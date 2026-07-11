@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   getVictoryGlitch,
+  getFirstWinGlitchText,
   checkNarrativeMicroBeat,
   NarrativeMicroBeat,
   getAnimalWhisper,
@@ -98,6 +99,9 @@ export interface ProcessVictoryParams {
   isOnboarding: boolean;
   /** Consecutive puzzles without visiting home screen. */
   puzzlesSinceHomeVisit: number;
+  /** The player's FIRST free-play (non-onboarding) win — fires the guaranteed,
+   *  prominent opening-promise glitch here rather than on the guided tutorial. */
+  firstFreeWin?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -175,18 +179,25 @@ export function useVictoryOrchestration(): [
       completedWords,
       isOnboarding: onboarding,
       puzzlesSinceHomeVisit,
+      firstFreeWin,
     } = params;
 
     const gen = ++generationRef.current;
 
-    // ------ Victory glitch (Phase 0, ~8%, guaranteed on first puzzle) ------
-    const glitchText = getVictoryGlitch(phase, totalPuzzlesCompleted);
+    // ------ Victory glitch ------
+    // The player's first FREE-PLAY win gets the guaranteed, prominent opening
+    // promise (held longer + louder). The guided tutorial gets NO glitch (pure
+    // warmth — the promise belongs on a win the player owns). Every other
+    // Phase-0 win keeps the ~8% ambient glitch.
+    let glitchText: string | null = null;
+    let prominent = false;
+    if (firstFreeWin) {
+      glitchText = getFirstWinGlitchText();
+      prominent = true;
+    } else if (!onboarding) {
+      glitchText = getVictoryGlitch(phase, totalPuzzlesCompleted);
+    }
     if (glitchText) {
-      // The FIRST-ever victory glitch is the game's opening promise that
-      // something else is here. Hold it longer and render it louder (App reads
-      // the prominent flag) so a new player actually registers it, instead of
-      // a 500ms flash they blink past.
-      const prominent = totalPuzzlesCompleted === 1;
       addTimeout(() => {
         setVictoryGlitch(glitchText);
         setVictoryGlitchProminent(prominent);

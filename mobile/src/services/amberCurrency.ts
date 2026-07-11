@@ -44,6 +44,9 @@ const MANDATORY_HARVEST_SEEN_KEY = 'wordshift_mandatory_harvest_seen';
 const SETUP_SELECTOR_INTRO_SEEN_KEY = 'wordshift_setup_selector_intro_seen';
 const JOURNAL_INTRO_SEEN_KEY = 'wordshift_journal_intro_seen';
 const STARTER_INTRO_SEEN_KEY = 'wordshift_starter_intro_seen';
+// The guaranteed, prominent first-FREE-victory glitch (opening promise); fired
+// once on the first non-onboarding win, cleared by Reset All so it replays.
+const FIRST_WIN_GLITCH_KEY = 'wordshift_first_win_glitch';
 const GATED_UNLOCK_INTRO_SEEN_KEY = 'wordshift_gated_unlock_intro_seen';
 const HARVEST_HOME_INTRO_SEEN_KEY = 'wordshift_harvest_home_intro_seen';
 
@@ -1060,6 +1063,7 @@ export async function clearProgress(): Promise<void> {
     await AsyncStorage.removeItem(SETUP_SELECTOR_INTRO_SEEN_KEY);
     await AsyncStorage.removeItem(JOURNAL_INTRO_SEEN_KEY);
     await AsyncStorage.removeItem(STARTER_INTRO_SEEN_KEY);
+    await AsyncStorage.removeItem(FIRST_WIN_GLITCH_KEY);
     await AsyncStorage.removeItem(GATED_UNLOCK_INTRO_SEEN_KEY);
     await AsyncStorage.removeItem(HARVEST_HOME_INTRO_SEEN_KEY);
     for (let i = 1; i <= 4; i++) {
@@ -1744,6 +1748,22 @@ export async function hasSeenStarterIntro(): Promise<boolean> {
 export async function markStarterIntroSeen(): Promise<void> {
   try {
     await AsyncStorage.setItem(STARTER_INTRO_SEEN_KEY, 'true');
+  } catch {
+    // Non-critical
+  }
+}
+
+export async function hasSeenFirstWinGlitch(): Promise<boolean> {
+  try {
+    return (await AsyncStorage.getItem(FIRST_WIN_GLITCH_KEY)) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export async function markFirstWinGlitchSeen(): Promise<void> {
+  try {
+    await AsyncStorage.setItem(FIRST_WIN_GLITCH_KEY, 'true');
   } catch {
     // Non-critical
   }

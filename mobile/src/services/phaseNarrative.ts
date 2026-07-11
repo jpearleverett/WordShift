@@ -24,16 +24,21 @@ export const VICTORY_GLITCH_TEXTS = [
   'WE REMEMBER',
 ];
 
+/** The text for the guaranteed, prominent first-free-victory glitch. */
+export function getFirstWinGlitchText(): string {
+  return VICTORY_GLITCH_TEXTS[0];
+}
+
 /**
- * Whether a victory glitch should appear at Phase 0.
- * Returns glitch text or null. First victory always glitches.
+ * Whether an AMBIENT victory glitch should appear at Phase 0 (~8% chance). The
+ * guaranteed first-win glitch is handled separately (getFirstWinGlitchText,
+ * fired on the first free-play win), so this no longer force-fires on
+ * puzzlesSolved===1 — that used to land the glitch on the guided tutorial.
  */
-export function getVictoryGlitch(phase: number, puzzlesSolved: number): string | null {
+export function getVictoryGlitch(phase: number, _puzzlesSolved: number): string | null {
   if (phase !== 0) return null;
-  // First victory always gets a brief glitch
-  if (puzzlesSolved === 1) return VICTORY_GLITCH_TEXTS[0];
-  // ~8% chance on subsequent Phase 0 victories — enough for ~2 glitches
-  // across 25 puzzles, creating subliminal unease that pays off later
+  // ~8% chance on Phase 0 victories — enough for ~2 glitches across 25 puzzles,
+  // creating subliminal unease that pays off later.
   if (Math.random() < 0.08) {
     return VICTORY_GLITCH_TEXTS[Math.floor(Math.random() * VICTORY_GLITCH_TEXTS.length)];
   }

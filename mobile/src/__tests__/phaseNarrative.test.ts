@@ -2,6 +2,8 @@ import {
   getVictoryTitle,
   getVictoryFeedback,
   getMoveMessage,
+  getVictoryGlitch,
+  getFirstWinGlitchText,
   getShareCardTagline,
   getDailyLadderLine,
   getDailyLadderTrendLabel,
@@ -1321,5 +1323,34 @@ describe('small interaction copy (toasts, alerts, buttons)', () => {
       expect(subtitle.length).toBeGreaterThan(0);
     }
     expect(getDailyLoginFirstClaimCopy(0).title).toBe('Welcome to the House');
+  });
+});
+
+describe('victory glitch', () => {
+  test('getVictoryGlitch no longer force-fires on the first puzzle (that landed on the tutorial)', () => {
+    // With Math.random pinned high, the ambient path never fires — proving the
+    // old puzzlesSolved===1 guarantee is gone (the guaranteed one moved to the
+    // first free win via getFirstWinGlitchText).
+    const spy = jest.spyOn(Math, 'random').mockReturnValue(0.99);
+    try {
+      expect(getVictoryGlitch(0, 1)).toBeNull();
+      expect(getVictoryGlitch(0, 5)).toBeNull();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test('getVictoryGlitch stays Phase-0 only and can fire ambiently', () => {
+    const spy = jest.spyOn(Math, 'random').mockReturnValue(0.0);
+    try {
+      expect(getVictoryGlitch(0, 5)).not.toBeNull();
+      expect(getVictoryGlitch(2, 5)).toBeNull();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test('getFirstWinGlitchText returns a stable non-empty glitch', () => {
+    expect(getFirstWinGlitchText()).toBe('WE SEE YOU');
   });
 });

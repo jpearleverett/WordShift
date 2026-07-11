@@ -44,7 +44,7 @@ export const MIN_PUZZLES_FOR_PHASE: Record<DialoguePhase, number> = {
   0: 0,
   1: 15,
   2: 40, // Pacing compression: accelerated players reach Deeper Questions inside week one (weighted PHASE_THRESHOLDS unchanged)
-  3: 110, // Was 135. Phase 2 was the longest single-tone stretch (the likeliest D14 break); shortening its floor brings Growing Shadows' visual/tonal shift ~25 puzzles sooner for accelerated players without touching the weighted thresholds or the house-unlock gates (Bamboo Attic 130).
+  3: 125, // Was 135. Phase 2 was the longest single-tone stretch (the likeliest D14 break); a modest floor drop brings Growing Shadows' visual/tonal shift ~10 puzzles sooner for accelerated players. Kept at 125 (not lower) so vanguard animals' +1 phase-4 dialogue doesn't leak the cult reveal too far ahead of the global reveal floor (155). Weighted thresholds + house-unlock gates (Bamboo Attic 130) untouched.
   4: 155, // The Horizon — the cult reveal, just after the house completes
   5: 210, // Post-revelation — after house completion + final puzzle
 };

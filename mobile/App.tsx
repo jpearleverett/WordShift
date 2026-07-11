@@ -44,6 +44,8 @@ import {
   markSetupSelectorIntroSeen,
   hasSeenMandatoryHarvest,
   hasSeenStarterIntro,
+  hasSeenFirstWinGlitch,
+  markFirstWinGlitchSeen,
   markStarterIntroSeen,
   consumePendingVariantTutorial,
   checkFreeStreakFreeze,
@@ -317,6 +319,12 @@ function MainApp() {
   // handleShare is defined far below; the share-prompt (declared above it) calls
   // it through this ref, kept current each render, to avoid a TDZ cycle.
   const handleShareRef = useRef<() => void>(() => {});
+  const buildShareDataRef = useRef<() => { result: ShareableResult; challengeText: string | null } | null>(() => null);
+  const openShareModalRef = useRef<(d: { result: ShareableResult; challengeText: string | null }) => void>(() => {});
+  // Share payload snapshotted at victory-exit time, BEFORE startVictoryExitFlow
+  // resets victoryData — the proactive share prompt reads it so its Share CTA
+  // works after teardown.
+  const pendingShareSnapshotRef = useRef<{ result: ShareableResult; challengeText: string | null } | null>(null);
   // Daily Challenge leaderboard standing for the current victory (null = none/off)
   const [dailyRank, setDailyRank] = useState<DailyRank | null>(null);
   // Persistent daily-ladder "best this week / your history" line + trend for the
@@ -1569,7 +1577,10 @@ function MainApp() {
               percentile: rank?.percentile ?? null,
               timeMs: elapsedMs,
               stars: victory.earnedStars,
-              difficulty: getDailyDifficulty(date),
+              // Record the ACTUAL board difficulty — an eased first daily is a
+              // MEDIUM board, so labelling it HARD would skew the local
+              // best-this-week / trend line with an easy fast time.
+              difficulty: getDailyDifficulty(date, dailyEasedRef.current),
             });
             const summary = await getDailyLadderSummary();
             setDailyLadderLine(getDailyLadderLine(summary, persistence.currentPhase));
@@ -1838,6 +1849,18 @@ function MainApp() {
       // Check achievements after brief delay to not block victory display
       addVictoryTimeout(() => achievementActions.checkForAchievements(finalVictory), 500);
 
+      // The guaranteed, prominent opening-promise glitch fires on the player's
+      // FIRST free-play win (one-time), not the guided tutorial.
+      let firstFreeWin = false;
+      if (!onboardingFlow.isOnboarding) {
+        try {
+          firstFreeWin = !(await hasSeenFirstWinGlitch());
+          if (firstFreeWin) markFirstWinGlitchSeen().catch(() => {});
+        } catch {
+          firstFreeWin = false;
+        }
+      }
+
       // Post-victory orchestration: glitch, micro-beat, whisper, interjection
       orchestrationActions.processVictory({
         phase: persistence.currentPhase,
@@ -1845,6 +1868,7 @@ function MainApp() {
         completedWords: result.completedWords,
         isOnboarding: onboardingFlow.isOnboarding,
         puzzlesSinceHomeVisit: puzzlesSinceHomeVisit.current,
+        firstFreeWin,
       });
 
       // Re-schedule notifications after puzzle completion
@@ -2258,9 +2282,9 @@ function MainApp() {
   // ignition, onboarding, or the serene post-revelation tone. Must run BEFORE
   // startVictoryExitFlow (which resets victoryData). Patron suppression + cadence
   // are handled inside ads.ts. Fire-and-forget: the ad overlays the transition.
-  const maybeShowVictoryInterstitial = useCallback(() => {
+  const maybeShowVictoryInterstitial = useCallback((): Promise<boolean> => {
     const vd = victoryFlow.victoryData;
-    if (!vd) return;
+    if (!vd) return Promise.resolve(false);
     const step = onboardingFlow.onboardingStep;
     const inOnboarding = step !== undefined && step !== 'complete';
     const exempt =
@@ -2275,12 +2299,12 @@ function MainApp() {
       phaseTransitionEvent != null ||                  // final / post-revelation cinematic queued
       (vd.newPhase as number) >= 5 ||                  // post-revelation: never break the serene tone
       vd.puzzlesSolved <= AUTO_COLLECT_PUZZLE_LIMIT;   // protect the early "pure delight" window — no ads in the first session
-    maybeShowInterstitial({
+    return maybeShowInterstitial({
       puzzlesSolved: vd.puzzlesSolved,
       phase: vd.newPhase,
       exempt,
     }).then(async (shown) => {
-      if (!shown) return;
+      if (!shown) return false;
       // After the player has actually seen a few interstitials, offer the
       // contextual one-time Remove-Ads upsell ("tired of these?").
       await recordInterstitialSeen();
@@ -2294,7 +2318,8 @@ function MainApp() {
           ],
         );
       }
-    }).catch(() => {});
+      return true;
+    }).catch(() => false);
   }, [victoryFlow.victoryData, onboardingFlow.onboardingStep, isPlayingDaily, phaseTransitionEvent, persistence.pendingPhaseTransition]);
 
   // One-time, low-pressure Patron nudge once the player has settled in. Suppressed
@@ -2317,19 +2342,30 @@ function MainApp() {
     }
   }, [onboardingFlow.isOnboarding, victoryFlow.victoryData, persistence.cumulativeStats]);
 
-  // One-time proactive SHARE invite at a genuine peak (first flawless win OR
-  // first phase transition). The game already nudges players to buy but never
-  // to share — this is the growth counterpart, frequency-capped exactly like
-  // the monetization nudges. Returns whether it fired so the exit flow can keep
-  // to one nudge per victory. Never on a mandatory-harvest / ceremony exit.
+  // One-time proactive SHARE invite at a genuine peak (the first flawless win).
+  // The game already nudges players to buy but never to share — this is the
+  // growth counterpart, frequency-capped exactly like the monetization nudges.
+  // (Phase transitions were considered as a second trigger but are deferred to
+  // the pit ceremony, which never routes through this exit — flawless-only is
+  // the reachable peak, and it lands early for nearly every player.) Returns
+  // whether it fired so the exit flow can keep to one nudge per victory. Never
+  // on a mandatory-harvest / ceremony exit, and never stacked on a queued Fox
+  // intro or an interstitial that just showed.
   const maybeShowSharePrompt = useCallback(async (): Promise<boolean> => {
     const vd = victoryFlow.victoryData;
     if (!vd) return false;
     if (onboardingFlow.isOnboarding) return false;
     if (vd.mandatoryHarvest || vd.phaseTransitionPending || persistence.pendingPhaseTransition != null) return false;
+    // Same anti-stacking guard the notification prompt uses: never layer on a
+    // Fox intro. Return WITHOUT consuming so it waits for a quiet exit.
+    if (postVictoryIntro || queuedPostVictoryIntrosRef.current.length > 0) return false;
+    // Snapshot taken at exit time (before teardown nulled victoryData); if it's
+    // missing, don't consume the one-time prompt on a broken exit.
+    const snapshot = pendingShareSnapshotRef.current;
+    if (!snapshot) return false;
     const fired = await consumeSharePrompt({
       isFlawlessWin: vd.flawless === true,
-      isPhaseTransition: vd.phaseChanged === true,
+      isPhaseTransition: false,
       isOnboarding: false,
     });
     if (fired) {
@@ -2338,18 +2374,21 @@ function MainApp() {
         getSharePromptInvite(persistence.currentPhase),
         [
           { text: 'Not now', style: 'cancel' },
-          // handleShare is defined below; call through a ref to avoid a
-          // declaration-order (TDZ) cycle with the victory-exit handlers.
-          { text: 'Share', onPress: () => handleShareRef.current() },
+          // Open the modal from the pre-teardown snapshot — victoryData/board
+          // state is already reset by the time this fires.
+          { text: 'Share', onPress: () => { hapticLight(); openShareModalRef.current(snapshot); } },
         ],
       );
     }
     return fired;
-  }, [victoryFlow.victoryData, onboardingFlow.isOnboarding, persistence.pendingPhaseTransition, persistence.currentPhase]);
+  }, [victoryFlow.victoryData, onboardingFlow.isOnboarding, persistence.pendingPhaseTransition, persistence.currentPhase, postVictoryIntro]);
 
   // At most ONE of the victory-exit nudges (share / patron / notification
   // permission) fires per exit — the share peak takes precedence when eligible.
-  const runVictoryExitNudges = useCallback(async () => {
+  // Skipped entirely when an interstitial just showed this exit, so a nudge
+  // never piles on top of an ad.
+  const runVictoryExitNudges = useCallback(async (interstitialShown: boolean) => {
+    if (interstitialShown) return;
     if (await maybeShowSharePrompt()) return;
     await maybePromptForNotifications();
     await maybeShowPatronNudge();
@@ -2359,12 +2398,14 @@ function MainApp() {
     hapticLight();
     setIsPlayingDaily(false);
     setSpeedRescueUsed(false);
-    maybeShowVictoryInterstitial();
+    // Snapshot the share payload BEFORE the exit flow resets victoryData.
+    pendingShareSnapshotRef.current = buildShareDataRef.current();
+    const adShown = maybeShowVictoryInterstitial();
     startVictoryExitFlow(() => {
       clearPuzzleState().catch(() => {});
       puzzleActions.handleNextLevel();
     });
-    runVictoryExitNudges().catch(() => {});
+    Promise.resolve(adShown).then((shown) => runVictoryExitNudges(shown === true)).catch(() => {});
   }, [puzzleActions, startVictoryExitFlow, runVictoryExitNudges, maybeShowVictoryInterstitial]);
 
   // During onboarding, "Continue" on the victory modal dismisses the modal and
@@ -2383,13 +2424,15 @@ function MainApp() {
   const handleReturnHome = useCallback(() => {
     hapticLight();
     setIsPlayingDaily(false);
-    maybeShowVictoryInterstitial();
+    // Snapshot the share payload BEFORE the exit flow resets victoryData.
+    pendingShareSnapshotRef.current = buildShareDataRef.current();
+    const adShown = maybeShowVictoryInterstitial();
     startVictoryExitFlow(() => {
       puzzlesSinceHomeVisit.current = 0;
       puzzleActions.clearBoard();
       transitionTo('home');
     });
-    runVictoryExitNudges().catch(() => {});
+    Promise.resolve(adShown).then((shown) => runVictoryExitNudges(shown === true)).catch(() => {});
   }, [puzzleActions, transitionTo, startVictoryExitFlow, runVictoryExitNudges, maybeShowVictoryInterstitial]);
 
   // The pit route is a victory exit too — same interstitial gate as
@@ -2474,11 +2517,15 @@ function MainApp() {
   // native capturer is present, else falls back to the emoji-grid text share).
   // It overlays the victory screen rather than exiting it, so sharing never
   // costs the player their victory moment.
-  const handleShare = useCallback(() => {
-    if (!victoryFlow.victoryData) return;
-    hapticLight();
+  // Build the share payload from CURRENT victory + board state. Returns null
+  // when there's no active victory. Kept separate so callers that fire around
+  // the victory-exit teardown (the proactive share prompt) can snapshot the
+  // payload while state is still valid, rather than reading it back after
+  // resetVictory() has nulled victoryData.
+  const buildShareData = useCallback((): { result: ShareableResult; challengeText: string | null } | null => {
+    if (!victoryFlow.victoryData) return null;
     const moveCount = puzzle.rows.length - 1;
-    setShareResultData({
+    const result: ShareableResult = {
       stars: victoryFlow.victoryData.earnedStars,
       difficulty: isPlayingDaily ? 'HARD' : puzzle.difficulty,
       hintsUsed: puzzle.hintsUsed,
@@ -2493,20 +2540,34 @@ function MainApp() {
       animalWhisper: orchestration.whisper?.text,
       phase: persistence.currentPhase,
       incantationName: puzzle.lastIncantationName || undefined,
-    });
+    };
     // Friend challenge: only a standard, non-daily board encodes into a link
     // the recipient can actually play (the deep link starts a standard board).
+    let challengeText: string | null = null;
     if (!isPlayingDaily && puzzle.currentVariant === 'standard') {
       try {
-        setShareChallengeText(buildChallengeShareText(puzzle.rows.map(r => r.originalWord)));
+        challengeText = buildChallengeShareText(puzzle.rows.map(r => r.originalWord));
       } catch {
-        setShareChallengeText(null);
+        challengeText = null;
       }
-    } else {
-      setShareChallengeText(null);
     }
+    return { result, challengeText };
   }, [victoryFlow.victoryData, puzzle, orchestration.whisper, persistence.currentPhase, isPlayingDaily]);
+
+  const openShareModal = useCallback((data: { result: ShareableResult; challengeText: string | null }) => {
+    setShareResultData(data.result);
+    setShareChallengeText(data.challengeText);
+  }, []);
+  openShareModalRef.current = openShareModal;
+
+  const handleShare = useCallback(() => {
+    const data = buildShareData();
+    if (!data) return;
+    hapticLight();
+    openShareModal(data);
+  }, [buildShareData, openShareModal]);
   handleShareRef.current = handleShare;
+  buildShareDataRef.current = buildShareData;
 
   const handleVictoryTapAccelerate = useCallback(() => {
     if (!victoryFlow.victoryData) return;
