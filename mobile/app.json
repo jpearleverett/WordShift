@@ -166,6 +166,52 @@
                     "style": "italic"
                   }
                 ]
+              },
+              {
+                "fontFamily": "Figtree-Regular",
+                "fontDefinitions": [
+                  {
+                    "path": "./assets/fonts/Figtree-Regular.ttf",
+                    "weight": 400
+                  },
+                  {
+                    "path": "./assets/fonts/Figtree-Regular.ttf",
+                    "weight": 700
+                  },
+                  {
+                    "path": "./assets/fonts/Figtree-Regular.ttf",
+                    "weight": 400,
+                    "style": "italic"
+                  },
+                  {
+                    "path": "./assets/fonts/Figtree-Regular.ttf",
+                    "weight": 700,
+                    "style": "italic"
+                  }
+                ]
+              },
+              {
+                "fontFamily": "Figtree-Bold",
+                "fontDefinitions": [
+                  {
+                    "path": "./assets/fonts/Figtree-Bold.ttf",
+                    "weight": 400
+                  },
+                  {
+                    "path": "./assets/fonts/Figtree-Bold.ttf",
+                    "weight": 700
+                  },
+                  {
+                    "path": "./assets/fonts/Figtree-Bold.ttf",
+                    "weight": 400,
+                    "style": "italic"
+                  },
+                  {
+                    "path": "./assets/fonts/Figtree-Bold.ttf",
+                    "weight": 700,
+                    "style": "italic"
+                  }
+                ]
               }
             ]
           }
