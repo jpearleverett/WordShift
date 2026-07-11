@@ -1,10 +1,11 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { validateCampaign } from './capturePlayStoreHelpers.mjs';
+import { validateFinalAssets } from './validatePlayStoreAssets.mjs';
 import {
   readPng,
   readPngMetadata,
@@ -208,6 +209,83 @@ async function loadCampaign() {
   return validateCampaign(campaign);
 }
 
+async function pathExists(targetPath) {
+  try {
+    await fs.access(targetPath);
+    return true;
+  } catch (error) {
+    if (error?.code === 'ENOENT') return false;
+    throw error;
+  }
+}
+
+async function copyDirectoryContents(sourceDir, destinationDir) {
+  if (!await pathExists(sourceDir)) return;
+  const sourceStat = await fs.stat(sourceDir);
+  if (!sourceStat.isDirectory()) {
+    throw new Error(`${sourceDir} is not a directory`);
+  }
+  const entries = await fs.readdir(sourceDir);
+  await Promise.all(entries.map(entry => fs.cp(
+    path.join(sourceDir, entry),
+    path.join(destinationDir, entry),
+    { recursive: true }
+  )));
+}
+
+async function replaceDirectory(stagingDir, finalDir) {
+  const finalExists = await pathExists(finalDir);
+  if (!finalExists) {
+    await fs.rename(stagingDir, finalDir);
+    return;
+  }
+
+  const backupDir = path.join(
+    path.dirname(finalDir),
+    `.${path.basename(finalDir)}.backup-${randomUUID()}`
+  );
+  await fs.rename(finalDir, backupDir);
+  try {
+    await fs.rename(stagingDir, finalDir);
+  } catch (error) {
+    await fs.rename(backupDir, finalDir);
+    throw error;
+  }
+  await fs.rm(backupDir, { recursive: true, force: true });
+}
+
+export async function withStagedPublication({
+  finalDir,
+  populateAndValidate,
+}) {
+  if (typeof populateAndValidate !== 'function') {
+    throw new Error('populateAndValidate must be a function');
+  }
+
+  const parentDir = path.dirname(finalDir);
+  await fs.mkdir(parentDir, { recursive: true });
+  let finalDirectoryMode = 0o755;
+  if (await pathExists(finalDir)) {
+    const finalStat = await fs.stat(finalDir);
+    if (!finalStat.isDirectory()) {
+      throw new Error(`${finalDir} is not a directory`);
+    }
+    finalDirectoryMode = finalStat.mode & 0o777;
+  }
+  const stagingDir = await fs.mkdtemp(
+    path.join(parentDir, `.${path.basename(finalDir)}.staging-`)
+  );
+  await fs.chmod(stagingDir, finalDirectoryMode);
+
+  try {
+    await copyDirectoryContents(finalDir, stagingDir);
+    await populateAndValidate(stagingDir);
+    await replaceDirectory(stagingDir, finalDir);
+  } finally {
+    await fs.rm(stagingDir, { recursive: true, force: true });
+  }
+}
+
 async function waitForComposition(page, item) {
   const audit = await page.evaluate(async () => {
     await document.fonts.ready;
@@ -315,8 +393,15 @@ async function waitForComposition(page, item) {
   }
 }
 
-async function composeCampaignItem(page, item, fonts, tempDir) {
-  const sourcePath = path.join(SOURCE_DIR, item.source);
+export async function composeCampaignItem({
+  page,
+  item,
+  fonts,
+  sourceDir,
+  outputDir,
+  browserPngDir,
+}) {
+  const sourcePath = path.join(sourceDir, item.source);
   const source = await readPng(sourcePath);
   if (source.width !== 1080 || source.height !== 1920) {
     throw new Error(
@@ -334,7 +419,8 @@ async function composeCampaignItem(page, item, fonts, tempDir) {
   await page.setContent(html, { waitUntil: 'load' });
   await waitForComposition(page, item);
 
-  const browserPngPath = path.join(tempDir, `${item.scenario}.png`);
+  await fs.mkdir(browserPngDir, { recursive: true });
+  const browserPngPath = path.join(browserPngDir, `${item.scenario}.png`);
   await page.screenshot({
     path: browserPngPath,
     type: 'png',
@@ -348,7 +434,7 @@ async function composeCampaignItem(page, item, fonts, tempDir) {
     );
   }
 
-  const outputPath = path.join(FINAL_DIR, item.final);
+  const outputPath = path.join(outputDir, item.final);
   await writeOpaquePng(outputPath, browserPng);
   const metadata = await readPngMetadata(outputPath);
   if (
@@ -402,25 +488,57 @@ async function main() {
       }
     });
     const page = await context.newPage();
-    const results = [];
+    await withStagedPublication({
+      finalDir: FINAL_DIR,
+      populateAndValidate: async stagingDir => {
+        const results = [];
+        for (const [index, item] of campaign.entries()) {
+          console.log(
+            `[compose] ${index + 1}/${campaign.length} ${item.scenario}`
+          );
+          const result = await composeCampaignItem({
+            page,
+            item,
+            fonts,
+            sourceDir: SOURCE_DIR,
+            outputDir: stagingDir,
+            browserPngDir: tempDir,
+          });
+          if (results.some(previous => previous.digest === result.digest)) {
+            throw new Error(`${item.final}: duplicate final composition detected`);
+          }
+          results.push(result);
+          console.log(
+            `[compose] ${item.final}: ${result.metadata.width}x`
+            + `${result.metadata.height}, 8-bit RGB staged`
+          );
+        }
 
-    for (const [index, item] of campaign.entries()) {
-      console.log(
-        `[compose] ${index + 1}/${campaign.length} ${item.scenario}`
-      );
-      const result = await composeCampaignItem(page, item, fonts, tempDir);
-      if (results.some(previous => previous.digest === result.digest)) {
-        throw new Error(`${item.final}: duplicate final composition detected`);
-      }
-      results.push(result);
-      console.log(
-        `[compose] ${item.final}: ${result.metadata.width}x`
-        + `${result.metadata.height}, 8-bit RGB`
-      );
-    }
+        const stagedAssets = await validateFinalAssets({
+          campaignPath: CAMPAIGN_PATH,
+          finalDir: stagingDir,
+          screenshotsOnly: true,
+        });
+        const stagedScreenshots = stagedAssets.filter(
+          result => result.kind === 'screenshot'
+        );
+        if (stagedScreenshots.length !== campaign.length) {
+          throw new Error(
+            `Staged validation found ${stagedScreenshots.length} screenshots; `
+            + `expected ${campaign.length}`
+          );
+        }
+        console.log(
+          `[compose] staged validation complete: ${results.length} unique `
+          + 'screenshots, exact geometry, unclipped copy, 8-bit RGB'
+        );
+      },
+    });
 
     await context.close();
-    console.log(`[compose] complete: ${results.length} unique final screenshots`);
+    console.log(
+      `[compose] published: ${campaign.length} unique final screenshots`
+    );
   } finally {
     await browser?.close().catch(() => {});
     await fs.rm(tempDir, { recursive: true, force: true });

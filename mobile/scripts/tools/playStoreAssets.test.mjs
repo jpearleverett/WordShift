@@ -3,8 +3,9 @@ import { Buffer } from 'node:buffer';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, test } from 'node:test';
+import { after, afterEach, before, beforeEach, describe, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { chromium } from 'playwright';
 import { PNG } from 'pngjs';
 import {
   readPng,
@@ -15,6 +16,8 @@ import {
   COMPOSITION_LAYOUT,
   PLAY_STORE_PALETTES,
   buildCompositionHtml,
+  composeCampaignItem,
+  withStagedPublication,
 } from './composePlayStoreScreenshots.mjs';
 import { validateFinalAssets } from './validatePlayStoreAssets.mjs';
 
@@ -223,6 +226,165 @@ describe('Storybook Editorial composition', () => {
     assert.match(html, /Move it down\. Keep both words real\./);
     assert.match(html, /alt="Authentic WordShift puzzle board\."/);
     assert.doesNotMatch(html, /SHIFT <ONE> LETTER/);
+  });
+});
+
+describe('atomic staged publication', () => {
+  test('leaves current finals untouched and cleans staging when work fails', async () => {
+    const finalDir = path.join(tempDir, 'final');
+    const currentPath = path.join(finalDir, 'current.png');
+    await fs.mkdir(finalDir, { recursive: true });
+    await fs.writeFile(currentPath, 'current finals');
+
+    await assert.rejects(
+      withStagedPublication({
+        finalDir,
+        populateAndValidate: async stagingDir => {
+          await fs.writeFile(
+            path.join(stagingDir, 'current.png'),
+            'partially rendered finals'
+          );
+          throw new Error('simulated render failure');
+        },
+      }),
+      /simulated render failure/
+    );
+
+    assert.equal(await fs.readFile(currentPath, 'utf8'), 'current finals');
+    assert.deepEqual(await fs.readdir(tempDir), ['final']);
+  });
+
+  test('publishes the completed staged directory and preserves other assets', async () => {
+    const finalDir = path.join(tempDir, 'final');
+    await fs.mkdir(finalDir, { recursive: true });
+    const originalMode = (await fs.stat(finalDir)).mode & 0o777;
+    await fs.writeFile(path.join(finalDir, 'feature-graphic.png'), 'feature');
+    await fs.writeFile(path.join(finalDir, 'old.png'), 'old screenshot');
+
+    await withStagedPublication({
+      finalDir,
+      populateAndValidate: async stagingDir => {
+        assert.equal(
+          await fs.readFile(path.join(stagingDir, 'feature-graphic.png'), 'utf8'),
+          'feature'
+        );
+        await fs.rm(path.join(stagingDir, 'old.png'));
+        await fs.writeFile(path.join(stagingDir, 'new.png'), 'new screenshot');
+      },
+    });
+
+    assert.equal(
+      await fs.readFile(path.join(finalDir, 'feature-graphic.png'), 'utf8'),
+      'feature'
+    );
+    assert.equal(
+      await fs.readFile(path.join(finalDir, 'new.png'), 'utf8'),
+      'new screenshot'
+    );
+    await assert.rejects(fs.access(path.join(finalDir, 'old.png')));
+    assert.equal((await fs.stat(finalDir)).mode & 0o777, originalMode);
+    assert.deepEqual(await fs.readdir(tempDir), ['final']);
+  });
+});
+
+describe('Playwright composition integration', { concurrency: false }, () => {
+  let browser;
+  let context;
+  let page;
+  let fonts;
+
+  before(async () => {
+    const fontDir = path.resolve(SCRIPT_DIR, '../../assets/fonts');
+    const [regular, bold] = await Promise.all([
+      fs.readFile(path.join(fontDir, 'ShantellSans-Regular.ttf')),
+      fs.readFile(path.join(fontDir, 'ShantellSans-Bold.ttf')),
+    ]);
+    fonts = {
+      regular: regular.toString('base64'),
+      bold: bold.toString('base64'),
+    };
+    browser = await chromium.launch({ headless: true });
+    context = await browser.newContext({
+      viewport: {
+        width: COMPOSITION_LAYOUT.viewportWidth,
+        height: COMPOSITION_LAYOUT.viewportHeight,
+      },
+      deviceScaleFactor: COMPOSITION_LAYOUT.deviceScaleFactor,
+      serviceWorkers: 'block',
+    });
+    page = await context.newPage();
+  });
+
+  after(async () => {
+    await context?.close();
+    await browser?.close();
+  });
+
+  async function writeIntegrationSource(filename) {
+    const sourceDir = path.join(tempDir, 'source');
+    await fs.mkdir(sourceDir, { recursive: true });
+    await fs.writeFile(
+      path.join(sourceDir, filename),
+      encodeSolidPng(1080, 1920)
+    );
+    return sourceDir;
+  }
+
+  test('renders and re-encodes one campaign item as 1080x1920 RGB', async () => {
+    const item = {
+      ...makeCampaign()[0],
+      source: 'valid-source.png',
+      final: 'valid-final.png',
+      headline: 'SHIFT ONE LETTER',
+      support: 'Move it down. Keep both words real.',
+    };
+    const sourceDir = await writeIntegrationSource(item.source);
+    const outputDir = path.join(tempDir, 'staged');
+    const browserPngDir = path.join(tempDir, 'browser');
+
+    const result = await composeCampaignItem({
+      page,
+      item,
+      fonts,
+      sourceDir,
+      outputDir,
+      browserPngDir,
+    });
+
+    assert.deepEqual(result.metadata, {
+      width: 1080,
+      height: 1920,
+      bitDepth: 8,
+      colorType: 2,
+    });
+    assert.deepEqual(
+      await readPngMetadata(path.join(outputDir, item.final)),
+      result.metadata
+    );
+  });
+
+  test('rejects an overlong headline before writing an output', async () => {
+    const item = {
+      ...makeCampaign()[0],
+      source: 'long-headline-source.png',
+      final: 'long-headline-final.png',
+      headline: 'THIS INTENTIONALLY OVERLONG HEADLINE CANNOT FIT THE APPROVED BAND',
+    };
+    const sourceDir = await writeIntegrationSource(item.source);
+    const outputDir = path.join(tempDir, 'staged');
+
+    await assert.rejects(
+      composeCampaignItem({
+        page,
+        item,
+        fonts,
+        sourceDir,
+        outputDir,
+        browserPngDir: path.join(tempDir, 'browser'),
+      }),
+      /campaign copy is clipped/
+    );
+    await assert.rejects(fs.access(path.join(outputDir, item.final)));
   });
 });
 
