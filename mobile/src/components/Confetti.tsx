@@ -162,7 +162,6 @@ const ConfettiPieceComponent: React.FC<{ piece: ConfettiPiece }> = ({ piece }) =
 
   return (
     <Animated.View
-      testID={`play-store-confetti-piece-${piece.id}`}
       style={[
         styles.confettiPiece,
         {
@@ -229,7 +228,7 @@ export const Confetti: React.FC<ConfettiProps> = ({ active, onComplete, phase = 
   if (!active || pieces.length === 0) return null;
 
   return (
-    <View testID="play-store-confetti" style={styles.container} pointerEvents="none">
+    <View style={styles.container} pointerEvents="none">
       {pieces.map((piece) => (
         <ConfettiPieceComponent key={piece.id} piece={piece} />
       ))}
@@ -323,15 +322,10 @@ export const StarBurst: React.FC<StarBurstProps> = ({ active, x, y, phase = 0 })
   if (!active || reducedMotion || freezeCaptureMotion) return null;
 
   return (
-    <View
-      testID="play-store-star-burst"
-      style={[styles.starBurstContainer, { left: x - 50, top: y - 50 }]}
-      pointerEvents="none"
-    >
+    <View style={[styles.starBurstContainer, { left: x - 50, top: y - 50 }]} pointerEvents="none">
       {stars.map((star, i) => (
         <Animated.View
           key={i}
-          testID={`play-store-star-burst-piece-${i}`}
           style={[
             styles.star,
             {

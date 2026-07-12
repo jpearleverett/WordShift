@@ -14,7 +14,6 @@ import {
   requireNoPartialVerticalOcclusion,
   validateCampaign,
 } from './capturePlayStoreHelpers.mjs';
-import * as captureHelpers from './capturePlayStoreHelpers.mjs';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const RUNNER_PATH = path.join(SCRIPT_DIR, 'capturePlayStoreScreenshots.mjs');
@@ -262,7 +261,7 @@ describe('capture publication and stability policy', () => {
     assert.match(home, /if \(shouldFreezePlayStoreCaptureMotion\(\)\) \{/);
   });
 
-  test('flawless capture normalizes browser scroll and consumes delayed overlays', async () => {
+  test('flawless capture normalizes scroll after victory and seeds transient state', async () => {
     const [runner, scenarios] = await Promise.all([
       fs.readFile(RUNNER_PATH, 'utf8'),
       fs.readFile(SCENARIOS_PATH, 'utf8'),
@@ -277,12 +276,16 @@ describe('capture publication and stability policy', () => {
       /element\.scrollTop\s*=\s*0/
     );
     assert.match(
+      runner,
+      /Math\.abs\(element\.scrollTop\)\s*<\s*0\.5/
+    );
+    assert.match(
       scenarios,
       /wordshift_first_win_glitch:\s*'true'/
     );
   });
 
-  test('capture-only motion freeze suppresses confetti without changing native behavior', async () => {
+  test('capture-only motion freeze suppresses effects without changing native behavior', async () => {
     const [confetti, captureWeb, captureNative] = await Promise.all([
       fs.readFile(CONFETTI_PATH, 'utf8'),
       fs.readFile(CAPTURE_WEB_PATH, 'utf8'),
@@ -408,48 +411,6 @@ describe('capture publication and stability policy', () => {
       runner,
       /skipCelebration\.waitFor\(\{\s*state: 'detached'/
     );
-  });
-
-  test('pixel diff summary reports exact bounds and disconnected regions', () => {
-    assert.equal(typeof captureHelpers.summarizeRgbaDiff, 'function');
-    const first = {
-      width: 4,
-      height: 3,
-      data: new Uint8Array(4 * 3 * 4),
-    };
-    const second = {
-      ...first,
-      data: new Uint8Array(first.data),
-    };
-    for (const [x, y] of [[0, 0], [1, 0], [3, 2]]) {
-      second.data[(y * first.width + x) * 4] = 255;
-    }
-
-    assert.deepEqual(
-      captureHelpers.summarizeRgbaDiff(first, second),
-      {
-        differentPixels: 3,
-        bounds: { left: 0, top: 0, right: 3, bottom: 2 },
-        components: [
-          { pixels: 2, left: 0, top: 0, right: 1, bottom: 0 },
-          { pixels: 1, left: 3, top: 2, right: 3, bottom: 2 },
-        ],
-      }
-    );
-  });
-
-  test('isolated flawless diagnostic repeats capture and maps changed pixels', async () => {
-    const [runner, confetti] = await Promise.all([
-      fs.readFile(RUNNER_PATH, 'utf8'),
-      fs.readFile(CONFETTI_PATH, 'utf8'),
-    ]);
-
-    assert.match(runner, /--debug-flawless-repeats=/);
-    assert.match(runner, /summarizeRgbaDiff/);
-    assert.match(runner, /flawless-repro/);
-    assert.match(runner, /\/opt\/cursor\/logs\/debug\.log/);
-    assert.match(confetti, /testID="play-store-confetti"/);
-    assert.match(confetti, /testID=\{`play-store-confetti-piece-\$\{piece\.id\}`\}/);
   });
 
   test('capture interactions contain no Daily screenshot branch', async () => {
