@@ -45,6 +45,14 @@ async function loadCore() {
   }
 }
 
+async function loadVerifier() {
+  try {
+    return await import('./verifyPlayStoreDeterminism.mjs');
+  } catch {
+    return {};
+  }
+}
+
 function encodePng(red) {
   const png = new PNG({ width: 2, height: 2 });
   for (let offset = 0; offset < png.data.length; offset += 4) {
@@ -373,16 +381,18 @@ describe('isolated verifier integration contract', () => {
     assert.doesNotMatch(source, /baselineRef|git show|fd3b81d/);
   });
 
-  test('reports all 17 generated outputs in the success message', async () => {
-    const source = await fs.readFile(VERIFIER_PATH, 'utf8');
+  test('formats the success count from the verified result', async () => {
+    const verifier = await loadVerifier();
+    assert.equal(typeof verifier.formatDeterminismSuccess, 'function');
 
-    assert.match(
-      source,
-      /agree for all 17 encoded\/decoded PNG hashes and file modes/
+    assert.equal(
+      verifier.formatDeterminismSuccess({ hashes: Array(17) }),
+      '[determinism] MATCH: isolated run 1, isolated run 2, and checked-in '
+        + 'publication agree for all 17 encoded/decoded PNG hashes and file modes'
     );
-    assert.doesNotMatch(
-      source,
-      /agree for all 15 encoded\/decoded PNG hashes and file modes/
+    assert.match(
+      verifier.formatDeterminismSuccess({ hashes: Array(3) }),
+      /agree for all 3 encoded\/decoded PNG hashes and file modes/
     );
   });
 

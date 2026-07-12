@@ -444,7 +444,8 @@ export function buildCompositionHtml({
         background: rgba(45, 13, 28, 0.84);
       }
       .composition[data-unease-level="6"] .cue-crimson-glint,
-      .composition[data-unease-level="7"] .cue-crimson-glint {
+      .composition[data-unease-level="7"] .cue-crimson-glint,
+      .composition[data-unease-level="8"] .cue-crimson-glint {
         opacity: 0.52;
       }
     </style>

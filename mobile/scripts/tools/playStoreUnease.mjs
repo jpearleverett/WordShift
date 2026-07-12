@@ -145,7 +145,7 @@ export const PROTECTED_COMPOSITION_REGIONS = Object.freeze({
   ]),
 });
 
-export const TASK4_REAUDIT_LEVELS = Object.freeze([6, 7]);
+export const AUTHENTIC_UNEASE_REAUDIT_LEVELS = Object.freeze([6, 7, 8]);
 
 // Floors are deliberately below the 2026-07-12 reference renders:
 // thumbnail scores low=0.001245, mid=0.001829, high=0.006338.
@@ -206,10 +206,10 @@ export function validateUneaseLevel(uneaseLevel, scenario = 'campaign item') {
   if (
     !Number.isInteger(uneaseLevel)
     || uneaseLevel < 1
-    || uneaseLevel > 7
+    || uneaseLevel > 8
   ) {
     throw new Error(
-      `${scenario}: unease level must be an integer from 1 to 7`
+      `${scenario}: unease level must be an integer from 1 to 8`
     );
   }
 }

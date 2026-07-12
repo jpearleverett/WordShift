@@ -12,7 +12,7 @@ import {
 } from './composePlayStoreScreenshots.mjs';
 import { readPng } from './playStorePng.mjs';
 import {
-  TASK4_REAUDIT_LEVELS,
+  AUTHENTIC_UNEASE_REAUDIT_LEVELS,
   rectanglesOverlap,
   validateUneaseVisibilityMetrics,
 } from './playStoreUnease.mjs';
@@ -118,7 +118,7 @@ function cueCollisions(audit) {
 }
 
 async function loadRequiredSources(campaign, sourceDir) {
-  return Promise.all(TASK4_REAUDIT_LEVELS.map(async level => {
+  return Promise.all(AUTHENTIC_UNEASE_REAUDIT_LEVELS.map(async level => {
     const item = campaign.find(candidate => candidate.uneaseLevel === level);
     if (!item) {
       throw new Error(

@@ -377,12 +377,12 @@ async function prepareVisualSource(item, sourceDir) {
     await fs.writeFile(targetPath, bytes);
     return { kind: 'authentic', checkedPath, targetPath };
   } catch (error) {
-    if (error?.code !== 'ENOENT' || ![6, 7].includes(item.uneaseLevel)) {
+    if (error?.code !== 'ENOENT' || ![6, 7, 8].includes(item.uneaseLevel)) {
       throw error;
     }
     await fs.writeFile(targetPath, encodePatternPng(1080, 1920));
     return {
-      kind: 'synthetic-pending-task4',
+      kind: 'synthetic-pending-publication',
       checkedPath: null,
       targetPath,
     };
@@ -798,13 +798,14 @@ describe('Storybook Editorial composition', () => {
       && Array.isArray(cue.paintRects)
       && cue.paintRects.length > 0
     ));
-    for (let level = 1; level <= 7; level += 1) {
+    assert.ok(model.UNEASE_CUE_REGISTRY.every(cue => cue.minLevel <= 7));
+    for (let level = 1; level <= 8; level += 1) {
       assert.deepEqual(
         model.getActiveUneaseCues(level).map(cue => cue.name),
         expectedActiveCueNames(level)
       );
     }
-    assert.deepEqual(model.TASK4_REAUDIT_LEVELS, [6, 7]);
+    assert.deepEqual(model.AUTHENTIC_UNEASE_REAUDIT_LEVELS, [6, 7, 8]);
     assert.deepEqual(
       model.UNEASE_VISIBILITY_PROFILES,
       EXPECTED_VISIBILITY_PROFILES
@@ -814,6 +815,7 @@ describe('Storybook Editorial composition', () => {
     assert.equal(model.getUneaseVisibilityProfile(1).name, 'low');
     assert.equal(model.getUneaseVisibilityProfile(6).name, 'mid');
     assert.equal(model.getUneaseVisibilityProfile(7).name, 'high');
+    assert.equal(model.getUneaseVisibilityProfile(8).name, 'high');
     for (const profile of EXPECTED_VISIBILITY_PROFILES) {
       assert.throws(
         () => model.validateUneaseVisibilityMetrics({
@@ -847,7 +849,7 @@ describe('Storybook Editorial composition', () => {
   });
 
   test('renders the exact cumulative unease cue matrix without future cues', () => {
-    for (let level = 1; level <= 7; level += 1) {
+    for (let level = 1; level <= 8; level += 1) {
       const item = {
         ...makeCampaign()[level - 1],
         uneaseLevel: level,
@@ -867,11 +869,12 @@ describe('Storybook Editorial composition', () => {
         html,
         /\b(fabricated button|entity|robe|gore)\b/i
       );
+      assert.doesNotMatch(html, /data-unease-min-level="8"/);
     }
   });
 
-  test('rejects unease values outside integer levels one through seven', () => {
-    for (const uneaseLevel of [0, 8, 2.5, Number.NaN]) {
+  test('rejects unease values outside integer levels one through eight', () => {
+    for (const uneaseLevel of [0, 9, 2.5, Number.NaN]) {
       assert.throws(
         () => buildCompositionHtml({
           item: { ...makeCampaign()[0], uneaseLevel },
@@ -879,7 +882,7 @@ describe('Storybook Editorial composition', () => {
           headlineFontBase64: 'FIGTREE_BOLD_BASE64',
           supportFontBase64: 'SHANTELL_REGULAR_BASE64',
         }),
-        /unease level must be an integer from 1 to 7/
+        /unease level must be an integer from 1 to 8/
       );
     }
   });
@@ -1138,15 +1141,16 @@ describe('Playwright composition integration', { concurrency: false }, () => {
     return sourceDir;
   }
 
-  test('renders with loaded font roles, preserves source bytes, and emits RGB', async () => {
+  test('renders storm level 8 with loaded font roles, preserves source bytes, and emits RGB', async () => {
     const item = {
-      ...makeCampaign()[0],
-      source: 'valid-source.png',
-      final: 'valid-final.png',
-      headline: 'SHIFT ONE LETTER',
-      support: 'Move it down. Keep both words real.',
+      ...makeCampaign()[7],
+      source: '08_home_storm.png',
+      final: '08_something_stirs.png',
     };
-    const sourceDir = await writeIntegrationSource(item.source);
+    const sourceDir = await writeIntegrationSource(
+      item.source,
+      encodePatternPng(1080, 1920)
+    );
     const sourcePath = path.join(sourceDir, item.source);
     const sourceHashBefore = sha256(await fs.readFile(sourcePath));
     const outputDir = path.join(tempDir, 'staged');
@@ -1174,10 +1178,14 @@ describe('Playwright composition integration', { concurrency: false }, () => {
       headlineFamily: 'Figtree',
       supportFamily: 'Shantell',
     });
+    assert.deepEqual(
+      result.audit.cues.map(cue => cue.name),
+      expectedActiveCueNames(8)
+    );
     assert.equal(
       sha256(await fs.readFile(sourcePath)),
       sourceHashBefore,
-      'raw source bytes changed during composition'
+      '08_home_storm.png bytes changed during composition'
     );
     assert.deepEqual(
       await readPngMetadata(path.join(outputDir, item.final)),
@@ -1187,7 +1195,7 @@ describe('Playwright composition integration', { concurrency: false }, () => {
 
   test('keeps every cue and copy box clipped inside composition geometry', async () => {
     const item = {
-      ...makeCampaign()[6],
+      ...makeCampaign()[7],
       source: 'geometry-source.png',
       final: 'geometry-final.png',
     };
@@ -1206,7 +1214,7 @@ describe('Playwright composition integration', { concurrency: false }, () => {
 
     assert.deepEqual(
       result.audit.cues.map(cue => cue.name),
-      expectedActiveCueNames(7)
+      expectedActiveCueNames(8)
     );
     assert.equal(result.audit.allOverlaysIgnorePointerEvents, true);
     assert.ok(result.audit.cues.every(cue => cue.pointerEvents === 'none'));
@@ -1237,6 +1245,17 @@ describe('Playwright composition integration', { concurrency: false }, () => {
         `${cue.name} overlaps the measured support line`
       );
     }
+    const levelEightCueAudit = await page.evaluate(() => ({
+      fabricatedLevelEightCueCount:
+        document.querySelectorAll('[data-unease-min-level="8"]').length,
+      crimsonGlintOpacity: getComputedStyle(
+        document.querySelector('[data-unease-cue="crimson-glint"]')
+      ).opacity,
+    }));
+    assert.deepEqual(levelEightCueAudit, {
+      fabricatedLevelEightCueCount: 0,
+      crimsonGlintOpacity: '0.52',
+    });
   });
 
   test('uses shaped eyes in scene negative space and inside the frame rail', async () => {
@@ -1416,7 +1435,7 @@ describe('Playwright composition integration', { concurrency: false }, () => {
     const thumbnailMetrics = [];
     const sourceKinds = [];
 
-    for (const level of [1, 4, 7]) {
+    for (const level of [1, 4, 7, 8]) {
       const item = makeCampaign()[level - 1];
       const sourceDir = path.join(tempDir, `visual-source-${level}`);
       const source = await prepareVisualSource(item, sourceDir);
@@ -1496,7 +1515,12 @@ describe('Playwright composition integration', { concurrency: false }, () => {
 
     assert.deepEqual(
       sourceKinds,
-      ['authentic', 'authentic', 'authentic']
+      [
+        'authentic',
+        'authentic',
+        'authentic',
+        'synthetic-pending-publication',
+      ]
     );
     for (const metrics of [finalMetrics, thumbnailMetrics]) {
       assert.ok(metrics[0].visibilityScore < metrics[1].visibilityScore);
@@ -1547,7 +1571,7 @@ describe('mandatory authentic-source unease audit', { concurrency: false }, () =
     ]);
     const sourceHashes = new Map(
       await Promise.all(campaign
-        .filter(item => [6, 7].includes(item.uneaseLevel))
+        .filter(item => [6, 7, 8].includes(item.uneaseLevel))
         .map(async item => [
           item.source,
           sha256(await fs.readFile(path.join(sourceDir, item.source))),
@@ -1580,6 +1604,13 @@ describe('mandatory authentic-source unease audit', { concurrency: false }, () =
           level: 7,
           scenario: 'home-dusk',
           source: '07_home_dusk.png',
+          collisionCount: 0,
+          profile: 'high',
+        },
+        {
+          level: 8,
+          scenario: 'home-storm',
+          source: '08_home_storm.png',
           collisionCount: 0,
           profile: 'high',
         },

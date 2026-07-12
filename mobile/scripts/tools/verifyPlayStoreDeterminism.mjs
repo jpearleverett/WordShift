@@ -333,6 +333,12 @@ export async function verifyPlayStoreDeterminism({
   return result;
 }
 
+export function formatDeterminismSuccess(result) {
+  return '[determinism] MATCH: isolated run 1, isolated run 2, and checked-in '
+    + `publication agree for all ${result.hashes.length} encoded/decoded PNG `
+    + 'hashes and file modes';
+}
+
 async function main() {
   if (process.argv.length > 2) {
     throw new Error(
@@ -340,10 +346,7 @@ async function main() {
     );
   }
   const result = await verifyPlayStoreDeterminism();
-  console.log(
-    '[determinism] MATCH: isolated run 1, isolated run 2, and checked-in '
-    + 'publication agree for all 17 encoded/decoded PNG hashes and file modes'
-  );
+  console.log(formatDeterminismSuccess(result));
   for (const hash of result.hashes) {
     console.log(
       `[determinism] ${hash.path}: encoded=${hash.encodedSha256} `
