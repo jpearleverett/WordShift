@@ -89,4 +89,3 @@ delivers the requested suspicion that the animals are hiding something.
   shot is stronger than shot 7, and the full eight-shot sequence remains
   cohesive.
 - Full Jest, asset tests, typecheck, lint, web export, and GitHub CI pass.
-

@@ -439,4 +439,3 @@ commit's run.
 Keep base `main`, update the summary from seven to eight shots, replace the
 walkthrough artifact with the final eight-shot recording, and report the
 current validation counts. Do not mark the pull request ready or merge it.
-
