@@ -31,6 +31,7 @@ import {
 import {
   AMBER_REWARDS,
   FIRST_COMPLETION_BONUS,
+  PHASE_THRESHOLDS,
 } from '../constants/gameBalance';
 import {
   getLocalDateString,
@@ -518,6 +519,88 @@ describe('Play Store screenshot scenarios', () => {
       .toEqual(['cozy_den', 'kitchen', 'study', 'aquarium']);
     expect(progress.unlockedAnimals)
       .toEqual(['fox', 'pangolin', 'owl', 'axolotl']);
+  });
+
+  test('storm seed is an unobstructed internal phase three home', () => {
+    const scenario = buildPlayStoreScenario('home-storm', '2026-07-11');
+    const progress = stored<{
+      amber: number;
+      totalAmberEarned: number;
+      currentPhase: number;
+      puzzlesSolved: number;
+      phaseProgress: number;
+      phaseProgressFraction: number;
+      pendingPhaseTransition: null;
+      postRevelation: boolean;
+      currentStreak: number;
+      completedDifficulties: string[];
+      unlockedRooms: string[];
+      unlockedAnimals: string[];
+      lastDialogueRead: Record<string, number>;
+      introsSeen: string[];
+    }>(scenario, 'wordshift_home_progress');
+
+    expect(progress).toMatchObject({
+      amber: 420,
+      totalAmberEarned: 3400,
+      currentPhase: 3,
+      phaseProgress: 170,
+      puzzlesSolved: 145,
+      phaseProgressFraction:
+        (170 - PHASE_THRESHOLDS[3]) /
+        (PHASE_THRESHOLDS[4] - PHASE_THRESHOLDS[3]),
+      pendingPhaseTransition: null,
+      postRevelation: false,
+      currentStreak: 9,
+      completedDifficulties: ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'],
+      unlockedAnimals: ['fox', 'pangolin', 'owl', 'axolotl'],
+      unlockedRooms: ['cozy_den', 'kitchen', 'study', 'aquarium'],
+      lastDialogueRead: {
+        fox: 0,
+        pangolin: 0,
+        owl: 0,
+        axolotl: 0,
+      },
+      introsSeen: ['fox', 'pangolin', 'owl', 'axolotl'],
+    });
+    expect(scenario.storage.wordshift_schema_version)
+      .toBe(String(CURRENT_SCHEMA_VERSION));
+    expect(stored(scenario, 'wordshift_settings')).toMatchObject({
+      reducedMotion: true,
+    });
+    expect(scenario.storage.wordshift_first_win_glitch).toBe('true');
+    expect(stored(scenario, 'wordshift_review_prompt')).toEqual({
+      prompted: true,
+    });
+  });
+
+  test('storm seed hydrates through production progress and stats loaders', async () => {
+    await seedScenario('home-storm', '2026-07-11');
+
+    const progress = await loadProgress();
+    const stats = await getCumulativeStats();
+
+    expect(progress).toEqual(expect.objectContaining({
+      amber: 420,
+      totalAmberEarned: 3400,
+      currentPhase: 3,
+      phaseProgress: 170,
+      puzzlesSolved: 145,
+      phaseProgressFraction:
+        (170 - PHASE_THRESHOLDS[3]) /
+        (PHASE_THRESHOLDS[4] - PHASE_THRESHOLDS[3]),
+      pendingPhaseTransition: null,
+      postRevelation: false,
+      currentStreak: 9,
+      completedDifficulties: ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'],
+      unlockedAnimals: ['fox', 'pangolin', 'owl', 'axolotl'],
+      unlockedRooms: ['cozy_den', 'kitchen', 'study', 'aquarium'],
+    }));
+    expect(stats.totalPuzzlesCompleted).toBe(145);
+    expect(
+      Object.values(stats.byDifficulty)
+        .reduce((sum, difficulty) => sum + difficulty.completed, 0)
+    ).toBe(145);
   });
 
   test.each([

@@ -154,6 +154,36 @@ function duskProgress(today: string): HomeWorldProgress {
   });
 }
 
+function stormProgress(today: string): HomeWorldProgress {
+  return baseProgress(today, {
+    amber: 420,
+    totalAmberEarned: 3400,
+    unlockedAnimals: [...SUNNY_ANIMALS],
+    unlockedRooms: [...SUNNY_ROOMS],
+    currentPhase: 3,
+    puzzlesSolved: 145,
+    phaseProgress: 170,
+    lastDialogueRead: {
+      fox: 0,
+      pangolin: 0,
+      owl: 0,
+      axolotl: 0,
+    },
+    introsSeen: [...SUNNY_ANIMALS],
+    currentStreak: 9,
+    completedDifficulties: ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'],
+    pendingPhaseTransition: null,
+    phaseProgressFraction:
+      (170 - PHASE_THRESHOLDS[3]) /
+      (PHASE_THRESHOLDS[4] - PHASE_THRESHOLDS[3]),
+    postRevelation: false,
+  });
+}
+
+function assertNever(value: never): never {
+  throw new Error(`Unhandled Play Store scenario: ${value}`);
+}
+
 function baseStats(
   completed: number,
   completedDifficulties: Difficulty[]
@@ -372,9 +402,10 @@ function progressForScenario(
       });
     case 'home-dusk':
       return duskProgress(today);
-    default:
-      return baseProgress(today);
+    case 'home-storm':
+      return stormProgress(today);
   }
+  return assertNever(name);
 }
 
 function flawlessAchievementProgress(): AchievementProgress {

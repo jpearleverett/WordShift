@@ -320,15 +320,80 @@ async function resetPuzzleScrollPosition(page, rowCount) {
   );
 }
 
-const SUNNY_COMPANION_LABELS = [
+const HOME_COMPANION_LABELS = [
   'Ember the fox',
   'Panko the pangolin',
   'Archimedes the owl',
   'Axel the axolotl',
 ];
 
+function boxesOverlap(first, second, tolerance = 0.5) {
+  return first.x < second.x + second.width - tolerance
+    && first.x + first.width > second.x + tolerance
+    && first.y < second.y + second.height - tolerance
+    && first.y + first.height > second.y + tolerance;
+}
+
+async function assertHomeChromeGeometry(page, scenario) {
+  const elements = [
+    {
+      label: 'amber header',
+      locator: page.getByLabel(/^\d+ amber\. Opens the store\.$/).first(),
+    },
+    {
+      label: 'utility header',
+      locator: page.getByLabel('Open utility menu', { exact: true }),
+    },
+    {
+      label: 'Next Unlock sign',
+      locator: page.getByLabel(/^Next unlock\./).first(),
+    },
+    {
+      label: 'PLAY dock',
+      locator: page.getByLabel('Play puzzle', { exact: true }),
+    },
+  ];
+  await Promise.all(elements.map(({ locator }) =>
+    locator.waitFor({ state: 'visible' })
+  ));
+  const boxes = await Promise.all(elements.map(({ locator }) => locator.boundingBox()));
+  const viewport = page.viewportSize();
+  if (!viewport || boxes.some(box => !box)) {
+    throw new Error(`Cannot measure ${scenario} home chrome`);
+  }
+
+  for (const [index, box] of boxes.entries()) {
+    const { label } = elements[index];
+    if (
+      box.x < 0
+      || box.y < 0
+      || box.x + box.width > viewport.width
+      || box.y + box.height > viewport.height
+    ) {
+      throw new Error(
+        `${scenario} ${label} is outside the viewport: ${JSON.stringify(box)}`
+      );
+    }
+  }
+
+  for (const [firstIndex, secondIndex] of [
+    [0, 1],
+    [0, 2],
+    [1, 2],
+    [2, 3],
+  ]) {
+    if (boxesOverlap(boxes[firstIndex], boxes[secondIndex])) {
+      throw new Error(
+        `${scenario} ${elements[firstIndex].label} overlaps `
+        + `${elements[secondIndex].label}`
+      );
+    }
+  }
+  console.log(`[capture] ${scenario}: header, signage, and PLAY dock are clear`);
+}
+
 async function getCompanionViewportMetrics(page) {
-  return Promise.all(SUNNY_COMPANION_LABELS.map(async label => {
+  return Promise.all(HOME_COMPANION_LABELS.map(async label => {
     const locator = page.getByLabel(label, { exact: true });
     await locator.waitFor({ state: 'attached' });
     return locator.evaluate((element, companionLabel) => {
@@ -392,11 +457,11 @@ async function assertHomeSunnyOverlayGeometry(page) {
   }
 }
 
-async function panHouseToVisibleCompanions(page) {
+async function panHouseToVisibleCompanions(page, scenario) {
   let metrics = await getCompanionViewportMetrics(page);
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const visible = metrics.filter(item => item.visibleRatio >= 0.6);
-    if (visible.length === SUNNY_COMPANION_LABELS.length) {
+    if (visible.length === HOME_COMPANION_LABELS.length) {
       break;
     }
 
@@ -411,17 +476,27 @@ async function panHouseToVisibleCompanions(page) {
     metrics = await getCompanionViewportMetrics(page);
   }
 
+  await waitForDocumentReadiness(page);
   const labels = requireAllVisibleCompanions(
     metrics,
-    SUNNY_COMPANION_LABELS,
+    HOME_COMPANION_LABELS,
     0.6
   );
-  await page.getByText("Today's challenge is ready.", { exact: true }).waitFor({
+  const ambientLine = scenario === 'home-storm'
+    ? page.getByText(
+      /^(?:The daily incantation is prepared\.|Today's words are chosen\.)$/
+    )
+    : page.getByText("Today's challenge is ready.", { exact: true });
+  await ambientLine.waitFor({
     state: 'detached',
     timeout: 7_000,
   });
-  await assertHomeSunnyOverlayGeometry(page);
-  console.log(`[capture] home-sunny: visible companions: ${labels.join(', ')}`);
+  await waitForDocumentReadiness(page);
+  await assertHomeChromeGeometry(page, scenario);
+  if (scenario === 'home-sunny') {
+    await assertHomeSunnyOverlayGeometry(page);
+  }
+  console.log(`[capture] ${scenario}: visible companions: ${labels.join(', ')}`);
   return labels;
 }
 
@@ -442,7 +517,7 @@ async function prepareScenario(page, scenario) {
 
     case 'home-sunny':
       await waitForHome(page);
-      await panHouseToVisibleCompanions(page);
+      await panHouseToVisibleCompanions(page, 'home-sunny');
       return;
 
     case 'animal-dialogue':
@@ -560,6 +635,11 @@ async function prepareScenario(page, scenario) {
 
     case 'home-dusk':
       await waitForHome(page);
+      return;
+
+    case 'home-storm':
+      await waitForHome(page);
+      await panHouseToVisibleCompanions(page, 'home-storm');
       return;
 
     default:

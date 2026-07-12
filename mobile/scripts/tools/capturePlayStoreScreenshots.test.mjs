@@ -23,6 +23,14 @@ const HOME_PATH = path.resolve(
   SCRIPT_DIR,
   '../../src/components/home/HomeScreen.tsx'
 );
+const HOUSE_WORLD_PATH = path.resolve(
+  SCRIPT_DIR,
+  '../../src/components/home/HouseWorld.tsx'
+);
+const ANIMAL_SPRITE_PATH = path.resolve(
+  SCRIPT_DIR,
+  '../../src/components/home/AnimalSprite.tsx'
+);
 const DIFFICULTY_MENU_PATH = path.resolve(
   SCRIPT_DIR,
   '../../src/components/puzzle/DifficultyMenu.tsx'
@@ -389,6 +397,61 @@ describe('capture publication and stability policy', () => {
       runner,
       /Today's challenge is ready\.[\s\S]*state: 'detached'/,
       'capture must let the transient ambient line clear before geometry audit'
+    );
+  });
+
+  test('storm capture explicitly pans the real home and audits settled chrome', async () => {
+    const runner = await fs.readFile(RUNNER_PATH, 'utf8');
+
+    assert.match(
+      runner,
+      /case 'home-storm':[\s\S]*await waitForHome\(page\);[\s\S]*await panHouseToVisibleCompanions\(page,\s*'home-storm'\);[\s\S]*return;/
+    );
+    assert.match(
+      runner,
+      /async function panHouseToVisibleCompanions\(page,\s*scenario\)/
+    );
+    assert.match(
+      runner,
+      /page\.mouse\.down\(\)[\s\S]*page\.mouse\.move\([\s\S]*page\.mouse\.up\(\)/
+    );
+    assert.match(
+      runner,
+      /await waitForDocumentReadiness\(page\);[\s\S]*await assertHomeChromeGeometry\(page,\s*scenario\)/
+    );
+  });
+
+  test('storm scenario uses production phase rendering without a sky override', async () => {
+    const [runner, scenarios, houseWorld, animalSprite] = await Promise.all([
+      fs.readFile(RUNNER_PATH, 'utf8'),
+      fs.readFile(SCENARIOS_PATH, 'utf8'),
+      fs.readFile(HOUSE_WORLD_PATH, 'utf8'),
+      fs.readFile(ANIMAL_SPRITE_PATH, 'utf8'),
+    ]);
+
+    assert.match(
+      scenarios,
+      /case 'home-storm':\s*return stormProgress\(today\);/
+    );
+    assert.match(
+      scenarios,
+      /function stormProgress\(today: string\)[\s\S]*currentPhase:\s*3/
+    );
+    assert.match(
+      scenarios,
+      /return assertNever\(name\);/
+    );
+    assert.match(
+      houseWorld,
+      /currentPhase >= 4 \? SKY_SHADOW :\s*currentPhase >= 3 \? SKY_STORM :/
+    );
+    assert.match(
+      animalSprite,
+      /currentPhase >= 4 && sprites\.robed \? sprites\.robed : sprites\.idle/
+    );
+    assert.doesNotMatch(
+      `${runner}\n${scenarios}`,
+      /sky(?:Image|Asset|Source)?Override|overrideSky|sky_storm\.png|SKY_STORM/
     );
   });
 
