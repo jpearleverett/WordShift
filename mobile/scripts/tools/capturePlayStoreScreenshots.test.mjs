@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { withStagedPublication } from './composePlayStoreScreenshots.mjs';
 import {
   APPROVED_SCENARIOS,
+  getValidDropZoneLabelMatcher,
   isAllowedCaptureRequest,
   isSafePngBasename,
   validateCampaign,
@@ -80,6 +81,33 @@ describe('capture request allowlist', () => {
     assert.equal(isAllowedCaptureRequest('https://example.com/tracker.js'), false);
     assert.equal(isAllowedCaptureRequest('file:///tmp/secret'), false);
     assert.equal(isAllowedCaptureRequest('not a URL'), false);
+  });
+});
+
+describe('accessible drop-zone selectors', () => {
+  test('matches valid preview labels plus guided and plain fallbacks', () => {
+    const matcher = getValidDropZoneLabelMatcher(2, 'PLANT');
+
+    for (const label of [
+      'Drop zone 2 of 5, forms PLANT, valid word',
+      'Guided drop zone 2 of 6, forms PLANT, valid word',
+      'Drop zone 2',
+      'Guided drop zone 2',
+    ]) {
+      assert.match(label, matcher);
+    }
+    assert.doesNotMatch(
+      'Drop zone 2 of 5, would form PLANT, not a valid move',
+      matcher
+    );
+    assert.doesNotMatch(
+      'Drop zone 2 of 5, forms PLANE, valid word',
+      matcher
+    );
+    assert.doesNotMatch(
+      'Drop zone 3 of 5, forms PLANT, valid word',
+      matcher
+    );
   });
 });
 

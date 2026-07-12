@@ -34,6 +34,18 @@ export function isAllowedCaptureRequest(urlString) {
   }
 }
 
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+export function getValidDropZoneLabelMatcher(position, formedWord) {
+  const escapedWord = escapeRegExp(formedWord);
+  return new RegExp(
+    `^(?:Drop|Guided drop) zone ${position}`
+    + `(?: of \\d+, forms ${escapedWord}, valid word)?$`
+  );
+}
+
 export function validateCampaign(campaign) {
   if (!Array.isArray(campaign) || campaign.length !== APPROVED_SCENARIOS.length) {
     throw new Error(

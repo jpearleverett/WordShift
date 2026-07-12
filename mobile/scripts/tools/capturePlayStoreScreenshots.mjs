@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { PNG } from 'pngjs';
 import {
+  getValidDropZoneLabelMatcher,
   isAllowedCaptureRequest,
   validateCampaign,
 } from './capturePlayStoreHelpers.mjs';
@@ -506,9 +507,15 @@ async function prepareScenario(page, scenario) {
       await enableVictoryAnimation(page);
       await clickPlayPuzzle(page);
       await getActiveLetter(page, 'L').click();
-      await page.getByLabel('Drop zone 2', { exact: true }).click();
+      await page.getByLabel(
+        getValidDropZoneLabelMatcher(2, 'PLANT')
+      ).click();
+      console.log('[capture] flawless-victory: completed move 1 (PAY / PLANT)');
       await getActiveLetter(page, 'T').click();
-      await page.getByLabel('Drop zone 5', { exact: true }).click();
+      await page.getByLabel(
+        getValidDropZoneLabelMatcher(5, 'HEART')
+      ).click();
+      console.log('[capture] flawless-victory: completed move 2 (PLAN / HEART)');
       const skipCelebration = page.getByLabel(
         'Skip celebration animation',
         { exact: true }
@@ -521,6 +528,7 @@ async function prepareScenario(page, scenario) {
       await page.getByLabel('3 of 3 stars', { exact: true }).waitFor({
         timeout: 60_000,
       });
+      console.log('[capture] flawless-victory: victory complete (3 of 3 stars)');
       return;
 
     case 'home-dusk':
