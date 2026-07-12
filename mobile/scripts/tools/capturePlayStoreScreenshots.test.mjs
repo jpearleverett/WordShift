@@ -10,6 +10,7 @@ import {
   getValidDropZoneLabelMatcher,
   isAllowedCaptureRequest,
   isSafePngBasename,
+  requireAllVisibleCompanions,
   validateCampaign,
 } from './capturePlayStoreHelpers.mjs';
 
@@ -241,6 +242,38 @@ describe('capture publication and stability policy', () => {
     assert.match(row, /if \(freezeCaptureMotion\) \{/);
     assert.match(home, /shouldFreezePlayStoreCaptureMotion/);
     assert.match(home, /if \(shouldFreezePlayStoreCaptureMotion\(\)\) \{/);
+  });
+
+  test('four-companion guard rejects a frame with only three visible animals', () => {
+    const requiredLabels = ['Ember', 'Panko', 'Archimedes', 'Axel'];
+    const threeVisible = requiredLabels.map((label, index) => ({
+      label,
+      visibleRatio: index === 3 ? 0.59 : 0.95,
+    }));
+
+    assert.throws(
+      () => requireAllVisibleCompanions(
+        threeVisible,
+        requiredLabels,
+        0.6
+      ),
+      /missing Axel.*3\/4 companions visible/
+    );
+    assert.deepEqual(
+      requireAllVisibleCompanions(
+        threeVisible.map(metric => ({ ...metric, visibleRatio: 0.6 })),
+        requiredLabels,
+        0.6
+      ),
+      requiredLabels
+    );
+  });
+
+  test('home capture routes its final visibility decision through the four-animal guard', async () => {
+    const runner = await fs.readFile(RUNNER_PATH, 'utf8');
+
+    assert.match(runner, /requireAllVisibleCompanions\(/);
+    assert.doesNotMatch(runner, /visible\.length\s*>=\s*3/);
   });
 
   test('production setup render contract has no nonexistent combination teaser', async () => {

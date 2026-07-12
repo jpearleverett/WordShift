@@ -9,6 +9,7 @@ import { PNG } from 'pngjs';
 import {
   getValidDropZoneLabelMatcher,
   isAllowedCaptureRequest,
+  requireAllVisibleCompanions,
   validateCampaign,
 } from './capturePlayStoreHelpers.mjs';
 import { withStagedPublication } from './composePlayStoreScreenshots.mjs';
@@ -338,8 +339,12 @@ async function panHouseToVisibleCompanions(page) {
   let metrics = await getCompanionViewportMetrics(page);
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const visible = metrics.filter(item => item.visibleRatio >= 0.6);
-    if (visible.length >= 3) {
-      const labels = visible.map(item => item.label);
+    if (visible.length === SUNNY_COMPANION_LABELS.length) {
+      const labels = requireAllVisibleCompanions(
+        metrics,
+        SUNNY_COMPANION_LABELS,
+        0.6
+      );
       console.log(`[capture] home-sunny: visible companions: ${labels.join(', ')}`);
       return labels;
     }
@@ -355,13 +360,11 @@ async function panHouseToVisibleCompanions(page) {
     metrics = await getCompanionViewportMetrics(page);
   }
 
-  const visible = metrics.filter(item => item.visibleRatio >= 0.6);
-  if (visible.length < 3) {
-    throw new Error(
-      `House pan framed only ${visible.length}/4 companions: ${JSON.stringify(metrics)}`
-    );
-  }
-  const labels = visible.map(item => item.label);
+  const labels = requireAllVisibleCompanions(
+    metrics,
+    SUNNY_COMPANION_LABELS,
+    0.6
+  );
   console.log(`[capture] home-sunny: visible companions: ${labels.join(', ')}`);
   return labels;
 }

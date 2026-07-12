@@ -62,7 +62,7 @@ const EXPECTED_CUE_DEFINITIONS = [
   { name: 'title-sigil', minLevel: 2, contentKind: 'empty' },
   { name: 'distant-eyes', minLevel: 3, contentKind: 'eyes' },
   { name: 'portrait-echo', minLevel: 4, contentKind: 'source-echo' },
-  { name: 'mode-thread', minLevel: 5, contentKind: 'empty' },
+  { name: 'mode-thread', minLevel: 5, contentKind: 'mode-thread' },
   { name: 'reward-glow', minLevel: 6, contentKind: 'empty' },
   { name: 'dusk-vignette', minLevel: 7, contentKind: 'empty' },
   { name: 'watching-eyes', minLevel: 7, contentKind: 'eyes' },
@@ -603,7 +603,11 @@ describe('Google Play listing metadata', () => {
     );
     assert.match(
       checklist,
-      /two complete pipeline runs\s+produced identical encoded and decoded hashes/
+      /`npm run verify:play-store-determinism` ran the complete pipeline twice/
+    );
+    assert.match(
+      checklist,
+      /All 15 outputs produced identical encoded and decoded hashes/
     );
     assert.match(
       checklist,
@@ -1265,9 +1269,17 @@ describe('Playwright composition integration', { concurrency: false }, () => {
     ));
   });
 
-  test('keeps the mode thread in the empty menu margin', async () => {
+  test('connects all six mode icons without crossing protected controls', async () => {
     const model = await loadUneaseModel();
     assert.ok(Array.isArray(model.PROTECTED_COMPOSITION_REGIONS?.modeMenu));
+    assert.deepEqual(model.MODE_THREAD_ICON_TARGETS, [
+      { x: 165, y: 368 },
+      { x: 165, y: 439 },
+      { x: 165, y: 496 },
+      { x: 165, y: 550 },
+      { x: 165, y: 616 },
+      { x: 165, y: 673 },
+    ]);
     const item = {
       ...makeCampaign()[4],
       final: 'mode-thread-margin.png',
@@ -1285,25 +1297,42 @@ describe('Playwright composition integration', { concurrency: false }, () => {
     });
     const thread = result.audit.cues.find(cue => cue.name === 'mode-thread');
     assert.ok(thread);
-    assert.ok(thread.height > thread.width * 40);
-    for (const protectedRegion of model.PROTECTED_COMPOSITION_REGIONS.modeMenu) {
-      assert.equal(
-        rectanglesOverlap(thread, protectedRegion),
-        false,
-        `mode thread overlaps protected ${protectedRegion.name}`
-      );
+    assert.ok(thread.left >= 150 && thread.right <= 170);
+    assert.ok(thread.top <= model.MODE_THREAD_ICON_TARGETS[0].y);
+    assert.ok(thread.bottom >= model.MODE_THREAD_ICON_TARGETS.at(-1).y);
+    const renderedNodes = await page.evaluate(() =>
+      [...document.querySelectorAll('[data-mode-thread-node]')].map(node => {
+        const bounds = node.getBoundingClientRect();
+        return {
+          x: bounds.right,
+          y: bounds.top + bounds.height / 2,
+        };
+      })
+    );
+    assert.equal(renderedNodes.length, 6);
+    for (const [index, target] of model.MODE_THREAD_ICON_TARGETS.entries()) {
+      assert.ok(Math.abs(renderedNodes[index].x - target.x) <= 1);
+      assert.ok(Math.abs(renderedNodes[index].y - target.y) <= 1);
     }
-    for (const cueDefinition of model.getActiveUneaseCues(5)) {
-      for (const paintRect of cueDefinition.paintRects) {
-        for (
-          const protectedRegion
-          of model.PROTECTED_COMPOSITION_REGIONS.modeMenu
+    for (const protectedRegion of model.PROTECTED_COMPOSITION_REGIONS.modeMenu) {
+      const modeThread = model.getActiveUneaseCues(5).find(
+        cueDefinition => cueDefinition.name === 'mode-thread'
+      );
+      for (const paintRect of modeThread.paintRects) {
+        assert.equal(
+          rectanglesOverlap(paintRect, protectedRegion),
+          false,
+          `mode thread paint overlaps protected ${protectedRegion.name}`
+        );
+      }
+      for (const node of renderedNodes) {
+        if (
+          node.x >= protectedRegion.left
+          && node.x <= protectedRegion.right
+          && node.y >= protectedRegion.top
+          && node.y <= protectedRegion.bottom
         ) {
-          assert.equal(
-            rectanglesOverlap(paintRect, protectedRegion),
-            false,
-            `${cueDefinition.name} overlaps protected ${protectedRegion.name}`
-          );
+          assert.fail(`mode thread node overlaps protected ${protectedRegion.name}`);
         }
       }
     }

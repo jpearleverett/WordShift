@@ -58,6 +58,12 @@ function cueContent(cueDefinition, sourceBase64) {
     return `<img class="cue-portrait-source" `
       + `src="data:image/png;base64,${sourceBase64}" alt="" aria-hidden="true">`;
   }
+  if (cueDefinition.contentKind === 'mode-thread') {
+    return cueDefinition.nodes.map((target, index) =>
+      `<span class="mode-thread-node" data-mode-thread-node="${index + 1}" `
+      + `style="top:${target.y - cueDefinition.bounds.top - 1}px"></span>`
+    ).join('');
+  }
   if (cueDefinition.contentKind === 'eyes') {
     const eye = '<span class="eye-shape" data-eye-shape>'
       + '<i class="eye-core" data-eye-core></i></span>';
@@ -362,6 +368,39 @@ export function buildCompositionHtml({
         filter: sepia(0.34) saturate(1.4) hue-rotate(318deg);
       }
       .cue-mode-thread {
+        opacity: 0.52;
+      }
+      .cue-mode-thread::before {
+        content: "";
+        position: absolute;
+        top: 8px;
+        left: 1px;
+        width: 2px;
+        height: 307px;
+        background: linear-gradient(
+          180deg,
+          transparent,
+          rgba(186, 39, 59, 0.88) 4% 96%,
+          transparent
+        );
+        box-shadow: 0 0 2px rgba(170, 34, 57, 0.55);
+      }
+      .mode-thread-node {
+        left: 2px;
+        width: 9px;
+        height: 2px;
+        background: linear-gradient(
+          90deg,
+          rgba(186, 39, 59, 0.76),
+          rgba(221, 65, 78, 0.92)
+        );
+        box-shadow: 0 0 2px rgba(170, 34, 57, 0.5);
+      }
+      .composition:not([data-scenario="variant-menu"]) .cue-mode-thread {
+        top: 292px;
+        left: 369px;
+        width: 2px;
+        height: 410px;
         opacity: 0.3;
         background: linear-gradient(
           180deg,
@@ -371,6 +410,10 @@ export function buildCompositionHtml({
         );
         transform: rotate(0.8deg);
         transform-origin: center;
+      }
+      .composition:not([data-scenario="variant-menu"]) .cue-mode-thread::before,
+      .composition:not([data-scenario="variant-menu"]) .mode-thread-node {
+        display: none;
       }
       .cue-reward-glow {
         opacity: 0.31;
@@ -410,6 +453,7 @@ export function buildCompositionHtml({
     <main
       class="composition"
       data-unease-level="${item.uneaseLevel}"
+      data-scenario="${escapeHtml(item.scenario)}"
       aria-label="${altText}"
     >
       <header class="copy-band">

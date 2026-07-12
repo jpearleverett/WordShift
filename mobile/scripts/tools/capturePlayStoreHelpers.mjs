@@ -46,6 +46,28 @@ export function getValidDropZoneLabelMatcher(position, formedWord) {
   );
 }
 
+export function requireAllVisibleCompanions(
+  metrics,
+  requiredLabels,
+  minimumVisibleRatio
+) {
+  const metricsByLabel = new Map(metrics.map(metric => [metric.label, metric]));
+  const visibleLabels = requiredLabels.filter(label =>
+    (metricsByLabel.get(label)?.visibleRatio ?? 0) >= minimumVisibleRatio
+  );
+  const missingLabels = requiredLabels.filter(label =>
+    !visibleLabels.includes(label)
+  );
+  if (missingLabels.length > 0) {
+    throw new Error(
+      `House pan missing ${missingLabels.join(', ')}; `
+      + `${visibleLabels.length}/${requiredLabels.length} companions visible `
+      + `at ratio ${minimumVisibleRatio}`
+    );
+  }
+  return visibleLabels;
+}
+
 export function validateCampaign(campaign) {
   if (!Array.isArray(campaign) || campaign.length !== APPROVED_SCENARIOS.length) {
     throw new Error(

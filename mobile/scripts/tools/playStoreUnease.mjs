@@ -16,6 +16,7 @@ function cue({
   contentKind,
   bounds,
   paintRects = [bounds],
+  nodes,
 }) {
   return Object.freeze({
     name,
@@ -23,6 +24,7 @@ function cue({
     contentKind,
     bounds,
     paintRects: Object.freeze(paintRects),
+    ...(nodes ? { nodes: Object.freeze(nodes) } : {}),
   });
 }
 
@@ -50,6 +52,23 @@ function visibilityProfile({ name, level, final, thumbnail }) {
 }
 
 const FRAME_GRAIN_BOUNDS = rect(25.5, 90, 381, 668);
+const MODE_THREAD_BOUNDS = rect(154, 359, 11, 323);
+
+export const MODE_THREAD_ICON_TARGETS = Object.freeze([
+  Object.freeze({ x: 165, y: 368 }),
+  Object.freeze({ x: 165, y: 439 }),
+  Object.freeze({ x: 165, y: 496 }),
+  Object.freeze({ x: 165, y: 550 }),
+  Object.freeze({ x: 165, y: 616 }),
+  Object.freeze({ x: 165, y: 673 }),
+]);
+
+const MODE_THREAD_PAINT_RECTS = Object.freeze([
+  rect(155, 367, 2, 307),
+  ...MODE_THREAD_ICON_TARGETS.map(target =>
+    rect(156, target.y - 1, target.x - 156, 2)
+  ),
+]);
 
 export const UNEASE_CUE_REGISTRY = Object.freeze([
   cue({
@@ -91,8 +110,10 @@ export const UNEASE_CUE_REGISTRY = Object.freeze([
   cue({
     name: 'mode-thread',
     minLevel: 5,
-    contentKind: 'empty',
-    bounds: rect(369, 292, 2, 410),
+    contentKind: 'mode-thread',
+    bounds: MODE_THREAD_BOUNDS,
+    paintRects: MODE_THREAD_PAINT_RECTS,
+    nodes: MODE_THREAD_ICON_TARGETS,
   }),
   cue({
     name: 'reward-glow',
@@ -117,7 +138,10 @@ export const UNEASE_CUE_REGISTRY = Object.freeze([
 export const PROTECTED_COMPOSITION_REGIONS = Object.freeze({
   modeMenu: Object.freeze([
     rect(160, 296, 200, 48, 'difficulty-control'),
-    rect(160, 345, 200, 361, 'variant-copy-and-controls'),
+    rect(180, 345, 180, 361, 'variant-copy-and-controls'),
+    ...MODE_THREAD_ICON_TARGETS.map((target, index) =>
+      rect(166, target.y - 9, 13, 18, `mode-icon-${index + 1}`)
+    ),
   ]),
 });
 
