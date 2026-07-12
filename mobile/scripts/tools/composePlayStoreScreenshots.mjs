@@ -11,6 +11,11 @@ import {
   readPngMetadata,
   writeOpaquePng,
 } from './playStorePng.mjs';
+import {
+  cueGeometryCss,
+  getActiveUneaseCues,
+  validateUneaseLevel,
+} from './playStoreUnease.mjs';
 
 const SCRIPT_DIR = import.meta.dirname
   ?? path.dirname(fileURLToPath(import.meta.url));
@@ -48,82 +53,30 @@ export const COMPOSITION_LAYOUT = Object.freeze({
   captureHeight: 656,
 });
 
-export const UNEASE_CUES_BY_LEVEL = Object.freeze([
-  Object.freeze(['crimson-glint', 'frame-grain']),
-  Object.freeze(['crimson-glint', 'frame-grain', 'title-sigil']),
-  Object.freeze([
-    'crimson-glint',
-    'frame-grain',
-    'title-sigil',
-    'distant-eyes',
-  ]),
-  Object.freeze([
-    'crimson-glint',
-    'frame-grain',
-    'title-sigil',
-    'distant-eyes',
-    'portrait-echo',
-  ]),
-  Object.freeze([
-    'crimson-glint',
-    'frame-grain',
-    'title-sigil',
-    'distant-eyes',
-    'portrait-echo',
-    'mode-thread',
-  ]),
-  Object.freeze([
-    'crimson-glint',
-    'frame-grain',
-    'title-sigil',
-    'distant-eyes',
-    'portrait-echo',
-    'mode-thread',
-    'reward-glow',
-  ]),
-  Object.freeze([
-    'crimson-glint',
-    'frame-grain',
-    'title-sigil',
-    'distant-eyes',
-    'portrait-echo',
-    'mode-thread',
-    'reward-glow',
-    'dusk-vignette',
-    'watching-eyes',
-  ]),
-]);
-
-function validateUneaseLevel(uneaseLevel, scenario = 'campaign item') {
-  if (
-    !Number.isInteger(uneaseLevel)
-    || uneaseLevel < 1
-    || uneaseLevel > 7
-  ) {
-    throw new Error(
-      `${scenario}: unease level must be an integer from 1 to 7`
-    );
+function cueContent(cueDefinition, sourceBase64) {
+  if (cueDefinition.contentKind === 'source-echo') {
+    return `<img class="cue-portrait-source" `
+      + `src="data:image/png;base64,${sourceBase64}" alt="" aria-hidden="true">`;
   }
+  if (cueDefinition.contentKind === 'eyes') {
+    const eye = '<span class="eye-shape" data-eye-shape>'
+      + '<i class="eye-core" data-eye-core></i></span>';
+    return eye + eye;
+  }
+  return '';
 }
 
-function renderUneaseCues(uneaseLevel, sourceBase64) {
-  const cue = (level, name, content = '') => uneaseLevel >= level
-    ? `<div class="unease-cue cue-${name}" data-unease-cue="${name}" `
-      + `data-unease-min-level="${level}" aria-hidden="true">${content}</div>`
-    : '';
-  const portraitSource = `<img class="cue-portrait-source" `
-    + `src="data:image/png;base64,${sourceBase64}" alt="" aria-hidden="true">`;
-  return [
-    cue(1, 'crimson-glint'),
-    cue(1, 'frame-grain'),
-    cue(2, 'title-sigil'),
-    cue(3, 'distant-eyes', '<i></i><i></i>'),
-    cue(4, 'portrait-echo', portraitSource),
-    cue(5, 'mode-thread'),
-    cue(6, 'reward-glow'),
-    cue(7, 'dusk-vignette'),
-    cue(7, 'watching-eyes', '<i></i><i></i>'),
-  ].join('\n        ');
+function renderUneaseCues(uneaseLevel, sourceBase64, scenario) {
+  return getActiveUneaseCues(uneaseLevel, scenario)
+    .map(cueDefinition =>
+      `<div class="unease-cue cue-${cueDefinition.name}" `
+      + `data-unease-cue="${cueDefinition.name}" `
+      + `data-unease-min-level="${cueDefinition.minLevel}" `
+      + `aria-hidden="true">`
+      + cueContent(cueDefinition, sourceBase64)
+      + '</div>'
+    )
+    .join('\n        ');
 }
 
 function escapeHtml(value) {
@@ -158,7 +111,12 @@ export function buildCompositionHtml({
   const support = escapeHtml(item.support);
   const altText = escapeHtml(item.altText);
   const headlineSize = headlineFontSize(item.headline);
-  const uneaseCues = renderUneaseCues(item.uneaseLevel, sourceBase64);
+  const uneaseCues = renderUneaseCues(
+    item.uneaseLevel,
+    sourceBase64,
+    item.scenario
+  );
+  const cueGeometry = cueGeometryCss();
   const layout = COMPOSITION_LAYOUT;
 
   return `<!doctype html>
@@ -289,11 +247,8 @@ export function buildCompositionHtml({
         position: absolute;
         pointer-events: none;
       }
+      ${cueGeometry}
       .cue-crimson-glint {
-        top: 90px;
-        left: 43.5px;
-        width: 58px;
-        height: 2px;
         opacity: 0.42;
         background: linear-gradient(
           90deg,
@@ -303,10 +258,6 @@ export function buildCompositionHtml({
         );
       }
       .cue-frame-grain {
-        top: 90px;
-        left: 25.5px;
-        width: 381px;
-        height: 668px;
         border: 6px solid transparent;
         border-radius: 12px;
         opacity: 0.22;
@@ -329,59 +280,72 @@ export function buildCompositionHtml({
         -webkit-mask-composite: xor;
       }
       .cue-title-sigil {
-        top: 49px;
-        left: 176px;
-        width: 80px;
-        height: 8px;
-        opacity: 0.27;
+        opacity: 0.24;
+        background: radial-gradient(
+          circle at center,
+          rgba(168, 63, 67, 0.72) 0 1px,
+          transparent 1.5px
+        );
       }
       .cue-title-sigil::before,
       .cue-title-sigil::after {
         content: "";
         position: absolute;
-        top: 3px;
+        top: 2px;
         height: 1px;
-        background: rgba(142, 42, 58, 0.78);
+        background: rgba(142, 42, 58, 0.7);
       }
       .cue-title-sigil::before {
-        left: 0;
-        width: 34px;
-        transform: rotate(3deg);
+        left: 5px;
+        width: 17px;
+        transform: rotate(-10deg);
         transform-origin: right center;
       }
       .cue-title-sigil::after {
-        right: 0;
-        width: 34px;
-        transform: rotate(-3deg);
+        right: 5px;
+        width: 17px;
+        transform: rotate(10deg);
         transform-origin: left center;
       }
       .cue-distant-eyes {
-        top: 306px;
-        left: 400.5px;
-        width: 7px;
+        opacity: 0.5;
+      }
+      .eye-shape {
+        top: 2.5px;
+        width: 11px;
         height: 5px;
-        opacity: 0.42;
+        overflow: visible;
+        background: rgba(53, 18, 31, 0.76);
+        clip-path: polygon(
+          0 50%,
+          22% 10%,
+          50% 0,
+          78% 10%,
+          100% 50%,
+          78% 90%,
+          50% 100%,
+          22% 90%
+        );
+        filter: drop-shadow(0 0 1.4px rgba(153, 34, 52, 0.5));
       }
-      .cue-distant-eyes i,
-      .cue-watching-eyes i {
-        top: 1px;
-        width: 2px;
-        height: 2px;
+      .eye-shape:first-child {
+        left: 1px;
+        transform: rotate(-2deg);
+      }
+      .eye-shape:last-child {
+        right: 1px;
+        transform: rotate(2deg);
+      }
+      .eye-core {
+        top: 1.9px;
+        left: 3.5px;
+        width: 4px;
+        height: 1.2px;
         border-radius: 50%;
-        background: rgba(221, 48, 66, 0.88);
-        box-shadow: 0 0 3px rgba(192, 33, 54, 0.48);
-      }
-      .cue-distant-eyes i:first-child {
-        left: 0;
-      }
-      .cue-distant-eyes i:last-child {
-        right: 0;
+        background: rgba(225, 67, 76, 0.82);
+        box-shadow: 0 0 2px rgba(202, 48, 65, 0.62);
       }
       .cue-portrait-echo {
-        top: 551px;
-        left: 49.5px;
-        width: 76px;
-        height: 120px;
         overflow: hidden;
         border-radius: 9px;
         opacity: 0.1;
@@ -398,25 +362,17 @@ export function buildCompositionHtml({
         filter: sepia(0.34) saturate(1.4) hue-rotate(318deg);
       }
       .cue-mode-thread {
-        top: 394px;
-        left: 145px;
-        width: 210px;
-        height: 1px;
-        opacity: 0.34;
+        opacity: 0.3;
         background: linear-gradient(
-          90deg,
+          180deg,
           transparent,
-          rgba(186, 39, 59, 0.84) 12% 86%,
+          rgba(186, 39, 59, 0.76) 12% 86%,
           transparent
         );
-        transform: rotate(-2.5deg);
+        transform: rotate(0.8deg);
         transform-origin: center;
       }
       .cue-reward-glow {
-        top: 531px;
-        left: 141.5px;
-        width: 155px;
-        height: 122px;
         opacity: 0.31;
         background: radial-gradient(
           ellipse at center,
@@ -427,10 +383,6 @@ export function buildCompositionHtml({
         mix-blend-mode: screen;
       }
       .cue-dusk-vignette {
-        top: 96px;
-        left: 31.5px;
-        width: ${layout.captureWidth}px;
-        height: ${layout.captureHeight}px;
         border-radius: 7px;
         opacity: 0.72;
         background: radial-gradient(
@@ -441,23 +393,12 @@ export function buildCompositionHtml({
         );
       }
       .cue-watching-eyes {
-        top: 94px;
-        left: 353.5px;
-        width: 22px;
-        height: 7px;
-        opacity: 0.62;
+        opacity: 0.68;
       }
-      .cue-watching-eyes i {
-        top: 2px;
-        width: 3px;
-        height: 2px;
-        border-radius: 50% 50% 45% 45%;
-      }
-      .cue-watching-eyes i:first-child {
-        left: 3px;
-      }
-      .cue-watching-eyes i:last-child {
-        right: 3px;
+      .cue-watching-eyes .eye-shape {
+        top: 1px;
+        width: 12px;
+        background: rgba(45, 13, 28, 0.84);
       }
       .composition[data-unease-level="6"] .cue-crimson-glint,
       .composition[data-unease-level="7"] .cue-crimson-glint {
@@ -730,7 +671,10 @@ async function waitForComposition(page, item) {
   ) {
     throw new Error(`${item.scenario}: composition extends outside the viewport`);
   }
-  const expectedCues = UNEASE_CUES_BY_LEVEL[item.uneaseLevel - 1];
+  const expectedCues = getActiveUneaseCues(
+    item.uneaseLevel,
+    item.scenario
+  ).map(cueDefinition => cueDefinition.name);
   const cueNames = audit.cues.map(cue => cue.name);
   if (JSON.stringify(cueNames) !== JSON.stringify(expectedCues)) {
     throw new Error(
@@ -753,19 +697,7 @@ async function waitForComposition(page, item) {
       );
     }
   }
-  const titleSigil = audit.cues.find(cue => cue.name === 'title-sigil');
-  if (
-    titleSigil
-    && (
-      titleSigil.left < audit.band.left
-      || titleSigil.top < audit.band.top
-      || titleSigil.right > audit.band.right
-      || titleSigil.bottom > audit.band.bottom
-    )
-  ) {
-    throw new Error(`${item.scenario}: title sigil escaped the copy band`);
-  }
-  for (const cue of audit.cues.filter(entry => entry.name !== 'title-sigil')) {
+  for (const cue of audit.cues) {
     if (
       cue.left < audit.frame.left
       || cue.top < audit.frame.top

@@ -51,45 +51,20 @@ const SHANTELL_REGULAR_PATH = path.resolve(
   SCRIPT_DIR,
   '../../assets/fonts/ShantellSans-Regular.ttf'
 );
-const EXPECTED_CUES_BY_LEVEL = [
-  ['crimson-glint', 'frame-grain'],
-  ['crimson-glint', 'frame-grain', 'title-sigil'],
-  ['crimson-glint', 'frame-grain', 'title-sigil', 'distant-eyes'],
-  [
-    'crimson-glint',
-    'frame-grain',
-    'title-sigil',
-    'distant-eyes',
-    'portrait-echo',
-  ],
-  [
-    'crimson-glint',
-    'frame-grain',
-    'title-sigil',
-    'distant-eyes',
-    'portrait-echo',
-    'mode-thread',
-  ],
-  [
-    'crimson-glint',
-    'frame-grain',
-    'title-sigil',
-    'distant-eyes',
-    'portrait-echo',
-    'mode-thread',
-    'reward-glow',
-  ],
-  [
-    'crimson-glint',
-    'frame-grain',
-    'title-sigil',
-    'distant-eyes',
-    'portrait-echo',
-    'mode-thread',
-    'reward-glow',
-    'dusk-vignette',
-    'watching-eyes',
-  ],
+const CHECKED_SOURCE_DIR = path.resolve(
+  SCRIPT_DIR,
+  '../../../docs/play-store/source'
+);
+const EXPECTED_CUE_DEFINITIONS = [
+  { name: 'crimson-glint', minLevel: 1, contentKind: 'empty' },
+  { name: 'frame-grain', minLevel: 1, contentKind: 'empty' },
+  { name: 'title-sigil', minLevel: 2, contentKind: 'empty' },
+  { name: 'distant-eyes', minLevel: 3, contentKind: 'eyes' },
+  { name: 'portrait-echo', minLevel: 4, contentKind: 'source-echo' },
+  { name: 'mode-thread', minLevel: 5, contentKind: 'empty' },
+  { name: 'reward-glow', minLevel: 6, contentKind: 'empty' },
+  { name: 'dusk-vignette', minLevel: 7, contentKind: 'empty' },
+  { name: 'watching-eyes', minLevel: 7, contentKind: 'eyes' },
 ];
 const EXPECTED_SCENARIOS = [
   'puzzle-preview',
@@ -232,8 +207,117 @@ function sha256(bytes) {
   return createHash('sha256').update(bytes).digest('hex');
 }
 
+function expectedActiveCueNames(level) {
+  return EXPECTED_CUE_DEFINITIONS
+    .filter(cue => cue.minLevel <= level)
+    .map(cue => cue.name);
+}
+
+async function loadUneaseModel() {
+  try {
+    return await import('./playStoreUnease.mjs');
+  } catch {
+    return {};
+  }
+}
+
+function rectanglesOverlap(first, second) {
+  return first.left < second.right
+    && first.right > second.left
+    && first.top < second.bottom
+    && first.bottom > second.top;
+}
+
 async function pixelHash(filePath) {
   return sha256((await readPng(filePath)).data);
+}
+
+async function pixelDeltaMetrics(baselinePath, composedPath) {
+  const [baseline, composed] = await Promise.all([
+    readPng(baselinePath),
+    readPng(composedPath),
+  ]);
+  assert.equal(composed.width, baseline.width);
+  assert.equal(composed.height, baseline.height);
+  let changedPixels = 0;
+  let totalDelta = 0;
+  const pixelCount = baseline.width * baseline.height;
+  for (let offset = 0; offset < baseline.data.length; offset += 4) {
+    const red = Math.abs(baseline.data[offset] - composed.data[offset]);
+    const green = Math.abs(
+      baseline.data[offset + 1] - composed.data[offset + 1]
+    );
+    const blue = Math.abs(
+      baseline.data[offset + 2] - composed.data[offset + 2]
+    );
+    const maxDelta = Math.max(red, green, blue);
+    if (maxDelta >= 4) changedPixels += 1;
+    totalDelta += red + green + blue;
+  }
+  return {
+    width: baseline.width,
+    height: baseline.height,
+    changedPixels,
+    changedFraction: changedPixels / pixelCount,
+    visibilityScore: totalDelta / (pixelCount * 3 * 255),
+  };
+}
+
+function withHiddenCues(html) {
+  return html.replace(
+    '</head>',
+    '<style>.unease-layer { display: none !important; }</style></head>'
+  );
+}
+
+function atThumbnailSize(html) {
+  return html.replace(
+    '</head>',
+    `<style>
+      html, body {
+        width: 216px !important;
+        height: 384px !important;
+      }
+      .composition {
+        transform: scale(0.5);
+        transform-origin: top left;
+      }
+    </style></head>`
+  );
+}
+
+async function renderCompositionHtml(page, html, outputPath) {
+  await page.setContent(html, { waitUntil: 'load' });
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await Promise.all(
+      [...document.querySelectorAll('img')].map(image => image.decode())
+    );
+    await new Promise(resolve => requestAnimationFrame(resolve));
+  });
+  await fs.mkdir(path.dirname(outputPath), { recursive: true });
+  await page.screenshot({ path: outputPath, type: 'png', fullPage: false });
+}
+
+async function prepareVisualSource(item, sourceDir) {
+  const checkedPath = path.join(CHECKED_SOURCE_DIR, item.source);
+  const targetPath = path.join(sourceDir, item.source);
+  await fs.mkdir(sourceDir, { recursive: true });
+  try {
+    const bytes = await fs.readFile(checkedPath);
+    await fs.writeFile(targetPath, bytes);
+    return { kind: 'authentic', checkedPath, targetPath };
+  } catch (error) {
+    if (error?.code !== 'ENOENT' || ![6, 7].includes(item.uneaseLevel)) {
+      throw error;
+    }
+    await fs.writeFile(targetPath, encodePatternPng(1080, 1920));
+    return {
+      kind: 'synthetic-pending-task4',
+      checkedPath: null,
+      targetPath,
+    };
+  }
 }
 
 async function writeScreenshotSet(
@@ -548,6 +632,48 @@ describe('Storybook Editorial composition', () => {
     assert.doesNotMatch(html, /SHIFT <ONE> LETTER/);
   });
 
+  test('uses one declarative registry for cue rendering and validation', async () => {
+    const model = await loadUneaseModel();
+    assert.ok(Array.isArray(model.UNEASE_CUE_REGISTRY));
+    assert.equal(typeof model.getActiveUneaseCues, 'function');
+    assert.deepEqual(
+      model.UNEASE_CUE_REGISTRY.map(cue => ({
+        name: cue.name,
+        minLevel: cue.minLevel,
+        contentKind: cue.contentKind,
+      })),
+      EXPECTED_CUE_DEFINITIONS
+    );
+    assert.ok(model.UNEASE_CUE_REGISTRY.every(cue =>
+      Number.isFinite(cue.bounds?.left)
+      && Number.isFinite(cue.bounds?.top)
+      && Number.isFinite(cue.bounds?.width)
+      && Number.isFinite(cue.bounds?.height)
+      && Array.isArray(cue.paintRects)
+      && cue.paintRects.length > 0
+    ));
+    for (let level = 1; level <= 7; level += 1) {
+      assert.deepEqual(
+        model.getActiveUneaseCues(level).map(cue => cue.name),
+        expectedActiveCueNames(level)
+      );
+    }
+    assert.deepEqual(model.TASK4_REAUDIT_LEVELS, [6, 7]);
+
+    const [composerSource, testSource] = await Promise.all([
+      fs.readFile(COMPOSER_PATH, 'utf8'),
+      fs.readFile(fileURLToPath(import.meta.url), 'utf8'),
+    ]);
+    const retiredComposerMatrix = new RegExp(
+      ['UNEASE', 'CUES', 'BY', 'LEVEL'].join('_')
+    );
+    const retiredTestMatrix = new RegExp(
+      ['EXPECTED', 'CUES', 'BY', 'LEVEL'].join('_')
+    );
+    assert.doesNotMatch(composerSource, retiredComposerMatrix);
+    assert.doesNotMatch(testSource, retiredTestMatrix);
+  });
+
   test('renders the exact cumulative unease cue matrix without future cues', () => {
     for (let level = 1; level <= 7; level += 1) {
       const item = {
@@ -563,7 +689,7 @@ describe('Storybook Editorial composition', () => {
       const cues = [...html.matchAll(/data-unease-cue="([^"]+)"/g)]
         .map(match => match[1]);
 
-      assert.deepEqual(cues, EXPECTED_CUES_BY_LEVEL[level - 1]);
+      assert.deepEqual(cues, expectedActiveCueNames(level));
       assert.doesNotMatch(html, /Math\.random/);
       assert.doesNotMatch(
         html,
@@ -793,6 +919,8 @@ describe('Playwright composition integration', { concurrency: false }, () => {
   let browser;
   let context;
   let page;
+  let thumbnailContext;
+  let thumbnailPage;
   let fonts;
 
   before(async () => {
@@ -814,9 +942,16 @@ describe('Playwright composition integration', { concurrency: false }, () => {
       serviceWorkers: 'block',
     });
     page = await context.newPage();
+    thumbnailContext = await browser.newContext({
+      viewport: { width: 216, height: 384 },
+      deviceScaleFactor: 1,
+      serviceWorkers: 'block',
+    });
+    thumbnailPage = await thumbnailContext.newPage();
   });
 
   after(async () => {
+    await thumbnailContext?.close();
     await context?.close();
     await browser?.close();
   });
@@ -899,7 +1034,7 @@ describe('Playwright composition integration', { concurrency: false }, () => {
 
     assert.deepEqual(
       result.audit.cues.map(cue => cue.name),
-      EXPECTED_CUES_BY_LEVEL[6]
+      expectedActiveCueNames(7)
     );
     assert.equal(result.audit.allOverlaysIgnorePointerEvents, true);
     assert.ok(result.audit.cues.every(cue => cue.pointerEvents === 'none'));
@@ -918,55 +1053,261 @@ describe('Playwright composition integration', { concurrency: false }, () => {
     assert.ok(
       result.audit.support.scrollWidth <= Math.ceil(result.audit.support.width)
     );
+    for (const cue of result.audit.cues) {
+      assert.equal(
+        rectanglesOverlap(cue, result.audit.headline),
+        false,
+        `${cue.name} overlaps the measured headline`
+      );
+      assert.equal(
+        rectanglesOverlap(cue, result.audit.support),
+        false,
+        `${cue.name} overlaps the measured support line`
+      );
+    }
   });
 
-  test('repeats identical RGB pixel hashes at low, middle, and high unease', async () => {
-    const sourcePng = encodePatternPng(1080, 1920);
-    const pixelHashes = [];
-    for (const level of [1, 4, 7]) {
-      const item = {
-        ...makeCampaign()[0],
-        uneaseLevel: level,
-        source: `deterministic-${level}.png`,
-        final: `deterministic-${level}.png`,
-      };
-      const sourceDir = await writeIntegrationSource(item.source, sourcePng);
-      const first = await composeCampaignItem({
-        page,
-        item,
-        fonts,
-        sourceDir,
-        outputDir: path.join(tempDir, `first-${level}`),
-        browserPngDir: path.join(tempDir, `browser-first-${level}`),
-      });
-      const second = await composeCampaignItem({
-        page,
-        item,
-        fonts,
-        sourceDir,
-        outputDir: path.join(tempDir, `second-${level}`),
-        browserPngDir: path.join(tempDir, `browser-second-${level}`),
-      });
-
-      assert.deepEqual(first.metadata, {
-        width: 1080,
-        height: 1920,
-        bitDepth: 8,
-        colorType: 2,
-      });
-      assert.deepEqual(second.metadata, first.metadata);
-      assert.equal(
-        await pixelHash(second.outputPath),
-        await pixelHash(first.outputPath),
-        `level ${level} pixels are not deterministic`
-      );
-      pixelHashes.push(await pixelHash(first.outputPath));
-    }
-    assert.equal(
-      new Set(pixelHashes).size,
-      3,
-      'unease levels rendered identical pixels'
+  test('uses shaped eyes in scene negative space and inside the frame rail', async () => {
+    const sourceDir = path.join(tempDir, 'source');
+    const levelThree = {
+      ...makeCampaign()[2],
+      final: 'level-three-eyes.png',
+    };
+    const levelSeven = {
+      ...makeCampaign()[6],
+      source: 'level-seven-fallback.png',
+      final: 'level-seven-eyes.png',
+    };
+    const levelThreeSource = await prepareVisualSource(levelThree, sourceDir);
+    await fs.writeFile(
+      path.join(sourceDir, levelSeven.source),
+      encodePatternPng(1080, 1920)
     );
+    assert.equal(levelThreeSource.kind, 'authentic');
+
+    const levelThreeResult = await composeCampaignItem({
+      page,
+      item: levelThree,
+      fonts,
+      sourceDir,
+      outputDir: path.join(tempDir, 'level-three'),
+      browserPngDir: path.join(tempDir, 'browser-three'),
+    });
+    const distantEyes = levelThreeResult.audit.cues.find(
+      cue => cue.name === 'distant-eyes'
+    );
+    assert.ok(distantEyes);
+    assert.ok(distantEyes.left >= levelThreeResult.audit.capture.left + 8);
+    assert.ok(distantEyes.right <= levelThreeResult.audit.capture.right - 8);
+    assert.ok(distantEyes.top >= levelThreeResult.audit.capture.top + 24);
+    assert.ok(distantEyes.bottom <= levelThreeResult.audit.capture.bottom - 24);
+
+    const levelSevenResult = await composeCampaignItem({
+      page,
+      item: levelSeven,
+      fonts,
+      sourceDir,
+      outputDir: path.join(tempDir, 'level-seven'),
+      browserPngDir: path.join(tempDir, 'browser-seven'),
+    });
+    const watchingEyes = levelSevenResult.audit.cues.find(
+      cue => cue.name === 'watching-eyes'
+    );
+    assert.ok(watchingEyes);
+    assert.ok(watchingEyes.left >= levelSevenResult.audit.frame.left);
+    assert.ok(watchingEyes.right <= levelSevenResult.audit.frame.right);
+    assert.ok(watchingEyes.top >= levelSevenResult.audit.frame.top);
+    assert.ok(watchingEyes.bottom <= levelSevenResult.audit.capture.top);
+
+    const eyeAudit = await page.evaluate(() =>
+      [...document.querySelectorAll('[data-unease-cue$="eyes"]')].map(cue => ({
+        name: cue.getAttribute('data-unease-cue'),
+        shapeCount: cue.querySelectorAll('[data-eye-shape]').length,
+        coreCount: cue.querySelectorAll('[data-eye-core]').length,
+        clipPaths: [...cue.querySelectorAll('[data-eye-shape]')].map(
+          shape => getComputedStyle(shape).clipPath
+        ),
+      }))
+    );
+    assert.deepEqual(
+      eyeAudit.map(entry => ({
+        name: entry.name,
+        shapeCount: entry.shapeCount,
+        coreCount: entry.coreCount,
+      })),
+      [
+        { name: 'distant-eyes', shapeCount: 2, coreCount: 2 },
+        { name: 'watching-eyes', shapeCount: 2, coreCount: 2 },
+      ]
+    );
+    assert.ok(eyeAudit.every(entry =>
+      entry.clipPaths.every(clipPath => clipPath !== 'none')
+    ));
+
+    const levelSevenHtml = buildCompositionHtml({
+      item: levelSeven,
+      sourceBase64: (
+        await fs.readFile(path.join(sourceDir, levelSeven.source))
+      ).toString('base64'),
+      headlineFontBase64: fonts.headline,
+      supportFontBase64: fonts.support,
+    });
+    await renderCompositionHtml(
+      thumbnailPage,
+      atThumbnailSize(levelSevenHtml),
+      path.join(tempDir, 'eye-shapes-thumbnail.png')
+    );
+    const thumbnailShapes = await thumbnailPage.evaluate(() =>
+      [...document.querySelectorAll('[data-eye-shape]')].map(shape => {
+        const bounds = shape.getBoundingClientRect();
+        return { width: bounds.width, height: bounds.height };
+      })
+    );
+    assert.ok(thumbnailShapes.length >= 4);
+    assert.ok(thumbnailShapes.every(shape =>
+      shape.width >= 5.5 && shape.height >= 2.25
+    ));
+  });
+
+  test('keeps the mode thread in the empty menu margin', async () => {
+    const model = await loadUneaseModel();
+    assert.ok(Array.isArray(model.PROTECTED_COMPOSITION_REGIONS?.modeMenu));
+    const item = {
+      ...makeCampaign()[4],
+      final: 'mode-thread-margin.png',
+    };
+    const sourceDir = path.join(tempDir, 'source');
+    const source = await prepareVisualSource(item, sourceDir);
+    assert.equal(source.kind, 'authentic');
+    const result = await composeCampaignItem({
+      page,
+      item,
+      fonts,
+      sourceDir,
+      outputDir: path.join(tempDir, 'mode-thread'),
+      browserPngDir: path.join(tempDir, 'browser-mode-thread'),
+    });
+    const thread = result.audit.cues.find(cue => cue.name === 'mode-thread');
+    assert.ok(thread);
+    assert.ok(thread.height > thread.width * 40);
+    for (const protectedRegion of model.PROTECTED_COMPOSITION_REGIONS.modeMenu) {
+      assert.equal(
+        rectanglesOverlap(thread, protectedRegion),
+        false,
+        `mode thread overlaps protected ${protectedRegion.name}`
+      );
+    }
+    for (const cueDefinition of model.getActiveUneaseCues(5)) {
+      for (const paintRect of cueDefinition.paintRects) {
+        for (
+          const protectedRegion
+          of model.PROTECTED_COMPOSITION_REGIONS.modeMenu
+        ) {
+          assert.equal(
+            rectanglesOverlap(paintRect, protectedRegion),
+            false,
+            `${cueDefinition.name} overlaps protected ${protectedRegion.name}`
+          );
+        }
+      }
+    }
+  });
+
+  test('bounds monotonic cue visibility at final and thumbnail sizes', async () => {
+    const finalMetrics = [];
+    const thumbnailMetrics = [];
+    const sourceKinds = [];
+    const finalAreaCaps = new Map([[1, 0.06], [4, 0.12], [7, 0.42]]);
+    const thumbnailAreaCaps = new Map([[1, 0.08], [4, 0.15], [7, 0.45]]);
+
+    for (const level of [1, 4, 7]) {
+      const item = makeCampaign()[level - 1];
+      const sourceDir = path.join(tempDir, `visual-source-${level}`);
+      const source = await prepareVisualSource(item, sourceDir);
+      sourceKinds.push(source.kind);
+      const sourceBytes = await fs.readFile(source.targetPath);
+      const sourceHashBefore = sha256(sourceBytes);
+      const html = buildCompositionHtml({
+        item,
+        sourceBase64: sourceBytes.toString('base64'),
+        headlineFontBase64: fonts.headline,
+        supportFontBase64: fonts.support,
+      });
+      const finalBaseline = path.join(tempDir, `final-${level}-baseline.png`);
+      const finalComposed = path.join(tempDir, `final-${level}-composed.png`);
+      const finalRepeat = path.join(tempDir, `final-${level}-repeat.png`);
+      const thumbnailBaseline = path.join(
+        tempDir,
+        `thumbnail-${level}-baseline.png`
+      );
+      const thumbnailComposed = path.join(
+        tempDir,
+        `thumbnail-${level}-composed.png`
+      );
+
+      await renderCompositionHtml(page, withHiddenCues(html), finalBaseline);
+      await renderCompositionHtml(page, html, finalComposed);
+      await renderCompositionHtml(page, html, finalRepeat);
+      await renderCompositionHtml(
+        thumbnailPage,
+        atThumbnailSize(withHiddenCues(html)),
+        thumbnailBaseline
+      );
+      await renderCompositionHtml(
+        thumbnailPage,
+        atThumbnailSize(html),
+        thumbnailComposed
+      );
+
+      assert.equal(await pixelHash(finalRepeat), await pixelHash(finalComposed));
+      assert.deepEqual(
+        {
+          width: (await readPng(finalComposed)).width,
+          height: (await readPng(finalComposed)).height,
+        },
+        { width: 1080, height: 1920 }
+      );
+      assert.deepEqual(
+        {
+          width: (await readPng(thumbnailComposed)).width,
+          height: (await readPng(thumbnailComposed)).height,
+        },
+        { width: 216, height: 384 }
+      );
+      assert.equal(
+        sha256(await fs.readFile(source.targetPath)),
+        sourceHashBefore,
+        `level ${level} source changed during visual testing`
+      );
+
+      const finalDelta = await pixelDeltaMetrics(
+        finalBaseline,
+        finalComposed
+      );
+      const thumbnailDelta = await pixelDeltaMetrics(
+        thumbnailBaseline,
+        thumbnailComposed
+      );
+      assert.ok(finalDelta.changedPixels > 0);
+      assert.ok(thumbnailDelta.changedPixels > 0);
+      assert.ok(finalDelta.changedFraction <= finalAreaCaps.get(level));
+      assert.ok(
+        thumbnailDelta.changedFraction <= thumbnailAreaCaps.get(level)
+      );
+      assert.ok(finalDelta.visibilityScore < 0.05);
+      assert.ok(thumbnailDelta.visibilityScore < 0.05);
+      finalMetrics.push(finalDelta);
+      thumbnailMetrics.push(thumbnailDelta);
+    }
+
+    assert.deepEqual(
+      sourceKinds,
+      ['authentic', 'authentic', 'synthetic-pending-task4']
+    );
+    for (const metrics of [finalMetrics, thumbnailMetrics]) {
+      assert.ok(metrics[0].visibilityScore < metrics[1].visibilityScore);
+      assert.ok(metrics[1].visibilityScore < metrics[2].visibilityScore);
+    }
   });
 
   test('rejects an overlong headline before writing an output', async () => {

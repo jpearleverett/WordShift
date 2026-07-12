@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { validateUneaseLevel } from './playStoreUnease.mjs';
 
 export const APPROVED_SCENARIOS = [
   'puzzle-preview',
@@ -67,15 +68,7 @@ export function validateCampaign(campaign) {
         throw new Error(`${item.scenario}: campaign field "${field}" is missing`);
       }
     }
-    if (
-      !Number.isInteger(item.uneaseLevel)
-      || item.uneaseLevel < 1
-      || item.uneaseLevel > 7
-    ) {
-      throw new Error(
-        `${item.scenario}: unease level must be an integer from 1 to 7`
-      );
-    }
+    validateUneaseLevel(item.uneaseLevel, item.scenario);
     if (!isSafePngBasename(item.source)) {
       throw new Error(`${item.scenario}: invalid source filename "${item.source}"`);
     }
