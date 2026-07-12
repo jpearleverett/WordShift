@@ -526,7 +526,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   }
 
   return (
-    <View style={[styles.modalOverlay, {
+    <View testID="play-store-victory-overlay" style={[styles.modalOverlay, {
       backgroundColor: phaseTheme.modalOverlayColor,
     }]}>
       <ScrollView
@@ -534,7 +534,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
-          <Animated.View style={[styles.victoryModal, {
+          <Animated.View testID="play-store-victory-modal-card" style={[styles.victoryModal, {
             backgroundColor: phaseTheme.modalBgColor,
             borderColor: btn.modalBorder,
             transform: [{ scale: modalScale }],

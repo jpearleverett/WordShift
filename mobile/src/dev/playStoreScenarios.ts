@@ -423,6 +423,7 @@ export function buildPlayStoreScenario(
     wordshift_harvest_home_intro_seen: 'true',
     wordshift_fox_play_nudge_seen: 'true',
     wordshift_pit_nudge_seen: 'true',
+    wordshift_first_win_glitch: 'true',
     wordshift_review_prompt: JSON.stringify({ prompted: true }),
     wordshift_monet_prompts: JSON.stringify({
       patronNudgeShown: true,

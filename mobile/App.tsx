@@ -2870,7 +2870,10 @@ function MainApp() {
         fallbackMessage="Something went wrong with the puzzle. Tap to return home."
         onReset={() => { setCurrentScreen('home'); puzzleActions.setGameState(GameState.IDLE); }}
       >
-      <Animated.View style={[styles.container, { transform: [{ translateX: dreadEffects.screenShakeRef }] }]}>
+      <Animated.View
+        testID="play-store-puzzle-screen"
+        style={[styles.container, { transform: [{ translateX: dreadEffects.screenShakeRef }] }]}
+      >
         <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
         {/* Animated Background — darkens with narrative phase */}

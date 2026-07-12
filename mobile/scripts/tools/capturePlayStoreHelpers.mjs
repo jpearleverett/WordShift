@@ -103,6 +103,106 @@ export function requireNoPartialVerticalOcclusion(
   );
 }
 
+export function summarizeRgbaDiff(first, second) {
+  if (
+    first?.width !== second?.width
+    || first?.height !== second?.height
+    || first?.data?.length !== second?.data?.length
+  ) {
+    throw new Error('RGBA images must have identical dimensions and data lengths');
+  }
+
+  const { width, height } = first;
+  const changed = new Uint8Array(width * height);
+  let differentPixels = 0;
+  let left = width;
+  let top = height;
+  let right = -1;
+  let bottom = -1;
+
+  for (let pixel = 0; pixel < changed.length; pixel += 1) {
+    const offset = pixel * 4;
+    if (
+      first.data[offset] === second.data[offset]
+      && first.data[offset + 1] === second.data[offset + 1]
+      && first.data[offset + 2] === second.data[offset + 2]
+      && first.data[offset + 3] === second.data[offset + 3]
+    ) {
+      continue;
+    }
+    changed[pixel] = 1;
+    differentPixels += 1;
+    const x = pixel % width;
+    const y = Math.floor(pixel / width);
+    left = Math.min(left, x);
+    top = Math.min(top, y);
+    right = Math.max(right, x);
+    bottom = Math.max(bottom, y);
+  }
+
+  if (differentPixels === 0) {
+    return { differentPixels: 0, bounds: null, components: [] };
+  }
+
+  const queue = new Int32Array(width * height);
+  const components = [];
+  for (let start = 0; start < changed.length; start += 1) {
+    if (changed[start] !== 1) continue;
+    let read = 0;
+    let write = 1;
+    queue[0] = start;
+    changed[start] = 2;
+    let componentPixels = 0;
+    let componentLeft = width;
+    let componentTop = height;
+    let componentRight = -1;
+    let componentBottom = -1;
+
+    while (read < write) {
+      const pixel = queue[read++];
+      const x = pixel % width;
+      const y = Math.floor(pixel / width);
+      componentPixels += 1;
+      componentLeft = Math.min(componentLeft, x);
+      componentTop = Math.min(componentTop, y);
+      componentRight = Math.max(componentRight, x);
+      componentBottom = Math.max(componentBottom, y);
+
+      for (let dy = -1; dy <= 1; dy += 1) {
+        for (let dx = -1; dx <= 1; dx += 1) {
+          if (dx === 0 && dy === 0) continue;
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+          const neighbor = ny * width + nx;
+          if (changed[neighbor] !== 1) continue;
+          changed[neighbor] = 2;
+          queue[write++] = neighbor;
+        }
+      }
+    }
+
+    components.push({
+      pixels: componentPixels,
+      left: componentLeft,
+      top: componentTop,
+      right: componentRight,
+      bottom: componentBottom,
+    });
+  }
+
+  components.sort((a, b) =>
+    b.pixels - a.pixels
+    || a.top - b.top
+    || a.left - b.left
+  );
+  return {
+    differentPixels,
+    bounds: { left, top, right, bottom },
+    components,
+  };
+}
+
 export function validateCampaign(campaign) {
   if (!Array.isArray(campaign) || campaign.length !== APPROVED_SCENARIOS.length) {
     throw new Error(
