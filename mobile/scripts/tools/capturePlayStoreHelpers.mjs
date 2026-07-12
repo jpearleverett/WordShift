@@ -61,19 +61,19 @@ export function validateCampaign(campaign) {
 
   const sourceNames = new Set();
   const finalNames = new Set();
-  for (const [index, item] of campaign.entries()) {
+  for (const item of campaign) {
     for (const field of ['source', 'final', 'headline', 'support', 'altText', 'theme']) {
       if (typeof item[field] !== 'string' || item[field].trim().length === 0) {
         throw new Error(`${item.scenario}: campaign field "${field}" is missing`);
       }
     }
-    const expectedUneaseLevel = index + 1;
     if (
       !Number.isInteger(item.uneaseLevel)
-      || item.uneaseLevel !== expectedUneaseLevel
+      || item.uneaseLevel < 1
+      || item.uneaseLevel > 7
     ) {
       throw new Error(
-        `${item.scenario}: expected unease level ${expectedUneaseLevel}`
+        `${item.scenario}: unease level must be an integer from 1 to 7`
       );
     }
     if (!isSafePngBasename(item.source)) {
@@ -90,6 +90,13 @@ export function validateCampaign(campaign) {
     }
     sourceNames.add(item.source);
     finalNames.add(item.final);
+  }
+
+  const uneaseLevels = campaign.map(item => item.uneaseLevel);
+  if (uneaseLevels.some((level, index) => level !== index + 1)) {
+    throw new Error(
+      'Campaign unease levels must strictly increase as 1, 2, 3, 4, 5, 6, 7'
+    );
   }
 
   return campaign;

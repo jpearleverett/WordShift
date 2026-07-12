@@ -82,15 +82,46 @@ describe('capture campaign validation', () => {
   test('requires unease levels one through seven in campaign order', () => {
     const missingLevel = makeCampaign();
     delete missingLevel[0].uneaseLevel;
-    assert.throws(() => validateCampaign(missingLevel), /unease level 1/);
+    assert.throws(
+      () => validateCampaign(missingLevel),
+      /unease level must be an integer from 1 to 7/
+    );
 
     const repeatedLevel = makeCampaign();
     repeatedLevel[6].uneaseLevel = 6;
-    assert.throws(() => validateCampaign(repeatedLevel), /unease level 7/);
+    assert.throws(
+      () => validateCampaign(repeatedLevel),
+      /strictly increase as 1, 2, 3, 4, 5, 6, 7/
+    );
 
     const fractionalLevel = makeCampaign();
     fractionalLevel[3].uneaseLevel = 4.5;
-    assert.throws(() => validateCampaign(fractionalLevel), /unease level 4/);
+    assert.throws(
+      () => validateCampaign(fractionalLevel),
+      /unease level must be an integer from 1 to 7/
+    );
+
+    for (const level of [0, 8]) {
+      const outOfRange = makeCampaign();
+      outOfRange[0].uneaseLevel = level;
+      assert.throws(
+        () => validateCampaign(outOfRange),
+        /unease level must be an integer from 1 to 7/
+      );
+    }
+
+    const descendingLevels = makeCampaign();
+    [
+      descendingLevels[2].uneaseLevel,
+      descendingLevels[3].uneaseLevel,
+    ] = [
+      descendingLevels[3].uneaseLevel,
+      descendingLevels[2].uneaseLevel,
+    ];
+    assert.throws(
+      () => validateCampaign(descendingLevels),
+      /strictly increase as 1, 2, 3, 4, 5, 6, 7/
+    );
   });
 });
 

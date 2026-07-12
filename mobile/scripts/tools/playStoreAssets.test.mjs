@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { Buffer } from 'node:buffer';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -42,6 +43,54 @@ const LANDING_PAGE_PATH = path.resolve(
   SCRIPT_DIR,
   '../../../docs/index.md'
 );
+const FIGTREE_BOLD_PATH = path.resolve(
+  SCRIPT_DIR,
+  '../../assets/fonts/Figtree-Bold.ttf'
+);
+const SHANTELL_REGULAR_PATH = path.resolve(
+  SCRIPT_DIR,
+  '../../assets/fonts/ShantellSans-Regular.ttf'
+);
+const EXPECTED_CUES_BY_LEVEL = [
+  ['crimson-glint', 'frame-grain'],
+  ['crimson-glint', 'frame-grain', 'title-sigil'],
+  ['crimson-glint', 'frame-grain', 'title-sigil', 'distant-eyes'],
+  [
+    'crimson-glint',
+    'frame-grain',
+    'title-sigil',
+    'distant-eyes',
+    'portrait-echo',
+  ],
+  [
+    'crimson-glint',
+    'frame-grain',
+    'title-sigil',
+    'distant-eyes',
+    'portrait-echo',
+    'mode-thread',
+  ],
+  [
+    'crimson-glint',
+    'frame-grain',
+    'title-sigil',
+    'distant-eyes',
+    'portrait-echo',
+    'mode-thread',
+    'reward-glow',
+  ],
+  [
+    'crimson-glint',
+    'frame-grain',
+    'title-sigil',
+    'distant-eyes',
+    'portrait-echo',
+    'mode-thread',
+    'reward-glow',
+    'dusk-vignette',
+    'watching-eyes',
+  ],
+];
 const EXPECTED_SCENARIOS = [
   'puzzle-preview',
   'puzzle-chain',
@@ -159,6 +208,32 @@ function encodeSolidPng(width, height, colorType = 2) {
     inputColorType: 6,
     inputHasAlpha: true,
   });
+}
+
+function encodePatternPng(width, height) {
+  const png = new PNG({ width, height });
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const offset = (y * width + x) * 4;
+      png.data[offset] = (x * 7 + y * 3) % 256;
+      png.data[offset + 1] = (x * 2 + y * 5) % 256;
+      png.data[offset + 2] = (x + y * 11) % 256;
+      png.data[offset + 3] = 255;
+    }
+  }
+  return PNG.sync.write(png, {
+    colorType: 2,
+    inputColorType: 6,
+    inputHasAlpha: true,
+  });
+}
+
+function sha256(bytes) {
+  return createHash('sha256').update(bytes).digest('hex');
+}
+
+async function pixelHash(filePath) {
+  return sha256((await readPng(filePath)).data);
 }
 
 async function writeScreenshotSet(
@@ -431,7 +506,14 @@ describe('Storybook Editorial composition', () => {
     );
   });
 
-  test('embeds authentic source, both Shantell faces, and exact campaign copy', () => {
+  test('embeds Figtree for headlines and Shantell Regular for support copy', async () => {
+    const [figtree, shantell] = await Promise.all([
+      fs.readFile(FIGTREE_BOLD_PATH),
+      fs.readFile(SHANTELL_REGULAR_PATH),
+    ]);
+    assert.ok(figtree.length > 1_000, 'Figtree Bold font file is empty');
+    assert.ok(shantell.length > 1_000, 'Shantell Regular font file is empty');
+
     const item = makeCampaign()[0];
     item.headline = 'SHIFT <ONE> LETTER';
     item.support = 'Move it down. Keep both words real.';
@@ -440,17 +522,68 @@ describe('Storybook Editorial composition', () => {
     const html = buildCompositionHtml({
       item,
       sourceBase64: 'SOURCE_BASE64',
-      regularFontBase64: 'REGULAR_BASE64',
-      boldFontBase64: 'BOLD_BASE64',
+      headlineFontBase64: 'FIGTREE_BOLD_BASE64',
+      supportFontBase64: 'SHANTELL_REGULAR_BASE64',
     });
 
     assert.match(html, /data:image\/png;base64,SOURCE_BASE64/);
-    assert.match(html, /data:font\/ttf;base64,REGULAR_BASE64/);
-    assert.match(html, /data:font\/ttf;base64,BOLD_BASE64/);
+    assert.match(html, /data:font\/ttf;base64,FIGTREE_BOLD_BASE64/);
+    assert.match(html, /data:font\/ttf;base64,SHANTELL_REGULAR_BASE64/);
+    assert.match(
+      html,
+      /\.headline\s*\{[\s\S]*?font-family: "Figtree", sans-serif;/
+    );
+    assert.match(
+      html,
+      /\.support\s*\{[\s\S]*?font-family: "Shantell", cursive;/
+    );
+    const shantellFace = html.match(
+      /@font-face\s*\{\s*font-family: "Shantell";([\s\S]*?)\n\s*\}/
+    )?.[1] ?? '';
+    assert.match(shantellFace, /font-weight: 400/);
+    assert.doesNotMatch(shantellFace, /font-weight: 700/);
     assert.match(html, /SHIFT &lt;ONE&gt; LETTER/);
     assert.match(html, /Move it down\. Keep both words real\./);
     assert.match(html, /alt="Authentic WordShift puzzle board\."/);
     assert.doesNotMatch(html, /SHIFT <ONE> LETTER/);
+  });
+
+  test('renders the exact cumulative unease cue matrix without future cues', () => {
+    for (let level = 1; level <= 7; level += 1) {
+      const item = {
+        ...makeCampaign()[level - 1],
+        uneaseLevel: level,
+      };
+      const html = buildCompositionHtml({
+        item,
+        sourceBase64: 'SOURCE_BASE64',
+        headlineFontBase64: 'FIGTREE_BOLD_BASE64',
+        supportFontBase64: 'SHANTELL_REGULAR_BASE64',
+      });
+      const cues = [...html.matchAll(/data-unease-cue="([^"]+)"/g)]
+        .map(match => match[1]);
+
+      assert.deepEqual(cues, EXPECTED_CUES_BY_LEVEL[level - 1]);
+      assert.doesNotMatch(html, /Math\.random/);
+      assert.doesNotMatch(
+        html,
+        /\b(fabricated button|entity|robe|gore)\b/i
+      );
+    }
+  });
+
+  test('rejects unease values outside integer levels one through seven', () => {
+    for (const uneaseLevel of [0, 8, 2.5, Number.NaN]) {
+      assert.throws(
+        () => buildCompositionHtml({
+          item: { ...makeCampaign()[0], uneaseLevel },
+          sourceBase64: 'SOURCE_BASE64',
+          headlineFontBase64: 'FIGTREE_BOLD_BASE64',
+          supportFontBase64: 'SHANTELL_REGULAR_BASE64',
+        }),
+        /unease level must be an integer from 1 to 7/
+      );
+    }
   });
 });
 
@@ -663,14 +796,13 @@ describe('Playwright composition integration', { concurrency: false }, () => {
   let fonts;
 
   before(async () => {
-    const fontDir = path.resolve(SCRIPT_DIR, '../../assets/fonts');
-    const [regular, bold] = await Promise.all([
-      fs.readFile(path.join(fontDir, 'ShantellSans-Regular.ttf')),
-      fs.readFile(path.join(fontDir, 'ShantellSans-Bold.ttf')),
+    const [headline, support] = await Promise.all([
+      fs.readFile(FIGTREE_BOLD_PATH),
+      fs.readFile(SHANTELL_REGULAR_PATH),
     ]);
     fonts = {
-      regular: regular.toString('base64'),
-      bold: bold.toString('base64'),
+      headline: headline.toString('base64'),
+      support: support.toString('base64'),
     };
     browser = await chromium.launch({ headless: true });
     context = await browser.newContext({
@@ -689,17 +821,17 @@ describe('Playwright composition integration', { concurrency: false }, () => {
     await browser?.close();
   });
 
-  async function writeIntegrationSource(filename) {
+  async function writeIntegrationSource(
+    filename,
+    encoded = encodeSolidPng(1080, 1920)
+  ) {
     const sourceDir = path.join(tempDir, 'source');
     await fs.mkdir(sourceDir, { recursive: true });
-    await fs.writeFile(
-      path.join(sourceDir, filename),
-      encodeSolidPng(1080, 1920)
-    );
+    await fs.writeFile(path.join(sourceDir, filename), encoded);
     return sourceDir;
   }
 
-  test('renders and re-encodes one campaign item as 1080x1920 RGB', async () => {
+  test('renders with loaded font roles, preserves source bytes, and emits RGB', async () => {
     const item = {
       ...makeCampaign()[0],
       source: 'valid-source.png',
@@ -708,6 +840,8 @@ describe('Playwright composition integration', { concurrency: false }, () => {
       support: 'Move it down. Keep both words real.',
     };
     const sourceDir = await writeIntegrationSource(item.source);
+    const sourcePath = path.join(sourceDir, item.source);
+    const sourceHashBefore = sha256(await fs.readFile(sourcePath));
     const outputDir = path.join(tempDir, 'staged');
     const browserPngDir = path.join(tempDir, 'browser');
 
@@ -726,9 +860,112 @@ describe('Playwright composition integration', { concurrency: false }, () => {
       bitDepth: 8,
       colorType: 2,
     });
+    assert.deepEqual(result.audit.fonts, {
+      status: 'loaded',
+      figtreeLoaded: true,
+      shantellLoaded: true,
+      headlineFamily: 'Figtree',
+      supportFamily: 'Shantell',
+    });
+    assert.equal(
+      sha256(await fs.readFile(sourcePath)),
+      sourceHashBefore,
+      'raw source bytes changed during composition'
+    );
     assert.deepEqual(
       await readPngMetadata(path.join(outputDir, item.final)),
       result.metadata
+    );
+  });
+
+  test('keeps every cue and copy box clipped inside composition geometry', async () => {
+    const item = {
+      ...makeCampaign()[6],
+      source: 'geometry-source.png',
+      final: 'geometry-final.png',
+    };
+    const sourceDir = await writeIntegrationSource(
+      item.source,
+      encodePatternPng(1080, 1920)
+    );
+    const result = await composeCampaignItem({
+      page,
+      item,
+      fonts,
+      sourceDir,
+      outputDir: path.join(tempDir, 'staged'),
+      browserPngDir: path.join(tempDir, 'browser'),
+    });
+
+    assert.deepEqual(
+      result.audit.cues.map(cue => cue.name),
+      EXPECTED_CUES_BY_LEVEL[6]
+    );
+    assert.equal(result.audit.allOverlaysIgnorePointerEvents, true);
+    assert.ok(result.audit.cues.every(cue => cue.pointerEvents === 'none'));
+    assert.ok(result.audit.cues.every(cue =>
+      cue.left >= result.audit.root.left
+      && cue.top >= result.audit.root.top
+      && cue.right <= result.audit.root.right
+      && cue.bottom <= result.audit.root.bottom
+    ));
+    assert.equal(result.audit.captureWindow.overflow, 'hidden');
+    assert.equal(result.audit.portraitEcho.overflow, 'hidden');
+    assert.equal(result.audit.portraitEcho.usesAuthenticSource, true);
+    assert.ok(
+      result.audit.headline.scrollWidth <= Math.ceil(result.audit.headline.width)
+    );
+    assert.ok(
+      result.audit.support.scrollWidth <= Math.ceil(result.audit.support.width)
+    );
+  });
+
+  test('repeats identical RGB pixel hashes at low, middle, and high unease', async () => {
+    const sourcePng = encodePatternPng(1080, 1920);
+    const pixelHashes = [];
+    for (const level of [1, 4, 7]) {
+      const item = {
+        ...makeCampaign()[0],
+        uneaseLevel: level,
+        source: `deterministic-${level}.png`,
+        final: `deterministic-${level}.png`,
+      };
+      const sourceDir = await writeIntegrationSource(item.source, sourcePng);
+      const first = await composeCampaignItem({
+        page,
+        item,
+        fonts,
+        sourceDir,
+        outputDir: path.join(tempDir, `first-${level}`),
+        browserPngDir: path.join(tempDir, `browser-first-${level}`),
+      });
+      const second = await composeCampaignItem({
+        page,
+        item,
+        fonts,
+        sourceDir,
+        outputDir: path.join(tempDir, `second-${level}`),
+        browserPngDir: path.join(tempDir, `browser-second-${level}`),
+      });
+
+      assert.deepEqual(first.metadata, {
+        width: 1080,
+        height: 1920,
+        bitDepth: 8,
+        colorType: 2,
+      });
+      assert.deepEqual(second.metadata, first.metadata);
+      assert.equal(
+        await pixelHash(second.outputPath),
+        await pixelHash(first.outputPath),
+        `level ${level} pixels are not deterministic`
+      );
+      pixelHashes.push(await pixelHash(first.outputPath));
+    }
+    assert.equal(
+      new Set(pixelHashes).size,
+      3,
+      'unease levels rendered identical pixels'
     );
   });
 
