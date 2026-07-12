@@ -20,6 +20,7 @@ export const PLAY_STORE_SCENARIO_NAMES = [
   'variant-menu',
   'flawless-victory',
   'home-dusk',
+  'home-storm',
 ] as const;
 
 export type PlayStoreScenarioName = typeof PLAY_STORE_SCENARIO_NAMES[number];

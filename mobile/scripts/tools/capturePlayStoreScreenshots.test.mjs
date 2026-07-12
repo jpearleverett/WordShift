@@ -51,6 +51,7 @@ const EXPECTED_SCENARIOS = [
   'variant-menu',
   'flawless-victory',
   'home-dusk',
+  'home-storm',
 ];
 
 const makeCampaign = () => EXPECTED_SCENARIOS.map((scenario, index) => ({
@@ -65,7 +66,7 @@ const makeCampaign = () => EXPECTED_SCENARIOS.map((scenario, index) => ({
 }));
 
 describe('capture campaign validation', () => {
-  test('accepts the exact seven-shot order, safe PNG basenames, and themes', () => {
+  test('accepts the exact eight-shot order, safe PNG basenames, and themes', () => {
     const campaign = makeCampaign();
 
     assert.deepEqual(APPROVED_SCENARIOS, EXPECTED_SCENARIOS);
@@ -97,34 +98,34 @@ describe('capture campaign validation', () => {
     assert.throws(() => validateCampaign(invalidOrder), /out of order/);
   });
 
-  test('requires unease levels one through seven in campaign order', () => {
+  test('requires unease levels one through eight in campaign order', () => {
     const missingLevel = makeCampaign();
     delete missingLevel[0].uneaseLevel;
     assert.throws(
       () => validateCampaign(missingLevel),
-      /unease level must be an integer from 1 to 7/
+      /unease level must be an integer from 1 to 8/
     );
 
     const repeatedLevel = makeCampaign();
-    repeatedLevel[6].uneaseLevel = 6;
+    repeatedLevel[7].uneaseLevel = 7;
     assert.throws(
       () => validateCampaign(repeatedLevel),
-      /strictly increase as 1, 2, 3, 4, 5, 6, 7/
+      /strictly increase as 1, 2, 3, 4, 5, 6, 7, 8/
     );
 
     const fractionalLevel = makeCampaign();
     fractionalLevel[3].uneaseLevel = 4.5;
     assert.throws(
       () => validateCampaign(fractionalLevel),
-      /unease level must be an integer from 1 to 7/
+      /unease level must be an integer from 1 to 8/
     );
 
-    for (const level of [0, 8]) {
+    for (const level of [0, 9]) {
       const outOfRange = makeCampaign();
       outOfRange[0].uneaseLevel = level;
       assert.throws(
         () => validateCampaign(outOfRange),
-        /unease level must be an integer from 1 to 7/
+        /unease level must be an integer from 1 to 8/
       );
     }
 
@@ -138,7 +139,7 @@ describe('capture campaign validation', () => {
     ];
     assert.throws(
       () => validateCampaign(descendingLevels),
-      /strictly increase as 1, 2, 3, 4, 5, 6, 7/
+      /strictly increase as 1, 2, 3, 4, 5, 6, 7, 8/
     );
   });
 });

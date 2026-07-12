@@ -68,5 +68,15 @@
     "altText": "WordShift animal house at dusk beneath a purple-orange sky, with the Jungle Hammock locked above furnished rooms.",
     "theme": "mystery",
     "uneaseLevel": 7
+  },
+  {
+    "scenario": "home-storm",
+    "source": "08_home_storm.png",
+    "final": "08_something_stirs.png",
+    "headline": "SOMETHING STIRS IN THE AIR",
+    "support": "Your friends know more than they are willing to say.",
+    "altText": "WordShift animal house beneath a storm-dark sky, with familiar companions waiting inside dimly lit rooms.",
+    "theme": "mystery",
+    "uneaseLevel": 8
   }
 ]

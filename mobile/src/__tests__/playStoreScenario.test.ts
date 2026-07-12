@@ -150,7 +150,7 @@ describe('Play Store screenshot scenarios', () => {
     jest.useRealTimers();
   });
 
-  test('exposes the seven approved scenarios in campaign order', () => {
+  test('exposes the eight approved scenarios in campaign order', () => {
     expect(PLAY_STORE_SCENARIO_NAMES).toEqual([
       'puzzle-preview',
       'puzzle-chain',
@@ -159,6 +159,7 @@ describe('Play Store screenshot scenarios', () => {
       'variant-menu',
       'flawless-victory',
       'home-dusk',
+      'home-storm',
     ]);
   });
 

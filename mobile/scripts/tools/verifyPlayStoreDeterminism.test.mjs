@@ -12,6 +12,7 @@ const REPO_ROOT = path.resolve(SCRIPT_DIR, '../../..');
 const PACKAGE_PATH = path.join(REPO_ROOT, 'mobile/package.json');
 const CHECKLIST_PATH = path.join(REPO_ROOT, 'docs/LAUNCH_CHECKLIST.md');
 const STORE_LISTING_PATH = path.join(REPO_ROOT, 'docs/STORE_LISTING.md');
+const CAMPAIGN_PATH = path.join(REPO_ROOT, 'docs/play-store/campaign.json');
 const VERIFIER_PATH = path.join(SCRIPT_DIR, 'verifyPlayStoreDeterminism.mjs');
 const PROTECTED_MANIFEST_PATH = path.join(
   REPO_ROOT,
@@ -113,6 +114,48 @@ describe('exclusive verifier lock', () => {
 });
 
 describe('publication preflight and comparison', () => {
+  test('requires the exact 17 generated outputs for the eight-shot campaign', async () => {
+    const core = await loadCore();
+    const currentCampaign = JSON.parse(await fs.readFile(CAMPAIGN_PATH, 'utf8'));
+    const stormShot = {
+      scenario: 'home-storm',
+      source: '08_home_storm.png',
+      final: '08_something_stirs.png',
+      headline: 'SOMETHING STIRS IN THE AIR',
+      support: 'Your friends know more than they are willing to say.',
+      altText: 'WordShift animal house beneath a storm-dark sky, with familiar companions waiting inside dimly lit rooms.',
+      theme: 'mystery',
+      uneaseLevel: 8,
+    };
+    const campaign = [
+      ...currentCampaign.filter(item => item.scenario !== stormShot.scenario),
+      stormShot,
+    ];
+
+    const outputs = core.buildRequiredOutputPaths(campaign);
+
+    assert.equal(outputs.length, 17);
+    assert.deepEqual(outputs, [
+      'docs/play-store/source/01_puzzle_preview.png',
+      'docs/play-store/source/02_puzzle_chain.png',
+      'docs/play-store/source/03_home_sunny.png',
+      'docs/play-store/source/04_animal_dialogue.png',
+      'docs/play-store/source/05_variant_menu.png',
+      'docs/play-store/source/06_flawless_victory.png',
+      'docs/play-store/source/07_home_dusk.png',
+      'docs/play-store/source/08_home_storm.png',
+      'docs/play-store/final/01_shift_one_letter.png',
+      'docs/play-store/final/02_every_word_stays_real.png',
+      'docs/play-store/final/03_build_a_home.png',
+      'docs/play-store/final/04_meet_unlikely_friends.png',
+      'docs/play-store/final/05_master_every_mode.png',
+      'docs/play-store/final/06_flawless_offering.png',
+      'docs/play-store/final/07_theyve_been_waiting.png',
+      'docs/play-store/final/08_something_stirs.png',
+      'docs/play-store/final/feature-graphic.png',
+    ]);
+  });
+
   test('rejects targeted dirty checked-in assets', async () => {
     const core = await loadCore();
     assert.equal(typeof core.assertTargetAssetsClean, 'function');
@@ -344,6 +387,9 @@ describe('isolated verifier integration contract', () => {
     assert.match(checklist, /detached temporary Git worktree/);
     assert.match(checklist, /approved feature-hash manifest/);
     assert.doesNotMatch(storeListing, /seven-shot regeneration pending/i);
-    assert.match(storeListing, /Android phone screenshots ×7, generated and validated/);
+    assert.match(
+      storeListing,
+      /Android phone screenshots ×8, 7 generated and validated; shot 8 generation pending/
+    );
   });
 });

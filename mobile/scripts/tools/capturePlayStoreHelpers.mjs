@@ -1,5 +1,4 @@
 import path from 'node:path';
-import { validateUneaseLevel } from './playStoreUnease.mjs';
 
 export const APPROVED_SCENARIOS = [
   'puzzle-preview',
@@ -9,6 +8,7 @@ export const APPROVED_SCENARIOS = [
   'variant-menu',
   'flawless-victory',
   'home-dusk',
+  'home-storm',
 ];
 
 export const CAMPAIGN_THEMES = new Set(['bright', 'dusk', 'mystery']);
@@ -125,7 +125,16 @@ export function validateCampaign(campaign) {
         throw new Error(`${item.scenario}: campaign field "${field}" is missing`);
       }
     }
-    validateUneaseLevel(item.uneaseLevel, item.scenario);
+    if (
+      !Number.isInteger(item.uneaseLevel)
+      || item.uneaseLevel < 1
+      || item.uneaseLevel > APPROVED_SCENARIOS.length
+    ) {
+      throw new Error(
+        `${item.scenario}: unease level must be an integer from 1 to `
+        + APPROVED_SCENARIOS.length
+      );
+    }
     if (!isSafePngBasename(item.source)) {
       throw new Error(`${item.scenario}: invalid source filename "${item.source}"`);
     }
@@ -145,7 +154,7 @@ export function validateCampaign(campaign) {
   const uneaseLevels = campaign.map(item => item.uneaseLevel);
   if (uneaseLevels.some((level, index) => level !== index + 1)) {
     throw new Error(
-      'Campaign unease levels must strictly increase as 1, 2, 3, 4, 5, 6, 7'
+      'Campaign unease levels must strictly increase as 1, 2, 3, 4, 5, 6, 7, 8'
     );
   }
 

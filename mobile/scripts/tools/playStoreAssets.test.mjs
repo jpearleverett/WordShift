@@ -129,6 +129,7 @@ const EXPECTED_SCENARIOS = [
   'variant-menu',
   'flawless-victory',
   'home-dusk',
+  'home-storm',
 ];
 const EXPECTED_SOURCES = [
   '01_puzzle_preview.png',
@@ -138,6 +139,7 @@ const EXPECTED_SOURCES = [
   '05_variant_menu.png',
   '06_flawless_victory.png',
   '07_home_dusk.png',
+  '08_home_storm.png',
 ];
 const EXPECTED_FINALS = [
   '01_shift_one_letter.png',
@@ -147,6 +149,7 @@ const EXPECTED_FINALS = [
   '05_master_every_mode.png',
   '06_flawless_offering.png',
   '07_theyve_been_waiting.png',
+  '08_something_stirs.png',
 ];
 const OLD_EIGHT_SOURCES = [
   '01_puzzle_preview.png',
@@ -176,6 +179,7 @@ const EXPECTED_HEADLINES = [
   'MASTER EVERY MODE',
   'CHASE A FLAWLESS OFFERING',
   "THEY'VE BEEN WAITING",
+  'SOMETHING STIRS IN THE AIR',
 ];
 const EXPECTED_SUPPORT = [
   'Move it down. Keep both words real. Something remains.',
@@ -185,6 +189,7 @@ const EXPECTED_SUPPORT = [
   'Reverse it. Race it. Hide the previews. The pattern still grows.',
   'No hints. No mistakes. It notices perfection.',
   'Some houses remember every word.',
+  'Your friends know more than they are willing to say.',
 ];
 const EXPECTED_ALT_TEXTS = [
   'WordShift puzzle board with the letter L selected and valid and invalid destination word previews visible.',
@@ -194,6 +199,7 @@ const EXPECTED_ALT_TEXTS = [
   'WordShift setup lists Standard, Reverse Shift, Speed Shift, Double Shift, Challenge, and Blind Mode.',
   'WordShift victory screen showing a flawless three-star solve and amber rewards.',
   'WordShift animal house at dusk beneath a purple-orange sky, with the Jungle Hammock locked above furnished rooms.',
+  'WordShift animal house beneath a storm-dark sky, with familiar companions waiting inside dimly lit rooms.',
 ];
 
 let tempDir;
@@ -477,21 +483,34 @@ describe('shared PNG helpers', () => {
 });
 
 describe('approved campaign manifest', () => {
-  test('defines the exact seven-shot order, names, filenames, copy, and unease', async () => {
+  test('defines the exact eight-shot order, names, filenames, copy, and unease', async () => {
     const campaign = JSON.parse(await fs.readFile(CAMPAIGN_PATH, 'utf8'));
 
-    assert.equal(campaign.length, 7);
+    assert.equal(campaign.length, 8);
     assert.deepEqual(campaign.map(item => item.scenario), EXPECTED_SCENARIOS);
     assert.deepEqual(campaign.map(item => item.source), EXPECTED_SOURCES);
     assert.deepEqual(campaign.map(item => item.final), EXPECTED_FINALS);
     assert.deepEqual(campaign.map(item => item.headline), EXPECTED_HEADLINES);
     assert.deepEqual(campaign.map(item => item.support), EXPECTED_SUPPORT);
-    assert.deepEqual(campaign.map(item => item.uneaseLevel), [1, 2, 3, 4, 5, 6, 7]);
-    assert.equal(new Set(campaign.map(item => item.scenario)).size, 7);
-    assert.equal(new Set(campaign.map(item => item.source)).size, 7);
-    assert.equal(new Set(campaign.map(item => item.final)).size, 7);
+    assert.deepEqual(
+      campaign.map(item => item.uneaseLevel),
+      [1, 2, 3, 4, 5, 6, 7, 8]
+    );
+    assert.equal(new Set(campaign.map(item => item.scenario)).size, 8);
+    assert.equal(new Set(campaign.map(item => item.source)).size, 8);
+    assert.equal(new Set(campaign.map(item => item.final)).size, 8);
     assert.ok(campaign.every(item => Number.isInteger(item.uneaseLevel)));
     assert.ok(campaign.every(item => item.scenario !== 'daily'));
+    assert.deepEqual(campaign.at(-1), {
+      scenario: 'home-storm',
+      source: '08_home_storm.png',
+      final: '08_something_stirs.png',
+      headline: 'SOMETHING STIRS IN THE AIR',
+      support: 'Your friends know more than they are willing to say.',
+      altText: 'WordShift animal house beneath a storm-dark sky, with familiar companions waiting inside dimly lit rooms.',
+      theme: 'mystery',
+      uneaseLevel: 8,
+    });
   });
 
   test('provides visible-only unique alt text within the 140-character limit', async () => {
@@ -499,7 +518,7 @@ describe('approved campaign manifest', () => {
     const altTexts = campaign.map(item => item.altText);
 
     assert.deepEqual(altTexts, EXPECTED_ALT_TEXTS);
-    assert.equal(new Set(altTexts).size, 7);
+    assert.equal(new Set(altTexts).size, 8);
     assert.ok(altTexts.every(text => text.length >= 60));
     assert.ok(altTexts.every(text => text.length <= 140));
     assert.ok(altTexts.every(text => text.trim().split(/\s+/).length >= 8));
@@ -527,7 +546,7 @@ describe('Google Play listing metadata', () => {
     )?.[1] ?? '';
     const tableRows = screenshotSection
       .split('\n')
-      .filter(line => /^\| [1-7] \|/.test(line))
+      .filter(line => /^\| [1-8] \|/.test(line))
       .map(line => line.split('|').slice(1, -1).map(cell => cell.trim()));
     const tablePaths = tableRows.map(cells => cells[1]);
     const tableHeadlines = tableRows.map(cells => cells[2]);
@@ -556,7 +575,7 @@ describe('Google Play listing metadata', () => {
       /Purchases never accelerate the story/
     );
     assert.match(fullDescription, /Take on a shared Daily Challenge/);
-    assert.equal(tableRows.length, 7);
+    assert.equal(tableRows.length, 8);
     assert.deepEqual(
       tablePaths,
       EXPECTED_FINALS.map(name => `\`docs/play-store/final/${name}\``)
@@ -591,7 +610,7 @@ describe('Google Play listing metadata', () => {
     );
   });
 
-  test('marks seven-shot regeneration complete while upload remains pending', async () => {
+  test('tracks shot-eight generation as pending while upload remains pending', async () => {
     const [listing, checklist] = await Promise.all([
       fs.readFile(STORE_LISTING_PATH, 'utf8'),
       fs.readFile(LAUNCH_CHECKLIST_PATH, 'utf8'),
@@ -599,7 +618,11 @@ describe('Google Play listing metadata', () => {
 
     assert.match(
       listing,
-      /- \[x\] Android phone screenshots ×7, generated and validated/
+      /- \[ \] Android phone screenshots ×8, 7 generated and validated; shot 8 generation pending/
+    );
+    assert.doesNotMatch(
+      listing,
+      /Android phone screenshots ×8, generated and validated/
     );
     assert.match(
       checklist,
@@ -930,7 +953,7 @@ describe('atomic staged publication', () => {
   });
 });
 
-describe('old-eight to new-seven atomic transition', () => {
+describe('retired daily to current campaign atomic transition', () => {
   test('source transition removes stale captures and preserves only the background', async () => {
     const campaign = makeCampaign();
     const campaignPath = await writeCampaign(campaign);
@@ -1593,7 +1616,7 @@ describe('mandatory authentic-source unease audit', { concurrency: false }, () =
 });
 
 describe('final Play Store asset validation', () => {
-  test('screenshots-only mode accepts all seven RGB screenshots without a feature graphic', async () => {
+  test('screenshots-only mode accepts all eight RGB screenshots without a feature graphic', async () => {
     const campaign = makeCampaign();
     const campaignPath = await writeCampaign(campaign);
     const finalDir = path.join(tempDir, 'final');
@@ -1605,7 +1628,7 @@ describe('final Play Store asset validation', () => {
       screenshotsOnly: true,
     });
 
-    assert.equal(results.length, 7);
+    assert.equal(results.length, 8);
     assert.ok(results.every(result => result.metadata.colorType === 2));
   });
 
@@ -1625,7 +1648,7 @@ describe('final Play Store asset validation', () => {
       encodeSolidPng(1024, 500)
     );
     const results = await validateFinalAssets({ campaignPath, finalDir });
-    assert.equal(results.length, 8);
+    assert.equal(results.length, 9);
   });
 
   test('rejects a screenshot with the wrong dimensions', async () => {
@@ -1702,7 +1725,7 @@ describe('final Play Store asset validation', () => {
 });
 
 describe('exact Play Store source-set validation', () => {
-  test('accepts exactly seven decoded raw screenshots and the audited background', async () => {
+  test('accepts exactly eight decoded raw screenshots and the audited background', async () => {
     const campaign = makeCampaign();
     const campaignPath = await writeCampaign(campaign);
     const sourceDir = path.join(tempDir, 'source');
@@ -1710,7 +1733,7 @@ describe('exact Play Store source-set validation', () => {
 
     const results = await validateSourceAssets({ campaignPath, sourceDir });
 
-    assert.equal(results.length, 8);
+    assert.equal(results.length, 9);
     assert.deepEqual(
       results.map(result => result.filename),
       [...EXPECTED_SOURCES, 'feature-background.png']
@@ -1808,8 +1831,8 @@ describe('exact Play Store directory-entry validation', () => {
       validateFinalAssets({ campaignPath, finalDir }),
     ]);
 
-    assert.equal(sources.length, 8);
-    assert.equal(finals.length, 8);
+    assert.equal(sources.length, 9);
+    assert.equal(finals.length, 9);
   });
 
   for (const kind of ['temporary file', 'JPEG file', 'nested directory']) {

@@ -27,9 +27,9 @@ export function buildRequiredOutputPaths(campaign) {
     ...approved.map(item => `docs/play-store/final/${item.final}`),
     'docs/play-store/final/feature-graphic.png',
   ];
-  if (outputs.length !== 15) {
+  if (outputs.length !== 17) {
     throw new Error(
-      `Determinism verification requires 15 generated outputs; found ${outputs.length}`
+      `Determinism verification requires 17 generated outputs; found ${outputs.length}`
     );
   }
   return outputs;
