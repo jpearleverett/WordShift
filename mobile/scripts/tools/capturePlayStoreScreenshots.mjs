@@ -9,10 +9,11 @@ import { chromium } from 'playwright';
 import { PNG } from 'pngjs';
 import {
   getValidDropZoneLabelMatcher,
-  getRequiredGroupUpwardShiftForVerticalClearance,
+  getRequiredCoherentGroupUpwardShift,
   isAllowedCaptureRequest,
   measureUnoccludedVisibleArea,
   requireAllVisibleCompanions,
+  requireCoherentVerticalGroupPlacement,
   requireNoPartialVerticalOcclusion,
   validateCampaign,
 } from './capturePlayStoreHelpers.mjs';
@@ -34,9 +35,10 @@ const BASE_URL = 'http://127.0.0.1:8091';
 const EXPO_HOST = '127.0.0.1';
 const EXPO_PORT = 8091;
 const HOME_PAN_ACTIVATION_DISTANCE = 10;
+const HOME_PAN_SETTLE_MARGIN = 2;
 const HOME_PAN_MAX_ATTEMPTS = 5;
-const HOME_SIGNAGE_ASSERTION_CLEARANCE = 0.5;
-const HOME_SIGNAGE_TARGET_CLEARANCE = 1;
+const HOME_SIGNAGE_ASSERTION_CLEARANCE = 0;
+const HOME_SIGNAGE_TARGET_CLEARANCE = 0;
 
 function describeError(error) {
   return error instanceof Error ? error.stack ?? error.message : String(error);
@@ -568,6 +570,7 @@ async function waitForAmbientOverlaySettled(page) {
 }
 
 async function measureHomeLockedRoomGeometry(page, scenario, amber) {
+  const header = page.getByTestId('home-header');
   const nextUnlockBar = page.getByLabel(/^Next unlock\./).first();
   const lockedRoom = page.getByLabel(
     'Build Jungle Hammock for 200 amber',
@@ -588,51 +591,74 @@ async function measureHomeLockedRoomGeometry(page, scenario, amber) {
     },
   ];
   await Promise.all([
+    header.waitFor({ state: 'visible' }),
     nextUnlockBar.waitFor({ state: 'visible' }),
     ...lockedRoomLines.map(({ locator }) =>
       locator.waitFor({ state: 'attached' })
     ),
   ]);
-  const [barBox, ...lineBoxes] = await Promise.all([
+  const [headerBox, barBox, ...lineBoxes] = await Promise.all([
+    header.boundingBox(),
     nextUnlockBar.boundingBox(),
     ...lockedRoomLines.map(({ locator }) => locator.boundingBox()),
   ]);
-  if (!barBox || lineBoxes.some(lineBox => !lineBox)) {
+  if (!headerBox || !barBox || lineBoxes.some(lineBox => !lineBox)) {
     throw new Error(
-      `Cannot measure ${scenario} Next Unlock and locked-room geometry`
+      `Cannot measure ${scenario} header, Next Unlock, and locked-room geometry`
     );
   }
-  return { barBox, lineBoxes, lockedRoomLines };
+  return { headerBox, barBox, lineBoxes, lockedRoomLines };
 }
 
 async function assertHomeLockedRoomGeometry(page, scenario, amber) {
   const {
+    headerBox,
     barBox,
     lineBoxes,
-    lockedRoomLines,
   } = await measureHomeLockedRoomGeometry(page, scenario, amber);
-  for (const [index, lineBox] of lineBoxes.entries()) {
-    const { label } = lockedRoomLines[index];
-    const relationship = requireNoPartialVerticalOcclusion(
-      { top: lineBox.y, bottom: lineBox.y + lineBox.height },
-      { top: barBox.y, bottom: barBox.y + barBox.height },
-      label,
-      HOME_SIGNAGE_ASSERTION_CLEARANCE
-    );
-    console.log(`[capture] ${scenario}: ${label} is ${relationship}`);
+  const aquariumBox = await page
+    .getByText('Aquarium Room', { exact: true })
+    .first()
+    .boundingBox();
+  if (!aquariumBox) {
+    throw new Error(`Cannot measure ${scenario} Aquarium Room label`);
   }
-}
-
-async function getHomeLockedRoomUpwardAdjustment(page, scenario, amber) {
-  const {
-    barBox,
-    lineBoxes,
-  } = await measureHomeLockedRoomGeometry(page, scenario, amber);
-  return getRequiredGroupUpwardShiftForVerticalClearance(
+  const aquariumRelationship = requireNoPartialVerticalOcclusion(
+    { top: aquariumBox.y, bottom: aquariumBox.y + aquariumBox.height },
+    { top: barBox.y, bottom: barBox.y + barBox.height },
+    `${scenario} Aquarium Room label`,
+    HOME_SIGNAGE_ASSERTION_CLEARANCE
+  );
+  if (aquariumRelationship !== 'clear') {
+    throw new Error(`${scenario} Aquarium Room label is not fully visible`);
+  }
+  const relationship = requireCoherentVerticalGroupPlacement(
     lineBoxes.map(lineBox => ({
       top: lineBox.y,
       bottom: lineBox.y + lineBox.height,
     })),
+    { top: headerBox.y, bottom: headerBox.y + headerBox.height },
+    { top: barBox.y, bottom: barBox.y + barBox.height },
+    `${scenario} locked-room text`,
+    HOME_SIGNAGE_ASSERTION_CLEARANCE
+  );
+  console.log(
+    `[capture] ${scenario}: locked-room text group is ${relationship}`
+  );
+}
+
+async function getHomeLockedRoomUpwardAdjustment(page, scenario, amber) {
+  const {
+    headerBox,
+    barBox,
+    lineBoxes,
+  } = await measureHomeLockedRoomGeometry(page, scenario, amber);
+  return getRequiredCoherentGroupUpwardShift(
+    lineBoxes.map(lineBox => ({
+      top: lineBox.y,
+      bottom: lineBox.y + lineBox.height,
+    })),
+    { top: headerBox.y, bottom: headerBox.y + headerBox.height },
     { top: barBox.y, bottom: barBox.y + barBox.height },
     HOME_SIGNAGE_TARGET_CLEARANCE
   );
@@ -661,7 +687,9 @@ async function dragHomePanSurface(page, requestedUpwardDistance) {
   const dragX = box.x + Math.max(12, Math.min(28, box.width * 0.08));
   const dragStartY = box.y + box.height * 0.82;
   const upwardDistance = Math.min(
-    requestedUpwardDistance + HOME_PAN_ACTIVATION_DISTANCE,
+    requestedUpwardDistance
+      + HOME_PAN_ACTIVATION_DISTANCE
+      + HOME_PAN_SETTLE_MARGIN,
     box.height * 0.42
   );
   const dragEndY = dragStartY - upwardDistance;

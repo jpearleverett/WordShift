@@ -411,62 +411,81 @@ describe('capture publication and stability policy', () => {
     );
   });
 
-  test('locked-room geometry derives the minimum upward correction', async () => {
+  test('locked-room text group rejects mixed header/sign visibility for sunny and storm', async () => {
     const helpers = await import('./capturePlayStoreHelpers.mjs');
     assert.equal(
-      typeof helpers.getRequiredUpwardShiftForVerticalClearance,
+      typeof helpers.requireCoherentVerticalGroupPlacement,
       'function'
     );
     assert.equal(
-      helpers.getRequiredUpwardShiftForVerticalClearance(
-        { top: 105, bottom: 124 },
-        { top: 112, bottom: 162 },
-        0.5
-      ),
-      12.5
-    );
-    assert.equal(
-      helpers.getRequiredUpwardShiftForVerticalClearance(
-        { top: 90, bottom: 110 },
-        { top: 112, bottom: 162 },
-        0.5
-      ),
-      0
-    );
-  });
-
-  test('locked-room group correction cannot uncover a lower label', async () => {
-    const helpers = await import('./capturePlayStoreHelpers.mjs');
-    assert.equal(
-      typeof helpers.getRequiredGroupUpwardShiftForVerticalClearance,
+      typeof helpers.getRequiredCoherentGroupUpwardShift,
       'function'
     );
-    const labels = [
-      { top: 93, bottom: 110 },
-      { top: 112, bottom: 131 },
-      { top: 133, bottom: 151 },
+    const header = { top: 0, bottom: 109 };
+    const nextUnlockSign = { top: 112, bottom: 162 };
+    assert.equal(
+      helpers.requireCoherentVerticalGroupPlacement(
+        [
+          { top: 80, bottom: 90 },
+          { top: 94, bottom: 104 },
+          { top: 108, bottom: 118 },
+        ],
+        { top: 0, bottom: 70 },
+        { top: 128, bottom: 178 },
+        'safe-gap locked-room text',
+        1
+      ),
+      'clear'
+    );
+    const fixtures = [
+      {
+        scenario: 'home-sunny',
+        labels: [
+          { top: 93, bottom: 110 },
+          { top: 112, bottom: 131 },
+          { top: 133, bottom: 151 },
+        ],
+      },
+      {
+        scenario: 'home-storm',
+        labels: [
+          { top: 91, bottom: 109 },
+          { top: 111, bottom: 130 },
+          { top: 132, bottom: 150 },
+        ],
+      },
     ];
-    const overlay = { top: 112, bottom: 162 };
-    const correction =
-      helpers.getRequiredGroupUpwardShiftForVerticalClearance(
-        labels,
-        overlay,
-        3
-      );
 
-    assert.equal(correction, 42);
-    for (const [index, label] of labels.entries()) {
+    for (const { scenario, labels } of fixtures) {
+      assert.throws(
+        () => helpers.requireCoherentVerticalGroupPlacement(
+          labels,
+          header,
+          nextUnlockSign,
+          `${scenario} locked-room text`,
+          1
+        ),
+        new RegExp(`${scenario} locked-room text has mixed vertical visibility`)
+      );
+      const correction = helpers.getRequiredCoherentGroupUpwardShift(
+        labels,
+        header,
+        nextUnlockSign,
+        1
+      );
+      assert.ok(correction > 0);
       assert.equal(
-        requireNoPartialVerticalOcclusion(
-          {
+        helpers.requireCoherentVerticalGroupPlacement(
+          labels.map(label => ({
             top: label.top - correction,
             bottom: label.bottom - correction,
-          },
-          overlay,
-          `label ${index + 1}`,
-          3
+          })),
+          header,
+          nextUnlockSign,
+          `${scenario} corrected locked-room text`,
+          1
         ),
-        'clear'
+        'occluded'
       );
     }
   });
@@ -474,7 +493,17 @@ describe('capture publication and stability policy', () => {
   test('home capture parameterizes locked-room geometry for sunny and storm', async () => {
     const runner = await fs.readFile(RUNNER_PATH, 'utf8');
 
-    assert.match(runner, /requireNoPartialVerticalOcclusion\(/);
+    assert.match(runner, /requireCoherentVerticalGroupPlacement\(/);
+    assert.match(runner, /getRequiredCoherentGroupUpwardShift\(/);
+    assert.match(runner, /const header = page\.getByTestId\('home-header'\)/);
+    assert.match(
+      runner,
+      /getByText\('Aquarium Room',\s*\{\s*exact:\s*true\s*\}\)/
+    );
+    assert.match(
+      runner,
+      /requireNoPartialVerticalOcclusion\([\s\S]*Aquarium Room label/
+    );
     assert.match(runner, /Build Jungle Hammock for 200 amber/);
     assert.match(
       runner,
@@ -516,9 +545,10 @@ describe('capture publication and stability policy', () => {
     assert.match(runner, /getByTestId\('home-world-pan-surface'\)/);
     assert.match(runner, /panSurface\.boundingBox\(\)/);
     assert.match(runner, /HOME_PAN_ACTIVATION_DISTANCE\s*=\s*10/);
+    assert.match(runner, /HOME_PAN_SETTLE_MARGIN\s*=\s*2/);
     assert.match(
       runner,
-      /requestedUpwardDistance\s*\+\s*HOME_PAN_ACTIVATION_DISTANCE/
+      /requestedUpwardDistance\s*\+\s*HOME_PAN_ACTIVATION_DISTANCE\s*\+\s*HOME_PAN_SETTLE_MARGIN/
     );
     assert.match(
       runner,

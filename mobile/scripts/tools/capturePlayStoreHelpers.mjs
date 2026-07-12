@@ -214,87 +214,124 @@ export function requireNoPartialVerticalOcclusion(
   );
 }
 
-export function getRequiredUpwardShiftForVerticalClearance(
-  subject,
-  overlay,
-  clearance = 2
-) {
-  for (const [name, rect] of [['subject', subject], ['overlay', overlay]]) {
-    if (
-      !rect
-      || !Number.isFinite(rect.top)
-      || !Number.isFinite(rect.bottom)
-      || rect.bottom <= rect.top
-    ) {
-      throw new Error(`Vertical clearance has invalid ${name} geometry`);
-    }
-  }
+function assertVerticalRect(rect, label) {
   if (
-    subject.bottom <= overlay.top - clearance
-    || subject.top >= overlay.bottom + clearance
-    || (
-      subject.top >= overlay.top + clearance
-      && subject.bottom <= overlay.bottom - clearance
-    )
+    !rect
+    || !Number.isFinite(rect.top)
+    || !Number.isFinite(rect.bottom)
+    || rect.bottom <= rect.top
   ) {
-    return 0;
+    throw new Error(`${label} has invalid vertical geometry`);
   }
-
-  const subjectHeight = subject.bottom - subject.top;
-  const overlayInnerHeight =
-    overlay.bottom - overlay.top - clearance * 2;
-  if (
-    subject.top < overlay.top + clearance
-    || subjectHeight > overlayInnerHeight
-  ) {
-    return subject.bottom - (overlay.top - clearance);
-  }
-  return subject.bottom - (overlay.bottom - clearance);
 }
 
-export function getRequiredGroupUpwardShiftForVerticalClearance(
+function classifyVerticalPlacement(subject, header, lowerOverlay, clearance) {
+  if (
+    subject.top >= header.bottom + clearance
+    && subject.bottom <= lowerOverlay.top - clearance
+  ) {
+    return 'clear';
+  }
+  if (
+    subject.bottom <= header.bottom - clearance
+    || (
+      subject.top >= lowerOverlay.top + clearance
+      && subject.bottom <= lowerOverlay.bottom - clearance
+    )
+  ) {
+    return 'occluded';
+  }
+  return 'partial';
+}
+
+export function requireCoherentVerticalGroupPlacement(
   subjects,
-  overlay,
+  header,
+  lowerOverlay,
+  groupLabel,
   clearance = 2
 ) {
   if (!Array.isArray(subjects) || subjects.length === 0) {
-    throw new Error('Vertical clearance group must contain at least one subject');
+    throw new Error(`${groupLabel} must contain at least one subject`);
   }
-  for (const subject of subjects) {
-    getRequiredUpwardShiftForVerticalClearance(subject, overlay, clearance);
+  assertVerticalRect(header, `${groupLabel} header`);
+  assertVerticalRect(lowerOverlay, `${groupLabel} lower overlay`);
+  if (header.bottom > lowerOverlay.top) {
+    throw new Error(`${groupLabel} overlays are out of vertical order`);
+  }
+  for (const [index, subject] of subjects.entries()) {
+    assertVerticalRect(subject, `${groupLabel} subject ${index + 1}`);
+  }
+
+  const placements = subjects.map(subject =>
+    classifyVerticalPlacement(subject, header, lowerOverlay, clearance)
+  );
+  if (placements.every(placement => placement === 'clear')) return 'clear';
+  if (placements.every(placement => placement === 'occluded')) {
+    return 'occluded';
+  }
+  throw new Error(
+    `${groupLabel} has mixed vertical visibility: ${placements.join(', ')}`
+  );
+}
+
+export function getRequiredCoherentGroupUpwardShift(
+  subjects,
+  header,
+  lowerOverlay,
+  clearance = 2
+) {
+  const groupLabel = 'Locked-room text group';
+  try {
+    requireCoherentVerticalGroupPlacement(
+      subjects,
+      header,
+      lowerOverlay,
+      groupLabel,
+      clearance
+    );
+    return 0;
+  } catch (error) {
+    if (!String(error).includes('mixed vertical visibility')) throw error;
   }
 
   const candidates = new Set([0]);
   for (const subject of subjects) {
     candidates.add(Math.max(
       0,
-      subject.bottom - (overlay.top - clearance)
+      subject.bottom - (header.bottom - clearance)
     ));
     candidates.add(Math.max(
       0,
-      subject.bottom - (overlay.bottom - clearance)
+      subject.bottom - (lowerOverlay.top - clearance)
     ));
   }
+  const groupBottom = Math.max(...subjects.map(subject => subject.bottom));
+  candidates.add(Math.max(
+    0,
+    groupBottom - (header.bottom - clearance)
+  ));
 
-  const isValidShift = shift => subjects.every(subject => {
-    const shifted = {
-      top: subject.top - shift,
-      bottom: subject.bottom - shift,
-    };
-    return shifted.bottom <= overlay.top - clearance
-      || shifted.top >= overlay.bottom + clearance
-      || (
-        shifted.top >= overlay.top + clearance
-        && shifted.bottom <= overlay.bottom - clearance
+  for (const correction of [...candidates].sort((first, second) => first - second)) {
+    if (correction === 0) continue;
+    const shifted = subjects.map(subject => ({
+      top: subject.top - correction,
+      bottom: subject.bottom - correction,
+    }));
+    try {
+      requireCoherentVerticalGroupPlacement(
+        shifted,
+        header,
+        lowerOverlay,
+        groupLabel,
+        clearance
       );
-  });
-  const correction = [...candidates]
-    .sort((first, second) => first - second)
-    .find(isValidShift);
-  if (correction === undefined) {
-    throw new Error('Vertical clearance group has no safe upward correction');
+      return correction;
+    } catch (error) {
+      if (!String(error).includes('mixed vertical visibility')) throw error;
+    }
   }
-  return correction;
+  throw new Error('Locked-room text group has no safe upward correction');
 }
 
 export function validateCampaign(campaign) {

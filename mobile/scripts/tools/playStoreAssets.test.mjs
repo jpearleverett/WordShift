@@ -305,6 +305,31 @@ async function pixelHash(filePath) {
   return sha256((await readPng(filePath)).data);
 }
 
+async function medianLuminanceInRegion(filePath, region) {
+  const png = await readPng(filePath);
+  const histogram = new Uint32Array(256);
+  let pixelCount = 0;
+  for (let y = region.top; y < region.bottom; y += 1) {
+    for (let x = region.left; x < region.right; x += 1) {
+      const offset = (y * png.width + x) * 4;
+      const luminance = Math.round(
+        png.data[offset] * 0.2126
+        + png.data[offset + 1] * 0.7152
+        + png.data[offset + 2] * 0.0722
+      );
+      histogram[luminance] += 1;
+      pixelCount += 1;
+    }
+  }
+  const midpoint = Math.ceil(pixelCount / 2);
+  let cumulative = 0;
+  for (let luminance = 0; luminance < histogram.length; luminance += 1) {
+    cumulative += histogram[luminance];
+    if (cumulative >= midpoint) return luminance;
+  }
+  throw new Error(`Cannot measure luminance for ${filePath}`);
+}
+
 async function pixelDeltaMetrics(baselinePath, composedPath) {
   const [baseline, composed] = await Promise.all([
     readPng(baselinePath),
@@ -1561,6 +1586,26 @@ describe('mandatory authentic-source unease audit', { concurrency: false }, () =
       sourceDigest,
       sha256(await fs.readFile(path.join(CHECKED_SOURCE_DIR, '07_home_dusk.png'))),
       'storm source must be distinct from the dusk source'
+    );
+    // This normalized source-world band excludes the fixed header/sign and PLAY
+    // dock. Median Rec. 709 luma resists bright room lamps and small text.
+    const sourceWorldBand = {
+      left: 0,
+      top: 500,
+      right: 1080,
+      bottom: 1700,
+    };
+    const [duskMedianLuminance, stormMedianLuminance] = await Promise.all([
+      medianLuminanceInRegion(
+        path.join(CHECKED_SOURCE_DIR, '07_home_dusk.png'),
+        sourceWorldBand
+      ),
+      medianLuminanceInRegion(sourcePath, sourceWorldBand),
+    ]);
+    assert.ok(
+      duskMedianLuminance - stormMedianLuminance >= 15,
+      `storm source world band must be visibly darker than dusk: `
+      + `dusk=${duskMedianLuminance}, storm=${stormMedianLuminance}`
     );
 
     const [sourceAssets, finalAssets] = await Promise.all([
