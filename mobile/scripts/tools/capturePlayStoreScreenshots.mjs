@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { PNG } from 'pngjs';
 import {
+  getValidDropZoneLabelMatcher,
   isAllowedCaptureRequest,
   validateCampaign,
 } from './capturePlayStoreHelpers.mjs';
@@ -259,27 +260,6 @@ async function waitForScreenTransition(page) {
   );
 }
 
-async function waitForLocatorAnimations(page, locator) {
-  await locator.waitFor();
-  const handle = await locator.elementHandle();
-  if (!handle) throw new Error('Animated capture surface is not attached');
-  await page.waitForFunction(element => {
-    let current = element;
-    while (current) {
-      const animations = typeof current.getAnimations === 'function'
-        ? current.getAnimations()
-        : [];
-      if (animations.some(animation =>
-        animation.playState === 'pending' || animation.playState === 'running'
-      )) {
-        return false;
-      }
-      current = current.parentElement;
-    }
-    return true;
-  }, handle);
-}
-
 async function waitForHome(page) {
   await page.getByLabel('Play puzzle', { exact: true }).waitFor();
   await page.getByLabel('Ember the fox', { exact: true }).waitFor();
@@ -484,21 +464,6 @@ async function prepareScenario(page, scenario) {
       }
       return;
 
-    case 'daily':
-      await page.getByLabel(/^Daily challenge completed\..*7 day streak\./).click();
-      await page.getByText('Today’s Standing', { exact: true }).waitFor();
-      await page.getByText(
-        'The standings are still gathering. Check back a little later. Daily streak: 7 days.',
-        { exact: true }
-      ).waitFor();
-      await page.getByLabel('OK', { exact: true }).waitFor();
-      await waitForLocatorAnimations(
-        page,
-        page.getByLabel('Dismiss alert', { exact: true })
-      );
-      await page.getByLabel('Play puzzle', { exact: true }).waitFor();
-      return;
-
     case 'flawless-victory':
       // Capture fixtures use reduced motion for deterministic static states.
       // Toggle it through the production Settings UI so this scenario can
@@ -506,9 +471,15 @@ async function prepareScenario(page, scenario) {
       await enableVictoryAnimation(page);
       await clickPlayPuzzle(page);
       await getActiveLetter(page, 'L').click();
-      await page.getByLabel('Drop zone 2', { exact: true }).click();
+      await page.getByLabel(
+        getValidDropZoneLabelMatcher(2, 'PLANT')
+      ).click();
+      console.log('[capture] flawless-victory: completed move 1 (PAY / PLANT)');
       await getActiveLetter(page, 'T').click();
-      await page.getByLabel('Drop zone 5', { exact: true }).click();
+      await page.getByLabel(
+        getValidDropZoneLabelMatcher(5, 'HEART')
+      ).click();
+      console.log('[capture] flawless-victory: completed move 2 (PLAN / HEART)');
       const skipCelebration = page.getByLabel(
         'Skip celebration animation',
         { exact: true }
@@ -521,6 +492,7 @@ async function prepareScenario(page, scenario) {
       await page.getByLabel('3 of 3 stars', { exact: true }).waitFor({
         timeout: 60_000,
       });
+      console.log('[capture] flawless-victory: victory complete (3 of 3 stars)');
       return;
 
     case 'home-dusk':
@@ -728,6 +700,7 @@ async function main() {
     throwIfInterrupted();
     await withStagedPublication({
       finalDir: SOURCE_DIR,
+      preserveNames: ['feature-background.png'],
       populateAndValidate: async stagingDir => {
         const results = [];
         for (const [index, item] of campaign.entries()) {

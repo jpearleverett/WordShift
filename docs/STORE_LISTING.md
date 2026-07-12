@@ -101,7 +101,7 @@ Legal pages are **LIVE and publicly accessible** via GitHub Pages (deployed from
 ## Asset checklist
 
 - [x] App icon 1024×1024 — `mobile/assets/icon.png`
-- [x] Android phone screenshots ×8, generated at 1080×1920 — `docs/play-store/final/`
+- [ ] Android phone screenshots ×7, seven-shot regeneration pending — `docs/play-store/final/`
 - [x] Feature graphic 1024×500 (Play), generated — `docs/play-store/final/feature-graphic.png`
 - [ ] iPhone 6.7" screenshots ×5 (needs device/simulator)
 - [ ] iPad 12.9" screenshots ×3 (supportsTablet is true)
@@ -110,14 +110,13 @@ Legal pages are **LIVE and publicly accessible** via GitHub Pages (deployed from
 
 | # | Final upload path | Headline | Support line | Unique alt text | Visible authentic state |
 |---:|---|---|---|---|---|
-| 1 | `docs/play-store/final/01_shift_one_letter.png` | SHIFT ONE LETTER | Move it down. Keep both words real. | WordShift puzzle board with the letter L selected and valid and invalid destination word previews visible. | Phase 0 puzzle board with L selected from PLAY and destination previews shown over PANT. |
-| 2 | `docs/play-store/final/02_every_word_stays_real.png` | EVERY WORD STAYS REAL | Build a chain one clever move at a time. | WordShift puzzle showing PAY, PLANT, and HEAR midway through a valid letter-shifting chain. | Phase 0 puzzle board midway through the PAY, PLANT, HEAR chain with PLANT active. |
-| 3 | `docs/play-store/final/03_build_a_home.png` | BUILD A HOME | Your words bring every room to life. | Sunny WordShift house with several furnished rooms and multiple animal companions. | Sunny house showing the Cozy Den, Rustic Kitchen, Scholar's Study, Aquarium Room, and their companions. |
-| 4 | `docs/play-store/final/04_meet_unlikely_friends.png` | MEET 13 UNLIKELY FRIENDS | They always have something to tell you. | Ember the fox speaking to the player in a warm dialogue scene over the animal house. | Ember's warm introductory dialogue open over the sunny animal house. |
-| 5 | `docs/play-store/final/05_master_every_mode.png` | MASTER EVERY MODE | Reverse, Double Shift, Speed, and Blind Offering. | WordShift setup menu displaying Standard, Reverse, Double Shift, Speed, and Blind Offering modes. | Puzzle setup menu with Standard selected and Reverse Shift, Speed Shift, Double Shift, and Blind Mode visible. |
-| 6 | `docs/play-store/final/06_new_puzzle_every_day.png` | A NEW PUZZLE EVERY DAY | Build your streak and compare your standing. | WordShift home after a completed Daily Challenge, showing a seven-day streak and a Today’s Standing dialog. | Phase 1 home with the completed Daily Challenge control and a Today’s Standing dialog showing a seven-day streak. |
-| 7 | `docs/play-store/final/07_flawless_offering.png` | CHASE A FLAWLESS OFFERING | No hints. No mistakes. One perfect chain. | WordShift victory screen showing a flawless three-star solve and amber rewards. | Phase 0 victory modal with three stars, a FLAWLESS ribbon, the PAY to PLAN to HEART chain, and amber rewards. |
-| 8 | `docs/play-store/final/08_theyve_been_waiting.png` | THEY'VE BEEN WAITING | Some houses remember every word. | WordShift animal house at dusk beneath a purple-orange sky, with the Jungle Hammock locked above furnished rooms. | Phase 2 dusk house with the Jungle Hammock still locked and no late-story imagery. |
+| 1 | `docs/play-store/final/01_shift_one_letter.png` | SHIFT ONE LETTER | Move it down. Keep both words real. Something remains. | WordShift puzzle board with the letter L selected and valid and invalid destination word previews visible. | Phase 0 puzzle board with L selected from PLAY and destination previews shown over PANT. |
+| 2 | `docs/play-store/final/02_every_word_stays_real.png` | EVERY WORD STAYS REAL | Build a chain one clever move at a time. The words remember. | WordShift puzzle showing PAY, PLANT, and HEAR midway through a valid letter-shifting chain. | Phase 0 puzzle board midway through the PAY, PLANT, HEAR chain with PLANT active. |
+| 3 | `docs/play-store/final/03_build_a_home.png` | BUILD A HOME | Your words bring every room to life. Every room was waiting. | Sunny WordShift house with several furnished rooms and multiple animal companions. | Sunny house showing the Cozy Den, Rustic Kitchen, Scholar's Study, Aquarium Room, and their companions. |
+| 4 | `docs/play-store/final/04_meet_unlikely_friends.png` | MEET 13 UNLIKELY FRIENDS | They always have something to tell you. Never everything. | Ember the fox speaking to the player in a warm dialogue scene over the animal house. | Ember's warm introductory dialogue open over the sunny animal house. |
+| 5 | `docs/play-store/final/05_master_every_mode.png` | MASTER EVERY MODE | Reverse it. Race it. Hide the previews. The pattern still grows. | WordShift setup menu displaying Standard, Reverse, Double Shift, Speed, and Blind Offering modes. | Puzzle setup menu with Standard selected and Reverse Shift, Speed Shift, Double Shift, and Blind Mode visible. |
+| 6 | `docs/play-store/final/06_flawless_offering.png` | CHASE A FLAWLESS OFFERING | No hints. No mistakes. It notices perfection. | WordShift victory screen showing a flawless three-star solve and amber rewards. | Phase 0 victory modal with three stars, a FLAWLESS ribbon, the PAY to PLAN to HEART chain, and amber rewards. |
+| 7 | `docs/play-store/final/07_theyve_been_waiting.png` | THEY'VE BEEN WAITING | Some houses remember every word. | WordShift animal house at dusk beneath a purple-orange sky, with the Jungle Hammock locked above furnished rooms. | Phase 2 dusk house with the Jungle Hammock still locked and no late-story imagery. |
 
 Final feature graphic: `docs/play-store/final/feature-graphic.png`
 Feature graphic alt text: Ember the fox beside the exact WordShift logo, candy tiles, glowing amber, and a sunny-to-dusk forest with subtle distant eyes.

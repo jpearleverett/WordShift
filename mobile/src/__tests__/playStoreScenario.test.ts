@@ -29,10 +29,6 @@ import {
   invalidatePuzzleStateCache,
 } from '../services/puzzleSaveState';
 import {
-  DAILY_CHALLENGE_UNLOCK_PUZZLES,
-  isDailyChallengeUnlocked,
-} from '../services/dailyChallenge';
-import {
   AMBER_REWARDS,
   FIRST_COMPLETION_BONUS,
 } from '../constants/gameBalance';
@@ -69,12 +65,6 @@ function stored<T>(scenario: PlayStoreScenario, key: string): T {
 
 function rowWords(save: { rows: { words: { char: string }[] }[] }): string[] {
   return save.rows.map(row => row.words.map(letter => letter.char).join(''));
-}
-
-function localDateWithOffset(dateString: string, days: number): string {
-  const date = parseLocalDate(dateString);
-  date.setDate(date.getDate() + days);
-  return getLocalDateString(date);
 }
 
 function localNoonTimestamp(dateString: string): number {
@@ -129,11 +119,6 @@ function resetModulesWithSeededStorage(): void {
   }));
 }
 
-function loadFreshDailyChallengeService(): typeof import('../services/dailyChallenge') {
-  resetModulesWithSeededStorage();
-  return require('../services/dailyChallenge');
-}
-
 function loadFreshAchievementService(): typeof import('../services/achievements') {
   resetModulesWithSeededStorage();
   return require('../services/achievements');
@@ -165,14 +150,13 @@ describe('Play Store screenshot scenarios', () => {
     jest.useRealTimers();
   });
 
-  test('exposes the eight approved scenarios in campaign order', () => {
+  test('exposes the seven approved scenarios in campaign order', () => {
     expect(PLAY_STORE_SCENARIO_NAMES).toEqual([
       'puzzle-preview',
       'puzzle-chain',
       'home-sunny',
       'animal-dialogue',
       'variant-menu',
-      'daily',
       'flawless-victory',
       'home-dusk',
     ]);
@@ -256,9 +240,16 @@ describe('Play Store screenshot scenarios', () => {
       soundEnabled: false,
       hapticsEnabled: false,
       reducedMotion: true,
+      swiftVictories: false,
     });
 
     const expected = buildPlayStoreScenario('home-sunny', '2026-07-11');
+    expect(JSON.parse(expected.storage.wordshift_settings)).toEqual({
+      soundEnabled: false,
+      hapticsEnabled: false,
+      reducedMotion: true,
+      swiftVictories: false,
+    });
     expect(AsyncStorage.clear).toHaveBeenCalledTimes(1);
     expect(AsyncStorage.multiSet).toHaveBeenCalledWith(
       Object.entries(expected.storage)
@@ -329,6 +320,7 @@ describe('Play Store screenshot scenarios', () => {
       soundEnabled: false,
       hapticsEnabled: false,
       reducedMotion: true,
+      swiftVictories: false,
     });
     expect(stored(scenario, 'wordshift_daily_login')).toEqual({
       lastClaimedDate: '2026-07-11',
@@ -480,55 +472,6 @@ describe('Play Store screenshot scenarios', () => {
     expect(save.currentPhase).toBe(progress.currentPhase);
   });
 
-  test('daily seed uses the supplied local date and approved streak state', () => {
-    const scenario = buildPlayStoreScenario('daily', '2026-03-09');
-    const home = stored<{ puzzlesSolved: number; currentPhase: number }>(
-      scenario,
-      'wordshift_home_progress'
-    );
-    const daily = stored<{
-      completedChallenges: { date: string; stars: number; completedAt: number }[];
-      totalCompleted: number;
-      currentStreak: number;
-      bestStreak: number;
-      lastCompletedDate: string;
-      streakFreezes: number;
-      firstDailyMercyGranted: boolean;
-    }>(scenario, 'wordshift_daily_challenge');
-
-    expect(home.puzzlesSolved).toBeGreaterThanOrEqual(
-      DAILY_CHALLENGE_UNLOCK_PUZZLES + daily.totalCompleted
-    );
-    expect(home.puzzlesSolved).toBeGreaterThanOrEqual(
-      DAILY_CHALLENGE_UNLOCK_PUZZLES
-    );
-    expect(isDailyChallengeUnlocked(home.puzzlesSolved, home.currentPhase)).toBe(true);
-    expect(daily.totalCompleted).toBe(19);
-    expect(daily.completedChallenges).toHaveLength(daily.totalCompleted);
-    expect(daily.completedChallenges.slice(0, 12).map(result => result.date))
-      .toEqual(Array.from(
-        { length: 12 },
-        (_, index) => localDateWithOffset('2026-03-09', index - 19)
-      ));
-    expect(daily.completedChallenges.slice(-7).map(result => result.date))
-      .toEqual(Array.from(
-        { length: 7 },
-        (_, index) => localDateWithOffset('2026-03-09', index - 6)
-      ));
-    expect(daily.completedChallenges.map(result => result.date))
-      .not.toContain(localDateWithOffset('2026-03-09', -7));
-    for (const result of daily.completedChallenges) {
-      expect(result.completedAt).toBe(localNoonTimestamp(result.date));
-    }
-    expect(daily).toMatchObject({
-      currentStreak: 7,
-      bestStreak: 12,
-      lastCompletedDate: '2026-03-09',
-      streakFreezes: 1,
-      firstDailyMercyGranted: true,
-    });
-  });
-
   test('flawless victory starts from curated puzzle zero without a saved board', () => {
     const scenario = buildPlayStoreScenario('flawless-victory', '2026-07-11');
     const progress = stored<{
@@ -582,7 +525,6 @@ describe('Play Store screenshot scenarios', () => {
     ['home-sunny', 12, 0, 12],
     ['animal-dialogue', 12, 0, 12],
     ['variant-menu', 40, 1, 40],
-    ['daily', 27, 1, 50],
     ['flawless-victory', 0, 0, 0],
     ['home-dusk', 60, 2, 70],
   ] as const)(
@@ -609,7 +551,6 @@ describe('Play Store screenshot scenarios', () => {
     ['home-sunny', 12],
     ['animal-dialogue', 12],
     ['variant-menu', 40],
-    ['daily', 27],
     ['home-dusk', 60],
   ] as const)('%s has complete stats matching home progress', (name, completed) => {
     const scenario = buildPlayStoreScenario(name, '2026-07-11');
@@ -713,44 +654,6 @@ describe('Play Store screenshot scenarios', () => {
       expect(save?.undosRemaining).toBe(Infinity);
     }
   );
-
-  test('daily hydrates the supplied completed date through production loaders', async () => {
-    const today = getLocalDateString();
-    await seedScenario('daily', today);
-    const {
-      getDailyStatus,
-      loadDailyProgress,
-    } = loadFreshDailyChallengeService();
-
-    const progress = await loadDailyProgress();
-    const status = await getDailyStatus();
-    const currentRunDates = Array.from(
-      { length: 7 },
-      (_, index) => localDateWithOffset(today, index - 6)
-    );
-
-    expect(progress.lastCompletedDate).toBe(today);
-    expect(progress.currentStreak).toBe(7);
-    expect(progress.bestStreak).toBe(12);
-    expect(progress.completedChallenges).toHaveLength(progress.totalCompleted);
-    expect(progress.completedChallenges.slice(-7).map(result => result.date))
-      .toEqual(currentRunDates);
-    expect(progress.completedChallenges.at(-1)).toEqual(expect.objectContaining({
-      date: today,
-      stars: 3,
-      completedAt: localNoonTimestamp(today),
-    }));
-    expect(status).toEqual(expect.objectContaining({
-      isCompleted: true,
-      streak: 7,
-      bestStreak: 12,
-      totalCompleted: progress.totalCompleted,
-    }));
-    expect(status.todayResult).toEqual(expect.objectContaining({
-      date: today,
-      stars: 3,
-    }));
-  });
 
   test('flawless victory hydrates its pre-unlocked achievements', async () => {
     await seedScenario('flawless-victory', '2026-07-11');

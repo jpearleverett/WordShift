@@ -208,8 +208,8 @@ function scheduleNotificationsUnlessCapturing(phase: number): void {
 // Install the global error handler at module load so it catches errors as
 // early as possible — including errors thrown during the first render.
 installGlobalErrorHandler();
-// Force the single app font (Kurale) onto every Text/TextInput before the
-// first render, so no screen can flash a system font while the font loads.
+// Force the body font onto every Text/TextInput before the first render, so no
+// screen can flash a system font while the font assets load.
 installGlobalFont();
 // Initialize Sentry's native SDK for crash reporting. Unlike the JS-only error
 // handler above, this captures NATIVE crashes (force-closes / SIGSEGV / Java
@@ -634,7 +634,9 @@ function MainApp() {
     if (__DEV__) {
       startFrameMonitoring();
     }
-    uploadToCloud().catch(() => {});
+    if (!captureActive) {
+      uploadToCloud().catch(() => {});
+    }
     return () => {
       if (__DEV__) {
         stopFrameMonitoring();
@@ -663,7 +665,7 @@ function MainApp() {
     if (persistence.cumulativeStats === null) return;
     if (notificationsScheduledRef.current) return;
     notificationsScheduledRef.current = true;
-    scheduleAllNotifications(persistence.currentPhase).catch(() => {});
+    scheduleNotificationsUnlessCapturing(persistence.currentPhase);
   }, [persistence.cumulativeStats, persistence.currentPhase]);
 
   // (The Android hardware-back handler lives below handleGoToPit — its deps
@@ -1887,8 +1889,10 @@ function MainApp() {
       scheduleNotificationsUnlessCapturing(persistence.currentPhase);
 
       // Mark cloud save as having pending changes
-      markPendingChanges().catch(() => {});
-      uploadToCloud().catch(() => {});
+      if (!captureActive) {
+        markPendingChanges().catch(() => {});
+        uploadToCloud().catch(() => {});
+      }
     } else if (result === null && puzzle.selectedLetter) {
       // Slot press happened but was invalid
       hapticError();
@@ -3596,29 +3600,29 @@ function App() {
         if (captureActive) {
           await preparePlayStoreCapture();
         } else {
-          // The wait is capped: D1 is decided on this exact launch, and a network
-          // stall must not read as a hung app.
+          // The wait is capped: first-launch state is decided on this exact
+          // launch, and a network stall must not read as a hung app.
           installCloudProviderIfConfigured();
           const restorePromise = maybeAutoRestoreOnFreshInstall();
-          // Background uploads (MainApp fires one on mount) wait for the restore
-          // to settle so a slow first launch can't push near-empty fresh-install
-          // state over the cloud row the restore is still downloading.
+          // Background uploads wait for restore settlement so a slow first
+          // launch cannot push near-empty state over the cloud row.
           holdUploadsUntil(restorePromise);
           const raced = await Promise.race([
             restorePromise.then((restored) => ({ restored, timedOut: false })),
             new Promise<{ restored: boolean; timedOut: boolean }>((resolve) =>
-              setTimeout(() => resolve({ restored: false, timedOut: true }), BOOT_RESTORE_RACE_MS)
+              setTimeout(
+                () => resolve({ restored: false, timedOut: true }),
+                BOOT_RESTORE_RACE_MS
+              )
             ),
           ]);
           if (raced.timedOut) {
             // Boot proceeds as a fresh install. If the restore later succeeds,
-            // apply it: re-run migrations over the restored data, then remount.
+            // migrate the restored data and remount every stateful hook.
             void restorePromise
               .then(async (restored) => {
                 if (restored && !cancelled) {
                   await runMigrations();
-                  // The remount hard-resets whatever the player was doing; the
-                  // notice tells them why (their cloud progress arrived).
                   pendingRestoreNotice = true;
                   setAppEpoch((epoch) => epoch + 1);
                 }
@@ -3661,18 +3665,20 @@ function App() {
         // loses a paid purchase. Local-only reads/writes — cheap to await, and
         // doing it before MainApp mounts means the first frame shows the
         // recovered balance.
-        try {
-          const pendingGrants = await reconcilePendingConsumableGrants();
-          for (const grant of pendingGrants) {
-            if (grant.reward.kind === 'amber') {
-              await awardBonusAmber(grant.reward.amount, `iap_recovered_${grant.productId}`);
-            } else {
-              await addHints(grant.reward.amount, `iap_recovered_${grant.productId}`);
+        if (!captureActive) {
+          try {
+            const pendingGrants = await reconcilePendingConsumableGrants();
+            for (const grant of pendingGrants) {
+              if (grant.reward.kind === 'amber') {
+                await awardBonusAmber(grant.reward.amount, `iap_recovered_${grant.productId}`);
+              } else {
+                await addHints(grant.reward.amount, `iap_recovered_${grant.productId}`);
+              }
+              await acknowledgeConsumableGrant(grant.grantId);
             }
-            await acknowledgeConsumableGrant(grant.grantId);
+          } catch (error) {
+            console.warn('Pending IAP grant recovery failed:', error);
           }
-        } catch (error) {
-          console.warn('Pending IAP grant recovery failed:', error);
         }
       } catch (error) {
         console.warn('Bootstrap init failed:', error);

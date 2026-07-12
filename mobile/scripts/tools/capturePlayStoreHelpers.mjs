@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { validateUneaseLevel } from './playStoreUnease.mjs';
 
 export const APPROVED_SCENARIOS = [
   'puzzle-preview',
@@ -6,7 +7,6 @@ export const APPROVED_SCENARIOS = [
   'home-sunny',
   'animal-dialogue',
   'variant-menu',
-  'daily',
   'flawless-victory',
   'home-dusk',
 ];
@@ -34,6 +34,18 @@ export function isAllowedCaptureRequest(urlString) {
   }
 }
 
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+export function getValidDropZoneLabelMatcher(position, formedWord) {
+  const escapedWord = escapeRegExp(formedWord);
+  return new RegExp(
+    `^(?:Drop|Guided drop) zone ${position}`
+    + `(?: of \\d+, forms ${escapedWord}, valid word)?$`
+  );
+}
+
 export function validateCampaign(campaign) {
   if (!Array.isArray(campaign) || campaign.length !== APPROVED_SCENARIOS.length) {
     throw new Error(
@@ -56,6 +68,7 @@ export function validateCampaign(campaign) {
         throw new Error(`${item.scenario}: campaign field "${field}" is missing`);
       }
     }
+    validateUneaseLevel(item.uneaseLevel, item.scenario);
     if (!isSafePngBasename(item.source)) {
       throw new Error(`${item.scenario}: invalid source filename "${item.source}"`);
     }
@@ -70,6 +83,13 @@ export function validateCampaign(campaign) {
     }
     sourceNames.add(item.source);
     finalNames.add(item.final);
+  }
+
+  const uneaseLevels = campaign.map(item => item.uneaseLevel);
+  if (uneaseLevels.some((level, index) => level !== index + 1)) {
+    throw new Error(
+      'Campaign unease levels must strictly increase as 1, 2, 3, 4, 5, 6, 7'
+    );
   }
 
   return campaign;

@@ -11,6 +11,11 @@ import {
   readPngMetadata,
   writeOpaquePng,
 } from './playStorePng.mjs';
+import {
+  cueGeometryCss,
+  getActiveUneaseCues,
+  validateUneaseLevel,
+} from './playStoreUnease.mjs';
 
 const SCRIPT_DIR = import.meta.dirname
   ?? path.dirname(fileURLToPath(import.meta.url));
@@ -19,13 +24,13 @@ const REPO_ROOT = path.resolve(MOBILE_DIR, '..');
 const CAMPAIGN_PATH = path.join(REPO_ROOT, 'docs/play-store/campaign.json');
 const SOURCE_DIR = path.join(REPO_ROOT, 'docs/play-store/source');
 const FINAL_DIR = path.join(REPO_ROOT, 'docs/play-store/final');
-const REGULAR_FONT_PATH = path.join(
+const HEADLINE_FONT_PATH = path.join(
+  MOBILE_DIR,
+  'assets/fonts/Figtree-Bold.ttf'
+);
+const SUPPORT_FONT_PATH = path.join(
   MOBILE_DIR,
   'assets/fonts/ShantellSans-Regular.ttf'
-);
-const BOLD_FONT_PATH = path.join(
-  MOBILE_DIR,
-  'assets/fonts/ShantellSans-Bold.ttf'
 );
 
 export const PLAY_STORE_PALETTES = Object.freeze({
@@ -48,6 +53,32 @@ export const COMPOSITION_LAYOUT = Object.freeze({
   captureHeight: 656,
 });
 
+function cueContent(cueDefinition, sourceBase64) {
+  if (cueDefinition.contentKind === 'source-echo') {
+    return `<img class="cue-portrait-source" `
+      + `src="data:image/png;base64,${sourceBase64}" alt="" aria-hidden="true">`;
+  }
+  if (cueDefinition.contentKind === 'eyes') {
+    const eye = '<span class="eye-shape" data-eye-shape>'
+      + '<i class="eye-core" data-eye-core></i></span>';
+    return eye + eye;
+  }
+  return '';
+}
+
+function renderUneaseCues(uneaseLevel, sourceBase64, scenario) {
+  return getActiveUneaseCues(uneaseLevel, scenario)
+    .map(cueDefinition =>
+      `<div class="unease-cue cue-${cueDefinition.name}" `
+      + `data-unease-cue="${cueDefinition.name}" `
+      + `data-unease-min-level="${cueDefinition.minLevel}" `
+      + `aria-hidden="true">`
+      + cueContent(cueDefinition, sourceBase64)
+      + '</div>'
+    )
+    .join('\n        ');
+}
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll('&', '&amp;')
@@ -67,9 +98,10 @@ function headlineFontSize(headline) {
 export function buildCompositionHtml({
   item,
   sourceBase64,
-  regularFontBase64,
-  boldFontBase64,
+  headlineFontBase64,
+  supportFontBase64,
 }) {
+  validateUneaseLevel(item?.uneaseLevel, item?.scenario);
   const palette = PLAY_STORE_PALETTES[item?.theme];
   if (!palette) {
     throw new Error(`${item?.scenario ?? 'campaign item'}: unsupported palette`);
@@ -79,6 +111,12 @@ export function buildCompositionHtml({
   const support = escapeHtml(item.support);
   const altText = escapeHtml(item.altText);
   const headlineSize = headlineFontSize(item.headline);
+  const uneaseCues = renderUneaseCues(
+    item.uneaseLevel,
+    sourceBase64,
+    item.scenario
+  );
+  const cueGeometry = cueGeometryCss();
   const layout = COMPOSITION_LAYOUT;
 
   return `<!doctype html>
@@ -88,16 +126,16 @@ export function buildCompositionHtml({
     <meta name="viewport" content="width=${layout.viewportWidth}, initial-scale=1">
     <style>
       @font-face {
-        font-family: "Shantell";
-        src: url(data:font/ttf;base64,${regularFontBase64}) format("truetype");
+        font-family: "Figtree";
+        src: url(data:font/ttf;base64,${headlineFontBase64}) format("truetype");
         font-style: normal;
-        font-weight: 400;
+        font-weight: 700;
       }
       @font-face {
         font-family: "Shantell";
-        src: url(data:font/ttf;base64,${boldFontBase64}) format("truetype");
+        src: url(data:font/ttf;base64,${supportFontBase64}) format("truetype");
         font-style: normal;
-        font-weight: 700;
+        font-weight: 400;
       }
       * {
         box-sizing: border-box;
@@ -110,7 +148,7 @@ export function buildCompositionHtml({
         background: ${background};
       }
       body {
-        font-family: "Shantell", sans-serif;
+        font-family: "Shantell", cursive;
         -webkit-font-smoothing: antialiased;
       }
       .composition {
@@ -122,6 +160,7 @@ export function buildCompositionHtml({
       }
       .copy-band {
         position: absolute;
+        z-index: 2;
         top: 6px;
         left: 6px;
         width: 420px;
@@ -145,6 +184,7 @@ export function buildCompositionHtml({
         max-width: 386px;
         overflow: hidden;
         color: ${ink};
+        font-family: "Figtree", sans-serif;
         font-size: ${headlineSize}px;
         font-weight: 700;
         line-height: 1.3;
@@ -156,6 +196,7 @@ export function buildCompositionHtml({
         max-width: 392px;
         overflow: hidden;
         color: ${ink};
+        font-family: "Shantell", cursive;
         font-size: 12.5px;
         font-weight: 400;
         line-height: 17px;
@@ -165,6 +206,7 @@ export function buildCompositionHtml({
       }
       .capture-frame {
         position: absolute;
+        z-index: 1;
         top: ${layout.frameTop}px;
         left: ${layout.frameLeft}px;
         width: ${layout.frameWidth}px;
@@ -177,6 +219,13 @@ export function buildCompositionHtml({
           0 0 0 2px ${amber},
           0 5px 0 ${ink};
       }
+      .capture-window {
+        position: relative;
+        width: ${layout.captureWidth}px;
+        height: ${layout.captureHeight}px;
+        overflow: hidden;
+        border-radius: 7px;
+      }
       .capture {
         display: block;
         width: ${layout.captureWidth}px;
@@ -184,20 +233,200 @@ export function buildCompositionHtml({
         object-fit: cover;
         border-radius: 7px;
       }
+      .unease-layer {
+        position: absolute;
+        z-index: 3;
+        inset: 0;
+        width: ${layout.viewportWidth}px;
+        height: ${layout.viewportHeight}px;
+        overflow: hidden;
+        pointer-events: none;
+      }
+      .unease-cue,
+      .unease-cue * {
+        position: absolute;
+        pointer-events: none;
+      }
+      ${cueGeometry}
+      .cue-crimson-glint {
+        opacity: 0.42;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          rgba(190, 50, 68, 0.72) 46%,
+          transparent
+        );
+      }
+      .cue-frame-grain {
+        border: 6px solid transparent;
+        border-radius: 12px;
+        opacity: 0.22;
+        background:
+          repeating-linear-gradient(
+            91deg,
+            transparent 0 19px,
+            rgba(255, 229, 190, 0.3) 20px,
+            transparent 21px 47px
+          ) border-box,
+          repeating-linear-gradient(
+            177deg,
+            transparent 0 31px,
+            rgba(84, 29, 45, 0.24) 32px,
+            transparent 33px 61px
+          ) border-box;
+        -webkit-mask:
+          linear-gradient(#000 0 0) padding-box,
+          linear-gradient(#000 0 0);
+        -webkit-mask-composite: xor;
+      }
+      .cue-title-sigil {
+        opacity: 0.24;
+        background: radial-gradient(
+          circle at center,
+          rgba(168, 63, 67, 0.72) 0 1px,
+          transparent 1.5px
+        );
+      }
+      .cue-title-sigil::before,
+      .cue-title-sigil::after {
+        content: "";
+        position: absolute;
+        top: 2px;
+        height: 1px;
+        background: rgba(142, 42, 58, 0.7);
+      }
+      .cue-title-sigil::before {
+        left: 5px;
+        width: 17px;
+        transform: rotate(-10deg);
+        transform-origin: right center;
+      }
+      .cue-title-sigil::after {
+        right: 5px;
+        width: 17px;
+        transform: rotate(10deg);
+        transform-origin: left center;
+      }
+      .cue-distant-eyes {
+        opacity: 0.5;
+      }
+      .eye-shape {
+        top: 2.5px;
+        width: 11px;
+        height: 5px;
+        overflow: visible;
+        background: rgba(53, 18, 31, 0.76);
+        clip-path: polygon(
+          0 50%,
+          22% 10%,
+          50% 0,
+          78% 10%,
+          100% 50%,
+          78% 90%,
+          50% 100%,
+          22% 90%
+        );
+        filter: drop-shadow(0 0 1.4px rgba(153, 34, 52, 0.5));
+      }
+      .eye-shape:first-child {
+        left: 1px;
+        transform: rotate(-2deg);
+      }
+      .eye-shape:last-child {
+        right: 1px;
+        transform: rotate(2deg);
+      }
+      .eye-core {
+        top: 1.9px;
+        left: 3.5px;
+        width: 4px;
+        height: 1.2px;
+        border-radius: 50%;
+        background: rgba(225, 67, 76, 0.82);
+        box-shadow: 0 0 2px rgba(202, 48, 65, 0.62);
+      }
+      .cue-portrait-echo {
+        overflow: hidden;
+        border-radius: 9px;
+        opacity: 0.1;
+        mix-blend-mode: screen;
+      }
+      .cue-portrait-source {
+        top: -455px;
+        left: -16px;
+        width: ${layout.captureWidth}px;
+        height: ${layout.captureHeight}px;
+        max-width: none;
+        object-fit: cover;
+        transform: translateX(2px);
+        filter: sepia(0.34) saturate(1.4) hue-rotate(318deg);
+      }
+      .cue-mode-thread {
+        opacity: 0.3;
+        background: linear-gradient(
+          180deg,
+          transparent,
+          rgba(186, 39, 59, 0.76) 12% 86%,
+          transparent
+        );
+        transform: rotate(0.8deg);
+        transform-origin: center;
+      }
+      .cue-reward-glow {
+        opacity: 0.31;
+        background: radial-gradient(
+          ellipse at center,
+          rgba(207, 43, 57, 0.42) 0,
+          rgba(164, 32, 52, 0.15) 38%,
+          transparent 70%
+        );
+        mix-blend-mode: screen;
+      }
+      .cue-dusk-vignette {
+        border-radius: 7px;
+        opacity: 0.72;
+        background: radial-gradient(
+          ellipse at 50% 43%,
+          transparent 46%,
+          rgba(26, 12, 40, 0.1) 72%,
+          rgba(17, 8, 31, 0.3) 100%
+        );
+      }
+      .cue-watching-eyes {
+        opacity: 0.68;
+      }
+      .cue-watching-eyes .eye-shape {
+        top: 1px;
+        width: 12px;
+        background: rgba(45, 13, 28, 0.84);
+      }
+      .composition[data-unease-level="6"] .cue-crimson-glint,
+      .composition[data-unease-level="7"] .cue-crimson-glint {
+        opacity: 0.52;
+      }
     </style>
   </head>
   <body>
-    <main class="composition" aria-label="${altText}">
+    <main
+      class="composition"
+      data-unease-level="${item.uneaseLevel}"
+      aria-label="${altText}"
+    >
       <header class="copy-band">
         <div class="headline">${headline}</div>
         <div class="support">${support}</div>
       </header>
       <div class="capture-frame">
-        <img
-          class="capture"
-          src="data:image/png;base64,${sourceBase64}"
-          alt="${altText}"
-        >
+        <div class="capture-window">
+          <img
+            class="capture"
+            src="data:image/png;base64,${sourceBase64}"
+            alt="${altText}"
+          >
+        </div>
+      </div>
+      <div class="unease-layer" aria-hidden="true">
+        ${uneaseCues}
       </div>
     </main>
   </body>
@@ -219,17 +448,10 @@ async function pathExists(targetPath) {
   }
 }
 
-async function copyDirectoryContents(sourceDir, destinationDir) {
-  if (!await pathExists(sourceDir)) return;
-  const sourceStat = await fs.stat(sourceDir);
-  if (!sourceStat.isDirectory()) {
-    throw new Error(`${sourceDir} is not a directory`);
-  }
-  const entries = await fs.readdir(sourceDir);
-  await Promise.all(entries.map(entry => fs.cp(
-    path.join(sourceDir, entry),
-    path.join(destinationDir, entry),
-    { recursive: true }
+async function copyPreservedEntries(sourceDir, destinationDir, preserveNames) {
+  await Promise.all(preserveNames.map(name => fs.copyFile(
+    path.join(sourceDir, name),
+    path.join(destinationDir, name)
   )));
 }
 
@@ -256,6 +478,7 @@ async function replaceDirectory(stagingDir, finalDir) {
 
 export async function withStagedPublication({
   finalDir,
+  preserveNames = [],
   populateAndValidate,
 }) {
   if (typeof populateAndValidate !== 'function') {
@@ -278,7 +501,7 @@ export async function withStagedPublication({
   await fs.chmod(stagingDir, finalDirectoryMode);
 
   try {
-    await copyDirectoryContents(finalDir, stagingDir);
+    await copyPreservedEntries(finalDir, stagingDir, preserveNames);
     await populateAndValidate(stagingDir);
     await replaceDirectory(stagingDir, finalDir);
   } finally {
@@ -293,7 +516,8 @@ async function waitForComposition(page, item) {
     if (!(capture instanceof HTMLImageElement)) {
       throw new Error('Authentic source image is missing');
     }
-    await capture.decode();
+    const images = [...document.querySelectorAll('img')];
+    await Promise.all(images.map(image => image.decode()));
     await new Promise(resolve => requestAnimationFrame(() => {
       requestAnimationFrame(resolve);
     }));
@@ -303,7 +527,15 @@ async function waitForComposition(page, item) {
     const headline = document.querySelector('.headline');
     const support = document.querySelector('.support');
     const frame = document.querySelector('.capture-frame');
-    if (!root || !band || !headline || !support || !frame) {
+    const captureWindow = document.querySelector('.capture-window');
+    if (
+      !root
+      || !band
+      || !headline
+      || !support
+      || !frame
+      || !captureWindow
+    ) {
       throw new Error('Composition structure is incomplete');
     }
     const toBounds = element => {
@@ -321,6 +553,22 @@ async function waitForComposition(page, item) {
         scrollHeight: element.scrollHeight,
       };
     };
+    const cueElements = [...document.querySelectorAll('[data-unease-cue]')];
+    const overlayElements = [
+      ...document.querySelectorAll('.unease-layer, .unease-layer *'),
+    ];
+    const portraitEcho = document.querySelector('.cue-portrait-echo');
+    const portraitSource = portraitEcho?.querySelector('.cue-portrait-source');
+    const firstFamily = element => getComputedStyle(element)
+      .fontFamily
+      .split(',')[0]
+      .replaceAll('"', '')
+      .trim();
+    const loadedFaces = [...document.fonts].map(face => ({
+      family: face.family.replaceAll('"', '').trim(),
+      weight: face.weight,
+      status: face.status,
+    }));
     return {
       viewport: {
         width: window.innerWidth,
@@ -331,12 +579,45 @@ async function waitForComposition(page, item) {
       headline: toBounds(headline),
       support: toBounds(support),
       frame: toBounds(frame),
+      captureWindow: {
+        ...toBounds(captureWindow),
+        overflow: getComputedStyle(captureWindow).overflow,
+      },
       capture: toBounds(capture),
+      cues: cueElements.map(element => ({
+        name: element.dataset.uneaseCue,
+        ...toBounds(element),
+        pointerEvents: getComputedStyle(element).pointerEvents,
+      })),
+      allOverlaysIgnorePointerEvents: overlayElements.every(
+        element => getComputedStyle(element).pointerEvents === 'none'
+      ),
+      portraitEcho: portraitEcho ? {
+        ...toBounds(portraitEcho),
+        overflow: getComputedStyle(portraitEcho).overflow,
+        usesAuthenticSource:
+          portraitSource instanceof HTMLImageElement
+          && portraitSource.currentSrc === capture.currentSrc,
+      } : null,
       natural: {
         width: capture.naturalWidth,
         height: capture.naturalHeight,
       },
-      fontsStatus: document.fonts.status,
+      fonts: {
+        status: document.fonts.status,
+        figtreeLoaded: loadedFaces.some(face =>
+          face.family === 'Figtree'
+          && face.weight === '700'
+          && face.status === 'loaded'
+        ),
+        shantellLoaded: loadedFaces.some(face =>
+          face.family === 'Shantell'
+          && face.weight === '400'
+          && face.status === 'loaded'
+        ),
+        headlineFamily: firstFamily(headline),
+        supportFamily: firstFamily(support),
+      },
     };
   });
 
@@ -361,6 +642,8 @@ async function waitForComposition(page, item) {
   if (
     audit.capture.width !== layout.captureWidth
     || audit.capture.height !== layout.captureHeight
+    || audit.captureWindow.width !== layout.captureWidth
+    || audit.captureWindow.height !== layout.captureHeight
   ) {
     throw new Error(
       `${item.scenario}: authentic capture area is not `
@@ -388,9 +671,65 @@ async function waitForComposition(page, item) {
   ) {
     throw new Error(`${item.scenario}: composition extends outside the viewport`);
   }
-  if (audit.fontsStatus !== 'loaded') {
-    throw new Error(`${item.scenario}: embedded Shantell fonts did not load`);
+  const expectedCues = getActiveUneaseCues(
+    item.uneaseLevel,
+    item.scenario
+  ).map(cueDefinition => cueDefinition.name);
+  const cueNames = audit.cues.map(cue => cue.name);
+  if (JSON.stringify(cueNames) !== JSON.stringify(expectedCues)) {
+    throw new Error(
+      `${item.scenario}: unease cues do not match level ${item.uneaseLevel}`
+    );
   }
+  if (!audit.allOverlaysIgnorePointerEvents) {
+    throw new Error(`${item.scenario}: an unease overlay accepts pointer events`);
+  }
+  for (const cue of audit.cues) {
+    if (
+      cue.pointerEvents !== 'none'
+      || cue.left < audit.root.left
+      || cue.top < audit.root.top
+      || cue.right > audit.root.right
+      || cue.bottom > audit.root.bottom
+    ) {
+      throw new Error(
+        `${item.scenario}: cue "${cue.name}" is interactive or out of bounds`
+      );
+    }
+  }
+  for (const cue of audit.cues) {
+    if (
+      cue.left < audit.frame.left
+      || cue.top < audit.frame.top
+      || cue.right > audit.frame.right
+      || cue.bottom > audit.frame.bottom
+    ) {
+      throw new Error(`${item.scenario}: cue "${cue.name}" escaped the frame`);
+    }
+  }
+  if (audit.captureWindow.overflow !== 'hidden') {
+    throw new Error(`${item.scenario}: source capture is not clipped to its frame`);
+  }
+  if (
+    item.uneaseLevel >= 4
+    && (
+      !audit.portraitEcho
+      || audit.portraitEcho.overflow !== 'hidden'
+      || !audit.portraitEcho.usesAuthenticSource
+    )
+  ) {
+    throw new Error(`${item.scenario}: portrait echo is not authentic or clipped`);
+  }
+  if (
+    audit.fonts.status !== 'loaded'
+    || !audit.fonts.figtreeLoaded
+    || !audit.fonts.shantellLoaded
+    || audit.fonts.headlineFamily !== 'Figtree'
+    || audit.fonts.supportFamily !== 'Shantell'
+  ) {
+    throw new Error(`${item.scenario}: embedded marketing fonts did not load`);
+  }
+  return audit;
 }
 
 export async function composeCampaignItem({
@@ -412,12 +751,12 @@ export async function composeCampaignItem({
   const html = buildCompositionHtml({
     item,
     sourceBase64,
-    regularFontBase64: fonts.regular,
-    boldFontBase64: fonts.bold,
+    headlineFontBase64: fonts.headline,
+    supportFontBase64: fonts.support,
   });
 
   await page.setContent(html, { waitUntil: 'load' });
-  await waitForComposition(page, item);
+  const audit = await waitForComposition(page, item);
 
   await fs.mkdir(browserPngDir, { recursive: true });
   const browserPngPath = path.join(browserPngDir, `${item.scenario}.png`);
@@ -448,6 +787,7 @@ export async function composeCampaignItem({
   return {
     outputPath,
     metadata,
+    audit,
     digest: createHash('sha256')
       .update(await fs.readFile(outputPath))
       .digest('hex'),
@@ -456,13 +796,13 @@ export async function composeCampaignItem({
 
 async function main() {
   const campaign = await loadCampaign();
-  const [regularFont, boldFont] = await Promise.all([
-    fs.readFile(REGULAR_FONT_PATH),
-    fs.readFile(BOLD_FONT_PATH),
+  const [headlineFont, supportFont] = await Promise.all([
+    fs.readFile(HEADLINE_FONT_PATH),
+    fs.readFile(SUPPORT_FONT_PATH),
   ]);
   const fonts = {
-    regular: regularFont.toString('base64'),
-    bold: boldFont.toString('base64'),
+    headline: headlineFont.toString('base64'),
+    support: supportFont.toString('base64'),
   };
   const tempDir = await fs.mkdtemp(
     path.join(os.tmpdir(), 'wordshift-play-store-compose-')
@@ -490,6 +830,7 @@ async function main() {
     const page = await context.newPage();
     await withStagedPublication({
       finalDir: FINAL_DIR,
+      preserveNames: ['feature-graphic.png'],
       populateAndValidate: async stagingDir => {
         const results = [];
         for (const [index, item] of campaign.entries()) {

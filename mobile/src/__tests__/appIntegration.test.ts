@@ -40,7 +40,7 @@ describe('Play Store capture bootstrap isolation', () => {
 
     const seedIndex = bootstrap.indexOf('await preparePlayStoreCapture();');
     const cloudRestoreIndex = bootstrap.indexOf(
-      'await maybeAutoRestoreOnFreshInstall();'
+      'const restorePromise = maybeAutoRestoreOnFreshInstall();'
     );
     const migrationIndex = bootstrap.indexOf('await runMigrations();');
     expect(seedIndex).toBeGreaterThan(-1);
@@ -53,10 +53,16 @@ describe('Play Store capture bootstrap isolation', () => {
       /if \(!captureActive\) \{\s*logEvent\(\{ type: 'app_open' \}\);\s*\}/
     );
     expect(bootstrap).toMatch(
-      /if \(captureActive\) \{\s*await preparePlayStoreCapture\(\);\s*\} else \{\s*installCloudProviderIfConfigured\(\);\s*await maybeAutoRestoreOnFreshInstall\(\);\s*\}/
+      /if \(captureActive\) \{\s*await preparePlayStoreCapture\(\);\s*\} else \{[\s\S]*installCloudProviderIfConfigured\(\);[\s\S]*const restorePromise = maybeAutoRestoreOnFreshInstall\(\);/
     );
     expect(bootstrap).toMatch(
       /if \(!captureActive\) \{[\s\S]*setBillingProvider\(createRevenueCatBillingProvider\(\)\);[\s\S]*setAdProvider\(createAdMobAdProvider\(\)\);[\s\S]*void initIAP\(\)\.catch[\s\S]*void initAds\(\)\.catch/
+    );
+    expect(bootstrap).toMatch(
+      /if \(!captureActive\) \{\s*try \{\s*const pendingGrants = await reconcilePendingConsumableGrants\(\);/
+    );
+    expect(APP_TSX).toMatch(
+      /if \(!captureActive\) \{\s*uploadToCloud\(\)\.catch\(\(\) => \{\}\);\s*\}/
     );
   });
 
