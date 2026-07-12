@@ -101,7 +101,7 @@ Legal pages are **LIVE and publicly accessible** via GitHub Pages (deployed from
 ## Asset checklist
 
 - [x] App icon 1024×1024 — `mobile/assets/icon.png`
-- [ ] Android phone screenshots ×8, 7 generated and validated; shot 8 generation pending — `docs/play-store/final/`
+- [x] Android phone screenshots ×8, generated and validated — `docs/play-store/final/`
 - [x] Feature graphic 1024×500 (Play), generated — `docs/play-store/final/feature-graphic.png`
 - [ ] iPhone 6.7" screenshots ×5 (needs device/simulator)
 - [ ] iPad 12.9" screenshots ×3 (supportsTablet is true)
@@ -119,8 +119,8 @@ Legal pages are **LIVE and publicly accessible** via GitHub Pages (deployed from
 | 7 | `docs/play-store/final/07_theyve_been_waiting.png` | THEY'VE BEEN WAITING | Some houses remember every word. | WordShift animal house at dusk beneath a purple-orange sky, with the Jungle Hammock locked above furnished rooms. | Phase 2 dusk house with the Jungle Hammock still locked and no late-story imagery. |
 | 8 | `docs/play-store/final/08_something_stirs.png` | SOMETHING STIRS IN THE AIR | Your friends know more than they are willing to say. | WordShift animal house beneath a storm-dark sky, with familiar companions waiting inside dimly lit rooms. | Phase 3 storm house with familiar non-robed companions waiting inside dimly lit rooms. |
 
-Shot 8 is approved in the campaign metadata, but its PNG remains pending the
-final generation task. Shots 1 through 7 are the current generated files.
+All eight screenshots are generated and validated. Play Console upload remains
+a human task.
 
 Final feature graphic: `docs/play-store/final/feature-graphic.png`
 Feature graphic alt text: Ember the fox beside the exact WordShift logo, candy tiles, glowing amber, and a sunny-to-dusk forest with subtle distant eyes.

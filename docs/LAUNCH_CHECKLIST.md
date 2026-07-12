@@ -6,10 +6,10 @@ the codebase and are the remaining gates to submission.
 
 ## Android (submission-blocking)
 
-- [x] **Generate Play Store creative** — DONE (2026-07-12): regenerated seven
+- [x] **Generate Play Store creative** — DONE (2026-07-12): regenerated eight
       1080x1920 screenshots from the merged campaign branch at current branch HEAD;
       `npm run verify:play-store-determinism` ran the complete pipeline twice
-      in a detached temporary Git worktree. All 15 outputs matched each other
+      in a detached temporary Git worktree. All 17 outputs matched each other
       and the checked-in publication. The approved feature-hash manifest held,
       and the active checkout's publication stayed untouched.
 - [ ] **Upload Play Store creative** — upload the generated phone screenshots

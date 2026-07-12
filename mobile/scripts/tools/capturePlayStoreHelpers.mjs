@@ -252,6 +252,51 @@ export function getRequiredUpwardShiftForVerticalClearance(
   return subject.bottom - (overlay.bottom - clearance);
 }
 
+export function getRequiredGroupUpwardShiftForVerticalClearance(
+  subjects,
+  overlay,
+  clearance = 2
+) {
+  if (!Array.isArray(subjects) || subjects.length === 0) {
+    throw new Error('Vertical clearance group must contain at least one subject');
+  }
+  for (const subject of subjects) {
+    getRequiredUpwardShiftForVerticalClearance(subject, overlay, clearance);
+  }
+
+  const candidates = new Set([0]);
+  for (const subject of subjects) {
+    candidates.add(Math.max(
+      0,
+      subject.bottom - (overlay.top - clearance)
+    ));
+    candidates.add(Math.max(
+      0,
+      subject.bottom - (overlay.bottom - clearance)
+    ));
+  }
+
+  const isValidShift = shift => subjects.every(subject => {
+    const shifted = {
+      top: subject.top - shift,
+      bottom: subject.bottom - shift,
+    };
+    return shifted.bottom <= overlay.top - clearance
+      || shifted.top >= overlay.bottom + clearance
+      || (
+        shifted.top >= overlay.top + clearance
+        && shifted.bottom <= overlay.bottom - clearance
+      );
+  });
+  const correction = [...candidates]
+    .sort((first, second) => first - second)
+    .find(isValidShift);
+  if (correction === undefined) {
+    throw new Error('Vertical clearance group has no safe upward correction');
+  }
+  return correction;
+}
+
 export function validateCampaign(campaign) {
   if (!Array.isArray(campaign) || campaign.length !== APPROVED_SCENARIOS.length) {
     throw new Error(

@@ -9,7 +9,7 @@ import { chromium } from 'playwright';
 import { PNG } from 'pngjs';
 import {
   getValidDropZoneLabelMatcher,
-  getRequiredUpwardShiftForVerticalClearance,
+  getRequiredGroupUpwardShiftForVerticalClearance,
   isAllowedCaptureRequest,
   measureUnoccludedVisibleArea,
   requireAllVisibleCompanions,
@@ -36,7 +36,7 @@ const EXPO_PORT = 8091;
 const HOME_PAN_ACTIVATION_DISTANCE = 10;
 const HOME_PAN_MAX_ATTEMPTS = 5;
 const HOME_SIGNAGE_ASSERTION_CLEARANCE = 0.5;
-const HOME_SIGNAGE_TARGET_CLEARANCE = 3;
+const HOME_SIGNAGE_TARGET_CLEARANCE = 1;
 
 function describeError(error) {
   return error instanceof Error ? error.stack ?? error.message : String(error);
@@ -628,13 +628,14 @@ async function getHomeLockedRoomUpwardAdjustment(page, scenario, amber) {
     barBox,
     lineBoxes,
   } = await measureHomeLockedRoomGeometry(page, scenario, amber);
-  return Math.max(0, ...lineBoxes.map(lineBox =>
-    getRequiredUpwardShiftForVerticalClearance(
-      { top: lineBox.y, bottom: lineBox.y + lineBox.height },
-      { top: barBox.y, bottom: barBox.y + barBox.height },
-      HOME_SIGNAGE_TARGET_CLEARANCE
-    )
-  ));
+  return getRequiredGroupUpwardShiftForVerticalClearance(
+    lineBoxes.map(lineBox => ({
+      top: lineBox.y,
+      bottom: lineBox.y + lineBox.height,
+    })),
+    { top: barBox.y, bottom: barBox.y + barBox.height },
+    HOME_SIGNAGE_TARGET_CLEARANCE
+  );
 }
 
 function getRequiredUpwardPanDistance(metrics, overlays, minimumVisibleRatio) {

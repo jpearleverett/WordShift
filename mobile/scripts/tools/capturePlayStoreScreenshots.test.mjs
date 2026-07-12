@@ -435,6 +435,42 @@ describe('capture publication and stability policy', () => {
     );
   });
 
+  test('locked-room group correction cannot uncover a lower label', async () => {
+    const helpers = await import('./capturePlayStoreHelpers.mjs');
+    assert.equal(
+      typeof helpers.getRequiredGroupUpwardShiftForVerticalClearance,
+      'function'
+    );
+    const labels = [
+      { top: 93, bottom: 110 },
+      { top: 112, bottom: 131 },
+      { top: 133, bottom: 151 },
+    ];
+    const overlay = { top: 112, bottom: 162 };
+    const correction =
+      helpers.getRequiredGroupUpwardShiftForVerticalClearance(
+        labels,
+        overlay,
+        3
+      );
+
+    assert.equal(correction, 42);
+    for (const [index, label] of labels.entries()) {
+      assert.equal(
+        requireNoPartialVerticalOcclusion(
+          {
+            top: label.top - correction,
+            bottom: label.bottom - correction,
+          },
+          overlay,
+          `label ${index + 1}`,
+          3
+        ),
+        'clear'
+      );
+    }
+  });
+
   test('home capture parameterizes locked-room geometry for sunny and storm', async () => {
     const runner = await fs.readFile(RUNNER_PATH, 'utf8');
 

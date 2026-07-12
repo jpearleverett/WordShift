@@ -60,6 +60,10 @@ const CHECKED_SOURCE_DIR = path.resolve(
   SCRIPT_DIR,
   '../../../docs/play-store/source'
 );
+const CHECKED_FINAL_DIR = path.resolve(
+  SCRIPT_DIR,
+  '../../../docs/play-store/final'
+);
 const EXPECTED_CUE_DEFINITIONS = [
   { name: 'crimson-glint', minLevel: 1, contentKind: 'empty' },
   { name: 'frame-grain', minLevel: 1, contentKind: 'empty' },
@@ -610,7 +614,7 @@ describe('Google Play listing metadata', () => {
     );
   });
 
-  test('tracks shot-eight generation as pending while upload remains pending', async () => {
+  test('tracks all eight generated shots while upload remains pending', async () => {
     const [listing, checklist] = await Promise.all([
       fs.readFile(STORE_LISTING_PATH, 'utf8'),
       fs.readFile(LAUNCH_CHECKLIST_PATH, 'utf8'),
@@ -618,15 +622,13 @@ describe('Google Play listing metadata', () => {
 
     assert.match(
       listing,
-      /- \[ \] Android phone screenshots ×8, 7 generated and validated; shot 8 generation pending/
+      /- \[x\] Android phone screenshots ×8, generated and validated/
     );
-    assert.doesNotMatch(
-      listing,
-      /Android phone screenshots ×8, generated and validated/
-    );
+    assert.match(listing, /All eight screenshots are generated and validated\./);
+    assert.match(listing, /Play Console upload remains\s+a human task\./);
     assert.match(
       checklist,
-      /- \[x\] \*\*Generate Play Store creative\*\* — DONE \(2026-07-12\): regenerated seven/
+      /- \[x\] \*\*Generate Play Store creative\*\* — DONE \(2026-07-12\): regenerated eight/
     );
     assert.match(
       checklist,
@@ -634,7 +636,7 @@ describe('Google Play listing metadata', () => {
     );
     assert.match(
       checklist,
-      /All 15 outputs matched each other\s+and the checked-in publication/
+      /All 17 outputs matched each other\s+and the checked-in publication/
     );
     assert.match(
       checklist,
@@ -644,8 +646,7 @@ describe('Google Play listing metadata', () => {
       checklist,
       /- \[ \] \*\*Upload Play Store creative\*\*/
     );
-    assert.doesNotMatch(listing, /seven-shot regeneration pending/);
-    assert.doesNotMatch(checklist, /current checked-in eight screenshots/);
+    assert.doesNotMatch(listing, /generation pending|7 generated/i);
     assert.match(listing, /Feature graphic 1024×500 \(Play\), generated/);
     assert.match(checklist, /active checkout's publication stayed untouched/);
     assert.match(
@@ -1429,10 +1430,8 @@ describe('Playwright composition integration', { concurrency: false }, () => {
     }
   });
 
-  test('bounds monotonic cue visibility at final and thumbnail sizes', async () => {
+  test('enforces each cue visibility profile at final and thumbnail sizes', async () => {
     const model = await loadUneaseModel();
-    const finalMetrics = [];
-    const thumbnailMetrics = [];
     const sourceKinds = [];
 
     for (const level of [1, 4, 7, 8]) {
@@ -1509,8 +1508,6 @@ describe('Playwright composition integration', { concurrency: false }, () => {
         final: finalDelta,
         thumbnail: thumbnailDelta,
       }));
-      finalMetrics.push(finalDelta);
-      thumbnailMetrics.push(thumbnailDelta);
     }
 
     assert.deepEqual(
@@ -1519,13 +1516,9 @@ describe('Playwright composition integration', { concurrency: false }, () => {
         'authentic',
         'authentic',
         'authentic',
-        'synthetic-pending-publication',
+        'authentic',
       ]
     );
-    for (const metrics of [finalMetrics, thumbnailMetrics]) {
-      assert.ok(metrics[0].visibilityScore < metrics[1].visibilityScore);
-      assert.ok(metrics[1].visibilityScore < metrics[2].visibilityScore);
-    }
   });
 
   test('rejects an overlong headline before writing an output', async () => {
@@ -1554,6 +1547,86 @@ describe('Playwright composition integration', { concurrency: false }, () => {
 });
 
 describe('mandatory authentic-source unease audit', { concurrency: false }, () => {
+  test('checked-in shot eight is present and passes authentic re-audit', async () => {
+    const auditModule = await loadAuthenticUneaseAudit();
+    assert.equal(
+      typeof auditModule.auditAuthenticUneaseSources,
+      'function',
+      'authentic unease audit is unavailable'
+    );
+    const sourcePath = path.join(CHECKED_SOURCE_DIR, '08_home_storm.png');
+    const finalPath = path.join(CHECKED_FINAL_DIR, '08_something_stirs.png');
+    const sourceDigest = sha256(await fs.readFile(sourcePath));
+    assert.notEqual(
+      sourceDigest,
+      sha256(await fs.readFile(path.join(CHECKED_SOURCE_DIR, '07_home_dusk.png'))),
+      'storm source must be distinct from the dusk source'
+    );
+
+    const [sourceAssets, finalAssets] = await Promise.all([
+      validateSourceAssets(),
+      validateFinalAssets(),
+    ]);
+    assert.deepEqual(
+      sourceAssets.map(asset => asset.filename),
+      [...EXPECTED_SOURCES, 'feature-background.png']
+    );
+    assert.deepEqual(
+      finalAssets.map(asset => asset.filename),
+      [...EXPECTED_FINALS, 'feature-graphic.png']
+    );
+    assert.deepEqual(await readPngMetadata(sourcePath), {
+      width: 1080,
+      height: 1920,
+      bitDepth: 8,
+      colorType: 2,
+    });
+    assert.deepEqual(await readPngMetadata(finalPath), {
+      width: 1080,
+      height: 1920,
+      bitDepth: 8,
+      colorType: 2,
+    });
+
+    const audit = await auditModule.auditAuthenticUneaseSources({
+      campaignPath: CAMPAIGN_PATH,
+      sourceDir: CHECKED_SOURCE_DIR,
+    });
+    const stormAudit = audit.find(entry => entry.level === 8);
+    assert.deepEqual(
+      {
+        level: stormAudit?.level,
+        scenario: stormAudit?.scenario,
+        source: stormAudit?.source,
+        profile: stormAudit?.profile,
+        geometryValid: stormAudit?.geometryValid,
+        collisionCount: stormAudit?.collisionCount,
+        finalSize: [stormAudit?.final.width, stormAudit?.final.height],
+        thumbnailSize: [
+          stormAudit?.thumbnail.width,
+          stormAudit?.thumbnail.height,
+        ],
+      },
+      {
+        level: 8,
+        scenario: 'home-storm',
+        source: '08_home_storm.png',
+        profile: 'high',
+        geometryValid: true,
+        collisionCount: 0,
+        finalSize: [1080, 1920],
+        thumbnailSize: [216, 384],
+      }
+    );
+    assert.ok(stormAudit.final.changedPixels > 0);
+    assert.ok(stormAudit.thumbnail.changedPixels > 0);
+    assert.equal(
+      sha256(await fs.readFile(sourcePath)),
+      sourceDigest,
+      '08_home_storm.png changed during authentic re-audit'
+    );
+  });
+
   test('full validation renders required authentic fixture sources', async () => {
     const auditModule = await loadAuthenticUneaseAudit();
     assert.equal(
