@@ -144,6 +144,10 @@ describe('capture publication and stability policy', () => {
       runner,
       /await withStagedPublication\(\{\s*finalDir: SOURCE_DIR,/
     );
+    assert.match(
+      runner,
+      /preserveNames:\s*\['feature-background\.png'\]/
+    );
     assert.match(runner, /captureScenario\(browser, item, stagingDir\)/);
     assert.doesNotMatch(
       runner,

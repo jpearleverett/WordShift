@@ -700,6 +700,7 @@ async function main() {
     throwIfInterrupted();
     await withStagedPublication({
       finalDir: SOURCE_DIR,
+      preserveNames: ['feature-background.png'],
       populateAndValidate: async stagingDir => {
         const results = [];
         for (const [index, item] of campaign.entries()) {

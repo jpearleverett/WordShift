@@ -29,6 +29,7 @@ const CAMPAIGN_PATH = path.resolve(
   SCRIPT_DIR,
   '../../../docs/play-store/campaign.json'
 );
+const COMPOSER_PATH = path.join(SCRIPT_DIR, 'composePlayStoreScreenshots.mjs');
 const STORE_LISTING_PATH = path.resolve(
   SCRIPT_DIR,
   '../../../docs/STORE_LISTING.md'
@@ -67,6 +68,26 @@ const EXPECTED_FINALS = [
   '05_master_every_mode.png',
   '06_flawless_offering.png',
   '07_theyve_been_waiting.png',
+];
+const OLD_EIGHT_SOURCES = [
+  '01_puzzle_preview.png',
+  '02_puzzle_chain.png',
+  '03_home_sunny.png',
+  '04_animal_dialogue.png',
+  '05_variant_menu.png',
+  '06_daily.png',
+  '07_flawless_victory.png',
+  '08_home_dusk.png',
+];
+const OLD_EIGHT_FINALS = [
+  '01_shift_one_letter.png',
+  '02_every_word_stays_real.png',
+  '03_build_a_home.png',
+  '04_meet_unlikely_friends.png',
+  '05_master_every_mode.png',
+  '06_new_puzzle_every_day.png',
+  '07_flawless_offering.png',
+  '08_theyve_been_waiting.png',
 ];
 const EXPECTED_HEADLINES = [
   'SHIFT ONE LETTER',
@@ -171,6 +192,13 @@ async function writeFinalSet(finalDir, campaign) {
     path.join(finalDir, 'feature-graphic.png'),
     encodeSolidPng(1024, 500)
   );
+}
+
+async function writeNamedPngSet(directory, names, encoded) {
+  await fs.mkdir(directory, { recursive: true });
+  await Promise.all(names.map(name =>
+    fs.writeFile(path.join(directory, name), encoded)
+  ));
 }
 
 async function addUnexpectedEntry(directory, kind) {
@@ -341,14 +369,23 @@ describe('Google Play listing metadata', () => {
     );
   });
 
-  test('documents seven generated Android screenshots without changing feature assets', async () => {
+  test('marks seven-shot regeneration pending without changing feature assets', async () => {
     const [listing, checklist] = await Promise.all([
       fs.readFile(STORE_LISTING_PATH, 'utf8'),
       fs.readFile(LAUNCH_CHECKLIST_PATH, 'utf8'),
     ]);
 
-    assert.match(listing, /Android phone screenshots ×7, generated at 1080×1920/);
-    assert.match(checklist, /seven 1080x1920 phone screenshots and/);
+    assert.match(
+      listing,
+      /- \[ \] Android phone screenshots ×7, seven-shot regeneration pending/
+    );
+    assert.match(
+      checklist,
+      /- \[ \] \*\*Generate Play Store creative\*\* — seven-shot screenshot regeneration is pending\./
+    );
+    assert.match(checklist, /current checked-in eight screenshots/);
+    assert.doesNotMatch(listing, /- \[x\] Android phone screenshots ×7/);
+    assert.doesNotMatch(checklist, /- \[x\] \*\*Generate Play Store creative\*\*/);
     assert.match(listing, /Feature graphic 1024×500 \(Play\), generated/);
     assert.match(checklist, /the 1024x500 feature graphic/);
   });
@@ -442,7 +479,7 @@ describe('atomic staged publication', () => {
     assert.deepEqual(await fs.readdir(tempDir), ['final']);
   });
 
-  test('publishes the completed staged directory and preserves other assets', async () => {
+  test('publishes a fresh staged directory with only explicitly preserved assets', async () => {
     const finalDir = path.join(tempDir, 'final');
     await fs.mkdir(finalDir, { recursive: true });
     const originalMode = (await fs.stat(finalDir)).mode & 0o777;
@@ -451,12 +488,13 @@ describe('atomic staged publication', () => {
 
     await withStagedPublication({
       finalDir,
+      preserveNames: ['feature-graphic.png'],
       populateAndValidate: async stagingDir => {
         assert.equal(
           await fs.readFile(path.join(stagingDir, 'feature-graphic.png'), 'utf8'),
           'feature'
         );
-        await fs.rm(path.join(stagingDir, 'old.png'));
+        await assert.rejects(fs.access(path.join(stagingDir, 'old.png')));
         await fs.writeFile(path.join(stagingDir, 'new.png'), 'new screenshot');
       },
     });
@@ -472,6 +510,149 @@ describe('atomic staged publication', () => {
     await assert.rejects(fs.access(path.join(finalDir, 'old.png')));
     assert.equal((await fs.stat(finalDir)).mode & 0o777, originalMode);
     assert.deepEqual(await fs.readdir(tempDir), ['final']);
+  });
+
+  test('composition runner preserves only the current feature graphic', async () => {
+    const composer = await fs.readFile(COMPOSER_PATH, 'utf8');
+
+    assert.match(
+      composer,
+      /await withStagedPublication\(\{\s*finalDir: FINAL_DIR,\s*preserveNames:\s*\['feature-graphic\.png'\]/
+    );
+  });
+});
+
+describe('old-eight to new-seven atomic transition', () => {
+  test('source transition removes stale captures and preserves only the background', async () => {
+    const campaign = makeCampaign();
+    const campaignPath = await writeCampaign(campaign);
+    const sourceDir = path.join(tempDir, 'source');
+    const sourcePng = encodeSolidPng(1080, 1920);
+    const featureBackground = encodeSolidPng(1536, 1024);
+    await writeNamedPngSet(sourceDir, OLD_EIGHT_SOURCES, sourcePng);
+    await fs.writeFile(
+      path.join(sourceDir, 'feature-background.png'),
+      featureBackground
+    );
+
+    await withStagedPublication({
+      finalDir: sourceDir,
+      preserveNames: ['feature-background.png'],
+      populateAndValidate: async stagingDir => {
+        await writeNamedPngSet(stagingDir, EXPECTED_SOURCES, sourcePng);
+        await validateSourceAssets({ campaignPath, sourceDir: stagingDir });
+      },
+    });
+
+    assert.deepEqual(
+      (await fs.readdir(sourceDir)).sort(),
+      [...EXPECTED_SOURCES, 'feature-background.png'].sort()
+    );
+    assert.deepEqual(
+      await fs.readFile(path.join(sourceDir, 'feature-background.png')),
+      featureBackground
+    );
+    for (const staleName of [
+      '06_daily.png',
+      '07_flawless_victory.png',
+      '08_home_dusk.png',
+    ]) {
+      await assert.rejects(fs.access(path.join(sourceDir, staleName)));
+    }
+  });
+
+  test('source transition rollback preserves the complete old eight-shot directory', async () => {
+    const campaign = makeCampaign();
+    const campaignPath = await writeCampaign(campaign);
+    const sourceDir = path.join(tempDir, 'source');
+    const sourcePng = encodeSolidPng(1080, 1920);
+    await writeNamedPngSet(sourceDir, OLD_EIGHT_SOURCES, sourcePng);
+    await fs.writeFile(
+      path.join(sourceDir, 'feature-background.png'),
+      encodeSolidPng(1536, 1024)
+    );
+    const before = await snapshotDirectory(sourceDir);
+
+    await assert.rejects(
+      withStagedPublication({
+        finalDir: sourceDir,
+        preserveNames: ['feature-background.png'],
+        populateAndValidate: async stagingDir => {
+          await writeNamedPngSet(stagingDir, EXPECTED_SOURCES, sourcePng);
+          await validateSourceAssets({ campaignPath, sourceDir: stagingDir });
+          throw new Error('injected source publication failure');
+        },
+      }),
+      /injected source publication failure/
+    );
+
+    assert.deepEqual(await snapshotDirectory(sourceDir), before);
+  });
+
+  test('final transition removes stale compositions and preserves only the feature graphic', async () => {
+    const campaign = makeCampaign();
+    const campaignPath = await writeCampaign(campaign);
+    const finalDir = path.join(tempDir, 'final');
+    const screenshotPng = encodeSolidPng(1080, 1920);
+    const featureGraphic = encodeSolidPng(1024, 500);
+    await writeNamedPngSet(finalDir, OLD_EIGHT_FINALS, screenshotPng);
+    await fs.writeFile(
+      path.join(finalDir, 'feature-graphic.png'),
+      featureGraphic
+    );
+
+    await withStagedPublication({
+      finalDir,
+      preserveNames: ['feature-graphic.png'],
+      populateAndValidate: async stagingDir => {
+        await writeNamedPngSet(stagingDir, EXPECTED_FINALS, screenshotPng);
+        await validateFinalAssets({ campaignPath, finalDir: stagingDir });
+      },
+    });
+
+    assert.deepEqual(
+      (await fs.readdir(finalDir)).sort(),
+      [...EXPECTED_FINALS, 'feature-graphic.png'].sort()
+    );
+    assert.deepEqual(
+      await fs.readFile(path.join(finalDir, 'feature-graphic.png')),
+      featureGraphic
+    );
+    for (const staleName of [
+      '06_new_puzzle_every_day.png',
+      '07_flawless_offering.png',
+      '08_theyve_been_waiting.png',
+    ]) {
+      await assert.rejects(fs.access(path.join(finalDir, staleName)));
+    }
+  });
+
+  test('final transition rollback preserves the complete old eight-shot directory', async () => {
+    const campaign = makeCampaign();
+    const campaignPath = await writeCampaign(campaign);
+    const finalDir = path.join(tempDir, 'final');
+    const screenshotPng = encodeSolidPng(1080, 1920);
+    await writeNamedPngSet(finalDir, OLD_EIGHT_FINALS, screenshotPng);
+    await fs.writeFile(
+      path.join(finalDir, 'feature-graphic.png'),
+      encodeSolidPng(1024, 500)
+    );
+    const before = await snapshotDirectory(finalDir);
+
+    await assert.rejects(
+      withStagedPublication({
+        finalDir,
+        preserveNames: ['feature-graphic.png'],
+        populateAndValidate: async stagingDir => {
+          await writeNamedPngSet(stagingDir, EXPECTED_FINALS, screenshotPng);
+          await validateFinalAssets({ campaignPath, finalDir: stagingDir });
+          throw new Error('injected final publication failure');
+        },
+      }),
+      /injected final publication failure/
+    );
+
+    assert.deepEqual(await snapshotDirectory(finalDir), before);
   });
 });
 

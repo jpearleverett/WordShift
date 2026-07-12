@@ -101,7 +101,7 @@ Legal pages are **LIVE and publicly accessible** via GitHub Pages (deployed from
 ## Asset checklist
 
 - [x] App icon 1024×1024 — `mobile/assets/icon.png`
-- [x] Android phone screenshots ×7, generated at 1080×1920 — `docs/play-store/final/`
+- [ ] Android phone screenshots ×7, seven-shot regeneration pending — `docs/play-store/final/`
 - [x] Feature graphic 1024×500 (Play), generated — `docs/play-store/final/feature-graphic.png`
 - [ ] iPhone 6.7" screenshots ×5 (needs device/simulator)
 - [ ] iPad 12.9" screenshots ×3 (supportsTablet is true)

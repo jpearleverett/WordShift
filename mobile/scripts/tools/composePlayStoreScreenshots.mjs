@@ -219,17 +219,10 @@ async function pathExists(targetPath) {
   }
 }
 
-async function copyDirectoryContents(sourceDir, destinationDir) {
-  if (!await pathExists(sourceDir)) return;
-  const sourceStat = await fs.stat(sourceDir);
-  if (!sourceStat.isDirectory()) {
-    throw new Error(`${sourceDir} is not a directory`);
-  }
-  const entries = await fs.readdir(sourceDir);
-  await Promise.all(entries.map(entry => fs.cp(
-    path.join(sourceDir, entry),
-    path.join(destinationDir, entry),
-    { recursive: true }
+async function copyPreservedEntries(sourceDir, destinationDir, preserveNames) {
+  await Promise.all(preserveNames.map(name => fs.copyFile(
+    path.join(sourceDir, name),
+    path.join(destinationDir, name)
   )));
 }
 
@@ -256,6 +249,7 @@ async function replaceDirectory(stagingDir, finalDir) {
 
 export async function withStagedPublication({
   finalDir,
+  preserveNames = [],
   populateAndValidate,
 }) {
   if (typeof populateAndValidate !== 'function') {
@@ -278,7 +272,7 @@ export async function withStagedPublication({
   await fs.chmod(stagingDir, finalDirectoryMode);
 
   try {
-    await copyDirectoryContents(finalDir, stagingDir);
+    await copyPreservedEntries(finalDir, stagingDir, preserveNames);
     await populateAndValidate(stagingDir);
     await replaceDirectory(stagingDir, finalDir);
   } finally {
@@ -490,6 +484,7 @@ async function main() {
     const page = await context.newPage();
     await withStagedPublication({
       finalDir: FINAL_DIR,
+      preserveNames: ['feature-graphic.png'],
       populateAndValidate: async stagingDir => {
         const results = [];
         for (const [index, item] of campaign.entries()) {
