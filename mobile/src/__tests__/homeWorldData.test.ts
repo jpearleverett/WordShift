@@ -1,3 +1,5 @@
+jest.mock('../services/eventLogger');
+
 import {
   ROOMS,
   ANIMALS,
