@@ -10,6 +10,7 @@ import {
   getValidDropZoneLabelMatcher,
   isAllowedCaptureRequest,
   requireAllVisibleCompanions,
+  requireNoPartialVerticalOcclusion,
   validateCampaign,
 } from './capturePlayStoreHelpers.mjs';
 import { withStagedPublication } from './composePlayStoreScreenshots.mjs';
@@ -335,18 +336,52 @@ async function getCompanionViewportMetrics(page) {
   }));
 }
 
+async function assertHomeSunnyOverlayGeometry(page) {
+  const nextUnlockBar = page.getByLabel(/^Next unlock\./).first();
+  const lockedRoom = page.getByLabel(
+    'Build Jungle Hammock for 200 amber',
+    { exact: true }
+  );
+  const lockedRoomLines = [
+    {
+      label: 'Jungle Hammock',
+      locator: lockedRoom.getByText('Jungle Hammock', { exact: true }).first(),
+    },
+    { label: 'Build: 200', locator: lockedRoom.getByText(/^Build:/).first() },
+    { label: '180 / 200', locator: lockedRoom.getByText('180 / 200').first() },
+  ];
+  await Promise.all([
+    nextUnlockBar.waitFor({ state: 'visible' }),
+    ...lockedRoomLines.map(({ locator }) =>
+      locator.waitFor({ state: 'attached' })
+    ),
+  ]);
+  const [barBox, ...lineBoxes] = await Promise.all([
+    nextUnlockBar.boundingBox(),
+    ...lockedRoomLines.map(({ locator }) => locator.boundingBox()),
+  ]);
+  if (!barBox || lineBoxes.some(lineBox => !lineBox)) {
+    throw new Error('Cannot measure home-sunny Next Unlock and locked-room geometry');
+  }
+
+  for (const [index, lineBox] of lineBoxes.entries()) {
+    const { label } = lockedRoomLines[index];
+    const relationship = requireNoPartialVerticalOcclusion(
+      { top: lineBox.y, bottom: lineBox.y + lineBox.height },
+      { top: barBox.y, bottom: barBox.y + barBox.height },
+      label,
+      0.5
+    );
+    console.log(`[capture] home-sunny: ${label} is ${relationship}`);
+  }
+}
+
 async function panHouseToVisibleCompanions(page) {
   let metrics = await getCompanionViewportMetrics(page);
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const visible = metrics.filter(item => item.visibleRatio >= 0.6);
     if (visible.length === SUNNY_COMPANION_LABELS.length) {
-      const labels = requireAllVisibleCompanions(
-        metrics,
-        SUNNY_COMPANION_LABELS,
-        0.6
-      );
-      console.log(`[capture] home-sunny: visible companions: ${labels.join(', ')}`);
-      return labels;
+      break;
     }
 
     // HouseWorld starts at its positive maxPanY to frame the roof. Dragging the
@@ -354,7 +389,7 @@ async function panHouseToVisibleCompanions(page) {
     // occupied rooms. Keep the gesture left of the dock and animal controls.
     await page.mouse.move(24, 620);
     await page.mouse.down();
-    await page.mouse.move(24, 300, { steps: 16 });
+    await page.mouse.move(24, 314, { steps: 16 });
     await page.mouse.up();
     await waitForDocumentReadiness(page);
     metrics = await getCompanionViewportMetrics(page);
@@ -365,6 +400,11 @@ async function panHouseToVisibleCompanions(page) {
     SUNNY_COMPANION_LABELS,
     0.6
   );
+  await page.getByText("Today's challenge is ready.", { exact: true }).waitFor({
+    state: 'detached',
+    timeout: 7_000,
+  });
+  await assertHomeSunnyOverlayGeometry(page);
   console.log(`[capture] home-sunny: visible companions: ${labels.join(', ')}`);
   return labels;
 }

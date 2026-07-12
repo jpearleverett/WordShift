@@ -40,6 +40,10 @@ const LAUNCH_CHECKLIST_PATH = path.resolve(
   SCRIPT_DIR,
   '../../../docs/LAUNCH_CHECKLIST.md'
 );
+const CI_WORKFLOW_PATH = path.resolve(
+  SCRIPT_DIR,
+  '../../../.github/workflows/ci.yml'
+);
 const LANDING_PAGE_PATH = path.resolve(
   SCRIPT_DIR,
   '../../../docs/index.md'
@@ -187,7 +191,7 @@ const EXPECTED_ALT_TEXTS = [
   'WordShift puzzle showing PAY, PLANT, and HEAR midway through a valid letter-shifting chain.',
   'Sunny WordShift house with several furnished rooms and multiple animal companions.',
   'Ember the fox speaking to the player in a warm dialogue scene over the animal house.',
-  'WordShift setup menu displaying Standard, Reverse, Double Shift, Speed, and Blind Offering modes.',
+  'WordShift setup lists Standard, Reverse Shift, Speed Shift, Double Shift, Challenge, and Blind Mode.',
   'WordShift victory screen showing a flawless three-star solve and amber rewards.',
   'WordShift animal house at dusk beneath a purple-orange sky, with the Jungle Hammock locked above furnished rooms.',
 ];
@@ -621,11 +625,56 @@ describe('Google Play listing metadata', () => {
     assert.doesNotMatch(checklist, /current checked-in eight screenshots/);
     assert.match(listing, /Feature graphic 1024×500 \(Play\), generated/);
     assert.match(checklist, /active checkout's publication stayed untouched/);
+    assert.match(
+      checklist,
+      /merged campaign branch at current branch HEAD/
+    );
+    assert.doesNotMatch(checklist, /from current `main`/);
+  });
+
+  test('gives safe versionCode instructions without ambiguous release labels', async () => {
+    const checklist = await fs.readFile(LAUNCH_CHECKLIST_PATH, 'utf8');
+
+    assert.match(
+      checklist,
+      /manually bump\s+`android\.versionCode` above 43 before building/
+    );
+    assert.match(
+      checklist,
+      /new bundle supersedes the current Play bundle/
+    );
+    assert.doesNotMatch(checklist, /\bBuild & upload v\d+\b|\bv12\b|\bv13\b/);
   });
 
   test('keeps the public landing page free of em and en dashes', async () => {
     const landingPage = await fs.readFile(LANDING_PAGE_PATH, 'utf8');
     assert.doesNotMatch(landingPage, /[—–]/);
+  });
+});
+
+describe('GitHub campaign CI', () => {
+  test('installs Chromium and runs every Play Store asset gate in a parallel job', async () => {
+    const workflow = await fs.readFile(CI_WORKFLOW_PATH, 'utf8');
+    const campaignJob = workflow.match(
+      /\n  play-store-assets:\n([\s\S]*?)(?=\n  [a-zA-Z0-9_-]+:\n|$)/
+    )?.[1];
+
+    assert.ok(campaignJob, 'ci.yml must define a separate play-store-assets job');
+    assert.match(campaignJob, /runs-on: ubuntu-latest/);
+    assert.match(campaignJob, /working-directory: mobile/);
+    assert.match(campaignJob, /uses: actions\/setup-node@v4/);
+    assert.match(campaignJob, /node-version: 20/);
+    assert.match(campaignJob, /cache: npm/);
+    assert.match(campaignJob, /cache-dependency-path: mobile\/package-lock\.json/);
+    assert.match(campaignJob, /run: npm ci/);
+    assert.match(
+      campaignJob,
+      /run: npx playwright install --with-deps chromium/
+    );
+    assert.match(campaignJob, /run: npm run test:play-store-assets/);
+    assert.match(campaignJob, /run: npm run validate:play-store/);
+    assert.match(campaignJob, /run: npm run verify:play-store-determinism/);
+    assert.doesNotMatch(campaignJob, /\$\{\{\s*secrets\./);
   });
 });
 

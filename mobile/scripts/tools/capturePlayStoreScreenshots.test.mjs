@@ -11,6 +11,7 @@ import {
   isAllowedCaptureRequest,
   isSafePngBasename,
   requireAllVisibleCompanions,
+  requireNoPartialVerticalOcclusion,
   validateCampaign,
 } from './capturePlayStoreHelpers.mjs';
 
@@ -274,6 +275,57 @@ describe('capture publication and stability policy', () => {
 
     assert.match(runner, /requireAllVisibleCompanions\(/);
     assert.doesNotMatch(runner, /visible\.length\s*>=\s*3/);
+  });
+
+  test('home framing rejects a locked-room line that peeks beneath the Next Unlock bar', () => {
+    const nextUnlockBar = { top: 150, bottom: 216 };
+
+    assert.throws(
+      () => requireNoPartialVerticalOcclusion(
+        { top: 207, bottom: 225 },
+        nextUnlockBar,
+        'Build: 200'
+      ),
+      /Build: 200 partially overlaps the Next Unlock bar/
+    );
+    assert.equal(
+      requireNoPartialVerticalOcclusion(
+        { top: 180, bottom: 200 },
+        nextUnlockBar,
+        'Build: 200'
+      ),
+      'occluded'
+    );
+    assert.equal(
+      requireNoPartialVerticalOcclusion(
+        { top: 220, bottom: 238 },
+        nextUnlockBar,
+        'Build: 200'
+      ),
+      'clear'
+    );
+  });
+
+  test('home capture checks real locked-room geometry after its deterministic pan', async () => {
+    const runner = await fs.readFile(RUNNER_PATH, 'utf8');
+
+    assert.match(runner, /requireNoPartialVerticalOcclusion\(/);
+    assert.match(runner, /Build Jungle Hammock for 200 amber/);
+    assert.match(
+      runner,
+      /lockedRoom\.getByText\('Jungle Hammock'/,
+      'capture must guard the locked-room title'
+    );
+    assert.match(
+      runner,
+      /180\s+\/\s+200/,
+      'capture must also guard the locked-room affordability line'
+    );
+    assert.match(
+      runner,
+      /Today's challenge is ready\.[\s\S]*state: 'detached'/,
+      'capture must let the transient ambient line clear before geometry audit'
+    );
   });
 
   test('production setup render contract has no nonexistent combination teaser', async () => {

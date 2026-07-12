@@ -68,6 +68,41 @@ export function requireAllVisibleCompanions(
   return visibleLabels;
 }
 
+export function requireNoPartialVerticalOcclusion(
+  subject,
+  overlay,
+  subjectLabel,
+  clearance = 2
+) {
+  for (const [name, rect] of [['subject', subject], ['overlay', overlay]]) {
+    if (
+      !rect
+      || !Number.isFinite(rect.top)
+      || !Number.isFinite(rect.bottom)
+      || rect.bottom <= rect.top
+    ) {
+      throw new Error(`${subjectLabel} has invalid ${name} geometry`);
+    }
+  }
+
+  if (
+    subject.bottom <= overlay.top - clearance
+    || subject.top >= overlay.bottom + clearance
+  ) {
+    return 'clear';
+  }
+  if (
+    subject.top >= overlay.top + clearance
+    && subject.bottom <= overlay.bottom - clearance
+  ) {
+    return 'occluded';
+  }
+  throw new Error(
+    `${subjectLabel} partially overlaps the Next Unlock bar: `
+    + `line ${subject.top}-${subject.bottom}, bar ${overlay.top}-${overlay.bottom}`
+  );
+}
+
 export function validateCampaign(campaign) {
   if (!Array.isArray(campaign) || campaign.length !== APPROVED_SCENARIOS.length) {
     throw new Error(
