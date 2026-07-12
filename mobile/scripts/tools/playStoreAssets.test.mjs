@@ -587,7 +587,7 @@ describe('Google Play listing metadata', () => {
     );
   });
 
-  test('marks seven-shot regeneration pending without changing feature assets', async () => {
+  test('marks seven-shot regeneration complete while upload remains pending', async () => {
     const [listing, checklist] = await Promise.all([
       fs.readFile(STORE_LISTING_PATH, 'utf8'),
       fs.readFile(LAUNCH_CHECKLIST_PATH, 'utf8'),
@@ -599,13 +599,24 @@ describe('Google Play listing metadata', () => {
     );
     assert.match(
       checklist,
-      /- \[ \] \*\*Generate Play Store creative\*\* — seven-shot screenshot regeneration is pending\./
+      /- \[x\] \*\*Generate Play Store creative\*\* — DONE \(2026-07-12\): regenerated seven/
     );
-    assert.match(checklist, /current checked-in eight screenshots/);
+    assert.match(
+      checklist,
+      /two complete pipeline runs\s+produced identical encoded and decoded hashes/
+    );
+    assert.match(
+      checklist,
+      /preserving the\s+1024x500 feature graphic byte-for-byte/
+    );
+    assert.match(
+      checklist,
+      /- \[ \] \*\*Upload Play Store creative\*\*/
+    );
     assert.doesNotMatch(listing, /- \[x\] Android phone screenshots ×7/);
-    assert.doesNotMatch(checklist, /- \[x\] \*\*Generate Play Store creative\*\*/);
+    assert.doesNotMatch(checklist, /current checked-in eight screenshots/);
     assert.match(listing, /Feature graphic 1024×500 \(Play\), generated/);
-    assert.match(checklist, /the 1024x500 feature graphic/);
+    assert.match(checklist, /the\s+1024x500 feature graphic/);
   });
 
   test('keeps the public landing page free of em and en dashes', async () => {
@@ -1384,7 +1395,7 @@ describe('Playwright composition integration', { concurrency: false }, () => {
 
     assert.deepEqual(
       sourceKinds,
-      ['authentic', 'authentic', 'synthetic-pending-task4']
+      ['authentic', 'authentic', 'authentic']
     );
     for (const metrics of [finalMetrics, thumbnailMetrics]) {
       assert.ok(metrics[0].visibilityScore < metrics[1].visibilityScore);

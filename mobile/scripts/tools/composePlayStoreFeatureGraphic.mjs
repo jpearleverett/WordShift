@@ -614,9 +614,9 @@ async function main() {
           campaignPath: CAMPAIGN_PATH,
           finalDir: stagedFinalDir,
         });
-        if (assets.length !== 9) {
+        if (assets.length !== 8) {
           throw new Error(
-            `Staged asset validation found ${assets.length} assets; expected 9`
+            `Staged asset validation found ${assets.length} assets; expected 8`
           );
         }
         await validateFeatureGraphic(stagedLegacyPath);
@@ -633,7 +633,7 @@ async function main() {
         fs.readFile(FINAL_PATH),
         fs.readFile(LEGACY_PATH),
       ]);
-    if (publishedAssets.length !== 9 || !finalBytes.equals(legacyBytes)) {
+    if (publishedAssets.length !== 8 || !finalBytes.equals(legacyBytes)) {
       throw new Error('Published feature graphic validation failed');
     }
 

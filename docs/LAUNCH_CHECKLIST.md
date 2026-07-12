@@ -6,9 +6,10 @@ the codebase and are the remaining gates to submission.
 
 ## Android (submission-blocking)
 
-- [ ] **Generate Play Store creative** — seven-shot screenshot regeneration is pending.
-      Task 4 will replace the current checked-in eight screenshots with seven
-      1080x1920 screenshots while preserving the 1024x500 feature graphic.
+- [x] **Generate Play Store creative** — DONE (2026-07-12): regenerated seven
+      1080x1920 screenshots from current `main`; two complete pipeline runs
+      produced identical encoded and decoded hashes while preserving the
+      1024x500 feature graphic byte-for-byte.
 - [ ] **Upload Play Store creative** — upload the generated phone screenshots
       and feature graphic in Play Console, preserving their numbered order.
 - [ ] **Build & upload v13** — `eas build --platform android --profile production`
