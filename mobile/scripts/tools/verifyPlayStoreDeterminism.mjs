@@ -342,7 +342,7 @@ async function main() {
   const result = await verifyPlayStoreDeterminism();
   console.log(
     '[determinism] MATCH: isolated run 1, isolated run 2, and checked-in '
-    + 'publication agree for all 15 encoded/decoded PNG hashes and file modes'
+    + 'publication agree for all 17 encoded/decoded PNG hashes and file modes'
   );
   for (const hash of result.hashes) {
     console.log(

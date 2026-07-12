@@ -373,6 +373,19 @@ describe('isolated verifier integration contract', () => {
     assert.doesNotMatch(source, /baselineRef|git show|fd3b81d/);
   });
 
+  test('reports all 17 generated outputs in the success message', async () => {
+    const source = await fs.readFile(VERIFIER_PATH, 'utf8');
+
+    assert.match(
+      source,
+      /agree for all 17 encoded\/decoded PNG hashes and file modes/
+    );
+    assert.doesNotMatch(
+      source,
+      /agree for all 15 encoded\/decoded PNG hashes and file modes/
+    );
+  });
+
   test('uses the default manifest-based command and accurate publication docs', async () => {
     const [pkg, checklist, storeListing] = await Promise.all([
       fs.readFile(PACKAGE_PATH, 'utf8').then(JSON.parse),
