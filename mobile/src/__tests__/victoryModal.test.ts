@@ -112,8 +112,14 @@ jest.mock('react-native', () => ({
 // Service/component mocks (keep the module graph Node-safe)
 // ---------------------------------------------------------------------------
 
+let mockSwiftVictories = false;
 jest.mock('../services/settings', () => ({
-  getSettingsSync: () => ({ reducedMotion: true, soundEnabled: false, hapticsEnabled: false }),
+  getSettingsSync: () => ({
+    reducedMotion: true,
+    soundEnabled: false,
+    hapticsEnabled: false,
+    swiftVictories: mockSwiftVictories,
+  }),
 }));
 
 jest.mock('../services/haptics', () => ({
@@ -146,6 +152,8 @@ jest.mock('../components/monetization/RewardedAdButton', () => ({
 // ---------------------------------------------------------------------------
 
 import { VictoryModal, VictoryData } from '../components/puzzle/VictoryModal';
+import { getToastTheme } from '../components/puzzle/Toast';
+import { SWIFT_VICTORY_MIN_PUZZLES } from '../hooks/useVictoryFlow';
 import {
   getVictoryFeedback,
   getRitualEchoFooter,
@@ -153,6 +161,8 @@ import {
   getAutoCollectCaption,
   getMandatoryHarvestText,
   getMandatoryHarvestCTA,
+  getVictoryTitle,
+  getFlawlessHonorific,
 } from '../services/phaseNarrative';
 import { isDailyShareBonusAvailable, DAILY_SHARE_BONUS_AMBER } from '../services/shareResults';
 import { getPhaseTheme } from '../theme/colors';
@@ -287,6 +297,7 @@ function baseProps(overrides: Record<string, unknown> = {}): Record<string, unkn
 
 beforeEach(() => {
   resetHookState();
+  mockSwiftVictories = false;
 });
 
 // ===========================================================================
@@ -587,5 +598,217 @@ describe('rewarded double display (the doubled reward must be visible after the 
     const text = textOf(tree);
     expect(text).not.toContain('Doubled');
     expect(text).toContain('15');
+  });
+});
+
+// ===========================================================================
+// 6. Amber itemization — the modal renders the REAL breakdown when present
+// ===========================================================================
+
+describe('amber breakdown threading (economy is the display source of truth)', () => {
+  function breakdown(overrides: Record<string, number> = {}) {
+    return {
+      base: 12,
+      starBonus: 6,
+      streakBonus: 0,
+      challengeBonus: 0,
+      patronBonus: 0,
+      surpriseBonus: 0,
+      variantBonus: 0,
+      freshVariantBonus: 0,
+      firstCompletionBonus: 0,
+      milestoneBonus: 0,
+      streakMilestoneBonus: 0,
+      total: 18,
+      ...overrides,
+    };
+  }
+
+  it('renders base + star bonus from amberBreakdown, not the local AMBER_REWARDS math', () => {
+    // MEDIUM's local fallback would be base 10 / star +5; the breakdown says
+    // 12 / +6 (as if the economy changed) — the display must follow the data.
+    const tree = render(baseProps({
+      difficulty: 'MEDIUM',
+      earnedStars: 3,
+      victoryData: baseVictoryData({ amberEarned: 18, amberBreakdown: breakdown() }),
+    }));
+    // textOf joins tree text parts with single spaces, so "+{n}" reads "+ n".
+    const text = textOf(tree);
+    expect(text).toContain('12');
+    expect(text).toContain('+ 6');
+    expect(text).not.toContain('+ 5');
+  });
+
+  it('falls back to the local computation when the breakdown is absent', () => {
+    const tree = render(baseProps({
+      difficulty: 'MEDIUM',
+      earnedStars: 3,
+      victoryData: baseVictoryData({ amberEarned: 15 }),
+    }));
+    const text = textOf(tree);
+    // AMBER_REWARDS.MEDIUM = 10, 3-star bonus floor(10 * 0.5) = +5
+    expect(text).toContain('10');
+    expect(text).toContain('+ 5');
+  });
+
+  it('shows the Patron line only when the breakdown carries a patron bonus', () => {
+    const withPatron = render(baseProps({
+      victoryData: baseVictoryData({
+        amberEarned: 20,
+        amberBreakdown: breakdown({ patronBonus: 2, total: 20 }),
+      }),
+    }));
+    expect(textOf(withPatron)).toContain('Patron');
+
+    resetHookState();
+    const withoutPatron = render(baseProps({
+      victoryData: baseVictoryData({ amberEarned: 18, amberBreakdown: breakdown() }),
+    }));
+    expect(textOf(withoutPatron)).not.toContain('Patron');
+  });
+});
+
+// ===========================================================================
+// 7. Swift Victories — compact result strip for routine wins
+// ===========================================================================
+
+/** Routine victory data: past the early game, no special beat attached. */
+function routineVictoryData(overrides: Partial<VictoryData> = {}): VictoryData {
+  return baseVictoryData({
+    amberEarned: 18,
+    puzzlesSolved: SWIFT_VICTORY_MIN_PUZZLES + 30,
+    isDaily: false,
+    phaseTransitionPending: false,
+    firstCompletionBonus: 0,
+    ...overrides,
+  });
+}
+
+describe('swift victories compact strip', () => {
+  it('renders the condensed strip for a routine win when the setting is ON', () => {
+    mockSwiftVictories = true;
+    // A routine win past the auto-collect window queues its amber in a harvest
+    // batch, so the strip must keep the Collect Now affordance and frame the
+    // amber as gathered-for-the-pit (not credited).
+    const tree = render(baseProps({ victoryData: routineVictoryData({ autoCollected: false }) }));
+    const text = textOf(tree);
+
+    // Condensed content: title, stars, total amber; all actions intact.
+    expect(text).toContain(getVictoryTitle(3, 0));
+    expect(findByA11yLabel(tree, '3 of 3 stars')).not.toBeNull();
+    expect(findByA11yLabel(tree, '18 amber gathered for the pit')).not.toBeNull();
+    expect(findByA11yLabel(tree, 'Next level')).not.toBeNull();
+    expect(findByA11yLabel(tree, 'Share result')).not.toBeNull();
+    expect(findByA11yLabel(tree, 'Return home')).not.toBeNull();
+    // Queued amber keeps its pit collection path in the compact strip.
+    expect(findByA11yLabel(tree, 'Collect amber in the pit')).not.toBeNull();
+
+    // Ceremony content is gone: no ritual echo, no skip layer.
+    expect(text).not.toContain(getRitualEchoHeader(0));
+    expect(findByA11yLabel(tree, 'Skip celebration animation')).toBeNull();
+  });
+
+  it('shows the flawless honorific on a flawless routine win', () => {
+    mockSwiftVictories = true;
+    const tree = render(baseProps({
+      victoryData: routineVictoryData({ flawless: true }),
+    }));
+    expect(textOf(tree)).toContain(getFlawlessHonorific(0));
+  });
+
+  it('stays phase-aware: the compact card uses the phase modal colors', () => {
+    mockSwiftVictories = true;
+    const phase4 = getPhaseTheme(4);
+    const tree = render(baseProps({
+      phase: 4,
+      victoryData: routineVictoryData(),
+    }));
+    const cards = findAll(tree, el =>
+      flatStyle((el.props as Record<string, unknown>).style).backgroundColor === phase4.modalBgColor);
+    expect(cards.length).toBeGreaterThan(0);
+  });
+
+  it('setting OFF keeps the full ceremony for the same routine win', () => {
+    mockSwiftVictories = false;
+    const tree = render(baseProps({
+      victoryData: routineVictoryData(),
+      completedWords: ['WARM', 'WORM'],
+    }));
+    // Full modal markers: the ritual echo chain renders.
+    expect(textOf(tree)).toContain(getRitualEchoHeader(0));
+  });
+
+  it('special beats keep the full modal even with the setting ON', () => {
+    mockSwiftVictories = true;
+    const specials: Array<Partial<VictoryData>> = [
+      { milestoneBonus: 50, milestoneMessage: 'Milestone!' },
+      { firstCompletionBonus: 20 },
+      { streakMilestoneBonus: 30 },
+      { phaseChanged: true, newPhase: 1 },
+      { phaseTransitionPending: true },
+      { mandatoryHarvest: true },
+      { isDaily: true },
+      { ritualEnergy: 9 },
+      { questsCompleted: ['Solve 3'] },
+      { puzzlesSolved: 3 }, // early game
+    ];
+    for (const special of specials) {
+      resetHookState();
+      const tree = render(baseProps({
+        victoryData: routineVictoryData(special),
+        completedWords: ['WARM', 'WORM'],
+      }));
+      // The full modal renders the ritual echo chain; the compact strip never does.
+      expect(textOf(tree)).toContain(getRitualEchoHeader(0));
+    }
+  });
+
+  it('the daily prop alone forces the full modal (belt and braces with isDaily)', () => {
+    mockSwiftVictories = true;
+    const tree = render(baseProps({
+      isPlayingDaily: true,
+      dailyRank: null,
+      victoryData: routineVictoryData(),
+    }));
+    expect(textOf(tree)).toContain('Daily Challenge Complete');
+  });
+
+  it('onboarding victories always keep the full (single-button) modal', () => {
+    mockSwiftVictories = true;
+    const tree = render(baseProps({
+      isOnboarding: true,
+      onOnboardingContinue: jest.fn(),
+      victoryData: routineVictoryData(),
+    }));
+    expect(findByA11yLabel(tree, 'Continue')).not.toBeNull();
+  });
+});
+
+// ===========================================================================
+// 8. Phase-aware toast colors (Toast.tsx sibling component)
+// ===========================================================================
+
+describe('phase-aware toast colors', () => {
+  it('normal + error pairs hold WCAG AA (>=4.5:1) at every phase', () => {
+    for (const phase of [0, 1, 2, 3, 4, 5]) {
+      const t = getToastTheme(phase);
+      expect(contrast(t.normalText, t.normalBg)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(t.errorText, t.errorBg)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it('the toast surface follows the phase (no fixed candy white at Phase 4)', () => {
+    const bright = getToastTheme(0);
+    const dark = getToastTheme(4);
+    expect(bright.normalBg).not.toBe(dark.normalBg);
+    // Phase 4's toast fill is the phase modal surface, not candy white.
+    expect(dark.normalBg).toBe(getPhaseTheme(4).modalBgColor);
+    expect(dark.normalBg).not.toBe('#FFFFFF');
+  });
+
+  it('the old error pair (white on red.main, 3.8:1) is gone at every phase', () => {
+    for (const phase of [0, 1, 2, 3, 4, 5]) {
+      expect(getToastTheme(phase).errorBg).not.toBe('#EF4444');
+    }
   });
 });

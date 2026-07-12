@@ -44,6 +44,17 @@ interface PatronModalProps {
 type FlowState = 'idle' | 'working' | 'unavailable';
 
 /**
+ * Fallback price labels shown when the store product isn't fetchable (NoOp
+ * billing, Expo Go, or a failed fetch) — mirrors the `fallbackPrice` pattern on
+ * the consumable catalog in services/iap.ts. A price-less CTA reads as broken;
+ * the native charge sheet always shows the store's own localized price, so a
+ * stale label here can never mischarge. Keep in sync with the Play Console /
+ * App Store Connect price tiers.
+ */
+export const PATRON_FALLBACK_PRICE = '$4.99';
+export const REMOVE_ADS_FALLBACK_PRICE = '$2.99';
+
+/**
  * "Become a Patron" modal — cosmetic & convenience only.
  *
  * Patron's Key grants two things, both read live from the source-of-truth
@@ -318,7 +329,7 @@ export const PatronModal: React.FC<PatronModalProps> = ({
           {/* Actions */}
           {!isPatron && (
             <CandyButton
-              label={priceString ? `Become a Patron · ${priceString}` : 'Become a Patron'}
+              label={`Become a Patron · ${priceString ?? PATRON_FALLBACK_PRICE}`}
               onPress={handlePurchase}
               phase={phase}
               variant="primary"
@@ -337,7 +348,7 @@ export const PatronModal: React.FC<PatronModalProps> = ({
                 reward after each puzzle with a single tap.
               </Text>
               <CandyButton
-                label={adsPriceString ? `Remove Ads · ${adsPriceString}` : 'Remove Ads'}
+                label={`Remove Ads · ${adsPriceString ?? REMOVE_ADS_FALLBACK_PRICE}`}
                 onPress={handlePurchaseRemoveAds}
                 phase={phase}
                 variant="secondary"

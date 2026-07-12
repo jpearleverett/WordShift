@@ -11,6 +11,11 @@ const STORAGE_KEY = 'wordshift_dialogue_sessions';
 // In-memory cache of sessions
 let sessionsCache: Map<string, DialogueSession> = new Map();
 
+/** Drop the in-memory cache after an external storage write (cloud restore). */
+export function invalidateSessionsCache(): void {
+  sessionsCache = new Map();
+}
+
 // Current puzzle count (must be updated externally)
 let currentPuzzleCount = 0;
 

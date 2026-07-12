@@ -220,6 +220,12 @@ export const ANIMAL_CHOICES: Record<string, DialogueChoice> = {
 
 let choiceCache: ChoiceState | null = null;
 
+/** Drop the in-memory cache after an external storage write (cloud restore). */
+export function invalidateChoiceCache(): void {
+  choiceCache = null;
+}
+
+
 function getDefaultState(): ChoiceState {
   return {
     offeredBy: [],

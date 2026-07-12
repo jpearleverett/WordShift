@@ -52,8 +52,9 @@ interface RewardedAdButtonProps {
  *   - Hidden when the rewarded daily cap is reached.
  *   - `onReward` fires only on a genuine completed view.
  *
- * Build only — see RewardedAdButton.md / the integration notes for the recommended
- * call site. Not wired into App.tsx here.
+ * Live call sites: victory 2x (VictoryModal), speed rescue (App.tsx Time's-Up
+ * overlay), hint recovery (out-of-hints alert → StoreModal), and the daily
+ * amber faucet (StoreModal Free Amber card).
  */
 export const RewardedAdButton: React.FC<RewardedAdButtonProps> = ({
   placement,

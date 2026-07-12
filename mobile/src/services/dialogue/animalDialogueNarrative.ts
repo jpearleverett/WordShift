@@ -841,6 +841,12 @@ interface NarrativeDeliveryState {
 
 let deliveryCache: NarrativeDeliveryState | null = null;
 
+/** Drop the in-memory cache after an external storage write (cloud restore). */
+export function invalidateNarrativeDeliveryCache(): void {
+  deliveryCache = null;
+}
+
+
 function getDefaultDeliveryState(): NarrativeDeliveryState {
   return { seedsDelivered: {}, callbacksShown: {}, phase2PoolCursor: {} };
 }

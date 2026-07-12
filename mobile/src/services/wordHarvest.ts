@@ -19,8 +19,27 @@ export interface HarvestBatch {
   phaseAtHarvest: DialoguePhase;
 }
 
+/**
+ * Crash-safe credit ledger entry. When a batch is offered, its amber is moved
+ * into this ledger in the SAME write that removes the batch, and stays there
+ * until the caller confirms the amber actually landed in the spendable balance
+ * (acknowledgeBatchCredit after awardBonusAmber succeeds). An app kill between
+ * the offer and the credit can therefore never destroy the amber — the pit
+ * screen re-credits un-acknowledged entries on next load via
+ * reconcilePendingCredits, and the ledger entry is the dedupe that prevents
+ * double-crediting.
+ */
+export interface PendingCredit {
+  /** Credit id: the offered batch's id, or a generated `hc_` id for offer-all sweeps. */
+  id: string;
+  amber: number;
+  createdAt: number;
+}
+
 export interface HarvestState {
   pendingBatches: HarvestBatch[];
+  /** Amber released from batches but not yet acknowledged as credited. */
+  pendingCredits: PendingCredit[];
   totalWordsOffered: number;
   totalBatchesOffered: number;
   totalAmberClaimed: number;
@@ -36,6 +55,12 @@ export interface OfferResult {
   amberAwarded: number;
   wordsOffered: number;
   remainingSummary: HarvestSummary;
+  /**
+   * Ledger id for the crash-safe pending credit created by this offer (absent
+   * when nothing was offered). Pass to acknowledgeBatchCredit AFTER the amber
+   * has been credited via awardBonusAmber.
+   */
+  creditId?: string;
 }
 
 // ============================================================================
@@ -50,6 +75,7 @@ let harvestCache: HarvestState | null = null;
 function getDefaultHarvestState(): HarvestState {
   return {
     pendingBatches: [],
+    pendingCredits: [],
     totalWordsOffered: 0,
     totalBatchesOffered: 0,
     totalAmberClaimed: 0,
@@ -63,6 +89,8 @@ async function loadHarvestState(): Promise<HarvestState> {
     if (stored) {
       const parsed = JSON.parse(stored);
       if (parsed && Array.isArray(parsed.pendingBatches)) {
+        // Migrate pre-ledger saves (no pendingCredits field).
+        if (!Array.isArray(parsed.pendingCredits)) parsed.pendingCredits = [];
         harvestCache = parsed;
         return harvestCache!;
       }
@@ -72,6 +100,15 @@ async function loadHarvestState(): Promise<HarvestState> {
   }
   harvestCache = getDefaultHarvestState();
   return harvestCache;
+}
+
+/**
+ * Drop the in-memory harvest cache so the next read reloads from storage
+ * (external writes, e.g. cloud restore; also used by tests to simulate a
+ * relaunch mid-flow).
+ */
+export function invalidateHarvestCache(): void {
+  harvestCache = null;
 }
 
 async function saveHarvestState(): Promise<void> {
@@ -158,6 +195,16 @@ export async function offerBatch(batchId: string): Promise<OfferResult | null> {
   state.totalBatchesOffered += 1;
   state.totalAmberClaimed += batch.amberValue;
 
+  // Crash safety: move the batch's amber into the pending-credit ledger in the
+  // SAME write that removes the batch (single-write atomicity). If the app is
+  // killed before the caller credits + acknowledges, reconcilePendingCredits
+  // recovers the amber on next load.
+  let creditId: string | undefined;
+  if (batch.amberValue > 0) {
+    creditId = batch.id;
+    state.pendingCredits.push({ id: creditId, amber: batch.amberValue, createdAt: Date.now() });
+  }
+
   harvestCache = state;
   await saveHarvestState();
 
@@ -165,6 +212,7 @@ export async function offerBatch(batchId: string): Promise<OfferResult | null> {
     amberAwarded: batch.amberValue,
     wordsOffered: batch.words.length,
     remainingSummary: computeSummary(state.pendingBatches),
+    creditId,
   };
 }
 
@@ -187,6 +235,14 @@ export async function offerAllBatches(): Promise<OfferResult> {
   state.totalAmberClaimed += totalAmber;
   state.pendingBatches = [];
 
+  // Crash safety: one merged ledger entry for the whole sweep, written in the
+  // same save that clears the batches (see offerBatch).
+  let creditId: string | undefined;
+  if (totalAmber > 0) {
+    creditId = generateCreditId();
+    state.pendingCredits.push({ id: creditId, amber: totalAmber, createdAt: Date.now() });
+  }
+
   harvestCache = state;
   await saveHarvestState();
 
@@ -194,7 +250,35 @@ export async function offerAllBatches(): Promise<OfferResult> {
     amberAwarded: totalAmber,
     wordsOffered: totalWords,
     remainingSummary: { pendingAmber: 0, pendingWords: 0, pendingBatches: 0 },
+    creditId,
   };
+}
+
+/**
+ * Acknowledge that a pending credit's amber has landed in the spendable
+ * balance (call AFTER awardBonusAmber succeeds). Removes the ledger entry in a
+ * single write. Idempotent: acknowledging an unknown/already-cleared id is a
+ * no-op.
+ */
+export async function acknowledgeBatchCredit(creditId: string): Promise<void> {
+  const state = await loadHarvestState();
+  const index = state.pendingCredits.findIndex(c => c.id === creditId);
+  if (index === -1) return;
+  state.pendingCredits.splice(index, 1);
+  harvestCache = state;
+  await saveHarvestState();
+}
+
+/**
+ * Un-acknowledged pending credits: amber released from batches whose credit
+ * never confirmed (app killed between the offer and awardBonusAmber). The pit
+ * screen calls this on load, credits each entry, then acknowledges it. Entries
+ * are KEPT until acknowledged — the ledger is the double-credit dedupe, so a
+ * recovered entry can be credited exactly once.
+ */
+export async function reconcilePendingCredits(): Promise<PendingCredit[]> {
+  const state = await loadHarvestState();
+  return [...state.pendingCredits];
 }
 
 /**
@@ -232,4 +316,9 @@ function computeSummary(batches: HarvestBatch[]): HarvestSummary {
  */
 export function generateBatchId(): string {
   return `hb_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+}
+
+/** Generate a unique credit-ledger ID (offer-all sweeps, which have no batch id). */
+function generateCreditId(): string {
+  return `hc_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
 }

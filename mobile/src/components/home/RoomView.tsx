@@ -387,7 +387,7 @@ const styles = StyleSheet.create({
   roomName: {
     fontFamily: BODY_FONT_BOLD,
     color: CandyColors.white,
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
     textAlign: 'center',
     textShadowColor: 'rgba(0, 0, 0, 0.5)',
@@ -396,7 +396,7 @@ const styles = StyleSheet.create({
   },
   upgradeBadge: {
     fontFamily: BODY_FONT,
-    fontSize: 8,
+    fontSize: 10,
     color: '#FFD700',
     marginLeft: 3,
   },

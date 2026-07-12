@@ -1,16 +1,19 @@
 /**
- * In-app purchase layer (scaffold).
+ * In-app purchase layer.
  *
  * A real billing SDK is a NATIVE module and would break Expo Go, so it is
  * abstracted behind a `BillingProvider` interface — exactly like `cloudSave.ts`
- * abstracts the cloud backend behind `CloudProvider`. The active provider is a
- * `NoOpBillingProvider`: the app builds, runs in Expo Go, and is fully
- * unit-testable; purchases simply fail cleanly.
+ * abstracts the cloud backend behind `CloudProvider`. The DEFAULT provider is a
+ * `NoOpBillingProvider` (purchases fail cleanly), which keeps Expo Go / Jest
+ * working; at boot App.tsx registers the live RevenueCat adapter
+ * (`providers/revenueCatBilling.ts`) via `setBillingProvider()`, so real builds
+ * sell for real whenever a RevenueCat key is configured.
  *
  * On a verified purchase/restore, this module translates products → entitlement
  * keys and writes them to `entitlements.ts`, which is what the rest of the app reads.
  */
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ENTITLEMENTS,
   EntitlementKey,
@@ -151,6 +154,12 @@ export interface PurchaseResult {
   productId?: ProductId;
   /** Entitlement keys granted by this purchase (already written to entitlements.ts). */
   entitlements?: EntitlementKey[];
+  /**
+   * Store transaction id when the provider exposes one (RevenueCat:
+   * transaction.transactionIdentifier). Used as the pending-grant ledger id so
+   * a consumable grant is deduped against the exact store transaction.
+   */
+  transactionId?: string;
   /** True when the user dismissed the native purchase sheet. */
   cancelled?: boolean;
   error?: string;
@@ -276,10 +285,135 @@ export interface ConsumablePurchaseResult {
   productId?: ProductId;
   /** The reward to apply on success (caller credits amber/hints). Already doubled when `firstPurchaseDoubled`. */
   reward?: ConsumableReward;
+  /**
+   * Pending-grant ledger id for this purchase. The caller MUST call
+   * `acknowledgeConsumableGrant(grantId)` after applying `reward`, or the grant
+   * will be re-served by `reconcilePendingConsumableGrants()` on the next
+   * reconcile (that replay is the crash-safety net, not a bug).
+   */
+  grantId?: string;
   /** True when this was the player's first-ever amber pack — the amount was doubled. */
   firstPurchaseDoubled?: boolean;
   cancelled?: boolean;
   error?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Pending consumable-grant ledger (crash safety between store success + grant)
+// ---------------------------------------------------------------------------
+
+/**
+ * `purchaseConsumable` succeeds at the STORE, then returns the reward for the
+ * caller (StoreModal) to apply. An app kill/crash in that window means the
+ * player PAID and never received the amber/hints. This ledger closes the gap:
+ * the grant is persisted BEFORE `purchaseConsumable` returns, the caller
+ * acknowledges it after applying the reward, and anything left un-acked is
+ * re-served by `reconcilePendingConsumableGrants()` (boot / store-open path)
+ * until it is applied — never lost, and the ledger id (the store transaction
+ * id when available) is the dedupe, so it is never double-granted either.
+ *
+ * Deliberately cache-less (fresh AsyncStorage read per op): this is a rare,
+ * cold-path ledger and crash-safety is the whole point — no stale in-memory
+ * state can disagree with disk. Device-local like `wordshift_entitlements`
+ * (store-transaction-adjacent), so it is NOT in cloudSave.SYNC_KEYS, and it is
+ * intentionally NOT cleared by Reset All (a reset must not destroy paid value
+ * that was never delivered).
+ */
+export interface PendingConsumableGrant {
+  /** Unique ledger id — store transaction id when available, else productId+timestamp. */
+  grantId: string;
+  productId: ProductId;
+  /** Reward to apply (already includes the first-purchase 2x when applicable). */
+  reward: ConsumableReward;
+  purchasedAt: number;
+  /** True when this grant's amber amount includes the one-time first-purchase 2x. */
+  firstPurchaseDoubled?: boolean;
+}
+
+const PENDING_GRANTS_KEY = 'wordshift_pending_iap_grants';
+
+/** Session-monotonic suffix so fallback grant ids can never collide in-session. */
+let grantIdSeq = 0;
+
+async function loadPendingGrants(): Promise<PendingConsumableGrant[]> {
+  try {
+    const stored = await AsyncStorage.getItem(PENDING_GRANTS_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        return parsed.filter(
+          (g) => g && typeof g.grantId === 'string' && g.reward && typeof g.reward.amount === 'number',
+        );
+      }
+    }
+  } catch {
+    /* ignore — fall through to empty */
+  }
+  return [];
+}
+
+async function savePendingGrants(grants: PendingConsumableGrant[]): Promise<void> {
+  await AsyncStorage.setItem(PENDING_GRANTS_KEY, JSON.stringify(grants));
+}
+
+/**
+ * Persist a just-paid consumable grant. Returns the ledger id. A persist
+ * failure must never fail the purchase (the caller still applies the returned
+ * reward; only the crash-replay net is lost for that one grant), so this
+ * swallows storage errors.
+ */
+async function persistPendingConsumableGrant(entry: {
+  productId: ProductId;
+  reward: ConsumableReward;
+  transactionId?: string;
+  firstPurchaseDoubled: boolean;
+}): Promise<string> {
+  const grantId =
+    entry.transactionId ??
+    `${entry.productId}:${Date.now()}:${++grantIdSeq}:${Math.random().toString(36).slice(2, 8)}`;
+  try {
+    const grants = await loadPendingGrants();
+    // The ledger is the dedupe: the same store transaction never gets two entries.
+    if (!grants.some((g) => g.grantId === grantId)) {
+      grants.push({
+        grantId,
+        productId: entry.productId,
+        reward: entry.reward,
+        purchasedAt: Date.now(),
+        ...(entry.firstPurchaseDoubled ? { firstPurchaseDoubled: true } : {}),
+      });
+      await savePendingGrants(grants);
+    }
+  } catch (error) {
+    console.warn('[IAP] failed to persist pending consumable grant:', error);
+  }
+  return grantId;
+}
+
+/**
+ * All paid-but-not-yet-acknowledged consumable grants, oldest first. Grants
+ * stay in the ledger until `acknowledgeConsumableGrant` clears them, so a boot
+ * or store-open reconcile can re-apply anything a crash orphaned. Callers
+ * apply each grant's reward, then acknowledge it.
+ */
+export async function reconcilePendingConsumableGrants(): Promise<PendingConsumableGrant[]> {
+  return loadPendingGrants();
+}
+
+/**
+ * Clear a grant from the ledger AFTER its reward has been applied. Idempotent —
+ * acknowledging an unknown/already-acked id is a no-op.
+ */
+export async function acknowledgeConsumableGrant(grantId: string): Promise<void> {
+  try {
+    const grants = await loadPendingGrants();
+    const remaining = grants.filter((g) => g.grantId !== grantId);
+    if (remaining.length !== grants.length) {
+      await savePendingGrants(remaining);
+    }
+  } catch (error) {
+    console.warn('[IAP] failed to acknowledge consumable grant:', error);
+  }
 }
 
 /**
@@ -292,6 +426,11 @@ export interface ConsumablePurchaseResult {
  * First-purchase incentive: the first amber pack a player EVER buys grants
  * `FIRST_PURCHASE_AMBER_MULTIPLIER`x amber — the returned reward is already
  * doubled, and the one-time flag is consumed (persisted in entitlements.ts).
+ *
+ * Crash safety: the final reward is persisted to the pending-grant ledger
+ * BEFORE this returns (see `PendingConsumableGrant`). The caller applies the
+ * reward, then calls `acknowledgeConsumableGrant(result.grantId)`; if the app
+ * dies in between, `reconcilePendingConsumableGrants()` re-serves the grant.
  */
 export async function purchaseConsumable(productId: ProductId): Promise<ConsumablePurchaseResult> {
   const reward = consumableReward(productId);
@@ -300,19 +439,35 @@ export async function purchaseConsumable(productId: ProductId): Promise<Consumab
   }
   const result = await provider.purchase(productId);
   if (result.success) {
+    let grantedReward: ConsumableReward = reward;
+    let doubled = false;
     if (reward.kind === 'amber') {
       const isFirst = !(await hasMadeAmberPurchase());
-      await markAmberPurchaseMade();
       if (isFirst) {
-        return {
-          success: true,
-          productId,
-          reward: { kind: 'amber', amount: reward.amount * FIRST_PURCHASE_AMBER_MULTIPLIER },
-          firstPurchaseDoubled: true,
-        };
+        grantedReward = { kind: 'amber', amount: reward.amount * FIRST_PURCHASE_AMBER_MULTIPLIER };
+        doubled = true;
       }
     }
-    return { success: true, productId, reward };
+    // Persist the paid-for grant BEFORE returning, so a kill between the store
+    // success and the caller's apply can never lose the player's money.
+    const grantId = await persistPendingConsumableGrant({
+      productId,
+      reward: grantedReward,
+      transactionId: result.transactionId,
+      firstPurchaseDoubled: doubled,
+    });
+    // Mark the one-time 2x flag AFTER the grant is safely on the ledger. If a
+    // kill lands between the two, the grant still replays on reconcile (player
+    // keeps their money) and the worst case is the next amber pack also doubles
+    // — strictly player-favorable, versus the old ordering where a crash here
+    // burned the flag AND left no ledger entry (paid, got nothing).
+    if (doubled) {
+      await markAmberPurchaseMade();
+    }
+    if (doubled) {
+      return { success: true, productId, reward: grantedReward, grantId, firstPurchaseDoubled: true };
+    }
+    return { success: true, productId, reward: grantedReward, grantId };
   }
   return { success: false, productId, cancelled: result.cancelled, error: result.error };
 }
@@ -322,6 +477,12 @@ export interface StarterPackPurchaseResult {
   productId?: ProductId;
   /** The bundle to apply on success (caller credits amber + hints). */
   reward?: { amber: number; hints: number };
+  /**
+   * Pending-ledger ids for the bundle's two grants (amber, hints). The caller
+   * acknowledges each after applying its half of the reward — same crash-replay
+   * contract as `purchaseConsumable` (see PendingConsumableGrant).
+   */
+  grantIds?: { amber?: string; hints?: string };
   /** True when the one-per-account limit blocked the purchase. */
   alreadyOwned?: boolean;
   cancelled?: boolean;
@@ -343,7 +504,29 @@ export async function purchaseStarterPack(): Promise<StarterPackPurchaseResult> 
   const result = await provider.purchase(productId);
   if (result.success) {
     await grantEntitlements([ENTITLEMENTS.STARTER_PACK]);
-    return { success: true, productId, reward: { ...STARTER_PACK_GRANTS } };
+    // Same crash-replay net as purchaseConsumable: the entitlement persists
+    // instantly, but the amber+hints currency grant could be lost to a kill
+    // between this return and the caller's award. Two ledger entries (one per
+    // reward kind) ride the existing consumable reconcile path.
+    const txBase = result.transactionId;
+    const amberGrantId = await persistPendingConsumableGrant({
+      productId,
+      reward: { kind: 'amber', amount: STARTER_PACK_GRANTS.amber },
+      transactionId: txBase ? `${txBase}:amber` : undefined,
+      firstPurchaseDoubled: false,
+    });
+    const hintsGrantId = await persistPendingConsumableGrant({
+      productId,
+      reward: { kind: 'hints', amount: STARTER_PACK_GRANTS.hints },
+      transactionId: txBase ? `${txBase}:hints` : undefined,
+      firstPurchaseDoubled: false,
+    });
+    return {
+      success: true,
+      productId,
+      reward: { ...STARTER_PACK_GRANTS },
+      grantIds: { amber: amberGrantId, hints: hintsGrantId },
+    };
   }
   return { success: false, productId, cancelled: result.cancelled, error: result.error };
 }

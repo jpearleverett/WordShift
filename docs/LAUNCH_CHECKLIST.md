@@ -19,6 +19,56 @@ the codebase and are the remaining gates to submission.
       build logs; license-tester purchases work (one consumable, the starter
       one-time, Remove Ads + Restore round-trip); SFX still play (foreground
       audio unaffected by the permission strip).
+- [ ] **Verify one REAL purchase of each SKU kind on a Play internal build**
+      (CRITICAL) — one consumable (amber or hint pack), the starter one-time,
+      Remove Ads / Patron non-consumables, and a Restore Purchases round-trip.
+      The 2026-07-10 billing product-category fix (NON_SUBSCRIPTION on
+      getProducts) is exactly the class of bug that only a real device on a
+      Play build can validate — do not ship without this pass.
+- [ ] **Device pass on low/mid/high-end Android** — offline cold start (fresh
+      install, airplane mode), onboarding end-to-end, pit economy, IAP +
+      Restore, UMP consent form (EEA/debug geography), interstitials, rewarded
+      ads, notifications (tap routing incl. cold start), deep links
+      (`wordshift://challenge/...`), and sharing (PNG share card).
+- [ ] **30-minute performance session** — one long mixed session (puzzles,
+      home, pit, store, dialogue) on the low-end device, watching for jank,
+      memory growth, and audio glitches.
+- [ ] **Set `creatorCode` for press builds** — fill `expo.extra.creatorCode`
+      in `mobile/app.json` on the press/reviewer build only (empty string =
+      feature fully inert in shipping builds); hand the code out with
+      `docs/PRESS_KIT.md`.
+- [ ] **Flip `expo.extra.adsUseTestIds` to `false` for the PRODUCTION build
+      only** — it ships `true` so every dev/internal-testing build serves
+      Google TEST ad units. Serving LIVE ads to yourself on a test build and
+      tapping them is an AdMob policy violation that can get the account
+      limited. Leave it `true` through all internal testing; set it `false`
+      only when cutting the public production build (and confirm live ads fill
+      on a real production install before wide rollout).
+- [ ] **Bump `android.versionCode`** in `mobile/app.json` for the next release
+      (currently 43; autoIncrement is intentionally off — bump manually every
+      time).
+- [x] **Billing category fix + boot entitlement restore** — DONE (2026-07-10):
+      RevenueCat `getProducts` now passes the NON_SUBSCRIPTION category
+      (Android one-time products returned `[]` without it — the "purchases not
+      available" launch blocker); `initialize()` silently restores
+      entitlements via `getCustomerInfo` + a customer-info update listener.
+- [x] **Purchase-recovery ledgers** — DONE (2026-07-10): consumable + starter
+      purchases persist a pending-grant ledger (`wordshift_pending_iap_grants`,
+      apply-then-ack, reconciled at boot); pit offers move amber through a
+      `pendingCredits` ledger in the same write. A kill mid-flow can no longer
+      lose paid or earned currency.
+- [x] **Cloud-save conflict guard** — DONE (2026-07-10): uploads skip and flag
+      `conflictDetected` when another device holds a newer save; Settings →
+      Backup & Restore surfaces the use-newer / keep-this-device choice.
+- [x] **expo-doctor clean (21/21)** — DONE (2026-07-10): `expo-asset`
+      installed; splash config lives in the `expo-splash-screen` plugin;
+      deprecated top-level `splash` / `newArchEnabled` keys removed.
+- [x] **Store-listing counts corrected** — DONE (2026-07-10):
+      `docs/STORE_LISTING.md` now reads thirteen animal friends / 51
+      achievements (description + release-notes template).
+- [x] **Press kit created** — DONE (2026-07-10): `docs/PRESS_KIT.md` + the
+      `wordshift://creator?code=&era=` fast-forward deep link (era snapshots
+      for reviewers; inert without `creatorCode`).
 - [x] **Sentry source maps** — DONE (2026-07-02): org/project slugs in the
       `@sentry/react-native` plugin config (`mobile/app.json`);
       `SENTRY_AUTH_TOKEN` stored as a secret EAS environment variable
@@ -42,9 +92,7 @@ the codebase and are the remaining gates to submission.
 - [x] **Data safety + App content declarations** — DONE (2026-07-02): data
       safety, Advertising ID, privacy policy, ads declaration, content rating,
       target audience actioned in Play Console → App content.
-- [x] **Version bump** — v13 set in `mobile/app.json` (bump manually for each
-      future release; autoIncrement is intentionally off).
-- [x] First manual Play upload already happened (v12 era);
+- [x] First manual Play upload already happened (v12 era; versionCode now 43);
       `eas submit -p android` works from here (service account wired).
 
 ## iOS (separate track — blocked until the values below exist)

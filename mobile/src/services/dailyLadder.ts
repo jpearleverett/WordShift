@@ -67,6 +67,12 @@ export interface DailyLadderSummary {
 
 let cache: DailyLadderState | null = null;
 
+/** Drop the in-memory cache after an external storage write (cloud restore). */
+export function invalidateDailyLadderCache(): void {
+  cache = null;
+}
+
+
 const getDefault = (): DailyLadderState => ({ entries: [] });
 
 async function load(): Promise<DailyLadderState> {

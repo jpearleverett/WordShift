@@ -7,6 +7,12 @@ import { getEquippedSync } from '../services/cosmetics';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
+type ConfettiShape = 'rect' | 'square' | 'circle' | 'triangle' | 'spark';
+
+// Modest shape variety keeps the celebration lively; the phase-aware palette
+// (bright rainbow -> dark muted) and the native-driven fall are unchanged.
+const CONFETTI_SHAPES: ConfettiShape[] = ['rect', 'square', 'circle', 'triangle', 'spark'];
+
 interface ConfettiPiece {
   id: number;
   x: number;
@@ -14,6 +20,7 @@ interface ConfettiPiece {
   size: number;
   rotation: number;
   delay: number;
+  shape: ConfettiShape;
 }
 
 const generateConfetti = (count: number, colors?: string[]): ConfettiPiece[] => {
@@ -29,6 +36,7 @@ const generateConfetti = (count: number, colors?: string[]): ConfettiPiece[] => 
       size: 8 + Math.random() * 12,
       rotation: Math.random() * 360,
       delay: distFromCenter * 400 + Math.random() * 100,
+      shape: CONFETTI_SHAPES[Math.floor(Math.random() * CONFETTI_SHAPES.length)],
     });
   }
   return pieces;
@@ -100,9 +108,56 @@ const ConfettiPieceComponent: React.FC<{ piece: ConfettiPiece }> = ({ piece }) =
     outputRange: ['0deg', '360deg'],
   });
 
-  // Random shape - rectangle or circle
-  const isCircle = piece.id % 3 === 0;
-  const isLong = piece.id % 4 === 0;
+  // Shape variety: rectangles, squares, circles, triangles, and star-ish sparks.
+  // The Animated.View is now a motion/position wrapper; the shape renders inside
+  // so the native-driven transform stays exactly as before.
+  const s = piece.size;
+  const renderShape = () => {
+    switch (piece.shape) {
+      case 'rect':
+        return (
+          <View
+            style={{ width: s * 0.5, height: s * 1.4, backgroundColor: piece.color, borderRadius: 2 }}
+          />
+        );
+      case 'circle':
+        return (
+          <View
+            style={{ width: s, height: s, backgroundColor: piece.color, borderRadius: s / 2 }}
+          />
+        );
+      case 'triangle':
+        return (
+          <View
+            style={{
+              width: 0,
+              height: 0,
+              backgroundColor: 'transparent',
+              borderStyle: 'solid',
+              borderLeftWidth: s * 0.55,
+              borderRightWidth: s * 0.55,
+              borderBottomWidth: s,
+              borderLeftColor: 'transparent',
+              borderRightColor: 'transparent',
+              borderBottomColor: piece.color,
+            }}
+          />
+        );
+      case 'spark': {
+        const ss = s * 0.9;
+        return (
+          <View style={{ width: ss, height: ss }}>
+            <View style={[styles.sparkSquare, { backgroundColor: piece.color }]} />
+            <View style={[styles.sparkDiamond, { backgroundColor: piece.color }]} />
+          </View>
+        );
+      }
+      default: // 'square'
+        return (
+          <View style={{ width: s, height: s, backgroundColor: piece.color, borderRadius: 2 }} />
+        );
+    }
+  };
 
   return (
     <Animated.View
@@ -110,10 +165,6 @@ const ConfettiPieceComponent: React.FC<{ piece: ConfettiPiece }> = ({ piece }) =
         styles.confettiPiece,
         {
           left: piece.x,
-          width: isLong ? piece.size * 0.4 : piece.size,
-          height: isLong ? piece.size * 1.5 : piece.size,
-          backgroundColor: piece.color,
-          borderRadius: isCircle ? piece.size / 2 : 2,
           transform: [
             { translateY },
             { translateX },
@@ -123,7 +174,9 @@ const ConfettiPieceComponent: React.FC<{ piece: ConfettiPiece }> = ({ piece }) =
           opacity,
         },
       ]}
-    />
+    >
+      {renderShape()}
+    </Animated.View>
   );
 };
 
@@ -297,6 +350,16 @@ const styles = StyleSheet.create({
   confettiPiece: {
     position: 'absolute',
     top: 0,
+  },
+  // Star-ish spark confetti: square + 45deg diamond overlaid (compact sparkle).
+  sparkSquare: {
+    ...StyleSheet.absoluteFill,
+    borderRadius: 1,
+  },
+  sparkDiamond: {
+    ...StyleSheet.absoluteFill,
+    borderRadius: 1,
+    transform: [{ rotate: '45deg' }],
   },
   starBurstContainer: {
     position: 'absolute',

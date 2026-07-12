@@ -7,17 +7,11 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "updates": {
       "url": "https://u.expo.dev/e8c8c0b5-f666-472d-91bf-3b055d96be23"
     },
     "runtimeVersion": {
       "policy": "appVersion"
-    },
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#FFF0F5"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -84,37 +78,139 @@
               {
                 "fontFamily": "ShantellSans-Regular",
                 "fontDefinitions": [
-                  { "path": "./assets/fonts/ShantellSans-Regular.ttf", "weight": 400 },
-                  { "path": "./assets/fonts/ShantellSans-Regular.ttf", "weight": 700 },
-                  { "path": "./assets/fonts/ShantellSans-Regular.ttf", "weight": 400, "style": "italic" },
-                  { "path": "./assets/fonts/ShantellSans-Regular.ttf", "weight": 700, "style": "italic" }
+                  {
+                    "path": "./assets/fonts/ShantellSans-Regular.ttf",
+                    "weight": 400
+                  },
+                  {
+                    "path": "./assets/fonts/ShantellSans-Regular.ttf",
+                    "weight": 700
+                  },
+                  {
+                    "path": "./assets/fonts/ShantellSans-Regular.ttf",
+                    "weight": 400,
+                    "style": "italic"
+                  },
+                  {
+                    "path": "./assets/fonts/ShantellSans-Regular.ttf",
+                    "weight": 700,
+                    "style": "italic"
+                  }
                 ]
               },
               {
                 "fontFamily": "ShantellSans-Bold",
                 "fontDefinitions": [
-                  { "path": "./assets/fonts/ShantellSans-Bold.ttf", "weight": 400 },
-                  { "path": "./assets/fonts/ShantellSans-Bold.ttf", "weight": 700 },
-                  { "path": "./assets/fonts/ShantellSans-Bold.ttf", "weight": 400, "style": "italic" },
-                  { "path": "./assets/fonts/ShantellSans-Bold.ttf", "weight": 700, "style": "italic" }
+                  {
+                    "path": "./assets/fonts/ShantellSans-Bold.ttf",
+                    "weight": 400
+                  },
+                  {
+                    "path": "./assets/fonts/ShantellSans-Bold.ttf",
+                    "weight": 700
+                  },
+                  {
+                    "path": "./assets/fonts/ShantellSans-Bold.ttf",
+                    "weight": 400,
+                    "style": "italic"
+                  },
+                  {
+                    "path": "./assets/fonts/ShantellSans-Bold.ttf",
+                    "weight": 700,
+                    "style": "italic"
+                  }
                 ]
               },
               {
                 "fontFamily": "ShantellSans-Italic",
                 "fontDefinitions": [
-                  { "path": "./assets/fonts/ShantellSans-Italic.ttf", "weight": 400 },
-                  { "path": "./assets/fonts/ShantellSans-Italic.ttf", "weight": 700 },
-                  { "path": "./assets/fonts/ShantellSans-Italic.ttf", "weight": 400, "style": "italic" },
-                  { "path": "./assets/fonts/ShantellSans-Italic.ttf", "weight": 700, "style": "italic" }
+                  {
+                    "path": "./assets/fonts/ShantellSans-Italic.ttf",
+                    "weight": 400
+                  },
+                  {
+                    "path": "./assets/fonts/ShantellSans-Italic.ttf",
+                    "weight": 700
+                  },
+                  {
+                    "path": "./assets/fonts/ShantellSans-Italic.ttf",
+                    "weight": 400,
+                    "style": "italic"
+                  },
+                  {
+                    "path": "./assets/fonts/ShantellSans-Italic.ttf",
+                    "weight": 700,
+                    "style": "italic"
+                  }
                 ]
               },
               {
                 "fontFamily": "ShantellSans-BoldItalic",
                 "fontDefinitions": [
-                  { "path": "./assets/fonts/ShantellSans-BoldItalic.ttf", "weight": 400 },
-                  { "path": "./assets/fonts/ShantellSans-BoldItalic.ttf", "weight": 700 },
-                  { "path": "./assets/fonts/ShantellSans-BoldItalic.ttf", "weight": 400, "style": "italic" },
-                  { "path": "./assets/fonts/ShantellSans-BoldItalic.ttf", "weight": 700, "style": "italic" }
+                  {
+                    "path": "./assets/fonts/ShantellSans-BoldItalic.ttf",
+                    "weight": 400
+                  },
+                  {
+                    "path": "./assets/fonts/ShantellSans-BoldItalic.ttf",
+                    "weight": 700
+                  },
+                  {
+                    "path": "./assets/fonts/ShantellSans-BoldItalic.ttf",
+                    "weight": 400,
+                    "style": "italic"
+                  },
+                  {
+                    "path": "./assets/fonts/ShantellSans-BoldItalic.ttf",
+                    "weight": 700,
+                    "style": "italic"
+                  }
+                ]
+              },
+              {
+                "fontFamily": "Figtree-Regular",
+                "fontDefinitions": [
+                  {
+                    "path": "./assets/fonts/Figtree-Regular.ttf",
+                    "weight": 400
+                  },
+                  {
+                    "path": "./assets/fonts/Figtree-Regular.ttf",
+                    "weight": 700
+                  },
+                  {
+                    "path": "./assets/fonts/Figtree-Regular.ttf",
+                    "weight": 400,
+                    "style": "italic"
+                  },
+                  {
+                    "path": "./assets/fonts/Figtree-Regular.ttf",
+                    "weight": 700,
+                    "style": "italic"
+                  }
+                ]
+              },
+              {
+                "fontFamily": "Figtree-Bold",
+                "fontDefinitions": [
+                  {
+                    "path": "./assets/fonts/Figtree-Bold.ttf",
+                    "weight": 400
+                  },
+                  {
+                    "path": "./assets/fonts/Figtree-Bold.ttf",
+                    "weight": 700
+                  },
+                  {
+                    "path": "./assets/fonts/Figtree-Bold.ttf",
+                    "weight": 400,
+                    "style": "italic"
+                  },
+                  {
+                    "path": "./assets/fonts/Figtree-Bold.ttf",
+                    "weight": 700,
+                    "style": "italic"
+                  }
                 ]
               }
             ]
@@ -128,10 +224,20 @@
             "enablePngCrunchInReleaseBuilds": false
           }
         }
+      ],
+      "expo-asset",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#FFF0F5"
+        }
       ]
     ],
     "extra": {
       "telemetryEndpoint": "",
+      "creatorCode": "",
       "supabaseUrl": "https://rsppoarumebdrsbfrqdi.supabase.co",
       "supabaseAnonKey": "sb_publishable_ykVJVIBmwX_Yg3sRPcFyEw_KMyGpLFS",
       "sentryDsn": "https://3e352a9d4e87da64322185f411bcc03a@o4511612369633280.ingest.us.sentry.io/4511612372844544",
@@ -141,6 +247,7 @@
       "admobInterstitialIdAndroid": "ca-app-pub-6575205005908086/1853886149",
       "admobRewardedIdIos": "",
       "admobRewardedIdAndroid": "ca-app-pub-6575205005908086/4565855562",
+      "adsUseTestIds": true,
       "eas": {
         "projectId": "e8c8c0b5-f666-472d-91bf-3b055d96be23"
       }

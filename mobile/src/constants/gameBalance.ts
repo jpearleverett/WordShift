@@ -1,11 +1,16 @@
 /**
  * Centralized game balance constants for WordShift.
  *
- * ALL numeric tuning values that affect game economy, progression,
+ * Numeric tuning values that affect game economy, progression,
  * puzzle generation, and narrative pacing live here. When a designer
- * wants to tweak "how many puzzles until Phase 2?", "how much amber
- * for a streak freeze?", or "how long before a word can repeat?",
- * this is the single file to edit.
+ * wants to tweak "how many puzzles until Phase 2?" or "how much amber
+ * for a streak freeze?", this is the first file to check.
+ *
+ * Known exceptions (live values owned elsewhere — keep them there):
+ * - Word cooldown/diversity tuning lives in services/wordHistory.ts
+ *   (HARD_COOLDOWN / SOFT_COOLDOWN / MAX_HISTORY_SIZE).
+ * - The daily-challenge streak-freeze interval lives in
+ *   services/dailyChallenge.ts (DAILY_FREE_FREEZE_INTERVAL_DAYS).
  *
  * DO NOT put UI layout values, color palettes, or animation curves
  * here — those belong in theme/ or component-level constants.
@@ -31,14 +36,15 @@ export const PHASE_THRESHOLDS = [0, 20, 65, 150, 235];
  * (post-revelation) floors are deliberately reachable — the entire narrative
  * payoff lives there, so an engaged player must be able to arrive at the
  * climax in a single committed playthrough rather than ~225-300 puzzles.
- * House-building still completes (~puzzle 130) before Phase 4, and Phase 5
- * still lands comfortably after the Phase 4 dread window + final puzzle.
+ * House-building completes at the puzzle-190 gate (descent trio), just before
+ * the finale, and Phase 5 still lands comfortably after the Phase 4 dread
+ * window + final puzzle.
  */
 export const MIN_PUZZLES_FOR_PHASE: Record<DialoguePhase, number> = {
   0: 0,
   1: 15,
-  2: 55,
-  3: 135,
+  2: 40, // Pacing compression: accelerated players reach Deeper Questions inside week one (weighted PHASE_THRESHOLDS unchanged)
+  3: 125, // Was 135. Phase 2 was the longest single-tone stretch (the likeliest D14 break); a modest floor drop brings Growing Shadows' visual/tonal shift ~10 puzzles sooner for accelerated players. Kept at 125 (not lower) so vanguard animals' +1 phase-4 dialogue doesn't leak the cult reveal too far ahead of the global reveal floor (155). Weighted thresholds + house-unlock gates (Bamboo Attic 130) untouched.
   4: 155, // The Horizon — the cult reveal, just after the house completes
   5: 210, // Post-revelation — after house completion + final puzzle
 };
@@ -88,9 +94,11 @@ export const PATRON_AMBER_BONUS = 2;
 // ============================================================================
 
 /**
- * Variable-ratio "lucky" amber bonus on a normal win — the one intentionally
- * non-deterministic reward in an otherwise fully predictable economy. On a small
- * fraction of standard victories the player gets a modest extra amber windfall,
+ * Variable-ratio "lucky" amber bonus on a win — the one intentionally
+ * non-deterministic reward in an otherwise fully predictable economy. Applies
+ * to EVERY victory past the onboarding window (standard, challenge, and daily
+ * alike — computeSurpriseBonus runs unconditionally in awardPuzzleAmber). On a
+ * small fraction of victories the player gets a modest extra amber windfall,
  * the unpredictable-reward lever that keeps "just one more puzzle" alive.
  *
  * IMPORTANT (hard rule, mirrors PATRON_AMBER_BONUS): this is additive to the
@@ -219,10 +227,20 @@ export const REMOVE_ADS_NUDGE_AFTER_INTERSTITIALS = 3;
 
 /**
  * Earliest puzzle count for Fox's one-time "Keeper's Welcome" starter-pack intro.
- * After the pit-harvest intro (puzzle 8) and before challenge mode (15), once the
- * player understands amber. Suppressed if the starter pack is already owned.
+ * Pushed past puzzle 20 so the store pitch never lands inside the first-session
+ * cluster of new-thing introductions (journal, daily, variants, challenge,
+ * mandatory harvest all fire before this) — the newcomer meets the game before
+ * the game asks for anything. Suppressed if the starter pack is already owned.
  */
-export const STARTER_INTRO_MIN_PUZZLES = 12;
+export const STARTER_INTRO_MIN_PUZZLES = 22;
+
+/**
+ * Puzzle count where the Journal Hub (ledger, gallery, quests) and the header
+ * quest pill become visible, ending the post-tutorial "light mode" home.
+ * Quest GENERATION is gated on the same number (weeklyQuests) so quests can
+ * never accrue and expire invisibly before the player has a surface for them.
+ */
+export const JOURNAL_UNLOCK_PUZZLES = 6;
 
 // ============================================================================
 // OFFERING PIT
@@ -297,6 +315,14 @@ export const STREAK_FREEZE_COST = 50;
 
 /** Days between free streak freeze grants. */
 export const FREE_FREEZE_INTERVAL_DAYS = 14;
+
+/**
+ * Maximum banked main-streak freezes (purchased + free 14-day grants combined).
+ * Uncapped freezes were stackable into an effectively unbreakable streak, which
+ * hollows out the daily-habit tension the streak exists to create. Purchases
+ * refuse at the cap and the free grant simply waits until a freeze is consumed.
+ */
+export const STREAK_FREEZE_CAP = 3;
 
 /** Streak milestones that award one-time amber bonuses when crossed. */
 export const STREAK_MILESTONES: {
@@ -419,19 +445,6 @@ export const DOUBLE_SHIFT_GENERATION_TIMEOUT = 5000;
 
 /** Minimum quality score for double shift puzzles. */
 export const DOUBLE_SHIFT_MIN_ACCEPTABLE_SCORE = 30;
-
-// ============================================================================
-// WORD HISTORY
-// ============================================================================
-
-/** Puzzles before a word can reappear (hard exclusion). */
-export const WORD_HARD_COOLDOWN = 15;
-
-/** Puzzles before freshness penalty fully decays. */
-export const WORD_SOFT_COOLDOWN = 40;
-
-/** Maximum number of puzzle groups tracked in word history. */
-export const WORD_MAX_HISTORY_SIZE = 100;
 
 // ============================================================================
 // PUZZLE BANK
@@ -560,10 +573,12 @@ export const MILESTONE_BONUSES: {
   { puzzles: 100, amber: 150, message: 'Century milestone!', darkMessage: 'One hundred arrangements completed.', dreadMessage: 'The arrangement grows. One hundred offerings.' },
   { puzzles: 110, amber: 75, message: 'Double digits!', darkMessage: 'The house stirs.', dreadMessage: 'One hundred ten threads woven into the pattern.' },
   { puzzles: 125, amber: 100, message: 'Halfway to mastery!', darkMessage: 'The house feels heavier. Fuller.', dreadMessage: 'One hundred twenty-five incantations. The walls listen.' },
-  // Mid-game valley beats (~130–170): the house finishes around puzzle 130 but the
-  // Phase 4 reveal doesn't land until ~155, leaving a stretch with no new unlocks.
-  // These keep the amber faucet pulsing through that gap so the climb to the climax
-  // never feels rewardless. Kept modest so they don't outpace the room-upgrade sink.
+  // Mid-game valley beats (~130–170): the pre-descent-trio house rooms finish
+  // unlocking around here while the Phase 4 reveal doesn't land until ~155,
+  // leaving a stretch with fewer new unlocks (the trio's 150/170/190 gates thin
+  // it but don't fill it). These keep the amber faucet pulsing through that gap
+  // so the climb to the climax never feels rewardless. Kept modest so they
+  // don't outpace the room-upgrade sink.
   { puzzles: 135, amber: 90, message: 'The house is whole!', darkMessage: 'The last room is built. The house is whole... and quiet.', dreadMessage: 'The house is complete. Now it waits, with you, for what comes.' },
   { puzzles: 145, amber: 110, message: 'Going strong!', darkMessage: 'Every room is full, yet something still feels unfinished.', dreadMessage: 'The walls are full. The space between them is not.' },
   { puzzles: 150, amber: 200, message: 'Dedicated player!', darkMessage: 'The letters rearrange themselves for you now.', dreadMessage: 'One hundred fifty words offered to the pattern.' },

@@ -20,6 +20,12 @@ interface WordHistoryData {
 // In-memory cache
 let historyCache: WordHistoryData | null = null;
 
+/** Drop the in-memory cache after an external storage write (cloud restore). */
+export function invalidateWordHistoryCache(): void {
+  historyCache = null;
+}
+
+
 /**
  * Migrate legacy flat array format to grouped format
  */

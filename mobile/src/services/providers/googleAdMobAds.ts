@@ -61,16 +61,42 @@ function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
   });
 }
 
-function idsFromExtra(): AdMobConfig {
+function readExtra(): Record<string, any> {
   try {
     const Constants = require('expo-constants').default ?? require('expo-constants');
-    const extra = Constants?.expoConfig?.extra ?? Constants?.manifest?.extra ?? {};
-    return Platform.OS === 'ios'
-      ? { interstitialId: extra.admobInterstitialIdIos, rewardedId: extra.admobRewardedIdIos }
-      : { interstitialId: extra.admobInterstitialIdAndroid, rewardedId: extra.admobRewardedIdAndroid };
+    return Constants?.expoConfig?.extra ?? Constants?.manifest?.extra ?? {};
   } catch {
     return {};
   }
+}
+
+/**
+ * Whether to serve Google's TEST ad units instead of the live production units.
+ * True in dev builds (__DEV__) OR when `extra.adsUseTestIds` is set — so an
+ * internal-testing (release) build can opt into test ads too. Serving LIVE ads
+ * to yourself on a test build and clicking them is an AdMob policy violation
+ * that can get the whole account limited; this gate is the guard against it.
+ * Flip `adsUseTestIds` to false in app.json ONLY for the production build.
+ */
+function shouldUseTestAds(): boolean {
+  if (typeof __DEV__ !== 'undefined' && __DEV__) return true;
+  return readExtra().adsUseTestIds === true;
+}
+
+function idsFromExtra(mod?: any): AdMobConfig {
+  // Test mode: use the SDK's official TestIds (falling back to Google's public
+  // sample unit ids if the SDK export is unavailable in this context).
+  if (shouldUseTestAds()) {
+    const TestIds = mod?.TestIds;
+    return {
+      interstitialId: TestIds?.INTERSTITIAL ?? 'ca-app-pub-3940256099942544/1033173712',
+      rewardedId: TestIds?.REWARDED ?? 'ca-app-pub-3940256099942544/5224354917',
+    };
+  }
+  const extra = readExtra();
+  return Platform.OS === 'ios'
+    ? { interstitialId: extra.admobInterstitialIdIos, rewardedId: extra.admobRewardedIdIos }
+    : { interstitialId: extra.admobInterstitialIdAndroid, rewardedId: extra.admobRewardedIdAndroid };
 }
 
 // LITERAL requires (not eval): Metro only bundles the native module's JS when it
@@ -195,18 +221,16 @@ export function createAdMobAdProvider(config: AdMobConfig = {}): AdProvider {
     },
 
     async initialize(): Promise<void> {
-      const ids = {
-        interstitialId: config.interstitialId,
-        rewardedId: config.rewardedId,
-        ...idsFromExtra(),
-      };
-      // Explicit config wins over extra.
+      // Load the SDK first so idsFromExtra can read its official TestIds when
+      // test mode is active (dev build or extra.adsUseTestIds).
+      const loaded = loadAdsModule();
+      if (!loaded) return; // SDK not installed → inert (Expo Go / Jest)
+
+      const ids = idsFromExtra(loaded);
+      // Explicit config wins over extra/test resolution.
       interstitialId = config.interstitialId ?? ids.interstitialId;
       rewardedId = config.rewardedId ?? ids.rewardedId;
       if (!interstitialId && !rewardedId) return; // nothing configured → inert
-
-      const loaded = loadAdsModule();
-      if (!loaded) return; // SDK not installed → inert
       // Keep the FULL module namespace: InterstitialAd / RewardedAd / AdEventType /
       // RewardedAdEventType / AdsConsent are NAMED exports, while the default export
       // is the mobileAds() initializer. Conflating them makes every ad request throw

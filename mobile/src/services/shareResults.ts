@@ -41,6 +41,65 @@ export interface ShareableResult {
   shareFrame?: string;
 }
 
+// ─── Spoiler-safe intrigue taglines (early shares) ──────────────────────────
+//
+// The spoiler-free grid is the growth engine, but at the bright phases the card
+// carried no curiosity. These add a faint wrongness ("Mostly." / "For now.")
+// that hints "there is more here than it looks" WITHOUT naming or revealing the
+// turn. Used ONLY on Phase 0-1 non-daily cards (see pickShareIntrigueTagline);
+// daily cards (same puzzle for everyone) and dark-phase cards (the player is
+// already in it) keep their existing phaseNarrative tagline untouched. Exported
+// so the noEmDashes sweep covers them. No em dashes.
+
+export const SHARE_INTRIGUE_TAGLINES: Record<0 | 1, string[]> = {
+  0: [
+    'A cozy little word game. Mostly.',
+    'Cute animals, cozy words. For now.',
+    'It is very relaxing. You should play.',
+    'Friendly animals. Nothing more. Truly.',
+  ],
+  1: [
+    'Still just a cozy word game. Mostly.',
+    'The animals are so friendly. For now.',
+    'Nothing to worry about here. Come play.',
+    'It stays warm and quiet. Mostly.',
+  ],
+};
+
+/**
+ * Stable, render-independent seed from a share result (same result → same pick,
+ * so the choice never flickers across re-renders and the captured PNG matches
+ * the preview). Not security-sensitive; just a spread over the small pool.
+ */
+function intrigueSeed(result: ShareableResult): number {
+  const basis = [
+    result.wordChain?.join('') ?? '',
+    result.moveCount,
+    result.stars,
+    result.hintsUsed,
+    result.invalidAttempts,
+    result.difficulty,
+  ].join('|');
+  let h = 0;
+  for (let i = 0; i < basis.length; i++) {
+    h = (h * 31 + basis.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h);
+}
+
+/**
+ * Pick a spoiler-safe intrigue tagline for the share card, or null when the
+ * card should keep its existing phaseNarrative tagline instead (daily shares,
+ * and any dark phase >= 2). Deterministic per result.
+ */
+export function pickShareIntrigueTagline(result: ShareableResult): string | null {
+  if (result.isDaily) return null; // daily stays spoiler-free / unchanged
+  const phase = Math.round(result.phase ?? 0);
+  if (phase !== 0 && phase !== 1) return null; // dark phases keep their tagline
+  const pool = SHARE_INTRIGUE_TAGLINES[phase];
+  return pool[intrigueSeed(result) % pool.length];
+}
+
 function getChallengeLink(result: ShareableResult): string {
   if (result.isDaily) {
     return `wordshift://challenge/daily${result.dailyDate ? `?date=${result.dailyDate}` : ''}`;

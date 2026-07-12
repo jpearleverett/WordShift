@@ -4,6 +4,7 @@ import { PhaseTransitionEvent, PhaseScene, CinematicParticleConfig } from '../se
 import { getSettingsSync } from '../services/settings';
 import { hapticLight, hapticMedium, hapticHeavy, hapticWarning } from '../services/haptics';
 import { BODY_FONT, BODY_FONT_BOLD } from '../theme/fonts';
+import { getPhaseTheme } from '../theme/colors';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -116,6 +117,65 @@ const CinematicParticle: React.FC<{
           : [{ translateX: translateMain }],
       }}
     />
+  );
+};
+
+// Stepped translucent edge bands, alpha fading toward the center.
+const VIGNETTE_STEPS = 5;
+const VIGNETTE_ALPHAS = [0.85, 0.55, 0.32, 0.16, 0.06];
+
+/** 0..1 alpha -> a 2-digit hex suffix for a 6-digit hex color (#RRGGBB + AA). */
+function alphaHex(a: number): string {
+  const clamped = Math.max(0, Math.min(1, a));
+  return Math.round(clamped * 255)
+    .toString(16)
+    .padStart(2, '0');
+}
+
+/**
+ * Soft atmospheric edge vignette. Replaces the old bordered rounded-rect (which
+ * read as a hard picture frame) with stepped translucent bands hugging each
+ * screen edge, alpha fading toward the center so there is no hard edge — the
+ * layered-concentric approach the Offering Pit glow uses. Corners naturally read
+ * darkest where two edges overlap. Phase-aware tint; the whole group's opacity is
+ * driven by the caller's Animated value (native driver, reduced-motion aware —
+ * the caller only animates it in when motion is on).
+ */
+const SoftVignette: React.FC<{ opacity: Animated.Value; color: string }> = ({ opacity, color }) => {
+  const depth = Math.min(SCREEN_WIDTH, SCREEN_HEIGHT) * 0.34;
+  const band = depth / VIGNETTE_STEPS;
+  const bands: React.ReactNode[] = [];
+  for (let i = 0; i < VIGNETTE_STEPS; i++) {
+    const bg = color + alphaHex(VIGNETTE_ALPHAS[i]);
+    const offset = i * band;
+    const thickness = band + 1; // +1 overlap so rounding can't open a seam
+    bands.push(
+      <View
+        key={`t${i}`}
+        pointerEvents="none"
+        style={{ position: 'absolute', left: 0, right: 0, top: offset, height: thickness, backgroundColor: bg }}
+      />,
+      <View
+        key={`b${i}`}
+        pointerEvents="none"
+        style={{ position: 'absolute', left: 0, right: 0, bottom: offset, height: thickness, backgroundColor: bg }}
+      />,
+      <View
+        key={`l${i}`}
+        pointerEvents="none"
+        style={{ position: 'absolute', top: 0, bottom: 0, left: offset, width: thickness, backgroundColor: bg }}
+      />,
+      <View
+        key={`r${i}`}
+        pointerEvents="none"
+        style={{ position: 'absolute', top: 0, bottom: 0, right: offset, width: thickness, backgroundColor: bg }}
+      />
+    );
+  }
+  return (
+    <Animated.View pointerEvents="none" style={[styles.vignette, { opacity }]}>
+      {bands}
+    </Animated.View>
   );
 };
 
@@ -339,11 +399,8 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
       accessibilityRole="alert"
       accessibilityLabel={`Phase transition: ${event.title}`}
     >
-      {/* Darkening edge vignette (fades in on vignette_close scenes) */}
-      <Animated.View
-        pointerEvents="none"
-        style={[styles.vignette, { opacity: vignetteOpacity }]}
-      />
+      {/* Soft atmospheric edge vignette (fades in on vignette_close scenes) */}
+      <SoftVignette opacity={vignetteOpacity} color={getPhaseTheme(event.phase).vignetteColor} />
 
       {/* Full-screen flash overlay */}
       <Animated.View
@@ -480,14 +537,11 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     zIndex: 1001,
   },
-  // Approximated radial vignette: a thick dark border whose inner corners are
-  // rounded, darkening the screen edges while leaving the center clearer.
-  // (No new assets; a true radial gradient isn't available without one.)
+  // Soft edge vignette container. The darkening comes from stepped translucent
+  // bands (see SoftVignette) rather than a bordered rounded-rect, so there is no
+  // hard picture-frame edge — just an atmospheric darkening toward the corners.
   vignette: {
     ...StyleSheet.absoluteFill,
-    borderColor: 'rgba(0, 0, 0, 0.85)',
-    borderWidth: Math.round(Math.min(SCREEN_WIDTH, SCREEN_HEIGHT) * 0.32),
-    borderRadius: Math.round(Math.min(SCREEN_WIDTH, SCREEN_HEIGHT) * 0.55),
     zIndex: 999,
   },
 });
