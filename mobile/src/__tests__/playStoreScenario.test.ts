@@ -31,6 +31,7 @@ import {
 import {
   AMBER_REWARDS,
   FIRST_COMPLETION_BONUS,
+  MIN_PUZZLES_FOR_PHASE,
   PHASE_THRESHOLDS,
 } from '../constants/gameBalance';
 import {
@@ -563,6 +564,11 @@ describe('Play Store screenshot scenarios', () => {
       },
       introsSeen: ['fox', 'pangolin', 'owl', 'axolotl'],
     });
+    expect(progress.phaseProgress).toBeGreaterThanOrEqual(PHASE_THRESHOLDS[3]);
+    expect(progress.phaseProgress).toBeLessThan(PHASE_THRESHOLDS[4]);
+    expect(progress.puzzlesSolved)
+      .toBeGreaterThanOrEqual(MIN_PUZZLES_FOR_PHASE[3]);
+    expect(progress.phaseProgress).toBeGreaterThanOrEqual(progress.puzzlesSolved);
     expect(scenario.storage.wordshift_schema_version)
       .toBe(String(CURRENT_SCHEMA_VERSION));
     expect(stored(scenario, 'wordshift_settings')).toMatchObject({
@@ -611,6 +617,7 @@ describe('Play Store screenshot scenarios', () => {
     ['variant-menu', 40, 1, 40],
     ['flawless-victory', 0, 0, 0],
     ['home-dusk', 60, 2, 70],
+    ['home-storm', 145, 3, 170],
   ] as const)(
     '%s has coherent puzzle and phase progress',
     (name, puzzlesSolved, currentPhase, phaseProgress) => {
@@ -636,6 +643,7 @@ describe('Play Store screenshot scenarios', () => {
     ['animal-dialogue', 12],
     ['variant-menu', 40],
     ['home-dusk', 60],
+    ['home-storm', 145],
   ] as const)('%s has complete stats matching home progress', (name, completed) => {
     const scenario = buildPlayStoreScenario(name, '2026-07-11');
     const stats = stored<{

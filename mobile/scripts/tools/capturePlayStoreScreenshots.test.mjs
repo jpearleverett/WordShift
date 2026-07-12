@@ -322,6 +322,10 @@ describe('capture publication and stability policy', () => {
     const threeVisible = requiredLabels.map((label, index) => ({
       label,
       visibleRatio: index === 3 ? 0.59 : 0.95,
+      viewportRatio: 1,
+      occludedBy: index === 3
+        ? [{ label: 'PLAY dock', overlapRatio: 0.41 }]
+        : [],
     }));
 
     assert.throws(
@@ -330,7 +334,7 @@ describe('capture publication and stability policy', () => {
         requiredLabels,
         0.6
       ),
-      /missing Axel.*3\/4 companions visible/
+      /missing Axel.*Axel=0\.590.*viewport=1\.000.*PLAY dock=0\.410.*3\/4 companions visible/
     );
     assert.deepEqual(
       requireAllVisibleCompanions(
@@ -342,9 +346,38 @@ describe('capture publication and stability policy', () => {
     );
   });
 
-  test('home capture routes its final visibility decision through the four-animal guard', async () => {
+  test('unoccluded ratio subtracts every home overlay from viewport-visible area', async () => {
+    const helpers = await import('./capturePlayStoreHelpers.mjs');
+    assert.equal(typeof helpers.measureUnoccludedVisibleArea, 'function');
+    const result = helpers.measureUnoccludedVisibleArea(
+      { x: 0, y: 0, width: 100, height: 100 },
+      { x: 0, y: 0, width: 100, height: 100 },
+      [
+        { label: 'header', x: 0, y: 0, width: 100, height: 20 },
+        { label: 'Next Unlock sign', x: 0, y: 20, width: 100, height: 20 },
+        { label: 'ambient line', x: 0, y: 40, width: 100, height: 10 },
+        { label: 'PLAY dock', x: 0, y: 80, width: 100, height: 20 },
+      ]
+    );
+
+    assert.equal(result.viewportRatio, 1);
+    assert.equal(result.visibleRatio, 0.3);
+    assert.deepEqual(
+      result.occludedBy.map(item => [item.label, item.overlapRatio]),
+      [
+        ['header', 0.2],
+        ['Next Unlock sign', 0.2],
+        ['ambient line', 0.1],
+        ['PLAY dock', 0.2],
+      ]
+    );
+  });
+
+  test('home capture measures unoccluded area before the four-animal guard', async () => {
     const runner = await fs.readFile(RUNNER_PATH, 'utf8');
 
+    assert.match(runner, /measureUnoccludedVisibleArea\(/);
+    assert.match(runner, /getHomeOverlayRects\(/);
     assert.match(runner, /requireAllVisibleCompanions\(/);
     assert.doesNotMatch(runner, /visible\.length\s*>=\s*3/);
   });
@@ -378,11 +411,40 @@ describe('capture publication and stability policy', () => {
     );
   });
 
-  test('home capture checks real locked-room geometry after its deterministic pan', async () => {
+  test('locked-room geometry derives the minimum upward correction', async () => {
+    const helpers = await import('./capturePlayStoreHelpers.mjs');
+    assert.equal(
+      typeof helpers.getRequiredUpwardShiftForVerticalClearance,
+      'function'
+    );
+    assert.equal(
+      helpers.getRequiredUpwardShiftForVerticalClearance(
+        { top: 105, bottom: 124 },
+        { top: 112, bottom: 162 },
+        0.5
+      ),
+      12.5
+    );
+    assert.equal(
+      helpers.getRequiredUpwardShiftForVerticalClearance(
+        { top: 90, bottom: 110 },
+        { top: 112, bottom: 162 },
+        0.5
+      ),
+      0
+    );
+  });
+
+  test('home capture parameterizes locked-room geometry for sunny and storm', async () => {
     const runner = await fs.readFile(RUNNER_PATH, 'utf8');
 
     assert.match(runner, /requireNoPartialVerticalOcclusion\(/);
     assert.match(runner, /Build Jungle Hammock for 200 amber/);
+    assert.match(
+      runner,
+      /async function assertHomeLockedRoomGeometry\(page,\s*scenario,\s*amber\)/,
+      'locked-room audit must accept scenario fixture values'
+    );
     assert.match(
       runner,
       /lockedRoom\.getByText\('Jungle Hammock'/,
@@ -390,18 +452,20 @@ describe('capture publication and stability policy', () => {
     );
     assert.match(
       runner,
-      /180\s+\/\s+200/,
-      'capture must also guard the locked-room affordability line'
+      /amber >= 200\s*\?\s*'Tap to build this room'\s*:\s*`\$\{amber\} \/\s*200`/,
+      'capture must guard each scenario production affordability line'
     );
     assert.match(
       runner,
-      /Today's challenge is ready\.[\s\S]*state: 'detached'/,
-      'capture must let the transient ambient line clear before geometry audit'
+      /'home-sunny':\s*\{\s*amber:\s*180\s*\}[\s\S]*'home-storm':\s*\{\s*amber:\s*420\s*\}/
     );
   });
 
-  test('storm capture explicitly pans the real home and audits settled chrome', async () => {
-    const runner = await fs.readFile(RUNNER_PATH, 'utf8');
+  test('storm capture pans the semantic HouseWorld surface and waits for stable frames', async () => {
+    const [runner, houseWorld] = await Promise.all([
+      fs.readFile(RUNNER_PATH, 'utf8'),
+      fs.readFile(HOUSE_WORLD_PATH, 'utf8'),
+    ]);
 
     assert.match(
       runner,
@@ -411,14 +475,54 @@ describe('capture publication and stability policy', () => {
       runner,
       /async function panHouseToVisibleCompanions\(page,\s*scenario\)/
     );
+    assert.match(houseWorld, /testID="home-world-pan-surface"/);
+    assert.match(houseWorld, /minDist=\{10\}/);
+    assert.match(runner, /getByTestId\('home-world-pan-surface'\)/);
+    assert.match(runner, /panSurface\.boundingBox\(\)/);
+    assert.match(runner, /HOME_PAN_ACTIVATION_DISTANCE\s*=\s*10/);
+    assert.match(
+      runner,
+      /requestedUpwardDistance\s*\+\s*HOME_PAN_ACTIVATION_DISTANCE/
+    );
     assert.match(
       runner,
       /page\.mouse\.down\(\)[\s\S]*page\.mouse\.move\([\s\S]*page\.mouse\.up\(\)/
     );
+    assert.doesNotMatch(runner, /page\.mouse\.move\(24,\s*(?:620|314)/);
+    assert.match(runner, /waitForStableHomeGeometry\(/);
+    assert.match(runner, /stableFrameTarget\s*=\s*3/);
+    assert.match(runner, /requestAnimationFrame/);
+    assert.match(runner, /stableFrameCount\s*>=\s*stableFrameTarget/);
     assert.match(
       runner,
       /await waitForDocumentReadiness\(page\);[\s\S]*await assertHomeChromeGeometry\(page,\s*scenario\)/
     );
+  });
+
+  test('ambient capture state uses a semantic opacity hook without copy coupling', async () => {
+    const [runner, home] = await Promise.all([
+      fs.readFile(RUNNER_PATH, 'utf8'),
+      fs.readFile(HOME_PATH, 'utf8'),
+    ]);
+
+    assert.match(home, /testID="home-ambient-line"/);
+    assert.match(runner, /confirmAmbientCaptureState\(page\)/);
+    assert.match(runner, /'home-ambient-line'/);
+    assert.match(runner, /querySelector\(`\[data-testid="\$\{testId\}"\]`\)/);
+    assert.match(runner, /const detached = element === null/);
+    assert.match(runner, /const opacity = detached/);
+    assert.match(runner, /return detached \|\| opacity <= 0\.001/);
+    assert.doesNotMatch(runner, /Today's challenge is ready/);
+    assert.doesNotMatch(runner, /The daily incantation is prepared/);
+    assert.doesNotMatch(runner, /Today's words are chosen/);
+  });
+
+  test('home overlays expose semantic geometry hooks', async () => {
+    const home = await fs.readFile(HOME_PATH, 'utf8');
+
+    assert.match(home, /testID="home-header"/);
+    assert.match(home, /testID="home-next-unlock-sign"/);
+    assert.match(home, /testID="home-play-dock"/);
   });
 
   test('storm scenario uses production phase rendering without a sky override', async () => {
@@ -484,11 +588,58 @@ describe('capture publication and stability policy', () => {
     assert.doesNotMatch(runner, /Today’s Standing/);
   });
 
+  test('real storm smoke capture is temporary, isolated, and cleanup-safe', async () => {
+    const runner = await fs.readFile(RUNNER_PATH, 'utf8');
+    const smokeFunction = runner.match(
+      /async function runHomeStormSmoke\([\s\S]*?\n}\n/
+    )?.[0];
+
+    assert.ok(smokeFunction, 'runner must define a focused home-storm smoke path');
+    assert.match(runner, /--smoke-home-storm/);
+    assert.match(
+      smokeFunction,
+      /fs\.mkdtemp\(path\.join\(\s*os\.tmpdir\(\),\s*'wordshift-home-storm-smoke-'\s*\)\)/
+    );
+    assert.match(
+      smokeFunction,
+      /captureScenario\(\s*browser,\s*smokeItem,\s*smokeDirectory,\s*\{\s*debugDirectory:\s*smokeDirectory\s*\}\s*\)/
+    );
+    assert.match(smokeFunction, /assertPngDimensions\(/);
+    assert.match(
+      smokeFunction,
+      /finally[\s\S]*fs\.rm\(smokeDirectory,\s*\{\s*recursive:\s*true,\s*force:\s*true\s*\}\)/
+    );
+    assert.doesNotMatch(smokeFunction, /SOURCE_DIR|withStagedPublication/);
+    assert.match(runner, /context\.route\('\*\*\/\*'/);
+    assert.match(runner, /isAllowedCaptureRequest\(route\.request\(\)\.url\(\)\)/);
+  });
+
+  test('capture and asset commands run the real storm smoke gate', async () => {
+    const pkg = JSON.parse(await fs.readFile(PACKAGE_PATH, 'utf8'));
+
+    assert.match(
+      pkg.scripts['test:play-store-capture'],
+      /capturePlayStoreScreenshots\.test\.mjs/
+    );
+    assert.match(
+      pkg.scripts['test:play-store-capture'],
+      /--smoke-home-storm/
+    );
+    assert.match(
+      pkg.scripts['test:play-store-assets'],
+      /npm run test:play-store-capture/
+    );
+  });
+
   test('aggregate Play Store asset tests include capture runner regressions', async () => {
     const pkg = JSON.parse(await fs.readFile(PACKAGE_PATH, 'utf8'));
 
     assert.match(
       pkg.scripts['test:play-store-assets'],
+      /npm run test:play-store-capture/
+    );
+    assert.match(
+      pkg.scripts['test:play-store-capture'],
       /capturePlayStoreScreenshots\.test\.mjs/
     );
   });

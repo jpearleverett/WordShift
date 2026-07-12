@@ -1055,7 +1055,11 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
         minDist={10}
         avgTouches
       >
-        <Animated.View style={styles.gestureContainer} onLayout={onContainerLayout}>
+        <Animated.View
+          style={styles.gestureContainer}
+          onLayout={onContainerLayout}
+          testID="home-world-pan-surface"
+        >
           <Animated.View
             style={[
               styles.transformContainer,

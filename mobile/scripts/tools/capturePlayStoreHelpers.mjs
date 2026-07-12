@@ -46,6 +46,104 @@ export function getValidDropZoneLabelMatcher(position, formedWord) {
   );
 }
 
+function assertRect(rect, label) {
+  if (
+    !rect
+    || !Number.isFinite(rect.x)
+    || !Number.isFinite(rect.y)
+    || !Number.isFinite(rect.width)
+    || !Number.isFinite(rect.height)
+    || rect.width <= 0
+    || rect.height <= 0
+  ) {
+    throw new Error(`${label} has invalid rectangle geometry`);
+  }
+}
+
+function intersectRects(first, second) {
+  const left = Math.max(first.x, second.x);
+  const top = Math.max(first.y, second.y);
+  const right = Math.min(first.x + first.width, second.x + second.width);
+  const bottom = Math.min(first.y + first.height, second.y + second.height);
+  if (right <= left || bottom <= top) return null;
+  return { x: left, y: top, width: right - left, height: bottom - top };
+}
+
+function subtractRect(subject, overlay) {
+  const intersection = intersectRects(subject, overlay);
+  if (!intersection) return [subject];
+
+  const subjectRight = subject.x + subject.width;
+  const subjectBottom = subject.y + subject.height;
+  const intersectionRight = intersection.x + intersection.width;
+  const intersectionBottom = intersection.y + intersection.height;
+  return [
+    {
+      x: subject.x,
+      y: subject.y,
+      width: subject.width,
+      height: intersection.y - subject.y,
+    },
+    {
+      x: subject.x,
+      y: intersectionBottom,
+      width: subject.width,
+      height: subjectBottom - intersectionBottom,
+    },
+    {
+      x: subject.x,
+      y: intersection.y,
+      width: intersection.x - subject.x,
+      height: intersection.height,
+    },
+    {
+      x: intersectionRight,
+      y: intersection.y,
+      width: subjectRight - intersectionRight,
+      height: intersection.height,
+    },
+  ].filter(piece => piece.width > 0 && piece.height > 0);
+}
+
+export function measureUnoccludedVisibleArea(subject, viewport, overlays = []) {
+  assertRect(subject, 'subject');
+  assertRect(viewport, 'viewport');
+  for (const overlay of overlays) {
+    assertRect(overlay, overlay.label ?? 'overlay');
+  }
+
+  const subjectArea = subject.width * subject.height;
+  const viewportIntersection = intersectRects(subject, viewport);
+  const viewportArea = viewportIntersection
+    ? viewportIntersection.width * viewportIntersection.height
+    : 0;
+  let visiblePieces = viewportIntersection ? [viewportIntersection] : [];
+  for (const overlay of overlays) {
+    visiblePieces = visiblePieces.flatMap(piece => subtractRect(piece, overlay));
+  }
+  const visibleArea = visiblePieces.reduce(
+    (sum, piece) => sum + piece.width * piece.height,
+    0
+  );
+  const occludedBy = overlays.flatMap(overlay => {
+    if (!viewportIntersection) return [];
+    const overlap = intersectRects(viewportIntersection, overlay);
+    if (!overlap) return [];
+    return [{
+      label: overlay.label ?? 'overlay',
+      overlapRatio: (overlap.width * overlap.height) / subjectArea,
+    }];
+  });
+
+  return {
+    subjectArea,
+    viewportRatio: viewportArea / subjectArea,
+    visibleArea,
+    visibleRatio: visibleArea / subjectArea,
+    occludedBy,
+  };
+}
+
 export function requireAllVisibleCompanions(
   metrics,
   requiredLabels,
@@ -59,8 +157,21 @@ export function requireAllVisibleCompanions(
     !visibleLabels.includes(label)
   );
   if (missingLabels.length > 0) {
+    const diagnostics = missingLabels.map(label => {
+      const metric = metricsByLabel.get(label);
+      const visibleRatio = metric?.visibleRatio ?? 0;
+      const viewportRatio = metric?.viewportRatio ?? 0;
+      const occlusion = (metric?.occludedBy ?? [])
+        .filter(item => item.overlapRatio > 0)
+        .map(item => `${item.label}=${item.overlapRatio.toFixed(3)}`)
+        .join(', ');
+      return `${label}=${visibleRatio.toFixed(3)} `
+        + `(viewport=${viewportRatio.toFixed(3)}`
+        + `${occlusion ? `; occluded by ${occlusion}` : ''})`;
+    });
     throw new Error(
       `House pan missing ${missingLabels.join(', ')}; `
+      + `${diagnostics.join('; ')}; `
       + `${visibleLabels.length}/${requiredLabels.length} companions visible `
       + `at ratio ${minimumVisibleRatio}`
     );
@@ -101,6 +212,44 @@ export function requireNoPartialVerticalOcclusion(
     `${subjectLabel} partially overlaps the Next Unlock bar: `
     + `line ${subject.top}-${subject.bottom}, bar ${overlay.top}-${overlay.bottom}`
   );
+}
+
+export function getRequiredUpwardShiftForVerticalClearance(
+  subject,
+  overlay,
+  clearance = 2
+) {
+  for (const [name, rect] of [['subject', subject], ['overlay', overlay]]) {
+    if (
+      !rect
+      || !Number.isFinite(rect.top)
+      || !Number.isFinite(rect.bottom)
+      || rect.bottom <= rect.top
+    ) {
+      throw new Error(`Vertical clearance has invalid ${name} geometry`);
+    }
+  }
+  if (
+    subject.bottom <= overlay.top - clearance
+    || subject.top >= overlay.bottom + clearance
+    || (
+      subject.top >= overlay.top + clearance
+      && subject.bottom <= overlay.bottom - clearance
+    )
+  ) {
+    return 0;
+  }
+
+  const subjectHeight = subject.bottom - subject.top;
+  const overlayInnerHeight =
+    overlay.bottom - overlay.top - clearance * 2;
+  if (
+    subject.top < overlay.top + clearance
+    || subjectHeight > overlayInnerHeight
+  ) {
+    return subject.bottom - (overlay.top - clearance);
+  }
+  return subject.bottom - (overlay.bottom - clearance);
 }
 
 export function validateCampaign(campaign) {

@@ -2,13 +2,16 @@ import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 import { createConnection } from 'node:net';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { PNG } from 'pngjs';
 import {
   getValidDropZoneLabelMatcher,
+  getRequiredUpwardShiftForVerticalClearance,
   isAllowedCaptureRequest,
+  measureUnoccludedVisibleArea,
   requireAllVisibleCompanions,
   requireNoPartialVerticalOcclusion,
   validateCampaign,
@@ -30,6 +33,10 @@ const EXPECTED_DIMENSIONS = { width: 1080, height: 1920 };
 const BASE_URL = 'http://127.0.0.1:8091';
 const EXPO_HOST = '127.0.0.1';
 const EXPO_PORT = 8091;
+const HOME_PAN_ACTIVATION_DISTANCE = 10;
+const HOME_PAN_MAX_ATTEMPTS = 5;
+const HOME_SIGNAGE_ASSERTION_CLEARANCE = 0.5;
+const HOME_SIGNAGE_TARGET_CLEARANCE = 3;
 
 function describeError(error) {
   return error instanceof Error ? error.stack ?? error.message : String(error);
@@ -78,6 +85,17 @@ async function assertCapturePortAvailable() {
       }
     }));
   });
+}
+
+async function canReuseCaptureServer(url) {
+  try {
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(3_000),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
 }
 
 async function waitForServer(url, expoChild, timeoutMs = 120_000) {
@@ -326,6 +344,17 @@ const HOME_COMPANION_LABELS = [
   'Archimedes the owl',
   'Axel the axolotl',
 ];
+const HOME_CAPTURE_FIXTURES = Object.freeze({
+  'home-sunny': { amber: 180 },
+  'home-storm': { amber: 420 },
+});
+const HOME_GEOMETRY_TEST_IDS = [
+  'home-world-pan-surface',
+  'home-header',
+  'home-next-unlock-sign',
+  'home-play-dock',
+  'home-ambient-line',
+];
 
 function boxesOverlap(first, second, tolerance = 0.5) {
   return first.x < second.x + second.width - tolerance
@@ -392,44 +421,171 @@ async function assertHomeChromeGeometry(page, scenario) {
   console.log(`[capture] ${scenario}: header, signage, and PLAY dock are clear`);
 }
 
-async function getCompanionViewportMetrics(page) {
+async function getHomeOverlayRects(page) {
+  const candidates = [
+    { label: 'header', testId: 'home-header', required: true },
+    {
+      label: 'Next Unlock sign',
+      testId: 'home-next-unlock-sign',
+      required: true,
+    },
+    { label: 'ambient line', testId: 'home-ambient-line', required: false },
+    { label: 'PLAY dock', testId: 'home-play-dock', required: true },
+  ];
+  const overlays = [];
+  for (const candidate of candidates) {
+    const locator = page.getByTestId(candidate.testId);
+    if (await locator.count() === 0) {
+      if (candidate.required) {
+        throw new Error(`Missing ${candidate.label} geometry hook`);
+      }
+      continue;
+    }
+    if (candidate.testId === 'home-ambient-line') {
+      const opacity = await locator.evaluate(element =>
+        Number.parseFloat(getComputedStyle(element).opacity)
+      );
+      if (opacity <= 0.001) continue;
+    }
+    const box = await locator.boundingBox();
+    if (!box) {
+      throw new Error(`Cannot measure ${candidate.label} overlay`);
+    }
+    overlays.push({ label: candidate.label, ...box });
+  }
+  return overlays;
+}
+
+async function getCompanionViewportMetrics(page, overlays) {
+  const viewportSize = page.viewportSize();
+  if (!viewportSize) throw new Error('Capture viewport is unavailable');
+  const viewport = { x: 0, y: 0, ...viewportSize };
   return Promise.all(HOME_COMPANION_LABELS.map(async label => {
     const locator = page.getByLabel(label, { exact: true });
     await locator.waitFor({ state: 'attached' });
-    return locator.evaluate((element, companionLabel) => {
-      const rect = element.getBoundingClientRect();
-      const intersectionWidth = Math.max(
-        0,
-        Math.min(rect.right, window.innerWidth) - Math.max(rect.left, 0)
-      );
-      const intersectionHeight = Math.max(
-        0,
-        Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, 0)
-      );
-      const area = Math.max(1, rect.width * rect.height);
-      return {
-        label: companionLabel,
-        top: Math.round(rect.top),
-        bottom: Math.round(rect.bottom),
-        visibleRatio: (intersectionWidth * intersectionHeight) / area,
-      };
-    }, label);
+    const box = await locator.boundingBox();
+    if (!box) {
+      throw new Error(`Cannot measure companion ${label}`);
+    }
+    return {
+      label,
+      rect: box,
+      top: Math.round(box.y),
+      bottom: Math.round(box.y + box.height),
+      ...measureUnoccludedVisibleArea(box, viewport, overlays),
+    };
   }));
 }
 
-async function assertHomeSunnyOverlayGeometry(page) {
+async function waitForStableHomeGeometry(page) {
+  await page.evaluate(async ({ companionLabels, testIds }) => {
+    const stableFrameTarget = 3;
+    const frameTolerance = 0.25;
+    const maxFrames = 120;
+    const requiredTestIds = new Set(testIds.filter(
+      testId => testId !== 'home-ambient-line'
+    ));
+    const readRect = element => {
+      const rect = element.getBoundingClientRect();
+      return [
+        rect.x,
+        rect.y,
+        rect.width,
+        rect.height,
+        Number.parseFloat(getComputedStyle(element).opacity),
+      ];
+    };
+    const readSnapshot = () => {
+      const snapshot = [];
+      const labelled = Array.from(document.querySelectorAll('[aria-label]'));
+      for (const label of companionLabels) {
+        const element = labelled.find(candidate =>
+          candidate.getAttribute('aria-label') === label
+        );
+        if (!element) return null;
+        snapshot.push([`label:${label}`, ...readRect(element)]);
+      }
+      for (const testId of testIds) {
+        const element = document.querySelector(`[data-testid="${testId}"]`);
+        if (!element) {
+          if (requiredTestIds.has(testId)) return null;
+          continue;
+        }
+        snapshot.push([`testid:${testId}`, ...readRect(element)]);
+      }
+      return snapshot;
+    };
+    const matches = (first, second) =>
+      first !== null
+      && second !== null
+      && first.length === second.length
+      && first.every((entry, index) =>
+        entry[0] === second[index][0]
+        && entry.slice(1).every((value, valueIndex) =>
+          Math.abs(value - second[index][valueIndex + 1]) <= frameTolerance
+        )
+      );
+
+    let previousSnapshot = null;
+    let stableFrameCount = 0;
+    for (let frame = 0; frame < maxFrames; frame += 1) {
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      const snapshot = readSnapshot();
+      stableFrameCount = matches(previousSnapshot, snapshot)
+        ? stableFrameCount + 1
+        : 0;
+      if (stableFrameCount >= stableFrameTarget) return;
+      previousSnapshot = snapshot;
+    }
+    throw new Error(
+      `Home geometry did not remain stable for ${stableFrameTarget} animation frames`
+    );
+  }, {
+    companionLabels: HOME_COMPANION_LABELS,
+    testIds: HOME_GEOMETRY_TEST_IDS,
+  });
+}
+
+async function confirmAmbientCaptureState(page) {
+  await page.waitForFunction(testId => {
+    const element = document.querySelector(`[data-testid="${testId}"]`);
+    if (!element || !(element.textContent ?? '').trim()) return false;
+    const opacity = Number.parseFloat(getComputedStyle(element).opacity);
+    return opacity >= 0.999;
+  }, 'home-ambient-line', { timeout: 10_000 });
+  console.log('[capture] home ambient line reached deterministic visible state');
+}
+
+async function waitForAmbientOverlaySettled(page) {
+  await page.waitForFunction(testId => {
+    const element = document.querySelector(`[data-testid="${testId}"]`);
+    const detached = element === null;
+    const opacity = detached
+      ? 0
+      : Number.parseFloat(getComputedStyle(element).opacity);
+    return detached || opacity <= 0.001;
+  }, 'home-ambient-line', { timeout: 7_000 });
+}
+
+async function measureHomeLockedRoomGeometry(page, scenario, amber) {
   const nextUnlockBar = page.getByLabel(/^Next unlock\./).first();
   const lockedRoom = page.getByLabel(
     'Build Jungle Hammock for 200 amber',
     { exact: true }
   );
+  const affordabilityLine = amber >= 200
+    ? 'Tap to build this room'
+    : `${amber} / 200`;
   const lockedRoomLines = [
     {
       label: 'Jungle Hammock',
       locator: lockedRoom.getByText('Jungle Hammock', { exact: true }).first(),
     },
     { label: 'Build: 200', locator: lockedRoom.getByText(/^Build:/).first() },
-    { label: '180 / 200', locator: lockedRoom.getByText('180 / 200').first() },
+    {
+      label: affordabilityLine,
+      locator: lockedRoom.getByText(affordabilityLine, { exact: true }).first(),
+    },
   ];
   await Promise.all([
     nextUnlockBar.waitFor({ state: 'visible' }),
@@ -442,60 +598,133 @@ async function assertHomeSunnyOverlayGeometry(page) {
     ...lockedRoomLines.map(({ locator }) => locator.boundingBox()),
   ]);
   if (!barBox || lineBoxes.some(lineBox => !lineBox)) {
-    throw new Error('Cannot measure home-sunny Next Unlock and locked-room geometry');
+    throw new Error(
+      `Cannot measure ${scenario} Next Unlock and locked-room geometry`
+    );
   }
+  return { barBox, lineBoxes, lockedRoomLines };
+}
 
+async function assertHomeLockedRoomGeometry(page, scenario, amber) {
+  const {
+    barBox,
+    lineBoxes,
+    lockedRoomLines,
+  } = await measureHomeLockedRoomGeometry(page, scenario, amber);
   for (const [index, lineBox] of lineBoxes.entries()) {
     const { label } = lockedRoomLines[index];
     const relationship = requireNoPartialVerticalOcclusion(
       { top: lineBox.y, bottom: lineBox.y + lineBox.height },
       { top: barBox.y, bottom: barBox.y + barBox.height },
       label,
-      0.5
+      HOME_SIGNAGE_ASSERTION_CLEARANCE
     );
-    console.log(`[capture] home-sunny: ${label} is ${relationship}`);
+    console.log(`[capture] ${scenario}: ${label} is ${relationship}`);
   }
 }
 
+async function getHomeLockedRoomUpwardAdjustment(page, scenario, amber) {
+  const {
+    barBox,
+    lineBoxes,
+  } = await measureHomeLockedRoomGeometry(page, scenario, amber);
+  return Math.max(0, ...lineBoxes.map(lineBox =>
+    getRequiredUpwardShiftForVerticalClearance(
+      { top: lineBox.y, bottom: lineBox.y + lineBox.height },
+      { top: barBox.y, bottom: barBox.y + barBox.height },
+      HOME_SIGNAGE_TARGET_CLEARANCE
+    )
+  ));
+}
+
+function getRequiredUpwardPanDistance(metrics, overlays, minimumVisibleRatio) {
+  const playDock = overlays.find(overlay => overlay.label === 'PLAY dock');
+  if (!playDock) throw new Error('PLAY dock overlay is unavailable');
+  const lowestCompanion = metrics.reduce((lowest, metric) =>
+    metric.rect.y > lowest.rect.y ? metric : lowest
+  );
+  const requiredVisibleHeight =
+    lowestCompanion.rect.height * minimumVisibleRatio;
+  return Math.max(
+    20,
+    lowestCompanion.rect.y + requiredVisibleHeight - playDock.y + 12
+  );
+}
+
+async function dragHomePanSurface(page, requestedUpwardDistance) {
+  const panSurface = page.getByTestId('home-world-pan-surface');
+  await panSurface.waitFor({ state: 'visible' });
+  const box = await panSurface.boundingBox();
+  if (!box) throw new Error('Cannot measure HouseWorld pan surface');
+
+  const dragX = box.x + Math.max(12, Math.min(28, box.width * 0.08));
+  const dragStartY = box.y + box.height * 0.82;
+  const upwardDistance = Math.min(
+    requestedUpwardDistance + HOME_PAN_ACTIVATION_DISTANCE,
+    box.height * 0.42
+  );
+  const dragEndY = dragStartY - upwardDistance;
+  if (upwardDistance < 10 || dragEndY < box.y) {
+    throw new Error(
+      `HouseWorld pan surface cannot satisfy an upward drag of `
+      + `${requestedUpwardDistance}: ${JSON.stringify(box)}`
+    );
+  }
+  await page.mouse.move(dragX, dragStartY);
+  await page.mouse.down();
+  await page.mouse.move(dragX, dragEndY, { steps: 16 });
+  await page.mouse.up();
+}
+
 async function panHouseToVisibleCompanions(page, scenario) {
-  let metrics = await getCompanionViewportMetrics(page);
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  const fixture = HOME_CAPTURE_FIXTURES[scenario];
+  if (!fixture) throw new Error(`Missing home capture fixture for ${scenario}`);
+  await confirmAmbientCaptureState(page);
+
+  let metrics = [];
+  for (let attempt = 0; attempt < HOME_PAN_MAX_ATTEMPTS; attempt += 1) {
+    await waitForStableHomeGeometry(page);
+    const overlays = await getHomeOverlayRects(page);
+    metrics = await getCompanionViewportMetrics(page, overlays);
     const visible = metrics.filter(item => item.visibleRatio >= 0.6);
-    if (visible.length === HOME_COMPANION_LABELS.length) {
+    const signageAdjustment = await getHomeLockedRoomUpwardAdjustment(
+      page,
+      scenario,
+      fixture.amber
+    );
+    if (
+      visible.length === HOME_COMPANION_LABELS.length
+      && signageAdjustment === 0
+    ) {
       break;
     }
 
     // HouseWorld starts at its positive maxPanY to frame the roof. Dragging the
-    // real RNGH pan surface upward reduces that state and reveals the lower
-    // occupied rooms. Keep the gesture left of the dock and animal controls.
-    await page.mouse.move(24, 620);
-    await page.mouse.down();
-    await page.mouse.move(24, 314, { steps: 16 });
-    await page.mouse.up();
+    // real RNGH pan surface upward reduces that state and reveals lower rooms.
+    const companionAdjustment =
+      visible.length === HOME_COMPANION_LABELS.length
+        ? 0
+        : getRequiredUpwardPanDistance(metrics, overlays, 0.6);
+    const upwardDistance = Math.max(
+      signageAdjustment,
+      companionAdjustment
+    );
+    await dragHomePanSurface(page, upwardDistance);
     await waitForDocumentReadiness(page);
-    metrics = await getCompanionViewportMetrics(page);
   }
 
+  await waitForAmbientOverlaySettled(page);
   await waitForDocumentReadiness(page);
+  await waitForStableHomeGeometry(page);
+  const settledOverlays = await getHomeOverlayRects(page);
+  metrics = await getCompanionViewportMetrics(page, settledOverlays);
   const labels = requireAllVisibleCompanions(
     metrics,
     HOME_COMPANION_LABELS,
     0.6
   );
-  const ambientLine = scenario === 'home-storm'
-    ? page.getByText(
-      /^(?:The daily incantation is prepared\.|Today's words are chosen\.)$/
-    )
-    : page.getByText("Today's challenge is ready.", { exact: true });
-  await ambientLine.waitFor({
-    state: 'detached',
-    timeout: 7_000,
-  });
-  await waitForDocumentReadiness(page);
   await assertHomeChromeGeometry(page, scenario);
-  if (scenario === 'home-sunny') {
-    await assertHomeSunnyOverlayGeometry(page);
-  }
+  await assertHomeLockedRoomGeometry(page, scenario, fixture.amber);
   console.log(`[capture] ${scenario}: visible companions: ${labels.join(', ')}`);
   return labels;
 }
@@ -695,7 +924,12 @@ function collectPageIntegrity(context, page) {
   };
 }
 
-async function captureScenario(browser, item, outputDir) {
+async function captureScenario(
+  browser,
+  item,
+  outputDir,
+  { debugDirectory = DEBUG_DIR } = {}
+) {
   const context = await browser.newContext({
     viewport: VIEWPORT,
     deviceScaleFactor: DEVICE_SCALE_FACTOR,
@@ -745,8 +979,11 @@ async function captureScenario(browser, item, outputDir) {
       const dimensions = await assertPngDimensions(outputPath);
       return { outputPath, dimensions };
     } catch (error) {
-      await fs.mkdir(DEBUG_DIR, { recursive: true });
-      const debugPath = path.join(DEBUG_DIR, `${item.scenario}-failure.png`);
+      await fs.mkdir(debugDirectory, { recursive: true });
+      const debugPath = path.join(
+        debugDirectory,
+        `${item.scenario}-failure.png`
+      );
       await page.screenshot({ path: debugPath, fullPage: false }).catch(() => {});
       throw new Error(
         `${item.scenario} failed: ${describeError(error)} Debug screenshot: ${debugPath}`
@@ -774,8 +1011,43 @@ async function assertCapturesAreUnique(results) {
   }
 }
 
+async function runHomeStormSmoke(browser, campaign) {
+  const smokeItem = campaign.find(item => item.scenario === 'home-storm');
+  if (!smokeItem) throw new Error('Campaign is missing home-storm');
+  const smokeDirectory = await fs.mkdtemp(path.join(
+    os.tmpdir(),
+    'wordshift-home-storm-smoke-'
+  ));
+  try {
+    const result = await captureScenario(
+      browser,
+      smokeItem,
+      smokeDirectory,
+      { debugDirectory: smokeDirectory }
+    );
+    const dimensions = await assertPngDimensions(result.outputPath);
+    const smokeFiles = await fs.readdir(smokeDirectory);
+    if (
+      smokeFiles.length !== 1
+      || smokeFiles[0] !== smokeItem.source
+    ) {
+      throw new Error(
+        `Storm smoke directory contains unexpected files: ${smokeFiles.join(', ')}`
+      );
+    }
+    console.log(
+      `[capture-smoke] PASS home-storm ${dimensions}; `
+      + `isolated output ${result.outputPath}`
+    );
+    return dimensions;
+  } finally {
+    await fs.rm(smokeDirectory, { recursive: true, force: true });
+  }
+}
+
 async function main() {
   const campaign = await loadCampaign();
+  const smokeHomeStorm = process.argv.includes('--smoke-home-storm');
   if (process.argv.includes('--list')) {
     console.log(`[capture] manifest valid: ${CAMPAIGN_PATH}`);
     for (const [index, item] of campaign.entries()) {
@@ -786,8 +1058,9 @@ async function main() {
     return;
   }
 
-  await fs.mkdir(SOURCE_DIR, { recursive: true });
-  await assertCapturePortAvailable();
+  if (!smokeHomeStorm) {
+    await fs.mkdir(SOURCE_DIR, { recursive: true });
+  }
   const expoLogs = [];
   let expoChild;
   let expoGroupId;
@@ -831,16 +1104,29 @@ async function main() {
   process.once('SIGTERM', handleSigterm);
   try {
     throwIfInterrupted();
-    console.log('[capture] starting Expo web on 127.0.0.1:8091');
-    expoChild = startExpo(expoLogs);
-    expoGroupId = expoChild.pid;
-    if (!expoGroupId) throw new Error('Expo child started without a process group id');
-    await waitForServer(BASE_URL, expoChild);
+    if (await canReuseCaptureServer(BASE_URL)) {
+      console.log('[capture] reusing Expo web on 127.0.0.1:8091');
+    } else {
+      await assertCapturePortAvailable();
+      console.log('[capture] starting Expo web on 127.0.0.1:8091');
+      expoChild = startExpo(expoLogs);
+      expoGroupId = expoChild.pid;
+      if (!expoGroupId) {
+        throw new Error('Expo child started without a process group id');
+      }
+      await waitForServer(BASE_URL, expoChild);
+    }
     throwIfInterrupted();
-    console.log(`[capture] Expo ready (pid ${expoChild.pid})`);
+    console.log(
+      `[capture] Expo ready${expoChild ? ` (pid ${expoChild.pid})` : ' (reused)'}`
+    );
 
     browser = await chromium.launch({ headless: true });
     throwIfInterrupted();
+    if (smokeHomeStorm) {
+      await runHomeStormSmoke(browser, campaign);
+      return;
+    }
     await withStagedPublication({
       finalDir: SOURCE_DIR,
       preserveNames: ['feature-background.png'],
