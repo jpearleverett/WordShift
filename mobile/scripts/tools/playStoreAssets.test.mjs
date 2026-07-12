@@ -33,6 +33,10 @@ const STORE_LISTING_PATH = path.resolve(
   SCRIPT_DIR,
   '../../../docs/STORE_LISTING.md'
 );
+const LAUNCH_CHECKLIST_PATH = path.resolve(
+  SCRIPT_DIR,
+  '../../../docs/LAUNCH_CHECKLIST.md'
+);
 const LANDING_PAGE_PATH = path.resolve(
   SCRIPT_DIR,
   '../../../docs/index.md'
@@ -43,7 +47,6 @@ const EXPECTED_SCENARIOS = [
   'home-sunny',
   'animal-dialogue',
   'variant-menu',
-  'daily',
   'flawless-victory',
   'home-dusk',
 ];
@@ -53,9 +56,8 @@ const EXPECTED_SOURCES = [
   '03_home_sunny.png',
   '04_animal_dialogue.png',
   '05_variant_menu.png',
-  '06_daily.png',
-  '07_flawless_victory.png',
-  '08_home_dusk.png',
+  '06_flawless_victory.png',
+  '07_home_dusk.png',
 ];
 const EXPECTED_FINALS = [
   '01_shift_one_letter.png',
@@ -63,9 +65,35 @@ const EXPECTED_FINALS = [
   '03_build_a_home.png',
   '04_meet_unlikely_friends.png',
   '05_master_every_mode.png',
-  '06_new_puzzle_every_day.png',
-  '07_flawless_offering.png',
-  '08_theyve_been_waiting.png',
+  '06_flawless_offering.png',
+  '07_theyve_been_waiting.png',
+];
+const EXPECTED_HEADLINES = [
+  'SHIFT ONE LETTER',
+  'EVERY WORD STAYS REAL',
+  'BUILD A HOME',
+  'MEET 13 UNLIKELY FRIENDS',
+  'MASTER EVERY MODE',
+  'CHASE A FLAWLESS OFFERING',
+  "THEY'VE BEEN WAITING",
+];
+const EXPECTED_SUPPORT = [
+  'Move it down. Keep both words real. Something remains.',
+  'Build a chain one clever move at a time. The words remember.',
+  'Your words bring every room to life. Every room was waiting.',
+  'They always have something to tell you. Never everything.',
+  'Reverse it. Race it. Hide the previews. The pattern still grows.',
+  'No hints. No mistakes. It notices perfection.',
+  'Some houses remember every word.',
+];
+const EXPECTED_ALT_TEXTS = [
+  'WordShift puzzle board with the letter L selected and valid and invalid destination word previews visible.',
+  'WordShift puzzle showing PAY, PLANT, and HEAR midway through a valid letter-shifting chain.',
+  'Sunny WordShift house with several furnished rooms and multiple animal companions.',
+  'Ember the fox speaking to the player in a warm dialogue scene over the animal house.',
+  'WordShift setup menu displaying Standard, Reverse, Double Shift, Speed, and Blind Offering modes.',
+  'WordShift victory screen showing a flawless three-star solve and amber rewards.',
+  'WordShift animal house at dusk beneath a purple-orange sky, with the Jungle Hammock locked above furnished rooms.',
 ];
 
 let tempDir;
@@ -83,10 +111,11 @@ function makeCampaign() {
     scenario,
     source: EXPECTED_SOURCES[index],
     final: EXPECTED_FINALS[index],
-    headline: `Approved headline ${index + 1}`,
-    support: `Approved support copy ${index + 1}`,
-    altText: `Meaningful description of authentic WordShift scenario ${index + 1}.`,
-    theme: index < 4 ? 'bright' : index < 7 ? 'dusk' : 'mystery',
+    headline: EXPECTED_HEADLINES[index],
+    support: EXPECTED_SUPPORT[index],
+    altText: EXPECTED_ALT_TEXTS[index],
+    theme: index < 4 ? 'bright' : index < 6 ? 'dusk' : 'mystery',
+    uneaseLevel: index + 1,
   }));
 }
 
@@ -198,27 +227,35 @@ describe('shared PNG helpers', () => {
 });
 
 describe('approved campaign manifest', () => {
-  test('defines exactly eight unique approved scenarios and filenames', async () => {
+  test('defines the exact seven-shot order, names, filenames, copy, and unease', async () => {
     const campaign = JSON.parse(await fs.readFile(CAMPAIGN_PATH, 'utf8'));
 
-    assert.equal(campaign.length, 8);
+    assert.equal(campaign.length, 7);
     assert.deepEqual(campaign.map(item => item.scenario), EXPECTED_SCENARIOS);
     assert.deepEqual(campaign.map(item => item.source), EXPECTED_SOURCES);
     assert.deepEqual(campaign.map(item => item.final), EXPECTED_FINALS);
-    assert.equal(new Set(campaign.map(item => item.scenario)).size, 8);
-    assert.equal(new Set(campaign.map(item => item.source)).size, 8);
-    assert.equal(new Set(campaign.map(item => item.final)).size, 8);
+    assert.deepEqual(campaign.map(item => item.headline), EXPECTED_HEADLINES);
+    assert.deepEqual(campaign.map(item => item.support), EXPECTED_SUPPORT);
+    assert.deepEqual(campaign.map(item => item.uneaseLevel), [1, 2, 3, 4, 5, 6, 7]);
+    assert.equal(new Set(campaign.map(item => item.scenario)).size, 7);
+    assert.equal(new Set(campaign.map(item => item.source)).size, 7);
+    assert.equal(new Set(campaign.map(item => item.final)).size, 7);
+    assert.ok(campaign.every(item => Number.isInteger(item.uneaseLevel)));
+    assert.ok(campaign.every(item => item.scenario !== 'daily'));
   });
 
-  test('provides meaningful unique alt text for every authentic state', async () => {
+  test('provides visible-only unique alt text within the 140-character limit', async () => {
     const campaign = JSON.parse(await fs.readFile(CAMPAIGN_PATH, 'utf8'));
     const altTexts = campaign.map(item => item.altText);
 
-    assert.equal(new Set(altTexts).size, 8);
+    assert.deepEqual(altTexts, EXPECTED_ALT_TEXTS);
+    assert.equal(new Set(altTexts).size, 7);
     assert.ok(altTexts.every(text => text.length >= 60));
+    assert.ok(altTexts.every(text => text.length <= 140));
     assert.ok(altTexts.every(text => text.trim().split(/\s+/).length >= 8));
     assert.ok(altTexts.every(text => /[.!?]$/.test(text)));
     assert.ok(campaign.every(item => item.altText !== item.headline));
+    assert.doesNotMatch(altTexts.join('\n'), /\b(daily|entity|robed|cult)\b/i);
   });
 });
 
@@ -235,10 +272,18 @@ describe('Google Play listing metadata', () => {
     const fullDescription = listing.match(
       /## Full description\s+```text\n([\s\S]*?)\n```/
     )?.[1];
-    const tableAltTexts = listing
+    const screenshotSection = listing.match(
+      /### Android screenshot campaign \(final upload order\)([\s\S]*?)\nFinal feature graphic:/
+    )?.[1] ?? '';
+    const tableRows = screenshotSection
       .split('\n')
-      .filter(line => /^\| [1-8] \|/.test(line))
-      .map(line => line.split('|').slice(1, -1).map(cell => cell.trim())[4]);
+      .filter(line => /^\| [1-7] \|/.test(line))
+      .map(line => line.split('|').slice(1, -1).map(cell => cell.trim()));
+    const tablePaths = tableRows.map(cells => cells[1]);
+    const tableHeadlines = tableRows.map(cells => cells[2]);
+    const tableSupport = tableRows.map(cells => cells[3]);
+    const tableAltTexts = tableRows.map(cells => cells[4]);
+    const tableVisibleStates = tableRows.map(cells => cells[5]);
     const featureAltText = listing.match(
       /^Feature graphic alt text: (.+)$/m
     )?.[1];
@@ -260,14 +305,19 @@ describe('Google Play listing metadata', () => {
       fullDescription,
       /Purchases never accelerate the story/
     );
-    assert.equal(tableAltTexts.length, 8);
+    assert.match(fullDescription, /Take on a shared Daily Challenge/);
+    assert.equal(tableRows.length, 7);
+    assert.deepEqual(
+      tablePaths,
+      EXPECTED_FINALS.map(name => `\`docs/play-store/final/${name}\``)
+    );
+    assert.deepEqual(tableHeadlines, EXPECTED_HEADLINES);
+    assert.deepEqual(tableSupport, EXPECTED_SUPPORT);
     assert.deepEqual(tableAltTexts, campaign.map(item => item.altText));
     assert.ok(tableAltTexts.every(text => text.length <= 140));
-    assert.equal(
-      tableAltTexts[5],
-      'WordShift home after a completed Daily Challenge, showing a seven-day streak and a Today’s Standing dialog.'
-    );
-    assert.doesNotMatch(tableAltTexts[7], /\b(no|without|absent)\b/i);
+    assert.ok(tableVisibleStates.every(text => text.length > 0));
+    assert.doesNotMatch(screenshotSection, /\bDaily Challenge\b|06_daily|new_puzzle_every_day/i);
+    assert.doesNotMatch(tableAltTexts[6], /\b(no|without|absent)\b/i);
     assert.ok(featureAltText.length <= 140);
     for (const detail of [
       'Ember',
@@ -280,9 +330,27 @@ describe('Google Play listing metadata', () => {
       assert.match(featureAltText, new RegExp(detail, 'i'));
     }
     assert.doesNotMatch(
-      [shortDescription, fullDescription, ...tableAltTexts, featureAltText].join('\n'),
+      [
+        shortDescription,
+        fullDescription,
+        ...campaign.map(item => item.support),
+        ...tableAltTexts,
+        featureAltText,
+      ].join('\n'),
       /[—–]/
     );
+  });
+
+  test('documents seven generated Android screenshots without changing feature assets', async () => {
+    const [listing, checklist] = await Promise.all([
+      fs.readFile(STORE_LISTING_PATH, 'utf8'),
+      fs.readFile(LAUNCH_CHECKLIST_PATH, 'utf8'),
+    ]);
+
+    assert.match(listing, /Android phone screenshots ×7, generated at 1080×1920/);
+    assert.match(checklist, /seven 1080x1920 phone screenshots and/);
+    assert.match(listing, /Feature graphic 1024×500 \(Play\), generated/);
+    assert.match(checklist, /the 1024x500 feature graphic/);
   });
 
   test('keeps the public landing page free of em and en dashes', async () => {
@@ -509,7 +577,7 @@ describe('Playwright composition integration', { concurrency: false }, () => {
 });
 
 describe('final Play Store asset validation', () => {
-  test('screenshots-only mode accepts all eight RGB screenshots without a feature graphic', async () => {
+  test('screenshots-only mode accepts all seven RGB screenshots without a feature graphic', async () => {
     const campaign = makeCampaign();
     const campaignPath = await writeCampaign(campaign);
     const finalDir = path.join(tempDir, 'final');
@@ -521,7 +589,7 @@ describe('final Play Store asset validation', () => {
       screenshotsOnly: true,
     });
 
-    assert.equal(results.length, 8);
+    assert.equal(results.length, 7);
     assert.ok(results.every(result => result.metadata.colorType === 2));
   });
 
@@ -541,7 +609,7 @@ describe('final Play Store asset validation', () => {
       encodeSolidPng(1024, 500)
     );
     const results = await validateFinalAssets({ campaignPath, finalDir });
-    assert.equal(results.length, 9);
+    assert.equal(results.length, 8);
   });
 
   test('rejects a screenshot with the wrong dimensions', async () => {
@@ -609,16 +677,16 @@ describe('final Play Store asset validation', () => {
       encodeSolidPng(1080, 1920),
       Buffer.alloc(8 * 1024 * 1024),
     ]);
-    await fs.writeFile(path.join(finalDir, campaign[7].final), oversized);
+    await fs.writeFile(path.join(finalDir, campaign[6].final), oversized);
     await assert.rejects(
       validateFinalAssets({ campaignPath, finalDir, screenshotsOnly: true }),
-      /08_theyve_been_waiting\.png exceeds 8 MB/
+      /07_theyve_been_waiting\.png exceeds 8 MB/
     );
   });
 });
 
 describe('exact Play Store source-set validation', () => {
-  test('accepts exactly eight decoded raw screenshots and the audited background', async () => {
+  test('accepts exactly seven decoded raw screenshots and the audited background', async () => {
     const campaign = makeCampaign();
     const campaignPath = await writeCampaign(campaign);
     const sourceDir = path.join(tempDir, 'source');
@@ -626,7 +694,7 @@ describe('exact Play Store source-set validation', () => {
 
     const results = await validateSourceAssets({ campaignPath, sourceDir });
 
-    assert.equal(results.length, 9);
+    assert.equal(results.length, 8);
     assert.deepEqual(
       results.map(result => result.filename),
       [...EXPECTED_SOURCES, 'feature-background.png']
@@ -697,13 +765,13 @@ describe('exact Play Store source-set validation', () => {
     const sourceDir = path.join(tempDir, 'source');
     await writeSourceSet(sourceDir, campaign);
     await fs.writeFile(
-      path.join(sourceDir, campaign[7].source),
+      path.join(sourceDir, campaign[6].source),
       encodeSolidPng(1080, 1919)
     );
 
     await assert.rejects(
       validateSourceAssets({ campaignPath, sourceDir }),
-      /08_home_dusk\.png is 1080x1919; expected 1080x1920/
+      /07_home_dusk\.png is 1080x1919; expected 1080x1920/
     );
   });
 });
@@ -724,8 +792,8 @@ describe('exact Play Store directory-entry validation', () => {
       validateFinalAssets({ campaignPath, finalDir }),
     ]);
 
-    assert.equal(sources.length, 9);
-    assert.equal(finals.length, 9);
+    assert.equal(sources.length, 8);
+    assert.equal(finals.length, 8);
   });
 
   for (const kind of ['temporary file', 'JPEG file', 'nested directory']) {

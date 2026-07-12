@@ -25,21 +25,32 @@ const DIFFICULTY_MENU_PATH = path.resolve(
   SCRIPT_DIR,
   '../../src/components/puzzle/DifficultyMenu.tsx'
 );
+const EXPECTED_SCENARIOS = [
+  'puzzle-preview',
+  'puzzle-chain',
+  'home-sunny',
+  'animal-dialogue',
+  'variant-menu',
+  'flawless-victory',
+  'home-dusk',
+];
 
-const makeCampaign = () => APPROVED_SCENARIOS.map((scenario, index) => ({
+const makeCampaign = () => EXPECTED_SCENARIOS.map((scenario, index) => ({
   scenario,
   source: `${String(index + 1).padStart(2, '0')}_${scenario}.png`,
   final: `${String(index + 1).padStart(2, '0')}_${scenario}_final.png`,
   headline: `Headline ${index + 1}`,
   support: `Support ${index + 1}`,
   altText: `Alt text ${index + 1}`,
-  theme: index < 4 ? 'bright' : index < 7 ? 'dusk' : 'mystery',
+  theme: index < 4 ? 'bright' : index < 6 ? 'dusk' : 'mystery',
+  uneaseLevel: index + 1,
 }));
 
 describe('capture campaign validation', () => {
-  test('accepts the approved order, safe PNG basenames, and themes', () => {
+  test('accepts the exact seven-shot order, safe PNG basenames, and themes', () => {
     const campaign = makeCampaign();
 
+    assert.deepEqual(APPROVED_SCENARIOS, EXPECTED_SCENARIOS);
     assert.equal(validateCampaign(campaign), campaign);
   });
 
@@ -66,6 +77,20 @@ describe('capture campaign validation', () => {
     const invalidOrder = makeCampaign();
     [invalidOrder[0], invalidOrder[1]] = [invalidOrder[1], invalidOrder[0]];
     assert.throws(() => validateCampaign(invalidOrder), /out of order/);
+  });
+
+  test('requires unease levels one through seven in campaign order', () => {
+    const missingLevel = makeCampaign();
+    delete missingLevel[0].uneaseLevel;
+    assert.throws(() => validateCampaign(missingLevel), /unease level 1/);
+
+    const repeatedLevel = makeCampaign();
+    repeatedLevel[6].uneaseLevel = 6;
+    assert.throws(() => validateCampaign(repeatedLevel), /unease level 7/);
+
+    const fractionalLevel = makeCampaign();
+    fractionalLevel[3].uneaseLevel = 4.5;
+    assert.throws(() => validateCampaign(fractionalLevel), /unease level 4/);
   });
 });
 
@@ -203,6 +228,13 @@ describe('capture publication and stability policy', () => {
       runner,
       /skipCelebration\.waitFor\(\{\s*state: 'detached'/
     );
+  });
+
+  test('capture interactions contain no Daily screenshot branch', async () => {
+    const runner = await fs.readFile(RUNNER_PATH, 'utf8');
+
+    assert.doesNotMatch(runner, /case 'daily':/);
+    assert.doesNotMatch(runner, /Today’s Standing/);
   });
 
   test('aggregate Play Store asset tests include capture runner regressions', async () => {

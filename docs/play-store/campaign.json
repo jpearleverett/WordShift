@@ -4,71 +4,69 @@
     "source": "01_puzzle_preview.png",
     "final": "01_shift_one_letter.png",
     "headline": "SHIFT ONE LETTER",
-    "support": "Move it down. Keep both words real.",
+    "support": "Move it down. Keep both words real. Something remains.",
     "altText": "WordShift puzzle board with the letter L selected and valid and invalid destination word previews visible.",
-    "theme": "bright"
+    "theme": "bright",
+    "uneaseLevel": 1
   },
   {
     "scenario": "puzzle-chain",
     "source": "02_puzzle_chain.png",
     "final": "02_every_word_stays_real.png",
     "headline": "EVERY WORD STAYS REAL",
-    "support": "Build a chain one clever move at a time.",
+    "support": "Build a chain one clever move at a time. The words remember.",
     "altText": "WordShift puzzle showing PAY, PLANT, and HEAR midway through a valid letter-shifting chain.",
-    "theme": "bright"
+    "theme": "bright",
+    "uneaseLevel": 2
   },
   {
     "scenario": "home-sunny",
     "source": "03_home_sunny.png",
     "final": "03_build_a_home.png",
     "headline": "BUILD A HOME",
-    "support": "Your words bring every room to life.",
+    "support": "Your words bring every room to life. Every room was waiting.",
     "altText": "Sunny WordShift house with several furnished rooms and multiple animal companions.",
-    "theme": "bright"
+    "theme": "bright",
+    "uneaseLevel": 3
   },
   {
     "scenario": "animal-dialogue",
     "source": "04_animal_dialogue.png",
     "final": "04_meet_unlikely_friends.png",
     "headline": "MEET 13 UNLIKELY FRIENDS",
-    "support": "They always have something to tell you.",
+    "support": "They always have something to tell you. Never everything.",
     "altText": "Ember the fox speaking to the player in a warm dialogue scene over the animal house.",
-    "theme": "bright"
+    "theme": "bright",
+    "uneaseLevel": 4
   },
   {
     "scenario": "variant-menu",
     "source": "05_variant_menu.png",
     "final": "05_master_every_mode.png",
     "headline": "MASTER EVERY MODE",
-    "support": "Reverse, Double Shift, Speed, and Blind Offering.",
+    "support": "Reverse it. Race it. Hide the previews. The pattern still grows.",
     "altText": "WordShift setup menu displaying Standard, Reverse, Double Shift, Speed, and Blind Offering modes.",
-    "theme": "dusk"
-  },
-  {
-    "scenario": "daily",
-    "source": "06_daily.png",
-    "final": "06_new_puzzle_every_day.png",
-    "headline": "A NEW PUZZLE EVERY DAY",
-    "support": "Build your streak and compare your standing.",
-    "altText": "WordShift home after a completed Daily Challenge, showing a seven-day streak and a Today’s Standing dialog.",
-    "theme": "dusk"
+    "theme": "dusk",
+    "uneaseLevel": 5
   },
   {
     "scenario": "flawless-victory",
-    "source": "07_flawless_victory.png",
-    "final": "07_flawless_offering.png",
+    "source": "06_flawless_victory.png",
+    "final": "06_flawless_offering.png",
     "headline": "CHASE A FLAWLESS OFFERING",
-    "support": "No hints. No mistakes. One perfect chain.",
+    "support": "No hints. No mistakes. It notices perfection.",
     "altText": "WordShift victory screen showing a flawless three-star solve and amber rewards.",
-    "theme": "dusk"
+    "theme": "dusk",
+    "uneaseLevel": 6
   },
   {
     "scenario": "home-dusk",
-    "source": "08_home_dusk.png",
-    "final": "08_theyve_been_waiting.png",
+    "source": "07_home_dusk.png",
+    "final": "07_theyve_been_waiting.png",
     "headline": "THEY'VE BEEN WAITING",
     "support": "Some houses remember every word.",
     "altText": "WordShift animal house at dusk beneath a purple-orange sky, with the Jungle Hammock locked above furnished rooms.",
-    "theme": "mystery"
+    "theme": "mystery",
+    "uneaseLevel": 7
   }
 ]

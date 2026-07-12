@@ -6,7 +6,6 @@ export const APPROVED_SCENARIOS = [
   'home-sunny',
   'animal-dialogue',
   'variant-menu',
-  'daily',
   'flawless-victory',
   'home-dusk',
 ];
@@ -62,11 +61,20 @@ export function validateCampaign(campaign) {
 
   const sourceNames = new Set();
   const finalNames = new Set();
-  for (const item of campaign) {
+  for (const [index, item] of campaign.entries()) {
     for (const field of ['source', 'final', 'headline', 'support', 'altText', 'theme']) {
       if (typeof item[field] !== 'string' || item[field].trim().length === 0) {
         throw new Error(`${item.scenario}: campaign field "${field}" is missing`);
       }
+    }
+    const expectedUneaseLevel = index + 1;
+    if (
+      !Number.isInteger(item.uneaseLevel)
+      || item.uneaseLevel !== expectedUneaseLevel
+    ) {
+      throw new Error(
+        `${item.scenario}: expected unease level ${expectedUneaseLevel}`
+      );
     }
     if (!isSafePngBasename(item.source)) {
       throw new Error(`${item.scenario}: invalid source filename "${item.source}"`);

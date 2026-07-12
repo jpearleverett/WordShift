@@ -6,7 +6,7 @@ the codebase and are the remaining gates to submission.
 
 ## Android (submission-blocking)
 
-- [x] **Generate Play Store creative** — eight 1080x1920 phone screenshots and
+- [x] **Generate Play Store creative** — seven 1080x1920 phone screenshots and
       the 1024x500 feature graphic are in `docs/play-store/final/`.
 - [ ] **Upload Play Store creative** — upload the generated phone screenshots
       and feature graphic in Play Console, preserving their numbered order.
