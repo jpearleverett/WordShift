@@ -57,8 +57,10 @@ delivers the requested suspicion that the animals are hiding something.
 - Retain all cumulative marketing-frame unease cues from levels 1 through 7.
   Level 8 does not add a fabricated horror element; the authentic storm scene
   supplies the final escalation.
-- Do not add an entity silhouette, explanatory ritual copy, gore, false
-  controls, or any visual that is absent from the actual Phase 3 home.
+- Do not add a capture-only entity, explanatory ritual copy, gore, false
+  controls, or any visual that is absent from the actual Phase 3 home. If the
+  shipped Phase 3 shadow is naturally visible, it must remain at its authentic
+  faint pre-reveal treatment rather than being enhanced.
 
 ## Pipeline and Documentation
 
@@ -81,8 +83,8 @@ delivers the requested suspicion that the animals are hiding something.
   asset in each.
 - Two isolated complete pipeline runs produce identical encoded PNG, decoded
   RGBA, and file-mode hashes for all 17 generated outputs.
-- The new source visibly uses `sky_storm.png`, internal Phase 3 styling, and no
-  Phase 4 robes.
+- The new source visibly uses `sky_storm.png`, internal Phase 3 styling, no
+  Phase 4 robes, and no enhanced Phase 4 entity treatment.
 - Full-size and thumbnail review confirms the new copy is readable, the storm
   shot is stronger than shot 7, and the full eight-shot sequence remains
   cohesive.
