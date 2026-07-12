@@ -109,22 +109,27 @@ Legal pages are **LIVE and publicly accessible** via GitHub Pages (deployed from
 
 ### Android screenshot campaign (final upload order)
 
-Copy revised 2026-07-12: plain, benefit-led lines up front; the ominous beat is
-rationed to one soft tease (#4), a medium tease (#7), and the closer (#8) — the
-old version stamped a spooky fragment on every frame and read as mannered.
+Copy revised 2026-07-12 (second pass): every support line is a complete
+sentence whose horror hint is woven INTO an innocent reading — several quote
+the game itself ("They've been hoping for someone like you" is Ember's
+onboarding seed line; "warm, funny, thoughtful" quotes the full description) so
+the store page reads warm now and chilling in hindsight, exactly like the game.
+The old set stamped a spooky fragment on every frame and read as mannered.
+Dread ramp: edge (1), clean (2), whisper (3), warm-ominous (4), whisper (5),
+medium (6), strong (7), closer (8).
 File names keep their original headline slugs (e.g. `02_every_word_stays_real`,
 `06_flawless_offering`) even where the banner headline has since changed — the
 paths are upload artifacts; do not rename them.
 
 | # | Final upload path | Headline | Support line | Unique alt text | Visible authentic state |
 |---:|---|---|---|---|---|
-| 1 | `docs/play-store/final/01_shift_one_letter.png` | SHIFT ONE LETTER | Take a letter from one word, tuck it into the next. Both must stay real. | WordShift puzzle board with the letter L selected and valid and invalid destination word previews visible. | Phase 0 puzzle board with L selected from PLAY and destination previews shown over PANT. |
-| 2 | `docs/play-store/final/02_every_word_stays_real.png` | ONE MOVE, TWO WORDS | Every shift rewrites two words at once. Easy to learn, tricky to master. | WordShift puzzle showing PAY, PLANT, and HEAR midway through a valid letter-shifting chain. | Phase 0 puzzle board midway through the PAY, PLANT, HEAR chain with PLANT active. |
-| 3 | `docs/play-store/final/03_build_a_home.png` | BUILD A HOME | Turn puzzles into amber. Turn amber into a cozy woodland home. | Sunny WordShift house with several furnished rooms and multiple animal companions. | Sunny house showing the Cozy Den, Rustic Kitchen, Scholar's Study, Aquarium Room, and their companions. |
-| 4 | `docs/play-store/final/04_meet_unlikely_friends.png` | MEET 13 UNLIKELY FRIENDS | Each one has stories to share, and a few they're saving for later. | Ember the fox speaking to the player in a warm dialogue scene over the animal house. | Ember's warm introductory dialogue open over the sunny animal house. |
-| 5 | `docs/play-store/final/05_master_every_mode.png` | MASTER EVERY MODE | Reverse the chain, race the clock, double the shift, or go in blind. | WordShift setup lists Standard, Reverse Shift, Speed Shift, Double Shift, Challenge, and Blind Mode. | Puzzle setup menu with Standard selected and Reverse Shift, Speed Shift, Double Shift, Challenge, and Blind Mode visible. |
-| 6 | `docs/play-store/final/06_flawless_offering.png` | GO FLAWLESS | Three stars is good. No hints, no mistakes, no undos is better. | WordShift victory screen showing a flawless three-star solve and amber rewards. | Phase 0 victory modal with three stars, a FLAWLESS ribbon, the PAY to PLAN to HEART chain, and amber rewards. |
-| 7 | `docs/play-store/final/07_theyve_been_waiting.png` | THEY'VE BEEN WAITING | The longer you stay, the more the house changes. | WordShift animal house at dusk beneath a purple-orange sky, with the Jungle Hammock locked above furnished rooms. | Phase 2 dusk house with the Jungle Hammock still locked and no late-story imagery. |
+| 1 | `docs/play-store/final/01_shift_one_letter.png` | SHIFT ONE LETTER | Tuck a letter into the word below. Both words must survive. | WordShift puzzle board with the letter L selected and valid and invalid destination word previews visible. | Phase 0 puzzle board with L selected from PLAY and destination previews shown over PANT. |
+| 2 | `docs/play-store/final/02_every_word_stays_real.png` | ONE MOVE, TWO WORDS | Each move rewrites two words. Easy to learn, tricky to master. | WordShift puzzle showing PAY, PLANT, and HEAR midway through a valid letter-shifting chain. | Phase 0 puzzle board midway through the PAY, PLANT, HEAR chain with PLANT active. |
+| 3 | `docs/play-store/final/03_build_a_home.png` | BUILD A HOME | Turn puzzles into amber. The house turns amber into rooms. | Sunny WordShift house with several furnished rooms and multiple animal companions. | Sunny house showing the Cozy Den, Rustic Kitchen, Scholar's Study, Aquarium Room, and their companions. |
+| 4 | `docs/play-store/final/04_meet_unlikely_friends.png` | MEET 13 UNLIKELY FRIENDS | Warm, funny, thoughtful. They've been hoping for someone like you. | Ember the fox speaking to the player in a warm dialogue scene over the animal house. | Ember's warm introductory dialogue open over the sunny animal house. |
+| 5 | `docs/play-store/final/05_master_every_mode.png` | MASTER EVERY MODE | Reverse the chain, race the clock, go in blind. It all counts. | WordShift setup lists Standard, Reverse Shift, Speed Shift, Double Shift, Challenge, and Blind Mode. | Puzzle setup menu with Standard selected and Reverse Shift, Speed Shift, Double Shift, Challenge, and Blind Mode visible. |
+| 6 | `docs/play-store/final/06_flawless_offering.png` | GO FLAWLESS | No hints, no mistakes, no undos. Perfection gets noticed. | WordShift victory screen showing a flawless three-star solve and amber rewards. | Phase 0 victory modal with three stars, a FLAWLESS ribbon, the PAY to PLAN to HEART chain, and amber rewards. |
+| 7 | `docs/play-store/final/07_theyve_been_waiting.png` | THEY'VE BEEN WAITING | The longer you stay, the more the house changes around you. | WordShift animal house at dusk beneath a purple-orange sky, with the Jungle Hammock locked above furnished rooms. | Phase 2 dusk house with the Jungle Hammock still locked and no late-story imagery. |
 | 8 | `docs/play-store/final/08_something_stirs.png` | SOMETHING STIRS IN THE AIR | Your friends know more than they are willing to say. | A glowing offering pit in a moonlit forest clearing on the WordShift offering screen, with the message: Nothing left to give. The dark is patient. | Phase 3 night Offering Pit in its empty state. No ward ceremony, no robed sprites, no late-story imagery. |
 
 ### Regen checklist (from the 2026-07-12 screenshot review)
