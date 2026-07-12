@@ -1,6 +1,6 @@
 # WordShift
 
-A word puzzle game where you shift letters between neighboring words in a chain to form new valid English words — with ten animal friends, a house to build, and a slow-burn story. A cozy word game that slowly becomes something else.
+A word puzzle game where you shift letters between neighboring words in a chain to form new valid English words — with thirteen animal friends, a house to build, and a slow-burn story. A cozy word game that slowly becomes something else.
 
 The tonal shift is a designed surprise. This README keeps it unspoiled; [CLAUDE.md](./CLAUDE.md) does not.
 
@@ -11,7 +11,7 @@ The tonal shift is a designed surprise. This README keeps it unspoiled; [CLAUDE.
 3. Drop it into the next word — that word grows and must also be valid.
 4. Reach the end of the chain to win. Earn amber, build the house, meet the animals, and watch the world change.
 
-Variants: **Reverse Shift** (down the chain, then back up, with cumulative letter locking), **Double Shift** (two letters per move, up to 6 rows), **Speed Shift** (timed runs with an escalating clock). Plus a deterministic **Daily Challenge** (unlocks after 8 puzzles) with streaks and streak freezes, weekly quests, 40 achievements, and a phase-aware theming system that re-skins every screen, message, and animation as the story unfolds.
+Variants: **Reverse Shift** (down the chain, then back up, with cumulative letter locking), **Double Shift** (two letters per move, up to 6 rows), **Speed Shift** (timed runs with an escalating clock). Plus a deterministic **Daily Challenge** (unlocks after 8 puzzles) with streaks and streak freezes, weekly quests, 51 achievements, and a phase-aware theming system that re-skins every screen, message, and animation as the story unfolds.
 
 Monetization is convenience/expression only, never progression: a cosmetic shop bought with in-game amber, optional consumable amber/hint packs, a one-time starter pack, a cosmetic bundle, an optional Patron / Remove-Ads purchase, and gently-paced ads (GDPR/UMP consent-gated).
 

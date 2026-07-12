@@ -475,6 +475,11 @@ export const StoreModal: React.FC<StoreModalProps> = ({
                         onReward={handleClaimDailyAmber}
                         label={`Watch · +${DAILY_AMBER_REWARD}`}
                         phase={phase}
+                        // Host is the cottage PanelCard, which stays light
+                        // parchment through phase 3 (storm) and flips dark at
+                        // 4 — 'auto' assumes a dark host from phase 3 and made
+                        // the label near-invisible on the storm card.
+                        surface={phase >= 4 ? 'dark' : 'light'}
                       />
                     ))}
                 </PanelCard>

@@ -2615,8 +2615,12 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       </Modal>
 
       {/* Empty state — boxless atmospheric text (player feedback: a framed
-          sign floating over the pit art read as clutter). */}
-      {pendingWordCount === 0 && !resultMessage && (
+          sign floating over the pit art read as clutter). Suppressed while a
+          phase transition owns the pit (pending ward ignition or the ceremony
+          itself): "nothing left to give" under an erupting ward read as a
+          contradiction. */}
+      {pendingWordCount === 0 && !resultMessage
+        && pendingPhaseTransition == null && ceremonyStatus === 'idle' && (
         <View style={styles.emptyContainer} pointerEvents="none">
           <Text style={styles.emptyText}>
             {getPitEmptyMessage(phase)}

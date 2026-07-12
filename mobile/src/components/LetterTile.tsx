@@ -112,6 +112,37 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
     return -4;
   };
 
+  // The selected-tile float bob slows as it shrinks: a small SLOW bob reads as
+  // weight, a small fast bob just reads as jitter.
+  const getBounceDuration = () => {
+    if (phase >= 4) return 850;
+    if (phase >= 3) return 700;
+    if (phase >= 2) return 550;
+    if (phase >= 1) return 450;
+    return 400;
+  };
+
+  // Idle timings (every tile, all the time — this is where the board's weight
+  // actually reads, since only one tile is ever selected). The candy glow
+  // pulse slows from a lively shimmer to a long tired breath, and the glass
+  // shine sweep comes rarer and drags slower as the phases descend.
+  const getIdleTimings = () => {
+    if (phase >= 4) return { pulse: 2600, shineDelay: 5200, shineSweep: 1150 };
+    if (phase >= 3) return { pulse: 2100, shineDelay: 4200, shineSweep: 950 };
+    if (phase >= 2) return { pulse: 1700, shineDelay: 3200, shineSweep: 780 };
+    if (phase >= 1) return { pulse: 1400, shineDelay: 2500, shineSweep: 680 };
+    return { pulse: 1200, shineDelay: 2000, shineSweep: 600 };
+  };
+
+  // Heavy tiles barely tip; bright candy rocks freely.
+  const getWobbleAmplitudeDeg = () => {
+    if (phase >= 4) return 1.6;
+    if (phase >= 3) return 2;
+    if (phase >= 2) return 2.4;
+    if (phase >= 1) return 2.8;
+    return 3;
+  };
+
   // Get consistent color based on letter
   const tileColor = getTileColor(letter.char);
 
@@ -119,18 +150,22 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
   useEffect(() => {
     if (settings.reducedMotion || shouldSimplifyAnimations()) return;
     if (isInteractable && !isSelected) {
-      // Subtle pulse glow — drives only the glow overlay's opacity (native driver)
+      const idleTimings = getIdleTimings();
+      // Subtle pulse glow — drives only the glow overlay's opacity (native
+      // driver). Phase-aware cadence: lively candy shimmer at Phase 0, a long
+      // tired breath by Phase 4 (the always-visible half of the tiles'
+      // "heavier every phase" language).
       const glowLoop = Animated.loop(
         Animated.sequence([
           Animated.timing(glowAnim, {
             toValue: 1,
-            duration: 1200,
+            duration: idleTimings.pulse,
             easing: Easing.inOut(Easing.sin),
             useNativeDriver: true,
           }),
           Animated.timing(glowAnim, {
             toValue: 0,
-            duration: 1200,
+            duration: idleTimings.pulse,
             easing: Easing.inOut(Easing.sin),
             useNativeDriver: true,
           }),
@@ -139,13 +174,14 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
       glowLoopRef.current = glowLoop;
       glowLoop.start();
 
-      // Shine sweep animation
+      // Shine sweep animation — rarer and slower as the phases descend (the
+      // glass losing its sparkle).
       const shineLoop = Animated.loop(
         Animated.sequence([
-          Animated.delay(2000),
+          Animated.delay(idleTimings.shineDelay),
           Animated.timing(shineAnim, {
             toValue: 1,
-            duration: 600,
+            duration: idleTimings.shineSweep,
             easing: Easing.inOut(Easing.quad),
             useNativeDriver: true,
           }),
@@ -175,7 +211,8 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
       glowAnim.stopAnimation();
       shineAnim.stopAnimation();
     };
-  }, [isInteractable, isSelected, settings.reducedMotion]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- anim values are stable refs
+  }, [isInteractable, isSelected, settings.reducedMotion, phase]);
 
   // Selected bounce animation (phase-aware: bouncy at Phase 0, heavy/ritualistic at Phase 4)
   useEffect(() => {
@@ -233,18 +270,21 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
       wobbleLoopRef.current = wobbleLoop;
       wobbleLoop.start();
 
-      // Floating bounce - phase-aware height (light Phase 0 → weighed down Phase 4)
+      // Floating bounce - phase-aware height AND speed (light quick float at
+      // Phase 0 → a small slow heave by Phase 4; a shrunken-but-fast bob reads
+      // as jitter, not weight)
+      const bounceDuration = getBounceDuration();
       const bounceLoop = Animated.loop(
         Animated.sequence([
           Animated.timing(bounceAnim, {
             toValue: bounceHeight,
-            duration: 400,
+            duration: bounceDuration,
             easing: Easing.inOut(Easing.sin),
             useNativeDriver: true,
           }),
           Animated.timing(bounceAnim, {
             toValue: 0,
-            duration: 400,
+            duration: bounceDuration,
             easing: Easing.inOut(Easing.sin),
             useNativeDriver: true,
           }),
@@ -647,10 +687,11 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
     outputRange: [-60, 60],
   });
 
-  // Wobble rotation
+  // Wobble rotation — amplitude shrinks with phase (heavy tiles barely tip)
+  const wobbleDeg = getWobbleAmplitudeDeg();
   const wobbleRotate = wobbleAnim.interpolate({
     inputRange: [-1, 0, 1],
-    outputRange: ['-3deg', '0deg', '3deg'],
+    outputRange: [`-${wobbleDeg}deg`, '0deg', `${wobbleDeg}deg`],
   });
 
   // Trail glow interpolation for Phase 3+ energy mark effect — drives the

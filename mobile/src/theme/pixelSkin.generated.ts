@@ -97,9 +97,15 @@ export const PIXEL_SKINS: Record<'bright' | 'dusk' | 'storm' | 'dark' | 'serene'
   },
 };
 
-/** Skin for a narrative phase (hostDark maps pre-dark phases onto storm). */
+/**
+ * Skin for a narrative phase. hostDark runs the dialogue-hosted surfaces
+ * one material ahead of the world: pre-dark phases map onto storm, and
+ * phase 3 (the night sky) maps onto the dark ash material so the most-seen
+ * home surface visibly turns when the world does (phase 4 pairings reused,
+ * so no new ink/fill contrast pairs are introduced).
+ */
 export function getPixelSkin(phase: number, hostDark = false): PixelSkin {
-  const p = hostDark && phase < 3 ? 3 : phase;
+  const p = hostDark ? (phase < 3 ? 3 : phase === 3 ? 4 : phase) : phase;
   if (p >= 5) return PIXEL_SKINS.serene;
   if (p >= 4) return PIXEL_SKINS.dark;
   if (p >= 3) return PIXEL_SKINS.storm;

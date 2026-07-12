@@ -25,9 +25,11 @@ interface RewardedAdButtonProps {
   /**
    * Which background the button sits on. 'auto' (default) infers from phase
    * (dark at phase 3+), which is right when the host surface follows the phase
-   * theme (victory modal, store). Hosts that are dark at EVERY phase (the
-   * speed-rescue overlay, the pit's tending modal) must pass 'dark' so the
-   * label keeps its light-gold ink instead of dark-on-dark.
+   * theme (the victory modal's modalBg darkens at phase 3). Hosts that are
+   * dark at EVERY phase (the speed-rescue overlay, the pit's tending modal)
+   * must pass 'dark'. Hosts on the cottage pixel skin (PanelCard) must pass
+   * an explicit surface too — its parchment stays LIGHT through phase 3
+   * (storm) and only flips dark at 4, so 'auto' renders light-on-light there.
    */
   surface?: 'auto' | 'light' | 'dark';
   /**
@@ -130,7 +132,7 @@ export const RewardedAdButton: React.FC<RewardedAdButtonProps> = ({
       accessibilityLabel={label}
     >
       {busy ? (
-        <ActivityIndicator size="small" color={isDark ? '#FFD479' : '#755A00'} />
+        <ActivityIndicator size="small" color={isDark ? '#FFD479' : '#4E3C00'} />
       ) : (
         <Text style={[styles.label, isDark ? styles.labelDark : styles.labelLight]}>
           {'▷ '}
@@ -161,8 +163,10 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.4 },
   label: { fontSize: 13.5, fontWeight: '800', fontFamily: PIXEL_FONT_BOLD },
   // Dark amber ink on the light gold pill (matches freeDoubleTextLight in the
-  // victory modal); the old #FFD479 was near-invisible on cream surfaces.
-  labelLight: { color: '#755A00' },
+  // victory modal); the old #FFD479 was near-invisible on cream surfaces, and
+  // #755A00 measured only ~3:1 over the storm skin's deeper parchment —
+  // #4E3C00 holds ≥4.5:1 on every light host (bright cream through storm tan).
+  labelLight: { color: '#4E3C00' },
   labelDark: { color: '#E0B080' },
 });
 

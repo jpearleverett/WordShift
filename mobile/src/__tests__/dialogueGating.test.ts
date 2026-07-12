@@ -8,7 +8,7 @@
  *    (a `requiresAnimals` tag, the cross-ref `mentions` filter, or the
  *    coordinated-event unlockedAnimals check).
  *  - Phase 5 / post-revelation content is exempt: it requires house
- *    completion, so all ten animals are unlocked by then.
+ *    completion, so every animal is unlocked by then.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AnimalType } from '../types/homeWorld';
