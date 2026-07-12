@@ -595,7 +595,7 @@ describe('Google Play listing metadata', () => {
 
     assert.match(
       listing,
-      /- \[ \] Android phone screenshots ×7, seven-shot regeneration pending/
+      /- \[x\] Android phone screenshots ×7, generated and validated/
     );
     assert.match(
       checklist,
@@ -607,20 +607,20 @@ describe('Google Play listing metadata', () => {
     );
     assert.match(
       checklist,
-      /All 15 outputs produced identical encoded and decoded hashes/
+      /All 15 outputs matched each other\s+and the checked-in publication/
     );
     assert.match(
       checklist,
-      /preserving the\s+1024x500 feature graphic byte-for-byte/
+      /approved feature-hash manifest held/
     );
     assert.match(
       checklist,
       /- \[ \] \*\*Upload Play Store creative\*\*/
     );
-    assert.doesNotMatch(listing, /- \[x\] Android phone screenshots ×7/);
+    assert.doesNotMatch(listing, /seven-shot regeneration pending/);
     assert.doesNotMatch(checklist, /current checked-in eight screenshots/);
     assert.match(listing, /Feature graphic 1024×500 \(Play\), generated/);
-    assert.match(checklist, /the\s+1024x500 feature graphic/);
+    assert.match(checklist, /active checkout's publication stayed untouched/);
   });
 
   test('keeps the public landing page free of em and en dashes', async () => {

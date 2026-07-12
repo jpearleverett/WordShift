@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -7,16 +8,23 @@ import { fileURLToPath } from 'node:url';
 import { PNG } from 'pngjs';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
-const PACKAGE_PATH = path.resolve(SCRIPT_DIR, '../../package.json');
-const SCENARIOS = [
-  'puzzle-preview',
-  'puzzle-chain',
-  'home-sunny',
-  'animal-dialogue',
-  'variant-menu',
-  'flawless-victory',
-  'home-dusk',
-];
+const REPO_ROOT = path.resolve(SCRIPT_DIR, '../../..');
+const PACKAGE_PATH = path.join(REPO_ROOT, 'mobile/package.json');
+const CHECKLIST_PATH = path.join(REPO_ROOT, 'docs/LAUNCH_CHECKLIST.md');
+const STORE_LISTING_PATH = path.join(REPO_ROOT, 'docs/STORE_LISTING.md');
+const VERIFIER_PATH = path.join(SCRIPT_DIR, 'verifyPlayStoreDeterminism.mjs');
+const PROTECTED_MANIFEST_PATH = path.join(
+  REPO_ROOT,
+  'docs/play-store/protected-feature-hashes.json'
+);
+const PROTECTED_HASHES = {
+  'docs/play-store/source/feature-background.png':
+    'd5e6371e06f458b91f15c7cfd2d3fc348cfd3937c2172a9d5fea3c2c3ce98c44',
+  'docs/play-store/final/feature-graphic.png':
+    'a0e16100526e2981311bcd81a5eda56edacf1a12e4b5ed39f2f1d808825c30f1',
+  'docs/feature-graphic.png':
+    'a0e16100526e2981311bcd81a5eda56edacf1a12e4b5ed39f2f1d808825c30f1',
+};
 
 let tempDir;
 
@@ -28,20 +36,20 @@ afterEach(async () => {
   await fs.rm(tempDir, { recursive: true, force: true });
 });
 
-async function loadVerifier() {
+async function loadCore() {
   try {
-    return await import('./verifyPlayStoreDeterminism.mjs');
+    return await import('./playStoreDeterminismCore.mjs');
   } catch {
     return {};
   }
 }
 
-function encodePng(red, green = 40, blue = 80) {
+function encodePng(red) {
   const png = new PNG({ width: 2, height: 2 });
   for (let offset = 0; offset < png.data.length; offset += 4) {
     png.data[offset] = red;
-    png.data[offset + 1] = green;
-    png.data[offset + 2] = blue;
+    png.data[offset + 1] = 40;
+    png.data[offset + 2] = 80;
     png.data[offset + 3] = 255;
   }
   return PNG.sync.write(png, {
@@ -51,228 +59,291 @@ function encodePng(red, green = 40, blue = 80) {
   });
 }
 
-function campaignFixture() {
-  return SCENARIOS.map((scenario, index) => ({
-    scenario,
-    source: `source-${index + 1}.png`,
-    final: `final-${index + 1}.png`,
-    headline: `Headline ${index + 1}`,
-    support: `Support ${index + 1}`,
-    altText: `Visible state ${index + 1}`,
-    theme: index < 4 ? 'bright' : index < 6 ? 'dusk' : 'mystery',
-    uneaseLevel: index + 1,
-  }));
-}
+describe('protected feature hash manifest', () => {
+  test('loads the immutable approved hashes from the repository', async () => {
+    const core = await loadCore();
+    assert.equal(typeof core.loadProtectedHashManifest, 'function');
 
-async function snapshotTree(directory) {
-  const names = (await fs.readdir(directory)).sort();
-  return Promise.all(names.map(async name => ({
-    name,
-    bytes: await fs.readFile(path.join(directory, name)),
-  })));
-}
+    const manifest = await core.loadProtectedHashManifest(PROTECTED_MANIFEST_PATH);
 
-describe('Play Store determinism verifier', () => {
-  test('defines exactly 15 generated outputs from the seven-shot campaign', async () => {
-    const verifier = await loadVerifier();
-    assert.equal(typeof verifier.buildRequiredOutputPaths, 'function');
-
-    const paths = verifier.buildRequiredOutputPaths(campaignFixture());
-
-    assert.equal(paths.length, 15);
-    assert.deepEqual(paths.slice(0, 7), [
-      'docs/play-store/source/source-1.png',
-      'docs/play-store/source/source-2.png',
-      'docs/play-store/source/source-3.png',
-      'docs/play-store/source/source-4.png',
-      'docs/play-store/source/source-5.png',
-      'docs/play-store/source/source-6.png',
-      'docs/play-store/source/source-7.png',
-    ]);
-    assert.deepEqual(paths.slice(7), [
-      'docs/play-store/final/final-1.png',
-      'docs/play-store/final/final-2.png',
-      'docs/play-store/final/final-3.png',
-      'docs/play-store/final/final-4.png',
-      'docs/play-store/final/final-5.png',
-      'docs/play-store/final/final-6.png',
-      'docs/play-store/final/final-7.png',
-      'docs/play-store/final/feature-graphic.png',
-    ]);
+    assert.deepEqual(manifest, PROTECTED_HASHES);
   });
 
-  test('reports encoded and decoded mismatches for each affected file', async () => {
-    const verifier = await loadVerifier();
-    assert.equal(typeof verifier.compareHashManifests, 'function');
-    const first = [
-      { path: 'source/a.png', encodedSha256: 'encoded-a', decodedSha256: 'decoded-a' },
-      { path: 'final/b.png', encodedSha256: 'encoded-b', decodedSha256: 'decoded-b' },
-    ];
-    const second = [
-      { path: 'source/a.png', encodedSha256: 'encoded-z', decodedSha256: 'decoded-a' },
-      { path: 'final/b.png', encodedSha256: 'encoded-b', decodedSha256: 'decoded-z' },
-    ];
+  test('rejects a missing or malformed manifest before generation', async () => {
+    const core = await loadCore();
+    assert.equal(typeof core.loadProtectedHashManifest, 'function');
+    const missing = path.join(tempDir, 'missing.json');
+    await assert.rejects(
+      core.loadProtectedHashManifest(missing),
+      /protected feature hash manifest.*missing/i
+    );
+
+    const malformed = path.join(tempDir, 'malformed.json');
+    await fs.writeFile(malformed, JSON.stringify({
+      schemaVersion: 1,
+      algorithm: 'sha256',
+      files: {
+        ...PROTECTED_HASHES,
+        'docs/feature-graphic.png': 'not-a-sha',
+      },
+    }));
+    await assert.rejects(
+      core.loadProtectedHashManifest(malformed),
+      /docs\/feature-graphic\.png.*64 lowercase hexadecimal/i
+    );
+  });
+});
+
+describe('exclusive verifier lock', () => {
+  test('rejects a concurrent invocation and releases cleanly', async () => {
+    const core = await loadCore();
+    assert.equal(typeof core.acquireExclusiveLock, 'function');
+    const lockPath = path.join(tempDir, 'verification.lock');
+    const first = await core.acquireExclusiveLock(lockPath, { pid: 101 });
+
+    await assert.rejects(
+      core.acquireExclusiveLock(lockPath, { pid: 202 }),
+      /determinism verification already running.*101/i
+    );
+    await first.release();
+    const second = await core.acquireExclusiveLock(lockPath, { pid: 202 });
+    await second.release();
+    await assert.rejects(fs.stat(lockPath), error => error.code === 'ENOENT');
+  });
+});
+
+describe('publication preflight and comparison', () => {
+  test('rejects targeted dirty checked-in assets', async () => {
+    const core = await loadCore();
+    assert.equal(typeof core.assertTargetAssetsClean, 'function');
 
     assert.throws(
-      () => verifier.compareHashManifests(first, second),
+      () => core.assertTargetAssetsClean(
+        ' M docs/play-store/final/05_master_every_mode.png\0'
+      ),
+      /targeted Play Store assets are dirty.*05_master_every_mode\.png/is
+    );
+    assert.doesNotThrow(() => core.assertTargetAssetsClean(''));
+  });
+
+  test('reports generated-vs-checked-in hash and file-mode mismatches', async () => {
+    const core = await loadCore();
+    assert.equal(typeof core.compareHashManifests, 'function');
+    const checkedIn = [{
+      path: 'docs/play-store/final/01.png',
+      encodedSha256: 'encoded-a',
+      decodedSha256: 'decoded-a',
+      mode: 0o644,
+    }];
+    const generated = [{
+      path: 'docs/play-store/final/01.png',
+      encodedSha256: 'encoded-b',
+      decodedSha256: 'decoded-a',
+      mode: 0o600,
+    }];
+
+    assert.throws(
+      () => core.compareHashManifests(checkedIn, generated, {
+        firstLabel: 'checked-in',
+        secondLabel: 'generated',
+      }),
       error => {
-        assert.match(error.message, /source\/a\.png: encoded SHA-256/);
-        assert.match(error.message, /run 1=encoded-a, run 2=encoded-z/);
-        assert.match(error.message, /final\/b\.png: decoded RGBA SHA-256/);
-        assert.match(error.message, /run 1=decoded-b, run 2=decoded-z/);
+        assert.match(error.message, /encoded SHA-256 checked-in=encoded-a, generated=encoded-b/);
+        assert.match(error.message, /file mode checked-in=0644, generated=0600/);
         return true;
       }
     );
   });
 
-  test('runs generation twice and restores the original publication on success', async () => {
-    const verifier = await loadVerifier();
-    assert.equal(typeof verifier.verifyPlayStoreDeterminism, 'function');
-    const campaign = campaignFixture();
-    const campaignPath = path.join(tempDir, 'campaign.json');
-    const sourceDir = path.join(tempDir, 'source');
-    const finalDir = path.join(tempDir, 'final');
-    const legacyFeaturePath = path.join(tempDir, 'legacy-feature.png');
-    await Promise.all([
-      fs.mkdir(sourceDir),
-      fs.mkdir(finalDir),
-      fs.writeFile(campaignPath, JSON.stringify(campaign)),
-    ]);
-    await Promise.all([
-      ...campaign.map((item, index) =>
-        fs.writeFile(path.join(sourceDir, item.source), encodePng(20 + index))
-      ),
-      ...campaign.map((item, index) =>
-        fs.writeFile(path.join(finalDir, item.final), encodePng(40 + index))
-      ),
-      fs.writeFile(path.join(sourceDir, 'feature-background.png'), encodePng(70)),
-      fs.writeFile(path.join(finalDir, 'feature-graphic.png'), encodePng(80)),
-      fs.writeFile(legacyFeaturePath, encodePng(80)),
-    ]);
-    const before = {
-      source: await snapshotTree(sourceDir),
-      final: await snapshotTree(finalDir),
-      legacy: await fs.readFile(legacyFeaturePath),
-    };
-    const protectedBaseline = new Map([
-      ['docs/play-store/source/feature-background.png', encodePng(70)],
-      ['docs/play-store/final/feature-graphic.png', encodePng(80)],
-      ['docs/feature-graphic.png', encodePng(80)],
-    ]);
-    let generationRuns = 0;
-    const generated = encodePng(120);
+  test('hashing PNG outputs is read-only and records file mode', async () => {
+    const core = await loadCore();
+    assert.equal(typeof core.hashPngFiles, 'function');
+    const relativePath = 'docs/play-store/final/sample.png';
+    const filePath = path.join(tempDir, relativePath);
+    const bytes = encodePng(90);
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.writeFile(filePath, bytes, { mode: 0o640 });
 
-    const result = await verifier.verifyPlayStoreDeterminism({
-      repoRoot: tempDir,
-      campaignPath,
-      sourceDir,
-      finalDir,
-      legacyFeaturePath,
-      baselineRef: 'fixture',
-      loadBaselineBytes: async relativePath => protectedBaseline.get(relativePath),
-      runGeneration: async () => {
-        generationRuns += 1;
-        await Promise.all([
-          ...campaign.map(item =>
-            fs.writeFile(path.join(sourceDir, item.source), generated)
-          ),
-          ...campaign.map(item =>
-            fs.writeFile(path.join(finalDir, item.final), generated)
-          ),
-          fs.writeFile(path.join(finalDir, 'feature-graphic.png'), encodePng(80)),
-          fs.writeFile(legacyFeaturePath, encodePng(80)),
-        ]);
+    const hashes = await core.hashPngFiles(tempDir, [relativePath]);
+
+    assert.equal(hashes[0].mode, 0o640);
+    assert.deepEqual(await fs.readFile(filePath), bytes);
+    assert.equal((await fs.stat(filePath)).mode & 0o777, 0o640);
+  });
+});
+
+describe('signal-safe process lifecycle', () => {
+  for (const [signal, exitCode] of [['SIGINT', 130], ['SIGTERM', 143]]) {
+    test(`forwards ${signal} to the child group, waits, then cleans up`, async () => {
+      const core = await loadCore();
+      assert.equal(typeof core.SignalCoordinator, 'function');
+      assert.equal(typeof core.runManagedCommand, 'function');
+      assert.equal(typeof core.runWithCleanup, 'function');
+      const events = [];
+      let child;
+      const coordinator = new core.SignalCoordinator({
+        killProcessGroup: (pid, forwardedSignal) => {
+          events.push(`forward:${pid}:${forwardedSignal}`);
+          setImmediate(() => {
+            events.push('child-exit');
+            child.emit('exit', null, forwardedSignal);
+          });
+        },
+      });
+      const spawnProcess = () => {
+        child = new EventEmitter();
+        child.pid = 4321;
+        events.push('spawn');
+        return child;
+      };
+
+      const operation = core.runWithCleanup(
+        () => core.runManagedCommand({
+          command: 'npm',
+          args: ['run', 'generate:play-store'],
+          cwd: tempDir,
+          spawnProcess,
+          signalCoordinator: coordinator,
+        }),
+        [{ name: 'workspace', run: async () => events.push('cleanup') }]
+      );
+      await new Promise(resolve => setImmediate(resolve));
+      coordinator.handleSignal(signal);
+
+      await assert.rejects(operation, error => {
+        assert.equal(error.signal, signal);
+        assert.equal(error.exitCode, exitCode);
+        return true;
+      });
+      assert.deepEqual(events, [
+        'spawn',
+        `forward:-4321:${signal}`,
+        'child-exit',
+        'cleanup',
+      ]);
+    });
+  }
+
+  test('a process-group forwarding race cannot skip cleanup', async () => {
+    const core = await loadCore();
+    const events = [];
+    let child;
+    const coordinator = new core.SignalCoordinator({
+      killProcessGroup: () => {
+        throw Object.assign(new Error('process already exited'), { code: 'ESRCH' });
       },
     });
+    const operation = core.runWithCleanup(
+      () => core.runManagedCommand({
+        command: 'npm',
+        args: ['run', 'generate:play-store'],
+        cwd: tempDir,
+        spawnProcess: () => {
+          child = new EventEmitter();
+          child.pid = 4321;
+          return child;
+        },
+        signalCoordinator: coordinator,
+      }),
+      [{ name: 'lock', run: async () => events.push('cleanup') }]
+    );
+    await new Promise(resolve => setImmediate(resolve));
 
-    assert.equal(generationRuns, 2);
-    assert.equal(result.hashes.length, 15);
-    assert.deepEqual(await snapshotTree(sourceDir), before.source);
-    assert.deepEqual(await snapshotTree(finalDir), before.final);
-    assert.deepEqual(await fs.readFile(legacyFeaturePath), before.legacy);
+    assert.doesNotThrow(() => coordinator.handleSignal('SIGTERM'));
+    child.emit('exit', null, 'SIGTERM');
+
+    await assert.rejects(operation, error => error.signal === 'SIGTERM');
+    assert.deepEqual(events, ['cleanup']);
   });
 
-  test('restores the original publication and identifies a mismatched second run', async () => {
-    const verifier = await loadVerifier();
-    assert.equal(typeof verifier.verifyPlayStoreDeterminism, 'function');
-    const campaign = campaignFixture();
-    const campaignPath = path.join(tempDir, 'campaign.json');
-    const sourceDir = path.join(tempDir, 'source');
-    const finalDir = path.join(tempDir, 'final');
-    const legacyFeaturePath = path.join(tempDir, 'legacy-feature.png');
-    await Promise.all([
-      fs.mkdir(sourceDir),
-      fs.mkdir(finalDir),
-      fs.writeFile(campaignPath, JSON.stringify(campaign)),
-    ]);
-    await Promise.all([
-      ...campaign.map(item =>
-        fs.writeFile(path.join(sourceDir, item.source), encodePng(20))
-      ),
-      ...campaign.map(item =>
-        fs.writeFile(path.join(finalDir, item.final), encodePng(30))
-      ),
-      fs.writeFile(path.join(sourceDir, 'feature-background.png'), encodePng(70)),
-      fs.writeFile(path.join(finalDir, 'feature-graphic.png'), encodePng(80)),
-      fs.writeFile(legacyFeaturePath, encodePng(80)),
-    ]);
-    const before = {
-      source: await snapshotTree(sourceDir),
-      final: await snapshotTree(finalDir),
-      legacy: await fs.readFile(legacyFeaturePath),
-    };
-    const protectedBaseline = new Map([
-      ['docs/play-store/source/feature-background.png', encodePng(70)],
-      ['docs/play-store/final/feature-graphic.png', encodePng(80)],
-      ['docs/feature-graphic.png', encodePng(80)],
-    ]);
-    let generationRuns = 0;
+  test('setup failure still attempts every cleanup target and aggregates failures', async () => {
+    const core = await loadCore();
+    assert.equal(typeof core.runWithCleanup, 'function');
+    const called = [];
 
     await assert.rejects(
-      verifier.verifyPlayStoreDeterminism({
-        repoRoot: tempDir,
-        campaignPath,
-        sourceDir,
-        finalDir,
-        legacyFeaturePath,
-        baselineRef: 'fixture',
-        loadBaselineBytes: async relativePath => protectedBaseline.get(relativePath),
-        runGeneration: async () => {
-          generationRuns += 1;
-          const sourceBytes = generationRuns === 1
-            ? encodePng(110)
-            : encodePng(111);
-          await Promise.all([
-            ...campaign.map(item =>
-              fs.writeFile(path.join(sourceDir, item.source), sourceBytes)
-            ),
-            ...campaign.map(item =>
-              fs.writeFile(path.join(finalDir, item.final), encodePng(120))
-            ),
-            fs.writeFile(path.join(finalDir, 'feature-graphic.png'), encodePng(80)),
-            fs.writeFile(legacyFeaturePath, encodePng(80)),
-          ]);
+      core.runWithCleanup(
+        async () => {
+          called.push('setup');
+          throw new Error('worktree setup failed');
         },
-      }),
-      /source-1\.png: encoded SHA-256[\s\S]*source-1\.png: decoded RGBA SHA-256/
+        [
+          {
+            name: 'worktree',
+            run: async () => {
+              called.push('worktree');
+              throw new Error('worktree cleanup failed');
+            },
+          },
+          { name: 'temp directory', run: async () => called.push('temp') },
+          { name: 'lock', run: async () => called.push('lock') },
+        ]
+      ),
+      error => {
+        assert.ok(error instanceof AggregateError);
+        assert.match(error.message, /operation and cleanup failed/i);
+        assert.equal(error.errors.length, 2);
+        return true;
+      }
     );
-
-    assert.equal(generationRuns, 2);
-    assert.deepEqual(await snapshotTree(sourceDir), before.source);
-    assert.deepEqual(await snapshotTree(finalDir), before.final);
-    assert.deepEqual(await fs.readFile(legacyFeaturePath), before.legacy);
+    assert.deepEqual(called, ['setup', 'worktree', 'temp', 'lock']);
   });
 
-  test('exposes a baseline-pinned package command and includes its tests', async () => {
-    const pkg = JSON.parse(await fs.readFile(PACKAGE_PATH, 'utf8'));
+  test('holds the exclusive lock until all other cleanup attempts finish', async () => {
+    const core = await loadCore();
+    assert.equal(typeof core.runCleanupPhases, 'function');
+    const events = [];
+
+    await assert.rejects(
+      core.runCleanupPhases([
+        [
+          {
+            name: 'worktree',
+            run: async () => {
+              await new Promise(resolve => setImmediate(resolve));
+              events.push('worktree');
+              throw new Error('remove failed');
+            },
+          },
+          { name: 'temp', run: async () => events.push('temp') },
+        ],
+        [{ name: 'lock', run: async () => events.push('lock') }],
+      ]),
+      error => {
+        assert.ok(error instanceof AggregateError);
+        assert.equal(error.errors.length, 1);
+        return true;
+      }
+    );
+    assert.equal(events.at(-1), 'lock');
+    assert.deepEqual(new Set(events), new Set(['worktree', 'temp', 'lock']));
+  });
+});
+
+describe('isolated verifier integration contract', () => {
+  test('uses a detached worktree and never snapshots or restores active assets', async () => {
+    const source = await fs.readFile(VERIFIER_PATH, 'utf8');
+
+    assert.match(source, /worktree', 'add', '--detach'/);
+    assert.match(source, /cwd:\s*isolatedMobileDir/);
+    assert.doesNotMatch(source, /snapshotPublication|restorePublication/);
+    assert.doesNotMatch(source, /baselineRef|git show|fd3b81d/);
+  });
+
+  test('uses the default manifest-based command and accurate publication docs', async () => {
+    const [pkg, checklist, storeListing] = await Promise.all([
+      fs.readFile(PACKAGE_PATH, 'utf8').then(JSON.parse),
+      fs.readFile(CHECKLIST_PATH, 'utf8'),
+      fs.readFile(STORE_LISTING_PATH, 'utf8'),
+    ]);
 
     assert.equal(
       pkg.scripts['verify:play-store-determinism'],
-      'node scripts/tools/verifyPlayStoreDeterminism.mjs --baseline fd3b81d'
+      'node scripts/tools/verifyPlayStoreDeterminism.mjs'
     );
-    assert.match(
-      pkg.scripts['test:play-store-assets'],
-      /verifyPlayStoreDeterminism\.test\.mjs/
-    );
+    assert.match(checklist, /detached temporary Git worktree/);
+    assert.match(checklist, /approved feature-hash manifest/);
+    assert.doesNotMatch(storeListing, /seven-shot regeneration pending/i);
+    assert.match(storeListing, /Android phone screenshots ×7, generated and validated/);
   });
 });
