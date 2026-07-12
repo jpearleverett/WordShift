@@ -1,4 +1,5 @@
 import { getInstallId } from './telemetry';
+import { isPlayStoreCaptureActive } from '../dev/playStoreCapture';
 
 /**
  * Shared Supabase REST client for WordShift.
@@ -111,6 +112,8 @@ export async function sbFetch(
   path: string,
   init: RequestInit & { timeoutMs?: number } = {},
 ): Promise<Response | null> {
+  if (isPlayStoreCaptureActive()) return null;
+
   const config = getSupabaseConfig();
   if (!config) return null;
 

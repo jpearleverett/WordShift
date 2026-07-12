@@ -4,6 +4,7 @@ import { getPhaseTheme } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
 import { getMaxParticleCount, getDeviceTier } from '../services/deviceTier';
 import type { DeviceTier } from '../services/deviceTier';
+import { shouldFreezePlayStoreCaptureMotion } from '../dev/playStoreCapture';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -329,7 +330,8 @@ interface AnimatedBackgroundProps {
 }
 
 export const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ phase = 0 }) => {
-  const reducedMotion = getSettingsSync().reducedMotion;
+  const reducedMotion =
+    getSettingsSync().reducedMotion || shouldFreezePlayStoreCaptureMotion();
   const theme = useMemo(() => getPhaseTheme(phase), [phase]);
   const particleCount = getMaxParticleCount();
   // Layout (positions/timing) is generated once and kept stable; color is mapped

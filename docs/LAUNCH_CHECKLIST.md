@@ -6,8 +6,25 @@ the codebase and are the remaining gates to submission.
 
 ## Android (submission-blocking)
 
-- [ ] **Store screenshots** — capture the 4 phone screenshots per the shot
-      list in `docs/STORE_LISTING.md`. Upload in Play Console → Store listing.
+- [x] **Generate Play Store creative** — DONE (2026-07-12): regenerated eight
+      1080x1920 screenshots from the merged campaign branch at current branch HEAD;
+      `npm run verify:play-store-determinism` ran the complete pipeline twice
+      in a detached temporary Git worktree. All 17 outputs matched each other
+      and the checked-in publication. The approved feature-hash manifest held,
+      and the active checkout's publication stayed untouched.
+- [ ] **Upload Play Store creative** — upload the generated phone screenshots
+      and feature graphic in Play Console, preserving their numbered order.
+- [ ] **Build & upload the next production bundle** — manually bump
+      `android.versionCode` above 43 before building, then run
+      `eas build --platform android --profile production` and upload that
+      resulting bundle to internal testing (or `eas submit -p android`). The
+      Play Console "Foreground service permissions" declaration clears when
+      the new bundle supersedes the current Play bundle because the new
+      manifest strips those permissions. Do NOT fill in that declaration form.
+- [ ] **On-build verification** — Sentry source-map upload step appears in the
+      build logs; license-tester purchases work (one consumable, the starter
+      one-time, Remove Ads + Restore round-trip); SFX still play (foreground
+      audio unaffected by the permission strip).
 - [ ] **Verify one REAL purchase of each SKU kind on a Play internal build**
       (CRITICAL) — one consumable (amber or hint pack), the starter one-time,
       Remove Ads / Patron non-consumables, and a Restore Purchases round-trip.
@@ -22,8 +39,6 @@ the codebase and are the remaining gates to submission.
 - [ ] **30-minute performance session** — one long mixed session (puzzles,
       home, pit, store, dialogue) on the low-end device, watching for jank,
       memory growth, and audio glitches.
-- [ ] **Feature graphic** — upgrade/replace `docs/feature-graphic.png` before
-      the listing goes live (current one is placeholder-grade).
 - [ ] **Set `creatorCode` for press builds** — fill `expo.extra.creatorCode`
       in `mobile/app.json` on the press/reviewer build only (empty string =
       feature fully inert in shipping builds); hand the code out with
@@ -35,9 +50,10 @@ the codebase and are the remaining gates to submission.
       limited. Leave it `true` through all internal testing; set it `false`
       only when cutting the public production build (and confirm live ads fill
       on a real production install before wide rollout).
-- [ ] **Bump `android.versionCode`** in `mobile/app.json` for the next release
-      (currently 43; autoIncrement is intentionally off — bump manually every
-      time).
+- [ ] **Bump `android.versionCode` above 43** in `mobile/app.json` before the
+      next production build. It is currently 43 and `autoIncrement` is
+      intentionally off, so this manual bump is a prerequisite for the
+      build-and-upload item and every later release.
 - [x] **Billing category fix + boot entitlement restore** — DONE (2026-07-10):
       RevenueCat `getProducts` now passes the NON_SUBSCRIPTION category
       (Android one-time products returned `[]` without it — the "purchases not
@@ -83,7 +99,7 @@ the codebase and are the remaining gates to submission.
 - [x] **Data safety + App content declarations** — DONE (2026-07-02): data
       safety, Advertising ID, privacy policy, ads declaration, content rating,
       target audience actioned in Play Console → App content.
-- [x] First manual Play upload already happened (v12 era; versionCode now 43);
+- [x] First manual Play upload already happened (current versionCode is 43);
       `eas submit -p android` works from here (service account wired).
 
 ## iOS (separate track — blocked until the values below exist)

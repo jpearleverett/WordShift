@@ -179,6 +179,10 @@ import {
 import { appStyles as styles, getScreenBackgroundColor } from './src/styles/appStyles';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useScreenInsets } from './src/hooks/useScreenInsets';
+import {
+  isPlayStoreCaptureActive,
+  preparePlayStoreCapture,
+} from './src/dev/playStoreCapture';
 
 // App screen type — expanded with settings, stats, and ledger
 type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery' | 'pit' | 'shop';
@@ -194,12 +198,18 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Speed rescue: seconds granted by the one-per-board rewarded continue.
 const SPEED_RESCUE_EXTRA_SEC = 30;
 const SPEED_RESCUE_PLACEMENT: RewardedPlacement = 'speed_rescue';
+const captureActive = isPlayStoreCaptureActive();
+
+function scheduleNotificationsUnlessCapturing(phase: number): void {
+  if (captureActive) return;
+  scheduleAllNotifications(phase).catch(() => {});
+}
 
 // Install the global error handler at module load so it catches errors as
 // early as possible — including errors thrown during the first render.
 installGlobalErrorHandler();
-// Force the single app font (Kurale) onto every Text/TextInput before the
-// first render, so no screen can flash a system font while the font loads.
+// Force the body font onto every Text/TextInput before the first render, so no
+// screen can flash a system font while the font assets load.
 installGlobalFont();
 // Initialize Sentry's native SDK for crash reporting. Unlike the JS-only error
 // handler above, this captures NATIVE crashes (force-closes / SIGSEGV / Java
@@ -208,7 +218,7 @@ installGlobalFont();
 // Errors routed through reportError() (ErrorBoundary, etc.) are forwarded with
 // their source/metadata context.
 const sentryDsn = getSentryDsn();
-if (sentryDsn) {
+if (!captureActive && sentryDsn) {
   Sentry.init({
     dsn: sentryDsn,
     // Crash + error capture only; no performance tracing by default.
@@ -624,7 +634,9 @@ function MainApp() {
     if (__DEV__) {
       startFrameMonitoring();
     }
-    uploadToCloud().catch(() => {});
+    if (!captureActive) {
+      uploadToCloud().catch(() => {});
+    }
     return () => {
       if (__DEV__) {
         stopFrameMonitoring();
@@ -653,7 +665,7 @@ function MainApp() {
     if (persistence.cumulativeStats === null) return;
     if (notificationsScheduledRef.current) return;
     notificationsScheduledRef.current = true;
-    scheduleAllNotifications(persistence.currentPhase).catch(() => {});
+    scheduleNotificationsUnlessCapturing(persistence.currentPhase);
   }, [persistence.cumulativeStats, persistence.currentPhase]);
 
   // (The Android hardware-back handler lives below handleGoToPit — its deps
@@ -730,7 +742,7 @@ function MainApp() {
     if (isRollover) {
       // A new local day invalidates day-bucketed state computed at launch:
       // reschedule the notification ladder and refresh streak/stats display.
-      scheduleAllNotifications(persistence.currentPhase).catch(() => {});
+      scheduleNotificationsUnlessCapturing(persistence.currentPhase);
       persistenceActions.refreshStats();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1787,15 +1799,17 @@ function MainApp() {
       // HARD-suppressed from Phase 2 on so the reveal's betrayal can't harvest
       // one-star reviews (assessment §9). Policy-gated + once-ever; deferred so
       // it lands after the victory choreography settles.
-      addVictoryTimeout(() => {
-        maybePromptReview({
-          phase: persistence.currentPhase,
-          stars: victory.earnedStars,
-          puzzlesSolved: completedTotal,
-          isOnboarding: !(onboardingFlow.onboardingStep === undefined || onboardingFlow.onboardingStep === 'complete'),
-          isDaily: isPlayingDaily,
-        }).catch(() => {});
-      }, 1800);
+      if (!captureActive) {
+        addVictoryTimeout(() => {
+          maybePromptReview({
+            phase: persistence.currentPhase,
+            stars: victory.earnedStars,
+            puzzlesSolved: completedTotal,
+            isOnboarding: !(onboardingFlow.onboardingStep === undefined || onboardingFlow.onboardingStep === 'complete'),
+            isDaily: isPlayingDaily,
+          }).catch(() => {});
+        }, 1800);
+      }
 
       // Play choreographed victory sequence (the modal gates tap-to-skip to
       // its own entrance window via onSkip)
@@ -1872,11 +1886,13 @@ function MainApp() {
       });
 
       // Re-schedule notifications after puzzle completion
-      scheduleAllNotifications(persistence.currentPhase).catch(() => {});
+      scheduleNotificationsUnlessCapturing(persistence.currentPhase);
 
       // Mark cloud save as having pending changes
-      markPendingChanges().catch(() => {});
-      uploadToCloud().catch(() => {});
+      if (!captureActive) {
+        markPendingChanges().catch(() => {});
+        uploadToCloud().catch(() => {});
+      }
     } else if (result === null && puzzle.selectedLetter) {
       // Slot press happened but was invalid
       hapticError();
@@ -2273,7 +2289,7 @@ function MainApp() {
       data: { granted },
     });
     if (granted) {
-      scheduleAllNotifications(persistence.currentPhase).catch(() => {});
+      scheduleNotificationsUnlessCapturing(persistence.currentPhase);
     }
   }, [persistence.currentPhase]);
 
@@ -2745,7 +2761,7 @@ function MainApp() {
               }
               victoryActions.playPhaseChangeFlash();
               // Update notifications with new phase
-              scheduleAllNotifications(newPhase).catch(() => {});
+              scheduleNotificationsUnlessCapturing(newPhase);
             }}
             isOnboarding={onboardingFlow.isOnboarding}
             onboardingStep={onboardingFlow.onboardingStep}
@@ -3484,6 +3500,7 @@ function MainApp() {
       </ErrorBoundary>
       {/* Screen transition overlay — solid cover that fades in/out during navigation */}
       <Animated.View
+        testID="screen-transition-overlay"
         pointerEvents="none"
         style={[StyleSheet.absoluteFill, {
           backgroundColor: transitionOverlayColor,
@@ -3550,8 +3567,8 @@ function MainApp() {
 
 /**
  * Bootstrap gate: runs data migrations BEFORE MainApp mounts so that all
- * service caches read migrated data. Never blocks forever — the app renders
- * even if migrations fail (failures are logged, not fatal).
+ * service caches read migrated data. Normal launches fail open after logging;
+ * capture launches fail closed so partial fixture state never reaches MainApp.
  */
 // How long the first frame may wait on the fresh-install cloud restore. The
 // restore is a single RPC that normally resolves well under a second; on a
@@ -3563,66 +3580,76 @@ function MainApp() {
 const BOOT_RESTORE_RACE_MS = 2500;
 
 function App() {
-  const [bootReady, setBootReady] = useState(false);
+  const [bootstrapState, setBootstrapState] = useState<
+    'loading' | 'ready' | 'capture-error'
+  >('loading');
   // Bumped when a slow cloud restore lands after boot — remounts MainApp so
   // every hook re-reads the restored storage.
   const [appEpoch, setAppEpoch] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
-    logEvent({ type: 'app_open' });
+    if (!captureActive) {
+      logEvent({ type: 'app_open' });
+    }
     (async () => {
       try {
         // Install the cloud provider (no-op unless Supabase is configured), then
         // pull a cloud save BEFORE migrations/services read storage — so a fresh
         // install (or a device switch via recovery code) restores prior progress.
-        // The wait is capped: D1 is decided on this exact launch, and a network
-        // stall must not read as a hung app.
-        installCloudProviderIfConfigured();
-        const restorePromise = maybeAutoRestoreOnFreshInstall();
-        // Background uploads (MainApp fires one on mount) wait for the restore
-        // to settle so a slow first launch can't push near-empty fresh-install
-        // state over the cloud row the restore is still downloading.
-        holdUploadsUntil(restorePromise);
-        const raced = await Promise.race([
-          restorePromise.then((restored) => ({ restored, timedOut: false })),
-          new Promise<{ restored: boolean; timedOut: boolean }>((resolve) =>
-            setTimeout(() => resolve({ restored: false, timedOut: true }), BOOT_RESTORE_RACE_MS)
-          ),
-        ]);
-        if (raced.timedOut) {
-          // Boot proceeds as a fresh install. If the restore later succeeds,
-          // apply it: re-run migrations over the restored data, then remount.
-          void restorePromise
-            .then(async (restored) => {
-              if (restored && !cancelled) {
-                await runMigrations();
-                // The remount hard-resets whatever the player was doing; the
-                // notice tells them why (their cloud progress arrived).
-                pendingRestoreNotice = true;
-                setAppEpoch((epoch) => epoch + 1);
-              }
-            })
-            .catch(() => {});
+        if (captureActive) {
+          await preparePlayStoreCapture();
+        } else {
+          // The wait is capped: first-launch state is decided on this exact
+          // launch, and a network stall must not read as a hung app.
+          installCloudProviderIfConfigured();
+          const restorePromise = maybeAutoRestoreOnFreshInstall();
+          // Background uploads wait for restore settlement so a slow first
+          // launch cannot push near-empty state over the cloud row.
+          holdUploadsUntil(restorePromise);
+          const raced = await Promise.race([
+            restorePromise.then((restored) => ({ restored, timedOut: false })),
+            new Promise<{ restored: boolean; timedOut: boolean }>((resolve) =>
+              setTimeout(
+                () => resolve({ restored: false, timedOut: true }),
+                BOOT_RESTORE_RACE_MS
+              )
+            ),
+          ]);
+          if (raced.timedOut) {
+            // Boot proceeds as a fresh install. If the restore later succeeds,
+            // migrate the restored data and remount every stateful hook.
+            void restorePromise
+              .then(async (restored) => {
+                if (restored && !cancelled) {
+                  await runMigrations();
+                  pendingRestoreNotice = true;
+                  setAppEpoch((epoch) => epoch + 1);
+                }
+              })
+              .catch(() => {});
+          }
         }
         await runMigrations();
         // Monetization scaffold: warm entitlement cache + init (NoOp) billing/ads
         // providers so isPatronSync() and ad gating read correct values. Safe in
         // Expo Go — no native modules until a real provider is wired.
         initShareImage(); // registers the native image capturer if present (no-op in Expo Go)
-        // RevenueCat billing: inert until react-native-purchases is installed AND
-        // revenueCatIosKey/AndroidKey are set in app.json → extra. initIAP() configures it.
-        setBillingProvider(createRevenueCatBillingProvider());
-        // AdMob: inert until react-native-google-mobile-ads is installed AND the
-        // admob*Id* keys are set in app.json → extra. initAds() initializes it
-        // (and the adapter requests GDPR/UMP consent on init).
-        setAdProvider(createAdMobAdProvider());
-        // Store/ad SDK init is fire-and-forget: the first frame must never wait
-        // on billing config or the ads consent → SDK init → preload chain (the
-        // adapter runs that whole chain in the background internally). Worst
-        // case the first eligible ad/purchase surface is briefly unavailable.
-        void initIAP().catch((err) => console.warn('initIAP failed:', err));
-        void initAds().catch((err) => console.warn('initAds failed:', err));
+        if (!captureActive) {
+          // RevenueCat billing: inert until react-native-purchases is installed AND
+          // revenueCatIosKey/AndroidKey are set in app.json → extra. initIAP() configures it.
+          setBillingProvider(createRevenueCatBillingProvider());
+          // AdMob: inert until react-native-google-mobile-ads is installed AND the
+          // admob*Id* keys are set in app.json → extra. initAds() initializes it
+          // (and the adapter requests GDPR/UMP consent on init).
+          setAdProvider(createAdMobAdProvider());
+          // Store/ad SDK init is fire-and-forget: the first frame must never wait
+          // on billing config or the ads consent → SDK init → preload chain (the
+          // adapter runs that whole chain in the background internally). Worst
+          // case the first eligible ad/purchase surface is briefly unavailable.
+          void initIAP().catch((err) => console.warn('initIAP failed:', err));
+          void initAds().catch((err) => console.warn('initAds failed:', err));
+        }
         // initHints seeds the one-time free hint stash; awaited before MainApp
         // mounts, so usePuzzleGame reads the correct balance on its first render.
         // loadEntitlements warms the sync cache (isPatronSync / ad suppression /
@@ -3638,24 +3665,29 @@ function App() {
         // loses a paid purchase. Local-only reads/writes — cheap to await, and
         // doing it before MainApp mounts means the first frame shows the
         // recovered balance.
-        try {
-          const pendingGrants = await reconcilePendingConsumableGrants();
-          for (const grant of pendingGrants) {
-            if (grant.reward.kind === 'amber') {
-              await awardBonusAmber(grant.reward.amount, `iap_recovered_${grant.productId}`);
-            } else {
-              await addHints(grant.reward.amount, `iap_recovered_${grant.productId}`);
+        if (!captureActive) {
+          try {
+            const pendingGrants = await reconcilePendingConsumableGrants();
+            for (const grant of pendingGrants) {
+              if (grant.reward.kind === 'amber') {
+                await awardBonusAmber(grant.reward.amount, `iap_recovered_${grant.productId}`);
+              } else {
+                await addHints(grant.reward.amount, `iap_recovered_${grant.productId}`);
+              }
+              await acknowledgeConsumableGrant(grant.grantId);
             }
-            await acknowledgeConsumableGrant(grant.grantId);
+          } catch (error) {
+            console.warn('Pending IAP grant recovery failed:', error);
           }
-        } catch (error) {
-          console.warn('Pending IAP grant recovery failed:', error);
         }
       } catch (error) {
         console.warn('Bootstrap init failed:', error);
-      } finally {
-        if (!cancelled) setBootReady(true);
+        if (!cancelled) {
+          setBootstrapState(captureActive ? 'capture-error' : 'ready');
+        }
+        return;
       }
+      if (!cancelled) setBootstrapState('ready');
     })();
     return () => { cancelled = true; };
   }, []);
@@ -3666,7 +3698,16 @@ function App() {
   // useSafeAreaInsets is available everywhere in MainApp.
   return (
     <SafeAreaProvider>
-      {bootReady ? (
+      {bootstrapState === 'capture-error' ? (
+        <View
+          testID="play-store-capture-error"
+          accessibilityLabel="play-store-capture-error"
+          accessibilityRole="alert"
+          style={{ flex: 1, backgroundColor: '#1A1A2E', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <Text style={{ color: '#FFFFFF' }}>Play Store capture setup failed.</Text>
+        </View>
+      ) : bootstrapState === 'ready' ? (
         <MainApp key={appEpoch} />
       ) : (
         <View style={bootStyles.container}>

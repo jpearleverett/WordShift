@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { isPlayStoreCaptureActive } from '../dev/playStoreCapture';
 import { getLocalDateString, daysAgoLocal } from './dateUtils';
 
 const STORAGE_KEY = 'wordshift_event_log';
@@ -98,6 +99,8 @@ export async function getInstallAgeDays(): Promise<number> {
  * flushed to AsyncStorage.
  */
 export function logEvent(event: GameEvent): void {
+  if (isPlayStoreCaptureActive()) return;
+
   const storedEvent: StoredEvent = {
     ...event,
     timestamp: event.timestamp ?? Date.now(),

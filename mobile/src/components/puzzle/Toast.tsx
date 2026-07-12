@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Animated } from 'react-native';
 import { CandyColors, getPhaseTheme } from '../../theme/colors';
 import { getSettingsSync } from '../../services/settings';
 import { PIXEL_FONT_BOLD } from '../../theme/fonts';
+import { hasVisibleToastMessage } from './toastMessage';
 
 interface ToastProps {
   message: string;
@@ -50,6 +51,7 @@ export const Toast: React.FC<ToastProps> = ({ message, isError, phase = 0 }) => 
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const enterAnimRef = useRef<Animated.CompositeAnimation | null>(null);
   const shakeAnimRef = useRef<Animated.CompositeAnimation | null>(null);
+  const hasVisibleMessage = hasVisibleToastMessage(message);
 
   const toastTheme = getToastTheme(phase);
 
@@ -61,6 +63,8 @@ export const Toast: React.FC<ToastProps> = ({ message, isError, phase = 0 }) => 
     slideAnim.setValue(-20);
     opacityAnim.setValue(0);
     shakeAnim.setValue(0);
+
+    if (!hasVisibleMessage) return;
 
     if (getSettingsSync().reducedMotion) {
       slideAnim.setValue(0);
@@ -101,7 +105,9 @@ export const Toast: React.FC<ToastProps> = ({ message, isError, phase = 0 }) => 
       enterAnimRef.current?.stop();
       shakeAnimRef.current?.stop();
     };
-  }, [message, isError]);
+  }, [message, isError, hasVisibleMessage]);
+
+  if (!hasVisibleMessage) return null;
 
   return (
     <Animated.View

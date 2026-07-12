@@ -4,6 +4,7 @@ import { getSettingsSync } from '../services/settings';
 import { getPhaseTheme, CONFETTI_THEMES } from '../theme/colors';
 import { getMaxConfettiCount } from '../services/deviceTier';
 import { getEquippedSync } from '../services/cosmetics';
+import { shouldFreezePlayStoreCaptureMotion } from '../dev/playStoreCapture';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -193,8 +194,13 @@ export const Confetti: React.FC<ConfettiProps> = ({ active, onComplete, phase = 
 
   useEffect(() => {
     if (active) {
-      // Skip confetti animation if reduced motion is enabled
-      if (getSettingsSync().reducedMotion) {
+      // Play Store fixtures are development-web-only static captures. The
+      // native resolver always returns false, so real celebrations are unchanged.
+      if (
+        getSettingsSync().reducedMotion
+        || shouldFreezePlayStoreCaptureMotion()
+      ) {
+        setPieces([]);
         onComplete?.();
         return;
       }
@@ -249,6 +255,7 @@ interface StarBurstProps {
 
 export const StarBurst: React.FC<StarBurstProps> = ({ active, x, y, phase = 0 }) => {
   const reducedMotion = getSettingsSync().reducedMotion;
+  const freezeCaptureMotion = shouldFreezePlayStoreCaptureMotion();
   const stars = useRef(
     Array(8).fill(0).map((_, i) => ({
       scale: new Animated.Value(0),
@@ -260,7 +267,7 @@ export const StarBurst: React.FC<StarBurstProps> = ({ active, x, y, phase = 0 })
   ).current;
 
   useEffect(() => {
-    if (active && !reducedMotion) {
+    if (active && !reducedMotion && !freezeCaptureMotion) {
       const runningAnims: Animated.CompositeAnimation[] = [];
       stars.forEach((star, i) => {
         star.scale.setValue(0);
@@ -310,9 +317,9 @@ export const StarBurst: React.FC<StarBurstProps> = ({ active, x, y, phase = 0 })
       });
       return () => runningAnims.forEach(a => a.stop());
     }
-  }, [active, reducedMotion]);
+  }, [active, reducedMotion, freezeCaptureMotion]);
 
-  if (!active || reducedMotion) return null;
+  if (!active || reducedMotion || freezeCaptureMotion) return null;
 
   return (
     <View style={[styles.starBurstContainer, { left: x - 50, top: y - 50 }]} pointerEvents="none">

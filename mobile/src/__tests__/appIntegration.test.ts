@@ -30,6 +30,77 @@ describe('bootstrap is non-blocking', () => {
   });
 });
 
+describe('Play Store capture bootstrap isolation', () => {
+  const bootstrap = APP_TSX.slice(APP_TSX.indexOf('function App()'));
+
+  test('capture state is determined synchronously and seeded before cloud restore or migrations', () => {
+    expect(APP_TSX).toMatch(
+      /const captureActive = isPlayStoreCaptureActive\(\);/
+    );
+
+    const seedIndex = bootstrap.indexOf('await preparePlayStoreCapture();');
+    const cloudRestoreIndex = bootstrap.indexOf(
+      'const restorePromise = maybeAutoRestoreOnFreshInstall();'
+    );
+    const migrationIndex = bootstrap.indexOf('await runMigrations();');
+    expect(seedIndex).toBeGreaterThan(-1);
+    expect(cloudRestoreIndex).toBeGreaterThan(seedIndex);
+    expect(migrationIndex).toBeGreaterThan(seedIndex);
+  });
+
+  test('capture bootstrap gates app-open logging, cloud restore, billing, and ads', () => {
+    expect(bootstrap).toMatch(
+      /if \(!captureActive\) \{\s*logEvent\(\{ type: 'app_open' \}\);\s*\}/
+    );
+    expect(bootstrap).toMatch(
+      /if \(captureActive\) \{\s*await preparePlayStoreCapture\(\);\s*\} else \{[\s\S]*installCloudProviderIfConfigured\(\);[\s\S]*const restorePromise = maybeAutoRestoreOnFreshInstall\(\);/
+    );
+    expect(bootstrap).toMatch(
+      /if \(!captureActive\) \{[\s\S]*setBillingProvider\(createRevenueCatBillingProvider\(\)\);[\s\S]*setAdProvider\(createAdMobAdProvider\(\)\);[\s\S]*void initIAP\(\)\.catch[\s\S]*void initAds\(\)\.catch/
+    );
+    expect(bootstrap).toMatch(
+      /if \(!captureActive\) \{\s*try \{\s*const pendingGrants = await reconcilePendingConsumableGrants\(\);/
+    );
+    expect(APP_TSX).toMatch(
+      /if \(!captureActive\) \{\s*uploadToCloud\(\)\.catch\(\(\) => \{\}\);\s*\}/
+    );
+  });
+
+  test('capture mode gates Sentry, notification scheduling, and review prompts', () => {
+    expect(APP_TSX).toMatch(/if \(!captureActive && sentryDsn\) \{/);
+    expect(APP_TSX).toMatch(
+      /function scheduleNotificationsUnlessCapturing[\s\S]*if \(captureActive\) return;[\s\S]*scheduleAllNotifications\(phase\)/
+    );
+    expect(APP_TSX).toMatch(
+      /if \(!captureActive\) \{\s*addVictoryTimeout\(\(\) => \{\s*maybePromptReview/
+    );
+  });
+
+  test('screen transition exposes a stable capture-ready signal', () => {
+    expect(APP_TSX).toContain('testID="screen-transition-overlay"');
+  });
+
+  test('capture bootstrap failures render an error instead of mounting MainApp', () => {
+    expect(bootstrap).toMatch(
+      /setBootstrapState\(captureActive \? 'capture-error' : 'ready'\);/
+    );
+    expect(bootstrap).toMatch(
+      /if \(!cancelled\) setBootstrapState\('ready'\);/
+    );
+
+    const errorRenderIndex = bootstrap.indexOf(
+      "bootstrapState === 'capture-error'"
+    );
+    const readyRenderIndex = bootstrap.indexOf(
+      "bootstrapState === 'ready'"
+    );
+    expect(errorRenderIndex).toBeGreaterThan(-1);
+    expect(readyRenderIndex).toBeGreaterThan(errorRenderIndex);
+    expect(bootstrap).toMatch(/testID="play-store-capture-error"/);
+    expect(bootstrap).toMatch(/accessibilityLabel="play-store-capture-error"/);
+  });
+});
+
 describe('local-day rollover', () => {
   test('AppState listener re-runs daily launch tasks on a new LOCAL day', () => {
     expect(APP_TSX).toMatch(/AppState\.addEventListener\('change'/);

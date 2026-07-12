@@ -17,11 +17,10 @@ import { PuzzleVariant, VariantSelectorOption, getVariantDescription } from '../
 import { BODY_FONT, BODY_FONT_ITALIC, PIXEL_FONT_BOLD } from '../../theme/fonts';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-// The menu floats at top: 52. Size it to the device so DIFFICULTY + PUZZLE STYLE
-// (Standard/Reverse/Speed/Double + combos) + CHALLENGE/BLIND all fit without the
-// last row clipping the frame — taller than the old fixed 650 once Speed Shift
-// unlocks, but never so tall it runs off a short device.
-const MENU_MAX_HEIGHT = Math.max(560, Math.min(SCREEN_HEIGHT - 88, 900));
+// The menu floats at top: 52 inside the stats row, below the puzzle header.
+// Reserve that full chrome offset plus a bottom margin so the lower wood edge
+// stays on-screen; the ScrollView carries overflow on shorter devices.
+const MENU_MAX_HEIGHT = Math.max(400, Math.min(SCREEN_HEIGHT - 204, 900));
 // The scroll area must fit ABOVE the frame's ~21dp bottom wood band, or its
 // last row is clipped by the panel's overflow:hidden and can't be scrolled
 // into view. Reserve the top padding (18) + title (~26) + a bottom clearance
@@ -82,7 +81,6 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   const visibleOptions = variantOptions.filter(option => option.unlocked);
   const coreOptions = visibleOptions.filter(option => option.group === 'core');
   const baseOptions = visibleOptions.filter(option => option.group === 'base');
-  const comboOptions: VariantSelectorOption[] = [];
   const hasNonStandardVariants = !introMode && baseOptions.length > 0;
 
   const activeBadge = dark
@@ -190,20 +188,6 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
             <Text style={[styles.sectionTitle, { color: t.muted }]}>{styleTitle}</Text>
             {coreOptions.map(renderVariantItem)}
             {baseOptions.map(renderVariantItem)}
-
-            {comboOptions.length > 0 && (
-              <Text style={[styles.sectionTitle, { color: t.muted }]}>
-                COMBINATION STYLES
-              </Text>
-            )}
-            {comboOptions.map(renderVariantItem)}
-            {comboOptions.length === 0 && (
-              <Text style={[styles.combosComingText, { color: t.muted }]}>
-                {phase >= 3
-                  ? 'More layered arrangements will reveal themselves.'
-                  : 'More combo styles unlock later as you progress.'}
-              </Text>
-            )}
           </>
         ) : (
           <View
@@ -338,14 +322,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 3,
     paddingHorizontal: 6,
-  },
-  combosComingText: {
-    fontFamily: BODY_FONT,
-    fontSize: 12,
-    lineHeight: 16,
-    marginTop: 2,
-    marginBottom: 4,
-    paddingHorizontal: 8,
   },
   menuRow: {
     flexDirection: 'row',

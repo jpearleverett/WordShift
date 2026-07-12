@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "algorithm": "sha256",
+  "files": {
+    "docs/play-store/source/feature-background.png": "d5e6371e06f458b91f15c7cfd2d3fc348cfd3937c2172a9d5fea3c2c3ce98c44",
+    "docs/play-store/final/feature-graphic.png": "a0e16100526e2981311bcd81a5eda56edacf1a12e4b5ed39f2f1d808825c30f1",
+    "docs/feature-graphic.png": "a0e16100526e2981311bcd81a5eda56edacf1a12e4b5ed39f2f1d808825c30f1"
+  }
+}

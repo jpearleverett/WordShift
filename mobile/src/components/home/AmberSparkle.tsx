@@ -1,8 +1,10 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Animated } from 'react-native';
 import { BODY_FONT } from '../../theme/fonts';
+import { shouldFreezePlayStoreCaptureMotion } from '../../dev/playStoreCapture';
 
 export const AmberSparkle: React.FC = () => {
+  const freezeCaptureMotion = shouldFreezePlayStoreCaptureMotion();
   const sparkles = useRef(
     [...Array(5)].map(() => ({
       x: new Animated.Value(0),
@@ -13,6 +15,7 @@ export const AmberSparkle: React.FC = () => {
   ).current;
 
   useEffect(() => {
+    if (freezeCaptureMotion) return;
     sparkles.forEach((sparkle, i) => {
       const animate = () => {
         sparkle.x.setValue(Math.random() * 30 - 15);
@@ -50,7 +53,7 @@ export const AmberSparkle: React.FC = () => {
       };
       animate();
     });
-  }, []);
+  }, [freezeCaptureMotion, sparkles]);
 
   return (
     <View style={{ position: 'absolute', top: -5, right: 0 }}>

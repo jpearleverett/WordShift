@@ -10,6 +10,14 @@
     "test": "jest",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
+    "capture:play-store": "node scripts/tools/capturePlayStoreScreenshots.mjs",
+    "compose:play-store": "node scripts/tools/composePlayStoreScreenshots.mjs",
+    "compose:play-store-feature": "node scripts/tools/composePlayStoreFeatureGraphic.mjs",
+    "validate:play-store": "node scripts/tools/validatePlayStoreAssets.mjs",
+    "verify:play-store-determinism": "node scripts/tools/verifyPlayStoreDeterminism.mjs",
+    "generate:play-store": "npm run capture:play-store && npm run compose:play-store && npm run compose:play-store-feature && npm run validate:play-store",
+    "test:play-store-capture": "node --test scripts/tools/capturePlayStoreScreenshots.test.mjs && node scripts/tools/capturePlayStoreScreenshots.mjs --smoke-home-storm",
+    "test:play-store-assets": "npm run test:play-store-capture && node --test scripts/tools/playStoreAssets.test.mjs scripts/tools/playStoreFeatureGraphic.test.mjs scripts/tools/verifyPlayStoreDeterminism.test.mjs",
     "generate:puzzles": "jest --config scripts/jest.config.js --no-coverage --testTimeout 900000",
     "generate:assets": "node scripts/tools/processAppIcon.mjs && node scripts/tools/generateAppIcons.mjs && node scripts/tools/generateNotificationIcon.mjs && node scripts/tools/generateSounds.mjs && node scripts/tools/generateWorldArt.mjs && node scripts/tools/generatePixelWorld.mjs && node scripts/tools/generateUiIcons.mjs"
   },
@@ -52,6 +60,7 @@
     "eslint": "^9.25.0",
     "eslint-config-expo": "~56.0.4",
     "jest": "~29.7.0",
+    "playwright": "^1.61.1",
     "pngjs": "^7.0.0",
     "ts-jest": "^29.4.6",
     "typescript": "~6.0.3"

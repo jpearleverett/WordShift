@@ -137,6 +137,7 @@ import {
   CombinedQuestState,
 } from '../../services/weeklyQuests';
 import { getSettingsSync } from '../../services/settings';
+import { shouldFreezePlayStoreCaptureMotion } from '../../dev/playStoreCapture';
 import { getUnlockedVariants } from '../../services/puzzleVariety';
 import { getPendingHarvestSummary, HarvestSummary } from '../../services/wordHarvest';
 import { getLocalDateString, daysAgoLocal } from '../../services/dateUtils';
@@ -1073,6 +1074,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   // Animate amber when it changes
   useEffect(() => {
+    if (shouldFreezePlayStoreCaptureMotion()) {
+      amberPulse.stopAnimation();
+      amberPulse.setValue(1);
+      return;
+    }
     if (progress) {
       Animated.sequence([
         Animated.timing(amberPulse, {
@@ -1350,7 +1356,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           = 190; 340 − 190 − 8 cluster gap = 142 for amber + streak (streak
           ≈50 fixed → amber pill ≥84dp before truncating). Early game the
           right cluster is just ☰ (38), leaving ~294dp. */}
-      <View style={[styles.header, { paddingTop: screenInsets.top + 10 }]}>
+      <View
+        style={[styles.header, { paddingTop: screenInsets.top + 10 }]}
+        testID="home-header"
+      >
         <View style={styles.headerRow}>
           <View style={styles.headerLeftCluster}>
             <TouchableOpacity
@@ -1485,6 +1494,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           {unlockFlow.nextUnlock && (!isOnboarding || onboardingStep === 'unlock_explained') && (
             <TouchableOpacity
               style={styles.unlockProgressContainer}
+              testID="home-next-unlock-sign"
               activeOpacity={0.85}
               onPress={() => {
                 hapticLight();
@@ -1536,7 +1546,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               here stacked awkwardly under the Next Unlock signage): cream ink
               with a soft warm shadow reads over every phase's sky art. */}
           {ambientLine && !isOnboarding && (
-            <Animated.View style={[styles.ambientLineContainer, { opacity: ambientOpacity }]} pointerEvents="none">
+            <Animated.View
+              style={[styles.ambientLineContainer, { opacity: ambientOpacity }]}
+              pointerEvents="none"
+              testID="home-ambient-line"
+            >
               <Text style={styles.ambientLineText}>
                 {ambientLine}
               </Text>
@@ -1557,6 +1571,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           scroll clear of the dock. */}
       {!isOnboarding && (
         <Animated.View
+          testID="home-play-dock"
           style={[
             styles.playDock,
             { bottom: screenInsets.bottom + 12 },

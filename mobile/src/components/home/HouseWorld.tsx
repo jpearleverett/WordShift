@@ -759,6 +759,8 @@ const PitAttentionGlow: React.FC = () => {
 const ROOM_WIDTH = 250;
 const ROOM_HEIGHT = ROOM_WIDTH * 0.493865; // Maintains ~2:1 aspect ratio of room PNGs (1456x720)
 const ROOM_GAP = 6;
+// Keeps the first occupied nameplate clear when fixed home chrome masks a locked room.
+const LOCKED_TO_OCCUPIED_ROOM_CLEARANCE = 24;
 const HOUSE_PADDING = 16;
 const HOUSE_WIDTH = ROOM_WIDTH + (HOUSE_PADDING * 2);
 // The house BODY is a touch narrower than the foundation/roof so the timber
@@ -974,12 +976,14 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   // Single-column layout: each room is its own row, sorted top-to-bottom.
   const sortedRooms = [...displayRooms].sort((a, b) => b.layoutPosition.row - a.layoutPosition.row);
   const numRows = Math.max(1, displayRooms.length);
+  const needsLockedRoomClearance = sortedRooms.length > 1
+    && !sortedRooms[0].isUnlocked
+    && sortedRooms.slice(1).some(room => room.isUnlocked);
 
-  const houseHeight = useMemo(() => {
-    return numRows * ROOM_HEIGHT +
-      Math.max(0, numRows - 1) * ROOM_GAP +
-      HOUSE_PADDING * 2;
-  }, [numRows]);
+  const houseHeight = numRows * ROOM_HEIGHT
+    + Math.max(0, numRows - 1) * ROOM_GAP
+    + HOUSE_PADDING * 2
+    + (needsLockedRoomClearance ? LOCKED_TO_OCCUPIED_ROOM_CLEARANCE : 0);
 
   // Extra downward pan slack so the pit entrance can be pulled fully clear of
   // Extra in-flow bottom margin so the pit entrance rests fully above
@@ -1055,7 +1059,11 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
         minDist={10}
         avgTouches
       >
-        <Animated.View style={styles.gestureContainer} onLayout={onContainerLayout}>
+        <Animated.View
+          style={styles.gestureContainer}
+          onLayout={onContainerLayout}
+          testID="home-world-pan-surface"
+        >
           <Animated.View
             style={[
               styles.transformContainer,
@@ -1236,7 +1244,14 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                       : null;
                     return (
                       <React.Fragment key={room.id}>
-                        <View style={styles.roomRow}>
+                        <View
+                          style={[
+                            styles.roomRow,
+                            index === 0
+                              && needsLockedRoomClearance
+                              && styles.leadingLockedRoomRow,
+                          ]}
+                        >
                           <RoomView
                             room={room}
                             animal={roomAnimal}
@@ -1605,6 +1620,9 @@ const styles = StyleSheet.create({
   roomRow: {
     marginBottom: ROOM_GAP,
     alignItems: 'center',
+  },
+  leadingLockedRoomRow: {
+    marginBottom: ROOM_GAP + LOCKED_TO_OCCUPIED_ROOM_CLEARANCE,
   },
   emptyHouse: {
     padding: 40,

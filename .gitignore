@@ -22,4 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+# Agent and Play Store capture state
+.superpowers/
+mobile/.cache/play-store-capture/
+
+# Accidental scratch output
 /undefined/

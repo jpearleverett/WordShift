@@ -1,6 +1,6 @@
-import React from 'react';
 import { Platform } from 'react-native';
 import * as Font from 'expo-font';
+import { installGlobalFont as installGlobalFontForPlatform } from './installGlobalFont';
 
 /**
  * Two-typeface system: Figtree for the header/title chrome, Shantell Sans for
@@ -77,92 +77,7 @@ export async function loadPixelFonts(): Promise<void> {
   }
 }
 
-/**
- * Force Shantell Sans onto EVERY <Text> / <TextInput> in the app, including
- * ones whose style omits `fontFamily` entirely (those would otherwise render
- * the system font). Element styles still win, so the ~320 explicit fontFamily
- * usages keep their role-correct face; text with no family gets the regular
- * face as its base. Net result: nothing but Shantell can render.
- *
- * Mechanism (RN 0.85 / React 19): `Text` is a plain function component, so it
- * has no `.render` to wrap and React 19 ignores `defaultProps` on function
- * components — both classic hooks are dead. But React Native's index re-exports
- * Text via a LIVE getter (`get Text() { return require('.../Text').default }`),
- * so we replace that module's `.default` with a thin wrapper that prepends the
- * base family. Every `import { Text } from 'react-native'` reads the getter at
- * render time and therefore sees the wrapper. Fully defensive: if the module
- * shape differs it no-ops, and the explicit fontFamily aliases above still route
- * all styled text to Shantell.
- *
- * Must run once at App module load, before the first render.
- */
-let globalFontInstalled = false;
+/** Install the platform's global Text/TextInput font behavior before render. */
 export function installGlobalFont(): void {
-  if (globalFontInstalled) return;
-  globalFontInstalled = true;
-
-  // Everything below touches PRIVATE React Native internals
-  // ('react-native/Libraries/...') that an RN minor bump is free to move or
-  // reshape. The entire patch is therefore layered in try/catch guards with a
-  // safe no-op fallback: if any step fails, we log a warning and boot
-  // continues on the system font (the explicit fontFamily aliases above still
-  // route all styled text to Shantell). This must NEVER be able to crash boot.
-  const warnPatchSkipped = (which: string, err: unknown): void => {
-    try {
-      console.warn(
-        `[fonts] global ${which} font patch skipped (React Native internals changed?); ` +
-          'falling back to explicit fontFamily styles.',
-        err
-      );
-    } catch {
-      // Even logging is best-effort.
-    }
-  };
-
-  try {
-    const base = { fontFamily: SHANTELL_REGULAR };
-
-    const patch = (mod: { default?: unknown } | undefined, which: string): void => {
-      try {
-        const Orig = mod?.default as
-          | (React.ComponentType<{ style?: unknown }> & { __fontWrapped?: boolean })
-          | undefined;
-        if (typeof Orig !== 'function' || Orig.__fontWrapped) return;
-
-        const Wrapped = (props: { style?: unknown }) =>
-          React.createElement(Orig, {
-            ...props,
-            style: [base, props?.style],
-          });
-        // Preserve statics (e.g. TextInput.State) and identity markers.
-        Object.assign(Wrapped, Orig);
-        (Wrapped as { __fontWrapped?: boolean }).__fontWrapped = true;
-        (Wrapped as { displayName?: string }).displayName = 'ShantellText';
-
-        mod!.default = Wrapped;
-      } catch (err) {
-        warnPatchSkipped(which, err);
-      }
-    };
-
-    // Metro only bundles a module it can see via a STATIC require('literal'); a
-    // dynamic require(variable) is rejected at transform time ("Invalid call").
-    // So require each Text module by its literal path and hand the module object
-    // to patch(). Each require is guarded in case the internal path ever moves.
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      patch(require('react-native/Libraries/Text/Text'), 'Text');
-    } catch (err) {
-      warnPatchSkipped('Text', err);
-    }
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      patch(require('react-native/Libraries/Components/TextInput/TextInput'), 'TextInput');
-    } catch (err) {
-      warnPatchSkipped('TextInput', err);
-    }
-  } catch (err) {
-    // Outer belt-and-braces guard: no failure mode in the patch may escape.
-    warnPatchSkipped('Text/TextInput', err);
-  }
+  installGlobalFontForPlatform(SHANTELL_REGULAR);
 }

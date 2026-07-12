@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getAllStoredEvents, removeOldestEvents } from './eventLogger';
 import { isSupabaseConfigured, sbInsert } from './supabaseClient';
+import { isPlayStoreCaptureActive } from '../dev/playStoreCapture';
 
 /**
  * Optional remote telemetry transport.
@@ -62,6 +63,7 @@ let lastSyncAttempt = 0;
  * complete no-op and no network traffic occurs.
  */
 export function isTelemetryEnabled(): boolean {
+  if (isPlayStoreCaptureActive()) return false;
   return getTelemetryEndpoint().length > 0 || isSupabaseConfigured();
 }
 
