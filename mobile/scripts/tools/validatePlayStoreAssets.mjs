@@ -178,6 +178,16 @@ export async function validatePlayStoreAssets({
   finalDir = DEFAULT_FINAL_DIR,
   screenshotsOnly = false,
 } = {}) {
+  let uneaseAudit = [];
+  if (!screenshotsOnly) {
+    const { auditAuthenticUneaseSources } = await import(
+      './auditPlayStoreUnease.mjs'
+    );
+    uneaseAudit = await auditAuthenticUneaseSources({
+      campaignPath,
+      sourceDir,
+    });
+  }
   const sourceAssets = await validateSourceAssets({
     campaignPath,
     sourceDir,
@@ -187,7 +197,7 @@ export async function validatePlayStoreAssets({
     finalDir,
     screenshotsOnly,
   });
-  return { sourceAssets, finalAssets };
+  return { sourceAssets, finalAssets, uneaseAudit };
 }
 
 function formatMegabytes(bytes) {
@@ -201,10 +211,21 @@ async function main() {
     throw new Error(`Unknown argument${unknownArgs.length === 1 ? '' : 's'}: ${unknownArgs.join(', ')}`);
   }
   const screenshotsOnly = args.includes('--screenshots-only');
-  const { sourceAssets, finalAssets } = await validatePlayStoreAssets({
+  const {
+    sourceAssets,
+    finalAssets,
+    uneaseAudit,
+  } = await validatePlayStoreAssets({
     screenshotsOnly,
   });
 
+  for (const result of uneaseAudit) {
+    console.log(
+      `[validate] authentic unease level ${result.level} `
+      + `(${result.scenario}): ${result.profile} profile, `
+      + 'geometry/collisions/visibility valid'
+    );
+  }
   for (const result of sourceAssets) {
     const { width, height, bitDepth } = result.metadata;
     console.log(

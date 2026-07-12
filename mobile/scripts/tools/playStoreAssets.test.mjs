@@ -22,6 +22,7 @@ import {
 } from './composePlayStoreScreenshots.mjs';
 import {
   validateFinalAssets,
+  validatePlayStoreAssets,
   validateSourceAssets,
 } from './validatePlayStoreAssets.mjs';
 
@@ -65,6 +66,56 @@ const EXPECTED_CUE_DEFINITIONS = [
   { name: 'reward-glow', minLevel: 6, contentKind: 'empty' },
   { name: 'dusk-vignette', minLevel: 7, contentKind: 'empty' },
   { name: 'watching-eyes', minLevel: 7, contentKind: 'eyes' },
+];
+const EXPECTED_VISIBILITY_PROFILES = [
+  {
+    name: 'low',
+    level: 1,
+    final: {
+      minChangedFraction: 0.00035,
+      minVisibilityScore: 0.00001,
+      maxChangedFraction: 0.06,
+      maxVisibilityScore: 0.05,
+    },
+    thumbnail: {
+      minChangedFraction: 0.008,
+      minVisibilityScore: 0.0006,
+      maxChangedFraction: 0.08,
+      maxVisibilityScore: 0.05,
+    },
+  },
+  {
+    name: 'mid',
+    level: 4,
+    final: {
+      minChangedFraction: 0.006,
+      minVisibilityScore: 0.0002,
+      maxChangedFraction: 0.12,
+      maxVisibilityScore: 0.05,
+    },
+    thumbnail: {
+      minChangedFraction: 0.018,
+      minVisibilityScore: 0.001,
+      maxChangedFraction: 0.15,
+      maxVisibilityScore: 0.05,
+    },
+  },
+  {
+    name: 'high',
+    level: 7,
+    final: {
+      minChangedFraction: 0.09,
+      minVisibilityScore: 0.0024,
+      maxChangedFraction: 0.42,
+      maxVisibilityScore: 0.05,
+    },
+    thumbnail: {
+      minChangedFraction: 0.09,
+      minVisibilityScore: 0.003,
+      maxChangedFraction: 0.45,
+      maxVisibilityScore: 0.05,
+    },
+  },
 ];
 const EXPECTED_SCENARIOS = [
   'puzzle-preview',
@@ -216,6 +267,14 @@ function expectedActiveCueNames(level) {
 async function loadUneaseModel() {
   try {
     return await import('./playStoreUnease.mjs');
+  } catch {
+    return {};
+  }
+}
+
+async function loadAuthenticUneaseAudit() {
+  try {
+    return await import('./auditPlayStoreUnease.mjs');
   } catch {
     return {};
   }
@@ -659,6 +718,32 @@ describe('Storybook Editorial composition', () => {
       );
     }
     assert.deepEqual(model.TASK4_REAUDIT_LEVELS, [6, 7]);
+    assert.deepEqual(
+      model.UNEASE_VISIBILITY_PROFILES,
+      EXPECTED_VISIBILITY_PROFILES
+    );
+    assert.equal(typeof model.getUneaseVisibilityProfile, 'function');
+    assert.equal(typeof model.validateUneaseVisibilityMetrics, 'function');
+    assert.equal(model.getUneaseVisibilityProfile(1).name, 'low');
+    assert.equal(model.getUneaseVisibilityProfile(6).name, 'mid');
+    assert.equal(model.getUneaseVisibilityProfile(7).name, 'high');
+    for (const profile of EXPECTED_VISIBILITY_PROFILES) {
+      assert.throws(
+        () => model.validateUneaseVisibilityMetrics({
+          scenario: `${profile.name}-floor-regression`,
+          level: profile.level,
+          final: {
+            changedFraction: profile.final.minChangedFraction,
+            visibilityScore: profile.final.minVisibilityScore,
+          },
+          thumbnail: {
+            changedFraction: profile.thumbnail.minChangedFraction,
+            visibilityScore: profile.thumbnail.minVisibilityScore * 0.25,
+          },
+        }),
+        /thumbnail visibility score .* below/
+      );
+    }
 
     const [composerSource, testSource] = await Promise.all([
       fs.readFile(COMPOSER_PATH, 'utf8'),
@@ -1214,11 +1299,10 @@ describe('Playwright composition integration', { concurrency: false }, () => {
   });
 
   test('bounds monotonic cue visibility at final and thumbnail sizes', async () => {
+    const model = await loadUneaseModel();
     const finalMetrics = [];
     const thumbnailMetrics = [];
     const sourceKinds = [];
-    const finalAreaCaps = new Map([[1, 0.06], [4, 0.12], [7, 0.42]]);
-    const thumbnailAreaCaps = new Map([[1, 0.08], [4, 0.15], [7, 0.45]]);
 
     for (const level of [1, 4, 7]) {
       const item = makeCampaign()[level - 1];
@@ -1288,14 +1372,12 @@ describe('Playwright composition integration', { concurrency: false }, () => {
         thumbnailBaseline,
         thumbnailComposed
       );
-      assert.ok(finalDelta.changedPixels > 0);
-      assert.ok(thumbnailDelta.changedPixels > 0);
-      assert.ok(finalDelta.changedFraction <= finalAreaCaps.get(level));
-      assert.ok(
-        thumbnailDelta.changedFraction <= thumbnailAreaCaps.get(level)
-      );
-      assert.ok(finalDelta.visibilityScore < 0.05);
-      assert.ok(thumbnailDelta.visibilityScore < 0.05);
+      assert.doesNotThrow(() => model.validateUneaseVisibilityMetrics({
+        scenario: item.scenario,
+        level,
+        final: finalDelta,
+        thumbnail: thumbnailDelta,
+      }));
       finalMetrics.push(finalDelta);
       thumbnailMetrics.push(thumbnailDelta);
     }
@@ -1332,6 +1414,92 @@ describe('Playwright composition integration', { concurrency: false }, () => {
       /campaign copy is clipped/
     );
     await assert.rejects(fs.access(path.join(outputDir, item.final)));
+  });
+});
+
+describe('mandatory authentic-source unease audit', { concurrency: false }, () => {
+  test('full validation renders required authentic fixture sources', async () => {
+    const auditModule = await loadAuthenticUneaseAudit();
+    assert.equal(
+      typeof auditModule.auditAuthenticUneaseSources,
+      'function',
+      'authentic unease audit is unavailable'
+    );
+    const campaign = makeCampaign();
+    const campaignPath = await writeCampaign(campaign);
+    const sourceDir = path.join(tempDir, 'source');
+    const finalDir = path.join(tempDir, 'final');
+    await Promise.all([
+      writeSourceSet(sourceDir, campaign),
+      writeFinalSet(finalDir, campaign),
+    ]);
+    const sourceHashes = new Map(
+      await Promise.all(campaign
+        .filter(item => [6, 7].includes(item.uneaseLevel))
+        .map(async item => [
+          item.source,
+          sha256(await fs.readFile(path.join(sourceDir, item.source))),
+        ]))
+    );
+
+    const result = await validatePlayStoreAssets({
+      campaignPath,
+      sourceDir,
+      finalDir,
+    });
+
+    assert.deepEqual(
+      result.uneaseAudit.map(entry => ({
+        level: entry.level,
+        scenario: entry.scenario,
+        source: entry.source,
+        collisionCount: entry.collisionCount,
+        profile: entry.profile,
+      })),
+      [
+        {
+          level: 6,
+          scenario: 'flawless-victory',
+          source: '06_flawless_victory.png',
+          collisionCount: 0,
+          profile: 'mid',
+        },
+        {
+          level: 7,
+          scenario: 'home-dusk',
+          source: '07_home_dusk.png',
+          collisionCount: 0,
+          profile: 'high',
+        },
+      ]
+    );
+    for (const entry of result.uneaseAudit) {
+      assert.equal(entry.geometryValid, true);
+      assert.ok(entry.final.changedPixels > 0);
+      assert.ok(entry.thumbnail.changedPixels > 0);
+      assert.equal(
+        sha256(await fs.readFile(path.join(sourceDir, entry.source))),
+        sourceHashes.get(entry.source),
+        `${entry.source} changed during authentic audit`
+      );
+    }
+  });
+
+  test('full validation fails at the audit when a required source is missing', async () => {
+    const campaign = makeCampaign();
+    const campaignPath = await writeCampaign(campaign);
+    const sourceDir = path.join(tempDir, 'source');
+    const finalDir = path.join(tempDir, 'final');
+    await Promise.all([
+      writeSourceSet(sourceDir, campaign),
+      writeFinalSet(finalDir, campaign),
+    ]);
+    await fs.rm(path.join(sourceDir, '06_flawless_victory.png'));
+
+    await assert.rejects(
+      validatePlayStoreAssets({ campaignPath, sourceDir, finalDir }),
+      /authentic unease audit requires campaign source "06_flawless_victory\.png" for level 6/
+    );
   });
 });
 

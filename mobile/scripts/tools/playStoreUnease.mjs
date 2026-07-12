@@ -26,6 +26,29 @@ function cue({
   });
 }
 
+function metricBounds({
+  minChangedFraction,
+  minVisibilityScore,
+  maxChangedFraction,
+  maxVisibilityScore,
+}) {
+  return Object.freeze({
+    minChangedFraction,
+    minVisibilityScore,
+    maxChangedFraction,
+    maxVisibilityScore,
+  });
+}
+
+function visibilityProfile({ name, level, final, thumbnail }) {
+  return Object.freeze({
+    name,
+    level,
+    final: metricBounds(final),
+    thumbnail: metricBounds(thumbnail),
+  });
+}
+
 const FRAME_GRAIN_BOUNDS = rect(25.5, 90, 381, 668);
 
 export const UNEASE_CUE_REGISTRY = Object.freeze([
@@ -100,6 +123,61 @@ export const PROTECTED_COMPOSITION_REGIONS = Object.freeze({
 
 export const TASK4_REAUDIT_LEVELS = Object.freeze([6, 7]);
 
+// Floors are deliberately below the 2026-07-12 reference renders:
+// thumbnail scores low=0.001245, mid=0.001829, high=0.006338.
+// They catch materially faded cues while leaving headroom for source-image and
+// browser rasterization differences. Existing area/score caps remain intact.
+export const UNEASE_VISIBILITY_PROFILES = Object.freeze([
+  visibilityProfile({
+    name: 'low',
+    level: 1,
+    final: {
+      minChangedFraction: 0.00035,
+      minVisibilityScore: 0.00001,
+      maxChangedFraction: 0.06,
+      maxVisibilityScore: 0.05,
+    },
+    thumbnail: {
+      minChangedFraction: 0.008,
+      minVisibilityScore: 0.0006,
+      maxChangedFraction: 0.08,
+      maxVisibilityScore: 0.05,
+    },
+  }),
+  visibilityProfile({
+    name: 'mid',
+    level: 4,
+    final: {
+      minChangedFraction: 0.006,
+      minVisibilityScore: 0.0002,
+      maxChangedFraction: 0.12,
+      maxVisibilityScore: 0.05,
+    },
+    thumbnail: {
+      minChangedFraction: 0.018,
+      minVisibilityScore: 0.001,
+      maxChangedFraction: 0.15,
+      maxVisibilityScore: 0.05,
+    },
+  }),
+  visibilityProfile({
+    name: 'high',
+    level: 7,
+    final: {
+      minChangedFraction: 0.09,
+      minVisibilityScore: 0.0024,
+      maxChangedFraction: 0.42,
+      maxVisibilityScore: 0.05,
+    },
+    thumbnail: {
+      minChangedFraction: 0.09,
+      minVisibilityScore: 0.003,
+      maxChangedFraction: 0.45,
+      maxVisibilityScore: 0.05,
+    },
+  }),
+]);
+
 export function validateUneaseLevel(uneaseLevel, scenario = 'campaign item') {
   if (
     !Number.isInteger(uneaseLevel)
@@ -110,6 +188,48 @@ export function validateUneaseLevel(uneaseLevel, scenario = 'campaign item') {
       `${scenario}: unease level must be an integer from 1 to 7`
     );
   }
+}
+
+export function getUneaseVisibilityProfile(uneaseLevel, scenario) {
+  validateUneaseLevel(uneaseLevel, scenario);
+  return UNEASE_VISIBILITY_PROFILES.findLast(
+    profile => profile.level <= uneaseLevel
+  );
+}
+
+export function validateUneaseVisibilityMetrics({
+  scenario = 'campaign item',
+  level,
+  final,
+  thumbnail,
+}) {
+  const profile = getUneaseVisibilityProfile(level, scenario);
+  for (const [size, metrics] of Object.entries({ final, thumbnail })) {
+    const bounds = profile[size];
+    for (const [metricName, label] of [
+      ['changedFraction', 'changed fraction'],
+      ['visibilityScore', 'visibility score'],
+    ]) {
+      const value = metrics?.[metricName];
+      const capitalized = metricName[0].toUpperCase() + metricName.slice(1);
+      const minimum = bounds[`min${capitalized}`];
+      const maximum = bounds[`max${capitalized}`];
+      if (!Number.isFinite(value)) {
+        throw new Error(`${scenario}: ${size} ${label} is not finite`);
+      }
+      if (value < minimum) {
+        throw new Error(
+          `${scenario}: ${size} ${label} ${value} is below ${minimum}`
+        );
+      }
+      if (value > maximum) {
+        throw new Error(
+          `${scenario}: ${size} ${label} ${value} exceeds ${maximum}`
+        );
+      }
+    }
+  }
+  return profile;
 }
 
 export function getActiveUneaseCues(uneaseLevel, scenario) {
