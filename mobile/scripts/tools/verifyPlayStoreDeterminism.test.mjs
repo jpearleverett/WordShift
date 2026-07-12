@@ -399,10 +399,12 @@ describe('isolated verifier integration contract', () => {
     );
     assert.match(checklist, /detached temporary Git worktree/);
     assert.match(checklist, /approved feature-hash manifest/);
-    assert.doesNotMatch(storeListing, /seven-shot regeneration pending/i);
+    assert.match(checklist, /regenerated eight/);
+    assert.match(checklist, /All 17 outputs matched/);
     assert.match(
       storeListing,
-      /Android phone screenshots ×8, 7 generated and validated; shot 8 generation pending/
+      /Android phone screenshots ×8, generated and validated/
     );
+    assert.doesNotMatch(storeListing, /generation pending|7 generated/i);
   });
 });
