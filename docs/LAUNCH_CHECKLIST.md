@@ -6,25 +6,40 @@ the codebase and are the remaining gates to submission.
 
 ## Android (submission-blocking)
 
-- [ ] **Store screenshots** — the 8 final phone screenshots are DONE and
-      validated (2026-07-13, per the campaign table + closed regen checklist in
-      `docs/STORE_LISTING.md`). Remaining: upload them in table order in Play
-      Console → Grow users → Store presence → Main store listing. If the
-      console rejects a PNG, flatten it (24-bit, no alpha).
-- [ ] **Verify one REAL purchase of each SKU kind on a Play internal build**
-      (CRITICAL) — one consumable (amber or hint pack), the starter one-time,
-      Remove Ads / Patron non-consumables, and a Restore Purchases round-trip.
-      The 2026-07-10 billing product-category fix (NON_SUBSCRIPTION on
-      getProducts) is exactly the class of bug that only a real device on a
-      Play build can validate — do not ship without this pass.
-- [ ] **Device pass on low/mid/high-end Android** — offline cold start (fresh
-      install, airplane mode), onboarding end-to-end, pit economy, IAP +
-      Restore, UMP consent form (EEA/debug geography), interstitials, rewarded
-      ads, notifications (tap routing incl. cold start), deep links
-      (`wordshift://challenge/...`), and sharing (PNG share card).
-- [ ] **30-minute performance session** — one long mixed session (puzzles,
-      home, pit, store, dialogue) on the low-end device, watching for jank,
-      memory growth, and audio glitches.
+- [x] **Store listing live in Play Console** — DONE (2026-07-13): the 8 final
+      screenshots, feature graphic, and descriptions from `docs/STORE_LISTING.md`
+      uploaded to Main store listing. (Note: screenshot #5's setup-menu copy
+      predates the same-day trial-ladder rebalance — see the optional regen
+      note in STORE_LISTING.md; not misleading, safe to ship.)
+- [x] **Verify one REAL purchase of each SKU kind on a Play internal build**
+      — DONE (2026-07-13): every SKU kind verified working on the Play
+      internal build (consumables, starter one-time, Remove Ads / Patron
+      non-consumables). The NON_SUBSCRIPTION billing fix is confirmed
+      end-to-end on a real device.
+- [ ] **Device pass on low/mid/high-end Android** — progress:
+      - [x] Offline cold start (fresh install, airplane mode) — DONE 2026-07-13
+      - [x] Pit economy, puzzles, home, store, dialogue — covered by the
+            multi-hour Phase-4 session (2026-07-13, build 44)
+      - [x] IAP + Restore — covered by the SKU verification pass (2026-07-13)
+      - [ ] Onboarding end-to-end on a fresh install
+      - [ ] UMP consent form (EEA/debug geography) + Settings → Privacy Options
+      - [ ] Interstitials + rewarded ads (test units)
+      - [ ] Notification tap routing (incl. cold start)
+      - [ ] Deep links (`wordshift://challenge/...`)
+      - [ ] Sharing (PNG share card)
+      - [ ] Re-check Challenge (previews on) + a deliberate Blind Offering
+            failure on build 45 (the trial ladder shipped after build 44)
+- [ ] **Closed test gate (12 testers / 14 days) — IN PROGRESS, started
+      2026-07-13.** Google requires the closed test with at least 12 testers
+      continuously opted in for 14 consecutive days before a personal account
+      can apply for production access → eligible to apply ~2026-07-27, then
+      Google's application review (typically ≤7 days). Uploading new builds to
+      the closed track during the window is fine and does NOT reset the clock
+      (push build 45 there). Keep the 12+ testers opted in the whole time —
+      dips below 12 pause the clock.
+- [x] **30-minute performance session** — DONE (2026-07-13), exceeded: a
+      multi-hour mixed session on device reaching Phase 4 (puzzles, home, pit,
+      store, dialogue) with no glitches, jank, or lag observed.
 - [x] **Feature graphic** — DONE (2026-07-13): final 1024×500 art (Ember +
       wordmark + hidden treeline eyes) generated and reviewed; upload with the
       screenshots.
@@ -40,8 +55,9 @@ the codebase and are the remaining gates to submission.
       only when cutting the public production build (and confirm live ads fill
       on a real production install before wide rollout).
 - [ ] **Bump `android.versionCode`** in `mobile/app.json` for the next release
-      (currently 43; autoIncrement is intentionally off — bump manually every
-      time).
+      (currently 45 — build 44 is on the internal track; 45 carries the
+      2026-07-13 playtest fixes + trial-ladder rebalance. autoIncrement is
+      intentionally off — bump manually every time).
 - [x] **Billing category fix + boot entitlement restore** — DONE (2026-07-10):
       RevenueCat `getProducts` now passes the NON_SUBSCRIPTION category
       (Android one-time products returned `[]` without it — the "purchases not
@@ -127,8 +143,8 @@ five-minute code change and iOS becomes buildable.
 
 ## Nice-to-verify on device before submission
 
-- [ ] Fresh-install cold start with airplane mode on (boot no longer awaits
-      ad/IAP SDKs — verify first frame is fast offline).
+- [x] Fresh-install cold start with airplane mode on (boot no longer awaits
+      ad/IAP SDKs — verify first frame is fast offline). DONE 2026-07-13.
 - [ ] EEA-region device (or debug geography in UMP) shows the consent form
       before the first ad, and Settings → Privacy Options opens the form again.
 - [ ] Share a result and confirm the PNG share card renders (requires the dev

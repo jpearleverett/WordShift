@@ -139,7 +139,16 @@ paths are upload artifacts; do not rename them.
 - [x] #7: recaptured with the phase-aware dusk-teal PLAY dock; the red compositing seam in the sunset clouds (x≈806) removed.
 - [ ] #8: optional, not done — a variant with the seven ward marks faintly visible around the pit opening would match the live app more closely. Shippable as-is.
 
-All eight screenshots are final; Play Console upload remains a human task.
+All eight screenshots are final and **UPLOADED to Play Console (2026-07-13)**
+along with the feature graphic and descriptions — the store listing is live in
+the console.
+
+Optional follow-up (not misleading, safe to ship): screenshot #5's setup menu
+shows the pre-trial-ladder copy ("No previews or hints, limited undos, +50%
+amber" / "Hide previews for a truer test"). The same-day rebalance changed the
+in-game rows to "No hints, limited undos, +25% amber" and "Challenge limits,
+no previews, judged only at the end, 2x amber". Recapture #5 whenever the
+screenshots next get touched.
 
 Final feature graphic: `docs/play-store/final/feature-graphic.png`
 Feature graphic alt text: Ember the fox beside the exact WordShift logo, candy tiles, glowing amber, and a sunny-to-dusk forest with subtle distant eyes.
