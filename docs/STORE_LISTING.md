@@ -101,8 +101,7 @@ Legal pages are **LIVE and publicly accessible** via GitHub Pages (deployed from
 ## Asset checklist
 
 - [x] App icon 1024×1024 — `mobile/assets/icon.png`
-- [x] Android phone screenshots ×8, generated and validated against the ORIGINAL banner copy — `docs/play-store/final/`
-- [ ] Re-render screenshot banners with the REVISED copy below (headlines/support lines changed 2026-07-12) + fix the review findings in the regen checklist
+- [x] Android phone screenshots ×8, re-rendered 2026-07-13 with the revised banner copy + review fixes applied and re-validated — `docs/play-store/final/`
 - [x] Feature graphic 1024×500 (Play), generated — `docs/play-store/final/feature-graphic.png`
 - [ ] iPhone 6.7" screenshots ×5 (needs device/simulator)
 - [ ] iPad 12.9" screenshots ×3 (supportsTablet is true)
@@ -132,15 +131,15 @@ paths are upload artifacts; do not rename them.
 | 7 | `docs/play-store/final/07_theyve_been_waiting.png` | THEY'VE BEEN WAITING | The longer you stay, the more the house changes around you. | WordShift animal house at dusk beneath a purple-orange sky, with the Jungle Hammock locked above furnished rooms. | Phase 2 dusk house with the Jungle Hammock still locked and no late-story imagery. |
 | 8 | `docs/play-store/final/08_something_stirs.png` | SOMETHING STIRS IN THE AIR | Your friends know more than they are willing to say. | A glowing offering pit in a moonlit forest clearing on the WordShift offering screen, with the message: Nothing left to give. The dark is patient. | Phase 3 night Offering Pit in its empty state. No ward ceremony, no robed sprites, no late-story imagery. |
 
-### Regen checklist (from the 2026-07-12 screenshot review)
+### Regen checklist (from the 2026-07-12 screenshot review — closed 2026-07-13)
 
-- [ ] Re-render all eight banner strips with the revised headline/support copy above.
-- [ ] #5 + #6: remove (or move to scenic margins) the small dark "eye" blobs composited onto flat UI surfaces — under the ? button in #5 and on the victory modal's cream band in #6 they read as smudges/rendering defects, not foreshadowing. On scenery edges (#3 sign, #7 frame) the motif works and can stay.
-- [ ] #5: fix the contradictory state — the modal shows HARD selected while the EASY pill is visible behind it — and give the "PUZZLE SETUP" header breathing room from the frame's top edge.
-- [ ] #7: optional — recapture so the PLAY dock shows the new phase-aware dusk-teal material (shipped 2026-07-12) instead of bright green.
-- [ ] #8: optional — a variant with the seven ward marks faintly visible around the pit opening would match the live app more closely (and add to the mood).
+- [x] Re-render all eight banner strips with the revised headline/support copy above.
+- [x] #5 + #6: removed the dark "eye" blobs from the flat UI surfaces (kept on scenery edges, where the motif works).
+- [x] #5: difficulty pill now reads HARD to match the modal; "PUZZLE SETUP" header has clearance from the frame's top edge; stray thought-bubble removed.
+- [x] #7: recaptured with the phase-aware dusk-teal PLAY dock; the red compositing seam in the sunset clouds (x≈806) removed.
+- [ ] #8: optional, not done — a variant with the seven ward marks faintly visible around the pit opening would match the live app more closely. Shippable as-is.
 
-All eight screenshots exist; Play Console upload remains a human task.
+All eight screenshots are final; Play Console upload remains a human task.
 
 Final feature graphic: `docs/play-store/final/feature-graphic.png`
 Feature graphic alt text: Ember the fox beside the exact WordShift logo, candy tiles, glowing amber, and a sunny-to-dusk forest with subtle distant eyes.
