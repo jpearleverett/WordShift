@@ -311,6 +311,10 @@ function MainApp() {
   const [showPatronModal, setShowPatronModal] = useState(false);
   // Store modal — consumable amber/hint packs + the cosmetic bundle.
   const [showStoreModal, setShowStoreModal] = useState(false);
+  // Bumped when an amber-changing App-level modal (Store/Patron) closes, so a
+  // mounted HomeScreen reloads its progress (purchased amber must register
+  // against the next unlock immediately, not after the next screen change).
+  const [homeRefreshSignal, setHomeRefreshSignal] = useState(0);
   // Solve-time stopwatch for the Daily Challenge leaderboard (ms since board ready)
   const puzzleStartTimeRef = useRef<number>(0);
   // True while the current daily board was eased (first-ever daily) — its
@@ -1886,6 +1890,15 @@ function MainApp() {
     } else if (result === null) {
       // No action
       isDragDropRef.current = false;
+    } else if (result.blindFailed) {
+      // Blind Offering's end-of-board reveal: the final letter landed but the
+      // chain contains a non-word. The move committed (the hook's message
+      // tells the player to undo); feedback here is the full error language,
+      // never the half-move click this result shape would otherwise hit.
+      isDragDropRef.current = false;
+      hapticError();
+      soundInvalidMove();
+      setInvalidDropSignal(prev => prev + 1);
     } else {
       // Valid intermediate move.
       const wasDragDrop = isDragDropRef.current;
@@ -2600,23 +2613,33 @@ function MainApp() {
     orchestrationActions,
   ]);
 
+  // Trial ladder: Challenge and Blind Offering are mutually exclusive rungs.
+  // Challenge = no hints + limited undos, previews ON. Blind Offering = the
+  // apex rung: Challenge's limits (it runs under gameMode 'challenge') PLUS
+  // previews hidden and free moves judged once at the end of the chain.
   const handleToggleChallengeMode = useCallback(() => {
     hapticMedium();
     orchestrationActions.setCompletionCoda(null);
     resetSpeedRun();
-    const newMode = puzzle.gameMode === 'challenge' ? 'standard' : 'challenge';
-    puzzleActions.startNewGame(puzzle.difficulty, newMode, puzzle.selectedVariant, puzzle.blindMode);
+    const isChallengeOnly = puzzle.gameMode === 'challenge' && !puzzle.blindMode;
+    const newMode = isChallengeOnly ? 'standard' : 'challenge';
+    puzzleActions.startNewGame(puzzle.difficulty, newMode, puzzle.selectedVariant, false);
   }, [puzzleActions, puzzle.gameMode, puzzle.difficulty, puzzle.selectedVariant, puzzle.blindMode, orchestrationActions]);
 
   // Blind Offering: chosen before the board (a fresh board applies it so the
   // player can't toggle previews back on mid-solve to peek). Sticky across Next
-  // Level like Challenge; composes with any variant/difficulty/challenge state.
+  // Level; selecting it engages the challenge limits, deselecting returns to
+  // standard. Composes with any variant/difficulty.
   const handleToggleBlindMode = useCallback(() => {
     hapticMedium();
     orchestrationActions.setCompletionCoda(null);
     resetSpeedRun();
-    puzzleActions.startNewGame(puzzle.difficulty, puzzle.gameMode, puzzle.selectedVariant, !puzzle.blindMode);
-  }, [puzzleActions, puzzle.gameMode, puzzle.difficulty, puzzle.selectedVariant, puzzle.blindMode, orchestrationActions, resetSpeedRun]);
+    if (puzzle.blindMode) {
+      puzzleActions.startNewGame(puzzle.difficulty, 'standard', puzzle.selectedVariant, false);
+    } else {
+      puzzleActions.startNewGame(puzzle.difficulty, 'challenge', puzzle.selectedVariant, true);
+    }
+  }, [puzzleActions, puzzle.difficulty, puzzle.selectedVariant, puzzle.blindMode, orchestrationActions, resetSpeedRun]);
 
   // Present the daily-login grant only on a quiet home screen — never over the
   // puzzle, the victory flow, a post-victory intro, or a queued ceremony. The
@@ -2733,6 +2756,7 @@ function MainApp() {
             }}
             onOpenStats={() => transitionTo('stats')}
             onOpenSettings={() => transitionTo('settings')}
+            onOpenStore={() => setShowStoreModal(true)}
             phaseProgressFraction={persistence.phaseProgressFraction}
             pendingPhaseTransition={persistence.pendingPhaseTransition}
             onPhaseTransitionConfirmed={(newPhase) => {
@@ -2812,6 +2836,7 @@ function MainApp() {
               initialHousePanY={homePanY}
               onHousePanChange={setHomePanY}
               onHouseCompleted={() => setPhaseTransitionEvent(HOUSE_COMPLETION_EVENT)}
+              refreshSignal={homeRefreshSignal}
             />
             {/* Achievement toast overlay */}
             <AchievementToast
@@ -2967,6 +2992,27 @@ function MainApp() {
                   persistence.currentPhase >= 3 && styles.variantBadgeTextDark,
                 ]}>
                   {VARIANT_CONFIGS[puzzle.currentVariant]?.title || 'Variant'}
+                </Text>
+              </View>
+            )}
+            {/* Blind Offering badge — the previews are hidden, so without a
+                standing indicator the player has no way to tell blind is on
+                (or remember to turn it off). Same chrome as the variant badge. */}
+            {puzzle.blindMode && (
+              <View
+                style={[
+                  styles.variantBadge,
+                  persistence.currentPhase >= 3 && styles.variantBadgeDark,
+                ]}
+                accessible
+                accessibilityLabel="Blind Offering is on: word previews hidden"
+              >
+                <Text style={styles.variantBadgeIcon}>{'🌑'}</Text>
+                <Text style={[
+                  styles.variantBadgeText,
+                  persistence.currentPhase >= 3 && styles.variantBadgeTextDark,
+                ]}>
+                  {persistence.currentPhase >= 2 ? 'Blind Offering' : 'Blind'}
                 </Text>
               </View>
             )}
@@ -3528,7 +3574,10 @@ function MainApp() {
       <PatronModal
         visible={showPatronModal}
         phase={persistence.currentPhase}
-        onClose={() => setShowPatronModal(false)}
+        onClose={() => {
+          setShowPatronModal(false);
+          setHomeRefreshSignal(n => n + 1);
+        }}
         onPatronChange={(isPatron) => { if (isPatron) persistenceActions.refreshStats(); }}
       />
       <StoreModal
@@ -3536,7 +3585,10 @@ function MainApp() {
         phase={persistence.currentPhase}
         amberBalance={persistence.amberBalance}
         hintBalance={puzzle.hintBalance}
-        onClose={() => setShowStoreModal(false)}
+        onClose={() => {
+          setShowStoreModal(false);
+          setHomeRefreshSignal(n => n + 1);
+        }}
         onAmberChange={persistenceActions.setAmberBalance}
         onHintsChange={() => puzzleActions.refreshHintBalance()}
         onOpenPatron={() => setShowPatronModal(true)}

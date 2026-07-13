@@ -6,7 +6,7 @@ import { selectPreGeneratedPuzzle } from '../services/puzzleBank';
 import { getWordHistoryWithRecency, recordPuzzleWords } from '../services/wordHistory';
 import { COMMON_WORDS, CURATED_EARLY_PUZZLES, CURATED_PUZZLE_COUNT, CuratedPuzzle, getRandomFallback } from '../constants';
 import { CHALLENGE_MODE_CONFIG, DialoguePhase } from '../types/homeWorld';
-import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getOutOfHintsMessage, getLoadingMessage, getStartMessage, getInvalidWordMessage, getLockedLetterMessage, getEchoPuzzleMessage } from '../services/phaseNarrative';
+import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getOutOfHintsMessage, getLoadingMessage, getStartMessage, getInvalidWordMessage, getBlindFailMessage, getLockedLetterMessage, getEchoPuzzleMessage } from '../services/phaseNarrative';
 import { getHintBalanceSync, hasHintSync, consumeHintSync } from '../services/hints';
 import { getPreferredPuzzleVariant, setPreferredPuzzleVariant, getFullProgress, getRitualWords } from '../services/amberCurrency';
 import {
@@ -425,6 +425,12 @@ export interface PuzzleGameActions {
     solveTimeMs?: number;
     /** Whether this board was played with the Blind Offering modifier on. */
     blind?: boolean;
+    /**
+     * Blind Offering only: the final letter landed but the finished chain
+     * contains a non-word — the board did NOT complete and the player must
+     * undo/restart. Routes App to error feedback, never the half-move click.
+     */
+    blindFailed?: boolean;
   } | null>;
   handleUndo: () => void;
   grantExtraUndo: () => void;
@@ -515,6 +521,21 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const cleanMoveStreakRef = useRef(0);
   const [earnedStars, setEarnedStars] = useState(0);
   const [gameMode, setGameMode] = useState<GameMode>('standard');
+  // Synchronous mirrors of gameMode/difficulty for applyBoard's undo reset.
+  // applyBoard runs inside async generation flows whose closures predate the
+  // startNewGame state updates — reading the stale closure here used to reset
+  // a just-enabled challenge board's undo budget back to Infinity (the bare
+  // "CHALLENGE" badge with no undo count). Every set site updates the ref in
+  // the same tick.
+  const gameModeRef = useRef<GameMode>('standard');
+  const difficultyRef = useRef<Difficulty>('MEDIUM');
+  // Blind Offering mercy: once the end-of-board judgment has failed on this
+  // board, undos stop charging against the limited budget. The punishment was
+  // already paid (an invalid attempt + the broken flawless run); walking the
+  // chain back to the flaw can take more undos than the budget holds, and a
+  // fail that can't be repaired reads as a bug, not a verdict. Cleared on any
+  // fresh/reset/restored board.
+  const blindFailFreeUndosRef = useRef(false);
   // Blind Offering modifier (opt-in, Wordle-Hard-Mode shape): when on, the ghost
   // word previews are hidden, so the player commits from their own word knowledge
   // and learns only from the rejection shake. Sticky across Next Level like
@@ -654,6 +675,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setError(null);
     setIsStuck(false);
     setHintHighlight(null);
+    blindFailFreeUndosRef.current = false;
     moveOutcomesRef.current = [];
     setMoveOutcomes([]);
     pendingHintRef.current = false;
@@ -681,8 +703,15 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       boardTimedRef.current = true;
     }
 
-    // Reset undos for challenge mode (scaled by difficulty)
-    setUndosRemaining(gameMode === 'challenge' ? CHALLENGE_MODE_CONFIG.getMaxUndos(difficulty) : Infinity);
+    // Reset undos for challenge mode (scaled by difficulty). Read the refs,
+    // not the closure state: applyBoard is invoked from async generation
+    // flows whose closures can predate a same-call setGameMode/setDifficulty
+    // (see gameModeRef above).
+    setUndosRemaining(
+      gameModeRef.current === 'challenge'
+        ? CHALLENGE_MODE_CONFIG.getMaxUndos(difficultyRef.current)
+        : Infinity
+    );
   }, [currentPhase, currentVariant, gameMode, difficulty]);
 
   const initGame = useCallback((
@@ -788,10 +817,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setMessage(getLoadingMessage(currentPhase));
     setError(null);
     setShowDifficultyMenu(false);
+    difficultyRef.current = selectedDifficulty;
     if (selectedDifficulty !== difficulty) {
       setDifficulty(selectedDifficulty);
     }
     if (mode !== undefined) {
+      gameModeRef.current = mode;
       setGameMode(mode);
       setUndosRemaining(mode === 'challenge' ? CHALLENGE_MODE_CONFIG.getMaxUndos(selectedDifficulty) : Infinity);
     }
@@ -936,6 +967,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     wordLength: number,
     puzzleSolution?: PuzzleSolutionStep[]
   ) => {
+    gameModeRef.current = 'standard';
     setGameMode('standard');
     setBlindMode(false); // the daily is a shared board — never blind
     setIsSharedChallenge(false);
@@ -973,6 +1005,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     // Invalidate any in-flight startNewGame generation so a slow async commit
     // can't clobber the shared board after it starts.
     generationIdRef.current++;
+    gameModeRef.current = 'standard';
     setGameMode('standard');
     setBlindMode(false); // a friend's shared board — never blind
     setIsEchoPuzzle(false);
@@ -1371,6 +1404,13 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     variant?: PuzzleVariant;
     reverseMidpoint?: boolean;
     moveOutcomes?: MoveOutcome[];
+    /**
+     * Blind Offering only: the final letter just landed but the finished
+     * chain contains at least one non-word, so the board did NOT complete.
+     * The player must undo (or restart) and mend the chain. App routes this
+     * to the error feedback path, never the half-move click.
+     */
+    blindFailed?: boolean;
   } | null> => {
     if (!selectedLetter || gameState !== GameState.PLAYING) return null;
 
@@ -1476,34 +1516,40 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       return null;
     }
 
-    const isSourceValid = checkValidation(sourceWordStr);
-    if (!isSourceValid) {
-      shakeError(getInvalidWordMessage(sourceWordStr, currentPhase));
-      setInvalidAttempts(prev => prev + 1);
-      pendingMistakeRef.current = true;
-      cleanMoveStreakRef.current = 0;
-      // For double shift drop2, go back to pick2 (let player try different letter/slot)
-      if (isDoubleShift && doubleShiftPhase === 'drop2') {
-        setDoubleShiftPhase('pick2');
-        setSelectedLetter(null);
+    // Blind Offering: EVERY structurally-legal move commits. The dictionary
+    // judges the chain exactly once, when the final letter lands (see the
+    // completion sites below) — mid-board rejection would leak validity, which
+    // is the information the mode exists to withhold.
+    if (!blindMode) {
+      const isSourceValid = checkValidation(sourceWordStr);
+      if (!isSourceValid) {
+        shakeError(getInvalidWordMessage(sourceWordStr, currentPhase));
+        setInvalidAttempts(prev => prev + 1);
+        pendingMistakeRef.current = true;
+        cleanMoveStreakRef.current = 0;
+        // For double shift drop2, go back to pick2 (let player try different letter/slot)
+        if (isDoubleShift && doubleShiftPhase === 'drop2') {
+          setDoubleShiftPhase('pick2');
+          setSelectedLetter(null);
+        }
+        setIsProcessing(false);
+        return null;
       }
-      setIsProcessing(false);
-      return null;
-    }
 
-    const isTargetValid = checkValidation(targetWordStr);
-    if (!isTargetValid) {
-      shakeError(getInvalidWordMessage(targetWordStr, currentPhase));
-      setInvalidAttempts(prev => prev + 1);
-      pendingMistakeRef.current = true;
-      cleanMoveStreakRef.current = 0;
-      // For double shift drop2, go back to pick2 (let player try different letter/slot)
-      if (isDoubleShift && doubleShiftPhase === 'drop2') {
-        setDoubleShiftPhase('pick2');
-        setSelectedLetter(null);
+      const isTargetValid = checkValidation(targetWordStr);
+      if (!isTargetValid) {
+        shakeError(getInvalidWordMessage(targetWordStr, currentPhase));
+        setInvalidAttempts(prev => prev + 1);
+        pendingMistakeRef.current = true;
+        cleanMoveStreakRef.current = 0;
+        // For double shift drop2, go back to pick2 (let player try different letter/slot)
+        if (isDoubleShift && doubleShiftPhase === 'drop2') {
+          setDoubleShiftPhase('pick2');
+          setSelectedLetter(null);
+        }
+        setIsProcessing(false);
+        return null;
       }
-      setIsProcessing(false);
-      return null;
     }
 
     // Store a lightweight move delta instead of deep-cloning entire board state
@@ -1618,18 +1664,49 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         : getMoveMessage(currentPhase);
     };
 
+    // Blind Offering's single judgment: the finished chain must be all real
+    // words. On failure the final move stays committed (the reveal is honest
+    // about what the player built), the board stays live, and the message
+    // sends them back through undo. Counts one invalid attempt for stars.
+    const judgeBlindCompletion = (completedWords: string[]) => {
+      const holds = completedWords.every(w => checkValidation(w));
+      if (holds) return null;
+      setInvalidAttempts(prev => prev + 1);
+      pendingMistakeRef.current = true;
+      cleanMoveStreakRef.current = 0;
+      // From here on, undos are free on this board (see blindFailFreeUndosRef).
+      blindFailFreeUndosRef.current = true;
+      shakeError(getBlindFailMessage(currentPhase));
+      setIsProcessing(false);
+      return {
+        completed: false,
+        hintsUsed,
+        invalidAttempts: invalidAttempts + 1,
+        gameMode,
+        completedWords: [],
+        blindFailed: true,
+      };
+    };
+
     if (!isReverseMode) {
       if (activeRowIndex === maxForwardSourceIndex) {
         const completedWords = newRows.map(r => r.words.map(l => l.char).join(''));
+        if (blindMode) {
+          const failed = judgeBlindCompletion(completedWords);
+          if (failed) return failed;
+        }
         return await finalizePuzzleCompletion(completedWords);
       }
 
       setActiveRowIndex(prev => prev + 1);
       // Stuck detection: double-shift needs the two-letter look-ahead; every
-      // other forward variant is one pick+drop per move.
-      const stuckForward = isDoubleShift
-        ? !hasAnyValidDoubleShiftMove(newRows, activeRowIndex + 1, checkValidation)
-        : !hasAnyValidMove(newRows, activeRowIndex + 1, 'down', checkValidation);
+      // other forward variant is one pick+drop per move. In blind mode every
+      // structurally-legal move plays, so a board is never "stuck".
+      const stuckForward = blindMode
+        ? false
+        : isDoubleShift
+          ? !hasAnyValidDoubleShiftMove(newRows, activeRowIndex + 1, checkValidation)
+          : !hasAnyValidMove(newRows, activeRowIndex + 1, 'down', checkValidation);
       setMessage(moveMessageFor(stuckForward));
       setIsStuck(stuckForward);
       setLastFormedWord(targetWordStr);
@@ -1648,7 +1725,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         setActiveRowIndex(rows.length - 1);
         // Show the "now return upward" beat regardless; if the descent left no
         // valid ascent we still don't announce it (player discovers + undoes).
-        const ascentStuck = !hasAnyValidMove(newRows, rows.length - 1, 'up', checkValidation);
+        const ascentStuck = blindMode
+          ? false
+          : !hasAnyValidMove(newRows, rows.length - 1, 'up', checkValidation);
         setMessage(
           currentPhase >= 3
             ? 'The descent is complete. Return every letter to the beginning.'
@@ -1657,7 +1736,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         setIsStuck(ascentStuck);
       } else {
         setActiveRowIndex(prev => prev + 1);
-        const stuck = !hasAnyValidMove(newRows, activeRowIndex + 1, 'down', checkValidation);
+        const stuck = blindMode
+          ? false
+          : !hasAnyValidMove(newRows, activeRowIndex + 1, 'down', checkValidation);
         setMessage(moveMessageFor(stuck));
         setIsStuck(stuck);
       }
@@ -1669,11 +1750,17 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     // Returning upward in reverse mode.
     if (activeRowIndex === 1) {
       const completedWords = newRows.map(r => r.words.map(l => l.char).join(''));
+      if (blindMode) {
+        const failed = judgeBlindCompletion(completedWords);
+        if (failed) return failed;
+      }
       return await finalizePuzzleCompletion(completedWords);
     }
 
     setActiveRowIndex(prev => prev - 1);
-    const stuckUp = !hasAnyValidMove(newRows, activeRowIndex - 1, 'up', checkValidation);
+    const stuckUp = blindMode
+      ? false
+      : !hasAnyValidMove(newRows, activeRowIndex - 1, 'up', checkValidation);
     setMessage(moveMessageFor(stuckUp));
     setIsStuck(stuckUp);
     setLastFormedWord(targetWordStr);
@@ -1693,6 +1780,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     currentVariant,
     currentPhase,
     gameMode,
+    blindMode,
     doubleShiftPhase,
   ]);
 
@@ -1736,8 +1824,11 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       return;
     }
 
-    // Challenge mode: limited undos (only applies to committed moves, not mid-step)
-    if (gameMode === 'challenge' && undosRemaining <= 0) {
+    // Challenge mode: limited undos (only applies to committed moves, not
+    // mid-step). A failed Blind Offering judgment unlocks free undos for the
+    // rest of the board — the fail must always be repairable.
+    const freeUndos = blindFailFreeUndosRef.current;
+    if (gameMode === 'challenge' && !freeUndos && undosRemaining <= 0) {
       shakeError("No undos remaining in Challenge Mode!");
       return;
     }
@@ -1792,7 +1883,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         setMoveOutcomes(moveOutcomesRef.current);
       }
       setMessage("Let's try again!");
-      setUndosRemaining(prev => prev - 1);
+      if (!freeUndos) setUndosRemaining(prev => prev - 1);
       return;
     }
 
@@ -1855,7 +1946,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       }
     }
 
-    if (gameMode === 'challenge') {
+    if (gameMode === 'challenge' && !freeUndos) {
       setUndosRemaining(prev => prev - 1);
     }
   }, [history, gameMode, undosRemaining, shakeError, gameState, currentVariant, doubleShiftPhase]);
@@ -1871,16 +1962,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     if (!selectedLetter || gameState !== GameState.PLAYING) return undefined;
     // Blind Offering: no ghost previews — and, because drag snapping keys off
     // these validity flags, suppressing them also removes the "tile jumps to a
-    // valid slot" tell, keeping the modifier honestly blind.
+    // valid slot" tell, keeping the modifier honestly blind. Challenge keeps
+    // its previews (2026-07 trial-ladder rebalance): losing them made the mode
+    // unreadable rather than harder, and the amber/progress multipliers were
+    // re-tuned (1.25x / 1.5x) to price the mode WITH previews on. Preview
+    // suppression is now solely Blind Offering's identity.
     if (blindMode) return undefined;
-    // Challenge mode: previews are part of what the mode takes away. With the
-    // ✓/✗ ghost previews on, every move gets a free hint — "no hints, limited
-    // undos" costs almost nothing while paying 1.5x amber / 2x phase progress.
-    // Suppressed via the same mechanism as blindMode (which also disables the
-    // drag valid-slot snapping tell), covering the double-shift drop1
-    // look-ahead too. Stuck detection (hasAnyValidMove/…DoubleShiftMove) and
-    // the undo/restart recovery paths are preview-independent and keep working.
-    if (gameMode === 'challenge') return undefined;
 
     const isDoubleShift = hasVariantModifier(currentVariant, 'double_shift');
 
@@ -1964,13 +2051,18 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setInvalidAttempts(saved.invalidAttempts);
     setHintsUsed(saved.hintsUsed);
     setUndosRemaining(saved.undosRemaining);
+    difficultyRef.current = saved.difficulty;
     setDifficulty(saved.difficulty);
     setCurrentWordLength(saved.currentWordLength);
     setHint(saved.hint);
     setSolution(saved.solution);
     setReverseSolution(saved.reverseSolution);
+    gameModeRef.current = saved.gameMode;
     setGameMode(saved.gameMode);
     setBlindMode(saved.blindMode ?? false);
+    // A restored board starts with a clean judgment slate (the free-undo
+    // mercy is per-live-board and deliberately not persisted).
+    blindFailFreeUndosRef.current = false;
     // Shared-challenge provenance rides in the autosave (isSharedChallenge in
     // SavedPuzzleState) so a kill+relaunch can't convert a shared board
     // (amber-only) into one that feeds phase progress. Old saves without the
@@ -2134,7 +2226,13 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setGameState,
     setEarnedStars,
     setMessage,
-    setGameMode,
+    // Keep the synchronous mirror in step: applyBoard's undo reset reads the
+    // ref, so an external setGameMode('challenge') followed by initGame in
+    // the same tick must see 'challenge' (state alone lags a render).
+    setGameMode: (mode: GameMode) => {
+      gameModeRef.current = mode;
+      setGameMode(mode);
+    },
     setCurrentPhase,
     setSelectedVariant,
     restorePuzzleState,

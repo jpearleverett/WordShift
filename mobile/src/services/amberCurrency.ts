@@ -373,7 +373,8 @@ export function calculatePhaseAcceleration(
   threeStarRate: number,
   currentStreak: number,
   difficulty: Difficulty,
-  gameMode: GameMode = 'standard'
+  gameMode: GameMode = 'standard',
+  blind: boolean = false
 ): number {
   let multiplier = 1.0;
 
@@ -396,8 +397,12 @@ export function calculatePhaseAcceleration(
     multiplier *= NARRATIVE_ACCELERATION.EASY_MULTIPLIER;
   }
 
-  // Challenge mode bonus
-  if (gameMode === 'challenge') {
+  // Trial rung bonus — Blind Offering (challenge limits + end-judged blind
+  // play) takes the 2.0x cap; plain Challenge (previews on) counts 1.5x.
+  // Not stacked: blind boards always run under gameMode 'challenge'.
+  if (blind) {
+    multiplier *= NARRATIVE_ACCELERATION.BLIND_MULTIPLIER;
+  } else if (gameMode === 'challenge') {
     multiplier *= NARRATIVE_ACCELERATION.CHALLENGE_MULTIPLIER;
   }
 
@@ -428,7 +433,12 @@ export async function awardPuzzleAmber(
   gameMode: GameMode = 'standard',
   threeStarRate: number = 0,
   creditToBalance: boolean = false,
-  options: { skipPhaseProgress?: boolean } = {}
+  options: {
+    skipPhaseProgress?: boolean;
+    /** Blind Offering win (challenge limits + end-judged blind play): pays the
+     *  apex amber multiplier and the 2.0x phase-progress cap. */
+    blind?: boolean;
+  } = {}
 ): Promise<{
   amount: number;
   baseAmount: number;
@@ -485,10 +495,16 @@ export async function awardPuzzleAmber(
   let totalAmount = Math.floor(baseAmount * streakMultiplier);
   const streakBonus = totalAmount - baseAmount;
 
-  // Apply challenge mode bonus
+  // Apply the trial-rung bonus. Blind Offering (challenge limits + previews
+  // hidden + end-judged free moves) is the apex rung and pays the top
+  // multiplier; plain Challenge (previews on) pays the modest one. Never
+  // stacked: a blind board runs under gameMode 'challenge'.
   let challengeBonus = 0;
   if (gameMode === 'challenge') {
-    challengeBonus = Math.floor(totalAmount * (CHALLENGE_MODE_CONFIG.AMBER_MULTIPLIER - 1));
+    const rungMultiplier = options.blind
+      ? CHALLENGE_MODE_CONFIG.BLIND_AMBER_MULTIPLIER
+      : CHALLENGE_MODE_CONFIG.AMBER_MULTIPLIER;
+    challengeBonus = Math.floor(totalAmount * (rungMultiplier - 1));
     totalAmount += challengeBonus;
 
     // Track challenge completions
@@ -519,7 +535,7 @@ export async function awardPuzzleAmber(
 
   // Calculate phase acceleration and update phase progress
   const phaseAcceleration = calculatePhaseAcceleration(
-    threeStarRate, currentStreak, difficulty, gameMode
+    threeStarRate, currentStreak, difficulty, gameMode, options.blind === true
   );
   // New Cycle: each completed descent makes the next one faster (dread earlier).
   // skipPhaseProgress: amber math above is untouched, but the win contributes

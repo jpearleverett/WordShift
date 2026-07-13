@@ -220,6 +220,9 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
     textAlign: 'center',
     marginBottom: 24,
+    // Clear the absolutely-positioned ✕ button: long phase titles ("THE
+    // PATTERN") otherwise run underneath it.
+    paddingHorizontal: 48,
   },
   ruleItem: {
     flexDirection: 'row',

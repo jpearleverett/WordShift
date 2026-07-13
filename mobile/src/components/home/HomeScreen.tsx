@@ -181,6 +181,14 @@ interface HomeScreenProps {
    * of the inline fallback modal.
    */
   onHouseCompleted?: () => void;
+  /**
+   * Bumped by App when an App-level modal that can change amber (the Store /
+   * Patron modals) closes while home is visible. HomeScreen loads its data on
+   * mount only, so without this an amber-pack purchase leaves the unlock UI
+   * (Next Unlock bar, Reserve/Skip affordability) stale until the next screen
+   * change.
+   */
+  refreshSignal?: number;
 }
 
 // --- Header quest pill: pure decisions (node-testable, see questPill.test.ts) ---
@@ -453,6 +461,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   initialHousePanY = null,
   onHousePanChange,
   onHouseCompleted,
+  refreshSignal = 0,
 }) => {
   const screenInsets = useScreenInsets();
   const isOnboarding = onboardingStep !== undefined && onboardingStep !== 'complete';
@@ -705,6 +714,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     loadAllData();
     loadDialogueSessions(); // Load session data
   }, []);
+
+  // Reload when an App-level amber-changing modal (Store/Patron) closes over
+  // home — without this, a purchased amber pack doesn't register against the
+  // next unlock (bar, Reserve/Skip affordability) until the screen remounts.
+  useEffect(() => {
+    if (refreshSignal > 0) loadAllData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- loadAllData identity is render-scoped; the signal is the trigger
+  }, [refreshSignal]);
 
   // Onboarding: auto-show invite prompt when data is loaded during home_empty step
   useEffect(() => {

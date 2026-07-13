@@ -54,6 +54,8 @@ export interface VictoryData {
   amberEarned: number;
   streakBonus: number;
   challengeBonus: number;
+  /** True when the win was a Blind Offering board (labels the trial bonus line). */
+  blind?: boolean;
   surpriseBonus?: number;
   milestoneBonus: number;
   milestoneMessage: string | null;
@@ -910,7 +912,9 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                         )}
                         {challengeBonusAmber > 0 && (
                           <View style={styles.bonusRow}>
-                            <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>Challenge</Text>
+                            <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
+                              {victoryData.blind ? 'Blind Offering' : 'Challenge'}
+                            </Text>
                             <Text style={[styles.bonusValue, { color: accent.challenge }]}>+{challengeBonusAmber}</Text>
                           </View>
                         )}
@@ -1724,6 +1728,8 @@ const styles = StyleSheet.create({
   harvestWordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
     paddingHorizontal: 18,
     paddingVertical: 8,
     borderRadius: 16,
@@ -1755,6 +1761,8 @@ const styles = StyleSheet.create({
   winStreakContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 16,

@@ -410,6 +410,26 @@ export function getInvalidWordMessage(word: string, phase: DialoguePhase): strin
 }
 
 // ============================================================================
+// BLIND OFFERING REVEAL — the end-of-board judgment when the finished chain
+// contains a non-word. Blind mode commits every move without validation, so
+// this is the mode's single moment of truth: say the chain doesn't hold and
+// point at undo. Never names WHICH word failed (finding it is the mode).
+// ============================================================================
+
+const BLIND_FAIL_MESSAGES: Record<DialoguePhase, string> = {
+  0: 'Not every word held! Undo and mend the chain.',
+  1: 'Something in the chain is not a word. Undo and try another path.',
+  2: 'The chain does not hold. Unwind it and offer again.',
+  3: 'The arrangement refuses this. Take it back, piece by piece.',
+  4: 'The pattern will not accept a flawed offering. Undo it. Make it true.',
+  5: 'The pattern knows its own shape. This is not it. Unwind.',
+};
+
+export function getBlindFailMessage(phase: DialoguePhase): string {
+  return BLIND_FAIL_MESSAGES[phase];
+}
+
+// ============================================================================
 // LOCKED LETTER MESSAGES — Phase-aware feedback for locked letters
 // ============================================================================
 
@@ -1744,14 +1764,15 @@ const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     text: 'You feel it too, don\'t you? The way the letters know where they belong before you place them.',
     durationMs: 4000,
   },
-  // Mid-game valley beats (140–185): the house finishes around puzzle 130 but the
-  // Phase 4 reveal doesn't land until ~155, leaving a stretch with no new unlocks.
-  // These keep the narrative pulse alive through that gap — escalating dread that
-  // bridges "the house is whole" into the cult reveal and one slog-breaker beyond
-  // it — so the climb to the climax never goes quiet.
+  // Mid-game valley beats (140–185): the Phase 4 reveal doesn't land until ~155
+  // and the final rooms arrive at the 190 gate, leaving a stretch with sparse
+  // unlocks. These keep the narrative pulse alive through that gap — escalating
+  // dread that bridges into the cult reveal and one slog-breaker beyond it — so
+  // the climb to the climax never goes quiet. (The 140 beat must NOT claim the
+  // house is finished: with the descent trio the house completes at 190.)
   140: {
     type: 'ambient_whisper',
-    text: 'The house is finished. Every room full. So why does it still feel like it\'s waiting for something?',
+    text: 'The house keeps making room. No one asked it to. It builds like it knows something is coming.',
     durationMs: 4000,
   },
   155: {
