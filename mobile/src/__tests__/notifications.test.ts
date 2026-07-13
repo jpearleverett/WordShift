@@ -499,18 +499,11 @@ describe('notifications', () => {
       return d.getDate();
     }
 
-    it('schedules a 7-day daily reminder ladder + the +1/+3/+7/+14/+30 win-back ladder when there is no streak', async () => {
+    it('schedules the daily reminder ladder + the +1/+3/+7/+14/+30 win-back ladder when there is no streak, deduped to one ping per day', async () => {
       const svc = loadWithStatus('granted');
       await svc.scheduleAllNotifications(0);
 
       const triggers = scheduledTriggers();
-      // Daily reminders fire at hour 9 (the default reminder hour). The ladder
-      // is pre-armed a full week ahead (7 future days; today's rung is included
-      // only if 9am hasn't passed yet).
-      const daily = triggers.filter((t) => t.hour === 9);
-      expect(daily.length).toBeGreaterThanOrEqual(7);
-      expect(daily.length).toBeLessThanOrEqual(8);
-
       // Win-back rungs are the 18:00 pings. No streak ⇒ no 19:00 streak-risk.
       const winBack = triggers.filter((t) => t.hour === 18);
       const streakRisk = triggers.filter((t) => t.hour === 19);
@@ -526,6 +519,21 @@ describe('notifications', () => {
         expectedDayOfMonth(14),
         expectedDayOfMonth(30),
       ]);
+
+      // Daily reminders fire at hour 9 (the default reminder hour). The 8-day
+      // window (today + 7 ahead) loses the +1/+3/+7 win-back days to the
+      // same-local-day dedupe, and today's rung only arms if 9am hasn't passed
+      // yet — so 4 or 5 morning pings remain.
+      const daily = triggers.filter((t) => t.hour === 9);
+      expect(daily.length).toBeGreaterThanOrEqual(4);
+      expect(daily.length).toBeLessThanOrEqual(5);
+
+      // No daily reminder shares a local day with a win-back rung.
+      const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      const winBackDays = new Set(winBack.map((t) => dayKey(t.date)));
+      for (const t of daily) {
+        expect(winBackDays.has(dayKey(t.date))).toBe(false);
+      }
     });
 
     it('win-back rungs carry phase-and-rung-aware escalating copy', async () => {
@@ -563,52 +571,125 @@ describe('notifications', () => {
     });
 
     it('quest-expiry ping is scheduled with a home-routing payload when quests are in flight', async () => {
-      expoMock = createExpoMock('granted');
-      jest.resetModules();
-      jest.doMock('expo-notifications', () => expoMock, { virtual: true });
-      jest.doMock('../services/weeklyQuests', () => ({
-        // Read-only peek (never generates): a stored weekly period with an
-        // unclaimed reward ⇒ remind. Returns null tiers when nothing is stored.
-        peekWeeklyQuests: jest.fn(() =>
-          Promise.resolve({ daily: null, weekly: { periodId: 'w', quests: [], generatedAt: 0, animalsVisitedThisPeriod: [] } })
-        ),
-        getUnclaimedAmber: jest.fn(() => 40), // unclaimed reward ⇒ remind
-      }));
-      const svc = require('../services/notifications');
+      // Pin the clock to a Wednesday morning: the upcoming Sunday (+4 days)
+      // never collides with a win-back rung (+1/+3/+7/+14/+30), so the quest
+      // ping is deterministically eligible. Collision behavior is covered by
+      // the dedupe tests below.
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date(2026, 5, 10, 8, 0, 0)); // Wed Jun 10 2026, 8am
+      try {
+        expoMock = createExpoMock('granted');
+        jest.resetModules();
+        jest.doMock('expo-notifications', () => expoMock, { virtual: true });
+        jest.doMock('../services/weeklyQuests', () => ({
+          // Read-only peek (never generates): a stored weekly period with an
+          // unclaimed reward ⇒ remind. Returns null tiers when nothing is stored.
+          peekWeeklyQuests: jest.fn(() =>
+            Promise.resolve({ daily: null, weekly: { periodId: 'w', quests: [], generatedAt: 0, animalsVisitedThisPeriod: [] } })
+          ),
+          getUnclaimedAmber: jest.fn(() => 40), // unclaimed reward ⇒ remind
+        }));
+        const svc = require('../services/notifications');
 
-      await svc.scheduleAllNotifications(2);
+        await svc.scheduleAllNotifications(2);
 
-      // The quest ping targets the upcoming Sunday 17:30 (staggered off the
-      // 18:00 win-back rungs); if that window has already passed this week
-      // (test running Sunday evening), it is skipped.
-      const now = new Date();
-      let daysUntilMonday = (1 - now.getDay() + 7) % 7;
-      if (daysUntilMonday === 0) daysUntilMonday = 7;
-      const nextMonday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + daysUntilMonday);
-      const questTrigger = new Date(nextMonday.getTime() - 6.5 * 60 * 60 * 1000);
-      const questEligible = questTrigger.getTime() > now.getTime();
+        const triggers = scheduledTriggers();
+        // 18:00 pings are the 5 win-back rungs ONLY — the quest ping no longer
+        // shares their minute (or their day).
+        const evening = triggers.filter((t) => t.hour === 18);
+        expect(evening.length).toBe(5);
+        evening.forEach((t) => expect(t.data).toEqual({ target: 'home' }));
+
+        // The quest-expiry ping fires Sunday 17:30 with a home-routing payload.
+        const questPings = triggers.filter((t) => t.hour === 17 && t.minute === 30);
+        expect(questPings.length).toBe(1);
+        expect(questPings[0].date.getDay()).toBe(0); // Sunday
+        questPings.forEach((t) => expect(t.data).toEqual({ target: 'home' }));
+
+        // Same-local-day dedupe guard (supersedes the old same-minute guard):
+        // the whole scheduled set carries at most ONE notification per day.
+        const dayStamps = triggers.map(
+          (t) => `${t.date.getFullYear()}-${t.date.getMonth()}-${t.date.getDate()}`
+        );
+        expect(new Set(dayStamps).size).toBe(dayStamps.length);
+      } finally {
+        jest.useRealTimers();
+        jest.dontMock('../services/weeklyQuests');
+      }
+    });
+
+    it('an active (or any) player is scheduled at most one notification per local day', async () => {
+      const svc = loadWithStatus('granted');
+      await svc.scheduleAllNotifications(0);
 
       const triggers = scheduledTriggers();
-      // 18:00 pings are the 5 win-back rungs ONLY — the quest ping no longer
-      // shares their minute.
-      const evening = triggers.filter((t) => t.hour === 18);
-      expect(evening.length).toBe(5);
-      evening.forEach((t) => expect(t.data).toEqual({ target: 'home' }));
-
-      // The quest-expiry ping fires at 17:30 with a home-routing payload.
-      const questPings = triggers.filter((t) => t.hour === 17 && t.minute === 30);
-      expect(questPings.length).toBe(questEligible ? 1 : 0);
-      questPings.forEach((t) => expect(t.data).toEqual({ target: 'home' }));
-
-      // Same-minute collision guard: no two scheduled notifications may ever
-      // land in the same minute (the old 18:00 quest ping could collide with a
-      // win-back rung on the same evening).
-      const minuteStamps = triggers.map(
-        (t) => `${t.date.getFullYear()}-${t.date.getMonth()}-${t.date.getDate()} ${t.hour}:${t.minute}`
+      expect(triggers.length).toBeGreaterThan(0);
+      const dayStamps = triggers.map(
+        (t) => `${t.date.getFullYear()}-${t.date.getMonth()}-${t.date.getDate()}`
       );
-      expect(new Set(minuteStamps).size).toBe(minuteStamps.length);
+      expect(new Set(dayStamps).size).toBe(dayStamps.length);
+    });
 
-      jest.dontMock('../services/weeklyQuests');
+    it("a lapsed streak-holder's first missed week never gets two pings on one local day", async () => {
+      // The worst case before the dedupe: streak-risk (19:00) + win-back rungs
+      // (18:00) + quest-expiry (Sun 17:30) + the 9am reminder ladder could
+      // stack ~12 pings into the first missed week, up to 2 on one day.
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date(2026, 5, 10, 8, 0, 0)); // Wed Jun 10 2026, 8am
+      try {
+        expoMock = createExpoMock('granted');
+        jest.resetModules();
+        jest.doMock('expo-notifications', () => expoMock, { virtual: true });
+        jest.doMock('../services/amberCurrency', () => ({
+          // Active streak, not played today ⇒ the full lapsed arsenal arms.
+          getFullProgress: jest.fn(() =>
+            Promise.resolve({ currentStreak: 5, lastPlayDate: null, puzzlesSolved: 40 })
+          ),
+          isPostRevelation: jest.fn(() => Promise.resolve(false)),
+        }));
+        jest.doMock('../services/weeklyQuests', () => ({
+          peekWeeklyQuests: jest.fn(() =>
+            Promise.resolve({ daily: null, weekly: { periodId: 'w', quests: [], generatedAt: 0, animalsVisitedThisPeriod: [] } })
+          ),
+          getUnclaimedAmber: jest.fn(() => 40),
+        }));
+        const svc = require('../services/notifications');
+
+        await svc.scheduleAllNotifications(2);
+
+        const triggers = scheduledTriggers();
+        // Everything is armed: streak-risk, 5 win-back rungs, quest-expiry,
+        // and a (thinned) morning ladder.
+        expect(triggers.filter((t) => t.hour === 19).length).toBe(1);
+        expect(triggers.filter((t) => t.hour === 18).length).toBe(5);
+        expect(triggers.filter((t) => t.hour === 17 && t.minute === 30).length).toBe(1);
+        expect(triggers.filter((t) => t.hour === 9).length).toBeGreaterThan(0);
+
+        // Hard cap: at most ONE notification per local day across the set.
+        const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+        const dayStamps = triggers.map((t) => dayKey(t.date));
+        expect(new Set(dayStamps).size).toBe(dayStamps.length);
+
+        // Priority order proof: the streak-risk day (today) and the
+        // quest-expiry Sunday both lose their 9am reminder to the dedupe.
+        const morningDays = new Set(
+          triggers.filter((t) => t.hour === 9).map((t) => dayKey(t.date))
+        );
+        expect(morningDays.has(dayKey(new Date(2026, 5, 10)))).toBe(false); // streak-risk day
+        expect(morningDays.has(dayKey(new Date(2026, 5, 14)))).toBe(false); // quest-expiry Sunday
+
+        // First missed week (Jun 10-16): at most one ping per day ⇒ at most 7.
+        const firstWeek = triggers.filter(
+          (t) => t.date.getTime() < new Date(2026, 5, 17).getTime()
+        );
+        expect(firstWeek.length).toBeLessThanOrEqual(7);
+        const firstWeekDays = firstWeek.map((t) => dayKey(t.date));
+        expect(new Set(firstWeekDays).size).toBe(firstWeekDays.length);
+      } finally {
+        jest.useRealTimers();
+        jest.dontMock('../services/amberCurrency');
+        jest.dontMock('../services/weeklyQuests');
+      }
     });
 
     it('does not schedule a daily reminder to fire on an already-played day', async () => {
@@ -757,8 +838,10 @@ describe('notifications', () => {
         Math.random = realRandom;
       }
 
+      // The same-local-day dedupe yields the +1/+3/+7 win-back days to the
+      // win-back ladder, so 4-5 morning pings remain of the 8-day window.
       const morning = scheduledTriggers().filter((t) => t.hour === 9);
-      expect(morning.length).toBeGreaterThanOrEqual(7);
+      expect(morning.length).toBeGreaterThanOrEqual(4);
       for (const t of morning) {
         expect(t.data).toEqual({ target: 'home' });
         expect(t.body).toBe(expectedBody);
@@ -782,7 +865,7 @@ describe('notifications', () => {
       }
 
       const morning = scheduledTriggers().filter((t) => t.hour === 9);
-      expect(morning.length).toBeGreaterThanOrEqual(7);
+      expect(morning.length).toBeGreaterThanOrEqual(4);
       for (const t of morning) {
         expect(t.data).toEqual({ target: 'daily' });
         expect(t.body).toBe(expectedBody);
@@ -797,7 +880,7 @@ describe('notifications', () => {
       await svc.scheduleAllNotifications(2);
 
       const morning = scheduledTriggers().filter((t) => t.hour === 9);
-      expect(morning.length).toBeGreaterThanOrEqual(7);
+      expect(morning.length).toBeGreaterThanOrEqual(4);
       morning.forEach((t) => expect(t.data).toEqual({ target: 'daily' }));
 
       jest.dontMock('../services/amberCurrency');

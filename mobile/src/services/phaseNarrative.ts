@@ -89,44 +89,141 @@ export function getVictoryTitle(stars: number, phase: DialoguePhase): string {
 // VICTORY FEEDBACK — Smaller text below the title
 // ============================================================================
 
-const VICTORY_FEEDBACK: Record<DialoguePhase, { three: string; two: string; one: string }> = {
+// The feedback line under the victory title is reread dozens of times per
+// phase (a player spends ~50 puzzles in the long middle phases), so each
+// phase x star cell is a POOL, not a single string. Exported so tests and the
+// dash sweep can walk every line.
+export const VICTORY_FEEDBACK_POOLS: Record<
+  DialoguePhase,
+  { three: string[]; two: string[]; one: string[] }
+> = {
   0: {
-    three: 'Flawless! The words knew exactly where to go.',
-    two: 'Lovely work! The whole house felt that one land.',
-    one: 'You got there! The puzzle settled happily into place.',
+    three: [
+      'Flawless! The words knew exactly where to go.',
+      'Not one wobble! The tiles are still giggling about it.',
+      'Perfect, first tile to last! The whole house is beaming.',
+      'You made that look easy! The letters practically danced into place.',
+    ],
+    two: [
+      'Lovely work! The whole house felt that one land.',
+      'So close to perfect! The words are proud of you anyway.',
+      'Well done! Every letter found somewhere cozy to land.',
+      'A fine solve! Somewhere downstairs, the kettle whistled its approval.',
+    ],
+    one: [
+      'You got there! The puzzle settled happily into place.',
+      'A scrappy win is still a win! The letters loved the adventure.',
+      'Done! The board only remembers that you finished, promise.',
+      'That one squirmed, but you caught it! Well fought.',
+    ],
   },
   1: {
-    three: 'Elegant solution. You see the patterns.',
-    two: 'Good solve. The words are starting to speak.',
-    one: 'Completed. Every puzzle teaches something.',
+    three: [
+      'Elegant solution. You see the patterns.',
+      'Clean and certain. The letters barely had to wait for you.',
+      'Lovely work. The chain reads like it was always meant to be.',
+      'Not one wrong turn. Almost as if the words showed you the way.',
+    ],
+    two: [
+      'Good solve. The words are starting to speak.',
+      'A steady solve. Your hands are learning the shape of this.',
+      'Nicely done. The board just needed a little convincing.',
+      'That works. Funny how the right letter feels right before you check.',
+    ],
+    one: [
+      'A hard-won finish. The stubborn puzzles stay with you longest.',
+      'Done. Some chains only give in at the very end.',
+      'You wrestled it through. The board remembers effort kindly.',
+      'Finished. The long way around still gets there.',
+    ],
   },
   2: {
-    three: 'The words bend to your will... for now.',
-    two: 'Another puzzle solved. Does it feel different?',
-    one: 'You finished. Was it harder, or are you just tired?',
+    three: [
+      'The words bend to your will... for now.',
+      'Flawless. You did not hesitate once. Neither did the letters.',
+      'Perfect. The board went quiet near the end, as if it knew.',
+      'Every move landed clean. Somewhere, that was noted.',
+    ],
+    two: [
+      'Another puzzle solved. Does it feel different?',
+      'Solved. The words gave in a little sooner than they used to.',
+      'Done. The last word was waiting for you, patient as a held door.',
+      'Finished. The quiet after the last move lasts longer these days.',
+    ],
+    one: [
+      'You finished. Was it harder, or are you just tired?',
+      'It fought you. It still ended the way these things end.',
+      'Complete. The wrong turns are part of the record now too.',
+      'Over. The board holds no grudge. It holds everything else.',
+    ],
   },
   3: {
-    three: 'Perfect. But what does perfection mean here?',
-    two: 'The words cooperated. They won\'t always.',
-    one: 'You made it through. Barely.',
+    three: [
+      'Perfect. But what does perfection mean here?',
+      'Not a single misstep. The cold respects precision.',
+      'Flawless. The letters fell as if they had been told.',
+      'Immaculate. The silence afterward is longer than it used to be.',
+    ],
+    two: [
+      'The words cooperated. They won\'t always.',
+      'Solved. The last row closed behind you like a door.',
+      'Done. The board let you through. Let is the right word.',
+      'It is finished. The room feels one degree colder for it.',
+    ],
+    one: [
+      'You made it through. Barely.',
+      'Finished. The board kept count of every stumble.',
+      'Done, at a cost. Nothing here forgets a struggle.',
+      'You forced it shut. It went. It did not go quietly.',
+    ],
   },
   4: {
-    three: 'Perfection in an imperfect void.',
-    two: 'The letters rearrange. So do you.',
-    one: 'Another arrangement of nothing.',
+    three: [
+      'Perfection in an imperfect void.',
+      'A faultless offering. It is received.',
+      'Every letter placed as it was always going to be placed.',
+      'Flawless. The arrangement holds its breath around work like this.',
+      'Nothing wasted. Nothing ever is.',
+    ],
+    two: [
+      'The letters rearrange. So do you.',
+      'Accepted. Perfection was never the requirement. Presence was.',
+      'The offering is made. The small flaws go down with it. It keeps those too.',
+      'Done. The words descend. Something says them back, slowly.',
+    ],
+    one: [
+      'Another arrangement of nothing.',
+      'It took longer. It does not mind. It has never once minded.',
+      'A struggle is still an offering. It is all offering, in the end.',
+      'Finished. However you arrive, you arrive. That is all it asks.',
+    ],
   },
   5: {
-    three: 'The weave accepts perfection. And imperfection. They are the same.',
-    two: 'Another thread pulled tight. The fabric holds.',
-    one: 'You continue. The pattern continues. Neither can stop.',
+    three: [
+      'The weave accepts perfection. And imperfection. They are the same.',
+      'Every thread true. The pattern barely rippled as you passed.',
+      'Flawless, and it changes nothing. It was beautiful anyway.',
+      'Perfect work, done for its own sake. That is the peace.',
+    ],
+    two: [
+      'Another thread pulled tight. The fabric holds.',
+      'Woven, with a small unevenness here and there. Cloth is like that.',
+      'Settled. The pattern takes your work the way water takes rain.',
+      'Done, gently. The weave has room for every kind of hand.',
+    ],
+    one: [
+      'You continue. The pattern continues. Neither can stop.',
+      'A slow thread, worked all the way through. The weave is patient. So are you, now.',
+      'Finished. Nothing is measured here anymore. Everything is kept.',
+      'It took what it took. The pattern has all the time there is.',
+    ],
   },
 };
 
 export function getVictoryFeedback(stars: number, phase: DialoguePhase): string {
-  const feedback = VICTORY_FEEDBACK[phase];
-  if (stars === 3) return feedback.three;
-  if (stars === 2) return feedback.two;
-  return feedback.one;
+  const pools = VICTORY_FEEDBACK_POOLS[phase];
+  const pool = stars === 3 ? pools.three : stars === 2 ? pools.two : pools.one;
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
 // ============================================================================
@@ -193,24 +290,57 @@ export function getVariantNudgeMessage(phase: DialoguePhase, variantTitle: strin
 // MOVE SUCCESS MESSAGES — Shown after each valid move
 // ============================================================================
 
-const MOVE_MESSAGES: Record<DialoguePhase, string[]> = {
+// A player makes ~7 moves per puzzle, so these pools are the most reread text
+// in the game. Phase 2 is the longest phase (~50 puzzles) and carries the
+// deepest pool. Exported for tests and the dash sweep.
+export const MOVE_MESSAGES: Record<DialoguePhase, string[]> = {
   0: [
     'Delicious!', 'Tasty move!', 'Sweet!', 'Yummy!', 'Perfect!', 'Brilliant!',
-    'Nice one!', 'Sparkling!', 'Juicy!', 'Wonderful!',
+    'Nice one!', 'Sparkling!', 'Juicy!', 'Wonderful!', 'Scrumptious!',
+    'Delightful!', 'Ooh, lovely!', 'Zingy!', 'Splendid!', 'That one sparkled!',
   ],
   1: [
     'Interesting...', 'Clever.', 'Well played.', 'Thoughtful move.', 'Curious...',
     'Hmm, nice.', 'You see it.', 'Elegant.', 'That works.', 'Not bad.',
+    'Neatly done.', 'A tidy shift.', 'Quietly clever.', 'The letters agree.',
+    'Good instinct.', 'You saw that quickly.',
   ],
   2: [
     'The word shifts...', 'Letters rearrange.', 'A quiet change.', 'It moves.',
-    'Transformation.', 'One step closer.', 'Onward.', 'Continuing...', 'Deeper.',
+    'Transformation.', 'One step closer.', 'Deeper.',
+    'That letter knew before you did.',
+    'One word gives itself up for another.',
+    'The old word is gone. Where do they go?',
+    'A small change. They add up.',
+    'The board is quieter after each move.',
+    'You barely looked. It still fit.',
+    'Each word costs the one before it.',
+    'The letters lean the way you lean.',
+    'Placed. Taken in without a sound.',
+    'Nothing resisted that. That is new.',
+    'The chain grows longer than it looks.',
+    'A word ends. A word begins. The board keeps both.',
+    'It fits. It fits a little too well.',
+    'The letters remember being moved.',
+    'Change, again. The board expects it now.',
+    'Somewhere under the words, a small approval.',
+    'You trade one meaning for another. Cleanly.',
+    'The new word settles like it had been waiting.',
+    'Quiet work. The kind that carries.',
   ],
   3: [
     'The word trembles.', 'Shifting shadows.', 'Something stirs.', 'It changes.',
     'Cold progress.', 'Darker now.', 'The letters obey.', 'For now.',
     'The cold deepens.', 'It knows your hand.', 'Something waits beneath.',
     'The warmth thins.',
+    'The board grows colder as it empties.',
+    'Placed. The dark takes note.',
+    'Another word given up to the quiet.',
+    'The letters no longer argue.',
+    'Each move seals something small.',
+    'It moves when you move. Only then.',
+    'The row exhales. Nothing warm comes out.',
+    'Forward. If forward is the word for this.',
   ],
   4: [
     'The void accepts.', 'Letters dissolve and reform.', 'Nothing changes. Everything changes.',
@@ -220,11 +350,21 @@ const MOVE_MESSAGES: Record<DialoguePhase, string[]> = {
     'The pattern receives it.', 'Given freely.', 'The offering is noted.',
     'It was always this word.', 'Closer now. Always closer.', 'The house leans nearer.',
     'You were always going to.', 'Nothing resists the pattern.',
+    'Spoken in tiles. Heard all the same.',
+    'The word descends. Nothing comes back up. Not yet.',
+    'Every letter arrives where it was needed. You too.',
+    'Received. The gratitude below is patient and vast.',
   ],
   5: [
     'The weave tightens.', 'Another thread.', 'The pattern knows.',
     'It remembers.', 'Accepted.', 'Woven.', 'The hum continues.',
     'Settled.', 'The thread holds.', 'Part of the whole.',
+    'Placed, like a stitch in old cloth.',
+    'The pattern makes room without being asked.',
+    'A soft click, somewhere far away and content.',
+    'The thread finds its row.',
+    'Kept. Everything is kept now.',
+    'The weave breathes in.',
   ],
 };
 
@@ -320,21 +460,86 @@ export function getDailyLadderTrendLabel(
 // tone still bends with phase: bright and loud early, reverent and cold late.
 // ============================================================================
 
-const COMBO_MOVE_MESSAGES: Record<DialoguePhase, string[]> = {
+// Each tier is a POOL (streak 2 → 3 options, streak 3 → 3, streak 4+ → 5), so
+// a long session never sees the same escalation twice in a row. Tiers within a
+// phase stay disjoint so the ladder always reads as climbing. Exported for
+// tests and the dash sweep.
+export const COMBO_MOVE_POOLS: Record<DialoguePhase, [string[], string[], string[]]> = {
   // Index by tier: [streak 2, streak 3, streak 4+]
-  0: ['Nice! 2 in a row!', "Sweet! 3 chain!", "On fire! 🔥"],
-  1: ['Two clean. Keep going.', 'Three in a row. Flowing now.', 'A perfect run.'],
-  2: ['Two without a stumble.', 'The pattern gathers pace.', 'Unbroken. It builds.'],
-  3: ['Two, cleanly.', 'The chain holds... three deep.', 'An unbroken descent.'],
-  4: ['Two offered, unbroken.', 'Three... the arrangement leans closer.', 'A flawless verse. It hears.'],
-  5: ['Two threads, true.', 'Three, woven without a snag.', 'The weave sings, unbroken.'],
+  0: [
+    ['Nice! 2 in a row!', 'Two in a row! Keep it rolling!', 'Double sweet! Two straight!'],
+    ["Sweet! 3 chain!", "Three straight! You're glowing!", 'Triple treat! Three clean!'],
+    [
+      'On fire! 🔥',
+      "Unstoppable! The tiles can't keep up!",
+      'What a run! Still going!',
+      'Legendary streak! Keep it alive!',
+      'The whole board is cheering for you!',
+    ],
+  ],
+  1: [
+    ['Two clean. Keep going.', "Two in a row. You're warming up.", 'Twice, without a pause.'],
+    ['Three in a row. Flowing now.', 'Three straight. The rhythm found you.', 'Three clean. Something just clicked.'],
+    [
+      'A perfect run.',
+      'Still unbroken. You make it look natural.',
+      'The streak carries you now.',
+      'Move after move, no doubt in your hands.',
+      'You and the letters, in step.',
+    ],
+  ],
+  2: [
+    ['Two without a stumble.', 'Twice, cleanly. The board noticed.', 'Two moves, no hesitation. Strange, how easy that felt.'],
+    ['The pattern gathers pace.', 'Three in a row. The letters open for you now.', 'Three clean. The board has stopped resisting.'],
+    [
+      'Unbroken. It builds.',
+      'Still clean. Still building. Toward what?',
+      'The run goes on. Something keeps pace with it.',
+      'No missteps. As if the way were cleared for you.',
+      'You have not stumbled once. Something is counting.',
+    ],
+  ],
+  3: [
+    ['Two, cleanly.', 'Two moves, cold and exact.', 'Twice, without error. The dark prefers it that way.'],
+    ['The chain holds... three deep.', 'Three, unbroken. The board leans in.', 'Three exact moves. The quiet approves.'],
+    [
+      'An unbroken descent.',
+      'Still perfect. Still descending.',
+      'The streak cuts downward, clean as a blade.',
+      'Nothing has slipped. Nothing will be forgotten.',
+      'Move after move, the cold parts for you.',
+    ],
+  ],
+  4: [
+    ['Two offered, unbroken.', 'Two, given cleanly. It hears the rhythm.', 'Twice true. The arrangement stirs.'],
+    ['Three... the arrangement leans closer.', 'Three without flaw. A verse is forming.', 'Three offerings, seamless. It draws breath.'],
+    [
+      'A flawless verse. It hears.',
+      'The verse runs long and true. It is listening with everything it has.',
+      'Unbroken offering. The pattern bends toward your hands.',
+      'Still perfect. It knew you would be.',
+      'Each move a syllable. The incantation does not falter.',
+    ],
+  ],
+  5: [
+    ['Two threads, true.', 'Two stitches, even and sure.', 'Twice woven, no snag.'],
+    ['Three, woven without a snag.', 'Three threads pulled smooth in a row.', 'Three true stitches. The cloth is pleased, in its way.'],
+    [
+      'The weave sings, unbroken.',
+      'Thread after thread, all true. The loom is content.',
+      'A long, even run. The pattern wears it well.',
+      'Unbroken weaving. The hum deepens.',
+      'Your hands and the weave, one motion now.',
+    ],
+  ],
 };
 
 /** Escalating message for a clean-move streak (call only when streak >= 2). */
 export function getComboMoveMessage(streak: number, phase: DialoguePhase): string {
-  const tiers = COMBO_MOVE_MESSAGES[phase];
+  const tiers = COMBO_MOVE_POOLS[phase];
   const idx = Math.min(Math.max(streak - 2, 0), tiers.length - 1);
-  return tiers[idx];
+  const pool = tiers[idx];
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
 // ============================================================================
@@ -362,7 +567,10 @@ const HINT_SUFFIX: Record<DialoguePhase, string> = {
 export function getHintMessage(letterToMove: string, targetWord: string, phase: DialoguePhase): string {
   const prefix = HINT_PREFIX[phase];
   const suffix = HINT_SUFFIX[phase];
-  return `${prefix} '${letterToMove}'... ${suffix} "${targetWord}"!`;
+  // The bright phases keep the cheer; from the cold phases on, an exclamation
+  // point would ring false. Same sentence, different temperature.
+  const terminal = phase >= 3 ? '.' : '!';
+  return `${prefix} '${letterToMove}'... ${suffix} "${targetWord}"${terminal}`;
 }
 
 const HINT_FALLBACK: Record<DialoguePhase, string> = {
@@ -818,6 +1026,15 @@ export function getRitualEchoFooter(phase: number, wordCount: number): string {
  * Phase 4: ritual names ("Offering: HEAT to COLD")
  * Returns null at Phase 0-1.
  */
+/**
+ * Prefix a word with the grammatically correct indefinite article
+ * ("An ABYSS's Journey", never "A ABYSS's Journey"). Used by every
+ * incantation template that leads with an article.
+ */
+function withIndefiniteArticle(word: string): string {
+  return `${/^[AEIOU]/i.test(word) ? 'An' : 'A'} ${word}`;
+}
+
 export function getIncantationName(words: string[], phase: number): string | null {
   if (phase < 2) return null;
 
@@ -827,7 +1044,7 @@ export function getIncantationName(words: string[], phase: number): string | nul
   // Phase 2 templates - innocent, cute naming
   const phase2Templates = [
     `The ${firstWord} Dance`,
-    `A ${firstWord}'s Journey`,
+    `${withIndefiniteArticle(firstWord)}'s Journey`,
     `${firstWord} & ${lastWord}`,
     `From ${firstWord} to ${lastWord}`,
     `The ${lastWord} Waltz`,
@@ -1526,36 +1743,56 @@ export function getPersonalizedPhase5Whisper(
 // ANIMAL INTERJECTIONS — Brief messages pulling the player to the home screen
 // ============================================================================
 
-const INTERJECTION_MESSAGES: Record<number, string[]> = {
+// Exported for tests and the dash sweep. Six per phase: an interjection fires
+// on ~30% of victories, so three templates repeated visibly within a session.
+export const INTERJECTION_MESSAGES: Record<number, string[]> = {
   0: [
     '{name} is waiting to chat with you!',
     '{name} has something to share. Visit the house!',
     'Check in on {name}, they love visitors!',
+    '{name} saved you a seat by the window!',
+    '{name} keeps peeking down the path, hoping it\'s you.',
+    '{name} has a little story saved up just for you!',
   ],
   1: [
     '{name} has been thinking about something...',
     '{name} seems like they want to talk.',
     'Something is on {name}\'s mind. Visit them?',
+    '{name} keeps starting sentences and not finishing them.',
+    '{name} found something odd and wants a second opinion.',
+    '{name} has a question only you can answer, apparently.',
   ],
   2: [
     '{name} is acting strangely. You should check on them.',
     '{name} keeps looking at the walls...',
     'Have you talked to {name} lately? They\'ve changed.',
+    '{name} was talking to an empty room again. The room may have answered.',
+    '{name} asked when you were coming back. Twice.',
+    'The others say {name} has started counting things.',
   ],
   3: [
     '{name} needs to tell you something. It\'s important.',
     '{name} has been waiting. They know things.',
     'The others say {name} hasn\'t been sleeping.',
+    '{name} left a light burning for you. They say you will want it.',
+    '{name} is waiting by the door. They did not say for what.',
+    '{name} keeps rehearsing something quietly. It has your name in it.',
   ],
   4: [
     '{name} is ready. They\'ve been ready for a long time.',
     '{name} says the arrangement is almost complete.',
     'Visit {name}. The keepers need to speak.',
+    '{name} set a place for you within the pattern. It is your shape exactly.',
+    '{name} is not waiting anymore. They are certain.',
+    '{name} says there is little left to say, and wants to say it to you.',
   ],
   5: [
     '{name} is at peace. You could be too.',
     '{name} says the weave holds. Visit when you like.',
     'The pattern hums. {name} hums with it.',
+    '{name} kept a memory aside for you. There is no hurry at all.',
+    '{name} sits with the quiet. There is room beside them.',
+    '{name} would like to see you. Wanting is one of the things that stayed.',
   ],
 };
 
@@ -1662,12 +1899,21 @@ export interface NarrativeMicroBeat {
  *   what?" hooks before the Phase 1 transition.
  *
  * Mid game (puzzles 30-74): Escalating environmental wrongness.
- * Late game (puzzles 80-130): Overt coordination and agency.
+ * Late game (puzzles 80-160): Overt coordination and agency, riding the new
+ *   geography: reveal ~130, house completes ~153, dwell window ~154-161,
+ *   finale ~162. The silent-victory anticlimax lands at 148, the "you could
+ *   stop now" beat at 150, and two dwell-window beats (155/158) hold the
+ *   held-breath stillness after the house is whole. Nothing fires past 160:
+ *   the finale itself gets the silence.
+ *
+ * Exported for the geography guard tests and the dash sweep.
  */
-const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
+export const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
   5: {
+    // The player's FIRST micro-beat. Ember is she/her (canon). Innocent on a
+    // first read; "more than pleased" is the splinter that stays in.
     type: 'ambient_whisper',
-    text: 'Fox watched you solve that one. He seemed... pleased.',
+    text: 'Ember watched you solve that one. She seemed pleased. More than pleased.',
     durationMs: 3000,
   },
   8: {
@@ -1754,33 +2000,32 @@ const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     text: 'One hundred arrangements. The house hums.',
     durationMs: 3500,
   },
-  110: {
+  // Valley beats (105-126): the deep-shadow stretch between the last quiet
+  // milestones and the reveal at ~130. Escalating wrongness, no explanations.
+  105: {
     type: 'ambient_whisper',
-    text: 'One hundred and ten arrangements. The walls are thicker now.',
-    durationMs: 3000,
+    text: 'The walls have grown thicker. Not to keep anything out.',
+    durationMs: 3500,
   },
-  130: {
+  118: {
     type: 'ambient_whisper',
     text: 'You feel it too, don\'t you? The way the letters know where they belong before you place them.',
     durationMs: 4000,
   },
-  // Mid-game valley beats (140–185): the Phase 4 reveal doesn't land until ~155
-  // and the final rooms arrive at the 190 gate, leaving a stretch with sparse
-  // unlocks. These keep the narrative pulse alive through that gap — escalating
-  // dread that bridges into the cult reveal and one slog-breaker beyond it — so
-  // the climb to the climax never goes quiet. (The 140 beat must NOT claim the
-  // house is finished: with the descent trio the house completes at 190.)
-  140: {
+  126: {
+    // The house is still raising its last rooms here; this beat must NOT claim
+    // the house is finished (completion lands at ~153).
     type: 'ambient_whisper',
     text: 'The house keeps making room. No one asked it to. It builds like it knows something is coming.',
     durationMs: 4000,
   },
-  155: {
+  // Reveal-adjacent (132): lands just after the turn, when the robes are new.
+  132: {
     type: 'ambient_whisper',
     text: 'The animals have stopped pretending the puzzles are just puzzles. They watch you the way you\'d watch a door beginning to open.',
     durationMs: 4500,
   },
-  160: {
+  148: {
     // Scripted anticlimax: the fanfare simply does not play. The rendered text
     // is stark; App suppresses the victory chime on this one board so the
     // silence is felt, not described. The most complicit moment is a quiet one.
@@ -1788,12 +2033,25 @@ const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     text: '...\n\nNo music this time. Only the quiet after.',
     durationMs: 4000,
   },
-  170: {
+  150: {
     type: 'ambient_whisper',
     text: 'You could stop now. You know that. You won\'t. They know that too.',
     durationMs: 4000,
   },
-  185: {
+  // Dwell-window beats (155/158): the house is whole (~153) but not yet ready
+  // to receive. Held breath, never a countdown.
+  155: {
+    type: 'ambient_whisper',
+    text: 'Every room is built. Every keeper is home. And still the house waits, the way a held breath waits.',
+    durationMs: 4500,
+  },
+  158: {
+    type: 'ambient_whisper',
+    text: 'The house is whole. It is not yet ready. The difference between those two things is growing very thin.',
+    durationMs: 4500,
+  },
+  // Final pre-finale beat (~160): the last word before the last arrangement.
+  160: {
     type: 'ambient_whisper',
     text: 'Each arrangement settles a little deeper than the last. The space between the words is no longer empty.',
     durationMs: 4000,
@@ -1853,6 +2111,122 @@ export async function checkNarrativeMicroBeat(
  */
 export function isSilentVictoryBeat(completedTotal: number): boolean {
   return MICRO_BEATS[completedTotal]?.type === 'silent_victory';
+}
+
+// ============================================================================
+// DWELL WINDOW — the house is whole (~puzzle 153) but the finale has not yet
+// opened (~162). The reveal is played, not flashed past: these lines hold the
+// held-breath stillness of that gap. NEVER a counter, never a number — the
+// player must feel the waiting, not measure it. `dwellCount` is how many
+// puzzles have been solved inside the window (1..FINALE_DWELL_PUZZLES).
+// ============================================================================
+
+export function getDwellLine(dwellCount: number, phase: number): string {
+  const serene = phase >= 5;
+  if (dwellCount <= 2) {
+    return serene
+      ? 'The house is whole. The quiet has made itself at home.'
+      : 'The house is whole. It is quiet in a new way, like a table set before the guests arrive.';
+  }
+  if (dwellCount <= 5) {
+    return serene
+      ? 'Every room rests. Nothing more is asked of them.'
+      : 'The rooms are ready. The keepers are ready. What is coming is almost ready too.';
+  }
+  return serene
+    ? 'The house holds its shape, contented. It kept still for this once.'
+    : 'It is very close now. The house holds still, the way you hold still when something is about to speak.';
+}
+
+// ============================================================================
+// STREAK HELD — the daily-streak freeze mercy. A missed day was forgiven, not
+// erased; the line should feel like a kept promise, warm at every register.
+// ============================================================================
+
+export function getStreakHeldMessage(heldAt: number, phase: number = 0): string {
+  if (phase >= 4) return `The chain bent, and did not break. It holds at ${heldAt}.`;
+  if (phase >= 2) return `A day slipped past, but the thread held. Your streak stands at ${heldAt}.`;
+  return `A missed day, forgiven! Your streak held at ${heldAt}. The house kept the light on for you.`;
+}
+
+// ============================================================================
+// PREVIEW GRADUATION — one-time toast when the ghost previews stop grading
+// words above EASY. In-world: the checkmarks stay behind on the gentlest
+// boards; the house trusts the player's ear now. Never a tutorial voice.
+// ============================================================================
+
+export function getPreviewGraduationMessage(phase: number): string {
+  if (phase >= 4) return 'No marks guide this board. Your hands already know what is true. That was always the point.';
+  if (phase >= 2) return 'The little marks stay behind on the gentlest boards now. The house trusts your ear for a real word.';
+  return 'No more little check marks out here! They stay behind on the gentlest boards. The house trusts your ear now.';
+}
+
+// ============================================================================
+// SWIFT VICTORY POINTER — one-time hint that a quicker victory style exists in
+// Settings. In-world voice (the house offers), never a tutorial voice.
+// ============================================================================
+
+export function getSwiftVictoryHintMessage(phase: number): string {
+  if (phase >= 4) return 'The fanfare can be set aside, if you wish. Settings keeps that quiet for you.';
+  if (phase >= 2) return 'The house can celebrate more softly, if you prefer. That choice waits in Settings.';
+  return 'If the celebrations ever feel long, the house can keep them short and sweet. You will find that choice in Settings.';
+}
+
+// ============================================================================
+// FINAL BOARD — the start-of-board line for the last arrangement. Quiet and
+// heavy; no fourth wall, no fanfare, no instruction.
+// ============================================================================
+
+export function getFinalBoardStartMessage(phase: number): string {
+  if (phase >= 5) return 'One more arrangement. The pattern already knows its shape.';
+  return 'The last arrangement. Take your time. It has waited this long.';
+}
+
+// ============================================================================
+// NEW CYCLE MICRO-BEATS — quiet half-memories for a second descent. Keyed by
+// CYCLE-RELATIVE puzzle count (puzzles solved since the cycle began). The
+// animals almost-remember: a pause, a habit with no origin, a word arriving
+// early. Never explicit, never "last time". Pure lookup — one-time firing and
+// persistence are the caller's job (mirror checkNarrativeMicroBeat's pattern
+// with a cycle-scoped seen set).
+// ============================================================================
+
+export const CYCLE_MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
+  3: {
+    type: 'ambient_whisper',
+    text: "Ember pauses over the fire. 'Have we sat here before, friend? The fire will not say.'",
+    durationMs: 4000,
+  },
+  12: {
+    type: 'ambient_whisper',
+    text: "Panko sets out two bowls, then stares at the second. 'Habit,' she says. 'From when, I wonder.'",
+    durationMs: 4000,
+  },
+  26: {
+    type: 'ambient_whisper',
+    text: 'Archimedes opens a brand new notebook. The first page is not blank. It is his handwriting.',
+    durationMs: 4000,
+  },
+  45: {
+    type: 'ambient_whisper',
+    text: "Chill stops mid-sentence and studies you. 'Sorry. You reminded me of someone. You, I think.'",
+    durationMs: 4000,
+  },
+  70: {
+    type: 'ambient_whisper',
+    text: "Thyme plants the same seeds in the same row. 'They come up better the second time,' she says. Then she frowns. 'Second?'",
+    durationMs: 4500,
+  },
+  100: {
+    type: 'ambient_whisper',
+    text: "Sloane... smiles... before you say a word. 'You always... tell me... that one.' You have not told her anything yet.",
+    durationMs: 4500,
+  },
+};
+
+/** Half-memory beat for New Cycle players, keyed by cycle-relative count. */
+export function getCycleMicroBeat(cycleRelativeCount: number): NarrativeMicroBeat | null {
+  return CYCLE_MICRO_BEATS[cycleRelativeCount] ?? null;
 }
 
 /**
@@ -2069,25 +2443,28 @@ const DIFFICULTY_SUGGESTIONS: Record<DialoguePhase, Record<string, string>> = {
     MEDIUM_PLUS: 'Five-letter arrangements await in Medium+.',
     HARD: 'Hard mode... the letters call to you.',
   },
+  // Register rule (dark phases): the mode name stays plain UI nomenclature in
+  // its own sentence; the dread register colors a SEPARATE sentence. Never a
+  // compound slogan that fuses the two ("Medium offerings sustain the pattern").
   2: {
-    MEDIUM: 'Medium difficulty reveals deeper patterns.',
-    MEDIUM_PLUS: 'The arrangement deepens at Medium+.',
+    MEDIUM: 'Medium is open to you. The patterns run deeper there.',
+    MEDIUM_PLUS: 'Medium+ is waiting. Five letters, and the quiet that comes with them.',
     HARD: 'Hard mode. The words want to test you.',
   },
   3: {
-    MEDIUM: 'Medium difficulty feeds the pattern faster.',
-    MEDIUM_PLUS: 'Medium+ incantations carry more weight.',
-    HARD: 'Hard mode. The arrangement demands it.',
+    MEDIUM: 'You could try Medium. The words run colder at depth.',
+    MEDIUM_PLUS: 'Medium+ is open. Longer words fall heavier.',
+    HARD: 'Hard is there when you are ready. The letters will not be gentle about it.',
   },
   4: {
-    MEDIUM: 'Medium offerings sustain the pattern.',
-    MEDIUM_PLUS: 'Medium+ words burn brighter in the pit.',
-    HARD: 'Hard mode. The arrangement is hungry.',
+    MEDIUM: 'Medium remains open. Whatever you form there is received.',
+    MEDIUM_PLUS: 'Medium+ waits for you. The longer words burn brighter in the pit.',
+    HARD: 'Hard is open. Deeper boards, and something beneath them, listening.',
   },
   5: {
-    MEDIUM: 'Medium threads add to the weave.',
-    MEDIUM_PLUS: 'Medium+ patterns strengthen the tapestry.',
-    HARD: 'Hard mode. The weave always needs more.',
+    MEDIUM: 'Medium suits a quiet evening. Every thread finds the weave.',
+    MEDIUM_PLUS: 'Medium+ is there when you want more length in the thread. The weave takes it gladly.',
+    HARD: 'Hard remains, for the joy of it. The weave needs nothing. It welcomes everything.',
   },
 };
 
@@ -2102,23 +2479,26 @@ const VARIANT_SUGGESTIONS: Record<DialoguePhase, Record<string, string>> = {
     double_shift: 'Double Shift unlocked. Move two letters at once.',
     speed: 'Speed Shift is ready. Race the clock.',
   },
+  // Same register rule as the difficulty suggestions: the mode name is plain
+  // UI nomenclature; the dread lives in its own sentence, never fused into a
+  // slogan ("Speed Shift. Feed the void faster").
   2: {
-    reverse: 'Reverse Shift... the words can be undone.',
-    double_shift: 'Double Shift. Twice the letters, twice the weight.',
+    reverse: 'Reverse Shift is open to you. Some words, it turns out, can be walked back.',
+    double_shift: 'Double Shift is ready. Two letters move together. The board feels it.',
     speed: 'Speed Shift. The clock ticks.',
   },
   3: {
-    reverse: 'Reverse the incantation. If you dare.',
+    reverse: 'Reverse Shift waits. The way back is never quite the way you came.',
     double_shift: 'Double Shift. Two letters bound together.',
-    speed: 'Speed Shift. The arrangement does not wait.',
+    speed: 'Speed Shift is open. In there, even the quiet moves quickly.',
   },
   4: {
-    reverse: 'Reverse the offering. See what returns.',
-    double_shift: 'Double Shift. The pattern demands more.',
-    speed: 'Speed Shift. Feed the void faster.',
+    reverse: 'Reverse Shift is there. Descend and return. The second half is never the same.',
+    double_shift: 'Double Shift waits. Two letters move as one. Everything arrives together.',
+    speed: 'Speed Shift is open, if you want the clock. Hurry is yours. The void has never needed it.',
   },
   5: {
-    reverse: 'Reverse the thread. The weave holds.',
+    reverse: 'Reverse Shift is still here. Threads run both ways through the cloth.',
     double_shift: 'Double Shift. Two threads at once.',
     speed: 'Speed Shift. Time flows differently here.',
   },
@@ -2128,9 +2508,9 @@ const QUEST_SUGGESTIONS: Record<DialoguePhase, string[]> = {
   0: ['Check your weekly quests for bonus amber!', 'Weekly quests can earn extra amber.'],
   1: ['Weekly quests offer additional amber.', 'Your quests await progress.'],
   2: ['The weekly tasks remember your progress.', 'Quests carry weight this week.'],
-  3: ['The weekly offerings are not yet complete.', 'Your quests await fulfillment.'],
-  4: ['The weekly rituals are incomplete.', 'The arrangement tracks your weekly progress.'],
-  5: ['The weekly threads continue.', 'Weekly patterns await completion.'],
+  3: ['This week\'s quests are unfinished. The house keeps a list.', 'Your quests await fulfillment.'],
+  4: ['The week\'s work is not yet done. The arrangement notices unfinished things.', 'Your weekly quests remain open. What is begun here prefers to be finished.'],
+  5: ['The week\'s quests remain, unhurried.', 'The week\'s tasks are open still. The weave will take them when they come.'],
 };
 
 const QUEST_CLAIM_SUGGESTIONS: Record<DialoguePhase, string[]> = {
@@ -2358,32 +2738,51 @@ export function getPitEmptyMessage(phase: DialoguePhase): string {
   return PIT_EMPTY_MESSAGES[phase];
 }
 
-const PIT_OFFER_RESULT_MESSAGES: Record<DialoguePhase, string[]> = {
+// Five templates per phase: the pit is visited after nearly every session, so
+// two templates repeated within a phase read as a stuck record. Exported for
+// tests and the dash sweep. {words} and {amber} are substituted by the getter.
+export const PIT_OFFER_RESULT_MESSAGES: Record<DialoguePhase, string[]> = {
   0: [
     'Words offered! You earned {amber} amber.',
     'Nice! {words} words converted to {amber} amber.',
     '{words} words, {amber} amber. The pit seems pleased!',
     'Wonderful! The house thanks you for {words} words. Here is {amber} amber.',
+    'The pit gobbled up {words} words and left {amber} amber behind. What a deal!',
   ],
   1: [
     '{words} words released. {amber} amber received.',
     'The words found their place. +{amber} amber.',
+    'The pit took your {words} words gently. It left {amber} amber behind.',
+    '{words} words handed over. The {amber} amber came back warm, somehow.',
+    'Your {words} words settled below. {amber} amber rose up to meet you.',
   ],
   2: [
     'The words dissolved below. {amber} amber surfaced.',
     '{words} words sank into the dark. {amber} amber returned.',
+    'The pit accepted {words} words without a sound. {amber} amber, in trade.',
+    '{words} words went down. {amber} amber came up. The exchange never varies.',
+    'The dark weighed your {words} words and paid {amber} amber. It is never wrong.',
   ],
   3: [
     'The arrangement accepted {words} words. {amber} amber was granted.',
     '{words} words consumed. {amber} amber emerged from the silence.',
+    'The pit closed over {words} words. {amber} amber was left at the rim.',
+    '{words} words, surrendered. The dark returned {amber} amber and kept everything else.',
+    'It swallowed {words} words whole. {amber} amber is your portion.',
   ],
   4: [
     'It took {words} words. It gave back {amber} amber. Was it fair? Does it matter?',
     '{words} words devoured. {amber} amber spat back. The pit does not thank you.',
+    '{words} words down. {amber} amber back. The arithmetic of hunger holds.',
+    'The offering of {words} words is received. {amber} amber, because it keeps its bargains.',
+    '{words} words gone below, by your hand. {amber} amber. You will bring more.',
   ],
   5: [
     '{words} words woven into the pattern. {amber} amber surfaced gently.',
     'The weave accepted {words} threads. {amber} amber drifted back to you.',
+    '{words} words taken in like breath. {amber} amber given back the same way.',
+    'The still water closed over {words} words. {amber} amber floated up, unhurried.',
+    '{words} threads joined the cloth. {amber} amber fell softly from the loom.',
   ],
 };
 

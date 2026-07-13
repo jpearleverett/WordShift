@@ -84,23 +84,37 @@ describe('dailyChallenge', () => {
     expect(today).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
-  test('daily difficulty ramps across the week (gentle Mon -> brutal Sun)', () => {
+  test('daily difficulty ramps across the week (gentle Mon -> Sunday peak, softened weekend)', () => {
     // 2026-02-09 is a Monday; step through the week (local-component dates).
-    // Mon accessible, Sun the peak — the habit-anchor ramp.
+    // Casual-fit ramp: two HARD anchors (Thu, Sat) plus the Sunday peak; the
+    // old ALL-HARD Thu-Sun block read as a wall to a casual player's weekend.
     expect(getDailyDifficulty('2026-02-09')).toBe('MEDIUM');       // Mon
     expect(getDailyDifficulty('2026-02-10')).toBe('MEDIUM_PLUS');  // Tue
     expect(getDailyDifficulty('2026-02-11')).toBe('MEDIUM_PLUS');  // Wed
-    expect(getDailyDifficulty('2026-02-12')).toBe('HARD');         // Thu
-    expect(getDailyDifficulty('2026-02-13')).toBe('HARD');         // Fri
-    expect(getDailyDifficulty('2026-02-14')).toBe('HARD');         // Sat
-    expect(getDailyDifficulty('2026-02-15')).toBe('HARD');         // Sun
+    expect(getDailyDifficulty('2026-02-12')).toBe('HARD');         // Thu — first anchor
+    expect(getDailyDifficulty('2026-02-13')).toBe('MEDIUM_PLUS');  // Fri — breather
+    expect(getDailyDifficulty('2026-02-14')).toBe('HARD');         // Sat — second anchor
+    expect(getDailyDifficulty('2026-02-15')).toBe('HARD');         // Sun — the peak
   });
 
   test('daily ramp is deterministic by date (same puzzle shape for everyone)', () => {
-    // Sunday is the peak: 6-letter / 5-row HARD.
+    // Sunday is the ONLY 6-letter/5-row peak (Saturday softened to 5 letters).
     expect(getDailyRamp('2026-02-15')).toEqual({ difficulty: 'HARD', wordLength: 6, targetRows: 5 });
+    expect(getDailyRamp('2026-02-14')).toEqual({ difficulty: 'HARD', wordLength: 5, targetRows: 5 });
+    // Friday is a genuine breather between the two HARD anchors.
+    expect(getDailyRamp('2026-02-13')).toEqual({ difficulty: 'MEDIUM_PLUS', wordLength: 5, targetRows: 4 });
     // Monday is accessible: 4-letter / 4-row MEDIUM.
     expect(getDailyRamp('2026-02-09')).toEqual({ difficulty: 'MEDIUM', wordLength: 4, targetRows: 4 });
+  });
+
+  test('only Sunday carries a 6-letter board (the weekend wall is gone)', () => {
+    // Mon 2026-02-09 .. Sun 2026-02-15.
+    const week = ['2026-02-09', '2026-02-10', '2026-02-11', '2026-02-12', '2026-02-13', '2026-02-14', '2026-02-15'];
+    const sixLetterDays = week.filter(d => getDailyRamp(d).wordLength === 6);
+    expect(sixLetterDays).toEqual(['2026-02-15']);
+    // And no more than three HARD days a week.
+    const hardDays = week.filter(d => getDailyRamp(d).difficulty === 'HARD');
+    expect(hardDays).toEqual(['2026-02-12', '2026-02-14', '2026-02-15']);
   });
 
   describe('first-ever daily easing', () => {
@@ -299,6 +313,28 @@ describe('dailyChallenge streak freeze mercy', () => {
     // Falls back to the 21-day checkpoint rather than being wiped to 1.
     expect(result.currentStreak).toBe(21);
     expect(result.streakDecayedTo).toBe(21);
+  });
+
+  test('streakDecayedTo flows out of the recordDailyCompletion return, then clears on a normal continuation', async () => {
+    // The UI contract: App reads recordDailyCompletion's returned progress and
+    // surfaces streakDecayedTo via phaseNarrative.getStreakHeldMessage (the
+    // "your streak held at N" beat, wave-2 wiring). The service must set it on
+    // a decay-to-milestone completion and leave it undefined otherwise.
+    const p = await loadDailyProgress();
+    p.currentStreak = 8; // past the 7-day milestone
+    p.streakFreezes = 0;
+    p.lastFreezeGrantDate = getLocalDateStringDaysAgo(1);
+    p.lastCompletedDate = getLocalDateStringDaysAgo(4); // multi-day lapse, no freeze
+    const decayed = await recordDailyCompletion(3, 0, 0);
+    expect(decayed.currentStreak).toBe(7);
+    expect(decayed.streakDecayedTo).toBe(7);
+
+    // Next day: an ordinary yesterday-continuation must not re-report a decay.
+    const p2 = await loadDailyProgress();
+    p2.lastCompletedDate = getLocalDateStringDaysAgo(1);
+    const next = await recordDailyCompletion(3, 0, 0);
+    expect(next.currentStreak).toBe(8);
+    expect(next.streakDecayedTo).toBeUndefined();
   });
 
   test('a free freeze is granted after the interval has elapsed', async () => {

@@ -2,13 +2,25 @@ import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-aud
 import { getSettings } from './settings';
 
 /**
- * Sound effects system for WordShift
+ * Sound effects + ambient music system for WordShift
  *
- * Plays short WAV assets from assets/sounds/ via expo-audio (expo-av's SDK 56
+ * SFX: short WAV assets from assets/sounds/ via expo-audio (expo-av's SDK 56
  * replacement). Sounds are lazily loaded on first play and cached for instant
- * replay; hot-path sounds are preloaded during initAudio().
- * Each sound checks the user's sound preference before playing, and all
- * errors are swallowed — sounds must never crash gameplay.
+ * replay; hot-path sounds are preloaded during initAudio(). Every sound checks
+ * the user's sound preference before playing, and all errors are swallowed —
+ * sounds must never crash gameplay.
+ *
+ * Phase awareness: App mirrors the narrative phase here via setAudioPhase().
+ * At Phase 3+ any sound with a registered `<name>_dark` variant automatically
+ * swaps to it, so the whole soundscape descends together.
+ *
+ * Combo ladder: soundValidMove(comboTier) escalates the move chime across
+ * clean-move streaks (bright = rising pentatonic steps; dark = sinking lower).
+ *
+ * Music: three seamless ambient loop beds (bright / dusk / dark) played on a
+ * dedicated looping player. startMusicForPhase(phase) picks the bed for the
+ * current phase and crossfades on changes; gated by the separate musicEnabled
+ * setting (NOT soundEnabled — music has its own toggle).
  */
 
 // Sound name → bundled asset source
@@ -16,6 +28,9 @@ const SOUND_SOURCES: Record<string, any> = {
   tap: require('../../assets/sounds/tap.wav'),
   letter_select: require('../../assets/sounds/letter_select.wav'),
   valid_move: require('../../assets/sounds/valid_move.wav'),
+  valid_move_2: require('../../assets/sounds/valid_move_2.wav'),
+  valid_move_3: require('../../assets/sounds/valid_move_3.wav'),
+  valid_move_4: require('../../assets/sounds/valid_move_4.wav'),
   invalid_move: require('../../assets/sounds/invalid_move.wav'),
   undo: require('../../assets/sounds/undo.wav'),
   hint: require('../../assets/sounds/hint.wav'),
@@ -27,10 +42,28 @@ const SOUND_SOURCES: Record<string, any> = {
   dialogue: require('../../assets/sounds/dialogue.wav'),
   phase_change: require('../../assets/sounds/phase_change.wav'),
   daily_ready: require('../../assets/sounds/daily_ready.wav'),
-  // Dark variants (Phase 3+): hollow, minor, cold — the descent reaches the ears.
+  // Dark variants (Phase 3+): hollow, minor, cold — the descent reaches the
+  // ears. Any `<name>_dark` here is picked automatically by the phase mirror.
+  tap_dark: require('../../assets/sounds/tap_dark.wav'),
+  letter_select_dark: require('../../assets/sounds/letter_select_dark.wav'),
   valid_move_dark: require('../../assets/sounds/valid_move_dark.wav'),
+  valid_move_2_dark: require('../../assets/sounds/valid_move_2_dark.wav'),
+  valid_move_3_dark: require('../../assets/sounds/valid_move_3_dark.wav'),
+  valid_move_4_dark: require('../../assets/sounds/valid_move_4_dark.wav'),
+  invalid_move_dark: require('../../assets/sounds/invalid_move_dark.wav'),
+  undo_dark: require('../../assets/sounds/undo_dark.wav'),
+  amber_earn_dark: require('../../assets/sounds/amber_earn_dark.wav'),
+  dialogue_dark: require('../../assets/sounds/dialogue_dark.wav'),
   victory_dark: require('../../assets/sounds/victory_dark.wav'),
   perfect_dark: require('../../assets/sounds/perfect_dark.wav'),
+};
+
+// Ambient music beds (looping) — kept out of SOUND_SOURCES so a stray
+// playSound() can never fire a 20-second bed as a one-shot.
+const MUSIC_SOURCES: Record<string, any> = {
+  music_bright: require('../../assets/sounds/music_bright.wav'),
+  music_dusk: require('../../assets/sounds/music_dusk.wav'),
+  music_dark: require('../../assets/sounds/music_dark.wav'),
 };
 
 // Hot-path sounds preloaded at init for latency-free first playback
@@ -38,10 +71,13 @@ const PRELOAD_SOUND_NAMES = [
   'tap',
   'letter_select',
   'valid_move',
+  'valid_move_2', // combo ladder fires within seconds of the first clean streak
+  'valid_move_3',
   'invalid_move',
   'victory',
   'amber_earn',
   'valid_move_dark', // hot path once the descent deepens (Phase 3+)
+  'valid_move_2_dark',
 ];
 
 const SOUND_VOLUME = 0.8;
@@ -50,10 +86,22 @@ const SOUND_VOLUME = 0.8;
 // the Phase 3+ dark variants without every call site threading a phase. App
 // keeps this in sync via setAudioPhase() when the phase changes.
 let audioPhase = 0;
-/** Phase at/above which move + victory chimes switch to their dark variants. */
+/** Phase at/above which SFX with a registered dark variant switch to it. */
 const DARK_SFX_PHASE = 3;
 export function setAudioPhase(phase: number): void {
   audioPhase = phase;
+}
+
+/**
+ * Pure variant resolver: returns `<name>_dark` when the phase is deep enough
+ * AND a dark variant is registered, otherwise the base name. Exported for
+ * tests; call sites go through the sound* helpers.
+ */
+export function resolveSfxForPhase(name: string, phase: number): string {
+  if (phase >= DARK_SFX_PHASE && SOUND_SOURCES[`${name}_dark`] !== undefined) {
+    return `${name}_dark`;
+  }
+  return name;
 }
 
 let audioInitialized = false;
@@ -102,8 +150,9 @@ async function loadSound(name: string): Promise<AudioPlayer | null> {
   const inFlight = loadingSounds.get(name);
   if (inFlight) return inFlight;
 
+  // Note: null check, not falsy — Metro asset ids are numbers and 0 is valid.
   const source = SOUND_SOURCES[name];
-  if (!source) return null;
+  if (source === undefined || source === null) return null;
 
   const loadPromise = (async (): Promise<AudioPlayer | null> => {
     try {
@@ -154,7 +203,7 @@ export async function preloadSound(name: string, source: any): Promise<void> {
 }
 
 /**
- * Cleanup all preloaded players
+ * Cleanup all preloaded players (and the music bed)
  */
 export async function unloadAllSounds(): Promise<void> {
   for (const [, player] of soundCache) {
@@ -164,78 +213,242 @@ export async function unloadAllSounds(): Promise<void> {
   }
   soundCache.clear();
   loadingSounds.clear();
+  teardownMusic();
 }
 
 // ===== Game Sound Effects =====
 // These are the API entry points that get called from game code.
-// Each one maps to a WAV asset in assets/sounds/.
+// Each one maps to a WAV asset in assets/sounds/ (with the phase mirror
+// silently swapping in the `_dark` variant at Phase 3+ where one exists).
 
-/** Letter tile selected */
+/** Letter tile selected. Hollow pluck at Phase 3+. */
 export async function soundLetterSelect(): Promise<void> {
-  await playSound('letter_select');
+  await playSound(resolveSfxForPhase('letter_select', audioPhase));
 }
 
-/** Valid move completed (letter dropped successfully). Dark chime at Phase 3+. */
-export async function soundValidMove(): Promise<void> {
-  await playSound(audioPhase >= DARK_SFX_PHASE ? 'valid_move_dark' : 'valid_move');
+// Combo ladder for clean-move streaks: tier 0 = base chime, tiers 1-3 escalate.
+// Bright ladder rises up the pentatonic; the dark ladder sinks lower instead.
+const VALID_MOVE_LADDER = ['valid_move', 'valid_move_2', 'valid_move_3', 'valid_move_4'] as const;
+
+/** Pure name resolver for the combo ladder (exported for tests). */
+export function validMoveSoundName(comboTier: number, phase: number): string {
+  const raw = Number.isFinite(comboTier) ? Math.floor(comboTier) : 0;
+  const tier = Math.max(0, Math.min(VALID_MOVE_LADDER.length - 1, raw));
+  return resolveSfxForPhase(VALID_MOVE_LADDER[tier], phase);
 }
 
-/** Invalid move attempted */
+/**
+ * Valid move completed (letter dropped successfully). Dark chime at Phase 3+.
+ * @param comboTier 0 = base chime (default — existing call sites unchanged);
+ *   1/2/3 = escalating clean-streak ladder steps (clamped into range).
+ */
+export async function soundValidMove(comboTier: number = 0): Promise<void> {
+  await playSound(validMoveSoundName(comboTier, audioPhase));
+}
+
+/** Invalid move attempted. Deeper thud at Phase 3+. */
 export async function soundInvalidMove(): Promise<void> {
-  await playSound('invalid_move');
+  await playSound(resolveSfxForPhase('invalid_move', audioPhase));
 }
 
 /** Puzzle completed successfully. Hollow, minor victory at Phase 3+. */
 export async function soundVictory(): Promise<void> {
-  await playSound(audioPhase >= DARK_SFX_PHASE ? 'victory_dark' : 'victory');
+  await playSound(resolveSfxForPhase('victory', audioPhase));
 }
 
 /** 3-star perfect completion. Dissonant-tuned at Phase 3+. */
 export async function soundPerfect(): Promise<void> {
-  await playSound(audioPhase >= DARK_SFX_PHASE ? 'perfect_dark' : 'perfect');
+  await playSound(resolveSfxForPhase('perfect', audioPhase));
 }
 
-/** Undo action */
+/** Undo action. Falling hollow slide at Phase 3+. */
 export async function soundUndo(): Promise<void> {
-  await playSound('undo');
+  await playSound(resolveSfxForPhase('undo', audioPhase));
 }
 
 /** Hint used */
 export async function soundHint(): Promise<void> {
-  await playSound('hint');
+  await playSound(resolveSfxForPhase('hint', audioPhase));
 }
 
-/** Button tap / UI interaction */
+/** Button tap / UI interaction. Dull hollow knock at Phase 3+. */
 export async function soundTap(): Promise<void> {
-  await playSound('tap');
+  await playSound(resolveSfxForPhase('tap', audioPhase));
 }
 
-/** Amber earned */
+/** Amber earned. Cold coin at Phase 3+. */
 export async function soundAmberEarn(): Promise<void> {
-  await playSound('amber_earn');
+  await playSound(resolveSfxForPhase('amber_earn', audioPhase));
 }
 
 /** Achievement unlocked */
 export async function soundAchievement(): Promise<void> {
-  await playSound('achievement');
+  await playSound(resolveSfxForPhase('achievement', audioPhase));
 }
 
 /** Animal unlock / room build */
 export async function soundUnlock(): Promise<void> {
-  await playSound('unlock');
+  await playSound(resolveSfxForPhase('unlock', audioPhase));
 }
 
-/** Dialogue advance */
+/** Dialogue advance. Low blip at Phase 3+. */
 export async function soundDialogue(): Promise<void> {
-  await playSound('dialogue');
+  await playSound(resolveSfxForPhase('dialogue', audioPhase));
 }
 
 /** Phase transition */
 export async function soundPhaseChange(): Promise<void> {
-  await playSound('phase_change');
+  await playSound(resolveSfxForPhase('phase_change', audioPhase));
 }
 
 /** Daily challenge available */
 export async function soundDailyReady(): Promise<void> {
-  await playSound('daily_ready');
+  await playSound(resolveSfxForPhase('daily_ready', audioPhase));
+}
+
+// ===== Ambient Music =====
+// A single looping bed per phase band. QUIET by design — it sits far under
+// the SFX. Gated by the dedicated musicEnabled setting (its own toggle,
+// independent of soundEnabled). All failures are swallowed.
+
+const MUSIC_VOLUME = 0.4;
+const MUSIC_FADE_MS = 1200;
+const MUSIC_FADE_STEPS = 16;
+/** Phase at/above which the bed cools to dusk. */
+const MUSIC_DUSK_PHASE = 2;
+/** Phase at/above which the bed corrupts to dark. */
+const MUSIC_DARK_PHASE = 3;
+
+/** Pure phase → bed mapping (exported for tests and the wave-2 wiring). */
+export function musicTrackForPhase(phase: number): string {
+  if (phase >= MUSIC_DARK_PHASE) return 'music_dark';
+  if (phase >= MUSIC_DUSK_PHASE) return 'music_dusk';
+  return 'music_bright';
+}
+
+let musicPlayer: AudioPlayer | null = null;
+let activeMusicTrack: string | null = null;
+// Player still fading out from the last track switch (snapped off if another
+// switch interrupts before its fade completes).
+let retiringMusicPlayer: AudioPlayer | null = null;
+let musicFadeTimer: ReturnType<typeof setInterval> | null = null;
+
+/** The bed currently owned by the music player, or null when stopped. */
+export function getActiveMusicTrack(): string | null {
+  return activeMusicTrack;
+}
+
+async function isMusicEnabled(): Promise<boolean> {
+  const settings = await getSettings();
+  return settings.musicEnabled;
+}
+
+function clearMusicFade(): void {
+  if (musicFadeTimer) {
+    clearInterval(musicFadeTimer);
+    musicFadeTimer = null;
+  }
+}
+
+/** Crossfade: ramp `to` up to MUSIC_VOLUME while ramping `from` out, then remove `from`. */
+function fadeMusic(from: AudioPlayer | null, to: AudioPlayer | null): void {
+  clearMusicFade();
+  let step = 0;
+  musicFadeTimer = setInterval(() => {
+    step++;
+    const k = Math.min(1, step / MUSIC_FADE_STEPS);
+    try {
+      if (to) to.volume = MUSIC_VOLUME * k;
+    } catch {}
+    try {
+      if (from) from.volume = MUSIC_VOLUME * (1 - k);
+    } catch {}
+    if (step >= MUSIC_FADE_STEPS) {
+      clearMusicFade();
+      if (from) {
+        try {
+          from.remove();
+        } catch {}
+        if (retiringMusicPlayer === from) retiringMusicPlayer = null;
+      }
+    }
+  }, MUSIC_FADE_MS / MUSIC_FADE_STEPS);
+}
+
+/**
+ * Start (or switch) the ambient bed for the given narrative phase.
+ * - Same bed already playing: no-op (safe to call on every victory/screen change).
+ * - Different bed: crossfades over ~1.2s.
+ * - musicEnabled off: does nothing (call again after re-enabling).
+ * Never throws — music must never crash gameplay.
+ */
+export async function startMusicForPhase(phase: number): Promise<void> {
+  try {
+    if (!(await isMusicEnabled())) return;
+    const track = musicTrackForPhase(phase);
+    if (activeMusicTrack === track && musicPlayer) {
+      try {
+        if (!musicPlayer.playing) musicPlayer.play();
+      } catch {}
+      return;
+    }
+    const source = MUSIC_SOURCES[track];
+    if (source === undefined || source === null) return;
+
+    // A rapid double-switch: snap off any player still fading out.
+    if (retiringMusicPlayer) {
+      try {
+        retiringMusicPlayer.remove();
+      } catch {}
+      retiringMusicPlayer = null;
+    }
+
+    const next = createAudioPlayer(source);
+    next.loop = true;
+    next.volume = 0;
+    next.play();
+
+    const prev = musicPlayer;
+    musicPlayer = next;
+    activeMusicTrack = track;
+    retiringMusicPlayer = prev;
+    fadeMusic(prev, next);
+  } catch {
+    // Music must never crash gameplay
+  }
+}
+
+/** Fade the ambient bed out and release its player. */
+export async function stopMusic(): Promise<void> {
+  try {
+    if (retiringMusicPlayer) {
+      try {
+        retiringMusicPlayer.remove();
+      } catch {}
+      retiringMusicPlayer = null;
+    }
+    const prev = musicPlayer;
+    musicPlayer = null;
+    activeMusicTrack = null;
+    if (!prev) return;
+    retiringMusicPlayer = prev;
+    fadeMusic(prev, null);
+  } catch {
+    // Music must never crash gameplay
+  }
+}
+
+/** Immediate synchronous teardown (app unload path — no fades). */
+function teardownMusic(): void {
+  clearMusicFade();
+  for (const p of [musicPlayer, retiringMusicPlayer]) {
+    if (p) {
+      try {
+        p.remove();
+      } catch {}
+    }
+  }
+  musicPlayer = null;
+  retiringMusicPlayer = null;
+  activeMusicTrack = null;
 }

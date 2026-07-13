@@ -41,6 +41,21 @@ import {
   getNewCyclePointerLine,
   NEW_CYCLE_POINTER_LINES,
   getPersonalizedPhase5Whisper,
+  VICTORY_FEEDBACK_POOLS,
+  MOVE_MESSAGES,
+  COMBO_MOVE_POOLS,
+  MICRO_BEATS,
+  isSilentVictoryBeat,
+  PIT_OFFER_RESULT_MESSAGES,
+  getPitOfferResultMessage,
+  INTERJECTION_MESSAGES,
+  getDwellLine,
+  getStreakHeldMessage,
+  getPreviewGraduationMessage,
+  getSwiftVictoryHintMessage,
+  getFinalBoardStartMessage,
+  getCycleMicroBeat,
+  CYCLE_MICRO_BEATS,
 } from '../services/phaseNarrative';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DialoguePhase } from '../types/homeWorld';
@@ -79,6 +94,8 @@ describe('getVictoryTitle', () => {
 });
 
 describe('getVictoryFeedback', () => {
+  const allSixPhases: DialoguePhase[] = [0, 1, 2, 3, 4, 5];
+
   test.each(
     ALL_PHASES.flatMap(phase =>
       STAR_LEVELS.map(stars => ({ phase, stars }))
@@ -89,21 +106,57 @@ describe('getVictoryFeedback', () => {
     expect(feedback.length).toBeGreaterThan(0);
   });
 
-  test('phase 0 feedback is encouraging', () => {
-    expect(getVictoryFeedback(3, 0)).toContain('Flawless');
+  test('every phase x star cell is a pool of 4-5 lines (reread ~25-40 times per phase)', () => {
+    for (const phase of allSixPhases) {
+      const pools = VICTORY_FEEDBACK_POOLS[phase];
+      for (const cell of [pools.three, pools.two, pools.one]) {
+        expect(cell.length).toBeGreaterThanOrEqual(4);
+        expect(cell.length).toBeLessThanOrEqual(5);
+      }
+    }
   });
 
-  test('phase 4 feedback is dark', () => {
-    expect(getVictoryFeedback(3, 4)).toContain('void');
+  test('picks come from the matching pool', () => {
+    for (const phase of allSixPhases) {
+      const pools = VICTORY_FEEDBACK_POOLS[phase];
+      for (let i = 0; i < 20; i++) {
+        expect(pools.three).toContain(getVictoryFeedback(3, phase));
+        expect(pools.two).toContain(getVictoryFeedback(2, phase));
+        expect(pools.one).toContain(getVictoryFeedback(1, phase));
+      }
+    }
   });
 
-  test('different star levels produce different feedback within same phase', () => {
-    const fb3 = getVictoryFeedback(3, 2);
-    const fb2 = getVictoryFeedback(2, 2);
-    const fb1 = getVictoryFeedback(1, 2);
-    expect(fb3).not.toBe(fb2);
-    expect(fb2).not.toBe(fb1);
-    expect(fb3).not.toBe(fb1);
+  test('phase 0 keeps the flagship bright line; phase 4 keeps the void line', () => {
+    expect(VICTORY_FEEDBACK_POOLS[0].three).toContain('Flawless! The words knew exactly where to go.');
+    expect(VICTORY_FEEDBACK_POOLS[4].three).toContain('Perfection in an imperfect void.');
+  });
+
+  test('phase 2 two-star pool keeps exactly ONE rhetorical question (the rest are statements)', () => {
+    const questions = VICTORY_FEEDBACK_POOLS[2].two.filter(line => line.includes('?'));
+    expect(questions).toEqual(['Another puzzle solved. Does it feel different?']);
+  });
+
+  test('cells within a phase are disjoint, so star levels always read differently', () => {
+    for (const phase of allSixPhases) {
+      const pools = VICTORY_FEEDBACK_POOLS[phase];
+      const all = [...pools.three, ...pools.two, ...pools.one];
+      expect(new Set(all).size).toBe(all.length);
+    }
+  });
+
+  test('no pool line says Phase or carries a dash', () => {
+    for (const phase of allSixPhases) {
+      const pools = VICTORY_FEEDBACK_POOLS[phase];
+      for (const line of [...pools.three, ...pools.two, ...pools.one]) {
+        expect(line).not.toMatch(/[–—]/);
+        expect(line).not.toMatch(/\bPhase\b/);
+      }
+    }
+  });
+
+  test('the flat phase-1 one-star line is retired', () => {
+    expect(VICTORY_FEEDBACK_POOLS[1].one).not.toContain('Completed. Every puzzle teaches something.');
   });
 });
 
@@ -114,24 +167,43 @@ describe('getMoveMessage', () => {
     expect(msg.length).toBeGreaterThan(0);
   });
 
-  test('phase 0 messages are upbeat (with rare darkness seeds)', () => {
-    // getMoveMessage uses Math.random; Phase 0 now includes ~5% rare "seed" messages
-    // that hint at darkness. Both normal upbeat and rare seed messages are valid.
-    const phase0Words = ['Delicious', 'Tasty', 'Sweet', 'Yummy', 'Perfect', 'Brilliant', 'Nice', 'Sparkling', 'Juicy', 'Wonderful'];
+  test('pool sizes match the reread budget (phase 2 is the longest phase, deepest pool)', () => {
+    expect(MOVE_MESSAGES[0].length).toBeGreaterThanOrEqual(16);
+    expect(MOVE_MESSAGES[1].length).toBeGreaterThanOrEqual(16);
+    expect(MOVE_MESSAGES[2].length).toBeGreaterThanOrEqual(26);
+    expect(MOVE_MESSAGES[3].length).toBeGreaterThanOrEqual(20);
+    expect(MOVE_MESSAGES[4].length).toBeGreaterThanOrEqual(24);
+    expect(MOVE_MESSAGES[5].length).toBeGreaterThanOrEqual(16);
+  });
+
+  test('phase 2 filler is retired in favor of the deeper-questions register', () => {
+    expect(MOVE_MESSAGES[2]).not.toContain('Onward.');
+    expect(MOVE_MESSAGES[2]).not.toContain('Continuing...');
+  });
+
+  test('phase 0 messages come from the pool or the rare darkness seeds', () => {
+    // getMoveMessage uses Math.random; Phase 0 includes ~7% rare "seed" messages.
     const seedWords = ['remember', 'shifted', 'feel', 'wanted'];
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 60; i++) {
       const msg = getMoveMessage(0);
-      const isUpbeat = phase0Words.some(w => msg.includes(w));
+      const isPool = MOVE_MESSAGES[0].includes(msg);
       const isSeed = seedWords.some(w => msg.toLowerCase().includes(w));
-      expect(isUpbeat || isSeed).toBe(true);
+      expect(isPool || isSeed).toBe(true);
     }
   });
 
-  test('phase 4 messages are dark', () => {
-    const phase4Words = ['void', 'dissolve', 'Nothing', 'matter', 'shift', '...', 'silence', 'arrangement', 'verse', 'deeper', 'going', 'listening', 'pattern', 'Given', 'offering', 'always', 'closer', 'house'];
-    for (let i = 0; i < 50; i++) {
-      const msg = getMoveMessage(4);
-      expect(phase4Words.some(w => msg.includes(w))).toBe(true);
+  test('phase 4 messages come from the phase 4 pool', () => {
+    for (let i = 0; i < 60; i++) {
+      expect(MOVE_MESSAGES[4]).toContain(getMoveMessage(4));
+    }
+  });
+
+  test('no move message says Phase or carries a dash', () => {
+    for (const phase of [0, 1, 2, 3, 4, 5] as DialoguePhase[]) {
+      for (const msg of MOVE_MESSAGES[phase]) {
+        expect(msg).not.toMatch(/[–—]/);
+        expect(msg).not.toMatch(/\bPhase\b/);
+      }
     }
   });
 });
@@ -621,21 +693,48 @@ describe('getComboMoveMessage', () => {
     expect(msg.length).toBeGreaterThan(0);
   });
 
-  test('escalates through tiers as the streak grows (phase 0)', () => {
-    const t2 = getComboMoveMessage(2, 0);
-    const t3 = getComboMoveMessage(3, 0);
-    const t4 = getComboMoveMessage(4, 0);
-    expect(new Set([t2, t3, t4]).size).toBe(3);
+  test('tier pools are sized 3 / 3 / 5 in every phase', () => {
+    for (const phase of allSixPhases) {
+      const [t2, t3, t4] = COMBO_MOVE_POOLS[phase];
+      expect(t2).toHaveLength(3);
+      expect(t3).toHaveLength(3);
+      expect(t4).toHaveLength(5);
+    }
+  });
+
+  test('each streak draws from its own tier pool', () => {
+    for (const phase of allSixPhases) {
+      const [t2, t3, t4] = COMBO_MOVE_POOLS[phase];
+      for (let i = 0; i < 15; i++) {
+        expect(t2).toContain(getComboMoveMessage(2, phase));
+        expect(t3).toContain(getComboMoveMessage(3, phase));
+        expect(t4).toContain(getComboMoveMessage(4, phase));
+      }
+    }
+  });
+
+  test('tiers within a phase are disjoint, so escalation always reads as climbing', () => {
+    for (const phase of allSixPhases) {
+      const all = COMBO_MOVE_POOLS[phase].flat();
+      expect(new Set(all).size).toBe(all.length);
+    }
+  });
+
+  test('signature lines survive as pool members', () => {
+    expect(COMBO_MOVE_POOLS[4][2]).toContain('A flawless verse. It hears.');
+    expect(COMBO_MOVE_POOLS[0][2]).toContain('On fire! 🔥');
+    expect(COMBO_MOVE_POOLS[5][2]).toContain('The weave sings, unbroken.');
   });
 
   test('saturates at the top tier for very long streaks', () => {
-    // streak 4 and 9 both map to the final tier
-    expect(getComboMoveMessage(9, 2)).toBe(getComboMoveMessage(4, 2));
+    // streak 4 and 9 both map to the final tier pool
+    expect(COMBO_MOVE_POOLS[2][2]).toContain(getComboMoveMessage(9, 2));
+    expect(COMBO_MOVE_POOLS[2][2]).toContain(getComboMoveMessage(4, 2));
   });
 
   test('clamps streaks below 2 to the first tier without throwing', () => {
     expect(typeof getComboMoveMessage(0, 3)).toBe('string');
-    expect(getComboMoveMessage(1, 3)).toBe(getComboMoveMessage(2, 3));
+    expect(COMBO_MOVE_POOLS[3][0]).toContain(getComboMoveMessage(1, 3));
   });
 });
 

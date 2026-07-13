@@ -7,6 +7,13 @@ const STORAGE_KEY = 'wordshift_settings';
  */
 export interface GameSettings {
   soundEnabled: boolean;
+  /**
+   * Ambient music bed (services/audio.ts startMusicForPhase). Independent of
+   * soundEnabled — music has its own toggle. Defaults to true; old saves
+   * without the key inherit true via the DEFAULT_SETTINGS spread in
+   * getSettings().
+   */
+  musicEnabled: boolean;
   hapticsEnabled: boolean;
   reducedMotion: boolean;
   /**
@@ -20,6 +27,7 @@ export interface GameSettings {
 
 const DEFAULT_SETTINGS: GameSettings = {
   soundEnabled: true,
+  musicEnabled: true,
   hapticsEnabled: true,
   reducedMotion: false,
   swiftVictories: false,
