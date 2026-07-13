@@ -65,6 +65,158 @@ import {
 import { buildPhase5Pool } from '../services/dialogue/phase5Pool';
 
 /**
+ * Maximum characters shown per dialogue page. Lines longer than this are split
+ * at sentence boundaries so the speech bubble never grows past a readable size
+ * (the newest animals carry lines of several hundred words). Pagination is
+ * purely presentational: it never touches dialogue indices, session counts,
+ * or any persistence.
+ */
+export const DIALOGUE_PAGE_CHAR_BUDGET = 420;
+
+interface SentenceUnit {
+  /** Sentence text with its terminal punctuation kept attached. */
+  text: string;
+  /** The whitespace that followed the sentence in the original text. */
+  sep: string;
+}
+
+/**
+ * Split text into sentence units at `. `, `! `, `? ` (runs of terminal
+ * punctuation like `...` or `?!` stay with their sentence) and at newlines.
+ * Each unit remembers the whitespace that followed it so pages can re-join
+ * sentences with their original separators.
+ */
+function splitIntoSentenceUnits(text: string): SentenceUnit[] {
+  const units: SentenceUnit[] = [];
+  const pushUnit = (segment: string, sep: string) => {
+    if (segment.length > 0) {
+      units.push({ text: segment, sep });
+    } else if (units.length > 0) {
+      // Empty segment (e.g. consecutive newlines): fold the whitespace into
+      // the previous unit's separator instead of creating an empty unit.
+      units[units.length - 1].sep += sep;
+    }
+  };
+  let start = 0;
+  let i = 0;
+  while (i < text.length) {
+    const ch = text[i];
+    if (ch === '\n') {
+      // Newlines are boundaries; capture the whole whitespace run as separator.
+      let j = i;
+      while (j < text.length && /\s/.test(text[j])) j++;
+      pushUnit(text.slice(start, i), text.slice(i, j));
+      start = j;
+      i = j;
+      continue;
+    }
+    if (ch === '.' || ch === '!' || ch === '?') {
+      // Consume the full punctuation run so `...` / `?!` stay together.
+      let j = i + 1;
+      while (j < text.length && (text[j] === '.' || text[j] === '!' || text[j] === '?')) j++;
+      if (j < text.length && text[j] === ' ') {
+        let k = j;
+        while (k < text.length && text[k] === ' ') k++;
+        pushUnit(text.slice(start, j), text.slice(j, k));
+        start = k;
+        i = k;
+        continue;
+      }
+      i = j;
+      continue;
+    }
+    i++;
+  }
+  if (start < text.length) {
+    pushUnit(text.slice(start), '');
+  }
+  return units;
+}
+
+/**
+ * Hard-split a single sentence that alone exceeds the budget, cutting at the
+ * last word boundary under the budget. Only cuts mid-word when a single word
+ * exceeds the whole budget (which real dialogue never does).
+ */
+function hardSplitLongSentence(sentence: string, budget: number): string[] {
+  const parts: string[] = [];
+  let rest = sentence;
+  while (rest.length > budget) {
+    let cut = rest.lastIndexOf(' ', budget);
+    if (cut <= 0) cut = budget;
+    parts.push(rest.slice(0, cut));
+    rest = rest.slice(cut).replace(/^ +/, '');
+  }
+  if (rest.length > 0) parts.push(rest);
+  return parts;
+}
+
+/**
+ * Split a dialogue line into display pages no longer than `budget` characters.
+ * Splits at sentence boundaries (`. `, `! `, `? `, and newlines), keeping the
+ * punctuation with its sentence and packing consecutive sentences greedily so
+ * each page is as full as possible without exceeding the budget. Text at or
+ * under the budget returns as a single page containing the ORIGINAL string
+ * (identity preserved — HomeScreen compares dialogueText against the active
+ * choice prompt by equality). Re-joining the pages preserves the original
+ * text modulo the whitespace consumed at split points. No page is ever empty
+ * and no counters/ellipses are appended (the text stays in-world).
+ */
+export function splitDialogueIntoPages(
+  text: string,
+  budget: number = DIALOGUE_PAGE_CHAR_BUDGET
+): string[] {
+  if (text.length <= budget) return [text];
+
+  const units: SentenceUnit[] = [];
+  for (const unit of splitIntoSentenceUnits(text)) {
+    if (unit.text.length <= budget) {
+      units.push(unit);
+    } else {
+      const pieces = hardSplitLongSentence(unit.text, budget);
+      pieces.forEach((piece, idx) => {
+        units.push({ text: piece, sep: idx === pieces.length - 1 ? unit.sep : ' ' });
+      });
+    }
+  }
+  if (units.length === 0) return [text];
+
+  const pages: string[] = [];
+  let current = '';
+  let currentSep = '';
+  for (const unit of units) {
+    if (current.length === 0) {
+      current = unit.text;
+    } else if (current.length + currentSep.length + unit.text.length <= budget) {
+      current = current + currentSep + unit.text;
+    } else {
+      pages.push(current);
+      current = unit.text;
+    }
+    currentSep = unit.sep;
+  }
+  if (current.length > 0) pages.push(current);
+  return pages.length > 0 ? pages : [text];
+}
+
+/**
+ * Resolve which page of a (possibly paginated) dialogue line is visible.
+ * `pageSource` is the full text the page cursor was last advanced against;
+ * whenever the underlying line changes (new session, pre-page drain, index
+ * advance) the source no longer matches and the view self-heals to page 0,
+ * so a stale cursor can never show a mid-line page of a fresh line.
+ */
+export function resolveVisiblePage(
+  fullText: string,
+  pageSource: string | null,
+  pageCursor: number
+): { pages: string[]; index: number } {
+  const pages = splitDialogueIntoPages(fullText);
+  const index = pageSource === fullText ? Math.min(pageCursor, pages.length - 1) : 0;
+  return { pages, index };
+}
+
+/**
  * Pick the session-end message. Only claim "come back later" when the animal is
  * GENUINELY on cooldown — during the newly-unlocked grace period the cooldown is
  * skipped, so re-tapping immediately shows more dialogue; telling the player to
@@ -117,6 +269,11 @@ interface UseDialogueFlowReturn {
  * 2. Cross-animal reference (if any) — animal mentions another animal
  * 3. Regular dialogue — the animal's main phase dialogue
  * Each shows as a full page in the dialogue bubble, advanced by tapping "Next".
+ *
+ * Any line longer than DIALOGUE_PAGE_CHAR_BUDGET is additionally paginated at
+ * sentence boundaries; "Next" drains the remaining pages before advancing to
+ * the next line. Page advances are purely presentational — they never touch
+ * dialogue indices, session counts, or persistence.
  */
 export function useDialogueFlow({
   progress,
@@ -132,6 +289,19 @@ export function useDialogueFlow({
   // Pre-dialogue pages: shown before regular dialogue, one at a time
   // These are trigger reactions, cross-animal refs, coordinated events, etc.
   const [preDialoguePages, setPreDialoguePages] = useState<string[]>([]);
+
+  // Long-line pagination (purely presentational). `pageCursor` is which page
+  // of the current line is visible; `pageSource` records the full text the
+  // cursor was advanced against, so resolveVisiblePage self-heals to page 0
+  // whenever the underlying line changes. Reset explicitly at every line
+  // transition too, so identical consecutive texts can never inherit a cursor.
+  const [pageCursor, setPageCursor] = useState(0);
+  const [pageSource, setPageSource] = useState<string | null>(null);
+
+  const resetPageQueue = useCallback(() => {
+    setPageSource(null);
+    setPageCursor(0);
+  }, []);
   // Active dialogue choice (Phase 3 choice points)
   const [activeChoice, setActiveChoice] = useState<DialogueChoice | null>(null);
   // Recorded Phase 3 choices (loaded once; refreshed when a choice is made) —
@@ -278,8 +448,11 @@ export function useDialogueFlow({
     }
   }, [showDialogue]);
 
-  // Get current dialogue text — shows pre-dialogue pages first, then regular dialogue
-  const getDialogueText = (): string => {
+  // Get the current dialogue line's FULL text — pre-dialogue pages first, then
+  // regular dialogue. This is the single source of the visible line; the
+  // paginated view (getDialogueText) and the whisper-gallery recording both
+  // derive from it.
+  const getFullDialogueText = (): string => {
     // If there are pre-dialogue pages remaining, show the first one
     if (preDialoguePages.length > 0) {
       return preDialoguePages[0];
@@ -330,8 +503,30 @@ export function useDialogueFlow({
     return dialogue?.text || 'Hello, friend!';
   };
 
-  // Check if there's more content to show (pre-dialogue pages or regular dialogue)
+  // The VISIBLE dialogue text: the current page of the current line. Lines at
+  // or under the budget pass through unchanged (same string identity, so the
+  // HomeScreen `dialogueText === activeChoice.prompt` check still holds); a
+  // long line shows one readable page at a time, advanced by "Next".
+  const getDialogueText = (): string => {
+    const fullText = getFullDialogueText();
+    // Never paginate an active choice prompt: the choice buttons render only
+    // while dialogueText equals the prompt verbatim. (Prompts are short today;
+    // this guards a future long one from silently breaking the choice UI.)
+    if (activeChoice && fullText === activeChoice.prompt) return fullText;
+    const { pages, index } = resolveVisiblePage(fullText, pageSource, pageCursor);
+    return pages[index];
+  };
+
+  // Check if there's more content to show (remaining pages of the current
+  // line, pre-dialogue pages, or further regular dialogue)
   const computeHasMore = (): boolean => {
+    // Remaining pages of the current line always mean more — the button must
+    // read "Next" while the rest of the line waits.
+    const fullText = getFullDialogueText();
+    if (!(activeChoice && fullText === activeChoice.prompt)) {
+      const { pages, index } = resolveVisiblePage(fullText, pageSource, pageCursor);
+      if (index < pages.length - 1) return true;
+    }
     // If pre-dialogue pages remain, there's always more (regular dialogue follows)
     if (preDialoguePages.length > 0) return true;
     // Otherwise check regular dialogue
@@ -395,6 +590,9 @@ export function useDialogueFlow({
 
     setSelectedAnimal(animal);
     setShowDialogue(true);
+    // Fresh session: a stale page cursor from the previous session must never
+    // leak into this one — the first line always opens on its first page.
+    resetPageQueue();
 
     // Build pre-dialogue pages: these show as sequential conversation pages
     // before the regular dialogue, creating natural conversational flow
@@ -640,7 +838,7 @@ export function useDialogueFlow({
         useNativeDriver: true,
       }).start();
     }
-  }, [dialogueSlide, progress, refreshTendingState]);
+  }, [dialogueSlide, progress, refreshTendingState, resetPageQueue]);
 
   // Recompute hasNewDialogue for a specific animal after session changes
   const recomputeHasNewDialogue = useCallback((animal: Animal): boolean => {
@@ -728,7 +926,10 @@ export function useDialogueFlow({
     setSelectedAnimal(null);
     setSessionInfo(null);
     setPreDialoguePages([]);
-  }, [selectedAnimal, progress, preDialoguePages, recomputeHasNewDialogue, setAnimals]);
+    // Closing mid-pages behaves exactly like closing mid-line: nothing extra
+    // beyond clearing the page queue so it can't leak into the next session.
+    resetPageQueue();
+  }, [selectedAnimal, progress, preDialoguePages, recomputeHasNewDialogue, setAnimals, resetPageQueue]);
 
   const handleCloseDialogue = useCallback(async () => {
     await closeDialogue(false);
@@ -739,9 +940,25 @@ export function useDialogueFlow({
     if (!selectedAnimal || !progress) return;
     hapticSelection();
 
+    // FIRST: drain any remaining pages of the current line (long lines are
+    // paginated for the speech bubble). Advancing a page is presentation only:
+    // it never records the session dialogue, never advances lastDialogueRead,
+    // and never re-fires once-per-line side effects (whisper recording,
+    // trigger-word consumption, Phase-5 caught-up advance).
+    const currentFullText = getFullDialogueText();
+    if (!(activeChoice && currentFullText === activeChoice.prompt)) {
+      const { pages, index } = resolveVisiblePage(currentFullText, pageSource, pageCursor);
+      if (index < pages.length - 1) {
+        setPageSource(currentFullText);
+        setPageCursor(index + 1);
+        return;
+      }
+    }
+
     // If still showing pre-dialogue pages, advance through them
     // Pre-dialogue pages don't count toward session dialogue limits
     if (preDialoguePages.length > 0) {
+      resetPageQueue();
       setPreDialoguePages(prev => prev.slice(1));
       return;
     }
@@ -773,8 +990,9 @@ export function useDialogueFlow({
     if (hasMore) {
       await recordDialogue(selectedAnimal.id);
 
-      // Record dialogue text in whisper gallery
-      const currentText = getDialogueText();
+      // Record dialogue text in whisper gallery — the FULL line, not just the
+      // last visible page of a paginated one.
+      const currentText = getFullDialogueText();
       if (currentText) {
         recordWhisper({
           animalType: selectedAnimal.type,
@@ -821,6 +1039,8 @@ export function useDialogueFlow({
         newIndex = resolveDialogueIndex(selectedAnimal.type, cur + 1, resolvePhase, unlocked);
       }
       await markDialogueRead(selectedAnimal.id, newIndex);
+      // A new line is about to show — it must open on its first page.
+      resetPageQueue();
 
       // Whether genuinely-new (undelivered) lines remain, INDEPENDENT of cooldown:
       // at Phase 5 (post-revelation) the Tending pool / caught-up pointer; at
@@ -884,6 +1104,7 @@ export function useDialogueFlow({
       ) {
         const seenNudge = await hasSeenFoxPlayNudge();
         if (!seenNudge) {
+          resetPageQueue();
           setPreDialoguePages([getFoxPostTutorialPlayPrompt(progress.currentPhase)]);
           await markFoxPlayNudgeSeen();
           onFoxPlayPrompt?.();
@@ -892,7 +1113,7 @@ export function useDialogueFlow({
       }
       closeDialogue(true);
     }
-  }, [selectedAnimal, progress, closeDialogue, setAnimals, preDialoguePages, onFoxPlayPrompt, tendingLevel, tendingCaughtUp, playerChoices, phase2Cursors]);
+  }, [selectedAnimal, progress, closeDialogue, setAnimals, preDialoguePages, onFoxPlayPrompt, tendingLevel, tendingCaughtUp, playerChoices, phase2Cursors, activeChoice, pageCursor, pageSource, resetPageQueue]);
 
   // Handle player choosing a dialogue option (Phase 3 choice points)
   const handleDialogueChoice = useCallback(async (choice: PlayerChoice) => {
@@ -902,6 +1123,7 @@ export function useDialogueFlow({
       const result = await recordChoice(selectedAnimal.type, choice);
       setPlayerChoices(prev => ({ ...prev, [selectedAnimal.type]: choice }));
       // Replace the current pre-dialogue page with the response, then convergence
+      resetPageQueue();
       setPreDialoguePages([result.response, result.convergence]);
       setActiveChoice(null);
 
@@ -917,7 +1139,7 @@ export function useDialogueFlow({
       // Choice handling is non-critical, just close the choice
       setActiveChoice(null);
     }
-  }, [selectedAnimal, activeChoice]);
+  }, [selectedAnimal, activeChoice, resetPageQueue]);
 
   return {
     selectedAnimal,
