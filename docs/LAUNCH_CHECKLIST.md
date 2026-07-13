@@ -6,17 +6,16 @@ the codebase and are the remaining gates to submission.
 
 ## Android (submission-blocking)
 
-- [ ] **Store screenshots** — the 8 final phone screenshots are DONE and
-      validated (2026-07-13, per the campaign table + closed regen checklist in
-      `docs/STORE_LISTING.md`). Remaining: upload them in table order in Play
-      Console → Grow users → Store presence → Main store listing. If the
-      console rejects a PNG, flatten it (24-bit, no alpha).
-- [ ] **Verify one REAL purchase of each SKU kind on a Play internal build**
-      (CRITICAL) — one consumable (amber or hint pack), the starter one-time,
-      Remove Ads / Patron non-consumables, and a Restore Purchases round-trip.
-      The 2026-07-10 billing product-category fix (NON_SUBSCRIPTION on
-      getProducts) is exactly the class of bug that only a real device on a
-      Play build can validate — do not ship without this pass.
+- [x] **Store listing live in Play Console** — DONE (2026-07-13): the 8 final
+      screenshots, feature graphic, and descriptions from `docs/STORE_LISTING.md`
+      uploaded to Main store listing. (Note: screenshot #5's setup-menu copy
+      predates the same-day trial-ladder rebalance — see the optional regen
+      note in STORE_LISTING.md; not misleading, safe to ship.)
+- [x] **Verify one REAL purchase of each SKU kind on a Play internal build**
+      — DONE (2026-07-13): every SKU kind verified working on the Play
+      internal build (consumables, starter one-time, Remove Ads / Patron
+      non-consumables). The NON_SUBSCRIPTION billing fix is confirmed
+      end-to-end on a real device.
 - [ ] **Device pass on low/mid/high-end Android** — offline cold start (fresh
       install, airplane mode), onboarding end-to-end, pit economy, IAP +
       Restore, UMP consent form (EEA/debug geography), interstitials, rewarded
@@ -40,8 +39,9 @@ the codebase and are the remaining gates to submission.
       only when cutting the public production build (and confirm live ads fill
       on a real production install before wide rollout).
 - [ ] **Bump `android.versionCode`** in `mobile/app.json` for the next release
-      (currently 43; autoIncrement is intentionally off — bump manually every
-      time).
+      (currently 45 — build 44 is on the internal track; 45 carries the
+      2026-07-13 playtest fixes + trial-ladder rebalance. autoIncrement is
+      intentionally off — bump manually every time).
 - [x] **Billing category fix + boot entitlement restore** — DONE (2026-07-10):
       RevenueCat `getProducts` now passes the NON_SUBSCRIPTION category
       (Android one-time products returned `[]` without it — the "purchases not
