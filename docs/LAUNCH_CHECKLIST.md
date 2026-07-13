@@ -6,8 +6,11 @@ the codebase and are the remaining gates to submission.
 
 ## Android (submission-blocking)
 
-- [ ] **Store screenshots** — capture the 4 phone screenshots per the shot
-      list in `docs/STORE_LISTING.md`. Upload in Play Console → Store listing.
+- [ ] **Store screenshots** — the 8 final phone screenshots are DONE and
+      validated (2026-07-13, per the campaign table + closed regen checklist in
+      `docs/STORE_LISTING.md`). Remaining: upload them in table order in Play
+      Console → Grow users → Store presence → Main store listing. If the
+      console rejects a PNG, flatten it (24-bit, no alpha).
 - [ ] **Verify one REAL purchase of each SKU kind on a Play internal build**
       (CRITICAL) — one consumable (amber or hint pack), the starter one-time,
       Remove Ads / Patron non-consumables, and a Restore Purchases round-trip.
@@ -22,8 +25,9 @@ the codebase and are the remaining gates to submission.
 - [ ] **30-minute performance session** — one long mixed session (puzzles,
       home, pit, store, dialogue) on the low-end device, watching for jank,
       memory growth, and audio glitches.
-- [ ] **Feature graphic** — upgrade/replace `docs/feature-graphic.png` before
-      the listing goes live (current one is placeholder-grade).
+- [x] **Feature graphic** — DONE (2026-07-13): final 1024×500 art (Ember +
+      wordmark + hidden treeline eyes) generated and reviewed; upload with the
+      screenshots.
 - [ ] **Set `creatorCode` for press builds** — fill `expo.extra.creatorCode`
       in `mobile/app.json` on the press/reviewer build only (empty string =
       feature fully inert in shipping builds); hand the code out with
