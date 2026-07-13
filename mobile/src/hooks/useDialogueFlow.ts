@@ -732,10 +732,13 @@ export function useDialogueFlow({
       }
     }
 
-    // 6b. Phase 0 narrative seed — innocent lines with dark double meanings
+    // 6b. Bright-days narrative seed — innocent lines with dark double meanings
     // that Phase 4 recontextualizes. Deterministic: seed 0 becomes due on the
     // animal's 2nd dialogue session, seed 1 on its 5th; each delivers once.
-    if (progress && progress.currentPhase === 0) {
+    // Gate is <= 1 so animals unlocked during Phase 1 still plant their seeds
+    // (the corpus is still innocent there); from Phase 2 the register darkens
+    // and a "seed" would no longer read as innocent, so planting stops.
+    if (progress && progress.currentPhase <= 1) {
       try {
         const sessionNumber = (getSession(animal.id)?.sessionsCompleted ?? 0) + 1;
         const seed = await getAndMarkNarrativeSeedPage(animal.type, sessionNumber);

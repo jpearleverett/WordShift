@@ -934,8 +934,8 @@ describe('checkNarrativeMicroBeat', () => {
     expect(beat!.type).toBe('ambient_whisper');
   });
 
-  test('keeps the narrative pulse alive through the mid-game valley (140-185)', async () => {
-    for (const count of [140, 155, 170, 185]) {
+  test('keeps the narrative pulse alive through the valley and the dwell window', async () => {
+    for (const count of [105, 118, 126, 132, 150, 155, 158, 160]) {
       await resetMicroBeats();
       (AsyncStorage.clear as jest.Mock)();
       const beat = await checkNarrativeMicroBeat(count);
@@ -1011,22 +1011,25 @@ describe('checkNarrativeMicroBeat', () => {
     expect(beat!.text).toBeDefined();
   });
 
-  test('returns a beat at puzzle 110', async () => {
-    const beat = await checkNarrativeMicroBeat(110);
+  test('returns a beat at puzzle 105 (first valley beat)', async () => {
+    const beat = await checkNarrativeMicroBeat(105);
     expect(beat).not.toBeNull();
     expect(beat!.type).toBe('ambient_whisper');
     expect(beat!.text).toBeDefined();
   });
 
-  test('returns a beat at puzzle 130', async () => {
-    const beat = await checkNarrativeMicroBeat(130);
+  test('returns a beat at puzzle 132 (reveal-adjacent)', async () => {
+    const beat = await checkNarrativeMicroBeat(132);
     expect(beat).not.toBeNull();
     expect(beat!.type).toBe('ambient_whisper');
     expect(beat!.text).toBeDefined();
   });
 
-  test('all 19 micro-beat thresholds fire independently', async () => {
-    const thresholds = [5, 8, 12, 16, 20, 25, 30, 35, 40, 50, 55, 65, 70, 74, 80, 90, 100, 110, 130];
+  test('all 26 micro-beat thresholds fire independently', async () => {
+    const thresholds = [
+      5, 8, 12, 16, 20, 25, 30, 35, 40, 50, 55, 65, 70, 74, 80, 90, 100,
+      105, 118, 126, 132, 148, 150, 155, 158, 160,
+    ];
     for (const t of thresholds) {
       const beat = await checkNarrativeMicroBeat(t);
       expect(beat).not.toBeNull();
@@ -1034,6 +1037,71 @@ describe('checkNarrativeMicroBeat', () => {
     // All consumed — none should fire again
     for (const t of thresholds) {
       expect(await checkNarrativeMicroBeat(t)).toBeNull();
+    }
+  });
+});
+
+// ============================================================================
+// Micro-beat geography (v1.3 pacing: reveal ~130, house whole ~153,
+// dwell ~154-161, finale ~162)
+// ============================================================================
+
+describe('MICRO_BEATS geography', () => {
+  const keys = Object.keys(MICRO_BEATS).map(Number).sort((a, b) => a - b);
+
+  test('keys match the new geography exactly', () => {
+    expect(keys).toEqual([
+      5, 8, 12, 16, 20, 25, 30, 35, 40, 50, 55, 65, 70, 74, 80, 90, 100,
+      105, 118, 126, 132, 148, 150, 155, 158, 160,
+    ]);
+  });
+
+  test('nothing fires past 160: the finale (~162) gets the silence', () => {
+    expect(keys[keys.length - 1]).toBe(160);
+  });
+
+  test('the silent-victory anticlimax sits at 148, before the finale', () => {
+    expect(MICRO_BEATS[148].type).toBe('silent_victory');
+    expect(isSilentVictoryBeat(148)).toBe(true);
+    // Exactly one silent victory in the whole table.
+    const silents = keys.filter(k => MICRO_BEATS[k].type === 'silent_victory');
+    expect(silents).toEqual([148]);
+    expect(isSilentVictoryBeat(160)).toBe(false);
+  });
+
+  test('the complicity beat lands at 150', () => {
+    expect(MICRO_BEATS[150].text).toBe(
+      'You could stop now. You know that. You won\'t. They know that too.'
+    );
+  });
+
+  test('house-wholeness language only appears at or after completion (~153)', () => {
+    for (const k of keys) {
+      const text = (MICRO_BEATS[k].text ?? '').toLowerCase();
+      if (/is whole|every room is built|every keeper is home/.test(text)) {
+        expect(k).toBeGreaterThanOrEqual(153);
+      }
+    }
+    // And the dwell-window beats DO speak of the whole house.
+    expect(MICRO_BEATS[155].text!.toLowerCase()).toContain('every room is built');
+    expect(MICRO_BEATS[158].text!.toLowerCase()).toContain('the house is whole');
+  });
+
+  test('dwell beats never surface a counter or number', () => {
+    for (const k of [155, 158]) {
+      expect(MICRO_BEATS[k].text).not.toMatch(/\d/);
+    }
+  });
+
+  test('the pre-completion builder beat sits before the house is whole', () => {
+    expect(MICRO_BEATS[126].text).toContain('The house keeps making room');
+  });
+
+  test('no beat says Phase or carries a dash', () => {
+    for (const k of keys) {
+      const text = MICRO_BEATS[k].text ?? '';
+      expect(text).not.toMatch(/[–—]/);
+      expect(text).not.toMatch(/\bPhase\b/);
     }
   });
 });
@@ -1463,5 +1531,227 @@ describe('victory glitch', () => {
 
   test('getFirstWinGlitchText returns a stable non-empty glitch', () => {
     expect(getFirstWinGlitchText()).toBe('WE SEE YOU');
+  });
+});
+
+// ============================================================================
+// Incantation article fix (a/an)
+// ============================================================================
+
+describe('getIncantationName indefinite article', () => {
+  // The template pick is a deterministic hash of the joined words; filler
+  // second words A-E cover every residue mod the template count, so exactly
+  // one candidate lands on the Journey template.
+  const journeyFor = (first: string): string | null => {
+    for (const filler of ['A', 'B', 'C', 'D', 'E']) {
+      const name = getIncantationName([first, filler], 2);
+      if (name && name.includes("'s Journey")) return name;
+    }
+    return null;
+  };
+
+  test('vowel-initial words take An (never "A ABYSS\'s Journey")', () => {
+    expect(journeyFor('ABYSS')).toBe("An ABYSS's Journey");
+  });
+
+  test('consonant-initial words keep A', () => {
+    expect(journeyFor('DOOM')).toBe("A DOOM's Journey");
+  });
+});
+
+// ============================================================================
+// Goal-suggestion register (UI nomenclature never fused with dread)
+// ============================================================================
+
+describe('goal-suggestion register separation', () => {
+  test('phase 4 Medium names the mode plainly; the dread colors its own sentence', () => {
+    const s = getGoalSuggestion(4, false, ['MEDIUM'], null, false, 0, false);
+    expect(s).not.toBeNull();
+    expect(s!.text).toBe('Medium remains open. Whatever you form there is received.');
+    expect(s!.text).not.toContain('Medium offerings');
+  });
+
+  test('phase 5 Medium+ no longer strengthens the tapestry as a compound slogan', () => {
+    const s = getGoalSuggestion(5, false, ['MEDIUM_PLUS'], null, false, 0, false);
+    expect(s).not.toBeNull();
+    expect(s!.text).not.toContain('Medium+ patterns');
+  });
+
+  test('the "Feed the void faster" slogan is retired', () => {
+    const s = getGoalSuggestion(4, false, [], 'speed', false, 0, false);
+    expect(s).not.toBeNull();
+    expect(s!.text).toContain('Speed Shift');
+    expect(s!.text).not.toContain('Feed the void faster');
+  });
+
+  test('phase 5 quest nudges no longer fuse Weekly with the weave register', () => {
+    for (let i = 0; i < 20; i++) {
+      const s = getGoalSuggestion(5, false, [], null, false, 0, true);
+      expect(s).not.toBeNull();
+      expect(s!.text).not.toBe('Weekly patterns await completion.');
+      expect(s!.text.toLowerCase()).not.toContain('weekly threads');
+      expect(s!.text.toLowerCase()).not.toContain('weekly patterns');
+    }
+  });
+});
+
+// ============================================================================
+// Pit offer-result pools
+// ============================================================================
+
+describe('getPitOfferResultMessage', () => {
+  const allSixPhases: DialoguePhase[] = [0, 1, 2, 3, 4, 5];
+
+  test('five templates per phase', () => {
+    for (const p of allSixPhases) {
+      expect(PIT_OFFER_RESULT_MESSAGES[p]).toHaveLength(5);
+    }
+  });
+
+  test('every template pays the amber; placeholders always resolve', () => {
+    for (const p of allSixPhases) {
+      for (const t of PIT_OFFER_RESULT_MESSAGES[p]) {
+        expect(t).toContain('{amber}');
+        expect(t).not.toMatch(/[–—]/);
+        expect(t).not.toMatch(/\bPhase\b/);
+      }
+      for (let i = 0; i < 25; i++) {
+        const msg = getPitOfferResultMessage(p, 7, 42);
+        expect(msg).not.toContain('{words}');
+        expect(msg).not.toContain('{amber}');
+        expect(msg).toContain('42');
+      }
+    }
+  });
+});
+
+// ============================================================================
+// Animal interjection pools
+// ============================================================================
+
+describe('INTERJECTION_MESSAGES', () => {
+  test('six templates per phase, each carrying the {name} slot', () => {
+    for (const p of [0, 1, 2, 3, 4, 5]) {
+      expect(INTERJECTION_MESSAGES[p]).toHaveLength(6);
+      for (const t of INTERJECTION_MESSAGES[p]) {
+        expect(t).toContain('{name}');
+        expect(t).not.toMatch(/[–—]/);
+        expect(t).not.toMatch(/\bPhase\b/);
+      }
+    }
+  });
+});
+
+// ============================================================================
+// New copy surfaces: dwell window, streak-held mercy, preview graduation,
+// swift-victory pointer, final board, New Cycle half-memories
+// ============================================================================
+
+describe('getDwellLine', () => {
+  test('escalates across the window and never shows a counter', () => {
+    const early = getDwellLine(1, 4);
+    const mid = getDwellLine(4, 4);
+    const late = getDwellLine(7, 4);
+    expect(new Set([early, mid, late]).size).toBe(3);
+    for (const line of [early, mid, late]) {
+      expect(line).not.toMatch(/\d/);
+      expect(line).not.toMatch(/[–—]/);
+      expect(line.toLowerCase()).not.toContain('phase');
+    }
+    expect(early.toLowerCase()).toContain('whole');
+  });
+
+  test('keeps a distinct serene register at phase 5', () => {
+    expect(getDwellLine(1, 5)).not.toBe(getDwellLine(1, 4));
+    expect(getDwellLine(7, 5)).not.toBe(getDwellLine(7, 4));
+  });
+});
+
+describe('getStreakHeldMessage', () => {
+  test('always names the held streak and shifts register with phase', () => {
+    for (const p of [0, 2, 4]) {
+      const msg = getStreakHeldMessage(9, p);
+      expect(msg).toContain('9');
+      expect(msg).not.toMatch(/[–—]/);
+    }
+    expect(getStreakHeldMessage(9, 0)).toContain('held at 9');
+    expect(getStreakHeldMessage(9, 0)).not.toBe(getStreakHeldMessage(9, 4));
+  });
+
+  test('stays warm at every register: never blame, never loss language', () => {
+    for (const p of [0, 1, 2, 3, 4, 5]) {
+      expect(getStreakHeldMessage(3, p).toLowerCase()).not.toMatch(/lost|broke\b|reset|missed it/);
+    }
+  });
+
+  test('phase defaults to the bright voice when omitted', () => {
+    expect(getStreakHeldMessage(5)).toBe(getStreakHeldMessage(5, 0));
+  });
+});
+
+describe('getPreviewGraduationMessage', () => {
+  test('explains the marks staying behind, in-world, without mechanics vocabulary', () => {
+    for (const p of [0, 2, 4]) {
+      const msg = getPreviewGraduationMessage(p);
+      expect(msg.length).toBeGreaterThan(0);
+      expect(msg.toLowerCase()).not.toMatch(/easy|difficulty|preview|setting|valid/);
+      expect(msg).not.toMatch(/[–—]/);
+    }
+    expect(getPreviewGraduationMessage(0).toLowerCase()).toContain('gentlest boards');
+    expect(getPreviewGraduationMessage(2)).not.toBe(getPreviewGraduationMessage(0));
+    expect(getPreviewGraduationMessage(4)).not.toBe(getPreviewGraduationMessage(2));
+  });
+});
+
+describe('getSwiftVictoryHintMessage', () => {
+  test('points at Settings in an in-world voice, never a tutorial voice', () => {
+    for (const p of [0, 2, 4]) {
+      const msg = getSwiftVictoryHintMessage(p);
+      expect(msg).toContain('Settings');
+      expect(msg.toLowerCase()).not.toMatch(/tap |toggle|enable|button/);
+      expect(msg).not.toMatch(/[–—]/);
+    }
+    expect(getSwiftVictoryHintMessage(0)).not.toBe(getSwiftVictoryHintMessage(4));
+  });
+});
+
+describe('getFinalBoardStartMessage', () => {
+  test('is quiet and heavy, with no fourth wall', () => {
+    const msg = getFinalBoardStartMessage(4);
+    expect(msg).toBe('The last arrangement. Take your time. It has waited this long.');
+    expect(msg.toLowerCase()).not.toMatch(/game|level|screen/);
+    expect(getFinalBoardStartMessage(5)).not.toBe(msg);
+  });
+});
+
+describe('getCycleMicroBeat', () => {
+  test('six half-memories at the cycle-relative keys, silence everywhere else', () => {
+    const keys = Object.keys(CYCLE_MICRO_BEATS).map(Number).sort((a, b) => a - b);
+    expect(keys).toEqual([3, 12, 26, 45, 70, 100]);
+    for (const k of keys) {
+      const beat = getCycleMicroBeat(k);
+      expect(beat).not.toBeNull();
+      expect(beat!.type).toBe('ambient_whisper');
+      expect(beat!.text!.length).toBeGreaterThan(0);
+      expect(beat!.text).not.toMatch(/[–—]/);
+      // Half-memory, never explicit: the animals must never name the loop.
+      expect(beat!.text!.toLowerCase()).not.toMatch(/cycle|last time|start over|began again/);
+      expect(beat!.durationMs).toBeGreaterThan(0);
+    }
+    expect(getCycleMicroBeat(0)).toBeNull();
+    expect(getCycleMicroBeat(4)).toBeNull();
+    expect(getCycleMicroBeat(99)).toBeNull();
+  });
+
+  test('the first half-memory belongs to Ember at the fire', () => {
+    const beat = getCycleMicroBeat(3);
+    expect(beat!.text).toContain('Ember');
+    expect(beat!.text).toContain('fire');
+  });
+
+  test('canon pronouns hold across the half-memories', () => {
+    expect(getCycleMicroBeat(12)!.text).toContain('she says'); // Panko
+    expect(getCycleMicroBeat(26)!.text).toContain('his handwriting'); // Archimedes
+    expect(getCycleMicroBeat(100)!.text).toContain('her'); // Sloane
   });
 });

@@ -34,7 +34,7 @@ jest.mock('react', () => ({
   default: jest.requireActual('react'),
 }));
 
-import { getVictoryTitle, getVictoryFeedback, getRulesText, getJourneyAtmosphereText } from '../services/phaseNarrative';
+import { getVictoryTitle, getVictoryFeedback, VICTORY_FEEDBACK_POOLS, getRulesText, getJourneyAtmosphereText } from '../services/phaseNarrative';
 import { getPhaseTheme, CandyColors } from '../theme/colors';
 import { DialoguePhase } from '../types/homeWorld';
 import type { VictoryData } from '../components/puzzle/VictoryModal';
@@ -89,11 +89,17 @@ describe('Victory modal data flow', () => {
   });
 
   test('victory feedback is phase-aware for all star levels', () => {
+    // Feedback is a random pool pick now; phase pools are disjoint, so a
+    // phase 0 line can never equal a phase 4 line.
     const phase0 = getVictoryFeedback(3, 0);
     const phase4 = getVictoryFeedback(3, 4);
     expect(phase0).not.toBe(phase4);
-    // Phase 0 is encouraging, phase 4 is dark
-    expect(phase0).toContain('Flawless');
+    // Phase 0 stays encouraging (the flagship line anchors the pool),
+    // phase 4 stays dark.
+    expect(VICTORY_FEEDBACK_POOLS[0].three).toContain('Flawless! The words knew exactly where to go.');
+    expect(VICTORY_FEEDBACK_POOLS[4].three).toContain('Perfection in an imperfect void.');
+    expect(VICTORY_FEEDBACK_POOLS[0].three).toContain(phase0);
+    expect(VICTORY_FEEDBACK_POOLS[4].three).toContain(phase4);
   });
 });
 

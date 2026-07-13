@@ -155,7 +155,7 @@ import { VictoryModal, VictoryData } from '../components/puzzle/VictoryModal';
 import { getToastTheme } from '../components/puzzle/Toast';
 import { SWIFT_VICTORY_MIN_PUZZLES } from '../hooks/useVictoryFlow';
 import {
-  getVictoryFeedback,
+  VICTORY_FEEDBACK_POOLS,
   getRitualEchoFooter,
   getRitualEchoHeader,
   getAutoCollectCaption,
@@ -407,21 +407,25 @@ describe('feedback vs ritual-echo footer (same emotional slot)', () => {
     const tree = render(baseProps({ phase: 1, completedWords: chain }));
     const text = textOf(tree);
     expect(text).toContain(getRitualEchoFooter(1, chain.length)); // 'A curious path...'
-    expect(text).not.toContain(getVictoryFeedback(3, 1));
+    // Feedback is a random pool pick now — assert NO pool line renders.
+    for (const line of VICTORY_FEEDBACK_POOLS[1].three) {
+      expect(text).not.toContain(line);
+    }
   });
 
   it('phase 0 with a chain: footer is intentionally empty, so the feedback line stays', () => {
     expect(getRitualEchoFooter(0, chain.length)).toBe('');
     const tree = render(baseProps({ phase: 0, completedWords: chain }));
     const text = textOf(tree);
-    expect(text).toContain(getVictoryFeedback(3, 0));
+    // Feedback is a random pool pick now — assert SOME pool line renders.
+    expect(VICTORY_FEEDBACK_POOLS[0].three.some(line => text.includes(line))).toBe(true);
     expect(text).toContain(getRitualEchoHeader(0));
   });
 
   it('no chain (e.g. autosave-restored board): the feedback line carries the register', () => {
     const tree = render(baseProps({ phase: 3, completedWords: [] }));
     const text = textOf(tree);
-    expect(text).toContain(getVictoryFeedback(3, 3));
+    expect(VICTORY_FEEDBACK_POOLS[3].three.some(line => text.includes(line))).toBe(true);
     expect(text).not.toContain(getRitualEchoHeader(3));
   });
 });
