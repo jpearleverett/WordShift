@@ -188,6 +188,12 @@ jest.mock('../services/localGenerator', () => ({
   extractTriggerWords: jest.fn(() => []),
 }));
 
+// --- Mock wordHistory (formed-word cooldown feed) ---
+const mockRecordFormedWords = jest.fn(async (_words?: string[]) => {});
+jest.mock('../services/wordHistory', () => ({
+  recordFormedWords: (...args: any[]) => mockRecordFormedWords(args[0]),
+}));
+
 // --- Mock eventLogger ---
 const mockLogEvent = jest.fn();
 jest.mock('../services/eventLogger', () => ({
@@ -539,6 +545,22 @@ describe('useGamePersistence', () => {
           variant: 'standard',
         })
       );
+    });
+
+    test('records formed words into wordHistory cooldowns', async () => {
+      const [, actions] = callHook();
+      await actions.recordVictory('MEDIUM', 0, 0, 'standard', ['LIME', 'TIME']);
+
+      // Bank selection freshness must see the words the player actually
+      // formed, not just the starting chain recorded at puzzle start.
+      expect(mockRecordFormedWords).toHaveBeenCalledWith(['LIME', 'TIME']);
+    });
+
+    test('does not record formed words when no completed words were passed', async () => {
+      const [, actions] = callHook();
+      await actions.recordVictory('MEDIUM', 0, 0);
+
+      expect(mockRecordFormedWords).not.toHaveBeenCalled();
     });
 
     test('returns harvestOverflow: false when no overflow', async () => {

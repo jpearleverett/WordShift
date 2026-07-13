@@ -140,6 +140,31 @@ export function isInHardCooldown(
 }
 
 /**
+ * Trim groups in place to the history size caps (max puzzles tracked and
+ * max total words tracked). Shared by recordPuzzleWords/recordFormedWords.
+ */
+function trimGroups(newGroups: string[][]): void {
+  // Trim to max puzzles
+  if (newGroups.length > MAX_HISTORY_SIZE) {
+    newGroups.length = MAX_HISTORY_SIZE;
+  }
+
+  // Also trim if total words exceed max
+  let totalWords = 0;
+  let trimIndex = newGroups.length;
+  for (let i = 0; i < newGroups.length; i++) {
+    totalWords += newGroups[i].length;
+    if (totalWords > MAX_WORDS_TRACKED) {
+      trimIndex = i + 1;
+      break;
+    }
+  }
+  if (trimIndex < newGroups.length) {
+    newGroups.length = trimIndex;
+  }
+}
+
+/**
  * Record words from a completed puzzle
  */
 export async function recordPuzzleWords(words: string[]): Promise<void> {
@@ -153,24 +178,7 @@ export async function recordPuzzleWords(words: string[]): Promise<void> {
     // Add new puzzle group at the beginning (most recent)
     const newGroups = [puzzleGroup, ...(historyCache?.puzzleGroups || [])];
 
-    // Trim to max puzzles
-    if (newGroups.length > MAX_HISTORY_SIZE) {
-      newGroups.length = MAX_HISTORY_SIZE;
-    }
-
-    // Also trim if total words exceed max
-    let totalWords = 0;
-    let trimIndex = newGroups.length;
-    for (let i = 0; i < newGroups.length; i++) {
-      totalWords += newGroups[i].length;
-      if (totalWords > MAX_WORDS_TRACKED) {
-        trimIndex = i + 1;
-        break;
-      }
-    }
-    if (trimIndex < newGroups.length) {
-      newGroups.length = trimIndex;
-    }
+    trimGroups(newGroups);
 
     historyCache = {
       puzzleGroups: newGroups,
@@ -180,6 +188,49 @@ export async function recordPuzzleWords(words: string[]): Promise<void> {
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(historyCache));
   } catch (error) {
     console.warn('Failed to record puzzle words:', error);
+  }
+}
+
+/**
+ * Record the words FORMED while solving the current puzzle. The starting
+ * chain is recorded as its own group when the puzzle is served
+ * (recordPuzzleWords at selection time), so the formed words are merged into
+ * that most-recent group — one group per puzzle keeps the "puzzles ago"
+ * recency math honest — and future bank selection penalizes every word the
+ * player actually SAW on the board, not just the starting chain. If no group
+ * exists yet (e.g. a board whose start path skipped chain recording), the
+ * formed words become their own group.
+ */
+export async function recordFormedWords(words: string[]): Promise<void> {
+  if (words.length === 0) return;
+  try {
+    if (!historyCache) {
+      await loadWordHistory();
+    }
+
+    const upper = words.map(w => w.toUpperCase());
+    const groups = historyCache?.puzzleGroups || [];
+    let newGroups: string[][];
+    if (groups.length === 0) {
+      newGroups = [upper];
+    } else {
+      const merged = [...groups[0]];
+      for (const w of upper) {
+        if (!merged.includes(w)) merged.push(w);
+      }
+      newGroups = [merged, ...groups.slice(1)];
+    }
+
+    trimGroups(newGroups);
+
+    historyCache = {
+      puzzleGroups: newGroups,
+      lastUpdated: Date.now()
+    };
+
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(historyCache));
+  } catch (error) {
+    console.warn('Failed to record formed words:', error);
   }
 }
 

@@ -467,6 +467,71 @@ describe('puzzleBank', () => {
     });
   });
 
+  describe('phase 4 climax freshness (no replays while unplayed boards exist)', () => {
+    const usedKey = 'wordshift_played_puzzle_ids';
+    const byWords = new Map(PUZZLE_BANK_HARD.map(p => [p.words.join(','), p]));
+
+    async function seedPlayed(playedIds: string[]) {
+      await AsyncStorage.setItem(usedKey, JSON.stringify(playedIds));
+    }
+
+    it('never re-serves a played puzzle while unplayed puzzles remain', async () => {
+      // Leave only three bright (tier 0) puzzles unplayed — everything else,
+      // including every dread board, is played. The old fold-in would have
+      // re-served played dread here; the rework must serve an unplayed board.
+      const unplayed = PUZZLE_BANK_HARD.filter(p => p.dreadTier === 0).slice(0, 3);
+      const unplayedIds = new Set(unplayed.map(p => p.id));
+      await seedPlayed(PUZZLE_BANK_HARD.filter(p => !unplayedIds.has(p.id)).map(p => p.id));
+
+      const result = await selectPreGeneratedPuzzle('HARD', 4, emptyRecencyMap());
+      expect(result).not.toBeNull();
+      const entry = byWords.get(result!.words.join(','));
+      expect(entry).toBeDefined();
+      expect(unplayedIds.has(entry!.id)).toBe(true);
+    });
+
+    it('serves the unplayed ideal-tier puzzle first at phase 4', async () => {
+      // One unplayed tier-4 board among unplayed tier-0 boards: the tier
+      // filter must pick the tier-4 one.
+      const tier4 = PUZZLE_BANK_HARD.find(p => p.dreadTier === 4)!;
+      const tier0 = PUZZLE_BANK_HARD.filter(p => p.dreadTier === 0).slice(0, 5);
+      const unplayedIds = new Set([tier4.id, ...tier0.map(p => p.id)]);
+      await seedPlayed(PUZZLE_BANK_HARD.filter(p => !unplayedIds.has(p.id)).map(p => p.id));
+
+      const result = await selectPreGeneratedPuzzle('HARD', 4, emptyRecencyMap());
+      expect(result).not.toBeNull();
+      expect(result!.words.join(',')).toBe(tier4.words.join(','));
+    });
+
+    it('widens to adjacent dread tiers before falling back to bright boards', async () => {
+      // All tier 3-4 played; unplayed pool holds tier-2 and tier-0 boards.
+      // Spread widening (|tier - 4| <= 2) must serve the tier-2 board.
+      const tier2 = PUZZLE_BANK_HARD.find(p => p.dreadTier === 2)!;
+      const tier0 = PUZZLE_BANK_HARD.filter(p => p.dreadTier === 0).slice(0, 5);
+      const unplayedIds = new Set([tier2.id, ...tier0.map(p => p.id)]);
+      await seedPlayed(PUZZLE_BANK_HARD.filter(p => !unplayedIds.has(p.id)).map(p => p.id));
+
+      const result = await selectPreGeneratedPuzzle('HARD', 4, emptyRecencyMap());
+      expect(result).not.toBeNull();
+      expect(result!.words.join(',')).toBe(tier2.words.join(','));
+    });
+
+    it('re-serves only on full-bank exhaustion, preferring least-recently-played', async () => {
+      // Entire bank played: the exhaustion recycle frees the OLDEST half of
+      // the played list (most-recent-first storage), so the replay must come
+      // from that half.
+      const allIds = PUZZLE_BANK_HARD.map(p => p.id);
+      await seedPlayed(allIds);
+
+      const result = await selectPreGeneratedPuzzle('HARD', 4, emptyRecencyMap());
+      expect(result).not.toBeNull();
+      const entry = byWords.get(result!.words.join(','));
+      expect(entry).toBeDefined();
+      const oldestHalf = new Set(allIds.slice(Math.floor(allIds.length / 2)));
+      expect(oldestHalf.has(entry!.id)).toBe(true);
+    });
+  });
+
   describe('PUZZLE_BANK_REVERSE_HARD', () => {
     it('exports an array', () => {
       expect(Array.isArray(PUZZLE_BANK_REVERSE_HARD)).toBe(true);

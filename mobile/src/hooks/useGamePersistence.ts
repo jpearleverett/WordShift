@@ -22,6 +22,7 @@ import {
   isPostRevelation,
 } from '../services/amberCurrency';
 import { updatePuzzleCount, updateSessionPhase } from '../services/dialogueSession';
+import { recordFormedWords } from '../services/wordHistory';
 import { calculateRitualEnergy, extractTriggerWords } from '../services/localGenerator';
 import { GameEvent, logEvent } from '../services/eventLogger';
 import { updateQuestProgress } from '../services/weeklyQuests';
@@ -362,6 +363,12 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         const triggerWords = extractTriggerWords(completedWords);
         const ritualResult = await recordRitualWords(completedWords, ritualEnergy, triggerWords);
         totalWordsFormed = ritualResult.totalWordsFormed;
+        // Feed the FORMED words into the word-history cooldowns too. The
+        // starting chain was recorded when the puzzle was served, so without
+        // this the words the player actually built (half of what they see)
+        // were invisible to bank-selection freshness and could repeat
+        // immediately on the next board.
+        await recordFormedWords(completedWords);
         // Fulfill any animal's outstanding offering request whose theme these
         // words match — the animal reacts by name on the next visit.
         recordOfferingFulfillment(completedWords).catch(() => {});

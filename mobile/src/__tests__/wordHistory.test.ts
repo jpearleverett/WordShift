@@ -1,4 +1,18 @@
-import { calculateFreshnessPenalty, isInHardCooldown } from '../services/wordHistory';
+import { createMockAsyncStorage } from './helpers/mockAsyncStorage';
+
+jest.mock('@react-native-async-storage/async-storage', () =>
+  createMockAsyncStorage()
+);
+
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  calculateFreshnessPenalty,
+  isInHardCooldown,
+  recordPuzzleWords,
+  recordFormedWords,
+  getWordHistoryWithRecency,
+  clearWordHistory,
+} from '../services/wordHistory';
 
 describe('calculateFreshnessPenalty', () => {
   test('returns -5 (bonus) for never-seen words', () => {
@@ -84,5 +98,63 @@ describe('isInHardCooldown', () => {
   test('returns false for old words', () => {
     const recencyMap = new Map([['WORD', 50]]);
     expect(isInHardCooldown('WORD', recencyMap)).toBe(false);
+  });
+});
+
+describe('recordFormedWords', () => {
+  beforeEach(async () => {
+    await AsyncStorage.clear();
+    await clearWordHistory();
+  });
+
+  test('merges formed words into the most recent puzzle group (same recency bucket)', async () => {
+    // Chain recorded at puzzle start...
+    await recordPuzzleWords(['LAMP', 'OVER', 'TIME', 'USED']);
+    // ...formed words recorded at victory join the SAME group.
+    await recordFormedWords(['LOVER', 'TIMER', 'MUSED']);
+
+    const recency = await getWordHistoryWithRecency();
+    expect(recency.get('LAMP')).toBe(0);
+    expect(recency.get('LOVER')).toBe(0);
+    expect(recency.get('TIMER')).toBe(0);
+
+    // The next puzzle pushes both chain AND formed words one bucket back
+    // together — merging kept one group per puzzle.
+    await recordPuzzleWords(['FIRE', 'LIKE']);
+    const recency2 = await getWordHistoryWithRecency();
+    expect(recency2.get('FIRE')).toBe(0);
+    expect(recency2.get('LAMP')).toBe(1);
+    expect(recency2.get('LOVER')).toBe(1);
+  });
+
+  test('does not duplicate words already present in the group', async () => {
+    await recordPuzzleWords(['LAMP', 'OVER']);
+    await recordFormedWords(['LAMP', 'LOVER']);
+    const stored = await AsyncStorage.getItem('wordshift_word_history');
+    const parsed = JSON.parse(stored!);
+    expect(parsed.puzzleGroups[0]).toEqual(['LAMP', 'OVER', 'LOVER']);
+    expect(parsed.puzzleGroups.length).toBe(1);
+  });
+
+  test('creates its own group when history is empty', async () => {
+    await recordFormedWords(['HEART', 'PLANT']);
+    const recency = await getWordHistoryWithRecency();
+    expect(recency.get('HEART')).toBe(0);
+    expect(recency.get('PLANT')).toBe(0);
+  });
+
+  test('empty input is a no-op', async () => {
+    await recordPuzzleWords(['LAMP']);
+    await recordFormedWords([]);
+    const stored = await AsyncStorage.getItem('wordshift_word_history');
+    const parsed = JSON.parse(stored!);
+    expect(parsed.puzzleGroups.length).toBe(1);
+    expect(parsed.puzzleGroups[0]).toEqual(['LAMP']);
+  });
+
+  test('uppercases formed words', async () => {
+    await recordFormedWords(['heart']);
+    const recency = await getWordHistoryWithRecency();
+    expect(recency.get('HEART')).toBe(0);
   });
 });
