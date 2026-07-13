@@ -3014,11 +3014,13 @@ export function getIncantationName(words: string[], phase: number): string | nul
   const formatWord = (w: string) => w.charAt(0) + w.slice(1).toLowerCase();
   const first = formatWord(firstWord);
   const last = formatWord(lastWord);
+  // a/an by the word's leading sound (vowel letter is a close-enough proxy here)
+  const firstArticle = /^[AEIOU]/.test(firstWord) ? 'An' : 'A';
 
   // Phase 2 templates - innocent, playful naming
   const phase2Templates = [
     `The ${first} Dance`,
-    `A ${first}'s Journey`,
+    `${firstArticle} ${first}'s Journey`,
     `${first} & ${last}`,
     `From ${first} to ${last}`,
     `The ${last} Waltz`,
