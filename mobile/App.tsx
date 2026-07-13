@@ -25,7 +25,7 @@ import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { CandyColors } from './src/theme/colors';
 import { usePuzzleGame } from './src/hooks/usePuzzleGame';
 import { useGamePersistence } from './src/hooks/useGamePersistence';
-import { useVictoryFlow } from './src/hooks/useVictoryFlow';
+import { useVictoryFlow, isRoutineVictory } from './src/hooks/useVictoryFlow';
 import { useAchievementQueue } from './src/hooks/useAchievementQueue';
 import { useSpeedTimer } from './src/hooks/useSpeedTimer';
 import { useDreadEffects } from './src/hooks/useDreadEffects';
@@ -76,7 +76,8 @@ import { initShareImage } from './src/services/shareImage';
 import { ShareResultModal } from './src/components/share/ShareResultModal';
 import { getLocalDateString } from './src/services/dateUtils';
 import { getSettingsSync } from './src/services/settings';
-import { initAudio, setAudioPhase, soundVictory, soundPerfect, soundValidMove, soundInvalidMove, soundUndo, soundHint, soundTap, soundLetterSelect } from './src/services/audio';
+import { initAudio, setAudioPhase, startMusicForPhase, soundVictory, soundPerfect, soundValidMove, soundInvalidMove, soundUndo, soundHint, soundTap, soundLetterSelect } from './src/services/audio';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess, hapticWarning, hapticError, hapticSelection } from './src/services/haptics';
 import { getVariantTutorialIntroLines } from './src/services/animalDialogue';
 import {
@@ -103,6 +104,9 @@ import {
   getDailyLadderLine,
   getDailyLadderTrendLabel,
   getEventDailyBonusLine,
+  getPreviewGraduationMessage,
+  getSwiftVictoryHintMessage,
+  getStreakHeldMessage,
 } from './src/services/phaseNarrative';
 import { getActiveEvent, getEventDailyBonusAmber } from './src/services/liveEvents';
 import { recordSolveTime, getSolveTrend, recordSpeedRound } from './src/services/masteryRecords';
@@ -144,6 +148,32 @@ import { getCumulativeStats } from './src/services/starRating';
 // play" beat (and the curated early window ignores difficulty anyway).
 const SETUP_SELECTOR_INTRO_MIN_PUZZLES = 3;
 
+// One-time Swift Victories pointer: only past this puzzle count (a few boards
+// beyond SWIFT_VICTORY_MIN_PUZZLES, so compact mode is actually available and
+// the player has felt some choreography repetition worth shortening).
+const SWIFT_HINT_MIN_PUZZLES = 24;
+
+// One-time, DEVICE-LOCAL UX pointer flags (deliberately not cloud-synced and
+// not cleared by Reset All owners' service clears: they mark "this device's
+// player has seen this pointer", not game progress).
+const PREVIEW_GRADUATION_SEEN_KEY = 'wordshift_preview_graduation_seen';
+const SWIFT_HINT_SEEN_KEY = 'wordshift_swift_hint_seen';
+async function hasSeenOneTimeFlag(key: string): Promise<boolean> {
+  try {
+    return (await AsyncStorage.getItem(key)) === 'true';
+  } catch {
+    // Broken storage must never spam a "one-time" pointer — treat as seen.
+    return true;
+  }
+}
+async function markOneTimeFlagSeen(key: string): Promise<void> {
+  try {
+    await AsyncStorage.setItem(key, 'true');
+  } catch {
+    // Non-critical.
+  }
+}
+
 // Module-scope launch-routing guards: an appEpoch remount (late cloud restore)
 // re-runs MainApp's mount effects, and both getInitialURL and
 // getLastNotificationResponseAsync keep returning the ORIGINAL launch payload —
@@ -158,7 +188,7 @@ import { markPendingChanges, uploadToCloud, installCloudProviderIfConfigured, ma
 import * as Sentry from '@sentry/react-native';
 import { getSentryDsn } from './src/services/supabaseClient';
 import { estimateSlotIndex, findClosestValidSlot } from './src/services/slotEstimation';
-import { DROP_SHAKE_KEYFRAME_MS, DROP_SHAKE_INTENSITY, SPEED_ESCALATION_STEP_SEC, SPEED_ESCALATION_MIN_SEC, SPEED_TICK_CRITICAL_SEC, speedTickKind } from './src/constants/timing';
+import { DROP_SHAKE_KEYFRAME_MS, DROP_SHAKE_INTENSITY, SPEED_ESCALATION_STEP_SEC, SPEED_ESCALATION_MIN_SEC, SPEED_TICK_CRITICAL_SEC, SWIFT_HINT_TOAST_DELAY_MS, speedTickKind } from './src/constants/timing';
 import { OfferingPitScreen } from './src/components/OfferingPitScreen';
 import { ShopScreen } from './src/components/shop/ShopScreen';
 import { loadPuzzleState, clearPuzzleState } from './src/services/puzzleSaveState';
@@ -587,6 +617,40 @@ function MainApp() {
   useEffect(() => {
     setAudioPhase(persistence.currentPhase);
   }, [persistence.currentPhase]);
+
+  // Ambient music bed. Starts once persistence hydrates (the bed must open on
+  // the REAL phase, not a Phase-0 default — cumulativeStats flips from null
+  // exactly once, in the same batch that sets currentPhase), and re-crossfades
+  // when the phase advances — but only after any ceremony overlay completes
+  // (phaseTransitionEvent -> null), so the pit ignition / finale cinematics
+  // keep their own soundscape and the new bed lands as the world settles.
+  // startMusicForPhase is a no-op when the right bed is already playing, so
+  // re-runs (refreshStats, appEpoch remounts, a rebuildSessionFromStorage
+  // whose refresh changes currentPhase) are free.
+  //
+  // Backgrounding: audio.ts initializes expo-audio with
+  // shouldPlayInBackground: false, which auto-pauses playback when the app
+  // leaves the foreground — deliberately NO stopMusic() here (stopping would
+  // release the player and force a re-decode + fade-up from silence on every
+  // app switch). The foreground listener resumes the paused bed: a same-track
+  // startMusicForPhase calls play() when the player isn't playing.
+  const musicPhaseRef = useRef(persistence.currentPhase);
+  musicPhaseRef.current = persistence.currentPhase;
+  const musicHydratedRef = useRef(false);
+  useEffect(() => {
+    if (persistence.cumulativeStats === null) return;
+    musicHydratedRef.current = true;
+    if (phaseTransitionEvent !== null) return;
+    startMusicForPhase(persistence.currentPhase).catch(() => {});
+  }, [persistence.cumulativeStats, persistence.currentPhase, phaseTransitionEvent]);
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') return;
+      if (!musicHydratedRef.current) return;
+      startMusicForPhase(musicPhaseRef.current).catch(() => {});
+    });
+    return () => subscription.remove();
+  }, []);
 
   // Glitch stutter for the prominent first-victory glitch: a short on/off
   // flicker so a held 1.4s glitch reads as a genuine tear, not a caption.
@@ -1487,9 +1551,12 @@ function MainApp() {
       // Clear mid-puzzle save on completion
       clearPuzzleState().catch(() => {});
 
-      // Lock interaction during async victory chain
+      // Lock interaction during async victory chain. Deliberately NO haptic
+      // here: the victory's success haptic belongs to the modal becoming
+      // visible (VictoryModal fires hapticSuccess on visible) — firing one at
+      // processing start too made every win buzz twice ~300ms apart, blurring
+      // the star rhythm (tap-tap-tap-THUD) that follows.
       victoryActions.setProcessingVictory(true);
-      hapticSuccess();
 
       const victory = await persistenceActions.recordVictory(
         // Daily Challenge always rewards as HARD regardless of the player's
@@ -1622,6 +1689,13 @@ function MainApp() {
             // chain survived so the protection feels real, not silent.
             addVictoryTimeout(() => {
               puzzleActions.setMessage('🛡️ A missed day, but your daily streak held.');
+            }, 1100);
+          } else if (dailyProgress.streakDecayedTo != null) {
+            // Decay-to-milestone: the lapse cost the climb, not the streak —
+            // name the checkpoint it held at (phase-aware copy).
+            const heldAt = dailyProgress.streakDecayedTo;
+            addVictoryTimeout(() => {
+              puzzleActions.setMessage(getStreakHeldMessage(heldAt, persistence.currentPhase));
             }, 1100);
           }
           // Full-moon event: +50% bonus on the daily's amber, credited as
@@ -1923,7 +1997,9 @@ function MainApp() {
       } else {
         hapticMedium();
       }
-      soundValidMove();
+      // Audio combo ladder: the chime climbs with the clean-move streak
+      // (tier 0 base → 1/2/3; dark variants resolve inside audio.ts).
+      soundValidMove(result.comboTier ?? 0);
 
       setStarBurst({
         active: true,
@@ -2014,16 +2090,107 @@ function MainApp() {
       return;
     }
 
+    // Locked tiles in the active source row are tappable for FEEDBACK only
+    // (Row mounts a feedback touchable on them): full rejection language —
+    // error haptic + rejection thud, then the hook's locked branch raises the
+    // shake + locked-letter message. Never the select chime a real pick gets.
+    // Gated on PLAYING so a stray tap during victory/processing stays silent
+    // (matching the hook's own guard, which would swallow the press anyway).
+    if (letter.isLocked) {
+      if (puzzle.gameState === GameState.PLAYING) {
+        hapticError();
+        soundInvalidMove();
+        puzzleActions.handleLetterPress(letter, rowIndex);
+      }
+      return;
+    }
+
     hapticLight();
     soundLetterSelect();
     puzzleActions.handleLetterPress(letter, rowIndex);
   }, [puzzleActions, onboardingFlow.onboardingStep, puzzle.gameState, puzzle.selectedLetter, tutorialGuidance]);
 
+  // Track the active row + move direction (read inside the deferred drop
+  // handler and the per-move hover handler) and a registry of each row's
+  // measurable node for Y-bounds checking on drop/hover.
+  const activeRowIndexRef = useRef(puzzle.activeRowIndex);
+  const moveDirectionRef = useRef(puzzle.moveDirection);
+  const rowsRef = useRef(puzzle.rows);
+  activeRowIndexRef.current = puzzle.activeRowIndex;
+  moveDirectionRef.current = puzzle.moveDirection;
+  rowsRef.current = puzzle.rows;
+  const rowNodeRefs = useRef(new Map<number, any>());
+  const registerRowNode = useCallback((rowIndex: number, node: any) => {
+    if (node) rowNodeRefs.current.set(rowIndex, node);
+    else rowNodeRefs.current.delete(rowIndex);
+  }, []);
+
   // Disable puzzle ScrollView during drag to prevent scroll-vs-drag conflict.
-  // Toggled by DraggableTile via onDragActiveChange callback.
+  // Toggled by DraggableTile via onDragActiveChange callback. Drag start also
+  // measures the target row's window bounds ONCE (cheap, async) so the
+  // per-move hover handler can Y-gate with a plain sync compare; drag end
+  // clears both the cached bounds and any live hover highlight.
   const [puzzleScrollEnabled, setPuzzleScrollEnabled] = useState(true);
+  // Live drag-hover highlight: the slot the finger is currently over. Purely
+  // geometric (nearest slot by X, row-gated by Y) — NEVER validity-filtered,
+  // so it can't become a second snapping tell in the hidden-validity modes.
+  const [hoverSlot, setHoverSlot] = useState<{ rowIndex: number; slotIndex: number } | null>(null);
+  const hoverSlotRef = useRef<{ rowIndex: number; slotIndex: number } | null>(null);
+  const dragHoverBoundsRef = useRef<{ y: number; h: number } | null>(null);
+  const clearHoverSlot = useCallback(() => {
+    if (hoverSlotRef.current !== null) {
+      hoverSlotRef.current = null;
+      setHoverSlot(null);
+    }
+  }, []);
   const handleDragActiveChange = useCallback((active: boolean) => {
     setPuzzleScrollEnabled(!active);
+    dragHoverBoundsRef.current = null;
+    if (active) {
+      const targetIdx =
+        activeRowIndexRef.current + (moveDirectionRef.current === 'down' ? 1 : -1);
+      const node = rowNodeRefs.current.get(targetIdx);
+      if (node && typeof node.measureInWindow === 'function') {
+        node.measureInWindow((_x: number, y: number, _w: number, h: number) => {
+          dragHoverBoundsRef.current = { y, h: h || 64 };
+        });
+      }
+    } else {
+      clearHoverSlot();
+    }
+  }, [clearHoverSlot]);
+
+  // Per-move hover update from DraggableTile. Runs inside the PanResponder
+  // move path, so it must stay cheap: derive the slot, ref-compare against the
+  // last one, and only setState when the hovered slot actually changes.
+  const handleLetterDragMove = useCallback((position: { x: number; y: number }) => {
+    const targetIdx =
+      activeRowIndexRef.current + (moveDirectionRef.current === 'down' ? 1 : -1);
+    const targetRow = rowsRef.current?.[targetIdx];
+    let next: { rowIndex: number; slotIndex: number } | null = null;
+    if (targetRow) {
+      // Y-gate with the same generous tolerance the drop path uses (one
+      // row-height of slack each side), so hover predicts the drop outcome.
+      // Missing bounds (measure still in flight) fail open — hover shows.
+      const bounds = dragHoverBoundsRef.current;
+      const inBand =
+        !bounds ||
+        (position.y >= bounds.y - bounds.h && position.y <= bounds.y + bounds.h * 2);
+      if (inBand) {
+        const slotCount = targetRow.words.length + 1;
+        const slotIndex = estimateSlotIndex(position.x, slotCount, targetRow.words.length);
+        next = { rowIndex: targetIdx, slotIndex };
+      }
+    }
+    const prev = hoverSlotRef.current;
+    if (
+      (prev === null && next === null) ||
+      (prev !== null && next !== null && prev.rowIndex === next.rowIndex && prev.slotIndex === next.slotIndex)
+    ) {
+      return;
+    }
+    hoverSlotRef.current = next;
+    setHoverSlot(next);
   }, []);
 
   // Every fresh board must present from the FIRST word. All board-building
@@ -2040,6 +2207,30 @@ function MainApp() {
     }
   }, [boardIdentity]);
 
+  // One-time preview-graduation beat: the FIRST board that starts with the
+  // ✓/✗ validity grading hidden explains, in-world, that the marks stay
+  // behind on the gentlest boards (getPreviewGraduationMessage — warm, never
+  // a tutorial voice). Keyed on board identity so it evaluates once per fresh
+  // board. Skipped in Blind Offering (no previews at all — its own intro
+  // covers the darkness) and during onboarding (tutorial boards are EASY, so
+  // this can't fire there anyway; the guard is belt-and-braces). Device-local
+  // one-time flag; the session ref keeps it to a single storage read.
+  const graduationCheckedRef = useRef(false);
+  useEffect(() => {
+    if (boardIdentity === null) return;
+    if (puzzle.gameState !== GameState.PLAYING) return;
+    if (puzzle.previewValidityVisible || puzzle.blindMode) return;
+    if (onboardingFlow.isOnboarding) return;
+    if (graduationCheckedRef.current) return;
+    graduationCheckedRef.current = true;
+    (async () => {
+      if (await hasSeenOneTimeFlag(PREVIEW_GRADUATION_SEEN_KEY)) return;
+      await markOneTimeFlagSeen(PREVIEW_GRADUATION_SEEN_KEY);
+      puzzleActions.setMessage(getPreviewGraduationMessage(persistence.currentPhase));
+    })().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fires per fresh board; actions/phase read at fire time
+  }, [boardIdentity, puzzle.gameState, puzzle.previewValidityVisible, puzzle.blindMode, onboardingFlow.isOnboarding]);
+
   // Drag-and-drop: when a letter is dragged onto the target row area, find the
   // closest valid slot and press it. The letter was already selected via onDragStart.
   // Uses refs + setTimeout to ensure React has processed the letter selection state
@@ -2048,20 +2239,13 @@ function MainApp() {
   const handleSlotPressRef = useRef(handleSlotPress);
   slotPreviewsRef.current = puzzle.slotPreviews;
   handleSlotPressRef.current = handleSlotPress;
+  // The verb-depth gate, mirrored for the deferred drop handler: near-miss
+  // snapping keys off preview VALIDITY, so it may only run while the ✓/✗
+  // grading is actually shown — otherwise the snap itself leaks validity on
+  // boards where the player is meant to judge the word.
+  const previewValidityVisibleRef = useRef(puzzle.previewValidityVisible);
+  previewValidityVisibleRef.current = puzzle.previewValidityVisible;
 
-  // Track the active row + move direction (read inside the deferred drop handler)
-  // and a registry of each row's measurable node for Y-bounds checking on drop.
-  const activeRowIndexRef = useRef(puzzle.activeRowIndex);
-  const moveDirectionRef = useRef(puzzle.moveDirection);
-  const rowsRef = useRef(puzzle.rows);
-  activeRowIndexRef.current = puzzle.activeRowIndex;
-  moveDirectionRef.current = puzzle.moveDirection;
-  rowsRef.current = puzzle.rows;
-  const rowNodeRefs = useRef(new Map<number, any>());
-  const registerRowNode = useCallback((rowIndex: number, node: any) => {
-    if (node) rowNodeRefs.current.set(rowIndex, node);
-    else rowNodeRefs.current.delete(rowIndex);
-  }, []);
   // Read inside the deferred drop handler (which has empty deps) so a rejected
   // drop can give phase-aware feedback without going stale.
   const currentPhaseRef = useRef(persistence.currentPhase);
@@ -2115,10 +2299,14 @@ function MainApp() {
       // a distant valid slot — an invalid drop that isn't a clear near-miss
       // still falls through to handleSlotPress's invalid feedback.
       let targetSlot = estimated;
-      // Near-miss snapping only when previews exist — in blind/challenge the
-      // absence of a snapping tell is part of the mode, and handleSlotPress
-      // gives real validation feedback on the raw estimated slot.
-      if (previews && !previews[estimated]?.isValid) {
+      // Near-miss snapping ONLY while the ✓/✗ validity grading is shown
+      // (previewValidityVisible: EASY / double-shift): the snap keys off
+      // validity, so on hidden-validity boards (MEDIUM+ standard/reverse/
+      // speed, daily, shared links) and in blind mode it would leak the very
+      // information the player is meant to judge. Everywhere else the drop
+      // commits to the nearest slot geometrically and handleSlotPress gives
+      // real validation feedback.
+      if (previews && previewValidityVisibleRef.current && !previews[estimated]?.isValid) {
         const closestValid = findClosestValidSlot(
           estimated,
           previews,
@@ -2407,10 +2595,37 @@ function MainApp() {
     await maybeShowPatronNudge();
   }, [maybeShowSharePrompt, maybePromptForNotifications, maybeShowPatronNudge]);
 
+  // One-time Swift Victories pointer: after the FIRST routine win past
+  // SWIFT_HINT_MIN_PUZZLES, a quiet toast points at the Settings toggle that
+  // keeps celebrations short. Routine wins only (isRoutineVictory — never the
+  // daily, milestones, quest turn-ins, or ceremonies), only while the setting
+  // is off, never during onboarding. Fired from the Next Level exit
+  // specifically — the toast surfaces on the puzzle screen, so it must land
+  // where the player is about to be. The delay lets the next board's start
+  // message settle first; the flag is consumed only when the toast will show.
+  const maybeShowSwiftVictoryHint = useCallback(() => {
+    const vd = victoryFlow.victoryData;
+    if (!vd) return;
+    if (onboardingFlow.isOnboarding) return;
+    if (getSettingsSync().swiftVictories === true) return;
+    if (!isRoutineVictory(vd)) return;
+    if ((vd.puzzlesSolved ?? 0) <= SWIFT_HINT_MIN_PUZZLES) return;
+    const phase = persistence.currentPhase;
+    (async () => {
+      if (await hasSeenOneTimeFlag(SWIFT_HINT_SEEN_KEY)) return;
+      await markOneTimeFlagSeen(SWIFT_HINT_SEEN_KEY);
+      setTimeout(() => {
+        puzzleActions.setMessage(getSwiftVictoryHintMessage(phase));
+      }, SWIFT_HINT_TOAST_DELAY_MS);
+    })().catch(() => {});
+  }, [victoryFlow.victoryData, onboardingFlow.isOnboarding, persistence.currentPhase, puzzleActions]);
+
   const handleNextLevel = useCallback(() => {
     hapticLight();
     setIsPlayingDaily(false);
     setSpeedRescueUsed(false);
+    // Reads victoryData — must run before the exit flow resets it.
+    maybeShowSwiftVictoryHint();
     // Snapshot the share payload BEFORE the exit flow resets victoryData.
     pendingShareSnapshotRef.current = buildShareDataRef.current();
     const adShown = maybeShowVictoryInterstitial();
@@ -2419,7 +2634,7 @@ function MainApp() {
       puzzleActions.handleNextLevel();
     });
     Promise.resolve(adShown).then((shown) => runVictoryExitNudges(shown === true)).catch(() => {});
-  }, [puzzleActions, startVictoryExitFlow, runVictoryExitNudges, maybeShowVictoryInterstitial]);
+  }, [puzzleActions, startVictoryExitFlow, runVictoryExitNudges, maybeShowVictoryInterstitial, maybeShowSwiftVictoryHint]);
 
   // During onboarding, "Continue" on the victory modal dismisses the modal and
   // surfaces the puzzle-screen completion beat ("Feel how the house settled...").
@@ -3214,12 +3429,17 @@ function MainApp() {
                 invalidDropSignal={invalidDropSignal}
                 successDropSignal={successDropSignal}
                 onLetterDragDrop={handleLetterDragDrop}
+                onLetterDragMove={handleLetterDragMove}
                 onDragActiveChange={handleDragActiveChange}
                 onMeasureRef={registerRowNode}
                 slotPreviews={
                   idx === puzzle.activeRowIndex + (puzzle.moveDirection === 'down' ? 1 : -1)
                     ? puzzle.slotPreviews
                     : undefined
+                }
+                previewValidityVisible={puzzle.previewValidityVisible}
+                hoverSlotIndex={
+                  hoverSlot && idx === hoverSlot.rowIndex ? hoverSlot.slotIndex : null
                 }
               />
             ))}

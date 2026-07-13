@@ -45,6 +45,11 @@ jest.mock('react-native', () => ({
 
 jest.mock('../components/LetterTile', () => ({ LetterTile: () => null }));
 jest.mock('../components/DraggableTile', () => ({ DraggableTile: () => null }));
+// Row fires hapticSelection for the inter-slot tap guidance — stub the
+// service so the native expo-haptics module never loads in Node.
+jest.mock('../services/haptics', () => ({
+  hapticSelection: jest.fn(),
+}));
 jest.mock('../services/settings', () => ({
   getSettingsSync: () => ({ reducedMotion: true, soundEnabled: false, hapticsEnabled: false }),
 }));
@@ -74,9 +79,24 @@ describe('getSlotAccessibilityLabel', () => {
       .toBe('Drop zone 1 of 5, would form TIMED, not a valid move');
   });
 
-  test('keeps the plain positional label when previews are suppressed (blind/challenge)', () => {
+  test('keeps the plain positional label when previews are suppressed (blind)', () => {
     expect(getSlotAccessibilityLabel(2, 5, false, undefined)).toBe('Drop zone 3');
     expect(getSlotAccessibilityLabel(2, 5, true, undefined)).toBe('Guided drop zone 3');
+  });
+
+  test('announces the formed word WITHOUT a verdict when validity is hidden', () => {
+    // The verb-depth gate: screen-reader players get exactly the same
+    // guidance sighted players do — the formed word, never the verdict.
+    expect(getSlotAccessibilityLabel(1, 5, false, { word: 'WARM', isValid: true }, false))
+      .toBe('Drop zone 2 of 5, would form WARM');
+    expect(getSlotAccessibilityLabel(0, 5, false, { word: 'TIMED', isValid: false }, false))
+      .toBe('Drop zone 1 of 5, would form TIMED');
+  });
+
+  test('hidden-validity labels are identical in shape for valid and invalid moves (no leak)', () => {
+    const validLabel = getSlotAccessibilityLabel(1, 5, false, { word: 'AAAA', isValid: true }, false);
+    const invalidLabel = getSlotAccessibilityLabel(1, 5, false, { word: 'AAAA', isValid: false }, false);
+    expect(validLabel).toBe(invalidLabel);
   });
 
   test('guided slots keep their guided prefix with previews', () => {
@@ -88,6 +108,7 @@ describe('getSlotAccessibilityLabel', () => {
     const labels = [
       getSlotAccessibilityLabel(0, 4, false, { word: 'TIED', isValid: true }),
       getSlotAccessibilityLabel(0, 4, false, { word: 'XRAY', isValid: false }),
+      getSlotAccessibilityLabel(0, 4, false, { word: 'XRAY', isValid: false }, false),
       getSlotAccessibilityLabel(0, 4, false),
     ];
     for (const label of labels) {
@@ -95,12 +116,24 @@ describe('getSlotAccessibilityLabel', () => {
     }
   });
 
-  test('Slot wires the builder with the row slot count (source pin)', () => {
+  test('Slot wires the builder with the row slot count AND the validity gate (source pin)', () => {
     const src = require('fs').readFileSync(
       require('path').join(__dirname, '../components/Row.tsx'),
       'utf8'
     );
-    expect(src).toMatch(/accessibilityLabel=\{getSlotAccessibilityLabel\(index, slotCount, isGuided, preview\)\}/);
+    expect(src).toMatch(/accessibilityLabel=\{getSlotAccessibilityLabel\(index, slotCount, isGuided, preview, validityVisible\)\}/);
     expect(src).toMatch(/slotCount=\{letters\.length \+ 1\}/);
+  });
+
+  test('the neutral preview renders no prefix and one shared ink (source pin)', () => {
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, '../components/Row.tsx'),
+      'utf8'
+    );
+    // Prefix only while validityVisible; neutral style is a single ink.
+    expect(src).toMatch(/\{validityVisible \? \(preview\.isValid \? '✓ ' : '✗ '\) : ''\}\{preview\.word\}/);
+    expect(src).toMatch(/slotPreviewNeutral/);
+    // The graded styles must stay gated behind validityVisible.
+    expect(src).toMatch(/validityVisible\s*\n?\s*\? \(preview\.isValid \? styles\.slotPreviewValid : styles\.slotPreviewInvalid\)\s*\n?\s*: styles\.slotPreviewNeutral/);
   });
 });

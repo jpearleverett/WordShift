@@ -132,13 +132,115 @@ describe('reset-all wiring', () => {
 
 describe('drag input without previews', () => {
   test('drops resolve slot geometry from the live board when previews are suppressed', () => {
-    // Previews are suppressed in blind AND challenge modes; the drop handler
-    // must derive slot count from the board or every drag in those modes dies
-    // as a "miss" and only tap input works.
+    // Previews are suppressed in blind mode; the drop handler must derive slot
+    // count from the board or every drag there dies as a "miss" and only tap
+    // input works.
     expect(APP_TSX).toMatch(/slotCount = previews\?\.length \?\? 0/);
     expect(APP_TSX).toMatch(/targetRow\.words\.length \+ 1/);
-    // Near-miss snapping stays preview-gated (no free validity tell in blind).
-    expect(APP_TSX).toMatch(/previews && !previews\[estimated\]\?\.isValid/);
+    // Near-miss snapping is gated on the verb-depth flag: it keys off preview
+    // VALIDITY, so it may only run while the ✓/✗ grading is actually shown
+    // (EASY / double-shift) — otherwise the snap leaks validity on boards
+    // where the player is meant to judge the word.
+    expect(APP_TSX).toMatch(/previews && previewValidityVisibleRef\.current && !previews\[estimated\]\?\.isValid/);
+  });
+});
+
+describe('verb-depth preview gate threading', () => {
+  test('Row receives the presentation flag straight from the hook', () => {
+    expect(APP_TSX).toMatch(/previewValidityVisible=\{puzzle\.previewValidityVisible\}/);
+  });
+
+  test('the one-time graduation toast fires on the first hidden-validity board', () => {
+    expect(APP_TSX).toMatch(/PREVIEW_GRADUATION_SEEN_KEY/);
+    expect(APP_TSX).toMatch(/getPreviewGraduationMessage\(persistence\.currentPhase\)/);
+    // Blind Offering and onboarding never consume the beat.
+    expect(APP_TSX).toMatch(/puzzle\.previewValidityVisible \|\| puzzle\.blindMode/);
+  });
+});
+
+describe('drag hover highlight', () => {
+  test('hover derives geometrically and threads to the target Row', () => {
+    expect(APP_TSX).toMatch(/onLetterDragMove=\{handleLetterDragMove\}/);
+    expect(APP_TSX).toMatch(/hoverSlotIndex=\{/);
+    // Ref-compare before setState keeps the PanResponder move path cheap.
+    expect(APP_TSX).toMatch(/prev\.rowIndex === next\.rowIndex && prev\.slotIndex === next\.slotIndex/);
+    // Hover must never be validity-filtered — no findClosestValidSlot in the
+    // move handler (only the drop handler may snap, and only gated).
+    const moveHandler = APP_TSX.slice(
+      APP_TSX.indexOf('const handleLetterDragMove'),
+      APP_TSX.indexOf('const handleLetterDragDrop')
+    );
+    expect(moveHandler.length).toBeGreaterThan(0);
+    expect(moveHandler).not.toContain('findClosestValidSlot');
+    expect(moveHandler).not.toContain('isValid');
+  });
+
+  test('drag end clears the hover highlight', () => {
+    expect(APP_TSX).toMatch(/const clearHoverSlot = useCallback/);
+    expect(APP_TSX).toMatch(/\} else \{\s*\n\s*clearHoverSlot\(\);/);
+  });
+});
+
+describe('move feedback stack', () => {
+  test('valid-move audio climbs the combo ladder from the hook-computed tier', () => {
+    expect(APP_TSX).toMatch(/soundValidMove\(result\.comboTier \?\? 0\)/);
+  });
+
+  test('locked-tile taps get the full rejection language, never the select chime', () => {
+    expect(APP_TSX).toMatch(/if \(letter\.isLocked\) \{/);
+    const lockedBranch = APP_TSX.slice(
+      APP_TSX.indexOf('if (letter.isLocked) {'),
+      APP_TSX.indexOf('hapticLight();', APP_TSX.indexOf('if (letter.isLocked) {'))
+    );
+    expect(lockedBranch).toContain('hapticError();');
+    expect(lockedBranch).toContain('soundInvalidMove();');
+  });
+});
+
+describe('victory haptics fire once', () => {
+  test('no hapticSuccess at victory-processing start (the modal owns it)', () => {
+    // The doubled-buzz fix: VictoryModal fires hapticSuccess when it becomes
+    // visible; a second one at setProcessingVictory(true) must not return.
+    expect(APP_TSX).not.toMatch(/setProcessingVictory\(true\);\s*\n\s*hapticSuccess\(\)/);
+  });
+});
+
+describe('ambient music wiring', () => {
+  test('the bed starts after hydration and re-crossfades outside ceremonies', () => {
+    expect(APP_TSX).toMatch(/startMusicForPhase\(persistence\.currentPhase\)/);
+    // Ceremony guard: never switch beds mid-overlay.
+    expect(APP_TSX).toMatch(/if \(phaseTransitionEvent !== null\) return;/);
+  });
+
+  test('foreground return resumes the paused bed (no stopMusic churn)', () => {
+    expect(APP_TSX).toMatch(/startMusicForPhase\(musicPhaseRef\.current\)/);
+    // Backgrounding relies on expo-audio's shouldPlayInBackground:false
+    // auto-pause — App must not tear the player down on every app switch
+    // (no stopMusic CALL anywhere in App; the word may appear in comments).
+    expect(APP_TSX).not.toMatch(/^\s*(?:await\s+)?stopMusic\(/m);
+  });
+});
+
+describe('one-time swift-victory pointer', () => {
+  test('fires only on a routine win, past the count gate, with the setting off', () => {
+    expect(APP_TSX).toMatch(/const maybeShowSwiftVictoryHint = useCallback/);
+    expect(APP_TSX).toMatch(/if \(!isRoutineVictory\(vd\)\) return;/);
+    expect(APP_TSX).toMatch(/SWIFT_HINT_MIN_PUZZLES/);
+    expect(APP_TSX).toMatch(/getSettingsSync\(\)\.swiftVictories === true\) return;/);
+    expect(APP_TSX).toMatch(/getSwiftVictoryHintMessage\(phase\)/);
+    // Reads victoryData — must run before the exit flow resets it.
+    const nextLevelIdx = APP_TSX.indexOf('const handleNextLevel = useCallback');
+    const hintCallIdx = APP_TSX.indexOf('maybeShowSwiftVictoryHint();', nextLevelIdx);
+    const exitIdx = APP_TSX.indexOf('startVictoryExitFlow(', nextLevelIdx);
+    expect(hintCallIdx).toBeGreaterThan(nextLevelIdx);
+    expect(hintCallIdx).toBeLessThan(exitIdx);
+  });
+});
+
+describe('daily streak decay-to-milestone messaging', () => {
+  test('the decayed checkpoint routes through getStreakHeldMessage', () => {
+    expect(APP_TSX).toMatch(/dailyProgress\.streakDecayedTo != null/);
+    expect(APP_TSX).toMatch(/getStreakHeldMessage\(heldAt, persistence\.currentPhase\)/);
   });
 });
 

@@ -3042,13 +3042,13 @@ export function getChallengeIntroLines(phase: DialoguePhase): string[] {
   if (phase >= 2) {
     return [
       "You've grown stronger with the letters, friend. Curious about a harder path?",
-      'Challenge Mode hides the little check marks, takes away your hints, and limits your undos. Rougher going, but the amber comes back half again as heavy.',
+      'Challenge Mode takes away your hints and limits your undos. Rougher going, but the amber comes back heavier for it.',
       'You\'ll find it in the puzzle setup. The words feel different when there\'s no safety net.',
     ];
   }
   return [
     "I've been watching you work, friend. You've got a feel for this now.",
-    'There\'s something called Challenge Mode. No previews telling you if a move works, no hints, fewer undos. Tougher, but the amber reward is half again as much.',
+    'There\'s something called Challenge Mode. No hints to lean on, and only a couple of undos. Tougher, but the amber reward comes back heavier for it.',
     'It\'s tucked into the puzzle setup. Give it a try when you want the letters to push back a little.',
   ];
 }
