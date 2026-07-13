@@ -21,9 +21,9 @@ the codebase and are the remaining gates to submission.
       Restore, UMP consent form (EEA/debug geography), interstitials, rewarded
       ads, notifications (tap routing incl. cold start), deep links
       (`wordshift://challenge/...`), and sharing (PNG share card).
-- [ ] **30-minute performance session** — one long mixed session (puzzles,
-      home, pit, store, dialogue) on the low-end device, watching for jank,
-      memory growth, and audio glitches.
+- [x] **30-minute performance session** — DONE (2026-07-13), exceeded: a
+      multi-hour mixed session on device reaching Phase 4 (puzzles, home, pit,
+      store, dialogue) with no glitches, jank, or lag observed.
 - [x] **Feature graphic** — DONE (2026-07-13): final 1024×500 art (Ember +
       wordmark + hidden treeline eyes) generated and reviewed; upload with the
       screenshots.
