@@ -91,7 +91,10 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
     ? { bg: CandyColors.green.dark + '33', text: CandyColors.green.light }
     : { bg: CandyColors.green.light + '2E', text: CandyColors.green.shadow };
   const selectedRowStyle = { backgroundColor: t.secondaryBg, borderColor: t.secondaryBorder };
-  const challengeActive = gameMode === 'challenge';
+  // Trial-ladder rungs are mutually exclusive: the CHALLENGE row lights only
+  // for challenge-without-blind (Blind Offering runs under gameMode
+  // 'challenge' too, but its own row carries that state).
+  const challengeActive = gameMode === 'challenge' && !blindActive;
 
   const panelStyle = StyleSheet.flatten([
     styles.difficultyMenu,
@@ -253,8 +256,8 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
                 </Text>
                 <Text style={[styles.challengeMenuDesc, { color: t.muted }]}>
                   {challengeActive
-                    ? 'No previews, no hints, limited undos, 1.5x amber'
-                    : 'No previews or hints, limited undos, +50% amber'}
+                    ? 'No hints, limited undos, 1.25x amber'
+                    : 'No hints, limited undos, +25% amber'}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -289,8 +292,8 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
               </Text>
               <Text style={[styles.challengeMenuDesc, { color: t.muted }]}>
                 {blindActive
-                  ? 'No previews. Any move plays. The chain is judged at the end.'
-                  : 'No previews, any move plays, judged only at the end'}
+                  ? 'Challenge limits, no previews. Judged once, at the end. 2x amber.'
+                  : 'Challenge limits, no previews, judged only at the end, 2x amber'}
               </Text>
             </View>
           </TouchableOpacity>

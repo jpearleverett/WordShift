@@ -359,8 +359,13 @@ export const NARRATIVE_ACCELERATION = {
   MEDIUM_PLUS_MULTIPLIER: 1.25,
   MEDIUM_MULTIPLIER: 1.0,
   EASY_MULTIPLIER: 1.0,
-  // Challenge mode: completing in challenge mode counts double
-  CHALLENGE_MULTIPLIER: 2.0,
+  // Trial ladder (2026-07 rebalance): Challenge keeps the ✓/✗ previews now, so
+  // its wins are meaningfully easier than before — 1.5x progress, not the old
+  // 2.0x. Blind Offering (the apex rung: challenge limits + no previews + free
+  // moves judged once at the end) takes the 2.0x cap. Neither may exceed 2.0x:
+  // the descent's pacing ceiling is a design constant.
+  CHALLENGE_MULTIPLIER: 1.5,
+  BLIND_MULTIPLIER: 2.0,
 };
 
 // ============================================================================
@@ -368,13 +373,22 @@ export const NARRATIVE_ACCELERATION = {
 // ============================================================================
 
 /**
- * Challenge mode configuration.
- * Optional harder mode for experienced players with better rewards.
+ * Trial ladder configuration (Challenge and Blind Offering share these limits).
+ *
+ * The two rungs are mutually exclusive in the setup menu:
+ * - CHALLENGE: no hints, limited undos, ✓/✗ previews STAY ON (2026-07: the old
+ *   preview suppression made the mode unreadable rather than harder; with
+ *   previews back, the amber multiplier drops from 1.5x to 1.25x because
+ *   previews pre-validate every move).
+ * - BLIND OFFERING (apex): all Challenge limits PLUS previews hidden and free
+ *   moves judged once at the end of the chain. Pays 2x amber — blind used to
+ *   pay nothing, which made the reward ladder non-monotonic once it absorbed
+ *   the challenge limits.
  */
 export const CHALLENGE_MODE_CONFIG = {
   // Legacy constant — prefer getMaxUndos(difficulty) for challenge mode
   MAX_UNDOS: 1,
-  /** Get max undos for challenge mode, scaled by difficulty */
+  /** Get max undos for challenge/blind, scaled by difficulty */
   getMaxUndos: (difficulty: Difficulty): number => {
     switch (difficulty) {
       case 'EASY': return 2;
@@ -383,8 +397,10 @@ export const CHALLENGE_MODE_CONFIG = {
       case 'HARD': return 1;
     }
   },
-  // Amber reward multiplier for challenge completions
-  AMBER_MULTIPLIER: 1.5,
+  // Amber reward multiplier for challenge completions (previews on)
+  AMBER_MULTIPLIER: 1.25,
+  // Amber reward multiplier for Blind Offering completions (the apex rung)
+  BLIND_AMBER_MULTIPLIER: 2.0,
   // No hints allowed in challenge mode
   HINTS_ALLOWED: false,
 };

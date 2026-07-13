@@ -509,6 +509,35 @@ describe('usePuzzleGame', () => {
       [state] = callHook();
       expect(state.invalidAttempts).toBe(0);
     });
+
+    test('a failed judgment unlocks free undos for the rest of the board', async () => {
+      // Blind Offering runs under gameMode 'challenge' (limited undos).
+      resetHookState();
+      let [, actions] = callHook();
+      await actions.startNewGame('MEDIUM', 'challenge', 'standard', true);
+      [, actions] = callHook();
+      actions.initGame(['TIME', 'TIED']);
+      let [state] = callHook();
+      expect(state.gameMode).toBe('challenge');
+      const budget = state.undosRemaining; // MEDIUM challenge budget (2)
+
+      // Fail the final judgment: T from TIME (IME) into TIED at 0 (TTIED).
+      const t = state.rows[0].words.find(le => le.char === 'T')!;
+      [, actions] = callHook();
+      actions.handleLetterPress(t, 0);
+      [, actions] = callHook();
+      const result = await actions.handleSlotPress(0);
+      expect(result?.blindFailed).toBe(true);
+
+      // The mercy: undoing back out of the failed chain charges nothing —
+      // walking to the flaw can take more undos than the budget holds.
+      [, actions] = callHook();
+      actions.handleUndo();
+      [state] = callHook();
+      expect(state.undosRemaining).toBe(budget);
+      expect(state.rows[0].words.map(le => le.char).join('')).toBe('TIME');
+      expect(state.rows[1].words.map(le => le.char).join('')).toBe('TIED');
+    });
   });
 
   describe('resetCurrentPuzzle', () => {
@@ -1031,7 +1060,7 @@ describe('usePuzzleGame', () => {
       actions.handleLetterPress(letter, state.activeRowIndex);
     }
 
-    test('challenge mode hides all slot previews', () => {
+    test('challenge mode KEEPS slot previews (2026-07 trial-ladder rebalance)', () => {
       resetHookState();
       let [, actions] = callHook();
       actions.setGameMode('challenge');
@@ -1042,7 +1071,8 @@ describe('usePuzzleGame', () => {
       const [state] = callHook();
       expect(state.gameMode).toBe('challenge');
       expect(state.selectedLetter).not.toBeNull();
-      expect(state.slotPreviews).toBeUndefined();
+      expect(state.slotPreviews).toBeDefined();
+      expect(state.slotPreviews![2].word).toBe('TIMED');
     });
 
     test('standard mode previews are unchanged', () => {
@@ -1056,20 +1086,22 @@ describe('usePuzzleGame', () => {
       expect(state.slotPreviews![2].word).toBe('TIMED');
     });
 
-    test('challenge suppresses the double-shift drop1 look-ahead previews too', () => {
-      // Standard double shift: drop1 look-ahead previews are shown.
+    test('blind suppresses the double-shift drop1 look-ahead previews (challenge does not)', async () => {
+      // Challenge double shift: drop1 look-ahead previews stay on.
       resetHookState();
       let [, actions] = callHook();
+      actions.setGameMode('challenge');
+      [, actions] = callHook();
       actions.initGame(['ABCDE', 'FGHIJ'], undefined, undefined, 5, 'double_shift');
       selectLetter('A');
       let [state] = callHook();
       expect(state.doubleShiftPhase).toBe('drop1');
       expect(state.slotPreviews).toBeDefined();
 
-      // Challenge double shift: same selection, no previews.
+      // Blind double shift: same selection, no previews.
       resetHookState();
       [, actions] = callHook();
-      actions.setGameMode('challenge');
+      await actions.startNewGame('MEDIUM', 'challenge', 'standard', true);
       [, actions] = callHook();
       actions.initGame(['ABCDE', 'FGHIJ'], undefined, undefined, 5, 'double_shift');
       selectLetter('A');

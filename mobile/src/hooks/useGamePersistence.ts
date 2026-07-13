@@ -71,6 +71,8 @@ export interface VictoryData {
   newPhase: DialoguePhase;
   streakBonus: number;
   challengeBonus: number;
+  /** True when the win was a Blind Offering board (labels the trial bonus line). */
+  blind?: boolean;
   /** Variable-ratio "lucky" surprise bonus (0 when none); reward-only, never phase progress */
   surpriseBonus: number;
   currentStreak: number;
@@ -254,6 +256,8 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
       // weighted phase progress (see awardPuzzleAmber's option contract).
       const amberResult = await awardPuzzleAmber(difficulty, stars, gameMode, threeStarRate, false, {
         skipPhaseProgress: isSharedChallenge,
+        // Blind Offering pays the apex rung (2x amber, 2x progress cap).
+        blind,
       });
 
       // Phase 5 (post-revelation) is set via markPostRevelation(), not phase progression.
@@ -430,6 +434,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         newPhase: effectivePhase,
         streakBonus: amberResult.streakBonus,
         challengeBonus: amberResult.challengeBonus,
+        blind,
         surpriseBonus: amberResult.surpriseBonus,
         currentStreak: amberResult.currentStreak,
         milestoneBonus: amberResult.milestoneBonus,

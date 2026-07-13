@@ -529,6 +529,13 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   // the same tick.
   const gameModeRef = useRef<GameMode>('standard');
   const difficultyRef = useRef<Difficulty>('MEDIUM');
+  // Blind Offering mercy: once the end-of-board judgment has failed on this
+  // board, undos stop charging against the limited budget. The punishment was
+  // already paid (an invalid attempt + the broken flawless run); walking the
+  // chain back to the flaw can take more undos than the budget holds, and a
+  // fail that can't be repaired reads as a bug, not a verdict. Cleared on any
+  // fresh/reset/restored board.
+  const blindFailFreeUndosRef = useRef(false);
   // Blind Offering modifier (opt-in, Wordle-Hard-Mode shape): when on, the ghost
   // word previews are hidden, so the player commits from their own word knowledge
   // and learns only from the rejection shake. Sticky across Next Level like
@@ -668,6 +675,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setError(null);
     setIsStuck(false);
     setHintHighlight(null);
+    blindFailFreeUndosRef.current = false;
     moveOutcomesRef.current = [];
     setMoveOutcomes([]);
     pendingHintRef.current = false;
@@ -1666,6 +1674,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       setInvalidAttempts(prev => prev + 1);
       pendingMistakeRef.current = true;
       cleanMoveStreakRef.current = 0;
+      // From here on, undos are free on this board (see blindFailFreeUndosRef).
+      blindFailFreeUndosRef.current = true;
       shakeError(getBlindFailMessage(currentPhase));
       setIsProcessing(false);
       return {
@@ -1814,8 +1824,11 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       return;
     }
 
-    // Challenge mode: limited undos (only applies to committed moves, not mid-step)
-    if (gameMode === 'challenge' && undosRemaining <= 0) {
+    // Challenge mode: limited undos (only applies to committed moves, not
+    // mid-step). A failed Blind Offering judgment unlocks free undos for the
+    // rest of the board — the fail must always be repairable.
+    const freeUndos = blindFailFreeUndosRef.current;
+    if (gameMode === 'challenge' && !freeUndos && undosRemaining <= 0) {
       shakeError("No undos remaining in Challenge Mode!");
       return;
     }
@@ -1870,7 +1883,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         setMoveOutcomes(moveOutcomesRef.current);
       }
       setMessage("Let's try again!");
-      setUndosRemaining(prev => prev - 1);
+      if (!freeUndos) setUndosRemaining(prev => prev - 1);
       return;
     }
 
@@ -1933,7 +1946,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       }
     }
 
-    if (gameMode === 'challenge') {
+    if (gameMode === 'challenge' && !freeUndos) {
       setUndosRemaining(prev => prev - 1);
     }
   }, [history, gameMode, undosRemaining, shakeError, gameState, currentVariant, doubleShiftPhase]);
@@ -1949,16 +1962,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     if (!selectedLetter || gameState !== GameState.PLAYING) return undefined;
     // Blind Offering: no ghost previews — and, because drag snapping keys off
     // these validity flags, suppressing them also removes the "tile jumps to a
-    // valid slot" tell, keeping the modifier honestly blind.
+    // valid slot" tell, keeping the modifier honestly blind. Challenge keeps
+    // its previews (2026-07 trial-ladder rebalance): losing them made the mode
+    // unreadable rather than harder, and the amber/progress multipliers were
+    // re-tuned (1.25x / 1.5x) to price the mode WITH previews on. Preview
+    // suppression is now solely Blind Offering's identity.
     if (blindMode) return undefined;
-    // Challenge mode: previews are part of what the mode takes away. With the
-    // ✓/✗ ghost previews on, every move gets a free hint — "no hints, limited
-    // undos" costs almost nothing while paying 1.5x amber / 2x phase progress.
-    // Suppressed via the same mechanism as blindMode (which also disables the
-    // drag valid-slot snapping tell), covering the double-shift drop1
-    // look-ahead too. Stuck detection (hasAnyValidMove/…DoubleShiftMove) and
-    // the undo/restart recovery paths are preview-independent and keep working.
-    if (gameMode === 'challenge') return undefined;
 
     const isDoubleShift = hasVariantModifier(currentVariant, 'double_shift');
 
@@ -2051,6 +2060,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     gameModeRef.current = saved.gameMode;
     setGameMode(saved.gameMode);
     setBlindMode(saved.blindMode ?? false);
+    // A restored board starts with a clean judgment slate (the free-undo
+    // mercy is per-live-board and deliberately not persisted).
+    blindFailFreeUndosRef.current = false;
     // Shared-challenge provenance rides in the autosave (isSharedChallenge in
     // SavedPuzzleState) so a kill+relaunch can't convert a shared board
     // (amber-only) into one that feeds phase progress. Old saves without the

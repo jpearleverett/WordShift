@@ -2613,23 +2613,33 @@ function MainApp() {
     orchestrationActions,
   ]);
 
+  // Trial ladder: Challenge and Blind Offering are mutually exclusive rungs.
+  // Challenge = no hints + limited undos, previews ON. Blind Offering = the
+  // apex rung: Challenge's limits (it runs under gameMode 'challenge') PLUS
+  // previews hidden and free moves judged once at the end of the chain.
   const handleToggleChallengeMode = useCallback(() => {
     hapticMedium();
     orchestrationActions.setCompletionCoda(null);
     resetSpeedRun();
-    const newMode = puzzle.gameMode === 'challenge' ? 'standard' : 'challenge';
-    puzzleActions.startNewGame(puzzle.difficulty, newMode, puzzle.selectedVariant, puzzle.blindMode);
+    const isChallengeOnly = puzzle.gameMode === 'challenge' && !puzzle.blindMode;
+    const newMode = isChallengeOnly ? 'standard' : 'challenge';
+    puzzleActions.startNewGame(puzzle.difficulty, newMode, puzzle.selectedVariant, false);
   }, [puzzleActions, puzzle.gameMode, puzzle.difficulty, puzzle.selectedVariant, puzzle.blindMode, orchestrationActions]);
 
   // Blind Offering: chosen before the board (a fresh board applies it so the
   // player can't toggle previews back on mid-solve to peek). Sticky across Next
-  // Level like Challenge; composes with any variant/difficulty/challenge state.
+  // Level; selecting it engages the challenge limits, deselecting returns to
+  // standard. Composes with any variant/difficulty.
   const handleToggleBlindMode = useCallback(() => {
     hapticMedium();
     orchestrationActions.setCompletionCoda(null);
     resetSpeedRun();
-    puzzleActions.startNewGame(puzzle.difficulty, puzzle.gameMode, puzzle.selectedVariant, !puzzle.blindMode);
-  }, [puzzleActions, puzzle.gameMode, puzzle.difficulty, puzzle.selectedVariant, puzzle.blindMode, orchestrationActions, resetSpeedRun]);
+    if (puzzle.blindMode) {
+      puzzleActions.startNewGame(puzzle.difficulty, 'standard', puzzle.selectedVariant, false);
+    } else {
+      puzzleActions.startNewGame(puzzle.difficulty, 'challenge', puzzle.selectedVariant, true);
+    }
+  }, [puzzleActions, puzzle.difficulty, puzzle.selectedVariant, puzzle.blindMode, orchestrationActions, resetSpeedRun]);
 
   // Present the daily-login grant only on a quiet home screen — never over the
   // puzzle, the victory flow, a post-victory intro, or a queued ceremony. The

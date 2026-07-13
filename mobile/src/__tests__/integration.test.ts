@@ -248,39 +248,52 @@ describe('Phase Boundaries', () => {
 // 3. Challenge Mode Constraints
 // ---------------------------------------------------------------------------
 describe('Challenge Mode', () => {
-  test('challenge mode awards 1.5x amber compared to standard', async () => {
+  test('trial-ladder amber: challenge 1.25x, blind offering 2x', async () => {
     // Standard mode: MEDIUM 3-star
     const standardResult = await awardPuzzleAmber('MEDIUM', 3, 'standard');
     const standardAmount = standardResult.amount;
 
     await clearProgress();
 
-    // Challenge mode: MEDIUM 3-star
+    // Challenge rung (previews on since the 2026-07 rebalance): MEDIUM 3-star
     const challengeResult = await awardPuzzleAmber('MEDIUM', 3, 'challenge');
 
     // Standard: base=floor(10*1.5)=15, amount=15
-    // Challenge: base=15, challengeBonus=floor(15*0.5)=7, amount=22
+    // Challenge: base=15, challengeBonus=floor(15*0.25)=3, amount=18
     expect(standardResult.baseAmount).toBe(15);
     expect(standardResult.challengeBonus).toBe(0);
     expect(standardResult.amount).toBe(15);
 
     expect(challengeResult.baseAmount).toBe(15);
-    expect(challengeResult.challengeBonus).toBe(7);
-    expect(challengeResult.amount).toBe(22);
+    expect(challengeResult.challengeBonus).toBe(3);
+    expect(challengeResult.amount).toBe(18);
 
     // Challenge total should be more than standard
     expect(challengeResult.amount).toBeGreaterThan(standardAmount);
+
+    await clearProgress();
+
+    // Blind Offering (apex rung, runs under gameMode 'challenge'):
+    // blindBonus=floor(15*1.0)=15, amount=30 — strictly above challenge.
+    const blindResult = await awardPuzzleAmber('MEDIUM', 3, 'challenge', 0, false, { blind: true });
+    expect(blindResult.challengeBonus).toBe(15);
+    expect(blindResult.amount).toBe(30);
+    expect(blindResult.amount).toBeGreaterThan(challengeResult.amount);
   });
 
-  test('challenge mode counts 2x toward phase progression', async () => {
+  test('trial-ladder progression: challenge 1.5x, blind offering 2x (the cap)', async () => {
     // Standard mode acceleration with default params
     const standardAccel = calculatePhaseAcceleration(0, 1, 'EASY', 'standard');
-    // Challenge mode acceleration with same params
+    // Challenge rung acceleration with same params
     const challengeAccel = calculatePhaseAcceleration(0, 1, 'EASY', 'challenge');
+    // Blind Offering rung (blind flag; still gameMode 'challenge')
+    const blindAccel = calculatePhaseAcceleration(0, 1, 'EASY', 'challenge', true);
 
     expect(standardAccel).toBe(1.0);
     expect(challengeAccel).toBe(NARRATIVE_ACCELERATION.CHALLENGE_MULTIPLIER);
-    expect(challengeAccel).toBe(2.0);
+    expect(challengeAccel).toBe(1.5);
+    expect(blindAccel).toBe(NARRATIVE_ACCELERATION.BLIND_MULTIPLIER);
+    expect(blindAccel).toBe(2.0);
 
     // Verify via actual awardPuzzleAmber calls
     const standardResult = await awardPuzzleAmber('EASY', 1, 'standard');
@@ -289,7 +302,12 @@ describe('Challenge Mode', () => {
     await clearProgress();
 
     const challengeResult = await awardPuzzleAmber('EASY', 1, 'challenge');
-    expect(challengeResult.phaseAcceleration).toBe(2.0);
+    expect(challengeResult.phaseAcceleration).toBe(1.5);
+
+    await clearProgress();
+
+    const blindResult = await awardPuzzleAmber('EASY', 1, 'challenge', 0, false, { blind: true });
+    expect(blindResult.phaseAcceleration).toBe(2.0);
   });
 
   test('challenge completions are tracked in progress', async () => {
@@ -353,18 +371,19 @@ describe('Economy Balance', () => {
   });
 
   test('maximum repeatable amber per puzzle is bounded', () => {
-    // Theoretical maximum: HARD 3-star, max streak, challenge mode
+    // Theoretical maximum: HARD 3-star, max streak, Blind Offering (the apex
+    // trial rung, 2x amber — plain challenge is 1.25x since the 2026-07 rebalance)
     const hardBase = AMBER_REWARDS.HARD; // 20
     const threeStarBase = Math.floor(hardBase * 1.5); // 30
     const maxStreakMultiplier = 1 + STREAK_BONUSES.MAX_BONUS_PERCENTAGE; // 2.0
     const afterStreak = Math.floor(threeStarBase * maxStreakMultiplier); // 60
-    const challengeBonus = Math.floor(afterStreak * (CHALLENGE_MODE_CONFIG.AMBER_MULTIPLIER - 1)); // 30
-    const maxPerPuzzle = afterStreak + challengeBonus; // 90
+    const blindBonus = Math.floor(afterStreak * (CHALLENGE_MODE_CONFIG.BLIND_AMBER_MULTIPLIER - 1)); // 60
+    const maxPerPuzzle = afterStreak + blindBonus; // 120
 
     // Verify the max is reasonable — enough to buy a mid-tier decoration (75-150 amber)
     // but not so much that progression trivializes the economy
-    expect(maxPerPuzzle).toBe(90);
-    expect(maxPerPuzzle).toBeLessThanOrEqual(100);
+    expect(maxPerPuzzle).toBe(120);
+    expect(maxPerPuzzle).toBeLessThanOrEqual(130);
     expect(maxPerPuzzle).toBeGreaterThan(0);
   });
 
