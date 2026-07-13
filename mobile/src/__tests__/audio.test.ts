@@ -49,7 +49,6 @@ jest.mock('expo-audio', () => {
   };
 });
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const expoAudio = require('expo-audio');
 const getPlayers = (): any[] => expoAudio.__getMockPlayers();
 
