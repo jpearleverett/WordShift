@@ -1724,6 +1724,8 @@ const styles = StyleSheet.create({
   harvestWordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
     paddingHorizontal: 18,
     paddingVertical: 8,
     borderRadius: 16,
@@ -1755,6 +1757,8 @@ const styles = StyleSheet.create({
   winStreakContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 16,

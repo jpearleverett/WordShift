@@ -774,6 +774,8 @@ interface OfferingPitScreenProps {
   onAmberChange?: (newBalance: number) => void;
   onOpenStats?: () => void;
   onOpenSettings?: () => void;
+  /** Open the amber Store (the header amber pill taps through, like home). */
+  onOpenStore?: () => void;
   /** 0.0 to 1.0 — how close the player is to the next phase */
   phaseProgressFraction: number;
   /** Non-null when a phase transition is pending and ready to confirm */
@@ -798,6 +800,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   onAmberChange,
   onOpenStats,
   onOpenSettings,
+  onOpenStore,
   phaseProgressFraction,
   pendingPhaseTransition,
   onPhaseTransitionConfirmed,
@@ -826,6 +829,13 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const [resultMessage, setResultMessage] = useState<string | null>(null);
   const [isOffering, setIsOffering] = useState(false);
   const [displayBalance, setDisplayBalance] = useState(amberBalance);
+  // Adopt EXTERNAL amber increases (a Store purchase made while the pit is
+  // open). Upward-only: pit-local spends/credits update displayBalance first
+  // and echo back through onAmberChange, so a lagging equal-or-smaller prop
+  // must never clobber the optimistic local value mid-cascade.
+  useEffect(() => {
+    setDisplayBalance(prev => (amberBalance > prev ? amberBalance : prev));
+  }, [amberBalance]);
   const [overflowCount, setOverflowCount] = useState(0);
   // Tracks amber visually consumed during harvest-all cascade (for decrementing pending display)
   const [pendingAmberOffset, setPendingAmberOffset] = useState(0);
@@ -2455,12 +2465,23 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       {/* Header — matches HomeScreen frosted glass style; safe-area aware */}
       <View style={[styles.header, { paddingTop: screenInsets.top + 16 }]}>
         <View style={styles.headerLeft}>
-          <View style={styles.amberContainer} accessibilityLabel={`${Math.max(0, displayBalance)} amber`}>
+          {/* Amber pill taps through to the Store, same as the home header. */}
+          <TouchableOpacity
+            style={styles.amberContainer}
+            onPress={() => { hapticLight(); onOpenStore?.(); }}
+            disabled={!onOpenStore || isOnboarding}
+            accessibilityLabel={
+              onOpenStore && !isOnboarding
+                ? `${Math.max(0, displayBalance)} amber. Tap to open the store`
+                : `${Math.max(0, displayBalance)} amber`
+            }
+            accessibilityRole={onOpenStore && !isOnboarding ? 'button' : undefined}
+          >
             <View style={styles.amberInner}>
               <AmberInline size={20} />
               <Text style={styles.amberCount}>{Math.max(0, displayBalance)}</Text>
             </View>
-          </View>
+          </TouchableOpacity>
           {pendingAmber - pendingAmberOffset > 0 && (
             <View style={styles.pendingBadge}>
               <Text style={styles.pendingBadgeText}>+{pendingAmber - pendingAmberOffset}</Text>

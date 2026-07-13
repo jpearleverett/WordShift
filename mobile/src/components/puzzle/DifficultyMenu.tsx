@@ -19,14 +19,16 @@ import { BODY_FONT, BODY_FONT_ITALIC, PIXEL_FONT_BOLD } from '../../theme/fonts'
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 // The menu floats at top: 52. Size it to the device so DIFFICULTY + PUZZLE STYLE
 // (Standard/Reverse/Speed/Double + combos) + CHALLENGE/BLIND all fit without the
-// last row clipping the frame — taller than the old fixed 650 once Speed Shift
-// unlocks, but never so tall it runs off a short device.
-const MENU_MAX_HEIGHT = Math.max(560, Math.min(SCREEN_HEIGHT - 88, 900));
+// last row clipping the frame. Strictly screen-derived: the old Math.max(560,…)
+// floor FORCED 560dp on short screens and pushed the last rows off the bottom
+// edge; the 140 budget covers the 52 anchor + gesture inset + shadow clearance.
+const MENU_MAX_HEIGHT = Math.max(380, Math.min(SCREEN_HEIGHT - 140, 900));
 // The scroll area must fit ABOVE the frame's ~21dp bottom wood band, or its
 // last row is clipped by the panel's overflow:hidden and can't be scrolled
-// into view. Reserve the top padding (18) + title (~26) + a bottom clearance
-// (28 > the wood band) so the final row always scrolls into clear parchment.
-const SCROLL_MAX_HEIGHT = MENU_MAX_HEIGHT - 72;
+// into view. Reserve the top padding (30, clearing the top wood band) + title
+// (~26) + a bottom clearance (28 > the wood band) so the final row always
+// scrolls into clear parchment.
+const SCROLL_MAX_HEIGHT = MENU_MAX_HEIGHT - 88;
 
 /** Semantic difficulty ring colors (shared candy identity with the header dot). */
 const DIFFICULTY_RING_COLORS: Record<Difficulty, string> = {
@@ -286,7 +288,9 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
                 {phase >= 3 ? 'BLIND OFFERING' : 'BLIND MODE'}
               </Text>
               <Text style={[styles.challengeMenuDesc, { color: t.muted }]}>
-                {blindActive ? 'No previews. Trust the words.' : 'Hide previews for a truer test'}
+                {blindActive
+                  ? 'No previews. Any move plays. The chain is judged at the end.'
+                  : 'No previews, any move plays, judged only at the end'}
               </Text>
             </View>
           </TouchableOpacity>
@@ -303,7 +307,9 @@ const styles = StyleSheet.create({
     top: 52,
     width: 290,
     maxHeight: MENU_MAX_HEIGHT,
-    paddingTop: 14,
+    // Must clear the cottage panel frame's 24dp top wood band, or the title
+    // sits inside the wood and reads as clipped against the top edge.
+    paddingTop: 30,
     paddingBottom: 26,
     paddingHorizontal: 10,
     shadowOffset: { width: 0, height: 10 },
