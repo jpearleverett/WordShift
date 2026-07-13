@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,8 @@ import {
   Image,
   ImageSourcePropType,
   Pressable,
+  Animated,
+  Easing,
 } from 'react-native';
 import { AmberInline } from '../AmberInline';
 import { Room, Animal, RoomTheme, DialoguePhase } from '../../types/homeWorld';
@@ -15,6 +17,8 @@ import { CandyColors } from '../../theme/colors';
 import { getPixelSkin, CARD_CORNER_DP, CARD_EDGE_DP } from '../../theme/pixelSkin.generated';
 import { NineSliceFrame } from '../ui/NineSlice';
 import { BODY_FONT, BODY_FONT_BOLD } from '../../theme/fonts';
+import { getSettingsSync } from '../../services/settings';
+import { shouldSimplifyAnimations } from '../../services/deviceTier';
 
 // Room background images - maps theme to image asset
 const ROOM_BACKGROUNDS: Record<RoomTheme, ImageSourcePropType> = {
@@ -112,6 +116,211 @@ export const getInviteAccessibilityLabel = (
   return `Invite animal to ${roomName} for ${inviteCost} amber`;
 };
 
+// ---------------------------------------------------------------------------
+// In-world investment rendering (room upgrades).
+// A purchased upgrade used to render as a single 10px "✦" glyph; deepenings
+// and attunements rendered nothing. These layers make each amber sink visible
+// inside its room: a breathing hearth glow (tier 1), phase-aware wall sigils +
+// a richer interior wash (tier 2), and scaling glow / extra sigils / dust
+// motes as the attunement level climbs (tier 3). All layers are decorative,
+// non-interactive, and opacity-capped so the room art stays readable.
+// ---------------------------------------------------------------------------
+
+/**
+ * Mirrors roomUpgrades.getRoomEmbellishmentIntensity math for prop-fed
+ * (already-loaded) maps: tier-1 = 0.25, deepening = 0.25, attunement =
+ * 0.5 × level/3. Pure + exported for tests and for HouseWorld.
+ */
+export const computeEmbellishmentIntensity = (
+  isUpgraded: boolean,
+  isDeepened: boolean,
+  attunementLevel: number,
+): number => {
+  const level = Math.min(Math.max(attunementLevel, 0), 3);
+  let intensity = 0;
+  if (isUpgraded) intensity += 0.25;
+  if (isDeepened) intensity += 0.25;
+  intensity += 0.5 * (level / 3);
+  return Math.min(1, intensity);
+};
+
+export interface EmbellishmentVisuals {
+  /** Tier-1 hearth glow (the replacement for the old ✦ glyph). */
+  showHearthGlow: boolean;
+  /** Peak opacity of the glow stack — capped so rooms stay readable. */
+  glowMaxOpacity: number;
+  /** Glow stack scale — steps up with each attunement level. */
+  glowScale: number;
+  /** Warm pips on the nameplate: 1 for tier-1 + 1 per attunement level. */
+  namePips: number;
+  /** Wall sigil marks: 1 for the deepening + 1 per attunement level (max 4). */
+  sigilCount: number;
+  /** Richer interior wash once deepened (phase-colored, very low opacity). */
+  deepTintOpacity: number;
+  /** Faint floating dust motes at full attunement (max 4, motion-gated). */
+  showMotes: boolean;
+}
+
+export const getEmbellishmentVisuals = (
+  isUpgraded: boolean,
+  isDeepened: boolean,
+  attunementLevel: number,
+  /** 0..1 intensity; defaults to the local mirror of the service math. */
+  intensityIn?: number,
+): EmbellishmentVisuals => {
+  const level = Math.min(Math.max(attunementLevel, 0), 3);
+  const intensity = Math.min(
+    1,
+    Math.max(0, intensityIn ?? computeEmbellishmentIntensity(isUpgraded, isDeepened, level))
+  );
+  return {
+    showHearthGlow: isUpgraded,
+    glowMaxOpacity: Math.min(0.3, 0.16 + intensity * 0.14),
+    glowScale: 1 + level * 0.12,
+    namePips: isUpgraded ? Math.min(4, 1 + level) : 0,
+    sigilCount: Math.min(4, (isDeepened ? 1 : 0) + level),
+    deepTintOpacity: isDeepened ? 0.08 : 0,
+    showMotes: level >= 3,
+  };
+};
+
+/**
+ * Phase register for the deepening wall marks: lavender through the dusk
+ * phases, crimson-leaning once the shadows grow (3+), serene mauve at 5.
+ * (Cycle-2 players can carry deepened rooms back into the bright phases —
+ * they read lavender there, same as dusk.)
+ */
+export const getSigilColors = (phase: number): { line: string; glow: string } => {
+  if (phase >= 5) return { line: '#8A78A8', glow: '#6B5B8A' };
+  if (phase >= 3) return { line: '#A34062', glow: '#8B2252' };
+  return { line: '#9B7FCF', glow: '#7B5FB0' };
+};
+
+/** Wall spots for up to 4 sigil marks (percent insets; mirrored pairs). */
+const SIGIL_SPOTS: { top: string; left?: string; right?: string }[] = [
+  { top: '26%', left: '9%' },
+  { top: '24%', right: '9%' },
+  { top: '58%', right: '5%' },
+  { top: '60%', left: '5%' },
+];
+
+/**
+ * Tier-1 hearth glow: 2-3 stacked feathered ovals with a slow native-driven
+ * opacity breathing. Static (steady glow) under reduced motion / low tier.
+ */
+const HearthGlow: React.FC<{ maxOpacity: number; scale: number; animate: boolean }> = ({
+  maxOpacity,
+  scale,
+  animate,
+}) => {
+  const breathe = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (!animate) {
+      breathe.setValue(1);
+      return;
+    }
+    breathe.setValue(0);
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(breathe, {
+          toValue: 1,
+          duration: 2600,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(breathe, {
+          toValue: 0,
+          duration: 2600,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [animate, breathe]);
+
+  return (
+    <Animated.View
+      style={[
+        styles.hearthGlowWrap,
+        {
+          opacity: animate ? breathe.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] }) : 1,
+          transform: [{ scale }],
+        },
+      ]}
+      pointerEvents="none"
+    >
+      <View style={[styles.hearthGlowOuter, { opacity: maxOpacity * 0.45 }]} />
+      <View style={[styles.hearthGlowMid, { opacity: maxOpacity * 0.7 }]} />
+      <View style={[styles.hearthGlowCore, { opacity: maxOpacity }]} />
+    </Animated.View>
+  );
+};
+
+/**
+ * One deepening wall mark: a thin angled line pair over a soft wide underlay
+ * pair (layered-View glow — Android renders no shadowRadius blur, so the
+ * "blur" is a fatter line at low opacity).
+ */
+const SigilMark: React.FC<{ line: string; glow: string }> = ({ line, glow }) => (
+  <View style={styles.sigilBox} pointerEvents="none">
+    <View style={[styles.sigilLine, styles.sigilLeft, styles.sigilUnderlay, { backgroundColor: glow }]} />
+    <View style={[styles.sigilLine, styles.sigilRight, styles.sigilUnderlay, { backgroundColor: glow }]} />
+    <View style={[styles.sigilLine, styles.sigilLeft, { backgroundColor: line }]} />
+    <View style={[styles.sigilLine, styles.sigilRight, { backgroundColor: line }]} />
+  </View>
+);
+
+/** One slow-rising dust mote (full-attunement rooms only; motion-gated). */
+const DustMote: React.FC<{ left: string; delay: number; duration: number; color: string }> = ({
+  left,
+  delay,
+  duration,
+  color,
+}) => {
+  const rise = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.delay(delay),
+        Animated.timing(rise, {
+          toValue: 1,
+          duration,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(rise, {
+          toValue: 0,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [delay, duration, rise]);
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        styles.dustMote,
+        {
+          left: left as `${number}%`,
+          backgroundColor: color,
+          opacity: rise.interpolate({ inputRange: [0, 0.2, 0.75, 1], outputRange: [0, 0.35, 0.25, 0] }),
+          transform: [
+            { translateY: rise.interpolate({ inputRange: [0, 1], outputRange: [0, -34] }) },
+          ],
+        },
+      ]}
+    />
+  );
+};
+
 interface RoomViewProps {
   room: Room;
   animal: Animal | null;
@@ -123,6 +332,12 @@ interface RoomViewProps {
   isAnimalOnCooldown?: boolean;
   cooldownPuzzlesLeft?: number;
   isRoomUpgraded?: boolean;
+  /** Tier-2 deepening purchased — wall sigils + a richer interior wash. */
+  isDeepened?: boolean;
+  /** Tier-3 attunement level (0..3) — scales glow, sigils, and dust motes. */
+  attunementLevel?: number;
+  /** Total investment 0..1 (see computeEmbellishmentIntensity). */
+  embellishmentIntensity?: number;
   ritualWords?: string[];
   unlockCost?: number | null;
   amberBalance?: number;
@@ -144,6 +359,9 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
   isAnimalOnCooldown = false,
   cooldownPuzzlesLeft,
   isRoomUpgraded = false,
+  isDeepened = false,
+  attunementLevel = 0,
+  embellishmentIntensity = 0,
   ritualWords = [],
   unlockCost = null,
   amberBalance = 0,
@@ -151,6 +369,16 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
   suppressInviteChip = false,
 }) => {
   const themeColors = ROOM_THEME_COLORS[room.theme];
+  const embellish = getEmbellishmentVisuals(
+    isRoomUpgraded,
+    isDeepened,
+    attunementLevel,
+    embellishmentIntensity > 0 ? embellishmentIntensity : undefined
+  );
+  const sigilColors = getSigilColors(currentPhase);
+  // Decorative-layer motion gate (breathing glow, motes). The layers still
+  // render statically under reduced motion; only the movement is skipped.
+  const embellishMotion = !getSettingsSync().reducedMotion && !shouldSimplifyAnimations();
 
   if (!room.isUnlocked) {
     // Locked room appearance
@@ -232,13 +460,71 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
         );
       })()}
 
+      {/* In-world investment layers (tier-1 hearth glow / tier-2 sigils and
+          wash / tier-3 scaling + motes). Behind the frame, animal, and
+          nameplate; entirely decorative and non-interactive. */}
+      {(embellish.showHearthGlow || embellish.sigilCount > 0 || embellish.deepTintOpacity > 0) && (
+        <View
+          style={styles.embellishOverlay}
+          pointerEvents="none"
+          importantForAccessibility="no-hide-descendants"
+        >
+          {embellish.deepTintOpacity > 0 && (
+            <View
+              style={[
+                styles.embellishFill,
+                { backgroundColor: sigilColors.glow, opacity: embellish.deepTintOpacity },
+              ]}
+            />
+          )}
+          {embellish.showHearthGlow && (
+            <HearthGlow
+              maxOpacity={embellish.glowMaxOpacity}
+              scale={embellish.glowScale}
+              animate={embellishMotion}
+            />
+          )}
+          {SIGIL_SPOTS.slice(0, embellish.sigilCount).map((spot, i) => (
+            <View
+              key={`sigil-${i}`}
+              style={[
+                styles.sigilSpot,
+                {
+                  top: spot.top as `${number}%`,
+                  ...(spot.left ? { left: spot.left as `${number}%` } : null),
+                  ...(spot.right ? { right: spot.right as `${number}%` } : null),
+                },
+              ]}
+            >
+              <SigilMark line={sigilColors.line} glow={sigilColors.glow} />
+            </View>
+          ))}
+          {embellish.showMotes && embellishMotion && (
+            <>
+              <DustMote left="22%" delay={0} duration={5200} color="#FFE9C4" />
+              <DustMote left="44%" delay={1700} duration={6400} color="#FFE9C4" />
+              <DustMote left="63%" delay={800} duration={5800} color="#F5D9EE" />
+              <DustMote left="80%" delay={2600} duration={7000} color="#FFE9C4" />
+            </>
+          )}
+        </View>
+      )}
+
       {/* Room frame */}
       <View style={[styles.frame, { borderColor: themeColors.accent }]} />
 
       {/* Room name plate */}
       <View style={styles.namePlate}>
         <Text style={styles.roomName}>{room.name}</Text>
-        {isRoomUpgraded && <Text style={styles.upgradeBadge}>✦</Text>}
+        {/* Procedural ornament row: one warm lantern pip per investment step
+            (tier-1 + each attunement level). Replaces the old lone ✦ glyph. */}
+        {embellish.namePips > 0 && (
+          <View style={styles.pipRow} importantForAccessibility="no-hide-descendants">
+            {Array.from({ length: embellish.namePips }).map((_, i) => (
+              <View key={`pip-${i}`} style={styles.pip} />
+            ))}
+          </View>
+        )}
       </View>
 
       {/* Animal if present and unlocked */}
@@ -394,11 +680,105 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
-  upgradeBadge: {
-    fontFamily: BODY_FONT,
-    fontSize: 10,
-    color: '#FFD700',
-    marginLeft: 3,
+  // Nameplate ornament row: tiny warm lantern pips (procedural, not emoji).
+  pipRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 3,
+    gap: 4,
+  },
+  pip: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#FFD27A',
+  },
+  // ---- In-world investment layers ----
+  embellishOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    overflow: 'hidden',
+  },
+  embellishFill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  // Hearth glow: bottom-center stack of feathered warm ovals (core brightest).
+  hearthGlowWrap: {
+    position: 'absolute',
+    bottom: 4,
+    alignSelf: 'center',
+    width: 120,
+    height: 70,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  hearthGlowOuter: {
+    position: 'absolute',
+    bottom: 0,
+    width: 120,
+    height: 64,
+    borderRadius: 999,
+    backgroundColor: '#F2953F',
+  },
+  hearthGlowMid: {
+    position: 'absolute',
+    bottom: 6,
+    width: 82,
+    height: 44,
+    borderRadius: 999,
+    backgroundColor: '#FFB65C',
+  },
+  hearthGlowCore: {
+    position: 'absolute',
+    bottom: 12,
+    width: 48,
+    height: 26,
+    borderRadius: 999,
+    backgroundColor: '#FFD9A0',
+  },
+  // Deepening sigils: thin angled line pair + a fatter low-opacity underlay
+  // pair standing in for blur (Android-safe: no shadowRadius glow).
+  sigilSpot: {
+    position: 'absolute',
+  },
+  sigilBox: {
+    width: 22,
+    height: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    opacity: 0.5,
+  },
+  sigilLine: {
+    position: 'absolute',
+    width: 2,
+    height: 20,
+    borderRadius: 1,
+  },
+  sigilLeft: {
+    transform: [{ translateX: -4 }, { rotate: '24deg' }],
+  },
+  sigilRight: {
+    transform: [{ translateX: 4 }, { rotate: '-24deg' }],
+  },
+  sigilUnderlay: {
+    width: 7,
+    borderRadius: 3,
+    opacity: 0.22,
+  },
+  dustMote: {
+    position: 'absolute',
+    bottom: '24%',
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
   },
   lockedRoom: {
     backgroundColor: CandyColors.gray[700],

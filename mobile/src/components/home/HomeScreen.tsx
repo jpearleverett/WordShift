@@ -144,7 +144,7 @@ import { getHomeAmbientLine, getFoxPitNudgeLines, getShopTitle, getGoalSuggestio
 import { getActiveEvent } from '../../services/liveEvents';
 import { DailyChallengeCard } from '../DailyChallengeCard';
 import { isDailyChallengeUnlocked, getDailyStatus } from '../../services/dailyChallenge';
-import { areUpgradesAvailable, getPurchasedUpgrades } from '../../services/roomUpgrades';
+import { areUpgradesAvailable, getPurchasedUpgrades, getDeepenedRooms, getAttunedRooms } from '../../services/roomUpgrades';
 import { getTendingLevel } from '../../services/tending';
 import { hapticLight, hapticSelection } from '../../services/haptics';
 import { logEvent } from '../../services/eventLogger';
@@ -533,6 +533,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   // Room upgrades
   const [purchasedUpgrades, setPurchasedUpgrades] = useState<Record<string, number>>({});
+  const [deepenedRooms, setDeepenedRooms] = useState<Record<string, number>>({});
+  const [attunedRooms, setAttunedRooms] = useState<Record<string, number>>({});
   const [tendingLevel, setTendingLevel] = useState(0);
 
   // Dialogue flow hook

@@ -18,7 +18,7 @@ import {
   TouchableOpacity,
 } from 'react-native-gesture-handler';
 import { Room, Animal, DialoguePhase, Unlockable } from '../../types/homeWorld';
-import { RoomView } from './RoomView';
+import { RoomView, computeEmbellishmentIntensity } from './RoomView';
 import { CandyColors } from '../../theme/colors';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { isOnCooldown, getSessionStatus } from '../../services/dialogueSession';
@@ -479,12 +479,15 @@ const CONTACT_SHADOW: Record<number, { color: string; mult: number }> = {
 // ARRANGEMENT CONNECTOR - Visual sigil lines connecting rooms
 // ═══════════════════════════════════════════════════════════════════════════
 
+// Glow is built from layered Views (a wider, fainter underlay beneath the
+// crisp line), NOT shadowColor/shadowRadius — Android renders no blur for
+// View shadow radii, so the old shadow-based glow was iOS-only. The layers
+// share one native-driven opacity pulse (static under reduced motion /
+// low-tier devices).
 const ArrangementConnector: React.FC<{ phase: number; tendingIntensity?: number }> = ({
   phase,
   tendingIntensity = 0,
 }) => {
-  if (phase < 2) return null;
-
   let lineWidth = phase === 5 ? 1.5 : phase >= 4 ? 3 : phase >= 3 ? 2 : 1;
   const lineColor = phase === 5 ? '#6B5B8A' : phase >= 4 ? '#8B2252' : phase >= 3 ? '#6B4C8A' : '#9B7FCF';
   let lineOpacity = phase === 5 ? 0.3 : phase >= 4 ? 0.7 : phase >= 3 ? 0.4 : 0.2;
@@ -502,9 +505,71 @@ const ArrangementConnector: React.FC<{ phase: number; tendingIntensity?: number 
     showGlow = t > 0.4;
   }
 
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const animatePulse =
+    showGlow && !getSettingsSync().reducedMotion && !shouldSimplifyAnimations();
+
+  useEffect(() => {
+    if (!animatePulse) {
+      pulseAnim.setValue(1);
+      return;
+    }
+    pulseAnim.setValue(0.65);
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1800,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.65,
+          duration: 1800,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [animatePulse, pulseAnim]);
+
+  if (phase < 2) return null;
+
+  // At Phase 5 the tending glow is serene mauve (the line's own color), never
+  // the Phase-4 ember crimson.
+  const glowColor = t > 0 ? lineColor : '#FF4444';
+
   return (
     <View style={arrangementStyles.connector}>
-      {/* Vertical line */}
+      {/* Layered-View glow: wide faint halo + tighter brighter halo under the
+          crisp line. Tending intensity keeps its scaling (opacity climbs). */}
+      {showGlow && (
+        <>
+          <Animated.View
+            style={[
+              arrangementStyles.glowLayer,
+              {
+                width: lineWidth + 10,
+                backgroundColor: glowColor,
+                opacity: Animated.multiply(pulseAnim, 0.16 + t * 0.12),
+              },
+            ]}
+          />
+          <Animated.View
+            style={[
+              arrangementStyles.glowLayer,
+              {
+                width: lineWidth + 5,
+                backgroundColor: glowColor,
+                opacity: Animated.multiply(pulseAnim, 0.3 + t * 0.18),
+              },
+            ]}
+          />
+        </>
+      )}
+      {/* Vertical line (crisp core) */}
       <View
         style={[
           arrangementStyles.line,
@@ -513,19 +578,28 @@ const ArrangementConnector: React.FC<{ phase: number; tendingIntensity?: number 
             backgroundColor: lineColor,
             opacity: lineOpacity,
           },
-          showGlow && arrangementStyles.lineGlow,
-          // At Phase 5 the deepening glow is serene mauve, not Phase-4 crimson.
-          showGlow && t > 0 && { shadowColor: lineColor, shadowOpacity: 0.4 + t * 0.4, shadowRadius: 3 + t * 4 },
         ]}
       />
+      {/* Node halo (layered glow behind the crisp node circle) */}
+      {showNodes && showGlow && (
+        <Animated.View
+          style={[
+            arrangementStyles.nodeHalo,
+            {
+              backgroundColor: glowColor,
+              opacity: Animated.multiply(pulseAnim, 0.35 + t * 0.2),
+            },
+          ]}
+        />
+      )}
       {/* Node circle at connection point */}
       {showNodes && (
         <View
           style={[
             arrangementStyles.node,
             { borderColor: lineColor },
-            showGlow && arrangementStyles.nodeGlow,
-            showGlow && t > 0 && { backgroundColor: lineColor, shadowColor: lineColor, shadowOpacity: 0.5 + t * 0.4 },
+            showGlow && arrangementStyles.nodeGlowCore,
+            showGlow && t > 0 && { backgroundColor: lineColor, borderColor: lineColor },
           ]}
         />
       )}
@@ -542,12 +616,12 @@ const arrangementStyles = StyleSheet.create({
   line: {
     height: '100%',
   },
-  lineGlow: {
-    shadowColor: '#FF4444',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 4,
-    elevation: 3,
+  // Soft halo strips beneath the crisp line (absolute children center via the
+  // connector's alignItems/justifyContent, like the node).
+  glowLayer: {
+    position: 'absolute',
+    height: '100%',
+    borderRadius: 3,
   },
   node: {
     position: 'absolute',
@@ -557,14 +631,15 @@ const arrangementStyles = StyleSheet.create({
     borderWidth: 1.5,
     backgroundColor: 'transparent',
   },
-  nodeGlow: {
+  nodeGlowCore: {
     backgroundColor: '#8B2252',
     borderColor: '#FF4444',
-    shadowColor: '#FF4444',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 6,
-    elevation: 4,
+  },
+  nodeHalo: {
+    position: 'absolute',
+    width: 18,
+    height: 18,
+    borderRadius: 9,
   },
 });
 
@@ -843,6 +918,10 @@ interface HouseWorldProps {
   nextUnlock?: Unlockable | null;
   amberBalance?: number;
   purchasedUpgrades?: Record<string, number>;
+  /** Tier-2 deepened roomId → purchase timestamp (same shape as purchasedUpgrades). */
+  deepenedRooms?: Record<string, number>;
+  /** Tier-3 attunement roomId → level reached 1..3 (level-0 rooms omitted). */
+  attunedRooms?: Record<string, number>;
   savedPanY?: number | null;
   onPanYChange?: (panY: number) => void;
   /** Tapping the in-world pit entrance opens the Offering Pit. */
@@ -871,6 +950,8 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   nextUnlock = null,
   amberBalance = 0,
   purchasedUpgrades = {},
+  deepenedRooms = {},
+  attunedRooms = {},
   savedPanY = null,
   onPanYChange,
   onPitPress,
@@ -1248,6 +1329,13 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                             isAnimalOnCooldown={roomAnimal ? isOnCooldown(roomAnimal.id) : false}
                             cooldownPuzzlesLeft={roomAnimal ? getSessionStatus(roomAnimal.id).puzzlesRemaining : undefined}
                             isRoomUpgraded={room.id in purchasedUpgrades}
+                            isDeepened={room.id in deepenedRooms}
+                            attunementLevel={attunedRooms[room.id] ?? 0}
+                            embellishmentIntensity={computeEmbellishmentIntensity(
+                              room.id in purchasedUpgrades,
+                              room.id in deepenedRooms,
+                              attunedRooms[room.id] ?? 0
+                            )}
                             ritualWords={ritualWords}
                             unlockCost={roomUnlockCost}
                             amberBalance={amberBalance}

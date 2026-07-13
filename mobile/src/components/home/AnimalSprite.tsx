@@ -263,6 +263,29 @@ const BOUNCE_HEIGHT: Record<AnimalType, number> = {
   kakapo: 2, // Grounded shuffle
 };
 
+// ---------------------------------------------------------------------------
+// Procedural gait (the 12 animals without real walk frames).
+// Without frames a wandering animal used to glide side-to-side as a static
+// sprite with a flat bounce ("fridge magnets"). While wandering, these animals
+// now play a transform-only gait bundle: a synced vertical bob, a slight
+// alternating lean, and a subtle squash-stretch on the footfall beat — all
+// native-driver, derived from each species' existing movement speed. The fox
+// keeps its real frames; robed Phase-4+ figures keep the gliding reverence;
+// reduced motion / low-tier devices keep the current static behavior.
+// ---------------------------------------------------------------------------
+
+/** Full two-step gait cycle duration (ms), derived from the wander speed so
+ * quick species (rabbit, fennec) patter and slow ones (sloth, kakapo) trudge. */
+export const getGaitPeriodMs = (type: AnimalType): number =>
+  Math.max(300, Math.min(1400, (MOVEMENT_SPEED[type] ?? 3000) * 0.22));
+
+/** Vertical bob amplitude (px): subtle 2-3px, scaled off the species bounce. */
+export const getGaitBobPx = (type: AnimalType): number =>
+  Math.max(2, Math.min(3, (BOUNCE_HEIGHT[type] ?? 3) * 0.5));
+
+/** Alternating lean, degrees (±). */
+export const GAIT_LEAN_DEG = 2.5;
+
 // Per-animal vertical nudge (px, +down) to plant feet on the floor. The sprite
 // art isn't uniformly bottom-aligned in its frame — some characters are drawn
 // higher, so with the same room placement they read as floating. These offsets
@@ -346,15 +369,63 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
   // Robed figures (Phase 4+) don't stroll — they keep the gliding reverence —
   // and reduced motion / low-tier devices keep the static sprite.
   const walkFrames = CHARACTER_SPRITES[animal.type]?.walk;
+  const hasWalkFrames = Boolean(walkFrames && walkFrames.length > 0);
   const walkActive = Boolean(
     isMoving &&
-    walkFrames &&
-    walkFrames.length > 0 &&
+    hasWalkFrames &&
     currentPhase < 4 &&
     !spriteLoadFailed &&
     !getSettingsSync().reducedMotion &&
     !shouldSimplifyAnimations()
   );
+
+  // Procedural gait for the animals WITHOUT real walk frames: bob + lean +
+  // footfall squash-stretch while wandering. Same gates as the walk cycle —
+  // robed figures glide, reduced motion / low tier stay static.
+  const gaitAnim = useRef(new Animated.Value(0)).current;
+  const gaitActive = Boolean(
+    isMoving &&
+    !hasWalkFrames &&
+    currentPhase < 4 &&
+    !getSettingsSync().reducedMotion &&
+    !shouldSimplifyAnimations()
+  );
+
+  useEffect(() => {
+    if (!gaitActive) {
+      gaitAnim.setValue(0); // 0 = neutral pose (no lean, no bob, scale 1)
+      return;
+    }
+    gaitAnim.setValue(0);
+    const loop = Animated.loop(
+      Animated.timing(gaitAnim, {
+        toValue: 1,
+        duration: getGaitPeriodMs(animal.type),
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+    loop.start();
+    return () => {
+      loop.stop();
+      gaitAnim.setValue(0);
+    };
+  }, [gaitActive, animal.type, gaitAnim]);
+
+  // One cycle = two steps: footfalls at 0 / 0.5 / 1, lifts at 0.25 / 0.75.
+  const gaitBobPx = getGaitBobPx(animal.type);
+  const gaitBob = gaitAnim.interpolate({
+    inputRange: [0, 0.25, 0.5, 0.75, 1],
+    outputRange: [0, -gaitBobPx, 0, -gaitBobPx, 0],
+  });
+  const gaitLean = gaitAnim.interpolate({
+    inputRange: [0, 0.25, 0.5, 0.75, 1],
+    outputRange: ['0deg', `${GAIT_LEAN_DEG}deg`, '0deg', `-${GAIT_LEAN_DEG}deg`, '0deg'],
+  });
+  const gaitScaleY = gaitAnim.interpolate({
+    inputRange: [0, 0.25, 0.5, 0.75, 1],
+    outputRange: [1, 1.03, 0.97, 1.03, 1],
+  });
 
   // Cycle gait frames while walking; reset to the first frame on stop so the
   // next stroll always starts at the cycle's beginning.
@@ -588,11 +659,11 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
     };
   }, [animal.type]);
 
-  // Bounce animation while moving. Suppressed when real walk frames play —
-  // the gait already carries the vertical bob, and stacking the glide-bounce
-  // on top reads as skipping.
+  // Bounce animation while moving. Suppressed when real walk frames play OR
+  // the procedural gait runs — either already carries the vertical bob, and
+  // stacking the glide-bounce on top reads as skipping.
   useEffect(() => {
-    if (getSettingsSync().reducedMotion || walkActive) {
+    if (getSettingsSync().reducedMotion || walkActive || gaitActive) {
       bounceY.setValue(0);
       return;
     }
@@ -624,7 +695,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
     return () => {
       bounceAnimation?.stop();
     };
-  }, [isMoving, animal.type, walkActive]);
+  }, [isMoving, animal.type, walkActive, gaitActive]);
 
   // Notification pulse for new dialogue
   useEffect(() => {
@@ -711,6 +782,10 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
                 { scaleX },
                 { scale: Animated.multiply(tapScale, breatheScale) },
                 { rotate: wiggleRotate },
+                // Procedural gait bundle (neutral at rest: 0 / 0deg / 1).
+                { translateY: gaitBob },
+                { rotate: gaitLean },
+                { scaleY: gaitScaleY },
               ],
             },
           ]}

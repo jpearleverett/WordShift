@@ -594,29 +594,37 @@ export function getDialogueTheme(phase: number): DialogueTheme {
         overlayBg: 'rgba(25, 15, 50, 0.65)',
       };
     case 2:
+      // Mid-dusk step. Phase 2 used to jump straight from Phase 1's warm white
+      // to the Phase-4 family near-black (#1A1A2E) — the largest single-step
+      // delta in the descent. Retuned to a desaturated twilight lavender-grey
+      // so the darkening arrives in two steps (warm white → twilight → the
+      // Phase-3 dark), preserving "feel it before you notice it".
       return {
-        modalBg: '#1A1A2E',
-        modalBorder: 'rgba(90, 70, 140, 0.25)',
-        modalShadowColor: '#2D1530',
-        accentLine: '#5A4880',
-        spriteBg: '#151525',
-        portraitRingBg: '#252540',
-        portraitRingBorder: 'rgba(90, 70, 140, 0.5)',
-        bubbleBg: '#222238',
-        bubbleBorder: 'rgba(90, 70, 140, 0.2)',
-        // Ghostly mauve, one step lighter: ≥4.5:1 on the serene skin's panel
-        // fill (#332A38) hosting the nameplate (#9080B0 was ~3.8:1).
-        nameColor: '#A898C8',
-        textColor: '#9898B0',
-        subtitleColor: '#9490AC', // WCAG AA-checked vs bubbleBg
-        progressColor: '#585870',
-        primaryButtonBg: '#4A3870',
-        primaryButtonShadow: '#2A1850',
-        secondaryButtonBg: '#3A6848',
-        secondaryButtonText: '#C0C0D0',
-        cooldownBg: 'rgba(60, 40, 90, 0.95)',
-        cooldownBorder: 'rgba(90, 70, 140, 0.3)',
-        overlayBg: 'rgba(10, 8, 25, 0.75)',
+        modalBg: '#3E3858',
+        modalBorder: 'rgba(150, 132, 190, 0.28)',
+        modalShadowColor: '#26203C',
+        accentLine: '#6B5894',
+        spriteBg: '#37314E',
+        portraitRingBg: '#463F63',
+        portraitRingBorder: 'rgba(150, 132, 190, 0.5)',
+        bubbleBg: '#454060',
+        bubbleBorder: 'rgba(150, 132, 190, 0.25)',
+        // Dark twilight-plum INK: at phase 2 the dialogue nameplate renders
+        // directly on the hostDark pixel skin's STORM parchment fill (#CDB289
+        // — getPixelSkin(2, true)), so the ink must be dark. Measured 5.6:1
+        // there (the old light #A898C8 measured ~1.3:1 — it was checked
+        // against the wrong fill).
+        nameColor: '#463060',
+        textColor: '#E4DFF2',   // 7.5:1 on bubbleBg, 8.4:1 on modalBg
+        subtitleColor: '#C6BEDC', // 5.5:1 on bubbleBg (WCAG AA-checked)
+        progressColor: '#8A82A8',
+        primaryButtonBg: '#5A4886',
+        primaryButtonShadow: '#3A2966',
+        secondaryButtonBg: '#3E6850',
+        secondaryButtonText: '#E8F2EA', // 5.6:1 on secondaryButtonBg
+        cooldownBg: 'rgba(96, 74, 128, 0.95)', // white toast text: 7.5:1
+        cooldownBorder: 'rgba(150, 132, 190, 0.3)',
+        overlayBg: 'rgba(18, 14, 38, 0.7)',
       };
     case 3:
       return {

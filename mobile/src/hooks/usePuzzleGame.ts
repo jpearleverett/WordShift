@@ -280,6 +280,32 @@ export function isBoardSolvableFromState(
 }
 
 /**
+ * Audio combo-ladder mapping for a clean-move streak: streak <2 plays the base
+ * chime (tier 0), streak 2 → tier 1, streak 3 → tier 2, streak >=4 → tier 3.
+ * Fed to audio.soundValidMove(comboTier), which resolves bright/dark variants
+ * internally. Pure and exported for tests.
+ */
+export function comboTierForStreak(streak: number): number {
+  if (streak >= 4) return 3;
+  if (streak === 3) return 2;
+  if (streak === 2) return 1;
+  return 0;
+}
+
+/**
+ * Message cadence for a clean-move streak: streaks 2 and 3 always get the
+ * escalating combo line; from streak 4 on, combo lines land on EVEN streaks
+ * with a regular move-pool draw between climbs (odd streaks), so a long run
+ * cycles variety instead of pinning one fixed escalation string forever.
+ * Pure and exported for tests.
+ */
+export function shouldUseComboMessage(streak: number): boolean {
+  if (streak < 2) return false;
+  if (streak <= 3) return true;
+  return streak % 2 === 0;
+}
+
+/**
  * Board coordinates for the hint glow. Set when a hint is actually delivered;
  * reuses the SAME tutorial-guide visuals (LetterTile guide ring / Slot halo).
  * `targetSlotIndex` may be undefined when only the letter can be pinpointed
@@ -361,6 +387,18 @@ export interface PuzzleGameState {
   moveDirection: 'down' | 'up';
   /** Word previews for each slot position in the target row (when letter is selected) */
   slotPreviews?: Array<{ word: string; isValid: boolean }>;
+  /**
+   * Whether the ✓/✗ validity grading on the ghost previews is PRESENTED.
+   * The preview data always computes isValid internally (the double-shift
+   * look-ahead and drag near-miss snapping need it); this flag controls
+   * presentation only. TRUE only on EASY boards (any variant) and in the
+   * double-shift variant at any difficulty (its intermediate non-word state
+   * needs the guidance) — never in Blind Offering, and never on daily /
+   * shared-challenge boards (the daily ramps MEDIUM+ by design; a friend's
+   * chain is judged by the player's own ear). Everywhere hidden, the preview
+   * is a neutral ghost word: the player must judge whether it is real.
+   */
+  previewValidityVisible: boolean;
   /** Double shift phase tracking: pick1 → drop1 → pick2 → drop2 */
   doubleShiftPhase: 'pick1' | 'pick2' | 'drop1' | 'drop2' | null;
   /** Phase 5 echo puzzle: one word is seeded from the player's ritual history */

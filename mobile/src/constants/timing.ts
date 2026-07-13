@@ -79,5 +79,25 @@ export const DROP_IMPACT_COLLAPSE_MS = 150;
 export const DROP_SHAKE_KEYFRAME_MS = 40;
 export const DROP_SHAKE_INTENSITY = 2;
 
+// === INTER-SLOT TAP GUIDANCE ===
+// Tapping a letter tile in the target row (between drop slots) pulses the two
+// ADJACENT slots — drawing the eye to where drops go without committing
+// anything or leaking validity.
+export const INTER_SLOT_PULSE_SCALE = 1.12;
+export const INTER_SLOT_PULSE_IN_MS = 110;
+export const INTER_SLOT_PULSE_OUT_MS = 140;
+
+// === DRAG HOVER ===
+// Live slot feedback under the finger during a drag: the geometrically nearest
+// slot scales up slightly while hovered. Purely geometric — NEVER
+// validity-filtered (hover must not become a second snapping tell).
+export const DRAG_HOVER_SCALE = 1.1;
+
+// === ONE-TIME POINTERS ===
+// Delay before the one-time Swift Victories pointer toast lands after a
+// routine-victory exit (long enough for the next board's start message to
+// settle first, so the pointer isn't immediately clobbered).
+export const SWIFT_HINT_TOAST_DELAY_MS = 1600;
+
 // === ENDGAME ===
 export const ENDGAME_EVENT_DELAY_MS = 1500;
