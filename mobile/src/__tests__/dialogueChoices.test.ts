@@ -21,6 +21,7 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 const ALL_ANIMALS = [
   'fox', 'owl', 'pangolin', 'axolotl', 'capybara',
   'fennec_fox', 'sloth', 'wombat', 'rabbit', 'red_panda',
+  'tarsier', 'aye_aye', 'kakapo',
 ];
 
 describe('dialogueChoices', () => {
@@ -34,7 +35,7 @@ describe('dialogueChoices', () => {
   // ===========================================================================
 
   describe('ANIMAL_CHOICES', () => {
-    it('has choice content for all 10 animals', () => {
+    it('has choice content for every animal', () => {
       for (const animal of ALL_ANIMALS) {
         expect(ANIMAL_CHOICES[animal]).toBeDefined();
       }
@@ -166,7 +167,7 @@ describe('dialogueChoices', () => {
       expect(result).not.toBeNull();
     });
 
-    it('returns choice content for all 10 animals', async () => {
+    it('returns choice content for every animal', async () => {
       for (const animal of ALL_ANIMALS) {
         await clearChoiceState();
         const result = await getChoiceForAnimal(animal, 3, 5);
@@ -300,11 +301,11 @@ describe('dialogueChoices', () => {
       expect(await getChoiceCount()).toBe(3);
     });
 
-    it('counts up to 10 for all animals', async () => {
+    it('counts every animal after all have recorded a choice', async () => {
       for (const animal of ALL_ANIMALS) {
         await recordChoice(animal, 'ask');
       }
-      expect(await getChoiceCount()).toBe(10);
+      expect(await getChoiceCount()).toBe(ALL_ANIMALS.length);
     });
   });
 
@@ -338,7 +339,7 @@ describe('dialogueChoices', () => {
       }
     });
 
-    it('has callbacks for all 10 animals', () => {
+    it('has callbacks for every animal', () => {
       for (const animal of ALL_ANIMALS) {
         const askCallback = getPhase4ChoiceCallback(animal, 'ask');
         const refuseCallback = getPhase4ChoiceCallback(animal, 'refuse');
@@ -394,7 +395,7 @@ describe('dialogueChoices', () => {
 });
 
 describe('getPhase5ChoiceCallback', () => {
-  const allAnimals = ['fox', 'pangolin', 'owl', 'axolotl', 'capybara', 'fennec_fox', 'sloth', 'wombat', 'rabbit', 'red_panda'];
+  const allAnimals = ['fox', 'pangolin', 'owl', 'axolotl', 'capybara', 'fennec_fox', 'sloth', 'wombat', 'rabbit', 'red_panda', 'tarsier', 'aye_aye', 'kakapo'];
 
   test('returns a serene callback for every animal and both choices', () => {
     for (const animal of allAnimals) {

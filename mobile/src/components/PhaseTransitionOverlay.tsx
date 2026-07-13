@@ -293,8 +293,11 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     vignetteOpacity.setValue(0);
 
     const reducedMotion = getSettingsSync().reducedMotion;
-    // Scale ALL timing by 0.4x in reduced motion (not just skip animations)
-    const timeScale = reducedMotion ? 0.4 : 1.0;
+    // Scale ALL timing: 0.4x in reduced motion (not just skip animations),
+    // 1.25x otherwise — playtest read the per-scene text as a touch too fast
+    // at 1.0, and uniform scaling stretches the dwell without disturbing the
+    // scene layout (delays and durations scale together; tap-to-skip remains).
+    const timeScale = reducedMotion ? 0.4 : 1.25;
     const timers: ReturnType<typeof setTimeout>[] = [];
 
     // Fade in overlay

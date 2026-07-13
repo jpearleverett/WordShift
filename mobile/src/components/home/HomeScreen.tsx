@@ -283,6 +283,52 @@ const SpringIn: React.FC<{
 };
 
 /**
+ * Phase-aware colors for the PLAY dock button. Same candy-glass anatomy at
+ * every phase (translucent body, lit top edge, deep 4px bottom edge, gloss);
+ * only the material ages with the descent: bright candy green → cooled dusk
+ * teal → storm slate → deep ember crimson → serene mauve. White label text
+ * holds ≥4.5:1 against every body color.
+ */
+function getPlayDockColors(phase: number): {
+  body: string; rim: string; topEdge: string; bottomEdge: string;
+  shadow: string; glossOpacity: number;
+} {
+  if (phase >= 5) {
+    return {
+      body: 'rgba(84, 68, 122, 0.92)', rim: 'rgba(164, 144, 208, 0.42)',
+      topEdge: 'rgba(255, 255, 255, 0.30)', bottomEdge: '#332852',
+      shadow: '#241C3E', glossOpacity: 0.14,
+    };
+  }
+  if (phase >= 4) {
+    return {
+      body: 'rgba(96, 26, 44, 0.94)', rim: 'rgba(192, 48, 80, 0.50)',
+      topEdge: 'rgba(255, 150, 160, 0.22)', bottomEdge: '#3A0E1C',
+      shadow: '#C03050', glossOpacity: 0.10,
+    };
+  }
+  if (phase >= 3) {
+    return {
+      body: 'rgba(37, 94, 102, 0.92)', rim: 'rgba(120, 180, 185, 0.35)',
+      topEdge: 'rgba(255, 255, 255, 0.32)', bottomEdge: '#132F35',
+      shadow: '#0A1D22', glossOpacity: 0.16,
+    };
+  }
+  if (phase >= 2) {
+    return {
+      body: 'rgba(30, 141, 104, 0.90)', rim: 'rgba(110, 205, 168, 0.40)',
+      topEdge: 'rgba(255, 255, 255, 0.45)', bottomEdge: '#155A42',
+      shadow: '#0F4433', glossOpacity: 0.22,
+    };
+  }
+  return {
+    body: 'rgba(34, 197, 94, 0.88)', rim: 'rgba(74, 222, 128, 0.45)',
+    topEdge: 'rgba(255, 255, 255, 0.55)', bottomEdge: CandyColors.green.shadow,
+    shadow: CandyColors.green.shadow, glossOpacity: 0.28,
+  };
+}
+
+/**
  * Framed hub-row (Journal / Utility menus): cottage pixel card frame with an
  * optional ui-sprite icon — replaces the old uniform ghost rows.
  */
@@ -295,7 +341,9 @@ const HubRow: React.FC<{
   /** Host panel is dt.modalBg, which darkens at phase 2 (see dtHostDark). */
   hostDark?: boolean;
 }> = ({ phase, label, onPress, accessibilityLabel, icon, hostDark = false }) => {
-  const t = getSurfaceTheme(hostDark && phase < 3 ? 3 : phase);
+  // Mirror getPixelSkin's hostDark ladder (2 → storm, 3 → dark) so the ink
+  // tokens always match the skin fill's polarity.
+  const t = getSurfaceTheme(hostDark ? (phase < 3 ? 3 : phase === 3 ? 4 : phase) : phase);
   const skin = getPixelSkin(phase, hostDark);
   return (
     <TouchableOpacity
@@ -1324,10 +1372,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // the same mapping for direct token reads (text/fills placed straight on
   // the panel).
   const dtHostDark = progress.currentPhase >= 2;
-  const panelSt = getSurfaceTheme(progress.currentPhase === 2 ? 3 : progress.currentPhase);
+  // Mirrors getPixelSkin's hostDark ladder (2 → storm, 3 → dark): the token
+  // theme must track the skin's polarity or phase-3 text goes dark-on-dark.
+  const panelSt = getSurfaceTheme(
+    progress.currentPhase === 2 ? 3 : progress.currentPhase === 3 ? 4 : progress.currentPhase
+  );
   // Cottage pixel skin for the home modal chrome (same hostDark mapping).
   const pixelSkin = getPixelSkin(progress.currentPhase, dtHostDark);
   const phaseTheme = getPhaseTheme(progress.currentPhase);
+  // Phase-aware material for the PLAY dock (candy green → ember → mauve).
+  const playDockColors = getPlayDockColors(progress.currentPhase);
   const currentJournalSpotlightStep = journalSpotlightStepMeta[
     Math.max(0, Math.min(journalSpotlightIndex, journalSpotlightStepMeta.length - 1))
   ];
@@ -1571,7 +1625,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           ]}
         >
           <JuicyButton
-            style={[styles.playButton, highlightPlayButton && styles.playButtonHighlighted]}
+            style={[
+              styles.playButton,
+              {
+                backgroundColor: playDockColors.body,
+                borderColor: playDockColors.rim,
+                borderTopColor: playDockColors.topEdge,
+                borderBottomColor: playDockColors.bottomEdge,
+                shadowColor: playDockColors.shadow,
+              },
+              highlightPlayButton && styles.playButtonHighlighted,
+            ]}
             onPress={() => {
               hapticSelection();
               setHighlightPlayButton(false);
@@ -1582,8 +1646,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             accessibilityRole="button"
           >
             {/* Inner top gloss — the candy-tile glass sheen (see LetterTile's
-                glossyShine). Purely decorative; never intercepts touches. */}
-            <View style={styles.playButtonGloss} pointerEvents="none" />
+                glossyShine). Purely decorative; never intercepts touches. The
+                sheen dims with the descent (glass losing its sparkle). */}
+            <View
+              style={[styles.playButtonGloss, { backgroundColor: `rgba(255, 255, 255, ${playDockColors.glossOpacity})` }]}
+              pointerEvents="none"
+            />
             <Text style={styles.playButtonText}>PLAY</Text>
           </JuicyButton>
         </Animated.View>

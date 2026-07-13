@@ -303,7 +303,11 @@ const FLOOR_OFFSET: Record<AnimalType, number> = {
  */
 function getSpriteDreadTint(phase: number): { color: string; opacity: number } | null {
   if (phase >= 4) return null; // robed sprite already carries the reveal
-  if (phase === 3) return { color: '#160F2C', opacity: 0.38 }; // cold near-black, storm-sky dread
+  // Phase 3 stacks with the room's night scrim (PHASE_HOUSE_TINT room 0.22 in
+  // HouseWorld), so this wash must stay light or the animals read as
+  // silhouettes: a cold violet at low opacity keeps the dread hue-shift while
+  // the sprite detail survives the combined darkening.
+  if (phase === 3) return { color: '#2B2450', opacity: 0.20 };
   if (phase === 2) return { color: '#2A2F58', opacity: 0.24 }; // cool desaturation creeps in
   if (phase === 1) return { color: '#3A4378', opacity: 0.12 }; // faint cool wash, barely there
   return null;

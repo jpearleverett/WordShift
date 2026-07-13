@@ -9,39 +9,64 @@ spoiling the reveal, while the age rating must declare it honestly.
 - **App name:** WordShift
 - **iOS subtitle (≤30 chars):** `Cozy word game. Mostly.`
 - **Android short description (≤80 chars):**
-  `Shift letters, build words, befriend animals. They've been waiting for you.`
+  `Shift letters in a cozy word puzzle. Meet animal friends. They've been waiting.`
 
 ## Full description
 
-> **Shift one letter. Change everything.**
->
-> WordShift is a cozy word puzzle with a simple, satisfying rule: pick a letter
-> from one word and drop it into the next — both words must stay real words.
-> Easy to learn, endlessly chewy to master.
->
-> 🦊 **Build a home.** Earn amber with every puzzle and fill a charming house
-> with thirteen animal friends — a fox who loves the fire, a pangolin who
-> cooks, an owl buried in old books.
->
-> 🧩 **Thousands of puzzles.** Four difficulties, Reverse and Double Shift
-> modes, timed Speed runs, and a Daily Challenge shared by every player.
->
-> 🔥 **Keep your streak.** Daily streaks with streak freezes to protect them,
-> weekly quests, and 51 achievements.
->
-> 🌙 **Stay a while.** The animals have so much to tell you. They find you
-> fascinating. They're so glad you're here.
->
-> They've been waiting a long time.
->
-> ---
->
-> No accounts required. Core puzzles play offline. Free to play, supported by
-> occasional ads and optional in-app purchases (amber and hint packs, cosmetic
-> themes, a one-time starter bundle) — including a one-time Remove Ads if
-> you'd rather not see the ads at all. Purchases are convenience and cosmetics
-> only: the story unfolds at the same pace for everyone. A slow-burn story for
-> players 13+ — things in the cozy house are not quite what they seem.
+```text
+SHIFT ONE LETTER. CHANGE EVERYTHING.
+
+WordShift is a cozy letter game built around one satisfying rule: move a letter from one word into the next, and keep both words real.
+
+HOW IT WORKS
+
+• Pick a letter from the current word.
+• Drop it into the word below.
+• Keep both results valid.
+• Continue the chain to complete the puzzle.
+
+Simple to learn. Surprisingly clever to master.
+
+BUILD A HOME FROM YOUR WORDS
+
+Every solved puzzle earns amber for a growing woodland house. Build 13 rooms, welcome 13 unlikely animal companions, and return to hear what they have to say.
+
+They are warm, funny, thoughtful, and very glad you found them.
+
+MASTER EVERY KIND OF SHIFT
+
+• Four difficulty levels for quick or demanding sessions
+• Reverse Shift journeys down the chain and back again
+• Double Shift moves two letters at every step
+• Speed Shift tests how quickly you can see the pattern
+• Blind Offering hides previews for a true mastery challenge
+• Thousands of curated and generated word puzzles
+
+RETURN EACH DAY
+
+Take on a shared Daily Challenge, protect your streak, complete daily and weekly quests, unlock 51 achievements, and chase flawless solves with no hints, mistakes, or undos.
+
+A COZY GAME. MOSTLY.
+
+The longer you stay, the more the house changes. Familiar conversations take on new meanings. The animals remember the words you make.
+
+Some mysteries unfold slowly.
+
+PLAY YOUR WAY
+
+• Core puzzles work offline
+• No account required
+• Optional hints and accessibility settings
+• Reduced-motion support
+• Free to play with occasional ads
+• Optional purchases for convenience and cosmetic expression
+• The main mystery unfolds through play, not purchases.
+
+WordShift is a slow-burn word game and mystery for players 13 and older.
+
+The house is ready.
+They've been waiting.
+```
 
 ## Keywords (iOS, ≤100 chars)
 
@@ -76,25 +101,55 @@ Legal pages are **LIVE and publicly accessible** via GitHub Pages (deployed from
 ## Asset checklist
 
 - [x] App icon 1024×1024 — `mobile/assets/icon.png`
-- [x] Feature graphic 1024×500 (Play) — `docs/feature-graphic.png`
+- [x] Android phone screenshots ×8, re-rendered 2026-07-13 with the revised banner copy + review fixes applied and re-validated — `docs/play-store/final/`
+- [x] Feature graphic 1024×500 (Play), generated — `docs/play-store/final/feature-graphic.png`
 - [ ] iPhone 6.7" screenshots ×5 (needs device/simulator)
 - [ ] iPad 12.9" screenshots ×3 (supportsTablet is true)
-- [ ] Android phone screenshots ×4
 
-### Screenshot shot list (in narrative-safe order)
+### Android screenshot campaign (final upload order)
 
-1. Puzzle mid-move at Phase 0 — selected tile + green ✓ previews ("One rule. Real words only.")
-2. Home screen, sunny, 3-4 animals + clouds ("Build a home for your friends.")
-3. Victory modal, 3 stars + amber breakdown ("Earn amber. Three-star everything.")
-4. Daily challenge card + streak flame ("One shared puzzle, every day.")
-5. (Optional tease, last slot) Phase 2 dusk home screen — slightly darker, no spoilers ("Stay a while.")
+Copy revised 2026-07-12 (second pass): every support line is a complete
+sentence whose horror hint is woven INTO an innocent reading — several quote
+the game itself ("They've been hoping for someone like you" is Ember's
+onboarding seed line; "warm, funny, thoughtful" quotes the full description) so
+the store page reads warm now and chilling in hindsight, exactly like the game.
+The old set stamped a spooky fragment on every frame and read as mannered.
+Dread ramp: edge (1), clean (2), whisper (3), warm-ominous (4), whisper (5),
+medium (6), strong (7), closer (8).
+File names keep their original headline slugs (e.g. `02_every_word_stays_real`,
+`06_flawless_offering`) even where the banner headline has since changed — the
+paths are upload artifacts; do not rename them.
 
-Never show Phase 3+ content, the robed sprites, or the shadow figure in store
-assets — the reveal is the product.
+| # | Final upload path | Headline | Support line | Unique alt text | Visible authentic state |
+|---:|---|---|---|---|---|
+| 1 | `docs/play-store/final/01_shift_one_letter.png` | SHIFT ONE LETTER | Tuck a letter into the word below. Both words must survive. | WordShift puzzle board with the letter L selected and valid and invalid destination word previews visible. | Phase 0 puzzle board with L selected from PLAY and destination previews shown over PANT. |
+| 2 | `docs/play-store/final/02_every_word_stays_real.png` | ONE MOVE, TWO WORDS | Each move rewrites two words. Easy to learn, tricky to master. | WordShift puzzle showing PAY, PLANT, and HEAR midway through a valid letter-shifting chain. | Phase 0 puzzle board midway through the PAY, PLANT, HEAR chain with PLANT active. |
+| 3 | `docs/play-store/final/03_build_a_home.png` | BUILD A HOME | Turn puzzles into amber. The house turns amber into rooms. | Sunny WordShift house with several furnished rooms and multiple animal companions. | Sunny house showing the Cozy Den, Rustic Kitchen, Scholar's Study, Aquarium Room, and their companions. |
+| 4 | `docs/play-store/final/04_meet_unlikely_friends.png` | MEET 13 UNLIKELY FRIENDS | Warm, funny, thoughtful. They've been hoping for someone like you. | Ember the fox speaking to the player in a warm dialogue scene over the animal house. | Ember's warm introductory dialogue open over the sunny animal house. |
+| 5 | `docs/play-store/final/05_master_every_mode.png` | MASTER EVERY MODE | Reverse the chain, race the clock, go in blind. It all counts. | WordShift setup lists Standard, Reverse Shift, Speed Shift, Double Shift, Challenge, and Blind Mode. | Puzzle setup menu with Standard selected and Reverse Shift, Speed Shift, Double Shift, Challenge, and Blind Mode visible. |
+| 6 | `docs/play-store/final/06_flawless_offering.png` | GO FLAWLESS | No hints, no mistakes, no undos. Perfection gets noticed. | WordShift victory screen showing a flawless three-star solve and amber rewards. | Phase 0 victory modal with three stars, a FLAWLESS ribbon, the PAY to PLAN to HEART chain, and amber rewards. |
+| 7 | `docs/play-store/final/07_theyve_been_waiting.png` | THEY'VE BEEN WAITING | The longer you stay, the more the house changes around you. | WordShift animal house at dusk beneath a purple-orange sky, with the Jungle Hammock locked above furnished rooms. | Phase 2 dusk house with the Jungle Hammock still locked and no late-story imagery. |
+| 8 | `docs/play-store/final/08_something_stirs.png` | SOMETHING STIRS IN THE AIR | Your friends know more than they are willing to say. | A glowing offering pit in a moonlit forest clearing on the WordShift offering screen, with the message: Nothing left to give. The dark is patient. | Phase 3 night Offering Pit in its empty state. No ward ceremony, no robed sprites, no late-story imagery. |
+
+### Regen checklist (from the 2026-07-12 screenshot review — closed 2026-07-13)
+
+- [x] Re-render all eight banner strips with the revised headline/support copy above.
+- [x] #5 + #6: removed the dark "eye" blobs from the flat UI surfaces (kept on scenery edges, where the motif works).
+- [x] #5: difficulty pill now reads HARD to match the modal; "PUZZLE SETUP" header has clearance from the frame's top edge; stray thought-bubble removed.
+- [x] #7: recaptured with the phase-aware dusk-teal PLAY dock; the red compositing seam in the sunset clouds (x≈806) removed.
+- [ ] #8: optional, not done — a variant with the seven ward marks faintly visible around the pit opening would match the live app more closely. Shippable as-is.
+
+All eight screenshots are final; Play Console upload remains a human task.
+
+Final feature graphic: `docs/play-store/final/feature-graphic.png`
+Feature graphic alt text: Ember the fox beside the exact WordShift logo, candy tiles, glowing amber, and a sunny-to-dusk forest with subtle distant eyes.
+
+Never show Phase 4+ content, robed sprites, or the revealed shadow figure in
+store assets — the reveal is the product.
 
 ## Release notes template (1.0)
 
 > The house is ready. The animals are waiting.
 > • Thousands of letter-shifting puzzles across four difficulties
-> • Thirteen animal friends, a house to build, a daily challenge to share
-> • Streaks, quests, achievements — and a story that unfolds the longer you stay
+> • 13 animal friends, a house to build, a daily challenge to share
+> • Streaks, quests, achievements, and a story that unfolds the longer you stay

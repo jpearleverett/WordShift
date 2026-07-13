@@ -604,7 +604,9 @@ export function getDialogueTheme(phase: number): DialogueTheme {
         portraitRingBorder: 'rgba(90, 70, 140, 0.5)',
         bubbleBg: '#222238',
         bubbleBorder: 'rgba(90, 70, 140, 0.2)',
-        nameColor: '#9080B0',
+        // Ghostly mauve, one step lighter: ≥4.5:1 on the serene skin's panel
+        // fill (#332A38) hosting the nameplate (#9080B0 was ~3.8:1).
+        nameColor: '#A898C8',
         textColor: '#9898B0',
         subtitleColor: '#9490AC', // WCAG AA-checked vs bubbleBg
         progressColor: '#585870',
@@ -627,7 +629,9 @@ export function getDialogueTheme(phase: number): DialogueTheme {
         portraitRingBorder: 'rgba(80, 40, 100, 0.5)',
         bubbleBg: '#161622',
         bubbleBorder: 'rgba(80, 40, 100, 0.2)',
-        nameColor: '#7050A0',
+        // Light lavender: the nameplate sits on the dark pixel-skin panel fill
+        // (#352A31) once the host goes dark; #7050A0 measured only ~2.2:1 there.
+        nameColor: '#B99BE0',
         // Text colors WCAG AA-checked (>=4.5:1) against bubbleBg #161622 / modalBg #0E0E1A
         textColor: '#C8C8E0',
         subtitleColor: '#9898B0',
@@ -651,7 +655,9 @@ export function getDialogueTheme(phase: number): DialogueTheme {
         portraitRingBorder: 'rgba(140, 40, 50, 0.5)',
         bubbleBg: '#120E18',
         bubbleBorder: 'rgba(140, 40, 50, 0.2)',
-        nameColor: '#A04050',
+        // Brightened crimson: ≥4.5:1 on the dark skin panel fill (#352A31)
+        // that hosts the nameplate (the old #A04050 measured ~2.2:1).
+        nameColor: '#E08090',
         // Text colors WCAG AA-checked (>=4.5:1) against bubbleBg #120E18 / modalBg #0A0810 — ashen mauve, not pure white
         textColor: '#C0B8D0',
         subtitleColor: '#9088A8',

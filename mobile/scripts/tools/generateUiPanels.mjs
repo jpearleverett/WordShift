@@ -646,9 +646,15 @@ if (PREVIEW_DIR) {
   lines.push(skinLit.join('\n'));
   lines.push('};');
   lines.push('');
-  lines.push('/** Skin for a narrative phase (hostDark maps pre-dark phases onto storm). */');
+  lines.push('/**');
+  lines.push(' * Skin for a narrative phase. hostDark runs the dialogue-hosted surfaces');
+  lines.push(' * one material ahead of the world: pre-dark phases map onto storm, and');
+  lines.push(' * phase 3 (the night sky) maps onto the dark ash material so the most-seen');
+  lines.push(' * home surface visibly turns when the world does (phase 4 pairings reused,');
+  lines.push(' * so no new ink/fill contrast pairs are introduced).');
+  lines.push(' */');
   lines.push('export function getPixelSkin(phase: number, hostDark = false): PixelSkin {');
-  lines.push('  const p = hostDark && phase < 3 ? 3 : phase;');
+  lines.push('  const p = hostDark ? (phase < 3 ? 3 : phase === 3 ? 4 : phase) : phase;');
   lines.push('  if (p >= 5) return PIXEL_SKINS.serene;');
   lines.push('  if (p >= 4) return PIXEL_SKINS.dark;');
   lines.push('  if (p >= 3) return PIXEL_SKINS.storm;');
