@@ -459,6 +459,12 @@ export interface PuzzleGameActions {
     moveOutcomes?: MoveOutcome[];
     /** Undos used across the whole puzzle, present on the completing move (for the flawless tier). */
     undosUsed?: number;
+    /**
+     * Audio combo-ladder tier for the clean-move streak AFTER this committed
+     * move (0 = base chime, 1-3 = escalating ladder). Present on valid
+     * intermediate moves so App can play soundValidMove(comboTier).
+     */
+    comboTier?: number;
     /** Solve duration (ms) for a freshly-started board; absent for restored/retried boards. */
     solveTimeMs?: number;
     /** Whether this board was played with the Blind Offering modifier on. */
@@ -582,6 +588,13 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const [blindMode, setBlindMode] = useState(false);
   // Friend-challenge provenance for the current board (see PuzzleGameState doc).
   const [isSharedChallenge, setIsSharedChallenge] = useState(false);
+  // Daily-board provenance: set only by startDailyGame, cleared by every other
+  // start path. Drives the preview-validity gate — the daily always hides the
+  // ✓/✗ grading (its board shape ramps MEDIUM+ by design), even when the
+  // player's own difficulty preference (which the daily leaves untouched)
+  // happens to be EASY. Not persisted: a daily autosave is never restored as a
+  // normal puzzle (App's load guard), so a restored board is never a daily.
+  const [isDailyBoard, setIsDailyBoard] = useState(false);
   const [undosRemaining, setUndosRemaining] = useState(Infinity);
   const [currentVariant, setCurrentVariant] = useState<PuzzleVariant>('standard');
   const [selectedVariant, setSelectedVariantState] = useState<PuzzleVariant>('standard');
@@ -761,8 +774,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     puzzleReverseSolution?: PuzzleSolutionStep[]
   ) => {
     // Every non-shared start path routes through here (curated/echo/bank/
-    // generated/fallback) — a fresh board is never a shared challenge.
+    // generated/fallback) — a fresh board is never a shared challenge or a
+    // daily (the daily has its own bypass, startDailyGame).
     setIsSharedChallenge(false);
+    setIsDailyBoard(false);
     applyBoard(words, puzzleHint, puzzleSolution, wordLength, {
       resetPerformance: true,
       variant,
@@ -1009,6 +1024,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setGameMode('standard');
     setBlindMode(false); // the daily is a shared board — never blind
     setIsSharedChallenge(false);
+    setIsDailyBoard(true);
     // The daily generator's solution steps thread through like a bank puzzle's,
     // so daily hints use the stored solution instead of the blind live search.
     // Optional param keeps older 3-arg callers working unchanged.
@@ -1046,6 +1062,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     gameModeRef.current = 'standard';
     setGameMode('standard');
     setBlindMode(false); // a friend's shared board — never blind
+    setIsDailyBoard(false);
     setIsEchoPuzzle(false);
     applyBoard(normalized, undefined, undefined, wordLength, {
       resetPerformance: true,
@@ -1442,6 +1459,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     variant?: PuzzleVariant;
     reverseMidpoint?: boolean;
     moveOutcomes?: MoveOutcome[];
+    /** Audio combo-ladder tier for the streak after this move (see interface doc). */
+    comboTier?: number;
     /**
      * Blind Offering only: the final letter just landed but the finished
      * chain contains at least one non-word, so the board did NOT complete.
@@ -1697,8 +1716,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         return getMoveMessage(currentPhase);
       }
       cleanMoveStreakRef.current += 1;
-      return cleanMoveStreakRef.current >= 2
-        ? getComboMoveMessage(cleanMoveStreakRef.current, currentPhase)
+      const streak = cleanMoveStreakRef.current;
+      // Cadence: streaks 2 and 3 always escalate; from 4 on the combo line
+      // lands on EVEN streaks with a regular pool draw between climbs, so a
+      // long clean run keeps drawing variety instead of one fixed string.
+      return shouldUseComboMessage(streak)
+        ? getComboMoveMessage(streak, currentPhase)
         : getMoveMessage(currentPhase);
     };
 
@@ -1749,7 +1772,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       setIsStuck(stuckForward);
       setLastFormedWord(targetWordStr);
       setIsProcessing(false);
-      return { completed: false, hintsUsed, invalidAttempts, gameMode, completedWords: [], formedWord: targetWordStr };
+      // comboTier reads the ref AFTER moveMessageFor updated the streak, so the
+      // chime ladder and the message escalate off the same count.
+      return { completed: false, hintsUsed, invalidAttempts, gameMode, completedWords: [], formedWord: targetWordStr, comboTier: comboTierForStreak(cleanMoveStreakRef.current) };
     }
 
     // Reverse Shift: descend to bottom, then return to row 0.
@@ -1782,7 +1807,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       }
       setLastFormedWord(targetWordStr);
       setIsProcessing(false);
-      return { completed: false, hintsUsed, invalidAttempts, gameMode, completedWords: [], formedWord: targetWordStr, reverseMidpoint: reachedMidpoint };
+      // At the midpoint the streak was just reset for the return leg → tier 0.
+      return { completed: false, hintsUsed, invalidAttempts, gameMode, completedWords: [], formedWord: targetWordStr, reverseMidpoint: reachedMidpoint, comboTier: comboTierForStreak(cleanMoveStreakRef.current) };
     }
 
     // Returning upward in reverse mode.
@@ -1803,7 +1829,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setIsStuck(stuckUp);
     setLastFormedWord(targetWordStr);
     setIsProcessing(false);
-    return { completed: false, hintsUsed, invalidAttempts, gameMode, completedWords: [], formedWord: targetWordStr };
+    return { completed: false, hintsUsed, invalidAttempts, gameMode, completedWords: [], formedWord: targetWordStr, comboTier: comboTierForStreak(cleanMoveStreakRef.current) };
   }, [
     selectedLetter,
     gameState,
@@ -2076,6 +2102,23 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     return previews;
   }, [selectedLetter, activeRowIndex, moveDirection, rows, gameState, currentVariant, doubleShiftPhase, blindMode, gameMode]);
 
+  // Verb-depth gate: whether the ✓/✗ validity grading on the ghost previews is
+  // PRESENTED. The slotPreviews data above keeps computing isValid internally
+  // (the double-shift drop1 look-ahead and the drag near-miss snapping need
+  // it); this flag controls presentation only. Shown ONLY on EASY boards (any
+  // variant) and in the double-shift variant at any difficulty (its
+  // intermediate non-word state needs the guidance). Hidden everywhere else —
+  // MEDIUM+ standard/reverse/speed, the daily (ramps MEDIUM+ by design), and
+  // shared-challenge links — so the player judges the word with their own ear.
+  // Blind Offering has no previews at all (blindMode short-circuits above),
+  // but the flag stays false there too so consumers never key a tell off it.
+  const previewValidityVisible = useMemo(() => {
+    if (blindMode) return false;
+    if (hasVariantModifier(currentVariant, 'double_shift')) return true;
+    if (isDailyBoard || isSharedChallenge) return false;
+    return difficulty === 'EASY';
+  }, [blindMode, currentVariant, isDailyBoard, isSharedChallenge, difficulty]);
+
   const restorePuzzleState = useCallback((saved: SavedPuzzleState) => {
     const selectedExists = saved.selectedLetter
       ? saved.rows.some(row => row.words.some(letter => letter.id === saved.selectedLetter!.id))
@@ -2106,6 +2149,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     // (amber-only) into one that feeds phase progress. Old saves without the
     // field restore as normal boards.
     setIsSharedChallenge(saved.isSharedChallenge ?? false);
+    // A daily autosave is never restored as a normal puzzle (App's load guard),
+    // so a restored board is by definition not a daily.
+    setIsDailyBoard(false);
     setCurrentVariant(saved.currentVariant);
     setSelectedVariantState(saved.selectedVariant);
     setMoveDirection(saved.moveDirection);
@@ -2192,6 +2238,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setDoubleShiftPhase(null);
     setIsEchoPuzzle(false);
     setIsSharedChallenge(false);
+    setIsDailyBoard(false);
     setIsStuck(false);
     setHintHighlight(null);
     setLastArrival(null);
@@ -2234,6 +2281,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     selectedVariant,
     moveDirection,
     slotPreviews,
+    previewValidityVisible,
     doubleShiftPhase,
     isEchoPuzzle,
     isStuck,

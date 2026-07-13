@@ -118,7 +118,7 @@ export const getInviteAccessibilityLabel = (
 
 // ---------------------------------------------------------------------------
 // In-world investment rendering (room upgrades).
-// A purchased upgrade used to render as a single 10px "✦" glyph; deepenings
+// A purchased upgrade used to render as a single 10px sparkle glyph; deepenings
 // and attunements rendered nothing. These layers make each amber sink visible
 // inside its room: a breathing hearth glow (tier 1), phase-aware wall sigils +
 // a richer interior wash (tier 2), and scaling glow / extra sigils / dust
@@ -145,7 +145,7 @@ export const computeEmbellishmentIntensity = (
 };
 
 export interface EmbellishmentVisuals {
-  /** Tier-1 hearth glow (the replacement for the old ✦ glyph). */
+  /** Tier-1 hearth glow (the replacement for the old sparkle glyph). */
   showHearthGlow: boolean;
   /** Peak opacity of the glow stack — capped so rooms stay readable. */
   glowMaxOpacity: number;
@@ -266,10 +266,10 @@ const HearthGlow: React.FC<{ maxOpacity: number; scale: number; animate: boolean
  */
 const SigilMark: React.FC<{ line: string; glow: string }> = ({ line, glow }) => (
   <View style={styles.sigilBox} pointerEvents="none">
-    <View style={[styles.sigilLine, styles.sigilLeft, styles.sigilUnderlay, { backgroundColor: glow }]} />
-    <View style={[styles.sigilLine, styles.sigilRight, styles.sigilUnderlay, { backgroundColor: glow }]} />
-    <View style={[styles.sigilLine, styles.sigilLeft, { backgroundColor: line }]} />
-    <View style={[styles.sigilLine, styles.sigilRight, { backgroundColor: line }]} />
+    <View style={[styles.sigilLine, styles.sigilGlowLeft, { backgroundColor: glow }]} />
+    <View style={[styles.sigilLine, styles.sigilGlowRight, { backgroundColor: glow }]} />
+    <View style={[styles.sigilLine, styles.sigilCrispLeft, { backgroundColor: line }]} />
+    <View style={[styles.sigilLine, styles.sigilCrispRight, { backgroundColor: line }]} />
   </View>
 );
 
@@ -517,7 +517,7 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
       <View style={styles.namePlate}>
         <Text style={styles.roomName}>{room.name}</Text>
         {/* Procedural ornament row: one warm lantern pip per investment step
-            (tier-1 + each attunement level). Replaces the old lone ✦ glyph. */}
+            (tier-1 + each attunement level). Replaces the old lone glyph. */}
         {embellish.namePips > 0 && (
           <View style={styles.pipRow} importantForAccessibility="no-hide-descendants">
             {Array.from({ length: embellish.namePips }).map((_, i) => (
@@ -749,29 +749,44 @@ const styles = StyleSheet.create({
   sigilSpot: {
     position: 'absolute',
   },
+  // The line pair is anchored with explicit `left` values (box is 22 wide:
+  // crisp 2px lines centered at 7/15, their 7px glow underlays center-aligned
+  // beneath them) — no translate offsets (the invite-chip centering pin bans
+  // hardcoded translates in this file).
   sigilBox: {
     width: 22,
     height: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
     opacity: 0.5,
   },
   sigilLine: {
     position: 'absolute',
-    width: 2,
+    top: 1,
     height: 20,
     borderRadius: 1,
   },
-  sigilLeft: {
-    transform: [{ translateX: -4 }, { rotate: '24deg' }],
+  sigilCrispLeft: {
+    left: 6,
+    width: 2,
+    transform: [{ rotate: '24deg' }],
   },
-  sigilRight: {
-    transform: [{ translateX: 4 }, { rotate: '-24deg' }],
+  sigilCrispRight: {
+    left: 14,
+    width: 2,
+    transform: [{ rotate: '-24deg' }],
   },
-  sigilUnderlay: {
+  sigilGlowLeft: {
+    left: 3.5,
     width: 7,
     borderRadius: 3,
     opacity: 0.22,
+    transform: [{ rotate: '24deg' }],
+  },
+  sigilGlowRight: {
+    left: 11.5,
+    width: 7,
+    borderRadius: 3,
+    opacity: 0.22,
+    transform: [{ rotate: '-24deg' }],
   },
   dustMote: {
     position: 'absolute',

@@ -622,9 +622,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     });
     setWeeklyQuestState(questState);
 
-    // Load room upgrades (tier 1) + deepenings (tier 2)
-    const upgrades = await getPurchasedUpgrades();
+    // Load room upgrades (tier 1) + deepenings (tier 2) + attunements (tier 3)
+    // — HouseWorld/RoomView render the in-world investment layers from these.
+    const [upgrades, deepened, attuned] = await Promise.all([
+      getPurchasedUpgrades(),
+      getDeepenedRooms(),
+      getAttunedRooms(),
+    ]);
     setPurchasedUpgrades(upgrades);
+    setDeepenedRooms(deepened);
+    setAttunedRooms(attuned);
 
     // Phase-5 Tending Level — drives the visual "deepening" of the house sigils.
     setTendingLevel(await getTendingLevel());
@@ -1542,6 +1549,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           nextUnlock={unlockFlow.nextUnlock}
           amberBalance={progress.amber}
           purchasedUpgrades={purchasedUpgrades}
+          deepenedRooms={deepenedRooms}
+          attunedRooms={attunedRooms}
           tendingLevel={tendingLevel}
           suppressInviteChips={unlockFlow.showInvitePrompt}
           savedPanY={initialHousePanY}
