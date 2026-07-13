@@ -421,7 +421,7 @@ interface CoordinatedEvent {
   // the same weighted scale phase transitions use (phaseProgress, which
   // accelerates for engaged players), falling back to raw puzzlesSolved for
   // legacy saves — otherwise accelerated players reach the finale (~155 real
-  // puzzles) before the 230/240/250 pre-finale crescendo ever fires.
+  // puzzles) before the 190/205/220 pre-finale crescendo ever fires.
   puzzleThreshold: number;
   phase: number;            // Minimum phase required
   theme: string;            // Internal theme name
@@ -431,7 +431,7 @@ interface CoordinatedEvent {
 export const COORDINATED_EVENTS: CoordinatedEvent[] = [
   // Event 1: Phase 2 — animals independently notice that words have changed
   {
-    puzzleThreshold: 80,
+    puzzleThreshold: 70,
     phase: 2,
     theme: 'words_changing',
     lines: {
@@ -445,7 +445,7 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
   },
   // Event 2: Phase 2 — the house itself responds to puzzles
   {
-    puzzleThreshold: 100,
+    puzzleThreshold: 90,
     phase: 2,
     theme: 'house_feels_different',
     lines: {
@@ -461,7 +461,7 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
   },
   // Event 3: Phase 2 — they all had the same dream
   {
-    puzzleThreshold: 120,
+    puzzleThreshold: 110,
     phase: 2,
     theme: 'shared_dream',
     lines: {
@@ -475,7 +475,7 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
   },
   // Event 4: Phase 3 — "the arrangement" is named openly for the first time
   {
-    puzzleThreshold: 160,
+    puzzleThreshold: 140,
     phase: 3,
     theme: 'the_arrangement',
     lines: {
@@ -494,7 +494,7 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
   },
   // Event 5: Phase 3 — each animal names their role in the cult
   {
-    puzzleThreshold: 200,
+    puzzleThreshold: 165,
     phase: 3,
     theme: 'roles_revealed',
     lines: {
@@ -515,7 +515,7 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
   },
   // Event 6: Phase 3 — the final countdown before Phase 4
   {
-    puzzleThreshold: 230,
+    puzzleThreshold: 190,
     phase: 3,
     theme: 'almost_time',
     lines: {
@@ -536,7 +536,7 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
   },
   // Event 7: Phase 4 — the convergence, animals sense closeness to the finale
   {
-    puzzleThreshold: 240,
+    puzzleThreshold: 205,
     phase: 4,
     theme: 'convergence',
     lines: {
@@ -557,7 +557,7 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
   },
   // Event 8: Phase 4 — the threshold, final coordinated event before the endgame
   {
-    puzzleThreshold: 250,
+    puzzleThreshold: 220,
     phase: 4,
     theme: 'the_threshold',
     lines: {
@@ -687,7 +687,7 @@ export const NARRATIVE_SEEDS: Record<AnimalType, { seeds: string[]; callbacks: s
       "The best recipes cannot be hurried. A truly great stew takes exactly as long as it takes, and patience is the one ingredient I have never once run short of.",
     ],
     callbacks: [
-      "Everything in my kitchen serves a purpose. I told you that on one of your first visits, do you remember? The pots, the spices, the ingredients that did not know what they were for. You did not know either, dear. You were the main ingredient, and you found out when it was time, just as I promised.",
+      "Everything in my kitchen serves a purpose. I told you that on one of your first visits, do you remember? The pots, the spices, the ingredients that did not know what they were for. You did not know either, dear, and I watched you wonder tonight which ingredient you were. None of them. You were my grandmother's spoon, the thing the whole meal moves through, and no cook melts her spoon into the stew. She washes it, and dries it, and keeps it. You found out when it was time, just as I promised.",
       "I said a great stew takes exactly as long as it takes, and this one took years. Every word you brought was one slow turn of the spoon. Smell the kitchen now, dear. It is ready. It was always going to be ready the moment you were.",
     ],
   },
@@ -767,8 +767,8 @@ export const NARRATIVE_SEEDS: Record<AnimalType, { seeds: string[]; callbacks: s
       "Being looked at is how a thing knows it is real, I have always believed that. So I look at everything, entirely, every night, the garden and the ridge and the far dark and all. It is my little gift to the valley. Everything around here is very, very real.",
     ],
     callbacks: [
-      "I told you once that nothing crosses the dark without me seeing it, and that you could sleep soundly because something was watching over this house. Every word was true, bright one. I only let you file the watching under protection. I was not keeping the dark away from the house. I was keeping the house in its sight, all night, every night, so it would never once lose its way to us.",
-      "Being looked at is how a thing knows it is real. I taught you that early, smiling, and you took it for a charming habit of mine. It was the whole engine, bright one. Every night I looked at the far dark entirely, and every night it grew more real, more near, more able. You cannot fatten a fire with wood you never give it. I gave it the one food it wanted. I gave it being seen.",
+      "The whole house slept soundly all those years because a watcher kept the rail, and nothing ever crossed the dark of this valley without me seeing it. All of that is true, bright one. Only the direction was filed wrong. I was never keeping the dark away from the house. I was keeping the house in its sight, all night, every night, so it would never once lose its way to us.",
+      "Being looked at is how a thing knows it is real. That has been my one creed since the old forest, and everyone here took it for a charming habit of mine. It was the whole engine, bright one. Every night I looked at the far dark entirely, and every night it grew more real, more near, more able. You cannot fatten a fire with wood you never give it. I gave it the one food it wanted. I gave it being seen.",
     ],
   },
   aye_aye: {

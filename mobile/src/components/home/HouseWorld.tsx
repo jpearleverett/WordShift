@@ -417,15 +417,15 @@ const ShootingStar: React.FC = () => {
 // Phase-aware backdrop colors behind the sky image. Each value is the average
 // of the TOP row of pixels of that phase's sky asset, so when the scene is
 // panned up the sky appears to extend upward seamlessly (no color step).
-// Sampled from assets/environment/sky_*.png via a scratch pngjs script —
-// re-sample these if the sky assets are ever regenerated.
+// Sampled from assets/environment/sky_*.png (scripts/tools/reworkSkies.mjs
+// prints the storm/shadow samples; re-sample if the sky assets regenerate).
 // Phase→sky mapping mirrors the <Image source> below: 0=day, 1=afternoon,
 // 2=dusk, 3=storm, 4+=shadow (Phase 5 reuses sky_shadow).
 const PHASE_BG_COLORS: Record<number, string> = {
   0: '#439cf2', // sky_day.png top row
   1: '#1583f9', // sky_afternoon.png top row
   2: '#684381', // sky_dusk.png top row
-  3: '#000212', // sky_storm.png top row
+  3: '#000000', // sky_storm.png top row (post-rework pre-storm night)
   4: '#050816', // sky_shadow.png top row
   5: '#050816', // Phase 5 renders sky_shadow too — same top row
 };
@@ -441,7 +441,7 @@ const PHASE_GROUND_COLORS: Record<number, string> = {
   0: '#8ba232', // sky_day.png bottom row (meadow grass)
   1: '#557718', // sky_afternoon.png bottom row
   2: '#6d4018', // sky_dusk.png bottom row
-  3: '#153150', // sky_storm.png bottom row
+  3: '#192330', // sky_storm.png bottom row (post-rework drained meadow)
   4: '#182131', // sky_shadow.png bottom row
   5: '#182131', // Phase 5 renders sky_shadow too
 };

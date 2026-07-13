@@ -1375,7 +1375,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // screen background meets the sky PNG without a seam — keep in sync with
   // HouseWorld/appStyles; re-sample if the sky assets regenerate.
   const phaseBgColor = {
-    0: '#439cf2', 1: '#1583f9', 2: '#684381', 3: '#000212', 4: '#050816', 5: '#050816',
+    0: '#439cf2', 1: '#1583f9', 2: '#684381', 3: '#000000', 4: '#050816', 5: '#050816',
   }[progress.currentPhase] || '#439cf2';
 
   // Phase-aware dialogue theme for all modals and dialogue boxes

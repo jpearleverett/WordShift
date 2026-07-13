@@ -293,6 +293,15 @@ describe('getHintMessage', () => {
     const unique = new Set(hints);
     expect(unique.size).toBe(5);
   });
+
+  test('punctuation cools with the descent: ! at phases 0-2, . from phase 3 up', () => {
+    for (const p of [0, 1, 2] as DialoguePhase[]) {
+      expect(getHintMessage('R', 'WARM', p).endsWith('"WARM"!')).toBe(true);
+    }
+    for (const p of [3, 4, 5] as DialoguePhase[]) {
+      expect(getHintMessage('R', 'VOID', p).endsWith('"VOID".')).toBe(true);
+    }
+  });
 });
 
 describe('getHintFallback', () => {
@@ -871,7 +880,10 @@ describe('checkNarrativeMicroBeat', () => {
     const beat5 = await checkNarrativeMicroBeat(5);
     expect(beat5).not.toBeNull();
     expect(beat5!.type).toBe('ambient_whisper');
-    expect(beat5!.text).toContain('Fox');
+    // Ember is she/her (canon) — the first micro-beat must never misgender her.
+    expect(beat5!.text).toContain('Ember');
+    expect(beat5!.text).toContain('She');
+    expect(beat5!.text).not.toMatch(/\bHe\b|\bhe\b|\bhis\b/);
 
     const beat8 = await checkNarrativeMicroBeat(8);
     expect(beat8).not.toBeNull();

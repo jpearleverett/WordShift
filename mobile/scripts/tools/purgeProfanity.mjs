@@ -8,15 +8,24 @@ import path from 'path';
 // Words that must never appear in puzzles or be accepted as player-formed
 // words. Mild oaths that double as legitimate common words (e.g. HELL) are
 // retained; everything sexual, scatological, or slur-adjacent is removed.
+// Also removed: juvenile scatological/insult words that undercut the game's
+// tone (FART/BUTT/MORON), POOF/POOFS (UK slur), and the archaic KJV set
+// (THEE/THOU/HAST/HATH/SHALT/DOTH) that reads as unfair obscure vocabulary
+// to mainstream players.
 export const BLOCKED_WORDS = [
   'ARSE', 'ARSES', 'ASS', 'ASSES', 'BIMBO', 'BITCH', 'BITCHES', 'BONER', 'BOOB', 'BOOBS',
+  'BUTT', 'BUTTS',
   'CHINK', 'CHINKS', 'COCK', 'COCKS', 'COON', 'COONS', 'CRAP', 'CRAPS', 'CUM', 'CUMS',
   'DAGO', 'DAMN', 'DAMNS', 'DICK', 'DICKS', 'DILDO', 'DYKE', 'DYKES', 'FAG', 'FAGS', 'FAGGOT',
-  'GOOK', 'GOOKS', 'HOMO', 'HOMOS', 'HONKY', 'KIKE', 'KIKES', 'MILF', 'NEGRO', 'NEGROS',
-  'PECKER', 'PISS', 'PISSED', 'PORN', 'PORNO', 'PRICK', 'PRICKS', 'PUBE', 'PUBES',
+  'FART', 'FARTS',
+  'GOOK', 'GOOKS', 'HOMO', 'HOMOS', 'HONKY', 'KIKE', 'KIKES', 'MILF', 'MORON', 'MORONS',
+  'NEGRO', 'NEGROS',
+  'PECKER', 'PISS', 'PISSED', 'POOF', 'POOFS', 'PORN', 'PORNO', 'PRICK', 'PRICKS', 'PUBE', 'PUBES',
   'RAPE', 'RAPED', 'RAPER', 'RAPES', 'RAPIST', 'RETARD', 'SEMEN', 'SEX', 'SEXED', 'SEXES', 'SEXY',
   'SHAG', 'SHAGS', 'SLUT', 'SLUTS', 'SMUT', 'SMUTS', 'SPAZ', 'SPERM', 'SPIC', 'SPICS',
   'TIT', 'TITS', 'TURD', 'TURDS', 'TWAT', 'TWATS', 'WANK', 'WANKS', 'WHORE', 'WHORES', 'WOP', 'WOPS',
+  // Archaic KJV-register words (not slurs, but unfair to mainstream players)
+  'THEE', 'THOU', 'HAST', 'HATH', 'SHALT', 'DOTH',
 ];
 const BLOCKED = new Set(BLOCKED_WORDS);
 
@@ -46,11 +55,15 @@ const REPO = path.resolve(MOBILE, '..');
 }
 
 // 3) Puzzle banks: drop any puzzle whose entry references a blocked word.
-//    Bank entries are single-line object literals; every chain/solution word
-//    appears single-quoted ('WORD') somewhere in the entry.
+//    Bank entries are single-line object literals; every chain word and every
+//    step's source/target word appears single-quoted ('WORD') somewhere in the
+//    entry — EXCEPT a leg's final formed word, which only appears inside the
+//    explanation template string ("...to form WORD."), so both patterns are
+//    scanned.
 {
   const dataDir = path.join(MOBILE, 'src/data');
   const tokenRe = /'([A-Z]{3,8})'/g;
+  const formedRe = /form ([A-Z]{3,8})\./g;
   for (const name of fs.readdirSync(dataDir).filter(f => f.startsWith('puzzleBank') && f !== 'puzzleBankTypes.ts')) {
     const file = path.join(dataDir, name);
     let src = fs.readFileSync(file, 'utf8');
@@ -60,6 +73,9 @@ const REPO = path.resolve(MOBILE, '..');
     const entries = body.split(/\n(?=\s*\{id:)/).filter(e => e.trim().length > 0);
     const kept = entries.filter(entry => {
       for (const m of entry.matchAll(tokenRe)) {
+        if (BLOCKED.has(m[1])) return false;
+      }
+      for (const m of entry.matchAll(formedRe)) {
         if (BLOCKED.has(m[1])) return false;
       }
       return true;
