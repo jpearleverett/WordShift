@@ -5,8 +5,11 @@ import { generateLocalPuzzle, generateDoubleShiftPuzzle, getIncantationName, get
 import { selectPreGeneratedPuzzle } from '../services/puzzleBank';
 import { getWordHistoryWithRecency, recordPuzzleWords } from '../services/wordHistory';
 import { COMMON_WORDS, CURATED_EARLY_PUZZLES, CURATED_PUZZLE_COUNT, CuratedPuzzle, getRandomFallback } from '../constants';
+// Imported from gameBalance directly (not the constants barrel) so the hook's
+// test harness — which mocks '../constants' wholesale — still gets the real value.
+import { PREVIEW_GRADING_BRIDGE_PUZZLES } from '../constants/gameBalance';
 import { CHALLENGE_MODE_CONFIG, DialoguePhase } from '../types/homeWorld';
-import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getOutOfHintsMessage, getLoadingMessage, getStartMessage, getInvalidWordMessage, getBlindFailMessage, getLockedLetterMessage, getEchoPuzzleMessage, getFinalBoardStartMessage } from '../services/phaseNarrative';
+import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getOutOfHintsMessage, getLoadingMessage, getStartMessage, getInvalidWordMessage, getBlindFailMessage, getLockedLetterMessage, getEchoPuzzleMessage, getFinalBoardStartMessage, getFinalBoardUndoRefusal } from '../services/phaseNarrative';
 import { getHintBalanceSync, hasHintSync, consumeHintSync } from '../services/hints';
 import { getPreferredPuzzleVariant, setPreferredPuzzleVariant, getFullProgress, getRitualWords } from '../services/amberCurrency';
 import {
@@ -390,9 +393,12 @@ export interface PuzzleGameState {
    * Whether the ✓/✗ validity grading on the ghost previews is PRESENTED.
    * The preview data always computes isValid internally (the double-shift
    * look-ahead and drag near-miss snapping need it); this flag controls
-   * presentation only. TRUE only on EASY boards (any variant) and in the
-   * double-shift variant at any difficulty (its intermediate non-word state
-   * needs the guidance) — never in Blind Offering, and never on daily /
+   * presentation only. TRUE on EASY boards (any variant), in the double-shift
+   * variant at any difficulty (its intermediate non-word state needs the
+   * guidance), and — the early-game grading bridge — on EVERY board until
+   * PREVIEW_GRADING_BRIDGE_PUZZLES total puzzles are solved (the tutorial
+   * teaches the marks; the first free MEDIUM board must not silently drop
+   * them). Never in Blind Offering; past the bridge, never on daily /
    * shared-challenge boards (the daily ramps MEDIUM+ by design; a friend's
    * chain is judged by the player's own ear). Everywhere hidden, the preview
    * is a neutral ghost word: the player must judge whether it is real.
@@ -602,6 +608,13 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   // happens to be EASY. Not persisted: a daily autosave is never restored as a
   // normal puzzle (App's load guard), so a restored board is never a daily.
   const [isDailyBoard, setIsDailyBoard] = useState(false);
+  // Total puzzles solved, for the preview-grading bridge (grading stays on for
+  // EVERY board until PREVIEW_GRADING_BRIDGE_PUZZLES solves). Loaded from
+  // progress at mount and refreshed on every startNewGame fetch. Initialized
+  // to the bridge threshold (bridge OVER) so a veteran restoring a board never
+  // sees a stale graded flash before the first progress read lands; a genuine
+  // newcomer's mount read resolves to 0 long before their first free board.
+  const [puzzlesSolvedCount, setPuzzlesSolvedCount] = useState(PREVIEW_GRADING_BRIDGE_PUZZLES);
   const [undosRemaining, setUndosRemaining] = useState(Infinity);
   const [currentVariant, setCurrentVariant] = useState<PuzzleVariant>('standard');
   const [selectedVariant, setSelectedVariantState] = useState<PuzzleVariant>('standard');
@@ -665,6 +678,23 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         if (stored && isPuzzleVariant(stored)) {
           setSelectedVariantState(stored);
         }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Seed the preview-grading bridge counter at mount so boards that never
+  // route through startNewGame's own progress fetch (a restored autosave, a
+  // daily/shared start as the session's first board) still see the real
+  // solved count. startNewGame refreshes it on every fetch thereafter.
+  useEffect(() => {
+    let cancelled = false;
+    getFullProgress()
+      .then((progress) => {
+        if (cancelled) return;
+        setPuzzlesSolvedCount(progress?.puzzlesSolved ?? 0);
       })
       .catch(() => {});
     return () => {
@@ -910,6 +940,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       // These are hand-picked to showcase interesting letter moves
       const progress = await getFullProgress();
       const puzzlesSolved = progress?.puzzlesSolved ?? 0;
+      // Keep the preview-grading bridge counter current with every fetch.
+      setPuzzlesSolvedCount(puzzlesSolved);
       if (
         puzzlesSolved < CURATED_PUZZLE_COUNT &&
         (selectedDifficulty === 'EASY' || selectedDifficulty === 'MEDIUM') &&
@@ -1935,6 +1967,20 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     if (gameState !== GameState.PLAYING) return;
     if (history.length === 0) return;
 
+    // THE FINAL BOARD'S ONE RULE: undo is refused. Every word placed on the
+    // last arrangement is placed for good — the moment complicity stops being
+    // narrated and becomes mechanical. Nothing reverts, nothing is charged
+    // (no streak break, no undosUsed tick, history intact); the board answers
+    // with the error shake + a phase-aware refusal. RESTART stays available
+    // (resetCurrentPuzzle — beginning the last arrangement again is permitted
+    // and preserves the finale mark), and hints stay available. This also
+    // covers a blind-mode finale whose end-judgment fails: the player cannot
+    // walk the chain back, but RESTART is always reachable from that state.
+    if (isFinalBoardRef.current) {
+      shakeError(getFinalBoardUndoRefusal(currentPhase));
+      return;
+    }
+
     // Taking back a move breaks the clean-move streak AND the flawless run.
     cleanMoveStreakRef.current = 0;
     undosUsedRef.current += 1;
@@ -2095,7 +2141,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     if (gameMode === 'challenge' && !freeUndos) {
       setUndosRemaining(prev => prev - 1);
     }
-  }, [history, gameMode, blindMode, undosRemaining, shakeError, gameState, currentVariant, doubleShiftPhase]);
+  }, [history, gameMode, blindMode, undosRemaining, shakeError, gameState, currentVariant, doubleShiftPhase, currentPhase]);
 
   const handleNextLevel = useCallback(() => {
     setShowConfetti(false);
@@ -2187,19 +2233,27 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   // Verb-depth gate: whether the ✓/✗ validity grading on the ghost previews is
   // PRESENTED. The slotPreviews data above keeps computing isValid internally
   // (the double-shift drop1 look-ahead and the drag near-miss snapping need
-  // it); this flag controls presentation only. Shown ONLY on EASY boards (any
-  // variant) and in the double-shift variant at any difficulty (its
-  // intermediate non-word state needs the guidance). Hidden everywhere else —
-  // MEDIUM+ standard/reverse/speed, the daily (ramps MEDIUM+ by design), and
-  // shared-challenge links — so the player judges the word with their own ear.
+  // it); this flag controls presentation only. Shown on EASY boards (any
+  // variant), in the double-shift variant at any difficulty (its intermediate
+  // non-word state needs the guidance), and — the early-game grading bridge —
+  // on EVERY board (any difficulty, the daily, shared links) until
+  // PREVIEW_GRADING_BRIDGE_PUZZLES total puzzles are solved: the tutorial
+  // teaches the marks, so the first free MEDIUM board must not silently drop
+  // them. Hidden everywhere else — MEDIUM+ standard/reverse/speed, the daily
+  // (ramps MEDIUM+ by design), and shared-challenge links — so the player
+  // judges the word with their own ear; App's one-time graduation toast marks
+  // the first board that starts hidden (post-bridge, by construction).
   // Blind Offering has no previews at all (blindMode short-circuits above),
   // but the flag stays false there too so consumers never key a tell off it.
   const previewValidityVisible = useMemo(() => {
     if (blindMode) return false;
     if (hasVariantModifier(currentVariant, 'double_shift')) return true;
+    // Early-game bridge: grading stays on for every board (even daily/shared)
+    // until the player has solved their way past the threshold.
+    if (puzzlesSolvedCount < PREVIEW_GRADING_BRIDGE_PUZZLES) return true;
     if (isDailyBoard || isSharedChallenge) return false;
     return difficulty === 'EASY';
-  }, [blindMode, currentVariant, isDailyBoard, isSharedChallenge, difficulty]);
+  }, [blindMode, currentVariant, puzzlesSolvedCount, isDailyBoard, isSharedChallenge, difficulty]);
 
   const restorePuzzleState = useCallback((saved: SavedPuzzleState) => {
     const selectedExists = saved.selectedLetter
@@ -2274,6 +2328,11 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   // puzzle — it's a real "retry this board", the recovery path for a stuck state.
   // Performance counters (invalid attempts, hints used) are intentionally kept so
   // a reset can't be used to game the star rating; undos refresh with the board.
+  // Restart the CURRENT board from its starting words. Deliberately does NOT
+  // touch isFinalBoard/isFinalBoardRef (applyBoard never clears them): on the
+  // marked final board — where undo is refused — RESTART is the sanctioned
+  // repair path (including a failed blind-finale judgment), and the restarted
+  // board must still BE the final board.
   const resetCurrentPuzzle = useCallback(() => {
     if (rows.length === 0) return;
     const originalWords = rows.map(r => r.originalWord);

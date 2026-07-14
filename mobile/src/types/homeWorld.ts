@@ -40,6 +40,14 @@ export const DIALOGUE_SESSION_CONFIG = {
   DIALOGUES_PER_SESSION: DIALOGUE_SESSION_DEFAULTS.DIALOGUES_PER_SESSION,
   PUZZLES_BETWEEN_SESSIONS: DIALOGUE_SESSION_DEFAULTS.PUZZLES_BETWEEN_SESSIONS,
   GRACE_PERIOD_SESSIONS: DIALOGUE_SESSION_DEFAULTS.GRACE_PERIOD_SESSIONS,
+  // Catch-up session boost: a late recruit (see LATE_PHASE_RECRUITS) that still
+  // has unread REGULAR dialogue at global Phase 3+ reads this many extra lines
+  // per session. Without it the descent trio is stranded: Moss unlocks at the
+  // sky-garden gate (152) with the finale ~10 puzzles away, and at 4-6 lines
+  // per session with 5-puzzle cooldowns the ending consumes his arc unheard.
+  CATCH_UP_BONUS_DIALOGUES: 2,
+  // The boost only exists in the compressed endgame window.
+  CATCH_UP_MIN_GLOBAL_PHASE: 3,
 };
 
 // Home World Types - Animal house with existential journey
@@ -98,20 +106,65 @@ export const ANIMAL_AWARENESS_TIERS: Record<AnimalType, AnimalAwarenessTier> = {
 };
 
 /**
- * Get the effective phase for a specific animal based on their awareness tier
+ * Get the effective phase for a specific animal based on their awareness tier.
+ *
+ * The tiers stagger the DESCENT, never the ARRIVAL: an animal's phase may only
+ * ever reach 5 through the global phase-5 gate, because the arrival itself is
+ * gated on the actual post-revelation event (markPostRevelation pins the
+ * global phase to 5). Pre-arrival the result is hard-capped at 4 — without
+ * that cap a vanguard animal (+1) at global Phase 4 resolved to 5 and the
+ * game's most-visited characters (Ember, Archimedes, Vesper) leaked
+ * "the shadow has settled" post-revelation serenity during the dwell window,
+ * BEFORE the entity ever descended. Conversely, at global phase 5 every
+ * animal clamps to 5 so the lagging four don't sit at Phase 4 forever and
+ * miss their post-revelation dialogue.
  */
 export function getAnimalPhase(globalPhase: DialoguePhase, animalType: AnimalType): DialoguePhase {
-  // Post-revelation the shadow has settled and every animal is serene — the
-  // awareness tiers only stagger the descent, never the arrival. Without this
-  // clamp the lagging four would stay at Phase 4 forever and never reach their
-  // post-revelation dialogue.
   if (globalPhase === 5) return 5;
   const tier = ANIMAL_AWARENESS_TIERS[animalType];
   let offset = 0;
   if (tier === 'vanguard') offset = 1;
   if (tier === 'lagging') offset = -1;
-  const effective = Math.max(0, Math.min(5, globalPhase + offset));
+  // Cap at 4 pre-arrival: phase-5 content is reachable ONLY via the gate above.
+  const effective = Math.max(0, Math.min(4, globalPhase + offset));
   return effective as DialoguePhase;
+}
+
+/**
+ * Animals whose unlock can only ever open at global Phase 3+ — the descent
+ * trio, whose intro is always the catch-up variant. This is the signal for the
+ * catch-up session boost. Chosen over a persisted "phase at unlock" record
+ * (nothing stores one, and adding one would need a save migration for players
+ * already past the gates) and over the catchup-intro flag (introsSeen records
+ * WHO was introduced, not at what phase): it is static, save-independent, and
+ * derivable from the unlock data — the trio's room gates (126/140/152) all sit
+ * at or past the Phase-3 weighted threshold (PHASE_THRESHOLDS[3] = 120), and
+ * weighted phase progress never trails raw puzzles solved, so by construction
+ * these three cannot exist before global Phase 3. Pinned against
+ * UNLOCK_PROGRESSION by homeWorldData.test.ts so the set can't silently drift
+ * from the real gates.
+ */
+export const LATE_PHASE_RECRUITS: ReadonlySet<AnimalType> = new Set<AnimalType>([
+  'tarsier',
+  'aye_aye',
+  'kakapo',
+]);
+
+/**
+ * Extra dialogues per session for a late recruit still working through its
+ * regular (indexed, non-pool) backlog. 0 whenever the boost doesn't apply:
+ * before global Phase 3, for animals that aren't late recruits, or once the
+ * backlog is read out. The cycling pools (Phase-2 exhaustion, Phase-5
+ * post-revelation) never earn the boost — they are ambience, not arc.
+ */
+export function getCatchUpSessionBonus(
+  globalPhase: DialoguePhase,
+  isLatePhaseRecruit: boolean,
+  hasUnreadRegularDialogue: boolean
+): number {
+  if (globalPhase < DIALOGUE_SESSION_CONFIG.CATCH_UP_MIN_GLOBAL_PHASE) return 0;
+  if (!isLatePhaseRecruit || !hasUnreadRegularDialogue) return 0;
+  return DIALOGUE_SESSION_CONFIG.CATCH_UP_BONUS_DIALOGUES;
 }
 
 /**

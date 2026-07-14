@@ -102,13 +102,14 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
     "Oh! Hello up there! I'm down here, by the little den.\nTap the invite and I'll come say hello properly!",
   ],
 
-  // Step 2: Fox just invited — intro dialogue. Warm on the surface, with ONE
-  // faint wrong-note (the "someone like you... for the longest time" seed):
-  // adorable eagerness on a first read, quietly ominous once the descent lands.
-  // Per the narrative vision's Early Darkness Seeds — the trap is set in warmth.
+  // Step 2: Fox just invited — intro dialogue (two beats; the greeting and the
+  // house-grows beat are merged so the corridor loses a tap). Warm on the
+  // surface, with ONE faint wrong-note (the "someone like you... for the
+  // longest time" seed): adorable eagerness on a first read, quietly ominous
+  // once the descent lands. Per the narrative vision's Early Darkness Seeds —
+  // the trap is set in warmth.
   fox_invited: [
-    "You let me in! Oh, I hoped you would. I have been practicing my hello all morning.\nI'm Ember!",
-    "Here is the wonderful part: every puzzle you solve makes this house a little more real. I don't entirely know how that works, only that it does, and that it is my favorite thing.",
+    "You let me in! Oh, I hoped you would. I'm Ember!\nAnd here is the wonderful part: every puzzle you solve makes this house a little more real. It is my favorite thing.",
     "Come on, one quick puzzle together, then we build. I have been hoping for someone like you for the longest time.",
   ],
 
@@ -144,11 +145,11 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
     "And the words you just made? Oh, they don't simply vanish, they're worth something!\nCome with me, I want to show you my favorite spot.",
   ],
 
-  // Step 6: On pit screen — Fox explains the Offering Pit (kept short: the player
-  // already had their first-win reward moment, so this is trimmed to two beats).
+  // Step 6: On pit screen — Fox explains the Offering Pit (ONE beat: the player
+  // already had their first-win reward moment, so the whole explanation lands
+  // in a single card and the corridor loses a tap).
   pit_intro: [
-    "Here we are! This is the pit. I know it looks a little dramatic, but I promise it's friendly.\nEvery word you solve drifts down here afterwards.",
-    "Offer your words and they turn to amber, the warm gold that builds our house.\nGo on, it loves being fed. Most things here do, funnily enough.",
+    "Here we are, the pit! Every word you solve drifts down here afterwards.\nOffer your words and they turn to amber, the warm gold that builds our house. Go on, it loves being fed. Most things here do, funnily enough.",
   ],
 
   // Step 6.5: On the pit screen, before the player has offered — a standing
@@ -166,13 +167,13 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
   ],
 
   // Step 8: Back on home screen — explain unlocks and keep playing (kept to
-  // three short beats so the text-dense tail right after the first-win dopamine
-  // hit doesn't drag). The second beat points at the pit entrance below the
-  // house: the in-world path is the only way back to the pit, so the player
-  // must hear where it lives before onboarding lets go of their hand.
+  // two short beats so the text-dense tail right after the first-win dopamine
+  // hit doesn't drag). The first beat carries the loop AND points at the pit
+  // entrance below the house: the in-world path is the only way back to the
+  // pit, so the player must hear where it lives before onboarding lets go of
+  // their hand.
   unlock_explained: [
-    "That's the whole happy loop! Solve puzzles, offer your words, and the amber comes home to build our rooms and invite more friends.",
-    "When you have words to offer, the pit waits just below the house.\nScroll down and give it a tap.",
+    "That's the whole happy loop! Solve puzzles, offer your words, and the amber builds our rooms and invites more friends.\nWhen you have words to offer, the pit waits just below the house. Scroll down and give it a tap.",
     "Come back each day, and we'll fill this house together. They need you.",
   ],
 };

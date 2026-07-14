@@ -1322,9 +1322,11 @@ export async function getAnimalsWithStatus(): Promise<Animal[]> {
   const progress = await loadProgress();
 
   // Phase-5 endgame: the honest "new dialogue" badge needs the Tending Shrine
-  // state + recorded choices (a vanguard animal can reach animalPhase 5 at global
-  // phase 4, so load whenever we're at the threshold). Loaded once, not per animal.
-  const nearEndgame = progress.currentPhase >= 4;
+  // state + recorded choices. Post-revelation only: getAnimalPhase hard-caps
+  // every animal at 4 until the global phase is 5 (the awareness tiers stagger
+  // the descent, never the arrival), so no animal can resolve to phase 5 before
+  // then. Loaded once, not per animal.
+  const nearEndgame = progress.currentPhase >= 5;
   const tendingState = nearEndgame ? await loadTendingState() : null;
   const choiceState = nearEndgame ? await loadChoiceState() : null;
   // Phase-2 exhaustion pool: badge honesty for animals whose base block is

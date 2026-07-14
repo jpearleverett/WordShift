@@ -367,7 +367,14 @@ export async function getAmberBalance(): Promise<number> {
 
 /**
  * Calculate narrative acceleration multiplier for phase progression
- * Based on player performance (three-star rate, streak, difficulty)
+ * Based on player performance (three-star rate, streak, difficulty).
+ *
+ * The three-star component is a LINEAR RAMP, not a step: 1.0 at or below
+ * THREE_STAR_RAMP_START (0.40), rising linearly to the THREE_STAR_MULTIPLIER
+ * ceiling (1.5) at THREE_STAR_RAMP_END (0.60) — so exactly 1.25 at a 0.50
+ * rate. The old hard step (1.5x iff rate >= 0.5) meant a one-percentage-point
+ * difference in skill could move the reveal by weeks. The overall cap stays
+ * 3.0.
  */
 export function calculatePhaseAcceleration(
   threeStarRate: number,
@@ -378,10 +385,14 @@ export function calculatePhaseAcceleration(
 ): number {
   let multiplier = 1.0;
 
-  // Three-star performance bonus
-  if (threeStarRate >= NARRATIVE_ACCELERATION.THREE_STAR_RATE_THRESHOLD) {
-    multiplier *= NARRATIVE_ACCELERATION.THREE_STAR_MULTIPLIER;
-  }
+  // Three-star performance ramp (linear between RAMP_START and RAMP_END)
+  const rampSpan =
+    NARRATIVE_ACCELERATION.THREE_STAR_RAMP_END - NARRATIVE_ACCELERATION.THREE_STAR_RAMP_START;
+  const rampT = Math.min(
+    1,
+    Math.max(0, (threeStarRate - NARRATIVE_ACCELERATION.THREE_STAR_RAMP_START) / rampSpan)
+  );
+  multiplier *= 1 + (NARRATIVE_ACCELERATION.THREE_STAR_MULTIPLIER - 1) * rampT;
 
   // Streak bonus
   if (currentStreak >= NARRATIVE_ACCELERATION.STREAK_THRESHOLD) {

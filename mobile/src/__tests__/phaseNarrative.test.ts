@@ -1650,22 +1650,48 @@ describe('INTERJECTION_MESSAGES', () => {
 // ============================================================================
 
 describe('getDwellLine', () => {
-  test('escalates across the window and never shows a counter', () => {
-    const early = getDwellLine(1, 4);
-    const mid = getDwellLine(4, 4);
-    const late = getDwellLine(7, 4);
-    expect(new Set([early, mid, late]).size).toBe(3);
-    for (const line of [early, mid, late]) {
+  const DWELL_WINDOW = [1, 2, 3, 4, 5, 6, 7, 8];
+
+  test('each of the 8 dwell wins gets its own line (no recycling as padding)', () => {
+    const lines = DWELL_WINDOW.map(n => getDwellLine(n, 4));
+    expect(new Set(lines).size).toBe(8);
+    for (const line of lines) {
+      expect(line.trim().length).toBeGreaterThan(0);
       expect(line).not.toMatch(/\d/);
       expect(line).not.toMatch(/[–—]/);
       expect(line.toLowerCase()).not.toContain('phase');
     }
-    expect(early.toLowerCase()).toContain('whole');
+    expect(lines[0].toLowerCase()).toContain('whole');
   });
 
-  test('keeps a distinct serene register at phase 5', () => {
-    expect(getDwellLine(1, 5)).not.toBe(getDwellLine(1, 4));
-    expect(getDwellLine(7, 5)).not.toBe(getDwellLine(7, 4));
+  test('the original anchor lines stay at their positions', () => {
+    expect(getDwellLine(1, 4)).toBe(
+      'The house is whole. It is quiet in a new way, like a table set before the guests arrive.'
+    );
+    expect(getDwellLine(3, 4)).toBe(
+      'The rooms are ready. The keepers are ready. What is coming is almost ready too.'
+    );
+    expect(getDwellLine(7, 4)).toBe(
+      'It is very close now. The house holds still, the way you hold still when something is about to speak.'
+    );
+  });
+
+  test('keeps a distinct serene register at phase 5, also 8 distinct lines', () => {
+    const serene = DWELL_WINDOW.map(n => getDwellLine(n, 5));
+    expect(new Set(serene).size).toBe(8);
+    for (let i = 0; i < DWELL_WINDOW.length; i++) {
+      expect(serene[i].trim().length).toBeGreaterThan(0);
+      expect(serene[i]).not.toBe(getDwellLine(DWELL_WINDOW[i], 4));
+      expect(serene[i]).not.toMatch(/\d/);
+      expect(serene[i]).not.toMatch(/[–—]/);
+      expect(serene[i].toLowerCase()).not.toContain('phase');
+    }
+  });
+
+  test('clamps out-of-window counts instead of crashing', () => {
+    expect(getDwellLine(0, 4)).toBe(getDwellLine(1, 4));
+    expect(getDwellLine(99, 4)).toBe(getDwellLine(8, 4));
+    expect(getDwellLine(99, 5)).toBe(getDwellLine(8, 5));
   });
 });
 

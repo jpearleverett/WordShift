@@ -24,7 +24,10 @@ export const FALLBACK_PUZZLES_EASY: string[][] = [
   ["FITS", "USED", "WITH"],
   ["GONE", "SURE", "THAT"],
   ["POLL", "OVER", "TIME"],
-  ["MAIL", "BEST", "LAST"],
+  // Was MAIL-BEST-LAST: its only path used transient remainder MIL, which
+  // hygiene pass 2 removed from the dictionary. BAIT-BEST-LAST solves via
+  // BAIT(-A, leaves BIT) -> BEAST -> (-B, leaves EAST) -> BLAST.
+  ["BAIT", "BEST", "LAST"],
   ["ARMY", "PART", "INTO"],
   ["ARTS", "THAT", "WILL"],
   ["BEEN", "YEAR", "GOOD"],
