@@ -5,8 +5,14 @@ import {
   setOnboardingStep,
   isOnboardingComplete,
   resetOnboarding,
+  COLD_OPEN_INSTRUCTION,
   ONBOARDING_FOX_LINES,
+  resolveColdOpenLaunchRoute,
 } from '../services/onboarding';
+import {
+  getColdOpenSkipAccessibilityLabel,
+  getColdOpenSkipLabel,
+} from '../services/phaseNarrative';
 
 // Mock AsyncStorage
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -33,7 +39,7 @@ describe('onboarding', () => {
 
     test('set and get round-trip all step values', async () => {
       const steps: OnboardingStep[] = [
-        'not_started', 'home_empty', 'fox_invited', 'going_to_puzzle',
+        'not_started', 'cold_open_puzzle', 'home_empty', 'fox_invited', 'going_to_puzzle',
         'puzzle_tutorial', 'puzzle_complete', 'going_to_pit', 'pit_intro',
         'pit_offering', 'returning_home', 'unlock_explained', 'complete',
       ];
@@ -62,6 +68,35 @@ describe('onboarding', () => {
     });
   });
 
+  describe('cold-open crash recovery', () => {
+    test('routes home after a recorded victory even when a stale playable autosave remains', () => {
+      expect(resolveColdOpenLaunchRoute(true, 1)).toBe('home_empty');
+      expect(resolveColdOpenLaunchRoute(true, 9)).toBe('home_empty');
+    });
+
+    test('restores a playable cold-open autosave before any victory was recorded', () => {
+      expect(resolveColdOpenLaunchRoute(true, 0)).toBe('restore');
+    });
+
+    test('routes to the empty home when victory progress exists without a playable autosave', () => {
+      expect(resolveColdOpenLaunchRoute(false, 1)).toBe('home_empty');
+      expect(resolveColdOpenLaunchRoute(false, 9)).toBe('home_empty');
+    });
+
+    test('starts the cold-open board only when neither a save nor victory progress exists', () => {
+      expect(resolveColdOpenLaunchRoute(false, 0)).toBe('new_board');
+    });
+  });
+
+  describe('cold-open skip copy', () => {
+    test('is concise, accessible, and em-dash free', () => {
+      expect(getColdOpenSkipLabel()).toBe('SKIP');
+      expect(getColdOpenSkipAccessibilityLabel().toLowerCase()).toContain('skip');
+      expect(getColdOpenSkipAccessibilityLabel().toLowerCase()).toContain('home');
+      expect(getColdOpenSkipAccessibilityLabel()).not.toMatch(/[—–]/);
+    });
+  });
+
   describe('pit onboarding steps', () => {
     test('going_to_pit step type is valid', async () => {
       await setOnboardingStep('going_to_pit');
@@ -80,6 +115,12 @@ describe('onboarding', () => {
   });
 
   describe('ONBOARDING_FOX_LINES', () => {
+    test('exports the concise self-directed cold-open instruction', () => {
+      expect(COLD_OPEN_INSTRUCTION).toBe(
+        'Move one letter down. Both words must stay real.'
+      );
+    });
+
     test('has dialogue for all standard onboarding steps', () => {
       expect(ONBOARDING_FOX_LINES.home_empty).toBeDefined();
       expect(ONBOARDING_FOX_LINES.home_empty.length).toBeGreaterThan(0);
@@ -151,13 +192,14 @@ describe('onboarding', () => {
       expect(ONBOARDING_FOX_LINES.unlock_explained.length).toBe(2);
     });
 
-    test('fox_invited is two beats with the darkness seed kept verbatim as the closer', () => {
+    test('fox_invited acknowledges the completed puzzle and keeps the darkness seed as the closer', () => {
       // The greeting and the house-grows beat are merged; the Early Darkness
       // Seed line must survive the trim word for word, and stay the closer.
       const lines = ONBOARDING_FOX_LINES.fox_invited;
       expect(lines.length).toBe(2);
       expect(lines[0]).toContain("I'm Ember!");
-      expect(lines[0].toLowerCase()).toContain('every puzzle you solve makes this house a little more real');
+      expect(lines.join(' ').toLowerCase()).toContain('puzzle');
+      expect(lines.join(' ').toLowerCase()).toContain('already');
       expect(lines[lines.length - 1]).toContain(
         'I have been hoping for someone like you for the longest time.'
       );

@@ -13,12 +13,20 @@ jest.mock('../services/wordHistory', () => ({
 }));
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { selectPreGeneratedPuzzle, clearPlayedPuzzles } from '../services/puzzleBank';
+import {
+  clearPlayedPuzzles,
+  getGuaranteedExtendedStandardFallback,
+  selectPreGeneratedPuzzle,
+} from '../services/puzzleBank';
 import { PUZZLE_BANK_HARD } from '../data/puzzleBankHard';
 import { PUZZLE_BANK_REVERSE_HARD } from '../data/puzzleBankReverseHard';
 import { PUZZLE_BANK_EASY } from '../data/puzzleBankEasy';
 import { PUZZLE_BANK_MEDIUM } from '../data/puzzleBankMedium';
 import { PUZZLE_BANK_MEDIUM_PLUS } from '../data/puzzleBankMediumPlus';
+import { COMMON_WORDS } from '../constants/wordLists';
+import { isStandardChainSolvable } from '../services/puzzleSolvability';
+import { isUnbrokenWeaveEligible } from '../services/unbrokenWeave';
+import { extendStandardPuzzle } from '../services/puzzleExtension';
 
 // Helper: get a recency map (empty by default)
 function emptyRecencyMap(): Map<string, number> {
@@ -119,6 +127,146 @@ describe('puzzleBank', () => {
       }
     });
 
+    it('selects a mature board through capped branching analysis', async () => {
+      const result = await selectPreGeneratedPuzzle(
+        'HARD', 0, emptyRecencyMap(), 'standard', 40,
+      );
+
+      expect(result).not.toBeNull();
+      expect(result!.words).toHaveLength(5);
+      expect(isStandardChainSolvable(
+        result!.words,
+        word => COMMON_WORDS.has(word),
+      )).toBe('solvable');
+    });
+
+    it('returns a solvable extended standard board at the depth gate', async () => {
+      const extendable = PUZZLE_BANK_EASY[0];
+      await AsyncStorage.setItem(
+        'wordshift_played_std_easy_puzzle_ids',
+        JSON.stringify(PUZZLE_BANK_EASY.slice(1).map(puzzle => puzzle.id)),
+      );
+
+      const result = await selectPreGeneratedPuzzle(
+        'EASY', 0, emptyRecencyMap(), 'standard', 100,
+      );
+
+      expect(result).not.toBeNull();
+      expect(result!.words.slice(0, -1)).toEqual(extendable.words);
+      expect(result!.words).toHaveLength(4);
+      expect(result!.solution).toHaveLength(3);
+      expect(isStandardChainSolvable(
+        result!.words,
+        word => COMMON_WORDS.has(word),
+      )).toBe('solvable');
+    });
+
+    it('guarantees an extra row even when dynamic recency covers the dictionary', async () => {
+      const recency = new Map(
+        [...COMMON_WORDS].map((word, index) => [word, index]),
+      );
+
+      const result = await selectPreGeneratedPuzzle(
+        'EASY', 0, recency, 'standard', 100,
+      );
+
+      expect(result).not.toBeNull();
+      expect(result!.words).toHaveLength(4);
+      expect(result!.solution).toHaveLength(3);
+    });
+
+    it('recycles from the extendable pool instead of serving an unextended board', async () => {
+      const nonExtendable = PUZZLE_BANK_EASY.find(puzzle => {
+        const config = {
+          words: puzzle.words,
+          solution: puzzle.solution,
+          wordLength: puzzle.wordLength,
+        };
+        return extendStandardPuzzle(config, {
+          excludedWords: new Set(puzzle.allWords),
+        }) === config;
+      });
+      expect(nonExtendable).toBeDefined();
+
+      const usedIds = PUZZLE_BANK_EASY
+        .filter(puzzle => puzzle.id !== nonExtendable!.id)
+        .map(puzzle => puzzle.id);
+      await AsyncStorage.setItem(
+        'wordshift_played_std_easy_puzzle_ids',
+        JSON.stringify(usedIds),
+      );
+
+      const result = await selectPreGeneratedPuzzle(
+        'EASY', 0, emptyRecencyMap(), 'standard', 100,
+      );
+
+      expect(result).not.toBeNull();
+      expect(result!.words).toHaveLength(4);
+      expect(result!.solution).toHaveLength(3);
+    });
+
+    it('filters Unbroken Weave selection to eligible canonical solutions', async () => {
+      const result = await selectPreGeneratedPuzzle(
+        'HARD',
+        5,
+        emptyRecencyMap(),
+        'standard',
+        180,
+        { unbrokenWeaveOnly: true },
+      );
+
+      expect(result).not.toBeNull();
+      expect(isUnbrokenWeaveEligible(result!.solution)).toBe(true);
+    });
+
+    it('recycles only eligible played boards for Unbroken Weave', async () => {
+      const eligible = PUZZLE_BANK_HARD.filter(puzzle =>
+        isUnbrokenWeaveEligible(puzzle.solution),
+      );
+      const ineligible = PUZZLE_BANK_HARD.find(puzzle =>
+        !isUnbrokenWeaveEligible(puzzle.solution),
+      );
+      expect(eligible.length).toBeGreaterThan(0);
+      expect(ineligible).toBeDefined();
+
+      const usedKey = 'wordshift_played_puzzle_ids';
+      await clearPlayedPuzzles();
+      await AsyncStorage.setItem(
+        usedKey,
+        JSON.stringify([ineligible!.id, ...eligible.map(puzzle => puzzle.id)]),
+      );
+
+      const result = await selectPreGeneratedPuzzle(
+        'HARD',
+        5,
+        emptyRecencyMap(),
+        'standard',
+        180,
+        { unbrokenWeaveOnly: true },
+      );
+
+      expect(result).not.toBeNull();
+      expect(isUnbrokenWeaveEligible(result!.solution)).toBe(true);
+      const storedIds = JSON.parse((await AsyncStorage.getItem(usedKey))!);
+      expect(storedIds).toContain(ineligible!.id);
+    });
+
+    it('does not extend an Unbroken Weave board after the depth gate', async () => {
+      const result = await selectPreGeneratedPuzzle(
+        'EASY',
+        5,
+        emptyRecencyMap(),
+        'standard',
+        100,
+        { unbrokenWeaveOnly: true },
+      );
+
+      expect(result).not.toBeNull();
+      expect(result!.words).toHaveLength(3);
+      expect(result!.solution).toHaveLength(2);
+      expect(isUnbrokenWeaveEligible(result!.solution)).toBe(true);
+    });
+
     it('recycles oldest puzzles when bank is exhausted', async () => {
       // Skip this test if bank is too large (would be slow)
       if (PUZZLE_BANK_HARD.length > 50) {
@@ -151,6 +299,32 @@ describe('puzzleBank', () => {
         expect(result).not.toBeNull();
       }
     });
+  });
+
+  describe('guaranteed mature standard fallback', () => {
+    it.each([
+      ['EASY', 4],
+      ['MEDIUM', 5],
+      ['MEDIUM_PLUS', 5],
+      ['HARD', 6],
+    ] as const)(
+      'synchronously returns an extended, solvable %s board without storage',
+      (difficulty, expectedRows) => {
+        jest.clearAllMocks();
+
+        const first = getGuaranteedExtendedStandardFallback(difficulty);
+        const second = getGuaranteedExtendedStandardFallback(difficulty);
+
+        expect(first).toBe(second);
+        expect(first.words).toHaveLength(expectedRows);
+        expect(first.solution).toHaveLength(expectedRows - 1);
+        expect(isStandardChainSolvable(
+          first.words,
+          word => COMMON_WORDS.has(word),
+        )).toBe('solvable');
+        expect(AsyncStorage.getItem).not.toHaveBeenCalled();
+      },
+    );
   });
 
   describe('clearPlayedPuzzles', () => {

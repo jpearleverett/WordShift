@@ -20,6 +20,7 @@ import {
 import { getCurrentPhase } from './amberCurrency';
 import { DialoguePhase } from '../types/homeWorld';
 import { isReverseChainSolvable } from './puzzleSolvability';
+import { analyzeStandardBranching } from './puzzleBranching';
 
 // Shipped-rules solvability check (COMMON_WORDS is the same dictionary the
 // board validates against). Used as the FINAL acceptance gate for reverse
@@ -856,6 +857,21 @@ export function scorePuzzleChain(chain: PathNode[], recencyMap?: Map<string, num
   const uniquePositions = new Set(movePositions).size;
   const positionVarietyBonus = (uniquePositions / 3) * 10;
   totalScore += positionVarietyBonus;
+
+  // Standard-board decision depth: reward chains that leave the player more
+  // than one completing route. This is deliberately a bounded final nudge,
+  // not a hard gate, so vocabulary, move quality, and generation latency stay
+  // primary. Reverse generation uses different lock semantics and already has
+  // its own flexibility scoring, so it skips this standard-rule metric.
+  if (!relaxBoring) {
+    const branching = analyzeStandardBranching(
+      chain.map(node => node.word),
+      validateWord,
+      { pathCap: 8, stateCap: 500 },
+    );
+    totalScore += Math.min(10, branching.structuralBonus * 0.75);
+    if (branching.completePathCount === 1) totalScore -= 3;
+  }
 
   return Math.round(Math.max(0, Math.min(100, totalScore)));
 }

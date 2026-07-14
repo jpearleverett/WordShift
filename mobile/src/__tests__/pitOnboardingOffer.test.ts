@@ -280,6 +280,22 @@ describe('auto-offer removal tripwire', () => {
   });
 });
 
+describe('pit viewport containment', () => {
+  test('the full-screen pit clips stale absolute geometry after a web viewport resize', () => {
+    // Pit art/particles use module-level screen geometry. On web, DevTools or a
+    // window resize can make that geometry wider than the live viewport; the
+    // full-screen host must contain it so the document cannot scroll sideways
+    // and carry the onboarding FoxGuide off the left edge.
+    const src = fs.readFileSync(
+      path.join(__dirname, '..', 'components', 'OfferingPitScreen.tsx'),
+      'utf8',
+    );
+    expect(src).toMatch(
+      /container:\s*\{\s*flex:\s*1,\s*overflow:\s*'hidden'\s*\}/,
+    );
+  });
+});
+
 describe('shouldShowHarvestPitIntro (first-manual-harvest Fox beat)', () => {
   test('fires on arrival with unlearned harvest and words waiting (past auto-collect)', () => {
     expect(shouldShowHarvestPitIntro(false, null, 2, false, true)).toBe(true);

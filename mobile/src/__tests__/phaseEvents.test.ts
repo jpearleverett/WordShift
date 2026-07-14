@@ -12,6 +12,56 @@
  *    1.25x time scale).
  */
 
+jest.mock('react', () => {
+  const actual = jest.requireActual('react');
+  return {
+    ...actual,
+    default: actual,
+    useEffect: () => undefined,
+    useRef: (initial: unknown) => ({ current: initial }),
+    useState: (initial: unknown) => [initial, jest.fn()],
+  };
+});
+
+jest.mock('react-native', () => ({
+  View: 'View',
+  Text: 'Text',
+  TouchableOpacity: 'TouchableOpacity',
+  Image: 'Image',
+  Dimensions: { get: () => ({ width: 400, height: 800 }) },
+  StyleSheet: {
+    absoluteFill: { position: 'absolute' },
+    create: (styles: unknown) => styles,
+  },
+  Animated: {
+    View: 'AnimatedView',
+    Value: jest.fn().mockImplementation((value: number) => ({
+      value,
+      setValue: jest.fn(),
+      stopAnimation: jest.fn(),
+    })),
+    timing: jest.fn().mockReturnValue({ start: jest.fn(), stop: jest.fn() }),
+    parallel: jest.fn().mockReturnValue({ start: jest.fn(), stop: jest.fn() }),
+    sequence: jest.fn().mockReturnValue({ start: jest.fn(), stop: jest.fn() }),
+    delay: jest.fn().mockReturnValue({ start: jest.fn(), stop: jest.fn() }),
+    loop: jest.fn().mockReturnValue({ start: jest.fn(), stop: jest.fn() }),
+  },
+}));
+
+jest.mock('../services/settings', () => ({
+  getSettingsSync: () => ({ reducedMotion: true }),
+}));
+jest.mock('../services/haptics', () => ({
+  hapticLight: jest.fn(),
+  hapticMedium: jest.fn(),
+  hapticHeavy: jest.fn(),
+  hapticWarning: jest.fn(),
+}));
+jest.mock('../theme/fonts', () => ({ BODY_FONT_BOLD: 'BodyBold' }));
+jest.mock('../theme/colors', () => ({
+  getPhaseTheme: () => ({ vignetteColor: '#000000' }),
+}));
+
 import {
   getPhaseTransitionEvent,
   getEventDuration,
@@ -21,6 +71,7 @@ import {
   PhaseTransitionEvent,
 } from '../services/phaseEvents';
 import { DialoguePhase } from '../types/homeWorld';
+import { PhaseTransitionOverlay } from '../components/PhaseTransitionOverlay';
 
 const ALL_EVENTS: PhaseTransitionEvent[] = [
   ...([1, 2, 3, 4] as DialoguePhase[]).map(p => getPhaseTransitionEvent(p)!),
@@ -28,6 +79,53 @@ const ALL_EVENTS: PhaseTransitionEvent[] = [
   FINAL_PUZZLE_EVENT,
   POST_REVELATION_EVENT,
 ];
+
+type ElementLike = { props?: { children?: unknown; accessibilityLabel?: string } };
+
+function collectText(node: unknown): string[] {
+  if (typeof node === 'string') return [node];
+  if (node == null || typeof node !== 'object') return [];
+  if (Array.isArray(node)) return node.flatMap(collectText);
+  return collectText((node as ElementLike).props?.children);
+}
+
+describe('ordinary transition title subtlety', () => {
+  const ordinaryEvents = ([1, 2, 3, 4] as DialoguePhase[])
+    .map(phase => getPhaseTransitionEvent(phase)!);
+  const titledEvents = [HOUSE_COMPLETION_EVENT, FINAL_PUZZLE_EVENT, POST_REVELATION_EVENT];
+
+  test('only ordinary phase transitions suppress their title', () => {
+    for (const event of ordinaryEvents) {
+      expect(event.showTitle).toBe(false);
+    }
+    for (const event of titledEvents) {
+      expect(event.showTitle).not.toBe(false);
+    }
+  });
+
+  test('the overlay omits suppressed titles but keeps special-event titles', () => {
+    for (const event of ordinaryEvents) {
+      const tree = PhaseTransitionOverlay({ event, onComplete: jest.fn() });
+      expect(collectText(tree)).not.toContain(event.title);
+    }
+    for (const event of titledEvents) {
+      const tree = PhaseTransitionOverlay({ event, onComplete: jest.fn() });
+      expect(collectText(tree)).toContain(event.title);
+    }
+  });
+
+  test('accessibility announces visible content, never a suppressed title', () => {
+    for (const event of ordinaryEvents) {
+      const tree = PhaseTransitionOverlay({ event, onComplete: jest.fn() }) as ElementLike;
+      expect(tree.props?.accessibilityLabel).toBe(event.scenes[0].text);
+      expect(tree.props?.accessibilityLabel).not.toContain(event.title);
+    }
+    for (const event of titledEvents) {
+      const tree = PhaseTransitionOverlay({ event, onComplete: jest.fn() }) as ElementLike;
+      expect(tree.props?.accessibilityLabel).toBe(event.title);
+    }
+  });
+});
 
 describe('emoji has left phaseEvents', () => {
   test('no scene carries an emoji property (in-engine art only)', () => {

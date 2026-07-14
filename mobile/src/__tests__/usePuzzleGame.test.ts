@@ -84,10 +84,14 @@ jest.mock('../services/phaseNarrative', () => ({
   getLoadingMessage: jest.fn(() => 'Loading...'),
   getStartMessage: jest.fn(() => 'Tap a tile to begin!'),
   getInvalidWordMessage: jest.fn((word: string, _p: number) => `${word} isn't a word!`),
+  getBlockedWordMessage: jest.fn((_p: number) => 'That word cannot be used.'),
   getBlindFailMessage: jest.fn((_p: number) => 'Not every word held! Undo and mend the chain.'),
   getLockedLetterMessage: jest.fn((_p: number) => 'That letter is locked!'),
   getFinalBoardStartMessage: jest.fn((_p: number) => 'The last arrangement. Take your time.'),
   getFinalBoardUndoRefusal: jest.fn((_p: number) => 'What is given now is given for good.'),
+  getPreviewRescueMessage: jest.fn((_p: number) => 'The checks return for this board.'),
+  getUnbrokenWeaveSpentLetterMessage: jest.fn((letter: string, _p: number) => `${letter} has already crossed the chain.`),
+  getUnbrokenWeaveUnavailableMessage: jest.fn((_p: number) => 'The thread breaks before it can begin. A plain offering remains.'),
 }));
 
 jest.mock('../services/hints', () => ({
@@ -99,16 +103,48 @@ jest.mock('../services/hints', () => ({
 jest.mock('../services/amberCurrency', () => ({
   getPreferredPuzzleVariant: jest.fn(async () => 'standard'),
   setPreferredPuzzleVariant: jest.fn(async () => {}),
-  // Default is POST-bridge (>= PREVIEW_GRADING_BRIDGE_PUZZLES = 12) so the
+  // Default is fully neutral (>= PREVIEW_GRADING_RESCUE_LIMIT = 20) so the
   // preview-validity truth table below exercises the steady-state gate; the
-  // bridge tests override this per-test with an early-game count.
+  // transition tests override this per-test with an early-game count.
   getFullProgress: jest.fn(async () => ({ puzzlesSolved: 20 })),
   getRitualWords: jest.fn(async () => []),
+}));
+
+jest.mock('../services/finalBoard', () => ({
+  buildFinalBoard: jest.fn(async () => ({
+    words: ['SPARK', 'LIGHT', 'PAINS', 'DWELL', 'CURSE', 'BLACK', 'GRAVE'],
+    hint: 'Follow the last arrangement.',
+    solution: [
+      { stepIndex: 0, sourceWord: 'SPARK', targetWord: 'LIGHT', letterToMove: 'S', explanation: '', insertionPosition: 0, removalPosition: 0 },
+      { stepIndex: 1, sourceWord: 'SLIGHT', targetWord: 'PAINS', letterToMove: 'L', explanation: '', insertionPosition: 1, removalPosition: 1 },
+      { stepIndex: 2, sourceWord: 'PLAINS', targetWord: 'DWELL', letterToMove: 'S', explanation: '', insertionPosition: 5, removalPosition: 5 },
+      { stepIndex: 3, sourceWord: 'DWELLS', targetWord: 'CURSE', letterToMove: 'D', explanation: '', insertionPosition: 5, removalPosition: 0 },
+      { stepIndex: 4, sourceWord: 'CURSED', targetWord: 'BLACK', letterToMove: 'S', explanation: '', insertionPosition: 5, removalPosition: 3 },
+      { stepIndex: 5, sourceWord: 'BLACKS', targetWord: 'GRAVE', letterToMove: 'L', explanation: '', insertionPosition: 5, removalPosition: 1 },
+    ],
+    wordLength: 5,
+  })),
+}));
+
+jest.mock('../services/wordHistory', () => ({
+  getWordHistoryWithRecency: jest.fn(async () => new Map()),
+  recordPuzzleWords: jest.fn(async () => {}),
 }));
 
 // Mock puzzleBank to return null — tests exercise the generation path
 jest.mock('../services/puzzleBank', () => ({
   selectPreGeneratedPuzzle: jest.fn(async () => null),
+  getGuaranteedExtendedStandardFallback: jest.fn(() => ({
+    words: ['SUIT', 'SITE', 'WHAT', 'HERE', 'LIME'],
+    hint: 'Guaranteed mature fallback',
+    solution: [],
+    wordLength: 4,
+  })),
+}));
+
+jest.mock('../services/puzzleExtension', () => ({
+  PUZZLE_EXTENSION_UNLOCK_PUZZLES: 100,
+  extendStandardPuzzle: jest.fn(config => config),
 }));
 
 // The hook value-imports the shared 3-6 challenge word-count bounds from
@@ -133,6 +169,12 @@ jest.mock('../constants', () => ({
     // Synthetic chain for multi-move tests: ABCD → EFGH → IJKL
     // (move A down forming AEFGH, then E down forming EIJKL)
     'BCD', 'AEFGH', 'AFGH', 'EIJKL',
+    // Unbroken Weave: first A forms AAEFG; the remaining unlocked A would
+    // otherwise be a legal repeat, while E is the next unspent hint.
+    'AAEFG', 'AEFG', 'AIJKL', 'AAFG', 'EIJKL',
+    // Unbroken Weave stuck detection: after A forms AAMNO, the only ordinary
+    // legal continuation reuses A and must therefore count as unavailable.
+    'AAMNO', 'AMNO', 'AQRST',
     // 4-row extension for the combo-ladder tests: ABCD → EFGH → IJKL → WXYZ
     // (third move: I out of EIJKL leaves EJKL, forms IWXYZ — keeps the board
     // solvable so stuck detection never resets the streak mid-test)
@@ -163,10 +205,13 @@ jest.mock('../constants', () => ({
   },
 }));
 
-import { usePuzzleGame, hasAnyValidMove, canCompleteDoubleShift, hasAnyValidDoubleShiftMove, isBoardSolvableFromState, comboTierForStreak, shouldUseComboMessage, PuzzleGameState, PuzzleGameActions } from '../hooks/usePuzzleGame';
-// Real value (the hook imports it from gameBalance directly, past the
-// '../constants' mock above) — the bridge tests pin against it.
-import { PREVIEW_GRADING_BRIDGE_PUZZLES } from '../constants/gameBalance';
+import { usePuzzleGame, hasAnyValidMove, canCompleteDoubleShift, hasAnyValidDoubleShiftMove, isBoardSolvableFromState, comboTierForStreak, shouldUseComboMessage, resolvePreviewGradingMode, PuzzleGameState, PuzzleGameActions } from '../hooks/usePuzzleGame';
+// Real values (the hook imports them from gameBalance directly, past the
+// '../constants' mock above) — the grading-window tests pin against them.
+import {
+  PREVIEW_GRADING_FULL_LIMIT,
+  PREVIEW_GRADING_RESCUE_LIMIT,
+} from '../constants/gameBalance';
 
 /**
  * Helper: call usePuzzleGame with fresh hook indices (simulates a re-render).
@@ -178,8 +223,69 @@ function callHook(): [PuzzleGameState, PuzzleGameActions] {
   return usePuzzleGame();
 }
 
+describe('resolvePreviewGradingMode', () => {
+  const resolve = (
+    puzzlesSolved: number,
+    overrides: Partial<Parameters<typeof resolvePreviewGradingMode>[0]> = {},
+  ) => resolvePreviewGradingMode({
+    puzzlesSolved,
+    difficulty: 'MEDIUM',
+    variant: 'standard',
+    blindMode: false,
+    isDailyBoard: false,
+    isSharedChallenge: false,
+    ...overrides,
+  });
+
+  test.each([
+    [11, 'graded'],
+    [12, 'rescue'],
+    [19, 'rescue'],
+    [20, 'neutral'],
+  ] as const)('resolves the progression boundary at %i solves to %s', (puzzlesSolved, expected) => {
+    expect(resolve(puzzlesSolved)).toBe(expected);
+  });
+
+  test('keeps EASY and double shift graded after the progression windows', () => {
+    expect(resolve(20, { difficulty: 'EASY' })).toBe('graded');
+    expect(resolve(20, { difficulty: 'HARD', variant: 'double_shift' })).toBe('graded');
+  });
+
+  test.each(['standard', 'reverse', 'speed'] as const)(
+    '%s uses rescue through solve 19, then stays neutral',
+    (variant) => {
+      expect(resolve(12, { difficulty: 'HARD', variant })).toBe('rescue');
+      expect(resolve(19, { difficulty: 'HARD', variant })).toBe('rescue');
+      expect(resolve(20, { difficulty: 'HARD', variant })).toBe('neutral');
+    },
+  );
+
+  test('treats daily and shared boards by their MEDIUM+ shape, not an EASY preference', () => {
+    expect(resolve(12, { difficulty: 'EASY', isDailyBoard: true })).toBe('rescue');
+    expect(resolve(20, { difficulty: 'EASY', isSharedChallenge: true })).toBe('neutral');
+  });
+
+  test('Blind Offering never exposes preview grading', () => {
+    expect(resolve(0, { difficulty: 'EASY', variant: 'double_shift', blindMode: true })).toBe('hidden');
+  });
+});
+
 describe('usePuzzleGame', () => {
   beforeEach(() => {
+    jest.clearAllMocks();
+    const amber = require('../services/amberCurrency');
+    const bank = require('../services/puzzleBank');
+    const extension = require('../services/puzzleExtension');
+    (amber.getFullProgress as jest.Mock).mockResolvedValue({ puzzlesSolved: 20 });
+    (amber.getRitualWords as jest.Mock).mockResolvedValue([]);
+    (bank.selectPreGeneratedPuzzle as jest.Mock).mockResolvedValue(null);
+    (bank.getGuaranteedExtendedStandardFallback as jest.Mock).mockImplementation(() => ({
+      words: ['SUIT', 'SITE', 'WHAT', 'HERE', 'LIME'],
+      hint: 'Guaranteed mature fallback',
+      solution: [],
+      wordLength: 4,
+    }));
+    (extension.extendStandardPuzzle as jest.Mock).mockImplementation(config => config);
     resetHookState();
     jest.useFakeTimers();
   });
@@ -256,6 +362,7 @@ describe('usePuzzleGame', () => {
 
   describe('startDailyGame', () => {
     test('starts a standard, playable board from the daily words', () => {
+      const bank = require('../services/puzzleBank');
       let [, actions] = callHook();
       actions.startDailyGame(['PLANET', 'PLATES', 'PLANES'], 'daily hint', 6);
 
@@ -266,6 +373,7 @@ describe('usePuzzleGame', () => {
       expect(state.currentWordLength).toBe(6);
       expect(state.currentVariant).toBe('standard');
       expect(state.hint).toBe('daily hint');
+      expect(bank.getGuaranteedExtendedStandardFallback).not.toHaveBeenCalled();
     });
 
     test('uses standard mode with unlimited undos even after challenge mode', () => {
@@ -843,6 +951,20 @@ describe('usePuzzleGame', () => {
   });
 
   describe('startNewGame', () => {
+    test('keeps curated early boards outside mature extension fallback', async () => {
+      const amber = require('../services/amberCurrency');
+      const bank = require('../services/puzzleBank');
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({ puzzlesSolved: 0 });
+
+      resetHookState();
+      let [, actions] = callHook();
+      await actions.startNewGame('MEDIUM', 'standard', 'standard');
+
+      const [state] = callHook();
+      expect(state.rows).toHaveLength(3);
+      expect(bank.getGuaranteedExtendedStandardFallback).not.toHaveBeenCalled();
+    });
+
     test('calls generateLocalPuzzle and initializes game', async () => {
       resetHookState();
       let [, actions] = callHook();
@@ -854,8 +976,33 @@ describe('usePuzzleGame', () => {
       expect(state.rows[0].originalWord).toBe('LIME');
     });
 
+    test('passes the current puzzles-solved depth into bank selection', async () => {
+      const amber = require('../services/amberCurrency');
+      const bank = require('../services/puzzleBank');
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({ puzzlesSolved: 100 });
+      (bank.selectPreGeneratedPuzzle as jest.Mock).mockResolvedValueOnce({
+        words: ['LIME', 'TIME', 'TIED', 'TEND'],
+        hint: 'Bank hint',
+        solution: [],
+        wordLength: 4,
+      });
+
+      resetHookState();
+      let [, actions] = callHook();
+      await actions.startNewGame('MEDIUM', 'standard', 'standard');
+
+      expect(bank.selectPreGeneratedPuzzle).toHaveBeenLastCalledWith(
+        'MEDIUM',
+        0,
+        expect.any(Map),
+        'standard',
+        100,
+      );
+    });
+
     test('uses fallback on generation failure', async () => {
       const { generateLocalPuzzle } = require('../services/localGenerator');
+      const bank = require('../services/puzzleBank');
       (generateLocalPuzzle as jest.Mock).mockRejectedValueOnce(new Error('timeout'));
 
       resetHookState();
@@ -866,6 +1013,97 @@ describe('usePuzzleGame', () => {
       // Should fall back to FALLBACK_PUZZLE
       expect(state.rows).toHaveLength(4);
       expect(state.gameState).toBe(GameState.PLAYING);
+      expect(bank.getGuaranteedExtendedStandardFallback).not.toHaveBeenCalled();
+    });
+
+    test('attempts a deterministic extension for a post-100 generated standard fallback', async () => {
+      const amber = require('../services/amberCurrency');
+      const extension = require('../services/puzzleExtension');
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({ puzzlesSolved: 101 });
+      (extension.extendStandardPuzzle as jest.Mock).mockImplementationOnce(config => ({
+        ...config,
+        words: [...config.words, 'WXYZ'],
+        solution: [
+          ...(config.solution ?? []),
+          {
+            stepIndex: config.words.length - 1,
+            sourceWord: 'TEND',
+            targetWord: 'WXYZ',
+            letterToMove: 'T',
+            explanation: 'test extension',
+          },
+        ],
+      }));
+
+      resetHookState();
+      let [, actions] = callHook();
+      await actions.startNewGame('MEDIUM', 'standard', 'standard');
+
+      const [state] = callHook();
+      expect(extension.extendStandardPuzzle).toHaveBeenCalledTimes(1);
+      expect(state.rows).toHaveLength(5);
+    });
+
+    test('uses the guaranteed bank fallback when a post-100 generated standard board cannot extend', async () => {
+      const amber = require('../services/amberCurrency');
+      const bank = require('../services/puzzleBank');
+      const extension = require('../services/puzzleExtension');
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({ puzzlesSolved: 101 });
+      (extension.extendStandardPuzzle as jest.Mock).mockImplementationOnce(config => config);
+
+      resetHookState();
+      let [, actions] = callHook();
+      await actions.startNewGame('MEDIUM', 'standard', 'standard');
+
+      const [state] = callHook();
+      expect(extension.extendStandardPuzzle).toHaveBeenCalledTimes(1);
+      expect(bank.getGuaranteedExtendedStandardFallback).toHaveBeenCalledWith('MEDIUM');
+      expect(state.rows).toHaveLength(5);
+      expect(state.message).toBe('Tap a tile to begin!');
+    });
+
+    test('uses the guaranteed bank fallback before ordinary fallback on post-100 generation failure', async () => {
+      const amber = require('../services/amberCurrency');
+      const bank = require('../services/puzzleBank');
+      const { generateLocalPuzzle } = require('../services/localGenerator');
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({ puzzlesSolved: 101 });
+      (generateLocalPuzzle as jest.Mock).mockRejectedValueOnce(new Error('timeout'));
+
+      resetHookState();
+      let [, actions] = callHook();
+      await actions.startNewGame('MEDIUM', 'standard', 'standard');
+
+      const [state] = callHook();
+      expect(bank.getGuaranteedExtendedStandardFallback).toHaveBeenCalledWith('MEDIUM');
+      expect(state.rows).toHaveLength(5);
+      expect(state.hint).toBe('Guaranteed mature fallback');
+    });
+
+    test('falls through to the guaranteed bank when a post-100 echo cannot extend', async () => {
+      const amber = require('../services/amberCurrency');
+      const bank = require('../services/puzzleBank');
+      const extension = require('../services/puzzleExtension');
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({ puzzlesSolved: 100 });
+      (amber.getRitualWords as jest.Mock).mockResolvedValueOnce(['LIME']);
+      (extension.extendStandardPuzzle as jest.Mock).mockImplementationOnce(config => config);
+      (bank.selectPreGeneratedPuzzle as jest.Mock).mockResolvedValueOnce({
+        words: ['SUIT', 'SITE', 'WHAT', 'HERE', 'LIME'],
+        hint: 'Guaranteed bank hint',
+        solution: [],
+        wordLength: 4,
+      });
+
+      resetHookState();
+      let [, actions] = callHook();
+      actions.setCurrentPhase(3);
+      [, actions] = callHook();
+      await actions.startNewGame('MEDIUM', 'standard', 'standard');
+
+      const [state] = callHook();
+      expect(extension.extendStandardPuzzle).toHaveBeenCalledTimes(1);
+      expect(bank.selectPreGeneratedPuzzle).toHaveBeenCalled();
+      expect(state.isEchoPuzzle).toBe(false);
+      expect(state.rows).toHaveLength(5);
     });
 
     test('uses selected variant for new puzzles', async () => {
@@ -884,6 +1122,8 @@ describe('usePuzzleGame', () => {
   describe('the marked final board (finale-armed serve)', () => {
     const amber = require('../services/amberCurrency');
     const gen = require('../services/localGenerator');
+    const finalBoard = require('../services/finalBoard');
+    const history = require('../services/wordHistory');
 
     afterEach(() => {
       // Restore the suite-wide defaults consumed by mockResolvedValueOnce.
@@ -892,36 +1132,56 @@ describe('usePuzzleGame', () => {
       (gen.getStrongestDreadWord as jest.Mock).mockImplementation(() => null);
     });
 
-    test('finale armed: the next standard start is the final board, seeded from the strongest dread word', async () => {
+    test('finale armed: builds and commits the bespoke seven-row HARD board, then returns before normal generation', async () => {
+      (finalBoard.buildFinalBoard as jest.Mock).mockClear();
+      (history.recordPuzzleWords as jest.Mock).mockClear();
+      (gen.generateLocalPuzzle as jest.Mock).mockClear();
+      const bank = require('../services/puzzleBank');
+      (bank.selectPreGeneratedPuzzle as jest.Mock).mockClear();
       (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({
-        puzzlesSolved: 162,
+        // A defensive stale/corrupt count must not let curated-early serving
+        // preempt an explicitly armed finale.
+        puzzlesSolved: 0,
         finaleArmed: true,
         finalPuzzleCompleted: false,
       });
-      (amber.getRitualWords as jest.Mock).mockResolvedValueOnce(['TIME', 'GLOW']);
-      (gen.getStrongestDreadWord as jest.Mock).mockReturnValueOnce({ word: 'TIME', tier: 4 });
+      (amber.getRitualWords as jest.Mock).mockResolvedValueOnce(['ALTAR', 'GLOW']);
 
       resetHookState();
       let [, actions] = callHook();
       await actions.startNewGame('MEDIUM');
 
       const [state] = callHook();
+      expect(finalBoard.buildFinalBoard).toHaveBeenCalledWith(['ALTAR', 'GLOW']);
       expect(state.isFinalBoard).toBe(true);
       expect(state.gameState).toBe(GameState.PLAYING);
       expect(state.currentVariant).toBe('standard');
-      // Seeded via the echo path from the player's own strongest dread word.
-      expect(gen.generateLocalPuzzle).toHaveBeenCalledWith(
-        'MEDIUM',
-        expect.objectContaining({ startWord: 'TIME' })
-      );
+      expect(state.gameMode).toBe('standard');
+      expect(state.blindMode).toBe(false);
+      expect(state.difficulty).toBe('HARD');
+      expect(state.currentWordLength).toBe(5);
+      expect(state.rows).toHaveLength(7);
+      expect(state.rows.map(row => row.originalWord)).toEqual([
+        'SPARK', 'LIGHT', 'PAINS', 'DWELL', 'CURSE', 'BLACK', 'GRAVE',
+      ]);
+      expect(state.solution).toHaveLength(6);
+      expect(state.hint).toBe('Follow the last arrangement.');
+      expect(history.recordPuzzleWords).toHaveBeenCalledWith([
+        'SPARK', 'LIGHT', 'PAINS', 'DWELL', 'CURSE', 'BLACK', 'GRAVE',
+      ]);
+      expect(bank.selectPreGeneratedPuzzle).not.toHaveBeenCalled();
+      expect(bank.getGuaranteedExtendedStandardFallback).not.toHaveBeenCalled();
+      expect(gen.generateLocalPuzzle).not.toHaveBeenCalled();
       // The quiet start line replaces the normal start toast.
       expect(state.message).toBe('The last arrangement. Take your time.');
     });
 
-    test('a selected variant is served as a standard board this once; the preference survives', async () => {
+    test('selected variant and difficulty preferences survive the one-board finale override', async () => {
+      const bank = require('../services/puzzleBank');
+      (bank.selectPreGeneratedPuzzle as jest.Mock).mockClear();
       resetHookState();
       let [, actions] = callHook();
-      actions.setSelectedVariant('reverse');
+      actions.setSelectedVariant('speed');
 
       (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({
         puzzlesSolved: 162,
@@ -933,12 +1193,22 @@ describe('usePuzzleGame', () => {
       [, actions] = callHook();
       await actions.startNewGame('MEDIUM');
 
-      const [state] = callHook();
+      let [state] = callHook();
       expect(state.isFinalBoard).toBe(true);
       expect(state.currentVariant).toBe('standard');
       // The player's preferred variant is untouched for later boards.
-      expect(state.selectedVariant).toBe('reverse');
+      expect(state.selectedVariant).toBe('speed');
+      // The current board rewards as HARD, but the no-argument next-board path
+      // returns to the player's prior MEDIUM preference.
+      expect(state.difficulty).toBe('HARD');
       expect(state.message).toBe('The last arrangement. Take your time.');
+      expect(bank.selectPreGeneratedPuzzle).not.toHaveBeenCalled();
+
+      [, actions] = callHook();
+      await actions.startNewGame(undefined, undefined, 'standard');
+      [state] = callHook();
+      expect(state.difficulty).toBe('MEDIUM');
+      expect(state.selectedVariant).toBe('speed');
     });
 
     test('after the finale is completed, boards serve normally again', async () => {
@@ -1025,12 +1295,11 @@ describe('usePuzzleGame', () => {
 
   describe('final board: undo refused', () => {
     const amber = require('../services/amberCurrency');
-    const gen = require('../services/localGenerator');
+    const finalBoard = require('../services/finalBoard');
 
     afterEach(() => {
       (amber.getFullProgress as jest.Mock).mockImplementation(async () => ({ puzzlesSolved: 20 }));
       (amber.getRitualWords as jest.Mock).mockImplementation(async () => []);
-      (gen.getStrongestDreadWord as jest.Mock).mockImplementation(() => null);
     });
 
     // Serve THE final board with the synthetic solvable chain ABCD→EFGH→IJKL
@@ -1042,8 +1311,7 @@ describe('usePuzzleGame', () => {
         finalPuzzleCompleted: false,
       });
       (amber.getRitualWords as jest.Mock).mockResolvedValueOnce(['ABCD']);
-      (gen.getStrongestDreadWord as jest.Mock).mockReturnValueOnce({ word: 'ABCD', tier: 4 });
-      (gen.generateLocalPuzzle as jest.Mock).mockResolvedValueOnce({
+      (finalBoard.buildFinalBoard as jest.Mock).mockResolvedValueOnce({
         words: ['ABCD', 'EFGH', 'IJKL'],
         hint: 'final',
         solution: [],
@@ -1116,10 +1384,23 @@ describe('usePuzzleGame', () => {
       ]);
     });
 
-    test('blind finale: undo refused even though blind undos are normally free; restart is the escape', async () => {
+    test('hints remain available on the forced-standard final board', async () => {
+      await serveFinalBoard();
+      let [state, actions] = callHook();
+      expect(state.gameMode).toBe('standard');
+
+      actions.handleHint();
+      [state] = callHook();
+
+      expect(state.hintsUsed).toBe(1);
+      expect(state.hintHighlight).not.toBeNull();
+    });
+
+    test('finale forces blind off; undo is still refused and restart is the escape', async () => {
       await serveFinalBoard(true);
       let [state] = callHook();
-      expect(state.blindMode).toBe(true);
+      expect(state.blindMode).toBe(false);
+      expect(state.gameMode).toBe('standard');
 
       await playMove('A', 0);
       let [stateAfterMove, actions] = callHook();
@@ -1373,6 +1654,44 @@ describe('usePuzzleGame', () => {
       const [state] = callHook();
       expect(state.slotPreviews![2].word).toBe('TIMED');
       expect(state.slotPreviews![2].isValid).toBe(true);
+    });
+
+    test('masks and rejects a blocked Double Shift drop1 target intermediate', async () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['NABCD', 'IPPLE'], undefined, undefined, 5, 'double_shift');
+      selectLetter('N');
+
+      let [state] = callHook();
+      expect(state.slotPreviews![0].word).toBe('••••••');
+      expect(state.slotPreviews![0].word).not.toContain('NIPPLE');
+      expect(state.slotPreviews![0].isValid).toBe(false);
+
+      [, actions] = callHook();
+      const result = await actions.handleSlotPress(0);
+      expect(result).toBeNull();
+      [state] = callHook();
+      expect(state.rows[0].words.map(letter => letter.char).join('')).toBe('NABCD');
+      expect(state.rows[1].words.map(letter => letter.char).join('')).toBe('IPPLE');
+      expect(state.history).toHaveLength(0);
+    });
+
+    test('rejects a blocked Double Shift drop1 source remainder before commit', async () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['XBARF', 'FGHIJ'], undefined, undefined, 5, 'double_shift');
+      selectLetter('X');
+
+      let [state] = callHook();
+      expect(state.slotPreviews!.every(preview => !preview.isValid)).toBe(true);
+
+      [, actions] = callHook();
+      const result = await actions.handleSlotPress(0);
+      expect(result).toBeNull();
+      [state] = callHook();
+      expect(state.rows[0].words.map(letter => letter.char).join('')).toBe('XBARF');
+      expect(state.rows[1].words.map(letter => letter.char).join('')).toBe('FGHIJ');
+      expect(state.history).toHaveLength(0);
     });
   });
 
@@ -1858,69 +2177,97 @@ describe('usePuzzleGame', () => {
   });
 
   // =========================================================================
-  // Preview-grading bridge: the tutorial teaches the ✓/✗ marks, so grading
-  // stays on for EVERY board until PREVIEW_GRADING_BRIDGE_PUZZLES total
-  // puzzles are solved — the first free MEDIUM board must not silently drop
-  // what the tutorial just taught. Blind still suppresses everything;
-  // double-shift stays always-graded.
+  // Preview-grading transition: full grading through solve 11, then a
+  // board-local rescue from solves 12 through 19. Rescue boards begin neutral
+  // and restore the checks after the first invalid attempt. At solve 20 the
+  // steady-state verb-depth rules take over.
   // =========================================================================
 
-  describe('previewValidityVisible (early-game grading bridge)', () => {
+  describe('previewValidityVisible (early-game grading transition)', () => {
     const amber = require('../services/amberCurrency');
 
     afterEach(() => {
-      // Restore the suite-wide post-bridge default.
+      // Restore the suite-wide fully-neutral default.
       (amber.getFullProgress as jest.Mock).mockImplementation(async () => ({ puzzlesSolved: 20 }));
     });
 
-    test('a MEDIUM board during the bridge keeps the grading on', async () => {
-      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({ puzzlesSolved: 5 });
+    test('a MEDIUM board before the full-grading limit keeps the grading on', async () => {
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({
+        puzzlesSolved: PREVIEW_GRADING_FULL_LIMIT - 1,
+      });
       resetHookState();
       let [, actions] = callHook();
       await actions.startNewGame('MEDIUM');
       const [state] = callHook();
       expect(state.difficulty).toBe('MEDIUM');
+      expect(state.previewGradingMode).toBe('graded');
       expect(state.previewValidityVisible).toBe(true);
     });
 
-    test('the bridge closes at exactly PREVIEW_GRADING_BRIDGE_PUZZLES solves', async () => {
+    test('a rescue board starts neutral, then restores checks once after the first invalid attempt', async () => {
+      const narrative = require('../services/phaseNarrative');
       (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({
-        puzzlesSolved: PREVIEW_GRADING_BRIDGE_PUZZLES,
+        puzzlesSolved: PREVIEW_GRADING_FULL_LIMIT,
       });
       resetHookState();
       let [, actions] = callHook();
       await actions.startNewGame('MEDIUM');
-      const [state] = callHook();
+      let [state, liveActions] = callHook();
+      expect(state.previewGradingMode).toBe('rescue');
+      expect(state.previewValidityVisible).toBe(false);
+
+      const letter = state.rows[0].words.find(l => l.char === 'L')!;
+      liveActions.handleLetterPress(letter, 0);
+      [, actions] = callHook();
+      expect(await actions.handleSlotPress(0)).toBeNull();
+
+      [state, actions] = callHook();
+      expect(state.invalidAttempts).toBe(1);
+      expect(state.previewGradingMode).toBe('rescue');
+      expect(state.previewValidityVisible).toBe(true);
+      expect(state.message).toBe('The checks return for this board.');
+      expect(narrative.getPreviewRescueMessage).toHaveBeenCalledTimes(1);
+
+      (narrative.getPreviewRescueMessage as jest.Mock).mockClear();
+      expect(await actions.handleSlotPress(0)).toBeNull();
+      expect(narrative.getPreviewRescueMessage).not.toHaveBeenCalled();
+
+      [, actions] = callHook();
+      actions.initGame(['LIME', 'TIME', 'TIED']);
+      [state] = callHook();
+      expect(state.previewGradingMode).toBe('rescue');
       expect(state.previewValidityVisible).toBe(false);
     });
 
-    test('one solve before the threshold is still bridged', async () => {
+    test('the rescue window ends at the neutral limit', async () => {
       (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({
-        puzzlesSolved: PREVIEW_GRADING_BRIDGE_PUZZLES - 1,
+        puzzlesSolved: PREVIEW_GRADING_RESCUE_LIMIT,
       });
       resetHookState();
       let [, actions] = callHook();
       await actions.startNewGame('MEDIUM');
       const [state] = callHook();
-      expect(state.previewValidityVisible).toBe(true);
+      expect(state.previewGradingMode).toBe('neutral');
+      expect(state.previewValidityVisible).toBe(false);
     });
 
-    test('Blind Offering still suppresses everything during the bridge', async () => {
+    test('Blind Offering still suppresses everything during full grading', async () => {
       (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({ puzzlesSolved: 5 });
       resetHookState();
       let [, actions] = callHook();
       await actions.startNewGame('EASY', 'challenge', 'standard', true);
       const [state] = callHook();
       expect(state.blindMode).toBe(true);
+      expect(state.previewGradingMode).toBe('hidden');
       expect(state.previewValidityVisible).toBe(false);
       expect(state.slotPreviews).toBeUndefined();
     });
 
-    test('the daily is graded during the bridge (EVERY board bridges)', async () => {
+    test('the daily is graded during the full-grading window', async () => {
       (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({ puzzlesSolved: 9 });
       resetHookState();
       let [, actions] = callHook();
-      // Seed the bridge counter via a normal start (the daily itself does not
+      // Seed the grading counter via a normal start (the daily itself does not
       // fetch progress; it inherits the last-known count).
       await actions.startNewGame('MEDIUM');
 
@@ -1930,7 +2277,7 @@ describe('usePuzzleGame', () => {
       expect(state.previewValidityVisible).toBe(true);
     });
 
-    test('shared-challenge boards are graded during the bridge', async () => {
+    test('shared-challenge boards are graded during the full-grading window', async () => {
       (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({ puzzlesSolved: 9 });
       resetHookState();
       let [, actions] = callHook();
@@ -2046,6 +2393,7 @@ describe('usePuzzleGame', () => {
 
   describe('startSharedChallengeGame', () => {
     test('starts a standard, hint-enabled board from a valid chain', () => {
+      const bank = require('../services/puzzleBank');
       resetHookState();
       let [, actions] = callHook();
       // Lowercase input exercises normalization; player was in challenge mode.
@@ -2063,6 +2411,7 @@ describe('usePuzzleGame', () => {
       expect(state.currentWordLength).toBe(4);
       // The player's difficulty preference is untouched.
       expect(state.difficulty).toBe('MEDIUM');
+      expect(bank.getGuaranteedExtendedStandardFallback).not.toHaveBeenCalled();
     });
 
     test('rejects a chain containing a non-dictionary word without touching the board', () => {
@@ -2469,6 +2818,235 @@ describe('usePuzzleGame', () => {
       actions2.restorePuzzleState(saved as unknown as import('../services/puzzleSaveState').SavedPuzzleState);
       [state] = callHook();
       expect(state.isSharedChallenge).toBe(false);
+    });
+  });
+
+  describe('Unbroken Weave', () => {
+    const amber = require('../services/amberCurrency');
+    const bank = require('../services/puzzleBank');
+    const narrative = require('../services/phaseNarrative');
+
+    async function serveUnbrokenWeave(words = ['ABCD', 'AEFG', 'IJKL']) {
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({
+        puzzlesSolved: 180,
+        postRevelation: true,
+      });
+      (bank.selectPreGeneratedPuzzle as jest.Mock).mockResolvedValueOnce({
+        words,
+        hint: 'weave',
+        solution: [
+          { stepIndex: 0, sourceWord: words[0], targetWord: words[1], letterToMove: 'A', explanation: '' },
+          { stepIndex: 1, sourceWord: words[1], targetWord: words[2], letterToMove: 'M', explanation: '' },
+        ],
+        wordLength: 4,
+      });
+      resetHookState();
+      let [, actions] = callHook();
+      actions.setCurrentPhase(5);
+      [, actions] = callHook();
+      await actions.startNewGame('MEDIUM', 'challenge', 'speed', true, true);
+    }
+
+    async function playMove(char: string, slot: number) {
+      let [state, actions] = callHook();
+      const letter = state.rows[state.activeRowIndex].words.find(
+        item => item.char === char && !item.isLocked,
+      )!;
+      actions.handleLetterPress(letter, state.activeRowIndex);
+      [, actions] = callHook();
+      return actions.handleSlotPress(slot);
+    }
+
+    test('enabling forces a fresh eligible standard bank board and normal rules', async () => {
+      await serveUnbrokenWeave();
+
+      const [state] = callHook();
+      expect(bank.selectPreGeneratedPuzzle).toHaveBeenLastCalledWith(
+        'MEDIUM',
+        5,
+        expect.any(Map),
+        'standard',
+        180,
+        { unbrokenWeaveOnly: true },
+      );
+      expect(state.unbrokenWeaveMode).toBe(true);
+      expect(state.currentVariant).toBe('standard');
+      expect(state.selectedVariant).toBe('standard');
+      expect(state.gameMode).toBe('standard');
+      expect(state.blindMode).toBe(false);
+      expect(state.spentLetters).toEqual([]);
+    });
+
+    test('successful moves spend their character and reject selecting it again', async () => {
+      await serveUnbrokenWeave();
+      await playMove('A', 0);
+
+      let [state, actions] = callHook();
+      expect(state.spentLetters).toEqual(['A']);
+      const repeatedA = state.rows[state.activeRowIndex].words.find(
+        item => item.char === 'A' && !item.isLocked,
+      )!;
+      expect(repeatedA).toBeDefined();
+
+      actions.handleLetterPress(repeatedA, state.activeRowIndex);
+      [state] = callHook();
+      expect(state.selectedLetter).toBeNull();
+      expect(state.error).toBe('A has already crossed the chain.');
+    });
+
+    test('undo releases the character spent by the undone move', async () => {
+      await serveUnbrokenWeave();
+      await playMove('A', 0);
+
+      let [, actions] = callHook();
+      actions.handleUndo();
+      const [state] = callHook();
+
+      expect(state.spentLetters).toEqual([]);
+      expect(state.activeRowIndex).toBe(0);
+    });
+
+    test('hints and stuck detection ignore spent characters', async () => {
+      await serveUnbrokenWeave(['ABCD', 'AMNO', 'QRST']);
+      await playMove('A', 0);
+      let [state] = callHook();
+      expect(state.isStuck).toBe(true);
+
+      const rows = [
+        {
+          id: 'row-source',
+          originalWord: 'AAEFG',
+          words: [
+            { id: 'spent-a', char: 'A', isLocked: true },
+            { id: 'open-a', char: 'A', isLocked: false },
+            { id: 'e', char: 'E', isLocked: false },
+            { id: 'f', char: 'F', isLocked: false },
+            { id: 'g', char: 'G', isLocked: false },
+          ],
+        },
+        {
+          id: 'row-target',
+          originalWord: 'IJKL',
+          words: 'IJKL'.split('').map((char, index) => ({
+            id: `target-${index}`,
+            char,
+            isLocked: false,
+          })),
+        },
+      ];
+      let [, actions] = callHook();
+      actions.restorePuzzleState({
+        rows,
+        activeRowIndex: 0,
+        selectedLetter: null,
+        gameState: GameState.PLAYING,
+        message: '',
+        history: [],
+        invalidAttempts: 0,
+        hintsUsed: 0,
+        undosRemaining: Infinity,
+        difficulty: 'MEDIUM',
+        currentWordLength: 4,
+        hint: '',
+        solution: [
+          {
+            stepIndex: 0,
+            sourceWord: 'AAEFG',
+            targetWord: 'IJKL',
+            letterToMove: 'A',
+            explanation: '',
+          },
+        ],
+        reverseSolution: undefined,
+        gameMode: 'standard',
+        currentVariant: 'standard',
+        selectedVariant: 'standard',
+        moveDirection: 'down',
+        currentPhase: 5,
+        lastFormedWord: null,
+        isPlayingDaily: false,
+        unbrokenWeaveMode: true,
+        spentLetters: ['A'],
+        savedAt: Date.now(),
+      } as import('../services/puzzleSaveState').SavedPuzzleState);
+      [, actions] = callHook();
+      actions.handleHint();
+
+      expect(narrative.getHintMessage).toHaveBeenLastCalledWith('E', 'EIJKL', 5);
+    });
+
+    test('restart clears spent letters but keeps the mode active', async () => {
+      await serveUnbrokenWeave();
+      await playMove('A', 0);
+
+      let [, actions] = callHook();
+      actions.resetCurrentPuzzle();
+      const [state] = callHook();
+
+      expect(state.unbrokenWeaveMode).toBe(true);
+      expect(state.spentLetters).toEqual([]);
+    });
+
+    test('restore keeps mode and spent letters only for eligible Phase 5 standard boards', async () => {
+      await serveUnbrokenWeave();
+      let [state, actions] = callHook();
+      const baseSaved = {
+        rows: state.rows,
+        activeRowIndex: 0,
+        selectedLetter: null,
+        gameState: GameState.PLAYING,
+        message: '',
+        history: [],
+        invalidAttempts: 0,
+        hintsUsed: 0,
+        undosRemaining: Infinity,
+        difficulty: 'MEDIUM',
+        currentWordLength: 4,
+        hint: '',
+        solution: state.solution,
+        reverseSolution: undefined,
+        gameMode: 'standard',
+        currentVariant: 'standard',
+        selectedVariant: 'standard',
+        moveDirection: 'down' as const,
+        currentPhase: 5 as const,
+        lastFormedWord: null,
+        isPlayingDaily: false,
+        unbrokenWeaveMode: true,
+        spentLetters: ['A'],
+        savedAt: Date.now(),
+      };
+
+      actions.restorePuzzleState(baseSaved as import('../services/puzzleSaveState').SavedPuzzleState);
+      [state, actions] = callHook();
+      expect(state.unbrokenWeaveMode).toBe(true);
+      expect(state.spentLetters).toEqual(['A']);
+
+      actions.restorePuzzleState({
+        ...baseSaved,
+        isFinalBoard: true,
+      } as import('../services/puzzleSaveState').SavedPuzzleState);
+      [state] = callHook();
+      expect(state.unbrokenWeaveMode).toBe(false);
+      expect(state.spentLetters).toEqual([]);
+    });
+
+    test('an unavailable eligible bank turns the mode off and explains the fallback', async () => {
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({
+        puzzlesSolved: 180,
+        postRevelation: true,
+      });
+      (bank.selectPreGeneratedPuzzle as jest.Mock).mockResolvedValueOnce(null);
+      resetHookState();
+      let [, actions] = callHook();
+      actions.setCurrentPhase(5);
+      [, actions] = callHook();
+      await actions.startNewGame('MEDIUM', 'standard', 'standard', false, true);
+
+      const [state] = callHook();
+      expect(state.unbrokenWeaveMode).toBe(false);
+      expect(state.message).toBe('The thread breaks before it can begin. A plain offering remains.');
+      expect(bank.getGuaranteedExtendedStandardFallback).not.toHaveBeenCalled();
     });
   });
 });

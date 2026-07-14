@@ -99,6 +99,17 @@ describe('getSlotAccessibilityLabel', () => {
     expect(validLabel).toBe(invalidLabel);
   });
 
+  test('a masked blocked preview never exposes the hidden term to accessibility', () => {
+    const label = getSlotAccessibilityLabel(
+      0,
+      6,
+      false,
+      { word: '••••••', isValid: false },
+    );
+    expect(label).toContain('••••••');
+    expect(label).not.toContain('NIPPLE');
+  });
+
   test('guided slots keep their guided prefix with previews', () => {
     expect(getSlotAccessibilityLabel(0, 4, true, { word: 'TIED', isValid: true }))
       .toBe('Guided drop zone 1 of 4, forms TIED, valid word');

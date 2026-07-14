@@ -617,6 +617,20 @@ export function getInvalidWordMessage(word: string, phase: DialoguePhase): strin
   return INVALID_WORD_MESSAGES[phase](word);
 }
 
+const BLOCKED_WORD_MESSAGES: Record<DialoguePhase, string> = {
+  0: 'That letter cannot rest there. Try another spot.',
+  1: 'That letter cannot settle there. Try another spot.',
+  2: 'The pattern refuses that placement.',
+  3: 'The arrangement refuses that placement.',
+  4: 'That placement is not accepted.',
+  5: 'The weave refuses that placement.',
+};
+
+/** Reject a blocked intermediate without repeating the hidden term. */
+export function getBlockedWordMessage(phase: DialoguePhase): string {
+  return BLOCKED_WORD_MESSAGES[phase];
+}
+
 // ============================================================================
 // BLIND OFFERING REVEAL — the end-of-board judgment when the finished chain
 // contains a non-word. Blind mode commits every move without validation, so
@@ -652,6 +666,35 @@ const LOCKED_LETTER_MESSAGES: Record<DialoguePhase, string> = {
 
 export function getLockedLetterMessage(phase: DialoguePhase): string {
   return LOCKED_LETTER_MESSAGES[phase];
+}
+
+const UNBROKEN_WEAVE_SPENT_MESSAGES: Record<DialoguePhase, (letter: string) => string> = {
+  0: letter => `${letter} has already moved.`,
+  1: letter => `${letter} has already crossed the chain.`,
+  2: letter => `${letter} has already been given.`,
+  3: letter => `${letter} cannot cross the arrangement twice.`,
+  4: letter => `${letter} has already been claimed by the chain.`,
+  5: letter => `${letter} has crossed already. Each letter is given once.`,
+};
+
+export function getUnbrokenWeaveSpentLetterMessage(
+  letter: string,
+  phase: DialoguePhase,
+): string {
+  return UNBROKEN_WEAVE_SPENT_MESSAGES[phase](letter);
+}
+
+const UNBROKEN_WEAVE_UNAVAILABLE_MESSAGES: Record<DialoguePhase, string> = {
+  0: 'That rule did not fit this puzzle. Starting a standard puzzle instead.',
+  1: 'The thread would not hold. A standard puzzle begins instead.',
+  2: 'This chain cannot carry that rule. The usual path remains.',
+  3: 'The arrangement could not sustain the thread. A plain offering remains.',
+  4: 'The thread breaks before it begins. The arrangement offers another path.',
+  5: 'The thread cannot hold this board. A plain offering remains.',
+};
+
+export function getUnbrokenWeaveUnavailableMessage(phase: DialoguePhase): string {
+  return UNBROKEN_WEAVE_UNAVAILABLE_MESSAGES[phase];
 }
 
 // ============================================================================
@@ -1495,7 +1538,7 @@ export function getHouseCompletionText(): string[] {
 // ============================================================================
 
 /** Ambient whispers animals send after the player completes a puzzle */
-const ANIMAL_WHISPERS: Record<number, Record<string, string[]>> = {
+export const ANIMAL_WHISPERS: Record<number, Record<string, string[]>> = {
   0: {
     fox: ['Ember is warming by the fire.', 'Ember says nice work!', 'Ember is proud of you.', 'Ember saved you the warmest spot.', 'Ember says the fire likes you already.'],
     owl: ['Archimedes nods approvingly.', 'Archimedes marked the page.', 'Archimedes is reading.', 'Archimedes dog-eared a happy page.', 'Archimedes says you have a clever mind.'],
@@ -1557,19 +1600,19 @@ const ANIMAL_WHISPERS: Record<number, Record<string, string[]>> = {
     kakapo: ["Moss is saying the welcome, row by row.", "Moss says it is a mast year.", "Moss wove your words into the nest.", "The beds all face the bowl now. Moss faces it too.", "Moss says the ground is learning our language."],
   },
   4: {
-    fox: ['Every word brings us closer. The fire knows.', 'Another incantation spoken. The flames rise.', 'Ember whispers: thank you.', 'Ember says you fed the fire well, friend.', 'The flames spell your name in gratitude.'],
-    owl: ['The text is complete. You wrote the last verse.', 'Archimedes closes the book. It opens again.', 'The words have been spoken.', 'Archimedes says you wrote the closing line.', 'The text is whole. You completed it.'],
-    pangolin: ['The offering is prepared. You seasoned it yourself.', 'Panko sets the table. For what comes.', 'The recipe was always your words.', 'Panko says the meal was always for what comes.', 'You seasoned the offering yourself. Perfectly.'],
-    axolotl: ['It has surfaced. You called it.', 'The water is warm now. It should not be.', 'Axel smiles. The water smiles.', 'It wears the water like a smile now.', 'Axel says you taught it to surface.'],
-    capybara: ['The arrangement is complete. Chill is satisfied.', 'All according to plan. Your plan.', 'Chill says: relax. It is done.', 'Chill says the plan was yours all along.', 'Everything arranged. Nothing left undone.'],
-    fennec_fox: ['The sound is here. You gave it voice.', 'Fennick is silent now. Listening.', 'It speaks in the words you formed.', 'It speaks now, in the words you gave it.', 'Fennick says you were the voice it waited for.'],
-    sloth: ['It... is... here.', 'Sloane... always... knew.', 'Time... no... longer... matters.', 'You... were... always... part... of... this.', 'It... is... here... because... of... you.'],
-    wombat: ['The foundation holds what you summoned.', 'Warren built this for you. For it.', 'The tunnels lead somewhere now.', 'Warren says you summoned what the foundation holds.', 'The tunnels open toward you now.'],
-    rabbit: ['Thyme is not afraid anymore. That is worse.', 'We all played our part. Especially you.', 'Thyme is at peace. That terrifies you.', 'Thyme is calm. You should not be.', 'We all helped. You most of all.'],
-    red_panda: ['The pattern is complete. You are the final thread.', 'Bamboo exhales. The universe inhales.', 'Oneness achieved. Was it what you expected?', 'Bamboo says you are the final thread, friend.', 'The universe inhales. You exhaled it here.'],
-    tarsier: ["Vesper holds the way open. It descends.", "Vesper says every word gave it eyes.", "Vesper watched you light the lamp, word by word.", "Vesper says: look up. Do not blink.", "The dark looks back now. Vesper is glad."],
-    aye_aye: ["Tock is at the rope.", "Tock says the knocking has stopped. The hand is on the latch.", "Tock says your words ripened the bronze.", "The bell hums all day now. Tock hums with her.", "Tock says: stand a little east, and lift your face."],
-    kakapo: ["Moss stands at the rim, chest full.", "The garden blooms all at once. Moss is ready.", "Moss says your words are in the call.", "The stars step aside over the sky garden.", "Moss holds the welcome for you."],
+    fox: ['The fire bends toward your last word. Ember watches without blinking.', 'Ember cups one ember in her paws. It does not burn her.', 'The flames spell your name, then fold inward.'],
+    owl: ['Archimedes closes the book. It opens again to a warm blank page.', 'Ink gathers at the margins while Archimedes watches.', 'Archimedes turns the last page without touching it.'],
+    pangolin: ['Panko sets one more place at the table.', 'Steam curls from an empty pot. Panko lowers the flame.', 'Panko tastes the air, then adds no more salt.'],
+    axolotl: ['The water is warm now. It should not be.', 'Axel smiles. The water ripples with him.', 'Something brushes the glass from the other side. Axel does not turn.'],
+    capybara: ['Chill closes the final folder and straightens its corners.', 'Every clock in the office ticks at once. Chill keeps breathing.', 'Chill says: relax. Nothing else needs moving.'],
+    fennec_fox: ['Fennick is silent now. Listening.', 'Both ears turn toward the ceiling. The room stays still.', 'Fennick whispers: closer. Then the echo whispers it too.'],
+    sloth: ['Sloane... opens... both... eyes.', 'The branch... does not... move... beneath... her.', 'Time... passes... around... Sloane... not... through... her.'],
+    wombat: ['Warren presses one paw to the foundation. It answers.', 'The tunnels carry a low note up through the floor.', 'Warren says the deepest wall is warm now.'],
+    rabbit: ['Thyme is not afraid anymore. Her paws are perfectly still.', 'The tea has gone cold. Thyme keeps both paws around the cup.', 'Thyme counts the exits once, then stops.'],
+    red_panda: ['Bamboo exhales. The whole attic seems to inhale.', 'The incense smoke gathers into one unbroken thread.', 'Bamboo opens both eyes. The room remains perfectly still.'],
+    tarsier: ['Vesper says: look up. Do not blink.', "The lantern gutters. Vesper's eyes catch a second light.", 'The dark looks back now. Vesper does not look away.'],
+    aye_aye: ['Tock rests one hand on the rope.', 'The knocking has stopped. Tock presses his ear to the latch.', 'The bell hums all day now. Tock hums with her.'],
+    kakapo: ['Moss draws one long breath. The garden leans toward him.', 'The garden blooms all at once. Moss closes his eyes.', 'The stars seem farther apart above the sky garden.'],
   },
   5: {
     fox: ['The fire burns low. Ember watches the embers. Both are content.', 'Ember hums a lullaby the flames taught her.', 'The warmth remains. It always will.', 'Ember says the smoke writes your name now.', 'The den smells of cedar and something finished.'],
@@ -2166,15 +2209,24 @@ export function getStreakHeldMessage(heldAt: number, phase: number = 0): string 
 }
 
 // ============================================================================
-// PREVIEW GRADUATION — one-time toast when the ghost previews stop grading
-// words above EASY. In-world: the checkmarks stay behind on the gentlest
-// boards; the house trusts the player's ear now. Never a tutorial voice.
+// PREVIEW GRADUATION — one-time toast when MEDIUM+ previews become fully
+// neutral. In-world: the player's judgment has sharpened. Never tutorial copy.
 // ============================================================================
 
 export function getPreviewGraduationMessage(phase: number): string {
-  if (phase >= 4) return 'No marks guide this board. Your hands already know what is true. That was always the point.';
-  if (phase >= 2) return 'The little marks stay behind on the gentlest boards now. The house trusts your ear for a real word.';
-  return 'No more little check marks out here! They stay behind on the gentlest boards. The house trusts your ear now.';
+  if (phase >= 4) return 'The marks withdraw. Your hands know which words hold. They have learned well.';
+  if (phase >= 2) return 'The little checks step back. The house has heard your judgment sharpen. Trust what sounds true.';
+  return 'The little checks step back now. You have learned to trust your ear for a real word.';
+}
+
+/**
+ * One-time-per-board explanation when an invalid attempt restores grading
+ * during the rescue window. The hook owns the once-only board guard.
+ */
+export function getPreviewRescueMessage(phase: number): string {
+  if (phase >= 4) return 'A false word entered. The marks return until this board is complete.';
+  if (phase >= 2) return 'One word slipped. The little checks return for this board. Listen closely.';
+  return 'A miss... the little checks return for this board. Use them, then try again!';
 }
 
 // ============================================================================
@@ -3293,6 +3345,14 @@ export function getSkipConfirmLeaveLabel(): string {
   return 'Skip it all';
 }
 
+export function getColdOpenSkipLabel(): string {
+  return 'SKIP';
+}
+
+export function getColdOpenSkipAccessibilityLabel(): string {
+  return 'Skip the welcome and go home';
+}
+
 /**
  * Home-screen safety net for the first-harvest gate: if the player somehow
  * lands on home past the auto-collect window with batches waiting and the pit
@@ -3380,16 +3440,16 @@ export function getTendingResultMessage(level: number): string {
 /** Milestone ceremony copy (fires at TENDING_MILESTONES levels). */
 export function getTendingMilestoneCeremonyText(level: number): string[] {
   switch (level) {
-    case 5:
-      return ['The pattern has deepened five times.', 'The keepers have begun to speak of it. Listen, when you visit them.'];
-    case 10:
-      return ['Ten tendings.', 'The warmth has reached every room now. The house breathes a little slower, a little fuller.'];
-    case 25:
-      return ['Twenty-five.', 'The shape is yours now, as much as anyone\'s. The keepers know your devotion by heart.'];
-    case 50:
-      return ['Fifty tendings offered.', 'There was never anything to summon. There was only this... the deepening, and the keeping. You understand that now.'];
-    case 100:
-      return ['One hundred.', 'The pattern and the keeper have become the same gesture. Breathe in. It deepens. Breathe out. So do you.'];
+    case 3:
+      return ['Three tendings.', 'The keepers have begun to speak of it. Listen, when you visit them.'];
+    case 8:
+      return ['Eight tendings.', 'The warmth has reached every room now. The house breathes a little slower, a little fuller.'];
+    case 15:
+      return ['Fifteen.', 'The shape is yours now, as much as anyone\'s. The keepers know your devotion by heart.'];
+    case 35:
+      return ['Thirty-five tendings offered.', 'There was never anything to summon. There was only this... the deepening, and the keeping. You understand that now.'];
+    case 70:
+      return ['Seventy.', 'The pattern and the keeper have become the same gesture. Breathe in. It deepens. Breathe out. So do you.'];
     default:
       return ['The pattern deepens.', 'Something old turns over in its long sleep, and is content.'];
   }

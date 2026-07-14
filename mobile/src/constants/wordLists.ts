@@ -1,5 +1,6 @@
 
 import { DICTIONARY_WORDS } from '../dictionary';
+import type { PuzzleSolutionStep } from '../types';
 
 // All unique words from dictionary (filtered to 3-7 letters)
 const ALL_UNIQUE_WORDS = DICTIONARY_WORDS;
@@ -120,6 +121,17 @@ export interface CuratedPuzzle {
   solution: { stepIndex: number; sourceWord: string; targetWord: string; letterToMove: string; explanation: string }[];
 }
 
+export type PositionedPuzzleSolutionStep = PuzzleSolutionStep & {
+  insertionPosition: number;
+  removalPosition: number;
+};
+
+export interface CuratedFinalPuzzle {
+  words: string[];
+  solution: PositionedPuzzleSolutionStep[];
+  wordLength: 5;
+}
+
 export const CURATED_EARLY_PUZZLES: CuratedPuzzle[] = [
   // Puzzle 0 (tutorial): PLAY → PANT → HEAR — gentle 3-row intro with warm, common
   // words (PLANT, HEART) so a first-timer isn't tripped up by an obscure word.
@@ -179,6 +191,72 @@ export const CURATED_EARLY_PUZZLES: CuratedPuzzle[] = [
     ],
   },
 ];
+
+/**
+ * The final arrangement is deliberately bespoke: seven common five-letter
+ * words descend from warmth into the grave, with a complete shipped-rules
+ * solution that never depends on a generated or banked fallback.
+ */
+export const CURATED_FINAL_PUZZLE: CuratedFinalPuzzle = {
+  words: ["SPARK", "LIGHT", "PAINS", "DWELL", "CURSE", "BLACK", "GRAVE"],
+  solution: [
+    {
+      stepIndex: 0,
+      sourceWord: "SPARK",
+      targetWord: "LIGHT",
+      letterToMove: "S",
+      explanation: "Move 'S' from SPARK to form SLIGHT.",
+      insertionPosition: 0,
+      removalPosition: 0,
+    },
+    {
+      stepIndex: 1,
+      sourceWord: "SLIGHT",
+      targetWord: "PAINS",
+      letterToMove: "L",
+      explanation: "Move 'L' from SLIGHT to form PLAINS.",
+      insertionPosition: 1,
+      removalPosition: 1,
+    },
+    {
+      stepIndex: 2,
+      sourceWord: "PLAINS",
+      targetWord: "DWELL",
+      letterToMove: "S",
+      explanation: "Move 'S' from PLAINS to form DWELLS.",
+      insertionPosition: 5,
+      removalPosition: 5,
+    },
+    {
+      stepIndex: 3,
+      sourceWord: "DWELLS",
+      targetWord: "CURSE",
+      letterToMove: "D",
+      explanation: "Move 'D' from DWELLS to form CURSED.",
+      insertionPosition: 5,
+      removalPosition: 0,
+    },
+    {
+      stepIndex: 4,
+      sourceWord: "CURSED",
+      targetWord: "BLACK",
+      letterToMove: "S",
+      explanation: "Move 'S' from CURSED to form BLACKS.",
+      insertionPosition: 5,
+      removalPosition: 3,
+    },
+    {
+      stepIndex: 5,
+      sourceWord: "BLACKS",
+      targetWord: "GRAVE",
+      letterToMove: "L",
+      explanation: "Move 'L' from BLACKS to form GRAVEL.",
+      insertionPosition: 5,
+      removalPosition: 1,
+    },
+  ],
+  wordLength: 5,
+};
 
 /** Number of curated puzzles to use before switching to generated puzzles */
 export const CURATED_PUZZLE_COUNT = CURATED_EARLY_PUZZLES.length;

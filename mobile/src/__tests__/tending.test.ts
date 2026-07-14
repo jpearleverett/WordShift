@@ -18,9 +18,11 @@ import {
 } from '../services/tending';
 import {
   TENDING_BASE,
+  TENDING_GROWTH,
   TENDING_COST_CAP,
   TENDING_MILESTONES,
   TENDING_DAILY_BONUS_DISCOUNT,
+  TENDING_VISUAL_SATURATION_LEVEL,
 } from '../constants/gameBalance';
 import { getTendingMilestoneLines, TENDING_DIALOGUES } from '../services/dialogue/animalDialogueTending';
 import { getLocalDateString, getLocalDateStringDaysAgo } from '../services/dateUtils';
@@ -44,17 +46,26 @@ describe('tending', () => {
   });
 
   describe('cost curve', () => {
+    it('uses the compressed endgame tuning', () => {
+      expect(TENDING_BASE).toBe(30);
+      expect(TENDING_GROWTH).toBe(1.085);
+      expect(TENDING_COST_CAP).toBe(650);
+      expect(TENDING_DAILY_BONUS_DISCOUNT).toBe(0.3);
+      expect(TENDING_MILESTONES).toEqual([3, 8, 15, 35, 70]);
+      expect(TENDING_VISUAL_SATURATION_LEVEL).toBe(40);
+    });
+
     it('matches the documented escalating curve', () => {
       // round(BASE * GROWTH^level / 10) * 10
-      expect(getTendingCost(1)).toBe(40);
-      expect(getTendingCost(2)).toBe(50);
-      expect(getTendingCost(5)).toBe(70);
-      expect(getTendingCost(10)).toBe(120);
-      expect(getTendingCost(25)).toBe(680);
+      expect(getTendingCost(1)).toBe(30);
+      expect(getTendingCost(2)).toBe(40);
+      expect(getTendingCost(5)).toBe(50);
+      expect(getTendingCost(10)).toBe(70);
+      expect(getTendingCost(25)).toBe(230);
     });
 
     it('caps the per-level cost', () => {
-      expect(getTendingCost(50)).toBe(TENDING_COST_CAP);
+      expect(getTendingCost(40)).toBe(TENDING_COST_CAP);
       expect(getTendingCost(100)).toBe(TENDING_COST_CAP);
       expect(getTendingCost(1000)).toBe(TENDING_COST_CAP);
     });
@@ -71,15 +82,15 @@ describe('tending', () => {
 
   describe('getNextTendingInfo', () => {
     it('applies the daily discount on the first tend of the day', () => {
-      const state = { level: 4, totalAmberTended: 0, lastTendDate: null, milestonesSeen: [], caughtUp: {} };
+      const state = { level: 2, totalAmberTended: 0, lastTendDate: null, milestonesSeen: [], caughtUp: {} };
       const info = getNextTendingInfo(state, getLocalDateString());
-      expect(info.nextLevel).toBe(5);
+      expect(info.nextLevel).toBe(3);
       expect(info.dailyBonusApplied).toBe(true);
-      // base 70, 30% off → 50 (rounded to 10)
+      // base 40, 30% off -> 30 (rounded to 10)
       const expected = Math.round((info.baseCost * (1 - TENDING_DAILY_BONUS_DISCOUNT)) / 10) * 10;
       expect(info.cost).toBe(expected);
       expect(info.cost).toBeLessThan(info.baseCost);
-      expect(info.milestone).toBe(5); // level 5 is a milestone
+      expect(info.milestone).toBe(3);
     });
 
     it('charges full price when already tended today', () => {
@@ -126,37 +137,37 @@ describe('tending', () => {
     });
 
     it('fires each milestone exactly once', async () => {
-      // Tend up to level 5 (first milestone).
+      // Tend up to level 3 (first milestone).
       let milestone: number | null = null;
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < 3; i++) {
         const r = await applyTend(getTendingCost(i + 1));
         if (r.milestone != null) milestone = r.milestone;
       }
-      expect(milestone).toBe(5);
-      // Tending again past 5 does not re-fire the level-5 milestone.
-      const r6 = await applyTend(getTendingCost(6));
-      expect(r6.milestone).toBeNull();
+      expect(milestone).toBe(3);
+      // Tending again past 3 does not re-fire the level-3 milestone.
+      const r4 = await applyTend(getTendingCost(4));
+      expect(r4.milestone).toBeNull();
     });
   });
 
   describe('milestone helpers', () => {
     it('counts unlocked milestone lines by level', () => {
       expect(unlockedTendingLineCount(0)).toBe(0);
-      expect(unlockedTendingLineCount(5)).toBe(1);
-      expect(unlockedTendingLineCount(10)).toBe(2);
-      expect(unlockedTendingLineCount(100)).toBe(TENDING_MILESTONES.length);
+      expect(unlockedTendingLineCount(3)).toBe(1);
+      expect(unlockedTendingLineCount(8)).toBe(2);
+      expect(unlockedTendingLineCount(70)).toBe(TENDING_MILESTONES.length);
     });
 
     it('identifies milestone levels', () => {
-      expect(getTendingMilestoneAt(5)).toBe(5);
-      expect(getTendingMilestoneAt(6)).toBeNull();
+      expect(getTendingMilestoneAt(3)).toBe(3);
+      expect(getTendingMilestoneAt(4)).toBeNull();
     });
   });
 
   describe('getTendingIntensity (visual deepening)', () => {
     it('is 0 at level 0 and saturates at 1', () => {
       expect(getTendingIntensity(0)).toBe(0);
-      expect(getTendingIntensity(50)).toBe(1);
+      expect(getTendingIntensity(40)).toBe(1);
       expect(getTendingIntensity(1000)).toBe(1); // never exceeds 1
     });
 
@@ -253,8 +264,8 @@ describe('selectPhase5Dialogue (pure)', () => {
 describe('getTendingMilestoneLines', () => {
   it('unlocks one line per crossed milestone, in order', () => {
     expect(getTendingMilestoneLines('fox', 0)).toHaveLength(0);
-    expect(getTendingMilestoneLines('fox', 5)).toHaveLength(1);
-    expect(getTendingMilestoneLines('fox', 10)).toHaveLength(2);
+    expect(getTendingMilestoneLines('fox', 3)).toHaveLength(1);
+    expect(getTendingMilestoneLines('fox', 8)).toHaveLength(2);
     expect(getTendingMilestoneLines('fox', 1000)).toHaveLength(TENDING_MILESTONES.length);
   });
 

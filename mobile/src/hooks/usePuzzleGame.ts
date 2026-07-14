@@ -1,15 +1,27 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { RowData, Letter, GameState, MoveDelta, PuzzleSolutionStep, Difficulty, GameMode } from '../types';
 import { SavedPuzzleState } from '../services/puzzleSaveState';
-import { generateLocalPuzzle, generateDoubleShiftPuzzle, getIncantationName, getStrongestDreadWord } from '../services/localGenerator';
-import { selectPreGeneratedPuzzle } from '../services/puzzleBank';
+import { generateLocalPuzzle, generateDoubleShiftPuzzle, getIncantationName } from '../services/localGenerator';
+import {
+  getGuaranteedExtendedStandardFallback,
+  selectPreGeneratedPuzzle,
+} from '../services/puzzleBank';
+import {
+  extendStandardPuzzle,
+  PUZZLE_EXTENSION_UNLOCK_PUZZLES,
+} from '../services/puzzleExtension';
 import { getWordHistoryWithRecency, recordPuzzleWords } from '../services/wordHistory';
 import { COMMON_WORDS, CURATED_EARLY_PUZZLES, CURATED_PUZZLE_COUNT, CuratedPuzzle, getRandomFallback } from '../constants';
+import { CURATED_FINAL_PUZZLE } from '../constants/wordLists';
+import { isBlockedWord } from '../constants/blockedWords';
 // Imported from gameBalance directly (not the constants barrel) so the hook's
-// test harness — which mocks '../constants' wholesale — still gets the real value.
-import { PREVIEW_GRADING_BRIDGE_PUZZLES } from '../constants/gameBalance';
+// test harness — which mocks '../constants' wholesale — still gets real values.
+import {
+  PREVIEW_GRADING_FULL_LIMIT,
+  PREVIEW_GRADING_RESCUE_LIMIT,
+} from '../constants/gameBalance';
 import { CHALLENGE_MODE_CONFIG, DialoguePhase } from '../types/homeWorld';
-import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getOutOfHintsMessage, getLoadingMessage, getStartMessage, getInvalidWordMessage, getBlindFailMessage, getLockedLetterMessage, getEchoPuzzleMessage, getFinalBoardStartMessage, getFinalBoardUndoRefusal } from '../services/phaseNarrative';
+import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getOutOfHintsMessage, getLoadingMessage, getStartMessage, getInvalidWordMessage, getBlockedWordMessage, getBlindFailMessage, getLockedLetterMessage, getEchoPuzzleMessage, getFinalBoardStartMessage, getFinalBoardUndoRefusal, getPreviewRescueMessage, getUnbrokenWeaveSpentLetterMessage, getUnbrokenWeaveUnavailableMessage } from '../services/phaseNarrative';
 import { getHintBalanceSync, hasHintSync, consumeHintSync } from '../services/hints';
 import { getPreferredPuzzleVariant, setPreferredPuzzleVariant, getFullProgress, getRitualWords } from '../services/amberCurrency';
 import {
@@ -24,6 +36,14 @@ import {
   PuzzleVariant,
 } from '../services/puzzleVariety';
 import { MIN_CHALLENGE_WORDS, MAX_CHALLENGE_WORDS, type MoveOutcome } from '../services/shareResults';
+import { buildFinalBoard } from '../services/finalBoard';
+import {
+  addSpentLetter,
+  isLetterSpent,
+  isUnbrokenWeaveAvailable,
+  isUnbrokenWeaveEligible,
+  removeSpentLetter,
+} from '../services/unbrokenWeave';
 
 // Simple ID generator (React Native compatible)
 let idCounter = 0;
@@ -47,7 +67,8 @@ export function hasAnyValidMove(
   rows: RowData[],
   activeRowIndex: number,
   moveDirection: 'down' | 'up',
-  isWordValid: (word: string) => boolean
+  isWordValid: (word: string) => boolean,
+  spentLetters: ReadonlySet<string> = new Set(),
 ): boolean {
   if (activeRowIndex < 0 || activeRowIndex >= rows.length) return false;
   const targetRowIndex = moveDirection === 'down' ? activeRowIndex + 1 : activeRowIndex - 1;
@@ -59,6 +80,7 @@ export function hasAnyValidMove(
   for (let i = 0; i < sourceLetters.length; i++) {
     if (sourceLetters[i].isLocked) continue;
     const letter = sourceLetters[i].char;
+    if (isLetterSpent(spentLetters, letter)) continue;
 
     // Removing this letter must leave a valid source word
     const remaining = sourceLetters
@@ -308,6 +330,47 @@ export function shouldUseComboMessage(streak: number): boolean {
   return streak % 2 === 0;
 }
 
+export type PreviewGradingMode = 'graded' | 'rescue' | 'neutral' | 'hidden';
+
+export interface PreviewGradingContext {
+  puzzlesSolved: number;
+  difficulty: Difficulty;
+  variant: PuzzleVariant;
+  blindMode: boolean;
+  isDailyBoard: boolean;
+  isSharedChallenge: boolean;
+}
+
+/**
+ * Pure progression resolver for ghost-preview grading. Rescue boards begin
+ * neutral and let the hook restore grading after the first invalid attempt;
+ * the resolver itself stays independent of per-board performance.
+ */
+export function resolvePreviewGradingMode({
+  puzzlesSolved,
+  difficulty,
+  variant,
+  blindMode,
+  isDailyBoard,
+  isSharedChallenge,
+}: PreviewGradingContext): PreviewGradingMode {
+  if (blindMode) return 'hidden';
+  if (hasVariantModifier(variant, 'double_shift')) return 'graded';
+  if (puzzlesSolved < PREVIEW_GRADING_FULL_LIMIT) return 'graded';
+
+  // Daily/shared boards have a MEDIUM+ shape independent of the player's
+  // retained difficulty preference, so an EASY preference cannot grade them.
+  const usesNeutralRules =
+    isDailyBoard ||
+    isSharedChallenge ||
+    difficulty !== 'EASY';
+  if (!usesNeutralRules) return 'graded';
+
+  return puzzlesSolved < PREVIEW_GRADING_RESCUE_LIMIT
+    ? 'rescue'
+    : 'neutral';
+}
+
 /**
  * Board coordinates for the hint glow. Set when a hint is actually delivered;
  * reuses the SAME tutorial-guide visuals (LetterTile guide ring / Slot halo).
@@ -363,6 +426,10 @@ export interface PuzzleGameState {
   gameMode: GameMode;
   /** Blind Offering modifier active (ghost previews hidden). */
   blindMode: boolean;
+  /** Phase-5 mastery mode: each moved character may cross only once. */
+  unbrokenWeaveMode: boolean;
+  /** Characters already moved on the current Unbroken Weave board. */
+  spentLetters: string[];
   /**
    * True while the current board came from a friend's shared challenge link
    * (startSharedChallengeGame). Every other start path — initGame/startNewGame
@@ -393,17 +460,14 @@ export interface PuzzleGameState {
    * Whether the ✓/✗ validity grading on the ghost previews is PRESENTED.
    * The preview data always computes isValid internally (the double-shift
    * look-ahead and drag near-miss snapping need it); this flag controls
-   * presentation only. TRUE on EASY boards (any variant), in the double-shift
-   * variant at any difficulty (its intermediate non-word state needs the
-   * guidance), and — the early-game grading bridge — on EVERY board until
-   * PREVIEW_GRADING_BRIDGE_PUZZLES total puzzles are solved (the tutorial
-   * teaches the marks; the first free MEDIUM board must not silently drop
-   * them). Never in Blind Offering; past the bridge, never on daily /
-   * shared-challenge boards (the daily ramps MEDIUM+ by design; a friend's
-   * chain is judged by the player's own ear). Everywhere hidden, the preview
-   * is a neutral ghost word: the player must judge whether it is real.
+   * presentation only. TRUE on EASY and double-shift boards, during the full
+   * early window, or after the first invalid attempt on a rescue-window board.
+   * Never in Blind Offering. At the fully-neutral threshold, MEDIUM+ standard,
+   * reverse, speed, daily, and shared boards stay neutral for the whole board.
    */
   previewValidityVisible: boolean;
+  /** Progression mode behind previewValidityVisible and graduation gating. */
+  previewGradingMode: PreviewGradingMode;
   /** Double shift phase tracking: pick1 → drop1 → pick2 → drop2 */
   doubleShiftPhase: 'pick1' | 'pick2' | 'drop1' | 'drop2' | null;
   /** Phase 5 echo puzzle: one word is seeded from the player's ritual history */
@@ -449,7 +513,8 @@ export interface PuzzleGameActions {
     selectedDifficulty?: Difficulty,
     mode?: GameMode,
     variant?: PuzzleVariant,
-    blind?: boolean
+    blind?: boolean,
+    unbrokenWeave?: boolean,
   ) => Promise<void>;
   handleLetterPress: (letter: Letter, rowIndex: number) => void;
   /**
@@ -590,6 +655,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   // the same tick.
   const gameModeRef = useRef<GameMode>('standard');
   const difficultyRef = useRef<Difficulty>('MEDIUM');
+  // The finale must expose HARD as the current board difficulty so App awards
+  // HARD rewards, but that one-board override must not become the next board's
+  // preference. This ref retains the last explicitly requested difficulty.
+  const preferredDifficultyRef = useRef<Difficulty>('MEDIUM');
   // Blind Offering modifier (opt-in, the trial ladder's apex rung): previews
   // hidden AND free moves — every structurally-legal move commits, and the
   // chain is judged exactly once when the final letter lands. Runs under
@@ -599,22 +668,24 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   // across Next Level like gameMode; forced OFF on daily/shared-challenge
   // boards. Composes with any variant/difficulty.
   const [blindMode, setBlindMode] = useState(false);
+  const [unbrokenWeaveMode, setUnbrokenWeaveMode] = useState(false);
+  const unbrokenWeaveModeRef = useRef(false);
+  const [spentLetterSet, setSpentLetterSet] = useState<ReadonlySet<string>>(
+    new Set<string>(),
+  );
   // Friend-challenge provenance for the current board (see PuzzleGameState doc).
   const [isSharedChallenge, setIsSharedChallenge] = useState(false);
   // Daily-board provenance: set only by startDailyGame, cleared by every other
-  // start path. Drives the preview-validity gate — the daily always hides the
-  // ✓/✗ grading (its board shape ramps MEDIUM+ by design), even when the
-  // player's own difficulty preference (which the daily leaves untouched)
-  // happens to be EASY. Not persisted: a daily autosave is never restored as a
-  // normal puzzle (App's load guard), so a restored board is never a daily.
+  // start path. Its board shape ramps MEDIUM+, so after the full-grading
+  // window it follows rescue/neutral rules even when the retained player
+  // preference is EASY. Not persisted: a daily autosave is never restored as
+  // a normal puzzle (App's load guard), so a restored board is never a daily.
   const [isDailyBoard, setIsDailyBoard] = useState(false);
-  // Total puzzles solved, for the preview-grading bridge (grading stays on for
-  // EVERY board until PREVIEW_GRADING_BRIDGE_PUZZLES solves). Loaded from
-  // progress at mount and refreshed on every startNewGame fetch. Initialized
-  // to the bridge threshold (bridge OVER) so a veteran restoring a board never
-  // sees a stale graded flash before the first progress read lands; a genuine
-  // newcomer's mount read resolves to 0 long before their first free board.
-  const [puzzlesSolvedCount, setPuzzlesSolvedCount] = useState(PREVIEW_GRADING_BRIDGE_PUZZLES);
+  // Total puzzles solved, for the preview-grading transition. Loaded from
+  // progress at mount and refreshed on every startNewGame fetch. Initialize to
+  // the fully-neutral threshold so a veteran restoring a board never sees a
+  // stale graded flash before the first progress read lands.
+  const [puzzlesSolvedCount, setPuzzlesSolvedCount] = useState(PREVIEW_GRADING_RESCUE_LIMIT);
   const [undosRemaining, setUndosRemaining] = useState(Infinity);
   const [currentVariant, setCurrentVariant] = useState<PuzzleVariant>('standard');
   const [selectedVariant, setSelectedVariantState] = useState<PuzzleVariant>('standard');
@@ -685,7 +756,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     };
   }, []);
 
-  // Seed the preview-grading bridge counter at mount so boards that never
+  // Seed the preview-grading progression counter at mount so boards that never
   // route through startNewGame's own progress fetch (a restored autosave, a
   // daily/shared start as the session's first board) still see the real
   // solved count. startNewGame refreshes it on every fetch thereafter.
@@ -706,6 +777,25 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setSelectedVariantState(variant);
     setPreferredPuzzleVariant(variant).catch(() => {});
   }, []);
+
+  const previewGradingMode = useMemo(
+    () => resolvePreviewGradingMode({
+      puzzlesSolved: puzzlesSolvedCount,
+      difficulty,
+      variant: currentVariant,
+      blindMode,
+      isDailyBoard,
+      isSharedChallenge,
+    }),
+    [
+      puzzlesSolvedCount,
+      difficulty,
+      currentVariant,
+      blindMode,
+      isDailyBoard,
+      isSharedChallenge,
+    ],
+  );
 
   const shakeError = useCallback((msg: string) => {
     if (shakeErrorTimeout.current) {
@@ -762,6 +852,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setActiveRowIndex(0);
     setSelectedLetter(null);
     setHistory([]);
+    setSpentLetterSet(new Set());
     cleanMoveStreakRef.current = 0;
     setGameState(GameState.PLAYING);
     setMessage(getStartMessage(currentPhase));
@@ -898,12 +989,33 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   }, []);
 
   const startNewGame = useCallback(async (
-    selectedDifficulty: Difficulty = difficulty,
+    selectedDifficulty?: Difficulty,
     mode?: GameMode,
     variantOverride?: PuzzleVariant,
-    blindOverride?: boolean
+    blindOverride?: boolean,
+    unbrokenWeaveOverride?: boolean,
   ) => {
-    if (blindOverride !== undefined) {
+    const requestedDifficulty = selectedDifficulty ?? preferredDifficultyRef.current;
+    if (selectedDifficulty !== undefined) {
+      preferredDifficultyRef.current = selectedDifficulty;
+    }
+    const requestedUnbrokenWeave =
+      unbrokenWeaveOverride ?? unbrokenWeaveModeRef.current;
+    const disableUnbrokenWeave = () => {
+      unbrokenWeaveModeRef.current = false;
+      setUnbrokenWeaveMode(false);
+      setSpentLetterSet(new Set());
+    };
+    if (unbrokenWeaveOverride !== undefined) {
+      unbrokenWeaveModeRef.current = unbrokenWeaveOverride;
+      setUnbrokenWeaveMode(unbrokenWeaveOverride);
+    }
+    if (requestedUnbrokenWeave) {
+      gameModeRef.current = 'standard';
+      setGameMode('standard');
+      setBlindMode(false);
+      setSelectedVariant('standard');
+    } else if (blindOverride !== undefined) {
       setBlindMode(blindOverride);
     }
     // Claim this generation. Any initGame commit below is skipped if a newer
@@ -914,37 +1026,52 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setMessage(getLoadingMessage(currentPhase));
     setError(null);
     setShowDifficultyMenu(false);
-    difficultyRef.current = selectedDifficulty;
-    if (selectedDifficulty !== difficulty) {
-      setDifficulty(selectedDifficulty);
+    difficultyRef.current = requestedDifficulty;
+    if (requestedDifficulty !== difficulty) {
+      setDifficulty(requestedDifficulty);
     }
-    if (mode !== undefined) {
+    if (requestedUnbrokenWeave) {
+      setUndosRemaining(Infinity);
+    } else if (mode !== undefined) {
       gameModeRef.current = mode;
       setGameMode(mode);
-      setUndosRemaining(mode === 'challenge' ? CHALLENGE_MODE_CONFIG.getMaxUndos(selectedDifficulty) : Infinity);
+      setUndosRemaining(mode === 'challenge' ? CHALLENGE_MODE_CONFIG.getMaxUndos(requestedDifficulty) : Infinity);
     }
 
-    const effectiveMode = mode ?? gameMode;
-    let variant: PuzzleVariant = variantOverride ?? selectedVariant;
+    const effectiveMode = requestedUnbrokenWeave ? 'standard' : (mode ?? gameMode);
+    let variant: PuzzleVariant = requestedUnbrokenWeave
+      ? 'standard'
+      : (variantOverride ?? selectedVariant);
     // Daily mode currently bypasses this hook path; keep this for safety.
     if (effectiveMode !== 'standard' && variantOverride === undefined) {
       variant = selectedVariant;
     }
     setCurrentVariant(variant);
-    // Hoisted past the try so the fallback path can still mark the final
-    // board (the ultimate fallback: any board, marked final).
-    let finaleServe = false;
 
+    let unbrokenWeaveFallback = false;
+    let puzzlesSolved = 0;
     try {
       // Serve curated early-game puzzles for the first few solves
       // These are hand-picked to showcase interesting letter moves
       const progress = await getFullProgress();
-      const puzzlesSolved = progress?.puzzlesSolved ?? 0;
-      // Keep the preview-grading bridge counter current with every fetch.
+      puzzlesSolved = progress?.puzzlesSolved ?? 0;
+      let unbrokenWeaveActive =
+        requestedUnbrokenWeave &&
+        isUnbrokenWeaveAvailable(currentPhase, progress?.postRevelation === true);
+      unbrokenWeaveFallback = requestedUnbrokenWeave && !unbrokenWeaveActive;
+      if (unbrokenWeaveFallback) {
+        disableUnbrokenWeave();
+      }
+      // Keep preview-grading progression current with every fetch.
       setPuzzlesSolvedCount(puzzlesSolved);
+      const finaleServe =
+        progress?.finaleArmed === true &&
+        progress?.finalPuzzleCompleted !== true;
       if (
+        !finaleServe &&
+        !requestedUnbrokenWeave &&
         puzzlesSolved < CURATED_PUZZLE_COUNT &&
-        (selectedDifficulty === 'EASY' || selectedDifficulty === 'MEDIUM') &&
+        (requestedDifficulty === 'EASY' || requestedDifficulty === 'MEDIUM') &&
         variant === 'standard' &&
         effectiveMode === 'standard'
       ) {
@@ -955,41 +1082,49 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         return;
       }
 
-      // THE FINAL BOARD: once the dwell window has filled, the finale is
-      // ARMED (amberCurrency.finaleArmed) and the next standard-mode start
-      // becomes the marked final board — the finale is played, not declared
-      // retroactively. A selected variant is served as a standard board this
-      // once (in-world, the arrangement chooses; the player's preference is
-      // untouched for later boards). Seeded via the echo path from the
-      // player's strongest fed dread word; if no dread word exists or the
-      // generator can't build from it, the normal bank/generation path below
-      // serves the board — still marked final (ultimate fallback).
-      finaleServe = progress?.finaleArmed === true && progress?.finalPuzzleCompleted !== true;
+      // THE FINAL BOARD: once armed, the arrangement fully overrides the
+      // current board's setup. It is always standard, visible, untimed, and
+      // HARD-rewarded, while the player's selected variant and difficulty
+      // remain preferences for later boards. buildFinalBoard owns all
+      // personalization and curated fallback, so this path always returns
+      // before bank, generic-generation, or ordinary fallback selection.
       if (finaleServe) {
+        disableUnbrokenWeave();
+        unbrokenWeaveActive = false;
         variant = 'standard';
         setCurrentVariant('standard');
+        gameModeRef.current = 'standard';
+        setGameMode('standard');
+        setBlindMode(false);
+        difficultyRef.current = 'HARD';
+        setDifficulty('HARD');
+        setUndosRemaining(Infinity);
+        setIsEchoPuzzle(false);
+
+        const ritualWords = await getRitualWords().catch(() => []);
+        let finalPuzzle: Awaited<ReturnType<typeof buildFinalBoard>> = CURATED_FINAL_PUZZLE;
         try {
-          const ritualWords = await getRitualWords();
-          const targetLen = selectedDifficulty === 'EASY' || selectedDifficulty === 'MEDIUM' ? 4 : 5;
-          const strongest = getStrongestDreadWord(
-            (ritualWords || []).filter(w => w.length === targetLen)
-          );
-          if (strongest) {
-            const finalPuzzle = await generateLocalPuzzle(selectedDifficulty, { startWord: strongest.word });
-            if (finalPuzzle) {
-              if (isStale()) return;
-              initGame(finalPuzzle.words, finalPuzzle.hint, finalPuzzle.solution, finalPuzzle.wordLength, 'standard');
-              await recordPuzzleWords(finalPuzzle.words);
-              isFinalBoardRef.current = true;
-              setIsFinalBoard(true);
-              setMessage(getFinalBoardStartMessage(currentPhase));
-              return;
-            }
-          }
+          finalPuzzle = await buildFinalBoard(ritualWords);
         } catch {
-          // Dread seeding failed — fall through: the normal path still serves
-          // the final board (any board, marked final).
+          // buildFinalBoard already owns its curated fallback; keep this final
+          // defensive boundary so an unexpected service failure still cannot
+          // leak the finale into generic generation.
+          finalPuzzle = CURATED_FINAL_PUZZLE;
         }
+        if (isStale()) return;
+        const finalHint = 'hint' in finalPuzzle ? finalPuzzle.hint : undefined;
+        initGame(
+          finalPuzzle.words,
+          finalHint,
+          finalPuzzle.solution,
+          finalPuzzle.wordLength,
+          'standard'
+        );
+        isFinalBoardRef.current = true;
+        setIsFinalBoard(true);
+        setMessage(getFinalBoardStartMessage(currentPhase));
+        await recordPuzzleWords(finalPuzzle.words).catch(() => {});
+        return;
       }
 
       // Echo puzzles: every 5th puzzle from Phase 3 onward re-seeds a word from
@@ -999,22 +1134,45 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       // normal bank/generation path if echo seeding fails. The marked final
       // board takes precedence (it carries its own dread-word echo).
       setIsEchoPuzzle(false);
-      if (!finaleServe && currentPhase >= 3 && puzzlesSolved > 0 && puzzlesSolved % 5 === 0 && variant === 'standard') {
+      if (
+        !requestedUnbrokenWeave &&
+        currentPhase >= 3 &&
+        puzzlesSolved > 0 &&
+        puzzlesSolved % 5 === 0 &&
+        variant === 'standard'
+      ) {
         try {
           const ritualWords = await getRitualWords();
           // Pick words matching the target word length for this difficulty
-          const targetLen = selectedDifficulty === 'EASY' || selectedDifficulty === 'MEDIUM' ? 4 : 5;
+          const targetLen = requestedDifficulty === 'EASY' || requestedDifficulty === 'MEDIUM' ? 4 : 5;
           const candidates = ritualWords.filter(w => w.length === targetLen);
           if (candidates.length > 0) {
             const echoWord = candidates[Math.floor(Math.random() * candidates.length)];
-            const echoPuzzle = await generateLocalPuzzle(selectedDifficulty, { startWord: echoWord });
+            const echoPuzzle = await generateLocalPuzzle(requestedDifficulty, { startWord: echoWord });
             if (echoPuzzle) {
-              if (isStale()) return;
-              initGame(echoPuzzle.words, echoPuzzle.hint, echoPuzzle.solution, echoPuzzle.wordLength, 'standard');
-              await recordPuzzleWords(echoPuzzle.words);
-              setIsEchoPuzzle(true);
-              setMessage(getEchoPuzzleMessage(currentPhase));
-              return;
+              const extendedEcho = puzzlesSolved >= PUZZLE_EXTENSION_UNLOCK_PUZZLES
+                ? extendStandardPuzzle(echoPuzzle)
+                : echoPuzzle;
+              // Mature standard boards always carry the extra row. If this
+              // personalized chain cannot extend, do not leak a short board:
+              // fall through to the bank's pre-filtered guaranteed pool.
+              if (
+                puzzlesSolved < PUZZLE_EXTENSION_UNLOCK_PUZZLES ||
+                extendedEcho.words.length === echoPuzzle.words.length + 1
+              ) {
+                if (isStale()) return;
+                initGame(
+                  extendedEcho.words,
+                  extendedEcho.hint,
+                  extendedEcho.solution,
+                  extendedEcho.wordLength,
+                  'standard',
+                );
+                await recordPuzzleWords(extendedEcho.words);
+                setIsEchoPuzzle(true);
+                setMessage(getEchoPuzzleMessage(currentPhase));
+                return;
+              }
             }
           }
         } catch {
@@ -1028,25 +1186,49 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       if (shouldUseBank) {
         try {
           const recencyMap = await getWordHistoryWithRecency();
-          const bankPuzzle = await selectPreGeneratedPuzzle(selectedDifficulty, currentPhase, recencyMap, variant);
+          const bankPuzzle = unbrokenWeaveActive
+            ? await selectPreGeneratedPuzzle(
+                requestedDifficulty,
+                currentPhase,
+                recencyMap,
+                variant,
+                puzzlesSolved,
+                { unbrokenWeaveOnly: true },
+              )
+            : await selectPreGeneratedPuzzle(
+                requestedDifficulty,
+                currentPhase,
+                recencyMap,
+                variant,
+                puzzlesSolved,
+              );
           if (bankPuzzle) {
             if (isStale()) return;
             initGame(bankPuzzle.words, bankPuzzle.hint, bankPuzzle.solution, bankPuzzle.wordLength, variant, bankPuzzle.reverseSolution);
             await recordPuzzleWords(bankPuzzle.words);
-            if (finaleServe) {
-              // Dread seeding fell through — this bank board IS the final board.
-              isFinalBoardRef.current = true;
-              setIsFinalBoard(true);
-              setMessage(getFinalBoardStartMessage(currentPhase));
-            } else if (variant !== 'standard') {
+            if (variant !== 'standard') {
               const config = VARIANT_CONFIGS[variant];
-              setMessage(getVariantInstruction(config, currentPhase, selectedDifficulty));
+              setMessage(getVariantInstruction(config, currentPhase, requestedDifficulty));
             } else {
-              setMessage(getStartMessage(currentPhase));
+              setMessage(
+                unbrokenWeaveFallback
+                  ? getUnbrokenWeaveUnavailableMessage(currentPhase)
+                  : getStartMessage(currentPhase),
+              );
             }
             return;
           }
+          if (unbrokenWeaveActive) {
+            disableUnbrokenWeave();
+            unbrokenWeaveActive = false;
+            unbrokenWeaveFallback = true;
+          }
         } catch (bankErr) {
+          if (unbrokenWeaveActive) {
+            disableUnbrokenWeave();
+            unbrokenWeaveActive = false;
+            unbrokenWeaveFallback = true;
+          }
           console.log('Puzzle bank selection failed, falling back to generation:', bankErr);
         }
       }
@@ -1058,20 +1240,33 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       );
 
       const { puzzle, activeVariant } = await generatePuzzleForVariant(
-        selectedDifficulty,
+        requestedDifficulty,
         variant,
         timeoutPromise
       );
       if (isStale()) return;
-      initGame(puzzle.words, puzzle.hint, puzzle.solution, puzzle.wordLength, activeVariant, puzzle.reverseSolution);
-      if (finaleServe) {
-        // Generated board serving as the final board (dread seed unavailable).
-        isFinalBoardRef.current = true;
-        setIsFinalBoard(true);
-        setMessage(getFinalBoardStartMessage(currentPhase));
-      } else if (activeVariant !== 'standard') {
+      let puzzleToServe = puzzle;
+      if (
+        activeVariant === 'standard' &&
+        puzzlesSolved >= PUZZLE_EXTENSION_UNLOCK_PUZZLES &&
+        !requestedUnbrokenWeave
+      ) {
+        const extended = extendStandardPuzzle(puzzle);
+        puzzleToServe = extended.words.length === puzzle.words.length + 1
+          ? extended
+          : getGuaranteedExtendedStandardFallback(requestedDifficulty);
+      }
+      initGame(
+        puzzleToServe.words,
+        puzzleToServe.hint,
+        puzzleToServe.solution,
+        puzzleToServe.wordLength,
+        activeVariant,
+        puzzleToServe.reverseSolution,
+      );
+      if (activeVariant !== 'standard') {
         const config = VARIANT_CONFIGS[activeVariant];
-        setMessage(getVariantInstruction(config, currentPhase, selectedDifficulty));
+        setMessage(getVariantInstruction(config, currentPhase, requestedDifficulty));
       } else if (variant !== 'standard') {
         // The requested variant couldn't be generated and was downgraded to a
         // standard puzzle. Tell the player instead of silently swapping it.
@@ -1080,13 +1275,35 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
             ? 'The arrangement could not sustain that pattern... a plain offering instead.'
             : 'That puzzle style wasn\'t available. Here\'s a standard puzzle instead.'
         );
+      } else if (unbrokenWeaveFallback) {
+        setMessage(getUnbrokenWeaveUnavailableMessage(currentPhase));
       }
     } catch (localErr) {
       console.log("Local generation failed, using fallback:", localErr);
       // Fallback puzzles don't include solver metadata, so restrictions may be
       // impossible to satisfy. Revert restriction variants to standard fallback.
       const fallbackVariant = 'standard' as PuzzleVariant;
-      const fallbackWords = getRandomFallback(selectedDifficulty);
+      if (
+        variant === 'standard' &&
+        puzzlesSolved >= PUZZLE_EXTENSION_UNLOCK_PUZZLES &&
+        !requestedUnbrokenWeave
+      ) {
+        try {
+          const matureFallback = getGuaranteedExtendedStandardFallback(requestedDifficulty);
+          if (isStale()) return;
+          initGame(
+            matureFallback.words,
+            matureFallback.hint,
+            matureFallback.solution,
+            matureFallback.wordLength,
+            fallbackVariant,
+          );
+          return;
+        } catch {
+          // A corrupt/missing bank must still leave the ordinary safe fallback.
+        }
+      }
+      const fallbackWords = getRandomFallback(requestedDifficulty);
       const fallbackWordLen = fallbackWords[0].length;
       if (isStale()) return;
       initGame(
@@ -1096,21 +1313,18 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         fallbackWordLen,
         fallbackVariant
       );
-      if (finaleServe) {
-        // Even the fallback pool serves the final board when armed.
-        isFinalBoardRef.current = true;
-        setIsFinalBoard(true);
-        setMessage(getFinalBoardStartMessage(currentPhase));
-      } else if (variant !== 'standard') {
+      if (variant !== 'standard') {
         // Variant was dropped during fallback — notify the player
         setMessage(
           currentPhase >= 3
             ? 'The arrangement could not sustain that pattern.'
             : 'That puzzle style wasn\'t available. Starting a standard puzzle instead.'
         );
+      } else if (unbrokenWeaveFallback) {
+        setMessage(getUnbrokenWeaveUnavailableMessage(currentPhase));
       }
     }
-  }, [difficulty, initGame, gameMode, currentPhase, generatePuzzleForVariant, selectedVariant]);
+  }, [difficulty, initGame, gameMode, currentPhase, generatePuzzleForVariant, selectedVariant, setSelectedVariant]);
 
   // Daily Challenge bypasses the bank/generation path: words are supplied by
   // the seeded daily generator. Always standard mode (hints allowed) with
@@ -1125,6 +1339,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     gameModeRef.current = 'standard';
     setGameMode('standard');
     setBlindMode(false); // the daily is a shared board — never blind
+    unbrokenWeaveModeRef.current = false;
+    setUnbrokenWeaveMode(false);
     setIsSharedChallenge(false);
     setIsDailyBoard(true);
     isFinalBoardRef.current = false;
@@ -1166,6 +1382,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     gameModeRef.current = 'standard';
     setGameMode('standard');
     setBlindMode(false); // a friend's shared board — never blind
+    unbrokenWeaveModeRef.current = false;
+    setUnbrokenWeaveMode(false);
     setIsDailyBoard(false);
     setIsEchoPuzzle(false);
     isFinalBoardRef.current = false;
@@ -1187,6 +1405,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     if (rowIndex !== activeRowIndex) return;
     if (letter.isLocked) {
       shakeError(getLockedLetterMessage(currentPhase));
+      return;
+    }
+    if (unbrokenWeaveMode && isLetterSpent(spentLetterSet, letter.char)) {
+      shakeError(getUnbrokenWeaveSpentLetterMessage(letter.char, currentPhase));
       return;
     }
 
@@ -1235,7 +1457,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       setSelectedLetter(letter);
       setError(null);
     }
-  }, [gameState, activeRowIndex, selectedLetter, shakeError, currentVariant, currentPhase, doubleShiftPhase]);
+  }, [gameState, activeRowIndex, selectedLetter, shakeError, currentVariant, currentPhase, doubleShiftPhase, unbrokenWeaveMode, spentLetterSet]);
 
   const handleHint = useCallback(() => {
     if (gameState !== GameState.PLAYING || isProcessing) return;
@@ -1305,7 +1527,13 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       const guardLetter = relevantStep.lettersToMove
         ? (doubleShiftMidStep ? relevantStep.lettersToMove[1] : null)
         : relevantStep.letterToMove;
-      if (guardLetter != null) {
+      if (
+        guardLetter != null &&
+        unbrokenWeaveMode &&
+        isLetterSpent(spentLetterSet, guardLetter)
+      ) {
+        relevantStep = undefined;
+      } else if (guardLetter != null) {
         // Single-shift legality (also covers the double-shift mid-step, whose
         // remaining half is exactly one pick+drop): the letter must exist
         // unlocked, its removal must leave a valid word, and some insertion
@@ -1367,7 +1595,11 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         letterIndex = preferredLetterIndex;
       } else {
         for (let i = 0; i < srcLetters.length; i++) {
-          if (!srcLetters[i].isLocked && srcLetters[i].char === letterChar) {
+          if (
+            !srcLetters[i].isLocked &&
+            srcLetters[i].char === letterChar &&
+            (!unbrokenWeaveMode || !isLetterSpent(spentLetterSet, letterChar))
+          ) {
             letterIndex = i;
             break;
           }
@@ -1509,6 +1741,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       for (let i = 0; i < sourceLetters.length && !foundMove; i++) {
         if (sourceLetters[i].isLocked) continue;
         const letter = sourceLetters[i].char;
+        if (unbrokenWeaveMode && isLetterSpent(spentLetterSet, letter)) continue;
         // Check if removing this letter leaves a valid word
         const remaining = sourceLetters
           .filter((_, idx) => idx !== i)
@@ -1549,7 +1782,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         setMessage(getHintFallback(currentPhase));
       }
     }
-  }, [gameState, isProcessing, rows, activeRowIndex, solution, reverseSolution, currentPhase, moveDirection, currentVariant, doubleShiftPhase, gameMode, checkValidation]);
+  }, [gameState, isProcessing, rows, activeRowIndex, solution, reverseSolution, currentPhase, moveDirection, currentVariant, doubleShiftPhase, gameMode, checkValidation, unbrokenWeaveMode, spentLetterSet]);
 
   const handleSlotPress = useCallback(async (
     targetIndex: number,
@@ -1597,10 +1830,21 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     const sourceWordStr = newSourceLetters.map(l => l.char).join("");
     const targetWordStr = newTargetLetters.map(l => l.char).join("");
 
-    setIsProcessing(true);
-
     // --- DOUBLE SHIFT DROP1: Place first letter without validation ---
     if (isDoubleShift && doubleShiftPhase === 'drop1') {
+      // The first half is normally an intentionally non-dictionary state, but
+      // blocked vocabulary must never become visible on either row. Reject it
+      // before any board/history mutation and use generic copy that does not
+      // repeat the hidden term.
+      if (isBlockedWord(sourceWordStr) || isBlockedWord(targetWordStr)) {
+        shakeError(getBlockedWordMessage(currentPhase));
+        setInvalidAttempts(prev => prev + 1);
+        pendingMistakeRef.current = true;
+        cleanMoveStreakRef.current = 0;
+        return null;
+      }
+
+      setIsProcessing(true);
       // Record delta for undo
       const sourceLetterIndex = sourceRow.words.findIndex(l => l.id === selectedLetter.id);
       const delta: MoveDelta = {
@@ -1647,6 +1891,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       return { completed: false, hintsUsed, invalidAttempts, gameMode, completedWords: [] };
     }
 
+    setIsProcessing(true);
+
     // --- Standard validation (single shift OR double shift drop2) ---
     const isReverseReturn = hasVariantModifier(currentVariant, 'reverse') && moveDirection === 'up';
     const isStartRow = activeRowIndex === 0;
@@ -1684,10 +1930,16 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     // completion sites below) — mid-board rejection would leak validity, which
     // is the information the mode exists to withhold.
     if (!blindMode) {
+      const revealRescueGrading = () => {
+        if (previewGradingMode === 'rescue' && invalidAttempts === 0) {
+          setMessage(getPreviewRescueMessage(currentPhase));
+        }
+      };
       const isSourceValid = checkValidation(sourceWordStr);
       if (!isSourceValid) {
         shakeError(getInvalidWordMessage(sourceWordStr, currentPhase));
         setInvalidAttempts(prev => prev + 1);
+        revealRescueGrading();
         pendingMistakeRef.current = true;
         cleanMoveStreakRef.current = 0;
         // For double shift drop2, go back to pick2 (let player try different letter/slot)
@@ -1703,6 +1955,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       if (!isTargetValid) {
         shakeError(getInvalidWordMessage(targetWordStr, currentPhase));
         setInvalidAttempts(prev => prev + 1);
+        revealRescueGrading();
         pendingMistakeRef.current = true;
         cleanMoveStreakRef.current = 0;
         // For double shift drop2, go back to pick2 (let player try different letter/slot)
@@ -1746,6 +1999,15 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     };
 
     setRows(newRows);
+    let nextSpentLetterSet = spentLetterSet;
+    if (
+      unbrokenWeaveMode &&
+      currentVariant === 'standard' &&
+      !isDoubleShift
+    ) {
+      nextSpentLetterSet = addSpentLetter(spentLetterSet, selectedLetter.char);
+      setSpentLetterSet(nextSpentLetterSet);
+    }
     setSelectedLetter(null);
     setError(null);
     setHintHighlight(null);
@@ -1876,7 +2138,13 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         ? false
         : isDoubleShift
           ? !hasAnyValidDoubleShiftMove(newRows, activeRowIndex + 1, checkValidation)
-          : !hasAnyValidMove(newRows, activeRowIndex + 1, 'down', checkValidation);
+          : !hasAnyValidMove(
+              newRows,
+              activeRowIndex + 1,
+              'down',
+              checkValidation,
+              unbrokenWeaveMode ? nextSpentLetterSet : undefined,
+            );
       setMessage(moveMessageFor(stuckForward));
       setIsStuck(stuckForward);
       setLastFormedWord(targetWordStr);
@@ -1954,7 +2222,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     currentPhase,
     gameMode,
     blindMode,
+    unbrokenWeaveMode,
+    spentLetterSet,
     doubleShiftPhase,
+    previewGradingMode,
   ]);
 
   // Grant one extra undo (e.g. an amber-spend refill in Challenge mode). No-op
@@ -2082,6 +2353,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     // Standard undo: always undo 1 delta at a time.
     // For double shift completed steps, the second undo press will reverse the other drop.
     const delta = history[history.length - 1];
+    if (unbrokenWeaveMode) {
+      setSpentLetterSet(prev => removeSpentLetter(prev, delta.movedLetterChar));
+    }
 
     setRows(prevRows => {
       const newRows = [...prevRows];
@@ -2141,7 +2415,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     if (gameMode === 'challenge' && !freeUndos) {
       setUndosRemaining(prev => prev - 1);
     }
-  }, [history, gameMode, blindMode, undosRemaining, shakeError, gameState, currentVariant, doubleShiftPhase, currentPhase]);
+  }, [history, gameMode, blindMode, unbrokenWeaveMode, undosRemaining, shakeError, gameState, currentVariant, doubleShiftPhase, currentPhase]);
 
   const handleNextLevel = useCallback(() => {
     setShowConfetti(false);
@@ -2209,9 +2483,11 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
           selectedLetter.char,
           ...targetLetters.slice(i),
         ];
+        const blockedSource = isBlockedWord(sourceWordAfterRemoval);
+        const blockedTarget = isBlockedWord(newWord);
         previews.push({
-          word: newWord,
-          isValid: canCompleteDoubleShift(
+          word: blockedTarget ? '•'.repeat(newWord.length) : newWord,
+          isValid: !blockedSource && !blockedTarget && canCompleteDoubleShift(
             reducedSource,
             intermediateChars,
             (w) => validWordsCache.current.has(w)
@@ -2230,35 +2506,34 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     return previews;
   }, [selectedLetter, activeRowIndex, moveDirection, rows, gameState, currentVariant, doubleShiftPhase, blindMode, gameMode]);
 
-  // Verb-depth gate: whether the ✓/✗ validity grading on the ghost previews is
-  // PRESENTED. The slotPreviews data above keeps computing isValid internally
-  // (the double-shift drop1 look-ahead and the drag near-miss snapping need
-  // it); this flag controls presentation only. Shown on EASY boards (any
-  // variant), in the double-shift variant at any difficulty (its intermediate
-  // non-word state needs the guidance), and — the early-game grading bridge —
-  // on EVERY board (any difficulty, the daily, shared links) until
-  // PREVIEW_GRADING_BRIDGE_PUZZLES total puzzles are solved: the tutorial
-  // teaches the marks, so the first free MEDIUM board must not silently drop
-  // them. Hidden everywhere else — MEDIUM+ standard/reverse/speed, the daily
-  // (ramps MEDIUM+ by design), and shared-challenge links — so the player
-  // judges the word with their own ear; App's one-time graduation toast marks
-  // the first board that starts hidden (post-bridge, by construction).
-  // Blind Offering has no previews at all (blindMode short-circuits above),
-  // but the flag stays false there too so consumers never key a tell off it.
-  const previewValidityVisible = useMemo(() => {
-    if (blindMode) return false;
-    if (hasVariantModifier(currentVariant, 'double_shift')) return true;
-    // Early-game bridge: grading stays on for every board (even daily/shared)
-    // until the player has solved their way past the threshold.
-    if (puzzlesSolvedCount < PREVIEW_GRADING_BRIDGE_PUZZLES) return true;
-    if (isDailyBoard || isSharedChallenge) return false;
-    return difficulty === 'EASY';
-  }, [blindMode, currentVariant, puzzlesSolvedCount, isDailyBoard, isSharedChallenge, difficulty]);
+  // The single presentation signal consumed by Row, drag snapping, and a11y.
+  // Rescue boards start neutral, then keep grading visible for the remainder
+  // of the board after the first invalid attempt. Slot data still computes
+  // isValid while hidden.
+  const previewValidityVisible =
+    previewGradingMode === 'graded' ||
+    (previewGradingMode === 'rescue' && invalidAttempts > 0);
 
   const restorePuzzleState = useCallback((saved: SavedPuzzleState) => {
     const selectedExists = saved.selectedLetter
       ? saved.rows.some(row => row.words.some(letter => letter.id === saved.selectedLetter!.id))
       : false;
+    const restoreUnbrokenWeave =
+      saved.unbrokenWeaveMode === true &&
+      saved.currentPhase === 5 &&
+      saved.gameMode === 'standard' &&
+      saved.currentVariant === 'standard' &&
+      saved.blindMode !== true &&
+      saved.isPlayingDaily !== true &&
+      saved.isSharedChallenge !== true &&
+      saved.isFinalBoard !== true &&
+      isUnbrokenWeaveEligible(saved.solution);
+    let restoredSpentLetters: ReadonlySet<string> = new Set();
+    if (restoreUnbrokenWeave) {
+      for (const letter of saved.spentLetters ?? []) {
+        restoredSpentLetters = addSpentLetter(restoredSpentLetters, letter);
+      }
+    }
     setRows(saved.rows);
     setActiveRowIndex(saved.activeRowIndex);
     setSelectedLetter(selectedExists ? saved.selectedLetter : null);
@@ -2269,6 +2544,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setHintsUsed(saved.hintsUsed);
     setUndosRemaining(saved.undosRemaining);
     difficultyRef.current = saved.difficulty;
+    preferredDifficultyRef.current = saved.difficulty;
     setDifficulty(saved.difficulty);
     setCurrentWordLength(saved.currentWordLength);
     setHint(saved.hint);
@@ -2278,7 +2554,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setGameMode(saved.gameMode);
     // blindMode restores with the board — a restored blind board keeps its
     // always-free undos (the rule derives from the mode, not per-board state).
-    setBlindMode(saved.blindMode ?? false);
+    setBlindMode(restoreUnbrokenWeave ? false : (saved.blindMode ?? false));
+    unbrokenWeaveModeRef.current = restoreUnbrokenWeave;
+    setUnbrokenWeaveMode(restoreUnbrokenWeave);
+    setSpentLetterSet(restoredSpentLetters);
     // Shared-challenge provenance rides in the autosave (isSharedChallenge in
     // SavedPuzzleState) so a kill+relaunch can't convert a shared board
     // (amber-only) into one that feeds phase progress. Old saves without the
@@ -2291,8 +2570,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     // board that was served as final, even across a relaunch.
     isFinalBoardRef.current = saved.isFinalBoard === true;
     setIsFinalBoard(saved.isFinalBoard === true);
-    setCurrentVariant(saved.currentVariant);
-    setSelectedVariantState(saved.selectedVariant);
+    setCurrentVariant(restoreUnbrokenWeave ? 'standard' : saved.currentVariant);
+    setSelectedVariantState(restoreUnbrokenWeave ? 'standard' : saved.selectedVariant);
     setMoveDirection(saved.moveDirection);
     setCurrentPhase(saved.currentPhase);
     setLastFormedWord(saved.lastFormedWord);
@@ -2380,6 +2659,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setLastIncantationName(null);
     setLastFormedWord(null);
     setDoubleShiftPhase(null);
+    unbrokenWeaveModeRef.current = false;
+    setUnbrokenWeaveMode(false);
+    setSpentLetterSet(new Set());
     setIsEchoPuzzle(false);
     isFinalBoardRef.current = false;
     setIsFinalBoard(false);
@@ -2417,6 +2699,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     earnedStars,
     gameMode,
     blindMode,
+    unbrokenWeaveMode,
+    spentLetters: [...spentLetterSet],
     isSharedChallenge,
     undosRemaining,
     currentPhase,
@@ -2428,6 +2712,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     moveDirection,
     slotPreviews,
     previewValidityVisible,
+    previewGradingMode,
     doubleShiftPhase,
     isEchoPuzzle,
     isFinalBoard,

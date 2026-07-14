@@ -65,6 +65,10 @@ import {
 import { FIRST_COMPLETION_BONUS } from '../types/homeWorld';
 import { getLocalDateStringDaysAgo } from '../services/dateUtils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  getPhaseStartIndex,
+  getTotalDialogueCount,
+} from '../services/dialogue/animalDialogueBase';
 
 // amberCurrency lazy-requires eventLogger for phase_reached telemetry — mock it
 // so the debounced flush timer never runs and the calls are assertable.
@@ -98,6 +102,71 @@ describe('loadProgress', () => {
     expect(progress.currentPhase).toBe(0);
     expect(progress.unlockedRooms).toContain('cozy_den');
     expect(progress.unlockedAnimals).toHaveLength(0);
+  });
+
+  test('self-heals unlocked vanguard Vesper to her effective Phase 4 start in global Phase 3', async () => {
+    const legacy = {
+      ...(await loadProgress()),
+      currentPhase: 3,
+      unlockedAnimals: ['tarsier'],
+      lastDialogueRead: { tarsier: 0 },
+    };
+    await AsyncStorage.setItem('wordshift_home_progress', JSON.stringify(legacy));
+    invalidateProgressCache();
+
+    const expected = getPhaseStartIndex('tarsier', 4);
+    expect((await loadProgress()).lastDialogueRead.tarsier).toBe(expected);
+
+    invalidateProgressCache();
+    expect((await loadProgress()).lastDialogueRead.tarsier).toBe(expected);
+  });
+
+  test('self-heals Phase 2 late recruits to their current effective phases, including lagging Phase 1', async () => {
+    const legacy = {
+      ...(await loadProgress()),
+      currentPhase: 2,
+      unlockedAnimals: ['tarsier', 'aye_aye', 'kakapo'],
+      lastDialogueRead: { tarsier: 0, aye_aye: 0, kakapo: 0 },
+    };
+    await AsyncStorage.setItem('wordshift_home_progress', JSON.stringify(legacy));
+    invalidateProgressCache();
+
+    expect((await loadProgress()).lastDialogueRead).toMatchObject({
+      tarsier: getPhaseStartIndex('tarsier', 3),
+      aye_aye: getPhaseStartIndex('aye_aye', 2),
+      kakapo: getPhaseStartIndex('kakapo', 1),
+    });
+  });
+
+  test('self-heals unlocked lagging Moss to his effective Phase 3 start in global Phase 4', async () => {
+    const legacy = {
+      ...(await loadProgress()),
+      currentPhase: 4,
+      unlockedAnimals: ['kakapo'],
+      lastDialogueRead: { kakapo: 0 },
+    };
+    await AsyncStorage.setItem('wordshift_home_progress', JSON.stringify(legacy));
+    invalidateProgressCache();
+
+    expect((await loadProgress()).lastDialogueRead.kakapo).toBe(
+      getPhaseStartIndex('kakapo', 3)
+    );
+  });
+
+  test('late-recruit self-heal never rewinds an existing dialogue position', async () => {
+    const legacy = {
+      ...(await loadProgress()),
+      currentPhase: 4,
+      unlockedAnimals: ['tarsier', 'kakapo'],
+      lastDialogueRead: { tarsier: 9999, kakapo: 9999 },
+    };
+    await AsyncStorage.setItem('wordshift_home_progress', JSON.stringify(legacy));
+    invalidateProgressCache();
+
+    expect((await loadProgress()).lastDialogueRead).toMatchObject({
+      tarsier: 9999,
+      kakapo: 9999,
+    });
   });
 });
 
@@ -994,6 +1063,23 @@ describe('post-revelation phase pinning (Phase 5)', () => {
     expect(await getCurrentPhase()).toBe(5);
   });
 
+  test('markPostRevelation retires every unlocked animal regular-dialogue index', async () => {
+    const progress = await loadProgress();
+    const foxTotal = getTotalDialogueCount('fox', 4);
+    const pangolinTotal = getTotalDialogueCount('pangolin', 4);
+    progress.unlockedAnimals = ['fox', 'pangolin'];
+    progress.lastDialogueRead = {
+      fox: 0,
+      pangolin: pangolinTotal + 3,
+    };
+
+    await markPostRevelation();
+
+    const after = await getFullProgress();
+    expect(after.lastDialogueRead.fox).toBe(foxTotal);
+    expect(after.lastDialogueRead.pangolin).toBe(pangolinTotal + 3);
+  });
+
   test('awardPuzzleAmber never downgrades the phase after post-revelation', async () => {
     await devAddPuzzles(235);
     await markPostRevelation();
@@ -1035,6 +1121,25 @@ describe('post-revelation phase pinning (Phase 5)', () => {
     invalidateProgressCache();
     const reloaded = await loadProgress();
     expect(reloaded.currentPhase).toBe(5);
+  });
+
+  test('Phase 5 retirement takes precedence over late-recruit fast-forward', async () => {
+    const tarsierTotal = getTotalDialogueCount('tarsier', 4);
+    const legacy = {
+      ...(await loadProgress()),
+      currentPhase: 5,
+      postRevelation: true,
+      unlockedAnimals: ['tarsier'],
+      lastDialogueRead: { tarsier: 2 },
+    };
+    await AsyncStorage.setItem('wordshift_home_progress', JSON.stringify(legacy));
+    invalidateProgressCache();
+
+    const progress = await loadProgress();
+    expect(progress.lastDialogueRead.tarsier).toBe(tarsierTotal);
+
+    invalidateProgressCache();
+    expect((await loadProgress()).lastDialogueRead.tarsier).toBe(tarsierTotal);
   });
 
   test('non-post-revelation saves are untouched on load', async () => {

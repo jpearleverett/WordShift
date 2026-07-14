@@ -4,6 +4,15 @@ import type { PreGeneratedPuzzle } from '../data/puzzleBankTypes';
 import { DialoguePhase } from '../types/homeWorld';
 import { isInHardCooldown } from './wordHistory';
 import { PuzzleVariant } from './puzzleVariety';
+import { COMMON_WORDS } from '../constants/wordLists';
+import {
+  analyzeStandardBranching,
+  type PuzzleBranchingMetrics,
+} from './puzzleBranching';
+import {
+  extendStandardPuzzle,
+  PUZZLE_EXTENSION_UNLOCK_PUZZLES,
+} from './puzzleExtension';
 // Bank novelty/recency tuning lives in the central balance file (single source).
 import {
   MAX_USED_TRACKED,
@@ -15,6 +24,18 @@ import {
   BANK_NOVEL_BONUS_MOST,
   BANK_NOVEL_BONUS_SOME,
 } from '../constants/gameBalance';
+import { isUnbrokenWeaveEligible } from './unbrokenWeave';
+
+const BRANCHING_UNLOCK_PUZZLES = 40;
+const BRANCHING_CONTEXT_CANDIDATES = 40;
+const BRANCHING_BONUS_CAP = 12;
+const branchingMetricsCache = new Map<string, PuzzleBranchingMetrics>();
+const standardExtensionCache = new Map<string, PuzzleConfig | null>();
+const guaranteedStandardFallbackCache = new Map<Difficulty, PuzzleConfig>();
+
+export interface PuzzleBankSelectionOptions {
+  unbrokenWeaveOnly?: boolean;
+}
 
 // ---------------------------------------------------------------------------
 // Bank Registry — single source of truth for all 12 puzzle banks
@@ -57,6 +78,46 @@ function getBank(bankKey: string): PreGeneratedPuzzle[] {
     entry.bankData = entry.loadBank();
   }
   return entry.bankData;
+}
+
+function toPuzzleConfig(puzzle: PreGeneratedPuzzle): PuzzleConfig {
+  const sol0 = puzzle.solution[0];
+  const isDS = puzzle.isDoubleShift === true;
+  return {
+    words: puzzle.words,
+    hint: isDS && sol0?.lettersToMove
+      ? `Start by shifting '${sol0.lettersToMove[0]}' and '${sol0.lettersToMove[1]}'`
+      : `Start by shifting '${sol0?.letterToMove ?? '?'}'`,
+    solution: puzzle.solution,
+    reverseSolution: puzzle.reverseSolution,
+    wordLength: puzzle.wordLength,
+    isDoubleShift: isDS || undefined,
+  };
+}
+
+/**
+ * Build each mature standard-bank extension once. Inputs are intentionally
+ * puzzle-local and deterministic: live word recency affects selection score,
+ * never whether a board can receive its required extra row.
+ */
+function getCachedStandardExtension(
+  bankKey: string,
+  puzzle: PreGeneratedPuzzle,
+): PuzzleConfig | null {
+  const cacheKey = `${bankKey}:${puzzle.id}`;
+  if (standardExtensionCache.has(cacheKey)) {
+    return standardExtensionCache.get(cacheKey) ?? null;
+  }
+
+  const base = toPuzzleConfig(puzzle);
+  const extended = extendStandardPuzzle(base, {
+    excludedWords: new Set(puzzle.allWords),
+  });
+  const result = extended.words.length === base.words.length + 1
+    ? extended
+    : null;
+  standardExtensionCache.set(cacheKey, result);
+  return result;
 }
 
 // Per-bank word frequency — the generator's adjacency bias makes "hub" words
@@ -107,6 +168,29 @@ function getBankKey(difficulty: Difficulty, variant: PuzzleVariant): string {
   if (difficulty === 'MEDIUM') return 'std_medium';
   if (difficulty === 'MEDIUM_PLUS') return 'std_mp';
   return 'standard';
+}
+
+/**
+ * Return a mature standard board without consulting played-puzzle storage.
+ * Each real difficulty bank is scanned at most once; shipped bank guards ensure
+ * at least one canonical puzzle can receive the required extra row.
+ */
+export function getGuaranteedExtendedStandardFallback(
+  difficulty: Difficulty,
+): PuzzleConfig {
+  const cached = guaranteedStandardFallbackCache.get(difficulty);
+  if (cached) return cached;
+
+  const bankKey = getBankKey(difficulty, 'standard');
+  for (const puzzle of getBank(bankKey)) {
+    const extended = getCachedStandardExtension(bankKey, puzzle);
+    if (extended) {
+      guaranteedStandardFallbackCache.set(difficulty, extended);
+      return extended;
+    }
+  }
+
+  throw new Error(`No extendable standard puzzle found for ${difficulty}`);
 }
 
 /**
@@ -343,18 +427,32 @@ export async function selectPreGeneratedPuzzle(
   difficulty: Difficulty,
   phase: DialoguePhase,
   recencyMap: Map<string, number>,
-  variant: PuzzleVariant = 'standard'
+  variant: PuzzleVariant = 'standard',
+  puzzlesSolved: number = 0,
+  options: PuzzleBankSelectionOptions = {},
 ): Promise<PuzzleConfig | null> {
   const bank = getBankForSelection(difficulty, variant);
   if (!bank) return null;
+  if (options.unbrokenWeaveOnly && variant !== 'standard') return null;
 
   const bankKey = getBankKey(difficulty, variant);
+  const extensionRequired =
+    variant === 'standard' &&
+    puzzlesSolved >= PUZZLE_EXTENSION_UNLOCK_PUZZLES &&
+    !options.unbrokenWeaveOnly;
+  const selectableBank = options.unbrokenWeaveOnly
+    ? bank.filter(puzzle => isUnbrokenWeaveEligible(puzzle.solution))
+    : extensionRequired
+      ? bank.filter(puzzle => getCachedStandardExtension(bankKey, puzzle) !== null)
+      : bank;
+  if (selectableBank.length === 0) return null;
+
   const storageConfig = getStorageConfig(bankKey);
   const used = await loadUsedPuzzles(bankKey);
   const usedSet = new Set(used);
 
   // Filter out already-played puzzles
-  let available = bank.filter(p => !usedSet.has(p.id));
+  let available = selectableBank.filter(p => !usedSet.has(p.id));
 
   // Phase 4+ dread steering: the climax must serve dread vocabulary, but a
   // played board must NEVER be re-served while ANY unplayed board remains
@@ -379,28 +477,45 @@ export async function selectPreGeneratedPuzzle(
 
   // If all puzzles exhausted, recycle the oldest-played half
   if (available.length === 0) {
-    const halfIdx = Math.floor(used.length / 2);
-    const recycledIds = new Set(used.slice(halfIdx));
+    if (options.unbrokenWeaveOnly || extensionRequired) {
+      const selectableIds = new Set(selectableBank.map(puzzle => puzzle.id));
+      const usedSelectableIds = used.filter(id => selectableIds.has(id));
+      if (usedSelectableIds.length === 0) return null;
 
-    // Remove recycled IDs from the used list
-    const trimmed = used.slice(0, halfIdx);
-    storageConfig.setCache(trimmed);
-    try {
-      await AsyncStorage.setItem(storageConfig.key, JSON.stringify(trimmed));
-    } catch {
-      // Non-critical
-    }
-
-    available = bank.filter(p => recycledIds.has(p.id));
-
-    // If still empty (shouldn't happen), return all
-    if (available.length === 0) {
-      available = [...bank];
-      storageConfig.setCache([]);
+      const halfIdx = Math.floor(usedSelectableIds.length / 2);
+      const recycledIds = new Set(usedSelectableIds.slice(halfIdx));
+      const trimmed = used.filter(id => !recycledIds.has(id));
+      storageConfig.setCache(trimmed);
       try {
-        await AsyncStorage.setItem(storageConfig.key, JSON.stringify([]));
+        await AsyncStorage.setItem(storageConfig.key, JSON.stringify(trimmed));
       } catch {
         // Non-critical
+      }
+      available = selectableBank.filter(puzzle => recycledIds.has(puzzle.id));
+    } else {
+      const halfIdx = Math.floor(used.length / 2);
+      const recycledIds = new Set(used.slice(halfIdx));
+
+      // Remove recycled IDs from the used list
+      const trimmed = used.slice(0, halfIdx);
+      storageConfig.setCache(trimmed);
+      try {
+        await AsyncStorage.setItem(storageConfig.key, JSON.stringify(trimmed));
+      } catch {
+        // Non-critical
+      }
+
+      available = selectableBank.filter(p => recycledIds.has(p.id));
+
+      // If still empty (shouldn't happen), return all
+      if (available.length === 0) {
+        available = [...selectableBank];
+        storageConfig.setCache([]);
+        try {
+          await AsyncStorage.setItem(storageConfig.key, JSON.stringify([]));
+        } catch {
+          // Non-critical
+        }
       }
     }
   }
@@ -420,6 +535,27 @@ export async function selectPreGeneratedPuzzle(
   // Sort by score descending
   scored.sort((a, b) => b.score - a.score);
 
+  // Once the player knows the base verb, favor standard boards with multiple
+  // completing routes. Analyze only the strongest context candidates so phase
+  // and freshness remain the primary filters and synchronous work stays capped.
+  if (variant === 'standard' && puzzlesSolved >= BRANCHING_UNLOCK_PUZZLES) {
+    const candidateCount = Math.min(BRANCHING_CONTEXT_CANDIDATES, scored.length);
+    const depthCandidates = scored.slice(0, candidateCount);
+    for (const candidate of depthCandidates) {
+      let metrics = branchingMetricsCache.get(candidate.puzzle.id);
+      if (!metrics) {
+        metrics = analyzeStandardBranching(
+          candidate.puzzle.words,
+          word => COMMON_WORDS.has(word.toUpperCase()),
+        );
+        branchingMetricsCache.set(candidate.puzzle.id, metrics);
+      }
+      candidate.score += Math.min(BRANCHING_BONUS_CAP, metrics.structuralBonus);
+    }
+    depthCandidates.sort((a, b) => b.score - a.score);
+    scored.splice(0, candidateCount, ...depthCandidates);
+  }
+
   // Pick randomly from the top 10 (wider pool = more vocabulary variety)
   const topN = Math.min(10, scored.length);
   const selected = scored[Math.floor(Math.random() * topN)];
@@ -427,21 +563,13 @@ export async function selectPreGeneratedPuzzle(
   // Mark as played
   await markPuzzlePlayed(selected.puzzle.id, bankKey);
 
-  // Convert to PuzzleConfig
-  const sol0 = selected.puzzle.solution[0];
-  const isDS = selected.puzzle.isDoubleShift === true;
-  const hint = isDS && sol0?.lettersToMove
-    ? `Start by shifting '${sol0.lettersToMove[0]}' and '${sol0.lettersToMove[1]}'`
-    : `Start by shifting '${sol0?.letterToMove ?? '?'}'`;
+  if (extensionRequired) {
+    // `selectableBank` contains only cache hits, so this cannot fail without a
+    // mutation of generated bank data during the process.
+    return getCachedStandardExtension(bankKey, selected.puzzle);
+  }
 
-  return {
-    words: selected.puzzle.words,
-    hint,
-    solution: selected.puzzle.solution,
-    reverseSolution: selected.puzzle.reverseSolution,
-    wordLength: selected.puzzle.wordLength,
-    isDoubleShift: isDS || undefined,
-  };
+  return toPuzzleConfig(selected.puzzle);
 }
 
 /**

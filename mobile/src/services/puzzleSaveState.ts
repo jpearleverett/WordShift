@@ -37,6 +37,10 @@ export interface SavedPuzzleState {
   /** Blind Offering modifier active on this board (previews hidden). Restored so
    *  a kill+relaunch can't hand the player a free peek at the previews. */
   blindMode?: boolean;
+  /** Phase-5 Unbroken Weave mastery mode active on this board. */
+  unbrokenWeaveMode?: boolean;
+  /** Moved character values already spent by Unbroken Weave. */
+  spentLetters?: string[];
   currentPhase: DialoguePhase;
   lastFormedWord: string | null;
   /** Double shift input cycle phase (null for non-double-shift puzzles). */

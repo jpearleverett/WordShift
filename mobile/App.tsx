@@ -36,7 +36,11 @@ import { useAutosave } from './src/hooks/useAutosave';
 import { logEvent } from './src/services/eventLogger';
 import { SettingsScreen } from './src/components/SettingsScreen';
 import { FoxGuide } from './src/components/FoxGuide';
-import { ONBOARDING_FOX_LINES } from './src/services/onboarding';
+import {
+  COLD_OPEN_INSTRUCTION,
+  ONBOARDING_FOX_LINES,
+  resolveColdOpenLaunchRoute,
+} from './src/services/onboarding';
 import {
   awardBonusAmber,
   spendAmber,
@@ -111,6 +115,11 @@ import {
   getSwiftVictoryHintMessage,
   getStreakHeldMessage,
   getDwellLine,
+  getColdOpenSkipLabel,
+  getColdOpenSkipAccessibilityLabel,
+  getSkipConfirmText,
+  getSkipConfirmStayLabel,
+  getSkipConfirmLeaveLabel,
 } from './src/services/phaseNarrative';
 import { getActiveEvent, getEventDailyBonusAmber } from './src/services/liveEvents';
 import { recordSolveTime, getSolveTrend, recordSpeedRound } from './src/services/masteryRecords';
@@ -600,6 +609,63 @@ function MainApp() {
 
   const [onboardingFlow, onboardingActions] = useOnboardingFlow(onboardingCallbacks);
 
+  const launchColdOpenPuzzle = useCallback(async () => {
+    const [saved, stats] = await Promise.all([
+      loadPuzzleState(),
+      getCumulativeStats(),
+    ]);
+    const canRestoreColdOpen = (
+      saved?.gameState === GameState.PLAYING &&
+      !saved.isPlayingDaily &&
+      saved.difficulty === 'EASY' &&
+      saved.gameMode === 'standard' &&
+      saved.currentVariant === 'standard' &&
+      saved.blindMode !== true &&
+      saved.unbrokenWeaveMode !== true
+    );
+    const route = resolveColdOpenLaunchRoute(
+      canRestoreColdOpen,
+      stats?.totalPuzzlesCompleted ?? 0,
+    );
+
+    if (route === 'home_empty') {
+      if (saved) await clearPuzzleState();
+      await onboardingActions.advanceOnboarding('home_empty');
+      transitionTo('home', () => {
+        puzzleActions.clearBoard();
+      });
+      return;
+    }
+
+    setCurrentScreen('puzzle');
+    if (route === 'restore' && saved) {
+      puzzleActions.restorePuzzleState(saved);
+    } else {
+      if (saved) await clearPuzzleState();
+      await puzzleActions.startNewGame('EASY', 'standard', 'standard', false, false);
+    }
+    puzzleActions.setMessage(COLD_OPEN_INSTRUCTION);
+    logEvent({ type: 'puzzle_started', data: { difficulty: 'EASY', onboarding: true } });
+  }, [onboardingActions, puzzleActions, transitionTo]);
+
+  const handleColdOpenSkipPress = useCallback(() => {
+    showGameAlert(
+      '',
+      getSkipConfirmText(),
+      [
+        {
+          text: getSkipConfirmLeaveLabel(),
+          style: 'destructive',
+          onPress: onboardingActions.handleSkipOnboarding,
+        },
+        {
+          text: getSkipConfirmStayLabel(),
+          style: 'cancel',
+        },
+      ],
+    );
+  }, [onboardingActions.handleSkipOnboarding]);
+
   // Auto-save puzzle state during active play
   useAutosave({
     currentScreen,
@@ -620,6 +686,8 @@ function MainApp() {
     reverseSolution: puzzle.reverseSolution,
     gameMode: puzzle.gameMode,
     blindMode: puzzle.blindMode,
+    unbrokenWeaveMode: puzzle.unbrokenWeaveMode,
+    spentLetters: puzzle.spentLetters,
     currentVariant: puzzle.currentVariant,
     selectedVariant: puzzle.selectedVariant,
     moveDirection: puzzle.moveDirection,
@@ -761,15 +829,19 @@ function MainApp() {
       const step = onboardingFlow.onboardingStep;
       if (step === 'going_to_pit' || step === 'pit_intro' || step === 'pit_offering') {
         setCurrentScreen('pit');
+      } else if (step === 'cold_open_puzzle') {
+        // A kill during the self-directed opener resumes the exact autosaved
+        // board when possible; otherwise start curated EASY puzzle 0.
+        launchColdOpenPuzzle().catch(() => {});
       } else if (step === 'puzzle_tutorial') {
         // Re-init the guided tutorial puzzle so the player resumes a live,
         // winnable board with the Fox overlay rather than a dead screen.
         setCurrentScreen('puzzle');
-        puzzleActions.startNewGame('EASY');
+        puzzleActions.startNewGame('EASY', 'standard', 'standard', false, false);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onboardingFlow.onboardingReady, onboardingFlow.onboardingStep]);
+  }, [onboardingFlow.onboardingReady, onboardingFlow.onboardingStep, launchColdOpenPuzzle]);
 
   // Daily launch tasks — free streak freeze (every 14 days) + daily login
   // reward claim. Runs once per LOCAL day: on cold launch via the effect below,
@@ -1085,10 +1157,15 @@ function MainApp() {
     setIsPlayingDaily(false);
     resetSpeedRun();
     transitionTo('home', () => {
-      puzzleActions.setGameState(GameState.IDLE);
+      if (puzzle.unbrokenWeaveMode) {
+        clearPuzzleState().catch(() => {});
+        puzzleActions.clearBoard();
+      } else {
+        puzzleActions.setGameState(GameState.IDLE);
+      }
       puzzleActions.setShowConfetti(false);
     });
-  }, [puzzleActions, transitionTo]);
+  }, [puzzleActions, puzzle.unbrokenWeaveMode, transitionTo]);
 
   // Reset All completed but an in-place reload wasn't available (Expo Go /
   // dev client — Updates.reloadAsync throws there). Storage and service
@@ -1096,7 +1173,7 @@ function MainApp() {
   // of App-level in-memory state from the cleared services so the live
   // session genuinely starts over: fresh persistence (amber 0 / phase 0 /
   // no stats), an empty board, no victory/ceremony remnants, and onboarding
-  // restarted from the empty den — instead of dumping the player back onto
+  // restarted from the cold open instead of dumping the player back onto
   // a home screen still rendering their old save.
   const rebuildSessionFromStorage = useCallback((opts: { restartOnboarding: boolean }) => {
     clearVictoryTimeouts();
@@ -1130,9 +1207,15 @@ function MainApp() {
     // fresh-launch init so the intro replays this session. Creator snapshot:
     // storage says 'complete' and must stay complete.
     onboardingActions
-      .advanceOnboarding(opts.restartOnboarding ? 'home_empty' : 'complete')
+      .advanceOnboarding(opts.restartOnboarding ? 'cold_open_puzzle' : 'complete')
+      .then(() => {
+        if (opts.restartOnboarding) {
+          launchColdOpenPuzzle().catch(() => {});
+        } else {
+          transitionTo('home');
+        }
+      })
       .catch(() => {});
-    transitionTo('home');
   }, [
     clearVictoryTimeouts,
     puzzleActions,
@@ -1140,6 +1223,7 @@ function MainApp() {
     orchestrationActions,
     persistenceActions,
     onboardingActions,
+    launchColdOpenPuzzle,
     resetSpeedRun,
     transitionTo,
   ]);
@@ -1219,7 +1303,7 @@ function MainApp() {
         // Daily generation failed — fall back to a standard HARD puzzle so the
         // player is never stranded on a loading screen.
         setIsPlayingDaily(false);
-        await puzzleActions.startNewGame('HARD');
+        await puzzleActions.startNewGame('HARD', 'standard', 'standard', false, false);
       }
     });
   }, [puzzleActions, transitionTo, persistenceActions, orchestrationActions, persistence.currentPhase, maybeShowSetupSelectorIntro]);
@@ -2295,19 +2379,17 @@ function MainApp() {
     }
   }, [boardIdentity]);
 
-  // One-time preview-graduation beat: the FIRST board that starts with the
-  // ✓/✗ validity grading hidden explains, in-world, that the marks stay
-  // behind on the gentlest boards (getPreviewGraduationMessage — warm, never
-  // a tutorial voice). Keyed on board identity so it evaluates once per fresh
-  // board. Skipped in Blind Offering (no previews at all — its own intro
-  // covers the darkness) and during onboarding (tutorial boards are EASY, so
-  // this can't fire there anyway; the guard is belt-and-braces). Device-local
-  // one-time flag; the session ref keeps it to a single storage read.
+  // One-time preview-graduation beat: the FIRST fully-neutral board after the
+  // rescue window explains, in-world, that the player's word judgment has
+  // sharpened. A rescue board also starts with hidden checks, so gate on the
+  // underlying mode rather than previewValidityVisible or solve 12 would
+  // consume this beat early. Blind Offering and onboarding stay excluded.
+  // Device-local one-time flag; the session ref keeps one storage read.
   const graduationCheckedRef = useRef(false);
   useEffect(() => {
     if (boardIdentity === null) return;
     if (puzzle.gameState !== GameState.PLAYING) return;
-    if (puzzle.previewValidityVisible || puzzle.blindMode) return;
+    if (puzzle.previewGradingMode !== 'neutral' || puzzle.blindMode) return;
     if (onboardingFlow.isOnboarding) return;
     if (graduationCheckedRef.current) return;
     graduationCheckedRef.current = true;
@@ -2317,7 +2399,7 @@ function MainApp() {
       puzzleActions.setMessage(getPreviewGraduationMessage(persistence.currentPhase));
     })().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fires per fresh board; actions/phase read at fire time
-  }, [boardIdentity, puzzle.gameState, puzzle.previewValidityVisible, puzzle.blindMode, onboardingFlow.isOnboarding]);
+  }, [boardIdentity, puzzle.gameState, puzzle.previewGradingMode, puzzle.blindMode, onboardingFlow.isOnboarding]);
 
   // Drag-and-drop: when a letter is dragged onto the target row area, find the
   // closest valid slot and press it. The letter was already selected via onDragStart.
@@ -2761,18 +2843,31 @@ function MainApp() {
       .catch(() => {});
   }, [puzzleActions, startVictoryExitFlow, runVictoryExitNudges, maybeShowVictoryInterstitial, maybeShowSwiftVictoryHint, postVictoryIntro]);
 
-  // During onboarding, "Continue" on the victory modal dismisses the modal and
-  // surfaces the puzzle-screen completion beat ("Feel how the house settled...").
-  // That FoxGuide's own Continue (handleOnboardingContinue) then routes to the pit.
+  // The cold-open Continue reveals the empty home and Fox invitation. Legacy
+  // guided-puzzle resumes keep their old puzzle-screen completion beat.
   const handleOnboardingVictoryContinue = useCallback(async () => {
     hapticLight();
     clearVictoryTimeouts();
-    // Clean up victory state so the Fox completion beat is visible behind the modal
     puzzleActions.setShowConfetti(false);
     victoryActions.resetVictory();
     orchestrationActions.resetOrchestration();
+    if (onboardingFlow.onboardingStep === 'cold_open_puzzle') {
+      await onboardingActions.advanceOnboarding('home_empty');
+      transitionTo('home', () => {
+        puzzleActions.clearBoard();
+      });
+      return;
+    }
     await onboardingActions.advanceOnboarding('puzzle_complete');
-  }, [onboardingActions, puzzleActions, victoryActions, orchestrationActions, clearVictoryTimeouts]);
+  }, [
+    onboardingFlow.onboardingStep,
+    onboardingActions,
+    puzzleActions,
+    victoryActions,
+    orchestrationActions,
+    clearVictoryTimeouts,
+    transitionTo,
+  ]);
 
   const handleReturnHome = useCallback(() => {
     hapticLight();
@@ -2830,7 +2925,12 @@ function MainApp() {
         // (mid-puzzle progress itself is preserved by autosave).
         transitionTo('home', () => {
           if (currentScreen === 'puzzle') {
-            puzzleActions.setGameState(GameState.IDLE);
+            if (puzzle.unbrokenWeaveMode) {
+              clearPuzzleState().catch(() => {});
+              puzzleActions.clearBoard();
+            } else {
+              puzzleActions.setGameState(GameState.IDLE);
+            }
             puzzleActions.setShowConfetti(false);
           }
         });
@@ -2839,7 +2939,7 @@ function MainApp() {
       return false;
     });
     return () => subscription.remove();
-  }, [currentScreen, transitionTo, onboardingFlow.isOnboarding, puzzleActions, puzzle.gameState, victoryFlow.victoryData, persistence.pendingPhaseTransition, handleGoToPit]);
+  }, [currentScreen, transitionTo, onboardingFlow.isOnboarding, puzzleActions, puzzle.gameState, puzzle.unbrokenWeaveMode, victoryFlow.victoryData, persistence.pendingPhaseTransition, handleGoToPit]);
 
   // Optional rewarded "double the reward": credits a bonus equal to this
   // puzzle's amber (a true 2x), reward-only — never phase progress. One claim
@@ -2948,7 +3048,13 @@ function MainApp() {
     orchestrationActions.setCompletionCoda(null);
     resetSpeedRun();
     puzzleActions.setSelectedVariant(variant);
-    puzzleActions.startNewGame(puzzle.difficulty, puzzle.gameMode, variant);
+    puzzleActions.startNewGame(
+      puzzle.difficulty,
+      puzzle.gameMode,
+      variant,
+      undefined,
+      false,
+    );
   }, [
     puzzleActions,
     puzzle.difficulty,
@@ -2969,7 +3075,13 @@ function MainApp() {
     resetSpeedRun();
     const isChallengeOnly = puzzle.gameMode === 'challenge' && !puzzle.blindMode;
     const newMode = isChallengeOnly ? 'standard' : 'challenge';
-    puzzleActions.startNewGame(puzzle.difficulty, newMode, puzzle.selectedVariant, false);
+    puzzleActions.startNewGame(
+      puzzle.difficulty,
+      newMode,
+      puzzle.selectedVariant,
+      false,
+      false,
+    );
   }, [puzzleActions, puzzle.gameMode, puzzle.difficulty, puzzle.selectedVariant, puzzle.blindMode, orchestrationActions]);
 
   // Blind Offering: chosen before the board (a fresh board applies it so the
@@ -2987,11 +3099,44 @@ function MainApp() {
     orchestrationActions.setCompletionCoda(null);
     resetSpeedRun();
     if (puzzle.blindMode) {
-      puzzleActions.startNewGame(puzzle.difficulty, 'standard', puzzle.selectedVariant, false);
+      puzzleActions.startNewGame(
+        puzzle.difficulty,
+        'standard',
+        puzzle.selectedVariant,
+        false,
+        false,
+      );
     } else {
-      puzzleActions.startNewGame(puzzle.difficulty, 'challenge', puzzle.selectedVariant, true);
+      puzzleActions.startNewGame(
+        puzzle.difficulty,
+        'challenge',
+        puzzle.selectedVariant,
+        true,
+        false,
+      );
     }
   }, [puzzleActions, puzzle.difficulty, puzzle.selectedVariant, puzzle.blindMode, puzzlesSolvedForVariantUnlocks, orchestrationActions, resetSpeedRun]);
+
+  const handleToggleUnbrokenWeave = useCallback(() => {
+    if (persistence.currentPhase !== 5) return;
+    hapticMedium();
+    orchestrationActions.setCompletionCoda(null);
+    resetSpeedRun();
+    puzzleActions.startNewGame(
+      puzzle.difficulty,
+      'standard',
+      'standard',
+      false,
+      !puzzle.unbrokenWeaveMode,
+    );
+  }, [
+    persistence.currentPhase,
+    puzzleActions,
+    puzzle.difficulty,
+    puzzle.unbrokenWeaveMode,
+    orchestrationActions,
+    resetSpeedRun,
+  ]);
 
   // Combination styles: one tap arms a variant plus its trial rung atomically
   // on a fresh board (never two sequential startNewGame calls, which would
@@ -3009,7 +3154,8 @@ function MainApp() {
       puzzle.difficulty,
       combo.challenge || combo.blind ? 'challenge' : 'standard',
       combo.variant,
-      combo.blind
+      combo.blind,
+      false,
     );
   }, [
     puzzleActions,
@@ -3405,6 +3551,24 @@ function MainApp() {
                 </Text>
               </View>
             )}
+            {puzzle.unbrokenWeaveMode && (
+              <View
+                style={[
+                  styles.variantBadge,
+                  styles.variantBadgeDark,
+                ]}
+                accessible
+                accessibilityLabel={`Unbroken Weave is on, ${puzzle.spentLetters.length} letters spent`}
+              >
+                <Text style={styles.variantBadgeIcon}>{'🧵'}</Text>
+                <Text style={[
+                  styles.variantBadgeText,
+                  styles.variantBadgeTextDark,
+                ]}>
+                  {puzzle.spentLetters.length}
+                </Text>
+              </View>
+            )}
           </View>
 
           <TouchableOpacity
@@ -3451,6 +3615,9 @@ function MainApp() {
             showBlindToggle={puzzlesSolvedForVariantUnlocks >= CHALLENGE_TOGGLE_UNLOCK_PUZZLES}
             blindLocked={puzzlesSolvedForVariantUnlocks < BLIND_TOGGLE_UNLOCK_PUZZLES}
             blindUnlockHint={getBlindUnlockHint(puzzlesSolvedForVariantUnlocks, persistence.currentPhase)}
+            showUnbrokenWeave={persistence.currentPhase === 5}
+            unbrokenWeaveActive={puzzle.unbrokenWeaveMode}
+            onToggleUnbrokenWeave={handleToggleUnbrokenWeave}
             introMode={showSetupSelectorIntro}
             introHintText={showSetupSelectorIntro ? setupSelectorLines[1] : undefined}
           />
@@ -3657,6 +3824,16 @@ function MainApp() {
                 : `Hint, ${puzzle.hintBalance} remaining`
             }
           />
+          {onboardingFlow.onboardingStep === 'cold_open_puzzle' && (
+            <ActionButton
+              icon=">"
+              label={getColdOpenSkipLabel()}
+              colors={getActionButtonColors('restart', persistence.currentPhase)}
+              onPress={handleColdOpenSkipPress}
+              disabled={false}
+              accessibilityLabel={getColdOpenSkipAccessibilityLabel()}
+            />
+          )}
           {!onboardingFlow.isOnboarding && (
           <ActionButton
             icon="🔄"
@@ -3722,7 +3899,7 @@ function MainApp() {
           onGoToPit={handleGoToPit}
           onShare={handleShare}
           onSkip={handleVictoryTapAccelerate}
-          isOnboarding={onboardingFlow.isOnboarding && onboardingFlow.onboardingStep === 'puzzle_tutorial'}
+          isOnboarding={onboardingFlow.isOnboarding && (onboardingFlow.onboardingStep === 'cold_open_puzzle' || onboardingFlow.onboardingStep === 'puzzle_tutorial')}
           onOnboardingContinue={handleOnboardingVictoryContinue}
           variant={puzzle.currentVariant}
           gameMode={puzzle.gameMode}

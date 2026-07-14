@@ -1,4 +1,4 @@
-import { Animal, Room, Unlockable, AnimalType, RoomTheme, DialoguePhase, getAnimalPhase } from '../types/homeWorld';
+import { Animal, Room, Unlockable, AnimalType, RoomTheme, DialoguePhase, getAnimalPhase, LATE_PHASE_RECRUITS } from '../types/homeWorld';
 import { loadProgress, unlockAnimal, unlockRoom, canAfford, markDialogueRead, reserveUnlock, getReservedUnlockId, claimReservedUnlock, spendAmber } from './amberCurrency';
 import { getPhaseStartIndex, phase2PoolHasNew, resolveDialogueIndex } from './dialogue/animalDialogueBase';
 import { getPhase2PoolCursors } from './dialogue/animalDialogueNarrative';
@@ -971,11 +971,12 @@ export async function isUnlockAvailable(unlockId: string): Promise<{
  */
 
 /**
- * Animals unlocked at Phase 2+ skip ahead to their previous phase's dialogue
- * block: the catch-up intro arc covers their backstory, then their regular
- * conversation starts one phase behind the present (a little history for
- * texture) instead of replaying months of bright-days small talk that no
- * longer matches the world. Never rewinds an existing read position.
+ * Animals unlocked at Phase 2+ skip ahead instead of replaying bright-days
+ * small talk under a dark sky. The descent trio starts at its CURRENT effective
+ * animal phase because its mandatory phase-aware catch-up intro already
+ * summarizes the earlier arc; replaying another whole block strands its late
+ * dialogue before the finale. Earlier recruits retain the prior one-phase-back
+ * behavior. Never rewinds an existing read position.
  *
  * Floor at phase 1: a lagging-tier animal unlocked at global Phase 2 has
  * animalPhase 1, so "one phase behind" used to compute 0 and its dark catch-up
@@ -990,7 +991,9 @@ async function fastForwardLateUnlockDialogue(animalId: string): Promise<void> {
 
   const animalType = animalId as AnimalType;
   const animalPhase = getAnimalPhase(progress.currentPhase, animalType);
-  const startPhase = Math.max(1, animalPhase - 1) as DialoguePhase;
+  const startPhase = LATE_PHASE_RECRUITS.has(animalType)
+    ? animalPhase
+    : Math.max(1, animalPhase - 1) as DialoguePhase;
   const startIndex = getPhaseStartIndex(animalType, startPhase);
   const existing = progress.lastDialogueRead[animalId] ?? 0;
   if (startIndex > existing) {
@@ -1348,21 +1351,15 @@ export async function getAnimalsWithStatus(): Promise<Animal[]> {
     if (unlocked && !isOnCooldown(animal.id)) {
       const animalPhase = getAnimalPhase(progress.currentPhase, animal.type);
       if (animalPhase === 5 && tendingState) {
-        const totalRegular = getTotalDialogueCount(animal.type, 4);
-        if (dialogueIndex < totalRegular) {
-          // Still finishing the Phase-4 lines.
-          hasNewDialogue = true;
-        } else {
-          // Post-revelation: honest — lit only while the animal has undelivered
-          // pool lines (re-lights when a Tending milestone unlocks a new one).
-          const poolLen = getPhase5PoolLength(
-            animal.type,
-            tendingState.level,
-            choiceState?.choices?.[animal.type] ?? null
-          );
-          const caughtUp = tendingState.caughtUp[animal.type] ?? 0;
-          hasNewDialogue = caughtUp < poolLen;
-        }
+        // Post-revelation is pool-only. Regular Phase 3/4 backlog is retired
+        // at the reveal and must never light the badge again.
+        const poolLen = getPhase5PoolLength(
+          animal.type,
+          tendingState.level,
+          choiceState?.choices?.[animal.type] ?? null
+        );
+        const caughtUp = tendingState.caughtUp[animal.type] ?? 0;
+        hasNewDialogue = caughtUp < poolLen;
       } else if (animalPhase === 2) {
         const totalDialogues = getTotalDialogueCount(animal.type, 2);
         // Resolve the raw stored index past lines gated on still-locked

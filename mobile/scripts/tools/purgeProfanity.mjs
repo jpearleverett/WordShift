@@ -5,60 +5,99 @@
 import fs from 'fs';
 import path from 'path';
 
-// Words that must never appear in puzzles or be accepted as player-formed
-// words. Mild oaths that double as legitimate common words (e.g. HELL) are
-// retained; everything sexual, scatological, or slur-adjacent is removed.
-// Also removed: juvenile scatological/insult words that undercut the game's
-// tone (FART/BUTT/MORON), POOF/POOFS (UK slur), and the archaic KJV set
-// (THEE/THOU/HAST/HATH/SHALT/DOTH) that reads as unfair obscure vocabulary
-// to mainstream players.
-export const BLOCKED_WORDS = [
-  'ARSE', 'ARSES', 'ASS', 'ASSES', 'BIMBO', 'BITCH', 'BITCHES', 'BONER', 'BOOB', 'BOOBS',
-  'BUTT', 'BUTTS',
-  'CHINK', 'CHINKS', 'COCK', 'COCKS', 'COON', 'COONS', 'CRAP', 'CRAPS', 'CUM', 'CUMS',
-  'DAGO', 'DAMN', 'DAMNS', 'DICK', 'DICKS', 'DILDO', 'DYKE', 'DYKES', 'FAG', 'FAGS', 'FAGGOT',
-  'FART', 'FARTS',
-  'GOOK', 'GOOKS', 'HOMO', 'HOMOS', 'HONKY', 'KIKE', 'KIKES', 'MILF', 'MORON', 'MORONS',
-  'NEGRO', 'NEGROS',
-  'PECKER', 'PISS', 'PISSED', 'POOF', 'POOFS', 'PORN', 'PORNO', 'PRICK', 'PRICKS', 'PUBE', 'PUBES',
-  'RAPE', 'RAPED', 'RAPER', 'RAPES', 'RAPIST', 'RETARD', 'SEMEN', 'SEX', 'SEXED', 'SEXES', 'SEXY',
-  'SHAG', 'SHAGS', 'SLUT', 'SLUTS', 'SMUT', 'SMUTS', 'SPAZ', 'SPERM', 'SPIC', 'SPICS',
-  'TIT', 'TITS', 'TURD', 'TURDS', 'TWAT', 'TWATS', 'WANK', 'WANKS', 'WHORE', 'WHORES', 'WOP', 'WOPS',
-  // Archaic KJV-register words (not slurs, but unfair to mainstream players)
-  'THEE', 'THOU', 'HAST', 'HATH', 'SHALT', 'DOTH',
-  // ---------------------------------------------------------------------
-  // hygiene pass 2: anatomical + proper nouns + abbreviations
-  // (second external review: PENIS/PUBIC shipped on boards; VITA/BETH/TONY
-  // are proper nouns; MIL/BROS/FRAT abbreviations; WORT obscure brewing
-  // jargon; plus crude words the dictionary still green-check accepted)
-  // ---------------------------------------------------------------------
-  // Anatomical-sexual terms (and the crude/sexual set the first pass missed)
-  'PENIS', 'PENISES', 'PUBIC', 'ANUS', 'ANUSES', 'ANAL', 'VULVA', 'VULVAS',
-  'LABIA', 'VAGINA', 'VAGINAS', 'ORGASM', 'ORGASMS', 'ORGY', 'ORGIES',
-  'INCEST', 'HORNY', 'RANDY', 'EROTIC', 'EROTICA', 'SEXIER', 'SEXUAL',
-  'CONDOM', 'CONDOMS', 'DOUCHE', 'DOUCHES', 'FANNY', 'FANNIES',
-  'BUGGER', 'BUGGERS', 'BUGGERY', 'RAPING', 'RAPISTS',
-  // Sex-trade terms (WHORE/SLUT family the first pass started)
-  'HOOKER', 'HOOKERS', 'BROTHEL', 'BROTHELS', 'PIMP', 'PIMPS',
-  'PERVERT', 'PERVERTS',
-  // Slur-adjacent (ableist / identity / ethnic exonym)
-  'MIDGET', 'MIDGETS', 'CRIPPLE', 'CRIPPLES', 'BASTARD', 'BASTARDS',
-  'QUEER', 'QUEERS', 'SISSY', 'SISSIES', 'GYPSY', 'GYPSIES',
-  // Derivatives of already-blocked words the first pass missed
-  'CRAPPY', 'BITCHY',
-  // Juvenile scatological (FART/TURD/CRAP tone precedent)
-  'POOP', 'POOPS', 'POOPED', 'PEE', 'PEES', 'PEED', 'PEEING',
-  // Proper nouns (the dictionary is common-English-only, no proper nouns)
-  'VITA', 'BETH', 'TONY',
-  // Abbreviations / clipped informal forms (not standalone dictionary words)
-  'MIL', 'MILS', 'BROS', 'FRAT', 'FRATS',
-  // Obscure brewing jargon (unfair vocabulary for mainstream players)
-  'WORT', 'WORTS',
-];
-const BLOCKED = new Set(BLOCKED_WORDS);
-
 const MOBILE = path.resolve(import.meta.dirname, '../..');
 const REPO = path.resolve(MOBILE, '..');
+
+function readBlockedWords() {
+  const file = path.join(MOBILE, 'src/constants/blockedWords.ts');
+  const source = fs.readFileSync(file, 'utf8');
+  const arraySource = /export const BLOCKED_WORDS\s*=\s*\[([\s\S]*?)\]\s*as const;/.exec(source)?.[1];
+  if (!arraySource) {
+    throw new Error(`Could not parse BLOCKED_WORDS from ${file}`);
+  }
+  const words = Array.from(arraySource.matchAll(/['"]([A-Z]+)['"]/g), match => match[1]);
+  if (words.length === 0 || new Set(words).size !== words.length) {
+    throw new Error(`BLOCKED_WORDS must be a non-empty duplicate-free string array in ${file}`);
+  }
+  return words;
+}
+
+const BLOCKED = new Set(readBlockedWords());
+
+/**
+ * Stored `allWords` includes starting and formed words, but not the shorter
+ * source remainder produced by each removal. A dictionary purge can therefore
+ * leave a bank entry whose visible words are clean but whose required hidden
+ * remainder was deleted. Inspect the canonical step objects as an additional
+ * guard so the solvability suite stays green after every vocabulary pass.
+ */
+function entryHasBlockedCanonicalIntermediate(entry) {
+  const steps = entry.match(/\{stepIndex:\d+,[^{}]*\}/g) ?? [];
+  for (const step of steps) {
+    const source = /sourceWord:'([A-Z]+)'/.exec(step)?.[1];
+    if (!source) continue;
+
+    const pairRaw = /removalPositions:\[([0-9,]+)\]/.exec(step)?.[1];
+    if (pairRaw) {
+      const pairPositions = pairRaw.split(',').map(Number);
+      const target = /targetWord:'([A-Z]+)'/.exec(step)?.[1];
+      const letters = /lettersToMove:\['([A-Z])','([A-Z])'\]/.exec(step);
+
+      // Double Shift lets either stored letter move first and drop into any
+      // target slot. Do not assume the generated letter/position arrays share
+      // an ordering: inspect every available first removal and every possible
+      // first insertion, matching the shipped free-form drop1 rules.
+      for (const position of pairPositions) {
+        const firstSource =
+          source.slice(0, position) +
+          source.slice(position + 1);
+        if (BLOCKED.has(firstSource)) return true;
+      }
+      if (target && letters) {
+        for (const letter of [letters[1], letters[2]]) {
+          for (let position = 0; position <= target.length; position++) {
+            const firstTarget =
+              target.slice(0, position) +
+              letter +
+              target.slice(position);
+            if (BLOCKED.has(firstTarget)) return true;
+          }
+        }
+      }
+
+      const positions = pairPositions.sort((a, b) => b - a);
+      let remainder = source;
+      for (const position of positions) {
+        remainder = remainder.slice(0, position) + remainder.slice(position + 1);
+      }
+      if (BLOCKED.has(remainder)) return true;
+      continue;
+    }
+
+    const storedPosition = /removalPosition:(\d+)/.exec(step)?.[1];
+    if (storedPosition !== undefined) {
+      const position = Number(storedPosition);
+      const remainder = source.slice(0, position) + source.slice(position + 1);
+      if (BLOCKED.has(remainder)) return true;
+      continue;
+    }
+
+    // Reverse hints do not persist a removal position. If every occurrence of
+    // the moved character produces a blocked remainder, no shipped-rule move
+    // can use that stored step.
+    const letter = /letterToMove:'([A-Z])'/.exec(step)?.[1];
+    if (!letter) continue;
+    const remainders = [...source]
+      .map((char, index) => char === letter
+        ? source.slice(0, index) + source.slice(index + 1)
+        : null)
+      .filter(Boolean);
+    if (remainders.length > 0 && remainders.every(word => BLOCKED.has(word))) {
+      return true;
+    }
+  }
+  return false;
+}
 
 // 1) Mobile dictionary (validation + generation source for the app)
 {
@@ -106,6 +145,7 @@ const REPO = path.resolve(MOBILE, '..');
       for (const m of entry.matchAll(formedRe)) {
         if (BLOCKED.has(m[1])) return false;
       }
+      if (entryHasBlockedCanonicalIntermediate(entry)) return false;
       return true;
     });
     const removed = entries.length - kept.length;

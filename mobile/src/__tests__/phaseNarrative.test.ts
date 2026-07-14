@@ -40,7 +40,10 @@ import {
   getIncantationName,
   getNewCyclePointerLine,
   NEW_CYCLE_POINTER_LINES,
+  ANIMAL_WHISPERS,
+  getAnimalWhisper,
   getPersonalizedPhase5Whisper,
+  getTendingMilestoneCeremonyText,
   VICTORY_FEEDBACK_POOLS,
   MOVE_MESSAGES,
   COMBO_MOVE_POOLS,
@@ -52,6 +55,7 @@ import {
   getDwellLine,
   getStreakHeldMessage,
   getPreviewGraduationMessage,
+  getPreviewRescueMessage,
   getSwiftVictoryHintMessage,
   getFinalBoardStartMessage,
   getCycleMicroBeat,
@@ -486,6 +490,64 @@ describe('getPersonalizedPhase5Whisper', () => {
       expect(typeof whisper.text).toBe('string');
       expect(whisper.text.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('Phase 4 animal whisper subtlety', () => {
+  const animalTypes = [
+    'fox', 'owl', 'pangolin', 'axolotl', 'capybara', 'fennec_fox',
+    'sloth', 'wombat', 'rabbit', 'red_panda', 'tarsier', 'aye_aye', 'kakapo',
+  ];
+  const bluntExposition = /your plan|especially you|you wrote the last verse|you summoned/i;
+
+  test('keeps exactly three in-character whispers per animal', () => {
+    expect(Object.keys(ANIMAL_WHISPERS[4]).sort()).toEqual([...animalTypes].sort());
+    for (const animalType of animalTypes) {
+      expect(ANIMAL_WHISPERS[4][animalType]).toHaveLength(3);
+    }
+  });
+
+  test('removes blunt explanations of the player role', () => {
+    for (const whispers of Object.values(ANIMAL_WHISPERS[4])) {
+      for (const whisper of whispers) {
+        expect(whisper).not.toMatch(bluntExposition);
+      }
+    }
+  });
+
+  test('the public selector still draws from each animal voice', () => {
+    const random = jest.spyOn(Math, 'random').mockReturnValue(0);
+    try {
+      for (const animalType of animalTypes) {
+        const result = getAnimalWhisper(4, [animalType]);
+        expect(result?.animalType).toBe(animalType);
+        expect(ANIMAL_WHISPERS[4][animalType]).toContain(result?.text);
+      }
+    } finally {
+      random.mockRestore();
+    }
+  });
+});
+
+describe('Tending milestone ceremony compression', () => {
+  const milestones = [3, 8, 15, 35, 70];
+
+  test.each(milestones)('level %i has authored two-part ceremony copy', (level) => {
+    const lines = getTendingMilestoneCeremonyText(level);
+    expect(lines).toHaveLength(2);
+    expect(lines.every(line => line.trim().length > 0)).toBe(true);
+    expect(lines.join(' ')).not.toMatch(/[–—]/);
+    expect(lines).not.toEqual([
+      'The pattern deepens.',
+      'Something old turns over in its long sleep, and is content.',
+    ]);
+  });
+
+  test.each([5, 10, 25, 50, 100])('retired level %i uses the non-milestone fallback', (level) => {
+    expect(getTendingMilestoneCeremonyText(level)).toEqual([
+      'The pattern deepens.',
+      'Something old turns over in its long sleep, and is content.',
+    ]);
   });
 });
 
@@ -1718,16 +1780,28 @@ describe('getStreakHeldMessage', () => {
 });
 
 describe('getPreviewGraduationMessage', () => {
-  test('explains the marks staying behind, in-world, without mechanics vocabulary', () => {
+  test('marks earned word judgment, in-world, without mechanics vocabulary', () => {
     for (const p of [0, 2, 4]) {
       const msg = getPreviewGraduationMessage(p);
       expect(msg.length).toBeGreaterThan(0);
       expect(msg.toLowerCase()).not.toMatch(/easy|difficulty|preview|setting|valid/);
       expect(msg).not.toMatch(/[–—]/);
     }
-    expect(getPreviewGraduationMessage(0).toLowerCase()).toContain('gentlest boards');
+    expect(getPreviewGraduationMessage(0).toLowerCase()).toMatch(/learned|trust your ear/);
     expect(getPreviewGraduationMessage(2)).not.toBe(getPreviewGraduationMessage(0));
     expect(getPreviewGraduationMessage(4)).not.toBe(getPreviewGraduationMessage(2));
+  });
+});
+
+describe('getPreviewRescueMessage', () => {
+  test('explains that checks returned for this board without spamming mechanics language', () => {
+    for (const p of [0, 2, 4]) {
+      const msg = getPreviewRescueMessage(p);
+      expect(msg.toLowerCase()).toContain('return');
+      expect(msg.toLowerCase()).toContain('board');
+      expect(msg.toLowerCase()).not.toMatch(/difficulty|setting|valid/);
+      expect(msg).not.toMatch(/[–—]/);
+    }
   });
 });
 
