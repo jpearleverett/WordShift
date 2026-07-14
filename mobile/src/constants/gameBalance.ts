@@ -255,17 +255,14 @@ export const STARTER_INTRO_MIN_PUZZLES = 22;
 export const JOURNAL_UNLOCK_PUZZLES = 6;
 
 /**
- * Preview-grading bridge: the tutorial teaches the green-check/red-cross
- * preview marks, but the default post-onboarding board is MEDIUM, where the
- * verb-redesign gate would hide them on the player's FIRST free board — the
- * single highest early mechanical quit risk. The ✓/✗ grading therefore stays
- * on for EVERY board until this many total puzzles are solved, regardless of
- * difficulty (Blind Offering still suppresses previews entirely; double-shift
- * stays always-graded), bridging the tutorial into the ungraded game. The
- * one-time graduation toast then marks the first genuinely ungraded board,
- * which now lands after the bridge closes.
+ * Preview-grading transition. The tutorial's ✓/✗ marks remain on every board
+ * below FULL_LIMIT. From FULL_LIMIT through RESCUE_LIMIT - 1, MEDIUM+ boards
+ * begin neutral but restore grading after the first invalid attempt on that
+ * board. At RESCUE_LIMIT the normal verb-depth rules take over permanently.
+ * EASY and double-shift remain graded; Blind Offering has no previews.
  */
-export const PREVIEW_GRADING_BRIDGE_PUZZLES = 12;
+export const PREVIEW_GRADING_FULL_LIMIT = 12;
+export const PREVIEW_GRADING_RESCUE_LIMIT = 20;
 
 // ============================================================================
 // OFFERING PIT

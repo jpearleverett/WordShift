@@ -55,6 +55,7 @@ import {
   getDwellLine,
   getStreakHeldMessage,
   getPreviewGraduationMessage,
+  getPreviewRescueMessage,
   getSwiftVictoryHintMessage,
   getFinalBoardStartMessage,
   getCycleMicroBeat,
@@ -1779,16 +1780,28 @@ describe('getStreakHeldMessage', () => {
 });
 
 describe('getPreviewGraduationMessage', () => {
-  test('explains the marks staying behind, in-world, without mechanics vocabulary', () => {
+  test('marks earned word judgment, in-world, without mechanics vocabulary', () => {
     for (const p of [0, 2, 4]) {
       const msg = getPreviewGraduationMessage(p);
       expect(msg.length).toBeGreaterThan(0);
       expect(msg.toLowerCase()).not.toMatch(/easy|difficulty|preview|setting|valid/);
       expect(msg).not.toMatch(/[–—]/);
     }
-    expect(getPreviewGraduationMessage(0).toLowerCase()).toContain('gentlest boards');
+    expect(getPreviewGraduationMessage(0).toLowerCase()).toMatch(/learned|trust your ear/);
     expect(getPreviewGraduationMessage(2)).not.toBe(getPreviewGraduationMessage(0));
     expect(getPreviewGraduationMessage(4)).not.toBe(getPreviewGraduationMessage(2));
+  });
+});
+
+describe('getPreviewRescueMessage', () => {
+  test('explains that checks returned for this board without spamming mechanics language', () => {
+    for (const p of [0, 2, 4]) {
+      const msg = getPreviewRescueMessage(p);
+      expect(msg.toLowerCase()).toContain('return');
+      expect(msg.toLowerCase()).toContain('board');
+      expect(msg.toLowerCase()).not.toMatch(/difficulty|setting|valid/);
+      expect(msg).not.toMatch(/[–—]/);
+    }
   });
 });
 

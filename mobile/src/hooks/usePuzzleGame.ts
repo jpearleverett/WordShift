@@ -6,10 +6,13 @@ import { selectPreGeneratedPuzzle } from '../services/puzzleBank';
 import { getWordHistoryWithRecency, recordPuzzleWords } from '../services/wordHistory';
 import { COMMON_WORDS, CURATED_EARLY_PUZZLES, CURATED_PUZZLE_COUNT, CuratedPuzzle, getRandomFallback } from '../constants';
 // Imported from gameBalance directly (not the constants barrel) so the hook's
-// test harness — which mocks '../constants' wholesale — still gets the real value.
-import { PREVIEW_GRADING_BRIDGE_PUZZLES } from '../constants/gameBalance';
+// test harness — which mocks '../constants' wholesale — still gets real values.
+import {
+  PREVIEW_GRADING_FULL_LIMIT,
+  PREVIEW_GRADING_RESCUE_LIMIT,
+} from '../constants/gameBalance';
 import { CHALLENGE_MODE_CONFIG, DialoguePhase } from '../types/homeWorld';
-import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getOutOfHintsMessage, getLoadingMessage, getStartMessage, getInvalidWordMessage, getBlindFailMessage, getLockedLetterMessage, getEchoPuzzleMessage, getFinalBoardStartMessage, getFinalBoardUndoRefusal } from '../services/phaseNarrative';
+import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getOutOfHintsMessage, getLoadingMessage, getStartMessage, getInvalidWordMessage, getBlindFailMessage, getLockedLetterMessage, getEchoPuzzleMessage, getFinalBoardStartMessage, getFinalBoardUndoRefusal, getPreviewRescueMessage } from '../services/phaseNarrative';
 import { getHintBalanceSync, hasHintSync, consumeHintSync } from '../services/hints';
 import { getPreferredPuzzleVariant, setPreferredPuzzleVariant, getFullProgress, getRitualWords } from '../services/amberCurrency';
 import {
@@ -308,6 +311,47 @@ export function shouldUseComboMessage(streak: number): boolean {
   return streak % 2 === 0;
 }
 
+export type PreviewGradingMode = 'graded' | 'rescue' | 'neutral' | 'hidden';
+
+export interface PreviewGradingContext {
+  puzzlesSolved: number;
+  difficulty: Difficulty;
+  variant: PuzzleVariant;
+  blindMode: boolean;
+  isDailyBoard: boolean;
+  isSharedChallenge: boolean;
+}
+
+/**
+ * Pure progression resolver for ghost-preview grading. Rescue boards begin
+ * neutral and let the hook restore grading after the first invalid attempt;
+ * the resolver itself stays independent of per-board performance.
+ */
+export function resolvePreviewGradingMode({
+  puzzlesSolved,
+  difficulty,
+  variant,
+  blindMode,
+  isDailyBoard,
+  isSharedChallenge,
+}: PreviewGradingContext): PreviewGradingMode {
+  if (blindMode) return 'hidden';
+  if (hasVariantModifier(variant, 'double_shift')) return 'graded';
+  if (puzzlesSolved < PREVIEW_GRADING_FULL_LIMIT) return 'graded';
+
+  // Daily/shared boards have a MEDIUM+ shape independent of the player's
+  // retained difficulty preference, so an EASY preference cannot grade them.
+  const usesNeutralRules =
+    isDailyBoard ||
+    isSharedChallenge ||
+    difficulty !== 'EASY';
+  if (!usesNeutralRules) return 'graded';
+
+  return puzzlesSolved < PREVIEW_GRADING_RESCUE_LIMIT
+    ? 'rescue'
+    : 'neutral';
+}
+
 /**
  * Board coordinates for the hint glow. Set when a hint is actually delivered;
  * reuses the SAME tutorial-guide visuals (LetterTile guide ring / Slot halo).
@@ -393,17 +437,14 @@ export interface PuzzleGameState {
    * Whether the ✓/✗ validity grading on the ghost previews is PRESENTED.
    * The preview data always computes isValid internally (the double-shift
    * look-ahead and drag near-miss snapping need it); this flag controls
-   * presentation only. TRUE on EASY boards (any variant), in the double-shift
-   * variant at any difficulty (its intermediate non-word state needs the
-   * guidance), and — the early-game grading bridge — on EVERY board until
-   * PREVIEW_GRADING_BRIDGE_PUZZLES total puzzles are solved (the tutorial
-   * teaches the marks; the first free MEDIUM board must not silently drop
-   * them). Never in Blind Offering; past the bridge, never on daily /
-   * shared-challenge boards (the daily ramps MEDIUM+ by design; a friend's
-   * chain is judged by the player's own ear). Everywhere hidden, the preview
-   * is a neutral ghost word: the player must judge whether it is real.
+   * presentation only. TRUE on EASY and double-shift boards, during the full
+   * early window, or after the first invalid attempt on a rescue-window board.
+   * Never in Blind Offering. At the fully-neutral threshold, MEDIUM+ standard,
+   * reverse, speed, daily, and shared boards stay neutral for the whole board.
    */
   previewValidityVisible: boolean;
+  /** Progression mode behind previewValidityVisible and graduation gating. */
+  previewGradingMode: PreviewGradingMode;
   /** Double shift phase tracking: pick1 → drop1 → pick2 → drop2 */
   doubleShiftPhase: 'pick1' | 'pick2' | 'drop1' | 'drop2' | null;
   /** Phase 5 echo puzzle: one word is seeded from the player's ritual history */
@@ -602,19 +643,16 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   // Friend-challenge provenance for the current board (see PuzzleGameState doc).
   const [isSharedChallenge, setIsSharedChallenge] = useState(false);
   // Daily-board provenance: set only by startDailyGame, cleared by every other
-  // start path. Drives the preview-validity gate — the daily always hides the
-  // ✓/✗ grading (its board shape ramps MEDIUM+ by design), even when the
-  // player's own difficulty preference (which the daily leaves untouched)
-  // happens to be EASY. Not persisted: a daily autosave is never restored as a
-  // normal puzzle (App's load guard), so a restored board is never a daily.
+  // start path. Its board shape ramps MEDIUM+, so after the full-grading
+  // window it follows rescue/neutral rules even when the retained player
+  // preference is EASY. Not persisted: a daily autosave is never restored as
+  // a normal puzzle (App's load guard), so a restored board is never a daily.
   const [isDailyBoard, setIsDailyBoard] = useState(false);
-  // Total puzzles solved, for the preview-grading bridge (grading stays on for
-  // EVERY board until PREVIEW_GRADING_BRIDGE_PUZZLES solves). Loaded from
-  // progress at mount and refreshed on every startNewGame fetch. Initialized
-  // to the bridge threshold (bridge OVER) so a veteran restoring a board never
-  // sees a stale graded flash before the first progress read lands; a genuine
-  // newcomer's mount read resolves to 0 long before their first free board.
-  const [puzzlesSolvedCount, setPuzzlesSolvedCount] = useState(PREVIEW_GRADING_BRIDGE_PUZZLES);
+  // Total puzzles solved, for the preview-grading transition. Loaded from
+  // progress at mount and refreshed on every startNewGame fetch. Initialize to
+  // the fully-neutral threshold so a veteran restoring a board never sees a
+  // stale graded flash before the first progress read lands.
+  const [puzzlesSolvedCount, setPuzzlesSolvedCount] = useState(PREVIEW_GRADING_RESCUE_LIMIT);
   const [undosRemaining, setUndosRemaining] = useState(Infinity);
   const [currentVariant, setCurrentVariant] = useState<PuzzleVariant>('standard');
   const [selectedVariant, setSelectedVariantState] = useState<PuzzleVariant>('standard');
@@ -685,7 +723,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     };
   }, []);
 
-  // Seed the preview-grading bridge counter at mount so boards that never
+  // Seed the preview-grading progression counter at mount so boards that never
   // route through startNewGame's own progress fetch (a restored autosave, a
   // daily/shared start as the session's first board) still see the real
   // solved count. startNewGame refreshes it on every fetch thereafter.
@@ -706,6 +744,25 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setSelectedVariantState(variant);
     setPreferredPuzzleVariant(variant).catch(() => {});
   }, []);
+
+  const previewGradingMode = useMemo(
+    () => resolvePreviewGradingMode({
+      puzzlesSolved: puzzlesSolvedCount,
+      difficulty,
+      variant: currentVariant,
+      blindMode,
+      isDailyBoard,
+      isSharedChallenge,
+    }),
+    [
+      puzzlesSolvedCount,
+      difficulty,
+      currentVariant,
+      blindMode,
+      isDailyBoard,
+      isSharedChallenge,
+    ],
+  );
 
   const shakeError = useCallback((msg: string) => {
     if (shakeErrorTimeout.current) {
@@ -940,7 +997,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       // These are hand-picked to showcase interesting letter moves
       const progress = await getFullProgress();
       const puzzlesSolved = progress?.puzzlesSolved ?? 0;
-      // Keep the preview-grading bridge counter current with every fetch.
+      // Keep preview-grading progression current with every fetch.
       setPuzzlesSolvedCount(puzzlesSolved);
       if (
         puzzlesSolved < CURATED_PUZZLE_COUNT &&
@@ -962,8 +1019,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       // once (in-world, the arrangement chooses; the player's preference is
       // untouched for later boards). Seeded via the echo path from the
       // player's strongest fed dread word; if no dread word exists or the
-      // generator can't build from it, the normal bank/generation path below
-      // serves the board — still marked final (ultimate fallback).
+      // generator can't build from it, the normal generation path below
+      // serves the board, still marked final. It deliberately skips mature
+      // bank depth so the finale keeps its bespoke shape.
       finaleServe = progress?.finaleArmed === true && progress?.finalPuzzleCompleted !== true;
       if (finaleServe) {
         variant = 'standard';
@@ -1024,11 +1082,17 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
 
       // Use pre-generated puzzle bank for standard/reverse/double_shift variants at all difficulties
       const bankVariants: PuzzleVariant[] = ['standard', 'reverse', 'double_shift'];
-      const shouldUseBank = bankVariants.includes(variant);
+      const shouldUseBank = !finaleServe && bankVariants.includes(variant);
       if (shouldUseBank) {
         try {
           const recencyMap = await getWordHistoryWithRecency();
-          const bankPuzzle = await selectPreGeneratedPuzzle(selectedDifficulty, currentPhase, recencyMap, variant);
+          const bankPuzzle = await selectPreGeneratedPuzzle(
+            selectedDifficulty,
+            currentPhase,
+            recencyMap,
+            variant,
+            puzzlesSolved,
+          );
           if (bankPuzzle) {
             if (isStale()) return;
             initGame(bankPuzzle.words, bankPuzzle.hint, bankPuzzle.solution, bankPuzzle.wordLength, variant, bankPuzzle.reverseSolution);
@@ -1684,10 +1748,16 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     // completion sites below) — mid-board rejection would leak validity, which
     // is the information the mode exists to withhold.
     if (!blindMode) {
+      const revealRescueGrading = () => {
+        if (previewGradingMode === 'rescue' && invalidAttempts === 0) {
+          setMessage(getPreviewRescueMessage(currentPhase));
+        }
+      };
       const isSourceValid = checkValidation(sourceWordStr);
       if (!isSourceValid) {
         shakeError(getInvalidWordMessage(sourceWordStr, currentPhase));
         setInvalidAttempts(prev => prev + 1);
+        revealRescueGrading();
         pendingMistakeRef.current = true;
         cleanMoveStreakRef.current = 0;
         // For double shift drop2, go back to pick2 (let player try different letter/slot)
@@ -1703,6 +1773,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       if (!isTargetValid) {
         shakeError(getInvalidWordMessage(targetWordStr, currentPhase));
         setInvalidAttempts(prev => prev + 1);
+        revealRescueGrading();
         pendingMistakeRef.current = true;
         cleanMoveStreakRef.current = 0;
         // For double shift drop2, go back to pick2 (let player try different letter/slot)
@@ -1955,6 +2026,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     gameMode,
     blindMode,
     doubleShiftPhase,
+    previewGradingMode,
   ]);
 
   // Grant one extra undo (e.g. an amber-spend refill in Challenge mode). No-op
@@ -2230,30 +2302,13 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     return previews;
   }, [selectedLetter, activeRowIndex, moveDirection, rows, gameState, currentVariant, doubleShiftPhase, blindMode, gameMode]);
 
-  // Verb-depth gate: whether the ✓/✗ validity grading on the ghost previews is
-  // PRESENTED. The slotPreviews data above keeps computing isValid internally
-  // (the double-shift drop1 look-ahead and the drag near-miss snapping need
-  // it); this flag controls presentation only. Shown on EASY boards (any
-  // variant), in the double-shift variant at any difficulty (its intermediate
-  // non-word state needs the guidance), and — the early-game grading bridge —
-  // on EVERY board (any difficulty, the daily, shared links) until
-  // PREVIEW_GRADING_BRIDGE_PUZZLES total puzzles are solved: the tutorial
-  // teaches the marks, so the first free MEDIUM board must not silently drop
-  // them. Hidden everywhere else — MEDIUM+ standard/reverse/speed, the daily
-  // (ramps MEDIUM+ by design), and shared-challenge links — so the player
-  // judges the word with their own ear; App's one-time graduation toast marks
-  // the first board that starts hidden (post-bridge, by construction).
-  // Blind Offering has no previews at all (blindMode short-circuits above),
-  // but the flag stays false there too so consumers never key a tell off it.
-  const previewValidityVisible = useMemo(() => {
-    if (blindMode) return false;
-    if (hasVariantModifier(currentVariant, 'double_shift')) return true;
-    // Early-game bridge: grading stays on for every board (even daily/shared)
-    // until the player has solved their way past the threshold.
-    if (puzzlesSolvedCount < PREVIEW_GRADING_BRIDGE_PUZZLES) return true;
-    if (isDailyBoard || isSharedChallenge) return false;
-    return difficulty === 'EASY';
-  }, [blindMode, currentVariant, puzzlesSolvedCount, isDailyBoard, isSharedChallenge, difficulty]);
+  // The single presentation signal consumed by Row, drag snapping, and a11y.
+  // Rescue boards start neutral, then keep grading visible for the remainder
+  // of the board after the first invalid attempt. Slot data still computes
+  // isValid while hidden.
+  const previewValidityVisible =
+    previewGradingMode === 'graded' ||
+    (previewGradingMode === 'rescue' && invalidAttempts > 0);
 
   const restorePuzzleState = useCallback((saved: SavedPuzzleState) => {
     const selectedExists = saved.selectedLetter
@@ -2428,6 +2483,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     moveDirection,
     slotPreviews,
     previewValidityVisible,
+    previewGradingMode,
     doubleShiftPhase,
     isEchoPuzzle,
     isFinalBoard,

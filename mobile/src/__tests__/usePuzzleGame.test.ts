@@ -88,6 +88,7 @@ jest.mock('../services/phaseNarrative', () => ({
   getLockedLetterMessage: jest.fn((_p: number) => 'That letter is locked!'),
   getFinalBoardStartMessage: jest.fn((_p: number) => 'The last arrangement. Take your time.'),
   getFinalBoardUndoRefusal: jest.fn((_p: number) => 'What is given now is given for good.'),
+  getPreviewRescueMessage: jest.fn((_p: number) => 'The checks return for this board.'),
 }));
 
 jest.mock('../services/hints', () => ({
@@ -99,9 +100,9 @@ jest.mock('../services/hints', () => ({
 jest.mock('../services/amberCurrency', () => ({
   getPreferredPuzzleVariant: jest.fn(async () => 'standard'),
   setPreferredPuzzleVariant: jest.fn(async () => {}),
-  // Default is POST-bridge (>= PREVIEW_GRADING_BRIDGE_PUZZLES = 12) so the
+  // Default is fully neutral (>= PREVIEW_GRADING_RESCUE_LIMIT = 20) so the
   // preview-validity truth table below exercises the steady-state gate; the
-  // bridge tests override this per-test with an early-game count.
+  // transition tests override this per-test with an early-game count.
   getFullProgress: jest.fn(async () => ({ puzzlesSolved: 20 })),
   getRitualWords: jest.fn(async () => []),
 }));
@@ -163,10 +164,13 @@ jest.mock('../constants', () => ({
   },
 }));
 
-import { usePuzzleGame, hasAnyValidMove, canCompleteDoubleShift, hasAnyValidDoubleShiftMove, isBoardSolvableFromState, comboTierForStreak, shouldUseComboMessage, PuzzleGameState, PuzzleGameActions } from '../hooks/usePuzzleGame';
-// Real value (the hook imports it from gameBalance directly, past the
-// '../constants' mock above) — the bridge tests pin against it.
-import { PREVIEW_GRADING_BRIDGE_PUZZLES } from '../constants/gameBalance';
+import { usePuzzleGame, hasAnyValidMove, canCompleteDoubleShift, hasAnyValidDoubleShiftMove, isBoardSolvableFromState, comboTierForStreak, shouldUseComboMessage, resolvePreviewGradingMode, PuzzleGameState, PuzzleGameActions } from '../hooks/usePuzzleGame';
+// Real values (the hook imports them from gameBalance directly, past the
+// '../constants' mock above) — the grading-window tests pin against them.
+import {
+  PREVIEW_GRADING_FULL_LIMIT,
+  PREVIEW_GRADING_RESCUE_LIMIT,
+} from '../constants/gameBalance';
 
 /**
  * Helper: call usePuzzleGame with fresh hook indices (simulates a re-render).
@@ -177,6 +181,53 @@ function callHook(): [PuzzleGameState, PuzzleGameActions] {
   // eslint-disable-next-line react-hooks/rules-of-hooks -- test harness drives the hook against a manual React mock
   return usePuzzleGame();
 }
+
+describe('resolvePreviewGradingMode', () => {
+  const resolve = (
+    puzzlesSolved: number,
+    overrides: Partial<Parameters<typeof resolvePreviewGradingMode>[0]> = {},
+  ) => resolvePreviewGradingMode({
+    puzzlesSolved,
+    difficulty: 'MEDIUM',
+    variant: 'standard',
+    blindMode: false,
+    isDailyBoard: false,
+    isSharedChallenge: false,
+    ...overrides,
+  });
+
+  test.each([
+    [11, 'graded'],
+    [12, 'rescue'],
+    [19, 'rescue'],
+    [20, 'neutral'],
+  ] as const)('resolves the progression boundary at %i solves to %s', (puzzlesSolved, expected) => {
+    expect(resolve(puzzlesSolved)).toBe(expected);
+  });
+
+  test('keeps EASY and double shift graded after the progression windows', () => {
+    expect(resolve(20, { difficulty: 'EASY' })).toBe('graded');
+    expect(resolve(20, { difficulty: 'HARD', variant: 'double_shift' })).toBe('graded');
+  });
+
+  test.each(['standard', 'reverse', 'speed'] as const)(
+    '%s uses rescue through solve 19, then stays neutral',
+    (variant) => {
+      expect(resolve(12, { difficulty: 'HARD', variant })).toBe('rescue');
+      expect(resolve(19, { difficulty: 'HARD', variant })).toBe('rescue');
+      expect(resolve(20, { difficulty: 'HARD', variant })).toBe('neutral');
+    },
+  );
+
+  test('treats daily and shared boards by their MEDIUM+ shape, not an EASY preference', () => {
+    expect(resolve(12, { difficulty: 'EASY', isDailyBoard: true })).toBe('rescue');
+    expect(resolve(20, { difficulty: 'EASY', isSharedChallenge: true })).toBe('neutral');
+  });
+
+  test('Blind Offering never exposes preview grading', () => {
+    expect(resolve(0, { difficulty: 'EASY', variant: 'double_shift', blindMode: true })).toBe('hidden');
+  });
+});
 
 describe('usePuzzleGame', () => {
   beforeEach(() => {
@@ -854,6 +905,30 @@ describe('usePuzzleGame', () => {
       expect(state.rows[0].originalWord).toBe('LIME');
     });
 
+    test('passes the current puzzles-solved depth into bank selection', async () => {
+      const amber = require('../services/amberCurrency');
+      const bank = require('../services/puzzleBank');
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({ puzzlesSolved: 100 });
+      (bank.selectPreGeneratedPuzzle as jest.Mock).mockResolvedValueOnce({
+        words: ['LIME', 'TIME', 'TIED', 'TEND'],
+        hint: 'Bank hint',
+        solution: [],
+        wordLength: 4,
+      });
+
+      resetHookState();
+      let [, actions] = callHook();
+      await actions.startNewGame('MEDIUM', 'standard', 'standard');
+
+      expect(bank.selectPreGeneratedPuzzle).toHaveBeenLastCalledWith(
+        'MEDIUM',
+        0,
+        expect.any(Map),
+        'standard',
+        100,
+      );
+    });
+
     test('uses fallback on generation failure', async () => {
       const { generateLocalPuzzle } = require('../services/localGenerator');
       (generateLocalPuzzle as jest.Mock).mockRejectedValueOnce(new Error('timeout'));
@@ -919,6 +994,8 @@ describe('usePuzzleGame', () => {
     });
 
     test('a selected variant is served as a standard board this once; the preference survives', async () => {
+      const bank = require('../services/puzzleBank');
+      (bank.selectPreGeneratedPuzzle as jest.Mock).mockClear();
       resetHookState();
       let [, actions] = callHook();
       actions.setSelectedVariant('reverse');
@@ -939,6 +1016,9 @@ describe('usePuzzleGame', () => {
       // The player's preferred variant is untouched for later boards.
       expect(state.selectedVariant).toBe('reverse');
       expect(state.message).toBe('The last arrangement. Take your time.');
+      // Finale fallback generation stays bespoke and never picks up mature
+      // bank branching/extension depth.
+      expect(bank.selectPreGeneratedPuzzle).not.toHaveBeenCalled();
     });
 
     test('after the finale is completed, boards serve normally again', async () => {
@@ -1858,69 +1938,97 @@ describe('usePuzzleGame', () => {
   });
 
   // =========================================================================
-  // Preview-grading bridge: the tutorial teaches the ✓/✗ marks, so grading
-  // stays on for EVERY board until PREVIEW_GRADING_BRIDGE_PUZZLES total
-  // puzzles are solved — the first free MEDIUM board must not silently drop
-  // what the tutorial just taught. Blind still suppresses everything;
-  // double-shift stays always-graded.
+  // Preview-grading transition: full grading through solve 11, then a
+  // board-local rescue from solves 12 through 19. Rescue boards begin neutral
+  // and restore the checks after the first invalid attempt. At solve 20 the
+  // steady-state verb-depth rules take over.
   // =========================================================================
 
-  describe('previewValidityVisible (early-game grading bridge)', () => {
+  describe('previewValidityVisible (early-game grading transition)', () => {
     const amber = require('../services/amberCurrency');
 
     afterEach(() => {
-      // Restore the suite-wide post-bridge default.
+      // Restore the suite-wide fully-neutral default.
       (amber.getFullProgress as jest.Mock).mockImplementation(async () => ({ puzzlesSolved: 20 }));
     });
 
-    test('a MEDIUM board during the bridge keeps the grading on', async () => {
-      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({ puzzlesSolved: 5 });
+    test('a MEDIUM board before the full-grading limit keeps the grading on', async () => {
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({
+        puzzlesSolved: PREVIEW_GRADING_FULL_LIMIT - 1,
+      });
       resetHookState();
       let [, actions] = callHook();
       await actions.startNewGame('MEDIUM');
       const [state] = callHook();
       expect(state.difficulty).toBe('MEDIUM');
+      expect(state.previewGradingMode).toBe('graded');
       expect(state.previewValidityVisible).toBe(true);
     });
 
-    test('the bridge closes at exactly PREVIEW_GRADING_BRIDGE_PUZZLES solves', async () => {
+    test('a rescue board starts neutral, then restores checks once after the first invalid attempt', async () => {
+      const narrative = require('../services/phaseNarrative');
       (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({
-        puzzlesSolved: PREVIEW_GRADING_BRIDGE_PUZZLES,
+        puzzlesSolved: PREVIEW_GRADING_FULL_LIMIT,
       });
       resetHookState();
       let [, actions] = callHook();
       await actions.startNewGame('MEDIUM');
-      const [state] = callHook();
+      let [state, liveActions] = callHook();
+      expect(state.previewGradingMode).toBe('rescue');
+      expect(state.previewValidityVisible).toBe(false);
+
+      const letter = state.rows[0].words.find(l => l.char === 'L')!;
+      liveActions.handleLetterPress(letter, 0);
+      [, actions] = callHook();
+      expect(await actions.handleSlotPress(0)).toBeNull();
+
+      [state, actions] = callHook();
+      expect(state.invalidAttempts).toBe(1);
+      expect(state.previewGradingMode).toBe('rescue');
+      expect(state.previewValidityVisible).toBe(true);
+      expect(state.message).toBe('The checks return for this board.');
+      expect(narrative.getPreviewRescueMessage).toHaveBeenCalledTimes(1);
+
+      (narrative.getPreviewRescueMessage as jest.Mock).mockClear();
+      expect(await actions.handleSlotPress(0)).toBeNull();
+      expect(narrative.getPreviewRescueMessage).not.toHaveBeenCalled();
+
+      [, actions] = callHook();
+      actions.initGame(['LIME', 'TIME', 'TIED']);
+      [state] = callHook();
+      expect(state.previewGradingMode).toBe('rescue');
       expect(state.previewValidityVisible).toBe(false);
     });
 
-    test('one solve before the threshold is still bridged', async () => {
+    test('the rescue window ends at the neutral limit', async () => {
       (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({
-        puzzlesSolved: PREVIEW_GRADING_BRIDGE_PUZZLES - 1,
+        puzzlesSolved: PREVIEW_GRADING_RESCUE_LIMIT,
       });
       resetHookState();
       let [, actions] = callHook();
       await actions.startNewGame('MEDIUM');
       const [state] = callHook();
-      expect(state.previewValidityVisible).toBe(true);
+      expect(state.previewGradingMode).toBe('neutral');
+      expect(state.previewValidityVisible).toBe(false);
     });
 
-    test('Blind Offering still suppresses everything during the bridge', async () => {
+    test('Blind Offering still suppresses everything during full grading', async () => {
       (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({ puzzlesSolved: 5 });
       resetHookState();
       let [, actions] = callHook();
       await actions.startNewGame('EASY', 'challenge', 'standard', true);
       const [state] = callHook();
       expect(state.blindMode).toBe(true);
+      expect(state.previewGradingMode).toBe('hidden');
       expect(state.previewValidityVisible).toBe(false);
       expect(state.slotPreviews).toBeUndefined();
     });
 
-    test('the daily is graded during the bridge (EVERY board bridges)', async () => {
+    test('the daily is graded during the full-grading window', async () => {
       (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({ puzzlesSolved: 9 });
       resetHookState();
       let [, actions] = callHook();
-      // Seed the bridge counter via a normal start (the daily itself does not
+      // Seed the grading counter via a normal start (the daily itself does not
       // fetch progress; it inherits the last-known count).
       await actions.startNewGame('MEDIUM');
 
@@ -1930,7 +2038,7 @@ describe('usePuzzleGame', () => {
       expect(state.previewValidityVisible).toBe(true);
     });
 
-    test('shared-challenge boards are graded during the bridge', async () => {
+    test('shared-challenge boards are graded during the full-grading window', async () => {
       (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({ puzzlesSolved: 9 });
       resetHookState();
       let [, actions] = callHook();

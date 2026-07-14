@@ -190,11 +190,12 @@ describe('verb-depth preview gate threading', () => {
     expect(APP_TSX).toMatch(/previewValidityVisible=\{puzzle\.previewValidityVisible\}/);
   });
 
-  test('the one-time graduation toast fires on the first hidden-validity board', () => {
+  test('the one-time graduation toast waits for the first fully neutral board', () => {
     expect(APP_TSX).toMatch(/PREVIEW_GRADUATION_SEEN_KEY/);
     expect(APP_TSX).toMatch(/getPreviewGraduationMessage\(persistence\.currentPhase\)/);
-    // Blind Offering and onboarding never consume the beat.
-    expect(APP_TSX).toMatch(/puzzle\.previewValidityVisible \|\| puzzle\.blindMode/);
+    // Rescue boards start with hidden checks too, but must not consume the
+    // graduation beat. Blind Offering and onboarding remain excluded.
+    expect(APP_TSX).toMatch(/puzzle\.previewGradingMode !== 'neutral' \|\| puzzle\.blindMode/);
   });
 });
 

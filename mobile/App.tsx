@@ -2328,19 +2328,17 @@ function MainApp() {
     }
   }, [boardIdentity]);
 
-  // One-time preview-graduation beat: the FIRST board that starts with the
-  // ✓/✗ validity grading hidden explains, in-world, that the marks stay
-  // behind on the gentlest boards (getPreviewGraduationMessage — warm, never
-  // a tutorial voice). Keyed on board identity so it evaluates once per fresh
-  // board. Skipped in Blind Offering (no previews at all — its own intro
-  // covers the darkness) and during onboarding (tutorial boards are EASY, so
-  // this can't fire there anyway; the guard is belt-and-braces). Device-local
-  // one-time flag; the session ref keeps it to a single storage read.
+  // One-time preview-graduation beat: the FIRST fully-neutral board after the
+  // rescue window explains, in-world, that the player's word judgment has
+  // sharpened. A rescue board also starts with hidden checks, so gate on the
+  // underlying mode rather than previewValidityVisible or solve 12 would
+  // consume this beat early. Blind Offering and onboarding stay excluded.
+  // Device-local one-time flag; the session ref keeps one storage read.
   const graduationCheckedRef = useRef(false);
   useEffect(() => {
     if (boardIdentity === null) return;
     if (puzzle.gameState !== GameState.PLAYING) return;
-    if (puzzle.previewValidityVisible || puzzle.blindMode) return;
+    if (puzzle.previewGradingMode !== 'neutral' || puzzle.blindMode) return;
     if (onboardingFlow.isOnboarding) return;
     if (graduationCheckedRef.current) return;
     graduationCheckedRef.current = true;
@@ -2350,7 +2348,7 @@ function MainApp() {
       puzzleActions.setMessage(getPreviewGraduationMessage(persistence.currentPhase));
     })().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fires per fresh board; actions/phase read at fire time
-  }, [boardIdentity, puzzle.gameState, puzzle.previewValidityVisible, puzzle.blindMode, onboardingFlow.isOnboarding]);
+  }, [boardIdentity, puzzle.gameState, puzzle.previewGradingMode, puzzle.blindMode, onboardingFlow.isOnboarding]);
 
   // Drag-and-drop: when a letter is dragged onto the target row area, find the
   // closest valid slot and press it. The letter was already selected via onDragStart.

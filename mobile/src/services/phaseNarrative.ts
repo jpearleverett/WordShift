@@ -2166,15 +2166,24 @@ export function getStreakHeldMessage(heldAt: number, phase: number = 0): string 
 }
 
 // ============================================================================
-// PREVIEW GRADUATION — one-time toast when the ghost previews stop grading
-// words above EASY. In-world: the checkmarks stay behind on the gentlest
-// boards; the house trusts the player's ear now. Never a tutorial voice.
+// PREVIEW GRADUATION — one-time toast when MEDIUM+ previews become fully
+// neutral. In-world: the player's judgment has sharpened. Never tutorial copy.
 // ============================================================================
 
 export function getPreviewGraduationMessage(phase: number): string {
-  if (phase >= 4) return 'No marks guide this board. Your hands already know what is true. That was always the point.';
-  if (phase >= 2) return 'The little marks stay behind on the gentlest boards now. The house trusts your ear for a real word.';
-  return 'No more little check marks out here! They stay behind on the gentlest boards. The house trusts your ear now.';
+  if (phase >= 4) return 'The marks withdraw. Your hands know which words hold. They have learned well.';
+  if (phase >= 2) return 'The little checks step back. The house has heard your judgment sharpen. Trust what sounds true.';
+  return 'The little checks step back now. You have learned to trust your ear for a real word.';
+}
+
+/**
+ * One-time-per-board explanation when an invalid attempt restores grading
+ * during the rescue window. The hook owns the once-only board guard.
+ */
+export function getPreviewRescueMessage(phase: number): string {
+  if (phase >= 4) return 'A false word entered. The marks return until this board is complete.';
+  if (phase >= 2) return 'One word slipped. The little checks return for this board. Listen closely.';
+  return 'A miss... the little checks return for this board. Use them, then try again!';
 }
 
 // ============================================================================
