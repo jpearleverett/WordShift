@@ -216,7 +216,7 @@ import {
   CHALLENGE_TOGGLE_UNLOCK_PUZZLES,
   BLIND_TOGGLE_UNLOCK_PUZZLES,
 } from './src/services/puzzleVariety';
-import { appStyles as styles, getScreenBackgroundColor } from './src/styles/appStyles';
+import { appStyles as styles, getScreenBackgroundColor, getActionButtonColors } from './src/styles/appStyles';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useScreenInsets } from './src/hooks/useScreenInsets';
 
@@ -2422,9 +2422,12 @@ function MainApp() {
   }, [puzzleActions]);
 
   // Challenge-only convenience: spend EARNED amber to refill one undo when out.
-  // Convenience, never progress — Challenge stays hint-free by design.
+  // Convenience, never progress — Challenge stays hint-free by design. Blind
+  // Offering is excluded: its undos are always free and unlimited, so a refill
+  // would charge amber for nothing (the chip is hidden in blind too — this
+  // guard is defense in depth).
   const handleBuyUndo = useCallback(async () => {
-    if (puzzle.gameMode !== 'challenge') return;
+    if (puzzle.gameMode !== 'challenge' || puzzle.blindMode) return;
     if (persistence.amberBalance < AMBER_UNDO_REFILL_COST) {
       puzzleActions.setMessage('Not enough amber for an undo.');
       hapticWarning();
@@ -2437,7 +2440,7 @@ function MainApp() {
       hapticSuccess();
       soundUndo();
     }
-  }, [puzzle.gameMode, persistence.amberBalance, puzzleActions, persistenceActions]);
+  }, [puzzle.gameMode, puzzle.blindMode, persistence.amberBalance, puzzleActions, persistenceActions]);
 
   const handleHintPress = useCallback(() => {
     hapticSelection();
@@ -2932,8 +2935,9 @@ function MainApp() {
 
   // Trial ladder: Challenge and Blind Offering are mutually exclusive rungs.
   // Challenge = no hints + limited undos, previews ON. Blind Offering = the
-  // apex rung: Challenge's limits (it runs under gameMode 'challenge') PLUS
-  // previews hidden and free moves judged once at the end of the chain.
+  // apex rung: no hints (it runs under gameMode 'challenge') PLUS previews
+  // hidden and free moves judged once at the end of the chain — but undos
+  // stay free and unlimited in blind (the challenge undo budget never applies).
   const handleToggleChallengeMode = useCallback(() => {
     hapticMedium();
     orchestrationActions.setCompletionCoda(null);
@@ -2945,8 +2949,9 @@ function MainApp() {
 
   // Blind Offering: chosen before the board (a fresh board applies it so the
   // player can't toggle previews back on mid-solve to peek). Sticky across Next
-  // Level; selecting it engages the challenge limits, deselecting returns to
-  // standard. Composes with any variant/difficulty.
+  // Level; selecting it engages the challenge rung (no hints — undos stay free
+  // in blind), deselecting returns to standard. Composes with any
+  // variant/difficulty.
   const handleToggleBlindMode = useCallback(() => {
     // Gate: Blind Offering is the apex rung and unlocks late. Turning it OFF
     // is always allowed (a restored legacy board may carry it in while locked).
@@ -3303,9 +3308,17 @@ function MainApp() {
         {onboardingFlow.isOnboarding ? null : (
         <View style={styles.statsRow}>
           <View style={styles.leftStatsGroup}>
-            {/* Challenge Mode Badge */}
-            {puzzle.gameMode === 'challenge' && (
-              <View style={styles.challengeBadge}>
+            {/* Challenge Mode Badge — hidden in Blind Offering. Blind runs
+                under gameMode 'challenge' internally, but its undos are always
+                free, so the undo-budget chrome (count + amber refill chip) is
+                meaningless there and the double chip read as a bug. The Blind
+                badge below is the mode's one standing indicator. */}
+            {puzzle.gameMode === 'challenge' && !puzzle.blindMode && (
+              <View style={[
+                styles.challengeBadge,
+                persistence.currentPhase >= 3 && styles.challengeBadgeDark,
+                persistence.currentPhase >= 4 && styles.challengeBadgeVoid,
+              ]}>
                 <Text style={styles.challengeBadgeText}>CHALLENGE</Text>
                 {puzzle.undosRemaining < Infinity && (
                   <Text style={styles.challengeUndoText}>
@@ -3372,13 +3385,15 @@ function MainApp() {
           <TouchableOpacity
             style={[
               styles.difficultyButton,
+              persistence.currentPhase >= 3 && styles.difficultyButtonDark,
+              persistence.currentPhase >= 4 && styles.difficultyButtonVoid,
               showSetupSelectorIntro && styles.difficultyButtonHighlighted,
             ]}
             onPress={() => puzzleActions.setShowDifficultyMenu(!puzzle.showDifficultyMenu)}
             accessibilityLabel={`Difficulty ${puzzle.difficulty}, style ${VARIANT_CONFIGS[puzzle.selectedVariant]?.title || 'Standard'}. Tap to change puzzle setup`}
             accessibilityRole="button"
           >
-            <View style={styles.difficultyButtonShine} />
+            {persistence.currentPhase < 3 && <View style={styles.difficultyButtonShine} />}
             <View style={[
               styles.difficultyDot,
               puzzle.difficulty === 'EASY' && styles.difficultyDotEasy,
@@ -3601,22 +3616,14 @@ function MainApp() {
           <ActionButton
             icon="↩"
             label="UNDO"
-            colors={{
-              bg: CandyColors.yellow.main,
-              border: CandyColors.yellow.shadow,
-              glow: CandyColors.yellow.glow,
-            }}
+            colors={getActionButtonColors('undo', persistence.currentPhase)}
             onPress={handleUndo}
             disabled={puzzle.history.length === 0 || puzzle.gameState !== GameState.PLAYING}
           />
           <ActionButton
             icon="💡"
             label={puzzle.gameMode === 'challenge' ? 'HINT' : `HINT · ${puzzle.hintBalance}`}
-            colors={{
-              bg: CandyColors.blue.main,
-              border: CandyColors.blue.shadow,
-              glow: CandyColors.blue.glow,
-            }}
+            colors={getActionButtonColors('hint', persistence.currentPhase)}
             onPress={handleHintPress}
             disabled={puzzle.gameState !== GameState.PLAYING}
             accessibilityLabel={
@@ -3629,11 +3636,7 @@ function MainApp() {
           <ActionButton
             icon="🔄"
             label={puzzle.gameState === GameState.PLAYING ? "RESTART" : "NEW"}
-            colors={{
-              bg: CandyColors.green.main,
-              border: CandyColors.green.shadow,
-              glow: CandyColors.green.glow,
-            }}
+            colors={getActionButtonColors('restart', persistence.currentPhase)}
             onPress={() => {
               hapticLight();
               // RESTART while playing resets THIS board (a true retry); NEW (idle)

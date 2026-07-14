@@ -518,8 +518,46 @@ describe('usePuzzleGame', () => {
       expect(state.invalidAttempts).toBe(0);
     });
 
-    test('a failed judgment unlocks free undos for the rest of the board', async () => {
-      // Blind Offering runs under gameMode 'challenge' (limited undos).
+    test('undos are ALWAYS free in blind, from the first move, even under a challenge budget', async () => {
+      // The design ruling (and the player-reported bug fix): blind undos are
+      // never charged against the challenge undo budget — not just after a
+      // fail, but from the very first move. Walking the chain back to a flaw
+      // is the mode's core repair loop, never a budgeted resource.
+      resetHookState();
+      let [, actions] = callHook();
+      await actions.startNewGame('MEDIUM', 'challenge', 'standard', true);
+      [, actions] = callHook();
+      actions.initGame(['TIME', 'TIED']);
+      let [state] = callHook();
+      expect(state.gameMode).toBe('challenge');
+      expect(state.blindMode).toBe(true);
+      const budget = state.undosRemaining; // MEDIUM challenge budget (2)
+
+      // A valid intermediate move (no fail yet): M from TIME (TIE) into TIED
+      // at 2 forms TIMED and completes — so instead commit a NON-final move
+      // to leave the board mid-chain, then undo it repeatedly.
+      // Simplest: make one commit, undo it 3+ times' worth of budget checks.
+      const m = state.rows[0].words.find(le => le.char === 'M')!;
+      [, actions] = callHook();
+      actions.handleLetterPress(m, 0);
+      [, actions] = callHook();
+      // Drop M at 0 (MTIED, invalid) — commits in blind, no fail, board live.
+      await actions.handleSlotPress(0);
+      [state] = callHook();
+      expect(state.gameState).toBe(GameState.PLAYING);
+
+      // Undo it — budget must be untouched (this is the exact regression:
+      // the old code charged the challenge budget before any fail).
+      [, actions] = callHook();
+      actions.handleUndo();
+      [state] = callHook();
+      expect(state.undosRemaining).toBe(budget);
+      expect(state.rows[0].words.map(le => le.char).join('')).toBe('TIME');
+    });
+
+    test('a failed judgment keeps undos free for the rest of the board', async () => {
+      // Blind Offering runs under gameMode 'challenge' (a finite budget lives
+      // on the state), but undos never consult it — before OR after a fail.
       resetHookState();
       let [, actions] = callHook();
       await actions.startNewGame('MEDIUM', 'challenge', 'standard', true);
@@ -537,8 +575,7 @@ describe('usePuzzleGame', () => {
       const result = await actions.handleSlotPress(0);
       expect(result?.blindFailed).toBe(true);
 
-      // The mercy: undoing back out of the failed chain charges nothing —
-      // walking to the flaw can take more undos than the budget holds.
+      // Undoing back out of the failed chain charges nothing.
       [, actions] = callHook();
       actions.handleUndo();
       [state] = callHook();

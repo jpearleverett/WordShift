@@ -388,22 +388,24 @@ export const NARRATIVE_ACCELERATION = {
 // ============================================================================
 
 /**
- * Trial ladder configuration (Challenge and Blind Offering share these limits).
+ * Trial ladder configuration.
  *
  * The two rungs are mutually exclusive in the setup menu:
- * - CHALLENGE: no hints, limited undos, ✓/✗ previews STAY ON (2026-07: the old
- *   preview suppression made the mode unreadable rather than harder; with
- *   previews back, the amber multiplier drops from 1.5x to 1.25x because
- *   previews pre-validate every move).
- * - BLIND OFFERING (apex): all Challenge limits PLUS previews hidden and free
- *   moves judged once at the end of the chain. Pays 2x amber — blind used to
- *   pay nothing, which made the reward ladder non-monotonic once it absorbed
- *   the challenge limits.
+ * - CHALLENGE: no hints, limited undos (getMaxUndos), preview grading follows
+ *   the global difficulty rule (graded on EASY only). 1.25x amber.
+ * - BLIND OFFERING (apex): no hints, previews hidden entirely, free moves
+ *   judged once at the end of the chain. Pays 2x amber. IMPORTANT: undos in
+ *   blind are ALWAYS FREE and UNLIMITED — walking the chain back to a flaw is
+ *   the mode's core repair loop, never a budgeted resource (design ruling; see
+ *   usePuzzleGame.handleUndo). Blind runs under gameMode 'challenge' for the
+ *   no-hints rule + amber accounting, but getMaxUndos below is NEVER consulted
+ *   on the blind path, and App hides the undo-budget chrome while blind is on.
  */
 export const CHALLENGE_MODE_CONFIG = {
   // Legacy constant — prefer getMaxUndos(difficulty) for challenge mode
   MAX_UNDOS: 1,
-  /** Get max undos for challenge/blind, scaled by difficulty */
+  /** Max undos for plain Challenge, scaled by difficulty. Blind ignores this
+   *  (blind undos are always free — see the doc above). */
   getMaxUndos: (difficulty: Difficulty): number => {
     switch (difficulty) {
       case 'EASY': return 2;
