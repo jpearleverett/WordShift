@@ -138,7 +138,7 @@ import { loadPixelFonts, installGlobalFont } from './src/theme/fonts';
 import { initHints, addHints } from './src/services/hints';
 import { loadEntitlements, hasEntitlementSync, ENTITLEMENTS } from './src/services/entitlements';
 import { StoreModal } from './src/components/monetization/StoreModal';
-import { recordInterstitialSeen, consumePatronNudge, consumeRemoveAdsNudge } from './src/services/monetizationPrompts';
+import { recordInterstitialSeen, consumePatronNudge, armRemoveAdsNudgeIfEligible, consumePendingRemoveAdsNudge } from './src/services/monetizationPrompts';
 import { REWARDED_HINT_GRANT } from './src/constants/gameBalance';
 import { createRevenueCatBillingProvider } from './src/services/providers/revenueCatBilling';
 import { createAdMobAdProvider } from './src/services/providers/googleAdMobAds';
@@ -2436,8 +2436,10 @@ function MainApp() {
     puzzleActions.handleHint();
   }, [puzzleActions]);
 
-  // Out-of-hints recovery: a completed `hint_recovery` clip grants one hint;
-  // otherwise (no provider / cap / dismissed) we gently route to the store.
+  // Out-of-hints recovery: a completed `hint_recovery` clip grants one hint.
+  // Declining/closing the clip (or an ad failure) is a quiet toast, never a
+  // forced Store — the explicit store path stays available via the
+  // out-of-hints alert's own "Get hints" button (handleOutOfHints).
   const handleClaimRewardedHint = useCallback(async () => {
     try {
       const res = await showRewarded('hint_recovery');
@@ -2449,10 +2451,10 @@ function MainApp() {
       } else if (res.reason === 'daily_cap') {
         puzzleActions.setMessage('Daily clip limit reached. Try the store.');
       } else {
-        setShowStoreModal(true);
+        puzzleActions.setMessage('No hint this time. Hint packs live in the store.');
       }
     } catch {
-      setShowStoreModal(true);
+      puzzleActions.setMessage('No hint this time. Hint packs live in the store.');
     }
   }, [puzzleActions]);
 
@@ -2488,25 +2490,28 @@ function MainApp() {
   // One-time contextual notification prompt — shown after dismissing the
   // victory modal once the player has finished 3+ puzzles. The OS permission
   // dialog is only triggered if the player accepts the in-app prompt.
+  // Returns whether the prompt was actually presented so the victory-exit
+  // nudge chain can honor its one-nudge-per-exit contract.
   const notificationPromptInFlightRef = useRef(false);
-  const maybePromptForNotifications = useCallback(async () => {
-    if (notificationPromptInFlightRef.current) return;
+  const maybePromptForNotifications = useCallback(async (): Promise<boolean> => {
+    if (notificationPromptInFlightRef.current) return false;
     notificationPromptInFlightRef.current = true;
     try {
-      if (onboardingFlow.isOnboarding) return;
-      if ((persistence.cumulativeStats?.totalPuzzlesCompleted ?? 0) < 3) return;
+      if (onboardingFlow.isOnboarding) return false;
+      if ((persistence.cumulativeStats?.totalPuzzlesCompleted ?? 0) < 3) return false;
       // Declutter: never stack the permission prompt on a victory that already
       // has a Fox intro playing/queued. Return WITHOUT marking prompted so it
       // simply waits for a quiet victory exit.
-      if (postVictoryIntro || queuedPostVictoryIntrosRef.current.length > 0) return;
-      if (await hasPromptedForNotifications()) return;
-      if ((await getNotificationPermissionStatus()) === 'granted') return;
+      if (postVictoryIntro || queuedPostVictoryIntrosRef.current.length > 0) return false;
+      if (await hasPromptedForNotifications()) return false;
+      if ((await getNotificationPermissionStatus()) === 'granted') return false;
       await markPromptedForNotifications();
 
       const { title, body, accept, decline } = getNotificationPromptText(persistence.currentPhase);
       // Present the styled in-game modal instead of a bare OS Alert. The
       // accept/decline handlers (below) own the permission request + telemetry.
       setNotificationPrompt({ title, body, accept, decline });
+      return true;
     } finally {
       notificationPromptInFlightRef.current = false;
     }
@@ -2560,22 +2565,36 @@ function MainApp() {
       exempt,
     }).then(async (shown) => {
       if (!shown) return false;
-      // After the player has actually seen a few interstitials, offer the
-      // contextual one-time Remove-Ads upsell ("tired of these?").
+      // After the player has actually seen a few interstitials, ARM the
+      // contextual one-time Remove-Ads upsell ("tired of these?") — it is
+      // presented on the NEXT qualifying exit (maybeShowRemoveAdsOffer in the
+      // nudge chain), never stacked on the interstitial that just played.
       await recordInterstitialSeen();
-      if (await consumeRemoveAdsNudge()) {
-        showGameAlert(
-          'Tired of ads?',
-          'You can remove interstitials for good, or become a Patron for a quieter table and a little amber every puzzle.',
-          [
-            { text: 'Maybe later', style: 'cancel' },
-            { text: 'See options', onPress: () => setShowPatronModal(true) },
-          ],
-        );
-      }
+      await armRemoveAdsNudgeIfEligible();
       return true;
     }).catch(() => false);
   }, [victoryFlow.victoryData, onboardingFlow.onboardingStep, isPlayingDaily, phaseTransitionEvent, persistence.pendingPhaseTransition]);
+
+  // Deferred one-time Remove-Ads offer: armed by maybeShowVictoryInterstitial
+  // right after an interstitial actually played, presented here on the next
+  // ad-free victory exit so the upsell never doubles the most annoying moment.
+  const maybeShowRemoveAdsOffer = useCallback(async (): Promise<boolean> => {
+    if (onboardingFlow.isOnboarding) return false;
+    // Same anti-stacking guard as the share/notification prompts: never layer
+    // on a Fox intro. Return WITHOUT consuming — the armed offer just waits
+    // for a quieter exit.
+    if (postVictoryIntro || queuedPostVictoryIntrosRef.current.length > 0) return false;
+    if (!(await consumePendingRemoveAdsNudge())) return false;
+    showGameAlert(
+      'Tired of ads?',
+      'You can remove interstitials for good, or become a Patron for a quieter table and a little amber every puzzle.',
+      [
+        { text: 'Maybe later', style: 'cancel' },
+        { text: 'See options', onPress: () => setShowPatronModal(true) },
+      ],
+    );
+    return true;
+  }, [onboardingFlow.isOnboarding, postVictoryIntro]);
 
   // One-time, low-pressure Patron nudge once the player has settled in. Suppressed
   // for Patrons and during onboarding (gating lives in monetizationPrompts.ts).
@@ -2638,16 +2657,18 @@ function MainApp() {
     return fired;
   }, [victoryFlow.victoryData, onboardingFlow.isOnboarding, persistence.pendingPhaseTransition, persistence.currentPhase, postVictoryIntro]);
 
-  // At most ONE of the victory-exit nudges (share / patron / notification
-  // permission) fires per exit — the share peak takes precedence when eligible.
+  // At most ONE of the victory-exit nudges (share / notification permission /
+  // deferred remove-ads / patron) fires per exit — the share peak takes
+  // precedence when eligible, and every step short-circuits the rest.
   // Skipped entirely when an interstitial just showed this exit, so a nudge
   // never piles on top of an ad.
   const runVictoryExitNudges = useCallback(async (interstitialShown: boolean) => {
     if (interstitialShown) return;
     if (await maybeShowSharePrompt()) return;
-    await maybePromptForNotifications();
+    if (await maybePromptForNotifications()) return;
+    if (await maybeShowRemoveAdsOffer()) return;
     await maybeShowPatronNudge();
-  }, [maybeShowSharePrompt, maybePromptForNotifications, maybeShowPatronNudge]);
+  }, [maybeShowSharePrompt, maybePromptForNotifications, maybeShowRemoveAdsOffer, maybeShowPatronNudge]);
 
   // One-time Swift Victories pointer: after the FIRST routine win past
   // SWIFT_HINT_MIN_PUZZLES, a quiet toast points at the Settings toggle that
@@ -2717,19 +2738,19 @@ function MainApp() {
     Promise.resolve(adShown).then((shown) => runVictoryExitNudges(shown === true)).catch(() => {});
   }, [puzzleActions, transitionTo, startVictoryExitFlow, runVictoryExitNudges, maybeShowVictoryInterstitial]);
 
-  // The pit route is a victory exit too — same interstitial gate as
-  // next/home. Its exemptions already cover the sensitive pit moments
-  // (pending ward ceremony, onboarding, daily, queued cinematics, Phase 5),
-  // so an ad can never precede an ignition ceremony.
+  // The pit route (Collect Now) is deliberately EXEMPT from interstitials:
+  // the player is on their way to collect amber they already earned, and an
+  // ad tax on your own earnings poisons the harvest loop. The next-level and
+  // home exits keep the normal cadence, so ad inventory shifts rather than
+  // disappears.
   const handleGoToPit = useCallback(() => {
     hapticLight();
-    maybeShowVictoryInterstitial();
     startVictoryExitFlow(() => {
       puzzlesSinceHomeVisit.current = 0;
       puzzleActions.clearBoard();
       transitionTo('pit');
     });
-  }, [puzzleActions, transitionTo, startVictoryExitFlow, maybeShowVictoryInterstitial]);
+  }, [puzzleActions, transitionTo, startVictoryExitFlow]);
 
   // Android hardware back button: sub-screens navigate home; home exits the app.
   // Swallowed during onboarding so back can't break the guided flow.

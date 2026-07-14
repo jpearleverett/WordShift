@@ -260,6 +260,49 @@ describe('proactive share prompt', () => {
     expect(APP_TSX).toMatch(/if \(postVictoryIntro \|\| queuedPostVictoryIntrosRef\.current\.length > 0\) return false;/);
   });
 
+  test('every nudge in the chain short-circuits the rest (no double-nudge exits)', () => {
+    // The notification prompt reports whether it actually presented, and a
+    // shown prompt must end the chain before the remove-ads / patron nudges.
+    expect(APP_TSX).toMatch(/const maybePromptForNotifications = useCallback\(async \(\): Promise<boolean>/);
+    expect(APP_TSX).toMatch(/if \(await maybeShowSharePrompt\(\)\) return;/);
+    expect(APP_TSX).toMatch(/if \(await maybePromptForNotifications\(\)\) return;/);
+    expect(APP_TSX).toMatch(/if \(await maybeShowRemoveAdsOffer\(\)\) return;/);
+  });
+
+  test('the remove-ads upsell is deferred: armed on the ad exit, offered on the NEXT quiet exit', () => {
+    // Inside the interstitial gate: only record + arm — the 'Tired of ads?'
+    // alert must never stack on the interstitial that just played.
+    const gate = APP_TSX.slice(
+      APP_TSX.indexOf('const maybeShowVictoryInterstitial = useCallback'),
+      APP_TSX.indexOf('const maybeShowRemoveAdsOffer = useCallback')
+    );
+    expect(gate.length).toBeGreaterThan(0);
+    expect(gate).toContain('recordInterstitialSeen()');
+    expect(gate).toContain('armRemoveAdsNudgeIfEligible()');
+    expect(gate).not.toContain('Tired of ads?');
+    expect(gate).not.toContain('showGameAlert');
+    // The offer itself lives in the nudge chain, gated on the armed flag.
+    const offer = APP_TSX.slice(
+      APP_TSX.indexOf('const maybeShowRemoveAdsOffer = useCallback'),
+      APP_TSX.indexOf('const runVictoryExitNudges = useCallback')
+    );
+    expect(offer).toContain('consumePendingRemoveAdsNudge()');
+    expect(offer).toContain('Tired of ads?');
+  });
+
+  test('declining the rewarded hint clip never force-opens the Store', () => {
+    // Backing out of an ad is a quiet toast; the Store opens only from the
+    // out-of-hints alert's explicit 'Get hints' button.
+    const claim = APP_TSX.slice(
+      APP_TSX.indexOf('const handleClaimRewardedHint = useCallback'),
+      APP_TSX.indexOf('const handleOutOfHints = useCallback')
+    );
+    expect(claim.length).toBeGreaterThan(0);
+    expect(claim).not.toContain('setShowStoreModal');
+    // The explicit store path stays available in the out-of-hints alert.
+    expect(APP_TSX).toMatch(/text: 'Get hints', onPress: \(\) => \{ done\(\); setShowStoreModal\(true\); \}/);
+  });
+
   test('the prominent opening glitch fires on the first FREE win, not the tutorial', () => {
     expect(APP_TSX).toMatch(/firstFreeWin = !\(await hasSeenFirstWinGlitch\(\)\)/);
     // firstFreeWin (and the dwell-window voice line) thread into processVictory.
@@ -309,9 +352,19 @@ describe('victory flow', () => {
     );
   });
 
-  test('all three victory exits (next / home / pit) run the interstitial gate', () => {
-    const calls = APP_TSX.match(/maybeShowVictoryInterstitial\(\);/g) || [];
-    expect(calls.length).toBeGreaterThanOrEqual(3);
+  test('next/home victory exits run the interstitial gate; the pit exit (Collect Now) is exempt', () => {
+    // Next Level and Return Home keep the cadence (ad inventory shifts, it
+    // does not disappear).
+    const calls = APP_TSX.match(/const adShown = maybeShowVictoryInterstitial\(\);/g) || [];
+    expect(calls.length).toBeGreaterThanOrEqual(2);
+    // Collecting amber you already earned is never an ad moment: handleGoToPit
+    // must not run the interstitial gate.
+    const pitExit = APP_TSX.slice(
+      APP_TSX.indexOf('const handleGoToPit = useCallback'),
+      APP_TSX.indexOf('}, [', APP_TSX.indexOf('const handleGoToPit = useCallback'))
+    );
+    expect(pitExit.length).toBeGreaterThan(0);
+    expect(pitExit).not.toContain('maybeShowVictoryInterstitial');
     // Pending ward ceremonies are exempt at the gate itself.
     expect(APP_TSX).toMatch(/persistence\.pendingPhaseTransition != null/);
   });

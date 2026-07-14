@@ -6,11 +6,14 @@
  *     into the game (>= PATRON_NUDGE_MIN_PUZZLES), suppressed for Patrons.
  *   - Remove-Ads nudge: a one-time prompt once the player has actually seen a few
  *     interstitials (so it's contextual — "tired of these?"), suppressed for
- *     anyone already ad-free.
+ *     anyone already ad-free. Two-step pacing: the interstitial that crosses the
+ *     threshold ARMS the offer (armRemoveAdsNudgeIfEligible), and it is presented
+ *     on the NEXT qualifying exit (consumePendingRemoveAdsNudge) — never stacked
+ *     on the same exit as the ad that triggered it.
  *
  * Decision logic is pure/exported for testing; the persisted state only records
- * "have we shown this yet" + an interstitials-seen counter. This is device UX
- * pacing (like ad_pacing), intentionally NOT part of cloud sync.
+ * "have we shown this yet" + an interstitials-seen counter (+ the armed offer).
+ * This is device UX pacing (like ad_pacing), intentionally NOT part of cloud sync.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -27,12 +30,22 @@ export interface MonetPromptState {
   removeAdsNudgeShown: boolean;
   /** Interstitials the player has actually been shown (for the Remove-Ads nudge). */
   interstitialsSeen: number;
+  /**
+   * The Remove-Ads offer is armed (threshold crossed on an interstitial exit)
+   * and waiting for the next ad-free exit to be presented.
+   */
+  removeAdsOfferPending: boolean;
 }
 
 let cache: MonetPromptState | null = null;
 
 function getDefault(): MonetPromptState {
-  return { patronNudgeShown: false, removeAdsNudgeShown: false, interstitialsSeen: 0 };
+  return {
+    patronNudgeShown: false,
+    removeAdsNudgeShown: false,
+    interstitialsSeen: 0,
+    removeAdsOfferPending: false,
+  };
 }
 
 async function load(): Promise<MonetPromptState> {
@@ -117,21 +130,44 @@ export async function consumePatronNudge(puzzlesSolved: number): Promise<boolean
 }
 
 /**
- * Decide whether to surface the one-time Remove-Ads nudge now. Marks it shown
- * when it returns true.
+ * Arm the one-time Remove-Ads offer once the interstitials-seen threshold is
+ * crossed. Called right after an interstitial actually played — the offer is
+ * NOT shown on that exit; it waits (persisted) for the next qualifying exit.
+ * Idempotent; returns whether the offer is now armed.
  */
-export async function consumeRemoveAdsNudge(): Promise<boolean> {
+export async function armRemoveAdsNudgeIfEligible(): Promise<boolean> {
   const state = await load();
-  const show = shouldShowRemoveAdsNudge({
+  if (state.removeAdsOfferPending) return true;
+  const eligible = shouldShowRemoveAdsNudge({
     interstitialsSeen: state.interstitialsSeen,
     isAdFree: isAdFreeSync(),
     alreadyShown: state.removeAdsNudgeShown,
   });
-  if (show) {
-    state.removeAdsNudgeShown = true;
+  if (eligible) {
+    state.removeAdsOfferPending = true;
     cache = state;
     await save();
   }
+  return eligible;
+}
+
+/**
+ * Present the armed Remove-Ads offer, once. Returns true only when an armed
+ * offer is waiting and the player still qualifies (not ad-free, never shown);
+ * marks it shown and clears the pending flag when it fires.
+ */
+export async function consumePendingRemoveAdsNudge(): Promise<boolean> {
+  const state = await load();
+  if (!state.removeAdsOfferPending) return false;
+  const show = !isAdFreeSync() && !state.removeAdsNudgeShown;
+  if (show) {
+    state.removeAdsNudgeShown = true;
+  }
+  // Clear the armed flag either way — a disqualified pending offer (player
+  // went ad-free in the meantime) must not linger forever.
+  state.removeAdsOfferPending = false;
+  cache = state;
+  await save();
   return show;
 }
 

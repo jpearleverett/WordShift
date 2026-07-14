@@ -59,10 +59,10 @@ export interface OnboardingFlowActions {
    */
   handleOnboardingContinue: () => Promise<void>;
   /**
-   * Skip onboarding.  During pre-puzzle steps this jumps to the
-   * tutorial puzzle; at or after the puzzle step it completes onboarding
-   * entirely and lands the player on a clean home screen (guided board
-   * abandoned, all tutorial UI torn down).
+   * Skip onboarding.  From EVERY step (including the pre-puzzle home
+   * dialogue) this completes onboarding entirely and lands the player on
+   * a clean home screen (guided board abandoned, all tutorial UI torn
+   * down). "Skip it all" means skip it all.
    */
   handleSkipOnboarding: () => Promise<void>;
   /**
@@ -315,14 +315,11 @@ export function useOnboardingFlow(
   // handleSkipOnboarding
   // ------------------------------------------------------------------
   const handleSkipOnboarding = useCallback(async () => {
-    if (onboardingStep === 'fox_invited' || onboardingStep === 'home_empty') {
-      // Skip dialogue but continue to tutorial puzzle
-      await navigateToPuzzleTutorial();
-      return;
-    }
-
-    // During/after the tutorial puzzle: complete onboarding entirely and land
-    // the player on a clean home screen — never a guided board in limbo.
+    // From EVERY step — including the home_empty/fox_invited intro dialogue —
+    // a confirmed "Skip it all" completes onboarding entirely and lands the
+    // player on a clean home screen. (The old behavior routed the home steps
+    // INTO the guided tutorial puzzle, which is the opposite of what the
+    // player just confirmed.) Never a guided board in limbo.
     // Cancel any pending step-transition timers first so a queued advance
     // (e.g. the going_to_pit → pit_intro transition) can't resurrect
     // onboarding after the skip.
@@ -347,7 +344,7 @@ export function useOnboardingFlow(
       callbacks.clearBoard();
       clearPuzzleState().catch(() => {});
     });
-  }, [onboardingStep, advanceOnboarding, navigateToPuzzleTutorial, callbacks]);
+  }, [advanceOnboarding, callbacks]);
 
   // ------------------------------------------------------------------
   // handlePitOnboardingOfferComplete

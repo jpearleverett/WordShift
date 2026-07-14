@@ -443,6 +443,13 @@ const BevelRowButton: React.FC<{
 // compact; tarsier at 65% stays standard.)
 const COMPACT_DIALOGUE_SPRITES = new Set<string>(['axolotl', 'fennec_fox', 'aye_aye', 'kakapo']);
 
+// Once-per-APP-SESSION guard for the gentle "your pit is getting heavy" nudge.
+// Module-scoped on purpose: HomeScreen unmounts on every navigation, so a
+// component ref re-armed the nudge on every home arrival — an engaged player
+// with a heavy pit dismissed the same Fox card many times a day. This survives
+// remounts and resets only on app relaunch (module reload).
+let heavyHarvestNudgeShownThisSession = false;
+
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   onPlayPuzzle,
   onStartDaily,
@@ -477,8 +484,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [introDialogueIndex, setIntroDialogueIndex] = useState(0);
   const [introOverrideLines, setIntroOverrideLines] = useState<string[] | null>(null);
   const [introContext, setIntroContext] = useState<'animal_intro' | 'challenge_intro' | 'pit_nudge' | 'daily_challenge_intro' | 'gated_room_intro' | 'harvest_gate_intro' | 'harvest_heavy_nudge'>('animal_intro');
-  // Once-per-session guard for the gentle "your pit is getting heavy" nudge.
-  const heavyHarvestNudgeShownRef = useRef(false);
   // Journal spotlight intro state
   const [journalSpotlightActive, setJournalSpotlightActive] = useState(false);
   const [journalSpotlightIndex, setJournalSpotlightIndex] = useState(0);
@@ -986,7 +991,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // until the pit has been learned (the safety net above owns teaching).
   useEffect(() => {
     if (!progress || isOnboarding || showIntroDialogue || introOverrideLines) return;
-    if (heavyHarvestNudgeShownRef.current) return;
+    if (heavyHarvestNudgeShownThisSession) return;
     if (pitPhaseReady) return;
     if ((progress.puzzlesSolved || 0) <= AUTO_COLLECT_PUZZLE_LIMIT) return;
     if (!pendingHarvest || pendingHarvest.pendingAmber < HARVEST_NUDGE_MIN_AMBER) return;
@@ -999,7 +1004,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       const fox = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
       if (!fox) return;
 
-      heavyHarvestNudgeShownRef.current = true;
+      heavyHarvestNudgeShownThisSession = true;
       setIntroAnimal(fox);
       setIntroDialogueIndex(0);
       setIntroOverrideLines(getHarvestNudgeLine(progress.currentPhase, pendingHarvest.pendingAmber));
@@ -1224,7 +1229,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       } else if (introContext === 'harvest_gate_intro') {
         await markHarvestHomeIntroSeen();
       } else if (introContext === 'harvest_heavy_nudge') {
-        // Session-scoped (heavyHarvestNudgeShownRef) — nothing to persist.
+        // App-session-scoped (heavyHarvestNudgeShownThisSession) — nothing to persist.
       } else {
         await markIntroSeen(introAnimal.id);
       }
@@ -1251,7 +1256,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       } else if (introContext === 'harvest_gate_intro') {
         await markHarvestHomeIntroSeen();
       } else if (introContext === 'harvest_heavy_nudge') {
-        // Session-scoped (heavyHarvestNudgeShownRef) — nothing to persist.
+        // App-session-scoped (heavyHarvestNudgeShownThisSession) — nothing to persist.
       } else {
         await markIntroSeen(introAnimal.id);
       }

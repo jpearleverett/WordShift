@@ -118,3 +118,38 @@ describe('harvest gate narrative copy', () => {
     }
   });
 });
+
+describe('heavy-pit nudge session guard (source scan)', () => {
+  // HomeScreen unmounts on every navigation, so a component-level useRef made
+  // the "once per app session" nudge re-fire on EVERY home arrival — an engaged
+  // player with a heavy pit dismissed the same Fox card many times a day. The
+  // guard must live at module scope (survives remounts, resets on relaunch).
+  // HomeScreen pulls the full native surface, so following the questPill /
+  // appIntegration precedent this is pinned by source scan.
+  const HOME_SCREEN = require('fs').readFileSync(
+    require('path').resolve(__dirname, '../components/home/HomeScreen.tsx'),
+    'utf8'
+  );
+
+  test('the guard is a module-scoped variable, not a component ref', () => {
+    expect(HOME_SCREEN).toMatch(/^let heavyHarvestNudgeShownThisSession = false;$/m);
+    expect(HOME_SCREEN).not.toContain('heavyHarvestNudgeShownRef');
+  });
+
+  test('the nudge effect checks and sets the module guard', () => {
+    expect(HOME_SCREEN).toContain('if (heavyHarvestNudgeShownThisSession) return;');
+    expect(HOME_SCREEN).toContain('heavyHarvestNudgeShownThisSession = true;');
+  });
+
+  test('the amber threshold and learned-pit gates stay in place', () => {
+    expect(HOME_SCREEN).toMatch(
+      /pendingHarvest\.pendingAmber < HARVEST_NUDGE_MIN_AMBER/
+    );
+    // Nudge only after the pit is learned (teaching belongs to the gate/intro).
+    const nudgeEffect = HOME_SCREEN.slice(
+      HOME_SCREEN.indexOf('if (heavyHarvestNudgeShownThisSession) return;'),
+      HOME_SCREEN.indexOf("setIntroContext('harvest_heavy_nudge')")
+    );
+    expect(nudgeEffect).toContain('hasSeenMandatoryHarvest()');
+  });
+});

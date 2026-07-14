@@ -1437,10 +1437,10 @@ export function pickNudgeVariant(
 }
 
 /**
- * The variant-offer nudge (revives the long-dead shouldOfferVariant path): once
- * per local day, after a STANDARD board, suggest a variant the player has
- * unlocked but never won. Marks the nudge date so it fires at most once/day.
- * Returns the variant key to suggest, or null.
+ * The variant-offer nudge: once per local day, after a STANDARD board, suggest
+ * a variant the player has unlocked but never won. Marks the nudge date so it
+ * fires at most once/day. Returns the variant key to suggest, or null.
+ * (The setup menu's teased locked rows are the always-visible complement.)
  */
 export async function consumeVariantNudge(
   unlockedVariants: string[],
