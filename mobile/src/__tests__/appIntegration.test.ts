@@ -140,8 +140,16 @@ describe('self-directed cold-open onboarding', () => {
     );
     expect(controls).toContain("onboardingFlow.onboardingStep === 'cold_open_puzzle'");
     expect(controls).toContain('label={getColdOpenSkipLabel()}');
-    expect(controls).toContain('onPress={onboardingActions.handleSkipOnboarding}');
+    expect(controls).toContain('onPress={handleColdOpenSkipPress}');
     expect(controls).toContain('accessibilityLabel={getColdOpenSkipAccessibilityLabel()}');
+    const confirmHandler = APP_TSX.slice(
+      APP_TSX.indexOf('const handleColdOpenSkipPress'),
+      APP_TSX.indexOf('// Auto-save puzzle state'),
+    );
+    expect(confirmHandler).toContain('getSkipConfirmText()');
+    expect(confirmHandler).toContain('getSkipConfirmLeaveLabel()');
+    expect(confirmHandler).toContain('onPress: onboardingActions.handleSkipOnboarding');
+    expect(confirmHandler).toContain('getSkipConfirmStayLabel()');
   });
 
   test('cold-open victory Continue clears the board and routes to the Fox invitation', () => {

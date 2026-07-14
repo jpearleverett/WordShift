@@ -117,6 +117,9 @@ import {
   getDwellLine,
   getColdOpenSkipLabel,
   getColdOpenSkipAccessibilityLabel,
+  getSkipConfirmText,
+  getSkipConfirmStayLabel,
+  getSkipConfirmLeaveLabel,
 } from './src/services/phaseNarrative';
 import { getActiveEvent, getEventDailyBonusAmber } from './src/services/liveEvents';
 import { recordSolveTime, getSolveTrend, recordSpeedRound } from './src/services/masteryRecords';
@@ -644,6 +647,24 @@ function MainApp() {
     puzzleActions.setMessage(COLD_OPEN_INSTRUCTION);
     logEvent({ type: 'puzzle_started', data: { difficulty: 'EASY', onboarding: true } });
   }, [onboardingActions, puzzleActions, transitionTo]);
+
+  const handleColdOpenSkipPress = useCallback(() => {
+    showGameAlert(
+      '',
+      getSkipConfirmText(),
+      [
+        {
+          text: getSkipConfirmLeaveLabel(),
+          style: 'destructive',
+          onPress: onboardingActions.handleSkipOnboarding,
+        },
+        {
+          text: getSkipConfirmStayLabel(),
+          style: 'cancel',
+        },
+      ],
+    );
+  }, [onboardingActions.handleSkipOnboarding]);
 
   // Auto-save puzzle state during active play
   useAutosave({
@@ -3808,7 +3829,7 @@ function MainApp() {
               icon=">"
               label={getColdOpenSkipLabel()}
               colors={getActionButtonColors('restart', persistence.currentPhase)}
-              onPress={onboardingActions.handleSkipOnboarding}
+              onPress={handleColdOpenSkipPress}
               disabled={false}
               accessibilityLabel={getColdOpenSkipAccessibilityLabel()}
             />
