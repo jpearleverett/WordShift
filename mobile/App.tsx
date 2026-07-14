@@ -3805,7 +3805,7 @@ function MainApp() {
           />
           {onboardingFlow.onboardingStep === 'cold_open_puzzle' && (
             <ActionButton
-              icon="»"
+              icon=">"
               label={getColdOpenSkipLabel()}
               colors={getActionButtonColors('restart', persistence.currentPhase)}
               onPress={onboardingActions.handleSkipOnboarding}
