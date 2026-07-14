@@ -2422,9 +2422,12 @@ function MainApp() {
   }, [puzzleActions]);
 
   // Challenge-only convenience: spend EARNED amber to refill one undo when out.
-  // Convenience, never progress — Challenge stays hint-free by design.
+  // Convenience, never progress — Challenge stays hint-free by design. Blind
+  // Offering is excluded: its undos are always free and unlimited, so a refill
+  // would charge amber for nothing (the chip is hidden in blind too — this
+  // guard is defense in depth).
   const handleBuyUndo = useCallback(async () => {
-    if (puzzle.gameMode !== 'challenge') return;
+    if (puzzle.gameMode !== 'challenge' || puzzle.blindMode) return;
     if (persistence.amberBalance < AMBER_UNDO_REFILL_COST) {
       puzzleActions.setMessage('Not enough amber for an undo.');
       hapticWarning();
@@ -2437,7 +2440,7 @@ function MainApp() {
       hapticSuccess();
       soundUndo();
     }
-  }, [puzzle.gameMode, persistence.amberBalance, puzzleActions, persistenceActions]);
+  }, [puzzle.gameMode, puzzle.blindMode, persistence.amberBalance, puzzleActions, persistenceActions]);
 
   const handleHintPress = useCallback(() => {
     hapticSelection();
@@ -2932,8 +2935,9 @@ function MainApp() {
 
   // Trial ladder: Challenge and Blind Offering are mutually exclusive rungs.
   // Challenge = no hints + limited undos, previews ON. Blind Offering = the
-  // apex rung: Challenge's limits (it runs under gameMode 'challenge') PLUS
-  // previews hidden and free moves judged once at the end of the chain.
+  // apex rung: no hints (it runs under gameMode 'challenge') PLUS previews
+  // hidden and free moves judged once at the end of the chain — but undos
+  // stay free and unlimited in blind (the challenge undo budget never applies).
   const handleToggleChallengeMode = useCallback(() => {
     hapticMedium();
     orchestrationActions.setCompletionCoda(null);
@@ -2945,8 +2949,9 @@ function MainApp() {
 
   // Blind Offering: chosen before the board (a fresh board applies it so the
   // player can't toggle previews back on mid-solve to peek). Sticky across Next
-  // Level; selecting it engages the challenge limits, deselecting returns to
-  // standard. Composes with any variant/difficulty.
+  // Level; selecting it engages the challenge rung (no hints — undos stay free
+  // in blind), deselecting returns to standard. Composes with any
+  // variant/difficulty.
   const handleToggleBlindMode = useCallback(() => {
     // Gate: Blind Offering is the apex rung and unlocks late. Turning it OFF
     // is always allowed (a restored legacy board may carry it in while locked).
@@ -3303,8 +3308,12 @@ function MainApp() {
         {onboardingFlow.isOnboarding ? null : (
         <View style={styles.statsRow}>
           <View style={styles.leftStatsGroup}>
-            {/* Challenge Mode Badge */}
-            {puzzle.gameMode === 'challenge' && (
+            {/* Challenge Mode Badge — hidden in Blind Offering. Blind runs
+                under gameMode 'challenge' internally, but its undos are always
+                free, so the undo-budget chrome (count + amber refill chip) is
+                meaningless there and the double chip read as a bug. The Blind
+                badge below is the mode's one standing indicator. */}
+            {puzzle.gameMode === 'challenge' && !puzzle.blindMode && (
               <View style={styles.challengeBadge}>
                 <Text style={styles.challengeBadgeText}>CHALLENGE</Text>
                 {puzzle.undosRemaining < Infinity && (

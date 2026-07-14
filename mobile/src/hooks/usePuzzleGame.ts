@@ -584,18 +584,14 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   // the same tick.
   const gameModeRef = useRef<GameMode>('standard');
   const difficultyRef = useRef<Difficulty>('MEDIUM');
-  // Blind Offering mercy: once the end-of-board judgment has failed on this
-  // board, undos stop charging against the limited budget. The punishment was
-  // already paid (an invalid attempt + the broken flawless run); walking the
-  // chain back to the flaw can take more undos than the budget holds, and a
-  // fail that can't be repaired reads as a bug, not a verdict. Cleared on any
-  // fresh/reset/restored board.
-  const blindFailFreeUndosRef = useRef(false);
-  // Blind Offering modifier (opt-in, Wordle-Hard-Mode shape): when on, the ghost
-  // word previews are hidden, so the player commits from their own word knowledge
-  // and learns only from the rejection shake. Sticky across Next Level like
-  // gameMode; forced OFF on daily/shared-challenge boards. Composes with any
-  // variant/difficulty. No amber bonus by design — the reward is the mastery.
+  // Blind Offering modifier (opt-in, the trial ladder's apex rung): previews
+  // hidden AND free moves — every structurally-legal move commits, and the
+  // chain is judged exactly once when the final letter lands. Runs under
+  // gameMode 'challenge' (no hints), but undos are ALWAYS free and unlimited
+  // in blind (design ruling — see handleUndo): walking the chain back to a
+  // flaw is the mode's core repair loop, never a budgeted resource. Sticky
+  // across Next Level like gameMode; forced OFF on daily/shared-challenge
+  // boards. Composes with any variant/difficulty.
   const [blindMode, setBlindMode] = useState(false);
   // Friend-challenge provenance for the current board (see PuzzleGameState doc).
   const [isSharedChallenge, setIsSharedChallenge] = useState(false);
@@ -742,7 +738,6 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setError(null);
     setIsStuck(false);
     setHintHighlight(null);
-    blindFailFreeUndosRef.current = false;
     moveOutcomesRef.current = [];
     setMoveOutcomes([]);
     pendingHintRef.current = false;
@@ -1810,15 +1805,15 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     // Blind Offering's single judgment: the finished chain must be all real
     // words. On failure the final move stays committed (the reveal is honest
     // about what the player built), the board stays live, and the message
-    // sends them back through undo. Counts one invalid attempt for stars.
+    // sends them back through undo — which never charges in blind (see
+    // handleUndo), so the repair is always possible. Counts one invalid
+    // attempt for stars.
     const judgeBlindCompletion = (completedWords: string[]) => {
       const holds = completedWords.every(w => checkValidation(w));
       if (holds) return null;
       setInvalidAttempts(prev => prev + 1);
       pendingMistakeRef.current = true;
       cleanMoveStreakRef.current = 0;
-      // From here on, undos are free on this board (see blindFailFreeUndosRef).
-      blindFailFreeUndosRef.current = true;
       shakeError(getBlindFailMessage(currentPhase));
       setIsProcessing(false);
       return {
@@ -1971,9 +1966,14 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     }
 
     // Challenge mode: limited undos (only applies to committed moves, not
-    // mid-step). A failed Blind Offering judgment unlocks free undos for the
-    // rest of the board — the fail must always be repairable.
-    const freeUndos = blindFailFreeUndosRef.current;
+    // mid-step). Blind Offering runs under gameMode 'challenge' but its undos
+    // are ALWAYS free and unlimited (design ruling): the chain is judged once
+    // at the end, so walking back to a flaw is the mode's core loop — it must
+    // never be blocked by or charged against the challenge budget. (A blind
+    // board's undosRemaining may still hold the finite challenge budget from
+    // applyBoard; it is deliberately never read or decremented on the blind
+    // path, and App hides the undo-budget chrome while blind is on.)
+    const freeUndos = blindMode;
     if (gameMode === 'challenge' && !freeUndos && undosRemaining <= 0) {
       shakeError("No undos remaining in Challenge Mode!");
       return;
@@ -2095,7 +2095,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     if (gameMode === 'challenge' && !freeUndos) {
       setUndosRemaining(prev => prev - 1);
     }
-  }, [history, gameMode, undosRemaining, shakeError, gameState, currentVariant, doubleShiftPhase]);
+  }, [history, gameMode, blindMode, undosRemaining, shakeError, gameState, currentVariant, doubleShiftPhase]);
 
   const handleNextLevel = useCallback(() => {
     setShowConfetti(false);
@@ -2222,10 +2222,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setReverseSolution(saved.reverseSolution);
     gameModeRef.current = saved.gameMode;
     setGameMode(saved.gameMode);
+    // blindMode restores with the board — a restored blind board keeps its
+    // always-free undos (the rule derives from the mode, not per-board state).
     setBlindMode(saved.blindMode ?? false);
-    // A restored board starts with a clean judgment slate (the free-undo
-    // mercy is per-live-board and deliberately not persisted).
-    blindFailFreeUndosRef.current = false;
     // Shared-challenge provenance rides in the autosave (isSharedChallenge in
     // SavedPuzzleState) so a kill+relaunch can't convert a shared board
     // (amber-only) into one that feeds phase progress. Old saves without the

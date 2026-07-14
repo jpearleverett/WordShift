@@ -22,20 +22,32 @@ import {
   getComboDescription,
 } from '../../services/puzzleVariety';
 import { BODY_FONT, BODY_FONT_ITALIC, PIXEL_FONT_BOLD } from '../../theme/fonts';
+import { useScreenInsets } from '../../hooks/useScreenInsets';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-// The menu floats at top: 52. Size it to the device so DIFFICULTY + PUZZLE STYLE
-// (Standard/Reverse/Speed/Double + combos) + CHALLENGE/BLIND all fit without the
-// last row clipping the frame. Strictly screen-derived: the old Math.max(560,…)
-// floor FORCED 560dp on short screens and pushed the last rows off the bottom
-// edge; the 140 budget covers the 52 anchor + gesture inset + shadow clearance.
-const MENU_MAX_HEIGHT = Math.max(380, Math.min(SCREEN_HEIGHT - 140, 900));
-// The scroll area must fit ABOVE the frame's ~21dp bottom wood band, or its
-// last row is clipped by the panel's overflow:hidden and can't be scrolled
-// into view. Reserve the top padding (30, clearing the top wood band) + title
-// (~26) + a bottom clearance (28 > the wood band) so the final row always
-// scrolls into clear parchment.
-const SCROLL_MAX_HEIGHT = MENU_MAX_HEIGHT - 88;
+// The menu floats at top: 52 inside the puzzle screen's statsRow, which itself
+// sits below the header block (16 top pad + ~59 wordmark + up to ~28 phase
+// badge + 8 bottom pad) and the row's own 8 top pad. This is that worst-case
+// chrome plus the 52 anchor: the panel's top edge sits ~(insets.top + this)
+// below the window top. The usable height is computed per-render from the
+// safe-area insets (see menuMaxHeight in the component) — the old
+// screen-height-minus-140 budget ignored the header block and the bottom
+// inset entirely, so on device the panel ran past the viewport and the last
+// rows (BLIND) were clipped beyond reach.
+const MENU_ANCHOR_BELOW_INSET = 171;
+// Floor so the panel stays usable even on absurdly short windows (the scroll
+// area + generous bottom padding keeps every row reachable there) and a cap
+// so tablets don't get a monolith.
+const MENU_MIN_HEIGHT = 300;
+const MENU_HEIGHT_CAP = 900;
+// Panel chrome around the scroll area: top padding (30, clearing the top wood
+// band) + title (~26) + a bottom clearance (28 > the wood band) so the final
+// row always scrolls into clear parchment, never under the frame's
+// overflow:hidden.
+const MENU_CHROME_HEIGHT = 88;
+// Base bottom padding inside the scroll content; the bottom safe-area inset
+// is added per-render so the last row (BLIND) always clears gesture bars.
+const SCROLL_BOTTOM_PAD = 28;
 
 /** Semantic difficulty ring colors (shared candy identity with the header dot). */
 const DIFFICULTY_RING_COLORS: Record<Difficulty, string> = {
@@ -91,7 +103,21 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   introMode = false,
   introHintText,
 }) => {
+  // Hook must run on every render (before the visibility early-return).
+  const screenInsets = useScreenInsets();
   if (!visible) return null;
+
+  // Bound the panel to the space actually below its anchor: window height
+  // minus the top inset + header chrome above the anchor, minus the bottom
+  // safe inset, with a little breathing room for the drop shadow.
+  const menuMaxHeight = Math.max(
+    MENU_MIN_HEIGHT,
+    Math.min(
+      SCREEN_HEIGHT - screenInsets.top - MENU_ANCHOR_BELOW_INSET - screenInsets.bottom - 12,
+      MENU_HEIGHT_CAP
+    )
+  );
+  const scrollMaxHeight = menuMaxHeight - MENU_CHROME_HEIGHT;
 
   const t = getSurfaceTheme(phase);
   const dark = phase >= 3;
@@ -110,13 +136,18 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   const selectedRowStyle = { backgroundColor: t.secondaryBg, borderColor: t.secondaryBorder };
   // Trial-ladder rungs are mutually exclusive: the CHALLENGE row lights only
   // for challenge-without-blind (Blind Offering runs under gameMode
-  // 'challenge' too, but its own row carries that state).
+  // 'challenge' too, but its own row carries that state). While blind is on,
+  // the CHALLENGE row renders as folded-in rather than deselected — plain
+  // deselection read as a broken toggle, when in truth blind absorbs the
+  // challenge rung. Tapping the folded row still switches to plain Challenge.
   const challengeActive = gameMode === 'challenge' && !blindActive;
+  const challengeIncluded = blindActive;
+  const blindName = phase >= 3 ? 'the Blind Offering' : 'Blind Mode';
 
   const panelStyle = StyleSheet.flatten([
     styles.difficultyMenu,
     !hasNonStandardVariants && styles.difficultyMenuCompact,
-    { shadowColor: t.screenBg },
+    { shadowColor: t.screenBg, maxHeight: menuMaxHeight },
   ]) as ViewStyle;
 
   /**
@@ -225,7 +256,13 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   return (
     <PanelCard phase={phase} kind="panel" style={panelStyle}>
       <Text style={[styles.menuTitle, { color: t.title }]}>{title}</Text>
-      <ScrollView style={styles.scrollArea} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        style={{ maxHeight: scrollMaxHeight }}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: SCROLL_BOTTOM_PAD + screenInsets.bottom },
+        ]}
+      >
         <Text style={[styles.sectionTitle, { color: t.muted }]}>DIFFICULTY</Text>
         {(['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'] as Difficulty[]).map(d => (
           <TouchableOpacity
@@ -309,28 +346,48 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
                   backgroundColor: t.dangerText + '14',
                   borderColor: t.dangerText + '55',
                 },
+                // Folded into blind: share the blind row's amber tint so the
+                // two rows read as one selected rung, never as deselected.
+                challengeIncluded && {
+                  backgroundColor: t.amberText + '14',
+                  borderColor: t.amberText + '55',
+                },
               ]}
               onPress={onToggleChallengeMode}
               accessibilityRole="button"
-              accessibilityState={{ selected: challengeActive }}
-              accessibilityLabel={`Challenge mode, ${challengeActive ? 'on' : 'off'}`}
+              accessibilityState={{ selected: challengeActive || challengeIncluded }}
+              accessibilityLabel={
+                challengeIncluded
+                  ? `Challenge mode, folded into ${blindName}. Tap to switch to Challenge on its own.`
+                  : `Challenge mode, ${challengeActive ? 'on' : 'off'}`
+              }
             >
               <Text style={styles.challengeMenuIcon}>
-                {challengeActive ? '🔓' : '🔒'}
+                {challengeIncluded ? '🌑' : challengeActive ? '🔓' : '🔒'}
               </Text>
               <View style={styles.challengeMenuContent}>
                 <Text
                   style={[
                     styles.menuRowText,
-                    { color: challengeActive ? t.dangerText : t.body },
+                    {
+                      color: challengeIncluded
+                        ? t.amberText
+                        : challengeActive
+                          ? t.dangerText
+                          : t.body,
+                    },
                   ]}
                 >
                   CHALLENGE
                 </Text>
                 <Text style={[styles.challengeMenuDesc, { color: t.muted }]}>
-                  {challengeActive
-                    ? 'No hints, limited undos, 1.25x amber'
-                    : 'No hints, limited undos, +25% amber'}
+                  {challengeIncluded
+                    ? phase >= 3
+                      ? 'Folded into the Blind Offering.'
+                      : 'Folded into Blind Mode.'
+                    : challengeActive
+                      ? 'No hints, limited undos, 1.25x amber'
+                      : 'No hints, limited undos, +25% amber'}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -391,8 +448,8 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
               </Text>
               <Text style={[styles.challengeMenuDesc, { color: t.muted }]}>
                 {blindActive
-                  ? 'Challenge limits, no previews. Judged once, at the end. 2x amber.'
-                  : 'Challenge limits, no previews, judged only at the end, 2x amber'}
+                  ? 'No hints, no previews, free shifts. Judged once, at the end. 2x amber.'
+                  : 'No hints, no previews, free shifts, judged only at the end, 2x amber'}
               </Text>
             </View>
           </TouchableOpacity>
@@ -408,7 +465,8 @@ const styles = StyleSheet.create({
     right: 20,
     top: 52,
     width: 290,
-    maxHeight: MENU_MAX_HEIGHT,
+    // maxHeight is applied inline (menuMaxHeight) — it depends on the live
+    // safe-area insets, so it cannot live in the static stylesheet.
     // Must clear the cottage panel frame's 24dp top wood band, or the title
     // sits inside the wood and reads as clipped against the top edge.
     paddingTop: 30,
@@ -430,9 +488,6 @@ const styles = StyleSheet.create({
     letterSpacing: SURFACE.sectionLetterSpacing,
     paddingHorizontal: 16,
     paddingBottom: 3,
-  },
-  scrollArea: {
-    maxHeight: SCROLL_MAX_HEIGHT,
   },
   scrollContent: {
     paddingHorizontal: 10,
