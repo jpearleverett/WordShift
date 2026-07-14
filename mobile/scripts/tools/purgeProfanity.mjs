@@ -76,6 +76,58 @@ const BLOCKED = new Set(BLOCKED_WORDS);
 const MOBILE = path.resolve(import.meta.dirname, '../..');
 const REPO = path.resolve(MOBILE, '..');
 
+/**
+ * Stored `allWords` includes starting and formed words, but not the shorter
+ * source remainder produced by each removal. A dictionary purge can therefore
+ * leave a bank entry whose visible words are clean but whose required hidden
+ * remainder was deleted. Inspect the canonical step objects as an additional
+ * guard so the solvability suite stays green after every vocabulary pass.
+ */
+function entryHasBlockedRemainder(entry) {
+  const steps = entry.match(/\{stepIndex:\d+,[^{}]*\}/g) ?? [];
+  for (const step of steps) {
+    const source = /sourceWord:'([A-Z]+)'/.exec(step)?.[1];
+    if (!source) continue;
+
+    const pairRaw = /removalPositions:\[([0-9,]+)\]/.exec(step)?.[1];
+    if (pairRaw) {
+      const positions = pairRaw
+        .split(',')
+        .map(Number)
+        .sort((a, b) => b - a);
+      let remainder = source;
+      for (const position of positions) {
+        remainder = remainder.slice(0, position) + remainder.slice(position + 1);
+      }
+      if (BLOCKED.has(remainder)) return true;
+      continue;
+    }
+
+    const storedPosition = /removalPosition:(\d+)/.exec(step)?.[1];
+    if (storedPosition !== undefined) {
+      const position = Number(storedPosition);
+      const remainder = source.slice(0, position) + source.slice(position + 1);
+      if (BLOCKED.has(remainder)) return true;
+      continue;
+    }
+
+    // Reverse hints do not persist a removal position. If every occurrence of
+    // the moved character produces a blocked remainder, no shipped-rule move
+    // can use that stored step.
+    const letter = /letterToMove:'([A-Z])'/.exec(step)?.[1];
+    if (!letter) continue;
+    const remainders = [...source]
+      .map((char, index) => char === letter
+        ? source.slice(0, index) + source.slice(index + 1)
+        : null)
+      .filter(Boolean);
+    if (remainders.length > 0 && remainders.every(word => BLOCKED.has(word))) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // 1) Mobile dictionary (validation + generation source for the app)
 {
   const file = path.join(MOBILE, 'src/dictionary.ts');
@@ -122,6 +174,7 @@ const REPO = path.resolve(MOBILE, '..');
       for (const m of entry.matchAll(formedRe)) {
         if (BLOCKED.has(m[1])) return false;
       }
+      if (entryHasBlockedRemainder(entry)) return false;
       return true;
     });
     const removed = entries.length - kept.length;
