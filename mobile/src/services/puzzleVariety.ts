@@ -5,11 +5,15 @@
  * - Add mechanical variety without overwhelming players.
  * - Introduce variants in a narrative-aware order.
  *
- * Variant progression order:
- * 1) Reverse      -> standard rules + return trip back to first row
- * 2) Speed        -> short row count + timer pressure
- * 3) Double Shift -> move two letters per step
- * 4) Chain        -> extended linked challenge
+ * Variant progression order (unlock gates spread across the full arc so
+ * mechanical novelty keeps landing instead of finishing by puzzle 35):
+ * 1) Reverse      (8)   -> standard rules + return trip back to first row
+ * 2) Double Shift (40)  -> move two letters per step
+ * 3) Speed        (70)  -> short row count + timer pressure
+ * The trial-ladder toggles gate separately (Challenge 15, Blind 100), and
+ * COMBO_PRESETS layer a variant + a trial rung at 55/85/115/135.
+ * Locked variants/combos are SHOWN in the setup menu as teased locked rows,
+ * so the player always sees the next mechanical goal.
  */
 
 import { Difficulty, PuzzleSolutionStep } from '../types';
@@ -59,6 +63,31 @@ export interface VariantSelectorOption {
   variant: PuzzleVariant;
   config: VariantConfig;
   group: 'core' | 'base';
+  unlocked: boolean;
+  unlockHint: string;
+}
+
+/**
+ * A combination style: one variant plus one trial-ladder rung, armed together
+ * as a single selection. Blind presets run under gameMode 'challenge' with
+ * blindMode on (the engine's existing composition); challenge presets run
+ * under gameMode 'challenge' with blindMode off.
+ */
+export interface ComboPreset {
+  id: 'twin_trial' | 'racing_shadows' | 'blind_return' | 'free_fall';
+  title: string;
+  description: string;
+  /** Phase 3+ dark description */
+  darkDescription: string;
+  icon: string;
+  variant: PuzzleVariant;
+  challenge: boolean;
+  blind: boolean;
+  unlockPuzzles: number;
+}
+
+export interface ComboSelectorOption {
+  preset: ComboPreset;
   unlocked: boolean;
   unlockHint: string;
 }
@@ -119,17 +148,27 @@ const VARIANT_MODIFIER_MAP: Record<PuzzleVariant, VariantModifier[]> = {
   double_shift: ['double_shift'],
 };
 
+// Selector display order matches unlock order: reverse -> double -> speed.
 const BASE_VARIANTS: VariantModifier[] = [
   'reverse',
-  'speed',
   'double_shift',
+  'speed',
 ];
 
 const VARIANT_UNLOCK_REQUIREMENTS: Record<Exclude<PuzzleVariant, 'standard'>, VariantUnlockRequirement> = {
   reverse: { puzzlesSolved: 8, minDepthPhase: 0 },
-  double_shift: { puzzlesSolved: 25, minDepthPhase: 0 },
-  speed: { puzzlesSolved: 35, minDepthPhase: 0 },
+  double_shift: { puzzlesSolved: 40, minDepthPhase: 0 },
+  speed: { puzzlesSolved: 70, minDepthPhase: 0 },
 };
+
+/**
+ * Trial-ladder toggle gates (the toggles live in App.tsx; the numbers live
+ * here with the variant gates so the whole unlock timeline reads in one place).
+ * Challenge is the middle rung; Blind Offering is the true apex and lands
+ * late, once the player has mastered every variant.
+ */
+export const CHALLENGE_TOGGLE_UNLOCK_PUZZLES = 15;
+export const BLIND_TOGGLE_UNLOCK_PUZZLES = 100;
 
 export function isPuzzleVariant(value: string): value is PuzzleVariant {
   return value in VARIANT_CONFIGS;
@@ -178,6 +217,37 @@ export function getNewlyUnlockedVariants(
   return nowUnlocked.filter(v => !previousSet.has(v));
 }
 
+/**
+ * Evocative one-line teases for locked modes. Light register for the bright
+ * days, dark register from the growing shadows on. Each stays true to what
+ * the mode will feel like without explaining the mechanic away.
+ */
+const VARIANT_LOCK_TEASES: Record<Exclude<PuzzleVariant, 'standard'>, { light: string; dark: string }> = {
+  reverse: {
+    light: 'Every chain wants to come back home.',
+    dark: 'What descends will be asked to climb again.',
+  },
+  double_shift: {
+    light: 'Some words will ask for two letters at once.',
+    dark: 'Soon the pattern will take two at a time.',
+  },
+  speed: {
+    light: 'One day the letters will race you.',
+    dark: 'The arrangement is learning not to wait.',
+  },
+};
+
+function formatLockedHint(tease: string, remainingPuzzles: number, uiPhase: number): string {
+  if (remainingPuzzles > 0) {
+    return uiPhase >= 3
+      ? `${tease} ${remainingPuzzles} more offering${remainingPuzzles === 1 ? '' : 's'}.`
+      : `${tease} Unlocks in ${remainingPuzzles} more puzzle${remainingPuzzles === 1 ? '' : 's'}.`;
+  }
+  return uiPhase >= 3
+    ? `${tease} Continue deeper into the arrangement.`
+    : `${tease} Keep solving to open this style.`;
+}
+
 export function getVariantUnlockHint(
   variant: PuzzleVariant,
   puzzlesSolved: number,
@@ -194,21 +264,25 @@ export function getVariantUnlockHint(
   }
 
   const remainingPuzzles = Math.max(0, req.puzzlesSolved - puzzlesSolved);
-  const needsDepth = currentPhase < req.minDepthPhase;
+  const tease = uiPhase >= 3
+    ? VARIANT_LOCK_TEASES[variant].dark
+    : VARIANT_LOCK_TEASES[variant].light;
+  return formatLockedHint(tease, remainingPuzzles, uiPhase);
+}
 
-  if (remainingPuzzles > 0 && needsDepth) {
-    return uiPhase >= 3
-      ? `${remainingPuzzles} more offerings, then go deeper.`
-      : `Unlocks in ${remainingPuzzles} more puzzles. Keep progressing to unlock deeper styles.`;
+/**
+ * Unlock hint for the Blind Offering toggle (not a variant, but it earns the
+ * same visible locked-row tease in the setup menu until its gate).
+ */
+export function getBlindUnlockHint(puzzlesSolved: number, uiPhase: number): string {
+  const remaining = Math.max(0, BLIND_TOGGLE_UNLOCK_PUZZLES - puzzlesSolved);
+  if (remaining <= 0) {
+    return uiPhase >= 3 ? 'Ready for the arrangement.' : 'Unlocked.';
   }
-  if (remainingPuzzles > 0) {
-    return uiPhase >= 3
-      ? `${remainingPuzzles} more offerings needed.`
-      : `Unlocks in ${remainingPuzzles} more puzzle${remainingPuzzles === 1 ? '' : 's'}.`;
-  }
-  return uiPhase >= 3
-    ? 'Continue deeper into the arrangement.'
-    : 'Keep progressing to unlock this style.';
+  const tease = uiPhase >= 3
+    ? 'One day you will offer a whole chain unseeing.'
+    : 'The last trial: no previews, judged only at the end.';
+  return formatLockedHint(tease, remaining, uiPhase);
 }
 
 export function getVariantSelectorOptions(
@@ -226,16 +300,14 @@ export function getVariantSelectorOptions(
     },
   ];
 
+  // Locked variants are INCLUDED (visibly locked, non-selectable in the menu)
+  // so the next mechanical goal is always on screen instead of hidden.
   for (const variant of BASE_VARIANTS) {
-    const unlocked = isVariantUnlocked(variant, puzzlesSolved, currentPhase);
-    if (!unlocked) {
-      continue;
-    }
     options.push({
       variant,
       config: VARIANT_CONFIGS[variant],
       group: 'base',
-      unlocked,
+      unlocked: isVariantUnlocked(variant, puzzlesSolved, currentPhase),
       unlockHint: getVariantUnlockHint(variant, puzzlesSolved, currentPhase, uiPhase),
     });
   }
@@ -244,36 +316,134 @@ export function getVariantSelectorOptions(
 }
 
 // ============================================================================
-// Variant Selection
+// Combination Styles (variant + trial rung, armed as one selection)
 // ============================================================================
 
-function getUnlockedBaseVariants(puzzlesSolved: number, currentPhase: number): PuzzleVariant[] {
-  return BASE_VARIANTS.filter(variant => isVariantUnlocked(variant, puzzlesSolved, currentPhase));
+/**
+ * Every composition here is engine-verified: challenge is a gameMode that
+ * composes with any variant (double-shift even has an atomic paired undo in
+ * challenge), and blind runs under gameMode 'challenge' with previews
+ * suppressed and one end-of-chain judgment. Blind + reverse has explicit
+ * ascent handling in usePuzzleGame; blind + double_shift is safe because the
+ * drop1 look-ahead only powers previews (never the commit path) and stuck
+ * detection is always false in blind, so no composition can soft-lock.
+ */
+export const COMBO_PRESETS: ComboPreset[] = [
+  {
+    id: 'twin_trial',
+    title: 'Twin Trial',
+    description: 'Double Shift under Challenge rules. Two letters a step, no hints, few undos.',
+    darkDescription: 'Two offerings a step, with nothing to catch you.',
+    icon: '⚔️',
+    variant: 'double_shift',
+    challenge: true,
+    blind: false,
+    unlockPuzzles: 55,
+  },
+  {
+    id: 'racing_shadows',
+    title: 'Racing Shadows',
+    description: 'Speed Shift under Challenge rules. Beat the clock with no hints and few undos.',
+    darkDescription: 'Outrun the closing pattern. It will not soften for you.',
+    icon: '🌪️',
+    variant: 'speed',
+    challenge: true,
+    blind: false,
+    unlockPuzzles: 85,
+  },
+  {
+    id: 'blind_return',
+    title: 'Blind Return',
+    description: 'Reverse Shift with no previews. Down and back, judged only at the end.',
+    darkDescription: 'Descend and return unseeing. Only the finished chain is judged.',
+    icon: '🌒',
+    variant: 'reverse',
+    challenge: false,
+    blind: true,
+    unlockPuzzles: 115,
+  },
+  {
+    id: 'free_fall',
+    title: 'Free Fall',
+    description: 'Double Shift with no previews. Two letters a step, judged only at the end.',
+    darkDescription: 'Two at a time, in the dark. The chain speaks only when it is whole.',
+    icon: '🕳️',
+    variant: 'double_shift',
+    challenge: false,
+    blind: true,
+    unlockPuzzles: 135,
+  },
+];
+
+const COMBO_LOCK_TEASES: Record<ComboPreset['id'], { light: string; dark: string }> = {
+  twin_trial: {
+    light: 'Double Shift with no net.',
+    dark: 'Two offerings a step, and no mercy.',
+  },
+  racing_shadows: {
+    light: 'Speed Shift with no net.',
+    dark: 'A race the arrangement will not soften.',
+  },
+  blind_return: {
+    light: 'Reverse Shift, played blind.',
+    dark: 'A blind descent, and a blind return.',
+  },
+  free_fall: {
+    light: 'Double Shift, played blind.',
+    dark: 'Two at a time, in the dark.',
+  },
+};
+
+/**
+ * A combo unlocks at its own gate, which always sits at or past every gate of
+ * its components (variant gate + trial-rung toggle gate) — guarded by tests.
+ */
+export function isComboUnlocked(
+  preset: ComboPreset,
+  puzzlesSolved: number,
+  currentPhase: number
+): boolean {
+  if (puzzlesSolved < preset.unlockPuzzles) return false;
+  if (!isVariantUnlocked(preset.variant, puzzlesSolved, currentPhase)) return false;
+  if (preset.challenge && puzzlesSolved < CHALLENGE_TOGGLE_UNLOCK_PUZZLES) return false;
+  if (preset.blind && puzzlesSolved < BLIND_TOGGLE_UNLOCK_PUZZLES) return false;
+  return true;
+}
+
+export function getComboDescription(preset: ComboPreset, phase: number): string {
+  return phase >= 3 ? preset.darkDescription : preset.description;
+}
+
+export function getComboUnlockHint(
+  preset: ComboPreset,
+  puzzlesSolved: number,
+  currentPhase: number,
+  uiPhase: number
+): string {
+  if (isComboUnlocked(preset, puzzlesSolved, currentPhase)) {
+    return uiPhase >= 3 ? 'Ready for the arrangement.' : 'Unlocked.';
+  }
+  const remaining = Math.max(0, preset.unlockPuzzles - puzzlesSolved);
+  const tease = uiPhase >= 3
+    ? COMBO_LOCK_TEASES[preset.id].dark
+    : COMBO_LOCK_TEASES[preset.id].light;
+  return formatLockedHint(tease, remaining, uiPhase);
 }
 
 /**
- * Determine if this puzzle should offer a variant mode.
- * Returns a variant config or null for standard play.
- *
- * Triggers on:
- * - Every 10th puzzle after onboarding comfort period
- * - ~12% random chance on other puzzles
+ * Selector rows for the COMBINATION STYLES section of the setup menu.
+ * Locked combos are included (teased, non-selectable), same as variants.
  */
-export function shouldOfferVariant(
+export function getComboSelectorOptions(
   puzzlesSolved: number,
-  currentPhase: number
-): VariantConfig | null {
-  // Keep the first chunk of play clean and fully standard.
-  if (puzzlesSolved < 18) return null;
-
-  const isVariantPuzzle = puzzlesSolved % 10 === 0 || Math.random() < 0.12;
-  if (!isVariantPuzzle) return null;
-
-  const pool = getUnlockedBaseVariants(puzzlesSolved, currentPhase);
-  if (pool.length === 0) return null;
-
-  const selected = pool[Math.floor(Math.random() * pool.length)];
-  return VARIANT_CONFIGS[selected];
+  currentPhase: number,
+  uiPhase: number
+): ComboSelectorOption[] {
+  return COMBO_PRESETS.map(preset => ({
+    preset,
+    unlocked: isComboUnlocked(preset, puzzlesSolved, currentPhase),
+    unlockHint: getComboUnlockHint(preset, puzzlesSolved, currentPhase, uiPhase),
+  }));
 }
 
 /**
