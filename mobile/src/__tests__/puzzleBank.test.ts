@@ -21,6 +21,7 @@ import { PUZZLE_BANK_MEDIUM } from '../data/puzzleBankMedium';
 import { PUZZLE_BANK_MEDIUM_PLUS } from '../data/puzzleBankMediumPlus';
 import { COMMON_WORDS } from '../constants/wordLists';
 import { isStandardChainSolvable } from '../services/puzzleSolvability';
+import { isUnbrokenWeaveEligible } from '../services/unbrokenWeave';
 
 // Helper: get a recency map (empty by default)
 function emptyRecencyMap(): Map<string, number> {
@@ -153,6 +154,68 @@ describe('puzzleBank', () => {
         result!.words,
         word => COMMON_WORDS.has(word),
       )).toBe('solvable');
+    });
+
+    it('filters Unbroken Weave selection to eligible canonical solutions', async () => {
+      const result = await selectPreGeneratedPuzzle(
+        'HARD',
+        5,
+        emptyRecencyMap(),
+        'standard',
+        180,
+        { unbrokenWeaveOnly: true },
+      );
+
+      expect(result).not.toBeNull();
+      expect(isUnbrokenWeaveEligible(result!.solution)).toBe(true);
+    });
+
+    it('recycles only eligible played boards for Unbroken Weave', async () => {
+      const eligible = PUZZLE_BANK_HARD.filter(puzzle =>
+        isUnbrokenWeaveEligible(puzzle.solution),
+      );
+      const ineligible = PUZZLE_BANK_HARD.find(puzzle =>
+        !isUnbrokenWeaveEligible(puzzle.solution),
+      );
+      expect(eligible.length).toBeGreaterThan(0);
+      expect(ineligible).toBeDefined();
+
+      const usedKey = 'wordshift_played_puzzle_ids';
+      await clearPlayedPuzzles();
+      await AsyncStorage.setItem(
+        usedKey,
+        JSON.stringify([ineligible!.id, ...eligible.map(puzzle => puzzle.id)]),
+      );
+
+      const result = await selectPreGeneratedPuzzle(
+        'HARD',
+        5,
+        emptyRecencyMap(),
+        'standard',
+        180,
+        { unbrokenWeaveOnly: true },
+      );
+
+      expect(result).not.toBeNull();
+      expect(isUnbrokenWeaveEligible(result!.solution)).toBe(true);
+      const storedIds = JSON.parse((await AsyncStorage.getItem(usedKey))!);
+      expect(storedIds).toContain(ineligible!.id);
+    });
+
+    it('does not extend an Unbroken Weave board after the depth gate', async () => {
+      const result = await selectPreGeneratedPuzzle(
+        'EASY',
+        5,
+        emptyRecencyMap(),
+        'standard',
+        100,
+        { unbrokenWeaveOnly: true },
+      );
+
+      expect(result).not.toBeNull();
+      expect(result!.words).toHaveLength(3);
+      expect(result!.solution).toHaveLength(2);
+      expect(isUnbrokenWeaveEligible(result!.solution)).toBe(true);
     });
 
     it('recycles oldest puzzles when bank is exhausted', async () => {

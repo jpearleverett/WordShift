@@ -654,6 +654,35 @@ export function getLockedLetterMessage(phase: DialoguePhase): string {
   return LOCKED_LETTER_MESSAGES[phase];
 }
 
+const UNBROKEN_WEAVE_SPENT_MESSAGES: Record<DialoguePhase, (letter: string) => string> = {
+  0: letter => `${letter} has already moved.`,
+  1: letter => `${letter} has already crossed the chain.`,
+  2: letter => `${letter} has already been given.`,
+  3: letter => `${letter} cannot cross the arrangement twice.`,
+  4: letter => `${letter} has already been claimed by the chain.`,
+  5: letter => `${letter} has crossed already. Each letter is given once.`,
+};
+
+export function getUnbrokenWeaveSpentLetterMessage(
+  letter: string,
+  phase: DialoguePhase,
+): string {
+  return UNBROKEN_WEAVE_SPENT_MESSAGES[phase](letter);
+}
+
+const UNBROKEN_WEAVE_UNAVAILABLE_MESSAGES: Record<DialoguePhase, string> = {
+  0: 'That rule did not fit this puzzle. Starting a standard puzzle instead.',
+  1: 'The thread would not hold. A standard puzzle begins instead.',
+  2: 'This chain cannot carry that rule. The usual path remains.',
+  3: 'The arrangement could not sustain the thread. A plain offering remains.',
+  4: 'The thread breaks before it begins. The arrangement offers another path.',
+  5: 'The thread cannot hold this board. A plain offering remains.',
+};
+
+export function getUnbrokenWeaveUnavailableMessage(phase: DialoguePhase): string {
+  return UNBROKEN_WEAVE_UNAVAILABLE_MESSAGES[phase];
+}
+
 // ============================================================================
 // NO VALID MOVES — Shown when no legal move remains from the current board
 // ============================================================================

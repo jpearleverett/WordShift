@@ -100,7 +100,8 @@ describe('self-directed cold-open onboarding', () => {
     expect(APP_TSX).toMatch(/step === 'cold_open_puzzle'/);
     expect(APP_TSX).toMatch(/await loadPuzzleState\(\)/);
     expect(APP_TSX).toMatch(/puzzleActions\.restorePuzzleState\(saved\)/);
-    expect(APP_TSX).toMatch(/puzzleActions\.startNewGame\('EASY', 'standard', 'standard', false\)/);
+    expect(APP_TSX).toMatch(/saved\.unbrokenWeaveMode !== true/);
+    expect(APP_TSX).toMatch(/puzzleActions\.startNewGame\('EASY', 'standard', 'standard', false, false\)/);
   });
 
   test('shows the concise instruction without FoxGuide or exact guidance', () => {

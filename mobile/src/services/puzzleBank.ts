@@ -21,12 +21,17 @@ import {
   BANK_NOVEL_BONUS_MOST,
   BANK_NOVEL_BONUS_SOME,
 } from '../constants/gameBalance';
+import { isUnbrokenWeaveEligible } from './unbrokenWeave';
 
 const BRANCHING_UNLOCK_PUZZLES = 40;
 const EXTENSION_UNLOCK_PUZZLES = 100;
 const BRANCHING_CONTEXT_CANDIDATES = 40;
 const BRANCHING_BONUS_CAP = 12;
 const branchingMetricsCache = new Map<string, PuzzleBranchingMetrics>();
+
+export interface PuzzleBankSelectionOptions {
+  unbrokenWeaveOnly?: boolean;
+}
 
 // ---------------------------------------------------------------------------
 // Bank Registry — single source of truth for all 12 puzzle banks
@@ -357,9 +362,16 @@ export async function selectPreGeneratedPuzzle(
   recencyMap: Map<string, number>,
   variant: PuzzleVariant = 'standard',
   puzzlesSolved: number = 0,
+  options: PuzzleBankSelectionOptions = {},
 ): Promise<PuzzleConfig | null> {
   const bank = getBankForSelection(difficulty, variant);
   if (!bank) return null;
+  if (options.unbrokenWeaveOnly && variant !== 'standard') return null;
+
+  const selectableBank = options.unbrokenWeaveOnly
+    ? bank.filter(puzzle => isUnbrokenWeaveEligible(puzzle.solution))
+    : bank;
+  if (selectableBank.length === 0) return null;
 
   const bankKey = getBankKey(difficulty, variant);
   const storageConfig = getStorageConfig(bankKey);
@@ -367,7 +379,7 @@ export async function selectPreGeneratedPuzzle(
   const usedSet = new Set(used);
 
   // Filter out already-played puzzles
-  let available = bank.filter(p => !usedSet.has(p.id));
+  let available = selectableBank.filter(p => !usedSet.has(p.id));
 
   // Phase 4+ dread steering: the climax must serve dread vocabulary, but a
   // played board must NEVER be re-served while ANY unplayed board remains
@@ -392,28 +404,45 @@ export async function selectPreGeneratedPuzzle(
 
   // If all puzzles exhausted, recycle the oldest-played half
   if (available.length === 0) {
-    const halfIdx = Math.floor(used.length / 2);
-    const recycledIds = new Set(used.slice(halfIdx));
+    if (options.unbrokenWeaveOnly) {
+      const selectableIds = new Set(selectableBank.map(puzzle => puzzle.id));
+      const usedSelectableIds = used.filter(id => selectableIds.has(id));
+      if (usedSelectableIds.length === 0) return null;
 
-    // Remove recycled IDs from the used list
-    const trimmed = used.slice(0, halfIdx);
-    storageConfig.setCache(trimmed);
-    try {
-      await AsyncStorage.setItem(storageConfig.key, JSON.stringify(trimmed));
-    } catch {
-      // Non-critical
-    }
-
-    available = bank.filter(p => recycledIds.has(p.id));
-
-    // If still empty (shouldn't happen), return all
-    if (available.length === 0) {
-      available = [...bank];
-      storageConfig.setCache([]);
+      const halfIdx = Math.floor(usedSelectableIds.length / 2);
+      const recycledIds = new Set(usedSelectableIds.slice(halfIdx));
+      const trimmed = used.filter(id => !recycledIds.has(id));
+      storageConfig.setCache(trimmed);
       try {
-        await AsyncStorage.setItem(storageConfig.key, JSON.stringify([]));
+        await AsyncStorage.setItem(storageConfig.key, JSON.stringify(trimmed));
       } catch {
         // Non-critical
+      }
+      available = selectableBank.filter(puzzle => recycledIds.has(puzzle.id));
+    } else {
+      const halfIdx = Math.floor(used.length / 2);
+      const recycledIds = new Set(used.slice(halfIdx));
+
+      // Remove recycled IDs from the used list
+      const trimmed = used.slice(0, halfIdx);
+      storageConfig.setCache(trimmed);
+      try {
+        await AsyncStorage.setItem(storageConfig.key, JSON.stringify(trimmed));
+      } catch {
+        // Non-critical
+      }
+
+      available = selectableBank.filter(p => recycledIds.has(p.id));
+
+      // If still empty (shouldn't happen), return all
+      if (available.length === 0) {
+        available = [...selectableBank];
+        storageConfig.setCache([]);
+        try {
+          await AsyncStorage.setItem(storageConfig.key, JSON.stringify([]));
+        } catch {
+          // Non-critical
+        }
       }
     }
   }
@@ -477,7 +506,11 @@ export async function selectPreGeneratedPuzzle(
     isDoubleShift: isDS || undefined,
   };
 
-  if (variant === 'standard' && puzzlesSolved >= EXTENSION_UNLOCK_PUZZLES) {
+  if (
+    variant === 'standard' &&
+    puzzlesSolved >= EXTENSION_UNLOCK_PUZZLES &&
+    !options.unbrokenWeaveOnly
+  ) {
     return extendStandardPuzzle(config, {
       excludedWords: new Set([
         ...selected.puzzle.allWords,

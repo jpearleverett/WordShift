@@ -77,6 +77,9 @@ interface DifficultyMenuProps {
   /** Blind toggle visible but not yet earned: render a teased locked row. */
   blindLocked?: boolean;
   blindUnlockHint?: string;
+  unbrokenWeaveActive?: boolean;
+  onToggleUnbrokenWeave?: () => void;
+  showUnbrokenWeave?: boolean;
   introMode?: boolean;
   introHintText?: string;
 }
@@ -100,6 +103,9 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   showBlindToggle = false,
   blindLocked = false,
   blindUnlockHint,
+  unbrokenWeaveActive = false,
+  onToggleUnbrokenWeave,
+  showUnbrokenWeave = false,
   introMode = false,
   introHintText,
 }) => {
@@ -450,6 +456,37 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
                 {blindActive
                   ? 'No hints, no previews, free shifts. Judged once, at the end. 2x amber.'
                   : 'No hints, no previews, free shifts, judged only at the end, 2x amber'}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        )}
+
+        {showUnbrokenWeave && phase === 5 && !introMode && onToggleUnbrokenWeave && (
+          <TouchableOpacity
+            style={[
+              styles.menuRow,
+              unbrokenWeaveActive && {
+                backgroundColor: t.amberText + '14',
+                borderColor: t.amberText + '55',
+              },
+            ]}
+            onPress={onToggleUnbrokenWeave}
+            accessibilityRole="button"
+            accessibilityState={{ selected: unbrokenWeaveActive }}
+            accessibilityLabel={`Unbroken Weave, ${unbrokenWeaveActive ? 'on' : 'off'}. Each letter may cross the chain only once.`}
+          >
+            <Text style={styles.challengeMenuIcon}>{'🧵'}</Text>
+            <View style={styles.challengeMenuContent}>
+              <Text
+                style={[
+                  styles.menuRowText,
+                  { color: unbrokenWeaveActive ? t.amberText : t.body },
+                ]}
+              >
+                UNBROKEN WEAVE
+              </Text>
+              <Text style={[styles.challengeMenuDesc, { color: t.muted }]}>
+                Each letter may cross the chain only once.
               </Text>
             </View>
           </TouchableOpacity>

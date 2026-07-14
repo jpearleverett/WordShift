@@ -89,6 +89,8 @@ jest.mock('../services/phaseNarrative', () => ({
   getFinalBoardStartMessage: jest.fn((_p: number) => 'The last arrangement. Take your time.'),
   getFinalBoardUndoRefusal: jest.fn((_p: number) => 'What is given now is given for good.'),
   getPreviewRescueMessage: jest.fn((_p: number) => 'The checks return for this board.'),
+  getUnbrokenWeaveSpentLetterMessage: jest.fn((letter: string, _p: number) => `${letter} has already crossed the chain.`),
+  getUnbrokenWeaveUnavailableMessage: jest.fn((_p: number) => 'The thread breaks before it can begin. A plain offering remains.'),
 }));
 
 jest.mock('../services/hints', () => ({
@@ -155,6 +157,12 @@ jest.mock('../constants', () => ({
     // Synthetic chain for multi-move tests: ABCD → EFGH → IJKL
     // (move A down forming AEFGH, then E down forming EIJKL)
     'BCD', 'AEFGH', 'AFGH', 'EIJKL',
+    // Unbroken Weave: first A forms AAEFG; the remaining unlocked A would
+    // otherwise be a legal repeat, while E is the next unspent hint.
+    'AAEFG', 'AEFG', 'AIJKL', 'AAFG', 'EIJKL',
+    // Unbroken Weave stuck detection: after A forms AAMNO, the only ordinary
+    // legal continuation reuses A and must therefore count as unavailable.
+    'AAMNO', 'AMNO', 'AQRST',
     // 4-row extension for the combo-ladder tests: ABCD → EFGH → IJKL → WXYZ
     // (third move: I out of EIJKL leaves EJKL, forms IWXYZ — keeps the board
     // solvable so stuck detection never resets the streak mid-test)
@@ -2635,6 +2643,234 @@ describe('usePuzzleGame', () => {
       actions2.restorePuzzleState(saved as unknown as import('../services/puzzleSaveState').SavedPuzzleState);
       [state] = callHook();
       expect(state.isSharedChallenge).toBe(false);
+    });
+  });
+
+  describe('Unbroken Weave', () => {
+    const amber = require('../services/amberCurrency');
+    const bank = require('../services/puzzleBank');
+    const narrative = require('../services/phaseNarrative');
+
+    async function serveUnbrokenWeave(words = ['ABCD', 'AEFG', 'IJKL']) {
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({
+        puzzlesSolved: 180,
+        postRevelation: true,
+      });
+      (bank.selectPreGeneratedPuzzle as jest.Mock).mockResolvedValueOnce({
+        words,
+        hint: 'weave',
+        solution: [
+          { stepIndex: 0, sourceWord: words[0], targetWord: words[1], letterToMove: 'A', explanation: '' },
+          { stepIndex: 1, sourceWord: words[1], targetWord: words[2], letterToMove: 'M', explanation: '' },
+        ],
+        wordLength: 4,
+      });
+      resetHookState();
+      let [, actions] = callHook();
+      actions.setCurrentPhase(5);
+      [, actions] = callHook();
+      await actions.startNewGame('MEDIUM', 'challenge', 'speed', true, true);
+    }
+
+    async function playMove(char: string, slot: number) {
+      let [state, actions] = callHook();
+      const letter = state.rows[state.activeRowIndex].words.find(
+        item => item.char === char && !item.isLocked,
+      )!;
+      actions.handleLetterPress(letter, state.activeRowIndex);
+      [, actions] = callHook();
+      return actions.handleSlotPress(slot);
+    }
+
+    test('enabling forces a fresh eligible standard bank board and normal rules', async () => {
+      await serveUnbrokenWeave();
+
+      const [state] = callHook();
+      expect(bank.selectPreGeneratedPuzzle).toHaveBeenLastCalledWith(
+        'MEDIUM',
+        5,
+        expect.any(Map),
+        'standard',
+        180,
+        { unbrokenWeaveOnly: true },
+      );
+      expect(state.unbrokenWeaveMode).toBe(true);
+      expect(state.currentVariant).toBe('standard');
+      expect(state.selectedVariant).toBe('standard');
+      expect(state.gameMode).toBe('standard');
+      expect(state.blindMode).toBe(false);
+      expect(state.spentLetters).toEqual([]);
+    });
+
+    test('successful moves spend their character and reject selecting it again', async () => {
+      await serveUnbrokenWeave();
+      await playMove('A', 0);
+
+      let [state, actions] = callHook();
+      expect(state.spentLetters).toEqual(['A']);
+      const repeatedA = state.rows[state.activeRowIndex].words.find(
+        item => item.char === 'A' && !item.isLocked,
+      )!;
+      expect(repeatedA).toBeDefined();
+
+      actions.handleLetterPress(repeatedA, state.activeRowIndex);
+      [state] = callHook();
+      expect(state.selectedLetter).toBeNull();
+      expect(state.error).toBe('A has already crossed the chain.');
+    });
+
+    test('undo releases the character spent by the undone move', async () => {
+      await serveUnbrokenWeave();
+      await playMove('A', 0);
+
+      let [, actions] = callHook();
+      actions.handleUndo();
+      const [state] = callHook();
+
+      expect(state.spentLetters).toEqual([]);
+      expect(state.activeRowIndex).toBe(0);
+    });
+
+    test('hints and stuck detection ignore spent characters', async () => {
+      await serveUnbrokenWeave(['ABCD', 'AMNO', 'QRST']);
+      await playMove('A', 0);
+      let [state] = callHook();
+      expect(state.isStuck).toBe(true);
+
+      const rows = [
+        {
+          id: 'row-source',
+          originalWord: 'AAEFG',
+          words: [
+            { id: 'spent-a', char: 'A', isLocked: true },
+            { id: 'open-a', char: 'A', isLocked: false },
+            { id: 'e', char: 'E', isLocked: false },
+            { id: 'f', char: 'F', isLocked: false },
+            { id: 'g', char: 'G', isLocked: false },
+          ],
+        },
+        {
+          id: 'row-target',
+          originalWord: 'IJKL',
+          words: 'IJKL'.split('').map((char, index) => ({
+            id: `target-${index}`,
+            char,
+            isLocked: false,
+          })),
+        },
+      ];
+      let [, actions] = callHook();
+      actions.restorePuzzleState({
+        rows,
+        activeRowIndex: 0,
+        selectedLetter: null,
+        gameState: GameState.PLAYING,
+        message: '',
+        history: [],
+        invalidAttempts: 0,
+        hintsUsed: 0,
+        undosRemaining: Infinity,
+        difficulty: 'MEDIUM',
+        currentWordLength: 4,
+        hint: '',
+        solution: [
+          {
+            stepIndex: 0,
+            sourceWord: 'AAEFG',
+            targetWord: 'IJKL',
+            letterToMove: 'A',
+            explanation: '',
+          },
+        ],
+        reverseSolution: undefined,
+        gameMode: 'standard',
+        currentVariant: 'standard',
+        selectedVariant: 'standard',
+        moveDirection: 'down',
+        currentPhase: 5,
+        lastFormedWord: null,
+        isPlayingDaily: false,
+        unbrokenWeaveMode: true,
+        spentLetters: ['A'],
+        savedAt: Date.now(),
+      } as import('../services/puzzleSaveState').SavedPuzzleState);
+      [, actions] = callHook();
+      actions.handleHint();
+
+      expect(narrative.getHintMessage).toHaveBeenLastCalledWith('E', 'EIJKL', 5);
+    });
+
+    test('restart clears spent letters but keeps the mode active', async () => {
+      await serveUnbrokenWeave();
+      await playMove('A', 0);
+
+      let [, actions] = callHook();
+      actions.resetCurrentPuzzle();
+      const [state] = callHook();
+
+      expect(state.unbrokenWeaveMode).toBe(true);
+      expect(state.spentLetters).toEqual([]);
+    });
+
+    test('restore keeps mode and spent letters only for eligible Phase 5 standard boards', async () => {
+      await serveUnbrokenWeave();
+      let [state, actions] = callHook();
+      const baseSaved = {
+        rows: state.rows,
+        activeRowIndex: 0,
+        selectedLetter: null,
+        gameState: GameState.PLAYING,
+        message: '',
+        history: [],
+        invalidAttempts: 0,
+        hintsUsed: 0,
+        undosRemaining: Infinity,
+        difficulty: 'MEDIUM',
+        currentWordLength: 4,
+        hint: '',
+        solution: state.solution,
+        reverseSolution: undefined,
+        gameMode: 'standard',
+        currentVariant: 'standard',
+        selectedVariant: 'standard',
+        moveDirection: 'down' as const,
+        currentPhase: 5 as const,
+        lastFormedWord: null,
+        isPlayingDaily: false,
+        unbrokenWeaveMode: true,
+        spentLetters: ['A'],
+        savedAt: Date.now(),
+      };
+
+      actions.restorePuzzleState(baseSaved as import('../services/puzzleSaveState').SavedPuzzleState);
+      [state, actions] = callHook();
+      expect(state.unbrokenWeaveMode).toBe(true);
+      expect(state.spentLetters).toEqual(['A']);
+
+      actions.restorePuzzleState({
+        ...baseSaved,
+        isFinalBoard: true,
+      } as import('../services/puzzleSaveState').SavedPuzzleState);
+      [state] = callHook();
+      expect(state.unbrokenWeaveMode).toBe(false);
+      expect(state.spentLetters).toEqual([]);
+    });
+
+    test('an unavailable eligible bank turns the mode off and explains the fallback', async () => {
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({
+        puzzlesSolved: 180,
+        postRevelation: true,
+      });
+      (bank.selectPreGeneratedPuzzle as jest.Mock).mockResolvedValueOnce(null);
+      resetHookState();
+      let [, actions] = callHook();
+      actions.setCurrentPhase(5);
+      [, actions] = callHook();
+      await actions.startNewGame('MEDIUM', 'standard', 'standard', false, true);
+
+      const [state] = callHook();
+      expect(state.unbrokenWeaveMode).toBe(false);
+      expect(state.message).toBe('The thread breaks before it can begin. A plain offering remains.');
     });
   });
 });

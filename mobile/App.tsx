@@ -609,14 +609,15 @@ function MainApp() {
       saved.difficulty === 'EASY' &&
       saved.gameMode === 'standard' &&
       saved.currentVariant === 'standard' &&
-      saved.blindMode !== true
+      saved.blindMode !== true &&
+      saved.unbrokenWeaveMode !== true
     );
 
     if (canRestoreColdOpen && saved) {
       puzzleActions.restorePuzzleState(saved);
     } else {
       if (saved) await clearPuzzleState();
-      await puzzleActions.startNewGame('EASY', 'standard', 'standard', false);
+      await puzzleActions.startNewGame('EASY', 'standard', 'standard', false, false);
     }
     puzzleActions.setMessage(COLD_OPEN_INSTRUCTION);
     logEvent({ type: 'puzzle_started', data: { difficulty: 'EASY', onboarding: true } });
@@ -642,6 +643,8 @@ function MainApp() {
     reverseSolution: puzzle.reverseSolution,
     gameMode: puzzle.gameMode,
     blindMode: puzzle.blindMode,
+    unbrokenWeaveMode: puzzle.unbrokenWeaveMode,
+    spentLetters: puzzle.spentLetters,
     currentVariant: puzzle.currentVariant,
     selectedVariant: puzzle.selectedVariant,
     moveDirection: puzzle.moveDirection,
@@ -791,7 +794,7 @@ function MainApp() {
         // Re-init the guided tutorial puzzle so the player resumes a live,
         // winnable board with the Fox overlay rather than a dead screen.
         setCurrentScreen('puzzle');
-        puzzleActions.startNewGame('EASY');
+        puzzleActions.startNewGame('EASY', 'standard', 'standard', false, false);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1111,10 +1114,15 @@ function MainApp() {
     setIsPlayingDaily(false);
     resetSpeedRun();
     transitionTo('home', () => {
-      puzzleActions.setGameState(GameState.IDLE);
+      if (puzzle.unbrokenWeaveMode) {
+        clearPuzzleState().catch(() => {});
+        puzzleActions.clearBoard();
+      } else {
+        puzzleActions.setGameState(GameState.IDLE);
+      }
       puzzleActions.setShowConfetti(false);
     });
-  }, [puzzleActions, transitionTo]);
+  }, [puzzleActions, puzzle.unbrokenWeaveMode, transitionTo]);
 
   // Reset All completed but an in-place reload wasn't available (Expo Go /
   // dev client — Updates.reloadAsync throws there). Storage and service
@@ -1252,7 +1260,7 @@ function MainApp() {
         // Daily generation failed — fall back to a standard HARD puzzle so the
         // player is never stranded on a loading screen.
         setIsPlayingDaily(false);
-        await puzzleActions.startNewGame('HARD');
+        await puzzleActions.startNewGame('HARD', 'standard', 'standard', false, false);
       }
     });
   }, [puzzleActions, transitionTo, persistenceActions, orchestrationActions, persistence.currentPhase, maybeShowSetupSelectorIntro]);
@@ -2874,7 +2882,12 @@ function MainApp() {
         // (mid-puzzle progress itself is preserved by autosave).
         transitionTo('home', () => {
           if (currentScreen === 'puzzle') {
-            puzzleActions.setGameState(GameState.IDLE);
+            if (puzzle.unbrokenWeaveMode) {
+              clearPuzzleState().catch(() => {});
+              puzzleActions.clearBoard();
+            } else {
+              puzzleActions.setGameState(GameState.IDLE);
+            }
             puzzleActions.setShowConfetti(false);
           }
         });
@@ -2883,7 +2896,7 @@ function MainApp() {
       return false;
     });
     return () => subscription.remove();
-  }, [currentScreen, transitionTo, onboardingFlow.isOnboarding, puzzleActions, puzzle.gameState, victoryFlow.victoryData, persistence.pendingPhaseTransition, handleGoToPit]);
+  }, [currentScreen, transitionTo, onboardingFlow.isOnboarding, puzzleActions, puzzle.gameState, puzzle.unbrokenWeaveMode, victoryFlow.victoryData, persistence.pendingPhaseTransition, handleGoToPit]);
 
   // Optional rewarded "double the reward": credits a bonus equal to this
   // puzzle's amber (a true 2x), reward-only — never phase progress. One claim
@@ -2992,7 +3005,13 @@ function MainApp() {
     orchestrationActions.setCompletionCoda(null);
     resetSpeedRun();
     puzzleActions.setSelectedVariant(variant);
-    puzzleActions.startNewGame(puzzle.difficulty, puzzle.gameMode, variant);
+    puzzleActions.startNewGame(
+      puzzle.difficulty,
+      puzzle.gameMode,
+      variant,
+      undefined,
+      false,
+    );
   }, [
     puzzleActions,
     puzzle.difficulty,
@@ -3013,7 +3032,13 @@ function MainApp() {
     resetSpeedRun();
     const isChallengeOnly = puzzle.gameMode === 'challenge' && !puzzle.blindMode;
     const newMode = isChallengeOnly ? 'standard' : 'challenge';
-    puzzleActions.startNewGame(puzzle.difficulty, newMode, puzzle.selectedVariant, false);
+    puzzleActions.startNewGame(
+      puzzle.difficulty,
+      newMode,
+      puzzle.selectedVariant,
+      false,
+      false,
+    );
   }, [puzzleActions, puzzle.gameMode, puzzle.difficulty, puzzle.selectedVariant, puzzle.blindMode, orchestrationActions]);
 
   // Blind Offering: chosen before the board (a fresh board applies it so the
@@ -3031,11 +3056,44 @@ function MainApp() {
     orchestrationActions.setCompletionCoda(null);
     resetSpeedRun();
     if (puzzle.blindMode) {
-      puzzleActions.startNewGame(puzzle.difficulty, 'standard', puzzle.selectedVariant, false);
+      puzzleActions.startNewGame(
+        puzzle.difficulty,
+        'standard',
+        puzzle.selectedVariant,
+        false,
+        false,
+      );
     } else {
-      puzzleActions.startNewGame(puzzle.difficulty, 'challenge', puzzle.selectedVariant, true);
+      puzzleActions.startNewGame(
+        puzzle.difficulty,
+        'challenge',
+        puzzle.selectedVariant,
+        true,
+        false,
+      );
     }
   }, [puzzleActions, puzzle.difficulty, puzzle.selectedVariant, puzzle.blindMode, puzzlesSolvedForVariantUnlocks, orchestrationActions, resetSpeedRun]);
+
+  const handleToggleUnbrokenWeave = useCallback(() => {
+    if (persistence.currentPhase !== 5) return;
+    hapticMedium();
+    orchestrationActions.setCompletionCoda(null);
+    resetSpeedRun();
+    puzzleActions.startNewGame(
+      puzzle.difficulty,
+      'standard',
+      'standard',
+      false,
+      !puzzle.unbrokenWeaveMode,
+    );
+  }, [
+    persistence.currentPhase,
+    puzzleActions,
+    puzzle.difficulty,
+    puzzle.unbrokenWeaveMode,
+    orchestrationActions,
+    resetSpeedRun,
+  ]);
 
   // Combination styles: one tap arms a variant plus its trial rung atomically
   // on a fresh board (never two sequential startNewGame calls, which would
@@ -3053,7 +3111,8 @@ function MainApp() {
       puzzle.difficulty,
       combo.challenge || combo.blind ? 'challenge' : 'standard',
       combo.variant,
-      combo.blind
+      combo.blind,
+      false,
     );
   }, [
     puzzleActions,
@@ -3449,6 +3508,24 @@ function MainApp() {
                 </Text>
               </View>
             )}
+            {puzzle.unbrokenWeaveMode && (
+              <View
+                style={[
+                  styles.variantBadge,
+                  styles.variantBadgeDark,
+                ]}
+                accessible
+                accessibilityLabel={`Unbroken Weave is on, ${puzzle.spentLetters.length} letters spent`}
+              >
+                <Text style={styles.variantBadgeIcon}>{'🧵'}</Text>
+                <Text style={[
+                  styles.variantBadgeText,
+                  styles.variantBadgeTextDark,
+                ]}>
+                  {puzzle.spentLetters.length}
+                </Text>
+              </View>
+            )}
           </View>
 
           <TouchableOpacity
@@ -3495,6 +3572,9 @@ function MainApp() {
             showBlindToggle={puzzlesSolvedForVariantUnlocks >= CHALLENGE_TOGGLE_UNLOCK_PUZZLES}
             blindLocked={puzzlesSolvedForVariantUnlocks < BLIND_TOGGLE_UNLOCK_PUZZLES}
             blindUnlockHint={getBlindUnlockHint(puzzlesSolvedForVariantUnlocks, persistence.currentPhase)}
+            showUnbrokenWeave={persistence.currentPhase === 5}
+            unbrokenWeaveActive={puzzle.unbrokenWeaveMode}
+            onToggleUnbrokenWeave={handleToggleUnbrokenWeave}
             introMode={showSetupSelectorIntro}
             introHintText={showSetupSelectorIntro ? setupSelectorLines[1] : undefined}
           />
