@@ -36,7 +36,11 @@ import { useAutosave } from './src/hooks/useAutosave';
 import { logEvent } from './src/services/eventLogger';
 import { SettingsScreen } from './src/components/SettingsScreen';
 import { FoxGuide } from './src/components/FoxGuide';
-import { COLD_OPEN_INSTRUCTION, ONBOARDING_FOX_LINES } from './src/services/onboarding';
+import {
+  COLD_OPEN_INSTRUCTION,
+  ONBOARDING_FOX_LINES,
+  resolveColdOpenLaunchRoute,
+} from './src/services/onboarding';
 import {
   awardBonusAmber,
   spendAmber,
@@ -111,6 +115,8 @@ import {
   getSwiftVictoryHintMessage,
   getStreakHeldMessage,
   getDwellLine,
+  getColdOpenSkipLabel,
+  getColdOpenSkipAccessibilityLabel,
 } from './src/services/phaseNarrative';
 import { getActiveEvent, getEventDailyBonusAmber } from './src/services/liveEvents';
 import { recordSolveTime, getSolveTrend, recordSpeedRound } from './src/services/masteryRecords';
@@ -601,8 +607,10 @@ function MainApp() {
   const [onboardingFlow, onboardingActions] = useOnboardingFlow(onboardingCallbacks);
 
   const launchColdOpenPuzzle = useCallback(async () => {
-    setCurrentScreen('puzzle');
-    const saved = await loadPuzzleState();
+    const [saved, stats] = await Promise.all([
+      loadPuzzleState(),
+      getCumulativeStats(),
+    ]);
     const canRestoreColdOpen = (
       saved?.gameState === GameState.PLAYING &&
       !saved.isPlayingDaily &&
@@ -612,8 +620,22 @@ function MainApp() {
       saved.blindMode !== true &&
       saved.unbrokenWeaveMode !== true
     );
+    const route = resolveColdOpenLaunchRoute(
+      canRestoreColdOpen,
+      stats?.totalPuzzlesCompleted ?? 0,
+    );
 
-    if (canRestoreColdOpen && saved) {
+    if (route === 'home_empty') {
+      if (saved) await clearPuzzleState();
+      await onboardingActions.advanceOnboarding('home_empty');
+      transitionTo('home', () => {
+        puzzleActions.clearBoard();
+      });
+      return;
+    }
+
+    setCurrentScreen('puzzle');
+    if (route === 'restore' && saved) {
       puzzleActions.restorePuzzleState(saved);
     } else {
       if (saved) await clearPuzzleState();
@@ -621,7 +643,7 @@ function MainApp() {
     }
     puzzleActions.setMessage(COLD_OPEN_INSTRUCTION);
     logEvent({ type: 'puzzle_started', data: { difficulty: 'EASY', onboarding: true } });
-  }, [puzzleActions]);
+  }, [onboardingActions, puzzleActions, transitionTo]);
 
   // Auto-save puzzle state during active play
   useAutosave({
@@ -3781,6 +3803,16 @@ function MainApp() {
                 : `Hint, ${puzzle.hintBalance} remaining`
             }
           />
+          {onboardingFlow.onboardingStep === 'cold_open_puzzle' && (
+            <ActionButton
+              icon="»"
+              label={getColdOpenSkipLabel()}
+              colors={getActionButtonColors('restart', persistence.currentPhase)}
+              onPress={onboardingActions.handleSkipOnboarding}
+              disabled={false}
+              accessibilityLabel={getColdOpenSkipAccessibilityLabel()}
+            />
+          )}
           {!onboardingFlow.isOnboarding && (
           <ActionButton
             icon="🔄"

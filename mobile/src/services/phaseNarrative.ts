@@ -617,6 +617,20 @@ export function getInvalidWordMessage(word: string, phase: DialoguePhase): strin
   return INVALID_WORD_MESSAGES[phase](word);
 }
 
+const BLOCKED_WORD_MESSAGES: Record<DialoguePhase, string> = {
+  0: 'That letter cannot rest there. Try another spot.',
+  1: 'That letter cannot settle there. Try another spot.',
+  2: 'The pattern refuses that placement.',
+  3: 'The arrangement refuses that placement.',
+  4: 'That placement is not accepted.',
+  5: 'The weave refuses that placement.',
+};
+
+/** Reject a blocked intermediate without repeating the hidden term. */
+export function getBlockedWordMessage(phase: DialoguePhase): string {
+  return BLOCKED_WORD_MESSAGES[phase];
+}
+
 // ============================================================================
 // BLIND OFFERING REVEAL — the end-of-board judgment when the finished chain
 // contains a non-word. Blind mode commits every move without validation, so
@@ -3329,6 +3343,14 @@ export function getSkipConfirmStayLabel(): string {
 
 export function getSkipConfirmLeaveLabel(): string {
   return 'Skip it all';
+}
+
+export function getColdOpenSkipLabel(): string {
+  return 'SKIP';
+}
+
+export function getColdOpenSkipAccessibilityLabel(): string {
+  return 'Skip the welcome and go home';
 }
 
 /**

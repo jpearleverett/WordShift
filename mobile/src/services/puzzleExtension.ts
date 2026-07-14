@@ -8,6 +8,8 @@ import {
   WORDS_7,
 } from '../constants/wordLists';
 
+export const PUZZLE_EXTENSION_UNLOCK_PUZZLES = 100;
+
 export interface PuzzleExtensionOptions {
   candidateWords?: readonly string[];
   isValidWord?: (word: string) => boolean;

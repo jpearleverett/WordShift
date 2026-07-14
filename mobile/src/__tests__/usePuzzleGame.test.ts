@@ -84,6 +84,7 @@ jest.mock('../services/phaseNarrative', () => ({
   getLoadingMessage: jest.fn(() => 'Loading...'),
   getStartMessage: jest.fn(() => 'Tap a tile to begin!'),
   getInvalidWordMessage: jest.fn((word: string, _p: number) => `${word} isn't a word!`),
+  getBlockedWordMessage: jest.fn((_p: number) => 'That word cannot be used.'),
   getBlindFailMessage: jest.fn((_p: number) => 'Not every word held! Undo and mend the chain.'),
   getLockedLetterMessage: jest.fn((_p: number) => 'That letter is locked!'),
   getFinalBoardStartMessage: jest.fn((_p: number) => 'The last arrangement. Take your time.'),
@@ -133,6 +134,11 @@ jest.mock('../services/wordHistory', () => ({
 // Mock puzzleBank to return null — tests exercise the generation path
 jest.mock('../services/puzzleBank', () => ({
   selectPreGeneratedPuzzle: jest.fn(async () => null),
+}));
+
+jest.mock('../services/puzzleExtension', () => ({
+  PUZZLE_EXTENSION_UNLOCK_PUZZLES: 100,
+  extendStandardPuzzle: jest.fn(config => config),
 }));
 
 // The hook value-imports the shared 3-6 challenge word-count bounds from
@@ -260,6 +266,14 @@ describe('resolvePreviewGradingMode', () => {
 
 describe('usePuzzleGame', () => {
   beforeEach(() => {
+    jest.clearAllMocks();
+    const amber = require('../services/amberCurrency');
+    const bank = require('../services/puzzleBank');
+    const extension = require('../services/puzzleExtension');
+    (amber.getFullProgress as jest.Mock).mockResolvedValue({ puzzlesSolved: 20 });
+    (amber.getRitualWords as jest.Mock).mockResolvedValue([]);
+    (bank.selectPreGeneratedPuzzle as jest.Mock).mockResolvedValue(null);
+    (extension.extendStandardPuzzle as jest.Mock).mockImplementation(config => config);
     resetHookState();
     jest.useFakeTimers();
   });
@@ -972,6 +986,61 @@ describe('usePuzzleGame', () => {
       expect(state.gameState).toBe(GameState.PLAYING);
     });
 
+    test('attempts a deterministic extension for a post-100 generated standard fallback', async () => {
+      const amber = require('../services/amberCurrency');
+      const extension = require('../services/puzzleExtension');
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({ puzzlesSolved: 101 });
+      (extension.extendStandardPuzzle as jest.Mock).mockImplementationOnce(config => ({
+        ...config,
+        words: [...config.words, 'WXYZ'],
+        solution: [
+          ...(config.solution ?? []),
+          {
+            stepIndex: config.words.length - 1,
+            sourceWord: 'TEND',
+            targetWord: 'WXYZ',
+            letterToMove: 'T',
+            explanation: 'test extension',
+          },
+        ],
+      }));
+
+      resetHookState();
+      let [, actions] = callHook();
+      await actions.startNewGame('MEDIUM', 'standard', 'standard');
+
+      const [state] = callHook();
+      expect(extension.extendStandardPuzzle).toHaveBeenCalledTimes(1);
+      expect(state.rows).toHaveLength(5);
+    });
+
+    test('falls through to the guaranteed bank when a post-100 echo cannot extend', async () => {
+      const amber = require('../services/amberCurrency');
+      const bank = require('../services/puzzleBank');
+      const extension = require('../services/puzzleExtension');
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({ puzzlesSolved: 100 });
+      (amber.getRitualWords as jest.Mock).mockResolvedValueOnce(['LIME']);
+      (extension.extendStandardPuzzle as jest.Mock).mockImplementationOnce(config => config);
+      (bank.selectPreGeneratedPuzzle as jest.Mock).mockResolvedValueOnce({
+        words: ['SUIT', 'SITE', 'WHAT', 'HERE', 'LIME'],
+        hint: 'Guaranteed bank hint',
+        solution: [],
+        wordLength: 4,
+      });
+
+      resetHookState();
+      let [, actions] = callHook();
+      actions.setCurrentPhase(3);
+      [, actions] = callHook();
+      await actions.startNewGame('MEDIUM', 'standard', 'standard');
+
+      const [state] = callHook();
+      expect(extension.extendStandardPuzzle).toHaveBeenCalledTimes(1);
+      expect(bank.selectPreGeneratedPuzzle).toHaveBeenCalled();
+      expect(state.isEchoPuzzle).toBe(false);
+      expect(state.rows).toHaveLength(5);
+    });
+
     test('uses selected variant for new puzzles', async () => {
       resetHookState();
       let [, actions] = callHook();
@@ -1519,6 +1588,44 @@ describe('usePuzzleGame', () => {
       const [state] = callHook();
       expect(state.slotPreviews![2].word).toBe('TIMED');
       expect(state.slotPreviews![2].isValid).toBe(true);
+    });
+
+    test('masks and rejects a blocked Double Shift drop1 target intermediate', async () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['NABCD', 'IPPLE'], undefined, undefined, 5, 'double_shift');
+      selectLetter('N');
+
+      let [state] = callHook();
+      expect(state.slotPreviews![0].word).toBe('••••••');
+      expect(state.slotPreviews![0].word).not.toContain('NIPPLE');
+      expect(state.slotPreviews![0].isValid).toBe(false);
+
+      [, actions] = callHook();
+      const result = await actions.handleSlotPress(0);
+      expect(result).toBeNull();
+      [state] = callHook();
+      expect(state.rows[0].words.map(letter => letter.char).join('')).toBe('NABCD');
+      expect(state.rows[1].words.map(letter => letter.char).join('')).toBe('IPPLE');
+      expect(state.history).toHaveLength(0);
+    });
+
+    test('rejects a blocked Double Shift drop1 source remainder before commit', async () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['XBARF', 'FGHIJ'], undefined, undefined, 5, 'double_shift');
+      selectLetter('X');
+
+      let [state] = callHook();
+      expect(state.slotPreviews!.every(preview => !preview.isValid)).toBe(true);
+
+      [, actions] = callHook();
+      const result = await actions.handleSlotPress(0);
+      expect(result).toBeNull();
+      [state] = callHook();
+      expect(state.rows[0].words.map(letter => letter.char).join('')).toBe('XBARF');
+      expect(state.rows[1].words.map(letter => letter.char).join('')).toBe('FGHIJ');
+      expect(state.history).toHaveLength(0);
     });
   });
 

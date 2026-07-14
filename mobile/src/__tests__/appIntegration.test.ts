@@ -104,6 +104,20 @@ describe('self-directed cold-open onboarding', () => {
     expect(APP_TSX).toMatch(/puzzleActions\.startNewGame\('EASY', 'standard', 'standard', false, false\)/);
   });
 
+  test('routes a recorded cold-open victory without an autosave to home_empty', () => {
+    const launcher = APP_TSX.slice(
+      APP_TSX.indexOf('const launchColdOpenPuzzle'),
+      APP_TSX.indexOf('// Auto-save puzzle state'),
+    );
+    expect(launcher).toContain('getCumulativeStats()');
+    expect(launcher).toContain('resolveColdOpenLaunchRoute');
+    expect(launcher).toContain("advanceOnboarding('home_empty')");
+    expect(launcher).toContain("transitionTo('home'");
+    expect(launcher.indexOf("route === 'home_empty'")).toBeLessThan(
+      launcher.indexOf("startNewGame('EASY'"),
+    );
+  });
+
   test('shows the concise instruction without FoxGuide or exact guidance', () => {
     expect(APP_TSX).toMatch(/puzzleActions\.setMessage\(COLD_OPEN_INSTRUCTION\)/);
     expect(APP_TSX).toMatch(/if \(onboardingFlow\.onboardingStep !== 'puzzle_tutorial'\) return null;/);
@@ -114,6 +128,17 @@ describe('self-directed cold-open onboarding', () => {
     );
     expect(onboardingPuzzleGuide.length).toBeGreaterThan(0);
     expect(onboardingPuzzleGuide).not.toContain("cold_open_puzzle");
+  });
+
+  test('shows an accessible bottom-control SKIP action for the unguided cold open', () => {
+    const controls = APP_TSX.slice(
+      APP_TSX.indexOf('{/* Bottom Controls'),
+      APP_TSX.indexOf('{/* Rules Modal'),
+    );
+    expect(controls).toContain("onboardingFlow.onboardingStep === 'cold_open_puzzle'");
+    expect(controls).toContain('label={getColdOpenSkipLabel()}');
+    expect(controls).toContain('onPress={onboardingActions.handleSkipOnboarding}');
+    expect(controls).toContain('accessibilityLabel={getColdOpenSkipAccessibilityLabel()}');
   });
 
   test('cold-open victory Continue clears the board and routes to the Fox invitation', () => {

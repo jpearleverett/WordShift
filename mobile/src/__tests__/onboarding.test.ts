@@ -7,7 +7,12 @@ import {
   resetOnboarding,
   COLD_OPEN_INSTRUCTION,
   ONBOARDING_FOX_LINES,
+  resolveColdOpenLaunchRoute,
 } from '../services/onboarding';
+import {
+  getColdOpenSkipAccessibilityLabel,
+  getColdOpenSkipLabel,
+} from '../services/phaseNarrative';
 
 // Mock AsyncStorage
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -60,6 +65,30 @@ describe('onboarding', () => {
       await resetOnboarding();
       const step = await getOnboardingStep();
       expect(step).toBe('not_started');
+    });
+  });
+
+  describe('cold-open crash recovery', () => {
+    test('restores a playable cold-open autosave even after progress was recorded', () => {
+      expect(resolveColdOpenLaunchRoute(true, 1)).toBe('restore');
+    });
+
+    test('routes to the empty home when victory progress exists without a playable autosave', () => {
+      expect(resolveColdOpenLaunchRoute(false, 1)).toBe('home_empty');
+      expect(resolveColdOpenLaunchRoute(false, 9)).toBe('home_empty');
+    });
+
+    test('starts the cold-open board only when neither a save nor victory progress exists', () => {
+      expect(resolveColdOpenLaunchRoute(false, 0)).toBe('new_board');
+    });
+  });
+
+  describe('cold-open skip copy', () => {
+    test('is concise, accessible, and em-dash free', () => {
+      expect(getColdOpenSkipLabel()).toBe('SKIP');
+      expect(getColdOpenSkipAccessibilityLabel().toLowerCase()).toContain('skip');
+      expect(getColdOpenSkipAccessibilityLabel().toLowerCase()).toContain('home');
+      expect(getColdOpenSkipAccessibilityLabel()).not.toMatch(/[—–]/);
     });
   });
 

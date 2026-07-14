@@ -3,6 +3,10 @@ import { extendStandardPuzzle } from '../services/puzzleExtension';
 import { isStandardChainSolvable } from '../services/puzzleSolvability';
 import { COMMON_WORDS } from '../constants/wordLists';
 import { PUZZLE_BANK_EASY } from '../data/puzzleBankEasy';
+import { PUZZLE_BANK_MEDIUM } from '../data/puzzleBankMedium';
+import { PUZZLE_BANK_MEDIUM_PLUS } from '../data/puzzleBankMediumPlus';
+import { PUZZLE_BANK_HARD } from '../data/puzzleBankHard';
+import type { PreGeneratedPuzzle } from '../data/puzzleBankTypes';
 
 const basePuzzle = (): PuzzleConfig => ({
   words: ['PLAY', 'PANT'],
@@ -137,4 +141,32 @@ describe('extendStandardPuzzle', () => {
       extended!.solution!.map((_, index) => index),
     );
   });
+
+  it.each([
+    ['EASY', PUZZLE_BANK_EASY, 190],
+    ['MEDIUM', PUZZLE_BANK_MEDIUM, 140],
+    ['MEDIUM_PLUS', PUZZLE_BANK_MEDIUM_PLUS, 165],
+    ['HARD', PUZZLE_BANK_HARD, 160],
+  ] as const)(
+    '%s bank keeps a large deterministic puzzle-local extension pool',
+    (_name, bank, floor) => {
+      const extendable = bank.filter((puzzle: PreGeneratedPuzzle) => {
+        const config: PuzzleConfig = {
+          words: puzzle.words,
+          solution: puzzle.solution,
+          wordLength: puzzle.wordLength,
+        };
+        const first = extendStandardPuzzle(config, {
+          excludedWords: new Set(puzzle.allWords),
+        });
+        const second = extendStandardPuzzle(config, {
+          excludedWords: new Set(puzzle.allWords),
+        });
+        expect(second).toEqual(first);
+        return first.words.length === puzzle.words.length + 1;
+      });
+
+      expect(extendable.length).toBeGreaterThanOrEqual(floor);
+    },
+  );
 });

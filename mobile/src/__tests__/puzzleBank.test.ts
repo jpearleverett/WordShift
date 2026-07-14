@@ -22,6 +22,7 @@ import { PUZZLE_BANK_MEDIUM_PLUS } from '../data/puzzleBankMediumPlus';
 import { COMMON_WORDS } from '../constants/wordLists';
 import { isStandardChainSolvable } from '../services/puzzleSolvability';
 import { isUnbrokenWeaveEligible } from '../services/unbrokenWeave';
+import { extendStandardPuzzle } from '../services/puzzleExtension';
 
 // Helper: get a recency map (empty by default)
 function emptyRecencyMap(): Map<string, number> {
@@ -154,6 +155,50 @@ describe('puzzleBank', () => {
         result!.words,
         word => COMMON_WORDS.has(word),
       )).toBe('solvable');
+    });
+
+    it('guarantees an extra row even when dynamic recency covers the dictionary', async () => {
+      const recency = new Map(
+        [...COMMON_WORDS].map((word, index) => [word, index]),
+      );
+
+      const result = await selectPreGeneratedPuzzle(
+        'EASY', 0, recency, 'standard', 100,
+      );
+
+      expect(result).not.toBeNull();
+      expect(result!.words).toHaveLength(4);
+      expect(result!.solution).toHaveLength(3);
+    });
+
+    it('recycles from the extendable pool instead of serving an unextended board', async () => {
+      const nonExtendable = PUZZLE_BANK_EASY.find(puzzle => {
+        const config = {
+          words: puzzle.words,
+          solution: puzzle.solution,
+          wordLength: puzzle.wordLength,
+        };
+        return extendStandardPuzzle(config, {
+          excludedWords: new Set(puzzle.allWords),
+        }) === config;
+      });
+      expect(nonExtendable).toBeDefined();
+
+      const usedIds = PUZZLE_BANK_EASY
+        .filter(puzzle => puzzle.id !== nonExtendable!.id)
+        .map(puzzle => puzzle.id);
+      await AsyncStorage.setItem(
+        'wordshift_played_std_easy_puzzle_ids',
+        JSON.stringify(usedIds),
+      );
+
+      const result = await selectPreGeneratedPuzzle(
+        'EASY', 0, emptyRecencyMap(), 'standard', 100,
+      );
+
+      expect(result).not.toBeNull();
+      expect(result!.words).toHaveLength(4);
+      expect(result!.solution).toHaveLength(3);
     });
 
     it('filters Unbroken Weave selection to eligible canonical solutions', async () => {

@@ -9,7 +9,10 @@ import {
   analyzeStandardBranching,
   type PuzzleBranchingMetrics,
 } from './puzzleBranching';
-import { extendStandardPuzzle } from './puzzleExtension';
+import {
+  extendStandardPuzzle,
+  PUZZLE_EXTENSION_UNLOCK_PUZZLES,
+} from './puzzleExtension';
 // Bank novelty/recency tuning lives in the central balance file (single source).
 import {
   MAX_USED_TRACKED,
@@ -24,10 +27,10 @@ import {
 import { isUnbrokenWeaveEligible } from './unbrokenWeave';
 
 const BRANCHING_UNLOCK_PUZZLES = 40;
-const EXTENSION_UNLOCK_PUZZLES = 100;
 const BRANCHING_CONTEXT_CANDIDATES = 40;
 const BRANCHING_BONUS_CAP = 12;
 const branchingMetricsCache = new Map<string, PuzzleBranchingMetrics>();
+const standardExtensionCache = new Map<string, PuzzleConfig | null>();
 
 export interface PuzzleBankSelectionOptions {
   unbrokenWeaveOnly?: boolean;
@@ -74,6 +77,46 @@ function getBank(bankKey: string): PreGeneratedPuzzle[] {
     entry.bankData = entry.loadBank();
   }
   return entry.bankData;
+}
+
+function toPuzzleConfig(puzzle: PreGeneratedPuzzle): PuzzleConfig {
+  const sol0 = puzzle.solution[0];
+  const isDS = puzzle.isDoubleShift === true;
+  return {
+    words: puzzle.words,
+    hint: isDS && sol0?.lettersToMove
+      ? `Start by shifting '${sol0.lettersToMove[0]}' and '${sol0.lettersToMove[1]}'`
+      : `Start by shifting '${sol0?.letterToMove ?? '?'}'`,
+    solution: puzzle.solution,
+    reverseSolution: puzzle.reverseSolution,
+    wordLength: puzzle.wordLength,
+    isDoubleShift: isDS || undefined,
+  };
+}
+
+/**
+ * Build each mature standard-bank extension once. Inputs are intentionally
+ * puzzle-local and deterministic: live word recency affects selection score,
+ * never whether a board can receive its required extra row.
+ */
+function getCachedStandardExtension(
+  bankKey: string,
+  puzzle: PreGeneratedPuzzle,
+): PuzzleConfig | null {
+  const cacheKey = `${bankKey}:${puzzle.id}`;
+  if (standardExtensionCache.has(cacheKey)) {
+    return standardExtensionCache.get(cacheKey) ?? null;
+  }
+
+  const base = toPuzzleConfig(puzzle);
+  const extended = extendStandardPuzzle(base, {
+    excludedWords: new Set(puzzle.allWords),
+  });
+  const result = extended.words.length === base.words.length + 1
+    ? extended
+    : null;
+  standardExtensionCache.set(cacheKey, result);
+  return result;
 }
 
 // Per-bank word frequency — the generator's adjacency bias makes "hub" words
@@ -368,12 +411,18 @@ export async function selectPreGeneratedPuzzle(
   if (!bank) return null;
   if (options.unbrokenWeaveOnly && variant !== 'standard') return null;
 
+  const bankKey = getBankKey(difficulty, variant);
+  const extensionRequired =
+    variant === 'standard' &&
+    puzzlesSolved >= PUZZLE_EXTENSION_UNLOCK_PUZZLES &&
+    !options.unbrokenWeaveOnly;
   const selectableBank = options.unbrokenWeaveOnly
     ? bank.filter(puzzle => isUnbrokenWeaveEligible(puzzle.solution))
-    : bank;
+    : extensionRequired
+      ? bank.filter(puzzle => getCachedStandardExtension(bankKey, puzzle) !== null)
+      : bank;
   if (selectableBank.length === 0) return null;
 
-  const bankKey = getBankKey(difficulty, variant);
   const storageConfig = getStorageConfig(bankKey);
   const used = await loadUsedPuzzles(bankKey);
   const usedSet = new Set(used);
@@ -404,7 +453,7 @@ export async function selectPreGeneratedPuzzle(
 
   // If all puzzles exhausted, recycle the oldest-played half
   if (available.length === 0) {
-    if (options.unbrokenWeaveOnly) {
+    if (options.unbrokenWeaveOnly || extensionRequired) {
       const selectableIds = new Set(selectableBank.map(puzzle => puzzle.id));
       const usedSelectableIds = used.filter(id => selectableIds.has(id));
       if (usedSelectableIds.length === 0) return null;
@@ -490,36 +539,13 @@ export async function selectPreGeneratedPuzzle(
   // Mark as played
   await markPuzzlePlayed(selected.puzzle.id, bankKey);
 
-  // Convert to PuzzleConfig
-  const sol0 = selected.puzzle.solution[0];
-  const isDS = selected.puzzle.isDoubleShift === true;
-  const hint = isDS && sol0?.lettersToMove
-    ? `Start by shifting '${sol0.lettersToMove[0]}' and '${sol0.lettersToMove[1]}'`
-    : `Start by shifting '${sol0?.letterToMove ?? '?'}'`;
-
-  const config: PuzzleConfig = {
-    words: selected.puzzle.words,
-    hint,
-    solution: selected.puzzle.solution,
-    reverseSolution: selected.puzzle.reverseSolution,
-    wordLength: selected.puzzle.wordLength,
-    isDoubleShift: isDS || undefined,
-  };
-
-  if (
-    variant === 'standard' &&
-    puzzlesSolved >= EXTENSION_UNLOCK_PUZZLES &&
-    !options.unbrokenWeaveOnly
-  ) {
-    return extendStandardPuzzle(config, {
-      excludedWords: new Set([
-        ...selected.puzzle.allWords,
-        ...recencyMap.keys(),
-      ]),
-    });
+  if (extensionRequired) {
+    // `selectableBank` contains only cache hits, so this cannot fail without a
+    // mutation of generated bank data during the process.
+    return getCachedStandardExtension(bankKey, selected.puzzle);
   }
 
-  return config;
+  return toPuzzleConfig(selected.puzzle);
 }
 
 /**

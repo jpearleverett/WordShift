@@ -18,6 +18,7 @@ jest.mock('../services/puzzleBranching', () => ({
 }));
 
 jest.mock('../services/puzzleExtension', () => ({
+  PUZZLE_EXTENSION_UNLOCK_PUZZLES: 100,
   extendStandardPuzzle: jest.fn(config => ({
     ...config,
     words: [...config.words, 'DEPTH'],
@@ -79,11 +80,18 @@ describe('puzzle bank depth gates', () => {
     const atGate = await selectPreGeneratedPuzzle(
       'EASY', 0, new Map(), 'standard', 100,
     );
-    expect(extendMock).toHaveBeenCalledTimes(1);
+    expect(extendMock.mock.calls.length).toBeGreaterThan(100);
     expect(atGate!.words.at(-1)).toBe('DEPTH');
 
-    extendMock.mockClear();
+    const callsAfterFirstSelection = extendMock.mock.calls.length;
+    await clearPlayedPuzzles();
+    const cached = await selectPreGeneratedPuzzle(
+      'EASY', 0, new Map(), 'standard', 100,
+    );
+    expect(cached!.words.at(-1)).toBe('DEPTH');
+    expect(extendMock).toHaveBeenCalledTimes(callsAfterFirstSelection);
+
     await selectPreGeneratedPuzzle('EASY', 0, new Map(), 'reverse', 100);
-    expect(extendMock).not.toHaveBeenCalled();
+    expect(extendMock).toHaveBeenCalledTimes(callsAfterFirstSelection);
   });
 });

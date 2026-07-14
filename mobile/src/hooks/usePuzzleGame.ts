@@ -3,9 +3,14 @@ import { RowData, Letter, GameState, MoveDelta, PuzzleSolutionStep, Difficulty, 
 import { SavedPuzzleState } from '../services/puzzleSaveState';
 import { generateLocalPuzzle, generateDoubleShiftPuzzle, getIncantationName } from '../services/localGenerator';
 import { selectPreGeneratedPuzzle } from '../services/puzzleBank';
+import {
+  extendStandardPuzzle,
+  PUZZLE_EXTENSION_UNLOCK_PUZZLES,
+} from '../services/puzzleExtension';
 import { getWordHistoryWithRecency, recordPuzzleWords } from '../services/wordHistory';
 import { COMMON_WORDS, CURATED_EARLY_PUZZLES, CURATED_PUZZLE_COUNT, CuratedPuzzle, getRandomFallback } from '../constants';
 import { CURATED_FINAL_PUZZLE } from '../constants/wordLists';
+import { isBlockedWord } from '../constants/blockedWords';
 // Imported from gameBalance directly (not the constants barrel) so the hook's
 // test harness — which mocks '../constants' wholesale — still gets real values.
 import {
@@ -13,7 +18,7 @@ import {
   PREVIEW_GRADING_RESCUE_LIMIT,
 } from '../constants/gameBalance';
 import { CHALLENGE_MODE_CONFIG, DialoguePhase } from '../types/homeWorld';
-import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getOutOfHintsMessage, getLoadingMessage, getStartMessage, getInvalidWordMessage, getBlindFailMessage, getLockedLetterMessage, getEchoPuzzleMessage, getFinalBoardStartMessage, getFinalBoardUndoRefusal, getPreviewRescueMessage, getUnbrokenWeaveSpentLetterMessage, getUnbrokenWeaveUnavailableMessage } from '../services/phaseNarrative';
+import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getOutOfHintsMessage, getLoadingMessage, getStartMessage, getInvalidWordMessage, getBlockedWordMessage, getBlindFailMessage, getLockedLetterMessage, getEchoPuzzleMessage, getFinalBoardStartMessage, getFinalBoardUndoRefusal, getPreviewRescueMessage, getUnbrokenWeaveSpentLetterMessage, getUnbrokenWeaveUnavailableMessage } from '../services/phaseNarrative';
 import { getHintBalanceSync, hasHintSync, consumeHintSync } from '../services/hints';
 import { getPreferredPuzzleVariant, setPreferredPuzzleVariant, getFullProgress, getRitualWords } from '../services/amberCurrency';
 import {
@@ -1141,12 +1146,29 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
             const echoWord = candidates[Math.floor(Math.random() * candidates.length)];
             const echoPuzzle = await generateLocalPuzzle(requestedDifficulty, { startWord: echoWord });
             if (echoPuzzle) {
-              if (isStale()) return;
-              initGame(echoPuzzle.words, echoPuzzle.hint, echoPuzzle.solution, echoPuzzle.wordLength, 'standard');
-              await recordPuzzleWords(echoPuzzle.words);
-              setIsEchoPuzzle(true);
-              setMessage(getEchoPuzzleMessage(currentPhase));
-              return;
+              const extendedEcho = puzzlesSolved >= PUZZLE_EXTENSION_UNLOCK_PUZZLES
+                ? extendStandardPuzzle(echoPuzzle)
+                : echoPuzzle;
+              // Mature standard boards always carry the extra row. If this
+              // personalized chain cannot extend, do not leak a short board:
+              // fall through to the bank's pre-filtered guaranteed pool.
+              if (
+                puzzlesSolved < PUZZLE_EXTENSION_UNLOCK_PUZZLES ||
+                extendedEcho.words.length === echoPuzzle.words.length + 1
+              ) {
+                if (isStale()) return;
+                initGame(
+                  extendedEcho.words,
+                  extendedEcho.hint,
+                  extendedEcho.solution,
+                  extendedEcho.wordLength,
+                  'standard',
+                );
+                await recordPuzzleWords(extendedEcho.words);
+                setIsEchoPuzzle(true);
+                setMessage(getEchoPuzzleMessage(currentPhase));
+                return;
+              }
             }
           }
         } catch {
@@ -1219,7 +1241,22 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         timeoutPromise
       );
       if (isStale()) return;
-      initGame(puzzle.words, puzzle.hint, puzzle.solution, puzzle.wordLength, activeVariant, puzzle.reverseSolution);
+      let puzzleToServe = puzzle;
+      if (
+        activeVariant === 'standard' &&
+        puzzlesSolved >= PUZZLE_EXTENSION_UNLOCK_PUZZLES &&
+        !unbrokenWeaveActive
+      ) {
+        puzzleToServe = extendStandardPuzzle(puzzle);
+      }
+      initGame(
+        puzzleToServe.words,
+        puzzleToServe.hint,
+        puzzleToServe.solution,
+        puzzleToServe.wordLength,
+        activeVariant,
+        puzzleToServe.reverseSolution,
+      );
       if (activeVariant !== 'standard') {
         const config = VARIANT_CONFIGS[activeVariant];
         setMessage(getVariantInstruction(config, currentPhase, requestedDifficulty));
@@ -1766,10 +1803,21 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     const sourceWordStr = newSourceLetters.map(l => l.char).join("");
     const targetWordStr = newTargetLetters.map(l => l.char).join("");
 
-    setIsProcessing(true);
-
     // --- DOUBLE SHIFT DROP1: Place first letter without validation ---
     if (isDoubleShift && doubleShiftPhase === 'drop1') {
+      // The first half is normally an intentionally non-dictionary state, but
+      // blocked vocabulary must never become visible on either row. Reject it
+      // before any board/history mutation and use generic copy that does not
+      // repeat the hidden term.
+      if (isBlockedWord(sourceWordStr) || isBlockedWord(targetWordStr)) {
+        shakeError(getBlockedWordMessage(currentPhase));
+        setInvalidAttempts(prev => prev + 1);
+        pendingMistakeRef.current = true;
+        cleanMoveStreakRef.current = 0;
+        return null;
+      }
+
+      setIsProcessing(true);
       // Record delta for undo
       const sourceLetterIndex = sourceRow.words.findIndex(l => l.id === selectedLetter.id);
       const delta: MoveDelta = {
@@ -1815,6 +1863,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       // tracking (which only fire when formedWord is present).
       return { completed: false, hintsUsed, invalidAttempts, gameMode, completedWords: [] };
     }
+
+    setIsProcessing(true);
 
     // --- Standard validation (single shift OR double shift drop2) ---
     const isReverseReturn = hasVariantModifier(currentVariant, 'reverse') && moveDirection === 'up';
@@ -2406,9 +2456,11 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
           selectedLetter.char,
           ...targetLetters.slice(i),
         ];
+        const blockedSource = isBlockedWord(sourceWordAfterRemoval);
+        const blockedTarget = isBlockedWord(newWord);
         previews.push({
-          word: newWord,
-          isValid: canCompleteDoubleShift(
+          word: blockedTarget ? '•'.repeat(newWord.length) : newWord,
+          isValid: !blockedSource && !blockedTarget && canCompleteDoubleShift(
             reducedSource,
             intermediateChars,
             (w) => validWordsCache.current.has(w)
