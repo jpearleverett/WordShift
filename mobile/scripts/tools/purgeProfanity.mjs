@@ -54,6 +54,22 @@ export const BLOCKED_WORDS = [
   'MIL', 'MILS', 'BROS', 'FRAT', 'FRATS',
   // Obscure brewing jargon (unfair vocabulary for mainstream players)
   'WORT', 'WORTS',
+  // ---------------------------------------------------------------------
+  // launch vocabulary pass: crude/charged surface forms + leaked proper nouns
+  // These are valid dictionary entries in some contexts, but as isolated
+  // puzzle answers they read as juvenile, hostile, anatomical, or simply
+  // name-like. The game has plenty of darker vocabulary without these tonal
+  // collisions, so remove the whole obvious inflection family.
+  // ---------------------------------------------------------------------
+  'BARF', 'BRA', 'BRAS', 'CROTCH', 'CROTCHES', 'DAMMIT', 'DRUNK', 'DRUNKS',
+  'DUMB', 'FETISH', 'FETISHES', 'IDIOT', 'IDIOTS', 'JERK', 'JERKS',
+  'NAKED', 'NIPPLE', 'NIPPLES', 'NUDE', 'NUDITY', 'PUKE', 'PUKED', 'PUKES',
+  'PUKING', 'PUSSY', 'PUSSIES', 'RACIAL', 'RACISM', 'RACIST', 'RACISTS',
+  'SEXISM', 'SEXIST', 'SUCK', 'SUCKED', 'SUCKER', 'SUCKERS', 'SUCKS',
+  'STUPID', 'THUG', 'THUGS', 'URINE', 'UTERUS', 'VIRGIN', 'VIRGINS',
+  'VOMIT', 'VOMITED', 'VOMITING', 'VOMITS',
+  // Proper names that leaked into shipped boards / on-device generation.
+  'BRAD', 'TROY',
 ];
 const BLOCKED = new Set(BLOCKED_WORDS);
 
