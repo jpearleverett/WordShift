@@ -2229,6 +2229,100 @@ export function getCycleMicroBeat(cycleRelativeCount: number): NarrativeMicroBea
   return CYCLE_MICRO_BEATS[cycleRelativeCount] ?? null;
 }
 
+// ---------------------------------------------------------------------------
+// Cycle-scoped micro-beat delivery. On a New Cycle (cycleCount > 0) the beats
+// key on the CYCLE-RELATIVE count (puzzlesSolved - cycleStartPuzzles): the
+// half-memory CYCLE_MICRO_BEATS take priority at their keys, and the regular
+// MICRO_BEATS re-fire cycle-relative too — a second descent replays its
+// pulse. FOREVER-ONCE exceptions (never re-fire on any cycle):
+//   - the silent_victory anticlimax (its power is that it happens once), and
+//   - the first-win glitch (separate hasSeenFirstWinGlitch flag, untouched
+//     by cycles by construction).
+// The seen set is persisted PER CYCLE: the stored record carries the cycle
+// number and self-resets when a newer cycle begins, so cycle 3 replays what
+// cycle 2 consumed.
+// ---------------------------------------------------------------------------
+
+const CYCLE_BEATS_SEEN_KEY = 'wordshift_cycle_beats_seen';
+
+interface CycleBeatsSeen {
+  cycle: number;
+  seen: number[];
+}
+
+let cycleBeatsSeenCache: CycleBeatsSeen | null = null;
+
+async function loadCycleBeatsSeen(cycleCount: number): Promise<Set<number>> {
+  if (cycleBeatsSeenCache && cycleBeatsSeenCache.cycle === cycleCount) {
+    return new Set(cycleBeatsSeenCache.seen);
+  }
+  try {
+    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+    const raw = await AsyncStorage.getItem(CYCLE_BEATS_SEEN_KEY);
+    const parsed: CycleBeatsSeen | null = raw ? JSON.parse(raw) : null;
+    // A record from an older cycle self-resets: the new descent starts fresh.
+    cycleBeatsSeenCache = parsed && parsed.cycle === cycleCount
+      ? parsed
+      : { cycle: cycleCount, seen: [] };
+  } catch {
+    cycleBeatsSeenCache = { cycle: cycleCount, seen: [] };
+  }
+  return new Set(cycleBeatsSeenCache.seen);
+}
+
+async function markCycleBeatSeen(cycleCount: number, cycleRelativeCount: number): Promise<void> {
+  const seen = await loadCycleBeatsSeen(cycleCount);
+  seen.add(cycleRelativeCount);
+  cycleBeatsSeenCache = { cycle: cycleCount, seen: [...seen] };
+  try {
+    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+    await AsyncStorage.setItem(CYCLE_BEATS_SEEN_KEY, JSON.stringify(cycleBeatsSeenCache));
+  } catch {
+    // Silently fail — non-critical
+  }
+}
+
+/**
+ * New-Cycle analogue of checkNarrativeMicroBeat, keyed by the CYCLE-RELATIVE
+ * puzzle count. Half-memory CYCLE_MICRO_BEATS win at shared keys; regular
+ * MICRO_BEATS re-fire (except the forever-once silent_victory). One-time per
+ * cycle via the cycle-scoped seen set.
+ */
+export async function checkCycleNarrativeMicroBeat(
+  cycleRelativeCount: number,
+  cycleCount: number,
+): Promise<NarrativeMicroBeat | null> {
+  if (cycleCount <= 0 || cycleRelativeCount <= 0) return null;
+  const regular = MICRO_BEATS[cycleRelativeCount];
+  const beat = CYCLE_MICRO_BEATS[cycleRelativeCount]
+    ?? (regular && regular.type !== 'silent_victory' ? regular : null);
+  if (!beat) return null;
+
+  const seen = await loadCycleBeatsSeen(cycleCount);
+  if (seen.has(cycleRelativeCount)) return null;
+
+  await markCycleBeatSeen(cycleCount, cycleRelativeCount);
+  return beat;
+}
+
+/**
+ * Single victory-time entry point for micro-beats: the first playthrough
+ * consumes the absolute-count MICRO_BEATS; a New Cycle (cycleCount > 0)
+ * consumes the cycle-relative track instead (legacy cycled saves without a
+ * cycleStartPuzzles anchor pass 0 and simply outrun every key — the same
+ * silence they had before this wiring, never a double-fire).
+ */
+export async function resolveVictoryMicroBeat(
+  totalPuzzlesCompleted: number,
+  cycleCount: number,
+  cycleStartPuzzles: number,
+): Promise<NarrativeMicroBeat | null> {
+  if (cycleCount > 0) {
+    return checkCycleNarrativeMicroBeat(totalPuzzlesCompleted - cycleStartPuzzles, cycleCount);
+  }
+  return checkNarrativeMicroBeat(totalPuzzlesCompleted);
+}
+
 /**
  * Message shown when an echo puzzle (seeded from the player's own ritual words)
  * begins. Phase-aware — unsettling during the reveal (Phase 3-4), serene after.
@@ -2318,13 +2412,26 @@ export function getDreadOfferingLine(word: string, phase: DialoguePhase): string
 }
 
 /**
- * Reset micro-beats tracking (for Reset All Data).
+ * Drop the in-memory micro-beat seen caches (absolute + cycle-scoped) after an
+ * external storage write (cloud restore) — both keys are cloud-synced, and a
+ * warm pre-restore cache would re-suppress/re-fire beats against stale state.
+ */
+export function invalidateMicroBeatCaches(): void {
+  microBeatsSeen = null;
+  cycleBeatsSeenCache = null;
+}
+
+/**
+ * Reset micro-beats tracking (for Reset All Data). Clears BOTH the absolute
+ * seen set and the cycle-scoped one — a full reset starts every track over.
  */
 export async function resetMicroBeats(): Promise<void> {
   microBeatsSeen = null;
+  cycleBeatsSeenCache = null;
   try {
     const AsyncStorage = require('@react-native-async-storage/async-storage').default;
     await AsyncStorage.removeItem(MICRO_BEATS_SEEN_KEY);
+    await AsyncStorage.removeItem(CYCLE_BEATS_SEEN_KEY);
   } catch {
     // Silently fail — non-critical
   }

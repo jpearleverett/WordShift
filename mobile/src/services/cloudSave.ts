@@ -21,6 +21,7 @@ import { invalidateSacrificeCache } from './sacrifice';
 import { invalidateWhisperGalleryCache } from './whisperGallery';
 import { invalidateChoiceCache } from './dialogueChoices';
 import { invalidateNarrativeDeliveryCache } from './dialogue/animalDialogueNarrative';
+import { invalidateMicroBeatCaches } from './phaseNarrative';
 
 /**
  * Cloud save infrastructure for WordShift.
@@ -145,6 +146,7 @@ const SYNC_KEYS = [
   'wordshift_pit_nudge_seen', // one-time pit-arrival nudge
   'wordshift_starter_intro_seen', // one-time Keeper's Welcome starter intro
   'wordshift_micro_beats_seen',
+  'wordshift_cycle_beats_seen', // New Cycle micro-beat seen set (per-cycle keyed)
 ];
 
 /**
@@ -447,6 +449,7 @@ function invalidateRestoredServiceCaches(): void {
   invalidateWhisperGalleryCache();
   invalidateChoiceCache();
   invalidateNarrativeDeliveryCache();
+  invalidateMicroBeatCaches();
 }
 
 /**

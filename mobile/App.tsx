@@ -202,9 +202,15 @@ import {
   getVariantTimeLimit,
   getVariantTimeLimitForDifficulty,
   getVariantSelectorOptions,
+  getComboSelectorOptions,
+  getBlindUnlockHint,
   isVariantUnlocked,
+  isComboUnlocked,
+  ComboPreset,
   PuzzleVariant,
   VARIANT_CONFIGS,
+  CHALLENGE_TOGGLE_UNLOCK_PUZZLES,
+  BLIND_TOGGLE_UNLOCK_PUZZLES,
 } from './src/services/puzzleVariety';
 import { appStyles as styles, getScreenBackgroundColor } from './src/styles/appStyles';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -277,6 +283,14 @@ function MainApp() {
     // uiPhase intentionally matches currentPhase — we use the confirmed phase
     // for text tone stability rather than the pending transition target
     return getVariantSelectorOptions(
+      puzzlesSolvedForVariantUnlocks,
+      persistence.currentPhase,
+      persistence.currentPhase
+    );
+  }, [puzzlesSolvedForVariantUnlocks, persistence.currentPhase]);
+
+  const comboSelectorOptions = useMemo(() => {
+    return getComboSelectorOptions(
       puzzlesSolvedForVariantUnlocks,
       persistence.currentPhase,
       persistence.currentPhase
@@ -1530,9 +1544,10 @@ function MainApp() {
           }
         }).catch(() => {});
       }
-      // Variant-offer nudge (revives the dead shouldOfferVariant path): once per
-      // local day, after a STANDARD board, gently suggest a variant the player has
-      // unlocked but never tried. Skipped during onboarding.
+      // Variant-offer nudge: once per local day, after a STANDARD board, gently
+      // suggest a variant the player has unlocked but never tried. Skipped
+      // during onboarding. (This replaced the old never-called shouldOfferVariant
+      // helper, since deleted from puzzleVariety.)
       if (
         (result.variant ?? 'standard') === 'standard' &&
         !isPlayingDaily &&
@@ -2846,6 +2861,11 @@ function MainApp() {
   // Level; selecting it engages the challenge limits, deselecting returns to
   // standard. Composes with any variant/difficulty.
   const handleToggleBlindMode = useCallback(() => {
+    // Gate: Blind Offering is the apex rung and unlocks late. Turning it OFF
+    // is always allowed (a restored legacy board may carry it in while locked).
+    if (!puzzle.blindMode && puzzlesSolvedForVariantUnlocks < BLIND_TOGGLE_UNLOCK_PUZZLES) {
+      return;
+    }
     hapticMedium();
     orchestrationActions.setCompletionCoda(null);
     resetSpeedRun();
@@ -2854,7 +2874,34 @@ function MainApp() {
     } else {
       puzzleActions.startNewGame(puzzle.difficulty, 'challenge', puzzle.selectedVariant, true);
     }
-  }, [puzzleActions, puzzle.difficulty, puzzle.selectedVariant, puzzle.blindMode, orchestrationActions, resetSpeedRun]);
+  }, [puzzleActions, puzzle.difficulty, puzzle.selectedVariant, puzzle.blindMode, puzzlesSolvedForVariantUnlocks, orchestrationActions, resetSpeedRun]);
+
+  // Combination styles: one tap arms a variant plus its trial rung atomically
+  // on a fresh board (never two sequential startNewGame calls, which would
+  // race the toggle logic against stale mode state).
+  const handleSelectCombo = useCallback((combo: ComboPreset) => {
+    if (!isComboUnlocked(combo, puzzlesSolvedForVariantUnlocks, persistence.currentPhase)) {
+      return;
+    }
+    hapticSelection();
+    soundTap();
+    orchestrationActions.setCompletionCoda(null);
+    resetSpeedRun();
+    puzzleActions.setSelectedVariant(combo.variant);
+    puzzleActions.startNewGame(
+      puzzle.difficulty,
+      combo.challenge || combo.blind ? 'challenge' : 'standard',
+      combo.variant,
+      combo.blind
+    );
+  }, [
+    puzzleActions,
+    puzzle.difficulty,
+    puzzlesSolvedForVariantUnlocks,
+    persistence.currentPhase,
+    orchestrationActions,
+    resetSpeedRun,
+  ]);
 
   // Present the daily-login grant only on a quiet home screen — never over the
   // puzzle, the victory flow, a post-victory intro, or a queued ceremony. The
@@ -3262,13 +3309,19 @@ function MainApp() {
             currentVariant={puzzle.selectedVariant}
             activeVariant={puzzle.currentVariant}
             variantOptions={variantSelectorOptions}
+            comboOptions={comboSelectorOptions}
             onSelectDifficulty={handleSelectDifficulty}
             onToggleChallengeMode={handleToggleChallengeMode}
             onSelectVariant={handleSelectVariant}
-            showChallengeToggle={puzzlesSolvedForVariantUnlocks >= 15}
+            onSelectCombo={handleSelectCombo}
+            showChallengeToggle={puzzlesSolvedForVariantUnlocks >= CHALLENGE_TOGGLE_UNLOCK_PUZZLES}
             blindActive={puzzle.blindMode}
             onToggleBlindMode={handleToggleBlindMode}
-            showBlindToggle={puzzlesSolvedForVariantUnlocks >= 15}
+            // The blind row appears with the trial-ladder section (challenge
+            // gate) but stays a teased locked row until its own late gate.
+            showBlindToggle={puzzlesSolvedForVariantUnlocks >= CHALLENGE_TOGGLE_UNLOCK_PUZZLES}
+            blindLocked={puzzlesSolvedForVariantUnlocks < BLIND_TOGGLE_UNLOCK_PUZZLES}
+            blindUnlockHint={getBlindUnlockHint(puzzlesSolvedForVariantUnlocks, persistence.currentPhase)}
             introMode={showSetupSelectorIntro}
             introHintText={showSetupSelectorIntro ? setupSelectorLines[1] : undefined}
           />

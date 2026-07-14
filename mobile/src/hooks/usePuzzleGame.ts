@@ -1,12 +1,12 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { RowData, Letter, GameState, MoveDelta, PuzzleSolutionStep, Difficulty, GameMode } from '../types';
 import { SavedPuzzleState } from '../services/puzzleSaveState';
-import { generateLocalPuzzle, generateDoubleShiftPuzzle, getIncantationName } from '../services/localGenerator';
+import { generateLocalPuzzle, generateDoubleShiftPuzzle, getIncantationName, getStrongestDreadWord } from '../services/localGenerator';
 import { selectPreGeneratedPuzzle } from '../services/puzzleBank';
 import { getWordHistoryWithRecency, recordPuzzleWords } from '../services/wordHistory';
 import { COMMON_WORDS, CURATED_EARLY_PUZZLES, CURATED_PUZZLE_COUNT, CuratedPuzzle, getRandomFallback } from '../constants';
 import { CHALLENGE_MODE_CONFIG, DialoguePhase } from '../types/homeWorld';
-import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getOutOfHintsMessage, getLoadingMessage, getStartMessage, getInvalidWordMessage, getBlindFailMessage, getLockedLetterMessage, getEchoPuzzleMessage } from '../services/phaseNarrative';
+import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getOutOfHintsMessage, getLoadingMessage, getStartMessage, getInvalidWordMessage, getBlindFailMessage, getLockedLetterMessage, getEchoPuzzleMessage, getFinalBoardStartMessage } from '../services/phaseNarrative';
 import { getHintBalanceSync, hasHintSync, consumeHintSync } from '../services/hints';
 import { getPreferredPuzzleVariant, setPreferredPuzzleVariant, getFullProgress, getRitualWords } from '../services/amberCurrency';
 import {
@@ -404,6 +404,13 @@ export interface PuzzleGameState {
   /** Phase 5 echo puzzle: one word is seeded from the player's ritual history */
   isEchoPuzzle: boolean;
   /**
+   * THE marked final board: served once the finale is armed (dwell window
+   * filled), seeded from the player's strongest fed dread word when possible.
+   * Its victory fires the finale (App suppresses the fanfare and plays
+   * FINAL_PUZZLE_EVENT). Persisted through autosave so kill/restore keeps it.
+   */
+  isFinalBoard: boolean;
+  /**
    * True when no legal move remains from the active row. Internal signal
    * only — it deliberately drives NOTHING player-visible (no panel, no
    * message): discovering a dead-end and choosing to undo or restart is
@@ -469,6 +476,11 @@ export interface PuzzleGameActions {
     solveTimeMs?: number;
     /** Whether this board was played with the Blind Offering modifier on. */
     blind?: boolean;
+    /**
+     * True when the completed board was THE marked final board (finale-armed
+     * serve). App suppresses the victory fanfare and fires the finale on it.
+     */
+    isFinalBoard?: boolean;
     /**
      * Blind Offering only: the final letter landed but the finished chain
      * contains a non-word — the board did NOT complete and the player must
@@ -607,6 +619,11 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   // Double shift state: tracks the 4-step flow (pick1 → drop1 → pick2 → drop2)
   const [doubleShiftPhase, setDoubleShiftPhase] = useState<'pick1' | 'pick2' | 'drop1' | 'drop2' | null>(null);
   const [isEchoPuzzle, setIsEchoPuzzle] = useState(false);
+  // THE marked final board (finale-armed serve). Ref mirror keeps the
+  // completion result honest inside async closures that predate the set
+  // (same pattern as gameModeRef); state drives render + autosave.
+  const [isFinalBoard, setIsFinalBoard] = useState(false);
+  const isFinalBoardRef = useRef(false);
   const [isStuck, setIsStuck] = useState(false);
   // Hint glow on the board (same visuals as the tutorial guide). Cleared on
   // any move/undo/restart/new board so a stale glow never outlives its advice.
@@ -775,9 +792,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   ) => {
     // Every non-shared start path routes through here (curated/echo/bank/
     // generated/fallback) — a fresh board is never a shared challenge or a
-    // daily (the daily has its own bypass, startDailyGame).
+    // daily (the daily has its own bypass, startDailyGame). The final-board
+    // mark also resets: the finale-armed serve re-marks it right after commit.
     setIsSharedChallenge(false);
     setIsDailyBoard(false);
+    isFinalBoardRef.current = false;
+    setIsFinalBoard(false);
     applyBoard(words, puzzleHint, puzzleSolution, wordLength, {
       resetPerformance: true,
       variant,
@@ -1025,6 +1045,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setBlindMode(false); // the daily is a shared board — never blind
     setIsSharedChallenge(false);
     setIsDailyBoard(true);
+    isFinalBoardRef.current = false;
+    setIsFinalBoard(false);
     // The daily generator's solution steps thread through like a bank puzzle's,
     // so daily hints use the stored solution instead of the blind live search.
     // Optional param keeps older 3-arg callers working unchanged.
@@ -1064,6 +1086,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setBlindMode(false); // a friend's shared board — never blind
     setIsDailyBoard(false);
     setIsEchoPuzzle(false);
+    isFinalBoardRef.current = false;
+    setIsFinalBoard(false);
     applyBoard(normalized, undefined, undefined, wordLength, {
       resetPerformance: true,
       variant: 'standard',
