@@ -249,13 +249,19 @@ describe('proactive share prompt', () => {
     // The prompt's Share CTA opens the modal from a pre-teardown snapshot; if
     // the snapshot were read after startVictoryExitFlow (which nulls
     // victoryData), the CTA would be a dead no-op.
-    expect(APP_TSX).toMatch(/pendingShareSnapshotRef\.current = buildShareDataRef\.current\(\);\s*\n\s*const adShown = maybeShowVictoryInterstitial\(\);\s*\n\s*startVictoryExitFlow/);
+    // The intro-queue capture may sit between the interstitial and the exit
+    // flow — the contract is only that the snapshot precedes the exit flow.
+    expect(APP_TSX).toMatch(/pendingShareSnapshotRef\.current = buildShareDataRef\.current\(\);[\s\S]{0,400}?startVictoryExitFlow/);
     expect(APP_TSX).toMatch(/onPress: \(\) => \{ hapticLight\(\); openShareModalRef\.current\(snapshot\); \}/);
   });
 
   test('victory-exit nudges are skipped when an interstitial showed (one nudge per exit)', () => {
-    expect(APP_TSX).toMatch(/runVictoryExitNudges = useCallback\(async \(interstitialShown: boolean\)/);
-    expect(APP_TSX).toMatch(/if \(interstitialShown\) return;/);
+    // Nudges skip when an interstitial showed OR a queued Fox intro will
+    // present on this exit (captured before the exit flow drains the queue).
+    expect(APP_TSX).toMatch(/runVictoryExitNudges = useCallback\(async \(\s*interstitialShown: boolean,\s*introWillPresent: boolean/);
+    expect(APP_TSX).toMatch(/if \(interstitialShown \|\| introWillPresent\) return;/);
+    expect(APP_TSX).toMatch(/const introWillPresent =\s*\n?\s*queuedPostVictoryIntrosRef\.current\.length > 0/);
+    expect(APP_TSX).toMatch(/if \(interstitialShown \|\| introWillPresent\) return;/);
     // Share prompt inherits the same anti-stacking guard the notification prompt has.
     expect(APP_TSX).toMatch(/if \(postVictoryIntro \|\| queuedPostVictoryIntrosRef\.current\.length > 0\) return false;/);
   });

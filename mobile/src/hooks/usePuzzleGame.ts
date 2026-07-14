@@ -365,10 +365,9 @@ export interface PuzzleGameState {
    * (startSharedChallengeGame). Every other start path — initGame/startNewGame
    * (and therefore Next Level), startDailyGame, clearBoard — resets it, so a
    * consumer (e.g. recordVictory threading) can make shared-link wins
-   * amber-only. NOT persisted in the autosave shape: restorePuzzleState resets
-   * it to false, so a shared board resumed after a process kill counts as a
-   * normal board (documented trade-off; threading it through SavedPuzzleState
-   * is a one-field change if that ever matters).
+   * amber-only. Persisted through the autosave shape (SavedPuzzleState
+   * carries isSharedChallenge and restorePuzzleState restores it), so a
+   * shared board resumed after a process kill stays amber-only.
    */
   isSharedChallenge: boolean;
   undosRemaining: number;

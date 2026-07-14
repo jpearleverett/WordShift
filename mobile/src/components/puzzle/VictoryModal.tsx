@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -226,6 +226,13 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 }) => {
   const phaseTheme = getPhaseTheme(phase);
   const btn = getButtonTheme(phase);
+  // getVictoryFeedback draws randomly from a pool: pick ONCE per victory so
+  // the line never visibly re-rolls as async lines (rank/social proof) land
+  // and re-render the open modal.
+  const victoryFeedbackLine = useMemo(
+    () => getVictoryFeedback(earnedStars, phase),
+    [earnedStars, phase, visible]
+  );
   const totalPuzzlesCompleted = cumulativeStats?.totalPuzzlesCompleted ?? 0;
   const isEarlyGameVictory = totalPuzzlesCompleted > 0 && totalPuzzlesCompleted <= 5;
   // Both the phase-transition ceremony and the one-time first-harvest gate force
@@ -741,7 +748,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               <Text style={[styles.victoryFeedback, {
                 color: phaseTheme.modalSecondaryTextColor,
               }]}>
-                {getVictoryFeedback(earnedStars, phase)}
+                {victoryFeedbackLine}
               </Text>
             )}
             </Animated.View>

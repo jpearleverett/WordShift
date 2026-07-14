@@ -773,12 +773,14 @@ describe('notifications', () => {
       const triggers = scheduledTriggers();
       const streakRisk = triggers.filter((t) => t.hour === 19);
       expect(streakRisk.length).toBe(0);
-      // Win-back rung 1 falls back to next-day (no streak-risk leading the
-      // ladder) — never today, so a player who played today hears nothing.
+      // A player who kept today alive is NOT lapsed: rung 1 starts at +2 so
+      // tomorrow's slot stays free for the routine morning reminder (the
+      // one-per-day dedupe would otherwise let the 18:00 win-back displace
+      // the user-configured daily ping on day +1, forever).
       const winBack = triggers.filter((t) => t.hour === 18);
       expect(winBack.length).toBe(5);
       expect(winBack.map((t) => t.date.getDate())).toEqual([
-        expectedDayOfMonth(1),
+        expectedDayOfMonth(2),
         expectedDayOfMonth(3),
         expectedDayOfMonth(7),
         expectedDayOfMonth(14),

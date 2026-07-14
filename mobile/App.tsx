@@ -1607,6 +1607,9 @@ function MainApp() {
       // count covers transient network failures so the line doesn't flicker
       // out between victories.
       setSocialProofLine(null);
+      // Event bonus is a DAILY-victory line; clear it here so a full-moon
+      // daily's +50% line can never linger onto later normal-board victories.
+      setEventBonusLine(null);
       setVictoryDoubleClaimed(false);
       (async () => {
         try {
@@ -2667,8 +2670,16 @@ function MainApp() {
   // precedence when eligible, and every step short-circuits the rest.
   // Skipped entirely when an interstitial just showed this exit, so a nudge
   // never piles on top of an ad.
-  const runVictoryExitNudges = useCallback(async (interstitialShown: boolean) => {
-    if (interstitialShown) return;
+  const runVictoryExitNudges = useCallback(async (
+    interstitialShown: boolean,
+    introWillPresent: boolean = false
+  ) => {
+    // A queued Fox intro presents the moment the exit flow runs — it would
+    // stack under any nudge AND burn the nudge's one-time flag on a cluttered
+    // exit. The queue is shift()ed synchronously inside startVictoryExitFlow,
+    // so callers capture this BEFORE the exit flow and pass it in (checking
+    // the ref here would always see an empty queue).
+    if (interstitialShown || introWillPresent) return;
     if (await maybeShowSharePrompt()) return;
     if (await maybePromptForNotifications()) return;
     if (await maybeShowRemoveAdsOffer()) return;
@@ -2709,12 +2720,17 @@ function MainApp() {
     // Snapshot the share payload BEFORE the exit flow resets victoryData.
     pendingShareSnapshotRef.current = buildShareDataRef.current();
     const adShown = maybeShowVictoryInterstitial();
+    // Capture BEFORE startVictoryExitFlow shift()s the intro queue.
+    const introWillPresent =
+      queuedPostVictoryIntrosRef.current.length > 0 || postVictoryIntro !== null;
     startVictoryExitFlow(() => {
       clearPuzzleState().catch(() => {});
       puzzleActions.handleNextLevel();
     });
-    Promise.resolve(adShown).then((shown) => runVictoryExitNudges(shown === true)).catch(() => {});
-  }, [puzzleActions, startVictoryExitFlow, runVictoryExitNudges, maybeShowVictoryInterstitial, maybeShowSwiftVictoryHint]);
+    Promise.resolve(adShown)
+      .then((shown) => runVictoryExitNudges(shown === true, introWillPresent))
+      .catch(() => {});
+  }, [puzzleActions, startVictoryExitFlow, runVictoryExitNudges, maybeShowVictoryInterstitial, maybeShowSwiftVictoryHint, postVictoryIntro]);
 
   // During onboarding, "Continue" on the victory modal dismisses the modal and
   // surfaces the puzzle-screen completion beat ("Feel how the house settled...").
@@ -2735,13 +2751,18 @@ function MainApp() {
     // Snapshot the share payload BEFORE the exit flow resets victoryData.
     pendingShareSnapshotRef.current = buildShareDataRef.current();
     const adShown = maybeShowVictoryInterstitial();
+    // Capture BEFORE startVictoryExitFlow shift()s the intro queue.
+    const introWillPresent =
+      queuedPostVictoryIntrosRef.current.length > 0 || postVictoryIntro !== null;
     startVictoryExitFlow(() => {
       puzzlesSinceHomeVisit.current = 0;
       puzzleActions.clearBoard();
       transitionTo('home');
     });
-    Promise.resolve(adShown).then((shown) => runVictoryExitNudges(shown === true)).catch(() => {});
-  }, [puzzleActions, transitionTo, startVictoryExitFlow, runVictoryExitNudges, maybeShowVictoryInterstitial]);
+    Promise.resolve(adShown)
+      .then((shown) => runVictoryExitNudges(shown === true, introWillPresent))
+      .catch(() => {});
+  }, [puzzleActions, transitionTo, startVictoryExitFlow, runVictoryExitNudges, maybeShowVictoryInterstitial, postVictoryIntro]);
 
   // The pit route (Collect Now) is deliberately EXEMPT from interstitials:
   // the player is on their way to collect amber they already earned, and an
