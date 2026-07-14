@@ -366,7 +366,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     rewardAmber: 50,
     title: 'Amber Hoarder',
     description: 'Earn 1,000 total amber',
-    icon: '💎',
+    icon: '🔶',
     category: 'collection',
     check: (s) => s.amberEarned >= 1000,
   },

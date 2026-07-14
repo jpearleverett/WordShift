@@ -22,6 +22,7 @@ import { Confetti, StarBurst } from './src/components/Confetti';
 import { ActionButton, AnimatedLogo, Toast, VictoryModal, RulesModal, DifficultyMenu } from './src/components/puzzle';
 import { HomeScreen } from './src/components/home';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
+import { AmberInline } from './src/components/AmberInline';
 import { CandyColors } from './src/theme/colors';
 import { usePuzzleGame } from './src/hooks/usePuzzleGame';
 import { useGamePersistence } from './src/hooks/useGamePersistence';
@@ -3322,7 +3323,9 @@ function MainApp() {
                     accessibilityRole="button"
                     accessibilityLabel={`Refill one undo for ${AMBER_UNDO_REFILL_COST} amber`}
                   >
-                    <Text style={styles.buyUndoText}>↩ +1 · {AMBER_UNDO_REFILL_COST}💎</Text>
+                    <Text style={styles.buyUndoText}>
+                      {'\u21a9'} +1 {'\u00b7'} {AMBER_UNDO_REFILL_COST} <AmberInline size={11} />
+                    </Text>
                   </TouchableOpacity>
                 )}
               </View>

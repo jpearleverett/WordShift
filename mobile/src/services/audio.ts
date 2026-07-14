@@ -353,15 +353,26 @@ function clearMusicFade(): void {
 /** Crossfade: ramp `to` up to MUSIC_VOLUME while ramping `from` out, then remove `from`. */
 function fadeMusic(from: AudioPlayer | null, to: AudioPlayer | null): void {
   clearMusicFade();
+  // Interpolate from each player's ACTUAL current volume, not from a fixed
+  // endpoint: a second phase flip mid-crossfade otherwise snaps the
+  // half-faded outgoing bed back to near-full volume before fading again.
+  let fromStart = from ? MUSIC_VOLUME : 0;
+  let toStart = 0;
+  try {
+    if (from) fromStart = from.volume;
+  } catch {}
+  try {
+    if (to) toStart = to.volume;
+  } catch {}
   let step = 0;
   musicFadeTimer = setInterval(() => {
     step++;
     const k = Math.min(1, step / MUSIC_FADE_STEPS);
     try {
-      if (to) to.volume = MUSIC_VOLUME * k;
+      if (to) to.volume = toStart + (MUSIC_VOLUME - toStart) * k;
     } catch {}
     try {
-      if (from) from.volume = MUSIC_VOLUME * (1 - k);
+      if (from) from.volume = fromStart * (1 - k);
     } catch {}
     if (step >= MUSIC_FADE_STEPS) {
       clearMusicFade();
