@@ -12,7 +12,7 @@
  */
 import { DICTIONARY_WORDS } from '../dictionary';
 import { isChainSolvable, SolvabilityResult } from '../services/puzzleSolvability';
-import { CURATED_EARLY_PUZZLES, FALLBACK_PUZZLES_EASY, FALLBACK_PUZZLES_MEDIUM, FALLBACK_PUZZLES_MEDIUM_PLUS, FALLBACK_PUZZLES_HARD } from '../constants/wordLists';
+import { CURATED_EARLY_PUZZLES, CURATED_FINAL_PUZZLE, FALLBACK_PUZZLES_EASY, FALLBACK_PUZZLES_MEDIUM, FALLBACK_PUZZLES_MEDIUM_PLUS, FALLBACK_PUZZLES_HARD } from '../constants/wordLists';
 import { PUZZLE_BANK_EASY } from '../data/puzzleBankEasy';
 import { PUZZLE_BANK_MEDIUM } from '../data/puzzleBankMedium';
 import { PUZZLE_BANK_MEDIUM_PLUS } from '../data/puzzleBankMediumPlus';
@@ -73,6 +73,55 @@ describe('bank solvability (shipped rules)', () => {
     for (const p of CURATED_EARLY_PUZZLES) {
       expect(isChainSolvable('standard', p.words, isValid)).toBe('solvable');
     }
+  });
+
+  test('curated final puzzle is a clean, positioned 7x5 standard chain', () => {
+    expect(CURATED_FINAL_PUZZLE.words).toHaveLength(7);
+    expect(CURATED_FINAL_PUZZLE.words.every(word => word.length === 5)).toBe(true);
+    expect(CURATED_FINAL_PUZZLE.solution).toHaveLength(6);
+    expect(CURATED_FINAL_PUZZLE.solution.every(step =>
+      Number.isInteger(step.removalPosition) && Number.isInteger(step.insertionPosition)
+    )).toBe(true);
+    expect(isChainSolvable('standard', CURATED_FINAL_PUZZLE.words, isValid)).toBe('solvable');
+
+    const rows = [...CURATED_FINAL_PUZZLE.words];
+    const lockedPositions: Array<number | null> = rows.map(() => null);
+    const playedWords = new Set(rows);
+    for (const step of CURATED_FINAL_PUZZLE.solution) {
+      const sourceIndex = step.stepIndex;
+      const targetIndex = sourceIndex + 1;
+      expect(rows[sourceIndex]).toBe(step.sourceWord);
+      expect(rows[targetIndex]).toBe(step.targetWord);
+      expect(step.removalPosition).not.toBe(lockedPositions[sourceIndex]);
+      expect(step.sourceWord[step.removalPosition]).toBe(step.letterToMove);
+
+      const remainder =
+        step.sourceWord.slice(0, step.removalPosition) +
+        step.sourceWord.slice(step.removalPosition + 1);
+      const formed =
+        step.targetWord.slice(0, step.insertionPosition) +
+        step.letterToMove +
+        step.targetWord.slice(step.insertionPosition);
+      expect(isValid(remainder)).toBe(true);
+      expect(isValid(formed)).toBe(true);
+      rows[sourceIndex] = remainder;
+      rows[targetIndex] = formed;
+      lockedPositions[targetIndex] = step.insertionPosition;
+      playedWords.add(remainder);
+      playedWords.add(formed);
+    }
+
+    const blockedSource = require('fs').readFileSync(
+      require('path').join(__dirname, '../../scripts/tools/purgeProfanity.mjs'),
+      'utf8',
+    ) as string;
+    const blockedSection = blockedSource.match(
+      /export const BLOCKED_WORDS = \[([\s\S]*?)\];/,
+    )?.[1] ?? '';
+    const blocked = new Set(
+      Array.from(blockedSection.matchAll(/'([A-Z]+)'/g), match => match[1]),
+    );
+    expect(Array.from(playedWords).filter(word => blocked.has(word))).toEqual([]);
   });
 
   test('fallback pools are winnable (standard rules)', () => {
