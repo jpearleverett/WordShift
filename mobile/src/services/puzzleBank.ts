@@ -31,6 +31,7 @@ const BRANCHING_CONTEXT_CANDIDATES = 40;
 const BRANCHING_BONUS_CAP = 12;
 const branchingMetricsCache = new Map<string, PuzzleBranchingMetrics>();
 const standardExtensionCache = new Map<string, PuzzleConfig | null>();
+const guaranteedStandardFallbackCache = new Map<Difficulty, PuzzleConfig>();
 
 export interface PuzzleBankSelectionOptions {
   unbrokenWeaveOnly?: boolean;
@@ -167,6 +168,29 @@ function getBankKey(difficulty: Difficulty, variant: PuzzleVariant): string {
   if (difficulty === 'MEDIUM') return 'std_medium';
   if (difficulty === 'MEDIUM_PLUS') return 'std_mp';
   return 'standard';
+}
+
+/**
+ * Return a mature standard board without consulting played-puzzle storage.
+ * Each real difficulty bank is scanned at most once; shipped bank guards ensure
+ * at least one canonical puzzle can receive the required extra row.
+ */
+export function getGuaranteedExtendedStandardFallback(
+  difficulty: Difficulty,
+): PuzzleConfig {
+  const cached = guaranteedStandardFallbackCache.get(difficulty);
+  if (cached) return cached;
+
+  const bankKey = getBankKey(difficulty, 'standard');
+  for (const puzzle of getBank(bankKey)) {
+    const extended = getCachedStandardExtension(bankKey, puzzle);
+    if (extended) {
+      guaranteedStandardFallbackCache.set(difficulty, extended);
+      return extended;
+    }
+  }
+
+  throw new Error(`No extendable standard puzzle found for ${difficulty}`);
 }
 
 /**

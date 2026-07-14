@@ -104,7 +104,7 @@ describe('self-directed cold-open onboarding', () => {
     expect(APP_TSX).toMatch(/puzzleActions\.startNewGame\('EASY', 'standard', 'standard', false, false\)/);
   });
 
-  test('routes a recorded cold-open victory without an autosave to home_empty', () => {
+  test('routes a recorded cold-open victory before stale autosave restoration', () => {
     const launcher = APP_TSX.slice(
       APP_TSX.indexOf('const launchColdOpenPuzzle'),
       APP_TSX.indexOf('// Auto-save puzzle state'),
@@ -115,6 +115,9 @@ describe('self-directed cold-open onboarding', () => {
     expect(launcher).toContain("transitionTo('home'");
     expect(launcher.indexOf("route === 'home_empty'")).toBeLessThan(
       launcher.indexOf("startNewGame('EASY'"),
+    );
+    expect(launcher.indexOf("route === 'home_empty'")).toBeLessThan(
+      launcher.indexOf("route === 'restore'"),
     );
   });
 

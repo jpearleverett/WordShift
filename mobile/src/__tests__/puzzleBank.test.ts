@@ -13,7 +13,11 @@ jest.mock('../services/wordHistory', () => ({
 }));
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { selectPreGeneratedPuzzle, clearPlayedPuzzles } from '../services/puzzleBank';
+import {
+  clearPlayedPuzzles,
+  getGuaranteedExtendedStandardFallback,
+  selectPreGeneratedPuzzle,
+} from '../services/puzzleBank';
 import { PUZZLE_BANK_HARD } from '../data/puzzleBankHard';
 import { PUZZLE_BANK_REVERSE_HARD } from '../data/puzzleBankReverseHard';
 import { PUZZLE_BANK_EASY } from '../data/puzzleBankEasy';
@@ -295,6 +299,32 @@ describe('puzzleBank', () => {
         expect(result).not.toBeNull();
       }
     });
+  });
+
+  describe('guaranteed mature standard fallback', () => {
+    it.each([
+      ['EASY', 4],
+      ['MEDIUM', 5],
+      ['MEDIUM_PLUS', 5],
+      ['HARD', 6],
+    ] as const)(
+      'synchronously returns an extended, solvable %s board without storage',
+      (difficulty, expectedRows) => {
+        jest.clearAllMocks();
+
+        const first = getGuaranteedExtendedStandardFallback(difficulty);
+        const second = getGuaranteedExtendedStandardFallback(difficulty);
+
+        expect(first).toBe(second);
+        expect(first.words).toHaveLength(expectedRows);
+        expect(first.solution).toHaveLength(expectedRows - 1);
+        expect(isStandardChainSolvable(
+          first.words,
+          word => COMMON_WORDS.has(word),
+        )).toBe('solvable');
+        expect(AsyncStorage.getItem).not.toHaveBeenCalled();
+      },
+    );
   });
 
   describe('clearPlayedPuzzles', () => {

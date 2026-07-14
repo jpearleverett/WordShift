@@ -148,9 +148,9 @@ describe('extendStandardPuzzle', () => {
     ['MEDIUM_PLUS', PUZZLE_BANK_MEDIUM_PLUS, 165],
     ['HARD', PUZZLE_BANK_HARD, 160],
   ] as const)(
-    '%s bank keeps a large deterministic puzzle-local extension pool',
+    '%s bank keeps a large deterministic pool with a valid fallback candidate',
     (_name, bank, floor) => {
-      const extendable = bank.filter((puzzle: PreGeneratedPuzzle) => {
+      const extendable = bank.flatMap((puzzle: PreGeneratedPuzzle) => {
         const config: PuzzleConfig = {
           words: puzzle.words,
           solution: puzzle.solution,
@@ -163,10 +163,18 @@ describe('extendStandardPuzzle', () => {
           excludedWords: new Set(puzzle.allWords),
         });
         expect(second).toEqual(first);
-        return first.words.length === puzzle.words.length + 1;
+        return first.words.length === puzzle.words.length + 1 ? [first] : [];
       });
 
       expect(extendable.length).toBeGreaterThanOrEqual(floor);
+      expect(canonicalPathIsValid(
+        extendable[0],
+        word => COMMON_WORDS.has(word),
+      )).toBe(true);
+      expect(isStandardChainSolvable(
+        extendable[0].words,
+        word => COMMON_WORDS.has(word),
+      )).toBe('solvable');
     },
   );
 });

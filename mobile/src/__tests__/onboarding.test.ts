@@ -69,8 +69,13 @@ describe('onboarding', () => {
   });
 
   describe('cold-open crash recovery', () => {
-    test('restores a playable cold-open autosave even after progress was recorded', () => {
-      expect(resolveColdOpenLaunchRoute(true, 1)).toBe('restore');
+    test('routes home after a recorded victory even when a stale playable autosave remains', () => {
+      expect(resolveColdOpenLaunchRoute(true, 1)).toBe('home_empty');
+      expect(resolveColdOpenLaunchRoute(true, 9)).toBe('home_empty');
+    });
+
+    test('restores a playable cold-open autosave before any victory was recorded', () => {
+      expect(resolveColdOpenLaunchRoute(true, 0)).toBe('restore');
     });
 
     test('routes to the empty home when victory progress exists without a playable autosave', () => {

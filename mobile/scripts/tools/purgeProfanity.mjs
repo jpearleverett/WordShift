@@ -39,26 +39,33 @@ function entryHasBlockedCanonicalIntermediate(entry) {
 
     const pairRaw = /removalPositions:\[([0-9,]+)\]/.exec(step)?.[1];
     if (pairRaw) {
-      const positions = pairRaw
-        .split(',')
-        .map(Number)
-        .sort((a, b) => b - a);
-      const canonicalRemovalOrder = pairRaw.split(',').map(Number);
+      const pairPositions = pairRaw.split(',').map(Number);
       const target = /targetWord:'([A-Z]+)'/.exec(step)?.[1];
       const letters = /lettersToMove:\['([A-Z])','([A-Z])'\]/.exec(step);
-      const insertions = /insertionPositions:\[([0-9,]+)\]/.exec(step)?.[1]
-        ?.split(',')
-        .map(Number);
-      if (target && letters && insertions?.length) {
+
+      // Double Shift lets either stored letter move first and drop into any
+      // target slot. Do not assume the generated letter/position arrays share
+      // an ordering: inspect every available first removal and every possible
+      // first insertion, matching the shipped free-form drop1 rules.
+      for (const position of pairPositions) {
         const firstSource =
-          source.slice(0, canonicalRemovalOrder[0]) +
-          source.slice(canonicalRemovalOrder[0] + 1);
-        const firstTarget =
-          target.slice(0, insertions[0]) +
-          letters[1] +
-          target.slice(insertions[0]);
-        if (BLOCKED.has(firstSource) || BLOCKED.has(firstTarget)) return true;
+          source.slice(0, position) +
+          source.slice(position + 1);
+        if (BLOCKED.has(firstSource)) return true;
       }
+      if (target && letters) {
+        for (const letter of [letters[1], letters[2]]) {
+          for (let position = 0; position <= target.length; position++) {
+            const firstTarget =
+              target.slice(0, position) +
+              letter +
+              target.slice(position);
+            if (BLOCKED.has(firstTarget)) return true;
+          }
+        }
+      }
+
+      const positions = pairPositions.sort((a, b) => b - a);
       let remainder = source;
       for (const position of positions) {
         remainder = remainder.slice(0, position) + remainder.slice(position + 1);

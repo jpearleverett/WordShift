@@ -50,14 +50,14 @@ export type ColdOpenLaunchRoute = 'restore' | 'home_empty' | 'new_board';
 /**
  * A victory can persist before the onboarding step advances. On relaunch,
  * progress is the crash-safe proof that the cold-open board was already won;
- * a live autosave still takes precedence so a true mid-board kill resumes.
+ * it takes precedence over a stale PLAYING autosave left by that victory.
  */
 export function resolveColdOpenLaunchRoute(
   hasPlayableAutosave: boolean,
   puzzlesSolved: number,
 ): ColdOpenLaunchRoute {
-  if (hasPlayableAutosave) return 'restore';
-  return puzzlesSolved >= 1 ? 'home_empty' : 'new_board';
+  if (puzzlesSolved >= 1) return 'home_empty';
+  return hasPlayableAutosave ? 'restore' : 'new_board';
 }
 
 /**

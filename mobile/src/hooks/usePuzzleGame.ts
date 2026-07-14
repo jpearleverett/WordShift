@@ -2,7 +2,10 @@ import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { RowData, Letter, GameState, MoveDelta, PuzzleSolutionStep, Difficulty, GameMode } from '../types';
 import { SavedPuzzleState } from '../services/puzzleSaveState';
 import { generateLocalPuzzle, generateDoubleShiftPuzzle, getIncantationName } from '../services/localGenerator';
-import { selectPreGeneratedPuzzle } from '../services/puzzleBank';
+import {
+  getGuaranteedExtendedStandardFallback,
+  selectPreGeneratedPuzzle,
+} from '../services/puzzleBank';
 import {
   extendStandardPuzzle,
   PUZZLE_EXTENSION_UNLOCK_PUZZLES,
@@ -1046,11 +1049,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setCurrentVariant(variant);
 
     let unbrokenWeaveFallback = false;
+    let puzzlesSolved = 0;
     try {
       // Serve curated early-game puzzles for the first few solves
       // These are hand-picked to showcase interesting letter moves
       const progress = await getFullProgress();
-      const puzzlesSolved = progress?.puzzlesSolved ?? 0;
+      puzzlesSolved = progress?.puzzlesSolved ?? 0;
       let unbrokenWeaveActive =
         requestedUnbrokenWeave &&
         isUnbrokenWeaveAvailable(currentPhase, progress?.postRevelation === true);
@@ -1245,9 +1249,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       if (
         activeVariant === 'standard' &&
         puzzlesSolved >= PUZZLE_EXTENSION_UNLOCK_PUZZLES &&
-        !unbrokenWeaveActive
+        !requestedUnbrokenWeave
       ) {
-        puzzleToServe = extendStandardPuzzle(puzzle);
+        const extended = extendStandardPuzzle(puzzle);
+        puzzleToServe = extended.words.length === puzzle.words.length + 1
+          ? extended
+          : getGuaranteedExtendedStandardFallback(requestedDifficulty);
       }
       initGame(
         puzzleToServe.words,
@@ -1276,6 +1283,26 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       // Fallback puzzles don't include solver metadata, so restrictions may be
       // impossible to satisfy. Revert restriction variants to standard fallback.
       const fallbackVariant = 'standard' as PuzzleVariant;
+      if (
+        variant === 'standard' &&
+        puzzlesSolved >= PUZZLE_EXTENSION_UNLOCK_PUZZLES &&
+        !requestedUnbrokenWeave
+      ) {
+        try {
+          const matureFallback = getGuaranteedExtendedStandardFallback(requestedDifficulty);
+          if (isStale()) return;
+          initGame(
+            matureFallback.words,
+            matureFallback.hint,
+            matureFallback.solution,
+            matureFallback.wordLength,
+            fallbackVariant,
+          );
+          return;
+        } catch {
+          // A corrupt/missing bank must still leave the ordinary safe fallback.
+        }
+      }
       const fallbackWords = getRandomFallback(requestedDifficulty);
       const fallbackWordLen = fallbackWords[0].length;
       if (isStale()) return;

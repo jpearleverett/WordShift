@@ -134,6 +134,12 @@ jest.mock('../services/wordHistory', () => ({
 // Mock puzzleBank to return null — tests exercise the generation path
 jest.mock('../services/puzzleBank', () => ({
   selectPreGeneratedPuzzle: jest.fn(async () => null),
+  getGuaranteedExtendedStandardFallback: jest.fn(() => ({
+    words: ['SUIT', 'SITE', 'WHAT', 'HERE', 'LIME'],
+    hint: 'Guaranteed mature fallback',
+    solution: [],
+    wordLength: 4,
+  })),
 }));
 
 jest.mock('../services/puzzleExtension', () => ({
@@ -273,6 +279,12 @@ describe('usePuzzleGame', () => {
     (amber.getFullProgress as jest.Mock).mockResolvedValue({ puzzlesSolved: 20 });
     (amber.getRitualWords as jest.Mock).mockResolvedValue([]);
     (bank.selectPreGeneratedPuzzle as jest.Mock).mockResolvedValue(null);
+    (bank.getGuaranteedExtendedStandardFallback as jest.Mock).mockImplementation(() => ({
+      words: ['SUIT', 'SITE', 'WHAT', 'HERE', 'LIME'],
+      hint: 'Guaranteed mature fallback',
+      solution: [],
+      wordLength: 4,
+    }));
     (extension.extendStandardPuzzle as jest.Mock).mockImplementation(config => config);
     resetHookState();
     jest.useFakeTimers();
@@ -350,6 +362,7 @@ describe('usePuzzleGame', () => {
 
   describe('startDailyGame', () => {
     test('starts a standard, playable board from the daily words', () => {
+      const bank = require('../services/puzzleBank');
       let [, actions] = callHook();
       actions.startDailyGame(['PLANET', 'PLATES', 'PLANES'], 'daily hint', 6);
 
@@ -360,6 +373,7 @@ describe('usePuzzleGame', () => {
       expect(state.currentWordLength).toBe(6);
       expect(state.currentVariant).toBe('standard');
       expect(state.hint).toBe('daily hint');
+      expect(bank.getGuaranteedExtendedStandardFallback).not.toHaveBeenCalled();
     });
 
     test('uses standard mode with unlimited undos even after challenge mode', () => {
@@ -937,6 +951,20 @@ describe('usePuzzleGame', () => {
   });
 
   describe('startNewGame', () => {
+    test('keeps curated early boards outside mature extension fallback', async () => {
+      const amber = require('../services/amberCurrency');
+      const bank = require('../services/puzzleBank');
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({ puzzlesSolved: 0 });
+
+      resetHookState();
+      let [, actions] = callHook();
+      await actions.startNewGame('MEDIUM', 'standard', 'standard');
+
+      const [state] = callHook();
+      expect(state.rows).toHaveLength(3);
+      expect(bank.getGuaranteedExtendedStandardFallback).not.toHaveBeenCalled();
+    });
+
     test('calls generateLocalPuzzle and initializes game', async () => {
       resetHookState();
       let [, actions] = callHook();
@@ -974,6 +1002,7 @@ describe('usePuzzleGame', () => {
 
     test('uses fallback on generation failure', async () => {
       const { generateLocalPuzzle } = require('../services/localGenerator');
+      const bank = require('../services/puzzleBank');
       (generateLocalPuzzle as jest.Mock).mockRejectedValueOnce(new Error('timeout'));
 
       resetHookState();
@@ -984,6 +1013,7 @@ describe('usePuzzleGame', () => {
       // Should fall back to FALLBACK_PUZZLE
       expect(state.rows).toHaveLength(4);
       expect(state.gameState).toBe(GameState.PLAYING);
+      expect(bank.getGuaranteedExtendedStandardFallback).not.toHaveBeenCalled();
     });
 
     test('attempts a deterministic extension for a post-100 generated standard fallback', async () => {
@@ -1012,6 +1042,41 @@ describe('usePuzzleGame', () => {
       const [state] = callHook();
       expect(extension.extendStandardPuzzle).toHaveBeenCalledTimes(1);
       expect(state.rows).toHaveLength(5);
+    });
+
+    test('uses the guaranteed bank fallback when a post-100 generated standard board cannot extend', async () => {
+      const amber = require('../services/amberCurrency');
+      const bank = require('../services/puzzleBank');
+      const extension = require('../services/puzzleExtension');
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({ puzzlesSolved: 101 });
+      (extension.extendStandardPuzzle as jest.Mock).mockImplementationOnce(config => config);
+
+      resetHookState();
+      let [, actions] = callHook();
+      await actions.startNewGame('MEDIUM', 'standard', 'standard');
+
+      const [state] = callHook();
+      expect(extension.extendStandardPuzzle).toHaveBeenCalledTimes(1);
+      expect(bank.getGuaranteedExtendedStandardFallback).toHaveBeenCalledWith('MEDIUM');
+      expect(state.rows).toHaveLength(5);
+      expect(state.message).toBe('Tap a tile to begin!');
+    });
+
+    test('uses the guaranteed bank fallback before ordinary fallback on post-100 generation failure', async () => {
+      const amber = require('../services/amberCurrency');
+      const bank = require('../services/puzzleBank');
+      const { generateLocalPuzzle } = require('../services/localGenerator');
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({ puzzlesSolved: 101 });
+      (generateLocalPuzzle as jest.Mock).mockRejectedValueOnce(new Error('timeout'));
+
+      resetHookState();
+      let [, actions] = callHook();
+      await actions.startNewGame('MEDIUM', 'standard', 'standard');
+
+      const [state] = callHook();
+      expect(bank.getGuaranteedExtendedStandardFallback).toHaveBeenCalledWith('MEDIUM');
+      expect(state.rows).toHaveLength(5);
+      expect(state.hint).toBe('Guaranteed mature fallback');
     });
 
     test('falls through to the guaranteed bank when a post-100 echo cannot extend', async () => {
@@ -1105,6 +1170,7 @@ describe('usePuzzleGame', () => {
         'SPARK', 'LIGHT', 'PAINS', 'DWELL', 'CURSE', 'BLACK', 'GRAVE',
       ]);
       expect(bank.selectPreGeneratedPuzzle).not.toHaveBeenCalled();
+      expect(bank.getGuaranteedExtendedStandardFallback).not.toHaveBeenCalled();
       expect(gen.generateLocalPuzzle).not.toHaveBeenCalled();
       // The quiet start line replaces the normal start toast.
       expect(state.message).toBe('The last arrangement. Take your time.');
@@ -2327,6 +2393,7 @@ describe('usePuzzleGame', () => {
 
   describe('startSharedChallengeGame', () => {
     test('starts a standard, hint-enabled board from a valid chain', () => {
+      const bank = require('../services/puzzleBank');
       resetHookState();
       let [, actions] = callHook();
       // Lowercase input exercises normalization; player was in challenge mode.
@@ -2344,6 +2411,7 @@ describe('usePuzzleGame', () => {
       expect(state.currentWordLength).toBe(4);
       // The player's difficulty preference is untouched.
       expect(state.difficulty).toBe('MEDIUM');
+      expect(bank.getGuaranteedExtendedStandardFallback).not.toHaveBeenCalled();
     });
 
     test('rejects a chain containing a non-dictionary word without touching the board', () => {
@@ -2978,6 +3046,7 @@ describe('usePuzzleGame', () => {
       const [state] = callHook();
       expect(state.unbrokenWeaveMode).toBe(false);
       expect(state.message).toBe('The thread breaks before it can begin. A plain offering remains.');
+      expect(bank.getGuaranteedExtendedStandardFallback).not.toHaveBeenCalled();
     });
   });
 });
