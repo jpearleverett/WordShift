@@ -8,9 +8,9 @@ WordShift is a React Native (Expo SDK 56) mobile word puzzle game. The app codeb
 
 ### Running the app
 
-- **Dev server:** `cd mobile && npx expo start --web --port 8081` for browser testing.
-- **Important:** When loading in Chrome in this VM, you must open DevTools (F12) **before** navigating to `localhost:8081`, otherwise Chrome's renderer will crash with error code 4 on the large bundle.
-- The web deps (`react-dom`, `react-native-web`) are regular dependencies in `mobile/package.json` — a plain `npm install` covers them.
+- **Primary target is Expo Go (iOS/Android).** In this VM there is no device/emulator, so the interactive dev/test path is **web**: `cd mobile && npx expo start --web --port 8081`. The web deps (`react-dom`, `react-native-web`) are regular dependencies in `mobile/package.json` — a plain `npm install` covers them.
+- **Important:** When loading in Chrome in this VM, you must open DevTools (F12) **before** navigating to `localhost:8081`, otherwise Chrome's renderer will crash with error code 4 on the large bundle. First load compiles an ~18MB bundle and can take 30-90s; be patient before reloading.
+- **Web bundling needs `mobile/metro.config.js` (committed).** Some native-only modules break the web bundle at Metro resolve time even though they are runtime-guarded with `Platform.OS === 'web'`: `react-native-google-mobile-ads` (native codegen banner view) and the internal `react-native/Libraries/Text/Text` + `.../TextInput/TextInput` paths that `src/theme/fonts.ts` requires (they pull in the native Fabric renderer). `metro.config.js` redirects these to `web-shims/empty.js` **for web only** — native (iOS/Android) resolution is untouched, so real builds keep the real modules. Do NOT comment out these imports in source to "fix" web; the resolver shim is the correct, source-clean fix. If you add another native-only dep that breaks the web bundle, add it to `WEB_STUBBED_MODULES` there. Restart Metro after editing `metro.config.js` (config changes are not hot-reloaded).
 
 ### Setup
 
