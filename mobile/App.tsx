@@ -139,7 +139,7 @@ import { loadPixelFonts, installGlobalFont } from './src/theme/fonts';
 import { initHints, addHints } from './src/services/hints';
 import { loadEntitlements, hasEntitlementSync, ENTITLEMENTS } from './src/services/entitlements';
 import { StoreModal } from './src/components/monetization/StoreModal';
-import { recordInterstitialSeen, consumePatronNudge, armRemoveAdsNudgeIfEligible, consumePendingRemoveAdsNudge } from './src/services/monetizationPrompts';
+import { recordInterstitialSeen, consumePatronNudge, armRemoveAdsNudgeIfEligible, consumePendingRemoveAdsNudge, canOfferRewardedDouble, recordRewardedDoubleOffered } from './src/services/monetizationPrompts';
 import { REWARDED_HINT_GRANT } from './src/constants/gameBalance';
 import { createRevenueCatBillingProvider } from './src/services/providers/revenueCatBilling';
 import { createAdMobAdProvider } from './src/services/providers/googleAdMobAds';
@@ -393,6 +393,10 @@ function MainApp() {
   const socialProofCacheRef = useRef<{ date: string; count: number } | null>(null);
   // Optional rewarded "double the reward" — one claim per victory
   const [victoryDoubleClaimed, setVictoryDoubleClaimed] = useState(false);
+  // Whether THIS victory presents the double slot at all. Decided (and the
+  // presentation recorded) once per victory at processing time — the slot is
+  // cadence-capped per local day and blocked at phase 4+ (monetizationPrompts).
+  const [victoryDoubleOffer, setVictoryDoubleOffer] = useState(false);
 
   // Phase transition overlay state
   const [phaseTransitionEvent, setPhaseTransitionEvent] = useState<PhaseTransitionEvent | null>(null);
@@ -1104,6 +1108,7 @@ function MainApp() {
     setIsPlayingDaily(false);
     resetSpeedRun();
     setVictoryDoubleClaimed(false);
+    setVictoryDoubleOffer(false);
     setDailyRank(null);
     setDailyLadderLine(null);
     setDailyLadderTrend(null);
@@ -1612,6 +1617,26 @@ function MainApp() {
       // daily's +50% line can never linger onto later normal-board victories.
       setEventBonusLine(null);
       setVictoryDoubleClaimed(false);
+      // Rewarded-double cadence gate: the 2x slot presents at most twice per
+      // local day and never at phase 4+ (the dread arc is protected like
+      // interstitials) — on every win it made the base reward read as the
+      // amount the player failed to claim. Decided + recorded HERE, once per
+      // victory (processing time), so modal re-renders can never double-count
+      // a presentation. Ad-free owners' instant-double perk is the same slot
+      // and follows the same cadence.
+      setVictoryDoubleOffer(false);
+      if (victory.puzzlesSolved > AUTO_COLLECT_PUZZLE_LIMIT) {
+        (async () => {
+          try {
+            if (await canOfferRewardedDouble(persistence.currentPhase)) {
+              await recordRewardedDoubleOffered();
+              setVictoryDoubleOffer(true);
+            }
+          } catch {
+            // Non-critical — the victory flow never blocks on the 2x slot.
+          }
+        })();
+      }
       (async () => {
         try {
           const today = getLocalDateString();
@@ -3679,7 +3704,7 @@ function MainApp() {
           socialProofLine={socialProofLine}
           eventBonusLine={eventBonusLine}
           forceFullCeremony={phaseTransitionEvent != null}
-          rewardedDoubleEnabled={(persistence.cumulativeStats?.totalPuzzlesCompleted ?? 0) > AUTO_COLLECT_PUZZLE_LIMIT}
+          rewardedDoubleEnabled={victoryDoubleOffer}
           rewardedDoubleClaimed={victoryDoubleClaimed}
           onRewardedDouble={handleRewardedDouble}
           victoryData={victoryFlow.victoryData}

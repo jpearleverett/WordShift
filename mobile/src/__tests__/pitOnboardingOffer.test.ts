@@ -102,9 +102,6 @@ jest.mock('../services/tending', () => ({
 jest.mock('../services/weeklyQuests', () => ({
   updateQuestProgress: jest.fn(),
 }));
-jest.mock('../components/monetization/RewardedAdButton', () => ({
-  RewardedAdButton: () => null,
-}));
 
 import {
   isPitWordTapEnabled,

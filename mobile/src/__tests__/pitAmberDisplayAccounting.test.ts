@@ -105,9 +105,6 @@ jest.mock('../services/tending', () => ({
 jest.mock('../services/weeklyQuests', () => ({
   updateQuestProgress: jest.fn(),
 }));
-jest.mock('../components/monetization/RewardedAdButton', () => ({
-  RewardedAdButton: () => null,
-}));
 
 import { computeDevourAmberIncrement } from '../components/OfferingPitScreen';
 import * as fs from 'fs';
@@ -229,5 +226,13 @@ describe('accounting regression tripwires', () => {
     // The mid-cascade prop echo (already-credited final balance) must not
     // clobber the counting display — the guard is the Bug A fix.
     expect(src).toMatch(/if \(isOfferingRef\.current\) return;\s*\n\s*setDisplayBalance\(amberBalance\);/);
+  });
+
+  test('the Tending Shrine carries no rewarded ad (serene custodianship, not a treadmill)', () => {
+    // The Store's daily faucet is the one rewarded-amber surface; the old
+    // in-shrine RewardedAdButton ('rewarded_tend') must stay removed.
+    expect(src).not.toMatch(/RewardedAdButton/);
+    expect(src).not.toMatch(/rewarded_tend/);
+    expect(src).not.toMatch(/REWARDED_TEND_BONUS/);
   });
 });

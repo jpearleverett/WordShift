@@ -603,6 +603,32 @@ describe('rewarded double display (the doubled reward must be visible after the 
     expect(text).not.toContain('Doubled');
     expect(text).toContain('15');
   });
+
+  it('renders the double slot when App enables it for this victory', () => {
+    // App decides per-victory (daily cadence cap + phase gate live upstream in
+    // monetizationPrompts); the modal just presents when told to.
+    const tree = render(baseProps({
+      phase: 0,
+      rewardedDoubleEnabled: true,
+      rewardedDoubleClaimed: false,
+      onRewardedDouble: jest.fn(),
+      victoryData: baseVictoryData({ amberEarned: 15, autoCollected: false }),
+    }));
+    const slots = findAll(tree, el => (el.props as Record<string, unknown>)?.placement === 'victory_double');
+    expect(slots).toHaveLength(1);
+  });
+
+  it('renders NO double slot when App withholds it (cadence exhausted / dread arc)', () => {
+    const tree = render(baseProps({
+      phase: 0,
+      rewardedDoubleEnabled: false,
+      rewardedDoubleClaimed: false,
+      onRewardedDouble: jest.fn(),
+      victoryData: baseVictoryData({ amberEarned: 15, autoCollected: false }),
+    }));
+    const slots = findAll(tree, el => (el.props as Record<string, unknown>)?.placement === 'victory_double');
+    expect(slots).toHaveLength(0);
+  });
 });
 
 // ===========================================================================

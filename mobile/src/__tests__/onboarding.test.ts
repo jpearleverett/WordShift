@@ -95,8 +95,10 @@ describe('onboarding', () => {
       expect(ONBOARDING_FOX_LINES.going_to_pit).toBeDefined();
       expect(ONBOARDING_FOX_LINES.going_to_pit.length).toBe(1);
 
+      // Merged to a single beat in the onboarding-tail trim: the pit
+      // explanation lands in one card, so the corridor loses a tap.
       expect(ONBOARDING_FOX_LINES.pit_intro).toBeDefined();
-      expect(ONBOARDING_FOX_LINES.pit_intro.length).toBe(2);
+      expect(ONBOARDING_FOX_LINES.pit_intro.length).toBe(1);
 
       expect(ONBOARDING_FOX_LINES.pit_offering_complete).toBeDefined();
       expect(ONBOARDING_FOX_LINES.pit_offering_complete.length).toBe(1);
@@ -142,11 +144,36 @@ describe('onboarding', () => {
       expect(allText).toContain('scroll down');
     });
 
-    test('unlock_explained stays a tight closing beat (three lines)', () => {
-      // Trimmed from four to three beats: the text-dense tail landed right after
-      // the first-win dopamine peak, so it says the same things (cycle + pit
-      // location + come-back warmth) in fewer words.
-      expect(ONBOARDING_FOX_LINES.unlock_explained.length).toBe(3);
+    test('unlock_explained stays a tight closing beat (two lines)', () => {
+      // Trimmed again (3 → 2): the text-dense tail landed right after the
+      // first-win dopamine peak, so it says the same things (cycle + pit
+      // location + come-back warmth) in fewer words and fewer taps.
+      expect(ONBOARDING_FOX_LINES.unlock_explained.length).toBe(2);
+    });
+
+    test('fox_invited is two beats with the darkness seed kept verbatim as the closer', () => {
+      // The greeting and the house-grows beat are merged; the Early Darkness
+      // Seed line must survive the trim word for word, and stay the closer.
+      const lines = ONBOARDING_FOX_LINES.fox_invited;
+      expect(lines.length).toBe(2);
+      expect(lines[0]).toContain("I'm Ember!");
+      expect(lines[0].toLowerCase()).toContain('every puzzle you solve makes this house a little more real');
+      expect(lines[lines.length - 1]).toContain(
+        'I have been hoping for someone like you for the longest time.'
+      );
+    });
+
+    test('the pit-intro seed survives the merge verbatim', () => {
+      expect(ONBOARDING_FOX_LINES.pit_intro.join(' ')).toContain(
+        'it loves being fed. Most things here do, funnily enough.'
+      );
+    });
+
+    test('the closing seed "They need you." survives verbatim as the final line', () => {
+      const lines = ONBOARDING_FOX_LINES.unlock_explained;
+      expect(lines[lines.length - 1]).toContain('They need you.');
+      // And the come-back-each-day retention hook rides the same closer.
+      expect(lines[lines.length - 1].toLowerCase()).toContain('come back each day');
     });
 
     test('the puzzle-tutorial intro teaches BOTH the tap and drag input paths', () => {

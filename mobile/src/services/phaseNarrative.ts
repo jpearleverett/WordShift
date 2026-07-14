@@ -2121,21 +2121,37 @@ export function isSilentVictoryBeat(completedTotal: number): boolean {
 // puzzles have been solved inside the window (1..FINALE_DWELL_PUZZLES).
 // ============================================================================
 
+// One line per dwell win (index = dwellCount - 1): the eight-win window is a
+// single held breath, so each win escalates instead of recycling. The three
+// original lines anchor positions 1, 3, and 7.
+const DWELL_LINES: string[] = [
+  'The house is whole. It is quiet in a new way, like a table set before the guests arrive.',
+  'Nothing is being built anymore. The keepers have folded their hands, and the rooms have begun to listen.',
+  'The rooms are ready. The keepers are ready. What is coming is almost ready too.',
+  'The walls have stopped their settling. Even the dust waits to fall until you have passed.',
+  'Your words land more softly now, the way footsteps soften outside a door that is about to open.',
+  'The quiet has a direction. Every room in the house faces it without turning.',
+  'It is very close now. The house holds still, the way you hold still when something is about to speak.',
+  'There is nothing left to make ready. The house has drawn a long breath, and holds it, and holds it.',
+];
+
+// Serene mirror (phase 5): the same window remembered from the far side —
+// rest, not anticipation. Original serene lines anchor positions 1, 3, and 7.
+const DWELL_LINES_SERENE: string[] = [
+  'The house is whole. The quiet has made itself at home.',
+  'The keepers move through the rooms without hurry. There is nowhere else they need to be.',
+  'Every room rests. Nothing more is asked of them.',
+  'The dust settles where it likes now. The house does not mind being lived in.',
+  'Your words arrive like letters from an old friend. The house reads them slowly.',
+  'The quiet is not waiting for anything. It is simply staying.',
+  'The house holds its shape, contented. It kept still for this once.',
+  'Everything that was promised has been kept. The house breathes out, and out, and out.',
+];
+
 export function getDwellLine(dwellCount: number, phase: number): string {
-  const serene = phase >= 5;
-  if (dwellCount <= 2) {
-    return serene
-      ? 'The house is whole. The quiet has made itself at home.'
-      : 'The house is whole. It is quiet in a new way, like a table set before the guests arrive.';
-  }
-  if (dwellCount <= 5) {
-    return serene
-      ? 'Every room rests. Nothing more is asked of them.'
-      : 'The rooms are ready. The keepers are ready. What is coming is almost ready too.';
-  }
-  return serene
-    ? 'The house holds its shape, contented. It kept still for this once.'
-    : 'It is very close now. The house holds still, the way you hold still when something is about to speak.';
+  const lines = phase >= 5 ? DWELL_LINES_SERENE : DWELL_LINES;
+  const idx = Math.max(1, Math.min(dwellCount, lines.length)) - 1;
+  return lines[idx];
 }
 
 // ============================================================================
@@ -2180,6 +2196,18 @@ export function getSwiftVictoryHintMessage(phase: number): string {
 export function getFinalBoardStartMessage(phase: number): string {
   if (phase >= 5) return 'One more arrangement. The pattern already knows its shape.';
   return 'The last arrangement. Take your time. It has waited this long.';
+}
+
+/**
+ * The final board's ONE rule change: undo is refused. Every word placed on the
+ * last arrangement is placed for good — the moment complicity stops being a
+ * story and becomes a mechanic. Shown as the error toast when the player taps
+ * UNDO on the final board (RESTART remains available: beginning the last
+ * arrangement again is permitted; taking a word back is not).
+ */
+export function getFinalBoardUndoRefusal(phase: number): string {
+  if (phase >= 5) return 'It is already part of the pattern. It cannot come back.';
+  return 'Not this one. What is given now is given for good.';
 }
 
 // ============================================================================

@@ -11,19 +11,38 @@
  *     on the NEXT qualifying exit (consumePendingRemoveAdsNudge) — never stacked
  *     on the same exit as the ad that triggered it.
  *
+ * This file also paces the victory "double the reward" slot:
+ *   - Rewarded-double cadence: the 2x control may present at most
+ *     REWARDED_DOUBLE_DAILY_CAP times per LOCAL day, and never once the dread
+ *     arc begins (phase 4+, protected exactly like interstitials). Otherwise
+ *     it appears on every win and the base reward reads as the amount a
+ *     rational player failed to claim. Ad-free owners' instant-double perk is
+ *     the same slot, so it follows the same cadence.
+ *
  * Decision logic is pure/exported for testing; the persisted state only records
- * "have we shown this yet" + an interstitials-seen counter (+ the armed offer).
+ * "have we shown this yet" + an interstitials-seen counter (+ the armed offer,
+ * + the local-day rewarded-double presentation counter).
  * This is device UX pacing (like ad_pacing), intentionally NOT part of cloud sync.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isPatronSync, isAdFreeSync } from './entitlements';
+import { getLocalDateString } from './dateUtils';
 import {
   PATRON_NUDGE_MIN_PUZZLES,
   REMOVE_ADS_NUDGE_AFTER_INTERSTITIALS,
 } from '../constants/gameBalance';
 
 const STORAGE_KEY = 'wordshift_monet_prompts';
+
+/** Max times per local day the victory "double the reward" slot may present. */
+export const REWARDED_DOUBLE_DAILY_CAP = 2;
+
+/**
+ * The rewarded-double slot never presents from this phase on — the dread arc
+ * is protected from monetization surfaces the same way interstitials are.
+ */
+export const REWARDED_DOUBLE_BLOCKED_FROM_PHASE = 4;
 
 export interface MonetPromptState {
   patronNudgeShown: boolean;
@@ -35,6 +54,10 @@ export interface MonetPromptState {
    * and waiting for the next ad-free exit to be presented.
    */
   removeAdsOfferPending: boolean;
+  /** Local calendar day (YYYY-MM-DD) the rewarded-double counter belongs to. */
+  rewardedDoubleDate: string | null;
+  /** Rewarded-double presentations already made on `rewardedDoubleDate`. */
+  rewardedDoubleOffersToday: number;
 }
 
 let cache: MonetPromptState | null = null;
@@ -45,6 +68,8 @@ function getDefault(): MonetPromptState {
     removeAdsNudgeShown: false,
     interstitialsSeen: 0,
     removeAdsOfferPending: false,
+    rewardedDoubleDate: null,
+    rewardedDoubleOffersToday: 0,
   };
 }
 
@@ -95,6 +120,15 @@ export function shouldShowRemoveAdsNudge(params: {
 }): boolean {
   if (params.isAdFree || params.alreadyShown) return false;
   return params.interstitialsSeen >= REMOVE_ADS_NUDGE_AFTER_INTERSTITIALS;
+}
+
+export function shouldOfferRewardedDouble(params: {
+  offersToday: number;
+  phase: number;
+}): boolean {
+  // The dread arc is protected like interstitials — never present the slot.
+  if (params.phase >= REWARDED_DOUBLE_BLOCKED_FROM_PHASE) return false;
+  return params.offersToday < REWARDED_DOUBLE_DAILY_CAP;
 }
 
 // ---------------------------------------------------------------------------
@@ -169,6 +203,40 @@ export async function consumePendingRemoveAdsNudge(): Promise<boolean> {
   cache = state;
   await save();
   return show;
+}
+
+/** Rewarded-double presentations recorded for TODAY (stale days read as 0). */
+function rewardedDoubleOffersFor(state: MonetPromptState, today: string): number {
+  return state.rewardedDoubleDate === today ? state.rewardedDoubleOffersToday : 0;
+}
+
+/**
+ * Whether the victory "double the reward" slot may present right now: under
+ * the per-local-day cap and outside the dread arc (phase 4+). Read-only —
+ * the caller records an actual presentation via recordRewardedDoubleOffered().
+ */
+export async function canOfferRewardedDouble(phase: number): Promise<boolean> {
+  const state = await load();
+  return shouldOfferRewardedDouble({
+    offersToday: rewardedDoubleOffersFor(state, getLocalDateString()),
+    phase,
+  });
+}
+
+/**
+ * Record one rewarded-double presentation for today (local-day bucketed; a
+ * stale day rolls the counter over). Returns the new count for today. Call
+ * exactly once per victory that actually presents the slot — never from a
+ * render path, where re-renders would double-count.
+ */
+export async function recordRewardedDoubleOffered(): Promise<number> {
+  const state = await load();
+  const today = getLocalDateString();
+  state.rewardedDoubleOffersToday = rewardedDoubleOffersFor(state, today) + 1;
+  state.rewardedDoubleDate = today;
+  cache = state;
+  await save();
+  return state.rewardedDoubleOffersToday;
 }
 
 /** Clear soft-prompt pacing state (for Settings → Reset All). */
