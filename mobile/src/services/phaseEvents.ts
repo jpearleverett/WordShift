@@ -12,6 +12,8 @@ import { DialoguePhase } from '../types/homeWorld';
 export interface PhaseTransitionEvent {
   phase: DialoguePhase;
   title: string;
+  /** Hide the era name for ordinary transitions; special ceremonies keep it. */
+  showTitle?: boolean;
   scenes: PhaseScene[];
   bgColor: string;
   textColor: string;
@@ -74,6 +76,7 @@ const PHASE_EVENTS: Record<number, PhaseTransitionEvent> = {
   1: {
     phase: 1,
     title: 'Curious Thoughts',
+    showTitle: false,
     bgColor: '#2D2B55',
     textColor: '#E8E4F0',
     accentColor: '#B794F4',
@@ -109,6 +112,7 @@ const PHASE_EVENTS: Record<number, PhaseTransitionEvent> = {
   2: {
     phase: 2,
     title: 'Deeper Questions',
+    showTitle: false,
     bgColor: '#1A1832',
     textColor: '#C4B5D9',
     accentColor: '#9B7DC8',
@@ -146,6 +150,7 @@ const PHASE_EVENTS: Record<number, PhaseTransitionEvent> = {
   3: {
     phase: 3,
     title: 'Growing Shadows',
+    showTitle: false,
     bgColor: '#0D0B1A',
     textColor: '#9B8FB5',
     accentColor: '#6B4F8A',
@@ -186,6 +191,7 @@ const PHASE_EVENTS: Record<number, PhaseTransitionEvent> = {
   4: {
     phase: 4,
     title: 'The Horizon',
+    showTitle: false,
     bgColor: '#050208',
     textColor: '#7A6B8A',
     accentColor: '#8B2252',

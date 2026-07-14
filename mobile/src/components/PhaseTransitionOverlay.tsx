@@ -506,7 +506,11 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
         },
       ]}
       accessibilityRole="alert"
-      accessibilityLabel={`Phase transition: ${event.title}`}
+      accessibilityLabel={
+        event.showTitle === false
+          ? (event.scenes[0]?.text ?? 'Narrative transition')
+          : event.title
+      }
     >
       {/* Event-long backdrop: the settled entity behind every line (static, faint) */}
       {event.backdrop && (
@@ -561,9 +565,11 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
       )}
 
       {/* Title */}
-      <Text style={[styles.title, { color: event.accentColor }]}>
-        {event.title}
-      </Text>
+      {event.showTitle !== false && (
+        <Text style={[styles.title, { color: event.accentColor }]}>
+          {event.title}
+        </Text>
+      )}
 
       {/* Active scene */}
       <Animated.View

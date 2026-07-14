@@ -587,21 +587,20 @@ export const SPEED_TIME_LIMITS: Record<string, number> = {
  * without ever blocking the (optional) loop.
  *
  * getTendingCost(level) = round( BASE * GROWTH^level / 10 ) * 10, capped.
- * Approximate curve: L1 40 · L2 50 · L5 70 · L10 120 · L25 680 · L34+ capped.
- * The first ~5 levels (~290 total) cost roughly one good day's earnings, so a
- * newly-Phase-5 player gets immediate, satisfying deepening. The cap is 1,800
- * (was 5,000): the old cap made every level past ~L40 a multi-day grind, so
- * the middle band of the sink was effectively unreachable — 1,800 keeps a
- * capped level to roughly a strong session's income, so deepening stays a
- * playable ritual instead of a wall. Retune against live data, not blind.
+ * Approximate curve: L1 30 · L2 40 · L5 50 · L10 70 · L25 230 · L35 520 ·
+ * L38+ capped. The first milestone arrives at level 3 for about 110 amber
+ * total, so a newly-Phase-5 player reaches new keeper dialogue promptly.
+ * The 650 cap (was 1,800) keeps later deepenings inside a regular endgame
+ * session instead of turning the cosmetic loop into a multi-day wall.
+ * Retune against live data, not blind.
  */
-export const TENDING_BASE = 40;
-export const TENDING_GROWTH = 1.12;
-export const TENDING_COST_CAP = 1800;
+export const TENDING_BASE = 30;
+export const TENDING_GROWTH = 1.085;
+export const TENDING_COST_CAP = 650;
 /** First deepening each local day is discounted — the daily return hook. */
 export const TENDING_DAILY_BONUS_DISCOUNT = 0.3;
 /** Tending Levels that fire a ceremony + unlock a new serene dialogue line. */
-export const TENDING_MILESTONES = [5, 10, 25, 50, 100];
+export const TENDING_MILESTONES = [3, 8, 15, 35, 70];
 
 
 /** Default time limit for speed variant when difficulty is unknown. */
