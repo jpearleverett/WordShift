@@ -2741,7 +2741,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, overflow: 'hidden' },
   backgroundImage: {
     position: 'absolute',
     top: 0, left: 0,
