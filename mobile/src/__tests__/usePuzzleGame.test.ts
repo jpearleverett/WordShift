@@ -87,6 +87,7 @@ jest.mock('../services/phaseNarrative', () => ({
   getBlindFailMessage: jest.fn((_p: number) => 'Not every word held! Undo and mend the chain.'),
   getLockedLetterMessage: jest.fn((_p: number) => 'That letter is locked!'),
   getFinalBoardStartMessage: jest.fn((_p: number) => 'The last arrangement. Take your time.'),
+  getFinalBoardUndoRefusal: jest.fn((_p: number) => 'What is given now is given for good.'),
 }));
 
 jest.mock('../services/hints', () => ({
@@ -98,7 +99,10 @@ jest.mock('../services/hints', () => ({
 jest.mock('../services/amberCurrency', () => ({
   getPreferredPuzzleVariant: jest.fn(async () => 'standard'),
   setPreferredPuzzleVariant: jest.fn(async () => {}),
-  getFullProgress: jest.fn(async () => ({ puzzlesSolved: 10 })),
+  // Default is POST-bridge (>= PREVIEW_GRADING_BRIDGE_PUZZLES = 12) so the
+  // preview-validity truth table below exercises the steady-state gate; the
+  // bridge tests override this per-test with an early-game count.
+  getFullProgress: jest.fn(async () => ({ puzzlesSolved: 20 })),
   getRitualWords: jest.fn(async () => []),
 }));
 
@@ -160,6 +164,9 @@ jest.mock('../constants', () => ({
 }));
 
 import { usePuzzleGame, hasAnyValidMove, canCompleteDoubleShift, hasAnyValidDoubleShiftMove, isBoardSolvableFromState, comboTierForStreak, shouldUseComboMessage, PuzzleGameState, PuzzleGameActions } from '../hooks/usePuzzleGame';
+// Real value (the hook imports it from gameBalance directly, past the
+// '../constants' mock above) — the bridge tests pin against it.
+import { PREVIEW_GRADING_BRIDGE_PUZZLES } from '../constants/gameBalance';
 
 /**
  * Helper: call usePuzzleGame with fresh hook indices (simulates a re-render).
@@ -880,7 +887,7 @@ describe('usePuzzleGame', () => {
 
     afterEach(() => {
       // Restore the suite-wide defaults consumed by mockResolvedValueOnce.
-      (amber.getFullProgress as jest.Mock).mockImplementation(async () => ({ puzzlesSolved: 10 }));
+      (amber.getFullProgress as jest.Mock).mockImplementation(async () => ({ puzzlesSolved: 20 }));
       (amber.getRitualWords as jest.Mock).mockImplementation(async () => []);
       (gen.getStrongestDreadWord as jest.Mock).mockImplementation(() => null);
     });
@@ -1005,6 +1012,150 @@ describe('usePuzzleGame', () => {
       actions.clearBoard();
       [state] = callHook();
       expect(state.isFinalBoard).toBe(false);
+    });
+  });
+
+  // =========================================================================
+  // The final board's ONE rule: undo is refused. Every word placed on the
+  // last arrangement is placed for good — complicity becomes mechanical.
+  // RESTART (resetCurrentPuzzle) remains the sanctioned repair path and
+  // preserves the finale mark; hints stay available; normal boards are
+  // untouched.
+  // =========================================================================
+
+  describe('final board: undo refused', () => {
+    const amber = require('../services/amberCurrency');
+    const gen = require('../services/localGenerator');
+
+    afterEach(() => {
+      (amber.getFullProgress as jest.Mock).mockImplementation(async () => ({ puzzlesSolved: 20 }));
+      (amber.getRitualWords as jest.Mock).mockImplementation(async () => []);
+      (gen.getStrongestDreadWord as jest.Mock).mockImplementation(() => null);
+    });
+
+    // Serve THE final board with the synthetic solvable chain ABCD→EFGH→IJKL
+    // (move A→slot 0 forms AEFGH; then E→slot 0 forms EIJKL and completes).
+    async function serveFinalBoard(blind = false) {
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({
+        puzzlesSolved: 162,
+        finaleArmed: true,
+        finalPuzzleCompleted: false,
+      });
+      (amber.getRitualWords as jest.Mock).mockResolvedValueOnce(['ABCD']);
+      (gen.getStrongestDreadWord as jest.Mock).mockReturnValueOnce({ word: 'ABCD', tier: 4 });
+      (gen.generateLocalPuzzle as jest.Mock).mockResolvedValueOnce({
+        words: ['ABCD', 'EFGH', 'IJKL'],
+        hint: 'final',
+        solution: [],
+        wordLength: 4,
+      });
+      resetHookState();
+      let [, actions] = callHook();
+      if (blind) {
+        await actions.startNewGame('MEDIUM', 'challenge', 'standard', true);
+      } else {
+        await actions.startNewGame('MEDIUM');
+      }
+      const [state] = callHook();
+      expect(state.isFinalBoard).toBe(true);
+    }
+
+    async function playMove(char: string, slot: number) {
+      let [state, actions] = callHook();
+      const letter = state.rows[state.activeRowIndex].words.find(
+        l => l.char === char && !l.isLocked
+      )!;
+      actions.handleLetterPress(letter, state.activeRowIndex);
+      [, actions] = callHook();
+      return actions.handleSlotPress(slot);
+    }
+
+    test('undo is refused: nothing reverts, history intact, refusal voiced via error shake', async () => {
+      await serveFinalBoard();
+      const moved = await playMove('A', 0);
+      expect(moved?.completed).toBe(false);
+
+      let [state, actions] = callHook();
+      expect(state.history).toHaveLength(1);
+      actions.handleUndo();
+
+      [state] = callHook();
+      // Nothing reverted: the move stands, the board is unchanged.
+      expect(state.history).toHaveLength(1);
+      expect(state.activeRowIndex).toBe(1);
+      expect(state.rows[1].words.map(l => l.char).join('')).toBe('AEFGH');
+      // The refusal speaks through the error shake (phase-aware line).
+      expect(state.error).toBe('What is given now is given for good.');
+    });
+
+    test('the refusal never charges the flawless run (undosUsed stays 0 at completion)', async () => {
+      await serveFinalBoard();
+      await playMove('A', 0);
+      let [, actions] = callHook();
+      actions.handleUndo(); // refused — must not tick undosUsed
+      const done = await playMove('E', 0);
+      expect(done?.completed).toBe(true);
+      expect(done?.isFinalBoard).toBe(true);
+      expect(done?.undosUsed).toBe(0);
+    });
+
+    test('RESTART still works on the final board and preserves the finale mark', async () => {
+      await serveFinalBoard();
+      await playMove('A', 0);
+      let [state, actions] = callHook();
+      expect(state.rows[1].words).toHaveLength(5);
+
+      actions.resetCurrentPuzzle();
+      [state] = callHook();
+      // The restarted board is still THE final board, back at its start.
+      expect(state.isFinalBoard).toBe(true);
+      expect(state.gameState).toBe(GameState.PLAYING);
+      expect(state.history).toHaveLength(0);
+      expect(state.rows.map(r => r.words.map(l => l.char).join(''))).toEqual([
+        'ABCD', 'EFGH', 'IJKL',
+      ]);
+    });
+
+    test('blind finale: undo refused even though blind undos are normally free; restart is the escape', async () => {
+      await serveFinalBoard(true);
+      let [state] = callHook();
+      expect(state.blindMode).toBe(true);
+
+      await playMove('A', 0);
+      let [stateAfterMove, actions] = callHook();
+      expect(stateAfterMove.history).toHaveLength(1);
+
+      actions.handleUndo();
+      [state] = callHook();
+      // Even blind's always-free undo yields to the final board's one rule...
+      expect(state.history).toHaveLength(1);
+      expect(state.error).toBe('What is given now is given for good.');
+
+      // ...and RESTART remains reachable from that state (the documented
+      // repair path for a failed blind-finale judgment).
+      [, actions] = callHook();
+      actions.resetCurrentPuzzle();
+      [state] = callHook();
+      expect(state.isFinalBoard).toBe(true);
+      expect(state.history).toHaveLength(0);
+      expect(state.gameState).toBe(GameState.PLAYING);
+    });
+
+    test('normal boards undo exactly as before', async () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['ABCD', 'EFGH', 'IJKL']);
+      await playMove('A', 0);
+
+      let [state, actionsAfter] = callHook();
+      expect(state.history).toHaveLength(1);
+      actionsAfter.handleUndo();
+
+      [state] = callHook();
+      expect(state.history).toHaveLength(0);
+      expect(state.activeRowIndex).toBe(0);
+      expect(state.rows[1].words.map(l => l.char).join('')).toBe('EFGH');
+      expect(state.message).toBe("Let's try again!");
     });
   });
 
@@ -1703,6 +1854,93 @@ describe('usePuzzleGame', () => {
       // on it) — only the PRESENTATION is gated.
       expect(state.slotPreviews).toBeDefined();
       expect(state.slotPreviews!.some(p => typeof p.isValid === 'boolean')).toBe(true);
+    });
+  });
+
+  // =========================================================================
+  // Preview-grading bridge: the tutorial teaches the ✓/✗ marks, so grading
+  // stays on for EVERY board until PREVIEW_GRADING_BRIDGE_PUZZLES total
+  // puzzles are solved — the first free MEDIUM board must not silently drop
+  // what the tutorial just taught. Blind still suppresses everything;
+  // double-shift stays always-graded.
+  // =========================================================================
+
+  describe('previewValidityVisible (early-game grading bridge)', () => {
+    const amber = require('../services/amberCurrency');
+
+    afterEach(() => {
+      // Restore the suite-wide post-bridge default.
+      (amber.getFullProgress as jest.Mock).mockImplementation(async () => ({ puzzlesSolved: 20 }));
+    });
+
+    test('a MEDIUM board during the bridge keeps the grading on', async () => {
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({ puzzlesSolved: 5 });
+      resetHookState();
+      let [, actions] = callHook();
+      await actions.startNewGame('MEDIUM');
+      const [state] = callHook();
+      expect(state.difficulty).toBe('MEDIUM');
+      expect(state.previewValidityVisible).toBe(true);
+    });
+
+    test('the bridge closes at exactly PREVIEW_GRADING_BRIDGE_PUZZLES solves', async () => {
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({
+        puzzlesSolved: PREVIEW_GRADING_BRIDGE_PUZZLES,
+      });
+      resetHookState();
+      let [, actions] = callHook();
+      await actions.startNewGame('MEDIUM');
+      const [state] = callHook();
+      expect(state.previewValidityVisible).toBe(false);
+    });
+
+    test('one solve before the threshold is still bridged', async () => {
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({
+        puzzlesSolved: PREVIEW_GRADING_BRIDGE_PUZZLES - 1,
+      });
+      resetHookState();
+      let [, actions] = callHook();
+      await actions.startNewGame('MEDIUM');
+      const [state] = callHook();
+      expect(state.previewValidityVisible).toBe(true);
+    });
+
+    test('Blind Offering still suppresses everything during the bridge', async () => {
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({ puzzlesSolved: 5 });
+      resetHookState();
+      let [, actions] = callHook();
+      await actions.startNewGame('EASY', 'challenge', 'standard', true);
+      const [state] = callHook();
+      expect(state.blindMode).toBe(true);
+      expect(state.previewValidityVisible).toBe(false);
+      expect(state.slotPreviews).toBeUndefined();
+    });
+
+    test('the daily is graded during the bridge (EVERY board bridges)', async () => {
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({ puzzlesSolved: 9 });
+      resetHookState();
+      let [, actions] = callHook();
+      // Seed the bridge counter via a normal start (the daily itself does not
+      // fetch progress; it inherits the last-known count).
+      await actions.startNewGame('MEDIUM');
+
+      [, actions] = callHook();
+      actions.startDailyGame(['PLANET', 'PLATES', 'PLANES'], undefined, 6);
+      const [state] = callHook();
+      expect(state.previewValidityVisible).toBe(true);
+    });
+
+    test('shared-challenge boards are graded during the bridge', async () => {
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({ puzzlesSolved: 9 });
+      resetHookState();
+      let [, actions] = callHook();
+      await actions.startNewGame('MEDIUM');
+
+      [, actions] = callHook();
+      const ok = actions.startSharedChallengeGame(['SUIT', 'SITE', 'WHAT']);
+      expect(ok).toBe(true);
+      const [state] = callHook();
+      expect(state.previewValidityVisible).toBe(true);
     });
   });
 

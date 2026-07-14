@@ -254,6 +254,19 @@ export const STARTER_INTRO_MIN_PUZZLES = 22;
  */
 export const JOURNAL_UNLOCK_PUZZLES = 6;
 
+/**
+ * Preview-grading bridge: the tutorial teaches the green-check/red-cross
+ * preview marks, but the default post-onboarding board is MEDIUM, where the
+ * verb-redesign gate would hide them on the player's FIRST free board — the
+ * single highest early mechanical quit risk. The ✓/✗ grading therefore stays
+ * on for EVERY board until this many total puzzles are solved, regardless of
+ * difficulty (Blind Offering still suppresses previews entirely; double-shift
+ * stays always-graded), bridging the tutorial into the ungraded game. The
+ * one-time graduation toast then marks the first genuinely ungraded board,
+ * which now lands after the bridge closes.
+ */
+export const PREVIEW_GRADING_BRIDGE_PUZZLES = 12;
+
 // ============================================================================
 // OFFERING PIT
 // ============================================================================
@@ -363,9 +376,18 @@ export const STREAK_MILESTONES: {
  * an unaccelerated casual player arrives at the weighted threshold (~180).
  */
 export const NARRATIVE_ACCELERATION = {
-  // Three-star rate threshold: above this, puzzles count more toward phase progress
-  THREE_STAR_RATE_THRESHOLD: 0.5,
+  // Three-star performance ramp (2026-07 smoothing): the multiplier climbs
+  // LINEARLY from 1.0 at THREE_STAR_RAMP_START to the THREE_STAR_MULTIPLIER
+  // ceiling at THREE_STAR_RAMP_END (so 1.25x at a 0.50 rate). The old hard
+  // step (1.5x iff rate >= 0.5) let a one-percentage-point skill difference
+  // move the reveal by weeks.
+  THREE_STAR_RAMP_START: 0.4,
+  THREE_STAR_RAMP_END: 0.6,
+  // Ceiling of the three-star ramp (full value at/above THREE_STAR_RAMP_END).
   THREE_STAR_MULTIPLIER: 1.5,
+  /** @deprecated The step threshold is replaced by the RAMP_START/RAMP_END
+   *  linear ramp above; kept for compat with older callers/saved tooling. */
+  THREE_STAR_RATE_THRESHOLD: 0.5,
   // Streak threshold: long streaks accelerate phase progression
   STREAK_THRESHOLD: 7,
   STREAK_MULTIPLIER: 1.25,

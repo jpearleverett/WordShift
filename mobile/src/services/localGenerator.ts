@@ -591,15 +591,22 @@ function scoreWordInterestingness(
     score += 5;
   }
 
-  // Use word position in dictionary as proxy for rarity
+  // Use word position in dictionary as a proxy for familiarity, and reward
+  // the MAINSTREAM sweet spot (2026-07 de-rarify pass). The old scoring gave
+  // +12 to the rarest 30% of the dictionary — it optimized for obscurity,
+  // confusing rarity with fun. Players enjoy RECOGNIZING words; obscure ones
+  // read as unfair, not clever.
   const wordArray = WORD_ARRAYS[wordLength];
   if (wordArray) {
     const index = wordArray.indexOf(word);
-    if (index > wordArray.length * 0.7) {
-      score += 12; // Rarer word bonus
-    } else if (index < wordArray.length * 0.1) {
-      score -= 8; // Very common word penalty
+    if (index < wordArray.length * 0.1) {
+      score -= 8; // Ultra-common head: boring filler words (unchanged)
+    } else if (index < wordArray.length * 0.6) {
+      score += 8; // Mainstream band [10%, 60%): the words players enjoy recognizing
+    } else if (index >= wordArray.length * 0.85) {
+      score -= 10; // Obscure tail [85%+): rare words read as unfair
     }
+    // [60%, 85%) stays neutral: uncommon-but-fair.
   }
 
   return Math.max(0, Math.min(100, score));

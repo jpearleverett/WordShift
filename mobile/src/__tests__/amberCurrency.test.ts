@@ -53,12 +53,14 @@ import {
   awardBonusAmber,
   confirmPhaseTransition,
   recordRitualWords,
+  calculatePhaseAcceleration,
 } from '../services/amberCurrency';
 import {
   SURPRISE_BONUS_AMOUNTS,
   SURPRISE_BONUS_MIN_PUZZLES,
   STREAK_FREEZE_CAP,
   FREE_FREEZE_INTERVAL_DAYS,
+  NARRATIVE_ACCELERATION,
 } from '../constants/gameBalance';
 import { FIRST_COMPLETION_BONUS } from '../types/homeWorld';
 import { getLocalDateStringDaysAgo } from '../services/dateUtils';
