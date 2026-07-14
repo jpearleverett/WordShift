@@ -1,6 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Animated } from 'react-native';
-import { Animal, AnimalType, HomeWorldProgress, getAnimalPhase, DialoguePhase, ANIMAL_AWARENESS_TIERS } from '../types/homeWorld';
+import {
+  Animal,
+  AnimalType,
+  HomeWorldProgress,
+  getAnimalPhase,
+  DialoguePhase,
+  ANIMAL_AWARENESS_TIERS,
+  LATE_PHASE_RECRUITS,
+  getCatchUpSessionBonus,
+} from '../types/homeWorld';
 import {
   getCurrentDialogue,
   hasMoreDialogues,
@@ -361,6 +370,33 @@ export function useDialogueFlow({
   const getUnlockedTypes = (): Set<AnimalType> =>
     new Set((progress?.unlockedAnimals ?? []) as AnimalType[]);
 
+  // Catch-up session boost: a late recruit (the descent trio, unlockable only
+  // at global Phase 3+) that still has unread REGULAR (indexed, non-pool)
+  // dialogue reads extra lines per session, so Moss's arc isn't consumed
+  // unheard by the finale ~10 puzzles after his gate. Computed per call from
+  // current state and passed into the session layer, which stays a pure
+  // counter. The newly-unlocked grace period is untouched (that's cooldowns).
+  const getSessionBonus = (animal: Animal): number => {
+    if (!progress) return 0;
+    const animalPhase = getAnimalPhase(progress.currentPhase, animal.type);
+    // "Regular" backlog = the indexed base lines. At animalPhase 5 the regular
+    // block is the Phase-4 corpus (the post-revelation pool cycles forever and
+    // never earns the boost; neither does the Phase-2 exhaustion pool).
+    const regularPhase = (animalPhase === 5 ? 4 : animalPhase) as DialoguePhase;
+    const resolved = resolveDialogueIndex(
+      animal.type,
+      animal.currentDialogueIndex,
+      regularPhase,
+      getUnlockedTypes()
+    );
+    const hasUnreadRegular = resolved < getTotalDialogueCount(animal.type, regularPhase);
+    return getCatchUpSessionBonus(
+      progress.currentPhase,
+      LATE_PHASE_RECRUITS.has(animal.type),
+      hasUnreadRegular
+    );
+  };
+
   // Track last-seen sacrifice count per animal to detect new sacrifices
   const lastSeenSacrificeCount = useRef<Record<string, number>>({});
 
@@ -372,9 +408,10 @@ export function useDialogueFlow({
   // Update session status when selected animal changes
   useEffect(() => {
     if (selectedAnimal) {
-      const status = getSessionStatus(selectedAnimal.id);
+      const status = getSessionStatus(selectedAnimal.id, getSessionBonus(selectedAnimal));
       setSessionInfo(status);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAnimal]);
 
   // Timer for dismissing cooldown message with animation
@@ -550,7 +587,7 @@ export function useDialogueFlow({
     // Pick up any Tending done since the hook mounted (e.g. the player just
     // deepened the pattern in the pit) so Phase-5 selection/badge are current.
     await refreshTendingState();
-    const availability = await checkDialogueAvailability(animal.id);
+    const availability = await checkDialogueAvailability(animal.id, getSessionBonus(animal));
 
     if (!availability.available) {
       // Phase-aware cooldown messages
@@ -832,7 +869,7 @@ export function useDialogueFlow({
 
     setPreDialoguePages(pages);
 
-    const status = getSessionStatus(animal.id);
+    const status = getSessionStatus(animal.id, getSessionBonus(animal));
     setSessionInfo(status);
 
     // Animate dialogue modal in
@@ -973,7 +1010,7 @@ export function useDialogueFlow({
     }
 
     // Regular dialogue advance — check if session is still available
-    const availability = await checkDialogueAvailability(selectedAnimal.id);
+    const availability = await checkDialogueAvailability(selectedAnimal.id, getSessionBonus(selectedAnimal));
     if (!availability.available) {
       const animalId = selectedAnimal.id;
       const animalName = selectedAnimal.name;
@@ -1027,7 +1064,7 @@ export function useDialogueFlow({
         }
       }
 
-      const status = getSessionStatus(selectedAnimal.id);
+      const status = getSessionStatus(selectedAnimal.id, getSessionBonus(selectedAnimal));
       setSessionInfo(status);
 
       const resolvePhase = (animalPhase === 5 ? 4 : animalPhase) as DialoguePhase;

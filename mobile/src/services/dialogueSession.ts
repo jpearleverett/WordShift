@@ -79,10 +79,14 @@ export function updateSessionPhase(phase: DialoguePhase): void {
 }
 
 /**
- * Get the effective max dialogues for a session (phase-aware)
+ * Get the effective max dialogues for a session (phase-aware).
+ * `sessionBonus` is a per-animal extension the CALLER decides (the catch-up
+ * boost for late recruits with a regular-dialogue backlog — see
+ * getCatchUpSessionBonus in types/homeWorld.ts); this module stays a pure
+ * counter and never inspects dialogue state itself.
  */
-function getEffectiveMaxDialogues(): number {
-  return getDialoguesPerSession(currentPhase);
+function getEffectiveMaxDialogues(sessionBonus: number = 0): number {
+  return getDialoguesPerSession(currentPhase) + Math.max(0, sessionBonus);
 }
 
 /**
@@ -98,8 +102,9 @@ function getCooldownRemaining(session: DialogueSession): number {
 /**
  * Check if an animal is available for dialogue
  * Returns: { available: boolean, reason?: string, puzzlesRemaining?: number }
+ * `sessionBonus` extends this animal's session cap (catch-up boost; default 0).
  */
-export async function checkDialogueAvailability(animalId: string): Promise<{
+export async function checkDialogueAvailability(animalId: string, sessionBonus: number = 0): Promise<{
   available: boolean;
   reason?: string;
   puzzlesRemaining?: number;
@@ -136,7 +141,7 @@ export async function checkDialogueAvailability(animalId: string): Promise<{
   }
 
   // Session is active - check if max dialogues reached (phase-aware limit)
-  const maxDialogues = getEffectiveMaxDialogues();
+  const maxDialogues = getEffectiveMaxDialogues(sessionBonus);
   if ((session.dialoguesInSession ?? 0) >= maxDialogues) {
     await startCooldown(animalId);
     return {
@@ -234,8 +239,9 @@ export async function endSession(animalId: string): Promise<void> {
 
 /**
  * Get session status for UI display
+ * `sessionBonus` extends this animal's session cap (catch-up boost; default 0).
  */
-export function getSessionStatus(animalId: string): {
+export function getSessionStatus(animalId: string, sessionBonus: number = 0): {
   status: 'available' | 'in_session' | 'cooldown';
   dialoguesRemaining?: number;
   puzzlesRemaining?: number;
@@ -259,7 +265,7 @@ export function getSessionStatus(animalId: string): {
   // In active session (phase-aware limit)
   return {
     status: 'in_session',
-    dialoguesRemaining: getEffectiveMaxDialogues() - session.dialoguesInSession,
+    dialoguesRemaining: getEffectiveMaxDialogues(sessionBonus) - session.dialoguesInSession,
   };
 }
 
