@@ -321,7 +321,12 @@ describe('finale staging (armed, not retroactive)', () => {
 
   test('the final board win is silent: no chime, no confetti (the quiet IS the moment)', () => {
     expect(APP_TSX).toMatch(/!isSilentVictoryBeat\(completedTotal\) && !wasFinalBoard/);
-    expect(APP_TSX).toMatch(/setShowConfetti\(!wasFinalBoard\)/);
+    // Full sensory silence on BOTH quiet beats: the final board AND the
+    // scripted silent-victory micro-beat (chime suppression alone would let
+    // confetti rain over "No music this time. Only the quiet after.").
+    expect(APP_TSX).toMatch(
+      /setShowConfetti\(\s*!wasFinalBoard && !isSilentVictoryBeat\(completedTotal\)\s*\)/
+    );
   });
 
   test('the dwell window has a voice: getDwellLine threads into the victory cascade', () => {

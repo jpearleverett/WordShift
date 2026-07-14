@@ -1885,7 +1885,12 @@ function MainApp() {
       }
 
       puzzleActions.setGameState(GameState.WON);
-      puzzleActions.setShowConfetti(!wasFinalBoard);
+      // Full sensory silence on BOTH quiet beats: the scripted silent victory
+      // (148) and the final board. Confetti raining over "No music this time.
+      // Only the quiet after." would undo the anticlimax the beat exists for.
+      puzzleActions.setShowConfetti(
+        !wasFinalBoard && !isSilentVictoryBeat(completedTotal)
+      );
       victoryActions.setProcessingVictory(false);
       puzzlesSinceHomeVisit.current += 1;
 

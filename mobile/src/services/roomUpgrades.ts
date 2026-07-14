@@ -244,7 +244,10 @@ export const ROOM_DEEPENINGS: RoomUpgrade[] = [
 // one continuous sink: 150/200/250 per level, 600 per room, 7,800 all-in.
 // Fiction: each level attunes the room's ambient presence a shade further.
 // Purchased strictly in order (the level is a counter). Cosmetic only — the
-// wave-2 room renderer reads getRoomEmbellishmentIntensity() below.
+// room renderer consumes RoomView's synchronous computeEmbellishmentIntensity
+// mirror (fed by the maps HomeScreen loads); getRoomEmbellishmentIntensity()
+// below is the async service-side equivalent (kept as the canonical formula,
+// covered by tests).
 // ---------------------------------------------------------------------------
 
 export const ATTUNEMENT_LEVEL_NAMES: readonly string[] = ['Kindled', 'Humming', 'Attuned'];
