@@ -9,10 +9,12 @@
  * relaunch) must snap forward to a stable, resumable target. A regression here
  * re-opens the first-session soft-lock, so it is pinned directly.
  *
- * `handleSkipOnboarding` mid-puzzle must be a CLEAN exit: onboarding step
+ * `handleSkipOnboarding` must be a CLEAN exit from EVERY step: onboarding step
  * 'complete' persisted, the guided board abandoned (cleared + autosave
  * dropped), and the player landed on home — never a guided board in limbo
- * with dashed highlights and no instructions.
+ * with dashed highlights and no instructions. A confirmed "Skip it all" from
+ * the home intro dialogue (home_empty/fox_invited) must NOT route the player
+ * INTO the tutorial puzzle it just promised to skip.
  */
 
 // --- Mock React hooks to run synchronously in Node (no renderer) ---
@@ -306,7 +308,7 @@ describe('handleSkipOnboarding (clean exit, no guided-board limbo)', () => {
     }
   });
 
-  test('skip during the intro dialogue still routes into the tutorial puzzle (not a full exit)', async () => {
+  test('skip during the fox_invited dialogue is a FULL exit: complete, home, no tutorial', async () => {
     jest.useFakeTimers();
     try {
       const cbs = makeCallbacks();
@@ -315,15 +317,45 @@ describe('handleSkipOnboarding (clean exit, no guided-board limbo)', () => {
       await actions.handleSkipOnboarding();
       await flushAsync();
 
-      // Early skip only skips the dialogue — onboarding is NOT completed.
-      expect(markTutorialCompleted).not.toHaveBeenCalled();
-      expect(await getOnboardingStep()).toBe('going_to_puzzle');
+      // "Skip it all" means skip it all — onboarding completes and persists.
+      expect(markTutorialCompleted).toHaveBeenCalled();
+      expect(await getOnboardingStep()).toBe('complete');
 
-      // The queued transition lands the player in the guided puzzle.
+      // The player lands on the full home screen, never the guided puzzle.
+      expect(cbs.transitionTo).toHaveBeenCalledWith('home', expect.any(Function));
+      expect(cbs.transitionTo).not.toHaveBeenCalledWith('puzzle', expect.any(Function));
+      expect(cbs.startNewGame).not.toHaveBeenCalled();
+
+      // No queued transition may resurrect the tutorial after the skip.
       jest.runAllTimers();
       await flushAsync();
-      expect(await getOnboardingStep()).toBe('puzzle_tutorial');
-      expect(cbs.transitionTo).toHaveBeenCalledWith('puzzle', expect.any(Function));
+      expect(await getOnboardingStep()).toBe('complete');
+      expect(cbs.transitionTo).not.toHaveBeenCalledWith('puzzle', expect.any(Function));
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test('skip from home_empty (before Fox is even invited) also completes cleanly', async () => {
+    jest.useFakeTimers();
+    try {
+      const cbs = makeCallbacks();
+      const [, actions] = await mountAtStep('home_empty', cbs);
+
+      await actions.handleSkipOnboarding();
+      await flushAsync();
+
+      expect(markTutorialCompleted).toHaveBeenCalled();
+      expect(await getOnboardingStep()).toBe('complete');
+      expect(cbs.transitionTo).toHaveBeenCalledWith('home', expect.any(Function));
+      expect(cbs.startNewGame).not.toHaveBeenCalled();
+
+      const [after] = renderOnboardingHook(cbs);
+      expect(after.isOnboarding).toBe(false);
+
+      jest.runAllTimers();
+      await flushAsync();
+      expect(await getOnboardingStep()).toBe('complete');
     } finally {
       jest.useRealTimers();
     }

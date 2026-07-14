@@ -71,6 +71,8 @@ jest.mock('../services/localGenerator', () => ({
     wordLength: 4,
   })),
   getIncantationName: jest.fn(() => null),
+  // Default: no dread word in the ledger — the finale-serve tests override this.
+  getStrongestDreadWord: jest.fn(() => null),
 }));
 
 jest.mock('../services/phaseNarrative', () => ({
@@ -84,6 +86,7 @@ jest.mock('../services/phaseNarrative', () => ({
   getInvalidWordMessage: jest.fn((word: string, _p: number) => `${word} isn't a word!`),
   getBlindFailMessage: jest.fn((_p: number) => 'Not every word held! Undo and mend the chain.'),
   getLockedLetterMessage: jest.fn((_p: number) => 'That letter is locked!'),
+  getFinalBoardStartMessage: jest.fn((_p: number) => 'The last arrangement. Take your time.'),
 }));
 
 jest.mock('../services/hints', () => ({
@@ -96,6 +99,7 @@ jest.mock('../services/amberCurrency', () => ({
   getPreferredPuzzleVariant: jest.fn(async () => 'standard'),
   setPreferredPuzzleVariant: jest.fn(async () => {}),
   getFullProgress: jest.fn(async () => ({ puzzlesSolved: 10 })),
+  getRitualWords: jest.fn(async () => []),
 }));
 
 // Mock puzzleBank to return null — tests exercise the generation path
@@ -125,6 +129,10 @@ jest.mock('../constants', () => ({
     // Synthetic chain for multi-move tests: ABCD → EFGH → IJKL
     // (move A down forming AEFGH, then E down forming EIJKL)
     'BCD', 'AEFGH', 'AFGH', 'EIJKL',
+    // 4-row extension for the combo-ladder tests: ABCD → EFGH → IJKL → WXYZ
+    // (third move: I out of EIJKL leaves EJKL, forms IWXYZ — keeps the board
+    // solvable so stuck detection never resets the streak mid-test)
+    'EJKL', 'IWXYZ',
     // Synthetic double-shift step: ABCDE → FGHIJ (move A then B → ABFGHIJ)
     'CDE', 'ABFGHIJ',
     // Hint dead-end awareness: MNOP → QRST → UVWX. First valid candidate is
@@ -151,7 +159,7 @@ jest.mock('../constants', () => ({
   },
 }));
 
-import { usePuzzleGame, hasAnyValidMove, canCompleteDoubleShift, hasAnyValidDoubleShiftMove, isBoardSolvableFromState, PuzzleGameState, PuzzleGameActions } from '../hooks/usePuzzleGame';
+import { usePuzzleGame, hasAnyValidMove, canCompleteDoubleShift, hasAnyValidDoubleShiftMove, isBoardSolvableFromState, comboTierForStreak, shouldUseComboMessage, PuzzleGameState, PuzzleGameActions } from '../hooks/usePuzzleGame';
 
 /**
  * Helper: call usePuzzleGame with fresh hook indices (simulates a re-render).
@@ -829,6 +837,140 @@ describe('usePuzzleGame', () => {
     });
   });
 
+  describe('the marked final board (finale-armed serve)', () => {
+    const amber = require('../services/amberCurrency');
+    const gen = require('../services/localGenerator');
+
+    afterEach(() => {
+      // Restore the suite-wide defaults consumed by mockResolvedValueOnce.
+      (amber.getFullProgress as jest.Mock).mockImplementation(async () => ({ puzzlesSolved: 10 }));
+      (amber.getRitualWords as jest.Mock).mockImplementation(async () => []);
+      (gen.getStrongestDreadWord as jest.Mock).mockImplementation(() => null);
+    });
+
+    test('finale armed: the next standard start is the final board, seeded from the strongest dread word', async () => {
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({
+        puzzlesSolved: 162,
+        finaleArmed: true,
+        finalPuzzleCompleted: false,
+      });
+      (amber.getRitualWords as jest.Mock).mockResolvedValueOnce(['TIME', 'GLOW']);
+      (gen.getStrongestDreadWord as jest.Mock).mockReturnValueOnce({ word: 'TIME', tier: 4 });
+
+      resetHookState();
+      let [, actions] = callHook();
+      await actions.startNewGame('MEDIUM');
+
+      const [state] = callHook();
+      expect(state.isFinalBoard).toBe(true);
+      expect(state.gameState).toBe(GameState.PLAYING);
+      expect(state.currentVariant).toBe('standard');
+      // Seeded via the echo path from the player's own strongest dread word.
+      expect(gen.generateLocalPuzzle).toHaveBeenCalledWith(
+        'MEDIUM',
+        expect.objectContaining({ startWord: 'TIME' })
+      );
+      // The quiet start line replaces the normal start toast.
+      expect(state.message).toBe('The last arrangement. Take your time.');
+    });
+
+    test('a selected variant is served as a standard board this once; the preference survives', async () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.setSelectedVariant('reverse');
+
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({
+        puzzlesSolved: 162,
+        finaleArmed: true,
+        finalPuzzleCompleted: false,
+      });
+      // No dread word (getRitualWords → [], getStrongestDreadWord → null):
+      // the ultimate fallback still serves a normal board, marked final.
+      [, actions] = callHook();
+      await actions.startNewGame('MEDIUM');
+
+      const [state] = callHook();
+      expect(state.isFinalBoard).toBe(true);
+      expect(state.currentVariant).toBe('standard');
+      // The player's preferred variant is untouched for later boards.
+      expect(state.selectedVariant).toBe('reverse');
+      expect(state.message).toBe('The last arrangement. Take your time.');
+    });
+
+    test('after the finale is completed, boards serve normally again', async () => {
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({
+        puzzlesSolved: 163,
+        finaleArmed: false,
+        finalPuzzleCompleted: true,
+      });
+      resetHookState();
+      let [, actions] = callHook();
+      await actions.startNewGame('MEDIUM');
+      const [state] = callHook();
+      expect(state.isFinalBoard).toBe(false);
+    });
+
+    test('kill/restore keeps the final-board mark (and a plain restore does not invent one)', () => {
+      resetHookState();
+      let [, actions] = callHook();
+      const baseSaved = {
+        rows: [],
+        activeRowIndex: 0,
+        selectedLetter: null,
+        gameState: GameState.PLAYING,
+        message: '',
+        history: [],
+        invalidAttempts: 0,
+        hintsUsed: 0,
+        undosRemaining: Infinity,
+        difficulty: 'MEDIUM',
+        currentWordLength: 4,
+        hint: '',
+        solution: undefined,
+        reverseSolution: undefined,
+        gameMode: 'standard',
+        currentVariant: 'standard',
+        selectedVariant: 'standard',
+        moveDirection: 'down',
+        currentPhase: 4,
+        lastFormedWord: null,
+        isPlayingDaily: false,
+        savedAt: Date.now(),
+      };
+      actions.restorePuzzleState({ ...baseSaved, isFinalBoard: true } as unknown as import('../services/puzzleSaveState').SavedPuzzleState);
+      let [state] = callHook();
+      expect(state.isFinalBoard).toBe(true);
+
+      [, actions] = callHook();
+      actions.restorePuzzleState(baseSaved as unknown as import('../services/puzzleSaveState').SavedPuzzleState);
+      [state] = callHook();
+      expect(state.isFinalBoard).toBe(false);
+    });
+
+    test('initGame and clearBoard both clear the mark (next board is never final by accident)', async () => {
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({
+        puzzlesSolved: 162,
+        finaleArmed: true,
+        finalPuzzleCompleted: false,
+      });
+      resetHookState();
+      let [, actions] = callHook();
+      await actions.startNewGame('MEDIUM');
+      let [state] = callHook();
+      expect(state.isFinalBoard).toBe(true);
+
+      [, actions] = callHook();
+      actions.initGame(['ABCD', 'EFGH', 'IJKL']);
+      [state] = callHook();
+      expect(state.isFinalBoard).toBe(false);
+
+      [, actions] = callHook();
+      actions.clearBoard();
+      [state] = callHook();
+      expect(state.isFinalBoard).toBe(false);
+    });
+  });
+
   describe('initial state', () => {
     test('has correct defaults', () => {
       resetHookState();
@@ -1349,6 +1491,181 @@ describe('usePuzzleGame', () => {
       expect(result?.completed).toBe(true);
       [state] = callHook();
       expect(state.moveOutcomes).toEqual(['clean']);
+    });
+  });
+
+  // =========================================================================
+  // Combo cadence + audio ladder
+  // =========================================================================
+
+  describe('combo cadence + audio ladder (pure helpers)', () => {
+    test('comboTierForStreak maps streak <2 to the base chime and clamps at tier 3', () => {
+      expect(comboTierForStreak(0)).toBe(0);
+      expect(comboTierForStreak(1)).toBe(0);
+      expect(comboTierForStreak(2)).toBe(1);
+      expect(comboTierForStreak(3)).toBe(2);
+      expect(comboTierForStreak(4)).toBe(3);
+      expect(comboTierForStreak(5)).toBe(3);
+      expect(comboTierForStreak(12)).toBe(3);
+    });
+
+    test('shouldUseComboMessage: streaks 2-3 always escalate; from 4 on only EVEN streaks', () => {
+      expect(shouldUseComboMessage(0)).toBe(false);
+      expect(shouldUseComboMessage(1)).toBe(false);
+      expect(shouldUseComboMessage(2)).toBe(true);
+      expect(shouldUseComboMessage(3)).toBe(true);
+      expect(shouldUseComboMessage(4)).toBe(true);
+      expect(shouldUseComboMessage(5)).toBe(false); // regular pool draw between climbs
+      expect(shouldUseComboMessage(6)).toBe(true);
+      expect(shouldUseComboMessage(7)).toBe(false);
+      expect(shouldUseComboMessage(8)).toBe(true);
+    });
+  });
+
+  describe('comboTier threading through handleSlotPress', () => {
+    async function playMove(char: string, slot: number) {
+      let [state, actions] = callHook();
+      const letter = state.rows[state.activeRowIndex].words.find(
+        l => l.char === char && !l.isLocked
+      )!;
+      actions.handleLetterPress(letter, state.activeRowIndex);
+      [, actions] = callHook();
+      return actions.handleSlotPress(slot);
+    }
+
+    test('the tier climbs with the clean streak (chime ladder and message escalate together)', async () => {
+      resetHookState();
+      let [, actions] = callHook();
+      // 4-row chain so both moves are intermediate (completion carries no tier).
+      actions.initGame(['ABCD', 'EFGH', 'IJKL', 'WXYZ']);
+
+      const first = await playMove('A', 0); // streak 1 → base chime
+      expect(first?.completed).toBe(false);
+      expect(first?.comboTier).toBe(0);
+
+      const second = await playMove('E', 0); // streak 2 → first ladder step
+      expect(second?.completed).toBe(false);
+      expect(second?.comboTier).toBe(1);
+    });
+
+    test('an invalid attempt resets the ladder to the base chime', async () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['ABCD', 'EFGH', 'IJKL', 'WXYZ']);
+
+      const first = await playMove('A', 0);
+      expect(first?.comboTier).toBe(0);
+
+      // Invalid drop (IJEKL is not a word) breaks the streak...
+      const bad = await playMove('E', 2);
+      expect(bad).toBeNull();
+      // ...so the next committed move is streak 1 again → tier 0.
+      let [, actions2] = callHook();
+      const redo = await actions2.handleSlotPress(0); // letter still selected
+      expect(redo?.completed).toBe(false);
+      expect(redo?.comboTier).toBe(0);
+    });
+
+    test('the completing move carries no tier (victory owns its own fanfare)', async () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['ABCD', 'EFGH', 'IJKL']);
+      await playMove('A', 0);
+      const done = await playMove('E', 0);
+      expect(done?.completed).toBe(true);
+      expect(done?.comboTier).toBeUndefined();
+    });
+  });
+
+  // =========================================================================
+  // Verb-depth gate: previewValidityVisible
+  // =========================================================================
+
+  describe('previewValidityVisible (verb-depth gate)', () => {
+    test('hidden on the default MEDIUM board', () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['LIME', 'TIME', 'TIED']);
+      const [state] = callHook();
+      expect(state.difficulty).toBe('MEDIUM');
+      expect(state.previewValidityVisible).toBe(false);
+    });
+
+    test('shown on EASY boards', async () => {
+      resetHookState();
+      let [, actions] = callHook();
+      await actions.startNewGame('EASY');
+      const [state] = callHook();
+      expect(state.difficulty).toBe('EASY');
+      expect(state.previewValidityVisible).toBe(true);
+    });
+
+    test('shown in double_shift at any difficulty (the intermediate non-word state needs it)', () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['ABCDE', 'FGHIJ'], undefined, undefined, 5, 'double_shift');
+      const [state] = callHook();
+      expect(state.difficulty).toBe('MEDIUM');
+      expect(state.previewValidityVisible).toBe(true);
+    });
+
+    test('hidden in Blind Offering even on EASY', async () => {
+      resetHookState();
+      let [, actions] = callHook();
+      await actions.startNewGame('EASY', 'challenge', 'standard', true);
+      const [state] = callHook();
+      expect(state.blindMode).toBe(true);
+      expect(state.slotPreviews).toBeUndefined();
+      expect(state.previewValidityVisible).toBe(false);
+    });
+
+    test('the daily hides the grading even when the player pref is EASY', async () => {
+      resetHookState();
+      let [, actions] = callHook();
+      await actions.startNewGame('EASY');
+      let [state] = callHook();
+      expect(state.previewValidityVisible).toBe(true);
+
+      [, actions] = callHook();
+      actions.startDailyGame(['PLANET', 'PLATES', 'PLANES'], undefined, 6);
+      [state] = callHook();
+      // The daily leaves the difficulty preference untouched...
+      expect(state.difficulty).toBe('EASY');
+      // ...but its board always hides the grading (MEDIUM+ shape by design).
+      expect(state.previewValidityVisible).toBe(false);
+
+      // A normal board afterwards restores the EASY grading.
+      [, actions] = callHook();
+      actions.initGame(['SUIT', 'SITE', 'WHAT']);
+      [state] = callHook();
+      expect(state.previewValidityVisible).toBe(true);
+    });
+
+    test('shared-challenge boards hide the grading even at an EASY pref', async () => {
+      resetHookState();
+      let [, actions] = callHook();
+      await actions.startNewGame('EASY');
+
+      [, actions] = callHook();
+      const ok = actions.startSharedChallengeGame(['SUIT', 'SITE', 'WHAT']);
+      expect(ok).toBe(true);
+      const [state] = callHook();
+      expect(state.previewValidityVisible).toBe(false);
+    });
+
+    test('slotPreviews keep computing isValid internally while presentation is hidden', async () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['LIME', 'TIME', 'TIED']); // MEDIUM → hidden
+      let [state, actionsAfterInit] = callHook();
+      const letter = state.rows[0].words.find(l => l.char === 'L' && !l.isLocked)!;
+      actionsAfterInit.handleLetterPress(letter, 0);
+      [state] = callHook();
+      expect(state.previewValidityVisible).toBe(false);
+      // The data still grades every slot (drag snapping and look-aheads rely
+      // on it) — only the PRESENTATION is gated.
+      expect(state.slotPreviews).toBeDefined();
+      expect(state.slotPreviews!.some(p => typeof p.isValid === 'boolean')).toBe(true);
     });
   });
 

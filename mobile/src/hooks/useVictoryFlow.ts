@@ -38,6 +38,8 @@ export const RITUAL_MICRO_EVENT_MIN_ENERGY = 7;
 export interface RoutineVictorySignals {
   isDaily?: boolean;
   mandatoryHarvest?: boolean;
+  /** THE marked final board's win — always the full (hushed) ceremony. */
+  finalBoard?: boolean;
   phaseTransitionPending?: boolean;
   phaseChanged?: boolean;
   firstCompletionBonus?: number;
@@ -54,6 +56,7 @@ export interface RoutineVictorySignals {
  * - no victory data at all (safe default: full modal)
  * - the Daily Challenge
  * - the mandatory first-harvest gate
+ * - THE marked final board's win (the finale must never compact away)
  * - a pending/new phase transition (phaseTransitionPending or phaseChanged)
  * - a one-time first-completion bonus for the difficulty
  * - a puzzle-count milestone or a daily-streak milestone bonus
@@ -65,6 +68,7 @@ export function isRoutineVictory(victory: RoutineVictorySignals | null | undefin
   if (!victory) return false;
   if (victory.isDaily) return false;
   if (victory.mandatoryHarvest) return false;
+  if (victory.finalBoard) return false;
   if (victory.phaseTransitionPending || victory.phaseChanged) return false;
   if ((victory.firstCompletionBonus ?? 0) > 0) return false;
   if ((victory.milestoneBonus ?? 0) > 0) return false;
@@ -207,6 +211,10 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
       victoryDataRef.current,
       settings.swiftVictories === true
     );
+    // THE marked final board: the choreography still plays (the stars are
+    // earned) but the celebration RHYTHM is hushed — one soft settle instead
+    // of tap-tap-tap-THUD. The quiet is the moment; the arrival follows.
+    const finalBoard = victoryDataRef.current?.finalBoard === true;
     if (reducedMotion || swiftCompact) {
       victoryStar1.setValue(stars >= 1 ? 1 : 0);
       victoryStar2.setValue(stars >= 2 ? 1 : 0);
@@ -214,7 +222,11 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
       victoryModalScale.setValue(1);
       victoryModalOpacity.setValue(1);
       setVictoryStage('settled');
-      hapticHeavy();
+      if (finalBoard) {
+        hapticLight();
+      } else {
+        hapticHeavy();
+      }
       return;
     }
 
@@ -261,14 +273,19 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
       if (finished) setVictoryStage('settled');
     });
 
-    // Haptic rhythm synced to star stagger: tap-tap-tap-THUD
+    // Haptic rhythm synced to star stagger: tap-tap-tap-THUD. On the final
+    // board the rhythm is replaced by a single soft settle at the end.
     hapticTimeouts.current.forEach(clearTimeout);
     hapticTimeouts.current = [];
     const firstHapticAt = STAR_POP_DELAY_MS + STAR_HAPTIC_OFFSET_MS;
-    if (stars >= 1) hapticTimeouts.current.push(setTimeout(() => hapticLight(), firstHapticAt));
-    if (stars >= 2) hapticTimeouts.current.push(setTimeout(() => hapticLight(), firstHapticAt + STAR_STAGGER_MS));
-    if (stars >= 3) hapticTimeouts.current.push(setTimeout(() => hapticLight(), firstHapticAt + STAR_STAGGER_MS * 2));
-    hapticTimeouts.current.push(setTimeout(() => hapticHeavy(), firstHapticAt + stars * STAR_STAGGER_MS + 150));
+    if (finalBoard) {
+      hapticTimeouts.current.push(setTimeout(() => hapticLight(), firstHapticAt + stars * STAR_STAGGER_MS + 150));
+    } else {
+      if (stars >= 1) hapticTimeouts.current.push(setTimeout(() => hapticLight(), firstHapticAt));
+      if (stars >= 2) hapticTimeouts.current.push(setTimeout(() => hapticLight(), firstHapticAt + STAR_STAGGER_MS));
+      if (stars >= 3) hapticTimeouts.current.push(setTimeout(() => hapticLight(), firstHapticAt + STAR_STAGGER_MS * 2));
+      hapticTimeouts.current.push(setTimeout(() => hapticHeavy(), firstHapticAt + stars * STAR_STAGGER_MS + 150));
+    }
   }, [clearSpinner, victoryStar1, victoryStar2, victoryStar3, victoryModalScale, victoryModalOpacity]);
 
   const playPhaseChangeFlash = useCallback(() => {

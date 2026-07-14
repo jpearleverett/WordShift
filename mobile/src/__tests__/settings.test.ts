@@ -69,6 +69,39 @@ describe('settings', () => {
     expect(settings.reducedMotion).toBe(false);
   });
 
+  describe('musicEnabled', () => {
+    test('defaults to true (music on out of the box, own toggle)', async () => {
+      const settings = await getSettings();
+      expect(settings.musicEnabled).toBe(true);
+    });
+
+    test('toggles independently of soundEnabled', async () => {
+      const updated = await updateSetting('musicEnabled', false);
+      expect(updated.musicEnabled).toBe(false);
+      expect(updated.soundEnabled).toBe(true);
+      expect(getSettingsSync().musicEnabled).toBe(false);
+    });
+
+    test('an old save missing the key defaults to true without a migration', async () => {
+      // Simulate a pre-music save on disk (no musicEnabled in the stored JSON).
+      await AsyncStorage.setItem(
+        'wordshift_settings',
+        JSON.stringify({ soundEnabled: false, hapticsEnabled: true, reducedMotion: false })
+      );
+      invalidateSettingsCache();
+
+      const settings = await getSettings();
+      expect(settings.soundEnabled).toBe(false);
+      expect(settings.musicEnabled).toBe(true);
+    });
+
+    test('resetSettings turns musicEnabled back on', async () => {
+      await updateSetting('musicEnabled', false);
+      const settings = await resetSettings();
+      expect(settings.musicEnabled).toBe(true);
+    });
+  });
+
   describe('swiftVictories', () => {
     test('defaults to false', async () => {
       const settings = await getSettings();

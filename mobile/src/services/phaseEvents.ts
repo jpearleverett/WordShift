@@ -22,15 +22,36 @@ export interface PhaseTransitionEvent {
   vignette?: boolean;
   /** Screen shake intensity (0 = none, 1 = heavy) */
   shakeIntensity?: number;
+  /**
+   * Event-long static backdrop image behind every scene (the settled shadow
+   * in POST_REVELATION_EVENT). Rendered at a constant low opacity — presence,
+   * not spectacle.
+   */
+  backdrop?: { image: SceneImage; opacity: number };
 }
+
+/**
+ * In-engine art for a cinematic scene — the real game assets, never an emoji.
+ * 'shadow_figure' is the entity (environment/shadow_figure.png); 'house' is
+ * the roof silhouette the player built (environment/roof.png).
+ */
+export type SceneImage = 'shadow_figure' | 'house';
 
 export interface PhaseScene {
   text: string;
-  emoji?: string;
+  /** In-engine image rendered behind the scene text (replaces the old emoji). */
+  image?: SceneImage;
+  /** Peak opacity for the scene image (default 0.6). */
+  imageOpacity?: number;
   delay: number; // ms before showing this scene
   duration: number; // ms to display this scene
-  /** Visual effect for this scene (rendered by PhaseTransitionOverlay) */
-  effect?: 'fade' | 'pulse' | 'shake' | 'flash' | 'particles_rise' | 'particles_fall' | 'vignette_close';
+  /**
+   * Visual effect for this scene (rendered by PhaseTransitionOverlay).
+   * 'descend' drives the scene IMAGE: a slow translateY down + opacity-in
+   * (native driver; static fade under reduced motion) — the arrival, in
+   * engine, instead of a text card.
+   */
+  effect?: 'fade' | 'pulse' | 'shake' | 'flash' | 'particles_rise' | 'particles_fall' | 'vignette_close' | 'descend';
   /** Intensity of the effect (0-1, default 0.5) */
   effectIntensity?: number;
 }
@@ -241,7 +262,9 @@ export const HOUSE_COMPLETION_EVENT: PhaseTransitionEvent = {
   scenes: [
     {
       text: 'The house is complete.',
-      emoji: '🏠',
+      // The roof the player raised, room by room — their own work, in engine.
+      image: 'house',
+      imageOpacity: 0.55,
       delay: 0,
       duration: 3000,
     },
@@ -261,8 +284,11 @@ export const HOUSE_COMPLETION_EVENT: PhaseTransitionEvent = {
       duration: 3500,
     },
     {
+      // A first faint glimpse of the entity — present and waiting, NOT
+      // descending: the arrival belongs to the finale, not this ceremony.
       text: 'The arrangement is ready.',
-      emoji: '🌑',
+      image: 'shadow_figure',
+      imageOpacity: 0.22,
       delay: 14300,
       duration: 3000,
     },
@@ -299,24 +325,35 @@ export const FINAL_PUZZLE_EVENT: PhaseTransitionEvent = {
     },
     {
       text: 'The keepers stand in their chambers.\nThe temple is complete.',
-      emoji: '🏠',
+      image: 'house',
+      imageOpacity: 0.55,
       delay: 7900,
       duration: 4000,
     },
     {
+      // The arrival, in engine: the entity itself descends behind the text —
+      // slow translateY down + opacity-in (static fade under reduced motion).
       text: 'Something descends from above the attic.\nSomething that has no name.',
-      emoji: '🌑',
+      image: 'shadow_figure',
+      imageOpacity: 0.7,
+      effect: 'descend',
       delay: 12100,
-      duration: 4000,
+      duration: 5000,
     },
     {
+      // The shadow holds through the closing lines (the image persists at its
+      // settled position until a later scene replaces or clears it).
       text: 'It was always coming.\nYou just gave it the words.',
-      delay: 16300,
+      image: 'shadow_figure',
+      imageOpacity: 0.7,
+      delay: 17300,
       duration: 4000,
     },
     {
       text: 'The arrangement is complete.',
-      delay: 20500,
+      image: 'shadow_figure',
+      imageOpacity: 0.45,
+      delay: 21500,
       duration: 3000,
     },
   ],
@@ -338,6 +375,9 @@ export const POST_REVELATION_EVENT: PhaseTransitionEvent = {
   accentColor: '#4A3060',
   particles: { count: 10, color: '#4A3060', direction: 'drift', speed: 5, size: 4, opacity: 0.15 },
   vignette: true,
+  // The settled entity, faint and constant behind every line — it is simply
+  // HERE now. Text-only scenes; the presence never moves again.
+  backdrop: { image: 'shadow_figure', opacity: 0.14 },
   scenes: [
     {
       text: 'The shadow settles.',

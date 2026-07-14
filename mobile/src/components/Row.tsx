@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, memo } from 'react';
+import React, { useEffect, useRef, useState, memo } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import { LetterTile } from './LetterTile';
 import { DraggableTile } from './DraggableTile';
 import { CandyColors, getPhaseTheme } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
+import { hapticSelection } from '../services/haptics';
 import { shouldSimplifyAnimations } from '../services/deviceTier';
 import { getWordPhaseTier } from '../services/localGenerator';
 import {
@@ -22,6 +23,12 @@ import {
   ARC_LETTER_MARGIN_H,
   ARC_SLOT_MARGIN_H,
 } from '../constants/tileLayout';
+import {
+  INTER_SLOT_PULSE_SCALE,
+  INTER_SLOT_PULSE_IN_MS,
+  INTER_SLOT_PULSE_OUT_MS,
+  DRAG_HOVER_SCALE,
+} from '../constants/timing';
 import { BODY_FONT, BODY_FONT_BOLD, PIXEL_FONT_BOLD } from '../theme/fonts';
 
 // Arc layout configuration
@@ -37,24 +44,27 @@ export interface SlotPreview {
 
 /**
  * Accessibility label for a drop slot. When a ghost preview is available the
- * label announces the word the drop would form and whether the move is legal,
- * so screen-reader players get the same guidance sighted players read from the
- * visual ✓/✗ preview. Deliberately functional, literal copy (not phase
- * narrative). "Not a valid move" rather than "not a valid word" because a
- * preview can be invalid even when the formed word is real — removing the
- * letter may break the word above. When previews are suppressed (Blind
- * Offering, Challenge mode) `preview` is undefined and the plain positional
+ * label ALWAYS announces the word the drop would form; the valid/invalid
+ * verdict is appended only while the visual ✓/✗ grading is shown
+ * (validityVisible), so screen-reader players get exactly the same guidance
+ * sighted players do — no more, no less. Deliberately functional, literal
+ * copy (not phase narrative). "Not a valid move" rather than "not a valid
+ * word" because a preview can be invalid even when the formed word is real —
+ * removing the letter may break the word above. When previews are suppressed
+ * entirely (Blind Offering) `preview` is undefined and the plain positional
  * label is kept.
  */
 export function getSlotAccessibilityLabel(
   index: number,
   slotCount: number,
   isGuided: boolean,
-  preview?: SlotPreview
+  preview?: SlotPreview,
+  validityVisible: boolean = true
 ): string {
   const base = `${isGuided ? 'Guided drop zone' : 'Drop zone'} ${index + 1}`;
   if (!preview) return base;
   const position = `${base} of ${slotCount}`;
+  if (!validityVisible) return `${position}, would form ${preview.word}`;
   return preview.isValid
     ? `${position}, forms ${preview.word}, valid word`
     : `${position}, would form ${preview.word}, not a valid move`;
@@ -87,8 +97,24 @@ interface RowProps {
   successDropSignal?: number;
   /** Word previews for each slot position (only on target row when letter is selected) */
   slotPreviews?: SlotPreview[];
+  /**
+   * Whether the previews' ✓/✗ validity grading is PRESENTED (usePuzzleGame's
+   * verb-depth gate). When false, every ghost preview renders the formed word
+   * in one neutral dimmed ink — no prefix, no valid/invalid styling — and the
+   * slot accessibility label announces the word without a verdict. Defaults
+   * to true so legacy call sites keep the graded presentation.
+   */
+  previewValidityVisible?: boolean;
+  /**
+   * Slot index currently hovered by an active drag in this row (null = none).
+   * Purely geometric feedback — the hovered slot swells slightly under the
+   * finger. NEVER validity-filtered.
+   */
+  hoverSlotIndex?: number | null;
   /** Called when a letter tile is dragged and dropped — receives the letter, row, and drop position */
   onLetterDragDrop?: (letter: Letter, rowIndex: number, position: { x: number; y: number }) => void;
+  /** Live finger position while a drag is active (drives the hover highlight). */
+  onLetterDragMove?: (position: { x: number; y: number }) => void;
   /** Called when drag activation state changes — used to disable parent ScrollView during drag */
   onDragActiveChange?: (active: boolean) => void;
   /** Registers this row's measurable node by index so the parent can Y-bounds-check drops */
@@ -173,15 +199,23 @@ const Slot: React.FC<{
   phase?: number;
   isGuided?: boolean;
   preview?: SlotPreview;
+  /** Whether the preview's ✓/✗ grading is shown (false = neutral ghost word). */
+  validityVisible?: boolean;
+  /** True while an active drag's finger is over this slot (geometric swell). */
+  isHovered?: boolean;
+  /** Incremented when the adjacent letter tile is tapped (brief guidance pulse). */
+  pulseSignal?: number;
   /** Incremented when a letter successfully lands in this slot (triggers catch bounce) */
   triggerCatch?: number;
-}> = ({ onPress, index, slotCount = 0, compact = false, phase = 0, isGuided = false, preview, triggerCatch = 0 }) => {
+}> = ({ onPress, index, slotCount = 0, compact = false, phase = 0, isGuided = false, preview, validityVisible = true, isHovered = false, pulseSignal = 0, triggerCatch = 0 }) => {
   const settings = getSettingsSync();
   const phaseColors = getPhaseRowColors(phase);
   const scaleAnim = useRef(new Animated.Value(settings.reducedMotion ? 1 : 0)).current;
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
   const catchBounceAnim = useRef(new Animated.Value(1)).current;
+  const hoverScaleAnim = useRef(new Animated.Value(1)).current;
+  const adjacentPulseAnim = useRef(new Animated.Value(0)).current;
   const previewOpacity = useRef(new Animated.Value(0)).current;
   const previewScale = useRef(new Animated.Value(0.85)).current;
 
@@ -267,6 +301,53 @@ const Slot: React.FC<{
     }
   }, [triggerCatch, settings.reducedMotion]);
 
+  // Live drag-hover swell: the slot under the finger scales up slightly while
+  // hovered. Purely GEOMETRIC feedback (never validity-filtered) — it answers
+  // "where would this land?", not "is this legal?". Reduced motion sets the
+  // value instantly (the feedback is informative, not decorative).
+  useEffect(() => {
+    if (settings.reducedMotion) {
+      hoverScaleAnim.setValue(isHovered ? DRAG_HOVER_SCALE : 1);
+      return;
+    }
+    Animated.spring(hoverScaleAnim, {
+      toValue: isHovered ? DRAG_HOVER_SCALE : 1,
+      friction: 5,
+      tension: 220,
+      useNativeDriver: true,
+    }).start();
+    return () => {
+      hoverScaleAnim.stopAnimation();
+    };
+  }, [isHovered, settings.reducedMotion]);
+
+  // Adjacent-slot guidance pulse: tapping the letter tile BETWEEN slots (a tap
+  // that previously vanished silently) briefly swells this slot to draw the
+  // eye toward where drops actually go. No commit, no validity leak.
+  useEffect(() => {
+    if (!pulseSignal || settings.reducedMotion) return;
+    adjacentPulseAnim.setValue(0);
+    const pulse = Animated.sequence([
+      Animated.timing(adjacentPulseAnim, {
+        toValue: 1,
+        duration: INTER_SLOT_PULSE_IN_MS,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(adjacentPulseAnim, {
+        toValue: 0,
+        duration: INTER_SLOT_PULSE_OUT_MS,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]);
+    pulse.start();
+    return () => {
+      pulse.stop();
+      adjacentPulseAnim.setValue(0);
+    };
+  }, [pulseSignal, settings.reducedMotion]);
+
   // Animate preview appearance
   useEffect(() => {
     if (preview) {
@@ -299,6 +380,11 @@ const Slot: React.FC<{
   const pulseScale = pulseAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [1, 1.08],
+  });
+
+  const adjacentPulseScale = adjacentPulseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, INTER_SLOT_PULSE_SCALE],
   });
 
   const glowOpacity = glowAnim.interpolate({
@@ -338,7 +424,7 @@ const Slot: React.FC<{
       onPressOut={handlePressOut}
       activeOpacity={1}
       hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
-      accessibilityLabel={getSlotAccessibilityLabel(index, slotCount, isGuided, preview)}
+      accessibilityLabel={getSlotAccessibilityLabel(index, slotCount, isGuided, preview, validityVisible)}
       accessibilityRole="button"
     >
       <Animated.View
@@ -346,7 +432,12 @@ const Slot: React.FC<{
           styles.slotOuter,
           {
             transform: [
-              { scale: Animated.multiply(Animated.multiply(scaleAnim, pulseScale), catchBounceAnim) },
+              {
+                scale: Animated.multiply(
+                  Animated.multiply(Animated.multiply(scaleAnim, pulseScale), catchBounceAnim),
+                  Animated.multiply(hoverScaleAnim, adjacentPulseScale)
+                ),
+              },
             ],
           },
         ]}
@@ -415,7 +506,10 @@ const Slot: React.FC<{
           )}
         </View>
 
-        {/* Word preview label — animated fade + scale */}
+        {/* Word preview label — animated fade + scale. When the validity gate
+            is closed, the formed word renders in ONE neutral dimmed ink for
+            every slot: no ✓/✗ prefix, no green/red split, no bold-vs-dim tell.
+            The player must judge whether the word is real. */}
         {preview && (
           <Animated.View style={[styles.slotPreviewContainer, {
             opacity: previewOpacity,
@@ -425,13 +519,15 @@ const Slot: React.FC<{
               style={[
                 styles.slotPreviewText,
                 compact && styles.slotPreviewTextCompact,
-                preview.isValid ? styles.slotPreviewValid : styles.slotPreviewInvalid,
-                preview.isValid && styles.slotPreviewValidBold,
+                validityVisible
+                  ? (preview.isValid ? styles.slotPreviewValid : styles.slotPreviewInvalid)
+                  : styles.slotPreviewNeutral,
+                validityVisible && preview.isValid && styles.slotPreviewValidBold,
               ]}
               numberOfLines={1}
               maxFontSizeMultiplier={1.2}
             >
-              {preview.isValid ? '✓ ' : '✗ '}{preview.word}
+              {validityVisible ? (preview.isValid ? '✓ ' : '✗ ') : ''}{preview.word}
             </Text>
           </Animated.View>
         )}
@@ -461,7 +557,10 @@ export const Row: React.FC<RowProps> = memo(({
   invalidDropSignal = 0,
   successDropSignal = 0,
   slotPreviews,
+  previewValidityVisible = true,
+  hoverSlotIndex = null,
   onLetterDragDrop,
+  onLetterDragMove,
   onDragActiveChange,
   onMeasureRef,
 }) => {
@@ -490,6 +589,19 @@ export const Row: React.FC<RowProps> = memo(({
   const invalidShakeX = useRef(new Animated.Value(0)).current;
   const successBounceScale = useRef(new Animated.Value(1)).current;
   const glowLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+
+  // Inter-slot tap guidance: tapping a letter tile in the target row (between
+  // drop slots) pulses its two ADJACENT slots. Letter i sits between slots i
+  // and i+1 in the interleaved arc layout; seq makes repeat taps re-fire.
+  const [slotPulse, setSlotPulse] = useState<{ left: number; right: number; seq: number } | null>(null);
+  const handleInterSlotTap = (letterIndex: number) => {
+    hapticSelection();
+    setSlotPulse(prev => ({
+      left: letterIndex,
+      right: letterIndex + 1,
+      seq: (prev?.seq ?? 0) + 1,
+    }));
+  };
 
   // Stable ref callback so the parent can measure this row in-window for drop
   // Y-bounds checking. Kept stable across renders to avoid detach/attach churn.
@@ -704,6 +816,13 @@ export const Row: React.FC<RowProps> = memo(({
                 (hintSlotIndex != null && hintSlotIndex === slotIndex)
               }
               preview={slotPreviews?.[slotIndex]}
+              validityVisible={previewValidityVisible}
+              isHovered={hoverSlotIndex === slotIndex}
+              pulseSignal={
+                slotPulse && (slotPulse.left === slotIndex || slotPulse.right === slotIndex)
+                  ? slotPulse.seq
+                  : 0
+              }
             />
           </Animated.View>
         );
@@ -732,6 +851,12 @@ export const Row: React.FC<RowProps> = memo(({
                 (guidanceActive && isSource && guidedLetterId === letter.id) ||
                 (hintLetterId != null && hintLetterId === letter.id)
               }
+              // Target-row letter tiles used to swallow taps silently during
+              // targeting. Now a tap acknowledges itself: a selection haptic
+              // plus a brief pulse on the two adjacent drop slots, drawing the
+              // eye to where drops go without committing anything (and without
+              // leaking validity).
+              onLockedPress={() => handleInterSlotTap(letterIndex)}
               arrivalMoveId={arrival && arrival.letterId === letter.id ? arrival.moveId : undefined}
               arrivalDirection={arrival && arrival.letterId === letter.id ? arrival.direction : undefined}
             />
@@ -760,6 +885,16 @@ export const Row: React.FC<RowProps> = memo(({
           isInteractable={isSource && !isProcessing && !letter.isLocked}
           highlight={letter.isLocked ? 'locked' : isSource ? 'source' : 'default'}
           onPress={canDrag ? undefined : () => onLetterPress(letter, rowIndex)}
+          // Locked tiles in the ACTIVE source row are tappable for feedback
+          // only: the press routes to the same handler, whose locked branch
+          // fires the error haptic + locked-letter message. Previously the
+          // touchable never mounted for locked tiles, so that path was
+          // unreachable and the tap produced literally nothing.
+          onLockedPress={
+            isSource && !isProcessing && letter.isLocked
+              ? () => onLetterPress(letter, rowIndex)
+              : undefined
+          }
           phase={phase}
           compact={compactTiles}
           isResonant={isRowResonant}
@@ -784,6 +919,7 @@ export const Row: React.FC<RowProps> = memo(({
               }
             }}
             onDragEnd={(pos) => onLetterDragDrop!(letter, rowIndex, pos)}
+            onMove={onLetterDragMove}
             onTap={() => onLetterPress(letter, rowIndex)}
             phase={phase}
             onDragActiveChange={onDragActiveChange}
@@ -1227,6 +1363,13 @@ const styles = StyleSheet.create({
   slotPreviewInvalid: {
     color: CandyColors.red.light,
     opacity: 0.45,
+  },
+  // Neutral ghost preview (validity gate closed): ONE dimmed ink for every
+  // slot — the current valid-green/invalid-red split must never leak through
+  // weight, color, or opacity when the player is meant to judge the word.
+  slotPreviewNeutral: {
+    color: CandyColors.gray[600],
+    opacity: 0.6,
   },
 });
 

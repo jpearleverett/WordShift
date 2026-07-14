@@ -43,7 +43,9 @@ export interface DailyChallengeProgress {
    * Transient (not persisted meaningfully): the milestone-day the streak
    * decayed back to on this completion, when a lapse fell back to a checkpoint
    * instead of resetting to 1 (see the decay-to-milestone logic). Undefined on
-   * a normal continuation. Lets the UI say "your streak held at N".
+   * a normal continuation. Flows out of recordDailyCompletion's return value;
+   * App surfaces it as the "your streak held at N" beat via
+   * phaseNarrative.getStreakHeldMessage (wave-2 wiring).
    */
   streakDecayedTo?: number;
   /** True once the one-time first-daily hint mercy has been granted. */
@@ -204,14 +206,19 @@ export function getDailyRamp(dateStr?: string, isFirstDaily = false): {
   if (isFirstDaily) {
     return { difficulty: 'MEDIUM', wordLength: 4, targetRows: 4 };
   }
+  // Casual-fit weekend: the old Thu-Sun block was ALL HARD (with a 6-letter
+  // Sat AND Sun), which turned every casual player's weekend into a wall. The
+  // softened ramp keeps two HARD anchors (Thu, Sat) plus the Sunday peak, but
+  // Friday drops back to MEDIUM_PLUS as a breather and only Sunday carries the
+  // 6-letter/5-row board. Still deterministic by date; rewards always pay HARD.
   const day = parseLocalDate(dateStr ?? getTodayString()).getDay(); // 0=Sun..6=Sat
   switch (day) {
     case 1: return { difficulty: 'MEDIUM', wordLength: 4, targetRows: 4 };      // Mon — accessible
     case 2: return { difficulty: 'MEDIUM_PLUS', wordLength: 5, targetRows: 4 }; // Tue
     case 3: return { difficulty: 'MEDIUM_PLUS', wordLength: 5, targetRows: 5 }; // Wed
-    case 4: return { difficulty: 'HARD', wordLength: 5, targetRows: 5 };        // Thu
-    case 5: return { difficulty: 'HARD', wordLength: 5, targetRows: 5 };        // Fri
-    case 6: return { difficulty: 'HARD', wordLength: 6, targetRows: 5 };        // Sat
+    case 4: return { difficulty: 'HARD', wordLength: 5, targetRows: 5 };        // Thu — first anchor
+    case 5: return { difficulty: 'MEDIUM_PLUS', wordLength: 5, targetRows: 4 }; // Fri — breather
+    case 6: return { difficulty: 'HARD', wordLength: 5, targetRows: 5 };        // Sat — second anchor
     default: return { difficulty: 'HARD', wordLength: 6, targetRows: 5 };       // Sun — the peak
   }
 }

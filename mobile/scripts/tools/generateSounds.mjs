@@ -1,13 +1,34 @@
-// Pure-Node WAV generator for WordShift's sound effects. Produces short,
-// soft synth chimes (sine partials with exponential envelopes) so the game
-// ships with a complete, lightweight SFX pack. No external dependencies.
-// Run: node scripts/tools/generateSounds.mjs
+// Pure-Node WAV generator for WordShift's sound effects and ambient music beds.
+// No external dependencies. Run: node scripts/tools/generateSounds.mjs
+//
+// Synthesis engine (v2 — the audio overhaul):
+//   - Additive voices with multiple detuned partials (chorus warmth) and
+//     per-partial decay rates (higher partials die faster, like real struck
+//     instruments). Inharmonic partial stacks for bell/toy-piano character.
+//   - Filtered-noise transients for tactile attacks (ticks, thocks, glitter).
+//   - Smooth half-cosine attacks + exponential decays (strikes) and full
+//     attack/sustain/release envelopes (swells/pads).
+//   - Soft-knee tanh saturation on the master for glue and gentle harmonics.
+//   - Lightweight Schroeder reverb (3 lowpassed feedback combs + 2 allpasses)
+//     for space; dark sounds get damper, longer rooms.
+//   - Ambient music loops that are sample-exact seamless BY CONSTRUCTION:
+//     every continuous component completes an integer number of cycles over
+//     the loop, event tails wrap circularly, and reverb is applied via a
+//     double-pass (periodic steady state) so the tail wraps too.
+//
+// Musical direction: bright = warm C-major-pentatonic toy-piano/celesta
+// (cozy, candy). Dark (Phase 3+ variants) = hollow bells with minor-third and
+// tritone partials, sub-octave weight, slower attacks, longer dissonant tails.
+// The dark combo ladder DESCENDS (sinking, not celebrating).
 import fs from 'fs';
 import path from 'path';
 
 const SAMPLE_RATE = 22050;
 const OUT_DIR = path.resolve(import.meta.dirname, '../../assets/sounds');
 
+// ---------------------------------------------------------------------------
+// WAV writer
+// ---------------------------------------------------------------------------
 function writeWav(filePath, samples) {
   const data = Buffer.alloc(samples.length * 2);
   for (let i = 0; i < samples.length; i++) {
@@ -31,188 +52,689 @@ function writeWav(filePath, samples) {
   console.log(`wrote ${filePath} (${((header.length + data.length) / 1024).toFixed(1)} KB)`);
 }
 
-// One soft chime: sine fundamental + quieter octave partial, exponential decay.
-function tone(samples, freq, start, dur, vol, { attack = 0.004, partial = 0.3, bend = 0 } = {}) {
+// ---------------------------------------------------------------------------
+// Deterministic randomness (stable regeneration → stable git diffs)
+// ---------------------------------------------------------------------------
+function hashSeed(str) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Envelopes
+// ---------------------------------------------------------------------------
+/** Half-cosine attack ramp into an exponential decay over dur. */
+function strikeEnv(t, dur, attack, decayShape) {
+  const a = t < attack ? Math.sin((Math.PI / 2) * (t / attack)) : 1;
+  return a * Math.exp(-decayShape * (t / dur));
+}
+
+/** Attack / sustain / release envelope for swells and pads. */
+function padEnv(t, dur, attack, release) {
+  let v = 1;
+  if (t < attack) v = Math.sin((Math.PI / 2) * (t / attack));
+  const rStart = dur - release;
+  if (t > rStart) v *= Math.cos((Math.PI / 2) * Math.min(1, (t - rStart) / release));
+  return v;
+}
+
+// ---------------------------------------------------------------------------
+// Voices
+// ---------------------------------------------------------------------------
+// Instrument partial stacks: { r: frequency ratio, g: gain, d: decay multiplier }
+// Slightly inharmonic upper partials give the toy-piano tine character.
+const TOY_PIANO = [
+  { r: 1, g: 1, d: 1 },
+  { r: 2.004, g: 0.45, d: 1.35 },
+  { r: 2.997, g: 0.14, d: 1.8 },
+  { r: 4.19, g: 0.22, d: 2.1 },
+  { r: 5.42, g: 0.07, d: 2.6 },
+  { r: 6.79, g: 0.05, d: 3.1 },
+];
+// Glassy, pure — strong 4th harmonic like a celesta plate.
+const CELESTA = [
+  { r: 1, g: 1, d: 1 },
+  { r: 2.0, g: 0.16, d: 1.5 },
+  { r: 4.0, g: 0.28, d: 2.2 },
+  { r: 5.98, g: 0.05, d: 3.0 },
+];
+// Deep-arch wooden bar: 1 / ~4 / ~9.2.
+const MARIMBA = [
+  { r: 1, g: 1, d: 1 },
+  { r: 3.98, g: 0.38, d: 2.3 },
+  { r: 9.19, g: 0.09, d: 3.5 },
+];
+// Bright handbell: hum, prime, tierce, quint, nominal.
+const HANDBELL = [
+  { r: 0.5, g: 0.28, d: 0.7 },
+  { r: 1, g: 1, d: 1 },
+  { r: 1.183, g: 0.32, d: 1.3 },
+  { r: 1.506, g: 0.22, d: 1.5 },
+  { r: 2.0, g: 0.32, d: 1.8 },
+  { r: 2.514, g: 0.14, d: 2.2 },
+  { r: 3.011, g: 0.07, d: 2.8 },
+];
+// The wrong bell: heavy sub-octave hum, minor-third tierce, a tritone partial.
+const DARK_BELL = [
+  { r: 0.5, g: 0.6, d: 0.55 },
+  { r: 1, g: 1, d: 1 },
+  { r: 1.1892, g: 0.55, d: 1.1 },
+  { r: 1.4142, g: 0.3, d: 1.35 },
+  { r: 1.782, g: 0.18, d: 1.6 },
+  { r: 2.0, g: 0.26, d: 1.9 },
+  { r: 2.828, g: 0.1, d: 2.4 },
+];
+// Hollow woody tube for the dark move ladder: sub weight, sparse upper body.
+const HOLLOW = [
+  { r: 0.5, g: 0.42, d: 0.6 },
+  { r: 1, g: 1, d: 1 },
+  { r: 2.0, g: 0.1, d: 1.6 },
+  { r: 2.756, g: 0.16, d: 2.0 },
+  { r: 4.21, g: 0.05, d: 2.6 },
+];
+
+/**
+ * Struck/plucked voice: additive partial stack, detuned unison copies for
+ * chorus warmth, per-partial decay, optional linear pitch bend and vibrato.
+ */
+function strike(samples, opts) {
+  const {
+    freq,
+    start = 0,
+    dur,
+    vol,
+    partials = [{ r: 1, g: 1, d: 1 }],
+    attack = 0.002,
+    decayShape = 5.5,
+    unison = 2,
+    detune = 0.0025,
+    bend = 0,
+    vibratoRate = 0,
+    vibratoDepth = 0,
+    rand = Math.random,
+  } = opts;
   const s0 = Math.floor(start * SAMPLE_RATE);
   const n = Math.floor(dur * SAMPLE_RATE);
-  let phase = 0, phase2 = 0;
+  const voices = [];
+  for (const p of partials) {
+    for (let u = 0; u < unison; u++) {
+      const off = unison === 1 ? 0 : (u / (unison - 1)) * 2 - 1;
+      voices.push({
+        f: freq * p.r * (1 + detune * off),
+        g: p.g / unison,
+        d: p.d ?? 1,
+        phase: rand() * 2 * Math.PI,
+      });
+    }
+  }
   for (let i = 0; i < n && s0 + i < samples.length; i++) {
     const t = i / SAMPLE_RATE;
-    const f = freq * (1 + bend * (t / dur));
-    phase += (2 * Math.PI * f) / SAMPLE_RATE;
-    phase2 += (2 * Math.PI * f * 2) / SAMPLE_RATE;
-    const env = Math.min(1, t / attack) * Math.exp(-4.5 * (t / dur));
-    samples[s0 + i] += (Math.sin(phase) + partial * Math.sin(phase2)) * env * vol;
+    const bendMul = 1 + bend * (t / dur);
+    const vib = vibratoDepth ? 1 + vibratoDepth * Math.sin(2 * Math.PI * vibratoRate * t) : 1;
+    let sum = 0;
+    for (const v of voices) {
+      v.phase += (2 * Math.PI * v.f * bendMul * vib) / SAMPLE_RATE;
+      sum += Math.sin(v.phase) * v.g * strikeEnv(t, dur, attack, decayShape * v.d);
+    }
+    samples[s0 + i] += sum * vol;
   }
 }
 
-// Soft filtered noise burst (for thuds / whooshes)
-function noise(samples, start, dur, vol, lowpass = 0.15) {
+/** Sustained swell voice (pads, low drones) with attack/release envelope. */
+function swell(samples, opts) {
+  const {
+    freq,
+    start = 0,
+    dur,
+    vol,
+    partials = [{ r: 1, g: 1 }],
+    attack = 0.3,
+    release = 0.4,
+    detune = 0.004,
+    unison = 3,
+    lfoRate = 0,
+    lfoDepth = 0,
+    rand = Math.random,
+  } = opts;
   const s0 = Math.floor(start * SAMPLE_RATE);
   const n = Math.floor(dur * SAMPLE_RATE);
-  let prev = 0;
+  const voices = [];
+  for (const p of partials) {
+    for (let u = 0; u < unison; u++) {
+      const off = unison === 1 ? 0 : (u / (unison - 1)) * 2 - 1;
+      voices.push({ f: freq * p.r * (1 + detune * off), g: p.g / unison, phase: rand() * 2 * Math.PI });
+    }
+  }
   for (let i = 0; i < n && s0 + i < samples.length; i++) {
     const t = i / SAMPLE_RATE;
-    prev = prev + lowpass * ((Math.random() * 2 - 1) - prev);
-    const env = Math.min(1, t / 0.003) * Math.exp(-6 * (t / dur));
-    samples[s0 + i] += prev * env * vol;
+    const env = padEnv(t, dur, attack, release);
+    const lfo = lfoDepth ? 1 - lfoDepth * (0.5 + 0.5 * Math.sin(2 * Math.PI * lfoRate * t)) : 1;
+    let sum = 0;
+    for (const v of voices) {
+      v.phase += (2 * Math.PI * v.f) / SAMPLE_RATE;
+      sum += Math.sin(v.phase) * v.g;
+    }
+    samples[s0 + i] += sum * env * lfo * vol;
   }
 }
 
+/**
+ * Filtered noise transient. lp = one-pole lowpass coefficient (higher =
+ * brighter); hp > 0 adds a one-pole highpass (for airy glitter).
+ */
+function noiseBurst(samples, opts) {
+  const {
+    start = 0,
+    dur,
+    vol,
+    lp = 0.3,
+    hp = 0,
+    attack = 0.001,
+    decayShape = 8,
+    rand = Math.random,
+  } = opts;
+  const s0 = Math.floor(start * SAMPLE_RATE);
+  const n = Math.floor(dur * SAMPLE_RATE);
+  let lpState = 0;
+  let hpPrevIn = 0;
+  let hpState = 0;
+  for (let i = 0; i < n && s0 + i < samples.length; i++) {
+    const t = i / SAMPLE_RATE;
+    const white = rand() * 2 - 1;
+    lpState += lp * (white - lpState);
+    let y = lpState;
+    if (hp > 0) {
+      hpState = hp * (hpState + y - hpPrevIn);
+      hpPrevIn = y;
+      y = hpState;
+    }
+    samples[s0 + i] += y * strikeEnv(t, dur, attack, decayShape) * vol;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Effects
+// ---------------------------------------------------------------------------
+/**
+ * Lightweight Schroeder reverb: 3 lowpass-damped feedback combs + 2 allpasses.
+ * Returns a NEW buffer extended by `tail` seconds to hold the decay.
+ */
+function reverb(input, opts = {}) {
+  const { wet = 0.22, dry = 1.0, decay = 0.75, damp = 0.35, tail = 0.5, predelayMs = 10 } = opts;
+  const n = input.length + Math.floor(tail * SAMPLE_RATE);
+  const out = new Float64Array(n);
+  const combDelays = [1116, 1277, 1422].map((d) => Math.round((d * SAMPLE_RATE) / 44100));
+  const combs = combDelays.map((d) => ({ buf: new Float64Array(d), idx: 0, filt: 0 }));
+  const apDelays = [556, 225].map((d) => Math.round((d * SAMPLE_RATE) / 44100));
+  const aps = apDelays.map((d) => ({ buf: new Float64Array(d), idx: 0 }));
+  const pre = Math.floor((predelayMs * SAMPLE_RATE) / 1000);
+  for (let i = 0; i < n; i++) {
+    const x = i < input.length ? input[i] : 0;
+    const xPre = i - pre >= 0 && i - pre < input.length ? input[i - pre] : 0;
+    let wetSum = 0;
+    for (const c of combs) {
+      const y = c.buf[c.idx];
+      c.filt = y * (1 - damp) + c.filt * damp;
+      c.buf[c.idx] = xPre + c.filt * decay;
+      c.idx = (c.idx + 1) % c.buf.length;
+      wetSum += y;
+    }
+    wetSum /= combs.length;
+    for (const a of aps) {
+      const bufOut = a.buf[a.idx];
+      const v = wetSum + bufOut * 0.5;
+      a.buf[a.idx] = v;
+      a.idx = (a.idx + 1) % a.buf.length;
+      wetSum = bufOut - 0.5 * v;
+    }
+    out[i] = x * dry + wetSum * wet;
+  }
+  return out;
+}
+
+/**
+ * Seamless reverb for loops: process two copies back-to-back and keep the
+ * second half. The input is periodic and the reverb is LTI, so the second
+ * pass is the periodic steady state — its tail wraps to its own start
+ * (initial-transient error decays below one int16 LSB long before 16s).
+ */
+function reverbLoop(input, opts = {}) {
+  const doubled = new Float64Array(input.length * 2);
+  doubled.set(input, 0);
+  doubled.set(input, input.length);
+  const processed = reverb(doubled, { ...opts, tail: 0 });
+  return processed.slice(input.length);
+}
+
+/**
+ * Master finish: soft-knee tanh saturation (drive 0 = bypass), normalize to a
+ * designed peak, then a short end fade so no file ends on a click.
+ * Loops use drive 0 + fadeMs 0 (a fade would break the seam; saturation is
+ * memoryless so it would be seam-safe, but the beds stay clean).
+ */
+function finalize(samples, opts = {}) {
+  const { peak = 0.72, drive = 1.25, fadeMs = 6 } = opts;
+  if (drive > 0) {
+    const norm = Math.tanh(drive);
+    for (let i = 0; i < samples.length; i++) samples[i] = Math.tanh(samples[i] * drive) / norm;
+  }
+  let max = 1e-9;
+  for (let i = 0; i < samples.length; i++) max = Math.max(max, Math.abs(samples[i]));
+  const g = peak / max;
+  for (let i = 0; i < samples.length; i++) samples[i] *= g;
+  if (fadeMs > 0) {
+    const n = Math.min(samples.length, Math.floor((fadeMs / 1000) * SAMPLE_RATE));
+    for (let i = 0; i < n; i++) {
+      samples[samples.length - n + i] *= Math.cos((Math.PI / 2) * ((i + 1) / n));
+    }
+  }
+  return samples;
+}
+
+// ---------------------------------------------------------------------------
+// Render drivers
+// ---------------------------------------------------------------------------
 function buf(seconds) {
   return new Float64Array(Math.ceil(seconds * SAMPLE_RATE));
 }
 
-fs.mkdirSync(OUT_DIR, { recursive: true });
+function render(name, seconds, build, opts = {}) {
+  const { reverb: rv, peak = 0.72, drive = 1.25, fadeMs = 6 } = opts;
+  const s = buf(seconds);
+  const rand = mulberry32(hashSeed(name));
+  build(s, rand);
+  const out = rv ? reverb(s, rv) : s;
+  finalize(out, { peak, drive, fadeMs });
+  writeWav(path.join(OUT_DIR, `${name}.wav`), out);
+}
 
-// C major-ish pentatonic palette keeps everything consonant.
-const N = { C5: 523.25, D5: 587.33, E5: 659.25, G5: 783.99, A5: 880.0, C6: 1046.5, E6: 1318.5, G6: 1568.0, C4: 261.63, G4: 392.0, A4: 440.0, E4: 329.63 };
-// Dark palette: low minor tones + a tritone for the Phase 3+ variants. Cold,
-// hollow, dissonant — the descent reaching the player's ears.
+/**
+ * Seamless loop driver. Every continuous voice must use q(freq) (quantized to
+ * an integer number of cycles over the loop) and integer LFO cycle counts;
+ * finite events are added with circular wrap via loopEvent.
+ */
+function renderLoop(name, L, build, opts = {}) {
+  const { reverb: rv, peak = 0.5 } = opts;
+  const n = Math.round(L * SAMPLE_RATE);
+  const s = new Float64Array(n);
+  const rand = mulberry32(hashSeed(name));
+  const q = (f) => Math.max(1, Math.round(f * L)) / L;
+  build(s, { rand, q, L });
+  const out = rv ? reverbLoop(s, rv) : s;
+  finalize(out, { peak, drive: 0, fadeMs: 0 });
+  writeWav(path.join(OUT_DIR, `${name}.wav`), out);
+}
+
+/** Continuous loop voice: quantized sine + amplitude LFO at integer cycles. */
+function loopPad(s, { freq, vol, lfoCycles = 0, lfoDepth = 0, lfoPhase = 0, phase = 0 }) {
+  const n = s.length;
+  const w = (2 * Math.PI * freq) / SAMPLE_RATE;
+  const wl = (2 * Math.PI * lfoCycles) / n;
+  for (let i = 0; i < n; i++) {
+    const lfo = lfoDepth ? 1 - lfoDepth * (0.5 + 0.5 * Math.sin(wl * i + lfoPhase)) : 1;
+    s[i] += Math.sin(w * i + phase) * vol * lfo;
+  }
+}
+
+/** Finite event added to a loop with circular wrap (tails cross the seam). */
+function loopEvent(s, startSec, dur, renderInto) {
+  const tmp = new Float64Array(Math.min(s.length, Math.ceil(dur * SAMPLE_RATE)));
+  renderInto(tmp);
+  const off = Math.floor(startSec * SAMPLE_RATE) % s.length;
+  for (let i = 0; i < tmp.length; i++) s[(off + i) % s.length] += tmp[i];
+}
+
+// ---------------------------------------------------------------------------
+// Note tables
+// ---------------------------------------------------------------------------
+// Bright: C major pentatonic — everything stays consonant and candy.
+const N = {
+  E3: 164.81,
+  C4: 261.63, D4: 293.66, E4: 329.63, G4: 392.0, A4: 440.0,
+  C5: 523.25, D5: 587.33, E5: 659.25, G5: 783.99, A5: 880.0,
+  C6: 1046.5, D6: 1174.66, E6: 1318.51, G6: 1567.98, A6: 1760.0, C7: 2093.0,
+};
+// Dark: low C minor with tritone accents — cold, hollow, heavy.
 const D = {
-  C3: 130.81, Eb3: 155.56, G3: 196.0, Ab3: 207.65, Bb3: 233.08,
-  C4: 261.63, Eb4: 311.13, F4: 349.23, Gb4: 369.99, Ab4: 415.30, Bb4: 466.16, C5: 523.25,
+  C2: 65.41, G2: 98.0, Bb2: 116.54,
+  C3: 130.81, Eb3: 155.56, F3: 174.61, Gb3: 185.0, G3: 196.0, Ab3: 207.65, A3: 220.0, Bb3: 233.08,
+  C4: 261.63, Eb4: 311.13, Gb4: 369.99, Ab4: 415.3, A4: 440.0, Bb4: 466.16,
+  C5: 523.25, Eb5: 622.25, B5: 987.77, C6: 1046.5,
 };
 
-// tap: tiny soft click-chime for generic UI taps
-{
-  const s = buf(0.12);
-  tone(s, N.A5, 0, 0.1, 0.22, { partial: 0.15 });
-  writeWav(path.join(OUT_DIR, 'tap.wav'), s);
-}
-// letter_select: bright pluck
-{
-  const s = buf(0.18);
-  tone(s, N.E5, 0, 0.16, 0.3);
-  tone(s, N.E6, 0, 0.08, 0.08);
-  writeWav(path.join(OUT_DIR, 'letter_select.wav'), s);
-}
-// valid_move: pleasant two-note rise
-{
-  const s = buf(0.3);
-  tone(s, N.C5, 0, 0.16, 0.26);
-  tone(s, N.G5, 0.07, 0.2, 0.26);
-  writeWav(path.join(OUT_DIR, 'valid_move.wav'), s);
-}
-// invalid_move: muted low double-thud (gentle, not punishing)
-{
-  const s = buf(0.32);
-  tone(s, N.E4 * 0.5, 0, 0.12, 0.3, { partial: 0.1, bend: -0.15 });
-  tone(s, N.E4 * 0.47, 0.12, 0.16, 0.26, { partial: 0.1, bend: -0.15 });
-  noise(s, 0, 0.08, 0.1);
-  writeWav(path.join(OUT_DIR, 'invalid_move.wav'), s);
-}
-// undo: quick descending slide
-{
-  const s = buf(0.22);
-  tone(s, N.G5, 0, 0.18, 0.22, { bend: -0.35 });
-  writeWav(path.join(OUT_DIR, 'undo.wav'), s);
-}
-// hint: curious sparkle (two quick high notes)
-{
-  const s = buf(0.3);
-  tone(s, N.C6, 0, 0.12, 0.18);
-  tone(s, N.E6, 0.08, 0.18, 0.18);
-  writeWav(path.join(OUT_DIR, 'hint.wav'), s);
-}
-// victory: ascending pentatonic arpeggio
-{
-  const s = buf(0.85);
-  tone(s, N.C5, 0, 0.3, 0.24);
-  tone(s, N.E5, 0.1, 0.3, 0.24);
-  tone(s, N.G5, 0.2, 0.35, 0.24);
-  tone(s, N.C6, 0.3, 0.5, 0.26);
-  writeWav(path.join(OUT_DIR, 'victory.wav'), s);
-}
-// perfect: longer arpeggio with a top sparkle (3-star wins)
-{
-  const s = buf(1.1);
-  tone(s, N.C5, 0, 0.3, 0.22);
-  tone(s, N.E5, 0.09, 0.3, 0.22);
-  tone(s, N.G5, 0.18, 0.35, 0.22);
-  tone(s, N.C6, 0.27, 0.45, 0.24);
-  tone(s, N.E6, 0.4, 0.5, 0.2);
-  tone(s, N.G6, 0.55, 0.5, 0.14);
-  writeWav(path.join(OUT_DIR, 'perfect.wav'), s);
-}
-// amber_earn: warm coin shimmer
-{
-  const s = buf(0.4);
-  tone(s, N.A5, 0, 0.18, 0.2);
-  tone(s, N.C6, 0.06, 0.25, 0.2);
-  tone(s, N.E6, 0.12, 0.25, 0.12);
-  writeWav(path.join(OUT_DIR, 'amber_earn.wav'), s);
-}
-// achievement: proud fanfare-ette
-{
-  const s = buf(0.7);
-  tone(s, N.G4, 0, 0.2, 0.22);
-  tone(s, N.C5, 0.1, 0.25, 0.24);
-  tone(s, N.E5, 0.2, 0.4, 0.26);
-  tone(s, N.G5, 0.3, 0.4, 0.2);
-  writeWav(path.join(OUT_DIR, 'achievement.wav'), s);
-}
-// unlock: door-opening rise + chime
-{
-  const s = buf(0.6);
-  tone(s, N.C4, 0, 0.3, 0.2, { bend: 0.5 });
-  tone(s, N.C6, 0.25, 0.35, 0.18);
-  writeWav(path.join(OUT_DIR, 'unlock.wav'), s);
-}
-// dialogue: soft speech blip
-{
-  const s = buf(0.14);
-  tone(s, N.D5, 0, 0.12, 0.16, { partial: 0.2 });
-  writeWav(path.join(OUT_DIR, 'dialogue.wav'), s);
-}
-// phase_change: low ominous swell (used by the ritual ceremonies)
-{
-  const s = buf(1.4);
-  tone(s, N.C4 * 0.5, 0, 1.3, 0.3, { attack: 0.25, partial: 0.4, bend: 0.04 });
-  tone(s, N.C4 * 0.5 * 1.498, 0.15, 1.1, 0.18, { attack: 0.3, partial: 0.3 });
-  noise(s, 0.1, 1.0, 0.06, 0.04);
-  writeWav(path.join(OUT_DIR, 'phase_change.wav'), s);
-}
-// daily_ready: gentle bell pair
-{
-  const s = buf(0.6);
-  tone(s, N.G5, 0, 0.3, 0.2);
-  tone(s, N.C6, 0.18, 0.4, 0.2);
-  writeWav(path.join(OUT_DIR, 'daily_ready.wav'), s);
-}
+fs.mkdirSync(OUT_DIR, { recursive: true });
 
-// ============================================================================
-// DARK VARIANTS (Phase 3+) — the descent reaches the ears. The move/victory
-// chimes stop being cheerful: hollow, low, minor, a touch dissonant.
-// ============================================================================
+// ===========================================================================
+// BRIGHT SFX (Phases 0-2): warm toy-piano / celesta / marimba candy chimes.
+// ===========================================================================
 
-// valid_move_dark: a low minor DESCENT (falls instead of rising), hollow.
-{
-  const s = buf(0.36);
-  tone(s, D.G3, 0, 0.2, 0.26, { partial: 0.5, bend: -0.06 });
-  tone(s, D.Eb3, 0.08, 0.26, 0.24, { partial: 0.5, bend: -0.08 });
-  noise(s, 0, 0.05, 0.04, 0.05);
-  writeWav(path.join(OUT_DIR, 'valid_move_dark.wav'), s);
+// tap: tiny celesta tick — noise transient + short A5, nearly dry.
+render('tap', 0.16, (s, rand) => {
+  noiseBurst(s, { start: 0, dur: 0.02, vol: 0.5, lp: 0.55, decayShape: 10, rand });
+  strike(s, { freq: N.A5, dur: 0.13, vol: 0.5, partials: CELESTA, attack: 0.0015, decayShape: 7, unison: 2, detune: 0.002, rand });
+}, { reverb: { wet: 0.08, tail: 0.12 }, peak: 0.5 });
+
+// letter_select: toy-piano E5 pluck with an octave sparkle.
+render('letter_select', 0.26, (s, rand) => {
+  noiseBurst(s, { start: 0, dur: 0.012, vol: 0.35, lp: 0.5, decayShape: 11, rand });
+  strike(s, { freq: N.E5, dur: 0.22, vol: 0.6, partials: TOY_PIANO, decayShape: 6, unison: 3, detune: 0.003, rand });
+  strike(s, { freq: N.E6, dur: 0.1, vol: 0.12, partials: CELESTA, decayShape: 7, rand });
+}, { reverb: { wet: 0.12, tail: 0.22 }, peak: 0.62 });
+
+// valid_move combo ladder: two-note toy-piano rises climbing the pentatonic.
+// Tier 0 = C5→G5; each tier steps the pair up and adds a celesta sparkle.
+function brightMove(name, note1, note2, sparkle, opts = {}) {
+  const { gap = 0.07, sparkleVol = 0.15, wet = 0.16, peak = 0.66, extra } = opts;
+  render(name, 0.5, (s, rand) => {
+    noiseBurst(s, { start: 0, dur: 0.01, vol: 0.25, lp: 0.5, decayShape: 11, rand });
+    strike(s, { freq: note1, dur: 0.22, vol: 0.55, partials: TOY_PIANO, decayShape: 6, unison: 3, detune: 0.003, rand });
+    noiseBurst(s, { start: gap, dur: 0.01, vol: 0.2, lp: 0.5, decayShape: 11, rand });
+    strike(s, { freq: note2, start: gap, dur: 0.28, vol: 0.5, partials: TOY_PIANO, decayShape: 5.5, unison: 3, detune: 0.003, rand });
+    if (sparkle) {
+      strike(s, { freq: sparkle, start: gap + 0.05, dur: 0.2, vol: sparkleVol, partials: CELESTA, decayShape: 6, rand });
+    }
+    if (extra) extra(s, rand);
+  }, { reverb: { wet, tail: 0.35 }, peak });
 }
-// victory_dark: a hollow DESCENDING minor line — the victory that feels wrong.
-{
-  const s = buf(1.0);
-  tone(s, D.C5, 0, 0.35, 0.22, { partial: 0.45, attack: 0.01 });
-  tone(s, D.Ab4, 0.14, 0.4, 0.22, { partial: 0.45 });
-  tone(s, D.Eb4, 0.3, 0.5, 0.22, { partial: 0.5 });
-  tone(s, D.C4, 0.48, 0.6, 0.24, { partial: 0.5, attack: 0.02 });
-  noise(s, 0.05, 0.7, 0.04, 0.03);
-  writeWav(path.join(OUT_DIR, 'victory_dark.wav'), s);
+brightMove('valid_move', N.C5, N.G5, null);
+brightMove('valid_move_2', N.D5, N.A5, N.D6, { sparkleVol: 0.14, peak: 0.68 });
+brightMove('valid_move_3', N.E5, N.C6, N.E6, { sparkleVol: 0.16, peak: 0.7, extra: (s, rand) => {
+  noiseBurst(s, { start: 0.12, dur: 0.15, vol: 0.05, lp: 0.9, hp: 0.85, decayShape: 5, rand });
+} });
+brightMove('valid_move_4', N.G5, N.D6, N.G6, { gap: 0.065, sparkleVol: 0.16, wet: 0.2, peak: 0.72, extra: (s, rand) => {
+  strike(s, { freq: N.E6, start: 0.13, dur: 0.18, vol: 0.1, partials: CELESTA, decayShape: 6, rand });
+  noiseBurst(s, { start: 0.11, dur: 0.18, vol: 0.06, lp: 0.9, hp: 0.85, decayShape: 5, rand });
+} });
+
+// invalid_move: gentle wooden double-thock, dry and tactile, never punishing.
+render('invalid_move', 0.38, (s, rand) => {
+  noiseBurst(s, { start: 0, dur: 0.03, vol: 0.35, lp: 0.12, decayShape: 9, rand });
+  strike(s, { freq: N.E3, dur: 0.14, vol: 0.6, partials: MARIMBA, decayShape: 7, bend: -0.12, unison: 2, detune: 0.002, rand });
+  noiseBurst(s, { start: 0.11, dur: 0.03, vol: 0.3, lp: 0.12, decayShape: 9, rand });
+  strike(s, { freq: N.E3 * 0.94, start: 0.11, dur: 0.18, vol: 0.55, partials: MARIMBA, decayShape: 6.5, bend: -0.12, unison: 2, detune: 0.002, rand });
+}, { reverb: { wet: 0.06, tail: 0.15 }, peak: 0.6 });
+
+// undo: celesta slide down G5→E5 (a polite step back).
+render('undo', 0.26, (s, rand) => {
+  noiseBurst(s, { start: 0, dur: 0.01, vol: 0.2, lp: 0.45, decayShape: 11, rand });
+  strike(s, { freq: N.G5, dur: 0.2, vol: 0.5, partials: CELESTA, decayShape: 6, bend: -0.159, unison: 2, detune: 0.003, rand });
+}, { reverb: { wet: 0.1, tail: 0.18 }, peak: 0.55 });
+
+// hint: curious glassy sparkle C6→E6 with fairy-dust air.
+render('hint', 0.45, (s, rand) => {
+  strike(s, { freq: N.C6, dur: 0.16, vol: 0.35, partials: CELESTA, decayShape: 6, rand });
+  strike(s, { freq: N.E6, start: 0.09, dur: 0.24, vol: 0.35, partials: CELESTA, decayShape: 5, vibratoRate: 6, vibratoDepth: 0.004, rand });
+  noiseBurst(s, { start: 0.02, dur: 0.18, vol: 0.08, lp: 0.9, hp: 0.8, decayShape: 4.5, rand });
+}, { reverb: { wet: 0.3, tail: 0.45 }, peak: 0.6 });
+
+// victory: toy-piano pentatonic arpeggio into a rolled celesta chord + glitter.
+render('victory', 1.5, (s, rand) => {
+  const arp = [
+    [N.C5, 0], [N.E5, 0.11], [N.G5, 0.22], [N.C6, 0.33],
+  ];
+  for (const [f, t] of arp) {
+    noiseBurst(s, { start: t, dur: 0.01, vol: 0.2, lp: 0.5, decayShape: 11, rand });
+    strike(s, { freq: f, start: t, dur: 0.4, vol: 0.5, partials: TOY_PIANO, decayShape: 5.5, unison: 3, detune: 0.003, rand });
+  }
+  strike(s, { freq: N.C6, start: 0.5, dur: 0.7, vol: 0.22, partials: CELESTA, decayShape: 4, rand });
+  strike(s, { freq: N.E6, start: 0.53, dur: 0.7, vol: 0.18, partials: CELESTA, decayShape: 4, rand });
+  strike(s, { freq: N.G6, start: 0.56, dur: 0.7, vol: 0.14, partials: CELESTA, decayShape: 4, rand });
+  noiseBurst(s, { start: 0.45, dur: 0.5, vol: 0.05, lp: 0.9, hp: 0.85, decayShape: 4, rand });
+}, { reverb: { wet: 0.28, decay: 0.8, tail: 0.7 }, peak: 0.75 });
+
+// perfect: the victory arpeggio extended to the top + handbell ringout.
+render('perfect', 2.0, (s, rand) => {
+  const arp = [
+    [N.C5, 0, 0.5], [N.E5, 0.1, 0.5], [N.G5, 0.2, 0.5], [N.C6, 0.3, 0.52],
+    [N.E6, 0.42, 0.4], [N.G6, 0.54, 0.32],
+  ];
+  for (const [f, t, v] of arp) {
+    noiseBurst(s, { start: t, dur: 0.01, vol: 0.18, lp: 0.5, decayShape: 11, rand });
+    strike(s, { freq: f, start: t, dur: 0.42, vol: v, partials: TOY_PIANO, decayShape: 5.5, unison: 3, detune: 0.003, rand });
+  }
+  strike(s, { freq: N.C7, start: 0.68, dur: 0.4, vol: 0.16, partials: CELESTA, decayShape: 5, rand });
+  strike(s, { freq: N.C6, start: 0.85, dur: 1.1, vol: 0.26, partials: HANDBELL, decayShape: 3.5, attack: 0.004, rand });
+  noiseBurst(s, { start: 0.55, dur: 0.7, vol: 0.05, lp: 0.9, hp: 0.85, decayShape: 3.5, rand });
+}, { reverb: { wet: 0.3, decay: 0.82, tail: 0.9 }, peak: 0.78 });
+
+// amber_earn: bright coin pair with tick transients and shimmer detune.
+render('amber_earn', 0.55, (s, rand) => {
+  noiseBurst(s, { start: 0, dur: 0.012, vol: 0.3, lp: 0.7, decayShape: 11, rand });
+  strike(s, { freq: N.A5, dur: 0.16, vol: 0.45, partials: CELESTA, decayShape: 6.5, unison: 3, detune: 0.004, rand });
+  noiseBurst(s, { start: 0.06, dur: 0.012, vol: 0.25, lp: 0.7, decayShape: 11, rand });
+  strike(s, { freq: N.C6, start: 0.06, dur: 0.22, vol: 0.45, partials: CELESTA, decayShape: 6, unison: 3, detune: 0.004, rand });
+  strike(s, { freq: N.E6, start: 0.12, dur: 0.24, vol: 0.26, partials: CELESTA, decayShape: 5.5, unison: 3, detune: 0.004, rand });
+}, { reverb: { wet: 0.12, tail: 0.3 }, peak: 0.65 });
+
+// achievement: proud little fanfare climbing to a handbell accent.
+render('achievement', 1.3, (s, rand) => {
+  const line = [ [N.G4, 0, 0.45], [N.C5, 0.12, 0.5], [N.E5, 0.24, 0.5], [N.G5, 0.36, 0.5] ];
+  for (const [f, t, v] of line) {
+    noiseBurst(s, { start: t, dur: 0.01, vol: 0.18, lp: 0.5, decayShape: 11, rand });
+    strike(s, { freq: f, start: t, dur: 0.42, vol: v, partials: TOY_PIANO, decayShape: 5.5, unison: 3, detune: 0.003, rand });
+  }
+  strike(s, { freq: N.C6, start: 0.5, dur: 0.7, vol: 0.3, partials: HANDBELL, decayShape: 3.8, attack: 0.004, rand });
+  noiseBurst(s, { start: 0.45, dur: 0.4, vol: 0.05, lp: 0.9, hp: 0.85, decayShape: 4, rand });
+}, { reverb: { wet: 0.28, decay: 0.8, tail: 0.7 }, peak: 0.72 });
+
+// unlock: quick rising marimba triad opening into a handbell.
+render('unlock', 1.0, (s, rand) => {
+  const line = [ [N.C4, 0], [N.E4, 0.09], [N.G4, 0.18] ];
+  for (const [f, t] of line) {
+    noiseBurst(s, { start: t, dur: 0.02, vol: 0.22, lp: 0.2, decayShape: 10, rand });
+    strike(s, { freq: f, start: t, dur: 0.25, vol: 0.5, partials: MARIMBA, decayShape: 6, unison: 2, detune: 0.002, rand });
+  }
+  strike(s, { freq: N.C6, start: 0.32, dur: 0.6, vol: 0.3, partials: HANDBELL, decayShape: 4, attack: 0.004, rand });
+}, { reverb: { wet: 0.25, tail: 0.55 }, peak: 0.68 });
+
+// dialogue: tiny soft celesta blip (fires on every dialogue line — stays quiet).
+render('dialogue', 0.15, (s, rand) => {
+  noiseBurst(s, { start: 0, dur: 0.008, vol: 0.15, lp: 0.45, decayShape: 12, rand });
+  strike(s, { freq: N.D5, dur: 0.11, vol: 0.4, partials: CELESTA, decayShape: 7.5, unison: 2, detune: 0.003, rand });
+}, { reverb: { wet: 0.06, tail: 0.1 }, peak: 0.42 });
+
+// phase_change: low ritual swell — sub pad, tritone shading, distant dark bell.
+render('phase_change', 2.6, (s, rand) => {
+  swell(s, { freq: D.C2, dur: 2.4, vol: 0.3, partials: [{ r: 1, g: 1 }, { r: 2, g: 0.4 }, { r: 3, g: 0.12 }], attack: 0.7, release: 1.1, unison: 3, detune: 0.006, rand });
+  swell(s, { freq: D.C3, start: 0.2, dur: 2.1, vol: 0.16, partials: [{ r: 1, g: 1 }, { r: 2, g: 0.25 }], attack: 0.8, release: 1.0, unison: 3, detune: 0.007, rand });
+  swell(s, { freq: D.Gb3, start: 0.7, dur: 1.6, vol: 0.09, attack: 0.7, release: 0.8, unison: 3, detune: 0.008, rand });
+  strike(s, { freq: D.C4, start: 1.1, dur: 1.3, vol: 0.28, partials: DARK_BELL, attack: 0.01, decayShape: 4, unison: 2, detune: 0.003, rand });
+  noiseBurst(s, { start: 0.2, dur: 2.0, vol: 0.1, lp: 0.03, attack: 0.5, decayShape: 3.5, rand });
+}, { reverb: { wet: 0.35, decay: 0.85, damp: 0.5, tail: 1.1 }, peak: 0.72 });
+
+// daily_ready: warm handbell pair, G5 then C6.
+render('daily_ready', 1.0, (s, rand) => {
+  strike(s, { freq: N.G5, dur: 0.5, vol: 0.4, partials: HANDBELL, decayShape: 4, attack: 0.003, rand });
+  strike(s, { freq: N.C6, start: 0.22, dur: 0.65, vol: 0.4, partials: HANDBELL, decayShape: 3.8, attack: 0.003, rand });
+}, { reverb: { wet: 0.3, tail: 0.6 }, peak: 0.65 });
+
+// ===========================================================================
+// DARK SFX (Phase 3+): hollow, minor, sub-heavy — the descent reaches the
+// ears. The move ladder DESCENDS: each combo tier sinks lower.
+// ===========================================================================
+
+// tap_dark: dull hollow knock, barely pitched.
+render('tap_dark', 0.24, (s, rand) => {
+  noiseBurst(s, { start: 0, dur: 0.03, vol: 0.4, lp: 0.1, decayShape: 9, rand });
+  strike(s, { freq: D.A3, dur: 0.18, vol: 0.55, partials: HOLLOW, attack: 0.004, decayShape: 6.5, unison: 2, detune: 0.003, rand });
+}, { reverb: { wet: 0.15, damp: 0.6, tail: 0.25 }, peak: 0.45 });
+
+// letter_select_dark: hollow pluck with wide detune (slow uneasy beating).
+render('letter_select_dark', 0.36, (s, rand) => {
+  noiseBurst(s, { start: 0, dur: 0.05, vol: 0.15, lp: 0.06, decayShape: 8, rand });
+  strike(s, { freq: D.Eb4, dur: 0.3, vol: 0.6, partials: HOLLOW, attack: 0.006, decayShape: 5, unison: 3, detune: 0.006, rand });
+}, { reverb: { wet: 0.2, damp: 0.55, tail: 0.3 }, peak: 0.55 });
+
+// valid_move_dark combo ladder: two-note hollow FALLS sinking lower per tier.
+function darkMove(name, note1, note2, opts = {}) {
+  const { vol = 0.6, attack = 0.006, wet = 0.25, tail = 0.5, peak = 0.6, dur2 = 0.34, extra } = opts;
+  render(name, 0.55, (s, rand) => {
+    noiseBurst(s, { start: 0, dur: 0.05, vol: 0.08, lp: 0.05, decayShape: 7, rand });
+    strike(s, { freq: note1, dur: 0.26, vol, partials: HOLLOW, attack, decayShape: 5, bend: -0.04, unison: 2, detune: 0.004, rand });
+    strike(s, { freq: note2, start: 0.09, dur: dur2, vol: vol * 0.92, partials: HOLLOW, attack, decayShape: 4.5, bend: -0.05, unison: 2, detune: 0.004, rand });
+    if (extra) extra(s, rand);
+  }, { reverb: { wet, damp: 0.5, decay: 0.78, tail }, peak });
 }
-// perfect_dark: the dark victory line with a dissonant tritone shimmer on top
-// instead of a bright sparkle (the "flawless" reward, wrong-tuned).
-{
-  const s = buf(1.2);
-  tone(s, D.C5, 0, 0.35, 0.2, { partial: 0.45 });
-  tone(s, D.Ab4, 0.14, 0.4, 0.2, { partial: 0.45 });
-  tone(s, D.Eb4, 0.3, 0.5, 0.2, { partial: 0.5 });
-  tone(s, D.C4, 0.46, 0.6, 0.22, { partial: 0.5 });
-  tone(s, D.Gb4, 0.62, 0.55, 0.12, { partial: 0.4 }); // tritone above C4 — unease
-  noise(s, 0.05, 0.9, 0.04, 0.03);
-  writeWav(path.join(OUT_DIR, 'perfect_dark.wav'), s);
-}
+darkMove('valid_move_dark', D.G3, D.Eb3);
+darkMove('valid_move_2_dark', D.F3, D.C3, { attack: 0.008 });
+darkMove('valid_move_3_dark', D.Eb3, D.Bb2, { attack: 0.01, dur2: 0.38, extra: (s, rand) => {
+  strike(s, { freq: D.A4, start: 0.16, dur: 0.3, vol: 0.06, partials: DARK_BELL, attack: 0.01, decayShape: 4.5, rand });
+} });
+darkMove('valid_move_4_dark', D.C3, D.G2, { attack: 0.012, dur2: 0.42, wet: 0.3, tail: 0.6, peak: 0.62, extra: (s, rand) => {
+  strike(s, { freq: D.Gb4, start: 0.18, dur: 0.32, vol: 0.07, partials: DARK_BELL, attack: 0.012, decayShape: 4.5, rand });
+  noiseBurst(s, { start: 0.05, dur: 0.3, vol: 0.1, lp: 0.04, attack: 0.05, decayShape: 4, rand });
+} });
+
+// invalid_move_dark: deep double thud with a sub groan underneath.
+render('invalid_move_dark', 0.5, (s, rand) => {
+  noiseBurst(s, { start: 0, dur: 0.04, vol: 0.3, lp: 0.05, decayShape: 8, rand });
+  strike(s, { freq: D.C3, dur: 0.16, vol: 0.6, partials: HOLLOW, attack: 0.004, decayShape: 6.5, bend: -0.15, unison: 2, detune: 0.003, rand });
+  noiseBurst(s, { start: 0.12, dur: 0.04, vol: 0.25, lp: 0.05, decayShape: 8, rand });
+  strike(s, { freq: D.Bb2, start: 0.12, dur: 0.22, vol: 0.55, partials: HOLLOW, attack: 0.004, decayShape: 6, bend: -0.15, unison: 2, detune: 0.003, rand });
+  swell(s, { freq: D.C2, start: 0.02, dur: 0.35, vol: 0.25, attack: 0.05, release: 0.2, unison: 2, detune: 0.005, rand });
+}, { reverb: { wet: 0.12, damp: 0.65, tail: 0.3 }, peak: 0.58 });
+
+// undo_dark: hollow falling slide with breath.
+render('undo_dark', 0.4, (s, rand) => {
+  strike(s, { freq: D.C4, dur: 0.28, vol: 0.55, partials: HOLLOW, attack: 0.006, decayShape: 5.5, bend: -0.25, unison: 2, detune: 0.004, rand });
+  noiseBurst(s, { start: 0.02, dur: 0.12, vol: 0.12, lp: 0.07, decayShape: 6, rand });
+}, { reverb: { wet: 0.2, damp: 0.55, tail: 0.3 }, peak: 0.5 });
+
+// amber_earn_dark: cold coin — a muted bell pair falling Eb5→Bb4.
+render('amber_earn_dark', 0.6, (s, rand) => {
+  noiseBurst(s, { start: 0, dur: 0.015, vol: 0.2, lp: 0.3, decayShape: 10, rand });
+  strike(s, { freq: D.Eb5, dur: 0.24, vol: 0.4, partials: DARK_BELL, attack: 0.005, decayShape: 5, unison: 2, detune: 0.004, rand });
+  strike(s, { freq: D.Bb4, start: 0.09, dur: 0.32, vol: 0.4, partials: DARK_BELL, attack: 0.005, decayShape: 4.5, unison: 2, detune: 0.004, rand });
+}, { reverb: { wet: 0.22, damp: 0.55, tail: 0.4 }, peak: 0.55 });
+
+// dialogue_dark: low hollow blip (quiet — fires on every line).
+render('dialogue_dark', 0.2, (s, rand) => {
+  strike(s, { freq: D.C4, dur: 0.15, vol: 0.45, partials: HOLLOW, attack: 0.004, decayShape: 7, unison: 2, detune: 0.004, rand });
+}, { reverb: { wet: 0.12, damp: 0.6, tail: 0.15 }, peak: 0.4 });
+
+// victory_dark: descending dark-bell line over a sub swell — the win that
+// feels like a door closing.
+render('victory_dark', 2.0, (s, rand) => {
+  const line = [ [D.C5, 0, 0.4], [D.Ab4, 0.16, 0.42], [D.Eb4, 0.34, 0.45], [D.C4, 0.55, 0.5] ];
+  for (const [f, t, v] of line) {
+    strike(s, { freq: f, start: t, dur: 0.6, vol: v, partials: DARK_BELL, attack: 0.008, decayShape: 4.2, unison: 2, detune: 0.004, rand });
+  }
+  swell(s, { freq: D.C3, start: 0.3, dur: 1.4, vol: 0.2, partials: [{ r: 1, g: 1 }, { r: 2, g: 0.3 }], attack: 0.4, release: 0.7, unison: 3, detune: 0.006, rand });
+  noiseBurst(s, { start: 0.1, dur: 1.2, vol: 0.06, lp: 0.04, attack: 0.3, decayShape: 4, rand });
+}, { reverb: { wet: 0.32, damp: 0.5, decay: 0.82, tail: 0.9 }, peak: 0.7 });
+
+// perfect_dark: the dark victory line, longer, with a tritone bell and a
+// faint semitone-beat shimmer on top — the flawless reward, wrong-tuned.
+render('perfect_dark', 2.6, (s, rand) => {
+  const line = [ [D.C5, 0, 0.38], [D.Ab4, 0.16, 0.4], [D.Eb4, 0.34, 0.42], [D.C4, 0.55, 0.48] ];
+  for (const [f, t, v] of line) {
+    strike(s, { freq: f, start: t, dur: 0.65, vol: v, partials: DARK_BELL, attack: 0.008, decayShape: 4, unison: 2, detune: 0.004, rand });
+  }
+  strike(s, { freq: D.Gb4, start: 0.78, dur: 0.7, vol: 0.22, partials: DARK_BELL, attack: 0.012, decayShape: 3.8, unison: 2, detune: 0.004, rand });
+  swell(s, { freq: D.B5, start: 0.9, dur: 1.2, vol: 0.03, attack: 0.5, release: 0.6, unison: 1, rand });
+  swell(s, { freq: D.C6, start: 0.9, dur: 1.2, vol: 0.03, attack: 0.5, release: 0.6, unison: 1, rand });
+  swell(s, { freq: D.C3, start: 0.35, dur: 1.9, vol: 0.2, partials: [{ r: 1, g: 1 }, { r: 2, g: 0.3 }], attack: 0.5, release: 0.9, unison: 3, detune: 0.006, rand });
+  noiseBurst(s, { start: 0.1, dur: 1.6, vol: 0.06, lp: 0.04, attack: 0.4, decayShape: 3.5, rand });
+}, { reverb: { wet: 0.34, damp: 0.5, decay: 0.84, tail: 1.0 }, peak: 0.72 });
+
+// ===========================================================================
+// AMBIENT MUSIC BEDS: three seamless loops sharing one musical DNA.
+// Quiet by design — a bed, not a song. Loop-exact by construction: continuous
+// voices quantized to integer cycles, event tails wrapped, reverb double-pass.
+// ===========================================================================
+
+// music_bright (18s): warm slow-breathing C add9 pad with gentle celesta
+// sparkle on the pentatonic — the cozy candy meadow.
+renderLoop('music_bright', 18, (s, { rand, q }) => {
+  const padVoice = (f, vol, lfoCycles, lfoDepth, lfoPhase) => {
+    loopPad(s, { freq: q(f), vol, lfoCycles, lfoDepth, lfoPhase, phase: rand() * 2 * Math.PI });
+    // Detuned twin for chorus warmth (also quantized → still periodic).
+    loopPad(s, { freq: q(f * 1.0035), vol: vol * 0.6, lfoCycles, lfoDepth, lfoPhase: lfoPhase + 1.3, phase: rand() * 2 * Math.PI });
+  };
+  padVoice(N.C4 / 2, 0.16, 2, 0.35, 0);      // C3 root
+  padVoice(N.G4 / 2, 0.11, 3, 0.4, 1.1);     // G3 fifth
+  padVoice(N.C4, 0.09, 2, 0.45, 2.4);        // C4
+  padVoice(N.E4, 0.07, 4, 0.5, 0.7);         // E4 third
+  padVoice(N.D4, 0.045, 1, 0.7, 3.6);        // D4 ninth, breathes once per loop
+  loopPad(s, { freq: q(N.C4 / 4), vol: 0.05, lfoCycles: 2, lfoDepth: 0.3, phase: rand() });
+  // Sparkle: seven soft celesta notes scattered across the loop.
+  const sparkleNotes = [N.C6, N.D6, N.E6, N.G6, N.A6, N.E6, N.G6];
+  for (let k = 0; k < sparkleNotes.length; k++) {
+    const t = (k + 0.15 + rand() * 0.7) * (18 / sparkleNotes.length);
+    loopEvent(s, t, 1.6, (tmp) => {
+      strike(tmp, { freq: sparkleNotes[k], dur: 1.4, vol: 0.045 + rand() * 0.02, partials: CELESTA, attack: 0.003, decayShape: 4.5, unison: 2, detune: 0.003, rand });
+    });
+  }
+}, { reverb: { wet: 0.3, decay: 0.8, damp: 0.45 }, peak: 0.5 });
+
+// music_dusk (20s): the same chord cooled and slowed — dimmer third, wider
+// detune, an occasional lowered 7th (Bb) drifting through, rarer duller
+// sparkle. Familiar, but the light is going.
+renderLoop('music_dusk', 20, (s, { rand, q }) => {
+  const padVoice = (f, vol, lfoCycles, lfoDepth, lfoPhase, det = 1.005) => {
+    loopPad(s, { freq: q(f), vol, lfoCycles, lfoDepth, lfoPhase, phase: rand() * 2 * Math.PI });
+    loopPad(s, { freq: q(f * det), vol: vol * 0.6, lfoCycles, lfoDepth, lfoPhase: lfoPhase + 1.3, phase: rand() * 2 * Math.PI });
+  };
+  padVoice(N.C4 / 2, 0.16, 1, 0.4, 0);       // C3 root, one slow breath
+  padVoice(N.G4 / 2, 0.1, 2, 0.45, 1.1);     // G3
+  padVoice(N.C4, 0.08, 1, 0.5, 2.4);         // C4
+  padVoice(N.E4, 0.05, 2, 0.6, 0.7);         // E4 dimmed
+  padVoice(N.A4 / 2 * 1.0594631, 0.05, 1, 0.85, 4.4);  // Bb3 lowered 7th, comes and goes
+  loopPad(s, { freq: q(N.C4 / 4), vol: 0.06, lfoCycles: 1, lfoDepth: 0.35, phase: rand() });
+  // Sparse, lower, duller sparkle.
+  const sparkleNotes = [N.G5, N.A5, N.C6, N.E6];
+  for (let k = 0; k < sparkleNotes.length; k++) {
+    const t = (k + 0.2 + rand() * 0.6) * (20 / sparkleNotes.length);
+    loopEvent(s, t, 2.0, (tmp) => {
+      strike(tmp, { freq: sparkleNotes[k], dur: 1.8, vol: 0.035 + rand() * 0.015, partials: CELESTA, attack: 0.006, decayShape: 4, unison: 2, detune: 0.004, rand });
+    });
+  }
+  // One quiet handbell C5 mid-loop — a far-off hour striking.
+  loopEvent(s, 11.3, 2.4, (tmp) => {
+    strike(tmp, { freq: N.C5, dur: 2.2, vol: 0.05, partials: HANDBELL, attack: 0.006, decayShape: 3.2, unison: 2, detune: 0.003, rand });
+  });
+}, { reverb: { wet: 0.34, decay: 0.82, damp: 0.55 }, peak: 0.48 });
+
+// music_dark (24s): the same DNA corrupted — low, detuned, sparse. A slow sub
+// pulse, a sour beating pair on the root, minor third and tritone shading, a
+// faint semitone shimmer far above, and two distant dark-bell tolls.
+renderLoop('music_dark', 24, (s, { rand, q }) => {
+  // Sub pulse: C2 swelling every 3 seconds.
+  loopPad(s, { freq: q(D.C2), vol: 0.2, lfoCycles: 8, lfoDepth: 0.85, phase: rand() * 2 * Math.PI });
+  // Sour root pair: C3 against a copy ~10 cents off — slow, wrong beating.
+  loopPad(s, { freq: q(D.C3), vol: 0.12, lfoCycles: 2, lfoDepth: 0.4, phase: rand() * 2 * Math.PI });
+  loopPad(s, { freq: q(D.C3 * 1.006), vol: 0.1, lfoCycles: 2, lfoDepth: 0.4, lfoPhase: 0.9, phase: rand() * 2 * Math.PI });
+  // Minor third and tritone, drifting in and out.
+  loopPad(s, { freq: q(D.Eb3), vol: 0.07, lfoCycles: 2, lfoDepth: 0.6, lfoPhase: 2.2, phase: rand() * 2 * Math.PI });
+  loopPad(s, { freq: q(D.Gb3), vol: 0.045, lfoCycles: 3, lfoDepth: 0.8, lfoPhase: 4.1, phase: rand() * 2 * Math.PI });
+  // Faint dissonant shimmer: B5/C6 semitone pair beating far above.
+  loopPad(s, { freq: q(D.B5), vol: 0.018, lfoCycles: 5, lfoDepth: 0.9, lfoPhase: 1.5, phase: rand() * 2 * Math.PI });
+  loopPad(s, { freq: q(D.C6), vol: 0.018, lfoCycles: 5, lfoDepth: 0.9, lfoPhase: 3.8, phase: rand() * 2 * Math.PI });
+  // Two distant dark-bell tolls and one slow breath of wind.
+  loopEvent(s, 6.2, 3.2, (tmp) => {
+    strike(tmp, { freq: D.C4, dur: 3.0, vol: 0.08, partials: DARK_BELL, attack: 0.015, decayShape: 3.2, unison: 2, detune: 0.004, rand });
+  });
+  loopEvent(s, 17.5, 3.2, (tmp) => {
+    strike(tmp, { freq: D.G3, dur: 3.0, vol: 0.07, partials: DARK_BELL, attack: 0.015, decayShape: 3.2, unison: 2, detune: 0.004, rand });
+  });
+  loopEvent(s, 12.0, 5.0, (tmp) => {
+    noiseBurst(tmp, { start: 0, dur: 4.5, vol: 0.05, lp: 0.02, attack: 1.5, decayShape: 3, rand });
+  });
+}, { reverb: { wet: 0.38, decay: 0.85, damp: 0.6 }, peak: 0.5 });
+
+console.log('done.');

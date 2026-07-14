@@ -507,6 +507,22 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
     setSettings(updated);
   };
 
+  const handleMusicToggle = async (value: boolean) => {
+    await handleToggle('musicEnabled', value);
+    // Apply to any playing bed right away. Guarded lazy require: audio.ts
+    // pulls expo-audio, which must not enter this module's import graph
+    // (resetAll.test.ts loads SettingsScreen in Node), and audio failures
+    // must never break the settings screen.
+    try {
+      const audio = require('../services/audio');
+      if (value) {
+        audio.startMusicForPhase(phase);
+      } else {
+        audio.stopMusic();
+      }
+    } catch {}
+  };
+
   const handleDailyReminderToggle = async (value: boolean) => {
     hapticLight();
     if (value) {
@@ -623,6 +639,22 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
           </View>
 
           <View style={[styles.settingRow, rowTint]}>
+            <View style={styles.settingInfo}>
+              <Text style={[styles.settingLabel, { color: t.title }]}>Music</Text>
+              <Text style={[styles.settingDescription, { color: t.muted }]}>Gentle background music that follows the mood</Text>
+            </View>
+            <Switch
+              value={settings.musicEnabled}
+              onValueChange={handleMusicToggle}
+              trackColor={switchTrack}
+              thumbColor={settings.musicEnabled ? t.primaryText : t.secondaryText}
+              accessibilityRole="switch"
+              accessibilityLabel="Music"
+              accessibilityState={{ checked: settings.musicEnabled }}
+            />
+          </View>
+
+          <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
               <Text style={[styles.settingLabel, { color: t.title }]}>Haptic Feedback</Text>
               <Text style={[styles.settingDescription, { color: t.muted }]}>Vibration on taps and interactions</Text>

@@ -16,6 +16,9 @@ import {
   QUEST_GENERATION_MIN_PUZZLES,
   DAILY_QUEST_POOL,
   WEEKLY_QUEST_POOL,
+  isCasualDailyQuest,
+  MIN_CASUAL_DAILY_QUESTS,
+  CASUAL_DAILY_SOLVE_BUDGET,
   EVENT_QUEST_TARGET,
   EVENT_QUEST_REWARD_AMBER,
   Quest,
@@ -838,6 +841,83 @@ describe('weeklyQuests', () => {
         }
       }
     );
+  });
+
+  // ===========================================================================
+  // Casual-day fit: a 2-puzzle/day player must always have quests to finish
+  // ===========================================================================
+
+  describe('casual-day floor (daily tier) and casual-week weekly ladder', () => {
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('pins the casual budget (2 solves) and the per-set floor (2 quests)', () => {
+      expect(CASUAL_DAILY_SOLVE_BUDGET).toBe(2);
+      expect(MIN_CASUAL_DAILY_QUESTS).toBe(2);
+    });
+
+    it('classifies casual-achievable quests correctly', () => {
+      // Per-solve types compare target to the 2-solve budget.
+      expect(isCasualDailyQuest({ type: 'solve_count', target: 2 })).toBe(true);
+      expect(isCasualDailyQuest({ type: 'solve_count', target: 3 })).toBe(false);
+      expect(isCasualDailyQuest({ type: 'earn_stars', target: 1 })).toBe(true);
+      expect(isCasualDailyQuest({ type: 'earn_stars', target: 3 })).toBe(false);
+      expect(isCasualDailyQuest({ type: 'no_hints', target: 3 })).toBe(false);
+      expect(isCasualDailyQuest({ type: 'solve_difficulty', target: 1 })).toBe(true);
+      expect(isCasualDailyQuest({ type: 'challenge_mode', target: 1 })).toBe(true);
+      expect(isCasualDailyQuest({ type: 'variant_wins', target: 1 })).toBe(true);
+      // Animal visits need no solves at all.
+      expect(isCasualDailyQuest({ type: 'visit_animals', target: 2 })).toBe(true);
+      // 30 amber = two MEDIUM_PLUS base rewards; 60 needs two perfect HARDs.
+      expect(isCasualDailyQuest({ type: 'earn_amber', target: 30 })).toBe(true);
+      expect(isCasualDailyQuest({ type: 'earn_amber', target: 60 })).toBe(false);
+      // Sink quests are never casual.
+      expect(isCasualDailyQuest({ type: 'tend_amber', target: 100 })).toBe(false);
+    });
+
+    it('at least half of the DAILY pool is completable within a 2-solve day', () => {
+      const casual = DAILY_QUEST_POOL.filter(isCasualDailyQuest);
+      expect(casual.length).toBeGreaterThanOrEqual(Math.ceil(DAILY_QUEST_POOL.length / 2));
+    });
+
+    it('every generated daily set carries at least 2 casual quests (40-day sweep, heaviest pool)', async () => {
+      jest.useFakeTimers();
+      // Fully unlocked at phase 5 exposes the heaviest possible template pool
+      // (challenge + all variants + tend_amber), maximizing the odds the raw
+      // seeded draw would come up all-heavy without the floor.
+      const fullContext = {
+        puzzlesSolved: 300,
+        unlockedAnimalCount: 13,
+        dailyUnlocked: true,
+        challengeUnlocked: true,
+        unlockedVariants: ['reverse', 'double_shift', 'speed'],
+      };
+      for (let day = 0; day < 40; day++) {
+        jest.setSystemTime(new Date(2026, 6, 1 + day, 12, 0, 0));
+        await clearWeeklyQuests();
+        await AsyncStorage.clear();
+        const state = await loadWeeklyQuests(5, fullContext);
+        expect(state.daily.quests.length).toBe(5);
+        const casualCount = state.daily.quests.filter(isCasualDailyQuest).length;
+        expect(casualCount).toBeGreaterThanOrEqual(MIN_CASUAL_DAILY_QUESTS);
+        // The floor must never break the max-2-per-type guard.
+        const counts: Record<string, number> = {};
+        for (const q of state.daily.quests) counts[q.type] = (counts[q.type] ?? 0) + 1;
+        for (const type of Object.keys(counts)) {
+          expect(counts[type]).toBeLessThanOrEqual(2);
+        }
+      }
+    });
+
+    it('weekly solve_count ladder is reachable by a 2/day casual (10/18/30 at 60/95/140)', () => {
+      // A 2-puzzle/day player produces 14 solves a week; the entry tier must
+      // sit under that (the old 15 was mathematically out of reach).
+      const solveTiers = WEEKLY_QUEST_POOL.filter(t => t.type === 'solve_count');
+      expect(solveTiers.map(t => t.target)).toEqual([10, 18, 30]);
+      expect(solveTiers.map(t => t.rewardAmber)).toEqual([60, 95, 140]);
+      expect(Math.min(...solveTiers.map(t => t.target))).toBeLessThan(14);
+    });
   });
 
   // ===========================================================================

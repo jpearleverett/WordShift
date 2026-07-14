@@ -603,11 +603,13 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // MID GAME (Puzzles ~28-130) - The house grows, darkness creeps in.
+  // MID GAME (Puzzles ~28-112) - The house grows, darkness creeps in.
   // These gates are spread across the Phase 1→3 window so the house keeps
-  // growing through the mid-game instead of completing by ~puzzle 85 and
-  // leaving the long stretch to the Phase 4 climax with no new investment.
-  // The final room (Bamboo Attic) lands just before Phase 3 (threshold 135).
+  // growing through the mid-game instead of completing early and leaving the
+  // climb to the climax with no new investment. Under the 2026-07 pacing the
+  // original ten rooms top out at the Bamboo Attic (112), early in Growing
+  // Shadows (Phase 3 floor 90); the high rooms then carry investment through
+  // the reveal (~130) to completion at 152, just before the finale (~162).
   // ═══════════════════════════════════════════════════════════════════════════
 
   // 8. Build the Jungle Room
@@ -661,7 +663,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // LATE-MID GAME (Puzzles ~60-105) - Existential dread intensifies
+  // LATE-MID GAME (Puzzles ~60-95) - Existential dread intensifies
   // ═══════════════════════════════════════════════════════════════════════════
 
   // 12. Build the Office
@@ -699,7 +701,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     targetId: 'burrow',
     name: 'Underground Burrow',
     description: 'Below everything, something stirs',
-    minPuzzles: 82,
+    minPuzzles: 78,
   },
 
   // 15. Invite Warren the Wombat
@@ -715,9 +717,9 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // LATE GAME (Puzzles ~105-130) - The original house tops out just before
-  // Phase 3; the high rooms below then carry investment onward through the
-  // Growing Shadows stretch.
+  // LATE GAME (Puzzles ~95-112) - The original house tops out early in Growing
+  // Shadows; the high rooms below then carry investment onward through the
+  // reveal.
   // ═══════════════════════════════════════════════════════════════════════════
 
   // 16. Build the Garden
@@ -730,7 +732,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     targetId: 'garden',
     name: 'Garden Patio',
     description: 'Where endings bloom like flowers',
-    minPuzzles: 105,
+    minPuzzles: 95,
   },
 
   // 17. Invite Thyme the Rabbit
@@ -755,7 +757,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     targetId: 'bamboo_attic',
     name: 'Bamboo Attic',
     description: 'The highest place, closest to the sky',
-    minPuzzles: 130,
+    minPuzzles: 112,
   },
 
   // 19. Invite Bamboo the Red Panda
@@ -771,9 +773,10 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // THE HIGH ROOMS (Puzzles ~150-190) - The house keeps growing through the
-  // Growing Shadows stretch, above what was once the top of the house. These
-  // gates carry investment through the long climb to the climax.
+  // THE HIGH ROOMS (Puzzles ~126-152) - The house keeps growing above what was
+  // once its top, through late Growing Shadows and past the reveal (~130). The
+  // Sky Garden gate at 152 completes the house (~153 with Moss) just before
+  // the finale (~162), so the climax arrives inside a finished temple.
   // ═══════════════════════════════════════════════════════════════════════════
 
   // 20. Build the Star Loft
@@ -786,7 +789,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     targetId: 'star_loft',
     name: 'Star Loft',
     description: 'A high window for watching the night arrive',
-    minPuzzles: 150,
+    minPuzzles: 126,
   },
 
   // 21. Invite Vesper the Tarsier
@@ -811,7 +814,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     targetId: 'belfry',
     name: 'Belfry',
     description: 'A silent bell waiting for its hour',
-    minPuzzles: 170,
+    minPuzzles: 140,
   },
 
   // 23. Invite Tock the Aye-Aye
@@ -836,7 +839,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     targetId: 'sky_garden',
     name: 'Sky Garden',
     description: 'A garden grown where only sky should be',
-    minPuzzles: 190,
+    minPuzzles: 152,
   },
 
   // 25. Invite Moss the Kakapo (FINAL UNLOCK)
@@ -973,6 +976,13 @@ export async function isUnlockAvailable(unlockId: string): Promise<{
  * conversation starts one phase behind the present (a little history for
  * texture) instead of replaying months of bright-days small talk that no
  * longer matches the world. Never rewinds an existing read position.
+ *
+ * Floor at phase 1: a lagging-tier animal unlocked at global Phase 2 has
+ * animalPhase 1, so "one phase behind" used to compute 0 and its dark catch-up
+ * intro was followed by bright Phase-0 small talk under a dusk sky. Once this
+ * fast-forward applies at all (global Phase 2+), no animal starts below the
+ * Curious Thoughts block. Vanguard/middle tiers are unaffected (their
+ * animalPhase - 1 is already >= 1 whenever this runs).
  */
 async function fastForwardLateUnlockDialogue(animalId: string): Promise<void> {
   const progress = await loadProgress();
@@ -980,7 +990,7 @@ async function fastForwardLateUnlockDialogue(animalId: string): Promise<void> {
 
   const animalType = animalId as AnimalType;
   const animalPhase = getAnimalPhase(progress.currentPhase, animalType);
-  const startPhase = Math.max(0, animalPhase - 1) as DialoguePhase;
+  const startPhase = Math.max(1, animalPhase - 1) as DialoguePhase;
   const startIndex = getPhaseStartIndex(animalType, startPhase);
   const existing = progress.lastDialogueRead[animalId] ?? 0;
   if (startIndex > existing) {

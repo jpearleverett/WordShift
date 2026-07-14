@@ -1,12 +1,12 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { RowData, Letter, GameState, MoveDelta, PuzzleSolutionStep, Difficulty, GameMode } from '../types';
 import { SavedPuzzleState } from '../services/puzzleSaveState';
-import { generateLocalPuzzle, generateDoubleShiftPuzzle, getIncantationName } from '../services/localGenerator';
+import { generateLocalPuzzle, generateDoubleShiftPuzzle, getIncantationName, getStrongestDreadWord } from '../services/localGenerator';
 import { selectPreGeneratedPuzzle } from '../services/puzzleBank';
 import { getWordHistoryWithRecency, recordPuzzleWords } from '../services/wordHistory';
 import { COMMON_WORDS, CURATED_EARLY_PUZZLES, CURATED_PUZZLE_COUNT, CuratedPuzzle, getRandomFallback } from '../constants';
 import { CHALLENGE_MODE_CONFIG, DialoguePhase } from '../types/homeWorld';
-import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getOutOfHintsMessage, getLoadingMessage, getStartMessage, getInvalidWordMessage, getBlindFailMessage, getLockedLetterMessage, getEchoPuzzleMessage } from '../services/phaseNarrative';
+import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getOutOfHintsMessage, getLoadingMessage, getStartMessage, getInvalidWordMessage, getBlindFailMessage, getLockedLetterMessage, getEchoPuzzleMessage, getFinalBoardStartMessage } from '../services/phaseNarrative';
 import { getHintBalanceSync, hasHintSync, consumeHintSync } from '../services/hints';
 import { getPreferredPuzzleVariant, setPreferredPuzzleVariant, getFullProgress, getRitualWords } from '../services/amberCurrency';
 import {
@@ -280,6 +280,32 @@ export function isBoardSolvableFromState(
 }
 
 /**
+ * Audio combo-ladder mapping for a clean-move streak: streak <2 plays the base
+ * chime (tier 0), streak 2 → tier 1, streak 3 → tier 2, streak >=4 → tier 3.
+ * Fed to audio.soundValidMove(comboTier), which resolves bright/dark variants
+ * internally. Pure and exported for tests.
+ */
+export function comboTierForStreak(streak: number): number {
+  if (streak >= 4) return 3;
+  if (streak === 3) return 2;
+  if (streak === 2) return 1;
+  return 0;
+}
+
+/**
+ * Message cadence for a clean-move streak: streaks 2 and 3 always get the
+ * escalating combo line; from streak 4 on, combo lines land on EVEN streaks
+ * with a regular move-pool draw between climbs (odd streaks), so a long run
+ * cycles variety instead of pinning one fixed escalation string forever.
+ * Pure and exported for tests.
+ */
+export function shouldUseComboMessage(streak: number): boolean {
+  if (streak < 2) return false;
+  if (streak <= 3) return true;
+  return streak % 2 === 0;
+}
+
+/**
  * Board coordinates for the hint glow. Set when a hint is actually delivered;
  * reuses the SAME tutorial-guide visuals (LetterTile guide ring / Slot halo).
  * `targetSlotIndex` may be undefined when only the letter can be pinpointed
@@ -339,10 +365,9 @@ export interface PuzzleGameState {
    * (startSharedChallengeGame). Every other start path — initGame/startNewGame
    * (and therefore Next Level), startDailyGame, clearBoard — resets it, so a
    * consumer (e.g. recordVictory threading) can make shared-link wins
-   * amber-only. NOT persisted in the autosave shape: restorePuzzleState resets
-   * it to false, so a shared board resumed after a process kill counts as a
-   * normal board (documented trade-off; threading it through SavedPuzzleState
-   * is a one-field change if that ever matters).
+   * amber-only. Persisted through the autosave shape (SavedPuzzleState
+   * carries isSharedChallenge and restorePuzzleState restores it), so a
+   * shared board resumed after a process kill stays amber-only.
    */
   isSharedChallenge: boolean;
   undosRemaining: number;
@@ -361,10 +386,29 @@ export interface PuzzleGameState {
   moveDirection: 'down' | 'up';
   /** Word previews for each slot position in the target row (when letter is selected) */
   slotPreviews?: Array<{ word: string; isValid: boolean }>;
+  /**
+   * Whether the ✓/✗ validity grading on the ghost previews is PRESENTED.
+   * The preview data always computes isValid internally (the double-shift
+   * look-ahead and drag near-miss snapping need it); this flag controls
+   * presentation only. TRUE only on EASY boards (any variant) and in the
+   * double-shift variant at any difficulty (its intermediate non-word state
+   * needs the guidance) — never in Blind Offering, and never on daily /
+   * shared-challenge boards (the daily ramps MEDIUM+ by design; a friend's
+   * chain is judged by the player's own ear). Everywhere hidden, the preview
+   * is a neutral ghost word: the player must judge whether it is real.
+   */
+  previewValidityVisible: boolean;
   /** Double shift phase tracking: pick1 → drop1 → pick2 → drop2 */
   doubleShiftPhase: 'pick1' | 'pick2' | 'drop1' | 'drop2' | null;
   /** Phase 5 echo puzzle: one word is seeded from the player's ritual history */
   isEchoPuzzle: boolean;
+  /**
+   * THE marked final board: served once the finale is armed (dwell window
+   * filled), seeded from the player's strongest fed dread word when possible.
+   * Its victory fires the finale (App suppresses the fanfare and plays
+   * FINAL_PUZZLE_EVENT). Persisted through autosave so kill/restore keeps it.
+   */
+  isFinalBoard: boolean;
   /**
    * True when no legal move remains from the active row. Internal signal
    * only — it deliberately drives NOTHING player-visible (no panel, no
@@ -421,10 +465,21 @@ export interface PuzzleGameActions {
     moveOutcomes?: MoveOutcome[];
     /** Undos used across the whole puzzle, present on the completing move (for the flawless tier). */
     undosUsed?: number;
+    /**
+     * Audio combo-ladder tier for the clean-move streak AFTER this committed
+     * move (0 = base chime, 1-3 = escalating ladder). Present on valid
+     * intermediate moves so App can play soundValidMove(comboTier).
+     */
+    comboTier?: number;
     /** Solve duration (ms) for a freshly-started board; absent for restored/retried boards. */
     solveTimeMs?: number;
     /** Whether this board was played with the Blind Offering modifier on. */
     blind?: boolean;
+    /**
+     * True when the completed board was THE marked final board (finale-armed
+     * serve). App suppresses the victory fanfare and fires the finale on it.
+     */
+    isFinalBoard?: boolean;
     /**
      * Blind Offering only: the final letter landed but the finished chain
      * contains a non-word — the board did NOT complete and the player must
@@ -544,6 +599,13 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const [blindMode, setBlindMode] = useState(false);
   // Friend-challenge provenance for the current board (see PuzzleGameState doc).
   const [isSharedChallenge, setIsSharedChallenge] = useState(false);
+  // Daily-board provenance: set only by startDailyGame, cleared by every other
+  // start path. Drives the preview-validity gate — the daily always hides the
+  // ✓/✗ grading (its board shape ramps MEDIUM+ by design), even when the
+  // player's own difficulty preference (which the daily leaves untouched)
+  // happens to be EASY. Not persisted: a daily autosave is never restored as a
+  // normal puzzle (App's load guard), so a restored board is never a daily.
+  const [isDailyBoard, setIsDailyBoard] = useState(false);
   const [undosRemaining, setUndosRemaining] = useState(Infinity);
   const [currentVariant, setCurrentVariant] = useState<PuzzleVariant>('standard');
   const [selectedVariant, setSelectedVariantState] = useState<PuzzleVariant>('standard');
@@ -556,6 +618,11 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   // Double shift state: tracks the 4-step flow (pick1 → drop1 → pick2 → drop2)
   const [doubleShiftPhase, setDoubleShiftPhase] = useState<'pick1' | 'pick2' | 'drop1' | 'drop2' | null>(null);
   const [isEchoPuzzle, setIsEchoPuzzle] = useState(false);
+  // THE marked final board (finale-armed serve). Ref mirror keeps the
+  // completion result honest inside async closures that predate the set
+  // (same pattern as gameModeRef); state drives render + autosave.
+  const [isFinalBoard, setIsFinalBoard] = useState(false);
+  const isFinalBoardRef = useRef(false);
   const [isStuck, setIsStuck] = useState(false);
   // Hint glow on the board (same visuals as the tutorial guide). Cleared on
   // any move/undo/restart/new board so a stale glow never outlives its advice.
@@ -723,8 +790,13 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     puzzleReverseSolution?: PuzzleSolutionStep[]
   ) => {
     // Every non-shared start path routes through here (curated/echo/bank/
-    // generated/fallback) — a fresh board is never a shared challenge.
+    // generated/fallback) — a fresh board is never a shared challenge or a
+    // daily (the daily has its own bypass, startDailyGame). The final-board
+    // mark also resets: the finale-armed serve re-marks it right after commit.
     setIsSharedChallenge(false);
+    setIsDailyBoard(false);
+    isFinalBoardRef.current = false;
+    setIsFinalBoard(false);
     applyBoard(words, puzzleHint, puzzleSolution, wordLength, {
       resetPerformance: true,
       variant,
@@ -834,6 +906,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       variant = selectedVariant;
     }
     setCurrentVariant(variant);
+    // Hoisted past the try so the fallback path can still mark the final
+    // board (the ultimate fallback: any board, marked final).
+    let finaleServe = false;
 
     try {
       // Serve curated early-game puzzles for the first few solves
@@ -853,13 +928,51 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         return;
       }
 
+      // THE FINAL BOARD: once the dwell window has filled, the finale is
+      // ARMED (amberCurrency.finaleArmed) and the next standard-mode start
+      // becomes the marked final board — the finale is played, not declared
+      // retroactively. A selected variant is served as a standard board this
+      // once (in-world, the arrangement chooses; the player's preference is
+      // untouched for later boards). Seeded via the echo path from the
+      // player's strongest fed dread word; if no dread word exists or the
+      // generator can't build from it, the normal bank/generation path below
+      // serves the board — still marked final (ultimate fallback).
+      finaleServe = progress?.finaleArmed === true && progress?.finalPuzzleCompleted !== true;
+      if (finaleServe) {
+        variant = 'standard';
+        setCurrentVariant('standard');
+        try {
+          const ritualWords = await getRitualWords();
+          const targetLen = selectedDifficulty === 'EASY' || selectedDifficulty === 'MEDIUM' ? 4 : 5;
+          const strongest = getStrongestDreadWord(
+            (ritualWords || []).filter(w => w.length === targetLen)
+          );
+          if (strongest) {
+            const finalPuzzle = await generateLocalPuzzle(selectedDifficulty, { startWord: strongest.word });
+            if (finalPuzzle) {
+              if (isStale()) return;
+              initGame(finalPuzzle.words, finalPuzzle.hint, finalPuzzle.solution, finalPuzzle.wordLength, 'standard');
+              await recordPuzzleWords(finalPuzzle.words);
+              isFinalBoardRef.current = true;
+              setIsFinalBoard(true);
+              setMessage(getFinalBoardStartMessage(currentPhase));
+              return;
+            }
+          }
+        } catch {
+          // Dread seeding failed — fall through: the normal path still serves
+          // the final board (any board, marked final).
+        }
+      }
+
       // Echo puzzles: every 5th puzzle from Phase 3 onward re-seeds a word from
       // the player's OWN ritual history — the descent handing their past words
       // back. This is the moment it was made for (the reveal), so it now runs
       // pre-finale, not just at Phase 5 (post-revelation). Falls through to the
-      // normal bank/generation path if echo seeding fails.
+      // normal bank/generation path if echo seeding fails. The marked final
+      // board takes precedence (it carries its own dread-word echo).
       setIsEchoPuzzle(false);
-      if (currentPhase >= 3 && puzzlesSolved > 0 && puzzlesSolved % 5 === 0 && variant === 'standard') {
+      if (!finaleServe && currentPhase >= 3 && puzzlesSolved > 0 && puzzlesSolved % 5 === 0 && variant === 'standard') {
         try {
           const ritualWords = await getRitualWords();
           // Pick words matching the target word length for this difficulty
@@ -893,7 +1006,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
             if (isStale()) return;
             initGame(bankPuzzle.words, bankPuzzle.hint, bankPuzzle.solution, bankPuzzle.wordLength, variant, bankPuzzle.reverseSolution);
             await recordPuzzleWords(bankPuzzle.words);
-            if (variant !== 'standard') {
+            if (finaleServe) {
+              // Dread seeding fell through — this bank board IS the final board.
+              isFinalBoardRef.current = true;
+              setIsFinalBoard(true);
+              setMessage(getFinalBoardStartMessage(currentPhase));
+            } else if (variant !== 'standard') {
               const config = VARIANT_CONFIGS[variant];
               setMessage(getVariantInstruction(config, currentPhase, selectedDifficulty));
             } else {
@@ -919,7 +1037,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       );
       if (isStale()) return;
       initGame(puzzle.words, puzzle.hint, puzzle.solution, puzzle.wordLength, activeVariant, puzzle.reverseSolution);
-      if (activeVariant !== 'standard') {
+      if (finaleServe) {
+        // Generated board serving as the final board (dread seed unavailable).
+        isFinalBoardRef.current = true;
+        setIsFinalBoard(true);
+        setMessage(getFinalBoardStartMessage(currentPhase));
+      } else if (activeVariant !== 'standard') {
         const config = VARIANT_CONFIGS[activeVariant];
         setMessage(getVariantInstruction(config, currentPhase, selectedDifficulty));
       } else if (variant !== 'standard') {
@@ -946,7 +1069,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         fallbackWordLen,
         fallbackVariant
       );
-      if (variant !== 'standard') {
+      if (finaleServe) {
+        // Even the fallback pool serves the final board when armed.
+        isFinalBoardRef.current = true;
+        setIsFinalBoard(true);
+        setMessage(getFinalBoardStartMessage(currentPhase));
+      } else if (variant !== 'standard') {
         // Variant was dropped during fallback — notify the player
         setMessage(
           currentPhase >= 3
@@ -971,6 +1099,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setGameMode('standard');
     setBlindMode(false); // the daily is a shared board — never blind
     setIsSharedChallenge(false);
+    setIsDailyBoard(true);
+    isFinalBoardRef.current = false;
+    setIsFinalBoard(false);
     // The daily generator's solution steps thread through like a bank puzzle's,
     // so daily hints use the stored solution instead of the blind live search.
     // Optional param keeps older 3-arg callers working unchanged.
@@ -1008,7 +1139,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     gameModeRef.current = 'standard';
     setGameMode('standard');
     setBlindMode(false); // a friend's shared board — never blind
+    setIsDailyBoard(false);
     setIsEchoPuzzle(false);
+    isFinalBoardRef.current = false;
+    setIsFinalBoard(false);
     applyBoard(normalized, undefined, undefined, wordLength, {
       resetPerformance: true,
       variant: 'standard',
@@ -1404,6 +1538,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     variant?: PuzzleVariant;
     reverseMidpoint?: boolean;
     moveOutcomes?: MoveOutcome[];
+    /** Audio combo-ladder tier for the streak after this move (see interface doc). */
+    comboTier?: number;
     /**
      * Blind Offering only: the final letter just landed but the finished
      * chain contains at least one non-word, so the board did NOT complete.
@@ -1642,6 +1778,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         variant: currentVariant,
         solveTimeMs,
         blind: blindMode,
+        // THE marked final board's win — App silences the fanfare and fires
+        // the finale (ref mirror: set at board start, immune to stale closures).
+        isFinalBoard: isFinalBoardRef.current,
         // Full per-move record including the completing move (ref mirror is
         // already current; state would be a render behind at this point).
         moveOutcomes: moveOutcomesRef.current,
@@ -1659,8 +1798,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         return getMoveMessage(currentPhase);
       }
       cleanMoveStreakRef.current += 1;
-      return cleanMoveStreakRef.current >= 2
-        ? getComboMoveMessage(cleanMoveStreakRef.current, currentPhase)
+      const streak = cleanMoveStreakRef.current;
+      // Cadence: streaks 2 and 3 always escalate; from 4 on the combo line
+      // lands on EVEN streaks with a regular pool draw between climbs, so a
+      // long clean run keeps drawing variety instead of one fixed string.
+      return shouldUseComboMessage(streak)
+        ? getComboMoveMessage(streak, currentPhase)
         : getMoveMessage(currentPhase);
     };
 
@@ -1711,7 +1854,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       setIsStuck(stuckForward);
       setLastFormedWord(targetWordStr);
       setIsProcessing(false);
-      return { completed: false, hintsUsed, invalidAttempts, gameMode, completedWords: [], formedWord: targetWordStr };
+      // comboTier reads the ref AFTER moveMessageFor updated the streak, so the
+      // chime ladder and the message escalate off the same count.
+      return { completed: false, hintsUsed, invalidAttempts, gameMode, completedWords: [], formedWord: targetWordStr, comboTier: comboTierForStreak(cleanMoveStreakRef.current) };
     }
 
     // Reverse Shift: descend to bottom, then return to row 0.
@@ -1744,7 +1889,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       }
       setLastFormedWord(targetWordStr);
       setIsProcessing(false);
-      return { completed: false, hintsUsed, invalidAttempts, gameMode, completedWords: [], formedWord: targetWordStr, reverseMidpoint: reachedMidpoint };
+      // At the midpoint the streak was just reset for the return leg → tier 0.
+      return { completed: false, hintsUsed, invalidAttempts, gameMode, completedWords: [], formedWord: targetWordStr, reverseMidpoint: reachedMidpoint, comboTier: comboTierForStreak(cleanMoveStreakRef.current) };
     }
 
     // Returning upward in reverse mode.
@@ -1765,7 +1911,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setIsStuck(stuckUp);
     setLastFormedWord(targetWordStr);
     setIsProcessing(false);
-    return { completed: false, hintsUsed, invalidAttempts, gameMode, completedWords: [], formedWord: targetWordStr };
+    return { completed: false, hintsUsed, invalidAttempts, gameMode, completedWords: [], formedWord: targetWordStr, comboTier: comboTierForStreak(cleanMoveStreakRef.current) };
   }, [
     selectedLetter,
     gameState,
@@ -2038,6 +2184,23 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     return previews;
   }, [selectedLetter, activeRowIndex, moveDirection, rows, gameState, currentVariant, doubleShiftPhase, blindMode, gameMode]);
 
+  // Verb-depth gate: whether the ✓/✗ validity grading on the ghost previews is
+  // PRESENTED. The slotPreviews data above keeps computing isValid internally
+  // (the double-shift drop1 look-ahead and the drag near-miss snapping need
+  // it); this flag controls presentation only. Shown ONLY on EASY boards (any
+  // variant) and in the double-shift variant at any difficulty (its
+  // intermediate non-word state needs the guidance). Hidden everywhere else —
+  // MEDIUM+ standard/reverse/speed, the daily (ramps MEDIUM+ by design), and
+  // shared-challenge links — so the player judges the word with their own ear.
+  // Blind Offering has no previews at all (blindMode short-circuits above),
+  // but the flag stays false there too so consumers never key a tell off it.
+  const previewValidityVisible = useMemo(() => {
+    if (blindMode) return false;
+    if (hasVariantModifier(currentVariant, 'double_shift')) return true;
+    if (isDailyBoard || isSharedChallenge) return false;
+    return difficulty === 'EASY';
+  }, [blindMode, currentVariant, isDailyBoard, isSharedChallenge, difficulty]);
+
   const restorePuzzleState = useCallback((saved: SavedPuzzleState) => {
     const selectedExists = saved.selectedLetter
       ? saved.rows.some(row => row.words.some(letter => letter.id === saved.selectedLetter!.id))
@@ -2068,6 +2231,13 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     // (amber-only) into one that feeds phase progress. Old saves without the
     // field restore as normal boards.
     setIsSharedChallenge(saved.isSharedChallenge ?? false);
+    // A daily autosave is never restored as a normal puzzle (App's load guard),
+    // so a restored board is by definition not a daily.
+    setIsDailyBoard(false);
+    // The final-board mark survives kill/restore: the finale must fire on the
+    // board that was served as final, even across a relaunch.
+    isFinalBoardRef.current = saved.isFinalBoard === true;
+    setIsFinalBoard(saved.isFinalBoard === true);
     setCurrentVariant(saved.currentVariant);
     setSelectedVariantState(saved.selectedVariant);
     setMoveDirection(saved.moveDirection);
@@ -2153,7 +2323,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setLastFormedWord(null);
     setDoubleShiftPhase(null);
     setIsEchoPuzzle(false);
+    isFinalBoardRef.current = false;
+    setIsFinalBoard(false);
     setIsSharedChallenge(false);
+    setIsDailyBoard(false);
     setIsStuck(false);
     setHintHighlight(null);
     setLastArrival(null);
@@ -2196,8 +2369,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     selectedVariant,
     moveDirection,
     slotPreviews,
+    previewValidityVisible,
     doubleShiftPhase,
     isEchoPuzzle,
+    isFinalBoard,
     isStuck,
     hintBalance,
     outOfHintsSignal,

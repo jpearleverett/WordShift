@@ -17,6 +17,11 @@ import { getWinBackMessage } from './phaseNarrative';
  * Every notification carries a content.data.target payload ('daily' | 'home')
  * so a tap can be routed by App.tsx's notification-response listener.
  *
+ * Same-local-day dedupe: the whole set is scheduled in one pass and capped at
+ * ONE notification per local calendar day (priority: streak-risk > win-back >
+ * quest-expiry > daily reminder), so a lapsed player never receives two pings
+ * on the same day.
+ *
  * Uses expo-notifications when available, falls back to no-op.
  * All notification logic is self-contained so the rest of the app
  * just calls schedule/cancel functions without worrying about the library.
@@ -325,22 +330,22 @@ export async function scheduleAllNotifications(currentPhase: number): Promise<vo
   // so a daily player never gets a redundant "your puzzle is ready" ping.
   const playedToday = await hasPlayedTodaySafe();
 
-  // Schedule daily reminder. While the Daily Challenge is still locked (the
-  // permission prompt can fire from the 3rd victory; the daily unlocks at 8
-  // puzzles / Phase 1) the ladder still arms, but with generic come-back copy
-  // routed home — never "your daily puzzle is ready" for content the player
-  // can't reach yet.
-  if (prefs.dailyReminderEnabled) {
-    const dailyUnlocked = await isDailyChallengeUnlockedSafe(currentPhase);
-    await scheduleDailyReminder(mod, prefs.dailyReminderHour, currentPhase, playedToday, dailyUnlocked);
-  }
+  // Same-local-day dedupe: the whole set is scheduled in this one pass, so we
+  // track which local days already carry a ping and cap delivery at ONE
+  // notification per local day. Without this a lapsed player's first missed
+  // week stacked the 9am reminder ladder on top of the 18:00 win-back rungs,
+  // the 19:00 streak-risk ping, and the Sunday 17:30 quest-expiry nudge — up
+  // to ~12 pings in a week, an uninstall driver. Scheduling order below IS the
+  // priority order: streak-risk > win-back > quest-expiry > daily reminder
+  // (the most specific ping wins its day; the generic morning reminder yields).
+  const occupiedDays = new Set<string>();
 
-  // Win-back ladder. Players with an active streak hear about the streak
-  // first (this/next evening), then the win-back ladder starts a day later;
-  // everyone else starts the ladder tomorrow. Rungs escalate per
-  // WIN_BACK_RUNG_OFFSETS (+1/+3/+7/+14/+30 days). Each app session
-  // reschedules, so these only fire on days the player actually missed — an
-  // active player never sees a win-back.
+  // Win-back ladder (plus streak-risk and quest-expiry). Players with an
+  // active streak hear about the streak first (this/next evening), then the
+  // win-back ladder starts a day later; everyone else starts the ladder
+  // tomorrow. Rungs escalate per WIN_BACK_RUNG_OFFSETS (+1/+3/+7/+14/+30
+  // days). Each app session reschedules, so these only fire on days the
+  // player actually missed — an active player never sees a win-back.
   if (prefs.reengagementEnabled) {
     const streak = await getCurrentStreakSafe();
     // Streak-risk only fires when genuinely at risk: a real streak (>= 2) that
@@ -348,7 +353,7 @@ export async function scheduleAllNotifications(currentPhase: number): Promise<vo
     // is safe, so the warning would contradict reality — suppress it.
     const hasStreakRisk = streak >= 2 && !playedToday;
     if (hasStreakRisk) {
-      await scheduleStreakRisk(mod, currentPhase, streak);
+      await scheduleStreakRisk(mod, currentPhase, streak, occupiedDays);
     }
     // A finished-story player gets the special tail copy on the +14/+30 rungs.
     let finishedStory = false;
@@ -356,14 +361,31 @@ export async function scheduleAllNotifications(currentPhase: number): Promise<vo
       const { isPostRevelation } = require('./amberCurrency');
       finishedStory = await isPostRevelation();
     } catch {}
-    await scheduleWinBackLadder(mod, currentPhase, hasStreakRisk ? 2 : 1, finishedStory);
+    // Win-back is for LAPSED players. For a player who kept today alive, rung 1
+    // starts at +2 so tomorrow's slot stays free for the routine morning
+    // reminder (the one-per-day dedupe would otherwise let the 18:00 win-back
+    // permanently displace the user-configured daily ping on day +1). A player
+    // already at streak risk keeps the original +2 stagger after the risk ping.
+    const firstRung = hasStreakRisk || playedToday ? 2 : 1;
+    await scheduleWinBackLadder(mod, currentPhase, firstRung, finishedStory, occupiedDays);
 
     // Weekly-quest-expiry nudge: the evening before the weekly reset, but only
     // when the player has quests in flight (progress made, or completed-but-
     // unclaimed amber waiting). Players who never touch quests are not nagged.
     if (await shouldRemindQuestExpirySafe(currentPhase)) {
-      await scheduleQuestExpiry(mod, currentPhase);
+      await scheduleQuestExpiry(mod, currentPhase, occupiedDays);
     }
+  }
+
+  // Schedule daily reminder LAST (lowest dedupe priority — it skips any local
+  // day already claimed above). While the Daily Challenge is still locked (the
+  // permission prompt can fire from the 3rd victory; the daily unlocks at 8
+  // puzzles / Phase 1) the ladder still arms, but with generic come-back copy
+  // routed home — never "your daily puzzle is ready" for content the player
+  // can't reach yet.
+  if (prefs.dailyReminderEnabled) {
+    const dailyUnlocked = await isDailyChallengeUnlockedSafe(currentPhase);
+    await scheduleDailyReminder(mod, prefs.dailyReminderHour, currentPhase, playedToday, dailyUnlocked, occupiedDays);
   }
 }
 
@@ -447,7 +469,8 @@ async function scheduleDailyReminder(
   hour: number,
   phase: number,
   playedToday: boolean,
-  dailyUnlocked: boolean
+  dailyUnlocked: boolean,
+  occupiedDays: Set<string>
 ): Promise<void> {
   try {
     // Strategy: instead of one unconditional REPEATING daily trigger (which pings
@@ -475,6 +498,12 @@ async function scheduleDailyReminder(
       // Never schedule a trigger in the past (e.g. dayOffset 0 with hour already passed).
       if (triggerDate.getTime() <= now.getTime()) continue;
 
+      // Same-local-day dedupe: the daily reminder is the LOWEST-priority ping —
+      // any day already claimed by streak-risk, a win-back rung, or the
+      // quest-expiry nudge gets no additional morning reminder.
+      const dayKey = getLocalDateString(triggerDate);
+      if (occupiedDays.has(dayKey)) continue;
+
       // Re-roll the phase-aware message per day for variety. While the Daily
       // Challenge is locked, serve generic come-back copy routed home instead
       // of advertising a daily the player can't open yet.
@@ -492,6 +521,7 @@ async function scheduleDailyReminder(
           date: triggerDate,
         },
       });
+      occupiedDays.add(dayKey);
     }
   } catch {}
 }
@@ -501,13 +531,16 @@ async function scheduleDailyReminder(
  * +7 days after the reschedule (rung 1 shifts to firstRungDays for streak
  * holders, whose streak-risk ping leads the ladder). Every session cancels and
  * reschedules everything, so active players never see a rung fire — each rung
- * only lands on a day the player genuinely hasn't launched by then.
+ * only lands on a day the player genuinely hasn't launched by then. Rungs
+ * claim their local day in occupiedDays (and skip a day a higher-priority
+ * ping already claimed) so a lapsed player never gets two pings in one day.
  */
 async function scheduleWinBackLadder(
   mod: any,
   phase: number,
   firstRungDays: number,
-  finished = false
+  finished: boolean,
+  occupiedDays: Set<string>
 ): Promise<void> {
   // Extended past the old +7 cliff to +14 and +30 so a lapsed player is never
   // permanently abandoned; a finished-story player gets special tail copy.
@@ -524,6 +557,9 @@ async function scheduleWinBackLadder(
       triggerDate.setDate(triggerDate.getDate() + daysFromNow);
       triggerDate.setHours(18, 0, 0, 0); // 6pm
 
+      const dayKey = getLocalDateString(triggerDate);
+      if (occupiedDays.has(dayKey)) continue;
+
       await mod.scheduleNotificationAsync({
         content: {
           title: 'WordShift',
@@ -535,6 +571,7 @@ async function scheduleWinBackLadder(
           date: triggerDate,
         },
       });
+      occupiedDays.add(dayKey);
     } catch {}
   }
 }
@@ -623,7 +660,11 @@ async function shouldRemindQuestExpirySafe(phase: number): Promise<boolean> {
   }
 }
 
-async function scheduleQuestExpiry(mod: any, phase: number): Promise<void> {
+async function scheduleQuestExpiry(
+  mod: any,
+  phase: number,
+  occupiedDays: Set<string>
+): Promise<void> {
   const message = getQuestExpiryMessage(phase);
   try {
     // Weekly quests reset at the local-Monday boundary. Fire the reminder the
@@ -644,6 +685,11 @@ async function scheduleQuestExpiry(mod: any, phase: number): Promise<void> {
     const triggerDate = new Date(nextMonday.getTime() - QUEST_EXPIRY_LEAD_MS);
     if (triggerDate.getTime() <= now.getTime()) return; // window already passed this week
 
+    // Same-local-day dedupe: yield if a streak-risk ping or win-back rung
+    // already owns that Sunday.
+    const dayKey = getLocalDateString(triggerDate);
+    if (occupiedDays.has(dayKey)) return;
+
     await mod.scheduleNotificationAsync({
       content: {
         title: 'WordShift',
@@ -655,13 +701,15 @@ async function scheduleQuestExpiry(mod: any, phase: number): Promise<void> {
         date: triggerDate,
       },
     });
+    occupiedDays.add(dayKey);
   } catch {}
 }
 
 async function scheduleStreakRisk(
   mod: any,
   phase: number,
-  streak: number
+  streak: number,
+  occupiedDays: Set<string>
 ): Promise<void> {
   const message = getStreakRiskMessage(phase, streak);
   try {
@@ -689,6 +737,9 @@ async function scheduleStreakRisk(
         date: triggerDate,
       },
     });
+    // Streak-risk is the highest-priority ping — it claims its local day
+    // first (scheduleAllNotifications runs it before the other ladders).
+    occupiedDays.add(getLocalDateString(triggerDate));
   } catch {}
 }
 

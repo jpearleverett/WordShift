@@ -22,6 +22,7 @@ import {
   isPostRevelation,
 } from '../services/amberCurrency';
 import { updatePuzzleCount, updateSessionPhase } from '../services/dialogueSession';
+import { recordFormedWords } from '../services/wordHistory';
 import { calculateRitualEnergy, extractTriggerWords } from '../services/localGenerator';
 import { GameEvent, logEvent } from '../services/eventLogger';
 import { updateQuestProgress } from '../services/weeklyQuests';
@@ -118,6 +119,13 @@ export interface VictoryData {
    * here). Drives the mandatory first-harvest gate in the Victory modal.
    */
   mandatoryHarvest?: boolean;
+  /**
+   * True on THE marked final board's victory (set in App, not here). Forces
+   * the full victory ceremony (never a compact strip) with the hushed
+   * treatment: App suppresses the chime + confetti, and FINAL_PUZZLE_EVENT
+   * plays over the settled modal.
+   */
+  finalBoard?: boolean;
   /** True when this puzzle created a new pending phase transition in the pit */
   phaseTransitionPending: boolean;
   /** True when pending harvest batches hit the 200 cap and oldest were trimmed */
@@ -362,6 +370,12 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         const triggerWords = extractTriggerWords(completedWords);
         const ritualResult = await recordRitualWords(completedWords, ritualEnergy, triggerWords);
         totalWordsFormed = ritualResult.totalWordsFormed;
+        // Feed the FORMED words into the word-history cooldowns too. The
+        // starting chain was recorded when the puzzle was served, so without
+        // this the words the player actually built (half of what they see)
+        // were invisible to bank-selection freshness and could repeat
+        // immediately on the next board.
+        await recordFormedWords(completedWords);
         // Fulfill any animal's outstanding offering request whose theme these
         // words match — the animal reacts by name on the next visit.
         recordOfferingFulfillment(completedWords).catch(() => {});

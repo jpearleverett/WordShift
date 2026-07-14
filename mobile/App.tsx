@@ -22,10 +22,11 @@ import { Confetti, StarBurst } from './src/components/Confetti';
 import { ActionButton, AnimatedLogo, Toast, VictoryModal, RulesModal, DifficultyMenu } from './src/components/puzzle';
 import { HomeScreen } from './src/components/home';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
+import { AmberInline } from './src/components/AmberInline';
 import { CandyColors } from './src/theme/colors';
 import { usePuzzleGame } from './src/hooks/usePuzzleGame';
 import { useGamePersistence } from './src/hooks/useGamePersistence';
-import { useVictoryFlow } from './src/hooks/useVictoryFlow';
+import { useVictoryFlow, isRoutineVictory } from './src/hooks/useVictoryFlow';
 import { useAchievementQueue } from './src/hooks/useAchievementQueue';
 import { useSpeedTimer } from './src/hooks/useSpeedTimer';
 import { useDreadEffects } from './src/hooks/useDreadEffects';
@@ -55,6 +56,8 @@ import {
   isPostRevelation,
   markPostRevelation,
   recordPhase4Dwell,
+  armFinale,
+  isFinaleArmed,
   consumeVariantNudge,
   getFullProgress,
   consumeCycleOpening,
@@ -76,7 +79,8 @@ import { initShareImage } from './src/services/shareImage';
 import { ShareResultModal } from './src/components/share/ShareResultModal';
 import { getLocalDateString } from './src/services/dateUtils';
 import { getSettingsSync } from './src/services/settings';
-import { initAudio, setAudioPhase, soundVictory, soundPerfect, soundValidMove, soundInvalidMove, soundUndo, soundHint, soundTap, soundLetterSelect } from './src/services/audio';
+import { initAudio, setAudioPhase, startMusicForPhase, soundVictory, soundPerfect, soundValidMove, soundInvalidMove, soundUndo, soundHint, soundTap, soundLetterSelect } from './src/services/audio';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess, hapticWarning, hapticError, hapticSelection } from './src/services/haptics';
 import { getVariantTutorialIntroLines } from './src/services/animalDialogue';
 import {
@@ -103,6 +107,10 @@ import {
   getDailyLadderLine,
   getDailyLadderTrendLabel,
   getEventDailyBonusLine,
+  getPreviewGraduationMessage,
+  getSwiftVictoryHintMessage,
+  getStreakHeldMessage,
+  getDwellLine,
 } from './src/services/phaseNarrative';
 import { getActiveEvent, getEventDailyBonusAmber } from './src/services/liveEvents';
 import { recordSolveTime, getSolveTrend, recordSpeedRound } from './src/services/masteryRecords';
@@ -131,7 +139,7 @@ import { loadPixelFonts, installGlobalFont } from './src/theme/fonts';
 import { initHints, addHints } from './src/services/hints';
 import { loadEntitlements, hasEntitlementSync, ENTITLEMENTS } from './src/services/entitlements';
 import { StoreModal } from './src/components/monetization/StoreModal';
-import { recordInterstitialSeen, consumePatronNudge, consumeRemoveAdsNudge } from './src/services/monetizationPrompts';
+import { recordInterstitialSeen, consumePatronNudge, armRemoveAdsNudgeIfEligible, consumePendingRemoveAdsNudge } from './src/services/monetizationPrompts';
 import { REWARDED_HINT_GRANT } from './src/constants/gameBalance';
 import { createRevenueCatBillingProvider } from './src/services/providers/revenueCatBilling';
 import { createAdMobAdProvider } from './src/services/providers/googleAdMobAds';
@@ -143,6 +151,32 @@ import { getCumulativeStats } from './src/services/starRating';
 // firing on the very first post-onboarding Play hijacked the "just let me
 // play" beat (and the curated early window ignores difficulty anyway).
 const SETUP_SELECTOR_INTRO_MIN_PUZZLES = 3;
+
+// One-time Swift Victories pointer: only past this puzzle count (a few boards
+// beyond SWIFT_VICTORY_MIN_PUZZLES, so compact mode is actually available and
+// the player has felt some choreography repetition worth shortening).
+const SWIFT_HINT_MIN_PUZZLES = 24;
+
+// One-time, DEVICE-LOCAL UX pointer flags (deliberately not cloud-synced and
+// not cleared by Reset All owners' service clears: they mark "this device's
+// player has seen this pointer", not game progress).
+const PREVIEW_GRADUATION_SEEN_KEY = 'wordshift_preview_graduation_seen';
+const SWIFT_HINT_SEEN_KEY = 'wordshift_swift_hint_seen';
+async function hasSeenOneTimeFlag(key: string): Promise<boolean> {
+  try {
+    return (await AsyncStorage.getItem(key)) === 'true';
+  } catch {
+    // Broken storage must never spam a "one-time" pointer — treat as seen.
+    return true;
+  }
+}
+async function markOneTimeFlagSeen(key: string): Promise<void> {
+  try {
+    await AsyncStorage.setItem(key, 'true');
+  } catch {
+    // Non-critical.
+  }
+}
 
 // Module-scope launch-routing guards: an appEpoch remount (late cloud restore)
 // re-runs MainApp's mount effects, and both getInitialURL and
@@ -158,7 +192,7 @@ import { markPendingChanges, uploadToCloud, installCloudProviderIfConfigured, ma
 import * as Sentry from '@sentry/react-native';
 import { getSentryDsn } from './src/services/supabaseClient';
 import { estimateSlotIndex, findClosestValidSlot } from './src/services/slotEstimation';
-import { DROP_SHAKE_KEYFRAME_MS, DROP_SHAKE_INTENSITY, SPEED_ESCALATION_STEP_SEC, SPEED_ESCALATION_MIN_SEC, SPEED_TICK_CRITICAL_SEC, speedTickKind } from './src/constants/timing';
+import { DROP_SHAKE_KEYFRAME_MS, DROP_SHAKE_INTENSITY, SPEED_ESCALATION_STEP_SEC, SPEED_ESCALATION_MIN_SEC, SPEED_TICK_CRITICAL_SEC, SWIFT_HINT_TOAST_DELAY_MS, speedTickKind } from './src/constants/timing';
 import { OfferingPitScreen } from './src/components/OfferingPitScreen';
 import { ShopScreen } from './src/components/shop/ShopScreen';
 import { loadPuzzleState, clearPuzzleState } from './src/services/puzzleSaveState';
@@ -172,9 +206,15 @@ import {
   getVariantTimeLimit,
   getVariantTimeLimitForDifficulty,
   getVariantSelectorOptions,
+  getComboSelectorOptions,
+  getBlindUnlockHint,
   isVariantUnlocked,
+  isComboUnlocked,
+  ComboPreset,
   PuzzleVariant,
   VARIANT_CONFIGS,
+  CHALLENGE_TOGGLE_UNLOCK_PUZZLES,
+  BLIND_TOGGLE_UNLOCK_PUZZLES,
 } from './src/services/puzzleVariety';
 import { appStyles as styles, getScreenBackgroundColor } from './src/styles/appStyles';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -247,6 +287,14 @@ function MainApp() {
     // uiPhase intentionally matches currentPhase — we use the confirmed phase
     // for text tone stability rather than the pending transition target
     return getVariantSelectorOptions(
+      puzzlesSolvedForVariantUnlocks,
+      persistence.currentPhase,
+      persistence.currentPhase
+    );
+  }, [puzzlesSolvedForVariantUnlocks, persistence.currentPhase]);
+
+  const comboSelectorOptions = useMemo(() => {
+    return getComboSelectorOptions(
       puzzlesSolvedForVariantUnlocks,
       persistence.currentPhase,
       persistence.currentPhase
@@ -576,6 +624,7 @@ function MainApp() {
     doubleShiftPhase: puzzle.doubleShiftPhase,
     speedTimeRemaining: speedTimer.speedTimeRemaining,
     isSharedChallenge: puzzle.isSharedChallenge,
+    isFinalBoard: puzzle.isFinalBoard,
   });
 
   // ========================================================================
@@ -587,6 +636,40 @@ function MainApp() {
   useEffect(() => {
     setAudioPhase(persistence.currentPhase);
   }, [persistence.currentPhase]);
+
+  // Ambient music bed. Starts once persistence hydrates (the bed must open on
+  // the REAL phase, not a Phase-0 default — cumulativeStats flips from null
+  // exactly once, in the same batch that sets currentPhase), and re-crossfades
+  // when the phase advances — but only after any ceremony overlay completes
+  // (phaseTransitionEvent -> null), so the pit ignition / finale cinematics
+  // keep their own soundscape and the new bed lands as the world settles.
+  // startMusicForPhase is a no-op when the right bed is already playing, so
+  // re-runs (refreshStats, appEpoch remounts, a rebuildSessionFromStorage
+  // whose refresh changes currentPhase) are free.
+  //
+  // Backgrounding: audio.ts initializes expo-audio with
+  // shouldPlayInBackground: false, which auto-pauses playback when the app
+  // leaves the foreground — deliberately NO stopMusic() here (stopping would
+  // release the player and force a re-decode + fade-up from silence on every
+  // app switch). The foreground listener resumes the paused bed: a same-track
+  // startMusicForPhase calls play() when the player isn't playing.
+  const musicPhaseRef = useRef(persistence.currentPhase);
+  musicPhaseRef.current = persistence.currentPhase;
+  const musicHydratedRef = useRef(false);
+  useEffect(() => {
+    if (persistence.cumulativeStats === null) return;
+    musicHydratedRef.current = true;
+    if (phaseTransitionEvent !== null) return;
+    startMusicForPhase(persistence.currentPhase).catch(() => {});
+  }, [persistence.cumulativeStats, persistence.currentPhase, phaseTransitionEvent]);
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') return;
+      if (!musicHydratedRef.current) return;
+      startMusicForPhase(musicPhaseRef.current).catch(() => {});
+    });
+    return () => subscription.remove();
+  }, []);
 
   // Glitch stutter for the prominent first-victory glitch: a short on/off
   // flicker so a held 1.4s glitch reads as a genuine tear, not a caption.
@@ -1431,6 +1514,9 @@ function MainApp() {
 
     if (result?.completed) {
       isDragDropRef.current = false;
+      // THE marked final board's win: the fanfare is suppressed (the quiet IS
+      // the moment) and the finale cinematic fires from the endgame block below.
+      const wasFinalBoard = result.isFinalBoard === true;
       // Speed streak: a completed speed puzzle ratchets up the next clock, and
       // the peak streak is remembered as a best-round record (the in-run counter
       // evaporates on every reset). Surface a new record as an in-world beat.
@@ -1466,9 +1552,10 @@ function MainApp() {
           }
         }).catch(() => {});
       }
-      // Variant-offer nudge (revives the dead shouldOfferVariant path): once per
-      // local day, after a STANDARD board, gently suggest a variant the player has
-      // unlocked but never tried. Skipped during onboarding.
+      // Variant-offer nudge: once per local day, after a STANDARD board, gently
+      // suggest a variant the player has unlocked but never tried. Skipped
+      // during onboarding. (This replaced the old never-called shouldOfferVariant
+      // helper, since deleted from puzzleVariety.)
       if (
         (result.variant ?? 'standard') === 'standard' &&
         !isPlayingDaily &&
@@ -1487,9 +1574,12 @@ function MainApp() {
       // Clear mid-puzzle save on completion
       clearPuzzleState().catch(() => {});
 
-      // Lock interaction during async victory chain
+      // Lock interaction during async victory chain. Deliberately NO haptic
+      // here: the victory's success haptic belongs to the modal becoming
+      // visible (VictoryModal fires hapticSuccess on visible) — firing one at
+      // processing start too made every win buzz twice ~300ms apart, blurring
+      // the star rhythm (tap-tap-tap-THUD) that follows.
       victoryActions.setProcessingVictory(true);
-      hapticSuccess();
 
       const victory = await persistenceActions.recordVictory(
         // Daily Challenge always rewards as HARD regardless of the player's
@@ -1518,6 +1608,9 @@ function MainApp() {
       // count covers transient network failures so the line doesn't flicker
       // out between victories.
       setSocialProofLine(null);
+      // Event bonus is a DAILY-victory line; clear it here so a full-moon
+      // daily's +50% line can never linger onto later normal-board victories.
+      setEventBonusLine(null);
       setVictoryDoubleClaimed(false);
       (async () => {
         try {
@@ -1622,6 +1715,13 @@ function MainApp() {
             // chain survived so the protection feels real, not silent.
             addVictoryTimeout(() => {
               puzzleActions.setMessage('🛡️ A missed day, but your daily streak held.');
+            }, 1100);
+          } else if (dailyProgress.streakDecayedTo != null) {
+            // Decay-to-milestone: the lapse cost the climb, not the streak —
+            // name the checkpoint it held at (phase-aware copy).
+            const heldAt = dailyProgress.streakDecayedTo;
+            addVictoryTimeout(() => {
+              puzzleActions.setMessage(getStreakHeldMessage(heldAt, persistence.currentPhase));
             }, 1100);
           }
           // Full-moon event: +50% bonus on the daily's amber, credited as
@@ -1733,6 +1833,11 @@ function MainApp() {
           lines: getFoxStarterIntroLines(finalVictory.newPhase),
         });
       }
+      // The final board's victory is a ceremony, never a compact strip — the
+      // flag routes useVictoryFlow to the full (but hushed) treatment.
+      if (wasFinalBoard) {
+        finalVictory = { ...finalVictory, finalBoard: true };
+      }
       queuedPostVictoryIntrosRef.current = immediateIntros;
 
       // Check for ritual micro-event on high-energy puzzles
@@ -1773,8 +1878,9 @@ function MainApp() {
 
       // Scripted anticlimax: on the one silent-victory board the fanfare simply
       // does not play (the micro-beat renders the stark line instead). The most
-      // complicit moment in the descent is a quiet one.
-      if (!isSilentVictoryBeat(completedTotal)) {
+      // complicit moment in the descent is a quiet one. The FINAL board gets
+      // the same silence — no chime, no confetti — before the arrival plays.
+      if (!isSilentVictoryBeat(completedTotal) && !wasFinalBoard) {
         if (victory.earnedStars === 3) {
           soundPerfect();
         } else {
@@ -1783,7 +1889,12 @@ function MainApp() {
       }
 
       puzzleActions.setGameState(GameState.WON);
-      puzzleActions.setShowConfetti(true);
+      // Full sensory silence on BOTH quiet beats: the scripted silent victory
+      // (148) and the final board. Confetti raining over "No music this time.
+      // Only the quiet after." would undo the anticlimax the beat exists for.
+      puzzleActions.setShowConfetti(
+        !wasFinalBoard && !isSilentVictoryBeat(completedTotal)
+      );
       victoryActions.setProcessingVictory(false);
       puzzlesSinceHomeVisit.current += 1;
 
@@ -1809,21 +1920,25 @@ function MainApp() {
       // When phaseTransitionPending is true, the phase change will be confirmed
       // in the pit screen with a ward mark ceremony. Don't play the overlay here.
 
-      // Check for endgame triggers (final puzzle + post-revelation)
+      // Check for endgame triggers (dwell voice → finale arming → the marked
+      // final board's win → post-revelation).
+      //
+      // The finale is no longer declared retroactively on an ordinary win:
+      // once the dwell window fills, the finale is ARMED (finaleArmed) and the
+      // NEXT standard board start serves the marked FINAL BOARD
+      // (usePuzzleGame.startNewGame). Its victory — and only its victory —
+      // plays FINAL_PUZZLE_EVENT. The win after that triggers
+      // POST_REVELATION_EVENT + markPostRevelation, exactly as before.
+      let dwellLineForWin: string | null = null;
       if (!victory.phaseChanged && persistence.currentPhase >= 4) {
         try {
           const houseComplete = await isHouseCompleted();
           if (houseComplete) {
             const finalDone = await isFinalPuzzleCompleted();
             if (!finalDone) {
-              // Dwell gate: the finale used to fire on the FIRST Phase-4
-              // victory, so the whole cult-reveal era flashed past in one
-              // puzzle. Require FINALE_DWELL_PUZZLES Phase-4 puzzles first so
-              // the robed sprites, sacrifice mechanic, and 300 Phase-4
-              // dialogue lines are actually played. Never shown as a counter
-              // (narrative rule 7) — the house "is not yet ready."
-              const dwell = await recordPhase4Dwell();
-              if (dwell >= FINALE_DWELL_PUZZLES) {
+              if (wasFinalBoard) {
+                // The last arrangement is complete. markFinalPuzzleCompleted
+                // also disarms the finale (single atomic write).
                 await markFinalPuzzleCompleted();
                 orchestrationActions.setCompletionCoda({
                   title: 'THE HOUSE STANDS COMPLETE',
@@ -1832,7 +1947,28 @@ function MainApp() {
                     : 'You completed the house and reached the final path.',
                 });
                 addVictoryTimeout(() => setPhaseTransitionEvent(FINAL_PUZZLE_EVENT), 1500);
+              } else if (!(await isFinaleArmed())) {
+                // Dwell gate: the finale used to fire on the FIRST Phase-4
+                // victory, so the whole cult-reveal era flashed past in one
+                // puzzle. Require FINALE_DWELL_PUZZLES Phase-4 puzzles first
+                // so the robed sprites, sacrifice mechanic, and 300 Phase-4
+                // dialogue lines are actually played. Never shown as a
+                // counter (narrative rule 7) — the house "is not yet ready."
+                const dwell = await recordPhase4Dwell();
+                if (dwell >= FINALE_DWELL_PUZZLES) {
+                  await armFinale();
+                }
+                // Dwell voice: the wait after "The arrangement is ready."
+                // reads as held breath, not silence — one counter-free line
+                // per dwell win, surfaced through the ambient overlay in the
+                // victory cascade (skipped when a keyed micro-beat fires).
+                dwellLineForWin = getDwellLine(
+                  Math.min(dwell, FINALE_DWELL_PUZZLES),
+                  persistence.currentPhase
+                );
               }
+              // Armed but not the final board (a daily / restored board):
+              // hold still — the arrangement has already chosen its board.
             } else {
               const postRev = await isPostRevelation();
               if (!postRev) {
@@ -1873,6 +2009,7 @@ function MainApp() {
         isOnboarding: onboardingFlow.isOnboarding,
         puzzlesSinceHomeVisit: puzzlesSinceHomeVisit.current,
         firstFreeWin,
+        dwellLine: dwellLineForWin,
       });
 
       // Re-schedule notifications after puzzle completion
@@ -1923,7 +2060,9 @@ function MainApp() {
       } else {
         hapticMedium();
       }
-      soundValidMove();
+      // Audio combo ladder: the chime climbs with the clean-move streak
+      // (tier 0 base → 1/2/3; dark variants resolve inside audio.ts).
+      soundValidMove(result.comboTier ?? 0);
 
       setStarBurst({
         active: true,
@@ -2014,16 +2153,107 @@ function MainApp() {
       return;
     }
 
+    // Locked tiles in the active source row are tappable for FEEDBACK only
+    // (Row mounts a feedback touchable on them): full rejection language —
+    // error haptic + rejection thud, then the hook's locked branch raises the
+    // shake + locked-letter message. Never the select chime a real pick gets.
+    // Gated on PLAYING so a stray tap during victory/processing stays silent
+    // (matching the hook's own guard, which would swallow the press anyway).
+    if (letter.isLocked) {
+      if (puzzle.gameState === GameState.PLAYING) {
+        hapticError();
+        soundInvalidMove();
+        puzzleActions.handleLetterPress(letter, rowIndex);
+      }
+      return;
+    }
+
     hapticLight();
     soundLetterSelect();
     puzzleActions.handleLetterPress(letter, rowIndex);
   }, [puzzleActions, onboardingFlow.onboardingStep, puzzle.gameState, puzzle.selectedLetter, tutorialGuidance]);
 
+  // Track the active row + move direction (read inside the deferred drop
+  // handler and the per-move hover handler) and a registry of each row's
+  // measurable node for Y-bounds checking on drop/hover.
+  const activeRowIndexRef = useRef(puzzle.activeRowIndex);
+  const moveDirectionRef = useRef(puzzle.moveDirection);
+  const rowsRef = useRef(puzzle.rows);
+  activeRowIndexRef.current = puzzle.activeRowIndex;
+  moveDirectionRef.current = puzzle.moveDirection;
+  rowsRef.current = puzzle.rows;
+  const rowNodeRefs = useRef(new Map<number, any>());
+  const registerRowNode = useCallback((rowIndex: number, node: any) => {
+    if (node) rowNodeRefs.current.set(rowIndex, node);
+    else rowNodeRefs.current.delete(rowIndex);
+  }, []);
+
   // Disable puzzle ScrollView during drag to prevent scroll-vs-drag conflict.
-  // Toggled by DraggableTile via onDragActiveChange callback.
+  // Toggled by DraggableTile via onDragActiveChange callback. Drag start also
+  // measures the target row's window bounds ONCE (cheap, async) so the
+  // per-move hover handler can Y-gate with a plain sync compare; drag end
+  // clears both the cached bounds and any live hover highlight.
   const [puzzleScrollEnabled, setPuzzleScrollEnabled] = useState(true);
+  // Live drag-hover highlight: the slot the finger is currently over. Purely
+  // geometric (nearest slot by X, row-gated by Y) — NEVER validity-filtered,
+  // so it can't become a second snapping tell in the hidden-validity modes.
+  const [hoverSlot, setHoverSlot] = useState<{ rowIndex: number; slotIndex: number } | null>(null);
+  const hoverSlotRef = useRef<{ rowIndex: number; slotIndex: number } | null>(null);
+  const dragHoverBoundsRef = useRef<{ y: number; h: number } | null>(null);
+  const clearHoverSlot = useCallback(() => {
+    if (hoverSlotRef.current !== null) {
+      hoverSlotRef.current = null;
+      setHoverSlot(null);
+    }
+  }, []);
   const handleDragActiveChange = useCallback((active: boolean) => {
     setPuzzleScrollEnabled(!active);
+    dragHoverBoundsRef.current = null;
+    if (active) {
+      const targetIdx =
+        activeRowIndexRef.current + (moveDirectionRef.current === 'down' ? 1 : -1);
+      const node = rowNodeRefs.current.get(targetIdx);
+      if (node && typeof node.measureInWindow === 'function') {
+        node.measureInWindow((_x: number, y: number, _w: number, h: number) => {
+          dragHoverBoundsRef.current = { y, h: h || 64 };
+        });
+      }
+    } else {
+      clearHoverSlot();
+    }
+  }, [clearHoverSlot]);
+
+  // Per-move hover update from DraggableTile. Runs inside the PanResponder
+  // move path, so it must stay cheap: derive the slot, ref-compare against the
+  // last one, and only setState when the hovered slot actually changes.
+  const handleLetterDragMove = useCallback((position: { x: number; y: number }) => {
+    const targetIdx =
+      activeRowIndexRef.current + (moveDirectionRef.current === 'down' ? 1 : -1);
+    const targetRow = rowsRef.current?.[targetIdx];
+    let next: { rowIndex: number; slotIndex: number } | null = null;
+    if (targetRow) {
+      // Y-gate with the same generous tolerance the drop path uses (one
+      // row-height of slack each side), so hover predicts the drop outcome.
+      // Missing bounds (measure still in flight) fail open — hover shows.
+      const bounds = dragHoverBoundsRef.current;
+      const inBand =
+        !bounds ||
+        (position.y >= bounds.y - bounds.h && position.y <= bounds.y + bounds.h * 2);
+      if (inBand) {
+        const slotCount = targetRow.words.length + 1;
+        const slotIndex = estimateSlotIndex(position.x, slotCount, targetRow.words.length);
+        next = { rowIndex: targetIdx, slotIndex };
+      }
+    }
+    const prev = hoverSlotRef.current;
+    if (
+      (prev === null && next === null) ||
+      (prev !== null && next !== null && prev.rowIndex === next.rowIndex && prev.slotIndex === next.slotIndex)
+    ) {
+      return;
+    }
+    hoverSlotRef.current = next;
+    setHoverSlot(next);
   }, []);
 
   // Every fresh board must present from the FIRST word. All board-building
@@ -2040,6 +2270,30 @@ function MainApp() {
     }
   }, [boardIdentity]);
 
+  // One-time preview-graduation beat: the FIRST board that starts with the
+  // ✓/✗ validity grading hidden explains, in-world, that the marks stay
+  // behind on the gentlest boards (getPreviewGraduationMessage — warm, never
+  // a tutorial voice). Keyed on board identity so it evaluates once per fresh
+  // board. Skipped in Blind Offering (no previews at all — its own intro
+  // covers the darkness) and during onboarding (tutorial boards are EASY, so
+  // this can't fire there anyway; the guard is belt-and-braces). Device-local
+  // one-time flag; the session ref keeps it to a single storage read.
+  const graduationCheckedRef = useRef(false);
+  useEffect(() => {
+    if (boardIdentity === null) return;
+    if (puzzle.gameState !== GameState.PLAYING) return;
+    if (puzzle.previewValidityVisible || puzzle.blindMode) return;
+    if (onboardingFlow.isOnboarding) return;
+    if (graduationCheckedRef.current) return;
+    graduationCheckedRef.current = true;
+    (async () => {
+      if (await hasSeenOneTimeFlag(PREVIEW_GRADUATION_SEEN_KEY)) return;
+      await markOneTimeFlagSeen(PREVIEW_GRADUATION_SEEN_KEY);
+      puzzleActions.setMessage(getPreviewGraduationMessage(persistence.currentPhase));
+    })().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fires per fresh board; actions/phase read at fire time
+  }, [boardIdentity, puzzle.gameState, puzzle.previewValidityVisible, puzzle.blindMode, onboardingFlow.isOnboarding]);
+
   // Drag-and-drop: when a letter is dragged onto the target row area, find the
   // closest valid slot and press it. The letter was already selected via onDragStart.
   // Uses refs + setTimeout to ensure React has processed the letter selection state
@@ -2048,20 +2302,13 @@ function MainApp() {
   const handleSlotPressRef = useRef(handleSlotPress);
   slotPreviewsRef.current = puzzle.slotPreviews;
   handleSlotPressRef.current = handleSlotPress;
+  // The verb-depth gate, mirrored for the deferred drop handler: near-miss
+  // snapping keys off preview VALIDITY, so it may only run while the ✓/✗
+  // grading is actually shown — otherwise the snap itself leaks validity on
+  // boards where the player is meant to judge the word.
+  const previewValidityVisibleRef = useRef(puzzle.previewValidityVisible);
+  previewValidityVisibleRef.current = puzzle.previewValidityVisible;
 
-  // Track the active row + move direction (read inside the deferred drop handler)
-  // and a registry of each row's measurable node for Y-bounds checking on drop.
-  const activeRowIndexRef = useRef(puzzle.activeRowIndex);
-  const moveDirectionRef = useRef(puzzle.moveDirection);
-  const rowsRef = useRef(puzzle.rows);
-  activeRowIndexRef.current = puzzle.activeRowIndex;
-  moveDirectionRef.current = puzzle.moveDirection;
-  rowsRef.current = puzzle.rows;
-  const rowNodeRefs = useRef(new Map<number, any>());
-  const registerRowNode = useCallback((rowIndex: number, node: any) => {
-    if (node) rowNodeRefs.current.set(rowIndex, node);
-    else rowNodeRefs.current.delete(rowIndex);
-  }, []);
   // Read inside the deferred drop handler (which has empty deps) so a rejected
   // drop can give phase-aware feedback without going stale.
   const currentPhaseRef = useRef(persistence.currentPhase);
@@ -2115,10 +2362,14 @@ function MainApp() {
       // a distant valid slot — an invalid drop that isn't a clear near-miss
       // still falls through to handleSlotPress's invalid feedback.
       let targetSlot = estimated;
-      // Near-miss snapping only when previews exist — in blind/challenge the
-      // absence of a snapping tell is part of the mode, and handleSlotPress
-      // gives real validation feedback on the raw estimated slot.
-      if (previews && !previews[estimated]?.isValid) {
+      // Near-miss snapping ONLY while the ✓/✗ validity grading is shown
+      // (previewValidityVisible: EASY / double-shift): the snap keys off
+      // validity, so on hidden-validity boards (MEDIUM+ standard/reverse/
+      // speed, daily, shared links) and in blind mode it would leak the very
+      // information the player is meant to judge. Everywhere else the drop
+      // commits to the nearest slot geometrically and handleSlotPress gives
+      // real validation feedback.
+      if (previews && previewValidityVisibleRef.current && !previews[estimated]?.isValid) {
         const closestValid = findClosestValidSlot(
           estimated,
           previews,
@@ -2194,8 +2445,10 @@ function MainApp() {
     puzzleActions.handleHint();
   }, [puzzleActions]);
 
-  // Out-of-hints recovery: a completed `hint_recovery` clip grants one hint;
-  // otherwise (no provider / cap / dismissed) we gently route to the store.
+  // Out-of-hints recovery: a completed `hint_recovery` clip grants one hint.
+  // Declining/closing the clip (or an ad failure) is a quiet toast, never a
+  // forced Store — the explicit store path stays available via the
+  // out-of-hints alert's own "Get hints" button (handleOutOfHints).
   const handleClaimRewardedHint = useCallback(async () => {
     try {
       const res = await showRewarded('hint_recovery');
@@ -2207,10 +2460,10 @@ function MainApp() {
       } else if (res.reason === 'daily_cap') {
         puzzleActions.setMessage('Daily clip limit reached. Try the store.');
       } else {
-        setShowStoreModal(true);
+        puzzleActions.setMessage('No hint this time. Hint packs live in the store.');
       }
     } catch {
-      setShowStoreModal(true);
+      puzzleActions.setMessage('No hint this time. Hint packs live in the store.');
     }
   }, [puzzleActions]);
 
@@ -2246,25 +2499,28 @@ function MainApp() {
   // One-time contextual notification prompt — shown after dismissing the
   // victory modal once the player has finished 3+ puzzles. The OS permission
   // dialog is only triggered if the player accepts the in-app prompt.
+  // Returns whether the prompt was actually presented so the victory-exit
+  // nudge chain can honor its one-nudge-per-exit contract.
   const notificationPromptInFlightRef = useRef(false);
-  const maybePromptForNotifications = useCallback(async () => {
-    if (notificationPromptInFlightRef.current) return;
+  const maybePromptForNotifications = useCallback(async (): Promise<boolean> => {
+    if (notificationPromptInFlightRef.current) return false;
     notificationPromptInFlightRef.current = true;
     try {
-      if (onboardingFlow.isOnboarding) return;
-      if ((persistence.cumulativeStats?.totalPuzzlesCompleted ?? 0) < 3) return;
+      if (onboardingFlow.isOnboarding) return false;
+      if ((persistence.cumulativeStats?.totalPuzzlesCompleted ?? 0) < 3) return false;
       // Declutter: never stack the permission prompt on a victory that already
       // has a Fox intro playing/queued. Return WITHOUT marking prompted so it
       // simply waits for a quiet victory exit.
-      if (postVictoryIntro || queuedPostVictoryIntrosRef.current.length > 0) return;
-      if (await hasPromptedForNotifications()) return;
-      if ((await getNotificationPermissionStatus()) === 'granted') return;
+      if (postVictoryIntro || queuedPostVictoryIntrosRef.current.length > 0) return false;
+      if (await hasPromptedForNotifications()) return false;
+      if ((await getNotificationPermissionStatus()) === 'granted') return false;
       await markPromptedForNotifications();
 
       const { title, body, accept, decline } = getNotificationPromptText(persistence.currentPhase);
       // Present the styled in-game modal instead of a bare OS Alert. The
       // accept/decline handlers (below) own the permission request + telemetry.
       setNotificationPrompt({ title, body, accept, decline });
+      return true;
     } finally {
       notificationPromptInFlightRef.current = false;
     }
@@ -2318,22 +2574,36 @@ function MainApp() {
       exempt,
     }).then(async (shown) => {
       if (!shown) return false;
-      // After the player has actually seen a few interstitials, offer the
-      // contextual one-time Remove-Ads upsell ("tired of these?").
+      // After the player has actually seen a few interstitials, ARM the
+      // contextual one-time Remove-Ads upsell ("tired of these?") — it is
+      // presented on the NEXT qualifying exit (maybeShowRemoveAdsOffer in the
+      // nudge chain), never stacked on the interstitial that just played.
       await recordInterstitialSeen();
-      if (await consumeRemoveAdsNudge()) {
-        showGameAlert(
-          'Tired of ads?',
-          'You can remove interstitials for good, or become a Patron for a quieter table and a little amber every puzzle.',
-          [
-            { text: 'Maybe later', style: 'cancel' },
-            { text: 'See options', onPress: () => setShowPatronModal(true) },
-          ],
-        );
-      }
+      await armRemoveAdsNudgeIfEligible();
       return true;
     }).catch(() => false);
   }, [victoryFlow.victoryData, onboardingFlow.onboardingStep, isPlayingDaily, phaseTransitionEvent, persistence.pendingPhaseTransition]);
+
+  // Deferred one-time Remove-Ads offer: armed by maybeShowVictoryInterstitial
+  // right after an interstitial actually played, presented here on the next
+  // ad-free victory exit so the upsell never doubles the most annoying moment.
+  const maybeShowRemoveAdsOffer = useCallback(async (): Promise<boolean> => {
+    if (onboardingFlow.isOnboarding) return false;
+    // Same anti-stacking guard as the share/notification prompts: never layer
+    // on a Fox intro. Return WITHOUT consuming — the armed offer just waits
+    // for a quieter exit.
+    if (postVictoryIntro || queuedPostVictoryIntrosRef.current.length > 0) return false;
+    if (!(await consumePendingRemoveAdsNudge())) return false;
+    showGameAlert(
+      'Tired of ads?',
+      'You can remove interstitials for good, or become a Patron for a quieter table and a little amber every puzzle.',
+      [
+        { text: 'Maybe later', style: 'cancel' },
+        { text: 'See options', onPress: () => setShowPatronModal(true) },
+      ],
+    );
+    return true;
+  }, [onboardingFlow.isOnboarding, postVictoryIntro]);
 
   // One-time, low-pressure Patron nudge once the player has settled in. Suppressed
   // for Patrons and during onboarding (gating lives in monetizationPrompts.ts).
@@ -2396,30 +2666,72 @@ function MainApp() {
     return fired;
   }, [victoryFlow.victoryData, onboardingFlow.isOnboarding, persistence.pendingPhaseTransition, persistence.currentPhase, postVictoryIntro]);
 
-  // At most ONE of the victory-exit nudges (share / patron / notification
-  // permission) fires per exit — the share peak takes precedence when eligible.
+  // At most ONE of the victory-exit nudges (share / notification permission /
+  // deferred remove-ads / patron) fires per exit — the share peak takes
+  // precedence when eligible, and every step short-circuits the rest.
   // Skipped entirely when an interstitial just showed this exit, so a nudge
   // never piles on top of an ad.
-  const runVictoryExitNudges = useCallback(async (interstitialShown: boolean) => {
-    if (interstitialShown) return;
+  const runVictoryExitNudges = useCallback(async (
+    interstitialShown: boolean,
+    introWillPresent: boolean = false
+  ) => {
+    // A queued Fox intro presents the moment the exit flow runs — it would
+    // stack under any nudge AND burn the nudge's one-time flag on a cluttered
+    // exit. The queue is shift()ed synchronously inside startVictoryExitFlow,
+    // so callers capture this BEFORE the exit flow and pass it in (checking
+    // the ref here would always see an empty queue).
+    if (interstitialShown || introWillPresent) return;
     if (await maybeShowSharePrompt()) return;
-    await maybePromptForNotifications();
+    if (await maybePromptForNotifications()) return;
+    if (await maybeShowRemoveAdsOffer()) return;
     await maybeShowPatronNudge();
-  }, [maybeShowSharePrompt, maybePromptForNotifications, maybeShowPatronNudge]);
+  }, [maybeShowSharePrompt, maybePromptForNotifications, maybeShowRemoveAdsOffer, maybeShowPatronNudge]);
+
+  // One-time Swift Victories pointer: after the FIRST routine win past
+  // SWIFT_HINT_MIN_PUZZLES, a quiet toast points at the Settings toggle that
+  // keeps celebrations short. Routine wins only (isRoutineVictory — never the
+  // daily, milestones, quest turn-ins, or ceremonies), only while the setting
+  // is off, never during onboarding. Fired from the Next Level exit
+  // specifically — the toast surfaces on the puzzle screen, so it must land
+  // where the player is about to be. The delay lets the next board's start
+  // message settle first; the flag is consumed only when the toast will show.
+  const maybeShowSwiftVictoryHint = useCallback(() => {
+    const vd = victoryFlow.victoryData;
+    if (!vd) return;
+    if (onboardingFlow.isOnboarding) return;
+    if (getSettingsSync().swiftVictories === true) return;
+    if (!isRoutineVictory(vd)) return;
+    if ((vd.puzzlesSolved ?? 0) <= SWIFT_HINT_MIN_PUZZLES) return;
+    const phase = persistence.currentPhase;
+    (async () => {
+      if (await hasSeenOneTimeFlag(SWIFT_HINT_SEEN_KEY)) return;
+      await markOneTimeFlagSeen(SWIFT_HINT_SEEN_KEY);
+      setTimeout(() => {
+        puzzleActions.setMessage(getSwiftVictoryHintMessage(phase));
+      }, SWIFT_HINT_TOAST_DELAY_MS);
+    })().catch(() => {});
+  }, [victoryFlow.victoryData, onboardingFlow.isOnboarding, persistence.currentPhase, puzzleActions]);
 
   const handleNextLevel = useCallback(() => {
     hapticLight();
     setIsPlayingDaily(false);
     setSpeedRescueUsed(false);
+    // Reads victoryData — must run before the exit flow resets it.
+    maybeShowSwiftVictoryHint();
     // Snapshot the share payload BEFORE the exit flow resets victoryData.
     pendingShareSnapshotRef.current = buildShareDataRef.current();
     const adShown = maybeShowVictoryInterstitial();
+    // Capture BEFORE startVictoryExitFlow shift()s the intro queue.
+    const introWillPresent =
+      queuedPostVictoryIntrosRef.current.length > 0 || postVictoryIntro !== null;
     startVictoryExitFlow(() => {
       clearPuzzleState().catch(() => {});
       puzzleActions.handleNextLevel();
     });
-    Promise.resolve(adShown).then((shown) => runVictoryExitNudges(shown === true)).catch(() => {});
-  }, [puzzleActions, startVictoryExitFlow, runVictoryExitNudges, maybeShowVictoryInterstitial]);
+    Promise.resolve(adShown)
+      .then((shown) => runVictoryExitNudges(shown === true, introWillPresent))
+      .catch(() => {});
+  }, [puzzleActions, startVictoryExitFlow, runVictoryExitNudges, maybeShowVictoryInterstitial, maybeShowSwiftVictoryHint, postVictoryIntro]);
 
   // During onboarding, "Continue" on the victory modal dismisses the modal and
   // surfaces the puzzle-screen completion beat ("Feel how the house settled...").
@@ -2440,27 +2752,32 @@ function MainApp() {
     // Snapshot the share payload BEFORE the exit flow resets victoryData.
     pendingShareSnapshotRef.current = buildShareDataRef.current();
     const adShown = maybeShowVictoryInterstitial();
+    // Capture BEFORE startVictoryExitFlow shift()s the intro queue.
+    const introWillPresent =
+      queuedPostVictoryIntrosRef.current.length > 0 || postVictoryIntro !== null;
     startVictoryExitFlow(() => {
       puzzlesSinceHomeVisit.current = 0;
       puzzleActions.clearBoard();
       transitionTo('home');
     });
-    Promise.resolve(adShown).then((shown) => runVictoryExitNudges(shown === true)).catch(() => {});
-  }, [puzzleActions, transitionTo, startVictoryExitFlow, runVictoryExitNudges, maybeShowVictoryInterstitial]);
+    Promise.resolve(adShown)
+      .then((shown) => runVictoryExitNudges(shown === true, introWillPresent))
+      .catch(() => {});
+  }, [puzzleActions, transitionTo, startVictoryExitFlow, runVictoryExitNudges, maybeShowVictoryInterstitial, postVictoryIntro]);
 
-  // The pit route is a victory exit too — same interstitial gate as
-  // next/home. Its exemptions already cover the sensitive pit moments
-  // (pending ward ceremony, onboarding, daily, queued cinematics, Phase 5),
-  // so an ad can never precede an ignition ceremony.
+  // The pit route (Collect Now) is deliberately EXEMPT from interstitials:
+  // the player is on their way to collect amber they already earned, and an
+  // ad tax on your own earnings poisons the harvest loop. The next-level and
+  // home exits keep the normal cadence, so ad inventory shifts rather than
+  // disappears.
   const handleGoToPit = useCallback(() => {
     hapticLight();
-    maybeShowVictoryInterstitial();
     startVictoryExitFlow(() => {
       puzzlesSinceHomeVisit.current = 0;
       puzzleActions.clearBoard();
       transitionTo('pit');
     });
-  }, [puzzleActions, transitionTo, startVictoryExitFlow, maybeShowVictoryInterstitial]);
+  }, [puzzleActions, transitionTo, startVictoryExitFlow]);
 
   // Android hardware back button: sub-screens navigate home; home exits the app.
   // Swallowed during onboarding so back can't break the guided flow.
@@ -2631,6 +2948,11 @@ function MainApp() {
   // Level; selecting it engages the challenge limits, deselecting returns to
   // standard. Composes with any variant/difficulty.
   const handleToggleBlindMode = useCallback(() => {
+    // Gate: Blind Offering is the apex rung and unlocks late. Turning it OFF
+    // is always allowed (a restored legacy board may carry it in while locked).
+    if (!puzzle.blindMode && puzzlesSolvedForVariantUnlocks < BLIND_TOGGLE_UNLOCK_PUZZLES) {
+      return;
+    }
     hapticMedium();
     orchestrationActions.setCompletionCoda(null);
     resetSpeedRun();
@@ -2639,7 +2961,34 @@ function MainApp() {
     } else {
       puzzleActions.startNewGame(puzzle.difficulty, 'challenge', puzzle.selectedVariant, true);
     }
-  }, [puzzleActions, puzzle.difficulty, puzzle.selectedVariant, puzzle.blindMode, orchestrationActions, resetSpeedRun]);
+  }, [puzzleActions, puzzle.difficulty, puzzle.selectedVariant, puzzle.blindMode, puzzlesSolvedForVariantUnlocks, orchestrationActions, resetSpeedRun]);
+
+  // Combination styles: one tap arms a variant plus its trial rung atomically
+  // on a fresh board (never two sequential startNewGame calls, which would
+  // race the toggle logic against stale mode state).
+  const handleSelectCombo = useCallback((combo: ComboPreset) => {
+    if (!isComboUnlocked(combo, puzzlesSolvedForVariantUnlocks, persistence.currentPhase)) {
+      return;
+    }
+    hapticSelection();
+    soundTap();
+    orchestrationActions.setCompletionCoda(null);
+    resetSpeedRun();
+    puzzleActions.setSelectedVariant(combo.variant);
+    puzzleActions.startNewGame(
+      puzzle.difficulty,
+      combo.challenge || combo.blind ? 'challenge' : 'standard',
+      combo.variant,
+      combo.blind
+    );
+  }, [
+    puzzleActions,
+    puzzle.difficulty,
+    puzzlesSolvedForVariantUnlocks,
+    persistence.currentPhase,
+    orchestrationActions,
+    resetSpeedRun,
+  ]);
 
   // Present the daily-login grant only on a quiet home screen — never over the
   // puzzle, the victory flow, a post-victory intro, or a queued ceremony. The
@@ -2974,7 +3323,9 @@ function MainApp() {
                     accessibilityRole="button"
                     accessibilityLabel={`Refill one undo for ${AMBER_UNDO_REFILL_COST} amber`}
                   >
-                    <Text style={styles.buyUndoText}>↩ +1 · {AMBER_UNDO_REFILL_COST}💎</Text>
+                    <Text style={styles.buyUndoText}>
+                      {'\u21a9'} +1 {'\u00b7'} {AMBER_UNDO_REFILL_COST} <AmberInline size={11} />
+                    </Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -3047,13 +3398,19 @@ function MainApp() {
             currentVariant={puzzle.selectedVariant}
             activeVariant={puzzle.currentVariant}
             variantOptions={variantSelectorOptions}
+            comboOptions={comboSelectorOptions}
             onSelectDifficulty={handleSelectDifficulty}
             onToggleChallengeMode={handleToggleChallengeMode}
             onSelectVariant={handleSelectVariant}
-            showChallengeToggle={puzzlesSolvedForVariantUnlocks >= 15}
+            onSelectCombo={handleSelectCombo}
+            showChallengeToggle={puzzlesSolvedForVariantUnlocks >= CHALLENGE_TOGGLE_UNLOCK_PUZZLES}
             blindActive={puzzle.blindMode}
             onToggleBlindMode={handleToggleBlindMode}
-            showBlindToggle={puzzlesSolvedForVariantUnlocks >= 15}
+            // The blind row appears with the trial-ladder section (challenge
+            // gate) but stays a teased locked row until its own late gate.
+            showBlindToggle={puzzlesSolvedForVariantUnlocks >= CHALLENGE_TOGGLE_UNLOCK_PUZZLES}
+            blindLocked={puzzlesSolvedForVariantUnlocks < BLIND_TOGGLE_UNLOCK_PUZZLES}
+            blindUnlockHint={getBlindUnlockHint(puzzlesSolvedForVariantUnlocks, persistence.currentPhase)}
             introMode={showSetupSelectorIntro}
             introHintText={showSetupSelectorIntro ? setupSelectorLines[1] : undefined}
           />
@@ -3214,12 +3571,17 @@ function MainApp() {
                 invalidDropSignal={invalidDropSignal}
                 successDropSignal={successDropSignal}
                 onLetterDragDrop={handleLetterDragDrop}
+                onLetterDragMove={handleLetterDragMove}
                 onDragActiveChange={handleDragActiveChange}
                 onMeasureRef={registerRowNode}
                 slotPreviews={
                   idx === puzzle.activeRowIndex + (puzzle.moveDirection === 'down' ? 1 : -1)
                     ? puzzle.slotPreviews
                     : undefined
+                }
+                previewValidityVisible={puzzle.previewValidityVisible}
+                hoverSlotIndex={
+                  hoverSlot && idx === hoverSlot.rowIndex ? hoverSlot.slotIndex : null
                 }
               />
             ))}

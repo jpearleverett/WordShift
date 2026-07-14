@@ -373,6 +373,13 @@ describe('isRoutineVictory (pure policy)', () => {
     expect(isRoutineVictory(routineVictory({ mandatoryHarvest: true }))).toBe(false);
   });
 
+  test('the marked final board always gets the full (hushed) ceremony', () => {
+    // The finale must never compact into the swift result strip — App
+    // suppresses the fanfare, but the modal + FINAL_PUZZLE_EVENT need the
+    // full treatment.
+    expect(isRoutineVictory(routineVictory({ finalBoard: true }))).toBe(false);
+  });
+
   test('a pending or new phase transition always gets the full ceremony', () => {
     expect(isRoutineVictory(routineVictory({ phaseTransitionPending: true }))).toBe(false);
     expect(isRoutineVictory(routineVictory({ phaseChanged: true }))).toBe(false);

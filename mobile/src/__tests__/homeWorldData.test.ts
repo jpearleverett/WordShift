@@ -22,7 +22,12 @@ import {
   getReservedSkipCost,
 } from '../services/homeWorldData';
 import { clearProgress, loadProgress, devAddAmber, getReservedUnlockId } from '../services/amberCurrency';
-import { PHASE_THRESHOLDS, UNLOCK_SKIP_PREMIUM } from '../constants/gameBalance';
+import {
+  PHASE_THRESHOLDS,
+  MIN_PUZZLES_FOR_PHASE,
+  FINALE_DWELL_PUZZLES,
+  UNLOCK_SKIP_PREMIUM,
+} from '../constants/gameBalance';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Reset state between tests
@@ -124,21 +129,35 @@ describe('UNLOCK_PROGRESSION', () => {
     }
   });
 
-  // DELIBERATE change with the high-rooms expansion: the house now keeps
-  // growing THROUGH Growing Shadows (the original ten rooms still top out
-  // just before Phase 3; the three high rooms gate at 150/170/190). The last
-  // gate must sit at or past the Phase 3 threshold so the descent's third act
-  // still has house investment, but stay clear of the finale territory at the
-  // Phase 4 threshold — the climax must not compete with a construction gate.
-  test('the final house unlock lands inside Growing Shadows, before finale territory', () => {
+  // DELIBERATE geography (2026-07 pacing): the house keeps growing THROUGH
+  // Growing Shadows and past the reveal (the original ten rooms top out at the
+  // Bamboo Attic gate 112; the three high rooms gate at 126/140/152). The last
+  // gate must sit at or past the Phase 3 weighted threshold so the descent's
+  // third act still has house investment, but stay clear of the Phase 4
+  // weighted threshold — house completion (~153) must land just BEFORE the
+  // finale (~162), never compete with it.
+  test('the final house unlock lands in the descent, before finale territory', () => {
     const gates = UNLOCK_PROGRESSION
       .map(u => u.minPuzzles)
       .filter((n): n is number => typeof n === 'number');
     const lastGate = gates[gates.length - 1];
-    const phase3Threshold = PHASE_THRESHOLDS[3]; // 150 weighted ≈ puzzle 135 floor
-    const phase4Threshold = PHASE_THRESHOLDS[4]; // 235 — finale territory
+    const phase3Threshold = PHASE_THRESHOLDS[3]; // 120 weighted (Phase 3 floor is 90 real puzzles)
+    const phase4Threshold = PHASE_THRESHOLDS[4]; // 180 weighted — finale territory
     expect(lastGate).toBeGreaterThanOrEqual(phase3Threshold);
     expect(lastGate).toBeLessThan(phase4Threshold);
+  });
+
+  // The reveal floor (130) must land before the house completes (sky-garden
+  // gate + the final animal), so the Phase-4 dwell + finale play out inside a
+  // finished temple — and the dwell window (8) must fit between completion and
+  // any player racing the finale.
+  test('house completion sits after the reveal floor, before the Phase 5 floor', () => {
+    const gates = UNLOCK_PROGRESSION
+      .map(u => u.minPuzzles)
+      .filter((n): n is number => typeof n === 'number');
+    const lastGate = gates[gates.length - 1];
+    expect(lastGate).toBeGreaterThan(MIN_PUZZLES_FOR_PHASE[4]); // reveal first
+    expect(lastGate + 1 + FINALE_DWELL_PUZZLES).toBeLessThan(MIN_PUZZLES_FOR_PHASE[5]); // finale before the Phase 5 floor binds
   });
 });
 
@@ -245,6 +264,59 @@ describe('late-unlock dialogue fast-forward', () => {
     const idx = getPhaseStartIndex('pangolin', 2);
     const all = getDialoguesForAnimal('pangolin', 4);
     expect(all[idx].phase).toBe(2);
+  });
+
+  // Behavioral coverage through purchaseUnlock (the fast-forward's caller).
+  // Buys every unlock in order up to and including the target, so room
+  // prerequisites are always satisfied.
+  async function unlockThrough(targetUnlockId: string) {
+    await devAddAmber(100000);
+    for (const u of UNLOCK_PROGRESSION) {
+      const res = await purchaseUnlock(u.id);
+      expect(res.success).toBe(true);
+      if (u.id === targetUnlockId) break;
+    }
+  }
+
+  test('no fast-forward below global Phase 2', async () => {
+    const p = await loadProgress();
+    p.puzzlesSolved = 40; // clears the jungle gate (28)
+    p.currentPhase = 1;
+    await unlockThrough('unlock_sloth');
+    const after = await loadProgress();
+    expect(after.lastDialogueRead['sloth'] ?? 0).toBe(0);
+  });
+
+  // The bright-replay seam: sloth is lagging (-1), so at global Phase 2 its
+  // animalPhase is 1 and "one phase behind" used to compute phase 0 — a dark
+  // catch-up intro followed by bright small talk under a dusk sky. The
+  // fast-forward now floors at phase 1 whenever it applies at all.
+  test('lagging animal unlocked at global Phase 2 starts at phase 1, never phase 0', async () => {
+    const p = await loadProgress();
+    p.puzzlesSolved = 40;
+    p.currentPhase = 2;
+    await unlockThrough('unlock_sloth');
+    const start = getPhaseStartIndex('sloth', 1);
+    expect(start).toBeGreaterThan(0); // floor is meaningful: phase 1, not 0
+    const after = await loadProgress();
+    expect(after.lastDialogueRead['sloth']).toBe(start);
+  });
+
+  test('vanguard behavior unchanged: owl at global Phase 2 starts at phase 2 (animalPhase 3 minus one)', async () => {
+    const p = await loadProgress();
+    p.currentPhase = 2;
+    await unlockThrough('unlock_owl');
+    const after = await loadProgress();
+    expect(after.lastDialogueRead['owl']).toBe(getPhaseStartIndex('owl', 2));
+  });
+
+  test('never rewinds an existing read position', async () => {
+    const p = await loadProgress();
+    p.puzzlesSolved = 40;
+    p.currentPhase = 2;
+    p.lastDialogueRead = { ...(p.lastDialogueRead ?? {}), sloth: 9999 };
+    await unlockThrough('unlock_sloth');
+    expect((await loadProgress()).lastDialogueRead['sloth']).toBe(9999);
   });
 });
 

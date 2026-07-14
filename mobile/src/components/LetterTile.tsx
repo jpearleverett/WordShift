@@ -15,6 +15,15 @@ import { PIXEL_FONT_BOLD } from '../theme/fonts';
 interface LetterTileProps {
   letter: Letter;
   onPress?: () => void;
+  /**
+   * Feedback-only press for tiles that are NOT interactable (locked tiles in
+   * the active source row, letter tiles in the target row during targeting).
+   * Mounts the touchable so the tap is acknowledged — the handler gives
+   * feedback (shake / message / haptic / slot pulse) but never commits a move.
+   * Ignored when the tile is genuinely clickable (isInteractable/isSelected
+   * with onPress).
+   */
+  onLockedPress?: () => void;
   isSelected?: boolean;
   isInteractable?: boolean;
   highlight?: 'default' | 'source' | 'locked';
@@ -44,6 +53,7 @@ const COMPACT_FONT = 21;
 const LetterTileComponent: React.FC<LetterTileProps> = ({
   letter,
   onPress,
+  onLockedPress,
   isSelected,
   isInteractable,
   highlight = 'default',
@@ -673,6 +683,12 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
 
   const tileStyles = getStyles();
   const isClickable = (isInteractable || isSelected) && onPress;
+  // Feedback-only touchable: a non-interactable tile with an onLockedPress
+  // still mounts a touchable so its tap is ACKNOWLEDGED (locked-tile shake /
+  // inter-slot pulse) instead of being swallowed silently. Without this, the
+  // hook's locked-letter feedback path was literally unreachable — the tile
+  // rendered bare content with no touch target.
+  const isFeedbackPressable = !isClickable && !!onLockedPress;
   const trailColor = phase >= 4 ? '#C03050' : phase >= 3 ? '#9050B0' : '#FFD700';
 
   // Animated glow intensity
@@ -713,10 +729,10 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
 
   const content = (
     <Animated.View
-      // Non-clickable tiles carry their own accessibility info; clickable tiles
-      // are labeled by the wrapping TouchableOpacity below.
-      accessible={!isClickable}
-      accessibilityLabel={!isClickable ? `Letter ${letter.char}${letter.isLocked ? ', locked' : ''}` : undefined}
+      // Non-pressable tiles carry their own accessibility info; clickable and
+      // feedback-pressable tiles are labeled by the wrapping TouchableOpacity.
+      accessible={!isClickable && !isFeedbackPressable}
+      accessibilityLabel={!isClickable && !isFeedbackPressable ? `Letter ${letter.char}${letter.isLocked ? ', locked' : ''}` : undefined}
       style={[
         styles.tileOuter,
         compact && { width: COMPACT_TILE_W, height: COMPACT_OUTER_H, marginHorizontal: COMPACT_TILE_MARGIN_H },
@@ -881,10 +897,10 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
     </Animated.View>
   );
 
-  if (isClickable) {
+  if (isClickable || isFeedbackPressable) {
     return (
       <TouchableOpacity
-        onPress={onPress}
+        onPress={isClickable ? onPress : onLockedPress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         activeOpacity={1}

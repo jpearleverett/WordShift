@@ -146,8 +146,21 @@ describe('invite chip source pins', () => {
 
   test('chip centers via absolute-fill wrapper, not hand-tuned translate offsets', () => {
     // The old lockedAnimalContainer used translateX: -40 / translateY: -35,
-    // which mis-centered the 104px-wide chip by ~12px.
-    expect(source).not.toMatch(/translateX|translateY/);
+    // which mis-centered the 104px-wide chip by ~12px. Scoped to the invite
+    // chip render + styles (the room embellishment dust motes legitimately
+    // animate a native-driven translateY elsewhere in this file).
+    const inviteRender = source.slice(
+      source.indexOf('Empty room waiting for animal'),
+      source.indexOf('Word Echo Overlay'),
+    );
+    const inviteStyles = source.slice(
+      source.indexOf('inviteCenterWrap: {'),
+      source.indexOf('inviteSubtextAffordable: {'),
+    );
+    expect(inviteRender.length).toBeGreaterThan(0);
+    expect(inviteStyles.length).toBeGreaterThan(0);
+    expect(inviteRender).not.toMatch(/translateX|translateY/);
+    expect(inviteStyles).not.toMatch(/translateX|translateY/);
     expect(source).toContain('inviteCenterWrap');
   });
 

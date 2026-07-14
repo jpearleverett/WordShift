@@ -123,6 +123,9 @@ export interface QuestTemplate {
 
 // Daily quest pool — achievable in a dedicated single session.
 // Exported for the economy guard test (sink quests must stay net-negative).
+// Composition rule (pinned in weeklyQuests.test.ts): at least HALF of this
+// pool must be completable within a casual 2-puzzle day (isCasualDailyQuest),
+// and generation additionally enforces MIN_CASUAL_DAILY_QUESTS per drawn set.
 export const DAILY_QUEST_POOL: QuestTemplate[] = [
   // NOTE: single-action dailies (target 1, or trivially met by one puzzle) are
   // tuned LOW on purpose — on a first HARD no-hints solve, several of these
@@ -155,12 +158,62 @@ export const DAILY_QUEST_POOL: QuestTemplate[] = [
   { type: 'tend_amber', titleTemplate: 'Daily Tending', descTemplate: 'Deepen the pattern by {target} amber', darkDescTemplate: 'Tend the pattern with {target} amber today', target: 100, rewardAmber: 25 },
 ];
 
+// ============================================================================
+// Casual-day floor (daily tier)
+// ============================================================================
+
+/**
+ * The casual player's daily solve budget: 2 puzzles. Daily quest sets are
+ * guaranteed to contain at least MIN_CASUAL_DAILY_QUESTS quests completable
+ * within this budget, so a 2-puzzle day always has something to finish.
+ */
+export const CASUAL_DAILY_SOLVE_BUDGET = 2;
+
+/**
+ * Minimum number of quests in every generated 5-quest DAILY set that must be
+ * completable within CASUAL_DAILY_SOLVE_BUDGET solves. Without this floor the
+ * seeded shuffle could fill all 5 slots with >2-solve quests (e.g. solve 3,
+ * solve 5, 3 stars x3, no-hints x3, 60 amber), handing a casual player a day
+ * of nothing but unreachable objectives.
+ */
+export const MIN_CASUAL_DAILY_QUESTS = 2;
+
+/**
+ * True when a daily quest (or template) is completable within a casual
+ * 2-puzzle day. Per-solve quest types just compare the target to the budget;
+ * visit_animals needs no solves at all; earn_amber counts as casual up to 30
+ * (two MEDIUM_PLUS base rewards, or two starred MEDIUM wins). The sink quests
+ * (tend_amber) demand a large amber spend and never count as casual.
+ */
+export function isCasualDailyQuest(q: { type: QuestType; target: number }): boolean {
+  switch (q.type) {
+    case 'solve_count':
+    case 'earn_stars':
+    case 'no_hints':
+    case 'solve_difficulty':
+    case 'challenge_mode':
+    case 'variant_wins':
+      return q.target <= CASUAL_DAILY_SOLVE_BUDGET;
+    case 'visit_animals':
+      return true;
+    case 'earn_amber':
+      return q.target <= 30;
+    default:
+      return false;
+  }
+}
+
 // Weekly quest pool — harder, multi-day objectives with bigger rewards.
 // Exported for the economy guard test (sink quests must stay net-negative).
 export const WEEKLY_QUEST_POOL: QuestTemplate[] = [
-  { type: 'solve_count', titleTemplate: 'Dedicated Shifter', descTemplate: 'Complete {target} puzzles this week', darkDescTemplate: '{target} incantations for the arrangement', target: 15, rewardAmber: 85 },
-  { type: 'solve_count', titleTemplate: 'Word Marathon', descTemplate: 'Complete {target} puzzles this week', darkDescTemplate: 'The void hungers for {target} offerings', target: 28, rewardAmber: 150 },
-  { type: 'solve_count', titleTemplate: 'Relentless', descTemplate: 'Complete {target} puzzles this week', darkDescTemplate: '{target} arrangements. No rest.', target: 40, rewardAmber: 220 },
+  // solve_count tiers are tuned for the CASUAL floor: a 2-puzzle/day player
+  // produces 14 solves a week, so the entry tier must sit comfortably under
+  // that (the old 15 was mathematically out of a 2/day player's reach).
+  // 10/18/30 keeps a real ladder (casual / regular / engaged) with rewards
+  // scaled proportionately to the old 15/28/40 @ 85/150/220 ladder.
+  { type: 'solve_count', titleTemplate: 'Dedicated Shifter', descTemplate: 'Complete {target} puzzles this week', darkDescTemplate: '{target} incantations for the arrangement', target: 10, rewardAmber: 60 },
+  { type: 'solve_count', titleTemplate: 'Word Marathon', descTemplate: 'Complete {target} puzzles this week', darkDescTemplate: 'The void hungers for {target} offerings', target: 18, rewardAmber: 95 },
+  { type: 'solve_count', titleTemplate: 'Relentless', descTemplate: 'Complete {target} puzzles this week', darkDescTemplate: '{target} arrangements. No rest.', target: 30, rewardAmber: 140 },
   { type: 'solve_difficulty', titleTemplate: 'Hard Challenger', descTemplate: 'Complete {target} Hard puzzles this week', darkDescTemplate: 'The difficult arrangements carry more weight', target: 7, rewardAmber: 90, difficulty: 'HARD' },
   { type: 'solve_difficulty', titleTemplate: 'Medium Mastery', descTemplate: 'Complete {target} Medium+ puzzles this week', darkDescTemplate: 'The pattern prefers complexity', target: 10, rewardAmber: 75, difficulty: 'MEDIUM_PLUS' },
   { type: 'earn_stars', titleTemplate: 'Perfectionist', descTemplate: 'Earn {target} three-star ratings this week', darkDescTemplate: '{target} flawless offerings', target: 12, rewardAmber: 100 },
@@ -350,6 +403,26 @@ function generateQuestsFromPool(
       const typeCount = selected.filter(s => s.type === template.type).length;
       if (typeCount >= 2) continue;
       selected.push(template);
+    }
+  }
+
+  // Casual-day floor (DAILY tier only): guarantee at least
+  // MIN_CASUAL_DAILY_QUESTS of the selected quests are completable within a
+  // 2-puzzle day. When the seeded draw comes up heavy, deterministically swap
+  // the last-selected heavy templates for unused casual ones from the same
+  // shuffled order (still respecting the max-2-per-type guard), so a casual
+  // player always has something finishable and determinism per period holds.
+  if (tier === 'daily') {
+    for (const candidate of shuffled) {
+      if (selected.filter(isCasualDailyQuest).length >= MIN_CASUAL_DAILY_QUESTS) break;
+      if (!isCasualDailyQuest(candidate) || selected.includes(candidate)) continue;
+      for (let i = selected.length - 1; i >= 0; i--) {
+        if (isCasualDailyQuest(selected[i])) continue;
+        const typeCount = selected.filter((s, idx) => idx !== i && s.type === candidate.type).length;
+        if (typeCount >= 2) continue;
+        selected[i] = candidate;
+        break;
+      }
     }
   }
 

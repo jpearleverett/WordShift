@@ -128,14 +128,19 @@ export const CURATED_EARLY_PUZZLES: CuratedPuzzle[] = [
       { stepIndex: 1, sourceWord: "PANT", targetWord: "HEAR", letterToMove: "T", explanation: "Move 'T' from PLANT to form HEART." },
     ],
   },
-  // Puzzle 1: LAMP → OVER → TIME → USED — 4-row MEDIUM, satisfying mid-position moves
-  // Pick L → AMP; LOVER. Pick R → LOVE; TIMER. Pick M → TIER; MUSED.
+  // Puzzle 1: SEAT → SPIN → PORT → EACH — 4-row MEDIUM, the first solo board.
+  // Every solution word is a common everyday word (no MUSED-style traps), and
+  // the chain has SIX genuinely distinct solution paths under the shipped
+  // rules (verified by exhaustive enumeration: SPINE>SPORT>PEACH,
+  // SPINS>SPORT>PEACH, SPINS>SPORT>REACH, SPINS>PORTS>REACH, ...), so a new
+  // player's own idea can also be right.
+  // Pick E → SAT; SPINE. Pick S → PINE; SPORT. Pick P → SORT; PEACH.
   {
-    words: ["LAMP", "OVER", "TIME", "USED"],
+    words: ["SEAT", "SPIN", "PORT", "EACH"],
     solution: [
-      { stepIndex: 0, sourceWord: "LAMP", targetWord: "OVER", letterToMove: "L", explanation: "Move 'L' from LAMP to form LOVER." },
-      { stepIndex: 1, sourceWord: "OVER", targetWord: "TIME", letterToMove: "R", explanation: "Move 'R' from LOVER to form TIMER." },
-      { stepIndex: 2, sourceWord: "TIME", targetWord: "USED", letterToMove: "M", explanation: "Move 'M' from TIMER to form MUSED." },
+      { stepIndex: 0, sourceWord: "SEAT", targetWord: "SPIN", letterToMove: "E", explanation: "Move 'E' from SEAT to form SPINE." },
+      { stepIndex: 1, sourceWord: "SPIN", targetWord: "PORT", letterToMove: "S", explanation: "Move 'S' from SPINE to form SPORT." },
+      { stepIndex: 2, sourceWord: "PORT", targetWord: "EACH", letterToMove: "P", explanation: "Move 'P' from SPORT to form PEACH." },
     ],
   },
   // Puzzle 2: FIRE → USED → LIKE → THAN — 4-row MEDIUM, thematic fire-to-thank chain

@@ -31,13 +31,18 @@ import { Room, DialoguePhase } from '../../types/homeWorld';
 import {
   areUpgradesAvailable,
   areDeepeningsAvailable,
+  areAttunementsAvailable,
   getRoomUpgrade,
   getRoomDeepening,
+  getAttunementForLevel,
   getUpgradeDescription,
   getPurchasedUpgrades,
   getDeepenedRooms,
+  getAttunedRooms,
   purchaseRoomUpgrade,
   purchaseRoomDeepening,
+  purchaseRoomAttunement,
+  MAX_ATTUNEMENT_LEVEL,
 } from '../../services/roomUpgrades';
 import { logEvent } from '../../services/eventLogger';
 import {
@@ -122,11 +127,13 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
 
-  // House upgrades (tier-1 decorations + tier-2 deepenings), sold here
-  // alongside the cosmetics — amber sinks, expression only.
+  // House upgrades (tier-1 decorations + tier-2 deepenings + tier-3
+  // attunements), sold here alongside the cosmetics — amber sinks,
+  // expression only.
   const [rooms, setRooms] = useState<Room[]>([]);
   const [purchasedUpgrades, setPurchasedUpgrades] = useState<Record<string, number>>({});
   const [purchasedDeepenings, setPurchasedDeepenings] = useState<Record<string, number>>({});
+  const [attunedRooms, setAttunedRooms] = useState<Record<string, number>>({});
   const [houseFeedback, setHouseFeedback] = useState<string | null>(null);
 
   const tileThemes = useMemo(() => getCosmeticsByCategory('tile_theme'), []);
@@ -146,14 +153,16 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   }, [allItems]);
 
   const refreshHouse = useCallback(async () => {
-    const [roomList, upgrades, deepenings] = await Promise.all([
+    const [roomList, upgrades, deepenings, attunements] = await Promise.all([
       getRoomsWithStatus(),
       getPurchasedUpgrades(),
       getDeepenedRooms(),
+      getAttunedRooms(),
     ]);
     setRooms(roomList);
     setPurchasedUpgrades(upgrades);
     setPurchasedDeepenings(deepenings);
+    setAttunedRooms(attunements);
   }, []);
 
   useEffect(() => {
@@ -240,6 +249,21 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
       .filter((entry): entry is { room: Room; deepening: NonNullable<ReturnType<typeof getRoomDeepening>> } => entry !== null);
   }, [rooms, purchasedUpgrades, purchasedDeepenings]);
 
+  // Tier-3 "attunements": eligible once the room's tier-1 decoration is in
+  // place (the deepening is NOT required) and the room isn't fully attuned.
+  // Each row is the room's NEXT level (levels purchase strictly in order).
+  const availableAttunements = useMemo(() => {
+    return rooms
+      .filter(room => room.isUnlocked)
+      .map(room => {
+        if (!purchasedUpgrades[room.id]) return null; // tier-1 required first
+        const info = getAttunementForLevel(room.id, (attunedRooms[room.id] ?? 0) + 1);
+        if (!info) return null; // no attunement for this room, or fully attuned
+        return { room, info };
+      })
+      .filter((entry): entry is { room: Room; info: NonNullable<ReturnType<typeof getAttunementForLevel>> } => entry !== null);
+  }, [rooms, purchasedUpgrades, attunedRooms]);
+
   const handleBuyUpgrade = useCallback(async (roomId: string) => {
     if (busy) return;
     const upgrade = getRoomUpgrade(roomId);
@@ -294,10 +318,38 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     }
   }, [busy, onAmberChange, refreshHouse]);
 
+  const handleBuyAttunement = useCallback(async (roomId: string) => {
+    if (busy) return;
+    const info = getAttunementForLevel(roomId, (attunedRooms[roomId] ?? 0) + 1);
+    if (!info) return;
+    setBusy(`attunement_${roomId}`);
+    try {
+      const spendResult = await spendAmber(info.cost, `attunement_${roomId}`);
+      if (!spendResult.success) {
+        setHouseFeedback('Not enough amber for that yet.');
+        return;
+      }
+      const purchased = await purchaseRoomAttunement(roomId);
+      if (!purchased) {
+        setHouseFeedback('That upgrade is already in place.');
+        return;
+      }
+      onAmberChange?.(spendResult.newBalance);
+      setBalance(spendResult.newBalance);
+      setHouseFeedback(`The room is ${info.name.toLowerCase()} now.`);
+      logEvent({ type: 'room_upgrade_purchased', data: { roomId, cost: info.cost, tier: 3, level: info.level } });
+      hapticMedium();
+      await refreshHouse();
+    } finally {
+      setBusy(null);
+    }
+  }, [busy, attunedRooms, onAmberChange, refreshHouse]);
+
   const showHouseUpgrades =
     areUpgradesAvailable(housePhase) &&
     availableUpgrades.length +
-      (areDeepeningsAvailable(housePhase) ? availableDeepenings.length : 0) > 0;
+      (areDeepeningsAvailable(housePhase) ? availableDeepenings.length : 0) +
+      (areAttunementsAvailable(housePhase) ? availableAttunements.length : 0) > 0;
 
   const renderActionButton = (item: CosmeticItem) => {
     const isOwned = owned[item.id];
@@ -521,6 +573,31 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                     />
                   </PanelCard>
                 ))}
+                {areAttunementsAvailable(housePhase) && availableAttunements.map(({ room, info }) => (
+                  <PanelCard key={`attune_${room.id}`} phase={phase} kind="card" style={styles.card}>
+                    <View style={styles.houseCardBody}>
+                      <Text style={[styles.cardName, { color: t.title }]}>
+                        {room.name}: {info.name}
+                      </Text>
+                      <Text style={[styles.attuneLevel, { color: t.muted }]}>
+                        Attunement {info.level} of {MAX_ATTUNEMENT_LEVEL}
+                      </Text>
+                      <Text style={[styles.cardDesc, { color: t.body }]}>{info.description}</Text>
+                      <Text style={[styles.houseCost, { color: t.amberText }]}>
+                        <AmberInline size={12} /> {info.cost}
+                      </Text>
+                    </View>
+                    <CandyButton
+                      label="Attune"
+                      onPress={() => handleBuyAttunement(room.id)}
+                      phase={phase}
+                      variant="amber"
+                      disabled={balance < info.cost || busy != null}
+                      style={styles.actionSlot}
+                      accessibilityLabel={`Attune ${room.name}, level ${info.level} of ${MAX_ATTUNEMENT_LEVEL}, ${info.name}, for ${info.cost} amber`}
+                    />
+                  </PanelCard>
+                ))}
               </View>
             )}
 
@@ -668,6 +745,13 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   houseCost: { fontSize: 13, fontWeight: '800', fontFamily: PIXEL_FONT_BOLD, marginTop: 6 },
+  attuneLevel: {
+    fontSize: 11,
+    fontWeight: '700',
+    fontFamily: PIXEL_FONT_BOLD,
+    letterSpacing: 0.4,
+    marginTop: 2,
+  },
   statusChip: {
     minWidth: 96,
     minHeight: 46,

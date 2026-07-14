@@ -12,6 +12,14 @@ interface DraggableTileProps {
   onDragStart: () => void;
   /** Called when drag ends over a valid area — receives finger position */
   onDragEnd: (position: { x: number; y: number }) => void;
+  /**
+   * Called while an ACTIVE drag moves — receives the live finger position
+   * (page space). Fires on every move event once the drag threshold has been
+   * crossed; the consumer is responsible for cheap ref-compare throttling
+   * (e.g. only reacting when the estimated slot index changes). Keep the
+   * handler light: it runs inside the PanResponder move path.
+   */
+  onMove?: (position: { x: number; y: number }) => void;
   /** Called on simple tap (no drag gesture activated) */
   onTap: () => void;
   /** Whether this tile can be interacted with */
@@ -43,6 +51,7 @@ export function DraggableTile({
   children,
   onDragStart,
   onDragEnd,
+  onMove,
   onTap,
   enabled,
   letterChar,
@@ -62,11 +71,13 @@ export function DraggableTile({
   // initial closure. Without refs, callbacks would be stale after re-renders.
   const onDragStartRef = useRef(onDragStart);
   const onDragEndRef = useRef(onDragEnd);
+  const onMoveRef = useRef(onMove);
   const onTapRef = useRef(onTap);
   const enabledRef = useRef(enabled);
   const onDragActiveChangeRef = useRef(onDragActiveChange);
   onDragStartRef.current = onDragStart;
   onDragEndRef.current = onDragEnd;
+  onMoveRef.current = onMove;
   onTapRef.current = onTap;
   enabledRef.current = enabled;
   onDragActiveChangeRef.current = onDragActiveChange;
@@ -127,6 +138,13 @@ export function DraggableTile({
         if (dragActivated.current) {
           translateX.setValue(dx);
           translateY.setValue(dy);
+          // Live hover feedback: report the finger's page position. The
+          // consumer ref-compares the derived slot index before any setState,
+          // so this stays cheap on the move path.
+          onMoveRef.current?.({
+            x: startPos.current.x + dx,
+            y: startPos.current.y + dy,
+          });
         }
       },
       onPanResponderRelease: (evt, gestureState) => {

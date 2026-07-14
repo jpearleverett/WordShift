@@ -4,7 +4,8 @@ import {
   shouldShowRemoveAdsNudge,
   recordInterstitialSeen,
   consumePatronNudge,
-  consumeRemoveAdsNudge,
+  armRemoveAdsNudgeIfEligible,
+  consumePendingRemoveAdsNudge,
   clearMonetPrompts,
 } from '../services/monetizationPrompts';
 import {
@@ -62,26 +63,59 @@ describe('consumePatronNudge', () => {
   });
 });
 
-describe('consumeRemoveAdsNudge', () => {
-  it('fires once after enough interstitials, then never again', async () => {
-    for (let i = 0; i < REMOVE_ADS_NUDGE_AFTER_INTERSTITIALS; i++) {
+describe('remove-ads nudge (arm on the ad exit, present on the NEXT exit)', () => {
+  async function seeInterstitials(n: number) {
+    for (let i = 0; i < n; i++) {
       await recordInterstitialSeen();
     }
-    expect(await consumeRemoveAdsNudge()).toBe(true);
-    expect(await consumeRemoveAdsNudge()).toBe(false);
+  }
+
+  it('does not arm before enough interstitials, and nothing pends', async () => {
+    await seeInterstitials(REMOVE_ADS_NUDGE_AFTER_INTERSTITIALS - 1);
+    expect(await armRemoveAdsNudgeIfEligible()).toBe(false);
+    expect(await consumePendingRemoveAdsNudge()).toBe(false);
   });
 
-  it('does not fire before enough interstitials', async () => {
-    await recordInterstitialSeen();
-    expect(await consumeRemoveAdsNudge()).toBe(false);
+  it('never presents on the exit that armed it: consume requires a prior arm', async () => {
+    await seeInterstitials(REMOVE_ADS_NUDGE_AFTER_INTERSTITIALS);
+    // Threshold reached but not armed (no interstitial-exit arm ran yet) —
+    // a qualifying exit must stay quiet.
+    expect(await consumePendingRemoveAdsNudge()).toBe(false);
   });
 
-  it('is suppressed for ad-free players', async () => {
+  it('arms at the threshold, then fires exactly once on a later exit', async () => {
+    await seeInterstitials(REMOVE_ADS_NUDGE_AFTER_INTERSTITIALS);
+    expect(await armRemoveAdsNudgeIfEligible()).toBe(true);
+    expect(await consumePendingRemoveAdsNudge()).toBe(true);  // next exit: fires
+    expect(await consumePendingRemoveAdsNudge()).toBe(false); // one-time
+    // Re-arming after it has shown must refuse (alreadyShown).
+    expect(await armRemoveAdsNudgeIfEligible()).toBe(false);
+    expect(await consumePendingRemoveAdsNudge()).toBe(false);
+  });
+
+  it('arming is idempotent across multiple interstitial exits before the offer lands', async () => {
+    await seeInterstitials(REMOVE_ADS_NUDGE_AFTER_INTERSTITIALS);
+    expect(await armRemoveAdsNudgeIfEligible()).toBe(true);
+    expect(await armRemoveAdsNudgeIfEligible()).toBe(true); // still armed, still pending
+    expect(await consumePendingRemoveAdsNudge()).toBe(true); // still fires only once
+    expect(await consumePendingRemoveAdsNudge()).toBe(false);
+  });
+
+  it('is suppressed for ad-free players at the arm step', async () => {
     await grantEntitlements([ENTITLEMENTS.ADFREE]);
     await loadEntitlements();
-    for (let i = 0; i < REMOVE_ADS_NUDGE_AFTER_INTERSTITIALS + 2; i++) {
-      await recordInterstitialSeen();
-    }
-    expect(await consumeRemoveAdsNudge()).toBe(false);
+    await seeInterstitials(REMOVE_ADS_NUDGE_AFTER_INTERSTITIALS + 2);
+    expect(await armRemoveAdsNudgeIfEligible()).toBe(false);
+    expect(await consumePendingRemoveAdsNudge()).toBe(false);
+  });
+
+  it('an armed offer is discarded (not shown, not marked shown) if the player goes ad-free before it lands', async () => {
+    await seeInterstitials(REMOVE_ADS_NUDGE_AFTER_INTERSTITIALS);
+    expect(await armRemoveAdsNudgeIfEligible()).toBe(true);
+    await grantEntitlements([ENTITLEMENTS.ADFREE]);
+    await loadEntitlements();
+    expect(await consumePendingRemoveAdsNudge()).toBe(false);
+    // And the stale pending flag does not linger.
+    expect(await consumePendingRemoveAdsNudge()).toBe(false);
   });
 });

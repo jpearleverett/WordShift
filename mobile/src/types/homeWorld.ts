@@ -266,6 +266,11 @@ export interface HomeWorldProgress {
   // gates the finale (dwell so the cult-reveal era is actually played, not
   // flashed past in one puzzle). See FINALE_DWELL_PUZZLES.
   phase4Dwell?: number;
+  // The dwell window has filled: the NEXT standard board start is served as
+  // the marked FINAL BOARD (dread-seeded, quiet treatment), and its victory
+  // fires the finale. Set by App when phase4Dwell reaches FINALE_DWELL_PUZZLES;
+  // cleared by markFinalPuzzleCompleted and by startNewCycle.
+  finaleArmed?: boolean;
   // Tutorial seeds - tracks specific tutorial lines for Phase 4 callbacks
   tutorialSeedsPlanted?: boolean;
   // Coordinated dialogue events that have been consumed (by theme name)
@@ -299,6 +304,11 @@ export interface HomeWorldProgress {
   // first playthrough. Each cycle re-descends faster (dread arrives earlier)
   // while the collection (rooms, animals, amber, cosmetics) is kept.
   cycleCount?: number;
+  // puzzlesSolved at the moment the current cycle began (0 on the first
+  // playthrough). puzzlesSolved is deliberately KEPT across cycles, so
+  // cycle-relative beats (micro-beats keyed at counts a 200-puzzle veteran
+  // will never hit again) subtract this to get "puzzles solved this cycle".
+  cycleStartPuzzles?: number;
   // The cycleCount whose opening beat has already been shown (so the "bright
   // days return" line fires exactly once per new cycle).
   cycleOpeningSeen?: number;

@@ -421,7 +421,7 @@ interface CoordinatedEvent {
   // the same weighted scale phase transitions use (phaseProgress, which
   // accelerates for engaged players), falling back to raw puzzlesSolved for
   // legacy saves — otherwise accelerated players reach the finale (~155 real
-  // puzzles) before the 230/240/250 pre-finale crescendo ever fires.
+  // puzzles) before the 190/205/220 pre-finale crescendo ever fires.
   puzzleThreshold: number;
   phase: number;            // Minimum phase required
   theme: string;            // Internal theme name
@@ -431,7 +431,7 @@ interface CoordinatedEvent {
 export const COORDINATED_EVENTS: CoordinatedEvent[] = [
   // Event 1: Phase 2 — animals independently notice that words have changed
   {
-    puzzleThreshold: 80,
+    puzzleThreshold: 70,
     phase: 2,
     theme: 'words_changing',
     lines: {
@@ -445,7 +445,7 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
   },
   // Event 2: Phase 2 — the house itself responds to puzzles
   {
-    puzzleThreshold: 100,
+    puzzleThreshold: 90,
     phase: 2,
     theme: 'house_feels_different',
     lines: {
@@ -461,7 +461,7 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
   },
   // Event 3: Phase 2 — they all had the same dream
   {
-    puzzleThreshold: 120,
+    puzzleThreshold: 110,
     phase: 2,
     theme: 'shared_dream',
     lines: {
@@ -475,7 +475,7 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
   },
   // Event 4: Phase 3 — "the arrangement" is named openly for the first time
   {
-    puzzleThreshold: 160,
+    puzzleThreshold: 140,
     phase: 3,
     theme: 'the_arrangement',
     lines: {
@@ -494,7 +494,7 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
   },
   // Event 5: Phase 3 — each animal names their role in the cult
   {
-    puzzleThreshold: 200,
+    puzzleThreshold: 165,
     phase: 3,
     theme: 'roles_revealed',
     lines: {
@@ -515,7 +515,7 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
   },
   // Event 6: Phase 3 — the final countdown before Phase 4
   {
-    puzzleThreshold: 230,
+    puzzleThreshold: 190,
     phase: 3,
     theme: 'almost_time',
     lines: {
@@ -536,7 +536,7 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
   },
   // Event 7: Phase 4 — the convergence, animals sense closeness to the finale
   {
-    puzzleThreshold: 240,
+    puzzleThreshold: 205,
     phase: 4,
     theme: 'convergence',
     lines: {
@@ -557,7 +557,7 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
   },
   // Event 8: Phase 4 — the threshold, final coordinated event before the endgame
   {
-    puzzleThreshold: 250,
+    puzzleThreshold: 220,
     phase: 4,
     theme: 'the_threshold',
     lines: {
@@ -687,7 +687,7 @@ export const NARRATIVE_SEEDS: Record<AnimalType, { seeds: string[]; callbacks: s
       "The best recipes cannot be hurried. A truly great stew takes exactly as long as it takes, and patience is the one ingredient I have never once run short of.",
     ],
     callbacks: [
-      "Everything in my kitchen serves a purpose. I told you that on one of your first visits, do you remember? The pots, the spices, the ingredients that did not know what they were for. You did not know either, dear. You were the main ingredient, and you found out when it was time, just as I promised.",
+      "Everything in my kitchen serves a purpose. I told you that on one of your first visits, do you remember? The pots, the spices, the ingredients that did not know what they were for. You did not know either, dear, and I watched you wonder tonight which ingredient you were. None of them. You were my grandmother's spoon, the thing the whole meal moves through, and no cook melts her spoon into the stew. She washes it, and dries it, and keeps it. You found out when it was time, just as I promised.",
       "I said a great stew takes exactly as long as it takes, and this one took years. Every word you brought was one slow turn of the spoon. Smell the kitchen now, dear. It is ready. It was always going to be ready the moment you were.",
     ],
   },
@@ -767,8 +767,8 @@ export const NARRATIVE_SEEDS: Record<AnimalType, { seeds: string[]; callbacks: s
       "Being looked at is how a thing knows it is real, I have always believed that. So I look at everything, entirely, every night, the garden and the ridge and the far dark and all. It is my little gift to the valley. Everything around here is very, very real.",
     ],
     callbacks: [
-      "I told you once that nothing crosses the dark without me seeing it, and that you could sleep soundly because something was watching over this house. Every word was true, bright one. I only let you file the watching under protection. I was not keeping the dark away from the house. I was keeping the house in its sight, all night, every night, so it would never once lose its way to us.",
-      "Being looked at is how a thing knows it is real. I taught you that early, smiling, and you took it for a charming habit of mine. It was the whole engine, bright one. Every night I looked at the far dark entirely, and every night it grew more real, more near, more able. You cannot fatten a fire with wood you never give it. I gave it the one food it wanted. I gave it being seen.",
+      "The whole house slept soundly all those years because a watcher kept the rail, and nothing ever crossed the dark of this valley without me seeing it. All of that is true, bright one. Only the direction was filed wrong. I was never keeping the dark away from the house. I was keeping the house in its sight, all night, every night, so it would never once lose its way to us.",
+      "Being looked at is how a thing knows it is real. That has been my one creed since the old forest, and everyone here took it for a charming habit of mine. It was the whole engine, bright one. Every night I looked at the far dark entirely, and every night it grew more real, more near, more able. You cannot fatten a fire with wood you never give it. I gave it the one food it wanted. I gave it being seen.",
     ],
   },
   aye_aye: {
@@ -777,8 +777,8 @@ export const NARRATIVE_SEEDS: Record<AnimalType, { seeds: string[]; callbacks: s
       "A bell only gets one first ring, so you save it for the most important thing that ever happens. Nothing important enough has happened yet, and isn't that wonderful? It means the most important thing is still ahead of us. I polish her every evening so she will be ready when it comes.",
     ],
     callbacks: [
-      "I told you in the bright days that this house answers every knock, and oh, it did, friend, it did. I simply had not learned yet who was doing the answering, or how long it had waited under the boards for a knock with your hand somewhere in it. It kept count, you know. Every knock, every word, every evening you came back. It never once left either of us waiting. And tonight it stops answering, and speaks first.",
-      "Do you remember why I never rang her? Save the first ring for the most important thing that ever happens, I said, and we smiled, and we let it be a keeper's charming habit. It was never a habit, friend. It was an appointment. The most important thing that ever happens has been walking toward this house since before either of us was born, and tonight I take the rope, and her one ring goes to exactly what it was saved for. Thank you for helping it arrive.",
+      "Every good board answers a knock. That is the first thing I say to anyone, it is practically my name, and this house answered beautifully from the night I arrived, top to bottom, never once leaving me waiting. What I had not learned yet was who was doing the answering, or how long it had waited under the boards for a knock with your hand somewhere in it. It kept count, you know. Every knock, every word, every evening you came back. And tonight it stops answering, and speaks first.",
+      "Sixty years that bell has never been rung, and I gave the reason gladly to anyone who climbed my stairs: you save a first ring for the most important thing that ever happens, and nothing important enough had happened yet. Everyone let that be a keeper's charming habit. It was never a habit, friend. It was an appointment. The most important thing that ever happens has been walking toward this house since before either of us was born, and tonight I take the rope, and her one ring goes to exactly what it was saved for. Thank you for helping it arrive.",
     ],
   },
   kakapo: {
@@ -787,8 +787,8 @@ export const NARRATIVE_SEEDS: Record<AnimalType, { seeds: string[]; callbacks: s
       "I boom once a year from my bowl, for old times. One call, out across the valley, and then the listening. Nobody has ever answered, and that has never once made it foolish. A call is hope you can hear. You do not stop hoping just because the valley is slow.",
     ],
     callbacks: [
-      "A garden is a letter to a day you will not choose. I told you that in the bright season, and I meant it kindly, and it was truer than I knew. Every bed I ever turned was addressed here, friend, to this night, in handwriting older than mine. I thought I was writing the letter. I was the letter. So were you. And it has been read, and the answer is descending, and the answer is glad.",
-      "I told you a call with no answer is still a true call, and I believed it, and it kept me warm for ninety years. Here is what I could not see from inside the calling. There was never no answer. There was one answer, being composed, all that time, to every boom at once. You helped write the last of it, friend, word by offered word. Tonight it is finished being composed. Listen. The valley is clearing its throat.",
+      "A garden is a letter you write to a day you will not choose. I have planted by that saying my whole life, and I always meant it kindly, and it was truer than I knew. Every bed I ever turned was addressed here, friend, to this night, in handwriting older than mine. I thought I was writing the letter. I was the letter. So were you. And it has been read, and the answer is descending, and the answer is glad.",
+      "Ninety years I boomed into a valley that never answered, and I called the calling true anyway, and the truth of it kept me warm. Here is what I could not see from inside the calling. There was never no answer. There was one answer, being composed, all that time, to every boom at once. You helped write the last of it, friend, word by offered word. Tonight it is finished being composed. Listen. The valley is clearing its throat.",
     ],
   },
 };
@@ -905,17 +905,33 @@ export async function getAndMarkNarrativeSeedPage(
 /**
  * One-time Phase 4 pre-dialogue page recontextualizing a Phase 0 seed.
  * Delivers at most one callback per call (so callbacks spread across
- * visits), each callback exactly once, and only for seeds the player
- * actually heard. Returns null when there's nothing left to say.
+ * visits), each callback exactly once.
+ *
+ * Default gate: only for seeds the player actually heard (never
+ * recontextualize an unsaid line). `allowUnheardSeeds` widens this for
+ * animals whose seeds could never be planted — seed planting stops at
+ * global Phase 2, so a late-unlocked animal (the descent trio arrives at
+ * Phase 3-4) would otherwise have its best Phase-4 material permanently
+ * unreachable on a first run. The callbacks restate their seed inside
+ * themselves (self-contained), so delivering them unheard still lands.
  */
 export async function getAndMarkNarrativeCallbackPage(
-  animalType: AnimalType
+  animalType: AnimalType,
+  options?: { allowUnheardSeeds?: boolean }
 ): Promise<string | null> {
   const state = await loadDeliveryState();
   const delivered = state.seedsDelivered[animalType] ?? [];
-  if (delivered.length === 0) return null;
+  const callbackCount = NARRATIVE_SEEDS[animalType]?.callbacks.length ?? 0;
+  // Heard seeds keep the classic contract; with zero heard seeds the widened
+  // gate (allowUnheardSeeds) walks every callback in order instead.
+  const eligible = delivered.length > 0
+    ? [...delivered].sort((a, b) => a - b)
+    : options?.allowUnheardSeeds
+      ? Array.from({ length: callbackCount }, (_, i) => i)
+      : [];
+  if (eligible.length === 0) return null;
   const shown = state.callbacksShown[animalType] ?? [];
-  for (const i of [...delivered].sort((a, b) => a - b)) {
+  for (const i of eligible) {
     if (shown.includes(i)) continue;
     const text = getNarrativeCallback(animalType, i);
     if (!text) return null;

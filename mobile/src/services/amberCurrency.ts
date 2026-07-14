@@ -1437,10 +1437,10 @@ export function pickNudgeVariant(
 }
 
 /**
- * The variant-offer nudge (revives the long-dead shouldOfferVariant path): once
- * per local day, after a STANDARD board, suggest a variant the player has
- * unlocked but never won. Marks the nudge date so it fires at most once/day.
- * Returns the variant key to suggest, or null.
+ * The variant-offer nudge: once per local day, after a STANDARD board, suggest
+ * a variant the player has unlocked but never won. Marks the nudge date so it
+ * fires at most once/day. Returns the variant key to suggest, or null.
+ * (The setup menu's teased locked rows are the always-visible complement.)
  */
 export async function consumeVariantNudge(
   unlockedVariants: string[],
@@ -1486,11 +1486,14 @@ export async function isHouseCompleted(): Promise<boolean> {
 }
 
 /**
- * Mark the final puzzle as completed (deep Phase 4 endgame)
+ * Mark the final puzzle as completed (deep Phase 4 endgame).
+ * Also disarms the finale: the marked final board has been served and won,
+ * so no further board start may claim it (single write — crash-atomic).
  */
 export async function markFinalPuzzleCompleted(): Promise<void> {
   const progress = await loadProgress();
   progress.finalPuzzleCompleted = true;
+  progress.finaleArmed = false;
   progressCache = progress;
   await saveProgress();
 }
@@ -1501,6 +1504,27 @@ export async function markFinalPuzzleCompleted(): Promise<void> {
 export async function isFinalPuzzleCompleted(): Promise<boolean> {
   const progress = await loadProgress();
   return progress.finalPuzzleCompleted === true;
+}
+
+/**
+ * Arm the finale: the Phase-4 dwell window has filled (house complete,
+ * FINALE_DWELL_PUZZLES dwell victories recorded), so the NEXT standard board
+ * start becomes the marked FINAL BOARD instead of the finale firing
+ * retroactively on an ordinary win. Idempotent; no-op once the final puzzle
+ * is already completed.
+ */
+export async function armFinale(): Promise<void> {
+  const progress = await loadProgress();
+  if (progress.finalPuzzleCompleted === true) return;
+  progress.finaleArmed = true;
+  progressCache = progress;
+  await saveProgress();
+}
+
+/** Whether the finale is armed (the next standard board is THE final board). */
+export async function isFinaleArmed(): Promise<boolean> {
+  const progress = await loadProgress();
+  return progress.finaleArmed === true && progress.finalPuzzleCompleted !== true;
 }
 
 /**
@@ -1604,6 +1628,9 @@ export async function startNewCycle(): Promise<number> {
   }
 
   progress.cycleCount = (progress.cycleCount ?? 0) + 1;
+  // Anchor the cycle-relative puzzle count: puzzlesSolved is kept (it's the
+  // collection's history), so cycle-scoped beats subtract this baseline.
+  progress.cycleStartPuzzles = progress.puzzlesSolved;
   // Re-descend from the bright days.
   progress.currentPhase = 0;
   progress.phaseProgress = 0;
@@ -1614,6 +1641,7 @@ export async function startNewCycle(): Promise<number> {
   // Clear the endgame pins so the finale + post-revelation can fire again.
   progress.postRevelation = false;
   progress.finalPuzzleCompleted = false;
+  progress.finaleArmed = false;
   // Dialogue replays from the top; drop the progress-owned dialogue bookkeeping.
   progress.lastDialogueRead = {};
   progress.consumedCoordinatedEvents = [];

@@ -86,6 +86,71 @@ describe('LetterTile arrival prop contract', () => {
     const up: Props['arrivalDirection'] = 'up';
     expect(up).toBe('up');
   });
+
+  test('accepts the feedback-only onLockedPress (compile-time check)', () => {
+    type Props = React.ComponentProps<typeof LetterTile>;
+    const onLockedPress = jest.fn();
+    const props: Props = {
+      letter: { id: 'l1', char: 'A', isLocked: true },
+      onLockedPress,
+    };
+    props.onLockedPress!();
+    expect(onLockedPress).toHaveBeenCalled();
+  });
+});
+
+describe('LetterTile mounts a touchable for feedback-only presses (source pin)', () => {
+  const tileSrc = require('fs').readFileSync(
+    require('path').join(__dirname, '../components/LetterTile.tsx'),
+    'utf8',
+  );
+  test('locked/inert tiles with onLockedPress are pressable; the handler routes to onLockedPress', () => {
+    expect(tileSrc).toMatch(/const isFeedbackPressable = !isClickable && !!onLockedPress;/);
+    expect(tileSrc).toMatch(/if \(isClickable \|\| isFeedbackPressable\) \{/);
+    expect(tileSrc).toMatch(/onPress=\{isClickable \? onPress : onLockedPress\}/);
+  });
+});
+
+describe('Row verb-depth + hover + drag-move prop contract', () => {
+  test('accepts previewValidityVisible / hoverSlotIndex / onLetterDragMove (compile-time check)', () => {
+    type Props = React.ComponentProps<typeof Row>;
+    const props: Props = {
+      rowData: { id: 'r1', originalWord: 'TIME', words: [] },
+      rowIndex: 0,
+      activeRowIndex: 0,
+      selectedLetter: null,
+      onLetterPress: () => {},
+      onSlotPress: () => {},
+      isProcessing: false,
+      previewValidityVisible: false,
+      hoverSlotIndex: 2,
+      onLetterDragMove: (_pos: { x: number; y: number }) => {},
+    };
+    expect(props.previewValidityVisible).toBe(false);
+    expect(props.hoverSlotIndex).toBe(2);
+    expect(typeof props.onLetterDragMove).toBe('function');
+  });
+});
+
+describe('DraggableTile live-move contract', () => {
+  test('accepts onMove with a page-space position (compile-time check)', () => {
+    type Props = React.ComponentProps<typeof DraggableTile>;
+    const onMove: Props['onMove'] = (_pos: { x: number; y: number }) => {};
+    expect(typeof onMove).toBe('function');
+  });
+
+  test('onMove fires only while the drag is ACTIVE (source pin)', () => {
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, '../components/DraggableTile.tsx'),
+      'utf8',
+    );
+    // The call sits inside the dragActivated branch of onPanResponderMove.
+    const moveBlock = src.slice(
+      src.indexOf('if (dragActivated.current) {'),
+      src.indexOf('onPanResponderRelease')
+    );
+    expect(moveBlock).toContain('onMoveRef.current?.(');
+  });
 });
 
 describe('Row hint-glow + arrival prop contract', () => {

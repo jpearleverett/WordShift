@@ -210,11 +210,11 @@ describe('no em/en dashes in player-facing text', () => {
     ];
 
     // Deterministic Math.random sweep so every random-pool entry is visited
-    // (pools are well under 24 entries each).
+    // (the deepest pool, phase-2 move messages, holds 26 entries).
     const realRandom = Math.random;
     try {
-      for (let k = 0; k < 24; k++) {
-        const r = (k + 0.5) / 24;
+      for (let k = 0; k < 32; k++) {
+        const r = (k + 0.5) / 32;
         Math.random = () => r;
         for (const p of PHASES) {
           for (const args of argSetsFor(p)) {

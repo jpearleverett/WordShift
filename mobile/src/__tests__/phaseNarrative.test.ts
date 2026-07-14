@@ -41,6 +41,23 @@ import {
   getNewCyclePointerLine,
   NEW_CYCLE_POINTER_LINES,
   getPersonalizedPhase5Whisper,
+  VICTORY_FEEDBACK_POOLS,
+  MOVE_MESSAGES,
+  COMBO_MOVE_POOLS,
+  MICRO_BEATS,
+  isSilentVictoryBeat,
+  PIT_OFFER_RESULT_MESSAGES,
+  getPitOfferResultMessage,
+  INTERJECTION_MESSAGES,
+  getDwellLine,
+  getStreakHeldMessage,
+  getPreviewGraduationMessage,
+  getSwiftVictoryHintMessage,
+  getFinalBoardStartMessage,
+  getCycleMicroBeat,
+  CYCLE_MICRO_BEATS,
+  checkCycleNarrativeMicroBeat,
+  resolveVictoryMicroBeat,
 } from '../services/phaseNarrative';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DialoguePhase } from '../types/homeWorld';
@@ -79,6 +96,8 @@ describe('getVictoryTitle', () => {
 });
 
 describe('getVictoryFeedback', () => {
+  const allSixPhases: DialoguePhase[] = [0, 1, 2, 3, 4, 5];
+
   test.each(
     ALL_PHASES.flatMap(phase =>
       STAR_LEVELS.map(stars => ({ phase, stars }))
@@ -89,21 +108,57 @@ describe('getVictoryFeedback', () => {
     expect(feedback.length).toBeGreaterThan(0);
   });
 
-  test('phase 0 feedback is encouraging', () => {
-    expect(getVictoryFeedback(3, 0)).toContain('Flawless');
+  test('every phase x star cell is a pool of 4-5 lines (reread ~25-40 times per phase)', () => {
+    for (const phase of allSixPhases) {
+      const pools = VICTORY_FEEDBACK_POOLS[phase];
+      for (const cell of [pools.three, pools.two, pools.one]) {
+        expect(cell.length).toBeGreaterThanOrEqual(4);
+        expect(cell.length).toBeLessThanOrEqual(5);
+      }
+    }
   });
 
-  test('phase 4 feedback is dark', () => {
-    expect(getVictoryFeedback(3, 4)).toContain('void');
+  test('picks come from the matching pool', () => {
+    for (const phase of allSixPhases) {
+      const pools = VICTORY_FEEDBACK_POOLS[phase];
+      for (let i = 0; i < 20; i++) {
+        expect(pools.three).toContain(getVictoryFeedback(3, phase));
+        expect(pools.two).toContain(getVictoryFeedback(2, phase));
+        expect(pools.one).toContain(getVictoryFeedback(1, phase));
+      }
+    }
   });
 
-  test('different star levels produce different feedback within same phase', () => {
-    const fb3 = getVictoryFeedback(3, 2);
-    const fb2 = getVictoryFeedback(2, 2);
-    const fb1 = getVictoryFeedback(1, 2);
-    expect(fb3).not.toBe(fb2);
-    expect(fb2).not.toBe(fb1);
-    expect(fb3).not.toBe(fb1);
+  test('phase 0 keeps the flagship bright line; phase 4 keeps the void line', () => {
+    expect(VICTORY_FEEDBACK_POOLS[0].three).toContain('Flawless! The words knew exactly where to go.');
+    expect(VICTORY_FEEDBACK_POOLS[4].three).toContain('Perfection in an imperfect void.');
+  });
+
+  test('phase 2 two-star pool keeps exactly ONE rhetorical question (the rest are statements)', () => {
+    const questions = VICTORY_FEEDBACK_POOLS[2].two.filter(line => line.includes('?'));
+    expect(questions).toEqual(['Another puzzle solved. Does it feel different?']);
+  });
+
+  test('cells within a phase are disjoint, so star levels always read differently', () => {
+    for (const phase of allSixPhases) {
+      const pools = VICTORY_FEEDBACK_POOLS[phase];
+      const all = [...pools.three, ...pools.two, ...pools.one];
+      expect(new Set(all).size).toBe(all.length);
+    }
+  });
+
+  test('no pool line says Phase or carries a dash', () => {
+    for (const phase of allSixPhases) {
+      const pools = VICTORY_FEEDBACK_POOLS[phase];
+      for (const line of [...pools.three, ...pools.two, ...pools.one]) {
+        expect(line).not.toMatch(/[–—]/);
+        expect(line).not.toMatch(/\bPhase\b/);
+      }
+    }
+  });
+
+  test('the flat phase-1 one-star line is retired', () => {
+    expect(VICTORY_FEEDBACK_POOLS[1].one).not.toContain('Completed. Every puzzle teaches something.');
   });
 });
 
@@ -114,24 +169,43 @@ describe('getMoveMessage', () => {
     expect(msg.length).toBeGreaterThan(0);
   });
 
-  test('phase 0 messages are upbeat (with rare darkness seeds)', () => {
-    // getMoveMessage uses Math.random; Phase 0 now includes ~5% rare "seed" messages
-    // that hint at darkness. Both normal upbeat and rare seed messages are valid.
-    const phase0Words = ['Delicious', 'Tasty', 'Sweet', 'Yummy', 'Perfect', 'Brilliant', 'Nice', 'Sparkling', 'Juicy', 'Wonderful'];
+  test('pool sizes match the reread budget (phase 2 is the longest phase, deepest pool)', () => {
+    expect(MOVE_MESSAGES[0].length).toBeGreaterThanOrEqual(16);
+    expect(MOVE_MESSAGES[1].length).toBeGreaterThanOrEqual(16);
+    expect(MOVE_MESSAGES[2].length).toBeGreaterThanOrEqual(26);
+    expect(MOVE_MESSAGES[3].length).toBeGreaterThanOrEqual(20);
+    expect(MOVE_MESSAGES[4].length).toBeGreaterThanOrEqual(24);
+    expect(MOVE_MESSAGES[5].length).toBeGreaterThanOrEqual(16);
+  });
+
+  test('phase 2 filler is retired in favor of the deeper-questions register', () => {
+    expect(MOVE_MESSAGES[2]).not.toContain('Onward.');
+    expect(MOVE_MESSAGES[2]).not.toContain('Continuing...');
+  });
+
+  test('phase 0 messages come from the pool or the rare darkness seeds', () => {
+    // getMoveMessage uses Math.random; Phase 0 includes ~7% rare "seed" messages.
     const seedWords = ['remember', 'shifted', 'feel', 'wanted'];
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 60; i++) {
       const msg = getMoveMessage(0);
-      const isUpbeat = phase0Words.some(w => msg.includes(w));
+      const isPool = MOVE_MESSAGES[0].includes(msg);
       const isSeed = seedWords.some(w => msg.toLowerCase().includes(w));
-      expect(isUpbeat || isSeed).toBe(true);
+      expect(isPool || isSeed).toBe(true);
     }
   });
 
-  test('phase 4 messages are dark', () => {
-    const phase4Words = ['void', 'dissolve', 'Nothing', 'matter', 'shift', '...', 'silence', 'arrangement', 'verse', 'deeper', 'going', 'listening', 'pattern', 'Given', 'offering', 'always', 'closer', 'house'];
-    for (let i = 0; i < 50; i++) {
-      const msg = getMoveMessage(4);
-      expect(phase4Words.some(w => msg.includes(w))).toBe(true);
+  test('phase 4 messages come from the phase 4 pool', () => {
+    for (let i = 0; i < 60; i++) {
+      expect(MOVE_MESSAGES[4]).toContain(getMoveMessage(4));
+    }
+  });
+
+  test('no move message says Phase or carries a dash', () => {
+    for (const phase of [0, 1, 2, 3, 4, 5] as DialoguePhase[]) {
+      for (const msg of MOVE_MESSAGES[phase]) {
+        expect(msg).not.toMatch(/[–—]/);
+        expect(msg).not.toMatch(/\bPhase\b/);
+      }
     }
   });
 });
@@ -220,6 +294,15 @@ describe('getHintMessage', () => {
     const hints = ALL_PHASES.map(p => getHintMessage('X', 'TEST', p));
     const unique = new Set(hints);
     expect(unique.size).toBe(5);
+  });
+
+  test('punctuation cools with the descent: ! at phases 0-2, . from phase 3 up', () => {
+    for (const p of [0, 1, 2] as DialoguePhase[]) {
+      expect(getHintMessage('R', 'WARM', p).endsWith('"WARM"!')).toBe(true);
+    }
+    for (const p of [3, 4, 5] as DialoguePhase[]) {
+      expect(getHintMessage('R', 'VOID', p).endsWith('"VOID".')).toBe(true);
+    }
   });
 });
 
@@ -621,21 +704,48 @@ describe('getComboMoveMessage', () => {
     expect(msg.length).toBeGreaterThan(0);
   });
 
-  test('escalates through tiers as the streak grows (phase 0)', () => {
-    const t2 = getComboMoveMessage(2, 0);
-    const t3 = getComboMoveMessage(3, 0);
-    const t4 = getComboMoveMessage(4, 0);
-    expect(new Set([t2, t3, t4]).size).toBe(3);
+  test('tier pools are sized 3 / 3 / 5 in every phase', () => {
+    for (const phase of allSixPhases) {
+      const [t2, t3, t4] = COMBO_MOVE_POOLS[phase];
+      expect(t2).toHaveLength(3);
+      expect(t3).toHaveLength(3);
+      expect(t4).toHaveLength(5);
+    }
+  });
+
+  test('each streak draws from its own tier pool', () => {
+    for (const phase of allSixPhases) {
+      const [t2, t3, t4] = COMBO_MOVE_POOLS[phase];
+      for (let i = 0; i < 15; i++) {
+        expect(t2).toContain(getComboMoveMessage(2, phase));
+        expect(t3).toContain(getComboMoveMessage(3, phase));
+        expect(t4).toContain(getComboMoveMessage(4, phase));
+      }
+    }
+  });
+
+  test('tiers within a phase are disjoint, so escalation always reads as climbing', () => {
+    for (const phase of allSixPhases) {
+      const all = COMBO_MOVE_POOLS[phase].flat();
+      expect(new Set(all).size).toBe(all.length);
+    }
+  });
+
+  test('signature lines survive as pool members', () => {
+    expect(COMBO_MOVE_POOLS[4][2]).toContain('A flawless verse. It hears.');
+    expect(COMBO_MOVE_POOLS[0][2]).toContain('On fire! 🔥');
+    expect(COMBO_MOVE_POOLS[5][2]).toContain('The weave sings, unbroken.');
   });
 
   test('saturates at the top tier for very long streaks', () => {
-    // streak 4 and 9 both map to the final tier
-    expect(getComboMoveMessage(9, 2)).toBe(getComboMoveMessage(4, 2));
+    // streak 4 and 9 both map to the final tier pool
+    expect(COMBO_MOVE_POOLS[2][2]).toContain(getComboMoveMessage(9, 2));
+    expect(COMBO_MOVE_POOLS[2][2]).toContain(getComboMoveMessage(4, 2));
   });
 
   test('clamps streaks below 2 to the first tier without throwing', () => {
     expect(typeof getComboMoveMessage(0, 3)).toBe('string');
-    expect(getComboMoveMessage(1, 3)).toBe(getComboMoveMessage(2, 3));
+    expect(COMBO_MOVE_POOLS[3][0]).toContain(getComboMoveMessage(1, 3));
   });
 });
 
@@ -772,7 +882,10 @@ describe('checkNarrativeMicroBeat', () => {
     const beat5 = await checkNarrativeMicroBeat(5);
     expect(beat5).not.toBeNull();
     expect(beat5!.type).toBe('ambient_whisper');
-    expect(beat5!.text).toContain('Fox');
+    // Ember is she/her (canon) — the first micro-beat must never misgender her.
+    expect(beat5!.text).toContain('Ember');
+    expect(beat5!.text).toContain('She');
+    expect(beat5!.text).not.toMatch(/\bHe\b|\bhe\b|\bhis\b/);
 
     const beat8 = await checkNarrativeMicroBeat(8);
     expect(beat8).not.toBeNull();
@@ -823,8 +936,8 @@ describe('checkNarrativeMicroBeat', () => {
     expect(beat!.type).toBe('ambient_whisper');
   });
 
-  test('keeps the narrative pulse alive through the mid-game valley (140-185)', async () => {
-    for (const count of [140, 155, 170, 185]) {
+  test('keeps the narrative pulse alive through the valley and the dwell window', async () => {
+    for (const count of [105, 118, 126, 132, 150, 155, 158, 160]) {
       await resetMicroBeats();
       (AsyncStorage.clear as jest.Mock)();
       const beat = await checkNarrativeMicroBeat(count);
@@ -900,22 +1013,25 @@ describe('checkNarrativeMicroBeat', () => {
     expect(beat!.text).toBeDefined();
   });
 
-  test('returns a beat at puzzle 110', async () => {
-    const beat = await checkNarrativeMicroBeat(110);
+  test('returns a beat at puzzle 105 (first valley beat)', async () => {
+    const beat = await checkNarrativeMicroBeat(105);
     expect(beat).not.toBeNull();
     expect(beat!.type).toBe('ambient_whisper');
     expect(beat!.text).toBeDefined();
   });
 
-  test('returns a beat at puzzle 130', async () => {
-    const beat = await checkNarrativeMicroBeat(130);
+  test('returns a beat at puzzle 132 (reveal-adjacent)', async () => {
+    const beat = await checkNarrativeMicroBeat(132);
     expect(beat).not.toBeNull();
     expect(beat!.type).toBe('ambient_whisper');
     expect(beat!.text).toBeDefined();
   });
 
-  test('all 19 micro-beat thresholds fire independently', async () => {
-    const thresholds = [5, 8, 12, 16, 20, 25, 30, 35, 40, 50, 55, 65, 70, 74, 80, 90, 100, 110, 130];
+  test('all 26 micro-beat thresholds fire independently', async () => {
+    const thresholds = [
+      5, 8, 12, 16, 20, 25, 30, 35, 40, 50, 55, 65, 70, 74, 80, 90, 100,
+      105, 118, 126, 132, 148, 150, 155, 158, 160,
+    ];
     for (const t of thresholds) {
       const beat = await checkNarrativeMicroBeat(t);
       expect(beat).not.toBeNull();
@@ -923,6 +1039,71 @@ describe('checkNarrativeMicroBeat', () => {
     // All consumed — none should fire again
     for (const t of thresholds) {
       expect(await checkNarrativeMicroBeat(t)).toBeNull();
+    }
+  });
+});
+
+// ============================================================================
+// Micro-beat geography (v1.3 pacing: reveal ~130, house whole ~153,
+// dwell ~154-161, finale ~162)
+// ============================================================================
+
+describe('MICRO_BEATS geography', () => {
+  const keys = Object.keys(MICRO_BEATS).map(Number).sort((a, b) => a - b);
+
+  test('keys match the new geography exactly', () => {
+    expect(keys).toEqual([
+      5, 8, 12, 16, 20, 25, 30, 35, 40, 50, 55, 65, 70, 74, 80, 90, 100,
+      105, 118, 126, 132, 148, 150, 155, 158, 160,
+    ]);
+  });
+
+  test('nothing fires past 160: the finale (~162) gets the silence', () => {
+    expect(keys[keys.length - 1]).toBe(160);
+  });
+
+  test('the silent-victory anticlimax sits at 148, before the finale', () => {
+    expect(MICRO_BEATS[148].type).toBe('silent_victory');
+    expect(isSilentVictoryBeat(148)).toBe(true);
+    // Exactly one silent victory in the whole table.
+    const silents = keys.filter(k => MICRO_BEATS[k].type === 'silent_victory');
+    expect(silents).toEqual([148]);
+    expect(isSilentVictoryBeat(160)).toBe(false);
+  });
+
+  test('the complicity beat lands at 150', () => {
+    expect(MICRO_BEATS[150].text).toBe(
+      'You could stop now. You know that. You won\'t. They know that too.'
+    );
+  });
+
+  test('house-wholeness language only appears at or after completion (~153)', () => {
+    for (const k of keys) {
+      const text = (MICRO_BEATS[k].text ?? '').toLowerCase();
+      if (/is whole|every room is built|every keeper is home/.test(text)) {
+        expect(k).toBeGreaterThanOrEqual(153);
+      }
+    }
+    // And the dwell-window beats DO speak of the whole house.
+    expect(MICRO_BEATS[155].text!.toLowerCase()).toContain('every room is built');
+    expect(MICRO_BEATS[158].text!.toLowerCase()).toContain('the house is whole');
+  });
+
+  test('dwell beats never surface a counter or number', () => {
+    for (const k of [155, 158]) {
+      expect(MICRO_BEATS[k].text).not.toMatch(/\d/);
+    }
+  });
+
+  test('the pre-completion builder beat sits before the house is whole', () => {
+    expect(MICRO_BEATS[126].text).toContain('The house keeps making room');
+  });
+
+  test('no beat says Phase or carries a dash', () => {
+    for (const k of keys) {
+      const text = MICRO_BEATS[k].text ?? '';
+      expect(text).not.toMatch(/[–—]/);
+      expect(text).not.toMatch(/\bPhase\b/);
     }
   });
 });
@@ -1352,5 +1533,301 @@ describe('victory glitch', () => {
 
   test('getFirstWinGlitchText returns a stable non-empty glitch', () => {
     expect(getFirstWinGlitchText()).toBe('WE SEE YOU');
+  });
+});
+
+// ============================================================================
+// Incantation article fix (a/an)
+// ============================================================================
+
+describe('getIncantationName indefinite article', () => {
+  // The template pick is a deterministic hash of the joined words; filler
+  // second words A-E cover every residue mod the template count, so exactly
+  // one candidate lands on the Journey template.
+  const journeyFor = (first: string): string | null => {
+    for (const filler of ['A', 'B', 'C', 'D', 'E']) {
+      const name = getIncantationName([first, filler], 2);
+      if (name && name.includes("'s Journey")) return name;
+    }
+    return null;
+  };
+
+  test('vowel-initial words take An (never "A ABYSS\'s Journey")', () => {
+    expect(journeyFor('ABYSS')).toBe("An ABYSS's Journey");
+  });
+
+  test('consonant-initial words keep A', () => {
+    expect(journeyFor('DOOM')).toBe("A DOOM's Journey");
+  });
+});
+
+// ============================================================================
+// Goal-suggestion register (UI nomenclature never fused with dread)
+// ============================================================================
+
+describe('goal-suggestion register separation', () => {
+  test('phase 4 Medium names the mode plainly; the dread colors its own sentence', () => {
+    const s = getGoalSuggestion(4, false, ['MEDIUM'], null, false, 0, false);
+    expect(s).not.toBeNull();
+    expect(s!.text).toBe('Medium remains open. Whatever you form there is received.');
+    expect(s!.text).not.toContain('Medium offerings');
+  });
+
+  test('phase 5 Medium+ no longer strengthens the tapestry as a compound slogan', () => {
+    const s = getGoalSuggestion(5, false, ['MEDIUM_PLUS'], null, false, 0, false);
+    expect(s).not.toBeNull();
+    expect(s!.text).not.toContain('Medium+ patterns');
+  });
+
+  test('the "Feed the void faster" slogan is retired', () => {
+    const s = getGoalSuggestion(4, false, [], 'speed', false, 0, false);
+    expect(s).not.toBeNull();
+    expect(s!.text).toContain('Speed Shift');
+    expect(s!.text).not.toContain('Feed the void faster');
+  });
+
+  test('phase 5 quest nudges no longer fuse Weekly with the weave register', () => {
+    for (let i = 0; i < 20; i++) {
+      const s = getGoalSuggestion(5, false, [], null, false, 0, true);
+      expect(s).not.toBeNull();
+      expect(s!.text).not.toBe('Weekly patterns await completion.');
+      expect(s!.text.toLowerCase()).not.toContain('weekly threads');
+      expect(s!.text.toLowerCase()).not.toContain('weekly patterns');
+    }
+  });
+});
+
+// ============================================================================
+// Pit offer-result pools
+// ============================================================================
+
+describe('getPitOfferResultMessage', () => {
+  const allSixPhases: DialoguePhase[] = [0, 1, 2, 3, 4, 5];
+
+  test('five templates per phase', () => {
+    for (const p of allSixPhases) {
+      expect(PIT_OFFER_RESULT_MESSAGES[p]).toHaveLength(5);
+    }
+  });
+
+  test('every template pays the amber; placeholders always resolve', () => {
+    for (const p of allSixPhases) {
+      for (const t of PIT_OFFER_RESULT_MESSAGES[p]) {
+        expect(t).toContain('{amber}');
+        expect(t).not.toMatch(/[–—]/);
+        expect(t).not.toMatch(/\bPhase\b/);
+      }
+      for (let i = 0; i < 25; i++) {
+        const msg = getPitOfferResultMessage(p, 7, 42);
+        expect(msg).not.toContain('{words}');
+        expect(msg).not.toContain('{amber}');
+        expect(msg).toContain('42');
+      }
+    }
+  });
+});
+
+// ============================================================================
+// Animal interjection pools
+// ============================================================================
+
+describe('INTERJECTION_MESSAGES', () => {
+  test('six templates per phase, each carrying the {name} slot', () => {
+    for (const p of [0, 1, 2, 3, 4, 5]) {
+      expect(INTERJECTION_MESSAGES[p]).toHaveLength(6);
+      for (const t of INTERJECTION_MESSAGES[p]) {
+        expect(t).toContain('{name}');
+        expect(t).not.toMatch(/[–—]/);
+        expect(t).not.toMatch(/\bPhase\b/);
+      }
+    }
+  });
+});
+
+// ============================================================================
+// New copy surfaces: dwell window, streak-held mercy, preview graduation,
+// swift-victory pointer, final board, New Cycle half-memories
+// ============================================================================
+
+describe('getDwellLine', () => {
+  test('escalates across the window and never shows a counter', () => {
+    const early = getDwellLine(1, 4);
+    const mid = getDwellLine(4, 4);
+    const late = getDwellLine(7, 4);
+    expect(new Set([early, mid, late]).size).toBe(3);
+    for (const line of [early, mid, late]) {
+      expect(line).not.toMatch(/\d/);
+      expect(line).not.toMatch(/[–—]/);
+      expect(line.toLowerCase()).not.toContain('phase');
+    }
+    expect(early.toLowerCase()).toContain('whole');
+  });
+
+  test('keeps a distinct serene register at phase 5', () => {
+    expect(getDwellLine(1, 5)).not.toBe(getDwellLine(1, 4));
+    expect(getDwellLine(7, 5)).not.toBe(getDwellLine(7, 4));
+  });
+});
+
+describe('getStreakHeldMessage', () => {
+  test('always names the held streak and shifts register with phase', () => {
+    for (const p of [0, 2, 4]) {
+      const msg = getStreakHeldMessage(9, p);
+      expect(msg).toContain('9');
+      expect(msg).not.toMatch(/[–—]/);
+    }
+    expect(getStreakHeldMessage(9, 0)).toContain('held at 9');
+    expect(getStreakHeldMessage(9, 0)).not.toBe(getStreakHeldMessage(9, 4));
+  });
+
+  test('stays warm at every register: never blame, never loss language', () => {
+    for (const p of [0, 1, 2, 3, 4, 5]) {
+      expect(getStreakHeldMessage(3, p).toLowerCase()).not.toMatch(/lost|broke\b|reset|missed it/);
+    }
+  });
+
+  test('phase defaults to the bright voice when omitted', () => {
+    expect(getStreakHeldMessage(5)).toBe(getStreakHeldMessage(5, 0));
+  });
+});
+
+describe('getPreviewGraduationMessage', () => {
+  test('explains the marks staying behind, in-world, without mechanics vocabulary', () => {
+    for (const p of [0, 2, 4]) {
+      const msg = getPreviewGraduationMessage(p);
+      expect(msg.length).toBeGreaterThan(0);
+      expect(msg.toLowerCase()).not.toMatch(/easy|difficulty|preview|setting|valid/);
+      expect(msg).not.toMatch(/[–—]/);
+    }
+    expect(getPreviewGraduationMessage(0).toLowerCase()).toContain('gentlest boards');
+    expect(getPreviewGraduationMessage(2)).not.toBe(getPreviewGraduationMessage(0));
+    expect(getPreviewGraduationMessage(4)).not.toBe(getPreviewGraduationMessage(2));
+  });
+});
+
+describe('getSwiftVictoryHintMessage', () => {
+  test('points at Settings in an in-world voice, never a tutorial voice', () => {
+    for (const p of [0, 2, 4]) {
+      const msg = getSwiftVictoryHintMessage(p);
+      expect(msg).toContain('Settings');
+      expect(msg.toLowerCase()).not.toMatch(/tap |toggle|enable|button/);
+      expect(msg).not.toMatch(/[–—]/);
+    }
+    expect(getSwiftVictoryHintMessage(0)).not.toBe(getSwiftVictoryHintMessage(4));
+  });
+});
+
+describe('getFinalBoardStartMessage', () => {
+  test('is quiet and heavy, with no fourth wall', () => {
+    const msg = getFinalBoardStartMessage(4);
+    expect(msg).toBe('The last arrangement. Take your time. It has waited this long.');
+    expect(msg.toLowerCase()).not.toMatch(/game|level|screen/);
+    expect(getFinalBoardStartMessage(5)).not.toBe(msg);
+  });
+});
+
+describe('getCycleMicroBeat', () => {
+  test('six half-memories at the cycle-relative keys, silence everywhere else', () => {
+    const keys = Object.keys(CYCLE_MICRO_BEATS).map(Number).sort((a, b) => a - b);
+    expect(keys).toEqual([3, 12, 26, 45, 70, 100]);
+    for (const k of keys) {
+      const beat = getCycleMicroBeat(k);
+      expect(beat).not.toBeNull();
+      expect(beat!.type).toBe('ambient_whisper');
+      expect(beat!.text!.length).toBeGreaterThan(0);
+      expect(beat!.text).not.toMatch(/[–—]/);
+      // Half-memory, never explicit: the animals must never name the loop.
+      expect(beat!.text!.toLowerCase()).not.toMatch(/cycle|last time|start over|began again/);
+      expect(beat!.durationMs).toBeGreaterThan(0);
+    }
+    expect(getCycleMicroBeat(0)).toBeNull();
+    expect(getCycleMicroBeat(4)).toBeNull();
+    expect(getCycleMicroBeat(99)).toBeNull();
+  });
+
+  test('the first half-memory belongs to Ember at the fire', () => {
+    const beat = getCycleMicroBeat(3);
+    expect(beat!.text).toContain('Ember');
+    expect(beat!.text).toContain('fire');
+  });
+
+  test('canon pronouns hold across the half-memories', () => {
+    expect(getCycleMicroBeat(12)!.text).toContain('she says'); // Panko
+    expect(getCycleMicroBeat(26)!.text).toContain('his handwriting'); // Archimedes
+    expect(getCycleMicroBeat(100)!.text).toContain('her'); // Sloane
+  });
+});
+
+// ============================================================================
+// Cycle-relative micro-beat delivery (NG+ depth): on cycleCount > 0 the beats
+// key on puzzles-solved-this-cycle, with a per-cycle seen set. Half-memory
+// CYCLE_MICRO_BEATS win at shared keys; regular MICRO_BEATS re-fire EXCEPT the
+// forever-once silent_victory (and the first-win glitch, which lives on its
+// own never-reset flag).
+// ============================================================================
+
+describe('checkCycleNarrativeMicroBeat + resolveVictoryMicroBeat', () => {
+  beforeEach(async () => {
+    (AsyncStorage.clear as jest.Mock)();
+    await resetMicroBeats();
+  });
+
+  test('cycle beats fire once per cycle at their cycle-relative keys', async () => {
+    const beat = await checkCycleNarrativeMicroBeat(3, 1);
+    expect(beat).not.toBeNull();
+    expect(beat!.text).toContain('Ember'); // the half-memory wins its key
+    // Consumed for THIS cycle.
+    expect(await checkCycleNarrativeMicroBeat(3, 1)).toBeNull();
+    // A deeper cycle replays it (the seen set is per-cycle).
+    expect(await checkCycleNarrativeMicroBeat(3, 2)).not.toBeNull();
+  });
+
+  test('regular micro-beats re-fire cycle-relative on a new cycle', async () => {
+    // 35 is a regular MICRO_BEATS key (no cycle beat there).
+    const beat = await checkCycleNarrativeMicroBeat(35, 1);
+    expect(beat).not.toBeNull();
+    expect(beat).toEqual(MICRO_BEATS[35]);
+    expect(await checkCycleNarrativeMicroBeat(35, 1)).toBeNull();
+  });
+
+  test('half-memory beats take priority over regular beats at shared keys', async () => {
+    // 12 and 100 exist on BOTH tracks — the cycle half-memory must win.
+    const beat12 = await checkCycleNarrativeMicroBeat(12, 1);
+    expect(beat12).toEqual(CYCLE_MICRO_BEATS[12]);
+    const beat100 = await checkCycleNarrativeMicroBeat(100, 1);
+    expect(beat100).toEqual(CYCLE_MICRO_BEATS[100]);
+  });
+
+  test('the silent_victory anticlimax stays forever-once (never re-fires on a cycle)', async () => {
+    const silentKey = Number(
+      Object.keys(MICRO_BEATS).find(k => MICRO_BEATS[Number(k)].type === 'silent_victory')
+    );
+    expect(Number.isFinite(silentKey)).toBe(true);
+    expect(await checkCycleNarrativeMicroBeat(silentKey, 1)).toBeNull();
+  });
+
+  test('returns null on the first playthrough or at non-keys', async () => {
+    expect(await checkCycleNarrativeMicroBeat(3, 0)).toBeNull();
+    expect(await checkCycleNarrativeMicroBeat(0, 1)).toBeNull();
+    expect(await checkCycleNarrativeMicroBeat(999, 1)).toBeNull();
+  });
+
+  test('resolveVictoryMicroBeat routes by cycle: absolute on cycle 0, relative after', async () => {
+    // First playthrough: absolute count consumes the classic track.
+    const first = await resolveVictoryMicroBeat(35, 0, 0);
+    expect(first).toEqual(MICRO_BEATS[35]);
+    // Cycle 1 at total 203, started at 200 → cycle-relative 3 → Ember's half-memory.
+    const cycled = await resolveVictoryMicroBeat(203, 1, 200);
+    expect(cycled).toEqual(CYCLE_MICRO_BEATS[3]);
+    // Legacy cycled save with no anchor (cycleStartPuzzles 0): relative count
+    // equals the huge total → outruns every key → the old silence, no crash.
+    expect(await resolveVictoryMicroBeat(203, 1, 0)).toBeNull();
+  });
+
+  test('resetMicroBeats clears the cycle-scoped seen set too', async () => {
+    await checkCycleNarrativeMicroBeat(3, 1);
+    expect(await checkCycleNarrativeMicroBeat(3, 1)).toBeNull();
+    await resetMicroBeats();
+    expect(await checkCycleNarrativeMicroBeat(3, 1)).not.toBeNull();
   });
 });

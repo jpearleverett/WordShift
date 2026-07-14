@@ -2708,9 +2708,16 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
               accessibilityRole="button"
             >
               <ThreeSliceStrip skin={pitSkin.buttons.primary.lg.up} capDp={BTN_CAP_DP} />
+              {/* Row layout, NOT an inline <Image> inside the Text run: the
+                  900-weight letter-spaced font shifts inline-image baselines
+                  on device and the gem overlapped the amount. */}
               <View style={styles.harvestAllContent}>
                 <Text style={[styles.harvestAllText, { color: pitSkin.ink.primary }]}>
-                  {getPitOfferAllLabel(phase)} (<AmberInline size={14} /> {Math.max(0, pendingAmber - pendingAmberOffset)})
+                  {getPitOfferAllLabel(phase)} (
+                </Text>
+                <AmberInline size={14} />
+                <Text style={[styles.harvestAllText, { color: pitSkin.ink.primary }]}>
+                  {' '}{Math.max(0, pendingAmber - pendingAmberOffset)})
                 </Text>
               </View>
             </TouchableOpacity>

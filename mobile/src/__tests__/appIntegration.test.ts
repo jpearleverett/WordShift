@@ -132,13 +132,115 @@ describe('reset-all wiring', () => {
 
 describe('drag input without previews', () => {
   test('drops resolve slot geometry from the live board when previews are suppressed', () => {
-    // Previews are suppressed in blind AND challenge modes; the drop handler
-    // must derive slot count from the board or every drag in those modes dies
-    // as a "miss" and only tap input works.
+    // Previews are suppressed in blind mode; the drop handler must derive slot
+    // count from the board or every drag there dies as a "miss" and only tap
+    // input works.
     expect(APP_TSX).toMatch(/slotCount = previews\?\.length \?\? 0/);
     expect(APP_TSX).toMatch(/targetRow\.words\.length \+ 1/);
-    // Near-miss snapping stays preview-gated (no free validity tell in blind).
-    expect(APP_TSX).toMatch(/previews && !previews\[estimated\]\?\.isValid/);
+    // Near-miss snapping is gated on the verb-depth flag: it keys off preview
+    // VALIDITY, so it may only run while the ✓/✗ grading is actually shown
+    // (EASY / double-shift) — otherwise the snap leaks validity on boards
+    // where the player is meant to judge the word.
+    expect(APP_TSX).toMatch(/previews && previewValidityVisibleRef\.current && !previews\[estimated\]\?\.isValid/);
+  });
+});
+
+describe('verb-depth preview gate threading', () => {
+  test('Row receives the presentation flag straight from the hook', () => {
+    expect(APP_TSX).toMatch(/previewValidityVisible=\{puzzle\.previewValidityVisible\}/);
+  });
+
+  test('the one-time graduation toast fires on the first hidden-validity board', () => {
+    expect(APP_TSX).toMatch(/PREVIEW_GRADUATION_SEEN_KEY/);
+    expect(APP_TSX).toMatch(/getPreviewGraduationMessage\(persistence\.currentPhase\)/);
+    // Blind Offering and onboarding never consume the beat.
+    expect(APP_TSX).toMatch(/puzzle\.previewValidityVisible \|\| puzzle\.blindMode/);
+  });
+});
+
+describe('drag hover highlight', () => {
+  test('hover derives geometrically and threads to the target Row', () => {
+    expect(APP_TSX).toMatch(/onLetterDragMove=\{handleLetterDragMove\}/);
+    expect(APP_TSX).toMatch(/hoverSlotIndex=\{/);
+    // Ref-compare before setState keeps the PanResponder move path cheap.
+    expect(APP_TSX).toMatch(/prev\.rowIndex === next\.rowIndex && prev\.slotIndex === next\.slotIndex/);
+    // Hover must never be validity-filtered — no findClosestValidSlot in the
+    // move handler (only the drop handler may snap, and only gated).
+    const moveHandler = APP_TSX.slice(
+      APP_TSX.indexOf('const handleLetterDragMove'),
+      APP_TSX.indexOf('const handleLetterDragDrop')
+    );
+    expect(moveHandler.length).toBeGreaterThan(0);
+    expect(moveHandler).not.toContain('findClosestValidSlot');
+    expect(moveHandler).not.toContain('isValid');
+  });
+
+  test('drag end clears the hover highlight', () => {
+    expect(APP_TSX).toMatch(/const clearHoverSlot = useCallback/);
+    expect(APP_TSX).toMatch(/\} else \{\s*\n\s*clearHoverSlot\(\);/);
+  });
+});
+
+describe('move feedback stack', () => {
+  test('valid-move audio climbs the combo ladder from the hook-computed tier', () => {
+    expect(APP_TSX).toMatch(/soundValidMove\(result\.comboTier \?\? 0\)/);
+  });
+
+  test('locked-tile taps get the full rejection language, never the select chime', () => {
+    expect(APP_TSX).toMatch(/if \(letter\.isLocked\) \{/);
+    const lockedBranch = APP_TSX.slice(
+      APP_TSX.indexOf('if (letter.isLocked) {'),
+      APP_TSX.indexOf('hapticLight();', APP_TSX.indexOf('if (letter.isLocked) {'))
+    );
+    expect(lockedBranch).toContain('hapticError();');
+    expect(lockedBranch).toContain('soundInvalidMove();');
+  });
+});
+
+describe('victory haptics fire once', () => {
+  test('no hapticSuccess at victory-processing start (the modal owns it)', () => {
+    // The doubled-buzz fix: VictoryModal fires hapticSuccess when it becomes
+    // visible; a second one at setProcessingVictory(true) must not return.
+    expect(APP_TSX).not.toMatch(/setProcessingVictory\(true\);\s*\n\s*hapticSuccess\(\)/);
+  });
+});
+
+describe('ambient music wiring', () => {
+  test('the bed starts after hydration and re-crossfades outside ceremonies', () => {
+    expect(APP_TSX).toMatch(/startMusicForPhase\(persistence\.currentPhase\)/);
+    // Ceremony guard: never switch beds mid-overlay.
+    expect(APP_TSX).toMatch(/if \(phaseTransitionEvent !== null\) return;/);
+  });
+
+  test('foreground return resumes the paused bed (no stopMusic churn)', () => {
+    expect(APP_TSX).toMatch(/startMusicForPhase\(musicPhaseRef\.current\)/);
+    // Backgrounding relies on expo-audio's shouldPlayInBackground:false
+    // auto-pause — App must not tear the player down on every app switch
+    // (no stopMusic CALL anywhere in App; the word may appear in comments).
+    expect(APP_TSX).not.toMatch(/^\s*(?:await\s+)?stopMusic\(/m);
+  });
+});
+
+describe('one-time swift-victory pointer', () => {
+  test('fires only on a routine win, past the count gate, with the setting off', () => {
+    expect(APP_TSX).toMatch(/const maybeShowSwiftVictoryHint = useCallback/);
+    expect(APP_TSX).toMatch(/if \(!isRoutineVictory\(vd\)\) return;/);
+    expect(APP_TSX).toMatch(/SWIFT_HINT_MIN_PUZZLES/);
+    expect(APP_TSX).toMatch(/getSettingsSync\(\)\.swiftVictories === true\) return;/);
+    expect(APP_TSX).toMatch(/getSwiftVictoryHintMessage\(phase\)/);
+    // Reads victoryData — must run before the exit flow resets it.
+    const nextLevelIdx = APP_TSX.indexOf('const handleNextLevel = useCallback');
+    const hintCallIdx = APP_TSX.indexOf('maybeShowSwiftVictoryHint();', nextLevelIdx);
+    const exitIdx = APP_TSX.indexOf('startVictoryExitFlow(', nextLevelIdx);
+    expect(hintCallIdx).toBeGreaterThan(nextLevelIdx);
+    expect(hintCallIdx).toBeLessThan(exitIdx);
+  });
+});
+
+describe('daily streak decay-to-milestone messaging', () => {
+  test('the decayed checkpoint routes through getStreakHeldMessage', () => {
+    expect(APP_TSX).toMatch(/dailyProgress\.streakDecayedTo != null/);
+    expect(APP_TSX).toMatch(/getStreakHeldMessage\(heldAt, persistence\.currentPhase\)/);
   });
 });
 
@@ -147,20 +249,94 @@ describe('proactive share prompt', () => {
     // The prompt's Share CTA opens the modal from a pre-teardown snapshot; if
     // the snapshot were read after startVictoryExitFlow (which nulls
     // victoryData), the CTA would be a dead no-op.
-    expect(APP_TSX).toMatch(/pendingShareSnapshotRef\.current = buildShareDataRef\.current\(\);\s*\n\s*const adShown = maybeShowVictoryInterstitial\(\);\s*\n\s*startVictoryExitFlow/);
+    // The intro-queue capture may sit between the interstitial and the exit
+    // flow — the contract is only that the snapshot precedes the exit flow.
+    expect(APP_TSX).toMatch(/pendingShareSnapshotRef\.current = buildShareDataRef\.current\(\);[\s\S]{0,400}?startVictoryExitFlow/);
     expect(APP_TSX).toMatch(/onPress: \(\) => \{ hapticLight\(\); openShareModalRef\.current\(snapshot\); \}/);
   });
 
   test('victory-exit nudges are skipped when an interstitial showed (one nudge per exit)', () => {
-    expect(APP_TSX).toMatch(/runVictoryExitNudges = useCallback\(async \(interstitialShown: boolean\)/);
-    expect(APP_TSX).toMatch(/if \(interstitialShown\) return;/);
+    // Nudges skip when an interstitial showed OR a queued Fox intro will
+    // present on this exit (captured before the exit flow drains the queue).
+    expect(APP_TSX).toMatch(/runVictoryExitNudges = useCallback\(async \(\s*interstitialShown: boolean,\s*introWillPresent: boolean/);
+    expect(APP_TSX).toMatch(/if \(interstitialShown \|\| introWillPresent\) return;/);
+    expect(APP_TSX).toMatch(/const introWillPresent =\s*\n?\s*queuedPostVictoryIntrosRef\.current\.length > 0/);
+    expect(APP_TSX).toMatch(/if \(interstitialShown \|\| introWillPresent\) return;/);
     // Share prompt inherits the same anti-stacking guard the notification prompt has.
     expect(APP_TSX).toMatch(/if \(postVictoryIntro \|\| queuedPostVictoryIntrosRef\.current\.length > 0\) return false;/);
   });
 
+  test('every nudge in the chain short-circuits the rest (no double-nudge exits)', () => {
+    // The notification prompt reports whether it actually presented, and a
+    // shown prompt must end the chain before the remove-ads / patron nudges.
+    expect(APP_TSX).toMatch(/const maybePromptForNotifications = useCallback\(async \(\): Promise<boolean>/);
+    expect(APP_TSX).toMatch(/if \(await maybeShowSharePrompt\(\)\) return;/);
+    expect(APP_TSX).toMatch(/if \(await maybePromptForNotifications\(\)\) return;/);
+    expect(APP_TSX).toMatch(/if \(await maybeShowRemoveAdsOffer\(\)\) return;/);
+  });
+
+  test('the remove-ads upsell is deferred: armed on the ad exit, offered on the NEXT quiet exit', () => {
+    // Inside the interstitial gate: only record + arm — the 'Tired of ads?'
+    // alert must never stack on the interstitial that just played.
+    const gate = APP_TSX.slice(
+      APP_TSX.indexOf('const maybeShowVictoryInterstitial = useCallback'),
+      APP_TSX.indexOf('const maybeShowRemoveAdsOffer = useCallback')
+    );
+    expect(gate.length).toBeGreaterThan(0);
+    expect(gate).toContain('recordInterstitialSeen()');
+    expect(gate).toContain('armRemoveAdsNudgeIfEligible()');
+    expect(gate).not.toContain('Tired of ads?');
+    expect(gate).not.toContain('showGameAlert');
+    // The offer itself lives in the nudge chain, gated on the armed flag.
+    const offer = APP_TSX.slice(
+      APP_TSX.indexOf('const maybeShowRemoveAdsOffer = useCallback'),
+      APP_TSX.indexOf('const runVictoryExitNudges = useCallback')
+    );
+    expect(offer).toContain('consumePendingRemoveAdsNudge()');
+    expect(offer).toContain('Tired of ads?');
+  });
+
+  test('declining the rewarded hint clip never force-opens the Store', () => {
+    // Backing out of an ad is a quiet toast; the Store opens only from the
+    // out-of-hints alert's explicit 'Get hints' button.
+    const claim = APP_TSX.slice(
+      APP_TSX.indexOf('const handleClaimRewardedHint = useCallback'),
+      APP_TSX.indexOf('const handleOutOfHints = useCallback')
+    );
+    expect(claim.length).toBeGreaterThan(0);
+    expect(claim).not.toContain('setShowStoreModal');
+    // The explicit store path stays available in the out-of-hints alert.
+    expect(APP_TSX).toMatch(/text: 'Get hints', onPress: \(\) => \{ done\(\); setShowStoreModal\(true\); \}/);
+  });
+
   test('the prominent opening glitch fires on the first FREE win, not the tutorial', () => {
     expect(APP_TSX).toMatch(/firstFreeWin = !\(await hasSeenFirstWinGlitch\(\)\)/);
-    expect(APP_TSX).toMatch(/firstFreeWin,\s*\n\s*\}\);/);
+    // firstFreeWin (and the dwell-window voice line) thread into processVictory.
+    expect(APP_TSX).toMatch(/firstFreeWin,\s*\n\s*dwellLine: dwellLineForWin,\s*\n\s*\}\);/);
+  });
+});
+
+describe('finale staging (armed, not retroactive)', () => {
+  test('the dwell gate ARMS the finale; the cinematic fires only on the marked final board', () => {
+    // Arming path: dwell >= FINALE_DWELL_PUZZLES arms instead of firing.
+    expect(APP_TSX).toMatch(/if \(dwell >= FINALE_DWELL_PUZZLES\) \{\s*\n\s*await armFinale\(\);/);
+    // Firing path: only the marked final board's win completes the finale.
+    expect(APP_TSX).toMatch(/if \(wasFinalBoard\) \{[\s\S]{0,400}?markFinalPuzzleCompleted\(\)/);
+    expect(APP_TSX).toMatch(/setPhaseTransitionEvent\(FINAL_PUZZLE_EVENT\)/);
+  });
+
+  test('the final board win is silent: no chime, no confetti (the quiet IS the moment)', () => {
+    expect(APP_TSX).toMatch(/!isSilentVictoryBeat\(completedTotal\) && !wasFinalBoard/);
+    // Full sensory silence on BOTH quiet beats: the final board AND the
+    // scripted silent-victory micro-beat (chime suppression alone would let
+    // confetti rain over "No music this time. Only the quiet after.").
+    expect(APP_TSX).toMatch(
+      /setShowConfetti\(\s*!wasFinalBoard && !isSilentVictoryBeat\(completedTotal\)\s*\)/
+    );
+  });
+
+  test('the dwell window has a voice: getDwellLine threads into the victory cascade', () => {
+    expect(APP_TSX).toMatch(/dwellLineForWin = getDwellLine\(/);
   });
 });
 
@@ -187,9 +363,19 @@ describe('victory flow', () => {
     );
   });
 
-  test('all three victory exits (next / home / pit) run the interstitial gate', () => {
-    const calls = APP_TSX.match(/maybeShowVictoryInterstitial\(\);/g) || [];
-    expect(calls.length).toBeGreaterThanOrEqual(3);
+  test('next/home victory exits run the interstitial gate; the pit exit (Collect Now) is exempt', () => {
+    // Next Level and Return Home keep the cadence (ad inventory shifts, it
+    // does not disappear).
+    const calls = APP_TSX.match(/const adShown = maybeShowVictoryInterstitial\(\);/g) || [];
+    expect(calls.length).toBeGreaterThanOrEqual(2);
+    // Collecting amber you already earned is never an ad moment: handleGoToPit
+    // must not run the interstitial gate.
+    const pitExit = APP_TSX.slice(
+      APP_TSX.indexOf('const handleGoToPit = useCallback'),
+      APP_TSX.indexOf('}, [', APP_TSX.indexOf('const handleGoToPit = useCallback'))
+    );
+    expect(pitExit.length).toBeGreaterThan(0);
+    expect(pitExit).not.toContain('maybeShowVictoryInterstitial');
     // Pending ward ceremonies are exempt at the gate itself.
     expect(APP_TSX).toMatch(/persistence\.pendingPhaseTransition != null/);
   });

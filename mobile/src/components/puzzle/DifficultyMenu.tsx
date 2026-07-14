@@ -13,7 +13,14 @@ import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
 import { PanelCard } from '../ui/PanelCard';
 import { Difficulty, GameMode } from '../../types';
 import { DialoguePhase } from '../../types/homeWorld';
-import { PuzzleVariant, VariantSelectorOption, getVariantDescription } from '../../services/puzzleVariety';
+import {
+  PuzzleVariant,
+  VariantSelectorOption,
+  ComboSelectorOption,
+  ComboPreset,
+  getVariantDescription,
+  getComboDescription,
+} from '../../services/puzzleVariety';
 import { BODY_FONT, BODY_FONT_ITALIC, PIXEL_FONT_BOLD } from '../../theme/fonts';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -45,14 +52,19 @@ interface DifficultyMenuProps {
   currentVariant: PuzzleVariant;
   activeVariant?: PuzzleVariant;
   variantOptions: VariantSelectorOption[];
+  comboOptions?: ComboSelectorOption[];
   phase?: DialoguePhase;
   onSelectDifficulty: (difficulty: Difficulty) => void;
   onSelectVariant: (variant: PuzzleVariant) => void;
+  onSelectCombo?: (preset: ComboPreset) => void;
   onToggleChallengeMode: () => void;
   showChallengeToggle?: boolean;
   blindActive?: boolean;
   onToggleBlindMode?: () => void;
   showBlindToggle?: boolean;
+  /** Blind toggle visible but not yet earned: render a teased locked row. */
+  blindLocked?: boolean;
+  blindUnlockHint?: string;
   introMode?: boolean;
   introHintText?: string;
 }
@@ -64,14 +76,18 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   currentVariant,
   activeVariant,
   variantOptions,
+  comboOptions = [],
   phase = 0,
   onSelectDifficulty,
   onSelectVariant,
+  onSelectCombo,
   onToggleChallengeMode,
   showChallengeToggle = true,
   blindActive = false,
   onToggleBlindMode,
   showBlindToggle = false,
+  blindLocked = false,
+  blindUnlockHint,
   introMode = false,
   introHintText,
 }) => {
@@ -81,10 +97,11 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   const dark = phase >= 3;
   const title = phase >= 3 ? 'ARRANGEMENT SETUP' : 'PUZZLE SETUP';
   const styleTitle = phase >= 3 ? 'ARRANGEMENT STYLE' : 'PUZZLE STYLE';
-  const visibleOptions = variantOptions.filter(option => option.unlocked);
-  const coreOptions = visibleOptions.filter(option => option.group === 'core');
-  const baseOptions = visibleOptions.filter(option => option.group === 'base');
-  const comboOptions: VariantSelectorOption[] = [];
+  // Locked options render as visibly locked rows (teased, non-selectable) so
+  // the next mechanical goal is always on screen.
+  const coreOptions = variantOptions.filter(option => option.group === 'core');
+  const baseOptions = variantOptions.filter(option => option.group === 'base');
+  const comboRows = onSelectCombo ? comboOptions : [];
   const hasNonStandardVariants = !introMode && baseOptions.length > 0;
 
   const activeBadge = dark
@@ -102,25 +119,45 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
     { shadowColor: t.screenBg },
   ]) as ViewStyle;
 
-  const renderVariantItem = (option: VariantSelectorOption) => {
-    const isSelected = option.variant === currentVariant;
-    const isActive = option.variant === activeVariant;
+  /**
+   * Shared row body for variant and combo entries. Locked rows are dimmed,
+   * carry a lock glyph, swap their description for the unlock tease, and are
+   * disabled (never information by color alone: glyph + "locked" label + tease
+   * all carry the state).
+   */
+  const renderStyleRow = (params: {
+    key: string;
+    icon: string;
+    title: string;
+    description: string;
+    locked: boolean;
+    unlockHint: string;
+    isSelected: boolean;
+    isActive: boolean;
+    onPress: () => void;
+  }) => {
+    const { key, icon, title, description, locked, unlockHint, isSelected, isActive, onPress } = params;
     return (
       <TouchableOpacity
-        key={option.variant}
-        style={[styles.variantItem, isSelected && selectedRowStyle]}
-        onPress={() => onSelectVariant(option.variant)}
+        key={key}
+        style={[styles.variantItem, isSelected && selectedRowStyle, locked && styles.lockedRow]}
+        onPress={onPress}
+        disabled={locked}
         accessibilityRole="button"
-        accessibilityState={{ selected: isSelected }}
-        accessibilityLabel={`${option.config.title}${isSelected ? ', selected' : ''}${isActive ? ', active' : ''}`}
+        accessibilityState={locked ? { disabled: true } : { selected: isSelected }}
+        accessibilityLabel={
+          locked
+            ? `${title}, locked. ${unlockHint}`
+            : `${title}${isSelected ? ', selected' : ''}${isActive ? ', active' : ''}`
+        }
       >
-        <Text style={styles.variantIcon}>{option.config.icon}</Text>
+        <Text style={styles.variantIcon}>{locked ? '🔒' : icon}</Text>
         <View style={styles.variantContent}>
           <View style={styles.variantTitleRow}>
-            <Text style={[styles.variantTitle, { color: isSelected ? t.title : t.body }]}>
-              {option.config.title}
+            <Text style={[styles.variantTitle, { color: locked ? t.muted : isSelected ? t.title : t.body }]}>
+              {title}
             </Text>
-            {isSelected && (
+            {!locked && isSelected && (
               <Text
                 style={[
                   styles.variantBadge,
@@ -130,7 +167,7 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
                 SELECTED
               </Text>
             )}
-            {isActive && !isSelected && (
+            {!locked && isActive && !isSelected && (
               <Text
                 style={[
                   styles.variantBadge,
@@ -141,12 +178,48 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
               </Text>
             )}
           </View>
-          <Text style={[styles.variantDescription, { color: t.muted }]}>
-            {getVariantDescription(option.config, phase)}
-          </Text>
+          {locked ? (
+            <Text style={[styles.lockedHintText, { color: t.muted }]}>{unlockHint}</Text>
+          ) : (
+            <Text style={[styles.variantDescription, { color: t.muted }]}>{description}</Text>
+          )}
         </View>
       </TouchableOpacity>
     );
+  };
+
+  const renderVariantItem = (option: VariantSelectorOption) =>
+    renderStyleRow({
+      key: option.variant,
+      icon: option.config.icon,
+      title: option.config.title,
+      description: getVariantDescription(option.config, phase),
+      locked: !option.unlocked,
+      unlockHint: option.unlockHint,
+      isSelected: option.unlocked && option.variant === currentVariant,
+      isActive: option.unlocked && option.variant === activeVariant,
+      onPress: () => onSelectVariant(option.variant),
+    });
+
+  const renderComboItem = (option: ComboSelectorOption) => {
+    const { preset } = option;
+    // A combo is "selected" when its variant is the chosen one AND its trial
+    // rung matches the toggles (blind presets run under gameMode 'challenge'
+    // with blindMode on; challenge presets require blind off).
+    const rungMatches = preset.blind
+      ? blindActive
+      : gameMode === 'challenge' && !blindActive;
+    return renderStyleRow({
+      key: preset.id,
+      icon: preset.icon,
+      title: preset.title,
+      description: getComboDescription(preset, phase),
+      locked: !option.unlocked,
+      unlockHint: option.unlockHint,
+      isSelected: option.unlocked && preset.variant === currentVariant && rungMatches,
+      isActive: option.unlocked && preset.variant === activeVariant && rungMatches,
+      onPress: () => onSelectCombo?.(preset),
+    });
   };
 
   return (
@@ -196,13 +269,13 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
             {coreOptions.map(renderVariantItem)}
             {baseOptions.map(renderVariantItem)}
 
-            {comboOptions.length > 0 && (
+            {comboRows.length > 0 && (
               <Text style={[styles.sectionTitle, { color: t.muted }]}>
                 COMBINATION STYLES
               </Text>
             )}
-            {comboOptions.map(renderVariantItem)}
-            {comboOptions.length === 0 && (
+            {comboRows.map(renderComboItem)}
+            {comboRows.length === 0 && (
               <Text style={[styles.combosComingText, { color: t.muted }]}>
                 {phase >= 3
                   ? 'More layered arrangements will reveal themselves.'
@@ -264,7 +337,33 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
           </>
         )}
 
-        {showBlindToggle && !introMode && onToggleBlindMode && (
+        {/* Blind toggle pre-gate: a visible locked row with the tease (the apex
+            rung stays on screen as a goal). If a restored board somehow has
+            blind active while locked, the live toggle renders instead so the
+            player can always turn it off. */}
+        {showBlindToggle && !introMode && blindLocked && !blindActive && (
+          <TouchableOpacity
+            style={[styles.menuRow, styles.lockedRow]}
+            disabled
+            accessibilityRole="button"
+            accessibilityState={{ disabled: true }}
+            accessibilityLabel={`${phase >= 3 ? 'Blind offering' : 'Blind mode'}, locked. ${blindUnlockHint || ''}`}
+          >
+            <Text style={styles.challengeMenuIcon}>{'🔒'}</Text>
+            <View style={styles.challengeMenuContent}>
+              <Text style={[styles.menuRowText, { color: t.muted }]}>
+                {phase >= 3 ? 'BLIND OFFERING' : 'BLIND MODE'}
+              </Text>
+              {blindUnlockHint ? (
+                <Text style={[styles.lockedHintText, { color: t.muted }]}>
+                  {blindUnlockHint}
+                </Text>
+              ) : null}
+            </View>
+          </TouchableOpacity>
+        )}
+
+        {showBlindToggle && !introMode && (!blindLocked || blindActive) && onToggleBlindMode && (
           <TouchableOpacity
             style={[
               styles.menuRow,
@@ -445,6 +544,15 @@ const styles = StyleSheet.create({
     paddingVertical: 2.5,
     borderRadius: 8,
     overflow: 'hidden',
+  },
+  lockedRow: {
+    opacity: 0.62,
+  },
+  lockedHintText: {
+    fontFamily: BODY_FONT_ITALIC,
+    fontSize: 12,
+    lineHeight: 16,
+    fontStyle: 'italic',
   },
   variantUnlockHint: {
     marginTop: 6,

@@ -1,5 +1,4 @@
 import {
-  shouldOfferVariant,
   getVariantDescription,
   getVariantInstruction,
   getVariantOverrides,
@@ -17,6 +16,14 @@ import {
   getVariantTimeLimitForDifficulty,
   isLetterAllowedByVariant,
   isVariantCompatibleWithSolution,
+  getBlindUnlockHint,
+  getComboDescription,
+  getComboSelectorOptions,
+  getComboUnlockHint,
+  isComboUnlocked,
+  COMBO_PRESETS,
+  CHALLENGE_TOGGLE_UNLOCK_PUZZLES,
+  BLIND_TOGGLE_UNLOCK_PUZZLES,
   VARIANT_CONFIGS,
   PuzzleVariant,
 } from '../services/puzzleVariety';
@@ -50,38 +57,121 @@ describe('puzzleVariety', () => {
     });
   });
 
-  describe('shouldOfferVariant', () => {
-    it('does not offer variants before puzzle 12', () => {
-      for (let i = 0; i < 12; i++) {
-        expect(shouldOfferVariant(i, 0)).toBeNull();
+  describe('unlock gates (the variant-pacing wave)', () => {
+    it('spreads variant unlocks across the arc: reverse 8, double 40, speed 70', () => {
+      expect(getVariantUnlockRequirement('reverse')?.puzzlesSolved).toBe(8);
+      expect(getVariantUnlockRequirement('double_shift')?.puzzlesSolved).toBe(40);
+      expect(getVariantUnlockRequirement('speed')?.puzzlesSolved).toBe(70);
+    });
+
+    it('gates the trial-ladder toggles at 15 (challenge) and 100 (blind apex)', () => {
+      expect(CHALLENGE_TOGGLE_UNLOCK_PUZZLES).toBe(15);
+      expect(BLIND_TOGGLE_UNLOCK_PUZZLES).toBe(100);
+    });
+
+    it('unlocks each variant exactly at its gate', () => {
+      expect(isVariantUnlocked('double_shift', 39, 0)).toBe(false);
+      expect(isVariantUnlocked('double_shift', 40, 0)).toBe(true);
+      expect(isVariantUnlocked('speed', 69, 0)).toBe(false);
+      expect(isVariantUnlocked('speed', 70, 0)).toBe(true);
+    });
+  });
+
+  describe('combination presets', () => {
+    it('defines the four combos in unlock order 55/85/115/135', () => {
+      expect(COMBO_PRESETS.map(p => p.id)).toEqual([
+        'twin_trial',
+        'racing_shadows',
+        'blind_return',
+        'free_fall',
+      ]);
+      expect(COMBO_PRESETS.map(p => p.unlockPuzzles)).toEqual([55, 85, 115, 135]);
+    });
+
+    it('never gates a combo before any of its components', () => {
+      for (const preset of COMBO_PRESETS) {
+        const variantGate = getVariantUnlockRequirement(preset.variant)?.puzzlesSolved ?? 0;
+        expect(preset.unlockPuzzles).toBeGreaterThanOrEqual(variantGate);
+        if (preset.challenge) {
+          expect(preset.unlockPuzzles).toBeGreaterThanOrEqual(CHALLENGE_TOGGLE_UNLOCK_PUZZLES);
+        }
+        if (preset.blind) {
+          expect(preset.unlockPuzzles).toBeGreaterThanOrEqual(BLIND_TOGGLE_UNLOCK_PUZZLES);
+        }
+        // Exactly one trial rung per combo (blind runs under challenge rules
+        // in the engine, so a blind preset never also sets challenge).
+        expect(preset.challenge && preset.blind).toBe(false);
+        expect(preset.challenge || preset.blind).toBe(true);
       }
     });
 
-    it('offers reverse at the first milestone', () => {
-      const origRandom = Math.random;
-      Math.random = () => 0;
-      const offered = shouldOfferVariant(20, 0);
-      expect(offered?.variant).toBe('reverse');
-      Math.random = origRandom;
+    it('only composes engine-supported variants', () => {
+      for (const preset of COMBO_PRESETS) {
+        expect(isPuzzleVariant(preset.variant)).toBe(true);
+        expect(preset.variant).not.toBe('standard');
+      }
     });
 
-    it('unlocks additional variants by progression bands', () => {
-      const origRandom = Math.random;
+    it('unlocks each combo exactly at its own gate', () => {
+      for (const preset of COMBO_PRESETS) {
+        expect(isComboUnlocked(preset, preset.unlockPuzzles - 1, 0)).toBe(false);
+        expect(isComboUnlocked(preset, preset.unlockPuzzles, 0)).toBe(true);
+      }
+    });
 
-      // Use a multiple of 10 so the offer gate is guaranteed regardless of
-      // the mocked Math.random (the 12% chance check uses the same mock).
-      Math.random = () => 0.99;
-      expect(['reverse', 'double_shift']).toContain(shouldOfferVariant(30, 0)!.variant);
+    it('builds combo selector options including locked entries with count teases', () => {
+      const options = getComboSelectorOptions(60, 0, 0);
+      expect(options).toHaveLength(COMBO_PRESETS.length);
+      const twin = options.find(o => o.preset.id === 'twin_trial')!;
+      expect(twin.unlocked).toBe(true);
+      const racing = options.find(o => o.preset.id === 'racing_shadows')!;
+      expect(racing.unlocked).toBe(false);
+      expect(racing.unlockHint).toContain('25 more puzzle');
+      const freeFall = options.find(o => o.preset.id === 'free_fall')!;
+      expect(freeFall.unlocked).toBe(false);
+      expect(freeFall.unlockHint).toContain('75 more puzzle');
+    });
 
-      Math.random = () => 0.9;
-      expect(['reverse', 'speed', 'double_shift']).toContain(shouldOfferVariant(60, 0)!.variant);
+    it('switches combo descriptions and hints by phase register', () => {
+      for (const preset of COMBO_PRESETS) {
+        expect(getComboDescription(preset, 0)).toBe(preset.description);
+        expect(getComboDescription(preset, 3)).toBe(preset.darkDescription);
+        expect(getComboUnlockHint(preset, 0, 0, 3)).toContain('offering');
+      }
+    });
+  });
 
-      Math.random = () => 0.9;
-      expect(['reverse', 'speed', 'double_shift']).toContain(
-        shouldOfferVariant(90, 0)!.variant
-      );
+  describe('blind toggle unlock hint', () => {
+    it('teases with a countdown while locked and clears when earned', () => {
+      const locked = getBlindUnlockHint(60, 0);
+      expect(locked).toContain('40 more puzzle');
+      expect(getBlindUnlockHint(60, 3)).toContain('40 more offering');
+      expect(getBlindUnlockHint(100, 0)).toBe('Unlocked.');
+    });
+  });
 
-      Math.random = origRandom;
+  describe('player-facing copy hygiene', () => {
+    it('contains no em dashes and never names phases', () => {
+      const strings: string[] = [];
+      for (const config of Object.values(VARIANT_CONFIGS)) {
+        strings.push(config.title, config.description, config.darkDescription, config.instruction, config.darkInstruction);
+      }
+      for (const preset of COMBO_PRESETS) {
+        strings.push(preset.title, preset.description, preset.darkDescription);
+      }
+      for (const variant of ['reverse', 'double_shift', 'speed'] as PuzzleVariant[]) {
+        strings.push(getVariantUnlockHint(variant, 0, 0, 0));
+        strings.push(getVariantUnlockHint(variant, 0, 0, 4));
+      }
+      for (const preset of COMBO_PRESETS) {
+        strings.push(getComboUnlockHint(preset, 0, 0, 0));
+        strings.push(getComboUnlockHint(preset, 0, 0, 4));
+      }
+      strings.push(getBlindUnlockHint(0, 0), getBlindUnlockHint(0, 4));
+      for (const s of strings) {
+        expect(s).not.toMatch(/[—–]/);
+        expect(s).not.toMatch(/phase\s*\d/i);
+      }
     });
   });
 
@@ -167,7 +257,7 @@ describe('puzzleVariety', () => {
       expect(early).toContain('standard');
       expect(early).not.toContain('reverse');
 
-      // With 100 puzzles, all variants are unlocked (reverse=8, double_shift=25, speed=35)
+      // With 100 puzzles, all variants are unlocked (reverse=8, double_shift=40, speed=70)
       const mid = getUnlockedVariants(100, 0);
       expect(mid).toContain('standard');
       expect(mid).toContain('reverse');
@@ -175,14 +265,26 @@ describe('puzzleVariety', () => {
       expect(mid).toContain('double_shift');
     });
 
-    it('builds selector options with only unlocked variants', () => {
+    it('builds selector options that INCLUDE locked variants as teased rows', () => {
       // With 100 puzzles, all variants are unlocked
-      const options = getVariantSelectorOptions(100, 0, 0);
-      expect(options.every(o => o.unlocked)).toBe(true);
-      expect(options.map(o => o.variant)).toContain('standard');
-      expect(options.map(o => o.variant)).toContain('reverse');
-      expect(options.map(o => o.variant)).toContain('double_shift');
-      expect(options.map(o => o.variant)).toContain('speed');
+      const allUnlocked = getVariantSelectorOptions(100, 0, 0);
+      expect(allUnlocked.every(o => o.unlocked)).toBe(true);
+      expect(allUnlocked.map(o => o.variant)).toContain('standard');
+      expect(allUnlocked.map(o => o.variant)).toContain('reverse');
+      expect(allUnlocked.map(o => o.variant)).toContain('double_shift');
+      expect(allUnlocked.map(o => o.variant)).toContain('speed');
+
+      // With 10 puzzles, double_shift and speed are visible but locked, each
+      // carrying a countdown tease (the player always sees the next goal).
+      const early = getVariantSelectorOptions(10, 0, 0);
+      expect(early.map(o => o.variant)).toEqual(['standard', 'reverse', 'double_shift', 'speed']);
+      const doubleRow = early.find(o => o.variant === 'double_shift')!;
+      expect(doubleRow.unlocked).toBe(false);
+      expect(doubleRow.unlockHint).toContain('30 more puzzle');
+      const speedRow = early.find(o => o.variant === 'speed')!;
+      expect(speedRow.unlocked).toBe(false);
+      expect(speedRow.unlockHint).toContain('60 more puzzle');
+      expect(early.find(o => o.variant === 'reverse')!.unlocked).toBe(true);
     });
 
     it('validates known variant keys', () => {

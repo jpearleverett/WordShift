@@ -46,6 +46,8 @@ import {
   isPostRevelation,
   recordPhase4Dwell,
   getPhase4DwellCount,
+  armFinale,
+  isFinaleArmed,
   getFullProgress,
   invalidateProgressCache,
   awardBonusAmber,
@@ -442,6 +444,26 @@ describe('New Cycle (NG+)', () => {
     expect(await canStartNewCycle()).toBe(false);
   });
 
+  test('startNewCycle anchors cycleStartPuzzles and disarms the finale', async () => {
+    await devAddPuzzles(200);
+    await markHouseCompleted();
+    await armFinale();
+    await markFinalPuzzleCompleted();
+    await markPostRevelation();
+
+    await startNewCycle();
+    const progress = await getFullProgress();
+    // puzzlesSolved is KEPT; the cycle-relative baseline anchors at it so the
+    // cycle micro-beats (keyed at counts 3/12/26/...) become reachable again.
+    expect(progress.puzzlesSolved).toBe(200);
+    expect(progress.cycleStartPuzzles).toBe(200);
+    // The finale machinery fully re-arms from zero.
+    expect(progress.finaleArmed).toBe(false);
+    expect(progress.finalPuzzleCompleted).toBe(false);
+    expect(progress.phase4Dwell).toBe(0);
+    expect(await isFinaleArmed()).toBe(false);
+  });
+
   test('consumeCycleOpening fires once per new cycle', async () => {
     await markHouseCompleted();
     await markFinalPuzzleCompleted();
@@ -510,14 +532,14 @@ describe('getCurrentPhase', () => {
     expect(phase).toBe(1);
   });
 
-  test('transitions to phase 2 after 75 puzzles', async () => {
-    await devAddPuzzles(75);
+  test('transitions to phase 2 after 60 puzzles', async () => {
+    await devAddPuzzles(60);
     const phase = await getCurrentPhase();
     expect(phase).toBe(2);
   });
 
-  test('transitions to phase 4 after 235 puzzles', async () => {
-    await devAddPuzzles(235);
+  test('transitions to phase 4 after 180 puzzles', async () => {
+    await devAddPuzzles(180);
     const phase = await getCurrentPhase();
     expect(phase).toBe(4);
   });
@@ -530,7 +552,7 @@ describe('getPuzzlesUntilNextPhase', () => {
   });
 
   test('returns null at max phase', async () => {
-    await devAddPuzzles(235);
+    await devAddPuzzles(180);
     const remaining = await getPuzzlesUntilNextPhase();
     expect(remaining).toBeNull();
   });
@@ -552,7 +574,7 @@ describe('getPuzzlesUntilNextPhase', () => {
   test('never returns negative values', async () => {
     // At phase boundary, should be 0 not negative
     await devAddPuzzles(20);
-    // Now at phase 1, puzzles until phase 2 threshold (65)
+    // Now at phase 1, puzzles until phase 2 threshold (60)
     const remaining = await getPuzzlesUntilNextPhase();
     expect(remaining).toBeGreaterThanOrEqual(0);
   });
@@ -562,18 +584,18 @@ describe('getPuzzlesUntilNextPhase', () => {
     expect(await getPuzzlesUntilNextPhase()).toBe(20);
 
     await devAddPuzzles(20); // Now at phase 1
-    // Phase 1 -> 2: threshold is 65
-    expect(await getPuzzlesUntilNextPhase()).toBe(45); // 65 - 20
+    // Phase 1 -> 2: threshold is 60
+    expect(await getPuzzlesUntilNextPhase()).toBe(40); // 60 - 20
 
-    await devAddPuzzles(45); // Now at phase 2 (65 total)
-    // Phase 2 -> 3: threshold is 150
-    expect(await getPuzzlesUntilNextPhase()).toBe(85); // 150 - 65
+    await devAddPuzzles(40); // Now at phase 2 (60 total)
+    // Phase 2 -> 3: threshold is 120
+    expect(await getPuzzlesUntilNextPhase()).toBe(60); // 120 - 60
 
-    await devAddPuzzles(85); // Now at phase 3 (150 total)
-    // Phase 3 -> 4: threshold is 235
-    expect(await getPuzzlesUntilNextPhase()).toBe(85); // 235 - 150
+    await devAddPuzzles(60); // Now at phase 3 (120 total)
+    // Phase 3 -> 4: threshold is 180
+    expect(await getPuzzlesUntilNextPhase()).toBe(60); // 180 - 120
 
-    await devAddPuzzles(85); // Now at phase 4 (235 total)
+    await devAddPuzzles(60); // Now at phase 4 (180 total)
     expect(await getPuzzlesUntilNextPhase()).toBeNull();
   });
 });
@@ -935,6 +957,28 @@ describe('post-revelation phase pinning (Phase 5)', () => {
     expect(await recordPhase4Dwell()).toBe(2);
     expect(await recordPhase4Dwell()).toBe(3);
     expect(await getPhase4DwellCount()).toBe(3);
+  });
+
+  test('armFinale arms and markFinalPuzzleCompleted disarms (the marked final board contract)', async () => {
+    expect(await isFinaleArmed()).toBe(false);
+    await armFinale();
+    expect(await isFinaleArmed()).toBe(true);
+    // Idempotent while armed.
+    await armFinale();
+    expect(await isFinaleArmed()).toBe(true);
+    // The final board's win disarms in the same write that marks completion.
+    await markFinalPuzzleCompleted();
+    expect(await isFinaleArmed()).toBe(false);
+    const progress = await getFullProgress();
+    expect(progress.finalPuzzleCompleted).toBe(true);
+    expect(progress.finaleArmed).toBe(false);
+  });
+
+  test('armFinale is a no-op once the final puzzle is completed', async () => {
+    await markFinalPuzzleCompleted();
+    await armFinale();
+    // A late arm can never re-open the finale after it played.
+    expect(await isFinaleArmed()).toBe(false);
   });
 
   test('markPostRevelation sets currentPhase to 5 and clears any pending transition', async () => {

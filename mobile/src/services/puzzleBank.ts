@@ -356,22 +356,23 @@ export async function selectPreGeneratedPuzzle(
   // Filter out already-played puzzles
   let available = bank.filter(p => !usedSet.has(p.id));
 
-  // Phase 4+ dread recycle: the dread-tiered puzzles are scarce and get
-  // consumed early, so without this the cult reveal and the whole Phase-5
-  // endgame serve bright tier-0 words under a black sky (the FUN->VOID arc
-  // playing backwards). Fold PLAYED high-tier puzzles back into the candidate
-  // pool so dread boards can repeat rather than waiting for full-bank
-  // exhaustion. Unplayed puzzles still win on freshness/novelty scoring, so
-  // fresh dread is preferred while it lasts; only the recycled dread fills in
-  // once it runs out.
-  if ((phase as number) >= 4) {
-    const dreadFloor = Math.max(3, (phase as number) - 1);
-    const playedDread = bank.filter(p => usedSet.has(p.id) && p.dreadTier >= dreadFloor);
-    if (playedDread.length > 0) {
-      // De-dup by id (a puzzle is either unplayed-available or played-dread).
-      const seen = new Set(available.map(p => p.id));
-      for (const p of playedDread) {
-        if (!seen.has(p.id)) available.push(p);
+  // Phase 4+ dread steering: the climax must serve dread vocabulary, but a
+  // played board must NEVER be re-served while ANY unplayed board remains
+  // (the old played-dread fold-in re-served exact replays while unplayed
+  // lower-tier boards sat untouched). Steer the UNPLAYED pool instead:
+  // prefer unplayed puzzles at the ideal dread tier, widening to adjacent
+  // tiers (1 away, then 2 away) when the ideal tier is spent. If nothing
+  // within 2 tiers remains unplayed, the whole unplayed pool stays eligible —
+  // a fresh bright board beats an exact replay. Replays happen only through
+  // the full-bank exhaustion recycle below, which serves the
+  // least-recently-played half first.
+  if ((phase as number) >= 4 && available.length > 0) {
+    const idealTier = Math.min(4, phase as number);
+    for (const spread of [0, 1, 2]) {
+      const tierPool = available.filter(p => Math.abs(p.dreadTier - idealTier) <= spread);
+      if (tierPool.length > 0) {
+        available = tierPool;
+        break;
       }
     }
   }

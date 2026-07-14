@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   getVictoryGlitch,
   getFirstWinGlitchText,
-  checkNarrativeMicroBeat,
+  resolveVictoryMicroBeat,
   NarrativeMicroBeat,
   getAnimalWhisper,
   getPersonalizedPhase5Whisper,
@@ -102,7 +102,17 @@ export interface ProcessVictoryParams {
   /** The player's FIRST free-play (non-onboarding) win — fires the guaranteed,
    *  prominent opening-promise glitch here rather than on the guided tutorial. */
   firstFreeWin?: boolean;
+  /**
+   * Dwell-window voice: the held-breath line for a Phase-4 win inside the
+   * post-house-completion dwell window (App computes it from the dwell count).
+   * Surfaced through the ambient micro-beat overlay, but only when no keyed
+   * micro-beat fires on the same win — one narrative voice per victory.
+   */
+  dwellLine?: string | null;
 }
+
+/** Display duration for the dwell-window held-breath line (ambient overlay). */
+const DWELL_LINE_DURATION_MS = 4500;
 
 // ---------------------------------------------------------------------------
 // Hook
@@ -180,6 +190,7 @@ export function useVictoryOrchestration(): [
       isOnboarding: onboarding,
       puzzlesSinceHomeVisit,
       firstFreeWin,
+      dwellLine,
     } = params;
 
     const gen = ++generationRef.current;
@@ -210,22 +221,40 @@ export function useVictoryOrchestration(): [
     }
 
     // ------ Narrative micro-beat (one-time surprises at milestone counts) ------
-    checkNarrativeMicroBeat(totalPuzzlesCompleted)
-      .then(beat => {
+    // First playthrough: absolute-count MICRO_BEATS. New Cycle: the
+    // cycle-relative track (half-memory beats + re-fired regular beats).
+    // The dwell-window held-breath line rides the same ambient overlay, but
+    // only when no keyed beat claims this win — one narrative voice at a time.
+    (async () => {
+      let beat: NarrativeMicroBeat | null = null;
+      try {
+        const fullProgress = await getFullProgress();
         if (gen !== generationRef.current) return;
-        if (beat) {
-          const delay = beat.type === 'glitch_title'
-            ? MICRO_BEAT_GLITCH_DELAY_MS
-            : MICRO_BEAT_WHISPER_DELAY_MS;
-          addTimeout(() => {
-            if (gen !== generationRef.current) return;
-            setMicroBeat(beat);
-            setShowMicroBeat(true);
-            addTimeout(() => setShowMicroBeat(false), beat.durationMs);
-          }, delay);
-        }
-      })
-      .catch(() => {});
+        beat = await resolveVictoryMicroBeat(
+          totalPuzzlesCompleted,
+          fullProgress?.cycleCount ?? 0,
+          fullProgress?.cycleStartPuzzles ?? 0,
+        );
+      } catch {
+        beat = null;
+      }
+      if (gen !== generationRef.current) return;
+      if (!beat && dwellLine) {
+        beat = { type: 'ambient_whisper', text: dwellLine, durationMs: DWELL_LINE_DURATION_MS };
+      }
+      if (beat) {
+        const finalBeat = beat;
+        const delay = finalBeat.type === 'glitch_title'
+          ? MICRO_BEAT_GLITCH_DELAY_MS
+          : MICRO_BEAT_WHISPER_DELAY_MS;
+        addTimeout(() => {
+          if (gen !== generationRef.current) return;
+          setMicroBeat(finalBeat);
+          setShowMicroBeat(true);
+          addTimeout(() => setShowMicroBeat(false), finalBeat.durationMs);
+        }, delay);
+      }
+    })().catch(() => {});
 
     // ------ Animal whisper (skip during onboarding) ------
     if (!onboarding) {

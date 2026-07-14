@@ -117,22 +117,22 @@ describe('Victory Flow Integration', () => {
     expect(result.newPhase).toBe(1);
     await confirmPhaseTransition();
 
-    // Phase 1 -> 2 at 65 puzzles
-    await devAddPuzzles(44); // 20 + 44 = 64
+    // Phase 1 -> 2 at 60 puzzles
+    await devAddPuzzles(39); // 20 + 39 = 59
     result = await awardPuzzleAmber('EASY', 1);
     expect(result.phaseChanged).toBe(true);
     expect(result.newPhase).toBe(2);
     await confirmPhaseTransition();
 
-    // Phase 2 -> 3 at 150 puzzles
-    await devAddPuzzles(84); // 65 + 84 = 149
+    // Phase 2 -> 3 at 120 puzzles
+    await devAddPuzzles(59); // 60 + 59 = 119
     result = await awardPuzzleAmber('EASY', 1);
     expect(result.phaseChanged).toBe(true);
     expect(result.newPhase).toBe(3);
     await confirmPhaseTransition();
 
-    // Phase 3 -> 4 at 235 puzzles
-    await devAddPuzzles(84); // 150 + 84 = 234
+    // Phase 3 -> 4 at 180 puzzles
+    await devAddPuzzles(59); // 120 + 59 = 179
     result = await awardPuzzleAmber('EASY', 1);
     expect(result.phaseChanged).toBe(true);
     expect(result.newPhase).toBe(4);
@@ -179,32 +179,32 @@ describe('Phase Boundaries', () => {
     expect(result.phaseChanged).toBe(true);
   });
 
-  test('at exactly 65 puzzles, phase transitions from 1 to 2', async () => {
-    await devAddPuzzles(64);
+  test('at exactly 60 puzzles, phase transitions from 1 to 2', async () => {
+    await devAddPuzzles(59);
     expect(await getCurrentPhase()).toBe(1);
 
     const result = await awardPuzzleAmber('EASY', 1);
-    expect(result.puzzlesSolved).toBe(65);
+    expect(result.puzzlesSolved).toBe(60);
     expect(result.newPhase).toBe(2);
     expect(result.phaseChanged).toBe(true);
   });
 
-  test('at exactly 150 puzzles, phase transitions from 2 to 3', async () => {
-    await devAddPuzzles(149);
+  test('at exactly 120 puzzles, phase transitions from 2 to 3', async () => {
+    await devAddPuzzles(119);
     expect(await getCurrentPhase()).toBe(2);
 
     const result = await awardPuzzleAmber('EASY', 1);
-    expect(result.puzzlesSolved).toBe(150);
+    expect(result.puzzlesSolved).toBe(120);
     expect(result.newPhase).toBe(3);
     expect(result.phaseChanged).toBe(true);
   });
 
-  test('at exactly 235 puzzles, phase transitions from 3 to 4', async () => {
-    await devAddPuzzles(234);
+  test('at exactly 180 puzzles, phase transitions from 3 to 4', async () => {
+    await devAddPuzzles(179);
     expect(await getCurrentPhase()).toBe(3);
 
     const result = await awardPuzzleAmber('EASY', 1);
-    expect(result.puzzlesSolved).toBe(235);
+    expect(result.puzzlesSolved).toBe(180);
     expect(result.newPhase).toBe(4);
     expect(result.phaseChanged).toBe(true);
   });

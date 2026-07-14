@@ -24,7 +24,7 @@ import { DialoguePhase } from '../types/homeWorld';
 // ============================================================================
 
 /** Puzzle thresholds for phase transitions (weighted progress values). */
-export const PHASE_THRESHOLDS = [0, 20, 65, 150, 235];
+export const PHASE_THRESHOLDS = [0, 20, 60, 120, 180];
 
 /**
  * Minimum real puzzles the player must have completed before a phase
@@ -34,19 +34,26 @@ export const PHASE_THRESHOLDS = [0, 20, 65, 150, 235];
  * players: once weighted progress clears PHASE_THRESHOLDS, the floor is what
  * actually gates the transition. The Phase 4 (cult reveal) and Phase 5
  * (post-revelation) floors are deliberately reachable — the entire narrative
- * payoff lives there, so an engaged player must be able to arrive at the
- * climax in a single committed playthrough rather than ~225-300 puzzles.
- * House-building completes at the puzzle-190 gate (descent trio), just before
- * the finale, and Phase 5 still lands comfortably after the Phase 4 dread
- * window + final puzzle.
+ * payoff lives there, so an engaged player arrives at the climax in a single
+ * committed fortnight rather than a months-long grind.
+ *
+ * 2026-07 fun-overhaul geography: Phase 2 (Deeper Questions) spans ~52 puzzles
+ * (floor 38 → floor 90) — long enough to earn the dusk, short enough that the
+ * single-tone stretch never becomes the D14 quit point. The reveal floor sits
+ * at 130, just before the house completes at the sky-garden gate (152), so the
+ * Phase-4 dwell window plays out inside a finished temple. The vanguard tier's
+ * +1 offset means vanguard animals speak Phase-4 lines across the 90→130
+ * window (Phase 3 floor → reveal floor); that leak is ACCEPTED as the price of
+ * pacing — the oracle whispering ahead of the reveal reads as foreshadowing,
+ * not spoilage.
  */
 export const MIN_PUZZLES_FOR_PHASE: Record<DialoguePhase, number> = {
   0: 0,
   1: 15,
-  2: 40, // Pacing compression: accelerated players reach Deeper Questions inside week one (weighted PHASE_THRESHOLDS unchanged)
-  3: 125, // Was 135. Phase 2 was the longest single-tone stretch (the likeliest D14 break); a modest floor drop brings Growing Shadows' visual/tonal shift ~10 puzzles sooner for accelerated players. Kept at 125 (not lower) so vanguard animals' +1 phase-4 dialogue doesn't leak the cult reveal too far ahead of the global reveal floor (155). Weighted thresholds + house-unlock gates (Bamboo Attic 130) untouched.
-  4: 155, // The Horizon — the cult reveal, just after the house completes
-  5: 210, // Post-revelation — after house completion + final puzzle
+  2: 38, // Deeper Questions inside week one for engaged players; casual players hit it in ~3 weeks
+  3: 90, // Growing Shadows — opens a ~52-puzzle Phase 2 span (38→90) and starts the vanguard +1 leak window (accepted, see above)
+  4: 130, // The Horizon — the cult reveal, just before the house completes at the 152 gate
+  5: 170, // Post-revelation — after house completion (≈153) + dwell (8) + final puzzle (≈162)
 };
 
 // ============================================================================
@@ -219,8 +226,13 @@ export const FIRST_PURCHASE_AMBER_MULTIPLIER = 2;
 // Gentle, frequency-capped nudges (never modal spam). All are suppressed for
 // players who already own the relevant entitlement.
 
-/** Earliest puzzle count at which the one-time Patron nudge may appear. */
-export const PATRON_NUDGE_MIN_PUZZLES = 6;
+/**
+ * Earliest puzzle count at which the one-time Patron nudge may appear.
+ * Held back to 30 (was 6): the pitch lands after the player has met the first
+ * gated room and the daily habit has had a chance to form — an invested player
+ * hears "support the game" as a fair ask; a day-one player hears a shakedown.
+ */
+export const PATRON_NUDGE_MIN_PUZZLES = 30;
 
 /** Show the Remove-Ads nudge once this many interstitials have been seen. */
 export const REMOVE_ADS_NUDGE_AFTER_INTERSTITIALS = 3;
@@ -252,12 +264,14 @@ export const AUTO_COLLECT_PUZZLE_LIMIT = 8;
 /**
  * Finale dwell: the cult-reveal finale used to fire on the FIRST Phase-4
  * victory with a complete house, so the entire robed/storm/sacrifice era
- * (300 written dialogue lines) flashed past in ~2 puzzles. The finale now
- * unlocks only after the player has completed this many Phase-4 puzzles with
- * the house complete — long enough, against the 5-puzzle Phase-4 dialogue
- * cooldown, for multiple sessions per animal and the sacrifice mechanic to
- * actually be played. Never revealed as a counter (narrative rule 7); the
- * house "is not yet ready to receive it."
+ * (300 written dialogue lines) flashed past in ~2 puzzles. The player must
+ * now complete this many Phase-4 puzzles with the house complete — long
+ * enough, against the 5-puzzle Phase-4 dialogue cooldown, for multiple
+ * sessions per animal and the sacrifice mechanic to actually be played.
+ * Filling the window ARMS the finale (amberCurrency.finaleArmed): the NEXT
+ * standard board start is served as the marked FINAL BOARD (dread-seeded,
+ * quiet start line), and its victory plays the arrival. Never revealed as a
+ * counter (narrative rule 7); the house "is not yet ready to receive it."
  */
 export const FINALE_DWELL_PUZZLES = 8;
 
@@ -345,7 +359,8 @@ export const STREAK_MILESTONES: {
 /**
  * Narrative acceleration configuration.
  * Engaged players progress through phases faster based on performance.
- * An engaged player can reach Phase 4 in ~120-150 puzzles instead of 250.
+ * An engaged player hits the reveal at the Phase-4 floor (~130 puzzles);
+ * an unaccelerated casual player arrives at the weighted threshold (~180).
  */
 export const NARRATIVE_ACCELERATION = {
   // Three-star rate threshold: above this, puzzles count more toward phase progress
@@ -548,14 +563,17 @@ export const SPEED_TIME_LIMITS: Record<string, number> = {
  * without ever blocking the (optional) loop.
  *
  * getTendingCost(level) = round( BASE * GROWTH^level / 10 ) * 10, capped.
- * Approximate curve: L1 40 · L2 50 · L5 70 · L10 120 · L25 680 · L50+ capped.
+ * Approximate curve: L1 40 · L2 50 · L5 70 · L10 120 · L25 680 · L34+ capped.
  * The first ~5 levels (~290 total) cost roughly one good day's earnings, so a
- * newly-Phase-5 player gets immediate, satisfying deepening; the cap keeps a
- * grinder spending meaningfully forever. Retune against live data, not blind.
+ * newly-Phase-5 player gets immediate, satisfying deepening. The cap is 1,800
+ * (was 5,000): the old cap made every level past ~L40 a multi-day grind, so
+ * the middle band of the sink was effectively unreachable — 1,800 keeps a
+ * capped level to roughly a strong session's income, so deepening stays a
+ * playable ritual instead of a wall. Retune against live data, not blind.
  */
 export const TENDING_BASE = 40;
 export const TENDING_GROWTH = 1.12;
-export const TENDING_COST_CAP = 5000;
+export const TENDING_COST_CAP = 1800;
 /** First deepening each local day is discounted — the daily return hook. */
 export const TENDING_DAILY_BONUS_DISCOUNT = 0.3;
 /** Tending Levels that fire a ceremony + unlock a new serene dialogue line. */
@@ -589,18 +607,18 @@ export const MILESTONE_BONUSES: {
   { puzzles: 100, amber: 150, message: 'Century milestone!', darkMessage: 'One hundred arrangements completed.', dreadMessage: 'The arrangement grows. One hundred offerings.' },
   { puzzles: 110, amber: 75, message: 'Double digits!', darkMessage: 'The house stirs.', dreadMessage: 'One hundred ten threads woven into the pattern.' },
   { puzzles: 125, amber: 100, message: 'Halfway to mastery!', darkMessage: 'The house feels heavier. Fuller.', dreadMessage: 'One hundred twenty-five incantations. The walls listen.' },
-  // Mid-game valley beats (~130–170): the pre-descent-trio house rooms finish
-  // unlocking around here while the Phase 4 reveal doesn't land until ~155,
-  // leaving a stretch with fewer new unlocks (the trio's 150/170/190 gates thin
-  // it but don't fill it). These keep the amber faucet pulsing through that gap
-  // so the climb to the climax never feels rewardless. Kept modest so they
-  // don't outpace the room-upgrade sink.
-  { puzzles: 135, amber: 90, message: 'The house is whole!', darkMessage: 'The last room is built. The house is whole... and quiet.', dreadMessage: 'The house is complete. Now it waits, with you, for what comes.' },
-  { puzzles: 145, amber: 110, message: 'Going strong!', darkMessage: 'Every room is full, yet something still feels unfinished.', dreadMessage: 'The walls are full. The space between them is not.' },
-  { puzzles: 150, amber: 200, message: 'Dedicated player!', darkMessage: 'The letters rearrange themselves for you now.', dreadMessage: 'One hundred fifty words offered to the pattern.' },
-  { puzzles: 165, amber: 130, message: 'Unstoppable!', darkMessage: 'You no longer wonder why you keep going. You just go.', dreadMessage: 'One hundred sixty-five offerings. The horizon leans closer.' },
-  { puzzles: 200, amber: 250, message: 'True dedication!', darkMessage: 'Two hundred transformations. The house trembles.', dreadMessage: 'The ritual deepens. Two hundred incantations.' },
-  { puzzles: 250, amber: 300, message: 'Quarter thousand!', darkMessage: 'The arrangement nears completion.', dreadMessage: 'Two hundred fifty offerings. Something stirs.' },
+  // Climax-window beats (135-165): under the 2026-07 pacing, the reveal lands
+  // ~puzzle 130, the house completes at the sky-garden gate (~153), and the
+  // finale fires ~162. 135/145 sit deep in the reveal's shadow (last rooms
+  // still rising), 150 marks the house made whole, and 165 lands just past the
+  // finale for committed players. Amounts are untouched (economy is calibrated
+  // on them); only the message geography moved.
+  { puzzles: 135, amber: 90, message: 'Still climbing!', darkMessage: 'The shadows are longer now. You keep building anyway.', dreadMessage: 'One hundred thirty-five offerings. The horizon leans closer.' },
+  { puzzles: 145, amber: 110, message: 'Going strong!', darkMessage: 'The letters rearrange themselves for you now.', dreadMessage: 'One hundred forty-five. The last rooms reach toward what is coming.' },
+  { puzzles: 150, amber: 200, message: 'The house is whole!', darkMessage: 'The last room is built. The house is whole... and quiet.', dreadMessage: 'The house is complete. Now it waits, with you, for what comes.' },
+  { puzzles: 165, amber: 130, message: 'Unstoppable!', darkMessage: 'You no longer wonder why you keep going. You just go.', dreadMessage: 'One hundred sixty-five offerings. The sky is very near now.' },
+  { puzzles: 200, amber: 250, message: 'True dedication!', darkMessage: 'Two hundred transformations. The words come easily now.', dreadMessage: 'Two hundred incantations. The pattern is patient, and so are you.' },
+  { puzzles: 250, amber: 300, message: 'Quarter thousand!', darkMessage: 'Two hundred fifty arrangements. The quiet is complete.', dreadMessage: 'Two hundred fifty offerings. Nothing stirs now. It does not need to.' },
   { puzzles: 300, amber: 400, message: 'Master puzzler!', darkMessage: 'Three hundred words spoken into the void.', dreadMessage: 'The void has heard enough. The void responds.' },
   { puzzles: 350, amber: 500, message: 'The journey continues...', darkMessage: 'The journey never ends. It only transforms.', dreadMessage: 'Three hundred fifty incantations. The pattern is nearly complete.' },
   // Endgame tail — a modest repeating +75 every 50 puzzles so the puzzle-count

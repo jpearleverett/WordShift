@@ -98,7 +98,7 @@ interface EraSpec {
  */
 const ERA_SPECS: Record<CreatorEra, EraSpec> = {
   dusk: { phase: 2, puzzles: 70, maxUnlockOrder: 13, minSpendableAmber: 150 },
-  shadows: { phase: 3, puzzles: 140, maxUnlockOrder: 19, minSpendableAmber: 250 },
+  shadows: { phase: 3, puzzles: 120, maxUnlockOrder: 19, minSpendableAmber: 250 },
   reveal: { phase: 4, puzzles: 200, maxUnlockOrder: Number.MAX_SAFE_INTEGER, minSpendableAmber: 400 },
   peace: { phase: 5, puzzles: 260, maxUnlockOrder: Number.MAX_SAFE_INTEGER, minSpendableAmber: 600 },
 };
