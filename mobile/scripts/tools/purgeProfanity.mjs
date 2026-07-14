@@ -26,6 +26,34 @@ export const BLOCKED_WORDS = [
   'TIT', 'TITS', 'TURD', 'TURDS', 'TWAT', 'TWATS', 'WANK', 'WANKS', 'WHORE', 'WHORES', 'WOP', 'WOPS',
   // Archaic KJV-register words (not slurs, but unfair to mainstream players)
   'THEE', 'THOU', 'HAST', 'HATH', 'SHALT', 'DOTH',
+  // ---------------------------------------------------------------------
+  // hygiene pass 2: anatomical + proper nouns + abbreviations
+  // (second external review: PENIS/PUBIC shipped on boards; VITA/BETH/TONY
+  // are proper nouns; MIL/BROS/FRAT abbreviations; WORT obscure brewing
+  // jargon; plus crude words the dictionary still green-check accepted)
+  // ---------------------------------------------------------------------
+  // Anatomical-sexual terms (and the crude/sexual set the first pass missed)
+  'PENIS', 'PENISES', 'PUBIC', 'ANUS', 'ANUSES', 'ANAL', 'VULVA', 'VULVAS',
+  'LABIA', 'VAGINA', 'VAGINAS', 'ORGASM', 'ORGASMS', 'ORGY', 'ORGIES',
+  'INCEST', 'HORNY', 'RANDY', 'EROTIC', 'EROTICA', 'SEXIER', 'SEXUAL',
+  'CONDOM', 'CONDOMS', 'DOUCHE', 'DOUCHES', 'FANNY', 'FANNIES',
+  'BUGGER', 'BUGGERS', 'BUGGERY', 'RAPING', 'RAPISTS',
+  // Sex-trade terms (WHORE/SLUT family the first pass started)
+  'HOOKER', 'HOOKERS', 'BROTHEL', 'BROTHELS', 'PIMP', 'PIMPS',
+  'PERVERT', 'PERVERTS',
+  // Slur-adjacent (ableist / identity / ethnic exonym)
+  'MIDGET', 'MIDGETS', 'CRIPPLE', 'CRIPPLES', 'BASTARD', 'BASTARDS',
+  'QUEER', 'QUEERS', 'SISSY', 'SISSIES', 'GYPSY', 'GYPSIES',
+  // Derivatives of already-blocked words the first pass missed
+  'CRAPPY', 'BITCHY',
+  // Juvenile scatological (FART/TURD/CRAP tone precedent)
+  'POOP', 'POOPS', 'POOPED', 'PEE', 'PEES', 'PEED', 'PEEING',
+  // Proper nouns (the dictionary is common-English-only, no proper nouns)
+  'VITA', 'BETH', 'TONY',
+  // Abbreviations / clipped informal forms (not standalone dictionary words)
+  'MIL', 'MILS', 'BROS', 'FRAT', 'FRATS',
+  // Obscure brewing jargon (unfair vocabulary for mainstream players)
+  'WORT', 'WORTS',
 ];
 const BLOCKED = new Set(BLOCKED_WORDS);
 
