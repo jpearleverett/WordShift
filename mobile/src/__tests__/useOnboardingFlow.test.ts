@@ -113,7 +113,7 @@ import { markTutorialCompleted } from '../components/Tutorial';
 import { clearPuzzleState } from '../services/puzzleSaveState';
 
 const ALL_STEPS: OnboardingStep[] = [
-  'not_started', 'home_empty', 'fox_invited', 'going_to_puzzle',
+  'not_started', 'cold_open_puzzle', 'home_empty', 'fox_invited', 'going_to_puzzle',
   'puzzle_tutorial', 'puzzle_complete', 'going_to_pit', 'pit_intro',
   'pit_offering', 'returning_home', 'unlock_explained', 'complete',
 ];
@@ -232,6 +232,58 @@ async function mountAtStep(step: OnboardingStep, cbs: MockCallbacks) {
   return renderOnboardingHook(cbs);
 }
 
+describe('fresh-install cold open', () => {
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    resetHookState();
+    await (AsyncStorage.clear as jest.Mock)();
+    await resetOnboarding();
+  });
+
+  test('persists cold_open_puzzle as the first step', async () => {
+    const cbs = makeCallbacks();
+    const [state] = await mountAtStep('not_started', cbs);
+
+    expect(state.onboardingStep).toBe('cold_open_puzzle');
+    expect(state.onboardingReady).toBe(true);
+    expect(await getOnboardingStep()).toBe('cold_open_puzzle');
+  });
+});
+
+describe('fox invitation handoff', () => {
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    resetHookState();
+    await (AsyncStorage.clear as jest.Mock)();
+    await resetOnboarding();
+  });
+
+  test('routes directly to the pit tutorial without starting a second puzzle', async () => {
+    jest.useFakeTimers();
+    try {
+      const cbs = makeCallbacks();
+      await mountAtStep('fox_invited', cbs);
+
+      for (let i = 0; i < ONBOARDING_FOX_LINES.fox_invited.length; i++) {
+        const [, actions] = renderOnboardingHook(cbs);
+        await actions.handleOnboardingContinue();
+        await flushAsync();
+      }
+
+      expect(await getOnboardingStep()).toBe('going_to_pit');
+      jest.runAllTimers();
+      await flushAsync();
+
+      expect(await getOnboardingStep()).toBe('pit_intro');
+      expect(cbs.transitionTo).toHaveBeenCalledWith('pit', expect.any(Function));
+      expect(cbs.startNewGame).not.toHaveBeenCalled();
+      expect(cbs.transitionTo).not.toHaveBeenCalledWith('puzzle', expect.any(Function));
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+});
+
 describe('handleSkipOnboarding (clean exit, no guided-board limbo)', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -240,10 +292,10 @@ describe('handleSkipOnboarding (clean exit, no guided-board limbo)', () => {
     await resetOnboarding();
   });
 
-  test('skip mid-tutorial-puzzle completes onboarding, clears the board, and lands on home', async () => {
+  test('skip during the cold open completes onboarding, clears the board, and lands on home', async () => {
     const cbs = makeCallbacks();
-    const [state, actions] = await mountAtStep('puzzle_tutorial', cbs);
-    expect(state.onboardingStep).toBe('puzzle_tutorial');
+    const [state, actions] = await mountAtStep('cold_open_puzzle', cbs);
+    expect(state.onboardingStep).toBe('cold_open_puzzle');
     expect(state.isOnboarding).toBe(true);
 
     await actions.handleSkipOnboarding();

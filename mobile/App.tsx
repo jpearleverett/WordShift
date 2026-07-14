@@ -36,7 +36,7 @@ import { useAutosave } from './src/hooks/useAutosave';
 import { logEvent } from './src/services/eventLogger';
 import { SettingsScreen } from './src/components/SettingsScreen';
 import { FoxGuide } from './src/components/FoxGuide';
-import { ONBOARDING_FOX_LINES } from './src/services/onboarding';
+import { COLD_OPEN_INSTRUCTION, ONBOARDING_FOX_LINES } from './src/services/onboarding';
 import {
   awardBonusAmber,
   spendAmber,
@@ -600,6 +600,28 @@ function MainApp() {
 
   const [onboardingFlow, onboardingActions] = useOnboardingFlow(onboardingCallbacks);
 
+  const launchColdOpenPuzzle = useCallback(async () => {
+    setCurrentScreen('puzzle');
+    const saved = await loadPuzzleState();
+    const canRestoreColdOpen = (
+      saved?.gameState === GameState.PLAYING &&
+      !saved.isPlayingDaily &&
+      saved.difficulty === 'EASY' &&
+      saved.gameMode === 'standard' &&
+      saved.currentVariant === 'standard' &&
+      saved.blindMode !== true
+    );
+
+    if (canRestoreColdOpen && saved) {
+      puzzleActions.restorePuzzleState(saved);
+    } else {
+      if (saved) await clearPuzzleState();
+      await puzzleActions.startNewGame('EASY', 'standard', 'standard', false);
+    }
+    puzzleActions.setMessage(COLD_OPEN_INSTRUCTION);
+    logEvent({ type: 'puzzle_started', data: { difficulty: 'EASY', onboarding: true } });
+  }, [puzzleActions]);
+
   // Auto-save puzzle state during active play
   useAutosave({
     currentScreen,
@@ -761,6 +783,10 @@ function MainApp() {
       const step = onboardingFlow.onboardingStep;
       if (step === 'going_to_pit' || step === 'pit_intro' || step === 'pit_offering') {
         setCurrentScreen('pit');
+      } else if (step === 'cold_open_puzzle') {
+        // A kill during the self-directed opener resumes the exact autosaved
+        // board when possible; otherwise start curated EASY puzzle 0.
+        launchColdOpenPuzzle().catch(() => {});
       } else if (step === 'puzzle_tutorial') {
         // Re-init the guided tutorial puzzle so the player resumes a live,
         // winnable board with the Fox overlay rather than a dead screen.
@@ -769,7 +795,7 @@ function MainApp() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onboardingFlow.onboardingReady, onboardingFlow.onboardingStep]);
+  }, [onboardingFlow.onboardingReady, onboardingFlow.onboardingStep, launchColdOpenPuzzle]);
 
   // Daily launch tasks — free streak freeze (every 14 days) + daily login
   // reward claim. Runs once per LOCAL day: on cold launch via the effect below,
@@ -1096,7 +1122,7 @@ function MainApp() {
   // of App-level in-memory state from the cleared services so the live
   // session genuinely starts over: fresh persistence (amber 0 / phase 0 /
   // no stats), an empty board, no victory/ceremony remnants, and onboarding
-  // restarted from the empty den — instead of dumping the player back onto
+  // restarted from the cold open instead of dumping the player back onto
   // a home screen still rendering their old save.
   const rebuildSessionFromStorage = useCallback((opts: { restartOnboarding: boolean }) => {
     clearVictoryTimeouts();
@@ -1130,9 +1156,15 @@ function MainApp() {
     // fresh-launch init so the intro replays this session. Creator snapshot:
     // storage says 'complete' and must stay complete.
     onboardingActions
-      .advanceOnboarding(opts.restartOnboarding ? 'home_empty' : 'complete')
+      .advanceOnboarding(opts.restartOnboarding ? 'cold_open_puzzle' : 'complete')
+      .then(() => {
+        if (opts.restartOnboarding) {
+          launchColdOpenPuzzle().catch(() => {});
+        } else {
+          transitionTo('home');
+        }
+      })
       .catch(() => {});
-    transitionTo('home');
   }, [
     clearVictoryTimeouts,
     puzzleActions,
@@ -1140,6 +1172,7 @@ function MainApp() {
     orchestrationActions,
     persistenceActions,
     onboardingActions,
+    launchColdOpenPuzzle,
     resetSpeedRun,
     transitionTo,
   ]);
@@ -2761,18 +2794,31 @@ function MainApp() {
       .catch(() => {});
   }, [puzzleActions, startVictoryExitFlow, runVictoryExitNudges, maybeShowVictoryInterstitial, maybeShowSwiftVictoryHint, postVictoryIntro]);
 
-  // During onboarding, "Continue" on the victory modal dismisses the modal and
-  // surfaces the puzzle-screen completion beat ("Feel how the house settled...").
-  // That FoxGuide's own Continue (handleOnboardingContinue) then routes to the pit.
+  // The cold-open Continue reveals the empty home and Fox invitation. Legacy
+  // guided-puzzle resumes keep their old puzzle-screen completion beat.
   const handleOnboardingVictoryContinue = useCallback(async () => {
     hapticLight();
     clearVictoryTimeouts();
-    // Clean up victory state so the Fox completion beat is visible behind the modal
     puzzleActions.setShowConfetti(false);
     victoryActions.resetVictory();
     orchestrationActions.resetOrchestration();
+    if (onboardingFlow.onboardingStep === 'cold_open_puzzle') {
+      await onboardingActions.advanceOnboarding('home_empty');
+      transitionTo('home', () => {
+        puzzleActions.clearBoard();
+      });
+      return;
+    }
     await onboardingActions.advanceOnboarding('puzzle_complete');
-  }, [onboardingActions, puzzleActions, victoryActions, orchestrationActions, clearVictoryTimeouts]);
+  }, [
+    onboardingFlow.onboardingStep,
+    onboardingActions,
+    puzzleActions,
+    victoryActions,
+    orchestrationActions,
+    clearVictoryTimeouts,
+    transitionTo,
+  ]);
 
   const handleReturnHome = useCallback(() => {
     hapticLight();
@@ -3722,7 +3768,7 @@ function MainApp() {
           onGoToPit={handleGoToPit}
           onShare={handleShare}
           onSkip={handleVictoryTapAccelerate}
-          isOnboarding={onboardingFlow.isOnboarding && onboardingFlow.onboardingStep === 'puzzle_tutorial'}
+          isOnboarding={onboardingFlow.isOnboarding && (onboardingFlow.onboardingStep === 'cold_open_puzzle' || onboardingFlow.onboardingStep === 'puzzle_tutorial')}
           onOnboardingContinue={handleOnboardingVictoryContinue}
           variant={puzzle.currentVariant}
           gameMode={puzzle.gameMode}

@@ -8,8 +8,7 @@ import {
 import { hasTutorialCompleted, markTutorialCompleted } from '../components/Tutorial';
 import { markTutorialSeedsPlanted } from '../services/amberCurrency';
 import { clearPuzzleState } from '../services/puzzleSaveState';
-import { hapticLight, hapticSelection } from '../services/haptics';
-import { logEvent } from '../services/eventLogger';
+import { hapticLight } from '../services/haptics';
 import { ONBOARDING_TRANSITION_DELAY_MS } from '../constants/timing';
 
 // ---------------------------------------------------------------------------
@@ -166,10 +165,10 @@ export function useOnboardingFlow(
         if (!mountedRef.current) return;
         setOnboardingStepState('complete');
       } else if (step === 'not_started') {
-        // Fresh install — start onboarding
-        await setOnboardingStep('home_empty');
+        // Fresh install: begin with the self-directed curated puzzle.
+        await setOnboardingStep('cold_open_puzzle');
         if (!mountedRef.current) return;
-        setOnboardingStepState('home_empty');
+        setOnboardingStepState('cold_open_puzzle');
         setOnboardingLineIndex(0);
       } else {
         // Resume from where they left off — but snap transient/non-resumable
@@ -196,18 +195,21 @@ export function useOnboardingFlow(
   }, []);
 
   // ------------------------------------------------------------------
-  // navigateToPuzzleTutorial — shared helper for fox_invited → puzzle
+  // navigateToPitTutorial — shared helper for the post-puzzle handoff
   // ------------------------------------------------------------------
-  const navigateToPuzzleTutorial = useCallback(async () => {
-    await advanceOnboarding('going_to_puzzle');
+  const navigateToPitTutorial = useCallback(async () => {
+    await advanceOnboarding('going_to_pit');
+    hapticLight();
+    callbacks.setShowConfetti(false);
+    callbacks.resetVictory();
+    setPitOfferDone(false);
+    pitOfferCompletedRef.current = false;
     addTimeout(async () => {
       if (!mountedRef.current) return;
-      await advanceOnboarding('puzzle_tutorial');
+      await advanceOnboarding('pit_intro');
       if (!mountedRef.current) return;
-      callbacks.refreshStats();
-      callbacks.transitionTo('puzzle', () => {
-        callbacks.startNewGame('EASY');
-        logEvent({ type: 'puzzle_started', data: { difficulty: 'EASY', onboarding: true } });
+      callbacks.transitionTo('pit', () => {
+        callbacks.setGameState('IDLE');
       });
     }, ONBOARDING_TRANSITION_DELAY_MS);
   }, [advanceOnboarding, callbacks, addTimeout]);
@@ -226,7 +228,7 @@ export function useOnboardingFlow(
         if (onboardingLineIndex < lines.length - 1) {
           setOnboardingLineIndex(prev => prev + 1);
         } else {
-          await navigateToPuzzleTutorial();
+          await navigateToPitTutorial();
         }
         break;
       }
@@ -244,21 +246,7 @@ export function useOnboardingFlow(
         if (onboardingLineIndex < lines.length - 1) {
           setOnboardingLineIndex(prev => prev + 1);
         } else {
-          // Navigate to pit for harvest introduction
-          await advanceOnboarding('going_to_pit');
-          hapticLight();
-          callbacks.setShowConfetti(false);
-          callbacks.resetVictory();
-          setPitOfferDone(false);
-          pitOfferCompletedRef.current = false;
-          addTimeout(async () => {
-            if (!mountedRef.current) return;
-            await advanceOnboarding('pit_intro');
-            if (!mountedRef.current) return;
-            callbacks.transitionTo('pit', () => {
-              callbacks.setGameState('IDLE');
-            });
-          }, ONBOARDING_TRANSITION_DELAY_MS);
+          await navigateToPitTutorial();
         }
         break;
       }
@@ -306,9 +294,8 @@ export function useOnboardingFlow(
     onboardingStep,
     onboardingLineIndex,
     advanceOnboarding,
-    navigateToPuzzleTutorial,
+    navigateToPitTutorial,
     callbacks,
-    addTimeout,
   ]);
 
   // ------------------------------------------------------------------

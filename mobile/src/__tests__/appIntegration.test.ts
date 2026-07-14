@@ -95,6 +95,46 @@ describe('tutorial fox bubble avoidance', () => {
   });
 });
 
+describe('self-directed cold-open onboarding', () => {
+  test('routes the fresh cold-open step to an EASY standard board or its autosave', () => {
+    expect(APP_TSX).toMatch(/step === 'cold_open_puzzle'/);
+    expect(APP_TSX).toMatch(/await loadPuzzleState\(\)/);
+    expect(APP_TSX).toMatch(/puzzleActions\.restorePuzzleState\(saved\)/);
+    expect(APP_TSX).toMatch(/puzzleActions\.startNewGame\('EASY', 'standard', 'standard', false\)/);
+  });
+
+  test('shows the concise instruction without FoxGuide or exact guidance', () => {
+    expect(APP_TSX).toMatch(/puzzleActions\.setMessage\(COLD_OPEN_INSTRUCTION\)/);
+    expect(APP_TSX).toMatch(/if \(onboardingFlow\.onboardingStep !== 'puzzle_tutorial'\) return null;/);
+
+    const onboardingPuzzleGuide = APP_TSX.slice(
+      APP_TSX.indexOf('{/* Fox Guide overlay — shown during onboarding on puzzle screen'),
+      APP_TSX.indexOf('{!onboardingFlow.isOnboarding && showSetupSelectorIntro')
+    );
+    expect(onboardingPuzzleGuide.length).toBeGreaterThan(0);
+    expect(onboardingPuzzleGuide).not.toContain("cold_open_puzzle");
+  });
+
+  test('cold-open victory Continue clears the board and routes to the Fox invitation', () => {
+    const handler = APP_TSX.slice(
+      APP_TSX.indexOf('const handleOnboardingVictoryContinue'),
+      APP_TSX.indexOf('const handleReturnHome')
+    );
+    expect(handler).toContain("onboardingFlow.onboardingStep === 'cold_open_puzzle'");
+    expect(handler).toContain("advanceOnboarding('home_empty')");
+    expect(handler).toContain("transitionTo('home'");
+    expect(handler).toContain('puzzleActions.clearBoard()');
+    expect(APP_TSX).toMatch(
+      /isOnboarding=\{onboardingFlow\.isOnboarding && \(onboardingFlow\.onboardingStep === 'cold_open_puzzle' \|\| onboardingFlow\.onboardingStep === 'puzzle_tutorial'\)\}/
+    );
+  });
+
+  test('the first-free-win glitch remains suppressed for the cold open', () => {
+    expect(APP_TSX).toMatch(/let firstFreeWin = false;\s*\n\s*if \(!onboardingFlow\.isOnboarding\)/);
+    expect(APP_TSX).toMatch(/isOnboarding: onboardingFlow\.isOnboarding/);
+  });
+});
+
 describe('onboarding skip clean exit', () => {
   test('the onboarding hook receives the board-clearing escape hatch', () => {
     // handleSkipOnboarding abandons the guided board via this callback —
@@ -123,7 +163,7 @@ describe('reset-all wiring', () => {
     expect(APP_TSX).toMatch(/onReset=\{handleResetComplete\}/);
     // The shared rebuild refreshes persistence; Reset All restarts onboarding
     // live while the creator-snapshot path keeps it complete.
-    expect(APP_TSX).toMatch(/restartOnboarding \? 'home_empty' : 'complete'/);
+    expect(APP_TSX).toMatch(/restartOnboarding \? 'cold_open_puzzle' : 'complete'/);
     expect(APP_TSX).toMatch(/rebuildSessionFromStorage\(\{ restartOnboarding: true \}\)/);
     expect(APP_TSX).toMatch(/rebuildSessionFromStorage\(\{ restartOnboarding: false \}\)/);
     expect(APP_TSX).toMatch(/puzzleActions\.clearBoard\(\)/);

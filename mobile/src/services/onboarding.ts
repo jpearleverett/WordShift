@@ -7,20 +7,22 @@ const ONBOARDING_KEY = 'wordshift_onboarding_step';
  * Onboarding steps for the redesigned intro flow.
  *
  * Flow:
- * 1. home_empty      → Player sees empty home, guided to invite Fox
- * 2. fox_invited     → Fox intro dialogue plays on home screen
- * 3. going_to_puzzle → Fox says "follow me!" — transitioning to puzzle
- * 4. puzzle_tutorial → Guided easy puzzle with Fox tips
- * 5. puzzle_complete → Victory shown, Fox congratulates
- * 6. going_to_pit    → Fox introduces word harvesting concept
- * 7. pit_intro       → Fox explains the Offering Pit on the pit screen
- * 8. pit_offering    → Player taps each floating word to offer it; Fox reacts once all are offered
- * 9. returning_home  → Transitioning back to home screen
- * 10. unlock_explained → Fox explains amber & unlock system
- * 11. complete        → Player is free
+ * 1. cold_open_puzzle → Player solves curated EASY puzzle 0 without a guide
+ * 2. home_empty       → Player sees empty home, guided to invite Fox
+ * 3. fox_invited      → Fox acknowledges the solved puzzle
+ * 4. going_to_pit     → Transitioning directly to the pit
+ * 5. pit_intro        → Fox explains the Offering Pit on the pit screen
+ * 6. pit_offering     → Player taps each floating word to offer it; Fox reacts once all are offered
+ * 7. returning_home   → Transitioning back to home screen
+ * 8. unlock_explained → Fox explains amber & unlock system
+ * 9. complete         → Player is free
+ *
+ * The going_to_puzzle / puzzle_tutorial / puzzle_complete steps remain valid
+ * so installs interrupted during the previous onboarding can resume safely.
  */
 export type OnboardingStep =
   | 'not_started'
+  | 'cold_open_puzzle'
   | 'home_empty'
   | 'fox_invited'
   | 'going_to_puzzle'
@@ -36,10 +38,12 @@ export type OnboardingStep =
 let cachedStep: OnboardingStep | null = null;
 
 const VALID_STEPS: Set<string> = new Set([
-  'not_started', 'home_empty', 'fox_invited', 'going_to_puzzle',
+  'not_started', 'cold_open_puzzle', 'home_empty', 'fox_invited', 'going_to_puzzle',
   'puzzle_tutorial', 'puzzle_complete', 'going_to_pit', 'pit_intro',
   'pit_offering', 'returning_home', 'unlock_explained', 'complete',
 ]);
+
+export const COLD_OPEN_INSTRUCTION = 'Move one letter down. Both words must stay real.';
 
 /**
  * Get the current onboarding step from storage.
@@ -102,15 +106,11 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
     "Oh! Hello up there! I'm down here, by the little den.\nTap the invite and I'll come say hello properly!",
   ],
 
-  // Step 2: Fox just invited — intro dialogue (two beats; the greeting and the
-  // house-grows beat are merged so the corridor loses a tap). Warm on the
-  // surface, with ONE faint wrong-note (the "someone like you... for the
-  // longest time" seed): adorable eagerness on a first read, quietly ominous
-  // once the descent lands. Per the narrative vision's Early Darkness Seeds —
-  // the trap is set in warmth.
+  // Fox arrives after the player has already solved the cold-open puzzle.
+  // The final sentence keeps the original faint wrong-note intact.
   fox_invited: [
-    "You let me in! Oh, I hoped you would. I'm Ember!\nAnd here is the wonderful part: every puzzle you solve makes this house a little more real. It is my favorite thing.",
-    "Come on, one quick puzzle together, then we build. I have been hoping for someone like you for the longest time.",
+    "You let me in! Oh, I hoped you would. I'm Ember!\nYou already made this house a little more real with that puzzle. It is my favorite thing.",
+    "Those words are already waiting below us. Come on, I want to show you where they went. I have been hoping for someone like you for the longest time.",
   ],
 
   // Step 3: On puzzle screen — guide through the puzzle. This intro beat is the
