@@ -413,6 +413,14 @@ describe('useDialogueFlow Phase 5 pool-only delivery', () => {
       isNew: true,
       nextCaughtUp: 1,
     });
+    const animalDialogue = jest.requireMock('../services/animalDialogue') as {
+      getAndMarkNarrativeCallbackPage: jest.Mock;
+    };
+    animalDialogue.getAndMarkNarrativeCallbackPage.mockResolvedValue(null);
+    const dialogueChoices = jest.requireMock('../services/dialogueChoices') as {
+      getAndMarkPhase4CallbackPage: jest.Mock;
+    };
+    dialogueChoices.getAndMarkPhase4CallbackPage.mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -435,6 +443,29 @@ describe('useDialogueFlow Phase 5 pool-only delivery', () => {
 
     expect(markDialogueReadMock).toHaveBeenCalledWith('pangolin', 25);
     expect(setPhase5CaughtUpMock).toHaveBeenCalledWith('pangolin', 1);
+  });
+
+  it('opens on the Phase 5 pool without invoking Phase 4 callback queues', async () => {
+    const animalDialogue = jest.requireMock('../services/animalDialogue') as {
+      getAndMarkNarrativeCallbackPage: jest.Mock;
+    };
+    animalDialogue.getAndMarkNarrativeCallbackPage.mockResolvedValue(
+      'A Phase 4 seed callback.'
+    );
+    const dialogueChoices = jest.requireMock('../services/dialogueChoices') as {
+      getAndMarkPhase4CallbackPage: jest.Mock;
+    };
+    dialogueChoices.getAndMarkPhase4CallbackPage.mockResolvedValue(
+      'A Phase 4 choice callback.'
+    );
+
+    let hook = render();
+    await hook.handleAnimalTap({ ...pangolin, currentDialogueIndex: 0 } as never);
+    hook = render();
+
+    expect(dialogueChoices.getAndMarkPhase4CallbackPage).not.toHaveBeenCalled();
+    expect(animalDialogue.getAndMarkNarrativeCallbackPage).not.toHaveBeenCalled();
+    expect(hook.dialogueText).toBe(phase5Line);
   });
 
   it('does not grant late-recruit regular-backlog session bonus in Phase 5', async () => {
