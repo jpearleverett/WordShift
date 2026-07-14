@@ -115,6 +115,19 @@ describe('puzzleSaveState', () => {
     expect(loaded2!.hintsUsed).toBe(3);
   });
 
+  it('preserves the marked-final-board flag (kill/restore keeps the finale)', async () => {
+    await savePuzzleState(makeSavedState({ isFinalBoard: true }));
+    const loaded = await loadPuzzleState();
+    expect(loaded).not.toBeNull();
+    expect(loaded!.isFinalBoard).toBe(true);
+  });
+
+  it('old saves without isFinalBoard restore as normal boards', async () => {
+    await savePuzzleState(makeSavedState());
+    const loaded = await loadPuzzleState();
+    expect(loaded!.isFinalBoard).toBeUndefined();
+  });
+
   it('preserves all key fields in round-trip', async () => {
     const state = makeSavedState({
       activeRowIndex: 3,

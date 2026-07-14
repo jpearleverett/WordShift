@@ -119,6 +119,13 @@ export interface VictoryData {
    * here). Drives the mandatory first-harvest gate in the Victory modal.
    */
   mandatoryHarvest?: boolean;
+  /**
+   * True on THE marked final board's victory (set in App, not here). Forces
+   * the full victory ceremony (never a compact strip) with the hushed
+   * treatment: App suppresses the chime + confetti, and FINAL_PUZZLE_EVENT
+   * plays over the settled modal.
+   */
+  finalBoard?: boolean;
   /** True when this puzzle created a new pending phase transition in the pit */
   phaseTransitionPending: boolean;
   /** True when pending harvest batches hit the 200 cap and oldest were trimmed */

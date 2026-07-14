@@ -1,12 +1,40 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated, Dimensions, TouchableOpacity } from 'react-native';
-import { PhaseTransitionEvent, PhaseScene, CinematicParticleConfig } from '../services/phaseEvents';
+import { View, Text, StyleSheet, Animated, Dimensions, TouchableOpacity, Image } from 'react-native';
+import { PhaseTransitionEvent, PhaseScene, SceneImage, CinematicParticleConfig } from '../services/phaseEvents';
 import { getSettingsSync } from '../services/settings';
 import { hapticLight, hapticMedium, hapticHeavy, hapticWarning } from '../services/haptics';
-import { BODY_FONT, BODY_FONT_BOLD } from '../theme/fonts';
+import { BODY_FONT_BOLD } from '../theme/fonts';
 import { getPhaseTheme } from '../theme/colors';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+// ---------------------------------------------------------------------------
+// In-engine cinematic art: the REAL game assets (never emoji). The entity is
+// the same soft shadow_figure.png HouseWorld renders behind the house; the
+// house is the roof art the player raised room by room.
+// ---------------------------------------------------------------------------
+const SCENE_IMAGE_SOURCES: Record<SceneImage, ReturnType<typeof require>> = {
+  shadow_figure: require('../../assets/environment/shadow_figure.png'),
+  house: require('../../assets/environment/roof.png'),
+};
+
+// Rendered sizes preserve each asset's aspect (shadow_figure 600x1200,
+// roof 792x283) and sit behind the centered scene text.
+const SCENE_IMAGE_SIZES: Record<SceneImage, { width: number; height: number }> = {
+  shadow_figure: {
+    height: Math.round(SCREEN_HEIGHT * 0.52),
+    width: Math.round(SCREEN_HEIGHT * 0.52 * (600 / 1200)),
+  },
+  house: {
+    width: Math.round(SCREEN_WIDTH * 0.72),
+    height: Math.round(SCREEN_WIDTH * 0.72 * (283 / 792)),
+  },
+};
+
+/** Default peak opacity for a scene image when the scene doesn't set one. */
+const SCENE_IMAGE_DEFAULT_OPACITY = 0.6;
+/** How far (px) the descend effect lowers the image into place. */
+const DESCEND_DISTANCE = 90;
 
 /** Fire a haptic scaled to the scene's visual effect and event intensity */
 function fireSceneHaptic(scene: PhaseScene, shakeIntensity?: number): void {
@@ -192,6 +220,10 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
   const shakeY = useRef(new Animated.Value(0)).current;
   const flashOpacity = useRef(new Animated.Value(0)).current;
   const vignetteOpacity = useRef(new Animated.Value(0)).current;
+  // Scene-image drivers (the in-engine arrival: shadow figure / house art)
+  const imageOpacity = useRef(new Animated.Value(0)).current;
+  const imageTranslateY = useRef(new Animated.Value(0)).current;
+  const [activeImage, setActiveImage] = useState<SceneImage | null>(null);
   const effectAnimsRef = useRef<Animated.CompositeAnimation[]>([]);
   const [flashColor, setFlashColor] = useState('#FFFFFF');
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -203,6 +235,76 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     shakeX.stopAnimation();
     shakeY.stopAnimation();
     flashOpacity.stopAnimation();
+    imageOpacity.stopAnimation();
+    imageTranslateY.stopAnimation();
+  };
+
+  /**
+   * Drive the scene's in-engine image. 'descend' = the arrival: a slow
+   * translateY down + opacity-in (native driver); every other scene with an
+   * image gets a plain opacity fade toward its target. Consecutive scenes
+   * sharing an image animate opacity from the current value, so a settled
+   * shadow persists rather than blinking. Reduced motion: static fade
+   * (values set instantly, no movement).
+   */
+  const runSceneImage = (scene: PhaseScene, timeScale: number, reducedMotion: boolean) => {
+    if (!scene.image) {
+      // No image this scene — fade any lingering one away.
+      if (reducedMotion) {
+        imageOpacity.setValue(0);
+      } else {
+        const fadeOut = Animated.timing(imageOpacity, {
+          toValue: 0,
+          duration: 300 * timeScale,
+          useNativeDriver: true,
+        });
+        effectAnimsRef.current.push(fadeOut);
+        fadeOut.start();
+      }
+      return;
+    }
+
+    setActiveImage(scene.image);
+    const target = scene.imageOpacity ?? SCENE_IMAGE_DEFAULT_OPACITY;
+
+    if (reducedMotion) {
+      imageTranslateY.setValue(0);
+      imageOpacity.setValue(target);
+      return;
+    }
+
+    if (scene.effect === 'descend') {
+      // The descent: start above, unseen; settle slowly into place.
+      imageTranslateY.setValue(-DESCEND_DISTANCE);
+      imageOpacity.setValue(0);
+      const descendMs = Math.min(scene.duration * 0.75, 3800) * timeScale;
+      const anim = Animated.parallel([
+        Animated.timing(imageTranslateY, {
+          toValue: 0,
+          duration: descendMs,
+          useNativeDriver: true,
+        }),
+        Animated.timing(imageOpacity, {
+          toValue: target,
+          duration: descendMs * 0.6,
+          useNativeDriver: true,
+        }),
+      ]);
+      effectAnimsRef.current.push(anim);
+      anim.start();
+      return;
+    }
+
+    // Plain image scene: settle in place, fade from wherever opacity is now
+    // (0 for a fresh image, the previous target for a persisting one).
+    imageTranslateY.setValue(0);
+    const fade = Animated.timing(imageOpacity, {
+      toValue: target,
+      duration: 450 * timeScale,
+      useNativeDriver: true,
+    });
+    effectAnimsRef.current.push(fade);
+    fade.start();
   };
 
   /**
@@ -291,6 +393,9 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     shakeY.setValue(0);
     flashOpacity.setValue(0);
     vignetteOpacity.setValue(0);
+    imageOpacity.setValue(0);
+    imageTranslateY.setValue(0);
+    setActiveImage(null);
 
     const reducedMotion = getSettingsSync().reducedMotion;
     // Scale ALL timing: 0.4x in reduced motion (not just skip animations),
@@ -320,6 +425,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     event.scenes.forEach((scene, index) => {
       const showTimer = setTimeout(() => {
         setActiveSceneIndex(index);
+        runSceneImage(scene, timeScale, reducedMotion);
         if (!reducedMotion) {
           fireSceneHaptic(scene, event.shakeIntensity);
           runSceneEffect(scene, event.shakeIntensity ?? 0, event.phase);
@@ -402,6 +508,37 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
       accessibilityRole="alert"
       accessibilityLabel={`Phase transition: ${event.title}`}
     >
+      {/* Event-long backdrop: the settled entity behind every line (static, faint) */}
+      {event.backdrop && (
+        <View style={styles.imageLayer} pointerEvents="none">
+          <Image
+            source={SCENE_IMAGE_SOURCES[event.backdrop.image]}
+            resizeMode="contain"
+            style={{
+              ...SCENE_IMAGE_SIZES[event.backdrop.image],
+              opacity: event.backdrop.opacity,
+            }}
+          />
+        </View>
+      )}
+
+      {/* Per-scene in-engine image (the arrival descends behind the text) */}
+      {activeImage && (
+        <Animated.View
+          style={[
+            styles.imageLayer,
+            { opacity: imageOpacity, transform: [{ translateY: imageTranslateY }] },
+          ]}
+          pointerEvents="none"
+        >
+          <Image
+            source={SCENE_IMAGE_SOURCES[activeImage]}
+            resizeMode="contain"
+            style={SCENE_IMAGE_SIZES[activeImage]}
+          />
+        </Animated.View>
+      )}
+
       {/* Soft atmospheric edge vignette (fades in on vignette_close scenes) */}
       <SoftVignette opacity={vignetteOpacity} color={getPhaseTheme(event.phase).vignetteColor} />
 
@@ -438,9 +575,6 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
           },
         ]}
       >
-        {Boolean(activeScene?.emoji) && (
-          <Text style={styles.sceneEmoji}>{activeScene.emoji}</Text>
-        )}
         {activeScene && (
           <Text style={[styles.sceneText, { color: event.textColor }]}>
             {activeScene.text}
@@ -492,16 +626,22 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginBottom: 60,
     opacity: 0.6,
+    zIndex: 2,
   },
   sceneContainer: {
     alignItems: 'center',
     minHeight: 120,
     justifyContent: 'center',
+    zIndex: 2,
   },
-  sceneEmoji: {
-    fontFamily: BODY_FONT,
-    fontSize: 48,
-    marginBottom: 24,
+  // Centered layer for the in-engine cinematic art (backdrop + scene image).
+  // Sits behind the text (zIndex under sceneContainer) and never intercepts
+  // touches — the imagery is presence, the words stay legible on top.
+  imageLayer: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
   },
   sceneText: {
     fontFamily: BODY_FONT_BOLD,
@@ -516,6 +656,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 80,
     gap: 8,
+    zIndex: 2,
   },
   dot: {
     width: 8,
@@ -530,6 +671,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 16,
     borderWidth: 1,
+    zIndex: 2,
   },
   skipText: {
     fontFamily: BODY_FONT_BOLD,

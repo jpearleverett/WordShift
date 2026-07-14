@@ -71,6 +71,8 @@ jest.mock('../services/localGenerator', () => ({
     wordLength: 4,
   })),
   getIncantationName: jest.fn(() => null),
+  // Default: no dread word in the ledger — the finale-serve tests override this.
+  getStrongestDreadWord: jest.fn(() => null),
 }));
 
 jest.mock('../services/phaseNarrative', () => ({
@@ -84,6 +86,7 @@ jest.mock('../services/phaseNarrative', () => ({
   getInvalidWordMessage: jest.fn((word: string, _p: number) => `${word} isn't a word!`),
   getBlindFailMessage: jest.fn((_p: number) => 'Not every word held! Undo and mend the chain.'),
   getLockedLetterMessage: jest.fn((_p: number) => 'That letter is locked!'),
+  getFinalBoardStartMessage: jest.fn((_p: number) => 'The last arrangement. Take your time.'),
 }));
 
 jest.mock('../services/hints', () => ({
@@ -96,6 +99,7 @@ jest.mock('../services/amberCurrency', () => ({
   getPreferredPuzzleVariant: jest.fn(async () => 'standard'),
   setPreferredPuzzleVariant: jest.fn(async () => {}),
   getFullProgress: jest.fn(async () => ({ puzzlesSolved: 10 })),
+  getRitualWords: jest.fn(async () => []),
 }));
 
 // Mock puzzleBank to return null — tests exercise the generation path
@@ -830,6 +834,140 @@ describe('usePuzzleGame', () => {
       const [state] = callHook();
       expect(state.currentVariant).toBe('speed');
       expect(state.selectedVariant).toBe('speed');
+    });
+  });
+
+  describe('the marked final board (finale-armed serve)', () => {
+    const amber = require('../services/amberCurrency');
+    const gen = require('../services/localGenerator');
+
+    afterEach(() => {
+      // Restore the suite-wide defaults consumed by mockResolvedValueOnce.
+      (amber.getFullProgress as jest.Mock).mockImplementation(async () => ({ puzzlesSolved: 10 }));
+      (amber.getRitualWords as jest.Mock).mockImplementation(async () => []);
+      (gen.getStrongestDreadWord as jest.Mock).mockImplementation(() => null);
+    });
+
+    test('finale armed: the next standard start is the final board, seeded from the strongest dread word', async () => {
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({
+        puzzlesSolved: 162,
+        finaleArmed: true,
+        finalPuzzleCompleted: false,
+      });
+      (amber.getRitualWords as jest.Mock).mockResolvedValueOnce(['TIME', 'GLOW']);
+      (gen.getStrongestDreadWord as jest.Mock).mockReturnValueOnce({ word: 'TIME', tier: 4 });
+
+      resetHookState();
+      let [, actions] = callHook();
+      await actions.startNewGame('MEDIUM');
+
+      const [state] = callHook();
+      expect(state.isFinalBoard).toBe(true);
+      expect(state.gameState).toBe(GameState.PLAYING);
+      expect(state.currentVariant).toBe('standard');
+      // Seeded via the echo path from the player's own strongest dread word.
+      expect(gen.generateLocalPuzzle).toHaveBeenCalledWith(
+        'MEDIUM',
+        expect.objectContaining({ startWord: 'TIME' })
+      );
+      // The quiet start line replaces the normal start toast.
+      expect(state.message).toBe('The last arrangement. Take your time.');
+    });
+
+    test('a selected variant is served as a standard board this once; the preference survives', async () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.setSelectedVariant('reverse');
+
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({
+        puzzlesSolved: 162,
+        finaleArmed: true,
+        finalPuzzleCompleted: false,
+      });
+      // No dread word (getRitualWords → [], getStrongestDreadWord → null):
+      // the ultimate fallback still serves a normal board, marked final.
+      [, actions] = callHook();
+      await actions.startNewGame('MEDIUM');
+
+      const [state] = callHook();
+      expect(state.isFinalBoard).toBe(true);
+      expect(state.currentVariant).toBe('standard');
+      // The player's preferred variant is untouched for later boards.
+      expect(state.selectedVariant).toBe('reverse');
+      expect(state.message).toBe('The last arrangement. Take your time.');
+    });
+
+    test('after the finale is completed, boards serve normally again', async () => {
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({
+        puzzlesSolved: 163,
+        finaleArmed: false,
+        finalPuzzleCompleted: true,
+      });
+      resetHookState();
+      let [, actions] = callHook();
+      await actions.startNewGame('MEDIUM');
+      const [state] = callHook();
+      expect(state.isFinalBoard).toBe(false);
+    });
+
+    test('kill/restore keeps the final-board mark (and a plain restore does not invent one)', () => {
+      resetHookState();
+      let [, actions] = callHook();
+      const baseSaved = {
+        rows: [],
+        activeRowIndex: 0,
+        selectedLetter: null,
+        gameState: GameState.PLAYING,
+        message: '',
+        history: [],
+        invalidAttempts: 0,
+        hintsUsed: 0,
+        undosRemaining: Infinity,
+        difficulty: 'MEDIUM',
+        currentWordLength: 4,
+        hint: '',
+        solution: undefined,
+        reverseSolution: undefined,
+        gameMode: 'standard',
+        currentVariant: 'standard',
+        selectedVariant: 'standard',
+        moveDirection: 'down',
+        currentPhase: 4,
+        lastFormedWord: null,
+        isPlayingDaily: false,
+        savedAt: Date.now(),
+      };
+      actions.restorePuzzleState({ ...baseSaved, isFinalBoard: true } as unknown as import('../services/puzzleSaveState').SavedPuzzleState);
+      let [state] = callHook();
+      expect(state.isFinalBoard).toBe(true);
+
+      [, actions] = callHook();
+      actions.restorePuzzleState(baseSaved as unknown as import('../services/puzzleSaveState').SavedPuzzleState);
+      [state] = callHook();
+      expect(state.isFinalBoard).toBe(false);
+    });
+
+    test('initGame and clearBoard both clear the mark (next board is never final by accident)', async () => {
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({
+        puzzlesSolved: 162,
+        finaleArmed: true,
+        finalPuzzleCompleted: false,
+      });
+      resetHookState();
+      let [, actions] = callHook();
+      await actions.startNewGame('MEDIUM');
+      let [state] = callHook();
+      expect(state.isFinalBoard).toBe(true);
+
+      [, actions] = callHook();
+      actions.initGame(['ABCD', 'EFGH', 'IJKL']);
+      [state] = callHook();
+      expect(state.isFinalBoard).toBe(false);
+
+      [, actions] = callHook();
+      actions.clearBoard();
+      [state] = callHook();
+      expect(state.isFinalBoard).toBe(false);
     });
   });
 

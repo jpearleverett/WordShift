@@ -56,6 +56,8 @@ import {
   getFinalBoardStartMessage,
   getCycleMicroBeat,
   CYCLE_MICRO_BEATS,
+  checkCycleNarrativeMicroBeat,
+  resolveVictoryMicroBeat,
 } from '../services/phaseNarrative';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DialoguePhase } from '../types/homeWorld';
@@ -1753,5 +1755,79 @@ describe('getCycleMicroBeat', () => {
     expect(getCycleMicroBeat(12)!.text).toContain('she says'); // Panko
     expect(getCycleMicroBeat(26)!.text).toContain('his handwriting'); // Archimedes
     expect(getCycleMicroBeat(100)!.text).toContain('her'); // Sloane
+  });
+});
+
+// ============================================================================
+// Cycle-relative micro-beat delivery (NG+ depth): on cycleCount > 0 the beats
+// key on puzzles-solved-this-cycle, with a per-cycle seen set. Half-memory
+// CYCLE_MICRO_BEATS win at shared keys; regular MICRO_BEATS re-fire EXCEPT the
+// forever-once silent_victory (and the first-win glitch, which lives on its
+// own never-reset flag).
+// ============================================================================
+
+describe('checkCycleNarrativeMicroBeat + resolveVictoryMicroBeat', () => {
+  beforeEach(async () => {
+    (AsyncStorage.clear as jest.Mock)();
+    await resetMicroBeats();
+  });
+
+  test('cycle beats fire once per cycle at their cycle-relative keys', async () => {
+    const beat = await checkCycleNarrativeMicroBeat(3, 1);
+    expect(beat).not.toBeNull();
+    expect(beat!.text).toContain('Ember'); // the half-memory wins its key
+    // Consumed for THIS cycle.
+    expect(await checkCycleNarrativeMicroBeat(3, 1)).toBeNull();
+    // A deeper cycle replays it (the seen set is per-cycle).
+    expect(await checkCycleNarrativeMicroBeat(3, 2)).not.toBeNull();
+  });
+
+  test('regular micro-beats re-fire cycle-relative on a new cycle', async () => {
+    // 35 is a regular MICRO_BEATS key (no cycle beat there).
+    const beat = await checkCycleNarrativeMicroBeat(35, 1);
+    expect(beat).not.toBeNull();
+    expect(beat).toEqual(MICRO_BEATS[35]);
+    expect(await checkCycleNarrativeMicroBeat(35, 1)).toBeNull();
+  });
+
+  test('half-memory beats take priority over regular beats at shared keys', async () => {
+    // 12 and 100 exist on BOTH tracks — the cycle half-memory must win.
+    const beat12 = await checkCycleNarrativeMicroBeat(12, 1);
+    expect(beat12).toEqual(CYCLE_MICRO_BEATS[12]);
+    const beat100 = await checkCycleNarrativeMicroBeat(100, 1);
+    expect(beat100).toEqual(CYCLE_MICRO_BEATS[100]);
+  });
+
+  test('the silent_victory anticlimax stays forever-once (never re-fires on a cycle)', async () => {
+    const silentKey = Number(
+      Object.keys(MICRO_BEATS).find(k => MICRO_BEATS[Number(k)].type === 'silent_victory')
+    );
+    expect(Number.isFinite(silentKey)).toBe(true);
+    expect(await checkCycleNarrativeMicroBeat(silentKey, 1)).toBeNull();
+  });
+
+  test('returns null on the first playthrough or at non-keys', async () => {
+    expect(await checkCycleNarrativeMicroBeat(3, 0)).toBeNull();
+    expect(await checkCycleNarrativeMicroBeat(0, 1)).toBeNull();
+    expect(await checkCycleNarrativeMicroBeat(999, 1)).toBeNull();
+  });
+
+  test('resolveVictoryMicroBeat routes by cycle: absolute on cycle 0, relative after', async () => {
+    // First playthrough: absolute count consumes the classic track.
+    const first = await resolveVictoryMicroBeat(35, 0, 0);
+    expect(first).toEqual(MICRO_BEATS[35]);
+    // Cycle 1 at total 203, started at 200 → cycle-relative 3 → Ember's half-memory.
+    const cycled = await resolveVictoryMicroBeat(203, 1, 200);
+    expect(cycled).toEqual(CYCLE_MICRO_BEATS[3]);
+    // Legacy cycled save with no anchor (cycleStartPuzzles 0): relative count
+    // equals the huge total → outruns every key → the old silence, no crash.
+    expect(await resolveVictoryMicroBeat(203, 1, 0)).toBeNull();
+  });
+
+  test('resetMicroBeats clears the cycle-scoped seen set too', async () => {
+    await checkCycleNarrativeMicroBeat(3, 1);
+    expect(await checkCycleNarrativeMicroBeat(3, 1)).toBeNull();
+    await resetMicroBeats();
+    expect(await checkCycleNarrativeMicroBeat(3, 1)).not.toBeNull();
   });
 });

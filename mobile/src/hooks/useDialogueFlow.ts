@@ -794,10 +794,16 @@ export function useDialogueFlow({
     }
 
     // 8b. Phase 4+: one-time callbacks recontextualizing the Phase 0 seed
-    // lines the player actually heard (one per visit, each shown once).
+    // lines (one per visit, each shown once). Widened gate: an animal that
+    // reaches Phase 4 with NO seeds heard could never hear them now (seed
+    // planting stops at global Phase 2) — this covers the descent trio,
+    // unlocked at Phase 3-4, whose callbacks are self-contained and would
+    // otherwise be permanently unreachable on a first run.
     if (animalPhase >= 4) {
       try {
-        const seedCallback = await getAndMarkNarrativeCallbackPage(animal.type);
+        const seedCallback = await getAndMarkNarrativeCallbackPage(animal.type, {
+          allowUnheardSeeds: true,
+        });
         if (seedCallback) {
           pages.push(seedCallback);
         }

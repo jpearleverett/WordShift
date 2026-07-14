@@ -262,7 +262,27 @@ describe('proactive share prompt', () => {
 
   test('the prominent opening glitch fires on the first FREE win, not the tutorial', () => {
     expect(APP_TSX).toMatch(/firstFreeWin = !\(await hasSeenFirstWinGlitch\(\)\)/);
-    expect(APP_TSX).toMatch(/firstFreeWin,\s*\n\s*\}\);/);
+    // firstFreeWin (and the dwell-window voice line) thread into processVictory.
+    expect(APP_TSX).toMatch(/firstFreeWin,\s*\n\s*dwellLine: dwellLineForWin,\s*\n\s*\}\);/);
+  });
+});
+
+describe('finale staging (armed, not retroactive)', () => {
+  test('the dwell gate ARMS the finale; the cinematic fires only on the marked final board', () => {
+    // Arming path: dwell >= FINALE_DWELL_PUZZLES arms instead of firing.
+    expect(APP_TSX).toMatch(/if \(dwell >= FINALE_DWELL_PUZZLES\) \{\s*\n\s*await armFinale\(\);/);
+    // Firing path: only the marked final board's win completes the finale.
+    expect(APP_TSX).toMatch(/if \(wasFinalBoard\) \{[\s\S]{0,400}?markFinalPuzzleCompleted\(\)/);
+    expect(APP_TSX).toMatch(/setPhaseTransitionEvent\(FINAL_PUZZLE_EVENT\)/);
+  });
+
+  test('the final board win is silent: no chime, no confetti (the quiet IS the moment)', () => {
+    expect(APP_TSX).toMatch(/!isSilentVictoryBeat\(completedTotal\) && !wasFinalBoard/);
+    expect(APP_TSX).toMatch(/setShowConfetti\(!wasFinalBoard\)/);
+  });
+
+  test('the dwell window has a voice: getDwellLine threads into the victory cascade', () => {
+    expect(APP_TSX).toMatch(/dwellLineForWin = getDwellLine\(/);
   });
 });
 

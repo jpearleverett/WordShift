@@ -47,6 +47,10 @@ export interface SavedPuzzleState {
   /** Board came from a friend-shared challenge link. Restored so a kill+relaunch
    *  can't convert a shared board (amber-only) into one that feeds phase progress. */
   isSharedChallenge?: boolean;
+  /** THE marked final board (finale-armed serve). Restored so a kill+relaunch
+   *  keeps the finale on the board that was served as final — its victory must
+   *  still silence the fanfare and fire FINAL_PUZZLE_EVENT. */
+  isFinalBoard?: boolean;
   /** Absolute timestamp (ms) when the speed timer expires. Null for non-speed variants. */
   speedTimerExpireAt?: number | null;
   /** Remaining speed-timer seconds at save time. Preferred over

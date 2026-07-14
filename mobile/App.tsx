@@ -55,6 +55,8 @@ import {
   isPostRevelation,
   markPostRevelation,
   recordPhase4Dwell,
+  armFinale,
+  isFinaleArmed,
   consumeVariantNudge,
   getFullProgress,
   consumeCycleOpening,
@@ -107,6 +109,7 @@ import {
   getPreviewGraduationMessage,
   getSwiftVictoryHintMessage,
   getStreakHeldMessage,
+  getDwellLine,
 } from './src/services/phaseNarrative';
 import { getActiveEvent, getEventDailyBonusAmber } from './src/services/liveEvents';
 import { recordSolveTime, getSolveTrend, recordSpeedRound } from './src/services/masteryRecords';
@@ -620,6 +623,7 @@ function MainApp() {
     doubleShiftPhase: puzzle.doubleShiftPhase,
     speedTimeRemaining: speedTimer.speedTimeRemaining,
     isSharedChallenge: puzzle.isSharedChallenge,
+    isFinalBoard: puzzle.isFinalBoard,
   });
 
   // ========================================================================
@@ -1509,6 +1513,9 @@ function MainApp() {
 
     if (result?.completed) {
       isDragDropRef.current = false;
+      // THE marked final board's win: the fanfare is suppressed (the quiet IS
+      // the moment) and the finale cinematic fires from the endgame block below.
+      const wasFinalBoard = result.isFinalBoard === true;
       // Speed streak: a completed speed puzzle ratchets up the next clock, and
       // the peak streak is remembered as a best-round record (the in-run counter
       // evaporates on every reset). Surface a new record as an in-world beat.
@@ -1822,6 +1829,11 @@ function MainApp() {
           lines: getFoxStarterIntroLines(finalVictory.newPhase),
         });
       }
+      // The final board's victory is a ceremony, never a compact strip — the
+      // flag routes useVictoryFlow to the full (but hushed) treatment.
+      if (wasFinalBoard) {
+        finalVictory = { ...finalVictory, finalBoard: true };
+      }
       queuedPostVictoryIntrosRef.current = immediateIntros;
 
       // Check for ritual micro-event on high-energy puzzles
@@ -1862,8 +1874,9 @@ function MainApp() {
 
       // Scripted anticlimax: on the one silent-victory board the fanfare simply
       // does not play (the micro-beat renders the stark line instead). The most
-      // complicit moment in the descent is a quiet one.
-      if (!isSilentVictoryBeat(completedTotal)) {
+      // complicit moment in the descent is a quiet one. The FINAL board gets
+      // the same silence — no chime, no confetti — before the arrival plays.
+      if (!isSilentVictoryBeat(completedTotal) && !wasFinalBoard) {
         if (victory.earnedStars === 3) {
           soundPerfect();
         } else {
@@ -1872,7 +1885,7 @@ function MainApp() {
       }
 
       puzzleActions.setGameState(GameState.WON);
-      puzzleActions.setShowConfetti(true);
+      puzzleActions.setShowConfetti(!wasFinalBoard);
       victoryActions.setProcessingVictory(false);
       puzzlesSinceHomeVisit.current += 1;
 
@@ -1898,21 +1911,25 @@ function MainApp() {
       // When phaseTransitionPending is true, the phase change will be confirmed
       // in the pit screen with a ward mark ceremony. Don't play the overlay here.
 
-      // Check for endgame triggers (final puzzle + post-revelation)
+      // Check for endgame triggers (dwell voice → finale arming → the marked
+      // final board's win → post-revelation).
+      //
+      // The finale is no longer declared retroactively on an ordinary win:
+      // once the dwell window fills, the finale is ARMED (finaleArmed) and the
+      // NEXT standard board start serves the marked FINAL BOARD
+      // (usePuzzleGame.startNewGame). Its victory — and only its victory —
+      // plays FINAL_PUZZLE_EVENT. The win after that triggers
+      // POST_REVELATION_EVENT + markPostRevelation, exactly as before.
+      let dwellLineForWin: string | null = null;
       if (!victory.phaseChanged && persistence.currentPhase >= 4) {
         try {
           const houseComplete = await isHouseCompleted();
           if (houseComplete) {
             const finalDone = await isFinalPuzzleCompleted();
             if (!finalDone) {
-              // Dwell gate: the finale used to fire on the FIRST Phase-4
-              // victory, so the whole cult-reveal era flashed past in one
-              // puzzle. Require FINALE_DWELL_PUZZLES Phase-4 puzzles first so
-              // the robed sprites, sacrifice mechanic, and 300 Phase-4
-              // dialogue lines are actually played. Never shown as a counter
-              // (narrative rule 7) — the house "is not yet ready."
-              const dwell = await recordPhase4Dwell();
-              if (dwell >= FINALE_DWELL_PUZZLES) {
+              if (wasFinalBoard) {
+                // The last arrangement is complete. markFinalPuzzleCompleted
+                // also disarms the finale (single atomic write).
                 await markFinalPuzzleCompleted();
                 orchestrationActions.setCompletionCoda({
                   title: 'THE HOUSE STANDS COMPLETE',
@@ -1921,7 +1938,28 @@ function MainApp() {
                     : 'You completed the house and reached the final path.',
                 });
                 addVictoryTimeout(() => setPhaseTransitionEvent(FINAL_PUZZLE_EVENT), 1500);
+              } else if (!(await isFinaleArmed())) {
+                // Dwell gate: the finale used to fire on the FIRST Phase-4
+                // victory, so the whole cult-reveal era flashed past in one
+                // puzzle. Require FINALE_DWELL_PUZZLES Phase-4 puzzles first
+                // so the robed sprites, sacrifice mechanic, and 300 Phase-4
+                // dialogue lines are actually played. Never shown as a
+                // counter (narrative rule 7) — the house "is not yet ready."
+                const dwell = await recordPhase4Dwell();
+                if (dwell >= FINALE_DWELL_PUZZLES) {
+                  await armFinale();
+                }
+                // Dwell voice: the wait after "The arrangement is ready."
+                // reads as held breath, not silence — one counter-free line
+                // per dwell win, surfaced through the ambient overlay in the
+                // victory cascade (skipped when a keyed micro-beat fires).
+                dwellLineForWin = getDwellLine(
+                  Math.min(dwell, FINALE_DWELL_PUZZLES),
+                  persistence.currentPhase
+                );
               }
+              // Armed but not the final board (a daily / restored board):
+              // hold still — the arrangement has already chosen its board.
             } else {
               const postRev = await isPostRevelation();
               if (!postRev) {
@@ -1962,6 +2000,7 @@ function MainApp() {
         isOnboarding: onboardingFlow.isOnboarding,
         puzzlesSinceHomeVisit: puzzlesSinceHomeVisit.current,
         firstFreeWin,
+        dwellLine: dwellLineForWin,
       });
 
       // Re-schedule notifications after puzzle completion

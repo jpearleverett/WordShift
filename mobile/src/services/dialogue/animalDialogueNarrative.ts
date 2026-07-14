@@ -905,17 +905,33 @@ export async function getAndMarkNarrativeSeedPage(
 /**
  * One-time Phase 4 pre-dialogue page recontextualizing a Phase 0 seed.
  * Delivers at most one callback per call (so callbacks spread across
- * visits), each callback exactly once, and only for seeds the player
- * actually heard. Returns null when there's nothing left to say.
+ * visits), each callback exactly once.
+ *
+ * Default gate: only for seeds the player actually heard (never
+ * recontextualize an unsaid line). `allowUnheardSeeds` widens this for
+ * animals whose seeds could never be planted — seed planting stops at
+ * global Phase 2, so a late-unlocked animal (the descent trio arrives at
+ * Phase 3-4) would otherwise have its best Phase-4 material permanently
+ * unreachable on a first run. The callbacks restate their seed inside
+ * themselves (self-contained), so delivering them unheard still lands.
  */
 export async function getAndMarkNarrativeCallbackPage(
-  animalType: AnimalType
+  animalType: AnimalType,
+  options?: { allowUnheardSeeds?: boolean }
 ): Promise<string | null> {
   const state = await loadDeliveryState();
   const delivered = state.seedsDelivered[animalType] ?? [];
-  if (delivered.length === 0) return null;
+  const callbackCount = NARRATIVE_SEEDS[animalType]?.callbacks.length ?? 0;
+  // Heard seeds keep the classic contract; with zero heard seeds the widened
+  // gate (allowUnheardSeeds) walks every callback in order instead.
+  const eligible = delivered.length > 0
+    ? [...delivered].sort((a, b) => a - b)
+    : options?.allowUnheardSeeds
+      ? Array.from({ length: callbackCount }, (_, i) => i)
+      : [];
+  if (eligible.length === 0) return null;
   const shown = state.callbacksShown[animalType] ?? [];
-  for (const i of [...delivered].sort((a, b) => a - b)) {
+  for (const i of eligible) {
     if (shown.includes(i)) continue;
     const text = getNarrativeCallback(animalType, i);
     if (!text) return null;

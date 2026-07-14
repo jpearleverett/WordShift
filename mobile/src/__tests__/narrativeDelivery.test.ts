@@ -155,6 +155,33 @@ describe('phase-4 seed callbacks', () => {
     expect(await getAndMarkNarrativeCallbackPage('fox')).toBeNull();
     expect(await getAndMarkNarrativeCallbackPage('fox')).toBeNull();
   });
+
+  it('allowUnheardSeeds: a seedless animal (late unlock) still receives its callbacks, one per visit', async () => {
+    // The descent trio unlocks at global Phase 3-4 — seed planting stopped at
+    // Phase 2, so without the widened gate their callbacks are unreachable.
+    expect(await getAndMarkNarrativeCallbackPage('kakapo')).toBeNull();
+    expect(
+      await getAndMarkNarrativeCallbackPage('kakapo', { allowUnheardSeeds: true })
+    ).toBe(NARRATIVE_SEEDS.kakapo.callbacks[0]);
+    expect(
+      await getAndMarkNarrativeCallbackPage('kakapo', { allowUnheardSeeds: true })
+    ).toBe(NARRATIVE_SEEDS.kakapo.callbacks[1]);
+    expect(
+      await getAndMarkNarrativeCallbackPage('kakapo', { allowUnheardSeeds: true })
+    ).toBeNull();
+  });
+
+  it('allowUnheardSeeds keeps the classic heard-seed contract when SOME seed was heard', async () => {
+    await getAndMarkNarrativeSeedPage('owl', 2); // hears seed 0 only
+    expect(
+      await getAndMarkNarrativeCallbackPage('owl', { allowUnheardSeeds: true })
+    ).toBe(NARRATIVE_SEEDS.owl.callbacks[0]);
+    // Seed 1 was heard-able but skipped — the widened gate is only for animals
+    // whose seeds could NEVER be planted, so callback 1 stays withheld.
+    expect(
+      await getAndMarkNarrativeCallbackPage('owl', { allowUnheardSeeds: true })
+    ).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------

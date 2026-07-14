@@ -46,6 +46,8 @@ import {
   isPostRevelation,
   recordPhase4Dwell,
   getPhase4DwellCount,
+  armFinale,
+  isFinaleArmed,
   getFullProgress,
   invalidateProgressCache,
   awardBonusAmber,
@@ -440,6 +442,26 @@ describe('New Cycle (NG+)', () => {
     expect(await getAmberBalance()).toBe(500);
     // The finale can fire again.
     expect(await canStartNewCycle()).toBe(false);
+  });
+
+  test('startNewCycle anchors cycleStartPuzzles and disarms the finale', async () => {
+    await devAddPuzzles(200);
+    await markHouseCompleted();
+    await armFinale();
+    await markFinalPuzzleCompleted();
+    await markPostRevelation();
+
+    await startNewCycle();
+    const progress = await getFullProgress();
+    // puzzlesSolved is KEPT; the cycle-relative baseline anchors at it so the
+    // cycle micro-beats (keyed at counts 3/12/26/...) become reachable again.
+    expect(progress.puzzlesSolved).toBe(200);
+    expect(progress.cycleStartPuzzles).toBe(200);
+    // The finale machinery fully re-arms from zero.
+    expect(progress.finaleArmed).toBe(false);
+    expect(progress.finalPuzzleCompleted).toBe(false);
+    expect(progress.phase4Dwell).toBe(0);
+    expect(await isFinaleArmed()).toBe(false);
   });
 
   test('consumeCycleOpening fires once per new cycle', async () => {
@@ -935,6 +957,28 @@ describe('post-revelation phase pinning (Phase 5)', () => {
     expect(await recordPhase4Dwell()).toBe(2);
     expect(await recordPhase4Dwell()).toBe(3);
     expect(await getPhase4DwellCount()).toBe(3);
+  });
+
+  test('armFinale arms and markFinalPuzzleCompleted disarms (the marked final board contract)', async () => {
+    expect(await isFinaleArmed()).toBe(false);
+    await armFinale();
+    expect(await isFinaleArmed()).toBe(true);
+    // Idempotent while armed.
+    await armFinale();
+    expect(await isFinaleArmed()).toBe(true);
+    // The final board's win disarms in the same write that marks completion.
+    await markFinalPuzzleCompleted();
+    expect(await isFinaleArmed()).toBe(false);
+    const progress = await getFullProgress();
+    expect(progress.finalPuzzleCompleted).toBe(true);
+    expect(progress.finaleArmed).toBe(false);
+  });
+
+  test('armFinale is a no-op once the final puzzle is completed', async () => {
+    await markFinalPuzzleCompleted();
+    await armFinale();
+    // A late arm can never re-open the finale after it played.
+    expect(await isFinaleArmed()).toBe(false);
   });
 
   test('markPostRevelation sets currentPhase to 5 and clears any pending transition', async () => {

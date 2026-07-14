@@ -907,6 +907,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       variant = selectedVariant;
     }
     setCurrentVariant(variant);
+    // Hoisted past the try so the fallback path can still mark the final
+    // board (the ultimate fallback: any board, marked final).
+    let finaleServe = false;
 
     try {
       // Serve curated early-game puzzles for the first few solves
@@ -926,13 +929,51 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         return;
       }
 
+      // THE FINAL BOARD: once the dwell window has filled, the finale is
+      // ARMED (amberCurrency.finaleArmed) and the next standard-mode start
+      // becomes the marked final board — the finale is played, not declared
+      // retroactively. A selected variant is served as a standard board this
+      // once (in-world, the arrangement chooses; the player's preference is
+      // untouched for later boards). Seeded via the echo path from the
+      // player's strongest fed dread word; if no dread word exists or the
+      // generator can't build from it, the normal bank/generation path below
+      // serves the board — still marked final (ultimate fallback).
+      finaleServe = progress?.finaleArmed === true && progress?.finalPuzzleCompleted !== true;
+      if (finaleServe) {
+        variant = 'standard';
+        setCurrentVariant('standard');
+        try {
+          const ritualWords = await getRitualWords();
+          const targetLen = selectedDifficulty === 'EASY' || selectedDifficulty === 'MEDIUM' ? 4 : 5;
+          const strongest = getStrongestDreadWord(
+            (ritualWords || []).filter(w => w.length === targetLen)
+          );
+          if (strongest) {
+            const finalPuzzle = await generateLocalPuzzle(selectedDifficulty, { startWord: strongest.word });
+            if (finalPuzzle) {
+              if (isStale()) return;
+              initGame(finalPuzzle.words, finalPuzzle.hint, finalPuzzle.solution, finalPuzzle.wordLength, 'standard');
+              await recordPuzzleWords(finalPuzzle.words);
+              isFinalBoardRef.current = true;
+              setIsFinalBoard(true);
+              setMessage(getFinalBoardStartMessage(currentPhase));
+              return;
+            }
+          }
+        } catch {
+          // Dread seeding failed — fall through: the normal path still serves
+          // the final board (any board, marked final).
+        }
+      }
+
       // Echo puzzles: every 5th puzzle from Phase 3 onward re-seeds a word from
       // the player's OWN ritual history — the descent handing their past words
       // back. This is the moment it was made for (the reveal), so it now runs
       // pre-finale, not just at Phase 5 (post-revelation). Falls through to the
-      // normal bank/generation path if echo seeding fails.
+      // normal bank/generation path if echo seeding fails. The marked final
+      // board takes precedence (it carries its own dread-word echo).
       setIsEchoPuzzle(false);
-      if (currentPhase >= 3 && puzzlesSolved > 0 && puzzlesSolved % 5 === 0 && variant === 'standard') {
+      if (!finaleServe && currentPhase >= 3 && puzzlesSolved > 0 && puzzlesSolved % 5 === 0 && variant === 'standard') {
         try {
           const ritualWords = await getRitualWords();
           // Pick words matching the target word length for this difficulty
@@ -966,7 +1007,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
             if (isStale()) return;
             initGame(bankPuzzle.words, bankPuzzle.hint, bankPuzzle.solution, bankPuzzle.wordLength, variant, bankPuzzle.reverseSolution);
             await recordPuzzleWords(bankPuzzle.words);
-            if (variant !== 'standard') {
+            if (finaleServe) {
+              // Dread seeding fell through — this bank board IS the final board.
+              isFinalBoardRef.current = true;
+              setIsFinalBoard(true);
+              setMessage(getFinalBoardStartMessage(currentPhase));
+            } else if (variant !== 'standard') {
               const config = VARIANT_CONFIGS[variant];
               setMessage(getVariantInstruction(config, currentPhase, selectedDifficulty));
             } else {
@@ -992,7 +1038,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       );
       if (isStale()) return;
       initGame(puzzle.words, puzzle.hint, puzzle.solution, puzzle.wordLength, activeVariant, puzzle.reverseSolution);
-      if (activeVariant !== 'standard') {
+      if (finaleServe) {
+        // Generated board serving as the final board (dread seed unavailable).
+        isFinalBoardRef.current = true;
+        setIsFinalBoard(true);
+        setMessage(getFinalBoardStartMessage(currentPhase));
+      } else if (activeVariant !== 'standard') {
         const config = VARIANT_CONFIGS[activeVariant];
         setMessage(getVariantInstruction(config, currentPhase, selectedDifficulty));
       } else if (variant !== 'standard') {
@@ -1019,7 +1070,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         fallbackWordLen,
         fallbackVariant
       );
-      if (variant !== 'standard') {
+      if (finaleServe) {
+        // Even the fallback pool serves the final board when armed.
+        isFinalBoardRef.current = true;
+        setIsFinalBoard(true);
+        setMessage(getFinalBoardStartMessage(currentPhase));
+      } else if (variant !== 'standard') {
         // Variant was dropped during fallback — notify the player
         setMessage(
           currentPhase >= 3
@@ -1723,6 +1779,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         variant: currentVariant,
         solveTimeMs,
         blind: blindMode,
+        // THE marked final board's win — App silences the fanfare and fires
+        // the finale (ref mirror: set at board start, immune to stale closures).
+        isFinalBoard: isFinalBoardRef.current,
         // Full per-move record including the completing move (ref mirror is
         // already current; state would be a render behind at this point).
         moveOutcomes: moveOutcomesRef.current,
@@ -2176,6 +2235,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     // A daily autosave is never restored as a normal puzzle (App's load guard),
     // so a restored board is by definition not a daily.
     setIsDailyBoard(false);
+    // The final-board mark survives kill/restore: the finale must fire on the
+    // board that was served as final, even across a relaunch.
+    isFinalBoardRef.current = saved.isFinalBoard === true;
+    setIsFinalBoard(saved.isFinalBoard === true);
     setCurrentVariant(saved.currentVariant);
     setSelectedVariantState(saved.selectedVariant);
     setMoveDirection(saved.moveDirection);
@@ -2261,6 +2324,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setLastFormedWord(null);
     setDoubleShiftPhase(null);
     setIsEchoPuzzle(false);
+    isFinalBoardRef.current = false;
+    setIsFinalBoard(false);
     setIsSharedChallenge(false);
     setIsDailyBoard(false);
     setIsStuck(false);
@@ -2308,6 +2373,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     previewValidityVisible,
     doubleShiftPhase,
     isEchoPuzzle,
+    isFinalBoard,
     isStuck,
     hintBalance,
     outOfHintsSignal,
