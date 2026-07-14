@@ -15,6 +15,7 @@ import {
   getMilestoneMessage,
   NARRATIVE_ACCELERATION,
   CHALLENGE_MODE_CONFIG,
+  AnimalType,
 } from '../types/homeWorld';
 import {
   MIN_PUZZLES_FOR_PHASE,
@@ -81,6 +82,31 @@ function getDefaultProgress(): HomeWorldProgress {
     phaseProgressFraction: 0,
     reservedUnlockId: null,
   };
+}
+
+/**
+ * Phase 5 is a clean handoff to the post-revelation/Tending pool. Retire any
+ * unread regular backlog for unlocked animals while preserving indices already
+ * beyond the regular corpus (those positions drive deterministic pool re-reads).
+ * Lazy-load the dialogue corpus only at the reveal/load self-heal boundary so
+ * the foundational currency service does not evaluate it during normal startup.
+ */
+function retireUnlockedRegularDialogue(progress: HomeWorldProgress): boolean {
+  const unlocked = progress.unlockedAnimals ?? [];
+  if (unlocked.length === 0) return false;
+  if (!progress.lastDialogueRead) progress.lastDialogueRead = {};
+  const { getTotalDialogueCount } =
+    require('./dialogue/animalDialogueBase') as typeof import('./dialogue/animalDialogueBase');
+  let changed = false;
+  for (const animalId of unlocked) {
+    const totalRegular = getTotalDialogueCount(animalId as AnimalType, 4);
+    const existing = progress.lastDialogueRead[animalId] ?? 0;
+    if (existing < totalRegular) {
+      progress.lastDialogueRead[animalId] = totalRegular;
+      changed = true;
+    }
+  }
+  return changed;
 }
 
 // MIN_PUZZLES_FOR_PHASE imported from constants/gameBalance.ts (single source of truth).
@@ -323,11 +349,23 @@ export async function loadProgress(): Promise<HomeWorldProgress> {
     const stored = await AsyncStorage.getItem(PROGRESS_STORAGE_KEY);
     if (stored) {
       progressCache = JSON.parse(stored);
+      let healedPostRevelation = false;
       // Self-heal legacy saves: post-revelation locks the world at phase 5,
       // but older builds left currentPhase at 4 (calculatePhase caps there).
       if (progressCache!.postRevelation === true && progressCache!.currentPhase !== 5) {
         progressCache!.currentPhase = effectivePhaseFor(progressCache!);
         progressCache!.pendingPhaseTransition = null;
+        healedPostRevelation = true;
+      }
+      // Existing Phase-5 saves may still point into Phase 3/4 regular dialogue.
+      // Normalize those positions even when currentPhase was already correct.
+      if (
+        progressCache!.postRevelation === true &&
+        retireUnlockedRegularDialogue(progressCache!)
+      ) {
+        healedPostRevelation = true;
+      }
+      if (healedPostRevelation) {
         await saveProgress();
       }
       return progressCache!;
@@ -1548,6 +1586,7 @@ export async function markPostRevelation(): Promise<void> {
   // (useDialogueFlow, HomeScreen, homeWorldData) — pin it here.
   progress.currentPhase = effectivePhaseFor(progress);
   progress.pendingPhaseTransition = null;
+  retireUnlockedRegularDialogue(progress);
   progressCache = progress;
   await saveProgress();
 

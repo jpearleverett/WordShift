@@ -107,6 +107,27 @@ jest.mock('../services/amberCurrency', () => ({
   getRitualWords: jest.fn(async () => []),
 }));
 
+jest.mock('../services/finalBoard', () => ({
+  buildFinalBoard: jest.fn(async () => ({
+    words: ['SPARK', 'LIGHT', 'PAINS', 'DWELL', 'CURSE', 'BLACK', 'GRAVE'],
+    hint: 'Follow the last arrangement.',
+    solution: [
+      { stepIndex: 0, sourceWord: 'SPARK', targetWord: 'LIGHT', letterToMove: 'S', explanation: '', insertionPosition: 0, removalPosition: 0 },
+      { stepIndex: 1, sourceWord: 'SLIGHT', targetWord: 'PAINS', letterToMove: 'L', explanation: '', insertionPosition: 1, removalPosition: 1 },
+      { stepIndex: 2, sourceWord: 'PLAINS', targetWord: 'DWELL', letterToMove: 'S', explanation: '', insertionPosition: 5, removalPosition: 5 },
+      { stepIndex: 3, sourceWord: 'DWELLS', targetWord: 'CURSE', letterToMove: 'D', explanation: '', insertionPosition: 5, removalPosition: 0 },
+      { stepIndex: 4, sourceWord: 'CURSED', targetWord: 'BLACK', letterToMove: 'S', explanation: '', insertionPosition: 5, removalPosition: 3 },
+      { stepIndex: 5, sourceWord: 'BLACKS', targetWord: 'GRAVE', letterToMove: 'L', explanation: '', insertionPosition: 5, removalPosition: 1 },
+    ],
+    wordLength: 5,
+  })),
+}));
+
+jest.mock('../services/wordHistory', () => ({
+  getWordHistoryWithRecency: jest.fn(async () => new Map()),
+  recordPuzzleWords: jest.fn(async () => {}),
+}));
+
 // Mock puzzleBank to return null — tests exercise the generation path
 jest.mock('../services/puzzleBank', () => ({
   selectPreGeneratedPuzzle: jest.fn(async () => null),
@@ -959,6 +980,8 @@ describe('usePuzzleGame', () => {
   describe('the marked final board (finale-armed serve)', () => {
     const amber = require('../services/amberCurrency');
     const gen = require('../services/localGenerator');
+    const finalBoard = require('../services/finalBoard');
+    const history = require('../services/wordHistory');
 
     afterEach(() => {
       // Restore the suite-wide defaults consumed by mockResolvedValueOnce.
@@ -967,38 +990,55 @@ describe('usePuzzleGame', () => {
       (gen.getStrongestDreadWord as jest.Mock).mockImplementation(() => null);
     });
 
-    test('finale armed: the next standard start is the final board, seeded from the strongest dread word', async () => {
+    test('finale armed: builds and commits the bespoke seven-row HARD board, then returns before normal generation', async () => {
+      (finalBoard.buildFinalBoard as jest.Mock).mockClear();
+      (history.recordPuzzleWords as jest.Mock).mockClear();
+      (gen.generateLocalPuzzle as jest.Mock).mockClear();
+      const bank = require('../services/puzzleBank');
+      (bank.selectPreGeneratedPuzzle as jest.Mock).mockClear();
       (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({
-        puzzlesSolved: 162,
+        // A defensive stale/corrupt count must not let curated-early serving
+        // preempt an explicitly armed finale.
+        puzzlesSolved: 0,
         finaleArmed: true,
         finalPuzzleCompleted: false,
       });
-      (amber.getRitualWords as jest.Mock).mockResolvedValueOnce(['TIME', 'GLOW']);
-      (gen.getStrongestDreadWord as jest.Mock).mockReturnValueOnce({ word: 'TIME', tier: 4 });
+      (amber.getRitualWords as jest.Mock).mockResolvedValueOnce(['ALTAR', 'GLOW']);
 
       resetHookState();
       let [, actions] = callHook();
       await actions.startNewGame('MEDIUM');
 
       const [state] = callHook();
+      expect(finalBoard.buildFinalBoard).toHaveBeenCalledWith(['ALTAR', 'GLOW']);
       expect(state.isFinalBoard).toBe(true);
       expect(state.gameState).toBe(GameState.PLAYING);
       expect(state.currentVariant).toBe('standard');
-      // Seeded via the echo path from the player's own strongest dread word.
-      expect(gen.generateLocalPuzzle).toHaveBeenCalledWith(
-        'MEDIUM',
-        expect.objectContaining({ startWord: 'TIME' })
-      );
+      expect(state.gameMode).toBe('standard');
+      expect(state.blindMode).toBe(false);
+      expect(state.difficulty).toBe('HARD');
+      expect(state.currentWordLength).toBe(5);
+      expect(state.rows).toHaveLength(7);
+      expect(state.rows.map(row => row.originalWord)).toEqual([
+        'SPARK', 'LIGHT', 'PAINS', 'DWELL', 'CURSE', 'BLACK', 'GRAVE',
+      ]);
+      expect(state.solution).toHaveLength(6);
+      expect(state.hint).toBe('Follow the last arrangement.');
+      expect(history.recordPuzzleWords).toHaveBeenCalledWith([
+        'SPARK', 'LIGHT', 'PAINS', 'DWELL', 'CURSE', 'BLACK', 'GRAVE',
+      ]);
+      expect(bank.selectPreGeneratedPuzzle).not.toHaveBeenCalled();
+      expect(gen.generateLocalPuzzle).not.toHaveBeenCalled();
       // The quiet start line replaces the normal start toast.
       expect(state.message).toBe('The last arrangement. Take your time.');
     });
 
-    test('a selected variant is served as a standard board this once; the preference survives', async () => {
+    test('selected variant and difficulty preferences survive the one-board finale override', async () => {
       const bank = require('../services/puzzleBank');
       (bank.selectPreGeneratedPuzzle as jest.Mock).mockClear();
       resetHookState();
       let [, actions] = callHook();
-      actions.setSelectedVariant('reverse');
+      actions.setSelectedVariant('speed');
 
       (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({
         puzzlesSolved: 162,
@@ -1010,15 +1050,22 @@ describe('usePuzzleGame', () => {
       [, actions] = callHook();
       await actions.startNewGame('MEDIUM');
 
-      const [state] = callHook();
+      let [state] = callHook();
       expect(state.isFinalBoard).toBe(true);
       expect(state.currentVariant).toBe('standard');
       // The player's preferred variant is untouched for later boards.
-      expect(state.selectedVariant).toBe('reverse');
+      expect(state.selectedVariant).toBe('speed');
+      // The current board rewards as HARD, but the no-argument next-board path
+      // returns to the player's prior MEDIUM preference.
+      expect(state.difficulty).toBe('HARD');
       expect(state.message).toBe('The last arrangement. Take your time.');
-      // Finale fallback generation stays bespoke and never picks up mature
-      // bank branching/extension depth.
       expect(bank.selectPreGeneratedPuzzle).not.toHaveBeenCalled();
+
+      [, actions] = callHook();
+      await actions.startNewGame(undefined, undefined, 'standard');
+      [state] = callHook();
+      expect(state.difficulty).toBe('MEDIUM');
+      expect(state.selectedVariant).toBe('speed');
     });
 
     test('after the finale is completed, boards serve normally again', async () => {
@@ -1105,12 +1152,11 @@ describe('usePuzzleGame', () => {
 
   describe('final board: undo refused', () => {
     const amber = require('../services/amberCurrency');
-    const gen = require('../services/localGenerator');
+    const finalBoard = require('../services/finalBoard');
 
     afterEach(() => {
       (amber.getFullProgress as jest.Mock).mockImplementation(async () => ({ puzzlesSolved: 20 }));
       (amber.getRitualWords as jest.Mock).mockImplementation(async () => []);
-      (gen.getStrongestDreadWord as jest.Mock).mockImplementation(() => null);
     });
 
     // Serve THE final board with the synthetic solvable chain ABCD→EFGH→IJKL
@@ -1122,8 +1168,7 @@ describe('usePuzzleGame', () => {
         finalPuzzleCompleted: false,
       });
       (amber.getRitualWords as jest.Mock).mockResolvedValueOnce(['ABCD']);
-      (gen.getStrongestDreadWord as jest.Mock).mockReturnValueOnce({ word: 'ABCD', tier: 4 });
-      (gen.generateLocalPuzzle as jest.Mock).mockResolvedValueOnce({
+      (finalBoard.buildFinalBoard as jest.Mock).mockResolvedValueOnce({
         words: ['ABCD', 'EFGH', 'IJKL'],
         hint: 'final',
         solution: [],
@@ -1196,10 +1241,23 @@ describe('usePuzzleGame', () => {
       ]);
     });
 
-    test('blind finale: undo refused even though blind undos are normally free; restart is the escape', async () => {
+    test('hints remain available on the forced-standard final board', async () => {
+      await serveFinalBoard();
+      let [state, actions] = callHook();
+      expect(state.gameMode).toBe('standard');
+
+      actions.handleHint();
+      [state] = callHook();
+
+      expect(state.hintsUsed).toBe(1);
+      expect(state.hintHighlight).not.toBeNull();
+    });
+
+    test('finale forces blind off; undo is still refused and restart is the escape', async () => {
       await serveFinalBoard(true);
       let [state] = callHook();
-      expect(state.blindMode).toBe(true);
+      expect(state.blindMode).toBe(false);
+      expect(state.gameMode).toBe('standard');
 
       await playMove('A', 0);
       let [stateAfterMove, actions] = callHook();

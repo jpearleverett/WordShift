@@ -29,11 +29,18 @@ import {
   UNLOCK_SKIP_PREMIUM,
 } from '../constants/gameBalance';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  applyTend,
+  clearTendingState,
+  setPhase5CaughtUp,
+} from '../services/tending';
+import { buildPhase5Pool } from '../services/dialogue/phase5Pool';
 
 // Reset state between tests
 beforeEach(async () => {
   (AsyncStorage.clear as jest.Mock)();
   await clearProgress();
+  await clearTendingState();
 });
 
 describe('ROOMS data', () => {
@@ -310,6 +317,26 @@ describe('late-unlock dialogue fast-forward', () => {
     expect(after.lastDialogueRead['owl']).toBe(getPhaseStartIndex('owl', 2));
   });
 
+  test('Vesper starts at her current effective phase instead of replaying an earlier block', async () => {
+    const p = await loadProgress();
+    p.puzzlesSolved = 200;
+    p.currentPhase = 4;
+    await unlockThrough('unlock_tarsier');
+
+    const after = await loadProgress();
+    expect(after.lastDialogueRead['tarsier']).toBe(getPhaseStartIndex('tarsier', 4));
+  });
+
+  test('Moss starts at his current effective lagging phase', async () => {
+    const p = await loadProgress();
+    p.puzzlesSolved = 200;
+    p.currentPhase = 4;
+    await unlockThrough('unlock_kakapo');
+
+    const after = await loadProgress();
+    expect(after.lastDialogueRead['kakapo']).toBe(getPhaseStartIndex('kakapo', 3));
+  });
+
   test('never rewinds an existing read position', async () => {
     const p = await loadProgress();
     p.puzzlesSolved = 40;
@@ -347,6 +374,28 @@ describe('getAnimalsWithStatus new-dialogue badge honesty', () => {
     const total = getTotalDialogueCount('pangolin', 0);
     const pangolin = await setup(total);
     expect(pangolin.hasNewDialogue).toBe(false);
+  });
+
+  test('Phase 5 badge ignores old regular backlog and relights for a new Tending milestone line', async () => {
+    const p = await loadProgress();
+    p.currentPhase = 5;
+    p.postRevelation = true;
+    p.unlockedAnimals = ['pangolin'];
+    // Deliberately stale: Phase 5 must never advertise unread Phase 3/4 lines.
+    p.lastDialogueRead = { pangolin: 0 };
+
+    const basePoolLength = buildPhase5Pool('pangolin', 0, null).length;
+    await setPhase5CaughtUp('pangolin', basePoolLength);
+
+    let animals = await getAnimalsWithStatus();
+    expect(animals.find(a => a.id === 'pangolin')!.hasNewDialogue).toBe(false);
+
+    for (let level = 1; level <= 5; level++) {
+      await applyTend(100, `2026-07-${String(level).padStart(2, '0')}`);
+    }
+
+    animals = await getAnimalsWithStatus();
+    expect(animals.find(a => a.id === 'pangolin')!.hasNewDialogue).toBe(true);
   });
 });
 

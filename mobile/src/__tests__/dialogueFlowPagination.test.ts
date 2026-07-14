@@ -167,14 +167,17 @@ jest.mock('../services/dialogue/phase5Pool', () => ({
 
 import { useDialogueFlow, splitDialogueIntoPages } from '../hooks/useDialogueFlow';
 import { getCurrentDialogue } from '../services/animalDialogue';
-import { recordDialogue } from '../services/dialogueSession';
+import { checkDialogueAvailability, recordDialogue } from '../services/dialogueSession';
 import { markDialogueRead } from '../services/amberCurrency';
 import { recordWhisper } from '../services/whisperGallery';
+import { setPhase5CaughtUp } from '../services/tending';
 
 const getCurrentDialogueMock = getCurrentDialogue as jest.Mock;
 const recordDialogueMock = recordDialogue as jest.Mock;
 const markDialogueReadMock = markDialogueRead as jest.Mock;
 const recordWhisperMock = recordWhisper as jest.Mock;
+const checkDialogueAvailabilityMock = checkDialogueAvailability as jest.Mock;
+const setPhase5CaughtUpMock = setPhase5CaughtUp as jest.Mock;
 
 // A deterministic over-budget line (14 sentences, ~1300 chars => 3+ pages)
 const LONG_LINE = Array.from(
@@ -376,5 +379,70 @@ describe('useDialogueFlow long-line pagination (drain behavior)', () => {
     expect(hook.dialogueText).toBe(SHORT_LINE);
     expect(recordDialogueMock).not.toHaveBeenCalled();
     expect(markDialogueReadMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('useDialogueFlow Phase 5 pool-only delivery', () => {
+  const phase5Line = 'The pattern continues in a quieter shape.';
+  const tarsier = {
+    ...pangolin,
+    id: 'tarsier',
+    type: 'tarsier',
+    name: 'Vesper',
+    roomId: 'star_loft',
+  };
+
+  beforeEach(() => {
+    resetHookState();
+    jest.clearAllMocks();
+    progress.currentPhase = 5;
+    progress.puzzlesSolved = 180;
+    progress.unlockedAnimals = ['pangolin', 'tarsier'];
+    animals = [{ ...pangolin }];
+    getCurrentDialogueMock.mockReturnValue({ text: 'Legacy regular dialogue.' });
+
+    const phase5Pool = jest.requireMock('../services/dialogue/phase5Pool') as {
+      buildPhase5Pool: jest.Mock;
+    };
+    phase5Pool.buildPhase5Pool.mockReturnValue([phase5Line]);
+    const tending = jest.requireMock('../services/tending') as {
+      selectPhase5Dialogue: jest.Mock;
+    };
+    tending.selectPhase5Dialogue.mockReturnValue({
+      text: phase5Line,
+      isNew: true,
+      nextCaughtUp: 1,
+    });
+  });
+
+  afterEach(() => {
+    progress.currentPhase = 0;
+    progress.puzzlesSolved = 10;
+    progress.unlockedAnimals = ['fox', 'pangolin'];
+  });
+
+  it('serves and advances the post-revelation pool immediately from a low legacy index', async () => {
+    const legacyAnimal = { ...pangolin, currentDialogueIndex: 0 };
+    let hook = render();
+    await hook.handleAnimalTap(legacyAnimal as never);
+    hook = render();
+
+    expect(hook.dialogueText).toBe(phase5Line);
+    expect(hook.hasMoreToShow).toBe(true);
+    expect(getCurrentDialogueMock).not.toHaveBeenCalled();
+
+    await hook.handleNextDialogue();
+
+    expect(markDialogueReadMock).toHaveBeenCalledWith('pangolin', 25);
+    expect(setPhase5CaughtUpMock).toHaveBeenCalledWith('pangolin', 1);
+  });
+
+  it('does not grant late-recruit regular-backlog session bonus in Phase 5', async () => {
+    animals = [{ ...tarsier }];
+    const hook = render();
+
+    await hook.handleAnimalTap({ ...tarsier, currentDialogueIndex: 0 } as never);
+
+    expect(checkDialogueAvailabilityMock).toHaveBeenCalledWith('tarsier', 0);
   });
 });

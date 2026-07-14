@@ -1,10 +1,11 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { RowData, Letter, GameState, MoveDelta, PuzzleSolutionStep, Difficulty, GameMode } from '../types';
 import { SavedPuzzleState } from '../services/puzzleSaveState';
-import { generateLocalPuzzle, generateDoubleShiftPuzzle, getIncantationName, getStrongestDreadWord } from '../services/localGenerator';
+import { generateLocalPuzzle, generateDoubleShiftPuzzle, getIncantationName } from '../services/localGenerator';
 import { selectPreGeneratedPuzzle } from '../services/puzzleBank';
 import { getWordHistoryWithRecency, recordPuzzleWords } from '../services/wordHistory';
 import { COMMON_WORDS, CURATED_EARLY_PUZZLES, CURATED_PUZZLE_COUNT, CuratedPuzzle, getRandomFallback } from '../constants';
+import { CURATED_FINAL_PUZZLE } from '../constants/wordLists';
 // Imported from gameBalance directly (not the constants barrel) so the hook's
 // test harness — which mocks '../constants' wholesale — still gets real values.
 import {
@@ -27,6 +28,7 @@ import {
   PuzzleVariant,
 } from '../services/puzzleVariety';
 import { MIN_CHALLENGE_WORDS, MAX_CHALLENGE_WORDS, type MoveOutcome } from '../services/shareResults';
+import { buildFinalBoard } from '../services/finalBoard';
 
 // Simple ID generator (React Native compatible)
 let idCounter = 0;
@@ -631,6 +633,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   // the same tick.
   const gameModeRef = useRef<GameMode>('standard');
   const difficultyRef = useRef<Difficulty>('MEDIUM');
+  // The finale must expose HARD as the current board difficulty so App awards
+  // HARD rewards, but that one-board override must not become the next board's
+  // preference. This ref retains the last explicitly requested difficulty.
+  const preferredDifficultyRef = useRef<Difficulty>('MEDIUM');
   // Blind Offering modifier (opt-in, the trial ladder's apex rung): previews
   // hidden AND free moves — every structurally-legal move commits, and the
   // chain is judged exactly once when the final letter lands. Runs under
@@ -955,11 +961,15 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   }, []);
 
   const startNewGame = useCallback(async (
-    selectedDifficulty: Difficulty = difficulty,
+    selectedDifficulty?: Difficulty,
     mode?: GameMode,
     variantOverride?: PuzzleVariant,
     blindOverride?: boolean
   ) => {
+    const requestedDifficulty = selectedDifficulty ?? preferredDifficultyRef.current;
+    if (selectedDifficulty !== undefined) {
+      preferredDifficultyRef.current = selectedDifficulty;
+    }
     if (blindOverride !== undefined) {
       setBlindMode(blindOverride);
     }
@@ -971,14 +981,14 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setMessage(getLoadingMessage(currentPhase));
     setError(null);
     setShowDifficultyMenu(false);
-    difficultyRef.current = selectedDifficulty;
-    if (selectedDifficulty !== difficulty) {
-      setDifficulty(selectedDifficulty);
+    difficultyRef.current = requestedDifficulty;
+    if (requestedDifficulty !== difficulty) {
+      setDifficulty(requestedDifficulty);
     }
     if (mode !== undefined) {
       gameModeRef.current = mode;
       setGameMode(mode);
-      setUndosRemaining(mode === 'challenge' ? CHALLENGE_MODE_CONFIG.getMaxUndos(selectedDifficulty) : Infinity);
+      setUndosRemaining(mode === 'challenge' ? CHALLENGE_MODE_CONFIG.getMaxUndos(requestedDifficulty) : Infinity);
     }
 
     const effectiveMode = mode ?? gameMode;
@@ -988,9 +998,6 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       variant = selectedVariant;
     }
     setCurrentVariant(variant);
-    // Hoisted past the try so the fallback path can still mark the final
-    // board (the ultimate fallback: any board, marked final).
-    let finaleServe = false;
 
     try {
       // Serve curated early-game puzzles for the first few solves
@@ -999,9 +1006,13 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       const puzzlesSolved = progress?.puzzlesSolved ?? 0;
       // Keep preview-grading progression current with every fetch.
       setPuzzlesSolvedCount(puzzlesSolved);
+      const finaleServe =
+        progress?.finaleArmed === true &&
+        progress?.finalPuzzleCompleted !== true;
       if (
+        !finaleServe &&
         puzzlesSolved < CURATED_PUZZLE_COUNT &&
-        (selectedDifficulty === 'EASY' || selectedDifficulty === 'MEDIUM') &&
+        (requestedDifficulty === 'EASY' || requestedDifficulty === 'MEDIUM') &&
         variant === 'standard' &&
         effectiveMode === 'standard'
       ) {
@@ -1012,42 +1023,47 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         return;
       }
 
-      // THE FINAL BOARD: once the dwell window has filled, the finale is
-      // ARMED (amberCurrency.finaleArmed) and the next standard-mode start
-      // becomes the marked final board — the finale is played, not declared
-      // retroactively. A selected variant is served as a standard board this
-      // once (in-world, the arrangement chooses; the player's preference is
-      // untouched for later boards). Seeded via the echo path from the
-      // player's strongest fed dread word; if no dread word exists or the
-      // generator can't build from it, the normal generation path below
-      // serves the board, still marked final. It deliberately skips mature
-      // bank depth so the finale keeps its bespoke shape.
-      finaleServe = progress?.finaleArmed === true && progress?.finalPuzzleCompleted !== true;
+      // THE FINAL BOARD: once armed, the arrangement fully overrides the
+      // current board's setup. It is always standard, visible, untimed, and
+      // HARD-rewarded, while the player's selected variant and difficulty
+      // remain preferences for later boards. buildFinalBoard owns all
+      // personalization and curated fallback, so this path always returns
+      // before bank, generic-generation, or ordinary fallback selection.
       if (finaleServe) {
         variant = 'standard';
         setCurrentVariant('standard');
+        gameModeRef.current = 'standard';
+        setGameMode('standard');
+        setBlindMode(false);
+        difficultyRef.current = 'HARD';
+        setDifficulty('HARD');
+        setUndosRemaining(Infinity);
+        setIsEchoPuzzle(false);
+
+        const ritualWords = await getRitualWords().catch(() => []);
+        let finalPuzzle: Awaited<ReturnType<typeof buildFinalBoard>> = CURATED_FINAL_PUZZLE;
         try {
-          const ritualWords = await getRitualWords();
-          const targetLen = selectedDifficulty === 'EASY' || selectedDifficulty === 'MEDIUM' ? 4 : 5;
-          const strongest = getStrongestDreadWord(
-            (ritualWords || []).filter(w => w.length === targetLen)
-          );
-          if (strongest) {
-            const finalPuzzle = await generateLocalPuzzle(selectedDifficulty, { startWord: strongest.word });
-            if (finalPuzzle) {
-              if (isStale()) return;
-              initGame(finalPuzzle.words, finalPuzzle.hint, finalPuzzle.solution, finalPuzzle.wordLength, 'standard');
-              await recordPuzzleWords(finalPuzzle.words);
-              isFinalBoardRef.current = true;
-              setIsFinalBoard(true);
-              setMessage(getFinalBoardStartMessage(currentPhase));
-              return;
-            }
-          }
+          finalPuzzle = await buildFinalBoard(ritualWords);
         } catch {
-          // Dread seeding failed — fall through: the normal path still serves
-          // the final board (any board, marked final).
+          // buildFinalBoard already owns its curated fallback; keep this final
+          // defensive boundary so an unexpected service failure still cannot
+          // leak the finale into generic generation.
+          finalPuzzle = CURATED_FINAL_PUZZLE;
         }
+        if (isStale()) return;
+        const finalHint = 'hint' in finalPuzzle ? finalPuzzle.hint : undefined;
+        initGame(
+          finalPuzzle.words,
+          finalHint,
+          finalPuzzle.solution,
+          finalPuzzle.wordLength,
+          'standard'
+        );
+        isFinalBoardRef.current = true;
+        setIsFinalBoard(true);
+        setMessage(getFinalBoardStartMessage(currentPhase));
+        await recordPuzzleWords(finalPuzzle.words).catch(() => {});
+        return;
       }
 
       // Echo puzzles: every 5th puzzle from Phase 3 onward re-seeds a word from
@@ -1057,15 +1073,15 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       // normal bank/generation path if echo seeding fails. The marked final
       // board takes precedence (it carries its own dread-word echo).
       setIsEchoPuzzle(false);
-      if (!finaleServe && currentPhase >= 3 && puzzlesSolved > 0 && puzzlesSolved % 5 === 0 && variant === 'standard') {
+      if (currentPhase >= 3 && puzzlesSolved > 0 && puzzlesSolved % 5 === 0 && variant === 'standard') {
         try {
           const ritualWords = await getRitualWords();
           // Pick words matching the target word length for this difficulty
-          const targetLen = selectedDifficulty === 'EASY' || selectedDifficulty === 'MEDIUM' ? 4 : 5;
+          const targetLen = requestedDifficulty === 'EASY' || requestedDifficulty === 'MEDIUM' ? 4 : 5;
           const candidates = ritualWords.filter(w => w.length === targetLen);
           if (candidates.length > 0) {
             const echoWord = candidates[Math.floor(Math.random() * candidates.length)];
-            const echoPuzzle = await generateLocalPuzzle(selectedDifficulty, { startWord: echoWord });
+            const echoPuzzle = await generateLocalPuzzle(requestedDifficulty, { startWord: echoWord });
             if (echoPuzzle) {
               if (isStale()) return;
               initGame(echoPuzzle.words, echoPuzzle.hint, echoPuzzle.solution, echoPuzzle.wordLength, 'standard');
@@ -1082,12 +1098,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
 
       // Use pre-generated puzzle bank for standard/reverse/double_shift variants at all difficulties
       const bankVariants: PuzzleVariant[] = ['standard', 'reverse', 'double_shift'];
-      const shouldUseBank = !finaleServe && bankVariants.includes(variant);
+      const shouldUseBank = bankVariants.includes(variant);
       if (shouldUseBank) {
         try {
           const recencyMap = await getWordHistoryWithRecency();
           const bankPuzzle = await selectPreGeneratedPuzzle(
-            selectedDifficulty,
+            requestedDifficulty,
             currentPhase,
             recencyMap,
             variant,
@@ -1097,14 +1113,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
             if (isStale()) return;
             initGame(bankPuzzle.words, bankPuzzle.hint, bankPuzzle.solution, bankPuzzle.wordLength, variant, bankPuzzle.reverseSolution);
             await recordPuzzleWords(bankPuzzle.words);
-            if (finaleServe) {
-              // Dread seeding fell through — this bank board IS the final board.
-              isFinalBoardRef.current = true;
-              setIsFinalBoard(true);
-              setMessage(getFinalBoardStartMessage(currentPhase));
-            } else if (variant !== 'standard') {
+            if (variant !== 'standard') {
               const config = VARIANT_CONFIGS[variant];
-              setMessage(getVariantInstruction(config, currentPhase, selectedDifficulty));
+              setMessage(getVariantInstruction(config, currentPhase, requestedDifficulty));
             } else {
               setMessage(getStartMessage(currentPhase));
             }
@@ -1122,20 +1133,15 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       );
 
       const { puzzle, activeVariant } = await generatePuzzleForVariant(
-        selectedDifficulty,
+        requestedDifficulty,
         variant,
         timeoutPromise
       );
       if (isStale()) return;
       initGame(puzzle.words, puzzle.hint, puzzle.solution, puzzle.wordLength, activeVariant, puzzle.reverseSolution);
-      if (finaleServe) {
-        // Generated board serving as the final board (dread seed unavailable).
-        isFinalBoardRef.current = true;
-        setIsFinalBoard(true);
-        setMessage(getFinalBoardStartMessage(currentPhase));
-      } else if (activeVariant !== 'standard') {
+      if (activeVariant !== 'standard') {
         const config = VARIANT_CONFIGS[activeVariant];
-        setMessage(getVariantInstruction(config, currentPhase, selectedDifficulty));
+        setMessage(getVariantInstruction(config, currentPhase, requestedDifficulty));
       } else if (variant !== 'standard') {
         // The requested variant couldn't be generated and was downgraded to a
         // standard puzzle. Tell the player instead of silently swapping it.
@@ -1150,7 +1156,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       // Fallback puzzles don't include solver metadata, so restrictions may be
       // impossible to satisfy. Revert restriction variants to standard fallback.
       const fallbackVariant = 'standard' as PuzzleVariant;
-      const fallbackWords = getRandomFallback(selectedDifficulty);
+      const fallbackWords = getRandomFallback(requestedDifficulty);
       const fallbackWordLen = fallbackWords[0].length;
       if (isStale()) return;
       initGame(
@@ -1160,12 +1166,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         fallbackWordLen,
         fallbackVariant
       );
-      if (finaleServe) {
-        // Even the fallback pool serves the final board when armed.
-        isFinalBoardRef.current = true;
-        setIsFinalBoard(true);
-        setMessage(getFinalBoardStartMessage(currentPhase));
-      } else if (variant !== 'standard') {
+      if (variant !== 'standard') {
         // Variant was dropped during fallback — notify the player
         setMessage(
           currentPhase >= 3
@@ -2324,6 +2325,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setHintsUsed(saved.hintsUsed);
     setUndosRemaining(saved.undosRemaining);
     difficultyRef.current = saved.difficulty;
+    preferredDifficultyRef.current = saved.difficulty;
     setDifficulty(saved.difficulty);
     setCurrentWordLength(saved.currentWordLength);
     setHint(saved.hint);

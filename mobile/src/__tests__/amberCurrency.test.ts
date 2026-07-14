@@ -65,6 +65,7 @@ import {
 import { FIRST_COMPLETION_BONUS } from '../types/homeWorld';
 import { getLocalDateStringDaysAgo } from '../services/dateUtils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getTotalDialogueCount } from '../services/dialogue/animalDialogueBase';
 
 // amberCurrency lazy-requires eventLogger for phase_reached telemetry — mock it
 // so the debounced flush timer never runs and the calls are assertable.
@@ -994,6 +995,23 @@ describe('post-revelation phase pinning (Phase 5)', () => {
     expect(await getCurrentPhase()).toBe(5);
   });
 
+  test('markPostRevelation retires every unlocked animal regular-dialogue index', async () => {
+    const progress = await loadProgress();
+    const foxTotal = getTotalDialogueCount('fox', 4);
+    const pangolinTotal = getTotalDialogueCount('pangolin', 4);
+    progress.unlockedAnimals = ['fox', 'pangolin'];
+    progress.lastDialogueRead = {
+      fox: 0,
+      pangolin: pangolinTotal + 3,
+    };
+
+    await markPostRevelation();
+
+    const after = await getFullProgress();
+    expect(after.lastDialogueRead.fox).toBe(foxTotal);
+    expect(after.lastDialogueRead.pangolin).toBe(pangolinTotal + 3);
+  });
+
   test('awardPuzzleAmber never downgrades the phase after post-revelation', async () => {
     await devAddPuzzles(235);
     await markPostRevelation();
@@ -1035,6 +1053,25 @@ describe('post-revelation phase pinning (Phase 5)', () => {
     invalidateProgressCache();
     const reloaded = await loadProgress();
     expect(reloaded.currentPhase).toBe(5);
+  });
+
+  test('existing Phase 5 save self-heals low regular indices into the pool boundary', async () => {
+    const foxTotal = getTotalDialogueCount('fox', 4);
+    const legacy = {
+      ...(await loadProgress()),
+      currentPhase: 5,
+      postRevelation: true,
+      unlockedAnimals: ['fox'],
+      lastDialogueRead: { fox: 2 },
+    };
+    await AsyncStorage.setItem('wordshift_home_progress', JSON.stringify(legacy));
+    invalidateProgressCache();
+
+    const progress = await loadProgress();
+    expect(progress.lastDialogueRead.fox).toBe(foxTotal);
+
+    invalidateProgressCache();
+    expect((await loadProgress()).lastDialogueRead.fox).toBe(foxTotal);
   });
 
   test('non-post-revelation saves are untouched on load', async () => {

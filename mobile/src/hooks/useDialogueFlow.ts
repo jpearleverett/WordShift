@@ -379,10 +379,10 @@ export function useDialogueFlow({
   const getSessionBonus = (animal: Animal): number => {
     if (!progress) return 0;
     const animalPhase = getAnimalPhase(progress.currentPhase, animal.type);
-    // "Regular" backlog = the indexed base lines. At animalPhase 5 the regular
-    // block is the Phase-4 corpus (the post-revelation pool cycles forever and
-    // never earns the boost; neither does the Phase-2 exhaustion pool).
-    const regularPhase = (animalPhase === 5 ? 4 : animalPhase) as DialoguePhase;
+    // Phase 5 is pool-only: all regular backlog is retired at the reveal, and
+    // the cycling post-revelation/Tending pool never earns catch-up boosts.
+    if (animalPhase === 5) return 0;
+    const regularPhase = animalPhase as DialoguePhase;
     const resolved = resolveDialogueIndex(
       animal.type,
       animal.currentDialogueIndex,
@@ -498,27 +498,10 @@ export function useDialogueFlow({
     if (!selectedAnimal || !progress) return '';
     const animalPhase = getAnimalPhase(progress.currentPhase, selectedAnimal.type);
 
-    // Phase 5 (post-revelation): when regular dialogues are exhausted, cycle through
-    // the 10 post-revelation lines per animal with modular indexing.
-    // Note: getCurrentDialogue clamps out-of-bounds indices instead of returning null,
-    // so we must compare the index directly against the total count.
+    // Phase 5 is an immediate, clean handoff to the post-revelation/Tending
+    // pool. Never leak unread Phase 3/4 regular lines after the arrival.
     if (animalPhase === 5) {
-      const totalRegular = getTotalDialogueCount(selectedAnimal.type, 4);
-      if (selectedAnimal.currentDialogueIndex >= totalRegular) {
-        // Regular dialogues exhausted — serve the post-revelation pool via the
-        // recency-aware selector (genuinely-new lines in order, then a
-        // deterministic shuffled re-read so the same lines never arrive in the
-        // same verbatim sequence). The pool grows as the player deepens the
-        // pattern at the Tending Shrine.
-        return selectPhase5(selectedAnimal.type, selectedAnimal.currentDialogueIndex).text;
-      }
-      // Still within regular Phase 4 dialogues
-      const regularDialogue = getCurrentDialogue(
-        selectedAnimal.type,
-        resolveDialogueIndex(selectedAnimal.type, selectedAnimal.currentDialogueIndex, 4, getUnlockedTypes()),
-        4
-      );
-      return regularDialogue?.text || 'The pattern holds.';
+      return selectPhase5(selectedAnimal.type, selectedAnimal.currentDialogueIndex).text;
     }
 
     // Phase 2: once the base block is exhausted, serve the exhaustion pool
@@ -616,8 +599,17 @@ export function useDialogueFlow({
       // Skip past any lines that reference still-locked animals so the
       // stored read position never points at a blocked line.
       const tapPhase = getAnimalPhase(progress.currentPhase, animal.type);
-      const tapResolvePhase = (tapPhase === 5 ? 4 : tapPhase) as DialoguePhase;
-      const resolved = resolveDialogueIndex(animal.type, animal.currentDialogueIndex, tapResolvePhase, getUnlockedTypes());
+      const resolved = tapPhase === 5
+        ? Math.max(
+            animal.currentDialogueIndex,
+            getTotalDialogueCount(animal.type, 4)
+          )
+        : resolveDialogueIndex(
+            animal.type,
+            animal.currentDialogueIndex,
+            tapPhase,
+            getUnlockedTypes()
+          );
       if (resolved !== animal.currentDialogueIndex) {
         markDialogueRead(animal.id, resolved).catch(() => {});
         setAnimals(prev => prev.map(a => (a.id === animal.id ? { ...a, currentDialogueIndex: resolved } : a)));
@@ -893,11 +885,7 @@ export function useDialogueFlow({
     const animalPhase = getAnimalPhase(progress.currentPhase, animal.type);
     const totalDialogues = getTotalDialogueCount(animal.type, animalPhase);
     if (animalPhase === 5) {
-      const totalRegular = getTotalDialogueCount(animal.type, 4);
-      // Still finishing the Phase-4 lines — genuinely has more.
-      if (animal.currentDialogueIndex < totalRegular) return true;
-      // Post-revelation: honest now — the badge lights only while the animal has
-      // undelivered pool lines, and re-lights when a Tending milestone unlocks one.
+      // Pool-only badge: regular backlog is irrelevant after the reveal.
       const pool = buildPhase5Pool(animal.type, tendingLevel, playerChoices[animal.type] ?? null);
       const caughtUp = tendingCaughtUp[animal.type] ?? 0;
       return caughtUp < pool.length;
@@ -1054,7 +1042,7 @@ export function useDialogueFlow({
       // so the badge stays honest and the next visit delivers the following new line.
       const totalRegular = getTotalDialogueCount(selectedAnimal.type, 4);
       let nextCaughtUp = tendingCaughtUp[selectedAnimal.type] ?? 0;
-      if (animalPhase === 5 && selectedAnimal.currentDialogueIndex >= totalRegular) {
+      if (animalPhase === 5) {
         const sel = selectPhase5(selectedAnimal.type, selectedAnimal.currentDialogueIndex);
         if (sel.isNew) {
           nextCaughtUp = sel.nextCaughtUp;
@@ -1067,22 +1055,32 @@ export function useDialogueFlow({
       const status = getSessionStatus(selectedAnimal.id, getSessionBonus(selectedAnimal));
       setSessionInfo(status);
 
-      const resolvePhase = (animalPhase === 5 ? 4 : animalPhase) as DialoguePhase;
       const unlocked = getUnlockedTypes();
-      const cur = resolveDialogueIndex(selectedAnimal.type, selectedAnimal.currentDialogueIndex, resolvePhase, unlocked);
       const total2 = getTotalDialogueCount(selectedAnimal.type, 2);
       let newIndex: number;
       let nextPhase2Cursor = phase2Cursors[selectedAnimal.type] ?? 0;
-      if (animalPhase === 2 && phase2Pool.length > 0 && cur >= total2) {
-        // A pool line was just shown: pin the stored index at the base-block
-        // end (never inflate it — Phase 3 reads it as a phase-start position)
-        // and advance the persisted pool cursor instead.
-        newIndex = total2;
-        const animalType = selectedAnimal.type;
-        nextPhase2Cursor = await advancePhase2PoolCursor(animalType);
-        setPhase2Cursors(prev => ({ ...prev, [animalType]: nextPhase2Cursor }));
+      if (animalPhase === 5) {
+        // Keep the regular index at/after the pool boundary and advance it only
+        // as the deterministic re-read cursor. It never traverses old content.
+        newIndex = Math.max(selectedAnimal.currentDialogueIndex, totalRegular) + 1;
       } else {
-        newIndex = resolveDialogueIndex(selectedAnimal.type, cur + 1, resolvePhase, unlocked);
+        const cur = resolveDialogueIndex(
+          selectedAnimal.type,
+          selectedAnimal.currentDialogueIndex,
+          animalPhase,
+          unlocked
+        );
+        if (animalPhase === 2 && phase2Pool.length > 0 && cur >= total2) {
+          // A pool line was just shown: pin the stored index at the base-block
+          // end (never inflate it — Phase 3 reads it as a phase-start position)
+          // and advance the persisted pool cursor instead.
+          newIndex = total2;
+          const animalType = selectedAnimal.type;
+          nextPhase2Cursor = await advancePhase2PoolCursor(animalType);
+          setPhase2Cursors(prev => ({ ...prev, [animalType]: nextPhase2Cursor }));
+        } else {
+          newIndex = resolveDialogueIndex(selectedAnimal.type, cur + 1, animalPhase, unlocked);
+        }
       }
       await markDialogueRead(selectedAnimal.id, newIndex);
       // A new line is about to show — it must open on its first page.
@@ -1093,7 +1091,7 @@ export function useDialogueFlow({
       // Phase 2 past the base block the exhaustion-pool cursor; otherwise the
       // normal index-vs-total check.
       let hasUndeliveredLines: boolean;
-      if (animalPhase === 5 && newIndex >= totalRegular) {
+      if (animalPhase === 5) {
         const pool = getPhase5Pool(selectedAnimal.type);
         hasUndeliveredLines = nextCaughtUp < pool.length;
       } else if (animalPhase === 2 && phase2Pool.length > 0 && newIndex >= total2) {
