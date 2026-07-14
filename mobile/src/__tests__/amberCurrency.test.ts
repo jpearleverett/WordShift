@@ -121,6 +121,23 @@ describe('loadProgress', () => {
     expect((await loadProgress()).lastDialogueRead.tarsier).toBe(expected);
   });
 
+  test('self-heals Phase 2 late recruits to their current effective phases, including lagging Phase 1', async () => {
+    const legacy = {
+      ...(await loadProgress()),
+      currentPhase: 2,
+      unlockedAnimals: ['tarsier', 'aye_aye', 'kakapo'],
+      lastDialogueRead: { tarsier: 0, aye_aye: 0, kakapo: 0 },
+    };
+    await AsyncStorage.setItem('wordshift_home_progress', JSON.stringify(legacy));
+    invalidateProgressCache();
+
+    expect((await loadProgress()).lastDialogueRead).toMatchObject({
+      tarsier: getPhaseStartIndex('tarsier', 3),
+      aye_aye: getPhaseStartIndex('aye_aye', 2),
+      kakapo: getPhaseStartIndex('kakapo', 1),
+    });
+  });
+
   test('self-heals unlocked lagging Moss to his effective Phase 3 start in global Phase 4', async () => {
     const legacy = {
       ...(await loadProgress()),

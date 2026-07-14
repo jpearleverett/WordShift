@@ -113,13 +113,14 @@ function retireUnlockedRegularDialogue(progress: HomeWorldProgress): boolean {
 
 /**
  * Existing saves may already contain the descent trio from before their
- * current-era fast-forward was added to the unlock path. Bring those animals
- * to the start of their effective era without rewinding any dialogue progress.
+ * current-era fast-forward was added to the unlock path. Match the live unlock
+ * boundary (global Phase 2+) and bring those animals to the start of their
+ * effective era without rewinding any dialogue progress.
  */
 function fastForwardExistingLateRecruitDialogue(progress: HomeWorldProgress): boolean {
   if (
     progress.postRevelation === true ||
-    progress.currentPhase < 3 ||
+    progress.currentPhase < 2 ||
     progress.currentPhase > 4
   ) {
     return false;

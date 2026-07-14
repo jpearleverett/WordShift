@@ -382,8 +382,73 @@ describe('useDialogueFlow long-line pagination (drain behavior)', () => {
   });
 });
 
+describe('useDialogueFlow Fox Phase 4 tutorial callback gating', () => {
+  const fox = {
+    ...pangolin,
+    id: 'fox',
+    type: 'fox',
+    name: 'Ember',
+    roomId: 'cozy_den',
+  };
+
+  beforeEach(() => {
+    resetHookState();
+    jest.clearAllMocks();
+    progress.currentPhase = 4;
+    progress.puzzlesSolved = 130;
+    progress.unlockedAnimals = ['fox', 'pangolin'];
+    animals = [{ ...fox }];
+    getCurrentDialogueMock.mockReturnValue({ text: SHORT_LINE });
+  });
+
+  afterEach(() => {
+    progress.currentPhase = 0;
+    progress.puzzlesSolved = 10;
+    progress.unlockedAnimals = ['fox', 'pangolin'];
+  });
+
+  it('does not consume the callback at global Phase 3 when Fox is effectively Phase 4', async () => {
+    progress.currentPhase = 3;
+    const amberCurrency = jest.requireMock('../services/amberCurrency') as {
+      wereTutorialSeedsPlanted: jest.Mock;
+      markTutorialSeedsPlanted: jest.Mock;
+    };
+    amberCurrency.wereTutorialSeedsPlanted.mockResolvedValueOnce(false);
+
+    let hook = render();
+    await hook.handleAnimalTap({ ...fox, currentDialogueIndex: 0 } as never);
+    hook = render();
+
+    expect(amberCurrency.wereTutorialSeedsPlanted).not.toHaveBeenCalled();
+    expect(amberCurrency.markTutorialSeedsPlanted).not.toHaveBeenCalled();
+    expect(hook.dialogueText).toBe(SHORT_LINE);
+  });
+
+  it('serves and consumes the callback at exact global and effective Phase 4', async () => {
+    const amberCurrency = jest.requireMock('../services/amberCurrency') as {
+      wereTutorialSeedsPlanted: jest.Mock;
+      markTutorialSeedsPlanted: jest.Mock;
+    };
+    amberCurrency.wereTutorialSeedsPlanted.mockResolvedValueOnce(false);
+
+    let hook = render();
+    await hook.handleAnimalTap({ ...fox, currentDialogueIndex: 0 } as never);
+    hook = render();
+
+    expect(hook.dialogueText).toBe('tutorial callback line');
+    expect(amberCurrency.markTutorialSeedsPlanted).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('useDialogueFlow Phase 5 pool-only delivery', () => {
   const phase5Line = 'The pattern continues in a quieter shape.';
+  const fox = {
+    ...pangolin,
+    id: 'fox',
+    type: 'fox',
+    name: 'Ember',
+    roomId: 'cozy_den',
+  };
   const tarsier = {
     ...pangolin,
     id: 'tarsier',
@@ -397,7 +462,7 @@ describe('useDialogueFlow Phase 5 pool-only delivery', () => {
     jest.clearAllMocks();
     progress.currentPhase = 5;
     progress.puzzlesSolved = 180;
-    progress.unlockedAnimals = ['pangolin', 'tarsier'];
+    progress.unlockedAnimals = ['fox', 'pangolin', 'tarsier'];
     animals = [{ ...pangolin }];
     getCurrentDialogueMock.mockReturnValue({ text: 'Legacy regular dialogue.' });
 
@@ -445,7 +510,12 @@ describe('useDialogueFlow Phase 5 pool-only delivery', () => {
     expect(setPhase5CaughtUpMock).toHaveBeenCalledWith('pangolin', 1);
   });
 
-  it('opens on the Phase 5 pool without invoking Phase 4 callback queues', async () => {
+  it('opens Fox on the Phase 5 pool without invoking any Phase 4 callback queue', async () => {
+    const amberCurrency = jest.requireMock('../services/amberCurrency') as {
+      wereTutorialSeedsPlanted: jest.Mock;
+      markTutorialSeedsPlanted: jest.Mock;
+    };
+    amberCurrency.wereTutorialSeedsPlanted.mockResolvedValueOnce(false);
     const animalDialogue = jest.requireMock('../services/animalDialogue') as {
       getAndMarkNarrativeCallbackPage: jest.Mock;
     };
@@ -460,12 +530,119 @@ describe('useDialogueFlow Phase 5 pool-only delivery', () => {
     );
 
     let hook = render();
-    await hook.handleAnimalTap({ ...pangolin, currentDialogueIndex: 0 } as never);
+    await hook.handleAnimalTap({ ...fox, currentDialogueIndex: 0 } as never);
     hook = render();
 
+    expect(amberCurrency.wereTutorialSeedsPlanted).not.toHaveBeenCalled();
+    expect(amberCurrency.markTutorialSeedsPlanted).not.toHaveBeenCalled();
     expect(dialogueChoices.getAndMarkPhase4CallbackPage).not.toHaveBeenCalled();
     expect(animalDialogue.getAndMarkNarrativeCallbackPage).not.toHaveBeenCalled();
     expect(hook.dialogueText).toBe(phase5Line);
+  });
+
+  it('keeps the Phase 5 Unbroken variant tutorial ahead of the pool', async () => {
+    const variantLine =
+      'The arrangement wanted a full circuit, with the chain unbroken the whole way home.';
+    const amberCurrency = jest.requireMock('../services/amberCurrency') as {
+      consumePendingVariantTutorial: jest.Mock;
+    };
+    amberCurrency.consumePendingVariantTutorial.mockResolvedValueOnce('reverse');
+    const animalDialogue = jest.requireMock('../services/animalDialogue') as {
+      getVariantTutorialDialogue: jest.Mock;
+    };
+    animalDialogue.getVariantTutorialDialogue.mockReturnValueOnce(variantLine);
+
+    let hook = render();
+    await hook.handleAnimalTap({ ...pangolin, currentDialogueIndex: 0 } as never);
+    hook = render();
+
+    expect(animalDialogue.getVariantTutorialDialogue).toHaveBeenCalledWith(
+      'pangolin',
+      'reverse',
+      5
+    );
+    expect(hook.dialogueText).toBe(variantLine);
+
+    await hook.handleNextDialogue();
+    hook = render();
+    expect(hook.dialogueText).toBe(phase5Line);
+  });
+
+  it('keeps Phase 5 trigger and fulfilled-offering reactions ahead of the pool', async () => {
+    const triggerLine = 'ASH. Even now, the fire remembers.';
+    const offeringLine = 'You brought the word I asked for. It rests with the pattern.';
+    const amberCurrency = jest.requireMock('../services/amberCurrency') as {
+      consumeTriggerWords: jest.Mock;
+    };
+    amberCurrency.consumeTriggerWords.mockResolvedValueOnce(['ASH']);
+    const animalDialogue = jest.requireMock('../services/animalDialogue') as {
+      getTriggerWordReaction: jest.Mock;
+    };
+    animalDialogue.getTriggerWordReaction.mockReturnValueOnce(triggerLine);
+    const offeringRequests = jest.requireMock('../services/offeringRequests') as {
+      takeOfferingDialogue: jest.Mock;
+    };
+    offeringRequests.takeOfferingDialogue.mockResolvedValueOnce({
+      line: offeringLine,
+      kind: 'fulfilled',
+    });
+
+    let hook = render();
+    await hook.handleAnimalTap({ ...pangolin, currentDialogueIndex: 0 } as never);
+    hook = render();
+
+    expect(animalDialogue.getTriggerWordReaction).toHaveBeenCalledWith(
+      'pangolin',
+      'ASH',
+      5
+    );
+    expect(offeringRequests.takeOfferingDialogue).toHaveBeenCalledWith(
+      'pangolin',
+      5,
+      false
+    );
+    expect(hook.dialogueText).toBe(triggerLine);
+
+    await hook.handleNextDialogue();
+    hook = render();
+    expect(hook.dialogueText).toBe(offeringLine);
+
+    await hook.handleNextDialogue();
+    hook = render();
+    expect(hook.dialogueText).toBe(phase5Line);
+  });
+
+  it('keeps Phase 5 coordinated events ahead of the Tending-backed pool', async () => {
+    const coordinatedLine = 'The whole house settles around the finished pattern.';
+    const tendingLine = 'The shrine deepens, and I remember another quiet word.';
+    const animalDialogue = jest.requireMock('../services/animalDialogue') as {
+      getCoordinatedEventLine: jest.Mock;
+    };
+    animalDialogue.getCoordinatedEventLine.mockReturnValueOnce({
+      text: coordinatedLine,
+      theme: 'terrible_peace',
+    });
+    const phase5Pool = jest.requireMock('../services/dialogue/phase5Pool') as {
+      buildPhase5Pool: jest.Mock;
+    };
+    phase5Pool.buildPhase5Pool.mockReturnValue([tendingLine]);
+    const tending = jest.requireMock('../services/tending') as {
+      selectPhase5Dialogue: jest.Mock;
+    };
+    tending.selectPhase5Dialogue.mockReturnValue({
+      text: tendingLine,
+      isNew: true,
+      nextCaughtUp: 1,
+    });
+
+    let hook = render();
+    await hook.handleAnimalTap({ ...pangolin, currentDialogueIndex: 0 } as never);
+    hook = render();
+    expect(hook.dialogueText).toBe(coordinatedLine);
+
+    await hook.handleNextDialogue();
+    hook = render();
+    expect(hook.dialogueText).toBe(tendingLine);
   });
 
   it('does not grant late-recruit regular-backlog session bonus in Phase 5', async () => {

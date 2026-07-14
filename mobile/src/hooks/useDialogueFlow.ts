@@ -624,13 +624,22 @@ export function useDialogueFlow({
     resetPageQueue();
 
     // Build pre-dialogue pages: these show as sequential conversation pages
-    // before the regular dialogue, creating natural conversational flow
+    // before the regular dialogue, creating natural conversational flow.
+    // Phase 5 still permits live, phase-aware variant, coordinated-event,
+    // trigger, and fulfilled-offering pages before its post-revelation/Tending
+    // pool. They are not retired Phase 3/4 regular backlog; only the callback
+    // queues below are restricted to their exact era.
     const pages: string[] = [];
 
     const animalPhase = progress ? getAnimalPhase(progress.currentPhase, animal.type) : 0;
 
-    // 1. Tutorial callback for Fox at Phase 4 — one-time chilling reference
-    if (animal.type === 'fox' && progress && progress.currentPhase >= 4) {
+    // 1. Tutorial callback for Fox at exact global/effective Phase 4. Requiring
+    // both excludes vanguard Phase 4 at global Phase 3 and every Phase 5 visit.
+    if (
+      animal.type === 'fox' &&
+      progress?.currentPhase === 4 &&
+      animalPhase === 4
+    ) {
       try {
         const seedsPlanted = await wereTutorialSeedsPlanted();
         if (!seedsPlanted) {
