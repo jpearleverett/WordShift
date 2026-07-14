@@ -19,6 +19,8 @@ import { PUZZLE_BANK_REVERSE_HARD } from '../data/puzzleBankReverseHard';
 import { PUZZLE_BANK_EASY } from '../data/puzzleBankEasy';
 import { PUZZLE_BANK_MEDIUM } from '../data/puzzleBankMedium';
 import { PUZZLE_BANK_MEDIUM_PLUS } from '../data/puzzleBankMediumPlus';
+import { COMMON_WORDS } from '../constants/wordLists';
+import { isStandardChainSolvable } from '../services/puzzleSolvability';
 
 // Helper: get a recency map (empty by default)
 function emptyRecencyMap(): Map<string, number> {
@@ -117,6 +119,40 @@ describe('puzzleBank', () => {
         expect(step.letterToMove.length).toBe(1);
         expect(step.explanation).toBeTruthy();
       }
+    });
+
+    it('selects a mature board through capped branching analysis', async () => {
+      const result = await selectPreGeneratedPuzzle(
+        'HARD', 0, emptyRecencyMap(), 'standard', 40,
+      );
+
+      expect(result).not.toBeNull();
+      expect(result!.words).toHaveLength(5);
+      expect(isStandardChainSolvable(
+        result!.words,
+        word => COMMON_WORDS.has(word),
+      )).toBe('solvable');
+    });
+
+    it('returns a solvable extended standard board at the depth gate', async () => {
+      const extendable = PUZZLE_BANK_EASY[0];
+      await AsyncStorage.setItem(
+        'wordshift_played_std_easy_puzzle_ids',
+        JSON.stringify(PUZZLE_BANK_EASY.slice(1).map(puzzle => puzzle.id)),
+      );
+
+      const result = await selectPreGeneratedPuzzle(
+        'EASY', 0, emptyRecencyMap(), 'standard', 100,
+      );
+
+      expect(result).not.toBeNull();
+      expect(result!.words.slice(0, -1)).toEqual(extendable.words);
+      expect(result!.words).toHaveLength(4);
+      expect(result!.solution).toHaveLength(3);
+      expect(isStandardChainSolvable(
+        result!.words,
+        word => COMMON_WORDS.has(word),
+      )).toBe('solvable');
     });
 
     it('recycles oldest puzzles when bank is exhausted', async () => {

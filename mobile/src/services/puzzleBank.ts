@@ -4,6 +4,12 @@ import type { PreGeneratedPuzzle } from '../data/puzzleBankTypes';
 import { DialoguePhase } from '../types/homeWorld';
 import { isInHardCooldown } from './wordHistory';
 import { PuzzleVariant } from './puzzleVariety';
+import { COMMON_WORDS } from '../constants/wordLists';
+import {
+  analyzeStandardBranching,
+  type PuzzleBranchingMetrics,
+} from './puzzleBranching';
+import { extendStandardPuzzle } from './puzzleExtension';
 // Bank novelty/recency tuning lives in the central balance file (single source).
 import {
   MAX_USED_TRACKED,
@@ -15,6 +21,12 @@ import {
   BANK_NOVEL_BONUS_MOST,
   BANK_NOVEL_BONUS_SOME,
 } from '../constants/gameBalance';
+
+const BRANCHING_UNLOCK_PUZZLES = 40;
+const EXTENSION_UNLOCK_PUZZLES = 100;
+const BRANCHING_CONTEXT_CANDIDATES = 40;
+const BRANCHING_BONUS_CAP = 12;
+const branchingMetricsCache = new Map<string, PuzzleBranchingMetrics>();
 
 // ---------------------------------------------------------------------------
 // Bank Registry — single source of truth for all 12 puzzle banks
@@ -343,7 +355,8 @@ export async function selectPreGeneratedPuzzle(
   difficulty: Difficulty,
   phase: DialoguePhase,
   recencyMap: Map<string, number>,
-  variant: PuzzleVariant = 'standard'
+  variant: PuzzleVariant = 'standard',
+  puzzlesSolved: number = 0,
 ): Promise<PuzzleConfig | null> {
   const bank = getBankForSelection(difficulty, variant);
   if (!bank) return null;
@@ -420,6 +433,27 @@ export async function selectPreGeneratedPuzzle(
   // Sort by score descending
   scored.sort((a, b) => b.score - a.score);
 
+  // Once the player knows the base verb, favor standard boards with multiple
+  // completing routes. Analyze only the strongest context candidates so phase
+  // and freshness remain the primary filters and synchronous work stays capped.
+  if (variant === 'standard' && puzzlesSolved >= BRANCHING_UNLOCK_PUZZLES) {
+    const candidateCount = Math.min(BRANCHING_CONTEXT_CANDIDATES, scored.length);
+    const depthCandidates = scored.slice(0, candidateCount);
+    for (const candidate of depthCandidates) {
+      let metrics = branchingMetricsCache.get(candidate.puzzle.id);
+      if (!metrics) {
+        metrics = analyzeStandardBranching(
+          candidate.puzzle.words,
+          word => COMMON_WORDS.has(word.toUpperCase()),
+        );
+        branchingMetricsCache.set(candidate.puzzle.id, metrics);
+      }
+      candidate.score += Math.min(BRANCHING_BONUS_CAP, metrics.structuralBonus);
+    }
+    depthCandidates.sort((a, b) => b.score - a.score);
+    scored.splice(0, candidateCount, ...depthCandidates);
+  }
+
   // Pick randomly from the top 10 (wider pool = more vocabulary variety)
   const topN = Math.min(10, scored.length);
   const selected = scored[Math.floor(Math.random() * topN)];
@@ -434,7 +468,7 @@ export async function selectPreGeneratedPuzzle(
     ? `Start by shifting '${sol0.lettersToMove[0]}' and '${sol0.lettersToMove[1]}'`
     : `Start by shifting '${sol0?.letterToMove ?? '?'}'`;
 
-  return {
+  const config: PuzzleConfig = {
     words: selected.puzzle.words,
     hint,
     solution: selected.puzzle.solution,
@@ -442,6 +476,17 @@ export async function selectPreGeneratedPuzzle(
     wordLength: selected.puzzle.wordLength,
     isDoubleShift: isDS || undefined,
   };
+
+  if (variant === 'standard' && puzzlesSolved >= EXTENSION_UNLOCK_PUZZLES) {
+    return extendStandardPuzzle(config, {
+      excludedWords: new Set([
+        ...selected.puzzle.allWords,
+        ...recencyMap.keys(),
+      ]),
+    });
+  }
+
+  return config;
 }
 
 /**
