@@ -34,6 +34,42 @@ export function getScreenBackgroundColor(screen: string, phase: number): string 
   }
 }
 
+/**
+ * Phase-aware palette for the bottom action buttons (UNDO / HINT / RESTART).
+ * They keep their distinct HUE identity at every phase (warm=undo, cool=hint,
+ * green=restart — muscle memory holds), but darken and desaturate into the
+ * dread register from Phase 3 so three candy buttons don't glow against a
+ * near-black board and break the descent. Phases 0-2 are the original candy
+ * colors, pixel-identical to before.
+ */
+export type ActionButtonKind = 'undo' | 'hint' | 'restart';
+export function getActionButtonColors(
+  kind: ActionButtonKind,
+  phase: number
+): { bg: string; border: string; glow: string } {
+  const candy = {
+    undo: { bg: CandyColors.yellow.main, border: CandyColors.yellow.shadow, glow: CandyColors.yellow.glow },
+    hint: { bg: CandyColors.blue.main, border: CandyColors.blue.shadow, glow: CandyColors.blue.glow },
+    restart: { bg: CandyColors.green.main, border: CandyColors.green.shadow, glow: CandyColors.green.glow },
+  } as const;
+  if (phase < 3) return candy[kind];
+  // Dread-shifted: muted, darker, low-glow — hue preserved so each button is
+  // still recognizable, but the whole cluster recedes toward the board.
+  const dusk = {
+    undo: { bg: '#8A6A2E', border: '#5E4718', glow: 'rgba(160, 120, 60, 0.35)' },
+    hint: { bg: '#2E4A78', border: '#1B2E52', glow: 'rgba(70, 110, 170, 0.35)' },
+    restart: { bg: '#2E6248', border: '#194030', glow: 'rgba(60, 130, 95, 0.35)' },
+  } as const;
+  if (phase < 4) return dusk[kind];
+  // Phase 4+: deeper still, a crimson-cast on the warm control, near-black cool.
+  const dark = {
+    undo: { bg: '#6B4A1E', border: '#3E2A10', glow: 'rgba(130, 70, 40, 0.3)' },
+    hint: { bg: '#243858', border: '#14203A', glow: 'rgba(60, 90, 140, 0.3)' },
+    restart: { bg: '#244A38', border: '#132A20', glow: 'rgba(50, 100, 75, 0.3)' },
+  } as const;
+  return dark[kind];
+}
+
 export const appStyles = StyleSheet.create({
   initialLoadingContainer: {
     flex: 1,
@@ -168,6 +204,18 @@ export const appStyles = StyleSheet.create({
     shadowOpacity: 0.6,
     shadowRadius: 8,
     elevation: 6,
+  },
+  // Phase-aware darkening (matches the phaseBadge register): the setup pill
+  // cools from candy-translucent-white into the dread palette so it tracks the
+  // board instead of staying bright while everything around it darkens. The
+  // difficulty DOT keeps its meaningful color at every phase.
+  difficultyButtonDark: {
+    backgroundColor: 'rgba(60, 30, 80, 0.4)',
+  },
+  difficultyButtonVoid: {
+    backgroundColor: 'rgba(20, 10, 30, 0.6)',
+    borderWidth: 1,
+    borderColor: 'rgba(120, 40, 80, 0.4)',
   },
   difficultyButtonShine: {
     position: 'absolute',
@@ -418,6 +466,15 @@ export const appStyles = StyleSheet.create({
     // On a tight width the inline "refill undo" button wraps below the label
     // instead of forcing the pill wider than the row.
     flexWrap: 'wrap',
+  },
+  // The CHALLENGE pill keeps its red identity (the danger signal) but sinks
+  // toward a dread crimson as the story darkens, so it stops reading as a
+  // bright candy chip against a near-black board.
+  challengeBadgeDark: {
+    backgroundColor: CandyColors.red.dark,
+  },
+  challengeBadgeVoid: {
+    backgroundColor: '#7A1030',
   },
   challengeBadgeText: {
     fontSize: 10,

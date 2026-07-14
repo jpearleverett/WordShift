@@ -216,7 +216,7 @@ import {
   CHALLENGE_TOGGLE_UNLOCK_PUZZLES,
   BLIND_TOGGLE_UNLOCK_PUZZLES,
 } from './src/services/puzzleVariety';
-import { appStyles as styles, getScreenBackgroundColor } from './src/styles/appStyles';
+import { appStyles as styles, getScreenBackgroundColor, getActionButtonColors } from './src/styles/appStyles';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useScreenInsets } from './src/hooks/useScreenInsets';
 
@@ -3314,7 +3314,11 @@ function MainApp() {
                 meaningless there and the double chip read as a bug. The Blind
                 badge below is the mode's one standing indicator. */}
             {puzzle.gameMode === 'challenge' && !puzzle.blindMode && (
-              <View style={styles.challengeBadge}>
+              <View style={[
+                styles.challengeBadge,
+                persistence.currentPhase >= 3 && styles.challengeBadgeDark,
+                persistence.currentPhase >= 4 && styles.challengeBadgeVoid,
+              ]}>
                 <Text style={styles.challengeBadgeText}>CHALLENGE</Text>
                 {puzzle.undosRemaining < Infinity && (
                   <Text style={styles.challengeUndoText}>
@@ -3381,13 +3385,15 @@ function MainApp() {
           <TouchableOpacity
             style={[
               styles.difficultyButton,
+              persistence.currentPhase >= 3 && styles.difficultyButtonDark,
+              persistence.currentPhase >= 4 && styles.difficultyButtonVoid,
               showSetupSelectorIntro && styles.difficultyButtonHighlighted,
             ]}
             onPress={() => puzzleActions.setShowDifficultyMenu(!puzzle.showDifficultyMenu)}
             accessibilityLabel={`Difficulty ${puzzle.difficulty}, style ${VARIANT_CONFIGS[puzzle.selectedVariant]?.title || 'Standard'}. Tap to change puzzle setup`}
             accessibilityRole="button"
           >
-            <View style={styles.difficultyButtonShine} />
+            {persistence.currentPhase < 3 && <View style={styles.difficultyButtonShine} />}
             <View style={[
               styles.difficultyDot,
               puzzle.difficulty === 'EASY' && styles.difficultyDotEasy,
@@ -3610,22 +3616,14 @@ function MainApp() {
           <ActionButton
             icon="↩"
             label="UNDO"
-            colors={{
-              bg: CandyColors.yellow.main,
-              border: CandyColors.yellow.shadow,
-              glow: CandyColors.yellow.glow,
-            }}
+            colors={getActionButtonColors('undo', persistence.currentPhase)}
             onPress={handleUndo}
             disabled={puzzle.history.length === 0 || puzzle.gameState !== GameState.PLAYING}
           />
           <ActionButton
             icon="💡"
             label={puzzle.gameMode === 'challenge' ? 'HINT' : `HINT · ${puzzle.hintBalance}`}
-            colors={{
-              bg: CandyColors.blue.main,
-              border: CandyColors.blue.shadow,
-              glow: CandyColors.blue.glow,
-            }}
+            colors={getActionButtonColors('hint', persistence.currentPhase)}
             onPress={handleHintPress}
             disabled={puzzle.gameState !== GameState.PLAYING}
             accessibilityLabel={
@@ -3638,11 +3636,7 @@ function MainApp() {
           <ActionButton
             icon="🔄"
             label={puzzle.gameState === GameState.PLAYING ? "RESTART" : "NEW"}
-            colors={{
-              bg: CandyColors.green.main,
-              border: CandyColors.green.shadow,
-              glow: CandyColors.green.glow,
-            }}
+            colors={getActionButtonColors('restart', persistence.currentPhase)}
             onPress={() => {
               hapticLight();
               // RESTART while playing resets THIS board (a true retry); NEW (idle)
