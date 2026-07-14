@@ -598,6 +598,8 @@ export const TENDING_COST_CAP = 650;
 export const TENDING_DAILY_BONUS_DISCOUNT = 0.3;
 /** Tending Levels that fire a ceremony + unlock a new serene dialogue line. */
 export const TENDING_MILESTONES = [3, 8, 15, 35, 70];
+/** Level where the visible house/pit deepening reaches its full intensity. */
+export const TENDING_VISUAL_SATURATION_LEVEL = 40;
 
 
 /** Default time limit for speed variant when difficulty is unknown. */

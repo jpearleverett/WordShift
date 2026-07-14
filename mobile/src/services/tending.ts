@@ -5,6 +5,7 @@ import {
   TENDING_COST_CAP,
   TENDING_DAILY_BONUS_DISCOUNT,
   TENDING_MILESTONES,
+  TENDING_VISUAL_SATURATION_LEVEL,
 } from '../constants/gameBalance';
 import { getLocalDateString } from './dateUtils';
 
@@ -108,11 +109,12 @@ export function unlockedTendingLineCount(level: number): number {
  * Normalized "deepening" intensity in [0, 1] for visual scaling — how much the
  * world (pit glow/embers, house arrangement sigils) has deepened at a given
  * Tending Level. A sqrt curve gives an immediately-visible change at the first
- * few levels, saturating around level 50 so the effect never runs away. Pure.
+ * few levels, saturating at the tuned visual cap so the effect never runs
+ * away. Pure.
  */
 export function getTendingIntensity(level: number): number {
   if (level <= 0) return 0;
-  return Math.min(1, Math.sqrt(level / 50));
+  return Math.min(1, Math.sqrt(level / TENDING_VISUAL_SATURATION_LEVEL));
 }
 
 /** The milestone level at `level`, or null if `level` is not a milestone. */

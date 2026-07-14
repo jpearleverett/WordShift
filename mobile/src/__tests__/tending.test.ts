@@ -22,6 +22,7 @@ import {
   TENDING_COST_CAP,
   TENDING_MILESTONES,
   TENDING_DAILY_BONUS_DISCOUNT,
+  TENDING_VISUAL_SATURATION_LEVEL,
 } from '../constants/gameBalance';
 import { getTendingMilestoneLines, TENDING_DIALOGUES } from '../services/dialogue/animalDialogueTending';
 import { getLocalDateString, getLocalDateStringDaysAgo } from '../services/dateUtils';
@@ -51,6 +52,7 @@ describe('tending', () => {
       expect(TENDING_COST_CAP).toBe(650);
       expect(TENDING_DAILY_BONUS_DISCOUNT).toBe(0.3);
       expect(TENDING_MILESTONES).toEqual([3, 8, 15, 35, 70]);
+      expect(TENDING_VISUAL_SATURATION_LEVEL).toBe(40);
     });
 
     it('matches the documented escalating curve', () => {
@@ -165,7 +167,7 @@ describe('tending', () => {
   describe('getTendingIntensity (visual deepening)', () => {
     it('is 0 at level 0 and saturates at 1', () => {
       expect(getTendingIntensity(0)).toBe(0);
-      expect(getTendingIntensity(50)).toBe(1);
+      expect(getTendingIntensity(40)).toBe(1);
       expect(getTendingIntensity(1000)).toBe(1); // never exceeds 1
     });
 
