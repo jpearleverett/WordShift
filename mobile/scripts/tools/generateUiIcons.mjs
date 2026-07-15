@@ -370,3 +370,142 @@ fs.mkdirSync(UI, { recursive: true });
   ellipse(cv, c - 26, c - 116, 9, 9, '#FFFFFF', 0.8, 4);                    // micro sparkle
   savePNG(path.join(UI, 'amber.png'), W, W, down2(cv, W, W));
 }
+
+// === quest.png (256) — glossy target/dartboard for the header quest pill ======
+// Bright candy rings so it reads on the dark translucent header pill next to
+// the amber gem + journal book (which it now visually matches).
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  ellipse(cv, c + 6, c + 22, 198, 198, '#2A2040', 0.28, 26);     // soft drop shadow
+  ellipse(cv, c, c, 208, 208, '#7A1F33');                        // dark red outline
+  ellipse(cv, c, c, 194, 194, '#FF5A6E');                        // outer red ring
+  ellipse(cv, c, c, 152, 152, '#FFF3F0');                        // cream ring
+  ellipse(cv, c, c, 110, 110, '#FF5A6E');                        // red ring
+  ellipse(cv, c, c, 68, 68, '#FFF3F0');                          // cream ring
+  ellipse(cv, c, c, 34, 34, '#FFC845');                          // gold bullseye
+  ellipse(cv, c - 10, c - 10, 10, 10, '#FFFFFF', 0.92);          // center glint
+  ellipse(cv, c - 66, c - 74, 42, 32, '#FFFFFF', 0.28, 34);      // glossy top-left sheen
+  savePNG(path.join(UI, 'quest.png'), W, W, down2(cv, W, W));
+}
+
+// === menu.png (256) — three plump bars for the ☰ utility menu ================
+// White glyph over a soft dark edge (like the undo/restart arrows) so it stays
+// readable on both the dark header pill and the post-tutorial light home.
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  const halfW = 152, th = 48, ys = [c - 116, c, c + 116];
+  for (const y of ys) capsule(cv, c - halfW, y + 9, c + halfW, y + 9, th + 18, '#2A2040', 0.5); // ink edge
+  for (const y of ys) {
+    capsule(cv, c - halfW, y, c + halfW, y, th, '#F1ECFC');       // bright bar
+    capsule(cv, c - halfW + 10, y - th * 0.26, c + halfW - 10, y - th * 0.26, th * 0.36, '#FFFFFF', 0.75); // top sheen
+  }
+  savePNG(path.join(UI, 'menu.png'), W, W, down2(cv, W, W));
+}
+
+// === calendar.png (256) — daily-challenge calendar page ======================
+// Candy calendar: purple frame, cream page, red header band with binder rings,
+// a grid of days with today highlighted in amber.
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  roundRect(cv, c, c + 20, 150, 150, 28, '#2A2040', 0.3);        // drop shadow
+  roundRect(cv, c, c + 6, 150, 150, 26, '#6B3FD0');              // dark purple frame
+  roundRect(cv, c, c + 6, 138, 138, 20, '#FFFFFF', 1, '#EFE9FB'); // page body
+  roundRect(cv, c, c - 88, 138, 42, 20, '#FF6B7E', 1, '#E8455C'); // red header band
+  roundRect(cv, c, c - 116, 138, 16, 8, '#6B3FD0');              // band base cap (square-ish top)
+  for (const dx of [-86, 86]) {                                   // binder rings
+    capsule(cv, c + dx, c - 138, c + dx, c - 88, 22, '#332748');
+    capsule(cv, c + dx, c - 142, c + dx, c - 96, 12, '#D4CCEA');
+  }
+  const gx = [-88, -30, 28, 86], gy = [-16, 44, 104];            // day grid
+  for (let r = 0; r < gy.length; r++) for (let ci = 0; ci < gx.length; ci++) {
+    if (r === 1 && ci === 2) roundRect(cv, c + gx[ci], c + gy[r], 26, 24, 8, '#FFC845', 1, '#F5A315'); // today
+    else ellipse(cv, c + gx[ci], c + gy[r], 12, 12, '#C3B9E0');
+  }
+  roundRect(cv, c, c - 100, 120, 10, 5, '#FFFFFF', 0.32);        // band sheen
+  savePNG(path.join(UI, 'calendar.png'), W, W, down2(cv, W, W));
+}
+
+// === tending.png (256) — serene 8-spoke bloom for the Phase-5 Tending shrine ==
+// Mauve long spokes + gold short spokes, a soft aura, a bright core: the serene
+// post-revelation counterpart to the sparkle, not a busy asterisk.
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  ellipse(cv, c, c, 150, 150, '#C9A7E8', 0.22, 100);            // soft aura
+  for (let k = 0; k < 8; k++) {
+    const ang = k * Math.PI / 4, long = k % 2 === 0;
+    const len = long ? 198 : 122, hw = long ? 30 : 21;
+    const tx = Math.cos(ang), ty = Math.sin(ang), px = -Math.sin(ang), py = Math.cos(ang);
+    tri(cv, [c + tx * len, c + ty * len], [c + px * hw, c + py * hw], [c - px * hw, c - py * hw],
+      long ? '#E9D6F7' : '#F6E7B0');
+  }
+  ellipse(cv, c, c, 48, 48, '#FBF0FF');                         // bright core
+  ellipse(cv, c, c, 27, 27, '#FFF9E6');
+  ellipse(cv, c - 12, c - 12, 12, 12, '#FFFFFF', 0.9);         // glint
+  savePNG(path.join(UI, 'tending.png'), W, W, down2(cv, W, W));
+}
+
+// === home.png (256) — cozy cottage for the pit "return home" button ==========
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  roundRect(cv, c, c + 70, 128, 92, 18, '#2A2040', 0.28);       // drop shadow
+  poly(cv, [[c, c - 152], [c + 170, c - 6], [c - 170, c - 6]], '#C23048');       // roof outline
+  poly(cv, [[c, c - 134], [c + 152, c - 6], [c - 152, c - 6]], '#FF6B7E', 1, '#E8455C'); // roof
+  poly(cv, [[c, c - 120], [c + 96, c - 34], [c - 96, c - 34]], '#FF97A8', 0.55); // roof sheen
+  roundRect(cv, c, c + 62, 124, 88, 14, '#5A4A36', 0.5);        // body outline
+  roundRect(cv, c, c + 62, 118, 82, 12, '#FFFFFF', 1, '#F0E7D9'); // cream body
+  roundRect(cv, c, c + 94, 34, 52, 10, '#8257EA', 1, '#6B3FD0'); // door
+  ellipse(cv, c + 18, c + 98, 6, 6, '#FFD968');                 // doorknob
+  for (const dx of [-64, 64]) {                                 // windows
+    roundRect(cv, c + dx, c + 40, 26, 26, 6, '#7EC7F5', 1, '#4FA8E8');
+    capsule(cv, c + dx, c + 28, c + dx, c + 52, 4, '#FFFFFF', 0.5);
+  }
+  savePNG(path.join(UI, 'home.png'), W, W, down2(cv, W, W));
+}
+
+// === moon.png (256) — pale full moon for the full-moon event badge ===========
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  ellipse(cv, c, c, 190, 190, '#FFF6D8', 0.25, 100);           // glow
+  ellipse(cv, c, c, 152, 152, '#E4D7A0');                       // shadow rim
+  ellipse(cv, c - 6, c - 6, 146, 146, '#FBF3C8');               // body (pale gold)
+  ellipse(cv, c - 40, c - 44, 96, 96, '#FFFBE8', 0.6, 46);      // lit bloom
+  ellipse(cv, c + 42, c + 30, 26, 26, '#DCCF9A', 0.55);         // craters
+  ellipse(cv, c - 34, c + 54, 18, 18, '#DCCF9A', 0.5);
+  ellipse(cv, c + 56, c - 40, 15, 15, '#DCCF9A', 0.45);
+  ellipse(cv, c - 62, c - 4, 12, 12, '#DCCF9A', 0.4);
+  ellipse(cv, c - 48, c - 54, 22, 30, '#FFFFFF', 0.5, 16);      // specular
+  savePNG(path.join(UI, 'moon.png'), W, W, down2(cv, W, W));
+}
+
+// === share.png (256) — up-arrow rising from an open tray (share/upload) =======
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  roundRect(cv, c, c + 74, 130, 84, 22, '#2A2040', 0.26);       // shadow
+  roundRect(cv, c, c + 60, 124, 92, 22, '#6B3FD0');             // tray outer
+  roundRect(cv, c, c + 78, 96, 66, 14, '#EFE9FB');              // tray inner (open box)
+  roundRect(cv, c, c + 8, 42, 138, 16, '#E8455C');             // arrow shaft edge
+  capsule(cv, c, c + 60, c, c - 150, 40, '#FF8FA3');            // arrow shaft
+  tri(cv, [c, c - 204], [c + 84, c - 104], [c - 84, c - 104], '#C23048');        // head outline
+  tri(cv, [c, c - 190], [c + 74, c - 108], [c - 74, c - 108], '#FF6B7E');        // head
+  capsule(cv, c - 12, c - 120, c - 12, c + 20, 10, '#FFC3CE', 0.7);              // shaft sheen
+  savePNG(path.join(UI, 'share.png'), W, W, down2(cv, W, W));
+}
+
+// === bell.png (256) — golden notification bell ===============================
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  roundRect(cv, c, c + 40, 118, 118, 44, '#2A2040', 0.24);      // shadow
+  roundRect(cv, c, c - 128, 22, 26, 11, '#E8890C');             // top loop
+  poly(cv, [
+    [c, c - 122], [c + 62, c - 96], [c + 98, c + 40],
+    [c + 134, c + 82], [c - 134, c + 82], [c - 98, c + 40], [c - 62, c - 96],
+  ], '#D9770A');                                                // bell outline
+  poly(cv, [
+    [c, c - 108], [c + 54, c - 84], [c + 86, c + 38],
+    [c + 118, c + 72], [c - 118, c + 72], [c - 86, c + 38], [c - 54, c - 84],
+  ], '#FFC845', 1, '#F5A315');                                  // bell body
+  poly(cv, [[c - 118, c + 54], [c + 118, c + 54], [c + 118, c + 74], [c - 118, c + 74]], '#FFE08A', 0.85); // rim light
+  ellipse(cv, c, c + 108, 30, 30, '#E8890C');                   // clapper
+  capsule(cv, c - 44, c - 76, c - 62, c + 34, 15, '#FFECB4', 0.7); // sheen
+  savePNG(path.join(UI, 'bell.png'), W, W, down2(cv, W, W));
+}

@@ -75,6 +75,8 @@ const FLAME_ICON = require('../../../assets/ui/flame.png');
 const JOURNAL_ICON = require('../../../assets/ui/journal.png');
 const HINT_ICON = require('../../../assets/ui/hint.png');
 const STAR_ICON = require('../../../assets/ui/star_filled.png');
+const QUEST_ICON = require('../../../assets/ui/quest.png');
+const MENU_ICON = require('../../../assets/ui/menu.png');
 import {
   getChallengeIntroLines,
   getHouseCompletionText,
@@ -222,13 +224,14 @@ export const isQuestPillVisible = (
 ): boolean => !isOnboarding && !isPostTutorialLightMode && hasQuestState;
 
 /**
- * Quest pill label: 🎯 plus the actionable count — or the bare 🎯 when
- * nothing is left to do (all current daily + weekly quests completed and
- * claimed). A lingering "🎯 0" read as a permanent to-do; the number only
- * appears while a quest is actually actionable.
+ * Quest pill count text: the actionable count, or empty when nothing is left
+ * to do (all current daily + weekly quests completed and claimed). The pill
+ * now renders the target sprite always; a lingering "0" read as a permanent
+ * to-do, so the number only appears while a quest is actually actionable.
+ * Tracks the same signal as the "!" badge (claimable amber) and journal row.
  */
-export const getQuestPillLabel = (actionableCount: number): string =>
-  actionableCount > 0 ? `🎯 ${actionableCount}` : '🎯';
+export const getQuestPillCount = (actionableCount: number): string =>
+  actionableCount > 0 ? String(actionableCount) : '';
 
 /**
  * Journal Hub "Quests" row label. Prefers the claimable-amber call-out, then
@@ -1496,7 +1499,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   )}
                   accessibilityRole="button"
                 >
-                  <Text style={styles.questPillText}>{getQuestPillLabel(actionableQuestCount)}</Text>
+                  <Image source={QUEST_ICON} style={styles.questPillIcon} />
+                  {getQuestPillCount(actionableQuestCount) !== '' && (
+                    <Text style={styles.questPillText}>
+                      {getQuestPillCount(actionableQuestCount)}
+                    </Text>
+                  )}
                   {claimableQuestAmber > 0 && (
                     <View style={styles.headerBadge}>
                       <Text style={styles.headerBadgeText}>!</Text>
@@ -1535,7 +1543,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 accessibilityLabel="Open utility menu"
                 accessibilityRole="button"
               >
-                <Text style={styles.headerIconText}>☰</Text>
+                <Image source={MENU_ICON} style={styles.headerIconImage} />
               </TouchableOpacity>
             </View>
           )}
@@ -3291,11 +3299,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
+  questPillIcon: {
+    width: 22,
+    height: 22,
+  },
   questPillText: {
     fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
     fontSize: 13,
     fontWeight: '800',
+    marginLeft: 4,
   },
   headerBadge: {
     position: 'absolute',

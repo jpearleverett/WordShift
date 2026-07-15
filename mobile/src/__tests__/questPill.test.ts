@@ -18,9 +18,9 @@
  *    "🎯 5" and the journal "Quests (5)" — the two surfaces derived their
  *    numbers differently (journal: all unclaimed quests; pill: in-progress
  *    only) and neither matched what was actually left to do.
- *  - getQuestPillLabel: the number only renders while something is still
+ *  - getQuestPillCount: the number only renders while something is still
  *    actionable. When every current quest is completed AND claimed the pill
- *    is the bare 🎯 — no lingering count reading as a permanent to-do.
+ *    is the bare target sprite — no lingering count reading as a permanent to-do.
  *  - getJournalQuestLabel: same count feeds the Journal Hub row; the (N)
  *    suffix is omitted entirely when nothing is left to do.
  *  - isQuestPillVisible: gated exactly like the Journal Hub (puzzle 6+ via
@@ -112,7 +112,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import {
   getActionableQuestCount,
-  getQuestPillLabel,
+  getQuestPillCount,
   getJournalQuestLabel,
   isQuestPillVisible,
   getQuestPillAccessibilityLabel,
@@ -189,16 +189,18 @@ describe('getActionableQuestCount (claimable = completed & unclaimed)', () => {
   });
 });
 
-describe('getQuestPillLabel (badge/number semantics)', () => {
-  test('in-progress quests only: bare 🎯 — nothing to turn in yet', () => {
+describe('getQuestPillCount (badge/number semantics)', () => {
+  // The pill now renders the generated target SPRITE always; the count text is
+  // shown only while a quest is actionable (an empty string suppresses it), so
+  // a lingering "0" can never read as a permanent to-do.
+  test('in-progress quests only: no number — nothing to turn in yet', () => {
     const state = makeState(
       [makeQuest({ id: 'd1' }), makeQuest({ id: 'd2' })],
       [makeQuest({ id: 'w1', tier: 'weekly' })]
     );
     const count = getActionableQuestCount(state);
     expect(count).toBe(0);
-    expect(getQuestPillLabel(count)).toBe('🎯');
-    expect(getQuestPillLabel(count)).not.toMatch(/\d/);
+    expect(getQuestPillCount(count)).toBe('');
   });
 
   test('completed-but-unclaimed quests are counted, and the "!" badge condition holds', () => {
@@ -208,20 +210,19 @@ describe('getQuestPillLabel (badge/number semantics)', () => {
     );
     const count = getActionableQuestCount(state);
     expect(count).toBe(2);
-    expect(getQuestPillLabel(count)).toBe('🎯 2');
+    expect(getQuestPillCount(count)).toBe('2');
     // The '!' badge keys on claimable amber — lit while rewards wait.
     expect(getUnclaimedAmber(state, 0)).toBeGreaterThan(0);
   });
 
-  test('ALL quests completed AND claimed: bare 🎯 — no number, no badge', () => {
+  test('ALL quests completed AND claimed: no number, no badge', () => {
     const state = makeState(
       [makeQuest({ id: 'd1', completed: true, claimed: true, progress: 3 })],
       [makeQuest({ id: 'w1', tier: 'weekly', completed: true, claimed: true, progress: 3 })]
     );
     const count = getActionableQuestCount(state);
     expect(count).toBe(0);
-    expect(getQuestPillLabel(count)).toBe('🎯');
-    expect(getQuestPillLabel(count)).not.toMatch(/\d/);
+    expect(getQuestPillCount(count)).toBe('');
     expect(getUnclaimedAmber(state, 0)).toBe(0); // badge stays off too
   });
 });
@@ -325,8 +326,11 @@ describe('header wiring (source scan of the one-row header)', () => {
     expect(pillBlock).not.toContain('setShowJournalModal');
   });
 
-  test('pill text routes through getQuestPillLabel fed by the shared count', () => {
-    expect(pillBlock).toContain('getQuestPillLabel(actionableQuestCount)');
+  test('pill renders the target sprite + the shared actionable count', () => {
+    // The 🎯 emoji is now the generated quest.png sprite; the count text is
+    // still fed by the shared actionableQuestCount (same signal as the badge).
+    expect(pillBlock).toContain('QUEST_ICON');
+    expect(pillBlock).toContain('getQuestPillCount(actionableQuestCount)');
   });
 
   test('journal row routes through getJournalQuestLabel fed by the SAME count', () => {

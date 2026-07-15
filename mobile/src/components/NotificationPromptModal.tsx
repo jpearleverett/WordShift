@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Animated,
   Easing,
+  Image,
   Modal,
 } from 'react-native';
 import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
@@ -12,6 +13,8 @@ import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
 import { PanelCard } from './ui/PanelCard';
 import { CandyButton } from './ui/CandyButton';
 import { getSettingsSync } from '../services/settings';
+
+const BELL_ICON = require('../../assets/ui/bell.png');
 
 interface NotificationPromptModalProps {
   /** Whether the prompt is showing. */
@@ -134,12 +137,11 @@ export const NotificationPromptModal: React.FC<NotificationPromptModalProps> = (
             <View style={[styles.glow, { backgroundColor: t.glow }]} />
 
             <View style={[styles.iconBadge, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}>
-              <Text
-                style={styles.iconGlyph}
+              <Image
+                source={BELL_ICON}
+                style={styles.iconImage}
                 accessibilityLabel="Reminder bell"
-              >
-                🔔
-              </Text>
+              />
             </View>
 
             <Text style={[styles.title, { color: t.title }]}>
@@ -214,6 +216,10 @@ const styles = StyleSheet.create({
   iconGlyph: {
     fontSize: 30,
     fontFamily: BODY_FONT,
+  },
+  iconImage: {
+    width: 38,
+    height: 38,
   },
   title: {
     fontSize: 22,

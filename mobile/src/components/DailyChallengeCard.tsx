@@ -18,6 +18,8 @@ import { getSettingsSync } from '../services/settings';
 // Same flame sprite as the header streak pill — the badge is the DAILY streak
 // count, and the flame keeps it from reading as an unread-notification count.
 const FLAME_ICON = require('../../assets/ui/flame.png');
+const CALENDAR_ICON = require('../../assets/ui/calendar.png');
+const MOON_ICON = require('../../assets/ui/moon.png');
 
 interface DailyChallengeCardProps {
   onStartDaily: (difficulty: Difficulty) => void;
@@ -195,7 +197,7 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
             </Text>
           </View>
         ) : (
-          <Text style={styles.calendarIcon}>📅</Text>
+          <Image source={CALENDAR_ICON} style={styles.calendarIconImage} />
         )}
 
         {/* Daily-streak badge (flame + count, mirroring the header streak
@@ -226,7 +228,7 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
             style={[styles.moonBadge, phase >= 4 && styles.moonBadgeDark]}
             pointerEvents="none"
           >
-            <Text style={styles.moonBadgeText}>🌕</Text>
+            <Image source={MOON_ICON} style={styles.moonBadgeIcon} />
           </View>
         )}
       </TouchableOpacity>
@@ -253,6 +255,10 @@ const styles = StyleSheet.create({
   calendarIcon: {
     fontFamily: BODY_FONT,
     fontSize: 18,
+  },
+  calendarIconImage: {
+    width: 24,
+    height: 24,
   },
   completedContent: {
     alignItems: 'center',
@@ -322,5 +328,9 @@ const styles = StyleSheet.create({
   moonBadgeText: {
     fontFamily: BODY_FONT,
     fontSize: 9,
+  },
+  moonBadgeIcon: {
+    width: 12,
+    height: 12,
   },
 });

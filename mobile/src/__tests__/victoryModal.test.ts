@@ -481,13 +481,19 @@ describe('share button bonus layout', () => {
     expect(rowStyle.justifyContent).toBe('center');
     expect(rowStyle.flexWrap).toBeUndefined();
 
-    // Traversal order pins the reading order: "📤 Share", gem, "+N".
+    // Traversal order pins the reading order: share icon, "Share", gem, "+N".
+    // (The old "📤" emoji is now the generated share.png sprite.)
     const ordered = findAll(rows[0], el => el.type === 'Text' || el.type === 'Image');
-    expect(ordered.map(el => el.type)).toEqual(['Text', 'Image', 'Text']);
-    const [label, gem, amount] = ordered;
+    expect(ordered.map(el => el.type)).toEqual(['Image', 'Text', 'Image', 'Text']);
+    const [shareIcon, label, gem, amount] = ordered;
 
     expect(textOf(label)).toContain('Share');
     expect(textOf(amount)).toBe(`+${DAILY_SHARE_BONUS_AMBER}`);
+
+    // The share sprite is decorative (the button's accessibilityLabel speaks).
+    const shareIconProps = shareIcon.props as Record<string, unknown>;
+    expect(shareIconProps.importantForAccessibility).toBe('no');
+    expect(shareIconProps.accessibilityElementsHidden).toBe(true);
 
     // Both text pieces fit one line and share the button font + phase color.
     for (const t of [label, amount]) {
@@ -513,11 +519,12 @@ describe('share button bonus layout', () => {
     }
   });
 
-  it('renders just the share label when no bonus is available (no gem, no +N)', () => {
+  it('renders just the share icon + label when no bonus is available (no gem, no +N)', () => {
     const tree = render(baseProps());
     const btn = findByA11yLabel(tree, 'Share result');
     expect(btn).not.toBeNull();
-    expect(findAll(btn, el => el.type === 'Image')).toHaveLength(0);
+    // Exactly the share sprite (decorative) + the "Share" label — no amber gem.
+    expect(findAll(btn, el => el.type === 'Image')).toHaveLength(1);
     expect(findAll(btn, el => el.type === 'Text')).toHaveLength(1);
     expect(textOf(btn)).not.toContain(`+${DAILY_SHARE_BONUS_AMBER}`);
   });

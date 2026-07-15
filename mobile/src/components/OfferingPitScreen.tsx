@@ -91,6 +91,9 @@ const PIT_DAY = require('../../assets/environment/pitt_day.png');
 const PIT_AFTERNOON = require('../../assets/environment/pitt_afternoon.png');
 const PIT_DUSK = require('../../assets/environment/pitt_dusk.png');
 const PIT_NIGHT = require('../../assets/environment/pitt_night.png');
+const TENDING_ICON = require('../../assets/ui/tending.png');
+const MENU_ICON = require('../../assets/ui/menu.png');
+const HOME_ICON = require('../../assets/ui/home.png');
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -2493,7 +2496,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
                 accessibilityLabel={`Tend the pattern, ${getTendingLevelLabel(tendingLevel)}`}
                 accessibilityRole="button"
               >
-                <Text style={styles.headerIconText}>{'✴'}</Text>
+                <Image source={TENDING_ICON} style={styles.headerIconImage} />
               </TouchableOpacity>
             )}
             <TouchableOpacity
@@ -2502,7 +2505,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
               accessibilityLabel="Open utility menu"
               accessibilityRole="button"
             >
-              <Text style={styles.headerIconText}>☰</Text>
+              <Image source={MENU_ICON} style={styles.headerIconImage} />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.headerIconBtn}
@@ -2510,7 +2513,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
               accessibilityLabel="Return home"
               accessibilityRole="button"
             >
-              <Text style={styles.headerIconText}>{'\uD83C\uDFE0'}</Text>
+              <Image source={HOME_ICON} style={styles.headerIconImage} />
             </TouchableOpacity>
           </View>
         )}
@@ -2811,6 +2814,10 @@ const styles = StyleSheet.create({
   },
   headerIconText: {
     fontFamily: BODY_FONT, fontSize: 16 },
+  headerIconImage: {
+    width: 22,
+    height: 22,
+  },
   utilityOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
