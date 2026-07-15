@@ -24,6 +24,107 @@ const ALL_ANIMALS = [
   'tarsier', 'aye_aye', 'kakapo',
 ];
 const FORBIDDEN = /\b(game|puzzle|summoning|spreadsheet|consent)\b/i;
+type ChoiceAnchorContract = {
+  prompt: RegExp;
+  askOption: RegExp;
+  askResponse: RegExp;
+  refuseOption: RegExp;
+  refuseResponse: RegExp;
+};
+
+const REMEMBERED_CHOICE_ANCHORS: Record<string, ChoiceAnchorContract> = {
+  fox: {
+    prompt: /\bfire\b/i,
+    askOption: /\barrangement\b/i,
+    askResponse: /\b(?:fire|flame|hearth)\b/i,
+    refuseOption: /\b(?:don't|do not|rather not)\b.*\bknow\b/i,
+    refuseResponse: /\b(?:fire|flame|coal|ash)\b/i,
+  },
+  owl: {
+    prompt: /\b(?:book|text|line)\b/i,
+    askOption: /\b(?:text|book|read)\b/i,
+    askResponse: /\b(?:text|passage|read|line)\b/i,
+    refuseOption: /\b(?:book|read)\b/i,
+    refuseResponse: /\b(?:book|read|omission)\w*\b/i,
+  },
+  pangolin: {
+    prompt: /\b(?:dish|kitchen|recipe)\b/i,
+    askOption: /\brecipe\b/i,
+    askResponse: /\b(?:recipe|dish|meal|kitchen)\b/i,
+    refuseOption: /\b(?:don't|do not|rather not)\b.*\bknow\b/i,
+    refuseResponse: /\b(?:dish|kitchen|meal|cook\w*|recipe|covered)\b/i,
+  },
+  axolotl: {
+    prompt: /\bwater\b/i,
+    askOption: /\b(?:water|below|deep|swim\w*)\b/i,
+    askResponse: /\b(?:water|reflection|deep|glass)\b/i,
+    refuseOption: /\b(?:won't|will not|don't|do not)\b.*\blook\b/i,
+    refuseResponse: /\b(?:look|eyes?|water|deep|glass)\b/i,
+  },
+  capybara: {
+    prompt: /\b(?:file|folder|data)\b/i,
+    askOption: /(?=.*\bdata\b)(?=.*\bmy file\b)/i,
+    askResponse: /\b(?:data|file)\b/i,
+    refuseOption: /\b(?:won't|will not|don't|do not|decline)\b.*\bread\b/i,
+    refuseResponse: /\b(?:file|read|data)\b/i,
+  },
+  fennec_fox: {
+    prompt: /\b(?:ears?|hear|listen|sound)\b/i,
+    askOption: /\b(?:hear|listen)\b/i,
+    askResponse: /\b(?:frequency|sound|note)\b/i,
+    refuseOption: /\bI (?:don't|do not|would rather not)\b.*\b(?:listen|hear)\b/i,
+    refuseResponse: /\b(?:hear|listen|sound|note|ears?)\b/i,
+  },
+  sloth: {
+    prompt: /\b(?:eyes?|watch|time|long)\b/i,
+    askOption: /(?=.*\bhow long\b)(?=.*\bknown\b)/i,
+    askResponse: /\b(?:time|long|watch\w*|known)\b/i,
+    refuseOption: /\bsleep\b/i,
+    refuseResponse: /\b(?:sleep|rest|observation|wait)\w*\b/i,
+  },
+  wombat: {
+    prompt: /\b(?:tunnel|stone|foundation)\b/i,
+    askOption: /(?=.*\btunnel\b)(?=.*\b(?:lead|below|where)\b)/i,
+    askResponse: /\b(?:chamber|tunnel|below|foundation)\b/i,
+    refuseOption: /\b(?:don't.*look|do not.*look|rather not.*look)\b/i,
+    refuseResponse: /\b(?:tunnel|foundation|below|stone)\b/i,
+  },
+  rabbit: {
+    prompt: /\b(?:path|road|map|fear|afraid)\w*\b/i,
+    askOption: /\b(?:fear|afraid|scared)\b/i,
+    askResponse: /(?=.*\b(?:fear|afraid|scared)\b)(?=.*\b(?:path|road|route)\w*\b)/i,
+    refuseOption: /(?=.*\bfear\b)(?=.*\bprivate\b)/i,
+    refuseResponse: /\b(?:fear|afraid|scared)\b/i,
+  },
+  red_panda: {
+    prompt: /\b(?:pattern|arrangement|peace)\b/i,
+    askOption: /(?=.*\barrangement\b)(?=.*\bpeace\b)/i,
+    askResponse: /(?=.*\bpattern\b)(?=.*\bpeace\b)/i,
+    refuseOption: /\b(?:outside.*(?:pattern|arrangement)|not.*part)\b/i,
+    refuseResponse: /\b(?:pattern|arrangement|peace)\b/i,
+  },
+  tarsier: {
+    prompt: /\b(?:eyes?|watch|road)\w*\b/i,
+    askOption: /(?=.*\beyes?\b)(?=.*\bhold\w*\b)(?=.*\bopen\b)/i,
+    askResponse: /\b(?:road|watch|eyes?)\w*\b/i,
+    refuseOption: /\b(?:keep.*(?:night|telling).*yourself|don't.*tell|spare)\b/i,
+    refuseResponse: /\b(?:eyes?|watch|tell|ridge|night)\w*\b/i,
+  },
+  aye_aye: {
+    prompt: /\b(?:finger|bell|bronze)\b/i,
+    askOption: /(?=.*\bbell\b)(?=.*\bsay\b)/i,
+    askResponse: /\b(?:bell|bronze|word|note)\b/i,
+    refuseOption: /(?=.*\bfinger\b)(?=.*\b(?:away|fold|put)\b)/i,
+    refuseResponse: /\b(?:finger|bell|bronze|word|quiet)\w*\b/i,
+  },
+  kakapo: {
+    prompt: /\b(?:root|soil|garden|bed)\w*\b/i,
+    askOption: /\barrangement\b/i,
+    askResponse: /\b(?:mast|season|root|arrangement)\w*\b/i,
+    refuseOption: /\b(?:rather not|don't|do not)\b.*\bknow\b/i,
+    refuseResponse: /\b(?:seed|season)\w*\b/i,
+  },
+};
 
 describe('dialogueChoices', () => {
   beforeEach(async () => {
@@ -74,6 +175,30 @@ describe('dialogueChoices', () => {
       for (const animal of ALL_ANIMALS) {
         expect(ANIMAL_CHOICES[animal].convergence.trim()).not.toBe('');
       }
+    });
+
+    it('keeps every remembered-choice callback truthful through explicit semantic anchors', () => {
+      const failures: string[] = [];
+
+      for (const animal of ALL_ANIMALS) {
+        const choice = ANIMAL_CHOICES[animal];
+        const contract = REMEMBERED_CHOICE_ANCHORS[animal];
+        const fields: Record<keyof ChoiceAnchorContract, string> = {
+          prompt: choice.prompt,
+          askOption: choice.options.ask,
+          askResponse: choice.responses.ask,
+          refuseOption: choice.options.refuse,
+          refuseResponse: choice.responses.refuse,
+        };
+
+        for (const [field, pattern] of Object.entries(contract)) {
+          if (!pattern.test(fields[field as keyof ChoiceAnchorContract])) {
+            failures.push(`${animal}.${field}: ${fields[field as keyof ChoiceAnchorContract]}`);
+          }
+        }
+      }
+
+      expect(failures).toEqual([]);
     });
   });
 

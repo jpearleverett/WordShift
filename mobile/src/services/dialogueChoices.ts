@@ -4,16 +4,13 @@ import { AnimalType, DialoguePhase } from '../types/homeWorld';
 /**
  * Player choice point system for Phase 3 dialogue.
  *
- * When animals start speaking of "the arrangement," the player gets
- * a single dialogue choice: "What arrangement?" vs. "I don't want to know."
+ * Each animal offers one ask/refuse choice through their own established
+ * metaphor. The immediate responses remain emotionally distinct, then meet
+ * at a shared convergence without explaining what Phase 4 will reveal.
  *
- * Both paths lead to the same Phase 4 content, but the *illusion* of agency
- * dramatically increases emotional investment. The animals respond differently
- * based on the choice, then converge. The player feels they had a say.
- * They didn't. That's the point.
- *
- * Each animal offers this choice once during Phase 3. The player's choice
- * is remembered and referenced in Phase 4 callbacks.
+ * Each animal offers the choice once. The stored ask/refuse branch is recalled
+ * by authored Phase 4 and Phase 5 callbacks, so the prompt, option, and response
+ * must preserve the semantic anchors those later lines remember.
  */
 
 const STORAGE_KEY = 'wordshift_dialogue_choices';
@@ -28,8 +25,8 @@ export interface DialogueChoice {
   /** The choice prompt shown to the player */
   prompt: string;
   options: {
-    ask: string;    // "What arrangement?" style
-    refuse: string; // "I don't want to know" style
+    ask: string;    // Curiosity within the animal's metaphor
+    refuse: string; // A boundary or refusal within the same metaphor
   };
   /** Animal's response based on choice */
   responses: {
@@ -57,13 +54,13 @@ export interface ChoiceState {
 
 export const ANIMAL_CHOICES: Record<string, DialogueChoice> = {
   fox: {
-    prompt: 'Ember cups her paws around a coal that gives no warmth.',
+    prompt: 'Ember cups her paws around a coal in the fire that gives no warmth.',
     options: {
-      ask: 'What is the fire keeping?',
-      refuse: 'Leave it in the coals.',
+      ask: 'What arrangement does the fire see?',
+      refuse: 'I don\'t want to know.',
     },
     responses: {
-      ask: 'A place, I think. The flames warm every chair but one, as if they are saving something for whoever sits there.',
+      ask: 'The fire only shows me a place. Its flames warm every chair but one, as if they are saving something for whoever sits there.',
       refuse: 'All right. Sit where the light is kind, and I will not stir the ash. I can keep one cold coal to myself.',
     },
     convergence: 'Even banked low, the hearth keeps a little warmth apart.',
@@ -71,7 +68,7 @@ export const ANIMAL_CHOICES: Record<string, DialogueChoice> = {
   owl: {
     prompt: 'Archimedes lays one feather across an omitted line and closes the book.',
     options: {
-      ask: 'What was left out?',
+      ask: 'Show me the missing text.',
       refuse: 'Keep the book closed.',
     },
     responses: {
@@ -83,20 +80,20 @@ export const ANIMAL_CHOICES: Record<string, DialogueChoice> = {
   pangolin: {
     prompt: 'Panko sets a silver cover over a dish and rests both paws on it.',
     options: {
-      ask: 'Who is that dish for?',
-      refuse: 'Keep it covered.',
+      ask: 'What recipe are you preparing for that dish?',
+      refuse: 'I don\'t want to know what is cooking.',
     },
     responses: {
-      ask: 'No name came with the place setting. Still, the plate is warm every evening, and the covered dish grows lighter before I lift it.',
-      refuse: 'Then covered it stays. There are kinder things to share than an appetite you cannot put a name to.',
+      ask: 'The recipe gives no name for the guest. Still, the plate is warm every evening, and the covered dish grows lighter before I lift it.',
+      refuse: 'Then the dish stays covered. There are kinder things to share than an appetite you cannot put a name to.',
     },
     convergence: 'After the oven cools, one covered dish continues to steam.',
   },
   axolotl: {
-    prompt: 'Axel surfaces beneath a reflection that takes a moment to follow.',
+    prompt: 'Axel surfaces through still water beneath a reflection that takes a moment to follow.',
     options: {
-      ask: 'Whose reflection is that?',
-      refuse: 'Let the water hide it.',
+      ask: 'What is moving below the water?',
+      refuse: 'I won\'t look into the deep water.',
     },
     responses: {
       ask: 'Not mine. It began beyond the deep glass, no larger than a glint. Lately it reaches the surface before I do.',
@@ -107,11 +104,11 @@ export const ANIMAL_CHOICES: Record<string, DialogueChoice> = {
   capybara: {
     prompt: 'Chill closes a folder whose tab has a date but no name.',
     options: {
-      ask: 'What is scheduled for that date?',
-      refuse: 'Close the folder.',
+      ask: 'What does the data in my file show?',
+      refuse: 'I don\'t want to read the file.',
     },
     responses: {
-      ask: 'An arrival, according to every file in this cabinet. None of them gives a name, but they all reserve the same quiet hour.',
+      ask: 'The data in your file is mostly dates. They all reserve the same quiet hour for an arrival with no name.',
       refuse: 'Done. I will file it at the back and spare you the minutes. Some appointments are easier to bear without watching the clock.',
     },
     convergence: 'One chair remains open in the meeting room, and no one has canceled.',
@@ -119,8 +116,8 @@ export const ANIMAL_CHOICES: Record<string, DialogueChoice> = {
   fennec_fox: {
     prompt: 'Fennick turns one ear east and the other toward you.',
     options: {
-      ask: 'How far away is it?',
-      refuse: 'Please stop listening.',
+      ask: 'What do you hear coming?',
+      refuse: 'I don\'t want to listen.',
     },
     responses: {
       ask: 'Last week the note was beyond the salt ridge. Tonight it crossed the horizon and settled beneath the wind.',
@@ -131,11 +128,11 @@ export const ANIMAL_CHOICES: Record<string, DialogueChoice> = {
   sloth: {
     prompt: 'Sloane opens both eyes and studies the oldest branch.',
     options: {
-      ask: 'What changed?',
-      refuse: 'You should rest.',
+      ask: 'How long have you known?',
+      refuse: 'Go back to sleep.',
     },
     responses: {
-      ask: 'The evening... used to leave... by the west leaves. Now it lingers... one branch closer... than it did before.',
+      ask: 'A long time... The evening used to leave... by the west leaves. Time has brought it... one branch closer.',
       refuse: 'I will... in a while. An old observation... can wait beside me... without becoming yours.',
     },
     convergence: 'Some changes... take so long... they seem still... until they do not.',
@@ -143,8 +140,8 @@ export const ANIMAL_CHOICES: Record<string, DialogueChoice> = {
   wombat: {
     prompt: 'Warren emerges with pale stone dust on his paws and a broken survey peg.',
     options: {
-      ask: 'What is below the foundation?',
-      refuse: 'Seal the tunnel.',
+      ask: 'Where does the tunnel below the foundation lead?',
+      refuse: 'I don\'t want to look down that tunnel.',
     },
     responses: {
       ask: 'A chamber I did not cut. Its walls are smooth, and every footing above it settles around the empty space as neatly as if I had measured both together.',
@@ -155,31 +152,31 @@ export const ANIMAL_CHOICES: Record<string, DialogueChoice> = {
   rabbit: {
     prompt: 'Thyme unfolds a map crossed with paths that all curve near the garden.',
     options: {
-      ask: 'Where do the paths lead?',
-      refuse: 'Put the map away.',
+      ask: 'Why are you afraid of those paths?',
+      refuse: 'Keep your fear private.',
     },
     responses: {
-      ask: 'I marked three roads beyond the hedge. By morning each line had bent back toward the rosemary beds, though my ruler stayed straight.',
-      refuse: 'Yes. Let us make tea and leave the roads folded. I would rather hold a warm cup than another direction.',
+      ask: 'I am afraid of where they bend. I marked three roads beyond the hedge, and by morning each line curved back toward the rosemary beds.',
+      refuse: 'Thank you. Let us make tea and leave the fear folded with the roads. I would rather hold a warm cup than another direction.',
     },
     convergence: 'At dusk, the garden gate stands open and every path points softly inward.',
   },
   red_panda: {
-    prompt: 'Bamboo opens their eyes beside an incense thread shaped around an empty center.',
+    prompt: 'Bamboo opens their eyes beside an incense pattern shaped around an empty center.',
     options: {
-      ask: 'What is missing from the pattern?',
-      refuse: 'Let it remain unfinished.',
+      ask: 'Is this the arrangement you made peace with?',
+      refuse: 'Leave me outside the pattern.',
     },
     responses: {
-      ask: 'Only the center. I know its shape from the way every line makes room for it, but not what belongs there.',
-      refuse: 'Then unfinished it may remain. There is honesty in leaving an open space open and breathing beside it.',
+      ask: 'The pattern, yes, but only its empty center. I have made peace with its shape, not with what belongs there.',
+      refuse: 'Then the pattern can leave your place open. Peace does not require an explanation.',
     },
     convergence: 'Bamboo traces the open curve in smoke, then lets it dissolve.',
   },
   tarsier: {
     prompt: 'Vesper turns from the rail, leaving one eye on a faint road through the dark.',
     options: {
-      ask: 'What is on the road?',
+      ask: 'What are your eyes holding open out there?',
       refuse: 'Keep the night to yourself.',
     },
     responses: {
@@ -192,7 +189,7 @@ export const ANIMAL_CHOICES: Record<string, DialogueChoice> = {
     prompt: 'Tock rests his long finger against the bronze and listens to the bell breathe.',
     options: {
       ask: 'What will the bell say?',
-      refuse: 'Leave her silent.',
+      refuse: 'Put the finger away. Leave her silent.',
     },
     responses: {
       ask: 'One word, friend, but it belongs to her. I know the hollow around it, not the sound itself, and I will not spend her first clear note secondhand.',
@@ -203,12 +200,12 @@ export const ANIMAL_CHOICES: Record<string, DialogueChoice> = {
   kakapo: {
     prompt: 'Moss kneels where a ridge is passing through the soil from root to root.',
     options: {
-      ask: 'What are the roots saying?',
-      refuse: 'Let the season keep its secret.',
+      ask: 'What arrangement are the roots describing?',
+      refuse: 'I would rather not know.',
     },
     responses: {
       ask: 'Mast season, friend. One root tells the next, and soon trees far apart flower in the same week. The message is older than any one garden.',
-      refuse: 'A fair wish. We can tend what is green and leave the deep roots their private weather.',
+      refuse: 'A fair wish. We can tend what is green and let the seed keep the season\'s secret.',
     },
     convergence: 'Beneath the beds, the message passes on without being spoken aloud.',
   },
