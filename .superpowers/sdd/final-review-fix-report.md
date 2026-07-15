@@ -58,3 +58,8 @@ No functional blockers. The post-cap selector cycles deterministically through
 eight lines for a very long pre-finale run; normal progression arms at puzzle
 160, so this is only a resilience fallback rather than expected player-facing
 cadence.
+
+## Documentation follow-up
+
+`CLAUDE.md` now distinguishes the first eight `getDwellLine()` voices from
+the capped post-dwell `getPostCapDwellLine()` voices.
