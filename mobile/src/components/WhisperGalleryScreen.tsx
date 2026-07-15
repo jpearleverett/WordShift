@@ -31,6 +31,16 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const FLAME_ICON = require('../../assets/ui/flame.png');
 
+// Generated candy sprites replacing the bare entry-type emoji (💭/💬/🔗/⚡/📜).
+const ENTRY_TYPE_ICONS: Record<string, ReturnType<typeof require>> = {
+  whisper: require('../../assets/ui/whisper.png'),
+  dialogue: require('../../assets/ui/speech.png'),
+  cross_reference: require('../../assets/ui/link.png'),
+  trigger_reaction: require('../../assets/ui/variant_speed.png'),
+};
+const SCROLL_ICON = require('../../assets/ui/scroll.png');
+const getEntryTypeIcon = (type: string) => ENTRY_TYPE_ICONS[type] || SCROLL_ICON;
+
 interface WhisperGalleryScreenProps {
   phase: number;
   onClose: () => void;
@@ -171,16 +181,16 @@ export const WhisperGalleryScreen: React.FC<WhisperGalleryScreenProps> = ({
                   key={entry.id || i}
                   style={[styles.entryCard, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}
                 >
-                  <Text
-                    style={[styles.entryType, { color: t.muted }]}
+                  <View
+                    style={styles.entryTypeRow}
+                    accessible
                     accessibilityLabel={getPhaseEraName(entry.phase)}
                   >
-                    {entry.type === 'whisper' ? '💭' :
-                     entry.type === 'dialogue' ? '💬' :
-                     entry.type === 'cross_reference' ? '🔗' :
-                     entry.type === 'trigger_reaction' ? '⚡' : '📜'}
-                    {' '}{getPhaseEraName(entry.phase)}
-                  </Text>
+                    <Image source={getEntryTypeIcon(entry.type)} style={styles.entryTypeIcon} />
+                    <Text style={[styles.entryType, { color: t.muted }]}>
+                      {getPhaseEraName(entry.phase)}
+                    </Text>
+                  </View>
                   <Text style={[styles.entryText, { color: t.body }]}>
                     &ldquo;{entry.text}&rdquo;
                   </Text>
@@ -354,12 +364,21 @@ const styles = StyleSheet.create({
     borderRadius: SURFACE.cardRadius,
     borderWidth: 1.5,
   },
+  entryTypeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  entryTypeIcon: {
+    width: 17,
+    height: 17,
+  },
   entryType: {
     fontFamily: PIXEL_FONT_BOLD,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.8,
-    marginBottom: 4,
   },
   entryText: {
     fontFamily: BODY_FONT_ITALIC,

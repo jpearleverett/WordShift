@@ -718,3 +718,84 @@ function downArrow(cv, cx, topY, botY, shaftTh, headHalf, headLen, body, ink) {
   ellipse(cv, c - 30, c - 150, 26, 8, '#FFFFFF', 0.5);          // top sheen
   savePNG(path.join(UI, 'weave.png'), W, W, down2(cv, W, W));
 }
+
+// ================= Pit utility menu + Whisper Gallery icons ===================
+
+// gear.png — settings cog
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  ellipse(cv, c + 6, c + 16, 150, 150, '#2A2040', 0.24, 30);      // shadow
+  for (let i = 0; i < 8; i++) {                                    // teeth (ink)
+    const a = i * Math.PI / 4;
+    capsule(cv, c + Math.cos(a) * 92, c + Math.sin(a) * 92, c + Math.cos(a) * 172, c + Math.sin(a) * 172, 56, '#3A2E52');
+  }
+  for (let i = 0; i < 8; i++) {                                    // teeth (metal)
+    const a = i * Math.PI / 4;
+    capsule(cv, c + Math.cos(a) * 92, c + Math.sin(a) * 92, c + Math.cos(a) * 166, c + Math.sin(a) * 166, 40, '#C6BEDC');
+  }
+  ellipse(cv, c, c, 130, 130, '#3A2E52');                         // body ink
+  ellipse(cv, c, c, 116, 116, '#D6CFE6', 1, 3);                   // body
+  ellipse(cv, c - 30, c - 30, 40, 40, '#FFFFFF', 0.4, 20);        // sheen
+  ellipse(cv, c, c, 54, 54, '#3A2E52');                           // hub hole ink
+  ellipse(cv, c, c, 42, 42, '#8A7FB0');                           // hub hole
+  savePNG(path.join(UI, 'gear.png'), W, W, down2(cv, W, W));
+}
+
+// stats.png — bar chart (Statistics)
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  const baseY = c + 128;
+  const bars = [[-94, 118, '#5EEAD4', '#14B8A6'], [0, 178, '#7EC7F5', '#4FA8E8'], [94, 236, '#FFC845', '#F5A315']];
+  for (const [bx, h] of bars) roundRect(cv, c + bx, baseY - h / 2, 33, h / 2 + 6, 14, '#3A2E52');  // ink
+  for (const [bx, h, col, dk] of bars) roundRect(cv, c + bx, baseY - h / 2, 26, h / 2, 11, col, 1, dk);
+  roundRect(cv, c, baseY + 18, 150, 9, 5, '#3A2E52');             // baseline
+  savePNG(path.join(UI, 'stats.png'), W, W, down2(cv, W, W));
+}
+
+// whisper.png — thought bubble (Whisper Gallery: whisper entries)
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  const puffs = [[-72, -34, 62, 52], [-2, -62, 76, 62], [76, -30, 58, 48], [48, 24, 54, 44], [-44, 26, 52, 42], [8, -2, 82, 60]];
+  for (const [dx, dy, rx, ry] of puffs) ellipse(cv, c + dx, c + dy - 18, rx + 8, ry + 8, '#B7ADC9'); // ink
+  for (const [dx, dy, rx, ry] of puffs) ellipse(cv, c + dx, c + dy - 18, rx, ry, '#FFFFFF', 1, 6);
+  ellipse(cv, c - 66, c + 100, 26, 22, '#B7ADC9'); ellipse(cv, c - 66, c + 100, 19, 15, '#FFFFFF'); // trailing
+  ellipse(cv, c - 98, c + 146, 16, 14, '#B7ADC9'); ellipse(cv, c - 98, c + 146, 10, 8, '#FFFFFF');
+  savePNG(path.join(UI, 'whisper.png'), W, W, down2(cv, W, W));
+}
+
+// speech.png — speech bubble (Whisper Gallery: dialogue entries)
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  roundRect(cv, c, c - 4, 168, 122, 40, '#2A2040', 0.22);        // shadow
+  tri(cv, [c - 44, c + 84], [c + 14, c + 84], [c - 78, c + 168], '#6B3FD0'); // tail ink
+  roundRect(cv, c, c - 20, 168, 120, 40, '#3A2E52');             // ink
+  tri(cv, [c - 40, c + 74], [c + 8, c + 74], [c - 70, c + 156], '#8257EA'); // tail
+  roundRect(cv, c, c - 20, 156, 108, 34, '#A98BFF', 1, '#8257EA'); // bubble
+  for (const dx of [-52, 0, 52]) ellipse(cv, c + dx, c - 20, 15, 15, '#FFFFFF', 0.92); // dots
+  savePNG(path.join(UI, 'speech.png'), W, W, down2(cv, W, W));
+}
+
+// link.png — two chain-link rings (Whisper Gallery: cross-reference entries)
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  const ring = (cx, cy, r, col, ink) => {
+    arcStroke(cv, cx, cy, r, 46, 0.01, Math.PI * 2, ink);
+    arcStroke(cv, cx, cy, r, 30, 0.01, Math.PI * 2, col);
+  };
+  ring(c - 58, c - 58, 86, '#8FA0DE', '#2E3355');
+  ring(c + 58, c + 58, 86, '#B79BFF', '#3A2E52');
+  savePNG(path.join(UI, 'link.png'), W, W, down2(cv, W, W));
+}
+
+// scroll.png — rolled parchment (Whisper Gallery: default / narrative entries)
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  roundRect(cv, c, c + 16, 122, 150, 18, '#2A2040', 0.22);       // shadow
+  roundRect(cv, c, c, 108, 132, 8, '#F5E9C8', 1, '#E4CE96');     // sheet
+  for (const dy of [-72, -34, 4, 42]) roundRect(cv, c, c + dy, 76, 7, 4, '#C0A468'); // text lines
+  roundRect(cv, c, c - 138, 134, 30, 15, '#8A5A22');             // top roll ink
+  roundRect(cv, c, c - 142, 126, 24, 12, '#C08A44', 1, '#9A6A2E');
+  roundRect(cv, c, c + 138, 134, 30, 15, '#8A5A22');             // bottom roll ink
+  roundRect(cv, c, c + 142, 126, 24, 12, '#C08A44', 1, '#9A6A2E');
+  savePNG(path.join(UI, 'scroll.png'), W, W, down2(cv, W, W));
+}

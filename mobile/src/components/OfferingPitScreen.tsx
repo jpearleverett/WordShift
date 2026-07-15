@@ -94,6 +94,8 @@ const PIT_NIGHT = require('../../assets/environment/pitt_night.png');
 const TENDING_ICON = require('../../assets/ui/tending.png');
 const MENU_ICON = require('../../assets/ui/menu.png');
 const HOME_ICON = require('../../assets/ui/home.png');
+const STATS_ICON = require('../../assets/ui/stats.png');
+const GEAR_ICON = require('../../assets/ui/gear.png');
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -2545,7 +2547,10 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
                 accessibilityLabel="View stats"
                 accessibilityRole="button"
               >
-                <Text style={styles.utilityButtonText}>📊 Statistics</Text>
+                <View style={styles.utilityButtonRow}>
+                  <Image source={STATS_ICON} style={styles.utilityButtonIcon} />
+                  <Text style={styles.utilityButtonText}>Statistics</Text>
+                </View>
               </TouchableOpacity>
             )}
             {onOpenSettings && (
@@ -2558,7 +2563,10 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
                 accessibilityLabel="Open settings"
                 accessibilityRole="button"
               >
-                <Text style={styles.utilityButtonText}>⚙️ Settings</Text>
+                <View style={styles.utilityButtonRow}>
+                  <Image source={GEAR_ICON} style={styles.utilityButtonIcon} />
+                  <Text style={styles.utilityButtonText}>Settings</Text>
+                </View>
               </TouchableOpacity>
             )}
           </View>
@@ -2848,6 +2856,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     marginBottom: 10,
+  },
+  utilityButtonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  utilityButtonIcon: {
+    width: 22,
+    height: 22,
   },
   utilityButtonText: {
     fontFamily: PIXEL_FONT_BOLD,
