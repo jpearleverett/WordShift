@@ -125,22 +125,27 @@ describe('phase-appropriate room windows', () => {
     path.resolve(__dirname, '../components/home/RoomView.tsx'),
     'utf8'
   );
-  const TREATED = ['cozy_den', 'kitchen', 'study', 'office', 'garden'];
+  // Room THEME -> window-mask filename. The filename matches the theme except
+  // for the descent trio, whose masks are named for their art file
+  // (star_loft = observatory, belfry = workshop, sky_garden = rainforest).
+  const WINDOW_MASKS: Record<string, string> = {
+    cozy_den: 'cozy_den', kitchen: 'kitchen', study: 'study', office: 'office',
+    garden: 'garden', desert: 'desert', jungle: 'jungle',
+    star_loft: 'observatory', belfry: 'workshop', sky_garden: 'rainforest',
+  };
   const WINDOWS_DIR = path.resolve(__dirname, '../../assets/rooms/windows');
 
-  test.each(TREATED)('%s has a window-sky mask asset', (room) => {
-    expect(fs.existsSync(path.join(WINDOWS_DIR, `${room}.png`))).toBe(true);
+  test.each(Object.entries(WINDOW_MASKS))('%s theme has its %s window mask asset', (_theme, file) => {
+    expect(fs.existsSync(path.join(WINDOWS_DIR, `${file}.png`))).toBe(true);
   });
 
-  test('only the clear-window rooms are treated (aquarium/desert excluded)', () => {
-    for (const room of TREATED) {
-      expect(ROOM_VIEW).toMatch(new RegExp(`${room}: require\\(.*windows/${room}\\.png`));
+  test('every treated room is wired to its mask; the aquarium stays untreated', () => {
+    for (const [theme, file] of Object.entries(WINDOW_MASKS)) {
+      expect(ROOM_VIEW).toMatch(new RegExp(`${theme}: require\\(.*windows/${file}\\.png`));
     }
-    // The aquarium's water and the desert's night sky must NOT be recolored.
+    // The aquarium's water is deliberately never recolored.
     expect(ROOM_VIEW).not.toMatch(/windows\/aquarium/);
-    expect(ROOM_VIEW).not.toMatch(/windows\/desert/);
     expect(fs.existsSync(path.join(WINDOWS_DIR, 'aquarium.png'))).toBe(false);
-    expect(fs.existsSync(path.join(WINDOWS_DIR, 'desert.png'))).toBe(false);
   });
 
   test('the mask recolors per phase via WINDOW_TINT (day untouched)', () => {
