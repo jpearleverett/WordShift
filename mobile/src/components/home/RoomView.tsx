@@ -41,18 +41,26 @@ const ROOM_BACKGROUNDS: Record<RoomTheme, ImageSourcePropType> = {
   sky_garden: require('../../../assets/rooms/rainforest.png'),
 };
 
-// Phase-appropriate windows. The room art paints bright day-sky windows that
-// read as noon under a dusk/night sky. These masks (white on transparent,
-// window sky only — see scripts/tools/processRawWorldArt.mjs) let us recolor
-// just the window to the current phase. Only the rooms with a clear sky window
-// have a mask; the aquarium (water), desert (already night), and windowless
-// rooms are deliberately absent.
+// Phase-appropriate windows. The room art paints bright day-view windows that
+// read as noon under a dusk/night sky. These masks (white on transparent, the
+// window view only) let us recolor just the window to the current phase. The
+// first five (clear blue-sky windows) come from processRawWorldArt.mjs; the
+// descent-trio + jungle/desert windows (day views of sky + foliage / canopy /
+// misty rainforest) come from generateRoomWindows.mjs, keyed here by ROOM THEME
+// but derived from the art file (observatory/workshop/rainforest = the
+// star_loft/belfry/sky_garden art). Only the aquarium (water) and windowless
+// rooms (burrow, bamboo) stay untreated.
 const ROOM_WINDOW_MASKS: Partial<Record<RoomTheme, ImageSourcePropType>> = {
   cozy_den: require('../../../assets/rooms/windows/cozy_den.png'),
   kitchen: require('../../../assets/rooms/windows/kitchen.png'),
   study: require('../../../assets/rooms/windows/study.png'),
   office: require('../../../assets/rooms/windows/office.png'),
   garden: require('../../../assets/rooms/windows/garden.png'),
+  desert: require('../../../assets/rooms/windows/desert.png'),
+  jungle: require('../../../assets/rooms/windows/jungle.png'),
+  star_loft: require('../../../assets/rooms/windows/observatory.png'),
+  belfry: require('../../../assets/rooms/windows/workshop.png'),
+  sky_garden: require('../../../assets/rooms/windows/rainforest.png'),
 };
 
 // The color + strength painted over the window sky per phase (roughly each
