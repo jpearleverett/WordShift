@@ -27,11 +27,43 @@ import {
 import { isUnbrokenWeaveEligible } from './unbrokenWeave';
 
 const BRANCHING_UNLOCK_PUZZLES = 40;
-const BRANCHING_CONTEXT_CANDIDATES = 40;
+const BRANCHING_CONTEXT_CANDIDATES = 80;
 const BRANCHING_BONUS_CAP = 12;
 const branchingMetricsCache = new Map<string, PuzzleBranchingMetrics>();
 const standardExtensionCache = new Map<string, PuzzleConfig | null>();
 const guaranteedStandardFallbackCache = new Map<Difficulty, PuzzleConfig>();
+
+export function prioritizeMultiRouteCandidates<T>(
+  candidates: readonly T[],
+  getCompletePathCount: (candidate: T) => number,
+  targetPoolSize: number,
+): T[] {
+  const preferredPoolSize = Math.min(
+    candidates.length,
+    Math.max(0, Math.floor(targetPoolSize)),
+  );
+  const multiRouteIndices: number[] = [];
+  const fallbackIndices: number[] = [];
+
+  candidates.forEach((candidate, index) => {
+    if (getCompletePathCount(candidate) >= 2) {
+      multiRouteIndices.push(index);
+    } else {
+      fallbackIndices.push(index);
+    }
+  });
+
+  const preferredIndices = multiRouteIndices.slice(0, preferredPoolSize);
+  preferredIndices.push(
+    ...fallbackIndices.slice(0, preferredPoolSize - preferredIndices.length),
+  );
+  const preferredSet = new Set(preferredIndices);
+
+  return [
+    ...preferredIndices.map(index => candidates[index]),
+    ...candidates.filter((_, index) => !preferredSet.has(index)),
+  ];
+}
 
 export interface PuzzleBankSelectionOptions {
   unbrokenWeaveOnly?: boolean;
@@ -540,20 +572,36 @@ export async function selectPreGeneratedPuzzle(
   // and freshness remain the primary filters and synchronous work stays capped.
   if (variant === 'standard' && puzzlesSolved >= BRANCHING_UNLOCK_PUZZLES) {
     const candidateCount = Math.min(BRANCHING_CONTEXT_CANDIDATES, scored.length);
-    const depthCandidates = scored.slice(0, candidateCount);
-    for (const candidate of depthCandidates) {
-      let metrics = branchingMetricsCache.get(candidate.puzzle.id);
+    const metricSource = extensionRequired ? 'extended' : 'source';
+    const depthCandidates = scored.slice(0, candidateCount).map(candidate => {
+      const metricsCacheKey = `${bankKey}:${candidate.puzzle.id}:${metricSource}`;
+      let metrics = branchingMetricsCache.get(metricsCacheKey);
       if (!metrics) {
+        const branchingWords = extensionRequired
+          ? getCachedStandardExtension(bankKey, candidate.puzzle)!.words
+          : candidate.puzzle.words;
         metrics = analyzeStandardBranching(
-          candidate.puzzle.words,
+          branchingWords,
           word => COMMON_WORDS.has(word.toUpperCase()),
         );
-        branchingMetricsCache.set(candidate.puzzle.id, metrics);
+        branchingMetricsCache.set(metricsCacheKey, metrics);
       }
-      candidate.score += Math.min(BRANCHING_BONUS_CAP, metrics.structuralBonus);
-    }
+      return {
+        ...candidate,
+        score: candidate.score + Math.min(BRANCHING_BONUS_CAP, metrics.structuralBonus),
+        completePathCount: metrics.completePathCount,
+      };
+    });
     depthCandidates.sort((a, b) => b.score - a.score);
-    scored.splice(0, candidateCount, ...depthCandidates);
+    scored.splice(
+      0,
+      candidateCount,
+      ...prioritizeMultiRouteCandidates(
+        depthCandidates,
+        candidate => candidate.completePathCount,
+        10,
+      ),
+    );
   }
 
   // Pick randomly from the top 10 (wider pool = more vocabulary variety)

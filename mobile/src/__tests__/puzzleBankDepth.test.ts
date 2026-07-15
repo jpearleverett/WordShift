@@ -58,10 +58,10 @@ describe('puzzle bank depth gates', () => {
     expect(analyzeMock).not.toHaveBeenCalled();
   });
 
-  it('analyzes only the top 40 context candidates and reuses cached metrics', async () => {
+  it('analyzes only the top 80 context candidates and reuses cached metrics', async () => {
     await selectPreGeneratedPuzzle('HARD', 0, new Map(), 'standard', 40);
 
-    expect(analyzeMock).toHaveBeenCalledTimes(40);
+    expect(analyzeMock).toHaveBeenCalledTimes(80);
 
     analyzeMock.mockClear();
     await clearPlayedPuzzles();
@@ -76,11 +76,14 @@ describe('puzzle bank depth gates', () => {
     );
     expect(beforeGate).not.toBeNull();
     expect(extendMock).not.toHaveBeenCalled();
+    analyzeMock.mockClear();
 
     const atGate = await selectPreGeneratedPuzzle(
       'EASY', 0, new Map(), 'standard', 100,
     );
     expect(extendMock.mock.calls.length).toBeGreaterThan(100);
+    expect(analyzeMock).toHaveBeenCalledTimes(80);
+    expect(analyzeMock.mock.calls.every(([words]) => words.at(-1) === 'DEPTH')).toBe(true);
     expect(atGate!.words.at(-1)).toBe('DEPTH');
 
     const callsAfterFirstSelection = extendMock.mock.calls.length;
