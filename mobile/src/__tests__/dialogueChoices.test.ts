@@ -200,6 +200,20 @@ describe('dialogueChoices', () => {
 
       expect(failures).toEqual([]);
     });
+
+    it('has Moss promise the gentle seed-season outcome recalled by both later callbacks', () => {
+      const mossRefusal = [
+        ANIMAL_CHOICES.kakapo.options.refuse,
+        ANIMAL_CHOICES.kakapo.responses.refuse,
+        ANIMAL_CHOICES.kakapo.convergence,
+      ].join(' ');
+
+      expect(mossRefusal).toMatch(/\bI promise\b/i);
+      expect(mossRefusal).toMatch(/\bseed\b/i);
+      expect(mossRefusal).toMatch(/\bseason\b/i);
+      expect(mossRefusal).toMatch(/\bgently\b/i);
+      expect(mossRefusal).toMatch(/\bproper hour\b/i);
+    });
   });
 
   // ===========================================================================

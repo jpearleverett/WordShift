@@ -205,7 +205,7 @@ export const ANIMAL_CHOICES: Record<string, DialogueChoice> = {
     },
     responses: {
       ask: 'Mast season, friend. One root tells the next, and soon trees far apart flower in the same week. The message is older than any one garden.',
-      refuse: 'A fair wish. We can tend what is green and let the seed keep the season\'s secret.',
+      refuse: 'A fair wish. Let the roots keep their message. I promise only this: when the season reaches a seed, it opens gently, at its proper hour.',
     },
     convergence: 'Beneath the beds, the message passes on without being spoken aloud.',
   },
