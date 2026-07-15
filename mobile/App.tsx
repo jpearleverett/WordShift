@@ -150,7 +150,7 @@ import { loadPixelFonts, installGlobalFont } from './src/theme/fonts';
 import { initHints, addHints } from './src/services/hints';
 import { loadEntitlements, hasEntitlementSync, ENTITLEMENTS } from './src/services/entitlements';
 import { StoreModal } from './src/components/monetization/StoreModal';
-import { recordInterstitialSeen, consumePatronNudge, armRemoveAdsNudgeIfEligible, consumePendingRemoveAdsNudge, canOfferRewardedDouble, recordRewardedDoubleOffered } from './src/services/monetizationPrompts';
+import { recordInterstitialSeen, consumePatronNudge, armRemoveAdsNudgeIfEligible, consumePendingRemoveAdsNudge, canOfferRewardedDouble, recordRewardedDoubleOffered, canShowExitNudge, recordExitNudgeShown } from './src/services/monetizationPrompts';
 import { REWARDED_HINT_GRANT } from './src/constants/gameBalance';
 import { createRevenueCatBillingProvider } from './src/services/providers/revenueCatBilling';
 import { createAdMobAdProvider } from './src/services/providers/googleAdMobAds';
@@ -2736,18 +2736,20 @@ function MainApp() {
   // One-time, low-pressure Patron nudge once the player has settled in. Suppressed
   // for Patrons and during onboarding (gating lives in monetizationPrompts.ts).
   const patronNudgeInFlightRef = useRef(false);
-  const maybeShowPatronNudge = useCallback(async () => {
-    if (patronNudgeInFlightRef.current) return;
+  const maybeShowPatronNudge = useCallback(async (): Promise<boolean> => {
+    if (patronNudgeInFlightRef.current) return false;
     patronNudgeInFlightRef.current = true;
     try {
-      if (onboardingFlow.isOnboarding) return;
+      if (onboardingFlow.isOnboarding) return false;
       const solved =
         victoryFlow.victoryData?.puzzlesSolved ??
         persistence.cumulativeStats?.totalPuzzlesCompleted ??
         0;
       if (await consumePatronNudge(solved)) {
         setShowPatronModal(true);
+        return true;
       }
+      return false;
     } finally {
       patronNudgeInFlightRef.current = false;
     }
@@ -2809,11 +2811,34 @@ function MainApp() {
     // so callers capture this BEFORE the exit flow and pass it in (checking
     // the ref here would always see an empty queue).
     if (interstitialShown || introWillPresent) return;
-    if (await maybeShowSharePrompt()) return;
-    if (await maybePromptForNotifications()) return;
-    if (await maybeShowRemoveAdsOffer()) return;
-    await maybeShowPatronNudge();
-  }, [maybeShowSharePrompt, maybePromptForNotifications, maybeShowRemoveAdsOffer, maybeShowPatronNudge]);
+    const solved =
+      victoryFlow.victoryData?.puzzlesSolved ??
+      persistence.cumulativeStats?.totalPuzzlesCompleted ??
+      0;
+    if (!(await canShowExitNudge(solved))) return;
+    if (await maybeShowSharePrompt()) {
+      await recordExitNudgeShown(solved);
+      return;
+    }
+    if (await maybePromptForNotifications()) {
+      await recordExitNudgeShown(solved);
+      return;
+    }
+    if (await maybeShowRemoveAdsOffer()) {
+      await recordExitNudgeShown(solved);
+      return;
+    }
+    if (await maybeShowPatronNudge()) {
+      await recordExitNudgeShown(solved);
+    }
+  }, [
+    victoryFlow.victoryData,
+    persistence.cumulativeStats,
+    maybeShowSharePrompt,
+    maybePromptForNotifications,
+    maybeShowRemoveAdsOffer,
+    maybeShowPatronNudge,
+  ]);
 
   // One-time Swift Victories pointer: after the FIRST routine win past
   // SWIFT_HINT_MIN_PUZZLES, a quiet toast points at the Settings toggle that

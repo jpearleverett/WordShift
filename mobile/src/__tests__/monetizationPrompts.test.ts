@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
+  shouldAllowExitNudge,
   shouldShowPatronNudge,
   shouldShowRemoveAdsNudge,
   shouldOfferRewardedDouble,
@@ -9,6 +10,8 @@ import {
   consumePendingRemoveAdsNudge,
   canOfferRewardedDouble,
   recordRewardedDoubleOffered,
+  canShowExitNudge,
+  recordExitNudgeShown,
   clearMonetPrompts,
   REWARDED_DOUBLE_DAILY_CAP,
   REWARDED_DOUBLE_BLOCKED_FROM_PHASE,
@@ -20,8 +23,11 @@ import {
   clearEntitlements,
 } from '../services/entitlements';
 import {
+  EXIT_NUDGE_MIN_PUZZLES,
+  EXIT_NUDGE_SPACING_PUZZLES,
   PATRON_NUDGE_MIN_PUZZLES,
   REMOVE_ADS_NUDGE_AFTER_INTERSTITIALS,
+  STARTER_INTRO_MIN_PUZZLES,
 } from '../constants/gameBalance';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -44,6 +50,20 @@ beforeEach(async () => {
 });
 
 describe('pure decisions', () => {
+  it('exit nudges start at puzzle 12 and require five puzzles between presentations', () => {
+    expect(shouldAllowExitNudge({ puzzlesSolved: 11, lastExitNudgePuzzle: null })).toBe(false);
+    expect(shouldAllowExitNudge({ puzzlesSolved: 12, lastExitNudgePuzzle: null })).toBe(true);
+    expect(shouldAllowExitNudge({ puzzlesSolved: 16, lastExitNudgePuzzle: 12 })).toBe(false);
+    expect(shouldAllowExitNudge({ puzzlesSolved: 17, lastExitNudgePuzzle: 12 })).toBe(true);
+    expect(EXIT_NUDGE_MIN_PUZZLES).toBe(12);
+    expect(EXIT_NUDGE_SPACING_PUZZLES).toBe(5);
+  });
+
+  it('delays the starter-pack and Patron pitches', () => {
+    expect(STARTER_INTRO_MIN_PUZZLES).toBe(35);
+    expect(PATRON_NUDGE_MIN_PUZZLES).toBe(50);
+  });
+
   it('patron nudge: gated on min puzzles, suppressed for patrons / once shown', () => {
     expect(shouldShowPatronNudge({ puzzlesSolved: PATRON_NUDGE_MIN_PUZZLES, isPatron: false, alreadyShown: false })).toBe(true);
     expect(shouldShowPatronNudge({ puzzlesSolved: PATRON_NUDGE_MIN_PUZZLES - 1, isPatron: false, alreadyShown: false })).toBe(false);
@@ -59,12 +79,33 @@ describe('pure decisions', () => {
   });
 
   it('rewarded double: capped per day, blocked from the dread arc (phase 4+)', () => {
+    expect(REWARDED_DOUBLE_DAILY_CAP).toBe(2);
     expect(shouldOfferRewardedDouble({ offersToday: 0, phase: 0 })).toBe(true);
     expect(shouldOfferRewardedDouble({ offersToday: REWARDED_DOUBLE_DAILY_CAP - 1, phase: 3 })).toBe(true);
     expect(shouldOfferRewardedDouble({ offersToday: REWARDED_DOUBLE_DAILY_CAP, phase: 0 })).toBe(false);
     // The dread arc is protected like interstitials — no offers at all.
     expect(shouldOfferRewardedDouble({ offersToday: 0, phase: REWARDED_DOUBLE_BLOCKED_FROM_PHASE })).toBe(false);
     expect(shouldOfferRewardedDouble({ offersToday: 0, phase: 5 })).toBe(false);
+  });
+});
+
+describe('exit-nudge cadence (canShowExitNudge / recordExitNudgeShown)', () => {
+  it('persists the last shown puzzle and enforces spacing across reads', async () => {
+    expect(await canShowExitNudge(12)).toBe(true);
+    await recordExitNudgeShown(12);
+    expect(await canShowExitNudge(16)).toBe(false);
+    expect(await canShowExitNudge(17)).toBe(true);
+
+    const raw = await AsyncStorage.getItem('wordshift_monet_prompts');
+    expect(raw).toBeTruthy();
+    expect(JSON.parse(raw as string).lastExitNudgePuzzle).toBe(12);
+  });
+
+  it('Reset All clears the last shown puzzle', async () => {
+    await recordExitNudgeShown(12);
+    expect(await canShowExitNudge(16)).toBe(false);
+    await clearMonetPrompts();
+    expect(await canShowExitNudge(12)).toBe(true);
   });
 });
 

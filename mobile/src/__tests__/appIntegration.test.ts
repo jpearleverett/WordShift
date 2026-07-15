@@ -348,9 +348,25 @@ describe('proactive share prompt', () => {
     // The notification prompt reports whether it actually presented, and a
     // shown prompt must end the chain before the remove-ads / patron nudges.
     expect(APP_TSX).toMatch(/const maybePromptForNotifications = useCallback\(async \(\): Promise<boolean>/);
-    expect(APP_TSX).toMatch(/if \(await maybeShowSharePrompt\(\)\) return;/);
-    expect(APP_TSX).toMatch(/if \(await maybePromptForNotifications\(\)\) return;/);
-    expect(APP_TSX).toMatch(/if \(await maybeShowRemoveAdsOffer\(\)\) return;/);
+    expect(APP_TSX).toMatch(/if \(await maybeShowSharePrompt\(\)\) \{\s*await recordExitNudgeShown\(solved\);\s*return;\s*\}/);
+    expect(APP_TSX).toMatch(/if \(await maybePromptForNotifications\(\)\) \{\s*await recordExitNudgeShown\(solved\);\s*return;\s*\}/);
+    expect(APP_TSX).toMatch(/if \(await maybeShowRemoveAdsOffer\(\)\) \{\s*await recordExitNudgeShown\(solved\);\s*return;\s*\}/);
+    expect(APP_TSX).toMatch(/if \(await maybeShowPatronNudge\(\)\) \{\s*await recordExitNudgeShown\(solved\);\s*\}/);
+  });
+
+  test('the shared exit cadence gates the whole chain and records only presented prompts', () => {
+    const flowStart = APP_TSX.indexOf('const runVictoryExitNudges = useCallback');
+    const flow = APP_TSX.slice(
+      flowStart,
+      APP_TSX.indexOf('// One-time Swift Victories pointer', flowStart)
+    );
+    expect(flow.length).toBeGreaterThan(0);
+    const cadenceGate = flow.indexOf('canShowExitNudge(solved)');
+    const firstPromptCheck = flow.indexOf('maybeShowSharePrompt()');
+    expect(cadenceGate).toBeGreaterThanOrEqual(0);
+    expect(cadenceGate).toBeLessThan(firstPromptCheck);
+    expect(flow.match(/recordExitNudgeShown\(solved\)/g)).toHaveLength(4);
+    expect(APP_TSX).toMatch(/const maybeShowPatronNudge = useCallback\(async \(\): Promise<boolean>/);
   });
 
   test('the remove-ads upsell is deferred: armed on the ad exit, offered on the NEXT quiet exit', () => {

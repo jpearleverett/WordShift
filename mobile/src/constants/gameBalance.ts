@@ -226,25 +226,31 @@ export const FIRST_PURCHASE_AMBER_MULTIPLIER = 2;
 // Gentle, frequency-capped nudges (never modal spam). All are suppressed for
 // players who already own the relevant entitlement.
 
+/** Earliest puzzle count at which the shared victory-exit nudge chain may run. */
+export const EXIT_NUDGE_MIN_PUZZLES = 12;
+
+/** Minimum completed puzzles between proactive victory-exit nudges. */
+export const EXIT_NUDGE_SPACING_PUZZLES = 5;
+
 /**
  * Earliest puzzle count at which the one-time Patron nudge may appear.
- * Held back to 30 (was 6): the pitch lands after the player has met the first
+ * Held back to 50: the pitch lands after the player has met the first
  * gated room and the daily habit has had a chance to form — an invested player
  * hears "support the game" as a fair ask; a day-one player hears a shakedown.
  */
-export const PATRON_NUDGE_MIN_PUZZLES = 30;
+export const PATRON_NUDGE_MIN_PUZZLES = 50;
 
 /** Show the Remove-Ads nudge once this many interstitials have been seen. */
 export const REMOVE_ADS_NUDGE_AFTER_INTERSTITIALS = 3;
 
 /**
  * Earliest puzzle count for Fox's one-time "Keeper's Welcome" starter-pack intro.
- * Pushed past puzzle 20 so the store pitch never lands inside the first-session
+ * Pushed to puzzle 35 so the store pitch never lands inside the first-session
  * cluster of new-thing introductions (journal, daily, variants, challenge,
  * mandatory harvest all fire before this) — the newcomer meets the game before
  * the game asks for anything. Suppressed if the starter pack is already owned.
  */
-export const STARTER_INTRO_MIN_PUZZLES = 22;
+export const STARTER_INTRO_MIN_PUZZLES = 35;
 
 /**
  * Puzzle count where the Journal Hub (ledger, gallery, quests) and the header
