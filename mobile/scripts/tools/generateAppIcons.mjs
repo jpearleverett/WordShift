@@ -241,11 +241,13 @@ const S = 2; // supersample factor
 //    via scripts/tools/processAppIcon.mjs (reads assets/raw/app_icon_source.png).
 //    Run that instead; this generator only draws the splash mark below.
 
-// 3) Splash logo: 1024x1024 transparent mark (app.json uses resizeMode contain
-//    over the splash backgroundColor)
-{
-  const W = 1024;
-  const cv = makeCanvas(W * S, W * S);
-  drawLogoMark(cv, (W * S) / 2, (W * S) / 2, W * S * 0.52);
-  writePNG(path.join(ASSETS, 'splash.png'), W, W, downsampleToBuffer(cv, W, W));
-}
+// 3) Splash: NO LONGER generated here. The old flat procedural candy mark
+//    clashed with the hand-authored fox app icon + wooden wordmark, so the
+//    launch splash is now composed from those real brand assets by
+//    scripts/tools/generateSplash.mjs (run in generate:assets after the icon
+//    is processed). This file is retained only for its PNG writer / rasterizer
+//    helpers; it intentionally writes nothing now.
+void drawLogoMark; // keep the helper referenced for potential reuse
+void ASSETS;
+void S;
+console.log('generateAppIcons: splash is now built by generateSplash.mjs (no-op here)');

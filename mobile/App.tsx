@@ -4306,11 +4306,21 @@ function App() {
         <MainApp key={appEpoch} />
       ) : (
         <View style={bootStyles.container}>
+          {/* Fox app-icon art as a rounded card + wooden wordmark — mirrors the
+              native splash composition so the OS-splash -> JS-boot handoff reads
+              as one continuous branded hold, not a hard cut. */}
+          <View style={bootStyles.iconCard}>
+            <Image
+              source={require('./assets/icon.png')}
+              style={bootStyles.iconImage}
+              resizeMode="cover"
+              accessibilityLabel="WordShift"
+            />
+          </View>
           <Image
             source={require('./assets/ui/wordmark.png')}
             style={bootStyles.wordmark}
             resizeMode="contain"
-            accessibilityLabel="WordShift"
           />
           <ActivityIndicator size="small" color="#8B7BB8" style={bootStyles.spinner} />
         </View>
@@ -4329,12 +4339,30 @@ const bootStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Rounded fox card — corner radius matches the icon's own ~18% baked rounding
+  // and the native splash mask, with a soft shadow for the same lifted look.
+  iconCard: {
+    width: 152,
+    height: 152,
+    borderRadius: 28,
+    overflow: 'hidden',
+    marginBottom: 22,
+    shadowColor: '#28142A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    elevation: 8,
+  },
+  iconImage: {
+    width: '100%',
+    height: '100%',
+  },
   wordmark: {
-    width: 260,
-    height: 65,
+    width: 244,
+    height: 61,
   },
   spinner: {
-    marginTop: 28,
+    marginTop: 30,
   },
 });
 

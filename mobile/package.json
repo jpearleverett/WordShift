@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "generate:puzzles": "jest --config scripts/jest.config.js --no-coverage --testTimeout 900000",
-    "generate:assets": "node scripts/tools/processAppIcon.mjs && node scripts/tools/generateAppIcons.mjs && node scripts/tools/generateNotificationIcon.mjs && node scripts/tools/generateSounds.mjs && node scripts/tools/generateWorldArt.mjs && node scripts/tools/generatePixelWorld.mjs && node scripts/tools/generateUiIcons.mjs"
+    "generate:assets": "node scripts/tools/processAppIcon.mjs && node scripts/tools/generateSplash.mjs && node scripts/tools/generateNotificationIcon.mjs && node scripts/tools/generateSounds.mjs && node scripts/tools/generateWorldArt.mjs && node scripts/tools/generatePixelWorld.mjs && node scripts/tools/generateUiIcons.mjs"
   },
   "dependencies": {
     "@expo/metro-runtime": "~56.0.16",
