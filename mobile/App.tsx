@@ -2078,11 +2078,12 @@ function MainApp() {
       // final board's win → post-revelation).
       //
       // The finale is no longer declared retroactively on an ordinary win:
-      // once the dwell window fills, the finale is ARMED (finaleArmed) and the
-      // NEXT standard board start serves the marked FINAL BOARD
-      // (usePuzzleGame.startNewGame). Its victory — and only its victory —
-      // plays FINAL_PUZZLE_EVENT. The win after that triggers
-      // POST_REVELATION_EVENT + markPostRevelation, exactly as before.
+      // only a capped eight-win dwell AND completedTotal >=
+      // FINALE_ARM_MIN_PUZZLES (160) arm finaleArmed. The NEXT standard board
+      // start then serves the marked FINAL BOARD (usePuzzleGame.startNewGame).
+      // Its victory — and only its victory — plays FINAL_PUZZLE_EVENT. The win
+      // after that triggers POST_REVELATION_EVENT + markPostRevelation,
+      // exactly as before.
       let dwellLineForWin: string | null = null;
       if (!victory.phaseChanged && persistence.currentPhase >= 4) {
         try {

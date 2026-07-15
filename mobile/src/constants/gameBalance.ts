@@ -284,10 +284,12 @@ export const AUTO_COLLECT_PUZZLE_LIMIT = 8;
  * now complete this many Phase-4 puzzles with the house complete — long
  * enough, against the 5-puzzle Phase-4 dialogue cooldown, for multiple
  * sessions per animal and the sacrifice mechanic to actually be played.
- * Filling the window ARMS the finale (amberCurrency.finaleArmed): the NEXT
- * standard board start is served as the marked FINAL BOARD (dread-seeded,
- * quiet start line), and its victory plays the arrival. Never revealed as a
- * counter (narrative rule 7); the house "is not yet ready to receive it."
+ * The capped eight-win window is necessary but not sufficient: arming also
+ * requires `FINALE_ARM_MIN_PUZZLES` (160). Once both conditions are met,
+ * amberCurrency.finaleArmed makes the NEXT standard board the marked FINAL
+ * BOARD (dread-seeded, quiet start line), and its victory plays the arrival.
+ * Never revealed as a counter (narrative rule 7); the house "is not yet ready
+ * to receive it."
  */
 export const FINALE_DWELL_PUZZLES = 8;
 
