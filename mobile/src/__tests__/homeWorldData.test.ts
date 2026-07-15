@@ -26,6 +26,7 @@ import {
   PHASE_THRESHOLDS,
   MIN_PUZZLES_FOR_PHASE,
   FINALE_DWELL_PUZZLES,
+  FINALE_ARM_MIN_PUZZLES,
   UNLOCK_SKIP_PREMIUM,
 } from '../constants/gameBalance';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -121,6 +122,27 @@ describe('UNLOCK_PROGRESSION', () => {
     expect(UNLOCK_PROGRESSION[2].type).toBe('character');
   });
 
+  test('late rooms recruit the descent trio at their intended gates', () => {
+    const gatesById = Object.fromEntries(
+      UNLOCK_PROGRESSION
+        .filter(unlock => ['unlock_bamboo_attic', 'unlock_star_loft', 'unlock_belfry', 'unlock_sky_garden'].includes(unlock.id))
+        .map(unlock => [unlock.id, unlock.minPuzzles])
+    );
+
+    expect(gatesById).toEqual({
+      unlock_bamboo_attic: 105,
+      unlock_star_loft: 115,
+      unlock_belfry: 125,
+      unlock_sky_garden: 135,
+    });
+  });
+
+  test('finale arming floor leaves a Phase 4 dwell window after the last recruit', () => {
+    expect(FINALE_ARM_MIN_PUZZLES).toBe(160);
+    const lastGate = UNLOCK_PROGRESSION.find(unlock => unlock.id === 'unlock_sky_garden')!.minPuzzles!;
+    expect(lastGate + 1 + FINALE_DWELL_PUZZLES).toBeLessThanOrEqual(FINALE_ARM_MIN_PUZZLES);
+  });
+
   // Pacing guard: house-building must stay spread across the mid-game so the
   // primary investment object keeps growing through the Phase 1→3 valley,
   // rather than completing early and leaving the long climb to the Phase 4
@@ -138,11 +160,11 @@ describe('UNLOCK_PROGRESSION', () => {
 
   // DELIBERATE geography (2026-07 pacing): the house keeps growing THROUGH
   // Growing Shadows and past the reveal (the original ten rooms top out at the
-  // Bamboo Attic gate 112; the three high rooms gate at 126/140/152). The last
+  // Bamboo Attic gate 105; the three high rooms gate at 115/125/135). The last
   // gate must sit at or past the Phase 3 weighted threshold so the descent's
   // third act still has house investment, but stay clear of the Phase 4
-  // weighted threshold — house completion (~153) must land just BEFORE the
-  // finale (~162), never compete with it.
+  // weighted threshold — house completion (~136) must land before finale
+  // arming (160), never compete with it.
   test('the final house unlock lands in the descent, before finale territory', () => {
     const gates = UNLOCK_PROGRESSION
       .map(u => u.minPuzzles)
@@ -156,15 +178,16 @@ describe('UNLOCK_PROGRESSION', () => {
 
   // The reveal floor (130) must land before the house completes (sky-garden
   // gate + the final animal), so the Phase-4 dwell + finale play out inside a
-  // finished temple — and the dwell window (8) must fit between completion and
-  // any player racing the finale.
+  // finished temple. The dwell remains capped at eight wins, while the arming
+  // floor prevents early completion from advancing the finale.
   test('house completion sits after the reveal floor, before the Phase 5 floor', () => {
     const gates = UNLOCK_PROGRESSION
       .map(u => u.minPuzzles)
       .filter((n): n is number => typeof n === 'number');
     const lastGate = gates[gates.length - 1];
     expect(lastGate).toBeGreaterThan(MIN_PUZZLES_FOR_PHASE[4]); // reveal first
-    expect(lastGate + 1 + FINALE_DWELL_PUZZLES).toBeLessThan(MIN_PUZZLES_FOR_PHASE[5]); // finale before the Phase 5 floor binds
+    expect(lastGate + 1).toBeLessThanOrEqual(FINALE_ARM_MIN_PUZZLES);
+    expect(FINALE_ARM_MIN_PUZZLES + 1).toBeLessThan(MIN_PUZZLES_FOR_PHASE[5]); // marked finale before the Phase 5 floor binds
   });
 });
 

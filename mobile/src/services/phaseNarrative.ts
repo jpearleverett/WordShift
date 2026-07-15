@@ -1979,8 +1979,8 @@ export interface NarrativeMicroBeat {
  *
  * Mid game (puzzles 30-74): Escalating environmental wrongness.
  * Late game (puzzles 80-160): Overt coordination and agency, riding the new
- *   geography: reveal ~130, house completes ~153, dwell window ~154-161,
- *   finale ~162. The silent-victory anticlimax lands at 148, the "you could
+ *   geography: reveal ~130, house completes ~136, dwell completes before the
+ *   160 arming floor, finale ~161. The silent-victory anticlimax lands at 148, the "you could
  *   stop now" beat at 150, and two dwell-window beats (155/158) hold the
  *   held-breath stillness after the house is whole. Nothing fires past 160:
  *   the finale itself gets the silence.
@@ -2093,7 +2093,7 @@ export const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
   },
   126: {
     // The house is still raising its last rooms here; this beat must NOT claim
-    // the house is finished (completion lands at ~153).
+    // the house is finished (completion lands at ~136).
     type: 'ambient_whisper',
     text: 'The house keeps making room. No one asked it to. It builds like it knows something is coming.',
     durationMs: 4000,
@@ -2117,7 +2117,7 @@ export const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     text: 'You could stop now. You know that. You won\'t. They know that too.',
     durationMs: 4000,
   },
-  // Dwell-window beats (155/158): the house is whole (~153) but not yet ready
+  // Dwell-window beats (155/158): the house is whole (~136) but not yet ready
   // to receive. Held breath, never a countdown.
   155: {
     type: 'ambient_whisper',
@@ -2193,11 +2193,12 @@ export function isSilentVictoryBeat(completedTotal: number): boolean {
 }
 
 // ============================================================================
-// DWELL WINDOW — the house is whole (~puzzle 153) but the finale has not yet
-// opened (~162). The reveal is played, not flashed past: these lines hold the
-// held-breath stillness of that gap. NEVER a counter, never a number — the
-// player must feel the waiting, not measure it. `dwellCount` is how many
-// puzzles have been solved inside the window (1..FINALE_DWELL_PUZZLES).
+// DWELL WINDOW — the house is whole (~puzzle 136) but the finale has not yet
+// opened (~161). The reveal is played, not flashed past: these lines hold the
+// held-breath stillness through the 160 arming floor. NEVER a counter, never a
+// number — the player must feel the waiting, not measure it. `dwellCount` is
+// how many puzzles have been solved inside the capped window
+// (1..FINALE_DWELL_PUZZLES).
 // ============================================================================
 
 // One line per dwell win (index = dwellCount - 1): the eight-win window is a

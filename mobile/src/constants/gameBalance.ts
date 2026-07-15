@@ -40,7 +40,7 @@ export const PHASE_THRESHOLDS = [0, 20, 60, 120, 180];
  * 2026-07 fun-overhaul geography: Phase 2 (Deeper Questions) spans ~52 puzzles
  * (floor 38 → floor 90) — long enough to earn the dusk, short enough that the
  * single-tone stretch never becomes the D14 quit point. The reveal floor sits
- * at 130, just before the house completes at the sky-garden gate (152), so the
+ * at 130, just before the house completes at the sky-garden gate (135), so the
  * Phase-4 dwell window plays out inside a finished temple. The vanguard tier's
  * +1 offset means vanguard animals speak Phase-4 lines across the 90→130
  * window (Phase 3 floor → reveal floor); that leak is ACCEPTED as the price of
@@ -52,8 +52,8 @@ export const MIN_PUZZLES_FOR_PHASE: Record<DialoguePhase, number> = {
   1: 15,
   2: 38, // Deeper Questions inside week one for engaged players; casual players hit it in ~3 weeks
   3: 90, // Growing Shadows — opens a ~52-puzzle Phase 2 span (38→90) and starts the vanguard +1 leak window (accepted, see above)
-  4: 130, // The Horizon — the cult reveal, just before the house completes at the 152 gate
-  5: 170, // Post-revelation — after house completion (≈153) + dwell (8) + final puzzle (≈162)
+  4: 130, // The Horizon — the cult reveal, just before the house completes at the 135 gate
+  5: 170, // Post-revelation — after house completion (≈136), the arming floor (160), and final puzzle (≈161)
 };
 
 // ============================================================================
@@ -290,6 +290,13 @@ export const AUTO_COLLECT_PUZZLE_LIMIT = 8;
  * counter (narrative rule 7); the house "is not yet ready to receive it."
  */
 export const FINALE_DWELL_PUZZLES = 8;
+
+/**
+ * The earliest completed-puzzle count at which a full Phase-4 dwell can arm
+ * the finale. It gives the descent trio time to speak before the marked final
+ * board (~161) and post-revelation (~162), even when the house completes early.
+ */
+export const FINALE_ARM_MIN_PUZZLES = 160;
 
 /**
  * New Cycle (NG+) phase-progress acceleration per completed cycle. Each cycle

@@ -603,13 +603,13 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // MID GAME (Puzzles ~28-112) - The house grows, darkness creeps in.
+  // MID GAME (Puzzles ~28-105) - The house grows, darkness creeps in.
   // These gates are spread across the Phase 1→3 window so the house keeps
   // growing through the mid-game instead of completing early and leaving the
   // climb to the climax with no new investment. Under the 2026-07 pacing the
-  // original ten rooms top out at the Bamboo Attic (112), early in Growing
+  // original ten rooms top out at the Bamboo Attic (105), early in Growing
   // Shadows (Phase 3 floor 90); the high rooms then carry investment through
-  // the reveal (~130) to completion at 152, just before the finale (~162).
+  // the reveal (~130) to completion at 135, before finale arming at 160.
   // ═══════════════════════════════════════════════════════════════════════════
 
   // 8. Build the Jungle Room
@@ -717,7 +717,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // LATE GAME (Puzzles ~95-112) - The original house tops out early in Growing
+  // LATE GAME (Puzzles ~95-105) - The original house tops out early in Growing
   // Shadows; the high rooms below then carry investment onward through the
   // reveal.
   // ═══════════════════════════════════════════════════════════════════════════
@@ -757,7 +757,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     targetId: 'bamboo_attic',
     name: 'Bamboo Attic',
     description: 'The highest place, closest to the sky',
-    minPuzzles: 112,
+    minPuzzles: 105,
   },
 
   // 19. Invite Bamboo the Red Panda
@@ -773,10 +773,10 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // THE HIGH ROOMS (Puzzles ~126-152) - The house keeps growing above what was
+  // THE HIGH ROOMS (Puzzles ~115-135) - The house keeps growing above what was
   // once its top, through late Growing Shadows and past the reveal (~130). The
-  // Sky Garden gate at 152 completes the house (~153 with Moss) just before
-  // the finale (~162), so the climax arrives inside a finished temple.
+  // Sky Garden gate at 135 completes the house (~136 with Moss), leaving a
+  // Phase-4 dwell before finale arming at 160.
   // ═══════════════════════════════════════════════════════════════════════════
 
   // 20. Build the Star Loft
@@ -789,7 +789,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     targetId: 'star_loft',
     name: 'Star Loft',
     description: 'A high window for watching the night arrive',
-    minPuzzles: 126,
+    minPuzzles: 115,
   },
 
   // 21. Invite Vesper the Tarsier
@@ -814,7 +814,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     targetId: 'belfry',
     name: 'Belfry',
     description: 'A silent bell waiting for its hour',
-    minPuzzles: 140,
+    minPuzzles: 125,
   },
 
   // 23. Invite Tock the Aye-Aye
@@ -839,7 +839,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     targetId: 'sky_garden',
     name: 'Sky Garden',
     description: 'A garden grown where only sky should be',
-    minPuzzles: 152,
+    minPuzzles: 135,
   },
 
   // 25. Invite Moss the Kakapo (FINAL UNLOCK)

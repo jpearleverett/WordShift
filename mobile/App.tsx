@@ -162,7 +162,7 @@ import { REWARDED_HINT_GRANT } from './src/constants/gameBalance';
 import { createRevenueCatBillingProvider } from './src/services/providers/revenueCatBilling';
 import { createAdMobAdProvider } from './src/services/providers/googleAdMobAds';
 import { installGlobalErrorHandler, setErrorForwarder } from './src/services/errorReporting';
-import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST, STARTER_INTRO_MIN_PUZZLES, FINALE_DWELL_PUZZLES } from './src/constants/gameBalance';
+import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST, STARTER_INTRO_MIN_PUZZLES, FINALE_DWELL_PUZZLES, FINALE_ARM_MIN_PUZZLES } from './src/constants/gameBalance';
 import { getCumulativeStats } from './src/services/starRating';
 
 // Defer the one-time difficulty-selector intro until a few boards are done —
@@ -2105,10 +2105,13 @@ function MainApp() {
                 // victory, so the whole cult-reveal era flashed past in one
                 // puzzle. Require FINALE_DWELL_PUZZLES Phase-4 puzzles first
                 // so the robed sprites, sacrifice mechanic, and 300 Phase-4
-                // dialogue lines are actually played. Never shown as a
-                // counter (narrative rule 7) — the house "is not yet ready."
+                // dialogue lines are actually played. Even after all eight
+                // dwell wins land early, hold the marked board until the
+                // arming floor gives the descent trio time to speak. Never
+                // shown as a counter (narrative rule 7) — the house "is not
+                // yet ready."
                 const dwell = await recordPhase4Dwell();
-                if (dwell >= FINALE_DWELL_PUZZLES) {
+                if (dwell >= FINALE_DWELL_PUZZLES && completedTotal >= FINALE_ARM_MIN_PUZZLES) {
                   await armFinale();
                 }
                 // Dwell voice: the wait after "The arrangement is ready."

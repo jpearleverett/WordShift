@@ -6,6 +6,8 @@ import {
   DIALOGUE_SESSION_CONFIG,
 } from '../types/homeWorld';
 import type { AnimalType, DialoguePhase } from '../types/homeWorld';
+import { UNLOCK_PROGRESSION } from '../services/homeWorldData';
+import { FINALE_ARM_MIN_PUZZLES } from '../constants/gameBalance';
 
 /**
  * Guards the narrative-chronology fixes from the 2026-07 review pass:
@@ -53,6 +55,15 @@ describe('narrative chronology: getAnimalPhase never leaks phase 5 pre-arrival',
 describe('narrative chronology: late-recruit catch-up session boost', () => {
   const BONUS = DIALOGUE_SESSION_CONFIG.CATCH_UP_BONUS_DIALOGUES;
   const MIN_PHASE = DIALOGUE_SESSION_CONFIG.CATCH_UP_MIN_GLOBAL_PHASE as DialoguePhase;
+
+  test('the descent trio arrive before the finale arming floor', () => {
+    const gates = ['unlock_star_loft', 'unlock_belfry', 'unlock_sky_garden'].map(id =>
+      UNLOCK_PROGRESSION.find(unlock => unlock.id === id)!.minPuzzles!
+    );
+
+    expect(gates).toEqual([115, 125, 135]);
+    expect(gates.every(gate => gate < FINALE_ARM_MIN_PUZZLES)).toBe(true);
+  });
 
   test('the descent trio are the late recruits', () => {
     expect(LATE_PHASE_RECRUITS.has('tarsier')).toBe(true);

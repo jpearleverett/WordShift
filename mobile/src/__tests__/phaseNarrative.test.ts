@@ -1126,8 +1126,8 @@ describe('checkNarrativeMicroBeat', () => {
 });
 
 // ============================================================================
-// Micro-beat geography (v1.3 pacing: reveal ~130, house whole ~153,
-// dwell ~154-161, finale ~162)
+// Micro-beat geography (v1.3 pacing: reveal ~130, house whole ~136,
+// arming floor 160, finale ~161)
 // ============================================================================
 
 describe('MICRO_BEATS geography', () => {
@@ -1140,7 +1140,7 @@ describe('MICRO_BEATS geography', () => {
     ]);
   });
 
-  test('nothing fires past 160: the finale (~162) gets the silence', () => {
+  test('nothing fires past 160: the finale (~161) gets the silence', () => {
     expect(keys[keys.length - 1]).toBe(160);
   });
 
@@ -1159,11 +1159,11 @@ describe('MICRO_BEATS geography', () => {
     );
   });
 
-  test('house-wholeness language only appears at or after completion (~153)', () => {
+  test('house-wholeness language only appears at or after completion (~136)', () => {
     for (const k of keys) {
       const text = (MICRO_BEATS[k].text ?? '').toLowerCase();
       if (/is whole|every room is built|every keeper is home/.test(text)) {
-        expect(k).toBeGreaterThanOrEqual(153);
+        expect(k).toBeGreaterThanOrEqual(136);
       }
     }
     // And the dwell-window beats DO speak of the whole house.

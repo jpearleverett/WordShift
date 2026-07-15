@@ -411,9 +411,16 @@ describe('proactive share prompt', () => {
 });
 
 describe('finale staging (armed, not retroactive)', () => {
-  test('the dwell gate ARMS the finale; the cinematic fires only on the marked final board', () => {
-    // Arming path: dwell >= FINALE_DWELL_PUZZLES arms instead of firing.
-    expect(APP_TSX).toMatch(/if \(dwell >= FINALE_DWELL_PUZZLES\) \{\s*\n\s*await armFinale\(\);/);
+  test('the dwell gate waits for the arming floor before it arms the finale', () => {
+    expect(APP_TSX).toMatch(/FINALE_ARM_MIN_PUZZLES/);
+    // Dwell remains recorded before the floor, then the first eligible win
+    // arms after both constraints are met.
+    expect(APP_TSX).toMatch(
+      /const dwell = await recordPhase4Dwell\(\);[\s\S]{0,150}if \(dwell >= FINALE_DWELL_PUZZLES && completedTotal >= FINALE_ARM_MIN_PUZZLES\) \{\s*\n\s*await armFinale\(\);/
+    );
+  });
+
+  test('the cinematic fires only on the marked final board', () => {
     // Firing path: only the marked final board's win completes the finale.
     expect(APP_TSX).toMatch(/if \(wasFinalBoard\) \{[\s\S]{0,400}?markFinalPuzzleCompleted\(\)/);
     expect(APP_TSX).toMatch(/setPhaseTransitionEvent\(FINAL_PUZZLE_EVENT\)/);
