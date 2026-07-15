@@ -48,6 +48,7 @@ const STAR_FILLED = require('../../../assets/ui/star_filled.png');
 const STAR_EMPTY = require('../../../assets/ui/star_empty.png');
 const AMBER_ICON = require('../../../assets/ui/amber.png');
 const FLAME_ICON = require('../../../assets/ui/flame.png');
+const SHARE_ICON = require('../../../assets/ui/share.png');
 
 export interface VictoryData {
   earnedStars: number;
@@ -492,8 +493,14 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                   borderColor: btn.share.edge,
                 }]}>
                   <View style={styles.shareBtnRow}>
+                    <Image
+                      source={SHARE_ICON}
+                      style={styles.shareBtnIcon}
+                      importantForAccessibility="no"
+                      accessibilityElementsHidden
+                    />
                     <Text numberOfLines={1} style={[styles.btnFlatUniform, { color: btn.share.text }]}>
-                      {'\uD83D\uDCE4'} Share
+                      Share
                     </Text>
                     {shareBonusAvailable && (
                       <>
@@ -1174,8 +1181,14 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                       baseline-align unreliably and wrap onto their own line
                       when tight. The row centers the gem properly. */}
                   <View style={styles.shareBtnRow}>
+                    <Image
+                      source={SHARE_ICON}
+                      style={styles.shareBtnIcon}
+                      importantForAccessibility="no"
+                      accessibilityElementsHidden
+                    />
                     <Text numberOfLines={1} style={[styles.btnFlatUniform, { color: btn.share.text }]}>
-                      {'\uD83D\uDCE4'} Share
+                      Share
                     </Text>
                     {shareBonusAvailable && (
                       <>
@@ -1713,6 +1726,10 @@ const styles = StyleSheet.create({
   shareBonusIcon: {
     width: 14,
     height: 14,
+  },
+  shareBtnIcon: {
+    width: 18,
+    height: 18,
   },
 
   // Collect Now pill (inside amber stats box)

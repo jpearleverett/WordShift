@@ -38,6 +38,7 @@ import { SettingsScreen } from './src/components/SettingsScreen';
 import { FoxGuide } from './src/components/FoxGuide';
 import {
   COLD_OPEN_INSTRUCTION,
+  COLD_OPEN_FIRST_MOVE,
   ONBOARDING_FOX_LINES,
   resolveColdOpenLaunchRoute,
 } from './src/services/onboarding';
@@ -129,6 +130,7 @@ import { generateDailyPuzzle, prewarmDailyPuzzle, isDailyChallengeUnlocked, reco
 import { recordDailyLadderResult, getDailyLadderSummary, shouldShowTrend } from './src/services/dailyLadder';
 import { startFrameMonitoring, stopFrameMonitoring } from './src/services/performanceMonitor';
 import { AnimalWhisper } from './src/components/puzzle/AnimalWhisper';
+import { getModeIconSprite } from './src/components/puzzle/modeIcons';
 import { WordLedger } from './src/components/WordLedger';
 import { WhisperGalleryScreen } from './src/components/WhisperGalleryScreen';
 import { isDreadWord, validateWord } from './src/services/localGenerator';
@@ -842,6 +844,22 @@ function MainApp() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onboardingFlow.onboardingReady, onboardingFlow.onboardingStep, launchColdOpenPuzzle]);
+
+  // Cold-open warmth: the opener's guiding voice (COLD_OPEN_INSTRUCTION, set at
+  // launch) reacts with delight the instant the player lands their first valid
+  // move. Keyed on history LENGTH reaching 1 so it fires exactly once and never
+  // stomps invalid-word feedback (a rejected drop doesn't grow history). The
+  // hook sets its generic move message on that same move; this effect runs
+  // after the commit, so Ember's line wins. Only the cold-open step, only while
+  // playing.
+  useEffect(() => {
+    if (onboardingFlow.onboardingStep !== 'cold_open_puzzle') return;
+    if (puzzle.gameState !== GameState.PLAYING) return;
+    if (puzzle.history.length === 1) {
+      puzzleActions.setMessage(COLD_OPEN_FIRST_MOVE);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onboardingFlow.onboardingStep, puzzle.gameState, puzzle.history.length]);
 
   // Daily launch tasks — free streak freeze (every 14 days) + daily login
   // reward claim. Runs once per LOCAL day: on cold launch via the effect below,
@@ -3519,9 +3537,16 @@ function MainApp() {
                 styles.variantBadge,
                 persistence.currentPhase >= 3 && styles.variantBadgeDark,
               ]}>
-                <Text style={styles.variantBadgeIcon}>
-                  {VARIANT_CONFIGS[puzzle.currentVariant]?.icon || '✨'}
-                </Text>
+                {getModeIconSprite(VARIANT_CONFIGS[puzzle.currentVariant]?.icon || '') ? (
+                  <Image
+                    source={getModeIconSprite(VARIANT_CONFIGS[puzzle.currentVariant]?.icon || '')!}
+                    style={styles.variantBadgeIconImage}
+                  />
+                ) : (
+                  <Text style={styles.variantBadgeIcon}>
+                    {VARIANT_CONFIGS[puzzle.currentVariant]?.icon || '✨'}
+                  </Text>
+                )}
                 <Text style={[
                   styles.variantBadgeText,
                   persistence.currentPhase >= 3 && styles.variantBadgeTextDark,
@@ -3542,7 +3567,7 @@ function MainApp() {
                 accessible
                 accessibilityLabel="Blind Offering is on: word previews hidden"
               >
-                <Text style={styles.variantBadgeIcon}>{'🌑'}</Text>
+                <Image source={getModeIconSprite('🌑')!} style={styles.variantBadgeIconImage} />
                 <Text style={[
                   styles.variantBadgeText,
                   persistence.currentPhase >= 3 && styles.variantBadgeTextDark,
@@ -3560,7 +3585,7 @@ function MainApp() {
                 accessible
                 accessibilityLabel={`Unbroken Weave is on, ${puzzle.spentLetters.length} letters spent`}
               >
-                <Text style={styles.variantBadgeIcon}>{'🧵'}</Text>
+                <Image source={getModeIconSprite('🧵')!} style={styles.variantBadgeIconImage} />
                 <Text style={[
                   styles.variantBadgeText,
                   styles.variantBadgeTextDark,
@@ -3826,7 +3851,7 @@ function MainApp() {
           />
           {onboardingFlow.onboardingStep === 'cold_open_puzzle' && (
             <ActionButton
-              icon=">"
+              icon="⏭"
               label={getColdOpenSkipLabel()}
               colors={getActionButtonColors('restart', persistence.currentPhase)}
               onPress={handleColdOpenSkipPress}
@@ -4289,11 +4314,21 @@ function App() {
         <MainApp key={appEpoch} />
       ) : (
         <View style={bootStyles.container}>
+          {/* Fox app-icon art as a rounded card + wooden wordmark — mirrors the
+              native splash composition so the OS-splash -> JS-boot handoff reads
+              as one continuous branded hold, not a hard cut. */}
+          <View style={bootStyles.iconCard}>
+            <Image
+              source={require('./assets/icon.png')}
+              style={bootStyles.iconImage}
+              resizeMode="cover"
+              accessibilityLabel="WordShift"
+            />
+          </View>
           <Image
             source={require('./assets/ui/wordmark.png')}
             style={bootStyles.wordmark}
             resizeMode="contain"
-            accessibilityLabel="WordShift"
           />
           <ActivityIndicator size="small" color="#8B7BB8" style={bootStyles.spinner} />
         </View>
@@ -4312,12 +4347,30 @@ const bootStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Rounded fox card — corner radius matches the icon's own ~18% baked rounding
+  // and the native splash mask, with a soft shadow for the same lifted look.
+  iconCard: {
+    width: 152,
+    height: 152,
+    borderRadius: 28,
+    overflow: 'hidden',
+    marginBottom: 22,
+    shadowColor: '#28142A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    elevation: 8,
+  },
+  iconImage: {
+    width: '100%',
+    height: '100%',
+  },
   wordmark: {
-    width: 260,
-    height: 65,
+    width: 244,
+    height: 61,
   },
   spinner: {
-    marginTop: 28,
+    marginTop: 30,
   },
 });
 

@@ -20,6 +20,19 @@ import { shouldSimplifyAnimations } from '../../services/deviceTier';
  * a 30-frame gait at 24fps sampled every 3rd frame). */
 const WALK_FRAME_MS = 125;
 
+// The walk-cycle art (upright, mid-stride) reads a touch leaner than the fuller
+// idle pose, so the walking fox looks a little smaller even though its rendered
+// bounding box actually matches idle. Nudge the walk layers up a hair to match
+// the idle silhouette, anchored at the feet so the fox never lifts off the
+// floor: every walk frame plants its baseline at ~81% of the 90px sprite box
+// (measured constant across all 10 frames), i.e. ~28px below the box center, so
+// scaling around the center pushes the feet down by 28*(scale-1) — cancel that
+// with an equal upward translate.
+const WALK_SPRITE_BOX = 90;
+const WALK_MATCH_SCALE = 1.1;
+const WALK_FEET_FROM_CENTER = WALK_SPRITE_BOX * (0.81 - 0.5); // ~28px
+const WALK_FEET_CORRECTION = -WALK_FEET_FROM_CENTER * (WALK_MATCH_SCALE - 1);
+
 // Character sprite assets - add more as they become available
 // Exported so dialogue modals can use talk sprites
 export const CHARACTER_SPRITES: Partial<Record<AnimalType, {
@@ -850,6 +863,9 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
                       key={idx}
                       style={[
                         styles.spriteLayer,
+                        // Scale the walk art up a hair to match the idle
+                        // silhouette, kept feet-planted (see WALK_MATCH_SCALE).
+                        { transform: [{ translateY: WALK_FEET_CORRECTION }, { scale: WALK_MATCH_SCALE }] },
                         { opacity: walkActive && idx === walkFrame % walkFrames!.length ? 1 : 0 },
                       ]}
                     >

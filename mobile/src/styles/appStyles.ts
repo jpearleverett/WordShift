@@ -568,6 +568,10 @@ export const appStyles = StyleSheet.create({
     fontSize: 10,
     fontFamily: BODY_FONT,
   },
+  variantBadgeIconImage: {
+    width: 15,
+    height: 15,
+  },
   variantBadgeText: {
     fontSize: 9,
     fontFamily: BODY_FONT_BOLD,

@@ -6,6 +6,7 @@ import {
   isOnboardingComplete,
   resetOnboarding,
   COLD_OPEN_INSTRUCTION,
+  COLD_OPEN_FIRST_MOVE,
   ONBOARDING_FOX_LINES,
   resolveColdOpenLaunchRoute,
 } from '../services/onboarding';
@@ -115,10 +116,21 @@ describe('onboarding', () => {
   });
 
   describe('ONBOARDING_FOX_LINES', () => {
-    test('exports the concise self-directed cold-open instruction', () => {
-      expect(COLD_OPEN_INSTRUCTION).toBe(
-        'Move one letter down. Both words must stay real.'
-      );
+    test('cold-open opener is a warm voice, not a bare rules tooltip', () => {
+      // The opener must teach the ONE rule (both words stay real) but do it as
+      // a voice, not a system message — this is the game's first impression and
+      // the whole promise is warmth. It must NOT point at the exact letter (the
+      // solve stays the player's own) and must be dash-free (player-facing).
+      expect(COLD_OPEN_INSTRUCTION.length).toBeGreaterThan(0);
+      expect(COLD_OPEN_INSTRUCTION.toLowerCase()).toContain('real');
+      expect(COLD_OPEN_INSTRUCTION).not.toMatch(/[—–]/);
+    });
+
+    test('cold-open first-move reaction is a warm, dash-free line', () => {
+      expect(COLD_OPEN_FIRST_MOVE.length).toBeGreaterThan(0);
+      expect(COLD_OPEN_FIRST_MOVE).not.toMatch(/[—–]/);
+      // Distinct from the opener so the board reacts, not repeats.
+      expect(COLD_OPEN_FIRST_MOVE).not.toBe(COLD_OPEN_INSTRUCTION);
     });
 
     test('has dialogue for all standard onboarding steps', () => {

@@ -20,6 +20,7 @@ const ICON_SPRITES: { [icon: string]: ImageSourcePropType } = {
   '↩': require('../../../assets/ui/undo.png'),
   '💡': require('../../../assets/ui/hint.png'),
   '🔄': require('../../../assets/ui/restart.png'),
+  '⏭': require('../../../assets/ui/skip.png'),
 };
 
 // Key-membership lookup (not truthiness) — bundler asset ids and test stubs
