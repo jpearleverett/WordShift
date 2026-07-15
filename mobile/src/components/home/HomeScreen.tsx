@@ -101,6 +101,8 @@ import {
 } from '../../services/homeWorldData';
 import { RulesModal } from '../puzzle/RulesModal';
 import { RewardedAdButton } from '../monetization/RewardedAdButton';
+import { SeasonPassModal } from '../SeasonPassModal';
+import { getSeasonClaimableCount } from '../../services/seasonPass';
 import {
   ANIMAL_INFO,
   getIntroDialogueLine,
@@ -526,6 +528,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [doubleQuestOffer, setDoubleQuestOffer] = useState<{ questId: string; amber: number } | null>(null);
   const [questTab, setQuestTab] = useState<'daily' | 'weekly'>('daily');
   const [showJournalModal, setShowJournalModal] = useState(false);
+  const [showSeasonModal, setShowSeasonModal] = useState(false);
+  const [seasonClaimable, setSeasonClaimable] = useState(0);
   const [showUtilityModal, setShowUtilityModal] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
 
@@ -1340,7 +1344,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const handleOpenJournal = useCallback(() => {
     hapticLight();
     setShowJournalModal(true);
-  }, []);
+    // Surface the season pass's claimable count on its hub row.
+    if (progress) {
+      getSeasonClaimableCount(progress.puzzlesSolved ?? 0)
+        .then(setSeasonClaimable)
+        .catch(() => {});
+    }
+  }, [progress]);
 
   const handleOpenUtilityMenu = useCallback(() => {
     hapticLight();
@@ -1992,9 +2002,32 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 accessibilityLabel={`Open quests${claimableQuestAmber > 0 ? `, ${claimableQuestAmber} amber ready` : ''}`}
               />
             )}
+            <HubRow
+              phase={progress.currentPhase}
+              hostDark={dtHostDark}
+              label={seasonClaimable > 0 ? `Season Pass (${seasonClaimable})` : 'Season Pass'}
+              onPress={() => {
+                setShowJournalModal(false);
+                setShowSeasonModal(true);
+              }}
+              accessibilityLabel={`Open season pass${seasonClaimable > 0 ? `, ${seasonClaimable} rewards ready` : ''}`}
+            />
           </SpringIn>
         </TouchableOpacity>
       </Modal>
+
+      <SeasonPassModal
+        visible={showSeasonModal}
+        onClose={() => setShowSeasonModal(false)}
+        phase={progress.currentPhase}
+        puzzlesSolved={progress.puzzlesSolved ?? 0}
+        currentAmber={progress.amber ?? 0}
+        onAmberChange={(bal) => {
+          onAmberChange?.(bal);
+          setProgress(prev => (prev ? { ...prev, amber: bal } : prev));
+        }}
+        onSubscribe={onOpenStore ? () => { setShowSeasonModal(false); onOpenStore(); } : undefined}
+      />
 
       {/* Utility Hub Modal */}
       <Modal

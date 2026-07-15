@@ -3801,3 +3801,57 @@ export const EVENT_QUEST_DESCRIPTION_TEMPLATES = {
   bright: 'Solve {target} puzzles under the full moon',
   dark: 'The moon asks for {target} arrangements tonight',
 } as const;
+
+// ============================================================================
+// SEASON PASS — phase-aware copy for the monthly cosmetic reward track.
+// Structural verbs ("Claim", "Close") stay in the UI; the evocative season
+// NAME and taglines shift with the descent, like every other narrative surface.
+// No em dashes (guarded by noEmDashes.test) — the tone rules apply here too.
+// ============================================================================
+
+export interface SeasonPassCopy {
+  /** Evocative, phase-aware season name shown as the header title. */
+  title: string;
+  /** One-line tagline under the title. */
+  tagline: string;
+  /** Line shown when the premium track is still locked. */
+  lockedLine: string;
+}
+
+const SEASON_PASS_COPY: Record<DialoguePhase, SeasonPassCopy> = {
+  0: {
+    title: 'The Bright Season',
+    tagline: 'Play through the season and gather little gifts.',
+    lockedLine: 'Open the whole track for extra treats.',
+  },
+  1: {
+    title: 'The Turning Season',
+    tagline: 'Each puzzle carries the season a little further.',
+    lockedLine: 'Open the whole track for a little more.',
+  },
+  2: {
+    title: 'The Deepening Season',
+    tagline: 'The season keeps its own quiet count of your days.',
+    lockedLine: 'Open the deeper rewards, if you want them.',
+  },
+  3: {
+    title: 'The Gathering Season',
+    tagline: 'Something is being collected. You are helping.',
+    lockedLine: 'Open what waits further down the track.',
+  },
+  4: {
+    title: 'The Season of the Pattern',
+    tagline: 'The arrangement keeps its ledger. So does the season.',
+    lockedLine: 'Open the pattern that lies deeper in.',
+  },
+  5: {
+    title: 'The Season That Continues',
+    tagline: 'Round and round, and still there are gifts.',
+    lockedLine: 'Open what remains, for what remains.',
+  },
+};
+
+/** Phase-aware copy for the Season Pass modal. */
+export function getSeasonPassCopy(phase: DialoguePhase): SeasonPassCopy {
+  return SEASON_PASS_COPY[phase] ?? SEASON_PASS_COPY[0];
+}
