@@ -293,6 +293,26 @@ fs.mkdirSync(UI, { recursive: true });
   savePNG(path.join(UI, 'restart.png'), W, W, down2(cv, W, W));
 }
 
+// === skip.png (256) — skip-to-next glyph (two triangles + bar) for cold-open ==
+// White glyph over a dark sticker edge, matching undo/restart, so the onboarding
+// SKIP action reads as a real icon instead of a raw ">" character.
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  // Geometry in the 2x canvas: two right-pointing triangles then a vertical bar.
+  const H = 86;                 // half-height of the glyph
+  const t1x0 = c - 150, t1x1 = c - 18;   // first triangle base->apex x
+  const t2x0 = c - 18,  t2x1 = c + 114;  // second triangle base->apex x
+  const barX0 = c + 118, barX1 = c + 150, barY0 = c - H, barY1 = c + H;
+  const draw = (color, alpha, dy) => {
+    tri(cv, [t1x0, c - H + dy], [t1x0, c + H + dy], [t1x1, c + dy], color, alpha);
+    tri(cv, [t2x0, c - H + dy], [t2x0, c + H + dy], [t2x1, c + dy], color, alpha);
+    poly(cv, [[barX0, barY0 + dy], [barX1, barY0 + dy], [barX1, barY1 + dy], [barX0, barY1 + dy]], color, alpha);
+  };
+  draw('#2A2040', 0.85, 6);   // ink edge + grounding
+  draw('#FFFFFF', 1, 0);      // white glyph
+  savePNG(path.join(UI, 'skip.png'), W, W, down2(cv, W, W));
+}
+
 // === star_filled.png (256) — plump victory star, golden gradient + rim light =
 // Fills ~80% of the canvas (the old star used ~45%) so it stays crisp at the
 // larger render sizes in the victory modal.
