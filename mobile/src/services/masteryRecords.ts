@@ -4,12 +4,13 @@
  * WordShift board is time-to-find, so we measure the player's own scanning
  * speed and best speed-run streak privately and surface them in-world.
  *
- * Two records live here:
+ * Three records live here:
  *  - solveTimes: a per-difficulty rolling window of solve durations (ms) for
  *    STANDARD, non-daily boards. getSolveTrend() reports whether the player is
  *    genuinely getting faster (robust median comparison, generous thresholds).
  *  - bestSpeedRound: the highest Speed-Shift escalation round ever reached.
  *    The in-run `speedRound` evaporates on every reset; this remembers the peak.
+ *  - Unbroken Weave mastery: the private ladder of Weave wins and clear goals.
  *
  * In-memory cache pattern (load → cache → return cached), like the other
  * lightweight services. Cloud-synced under `wordshift_mastery`; cleared by
