@@ -33,6 +33,7 @@ import {
   interstitialFrequency,
   shouldShowInterstitial,
   isDailyInterstitialAllowed,
+  shouldShowBanner,
   showRewarded,
   maybeShowInterstitial,
   isRewardedCapReached,
@@ -418,6 +419,19 @@ describe('ads policy', () => {
     expect(isDailyInterstitialAllowed(3)).toBe(false);
     expect(isDailyInterstitialAllowed(4)).toBe(false);
     expect(isDailyInterstitialAllowed(5)).toBe(false);
+  });
+
+  it('banner policy: shows on menu surfaces at Phase 0-3, suppressed for ad-free / onboarding / Phase 4+', () => {
+    // Shown in the bright + dusk phases for a normal free player.
+    for (const phase of [0, 1, 2, 3]) {
+      expect(shouldShowBanner({ phase: phase as any, isAdFree: false, onboarding: false })).toBe(true);
+    }
+    // Suppressed from the reveal on (tonal protection, like interstitials).
+    expect(shouldShowBanner({ phase: 4 as any, isAdFree: false, onboarding: false })).toBe(false);
+    expect(shouldShowBanner({ phase: 5 as any, isAdFree: false, onboarding: false })).toBe(false);
+    // Ad-free holders and onboarding never see a banner.
+    expect(shouldShowBanner({ phase: 0 as any, isAdFree: true, onboarding: false })).toBe(false);
+    expect(shouldShowBanner({ phase: 0 as any, isAdFree: false, onboarding: true })).toBe(false);
   });
 });
 

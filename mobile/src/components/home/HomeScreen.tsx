@@ -100,6 +100,7 @@ import {
   getReserveGateText,
 } from '../../services/homeWorldData';
 import { RulesModal } from '../puzzle/RulesModal';
+import { RewardedAdButton } from '../monetization/RewardedAdButton';
 import {
   ANIMAL_INFO,
   getIntroDialogueLine,
@@ -519,6 +520,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [weeklyQuestState, setWeeklyQuestState] = useState<CombinedQuestState | null>(null);
   const [showQuestModal, setShowQuestModal] = useState(false);
   const [questFeedback, setQuestFeedback] = useState<string | null>(null);
+  // After a quest is claimed, an OPT-IN rewarded ad can double that reward
+  // (placement 'quest_bonus'). Holds the just-claimed reward so the button
+  // knows how much bonus amber to grant; cleared on double, re-claim, or reopen.
+  const [doubleQuestOffer, setDoubleQuestOffer] = useState<{ questId: string; amber: number } | null>(null);
   const [questTab, setQuestTab] = useState<'daily' | 'weekly'>('daily');
   const [showJournalModal, setShowJournalModal] = useState(false);
   const [showUtilityModal, setShowUtilityModal] = useState(false);
@@ -1284,6 +1289,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       setWeeklyQuestState(refreshed);
     }
     setQuestFeedback(null);
+    setDoubleQuestOffer(null);
     setShowQuestModal(true);
   }, [progress, animals]);
 
@@ -1296,6 +1302,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     onAmberChange?.(newBalance);
     setProgress(prev => prev ? { ...prev, amber: newBalance } : prev);
     setQuestFeedback(`Claimed +${reward.amber} amber!`);
+    // Offer an opt-in "watch to double it" rewarded ad for this claim.
+    setDoubleQuestOffer({ questId, amber: reward.amber });
     logEvent({ type: 'quest_reward_claimed', data: { questId, amber: reward.amber } });
 
     const refreshed = await loadWeeklyQuests(progress.currentPhase, {
@@ -1314,6 +1322,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       weekly: { ...refreshed.weekly, quests: refreshed.weekly.quests.map(q => ({ ...q })) },
     });
   }, [progress, onAmberChange, animals]);
+
+  // Opt-in "double your quest reward" — fired only when the player watched the
+  // full rewarded ad (RewardedAdButton onReward). Grants a second helping of the
+  // just-claimed reward's amber (reward-only, never phase progress).
+  const handleDoubleQuestReward = useCallback(async () => {
+    if (!progress || !doubleQuestOffer) return;
+    const { questId, amber } = doubleQuestOffer;
+    setDoubleQuestOffer(null);
+    const newBalance = await awardBonusAmber(amber, 'quest_bonus');
+    onAmberChange?.(newBalance);
+    setProgress(prev => (prev ? { ...prev, amber: newBalance } : prev));
+    setQuestFeedback(`Doubled! +${amber} more amber.`);
+    logEvent({ type: 'quest_reward_claimed', data: { questId, amber, doubled: true } });
+  }, [progress, doubleQuestOffer, onAmberChange]);
 
   const handleOpenJournal = useCallback(() => {
     hapticLight();
@@ -2288,6 +2310,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <Text style={[styles.shopFeedbackText, { color: panelSt.title }]}>
                 {questFeedback}
               </Text>
+            )}
+            {doubleQuestOffer && (
+              <RewardedAdButton
+                placement="quest_bonus"
+                label={`Watch to double it · +${doubleQuestOffer.amber}`}
+                phase={progress.currentPhase}
+                surface={progress.currentPhase >= 4 ? 'dark' : 'light'}
+                onReward={() => { handleDoubleQuestReward().catch(() => {}); }}
+                style={styles.questDoubleButton}
+              />
             )}
             {/* Tab Bar — framed segmented chips */}
             <View style={[styles.questTabBar, { backgroundColor: panelSt.sectionBg, borderColor: panelSt.sectionBorder }]}>
@@ -3751,6 +3783,11 @@ const styles = StyleSheet.create({
     maxHeight: SCREEN_HEIGHT * 0.8,
   },
   // Framed segmented tab chips (replaces the web-style underline tabs)
+  questDoubleButton: {
+    marginTop: 6,
+    marginBottom: 4,
+    alignSelf: 'center' as const,
+  },
   questTabBar: {
     flexDirection: 'row' as const,
     marginBottom: 10,
