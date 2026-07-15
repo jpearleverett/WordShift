@@ -315,6 +315,9 @@ export interface HomeWorldProgress {
   finalPuzzleCompleted?: boolean;
   // Whether post-revelation (Phase 5) content has been reached
   postRevelation?: boolean;
+  // Whether the one-time quiet-home Unbroken Weave mastery introduction has shown.
+  // Stored here so existing home-progress cloud sync and Reset All cover it.
+  unbrokenWeaveIntroSeen?: boolean;
   // Count of puzzles completed at Phase 4 with the house already complete —
   // gates the finale (dwell so the cult-reveal era is actually played, not
   // flashed past in one puzzle). See FINALE_DWELL_PUZZLES.

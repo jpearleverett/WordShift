@@ -47,6 +47,8 @@ export interface RoutineVictorySignals {
   streakMilestoneBonus?: number;
   questsCompleted?: string[];
   ritualEnergy?: number;
+  /** A newly earned Unbroken Weave rank is a ceremony, never a compact strip. */
+  unbrokenWeaveRankedUp?: boolean;
   puzzlesSolved?: number;
 }
 
@@ -74,6 +76,7 @@ export function isRoutineVictory(victory: RoutineVictorySignals | null | undefin
   if ((victory.milestoneBonus ?? 0) > 0) return false;
   if ((victory.streakMilestoneBonus ?? 0) > 0) return false;
   if ((victory.questsCompleted?.length ?? 0) > 0) return false;
+  if (victory.unbrokenWeaveRankedUp === true) return false;
   if ((victory.ritualEnergy ?? 0) >= RITUAL_MICRO_EVENT_MIN_ENERGY) return false;
   if ((victory.puzzlesSolved ?? 0) < SWIFT_VICTORY_MIN_PUZZLES) return false;
   return true;

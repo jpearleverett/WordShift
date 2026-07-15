@@ -163,6 +163,7 @@ import {
   getMandatoryHarvestCTA,
   getVictoryTitle,
   getFlawlessHonorific,
+  getUnbrokenWeaveRankUpLine,
 } from '../services/phaseNarrative';
 import { isDailyShareBonusAvailable, DAILY_SHARE_BONUS_AMBER } from '../services/shareResults';
 import { getPhaseTheme } from '../theme/colors';
@@ -453,6 +454,27 @@ describe('social proof line', () => {
   it('renders nothing when the line is null (weak/absent counts)', () => {
     const tree = render(baseProps({ socialProofLine: null }));
     expect(textOf(tree)).not.toContain('words today');
+  });
+});
+
+describe('Unbroken Weave mastery', () => {
+  it('renders the current rank, next objective, and rank-up line on a Weave victory', () => {
+    const tree = render(baseProps({
+      phase: 5,
+      victoryData: baseVictoryData({
+        unbrokenWeaveRank: 3,
+        unbrokenWeaveTitle: 'Seamless Dark',
+        unbrokenWeaveNextObjective: 'Complete 10 flawless Unbroken Weaves (2/10).',
+        unbrokenWeaveRankedUp: true,
+      }),
+    }));
+    const text = textOf(tree);
+
+    expect(text).toContain('UNBROKEN WEAVE');
+    expect(text).toContain('Rank 3');
+    expect(text).toContain('Seamless Dark');
+    expect(text).toContain('Complete 10 flawless Unbroken Weaves (2/10).');
+    expect(text).toContain(getUnbrokenWeaveRankUpLine(5, 'Seamless Dark'));
   });
 });
 
@@ -787,6 +809,7 @@ describe('swift victories compact strip', () => {
       { isDaily: true },
       { ritualEnergy: 9 },
       { questsCompleted: ['Solve 3'] },
+      { unbrokenWeaveRankedUp: true },
       { puzzlesSolved: 3 }, // early game
     ];
     for (const special of specials) {

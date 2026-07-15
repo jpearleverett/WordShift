@@ -37,6 +37,10 @@ const MIN_PLAUSIBLE_SOLVE_MS = 800; // sub-second "solves" are restores/glitches
 interface MasteryState {
   solveTimes: Partial<Record<Difficulty, number[]>>;
   bestSpeedRound: number;
+  unbrokenWeaveWins: number;
+  unbrokenWeaveFlawlessWins: number;
+  unbrokenWeaveDifficultyClears: Difficulty[];
+  unbrokenWeaveHardFlawless: boolean;
 }
 
 export interface SolveTrend {
@@ -50,6 +54,16 @@ export interface SolveTrend {
   improving: boolean;
 }
 
+export interface UnbrokenWeaveMastery {
+  wins: number;
+  flawlessWins: number;
+  difficultyClears: Difficulty[];
+  hardFlawless: boolean;
+  rank: number;
+  title: string;
+  nextObjective: string | null;
+}
+
 let cache: MasteryState | null = null;
 
 /** Drop the in-memory cache after an external storage write (cloud restore). */
@@ -58,7 +72,35 @@ export function invalidateMasteryCache(): void {
 }
 
 
-const getDefault = (): MasteryState => ({ solveTimes: {}, bestSpeedRound: 0 });
+const DIFFICULTIES: readonly Difficulty[] = ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'];
+
+function normalizeDifficultyClears(value: unknown): Difficulty[] {
+  if (!Array.isArray(value)) return [];
+  return value.reduce<Difficulty[]>((clears, candidate) => {
+    if (
+      DIFFICULTIES.includes(candidate as Difficulty)
+      && !clears.includes(candidate as Difficulty)
+    ) {
+      clears.push(candidate as Difficulty);
+    }
+    return clears;
+  }, []);
+}
+
+function normalizeCount(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.max(0, Math.floor(value))
+    : 0;
+}
+
+const getDefault = (): MasteryState => ({
+  solveTimes: {},
+  bestSpeedRound: 0,
+  unbrokenWeaveWins: 0,
+  unbrokenWeaveFlawlessWins: 0,
+  unbrokenWeaveDifficultyClears: [],
+  unbrokenWeaveHardFlawless: false,
+});
 
 async function load(): Promise<MasteryState> {
   if (cache) return cache;
@@ -69,6 +111,12 @@ async function load(): Promise<MasteryState> {
       cache = {
         solveTimes: parsed.solveTimes ?? {},
         bestSpeedRound: parsed.bestSpeedRound ?? 0,
+        unbrokenWeaveWins: normalizeCount(parsed.unbrokenWeaveWins),
+        unbrokenWeaveFlawlessWins: normalizeCount(parsed.unbrokenWeaveFlawlessWins),
+        unbrokenWeaveDifficultyClears: normalizeDifficultyClears(
+          parsed.unbrokenWeaveDifficultyClears,
+        ),
+        unbrokenWeaveHardFlawless: parsed.unbrokenWeaveHardFlawless === true,
       };
       return cache!;
     }
@@ -171,4 +219,91 @@ export async function recordSpeedRound(round: number): Promise<SpeedRoundResult>
 /** The highest Speed-Shift round ever reached (0 if never played). */
 export async function getBestSpeedRound(): Promise<number> {
   return (await load()).bestSpeedRound;
+}
+
+export function resolveUnbrokenWeaveMastery(input: {
+  wins: number;
+  flawlessWins: number;
+  difficultyClears: readonly Difficulty[];
+  hardFlawless: boolean;
+}): UnbrokenWeaveMastery {
+  const wins = normalizeCount(input.wins);
+  const flawlessWins = normalizeCount(input.flawlessWins);
+  const difficultyClears = normalizeDifficultyClears(input.difficultyClears);
+  const hardFlawless = input.hardFlawless === true;
+
+  let rank = 0;
+  let title = 'Unbroken Weave';
+  let nextObjective: string | null = 'Complete an Unbroken Weave.';
+
+  if (wins >= 1) {
+    rank = 1;
+    title = 'Thread Joined';
+    nextObjective = `Clear Unbroken Weave on every difficulty (${difficultyClears.length}/4).`;
+  }
+  if (rank === 1 && difficultyClears.length === DIFFICULTIES.length) {
+    rank = 2;
+    title = 'Fourfold Weave';
+    nextObjective = 'Complete a flawless HARD Unbroken Weave.';
+  }
+  if (rank === 2 && hardFlawless) {
+    rank = 3;
+    title = 'Seamless Dark';
+    nextObjective = `Complete 10 flawless Unbroken Weaves (${Math.min(flawlessWins, 10)}/10).`;
+  }
+  if (rank === 3 && flawlessWins >= 10) {
+    rank = 4;
+    title = 'Loomkeeper';
+    nextObjective = `Complete 25 flawless Unbroken Weaves (${Math.min(flawlessWins, 25)}/25).`;
+  }
+  if (rank === 4 && flawlessWins >= 25) {
+    rank = 5;
+    title = 'Patternbound';
+    nextObjective = null;
+  }
+
+  return {
+    wins,
+    flawlessWins,
+    difficultyClears,
+    hardFlawless,
+    rank,
+    title,
+    nextObjective,
+  };
+}
+
+function masteryFromState(state: MasteryState): UnbrokenWeaveMastery {
+  return resolveUnbrokenWeaveMastery({
+    wins: state.unbrokenWeaveWins,
+    flawlessWins: state.unbrokenWeaveFlawlessWins,
+    difficultyClears: state.unbrokenWeaveDifficultyClears,
+    hardFlawless: state.unbrokenWeaveHardFlawless,
+  });
+}
+
+export async function getUnbrokenWeaveMastery(): Promise<UnbrokenWeaveMastery> {
+  return masteryFromState(await load());
+}
+
+export async function recordUnbrokenWeaveVictory(
+  difficulty: Difficulty,
+  flawless: boolean,
+): Promise<{ mastery: UnbrokenWeaveMastery; rankedUp: boolean }> {
+  const state = await load();
+  const previousRank = masteryFromState(state).rank;
+  const difficultyClears = state.unbrokenWeaveDifficultyClears.includes(difficulty)
+    ? state.unbrokenWeaveDifficultyClears
+    : [...state.unbrokenWeaveDifficultyClears, difficulty];
+  const nextState: MasteryState = {
+    ...state,
+    unbrokenWeaveWins: state.unbrokenWeaveWins + 1,
+    unbrokenWeaveFlawlessWins: state.unbrokenWeaveFlawlessWins + (flawless ? 1 : 0),
+    unbrokenWeaveDifficultyClears: difficultyClears,
+    unbrokenWeaveHardFlawless:
+      state.unbrokenWeaveHardFlawless || (difficulty === 'HARD' && flawless),
+  };
+  const mastery = masteryFromState(nextState);
+  await save(nextState);
+  return { mastery, rankedUp: mastery.rank > previousRank };
 }

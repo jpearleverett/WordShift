@@ -275,6 +275,42 @@ export function getSpeedRecordMessage(phase: DialoguePhase, round: number): stri
 }
 
 // ============================================================================
+// UNBROKEN WEAVE MASTERY
+// ============================================================================
+
+export function getUnbrokenWeaveRankUpLine(
+  phase: DialoguePhase,
+  title: string,
+): string {
+  if (phase >= 5) return `The weave tightens. ${title} is now yours.`;
+  if (phase >= 4) return `The arrangement names you ${title}.`;
+  if (phase >= 2) return `A deeper thread takes shape: ${title}.`;
+  return `A new mastery rank! ${title}.`;
+}
+
+export function getUnbrokenWeaveIntroLines(phase: DialoguePhase): string[] {
+  if (phase >= 5) {
+    return [
+      'The house is quiet now, but one thread still asks to be followed.',
+      'The Unbroken Weave asks that no letter cross the chain twice. Every clean thread leaves a mark.',
+      'Open the arrangement setup before your next offering. The weave will remember how far you carry it.',
+    ];
+  }
+  if (phase >= 3) {
+    return [
+      'A stricter thread has appeared beneath the others.',
+      'The Unbroken Weave permits each letter to cross the chain only once.',
+      'You will find it waiting in the arrangement setup.',
+    ];
+  }
+  return [
+    'I found a new way to weave the words!',
+    'The Unbroken Weave lets each letter cross the chain only once.',
+    'Look for it in puzzle setup when you want a fresh challenge.',
+  ];
+}
+
+// ============================================================================
 // VARIANT NUDGE — Fox (early) / the arrangement (late) gently suggests trying a
 // variant the player unlocked but never played. Phase-aware; never nags (once
 // per day, only for a never-tried mode). {variant} = the variant's title.

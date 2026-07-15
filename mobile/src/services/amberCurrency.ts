@@ -436,6 +436,20 @@ async function saveProgress(): Promise<void> {
   }
 }
 
+/** Whether the one-time Phase-5 Unbroken Weave home introduction has shown. */
+export async function hasSeenUnbrokenWeaveIntro(): Promise<boolean> {
+  return (await loadProgress()).unbrokenWeaveIntroSeen === true;
+}
+
+/** Persist the Unbroken Weave introduction inside the existing home progress. */
+export async function markUnbrokenWeaveIntroSeen(): Promise<void> {
+  const progress = await loadProgress();
+  if (progress.unbrokenWeaveIntroSeen === true) return;
+  progress.unbrokenWeaveIntroSeen = true;
+  progressCache = progress;
+  await saveProgress();
+}
+
 /**
  * Get current amber balance
  */

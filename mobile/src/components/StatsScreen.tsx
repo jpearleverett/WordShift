@@ -20,7 +20,12 @@ import { getDailyStatus } from '../services/dailyChallenge';
 import { getStreakInfo } from '../services/amberCurrency';
 import { Difficulty } from '../types';
 import { getJourneyAtmosphereText, getPaceTrendMessage } from '../services/phaseNarrative';
-import { getBestSpeedRound, getSolveTrend } from '../services/masteryRecords';
+import {
+  getBestSpeedRound,
+  getSolveTrend,
+  getUnbrokenWeaveMastery,
+  UnbrokenWeaveMastery,
+} from '../services/masteryRecords';
 import { DialoguePhase } from '../types/homeWorld';
 
 const STAR_FILLED = require('../../assets/ui/star_filled.png');
@@ -53,6 +58,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
   const [selectedTab, setSelectedTab] = useState<'overview' | 'achievements'>('overview');
   const [bestSpeedRound, setBestSpeedRound] = useState(0);
   const [paceImproving, setPaceImproving] = useState(false);
+  const [unbrokenWeaveMastery, setUnbrokenWeaveMastery] = useState<UnbrokenWeaveMastery | null>(null);
 
   useEffect(() => {
     getCumulativeStats().then(setStats);
@@ -60,6 +66,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
     getDailyStatus().then(s => setDailyStatus({ totalCompleted: s.totalCompleted, bestStreak: s.bestStreak }));
     getStreakInfo().then(info => setCurrentStreak(info.currentStreak));
     getBestSpeedRound().then(setBestSpeedRound);
+    getUnbrokenWeaveMastery().then(setUnbrokenWeaveMastery);
     // Pace trend: improving if the player is quicker at ANY difficulty they've
     // played enough of. Private scanning-speed signal — no leaderboard.
     (async () => {
@@ -202,7 +209,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
             {/* Mastery — private skill records (best speed run, scanning pace).
                 Only shown once there's something to show, so it never clutters a
                 new player's overview. */}
-            {(bestSpeedRound > 0 || paceImproving) && (
+            {(bestSpeedRound > 0 || paceImproving || effectivePhase === 5 || (unbrokenWeaveMastery !== null && unbrokenWeaveMastery.wins > 0)) && (
               <PanelCard phase={effectivePhase} style={styles.sectionCard}>
                 <PixelPlaque phase={effectivePhase} label={'MASTERY'} style={styles.sectionPlaque} />
                 {bestSpeedRound > 0 && (
@@ -215,6 +222,21 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
                   <Text style={[styles.masteryPace, { color: t.amberText }]}>
                     {getPaceTrendMessage(effectivePhase as DialoguePhase)}
                   </Text>
+                )}
+                {unbrokenWeaveMastery && (
+                  <>
+                    <View style={styles.masteryRow}>
+                      <Text style={[styles.masteryLabel, { color: t.body }]}>Unbroken Weave</Text>
+                      <Text style={[styles.masteryValue, { color: t.title }]}>
+                        Rank {unbrokenWeaveMastery.rank}: {unbrokenWeaveMastery.title}
+                      </Text>
+                    </View>
+                    {unbrokenWeaveMastery.nextObjective && (
+                      <Text style={[styles.masteryPace, { color: t.muted }]}>
+                        {unbrokenWeaveMastery.nextObjective}
+                      </Text>
+                    )}
+                  </>
                 )}
               </PanelCard>
             )}

@@ -475,6 +475,40 @@ describe('victory flow', () => {
   });
 });
 
+describe('Unbroken Weave mastery orchestration', () => {
+  test('records Weave mastery before choreography and merges every field into victory data', () => {
+    const victoryFlow = APP_TSX.slice(
+      APP_TSX.indexOf('if (result?.completed)'),
+      APP_TSX.indexOf('// Check for endgame triggers', APP_TSX.indexOf('if (result?.completed)')),
+    );
+    const recordIndex = victoryFlow.indexOf('recordUnbrokenWeaveVictory(');
+    const setVictoryIndex = victoryFlow.indexOf('setVictoryData(finalVictory)');
+    const choreographyIndex = victoryFlow.indexOf('playVictorySequence(');
+
+    expect(victoryFlow).toContain('if (puzzle.unbrokenWeaveMode)');
+    expect(victoryFlow).toContain("recordUnbrokenWeaveVictory(puzzle.difficulty, victory.flawless === true)");
+    expect(recordIndex).toBeGreaterThan(-1);
+    expect(recordIndex).toBeLessThan(setVictoryIndex);
+    expect(recordIndex).toBeLessThan(choreographyIndex);
+    expect(victoryFlow).toContain('unbrokenWeaveRank: mastery.rank');
+    expect(victoryFlow).toContain('unbrokenWeaveTitle: mastery.title');
+    expect(victoryFlow).toContain('unbrokenWeaveNextObjective: mastery.nextObjective');
+    expect(victoryFlow).toContain('unbrokenWeaveRankedUp: rankedUp');
+  });
+
+  test('keeps setup mastery state fresh after load, victory, reset, and cloud restore', () => {
+    expect(APP_TSX).toMatch(/getUnbrokenWeaveMastery\(\)\.then\(setUnbrokenWeaveMastery\)/);
+    expect(APP_TSX).toMatch(/setUnbrokenWeaveMastery\(mastery\)/);
+    expect(APP_TSX).toMatch(/unbrokenWeaveMastery=\{unbrokenWeaveMastery\}/);
+
+    const rebuild = APP_TSX.slice(
+      APP_TSX.indexOf('const rebuildSessionFromStorage'),
+      APP_TSX.indexOf('const handleResetComplete'),
+    );
+    expect(rebuild).toContain('getUnbrokenWeaveMastery().then(setUnbrokenWeaveMastery)');
+  });
+});
+
 describe('speed rescue', () => {
   test('rewarded rescue resumes the run and is once-per-board', () => {
     expect(APP_TSX).toMatch(/resumeSpeedAfterRescue\(SPEED_RESCUE_EXTRA_SEC\)/);
