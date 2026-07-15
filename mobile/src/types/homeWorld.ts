@@ -42,9 +42,11 @@ export const DIALOGUE_SESSION_CONFIG = {
   GRACE_PERIOD_SESSIONS: DIALOGUE_SESSION_DEFAULTS.GRACE_PERIOD_SESSIONS,
   // Catch-up session boost: a late recruit (see LATE_PHASE_RECRUITS) that still
   // has unread REGULAR dialogue at global Phase 3+ reads this many extra lines
-  // per session. Without it the descent trio is stranded: Moss unlocks at the
-  // sky-garden gate (152) with the finale ~10 puzzles away, and at 4-6 lines
-  // per session with 5-puzzle cooldowns the ending consumes his arc unheard.
+  // per session. Without it the descent trio is stranded: house completion and
+  // Moss's recruit land around 136, the eight-win dwell completes around 143,
+  // arming waits for 160, the final board is ~161, and post-revelation is ~162.
+  // At 4-6 lines per session with 5-puzzle cooldowns the ending consumes his
+  // arc unheard.
   CATCH_UP_BONUS_DIALOGUES: 2,
   // The boost only exists in the compressed endgame window.
   CATCH_UP_MIN_GLOBAL_PHASE: 3,
@@ -137,7 +139,7 @@ export function getAnimalPhase(globalPhase: DialoguePhase, animalType: AnimalTyp
  * (nothing stores one, and adding one would need a save migration for players
  * already past the gates) and over the catchup-intro flag (introsSeen records
  * WHO was introduced, not at what phase): it is static, save-independent, and
- * derivable from the unlock data — the trio's room gates (126/140/152) all sit
+ * derivable from the unlock data — the trio's room gates (115/125/135) all sit
  * at or past the Phase-3 weighted threshold (PHASE_THRESHOLDS[3] = 120), and
  * weighted phase progress never trails raw puzzles solved, so by construction
  * these three cannot exist before global Phase 3. Pinned against
@@ -318,14 +320,15 @@ export interface HomeWorldProgress {
   // Whether the one-time quiet-home Unbroken Weave mastery introduction has shown.
   // Stored here so existing home-progress cloud sync and Reset All cover it.
   unbrokenWeaveIntroSeen?: boolean;
-  // Count of puzzles completed at Phase 4 with the house already complete —
-  // gates the finale (dwell so the cult-reveal era is actually played, not
-  // flashed past in one puzzle). See FINALE_DWELL_PUZZLES.
+  // Capped count of puzzles completed at Phase 4 with the house already
+  // complete — the eight-win dwell completes around 143, so the cult-reveal
+  // era is actually played rather than flashed past. See FINALE_DWELL_PUZZLES.
   phase4Dwell?: number;
-  // The dwell window has filled: the NEXT standard board start is served as
-  // the marked FINAL BOARD (dread-seeded, quiet treatment), and its victory
-  // fires the finale. Set by App when phase4Dwell reaches FINALE_DWELL_PUZZLES;
-  // cleared by markFinalPuzzleCompleted and by startNewCycle.
+  // The NEXT standard board start is served as the marked FINAL BOARD
+  // (dread-seeded, quiet treatment), and its victory fires the finale. Set
+  // only after capped dwell is full and the puzzle-160 arming floor is reached;
+  // the final board is ~161 and post-revelation ~162. Cleared by
+  // markFinalPuzzleCompleted and by startNewCycle.
   finaleArmed?: boolean;
   // Tutorial seeds - tracks specific tutorial lines for Phase 4 callbacks
   tutorialSeedsPlanted?: boolean;

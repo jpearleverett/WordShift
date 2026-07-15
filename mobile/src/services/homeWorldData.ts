@@ -609,7 +609,9 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   // climb to the climax with no new investment. Under the 2026-07 pacing the
   // original ten rooms top out at the Bamboo Attic (105), early in Growing
   // Shadows (Phase 3 floor 90); the high rooms then carry investment through
-  // the reveal (~130) to completion at 135, before finale arming at 160.
+  // the reveal (~130) to completion/recruit around 136. The eight-win dwell
+  // completes around 143, arming waits for 160, the final board is ~161, and
+  // post-revelation is ~162.
   // ═══════════════════════════════════════════════════════════════════════════
 
   // 8. Build the Jungle Room
@@ -775,8 +777,9 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   // ═══════════════════════════════════════════════════════════════════════════
   // THE HIGH ROOMS (Puzzles ~115-135) - The house keeps growing above what was
   // once its top, through late Growing Shadows and past the reveal (~130). The
-  // Sky Garden gate at 135 completes the house (~136 with Moss), leaving a
-  // Phase-4 dwell before finale arming at 160.
+  // Sky Garden gate at 135 completes the house/recruits Moss around 136. The
+  // eight-win dwell completes around 143, arming waits for 160, the final
+  // board is ~161, and post-revelation is ~162.
   // ═══════════════════════════════════════════════════════════════════════════
 
   // 20. Build the Star Loft

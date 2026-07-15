@@ -178,8 +178,8 @@ describe('UNLOCK_PROGRESSION', () => {
 
   // The reveal floor (130) must land before the house completes (sky-garden
   // gate + the final animal), so the Phase-4 dwell + finale play out inside a
-  // finished temple. The dwell remains capped at eight wins, while the arming
-  // floor prevents early completion from advancing the finale.
+  // finished temple. Completion/recruit is ~136, capped dwell completes ~143,
+  // arming waits for 160, the final board is ~161, and post-revelation ~162.
   test('house completion sits after the reveal floor, before the Phase 5 floor', () => {
     const gates = UNLOCK_PROGRESSION
       .map(u => u.minPuzzles)

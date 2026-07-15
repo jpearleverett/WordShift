@@ -1979,9 +1979,10 @@ export interface NarrativeMicroBeat {
  *
  * Mid game (puzzles 30-74): Escalating environmental wrongness.
  * Late game (puzzles 80-160): Overt coordination and agency, riding the new
- *   geography: reveal ~130, house completes ~136, dwell completes before the
- *   160 arming floor, finale ~161. The silent-victory anticlimax lands at 148, the "you could
- *   stop now" beat at 150, and two dwell-window beats (155/158) hold the
+ *   geography: reveal ~130, house completion/recruit ~136, dwell completion
+ *   ~143, arming floor 160, final board ~161, post-revelation ~162. The
+ *   silent-victory anticlimax lands at 148, the "you could stop now" beat at
+ *   150, and two dwell-window beats (155/158) hold the
  *   held-breath stillness after the house is whole. Nothing fires past 160:
  *   the finale itself gets the silence.
  *
@@ -2193,12 +2194,12 @@ export function isSilentVictoryBeat(completedTotal: number): boolean {
 }
 
 // ============================================================================
-// DWELL WINDOW — the house is whole (~puzzle 136) but the finale has not yet
-// opened (~161). The reveal is played, not flashed past: these lines hold the
-// held-breath stillness through the 160 arming floor. NEVER a counter, never a
-// number — the player must feel the waiting, not measure it. `dwellCount` is
-// how many puzzles have been solved inside the capped window
-// (1..FINALE_DWELL_PUZZLES).
+// DWELL WINDOW — house completion/recruit is ~136 and the eight-win dwell
+// completes around 143, but arming waits for 160. The final board is ~161 and
+// post-revelation ~162. The reveal is played, not flashed past: these lines
+// hold the stillness through the arming floor. NEVER a counter, never a number
+// — the player must feel the waiting, not measure it. `dwellCount` is how many
+// puzzles have been solved inside the capped window (1..FINALE_DWELL_PUZZLES).
 // ============================================================================
 
 // One line per dwell win (index = dwellCount - 1): the eight-win window is a

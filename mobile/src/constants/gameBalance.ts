@@ -40,8 +40,8 @@ export const PHASE_THRESHOLDS = [0, 20, 60, 120, 180];
  * 2026-07 fun-overhaul geography: Phase 2 (Deeper Questions) spans ~52 puzzles
  * (floor 38 → floor 90) — long enough to earn the dusk, short enough that the
  * single-tone stretch never becomes the D14 quit point. The reveal floor sits
- * at 130, just before the house completes at the sky-garden gate (135), so the
- * Phase-4 dwell window plays out inside a finished temple. The vanguard tier's
+ * at 130, just before the Sky Garden gate (135) and house completion/recruit
+ * (~136), so the Phase-4 dwell window plays out inside a finished temple. The vanguard tier's
  * +1 offset means vanguard animals speak Phase-4 lines across the 90→130
  * window (Phase 3 floor → reveal floor); that leak is ACCEPTED as the price of
  * pacing — the oracle whispering ahead of the reveal reads as foreshadowing,
@@ -52,8 +52,8 @@ export const MIN_PUZZLES_FOR_PHASE: Record<DialoguePhase, number> = {
   1: 15,
   2: 38, // Deeper Questions inside week one for engaged players; casual players hit it in ~3 weeks
   3: 90, // Growing Shadows — opens a ~52-puzzle Phase 2 span (38→90) and starts the vanguard +1 leak window (accepted, see above)
-  4: 130, // The Horizon — the cult reveal, just before the house completes at the 135 gate
-  5: 170, // Post-revelation — after house completion (≈136), the arming floor (160), and final puzzle (≈161)
+  4: 130, // The Horizon — the cult reveal, just before the Sky Garden gate (135) and house completion/recruit (~136)
+  5: 170, // Post-revelation — after house completion/recruit (≈136), dwell completion (≈143), arming (160), final board (≈161), and post-revelation (≈162)
 };
 
 // ============================================================================
@@ -294,7 +294,8 @@ export const FINALE_DWELL_PUZZLES = 8;
 /**
  * The earliest completed-puzzle count at which a full Phase-4 dwell can arm
  * the finale. It gives the descent trio time to speak before the marked final
- * board (~161) and post-revelation (~162), even when the house completes early.
+ * board (~161) and post-revelation (~162), even when house completion/recruit
+ * lands around 136 and the eight-win dwell completes around 143.
  */
 export const FINALE_ARM_MIN_PUZZLES = 160;
 
@@ -643,14 +644,15 @@ export const MILESTONE_BONUSES: {
   { puzzles: 110, amber: 75, message: 'Double digits!', darkMessage: 'The house stirs.', dreadMessage: 'One hundred ten threads woven into the pattern.' },
   { puzzles: 125, amber: 100, message: 'Halfway to mastery!', darkMessage: 'The house feels heavier. Fuller.', dreadMessage: 'One hundred twenty-five incantations. The walls listen.' },
   // Climax-window beats (135-165): under the 2026-07 pacing, the reveal lands
-  // ~puzzle 130, the house completes at the sky-garden gate (~153), and the
-  // finale fires ~162. 135/145 sit deep in the reveal's shadow (last rooms
-  // still rising), 150 marks the house made whole, and 165 lands just past the
-  // finale for committed players. Amounts are untouched (economy is calibrated
-  // on them); only the message geography moved.
+  // ~puzzle 130, house completion/recruit lands around 136, the eight-win
+  // dwell completes around 143, arming waits for 160, the final board is ~161,
+  // and post-revelation is ~162. 135/145 sit in the reveal's shadow, 150 holds
+  // the completed house in its wait, and 165 lands just past post-revelation.
+  // Amounts are untouched (economy is calibrated on them); only the message
+  // geography moved.
   { puzzles: 135, amber: 90, message: 'Still climbing!', darkMessage: 'The shadows are longer now. You keep building anyway.', dreadMessage: 'One hundred thirty-five offerings. The horizon leans closer.' },
   { puzzles: 145, amber: 110, message: 'Going strong!', darkMessage: 'The letters rearrange themselves for you now.', dreadMessage: 'One hundred forty-five. The last rooms reach toward what is coming.' },
-  { puzzles: 150, amber: 200, message: 'The house is whole!', darkMessage: 'The last room is built. The house is whole... and quiet.', dreadMessage: 'The house is complete. Now it waits, with you, for what comes.' },
+  { puzzles: 150, amber: 200, message: 'The house is whole!', darkMessage: 'The house is whole... and quiet.', dreadMessage: 'The house is complete. It waits with you for what comes.' },
   { puzzles: 165, amber: 130, message: 'Unstoppable!', darkMessage: 'You no longer wonder why you keep going. You just go.', dreadMessage: 'One hundred sixty-five offerings. The sky is very near now.' },
   { puzzles: 200, amber: 250, message: 'True dedication!', darkMessage: 'Two hundred transformations. The words come easily now.', dreadMessage: 'Two hundred incantations. The pattern is patient, and so are you.' },
   { puzzles: 250, amber: 300, message: 'Quarter thousand!', darkMessage: 'Two hundred fifty arrangements. The quiet is complete.', dreadMessage: 'Two hundred fifty offerings. Nothing stirs now. It does not need to.' },

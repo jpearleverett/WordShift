@@ -61,6 +61,7 @@ import {
   isPostRevelation,
   markPostRevelation,
   recordPhase4Dwell,
+  canArmFinale,
   armFinale,
   isFinaleArmed,
   consumeVariantNudge,
@@ -162,7 +163,7 @@ import { REWARDED_HINT_GRANT } from './src/constants/gameBalance';
 import { createRevenueCatBillingProvider } from './src/services/providers/revenueCatBilling';
 import { createAdMobAdProvider } from './src/services/providers/googleAdMobAds';
 import { installGlobalErrorHandler, setErrorForwarder } from './src/services/errorReporting';
-import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST, STARTER_INTRO_MIN_PUZZLES, FINALE_DWELL_PUZZLES, FINALE_ARM_MIN_PUZZLES } from './src/constants/gameBalance';
+import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST, STARTER_INTRO_MIN_PUZZLES, FINALE_DWELL_PUZZLES } from './src/constants/gameBalance';
 import { getCumulativeStats } from './src/services/starRating';
 
 // Defer the one-time difficulty-selector intro until a few boards are done —
@@ -2106,12 +2107,13 @@ function MainApp() {
                 // puzzle. Require FINALE_DWELL_PUZZLES Phase-4 puzzles first
                 // so the robed sprites, sacrifice mechanic, and 300 Phase-4
                 // dialogue lines are actually played. Even after all eight
-                // dwell wins land early, hold the marked board until the
-                // arming floor gives the descent trio time to speak. Never
-                // shown as a counter (narrative rule 7) — the house "is not
-                // yet ready."
+                // dwell wins land early (completion/recruit ~136, dwell ~143),
+                // hold the marked board until arming at 160. The final board
+                // is ~161 and post-revelation ~162, giving the descent trio
+                // time to speak. Never shown as a counter (narrative rule 7)
+                // — the house "is not yet ready."
                 const dwell = await recordPhase4Dwell();
-                if (dwell >= FINALE_DWELL_PUZZLES && completedTotal >= FINALE_ARM_MIN_PUZZLES) {
+                if (canArmFinale(dwell, completedTotal)) {
                   await armFinale();
                 }
                 // Dwell voice: the wait after "The arrangement is ready."

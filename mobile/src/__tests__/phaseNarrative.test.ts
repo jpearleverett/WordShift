@@ -1126,8 +1126,8 @@ describe('checkNarrativeMicroBeat', () => {
 });
 
 // ============================================================================
-// Micro-beat geography (v1.3 pacing: reveal ~130, house whole ~136,
-// arming floor 160, finale ~161)
+// Micro-beat geography (v1.3 pacing: reveal ~130, completion/recruit ~136,
+// dwell ~143, arming floor 160, final board ~161, post-revelation ~162)
 // ============================================================================
 
 describe('MICRO_BEATS geography', () => {

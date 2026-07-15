@@ -46,6 +46,7 @@ import {
   isPostRevelation,
   recordPhase4Dwell,
   getPhase4DwellCount,
+  canArmFinale,
   armFinale,
   isFinaleArmed,
   getFullProgress,
@@ -61,6 +62,8 @@ import {
   STREAK_FREEZE_CAP,
   FREE_FREEZE_INTERVAL_DAYS,
   NARRATIVE_ACCELERATION,
+  FINALE_DWELL_PUZZLES,
+  FINALE_ARM_MIN_PUZZLES,
 } from '../constants/gameBalance';
 import { FIRST_COMPLETION_BONUS } from '../types/homeWorld';
 import { getLocalDateStringDaysAgo } from '../services/dateUtils';
@@ -1022,12 +1025,19 @@ describe('challenge intro tracking', () => {
 // ============================================================================
 
 describe('post-revelation phase pinning (Phase 5)', () => {
-  test('recordPhase4Dwell counts up and getPhase4DwellCount reads it (finale gate)', async () => {
+  test('recordPhase4Dwell caps the persisted count at the eight-win dwell limit', async () => {
     expect(await getPhase4DwellCount()).toBe(0);
-    expect(await recordPhase4Dwell()).toBe(1);
-    expect(await recordPhase4Dwell()).toBe(2);
-    expect(await recordPhase4Dwell()).toBe(3);
-    expect(await getPhase4DwellCount()).toBe(3);
+    for (let count = 1; count <= FINALE_DWELL_PUZZLES + 3; count++) {
+      expect(await recordPhase4Dwell()).toBe(Math.min(count, FINALE_DWELL_PUZZLES));
+    }
+    expect(await getPhase4DwellCount()).toBe(FINALE_DWELL_PUZZLES);
+    expect((await getFullProgress()).phase4Dwell).toBe(FINALE_DWELL_PUZZLES);
+  });
+
+  test('canArmFinale requires both a full dwell and the puzzle-160 arming floor', () => {
+    expect(canArmFinale(FINALE_DWELL_PUZZLES, FINALE_ARM_MIN_PUZZLES - 1)).toBe(false);
+    expect(canArmFinale(FINALE_DWELL_PUZZLES - 1, FINALE_ARM_MIN_PUZZLES)).toBe(false);
+    expect(canArmFinale(FINALE_DWELL_PUZZLES, FINALE_ARM_MIN_PUZZLES)).toBe(true);
   });
 
   test('armFinale arms and markFinalPuzzleCompleted disarms (the marked final board contract)', async () => {
