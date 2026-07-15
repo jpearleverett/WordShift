@@ -228,6 +228,22 @@ describe('accounting regression tripwires', () => {
     expect(src).toMatch(/if \(isOfferingRef\.current\) return;\s*\n\s*setDisplayBalance\(amberBalance\);/);
   });
 
+  test('Offer All alone uses the bulk timing resolver and keeps the ceremony visually primary', () => {
+    const harvestAll = src.slice(
+      src.indexOf('const handleHarvestAll = useCallback'),
+      src.indexOf('// ---- Onboarding: advance when the PLAYER has offered every word ----'),
+    );
+
+    expect(harvestAll).toContain('getBulkOfferTiming(words.length, phase, reducedMotion)');
+    expect(harvestAll).toContain('timing.staggerMs');
+    expect(harvestAll).toContain('timing.wordDurationMs');
+    expect(harvestAll).toContain('timing.cascadeDurationMs');
+    expect(harvestAll).not.toContain('getDevourDuration(phase)');
+    expect(src).toContain(
+      'pendingPhaseTransition == null ? pitSkin.buttons.primary.lg.up : pitSkin.buttons.secondary.lg.up',
+    );
+  });
+
   test('the Tending Shrine carries no rewarded ad (serene custodianship, not a treadmill)', () => {
     // The Store's daily faucet is the one rewarded-amber surface; the old
     // in-shrine RewardedAdButton ('rewarded_tend') must stay removed.
