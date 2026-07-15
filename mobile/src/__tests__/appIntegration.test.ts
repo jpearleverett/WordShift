@@ -435,8 +435,11 @@ describe('finale staging (armed, not retroactive)', () => {
     );
   });
 
-  test('the dwell window has a voice: getDwellLine threads into the victory cascade', () => {
-    expect(APP_TSX).toMatch(/dwellLineForWin = getDwellLine\(/);
+  test('the dwell window keeps a post-cap held-breath voice without repeating the eighth line', () => {
+    expect(APP_TSX).toMatch(/const dwellBefore = await getPhase4DwellCount\(\);/);
+    expect(APP_TSX).toMatch(/dwellBefore >= FINALE_DWELL_PUZZLES/);
+    expect(APP_TSX).toMatch(/getPostCapDwellLine\(completedTotal, persistence\.currentPhase\)/);
+    expect(APP_TSX).toMatch(/getDwellLine\(Math\.min\(dwell, FINALE_DWELL_PUZZLES\), persistence\.currentPhase\)/);
   });
 });
 

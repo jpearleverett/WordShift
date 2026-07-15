@@ -2229,10 +2229,41 @@ const DWELL_LINES_SERENE: string[] = [
   'Everything that was promised has been kept. The house breathes out, and out, and out.',
 ];
 
+// Once the eighth dwell has been spoken, the house still has to wait for the
+// arming floor. These lines keep that pause alive without replaying the final
+// eighth-dwell sentence on every intervening victory.
+const POST_CAP_DWELL_LINES: string[] = [
+  'The house is listening past the sound of its own walls.',
+  'No one asks whether it is ready now. They have begun to wait with it.',
+  'A stillness gathers in the rooms and does not ask to be named.',
+  'The keepers move carefully, as if the air has become a sleeping thing.',
+  'Your words settle. The house keeps the silence around them.',
+  'Even the familiar rooms seem to be saving their voices.',
+  'Nothing hurries. Nothing has forgotten why it is waiting.',
+  'The long breath remains. The house does not let it go.',
+];
+
+const POST_CAP_DWELL_LINES_SERENE: string[] = [
+  'The quiet has room for every word that arrives.',
+  'The keepers wait together without needing to speak.',
+  'The rooms keep their gentle attention on the spaces between things.',
+  'The house rests in its own patient shape.',
+  'Your words settle among the others and are not lost.',
+  'The familiar rooms hold their peace without effort.',
+  'Nothing hurries. Everything is where it belongs.',
+  'The breath leaves slowly, and the house lets it go.',
+];
+
 export function getDwellLine(dwellCount: number, phase: number): string {
   const lines = phase >= 5 ? DWELL_LINES_SERENE : DWELL_LINES;
   const idx = Math.max(1, Math.min(dwellCount, lines.length)) - 1;
   return lines[idx];
+}
+
+/** A deterministic post-cap voice for victories while the finale waits to arm. */
+export function getPostCapDwellLine(completedTotal: number, phase: number): string {
+  const lines = phase >= 5 ? POST_CAP_DWELL_LINES_SERENE : POST_CAP_DWELL_LINES;
+  return lines[Math.abs(completedTotal) % lines.length];
 }
 
 // ============================================================================

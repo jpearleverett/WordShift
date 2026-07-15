@@ -61,6 +61,7 @@ import {
   isPostRevelation,
   markPostRevelation,
   recordPhase4Dwell,
+  getPhase4DwellCount,
   canArmFinale,
   armFinale,
   isFinaleArmed,
@@ -117,6 +118,7 @@ import {
   getSwiftVictoryHintMessage,
   getStreakHeldMessage,
   getDwellLine,
+  getPostCapDwellLine,
   getColdOpenSkipLabel,
   getColdOpenSkipAccessibilityLabel,
   getSkipConfirmText,
@@ -2113,6 +2115,7 @@ function MainApp() {
                 // is ~161 and post-revelation ~162, giving the descent trio
                 // time to speak. Never shown as a counter (narrative rule 7)
                 // — the house "is not yet ready."
+                const dwellBefore = await getPhase4DwellCount();
                 const dwell = await recordPhase4Dwell();
                 if (canArmFinale(dwell, completedTotal)) {
                   await armFinale();
@@ -2121,10 +2124,9 @@ function MainApp() {
                 // reads as held breath, not silence — one counter-free line
                 // per dwell win, surfaced through the ambient overlay in the
                 // victory cascade (skipped when a keyed micro-beat fires).
-                dwellLineForWin = getDwellLine(
-                  Math.min(dwell, FINALE_DWELL_PUZZLES),
-                  persistence.currentPhase
-                );
+                dwellLineForWin = dwellBefore >= FINALE_DWELL_PUZZLES
+                  ? getPostCapDwellLine(completedTotal, persistence.currentPhase)
+                  : getDwellLine(Math.min(dwell, FINALE_DWELL_PUZZLES), persistence.currentPhase);
               }
               // Armed but not the final board (a daily / restored board):
               // hold still — the arrangement has already chosen its board.

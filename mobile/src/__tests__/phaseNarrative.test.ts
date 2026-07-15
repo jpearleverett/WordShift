@@ -53,6 +53,7 @@ import {
   getPitOfferResultMessage,
   INTERJECTION_MESSAGES,
   getDwellLine,
+  getPostCapDwellLine,
   getStreakHeldMessage,
   getPreviewGraduationMessage,
   getPreviewRescueMessage,
@@ -1774,6 +1775,21 @@ describe('getDwellLine', () => {
     expect(getDwellLine(0, 4)).toBe(getDwellLine(1, 4));
     expect(getDwellLine(99, 4)).toBe(getDwellLine(8, 4));
     expect(getDwellLine(99, 5)).toBe(getDwellLine(8, 5));
+  });
+
+  test('uses distinct held-breath lines after the capped eighth dwell at puzzles 144 and 159', () => {
+    const eighthDwell = getDwellLine(8, 4);
+    const puzzle144 = getPostCapDwellLine(144, 4);
+    const puzzle159 = getPostCapDwellLine(159, 4);
+
+    expect(puzzle144).not.toBe(eighthDwell);
+    expect(puzzle159).not.toBe(eighthDwell);
+    expect(puzzle159).not.toBe(puzzle144);
+    for (const line of [puzzle144, puzzle159]) {
+      expect(line).not.toMatch(/[–—]/);
+      expect(line.toLowerCase()).not.toContain('phase');
+      expect(line).not.toMatch(/\d/);
+    }
   });
 });
 
