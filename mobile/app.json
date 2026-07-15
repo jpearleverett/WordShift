@@ -76,92 +76,92 @@
           "android": {
             "fonts": [
               {
-                "fontFamily": "ShantellSans-Regular",
+                "fontFamily": "EpundaSlab-Regular",
                 "fontDefinitions": [
                   {
-                    "path": "./assets/fonts/ShantellSans-Regular.ttf",
+                    "path": "./assets/fonts/EpundaSlab-Regular.ttf",
                     "weight": 400
                   },
                   {
-                    "path": "./assets/fonts/ShantellSans-Regular.ttf",
+                    "path": "./assets/fonts/EpundaSlab-Regular.ttf",
                     "weight": 700
                   },
                   {
-                    "path": "./assets/fonts/ShantellSans-Regular.ttf",
+                    "path": "./assets/fonts/EpundaSlab-Regular.ttf",
                     "weight": 400,
                     "style": "italic"
                   },
                   {
-                    "path": "./assets/fonts/ShantellSans-Regular.ttf",
+                    "path": "./assets/fonts/EpundaSlab-Regular.ttf",
                     "weight": 700,
                     "style": "italic"
                   }
                 ]
               },
               {
-                "fontFamily": "ShantellSans-Bold",
+                "fontFamily": "EpundaSlab-Bold",
                 "fontDefinitions": [
                   {
-                    "path": "./assets/fonts/ShantellSans-Bold.ttf",
+                    "path": "./assets/fonts/EpundaSlab-Bold.ttf",
                     "weight": 400
                   },
                   {
-                    "path": "./assets/fonts/ShantellSans-Bold.ttf",
+                    "path": "./assets/fonts/EpundaSlab-Bold.ttf",
                     "weight": 700
                   },
                   {
-                    "path": "./assets/fonts/ShantellSans-Bold.ttf",
+                    "path": "./assets/fonts/EpundaSlab-Bold.ttf",
                     "weight": 400,
                     "style": "italic"
                   },
                   {
-                    "path": "./assets/fonts/ShantellSans-Bold.ttf",
+                    "path": "./assets/fonts/EpundaSlab-Bold.ttf",
                     "weight": 700,
                     "style": "italic"
                   }
                 ]
               },
               {
-                "fontFamily": "ShantellSans-Italic",
+                "fontFamily": "EpundaSlab-Italic",
                 "fontDefinitions": [
                   {
-                    "path": "./assets/fonts/ShantellSans-Italic.ttf",
+                    "path": "./assets/fonts/EpundaSlab-Italic.ttf",
                     "weight": 400
                   },
                   {
-                    "path": "./assets/fonts/ShantellSans-Italic.ttf",
+                    "path": "./assets/fonts/EpundaSlab-Italic.ttf",
                     "weight": 700
                   },
                   {
-                    "path": "./assets/fonts/ShantellSans-Italic.ttf",
+                    "path": "./assets/fonts/EpundaSlab-Italic.ttf",
                     "weight": 400,
                     "style": "italic"
                   },
                   {
-                    "path": "./assets/fonts/ShantellSans-Italic.ttf",
+                    "path": "./assets/fonts/EpundaSlab-Italic.ttf",
                     "weight": 700,
                     "style": "italic"
                   }
                 ]
               },
               {
-                "fontFamily": "ShantellSans-BoldItalic",
+                "fontFamily": "EpundaSlab-BoldItalic",
                 "fontDefinitions": [
                   {
-                    "path": "./assets/fonts/ShantellSans-BoldItalic.ttf",
+                    "path": "./assets/fonts/EpundaSlab-BoldItalic.ttf",
                     "weight": 400
                   },
                   {
-                    "path": "./assets/fonts/ShantellSans-BoldItalic.ttf",
+                    "path": "./assets/fonts/EpundaSlab-BoldItalic.ttf",
                     "weight": 700
                   },
                   {
-                    "path": "./assets/fonts/ShantellSans-BoldItalic.ttf",
+                    "path": "./assets/fonts/EpundaSlab-BoldItalic.ttf",
                     "weight": 400,
                     "style": "italic"
                   },
                   {
-                    "path": "./assets/fonts/ShantellSans-BoldItalic.ttf",
+                    "path": "./assets/fonts/EpundaSlab-BoldItalic.ttf",
                     "weight": 700,
                     "style": "italic"
                   }

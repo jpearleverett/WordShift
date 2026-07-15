@@ -805,7 +805,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   // Compact: the whole stack (icon + name + cost + progress) must fit the
-  // ~123dp room height with Shantell's taller metrics, or the bottom line
+  // ~123dp room height with the body face's tall metrics, or the bottom line
   // overlaps the room's lower frame (the "Bamboo Attic 147/400" defect).
   lockIcon: {
     fontFamily: BODY_FONT,
