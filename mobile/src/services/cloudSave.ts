@@ -22,6 +22,8 @@ import { invalidateWhisperGalleryCache } from './whisperGallery';
 import { invalidateChoiceCache } from './dialogueChoices';
 import { invalidateNarrativeDeliveryCache } from './dialogue/animalDialogueNarrative';
 import { invalidateMicroBeatCaches } from './phaseNarrative';
+import { invalidateSupporterCache } from './supporterStipend';
+import { invalidateSeasonPassCache } from './seasonPass';
 
 /**
  * Cloud save infrastructure for WordShift.
@@ -104,6 +106,8 @@ const SYNC_KEYS = [
   'wordshift_room_upgrades',
   'wordshift_cosmetics',
   'wordshift_hints', // purchasable/earned hint balance — must follow the player
+  'wordshift_supporter', // Supporter monthly-stipend delivery record — must not double-pay across devices
+  'wordshift_season_pass', // season pass progress/claims/premium-unlock — follows the player
   // Streaks / sharing
   'wordshift_share_count',
   'wordshift_share_bonus_date',
@@ -450,6 +454,8 @@ function invalidateRestoredServiceCaches(): void {
   invalidateChoiceCache();
   invalidateNarrativeDeliveryCache();
   invalidateMicroBeatCaches();
+  invalidateSupporterCache();
+  invalidateSeasonPassCache();
 }
 
 /**

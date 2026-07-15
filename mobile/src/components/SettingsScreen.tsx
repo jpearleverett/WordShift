@@ -71,6 +71,8 @@ import { clearHints } from '../services/hints';
 import { clearMonetPrompts } from '../services/monetizationPrompts';
 import { clearSharePrompts } from '../services/sharePrompts';
 import { clearDailyLoginReward } from '../services/dailyLoginReward';
+import { clearSupporterState } from '../services/supporterStipend';
+import { clearSeasonPass } from '../services/seasonPass';
 import { clearDailyAmberReward } from '../services/dailyAmberReward';
 import { clearMasteryRecords } from '../services/masteryRecords';
 import { clearDailyLadder } from '../services/dailyLadder';
@@ -170,6 +172,8 @@ export async function performFullReset(): Promise<string[]> {
     ['sharePrompts', clearSharePrompts],
     ['dailyLogin', clearDailyLoginReward],
     ['dailyAmber', clearDailyAmberReward],
+    ['supporterStipend', clearSupporterState],
+    ['seasonPass', clearSeasonPass],
     ['masteryRecords', clearMasteryRecords],
     ['dailyLadder', clearDailyLadder],
     ['offeringRequests', clearOfferingRequests],

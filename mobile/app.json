@@ -247,7 +247,9 @@
       "admobInterstitialIdAndroid": "ca-app-pub-6575205005908086/1853886149",
       "admobRewardedIdIos": "",
       "admobRewardedIdAndroid": "ca-app-pub-6575205005908086/4565855562",
-      "adsUseTestIds": true,
+      "admobBannerIdIos": "",
+      "admobBannerIdAndroid": "",
+      "adsUseTestIds": false,
       "eas": {
         "projectId": "e8c8c0b5-f666-472d-91bf-3b055d96be23"
       }

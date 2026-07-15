@@ -38,6 +38,8 @@ export type EventType =
   | 'purchase_cancelled'
   | 'purchase_failed'
   | 'daily_amber_claimed'
+  | 'supporter_stipend_granted'
+  | 'season_reward_claimed'
   | 'app_error';
 
 /**

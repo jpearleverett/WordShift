@@ -51,8 +51,15 @@ type FlowState = 'idle' | 'working' | 'unavailable';
  * stale label here can never mischarge. Keep in sync with the Play Console /
  * App Store Connect price tiers.
  */
-export const PATRON_FALLBACK_PRICE = '$4.99';
-export const REMOVE_ADS_FALLBACK_PRICE = '$2.99';
+// Value ladder (revenue-pass reprice): Remove-Ads moved to the word-game norm
+// ($5.99; Wordscapes/WWF sit $5.99-9.99 for standalone ad-removal), and Patron
+// sits above it so the superset (ad-free + amber/puzzle + exclusive cosmetic)
+// never costs less than the ad-free-only tier. The Supporter subscription
+// ($3.99/mo) is the cheaper recurring alternative between the two. These are
+// fallback labels only — the real charge is the Play Console / App Store Connect
+// price tier, which MUST be updated to match.
+export const PATRON_FALLBACK_PRICE = '$8.99';
+export const REMOVE_ADS_FALLBACK_PRICE = '$5.99';
 
 /**
  * "Become a Patron" modal — cosmetic & convenience only.

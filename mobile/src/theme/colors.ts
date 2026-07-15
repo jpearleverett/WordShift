@@ -228,6 +228,12 @@ export const CONFETTI_THEMES: Record<string, string[]> = {
   confetti_sovereign: ['#7D5BB8', '#5A3E8E', '#C9A227', '#63449A', '#B08A2E', '#E8DCF5'],
   // Exclusive to "The Keeper's Collection" cosmetic bundle (IAP).
   confetti_eclipse: ['#7A5CC8', '#B45096', '#D75F6E', '#5F58B9', '#A055B9', '#E8DCF5'],
+  // Exclusive to active Supporter subscribers — warm gold shot through with a
+  // patron violet, distinct from the amber-only confetti_gold.
+  confetti_supporter: ['#F2B24E', '#C9902A', '#8E6BC4', '#E8A33D', '#B07EDB', '#FBE7C6'],
+  // Season pass premium reward (earned, not bought) — the "arrangement" hues:
+  // teal, old gold, and a rose ember.
+  confetti_season: ['#37A99E', '#0A8F82', '#E8A33D', '#C79A2E', '#D96A7E', '#EFE7D0'],
 };
 
 // The equipped tile theme id is pushed in from cosmetics.ts (registration pattern

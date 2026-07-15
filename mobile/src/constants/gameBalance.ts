@@ -221,6 +221,47 @@ export const STARTER_PACK_GRANTS = {
 export const FIRST_PURCHASE_AMBER_MULTIPLIER = 2;
 
 // ============================================================================
+// SUPPORTER SUBSCRIPTION (recurring revenue — never phase progress)
+// ============================================================================
+// An auto-renewing subscription (SUPPORTER_SUB / `supporter` entitlement). Value
+// is ad-free + a recurring monthly amber stipend + an exclusive cosmetic + the
+// season pass premium track included. All convenience/expression — like every
+// amber source, the stipend credits the REWARD balance only and NEVER feeds
+// phase progression (hard rule: no pay-to-skip-phases). Delivered idempotently,
+// once per local month, by supporterStipend.ts.
+
+/** Amber granted to an active Supporter each local month (recurring stipend). */
+export const SUPPORTER_MONTHLY_AMBER = 300;
+
+// ============================================================================
+// COSMETIC SEASON PASS (durable recurring amber sink + subscription perk)
+// ============================================================================
+// A monthly cosmetic reward track (seasonPass.ts). A FREE track earned purely by
+// playing (puzzles solved in-season advance tiers), and a PREMIUM track with
+// richer rewards. Premium is unlocked EITHER by an active Supporter subscription
+// (a recurring reason to subscribe) OR by spending amber (the durable monthly
+// sink the economy was missing — see the revenue assessment's "~$25 sink
+// ceiling"). Rewards are amber (reward-only, never phase progress) + an exclusive
+// premium cosmetic. Deliberately NOT a pay-to-progress lever: no season reward
+// touches phaseProgress, and the pass never gates narrative content.
+
+/** Reward tiers per season. */
+export const SEASON_PASS_TIERS = 10;
+/** In-season puzzles solved to advance one tier (10 tiers ≈ 60 solves / month). */
+export const SEASON_PASS_PUZZLES_PER_TIER = 6;
+/** Free-track amber granted per claimed tier. */
+export const SEASON_PASS_FREE_AMBER_PER_TIER = 20;
+/** Premium-track amber granted per claimed tier (additive to the free track). */
+export const SEASON_PASS_PREMIUM_AMBER_PER_TIER = 50;
+/**
+ * Amber cost for a non-subscriber to unlock the premium track for the current
+ * season. Sized as a genuine monthly sink for an amber-rich player (roughly a
+ * week-plus of engaged earning) while staying well under a large amber pack, so
+ * it never reads as "pay real money or grind" — Supporters get it for free.
+ */
+export const SEASON_PASS_PREMIUM_AMBER_COST = 2500;
+
+// ============================================================================
 // MONETIZATION SOFT PROMPTS
 // ============================================================================
 // Gentle, frequency-capped nudges (never modal spam). All are suppressed for
