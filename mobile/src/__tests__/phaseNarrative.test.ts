@@ -68,6 +68,11 @@ import { DialoguePhase } from '../types/homeWorld';
 
 const ALL_PHASES: DialoguePhase[] = [0, 1, 2, 3, 4];
 const STAR_LEVELS = [1, 2, 3];
+const ALL_ANIMAL_TYPES = [
+  'fox', 'owl', 'pangolin', 'axolotl', 'capybara', 'fennec_fox',
+  'sloth', 'wombat', 'rabbit', 'red_panda', 'tarsier', 'aye_aye', 'kakapo',
+];
+const FORBIDDEN_PHASE_3_CONTENT = /\b(game|puzzle|summoning|spreadsheet|consent)\b/i;
 
 describe('getVictoryTitle', () => {
   test.each(
@@ -490,6 +495,21 @@ describe('getPersonalizedPhase5Whisper', () => {
       expect(typeof whisper.text).toBe('string');
       expect(whisper.text.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('Phase 3 animal whisper restraint', () => {
+  test('keeps exactly five non-empty whispers for every animal', () => {
+    expect(Object.keys(ANIMAL_WHISPERS[3]).sort()).toEqual([...ALL_ANIMAL_TYPES].sort());
+    for (const animalType of ALL_ANIMAL_TYPES) {
+      expect(ANIMAL_WHISPERS[3][animalType]).toHaveLength(5);
+      expect(ANIMAL_WHISPERS[3][animalType].every(line => line.trim().length > 0)).toBe(true);
+    }
+  });
+
+  test('keeps mechanics and explicit answers out of the whispers', () => {
+    const normalized = Object.values(ANIMAL_WHISPERS[3]).flat().join(' ');
+    expect(normalized).not.toMatch(FORBIDDEN_PHASE_3_CONTENT);
   });
 });
 

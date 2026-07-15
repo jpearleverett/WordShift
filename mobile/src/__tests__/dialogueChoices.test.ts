@@ -23,6 +23,7 @@ const ALL_ANIMALS = [
   'fennec_fox', 'sloth', 'wombat', 'rabbit', 'red_panda',
   'tarsier', 'aye_aye', 'kakapo',
 ];
+const FORBIDDEN = /\b(game|puzzle|summoning|spreadsheet|consent)\b/i;
 
 describe('dialogueChoices', () => {
   beforeEach(async () => {
@@ -36,21 +37,22 @@ describe('dialogueChoices', () => {
 
   describe('ANIMAL_CHOICES', () => {
     it('has choice content for every animal', () => {
-      for (const animal of ALL_ANIMALS) {
-        expect(ANIMAL_CHOICES[animal]).toBeDefined();
-      }
+      expect(Object.keys(ANIMAL_CHOICES).sort()).toEqual([...ALL_ANIMALS].sort());
     });
 
     it('each choice has prompt, options, responses, and convergence', () => {
       for (const animal of ALL_ANIMALS) {
         const choice = ANIMAL_CHOICES[animal];
-        expect(choice.prompt).toBeDefined();
-        expect(typeof choice.prompt).toBe('string');
-        expect(choice.options.ask).toBeDefined();
-        expect(choice.options.refuse).toBeDefined();
-        expect(choice.responses.ask).toBeDefined();
-        expect(choice.responses.refuse).toBeDefined();
-        expect(choice.convergence).toBeDefined();
+        const content = [
+          choice.prompt,
+          choice.options.ask,
+          choice.options.refuse,
+          choice.responses.ask,
+          choice.responses.refuse,
+          choice.convergence,
+        ];
+        expect(content.every(line => typeof line === 'string' && line.trim().length > 0)).toBe(true);
+        expect(content.join(' ')).not.toMatch(FORBIDDEN);
       }
     });
 
@@ -65,6 +67,12 @@ describe('dialogueChoices', () => {
       for (const animal of ALL_ANIMALS) {
         const choice = ANIMAL_CHOICES[animal];
         expect(choice.responses.ask).not.toBe(choice.responses.refuse);
+      }
+    });
+
+    it('every convergence remains non-empty', () => {
+      for (const animal of ALL_ANIMALS) {
+        expect(ANIMAL_CHOICES[animal].convergence.trim()).not.toBe('');
       }
     });
   });
