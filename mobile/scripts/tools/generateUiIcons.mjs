@@ -509,3 +509,212 @@ fs.mkdirSync(UI, { recursive: true });
   capsule(cv, c - 44, c - 76, c - 62, c + 34, 15, '#FFECB4', 0.7); // sheen
   savePNG(path.join(UI, 'bell.png'), W, W, down2(cv, W, W));
 }
+
+// ===================== Setup-menu mode icons (render ~22px) ===================
+// Replace the bare emoji in the variant/combo selector + challenge/blind/weave
+// toggles. Bold shapes, dark outlines so they read on the light parchment rows,
+// bright bodies so they read on the dark (ash) rows.
+
+// lit crescent = inside the big disc AND outside a shadow disc offset by dx
+function crescent(cv, cx, cy, R, dx, color, alpha = 1) {
+  const [r, g, b] = hex(color);
+  for (let y = ~~(cy - R - 2); y <= ~~(cy + R + 2); y++)
+    for (let x = ~~(cx - R - 2); x <= ~~(cx + R + 2); x++) {
+      const d1 = Math.hypot(x + 0.5 - cx, y + 0.5 - cy) - R;
+      const d2 = Math.hypot(x + 0.5 - (cx + dx), y + 0.5 - cy) - R * 0.94;
+      const a = Math.max(0, Math.min(1, 0.5 - d1)) * Math.max(0, Math.min(1, 0.5 + d2));
+      if (a > 0) blend(cv, x, y, r, g, b, a * alpha);
+    }
+}
+// a downward arrow (shaft + head), outlined
+function downArrow(cv, cx, topY, botY, shaftTh, headHalf, headLen, body, ink) {
+  capsule(cv, cx, topY, cx, botY - headLen + 20, shaftTh + 18, ink);
+  tri(cv, [cx - headHalf - 12, botY - headLen + 8], [cx + headHalf + 12, botY - headLen + 8], [cx, botY + 14], ink);
+  capsule(cv, cx, topY, cx, botY - headLen + 20, shaftTh, body);
+  tri(cv, [cx - headHalf, botY - headLen], [cx + headHalf, botY - headLen], [cx, botY], body);
+}
+
+// variant_standard.png — the core "shift down" arrow
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  downArrow(cv, c, c - 150, c + 168, 44, 112, 128, '#B79BFF', '#3A2E52');
+  capsule(cv, c - 14, c - 130, c - 14, c + 4, 12, '#E7DCFF', 0.7);   // sheen
+  savePNG(path.join(UI, 'variant_standard.png'), W, W, down2(cv, W, W));
+}
+
+// variant_reverse.png — a down arrow + an up arrow (descend, then return)
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  downArrow(cv, c - 74, c - 150, c + 150, 34, 74, 92, '#8ED0FF', '#274A5E');       // down (left)
+  // up arrow (right): mirror vertically
+  const ux = c + 74;
+  capsule(cv, ux, c + 150, ux, c - 130, 34 + 18, '#274A5E');
+  tri(cv, [ux - 86, c - 108], [ux + 86, c - 108], [ux, c - 164], '#274A5E');
+  capsule(cv, ux, c + 150, ux, c - 130, 34, '#A9DEFF');
+  tri(cv, [ux - 74, c - 116], [ux + 74, c - 116], [ux, c - 168], '#A9DEFF');
+  savePNG(path.join(UI, 'variant_reverse.png'), W, W, down2(cv, W, W));
+}
+
+// variant_speed.png — lightning bolt
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  const bolt = [
+    [c + 34, c - 176], [c - 92, c + 20], [c - 12, c + 20],
+    [c - 40, c + 180], [c + 96, c - 40], [c + 14, c - 40],
+  ];
+  poly(cv, bolt.map(([x, y]) => [x, y]), '#B8860B');                 // outline (drawn larger below)
+  poly(cv, [
+    [c + 28, c - 168], [c - 82, c + 14], [c - 8, c + 14],
+    [c - 34, c + 168], [c + 86, c - 34], [c + 10, c - 34],
+  ], '#FFD23E', 1, '#F5A623');
+  capsule(cv, c + 4, c - 150, c - 46, c - 6, 12, '#FFF0A8', 0.7);    // sheen
+  savePNG(path.join(UI, 'variant_speed.png'), W, W, down2(cv, W, W));
+}
+
+// variant_double.png — two up chevrons (double shift)
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  const chev = (cy, body, ink) => {
+    capsule(cv, c - 120, cy + 66, c, cy - 40, 52, ink);
+    capsule(cv, c, cy - 40, c + 120, cy + 66, 52, ink);
+    capsule(cv, c - 120, cy + 60, c, cy - 46, 38, body);
+    capsule(cv, c, cy - 46, c + 120, cy + 60, 38, body);
+  };
+  chev(c + 44, '#5EEAD4', '#155E52');   // lower chevron
+  chev(c - 56, '#7DF3E0', '#155E52');   // upper chevron
+  savePNG(path.join(UI, 'variant_double.png'), W, W, down2(cv, W, W));
+}
+
+// variant_swords.png — crossed swords (Challenge / Twin Trial)
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  const sword = (flip) => {
+    const s = flip ? -1 : 1;
+    // blade from lower-inner to upper-outer
+    const bx0 = c - s * 40, by0 = c + 150, bx1 = c + s * 150, by1 = c - 150;
+    capsule(cv, bx0, by0, bx1, by1, 54, '#3A3550');                 // ink
+    capsule(cv, bx0, by0, bx1, by1, 38, '#D8DCEA', 1);              // steel
+    capsule(cv, bx0, by0, bx1, by1, 12, '#FFFFFF', 0.6);           // edge light
+    // crossguard + hilt at lower-inner
+    capsule(cv, c - s * 78, c + 112, c + s * 4, c + 178, 24, '#8A5A22'); // guard
+    ellipse(cv, c - s * 40, c + 150, 26, 26, '#F5B82E', 1, 3);      // pommel gold
+  };
+  sword(false);
+  sword(true);
+  savePNG(path.join(UI, 'variant_swords.png'), W, W, down2(cv, W, W));
+}
+
+// variant_tornado.png — a banded funnel (Racing Shadows)
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  // Narrowing stack of horizontal lozenges with alternating shade bands and a
+  // slight per-band lean — reads as a spinning tornado funnel. A thin dark ink
+  // ellipse behind each band delineates the horizontal banding.
+  const rings = [
+    [c - 12, c - 142, 144, 34], [c + 8, c - 98, 124, 32],
+    [c - 8, c - 54, 102, 30], [c + 8, c - 12, 78, 28], [c - 4, c + 28, 54, 25],
+  ];
+  for (const [cx, cy, rx, ry] of rings) ellipse(cv, cx, cy, rx + 7, ry, '#232840'); // ink band
+  const cols = ['#AEBBEC', '#7E92D2', '#AEBBEC', '#7285CB', '#9CACE4'];
+  rings.forEach(([cx, cy, rx, ry], i) => ellipse(cv, cx, cy, rx, ry - 7, cols[i]));
+  capsule(cv, c - 4, c + 44, c - 44, c + 156, 24, '#232840');     // curling tail ink
+  capsule(cv, c - 4, c + 44, c - 44, c + 156, 13, '#9CACE4');     // curling tail
+  savePNG(path.join(UI, 'variant_tornado.png'), W, W, down2(cv, W, W));
+}
+
+// variant_crescent.png — crescent moon (Blind Return)
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  crescent(cv, c, c, 176, 92, '#2A2438');                          // ink halo
+  crescent(cv, c - 4, c, 168, 92, '#FBF3C8');                      // lit crescent
+  crescent(cv, c - 20, c - 8, 120, 92, '#FFFBE8', 0.6);           // inner bloom
+  savePNG(path.join(UI, 'variant_crescent.png'), W, W, down2(cv, W, W));
+}
+
+// variant_hole.png — a dark void (Free Fall)
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  ellipse(cv, c, c + 6, 182, 150, '#2A2438');                      // rim ink
+  ellipse(cv, c, c, 170, 140, '#5B4F72');                          // rim
+  ellipse(cv, c, c + 4, 138, 112, '#241852');                      // mouth
+  ellipse(cv, c, c + 8, 108, 84, '#0E0820');                       // depths
+  ellipse(cv, c, c + 2, 62, 44, '#000000', 0.85, 24);             // black core
+  savePNG(path.join(UI, 'variant_hole.png'), W, W, down2(cv, W, W));
+}
+
+// lock.png — closed padlock (locked rows / challenge locked)
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  arcStroke(cv, c, c - 34, 82, 56, Math.PI * 1.02, Math.PI * 1.98, '#3A2E52');  // shackle ink
+  arcStroke(cv, c, c - 34, 82, 40, Math.PI * 1.02, Math.PI * 1.98, '#B7ADC9');  // shackle metal
+  roundRect(cv, c, c + 66, 126, 104, 26, '#3A2E52');              // body ink
+  roundRect(cv, c, c + 62, 114, 94, 22, '#FFC845', 1, '#F5A315'); // body gold
+  ellipse(cv, c, c + 46, 20, 20, '#7A4A0E');                      // keyhole
+  capsule(cv, c, c + 46, c, c + 92, 16, '#7A4A0E');
+  roundRect(cv, c - 40, c + 22, 40, 12, 6, '#FFE08A', 0.7);       // sheen
+  savePNG(path.join(UI, 'lock.png'), W, W, down2(cv, W, W));
+}
+
+// lock_open.png — open padlock (challenge active)
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  arcStroke(cv, c + 78, c - 40, 82, 56, Math.PI * 1.10, Math.PI * 2.06, '#3A2E52'); // open shackle ink
+  arcStroke(cv, c + 78, c - 40, 82, 40, Math.PI * 1.10, Math.PI * 2.06, '#B7ADC9'); // metal
+  roundRect(cv, c, c + 66, 126, 104, 26, '#3A2E52');
+  roundRect(cv, c, c + 62, 114, 94, 22, '#FFC845', 1, '#F5A315');
+  ellipse(cv, c, c + 46, 20, 20, '#7A4A0E');
+  capsule(cv, c, c + 46, c, c + 92, 16, '#7A4A0E');
+  savePNG(path.join(UI, 'lock_open.png'), W, W, down2(cv, W, W));
+}
+
+// blind.png — a dark new moon (Blind Offering active)
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  ellipse(cv, c, c, 190, 190, '#6B5FA0', 0.30, 60);              // faint aura
+  ellipse(cv, c, c, 176, 176, '#4A3F6A');                        // rim
+  ellipse(cv, c - 4, c - 4, 166, 166, '#1C1630');               // dark face
+  crescent(cv, c - 6, c, 168, 60, '#5A4F78', 0.55);            // faint lit sliver
+  savePNG(path.join(UI, 'blind.png'), W, W, down2(cv, W, W));
+}
+
+// eye.png — an open eye (previews visible)
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  // almond: intersection of two big circles above/below
+  const [ir, ig, ib] = hex('#3A2E52');
+  const [wr, wg, wb] = hex('#FFFFFF');
+  for (let y = ~~(c - 130); y <= ~~(c + 130); y++)
+    for (let x = ~~(c - 200); x <= ~~(c + 200); x++) {
+      const dTop = Math.hypot((x + 0.5 - c) * 0.62, y + 0.5 - (c + 210)) - 300;  // lower lid arc
+      const dBot = Math.hypot((x + 0.5 - c) * 0.62, y + 0.5 - (c - 210)) - 300;  // upper lid arc
+      const inside = Math.max(0, Math.min(1, 0.5 - dTop)) * Math.max(0, Math.min(1, 0.5 - dBot));
+      if (inside > 0) blend(cv, x, y, ir, ig, ib, inside);        // ink almond
+    }
+  for (let y = ~~(c - 118); y <= ~~(c + 118); y++)
+    for (let x = ~~(c - 188); x <= ~~(c + 188); x++) {
+      const dTop = Math.hypot((x + 0.5 - c) * 0.64, y + 0.5 - (c + 196)) - 282;
+      const dBot = Math.hypot((x + 0.5 - c) * 0.64, y + 0.5 - (c - 196)) - 282;
+      const inside = Math.max(0, Math.min(1, 0.5 - dTop)) * Math.max(0, Math.min(1, 0.5 - dBot));
+      if (inside > 0) blend(cv, x, y, wr, wg, wb, inside);        // white sclera
+    }
+  ellipse(cv, c, c, 62, 62, '#3A6EA5');                          // iris
+  ellipse(cv, c, c, 34, 34, '#141428');                          // pupil
+  ellipse(cv, c - 18, c - 18, 14, 14, '#FFFFFF', 0.9);          // catch light
+  savePNG(path.join(UI, 'eye.png'), W, W, down2(cv, W, W));
+}
+
+// weave.png — a spool of thread (Unbroken Weave)
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  roundRect(cv, c, c, 66, 150, 14, '#5A3A1E');                   // spool core (behind)
+  ellipse(cv, c, c - 150, 132, 34, '#7A4E28');                   // top flange ink
+  ellipse(cv, c, c - 156, 124, 28, '#B87A3E', 1, 3);            // top flange
+  ellipse(cv, c, c + 150, 132, 34, '#7A4E28');                   // bottom flange ink
+  ellipse(cv, c, c + 144, 124, 28, '#B87A3E', 1, 3);            // bottom flange
+  for (let i = 0; i < 5; i++) {                                   // thread windings
+    const y = c - 96 + i * 48;
+    capsule(cv, c - 60, y, c + 60, y + 18, 22, i % 2 ? '#FF8FA3' : '#FF6B7E');
+  }
+  ellipse(cv, c - 30, c - 150, 26, 8, '#FFFFFF', 0.5);          // top sheen
+  savePNG(path.join(UI, 'weave.png'), W, W, down2(cv, W, W));
+}

@@ -130,6 +130,7 @@ import { generateDailyPuzzle, prewarmDailyPuzzle, isDailyChallengeUnlocked, reco
 import { recordDailyLadderResult, getDailyLadderSummary, shouldShowTrend } from './src/services/dailyLadder';
 import { startFrameMonitoring, stopFrameMonitoring } from './src/services/performanceMonitor';
 import { AnimalWhisper } from './src/components/puzzle/AnimalWhisper';
+import { getModeIconSprite } from './src/components/puzzle/modeIcons';
 import { WordLedger } from './src/components/WordLedger';
 import { WhisperGalleryScreen } from './src/components/WhisperGalleryScreen';
 import { isDreadWord, validateWord } from './src/services/localGenerator';
@@ -3536,9 +3537,16 @@ function MainApp() {
                 styles.variantBadge,
                 persistence.currentPhase >= 3 && styles.variantBadgeDark,
               ]}>
-                <Text style={styles.variantBadgeIcon}>
-                  {VARIANT_CONFIGS[puzzle.currentVariant]?.icon || '✨'}
-                </Text>
+                {getModeIconSprite(VARIANT_CONFIGS[puzzle.currentVariant]?.icon || '') ? (
+                  <Image
+                    source={getModeIconSprite(VARIANT_CONFIGS[puzzle.currentVariant]?.icon || '')!}
+                    style={styles.variantBadgeIconImage}
+                  />
+                ) : (
+                  <Text style={styles.variantBadgeIcon}>
+                    {VARIANT_CONFIGS[puzzle.currentVariant]?.icon || '✨'}
+                  </Text>
+                )}
                 <Text style={[
                   styles.variantBadgeText,
                   persistence.currentPhase >= 3 && styles.variantBadgeTextDark,
@@ -3559,7 +3567,7 @@ function MainApp() {
                 accessible
                 accessibilityLabel="Blind Offering is on: word previews hidden"
               >
-                <Text style={styles.variantBadgeIcon}>{'🌑'}</Text>
+                <Image source={getModeIconSprite('🌑')!} style={styles.variantBadgeIconImage} />
                 <Text style={[
                   styles.variantBadgeText,
                   persistence.currentPhase >= 3 && styles.variantBadgeTextDark,
@@ -3577,7 +3585,7 @@ function MainApp() {
                 accessible
                 accessibilityLabel={`Unbroken Weave is on, ${puzzle.spentLetters.length} letters spent`}
               >
-                <Text style={styles.variantBadgeIcon}>{'🧵'}</Text>
+                <Image source={getModeIconSprite('🧵')!} style={styles.variantBadgeIconImage} />
                 <Text style={[
                   styles.variantBadgeText,
                   styles.variantBadgeTextDark,

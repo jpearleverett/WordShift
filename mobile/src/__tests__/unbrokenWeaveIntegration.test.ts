@@ -31,7 +31,9 @@ describe('Unbroken Weave player-facing wiring', () => {
 
   test('App displays a compact thread badge with the spent count', () => {
     expect(APP_TSX).toMatch(/puzzle\.unbrokenWeaveMode &&/);
-    expect(APP_TSX).toContain("{'🧵'}");
+    // The thread glyph now renders as the generated weave sprite (via the
+    // shared mode-icon resolver), not a bare emoji.
+    expect(APP_TSX).toContain("getModeIconSprite('🧵')");
     expect(APP_TSX).toMatch(/puzzle\.spentLetters\.length/);
     expect(APP_TSX).toMatch(/Unbroken Weave is on.*letters spent/);
   });

@@ -7,10 +7,15 @@ import {
   ScrollView,
   ViewStyle,
   Dimensions,
+  Image,
+  ImageStyle,
+  TextStyle,
+  StyleProp,
 } from 'react-native';
 import { CandyColors } from '../../theme/colors';
 import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
 import { PanelCard } from '../ui/PanelCard';
+import { getModeIconSprite } from './modeIcons';
 import { Difficulty, GameMode } from '../../types';
 import { DialoguePhase } from '../../types/homeWorld';
 import {
@@ -23,6 +28,23 @@ import {
 } from '../../services/puzzleVariety';
 import { BODY_FONT, BODY_FONT_ITALIC, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
+
+// The bare mode emoji in the variant/combo selector and the challenge/blind/
+// weave toggles now render as generated candy sprites (shared with the
+// puzzle-screen statsRow badges via modeIcons), falling back to text for any
+// unmapped glyph.
+const ModeIcon: React.FC<{
+  glyph: string;
+  textStyle: StyleProp<TextStyle>;
+  imageStyle: StyleProp<ImageStyle>;
+}> = ({ glyph, textStyle, imageStyle }) => {
+  const sprite = getModeIconSprite(glyph);
+  return sprite !== null ? (
+    <Image source={sprite} style={imageStyle} />
+  ) : (
+    <Text style={textStyle}>{glyph}</Text>
+  );
+};
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 // The menu floats at top: 52 inside the puzzle screen's statsRow, which itself
@@ -188,7 +210,11 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
             : `${title}${isSelected ? ', selected' : ''}${isActive ? ', active' : ''}`
         }
       >
-        <Text style={styles.variantIcon}>{locked ? '🔒' : icon}</Text>
+        <ModeIcon
+          glyph={locked ? '🔒' : icon}
+          textStyle={styles.variantIcon}
+          imageStyle={styles.variantIconImage}
+        />
         <View style={styles.variantContent}>
           <View style={styles.variantTitleRow}>
             <Text style={[styles.variantTitle, { color: locked ? t.muted : isSelected ? t.title : t.body }]}>
@@ -368,9 +394,11 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
                   : `Challenge mode, ${challengeActive ? 'on' : 'off'}`
               }
             >
-              <Text style={styles.challengeMenuIcon}>
-                {challengeIncluded ? '🌑' : challengeActive ? '🔓' : '🔒'}
-              </Text>
+              <ModeIcon
+                glyph={challengeIncluded ? '🌑' : challengeActive ? '🔓' : '🔒'}
+                textStyle={styles.challengeMenuIcon}
+                imageStyle={styles.challengeMenuIconImage}
+              />
               <View style={styles.challengeMenuContent}>
                 <Text
                   style={[
@@ -412,7 +440,11 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
             accessibilityState={{ disabled: true }}
             accessibilityLabel={`${phase >= 3 ? 'Blind offering' : 'Blind mode'}, locked. ${blindUnlockHint || ''}`}
           >
-            <Text style={styles.challengeMenuIcon}>{'🔒'}</Text>
+            <ModeIcon
+              glyph={'🔒'}
+              textStyle={styles.challengeMenuIcon}
+              imageStyle={styles.challengeMenuIconImage}
+            />
             <View style={styles.challengeMenuContent}>
               <Text style={[styles.menuRowText, { color: t.muted }]}>
                 {phase >= 3 ? 'BLIND OFFERING' : 'BLIND MODE'}
@@ -440,9 +472,11 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
             accessibilityState={{ selected: blindActive }}
             accessibilityLabel={`Blind offering, ${blindActive ? 'on' : 'off'}`}
           >
-            <Text style={styles.challengeMenuIcon}>
-              {blindActive ? '🌑' : '👁️'}
-            </Text>
+            <ModeIcon
+              glyph={blindActive ? '🌑' : '👁️'}
+              textStyle={styles.challengeMenuIcon}
+              imageStyle={styles.challengeMenuIconImage}
+            />
             <View style={styles.challengeMenuContent}>
               <Text
                 style={[
@@ -475,7 +509,11 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
             accessibilityState={{ selected: unbrokenWeaveActive }}
             accessibilityLabel={`Unbroken Weave, ${unbrokenWeaveActive ? 'on' : 'off'}. Each letter may cross the chain only once.`}
           >
-            <Text style={styles.challengeMenuIcon}>{'🧵'}</Text>
+            <ModeIcon
+              glyph={'🧵'}
+              textStyle={styles.challengeMenuIcon}
+              imageStyle={styles.challengeMenuIconImage}
+            />
             <View style={styles.challengeMenuContent}>
               <Text
                 style={[
@@ -582,6 +620,11 @@ const styles = StyleSheet.create({
     fontSize: 17,
     marginRight: 10,
   },
+  challengeMenuIconImage: {
+    width: 26,
+    height: 26,
+    marginRight: 10,
+  },
   challengeMenuContent: {
     flex: 1,
   },
@@ -604,6 +647,12 @@ const styles = StyleSheet.create({
   variantIcon: {
     fontFamily: BODY_FONT,
     fontSize: 17,
+    marginRight: 8,
+    marginTop: 1,
+  },
+  variantIconImage: {
+    width: 27,
+    height: 27,
     marginRight: 8,
     marginTop: 1,
   },
