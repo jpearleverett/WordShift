@@ -16,6 +16,9 @@ describe('getBulkOfferTiming', () => {
       expect(timing.cascadeDurationMs).toBeGreaterThanOrEqual(
         (wordCount - 1) * timing.staggerMs + timing.wordDurationMs,
       );
+      expect(timing.cascadeDurationMs).toBe(
+        (wordCount - 1) * timing.staggerMs + timing.wordDurationMs + 100,
+      );
     },
   );
 
