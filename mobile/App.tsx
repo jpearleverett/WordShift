@@ -38,6 +38,7 @@ import { SettingsScreen } from './src/components/SettingsScreen';
 import { FoxGuide } from './src/components/FoxGuide';
 import {
   COLD_OPEN_INSTRUCTION,
+  COLD_OPEN_FIRST_MOVE,
   ONBOARDING_FOX_LINES,
   resolveColdOpenLaunchRoute,
 } from './src/services/onboarding';
@@ -842,6 +843,22 @@ function MainApp() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onboardingFlow.onboardingReady, onboardingFlow.onboardingStep, launchColdOpenPuzzle]);
+
+  // Cold-open warmth: the opener's guiding voice (COLD_OPEN_INSTRUCTION, set at
+  // launch) reacts with delight the instant the player lands their first valid
+  // move. Keyed on history LENGTH reaching 1 so it fires exactly once and never
+  // stomps invalid-word feedback (a rejected drop doesn't grow history). The
+  // hook sets its generic move message on that same move; this effect runs
+  // after the commit, so Ember's line wins. Only the cold-open step, only while
+  // playing.
+  useEffect(() => {
+    if (onboardingFlow.onboardingStep !== 'cold_open_puzzle') return;
+    if (puzzle.gameState !== GameState.PLAYING) return;
+    if (puzzle.history.length === 1) {
+      puzzleActions.setMessage(COLD_OPEN_FIRST_MOVE);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onboardingFlow.onboardingStep, puzzle.gameState, puzzle.history.length]);
 
   // Daily launch tasks — free streak freeze (every 14 days) + daily login
   // reward claim. Runs once per LOCAL day: on cold launch via the effect below,

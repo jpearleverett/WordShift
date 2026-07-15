@@ -43,7 +43,19 @@ const VALID_STEPS: Set<string> = new Set([
   'pit_offering', 'returning_home', 'unlock_explained', 'complete',
 ]);
 
-export const COLD_OPEN_INSTRUCTION = 'Move one letter down. Both words must stay real.';
+// The cold-open opener is a self-directed first board, but it must not open on
+// a soulless rules tooltip: for a game whose whole promise is warmth (later
+// betrayed), the very first line should already be a voice, not a system
+// message. A warm, unnamed presence teaches the ONE rule (never points at the
+// exact letter — the solve stays the player's own), then reacts with delight to
+// the first successful move. The player learns who was speaking when they let
+// Fox in on the home screen a moment later ("I'm Ember!"), which turns the
+// opener into a quiet hook: something warm was already helping, before you ever
+// invited it in. No em dashes (player-facing).
+export const COLD_OPEN_INSTRUCTION = "Oh, you're here! Move a letter down into the word below, and keep both words real. Go on, tap one and try.";
+
+/** Shown once, the instant the player lands their first valid move on the cold-open board. */
+export const COLD_OPEN_FIRST_MOVE = "There! Oh, lovely. Feel how the whole house settled around that word? Keep going, you have the knack for this.";
 
 export type ColdOpenLaunchRoute = 'restore' | 'home_empty' | 'new_board';
 
