@@ -87,6 +87,7 @@ import {
   getJournalSpotlightSteps,
   getDailyChallengeIntroLines,
   getGatedRoomIntroLines,
+  getOfferingIntroLines,
   getHarvestHomeIntroLines,
   getHarvestNudgeLine,
   getUnbrokenWeaveIntroLines,
@@ -131,8 +132,13 @@ import {
   getSacrificeAmounts,
   getSacrificePrompt,
   performSacrifice,
+  getSacrificeStats,
+  getDevotionTier,
+  getArrangementHoldsLine,
+  hasSeenOfferingIntro,
+  markOfferingIntroSeen,
 } from '../../services/sacrifice';
-import { getGalleryTitle } from '../../services/whisperGallery';
+import { getGalleryTitle, recordWhisper } from '../../services/whisperGallery';
 import {
   updateQuestProgress,
   loadWeeklyQuests,
@@ -154,7 +160,7 @@ import { DailyChallengeCard } from '../DailyChallengeCard';
 import { isDailyChallengeUnlocked, getDailyStatus } from '../../services/dailyChallenge';
 import { areUpgradesAvailable, getPurchasedUpgrades, getDeepenedRooms, getAttunedRooms } from '../../services/roomUpgrades';
 import { getTendingLevel } from '../../services/tending';
-import { hapticLight, hapticSelection } from '../../services/haptics';
+import { hapticLight, hapticSelection, hapticMedium } from '../../services/haptics';
 import { playUiSound, type UiSoundKind } from '../../services/uiSound';
 import { logEvent } from '../../services/eventLogger';
 
@@ -499,7 +505,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [introAnimal, setIntroAnimal] = useState<Animal | null>(null);
   const [introDialogueIndex, setIntroDialogueIndex] = useState(0);
   const [introOverrideLines, setIntroOverrideLines] = useState<string[] | null>(null);
-  const [introContext, setIntroContext] = useState<'animal_intro' | 'challenge_intro' | 'pit_nudge' | 'daily_challenge_intro' | 'gated_room_intro' | 'harvest_gate_intro' | 'harvest_heavy_nudge' | 'unbroken_weave_intro'>('animal_intro');
+  const [introContext, setIntroContext] = useState<'animal_intro' | 'challenge_intro' | 'pit_nudge' | 'daily_challenge_intro' | 'gated_room_intro' | 'harvest_gate_intro' | 'harvest_heavy_nudge' | 'unbroken_weave_intro' | 'offering_intro'>('animal_intro');
   // Journal spotlight intro state
   const [journalSpotlightActive, setJournalSpotlightActive] = useState(false);
   const [journalSpotlightIndex, setJournalSpotlightIndex] = useState(0);
@@ -521,9 +527,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // the final animal's intro dialogue is on screen (see the effect below).
   const [pendingHouseCompletion, setPendingHouseCompletion] = useState(false);
 
-  // Sacrifice modal state (Phase 4+)
+  // Sacrifice ("The Offering") modal state (Phase 4+). The altar stays OPEN
+  // across repeated offerings now; these track the running monument + the
+  // in-session devotion streak that escalates the arrangement's response.
   const [showSacrificeModal, setShowSacrificeModal] = useState(false);
   const [sacrificeMessage, setSacrificeMessage] = useState<string | null>(null);
+  const [offeringTotal, setOfferingTotal] = useState(0);
+  const [offeringCount, setOfferingCount] = useState(0);
+  const [offerStreak, setOfferStreak] = useState(0);
+  const [offeringTierUp, setOfferingTierUp] = useState<string | null>(null);
+  const [confirmEverything, setConfirmEverything] = useState(false);
+  // Candle flare on each offering (native driver, reduced-motion aware).
+  const sacrificePulse = useRef(new Animated.Value(0)).current;
 
   // Pending harvest summary for pit badge
   const [pendingHarvest, setPendingHarvest] = useState<HarvestSummary | null>(null);
@@ -1087,6 +1102,107 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     animals,
   ]);
 
+  // One-time invitation to The Offering (Phase 4+): Ember, robed, invites the
+  // player into the ritual. Held until no ceremony/dialogue owns the moment;
+  // marked seen on close (handleAdvanceIntroDialogue) so it lands once.
+  useEffect(() => {
+    if (!progress || isOnboarding || showIntroDialogue || introOverrideLines) return;
+    if (!isSacrificeAvailable(progress.currentPhase)) return;
+    if (dialogueFlow.showDialogue || pendingHouseCompletion || pitPhaseReady) return;
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      (async () => {
+        const seen = await hasSeenOfferingIntro();
+        if (seen || cancelled) return;
+        const ember = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
+        if (!ember) return;
+        setIntroAnimal(ember);
+        setIntroDialogueIndex(0);
+        setIntroOverrideLines(getOfferingIntroLines(progress.currentPhase));
+        setIntroContext('offering_intro');
+        setShowIntroDialogue(true);
+      })().catch(() => {});
+    }, 700);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [
+    progress?.currentPhase,
+    isOnboarding,
+    showIntroDialogue,
+    introOverrideLines,
+    dialogueFlow.showDialogue,
+    pendingHouseCompletion,
+    pitPhaseReady,
+    animals,
+  ]);
+
+  // When the altar opens, load the running monument (total + count) and reset
+  // the session: no lingering response, streak from zero, no half-armed confirm.
+  useEffect(() => {
+    if (!showSacrificeModal) return;
+    let cancelled = false;
+    setSacrificeMessage(null);
+    setOfferStreak(0);
+    setOfferingTierUp(null);
+    setConfirmEverything(false);
+    (async () => {
+      const stats = await getSacrificeStats();
+      if (cancelled) return;
+      setOfferingTotal(stats.totalSacrificed);
+      setOfferingCount(stats.count);
+    })();
+    return () => { cancelled = true; };
+  }, [showSacrificeModal]);
+
+  // Shared offering action for both the amount chips and "Offer everything".
+  // The altar stays OPEN: it updates the running monument + the in-session
+  // devotion streak (which escalates the arrangement's response) and flares the
+  // candle, so the player can fall into a rhythm instead of reopening a form.
+  const handleOffer = useCallback(async (amount: number, everything: boolean) => {
+    if (!progress || amount <= 0) return;
+    const spendResult = await spendAmber(amount, 'sacrifice');
+    if (!spendResult.success) return;
+    const nextStreak = offerStreak + 1;
+    const result = await performSacrifice(amount, progress.currentPhase, {
+      sessionStreak: nextStreak,
+      everything,
+    });
+    setProgress(prev => (prev ? { ...prev, amber: spendResult.newBalance } : prev));
+    onAmberChange?.(spendResult.newBalance);
+    setSacrificeMessage(result.message);
+    setOfferStreak(nextStreak);
+    setOfferingTotal(result.total);
+    setOfferingCount(result.count);
+    setOfferingTierUp(result.tierUp ? result.tierUp.title : null);
+    setConfirmEverything(false);
+    hapticMedium();
+    const rm = getSettingsSync().reducedMotion;
+    if (!rm) {
+      sacrificePulse.setValue(0);
+      Animated.sequence([
+        Animated.timing(sacrificePulse, { toValue: 1, duration: 160, useNativeDriver: true }),
+        Animated.timing(sacrificePulse, { toValue: 0, duration: 520, useNativeDriver: true }),
+      ]).start();
+    }
+    // Milestone offerings become permanent collectibles in the Whisper Gallery,
+    // attributed to Ember (the flame-oracle who introduced the rite; the
+    // arrangement keeps no gallery of its own).
+    if (result.isMilestone) {
+      recordWhisper({
+        animalType: 'fox',
+        animalName: 'Ember',
+        text: result.message,
+        phase: progress.currentPhase,
+        type: 'whisper',
+      }).catch(() => {});
+    }
+    updateQuestProgress({ amberSacrificed: amount }, progress.currentPhase).catch(() => {});
+  }, [progress, offerStreak, onAmberChange, sacrificePulse]);
+
   // Ambient home line — atmospheric text when no dialogue is active
   // Fades in, holds for 5s, then fades out to avoid persistent visual clutter.
   useEffect(() => {
@@ -1291,6 +1407,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         await markGatedUnlockIntroSeen();
       } else if (introContext === 'harvest_gate_intro') {
         await markHarvestHomeIntroSeen();
+      } else if (introContext === 'offering_intro') {
+        await markOfferingIntroSeen();
       } else if (introContext === 'harvest_heavy_nudge') {
         // App-session-scoped (heavyHarvestNudgeShownThisSession) — nothing to persist.
       } else if (introContext === 'unbroken_weave_intro') {
@@ -1320,6 +1438,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         await markGatedUnlockIntroSeen();
       } else if (introContext === 'harvest_gate_intro') {
         await markHarvestHomeIntroSeen();
+      } else if (introContext === 'offering_intro') {
+        await markOfferingIntroSeen();
       } else if (introContext === 'harvest_heavy_nudge') {
         // App-session-scoped (heavyHarvestNudgeShownThisSession) — nothing to persist.
       } else if (introContext === 'unbroken_weave_intro') {
@@ -2951,76 +3071,125 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               edgeDp={PANEL_EDGE_DP}
               fillColor={pixelSkin.fill}
             />
-            <Text style={styles.sacrificeEmoji}>🕯️</Text>
+            <ScrollView
+              style={styles.sacrificeScroll}
+              contentContainerStyle={styles.sacrificeScrollContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+            <View style={styles.sacrificeCandleWrap}>
+              <Animated.View
+                pointerEvents="none"
+                style={[styles.sacrificeCandleGlow, {
+                  opacity: sacrificePulse.interpolate({ inputRange: [0, 1], outputRange: [0, 0.55] }),
+                  transform: [{ scale: sacrificePulse.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1.7] }) }],
+                }]}
+              />
+              <Animated.Text
+                style={[styles.sacrificeEmoji, {
+                  transform: [{ scale: sacrificePulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.3] }) }],
+                }]}
+              >
+                🕯️
+              </Animated.Text>
+            </View>
             <Text style={[styles.sacrificeTitle, { color: panelSt.title }]}>
               {getSacrificePrompt(progress.currentPhase).title}
             </Text>
             <Text style={[styles.sacrificeSubtitle, { color: panelSt.muted }]}>
               {getSacrificePrompt(progress.currentPhase).subtitle}
             </Text>
+
+            {/* The monument: what the arrangement now holds of you, and the
+                private "regard" that grows with repeat giving. */}
+            {offeringCount > 0 && (() => {
+              const devotion = getDevotionTier(offeringCount);
+              return (
+                <View style={styles.offeringMonument}>
+                  {devotion && (
+                    <>
+                      <Text style={[styles.offeringTierTitle, { color: panelSt.title }]}>
+                        {devotion.title}
+                      </Text>
+                      <Text style={[styles.offeringTierRegard, { color: panelSt.muted }]}>
+                        {devotion.regard}
+                      </Text>
+                    </>
+                  )}
+                  <Text style={[styles.offeringHolds, { color: panelSt.body }]}>
+                    {getArrangementHoldsLine(offeringTotal, progress.currentPhase)}
+                  </Text>
+                </View>
+              );
+            })()}
+
             <Text style={[styles.sacrificeBalance, { color: panelSt.body }]}>
               Your Amber: <AmberInline /> {progress.amber}
             </Text>
 
-            {sacrificeMessage ? (
+            {/* Persistent response: shown ABOVE the still-tappable amounts so
+                the player can keep offering without the altar closing. */}
+            {sacrificeMessage && (
               <View style={[styles.sacrificeResponseBox, { backgroundColor: panelSt.sectionBg, borderColor: panelSt.sectionBorder }]}>
+                {offeringTierUp && (
+                  <Text style={[styles.offeringTierUp, { color: panelSt.title }]}>
+                    {`The arrangement's regard deepens... ${offeringTierUp}`}
+                  </Text>
+                )}
                 <Text style={[styles.sacrificeResponseText, { color: panelSt.body }]}>
                   {sacrificeMessage}
                 </Text>
-                <CandyButton
-                  label="Close"
-                  variant="primary"
-                  phase={progress.currentPhase}
-                hostDark={dtHostDark}
-                  style={styles.sacrificeCloseAction}
-                  onPress={() => {
-                    setSacrificeMessage(null);
-                    setShowSacrificeModal(false);
-                  }}
-                />
-              </View>
-            ) : (
-              <View style={styles.sacrificeAmounts}>
-                {getSacrificeAmounts(progress.amber).map(amount => (
-                  <TouchableOpacity
-                    key={amount}
-                    style={[styles.sacrificeAmountBtn, { backgroundColor: panelSt.sectionBg, borderColor: panelSt.sectionBorder }]}
-                    onPress={async () => {
-                      const spendResult = await spendAmber(amount, 'sacrifice');
-                      if (!spendResult.success) return;
-                      const result = await performSacrifice(amount, progress.currentPhase);
-                      setProgress(prev => prev ? { ...prev, amber: spendResult.newBalance } : prev);
-                      onAmberChange?.(spendResult.newBalance);
-                      setSacrificeMessage(result.message);
-                      // Track sacrifice for weekly quest progress
-                      updateQuestProgress({ amberSacrificed: amount }, progress.currentPhase).catch(() => {});
-                    }}
-                    accessibilityLabel={`Offer ${amount} amber`}
-                    accessibilityRole="button"
-                  >
-                    <Text style={[styles.sacrificeAmountText, { color: panelSt.body }]}>
-                      <AmberInline /> {amount}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-                {getSacrificeAmounts(progress.amber).length === 0 && (
-                  <Text style={[styles.sacrificeNoAmber, { color: panelSt.muted }]}>
-                    You don&apos;t have enough amber to offer.
-                  </Text>
-                )}
               </View>
             )}
 
-            {!sacrificeMessage && (
-              <CandyButton
-                label="Not now"
-                variant="quiet"
-                phase={progress.currentPhase}
-                hostDark={dtHostDark}
-                style={styles.closeAction}
-                onPress={() => setShowSacrificeModal(false)}
-              />
+            <View style={styles.sacrificeAmounts}>
+              {getSacrificeAmounts(progress.amber).map(amount => (
+                <TouchableOpacity
+                  key={amount}
+                  style={[styles.sacrificeAmountBtn, { backgroundColor: panelSt.sectionBg, borderColor: panelSt.sectionBorder }]}
+                  onPress={() => handleOffer(amount, false)}
+                  accessibilityLabel={`Offer ${amount} amber`}
+                  accessibilityRole="button"
+                >
+                  <Text style={[styles.sacrificeAmountText, { color: panelSt.body }]}>
+                    <AmberInline /> {amount}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              {getSacrificeAmounts(progress.amber).length === 0 && progress.amber <= 0 && (
+                <Text style={[styles.sacrificeNoAmber, { color: panelSt.muted }]}>
+                  You have nothing left to offer.
+                </Text>
+              )}
+            </View>
+
+            {/* The fullest gesture: give the whole balance at once. Two-tap
+                confirm so it can never be an accident. */}
+            {progress.amber > 0 && (
+              <TouchableOpacity
+                style={[styles.offeringEverythingBtn, { borderColor: panelSt.sectionBorder }]}
+                onPress={() => {
+                  if (confirmEverything) handleOffer(progress.amber, true);
+                  else setConfirmEverything(true);
+                }}
+                accessibilityLabel={confirmEverything ? `Confirm offering all ${progress.amber} amber` : 'Offer everything'}
+                accessibilityRole="button"
+              >
+                <Text style={[styles.offeringEverythingText, { color: confirmEverything ? panelSt.title : panelSt.muted }]}>
+                  {confirmEverything ? `Give all ${progress.amber}? Tap again.` : 'Offer everything'}
+                </Text>
+              </TouchableOpacity>
             )}
+
+            <CandyButton
+              label={sacrificeMessage ? 'Done' : 'Not now'}
+              variant="quiet"
+              phase={progress.currentPhase}
+              hostDark={dtHostDark}
+              style={styles.closeAction}
+              onPress={() => setShowSacrificeModal(false)}
+            />
+            </ScrollView>
           </SpringIn>
         </View>
       </Modal>
@@ -4204,18 +4373,39 @@ const styles = StyleSheet.create({
     textShadowRadius: 4,
   },
 
-  // Sacrifice modal — chrome comes from the NineSliceFrame pixel panel
+  // Sacrifice modal — chrome comes from the NineSliceFrame pixel panel. The
+  // altar now stays open across offerings (monument + response + amounts +
+  // "offer everything"), so the body scrolls to stay safe on short screens.
   sacrificeModal: {
     padding: 30,
     marginHorizontal: 20,
     alignItems: 'center',
     maxWidth: 380,
     width: '90%',
+    maxHeight: '86%',
+  },
+  sacrificeScroll: {
+    alignSelf: 'stretch',
+  },
+  sacrificeScrollContent: {
+    alignItems: 'center',
+  },
+  sacrificeCandleWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  // Warm flare behind the candle on each offering (opacity/scale animated).
+  sacrificeCandleGlow: {
+    position: 'absolute',
+    width: 92,
+    height: 92,
+    borderRadius: 46,
+    backgroundColor: '#FFB347',
   },
   sacrificeEmoji: {
     fontFamily: BODY_FONT,
     fontSize: 50,
-    marginBottom: 12,
   },
   sacrificeTitle: {
     fontFamily: PIXEL_FONT_BOLD,
@@ -4281,10 +4471,58 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     textAlign: 'center',
     fontStyle: 'italic',
-    marginBottom: 16,
   },
   sacrificeCloseAction: {
     alignSelf: 'stretch',
+  },
+  // The monument: private devotion standing + what the arrangement holds of you.
+  offeringMonument: {
+    alignItems: 'center',
+    marginBottom: 14,
+    paddingHorizontal: 8,
+  },
+  offeringTierTitle: {
+    fontFamily: PIXEL_FONT_BOLD,
+    fontSize: 15,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+    textAlign: 'center',
+  },
+  offeringTierRegard: {
+    fontFamily: BODY_FONT_ITALIC,
+    fontSize: 12.5,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: 2,
+    marginBottom: 6,
+  },
+  offeringHolds: {
+    fontFamily: BODY_FONT,
+    fontSize: 12.5,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  offeringTierUp: {
+    fontFamily: PIXEL_FONT_BOLD,
+    fontSize: 13.5,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  offeringEverythingBtn: {
+    borderWidth: 1.5,
+    borderRadius: 14,
+    paddingVertical: 11,
+    paddingHorizontal: 18,
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  offeringEverythingText: {
+    fontFamily: PIXEL_FONT_BOLD,
+    fontSize: 14,
+    fontWeight: '800',
+    textAlign: 'center',
   },
 
   // House completion ceremony styles — chrome from the NineSliceFrame panel
