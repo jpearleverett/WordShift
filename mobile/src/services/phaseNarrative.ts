@@ -3268,6 +3268,28 @@ export function getGatedRoomIntroLines(phase: number, roomName: string): string[
 }
 
 /**
+ * One-time Phase-4 invitation to the Offering, spoken by Ember (the flame-oracle
+ * who reads the fire). Robed, reverent, certain, unsettling: it invites the
+ * player into the ritual and names the wrongness of wanting to give for nothing.
+ * Phase-5 variant is serene (the entity has arrived). No em dashes.
+ */
+export function getOfferingIntroLines(phase: number): string[] {
+  if (phase >= 5) {
+    return [
+      'You feel it too, I think. The stillness at the center of the house.',
+      'When you have amber to spare, you may give it to the pattern. Not to me... to what we have become.',
+      'It asks for nothing in return. That is how you know the giving is real.',
+    ];
+  }
+  return [
+    'There is a hollow at the heart of the house now. You have felt it. I have felt it since the beginning.',
+    'When you have amber to spare, you can offer it. Not to me, friend... to what we are making together.',
+    'It gives you nothing back. No room, no reward, nothing you can hold in your hands.',
+    'And still you will want to. That is how I knew you were the one we had been waiting for.',
+  ];
+}
+
+/**
  * Fox's one-time intro lines when Challenge Mode becomes available (after 15 puzzles).
  */
 export function getChallengeIntroLines(phase: DialoguePhase): string[] {

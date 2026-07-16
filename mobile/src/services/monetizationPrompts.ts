@@ -38,7 +38,7 @@ import {
 const STORAGE_KEY = 'wordshift_monet_prompts';
 
 /** Max times per local day the victory "double the reward" slot may present. */
-export const REWARDED_DOUBLE_DAILY_CAP = 2;
+export const REWARDED_DOUBLE_DAILY_CAP = 5;
 
 /**
  * The rewarded-double slot never presents from this phase on — the dread arc

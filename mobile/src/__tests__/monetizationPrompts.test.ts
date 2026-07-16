@@ -79,7 +79,7 @@ describe('pure decisions', () => {
   });
 
   it('rewarded double: capped per day, blocked from the dread arc (phase 4+)', () => {
-    expect(REWARDED_DOUBLE_DAILY_CAP).toBe(2);
+    expect(REWARDED_DOUBLE_DAILY_CAP).toBe(5);
     expect(shouldOfferRewardedDouble({ offersToday: 0, phase: 0 })).toBe(true);
     expect(shouldOfferRewardedDouble({ offersToday: REWARDED_DOUBLE_DAILY_CAP - 1, phase: 3 })).toBe(true);
     expect(shouldOfferRewardedDouble({ offersToday: REWARDED_DOUBLE_DAILY_CAP, phase: 0 })).toBe(false);
@@ -119,8 +119,9 @@ describe('rewarded-double cadence (canOfferRewardedDouble / recordRewardedDouble
   });
 
   it('resets on the local-day rollover', async () => {
-    await recordRewardedDoubleOffered();
-    await recordRewardedDoubleOffered();
+    for (let i = 0; i < REWARDED_DOUBLE_DAILY_CAP; i++) {
+      await recordRewardedDoubleOffered();
+    }
     expect(await canOfferRewardedDouble(0)).toBe(false);
 
     mockToday = '2026-07-15';
@@ -153,8 +154,10 @@ describe('rewarded-double cadence (canOfferRewardedDouble / recordRewardedDouble
   });
 
   it('Reset All clears the cadence state', async () => {
-    await recordRewardedDoubleOffered();
-    await recordRewardedDoubleOffered();
+    for (let i = 0; i < REWARDED_DOUBLE_DAILY_CAP; i++) {
+      await recordRewardedDoubleOffered();
+    }
+    expect(await canOfferRewardedDouble(0)).toBe(false);
     await clearMonetPrompts();
     expect(await canOfferRewardedDouble(0)).toBe(true);
   });

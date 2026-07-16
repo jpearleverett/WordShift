@@ -7,6 +7,13 @@ import {
   getSacrificePrompt,
   getSacrificeStats,
   clearSacrificeState,
+  selectOfferingResponse,
+  getDevotionTier,
+  getDevotionTierIndex,
+  getArrangementHoldsLine,
+  hasSeenOfferingIntro,
+  markOfferingIntroSeen,
+  DEVOTION_TIERS,
 } from '../services/sacrifice';
 
 // Mock AsyncStorage using shared factory
@@ -281,9 +288,9 @@ describe('sacrifice', () => {
       expect(prompt.title).toBe('Offer Amber');
     });
 
-    it('returns ritual prompt at phase 5', () => {
+    it('returns the serene ritual prompt at phase 5', () => {
       const prompt = getSacrificePrompt(5);
-      expect(prompt.title).toBe('Offer to the Arrangement');
+      expect(prompt.title).toBe('Give to the Pattern');
     });
 
     it('prompt has title and subtitle', () => {
@@ -336,6 +343,141 @@ describe('sacrifice', () => {
     it('calls AsyncStorage.removeItem', async () => {
       await clearSacrificeState();
       expect(AsyncStorage.removeItem).toHaveBeenCalledWith('wordshift_sacrifices');
+    });
+  });
+
+  // ===========================================================================
+  // Devotion tiers (private standing)
+  // ===========================================================================
+
+  describe('devotion tiers', () => {
+    it('has no tier before the first offering', () => {
+      expect(getDevotionTier(0)).toBeNull();
+      expect(getDevotionTierIndex(0)).toBe(-1);
+    });
+
+    it('holds the highest tier whose threshold is met', () => {
+      expect(getDevotionTier(1)?.title).toBe('Noticed');
+      expect(getDevotionTier(2)?.title).toBe('Noticed'); // still tier 0 until 3
+      expect(getDevotionTier(3)?.title).toBe('Marked');
+      expect(getDevotionTier(8)?.title).toBe('Known');
+      expect(getDevotionTier(20)?.title).toBe('Kept');
+      expect(getDevotionTier(50)?.title).toBe('Beloved of the Pattern');
+      expect(getDevotionTier(100)?.title).toBe('One of the Arrangement');
+      expect(getDevotionTier(999)?.title).toBe('One of the Arrangement'); // clamps to top
+    });
+
+    it('tier thresholds are strictly increasing', () => {
+      for (let i = 1; i < DEVOTION_TIERS.length; i++) {
+        expect(DEVOTION_TIERS[i].threshold).toBeGreaterThan(DEVOTION_TIERS[i - 1].threshold);
+      }
+    });
+  });
+
+  // ===========================================================================
+  // selectOfferingResponse (escalation / everything / milestone / first)
+  // ===========================================================================
+
+  describe('selectOfferingResponse', () => {
+    it('returns the special welcome on the first offering', () => {
+      const r = selectOfferingResponse({ count: 1 });
+      expect(r.isMilestone).toBe(false);
+      expect(r.message).toContain('arrangement');
+    });
+
+    it('surfaces milestone copy at milestone counts', () => {
+      expect(selectOfferingResponse({ count: 5 }).isMilestone).toBe(true);
+      expect(selectOfferingResponse({ count: 5 }).message).toContain('Five');
+      expect(selectOfferingResponse({ count: 10 }).message).toContain('Ten');
+    });
+
+    it('escalates the in-session tone by streak (non-milestone counts)', () => {
+      // count 4 is not a milestone; the pools differ by streak tier. Sample many
+      // draws and assert each streak tier only ever yields lines from its pool.
+      const calm = new Set<string>();
+      const fervent = new Set<string>();
+      for (let i = 0; i < 60; i++) {
+        calm.add(selectOfferingResponse({ count: 4, sessionStreak: 0, phase: 4 }).message);
+        fervent.add(selectOfferingResponse({ count: 4, sessionStreak: 8, phase: 4 }).message);
+      }
+      // The fervent pool contains a line the calm pool never produces.
+      expect([...fervent].some(m => m.includes('stopped pretending'))).toBe(true);
+      expect([...calm].some(m => m.includes('stopped pretending'))).toBe(false);
+    });
+
+    it('serves serene (phase 5) copy distinct from the dread (phase 4) pool', () => {
+      const p5 = new Set<string>();
+      for (let i = 0; i < 40; i++) {
+        p5.add(selectOfferingResponse({ count: 4, sessionStreak: 0, phase: 5 }).message);
+      }
+      expect([...p5].every(m => m.length > 0)).toBe(true);
+      // A serene line that never appears in the phase-4 calm pool.
+      expect([...p5].some(m => m.includes('no hunger'))).toBe(true);
+    });
+
+    it('gives the "offer everything" gesture its own response', () => {
+      const draws = new Set<string>();
+      for (let i = 0; i < 40; i++) {
+        draws.add(selectOfferingResponse({ count: 4, everything: true, phase: 4 }).message);
+      }
+      expect([...draws].some(m => m.toLowerCase().includes('everything'))).toBe(true);
+      expect(selectOfferingResponse({ count: 4, everything: true }).isMilestone).toBe(false);
+    });
+  });
+
+  // ===========================================================================
+  // performSacrifice — monument + devotion tier-up metadata
+  // ===========================================================================
+
+  describe('performSacrifice enrichment', () => {
+    it('returns the running monument (total + count)', async () => {
+      await performSacrifice(10, 4);
+      const r = await performSacrifice(15, 4);
+      expect(r.total).toBe(25);
+      expect(r.count).toBe(2);
+    });
+
+    it('reports a tierUp only on the offering that crosses a threshold', async () => {
+      const first = await performSacrifice(5, 4); // count 1 -> tier "Noticed"
+      expect(first.tierUp?.title).toBe('Noticed');
+      const second = await performSacrifice(5, 4); // count 2 -> still "Noticed", no cross
+      expect(second.tierUp).toBeNull();
+      const third = await performSacrifice(5, 4); // count 3 -> "Marked"
+      expect(third.tierUp?.title).toBe('Marked');
+    });
+
+    it('threads the session streak into the response without breaking milestones', async () => {
+      // count 2 is a milestone regardless of streak.
+      await performSacrifice(5, 4, { sessionStreak: 1 });
+      const r = await performSacrifice(5, 4, { sessionStreak: 2 });
+      expect(r.isMilestone).toBe(true);
+      expect(r.message).toContain('Twice');
+    });
+  });
+
+  // ===========================================================================
+  // Monument line + one-time intro flag
+  // ===========================================================================
+
+  describe('getArrangementHoldsLine', () => {
+    it('names the total and is phase-aware', () => {
+      expect(getArrangementHoldsLine(340, 4)).toContain('340');
+      expect(getArrangementHoldsLine(340, 4)).toContain('remembers');
+      expect(getArrangementHoldsLine(340, 5)).toContain('at peace');
+    });
+  });
+
+  describe('offering intro flag', () => {
+    it('is unseen by default and persists once marked (rides the synced state)', async () => {
+      expect(await hasSeenOfferingIntro()).toBe(false);
+      await markOfferingIntroSeen();
+      expect(await hasSeenOfferingIntro()).toBe(true);
+    });
+
+    it('is cleared by Reset All (clearSacrificeState)', async () => {
+      await markOfferingIntroSeen();
+      await clearSacrificeState();
+      expect(await hasSeenOfferingIntro()).toBe(false);
     });
   });
 });

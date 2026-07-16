@@ -154,12 +154,12 @@ import {
 } from './src/services/notifications';
 import { runMigrations } from './src/services/dataMigration';
 import { initIAP, setBillingProvider, reconcilePendingConsumableGrants, acknowledgeConsumableGrant } from './src/services/iap';
-import { initAds, setAdProvider, maybeShowInterstitial, showRewarded, isRewardedCapReached, RewardedPlacement, isDailyInterstitialAllowed } from './src/services/ads';
+import { initAds, setAdProvider, maybeShowInterstitial, showRewarded, isRewardedCapReached, isAdsReady, RewardedPlacement, isDailyInterstitialAllowed } from './src/services/ads';
 import { RewardedAdButton } from './src/components/monetization/RewardedAdButton';
 import { initCosmetics } from './src/services/cosmetics';
 import { loadPixelFonts, installGlobalFont } from './src/theme/fonts';
 import { initHints, addHints } from './src/services/hints';
-import { loadEntitlements, hasEntitlementSync, ENTITLEMENTS } from './src/services/entitlements';
+import { loadEntitlements, hasEntitlementSync, isAdFreeSync, ENTITLEMENTS } from './src/services/entitlements';
 import { StoreModal } from './src/components/monetization/StoreModal';
 import { recordInterstitialSeen, consumePatronNudge, armRemoveAdsNudgeIfEligible, consumePendingRemoveAdsNudge, canOfferRewardedDouble, recordRewardedDoubleOffered, canShowExitNudge, recordExitNudgeShown } from './src/services/monetizationPrompts';
 import { REWARDED_HINT_GRANT } from './src/constants/gameBalance';
@@ -1760,18 +1760,27 @@ function MainApp() {
       // daily's +50% line can never linger onto later normal-board victories.
       setEventBonusLine(null);
       setVictoryDoubleClaimed(false);
-      // Rewarded-double cadence gate: the 2x slot presents at most twice per
-      // local day and never at phase 4+ (the dread arc is protected like
-      // interstitials) — on every win it made the base reward read as the
-      // amount the player failed to claim. Decided + recorded HERE, once per
-      // victory (processing time), so modal re-renders can never double-count
-      // a presentation. Ad-free owners' instant-double perk is the same slot
-      // and follows the same cadence.
+      // Rewarded-double cadence gate: the 2x slot presents up to
+      // REWARDED_DOUBLE_DAILY_CAP times per local day and never at phase 4+
+      // (the dread arc is protected like interstitials) — on every win it made
+      // the base reward read as the amount the player failed to claim. Decided
+      // + recorded HERE, once per victory (processing time), so modal
+      // re-renders can never double-count a presentation.
+      //
+      // Only spend a daily slot when the button can ACTUALLY present: ad-free
+      // owners always can (the instant ✦), everyone else needs a ready ad
+      // provider with rewarded budget left. Recording an offer for a button
+      // that then self-hides (cold-start SDK not up yet, no provider, or the
+      // rewarded daily cap reached) silently burned the day's slots on an
+      // invisible affordance — the reason the 2x "never showed up." So the
+      // slot now surfaces on the FIRST eligible win it can render on.
       setVictoryDoubleOffer(false);
       if (victory.puzzlesSolved > AUTO_COLLECT_PUZZLE_LIMIT) {
         (async () => {
           try {
-            if (await canOfferRewardedDouble(persistence.currentPhase)) {
+            const canPresentDouble =
+              isAdFreeSync() || (isAdsReady() && !(await isRewardedCapReached()));
+            if (canPresentDouble && (await canOfferRewardedDouble(persistence.currentPhase))) {
               await recordRewardedDoubleOffered();
               setVictoryDoubleOffer(true);
             }

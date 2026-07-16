@@ -1,15 +1,19 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /**
- * Sacrifice mechanic for Phase 4+.
+ * The Offering (Phase 4+): a private altar to the thing the house is becoming.
  *
- * Players can voluntarily "offer" earned amber back to "the arrangement."
- * The amber is destroyed — they get nothing tangible in return.
- * The house glows briefly. The animals notice. That's it.
+ * The player offers earned amber "to the arrangement." The amber is destroyed;
+ * they get NOTHING tangible in return. No room, no cosmetic, no progress. The
+ * entire point is complicity: they choose to feed a cosmic-horror ritual for no
+ * mechanical benefit, and they will, because it is offered warmly.
  *
- * This reinforces the complicity theme: the player is choosing to give
- * resources to a cosmic horror ritual for no gameplay benefit.
- * The fact that players WILL do this (and they will) is the entire point.
+ * What the mechanic gives back is not a reward but *recognition*. The more you
+ * give, the more the arrangement notices you: a visible monument to what you've
+ * given, a private "devotion" standing that changes how it addresses you, and
+ * an in-session rhythm that escalates from indifferent acceptance to direct,
+ * unsettling attention. Satisfying, but wrong. Warm the way a held hand is warm
+ * when you cannot see whose hand it is.
  *
  * "You didn't have to do that. But you did."
  */
@@ -26,6 +30,8 @@ export interface SacrificeState {
   lastSacrificeTimestamp: number;
   /** The arrangement remembers what was offered */
   sacrificeHistory: SacrificeEntry[];
+  /** Whether the one-time Phase-4 offering invitation has been delivered. */
+  introSeen?: boolean;
 }
 
 export interface SacrificeEntry {
@@ -35,25 +41,26 @@ export interface SacrificeEntry {
   phase: number;
 }
 
+/** A private "devotion" standing: how the arrangement regards a repeat giver. */
+export interface DevotionTier {
+  /** Minimum cumulative offering count to hold this tier. */
+  threshold: number;
+  /** The title shown at the altar (never "level N" — this is regard, not rank). */
+  title: string;
+  /** One line on how the arrangement's attention reads at this tier. */
+  regard: string;
+}
+
 // ============================================================================
-// Sacrifice Response Messages
+// Copy pools
 // ============================================================================
 
-const SACRIFICE_RESPONSES = [
-  // First sacrifice — special
-  'The arrangement accepts your offering. The house glows, briefly.',
-  // Subsequent sacrifices
-  'The walls pulse once. The amber dissolves into the pattern.',
-  'You hear nothing. But something heard you.',
-  'The animals pause, briefly. They know what you did.',
-  'The amber sinks into the floor. The foundation drinks.',
-  'A warmth that should not be warm.',
-  'Accepted. Always accepted.',
-  'The pattern grows. You fed it voluntarily.',
-  'Ember\'s fire flickers. Not from wind.',
-  'The arrangement remembers every offering. Especially the voluntary ones.',
-];
+// First-ever offering (special). Tests assert this contains "arrangement".
+const FIRST_OFFERING = 'The arrangement accepts your offering. The house glows, briefly.';
 
+// Cumulative-count milestones. These OVERRIDE the escalation pools and are the
+// collectible beats (recorded to the Whisper Gallery by the caller). The exact
+// keywords here are part of the mechanic's contract (see sacrifice.test.ts).
 const SACRIFICE_MILESTONES: Record<number, string> = {
   2: 'Twice now. The walls remember.',
   3: 'Three offerings. The animals have noticed.',
@@ -63,6 +70,94 @@ const SACRIFICE_MILESTONES: Record<number, string> = {
   50: 'Fifty. The arrangement has never been fed so willingly.',
   100: 'One hundred offerings. You gave everything. You chose to.',
 };
+
+// Escalating in-session responses. The player can now offer repeatedly without
+// closing the altar; consecutive offerings in one sitting (sessionStreak) ramp
+// the arrangement's attention from calm acceptance to direct, unsettling
+// address. Phase 4 = reverent dread; Phase 5 = serene, arrived.
+const OFFERING_RESPONSES: Record<'p4' | 'p5', { calm: string[]; leaning: string[]; fervent: string[] }> = {
+  p4: {
+    calm: [
+      'The walls pulse once. The amber dissolves into the pattern.',
+      'You hear nothing. But something heard you.',
+      'The amber sinks into the floor. The foundation drinks.',
+      'A warmth that should not be warm.',
+      'Accepted. Always accepted.',
+    ],
+    leaning: [
+      'The animals pause, wherever they are. They know what you did.',
+      'The pattern grows. You fed it again, and freely.',
+      "Ember's fire leans toward you now, though you are not near it.",
+      'The house holds its breath around your hands.',
+    ],
+    fervent: [
+      'You are still here. Still giving. The house has stopped pretending to be surprised.',
+      'It knows the shape of your giving now. It waits for the next.',
+      'Something behind the walls has turned to face you fully.',
+      'You did not have to. You never have to. That is what it loves.',
+    ],
+  },
+  p5: {
+    calm: [
+      'The pattern accepts, gently. There is no hunger left in it, only welcome.',
+      'The amber settles into the quiet. Nothing stirs. Nothing needs to.',
+      'It is received. All of it is received now.',
+    ],
+    leaning: [
+      'The house is warm the way a held hand is warm. It remembers you giving.',
+      'The animals smile without turning. The offering was expected, and kind.',
+      'You give to something that has already arrived. It thanks you anyway.',
+    ],
+    fervent: [
+      'You are part of the pattern that gives to the pattern. It is very peaceful here.',
+      'There is nothing left to summon. You give for the closeness of it. So does it.',
+      'The arrangement holds you the way it holds the amber. Kept. Content.',
+    ],
+  },
+};
+
+// The rare "offer everything" act: the fullest complicity, in one gesture.
+const EVERYTHING_RESPONSES: Record<'p4' | 'p5', string[]> = {
+  p4: [
+    'Everything. You gave everything. The house floods with a light that has no source.',
+    'All of it, at once. The walls shudder like something waking. You feel seen to the bone.',
+    'You emptied your hands into the pattern. It closes around the gift, and around you.',
+  ],
+  p5: [
+    'Everything, freely, at the end of things. The arrangement receives it like a last warm breath.',
+    'You keep nothing. The house keeps you. It has, for some time now.',
+    'All of it. The pattern does not thank you. It simply makes room, and you fit.',
+  ],
+};
+
+// ============================================================================
+// Devotion tiers (private standing — flavor, never mechanical)
+// ============================================================================
+
+export const DEVOTION_TIERS: DevotionTier[] = [
+  { threshold: 1, title: 'Noticed', regard: 'The arrangement has turned its attention to you.' },
+  { threshold: 3, title: 'Marked', regard: 'It knows your hands now.' },
+  { threshold: 8, title: 'Known', regard: 'It no longer waits to be asked.' },
+  { threshold: 20, title: 'Kept', regard: 'You belong to the pattern a little.' },
+  { threshold: 50, title: 'Beloved of the Pattern', regard: 'The keepers speak of your devotion.' },
+  { threshold: 100, title: 'One of the Arrangement', regard: 'There is no longer a line between you and it.' },
+];
+
+/** Index (0-based) of the highest devotion tier held at `count`, or -1 if none. */
+export function getDevotionTierIndex(count: number): number {
+  let idx = -1;
+  for (let i = 0; i < DEVOTION_TIERS.length; i++) {
+    if (count >= DEVOTION_TIERS[i].threshold) idx = i;
+    else break;
+  }
+  return idx;
+}
+
+/** The devotion tier held at `count`, or null before the first offering. */
+export function getDevotionTier(count: number): DevotionTier | null {
+  const idx = getDevotionTierIndex(count);
+  return idx >= 0 ? DEVOTION_TIERS[idx] : null;
+}
 
 // ============================================================================
 // In-memory cache
@@ -75,14 +170,57 @@ export function invalidateSacrificeCache(): void {
   sacrificeCache = null;
 }
 
-
 function getDefaultState(): SacrificeState {
   return {
     totalAmberSacrificed: 0,
     sacrificeCount: 0,
     lastSacrificeTimestamp: 0,
     sacrificeHistory: [],
+    introSeen: false,
   };
+}
+
+function pick(pool: string[]): string {
+  if (pool.length === 0) return '';
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+// ============================================================================
+// Response selection (pure — exported for tests)
+// ============================================================================
+
+/**
+ * Choose the arrangement's response to an offering. Priority:
+ *   1. "Offer everything" — the fullest gesture, its own bespoke pool.
+ *   2. First-ever offering — the special welcome (contains "arrangement").
+ *   3. Cumulative-count milestone — the collectible beats.
+ *   4. Escalation pool — calm / leaning / fervent by in-session streak, and
+ *      dread (Phase 4) vs serene (Phase 5) by phase.
+ * `isMilestone` marks case 3 only (drives the collectible + emphasis).
+ */
+export function selectOfferingResponse(params: {
+  count: number;
+  sessionStreak?: number;
+  phase?: number;
+  everything?: boolean;
+}): { message: string; isMilestone: boolean } {
+  const { count } = params;
+  const phase = params.phase ?? 4;
+  const streak = Math.max(0, params.sessionStreak ?? 0);
+  const bank: 'p4' | 'p5' = phase >= 5 ? 'p5' : 'p4';
+
+  if (params.everything) {
+    return { message: pick(EVERYTHING_RESPONSES[bank]), isMilestone: false };
+  }
+  if (count <= 1) {
+    return { message: FIRST_OFFERING, isMilestone: false };
+  }
+  const milestone = SACRIFICE_MILESTONES[count];
+  if (milestone) {
+    return { message: milestone, isMilestone: true };
+  }
+  const tier: 'calm' | 'leaning' | 'fervent' = streak >= 6 ? 'fervent' : streak >= 3 ? 'leaning' : 'calm';
+  return { message: pick(OFFERING_RESPONSES[bank][tier]), isMilestone: false };
 }
 
 // ============================================================================
@@ -104,7 +242,14 @@ export async function loadSacrificeState(): Promise<SacrificeState> {
         typeof parsed.sacrificeCount === 'number' &&
         Array.isArray(parsed.sacrificeHistory)
       ) {
-        sacrificeCache = parsed;
+        // Normalize: older saves predate the introSeen flag.
+        sacrificeCache = {
+          totalAmberSacrificed: parsed.totalAmberSacrificed,
+          sacrificeCount: parsed.sacrificeCount,
+          lastSacrificeTimestamp: parsed.lastSacrificeTimestamp ?? 0,
+          sacrificeHistory: parsed.sacrificeHistory,
+          introSeen: parsed.introSeen === true,
+        };
       } else {
         sacrificeCache = getDefaultState();
       }
@@ -116,14 +261,28 @@ export async function loadSacrificeState(): Promise<SacrificeState> {
 }
 
 /**
- * Perform a sacrifice. Returns the response message.
- * The caller is responsible for deducting amber from the player's balance.
+ * Perform an offering. Deducts nothing itself — the CALLER spends the amber
+ * first (mirrors the room-upgrade / tending sinks). Returns the arrangement's
+ * response plus the running monument (total, count) and, when this offering
+ * crosses into a new devotion tier, that tier (so the altar can announce it).
+ *
+ * `opts.sessionStreak` is the number of offerings made in the current open
+ * altar session INCLUDING this one (the UI tracks it); it drives escalation.
+ * `opts.everything` marks the "offer everything" gesture.
  */
 export async function performSacrifice(
   amount: number,
-  currentPhase: number
-): Promise<{ message: string; isMilestone: boolean }> {
+  currentPhase: number,
+  opts?: { sessionStreak?: number; everything?: boolean }
+): Promise<{
+  message: string;
+  isMilestone: boolean;
+  total: number;
+  count: number;
+  tierUp: DevotionTier | null;
+}> {
   const state = await loadSacrificeState();
+  const prevCount = state.sacrificeCount;
 
   const entry: SacrificeEntry = {
     amount,
@@ -143,21 +302,27 @@ export async function performSacrifice(
 
   await saveSacrificeState(state);
 
-  // First sacrifice gets special message
-  if (state.sacrificeCount === 1) {
-    return { message: SACRIFICE_RESPONSES[0], isMilestone: false };
-  }
+  const newCount = state.sacrificeCount;
+  const resp = selectOfferingResponse({
+    count: newCount,
+    sessionStreak: opts?.sessionStreak,
+    phase: currentPhase,
+    everything: opts?.everything,
+  });
 
-  // Check for milestone
-  const milestoneMessage = SACRIFICE_MILESTONES[state.sacrificeCount];
-  if (milestoneMessage) {
-    return { message: milestoneMessage, isMilestone: true };
-  }
+  // Announce a newly-crossed devotion tier (metadata only — never replaces the
+  // response message, so milestone/first-offering copy is preserved).
+  const before = getDevotionTierIndex(prevCount);
+  const after = getDevotionTierIndex(newCount);
+  const tierUp = after > before ? DEVOTION_TIERS[after] : null;
 
-  // Random response
-  const responses = SACRIFICE_RESPONSES.slice(1);
-  const message = responses[Math.floor(Math.random() * responses.length)];
-  return { message, isMilestone: false };
+  return {
+    message: resp.message,
+    isMilestone: resp.isMilestone,
+    total: state.totalAmberSacrificed,
+    count: newCount,
+    tierUp,
+  };
 }
 
 /**
@@ -168,7 +333,7 @@ export function isSacrificeAvailable(currentPhase: number): boolean {
 }
 
 /**
- * Get suggested sacrifice amounts.
+ * Get suggested sacrifice amounts (the affordable subset).
  */
 export function getSacrificeAmounts(currentBalance: number): number[] {
   const amounts: number[] = [];
@@ -184,6 +349,12 @@ export function getSacrificeAmounts(currentBalance: number): number[] {
  * Get phase-aware text for the sacrifice button/prompt.
  */
 export function getSacrificePrompt(phase: number): { title: string; subtitle: string } {
+  if (phase >= 5) {
+    return {
+      title: 'Give to the Pattern',
+      subtitle: 'The amber returns to the quiet. You keep nothing. The house keeps you.',
+    };
+  }
   if (phase >= 4) {
     return {
       title: 'Offer to the Arrangement',
@@ -195,6 +366,17 @@ export function getSacrificePrompt(phase: number): { title: string; subtitle: st
     title: 'Offer Amber',
     subtitle: 'Why would you do this?',
   };
+}
+
+/**
+ * The monument line: how much of the player's amber the arrangement now holds.
+ * Phase-aware. The caller only shows it once at least one offering exists.
+ */
+export function getArrangementHoldsLine(total: number, phase: number): string {
+  if (phase >= 5) {
+    return `The arrangement holds ${total} amber of yours. It is at peace with the weight.`;
+  }
+  return `The arrangement holds ${total} amber of yours. It remembers every offering.`;
 }
 
 /**
@@ -211,6 +393,20 @@ export async function getSacrificeStats(): Promise<{
     count: state.sacrificeCount,
     lastSacrifice: state.lastSacrificeTimestamp,
   };
+}
+
+/** Whether the one-time Phase-4 offering invitation has been delivered. */
+export async function hasSeenOfferingIntro(): Promise<boolean> {
+  const state = await loadSacrificeState();
+  return state.introSeen === true;
+}
+
+/** Mark the one-time Phase-4 offering invitation delivered (rides the synced
+ *  sacrifice state, so it follows the player across devices and clears on Reset). */
+export async function markOfferingIntroSeen(): Promise<void> {
+  const state = await loadSacrificeState();
+  state.introSeen = true;
+  await saveSacrificeState(state);
 }
 
 // ============================================================================
