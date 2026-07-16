@@ -7,14 +7,14 @@ store build or review.
 ## The one rule that keeps this safe
 
 `runtimeVersion` is set to **`{ "policy": "appVersion" }`** — the runtime version
-is the `version` field in `app.json` (currently `1.3.0`). An OTA update only
+is the `version` field in `app.json` (currently `1.5.0`). An OTA update only
 reaches builds with the **same** `version`.
 
 - **Pure JS / asset change** (art, copy, balance, layout, logic): keep `version`
   the same → push OTA. No rebuild.
 - **Native change** (new native module, a config plugin, `app.json` native
   config, an Expo SDK bump, anything in `extra` that a native adapter reads at
-  build time, monetization keys): **bump `version`** (e.g. `1.3.0` → `1.3.1`)
+  build time, monetization keys): **bump `version`** (e.g. `1.5.0` → `1.5.1`)
   **and rebuild**. This stops an OTA update that needs new native code from
   landing on an older build that can't run it.
 
@@ -61,7 +61,7 @@ rebuild.
 
 - Ship new **native** code/modules/plugins, `app.json` native config, or an SDK
   bump (see the rule above — bump `version` + rebuild).
-- Bypass `version` mismatches — an update for `1.3.1` will not reach a `1.3.0`
+- Bypass `version` mismatches — an update for `1.5.1` will not reach a `1.5.0`
   build, by design.
 
 ## Fast local iteration (no OTA needed)

@@ -137,6 +137,26 @@ export function consumableReward(productId: ProductId): ConsumableReward | undef
 }
 
 // ---------------------------------------------------------------------------
+// Subscriptions (auto-renewing)
+// ---------------------------------------------------------------------------
+
+/**
+ * Product ids that are auto-renewing SUBSCRIPTIONS rather than one-time/consumable
+ * in-app products. This is the single source of truth the billing adapter uses to
+ * pick the RevenueCat/Play product CATEGORY: subscriptions MUST be fetched with the
+ * SUBSCRIPTION category and one-time products with NON_SUBSCRIPTION — a mismatch
+ * returns [] on Android and the purchase dies as `product_not_found`.
+ */
+export const SUBSCRIPTION_PRODUCT_IDS: ReadonlySet<string> = new Set([
+  PRODUCT_IDS.SUPPORTER_SUB,
+]);
+
+/** True when the product id is an auto-renewing subscription (see above). */
+export function isSubscriptionProduct(productId: ProductId): boolean {
+  return SUBSCRIPTION_PRODUCT_IDS.has(productId);
+}
+
+// ---------------------------------------------------------------------------
 // Starter pack (one-time welcome bundle)
 // ---------------------------------------------------------------------------
 

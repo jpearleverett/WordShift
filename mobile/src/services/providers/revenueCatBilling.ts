@@ -19,28 +19,33 @@
  *   setBillingProvider(createRevenueCatBillingProvider());
  *   // ...then the fire-and-forget `initIAP()` in the App bootstrap configures it.
  *
- * RevenueCat dashboard setup (LIVE for Android as of 2026-07-02): four
- * Entitlements — `patron`, `adfree`, `cosmetic_bundle`, `starter_pack` —
- * attached to `com.wordshift.patron_key` / `remove_ads` / `cosmetic_bundle` /
- * `starter` (non-consumable); the amber/hint packs are consumable with no
- * entitlement. Active entitlement identifiers map straight to the
- * `ENTITLEMENTS` values in entitlements.ts. No Offerings are configured —
- * purchases go through getProducts + purchaseStoreProduct by product id.
+ * RevenueCat dashboard setup: five Entitlements — `patron`, `adfree`,
+ * `cosmetic_bundle`, `starter_pack` (LIVE for Android as of 2026-07-02,
+ * attached to the matching non-consumable products) plus `supporter` (the
+ * revenue-pass auto-renewing subscription `com.wordshift.supporter_monthly`).
+ * The amber/hint packs are consumable with no entitlement. Active entitlement
+ * identifiers map straight to the `ENTITLEMENTS` values in entitlements.ts. No
+ * Offerings are configured — purchases go through getProducts +
+ * purchaseStoreProduct by product id.
  *
- * PRODUCT CATEGORY (load-bearing): every WordShift SKU is a ONE-TIME or
- * CONSUMABLE in-app product — there are no subscriptions. The SDK's
- * `Purchases.getProducts(ids, type?)` DEFAULTS the type param to
- * PRODUCT_CATEGORY.SUBSCRIPTION, and on Android Play Billing types the query,
- * so a defaulted (subscription) fetch of one-time products returns NOTHING —
- * getProducts → [] and every purchase dies as `product_not_found`. Every
- * product fetch here must therefore pass the NON_SUBSCRIPTION category
- * explicitly (see `nonSubscriptionCategory()`).
+ * PRODUCT CATEGORY (load-bearing): the SDK's `Purchases.getProducts(ids, type?)`
+ * DEFAULTS the type param to PRODUCT_CATEGORY.SUBSCRIPTION, and on Android Play
+ * Billing TYPES the query, so a category mismatch returns NOTHING — getProducts
+ * → [] and every purchase dies as `product_not_found`. WordShift's catalog is
+ * MIXED: the one-time/consumable SKUs must be fetched with NON_SUBSCRIPTION, and
+ * the `supporter` subscription with SUBSCRIPTION. Both call sites therefore
+ * split the requested ids by `isSubscriptionProduct()` and fetch each group with
+ * its own category (`nonSubscriptionCategory()` / `subscriptionCategory()`). An
+ * Android subscription StoreProduct's `identifier` carries a `:basePlanId`
+ * suffix (e.g. `...supporter_monthly:monthly`), so the subscription results are
+ * normalized back to the bare product id.
  */
 
 import { Platform } from 'react-native';
 import {
   BillingProvider,
   IapProduct,
+  isSubscriptionProduct,
   ProductId,
   PurchaseResult,
 } from '../iap';
@@ -96,6 +101,26 @@ function loadPurchases(): any | null {
  */
 function nonSubscriptionCategory(purchasesMod: any): string {
   return purchasesMod?.PRODUCT_CATEGORY?.NON_SUBSCRIPTION ?? 'NON_SUBSCRIPTION';
+}
+
+/**
+ * The SDK's PRODUCT_CATEGORY.SUBSCRIPTION constant (the getProducts default,
+ * passed explicitly here so the intent is legible). Used for the `supporter`
+ * auto-renewing subscription; on Android a NON_SUBSCRIPTION fetch of it returns
+ * []. Literal-string fallback covers partial test mocks, like the sibling above.
+ */
+function subscriptionCategory(purchasesMod: any): string {
+  return purchasesMod?.PRODUCT_CATEGORY?.SUBSCRIPTION ?? 'SUBSCRIPTION';
+}
+
+/**
+ * An Android subscription StoreProduct identifier is `productId:basePlanId`
+ * (e.g. `com.wordshift.supporter_monthly:monthly`); strip the base-plan suffix
+ * so results key back to the bare product id the app asked for. One-time product
+ * identifiers have no colon and pass through unchanged.
+ */
+function bareProductId(identifier: string): string {
+  return typeof identifier === 'string' ? identifier.split(':')[0] : identifier;
 }
 
 export function createRevenueCatBillingProvider(config: RevenueCatConfig = {}): BillingProvider {
@@ -188,23 +213,35 @@ export function createRevenueCatBillingProvider(config: RevenueCatConfig = {}): 
 
     async getProducts(productIds: ProductId[]): Promise<IapProduct[]> {
       if (!ready || !Purchases) return [];
-      try {
-        // Category is REQUIRED: the SDK defaults to SUBSCRIPTION, which on
-        // Android returns [] for our all-one-time/consumable catalog.
-        const products: any[] = await Purchases.getProducts(
-          productIds,
-          nonSubscriptionCategory(Purchases),
-        );
-        return (products ?? []).map((p) => ({
-          productId: p.identifier,
-          title: p.title ?? p.identifier,
-          description: p.description ?? '',
-          priceString: p.priceString ?? '',
-        }));
-      } catch (error) {
-        console.warn('[IAP] RevenueCat getProducts failed:', error);
-        return [];
-      }
+      // Category is REQUIRED and MIXED: the SDK defaults to SUBSCRIPTION (which
+      // on Android returns [] for one-time SKUs), so fetch the one-time and
+      // subscription ids in separate category-typed queries and merge.
+      const subIds = productIds.filter(isSubscriptionProduct);
+      const nonSubIds = productIds.filter((id) => !isSubscriptionProduct(id));
+      const fetchGroup = async (
+        ids: ProductId[],
+        category: string,
+        normalizeId: boolean,
+      ): Promise<IapProduct[]> => {
+        if (ids.length === 0) return [];
+        try {
+          const products: any[] = await Purchases.getProducts(ids, category);
+          return (products ?? []).map((p) => ({
+            productId: normalizeId ? bareProductId(p.identifier) : p.identifier,
+            title: p.title ?? p.identifier,
+            description: p.description ?? '',
+            priceString: p.priceString ?? '',
+          }));
+        } catch (error) {
+          console.warn('[IAP] RevenueCat getProducts failed:', error);
+          return [];
+        }
+      };
+      const [nonSub, sub] = await Promise.all([
+        fetchGroup(nonSubIds, nonSubscriptionCategory(Purchases), false),
+        fetchGroup(subIds, subscriptionCategory(Purchases), true),
+      ]);
+      return [...nonSub, ...sub];
     },
 
     async purchase(productId: ProductId): Promise<PurchaseResult> {
@@ -213,14 +250,21 @@ export function createRevenueCatBillingProvider(config: RevenueCatConfig = {}): 
       }
       try {
         // Fetch the store product object RevenueCat needs to start a purchase.
-        // Same category requirement as getProducts above: without the explicit
-        // NON_SUBSCRIPTION category this fetch returns [] on Android and every
-        // purchase dies in the product_not_found branch below.
-        const products: any[] = await Purchases.getProducts(
-          [productId],
-          nonSubscriptionCategory(Purchases),
-        );
-        const product = (products ?? []).find((p) => p.identifier === productId) ?? products?.[0];
+        // Same category requirement as getProducts above: the fetch MUST use the
+        // product's own category (SUBSCRIPTION for `supporter`, NON_SUBSCRIPTION
+        // for everything else) or Android returns [] and this dies in the
+        // product_not_found branch below.
+        const category = isSubscriptionProduct(productId)
+          ? subscriptionCategory(Purchases)
+          : nonSubscriptionCategory(Purchases);
+        const products: any[] = await Purchases.getProducts([productId], category);
+        // A subscription StoreProduct's identifier carries a `:basePlanId`
+        // suffix, so match on the bare id too before falling back to the first
+        // returned product (purchaseStoreProduct uses its default base plan).
+        const product =
+          (products ?? []).find((p) => p.identifier === productId) ??
+          (products ?? []).find((p) => bareProductId(p.identifier) === productId) ??
+          products?.[0];
         if (!product) {
           return { success: false, productId, error: 'product_not_found' };
         }

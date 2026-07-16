@@ -17,7 +17,7 @@ Monetization is convenience/expression only, never progression: a cosmetic shop 
 
 ## Tech
 
-React Native + Expo SDK 56 (React Native 0.85), TypeScript (strict), Jest (~1,548 tests across 64 suites — counts drift as features land). Local-first: the core puzzles play fully offline with all state in AsyncStorage, and there are no user accounts. Backend features (cloud save, daily leaderboard, anonymous analytics via **Supabase**; crash reporting via **Sentry**) and monetization (in-app purchases via **RevenueCat**, ads via **AdMob**) activate when their keys are present in `app.json` → `extra` and degrade to no-ops otherwise — so Expo Go still runs everything. Supabase/Sentry and the Android monetization keys are currently configured; the iOS monetization keys are still empty (iOS falls back to the no-op providers). See [CLAUDE.md](./CLAUDE.md) for the full architecture reference — it's the canonical codebase doc.
+React Native + Expo SDK 56 (React Native 0.85), TypeScript (strict), Jest (~2,600 tests across ~105 suites — counts drift as features land). Local-first: the core puzzles play fully offline with all state in AsyncStorage, and there are no user accounts. Backend features (cloud save, daily leaderboard, anonymous analytics via **Supabase**; crash reporting via **Sentry**) and monetization (in-app purchases via **RevenueCat**, ads via **AdMob**) activate when their keys are present in `app.json` → `extra` and degrade to no-ops otherwise — so Expo Go still runs everything. Supabase/Sentry and the Android monetization keys are currently configured; the iOS monetization keys are still empty (iOS falls back to the no-op providers). See [CLAUDE.md](./CLAUDE.md) for the full architecture reference — it's the canonical codebase doc.
 
 ## Development
 
@@ -42,7 +42,7 @@ Always use `npm test`, not `npx jest` — the latter misses the local install an
 ### Generated content
 
 - **Puzzle banks**: `npm run generate:puzzles`, then always run `node scripts/tools/purgeProfanity.mjs` (the generator does not filter offensive words).
-- **Art/SFX**: `npm run generate:assets` rebuilds the app icon, splash, notification icon, the 14-sound WAV pack, the world/pixel art, and the UI icon sprites from pure-Node scripts in `mobile/scripts/tools/`.
+- **Art/SFX**: `npm run generate:assets` rebuilds the app icon, splash, notification icon, the 32-file WAV pack, the world/pixel art, and the UI icon sprites from pure-Node scripts in `mobile/scripts/tools/`.
 - **Builds**: `eas build` profiles live in `mobile/eas.json` (`appVersionSource: "local"` — bump `android.versionCode` manually for each release). Remaining human release tasks are tracked in [docs/LAUNCH_CHECKLIST.md](./docs/LAUNCH_CHECKLIST.md).
 
 ## Docs

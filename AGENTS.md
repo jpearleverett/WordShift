@@ -21,7 +21,7 @@ WordShift is a React Native (Expo SDK 56) mobile word puzzle game. The app codeb
 - See `CLAUDE.md` for the full test commands. Key: always use `npm test` (not `npx jest`).
 - **Run all tests:** `cd mobile && npm test -- --no-coverage`
 - **Run a single file:** `cd mobile && npm test -- --no-coverage --testPathPattern=<filename>`
-- The suite is expected green (~1,548 tests across 64 suites; counts drift as features land — not load-bearing). Date-sensitive tests construct dates with local components (`new Date(2026, 1, 9)`) — never ISO strings, which parse as UTC and break in timezones behind UTC.
+- The suite is expected green (~2,600 tests across ~105 suites; counts drift as features land — not load-bearing). Date-sensitive tests construct dates with local components (`new Date(2026, 1, 9)`) — never ISO strings, which parse as UTC and break in timezones behind UTC.
 
 ### TypeScript
 

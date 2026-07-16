@@ -1,16 +1,31 @@
 # WordShift Monetization Setup (drop-in)
 
-> **Status:** ✅ Completed for Android — app-side AND console-side. Both adapters
-> are registered in `App.tsx`, the native SDKs are installed, and RevenueCat
-> (`revenueCatAndroidKey`) + AdMob (app id in the config plugin, unit ids in
-> `extra`) are configured in `app.json`. Console-side (done 2026-07-02): all
-> **9 products** created + activated in Play Console; RevenueCat products
-> imported (5 consumable / 4 non-consumable) and the **4 entitlements** mapped;
-> the EU consent (UMP) message is published; `app-ads.txt` is live at
-> `https://jpearleverett.github.io/app-ads.txt` (pub-6575205005908086). iOS keys
-> are intentionally left blank (NoOp fallback — see `docs/LAUNCH_CHECKLIST.md`
-> for the iOS track). The guide below remains the reference for re-doing this
-> or adding iOS.
+> **Status:** ✅ Android app-side is complete and mostly done console-side. Both
+> adapters are registered in `App.tsx`, the native SDKs are installed, and
+> RevenueCat (`revenueCatAndroidKey`) + AdMob (app id in the config plugin, unit
+> ids in `extra`) are configured in `app.json`. Console-side (first pass done
+> 2026-07-02): the original **9 one-time products** created + activated in Play
+> Console; RevenueCat products imported (5 consumable / 4 non-consumable) and the
+> original **4 entitlements** mapped; the EU consent (UMP) message is published;
+> `app-ads.txt` is live at `https://jpearleverett.github.io/app-ads.txt`
+> (pub-6575205005908086).
+>
+> **Remaining Android console work (added in the revenue pass):**
+> - **Supporter subscription** (`com.wordshift.supporter_monthly`, the 10th SKU)
+>   — *in progress 2026-07-16.* Create the auto-renewing subscription in Play
+>   Console (base plan `monthly`), import it into RevenueCat, and create the
+>   **`supporter` entitlement** (the 5th, identifier EXACTLY `supporter`)
+>   attached to it. This is the only *subscription*, so it's a third product
+>   flavor alongside the non-consumables and consumables.
+> - **Banner ad unit** — ✅ DONE for Android (2026-07-16): Android Banner unit
+>   created and `admobBannerIdAndroid` set in `extra`
+>   (`ca-app-pub-6575205005908086/7787305884`). Serves TEST banners while
+>   `adsUseTestIds` is `true`; the iOS banner unit + `admobBannerIdIos` stay open
+>   on the iOS track.
+>
+> iOS keys are intentionally left blank (NoOp fallback — see
+> `docs/LAUNCH_CHECKLIST.md` for the iOS track). The guide below remains the
+> reference for re-doing this or adding iOS.
 >
 > **Surfaces actually wired:**
 > - **Interstitials are invoked** — `App.tsx` `maybeShowVictoryInterstitial()`
@@ -23,12 +38,19 @@
 >   `INTERSTITIAL_FREQUENCY_*`. (Tuning lever: raise
 >   `INTERSTITIAL_FREQUENCY_EARLY` / the early-window guard for a gentler
 >   first few sessions.)
-> - **All four rewarded placements are surfaced** (each an opt-in button):
+> - **All five rewarded placements are surfaced** (each an opt-in button):
 >   `victory_double` (VictoryModal 2x amber), `hint_recovery` (offered when the
 >   consumable hint balance runs out — `handleOutOfHints` in App.tsx; hints are
 >   a consumable resource via `services/hints.ts`), `quest_bonus` (quest reward
->   boost), and `speed_rescue` (once-per-board +30s continue on the Speed
->   Time's-Up overlay).
+>   boost), `speed_rescue` (once-per-board +30s continue on the Speed Time's-Up
+>   overlay), and `daily_amber` (the Store's "Free Amber" faucet, capped
+>   `DAILY_AMBER_DAILY_CAP`/local day; Patrons claim it free with no ad).
+> - **Banner ads** are wired via `components/monetization/BannerAd.tsx` +
+>   `ads.shouldShowBanner` (menu surfaces like Stats; suppressed for
+>   ad-free/onboarding/Phase 4+). The Android banner unit id is set; iOS is still
+>   blank (banners stay inert on any platform whose `admobBannerId*` is empty).
+>   `BannerAd` honors the same `adsUseTestIds`/`__DEV__` gate as the other ad
+>   surfaces, so testing builds show TEST banners.
 > - **Restore Purchases** is reachable in **Settings → PURCHASES**
 >   (`restorePurchases()`), in addition to the Patron modal — satisfies the
 >   store-policy accessible-restore requirement.
@@ -58,9 +80,9 @@ purchases and no ads, degrading exactly like the NoOp providers.
 
 ## 1. In-app purchases (RevenueCat)
 
-Products (`iap.ts` → `PRODUCT_IDS`) — 9 SKUs in two flavors:
+Products (`iap.ts` → `PRODUCT_IDS`) — 10 SKUs in three flavors (5 entitlements total):
 
-**Non-consumables** (grant an entitlement — 4 entitlements total):
+**Non-consumables** (grant a permanent entitlement):
 - `com.wordshift.patron_key` → `patron` entitlement
 - `com.wordshift.remove_ads` → `adfree` entitlement
 - `com.wordshift.cosmetic_bundle` → `cosmetic_bundle` entitlement (The Keeper's
@@ -69,6 +91,14 @@ Products (`iap.ts` → `PRODUCT_IDS`) — 9 SKUs in two flavors:
   one-time bundle: 400 amber + 5 hints, `gameBalance.STARTER_PACK_GRANTS`;
   `purchaseStarterPack()` refuses a repurchase before it ever hits billing, so
   the entitlement doubles as the one-per-account lock)
+
+**Subscription** (auto-renewing; grants an entitlement *while active*):
+- `com.wordshift.supporter_monthly` → `supporter` entitlement — ad-free PLUS a
+  recurring monthly amber stipend (`supporterStipend.ts`, `SUPPORTER_MONTHLY_AMBER`,
+  idempotent per local month) + season-pass premium + an exclusive
+  `confetti_supporter`. The live RevenueCat adapter keeps the entitlement in
+  sync via customer-info updates, so a lapsed sub drops `supporter` on the next
+  restore/refresh. `entitlements.isAdFree` includes `supporter`.
 
 **Consumables** (repeatable; credit currency, NO entitlement — `purchaseConsumable`):
 - `com.wordshift.amber_small` / `amber_medium` / `amber_large` → amber packs of
@@ -88,14 +118,21 @@ Products (`iap.ts` → `PRODUCT_IDS`) — 9 SKUs in two flavors:
    Console: create them as **In-app products** and configure the amber/hint
    SKUs as **consumable** (RevenueCat/Billing consumes them on purchase so
    they can be bought again).
-2. ✅ *(done for Android, 2026-07-02)* In RevenueCat, add an iOS app and an
-   Android app, import the products (5 consumable / 4 non-consumable), create
-   **Entitlements named `patron`, `adfree`, `cosmetic_bundle`, and
-   `starter_pack`**, attach the matching non-consumable products, and copy the
-   **public SDK keys** (one per platform). The amber/hint consumables need
-   **no** entitlement — the app credits them directly from the purchase result.
-   **No Offerings/Packages setup is needed:** the adapter purchases by product
-   id via `Purchases.getProducts()` + `purchaseStoreProduct()`, never through
+2. *(4 non-consumable entitlements done for Android 2026-07-02; the `supporter`
+   subscription entitlement is the OPEN item)* In RevenueCat, add an iOS app and
+   an Android app, import the products (5 consumable / 4 non-consumable / 1
+   subscription), create **Entitlements named `patron`, `adfree`,
+   `cosmetic_bundle`, `starter_pack`, and `supporter`**, attach the matching
+   non-consumable products (and the `supporter_monthly` subscription to the
+   `supporter` entitlement), and copy the **public SDK keys** (one per platform).
+   The amber/hint consumables need **no** entitlement — the app credits them
+   directly from the purchase result. **The entitlement identifier must match
+   the string EXACTLY** (`supporter`, etc.): the adapter maps
+   `customerInfo.entitlements.active` keys straight to `ENTITLEMENTS` values, so
+   a mismatched RevenueCat identifier silently grants nothing.
+   **No Offerings/Packages setup is needed for the one-time products:** the
+   adapter purchases them by product id via `Purchases.getProducts()` (with the
+   `NON_SUBSCRIPTION` category) + `purchaseStoreProduct()`, never through
    Offerings.
 3. ✅ *(installed)* Install the SDK (native module — requires a dev/production
    build):
@@ -135,9 +172,12 @@ ads.
 > config-plugin breakage on Expo SDK 54 / RN 0.81 (invertase issue #835) — if
 > you ever change the pin, re-verify the config plugin runs in the build.
 
-1. ✅ *(done for Android)* In AdMob, create an Android app and an iOS app; copy
-   each **App ID**. Create an **Interstitial** and a **Rewarded** ad unit per
-   platform; copy the unit ids. Also done console-side: the **EU consent (UMP)
+1. ✅ *(interstitial + rewarded + Android banner done)* In AdMob, create an
+   Android app and an iOS app; copy each **App ID**. Create an **Interstitial**,
+   a **Rewarded**, and a **Banner** ad unit per platform; copy the unit ids. (The
+   banner unit is a revenue-pass addition — the Android banner unit is created
+   and `admobBannerIdAndroid` is set; the iOS banner remains open on the iOS
+   track.) Also done console-side: the **EU consent (UMP)
    message is published** (GDPR countries, privacy policy attached) and
    **`app-ads.txt` is live** at the domain root
    (`https://jpearleverett.github.io/app-ads.txt`, pub-6575205005908086) — its

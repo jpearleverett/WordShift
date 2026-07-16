@@ -58,7 +58,14 @@ jest.mock('react-native-purchases', () => {
     getProducts: async (ids: string[], category?: string) => {
       state.calls.push({ method: 'getProducts', args: [ids, category] });
       if (state.throwOnGetProducts) throw new Error('store exploded');
-      return state.products.filter((p) => ids.includes(p.identifier));
+      // Match by exact identifier OR by the bare product id (an Android
+      // subscription StoreProduct's identifier carries a `:basePlanId` suffix,
+      // yet the adapter queries by the bare product id).
+      return state.products.filter(
+        (p) =>
+          ids.includes(p.identifier) ||
+          ids.includes(String(p.identifier).split(':')[0]),
+      );
     },
     purchaseStoreProduct: async (product: any) => {
       state.calls.push({ method: 'purchaseStoreProduct', args: [product] });
@@ -211,6 +218,71 @@ describe('RevenueCat adapter — product category (launch blocker)', () => {
     const result = await p.purchase(PRODUCT_IDS.AMBER_LARGE);
     expect(result.success).toBe(false);
     expect(result.cancelled).toBeUndefined();
+  });
+});
+
+describe('RevenueCat adapter — subscription product category', () => {
+  // An Android subscription StoreProduct's identifier carries the base plan id.
+  const SUB_STORE_ID = `${PRODUCT_IDS.SUPPORTER_SUB}:monthly`;
+
+  it('splits a mixed batch by category and returns both (sub id normalized to bare)', async () => {
+    rc.__state.products = [
+      storeProduct(PRODUCT_IDS.AMBER_SMALL),
+      storeProduct(SUB_STORE_ID),
+    ];
+    const p = await initProvider();
+
+    const result = await p.getProducts([
+      PRODUCT_IDS.AMBER_SMALL,
+      PRODUCT_IDS.SUPPORTER_SUB,
+    ]);
+
+    // Both groups come back; the subscription's `:monthly` suffix is stripped so
+    // the Store can match it to PRODUCT_IDS.SUPPORTER_SUB.
+    expect(result.map((r) => r.productId).sort()).toEqual(
+      [PRODUCT_IDS.AMBER_SMALL, PRODUCT_IDS.SUPPORTER_SUB].sort(),
+    );
+
+    const fetches = callsOf('getProducts');
+    const nonSub = fetches.find(
+      (c) => c.args[1] === rc.default.PRODUCT_CATEGORY.NON_SUBSCRIPTION,
+    );
+    const sub = fetches.find(
+      (c) => c.args[1] === rc.default.PRODUCT_CATEGORY.SUBSCRIPTION,
+    );
+    expect(nonSub?.args[0]).toEqual([PRODUCT_IDS.AMBER_SMALL]);
+    expect(sub?.args[0]).toEqual([PRODUCT_IDS.SUPPORTER_SUB]);
+  });
+
+  it('purchase(SUPPORTER_SUB) fetches with SUBSCRIPTION and buys the suffixed product', async () => {
+    const product = storeProduct(SUB_STORE_ID);
+    rc.__state.products = [product];
+    rc.__state.activeEntitlements = { [ENTITLEMENTS.SUPPORTER]: { isActive: true } };
+    const p = await initProvider();
+
+    const result = await p.purchase(PRODUCT_IDS.SUPPORTER_SUB);
+
+    const fetches = callsOf('getProducts');
+    expect(fetches).toHaveLength(1);
+    expect(fetches[0].args[0]).toEqual([PRODUCT_IDS.SUPPORTER_SUB]);
+    expect(fetches[0].args[1]).toBe(rc.default.PRODUCT_CATEGORY.SUBSCRIPTION);
+    // purchaseStoreProduct receives the base-plan-suffixed store product object.
+    const purchases = callsOf('purchaseStoreProduct');
+    expect(purchases[0].args[0]).toBe(product);
+    expect(result.success).toBe(true);
+    expect(result.entitlements).toContain(ENTITLEMENTS.SUPPORTER);
+  });
+
+  it('a one-time purchase never uses the SUBSCRIPTION category', async () => {
+    rc.__state.products = [storeProduct(PRODUCT_IDS.PATRON_KEY)];
+    const p = await initProvider();
+    await p.purchase(PRODUCT_IDS.PATRON_KEY);
+
+    const fetches = callsOf('getProducts');
+    expect(fetches[0].args[1]).toBe(rc.default.PRODUCT_CATEGORY.NON_SUBSCRIPTION);
+    expect(
+      fetches.some((c) => c.args[1] === rc.default.PRODUCT_CATEGORY.SUBSCRIPTION),
+    ).toBe(false);
   });
 });
 
