@@ -19,6 +19,7 @@ import {
 } from '../../theme/pixelSkin.generated';
 import { ThreeSliceStrip } from './NineSlice';
 import { getSettingsSync } from '../../services/settings';
+import { playUiSound, type UiSoundKind } from '../../services/uiSound';
 import { PIXEL_FONT_BOLD } from '../../theme/fonts';
 
 export type CandyButtonVariant = 'primary' | 'amber' | 'secondary' | 'quiet';
@@ -49,6 +50,12 @@ interface CandyButtonProps {
   size?: 'md' | 'lg';
   style?: ViewStyle;
   accessibilityLabel?: string;
+  /**
+   * UI sound on press. Defaults to a confirm 'tap' for primary/amber and a
+   * softer 'selection' tick for secondary/quiet. Pass 'none' to stay silent
+   * (e.g. a button whose handler already plays a semantic sound).
+   */
+  soundKind?: UiSoundKind | 'none';
 }
 
 /**
@@ -70,11 +77,19 @@ export const CandyButton: React.FC<CandyButtonProps> = ({
   size = 'md',
   style,
   accessibilityLabel,
+  soundKind,
 }) => {
   const skin = getPixelSkin(phase, hostDark);
   const reducedMotion = getSettingsSync().reducedMotion;
   const travel = useRef(new Animated.Value(0)).current;
   const [pressed, setPressed] = useState(false);
+
+  const handlePress = useCallback(() => {
+    if (soundKind !== 'none') {
+      playUiSound(soundKind ?? (variant === 'secondary' || variant === 'quiet' ? 'selection' : 'tap'));
+    }
+    onPress();
+  }, [onPress, soundKind, variant]);
 
   const skinVariant = variant === 'amber' ? 'primary' : variant;
   const buttonSkin = skin.buttons[skinVariant][size];
@@ -101,7 +116,7 @@ export const CandyButton: React.FC<CandyButtonProps> = ({
 
   return (
     <Pressable
-      onPress={disabled ? undefined : onPress}
+      onPress={disabled ? undefined : handlePress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       disabled={disabled}

@@ -81,6 +81,7 @@ import {
 import { getSettingsSync } from '../services/settings';
 import { logEvent } from '../services/eventLogger';
 import { hapticLight, hapticMedium, hapticHeavy } from '../services/haptics';
+import { playUiSound } from '../services/uiSound';
 import { getDeviceTier, shouldSimplifyAnimations } from '../services/deviceTier';
 import { getBulkOfferTiming } from '../services/pitOfferTiming';
 
@@ -483,7 +484,7 @@ const FloatingWordChip = React.memo(({
     >
       <TouchableOpacity
         activeOpacity={0.8}
-        onPress={() => onTap(fw)}
+        onPress={() => { playUiSound('selection'); onTap(fw); }}
         accessibilityLabel={`Word: ${fw.word}, tap to offer`}
         accessibilityRole="button"
       >
@@ -2472,7 +2473,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
           {/* Amber pill taps through to the Store, same as the home header. */}
           <TouchableOpacity
             style={styles.amberContainer}
-            onPress={() => { hapticLight(); onOpenStore?.(); }}
+            onPress={() => { hapticLight(); playUiSound('tap'); onOpenStore?.(); }}
             disabled={!onOpenStore || isOnboarding}
             accessibilityLabel={
               onOpenStore && !isOnboarding
@@ -2497,7 +2498,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
             {tendingEnabled && !isOnboarding && (
               <TouchableOpacity
                 style={styles.headerIconBtn}
-                onPress={() => { hapticLight(); refreshTending(); setShowTendingModal(true); }}
+                onPress={() => { hapticLight(); playUiSound('tap'); refreshTending(); setShowTendingModal(true); }}
                 accessibilityLabel={`Tend the pattern, ${getTendingLevelLabel(tendingLevel)}`}
                 accessibilityRole="button"
               >
@@ -2506,7 +2507,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
             )}
             <TouchableOpacity
               style={styles.headerIconBtn}
-              onPress={() => { hapticLight(); setShowUtilityModal(true); }}
+              onPress={() => { hapticLight(); playUiSound('tap'); setShowUtilityModal(true); }}
               accessibilityLabel="Open utility menu"
               accessibilityRole="button"
             >
@@ -2514,7 +2515,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.headerIconBtn}
-              onPress={() => { hapticLight(); onClose(); }}
+              onPress={() => { hapticLight(); playUiSound('tap'); onClose(); }}
               accessibilityLabel="Return home"
               accessibilityRole="button"
             >
@@ -2706,7 +2707,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
                 pendingPhaseTransition == null && styles.harvestAllButtonPrimary,
                 { opacity: isOffering ? 0.5 : 1 },
               ]}
-              onPress={handleHarvestAll}
+              onPress={() => { playUiSound('tap'); handleHarvestAll(); }}
               disabled={isOffering}
               activeOpacity={0.85}
               accessibilityLabel={`${getPitOfferAllLabel(phase)}: ${Math.max(0, pendingAmber - pendingAmberOffset)} amber from ${pendingWordCount} words`}

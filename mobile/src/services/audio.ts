@@ -42,6 +42,11 @@ const SOUND_SOURCES: Record<string, any> = {
   dialogue: require('../../assets/sounds/dialogue.wav'),
   phase_change: require('../../assets/sounds/phase_change.wav'),
   daily_ready: require('../../assets/sounds/daily_ready.wav'),
+  // Dedicated UI sounds (menus / dialogue / navigation): a warm confirm tap and
+  // a soft selection tick, distinct from the board's tap/letter_select so menu
+  // taps never read as gameplay.
+  ui_tap: require('../../assets/sounds/ui_tap.wav'),
+  ui_tick: require('../../assets/sounds/ui_tick.wav'),
   // Dark variants (Phase 3+): hollow, minor, cold — the descent reaches the
   // ears. Any `<name>_dark` here is picked automatically by the phase mirror.
   tap_dark: require('../../assets/sounds/tap_dark.wav'),
@@ -56,6 +61,8 @@ const SOUND_SOURCES: Record<string, any> = {
   dialogue_dark: require('../../assets/sounds/dialogue_dark.wav'),
   victory_dark: require('../../assets/sounds/victory_dark.wav'),
   perfect_dark: require('../../assets/sounds/perfect_dark.wav'),
+  ui_tap_dark: require('../../assets/sounds/ui_tap_dark.wav'),
+  ui_tick_dark: require('../../assets/sounds/ui_tick_dark.wav'),
 };
 
 // Ambient music beds (looping) — kept out of SOUND_SOURCES so a stray
@@ -76,6 +83,8 @@ const PRELOAD_SOUND_NAMES = [
   'invalid_move',
   'victory',
   'amber_earn',
+  'ui_tap', // UI taps fire from the very first menu interaction
+  'ui_tick',
   'valid_move_dark', // hot path once the descent deepens (Phase 3+)
   'valid_move_2_dark',
 ];
@@ -274,6 +283,24 @@ export async function soundHint(): Promise<void> {
 /** Button tap / UI interaction. Dull hollow knock at Phase 3+. */
 export async function soundTap(): Promise<void> {
   await playSound(resolveSfxForPhase('tap', audioPhase));
+}
+
+/**
+ * Primary UI confirm tap (menus, dialogue advance, CTAs, purchases). Warm
+ * celesta tick that hollows to a knock at Phase 3+. Distinct from the board's
+ * `tap`/`letter_select` so menu taps don't read as gameplay.
+ */
+export async function soundUiTap(): Promise<void> {
+  await playSound(resolveSfxForPhase('ui_tap', audioPhase));
+}
+
+/**
+ * Soft UI selection tick (toggles, selectable rows, difficulty/variant picks).
+ * Quieter and higher than soundUiTap so a menu full of them never fatigues.
+ * Hollow blip at Phase 3+.
+ */
+export async function soundSelection(): Promise<void> {
+  await playSound(resolveSfxForPhase('ui_tick', audioPhase));
 }
 
 /** Amber earned. Cold coin at Phase 3+. */

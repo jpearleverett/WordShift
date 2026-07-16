@@ -563,6 +563,21 @@ render('daily_ready', 1.0, (s, rand) => {
   strike(s, { freq: N.C6, start: 0.22, dur: 0.65, vol: 0.4, partials: HANDBELL, decayShape: 3.8, attack: 0.003, rand });
 }, { reverb: { wet: 0.3, tail: 0.6 }, peak: 0.65 });
 
+// ui_tap: crisp warm confirm tick for primary UI (Play, Next, purchases). A
+// touch fuller than the board `tap`, still short and nearly dry.
+render('ui_tap', 0.15, (s, rand) => {
+  noiseBurst(s, { start: 0, dur: 0.014, vol: 0.4, lp: 0.55, decayShape: 10, rand });
+  strike(s, { freq: N.G5, dur: 0.12, vol: 0.5, partials: CELESTA, attack: 0.0015, decayShape: 7.5, unison: 2, detune: 0.002, rand });
+  strike(s, { freq: N.C6, start: 0.006, dur: 0.08, vol: 0.14, partials: CELESTA, decayShape: 8, rand });
+}, { reverb: { wet: 0.07, tail: 0.12 }, peak: 0.5 });
+
+// ui_tick: soft high selection tick for toggles / selectable rows. Quiet and
+// quick so a menu full of them never fatigues.
+render('ui_tick', 0.1, (s, rand) => {
+  noiseBurst(s, { start: 0, dur: 0.008, vol: 0.22, lp: 0.6, decayShape: 12, rand });
+  strike(s, { freq: N.C6, dur: 0.075, vol: 0.34, partials: CELESTA, attack: 0.001, decayShape: 9, rand });
+}, { reverb: { wet: 0.05, tail: 0.08 }, peak: 0.4 });
+
 // ===========================================================================
 // DARK SFX (Phase 3+): hollow, minor, sub-heavy — the descent reaches the
 // ears. The move ladder DESCENDS: each combo tier sinks lower.
@@ -651,6 +666,17 @@ render('perfect_dark', 2.6, (s, rand) => {
   swell(s, { freq: D.C3, start: 0.35, dur: 1.9, vol: 0.2, partials: [{ r: 1, g: 1 }, { r: 2, g: 0.3 }], attack: 0.5, release: 0.9, unison: 3, detune: 0.006, rand });
   noiseBurst(s, { start: 0.1, dur: 1.6, vol: 0.06, lp: 0.04, attack: 0.4, decayShape: 3.5, rand });
 }, { reverb: { wet: 0.34, damp: 0.5, decay: 0.84, tail: 1.0 }, peak: 0.72 });
+
+// ui_tap_dark: hollow confirm knock for primary UI at Phase 3+.
+render('ui_tap_dark', 0.2, (s, rand) => {
+  noiseBurst(s, { start: 0, dur: 0.03, vol: 0.35, lp: 0.1, decayShape: 9, rand });
+  strike(s, { freq: D.C4, dur: 0.16, vol: 0.5, partials: HOLLOW, attack: 0.003, decayShape: 7, unison: 2, detune: 0.003, rand });
+}, { reverb: { wet: 0.13, damp: 0.6, tail: 0.2 }, peak: 0.44 });
+
+// ui_tick_dark: quiet low hollow blip for toggles / rows at Phase 3+.
+render('ui_tick_dark', 0.16, (s, rand) => {
+  strike(s, { freq: D.Eb4, dur: 0.11, vol: 0.4, partials: HOLLOW, attack: 0.003, decayShape: 8, unison: 2, detune: 0.004, rand });
+}, { reverb: { wet: 0.1, damp: 0.6, tail: 0.12 }, peak: 0.38 });
 
 // ===========================================================================
 // AMBIENT MUSIC BEDS: three seamless loops sharing one musical DNA.

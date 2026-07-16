@@ -18,10 +18,9 @@ import { isBlockedWord } from '../constants/blockedWords';
 // test harness — which mocks '../constants' wholesale — still gets real values.
 import {
   PREVIEW_GRADING_FULL_LIMIT,
-  PREVIEW_GRADING_RESCUE_LIMIT,
 } from '../constants/gameBalance';
 import { CHALLENGE_MODE_CONFIG, DialoguePhase } from '../types/homeWorld';
-import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getOutOfHintsMessage, getLoadingMessage, getStartMessage, getInvalidWordMessage, getBlockedWordMessage, getBlindFailMessage, getLockedLetterMessage, getEchoPuzzleMessage, getFinalBoardStartMessage, getFinalBoardUndoRefusal, getPreviewRescueMessage, getUnbrokenWeaveSpentLetterMessage, getUnbrokenWeaveUnavailableMessage } from '../services/phaseNarrative';
+import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getOutOfHintsMessage, getLoadingMessage, getStartMessage, getInvalidWordMessage, getBlockedWordMessage, getBlindFailMessage, getLockedLetterMessage, getEchoPuzzleMessage, getFinalBoardStartMessage, getFinalBoardUndoRefusal, getUnbrokenWeaveSpentLetterMessage, getUnbrokenWeaveUnavailableMessage } from '../services/phaseNarrative';
 import { getHintBalanceSync, hasHintSync, consumeHintSync } from '../services/hints';
 import { getPreferredPuzzleVariant, setPreferredPuzzleVariant, getFullProgress, getRitualWords } from '../services/amberCurrency';
 import {
@@ -330,7 +329,7 @@ export function shouldUseComboMessage(streak: number): boolean {
   return streak % 2 === 0;
 }
 
-export type PreviewGradingMode = 'graded' | 'rescue' | 'neutral' | 'hidden';
+export type PreviewGradingMode = 'graded' | 'neutral' | 'hidden';
 
 export interface PreviewGradingContext {
   puzzlesSolved: number;
@@ -342,9 +341,12 @@ export interface PreviewGradingContext {
 }
 
 /**
- * Pure progression resolver for ghost-preview grading. Rescue boards begin
- * neutral and let the hook restore grading after the first invalid attempt;
- * the resolver itself stays independent of per-board performance.
+ * Pure progression resolver for ghost-preview grading. Grading is either ON
+ * ('graded' — the ✓/✗ marks show) or OFF ('neutral' — the player judges the
+ * word themselves), with a clean, one-way transition: once the marks step back
+ * they stay back for that board shape (no per-board "rescue" that resurrects
+ * them after a mistake — that read as a glitch). Blind Offering hides previews
+ * entirely.
  */
 export function resolvePreviewGradingMode({
   puzzlesSolved,
@@ -364,11 +366,7 @@ export function resolvePreviewGradingMode({
     isDailyBoard ||
     isSharedChallenge ||
     difficulty !== 'EASY';
-  if (!usesNeutralRules) return 'graded';
-
-  return puzzlesSolved < PREVIEW_GRADING_RESCUE_LIMIT
-    ? 'rescue'
-    : 'neutral';
+  return usesNeutralRules ? 'neutral' : 'graded';
 }
 
 /**
@@ -683,10 +681,11 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   // a normal puzzle (App's load guard), so a restored board is never a daily.
   const [isDailyBoard, setIsDailyBoard] = useState(false);
   // Total puzzles solved, for the preview-grading transition. Loaded from
-  // progress at mount and refreshed on every startNewGame fetch. Initialize to
-  // the fully-neutral threshold so a veteran restoring a board never sees a
-  // stale graded flash before the first progress read lands.
-  const [puzzlesSolvedCount, setPuzzlesSolvedCount] = useState(PREVIEW_GRADING_RESCUE_LIMIT);
+  // progress at mount and refreshed on every startNewGame fetch. Initialize at
+  // the neutral threshold so a veteran restoring a MEDIUM+ board never sees a
+  // stale graded flash before the first progress read lands (checks appearing
+  // once the real count loads is the safe direction; disappearing is not).
+  const [puzzlesSolvedCount, setPuzzlesSolvedCount] = useState(PREVIEW_GRADING_FULL_LIMIT);
   const [undosRemaining, setUndosRemaining] = useState(Infinity);
   const [currentVariant, setCurrentVariant] = useState<PuzzleVariant>('standard');
   const [selectedVariant, setSelectedVariantState] = useState<PuzzleVariant>('standard');
@@ -1931,16 +1930,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     // completion sites below) — mid-board rejection would leak validity, which
     // is the information the mode exists to withhold.
     if (!blindMode) {
-      const revealRescueGrading = () => {
-        if (previewGradingMode === 'rescue' && invalidAttempts === 0) {
-          setMessage(getPreviewRescueMessage(currentPhase));
-        }
-      };
       const isSourceValid = checkValidation(sourceWordStr);
       if (!isSourceValid) {
         shakeError(getInvalidWordMessage(sourceWordStr, currentPhase));
         setInvalidAttempts(prev => prev + 1);
-        revealRescueGrading();
         pendingMistakeRef.current = true;
         cleanMoveStreakRef.current = 0;
         // For double shift drop2, go back to pick2 (let player try different letter/slot)
@@ -1956,7 +1949,6 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       if (!isTargetValid) {
         shakeError(getInvalidWordMessage(targetWordStr, currentPhase));
         setInvalidAttempts(prev => prev + 1);
-        revealRescueGrading();
         pendingMistakeRef.current = true;
         cleanMoveStreakRef.current = 0;
         // For double shift drop2, go back to pick2 (let player try different letter/slot)
@@ -2226,7 +2218,6 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     unbrokenWeaveMode,
     spentLetterSet,
     doubleShiftPhase,
-    previewGradingMode,
   ]);
 
   // Grant one extra undo (e.g. an amber-spend refill in Challenge mode). No-op
@@ -2508,12 +2499,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   }, [selectedLetter, activeRowIndex, moveDirection, rows, gameState, currentVariant, doubleShiftPhase, blindMode, gameMode]);
 
   // The single presentation signal consumed by Row, drag snapping, and a11y.
-  // Rescue boards start neutral, then keep grading visible for the remainder
-  // of the board after the first invalid attempt. Slot data still computes
-  // isValid while hidden.
-  const previewValidityVisible =
-    previewGradingMode === 'graded' ||
-    (previewGradingMode === 'rescue' && invalidAttempts > 0);
+  // Grading is shown only on 'graded' boards; a 'neutral' board never shows the
+  // ✓/✗ marks (and an invalid attempt does NOT bring them back). Slot data
+  // still computes isValid while hidden.
+  const previewValidityVisible = previewGradingMode === 'graded';
 
   const restorePuzzleState = useCallback((saved: SavedPuzzleState) => {
     const selectedExists = saved.selectedLetter

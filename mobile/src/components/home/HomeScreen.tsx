@@ -155,6 +155,7 @@ import { isDailyChallengeUnlocked, getDailyStatus } from '../../services/dailyCh
 import { areUpgradesAvailable, getPurchasedUpgrades, getDeepenedRooms, getAttunedRooms } from '../../services/roomUpgrades';
 import { getTendingLevel } from '../../services/tending';
 import { hapticLight, hapticSelection } from '../../services/haptics';
+import { playUiSound, type UiSoundKind } from '../../services/uiSound';
 import { logEvent } from '../../services/eventLogger';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -401,12 +402,18 @@ const BevelRowButton: React.FC<{
   children: React.ReactNode;
   /** Host panel is dt.modalBg, which darkens at phase 2 (see dtHostDark). */
   hostDark?: boolean;
-}> = ({ phase, variant, onPress, disabled = false, accessibilityLabel, style, children, hostDark = false }) => {
+  /** UI sound on press (default 'tap'; dialogue-advance rows pass 'dialogue'). */
+  soundKind?: UiSoundKind | 'none';
+}> = ({ phase, variant, onPress, disabled = false, accessibilityLabel, style, children, hostDark = false, soundKind = 'tap' }) => {
   const skin = getPixelSkin(phase, hostDark);
   const reducedMotion = getSettingsSync().reducedMotion;
   const travel = useRef(new Animated.Value(0)).current;
   const [pressed, setPressed] = useState(false);
   const buttonSkin = skin.buttons[variant === 'secondary' ? 'secondary' : 'primary'].md;
+  const handlePress = useCallback(() => {
+    if (soundKind !== 'none') playUiSound(soundKind);
+    onPress();
+  }, [soundKind, onPress]);
   const handlePressIn = useCallback(() => {
     setPressed(true);
     if (reducedMotion) return;
@@ -423,7 +430,7 @@ const BevelRowButton: React.FC<{
   });
   return (
     <Pressable
-      onPress={disabled ? undefined : onPress}
+      onPress={disabled ? undefined : handlePress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       disabled={disabled}
@@ -1526,6 +1533,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               disabled={!onOpenStore || isOnboarding}
               onPress={() => {
                 hapticLight();
+                playUiSound('tap');
                 onOpenStore?.();
               }}
               activeOpacity={0.7}
@@ -1571,7 +1579,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <TouchableOpacity
                   style={styles.questPill}
                   hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                  onPress={() => { handleOpenQuestModal().catch(() => {}); }}
+                  onPress={() => { playUiSound('tap'); handleOpenQuestModal().catch(() => {}); }}
                   accessibilityLabel={getQuestPillAccessibilityLabel(
                     actionableQuestCount,
                     claimableQuestAmber,
@@ -1619,7 +1627,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <TouchableOpacity
                 style={styles.headerIconBtn}
                 hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                onPress={handleOpenUtilityMenu}
+                onPress={() => { playUiSound('tap'); handleOpenUtilityMenu(); }}
                 accessibilityLabel="Open utility menu"
                 accessibilityRole="button"
               >
@@ -1651,6 +1659,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           pitNeedsAttention={pitNeedsAttention}
           onPitPress={!isOnboarding && onOpenPit ? () => {
             hapticLight();
+            playUiSound('tap');
             onOpenPit();
           } : undefined}
         />
@@ -1663,6 +1672,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               activeOpacity={0.85}
               onPress={() => {
                 hapticLight();
+                playUiSound('tap');
                 unlockFlow.setShowShop(true);
               }}
               accessibilityLabel={`Next unlock. ${unlockFlow.nextUnlock.cost === 0 ? 'Free' : `${progress.amber} of ${unlockFlow.nextUnlock.cost} amber`}`}
@@ -1961,6 +1971,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       variant="primary"
                       hostDark={dtHostDark}
                       onPress={dialogueFlow.handleNextDialogue}
+                      soundKind="dialogue"
                       accessibilityLabel="Continue dialogue"
                       style={styles.dialogueContinueBevel}
                     >
@@ -2905,6 +2916,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       variant="primary"
                       hostDark={dtHostDark}
                       onPress={handleAdvanceIntroDialogue}
+                      soundKind="dialogue"
                       accessibilityLabel={hasMoreIntroDialogues() ? 'Continue intro' : 'Welcome and close'}
                       style={styles.dialogueContinueBevel}
                     >
@@ -3236,6 +3248,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                           setJournalSpotlightActive(false);
                         }
                     }
+                    soundKind="dialogue"
                     accessibilityLabel={journalSpotlightIndex < journalSpotlightLines.length - 1 ? 'Continue journal intro' : 'Close journal intro'}
                     style={styles.dialogueContinueBevel}
                   >

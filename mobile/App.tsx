@@ -87,7 +87,7 @@ import { initShareImage } from './src/services/shareImage';
 import { ShareResultModal } from './src/components/share/ShareResultModal';
 import { getLocalDateString } from './src/services/dateUtils';
 import { getSettingsSync } from './src/services/settings';
-import { initAudio, setAudioPhase, startMusicForPhase, soundVictory, soundPerfect, soundValidMove, soundInvalidMove, soundUndo, soundHint, soundTap, soundLetterSelect } from './src/services/audio';
+import { initAudio, setAudioPhase, startMusicForPhase, soundVictory, soundPerfect, soundValidMove, soundInvalidMove, soundUndo, soundHint, soundTap, soundUiTap, soundSelection, soundLetterSelect } from './src/services/audio';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess, hapticWarning, hapticError, hapticSelection } from './src/services/haptics';
 import { getVariantTutorialIntroLines } from './src/services/animalDialogue';
@@ -1166,7 +1166,7 @@ function MainApp() {
   // Start puzzle when navigating to puzzle screen
   const handlePlayPuzzle = useCallback((difficulty?: Difficulty) => {
     hapticLight();
-    soundTap();
+    soundUiTap();
     setIsPlayingDaily(false);
     resetSpeedRun();
     // Refresh persistence data (phase, stats) before starting puzzle
@@ -1362,7 +1362,7 @@ function MainApp() {
   // Start the Daily Challenge (seeded; difficulty follows the week ramp).
   const handleStartDaily = useCallback((_difficulty: Difficulty) => {
     hapticLight();
-    soundTap();
+    soundUiTap();
     (async () => {
       // Replay guard: the seeded daily board is identical all day and pays full
       // HARD-tier amber plus phase progress, so replays (deep link, notification
@@ -3126,6 +3126,7 @@ function MainApp() {
 
   const handleSelectDifficulty = useCallback((d: Difficulty) => {
     hapticLight();
+    soundSelection();
     orchestrationActions.setCompletionCoda(null);
     resetSpeedRun();
     puzzleActions.startNewGame(d, puzzle.gameMode, puzzle.selectedVariant);
@@ -3136,7 +3137,7 @@ function MainApp() {
       return;
     }
     hapticSelection();
-    soundTap();
+    soundSelection();
     orchestrationActions.setCompletionCoda(null);
     resetSpeedRun();
     puzzleActions.setSelectedVariant(variant);
@@ -3163,6 +3164,7 @@ function MainApp() {
   // stay free and unlimited in blind (the challenge undo budget never applies).
   const handleToggleChallengeMode = useCallback(() => {
     hapticMedium();
+    soundSelection();
     orchestrationActions.setCompletionCoda(null);
     resetSpeedRun();
     const isChallengeOnly = puzzle.gameMode === 'challenge' && !puzzle.blindMode;
@@ -3188,6 +3190,7 @@ function MainApp() {
       return;
     }
     hapticMedium();
+    soundSelection();
     orchestrationActions.setCompletionCoda(null);
     resetSpeedRun();
     if (puzzle.blindMode) {
@@ -3212,6 +3215,7 @@ function MainApp() {
   const handleToggleUnbrokenWeave = useCallback(() => {
     if (persistence.currentPhase !== 5) return;
     hapticMedium();
+    soundSelection();
     orchestrationActions.setCompletionCoda(null);
     resetSpeedRun();
     puzzleActions.startNewGame(
@@ -3238,7 +3242,7 @@ function MainApp() {
       return;
     }
     hapticSelection();
-    soundTap();
+    soundSelection();
     orchestrationActions.setCompletionCoda(null);
     resetSpeedRun();
     puzzleActions.setSelectedVariant(combo.variant);

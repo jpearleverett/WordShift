@@ -42,7 +42,7 @@ Always use `npm test`, not `npx jest` — the latter misses the local install an
 ### Generated content
 
 - **Puzzle banks**: `npm run generate:puzzles`, then always run `node scripts/tools/purgeProfanity.mjs` (the generator does not filter offensive words).
-- **Art/SFX**: `npm run generate:assets` rebuilds the app icon, splash, notification icon, the 32-file WAV pack, the world/pixel art, and the UI icon sprites from pure-Node scripts in `mobile/scripts/tools/`.
+- **Art/SFX**: `npm run generate:assets` rebuilds the app icon, splash, notification icon, the 36-file WAV pack, the world/pixel art, and the UI icon sprites from pure-Node scripts in `mobile/scripts/tools/`.
 - **Builds**: `eas build` profiles live in `mobile/eas.json` (`appVersionSource: "local"` — bump `android.versionCode` manually for each release). Remaining human release tasks are tracked in [docs/LAUNCH_CHECKLIST.md](./docs/LAUNCH_CHECKLIST.md).
 
 ## Docs

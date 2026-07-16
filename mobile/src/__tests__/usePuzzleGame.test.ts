@@ -89,7 +89,6 @@ jest.mock('../services/phaseNarrative', () => ({
   getLockedLetterMessage: jest.fn((_p: number) => 'That letter is locked!'),
   getFinalBoardStartMessage: jest.fn((_p: number) => 'The last arrangement. Take your time.'),
   getFinalBoardUndoRefusal: jest.fn((_p: number) => 'What is given now is given for good.'),
-  getPreviewRescueMessage: jest.fn((_p: number) => 'The checks return for this board.'),
   getUnbrokenWeaveSpentLetterMessage: jest.fn((letter: string, _p: number) => `${letter} has already crossed the chain.`),
   getUnbrokenWeaveUnavailableMessage: jest.fn((_p: number) => 'The thread breaks before it can begin. A plain offering remains.'),
 }));
@@ -103,7 +102,7 @@ jest.mock('../services/hints', () => ({
 jest.mock('../services/amberCurrency', () => ({
   getPreferredPuzzleVariant: jest.fn(async () => 'standard'),
   setPreferredPuzzleVariant: jest.fn(async () => {}),
-  // Default is fully neutral (>= PREVIEW_GRADING_RESCUE_LIMIT = 20) so the
+  // Default is fully neutral (>= PREVIEW_GRADING_FULL_LIMIT = 12) so the
   // preview-validity truth table below exercises the steady-state gate; the
   // transition tests override this per-test with an early-game count.
   getFullProgress: jest.fn(async () => ({ puzzlesSolved: 20 })),
@@ -210,7 +209,6 @@ import { usePuzzleGame, hasAnyValidMove, canCompleteDoubleShift, hasAnyValidDoub
 // '../constants' mock above) — the grading-window tests pin against them.
 import {
   PREVIEW_GRADING_FULL_LIMIT,
-  PREVIEW_GRADING_RESCUE_LIMIT,
 } from '../constants/gameBalance';
 
 /**
@@ -239,11 +237,18 @@ describe('resolvePreviewGradingMode', () => {
 
   test.each([
     [11, 'graded'],
-    [12, 'rescue'],
-    [19, 'rescue'],
+    [12, 'neutral'],
+    [19, 'neutral'],
     [20, 'neutral'],
   ] as const)('resolves the progression boundary at %i solves to %s', (puzzlesSolved, expected) => {
     expect(resolve(puzzlesSolved)).toBe(expected);
+  });
+
+  test('the transition is one-way at FULL_LIMIT (no rescue tier)', () => {
+    // Graded on the last full-grade board, neutral from FULL_LIMIT on — and it
+    // never flips back (previewValidityVisible no longer keys on invalidAttempts).
+    expect(resolve(PREVIEW_GRADING_FULL_LIMIT - 1)).toBe('graded');
+    expect(resolve(PREVIEW_GRADING_FULL_LIMIT)).toBe('neutral');
   });
 
   test('keeps EASY and double shift graded after the progression windows', () => {
@@ -252,16 +257,16 @@ describe('resolvePreviewGradingMode', () => {
   });
 
   test.each(['standard', 'reverse', 'speed'] as const)(
-    '%s uses rescue through solve 19, then stays neutral',
+    '%s goes neutral at FULL_LIMIT and stays neutral',
     (variant) => {
-      expect(resolve(12, { difficulty: 'HARD', variant })).toBe('rescue');
-      expect(resolve(19, { difficulty: 'HARD', variant })).toBe('rescue');
+      expect(resolve(12, { difficulty: 'HARD', variant })).toBe('neutral');
+      expect(resolve(19, { difficulty: 'HARD', variant })).toBe('neutral');
       expect(resolve(20, { difficulty: 'HARD', variant })).toBe('neutral');
     },
   );
 
   test('treats daily and shared boards by their MEDIUM+ shape, not an EASY preference', () => {
-    expect(resolve(12, { difficulty: 'EASY', isDailyBoard: true })).toBe('rescue');
+    expect(resolve(12, { difficulty: 'EASY', isDailyBoard: true })).toBe('neutral');
     expect(resolve(20, { difficulty: 'EASY', isSharedChallenge: true })).toBe('neutral');
   });
 
@@ -2177,10 +2182,10 @@ describe('usePuzzleGame', () => {
   });
 
   // =========================================================================
-  // Preview-grading transition: full grading through solve 11, then a
-  // board-local rescue from solves 12 through 19. Rescue boards begin neutral
-  // and restore the checks after the first invalid attempt. At solve 20 the
-  // steady-state verb-depth rules take over.
+  // Preview-grading transition: full grading through solve 11 (any difficulty),
+  // then MEDIUM+/daily/shared boards go NEUTRAL from solve 12 on. The transition
+  // is one-way — an invalid attempt never brings the checks back (no rescue
+  // tier); the steady-state verb-depth rules own the board from FULL_LIMIT.
   // =========================================================================
 
   describe('previewValidityVisible (early-game grading transition)', () => {
@@ -2204,8 +2209,7 @@ describe('usePuzzleGame', () => {
       expect(state.previewValidityVisible).toBe(true);
     });
 
-    test('a rescue board starts neutral, then restores checks once after the first invalid attempt', async () => {
-      const narrative = require('../services/phaseNarrative');
+    test('a MEDIUM board at the full-grading limit is neutral, and an invalid attempt does NOT restore the checks', async () => {
       (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({
         puzzlesSolved: PREVIEW_GRADING_FULL_LIMIT,
       });
@@ -2213,35 +2217,25 @@ describe('usePuzzleGame', () => {
       let [, actions] = callHook();
       await actions.startNewGame('MEDIUM');
       let [state, liveActions] = callHook();
-      expect(state.previewGradingMode).toBe('rescue');
+      expect(state.previewGradingMode).toBe('neutral');
       expect(state.previewValidityVisible).toBe(false);
 
+      // A wrong move increments the counter but MUST NOT bring the marks back
+      // (the old "rescue" resurrection read as a glitch and was removed).
       const letter = state.rows[0].words.find(l => l.char === 'L')!;
       liveActions.handleLetterPress(letter, 0);
       [, actions] = callHook();
       expect(await actions.handleSlotPress(0)).toBeNull();
 
-      [state, actions] = callHook();
-      expect(state.invalidAttempts).toBe(1);
-      expect(state.previewGradingMode).toBe('rescue');
-      expect(state.previewValidityVisible).toBe(true);
-      expect(state.message).toBe('The checks return for this board.');
-      expect(narrative.getPreviewRescueMessage).toHaveBeenCalledTimes(1);
-
-      (narrative.getPreviewRescueMessage as jest.Mock).mockClear();
-      expect(await actions.handleSlotPress(0)).toBeNull();
-      expect(narrative.getPreviewRescueMessage).not.toHaveBeenCalled();
-
-      [, actions] = callHook();
-      actions.initGame(['LIME', 'TIME', 'TIED']);
       [state] = callHook();
-      expect(state.previewGradingMode).toBe('rescue');
+      expect(state.invalidAttempts).toBe(1);
+      expect(state.previewGradingMode).toBe('neutral');
       expect(state.previewValidityVisible).toBe(false);
     });
 
-    test('the rescue window ends at the neutral limit', async () => {
+    test('a MEDIUM board well past the limit stays neutral', async () => {
       (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({
-        puzzlesSolved: PREVIEW_GRADING_RESCUE_LIMIT,
+        puzzlesSolved: 40,
       });
       resetHookState();
       let [, actions] = callHook();
