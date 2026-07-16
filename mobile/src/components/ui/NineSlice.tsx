@@ -51,19 +51,25 @@ export const NineSliceFrame: React.FC<{
           backgroundColor: fillColor,
         }}
       />
-      {/* edges */}
-      <View style={{ position: 'absolute', top: 0, left: C, right: C, height: E }}>
+      {/* edges — each tucks 1dp UNDER the corners (which are drawn last and are
+          opaque in that region, so the extra dp is fully overpainted). Without
+          this tuck the edge abuts the corner at exactly C, and at fractional
+          screen densities the independently-positioned corner sprite and edge
+          round to different physical pixels, opening a 1px transparent hairline
+          at each corner that reveals the layer behind the frame (the "white
+          corner gaps"). Same guard ThreeSliceStrip uses at its caps. */}
+      <View style={{ position: 'absolute', top: 0, left: C - 1, right: C - 1, height: E }}>
         <Image source={skin.top} style={styles.stretch} resizeMode="stretch" fadeDuration={0} />
       </View>
       {!openBottom && (
-        <View style={{ position: 'absolute', bottom: 0, left: C, right: C, height: E }}>
+        <View style={{ position: 'absolute', bottom: 0, left: C - 1, right: C - 1, height: E }}>
           <Image source={skin.bottom} style={styles.stretch} resizeMode="stretch" fadeDuration={0} />
         </View>
       )}
-      <View style={{ position: 'absolute', left: 0, top: C, bottom: openBottom ? 0 : C, width: E }}>
+      <View style={{ position: 'absolute', left: 0, top: C - 1, bottom: openBottom ? 0 : C - 1, width: E }}>
         <Image source={skin.left} style={styles.stretch} resizeMode="stretch" fadeDuration={0} />
       </View>
-      <View style={{ position: 'absolute', right: 0, top: C, bottom: openBottom ? 0 : C, width: E }}>
+      <View style={{ position: 'absolute', right: 0, top: C - 1, bottom: openBottom ? 0 : C - 1, width: E }}>
         <Image source={skin.right} style={styles.stretch} resizeMode="stretch" fadeDuration={0} />
       </View>
       {/* corners (drawn last so their baked fill wins at the overlaps) */}

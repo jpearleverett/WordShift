@@ -36,6 +36,10 @@ jest.mock('react', () => {
     useEffect: (effect: () => void | (() => void)) => {
       effectCallbacks.push(effect);
     },
+    // Renderer-less stubs (the component is invoked as a plain function): a ref
+    // is just a { current } box, and useCallback returns the callback unchanged.
+    useRef: (initial: unknown) => ({ current: initial }),
+    useCallback: (fn: unknown) => fn,
   };
 });
 

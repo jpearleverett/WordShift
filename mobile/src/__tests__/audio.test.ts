@@ -18,7 +18,9 @@ import {
   soundValidMove,
   soundTap,
   musicTrackForPhase,
+  musicTrackForContext,
   startMusicForPhase,
+  startMusicForScreen,
   stopMusic,
   getActiveMusicTrack,
   unloadAllSounds,
@@ -157,6 +159,30 @@ describe('audio', () => {
       expect(musicTrackForPhase(3)).toBe('music_dark');
       expect(musicTrackForPhase(4)).toBe('music_dark');
       expect(musicTrackForPhase(5)).toBe('music_dark');
+    });
+
+    test('musicTrackForContext picks the screen family and keeps the phase band', () => {
+      // Home = the bare world beds (also the default for menu screens).
+      expect(musicTrackForContext('home', 0)).toBe('music_bright');
+      expect(musicTrackForContext('home', 2)).toBe('music_dusk');
+      expect(musicTrackForContext('home', 4)).toBe('music_dark');
+      // Puzzle family darkens with the same descent.
+      expect(musicTrackForContext('puzzle', 1)).toBe('music_puzzle_bright');
+      expect(musicTrackForContext('puzzle', 2)).toBe('music_puzzle_dusk');
+      expect(musicTrackForContext('puzzle', 3)).toBe('music_puzzle_dark');
+      // Pit family too.
+      expect(musicTrackForContext('pit', 0)).toBe('music_pit_bright');
+      expect(musicTrackForContext('pit', 2)).toBe('music_pit_dusk');
+      expect(musicTrackForContext('pit', 5)).toBe('music_pit_dark');
+    });
+
+    test('startMusicForScreen plays the screen-specific bed and crossfades on a screen change', async () => {
+      await startMusicForScreen('home', 0);
+      expect(getActiveMusicTrack()).toBe('music_bright');
+      await startMusicForScreen('puzzle', 0);
+      expect(getActiveMusicTrack()).toBe('music_puzzle_bright');
+      await startMusicForScreen('pit', 0);
+      expect(getActiveMusicTrack()).toBe('music_pit_bright');
     });
 
     test('startMusicForPhase starts a looping player and fades it in', async () => {

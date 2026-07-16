@@ -303,13 +303,12 @@ export const JOURNAL_UNLOCK_PUZZLES = 6;
 
 /**
  * Preview-grading transition. The tutorial's ✓/✗ marks remain on every board
- * below FULL_LIMIT. From FULL_LIMIT through RESCUE_LIMIT - 1, MEDIUM+ boards
- * begin neutral but restore grading after the first invalid attempt on that
- * board. At RESCUE_LIMIT the normal verb-depth rules take over permanently.
- * EASY and double-shift remain graded; Blind Offering has no previews.
+ * below FULL_LIMIT (any difficulty). At FULL_LIMIT the normal verb-depth rules
+ * take over permanently for MEDIUM+/daily/shared boards: the marks step back
+ * for good (a one-time in-world notice explains it) and never resurrect on a
+ * mistake. EASY and double-shift remain graded; Blind Offering has no previews.
  */
 export const PREVIEW_GRADING_FULL_LIMIT = 12;
-export const PREVIEW_GRADING_RESCUE_LIMIT = 20;
 
 // ============================================================================
 // OFFERING PIT

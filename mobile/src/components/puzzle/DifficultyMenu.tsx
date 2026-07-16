@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -134,20 +134,39 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   introMode = false,
   introHintText,
 }) => {
-  // Hook must run on every render (before the visibility early-return).
+  // Hooks must run on every render (before the visibility early-return).
   const screenInsets = useScreenInsets();
+  // The panel is position:absolute below a VARIABLE-height header, so a static
+  // estimate of the space above it (MENU_ANCHOR_BELOW_INSET) can run the panel
+  // — and its inner ScrollView — off the bottom of the screen on a taller
+  // header, leaving the lowest rows (e.g. the Challenge toggle) below the fold
+  // and unreachable even at the scroll end. Measure the panel's REAL on-screen
+  // top once it lays out and size it to the actual space beneath it.
+  const panelWrapRef = useRef<View>(null);
+  const [measuredMaxHeight, setMeasuredMaxHeight] = useState<number | null>(null);
+  const handlePanelLayout = useCallback(() => {
+    const node = panelWrapRef.current;
+    if (!node || typeof node.measureInWindow !== 'function') return;
+    node.measureInWindow((_x, y, _w, _h) => {
+      if (typeof y !== 'number' || !Number.isFinite(y) || y <= 0) return;
+      const avail = SCREEN_HEIGHT - y - screenInsets.bottom - 12;
+      const bounded = Math.max(MENU_MIN_HEIGHT, Math.min(avail, MENU_HEIGHT_CAP));
+      setMeasuredMaxHeight(prev => (prev === bounded ? prev : bounded));
+    });
+  }, [screenInsets.bottom]);
   if (!visible) return null;
 
-  // Bound the panel to the space actually below its anchor: window height
-  // minus the top inset + header chrome above the anchor, minus the bottom
-  // safe inset, with a little breathing room for the drop shadow.
-  const menuMaxHeight = Math.max(
+  // Bound the panel to the space actually below its anchor. Prefer the measured
+  // height (exact, device-independent); fall back to the static estimate for the
+  // first frame before measurement lands.
+  const estimatedMaxHeight = Math.max(
     MENU_MIN_HEIGHT,
     Math.min(
       SCREEN_HEIGHT - screenInsets.top - MENU_ANCHOR_BELOW_INSET - screenInsets.bottom - 12,
       MENU_HEIGHT_CAP
     )
   );
+  const menuMaxHeight = measuredMaxHeight ?? estimatedMaxHeight;
   const scrollMaxHeight = menuMaxHeight - MENU_CHROME_HEIGHT;
 
   const t = getSurfaceTheme(phase);
@@ -289,6 +308,7 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   };
 
   return (
+    <View ref={panelWrapRef} onLayout={handlePanelLayout} style={styles.difficultyMenuAnchor}>
     <PanelCard phase={phase} kind="panel" style={panelStyle}>
       <Text style={[styles.menuTitle, { color: t.title }]}>{title}</Text>
       <ScrollView
@@ -546,17 +566,25 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
         )}
       </ScrollView>
     </PanelCard>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  difficultyMenu: {
+  // Positioning wrapper: carries the absolute anchor (below the difficulty
+  // button) + a ref so the panel can measure its real on-screen top and size
+  // its ScrollView to the space actually beneath it (see handlePanelLayout).
+  difficultyMenuAnchor: {
     position: 'absolute',
     right: 20,
     top: 52,
+    zIndex: 200,
+  },
+  difficultyMenu: {
     width: 290,
     // maxHeight is applied inline (menuMaxHeight) — it depends on the live
-    // safe-area insets, so it cannot live in the static stylesheet.
+    // safe-area insets / measured position, so it cannot live in the static
+    // stylesheet.
     // Must clear the cottage panel frame's 24dp top wood band, or the title
     // sits inside the wood and reads as clipped against the top edge.
     paddingTop: 30,
@@ -566,7 +594,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.45,
     shadowRadius: 18,
     elevation: 12,
-    zIndex: 200,
   },
   difficultyMenuCompact: {
     width: 210,

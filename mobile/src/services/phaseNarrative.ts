@@ -2283,19 +2283,9 @@ export function getStreakHeldMessage(heldAt: number, phase: number = 0): string 
 // ============================================================================
 
 export function getPreviewGraduationMessage(phase: number): string {
-  if (phase >= 4) return 'The marks withdraw. Your hands know which words hold. They have learned well.';
-  if (phase >= 2) return 'The little checks step back. The house has heard your judgment sharpen. Trust what sounds true.';
-  return 'The little checks step back now. You have learned to trust your ear for a real word.';
-}
-
-/**
- * One-time-per-board explanation when an invalid attempt restores grading
- * during the rescue window. The hook owns the once-only board guard.
- */
-export function getPreviewRescueMessage(phase: number): string {
-  if (phase >= 4) return 'A false word entered. The marks return until this board is complete.';
-  if (phase >= 2) return 'One word slipped. The little checks return for this board. Listen closely.';
-  return 'A miss... the little checks return for this board. Use them, then try again!';
+  if (phase >= 4) return 'The marks withdraw. From here, your hands know which words hold. They have learned well.';
+  if (phase >= 2) return 'The little checks step back now, and stay back. The house has heard your judgment sharpen. Trust what sounds true.';
+  return 'The little checks step back now, and stay back. From here you judge the words yourself. Trust your ear for a real word.';
 }
 
 // ============================================================================

@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 import { getDialogueTheme } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
+import { hapticLight } from '../services/haptics';
+import { playUiSound } from '../services/uiSound';
 import {
   getSkipConfirmText,
   getSkipConfirmStayLabel,
@@ -43,7 +45,7 @@ const FoxBevelButton: React.FC<{
 }> = ({ label, onPress, accessibilityLabel }) => (
   <TouchableOpacity
     style={foxBevelStyles.strip}
-    onPress={onPress}
+    onPress={onPress ? () => { hapticLight(); playUiSound('dialogue'); onPress(); } : undefined}
     activeOpacity={0.85}
     accessibilityLabel={accessibilityLabel}
     accessibilityRole="button"
@@ -351,7 +353,7 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
                 <>
                   <TouchableOpacity
                     style={styles.skipBtn}
-                    onPress={onSkip}
+                    onPress={onSkip ? () => { hapticLight(); playUiSound('selection'); onSkip(); } : undefined}
                     accessibilityLabel="Yes, skip the whole intro"
                     accessibilityRole="button"
                   >
@@ -368,7 +370,7 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
                   {showSkip && onSkip && (
                     <TouchableOpacity
                       style={styles.skipBtn}
-                      onPress={() => setConfirmingSkip(true)}
+                      onPress={() => { hapticLight(); playUiSound('selection'); setConfirmingSkip(true); }}
                       accessibilityLabel="Skip intro"
                       accessibilityRole="button"
                     >

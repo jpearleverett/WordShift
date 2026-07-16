@@ -42,6 +42,11 @@ const SOUND_SOURCES: Record<string, any> = {
   dialogue: require('../../assets/sounds/dialogue.wav'),
   phase_change: require('../../assets/sounds/phase_change.wav'),
   daily_ready: require('../../assets/sounds/daily_ready.wav'),
+  // Dedicated UI sounds (menus / dialogue / navigation): a warm confirm tap and
+  // a soft selection tick, distinct from the board's tap/letter_select so menu
+  // taps never read as gameplay.
+  ui_tap: require('../../assets/sounds/ui_tap.wav'),
+  ui_tick: require('../../assets/sounds/ui_tick.wav'),
   // Dark variants (Phase 3+): hollow, minor, cold — the descent reaches the
   // ears. Any `<name>_dark` here is picked automatically by the phase mirror.
   tap_dark: require('../../assets/sounds/tap_dark.wav'),
@@ -56,14 +61,25 @@ const SOUND_SOURCES: Record<string, any> = {
   dialogue_dark: require('../../assets/sounds/dialogue_dark.wav'),
   victory_dark: require('../../assets/sounds/victory_dark.wav'),
   perfect_dark: require('../../assets/sounds/perfect_dark.wav'),
+  ui_tap_dark: require('../../assets/sounds/ui_tap_dark.wav'),
+  ui_tick_dark: require('../../assets/sounds/ui_tick_dark.wav'),
 };
 
 // Ambient music beds (looping) — kept out of SOUND_SOURCES so a stray
 // playSound() can never fire a 20-second bed as a one-shot.
 const MUSIC_SOURCES: Record<string, any> = {
+  // Home / world beds (also the default for menu/secondary screens).
   music_bright: require('../../assets/sounds/music_bright.wav'),
   music_dusk: require('../../assets/sounds/music_dusk.wav'),
   music_dark: require('../../assets/sounds/music_dark.wav'),
+  // Puzzle-screen beds — the same DNA, focused/minimal so it never distracts.
+  music_puzzle_bright: require('../../assets/sounds/music_puzzle_bright.wav'),
+  music_puzzle_dusk: require('../../assets/sounds/music_puzzle_dusk.wav'),
+  music_puzzle_dark: require('../../assets/sounds/music_puzzle_dark.wav'),
+  // Offering-Pit beds — sunk underground: low drone, wide reverb, ritual tolls.
+  music_pit_bright: require('../../assets/sounds/music_pit_bright.wav'),
+  music_pit_dusk: require('../../assets/sounds/music_pit_dusk.wav'),
+  music_pit_dark: require('../../assets/sounds/music_pit_dark.wav'),
 };
 
 // Hot-path sounds preloaded at init for latency-free first playback
@@ -76,6 +92,8 @@ const PRELOAD_SOUND_NAMES = [
   'invalid_move',
   'victory',
   'amber_earn',
+  'ui_tap', // UI taps fire from the very first menu interaction
+  'ui_tick',
   'valid_move_dark', // hot path once the descent deepens (Phase 3+)
   'valid_move_2_dark',
 ];
@@ -276,6 +294,24 @@ export async function soundTap(): Promise<void> {
   await playSound(resolveSfxForPhase('tap', audioPhase));
 }
 
+/**
+ * Primary UI confirm tap (menus, dialogue advance, CTAs, purchases). Warm
+ * celesta tick that hollows to a knock at Phase 3+. Distinct from the board's
+ * `tap`/`letter_select` so menu taps don't read as gameplay.
+ */
+export async function soundUiTap(): Promise<void> {
+  await playSound(resolveSfxForPhase('ui_tap', audioPhase));
+}
+
+/**
+ * Soft UI selection tick (toggles, selectable rows, difficulty/variant picks).
+ * Quieter and higher than soundUiTap so a menu full of them never fatigues.
+ * Hollow blip at Phase 3+.
+ */
+export async function soundSelection(): Promise<void> {
+  await playSound(resolveSfxForPhase('ui_tick', audioPhase));
+}
+
 /** Amber earned. Cold coin at Phase 3+. */
 export async function soundAmberEarn(): Promise<void> {
   await playSound(resolveSfxForPhase('amber_earn', audioPhase));
@@ -319,11 +355,38 @@ const MUSIC_DUSK_PHASE = 2;
 /** Phase at/above which the bed corrupts to dark. */
 const MUSIC_DARK_PHASE = 3;
 
-/** Pure phase → bed mapping (exported for tests and the wave-2 wiring). */
+/**
+ * The screen context a music bed belongs to. 'home' is also the bed for every
+ * menu / secondary screen (settings, stats, shop, ledger, gallery) — the world
+ * music simply continues there.
+ */
+export type MusicScreen = 'home' | 'puzzle' | 'pit';
+
+/** Bed-name prefix per screen family. `home` uses the bare `music_*` beds. */
+const MUSIC_FAMILY: Record<MusicScreen, string> = {
+  home: 'music',
+  puzzle: 'music_puzzle',
+  pit: 'music_pit',
+};
+
+/** Pure phase → corruption band (bright / dusk / dark) — the descent. */
+function musicBandForPhase(phase: number): 'bright' | 'dusk' | 'dark' {
+  if (phase >= MUSIC_DARK_PHASE) return 'dark';
+  if (phase >= MUSIC_DUSK_PHASE) return 'dusk';
+  return 'bright';
+}
+
+/**
+ * Pure (screen, phase) → bed mapping. Each screen family darkens with the phase
+ * band, so the descent is preserved on every screen. Exported for tests.
+ */
+export function musicTrackForContext(screen: MusicScreen, phase: number): string {
+  return `${MUSIC_FAMILY[screen]}_${musicBandForPhase(phase)}`;
+}
+
+/** Back-compat: the home/world bed for a phase. */
 export function musicTrackForPhase(phase: number): string {
-  if (phase >= MUSIC_DARK_PHASE) return 'music_dark';
-  if (phase >= MUSIC_DUSK_PHASE) return 'music_dusk';
-  return 'music_bright';
+  return musicTrackForContext('home', phase);
 }
 
 let musicPlayer: AudioPlayer | null = null;
@@ -394,9 +457,20 @@ function fadeMusic(from: AudioPlayer | null, to: AudioPlayer | null): void {
  * Never throws — music must never crash gameplay.
  */
 export async function startMusicForPhase(phase: number): Promise<void> {
+  return startMusicForScreen('home', phase);
+}
+
+/**
+ * Start (or crossfade to) the ambient bed for the given SCREEN + narrative
+ * phase. The screen picks the bed family (home / puzzle / pit) and the phase
+ * picks the corruption band, so the pit sounds like a ritual space and the
+ * puzzle screen stays focused while both still darken with the descent.
+ * Same crossfade / no-op / musicEnabled semantics as before.
+ */
+export async function startMusicForScreen(screen: MusicScreen, phase: number): Promise<void> {
   try {
     if (!(await isMusicEnabled())) return;
-    const track = musicTrackForPhase(phase);
+    const track = musicTrackForContext(screen, phase);
     if (activeMusicTrack === track && musicPlayer) {
       try {
         if (!musicPlayer.playing) musicPlayer.play();
