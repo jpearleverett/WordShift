@@ -87,7 +87,7 @@ import { initShareImage } from './src/services/shareImage';
 import { ShareResultModal } from './src/components/share/ShareResultModal';
 import { getLocalDateString } from './src/services/dateUtils';
 import { getSettingsSync } from './src/services/settings';
-import { initAudio, setAudioPhase, startMusicForPhase, soundVictory, soundPerfect, soundValidMove, soundInvalidMove, soundUndo, soundHint, soundTap, soundUiTap, soundSelection, soundLetterSelect } from './src/services/audio';
+import { initAudio, setAudioPhase, startMusicForScreen, type MusicScreen, soundVictory, soundPerfect, soundValidMove, soundInvalidMove, soundUndo, soundHint, soundTap, soundUiTap, soundSelection, soundLetterSelect } from './src/services/audio';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess, hapticWarning, hapticError, hapticSelection } from './src/services/haptics';
 import { getVariantTutorialIntroLines } from './src/services/animalDialogue';
@@ -747,18 +747,26 @@ function MainApp() {
   // startMusicForPhase calls play() when the player isn't playing.
   const musicPhaseRef = useRef(persistence.currentPhase);
   musicPhaseRef.current = persistence.currentPhase;
+  // The music FAMILY follows the screen: the puzzle screen gets a focused bed,
+  // the Offering Pit a ritual one, and every other screen (home + all the menus)
+  // keeps the world bed. It's tracked in a ref too so the foreground-resume
+  // restarts the bed for the screen the player is actually on.
+  const musicScreen: MusicScreen =
+    currentScreen === 'puzzle' ? 'puzzle' : currentScreen === 'pit' ? 'pit' : 'home';
+  const musicScreenRef = useRef(musicScreen);
+  musicScreenRef.current = musicScreen;
   const musicHydratedRef = useRef(false);
   useEffect(() => {
     if (persistence.cumulativeStats === null) return;
     musicHydratedRef.current = true;
     if (phaseTransitionEvent !== null) return;
-    startMusicForPhase(persistence.currentPhase).catch(() => {});
-  }, [persistence.cumulativeStats, persistence.currentPhase, phaseTransitionEvent]);
+    startMusicForScreen(musicScreen, persistence.currentPhase).catch(() => {});
+  }, [persistence.cumulativeStats, persistence.currentPhase, phaseTransitionEvent, musicScreen]);
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state !== 'active') return;
       if (!musicHydratedRef.current) return;
-      startMusicForPhase(musicPhaseRef.current).catch(() => {});
+      startMusicForScreen(musicScreenRef.current, musicPhaseRef.current).catch(() => {});
     });
     return () => subscription.remove();
   }, []);

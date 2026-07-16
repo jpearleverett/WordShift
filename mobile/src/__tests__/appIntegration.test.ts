@@ -285,13 +285,14 @@ describe('victory haptics fire once', () => {
 
 describe('ambient music wiring', () => {
   test('the bed starts after hydration and re-crossfades outside ceremonies', () => {
-    expect(APP_TSX).toMatch(/startMusicForPhase\(persistence\.currentPhase\)/);
+    // Screen-aware: the bed family follows the current screen (home/puzzle/pit).
+    expect(APP_TSX).toMatch(/startMusicForScreen\(musicScreen, persistence\.currentPhase\)/);
     // Ceremony guard: never switch beds mid-overlay.
     expect(APP_TSX).toMatch(/if \(phaseTransitionEvent !== null\) return;/);
   });
 
   test('foreground return resumes the paused bed (no stopMusic churn)', () => {
-    expect(APP_TSX).toMatch(/startMusicForPhase\(musicPhaseRef\.current\)/);
+    expect(APP_TSX).toMatch(/startMusicForScreen\(musicScreenRef\.current, musicPhaseRef\.current\)/);
     // Backgrounding relies on expo-audio's shouldPlayInBackground:false
     // auto-pause — App must not tear the player down on every app switch
     // (no stopMusic CALL anywhere in App; the word may appear in comments).
