@@ -61,6 +61,8 @@ import {
   isPostRevelation,
   markPostRevelation,
   recordPhase4Dwell,
+  getPhase4DwellCount,
+  canArmFinale,
   armFinale,
   isFinaleArmed,
   consumeVariantNudge,
@@ -116,6 +118,7 @@ import {
   getSwiftVictoryHintMessage,
   getStreakHeldMessage,
   getDwellLine,
+  getPostCapDwellLine,
   getColdOpenSkipLabel,
   getColdOpenSkipAccessibilityLabel,
   getSkipConfirmText,
@@ -123,7 +126,14 @@ import {
   getSkipConfirmLeaveLabel,
 } from './src/services/phaseNarrative';
 import { getActiveEvent, getEventDailyBonusAmber } from './src/services/liveEvents';
-import { recordSolveTime, getSolveTrend, recordSpeedRound } from './src/services/masteryRecords';
+import {
+  getUnbrokenWeaveMastery,
+  recordSolveTime,
+  getSolveTrend,
+  recordSpeedRound,
+  recordUnbrokenWeaveVictory,
+  UnbrokenWeaveMastery,
+} from './src/services/masteryRecords';
 import { maybePromptReview } from './src/services/reviewPrompt';
 import { getPhaseTransitionEvent, PhaseTransitionEvent, HOUSE_COMPLETION_EVENT, FINAL_PUZZLE_EVENT, POST_REVELATION_EVENT } from './src/services/phaseEvents';
 import { generateDailyPuzzle, prewarmDailyPuzzle, isDailyChallengeUnlocked, recordDailyCompletion, getDailyStatus, checkDailyStreakMilestone, grantFirstDailyMercy, getDailyHostName, getDailyDifficulty } from './src/services/dailyChallenge';
@@ -150,7 +160,7 @@ import { loadPixelFonts, installGlobalFont } from './src/theme/fonts';
 import { initHints, addHints } from './src/services/hints';
 import { loadEntitlements, hasEntitlementSync, ENTITLEMENTS } from './src/services/entitlements';
 import { StoreModal } from './src/components/monetization/StoreModal';
-import { recordInterstitialSeen, consumePatronNudge, armRemoveAdsNudgeIfEligible, consumePendingRemoveAdsNudge, canOfferRewardedDouble, recordRewardedDoubleOffered } from './src/services/monetizationPrompts';
+import { recordInterstitialSeen, consumePatronNudge, armRemoveAdsNudgeIfEligible, consumePendingRemoveAdsNudge, canOfferRewardedDouble, recordRewardedDoubleOffered, canShowExitNudge, recordExitNudgeShown } from './src/services/monetizationPrompts';
 import { REWARDED_HINT_GRANT } from './src/constants/gameBalance';
 import { createRevenueCatBillingProvider } from './src/services/providers/revenueCatBilling';
 import { createAdMobAdProvider } from './src/services/providers/googleAdMobAds';
@@ -404,6 +414,9 @@ function MainApp() {
   const socialProofCacheRef = useRef<{ date: string; count: number } | null>(null);
   // Optional rewarded "double the reward" — one claim per victory
   const [victoryDoubleClaimed, setVictoryDoubleClaimed] = useState(false);
+  // The setup menu keeps this private ladder snapshot current without making
+  // the puzzle hook own persistence for a Phase-5-only modifier.
+  const [unbrokenWeaveMastery, setUnbrokenWeaveMastery] = useState<UnbrokenWeaveMastery | null>(null);
   // Whether THIS victory presents the double slot at all. Decided (and the
   // presentation recorded) once per victory at processing time — the slot is
   // cadence-capped per local day and blocked at phase 4+ (monetizationPrompts).
@@ -710,6 +723,10 @@ function MainApp() {
   useEffect(() => {
     setAudioPhase(persistence.currentPhase);
   }, [persistence.currentPhase]);
+
+  useEffect(() => {
+    getUnbrokenWeaveMastery().then(setUnbrokenWeaveMastery).catch(() => {});
+  }, []);
 
   // Ambient music bed. Starts once persistence hydrates (the bed must open on
   // the REAL phase, not a Phase-0 default — cumulativeStats flips from null
@@ -1221,6 +1238,7 @@ function MainApp() {
     puzzlesSinceHomeVisit.current = 0;
     // Re-read the rebuilt persistence (amber, phase, stats, pending transition).
     persistenceActions.refreshStats().catch(() => {});
+    getUnbrokenWeaveMastery().then(setUnbrokenWeaveMastery).catch(() => {});
     // Reset All: onboarding storage is back to 'not_started'; mirror the
     // fresh-launch init so the intro replays this session. Creator snapshot:
     // storage says 'complete' and must stay complete.
@@ -1876,6 +1894,17 @@ function MainApp() {
       }
 
       let finalVictory = victory;
+      if (puzzle.unbrokenWeaveMode) {
+        const { mastery, rankedUp } = await recordUnbrokenWeaveVictory(puzzle.difficulty, victory.flawless === true);
+        setUnbrokenWeaveMastery(mastery);
+        finalVictory = {
+          ...finalVictory,
+          unbrokenWeaveRank: mastery.rank,
+          unbrokenWeaveTitle: mastery.title,
+          unbrokenWeaveNextObjective: mastery.nextObjective,
+          unbrokenWeaveRankedUp: rankedUp,
+        };
+      }
       const shouldAutoCollectVictory = (
         (onboardingFlow.onboardingStep === undefined || onboardingFlow.onboardingStep === 'complete') &&
         !victory.phaseTransitionPending &&
@@ -2051,11 +2080,12 @@ function MainApp() {
       // final board's win → post-revelation).
       //
       // The finale is no longer declared retroactively on an ordinary win:
-      // once the dwell window fills, the finale is ARMED (finaleArmed) and the
-      // NEXT standard board start serves the marked FINAL BOARD
-      // (usePuzzleGame.startNewGame). Its victory — and only its victory —
-      // plays FINAL_PUZZLE_EVENT. The win after that triggers
-      // POST_REVELATION_EVENT + markPostRevelation, exactly as before.
+      // only a capped eight-win dwell AND completedTotal >=
+      // FINALE_ARM_MIN_PUZZLES (160) arm finaleArmed. The NEXT standard board
+      // start then serves the marked FINAL BOARD (usePuzzleGame.startNewGame).
+      // Its victory — and only its victory — plays FINAL_PUZZLE_EVENT. The win
+      // after that triggers POST_REVELATION_EVENT + markPostRevelation,
+      // exactly as before.
       let dwellLineForWin: string | null = null;
       if (!victory.phaseChanged && persistence.currentPhase >= 4) {
         try {
@@ -2079,20 +2109,24 @@ function MainApp() {
                 // victory, so the whole cult-reveal era flashed past in one
                 // puzzle. Require FINALE_DWELL_PUZZLES Phase-4 puzzles first
                 // so the robed sprites, sacrifice mechanic, and 300 Phase-4
-                // dialogue lines are actually played. Never shown as a
-                // counter (narrative rule 7) — the house "is not yet ready."
+                // dialogue lines are actually played. Even after all eight
+                // dwell wins land early (completion/recruit ~136, dwell ~143),
+                // hold the marked board until arming at 160. The final board
+                // is ~161 and post-revelation ~162, giving the descent trio
+                // time to speak. Never shown as a counter (narrative rule 7)
+                // — the house "is not yet ready."
+                const dwellBefore = await getPhase4DwellCount();
                 const dwell = await recordPhase4Dwell();
-                if (dwell >= FINALE_DWELL_PUZZLES) {
+                if (canArmFinale(dwell, completedTotal)) {
                   await armFinale();
                 }
                 // Dwell voice: the wait after "The arrangement is ready."
                 // reads as held breath, not silence — one counter-free line
                 // per dwell win, surfaced through the ambient overlay in the
                 // victory cascade (skipped when a keyed micro-beat fires).
-                dwellLineForWin = getDwellLine(
-                  Math.min(dwell, FINALE_DWELL_PUZZLES),
-                  persistence.currentPhase
-                );
+                dwellLineForWin = dwellBefore >= FINALE_DWELL_PUZZLES
+                  ? getPostCapDwellLine(completedTotal, persistence.currentPhase)
+                  : getDwellLine(Math.min(dwell, FINALE_DWELL_PUZZLES), persistence.currentPhase);
               }
               // Armed but not the final board (a daily / restored board):
               // hold still — the arrangement has already chosen its board.
@@ -2736,18 +2770,20 @@ function MainApp() {
   // One-time, low-pressure Patron nudge once the player has settled in. Suppressed
   // for Patrons and during onboarding (gating lives in monetizationPrompts.ts).
   const patronNudgeInFlightRef = useRef(false);
-  const maybeShowPatronNudge = useCallback(async () => {
-    if (patronNudgeInFlightRef.current) return;
+  const maybeShowPatronNudge = useCallback(async (): Promise<boolean> => {
+    if (patronNudgeInFlightRef.current) return false;
     patronNudgeInFlightRef.current = true;
     try {
-      if (onboardingFlow.isOnboarding) return;
+      if (onboardingFlow.isOnboarding) return false;
       const solved =
         victoryFlow.victoryData?.puzzlesSolved ??
         persistence.cumulativeStats?.totalPuzzlesCompleted ??
         0;
       if (await consumePatronNudge(solved)) {
         setShowPatronModal(true);
+        return true;
       }
+      return false;
     } finally {
       patronNudgeInFlightRef.current = false;
     }
@@ -2809,11 +2845,34 @@ function MainApp() {
     // so callers capture this BEFORE the exit flow and pass it in (checking
     // the ref here would always see an empty queue).
     if (interstitialShown || introWillPresent) return;
-    if (await maybeShowSharePrompt()) return;
-    if (await maybePromptForNotifications()) return;
-    if (await maybeShowRemoveAdsOffer()) return;
-    await maybeShowPatronNudge();
-  }, [maybeShowSharePrompt, maybePromptForNotifications, maybeShowRemoveAdsOffer, maybeShowPatronNudge]);
+    const solved =
+      victoryFlow.victoryData?.puzzlesSolved ??
+      persistence.cumulativeStats?.totalPuzzlesCompleted ??
+      0;
+    if (!(await canShowExitNudge(solved))) return;
+    if (await maybeShowSharePrompt()) {
+      await recordExitNudgeShown(solved);
+      return;
+    }
+    if (await maybePromptForNotifications()) {
+      await recordExitNudgeShown(solved);
+      return;
+    }
+    if (await maybeShowRemoveAdsOffer()) {
+      await recordExitNudgeShown(solved);
+      return;
+    }
+    if (await maybeShowPatronNudge()) {
+      await recordExitNudgeShown(solved);
+    }
+  }, [
+    victoryFlow.victoryData,
+    persistence.cumulativeStats,
+    maybeShowSharePrompt,
+    maybePromptForNotifications,
+    maybeShowRemoveAdsOffer,
+    maybeShowPatronNudge,
+  ]);
 
   // One-time Swift Victories pointer: after the FIRST routine win past
   // SWIFT_HINT_MIN_PUZZLES, a quiet toast points at the Settings toggle that
@@ -3643,6 +3702,7 @@ function MainApp() {
             showUnbrokenWeave={persistence.currentPhase === 5}
             unbrokenWeaveActive={puzzle.unbrokenWeaveMode}
             onToggleUnbrokenWeave={handleToggleUnbrokenWeave}
+            unbrokenWeaveMastery={unbrokenWeaveMastery}
             introMode={showSetupSelectorIntro}
             introHintText={showSetupSelectorIntro ? setupSelectorLines[1] : undefined}
           />

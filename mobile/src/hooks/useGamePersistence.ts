@@ -126,6 +126,12 @@ export interface VictoryData {
    * plays over the settled modal.
    */
   finalBoard?: boolean;
+  /** Unbroken Weave mastery snapshot attached by App for Weave victories. */
+  unbrokenWeaveRank?: number;
+  unbrokenWeaveTitle?: string;
+  unbrokenWeaveNextObjective?: string | null;
+  /** True when this victory advanced the ordered Weave mastery ladder. */
+  unbrokenWeaveRankedUp?: boolean;
   /** True when this puzzle created a new pending phase transition in the pit */
   phaseTransitionPending: boolean;
   /** True when pending harvest batches hit the 200 cap and oldest were trimmed */

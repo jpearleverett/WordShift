@@ -29,6 +29,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isPatronSync, isAdFreeSync } from './entitlements';
 import { getLocalDateString } from './dateUtils';
 import {
+  EXIT_NUDGE_MIN_PUZZLES,
+  EXIT_NUDGE_SPACING_PUZZLES,
   PATRON_NUDGE_MIN_PUZZLES,
   REMOVE_ADS_NUDGE_AFTER_INTERSTITIALS,
 } from '../constants/gameBalance';
@@ -58,6 +60,8 @@ export interface MonetPromptState {
   rewardedDoubleDate: string | null;
   /** Rewarded-double presentations already made on `rewardedDoubleDate`. */
   rewardedDoubleOffersToday: number;
+  /** Puzzle count at which the most recent proactive victory-exit nudge presented. */
+  lastExitNudgePuzzle: number | null;
 }
 
 let cache: MonetPromptState | null = null;
@@ -70,6 +74,7 @@ function getDefault(): MonetPromptState {
     removeAdsOfferPending: false,
     rewardedDoubleDate: null,
     rewardedDoubleOffersToday: 0,
+    lastExitNudgePuzzle: null,
   };
 }
 
@@ -104,6 +109,15 @@ async function save(): Promise<void> {
 // Pure decision helpers (exported for testing)
 // ---------------------------------------------------------------------------
 
+export function shouldAllowExitNudge(params: {
+  puzzlesSolved: number;
+  lastExitNudgePuzzle: number | null;
+}): boolean {
+  if (params.puzzlesSolved < EXIT_NUDGE_MIN_PUZZLES) return false;
+  if (params.lastExitNudgePuzzle === null) return true;
+  return params.puzzlesSolved - params.lastExitNudgePuzzle >= EXIT_NUDGE_SPACING_PUZZLES;
+}
+
 export function shouldShowPatronNudge(params: {
   puzzlesSolved: number;
   isPatron: boolean;
@@ -134,6 +148,23 @@ export function shouldOfferRewardedDouble(params: {
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
+
+/** Whether the shared proactive victory-exit nudge chain may run now. */
+export async function canShowExitNudge(puzzlesSolved: number): Promise<boolean> {
+  const state = await load();
+  return shouldAllowExitNudge({
+    puzzlesSolved,
+    lastExitNudgePuzzle: state.lastExitNudgePuzzle,
+  });
+}
+
+/** Record that a proactive victory-exit nudge actually presented. */
+export async function recordExitNudgeShown(puzzlesSolved: number): Promise<void> {
+  const state = await load();
+  state.lastExitNudgePuzzle = puzzlesSolved;
+  cache = state;
+  await save();
+}
 
 /** Record that an interstitial was actually shown; returns the new running count. */
 export async function recordInterstitialSeen(): Promise<number> {

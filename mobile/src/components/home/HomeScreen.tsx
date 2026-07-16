@@ -57,6 +57,8 @@ import {
   hasSeenMandatoryHarvest,
   hasSeenHarvestHomeIntro,
   markHarvestHomeIntroSeen,
+  hasSeenUnbrokenWeaveIntro,
+  markUnbrokenWeaveIntroSeen,
 } from '../../services/amberCurrency';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
 import { AUTO_COLLECT_PUZZLE_LIMIT, HARVEST_NUDGE_MIN_AMBER, JOURNAL_UNLOCK_PUZZLES } from '../../constants/gameBalance';
@@ -87,6 +89,7 @@ import {
   getGatedRoomIntroLines,
   getHarvestHomeIntroLines,
   getHarvestNudgeLine,
+  getUnbrokenWeaveIntroLines,
 } from '../../services/phaseNarrative';
 import {
   ROOMS,
@@ -486,7 +489,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [introAnimal, setIntroAnimal] = useState<Animal | null>(null);
   const [introDialogueIndex, setIntroDialogueIndex] = useState(0);
   const [introOverrideLines, setIntroOverrideLines] = useState<string[] | null>(null);
-  const [introContext, setIntroContext] = useState<'animal_intro' | 'challenge_intro' | 'pit_nudge' | 'daily_challenge_intro' | 'gated_room_intro' | 'harvest_gate_intro' | 'harvest_heavy_nudge'>('animal_intro');
+  const [introContext, setIntroContext] = useState<'animal_intro' | 'challenge_intro' | 'pit_nudge' | 'daily_challenge_intro' | 'gated_room_intro' | 'harvest_gate_intro' | 'harvest_heavy_nudge' | 'unbroken_weave_intro'>('animal_intro');
   // Journal spotlight intro state
   const [journalSpotlightActive, setJournalSpotlightActive] = useState(false);
   const [journalSpotlightIndex, setJournalSpotlightIndex] = useState(0);
@@ -1027,6 +1030,47 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     animals,
   ]);
 
+  // Unbroken Weave intro: a single quiet post-revelation home landing, held
+  // until no ceremony, pit transition, or animal dialogue owns the moment.
+  useEffect(() => {
+    if (!progress || isOnboarding || showIntroDialogue || introOverrideLines) return;
+    if (progress.currentPhase !== 5 || progress.postRevelation !== true) return;
+    if (dialogueFlow.showDialogue || pendingHouseCompletion || pitPhaseReady) return;
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      (async () => {
+        const seen = await hasSeenUnbrokenWeaveIntro();
+        if (seen || cancelled) return;
+
+        const fox = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
+        if (!fox) return;
+
+        setIntroAnimal(fox);
+        setIntroDialogueIndex(0);
+        setIntroOverrideLines(getUnbrokenWeaveIntroLines(progress.currentPhase));
+        setIntroContext('unbroken_weave_intro');
+        setShowIntroDialogue(true);
+        await markUnbrokenWeaveIntroSeen();
+      })().catch(() => {});
+    }, 650);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [
+    progress?.currentPhase,
+    progress?.postRevelation,
+    isOnboarding,
+    showIntroDialogue,
+    introOverrideLines,
+    dialogueFlow.showDialogue,
+    pendingHouseCompletion,
+    pitPhaseReady,
+    animals,
+  ]);
+
   // Ambient home line — atmospheric text when no dialogue is active
   // Fades in, holds for 5s, then fades out to avoid persistent visual clutter.
   useEffect(() => {
@@ -1233,6 +1277,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         await markHarvestHomeIntroSeen();
       } else if (introContext === 'harvest_heavy_nudge') {
         // App-session-scoped (heavyHarvestNudgeShownThisSession) — nothing to persist.
+      } else if (introContext === 'unbroken_weave_intro') {
+        // Marked at presentation so the quiet one-time landing cannot re-fire.
       } else {
         await markIntroSeen(introAnimal.id);
       }
@@ -1260,6 +1306,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         await markHarvestHomeIntroSeen();
       } else if (introContext === 'harvest_heavy_nudge') {
         // App-session-scoped (heavyHarvestNudgeShownThisSession) — nothing to persist.
+      } else if (introContext === 'unbroken_weave_intro') {
+        // Marked at presentation so closing this optional introduction is enough.
       } else {
         await markIntroSeen(introAnimal.id);
       }

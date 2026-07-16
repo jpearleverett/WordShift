@@ -27,6 +27,7 @@ import {
   getMandatoryHarvestCTA,
   getNextStreakMilestoneText,
   getFlawlessHonorific,
+  getUnbrokenWeaveRankUpLine,
 } from '../../services/phaseNarrative';
 import { DialoguePhase } from '../../types/homeWorld';
 import { VARIANT_CONFIGS } from '../../services/puzzleVariety';
@@ -89,6 +90,10 @@ export interface VictoryData {
   phaseTransitionPending?: boolean;
   /** Monotonic real-puzzle count — early wins keep the full ceremony */
   puzzlesSolved?: number;
+  unbrokenWeaveRank?: number;
+  unbrokenWeaveTitle?: string;
+  unbrokenWeaveNextObjective?: string | null;
+  unbrokenWeaveRankedUp?: boolean;
 }
 
 interface VictoryModalProps {
@@ -388,6 +393,18 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 {getFlawlessHonorific(phase)}
               </Text>
             )}
+            {victoryData?.unbrokenWeaveRank != null && (
+              <View style={styles.compactWeaveProgress}>
+                <Text style={[styles.compactFlawless, { color: phaseTheme.victoryTitleColor }]}>
+                  {`Rank ${victoryData.unbrokenWeaveRank}: ${victoryData.unbrokenWeaveTitle}`}
+                </Text>
+                {victoryData.unbrokenWeaveNextObjective && (
+                  <Text style={[styles.compactWeaveObjective, { color: phaseTheme.modalSecondaryTextColor }]}>
+                    {victoryData.unbrokenWeaveNextObjective}
+                  </Text>
+                )}
+              </View>
+            )}
             <View
               style={styles.compactAmberRow}
               accessible
@@ -625,6 +642,33 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               }]}>
                 Daily Challenge Complete
               </Text>
+            )}
+            {victoryData?.unbrokenWeaveRank != null && (
+              <View
+                style={[styles.weaveProgress, {
+                  borderColor: phaseTheme.victoryTitleColor + '55',
+                  backgroundColor: phaseTheme.victoryGlowColor,
+                }]}
+                accessible
+                accessibilityLabel={`Unbroken Weave rank ${victoryData.unbrokenWeaveRank}, ${victoryData.unbrokenWeaveTitle}`}
+              >
+                <Text style={[styles.weaveProgressTitle, { color: phaseTheme.victoryTitleColor }]}>
+                  UNBROKEN WEAVE
+                </Text>
+                <Text style={[styles.weaveProgressRank, { color: phaseTheme.modalTextColor }]}>
+                  {`Rank ${victoryData.unbrokenWeaveRank}: ${victoryData.unbrokenWeaveTitle}`}
+                </Text>
+                {victoryData.unbrokenWeaveRankedUp && (
+                  <Text style={[styles.weaveProgressLine, { color: phaseTheme.modalSecondaryTextColor }]}>
+                    {getUnbrokenWeaveRankUpLine(phase, victoryData.unbrokenWeaveTitle ?? 'Unbroken Weave')}
+                  </Text>
+                )}
+                {victoryData.unbrokenWeaveNextObjective && (
+                  <Text style={[styles.weaveProgressLine, { color: phaseTheme.modalSecondaryTextColor }]}>
+                    {victoryData.unbrokenWeaveNextObjective}
+                  </Text>
+                )}
+              </View>
             )}
 
             {isPlayingDaily && (dailyRank || dailyHistoryLine) && (
@@ -1318,6 +1362,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 2,
   },
+  compactWeaveProgress: {
+    alignItems: 'center',
+    marginTop: 2,
+    marginBottom: 4,
+  },
+  compactWeaveObjective: {
+    fontFamily: BODY_FONT_ITALIC,
+    fontSize: 10.5,
+    lineHeight: 14,
+    textAlign: 'center',
+  },
   compactAmberRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1441,6 +1496,36 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 1.5,
     textAlign: 'center',
+  },
+  weaveProgress: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    borderRadius: 14,
+    borderWidth: 1,
+    marginTop: 2,
+    marginBottom: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  weaveProgressTitle: {
+    fontFamily: PIXEL_FONT_BOLD,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1.4,
+  },
+  weaveProgressRank: {
+    fontFamily: PIXEL_FONT_BOLD,
+    fontSize: 14,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  weaveProgressLine: {
+    fontFamily: BODY_FONT_ITALIC,
+    fontSize: 11.5,
+    lineHeight: 16,
+    textAlign: 'center',
+    marginTop: 3,
   },
   socialProofLine: {
     fontFamily: PIXEL_FONT_BOLD,

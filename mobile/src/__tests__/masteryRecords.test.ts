@@ -7,6 +7,10 @@ import {
   getSolveTrend,
   recordSpeedRound,
   getBestSpeedRound,
+  getUnbrokenWeaveMastery,
+  invalidateMasteryCache,
+  recordUnbrokenWeaveVictory,
+  resolveUnbrokenWeaveMastery,
   clearMasteryRecords,
   _clearMasteryCache,
 } from '../services/masteryRecords';
@@ -80,5 +84,169 @@ describe('best speed round', () => {
     await clearMasteryRecords();
     expect(await getBestSpeedRound()).toBe(0);
     expect(await getSolveTrend('HARD')).toBeNull();
+  });
+});
+
+describe('Unbroken Weave mastery', () => {
+  test('loads pre-ladder mastery saves with empty compatible defaults', async () => {
+    await AsyncStorage.setItem(
+      'wordshift_mastery',
+      JSON.stringify({ solveTimes: { HARD: [15000] }, bestSpeedRound: 4 }),
+    );
+    invalidateMasteryCache();
+
+    expect(await getUnbrokenWeaveMastery()).toEqual({
+      wins: 0,
+      flawlessWins: 0,
+      difficultyClears: [],
+      hardFlawless: false,
+      rank: 0,
+      title: 'Unbroken Weave',
+      nextObjective: 'Complete an Unbroken Weave.',
+    });
+    expect(await getBestSpeedRound()).toBe(4);
+  });
+
+  test.each([
+    {
+      name: 'Thread Joined',
+      input: { wins: 1, flawlessWins: 0, difficultyClears: ['EASY'] as const, hardFlawless: false },
+      rank: 1,
+      nextObjective: 'Clear Unbroken Weave on every difficulty (1/4).',
+    },
+    {
+      name: 'Fourfold Weave',
+      input: {
+        wins: 4,
+        flawlessWins: 0,
+        difficultyClears: ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'] as const,
+        hardFlawless: false,
+      },
+      rank: 2,
+      nextObjective: 'Complete a flawless HARD Unbroken Weave.',
+    },
+    {
+      name: 'Seamless Dark',
+      input: {
+        wins: 4,
+        flawlessWins: 1,
+        difficultyClears: ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'] as const,
+        hardFlawless: true,
+      },
+      rank: 3,
+      nextObjective: 'Complete 10 flawless Unbroken Weaves (1/10).',
+    },
+    {
+      name: 'Loomkeeper',
+      input: {
+        wins: 12,
+        flawlessWins: 10,
+        difficultyClears: ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'] as const,
+        hardFlawless: true,
+      },
+      rank: 4,
+      nextObjective: 'Complete 25 flawless Unbroken Weaves (10/25).',
+    },
+    {
+      name: 'Patternbound',
+      input: {
+        wins: 27,
+        flawlessWins: 25,
+        difficultyClears: ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'] as const,
+        hardFlawless: true,
+      },
+      rank: 5,
+      nextObjective: null,
+    },
+  ])('resolves the $name rank in ladder order', ({ input, rank, name, nextObjective }) => {
+    expect(resolveUnbrokenWeaveMastery(input)).toMatchObject({
+      rank,
+      title: name,
+      nextObjective,
+    });
+  });
+
+  test('does not skip ordered ranks when a later objective is already met', () => {
+    expect(resolveUnbrokenWeaveMastery({
+      wins: 10,
+      flawlessWins: 10,
+      difficultyClears: ['HARD'],
+      hardFlawless: true,
+    })).toMatchObject({ rank: 1, title: 'Thread Joined' });
+  });
+
+  test('records wins, unique difficulty clears, and flawless HARD once', async () => {
+    const first = await recordUnbrokenWeaveVictory('EASY', false);
+    expect(first.rankedUp).toBe(true);
+    expect(first.mastery).toMatchObject({
+      wins: 1,
+      flawlessWins: 0,
+      difficultyClears: ['EASY'],
+      hardFlawless: false,
+      rank: 1,
+    });
+
+    const duplicate = await recordUnbrokenWeaveVictory('EASY', false);
+    expect(duplicate.rankedUp).toBe(false);
+    expect(duplicate.mastery.difficultyClears).toEqual(['EASY']);
+
+    const hard = await recordUnbrokenWeaveVictory('HARD', true);
+    expect(hard.mastery).toMatchObject({
+      wins: 3,
+      flawlessWins: 1,
+      difficultyClears: ['EASY', 'HARD'],
+      hardFlawless: true,
+    });
+  });
+
+  test('persists ladder fields without replacing existing mastery records', async () => {
+    await recordSpeedRound(6);
+    await recordUnbrokenWeaveVictory('MEDIUM_PLUS', true);
+    _clearMasteryCache();
+
+    expect(await getBestSpeedRound()).toBe(6);
+    expect(await getUnbrokenWeaveMastery()).toMatchObject({
+      wins: 1,
+      flawlessWins: 1,
+      difficultyClears: ['MEDIUM_PLUS'],
+    });
+  });
+
+  test('invalidation reloads externally restored ladder state', async () => {
+    await getUnbrokenWeaveMastery();
+    await AsyncStorage.setItem(
+      'wordshift_mastery',
+      JSON.stringify({
+        solveTimes: {},
+        bestSpeedRound: 0,
+        unbrokenWeaveWins: 7,
+        unbrokenWeaveFlawlessWins: 2,
+        unbrokenWeaveDifficultyClears: ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD', 'HARD'],
+        unbrokenWeaveHardFlawless: true,
+      }),
+    );
+    invalidateMasteryCache();
+
+    expect(await getUnbrokenWeaveMastery()).toMatchObject({
+      wins: 7,
+      flawlessWins: 2,
+      difficultyClears: ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'],
+      hardFlawless: true,
+      rank: 3,
+    });
+  });
+
+  test('clearMasteryRecords resets ladder progress for Reset All', async () => {
+    await recordUnbrokenWeaveVictory('HARD', true);
+    await clearMasteryRecords();
+
+    expect(await getUnbrokenWeaveMastery()).toMatchObject({
+      wins: 0,
+      flawlessWins: 0,
+      difficultyClears: [],
+      hardFlawless: false,
+      rank: 0,
+    });
+    expect(await AsyncStorage.getItem('wordshift_mastery')).toBeNull();
   });
 });

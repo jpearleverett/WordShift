@@ -28,6 +28,7 @@ import {
 } from '../../services/puzzleVariety';
 import { BODY_FONT, BODY_FONT_ITALIC, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
+import type { UnbrokenWeaveMastery } from '../../services/masteryRecords';
 
 // The bare mode emoji in the variant/combo selector and the challenge/blind/
 // weave toggles now render as generated candy sprites (shared with the
@@ -102,6 +103,7 @@ interface DifficultyMenuProps {
   unbrokenWeaveActive?: boolean;
   onToggleUnbrokenWeave?: () => void;
   showUnbrokenWeave?: boolean;
+  unbrokenWeaveMastery?: UnbrokenWeaveMastery | null;
   introMode?: boolean;
   introHintText?: string;
 }
@@ -128,6 +130,7 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   unbrokenWeaveActive = false,
   onToggleUnbrokenWeave,
   showUnbrokenWeave = false,
+  unbrokenWeaveMastery = null,
   introMode = false,
   introHintText,
 }) => {
@@ -526,6 +529,18 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
               <Text style={[styles.challengeMenuDesc, { color: t.muted }]}>
                 Each letter may cross the chain only once.
               </Text>
+              {unbrokenWeaveMastery && (
+                <>
+                  <Text style={[styles.weaveMasteryTitle, { color: t.amberText }]}>
+                    Rank {unbrokenWeaveMastery.rank}: {unbrokenWeaveMastery.title}
+                  </Text>
+                  {unbrokenWeaveMastery.nextObjective && (
+                    <Text style={[styles.weaveMasteryObjective, { color: t.muted }]}>
+                      {unbrokenWeaveMastery.nextObjective}
+                    </Text>
+                  )}
+                </>
+              )}
             </View>
           </TouchableOpacity>
         )}
@@ -631,6 +646,18 @@ const styles = StyleSheet.create({
   challengeMenuDesc: {
     fontFamily: BODY_FONT,
     fontSize: 11,
+    marginTop: 1,
+  },
+  weaveMasteryTitle: {
+    fontFamily: PIXEL_FONT_BOLD,
+    fontSize: 11,
+    fontWeight: '800',
+    marginTop: 4,
+  },
+  weaveMasteryObjective: {
+    fontFamily: BODY_FONT_ITALIC,
+    fontSize: 10.5,
+    lineHeight: 14,
     marginTop: 1,
   },
   variantItem: {

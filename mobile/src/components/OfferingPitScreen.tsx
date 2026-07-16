@@ -82,6 +82,7 @@ import { getSettingsSync } from '../services/settings';
 import { logEvent } from '../services/eventLogger';
 import { hapticLight, hapticMedium, hapticHeavy } from '../services/haptics';
 import { getDeviceTier, shouldSimplifyAnimations } from '../services/deviceTier';
+import { getBulkOfferTiming } from '../services/pitOfferTiming';
 
 // ---------------------------------------------------------------------------
 // Assets & Constants
@@ -2052,8 +2053,10 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       return;
     }
 
-    // Animate balance incrementally as words fly in
-    const staggerDelay = Math.min(70, 1800 / words.length);
+    // Bulk offerings stay brisk even for a full pit. The resolver includes the
+    // final word's motion and settle buffer, so this entire routine finishes
+    // within one second while individual tap-to-devour keeps its own cadence.
+    const timing = getBulkOfferTiming(words.length, phase, reducedMotion);
 
     words.forEach((fw, i) => {
       fw.isDevoured = true;
@@ -2066,7 +2069,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         fw.floatLoopY?.stop(); fw.floatLoopY = null;
 
         if (i % 3 === 0) spawnTrail(currentPos.x, currentPos.y);
-        const duration = getDevourDuration(phase);
+        const duration = timing.wordDurationMs;
 
         // Count the displayed total up and the visual pending amber down as
         // each word flies in. Increments partition amberAwarded exactly
@@ -2120,10 +2123,10 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
             if (i % 4 === 0) { spawnImpactBurst(); spawnShockwave(); }
           }
         });
-      }, i * staggerDelay);
+      }, i * timing.staggerMs);
     });
 
-    const cascadeDuration = words.length * staggerDelay + getDevourDuration(phase) + 300;
+    const cascadeDuration = timing.cascadeDurationMs;
     setTimeout(async () => {
       if (!mountedRef.current) return;
       const freshState = await getHarvestState();
@@ -2698,14 +2701,21 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
 
           {pendingWordCount > 0 && pendingAmber - pendingAmberOffset > 0 && (
             <TouchableOpacity
-              style={[styles.harvestAllButton, { opacity: isOffering ? 0.5 : 1 }]}
+              style={[
+                styles.harvestAllButton,
+                pendingPhaseTransition == null && styles.harvestAllButtonPrimary,
+                { opacity: isOffering ? 0.5 : 1 },
+              ]}
               onPress={handleHarvestAll}
               disabled={isOffering}
               activeOpacity={0.85}
               accessibilityLabel={`${getPitOfferAllLabel(phase)}: ${Math.max(0, pendingAmber - pendingAmberOffset)} amber from ${pendingWordCount} words`}
               accessibilityRole="button"
             >
-              <ThreeSliceStrip skin={pitSkin.buttons.primary.lg.up} capDp={BTN_CAP_DP} />
+              <ThreeSliceStrip
+                skin={pendingPhaseTransition == null ? pitSkin.buttons.primary.lg.up : pitSkin.buttons.secondary.lg.up}
+                capDp={BTN_CAP_DP}
+              />
               {/* Row layout, NOT an inline <Image> inside the Text run: the
                   900-weight letter-spaced font shifts inline-image baselines
                   on device and the gem overlapped the amount. */}
@@ -3049,6 +3059,9 @@ const styles = StyleSheet.create({
     height: BTN_LG_DP + BTN_SHADOW_DP,
     minWidth: 220,
     alignSelf: 'center',
+  },
+  harvestAllButtonPrimary: {
+    minWidth: 244,
   },
   harvestAllContent: {
     flex: 1,

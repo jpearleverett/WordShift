@@ -348,9 +348,25 @@ describe('proactive share prompt', () => {
     // The notification prompt reports whether it actually presented, and a
     // shown prompt must end the chain before the remove-ads / patron nudges.
     expect(APP_TSX).toMatch(/const maybePromptForNotifications = useCallback\(async \(\): Promise<boolean>/);
-    expect(APP_TSX).toMatch(/if \(await maybeShowSharePrompt\(\)\) return;/);
-    expect(APP_TSX).toMatch(/if \(await maybePromptForNotifications\(\)\) return;/);
-    expect(APP_TSX).toMatch(/if \(await maybeShowRemoveAdsOffer\(\)\) return;/);
+    expect(APP_TSX).toMatch(/if \(await maybeShowSharePrompt\(\)\) \{\s*await recordExitNudgeShown\(solved\);\s*return;\s*\}/);
+    expect(APP_TSX).toMatch(/if \(await maybePromptForNotifications\(\)\) \{\s*await recordExitNudgeShown\(solved\);\s*return;\s*\}/);
+    expect(APP_TSX).toMatch(/if \(await maybeShowRemoveAdsOffer\(\)\) \{\s*await recordExitNudgeShown\(solved\);\s*return;\s*\}/);
+    expect(APP_TSX).toMatch(/if \(await maybeShowPatronNudge\(\)\) \{\s*await recordExitNudgeShown\(solved\);\s*\}/);
+  });
+
+  test('the shared exit cadence gates the whole chain and records only presented prompts', () => {
+    const flowStart = APP_TSX.indexOf('const runVictoryExitNudges = useCallback');
+    const flow = APP_TSX.slice(
+      flowStart,
+      APP_TSX.indexOf('// One-time Swift Victories pointer', flowStart)
+    );
+    expect(flow.length).toBeGreaterThan(0);
+    const cadenceGate = flow.indexOf('canShowExitNudge(solved)');
+    const firstPromptCheck = flow.indexOf('maybeShowSharePrompt()');
+    expect(cadenceGate).toBeGreaterThanOrEqual(0);
+    expect(cadenceGate).toBeLessThan(firstPromptCheck);
+    expect(flow.match(/recordExitNudgeShown\(solved\)/g)).toHaveLength(4);
+    expect(APP_TSX).toMatch(/const maybeShowPatronNudge = useCallback\(async \(\): Promise<boolean>/);
   });
 
   test('the remove-ads upsell is deferred: armed on the ad exit, offered on the NEXT quiet exit', () => {
@@ -395,9 +411,15 @@ describe('proactive share prompt', () => {
 });
 
 describe('finale staging (armed, not retroactive)', () => {
-  test('the dwell gate ARMS the finale; the cinematic fires only on the marked final board', () => {
-    // Arming path: dwell >= FINALE_DWELL_PUZZLES arms instead of firing.
-    expect(APP_TSX).toMatch(/if \(dwell >= FINALE_DWELL_PUZZLES\) \{\s*\n\s*await armFinale\(\);/);
+  test('the dwell gate waits for the arming floor before it arms the finale', () => {
+    // Dwell remains recorded before the floor, then the direct service
+    // predicate decides whether the first eligible win may arm.
+    expect(APP_TSX).toMatch(
+      /const dwell = await recordPhase4Dwell\(\);[\s\S]{0,150}if \(canArmFinale\(dwell, completedTotal\)\) \{\s*\n\s*await armFinale\(\);/
+    );
+  });
+
+  test('the cinematic fires only on the marked final board', () => {
     // Firing path: only the marked final board's win completes the finale.
     expect(APP_TSX).toMatch(/if \(wasFinalBoard\) \{[\s\S]{0,400}?markFinalPuzzleCompleted\(\)/);
     expect(APP_TSX).toMatch(/setPhaseTransitionEvent\(FINAL_PUZZLE_EVENT\)/);
@@ -413,8 +435,11 @@ describe('finale staging (armed, not retroactive)', () => {
     );
   });
 
-  test('the dwell window has a voice: getDwellLine threads into the victory cascade', () => {
-    expect(APP_TSX).toMatch(/dwellLineForWin = getDwellLine\(/);
+  test('the dwell window keeps a post-cap held-breath voice without repeating the eighth line', () => {
+    expect(APP_TSX).toMatch(/const dwellBefore = await getPhase4DwellCount\(\);/);
+    expect(APP_TSX).toMatch(/dwellBefore >= FINALE_DWELL_PUZZLES/);
+    expect(APP_TSX).toMatch(/getPostCapDwellLine\(completedTotal, persistence\.currentPhase\)/);
+    expect(APP_TSX).toMatch(/getDwellLine\(Math\.min\(dwell, FINALE_DWELL_PUZZLES\), persistence\.currentPhase\)/);
   });
 });
 
@@ -456,6 +481,40 @@ describe('victory flow', () => {
     expect(pitExit).not.toContain('maybeShowVictoryInterstitial');
     // Pending ward ceremonies are exempt at the gate itself.
     expect(APP_TSX).toMatch(/persistence\.pendingPhaseTransition != null/);
+  });
+});
+
+describe('Unbroken Weave mastery orchestration', () => {
+  test('records Weave mastery before choreography and merges every field into victory data', () => {
+    const victoryFlow = APP_TSX.slice(
+      APP_TSX.indexOf('if (result?.completed)'),
+      APP_TSX.indexOf('// Check for endgame triggers', APP_TSX.indexOf('if (result?.completed)')),
+    );
+    const recordIndex = victoryFlow.indexOf('recordUnbrokenWeaveVictory(');
+    const setVictoryIndex = victoryFlow.indexOf('setVictoryData(finalVictory)');
+    const choreographyIndex = victoryFlow.indexOf('playVictorySequence(');
+
+    expect(victoryFlow).toContain('if (puzzle.unbrokenWeaveMode)');
+    expect(victoryFlow).toContain("recordUnbrokenWeaveVictory(puzzle.difficulty, victory.flawless === true)");
+    expect(recordIndex).toBeGreaterThan(-1);
+    expect(recordIndex).toBeLessThan(setVictoryIndex);
+    expect(recordIndex).toBeLessThan(choreographyIndex);
+    expect(victoryFlow).toContain('unbrokenWeaveRank: mastery.rank');
+    expect(victoryFlow).toContain('unbrokenWeaveTitle: mastery.title');
+    expect(victoryFlow).toContain('unbrokenWeaveNextObjective: mastery.nextObjective');
+    expect(victoryFlow).toContain('unbrokenWeaveRankedUp: rankedUp');
+  });
+
+  test('keeps setup mastery state fresh after load, victory, reset, and cloud restore', () => {
+    expect(APP_TSX).toMatch(/getUnbrokenWeaveMastery\(\)\.then\(setUnbrokenWeaveMastery\)/);
+    expect(APP_TSX).toMatch(/setUnbrokenWeaveMastery\(mastery\)/);
+    expect(APP_TSX).toMatch(/unbrokenWeaveMastery=\{unbrokenWeaveMastery\}/);
+
+    const rebuild = APP_TSX.slice(
+      APP_TSX.indexOf('const rebuildSessionFromStorage'),
+      APP_TSX.indexOf('const handleResetComplete'),
+    );
+    expect(rebuild).toContain('getUnbrokenWeaveMastery().then(setUnbrokenWeaveMastery)');
   });
 });
 

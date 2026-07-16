@@ -473,10 +473,11 @@ export interface PuzzleGameState {
   /** Phase 5 echo puzzle: one word is seeded from the player's ritual history */
   isEchoPuzzle: boolean;
   /**
-   * THE marked final board: served once the finale is armed (dwell window
-   * filled), seeded from the player's strongest fed dread word when possible.
-   * Its victory fires the finale (App suppresses the fanfare and plays
-   * FINAL_PUZZLE_EVENT). Persisted through autosave so kill/restore keeps it.
+   * THE marked final board: served only after capped eight-win dwell and the
+   * minimum-puzzle arming floor (160) set finaleArmed, seeded from the player's
+   * strongest fed dread word when possible. Its victory fires the finale (App
+   * suppresses the fanfare and plays FINAL_PUZZLE_EVENT). Persisted through
+   * autosave so kill/restore keeps it.
    */
   isFinalBoard: boolean;
   /**

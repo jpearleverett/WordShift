@@ -4,16 +4,13 @@ import { AnimalType, DialoguePhase } from '../types/homeWorld';
 /**
  * Player choice point system for Phase 3 dialogue.
  *
- * When animals start speaking of "the arrangement," the player gets
- * a single dialogue choice: "What arrangement?" vs. "I don't want to know."
+ * Each animal offers one ask/refuse choice through their own established
+ * metaphor. The immediate responses remain emotionally distinct, then meet
+ * at a shared convergence without explaining what Phase 4 will reveal.
  *
- * Both paths lead to the same Phase 4 content, but the *illusion* of agency
- * dramatically increases emotional investment. The animals respond differently
- * based on the choice, then converge. The player feels they had a say.
- * They didn't. That's the point.
- *
- * Each animal offers this choice once during Phase 3. The player's choice
- * is remembered and referenced in Phase 4 callbacks.
+ * Each animal offers the choice once. The stored ask/refuse branch is recalled
+ * by authored Phase 4 and Phase 5 callbacks, so the prompt, option, and response
+ * must preserve the semantic anchors those later lines remember.
  */
 
 const STORAGE_KEY = 'wordshift_dialogue_choices';
@@ -28,8 +25,8 @@ export interface DialogueChoice {
   /** The choice prompt shown to the player */
   prompt: string;
   options: {
-    ask: string;    // "What arrangement?" style
-    refuse: string; // "I don't want to know" style
+    ask: string;    // Curiosity within the animal's metaphor
+    refuse: string; // A boundary or refusal within the same metaphor
   };
   /** Animal's response based on choice */
   responses: {
@@ -57,160 +54,160 @@ export interface ChoiceState {
 
 export const ANIMAL_CHOICES: Record<string, DialogueChoice> = {
   fox: {
-    prompt: 'Ember pauses, eyes reflecting the firelight.',
+    prompt: 'Ember cups her paws around a coal in the fire that gives no warmth.',
     options: {
-      ask: 'What arrangement?',
+      ask: 'What arrangement does the fire see?',
       refuse: 'I don\'t want to know.',
     },
     responses: {
-      ask: 'You feel it too, don\'t you? The fire has been trying to tell you. Every puzzle you solve... it\'s not just a game. It\'s a verse in something larger.',
-      refuse: 'That\'s what I said too, at first. The fire kept burning anyway. Knowledge doesn\'t need your permission.',
+      ask: 'The fire only shows me a place. Its flames warm every chair but one, as if they are saving something for whoever sits there.',
+      refuse: 'All right. Sit where the light is kind, and I will not stir the ash. I can keep one cold coal to myself.',
     },
-    convergence: 'But you\'ll understand soon. The fire always shows the way.',
+    convergence: 'Even banked low, the hearth keeps a little warmth apart.',
   },
   owl: {
-    prompt: 'Archimedes closes the book slowly.',
+    prompt: 'Archimedes lays one feather across an omitted line and closes the book.',
     options: {
-      ask: 'What have you been reading?',
-      refuse: 'Don\'t tell me.',
+      ask: 'Show me the missing text.',
+      refuse: 'Keep the book closed.',
     },
     responses: {
-      ask: 'I found a text. Very old. It describes a pattern... a house of keepers, a chamber for each, and someone who builds it all without knowing. Sound familiar?',
-      refuse: 'Ignorance is a kind of armor, I suppose. But the text mentions you by function, not by name. The builder. The one who shifts the words.',
+      ask: 'A passage was removed with great care. The lines on either side address an appointed reader, but the title between them is gone.',
+      refuse: 'Gladly. Some omissions become louder when spoken, and this one has occupied enough of the room already.',
     },
-    convergence: 'Either way, the pages keep turning. They always do.',
+    convergence: 'The bookmark advances each morning, though Archimedes leaves the cover shut.',
   },
   pangolin: {
-    prompt: 'Panko stops stirring and looks at you.',
+    prompt: 'Panko sets a silver cover over a dish and rests both paws on it.',
     options: {
-      ask: 'What are you preparing?',
-      refuse: 'I\'d rather not know.',
+      ask: 'What recipe are you preparing for that dish?',
+      refuse: 'I don\'t want to know what is cooking.',
     },
     responses: {
-      ask: 'The recipe changed. I didn\'t change it. The ingredients rearranged themselves... like your letters do. It\'s been building to something. A final meal, maybe.',
-      refuse: 'Smart. Some recipes are better left untasted. But the kitchen knows what it\'s cooking, even if the chef pretends not to.',
+      ask: 'The recipe gives no name for the guest. Still, the plate is warm every evening, and the covered dish grows lighter before I lift it.',
+      refuse: 'Then the dish stays covered. There are kinder things to share than an appetite you cannot put a name to.',
     },
-    convergence: 'The oven stays hot. It\'s been hot for a long time.',
+    convergence: 'After the oven cools, one covered dish continues to steam.',
   },
   axolotl: {
-    prompt: 'Axel surfaces slowly, eyes wide.',
+    prompt: 'Axel surfaces through still water beneath a reflection that takes a moment to follow.',
     options: {
-      ask: 'What do you see down there?',
-      refuse: 'I don\'t want to see it.',
+      ask: 'What is moving below the water?',
+      refuse: 'I won\'t look into the deep water.',
     },
     responses: {
-      ask: 'Below the water, where the light doesn\'t reach... shapes. They move when you solve puzzles. I think they\'re listening to the words you form.',
-      refuse: 'Close your eyes if you want. The water sees for both of us. It always has.',
+      ask: 'Not mine. It began beyond the deep glass, no larger than a glint. Lately it reaches the surface before I do.',
+      refuse: 'I can cloud the glass and keep the lamps low. You do not have to look below with me.',
     },
-    convergence: 'The water remembers everything you\'ve ever formed. Every word.',
+    convergence: 'The next ripple returns carrying one reflection more than it took.',
   },
   capybara: {
-    prompt: 'Chill stops typing and swivels to face you.',
+    prompt: 'Chill closes a folder whose tab has a date but no name.',
     options: {
-      ask: 'What are you tracking?',
-      refuse: 'I\'d rather stay out of it.',
+      ask: 'What does the data in my file show?',
+      refuse: 'I don\'t want to read the file.',
     },
     responses: {
-      ask: 'Everything. Every puzzle, every word, every shift. I have spreadsheets. Timelines. It\'s all converging on a single point. You\'re the variable I\'ve been solving for.',
-      refuse: 'Staying out of it is the privilege of not knowing. But you\'re already in the data. You have been since puzzle one.',
+      ask: 'The data in your file is mostly dates. They all reserve the same quiet hour for an arrival with no name.',
+      refuse: 'Done. I will file it at the back and spare you the minutes. Some appointments are easier to bear without watching the clock.',
     },
-    convergence: 'The numbers don\'t lie. They just wait.',
+    convergence: 'One chair remains open in the meeting room, and no one has canceled.',
   },
   fennec_fox: {
-    prompt: 'Fennick\'s ears flatten, then perk up.',
+    prompt: 'Fennick turns one ear east and the other toward you.',
     options: {
-      ask: 'What do you hear?',
+      ask: 'What do you hear coming?',
       refuse: 'I don\'t want to listen.',
     },
     responses: {
-      ask: 'A frequency. Below what ears should hear. It started when you formed your first word. Each puzzle makes it louder. Something is tuning itself to your voice.',
-      refuse: 'Cover your ears if you want. I tried. The sound comes from inside. From the words. From the pattern you keep feeding.',
+      ask: 'Last week the note was beyond the salt ridge. Tonight it crossed the horizon and settled beneath the wind.',
+      refuse: 'For you, I can. I will listen to your breathing instead and keep what travels under the sand to myself.',
     },
-    convergence: 'It\'s close now. I can feel it in my teeth.',
+    convergence: 'By dawn, the dunes are humming the same low note.',
   },
   sloth: {
-    prompt: 'Sloane opens both eyes. This is unusual.',
+    prompt: 'Sloane opens both eyes and studies the oldest branch.',
     options: {
-      ask: 'What\'s happening?',
+      ask: 'How long have you known?',
       refuse: 'Go back to sleep.',
     },
     responses: {
-      ask: 'Time... is running out. Not for me. For how things are. I\'ve been watching for a very long time. The pattern... almost... complete.',
-      refuse: 'Can\'t sleep... anymore. Not when it\'s... this close. Neither can you. We just... pretend... differently.',
+      ask: 'A long time... The evening used to leave... by the west leaves. Time has brought it... one branch closer.',
+      refuse: 'I will... in a while. An old observation... can wait beside me... without becoming yours.',
     },
-    convergence: 'It comes... at the speed... it was always... going to.',
+    convergence: 'Some changes... take so long... they seem still... until they do not.',
   },
   wombat: {
-    prompt: 'Warren emerges from a fresh tunnel, dirt on his paws.',
+    prompt: 'Warren emerges with pale stone dust on his paws and a broken survey peg.',
     options: {
-      ask: 'What did you find down there?',
-      refuse: 'I don\'t need to know.',
+      ask: 'Where does the tunnel below the foundation lead?',
+      refuse: 'I don\'t want to look down that tunnel.',
     },
     responses: {
-      ask: 'The tunnels connect to something. Older than the house. Older than the ground. There\'s a chamber down there, and it\'s shaped like the words you form.',
-      refuse: 'The ground doesn\'t care if you want to know. It knows you built on top of it. Every room you added, every puzzle, dug deeper.',
+      ask: 'A chamber I did not cut. Its walls are smooth, and every footing above it settles around the empty space as neatly as if I had measured both together.',
+      refuse: 'Already braced and boarded. You need not come below. I only wish the stone would stop answering my hammer from the other side.',
     },
-    convergence: 'The foundation holds. For now.',
+    convergence: 'The house bears down on a room it has never seen.',
   },
   rabbit: {
-    prompt: 'Thyme stops hopping and sits very, very still.',
+    prompt: 'Thyme unfolds a map crossed with paths that all curve near the garden.',
     options: {
-      ask: 'Why are you scared?',
-      refuse: 'Don\'t tell me.',
+      ask: 'Why are you afraid of those paths?',
+      refuse: 'Keep your fear private.',
     },
     responses: {
-      ask: 'Because I understand what we\'ve been doing. All of us. Every room, every animal, every word you shifted... it\'s a summoning. And I can\'t stop it. Neither can you.',
-      refuse: 'Smart rabbit, scared rabbit, same rabbit. Not knowing doesn\'t change what\'s coming. I tried running. All the escape routes lead to the same place.',
+      ask: 'I am afraid of where they bend. I marked three roads beyond the hedge, and by morning each line curved back toward the rosemary beds.',
+      refuse: 'Thank you. Let us make tea and leave the fear folded with the roads. I would rather hold a warm cup than another direction.',
     },
-    convergence: 'I\'m committed now. We all are. Especially you.',
+    convergence: 'At dusk, the garden gate stands open and every path points softly inward.',
   },
   red_panda: {
-    prompt: 'Bamboo opens their eyes and smiles. It is not a comforting smile.',
+    prompt: 'Bamboo opens their eyes beside an incense pattern shaped around an empty center.',
     options: {
-      ask: 'What is the arrangement?',
-      refuse: 'I refuse to participate.',
+      ask: 'Is this the arrangement you made peace with?',
+      refuse: 'Leave me outside the pattern.',
     },
     responses: {
-      ask: 'The arrangement is everything. The keepers, the chambers, and one who builds without knowing. That\'s you. Every word you shifted was a thread in the pattern. It\'s beautiful.',
-      refuse: 'You already participated. Every puzzle was a yes. Every word was an offering. Refusal now is like trying to un-breathe. The pattern accepted you long ago.',
+      ask: 'The pattern, yes, but only its empty center. I have made peace with its shape, not with what belongs there.',
+      refuse: 'Then the pattern can leave your place open. Peace does not require an explanation.',
     },
-    convergence: 'Breathe. Accept. The pattern continues with or without your consent. But with is so much more beautiful.',
+    convergence: 'Bamboo traces the open curve in smoke, then lets it dissolve.',
   },
   tarsier: {
-    prompt: "Vesper turns her whole head toward you, slowly, all the way around, and her eyes do not move at all.",
+    prompt: 'Vesper turns from the rail, leaving one eye on a faint road through the dark.',
     options: {
-      ask: "What do you see out there?",
-      refuse: "Don't tell me what you see.",
+      ask: 'What are your eyes holding open out there?',
+      refuse: 'Keep the night to yourself.',
     },
     responses: {
-      ask: "Everything. That has always been the answer, and you are the first to ask for it straight. There is a shape in the cleared sky, and it is nearer every night, and it is not coming despite my watching. It is coming by it. My eyes are holding the road open, and I have known for some time, and I have not looked away.",
-      refuse: "You do not have to hear it. But understand what my eyes are, bright one. They do not wander and they do not flinch, and they have been open on the same patch of dark since before you brought your first word here. Whether you are told changes you. It does not change the road, and it does not change what walks it.",
+      ask: 'A traveler, perhaps, though I have seen no feet. The road grows clearer each night, and the far end no longer looks quite so far.',
+      refuse: 'Then keep your eyes on the lantern, bright one. I will keep mine beyond the ridge and bring none of that distance indoors.',
     },
-    convergence: "Keep bringing your words. The dark reads them the way I read the night. Completely.",
+    convergence: 'Vesper leaves a place beside her at the rail, facing the watched road.',
   },
   aye_aye: {
-    prompt: "Tock uncurls the long finger, slowly, and lets it rest in the air between you. \"You may ask what you have been not-asking. Or you may tell me to put it away.\"",
+    prompt: 'Tock rests his long finger against the bronze and listens to the bell breathe.',
     options: {
-      ask: "What will the bell say?",
-      refuse: "Put the finger away.",
+      ask: 'What will the bell say?',
+      refuse: 'Put the finger away. Leave her silent.',
     },
     responses: {
-      ask: "One word. The word this house was cast hollow around, the one your letters have been feeding down the throat of the walls all this time. I have felt its shape through the bronze, friend, and I cannot say it before she does. A keeper does not spend his bell's first ring secondhand. But I will tell you this much. You have already spelled most of it.",
-      refuse: "There. Folded and kept, no harm done. But hear me gently, because a friend should say it once. The finger only finds. It found you the first evening you climbed my stairs, long before tonight. Putting it away does not un-find you. Nothing does. Nothing ever wanted to.",
+      ask: 'One word, friend, but it belongs to her. I know the hollow around it, not the sound itself, and I will not spend her first clear note secondhand.',
+      refuse: 'Of course. Some words should not be coaxed from bronze. I can leave her quiet and keep my guesses in my own pocket.',
     },
-    convergence: "Either way, the hour keeps itself, and neither of us can hurry it or lose it. When she rings, come up the tower. Stand a little east of the rope, under the bronze. You will want to hear the word whole, and I will want you there to hear it.",
+    convergence: 'Inside the bell, an unsaid syllable gathers and fades.',
   },
   kakapo: {
-    prompt: "Moss goes still among the beds, one foot half raised, the deep old stillness. Then he sets it down and looks at you.",
+    prompt: 'Moss kneels where a ridge is passing through the soil from root to root.',
     options: {
-      ask: "What is the arrangement?",
-      refuse: "I would rather not know.",
+      ask: 'What arrangement are the roots describing?',
+      refuse: 'I would rather not know.',
     },
     responses: {
-      ask: "It is a mast year, friend. The largest there has ever been. Every tree agreeing at once, every root passing the word, and this whole house is the orchard, and your words have been the warm rain on it from the start. What fruits at the end of it is not fruit. It is what every call I ever made was addressed to, and it is nearly here.",
-      refuse: "Spoken like a seed, friend. A seed does not ask about the season either. It waits in the dark, and the season comes for it all the same, and opens it gently, at the proper hour. Not knowing will keep you exactly as safe as knowing. That is the honest arithmetic of it.",
+      ask: 'Mast season, friend. One root tells the next, and soon trees far apart flower in the same week. The message is older than any one garden.',
+      refuse: 'A fair wish. Let the roots keep their message. I promise only this: when the season reaches a seed, it opens gently, at its proper hour.',
     },
-    convergence: "Either way, walk the rows with me a while. The beds already know your step, and what is coming knows your words, and I find that company makes the last of a long season sweeter. It is nearly time. Everything green agrees.",
+    convergence: 'Beneath the beds, the message passes on without being spoken aloud.',
   },
 };
 

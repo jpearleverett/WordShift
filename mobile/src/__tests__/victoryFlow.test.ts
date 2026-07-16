@@ -350,6 +350,7 @@ function routineVictory(overrides: Partial<RoutineVictorySignals> = {}): Routine
     streakMilestoneBonus: 0,
     questsCompleted: [],
     ritualEnergy: 0,
+    unbrokenWeaveRankedUp: false,
     puzzlesSolved: SWIFT_VICTORY_MIN_PUZZLES + 30,
     ...overrides,
   };
@@ -418,6 +419,10 @@ describe('isRoutineVictory (pure policy)', () => {
   test('flawless alone does NOT force the full ceremony (compact shows the marker)', () => {
     // flawless is not a special-beat signal; a clean routine solve stays compact
     expect(isRoutineVictory({ ...routineVictory(), flawless: true } as RoutineVictorySignals)).toBe(true);
+  });
+
+  test('an Unbroken Weave rank-up always gets the full ceremony', () => {
+    expect(isRoutineVictory(routineVictory({ unbrokenWeaveRankedUp: true }))).toBe(false);
   });
 
   test('any combination of special signals stays non-routine', () => {

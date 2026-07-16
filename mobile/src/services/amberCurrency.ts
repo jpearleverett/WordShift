@@ -29,6 +29,8 @@ import {
   NEW_CYCLE_ACCELERATION_PER_CYCLE,
   NEW_CYCLE_ACCELERATION_MAX,
   STREAK_FREEZE_CAP,
+  FINALE_ARM_MIN_PUZZLES,
+  FINALE_DWELL_PUZZLES,
 } from '../constants/gameBalance';
 import { isPatronSync } from './entitlements';
 
@@ -434,6 +436,20 @@ async function saveProgress(): Promise<void> {
   } catch (error) {
     console.warn('Failed to save home progress:', error);
   }
+}
+
+/** Whether the one-time Phase-5 Unbroken Weave home introduction has shown. */
+export async function hasSeenUnbrokenWeaveIntro(): Promise<boolean> {
+  return (await loadProgress()).unbrokenWeaveIntroSeen === true;
+}
+
+/** Persist the Unbroken Weave introduction inside the existing home progress. */
+export async function markUnbrokenWeaveIntroSeen(): Promise<void> {
+  const progress = await loadProgress();
+  if (progress.unbrokenWeaveIntroSeen === true) return;
+  progress.unbrokenWeaveIntroSeen = true;
+  progressCache = progress;
+  await saveProgress();
 }
 
 /**
@@ -1597,11 +1613,20 @@ export async function isFinalPuzzleCompleted(): Promise<boolean> {
 }
 
 /**
- * Arm the finale: the Phase-4 dwell window has filled (house complete,
- * FINALE_DWELL_PUZZLES dwell victories recorded), so the NEXT standard board
- * start becomes the marked FINAL BOARD instead of the finale firing
- * retroactively on an ordinary win. Idempotent; no-op once the final puzzle
- * is already completed.
+ * Whether a completed Phase-4 win may arm the finale. Both conditions are
+ * required: the capped dwell window must be full, and the run must reach the
+ * puzzle-160 arming floor.
+ */
+export function canArmFinale(dwellCount: number, completedTotal: number): boolean {
+  return dwellCount >= FINALE_DWELL_PUZZLES && completedTotal >= FINALE_ARM_MIN_PUZZLES;
+}
+
+/**
+ * Arm the finale: the capped Phase-4 dwell window is full and the arming floor
+ * is reached. With house completion/recruit around 136 and dwell completion
+ * around 143, the NEXT standard board is ~161 and post-revelation is ~162.
+ * This avoids firing retroactively on an ordinary win. Idempotent; no-op once
+ * the final puzzle is already completed.
  */
 export async function armFinale(): Promise<void> {
   const progress = await loadProgress();
@@ -1745,14 +1770,18 @@ export async function startNewCycle(): Promise<number> {
 
 /**
  * Record one Phase-4 "dwell" puzzle (a victory at Phase 4 with the house
- * complete and the finale not yet fired) and return the new count. The finale
- * gate reads this so the cult-reveal era is genuinely played instead of
- * flashing past in one puzzle. Idempotent-safe: callers should only invoke it
- * on the exact victory path that would otherwise trigger the finale.
+ * complete and the finale not yet fired) and return the capped new count. The
+ * eight-win dwell completes around 143 after house completion/recruit around
+ * 136; the separate puzzle-160 arming floor preserves the later final board
+ * (~161) and post-revelation (~162). Callers should only invoke it on the
+ * exact victory path that would otherwise trigger the finale.
  */
 export async function recordPhase4Dwell(): Promise<number> {
   const progress = await loadProgress();
-  progress.phase4Dwell = (progress.phase4Dwell ?? 0) + 1;
+  progress.phase4Dwell = Math.min(
+    (progress.phase4Dwell ?? 0) + 1,
+    FINALE_DWELL_PUZZLES
+  );
   progressCache = progress;
   await saveProgress();
   return progress.phase4Dwell;

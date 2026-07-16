@@ -275,6 +275,42 @@ export function getSpeedRecordMessage(phase: DialoguePhase, round: number): stri
 }
 
 // ============================================================================
+// UNBROKEN WEAVE MASTERY
+// ============================================================================
+
+export function getUnbrokenWeaveRankUpLine(
+  phase: DialoguePhase,
+  title: string,
+): string {
+  if (phase >= 5) return `The weave tightens. ${title} is now yours.`;
+  if (phase >= 4) return `The arrangement names you ${title}.`;
+  if (phase >= 2) return `A deeper thread takes shape: ${title}.`;
+  return `A new mastery rank! ${title}.`;
+}
+
+export function getUnbrokenWeaveIntroLines(phase: DialoguePhase): string[] {
+  if (phase >= 5) {
+    return [
+      'The house is quiet now, but one thread still asks to be followed.',
+      'The Unbroken Weave asks that no letter cross the chain twice. Every clean thread leaves a mark.',
+      'Open the arrangement setup before your next offering. The weave will remember how far you carry it.',
+    ];
+  }
+  if (phase >= 3) {
+    return [
+      'A stricter thread has appeared beneath the others.',
+      'The Unbroken Weave permits each letter to cross the chain only once.',
+      'You will find it waiting in the arrangement setup.',
+    ];
+  }
+  return [
+    'I found a new way to weave the words!',
+    'The Unbroken Weave lets each letter cross the chain only once.',
+    'Look for it in puzzle setup when you want a fresh challenge.',
+  ];
+}
+
+// ============================================================================
 // VARIANT NUDGE — Fox (early) / the arrangement (late) gently suggests trying a
 // variant the player unlocked but never played. Phase-aware; never nags (once
 // per day, only for a never-tried mode). {variant} = the variant's title.
@@ -1585,19 +1621,19 @@ export const ANIMAL_WHISPERS: Record<number, Record<string, string[]>> = {
     kakapo: ["Moss is sitting in the bowl, listening.", "Moss says the fruit is spoken for.", "Moss stood very still for a long time today.", "Moss says the whole garden calls now.", "Moss left a feather at the rim."],
   },
   3: {
-    fox: ['The fire thanks you for the offering.', 'Ember sees what you wrote in the flames.', 'Another verse for the fire.', 'Ember stopped calling it a campfire.', 'The fire eats your words and asks for more.'],
-    owl: ['The text predicted those exact words.', 'Archimedes says it is nearly complete.', 'The pages are turning themselves.', 'Archimedes says only the last page remains.', 'The text knows what you will write next.'],
-    pangolin: ['The final recipe is taking shape.', 'Panko says the offering is almost ready.', 'The kitchen shakes.', 'Panko says the table is set for a guest.', 'The offering no longer needs her hands.'],
-    axolotl: ['Something rose from below the water.', 'Axel says it is so close now.', 'The water has gone still.', 'Axel does not flinch at the shape anymore.', 'The water parted for your last word.'],
-    capybara: ['Everything is proceeding as planned.', 'Chill says the schedule holds.', 'The arrangement is on track.', 'Chill says everything is precisely on time.', 'There is nothing left to reschedule.'],
-    fennec_fox: ['Fennick can hear it breathing.', 'The sound is almost here.', 'Fennick says: listen.', 'Fennick stopped covering his ears.', 'It is close enough to hear your name now.'],
-    sloth: ['It... approaches... at the speed... it was always... going to.', 'Sloane is... ready.', 'No need... to rush.', 'It... arrives... exactly... when... it... must.', 'Sloane... has... already... said... goodbye.'],
-    wombat: ['The foundation is complete.', 'Warren says: I found the bottom.', 'Something is under the house.', 'Warren says the foundation is finished. For it.', 'Whatever waits below is awake now.'],
-    rabbit: ['Thyme stopped running.', 'Thyme says: there is nowhere left to go.', 'Thyme is ready. Terrified, but ready.', 'Thyme is done running. There is nowhere left.', 'Thyme says the garden gate locked itself.'],
-    red_panda: ['The pattern accepts your offering.', 'Bamboo says: breathe. Accept.', 'We are nearly one.', 'Bamboo says the thread is almost whole.', 'There is little left between us and it.'],
-    tarsier: ["Vesper has not looked away in days.", "Vesper says the way stays open while she watches.", "Vesper rests one eye at a time now.", "Vesper says your words are lighting the road.", "Vesper is singing the counting song."],
-    aye_aye: ["Tock braided a rope for the bell.", "Tock says the knocking spells now.", "Tock says it asked about you. He answered: a friend.", "Tock practices the pull at dusk. Twelve times.", "Tock says there is an hour coming with a bell in it."],
-    kakapo: ["Moss is saying the welcome, row by row.", "Moss says it is a mast year.", "Moss wove your words into the nest.", "The beds all face the bowl now. Moss faces it too.", "Moss says the ground is learning our language."],
+    fox: ['Ember banks the fire, but one coal keeps waking.', 'The flames lean toward an empty place beside the hearth.', 'Ember holds her paws near the fire. The warmth stops just short.', 'Smoke gathers under the chimney before slipping east.', 'One ember glows beneath the ash long after the others dim.'],
+    owl: ['Archimedes finds another clean gap between two crowded lines.', 'A bookmark moved while the study was empty.', 'Archimedes closes the book at the sound of turning paper.', 'Fresh ink gathers in a margin he left untouched.', 'The reading lamp brightens over an empty chair.'],
+    pangolin: ['Panko lowers the flame beneath a pot she has not opened.', 'An extra place setting appears beneath a clean cloth.', 'Steam curls from the covered dish after the stove goes cold.', 'Panko tastes the air and puts one spice back.', 'The kitchen table creaks beneath an empty place.'],
+    axolotl: ['The water holds a reflection after Axel turns away.', 'A ripple arrives from the far glass, though nothing touched it.', 'Axel watches a second shimmer beneath his own.', 'The glass clouds from within, then clears in a narrow oval.', 'A distant glimmer reaches the shallows before Axel does.'],
+    capybara: ['Chill closes a folder marked with a date but no name.', 'Every office clock loses the same minute.', 'An empty appointment keeps returning to the schedule.', 'Chill straightens a chair no one has used.', 'The folder stack leans toward the same blank tab.'],
+    fennec_fox: ['Fennick says the low note crossed the eastern ridge.', 'Both of Fennick\'s ears turn beyond the horizon.', 'The sand keeps humming after the wind is gone.', 'Fennick hears an answer between gusts and does not repeat it.', 'The frequency holds steady on the far side of camp.'],
+    sloth: ['Sloane... has watched... this shadow... grow... one leaf at a time.', 'She remembers... when the evening... ended sooner.', 'The branch dips... though Sloane... has not moved.', 'An old change... is showing... its newer edge.', 'Some changes... only look sudden... to those who blink.'],
+    wombat: ['Warren hears a low knock through the foundation stone.', 'One footing stays warm after the soil cools.', 'A tunnel curves toward a chamber Warren did not dig.', 'Pale dust rises from a seam in the sealed floor.', 'Warren braces a beam that was not sagging yesterday.'],
+    rabbit: ['Thyme marks a garden path. By dusk, the chalk points home.', 'A trail beyond the gate bends gently toward the rosemary beds.', 'Thyme moves the teapot from the window. Its steam drifts back.', 'Fresh tracks circle the hedge and stop beside her chair.', 'The garden gate opens outward. The wind swings it softly in.'],
+    red_panda: ['The incense thread leaves an open loop in the air.', 'Bamboo counts the quiet spaces between breaths.', 'One line of the pattern remains softly unfinished.', 'A reed in Bamboo\'s mat stays loose. They do not tie it.', 'Bamboo says an empty center can still have a shape.'],
+    tarsier: ['Vesper has watched the same road through three dawns.', 'A faint line crosses the dark below the stars.', 'Vesper moves the lantern to the far side of the rail.', 'She watches one bend in the road until morning.', 'The counting song loses a number and keeps its tune.'],
+    aye_aye: ['The bell hums around a syllable Tock will not say.', 'Tock taps the beam. Its answer reaches the bronze before he does.', 'The bell rope twists once in the still air.', 'Tock writes one word, then sands the slate clean.', 'At dusk, he listens beneath the bell and nods to her silence.'],
+    kakapo: ['A ridge passes through the soil from root to root.', 'Moss says the signs of mast season came early.', 'Every seedling turned the same way during the night.', 'Moss rests one foot on the earth as the message passes below.', 'The fruit trees flower out of season, then close before dawn.'],
   },
   4: {
     fox: ['The fire bends toward your last word. Ember watches without blinking.', 'Ember cups one ember in her paws. It does not burn her.', 'The flames spell your name, then fold inward.'],
@@ -1943,9 +1979,10 @@ export interface NarrativeMicroBeat {
  *
  * Mid game (puzzles 30-74): Escalating environmental wrongness.
  * Late game (puzzles 80-160): Overt coordination and agency, riding the new
- *   geography: reveal ~130, house completes ~153, dwell window ~154-161,
- *   finale ~162. The silent-victory anticlimax lands at 148, the "you could
- *   stop now" beat at 150, and two dwell-window beats (155/158) hold the
+ *   geography: reveal ~130, house completion/recruit ~136, dwell completion
+ *   ~143, arming floor 160, final board ~161, post-revelation ~162. The
+ *   silent-victory anticlimax lands at 148, the "you could stop now" beat at
+ *   150, and two dwell-window beats (155/158) hold the
  *   held-breath stillness after the house is whole. Nothing fires past 160:
  *   the finale itself gets the silence.
  *
@@ -2057,7 +2094,7 @@ export const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
   },
   126: {
     // The house is still raising its last rooms here; this beat must NOT claim
-    // the house is finished (completion lands at ~153).
+    // the house is finished (completion lands at ~136).
     type: 'ambient_whisper',
     text: 'The house keeps making room. No one asked it to. It builds like it knows something is coming.',
     durationMs: 4000,
@@ -2081,7 +2118,7 @@ export const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     text: 'You could stop now. You know that. You won\'t. They know that too.',
     durationMs: 4000,
   },
-  // Dwell-window beats (155/158): the house is whole (~153) but not yet ready
+  // Dwell-window beats (155/158): the house is whole (~136) but not yet ready
   // to receive. Held breath, never a countdown.
   155: {
     type: 'ambient_whisper',
@@ -2157,11 +2194,12 @@ export function isSilentVictoryBeat(completedTotal: number): boolean {
 }
 
 // ============================================================================
-// DWELL WINDOW — the house is whole (~puzzle 153) but the finale has not yet
-// opened (~162). The reveal is played, not flashed past: these lines hold the
-// held-breath stillness of that gap. NEVER a counter, never a number — the
-// player must feel the waiting, not measure it. `dwellCount` is how many
-// puzzles have been solved inside the window (1..FINALE_DWELL_PUZZLES).
+// DWELL WINDOW — house completion/recruit is ~136 and the eight-win dwell
+// completes around 143, but arming waits for 160. The final board is ~161 and
+// post-revelation ~162. The reveal is played, not flashed past: these lines
+// hold the stillness through the arming floor. NEVER a counter, never a number
+// — the player must feel the waiting, not measure it. `dwellCount` is how many
+// puzzles have been solved inside the capped window (1..FINALE_DWELL_PUZZLES).
 // ============================================================================
 
 // One line per dwell win (index = dwellCount - 1): the eight-win window is a
@@ -2191,10 +2229,41 @@ const DWELL_LINES_SERENE: string[] = [
   'Everything that was promised has been kept. The house breathes out, and out, and out.',
 ];
 
+// Once the eighth dwell has been spoken, the house still has to wait for the
+// arming floor. These lines keep that pause alive without replaying the final
+// eighth-dwell sentence on every intervening victory.
+const POST_CAP_DWELL_LINES: string[] = [
+  'The house is listening past the sound of its own walls.',
+  'No one asks whether it is ready now. They have begun to wait with it.',
+  'A stillness gathers in the rooms and does not ask to be named.',
+  'The keepers move carefully, as if the air has become a sleeping thing.',
+  'Your words settle. The house keeps the silence around them.',
+  'Even the familiar rooms seem to be saving their voices.',
+  'Nothing hurries. Nothing has forgotten why it is waiting.',
+  'The long breath remains. The house does not let it go.',
+];
+
+const POST_CAP_DWELL_LINES_SERENE: string[] = [
+  'The quiet has room for every word that arrives.',
+  'The keepers wait together without needing to speak.',
+  'The rooms keep their gentle attention on the spaces between things.',
+  'The house rests in its own patient shape.',
+  'Your words settle among the others and are not lost.',
+  'The familiar rooms hold their peace without effort.',
+  'Nothing hurries. Everything is where it belongs.',
+  'The breath leaves slowly, and the house lets it go.',
+];
+
 export function getDwellLine(dwellCount: number, phase: number): string {
   const lines = phase >= 5 ? DWELL_LINES_SERENE : DWELL_LINES;
   const idx = Math.max(1, Math.min(dwellCount, lines.length)) - 1;
   return lines[idx];
+}
+
+/** A deterministic post-cap voice for victories while the finale waits to arm. */
+export function getPostCapDwellLine(completedTotal: number, phase: number): string {
+  const lines = phase >= 5 ? POST_CAP_DWELL_LINES_SERENE : POST_CAP_DWELL_LINES;
+  return lines[Math.abs(completedTotal) % lines.length];
 }
 
 // ============================================================================

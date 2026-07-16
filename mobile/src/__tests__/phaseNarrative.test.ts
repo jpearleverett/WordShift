@@ -53,6 +53,7 @@ import {
   getPitOfferResultMessage,
   INTERJECTION_MESSAGES,
   getDwellLine,
+  getPostCapDwellLine,
   getStreakHeldMessage,
   getPreviewGraduationMessage,
   getPreviewRescueMessage,
@@ -68,6 +69,11 @@ import { DialoguePhase } from '../types/homeWorld';
 
 const ALL_PHASES: DialoguePhase[] = [0, 1, 2, 3, 4];
 const STAR_LEVELS = [1, 2, 3];
+const ALL_ANIMAL_TYPES = [
+  'fox', 'owl', 'pangolin', 'axolotl', 'capybara', 'fennec_fox',
+  'sloth', 'wombat', 'rabbit', 'red_panda', 'tarsier', 'aye_aye', 'kakapo',
+];
+const FORBIDDEN_PHASE_3_CONTENT = /\b(game|puzzle|summoning|spreadsheet|consent)\b/i;
 
 describe('getVictoryTitle', () => {
   test.each(
@@ -490,6 +496,21 @@ describe('getPersonalizedPhase5Whisper', () => {
       expect(typeof whisper.text).toBe('string');
       expect(whisper.text.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('Phase 3 animal whisper restraint', () => {
+  test('keeps exactly five non-empty whispers for every animal', () => {
+    expect(Object.keys(ANIMAL_WHISPERS[3]).sort()).toEqual([...ALL_ANIMAL_TYPES].sort());
+    for (const animalType of ALL_ANIMAL_TYPES) {
+      expect(ANIMAL_WHISPERS[3][animalType]).toHaveLength(5);
+      expect(ANIMAL_WHISPERS[3][animalType].every(line => line.trim().length > 0)).toBe(true);
+    }
+  });
+
+  test('keeps mechanics and explicit answers out of the whispers', () => {
+    const normalized = Object.values(ANIMAL_WHISPERS[3]).flat().join(' ');
+    expect(normalized).not.toMatch(FORBIDDEN_PHASE_3_CONTENT);
   });
 });
 
@@ -1106,8 +1127,8 @@ describe('checkNarrativeMicroBeat', () => {
 });
 
 // ============================================================================
-// Micro-beat geography (v1.3 pacing: reveal ~130, house whole ~153,
-// dwell ~154-161, finale ~162)
+// Micro-beat geography (v1.3 pacing: reveal ~130, completion/recruit ~136,
+// dwell ~143, arming floor 160, final board ~161, post-revelation ~162)
 // ============================================================================
 
 describe('MICRO_BEATS geography', () => {
@@ -1120,7 +1141,7 @@ describe('MICRO_BEATS geography', () => {
     ]);
   });
 
-  test('nothing fires past 160: the finale (~162) gets the silence', () => {
+  test('nothing fires past 160: the finale (~161) gets the silence', () => {
     expect(keys[keys.length - 1]).toBe(160);
   });
 
@@ -1139,11 +1160,11 @@ describe('MICRO_BEATS geography', () => {
     );
   });
 
-  test('house-wholeness language only appears at or after completion (~153)', () => {
+  test('house-wholeness language only appears at or after completion (~136)', () => {
     for (const k of keys) {
       const text = (MICRO_BEATS[k].text ?? '').toLowerCase();
       if (/is whole|every room is built|every keeper is home/.test(text)) {
-        expect(k).toBeGreaterThanOrEqual(153);
+        expect(k).toBeGreaterThanOrEqual(136);
       }
     }
     // And the dwell-window beats DO speak of the whole house.
@@ -1754,6 +1775,21 @@ describe('getDwellLine', () => {
     expect(getDwellLine(0, 4)).toBe(getDwellLine(1, 4));
     expect(getDwellLine(99, 4)).toBe(getDwellLine(8, 4));
     expect(getDwellLine(99, 5)).toBe(getDwellLine(8, 5));
+  });
+
+  test('uses distinct held-breath lines after the capped eighth dwell at puzzles 144 and 159', () => {
+    const eighthDwell = getDwellLine(8, 4);
+    const puzzle144 = getPostCapDwellLine(144, 4);
+    const puzzle159 = getPostCapDwellLine(159, 4);
+
+    expect(puzzle144).not.toBe(eighthDwell);
+    expect(puzzle159).not.toBe(eighthDwell);
+    expect(puzzle159).not.toBe(puzzle144);
+    for (const line of [puzzle144, puzzle159]) {
+      expect(line).not.toMatch(/[–—]/);
+      expect(line.toLowerCase()).not.toContain('phase');
+      expect(line).not.toMatch(/\d/);
+    }
   });
 });
 
