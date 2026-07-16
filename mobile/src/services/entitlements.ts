@@ -27,8 +27,14 @@ const STORAGE_KEY = 'wordshift_entitlements';
 export const ENTITLEMENTS = {
   /** Patron's Key — ad-free, +amber/puzzle, exclusive cosmetic, extended undo, cloud save. */
   PATRON: 'patron',
-  /** Remove Ads / Supporter — ad-free, and the victory 2x reward is granted with no ad. */
+  /** Remove Ads — ad-free, and the victory 2x reward is granted with no ad. */
   ADFREE: 'adfree',
+  /**
+   * Supporter — an auto-renewing subscription. Ad-free (like Remove-Ads) PLUS a
+   * recurring monthly amber stipend (delivered by supporterStipend.ts) and an
+   * exclusive cosmetic. Convenience/expression only — never phase progress.
+   */
+  SUPPORTER: 'supporter',
   /** The Keeper's Collection — a one-time cosmetic bundle (exclusive tile theme + confetti). */
   COSMETIC_BUNDLE: 'cosmetic_bundle',
   /** Starter Pack — one-time-per-account welcome bundle (amber + hints). */
@@ -122,17 +128,36 @@ export function isPatronSync(): boolean {
   return hasEntitlementSync(ENTITLEMENTS.PATRON);
 }
 
+/** Convenience: is the player an active Supporter subscriber? */
+export async function isSupporter(): Promise<boolean> {
+  return hasEntitlement(ENTITLEMENTS.SUPPORTER);
+}
+
+/** Synchronous Supporter check (off cache; false until warmed). */
+export function isSupporterSync(): boolean {
+  return hasEntitlementSync(ENTITLEMENTS.SUPPORTER);
+}
+
 /**
- * Is the player ad-free? True for Patrons (superset) OR Remove-Ads owners.
- * Ad-free players also get the victory 2x reward granted directly, with no ad.
+ * Is the player ad-free? True for Patrons (superset), Remove-Ads owners, OR
+ * active Supporter subscribers. Ad-free players also get the victory 2x reward
+ * granted directly, with no ad.
  */
 export async function isAdFree(): Promise<boolean> {
-  return (await isPatron()) || hasEntitlement(ENTITLEMENTS.ADFREE);
+  return (
+    (await isPatron()) ||
+    hasEntitlement(ENTITLEMENTS.ADFREE) ||
+    hasEntitlement(ENTITLEMENTS.SUPPORTER)
+  );
 }
 
 /** Synchronous ad-free check (off cache; false until warmed). */
 export function isAdFreeSync(): boolean {
-  return isPatronSync() || hasEntitlementSync(ENTITLEMENTS.ADFREE);
+  return (
+    isPatronSync() ||
+    hasEntitlementSync(ENTITLEMENTS.ADFREE) ||
+    hasEntitlementSync(ENTITLEMENTS.SUPPORTER)
+  );
 }
 
 /**

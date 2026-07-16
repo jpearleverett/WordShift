@@ -71,6 +71,7 @@ import {
 } from './src/services/amberCurrency';
 import { claimDailyLoginReward, DailyLoginGrant } from './src/services/dailyLoginReward';
 import { DailyLoginModal } from './src/components/DailyLoginModal';
+import { claimSupporterStipendIfDue } from './src/services/supporterStipend';
 import { NotificationPromptModal } from './src/components/NotificationPromptModal';
 import { GameAlertModal } from './src/components/ui/GameAlertModal';
 import { showGameAlert } from './src/services/gameAlert';
@@ -923,6 +924,20 @@ function MainApp() {
       }
     } catch {
       // Non-critical — never block launch on the login reward.
+    }
+
+    try {
+      // Supporter subscribers receive a recurring monthly amber stipend. Claim
+      // is idempotent (once per local month) and gated on the entitlement, so
+      // this is a silent no-op for everyone else. The amber surfaces on the next
+      // stats refresh; no modal (the recurring stipend is quiet by design).
+      const stipend = await claimSupporterStipendIfDue();
+      if (stipend) {
+        persistenceActions.refreshStats();
+        logEvent({ type: 'supporter_stipend_granted', data: { amount: stipend.amount, month: stipend.month } });
+      }
+    } catch {
+      // Non-critical — never block launch on the stipend.
     }
 
     if (isRollover) {

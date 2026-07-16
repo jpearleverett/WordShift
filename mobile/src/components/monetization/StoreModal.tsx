@@ -49,7 +49,7 @@ import {
   dailyAmberGrantFor,
   DailyAmberStatus,
 } from '../../services/dailyAmberReward';
-import { DAILY_AMBER_REWARD } from '../../constants/gameBalance';
+import { DAILY_AMBER_REWARD, SUPPORTER_MONTHLY_AMBER } from '../../constants/gameBalance';
 
 const HINT_ICON = require('../../../assets/ui/hint.png');
 
@@ -61,6 +61,8 @@ const HINT_ICON = require('../../../assets/ui/hint.png');
  * always shows the store's own localized price.
  */
 export const COSMETIC_BUNDLE_FALLBACK_PRICE = '$4.99';
+/** Supporter subscription fallback label (monthly). Keep in sync with the store tier. */
+export const SUPPORTER_SUB_FALLBACK_PRICE = '$3.99/mo';
 
 interface StoreModalProps {
   visible: boolean;
@@ -120,6 +122,9 @@ export const StoreModal: React.FC<StoreModalProps> = ({
   const [ownsStarter, setOwnsStarter] = useState<boolean>(
     hasEntitlementSync(ENTITLEMENTS.STARTER_PACK),
   );
+  const [isSupporterActive, setIsSupporterActive] = useState<boolean>(
+    hasEntitlementSync(ENTITLEMENTS.SUPPORTER),
+  );
   const [firstAmberDouble, setFirstAmberDouble] = useState<boolean>(
     !hasMadeAmberPurchaseSync(),
   );
@@ -133,6 +138,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     if (visible) {
       setOwnsBundle(hasEntitlementSync(ENTITLEMENTS.COSMETIC_BUNDLE));
       setOwnsStarter(hasEntitlementSync(ENTITLEMENTS.STARTER_PACK));
+      setIsSupporterActive(hasEntitlementSync(ENTITLEMENTS.SUPPORTER));
       setFirstAmberDouble(!hasMadeAmberPurchaseSync());
       setSuccessMsg(null);
       getDailyAmberStatus().then(setAmberFaucet).catch(() => {});
@@ -151,6 +157,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
           ...AMBER_PACK_IDS,
           ...HINT_PACK_IDS,
           PRODUCT_IDS.COSMETIC_BUNDLE,
+          PRODUCT_IDS.SUPPORTER_SUB,
         ];
         const products: IapProduct[] = await getProducts(ids);
         if (!cancelled) {
@@ -334,6 +341,35 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     }
   }, [flow, ownsBundle]);
 
+  const handleBuySupporter = useCallback(async () => {
+    if (flow === 'working' || isSupporterActive) return;
+    setFlow('working');
+    setSuccessMsg(null);
+    hapticLight();
+    logEvent({ type: 'purchase_initiated', data: { productId: PRODUCT_IDS.SUPPORTER_SUB, kind: 'supporter' } });
+    try {
+      const result = await purchaseProduct(PRODUCT_IDS.SUPPORTER_SUB);
+      if (result.success) {
+        setIsSupporterActive(hasEntitlementSync(ENTITLEMENTS.SUPPORTER));
+        logEvent({ type: 'iap_purchase', data: { productId: PRODUCT_IDS.SUPPORTER_SUB, kind: 'supporter' } });
+        hapticMedium();
+        setSuccessMsg('Thank you. Your monthly amber will be waiting each month.');
+        setFlow('idle');
+        return;
+      }
+      if (result.cancelled) {
+        logEvent({ type: 'purchase_cancelled', data: { productId: PRODUCT_IDS.SUPPORTER_SUB, kind: 'supporter' } });
+        setFlow('idle');
+        return;
+      }
+      logEvent({ type: 'purchase_failed', data: { productId: PRODUCT_IDS.SUPPORTER_SUB, kind: 'supporter', reason: result.error ?? 'unknown' } });
+      setFlow('unavailable');
+    } catch {
+      logEvent({ type: 'purchase_failed', data: { productId: PRODUCT_IDS.SUPPORTER_SUB, kind: 'supporter', reason: 'exception' } });
+      setFlow('unavailable');
+    }
+  }, [flow, isSupporterActive]);
+
   const handleClose = useCallback(() => {
     setFlow('idle');
     setSuccessMsg(null);
@@ -495,6 +531,25 @@ export const StoreModal: React.FC<StoreModalProps> = ({
             {CONSUMABLE_PRODUCTS.filter(p => p.reward.kind === 'hints').map(info =>
               renderPackRow(info, <Image source={HINT_ICON} style={styles.hintInlineSmall} accessibilityLabel="hints" />),
             )}
+
+            <Text style={[styles.sectionLabel, { color: t.muted }]}>SUPPORTER</Text>
+            <PanelCard phase={phase} style={styles.row}>
+              <View style={styles.rowInfo}>
+                <Text style={[styles.rowTitle, { color: t.title }]}>Supporter</Text>
+                <Text style={[styles.rowDesc, { color: t.body }]}>
+                  Ad-free, {SUPPORTER_MONTHLY_AMBER} amber every month, the season pass premium track, and an exclusive confetti. Cancel anytime.
+                </Text>
+              </View>
+              {isSupporterActive ? (
+                <Text style={[styles.ownedText, { color: t.amberText }]}>Active ✦</Text>
+              ) : (
+                renderPricePill(
+                  prices[PRODUCT_IDS.SUPPORTER_SUB] ?? SUPPORTER_SUB_FALLBACK_PRICE,
+                  handleBuySupporter,
+                  'Subscribe as a Supporter',
+                )
+              )}
+            </PanelCard>
 
             <Text style={[styles.sectionLabel, { color: t.muted }]}>COSMETIC BUNDLE</Text>
             <PanelCard phase={phase} style={styles.row}>

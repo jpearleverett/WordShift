@@ -12,6 +12,7 @@ import { CandyColors } from '../theme/colors';
 import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
 import { PanelCard } from './ui/PanelCard';
 import { PixelPlaque } from './ui/PixelPlaque';
+import { BannerAd } from './monetization/BannerAd';
 import { useScreenInsets } from '../hooks/useScreenInsets';
 import { AmberInline } from './AmberInline';
 import { CumulativeStats, PersonalBest, getCumulativeStats, getAverageStars, getThreeStarRate } from '../services/starRating';
@@ -386,6 +387,10 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
             })}
           </>
         )}
+
+        {/* Menu-surface banner (low friction; self-suppresses for ad-free /
+            onboarding / Phase 4+, and when no ad backend is configured). */}
+        <BannerAd phase={effectivePhase} />
 
         <View style={styles.bottomSpacer} />
       </ScrollView>

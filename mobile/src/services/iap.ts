@@ -41,8 +41,15 @@ export const PRODUCT_IDS = {
   PATRON_KEY: 'com.wordshift.patron_key',
   /** The Keeper's Collection — non-consumable cosmetic bundle (grants an entitlement). */
   COSMETIC_BUNDLE: 'com.wordshift.cosmetic_bundle',
-  /** Remove Ads / Supporter — ad-free + the victory 2x granted with no ad. */
+  /** Remove Ads — ad-free + the victory 2x granted with no ad. */
   REMOVE_ADS: 'com.wordshift.remove_ads',
+  /**
+   * Supporter — an auto-renewing subscription (ad-free + monthly amber stipend
+   * + exclusive cosmetic). Grants the `supporter` entitlement while active; the
+   * live RevenueCat adapter keeps it in sync via customer-info updates, so a
+   * lapsed sub drops the entitlement on the next restore/refresh.
+   */
+  SUPPORTER_SUB: 'com.wordshift.supporter_monthly',
   /** Starter Pack — one-time-per-account welcome bundle (amber + hints). */
   STARTER_PACK: 'com.wordshift.starter',
   // Consumable amber packs (repeatable; credit the amber reward balance).
@@ -233,6 +240,7 @@ export function isBillingReady(): boolean {
 export function entitlementsForProduct(productId: ProductId): EntitlementKey[] {
   if (productId === PRODUCT_IDS.PATRON_KEY) return [ENTITLEMENTS.PATRON];
   if (productId === PRODUCT_IDS.REMOVE_ADS) return [ENTITLEMENTS.ADFREE];
+  if (productId === PRODUCT_IDS.SUPPORTER_SUB) return [ENTITLEMENTS.SUPPORTER];
   if (productId === PRODUCT_IDS.COSMETIC_BUNDLE) return [ENTITLEMENTS.COSMETIC_BUNDLE];
   if (productId === PRODUCT_IDS.STARTER_PACK) return [ENTITLEMENTS.STARTER_PACK];
   return [productId];

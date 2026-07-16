@@ -259,6 +259,24 @@ export function isDailyInterstitialAllowed(phase: number): boolean {
   return phase <= 2;
 }
 
+/**
+ * Pure policy: may a BANNER show on a menu/utility surface right now? Banners are
+ * the lowest-friction format (a small static strip on a screen the player is
+ * browsing, never over gameplay), but they still follow the same tonal contract
+ * as interstitials: suppressed for ad-free holders, during onboarding, and from
+ * the reveal on (Phase 4+), so the dread arc and the serene endgame stay clean.
+ * The BannerAd component consumes this; kept pure/exported for testing.
+ */
+export function shouldShowBanner(params: {
+  phase: DialoguePhase;
+  isAdFree: boolean;
+  onboarding: boolean;
+}): boolean {
+  if (params.isAdFree || params.onboarding) return false;
+  if ((params.phase as number) >= 4) return false;
+  return true;
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------

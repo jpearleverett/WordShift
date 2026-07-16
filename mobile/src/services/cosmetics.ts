@@ -29,7 +29,8 @@ export type CosmeticCategory = 'tile_theme' | 'confetti' | 'room_accent';
 export type CosmeticAcquisition =
   | { kind: 'amber'; cost: number }
   | { kind: 'iap'; productId: string }
-  | { kind: 'entitlement'; entitlement: string }; // auto-owned with an entitlement (e.g. Patron theme)
+  | { kind: 'entitlement'; entitlement: string } // auto-owned with an entitlement (e.g. Patron theme)
+  | { kind: 'reward' }; // earned via gameplay (e.g. a season pass tier) — granted with grantCosmetic()
 
 export interface CosmeticItem {
   id: string;
@@ -154,6 +155,23 @@ export const COSMETICS: CosmeticItem[] = [
     description: 'Violet and ember light, falling. Bundle exclusive.',
     acquisition: { kind: 'entitlement', entitlement: ENTITLEMENTS.COSMETIC_BUNDLE },
   },
+  // Exclusive to active Supporter subscribers (the `supporter` entitlement).
+  {
+    id: 'confetti_supporter',
+    category: 'confetti',
+    name: 'Keeper’s Thanks',
+    description: 'Warm gold and patron violet, for the ones who keep the fire lit.',
+    acquisition: { kind: 'entitlement', entitlement: ENTITLEMENTS.SUPPORTER },
+  },
+  // Season pass PREMIUM final-tier reward — earned via the season track (granted
+  // with grantCosmetic when the tier is claimed), not bought directly.
+  {
+    id: 'confetti_season',
+    category: 'confetti',
+    name: 'The Season Turns',
+    description: 'Teal, old gold, and a rose ember. Earned at the top of a season.',
+    acquisition: { kind: 'reward' },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -259,6 +277,7 @@ export async function ownsCosmetic(id: string): Promise<boolean> {
   if (item.acquisition.kind === 'iap') {
     return hasEntitlementSync(item.acquisition.productId);
   }
+  // 'amber' and 'reward' items are recorded in the local owned map.
   const state = await load();
   return id in state.owned;
 }
@@ -271,6 +290,24 @@ export async function ownsCosmetic(id: string): Promise<boolean> {
 export async function recordAmberCosmeticPurchase(id: string): Promise<boolean> {
   const item = getCosmetic(id);
   if (!item || item.acquisition.kind !== 'amber') return false;
+  const state = await load();
+  if (id in state.owned) return false;
+  state.owned[id] = Date.now();
+  cache = state;
+  await save();
+  return true;
+}
+
+/**
+ * Grant local ownership of a reward/amber cosmetic without spending anything —
+ * for cosmetics EARNED via gameplay (e.g. a Season Pass premium tier). Idempotent;
+ * returns true only on the first grant. Entitlement/IAP cosmetics are owned via
+ * their entitlement, so this is a no-op (returns false) for those.
+ */
+export async function grantCosmetic(id: string): Promise<boolean> {
+  const item = getCosmetic(id);
+  if (!item) return false;
+  if (item.acquisition.kind === 'entitlement' || item.acquisition.kind === 'iap') return false;
   const state = await load();
   if (id in state.owned) return false;
   state.owned[id] = Date.now();
