@@ -53,11 +53,15 @@ the codebase and are the remaining gates to submission.
       tapping them is an AdMob policy violation that can get the account
       limited. Leave it `true` through all internal testing; set it `false`
       only when cutting the public production build (and confirm live ads fill
-      on a real production install before wide rollout).
+      on a real production install before wide rollout). *(The revenue pass
+      briefly set this `false`; it was reverted to `true` on 2026-07-16 to keep
+      the live closed test from serving real ads — do NOT re-flip it until the
+      production cut. Only `__DEV__` or this flag forces test ads, so a `false`
+      value means EVERY release/testing build serves live ads.)*
 - [ ] **Bump `android.versionCode`** in `mobile/app.json` for the next release
-      (currently 45 — build 44 is on the internal track; 45 carries the
-      2026-07-13 playtest fixes + trial-ladder rebalance. autoIncrement is
-      intentionally off — bump manually every time).
+      (currently **47**, `version` **1.5.0**; the revenue pass rode on top of the
+      2026-07-13 playtest/trial-ladder builds. autoIncrement is intentionally
+      off — bump manually every time).
 - [x] **Billing category fix + boot entitlement restore** — DONE (2026-07-10):
       RevenueCat `getProducts` now passes the NON_SUBSCRIPTION category
       (Android one-time products returned `[]` without it — the "purchases not
@@ -96,10 +100,27 @@ the codebase and are the remaining gates to submission.
       the app is live on Play and linked to the store listing
       (AdMob → Apps → Word Shift → App settings → link store; then
       app-ads.txt tab → Check for updates).
-- [x] **Play Console IAP products** — DONE (2026-07-02): all 9 SKUs created and
-      activated; RevenueCat products imported (5 consumable, 4 non-consumable)
-      and 4 entitlements mapped (`patron`, `adfree`, `cosmetic_bundle`,
-      `starter_pack`).
+- [x] **Play Console IAP products (original 9)** — DONE (2026-07-02): the 9
+      one-time SKUs created and activated; RevenueCat products imported (5
+      consumable, 4 non-consumable) and 4 entitlements mapped (`patron`,
+      `adfree`, `cosmetic_bundle`, `starter_pack`).
+- [ ] **Supporter subscription (revenue pass, 10th SKU / 5th entitlement)** —
+      app-side wired (`com.wordshift.supporter_monthly` → `supporter`
+      entitlement; ad-free + monthly amber stipend + season-pass premium +
+      exclusive confetti). OPEN console-side: create the auto-renewing
+      subscription in Play Console, import it into RevenueCat, and create the
+      **`supporter` entitlement** (identifier EXACTLY `supporter`) attached to
+      it. See `docs/MONETIZATION_SETUP.md`.
+- [x] **Banner ad unit — Android (revenue pass)** — DONE (2026-07-16):
+      app-side wired (`BannerAd.tsx` + `ads.shouldShowBanner`, menu surfaces
+      only); Android Banner AdMob unit created and `admobBannerIdAndroid` set
+      (`ca-app-pub-6575205005908086/7787305884`). Serves TEST banners while
+      `adsUseTestIds` is `true`. (iOS banner unit + `admobBannerIdIos` remain on
+      the iOS track below.)
+- [ ] **Confirm the repriced store tiers** — the in-app fallback labels changed
+      in the revenue pass (Remove-Ads **$5.99**, Patron **$8.99**, Supporter
+      **$3.99/mo**); set the Play Console product **price tiers** to match so the
+      live `priceString` and the fallback agree.
 - [x] **Data safety + App content declarations** — DONE (2026-07-02): data
       safety, Advertising ID, privacy policy, ads declaration, content rating,
       target audience actioned in Play Console → App content.
@@ -126,10 +147,11 @@ five-minute code change and iOS becomes buildable.
 - [ ] **AdMob GDPR message for iOS** — add the iOS app to the published
       European-regulations message (or create a second message); the Android
       one only covers the Android app entry.
-- [ ] **App Store Connect IAP products** — same 9 SKUs (App Store product IDs
-      can reuse the `com.wordshift.*` identifiers), attached to the same 4
+- [ ] **App Store Connect IAP products** — same 10 SKUs (App Store product IDs
+      can reuse the `com.wordshift.*` identifiers), attached to the same 5
       RevenueCat entitlements. Consumables: amber + hint packs; non-consumable:
-      starter, remove_ads, patron_key, cosmetic_bundle.
+      starter, remove_ads, patron_key, cosmetic_bundle; auto-renewing
+      subscription: `supporter_monthly` → `supporter` entitlement.
 - [ ] **App privacy (nutrition labels)** — same data inventory as the Android
       data-safety form: Identifiers (device ID), Location (coarse, ads),
       Purchases, Usage Data (product interaction, ads), Diagnostics (crash).

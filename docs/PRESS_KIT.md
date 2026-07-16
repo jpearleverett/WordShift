@@ -33,7 +33,7 @@ exactly why what follows lands.
 | **Price** | Free. Optional in-app purchases (currency/hint packs, cosmetics, one-time Remove Ads) and occasional ads with an opt-in rewarded tier |
 | **Monetization stance** | Convenience and cosmetics only — the story unfolds at the same pace for everyone; nothing narrative is purchasable |
 | **Accounts** | None required; core puzzles play offline |
-| **Current version** | 1.3.0 |
+| **Current version** | 1.5.0 |
 | **Content rating** | ESRB Teen / PEGI 12 / Apple 12+ — mild horror themes; no gore, no violence, no profanity (the dictionary is filtered) |
 | **Genre** | Word puzzle / narrative slow burn |
 | **Session length** | 2–5 minutes per puzzle; the full arc is tens of hours |
@@ -41,8 +41,8 @@ exactly why what follows lands.
 
 **By the numbers:** 13 animal companions, a 13-room house built bottom-up,
 4 difficulty tiers, 3 variant modes (Reverse, Double Shift, timed Speed runs),
-a shared Daily Challenge with leaderboard, 51 achievements, an 11,500-word
-dictionary, and ~5,100 hand-vetted pre-generated puzzles plus on-device
+a shared Daily Challenge with leaderboard, 51 achievements, an 11,400-word
+dictionary, and ~4,700 hand-vetted pre-generated puzzles plus on-device
 generation.
 
 ## Why this clips well (creator notes, spoiler-safe)
@@ -208,4 +208,4 @@ Design rules the game never breaks (useful framing for reviews):
 
 *This document is the creator/press kit for WordShift. The creator code is
 distributed privately; if you received this kit without one, request it via
-the press contact above. Kit last updated for v1.3.0.*
+the press contact above. Kit last updated for v1.5.0.*

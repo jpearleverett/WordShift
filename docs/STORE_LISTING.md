@@ -77,8 +77,8 @@ They've been waiting.
 - **ESRB:** Teen (fantasy themes, mild horror) — answer "infrequent/mild horror/fear themes" honestly in the questionnaire.
 - **PEGI:** 12 (moderate horror themes, no violence, no profanity — dictionary is filtered).
 - **Apple:** 12+ — "Infrequent/Mild Horror/Fear Themes."
-- **Contains ads:** Yes (Google AdMob — interstitial + opt-in rewarded). Declare it in the Play "Ads" question. `app-ads.txt` is live at the domain root (`https://jpearleverett.github.io/app-ads.txt`, pub-6575205005908086).
-- **Contains in-app purchases:** Yes — 9 products (amber packs, hint packs, one-time starter bundle, Remove Ads, Patron's Key, cosmetic bundle; all created + activated in Play Console 2026-07-02). Play derives the displayed price range from the active products automatically.
+- **Contains ads:** Yes (Google AdMob — interstitial, opt-in rewarded, and menu banners). Declare it in the Play "Ads" question. `app-ads.txt` is live at the domain root (`https://jpearleverett.github.io/app-ads.txt`, pub-6575205005908086).
+- **Contains in-app purchases:** Yes — 10 products: amber packs, hint packs, one-time starter bundle, Remove Ads, Patron's Key, cosmetic bundle (the original 9, created + activated in Play Console 2026-07-02), plus the **Supporter auto-renewing subscription** (revenue pass — create it in Play Console; see `docs/MONETIZATION_SETUP.md`). Play derives the displayed price range from the active products automatically.
 - **Target audience:** 13+ (do not target children — ads + dark themes). Avoids the Families policy.
 
 ## Data safety / privacy (Play Data Safety + Apple Privacy)
