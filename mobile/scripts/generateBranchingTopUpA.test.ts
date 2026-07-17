@@ -8,6 +8,15 @@
  * without pushing any word past the bank's pinned diversity cap
  * (read from src/__tests__/bankDiversity.test.ts).
  *
+ * ROUND 2 (2026-07-17): MEDIUM only. EASY finished round 1 at 43.5%
+ * multi-path and is skipped; MEDIUM gets a +50 target with a doubled
+ * attempt budget (3000) under the SAME pinned cap (7) — round 1 showed
+ * MEDIUM supply is attempt-bound, not cap-bound. Round-2 checkpoints use
+ * new file names (.bank_topupA2_*) so a stale round-1 checkpoint (whose
+ * puzzles are already merged into the shipped bank) can never double-append.
+ * Each run also finalizes (writes the bank file) with whatever it has
+ * before the wall-clock deadline, so timed-out runs resume cleanly.
+ *
  * Run: cd mobile && NODE_OPTIONS=--max-old-space-size=4096 npx jest --config scripts/jest.config.js --no-coverage --forceExit --testTimeout 600000 scripts/generateBranchingTopUpA.test.ts
  */
 
@@ -77,23 +86,26 @@ import { generateLocalPuzzle, isDreadWord, getWordPhaseTier, getSemanticCluster 
 import { analyzeStandardBranching } from '../src/services/puzzleBranching';
 import { COMMON_WORDS } from '../src/constants/wordLists';
 import { PreGeneratedPuzzle } from '../src/data/puzzleBankTypes';
-import { PUZZLE_BANK_EASY } from '../src/data/puzzleBankEasy';
 import { PUZZLE_BANK_MEDIUM } from '../src/data/puzzleBankMedium';
 
 // ============================================================================
-// Top-up targets: +100 per bank, phase spread mirroring the bank generators'
-// PHASE_TARGETS ratios (120/100/100/100/80 out of 500).
+// Round-2 top-up targets: +50 for MEDIUM, phase spread mirroring the bank
+// generators' PHASE_TARGETS ratios (120/100/100/100/80 out of 500).
 // ============================================================================
 
 const TOP_UP_PHASE_TARGETS: Record<number, number> = {
-  0: 24,
-  1: 20,
-  2: 20,
-  3: 20,
-  4: 16,
+  0: 12,
+  1: 10,
+  2: 10,
+  3: 10,
+  4: 8,
 };
 
-const ATTEMPTS_PER_TARGET = 15; // 1500 attempts total per bank
+const ATTEMPTS_PER_TARGET = 60; // 3000 attempts total for the +50 MEDIUM target
+
+// Each run finalizes (writes the bank file) before the external 600s jest
+// timeout; a resumed run picks up from the checkpoint's cumulative attempts.
+const RUN_DEADLINE_MS = 550_000;
 
 // Acceptance gate: genuinely multi-path under the shipped rules. Same
 // validator + default caps puzzleBank.ts uses at selection time.
@@ -112,22 +124,15 @@ interface TopUpBankSpec {
   checkpointFile: string;
 }
 
+// EASY is deliberately absent this round (finished round 1 at 43.5% multi-path).
 const BANK_SPECS: TopUpBankSpec[] = [
-  {
-    name: 'EASY',
-    fileName: 'puzzleBankEasy.ts',
-    exportName: 'PUZZLE_BANK_EASY',
-    generatorScript: 'scripts/generatePuzzleBankEasy.test.ts',
-    bank: PUZZLE_BANK_EASY,
-    checkpointFile: '.bank_topupA_easy_progress.json',
-  },
   {
     name: 'MEDIUM',
     fileName: 'puzzleBankMedium.ts',
     exportName: 'PUZZLE_BANK_MEDIUM',
     generatorScript: 'scripts/generatePuzzleBankMedium.test.ts',
     bank: PUZZLE_BANK_MEDIUM,
-    checkpointFile: '.bank_topupA_medium_progress.json',
+    checkpointFile: '.bank_topupA2_medium_progress.json',
   },
 ];
 
@@ -155,6 +160,8 @@ function readPinnedCap(bankName: string): number {
 
 interface TopUpCheckpoint {
   phaseCounts: Record<string, number>;
+  /** Cumulative per-phase attempts, so the attempt budget spans re-runs. */
+  phaseAttempts: Record<string, number>;
   puzzles: PreGeneratedPuzzle[];
   attemptsUsed: number;
   completed?: boolean;
@@ -170,11 +177,11 @@ function loadCheckpoint(spec: TopUpBankSpec): TopUpCheckpoint {
     if (fs.existsSync(p)) {
       const data = JSON.parse(fs.readFileSync(p, 'utf-8'));
       if (data && Array.isArray(data.puzzles)) {
-        return { attemptsUsed: 0, phaseCounts: {}, ...data };
+        return { attemptsUsed: 0, phaseCounts: {}, phaseAttempts: {}, ...data };
       }
     }
   } catch { /* corrupted checkpoint: start fresh */ }
-  return { phaseCounts: {}, puzzles: [], attemptsUsed: 0 };
+  return { phaseCounts: {}, phaseAttempts: {}, puzzles: [], attemptsUsed: 0 };
 }
 
 function saveCheckpoint(spec: TopUpBankSpec, cp: TopUpCheckpoint): void {
@@ -233,7 +240,8 @@ function writeBankFile(spec: TopUpBankSpec, puzzles: PreGeneratedPuzzle[], topUp
 // Do not edit manually. Re-run the generator to update.
 // Generated: ${new Date().toISOString()}
 // Total puzzles: ${puzzles.length}
-// Branching top-up: scripts/generateBranchingTopUpA.test.ts appended ${topUpCount} verified multi-path puzzles.
+// Branching top-up round 1: scripts/generateBranchingTopUpA.test.ts appended 76 verified multi-path puzzles.
+// Branching top-up round 2: appended ${topUpCount} more verified multi-path puzzles (same pinned word cap).
 
 import { PreGeneratedPuzzle } from './puzzleBankTypes';
 
@@ -296,18 +304,21 @@ async function runTopUp(spec: TopUpBankSpec): Promise<void> {
   let rejectedBranching = 0;
   let rejectedCap = 0;
   let rejectedDup = 0;
+  let runAccepts = 0;
+  const runDeadline = Date.now() + RUN_DEADLINE_MS;
 
   for (const [phaseStr, target] of Object.entries(TOP_UP_PHASE_TARGETS)) {
     const phase = parseInt(phaseStr);
     mockPhase = phase;
     let phaseCount = checkpoint.phaseCounts[phaseStr] ?? 0;
-    let phaseAttempts = 0;
+    let phaseAttempts = checkpoint.phaseAttempts[phaseStr] ?? 0;
     const maxAttemptsPerPhase = target * ATTEMPTS_PER_TARGET;
 
-    process.stdout.write(`\n${spec.name} phase ${phase}: topping up ${target} multi-path puzzles (have ${phaseCount})...\n`);
+    process.stdout.write(`\n${spec.name} phase ${phase}: topping up ${target} multi-path puzzles (have ${phaseCount}, ${phaseAttempts}/${maxAttemptsPerPhase} attempts used)...\n`);
 
-    while (phaseCount < target && phaseAttempts < maxAttemptsPerPhase) {
+    while (phaseCount < target && phaseAttempts < maxAttemptsPerPhase && Date.now() < runDeadline) {
       phaseAttempts++;
+      checkpoint.phaseAttempts[phaseStr] = phaseAttempts;
       checkpoint.attemptsUsed++;
 
       try {
@@ -355,6 +366,7 @@ async function runTopUp(spec: TopUpBankSpec): Promise<void> {
         checkpoint.phaseCounts[phaseStr] = phaseCount + 1;
         saveCheckpoint(spec, checkpoint);
         phaseCount++;
+        runAccepts++;
 
         if (phaseCount % 5 === 0) {
           process.stdout.write(`  ${spec.name} phase ${phase}: ${phaseCount}/${target} (${phaseAttempts} attempts)\n`);
@@ -364,33 +376,48 @@ async function runTopUp(spec: TopUpBankSpec): Promise<void> {
       }
     }
 
-    process.stdout.write(`  ${spec.name} phase ${phase}: completed ${phaseCount}/${target} (${phaseAttempts} attempts)\n`);
+    process.stdout.write(`  ${spec.name} phase ${phase}: completed ${phaseCount}/${target} (${phaseAttempts}/${maxAttemptsPerPhase} attempts)\n`);
+    if (Date.now() >= runDeadline) {
+      process.stdout.write(`  Deadline reached for ${spec.name}; finalizing with current progress.\n`);
+      break;
+    }
   }
+
+  // Persist attempt counters even when nothing new was accepted this run.
+  saveCheckpoint(spec, checkpoint);
 
   const combined = [...spec.bank, ...additions];
   const topUpCount = Object.values(checkpoint.phaseCounts).reduce((a, b) => a + b, 0);
   const multiAfter = existingMultiPath + additions.length;
 
-  process.stdout.write(`\n=== ${spec.name} top-up complete ===\n`);
+  process.stdout.write(`\n=== ${spec.name} top-up run finished (${runAccepts} accepted this run) ===\n`);
   process.stdout.write(`Bank: ${spec.bank.length} -> ${combined.length} puzzles (+${additions.length} this pass, ${topUpCount} cumulative)\n`);
   process.stdout.write(`Attempts used: ${checkpoint.attemptsUsed} (dup ${rejectedDup}, cap ${rejectedCap}, branching ${rejectedBranching}, failures ${totalFailures})\n`);
   process.stdout.write(`Multi-path share: ${((existingMultiPath / spec.bank.length) * 100).toFixed(1)}% -> ${((multiAfter / combined.length) * 100).toFixed(1)}% (${multiAfter}/${combined.length})\n`);
 
-  writeBankFile(spec, combined, topUpCount);
-  checkpoint.completed = true;
-  saveCheckpoint(spec, checkpoint);
+  if (additions.length > 0) {
+    writeBankFile(spec, combined, topUpCount);
+  } else {
+    process.stdout.write(`No new additions to write this run.\n`);
+  }
+
+  // Completed = every phase met its target or exhausted its cumulative
+  // attempt budget (a deadline break leaves the checkpoint resumable).
+  const allDone = Object.entries(TOP_UP_PHASE_TARGETS).every(([ps, t]) =>
+    (checkpoint.phaseCounts[ps] ?? 0) >= t ||
+    (checkpoint.phaseAttempts[ps] ?? 0) >= t * ATTEMPTS_PER_TARGET);
+  if (allDone) {
+    checkpoint.completed = true;
+    saveCheckpoint(spec, checkpoint);
+  }
 }
 
 // ============================================================================
 // Main top-up test
 // ============================================================================
 
-describe('Branching Top-Up — EASY + MEDIUM Standard', () => {
-  it('tops up the EASY bank with multi-path puzzles', async () => {
-    await runTopUp(BANK_SPECS[0]);
-  }, 600000);
-
+describe('Branching Top-Up — MEDIUM Standard (round 2)', () => {
   it('tops up the MEDIUM bank with multi-path puzzles', async () => {
-    await runTopUp(BANK_SPECS[1]);
+    await runTopUp(BANK_SPECS[0]);
   }, 600000);
 });

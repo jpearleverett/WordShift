@@ -36,6 +36,16 @@
  * gained generator-fresh multi-path boards under the SAME pinned caps
  * (EASY +92, MEDIUM +76, MEDIUM_PLUS +47, HARD +19), so caps are unchanged
  * and the unique/puzzle floors below rose to ~10% under the new measured.
+ *
+ * Recalibrated after branching top-up ROUND 2 (MEDIUM +32, MEDIUM_PLUS +38,
+ * HARD +39): the 5-letter banks' caps were deliberately RAISED for that
+ * round (MEDIUM_PLUS 8 -> 10, HARD 10 -> 12) — the cap protects vocabulary
+ * diversity, but on those banks the dread-steered vocabulary saturates it
+ * long before the branching gate is satisfiable (round 1: 79-91% of HARD
+ * candidates hit an at-cap word). A +2 cap trades marginal repetition,
+ * still guarded by the unique-word floors below, for choice-rich supply.
+ * EASY (cap 3) and MEDIUM (cap 7) caps were NOT raised. Caps below remain
+ * the exact measured maxima of the committed data.
  */
 import { PUZZLE_BANK_EASY } from '../data/puzzleBankEasy';
 import { PUZZLE_BANK_MEDIUM } from '../data/puzzleBankMedium';
@@ -60,14 +70,14 @@ interface BankSpec {
 }
 
 const BANKS: BankSpec[] = [
-  // Measured (2026-07 branching top-up): EASY 547 puzzles / max 3 / 1574 unique
+  // Measured (2026-07 branching top-up round 2): EASY 547 puzzles / max 3 / 1574 unique
   { name: 'EASY', bank: PUZZLE_BANK_EASY, cap: 3, minUnique: 1415, minPuzzles: 490 },
-  // MEDIUM 526 / max 7 (marquee injection) / 1636 unique
-  { name: 'MEDIUM', bank: PUZZLE_BANK_MEDIUM, cap: 7, minUnique: 1470, minPuzzles: 470 },
-  // MEDIUM_PLUS 512 / max 8 (marquee injection) / 1437 unique
-  { name: 'MEDIUM_PLUS', bank: PUZZLE_BANK_MEDIUM_PLUS, cap: 8, minUnique: 1290, minPuzzles: 460 },
-  // HARD 453 / max 10 / 1337 unique
-  { name: 'HARD', bank: PUZZLE_BANK_HARD, cap: 10, minUnique: 1200, minPuzzles: 405 },
+  // MEDIUM 558 / max 7 (marquee injection) / 1654 unique
+  { name: 'MEDIUM', bank: PUZZLE_BANK_MEDIUM, cap: 7, minUnique: 1485, minPuzzles: 500 },
+  // MEDIUM_PLUS 550 / max 10 (round-2 cap raise) / 1465 unique
+  { name: 'MEDIUM_PLUS', bank: PUZZLE_BANK_MEDIUM_PLUS, cap: 10, minUnique: 1315, minPuzzles: 495 },
+  // HARD 492 / max 12 (round-2 cap raise) / 1368 unique
+  { name: 'HARD', bank: PUZZLE_BANK_HARD, cap: 12, minUnique: 1230, minPuzzles: 440 },
   // REVERSE_EASY 429 / max 7 / 1325 unique
   { name: 'REVERSE_EASY', bank: PUZZLE_BANK_REVERSE_EASY, cap: 7, minUnique: 1190, minPuzzles: 380 },
   // REVERSE_MEDIUM 318 / max 11 (solution-repair pass) / 1304 unique

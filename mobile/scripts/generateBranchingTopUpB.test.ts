@@ -12,6 +12,18 @@
  * Run: cd mobile && NODE_OPTIONS=--max-old-space-size=4096 npx jest --config scripts/jest.config.js --no-coverage --forceExit --testTimeout 600000 scripts/generateBranchingTopUpB.test.ts
  * Crash/timeout-safe: per-accept checkpoints resume on re-run; each run also
  * finalizes (writes the bank files) with whatever it has before the deadline.
+ *
+ * ROUND 2 (2026-07-17): the generation word-usage caps are RAISED here —
+ * MEDIUM_PLUS 8 -> 10, HARD 10 -> 12. Rationale: the cap protects vocabulary
+ * diversity, but on the 5-letter banks the dread-steered vocabulary saturates
+ * it long before the branching gate is satisfiable (round 1: 79-91% of HARD
+ * candidates hit an at-cap word, yielding only +19). A +2 cap trades marginal
+ * repetition (still guarded by bankDiversity.test.ts's unique-word floors)
+ * for choice-rich supply. bankDiversity.test.ts caps are recalibrated to the
+ * measured maxima after this round, per that file's own documented rule.
+ * Round-2 checkpoints use new file names (.bank_topupB2_*) so a stale
+ * round-1 checkpoint (already merged into the shipped banks) can never
+ * double-append.
  */
 
 import * as fs from 'fs';
@@ -87,7 +99,7 @@ interface TopUpCheckpoint {
 }
 
 function checkpointPath(bankKey: string): string {
-  return require('path').join(__dirname, '..', 'src', 'data', `.bank_topupB_${bankKey}_progress.json`);
+  return require('path').join(__dirname, '..', 'src', 'data', `.bank_topupB2_${bankKey}_progress.json`);
 }
 
 function loadCheckpoint(bankKey: string): TopUpCheckpoint {
@@ -128,21 +140,10 @@ import { PUZZLE_BANK_MEDIUM_PLUS } from '../src/data/puzzleBankMediumPlus';
 import { PUZZLE_BANK_HARD } from '../src/data/puzzleBankHard';
 
 // ============================================================================
-// Targets: +100 per bank, phase spread proportional to the original
-// generators' PHASE_TARGETS {0:120, 1:100, 2:100, 3:100, 4:80} (out of 500).
+// Round-2 targets: MEDIUM_PLUS +60, HARD +80 — phase spread proportional to
+// the original generators' PHASE_TARGETS {0:120, 1:100, 2:100, 3:100, 4:80}.
+// Per-bank now, since the two banks have different targets this round.
 // ============================================================================
-
-const PHASE_TARGETS: Record<number, number> = {
-  0: 24,
-  1: 20,
-  2: 20,
-  3: 20,
-  4: 16,
-};
-
-// The initial 1500-attempt budget completed in ~70s/bank and yielded only 8
-// HARD accepts (word-cap rejections dominate in the saturated HARD bank), so
-// the budget was raised per bank; wall-clock deadlines still bound every run.
 
 // Each run finalizes before the external 600s timeout: generation stops at
 // this wall-clock deadline and the bank files are written with what exists.
@@ -155,42 +156,59 @@ const MAX_SINGLE_CHOICE_FRACTION = 0.65;
 interface BankConfig {
   key: string;
   difficulty: 'MEDIUM_PLUS' | 'HARD';
-  /** Per-bank word saturation cap pinned in src/__tests__/bankDiversity.test.ts. */
+  /**
+   * Round-2 generation word-usage cap — deliberately ABOVE the round-1 pin
+   * (MEDIUM_PLUS 8 -> 10, HARD 10 -> 12). The cap protects vocabulary
+   * diversity, but on the 5-letter banks the dread-steered vocabulary
+   * saturates it long before the branching gate is satisfiable; a +2 cap
+   * trades marginal repetition (still guarded by the unique-word floors in
+   * bankDiversity.test.ts) for choice-rich supply. The diversity test's
+   * per-bank caps are recalibrated to the measured maxima after this round.
+   */
   wordCap: number;
   /** Per-phase attempt budget = phase target * this (cumulative across runs). */
   attemptsPerPhaseUnit: number;
+  /** Round-2 per-bank phase targets (the two banks differ this round). */
+  phaseTargets: Record<number, number>;
   existing: PreGeneratedPuzzle[];
   fileName: string;
   exportName: string;
   originalGenerator: string;
   /** puzzleBankHard.ts re-exports the puzzle type; preserve that line. */
   typeReExport: boolean;
+  /** Header note carrying the round-1 top-up count forward. */
+  priorTopUpNote: string;
 }
 
 const BANK_CONFIGS: BankConfig[] = [
   {
     key: 'mediumplus',
     difficulty: 'MEDIUM_PLUS',
-    wordCap: 8,
-    attemptsPerPhaseUnit: 100,
+    wordCap: 10,
+    // +60 target, ~4000-attempt budget (60 * 67).
+    attemptsPerPhaseUnit: 67,
+    phaseTargets: { 0: 14, 1: 12, 2: 12, 3: 12, 4: 10 },
     existing: PUZZLE_BANK_MEDIUM_PLUS,
     fileName: 'puzzleBankMediumPlus.ts',
     exportName: 'PUZZLE_BANK_MEDIUM_PLUS',
     originalGenerator: 'scripts/generatePuzzleBankMediumPlus.test.ts',
     typeReExport: false,
+    priorTopUpNote: 'round 1 appended 47 verified multi-path puzzles',
   },
   {
     key: 'hard',
     difficulty: 'HARD',
-    wordCap: 10,
-    // HARD acceptance is word-cap-bound (the bank's dread vocabulary is
-    // saturated), so its budget is effectively deadline-bound instead.
-    attemptsPerPhaseUnit: 500,
+    wordCap: 12,
+    // +80 target, 6000-attempt budget (80 * 75). Round 1 was word-cap-bound
+    // (79-91% of candidates hit an at-cap word at cap 10); cap 12 unchokes it.
+    attemptsPerPhaseUnit: 75,
+    phaseTargets: { 0: 19, 1: 16, 2: 16, 3: 16, 4: 13 },
     existing: PUZZLE_BANK_HARD,
     fileName: 'puzzleBankHard.ts',
     exportName: 'PUZZLE_BANK_HARD',
     originalGenerator: 'scripts/generatePuzzleBank.test.ts',
     typeReExport: true,
+    priorTopUpNote: 'round 1 appended 19 verified multi-path puzzles',
   },
 ];
 
@@ -259,10 +277,11 @@ function writeBankFile(
     : '';
 
   const fileContent = `// AUTO-GENERATED by ${config.originalGenerator}
-// Branching top-up additions: scripts/generateBranchingTopUpB.test.ts
+// Branching top-up additions: scripts/generateBranchingTopUpB.test.ts (${config.priorTopUpNote};
+// round 2 appended ${topUpCount} more under a raised word cap of ${config.wordCap} — see that script's header)
 // Do not edit manually. Re-run the generators to update.
 // Generated: ${new Date().toISOString()}
-// Total puzzles: ${finalPuzzles.length} (${baseCount} base + ${topUpCount} branching top-up)
+// Total puzzles: ${finalPuzzles.length} (${baseCount} base + ${topUpCount} round-2 branching top-up)
 
 import { PreGeneratedPuzzle } from './puzzleBankTypes';
 ${typeLine}
@@ -314,7 +333,7 @@ describe('Branching Top-Up Generator — MEDIUM_PLUS + HARD Standard', () => {
         seenChains.add(chainKey);
       }
 
-      const totalTarget = Object.values(PHASE_TARGETS).reduce((a, b) => a + b, 0);
+      const totalTarget = Object.values(config.phaseTargets).reduce((a, b) => a + b, 0);
       process.stdout.write(`\n=== ${config.difficulty}: bank ${config.existing.length}, top-up so far ${additions.length}/${totalTarget}, word cap ${config.wordCap} ===\n`);
 
       let runAttempts = 0;
@@ -324,7 +343,7 @@ describe('Branching Top-Up Generator — MEDIUM_PLUS + HARD Standard', () => {
       let rejectedBranching = 0;
       let genFailures = 0;
 
-      const phaseEntries = Object.entries(PHASE_TARGETS);
+      const phaseEntries = Object.entries(config.phaseTargets);
       for (let phaseIndex = 0; phaseIndex < phaseEntries.length; phaseIndex++) {
         const [phaseStr, target] = phaseEntries[phaseIndex];
         const phase = parseInt(phaseStr);
