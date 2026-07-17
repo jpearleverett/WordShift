@@ -244,6 +244,34 @@ interface SessionInfo {
   puzzlesRemaining?: number;
 }
 
+/**
+ * Pure resolver for the "visit next friend" chain. Starting AFTER the current
+ * animal in the given display/unlock order and wrapping around the list, it
+ * returns the first OTHER unlocked animal for which `hasNewsAvailable` holds
+ * (the caller supplies the same availability signal the home badge/tap uses).
+ * Never returns the current animal, even if the predicate would accept it;
+ * returns null when no other animal qualifies. Order-stable and side-effect
+ * free so it can be unit-tested directly.
+ */
+export function findNextAnimalWithNews<T extends { id: string; isUnlocked: boolean }>(
+  animals: T[],
+  currentAnimalId: string | null,
+  hasNewsAvailable: (animal: T) => boolean
+): T | null {
+  const count = animals.length;
+  if (count === 0) return null;
+  const startIndex = currentAnimalId
+    ? animals.findIndex(a => a.id === currentAnimalId)
+    : -1;
+  for (let offset = 1; offset <= count; offset++) {
+    const candidate = animals[(startIndex + offset + count) % count];
+    if (currentAnimalId !== null && candidate.id === currentAnimalId) continue;
+    if (!candidate.isUnlocked) continue;
+    if (hasNewsAvailable(candidate)) return candidate;
+  }
+  return null;
+}
+
 interface UseDialogueFlowParams {
   progress: HomeWorldProgress | null;
   setAnimals: React.Dispatch<React.SetStateAction<Animal[]>>;
@@ -267,6 +295,18 @@ interface UseDialogueFlowReturn {
   handleNextDialogue: () => Promise<void>;
   handleCloseDialogue: () => Promise<void>;
   handleDialogueChoice: (choice: PlayerChoice) => Promise<void>;
+  /**
+   * Resolve the next unlocked animal (after the current one, wrapping) with
+   * dialogue genuinely available right now, for the "visit next friend"
+   * chain. Fully synchronous; HomeScreen calls it only when the session has
+   * reached its end (the button reads "Close").
+   */
+  getNextAnimalWithNews: (animals: Animal[]) => Animal | null;
+  /**
+   * Chain to another animal: runs the EXACT Close bookkeeping for the current
+   * animal, then opens the next one through the normal tap path.
+   */
+  handleVisitNextAnimal: (next: Animal) => Promise<void>;
 }
 
 /**
@@ -983,6 +1023,51 @@ export function useDialogueFlow({
     await closeDialogue(false);
   }, [closeDialogue]);
 
+  // Availability signal for the "visit next friend" chain — the SAME news
+  // signal the home "!" badge uses (recomputeHasNewDialogue already folds in
+  // isOnCooldown), plus the synchronous equivalent of checkDialogueAvailability
+  // for the session budget: an in-session animal whose dialogue budget is
+  // spent would flip straight to cooldown on tap, so it is not offered.
+  const isChainCandidate = useCallback(
+    (animal: Animal): boolean => {
+      if (!animal.isUnlocked) return false;
+      if (!recomputeHasNewDialogue(animal)) return false;
+      const status = getSessionStatus(animal.id, getSessionBonus(animal));
+      if (status.status === 'cooldown') return false;
+      if (status.status === 'in_session' && (status.dialoguesRemaining ?? 0) <= 0) return false;
+      return true;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [recomputeHasNewDialogue, progress]
+  );
+
+  // Resolve the next unlocked animal with news, wrapping in display/unlock
+  // order and always excluding the current animal. Synchronous by design so
+  // HomeScreen can call it at the session-end render without any async work.
+  const getNextAnimalWithNews = useCallback(
+    (animals: Animal[]): Animal | null => {
+      if (!selectedAnimal || !showDialogue) return null;
+      return findNextAnimalWithNews(animals, selectedAnimal.id, isChainCandidate);
+    },
+    [selectedAnimal, showDialogue, isChainCandidate]
+  );
+
+  // Chain to the next friend: run the exact same close bookkeeping as the
+  // Close button (closeDialogue(false) — terminal-read advancement, badge
+  // honesty refresh, session left warm exactly like a manual close), then
+  // open the next animal through the normal tap path. handleAnimalTap
+  // re-checks availability itself, so if the animal's state changed between
+  // render and tap the standard cooldown message shows — no special casing.
+  const handleVisitNextAnimal = useCallback(
+    async (next: Animal) => {
+      if (!next || !next.isUnlocked) return;
+      if (selectedAnimal && next.id === selectedAnimal.id) return;
+      await closeDialogue(false);
+      await handleAnimalTap(next);
+    },
+    [selectedAnimal, closeDialogue, handleAnimalTap]
+  );
+
   // Handle dialogue advance
   const handleNextDialogue = useCallback(async () => {
     if (!selectedAnimal || !progress) return;
@@ -1215,5 +1300,7 @@ export function useDialogueFlow({
     handleNextDialogue,
     handleCloseDialogue,
     handleDialogueChoice,
+    getNextAnimalWithNews,
+    handleVisitNextAnimal,
   };
 }

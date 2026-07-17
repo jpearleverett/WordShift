@@ -2295,6 +2295,18 @@ export function getStreakHeldMessage(heldAt: number, phase: number = 0): string 
 }
 
 // ============================================================================
+// DIALOGUE ROUND — the "visit the next friend" chaining affordance. When one
+// animal's session ends and another has news, the close button offers the next
+// visit in-world (the house passes the player along; never an errand voice).
+// ============================================================================
+
+export function getNextFriendPrompt(phase: number, name: string): string {
+  if (phase >= 4) return `${name} is waiting to speak.`;
+  if (phase >= 2) return `${name} has something to tell you.`;
+  return `${name} has news for you!`;
+}
+
+// ============================================================================
 // MILESTONE HINT GRANT — the small hint trickle that rides certain puzzle-count
 // milestones (see hints.ts). In-world voice: the house sets help aside; never
 // "you earned a consumable".
