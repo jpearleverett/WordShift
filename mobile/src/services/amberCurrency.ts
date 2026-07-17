@@ -522,11 +522,18 @@ export function calculatePhaseAcceleration(
 /**
  * Award amber for completing a puzzle.
  *
- * When `creditToBalance` is false (default), the computed amber reward
- * is NOT added to the player's spendable balance. All other side effects
- * (streak, phase progression, milestones, stats) still execute normally.
- * The caller is responsible for crediting later (e.g. via awardBonusAmber
- * when the player offers words in the pit).
+ * When `creditToBalance` is false (default), the PER-PUZZLE amber reward
+ * (`amount`) is NOT added to the player's spendable balance. All other side
+ * effects (streak, phase progression, milestones, stats) still execute
+ * normally. The caller is responsible for crediting the per-puzzle amber
+ * later (e.g. via awardBonusAmber when the player offers words in the pit).
+ *
+ * One-time WINDFALLS (puzzle-count milestone, first-completion, streak
+ * milestone) are the exception: they credit the spendable balance
+ * IMMEDIATELY, regardless of `creditToBalance` — a "+150 Century milestone!"
+ * is a moment, not a harvest, and must be spendable without a pit detour.
+ * Only the per-puzzle amber stays deferred, preserving the pit ritual.
+ * totalAmberEarned counts every part exactly once either way.
  *
  * When `options.skipPhaseProgress` is true, ALL normal amber math still runs
  * but the win accrues ZERO weighted phaseProgress — used for boards outside
@@ -683,9 +690,9 @@ export async function awardPuzzleAmber(
     milestoneBonus = milestone.amber;
     // Use phase-aware milestone message
     milestoneMessage = getMilestoneMessage(milestone, progress.currentPhase);
-    if (creditToBalance) {
-      progress.amber += milestoneBonus;
-    }
+    // Windfall: credits the spendable balance IMMEDIATELY (never deferred to
+    // the harvest batch — see the function doc). Amber-only, never phase progress.
+    progress.amber += milestoneBonus;
     progress.totalAmberEarned += milestoneBonus;
     progress.lastClaimedMilestone = milestone.puzzles;
 
@@ -703,9 +710,8 @@ export async function awardPuzzleAmber(
   const completedDiffs = progress.completedDifficulties ?? [];
   if (!completedDiffs.includes(difficulty)) {
     firstCompletionBonus = FIRST_COMPLETION_BONUS[difficulty];
-    if (creditToBalance) {
-      progress.amber += firstCompletionBonus;
-    }
+    // Windfall: immediate credit, never deferred (see the function doc).
+    progress.amber += firstCompletionBonus;
     progress.totalAmberEarned += firstCompletionBonus;
     progress.completedDifficulties = [...completedDiffs, difficulty];
     if (firstCompletionBonus > 0) {
@@ -725,9 +731,8 @@ export async function awardPuzzleAmber(
   if (streakMilestone) {
     streakMilestoneBonus = streakMilestone.amber;
     streakMilestoneMessage = streakMilestone.message;
-    if (creditToBalance) {
-      progress.amber += streakMilestoneBonus;
-    }
+    // Windfall: immediate credit, never deferred (see the function doc).
+    progress.amber += streakMilestoneBonus;
     progress.totalAmberEarned += streakMilestoneBonus;
 
     await recordTransaction({

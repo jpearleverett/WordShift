@@ -65,7 +65,12 @@ export interface VictoryData {
   flawless?: boolean;
   /** Running lifetime count of flawless offerings (for the victory badge copy). */
   flawlessCount?: number;
-  /** Total amber value computed for this puzzle (queued, not yet spendable) */
+  /**
+   * Total amber earned by this victory. The per-puzzle share (base/star/
+   * streak/challenge/patron/surprise/resonance/variant) is queued in the
+   * harvest batch; one-time windfalls (milestone, first-completion, streak
+   * milestone) were already credited to the spendable balance by the economy.
+   */
   amberEarned: number;
   /** Real itemization of amberEarned (absent only on guard/error fallbacks) */
   amberBreakdown?: AmberBreakdown;
@@ -286,7 +291,10 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
       const stats = await getCumulativeStats();
       const threeStarRate = getThreeStarRate(stats) / 100; // Convert percentage to ratio
 
-      // creditToBalance=false: amber is queued in a harvest batch, not credited yet.
+      // creditToBalance=false: the PER-PUZZLE amber is queued in a harvest
+      // batch, not credited yet. One-time windfalls (milestone / first-
+      // completion / streak milestone) are credited to the spendable balance
+      // immediately by the economy regardless of this flag.
       // skipPhaseProgress: shared-challenge wins pay full amber but feed ZERO
       // weighted phase progress (see awardPuzzleAmber's option contract).
       const amberResult = await awardPuzzleAmber(difficulty, stars, gameMode, threeStarRate, false, {
@@ -335,8 +343,15 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         await recordVariantWin(variant, blind);
       }
 
-      // Compute total queued amber (puzzle + milestones + first-completion + streak milestone + variant)
-      const totalQueuedAmber = amberResult.amount
+      // Crediting split: ONLY the per-puzzle amber (amount — incl. the variant/
+      // fresh/resonance additions folded in above) is deferred into the harvest
+      // batch, preserving the pit ritual. The one-time windfalls (milestone /
+      // first-completion / streak milestone) were credited to the spendable
+      // balance immediately by awardPuzzleAmber, so they never enter the batch.
+      const queuedAmber = amberResult.amount;
+      // Total earned this victory (queued per-puzzle share + instant windfalls)
+      // — what the Victory modal itemizes and sums.
+      const totalEarnedAmber = amberResult.amount
         + amberResult.milestoneBonus
         + amberResult.firstCompletionBonus
         + amberResult.streakMilestoneBonus;
@@ -356,7 +371,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         firstCompletionBonus: amberResult.firstCompletionBonus ?? 0,
         milestoneBonus: amberResult.milestoneBonus ?? 0,
         streakMilestoneBonus: amberResult.streakMilestoneBonus ?? 0,
-        total: totalQueuedAmber,
+        total: totalEarnedAmber,
       };
 
       // Enqueue harvest batch with all completed words and computed amber value
@@ -367,7 +382,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
       const harvestResult = await enqueueHarvestBatch({
         id: harvestBatchId,
         words: harvestedWords,
-        amberValue: totalQueuedAmber,
+        amberValue: queuedAmber,
         createdAt: Date.now(),
         difficulty,
         gameMode,
@@ -386,7 +401,8 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         updateSessionPhase(effectivePhase);
         setCurrentPhase(effectivePhase);
       }
-      // Balance stays as-is (no credit); refresh from storage to stay in sync
+      // Balance reflects any instantly-credited windfalls (per-puzzle amber
+      // stays queued); refresh from the economy's post-award value.
       setAmberBalance(amberResult.newBalance);
       // Update pending phase transition state for pit screen
       if (amberResult.phaseTransitionPending) {
@@ -439,7 +455,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
           invalidAttempts,
           gameMode,
           isDaily,
-          amberEarned: totalQueuedAmber,
+          amberEarned: totalEarnedAmber,
           challengeBonus: amberResult.challengeBonus,
           puzzlesSolved: amberResult.puzzlesSolved,
           phase: effectivePhase,
@@ -462,7 +478,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
           hintsUsed,
           isDaily,
           isChallenge: gameMode === 'challenge',
-          amberEarned: totalQueuedAmber,
+          amberEarned: totalEarnedAmber,
           currentStreak: amberResult.currentStreak,
           variant,
         }, effectivePhase);
@@ -475,7 +491,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         earnedStars: stars,
         flawless,
         flawlessCount: stats.flawlessCount ?? 0,
-        amberEarned: totalQueuedAmber,
+        amberEarned: totalEarnedAmber,
         amberBreakdown,
         amberBalance: amberResult.newBalance,
         isDaily,

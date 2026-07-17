@@ -2529,6 +2529,15 @@ function MainApp() {
     puzzleActions.handleLetterPress(letter, rowIndex);
   }, [puzzleActions, onboardingFlow.onboardingStep, puzzle.gameState, puzzle.selectedLetter, tutorialGuidance]);
 
+  // Quiet acknowledgment for taps on tiles in completed/future rows (they
+  // used to mount no touchable at all, so a confused poke got literally
+  // nothing). A light selection haptic ONLY — no toast, no sound, no
+  // game-state change; the tile plays its own subtle pulse. Stable identity
+  // (empty deps) so the memoized Rows never re-render for this.
+  const handleInactiveTilePress = useCallback(() => {
+    hapticSelection();
+  }, []);
+
   // Track the active row + move direction (read inside the deferred drop
   // handler and the per-move hover handler) and a registry of each row's
   // measurable node for Y-bounds checking on drop/hover.
@@ -3019,8 +3028,9 @@ function MainApp() {
       phaseTransitionEvent != null ||                  // final / post-revelation cinematic queued
       (vd.newPhase as number) >= 5 ||                  // post-revelation: never break the serene tone
       // Protect the early "pure delight" window — no ads in the first
-      // session, and no first ad inside the puzzle 8-12 new-things pile-up
-      // (daily unlock, first-harvest gate, journal intro all land there).
+      // session, and no first ad inside the early new-things cluster
+      // (daily unlock 8, first-harvest gate 9, reverse 10, graduation 13,
+      // challenge intro 15 — the first ad waits for the exit of win 17).
       vd.puzzlesSolved <= INTERSTITIAL_MIN_PUZZLES;
     return maybeShowInterstitial({
       puzzlesSolved: vd.puzzlesSolved,
@@ -4164,6 +4174,7 @@ function MainApp() {
                 selectedLetter={puzzle.selectedLetter}
                 onLetterPress={handleLetterPress}
                 onSlotPress={handleSlotPress}
+                onInactivePress={handleInactiveTilePress}
                 isProcessing={puzzle.isProcessing}
                 phase={persistence.currentPhase}
                 wordLength={row.words.length}

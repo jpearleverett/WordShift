@@ -439,7 +439,7 @@ export function getPhase5ChoiceCallback(
   const callbacks: Record<string, Record<PlayerChoice, string>> = {
     fox: {
       ask: 'You asked, once, when asking still felt dangerous. The fire remembers your courage fondly.',
-      refuse: 'You didn\'t want to know, once. The fire holds no grudge. It knew you\'d warm to it.',
+      refuse: 'You didn\'t want to know, once. I banked the fire that night and said nothing more, and I still think it was a good evening. Some things are better arrived at than told.',
     },
     pangolin: {
       ask: 'You asked what was in the recipe. Now you\'ve tasted the finished dish. Was it everything I promised?',
@@ -451,7 +451,7 @@ export function getPhase5ChoiceCallback(
     },
     axolotl: {
       ask: 'You asked what swam below. It surfaced. You\'ve met. The water is calm now.',
-      refuse: 'You wouldn\'t look into the deep water. It looked at you anyway, and found you lovely.',
+      refuse: 'You wouldn\'t look into the deep water, and the water kept your not-looking the way it keeps everything, folded small and safe on the silt. Your no is still down there, whole. Nothing ever needed it opened.',
     },
     capybara: {
       ask: 'You requested your file, and I gave it to you complete... even the last page, which was blank then. It isn\'t now.',
@@ -459,7 +459,7 @@ export function getPhase5ChoiceCallback(
     },
     fennec_fox: {
       ask: 'You asked what I heard coming. Now we both hear it everywhere. Like a heartbeat. Like home.',
-      refuse: 'You covered your ears, in your way. The sound arrived regardless. It was never optional.',
+      refuse: 'You covered your ears, in your way. I understood. I spent years wishing mine folded flat. The sound is the floor under everything now, and I no longer sort the house into those who listened and those who would not. We all kept our watch.',
     },
     sloth: {
       ask: 'You asked how long I\'d known. Forever, friend. The same answer the pattern gives.',
@@ -467,7 +467,7 @@ export function getPhase5ChoiceCallback(
     },
     wombat: {
       ask: 'You asked where the tunnels led. Now you stand at the end of them. Solid ground, like I promised.',
-      refuse: 'You never looked down the tunnel. That\'s all right. Every path here led to the same depth.',
+      refuse: 'You never looked down the tunnel. Sensible. A floor is for standing on, not staring through. You trusted my bracing and walked where I said was sound, and there\'s no better compliment you can pay a builder.',
     },
     rabbit: {
       ask: 'You asked me why I was afraid. Asking was kind. The fear is gone now. I almost miss it.',
@@ -479,7 +479,7 @@ export function getPhase5ChoiceCallback(
     },
     tarsier: {
       ask: "You asked what I saw out there. Now you have seen it too, with your own two moving eyes. It was worth the whole watch, was it not.",
-      refuse: "You never asked what I saw. It made no difference, bright one. It saw you. It had seen you all along, and fondly.",
+      refuse: "You never asked what I saw. I have thought about that at the rail, bright one, and I have decided it was its own kind of discipline. You kept your eyes on the work in front of you and let the night stay mine to carry. So I carried it. That was always what my post was for.",
     },
     aye_aye: {
       ask: "You asked what the bell would say, once. Then you stood under the bronze and heard her say it. No answer of mine could have rung so true.",
@@ -487,7 +487,7 @@ export function getPhase5ChoiceCallback(
     },
     kakapo: {
       ask: "You asked what the arrangement was, there among the beds. It was a mast year. It fruited. You are standing in the orchard, and the orchard is glad of you.",
-      refuse: "You did not want to know, and the season came for you gently all the same, just as I promised. Seeds never need the almanac. Look how well you have come up.",
+      refuse: "You did not want to know, and I left the news in the ground where you set it down. The season never minded, friend. A season does not take a refusal personally. It simply goes on being the season, and you grew your own way up, and that is the growing I admire most.",
     },
   };
 

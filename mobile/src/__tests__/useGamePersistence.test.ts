@@ -8,7 +8,7 @@
 // --- Mock React hooks to run synchronously in Node ---
 const stateStore: Map<number, unknown> = new Map();
 let stateIndex = 0;
-let effectCallbacks: Array<() => void> = [];
+let effectCallbacks: (() => void)[] = [];
 const refStore: Map<number, { current: unknown }> = new Map();
 let refIndex = 0;
 
@@ -537,13 +537,13 @@ describe('useGamePersistence', () => {
       );
     });
 
-    test('enqueues harvest batch with correct amber value', async () => {
+    test('enqueues harvest batch with the per-puzzle amber only', async () => {
       const [, actions] = callHook();
       await actions.recordVictory('MEDIUM', 0, 0, 'standard', ['LIME', 'TIME']);
 
       expect(mockEnqueueHarvestBatch).toHaveBeenCalledWith(
         expect.objectContaining({
-          amberValue: 15, // amount (15) + milestoneBonus (0) + firstCompletionBonus (0) + streakMilestoneBonus (0)
+          amberValue: 15, // amberResult.amount ONLY — windfalls are credited instantly, never queued
           words: ['LIME', 'TIME'],
           difficulty: 'MEDIUM',
           gameMode: 'standard',
@@ -551,6 +551,47 @@ describe('useGamePersistence', () => {
           variant: 'standard',
         })
       );
+    });
+
+    test('a milestone win queues ONLY the per-puzzle amber; windfalls stay out of the batch', async () => {
+      // Windfalls (milestone / first-completion / streak milestone) are
+      // credited to the spendable balance by awardPuzzleAmber itself — the
+      // hook must enqueue exactly amberResult.amount, while amberEarned (the
+      // victory receipt) still totals everything the win earned.
+      mockAwardPuzzleAmber.mockResolvedValueOnce({
+        amount: 15,
+        baseAmount: 15,
+        baseAmber: 10,
+        starBonusAmber: 5,
+        newBalance: 195, // 100 + the 95 in windfalls, credited by the economy
+        puzzlesSolved: 100,
+        phaseChanged: false,
+        newPhase: 2,
+        streakBonus: 0,
+        challengeBonus: 0,
+        patronBonus: 0,
+        surpriseBonus: 0,
+        currentStreak: 4,
+        milestoneBonus: 50,
+        milestoneMessage: 'Milestone!',
+        phaseAcceleration: 1.0,
+        firstCompletionBonus: 30,
+        streakMilestoneBonus: 15,
+        streakMilestoneMessage: 'Streak!',
+      } as any);
+
+      const [, actions] = callHook();
+      const result = await actions.recordVictory('MEDIUM', 0, 0, 'standard', ['LIME', 'TIME']);
+
+      // The batch carries exactly the per-puzzle amber.
+      expect(mockEnqueueHarvestBatch).toHaveBeenCalledWith(
+        expect.objectContaining({ amberValue: 15 })
+      );
+      // The receipt still totals per-puzzle + windfalls, and the balance
+      // already reflects the instantly-credited windfalls.
+      expect(result.amberEarned).toBe(15 + 50 + 30 + 15);
+      expect(result.amberBreakdown!.total).toBe(result.amberEarned);
+      expect(result.amberBalance).toBe(195);
     });
 
     test('records formed words into wordHistory cooldowns', async () => {
@@ -646,6 +687,11 @@ describe('useGamePersistence', () => {
       expect(b.total).toBe(result.amberEarned);
       // amount(47) + variant(8) + fresh(4) + milestone(50) + firstComp(30) + streakMilestone(15)
       expect(result.amberEarned).toBe(154);
+      // The batch defers ONLY the per-puzzle share (amount + variant + fresh);
+      // the windfalls (50 + 30 + 15) were credited instantly by the economy.
+      expect(mockEnqueueHarvestBatch).toHaveBeenCalledWith(
+        expect.objectContaining({ amberValue: 59 })
+      );
     });
 
     test('a plain victory sums too (base + star only)', async () => {

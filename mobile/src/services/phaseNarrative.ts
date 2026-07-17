@@ -1644,7 +1644,7 @@ export const ANIMAL_WHISPERS: Record<number, Record<string, string[]>> = {
     fennec_fox: ['Fennick is silent now. Listening.', 'Both ears turn toward the ceiling. The room stays still.', 'Fennick whispers: closer. Then the echo whispers it too.'],
     sloth: ['Sloane opens both eyes. She has been saving them for this.', 'The branch does not move beneath her. Nothing here moves without meaning now.', 'Time passes around Sloane now, not through her.'],
     wombat: ['Warren presses one paw to the foundation. It answers.', 'The tunnels carry a low note up through the floor.', 'Warren says the deepest wall is warm now.'],
-    rabbit: ['Thyme is not afraid anymore. Her paws are perfectly still.', 'The tea has gone cold. Thyme keeps both paws around the cup.', 'Thyme counts the exits once, then stops.'],
+    rabbit: ['Thyme sits with her back to the garden gate. She has never done that.', 'The tea has gone cold. Thyme keeps both paws around the cup.', 'Thyme counts the exits once, then stops.'],
     red_panda: ['Bamboo exhales. The whole attic seems to inhale.', 'The incense smoke gathers into one unbroken thread.', 'Bamboo opens both eyes. The room remains perfectly still.'],
     tarsier: ['Vesper says: look up. Do not blink.', "The lantern gutters. Vesper's eyes catch a second light.", 'The dark looks back now. Vesper does not look away.'],
     aye_aye: ['Tock rests one hand on the rope.', 'The knocking has stopped. Tock presses his ear to the latch.', 'The bell hums all day now. Tock hums with her.'],

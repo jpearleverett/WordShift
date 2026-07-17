@@ -78,6 +78,15 @@ interface RowProps {
   selectedLetter: Letter | null;
   onLetterPress: (letter: Letter, rowIndex: number) => void;
   onSlotPress: (targetIndex: number, origin?: { x: number; y: number }) => void;
+  /**
+   * Quiet acknowledgment for taps on tiles in rows that are neither the
+   * active source row nor the selecting target row (completed and future
+   * rows, which used to mount no touchable at all). The parent fires a light
+   * selection haptic; the tile plays its own subtle pulse. Never threaded to
+   * source-row tiles (their tap/drag/locked paths own the feedback) nor the
+   * arc-layout target row (its inter-slot pulse owns those taps).
+   */
+  onInactivePress?: () => void;
   isProcessing: boolean;
   phase?: number;
   wordLength?: number;
@@ -544,6 +553,7 @@ export const Row: React.FC<RowProps> = memo(({
   selectedLetter,
   onLetterPress,
   onSlotPress,
+  onInactivePress,
   isProcessing,
   phase = 0,
   wordLength = 4,
@@ -895,6 +905,13 @@ export const Row: React.FC<RowProps> = memo(({
               ? () => onLetterPress(letter, rowIndex)
               : undefined
           }
+          // Tiles in completed/future rows (and the target row before a
+          // letter is selected) used to mount no touchable at all — a
+          // confused poke got literally nothing. Passed straight through
+          // (stable identity from App's useCallback) so the memoized tile
+          // gains a quiet acknowledgment without extra re-renders. Source-row
+          // tiles never receive it: their tap/drag/locked paths own feedback.
+          onInactivePress={isSource ? undefined : onInactivePress}
           phase={phase}
           compact={compactTiles}
           isResonant={isRowResonant}

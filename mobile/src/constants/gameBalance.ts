@@ -209,12 +209,18 @@ export const INTERSTITIAL_FREQUENCY_LATE = 5; // Phase 3 base (×2 → every 10)
 /**
  * No interstitial before this many completed puzzles. Wider than the pit
  * auto-collect window (8) on purpose: the puzzle 8-10 stretch already stacks
- * the variant intro, the daily unlock, and the mandatory first harvest, and
- * dropping the first-ever ad into that pile-up made the "free ride ends" cliff
- * read punitive. Aligned with EXIT_NUDGE_MIN_PUZZLES (12) so every commercial
- * surface waits for the same threshold.
+ * the daily unlock, the mandatory first harvest, and the reverse-variant
+ * intro, and dropping the first-ever ad into that pile-up made the "free ride
+ * ends" cliff read punitive. 16 (not 12): at 12 the first ad landed on the
+ * exit of win 13, the SAME board whose start carries the one-time
+ * preview-graduation toast (PREVIEW_GRADING_FULL_LIMIT = 12), so the marks
+ * stepped back and the first ad hit in one breath. 16 puts the first ad at
+ * the exit of win 17, clear of graduation (board 13) and the challenge-toggle
+ * intro (15). Deliberately no longer equal to EXIT_NUDGE_MIN_PUZZLES (12):
+ * the nudge and the interstitial never stack on one exit anyway
+ * (runVictoryExitNudges skips when an interstitial showed).
  */
-export const INTERSTITIAL_MIN_PUZZLES = 12;
+export const INTERSTITIAL_MIN_PUZZLES = 16;
 
 // ============================================================================
 // HINT ECONOMY
