@@ -216,10 +216,10 @@ describe('awardPuzzleAmber', () => {
   });
 
   test('tracks phase transitions', async () => {
-    // Solve enough puzzles to reach phase 1 (PHASE_THRESHOLDS[1] = 20 puzzles)
-    await devAddPuzzles(19);
+    // Solve enough puzzles to reach phase 1 (PHASE_THRESHOLDS[1] = 16 puzzles)
+    await devAddPuzzles(15);
     const result = await awardPuzzleAmber('EASY', 1);
-    expect(result.puzzlesSolved).toBe(20);
+    expect(result.puzzlesSolved).toBe(16);
     expect(result.phaseChanged).toBe(true);
     expect(result.newPhase).toBe(1);
   });
@@ -602,8 +602,8 @@ describe('getCurrentPhase', () => {
     expect(phase).toBe(0);
   });
 
-  test('transitions to phase 1 after 25 puzzles', async () => {
-    await devAddPuzzles(25);
+  test('transitions to phase 1 after 20 puzzles', async () => {
+    await devAddPuzzles(20);
     const phase = await getCurrentPhase();
     expect(phase).toBe(1);
   });
@@ -622,9 +622,9 @@ describe('getCurrentPhase', () => {
 });
 
 describe('getPuzzlesUntilNextPhase', () => {
-  test('returns 20 initially (to reach phase 1)', async () => {
+  test('returns 16 initially (to reach phase 1)', async () => {
     const remaining = await getPuzzlesUntilNextPhase();
-    expect(remaining).toBe(20);
+    expect(remaining).toBe(16);
   });
 
   test('returns null at max phase', async () => {
@@ -636,7 +636,7 @@ describe('getPuzzlesUntilNextPhase', () => {
   test('decreases as puzzles are solved', async () => {
     await devAddPuzzles(10);
     const remaining = await getPuzzlesUntilNextPhase();
-    expect(remaining).toBe(10); // 20 - 10
+    expect(remaining).toBe(6); // 16 - 10
   });
 
   test('uses phaseProgress for accelerated players', async () => {
@@ -644,7 +644,7 @@ describe('getPuzzlesUntilNextPhase', () => {
     // both puzzlesSolved and phaseProgress are 10
     await devAddPuzzles(10);
     const remaining = await getPuzzlesUntilNextPhase();
-    expect(remaining).toBe(10);
+    expect(remaining).toBe(6);
   });
 
   test('never returns negative values', async () => {
@@ -656,22 +656,22 @@ describe('getPuzzlesUntilNextPhase', () => {
   });
 
   test('returns correct value at each phase boundary', async () => {
-    // Phase 0 -> 1: threshold is 20
-    expect(await getPuzzlesUntilNextPhase()).toBe(20);
+    // Phase 0 -> 1: threshold is 16
+    expect(await getPuzzlesUntilNextPhase()).toBe(16);
 
-    await devAddPuzzles(20); // Now at phase 1
-    // Phase 1 -> 2: threshold is 60
-    expect(await getPuzzlesUntilNextPhase()).toBe(40); // 60 - 20
+    await devAddPuzzles(16); // Now at phase 1
+    // Phase 1 -> 2: threshold is 44
+    expect(await getPuzzlesUntilNextPhase()).toBe(28); // 44 - 16
 
-    await devAddPuzzles(40); // Now at phase 2 (60 total)
-    // Phase 2 -> 3: threshold is 120
-    expect(await getPuzzlesUntilNextPhase()).toBe(60); // 120 - 60
+    await devAddPuzzles(28); // Now at phase 2 (44 total)
+    // Phase 2 -> 3: threshold is 84
+    expect(await getPuzzlesUntilNextPhase()).toBe(40); // 84 - 44
 
-    await devAddPuzzles(60); // Now at phase 3 (120 total)
-    // Phase 3 -> 4: threshold is 180
-    expect(await getPuzzlesUntilNextPhase()).toBe(60); // 180 - 120
+    await devAddPuzzles(40); // Now at phase 3 (84 total)
+    // Phase 3 -> 4: threshold is 124
+    expect(await getPuzzlesUntilNextPhase()).toBe(40); // 124 - 84
 
-    await devAddPuzzles(60); // Now at phase 4 (180 total)
+    await devAddPuzzles(40); // Now at phase 4 (124 total)
     expect(await getPuzzlesUntilNextPhase()).toBeNull();
   });
 });
@@ -1036,7 +1036,7 @@ describe('post-revelation phase pinning (Phase 5)', () => {
     expect((await getFullProgress()).phase4Dwell).toBe(FINALE_DWELL_PUZZLES);
   });
 
-  test('canArmFinale requires both a full dwell and the puzzle-160 arming floor', () => {
+  test('canArmFinale requires both a full dwell and the arming floor', () => {
     expect(canArmFinale(FINALE_DWELL_PUZZLES, FINALE_ARM_MIN_PUZZLES - 1)).toBe(false);
     expect(canArmFinale(FINALE_DWELL_PUZZLES - 1, FINALE_ARM_MIN_PUZZLES)).toBe(false);
     expect(canArmFinale(FINALE_DWELL_PUZZLES, FINALE_ARM_MIN_PUZZLES)).toBe(true);
@@ -1274,7 +1274,7 @@ describe('awardPuzzleAmber skipPhaseProgress option', () => {
 
 describe('phase_reached telemetry', () => {
   test('confirmPhaseTransition logs phase_reached with puzzles and install age', async () => {
-    await devAddPuzzles(19);
+    await devAddPuzzles(15);
     const result = await awardPuzzleAmber('EASY', 1); // queues the 0 -> 1 transition
     expect(result.phaseChanged).toBe(true);
     mockLogEvent.mockClear();
@@ -1284,7 +1284,7 @@ describe('phase_reached telemetry', () => {
     expect(mockLogEvent).toHaveBeenCalledTimes(1);
     expect(mockLogEvent).toHaveBeenCalledWith({
       type: 'phase_reached',
-      data: { phase: 1, puzzlesSolved: 20, installAgeDays: 3 },
+      data: { phase: 1, puzzlesSolved: 16, installAgeDays: 3 },
     });
   });
 

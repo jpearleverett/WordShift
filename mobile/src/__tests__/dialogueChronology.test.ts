@@ -88,7 +88,7 @@ describe('narrative chronology: late-recruit catch-up session boost', () => {
       UNLOCK_PROGRESSION.find(unlock => unlock.id === id)!.minPuzzles!
     );
 
-    expect(gates).toEqual([115, 125, 135]);
+    expect(gates).toEqual([84, 88, 92]);
     expect(gates.every(gate => gate < FINALE_ARM_MIN_PUZZLES)).toBe(true);
   });
 

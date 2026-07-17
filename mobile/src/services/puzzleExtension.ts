@@ -8,7 +8,7 @@ import {
   WORDS_7,
 } from '../constants/wordLists';
 
-export const PUZZLE_EXTENSION_UNLOCK_PUZZLES = 100;
+export const PUZZLE_EXTENSION_UNLOCK_PUZZLES = 70;
 
 export interface PuzzleExtensionOptions {
   candidateWords?: readonly string[];

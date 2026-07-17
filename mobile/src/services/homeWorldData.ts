@@ -511,7 +511,7 @@ export const ANIMALS: Animal[] = [
  */
 export const UNLOCK_PROGRESSION: Unlockable[] = [
   // ═══════════════════════════════════════════════════════════════════════════
-  // EARLY GAME (Puzzles 1-50) - Quick unlocks to hook the player
+  // EARLY GAME (Puzzles 1-8) - Quick unlocks to hook the player
   // ═══════════════════════════════════════════════════════════════════════════
 
   // 1. First: Invite Ember the Fox into the starter room (FREE!)
@@ -551,7 +551,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // EARLY-MID GAME (Puzzles 50-120) - Building momentum
+  // EARLY-MID GAME (Puzzles ~8-19) - Building momentum
   // ═══════════════════════════════════════════════════════════════════════════
 
   // 4. Build the Study
@@ -603,15 +603,15 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // MID GAME (Puzzles ~28-105) - The house grows, darkness creeps in.
+  // MID GAME (Puzzles ~19-74) - The house grows, darkness creeps in.
   // These gates are spread across the Phase 1→3 window so the house keeps
   // growing through the mid-game instead of completing early and leaving the
-  // climb to the climax with no new investment. Under the 2026-07 pacing the
-  // original ten rooms top out at the Bamboo Attic (105), early in Growing
-  // Shadows (Phase 3 floor 90); the high rooms then carry investment through
-  // the reveal (~130) to completion/recruit around 136. The eight-win dwell
-  // completes around 143, arming waits for 160, the final board is ~161, and
-  // post-revelation is ~162.
+  // climb to the climax with no new investment. Under the 2026-07 compressed
+  // pacing the original ten rooms top out at the Bamboo Attic (74), late in
+  // Deeper Questions (Phase 3 floor 62); the high rooms then carry investment
+  // through the reveal (~90) to completion/recruit around 96-100. The
+  // eight-win dwell completes around 104-108, arming waits for 115, the final
+  // board is ~116, and post-revelation is ~117-122.
   // ═══════════════════════════════════════════════════════════════════════════
 
   // 8. Build the Jungle Room
@@ -624,7 +624,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     targetId: 'jungle_room',
     name: 'Jungle Hammock',
     description: 'A verdant retreat for slow contemplation',
-    minPuzzles: 28,
+    minPuzzles: 19,
   },
 
   // 9. Invite Sloane the Sloth
@@ -649,7 +649,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     targetId: 'desert_room',
     name: 'Desert Camp',
     description: 'Sandy silence under watchful stars',
-    minPuzzles: 42,
+    minPuzzles: 29,
   },
 
   // 11. Invite Fennick the Fennec Fox
@@ -678,7 +678,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     targetId: 'office',
     name: 'Chill Office',
     description: 'Where productivity meets existential doubt',
-    minPuzzles: 60,
+    minPuzzles: 41,
   },
 
   // 13. Invite Chill the Capybara
@@ -703,7 +703,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     targetId: 'burrow',
     name: 'Underground Burrow',
     description: 'Below everything, something stirs',
-    minPuzzles: 78,
+    minPuzzles: 53,
   },
 
   // 15. Invite Warren the Wombat
@@ -719,9 +719,9 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // LATE GAME (Puzzles ~95-105) - The original house tops out early in Growing
-  // Shadows; the high rooms below then carry investment onward through the
-  // reveal.
+  // LATE GAME (Puzzles ~65-74) - The original house tops out just past the
+  // Phase 3 floor (62); the high rooms below then carry investment onward
+  // through the reveal.
   // ═══════════════════════════════════════════════════════════════════════════
 
   // 16. Build the Garden
@@ -734,7 +734,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     targetId: 'garden',
     name: 'Garden Patio',
     description: 'Where endings bloom like flowers',
-    minPuzzles: 95,
+    minPuzzles: 65,
   },
 
   // 17. Invite Thyme the Rabbit
@@ -759,7 +759,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     targetId: 'bamboo_attic',
     name: 'Bamboo Attic',
     description: 'The highest place, closest to the sky',
-    minPuzzles: 105,
+    minPuzzles: 74,
   },
 
   // 19. Invite Bamboo the Red Panda
@@ -775,11 +775,15 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // THE HIGH ROOMS (Puzzles ~115-135) - The house keeps growing above what was
-  // once its top, through late Growing Shadows and past the reveal (~130). The
-  // Sky Garden gate at 135 completes the house/recruits Moss around 136. The
-  // eight-win dwell completes around 143, arming waits for 160, the final
-  // board is ~161, and post-revelation is ~162.
+  // THE HIGH ROOMS (Puzzles ~84-92) - The house keeps growing above what was
+  // once its top, through late Growing Shadows and past the reveal (~90). The
+  // gates sit at/past the Phase 3 weighted threshold (PHASE_THRESHOLDS[3] =
+  // 84) — the derivation LATE_PHASE_RECRUITS (types/homeWorld.ts) relies on:
+  // weighted progress never trails raw puzzles, so the descent trio can only
+  // ever unlock at global Phase 3+. The Sky Garden gate at 92 completes the
+  // house/recruits Moss around 96-100. The eight-win dwell completes around
+  // 104-108, arming waits for 115, the final board is ~116, and
+  // post-revelation is ~117-122.
   // ═══════════════════════════════════════════════════════════════════════════
 
   // 20. Build the Star Loft
@@ -792,7 +796,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     targetId: 'star_loft',
     name: 'Star Loft',
     description: 'A high window for watching the night arrive',
-    minPuzzles: 115,
+    minPuzzles: 84,
   },
 
   // 21. Invite Vesper the Tarsier
@@ -817,7 +821,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     targetId: 'belfry',
     name: 'Belfry',
     description: 'A silent bell waiting for its hour',
-    minPuzzles: 125,
+    minPuzzles: 88,
   },
 
   // 23. Invite Tock the Aye-Aye
@@ -842,7 +846,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     targetId: 'sky_garden',
     name: 'Sky Garden',
     description: 'A garden grown where only sky should be',
-    minPuzzles: 135,
+    minPuzzles: 92,
   },
 
   // 25. Invite Moss the Kakapo (FINAL UNLOCK)

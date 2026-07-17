@@ -204,25 +204,25 @@ describe('coordinated events keyed on weighted progress', () => {
   }
 
   it('an accelerated player (weighted progress past every threshold) receives ALL events, in threshold order', () => {
-    // Engaged player near the finale: phaseProgress ~260 from ~155 real puzzles.
-    const delivered = drain(260, 4);
+    // Engaged player near the finale: phaseProgress ~230 from ~116 real puzzles.
+    const delivered = drain(230, 4);
     expect(delivered).toEqual(themesInOrder);
   });
 
   it('skipped-past thresholds deliver one per visit rather than being lost', () => {
     const consumed: string[] = [];
-    const first = getCoordinatedEventLine('fox', 260, 4, consumed, ALL_ANIMALS);
+    const first = getCoordinatedEventLine('fox', 230, 4, consumed, ALL_ANIMALS);
     expect(first?.theme).toBe(themesInOrder[0]);
     consumed.push(first!.theme);
-    const second = getCoordinatedEventLine('fox', 260, 4, consumed, ALL_ANIMALS);
+    const second = getCoordinatedEventLine('fox', 230, 4, consumed, ALL_ANIMALS);
     expect(second?.theme).toBe(themesInOrder[1]);
   });
 
   it('regression: the raw puzzle count would strand the pre-finale crescendo that the weighted scale fires', () => {
-    // An accelerated player reaches the finale around 155 REAL puzzles.
-    const rawDelivered = drain(155, 4);
+    // An accelerated player reaches the finale around 116 REAL puzzles.
+    const rawDelivered = drain(116, 4);
     const reachableRaw = COORDINATED_EVENTS
-      .filter(e => e.puzzleThreshold <= 155)
+      .filter(e => e.puzzleThreshold <= 116)
       .map(e => e.theme);
     expect(rawDelivered).toEqual(reachableRaw);
     expect(rawDelivered).not.toContain('almost_time');
@@ -230,14 +230,14 @@ describe('coordinated events keyed on weighted progress', () => {
     expect(rawDelivered).not.toContain('the_threshold');
 
     // The same player's WEIGHTED progress reaches the crescendo events.
-    const weightedDelivered = drain(260, 4);
+    const weightedDelivered = drain(230, 4);
     expect(weightedDelivered).toContain('almost_time');
     expect(weightedDelivered).toContain('convergence');
     expect(weightedDelivered).toContain('the_threshold');
   });
 
   it('already-consumed bookkeeping still suppresses delivered events', () => {
-    const all = drain(260, 4);
-    expect(getCoordinatedEventLine('fox', 260, 4, all, ALL_ANIMALS)).toBeNull();
+    const all = drain(230, 4);
+    expect(getCoordinatedEventLine('fox', 230, 4, all, ALL_ANIMALS)).toBeNull();
   });
 });

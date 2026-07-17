@@ -130,15 +130,24 @@ describe('UNLOCK_PROGRESSION', () => {
     );
 
     expect(gatesById).toEqual({
-      unlock_bamboo_attic: 105,
-      unlock_star_loft: 115,
-      unlock_belfry: 125,
-      unlock_sky_garden: 135,
+      unlock_bamboo_attic: 74,
+      unlock_star_loft: 84,
+      unlock_belfry: 88,
+      unlock_sky_garden: 92,
     });
+
+    // LATE_PHASE_RECRUITS derivation guard (types/homeWorld.ts): the trio's
+    // room gates must ALL sit at or past the Phase 3 weighted threshold —
+    // weighted progress never trails raw puzzles solved, so gate >= threshold
+    // proves the trio cannot exist before global Phase 3. Bamboo (the room
+    // below) is deliberately NOT part of the derivation.
+    for (const id of ['unlock_star_loft', 'unlock_belfry', 'unlock_sky_garden']) {
+      expect(gatesById[id]).toBeGreaterThanOrEqual(PHASE_THRESHOLDS[3]);
+    }
   });
 
   test('finale arming floor leaves a Phase 4 dwell window after the last recruit', () => {
-    expect(FINALE_ARM_MIN_PUZZLES).toBe(160);
+    expect(FINALE_ARM_MIN_PUZZLES).toBe(115);
     const lastGate = UNLOCK_PROGRESSION.find(unlock => unlock.id === 'unlock_sky_garden')!.minPuzzles!;
     expect(lastGate + 1 + FINALE_DWELL_PUZZLES).toBeLessThanOrEqual(FINALE_ARM_MIN_PUZZLES);
   });
@@ -158,28 +167,32 @@ describe('UNLOCK_PROGRESSION', () => {
     }
   });
 
-  // DELIBERATE geography (2026-07 pacing): the house keeps growing THROUGH
-  // Growing Shadows and past the reveal (the original ten rooms top out at the
-  // Bamboo Attic gate 105; the three high rooms gate at 115/125/135). The last
-  // gate must sit at or past the Phase 3 weighted threshold so the descent's
-  // third act still has house investment, but stay clear of the Phase 4
-  // weighted threshold — house completion (~136) must land before finale
-  // arming (160), never compete with it.
+  // DELIBERATE geography (2026-07 compressed pacing): the house keeps growing
+  // THROUGH Growing Shadows and past the reveal (the original ten rooms top
+  // out at the Bamboo Attic gate 74; the three high rooms gate at 84/88/92).
+  // ALL THREE high-room gates must sit at or past the Phase 3 weighted
+  // threshold (PHASE_THRESHOLDS[3] = 84): the LATE_PHASE_RECRUITS derivation
+  // in types/homeWorld.ts relies on gate >= threshold plus
+  // weighted-never-trails-raw to prove the descent trio can only unlock at
+  // global Phase 3+. The last gate must stay clear of the Phase 4 weighted
+  // threshold — house completion (~96-100) must land before finale arming
+  // (115), never compete with it.
   test('the final house unlock lands in the descent, before finale territory', () => {
     const gates = UNLOCK_PROGRESSION
       .map(u => u.minPuzzles)
       .filter((n): n is number => typeof n === 'number');
     const lastGate = gates[gates.length - 1];
-    const phase3Threshold = PHASE_THRESHOLDS[3]; // 120 weighted (Phase 3 floor is 90 real puzzles)
-    const phase4Threshold = PHASE_THRESHOLDS[4]; // 180 weighted — finale territory
+    const phase3Threshold = PHASE_THRESHOLDS[3]; // 84 weighted (Phase 3 floor is 62 real puzzles)
+    const phase4Threshold = PHASE_THRESHOLDS[4]; // 124 weighted — finale territory
     expect(lastGate).toBeGreaterThanOrEqual(phase3Threshold);
     expect(lastGate).toBeLessThan(phase4Threshold);
   });
 
-  // The reveal floor (130) must land before the house completes (sky-garden
+  // The reveal floor (90) must land before the house completes (sky-garden
   // gate + the final animal), so the Phase-4 dwell + finale play out inside a
-  // finished temple. Completion/recruit is ~136, capped dwell completes ~143,
-  // arming waits for 160, the final board is ~161, and post-revelation ~162.
+  // finished temple. Completion/recruit is ~96-100, capped dwell completes
+  // ~104-108, arming waits for 115, the final board is ~116, and
+  // post-revelation ~117-122.
   test('house completion sits after the reveal floor, before the Phase 5 floor', () => {
     const gates = UNLOCK_PROGRESSION
       .map(u => u.minPuzzles)
@@ -310,7 +323,7 @@ describe('late-unlock dialogue fast-forward', () => {
 
   test('no fast-forward below global Phase 2', async () => {
     const p = await loadProgress();
-    p.puzzlesSolved = 40; // clears the jungle gate (28)
+    p.puzzlesSolved = 40; // clears the jungle gate (19)
     p.currentPhase = 1;
     await unlockThrough('unlock_sloth');
     const after = await loadProgress();

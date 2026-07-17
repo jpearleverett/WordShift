@@ -1977,13 +1977,13 @@ export interface NarrativeMicroBeat {
  *   Innocent on first read, resonant in retrospect. Create early "wait,
  *   what?" hooks before the Phase 1 transition.
  *
- * Mid game (puzzles 30-74): Escalating environmental wrongness.
- * Late game (puzzles 80-160): Overt coordination and agency, riding the new
- *   geography: reveal ~130, house completion/recruit ~136, dwell completion
- *   ~143, arming floor 160, final board ~161, post-revelation ~162. The
- *   silent-victory anticlimax lands at 148, the "you could stop now" beat at
- *   150, and two dwell-window beats (155/158) hold the
- *   held-breath stillness after the house is whole. Nothing fires past 160:
+ * Mid game (puzzles 30-58): Escalating environmental wrongness.
+ * Late game (puzzles 61-115): Overt coordination and agency, riding the
+ *   compressed geography: reveal ~90, house completion/recruit ~96-100, dwell
+ *   completion ~104-108, arming floor 115, final board ~116, post-revelation
+ *   ~117-122. The silent-victory anticlimax lands at 104, the "you could stop
+ *   now" beat at 106, and two dwell-window beats (109/112) hold the
+ *   held-breath stillness after the house is whole. Nothing fires past 115:
  *   the finale itself gets the silence.
  *
  * Exported for the geography guard tests and the dash sweep.
@@ -2050,79 +2050,79 @@ export const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     text: 'PERFECT!',
     durationMs: 400,
   },
-  40: {
+  38: {
     type: 'ambient_whisper',
     text: 'The house settles at night. You can almost hear it breathing.',
     durationMs: 3000,
   },
-  50: {
+  42: {
     type: 'ambient_whisper',
     text: 'The light is changing. Have you noticed?',
     durationMs: 3000,
   },
-  55: {
+  45: {
     type: 'ambient_whisper',
     text: 'Some words leave marks where others don\'t. Have you noticed which ones?',
     durationMs: 3000,
   },
-  65: {
+  50: {
     type: 'ambient_whisper',
     text: 'The words you\'ve formed... they remember each other.',
     durationMs: 3000,
   },
-  70: {
+  54: {
     type: 'ambient_whisper',
     text: 'The rooms are quieter now. Not empty... listening.',
     durationMs: 3000,
   },
-  74: {
+  58: {
     type: 'glitch_title',
     glitchTitle: 'IT BEGINS',
     text: 'PERFECT!',
     durationMs: 300,
   },
-  80: {
+  61: {
     type: 'glitch_title',
     glitchTitle: 'THEY HEAR YOU',
     text: 'PERFECT!',
     durationMs: 350,
   },
-  90: {
+  64: {
     type: 'ambient_whisper',
     text: 'The animals have been talking about you. All of them. At the same time.',
     durationMs: 3500,
   },
-  100: {
+  70: {
     type: 'ambient_whisper',
-    text: 'One hundred arrangements. The house hums.',
+    text: 'Seventy arrangements. The house hums.',
     durationMs: 3500,
   },
-  // Valley beats (105-126): the deep-shadow stretch between the last quiet
-  // milestones and the reveal at ~130. Escalating wrongness, no explanations.
-  105: {
+  // Valley beats (75-88): the deep-shadow stretch between the last quiet
+  // milestones and the reveal at ~90. Escalating wrongness, no explanations.
+  75: {
     type: 'ambient_whisper',
     text: 'The walls have grown thicker. Not to keep anything out.',
     durationMs: 3500,
   },
-  118: {
+  82: {
     type: 'ambient_whisper',
     text: 'You feel it too, don\'t you? The way the letters know where they belong before you place them.',
     durationMs: 4000,
   },
-  126: {
+  88: {
     // The house is still raising its last rooms here; this beat must NOT claim
-    // the house is finished (completion lands at ~136).
+    // the house is finished (completion lands at ~96-100).
     type: 'ambient_whisper',
     text: 'The house keeps making room. No one asked it to. It builds like it knows something is coming.',
     durationMs: 4000,
   },
-  // Reveal-adjacent (132): lands just after the turn, when the robes are new.
-  132: {
+  // Reveal-adjacent (92): lands just after the turn, when the robes are new.
+  92: {
     type: 'ambient_whisper',
     text: 'The animals have stopped pretending the puzzles are just puzzles. They watch you the way you\'d watch a door beginning to open.',
     durationMs: 4500,
   },
-  148: {
+  104: {
     // Scripted anticlimax: the fanfare simply does not play. The rendered text
     // is stark; App suppresses the victory chime on this one board so the
     // silence is felt, not described. The most complicit moment is a quiet one.
@@ -2130,25 +2130,25 @@ export const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     text: '...\n\nNo music this time. Only the quiet after.',
     durationMs: 4000,
   },
-  150: {
+  106: {
     type: 'ambient_whisper',
     text: 'You could stop now. You know that. You won\'t. They know that too.',
     durationMs: 4000,
   },
-  // Dwell-window beats (155/158): the house is whole (~136) but not yet ready
-  // to receive. Held breath, never a countdown.
-  155: {
+  // Dwell-window beats (109/112): the house is whole (~96-100) but not yet
+  // ready to receive. Held breath, never a countdown.
+  109: {
     type: 'ambient_whisper',
     text: 'Every room is built. Every keeper is home. And still the house waits, the way a held breath waits.',
     durationMs: 4500,
   },
-  158: {
+  112: {
     type: 'ambient_whisper',
     text: 'The house is whole. It is not yet ready. The difference between those two things is growing very thin.',
     durationMs: 4500,
   },
-  // Final pre-finale beat (~160): the last word before the last arrangement.
-  160: {
+  // Final pre-finale beat (115, the arming floor): the last word before the last arrangement.
+  115: {
     type: 'ambient_whisper',
     text: 'Each arrangement settles a little deeper than the last. The space between the words is no longer empty.',
     durationMs: 4000,
@@ -2211,9 +2211,9 @@ export function isSilentVictoryBeat(completedTotal: number): boolean {
 }
 
 // ============================================================================
-// DWELL WINDOW — house completion/recruit is ~136 and the eight-win dwell
-// completes around 143, but arming waits for 160. The final board is ~161 and
-// post-revelation ~162. The reveal is played, not flashed past: these lines
+// DWELL WINDOW — house completion/recruit is ~96-100 and the eight-win dwell
+// completes around 104-108, but arming waits for 115. The final board is ~116
+// and post-revelation ~117-122. The reveal is played, not flashed past: these lines
 // hold the stillness through the arming floor. NEVER a counter, never a number
 // — the player must feel the waiting, not measure it. `dwellCount` is how many
 // puzzles have been solved inside the capped window (1..FINALE_DWELL_PUZZLES).
@@ -2377,27 +2377,27 @@ export const CYCLE_MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     text: "Ember pauses over the fire. 'Have we sat here before, friend? The fire will not say.'",
     durationMs: 4000,
   },
-  12: {
+  10: {
     type: 'ambient_whisper',
     text: "Panko sets out two bowls, then stares at the second. 'Habit,' she says. 'From when, I wonder.'",
     durationMs: 4000,
   },
-  26: {
+  20: {
     type: 'ambient_whisper',
     text: 'Archimedes opens a brand new notebook. The first page is not blank. It is his handwriting.',
     durationMs: 4000,
   },
-  45: {
+  34: {
     type: 'ambient_whisper',
     text: "Chill stops mid-sentence and studies you. 'Sorry. You reminded me of someone. You, I think.'",
     durationMs: 4000,
   },
-  70: {
+  52: {
     type: 'ambient_whisper',
     text: "Thyme plants the same seeds in the same row. 'They come up better the second time,' she says. Then she frowns. 'Second?'",
     durationMs: 4500,
   },
-  100: {
+  75: {
     type: 'ambient_whisper',
     text: "Sloane smiles before you say a word. 'You always tell me that one.' You have not told her anything yet.",
     durationMs: 4500,

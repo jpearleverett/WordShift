@@ -64,9 +64,9 @@ describe('puzzleVariety', () => {
       expect(getVariantUnlockRequirement('speed')?.puzzlesSolved).toBe(55);
     });
 
-    it('gates the trial-ladder toggles at 15 (challenge) and 100 (blind apex)', () => {
+    it('gates the trial-ladder toggles at 15 (challenge) and 80 (blind apex)', () => {
       expect(CHALLENGE_TOGGLE_UNLOCK_PUZZLES).toBe(15);
-      expect(BLIND_TOGGLE_UNLOCK_PUZZLES).toBe(100);
+      expect(BLIND_TOGGLE_UNLOCK_PUZZLES).toBe(80);
     });
 
     it('unlocks each variant exactly at its gate', () => {
@@ -78,14 +78,14 @@ describe('puzzleVariety', () => {
   });
 
   describe('combination presets', () => {
-    it('defines the four combos in unlock order 55/85/115/135', () => {
+    it('defines the four combos in unlock order 55/70/90/105', () => {
       expect(COMBO_PRESETS.map(p => p.id)).toEqual([
         'twin_trial',
         'racing_shadows',
         'blind_return',
         'free_fall',
       ]);
-      expect(COMBO_PRESETS.map(p => p.unlockPuzzles)).toEqual([55, 85, 115, 135]);
+      expect(COMBO_PRESETS.map(p => p.unlockPuzzles)).toEqual([55, 70, 90, 105]);
     });
 
     it('never gates a combo before any of its components', () => {
@@ -126,10 +126,10 @@ describe('puzzleVariety', () => {
       expect(twin.unlocked).toBe(true);
       const racing = options.find(o => o.preset.id === 'racing_shadows')!;
       expect(racing.unlocked).toBe(false);
-      expect(racing.unlockHint).toContain('25 more puzzle');
+      expect(racing.unlockHint).toContain('10 more puzzle');
       const freeFall = options.find(o => o.preset.id === 'free_fall')!;
       expect(freeFall.unlocked).toBe(false);
-      expect(freeFall.unlockHint).toContain('75 more puzzle');
+      expect(freeFall.unlockHint).toContain('45 more puzzle');
     });
 
     it('switches combo descriptions and hints by phase register', () => {
@@ -144,9 +144,9 @@ describe('puzzleVariety', () => {
   describe('blind toggle unlock hint', () => {
     it('teases with a countdown while locked and clears when earned', () => {
       const locked = getBlindUnlockHint(60, 0);
-      expect(locked).toContain('40 more puzzle');
-      expect(getBlindUnlockHint(60, 3)).toContain('40 more offering');
-      expect(getBlindUnlockHint(100, 0)).toBe('Unlocked.');
+      expect(locked).toContain('20 more puzzle');
+      expect(getBlindUnlockHint(60, 3)).toContain('20 more offering');
+      expect(getBlindUnlockHint(80, 0)).toBe('Unlocked.');
     });
   });
 

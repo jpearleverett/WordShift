@@ -420,8 +420,8 @@ interface CoordinatedEvent {
   // Fires when the player's effective progress >= this. Effective progress is
   // the same weighted scale phase transitions use (phaseProgress, which
   // accelerates for engaged players), falling back to raw puzzlesSolved for
-  // legacy saves — otherwise accelerated players reach the finale (~155 real
-  // puzzles) before the 190/205/220 pre-finale crescendo ever fires.
+  // legacy saves — otherwise accelerated players reach the finale (~116 real
+  // puzzles) before the 161/168/175 pre-finale crescendo ever fires.
   puzzleThreshold: number;
   phase: number;            // Minimum phase required
   theme: string;            // Internal theme name
@@ -431,7 +431,7 @@ interface CoordinatedEvent {
 export const COORDINATED_EVENTS: CoordinatedEvent[] = [
   // Event 1: Phase 2 — animals independently notice that words have changed
   {
-    puzzleThreshold: 70,
+    puzzleThreshold: 56,
     phase: 2,
     theme: 'words_changing',
     lines: {
@@ -445,7 +445,7 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
   },
   // Event 2: Phase 2 — the house itself responds to puzzles
   {
-    puzzleThreshold: 90,
+    puzzleThreshold: 70,
     phase: 2,
     theme: 'house_feels_different',
     lines: {
@@ -461,7 +461,7 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
   },
   // Event 3: Phase 2 — they all had the same dream
   {
-    puzzleThreshold: 110,
+    puzzleThreshold: 84,
     phase: 2,
     theme: 'shared_dream',
     lines: {
@@ -475,7 +475,7 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
   },
   // Event 4: Phase 3 — "the arrangement" is named openly for the first time
   {
-    puzzleThreshold: 140,
+    puzzleThreshold: 112,
     phase: 3,
     theme: 'the_arrangement',
     lines: {
@@ -494,7 +494,7 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
   },
   // Event 5: Phase 3 — each animal names their role in the cult
   {
-    puzzleThreshold: 165,
+    puzzleThreshold: 140,
     phase: 3,
     theme: 'roles_revealed',
     lines: {
@@ -515,7 +515,7 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
   },
   // Event 6: Phase 3 — the final countdown before Phase 4
   {
-    puzzleThreshold: 190,
+    puzzleThreshold: 161,
     phase: 3,
     theme: 'almost_time',
     lines: {
@@ -536,7 +536,7 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
   },
   // Event 7: Phase 4 — the convergence, animals sense closeness to the finale
   {
-    puzzleThreshold: 205,
+    puzzleThreshold: 168,
     phase: 4,
     theme: 'convergence',
     lines: {
@@ -557,7 +557,7 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
   },
   // Event 8: Phase 4 — the threshold, final coordinated event before the endgame
   {
-    puzzleThreshold: 220,
+    puzzleThreshold: 175,
     phase: 4,
     theme: 'the_threshold',
     lines: {

@@ -999,27 +999,27 @@ describe('checkNarrativeMicroBeat', () => {
     expect(beat!.durationMs).toBeGreaterThan(0);
   });
 
-  test('returns a beat at puzzle 50', async () => {
-    const beat = await checkNarrativeMicroBeat(50);
+  test('returns a beat at puzzle 42', async () => {
+    const beat = await checkNarrativeMicroBeat(42);
     expect(beat).not.toBeNull();
     expect(beat!.type).toBe('ambient_whisper');
     expect(beat!.text).toBeDefined();
   });
 
-  test('returns a beat at puzzle 65', async () => {
-    const beat = await checkNarrativeMicroBeat(65);
+  test('returns a beat at puzzle 50', async () => {
+    const beat = await checkNarrativeMicroBeat(50);
     expect(beat).not.toBeNull();
     expect(beat!.type).toBe('ambient_whisper');
   });
 
-  test('returns a beat at puzzle 100', async () => {
-    const beat = await checkNarrativeMicroBeat(100);
+  test('returns a beat at puzzle 70', async () => {
+    const beat = await checkNarrativeMicroBeat(70);
     expect(beat).not.toBeNull();
     expect(beat!.type).toBe('ambient_whisper');
   });
 
   test('keeps the narrative pulse alive through the valley and the dwell window', async () => {
-    for (const count of [105, 118, 126, 132, 150, 155, 158, 160]) {
+    for (const count of [75, 82, 88, 92, 106, 109, 112, 115]) {
       await resetMicroBeats();
       (AsyncStorage.clear as jest.Mock)();
       const beat = await checkNarrativeMicroBeat(count);
@@ -1042,16 +1042,16 @@ describe('checkNarrativeMicroBeat', () => {
     const beat35 = await checkNarrativeMicroBeat(35);
     expect(beat35).not.toBeNull();
 
-    const beat50 = await checkNarrativeMicroBeat(50);
-    expect(beat50).not.toBeNull();
+    const beat42 = await checkNarrativeMicroBeat(42);
+    expect(beat42).not.toBeNull();
 
-    // 35 already consumed, 50 already consumed
+    // 35 already consumed, 42 already consumed
     expect(await checkNarrativeMicroBeat(35)).toBeNull();
-    expect(await checkNarrativeMicroBeat(50)).toBeNull();
+    expect(await checkNarrativeMicroBeat(42)).toBeNull();
 
-    // 65 and 100 still available
-    expect(await checkNarrativeMicroBeat(65)).not.toBeNull();
-    expect(await checkNarrativeMicroBeat(100)).not.toBeNull();
+    // 54 and 70 still available
+    expect(await checkNarrativeMicroBeat(54)).not.toBeNull();
+    expect(await checkNarrativeMicroBeat(70)).not.toBeNull();
   });
 
   test('resetMicroBeats clears consumed state', async () => {
@@ -1065,45 +1065,45 @@ describe('checkNarrativeMicroBeat', () => {
   });
 
   // New micro-beat thresholds (assessment-driven expansion)
-  test('returns a beat at puzzle 40', async () => {
-    const beat = await checkNarrativeMicroBeat(40);
+  test('returns a beat at puzzle 38', async () => {
+    const beat = await checkNarrativeMicroBeat(38);
     expect(beat).not.toBeNull();
     expect(beat!.type).toBe('ambient_whisper');
     expect(beat!.text).toBeDefined();
     expect(beat!.durationMs).toBeGreaterThan(0);
   });
 
-  test('returns a beat at puzzle 55', async () => {
-    const beat = await checkNarrativeMicroBeat(55);
+  test('returns a beat at puzzle 45', async () => {
+    const beat = await checkNarrativeMicroBeat(45);
     expect(beat).not.toBeNull();
     expect(beat!.type).toBe('ambient_whisper');
     expect(beat!.text).toBeDefined();
   });
 
-  test('returns a glitch_title beat at puzzle 80', async () => {
-    const beat = await checkNarrativeMicroBeat(80);
+  test('returns a glitch_title beat at puzzle 61', async () => {
+    const beat = await checkNarrativeMicroBeat(61);
     expect(beat).not.toBeNull();
     expect(beat!.type).toBe('glitch_title');
     expect(beat!.glitchTitle).toBeDefined();
     expect(beat!.durationMs).toBeGreaterThan(0);
   });
 
-  test('returns a beat at puzzle 90', async () => {
-    const beat = await checkNarrativeMicroBeat(90);
+  test('returns a beat at puzzle 64', async () => {
+    const beat = await checkNarrativeMicroBeat(64);
     expect(beat).not.toBeNull();
     expect(beat!.type).toBe('ambient_whisper');
     expect(beat!.text).toBeDefined();
   });
 
-  test('returns a beat at puzzle 105 (first valley beat)', async () => {
-    const beat = await checkNarrativeMicroBeat(105);
+  test('returns a beat at puzzle 75 (first valley beat)', async () => {
+    const beat = await checkNarrativeMicroBeat(75);
     expect(beat).not.toBeNull();
     expect(beat!.type).toBe('ambient_whisper');
     expect(beat!.text).toBeDefined();
   });
 
-  test('returns a beat at puzzle 132 (reveal-adjacent)', async () => {
-    const beat = await checkNarrativeMicroBeat(132);
+  test('returns a beat at puzzle 92 (reveal-adjacent)', async () => {
+    const beat = await checkNarrativeMicroBeat(92);
     expect(beat).not.toBeNull();
     expect(beat!.type).toBe('ambient_whisper');
     expect(beat!.text).toBeDefined();
@@ -1111,8 +1111,8 @@ describe('checkNarrativeMicroBeat', () => {
 
   test('all 28 micro-beat thresholds fire independently', async () => {
     const thresholds = [
-      5, 8, 12, 16, 20, 25, 30, 31, 33, 35, 40, 50, 55, 65, 70, 74, 80, 90, 100,
-      105, 118, 126, 132, 148, 150, 155, 158, 160,
+      5, 8, 12, 16, 20, 25, 30, 31, 33, 35, 38, 42, 45, 50, 54, 58, 61, 64, 70,
+      75, 82, 88, 92, 104, 106, 109, 112, 115,
     ];
     for (const t of thresholds) {
       const beat = await checkNarrativeMicroBeat(t);
@@ -1126,8 +1126,9 @@ describe('checkNarrativeMicroBeat', () => {
 });
 
 // ============================================================================
-// Micro-beat geography (v1.3 pacing: reveal ~130, completion/recruit ~136,
-// dwell ~143, arming floor 160, final board ~161, post-revelation ~162)
+// Micro-beat geography (v1.3.2 compressed pacing: reveal ~90,
+// completion/recruit ~96-100, dwell ~104-108, arming floor 115, final board
+// ~116, post-revelation ~117-122)
 // ============================================================================
 
 describe('MICRO_BEATS geography', () => {
@@ -1135,8 +1136,8 @@ describe('MICRO_BEATS geography', () => {
 
   test('keys match the new geography exactly', () => {
     expect(keys).toEqual([
-      5, 8, 12, 16, 20, 25, 30, 31, 33, 35, 40, 50, 55, 65, 70, 74, 80, 90, 100,
-      105, 118, 126, 132, 148, 150, 155, 158, 160,
+      5, 8, 12, 16, 20, 25, 30, 31, 33, 35, 38, 42, 45, 50, 54, 58, 61, 64, 70,
+      75, 82, 88, 92, 104, 106, 109, 112, 115,
     ]);
   });
 
@@ -1149,45 +1150,45 @@ describe('MICRO_BEATS geography', () => {
     expect(MICRO_BEATS[33].text).toContain('only the house');
   });
 
-  test('nothing fires past 160: the finale (~161) gets the silence', () => {
-    expect(keys[keys.length - 1]).toBe(160);
+  test('nothing fires past 115 (the arming floor): the finale (~116) gets the silence', () => {
+    expect(keys[keys.length - 1]).toBe(115);
   });
 
-  test('the silent-victory anticlimax sits at 148, before the finale', () => {
-    expect(MICRO_BEATS[148].type).toBe('silent_victory');
-    expect(isSilentVictoryBeat(148)).toBe(true);
+  test('the silent-victory anticlimax sits at 104, before the finale', () => {
+    expect(MICRO_BEATS[104].type).toBe('silent_victory');
+    expect(isSilentVictoryBeat(104)).toBe(true);
     // Exactly one silent victory in the whole table.
     const silents = keys.filter(k => MICRO_BEATS[k].type === 'silent_victory');
-    expect(silents).toEqual([148]);
-    expect(isSilentVictoryBeat(160)).toBe(false);
+    expect(silents).toEqual([104]);
+    expect(isSilentVictoryBeat(115)).toBe(false);
   });
 
-  test('the complicity beat lands at 150', () => {
-    expect(MICRO_BEATS[150].text).toBe(
+  test('the complicity beat lands at 106', () => {
+    expect(MICRO_BEATS[106].text).toBe(
       'You could stop now. You know that. You won\'t. They know that too.'
     );
   });
 
-  test('house-wholeness language only appears at or after completion (~136)', () => {
+  test('house-wholeness language only appears at or after completion (~96-100)', () => {
     for (const k of keys) {
       const text = (MICRO_BEATS[k].text ?? '').toLowerCase();
       if (/is whole|every room is built|every keeper is home/.test(text)) {
-        expect(k).toBeGreaterThanOrEqual(136);
+        expect(k).toBeGreaterThanOrEqual(96);
       }
     }
     // And the dwell-window beats DO speak of the whole house.
-    expect(MICRO_BEATS[155].text!.toLowerCase()).toContain('every room is built');
-    expect(MICRO_BEATS[158].text!.toLowerCase()).toContain('the house is whole');
+    expect(MICRO_BEATS[109].text!.toLowerCase()).toContain('every room is built');
+    expect(MICRO_BEATS[112].text!.toLowerCase()).toContain('the house is whole');
   });
 
   test('dwell beats never surface a counter or number', () => {
-    for (const k of [155, 158]) {
+    for (const k of [109, 112]) {
       expect(MICRO_BEATS[k].text).not.toMatch(/\d/);
     }
   });
 
   test('the pre-completion builder beat sits before the house is whole', () => {
-    expect(MICRO_BEATS[126].text).toContain('The house keeps making room');
+    expect(MICRO_BEATS[88].text).toContain('The house keeps making room');
   });
 
   test('no beat says Phase or carries a dash', () => {
@@ -1785,15 +1786,15 @@ describe('getDwellLine', () => {
     expect(getDwellLine(99, 5)).toBe(getDwellLine(8, 5));
   });
 
-  test('uses distinct held-breath lines after the capped eighth dwell at puzzles 144 and 159', () => {
+  test('uses distinct held-breath lines after the capped eighth dwell at puzzles 108 and 113', () => {
     const eighthDwell = getDwellLine(8, 4);
-    const puzzle144 = getPostCapDwellLine(144, 4);
-    const puzzle159 = getPostCapDwellLine(159, 4);
+    const puzzle108 = getPostCapDwellLine(108, 4);
+    const puzzle113 = getPostCapDwellLine(113, 4);
 
-    expect(puzzle144).not.toBe(eighthDwell);
-    expect(puzzle159).not.toBe(eighthDwell);
-    expect(puzzle159).not.toBe(puzzle144);
-    for (const line of [puzzle144, puzzle159]) {
+    expect(puzzle108).not.toBe(eighthDwell);
+    expect(puzzle113).not.toBe(eighthDwell);
+    expect(puzzle113).not.toBe(puzzle108);
+    for (const line of [puzzle108, puzzle113]) {
       expect(line).not.toMatch(/[–—]/);
       expect(line.toLowerCase()).not.toContain('phase');
       expect(line).not.toMatch(/\d/);
@@ -1861,7 +1862,7 @@ describe('getFinalBoardStartMessage', () => {
 describe('getCycleMicroBeat', () => {
   test('six half-memories at the cycle-relative keys, silence everywhere else', () => {
     const keys = Object.keys(CYCLE_MICRO_BEATS).map(Number).sort((a, b) => a - b);
-    expect(keys).toEqual([3, 12, 26, 45, 70, 100]);
+    expect(keys).toEqual([3, 10, 20, 34, 52, 75]);
     for (const k of keys) {
       const beat = getCycleMicroBeat(k);
       expect(beat).not.toBeNull();
@@ -1884,9 +1885,9 @@ describe('getCycleMicroBeat', () => {
   });
 
   test('canon pronouns hold across the half-memories', () => {
-    expect(getCycleMicroBeat(12)!.text).toContain('she says'); // Panko
-    expect(getCycleMicroBeat(26)!.text).toContain('his handwriting'); // Archimedes
-    expect(getCycleMicroBeat(100)!.text).toContain('her'); // Sloane
+    expect(getCycleMicroBeat(10)!.text).toContain('she says'); // Panko
+    expect(getCycleMicroBeat(20)!.text).toContain('his handwriting'); // Archimedes
+    expect(getCycleMicroBeat(75)!.text).toContain('her'); // Sloane
   });
 });
 
@@ -1923,11 +1924,11 @@ describe('checkCycleNarrativeMicroBeat + resolveVictoryMicroBeat', () => {
   });
 
   test('half-memory beats take priority over regular beats at shared keys', async () => {
-    // 12 and 100 exist on BOTH tracks — the cycle half-memory must win.
-    const beat12 = await checkCycleNarrativeMicroBeat(12, 1);
-    expect(beat12).toEqual(CYCLE_MICRO_BEATS[12]);
-    const beat100 = await checkCycleNarrativeMicroBeat(100, 1);
-    expect(beat100).toEqual(CYCLE_MICRO_BEATS[100]);
+    // 20 and 75 exist on BOTH tracks — the cycle half-memory must win.
+    const beat20 = await checkCycleNarrativeMicroBeat(20, 1);
+    expect(beat20).toEqual(CYCLE_MICRO_BEATS[20]);
+    const beat75 = await checkCycleNarrativeMicroBeat(75, 1);
+    expect(beat75).toEqual(CYCLE_MICRO_BEATS[75]);
   });
 
   test('the silent_victory anticlimax stays forever-once (never re-fires on a cycle)', async () => {

@@ -20,7 +20,7 @@
 // --- Mock React hooks to run synchronously in Node ---
 const stateStore: Map<number, unknown> = new Map();
 let stateIndex = 0;
-let effectCallbacks: Array<() => void> = [];
+let effectCallbacks: (() => void)[] = [];
 const refStore: Map<number, { current: unknown }> = new Map();
 let refIndex = 0;
 
@@ -390,7 +390,7 @@ describe('useDialogueFlow visit-next-friend chain', () => {
     // session warm (no endSession — identical to tapping Close).
     expect(markDialogueReadMock).toHaveBeenCalledWith('pangolin', 24);
     expect(endSessionMock).not.toHaveBeenCalled();
-    const storedPangolin = (animals as Array<{ id: string; currentDialogueIndex: number; hasNewDialogue: boolean }>)
+    const storedPangolin = (animals as { id: string; currentDialogueIndex: number; hasNewDialogue: boolean }[])
       .find(a => a.id === 'pangolin')!;
     expect(storedPangolin.currentDialogueIndex).toBe(24);
     expect(storedPangolin.hasNewDialogue).toBe(false);
