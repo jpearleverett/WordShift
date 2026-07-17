@@ -38,6 +38,12 @@ export interface DailyLadderEntry {
   stars: number;
   /** The day's board difficulty (the daily ramps Mon->Sun). */
   difficulty: Difficulty;
+  /**
+   * Resonant deep-word choices made on that day's board. Optional and absent
+   * by default (older entries / boards with none). Spoiler-safe: a count only,
+   * never the words themselves.
+   */
+  resonantChoiceCount?: number;
 }
 
 interface DailyLadderState {
@@ -125,6 +131,7 @@ export async function recordDailyLadderResult(
 ): Promise<DailyLadderState> {
   const state = await load();
   const entries = state.entries.filter(e => e.date !== entry.date);
+  const resonant = entry.resonantChoiceCount;
   entries.push({
     date: entry.date,
     rank: entry.rank ?? null,
@@ -132,6 +139,11 @@ export async function recordDailyLadderResult(
     timeMs: Math.max(0, Math.round(entry.timeMs)),
     stars: Math.max(0, Math.round(entry.stars)),
     difficulty: entry.difficulty,
+    // Optional field: stored only when a positive count exists (absent stays
+    // the default so old entries and zero-resonance days look identical).
+    ...(typeof resonant === 'number' && Number.isFinite(resonant) && resonant > 0
+      ? { resonantChoiceCount: Math.floor(resonant) }
+      : {}),
   });
   // Keep chronological by date so "latest"/trend are well-defined even if an
   // older day is backfilled.

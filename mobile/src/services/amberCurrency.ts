@@ -31,6 +31,7 @@ import {
   STREAK_FREEZE_CAP,
   FINALE_ARM_MIN_PUZZLES,
   FINALE_DWELL_PUZZLES,
+  RESONANT_BOARD_CAP_AMBER,
 } from '../constants/gameBalance';
 import { isPatronSync } from './entitlements';
 
@@ -544,6 +545,13 @@ export async function awardPuzzleAmber(
     /** Blind Offering win (challenge limits + end-judged blind play): pays the
      *  apex amber multiplier and the 2.0x phase-progress cap. */
     blind?: boolean;
+    /**
+     * Resonance bonus for the board (resonant deep-word choices, already
+     * per-move-priced by the caller). Amber-only, REWARD-only: added to the
+     * total and itemized, and — hard rule — NEVER feeds phase progression.
+     * Defensively clamped to [0, RESONANT_BOARD_CAP_AMBER].
+     */
+    resonanceBonus?: number;
   } = {}
 ): Promise<{
   amount: number;
@@ -556,6 +564,8 @@ export async function awardPuzzleAmber(
   challengeBonus: number;
   patronBonus: number;
   surpriseBonus: number;
+  /** Clamped resonance bonus actually credited (0 when none). */
+  resonanceBonus: number;
   milestoneBonus: number;
   milestoneMessage: string | null;
   firstCompletionBonus: number;
@@ -632,6 +642,16 @@ export async function awardPuzzleAmber(
   // NEVER touches phase progression.
   const surpriseBonus = computeSurpriseBonus(difficulty, progress.puzzlesSolved);
   totalAmount += surpriseBonus;
+
+  // Resonance bonus (evaluative depth: deepest-available dread word chosen when
+  // a real choice existed). Additive to the REWARD only — like the Patron and
+  // surprise bonuses it NEVER touches phase progression, so weighing options
+  // pays amber, never a faster descent. Clamped defensively to the board cap.
+  const rawResonance = options.resonanceBonus ?? 0;
+  const resonanceBonus = Number.isFinite(rawResonance)
+    ? Math.max(0, Math.min(Math.floor(rawResonance), RESONANT_BOARD_CAP_AMBER))
+    : 0;
+  totalAmount += resonanceBonus;
 
   if (creditToBalance) {
     progress.amber += totalAmount;
@@ -786,6 +806,7 @@ export async function awardPuzzleAmber(
     challengeBonus,
     patronBonus,
     surpriseBonus,
+    resonanceBonus,
     milestoneBonus,
     milestoneMessage,
     firstCompletionBonus,

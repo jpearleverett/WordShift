@@ -128,6 +128,8 @@ import {
   getSkipConfirmText,
   getSkipConfirmStayLabel,
   getSkipConfirmLeaveLabel,
+  getHouseAskLine,
+  getHouseAskFulfilledMessage,
 } from './src/services/phaseNarrative';
 import { getActiveEvent, getEventDailyBonusAmber } from './src/services/liveEvents';
 import {
@@ -165,11 +167,11 @@ import { initHints, addHints, grantBonusHint } from './src/services/hints';
 import { loadEntitlements, hasEntitlementSync, isAdFreeSync, ENTITLEMENTS } from './src/services/entitlements';
 import { StoreModal } from './src/components/monetization/StoreModal';
 import { recordInterstitialSeen, consumePatronNudge, armRemoveAdsNudgeIfEligible, consumePendingRemoveAdsNudge, canOfferRewardedDouble, recordRewardedDoubleOffered, canShowExitNudge, recordExitNudgeShown } from './src/services/monetizationPrompts';
-import { REWARDED_HINT_GRANT } from './src/constants/gameBalance';
 import { createRevenueCatBillingProvider } from './src/services/providers/revenueCatBilling';
 import { createAdMobAdProvider } from './src/services/providers/googleAdMobAds';
 import { installGlobalErrorHandler, setErrorForwarder } from './src/services/errorReporting';
-import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST, STARTER_INTRO_MIN_PUZZLES, FINALE_DWELL_PUZZLES, INTERSTITIAL_MIN_PUZZLES } from './src/constants/gameBalance';
+import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST, STARTER_INTRO_MIN_PUZZLES, FINALE_DWELL_PUZZLES, INTERSTITIAL_MIN_PUZZLES, HOUSE_ASK_MIN_PUZZLES, HOUSE_ASK_CHANCE, HOUSE_ASK_REWARD_AMBER, REWARDED_HINT_GRANT } from './src/constants/gameBalance';
+import { pickHouseAsk, evaluateHouseAsk, HouseAsk } from './src/services/houseAsks';
 import { getCumulativeStats } from './src/services/starRating';
 
 // Defer the one-time difficulty-selector intro until a few boards are done —
@@ -187,6 +189,11 @@ const SWIFT_HINT_MIN_PUZZLES = 24;
 // choreography (and any ritual micro-event line) land first.
 const VICTORY_TOAST_DURATION_MS = 1900;
 const VICTORY_TOAST_INITIAL_DELAY_MS = 600;
+
+// House-ask line deferral: when a fresh board's start message already owns the
+// single message slot, the ask line waits this long before taking it (so the
+// two lines read in sequence instead of the ask clobbering the greeting).
+const HOUSE_ASK_LINE_DELAY_MS = 2200;
 
 // One-time, DEVICE-LOCAL UX pointer flags (deliberately not cloud-synced and
 // not cleared by Reset All owners' service clears: they mark "this device's
@@ -420,10 +427,36 @@ function MainApp() {
     }
   }, []);
 
+  // HOUSE ASKS — the small optional per-board constraint (services/houseAsks):
+  // on some standard boards the house asks that one letter travel, or that it
+  // stay untouched. App-level state ONLY, on purpose: the ask deliberately
+  // does NOT survive autosave restore (dropped silently — a deliberate
+  // simplification: a restored board simply has no ask), and an unkept ask is
+  // never mentioned again (soft-fail contract).
+  const [houseAsk, setHouseAsk] = useState<HouseAsk | null>(null);
+  // Pending deferred ask-line timer (the board-start message gets the slot
+  // first); cancelled whenever the ask is cleared.
+  const houseAskLineTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Armed immediately before each restorePuzzleState call so a restored board
+  // never rolls a fresh ask; consumed (reset) by the board-identity roll effect.
+  const houseAskRestoreSuppressRef = useRef(false);
+  const clearHouseAsk = useCallback(() => {
+    if (houseAskLineTimerRef.current !== null) {
+      clearTimeout(houseAskLineTimerRef.current);
+      houseAskLineTimerRef.current = null;
+    }
+    setHouseAsk(null);
+  }, []);
+
   useEffect(() => {
     return () => {
       clearVictoryTimeouts();
       clearVictoryToastQueue();
+      // A pending deferred house-ask line must not fire after teardown.
+      if (houseAskLineTimerRef.current !== null) {
+        clearTimeout(houseAskLineTimerRef.current);
+        houseAskLineTimerRef.current = null;
+      }
     };
   }, [clearVictoryTimeouts, clearVictoryToastQueue]);
 
@@ -725,6 +758,8 @@ function MainApp() {
 
     setCurrentScreen('puzzle');
     if (route === 'restore' && saved) {
+      // Restored boards never carry (or roll) a house ask.
+      houseAskRestoreSuppressRef.current = true;
       puzzleActions.restorePuzzleState(saved);
     } else {
       if (saved) await clearPuzzleState();
@@ -1292,6 +1327,9 @@ function MainApp() {
       // Check for saved in-progress puzzle
       const saved = await loadPuzzleState();
       if (saved && saved.gameState === 'PLAYING' && !saved.isPlayingDaily) {
+        // Restored boards never carry (or roll) a house ask — the ask does
+        // not survive autosave (dropped silently; deliberate simplification).
+        houseAskRestoreSuppressRef.current = true;
         puzzleActions.restorePuzzleState(saved);
         // Restore speed timer from the saved remaining seconds so a kill/
         // relaunch resumes the countdown instead of expiring it. Legacy
@@ -1853,7 +1891,10 @@ function MainApp() {
         result.blind ?? false,
         // Shared-link boards pay amber but never feed phase progress (the
         // chain is attacker-craftable, so it must not advance the story).
-        puzzle.isSharedChallenge ?? false
+        puzzle.isSharedChallenge ?? false,
+        // Resonant choices made on this board (amber-only bonus, capped in
+        // the economy layer; never phase progress).
+        result.resonantChoiceCount ?? 0
       );
 
       // Aggregate social proof: contribute this puzzle's words to the global
@@ -1963,6 +2004,8 @@ function MainApp() {
               // MEDIUM board, so labelling it HARD would skew the local
               // best-this-week / trend line with an easy fast time.
               difficulty: getDailyDifficulty(date, dailyEasedRef.current),
+              // Spoiler-safe resonance tally (stored only when positive).
+              resonantChoiceCount: result.resonantChoiceCount,
             });
             const summary = await getDailyLadderSummary();
             setDailyLadderLine(getDailyLadderLine(summary, persistence.currentPhase));
@@ -2625,6 +2668,79 @@ function MainApp() {
     })().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot; actions/phase read at fire time
   }, [puzzle.isStuck]);
+
+  // HOUSE ASKS roll — at most one ask per fresh STANDARD board, decided once
+  // at board start. Keyed on board identity so one effect covers every
+  // board-building path (Play, Next Level, RESTART, difficulty/variant
+  // switches); every gate is read at fire time. Never on: the daily,
+  // shared-challenge boards, the finale board, Unbroken Weave, Blind
+  // Offering, non-standard variants (reverse/double/speed), during
+  // onboarding, or below HOUSE_ASK_MIN_PUZZLES (which also covers the
+  // curated early boards). A restored autosave board never rolls (suppress
+  // ref + committed-move guard): the ask does not survive autosave restore —
+  // dropped silently (deliberate simplification, no persistence).
+  useEffect(() => {
+    // A board-identity change always retires any live ask + queued ask line
+    // first (an ask never outlives its board).
+    clearHouseAsk();
+    const wasRestore = houseAskRestoreSuppressRef.current;
+    houseAskRestoreSuppressRef.current = false;
+    if (boardIdentity === null || wasRestore) return;
+    if (puzzle.gameState !== GameState.PLAYING) return;
+    if (onboardingFlow.isOnboarding) return;
+    if (isPlayingDaily || puzzle.isSharedChallenge || puzzle.isFinalBoard) return;
+    if (puzzle.currentVariant !== 'standard') return;
+    if (puzzle.blindMode || puzzle.unbrokenWeaveMode) return;
+    if (puzzlesSolvedForVariantUnlocks < HOUSE_ASK_MIN_PUZZLES) return;
+    if (puzzle.moveHistorySummary.length > 0) return; // mid-board state — never roll late
+    if (Math.random() >= HOUSE_ASK_CHANCE) return;
+    const startWords = puzzle.rows.map(r => r.words.map(l => l.char).join(''));
+    const ask = pickHouseAsk(puzzle.solution, startWords);
+    if (!ask) return;
+    setHouseAsk(ask);
+    const line = getHouseAskLine(persistence.currentPhase, ask.kind, ask.letter);
+    if (puzzle.message) {
+      // The board-start message owns the slot — let it breathe, then the ask
+      // line takes over (queued briefly, never clobbering the greeting).
+      houseAskLineTimerRef.current = setTimeout(() => {
+        houseAskLineTimerRef.current = null;
+        puzzleActions.setMessage(line);
+      }, HOUSE_ASK_LINE_DELAY_MS);
+    } else {
+      puzzleActions.setMessage(line);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- rolls once per fresh board; gates/actions read at fire time
+  }, [boardIdentity]);
+
+  // HOUSE ASKS evaluation — judged exactly once, at the WON commit (the
+  // completing move is already in the committed summary there). Kept: bonus
+  // amber ONLY via awardBonusAmber (never phase progress — hard design rule)
+  // plus a receipt-priority toast. Unkept: cleared with NO message, ever
+  // (soft-fail contract — the house never scolds).
+  useEffect(() => {
+    if (puzzle.gameState !== GameState.WON || houseAsk === null) return;
+    const kept = evaluateHouseAsk(houseAsk, puzzle.moveHistorySummary);
+    clearHouseAsk();
+    if (!kept) return;
+    (async () => {
+      try {
+        const newBalance = await awardBonusAmber(HOUSE_ASK_REWARD_AMBER, 'house_ask');
+        persistenceActions.setAmberBalance(newBalance);
+        enqueueVictoryToast(getHouseAskFulfilledMessage(persistence.currentPhase), 'receipt');
+      } catch {
+        // Non-critical — the victory flow never blocks on the ask receipt.
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fires once per won board; history/phase read at fire time
+  }, [puzzle.gameState, houseAsk]);
+
+  // Leaving the puzzle screen retires the ask (home button, hardware back,
+  // victory exits, pit routes — every exit path lands off-screen). Returning
+  // to the same in-memory board resumes it WITHOUT an ask, matching the
+  // autosave contract: an interrupted board simply has no ask.
+  useEffect(() => {
+    if (currentScreen !== 'puzzle') clearHouseAsk();
+  }, [currentScreen, clearHouseAsk]);
 
   // Drag-and-drop: when a letter is dragged onto the target row area, find the
   // closest valid slot and press it. The letter was already selected via onDragStart.
@@ -3839,6 +3955,29 @@ function MainApp() {
                   styles.variantBadgeTextDark,
                 ]}>
                   {puzzle.spentLetters.length}
+                </Text>
+              </View>
+            )}
+            {/* House Ask badge — the small standing reminder while an ask is
+                live on this board (soft-fail: it simply disappears unkept,
+                never scolds). Same chrome as the variant badge; the full
+                phase-aware ask line rides the accessibility label. The 🏠 is
+                an intentional emoji accent (labeled), like 🏆/📋/✨. */}
+            {houseAsk !== null && (
+              <View
+                style={[
+                  styles.variantBadge,
+                  persistence.currentPhase >= 3 && styles.variantBadgeDark,
+                ]}
+                accessible
+                accessibilityLabel={getHouseAskLine(persistence.currentPhase, houseAsk.kind, houseAsk.letter)}
+              >
+                <Text style={styles.variantBadgeIcon}>🏠</Text>
+                <Text style={[
+                  styles.variantBadgeText,
+                  persistence.currentPhase >= 3 && styles.variantBadgeTextDark,
+                ]}>
+                  {houseAsk.letter.toUpperCase()}
                 </Text>
               </View>
             )}

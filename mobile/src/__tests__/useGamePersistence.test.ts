@@ -200,6 +200,12 @@ jest.mock('../services/eventLogger', () => ({
   logEvent: (...args: any[]) => mockLogEvent(args[0]),
 }));
 
+// --- Mock masteryRecords (resonant-choice mastery stat feed) ---
+const mockRecordResonantChoices = jest.fn(async (_count?: any) => 0);
+jest.mock('../services/masteryRecords', () => ({
+  recordResonantChoices: (...args: any[]) => mockRecordResonantChoices(args[0]),
+}));
+
 // --- Mock weekly quests ---
 const mockUpdateQuestProgress = jest.fn(async (_event?: any, _phase?: any) => []);
 jest.mock('../services/weeklyQuests', () => ({
@@ -321,7 +327,7 @@ describe('useGamePersistence', () => {
       await actions.recordVictory('MEDIUM', 0, 0, 'standard');
 
       expect(mockAwardPuzzleAmber).toHaveBeenCalledWith(
-        'MEDIUM', 3, 'standard', expect.any(Number), false, { skipPhaseProgress: false, blind: false }
+        'MEDIUM', 3, 'standard', expect.any(Number), false, { skipPhaseProgress: false, blind: false, resonanceBonus: 0 }
       );
     });
 
@@ -449,7 +455,7 @@ describe('useGamePersistence', () => {
       await actions.recordVictory('MEDIUM', 0, 0);
 
       expect(mockAwardPuzzleAmber).toHaveBeenCalledWith(
-        'MEDIUM', 3, 'standard', expect.any(Number), false, { skipPhaseProgress: false, blind: false }
+        'MEDIUM', 3, 'standard', expect.any(Number), false, { skipPhaseProgress: false, blind: false, resonanceBonus: 0 }
       );
     });
 
@@ -527,7 +533,7 @@ describe('useGamePersistence', () => {
 
       // getThreeStarRate returns 50 (percentage), should be divided by 100 to get ratio 0.5
       expect(mockAwardPuzzleAmber).toHaveBeenCalledWith(
-        'MEDIUM', 3, 'standard', 0.5, false, { skipPhaseProgress: false, blind: false }
+        'MEDIUM', 3, 'standard', 0.5, false, { skipPhaseProgress: false, blind: false, resonanceBonus: 0 }
       );
     });
 
@@ -689,6 +695,103 @@ describe('useGamePersistence', () => {
     });
   });
 
+  describe('resonance threading (evaluative depth)', () => {
+    // The RESONANT_MOVE_AMBER (2) / RESONANT_BOARD_CAP_AMBER (6) constants are
+    // imported for real by the hook; assertions below pin the derived amounts.
+
+    test('derives the amber from the count and passes it to awardPuzzleAmber (options)', async () => {
+      const [, actions] = callHook();
+      await actions.recordVictory(
+        'MEDIUM', 0, 0, 'standard', [], 'standard',
+        false, 0, false, false, 2 // resonantChoiceCount
+      );
+      expect(mockAwardPuzzleAmber).toHaveBeenCalledWith(
+        'MEDIUM', 3, 'standard', expect.any(Number), false,
+        { skipPhaseProgress: false, blind: false, resonanceBonus: 4 }
+      );
+    });
+
+    test('caps the derived bonus at the board cap', async () => {
+      const [, actions] = callHook();
+      await actions.recordVictory(
+        'MEDIUM', 0, 0, 'standard', [], 'standard',
+        false, 0, false, false, 5 // 5 × 2 = 10 → capped to 6
+      );
+      expect(mockAwardPuzzleAmber).toHaveBeenCalledWith(
+        'MEDIUM', 3, 'standard', expect.any(Number), false,
+        { skipPhaseProgress: false, blind: false, resonanceBonus: 6 }
+      );
+    });
+
+    test('feeds the cumulative mastery stat by the board count (and never for 0)', async () => {
+      const [, actions] = callHook();
+      await actions.recordVictory(
+        'MEDIUM', 0, 0, 'standard', [], 'standard',
+        false, 0, false, false, 3
+      );
+      expect(mockRecordResonantChoices).toHaveBeenCalledWith(3);
+
+      mockRecordResonantChoices.mockClear();
+      await actions.recordVictory('MEDIUM', 0, 0);
+      expect(mockRecordResonantChoices).not.toHaveBeenCalled();
+    });
+
+    test('exposes VictoryData.resonanceBonus and the itemized breakdown entry (parts still sum)', async () => {
+      mockAwardPuzzleAmber.mockResolvedValueOnce({
+        amount: 19, // 10 base + 5 star + 4 resonance
+        baseAmount: 15,
+        baseAmber: 10,
+        starBonusAmber: 5,
+        newBalance: 115,
+        puzzlesSolved: 30,
+        phaseChanged: false,
+        newPhase: 0 as const,
+        streakBonus: 0,
+        challengeBonus: 0,
+        patronBonus: 0,
+        surpriseBonus: 0,
+        resonanceBonus: 4,
+        currentStreak: 1,
+        milestoneBonus: 0,
+        milestoneMessage: null,
+        phaseAcceleration: 1.0,
+        firstCompletionBonus: 0,
+        streakMilestoneBonus: 0,
+        streakMilestoneMessage: null,
+      } as any);
+
+      const [, actions] = callHook();
+      const result = await actions.recordVictory(
+        'MEDIUM', 0, 0, 'standard', [], 'standard',
+        false, 0, false, false, 2
+      );
+
+      expect(result.resonanceBonus).toBe(4);
+      expect(result.resonantChoiceCount).toBe(2);
+      const b = result.amberBreakdown!;
+      expect(b.resonanceBonus).toBe(4);
+      const partsSum =
+        b.base + b.starBonus + b.streakBonus + b.challengeBonus + b.patronBonus +
+        b.surpriseBonus + b.resonanceBonus + b.variantBonus + b.freshVariantBonus +
+        b.firstCompletionBonus + b.milestoneBonus + b.streakMilestoneBonus;
+      expect(partsSum).toBe(result.amberEarned);
+      expect(result.amberEarned).toBe(19);
+    });
+
+    test('sanitizes a garbage count to zero', async () => {
+      const [, actions] = callHook();
+      await actions.recordVictory(
+        'MEDIUM', 0, 0, 'standard', [], 'standard',
+        false, 0, false, false, Number.NaN
+      );
+      expect(mockAwardPuzzleAmber).toHaveBeenCalledWith(
+        'MEDIUM', 3, 'standard', expect.any(Number), false,
+        { skipPhaseProgress: false, blind: false, resonanceBonus: 0 }
+      );
+      expect(mockRecordResonantChoices).not.toHaveBeenCalled();
+    });
+  });
+
   describe('shared-challenge wins are amber-only', () => {
     test('passes skipPhaseProgress: true to awardPuzzleAmber', async () => {
       const [, actions] = callHook();
@@ -698,7 +801,7 @@ describe('useGamePersistence', () => {
       );
 
       expect(mockAwardPuzzleAmber).toHaveBeenCalledWith(
-        'MEDIUM', 3, 'standard', expect.any(Number), false, { skipPhaseProgress: true, blind: false }
+        'MEDIUM', 3, 'standard', expect.any(Number), false, { skipPhaseProgress: true, blind: false, resonanceBonus: 0 }
       );
     });
 

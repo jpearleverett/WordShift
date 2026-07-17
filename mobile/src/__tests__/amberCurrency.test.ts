@@ -64,6 +64,7 @@ import {
   NARRATIVE_ACCELERATION,
   FINALE_DWELL_PUZZLES,
   FINALE_ARM_MIN_PUZZLES,
+  RESONANT_BOARD_CAP_AMBER,
 } from '../constants/gameBalance';
 import { FIRST_COMPLETION_BONUS } from '../types/homeWorld';
 import { getLocalDateStringDaysAgo } from '../services/dateUtils';
@@ -375,6 +376,69 @@ describe('surprise bonus (variable-ratio reward)', () => {
     expect(easy.surpriseBonus).toBe(SURPRISE_BONUS_AMOUNTS.EASY);
     expect(hard.surpriseBonus).toBe(SURPRISE_BONUS_AMOUNTS.HARD);
     expect(hard.surpriseBonus).toBeGreaterThan(easy.surpriseBonus);
+  });
+});
+
+describe('resonance bonus (evaluative depth reward)', () => {
+  test('adds the bonus to the reward total and itemizes it', async () => {
+    const baseline = await awardPuzzleAmber('MEDIUM', 1, 'standard', 0, true);
+    expect(baseline.resonanceBonus).toBe(0);
+
+    await clearProgress();
+    const resonant = await awardPuzzleAmber('MEDIUM', 1, 'standard', 0, true, {
+      resonanceBonus: 4,
+    });
+
+    expect(resonant.resonanceBonus).toBe(4);
+    // Purely additive to the identical baseline win.
+    expect(resonant.amount).toBe(baseline.amount + 4);
+    // The itemized parts still sum to the total.
+    expect(
+      resonant.baseAmber +
+      resonant.starBonusAmber +
+      resonant.streakBonus +
+      resonant.challengeBonus +
+      resonant.patronBonus +
+      resonant.surpriseBonus +
+      resonant.resonanceBonus
+    ).toBe(resonant.amount);
+  });
+
+  test('NEVER feeds phase progression (hard design rule)', async () => {
+    await awardPuzzleAmber('HARD', 3, 'standard', 0, true);
+    const withoutBonus = await loadProgress();
+    const progressWithout = withoutBonus.phaseProgress;
+    const fractionWithout = withoutBonus.phaseProgressFraction;
+
+    await clearProgress();
+    const boosted = await awardPuzzleAmber('HARD', 3, 'standard', 0, true, {
+      resonanceBonus: RESONANT_BOARD_CAP_AMBER,
+    });
+    const withBonus = await loadProgress();
+
+    expect(boosted.resonanceBonus).toBe(RESONANT_BOARD_CAP_AMBER);
+    // Identical wins, identical descent — the bonus buys amber, never pacing.
+    expect(withBonus.phaseProgress).toBe(progressWithout);
+    expect(withBonus.phaseProgressFraction).toBe(fractionWithout);
+  });
+
+  test('defensively clamps to [0, RESONANT_BOARD_CAP_AMBER]', async () => {
+    const over = await awardPuzzleAmber('EASY', 1, 'standard', 0, true, {
+      resonanceBonus: 999,
+    });
+    expect(over.resonanceBonus).toBe(RESONANT_BOARD_CAP_AMBER);
+
+    await clearProgress();
+    const negative = await awardPuzzleAmber('EASY', 1, 'standard', 0, true, {
+      resonanceBonus: -5,
+    });
+    expect(negative.resonanceBonus).toBe(0);
+
+    await clearProgress();
+    const nan = await awardPuzzleAmber('EASY', 1, 'standard', 0, true, {
+      resonanceBonus: Number.NaN,
+    });
+    expect(nan.resonanceBonus).toBe(0);
   });
 });
 

@@ -609,3 +609,85 @@ describe('daily login modal deferral', () => {
     expect(gate).toContain('phaseTransitionEvent === null');
   });
 });
+
+describe('house asks (optional per-board constraint)', () => {
+  // Markers for the two effect slices (comment headers are load-bearing).
+  const rollEffect = () => APP_TSX.slice(
+    APP_TSX.indexOf('// HOUSE ASKS roll'),
+    APP_TSX.indexOf('// HOUSE ASKS evaluation')
+  );
+  const evalEffect = () => APP_TSX.slice(
+    APP_TSX.indexOf('// HOUSE ASKS evaluation'),
+    APP_TSX.indexOf('// Leaving the puzzle screen retires the ask')
+  );
+
+  test('the roll is gated to eligible fresh STANDARD boards only', () => {
+    const effect = rollEffect();
+    expect(effect.length).toBeGreaterThan(0);
+    // Floor + chance come from gameBalance constants, never inlined numbers.
+    expect(effect).toContain('puzzlesSolvedForVariantUnlocks < HOUSE_ASK_MIN_PUZZLES');
+    expect(effect).toContain('Math.random() >= HOUSE_ASK_CHANCE');
+    // Every exclusion: onboarding, daily, shared-challenge, finale board,
+    // non-standard variants (reverse/double/speed), blind, Unbroken Weave.
+    expect(effect).toContain('if (onboardingFlow.isOnboarding) return;');
+    expect(effect).toContain('if (isPlayingDaily || puzzle.isSharedChallenge || puzzle.isFinalBoard) return;');
+    expect(effect).toContain("if (puzzle.currentVariant !== 'standard') return;");
+    expect(effect).toContain('if (puzzle.blindMode || puzzle.unbrokenWeaveMode) return;');
+    // Derived from the STORED solution, so asks are satisfiable by construction.
+    expect(effect).toContain('pickHouseAsk(puzzle.solution, startWords)');
+  });
+
+  test('a restored autosave board never rolls or carries an ask (dropped silently)', () => {
+    // Both restorePuzzleState call sites arm the suppress ref first, and the
+    // roll effect consumes it (plus a committed-move guard for mid-board saves).
+    const arms = APP_TSX.match(/houseAskRestoreSuppressRef\.current = true;/g) || [];
+    expect(arms).toHaveLength(2);
+    const effect = rollEffect();
+    expect(effect).toContain('houseAskRestoreSuppressRef.current');
+    expect(effect).toContain('if (puzzle.moveHistorySummary.length > 0) return;');
+  });
+
+  test('a kept ask pays BONUS amber only (never phase progress) with a receipt toast', () => {
+    const effect = evalEffect();
+    expect(effect.length).toBeGreaterThan(0);
+    // The one and only credit path is the amber-only bonus source; the phase
+    // channel (awardPuzzleAmber / recordVictory) must never appear here — a
+    // bonus source can never feed phase progression (hard design rule).
+    expect(effect).toContain("awardBonusAmber(HOUSE_ASK_REWARD_AMBER, 'house_ask')");
+    expect(effect).not.toContain('awardPuzzleAmber');
+    expect(effect).not.toContain('recordVictory');
+    expect(effect).toContain(
+      "enqueueVictoryToast(getHouseAskFulfilledMessage(persistence.currentPhase), 'receipt')"
+    );
+  });
+
+  test('soft-fail: an unkept ask is cleared with NO message, ever', () => {
+    const effect = evalEffect();
+    // Evaluation clears first; only the kept path speaks.
+    expect(effect.indexOf('clearHouseAsk();')).toBeGreaterThan(-1);
+    expect(effect.indexOf('clearHouseAsk();')).toBeLessThan(effect.indexOf('if (!kept) return;'));
+    // Exactly one player-facing line in the whole evaluation effect (the
+    // kept receipt); the unkept branch says nothing.
+    expect(effect.match(/enqueueVictoryToast|setMessage/g)).toHaveLength(1);
+  });
+
+  test('the live-ask indicator rides the statsRow badge idiom with the full ask line as its label', () => {
+    expect(APP_TSX).toMatch(
+      /accessibilityLabel=\{getHouseAskLine\(persistence\.currentPhase, houseAsk\.kind, houseAsk\.letter\)\}/
+    );
+    expect(APP_TSX).toMatch(/\{houseAsk\.letter\.toUpperCase\(\)\}/);
+  });
+
+  test('the ask line defers when the board-start message owns the slot', () => {
+    expect(APP_TSX).toMatch(/const HOUSE_ASK_LINE_DELAY_MS = /);
+    expect(rollEffect()).toContain('if (puzzle.message) {');
+  });
+
+  test('the ask is cleared on every new-board and exit path', () => {
+    // New boards: the roll effect retires any live ask first thing.
+    const effect = rollEffect();
+    expect(effect.indexOf('clearHouseAsk();')).toBeLessThan(effect.indexOf('if (boardIdentity === null'));
+    // Exits: leaving the puzzle screen retires the ask.
+    expect(APP_TSX).toMatch(/if \(currentScreen !== 'puzzle'\) clearHouseAsk\(\);/);
+  });
+});

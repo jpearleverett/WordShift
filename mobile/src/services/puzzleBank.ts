@@ -48,6 +48,15 @@ const BRANCHING_CONTEXT_CANDIDATES = 160;
 // freshness edge (the old 12-point cap was routinely drowned by the novelty
 // bonuses, leaving the reorder pass as the only effective lever).
 const BRANCHING_BONUS_CAP = 24;
+// Trap steering (planning depth): once route-finding is established, boards
+// where several LEGAL moves exist but only some complete the chain reward
+// look-ahead (reverse mode's 15.9% dead-end states play much deeper than the
+// standard banks' ~3.7% trap steps). Engaged ONLY at MEDIUM_PLUS/HARD and
+// only past this solve count — newcomers should not meet plausible wrong
+// turns cold — and ONLY as a secondary criterion among multi-route
+// candidates: a trap with no alternate route is just frustration, so trap
+// preference can never promote a single-route board.
+const TRAP_STEERING_UNLOCK_PUZZLES = 25;
 const branchingMetricsCache = new Map<string, PuzzleBranchingMetrics>();
 const standardExtensionCache = new Map<string, PuzzleConfig | null>();
 const guaranteedStandardFallbackCache = new Map<Difficulty, PuzzleConfig>();
@@ -56,12 +65,13 @@ export function prioritizeMultiRouteCandidates<T>(
   candidates: readonly T[],
   getCompletePathCount: (candidate: T) => number,
   targetPoolSize: number,
+  prefersTrap?: (candidate: T) => boolean,
 ): T[] {
   const preferredPoolSize = Math.min(
     candidates.length,
     Math.max(0, Math.floor(targetPoolSize)),
   );
-  const multiRouteIndices: number[] = [];
+  let multiRouteIndices: number[] = [];
   const fallbackIndices: number[] = [];
 
   candidates.forEach((candidate, index) => {
@@ -71,6 +81,19 @@ export function prioritizeMultiRouteCandidates<T>(
       fallbackIndices.push(index);
     }
   });
+
+  // Secondary trap preference: WITHIN the multi-route tier only, stable-order
+  // trap-bearing boards first. Single-route candidates stay in the fallback
+  // tier untouched — trap presence never promotes a board with no alternate
+  // completing route.
+  if (prefersTrap) {
+    const trapIndices: number[] = [];
+    const plainIndices: number[] = [];
+    for (const index of multiRouteIndices) {
+      (prefersTrap(candidates[index]) ? trapIndices : plainIndices).push(index);
+    }
+    multiRouteIndices = [...trapIndices, ...plainIndices];
+  }
 
   const preferredIndices = multiRouteIndices.slice(0, preferredPoolSize);
   preferredIndices.push(
@@ -611,9 +634,18 @@ export async function selectPreGeneratedPuzzle(
         ...candidate,
         score: candidate.score + Math.min(BRANCHING_BONUS_CAP, metrics.structuralBonus),
         completePathCount: metrics.completePathCount,
+        trapStepFraction: metrics.trapStepFraction,
       };
     });
     depthCandidates.sort((a, b) => b.score - a.score);
+    // Trap preference is a SECONDARY criterion behind the multi-route tiering,
+    // and only where planning depth is the point: the 5-letter banks
+    // (MEDIUM_PLUS/HARD) past 25 solves. EASY/MEDIUM and earlier solves keep
+    // the plain multi-route ordering — newcomers should not meet plausible
+    // wrong turns cold.
+    const trapPreferenceActive =
+      (difficulty === 'MEDIUM_PLUS' || difficulty === 'HARD') &&
+      puzzlesSolved >= TRAP_STEERING_UNLOCK_PUZZLES;
     scored.splice(
       0,
       candidateCount,
@@ -621,6 +653,9 @@ export async function selectPreGeneratedPuzzle(
         depthCandidates,
         candidate => candidate.completePathCount,
         10,
+        trapPreferenceActive
+          ? candidate => candidate.trapStepFraction > 0
+          : undefined,
       ),
     );
   }

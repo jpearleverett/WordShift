@@ -202,6 +202,46 @@ describe('pickMultiRouteCandidate (standard final-pick preference)', () => {
   test('returns null for an empty candidate list', () => {
     expect(pickMultiRouteCandidate([], () => 0)).toBeNull();
   });
+
+  test('breaks exact score ties among multi-route candidates toward trap presence', () => {
+    const candidates: FakeCandidate[] = [
+      { id: 'multi-plain', score: 70 },
+      { id: 'multi-trap', score: 70 },
+      { id: 'single-high', score: 90 },
+    ];
+    const picked = pickMultiRouteCandidate(
+      candidates,
+      byId({ 'multi-plain': 2, 'multi-trap': 3, 'single-high': 1 }),
+      candidate => candidate.id === 'multi-trap' || candidate.id === 'single-high',
+    );
+    expect(picked!.id).toBe('multi-trap');
+  });
+
+  test('a higher multi-route score still beats trap presence (tie-break only)', () => {
+    const candidates: FakeCandidate[] = [
+      { id: 'multi-plain-high', score: 80 },
+      { id: 'multi-trap-low', score: 70 },
+    ];
+    const picked = pickMultiRouteCandidate(
+      candidates,
+      byId({ 'multi-plain-high': 2, 'multi-trap-low': 4 }),
+      candidate => candidate.id === 'multi-trap-low',
+    );
+    expect(picked!.id).toBe('multi-plain-high');
+  });
+
+  test('trap presence never promotes a single-route candidate over a multi-route one', () => {
+    const candidates: FakeCandidate[] = [
+      { id: 'single-trap', score: 90 },
+      { id: 'multi-plain', score: 60 },
+    ];
+    const picked = pickMultiRouteCandidate(
+      candidates,
+      byId({ 'single-trap': 1, 'multi-plain': 2 }),
+      candidate => candidate.id === 'single-trap',
+    );
+    expect(picked!.id).toBe('multi-plain');
+  });
 });
 
 describe('getInsertionIndex', () => {

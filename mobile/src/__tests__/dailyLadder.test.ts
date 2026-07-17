@@ -43,6 +43,24 @@ describe('recordDailyLadderResult', () => {
     expect(await AsyncStorage.getItem(STORAGE_KEY)).not.toBeNull();
   });
 
+  test('stores resonantChoiceCount only when a positive count exists (spoiler-safe, default absent)', async () => {
+    const today = getLocalDateString();
+    await recordDailyLadderResult(entry({ date: today, resonantChoiceCount: 2 }));
+    let history = await getDailyLadderHistory();
+    expect(history[0].resonantChoiceCount).toBe(2);
+    // Spoiler-safety: a count only — no words ride along on the entry.
+    expect(Object.keys(history[0])).not.toContain('words');
+
+    // Zero / absent counts stay absent (older entries look identical).
+    await recordDailyLadderResult(entry({ date: today, resonantChoiceCount: 0 }));
+    history = await getDailyLadderHistory();
+    expect('resonantChoiceCount' in history[0]).toBe(false);
+
+    await recordDailyLadderResult(entry({ date: today }));
+    history = await getDailyLadderHistory();
+    expect('resonantChoiceCount' in history[0]).toBe(false);
+  });
+
   test('upserts by date (offline record then online patch = one entry)', async () => {
     const today = getLocalDateString();
     await recordDailyLadderResult(entry({ date: today, rank: null, percentile: null }));

@@ -29,6 +29,8 @@ import { updateQuestProgress } from '../services/weeklyQuests';
 import { recordOfferingFulfillment } from '../services/offeringRequests';
 import { PuzzleVariant, getVariantAmberMultiplier, getNewlyUnlockedVariants } from '../services/puzzleVariety';
 import { enqueueHarvestBatch, generateBatchId, getPendingHarvestSummary, HarvestSummary } from '../services/wordHarvest';
+import { recordResonantChoices } from '../services/masteryRecords';
+import { RESONANT_MOVE_AMBER, RESONANT_BOARD_CAP_AMBER } from '../constants/gameBalance';
 
 /**
  * Itemized amber breakdown for a single victory, straight from the economy
@@ -46,6 +48,8 @@ export interface AmberBreakdown {
   challengeBonus: number;
   patronBonus: number;
   surpriseBonus: number;
+  /** Resonant deep-word choices this board (per-move, board-capped; amber-only). */
+  resonanceBonus: number;
   variantBonus: number;
   freshVariantBonus: number;
   firstCompletionBonus: number;
@@ -89,6 +93,10 @@ export interface VictoryData {
   firstCompletionBonus: number;
   /** Bonus amber from puzzle variant mode */
   variantBonus: number;
+  /** Amber from resonant deep-word choices (0/absent when none; amber-only) */
+  resonanceBonus?: number;
+  /** How many resonant choices the board carried (mastery stat feed) */
+  resonantChoiceCount?: number;
   /** One-time-per-day fresh-variant rotation bonus (0 if already claimed today) */
   freshVariantBonus?: number;
   /** Puzzle variant used */
@@ -159,7 +167,8 @@ export interface PersistenceActions {
     isDaily?: boolean,
     undosUsed?: number,
     blind?: boolean,
-    isSharedChallenge?: boolean
+    isSharedChallenge?: boolean,
+    resonantChoiceCount?: number
   ) => Promise<VictoryData>;
   setAmberBalance: (balance: number) => void;
   refreshStats: () => Promise<void>;
@@ -222,10 +231,22 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
     // Shared-challenge-link wins are AMBER-ONLY: they skip weighted phase
     // progress AND the ritual-energy phase feed, so a self-crafted trivial
     // chain can never accelerate the narrative descent.
-    isSharedChallenge: boolean = false
+    isSharedChallenge: boolean = false,
+    // Resonant deep-word choices this board (from usePuzzleGame's tally).
+    // Pays a small itemized amber bonus (per-move, board-capped) and feeds
+    // the cumulative mastery stat — never phase progression.
+    resonantChoiceCount: number = 0
   ): Promise<VictoryData> => {
     const stars = calculateStars(hintsUsed, invalidAttempts);
     const flawless = isFlawless(hintsUsed, invalidAttempts, undosUsed);
+    const safeResonantCount =
+      Number.isFinite(resonantChoiceCount) && resonantChoiceCount > 0
+        ? Math.floor(resonantChoiceCount)
+        : 0;
+    const resonanceBonus = Math.min(
+      safeResonantCount * RESONANT_MOVE_AMBER,
+      RESONANT_BOARD_CAP_AMBER,
+    );
 
     // Guard against concurrent recordVictory calls
     if (recordInProgress.current) {
@@ -272,7 +293,14 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         skipPhaseProgress: isSharedChallenge,
         // Blind Offering pays the apex rung (2x amber, 2x progress cap).
         blind,
+        // Amber-only resonance bonus (itemized by the economy, never progress).
+        resonanceBonus,
       });
+
+      // Cumulative mastery stat: resonant choices ever made (non-critical).
+      if (safeResonantCount > 0) {
+        recordResonantChoices(safeResonantCount).catch(() => {});
+      }
 
       // Phase 5 (post-revelation) is set via markPostRevelation(), not phase progression.
       // calculatePhase() maxes at 4, so amberResult.newPhase can't exceed 4. If the player
@@ -322,6 +350,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         challengeBonus: amberResult.challengeBonus ?? 0,
         patronBonus: amberResult.patronBonus ?? 0,
         surpriseBonus: amberResult.surpriseBonus ?? 0,
+        resonanceBonus: amberResult.resonanceBonus ?? 0,
         variantBonus,
         freshVariantBonus,
         firstCompletionBonus: amberResult.firstCompletionBonus ?? 0,
@@ -465,6 +494,8 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         ritualEnergy,
         firstCompletionBonus: amberResult.firstCompletionBonus,
         variantBonus,
+        resonanceBonus: amberResult.resonanceBonus ?? 0,
+        resonantChoiceCount: safeResonantCount,
         freshVariantBonus,
         variant,
         variantAppliedMultiplier,

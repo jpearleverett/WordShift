@@ -38,6 +38,12 @@ const MIN_PLAUSIBLE_SOLVE_MS = 800; // sub-second "solves" are restores/glitches
 interface MasteryState {
   solveTimes: Partial<Record<Difficulty, number[]>>;
   bestSpeedRound: number;
+  /**
+   * Lifetime resonant choices: commits where a real choice of valid outcome
+   * words existed and the player formed the deepest available dread word.
+   * Migration-safe (older saves default to 0).
+   */
+  resonantChoices: number;
   unbrokenWeaveWins: number;
   unbrokenWeaveFlawlessWins: number;
   unbrokenWeaveDifficultyClears: Difficulty[];
@@ -97,6 +103,7 @@ function normalizeCount(value: unknown): number {
 const getDefault = (): MasteryState => ({
   solveTimes: {},
   bestSpeedRound: 0,
+  resonantChoices: 0,
   unbrokenWeaveWins: 0,
   unbrokenWeaveFlawlessWins: 0,
   unbrokenWeaveDifficultyClears: [],
@@ -112,6 +119,7 @@ async function load(): Promise<MasteryState> {
       cache = {
         solveTimes: parsed.solveTimes ?? {},
         bestSpeedRound: parsed.bestSpeedRound ?? 0,
+        resonantChoices: normalizeCount(parsed.resonantChoices),
         unbrokenWeaveWins: normalizeCount(parsed.unbrokenWeaveWins),
         unbrokenWeaveFlawlessWins: normalizeCount(parsed.unbrokenWeaveFlawlessWins),
         unbrokenWeaveDifficultyClears: normalizeDifficultyClears(
@@ -196,6 +204,24 @@ export async function getSolveTrend(difficulty: Difficulty): Promise<SolveTrend 
   const improving = recentMedianMs <= olderMedianMs * IMPROVEMENT_RATIO;
 
   return { samples: window.length, recentMedianMs, olderMedianMs, improving };
+}
+
+/**
+ * Accumulate a board's resonant-choice count into the lifetime mastery stat.
+ * Non-positive / non-finite counts are ignored. Returns the running total.
+ */
+export async function recordResonantChoices(count: number): Promise<number> {
+  const state = await load();
+  const add = normalizeCount(count);
+  if (add <= 0) return state.resonantChoices;
+  const next = { ...state, resonantChoices: state.resonantChoices + add };
+  await save(next);
+  return next.resonantChoices;
+}
+
+/** Lifetime resonant choices (0 if never recorded). */
+export async function getResonantChoices(): Promise<number> {
+  return (await load()).resonantChoices;
 }
 
 export interface SpeedRoundResult {

@@ -1,5 +1,9 @@
 
 import { WORDS_3, WORDS_4, WORDS_5, WORDS_6, WORDS_7, COMMON_WORDS } from '../constants';
+import {
+  analyzeStandardBranching,
+  type PuzzleBranchingMetrics,
+} from './puzzleBranching';
 
 // Offline bank generation runs the search loops synchronously (no UI to keep
 // responsive) and sets GENERATOR_NO_YIELD=1: the periodic setTimeout yields
@@ -20,7 +24,6 @@ import {
 import { getCurrentPhase } from './amberCurrency';
 import { DialoguePhase } from '../types/homeWorld';
 import { isReverseChainSolvable } from './puzzleSolvability';
-import { analyzeStandardBranching } from './puzzleBranching';
 
 // Shipped-rules solvability check (COMMON_WORDS is the same dictionary the
 // board validates against). Used as the FINAL acceptance gate for reverse
@@ -1190,17 +1193,28 @@ export const FORCED_START_MIN_SCORE = 20;
 export function pickMultiRouteCandidate<T extends { score: number }>(
   candidates: readonly T[],
   getCompletePathCount: (candidate: T) => number,
+  hasTrap?: (candidate: T) => boolean,
 ): T | null {
   if (candidates.length === 0) return null;
   let bestOverall = candidates[0];
   let bestMultiRoute: T | null = null;
   for (const candidate of candidates) {
     if (candidate.score > bestOverall.score) bestOverall = candidate;
-    if (
-      getCompletePathCount(candidate) >= 2 &&
-      (bestMultiRoute === null || candidate.score > bestMultiRoute.score)
-    ) {
-      bestMultiRoute = candidate;
+    if (getCompletePathCount(candidate) >= 2) {
+      // Score stays primary; trap presence only breaks EXACT score ties among
+      // qualifying multi-route candidates (a plausible wrong turn is planning
+      // depth when an alternate completing route exists). Single-route
+      // candidates never gain from traps: they stay in the fallback below.
+      if (
+        bestMultiRoute === null ||
+        candidate.score > bestMultiRoute.score ||
+        (hasTrap !== undefined &&
+          candidate.score === bestMultiRoute.score &&
+          hasTrap(candidate) &&
+          !hasTrap(bestMultiRoute))
+      ) {
+        bestMultiRoute = candidate;
+      }
     }
   }
   return bestMultiRoute ?? bestOverall;
@@ -1377,18 +1391,31 @@ export const generateLocalPuzzle = async (
   // semantics this standard-rule metric does not model. At most 3 finished
   // candidates are analyzed with tight caps AFTER the search loop ends, so
   // generation latency and the existing timeout behavior are untouched.
-  const bestPuzzle =
-    forcedStartWord || requireReverse || generatedPuzzles.length < 2
-      ? generatedPuzzles[0]
-      : pickMultiRouteCandidate(
-          generatedPuzzles,
-          candidate =>
-            analyzeStandardBranching(
-              candidate.chain.map(node => node.word),
-              validateWord,
-              { pathCap: 8, stateCap: 500 },
-            ).completePathCount,
-        ) ?? generatedPuzzles[0];
+  let bestPuzzle: GeneratedPuzzle;
+  if (forcedStartWord || requireReverse || generatedPuzzles.length < 2) {
+    bestPuzzle = generatedPuzzles[0];
+  } else {
+    // Analyze each finished candidate at most once (both getters share the
+    // memo), keeping the tight caps and post-search timing unchanged.
+    const candidateMetrics = new Map<GeneratedPuzzle, PuzzleBranchingMetrics>();
+    const metricsFor = (candidate: GeneratedPuzzle): PuzzleBranchingMetrics => {
+      let metrics = candidateMetrics.get(candidate);
+      if (!metrics) {
+        metrics = analyzeStandardBranching(
+          candidate.chain.map(node => node.word),
+          validateWord,
+          { pathCap: 8, stateCap: 500 },
+        );
+        candidateMetrics.set(candidate, metrics);
+      }
+      return metrics;
+    };
+    bestPuzzle = pickMultiRouteCandidate(
+      generatedPuzzles,
+      candidate => metricsFor(candidate).completePathCount,
+      candidate => metricsFor(candidate).trapStepFraction > 0,
+    ) ?? generatedPuzzles[0];
+  }
   const path = bestPuzzle.chain;
 
   const words = path.map(n => n.word);

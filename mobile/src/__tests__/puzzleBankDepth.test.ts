@@ -13,6 +13,8 @@ jest.mock('../services/puzzleBranching', () => ({
     completePathCount: 4,
     stateCount: 12,
     singleChoiceFraction: 0.25,
+    trapStepFraction: 0,
+    deadEndStateFraction: 0,
     structuralBonus: 7,
   })),
 }));
@@ -44,6 +46,8 @@ const DEFAULT_BRANCHING_METRICS = {
   completePathCount: 4,
   stateCount: 12,
   singleChoiceFraction: 0.25,
+  trapStepFraction: 0,
+  deadEndStateFraction: 0,
   structuralBonus: 7,
 };
 
@@ -96,6 +100,8 @@ describe('puzzle bank depth gates', () => {
           completePathCount: 3,
           stateCount: 12,
           singleChoiceFraction: 0.4,
+          trapStepFraction: 0,
+          deadEndStateFraction: 0,
           structuralBonus: 0,
         };
       }
@@ -103,6 +109,8 @@ describe('puzzle bank depth gates', () => {
         completePathCount: 1,
         stateCount: 10,
         singleChoiceFraction: 1,
+        trapStepFraction: 0,
+        deadEndStateFraction: 0,
         structuralBonus: 24,
       };
     });
@@ -151,5 +159,106 @@ describe('puzzle bank depth gates', () => {
 
     await selectPreGeneratedPuzzle('EASY', 0, new Map(), 'reverse', 100);
     expect(extendMock).toHaveBeenCalledTimes(callsAfterFirstSelection);
+  });
+});
+
+describe('trap steering (secondary planning-depth preference)', () => {
+  // The metrics cache inside puzzleBank is module-level and keyed by puzzle
+  // id, so each of these tests loads a FRESH module (and a fresh analyze
+  // mock) to control exactly which chains classify as trap-bearing.
+  type BankModule = typeof import('../services/puzzleBank');
+
+  interface FreshHarness {
+    select: BankModule['selectPreGeneratedPuzzle'];
+    trapMulti: Set<string>;
+    plainMulti: Set<string>;
+  }
+
+  function loadFreshHarness(): FreshHarness {
+    jest.resetModules();
+    const branching = require('../services/puzzleBranching');
+    const freshAnalyze = branching.analyzeStandardBranching as jest.Mock;
+    const trapMulti = new Set<string>();
+    const plainMulti = new Set<string>();
+    let analysisIndex = 0;
+
+    // Alternate classes in analysis (score) order:
+    //   odd index  -> single-route WITH a trap and the max bonus (must never
+    //                 reach the pool head — the multi-route tier is primary)
+    //   idx % 4 == 2 -> multi-route WITHOUT a trap (first multi in order)
+    //   idx % 4 == 0 -> multi-route WITH a trap
+    freshAnalyze.mockImplementation((words: string[]) => {
+      analysisIndex++;
+      if (analysisIndex % 2 === 1) {
+        return {
+          completePathCount: 1,
+          stateCount: 10,
+          singleChoiceFraction: 1,
+          trapStepFraction: 0.6,
+          deadEndStateFraction: 0.2,
+          structuralBonus: 24,
+        };
+      }
+      if (analysisIndex % 4 === 0) {
+        trapMulti.add(words.join(','));
+        return {
+          completePathCount: 3,
+          stateCount: 12,
+          singleChoiceFraction: 0.4,
+          trapStepFraction: 0.35,
+          deadEndStateFraction: 0.1,
+          structuralBonus: 0,
+        };
+      }
+      plainMulti.add(words.join(','));
+      return {
+        completePathCount: 2,
+        stateCount: 12,
+        singleChoiceFraction: 0.5,
+        trapStepFraction: 0,
+        deadEndStateFraction: 0,
+        structuralBonus: 0,
+      };
+    });
+
+    const bank = require('../services/puzzleBank') as BankModule;
+    return { select: bank.selectPreGeneratedPuzzle, trapMulti, plainMulti };
+  }
+
+  it('prefers trap-bearing multi-route boards at MEDIUM_PLUS past 25 solves', async () => {
+    const { select, trapMulti } = loadFreshHarness();
+
+    (Math.random as jest.Mock).mockReturnValue(0);
+    const first = await select('MEDIUM_PLUS', 0, new Map(), 'standard', 25);
+    expect(first).not.toBeNull();
+    expect(trapMulti.has(first!.words.join(','))).toBe(true);
+
+    // Slot 9 of the top-10 draw pool must ALSO be a trap-bearing multi-route
+    // board: the whole pool is multi-route-first, traps-first within it.
+    (Math.random as jest.Mock).mockReturnValue(0.95);
+    const second = await select('MEDIUM_PLUS', 0, new Map(), 'standard', 25);
+    expect(second).not.toBeNull();
+    expect(trapMulti.has(second!.words.join(','))).toBe(true);
+  });
+
+  it('leaves the plain multi-route ordering below 25 solves', async () => {
+    const { select, plainMulti } = loadFreshHarness();
+
+    // Without the trap preference the first multi-route candidate in score
+    // order is a trap-FREE one (analysis index 2), so the head of the pool
+    // must be plain — multi-route tiering alone, no trap reordering.
+    (Math.random as jest.Mock).mockReturnValue(0);
+    const selected = await select('MEDIUM_PLUS', 0, new Map(), 'standard', 24);
+    expect(selected).not.toBeNull();
+    expect(plainMulti.has(selected!.words.join(','))).toBe(true);
+  });
+
+  it('never applies the trap preference to EASY/MEDIUM banks', async () => {
+    const { select, plainMulti } = loadFreshHarness();
+
+    (Math.random as jest.Mock).mockReturnValue(0);
+    const selected = await select('MEDIUM', 0, new Map(), 'standard', 40);
+    expect(selected).not.toBeNull();
+    expect(plainMulti.has(selected!.words.join(','))).toBe(true);
   });
 });

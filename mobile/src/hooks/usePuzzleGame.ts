@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { RowData, Letter, GameState, MoveDelta, PuzzleSolutionStep, Difficulty, GameMode } from '../types';
 import { SavedPuzzleState } from '../services/puzzleSaveState';
-import { generateLocalPuzzle, generateDoubleShiftPuzzle, getIncantationName } from '../services/localGenerator';
+import { generateLocalPuzzle, generateDoubleShiftPuzzle, getIncantationName, getWordPhaseTier } from '../services/localGenerator';
 import {
   getGuaranteedExtendedStandardFallback,
   selectPreGeneratedPuzzle,
@@ -18,9 +18,11 @@ import { isBlockedWord } from '../constants/blockedWords';
 // test harness — which mocks '../constants' wholesale — still gets real values.
 import {
   PREVIEW_GRADING_FULL_LIMIT,
+  RESONANT_MOVE_AMBER,
+  RESONANT_BOARD_CAP_AMBER,
 } from '../constants/gameBalance';
 import { CHALLENGE_MODE_CONFIG, DialoguePhase } from '../types/homeWorld';
-import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getOutOfHintsMessage, getLoadingMessage, getStartMessage, getInvalidWordMessage, getBlockedWordMessage, getBlindFailMessage, getLockedLetterMessage, getEchoPuzzleMessage, getFinalBoardStartMessage, getFinalBoardUndoRefusal, getUnbrokenWeaveSpentLetterMessage, getUnbrokenWeaveUnavailableMessage } from '../services/phaseNarrative';
+import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getOutOfHintsMessage, getLoadingMessage, getStartMessage, getInvalidWordMessage, getBlockedWordMessage, getBlindFailMessage, getLockedLetterMessage, getEchoPuzzleMessage, getFinalBoardStartMessage, getFinalBoardUndoRefusal, getResonantMoveMessage, getUnbrokenWeaveSpentLetterMessage, getUnbrokenWeaveUnavailableMessage } from '../services/phaseNarrative';
 import { getHintBalanceSync, hasHintSync, consumeHintSync } from '../services/hints';
 import { getPreferredPuzzleVariant, setPreferredPuzzleVariant, getFullProgress, getRitualWords } from '../services/amberCurrency';
 import {
@@ -96,6 +98,75 @@ export function hasAnyValidMove(
   }
 
   return false;
+}
+
+/**
+ * RESONANT-CHOICE enumeration: from a PRE-move step state, collect the set of
+ * DISTINCT valid outcome words the player could have formed on this step —
+ * every unlocked (and, in Unbroken Weave, unspent) source letter whose removal
+ * leaves a valid source word, crossed with every target slot whose insertion
+ * forms a valid word. This is exactly the hasAnyValidMove enumeration, but
+ * collecting the outcome words instead of short-circuiting. Bounded by
+ * (source letters × slots) ≈ 20-40 dictionary lookups, run once per commit.
+ *
+ * For a double-shift step, pass the MID-step state (source already reduced by
+ * drop1, target holding the intermediate word): the enumeration then mirrors
+ * the completed step's real remaining decision space.
+ */
+export function collectDistinctOutcomeWords(
+  sourceLetters: Letter[],
+  targetChars: string[],
+  isWordValid: (word: string) => boolean,
+  spentLetters: ReadonlySet<string> = new Set(),
+): Set<string> {
+  const outcomes = new Set<string>();
+  for (let i = 0; i < sourceLetters.length; i++) {
+    if (sourceLetters[i].isLocked) continue;
+    const letter = sourceLetters[i].char;
+    if (isLetterSpent(spentLetters, letter)) continue;
+    const remaining = sourceLetters
+      .filter((_, idx) => idx !== i)
+      .map(l => l.char)
+      .join('');
+    if (!isWordValid(remaining)) continue;
+    for (let j = 0; j <= targetChars.length; j++) {
+      const candidate =
+        targetChars.slice(0, j).join('') + letter + targetChars.slice(j).join('');
+      if (isWordValid(candidate)) outcomes.add(candidate);
+    }
+  }
+  return outcomes;
+}
+
+/**
+ * A committed move is a RESONANT CHOICE when (a) the player had a real choice
+ * (2+ distinct valid outcome words existed), (b) the word they chose carries
+ * dread weight (getWordPhaseTier >= 1), and (c) no available alternative ran
+ * deeper (chosen tier >= the max tier among the outcomes). Pure and exported
+ * for tests.
+ */
+export function isResonantChoice(
+  chosenWord: string,
+  outcomeWords: ReadonlySet<string>,
+): boolean {
+  if (outcomeWords.size < 2) return false;
+  const chosenTier = getWordPhaseTier(chosenWord);
+  if (chosenTier < 1) return false;
+  for (const word of outcomeWords) {
+    if (getWordPhaseTier(word) > chosenTier) return false;
+  }
+  return true;
+}
+
+/**
+ * Per-board resonance amber: RESONANT_MOVE_AMBER per resonant choice, capped
+ * at RESONANT_BOARD_CAP_AMBER. Amber-only — never phase progress.
+ */
+export function resonanceAmberForCount(count: number): number {
+  return Math.min(
+    Math.max(0, Math.floor(count)) * RESONANT_MOVE_AMBER,
+    RESONANT_BOARD_CAP_AMBER,
+  );
 }
 
 /**
@@ -493,6 +564,19 @@ export interface PuzzleGameState {
   hintHighlight: HintHighlight | null;
   /** Per-committed-move outcomes for the honest share grid, in play order. */
   moveOutcomes: MoveOutcome[];
+  /**
+   * Resonant choices this board: commits where a real choice of valid outcome
+   * words existed and the player formed the deepest available dread word.
+   * Blind boards and the finale never count; undo decrements.
+   */
+  resonantChoiceCount: number;
+  /** Amber earned from resonant choices this board (per-move, board-capped). */
+  resonanceAmber: number;
+  /**
+   * Read-only summary of the committed move history (letter + source row per
+   * delta), for sibling consumers. Cleared on new board, popped on undo.
+   */
+  moveHistorySummary: { letter: string; fromRow: number }[];
   /** Landing spot of the last committed tap move (null for drag/initial/undo/restore). */
   lastArrival: ArrivalMark | null;
   /** Set by resumeSpeedAfterRescue so App can restart the speed clock with the granted seconds. */
@@ -545,6 +629,10 @@ export interface PuzzleGameActions {
     solveTimeMs?: number;
     /** Whether this board was played with the Blind Offering modifier on. */
     blind?: boolean;
+    /** Resonant choices across the whole board (present on the completing move). */
+    resonantChoiceCount?: number;
+    /** Capped resonance amber for the board (present on the completing move). */
+    resonanceAmber?: number;
     /**
      * True when the completed board was THE marked final board (finale-armed
      * serve). App suppresses the victory fanfare and fires the finale on it.
@@ -716,6 +804,13 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   // (classifies the NEXT committed move for the share grid).
   const pendingHintRef = useRef(false);
   const pendingMistakeRef = useRef(false);
+  // Resonant-choice tracking (evaluative depth): one flag per committed step,
+  // aligned 1:1 with moveOutcomesRef so undo can pop the pair together and
+  // decrement the tally when the undone step was resonant. Ref mirror keeps
+  // the completion result honest inside the async commit closure.
+  const [resonantChoiceCount, setResonantChoiceCount] = useState(0);
+  const resonantChoiceCountRef = useRef(0);
+  const resonantFlagsRef = useRef<boolean[]>([]);
   // Arrival settle for the tap path (drag-drops keep their own feedback).
   const [lastArrival, setLastArrival] = useState<ArrivalMark | null>(null);
   const arrivalMoveIdRef = useRef(0);
@@ -863,6 +958,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setMoveOutcomes([]);
     pendingHintRef.current = false;
     pendingMistakeRef.current = false;
+    resonantFlagsRef.current = [];
+    resonantChoiceCountRef.current = 0;
+    setResonantChoiceCount(0);
     setLastArrival(null);
     setSpeedRescueSignal(null);
     setHint(puzzleHint || "");
@@ -2017,6 +2115,31 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     pendingHintRef.current = false;
     pendingMistakeRef.current = false;
 
+    // RESONANT-CHOICE detection, from the PRE-move step state: did the player
+    // have a real choice of valid outcome words, and did they form the deepest
+    // available dread word? Blind boards are excluded entirely (the chain is
+    // judged once at the end — mid-board evaluation would leak validity) and
+    // the finale board never pays it. sourceRow/targetRow still hold the
+    // pre-commit rows here; for a double-shift drop2 they hold the MID-step
+    // state (reduced source + intermediate target), which is exactly the
+    // completed step's remaining decision space. One flag per committed step,
+    // aligned with moveOutcomesRef for the undo pop.
+    let resonantMove = false;
+    if (!blindMode && !isFinalBoardRef.current) {
+      const outcomeWords = collectDistinctOutcomeWords(
+        sourceRow.words,
+        targetRow.words.map(l => l.char),
+        (w) => validWordsCache.current.has(w),
+        unbrokenWeaveMode ? spentLetterSet : undefined,
+      );
+      resonantMove = isResonantChoice(targetWordStr, outcomeWords);
+    }
+    resonantFlagsRef.current = [...resonantFlagsRef.current, resonantMove];
+    if (resonantMove) {
+      resonantChoiceCountRef.current += 1;
+      setResonantChoiceCount(resonantChoiceCountRef.current);
+    }
+
     // Arrival settle for the tap path — the moved letter lands with a
     // scale/translate spring instead of teleporting. Drag-drops keep the
     // floating-tile collapse + catch bounce (App passes inputSource='drag').
@@ -2066,6 +2189,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         // Full per-move record including the completing move (ref mirror is
         // already current; state would be a render behind at this point).
         moveOutcomes: moveOutcomesRef.current,
+        // Resonance tally for the whole board (ref mirror — includes the
+        // completing move); amber is per-move, board-capped, amber-only.
+        resonantChoiceCount: resonantChoiceCountRef.current,
+        resonanceAmber: resonanceAmberForCount(resonantChoiceCountRef.current),
       };
     };
 
@@ -2087,6 +2214,14 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       return shouldUseComboMessage(streak)
         ? getComboMoveMessage(streak, currentPhase)
         : getMoveMessage(currentPhase);
+    };
+
+    // A resonant choice REPLACES the normal move message for that commit only —
+    // the line IS the acknowledgment (never stacked with the pool draw). The
+    // streak/combo bookkeeping inside moveMessageFor still runs identically.
+    const applyMoveMessage = (stuck: boolean) => {
+      const normal = moveMessageFor(stuck);
+      setMessage(resonantMove ? getResonantMoveMessage(currentPhase) : normal);
     };
 
     // Blind Offering's single judgment: the finished chain must be all real
@@ -2138,7 +2273,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
               checkValidation,
               unbrokenWeaveMode ? nextSpentLetterSet : undefined,
             );
-      setMessage(moveMessageFor(stuckForward));
+      applyMoveMessage(stuckForward);
       setIsStuck(stuckForward);
       setLastFormedWord(targetWordStr);
       setIsProcessing(false);
@@ -2172,7 +2307,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         const stuck = blindMode
           ? false
           : !hasAnyValidMove(newRows, activeRowIndex + 1, 'down', checkValidation);
-        setMessage(moveMessageFor(stuck));
+        applyMoveMessage(stuck);
         setIsStuck(stuck);
       }
       setLastFormedWord(targetWordStr);
@@ -2195,7 +2330,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     const stuckUp = blindMode
       ? false
       : !hasAnyValidMove(newRows, activeRowIndex - 1, 'up', checkValidation);
-    setMessage(moveMessageFor(stuckUp));
+    applyMoveMessage(stuckUp);
     setIsStuck(stuckUp);
     setLastFormedWord(targetWordStr);
     setIsProcessing(false);
@@ -2336,6 +2471,13 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         if (undone === 'mistake' || undone === 'both') pendingMistakeRef.current = true;
         moveOutcomesRef.current = moveOutcomesRef.current.slice(0, -1);
         setMoveOutcomes(moveOutcomesRef.current);
+        // Aligned resonant-flag pop: undoing a resonant step takes its tally back.
+        const undoneResonant = resonantFlagsRef.current[resonantFlagsRef.current.length - 1];
+        resonantFlagsRef.current = resonantFlagsRef.current.slice(0, -1);
+        if (undoneResonant) {
+          resonantChoiceCountRef.current = Math.max(0, resonantChoiceCountRef.current - 1);
+          setResonantChoiceCount(resonantChoiceCountRef.current);
+        }
       }
       setMessage("Let's try again!");
       if (!freeUndos) setUndosRemaining(prev => prev - 1);
@@ -2382,6 +2524,13 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       if (undone === 'mistake' || undone === 'both') pendingMistakeRef.current = true;
       moveOutcomesRef.current = moveOutcomesRef.current.slice(0, -1);
       setMoveOutcomes(moveOutcomesRef.current);
+      // Aligned resonant-flag pop: undoing a resonant move takes its tally back.
+      const undoneResonant = resonantFlagsRef.current[resonantFlagsRef.current.length - 1];
+      resonantFlagsRef.current = resonantFlagsRef.current.slice(0, -1);
+      if (undoneResonant) {
+        resonantChoiceCountRef.current = Math.max(0, resonantChoiceCountRef.current - 1);
+        setResonantChoiceCount(resonantChoiceCountRef.current);
+      }
     }
     setMessage("Let's try again!");
 
@@ -2588,6 +2737,11 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setMoveOutcomes([]);
     pendingHintRef.current = false;
     pendingMistakeRef.current = false;
+    // Like moveOutcomes, resonance isn't persisted — a restored board restarts
+    // its tally (the pre-kill choices can't be re-verified against the rules).
+    resonantFlagsRef.current = [];
+    resonantChoiceCountRef.current = 0;
+    setResonantChoiceCount(0);
     // A restored board has no honest solve-time origin — don't feed the trend.
     boardTimedRef.current = false;
   }, []);
@@ -2665,7 +2819,18 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setMoveOutcomes([]);
     pendingHintRef.current = false;
     pendingMistakeRef.current = false;
+    resonantFlagsRef.current = [];
+    resonantChoiceCountRef.current = 0;
+    setResonantChoiceCount(0);
   }, []);
+
+  // Read-only committed-move summary for sibling consumers (one entry per
+  // MoveDelta — a double-shift step contributes two). Derived, so it clears
+  // with the history on new boards and pops with it on undo.
+  const moveHistorySummary = useMemo(
+    () => history.map(d => ({ letter: d.movedLetterChar, fromRow: d.sourceRowIndex })),
+    [history],
+  );
 
   const state: PuzzleGameState = {
     rows,
@@ -2711,6 +2876,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     outOfHintsSignal,
     hintHighlight,
     moveOutcomes,
+    resonantChoiceCount,
+    resonanceAmber: resonanceAmberForCount(resonantChoiceCount),
+    moveHistorySummary,
     lastArrival,
     speedRescueSignal,
   };

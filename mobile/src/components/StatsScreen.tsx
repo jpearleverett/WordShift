@@ -23,6 +23,7 @@ import { Difficulty } from '../types';
 import { getJourneyAtmosphereText, getPaceTrendMessage } from '../services/phaseNarrative';
 import {
   getBestSpeedRound,
+  getResonantChoices,
   getSolveTrend,
   getUnbrokenWeaveMastery,
   UnbrokenWeaveMastery,
@@ -58,6 +59,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
   const [currentStreak, setCurrentStreak] = useState(0);
   const [selectedTab, setSelectedTab] = useState<'overview' | 'achievements'>('overview');
   const [bestSpeedRound, setBestSpeedRound] = useState(0);
+  const [resonantChoices, setResonantChoices] = useState(0);
   const [paceImproving, setPaceImproving] = useState(false);
   const [unbrokenWeaveMastery, setUnbrokenWeaveMastery] = useState<UnbrokenWeaveMastery | null>(null);
 
@@ -67,6 +69,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
     getDailyStatus().then(s => setDailyStatus({ totalCompleted: s.totalCompleted, bestStreak: s.bestStreak }));
     getStreakInfo().then(info => setCurrentStreak(info.currentStreak));
     getBestSpeedRound().then(setBestSpeedRound);
+    getResonantChoices().then(setResonantChoices);
     getUnbrokenWeaveMastery().then(setUnbrokenWeaveMastery);
     // Pace trend: improving if the player is quicker at ANY difficulty they've
     // played enough of. Private scanning-speed signal — no leaderboard.
@@ -210,13 +213,24 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
             {/* Mastery — private skill records (best speed run, scanning pace).
                 Only shown once there's something to show, so it never clutters a
                 new player's overview. */}
-            {(bestSpeedRound > 0 || paceImproving || effectivePhase === 5 || (unbrokenWeaveMastery !== null && unbrokenWeaveMastery.wins > 0)) && (
+            {(bestSpeedRound > 0 || resonantChoices > 0 || paceImproving || effectivePhase === 5 || (unbrokenWeaveMastery !== null && unbrokenWeaveMastery.wins > 0)) && (
               <PanelCard phase={effectivePhase} style={styles.sectionCard}>
                 <PixelPlaque phase={effectivePhase} label={'MASTERY'} style={styles.sectionPlaque} />
                 {bestSpeedRound > 0 && (
                   <View style={styles.masteryRow}>
                     <Text style={[styles.masteryLabel, { color: t.body }]}>Best speed run</Text>
                     <Text style={[styles.masteryValue, { color: t.title }]}>Round {bestSpeedRound + 1}</Text>
+                  </View>
+                )}
+                {resonantChoices > 0 && (
+                  <View style={styles.masteryRow}>
+                    <Text
+                      style={[styles.masteryLabel, { color: t.body }]}
+                      accessibilityLabel={`${resonantChoices} resonant choices`}
+                    >
+                      Resonant choices
+                    </Text>
+                    <Text style={[styles.masteryValue, { color: t.title }]}>{resonantChoices}</Text>
                   </View>
                 )}
                 {paceImproving && (

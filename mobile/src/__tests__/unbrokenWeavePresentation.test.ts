@@ -109,6 +109,7 @@ jest.mock('../services/amberCurrency', () => ({
 }));
 jest.mock('../services/masteryRecords', () => ({
   getBestSpeedRound: jest.fn(async () => 0),
+  getResonantChoices: jest.fn(async () => 0),
   getSolveTrend: jest.fn(async () => null),
   getUnbrokenWeaveMastery: jest.fn(async () => ({
     rank: 2,

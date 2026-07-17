@@ -164,6 +164,7 @@ import {
   getVictoryTitle,
   getFlawlessHonorific,
   getUnbrokenWeaveRankUpLine,
+  getResonanceBonusLabel,
 } from '../services/phaseNarrative';
 import { isDailyShareBonusAvailable, DAILY_SHARE_BONUS_AMBER } from '../services/shareResults';
 import { getPhaseTheme } from '../theme/colors';
@@ -673,6 +674,7 @@ describe('amber breakdown threading (economy is the display source of truth)', (
       challengeBonus: 0,
       patronBonus: 0,
       surpriseBonus: 0,
+      resonanceBonus: 0,
       variantBonus: 0,
       freshVariantBonus: 0,
       firstCompletionBonus: 0,
@@ -708,6 +710,43 @@ describe('amber breakdown threading (economy is the display source of truth)', (
     // AMBER_REWARDS.MEDIUM = 10, 3-star bonus floor(10 * 0.5) = +5
     expect(text).toContain('10');
     expect(text).toContain('+ 5');
+  });
+
+  it('renders the resonance line with the phase label when the breakdown carries one', () => {
+    const tree = render(baseProps({
+      phase: 0 as DialoguePhase,
+      victoryData: baseVictoryData({
+        amberEarned: 22,
+        amberBreakdown: breakdown({ resonanceBonus: 4, total: 22 }),
+      }),
+    }));
+    const text = textOf(tree);
+    expect(text).toContain(getResonanceBonusLabel(0));
+    expect(text).toContain('+ 4');
+
+    // Dark-phase label follows the phase-aware copy function.
+    resetHookState();
+    const darkTree = render(baseProps({
+      phase: 4 as DialoguePhase,
+      victoryData: baseVictoryData({
+        amberEarned: 22,
+        amberBreakdown: breakdown({ resonanceBonus: 4, total: 22 }),
+      }),
+    }));
+    expect(textOf(darkTree)).toContain(getResonanceBonusLabel(4));
+  });
+
+  it('renders no resonance line when the bonus is zero/absent', () => {
+    const tree = render(baseProps({
+      victoryData: baseVictoryData({ amberEarned: 18, amberBreakdown: breakdown() }),
+    }));
+    expect(textOf(tree)).not.toContain(getResonanceBonusLabel(0));
+
+    resetHookState();
+    const noBreakdown = render(baseProps({
+      victoryData: baseVictoryData({ amberEarned: 15 }),
+    }));
+    expect(textOf(noBreakdown)).not.toContain(getResonanceBonusLabel(0));
   });
 
   it('shows the Patron line only when the breakdown carries a patron bonus', () => {
