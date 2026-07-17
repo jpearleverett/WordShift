@@ -78,21 +78,21 @@ const BANKS: BankSpec[] = [
   { name: 'MEDIUM_PLUS', bank: PUZZLE_BANK_MEDIUM_PLUS, cap: 10, minUnique: 1315, minPuzzles: 495 },
   // HARD 492 / max 12 (round-2 cap raise) / 1368 unique
   { name: 'HARD', bank: PUZZLE_BANK_HARD, cap: 12, minUnique: 1230, minPuzzles: 440 },
-  // REVERSE_EASY 429 / max 7 / 1325 unique
+  // REVERSE_EASY 406 / max 7 / 1325 unique
   { name: 'REVERSE_EASY', bank: PUZZLE_BANK_REVERSE_EASY, cap: 7, minUnique: 1190, minPuzzles: 380 },
-  // REVERSE_MEDIUM 318 / max 11 (solution-repair pass) / 1304 unique
+  // REVERSE_MEDIUM 292 / max 11 (solution-repair pass) / 1304 unique
   { name: 'REVERSE_MEDIUM', bank: PUZZLE_BANK_REVERSE_MEDIUM, cap: 11, minUnique: 1170, minPuzzles: 280 },
   // REVERSE_MEDIUM_PLUS 219 / max 12 / 877 unique
   { name: 'REVERSE_MEDIUM_PLUS', bank: PUZZLE_BANK_REVERSE_MEDIUM_PLUS, cap: 12, minUnique: 785, minPuzzles: 195 },
-  // REVERSE_HARD 183 / max 16 / 783 unique
+  // REVERSE_HARD 182 / max 16 / 783 unique
   { name: 'REVERSE_HARD', bank: PUZZLE_BANK_REVERSE_HARD, cap: 16, minUnique: 700, minPuzzles: 160 },
-  // DOUBLE_EASY 495 / max 3 / 1619 unique
+  // DOUBLE_EASY 489 / max 3 / 1619 unique
   { name: 'DOUBLE_EASY', bank: PUZZLE_BANK_DOUBLE_SHIFT_EASY, cap: 3, minUnique: 1455, minPuzzles: 440 },
-  // DOUBLE_MEDIUM 458 / max 5 / 1604 unique
+  // DOUBLE_MEDIUM 447 / max 5 / 1604 unique
   { name: 'DOUBLE_MEDIUM', bank: PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM, cap: 5, minUnique: 1440, minPuzzles: 405 },
-  // DOUBLE_MEDIUM_PLUS 474 / max 8 / 1637 unique
+  // DOUBLE_MEDIUM_PLUS 463 / max 8 / 1637 unique
   { name: 'DOUBLE_MEDIUM_PLUS', bank: PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM_PLUS, cap: 8, minUnique: 1470, minPuzzles: 420 },
-  // DOUBLE_HARD 442 / max 10 / 1617 unique
+  // DOUBLE_HARD 425 / max 10 / 1617 unique
   { name: 'DOUBLE_HARD', bank: PUZZLE_BANK_DOUBLE_SHIFT_HARD, cap: 10, minUnique: 1450, minPuzzles: 390 },
 ];
 

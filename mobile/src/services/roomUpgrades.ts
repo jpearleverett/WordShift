@@ -149,7 +149,7 @@ export const ROOM_UPGRADES: RoomUpgrade[] = [
 // ---------------------------------------------------------------------------
 // Tier-2 "deepenings" (1 per room) — a second, costlier enhancement that opens
 // at Phase 2 (the same gate as the tier-1 decorations it builds on), filling the
-// ~puzzle 65–135 mid-game spend valley as one continuous sink (decorate, then
+// ~puzzle 45–95 mid-game spend valley as one continuous sink (decorate, then
 // deepen). Requires the room's tier-1 decoration first; never disappears, so
 // slower players still find it later. Cosmetic only (never progression). Copy
 // leans into the growing dread — these are not cozy.
@@ -480,7 +480,7 @@ export async function getDeepenedRooms(): Promise<Record<string, number>> {
 
 /**
  * Deepenings open at Phase 2 — the same gate as the tier-1 decorations they
- * build on. This is deliberate: Phase 2 spans the ~puzzle 65–135 mid-game
+ * build on. This is deliberate: Phase 2 spans the ~puzzle 45–95 mid-game
  * valley, where the house has largely finished unlocking and amber starts to
  * pile up with nothing compelling to spend it on. Opening tier-1 AND tier-2 in
  * the same phase turns two discrete unlock cliffs into one continuous sink
