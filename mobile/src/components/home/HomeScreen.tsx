@@ -1297,10 +1297,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   ]);
 
 
-  // Talking animation for intro dialogue
+  // Talking animation shared by the intro/override dialogue AND the journal
+  // spotlight (ONE timer serves every dialogue surface that isn't driven by
+  // useDialogueFlow's own isTalking). Mirrors the main dialogue card exactly:
+  // under reduced motion the flag HOLDS true, so the talk frame and the
+  // dialogueSpriteTalking lift resolve to a static pose instead of toggling.
   const [introIsTalking, setIntroIsTalking] = useState(false);
+  const journalSpotlightVisible =
+    journalSpotlightActive && journalSpotlightLines.length > 0;
   useEffect(() => {
-    if (showIntroDialogue) {
+    if (showIntroDialogue || journalSpotlightVisible) {
+      if (getSettingsSync().reducedMotion) {
+        setIntroIsTalking(true);
+        return;
+      }
       // Slower mouth-flap cadence on low-end devices
       const interval = setInterval(() => {
         setIntroIsTalking(prev => !prev);
@@ -1309,7 +1319,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     } else {
       setIntroIsTalking(false);
     }
-  }, [showIntroDialogue]);
+  }, [showIntroDialogue, journalSpotlightVisible]);
 
   // Slide animation for intro dialogue (matches normal dialogue)
   useEffect(() => {
@@ -3002,6 +3012,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         styles.dialogueSpriteImage,
                         COMPACT_DIALOGUE_SPRITES.has(introAnimal.type) &&
                           styles.dialogueSpriteImageSmall,
+                        introIsTalking && styles.dialogueSpriteTalking,
                       ]}
                       accessibilityRole="image"
                       accessibilityLabel={`${introAnimal.name} portrait`}
@@ -3301,7 +3312,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
       {/* Journal Spotlight Intro — Modal so it renders above the journal hub Modal */}
       <Modal
-        visible={journalSpotlightActive && journalSpotlightLines.length > 0}
+        visible={journalSpotlightVisible}
         transparent
         statusBarTranslucent
         animationType="none"
@@ -3384,23 +3395,43 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               {/* Portrait + name below it (reclaims the wasted header space;
                   the bubble now starts at the top of the text column). */}
               <View style={styles.journalSpotlightSpriteWrap}>
-                <View
-                  style={[
-                    styles.journalSpotlightSpriteCol,
-                    { backgroundColor: dt.spriteBg, borderColor: dt.bubbleBorder },
-                  ]}
-                >
-                  {CHARACTER_SPRITES.fox ? (
+                {CHARACTER_SPRITES.fox ? (
+                  /* Pre-mounted idle+talk stack, same as the main dialogue
+                     portrait (source swaps re-decode and flicker). The sprite
+                     sits TRANSPARENT on the parchment: no fill box, no border,
+                     matching how the other dialogue cards treat their sprite. */
+                  <View
+                    style={[
+                      styles.journalSpotlightSpriteCol,
+                      introIsTalking && styles.dialogueSpriteTalking,
+                    ]}
+                    accessibilityRole="image"
+                    accessibilityLabel="Fox portrait"
+                  >
                     <Image
-                      source={CHARACTER_SPRITES.fox.talk || CHARACTER_SPRITES.fox.idle}
-                      style={styles.journalSpotlightSpriteImage}
+                      source={CHARACTER_SPRITES.fox.idle}
+                      style={[
+                        styles.dialogueSpriteLayer,
+                        introIsTalking &&
+                          Boolean(CHARACTER_SPRITES.fox.talk) &&
+                          styles.dialogueSpriteLayerHidden,
+                      ]}
                       resizeMode="cover"
-                      accessibilityLabel="Fox portrait"
                     />
-                  ) : (
-                    <Text style={styles.dialogueSpriteEmoji}>🦊</Text>
-                  )}
-                </View>
+                    {Boolean(CHARACTER_SPRITES.fox.talk) && (
+                      <Image
+                        source={CHARACTER_SPRITES.fox.talk!}
+                        style={[
+                          styles.dialogueSpriteLayer,
+                          !introIsTalking && styles.dialogueSpriteLayerHidden,
+                        ]}
+                        resizeMode="cover"
+                      />
+                    )}
+                  </View>
+                ) : (
+                  <Text style={styles.dialogueSpriteEmoji}>🦊</Text>
+                )}
                 <Text numberOfLines={1} style={[styles.journalSpotlightSpeaker, { color: dt.nameColor }]}>
                   {ANIMAL_INFO.fox?.name || 'Ember'}
                 </Text>
@@ -4763,23 +4794,18 @@ const styles = StyleSheet.create({
     paddingBottom: 22,
     gap: 12,
   },
-  // Portrait + nameplate stacked; the framed box no longer stretches to the
+  // Portrait + nameplate stacked; the crop box no longer stretches to the
   // row (it is wrapped), so it carries an explicit height.
   journalSpotlightSpriteWrap: {
     alignItems: 'center',
   },
+  // Transparent portrait crop box (NO fill, NO border/borderRadius): the
+  // sprite sits directly on the card parchment like the main dialogue card's
+  // sprite column; fixed dims crop the cover-scaled idle/talk layers.
   journalSpotlightSpriteCol: {
     width: 92,
     height: 140,
-    borderRadius: 20,
     overflow: 'hidden',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-  },
-  journalSpotlightSpriteImage: {
-    width: 118,
-    height: 140,
   },
   journalSpotlightDialogueCol: {
     flex: 1,

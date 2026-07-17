@@ -941,5 +941,95 @@ describe('useGamePersistence', () => {
       const [state] = callHook();
       expect(state.amberBalance).toBe(999);
     });
+
+    test('never stores a negative mirror value: clamps, then re-syncs from the store', async () => {
+      // The real-device bug: a caller computed `staleSnapshot.amber - cost`
+      // (the unlock-purchase path) and pushed a NEGATIVE number into the
+      // mirror while the store held the true balance. The guard must refuse
+      // the garbage value and self-heal from the authoritative store.
+      mockGetAmberBalance.mockResolvedValue(190);
+
+      const [, actions] = callHook();
+      actions.setAmberBalance(100); // legitimate prior value
+      actions.setAmberBalance(-12); // stale-snapshot subtraction gone wrong
+
+      // Synchronously: the negative is refused (display stays non-negative).
+      let [state] = callHook();
+      expect(state.amberBalance).toBeGreaterThanOrEqual(0);
+      expect(state.amberBalance).not.toBe(-12);
+
+      // After the async re-sync: the mirror equals the store truth.
+      await new Promise(resolve => setTimeout(resolve, 0));
+      [state] = callHook();
+      expect(state.amberBalance).toBe(190);
+      expect(mockGetAmberBalance).toHaveBeenCalled();
+    });
+
+    test('refuses non-finite values and re-syncs from the store', async () => {
+      mockGetAmberBalance.mockResolvedValue(75);
+
+      const [, actions] = callHook();
+      actions.setAmberBalance(40);
+      actions.setAmberBalance(Number.NaN);
+
+      let [state] = callHook();
+      expect(Number.isFinite(state.amberBalance)).toBe(true);
+      expect(state.amberBalance).toBeGreaterThanOrEqual(0);
+
+      await new Promise(resolve => setTimeout(resolve, 0));
+      [state] = callHook();
+      expect(state.amberBalance).toBe(75);
+    });
+
+    test('a store re-sync itself clamps a (hypothetically) negative store read', async () => {
+      // Defense in depth: even if the store ever returned a negative, the
+      // mirror renders 0, never a minus sign.
+      mockGetAmberBalance.mockResolvedValue(-30 as unknown as number);
+
+      const [, actions] = callHook();
+      actions.setAmberBalance(-1);
+
+      await new Promise(resolve => setTimeout(resolve, 0));
+      const [state] = callHook();
+      expect(state.amberBalance).toBe(0);
+    });
+  });
+
+  describe('mirror can never go negative via recordVictory/refresh paths', () => {
+    test('recordVictory clamps a negative economy newBalance before mirroring', async () => {
+      mockAwardPuzzleAmber.mockResolvedValueOnce({
+        amount: 15,
+        baseAmount: 15,
+        newBalance: -5 as unknown as number, // corrupted economy value
+        puzzlesSolved: 1,
+        phaseChanged: false,
+        newPhase: 0 as const,
+        streakBonus: 0,
+        challengeBonus: 0,
+        currentStreak: 1,
+        milestoneBonus: 0,
+        milestoneMessage: null,
+        phaseAcceleration: 1.0,
+        firstCompletionBonus: 0,
+        streakMilestoneBonus: 0,
+        streakMilestoneMessage: null,
+      } as any);
+
+      const [, actions] = callHook();
+      await actions.recordVictory('MEDIUM', 0, 0);
+
+      const [state] = callHook();
+      expect(state.amberBalance).toBeGreaterThanOrEqual(0);
+    });
+
+    test('refreshStats clamps a negative store read', async () => {
+      mockGetAmberBalance.mockResolvedValueOnce(-9 as unknown as number);
+
+      const [, actions] = callHook();
+      await actions.refreshStats();
+
+      const [state] = callHook();
+      expect(state.amberBalance).toBe(0);
+    });
   });
 });

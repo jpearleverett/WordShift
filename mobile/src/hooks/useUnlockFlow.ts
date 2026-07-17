@@ -15,7 +15,7 @@ import {
   skipReservedUnlock,
   getReservedSkipCost,
 } from '../services/homeWorldData';
-import { getReservedUnlockId } from '../services/amberCurrency';
+import { getAmberBalance, getReservedUnlockId } from '../services/amberCurrency';
 import { hapticError, hapticLight, hapticSuccess } from '../services/haptics';
 
 interface UseUnlockFlowParams {
@@ -276,9 +276,13 @@ export function useUnlockFlow({
       setShowShop(false);
       setShowRoomUnlock(null);
       setShowInvitePrompt(false);
-      if (progress) {
-        onAmberChange?.(progress.amber - unlock.cost);
-      }
+      // Push the STORE's post-spend balance, never a snapshot subtraction:
+      // purchaseUnlock validated affordability against the live amberCurrency
+      // store, but HomeScreen's `progress` state can be stale-low (it misses
+      // credits that never trigger loadAllData), so `progress.amber - cost`
+      // could go negative and poison the app-level amber mirror.
+      const balance = await getAmberBalance();
+      onAmberChange?.(balance);
 
       // If we just unlocked a character, show their intro dialogue
       if (unlock.type === 'character' && !options?.suppressIntro) {
@@ -301,7 +305,7 @@ export function useUnlockFlow({
       hapticError();
       setPurchaseError(result.error || 'Unable to unlock. Try again later.');
     }
-  }, [progress, loadAllData, onAmberChange, setShowCelebration, setIntroAnimal, setIntroDialogueIndex, setShowIntroDialogue]);
+  }, [loadAllData, onAmberChange, setShowCelebration, setIntroAnimal, setIntroDialogueIndex, setShowIntroDialogue]);
 
   return {
     showShop,
