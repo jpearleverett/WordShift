@@ -114,6 +114,19 @@ export interface ProcessVictoryParams {
 /** Display duration for the dwell-window held-breath line (ambient overlay). */
 const DWELL_LINE_DURATION_MS = 4500;
 
+/**
+ * Whisper frequency gate: the probability that a given win voices an animal
+ * whisper. Firing on EVERY win guaranteed fast repeats from the 5-line-per-
+ * phase pools, so phases 0-3 whisper on under half of wins, phase 4 more
+ * often (the dread thickens), and phase 5 always (the personalized whispers
+ * are the endgame feature). Exported for tests.
+ */
+export function getWhisperChance(phase: number): number {
+  if (phase >= 5) return 1;
+  if (phase >= 4) return 0.6;
+  return 0.45;
+}
+
 // ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
@@ -256,8 +269,11 @@ export function useVictoryOrchestration(): [
       }
     })().catch(() => {});
 
-    // ------ Animal whisper (skip during onboarding) ------
-    if (!onboarding) {
+    // ------ Animal whisper (skip during onboarding; frequency-gated) ------
+    // The roll happens BEFORE generation: a win that loses the roll skips the
+    // whisper entirely, INCLUDING the gallery recordWhisper — a line the
+    // player never saw must not fill the archive.
+    if (!onboarding && Math.random() < getWhisperChance(phase)) {
       addTimeout(async () => {
         try {
           if (gen !== generationRef.current) return;

@@ -24,7 +24,7 @@ import { DialoguePhase } from '../types/homeWorld';
 // ============================================================================
 
 /** Puzzle thresholds for phase transitions (weighted progress values). */
-export const PHASE_THRESHOLDS = [0, 20, 60, 120, 180];
+export const PHASE_THRESHOLDS = [0, 16, 44, 84, 124];
 
 /**
  * Minimum real puzzles the player must have completed before a phase
@@ -34,26 +34,31 @@ export const PHASE_THRESHOLDS = [0, 20, 60, 120, 180];
  * players: once weighted progress clears PHASE_THRESHOLDS, the floor is what
  * actually gates the transition. The Phase 4 (cult reveal) and Phase 5
  * (post-revelation) floors are deliberately reachable — the entire narrative
- * payoff lives there, so an engaged player arrives at the climax in a single
- * committed fortnight rather than a months-long grind.
+ * payoff lives there, so an engaged player arrives at the climax in under two
+ * committed weeks rather than a months-long grind.
  *
- * 2026-07 fun-overhaul geography: Phase 2 (Deeper Questions) spans ~52 puzzles
- * (floor 38 → floor 90) — long enough to earn the dusk, short enough that the
- * single-tone stretch never becomes the D14 quit point. The reveal floor sits
- * at 130, just before the Sky Garden gate (135) and house completion/recruit
- * (~136), so the Phase-4 dwell window plays out inside a finished temple. The vanguard tier's
- * +1 offset means vanguard animals speak Phase-4 lines across the 90→130
- * window (Phase 3 floor → reveal floor); that leak is ACCEPTED as the price of
- * pacing — the oracle whispering ahead of the reveal reads as foreshadowing,
- * not spoilage.
+ * 2026-07 compressed geography (~×0.7 of the fun-overhaul arc): the whole arc
+ * moved down so a CASUAL 2-puzzle/day player reaches the reveal around day 45
+ * (was ~day 65) and post-revelation around day 60 (was ~day 81), while an
+ * ENGAGED 8/day player lands the reveal ~day 11-12 and the finale ~day 15.
+ * Phase 2 (Deeper Questions) spans ~34 puzzles (floor 28 → floor 62) — long
+ * enough to earn the dusk, short enough that the single-tone stretch never
+ * becomes the D14 quit point. The reveal floor sits at 90, just before the
+ * Sky Garden gate (92) and house completion/recruit (~96-100), so the Phase-4
+ * dwell window (~104-108) plays out inside a finished temple; arming waits
+ * for 115, the marked final board is ~116, and post-revelation ~117-122. The
+ * vanguard tier's +1 offset means vanguard animals speak Phase-4 lines across
+ * the 62→90 window (Phase 3 floor → reveal floor); that leak is ACCEPTED as
+ * the price of pacing — the oracle whispering ahead of the reveal reads as
+ * foreshadowing, not spoilage.
  */
 export const MIN_PUZZLES_FOR_PHASE: Record<DialoguePhase, number> = {
   0: 0,
-  1: 15,
-  2: 38, // Deeper Questions inside week one for engaged players; casual players hit it in ~3 weeks
-  3: 90, // Growing Shadows — opens a ~52-puzzle Phase 2 span (38→90) and starts the vanguard +1 leak window (accepted, see above)
-  4: 130, // The Horizon — the cult reveal, just before the Sky Garden gate (135) and house completion/recruit (~136)
-  5: 170, // Post-revelation — after house completion/recruit (≈136), dwell completion (≈143), arming (160), final board (≈161), and post-revelation (≈162)
+  1: 12,
+  2: 28, // Deeper Questions inside week one for engaged players; casual players hit it in ~2 weeks
+  3: 62, // Growing Shadows — opens a ~34-puzzle Phase 2 span (28→62) and starts the vanguard +1 leak window (accepted, see above)
+  4: 90, // The Horizon — the cult reveal, just before the Sky Garden gate (92) and house completion/recruit (~96-100)
+  5: 120, // Post-revelation — after house completion/recruit (≈96-100), dwell completion (≈104-108), arming (115), final board (≈116), and post-revelation (≈117-122)
 };
 
 // ============================================================================
@@ -136,6 +141,41 @@ export const SURPRISE_BONUS_MIN_PUZZLES = 8;
  */
 export const AMBER_UNDO_REFILL_COST = 15;
 
+// ============================================================================
+// MOVE RESONANCE (choice-quality reward)
+// ============================================================================
+// When a committed move had 2+ genuinely distinct valid outcome words AND the
+// player chose one at the deepest available dread tier (tier >= 1), the move
+// is a "resonant choice": small amber on the spot, itemized at victory.
+// Amber only — like every bonus, this must NEVER feed phase progression
+// (ritual energy already carries the dread->progress channel; this rewards
+// CHOOSING well, and pacing stays identical however the player chooses).
+
+/** Amber granted per resonant choice (see usePuzzleGame resonance tracking). */
+export const RESONANT_MOVE_AMBER = 2;
+
+/** Cap on resonance amber per board (keeps the bonus a garnish, not a farm). */
+export const RESONANT_BOARD_CAP_AMBER = 6;
+
+// ============================================================================
+// HOUSE ASKS (optional per-board constraint beat)
+// ============================================================================
+// On some standard boards past HOUSE_ASK_MIN_PUZZLES, the house quietly asks
+// one small thing of the arrangement: a specific letter must travel, or must
+// be left untouched. Both ask types are derived from the board's stored
+// solution, so every ask is satisfiable by construction; on multi-route
+// boards the ask selects BETWEEN routes, which is the point. Soft-fail (an
+// unkept ask is never mentioned again), bonus amber only, never progress.
+
+/** Earliest solve count at which the house may place an ask. */
+export const HOUSE_ASK_MIN_PUZZLES = 40;
+
+/** Chance that an eligible standard board carries an ask. */
+export const HOUSE_ASK_CHANCE = 0.25;
+
+/** Amber granted when the ask is kept (evaluated at victory). */
+export const HOUSE_ASK_REWARD_AMBER = 15;
+
 /**
  * Max rewarded-video grants a player can claim per local day (anti-farm).
  * Ad amber stays small relative to phase thresholds so it can't trivialize pacing.
@@ -165,6 +205,16 @@ export const DAILY_AMBER_DAILY_CAP = 2;
  */
 export const INTERSTITIAL_FREQUENCY_EARLY = 6; // Phase 0–2 (candy hours: light touch)
 export const INTERSTITIAL_FREQUENCY_LATE = 5; // Phase 3 base (×2 → every 10); Phase 4+ suppressed
+
+/**
+ * No interstitial before this many completed puzzles. Wider than the pit
+ * auto-collect window (8) on purpose: the puzzle 8-10 stretch already stacks
+ * the variant intro, the daily unlock, and the mandatory first harvest, and
+ * dropping the first-ever ad into that pile-up made the "free ride ends" cliff
+ * read punitive. Aligned with EXIT_NUDGE_MIN_PUZZLES (12) so every commercial
+ * surface waits for the same threshold.
+ */
+export const INTERSTITIAL_MIN_PUZZLES = 12;
 
 // ============================================================================
 // HINT ECONOMY
@@ -325,7 +375,7 @@ export const AUTO_COLLECT_PUZZLE_LIMIT = 8;
  * enough, against the 5-puzzle Phase-4 dialogue cooldown, for multiple
  * sessions per animal and the sacrifice mechanic to actually be played.
  * The capped eight-win window is necessary but not sufficient: arming also
- * requires `FINALE_ARM_MIN_PUZZLES` (160). Once both conditions are met,
+ * requires `FINALE_ARM_MIN_PUZZLES` (115). Once both conditions are met,
  * amberCurrency.finaleArmed makes the NEXT standard board the marked FINAL
  * BOARD (dread-seeded, quiet start line), and its victory plays the arrival.
  * Never revealed as a counter (narrative rule 7); the house "is not yet ready
@@ -336,10 +386,11 @@ export const FINALE_DWELL_PUZZLES = 8;
 /**
  * The earliest completed-puzzle count at which a full Phase-4 dwell can arm
  * the finale. It gives the descent trio time to speak before the marked final
- * board (~161) and post-revelation (~162), even when house completion/recruit
- * lands around 136 and the eight-win dwell completes around 143.
+ * board (~116) and post-revelation (~117-122), even when house
+ * completion/recruit lands around 96-100 and the eight-win dwell completes
+ * around 104-108.
  */
-export const FINALE_ARM_MIN_PUZZLES = 160;
+export const FINALE_ARM_MIN_PUZZLES = 115;
 
 /**
  * New Cycle (NG+) phase-progress acceleration per completed cycle. Each cycle
@@ -365,14 +416,15 @@ export const HARVEST_NUDGE_MIN_AMBER = 150;
 /**
  * Amber premium for skipping a level-gated room's puzzle requirement and
  * unlocking it immediately (vs Reserve, which pays the plain cost and waits for
- * the gate). skip cost = ceil(buildCost * (1 + UNLOCK_SKIP_PREMIUM)). At 1.0 the
- * gated rooms (build 200-400) skip for 400-800 — enough to push a player who
- * just barely afforded the room past their balance (so it doubles as amber-pack
- * demand) while staying coverable by one small/medium pack. Reserve (base cost,
- * auto-build at the gate) stays the non-paying path, so the premium is a
- * convenience, never a wall. Tune post-launch on real conversion data.
+ * the gate). skip cost = ceil(buildCost * (1 + UNLOCK_SKIP_PREMIUM)). This is
+ * convenience pricing: a meaningful premium over Reserve so the gate keeps its
+ * shape, sized so a player who can afford the room can usually also afford the
+ * skip with a session or two of earnings. At 0.5 the gated rooms (build
+ * 200-550) skip for 300-825. Reserve (base cost, auto-build at the gate) stays
+ * the non-paying path, so the premium is a convenience, never a wall. Tune
+ * post-launch on real data.
  */
-export const UNLOCK_SKIP_PREMIUM = 1.0;
+export const UNLOCK_SKIP_PREMIUM = 0.5;
 
 // ============================================================================
 // STREAK
@@ -425,8 +477,9 @@ export const STREAK_MILESTONES: {
 /**
  * Narrative acceleration configuration.
  * Engaged players progress through phases faster based on performance.
- * An engaged player hits the reveal at the Phase-4 floor (~130 puzzles);
- * an unaccelerated casual player arrives at the weighted threshold (~180).
+ * An engaged player hits the reveal at the Phase-4 floor (~90 puzzles);
+ * an unaccelerated casual player arrives near the weighted threshold (~124,
+ * usually a little earlier because ritual energy tops up weighted progress).
  */
 export const NARRATIVE_ACCELERATION = {
   // Three-star performance ramp (2026-07 smoothing): the multiplier climbs
@@ -669,6 +722,15 @@ export const SPEED_DEFAULT_TIME = 60;
  * Milestone bonuses - reward players at key puzzle counts.
  * Keeps progression feeling rewarding during longer gameplay.
  * Phase-aware messages shift tone with the narrative.
+ *
+ * 2026-07 compressed geography: keys from 96 up were re-keyed ~×0.7 to track
+ * the new arc (reveal floor 90, house completion/recruit ~96-100, dwell
+ * ~104-108, arming 115, final board ~116, post-revelation ~117-122). Amounts
+ * are untouched (the economy is calibrated on them) and stay in their original
+ * order; only keys and the number-naming copy moved. Re-keying is SAFE
+ * pre-launch: lastClaimedMilestone compares with >= against the last-claimed
+ * VALUE, so no existing key ever double-fires (and there are no live saves
+ * whose lastClaimedMilestone sits between an old key and its new position).
  */
 export const MILESTONE_BONUSES: {
   puzzles: number;
@@ -682,33 +744,35 @@ export const MILESTONE_BONUSES: {
   { puzzles: 25, amber: 50, message: 'Getting the hang of it!', darkMessage: 'The words are beginning to listen.' },
   { puzzles: 50, amber: 75, message: 'Puzzle enthusiast!', darkMessage: 'The pattern takes shape.' },
   { puzzles: 75, amber: 100, message: 'Word wizard!', darkMessage: 'The words know your touch now.', dreadMessage: 'Seventy-five incantations spoken.' },
+  // Climax-window beats (96-124): under the compressed pacing, the reveal
+  // lands ~puzzle 90, house completion/recruit lands around 96-100, the
+  // eight-win dwell completes around 104-108, arming waits for 115, the final
+  // board is ~116, and post-revelation is ~117-122. 96 sits in the reveal's
+  // shadow, 102/104/106 carry the last rooms and the young dwell, 108 holds
+  // the completed house in its wait, and 124 lands just past post-revelation.
+  // Amounts are untouched (economy is calibrated on them); only the key
+  // geography and the spelled counts moved (keys stay strictly increasing, so
+  // the re-keyed cluster now straddles the untouched century milestone).
+  { puzzles: 96, amber: 75, message: 'Double digits!', darkMessage: 'The house stirs.', dreadMessage: 'Ninety-six threads woven into the pattern.' },
   { puzzles: 100, amber: 150, message: 'Century milestone!', darkMessage: 'One hundred arrangements completed.', dreadMessage: 'The arrangement grows. One hundred offerings.' },
-  { puzzles: 110, amber: 75, message: 'Double digits!', darkMessage: 'The house stirs.', dreadMessage: 'One hundred ten threads woven into the pattern.' },
-  { puzzles: 125, amber: 100, message: 'Halfway to mastery!', darkMessage: 'The house feels heavier. Fuller.', dreadMessage: 'One hundred twenty-five incantations. The walls listen.' },
-  // Climax-window beats (135-165): under the 2026-07 pacing, the reveal lands
-  // ~puzzle 130, house completion/recruit lands around 136, the eight-win
-  // dwell completes around 143, arming waits for 160, the final board is ~161,
-  // and post-revelation is ~162. 135/145 sit in the reveal's shadow, 150 holds
-  // the completed house in its wait, and 165 lands just past post-revelation.
-  // Amounts are untouched (economy is calibrated on them); only the message
-  // geography moved.
-  { puzzles: 135, amber: 90, message: 'Still climbing!', darkMessage: 'The shadows are longer now. You keep building anyway.', dreadMessage: 'One hundred thirty-five offerings. The horizon leans closer.' },
-  { puzzles: 145, amber: 110, message: 'Going strong!', darkMessage: 'The letters rearrange themselves for you now.', dreadMessage: 'One hundred forty-five. The last rooms reach toward what is coming.' },
-  { puzzles: 150, amber: 200, message: 'The house is whole!', darkMessage: 'The house is whole... and quiet.', dreadMessage: 'The house is complete. It waits with you for what comes.' },
-  { puzzles: 165, amber: 130, message: 'Unstoppable!', darkMessage: 'You no longer wonder why you keep going. You just go.', dreadMessage: 'One hundred sixty-five offerings. The sky is very near now.' },
-  { puzzles: 200, amber: 250, message: 'True dedication!', darkMessage: 'Two hundred transformations. The words come easily now.', dreadMessage: 'Two hundred incantations. The pattern is patient, and so are you.' },
-  { puzzles: 250, amber: 300, message: 'Quarter thousand!', darkMessage: 'Two hundred fifty arrangements. The quiet is complete.', dreadMessage: 'Two hundred fifty offerings. Nothing stirs now. It does not need to.' },
-  { puzzles: 300, amber: 400, message: 'Master puzzler!', darkMessage: 'Three hundred words spoken into the void.', dreadMessage: 'The void has heard enough. The void responds.' },
-  { puzzles: 350, amber: 500, message: 'The journey continues...', darkMessage: 'The journey never ends. It only transforms.', dreadMessage: 'Three hundred fifty incantations. The pattern is nearly complete.' },
+  { puzzles: 102, amber: 100, message: 'Halfway to mastery!', darkMessage: 'The house feels heavier. Fuller.', dreadMessage: 'One hundred two incantations. The walls listen.' },
+  { puzzles: 104, amber: 90, message: 'Still climbing!', darkMessage: 'The shadows are longer now. You keep building anyway.', dreadMessage: 'One hundred four offerings. The horizon leans closer.' },
+  { puzzles: 106, amber: 110, message: 'Going strong!', darkMessage: 'The letters rearrange themselves for you now.', dreadMessage: 'One hundred six. The finished rooms reach toward what is coming.' },
+  { puzzles: 108, amber: 200, message: 'The house is whole!', darkMessage: 'The house is whole... and quiet.', dreadMessage: 'The house is complete. It waits with you for what comes.' },
+  { puzzles: 124, amber: 130, message: 'Unstoppable!', darkMessage: 'You no longer wonder why you keep going. You just go.', dreadMessage: 'One hundred twenty-four offerings. The sky is very near now.' },
+  { puzzles: 150, amber: 250, message: 'True dedication!', darkMessage: 'One hundred fifty transformations. The words come easily now.', dreadMessage: 'One hundred fifty incantations. The pattern is patient, and so are you.' },
+  { puzzles: 190, amber: 300, message: 'One ninety!', darkMessage: 'One hundred ninety arrangements. The quiet is complete.', dreadMessage: 'One hundred ninety offerings. Nothing stirs now. It does not need to.' },
+  { puzzles: 235, amber: 400, message: 'Master puzzler!', darkMessage: 'Two hundred thirty-five words spoken into the void.', dreadMessage: 'The void has heard enough. The void responds.' },
+  { puzzles: 280, amber: 500, message: 'The journey continues...', darkMessage: 'The journey never ends. It only transforms.', dreadMessage: 'Two hundred eighty incantations. The pattern is nearly complete.' },
   // Endgame tail — a modest repeating +75 every 50 puzzles so the puzzle-count
   // faucet never fully dries up at Phase 5. Kept small so it doesn't outpace the
   // Tending Shrine sink (the deliberate endgame amber drain).
-  { puzzles: 400, amber: 75, message: 'Still tending the pattern.', darkMessage: 'Four hundred. The pattern keeps its shape because you keep it.', dreadMessage: 'Four hundred offerings. The weave holds.' },
-  { puzzles: 450, amber: 75, message: 'Still here.', darkMessage: 'Four hundred fifty. Stopping would feel like forgetting.', dreadMessage: 'The pattern continues. Four hundred fifty.' },
-  { puzzles: 500, amber: 100, message: 'Five hundred.', darkMessage: 'Five hundred arrangements. Terrible peace.', dreadMessage: 'Five hundred. The shape is yours now.' },
-  { puzzles: 600, amber: 100, message: 'The tending continues.', darkMessage: 'Six hundred. The fire stays lit because you tend it.', dreadMessage: 'Six hundred offerings woven into the pattern.' },
-  { puzzles: 750, amber: 150, message: 'Faithful keeper.', darkMessage: 'Seven hundred fifty. The pattern remembers every one.', dreadMessage: 'Seven hundred fifty. The weave deepens.' },
-  { puzzles: 1000, amber: 200, message: 'A thousand.', darkMessage: 'A thousand arrangements. The pattern, and you, continue.', dreadMessage: 'One thousand. The shape will outlast us both.' },
+  { puzzles: 330, amber: 75, message: 'Still tending the pattern.', darkMessage: 'Three hundred thirty. The pattern keeps its shape because you keep it.', dreadMessage: 'Three hundred thirty offerings. The weave holds.' },
+  { puzzles: 380, amber: 75, message: 'Still here.', darkMessage: 'Three hundred eighty. Stopping would feel like forgetting.', dreadMessage: 'The pattern continues. Three hundred eighty.' },
+  { puzzles: 430, amber: 100, message: 'Four hundred thirty.', darkMessage: 'Four hundred thirty arrangements. Terrible peace.', dreadMessage: 'Four hundred thirty. The shape is yours now.' },
+  { puzzles: 530, amber: 100, message: 'The tending continues.', darkMessage: 'Five hundred thirty. The fire stays lit because you tend it.', dreadMessage: 'Five hundred thirty offerings woven into the pattern.' },
+  { puzzles: 680, amber: 150, message: 'Faithful keeper.', darkMessage: 'Six hundred eighty. The pattern remembers every one.', dreadMessage: 'Six hundred eighty. The weave deepens.' },
+  { puzzles: 930, amber: 200, message: 'Nine hundred thirty.', darkMessage: 'Nine hundred thirty arrangements. The pattern, and you, continue.', dreadMessage: 'Nine hundred thirty. The shape will outlast us both.' },
 ];
 
 // ============================================================================

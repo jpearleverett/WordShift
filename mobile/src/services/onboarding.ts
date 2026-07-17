@@ -57,6 +57,15 @@ export const COLD_OPEN_INSTRUCTION = "Oh, you're here! Move a letter down into t
 /** Shown once, the instant the player lands their first valid move on the cold-open board. */
 export const COLD_OPEN_FIRST_MOVE = "There! Oh, lovely. Feel how the whole house settled around that word? Keep going, you have the knack for this.";
 
+/**
+ * Shown once, the first time the player picks a letter up on the cold-open
+ * board, while the ghost previews are visible and before the first committed
+ * move. The same warm voice explains the marks the player is now looking at
+ * (green check / red cross) and names undo, so the tools are taught at the
+ * exact moment they first matter.
+ */
+export const COLD_OPEN_PREVIEW_TEACH = "See those faint little words? A green check means both words stay real, a red cross means one would break. And undo takes any move back, so try freely.";
+
 export type ColdOpenLaunchRoute = 'restore' | 'home_empty' | 'new_board';
 
 /**

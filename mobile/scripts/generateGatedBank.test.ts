@@ -1,0 +1,492 @@
+/**
+ * GATED FULL-REGENERATION generator for WordShift's four standard puzzle banks.
+ *
+ * Unlike the top-up scripts (which append to the shipped banks), this builds a
+ * COMPLETE replacement bank from scratch around choice-rich boards. Every
+ * accepted puzzle must pass the branching acceptance gate:
+ *   - non-duplicate chain (within the new bank being built),
+ *   - bank-wide word-usage cap safe (EASY 3 / MEDIUM 7 / MEDIUM_PLUS 10 / HARD 12),
+ *   - analyzeStandardBranching completePathCount >= 2, and
+ *   - singleChoiceFraction <= 0.65 for phase 0-2 boards, <= 0.75 for phase 3-4
+ *     boards (the dread vocabulary is less connected; the looser late gate
+ *     keeps the marquee dread supply alive).
+ * Trap presence (trapStepFraction > 0) is a SOFT preference: recorded per
+ * accept and reported, never gated on.
+ *
+ * The generator NEVER touches the live src/data/puzzleBank*.ts files. Each run
+ * finalizes by writing the complete serialized bank so far to a SIDECAR:
+ *   src/data/.gatedRegen_<bank>_output.ts
+ * (dot-prefixed so tsc/metro ignore it). scripts/swapGatedBanks.mjs swaps a
+ * finished sidecar over the live file at the end of the campaign.
+ *
+ * Parametrized by env:
+ *   GATED_BANK      EASY | MEDIUM | MEDIUM_PLUS | HARD   (default MEDIUM)
+ *   GATED_SMOKE_MS  optional short internal deadline for smoke runs
+ *   GATED_RUN_MS    internal deadline override (default 540000 — finalize
+ *                   before the driver's 570s jest --testTimeout kills the run)
+ *
+ * Run (one bounded pass; the driver loops it):
+ *   cd mobile && GATED_BANK=MEDIUM NODE_OPTIONS=--max-old-space-size=4096 \
+ *     npx jest --config scripts/jest.config.js --no-coverage --forceExit \
+ *     --testTimeout 570000 scripts/generateGatedBank.test.ts
+ * Crash/timeout-safe: per-accept checkpoints at
+ * src/data/.gatedRegen_<bank>_progress.json resume on re-run; each run also
+ * rewrites the sidecar with whatever it has before the deadline.
+ */
+
+import * as fs from 'fs';
+import * as path from 'path';
+import * as crypto from 'crypto';
+
+// ============================================================================
+// Bank parametrization (read before mocks so the word cap is fixed per run)
+// ============================================================================
+
+type BankName = 'EASY' | 'MEDIUM' | 'MEDIUM_PLUS' | 'HARD';
+
+interface GatedBankConfig {
+  bank: BankName;
+  /** Lowercase file-name key: easy | medium | medium_plus | hard. */
+  key: string;
+  difficulty: 'EASY' | 'MEDIUM' | 'MEDIUM_PLUS' | 'HARD';
+  /** Bank-wide word-usage cap (matches the shipped banks' pinned caps). */
+  wordCap: number;
+  defaultWordLength: number;
+  exportName: string;
+  /** The live file this sidecar is built to replace (never written here). */
+  liveFileName: string;
+  /** puzzleBankHard.ts re-exports the puzzle type; the sidecar must too. */
+  typeReExport: boolean;
+}
+
+const BANK_CONFIGS: Record<BankName, GatedBankConfig> = {
+  EASY: {
+    bank: 'EASY', key: 'easy', difficulty: 'EASY', wordCap: 3,
+    defaultWordLength: 4, exportName: 'PUZZLE_BANK_EASY',
+    liveFileName: 'puzzleBankEasy.ts', typeReExport: false,
+  },
+  MEDIUM: {
+    bank: 'MEDIUM', key: 'medium', difficulty: 'MEDIUM', wordCap: 7,
+    defaultWordLength: 4, exportName: 'PUZZLE_BANK_MEDIUM',
+    liveFileName: 'puzzleBankMedium.ts', typeReExport: false,
+  },
+  MEDIUM_PLUS: {
+    bank: 'MEDIUM_PLUS', key: 'medium_plus', difficulty: 'MEDIUM_PLUS', wordCap: 10,
+    defaultWordLength: 5, exportName: 'PUZZLE_BANK_MEDIUM_PLUS',
+    liveFileName: 'puzzleBankMediumPlus.ts', typeReExport: false,
+  },
+  HARD: {
+    bank: 'HARD', key: 'hard', difficulty: 'HARD', wordCap: 12,
+    defaultWordLength: 5, exportName: 'PUZZLE_BANK_HARD',
+    liveFileName: 'puzzleBankHard.ts', typeReExport: true,
+  },
+};
+
+const BANK_NAME = String(process.env.GATED_BANK ?? 'MEDIUM').toUpperCase() as BankName;
+const CONFIG = BANK_CONFIGS[BANK_NAME];
+if (!CONFIG) {
+  throw new Error(`GATED_BANK must be one of EASY|MEDIUM|MEDIUM_PLUS|HARD (got '${process.env.GATED_BANK}')`);
+}
+
+// Internal wall-clock deadline: finalize (sidecar write) happens BEFORE the
+// driver's jest --testTimeout 570000 can kill the process, mirroring the
+// top-up scripts' finalize-before-jest-deadline pattern. GATED_SMOKE_MS wins
+// so smoke runs can bound the whole pass to ~2 minutes.
+const RUN_DEADLINE_MS = Number(process.env.GATED_SMOKE_MS ?? process.env.GATED_RUN_MS ?? 540_000);
+
+// ============================================================================
+// Mocks — must be before imports that use them
+// ============================================================================
+
+let mockPhase = 0;
+
+jest.mock('../src/services/amberCurrency', () => ({
+  getCurrentPhase: async () => mockPhase,
+  getFullProgress: async () => ({ puzzlesSolved: 999 }),
+}));
+
+// ============================================================================
+// Bank-wide word saturation (diversity guard)
+// Same model as the bank generators: count, for the WHOLE new bank, how many
+// accepted puzzles each visible word appears in. A word at the cap is treated
+// as hard-cooldown inside the generator, and the accept loop hard-rejects any
+// candidate that would push a word past the cap (covers formed words the DFS
+// cannot see). Full regeneration: usage starts empty and accumulates only
+// from accepted puzzles (reloaded from the checkpoint on resume).
+// ============================================================================
+
+const WORD_USAGE_CAP = CONFIG.wordCap;
+const bankWordUsage = new Map<string, number>();
+
+function collectPuzzleWords(puzzle: { words: string[]; solution?: { sourceWord: string; targetWord: string; explanation?: string }[]; reverseSolution?: { sourceWord: string; targetWord: string; explanation?: string }[] }): string[] {
+  const seen = new Set<string>();
+  for (const w of puzzle.words) seen.add(w.toUpperCase());
+  for (const step of [...(puzzle.solution ?? []), ...(puzzle.reverseSolution ?? [])]) {
+    if (step.sourceWord) seen.add(String(step.sourceWord).toUpperCase());
+    if (step.targetWord) seen.add(String(step.targetWord).toUpperCase());
+    const m = /form ([A-Z]+)/.exec(step.explanation ?? '');
+    if (m) seen.add(m[1]);
+  }
+  return [...seen];
+}
+
+function exceedsUsageCap(words: string[]): boolean {
+  return words.some(w => (bankWordUsage.get(w) ?? 0) >= WORD_USAGE_CAP);
+}
+
+function recordUsage(words: string[]): void {
+  for (const w of words) bankWordUsage.set(w, (bankWordUsage.get(w) ?? 0) + 1);
+}
+
+jest.mock('../src/services/wordHistory', () => ({
+  getWordHistoryWithRecency: async () => new Map(bankWordUsage),
+  calculateFreshnessPenalty: (word: string, usage: Map<string, number>) => {
+    const uses = usage.get(word) ?? 0;
+    if (uses === 0) return -5; // small bonus for never-used words
+    if (uses >= WORD_USAGE_CAP) return 100;
+    return Math.round((uses / WORD_USAGE_CAP) * 85);
+  },
+  isInHardCooldown: (word: string, usage: Map<string, number>) => (usage.get(word) ?? 0) >= WORD_USAGE_CAP,
+  recordPuzzleWords: async () => {}, // usage recorded on ACCEPT in the loop below
+}));
+
+// ============================================================================
+// Crash-safe checkpointing (mirrors the bank generators)
+// One checkpoint per bank; saved after every accepted puzzle so a killed or
+// timed-out run resumes exactly where it left off. Cumulative attempt counts
+// persist too, so the per-phase attempt budget spans re-runs.
+// ============================================================================
+
+const CHECKPOINT_PATH = require('path').join(
+  __dirname, '..', 'src', 'data', `.gatedRegen_${CONFIG.key}_progress.json`,
+);
+
+interface GatedCheckpoint {
+  phaseCounts: Record<string, number>;
+  phaseAttempts: Record<string, number>;
+  /** Soft-preference tally: accepts whose trapStepFraction > 0. */
+  trapAccepts: number;
+  puzzles: unknown[];
+}
+
+function loadCheckpoint(): GatedCheckpoint {
+  try {
+    const fsMod = require('fs');
+    if (fsMod.existsSync(CHECKPOINT_PATH)) {
+      const data = JSON.parse(fsMod.readFileSync(CHECKPOINT_PATH, 'utf-8'));
+      if (data && Array.isArray(data.puzzles)) {
+        return {
+          phaseCounts: data.phaseCounts ?? {},
+          phaseAttempts: data.phaseAttempts ?? {},
+          trapAccepts: data.trapAccepts ?? 0,
+          puzzles: data.puzzles,
+        };
+      }
+    }
+  } catch { /* corrupted checkpoint: start fresh */ }
+  return { phaseCounts: {}, phaseAttempts: {}, trapAccepts: 0, puzzles: [] };
+}
+
+function saveCheckpoint(cp: GatedCheckpoint): void {
+  const fsMod = require('fs');
+  const tmp = CHECKPOINT_PATH + '.tmp';
+  fsMod.writeFileSync(tmp, JSON.stringify(cp), 'utf-8');
+  fsMod.renameSync(tmp, CHECKPOINT_PATH); // atomic on Linux
+}
+
+// ============================================================================
+// Imports — after mocks
+// ============================================================================
+
+import { generateLocalPuzzle, isDreadWord, getWordPhaseTier, getSemanticCluster } from '../src/services/localGenerator';
+import { analyzeStandardBranching } from '../src/services/puzzleBranching';
+import { COMMON_WORDS } from '../src/constants/wordLists';
+import { PreGeneratedPuzzle } from '../src/data/puzzleBankTypes';
+
+// ============================================================================
+// Targets and acceptance gate
+// ============================================================================
+
+// The original per-phase targets (500 total).
+const PHASE_TARGETS: Record<number, number> = {
+  0: 120,
+  1: 100,
+  2: 100,
+  3: 100,
+  4: 80,
+};
+const TOTAL_TARGET = Object.values(PHASE_TARGETS).reduce((a, b) => a + b, 0);
+
+// Cumulative attempt budget per phase (spans re-runs via the checkpoint).
+// Generous: the driver's plateau exit is the real terminator; the budget only
+// stops a bank that can never fill from burning wall-clock forever.
+const ATTEMPTS_PER_TARGET_UNIT = 120;
+
+// Acceptance gate: multiple real completing routes on every board.
+const MIN_COMPLETE_PATHS = 2;
+// Phase 0-2 boards: the standard multi-path bar. Phase 3-4 boards: looser —
+// the dread vocabulary is less connected, and the marquee dread supply must
+// stay alive.
+const MAX_SINGLE_CHOICE_EARLY = 0.65;
+const MAX_SINGLE_CHOICE_LATE = 0.75;
+
+function maxSingleChoiceForPhase(phase: number): number {
+  return phase >= 3 ? MAX_SINGLE_CHOICE_LATE : MAX_SINGLE_CHOICE_EARLY;
+}
+
+const SIDECAR_PATH = path.join(
+  __dirname, '..', 'src', 'data', `.gatedRegen_${CONFIG.key}_output.ts`,
+);
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+function puzzleId(words: string[]): string {
+  const key = words.join('-');
+  return crypto.createHash('md5').update(key).digest('hex').slice(0, 12);
+}
+
+function computeDreadTier(words: string[]): number {
+  let maxTier = 0;
+  for (const word of words) {
+    const tier = getWordPhaseTier(word);
+    if (tier > maxTier) maxTier = tier;
+  }
+  return maxTier;
+}
+
+function computeDreadWordCount(words: string[]): number {
+  return words.filter(w => isDreadWord(w)).length;
+}
+
+function computeSemanticTags(words: string[]): string[] {
+  const tags = new Set<string>();
+  for (const word of words) {
+    const cluster = getSemanticCluster(word);
+    if (cluster) tags.add(cluster);
+  }
+  return [...tags];
+}
+
+function serializePuzzle(p: PreGeneratedPuzzle): string {
+  const solutionStr = p.solution.map(s => {
+    const insertPos = s.insertionPosition !== undefined ? `,insertionPosition:${s.insertionPosition}` : '';
+    const removePos = s.removalPosition !== undefined ? `,removalPosition:${s.removalPosition}` : '';
+    return `{stepIndex:${s.stepIndex},sourceWord:'${s.sourceWord}',targetWord:'${s.targetWord}',letterToMove:'${s.letterToMove}',explanation:\`${s.explanation}\`${insertPos}${removePos}}`;
+  }).join(',');
+
+  return `{id:'${p.id}',words:[${p.words.map(w => `'${w}'`).join(',')}],solution:[${solutionStr}],wordLength:${p.wordLength},qualityScore:${p.qualityScore},dreadTier:${p.dreadTier},dreadWordCount:${p.dreadWordCount},allWords:[${p.allWords.map(w => `'${w}'`).join(',')}],semanticTags:[${p.semanticTags.map(t => `'${t}'`).join(',')}]}`;
+}
+
+interface GateResult {
+  pass: boolean;
+  hasTrap: boolean;
+}
+
+function checkBranchingGate(words: string[], phase: number): GateResult {
+  // Mirror puzzleBank.ts: the analyzer's validity callback is COMMON_WORDS.
+  const metrics = analyzeStandardBranching(
+    words,
+    word => COMMON_WORDS.has(word.toUpperCase()),
+  );
+  return {
+    pass: metrics.completePathCount >= MIN_COMPLETE_PATHS &&
+      metrics.singleChoiceFraction <= maxSingleChoiceForPhase(phase),
+    hasTrap: metrics.trapStepFraction > 0,
+  };
+}
+
+function writeSidecar(puzzles: PreGeneratedPuzzle[], trapAccepts: number): void {
+  const typeLine = CONFIG.typeReExport
+    ? `export type { PreGeneratedPuzzle } from './puzzleBankTypes';\n`
+    : '';
+  const fileContent = `// AUTO-GENERATED by scripts/generateGatedBank.test.ts (gated full regeneration)
+// Sidecar replacement for src/data/${CONFIG.liveFileName} — swapped in by scripts/swapGatedBanks.mjs.
+// Bank: ${CONFIG.bank} (${CONFIG.difficulty}), bank-wide word-usage cap ${CONFIG.wordCap}.
+// Acceptance gate (every puzzle): non-duplicate chain; cap-safe; analyzeStandardBranching
+// completePathCount >= ${MIN_COMPLETE_PATHS}; singleChoiceFraction <= ${MAX_SINGLE_CHOICE_EARLY} (phase 0-2 boards) / <= ${MAX_SINGLE_CHOICE_LATE} (phase 3-4 boards).
+// Trap-bearing accepts (trapStepFraction > 0, soft preference, never gated): ${trapAccepts}/${puzzles.length}.
+// Do not edit manually. Re-run the generator to update.
+// Generated: ${new Date().toISOString()}
+// Total puzzles: ${puzzles.length}
+
+import { PreGeneratedPuzzle } from './puzzleBankTypes';
+${typeLine}
+export const ${CONFIG.exportName}: PreGeneratedPuzzle[] = [
+${puzzles.map(p => '  ' + serializePuzzle(p)).join(',\n')}
+];
+`;
+
+  const tmp = SIDECAR_PATH + '.tmp';
+  fs.writeFileSync(tmp, fileContent, 'utf-8');
+  fs.renameSync(tmp, SIDECAR_PATH);
+  process.stdout.write(`Sidecar: wrote ${puzzles.length} puzzles to ${SIDECAR_PATH}\n`);
+}
+
+// ============================================================================
+// Main generation test
+// ============================================================================
+
+describe(`Gated Full-Regeneration Generator — ${BANK_NAME} Standard`, () => {
+  it(`regenerates the ${BANK_NAME} bank around choice-rich boards`, async () => {
+    const runStart = Date.now();
+    const runDeadline = runStart + RUN_DEADLINE_MS;
+
+    const checkpoint = loadCheckpoint();
+    const allPuzzles: PreGeneratedPuzzle[] = checkpoint.puzzles as PreGeneratedPuzzle[];
+    const seenChains = new Set<string>();
+    for (const p of allPuzzles) {
+      seenChains.add(p.words.join('-'));
+      recordUsage(collectPuzzleWords(p as { words: string[]; solution?: { sourceWord: string; targetWord: string; explanation?: string }[] }));
+    }
+
+    process.stdout.write(
+      `\n=== GATED REGEN ${BANK_NAME}: resuming at ${allPuzzles.length}/${TOTAL_TARGET}, ` +
+      `word cap ${WORD_USAGE_CAP}, deadline ${Math.round(RUN_DEADLINE_MS / 1000)}s ===\n`,
+    );
+
+    // Run-scope tallies (the checkpoint carries cumulative counts).
+    let runAttempts = 0;
+    let runAccepts = 0;
+    let runTrapAccepts = 0;
+    let rejectedDup = 0;
+    let rejectedCap = 0;
+    let rejectedBranching = 0;
+    let genFailures = 0;
+
+    const logProgress = (): void => {
+      const fill = Object.keys(PHASE_TARGETS)
+        .map(ph => `${ph}:${checkpoint.phaseCounts[ph] ?? 0}/${PHASE_TARGETS[Number(ph)]}`)
+        .join(' ');
+      const pct = runAttempts > 0 ? ((runAccepts / runAttempts) * 100).toFixed(1) : '0.0';
+      process.stdout.write(
+        `[${BANK_NAME}] ${allPuzzles.length}/${TOTAL_TARGET} accepted | ` +
+        `run ${runAccepts}/${runAttempts} attempts (${pct}%) | phases ${fill} | ` +
+        `rej dup ${rejectedDup} cap ${rejectedCap} branching ${rejectedBranching} genFail ${genFailures} | ` +
+        `traps ${checkpoint.trapAccepts}/${allPuzzles.length}\n`,
+      );
+    };
+
+    const phaseEntries = Object.entries(PHASE_TARGETS);
+    for (let phaseIndex = 0; phaseIndex < phaseEntries.length; phaseIndex++) {
+      const [phaseStr, target] = phaseEntries[phaseIndex];
+      const phase = parseInt(phaseStr);
+      mockPhase = phase;
+      let phaseCount = checkpoint.phaseCounts[phaseStr] ?? 0;
+      let phaseAttempts = checkpoint.phaseAttempts[phaseStr] ?? 0;
+      const phaseBudget = target * ATTEMPTS_PER_TARGET_UNIT;
+
+      if (phaseCount >= target || phaseAttempts >= phaseBudget) {
+        process.stdout.write(`  Phase ${phase}: done (${phaseCount}/${target}, ${phaseAttempts} attempts)\n`);
+        continue;
+      }
+
+      // Slice remaining wall-clock across remaining phases proportionally to
+      // their targets, so an attempt-rich early phase cannot consume the whole
+      // deadline before later phases run.
+      const remainingTargets = phaseEntries
+        .slice(phaseIndex)
+        .reduce((sum, [, t]) => sum + t, 0);
+      const phaseDeadline = Math.min(
+        runDeadline,
+        Date.now() + Math.floor((runDeadline - Date.now()) * (target / remainingTargets)),
+      );
+
+      while (phaseCount < target && phaseAttempts < phaseBudget && Date.now() < phaseDeadline) {
+        phaseAttempts++;
+        runAttempts++;
+        checkpoint.phaseAttempts[phaseStr] = phaseAttempts;
+
+        try {
+          const puzzle = await generateLocalPuzzle(CONFIG.difficulty);
+          const chainKey = puzzle.words.join('-');
+
+          if (seenChains.has(chainKey)) {
+            rejectedDup++;
+            continue;
+          }
+          seenChains.add(chainKey);
+
+          // Bank-wide diversity: reject any puzzle that would push a word past the cap.
+          const puzzleWords = collectPuzzleWords(puzzle);
+          if (exceedsUsageCap(puzzleWords)) {
+            rejectedCap++;
+            continue;
+          }
+
+          // The point of this campaign: only choice-rich boards ship.
+          const gate = checkBranchingGate(puzzle.words, phase);
+          if (!gate.pass) {
+            rejectedBranching++;
+            continue;
+          }
+
+          const id = puzzleId(puzzle.words);
+          const dreadTier = computeDreadTier(puzzleWords);
+          const dreadWordCount = computeDreadWordCount(puzzleWords);
+          const semanticTags = computeSemanticTags(puzzleWords);
+
+          const preGenPuzzle: PreGeneratedPuzzle = {
+            id,
+            words: puzzle.words,
+            solution: puzzle.solution || [],
+            wordLength: puzzle.wordLength || CONFIG.defaultWordLength,
+            qualityScore: 50,
+            dreadTier,
+            dreadWordCount,
+            allWords: puzzleWords,
+            semanticTags,
+          };
+
+          allPuzzles.push(preGenPuzzle);
+          recordUsage(puzzleWords);
+          checkpoint.phaseCounts[phaseStr] = phaseCount + 1;
+          if (gate.hasTrap) {
+            checkpoint.trapAccepts++;
+            runTrapAccepts++;
+          }
+          saveCheckpoint(checkpoint);
+          phaseCount++;
+          runAccepts++;
+
+          if (allPuzzles.length % 10 === 0) {
+            logProgress();
+          }
+        } catch {
+          genFailures++;
+        }
+      }
+
+      process.stdout.write(`  Phase ${phase}: ${phaseCount}/${target} (${phaseAttempts}/${phaseBudget} attempts)\n`);
+      if (Date.now() >= runDeadline) {
+        process.stdout.write(`  Deadline reached; finalizing with current progress.\n`);
+        break;
+      }
+    }
+
+    // Persist attempt counters even when nothing new was accepted this run.
+    saveCheckpoint(checkpoint);
+
+    const totalAttemptsSoFar = Object.values(checkpoint.phaseAttempts).reduce((a, b) => a + b, 0);
+    const runPct = runAttempts > 0 ? ((runAccepts / runAttempts) * 100).toFixed(1) : '0.0';
+    process.stdout.write(
+      `\nRUN SUMMARY ${BANK_NAME}: accepted ${runAccepts}/${runAttempts} attempts this run (${runPct}%), ` +
+      `trap-bearing ${runTrapAccepts}; cumulative ${allPuzzles.length}/${TOTAL_TARGET} ` +
+      `(${totalAttemptsSoFar} attempts, traps ${checkpoint.trapAccepts}/${allPuzzles.length}); ` +
+      `rej dup ${rejectedDup} cap ${rejectedCap} branching ${rejectedBranching} genFail ${genFailures}\n`,
+    );
+    logProgress();
+
+    // Finalize: ALWAYS rewrite the sidecar with the complete bank so far
+    // (partial banks are fine; the swap script enforces the ship threshold).
+    writeSidecar(allPuzzles, checkpoint.trapAccepts);
+
+    // The run itself always "passes" — completion is the DRIVER's judgment
+    // (target reached or plateau). Only structural sanity is asserted here.
+    expect(fs.existsSync(SIDECAR_PATH)).toBe(true);
+    const countedPhases = Object.values(checkpoint.phaseCounts).reduce((a, b) => a + b, 0);
+    expect(allPuzzles.length).toBe(countedPhases);
+    expect(allPuzzles.length).toBeLessThanOrEqual(TOTAL_TARGET);
+  }, 570000);
+});

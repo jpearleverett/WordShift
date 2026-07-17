@@ -94,6 +94,56 @@ describe('extendStandardPuzzle', () => {
     expect(isStandardChainSolvable(result.words, isValidWord)).toBe('solvable');
   });
 
+  it('prefers an append whose final step keeps 2+ distinct valid outcome words', () => {
+    // LACE is found FIRST but leaves a forced final step (only PLACE can be
+    // formed). RICE keeps a real choice alive: 'P' via LANT forms PRICE and
+    // 'T' via PLAN forms TRICE — two distinct valid outcome words — so the
+    // extension must skip past the earlier forced append and choose RICE.
+    const validWords = new Set([
+      'PAY', 'PLANT',
+      'PLAN', 'LANT',
+      'LACE', 'PLACE',
+      'RICE', 'PRICE', 'TRICE',
+    ]);
+
+    const result = extendStandardPuzzle(basePuzzle(), {
+      candidateWords: ['LACE', 'RICE'],
+      isValidWord: word => validWords.has(word),
+    });
+
+    expect(result.words).toEqual(['PLAY', 'PANT', 'RICE']);
+    expect(result.solution).toHaveLength(2);
+    expect(result.solution![1]).toEqual<PuzzleSolutionStep>({
+      stepIndex: 1,
+      sourceWord: 'PLANT',
+      targetWord: 'RICE',
+      letterToMove: 'P',
+      explanation: "Move 'P' from PLANT to form PRICE.",
+      removalPosition: 0,
+      insertionPosition: 0,
+    });
+  });
+
+  it('falls back to the first valid append when every final step is forced', () => {
+    // Same shape as the preference test, but TRICE is not a valid word, so
+    // RICE is forced too (only PRICE) — the first valid append (LACE) wins.
+    const validWords = new Set([
+      'PAY', 'PLANT',
+      'PLAN', 'LANT',
+      'LACE', 'PLACE',
+      'RICE', 'PRICE',
+    ]);
+
+    const result = extendStandardPuzzle(basePuzzle(), {
+      candidateWords: ['LACE', 'RICE'],
+      isValidWord: word => validWords.has(word),
+    });
+
+    expect(result.words).toEqual(['PLAY', 'PANT', 'LACE']);
+    expect(result.solution![1].letterToMove).toBe('P');
+    expect(result.solution![1].targetWord).toBe('LACE');
+  });
+
   it('returns the original puzzle when no valid fresh extension exists', () => {
     const puzzle = basePuzzle();
     const validWords = new Set(['PAY', 'PLANT', 'PLAN', 'HEAR', 'HEART']);
@@ -145,8 +195,8 @@ describe('extendStandardPuzzle', () => {
   it.each([
     ['EASY', PUZZLE_BANK_EASY, 190],
     ['MEDIUM', PUZZLE_BANK_MEDIUM, 140],
-    ['MEDIUM_PLUS', PUZZLE_BANK_MEDIUM_PLUS, 165],
-    ['HARD', PUZZLE_BANK_HARD, 160],
+    ['MEDIUM_PLUS', PUZZLE_BANK_MEDIUM_PLUS, 130],
+    ['HARD', PUZZLE_BANK_HARD, 110],
   ] as const)(
     '%s bank keeps a large deterministic pool with a valid fallback candidate',
     (_name, bank, floor) => {

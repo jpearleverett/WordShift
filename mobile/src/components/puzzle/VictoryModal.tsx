@@ -28,6 +28,10 @@ import {
   getNextStreakMilestoneText,
   getFlawlessHonorific,
   getUnbrokenWeaveRankUpLine,
+  getRewardedDoubleLabel,
+  getRewardedDoubleConfirm,
+  getDailyLadderTrendLabel,
+  getResonanceBonusLabel,
 } from '../../services/phaseNarrative';
 import { DialoguePhase } from '../../types/homeWorld';
 import { VARIANT_CONFIGS } from '../../services/puzzleVariety';
@@ -40,7 +44,6 @@ import { getSettingsSync } from '../../services/settings';
 import { DailyLeaderboardCard } from '../social/DailyLeaderboardCard';
 import { getBeatPercentText, DailyRank } from '../../services/leaderboard';
 import { RewardedAdButton } from '../monetization/RewardedAdButton';
-import { getRewardedDoubleLabel, getRewardedDoubleConfirm, getDailyLadderTrendLabel } from '../../services/phaseNarrative';
 import { isAdFreeSync } from '../../services/entitlements';
 import { BODY_FONT, BODY_FONT_ITALIC, PIXEL_FONT_BOLD } from '../../theme/fonts';
 
@@ -70,6 +73,8 @@ export interface VictoryData {
   totalWordsFormed?: number;
   ritualEnergy?: number;
   variantBonus?: number;
+  /** Amber from resonant deep-word choices (absent/0 when none; amber-only) */
+  resonanceBonus?: number;
   freshVariantBonus?: number;
   variantRepeatDecay?: number;
   questsCompleted?: string[];
@@ -919,6 +924,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               const patronBonusAmber = breakdown?.patronBonus ?? 0;
               const challengeBonusAmber = victoryData.challengeBonus ?? 0;
               const surpriseBonusAmber = victoryData.surpriseBonus ?? 0;
+              const resonanceBonusAmber = breakdown?.resonanceBonus ?? victoryData.resonanceBonus ?? 0;
               const variantBonusAmber = victoryData.variantBonus ?? 0;
               const streakBonusAmber = victoryData.streakBonus ?? 0;
               const firstCompBonus = victoryData.firstCompletionBonus ?? 0;
@@ -982,6 +988,14 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                               {'✨'} Lucky Find
                             </Text>
                             <Text style={[styles.bonusValue, { color: accent.gold }]}>+{surpriseBonusAmber}</Text>
+                          </View>
+                        )}
+                        {resonanceBonusAmber > 0 && (
+                          <View style={styles.bonusRow}>
+                            <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
+                              {getResonanceBonusLabel(phase)}
+                            </Text>
+                            <Text style={[styles.bonusValue, { color: accent.gold }]}>+{resonanceBonusAmber}</Text>
                           </View>
                         )}
                         {patronBonusAmber > 0 && (

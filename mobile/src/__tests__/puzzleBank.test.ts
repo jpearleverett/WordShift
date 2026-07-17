@@ -127,9 +127,9 @@ describe('puzzleBank', () => {
       }
     });
 
-    it('selects a mature board through capped branching analysis', async () => {
+    it('selects a board through capped branching analysis at the neutral-grading gate', async () => {
       const result = await selectPreGeneratedPuzzle(
-        'HARD', 0, emptyRecencyMap(), 'standard', 40,
+        'HARD', 0, emptyRecencyMap(), 'standard', 13,
       );
 
       expect(result).not.toBeNull();

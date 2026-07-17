@@ -26,9 +26,37 @@ import {
 } from '../constants/gameBalance';
 import { isUnbrokenWeaveEligible } from './unbrokenWeave';
 
-const BRANCHING_UNLOCK_PUZZLES = 40;
-const BRANCHING_CONTEXT_CANDIDATES = 80;
-const BRANCHING_BONUS_CAP = 12;
+// Delivered-experience branching steering. Measured over the shipped banks,
+// 62-71% of puzzles have exactly ONE complete solution path, so an unsteered
+// draw serves mostly single-route boards. These knobs exist so the player
+// instead mostly meets boards with 2+ real routes once route-finding is the
+// skill being exercised.
+//
+// Unlock: engage the moment preview grading goes neutral
+// (PREVIEW_GRADING_FULL_LIMIT = 12 in gameBalance) — that is when choice
+// starts mattering; before that, EASY-style graded previews carry the
+// tutorial and steering would be spent on boards the UI still solves.
+const BRANCHING_UNLOCK_PUZZLES = 13;
+// Window: how many top context-scored candidates get branching analysis.
+// Wide enough that the multi-route subset stays reachable deep into a run
+// (a narrow window collapses to whatever freshness happened to rank first).
+// Perf: metrics are cached by puzzle id (branchingMetricsCache), so this is
+// at most 160 one-time analyses per bank of 3-6 row boards whose path/state
+// counts are capped — bounded synchronous work, cache hits thereafter.
+const BRANCHING_CONTEXT_CANDIDATES = 160;
+// Bonus: strong enough that real structural depth can outrank a modest
+// freshness edge (the old 12-point cap was routinely drowned by the novelty
+// bonuses, leaving the reorder pass as the only effective lever).
+const BRANCHING_BONUS_CAP = 24;
+// Trap steering (planning depth): once route-finding is established, boards
+// where several LEGAL moves exist but only some complete the chain reward
+// look-ahead (reverse mode's 15.9% dead-end states play much deeper than the
+// standard banks' ~3.7% trap steps). Engaged ONLY at MEDIUM_PLUS/HARD and
+// only past this solve count — newcomers should not meet plausible wrong
+// turns cold — and ONLY as a secondary criterion among multi-route
+// candidates: a trap with no alternate route is just frustration, so trap
+// preference can never promote a single-route board.
+const TRAP_STEERING_UNLOCK_PUZZLES = 25;
 const branchingMetricsCache = new Map<string, PuzzleBranchingMetrics>();
 const standardExtensionCache = new Map<string, PuzzleConfig | null>();
 const guaranteedStandardFallbackCache = new Map<Difficulty, PuzzleConfig>();
@@ -37,12 +65,13 @@ export function prioritizeMultiRouteCandidates<T>(
   candidates: readonly T[],
   getCompletePathCount: (candidate: T) => number,
   targetPoolSize: number,
+  prefersTrap?: (candidate: T) => boolean,
 ): T[] {
   const preferredPoolSize = Math.min(
     candidates.length,
     Math.max(0, Math.floor(targetPoolSize)),
   );
-  const multiRouteIndices: number[] = [];
+  let multiRouteIndices: number[] = [];
   const fallbackIndices: number[] = [];
 
   candidates.forEach((candidate, index) => {
@@ -52,6 +81,19 @@ export function prioritizeMultiRouteCandidates<T>(
       fallbackIndices.push(index);
     }
   });
+
+  // Secondary trap preference: WITHIN the multi-route tier only, stable-order
+  // trap-bearing boards first. Single-route candidates stay in the fallback
+  // tier untouched — trap presence never promotes a board with no alternate
+  // completing route.
+  if (prefersTrap) {
+    const trapIndices: number[] = [];
+    const plainIndices: number[] = [];
+    for (const index of multiRouteIndices) {
+      (prefersTrap(candidates[index]) ? trapIndices : plainIndices).push(index);
+    }
+    multiRouteIndices = [...trapIndices, ...plainIndices];
+  }
 
   const preferredIndices = multiRouteIndices.slice(0, preferredPoolSize);
   preferredIndices.push(
@@ -567,9 +609,11 @@ export async function selectPreGeneratedPuzzle(
   // Sort by score descending
   scored.sort((a, b) => b.score - a.score);
 
-  // Once the player knows the base verb, favor standard boards with multiple
-  // completing routes. Analyze only the strongest context candidates so phase
-  // and freshness remain the primary filters and synchronous work stays capped.
+  // Once preview grading has gone neutral, favor standard boards with
+  // multiple completing routes — the delivered experience should be mostly
+  // boards with 2+ real routes, not the banks' single-route majority. Analyze
+  // only the strongest context candidates so phase and freshness remain the
+  // primary filters and synchronous work stays capped (see the constant docs).
   if (variant === 'standard' && puzzlesSolved >= BRANCHING_UNLOCK_PUZZLES) {
     const candidateCount = Math.min(BRANCHING_CONTEXT_CANDIDATES, scored.length);
     const metricSource = extensionRequired ? 'extended' : 'source';
@@ -590,9 +634,18 @@ export async function selectPreGeneratedPuzzle(
         ...candidate,
         score: candidate.score + Math.min(BRANCHING_BONUS_CAP, metrics.structuralBonus),
         completePathCount: metrics.completePathCount,
+        trapStepFraction: metrics.trapStepFraction,
       };
     });
     depthCandidates.sort((a, b) => b.score - a.score);
+    // Trap preference is a SECONDARY criterion behind the multi-route tiering,
+    // and only where planning depth is the point: the 5-letter banks
+    // (MEDIUM_PLUS/HARD) past 25 solves. EASY/MEDIUM and earlier solves keep
+    // the plain multi-route ordering — newcomers should not meet plausible
+    // wrong turns cold.
+    const trapPreferenceActive =
+      (difficulty === 'MEDIUM_PLUS' || difficulty === 'HARD') &&
+      puzzlesSolved >= TRAP_STEERING_UNLOCK_PUZZLES;
     scored.splice(
       0,
       candidateCount,
@@ -600,6 +653,9 @@ export async function selectPreGeneratedPuzzle(
         depthCandidates,
         candidate => candidate.completePathCount,
         10,
+        trapPreferenceActive
+          ? candidate => candidate.trapStepFraction > 0
+          : undefined,
       ),
     );
   }

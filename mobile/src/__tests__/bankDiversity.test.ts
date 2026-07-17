@@ -30,6 +30,22 @@
  * FRAT/WORT and the crude formable set — see purgeProfanity.mjs): 66
  * puzzles dropped by the purge, a further 52 dropped as chain-unsolvable
  * under the shrunk dictionary, 2 stored solutions regenerated.
+ *
+ * Recalibrated after the multi-route branching top-up
+ * (scripts/generateBranchingTopUp{A,B}.test.ts): the four standard banks
+ * gained generator-fresh multi-path boards under the SAME pinned caps
+ * (EASY +92, MEDIUM +76, MEDIUM_PLUS +47, HARD +19), so caps are unchanged
+ * and the unique/puzzle floors below rose to ~10% under the new measured.
+ *
+ * Recalibrated after branching top-up ROUND 2 (MEDIUM +32, MEDIUM_PLUS +38,
+ * HARD +39): the 5-letter banks' caps were deliberately RAISED for that
+ * round (MEDIUM_PLUS 8 -> 10, HARD 10 -> 12) — the cap protects vocabulary
+ * diversity, but on those banks the dread-steered vocabulary saturates it
+ * long before the branching gate is satisfiable (round 1: 79-91% of HARD
+ * candidates hit an at-cap word). A +2 cap trades marginal repetition,
+ * still guarded by the unique-word floors below, for choice-rich supply.
+ * EASY (cap 3) and MEDIUM (cap 7) caps were NOT raised. Caps below remain
+ * the exact measured maxima of the committed data.
  */
 import { PUZZLE_BANK_EASY } from '../data/puzzleBankEasy';
 import { PUZZLE_BANK_MEDIUM } from '../data/puzzleBankMedium';
@@ -54,29 +70,32 @@ interface BankSpec {
 }
 
 const BANKS: BankSpec[] = [
-  // Measured (2026-07 hygiene pass 2): EASY 470 puzzles / max 3 / 1482 unique
-  { name: 'EASY', bank: PUZZLE_BANK_EASY, cap: 3, minUnique: 1330, minPuzzles: 415 },
-  // MEDIUM 472 / max 7 (marquee injection) / 1609 unique
-  { name: 'MEDIUM', bank: PUZZLE_BANK_MEDIUM, cap: 7, minUnique: 1445, minPuzzles: 420 },
-  // MEDIUM_PLUS 474 / max 8 (marquee injection) / 1399 unique
-  { name: 'MEDIUM_PLUS', bank: PUZZLE_BANK_MEDIUM_PLUS, cap: 8, minUnique: 1255, minPuzzles: 420 },
-  // HARD 438 / max 10 / 1330 unique
-  { name: 'HARD', bank: PUZZLE_BANK_HARD, cap: 10, minUnique: 1195, minPuzzles: 390 },
-  // REVERSE_EASY 429 / max 7 / 1325 unique
+  // Measured (2026-07 gated full regeneration: every standard-bank board passes
+  // completePathCount >= 2, singleChoiceFraction <= 0.65 bright / <= 0.75 dread
+  // phases — smaller banks, 100% choice-rich; floors ~10% under measured):
+  // EASY 496 puzzles / max 3 / 1417 unique
+  { name: 'EASY', bank: PUZZLE_BANK_EASY, cap: 3, minUnique: 1275, minPuzzles: 445 },
+  // MEDIUM 426 / max 7 / 1256 unique
+  { name: 'MEDIUM', bank: PUZZLE_BANK_MEDIUM, cap: 7, minUnique: 1130, minPuzzles: 380 },
+  // MEDIUM_PLUS 344 / max 10 / 935 unique
+  { name: 'MEDIUM_PLUS', bank: PUZZLE_BANK_MEDIUM_PLUS, cap: 10, minUnique: 840, minPuzzles: 310 },
+  // HARD 310 / max 12 / 933 unique
+  { name: 'HARD', bank: PUZZLE_BANK_HARD, cap: 12, minUnique: 840, minPuzzles: 280 },
+  // REVERSE_EASY 406 / max 7 / 1325 unique
   { name: 'REVERSE_EASY', bank: PUZZLE_BANK_REVERSE_EASY, cap: 7, minUnique: 1190, minPuzzles: 380 },
-  // REVERSE_MEDIUM 318 / max 11 (solution-repair pass) / 1304 unique
+  // REVERSE_MEDIUM 292 / max 11 (solution-repair pass) / 1304 unique
   { name: 'REVERSE_MEDIUM', bank: PUZZLE_BANK_REVERSE_MEDIUM, cap: 11, minUnique: 1170, minPuzzles: 280 },
   // REVERSE_MEDIUM_PLUS 219 / max 12 / 877 unique
   { name: 'REVERSE_MEDIUM_PLUS', bank: PUZZLE_BANK_REVERSE_MEDIUM_PLUS, cap: 12, minUnique: 785, minPuzzles: 195 },
-  // REVERSE_HARD 183 / max 16 / 783 unique
+  // REVERSE_HARD 182 / max 16 / 783 unique
   { name: 'REVERSE_HARD', bank: PUZZLE_BANK_REVERSE_HARD, cap: 16, minUnique: 700, minPuzzles: 160 },
-  // DOUBLE_EASY 495 / max 3 / 1619 unique
+  // DOUBLE_EASY 489 / max 3 / 1619 unique
   { name: 'DOUBLE_EASY', bank: PUZZLE_BANK_DOUBLE_SHIFT_EASY, cap: 3, minUnique: 1455, minPuzzles: 440 },
-  // DOUBLE_MEDIUM 458 / max 5 / 1604 unique
+  // DOUBLE_MEDIUM 447 / max 5 / 1604 unique
   { name: 'DOUBLE_MEDIUM', bank: PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM, cap: 5, minUnique: 1440, minPuzzles: 405 },
-  // DOUBLE_MEDIUM_PLUS 474 / max 8 / 1637 unique
+  // DOUBLE_MEDIUM_PLUS 463 / max 8 / 1637 unique
   { name: 'DOUBLE_MEDIUM_PLUS', bank: PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM_PLUS, cap: 8, minUnique: 1470, minPuzzles: 420 },
-  // DOUBLE_HARD 442 / max 10 / 1617 unique
+  // DOUBLE_HARD 425 / max 10 / 1617 unique
   { name: 'DOUBLE_HARD', bank: PUZZLE_BANK_DOUBLE_SHIFT_HARD, cap: 10, minUnique: 1450, minPuzzles: 390 },
 ];
 

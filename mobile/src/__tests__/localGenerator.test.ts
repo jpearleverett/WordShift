@@ -1,4 +1,4 @@
-import { validateWord, generateLocalPuzzle, isReverseSolvable, getInsertionIndex, getIncantationName, getStrongestDreadWord, FORCED_START_MIN_SCORE } from '../services/localGenerator';
+import { validateWord, generateLocalPuzzle, isReverseSolvable, getInsertionIndex, getIncantationName, getStrongestDreadWord, FORCED_START_MIN_SCORE, pickMultiRouteCandidate } from '../services/localGenerator';
 
 // Mock amberCurrency to avoid AsyncStorage issues during generation
 jest.mock('../services/amberCurrency', () => ({
@@ -152,6 +152,96 @@ describe('generateLocalPuzzle', () => {
     expect(puzzle.solution).toBeDefined();
     expect(puzzle.solution!.length).toBe(3);
   }, 10000);
+});
+
+describe('pickMultiRouteCandidate (standard final-pick preference)', () => {
+  interface FakeCandidate {
+    id: string;
+    score: number;
+  }
+  const byId = (counts: Record<string, number>) =>
+    (candidate: FakeCandidate) => counts[candidate.id];
+
+  test('prefers the highest-scoring multi-route candidate over a higher-scoring single-route one', () => {
+    const candidates: FakeCandidate[] = [
+      { id: 'single-high', score: 90 },
+      { id: 'multi-a', score: 70 },
+      { id: 'multi-b', score: 60 },
+    ];
+    const picked = pickMultiRouteCandidate(
+      candidates,
+      byId({ 'single-high': 1, 'multi-a': 3, 'multi-b': 5 }),
+    );
+    expect(picked!.id).toBe('multi-a');
+  });
+
+  test('a route count of exactly 2 qualifies as multi-route', () => {
+    const candidates: FakeCandidate[] = [
+      { id: 'single', score: 80 },
+      { id: 'two-routes', score: 50 },
+    ];
+    const picked = pickMultiRouteCandidate(
+      candidates,
+      byId({ single: 1, 'two-routes': 2 }),
+    );
+    expect(picked!.id).toBe('two-routes');
+  });
+
+  test('falls back to the best single-route candidate when none is multi-route', () => {
+    const candidates: FakeCandidate[] = [
+      { id: 'best', score: 75 },
+      { id: 'worse', score: 55 },
+    ];
+    const picked = pickMultiRouteCandidate(
+      candidates,
+      byId({ best: 1, worse: 1 }),
+    );
+    expect(picked!.id).toBe('best');
+  });
+
+  test('returns null for an empty candidate list', () => {
+    expect(pickMultiRouteCandidate([], () => 0)).toBeNull();
+  });
+
+  test('breaks exact score ties among multi-route candidates toward trap presence', () => {
+    const candidates: FakeCandidate[] = [
+      { id: 'multi-plain', score: 70 },
+      { id: 'multi-trap', score: 70 },
+      { id: 'single-high', score: 90 },
+    ];
+    const picked = pickMultiRouteCandidate(
+      candidates,
+      byId({ 'multi-plain': 2, 'multi-trap': 3, 'single-high': 1 }),
+      candidate => candidate.id === 'multi-trap' || candidate.id === 'single-high',
+    );
+    expect(picked!.id).toBe('multi-trap');
+  });
+
+  test('a higher multi-route score still beats trap presence (tie-break only)', () => {
+    const candidates: FakeCandidate[] = [
+      { id: 'multi-plain-high', score: 80 },
+      { id: 'multi-trap-low', score: 70 },
+    ];
+    const picked = pickMultiRouteCandidate(
+      candidates,
+      byId({ 'multi-plain-high': 2, 'multi-trap-low': 4 }),
+      candidate => candidate.id === 'multi-trap-low',
+    );
+    expect(picked!.id).toBe('multi-plain-high');
+  });
+
+  test('trap presence never promotes a single-route candidate over a multi-route one', () => {
+    const candidates: FakeCandidate[] = [
+      { id: 'single-trap', score: 90 },
+      { id: 'multi-plain', score: 60 },
+    ];
+    const picked = pickMultiRouteCandidate(
+      candidates,
+      byId({ 'single-trap': 1, 'multi-plain': 2 }),
+      candidate => candidate.id === 'single-trap',
+    );
+    expect(picked!.id).toBe('multi-plain');
+  });
 });
 
 describe('getInsertionIndex', () => {

@@ -6,6 +6,8 @@ import {
   hasHintSync,
   consumeHintSync,
   addHints,
+  grantBonusHint,
+  BONUS_HINT_SOFT_CAP,
   clearHints,
 } from '../services/hints';
 import { STARTING_FREE_HINTS, FIRST_DAILY_BONUS_HINTS } from '../constants/gameBalance';
@@ -87,5 +89,44 @@ describe('hints economy', () => {
     await clearHints();
     expect(await getHintBalance()).toBe(0);
     expect(getHintBalanceSync()).toBe(0);
+  });
+
+  describe('milestone bonus hint trickle', () => {
+    it('grants +1 while the balance is under the soft cap', async () => {
+      await initHints(); // STARTING_FREE_HINTS (5) < BONUS_HINT_SOFT_CAP (10)
+      expect(STARTING_FREE_HINTS).toBeLessThan(BONUS_HINT_SOFT_CAP);
+      const granted = await grantBonusHint('milestone');
+      expect(granted).toBe(true);
+      expect(await getHintBalance()).toBe(STARTING_FREE_HINTS + 1);
+      expect(getHintBalanceSync()).toBe(STARTING_FREE_HINTS + 1);
+    });
+
+    it('refuses at or above the soft cap (never stacks a stockpile)', async () => {
+      await initHints();
+      await addHints(BONUS_HINT_SOFT_CAP - STARTING_FREE_HINTS, 'top_up'); // exactly at cap
+      expect(await getHintBalance()).toBe(BONUS_HINT_SOFT_CAP);
+      expect(await grantBonusHint('milestone')).toBe(false);
+      expect(await getHintBalance()).toBe(BONUS_HINT_SOFT_CAP);
+
+      await addHints(20, 'iap_test'); // well above cap
+      expect(await grantBonusHint('milestone')).toBe(false);
+      expect(getHintBalanceSync()).toBe(BONUS_HINT_SOFT_CAP + 20);
+    });
+
+    it('grants one below the cap and lands exactly at it', async () => {
+      await initHints();
+      await addHints(BONUS_HINT_SOFT_CAP - STARTING_FREE_HINTS - 1, 'top_up'); // cap - 1
+      expect(await grantBonusHint('milestone')).toBe(true);
+      expect(await getHintBalance()).toBe(BONUS_HINT_SOFT_CAP);
+      // Next trickle is refused: the previous grant reached the cap.
+      expect(await grantBonusHint('milestone')).toBe(false);
+    });
+
+    it('grants from an empty, unseeded balance', async () => {
+      // No init: balance 0. The trickle still works as a mercy top-up.
+      expect(await grantBonusHint('milestone')).toBe(true);
+      expect(await getHintBalance()).toBe(1);
+      expect(hasHintSync()).toBe(true);
+    });
   });
 });

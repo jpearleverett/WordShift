@@ -73,6 +73,10 @@ jest.mock('../services/localGenerator', () => ({
   getIncantationName: jest.fn(() => null),
   // Default: no dread word in the ledger — the finale-serve tests override this.
   getStrongestDreadWord: jest.fn(() => null),
+  // Resonance detection reads dread tiers at move commit; default tier 0 so
+  // existing move tests never trip a resonant message. The dedicated resonance
+  // suite (usePuzzleGameResonance.test.ts) carries its own tier map.
+  getWordPhaseTier: jest.fn(() => 0),
 }));
 
 jest.mock('../services/phaseNarrative', () => ({
@@ -89,6 +93,7 @@ jest.mock('../services/phaseNarrative', () => ({
   getLockedLetterMessage: jest.fn((_p: number) => 'That letter is locked!'),
   getFinalBoardStartMessage: jest.fn((_p: number) => 'The last arrangement. Take your time.'),
   getFinalBoardUndoRefusal: jest.fn((_p: number) => 'What is given now is given for good.'),
+  getResonantMoveMessage: jest.fn((_p: number) => 'Oh, lovely choice. That word sits deep in the house.'),
   getUnbrokenWeaveSpentLetterMessage: jest.fn((letter: string, _p: number) => `${letter} has already crossed the chain.`),
   getUnbrokenWeaveUnavailableMessage: jest.fn((_p: number) => 'The thread breaks before it can begin. A plain offering remains.'),
 }));

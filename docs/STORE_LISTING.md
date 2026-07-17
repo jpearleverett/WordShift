@@ -18,6 +18,8 @@ SHIFT ONE LETTER. CHANGE EVERYTHING.
 
 WordShift is a cozy letter game built around one satisfying rule: move a letter from one word into the next, and keep both words real.
 
+A cozy word game that does not stay cozy.
+
 HOW IT WORKS
 
 • Pick a letter from the current word.

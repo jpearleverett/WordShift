@@ -40,7 +40,7 @@ import { clearHarvestState } from './wordHarvest';
 /**
  * Creator / press kit: reviewer fast-forward snapshots.
  *
- * The cult reveal is gated ~155+ puzzles deep by design, which means press and
+ * The cult reveal is gated ~90+ puzzles deep by design, which means press and
  * streamers can never showcase the game's actual hook from a fresh install.
  * This service builds a COHERENT late-game save on demand so a reviewer can
  * jump straight to a chosen era of the descent.
@@ -87,20 +87,24 @@ interface EraSpec {
 }
 
 /**
- * Era targets. Puzzle counts are tuned to the current pacing constants:
- * - dusk    (~70):  Deeper Questions. Dusk sky, uneasy animals, 7 rooms built.
- * - shadows (~140): Growing Shadows. Storm is close, original house complete.
- * - reveal  (~200): The Horizon. Cult revealed, full house, robed sprites.
- * - peace   (~260): Terrible Peace. Post-revelation, Tending Shrine open.
- * If pacing constants move, the win simulation follows them automatically
- * (phase floors are re-read from gameBalance and the final sanity check fails
- * loudly rather than shipping an off-phase snapshot).
+ * Era targets. Puzzle counts are tuned to the 2026-07 compressed pacing
+ * constants (phase floors 12/28/62/90/120):
+ * - dusk    (~50):  Deeper Questions. Dusk sky, uneasy animals, 7 rooms built.
+ * - shadows (~85):  Growing Shadows. Storm is close, original house complete.
+ * - reveal  (~140): The Horizon. Cult revealed, full house, robed sprites.
+ * - peace   (~180): Terrible Peace. Post-revelation, Tending Shrine open.
+ * Each era's count sits BELOW the next phase's puzzle floor (dusk 50 < 62,
+ * shadows 85 < 90) so the exposure guard pins the snapshot to exactly the
+ * target phase with no pending transition. If pacing constants move, the win
+ * simulation follows them automatically (phase floors are re-read from
+ * gameBalance and the final sanity check fails loudly rather than shipping an
+ * off-phase snapshot).
  */
 const ERA_SPECS: Record<CreatorEra, EraSpec> = {
-  dusk: { phase: 2, puzzles: 70, maxUnlockOrder: 13, minSpendableAmber: 150 },
-  shadows: { phase: 3, puzzles: 120, maxUnlockOrder: 19, minSpendableAmber: 250 },
-  reveal: { phase: 4, puzzles: 200, maxUnlockOrder: Number.MAX_SAFE_INTEGER, minSpendableAmber: 400 },
-  peace: { phase: 5, puzzles: 260, maxUnlockOrder: Number.MAX_SAFE_INTEGER, minSpendableAmber: 600 },
+  dusk: { phase: 2, puzzles: 50, maxUnlockOrder: 13, minSpendableAmber: 150 },
+  shadows: { phase: 3, puzzles: 85, maxUnlockOrder: 19, minSpendableAmber: 250 },
+  reveal: { phase: 4, puzzles: 140, maxUnlockOrder: Number.MAX_SAFE_INTEGER, minSpendableAmber: 400 },
+  peace: { phase: 5, puzzles: 180, maxUnlockOrder: Number.MAX_SAFE_INTEGER, minSpendableAmber: 600 },
 };
 
 /**

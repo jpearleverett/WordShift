@@ -43,10 +43,12 @@ export const DIALOGUE_SESSION_CONFIG = {
   // Catch-up session boost: a late recruit (see LATE_PHASE_RECRUITS) that still
   // has unread REGULAR dialogue at global Phase 3+ reads this many extra lines
   // per session. Without it the descent trio is stranded: house completion and
-  // Moss's recruit land around 136, the eight-win dwell completes around 143,
-  // arming waits for 160, the final board is ~161, and post-revelation is ~162.
-  // At 4-6 lines per session with 5-puzzle cooldowns the ending consumes his
-  // arc unheard.
+  // Moss's recruit land around 96-100, the eight-win dwell completes around
+  // 104-108, arming waits for 115, the final board is ~116, and
+  // post-revelation is ~117-122. At 4-6 lines per session with 5-puzzle
+  // cooldowns the ending consumes his arc unheard. The lagging tier borrows the same boost at global Phase 4,
+  // where it converges to phase 4 and gains its whole Phase-4 block at once
+  // (see getCatchUpSessionBonus).
   CATCH_UP_BONUS_DIALOGUES: 2,
   // The boost only exists in the compressed endgame window.
   CATCH_UP_MIN_GLOBAL_PHASE: 3,
@@ -110,23 +112,29 @@ export const ANIMAL_AWARENESS_TIERS: Record<AnimalType, AnimalAwarenessTier> = {
 /**
  * Get the effective phase for a specific animal based on their awareness tier.
  *
- * The tiers stagger the DESCENT, never the ARRIVAL: an animal's phase may only
- * ever reach 5 through the global phase-5 gate, because the arrival itself is
- * gated on the actual post-revelation event (markPostRevelation pins the
- * global phase to 5). Pre-arrival the result is hard-capped at 4 — without
- * that cap a vanguard animal (+1) at global Phase 4 resolved to 5 and the
- * game's most-visited characters (Ember, Archimedes, Vesper) leaked
- * "the shadow has settled" post-revelation serenity during the dwell window,
- * BEFORE the entity ever descended. Conversely, at global phase 5 every
- * animal clamps to 5 so the lagging four don't sit at Phase 4 forever and
- * miss their post-revelation dialogue.
+ * The tiers stagger the DESCENT (phases 1-3), never the ARRIVAL — in either
+ * direction. Upward: an animal's phase may only ever reach 5 through the
+ * global phase-5 gate, because the arrival itself is gated on the actual
+ * post-revelation event (markPostRevelation pins the global phase to 5).
+ * Pre-arrival the result is hard-capped at 4 — without that cap a vanguard
+ * animal (+1) at global Phase 4 resolved to 5 and the game's most-visited
+ * characters (Ember, Archimedes, Vesper) leaked "the shadow has settled"
+ * post-revelation serenity during the dwell window, BEFORE the entity ever
+ * descended. Downward: the lagging -1 applies only through global Phase 3.
+ * The Phase-4 reveal is house-wide (every sprite is already robed at global
+ * Phase 4), so the lagging tier converges to 4 at the reveal — holding it at
+ * 3 through the whole reveal era orphaned its Phase-4 blocks permanently,
+ * because the phase-5 handoff skips unread earlier lines by design. And at
+ * global phase 5 every animal clamps to 5 so no tier sits at Phase 4 forever
+ * and misses its post-revelation dialogue.
  */
 export function getAnimalPhase(globalPhase: DialoguePhase, animalType: AnimalType): DialoguePhase {
   if (globalPhase === 5) return 5;
   const tier = ANIMAL_AWARENESS_TIERS[animalType];
   let offset = 0;
   if (tier === 'vanguard') offset = 1;
-  if (tier === 'lagging') offset = -1;
+  // Lagging staggers the descent only: the -1 ends at the house-wide reveal.
+  if (tier === 'lagging' && globalPhase < 4) offset = -1;
   // Cap at 4 pre-arrival: phase-5 content is reachable ONLY via the gate above.
   const effective = Math.max(0, Math.min(4, globalPhase + offset));
   return effective as DialoguePhase;
@@ -139,8 +147,8 @@ export function getAnimalPhase(globalPhase: DialoguePhase, animalType: AnimalTyp
  * (nothing stores one, and adding one would need a save migration for players
  * already past the gates) and over the catchup-intro flag (introsSeen records
  * WHO was introduced, not at what phase): it is static, save-independent, and
- * derivable from the unlock data — the trio's room gates (115/125/135) all sit
- * at or past the Phase-3 weighted threshold (PHASE_THRESHOLDS[3] = 120), and
+ * derivable from the unlock data — the trio's room gates (84/88/92) all sit
+ * at or past the Phase-3 weighted threshold (PHASE_THRESHOLDS[3] = 84), and
  * weighted phase progress never trails raw puzzles solved, so by construction
  * these three cannot exist before global Phase 3. Pinned against
  * UNLOCK_PROGRESSION by homeWorldData.test.ts so the set can't silently drift
@@ -153,19 +161,29 @@ export const LATE_PHASE_RECRUITS: ReadonlySet<AnimalType> = new Set<AnimalType>(
 ]);
 
 /**
- * Extra dialogues per session for a late recruit still working through its
- * regular (indexed, non-pool) backlog. 0 whenever the boost doesn't apply:
- * before global Phase 3, for animals that aren't late recruits, or once the
- * backlog is read out. The cycling pools (Phase-2 exhaustion, Phase-5
- * post-revelation) never earn the boost — they are ambience, not arc.
+ * Extra dialogues per session for an animal still working through its regular
+ * (indexed, non-pool) backlog inside a compressed window. Two claimants share
+ * the SAME boost and cap (never stacked):
+ *  - a late recruit (the descent trio) at global Phase 3+, whose whole arc
+ *    lands just before the finale;
+ *  - a lagging-tier animal at global Phase 4, which converges to phase 4 at
+ *    the reveal (see getAnimalPhase) and gains its 30-line Phase-4 block with
+ *    only ~32 puzzles before post-revelation retires unread lines for good.
+ * 0 whenever neither window applies or once the backlog is read out. The
+ * cycling pools (Phase-2 exhaustion, Phase-5 post-revelation) never earn the
+ * boost — they are ambience, not arc.
  */
 export function getCatchUpSessionBonus(
   globalPhase: DialoguePhase,
   isLatePhaseRecruit: boolean,
-  hasUnreadRegularDialogue: boolean
+  hasUnreadRegularDialogue: boolean,
+  isLaggingTier: boolean = false
 ): number {
-  if (globalPhase < DIALOGUE_SESSION_CONFIG.CATCH_UP_MIN_GLOBAL_PHASE) return 0;
-  if (!isLatePhaseRecruit || !hasUnreadRegularDialogue) return 0;
+  if (!hasUnreadRegularDialogue) return 0;
+  const lateRecruitWindow =
+    isLatePhaseRecruit && globalPhase >= DIALOGUE_SESSION_CONFIG.CATCH_UP_MIN_GLOBAL_PHASE;
+  const laggingRevealWindow = isLaggingTier && globalPhase === 4;
+  if (!lateRecruitWindow && !laggingRevealWindow) return 0;
   return DIALOGUE_SESSION_CONFIG.CATCH_UP_BONUS_DIALOGUES;
 }
 
@@ -321,13 +339,13 @@ export interface HomeWorldProgress {
   // Stored here so existing home-progress cloud sync and Reset All cover it.
   unbrokenWeaveIntroSeen?: boolean;
   // Capped count of puzzles completed at Phase 4 with the house already
-  // complete — the eight-win dwell completes around 143, so the cult-reveal
+  // complete — the eight-win dwell completes around 104-108, so the cult-reveal
   // era is actually played rather than flashed past. See FINALE_DWELL_PUZZLES.
   phase4Dwell?: number;
   // The NEXT standard board start is served as the marked FINAL BOARD
   // (dread-seeded, quiet treatment), and its victory fires the finale. Set
-  // only after capped dwell is full and the puzzle-160 arming floor is reached;
-  // the final board is ~161 and post-revelation ~162. Cleared by
+  // only after capped dwell is full and the puzzle-115 arming floor is reached;
+  // the final board is ~116 and post-revelation ~117-122. Cleared by
   // markFinalPuzzleCompleted and by startNewCycle.
   finaleArmed?: boolean;
   // Tutorial seeds - tracks specific tutorial lines for Phase 4 callbacks

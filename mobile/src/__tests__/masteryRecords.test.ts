@@ -7,6 +7,8 @@ import {
   getSolveTrend,
   recordSpeedRound,
   getBestSpeedRound,
+  getResonantChoices,
+  recordResonantChoices,
   getUnbrokenWeaveMastery,
   invalidateMasteryCache,
   recordUnbrokenWeaveVictory,
@@ -84,6 +86,47 @@ describe('best speed round', () => {
     await clearMasteryRecords();
     expect(await getBestSpeedRound()).toBe(0);
     expect(await getSolveTrend('HARD')).toBeNull();
+  });
+});
+
+describe('resonant choices (lifetime mastery stat)', () => {
+  test('starts at 0 and accumulates per-victory counts', async () => {
+    expect(await getResonantChoices()).toBe(0);
+
+    expect(await recordResonantChoices(2)).toBe(2);
+    expect(await recordResonantChoices(3)).toBe(5);
+    expect(await getResonantChoices()).toBe(5);
+  });
+
+  test('ignores non-positive and non-finite counts', async () => {
+    await recordResonantChoices(4);
+    expect(await recordResonantChoices(0)).toBe(4);
+    expect(await recordResonantChoices(-2)).toBe(4);
+    expect(await recordResonantChoices(Number.NaN)).toBe(4);
+    expect(await getResonantChoices()).toBe(4);
+  });
+
+  test('persists across a cache drop (survives restart)', async () => {
+    await recordResonantChoices(6);
+    _clearMasteryCache();
+    expect(await getResonantChoices()).toBe(6);
+  });
+
+  test('is migration-safe: an older stored shape defaults to 0', async () => {
+    // A pre-resonance save: no resonantChoices field at all.
+    await AsyncStorage.setItem(
+      'wordshift_mastery',
+      JSON.stringify({ solveTimes: {}, bestSpeedRound: 3 }),
+    );
+    _clearMasteryCache();
+    expect(await getResonantChoices()).toBe(0);
+    expect(await getBestSpeedRound()).toBe(3);
+  });
+
+  test('clearMasteryRecords resets the stat', async () => {
+    await recordResonantChoices(9);
+    await clearMasteryRecords();
+    expect(await getResonantChoices()).toBe(0);
   });
 });
 

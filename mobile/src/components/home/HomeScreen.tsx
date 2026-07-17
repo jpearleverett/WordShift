@@ -154,7 +154,7 @@ import { getSettingsSync } from '../../services/settings';
 import { getUnlockedVariants } from '../../services/puzzleVariety';
 import { getPendingHarvestSummary, HarvestSummary } from '../../services/wordHarvest';
 import { getLocalDateString, daysAgoLocal } from '../../services/dateUtils';
-import { getHomeAmbientLine, getFoxPitNudgeLines, getShopTitle, getGoalSuggestion, getEventAmbientLine } from '../../services/phaseNarrative';
+import { getHomeAmbientLine, getFoxPitNudgeLines, getShopTitle, getGoalSuggestion, getEventAmbientLine, getNextFriendPrompt } from '../../services/phaseNarrative';
 import { getActiveEvent } from '../../services/liveEvents';
 import { DailyChallengeCard } from '../DailyChallengeCard';
 import { isDailyChallengeUnlocked, getDailyStatus } from '../../services/dailyChallenge';
@@ -1623,6 +1623,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const phaseTheme = getPhaseTheme(progress.currentPhase);
   // Phase-aware material for the PLAY dock (candy green → ember → mauve).
   const playDockColors = getPlayDockColors(progress.currentPhase);
+  // "Visit next friend" chain: offered only at the dialogue session's natural
+  // end (the moment the button reads "Close"), never during onboarding and
+  // never while a one-time intro override owns the dialogue surface. The
+  // resolution is fully synchronous (badge-equivalent availability), so this
+  // costs nothing on the renders where the button cannot appear.
+  const nextFriendWithNews =
+    dialogueFlow.showDialogue &&
+    !dialogueFlow.hasMoreToShow &&
+    !isOnboarding &&
+    !introOverrideLines &&
+    !showIntroDialogue
+      ? dialogueFlow.getNextAnimalWithNews(animals)
+      : null;
   const currentJournalSpotlightStep = journalSpotlightStepMeta[
     Math.max(0, Math.min(journalSpotlightIndex, journalSpotlightStepMeta.length - 1))
   ];
@@ -2085,6 +2098,27 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       </TouchableOpacity>
                     </View>
                   ) : (
+                  <View>
+                  {nextFriendWithNews ? (
+                    <BevelRowButton
+                      phase={progress.currentPhase}
+                      variant="secondary"
+                      hostDark={dtHostDark}
+                      onPress={() => dialogueFlow.handleVisitNextAnimal(nextFriendWithNews)}
+                      soundKind="dialogue"
+                      accessibilityLabel={getNextFriendPrompt(progress.currentPhase, nextFriendWithNews.name)}
+                      style={styles.dialogueNextFriendBevel}
+                    >
+                      <Text
+                        style={[styles.nextFriendButtonText, { color: pixelSkin.ink.secondary }]}
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.7}
+                      >
+                        {getNextFriendPrompt(progress.currentPhase, nextFriendWithNews.name)}
+                      </Text>
+                    </BevelRowButton>
+                  ) : null}
                   <View style={styles.dialogueFooter}>
                     <BevelRowButton
                       phase={progress.currentPhase}
@@ -2099,6 +2133,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         {dialogueFlow.hasMoreToShow ? 'Next' : 'Close'}
                       </Text>
                     </BevelRowButton>
+                  </View>
                   </View>
                   )}
                 </View>
@@ -3890,6 +3925,17 @@ const styles = StyleSheet.create({
   // The cottage bevel sits flush-right in the footer at its own strip height.
   dialogueContinueBevel: {
     minWidth: 132,
+  },
+  // "Visit next friend" chain button: full-width row above the Close row (the
+  // phase-aware prompt labels are sentence-length, so it never shares a row).
+  dialogueNextFriendBevel: {
+    alignSelf: 'stretch',
+    marginBottom: 6,
+  },
+  nextFriendButtonText: {
+    fontFamily: PIXEL_FONT_BOLD,
+    fontSize: 13,
+    fontWeight: '800',
   },
   dialogueFooter: {
     flexDirection: 'row',
