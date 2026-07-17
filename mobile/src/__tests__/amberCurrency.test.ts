@@ -65,6 +65,7 @@ import {
   FINALE_DWELL_PUZZLES,
   FINALE_ARM_MIN_PUZZLES,
   RESONANT_BOARD_CAP_AMBER,
+  MILESTONE_BONUSES,
 } from '../constants/gameBalance';
 import { FIRST_COMPLETION_BONUS } from '../types/homeWorld';
 import { getLocalDateStringDaysAgo } from '../services/dateUtils';
@@ -237,12 +238,23 @@ describe('awardPuzzleAmber', () => {
     expect(await getCurrentPhase()).toBe(0);
   });
 
-  test('deferred crediting (default) does not increase spendable balance', async () => {
+  test('deferred crediting (default) never credits the per-puzzle amber, but windfalls land instantly', async () => {
+    // First MEDIUM win: the per-puzzle amount stays deferred (harvest batch),
+    // while the one-time first-completion WINDFALL credits the balance NOW.
     const result = await awardPuzzleAmber('MEDIUM', 3);
     expect(result.amount).toBeGreaterThan(0);
-    expect(result.newBalance).toBe(0); // Not credited to balance
-    const balance = await getAmberBalance();
-    expect(balance).toBe(0);
+    expect(result.firstCompletionBonus).toBe(FIRST_COMPLETION_BONUS.MEDIUM);
+    expect(result.newBalance).toBe(FIRST_COMPLETION_BONUS.MEDIUM); // Windfall only — no per-puzzle credit
+    expect(await getAmberBalance()).toBe(FIRST_COMPLETION_BONUS.MEDIUM);
+
+    // Second MEDIUM win: no windfall this time — the balance must not move.
+    const second = await awardPuzzleAmber('MEDIUM', 3);
+    expect(second.amount).toBeGreaterThan(0);
+    expect(second.firstCompletionBonus).toBe(0);
+    expect(second.milestoneBonus).toBe(0);
+    expect(second.streakMilestoneBonus).toBe(0);
+    expect(second.newBalance).toBe(FIRST_COMPLETION_BONUS.MEDIUM);
+    expect(await getAmberBalance()).toBe(FIRST_COMPLETION_BONUS.MEDIUM);
   });
 
   test('no Patron bonus for non-patrons', async () => {
@@ -1239,31 +1251,33 @@ describe('post-revelation phase pinning (Phase 5)', () => {
 
 describe('deferred harvest credit (no totalAmberEarned double count)', () => {
   test('a deferred win credited via word_offering increments totalAmberEarned exactly once', async () => {
-    // Victory: creditToBalance=false — amber queued for the pit, but the
-    // lifetime counter is incremented NOW.
+    // Victory: creditToBalance=false — the PER-PUZZLE amber is queued for the
+    // pit; the one-time windfalls credit the balance NOW; the lifetime counter
+    // counts every part exactly once.
     const result = await awardPuzzleAmber('MEDIUM', 3);
-    const queued = result.amount
-      + result.milestoneBonus
+    const queued = result.amount;
+    const windfalls = result.milestoneBonus
       + result.firstCompletionBonus
       + result.streakMilestoneBonus;
     expect(queued).toBeGreaterThan(0);
-    expect((await getFullProgress()).totalAmberEarned).toBe(queued);
-    expect(await getAmberBalance()).toBe(0);
+    expect((await getFullProgress()).totalAmberEarned).toBe(queued + windfalls);
+    expect(await getAmberBalance()).toBe(windfalls);
 
-    // Pit offer: the SAME amber is released to the spendable balance.
+    // Pit offer: the SAME per-puzzle amber is released to the spendable balance.
     const newBalance = await awardBonusAmber(queued, 'word_offering');
-    expect(newBalance).toBe(queued);
+    expect(newBalance).toBe(queued + windfalls);
 
     // Counted once, not twice — the amber-earned achievements pace correctly.
-    expect((await getFullProgress()).totalAmberEarned).toBe(queued);
+    expect((await getFullProgress()).totalAmberEarned).toBe(queued + windfalls);
   });
 
   test('the auto-collect credit source also skips totalAmberEarned', async () => {
     const result = await awardPuzzleAmber('EASY', 1);
-    const queued = result.amount + result.firstCompletionBonus;
+    const queued = result.amount;
     await awardBonusAmber(queued, 'auto_word_offering');
-    expect((await getFullProgress()).totalAmberEarned).toBe(queued);
-    expect(await getAmberBalance()).toBe(queued);
+    expect((await getFullProgress()).totalAmberEarned).toBe(queued + result.firstCompletionBonus);
+    // Windfall (instant) + auto-collected batch both land in the balance.
+    expect(await getAmberBalance()).toBe(queued + result.firstCompletionBonus);
   });
 
   test('genuinely new bonus sources still increment totalAmberEarned', async () => {
@@ -1272,6 +1286,57 @@ describe('deferred harvest credit (no totalAmberEarned double count)', () => {
     const progress = await getFullProgress();
     expect(progress.amber).toBe(80);
     expect(progress.totalAmberEarned).toBe(80);
+  });
+});
+
+// ============================================================================
+// Windfall crediting split — one-time windfalls are spendable IMMEDIATELY,
+// only the per-puzzle amber stays deferred for the pit ritual
+// ============================================================================
+
+describe('windfall crediting split (deferred wins)', () => {
+  test('a milestone win with creditToBalance=false raises the balance by exactly the windfalls', async () => {
+    const firstMilestone = MILESTONE_BONUSES[0];
+
+    // Spend the EASY first-completion windfall on win one, then advance so the
+    // NEXT win lands exactly on the first puzzle-count milestone.
+    const first = await awardPuzzleAmber('EASY', 1);
+    expect(first.firstCompletionBonus).toBe(FIRST_COMPLETION_BONUS.EASY);
+    await devAddPuzzles(firstMilestone.puzzles - 2);
+
+    const balanceBefore = await getAmberBalance();
+    const result = await awardPuzzleAmber('EASY', 1); // creditToBalance defaults false
+    expect(result.puzzlesSolved).toBe(firstMilestone.puzzles);
+    expect(result.milestoneBonus).toBe(firstMilestone.amber);
+    expect(result.firstCompletionBonus).toBe(0);
+    expect(result.streakMilestoneBonus).toBe(0);
+    expect(result.amount).toBeGreaterThan(0);
+
+    // Balance rose by EXACTLY the windfall — the per-puzzle amount stays
+    // deferred (it is released later by the pit's word offering).
+    expect(result.newBalance).toBe(balanceBefore + firstMilestone.amber);
+    expect(await getAmberBalance()).toBe(balanceBefore + firstMilestone.amber);
+  });
+
+  test('windfalls never feed phase progression (amber-only, same as every bonus)', async () => {
+    // Identical wins with and without the milestone windfall accrue identical
+    // phaseProgress — the windfall moves amber, never the descent.
+    const firstMilestone = MILESTONE_BONUSES[0];
+    await devAddPuzzles(firstMilestone.puzzles - 1);
+    const win = await awardPuzzleAmber('EASY', 1);
+    expect(win.milestoneBonus).toBe(firstMilestone.amber);
+    const withMilestone = (await getFullProgress()).phaseProgress;
+
+    await clearProgress();
+    await devAddPuzzles(firstMilestone.puzzles - 1);
+    // Claim the milestone as already taken so no windfall fires this time.
+    const progress = await loadProgress();
+    progress.lastClaimedMilestone = firstMilestone.puzzles;
+    const plain = await awardPuzzleAmber('EASY', 1);
+    expect(plain.milestoneBonus).toBe(0);
+    const withoutMilestone = (await getFullProgress()).phaseProgress;
+
+    expect(withMilestone).toBe(withoutMilestone);
   });
 });
 

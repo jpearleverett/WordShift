@@ -24,6 +24,16 @@ interface LetterTileProps {
    * with onPress).
    */
   onLockedPress?: () => void;
+  /**
+   * Quiet acknowledgment for tiles that are otherwise fully inert (rows that
+   * are neither the active source row nor the selecting target row: completed
+   * and future rows). Mounts a feedback-only touchable so a confused poke is
+   * ACKNOWLEDGED with a subtle scale pulse here plus whatever the parent does
+   * (App fires a light selection haptic, nothing else). No message, no sound,
+   * no game-state change. Ignored when the tile is clickable or already has
+   * an onLockedPress feedback path.
+   */
+  onInactivePress?: () => void;
   isSelected?: boolean;
   isInteractable?: boolean;
   highlight?: 'default' | 'source' | 'locked';
@@ -54,6 +64,7 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
   letter,
   onPress,
   onLockedPress,
+  onInactivePress,
   isSelected,
   isInteractable,
   highlight = 'default',
@@ -689,7 +700,36 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
   // hook's locked-letter feedback path was literally unreachable — the tile
   // rendered bare content with no touch target.
   const isFeedbackPressable = !isClickable && !!onLockedPress;
+  // Inert tiles (completed/future rows) with an onInactivePress still mount a
+  // touchable: the quiet acknowledgment. onLockedPress takes precedence, so
+  // the active-row locked shake and the target-row inter-slot pulse are never
+  // displaced by this softer path.
+  const isInactivePressable = !isClickable && !isFeedbackPressable && !!onInactivePress;
   const trailColor = phase >= 4 ? '#C03050' : phase >= 3 ? '#9050B0' : '#FFD700';
+
+  // Quiet acknowledgment pulse: a soft native-driver scale dip that springs
+  // back. Reduced motion skips the pulse but still notifies the parent (its
+  // light haptic tick is then the whole acknowledgment). Never a message,
+  // never a sound, never a game-state change.
+  const handleInactivePress = () => {
+    if (!settings.reducedMotion) {
+      Animated.sequence([
+        Animated.timing(scaleAnim, {
+          toValue: 0.94,
+          duration: 70,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          friction: 4,
+          tension: 220,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+    onInactivePress?.();
+  };
 
   // Animated glow intensity
   const glowOpacity = glowAnim.interpolate({
@@ -729,10 +769,11 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
 
   const content = (
     <Animated.View
-      // Non-pressable tiles carry their own accessibility info; clickable and
-      // feedback-pressable tiles are labeled by the wrapping TouchableOpacity.
-      accessible={!isClickable && !isFeedbackPressable}
-      accessibilityLabel={!isClickable && !isFeedbackPressable ? `Letter ${letter.char}${letter.isLocked ? ', locked' : ''}` : undefined}
+      // Non-pressable tiles carry their own accessibility info; clickable,
+      // feedback-pressable, and inactive-pressable tiles are labeled by the
+      // wrapping TouchableOpacity.
+      accessible={!isClickable && !isFeedbackPressable && !isInactivePressable}
+      accessibilityLabel={!isClickable && !isFeedbackPressable && !isInactivePressable ? `Letter ${letter.char}${letter.isLocked ? ', locked' : ''}` : undefined}
       style={[
         styles.tileOuter,
         compact && { width: COMPACT_TILE_W, height: COMPACT_OUTER_H, marginHorizontal: COMPACT_TILE_MARGIN_H },
@@ -907,6 +948,22 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
         accessibilityLabel={`Letter ${letter.char}${letter.isLocked ? ', locked' : ''}`}
         accessibilityRole="button"
         accessibilityState={{ selected: !!isSelected, disabled: !!letter.isLocked }}
+      >
+        {content}
+      </TouchableOpacity>
+    );
+  }
+
+  if (isInactivePressable) {
+    return (
+      // Quiet-acknowledgment touchable for inert tiles. Deliberately NO
+      // accessibilityRole="button": announcing a button would promise an
+      // action these tiles don't have — the label is just the letter, same
+      // as the bare-content path.
+      <TouchableOpacity
+        onPress={handleInactivePress}
+        activeOpacity={1}
+        accessibilityLabel={`Letter ${letter.char}${letter.isLocked ? ', locked' : ''}`}
       >
         {content}
       </TouchableOpacity>

@@ -111,6 +111,111 @@ describe('LetterTile mounts a touchable for feedback-only presses (source pin)',
   });
 });
 
+// ─── Quiet acknowledgment for fully inert tiles (completed/future rows) ──────
+// Tiles on rows that are neither the active source row nor the selecting
+// target row used to mount NO touchable at all — a confused poke got literally
+// nothing. The contract: a feedback-only pressable that plays a subtle
+// native-driver tile pulse (skipped under reduced motion) and notifies App,
+// which fires a light selection haptic ONLY. No message, no sound, no
+// game-state mutation, and the existing feedback paths (active-row locked
+// shake, target-row inter-slot pulse, drag) are never displaced.
+describe('inactive-tile quiet acknowledgment', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const tileSrc = fs.readFileSync(
+    path.join(__dirname, '../components/LetterTile.tsx'),
+    'utf8',
+  );
+  const rowSrc = fs.readFileSync(
+    path.join(__dirname, '../components/Row.tsx'),
+    'utf8',
+  );
+  const appSrc = fs.readFileSync(
+    path.join(__dirname, '../../App.tsx'),
+    'utf8',
+  );
+
+  test('LetterTile and Row accept onInactivePress (compile-time check)', () => {
+    type TileProps = React.ComponentProps<typeof LetterTile>;
+    const onInactivePress = jest.fn();
+    const tileProps: TileProps = {
+      letter: { id: 'l1', char: 'A', isLocked: false },
+      onInactivePress,
+    };
+    tileProps.onInactivePress!();
+    expect(onInactivePress).toHaveBeenCalled();
+
+    type RowProps = React.ComponentProps<typeof Row>;
+    const rowProps: RowProps = {
+      rowData: { id: 'r1', originalWord: 'TIME', words: [] },
+      rowIndex: 0,
+      activeRowIndex: 1,
+      selectedLetter: null,
+      onLetterPress: () => {},
+      onSlotPress: () => {},
+      isProcessing: false,
+      onInactivePress,
+    };
+    expect(typeof rowProps.onInactivePress).toBe('function');
+  });
+
+  test('inert tiles with onInactivePress mount a touchable; locked-press feedback wins precedence (source pin)', () => {
+    expect(tileSrc).toMatch(
+      /const isInactivePressable = !isClickable && !isFeedbackPressable && !!onInactivePress;/
+    );
+    expect(tileSrc).toMatch(/if \(isInactivePressable\) \{/);
+    expect(tileSrc).toMatch(/onPress=\{handleInactivePress\}/);
+  });
+
+  test('the pulse is reduced-motion aware; the parent callback always fires (source pin)', () => {
+    // Pulse gated behind !reducedMotion; onInactivePress?.() sits OUTSIDE the
+    // gate so the App-level haptic tick survives reduced motion.
+    const handlerBlock = tileSrc.slice(
+      tileSrc.indexOf('const handleInactivePress = () => {'),
+      tileSrc.indexOf('onInactivePress?.();')
+    );
+    expect(handlerBlock).toContain('if (!settings.reducedMotion) {');
+    expect(handlerBlock).toContain('useNativeDriver: true');
+    expect(tileSrc).toContain('onInactivePress?.();');
+  });
+
+  test('the inactive touchable does not claim a button role (source pin)', () => {
+    const inactiveBranch = tileSrc.slice(
+      tileSrc.indexOf('if (isInactivePressable) {'),
+      tileSrc.indexOf('return content;')
+    );
+    // The label is just the letter; no role that would promise an action.
+    // (Matches a real JSX prop line only, not the explanatory comment.)
+    expect(inactiveBranch).toContain('accessibilityLabel={`Letter ${letter.char}');
+    expect(inactiveBranch).not.toMatch(/^\s*accessibilityRole=/m);
+  });
+
+  test('Row threads onInactivePress to non-source standard-layout tiles only (source pin)', () => {
+    expect(rowSrc).toMatch(/onInactivePress=\{isSource \? undefined : onInactivePress\}/);
+    // The arc layout (target row during selection) keeps its inter-slot pulse
+    // path untouched — no onInactivePress inside renderArcContent.
+    const arcBlock = rowSrc.slice(
+      rowSrc.indexOf('const renderArcContent = () => {'),
+      rowSrc.indexOf('const renderContent = () => {')
+    );
+    expect(arcBlock).not.toContain('onInactivePress');
+  });
+
+  test('App handler is a stable light haptic tick and nothing else (source pin)', () => {
+    const start = appSrc.indexOf('const handleInactiveTilePress');
+    expect(start).toBeGreaterThan(-1);
+    const end = appSrc.indexOf('}, []);', start);
+    expect(end).toBeGreaterThan(start);
+    const block = appSrc.slice(start, end);
+    expect(block).toContain('hapticSelection();');
+    // Zero game-state effects: no message, no sound, no puzzle action, no
+    // state setter of any kind inside the handler.
+    expect(block).not.toMatch(/setMessage|sound[A-Z]|puzzleActions|set[A-Z]/);
+    // And the Row wiring passes the stable callback through.
+    expect(appSrc).toMatch(/onInactivePress=\{handleInactiveTilePress\}/);
+  });
+});
+
 describe('Row verb-depth + hover + drag-move prop contract', () => {
   test('accepts previewValidityVisible / hoverSlotIndex / onLetterDragMove (compile-time check)', () => {
     type Props = React.ComponentProps<typeof Row>;

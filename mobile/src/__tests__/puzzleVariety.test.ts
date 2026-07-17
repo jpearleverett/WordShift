@@ -27,6 +27,7 @@ import {
   VARIANT_CONFIGS,
   PuzzleVariant,
 } from '../services/puzzleVariety';
+import { DAILY_CHALLENGE_UNLOCK_PUZZLES } from '../constants/gameBalance';
 
 describe('puzzleVariety', () => {
   describe('VARIANT_CONFIGS', () => {
@@ -58,10 +59,19 @@ describe('puzzleVariety', () => {
   });
 
   describe('unlock gates (the variant-pacing wave)', () => {
-    it('spreads variant unlocks across the arc: reverse 8, double 25, speed 55', () => {
-      expect(getVariantUnlockRequirement('reverse')?.puzzlesSolved).toBe(8);
+    it('spreads variant unlocks across the arc: reverse 10, double 25, speed 55', () => {
+      expect(getVariantUnlockRequirement('reverse')?.puzzlesSolved).toBe(10);
       expect(getVariantUnlockRequirement('double_shift')?.puzzlesSolved).toBe(25);
       expect(getVariantUnlockRequirement('speed')?.puzzlesSolved).toBe(55);
+    });
+
+    it('keeps the reverse gate clear of the daily unlock (8) and the first-harvest gate (win 9)', () => {
+      // The early one-time beats must not stack: daily unlock at 8, mandatory
+      // first harvest at win 9, reverse intro at 10.
+      expect(DAILY_CHALLENGE_UNLOCK_PUZZLES).toBe(8);
+      expect(getVariantUnlockRequirement('reverse')!.puzzlesSolved).toBeGreaterThan(
+        DAILY_CHALLENGE_UNLOCK_PUZZLES + 1
+      );
     });
 
     it('gates the trial-ladder toggles at 15 (challenge) and 80 (blind apex)', () => {
@@ -245,10 +255,11 @@ describe('puzzleVariety', () => {
 
     it('exposes unlock requirements and unlocked checks', () => {
       expect(getVariantUnlockRequirement('standard')).toBeNull();
-      // Reverse unlocks at 8 puzzles
-      expect(getVariantUnlockRequirement('reverse')?.puzzlesSolved).toBe(8);
+      // Reverse unlocks at 10 puzzles
+      expect(getVariantUnlockRequirement('reverse')?.puzzlesSolved).toBe(10);
       expect(isVariantUnlocked('reverse', 0, 0)).toBe(false);
-      expect(isVariantUnlocked('reverse', 8, 0)).toBe(true);
+      expect(isVariantUnlocked('reverse', 9, 0)).toBe(false);
+      expect(isVariantUnlocked('reverse', 10, 0)).toBe(true);
     });
 
     it('returns unlocked variants list with standard first', () => {
@@ -257,7 +268,7 @@ describe('puzzleVariety', () => {
       expect(early).toContain('standard');
       expect(early).not.toContain('reverse');
 
-      // With 100 puzzles, all variants are unlocked (reverse=8, double_shift=25, speed=55)
+      // With 100 puzzles, all variants are unlocked (reverse=10, double_shift=25, speed=55)
       const mid = getUnlockedVariants(100, 0);
       expect(mid).toContain('standard');
       expect(mid).toContain('reverse');
