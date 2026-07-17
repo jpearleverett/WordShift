@@ -141,6 +141,41 @@ export const SURPRISE_BONUS_MIN_PUZZLES = 8;
  */
 export const AMBER_UNDO_REFILL_COST = 15;
 
+// ============================================================================
+// MOVE RESONANCE (choice-quality reward)
+// ============================================================================
+// When a committed move had 2+ genuinely distinct valid outcome words AND the
+// player chose one at the deepest available dread tier (tier >= 1), the move
+// is a "resonant choice": small amber on the spot, itemized at victory.
+// Amber only — like every bonus, this must NEVER feed phase progression
+// (ritual energy already carries the dread->progress channel; this rewards
+// CHOOSING well, and pacing stays identical however the player chooses).
+
+/** Amber granted per resonant choice (see usePuzzleGame resonance tracking). */
+export const RESONANT_MOVE_AMBER = 2;
+
+/** Cap on resonance amber per board (keeps the bonus a garnish, not a farm). */
+export const RESONANT_BOARD_CAP_AMBER = 6;
+
+// ============================================================================
+// HOUSE ASKS (optional per-board constraint beat)
+// ============================================================================
+// On some standard boards past HOUSE_ASK_MIN_PUZZLES, the house quietly asks
+// one small thing of the arrangement: a specific letter must travel, or must
+// be left untouched. Both ask types are derived from the board's stored
+// solution, so every ask is satisfiable by construction; on multi-route
+// boards the ask selects BETWEEN routes, which is the point. Soft-fail (an
+// unkept ask is never mentioned again), bonus amber only, never progress.
+
+/** Earliest solve count at which the house may place an ask. */
+export const HOUSE_ASK_MIN_PUZZLES = 40;
+
+/** Chance that an eligible standard board carries an ask. */
+export const HOUSE_ASK_CHANCE = 0.25;
+
+/** Amber granted when the ask is kept (evaluated at victory). */
+export const HOUSE_ASK_REWARD_AMBER = 15;
+
 /**
  * Max rewarded-video grants a player can claim per local day (anti-farm).
  * Ad amber stays small relative to phase thresholds so it can't trivialize pacing.

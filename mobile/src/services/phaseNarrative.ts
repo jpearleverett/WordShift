@@ -2307,6 +2307,50 @@ export function getNextFriendPrompt(phase: number, name: string): string {
 }
 
 // ============================================================================
+// MOVE RESONANCE — acknowledgment when the player, given a real choice of
+// valid words, chose the deepest one (see usePuzzleGame resonance tracking).
+// Bright phases stay innocent (a lovely word, nothing more); the dread
+// framing arrives only when the world has already turned.
+// ============================================================================
+
+export function getResonantMoveMessage(phase: number): string {
+  if (phase >= 4) return 'Of the words you could have made, you made the one it wanted.';
+  if (phase >= 2) return 'That word rings lower than the others would have. The house noticed.';
+  return 'Oh, lovely choice. That word sits deep in the house.';
+}
+
+/** Label for the resonance line in the victory amber breakdown. */
+export function getResonanceBonusLabel(phase: number): string {
+  if (phase >= 4) return 'Words it wanted';
+  if (phase >= 2) return 'Resonant words';
+  return 'Deep words';
+}
+
+// ============================================================================
+// HOUSE ASKS — the small optional constraint the house sometimes places on a
+// board (move this letter / leave this letter be). Soft-fail: an unkept ask
+// is never mentioned again. Never a quest voice, never an obligation.
+// ============================================================================
+
+export function getHouseAskLine(phase: number, kind: 'move' | 'keep', letter: string): string {
+  const l = letter.toUpperCase();
+  if (kind === 'move') {
+    if (phase >= 4) return `It asks one thing of this arrangement: the ${l} must travel.`;
+    if (phase >= 2) return `The house asks quietly: let the ${l} move before the end.`;
+    return `A little wish from the house: let the letter ${l} travel today.`;
+  }
+  if (phase >= 4) return `It asks one thing of this arrangement: the ${l} does not move.`;
+  if (phase >= 2) return `The house asks quietly: leave the ${l} where it sits.`;
+  return `A little wish from the house: let the letter ${l} stay right where it is.`;
+}
+
+export function getHouseAskFulfilledMessage(phase: number): string {
+  if (phase >= 4) return 'The ask was honored. It does not forget that.';
+  if (phase >= 2) return 'The small ask was kept. Something in the walls settles, pleased.';
+  return 'You remembered the little wish! The house is delighted.';
+}
+
+// ============================================================================
 // MILESTONE HINT GRANT — the small hint trickle that rides certain puzzle-count
 // milestones (see hints.ts). In-world voice: the house sets help aside; never
 // "you earned a consumable".
