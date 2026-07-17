@@ -166,6 +166,16 @@ export const DAILY_AMBER_DAILY_CAP = 2;
 export const INTERSTITIAL_FREQUENCY_EARLY = 6; // Phase 0–2 (candy hours: light touch)
 export const INTERSTITIAL_FREQUENCY_LATE = 5; // Phase 3 base (×2 → every 10); Phase 4+ suppressed
 
+/**
+ * No interstitial before this many completed puzzles. Wider than the pit
+ * auto-collect window (8) on purpose: the puzzle 8-10 stretch already stacks
+ * the variant intro, the daily unlock, and the mandatory first harvest, and
+ * dropping the first-ever ad into that pile-up made the "free ride ends" cliff
+ * read punitive. Aligned with EXIT_NUDGE_MIN_PUZZLES (12) so every commercial
+ * surface waits for the same threshold.
+ */
+export const INTERSTITIAL_MIN_PUZZLES = 12;
+
 // ============================================================================
 // HINT ECONOMY
 // ============================================================================
@@ -365,14 +375,15 @@ export const HARVEST_NUDGE_MIN_AMBER = 150;
 /**
  * Amber premium for skipping a level-gated room's puzzle requirement and
  * unlocking it immediately (vs Reserve, which pays the plain cost and waits for
- * the gate). skip cost = ceil(buildCost * (1 + UNLOCK_SKIP_PREMIUM)). At 1.0 the
- * gated rooms (build 200-400) skip for 400-800 — enough to push a player who
- * just barely afforded the room past their balance (so it doubles as amber-pack
- * demand) while staying coverable by one small/medium pack. Reserve (base cost,
- * auto-build at the gate) stays the non-paying path, so the premium is a
- * convenience, never a wall. Tune post-launch on real conversion data.
+ * the gate). skip cost = ceil(buildCost * (1 + UNLOCK_SKIP_PREMIUM)). This is
+ * convenience pricing: a meaningful premium over Reserve so the gate keeps its
+ * shape, sized so a player who can afford the room can usually also afford the
+ * skip with a session or two of earnings. At 0.5 the gated rooms (build
+ * 200-550) skip for 300-825. Reserve (base cost, auto-build at the gate) stays
+ * the non-paying path, so the premium is a convenience, never a wall. Tune
+ * post-launch on real data.
  */
-export const UNLOCK_SKIP_PREMIUM = 1.0;
+export const UNLOCK_SKIP_PREMIUM = 0.5;
 
 // ============================================================================
 // STREAK

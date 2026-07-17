@@ -26,9 +26,28 @@ import {
 } from '../constants/gameBalance';
 import { isUnbrokenWeaveEligible } from './unbrokenWeave';
 
-const BRANCHING_UNLOCK_PUZZLES = 40;
-const BRANCHING_CONTEXT_CANDIDATES = 80;
-const BRANCHING_BONUS_CAP = 12;
+// Delivered-experience branching steering. Measured over the shipped banks,
+// 62-71% of puzzles have exactly ONE complete solution path, so an unsteered
+// draw serves mostly single-route boards. These knobs exist so the player
+// instead mostly meets boards with 2+ real routes once route-finding is the
+// skill being exercised.
+//
+// Unlock: engage the moment preview grading goes neutral
+// (PREVIEW_GRADING_FULL_LIMIT = 12 in gameBalance) — that is when choice
+// starts mattering; before that, EASY-style graded previews carry the
+// tutorial and steering would be spent on boards the UI still solves.
+const BRANCHING_UNLOCK_PUZZLES = 13;
+// Window: how many top context-scored candidates get branching analysis.
+// Wide enough that the multi-route subset stays reachable deep into a run
+// (a narrow window collapses to whatever freshness happened to rank first).
+// Perf: metrics are cached by puzzle id (branchingMetricsCache), so this is
+// at most 160 one-time analyses per bank of 3-6 row boards whose path/state
+// counts are capped — bounded synchronous work, cache hits thereafter.
+const BRANCHING_CONTEXT_CANDIDATES = 160;
+// Bonus: strong enough that real structural depth can outrank a modest
+// freshness edge (the old 12-point cap was routinely drowned by the novelty
+// bonuses, leaving the reorder pass as the only effective lever).
+const BRANCHING_BONUS_CAP = 24;
 const branchingMetricsCache = new Map<string, PuzzleBranchingMetrics>();
 const standardExtensionCache = new Map<string, PuzzleConfig | null>();
 const guaranteedStandardFallbackCache = new Map<Difficulty, PuzzleConfig>();
@@ -567,9 +586,11 @@ export async function selectPreGeneratedPuzzle(
   // Sort by score descending
   scored.sort((a, b) => b.score - a.score);
 
-  // Once the player knows the base verb, favor standard boards with multiple
-  // completing routes. Analyze only the strongest context candidates so phase
-  // and freshness remain the primary filters and synchronous work stays capped.
+  // Once preview grading has gone neutral, favor standard boards with
+  // multiple completing routes — the delivered experience should be mostly
+  // boards with 2+ real routes, not the banks' single-route majority. Analyze
+  // only the strongest context candidates so phase and freshness remain the
+  // primary filters and synchronous work stays capped (see the constant docs).
   if (variant === 'standard' && puzzlesSolved >= BRANCHING_UNLOCK_PUZZLES) {
     const candidateCount = Math.min(BRANCHING_CONTEXT_CANDIDATES, scored.length);
     const metricSource = extensionRequired ? 'extended' : 'source';

@@ -370,14 +370,16 @@ export function useDialogueFlow({
   const getUnlockedTypes = (): Set<AnimalType> =>
     new Set((progress?.unlockedAnimals ?? []) as AnimalType[]);
 
-  // Catch-up session boost: a late recruit (the descent trio, unlockable only
-  // at global Phase 3+) that still has unread REGULAR (indexed, non-pool)
-  // dialogue reads extra lines per session, so Moss's arc is not consumed
-  // unheard after the Sky Garden gate at 135. House completion/recruit is
-  // ~136, capped dwell ~143, arming 160, the final board ~161, and
-  // post-revelation ~162. Computed per call from current state and passed into
-  // the session layer, which stays a pure counter. The newly-unlocked grace
-  // period is untouched (that's cooldowns).
+  // Catch-up session boost: extra lines per session for an animal with unread
+  // REGULAR (indexed, non-pool) backlog inside a compressed window — a late
+  // recruit (the descent trio, unlockable only at global Phase 3+) so Moss's
+  // arc is not consumed unheard after the Sky Garden gate at 135, and a
+  // lagging-tier animal at global Phase 4, which converges to phase 4 at the
+  // reveal and gains its whole Phase-4 block with the finale ~32 puzzles out.
+  // House completion/recruit is ~136, capped dwell ~143, arming 160, the
+  // final board ~161, and post-revelation ~162. Computed per call from
+  // current state and passed into the session layer, which stays a pure
+  // counter. The newly-unlocked grace period is untouched (that's cooldowns).
   const getSessionBonus = (animal: Animal): number => {
     if (!progress) return 0;
     const animalPhase = getAnimalPhase(progress.currentPhase, animal.type);
@@ -395,7 +397,8 @@ export function useDialogueFlow({
     return getCatchUpSessionBonus(
       progress.currentPhase,
       LATE_PHASE_RECRUITS.has(animal.type),
-      hasUnreadRegular
+      hasUnreadRegular,
+      ANIMAL_AWARENESS_TIERS[animal.type] === 'lagging'
     );
   };
 

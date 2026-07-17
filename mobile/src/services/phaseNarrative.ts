@@ -1582,7 +1582,7 @@ export const ANIMAL_WHISPERS: Record<number, Record<string, string[]>> = {
     axolotl: ['Axel is floating happily.', 'Axel waves a tiny hand.', 'Axel blew some bubbles.', 'Axel did a little happy spin.', 'Axel says the water is the perfect temperature.'],
     capybara: ['Chill is relaxing.', 'Chill gives a thumbs up.', 'Chill seems content.', 'Chill saved you a seat in the sun.', 'Chill says: nice and easy. Just like that.'],
     fennec_fox: ['Fennick perked up!', 'Fennick is listening.', 'Fennick heard you win.', 'Fennick wiggled his big ears.', 'Fennick says your footsteps sound friendly.'],
-    sloth: ['Sloane... smiled... slowly.', 'Sloane... approves.', 'Sloane noticed. Eventually.', 'Sloane... waved... eventually.', 'Sloane... likes... your... company.'],
+    sloth: ['Sloane smiled. It took a while to arrive, and it was worth the wait.', 'Sloane approves. She decided to yesterday, to be ready.', 'Sloane noticed. Eventually.', 'Sloane waved. If you missed it, she is most likely still waving.', 'Sloane likes your company. She has liked it since before you sat down.'],
     wombat: ['Warren felt that from below.', 'Warren tapped the wall.', 'Warren is digging.', 'Warren left you a cozy nook in the burrow.', 'Warren says the ground feels happy today.'],
     rabbit: ['Thyme hopped excitedly!', 'Thyme is making tea.', 'Thyme clapped!', 'Thyme poured you a fresh cup.', 'Thyme says today is a good day!'],
     red_panda: ['Bamboo is meditating.', 'Bamboo breathed deeply.', 'Bamboo is at peace.', 'Bamboo left you a warm cushion.', 'Bamboo says your heart sounds calm.'],
@@ -1597,7 +1597,7 @@ export const ANIMAL_WHISPERS: Record<number, Record<string, string[]>> = {
     axolotl: ['Axel felt a ripple.', 'Axel says the water shifted.', 'Axel is staring at something.', 'Axel wonders what is on the other side of the glass.', 'Axel says the water hums when you win.'],
     capybara: ['Chill noticed. Stayed chill.', 'Chill filed that away.', 'Chill is thinking.', 'Chill wonders why the calm feels arranged.', 'Chill watched the patterns line up. Stayed chill.'],
     fennec_fox: ['Fennick heard something in those words.', 'Fennick is alert.', 'Fennick tilted his head.', 'Fennick wonders what keeps calling.', 'Fennick says the quiet has a shape now.'],
-    sloth: ['Sloane... felt... something.', 'Sloane... is... thinking.', 'Sloane... paused.', 'Sloane... wonders... if... you... feel... it... too.', 'Sloane... has... been... counting.'],
+    sloth: ['Sloane felt something arrive. It is in no hurry, and neither is she.', 'Sloane is thinking. She started well before you got here.', 'Sloane paused today. From her, that means something.', 'Sloane wonders if you feel it too, or if she is simply early again.', 'Sloane has been counting. She will not say what.'],
     wombat: ['Warren says the ground trembled.', 'Warren heard it below.', 'Warren is checking the walls.', 'Warren wonders how deep the burrow really goes.', 'Warren found a tunnel he did not dig.'],
     rabbit: ['Thyme is a little nervous.', 'Thyme felt a chill.', 'Thyme is wringing her paws.', 'Thyme keeps glancing at the door.', 'Thyme wonders why she keeps counting the exits.'],
     red_panda: ['Bamboo sensed a shift.', 'Bamboo opened one eye.', 'Bamboo exhaled slowly.', 'Bamboo wonders what the stillness is waiting for.', 'Bamboo says the silence learned a word today.'],
@@ -1612,7 +1612,7 @@ export const ANIMAL_WHISPERS: Record<number, Record<string, string[]>> = {
     axolotl: ['The water remembered that word.', 'Axel sank a little deeper.', 'Something moved beneath Axel.', 'Axel says something on the glass is looking back.', 'The water dimmed when you finished.'],
     capybara: ['Chill catalogued the arrangement.', 'Chill added it to the list.', 'Chill is still calm. Unsettlingly so.', 'Chill says the schedule has your name in it.', 'Chill underlined your word. Twice.'],
     fennec_fox: ['Fennick heard that word echo.', 'The desert is listening.', 'Fennick says it is getting closer.', 'Fennick says the echo answered this time.', 'The desert held its breath when you won.'],
-    sloth: ['Sloane... already... knew.', 'Time... slowed... again.', 'Sloane... felt... it... pass.', 'Sloane... is... not... surprised... anymore.', 'It... was... always... going... to... be... this... word.'],
+    sloth: ['Sloane already knew. She has known longer than she likes.', 'Time slowed again. Sloane says it is learning her pace.', 'Sloane felt it pass. She did not need to turn her head.', 'Sloane is not surprised anymore. She misses being surprised.', 'It was always going to be this word. Sloane watched it coming for years.'],
     wombat: ['Warren found that word underground.', 'The tunnels echoed.', 'Warren is digging faster.', 'Warren says the bottom is deeper than yesterday.', 'Something below repeated your word back.'],
     rabbit: ['Thyme is pretending not to notice.', 'Thyme hid under the table.', 'Thyme whispered: I know.', 'Thyme stopped pretending she did not hear it.', 'Thyme says the walls are thinner now.'],
     red_panda: ['Bamboo says the pattern grows.', 'The incense burned brighter.', 'Bamboo is chanting softly.', 'Bamboo says the pattern learned your hand.', 'The incense bent toward your offering.'],
@@ -1627,7 +1627,7 @@ export const ANIMAL_WHISPERS: Record<number, Record<string, string[]>> = {
     axolotl: ['The water holds a reflection after Axel turns away.', 'A ripple arrives from the far glass, though nothing touched it.', 'Axel watches a second shimmer beneath his own.', 'The glass clouds from within, then clears in a narrow oval.', 'A distant glimmer reaches the shallows before Axel does.'],
     capybara: ['Chill closes a folder marked with a date but no name.', 'Every office clock loses the same minute.', 'An empty appointment keeps returning to the schedule.', 'Chill straightens a chair no one has used.', 'The folder stack leans toward the same blank tab.'],
     fennec_fox: ['Fennick says the low note crossed the eastern ridge.', 'Both of Fennick\'s ears turn beyond the horizon.', 'The sand keeps humming after the wind is gone.', 'Fennick hears an answer between gusts and does not repeat it.', 'The frequency holds steady on the far side of camp.'],
-    sloth: ['Sloane... has watched... this shadow... grow... one leaf at a time.', 'She remembers... when the evening... ended sooner.', 'The branch dips... though Sloane... has not moved.', 'An old change... is showing... its newer edge.', 'Some changes... only look sudden... to those who blink.'],
+    sloth: ['Sloane has watched this shadow grow, one leaf at a time.', 'She remembers when the evening ended sooner.', 'The branch dips, though Sloane has not moved.', 'An old change is showing its newer edge.', 'Some changes only look sudden to those who blink.'],
     wombat: ['Warren hears a low knock through the foundation stone.', 'One footing stays warm after the soil cools.', 'A tunnel curves toward a chamber Warren did not dig.', 'Pale dust rises from a seam in the sealed floor.', 'Warren braces a beam that was not sagging yesterday.'],
     rabbit: ['Thyme marks a garden path. By dusk, the chalk points home.', 'A trail beyond the gate bends gently toward the rosemary beds.', 'Thyme moves the teapot from the window. Its steam drifts back.', 'Fresh tracks circle the hedge and stop beside her chair.', 'The garden gate opens outward. The wind swings it softly in.'],
     red_panda: ['The incense thread leaves an open loop in the air.', 'Bamboo counts the quiet spaces between breaths.', 'One line of the pattern remains softly unfinished.', 'A reed in Bamboo\'s mat stays loose. They do not tie it.', 'Bamboo says an empty center can still have a shape.'],
@@ -1642,7 +1642,7 @@ export const ANIMAL_WHISPERS: Record<number, Record<string, string[]>> = {
     axolotl: ['The water is warm now. It should not be.', 'Axel smiles. The water ripples with him.', 'Something brushes the glass from the other side. Axel does not turn.'],
     capybara: ['Chill closes the final folder and straightens its corners.', 'Every clock in the office ticks at once. Chill keeps breathing.', 'Chill says: relax. Nothing else needs moving.'],
     fennec_fox: ['Fennick is silent now. Listening.', 'Both ears turn toward the ceiling. The room stays still.', 'Fennick whispers: closer. Then the echo whispers it too.'],
-    sloth: ['Sloane... opens... both... eyes.', 'The branch... does not... move... beneath... her.', 'Time... passes... around... Sloane... not... through... her.'],
+    sloth: ['Sloane opens both eyes. She has been saving them for this.', 'The branch does not move beneath her. Nothing here moves without meaning now.', 'Time passes around Sloane now, not through her.'],
     wombat: ['Warren presses one paw to the foundation. It answers.', 'The tunnels carry a low note up through the floor.', 'Warren says the deepest wall is warm now.'],
     rabbit: ['Thyme is not afraid anymore. Her paws are perfectly still.', 'The tea has gone cold. Thyme keeps both paws around the cup.', 'Thyme counts the exits once, then stops.'],
     red_panda: ['Bamboo exhales. The whole attic seems to inhale.', 'The incense smoke gathers into one unbroken thread.', 'Bamboo opens both eyes. The room remains perfectly still.'],
@@ -1655,9 +1655,9 @@ export const ANIMAL_WHISPERS: Record<number, Record<string, string[]>> = {
     owl: ['Archimedes closed the book. It stays closed now.', 'The last page was blank. Archimedes smiles.', 'Knowledge rests. Archimedes rests with it.', 'The study is quiet. Archimedes says quiet is a kind of answer.', 'Archimedes found one last footnote. It just says: thank you.'],
     pangolin: ['Panko set the table one last time. For no one. For everyone.', 'The kitchen smells of something ancient and warm.', 'Panko hums while stirring nothing.', 'Panko says the oven stays warm by itself now.', 'The last recipe has no ingredients. Just warmth.'],
     axolotl: ['The water is still. Axel floats. Everything floats.', 'Axel says the water remembers everything you gave it.', 'Bubbles rise. Each one holds a word.', 'Axel regenerated something new. He can not name it yet.', 'The tank glows faintly. Axel says it has always glowed.'],
-    capybara: ['Chill is at peace. Genuinely. That is the strangest part.', 'All tasks complete. Chill files the last report.', 'Chill says: there is nothing left to schedule.', 'Chill closed the laptop. The screen still glows.', 'The spreadsheet balanced itself. Chill just watched.'],
+    capybara: ['Chill is at peace. Genuinely. That is the strangest part.', 'All tasks complete. Chill files the last report.', 'Chill says: there is nothing left to schedule.', 'Chill set the pen down at last. The ink keeps writing without him.', 'The ledger balanced itself. Chill just watched.'],
     fennec_fox: ['Fennick listens. The silence has its own sound now.', 'The desert hums. Fennick hums with it.', 'Fennick says: I can hear everything. And nothing.', 'Fennick tilts his ears toward something only he can hear.', 'The desert wind carries a melody. Fennick says it is yours.'],
-    sloth: ['Sloane... is... still... and that... is... enough.', 'Time... has... stopped... mattering.', 'Sloane... breathes... the pattern... breathes.', 'Gerald... and Gerald... say hello.', 'Sloane... smiles. The branches... smile... back.'],
+    sloth: ['Sloane is still, and being still is finally enough.', 'Time has stopped mattering. Sloane forgave it long ago.', 'Sloane breathes, and the pattern breathes with her.', 'Gerald and Gerald say hello.', 'Sloane smiles. The branches smile back.'],
     wombat: ['Warren sealed the tunnels. They lead nowhere now. Nowhere is enough.', 'The foundation holds. It will hold forever.', 'Warren rests in the earth. The earth rests in Warren.', 'Warren says the soil hums a low note. A contented note.', 'The deepest tunnel is warm. Warren sleeps there now.'],
     rabbit: ['Thyme planted seeds that will never grow. That is okay.', 'Thyme is still. For the first time. That is terrifying and beautiful.', 'The garden is overgrown. Thyme smiles at the chaos.', 'Thyme brewed one final cup. It steeps forever.', 'The flowers lean toward Thyme. They know her heartbeat.'],
     red_panda: ['Bamboo exhales. Does not inhale. Does not need to.', 'The pattern hums. Bamboo hums. They are the same sound.', 'Oneness. Silence. The thread continues.', 'Bamboo meditates with open eyes. Everything is the center.', 'The attic touches the sky. Bamboo touches the attic. You touch Bamboo.'],
@@ -1771,8 +1771,8 @@ export function getPersonalizedPhase5Whisper(
       `${name} tilts an ear. "${word}," the wind says.`,
     ],
     sloth: [
-      `${name}... still... thinks... about... ${word}.`,
-      `${word}... echoes... slowly... through... ${name}'s... dreams.`,
+      `${name} still thinks about ${word}. Slowly, and with great fondness.`,
+      `${word} drifts through ${name}'s dreams, taking all the time it likes.`,
     ],
     wombat: [
       `${name} says ${word} is carved into the deepest tunnel wall.`,
@@ -2027,6 +2027,23 @@ export const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     text: 'The house feels fuller with each puzzle. Or maybe it just wants to.',
     durationMs: 3000,
   },
+  31: {
+    // The first HELD wrong-note. Earlier glitches (16) are subliminal flickers;
+    // this one lingers long enough to be read on purpose. The wrongness is
+    // authorship, not content: a caretaker's warmth where an exclamation
+    // belongs. Deniable, unmistakable.
+    type: 'glitch_title',
+    glitchTitle: 'YOU ARE DOING SO WELL',
+    text: 'PERFECT!',
+    durationMs: 900,
+  },
+  33: {
+    // Half-normalizes the puzzle-31 glitch: an explanation that explains
+    // nothing, offered before the player asked. Deepens, never defuses.
+    type: 'ambient_whisper',
+    text: 'If the winning words ever look like someone else wrote them, that is only the house being fond of you. Old houses talk in their sleep.',
+    durationMs: 3500,
+  },
   35: {
     type: 'glitch_title',
     glitchTitle: 'WE REMEMBER',
@@ -2278,6 +2295,18 @@ export function getStreakHeldMessage(heldAt: number, phase: number = 0): string 
 }
 
 // ============================================================================
+// MILESTONE HINT GRANT — the small hint trickle that rides certain puzzle-count
+// milestones (see hints.ts). In-world voice: the house sets help aside; never
+// "you earned a consumable".
+// ============================================================================
+
+export function getHintGrantMessage(phase: number): string {
+  if (phase >= 4) return 'A small kindness is set aside for you. One hint, kept where the cold cannot reach it.';
+  if (phase >= 2) return 'The house tucks a spare hint into your pocket. For the harder doors ahead.';
+  return 'A little gift from the house! One extra hint, saved for a rainy puzzle.';
+}
+
+// ============================================================================
 // PREVIEW GRADUATION — one-time toast when MEDIUM+ previews become fully
 // neutral. In-world: the player's judgment has sharpened. Never tutorial copy.
 // ============================================================================
@@ -2358,7 +2387,7 @@ export const CYCLE_MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
   },
   100: {
     type: 'ambient_whisper',
-    text: "Sloane... smiles... before you say a word. 'You always... tell me... that one.' You have not told her anything yet.",
+    text: "Sloane smiles before you say a word. 'You always tell me that one.' You have not told her anything yet.",
     durationMs: 4500,
   },
 };

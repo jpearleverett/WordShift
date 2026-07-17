@@ -39,6 +39,7 @@ import { FoxGuide } from './src/components/FoxGuide';
 import {
   COLD_OPEN_INSTRUCTION,
   COLD_OPEN_FIRST_MOVE,
+  COLD_OPEN_PREVIEW_TEACH,
   ONBOARDING_FOX_LINES,
   resolveColdOpenLaunchRoute,
 } from './src/services/onboarding';
@@ -120,6 +121,8 @@ import {
   getStreakHeldMessage,
   getDwellLine,
   getPostCapDwellLine,
+  getNoValidMovesMessage,
+  getHintGrantMessage,
   getColdOpenSkipLabel,
   getColdOpenSkipAccessibilityLabel,
   getSkipConfirmText,
@@ -158,7 +161,7 @@ import { initAds, setAdProvider, maybeShowInterstitial, showRewarded, isRewarded
 import { RewardedAdButton } from './src/components/monetization/RewardedAdButton';
 import { initCosmetics } from './src/services/cosmetics';
 import { loadPixelFonts, installGlobalFont } from './src/theme/fonts';
-import { initHints, addHints } from './src/services/hints';
+import { initHints, addHints, grantBonusHint } from './src/services/hints';
 import { loadEntitlements, hasEntitlementSync, isAdFreeSync, ENTITLEMENTS } from './src/services/entitlements';
 import { StoreModal } from './src/components/monetization/StoreModal';
 import { recordInterstitialSeen, consumePatronNudge, armRemoveAdsNudgeIfEligible, consumePendingRemoveAdsNudge, canOfferRewardedDouble, recordRewardedDoubleOffered, canShowExitNudge, recordExitNudgeShown } from './src/services/monetizationPrompts';
@@ -166,7 +169,7 @@ import { REWARDED_HINT_GRANT } from './src/constants/gameBalance';
 import { createRevenueCatBillingProvider } from './src/services/providers/revenueCatBilling';
 import { createAdMobAdProvider } from './src/services/providers/googleAdMobAds';
 import { installGlobalErrorHandler, setErrorForwarder } from './src/services/errorReporting';
-import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST, STARTER_INTRO_MIN_PUZZLES, FINALE_DWELL_PUZZLES } from './src/constants/gameBalance';
+import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST, STARTER_INTRO_MIN_PUZZLES, FINALE_DWELL_PUZZLES, INTERSTITIAL_MIN_PUZZLES } from './src/constants/gameBalance';
 import { getCumulativeStats } from './src/services/starRating';
 
 // Defer the one-time difficulty-selector intro until a few boards are done —
@@ -179,11 +182,21 @@ const SETUP_SELECTOR_INTRO_MIN_PUZZLES = 3;
 // the player has felt some choreography repetition worth shortening).
 const SWIFT_HINT_MIN_PUZZLES = 24;
 
+// Sequential victory toast pacing: each queued line holds the message slot
+// this long before the next shows; the initial delay lets the victory
+// choreography (and any ritual micro-event line) land first.
+const VICTORY_TOAST_DURATION_MS = 1900;
+const VICTORY_TOAST_INITIAL_DELAY_MS = 600;
+
 // One-time, DEVICE-LOCAL UX pointer flags (deliberately not cloud-synced and
 // not cleared by Reset All owners' service clears: they mark "this device's
 // player has seen this pointer", not game progress).
 const PREVIEW_GRADUATION_SEEN_KEY = 'wordshift_preview_graduation_seen';
 const SWIFT_HINT_SEEN_KEY = 'wordshift_swift_hint_seen';
+// The first-stuck mercy flag is device-local ON PURPOSE (never in cloudSave
+// SYNC_KEYS): a returning player on a new device may deserve the mercy once
+// more.
+const FIRST_STUCK_SEEN_KEY = 'wordshift_first_stuck_seen';
 async function hasSeenOneTimeFlag(key: string): Promise<boolean> {
   try {
     return (await AsyncStorage.getItem(key)) === 'true';
@@ -363,9 +376,56 @@ function MainApp() {
     victoryTimeoutsRef.current.forEach(clearTimeout);
     victoryTimeoutsRef.current = [];
   }, []);
+
+  // Sequential victory toast queue. The post-victory receipts (streak
+  // milestone amber, daily milestones, freeze saves, harvest overflow, pace
+  // beats...) used to race into the single setMessage slot at fixed delays,
+  // so any two on one win clobbered each other. Each queued line now holds
+  // the slot for VICTORY_TOAST_DURATION_MS before the next shows. Priority:
+  // money receipts outrank informational lines, which outrank nudges,
+  // regardless of arrival order (several enqueuers are fire-and-forget
+  // promises). Cleared on new-board starts and victory-exit navigation.
+  const victoryToastQueueRef = useRef<{ message: string; rank: number }[]>([]);
+  const victoryToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showNextVictoryToast = useCallback(function showNext() {
+    const next = victoryToastQueueRef.current.shift();
+    if (!next) {
+      victoryToastTimerRef.current = null;
+      return;
+    }
+    puzzleActions.setMessage(next.message);
+    victoryToastTimerRef.current = setTimeout(showNext, VICTORY_TOAST_DURATION_MS);
+  }, [puzzleActions]);
+  const enqueueVictoryToast = useCallback((
+    message: string,
+    priority: 'receipt' | 'info' | 'nudge' = 'info'
+  ) => {
+    const rank = priority === 'receipt' ? 0 : priority === 'info' ? 1 : 2;
+    const queue = victoryToastQueueRef.current;
+    let insertAt = queue.length;
+    while (insertAt > 0 && queue[insertAt - 1].rank > rank) insertAt--;
+    queue.splice(insertAt, 0, { message, rank });
+    if (victoryToastTimerRef.current === null) {
+      victoryToastTimerRef.current = setTimeout(
+        showNextVictoryToast,
+        VICTORY_TOAST_INITIAL_DELAY_MS
+      );
+    }
+  }, [showNextVictoryToast]);
+  const clearVictoryToastQueue = useCallback(() => {
+    victoryToastQueueRef.current = [];
+    if (victoryToastTimerRef.current !== null) {
+      clearTimeout(victoryToastTimerRef.current);
+      victoryToastTimerRef.current = null;
+    }
+  }, []);
+
   useEffect(() => {
-    return () => clearVictoryTimeouts();
-  }, [clearVictoryTimeouts]);
+    return () => {
+      clearVictoryTimeouts();
+      clearVictoryToastQueue();
+    };
+  }, [clearVictoryTimeouts, clearVictoryToastQueue]);
 
   // Home nudge — track consecutive puzzles without visiting home
   const puzzlesSinceHomeVisit = useRef(0);
@@ -377,6 +437,16 @@ function MainApp() {
   // AppState listener can re-run them after an overnight foreground return
   // without ever double-firing on the same local day.
   const dailyTasksDateRef = useRef<string | null>(null);
+  // True once THIS SESSION has contained any onboarding (launched mid-intro
+  // or completed it live). While set, the daily-login claim/modal is skipped
+  // for the whole session: a "welcome back" reward must never precede
+  // leaving, so the 7-day cycle starts on the player's NEXT launch instead
+  // of minutes into the very first session.
+  const onboardingSessionRef = useRef(false);
+  // Set when the store-review sheet fired on this win (it runs mid-victory,
+  // outside the one-nudge-per-exit chain); the exit checks + clears it so a
+  // review sheet and a nudge can never stack on the same win.
+  const reviewPromptFiredRef = useRef(false);
   // Patron (cosmetic IAP) modal — opened from Shop header / Settings
   const [showPatronModal, setShowPatronModal] = useState(false);
   // Store modal — consumable amber/hint packs + the cosmetic bundle.
@@ -887,6 +957,34 @@ function MainApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onboardingFlow.onboardingStep, puzzle.gameState, puzzle.history.length]);
 
+  // Cold-open preview teach: the first time the player picks a letter UP on
+  // the opener board (the ghost previews just appeared, no move committed
+  // yet), the same warm voice explains the green check / red cross marks and
+  // names undo — the tools are taught at the exact moment they first matter.
+  // Ref-guarded to once; keyed on selection BEFORE the first commit so it can
+  // never clobber the first-move delight line above (which fires on history
+  // growth, after the commit).
+  const coldOpenPreviewTaughtRef = useRef(false);
+  useEffect(() => {
+    if (onboardingFlow.onboardingStep !== 'cold_open_puzzle') return;
+    if (puzzle.gameState !== GameState.PLAYING) return;
+    if (!puzzle.selectedLetter) return;
+    if (puzzle.history.length > 0) return;
+    if (coldOpenPreviewTaughtRef.current) return;
+    coldOpenPreviewTaughtRef.current = true;
+    puzzleActions.setMessage(COLD_OPEN_PREVIEW_TEACH);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onboardingFlow.onboardingStep, puzzle.gameState, puzzle.selectedLetter, puzzle.history.length]);
+
+  // Session-scoped onboarding marker for the daily-login deferral: latched
+  // the first time this session observes an onboarding step (post-hydration),
+  // and never unlatched — completion mid-session must keep the skip.
+  useEffect(() => {
+    if (onboardingFlow.onboardingReady && onboardingFlow.isOnboarding) {
+      onboardingSessionRef.current = true;
+    }
+  }, [onboardingFlow.onboardingReady, onboardingFlow.isOnboarding]);
+
   // Daily launch tasks — free streak freeze (every 14 days) + daily login
   // reward claim. Runs once per LOCAL day: on cold launch via the effect below,
   // and again from the AppState listener when the app returns to the foreground
@@ -921,17 +1019,23 @@ function MainApp() {
       return;
     }
 
-    try {
-      const grant = await claimDailyLoginReward();
-      if (grant) {
-        persistenceActions.refreshStats();
-        // Presentation is deferred: the modal only shows on a quiet home
-        // screen (see dailyLoginGrantVisible), so a claim that lands while
-        // the player is elsewhere is held and presented on home arrival.
-        setDailyLoginGrant(grant);
+    // First-session deferral: a session that contained onboarding never
+    // claims the daily login reward (onboardingSessionRef) — the claim is
+    // NOT consumed, so the cycle starts on the next launch, when "come back
+    // each day" actually has a yesterday. Every other launch task runs.
+    if (!onboardingSessionRef.current) {
+      try {
+        const grant = await claimDailyLoginReward();
+        if (grant) {
+          persistenceActions.refreshStats();
+          // Presentation is deferred: the modal only shows on a quiet home
+          // screen (see dailyLoginGrantVisible), so a claim that lands while
+          // the player is elsewhere is held and presented on home arrival.
+          setDailyLoginGrant(grant);
+        }
+      } catch {
+        // Non-critical — never block launch on the login reward.
       }
-    } catch {
-      // Non-critical — never block launch on the login reward.
     }
 
     try {
@@ -1148,6 +1252,7 @@ function MainApp() {
 
   const startVictoryExitFlow = useCallback((action: () => void) => {
     clearVictoryTimeouts();
+    clearVictoryToastQueue();
     // The completed puzzle's autosave must never be resumable from Play
     clearPuzzleState().catch(() => {});
     puzzleActions.setShowConfetti(false);
@@ -1165,7 +1270,7 @@ function MainApp() {
     }
 
     action();
-  }, [clearVictoryTimeouts, puzzleActions, victoryActions, orchestrationActions, advanceQueuedPostVictoryIntro]);
+  }, [clearVictoryTimeouts, clearVictoryToastQueue, puzzleActions, victoryActions, orchestrationActions, advanceQueuedPostVictoryIntro]);
 
   // ========================================================================
   // Navigation & puzzle lifecycle handlers
@@ -1177,6 +1282,8 @@ function MainApp() {
     soundUiTap();
     setIsPlayingDaily(false);
     resetSpeedRun();
+    // A fresh board must not inherit the previous win's queued toasts.
+    clearVictoryToastQueue();
     // Refresh persistence data (phase, stats) before starting puzzle
     persistenceActions.refreshStats();
     const diff = difficulty || puzzle.difficulty;
@@ -1206,7 +1313,7 @@ function MainApp() {
         maybeShowSetupSelectorIntro().catch(() => {});
       }
     });
-  }, [puzzle.difficulty, puzzleActions, transitionTo, persistenceActions, orchestrationActions, maybeShowSetupSelectorIntro]);
+  }, [puzzle.difficulty, puzzleActions, transitionTo, persistenceActions, orchestrationActions, maybeShowSetupSelectorIntro, clearVictoryToastQueue]);
 
   // Return to home screen
   const handleGoHome = useCallback(() => {
@@ -1214,6 +1321,7 @@ function MainApp() {
     puzzlesSinceHomeVisit.current = 0;
     setIsPlayingDaily(false);
     resetSpeedRun();
+    clearVictoryToastQueue();
     transitionTo('home', () => {
       if (puzzle.unbrokenWeaveMode) {
         clearPuzzleState().catch(() => {});
@@ -1223,7 +1331,7 @@ function MainApp() {
       }
       puzzleActions.setShowConfetti(false);
     });
-  }, [puzzleActions, puzzle.unbrokenWeaveMode, transitionTo]);
+  }, [puzzleActions, puzzle.unbrokenWeaveMode, transitionTo, clearVictoryToastQueue]);
 
   // Reset All completed but an in-place reload wasn't available (Expo Go /
   // dev client — Updates.reloadAsync throws there). Storage and service
@@ -1235,6 +1343,7 @@ function MainApp() {
   // a home screen still rendering their old save.
   const rebuildSessionFromStorage = useCallback((opts: { restartOnboarding: boolean }) => {
     clearVictoryTimeouts();
+    clearVictoryToastQueue();
     puzzleActions.clearBoard();
     puzzleActions.setShowConfetti(false);
     puzzleActions.refreshHintBalance();
@@ -1277,6 +1386,7 @@ function MainApp() {
       .catch(() => {});
   }, [
     clearVictoryTimeouts,
+    clearVictoryToastQueue,
     puzzleActions,
     victoryActions,
     orchestrationActions,
@@ -1325,6 +1435,7 @@ function MainApp() {
     orchestrationActions.setCompletionCoda(null);
     setIsPlayingDaily(true);
     resetSpeedRun();
+    clearVictoryToastQueue();
     transitionTo('puzzle', async () => {
       puzzleActions.setGameState(GameState.LOADING);
       puzzleActions.setMessage(getLoadingMessage(persistence.currentPhase));
@@ -1365,7 +1476,7 @@ function MainApp() {
         await puzzleActions.startNewGame('HARD', 'standard', 'standard', false, false);
       }
     });
-  }, [puzzleActions, transitionTo, persistenceActions, orchestrationActions, persistence.currentPhase, maybeShowSetupSelectorIntro]);
+  }, [puzzleActions, transitionTo, persistenceActions, orchestrationActions, persistence.currentPhase, maybeShowSetupSelectorIntro, clearVictoryToastQueue]);
 
   // Start the Daily Challenge (seeded; difficulty follows the week ramp).
   const handleStartDaily = useCallback((_difficulty: Difficulty) => {
@@ -1662,6 +1773,9 @@ function MainApp() {
 
     if (result?.completed) {
       isDragDropRef.current = false;
+      // This win owns the review-destack flag from here on — a stale value
+      // from an earlier win must not swallow this exit's nudges.
+      reviewPromptFiredRef.current = false;
       // THE marked final board's win: the fanfare is suppressed (the quiet IS
       // the moment) and the finale cinematic fires from the endgame block below.
       const wasFinalBoard = result.isFinalBoard === true;
@@ -1673,9 +1787,7 @@ function MainApp() {
         setSpeedRound(newRound);
         recordSpeedRound(newRound).then(res => {
           if (res.isNewRecord && res.best >= 3) {
-            addVictoryTimeout(() => {
-              puzzleActions.setMessage(getSpeedRecordMessage(persistence.currentPhase, res.best));
-            }, 1000);
+            enqueueVictoryToast(getSpeedRecordMessage(persistence.currentPhase, res.best));
           }
         }).catch(() => {});
       }
@@ -1694,9 +1806,7 @@ function MainApp() {
           const trend = await getSolveTrend(solveDifficulty);
           if (trend?.improving) {
             fasterBeatShownRef.current = true;
-            addVictoryTimeout(() => {
-              puzzleActions.setMessage(getPaceTrendMessage(persistence.currentPhase));
-            }, 1300);
+            enqueueVictoryToast(getPaceTrendMessage(persistence.currentPhase));
           }
         }).catch(() => {});
       }
@@ -1713,9 +1823,7 @@ function MainApp() {
         consumeVariantNudge(unlockedVariants, 'standard').then(nudgeVariant => {
           if (nudgeVariant) {
             const title = VARIANT_CONFIGS[nudgeVariant as PuzzleVariant]?.title || 'a new style';
-            addVictoryTimeout(() => {
-              puzzleActions.setMessage(getVariantNudgeMessage(persistence.currentPhase, title));
-            }, 2000);
+            enqueueVictoryToast(getVariantNudgeMessage(persistence.currentPhase, title), 'nudge');
           }
         }).catch(() => {});
       }
@@ -1884,22 +1992,16 @@ function MainApp() {
           if (milestone) {
             const newBalance = await awardBonusAmber(milestone.amber, 'daily_streak_milestone');
             persistenceActions.setAmberBalance(newBalance);
-            addVictoryTimeout(() => {
-              puzzleActions.setMessage(`${milestone.message} (+${milestone.amber} amber)`);
-            }, 1100);
+            enqueueVictoryToast(`${milestone.message} (+${milestone.amber} amber)`, 'receipt');
           } else if (dailyProgress.streakSavedByFreeze) {
             // A banked freeze forgave a missed day — let the player know the
             // chain survived so the protection feels real, not silent.
-            addVictoryTimeout(() => {
-              puzzleActions.setMessage('🛡️ A missed day, but your daily streak held.');
-            }, 1100);
+            enqueueVictoryToast('🛡️ A missed day, but your daily streak held.');
           } else if (dailyProgress.streakDecayedTo != null) {
             // Decay-to-milestone: the lapse cost the climb, not the streak —
             // name the checkpoint it held at (phase-aware copy).
             const heldAt = dailyProgress.streakDecayedTo;
-            addVictoryTimeout(() => {
-              puzzleActions.setMessage(getStreakHeldMessage(heldAt, persistence.currentPhase));
-            }, 1100);
+            enqueueVictoryToast(getStreakHeldMessage(heldAt, persistence.currentPhase));
           }
           // Full-moon event: +50% bonus on the daily's amber, credited as
           // BONUS amber only. Never feeds phase progress (same rule as every
@@ -2040,25 +2142,36 @@ function MainApp() {
         }
       }
 
+      // Post-victory receipts and beats all ride the sequential toast queue
+      // (enqueueVictoryToast) — receipts first, informational lines after,
+      // nudges last — so no message clobbers another on a stacked win.
+
       // Surface the "your streak was protected" moment when a freeze was consumed
       if (victory.streakSaved) {
-        addVictoryTimeout(() => {
-          puzzleActions.setMessage('🛡️ A streak freeze protected your streak!');
-        }, 600);
+        enqueueVictoryToast('🛡️ A streak freeze protected your streak!');
       }
 
       // Show streak milestone toast if threshold was just crossed
       if (victory.streakMilestoneMessage) {
-        addVictoryTimeout(() => {
-          puzzleActions.setMessage(`${victory.streakMilestoneMessage} (+${victory.streakMilestoneBonus} amber)`);
-        }, 800);
+        enqueueVictoryToast(`${victory.streakMilestoneMessage} (+${victory.streakMilestoneBonus} amber)`, 'receipt');
+      }
+
+      // Milestone hint trickle: a win that crossed a puzzle-count milestone
+      // tops the hint stash up by one (soft-capped in hints.ts, so it never
+      // stacks a stockpile) — the difficulty tail is where the lifetime free
+      // hints run dry.
+      if (victory.milestoneBonus > 0) {
+        grantBonusHint('milestone').then(granted => {
+          if (granted) {
+            puzzleActions.refreshHintBalance();
+            enqueueVictoryToast(getHintGrantMessage(persistence.currentPhase), 'receipt');
+          }
+        }).catch(() => {});
       }
 
       // Show harvest overflow warning if pending batches hit the cap
       if (victory.harvestOverflow) {
-        addVictoryTimeout(() => {
-          puzzleActions.setMessage(getHarvestOverflowMessage(persistence.currentPhase));
-        }, 1500);
+        enqueueVictoryToast(getHarvestOverflowMessage(persistence.currentPhase));
       }
 
       puzzleActions.setEarnedStars(victory.earnedStars);
@@ -2097,6 +2210,12 @@ function MainApp() {
           puzzlesSolved: completedTotal,
           isOnboarding: !(onboardingFlow.onboardingStep === undefined || onboardingFlow.onboardingStep === 'complete'),
           isDaily: isPlayingDaily,
+        }).then(prompted => {
+          // The OS review sheet fired mid-victory, outside the exit-nudge
+          // chain — flag it so THIS win's exit runs no nudges on top
+          // (runVictoryExitNudges checks + clears the flag, non-consuming
+          // for the deferred nudges themselves).
+          if (prompted) reviewPromptFiredRef.current = true;
         }).catch(() => {});
       }, 1800);
 
@@ -2318,6 +2437,7 @@ function MainApp() {
     dreadEffects,
     tutorialGuidance,
     addVictoryTimeout,
+    enqueueVictoryToast,
   ]);
 
   const handleLetterPress = useCallback((letter: any, rowIndex: number) => {
@@ -2484,6 +2604,27 @@ function MainApp() {
     })().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fires per fresh board; actions/phase read at fire time
   }, [boardIdentity, puzzle.gameState, puzzle.previewGradingMode, puzzle.blindMode, onboardingFlow.isOnboarding]);
+
+  // First-stuck mercy — the ONLY consumer of puzzle.isStuck. Stuck detection
+  // stays silent by product decision (discovering a dead end and choosing
+  // undo/restart is part of the challenge), EXCEPT the very first dead end
+  // ever, which gets one phase-aware pointer through the normal message slot:
+  // without it, a player who doesn't recognize the dead end gets nothing but
+  // error-shakes. The flag is committed before the message shows, so it fires
+  // once ever; every later stuck is silent again. Device-local ON PURPOSE
+  // (see FIRST_STUCK_SEEN_KEY).
+  const firstStuckCheckedRef = useRef(false);
+  useEffect(() => {
+    if (!puzzle.isStuck) return;
+    if (firstStuckCheckedRef.current) return;
+    firstStuckCheckedRef.current = true;
+    (async () => {
+      if (await hasSeenOneTimeFlag(FIRST_STUCK_SEEN_KEY)) return;
+      await markOneTimeFlagSeen(FIRST_STUCK_SEEN_KEY);
+      puzzleActions.setMessage(getNoValidMovesMessage(persistence.currentPhase));
+    })().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot; actions/phase read at fire time
+  }, [puzzle.isStuck]);
 
   // Drag-and-drop: when a letter is dragged onto the target row area, find the
   // closest valid slot and press it. The letter was already selected via onDragStart.
@@ -2761,7 +2902,10 @@ function MainApp() {
       persistence.pendingPhaseTransition != null ||    // ward ceremony waiting in the pit
       phaseTransitionEvent != null ||                  // final / post-revelation cinematic queued
       (vd.newPhase as number) >= 5 ||                  // post-revelation: never break the serene tone
-      vd.puzzlesSolved <= AUTO_COLLECT_PUZZLE_LIMIT;   // protect the early "pure delight" window — no ads in the first session
+      // Protect the early "pure delight" window — no ads in the first
+      // session, and no first ad inside the puzzle 8-12 new-things pile-up
+      // (daily unlock, first-harvest gate, journal intro all land there).
+      vd.puzzlesSolved <= INTERSTITIAL_MIN_PUZZLES;
     return maybeShowInterstitial({
       puzzlesSolved: vd.puzzlesSolved,
       phase: vd.newPhase,
@@ -2877,6 +3021,13 @@ function MainApp() {
     // so callers capture this BEFORE the exit flow and pass it in (checking
     // the ref here would always see an empty queue).
     if (interstitialShown || introWillPresent) return;
+    // The store-review sheet fired on this win (mid-victory, outside this
+    // chain): its exit runs NO nudges. Non-consuming — the deferred nudges
+    // keep their one-time flags and simply wait for a quieter exit.
+    if (reviewPromptFiredRef.current) {
+      reviewPromptFiredRef.current = false;
+      return;
+    }
     const solved =
       victoryFlow.victoryData?.puzzlesSolved ??
       persistence.cumulativeStats?.totalPuzzlesCompleted ??
@@ -2957,6 +3108,7 @@ function MainApp() {
   const handleOnboardingVictoryContinue = useCallback(async () => {
     hapticLight();
     clearVictoryTimeouts();
+    clearVictoryToastQueue();
     puzzleActions.setShowConfetti(false);
     victoryActions.resetVictory();
     orchestrationActions.resetOrchestration();
@@ -2975,6 +3127,7 @@ function MainApp() {
     victoryActions,
     orchestrationActions,
     clearVictoryTimeouts,
+    clearVictoryToastQueue,
     transitionTo,
   ]);
 
@@ -3918,9 +4071,10 @@ function MainApp() {
 
         {/* No stuck-panel / no immediate "unwinnable" announcement — product
             decision: discovering a dead-end and choosing to undo or restart
-            is part of the challenge. puzzle.isStuck stays a silent internal
-            signal; the always-available UNDO / RESTART controls below are the
-            player's way out. */}
+            is part of the challenge. puzzle.isStuck drives ONLY the one-time
+            first-stuck mercy toast (see firstStuckCheckedRef); every later
+            stuck stays silent, and the always-available UNDO / RESTART
+            controls below are the player's way out. */}
 
         {/* Bottom Controls — simplified during onboarding (no NEW button).
             Bottom padding grows past the legacy 30 to clear the home
@@ -4072,7 +4226,10 @@ function MainApp() {
 
         {/* Animal Interjection — brief message pulling player to home screen */}
         {orchestration.showInterjection && orchestration.interjection && !orchestration.showWhisper && (
-          <View style={styles.interjectionContainer}>
+          // pointerEvents="none": a decorative overlay that lives up to 4s —
+          // it must never swallow taps meant for the board/buttons under it
+          // (the whisper overlay already does the same).
+          <View style={styles.interjectionContainer} pointerEvents="none">
             <Text style={[
               styles.interjectionText,
               persistence.currentPhase >= 3 && styles.interjectionTextDark,

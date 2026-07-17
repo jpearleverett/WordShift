@@ -7,6 +7,7 @@ import {
   resetOnboarding,
   COLD_OPEN_INSTRUCTION,
   COLD_OPEN_FIRST_MOVE,
+  COLD_OPEN_PREVIEW_TEACH,
   ONBOARDING_FOX_LINES,
   resolveColdOpenLaunchRoute,
 } from '../services/onboarding';
@@ -131,6 +132,19 @@ describe('onboarding', () => {
       expect(COLD_OPEN_FIRST_MOVE).not.toMatch(/[—–]/);
       // Distinct from the opener so the board reacts, not repeats.
       expect(COLD_OPEN_FIRST_MOVE).not.toBe(COLD_OPEN_INSTRUCTION);
+    });
+
+    test('cold-open preview teach names the check, the cross, and undo', () => {
+      // Shown the first time a letter is picked up: the ghost previews are on
+      // screen, so the marks are explained at the moment they first matter.
+      const teach = COLD_OPEN_PREVIEW_TEACH.toLowerCase();
+      expect(teach).toContain('green check');
+      expect(teach).toContain('red cross');
+      expect(teach).toContain('undo');
+      expect(COLD_OPEN_PREVIEW_TEACH).not.toMatch(/[—–]/);
+      // Distinct from the opener and the first-move delight line.
+      expect(COLD_OPEN_PREVIEW_TEACH).not.toBe(COLD_OPEN_INSTRUCTION);
+      expect(COLD_OPEN_PREVIEW_TEACH).not.toBe(COLD_OPEN_FIRST_MOVE);
     });
 
     test('has dialogue for all standard onboarding steps', () => {

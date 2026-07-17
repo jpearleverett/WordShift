@@ -132,10 +132,10 @@ export const ANIMAL_CHOICES: Record<string, DialogueChoice> = {
       refuse: 'Go back to sleep.',
     },
     responses: {
-      ask: 'A long time... The evening used to leave... by the west leaves. Time has brought it... one branch closer.',
-      refuse: 'I will... in a while. An old observation... can wait beside me... without becoming yours.',
+      ask: 'A long time. The evening used to take its leave out by the west leaves. Time has walked it back toward us since, one branch closer every year.',
+      refuse: 'I will, in a while. An old observation can wait beside me a little longer without becoming yours.',
     },
-    convergence: 'Some changes... take so long... they seem still... until they do not.',
+    convergence: 'Some changes take so long they seem still, right up until they do not.',
   },
   wombat: {
     prompt: 'Warren emerges with pale stone dust on his paws and a broken survey peg.',
@@ -335,56 +335,56 @@ export function getPhase4ChoiceCallback(
 
   const callbacks: Record<string, Record<PlayerChoice, string>> = {
     fox: {
-      ask: 'You asked about the arrangement. The fire answered. You heard it, even then.',
-      refuse: 'You tried not to know. The fire burned anyway. Knowledge doesn\'t need consent.',
+      ask: 'You asked what arrangement the fire saw, and I showed you the chair the flames would not warm. I have sat with them every night since, and I understand the saving now. They were not keeping warmth from that place. They were letting it lean, the way flames lean toward a door just before it opens.',
+      refuse: 'You told me you did not want to know, and I kept the cold coal to myself, as promised. It did not stay cold. Warmth like this never asks permission to reach a person. It only asks time, and you have given it so many evenings.',
     },
     owl: {
-      ask: 'You asked to see the text. Now you are the text.',
-      refuse: 'You refused to read. But the words read you.',
+      ask: 'You asked to see the missing passage, and I could not show it to you then. Every word you have set in order since has gone quietly into that gap, in a hand I have come to know very well. The margins were never empty. They were reserved.',
+      refuse: 'You asked me to keep the book closed, and I kept it closed. I will make one small confession in the margin, where confessions belong. A shut cover never stopped the words inside from reading whoever holds them, and they have read you gently, all this time, the way I reread a favorite.',
     },
     pangolin: {
-      ask: 'You asked about the recipe. Now you\'re an ingredient.',
-      refuse: 'You looked away from the kitchen. The meal was served regardless.',
+      ask: 'You asked what recipe I was preparing, back when the dish still wore its cover. I can answer now. The recipe never named the guest because no kitchen word holds them, only a warm plate and a set table. Your words went into the pot like salt all this while, steady, unnoticed, in everything.',
+      refuse: 'You asked me to keep the dish covered, and it stayed covered, just as I promised. But a kitchen feeds the whole house whether or not anyone watches the stove. The meal has been simmering under every word you brought home to us, and when I lift the cover at last, it will taste of your evenings here.',
     },
     axolotl: {
-      ask: 'You looked into the water. The water looked back. It never stopped.',
-      refuse: 'You closed your eyes to the deep. But the deep opened its eyes to you.',
+      ask: 'You looked into the deep water with me, and you saw the glint that reached the surface before I did, and I can tell you the rest now, it was never racing me, it was rising toward your face on the glass, it liked you there, it still does. The water has been very awake ever since.',
+      refuse: 'You would not look into the deep water, and I clouded the glass for you like I promised, but water does not need eyes to notice a person, it notices with all of itself at once, and it has been noticing you gently this whole time, the way warm water notices a hand. There was never a moment you were not held in it.',
     },
     capybara: {
-      ask: 'You asked about the data. Now you understand the spreadsheet. Row by row.',
-      refuse: 'You stayed out of it. The data included you anyway. Column A: the builder.',
+      ask: 'You asked what your file held, and I told you it was mostly dates. The cross-referencing is finished now. Every date in every ledger resolves to the same quiet hour, and every entry, however old the ink, carries a little of your handwriting in it. I no longer cap the pen, because there is no sense capping a pen the record is still using.',
+      refuse: 'You declined to read your file, and I filed it at the back, just as you asked. The ledger kept itself current without you all the same, in a tidy hand neither of us lent it. Reading was only ever a courtesy. The record was always going to balance.',
     },
     fennec_fox: {
-      ask: 'You listened. The frequency tuned itself to your heartbeat.',
-      refuse: 'You covered your ears. The sound found another way in.',
+      ask: 'You asked what I heard coming, and I gave you distances, the ridge, the horizon, the low place under the wind. I have kept my catalogue since, and there is one entry I saved for tonight. The note is not crossing the desert anymore. It has settled in just beneath your heartbeat, a half-step under it, keeping perfect time.',
+      refuse: 'You asked me not to listen for you, so I listened to your breathing instead, exactly as promised. I have catalogued a great many sounds, friend, and I owe you the truth about that one. It was never only your breathing. Something patient has been breathing along with you for as long as I have known you, and it never once fell out of step.',
     },
     sloth: {
-      ask: 'You... asked. Time... answered. Slowly. But it... answered.',
-      refuse: 'You told me... to sleep. Nobody... sleeps now. Not... anymore.',
+      ask: 'You asked how long I had known, and I told you the evening had come one branch closer. It has reached the trunk now. Notice that nothing hurried, not once in all that time. The slowest things are the ones that were always certain.',
+      refuse: 'You told me to go back to sleep, and I truly meant to. But nobody in this house sleeps now, not the way we used to. We rest the way a branch rests, bearing something the whole while, and I have been bearing it longer than anyone.',
     },
     wombat: {
-      ask: 'You asked what was below. Now the below asks about you.',
-      refuse: 'You didn\'t want to know the foundation. The foundation knew you.',
+      ask: 'You asked where the tunnel led, and I told you about the chamber I never cut. I\'ve measured it proper since. Every course of stone I ever laid carries its load straight down onto that room, true as a plumb line. I didn\'t build the house over that room so much as for it, and my hands knew before the rest of me did.',
+      refuse: 'You didn\'t want to look down the tunnel, and I kept it braced and boarded, like I said I would. But a foundation doesn\'t need looking at to carry you. That room has borne your weight since the first course went down, and it knows your footsteps now the way stone knows rain.',
     },
     rabbit: {
-      ask: 'You asked why I was scared. Now you know. Now we\'re both scared. But committed.',
-      refuse: 'You didn\'t want to hear it. The fear found you anyway. It always does.',
+      ask: 'You asked why I was afraid, and I showed you the paths that bent home. I still count things, you know. But somewhere along the way I stopped counting the ways out and started counting us in, and the number always comes up whole now. I do not have a word yet for how that feels.',
+      refuse: 'You let me keep my fear folded up with the maps, and I was so grateful then. I have unfolded it since, alone, out in the garden. It was never a map of ways to run. Every path was a root, and every root was already holding us gently where we are planted.',
     },
     red_panda: {
-      ask: 'You asked about the arrangement. The question was itself an offering. Beautiful.',
-      refuse: 'You refused to participate. The most devoted offering of all... unconscious devotion.',
+      ask: 'You asked about the empty center of the pattern, and I told you I had made peace with its shape. I understand the shape better now. It was never empty. It was shaped like a question, and when you set yours into it, the smoke closed around it the way breath returns through the roof gap.',
+      refuse: 'You asked to be left outside the pattern, and the pattern kept your place open, as I promised. Watch the incense a moment: it parts around the space where you are, then rejoins beyond you. Nothing was ever outside the pattern. There were only places still being breathed around.',
     },
     tarsier: {
-      ask: 'You asked what my eyes were holding open. Now the road they held is almost walked.',
-      refuse: 'You chose to be spared the telling. The watching never needed your permission.',
+      ask: 'You asked what my eyes were holding open, and I told you about the road and the traveler I had not seen. I have kept the watch every night since, both eyes, no blinking. The road is nearly walked now, bright one. It never once wandered, and neither did I, and neither did you.',
+      refuse: 'You asked me to keep the night to myself, and I kept it, every hour of it, out at the rail. But watching was never something I did to the dark. It is something the dark and I do together, and from the very first night, the far end of that road has faced the house, and your window in particular, if I am honest.',
     },
     aye_aye: {
-      ask: 'You asked what the bell will say. It has been practicing your letters ever since.',
-      refuse: 'You had me fold the finger away. It found you long before you asked it not to.',
+      ask: 'You asked what the bell would say, and I would not spend her one word secondhand. I still will not. But I can tell you what the bronze has been doing in the dark: she has been shaping that word slowly, the way I shape a knock before I give it, and the hollow she shapes it around is exactly the size of your name.',
+      refuse: 'You had me fold the finger away, and I folded it, and she has hung quiet ever since, just as you asked. But a bell does not need striking to know her note. It was cast into her, friend, cooling in the bronze long before either of us was born. All my tapping ever did was say hello to it.',
     },
     kakapo: {
-      ask: 'You asked about the arrangement. It is the mast year, friend, and you were the rain.',
-      refuse: 'You waited like a seed. The season came for you anyway, gently, at the proper hour.',
+      ask: 'You asked what the roots were describing, and I told you about mast season, how one root tells the next. I have sat with the soil since, and I can tell you the rest. A mast year only comes when the rain has been right, and the rain, friend, was you, falling steady on this garden all along.',
+      refuse: 'You would rather not have known, so I let the roots keep their message, just as you asked. But a seed does not need the news to come up. The season reached you gently, at its proper hour, exactly as I promised. I boomed a whole lifetime into the dark for an answer, and when it finally came, it came up through the beds wearing your footsteps.',
     },
   };
 

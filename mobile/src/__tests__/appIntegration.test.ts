@@ -61,15 +61,37 @@ describe('deep links and notification taps', () => {
   });
 });
 
-describe('stuck popup stays removed (product decision)', () => {
-  test('App renders NO stuck panel and never announces an unwinnable board', () => {
+describe('stuck stays silent — except the ONE-TIME first-stuck mercy', () => {
+  test('App renders NO stuck panel and never renders off isStuck', () => {
     // Discovering a dead-end and choosing to undo/restart is part of the
     // challenge — the old immediate "you're stuck" panel must not return.
     expect(APP_TSX).not.toMatch(/getStuckPanelTitle/);
-    expect(APP_TSX).not.toMatch(/getNoValidMovesMessage/);
     expect(APP_TSX).not.toMatch(/styles\.stuckPanel/);
-    // isStuck stays an internal hook signal; App must not render off it.
+    // isStuck never drives rendering (no conditional JSX off the signal).
     expect(APP_TSX).not.toMatch(/puzzle\.isStuck &&/);
+  });
+
+  test('isStuck drives ONLY the one-time-ever gated notice (the pinned invariant)', () => {
+    // The single allowed consumer: an effect that shows the phase-aware
+    // no-valid-moves line ONCE EVER (device-local flag, deliberately NOT
+    // cloud-synced), then goes permanently silent. One-time-ness is the
+    // contract: the flag is committed BEFORE the message shows, and a
+    // session ref stops repeat storage reads.
+    const effect = APP_TSX.slice(
+      APP_TSX.indexOf('const firstStuckCheckedRef'),
+      APP_TSX.indexOf('}, [puzzle.isStuck]);')
+    );
+    expect(effect.length).toBeGreaterThan(0);
+    expect(effect).toContain('if (!puzzle.isStuck) return;');
+    expect(effect).toContain('if (firstStuckCheckedRef.current) return;');
+    expect(effect).toContain('hasSeenOneTimeFlag(FIRST_STUCK_SEEN_KEY)');
+    expect(effect.indexOf('markOneTimeFlagSeen(FIRST_STUCK_SEEN_KEY)')).toBeLessThan(
+      effect.indexOf('getNoValidMovesMessage')
+    );
+    // The device-local flag key (must NOT be added to cloudSave SYNC_KEYS).
+    expect(APP_TSX).toContain("const FIRST_STUCK_SEEN_KEY = 'wordshift_first_stuck_seen'");
+    // Exactly ONE call site of getNoValidMovesMessage in all of App.
+    expect(APP_TSX.match(/getNoValidMovesMessage\(/g)).toHaveLength(1);
   });
 });
 

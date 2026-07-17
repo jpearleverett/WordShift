@@ -30,6 +30,12 @@
  * FRAT/WORT and the crude formable set — see purgeProfanity.mjs): 66
  * puzzles dropped by the purge, a further 52 dropped as chain-unsolvable
  * under the shrunk dictionary, 2 stored solutions regenerated.
+ *
+ * Recalibrated after the multi-route branching top-up
+ * (scripts/generateBranchingTopUp{A,B}.test.ts): the four standard banks
+ * gained generator-fresh multi-path boards under the SAME pinned caps
+ * (EASY +92, MEDIUM +76, MEDIUM_PLUS +47, HARD +19), so caps are unchanged
+ * and the unique/puzzle floors below rose to ~10% under the new measured.
  */
 import { PUZZLE_BANK_EASY } from '../data/puzzleBankEasy';
 import { PUZZLE_BANK_MEDIUM } from '../data/puzzleBankMedium';
@@ -54,14 +60,14 @@ interface BankSpec {
 }
 
 const BANKS: BankSpec[] = [
-  // Measured (2026-07 hygiene pass 2): EASY 470 puzzles / max 3 / 1482 unique
-  { name: 'EASY', bank: PUZZLE_BANK_EASY, cap: 3, minUnique: 1330, minPuzzles: 415 },
-  // MEDIUM 472 / max 7 (marquee injection) / 1609 unique
-  { name: 'MEDIUM', bank: PUZZLE_BANK_MEDIUM, cap: 7, minUnique: 1445, minPuzzles: 420 },
-  // MEDIUM_PLUS 474 / max 8 (marquee injection) / 1399 unique
-  { name: 'MEDIUM_PLUS', bank: PUZZLE_BANK_MEDIUM_PLUS, cap: 8, minUnique: 1255, minPuzzles: 420 },
-  // HARD 438 / max 10 / 1330 unique
-  { name: 'HARD', bank: PUZZLE_BANK_HARD, cap: 10, minUnique: 1195, minPuzzles: 390 },
+  // Measured (2026-07 branching top-up): EASY 547 puzzles / max 3 / 1574 unique
+  { name: 'EASY', bank: PUZZLE_BANK_EASY, cap: 3, minUnique: 1415, minPuzzles: 490 },
+  // MEDIUM 526 / max 7 (marquee injection) / 1636 unique
+  { name: 'MEDIUM', bank: PUZZLE_BANK_MEDIUM, cap: 7, minUnique: 1470, minPuzzles: 470 },
+  // MEDIUM_PLUS 512 / max 8 (marquee injection) / 1437 unique
+  { name: 'MEDIUM_PLUS', bank: PUZZLE_BANK_MEDIUM_PLUS, cap: 8, minUnique: 1290, minPuzzles: 460 },
+  // HARD 453 / max 10 / 1337 unique
+  { name: 'HARD', bank: PUZZLE_BANK_HARD, cap: 10, minUnique: 1200, minPuzzles: 405 },
   // REVERSE_EASY 429 / max 7 / 1325 unique
   { name: 'REVERSE_EASY', bank: PUZZLE_BANK_REVERSE_EASY, cap: 7, minUnique: 1190, minPuzzles: 380 },
   // REVERSE_MEDIUM 318 / max 11 (solution-repair pass) / 1304 unique

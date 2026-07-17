@@ -1109,9 +1109,9 @@ describe('checkNarrativeMicroBeat', () => {
     expect(beat!.text).toBeDefined();
   });
 
-  test('all 26 micro-beat thresholds fire independently', async () => {
+  test('all 28 micro-beat thresholds fire independently', async () => {
     const thresholds = [
-      5, 8, 12, 16, 20, 25, 30, 35, 40, 50, 55, 65, 70, 74, 80, 90, 100,
+      5, 8, 12, 16, 20, 25, 30, 31, 33, 35, 40, 50, 55, 65, 70, 74, 80, 90, 100,
       105, 118, 126, 132, 148, 150, 155, 158, 160,
     ];
     for (const t of thresholds) {
@@ -1135,9 +1135,18 @@ describe('MICRO_BEATS geography', () => {
 
   test('keys match the new geography exactly', () => {
     expect(keys).toEqual([
-      5, 8, 12, 16, 20, 25, 30, 35, 40, 50, 55, 65, 70, 74, 80, 90, 100,
+      5, 8, 12, 16, 20, 25, 30, 31, 33, 35, 40, 50, 55, 65, 70, 74, 80, 90, 100,
       105, 118, 126, 132, 148, 150, 155, 158, 160,
     ]);
+  });
+
+  test('the puzzle-31 held glitch is prominent and the 33 whisper half-normalizes it', () => {
+    expect(MICRO_BEATS[31].type).toBe('glitch_title');
+    expect(MICRO_BEATS[31].glitchTitle).toBe('YOU ARE DOING SO WELL');
+    // Held long enough to be read on purpose, unlike the subliminal flickers.
+    expect(MICRO_BEATS[31].durationMs).toBeGreaterThan(MICRO_BEATS[16].durationMs);
+    expect(MICRO_BEATS[33].type).toBe('ambient_whisper');
+    expect(MICRO_BEATS[33].text).toContain('only the house');
   });
 
   test('nothing fires past 160: the finale (~161) gets the silence', () => {

@@ -58,10 +58,10 @@ describe('puzzleVariety', () => {
   });
 
   describe('unlock gates (the variant-pacing wave)', () => {
-    it('spreads variant unlocks across the arc: reverse 8, double 40, speed 70', () => {
+    it('spreads variant unlocks across the arc: reverse 8, double 25, speed 55', () => {
       expect(getVariantUnlockRequirement('reverse')?.puzzlesSolved).toBe(8);
-      expect(getVariantUnlockRequirement('double_shift')?.puzzlesSolved).toBe(40);
-      expect(getVariantUnlockRequirement('speed')?.puzzlesSolved).toBe(70);
+      expect(getVariantUnlockRequirement('double_shift')?.puzzlesSolved).toBe(25);
+      expect(getVariantUnlockRequirement('speed')?.puzzlesSolved).toBe(55);
     });
 
     it('gates the trial-ladder toggles at 15 (challenge) and 100 (blind apex)', () => {
@@ -70,10 +70,10 @@ describe('puzzleVariety', () => {
     });
 
     it('unlocks each variant exactly at its gate', () => {
-      expect(isVariantUnlocked('double_shift', 39, 0)).toBe(false);
-      expect(isVariantUnlocked('double_shift', 40, 0)).toBe(true);
-      expect(isVariantUnlocked('speed', 69, 0)).toBe(false);
-      expect(isVariantUnlocked('speed', 70, 0)).toBe(true);
+      expect(isVariantUnlocked('double_shift', 24, 0)).toBe(false);
+      expect(isVariantUnlocked('double_shift', 25, 0)).toBe(true);
+      expect(isVariantUnlocked('speed', 54, 0)).toBe(false);
+      expect(isVariantUnlocked('speed', 55, 0)).toBe(true);
     });
   });
 
@@ -257,7 +257,7 @@ describe('puzzleVariety', () => {
       expect(early).toContain('standard');
       expect(early).not.toContain('reverse');
 
-      // With 100 puzzles, all variants are unlocked (reverse=8, double_shift=40, speed=70)
+      // With 100 puzzles, all variants are unlocked (reverse=8, double_shift=25, speed=55)
       const mid = getUnlockedVariants(100, 0);
       expect(mid).toContain('standard');
       expect(mid).toContain('reverse');
@@ -280,10 +280,10 @@ describe('puzzleVariety', () => {
       expect(early.map(o => o.variant)).toEqual(['standard', 'reverse', 'double_shift', 'speed']);
       const doubleRow = early.find(o => o.variant === 'double_shift')!;
       expect(doubleRow.unlocked).toBe(false);
-      expect(doubleRow.unlockHint).toContain('30 more puzzle');
+      expect(doubleRow.unlockHint).toContain('15 more puzzle');
       const speedRow = early.find(o => o.variant === 'speed')!;
       expect(speedRow.unlocked).toBe(false);
-      expect(speedRow.unlockHint).toContain('60 more puzzle');
+      expect(speedRow.unlockHint).toContain('45 more puzzle');
       expect(early.find(o => o.variant === 'reverse')!.unlocked).toBe(true);
     });
 

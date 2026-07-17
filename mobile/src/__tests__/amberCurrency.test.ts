@@ -141,7 +141,9 @@ describe('loadProgress', () => {
     });
   });
 
-  test('self-heals unlocked lagging Moss to his effective Phase 3 start in global Phase 4', async () => {
+  // Lagging converges to phase 4 at the reveal (getAnimalPhase drops the -1
+  // at global Phase 4), so Moss's effective phase in global Phase 4 is 4.
+  test('self-heals unlocked lagging Moss to his effective Phase 4 start in global Phase 4', async () => {
     const legacy = {
       ...(await loadProgress()),
       currentPhase: 4,
@@ -152,7 +154,7 @@ describe('loadProgress', () => {
     invalidateProgressCache();
 
     expect((await loadProgress()).lastDialogueRead.kakapo).toBe(
-      getPhaseStartIndex('kakapo', 3)
+      getPhaseStartIndex('kakapo', 4)
     );
   });
 

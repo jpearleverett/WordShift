@@ -138,6 +138,29 @@ export async function addHints(amount: number, _source?: string): Promise<number
   return state.balance;
 }
 
+/**
+ * Soft cap for the milestone hint trickle: a bonus hint is only granted while
+ * the balance sits below this, so the trickle relieves late-game scarcity
+ * without ever stacking a stockpile a paying player would have bought.
+ */
+export const BONUS_HINT_SOFT_CAP = 10;
+
+/**
+ * Grant a single bonus hint (puzzle-count milestone trickle). Grants +1 ONLY
+ * when the current balance is under BONUS_HINT_SOFT_CAP; returns whether the
+ * hint was actually granted so the caller can gate its receipt toast.
+ * `source` is recorded only via the caller's own logging.
+ */
+export async function grantBonusHint(_source: string): Promise<boolean> {
+  const state = await load();
+  if (state.balance >= BONUS_HINT_SOFT_CAP) return false;
+  state.balance += 1;
+  cache = state;
+  mirror(state);
+  await save();
+  return true;
+}
+
 /** Clear all hint state (for Settings → Reset All). */
 export async function clearHints(): Promise<void> {
   cache = getDefault();

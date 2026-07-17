@@ -350,6 +350,8 @@ describe('late-unlock dialogue fast-forward', () => {
     expect(after.lastDialogueRead['tarsier']).toBe(getPhaseStartIndex('tarsier', 4));
   });
 
+  // Lagging converges to phase 4 at the reveal (getAnimalPhase drops the -1
+  // at global Phase 4), so Moss's effective phase here is 4, not 3.
   test('Moss starts at his current effective lagging phase', async () => {
     const p = await loadProgress();
     p.puzzlesSolved = 200;
@@ -357,7 +359,7 @@ describe('late-unlock dialogue fast-forward', () => {
     await unlockThrough('unlock_kakapo');
 
     const after = await loadProgress();
-    expect(after.lastDialogueRead['kakapo']).toBe(getPhaseStartIndex('kakapo', 3));
+    expect(after.lastDialogueRead['kakapo']).toBe(getPhaseStartIndex('kakapo', 4));
   });
 
   test('never rewinds an existing read position', async () => {

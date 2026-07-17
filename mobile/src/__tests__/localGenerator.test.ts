@@ -1,4 +1,4 @@
-import { validateWord, generateLocalPuzzle, isReverseSolvable, getInsertionIndex, getIncantationName, getStrongestDreadWord, FORCED_START_MIN_SCORE } from '../services/localGenerator';
+import { validateWord, generateLocalPuzzle, isReverseSolvable, getInsertionIndex, getIncantationName, getStrongestDreadWord, FORCED_START_MIN_SCORE, pickMultiRouteCandidate } from '../services/localGenerator';
 
 // Mock amberCurrency to avoid AsyncStorage issues during generation
 jest.mock('../services/amberCurrency', () => ({
@@ -152,6 +152,56 @@ describe('generateLocalPuzzle', () => {
     expect(puzzle.solution).toBeDefined();
     expect(puzzle.solution!.length).toBe(3);
   }, 10000);
+});
+
+describe('pickMultiRouteCandidate (standard final-pick preference)', () => {
+  interface FakeCandidate {
+    id: string;
+    score: number;
+  }
+  const byId = (counts: Record<string, number>) =>
+    (candidate: FakeCandidate) => counts[candidate.id];
+
+  test('prefers the highest-scoring multi-route candidate over a higher-scoring single-route one', () => {
+    const candidates: FakeCandidate[] = [
+      { id: 'single-high', score: 90 },
+      { id: 'multi-a', score: 70 },
+      { id: 'multi-b', score: 60 },
+    ];
+    const picked = pickMultiRouteCandidate(
+      candidates,
+      byId({ 'single-high': 1, 'multi-a': 3, 'multi-b': 5 }),
+    );
+    expect(picked!.id).toBe('multi-a');
+  });
+
+  test('a route count of exactly 2 qualifies as multi-route', () => {
+    const candidates: FakeCandidate[] = [
+      { id: 'single', score: 80 },
+      { id: 'two-routes', score: 50 },
+    ];
+    const picked = pickMultiRouteCandidate(
+      candidates,
+      byId({ single: 1, 'two-routes': 2 }),
+    );
+    expect(picked!.id).toBe('two-routes');
+  });
+
+  test('falls back to the best single-route candidate when none is multi-route', () => {
+    const candidates: FakeCandidate[] = [
+      { id: 'best', score: 75 },
+      { id: 'worse', score: 55 },
+    ];
+    const picked = pickMultiRouteCandidate(
+      candidates,
+      byId({ best: 1, worse: 1 }),
+    );
+    expect(picked!.id).toBe('best');
+  });
+
+  test('returns null for an empty candidate list', () => {
+    expect(pickMultiRouteCandidate([], () => 0)).toBeNull();
+  });
 });
 
 describe('getInsertionIndex', () => {

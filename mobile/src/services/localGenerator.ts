@@ -1180,6 +1180,32 @@ async function generateReverseChain(
  */
 export const FORCED_START_MIN_SCORE = 20;
 
+/**
+ * Final-pick preference for standard generation: among the finished
+ * candidates, the highest-scoring one with 2+ complete routes wins; when
+ * every candidate is single-route, the best-scoring candidate ships
+ * unchanged. Generic over the candidate shape (the path-count lookup is
+ * injected) so the rule is directly testable without live generation.
+ */
+export function pickMultiRouteCandidate<T extends { score: number }>(
+  candidates: readonly T[],
+  getCompletePathCount: (candidate: T) => number,
+): T | null {
+  if (candidates.length === 0) return null;
+  let bestOverall = candidates[0];
+  let bestMultiRoute: T | null = null;
+  for (const candidate of candidates) {
+    if (candidate.score > bestOverall.score) bestOverall = candidate;
+    if (
+      getCompletePathCount(candidate) >= 2 &&
+      (bestMultiRoute === null || candidate.score > bestMultiRoute.score)
+    ) {
+      bestMultiRoute = candidate;
+    }
+  }
+  return bestMultiRoute ?? bestOverall;
+}
+
 export const generateLocalPuzzle = async (
   difficulty: Difficulty = 'MEDIUM',
   overrides?: { wordLength?: number; targetRows?: number; startWord?: string; requireReverseSolvable?: boolean; relaxBoring?: boolean }
@@ -1342,7 +1368,27 @@ export const generateLocalPuzzle = async (
   }
 
   generatedPuzzles.sort((a, b) => b.score - a.score);
-  const bestPuzzle = generatedPuzzles[0];
+  // Delivered-experience preference at the final pick: most chains have
+  // exactly one complete route, so when several finished candidates exist,
+  // ship the highest-scoring one that leaves the player 2+ real routes (the
+  // best single-route candidate when none qualifies). Skipped for
+  // forced-start (echo) boards, whose non-negotiable seed word already
+  // starves the candidate pool, and for reverse-required chains, whose lock
+  // semantics this standard-rule metric does not model. At most 3 finished
+  // candidates are analyzed with tight caps AFTER the search loop ends, so
+  // generation latency and the existing timeout behavior are untouched.
+  const bestPuzzle =
+    forcedStartWord || requireReverse || generatedPuzzles.length < 2
+      ? generatedPuzzles[0]
+      : pickMultiRouteCandidate(
+          generatedPuzzles,
+          candidate =>
+            analyzeStandardBranching(
+              candidate.chain.map(node => node.word),
+              validateWord,
+              { pathCap: 8, stateCap: 500 },
+            ).completePathCount,
+        ) ?? generatedPuzzles[0];
   const path = bestPuzzle.chain;
 
   const words = path.map(n => n.word);

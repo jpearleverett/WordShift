@@ -5,11 +5,12 @@
  * - Add mechanical variety without overwhelming players.
  * - Introduce variants in a narrative-aware order.
  *
- * Variant progression order (unlock gates spread across the full arc so
- * mechanical novelty keeps landing instead of finishing by puzzle 35):
+ * Variant progression order (gates pulled forward so the puzzle 15-40 stretch,
+ * which sits on the day 7-14 retention valley, is never a variety desert; the
+ * combos and the blind toggle still carry mechanical novelty deep into the arc):
  * 1) Reverse      (8)   -> standard rules + return trip back to first row
- * 2) Double Shift (40)  -> move two letters per step
- * 3) Speed        (70)  -> short row count + timer pressure
+ * 2) Double Shift (25)  -> move two letters per step
+ * 3) Speed        (55)  -> short row count + timer pressure
  * The trial-ladder toggles gate separately (Challenge 15, Blind 100), and
  * COMBO_PRESETS layer a variant + a trial rung at 55/85/115/135.
  * Locked variants/combos are SHOWN in the setup menu as teased locked rows,
@@ -157,8 +158,8 @@ const BASE_VARIANTS: VariantModifier[] = [
 
 const VARIANT_UNLOCK_REQUIREMENTS: Record<Exclude<PuzzleVariant, 'standard'>, VariantUnlockRequirement> = {
   reverse: { puzzlesSolved: 8, minDepthPhase: 0 },
-  double_shift: { puzzlesSolved: 40, minDepthPhase: 0 },
-  speed: { puzzlesSolved: 70, minDepthPhase: 0 },
+  double_shift: { puzzlesSolved: 25, minDepthPhase: 0 },
+  speed: { puzzlesSolved: 55, minDepthPhase: 0 },
 };
 
 /**
