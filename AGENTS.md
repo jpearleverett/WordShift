@@ -26,7 +26,7 @@ WordShift is a React Native (Expo SDK 56) mobile word puzzle game. The app codeb
 - See `CLAUDE.md` for the full test commands. Key: always use `npm test` (not `npx jest`).
 - **Run all tests:** `cd mobile && npm test -- --no-coverage`
 - **Run a single file:** `cd mobile && npm test -- --no-coverage --testPathPattern=<filename>`
-- The suite is expected green (~2,700 tests across ~108 suites; counts drift as features land — not load-bearing). Date-sensitive tests construct dates with local components (`new Date(2026, 1, 9)`) — never ISO strings, which parse as UTC and break in timezones behind UTC.
+- The suite is expected green (~2,800 tests across ~111 suites; counts drift as features land — not load-bearing). Date-sensitive tests construct dates with local components (`new Date(2026, 1, 9)`) — never ISO strings, which parse as UTC and break in timezones behind UTC.
 
 ### TypeScript
 
@@ -37,5 +37,5 @@ WordShift is a React Native (Expo SDK 56) mobile word puzzle game. The app codeb
 
 - `package-lock.json` is present — use `npm` (not pnpm/yarn) for dependency management.
 - The `tsconfig.json` extends `expo/tsconfig.base` — this is resolved from `node_modules` after install.
-- Puzzle bank `.ts` files in `src/data/` are auto-generated and large (~180-560 puzzles each, 12 files; the four standard banks — EASY 547, MEDIUM 558, MEDIUM_PLUS 550, HARD 492 — carry two rounds of v1.3.2 multi-path top-ups appended by `scripts/generateBranchingTopUpA/B.test.ts`, each file's header comment documents its rounds and current count). Do not manually edit these — regenerate with `npm run generate:puzzles`, then run `node scripts/tools/purgeProfanity.mjs`. Note: a from-scratch regeneration rebuilds a standard bank to ~500 and DROPS the branching top-ups; see the Pre-Generated Puzzle Banks section in `CLAUDE.md`.
+- Puzzle bank `.ts` files in `src/data/` are auto-generated and large (~180-500 puzzles each, 12 files). The four standard banks — EASY 496, MEDIUM 426, MEDIUM_PLUS 344, HARD 310 — are the v1.3.2 **gated full regeneration** (`scripts/generateGatedBank.test.ts` via `scripts/runGatedRegen.sh`, swapped in by `scripts/swapGatedBanks.mjs`): every board passes `completePathCount >= 2` (multi-route by construction); each file's header comment carries its current count, and the pre-gated banks are backed up as gitignored `src/data/.pre_gated_*.ts.bak`. Do not manually edit any bank — regenerate standard banks with the gated toolkit and reverse/double banks with `npm run generate:puzzles`, then always run `node scripts/tools/purgeProfanity.mjs`. Note: re-running the legacy standard generators or the old `generateBranchingTopUpA/B` top-up scripts would rebuild the pre-gated (partly single-route) shape — don't; see the Pre-Generated Puzzle Banks section in `CLAUDE.md`.
 - App icons, splash, notification icon, the SFX pack, the world/pixel art, and the UI icon sprites are generated: `npm run generate:assets` (pure-Node scripts in `mobile/scripts/tools/`).
