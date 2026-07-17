@@ -131,6 +131,13 @@ export const appStyles = StyleSheet.create({
     fontSize: 20,
     fontFamily: BODY_FONT,
   },
+  // Invisible layout stand-in for the withheld home button during onboarding:
+  // identical footprint (the wordmark stays centered), ZERO visible chrome —
+  // no background, no border, nothing to read as an empty dead circle.
+  headerHomeSpacer: {
+    width: 40,
+    height: 40,
+  },
   headerTitleArea: {
     flex: 1,
     alignItems: 'center',

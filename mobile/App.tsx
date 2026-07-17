@@ -20,6 +20,7 @@ import { Row } from './src/components/Row';
 import { AnimatedBackground } from './src/components/AnimatedBackground';
 import { Confetti, StarBurst } from './src/components/Confetti';
 import { ActionButton, AnimatedLogo, Toast, VictoryModal, RulesModal, DifficultyMenu } from './src/components/puzzle';
+import { isValidDifficulty, normalizeDifficulty, getDifficultyChipLabel } from './src/components/puzzle/DifficultyMenu';
 import { HomeScreen } from './src/components/home';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { AmberInline } from './src/components/AmberInline';
@@ -1321,12 +1322,20 @@ function MainApp() {
     clearVictoryToastQueue();
     // Refresh persistence data (phase, stats) before starting puzzle
     persistenceActions.refreshStats();
-    const diff = difficulty || puzzle.difficulty;
+    // A board must never start from an unset difficulty: normalize the request
+    // so an out-of-union live value (e.g. state poisoned by a legacy restore)
+    // can never reach startNewGame and serve a board whose shape matches no
+    // selected difficulty.
+    const diff = normalizeDifficulty(difficulty || puzzle.difficulty);
     orchestrationActions.setCompletionCoda(null);
     transitionTo('puzzle', async () => {
-      // Check for saved in-progress puzzle
+      // Check for saved in-progress puzzle. A save whose difficulty is not a
+      // real Difficulty (older schema / corrupt row) is DISCARDED, not
+      // restored: restorePuzzleState copies saved.difficulty into both the
+      // live state and the retained preference, so restoring it would blank
+      // the setup chip and seed every following board from an unset value.
       const saved = await loadPuzzleState();
-      if (saved && saved.gameState === 'PLAYING' && !saved.isPlayingDaily) {
+      if (saved && saved.gameState === 'PLAYING' && !saved.isPlayingDaily && isValidDifficulty(saved.difficulty)) {
         // Restored boards never carry (or roll) a house ask — the ask does
         // not survive autosave (dropped silently; deliberate simplification).
         houseAskRestoreSuppressRef.current = true;
@@ -3791,6 +3800,12 @@ function MainApp() {
     }
 
     // Puzzle screen
+    // Setup-chip guard: the pill must always show the LIVE difficulty. If the
+    // hook state ever slips outside the union (legacy/corrupt restore), the
+    // raw value rendered an EMPTY pill — the colored dot matched no case and
+    // Text renders nothing for undefined — so both the dot and the label go
+    // through the normalizer (MEDIUM fallback, the hook's own default).
+    const chipDifficulty = normalizeDifficulty(puzzle.difficulty);
     return (
       <ErrorBoundary
         fallbackMessage="Something went wrong with the puzzle. Tap to return home."
@@ -3834,7 +3849,18 @@ function MainApp() {
               <Text style={styles.headerHomeText}>{'\uD83C\uDFE0'}</Text>
             </TouchableOpacity>
           ) : (
-            <View style={styles.headerHomeButton} />
+            /* The home route is deliberately withheld during onboarding, but
+               the stand-in must be INVISIBLE: reusing the button style drew an
+               empty lighter circle (its translucent background with no icon).
+               This spacer keeps the exact footprint so the wordmark stays
+               centered, with no chrome, no touches, and no a11y focus. */
+            <View
+              style={styles.headerHomeSpacer}
+              pointerEvents="none"
+              accessible={false}
+              accessibilityElementsHidden={true}
+              importantForAccessibility="no-hide-descendants"
+            />
           )}
 
           <View style={styles.headerTitleArea}>
@@ -4001,18 +4027,18 @@ function MainApp() {
               showSetupSelectorIntro && styles.difficultyButtonHighlighted,
             ]}
             onPress={() => puzzleActions.setShowDifficultyMenu(!puzzle.showDifficultyMenu)}
-            accessibilityLabel={`Difficulty ${puzzle.difficulty}, style ${VARIANT_CONFIGS[puzzle.selectedVariant]?.title || 'Standard'}. Tap to change puzzle setup`}
+            accessibilityLabel={`Difficulty ${chipDifficulty}, style ${VARIANT_CONFIGS[puzzle.selectedVariant]?.title || 'Standard'}. Tap to change puzzle setup`}
             accessibilityRole="button"
           >
             {persistence.currentPhase < 3 && <View style={styles.difficultyButtonShine} />}
             <View style={[
               styles.difficultyDot,
-              puzzle.difficulty === 'EASY' && styles.difficultyDotEasy,
-              puzzle.difficulty === 'MEDIUM' && styles.difficultyDotMedium,
-              puzzle.difficulty === 'MEDIUM_PLUS' && styles.difficultyDotMediumPlus,
-              puzzle.difficulty === 'HARD' && styles.difficultyDotHard,
+              chipDifficulty === 'EASY' && styles.difficultyDotEasy,
+              chipDifficulty === 'MEDIUM' && styles.difficultyDotMedium,
+              chipDifficulty === 'MEDIUM_PLUS' && styles.difficultyDotMediumPlus,
+              chipDifficulty === 'HARD' && styles.difficultyDotHard,
             ]} />
-            <Text style={styles.difficultyText}>{puzzle.difficulty === 'MEDIUM_PLUS' ? 'MED+' : puzzle.difficulty}</Text>
+            <Text style={styles.difficultyText}>{getDifficultyChipLabel(puzzle.difficulty)}</Text>
             <Text style={styles.difficultyArrow}>{'\u25BC'}</Text>
           </TouchableOpacity>
 

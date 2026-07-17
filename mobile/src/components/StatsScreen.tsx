@@ -18,7 +18,7 @@ import { AmberInline } from './AmberInline';
 import { CumulativeStats, PersonalBest, getCumulativeStats, getAverageStars, getThreeStarRate } from '../services/starRating';
 import { getAchievementsWithStatus, Achievement, getTotalCount } from '../services/achievements';
 import { getDailyStatus } from '../services/dailyChallenge';
-import { getStreakInfo } from '../services/amberCurrency';
+import { getStreakInfo, getAmberBalance } from '../services/amberCurrency';
 import { Difficulty } from '../types';
 import { getJourneyAtmosphereText, getPaceTrendMessage } from '../services/phaseNarrative';
 import {
@@ -32,6 +32,21 @@ import { DialoguePhase } from '../types/homeWorld';
 
 const STAR_FILLED = require('../../assets/ui/star_filled.png');
 const STAR_EMPTY = require('../../assets/ui/star_empty.png');
+
+/** True when a personal best is clean on both counts: zero hints AND zero mistakes. */
+export function isPerfectPersonalBest(pb: PersonalBest): boolean {
+  return pb.fewestHints === 0 && pb.fewestInvalidAttempts === 0;
+}
+
+/**
+ * Plain-words personal-best summary ("1 hint, 0 mistakes") for a non-perfect
+ * best. Each field is an independent fewest-ever minimum (see starRating).
+ */
+export function formatPersonalBestSummary(pb: PersonalBest): string {
+  const hints = `${pb.fewestHints} hint${pb.fewestHints === 1 ? '' : 's'}`;
+  const mistakes = `${pb.fewestInvalidAttempts} mistake${pb.fewestInvalidAttempts === 1 ? '' : 's'}`;
+  return `${hints}, ${mistakes}`;
+}
 
 /** Tinted chip fill for chrome sitting directly on the deep screen base. */
 const CHROME_CHIP_BG = `rgba(255, 255, 255, ${SURFACE.highlightAlpha})`;
@@ -62,8 +77,17 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
   const [resonantChoices, setResonantChoices] = useState(0);
   const [paceImproving, setPaceImproving] = useState(false);
   const [unbrokenWeaveMastery, setUnbrokenWeaveMastery] = useState<UnbrokenWeaveMastery | null>(null);
+  // Live spendable balance read straight from the amberCurrency store on
+  // mount (this screen mounts fresh on every visit). The amberBalance PROP is
+  // App's React-state mirror, which can drift stale (or, via a bad caller
+  // computation, even negative) between refreshes — the home header reads the
+  // store directly and this screen must agree with it. The prop serves only
+  // as the first-paint fallback, clamped so a broken mirror can never show a
+  // negative balance.
+  const [liveAmberBalance, setLiveAmberBalance] = useState<number | null>(null);
 
   useEffect(() => {
+    getAmberBalance().then(setLiveAmberBalance).catch(() => {});
     getCumulativeStats().then(setStats);
     getAchievementsWithStatus().then(setAchievements);
     getDailyStatus().then(s => setDailyStatus({ totalCompleted: s.totalCompleted, bestStreak: s.bestStreak }));
@@ -89,6 +113,9 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
   // Alternating row depth: a whisper of the panel's own shade/highlight
   // material instead of hairline dividers.
   const rowAltTint = isDarkPhase ? 'rgba(255, 255, 255, 0.05)' : 'rgba(10, 6, 24, 0.05)';
+
+  // Truth-first display: live store value once loaded, clamped prop before.
+  const displayedAmberBalance = Math.max(0, liveAmberBalance ?? amberBalance);
 
   const avgStars = getAverageStars(stats);
   const perfectRate = getThreeStarRate(stats);
@@ -289,29 +316,49 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
               />
             </PanelCard>
 
-            {/* Personal bests */}
+            {/* Personal bests — cleanest solves at each difficulty. Sprite
+                policy (no raw emoji in stats chrome): a perfect best gets the
+                star sprite + the word "Perfect"; anything else reads in plain
+                words ("1 hint, 2 mistakes"); a difficulty with no best yet
+                says so explicitly instead of hiding the row. */}
             {stats.personalBests && Object.keys(stats.personalBests).length > 0 && (
               <PanelCard phase={effectivePhase} style={styles.sectionCard}>
                 <PixelPlaque phase={effectivePhase} label={'PERSONAL BESTS'} style={styles.sectionPlaque} />
-                {(['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'] as Difficulty[])
-                  .map(diff => ({ diff, pb: stats.personalBests?.[diff] }))
-                  .filter((entry): entry is { diff: Difficulty; pb: PersonalBest } => !!entry.pb)
-                  .map((entry, i) => {
-                    const label = entry.diff === 'MEDIUM_PLUS' ? 'MED+' : entry.diff;
-                    return (
-                      <View
-                        key={entry.diff}
-                        style={[styles.journeyRow, i % 2 === 1 && { backgroundColor: rowAltTint }]}
-                      >
-                        <Text style={[styles.journeyLabel, { color: t.body }]}>{label}</Text>
-                        <Text style={[styles.journeyValue, { color: t.title }]}>
-                          {entry.pb.fewestHints === 0 ? '✨ ' : `${entry.pb.fewestHints}h `}
-                          {entry.pb.fewestInvalidAttempts === 0 ? '✨' : `${entry.pb.fewestInvalidAttempts}m`}
-                        </Text>
-                      </View>
-                    );
-                  })}
-                <Text style={[styles.personalBestLegend, { color: t.muted }]}>h = hints · m = mistakes · ✨ = perfect</Text>
+                {(['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'] as Difficulty[]).map((diff, i) => {
+                  const pb = stats.personalBests?.[diff];
+                  const label = diff === 'MEDIUM_PLUS' ? 'MED+' : diff;
+                  const perfect = !!pb && isPerfectPersonalBest(pb);
+                  const summary = pb ? formatPersonalBestSummary(pb) : null;
+                  return (
+                    <View
+                      key={diff}
+                      style={[styles.journeyRow, i % 2 === 1 && { backgroundColor: rowAltTint }]}
+                      accessible
+                      accessibilityLabel={
+                        pb
+                          ? `${label} best: ${perfect ? 'perfect, no hints, no mistakes' : summary}`
+                          : `${label}: no best yet`
+                      }
+                    >
+                      <Text style={[styles.journeyLabel, { color: t.body }]}>{label}</Text>
+                      {pb ? (
+                        perfect ? (
+                          <View style={styles.personalBestValueRow}>
+                            <Image source={STAR_FILLED} style={styles.personalBestStarIcon} resizeMode="contain" />
+                            <Text style={[styles.journeyValue, { color: t.amberText }]}>Perfect</Text>
+                          </View>
+                        ) : (
+                          <Text style={[styles.journeyValue, { color: t.title }]}>{summary}</Text>
+                        )
+                      ) : (
+                        <Text style={[styles.journeyValue, { color: t.muted }]}>No best yet</Text>
+                      )}
+                    </View>
+                  );
+                })}
+                <Text style={[styles.personalBestLegend, { color: t.muted }]}>
+                  Fewest hints and mistakes at each difficulty
+                </Text>
               </PanelCard>
             )}
 
@@ -324,7 +371,12 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
               </View>
               <View style={[styles.journeyRow, { backgroundColor: rowAltTint }]}>
                 <Text style={[styles.journeyLabel, { color: t.body }]}>Amber Balance</Text>
-                <Text style={[styles.journeyValue, { color: t.amberText }]}><AmberInline /> {amberBalance}</Text>
+                <Text
+                  style={[styles.journeyValue, { color: t.amberText }]}
+                  accessibilityLabel={`${displayedAmberBalance} amber`}
+                >
+                  <AmberInline /> {displayedAmberBalance}
+                </Text>
               </View>
               <View style={styles.journeyRow}>
                 <Text style={[styles.journeyLabel, { color: t.body }]}>Daily Challenges</Text>
@@ -600,6 +652,11 @@ const styles = StyleSheet.create({
   // Sections
   sectionCard: {
     marginBottom: 18,
+    // The card frame's wood band is 12dp; without extra padding the last
+    // row's box ran to the card's bottom pixel and its content sat only
+    // ~2dp of parchment above the wood (the cramped HARD row). 16dp keeps
+    // every last row clear of the band with breathing room, on every card.
+    paddingBottom: 16,
   },
   sectionPlaque: {
     marginBottom: 12,
@@ -739,6 +796,15 @@ const styles = StyleSheet.create({
     fontFamily: PIXEL_FONT_BOLD,
     fontSize: 14,
     fontWeight: '700',
+  },
+  personalBestValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  personalBestStarIcon: {
+    width: 14,
+    height: 14,
+    marginRight: 5,
   },
   personalBestLegend: {
     fontFamily: BODY_FONT,

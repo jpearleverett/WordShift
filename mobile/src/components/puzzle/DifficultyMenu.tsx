@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,7 @@ import {
   StyleSheet,
   ScrollView,
   ViewStyle,
-  Dimensions,
+  useWindowDimensions,
   Image,
   ImageStyle,
   TextStyle,
@@ -47,17 +47,19 @@ const ModeIcon: React.FC<{
   );
 };
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 // The menu floats at top: 52 inside the puzzle screen's statsRow, which itself
 // sits below the header block (16 top pad + ~59 wordmark + up to ~28 phase
 // badge + 8 bottom pad) and the row's own 8 top pad. This is that worst-case
 // chrome plus the 52 anchor: the panel's top edge sits ~(insets.top + this)
 // below the window top. The usable height is computed per-render from the
-// safe-area insets (see menuMaxHeight in the component) — the old
+// LIVE window height + safe-area insets (see menuMaxHeight in the component)
+// and refined by measuring the panel's real on-screen top — the old
 // screen-height-minus-140 budget ignored the header block and the bottom
 // inset entirely, so on device the panel ran past the viewport and the last
 // rows (BLIND) were clipped beyond reach.
 const MENU_ANCHOR_BELOW_INSET = 171;
+// Breathing room kept between the panel's bottom edge and the safe area.
+const MENU_BOTTOM_MARGIN = 12;
 // Floor so the panel stays usable even on absurdly short windows (the scroll
 // area + generous bottom padding keeps every row reachable there) and a cap
 // so tablets don't get a monolith.
@@ -79,6 +81,35 @@ const DIFFICULTY_RING_COLORS: Record<Difficulty, string> = {
   MEDIUM_PLUS: CandyColors.orange.main,
   HARD: CandyColors.red.main,
 };
+
+/** Canonical difficulty order — the setup rows and the header chip share it. */
+export const DIFFICULTY_LEVELS: readonly Difficulty[] = ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'];
+
+/** True only for the four real Difficulty union values. */
+export function isValidDifficulty(value: unknown): value is Difficulty {
+  return typeof value === 'string' && (DIFFICULTY_LEVELS as readonly string[]).includes(value);
+}
+
+/**
+ * Coerce any value into a real Difficulty. Live state should always be in the
+ * union, but a legacy/corrupt autosave restored wholesale can leave the hook's
+ * difficulty (and the retained preference) outside it — MEDIUM matches the
+ * hook's own default preference, so the fallback is the same board the hook
+ * would have served on a fresh install.
+ */
+export function normalizeDifficulty(value: unknown): Difficulty {
+  return isValidDifficulty(value) ? value : 'MEDIUM';
+}
+
+/**
+ * Header setup-chip label. NEVER empty: an out-of-union value used to render
+ * a blank pill (Text renders nothing for undefined and the colored dot matched
+ * no case) — the chip must always name a real difficulty.
+ */
+export function getDifficultyChipLabel(value: unknown): string {
+  const difficulty = normalizeDifficulty(value);
+  return difficulty === 'MEDIUM_PLUS' ? 'MED+' : difficulty;
+}
 
 interface DifficultyMenuProps {
   visible: boolean;
@@ -136,6 +167,9 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
 }) => {
   // Hooks must run on every render (before the visibility early-return).
   const screenInsets = useScreenInsets();
+  // LIVE window height (module-scope Dimensions.get is a one-shot snapshot and
+  // never updates) — the bound below must track the real visible area.
+  const { height: windowHeight } = useWindowDimensions();
   // The panel is position:absolute below a VARIABLE-height header, so a static
   // estimate of the space above it (MENU_ANCHOR_BELOW_INSET) can run the panel
   // — and its inner ScrollView — off the bottom of the screen on a taller
@@ -144,16 +178,34 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   // top once it lays out and size it to the actual space beneath it.
   const panelWrapRef = useRef<View>(null);
   const [measuredMaxHeight, setMeasuredMaxHeight] = useState<number | null>(null);
-  const handlePanelLayout = useCallback(() => {
+  const measurePanelTop = useCallback(() => {
     const node = panelWrapRef.current;
     if (!node || typeof node.measureInWindow !== 'function') return;
     node.measureInWindow((_x, y, _w, _h) => {
       if (typeof y !== 'number' || !Number.isFinite(y) || y <= 0) return;
-      const avail = SCREEN_HEIGHT - y - screenInsets.bottom - 12;
+      const avail = windowHeight - y - screenInsets.bottom - MENU_BOTTOM_MARGIN;
       const bounded = Math.max(MENU_MIN_HEIGHT, Math.min(avail, MENU_HEIGHT_CAP));
       setMeasuredMaxHeight(prev => (prev === bounded ? prev : bounded));
     });
-  }, [screenInsets.bottom]);
+  }, [windowHeight, screenInsets.bottom]);
+  const handlePanelLayout = measurePanelTop;
+  // Root-cause guard for the "panel runs past the bottom, unscrollable" bug:
+  // measureInWindow can report a zero frame if it lands while the mount commit
+  // is still in flight; the old code rejected that sample and — because
+  // onLayout never re-fires for an unchanged frame — was stranded on the
+  // static header estimate forever, which under-models tall headers and let
+  // the panel overflow the screen. Re-attempt shortly after every open so the
+  // exact measured bound always lands. (setTimeout, not rAF: same behavior in
+  // the Node test env.)
+  useEffect(() => {
+    if (!visible) return undefined;
+    const immediate = setTimeout(measurePanelTop, 0);
+    const settle = setTimeout(measurePanelTop, 150);
+    return () => {
+      clearTimeout(immediate);
+      clearTimeout(settle);
+    };
+  }, [visible, measurePanelTop]);
   if (!visible) return null;
 
   // Bound the panel to the space actually below its anchor. Prefer the measured
@@ -162,12 +214,17 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   const estimatedMaxHeight = Math.max(
     MENU_MIN_HEIGHT,
     Math.min(
-      SCREEN_HEIGHT - screenInsets.top - MENU_ANCHOR_BELOW_INSET - screenInsets.bottom - 12,
+      windowHeight - screenInsets.top - MENU_ANCHOR_BELOW_INSET - screenInsets.bottom - MENU_BOTTOM_MARGIN,
       MENU_HEIGHT_CAP
     )
   );
   const menuMaxHeight = measuredMaxHeight ?? estimatedMaxHeight;
-  const scrollMaxHeight = menuMaxHeight - MENU_CHROME_HEIGHT;
+  // Defensive secondary bound for the scroll region. The PRIMARY bound is
+  // structural (styles.scrollArea flexShrink inside the maxHeight-bounded
+  // panel, which cannot drift when chrome changes); this arithmetic cap is
+  // kept as a backstop so the region can never exceed the panel budget even
+  // if a layout engine quirk ignores the shrink.
+  const scrollMaxHeight = Math.max(120, menuMaxHeight - MENU_CHROME_HEIGHT);
 
   const t = getSurfaceTheme(phase);
   const dark = phase >= 3;
@@ -312,14 +369,15 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
     <PanelCard phase={phase} kind="panel" style={panelStyle}>
       <Text style={[styles.menuTitle, { color: t.title }]}>{title}</Text>
       <ScrollView
-        style={{ maxHeight: scrollMaxHeight }}
+        style={[styles.scrollArea, { maxHeight: scrollMaxHeight }]}
         contentContainerStyle={[
           styles.scrollContent,
           { paddingBottom: SCROLL_BOTTOM_PAD + screenInsets.bottom },
         ]}
+        showsVerticalScrollIndicator={true}
       >
         <Text style={[styles.sectionTitle, { color: t.muted }]}>DIFFICULTY</Text>
-        {(['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'] as Difficulty[]).map(d => (
+        {DIFFICULTY_LEVELS.map(d => (
           <TouchableOpacity
             key={d}
             style={[styles.menuRow, currentDifficulty === d && selectedRowStyle]}
@@ -605,6 +663,15 @@ const styles = StyleSheet.create({
     letterSpacing: SURFACE.sectionLetterSpacing,
     paddingHorizontal: 16,
     paddingBottom: 3,
+  },
+  // The option list must SHRINK to fit inside the maxHeight-bounded panel
+  // (and then scroll) rather than grow the auto-height absolute anchor past
+  // the screen edge — a ScrollView inside an unbounded container lays out at
+  // its full content height and never scrolls. flexGrow: 0 keeps a short list
+  // at its natural height.
+  scrollArea: {
+    flexGrow: 0,
+    flexShrink: 1,
   },
   scrollContent: {
     paddingHorizontal: 10,

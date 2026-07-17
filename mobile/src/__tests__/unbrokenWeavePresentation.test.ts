@@ -50,6 +50,7 @@ jest.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   Image: 'Image',
   Dimensions: { get: () => ({ height: 800 }) },
+  useWindowDimensions: () => ({ width: 400, height: 800 }),
   StyleSheet: {
     create: (styles: unknown) => styles,
     flatten: (style: unknown) => style,

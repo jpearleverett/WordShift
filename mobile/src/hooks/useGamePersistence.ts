@@ -198,7 +198,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
       isPostRevelation(),
     ]).then(([stats, balance, phase, fraction, pending, postRev]) => {
       setCumulativeStats(stats);
-      setAmberBalance(balance);
+      setAmberBalance(Math.max(0, balance));
       setCurrentPhase(postRev ? 5 as DialoguePhase : phase);
       setPhaseProgressFraction(fraction);
       setPendingPhaseTransition(pending);
@@ -217,10 +217,31 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
       isPostRevelation(),
     ]);
     setCumulativeStats(stats);
-    setAmberBalance(balance);
+    setAmberBalance(Math.max(0, balance));
     setCurrentPhase(postRev ? 5 as DialoguePhase : phase);
     setPhaseProgressFraction(fraction);
     setPendingPhaseTransition(pending);
+  }, []);
+
+  /**
+   * Guarded mirror write. The amberBalance state is a display MIRROR of the
+   * amberCurrency store, and many callers thread balances through this
+   * setter. A negative or non-finite value is always a caller bug (the
+   * shipped example: a purchase path passing `staleSnapshot.amber - cost`,
+   * which rendered as a negative Stats-screen balance) — it must never be
+   * stored or rendered. On garbage input: clamp whatever is currently shown,
+   * then re-sync the mirror from the authoritative store so the display
+   * self-heals to the truth instead of freezing on a stale value.
+   */
+  const setAmberBalanceSafe = useCallback((balance: number) => {
+    if (!Number.isFinite(balance) || balance < 0) {
+      setAmberBalance(prev => Math.max(0, prev));
+      getAmberBalance()
+        .then(real => setAmberBalance(Math.max(0, real)))
+        .catch(() => {});
+      return;
+    }
+    setAmberBalance(balance);
   }, []);
 
   const recordVictory = useCallback(async (
@@ -402,8 +423,9 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         setCurrentPhase(effectivePhase);
       }
       // Balance reflects any instantly-credited windfalls (per-puzzle amber
-      // stays queued); refresh from the economy's post-award value.
-      setAmberBalance(amberResult.newBalance);
+      // stays queued); refresh from the economy's post-award value (clamped —
+      // the mirror must never store a negative).
+      setAmberBalance(Math.max(0, amberResult.newBalance));
       // Update pending phase transition state for pit screen
       if (amberResult.phaseTransitionPending) {
         setPendingPhaseTransition(effectivePhase);
@@ -574,7 +596,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
 
   const actions: PersistenceActions = {
     recordVictory,
-    setAmberBalance,
+    setAmberBalance: setAmberBalanceSafe,
     refreshStats,
   };
 
