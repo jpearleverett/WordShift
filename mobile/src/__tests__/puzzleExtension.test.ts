@@ -195,8 +195,8 @@ describe('extendStandardPuzzle', () => {
   it.each([
     ['EASY', PUZZLE_BANK_EASY, 190],
     ['MEDIUM', PUZZLE_BANK_MEDIUM, 140],
-    ['MEDIUM_PLUS', PUZZLE_BANK_MEDIUM_PLUS, 165],
-    ['HARD', PUZZLE_BANK_HARD, 160],
+    ['MEDIUM_PLUS', PUZZLE_BANK_MEDIUM_PLUS, 130],
+    ['HARD', PUZZLE_BANK_HARD, 110],
   ] as const)(
     '%s bank keeps a large deterministic pool with a valid fallback candidate',
     (_name, bank, floor) => {

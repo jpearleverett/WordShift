@@ -70,14 +70,17 @@ interface BankSpec {
 }
 
 const BANKS: BankSpec[] = [
-  // Measured (2026-07 branching top-up round 2): EASY 547 puzzles / max 3 / 1574 unique
-  { name: 'EASY', bank: PUZZLE_BANK_EASY, cap: 3, minUnique: 1415, minPuzzles: 490 },
-  // MEDIUM 558 / max 7 (marquee injection) / 1654 unique
-  { name: 'MEDIUM', bank: PUZZLE_BANK_MEDIUM, cap: 7, minUnique: 1485, minPuzzles: 500 },
-  // MEDIUM_PLUS 550 / max 10 (round-2 cap raise) / 1465 unique
-  { name: 'MEDIUM_PLUS', bank: PUZZLE_BANK_MEDIUM_PLUS, cap: 10, minUnique: 1315, minPuzzles: 495 },
-  // HARD 492 / max 12 (round-2 cap raise) / 1368 unique
-  { name: 'HARD', bank: PUZZLE_BANK_HARD, cap: 12, minUnique: 1230, minPuzzles: 440 },
+  // Measured (2026-07 gated full regeneration: every standard-bank board passes
+  // completePathCount >= 2, singleChoiceFraction <= 0.65 bright / <= 0.75 dread
+  // phases — smaller banks, 100% choice-rich; floors ~10% under measured):
+  // EASY 496 puzzles / max 3 / 1417 unique
+  { name: 'EASY', bank: PUZZLE_BANK_EASY, cap: 3, minUnique: 1275, minPuzzles: 445 },
+  // MEDIUM 426 / max 7 / 1256 unique
+  { name: 'MEDIUM', bank: PUZZLE_BANK_MEDIUM, cap: 7, minUnique: 1130, minPuzzles: 380 },
+  // MEDIUM_PLUS 344 / max 10 / 935 unique
+  { name: 'MEDIUM_PLUS', bank: PUZZLE_BANK_MEDIUM_PLUS, cap: 10, minUnique: 840, minPuzzles: 310 },
+  // HARD 310 / max 12 / 933 unique
+  { name: 'HARD', bank: PUZZLE_BANK_HARD, cap: 12, minUnique: 840, minPuzzles: 280 },
   // REVERSE_EASY 406 / max 7 / 1325 unique
   { name: 'REVERSE_EASY', bank: PUZZLE_BANK_REVERSE_EASY, cap: 7, minUnique: 1190, minPuzzles: 380 },
   // REVERSE_MEDIUM 292 / max 11 (solution-repair pass) / 1304 unique
