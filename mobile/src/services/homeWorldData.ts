@@ -1309,8 +1309,12 @@ export function getReserveGateText(
   minPuzzles: number | undefined,
   puzzlesSolved: number,
 ): string {
-  if (minPuzzles === undefined) return `Unlocks later. You're at level ${puzzlesSolved}`;
-  return `Unlocks at level ${minPuzzles}. You're at ${puzzlesSolved}`;
+  // Anticipatory framing, not a transactional wall: "Unlocks at level N" read
+  // as a chore requirement (a fast solver hitting the gate early felt walled).
+  // "Still growing here" frames the wait as the house taking shape in-world,
+  // while keeping the numbers so progress-to-arrival stays visible.
+  if (minPuzzles === undefined) return `Still growing here. You're at level ${puzzlesSolved}`;
+  return `Still growing here. Opens at level ${minPuzzles} (you're at ${puzzlesSolved})`;
 }
 
 /**
