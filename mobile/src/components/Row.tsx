@@ -1378,8 +1378,13 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   slotPreviewInvalid: {
-    color: CandyColors.red.light,
-    opacity: 0.45,
+    // Tester-verified legibility fix: red.light at 0.45 opacity was a faint
+    // pink ghost on the lavender board and first-timers could not read the
+    // invalid words at all. The invalid verdict must be READABLE (the ✗
+    // prefix plus a clearly weaker treatment than the bold green ✓ carries
+    // the hierarchy, never invisibility).
+    color: CandyColors.red.dark,
+    opacity: 0.8,
   },
   // Neutral ghost preview (validity gate closed): ONE dimmed ink for every
   // slot — the current valid-green/invalid-red split must never leak through

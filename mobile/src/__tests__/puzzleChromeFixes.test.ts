@@ -6,11 +6,13 @@
  *    restored wholesale used to poison both the state and the retained
  *    preference) rendered an EMPTY pill, and the same unset value could seed
  *    the next board with a shape matching no selected difficulty.
- * 2) DifficultyMenu height bound — the PUZZLE SETUP panel is height-bounded
- *    to the visible area (live window height + safe-area insets + measured
- *    anchor top) with a shrinkable, indicator-visible ScrollView, so the last
- *    rows (e.g. Blind Return) can never be clipped past the screen bottom
- *    with no way to scroll.
+ * 2) DifficultyMenu structural bound — the PUZZLE SETUP panel renders inside
+ *    a transparent full-window Modal whose padded flex layer gives the panel
+ *    a DEFINITE height bound (maxHeight '100%'), with a shrinkable,
+ *    indicator-visible ScrollView. Two arithmetic generations of this fix
+ *    failed on device (Android does not deliver touches to children rendered
+ *    outside their parent's bounds, and edge-to-edge insets poisoned the
+ *    math); the Modal structure has no measurement left to be wrong.
  * 3) Onboarding home-button spacer — while the home route is withheld during
  *    the tutorial, the stand-in is an invisible layout spacer, never the
  *    styled circle (which read as a blank dead button).
@@ -59,10 +61,13 @@ jest.mock('react-native', () => ({
   TouchableOpacity: 'TouchableOpacity',
   ScrollView: 'ScrollView',
   Image: 'Image',
+  Modal: 'Modal',
+  Pressable: 'Pressable',
   Platform: { OS: 'ios', select: (spec: Record<string, unknown>) => spec.ios },
   Dimensions: { get: () => ({ width: 400, height: 800 }) },
   useWindowDimensions: () => ({ width: 400, height: 800 }),
   StyleSheet: {
+    absoluteFill: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 },
     create: (styles: unknown) => styles,
     flatten: (style: unknown) => {
       if (Array.isArray(style)) {
@@ -139,6 +144,22 @@ const flattenStyle = (style: unknown): Record<string, unknown> => {
   return (style && typeof style === 'object') ? (style as Record<string, unknown>) : {};
 };
 
+const findAllByProp = (node: unknown, prop: string, value: unknown): Element[] => {
+  const out: Element[] = [];
+  const walk = (current: unknown): void => {
+    if (current == null || typeof current !== 'object') return;
+    if (Array.isArray(current)) {
+      current.forEach(walk);
+      return;
+    }
+    const element = current as Element;
+    if (element.props?.[prop] === value) out.push(element);
+    walk(element.props?.children);
+  };
+  walk(node);
+  return out;
+};
+
 beforeEach(() => {
   resetRenderState();
 });
@@ -201,14 +222,36 @@ describe('DifficultyMenu height bound (clipped-panel regression)', () => {
     onToggleChallengeMode: jest.fn(),
   };
 
-  test('panel carries a numeric maxHeight bounded to the visible area', () => {
+  test('the menu renders inside a transparent full-window Modal (structural bound)', () => {
+    const tree = DifficultyMenu({ ...baseProps, onClose: jest.fn() });
+    const modal = findByType(tree, 'Modal');
+    expect(modal).not.toBeNull();
+    expect(modal!.props?.transparent).toBe(true);
+    expect(modal!.props?.statusBarTranslucent).toBe(true);
+    // Android back must dismiss.
+    expect(typeof modal!.props?.onRequestClose).toBe('function');
+  });
+
+  test('panel is capped at the definite 100% of the padded modal layer', () => {
     const tree = DifficultyMenu(baseProps);
     const panel = findByType(tree, 'PanelCard');
     expect(panel).not.toBeNull();
     const style = flattenStyle(panel!.props?.style);
-    // window 800, insets top 44 / bottom 34, static anchor 171, margin 12:
-    // 800 - 44 - 171 - 34 - 12 = 539 (within the 300..900 clamp).
-    expect(style.maxHeight).toBe(539);
+    // '100%' is DEFINITE here: the parent layer carries inline top/bottom
+    // paddings built from the live insets, and the Modal gives it the whole
+    // window. No arithmetic bound to drift on any device.
+    expect(style.maxHeight).toBe('100%');
+  });
+
+  test('the padded layer carries the anchor offset and the bottom safe-area', () => {
+    const tree = DifficultyMenu(baseProps);
+    const layers = findAllByProp(tree, 'pointerEvents', 'box-none');
+    expect(layers.length).toBeGreaterThanOrEqual(1);
+    const style = flattenStyle(layers[0].props?.style);
+    // mocked insets: top 44 + anchor 171; bottom 34 + margin 12.
+    expect(style.paddingTop).toBe(44 + 171);
+    expect(style.paddingBottom).toBe(34 + 12);
+    expect(style.flex).toBe(1);
   });
 
   test('the option list scrolls: shrinkable region, visible indicator, safe bottom padding', () => {
@@ -217,28 +260,28 @@ describe('DifficultyMenu height bound (clipped-panel regression)', () => {
     expect(scroll).not.toBeNull();
     expect(scroll!.props?.showsVerticalScrollIndicator).toBe(true);
     const style = flattenStyle(scroll!.props?.style);
-    // flexShrink lets the list compress inside the bounded panel (and then
-    // scroll) instead of growing the auto-height absolute anchor offscreen;
-    // the arithmetic maxHeight stays as a backstop.
+    // flexShrink lets the list compress inside the '100%'-capped panel (and
+    // then scroll); flexGrow 0 keeps short menus at natural height.
     expect(style.flexShrink).toBe(1);
     expect(style.flexGrow).toBe(0);
-    expect(typeof style.maxHeight).toBe('number');
-    expect(style.maxHeight as number).toBeLessThan(539);
     const contentStyle = flattenStyle(scroll!.props?.contentContainerStyle);
-    // Bottom inset (34) rides the content padding so the last row clears the
-    // home indicator.
-    expect(contentStyle.paddingBottom as number).toBeGreaterThanOrEqual(28 + 34);
+    // The layer's bottom padding already clears the safe area, so the content
+    // padding only needs the wood-band clearance.
+    expect(contentStyle.paddingBottom as number).toBeGreaterThanOrEqual(28);
   });
 
-  test('bounds derive from the LIVE window and the measurement retries after a rejected sample', () => {
-    // Live dimensions, not the module-load Dimensions snapshot.
-    expect(MENU_TSX).toMatch(/useWindowDimensions\(\)/);
+  test('backdrop dismisses and no measurement arithmetic remains', () => {
+    const onClose = jest.fn();
+    const tree = DifficultyMenu({ ...baseProps, onClose });
+    const backdrop = findByType(tree, 'Pressable');
+    expect(backdrop).not.toBeNull();
+    (backdrop!.props?.onPress as (() => void) | undefined)?.();
+    expect(onClose).toHaveBeenCalled();
+    // The failed arithmetic generation is gone for good: no window math, no
+    // position measurement, no module-load Dimensions snapshot.
+    expect(MENU_TSX).not.toMatch(/useWindowDimensions/);
+    expect(MENU_TSX).not.toMatch(/measureInWindow/);
     expect(MENU_TSX).not.toMatch(/Dimensions\.get\('window'\)/);
-    // Re-measure on open: a zero-frame measureInWindow sample must not strand
-    // the panel on the static header estimate forever.
-    expect(MENU_TSX).toMatch(/useEffect\(\(\) => \{\s*\n\s*if \(!visible\) return undefined;/);
-    expect(MENU_TSX).toMatch(/setTimeout\(measurePanelTop, 0\)/);
-    expect(MENU_TSX).toMatch(/setTimeout\(measurePanelTop, 150\)/);
   });
 });
 

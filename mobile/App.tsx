@@ -4044,6 +4044,7 @@ function MainApp() {
 
           <DifficultyMenu
             visible={puzzle.showDifficultyMenu}
+            onClose={() => puzzleActions.setShowDifficultyMenu(false)}
             currentDifficulty={puzzle.difficulty}
             gameMode={puzzle.gameMode}
             phase={persistence.currentPhase}
