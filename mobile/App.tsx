@@ -576,6 +576,22 @@ function MainApp() {
   const speedPulseScale = useRef(new Animated.Value(1)).current;
   const prevSpeedRemainingRef = useRef<number | null>(null);
 
+  // Setup-chip anchor: the difficulty menu (a Modal) hangs from the chip's real
+  // window position, measured on open. Cosmetic-only — the Modal owns its bounds
+  // so a stale/missing measurement just falls back to the static offset.
+  const difficultyChipRef = useRef<React.ElementRef<typeof TouchableOpacity>>(null);
+  const [difficultyMenuAnchorTop, setDifficultyMenuAnchorTop] = useState<number | null>(null);
+  const measureDifficultyChip = useCallback(() => {
+    const node = difficultyChipRef.current;
+    if (!node || typeof node.measureInWindow !== 'function') return;
+    node.measureInWindow((_x: number, y: number, _w: number, h: number) => {
+      if (typeof y === 'number' && typeof h === 'number' && h > 0) {
+        // Hang the panel a small gap below the chip's bottom edge.
+        setDifficultyMenuAnchorTop(y + h + 8);
+      }
+    });
+  }, []);
+
   // One-time post-tutorial setup reveal
   const [showSetupSelectorIntro, setShowSetupSelectorIntro] = useState(false);
   const [setupSelectorIntroIndex, setSetupSelectorIntroIndex] = useState(0);
@@ -4020,13 +4036,18 @@ function MainApp() {
           </View>
 
           <TouchableOpacity
+            ref={difficultyChipRef}
             style={[
               styles.difficultyButton,
               persistence.currentPhase >= 3 && styles.difficultyButtonDark,
               persistence.currentPhase >= 4 && styles.difficultyButtonVoid,
               showSetupSelectorIntro && styles.difficultyButtonHighlighted,
             ]}
-            onPress={() => puzzleActions.setShowDifficultyMenu(!puzzle.showDifficultyMenu)}
+            onPress={() => {
+              const opening = !puzzle.showDifficultyMenu;
+              if (opening) measureDifficultyChip();
+              puzzleActions.setShowDifficultyMenu(opening);
+            }}
             accessibilityLabel={`Difficulty ${chipDifficulty}, style ${VARIANT_CONFIGS[puzzle.selectedVariant]?.title || 'Standard'}. Tap to change puzzle setup`}
             accessibilityRole="button"
           >
@@ -4045,6 +4066,7 @@ function MainApp() {
           <DifficultyMenu
             visible={puzzle.showDifficultyMenu}
             onClose={() => puzzleActions.setShowDifficultyMenu(false)}
+            anchorTop={difficultyMenuAnchorTop}
             currentDifficulty={puzzle.difficulty}
             gameMode={puzzle.gameMode}
             phase={persistence.currentPhase}

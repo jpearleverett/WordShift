@@ -63,8 +63,12 @@ const ModeIcon: React.FC<{
 // back closes it, and tapping outside dismisses. There is no measurement and
 // no window arithmetic left to be wrong. Do NOT move this back inline.
 //
-// Panel top offset below the top inset, matching the old visual anchor
-// (header block + statsRow chrome + the 52dp drop below the setup chip).
+// Fallback panel top offset below the top inset, matching the old visual anchor
+// (header block + statsRow chrome + the 52dp drop below the setup chip). Used
+// only when App can't supply a measured `anchorTop` (see that prop). This was a
+// hair too low on device — the panel floated far below the chip — so App now
+// measures the chip's real window bottom and passes it as `anchorTop`; the
+// bounds stay Modal-owned, so a stale measurement is cosmetic, never a soft-lock.
 const MENU_ANCHOR_BELOW_INSET = 171;
 // Breathing room kept between the panel's bottom edge and the safe area.
 const MENU_BOTTOM_MARGIN = 12;
@@ -114,6 +118,10 @@ interface DifficultyMenuProps {
   /** Dismiss the menu: backdrop tap and the Android back button both route
    *  here (the setup chip toggle remains the explicit open/close control). */
   onClose?: () => void;
+  /** Measured window-Y (dp) where the panel's top edge should sit, so it hangs
+   *  just under the setup chip that opened it. App measures the chip on open;
+   *  when absent (or 0), the static MENU_ANCHOR_BELOW_INSET fallback is used. */
+  anchorTop?: number | null;
   currentDifficulty: Difficulty;
   gameMode: GameMode;
   currentVariant: PuzzleVariant;
@@ -143,6 +151,7 @@ interface DifficultyMenuProps {
 export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   visible,
   onClose,
+  anchorTop,
   currentDifficulty,
   gameMode,
   currentVariant,
@@ -335,7 +344,10 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
         style={[
           styles.menuLayer,
           {
-            paddingTop: screenInsets.top + MENU_ANCHOR_BELOW_INSET,
+            paddingTop:
+              anchorTop && anchorTop > 0
+                ? anchorTop
+                : screenInsets.top + MENU_ANCHOR_BELOW_INSET,
             paddingBottom: screenInsets.bottom + MENU_BOTTOM_MARGIN,
           },
         ]}
