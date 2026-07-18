@@ -22,10 +22,7 @@ import { DialoguePhase } from '../../types/homeWorld';
 import {
   PuzzleVariant,
   VariantSelectorOption,
-  ComboSelectorOption,
-  ComboPreset,
   getVariantDescription,
-  getComboDescription,
 } from '../../services/puzzleVariety';
 import { BODY_FONT, BODY_FONT_ITALIC, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
@@ -63,8 +60,12 @@ const ModeIcon: React.FC<{
 // back closes it, and tapping outside dismisses. There is no measurement and
 // no window arithmetic left to be wrong. Do NOT move this back inline.
 //
-// Panel top offset below the top inset, matching the old visual anchor
-// (header block + statsRow chrome + the 52dp drop below the setup chip).
+// Fallback panel top offset below the top inset, matching the old visual anchor
+// (header block + statsRow chrome + the 52dp drop below the setup chip). Used
+// only when App can't supply a measured `anchorTop` (see that prop). This was a
+// hair too low on device — the panel floated far below the chip — so App now
+// measures the chip's real window bottom and passes it as `anchorTop`; the
+// bounds stay Modal-owned, so a stale measurement is cosmetic, never a soft-lock.
 const MENU_ANCHOR_BELOW_INSET = 171;
 // Breathing room kept between the panel's bottom edge and the safe area.
 const MENU_BOTTOM_MARGIN = 12;
@@ -114,16 +115,18 @@ interface DifficultyMenuProps {
   /** Dismiss the menu: backdrop tap and the Android back button both route
    *  here (the setup chip toggle remains the explicit open/close control). */
   onClose?: () => void;
+  /** Measured window-Y (dp) where the panel's top edge should sit, so it hangs
+   *  just under the setup chip that opened it. App measures the chip on open;
+   *  when absent (or 0), the static MENU_ANCHOR_BELOW_INSET fallback is used. */
+  anchorTop?: number | null;
   currentDifficulty: Difficulty;
   gameMode: GameMode;
   currentVariant: PuzzleVariant;
   activeVariant?: PuzzleVariant;
   variantOptions: VariantSelectorOption[];
-  comboOptions?: ComboSelectorOption[];
   phase?: DialoguePhase;
   onSelectDifficulty: (difficulty: Difficulty) => void;
   onSelectVariant: (variant: PuzzleVariant) => void;
-  onSelectCombo?: (preset: ComboPreset) => void;
   onToggleChallengeMode: () => void;
   showChallengeToggle?: boolean;
   blindActive?: boolean;
@@ -143,16 +146,15 @@ interface DifficultyMenuProps {
 export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   visible,
   onClose,
+  anchorTop,
   currentDifficulty,
   gameMode,
   currentVariant,
   activeVariant,
   variantOptions,
-  comboOptions = [],
   phase = 0,
   onSelectDifficulty,
   onSelectVariant,
-  onSelectCombo,
   onToggleChallengeMode,
   showChallengeToggle = true,
   blindActive = false,
@@ -179,7 +181,6 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   // the next mechanical goal is always on screen.
   const coreOptions = variantOptions.filter(option => option.group === 'core');
   const baseOptions = variantOptions.filter(option => option.group === 'base');
-  const comboRows = onSelectCombo ? comboOptions : [];
   const hasNonStandardVariants = !introMode && baseOptions.length > 0;
 
   const activeBadge = dark
@@ -292,27 +293,6 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
       onPress: () => onSelectVariant(option.variant),
     });
 
-  const renderComboItem = (option: ComboSelectorOption) => {
-    const { preset } = option;
-    // A combo is "selected" when its variant is the chosen one AND its trial
-    // rung matches the toggles (blind presets run under gameMode 'challenge'
-    // with blindMode on; challenge presets require blind off).
-    const rungMatches = preset.blind
-      ? blindActive
-      : gameMode === 'challenge' && !blindActive;
-    return renderStyleRow({
-      key: preset.id,
-      icon: preset.icon,
-      title: preset.title,
-      description: getComboDescription(preset, phase),
-      locked: !option.unlocked,
-      unlockHint: option.unlockHint,
-      isSelected: option.unlocked && preset.variant === currentVariant && rungMatches,
-      isActive: option.unlocked && preset.variant === activeVariant && rungMatches,
-      onPress: () => onSelectCombo?.(preset),
-    });
-  };
-
   return (
     <Modal
       visible={visible}
@@ -335,7 +315,10 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
         style={[
           styles.menuLayer,
           {
-            paddingTop: screenInsets.top + MENU_ANCHOR_BELOW_INSET,
+            paddingTop:
+              anchorTop && anchorTop > 0
+                ? anchorTop
+                : screenInsets.top + MENU_ANCHOR_BELOW_INSET,
             paddingBottom: screenInsets.bottom + MENU_BOTTOM_MARGIN,
           },
         ]}
@@ -389,20 +372,6 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
             <Text style={[styles.sectionTitle, { color: t.muted }]}>{styleTitle}</Text>
             {coreOptions.map(renderVariantItem)}
             {baseOptions.map(renderVariantItem)}
-
-            {comboRows.length > 0 && (
-              <Text style={[styles.sectionTitle, { color: t.muted }]}>
-                COMBINATION STYLES
-              </Text>
-            )}
-            {comboRows.map(renderComboItem)}
-            {comboRows.length === 0 && (
-              <Text style={[styles.combosComingText, { color: t.muted }]}>
-                {phase >= 3
-                  ? 'More layered arrangements will reveal themselves.'
-                  : 'More combo styles unlock later as you progress.'}
-              </Text>
-            )}
           </>
         ) : (
           <View
@@ -653,14 +622,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 3,
     paddingHorizontal: 6,
-  },
-  combosComingText: {
-    fontFamily: BODY_FONT,
-    fontSize: 12,
-    lineHeight: 16,
-    marginTop: 2,
-    marginBottom: 4,
-    paddingHorizontal: 8,
   },
   menuRow: {
     flexDirection: 'row',

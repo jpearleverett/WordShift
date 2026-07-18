@@ -380,21 +380,24 @@ export const COMBO_PRESETS: ComboPreset[] = [
   },
 ];
 
+// Locked-row teases must be LITERAL: at the moment a player reads these they
+// may not have met the component modes yet, so idioms ("no net") and bare
+// jargon ("played blind") read as noise. Name the two things being combined.
 const COMBO_LOCK_TEASES: Record<ComboPreset['id'], { light: string; dark: string }> = {
   twin_trial: {
-    light: 'Double Shift with no net.',
+    light: 'Double Shift plus Challenge rules.',
     dark: 'Two offerings a step, and no mercy.',
   },
   racing_shadows: {
-    light: 'Speed Shift with no net.',
+    light: 'Speed Shift plus Challenge rules.',
     dark: 'A race the arrangement will not soften.',
   },
   blind_return: {
-    light: 'Reverse Shift, played blind.',
+    light: 'Reverse Shift with previews hidden.',
     dark: 'A blind descent, and a blind return.',
   },
   free_fall: {
-    light: 'Double Shift, played blind.',
+    light: 'Double Shift with previews hidden.',
     dark: 'Two at a time, in the dark.',
   },
 };

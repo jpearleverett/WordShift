@@ -249,11 +249,8 @@ import {
   getVariantTimeLimit,
   getVariantTimeLimitForDifficulty,
   getVariantSelectorOptions,
-  getComboSelectorOptions,
   getBlindUnlockHint,
   isVariantUnlocked,
-  isComboUnlocked,
-  ComboPreset,
   PuzzleVariant,
   VARIANT_CONFIGS,
   CHALLENGE_TOGGLE_UNLOCK_PUZZLES,
@@ -330,14 +327,6 @@ function MainApp() {
     // uiPhase intentionally matches currentPhase — we use the confirmed phase
     // for text tone stability rather than the pending transition target
     return getVariantSelectorOptions(
-      puzzlesSolvedForVariantUnlocks,
-      persistence.currentPhase,
-      persistence.currentPhase
-    );
-  }, [puzzlesSolvedForVariantUnlocks, persistence.currentPhase]);
-
-  const comboSelectorOptions = useMemo(() => {
-    return getComboSelectorOptions(
       puzzlesSolvedForVariantUnlocks,
       persistence.currentPhase,
       persistence.currentPhase
@@ -575,6 +564,22 @@ function MainApp() {
   // thread, independent of React re-renders.
   const speedPulseScale = useRef(new Animated.Value(1)).current;
   const prevSpeedRemainingRef = useRef<number | null>(null);
+
+  // Setup-chip anchor: the difficulty menu (a Modal) hangs from the chip's real
+  // window position, measured on open. Cosmetic-only — the Modal owns its bounds
+  // so a stale/missing measurement just falls back to the static offset.
+  const difficultyChipRef = useRef<React.ElementRef<typeof TouchableOpacity>>(null);
+  const [difficultyMenuAnchorTop, setDifficultyMenuAnchorTop] = useState<number | null>(null);
+  const measureDifficultyChip = useCallback(() => {
+    const node = difficultyChipRef.current;
+    if (!node || typeof node.measureInWindow !== 'function') return;
+    node.measureInWindow((_x: number, y: number, _w: number, h: number) => {
+      if (typeof y === 'number' && typeof h === 'number' && h > 0) {
+        // Hang the panel a small gap below the chip's bottom edge.
+        setDifficultyMenuAnchorTop(y + h + 8);
+      }
+    });
+  }, []);
 
   // One-time post-tutorial setup reveal
   const [showSetupSelectorIntro, setShowSetupSelectorIntro] = useState(false);
@@ -3542,31 +3547,6 @@ function MainApp() {
   // Combination styles: one tap arms a variant plus its trial rung atomically
   // on a fresh board (never two sequential startNewGame calls, which would
   // race the toggle logic against stale mode state).
-  const handleSelectCombo = useCallback((combo: ComboPreset) => {
-    if (!isComboUnlocked(combo, puzzlesSolvedForVariantUnlocks, persistence.currentPhase)) {
-      return;
-    }
-    hapticSelection();
-    soundSelection();
-    orchestrationActions.setCompletionCoda(null);
-    resetSpeedRun();
-    puzzleActions.setSelectedVariant(combo.variant);
-    puzzleActions.startNewGame(
-      puzzle.difficulty,
-      combo.challenge || combo.blind ? 'challenge' : 'standard',
-      combo.variant,
-      combo.blind,
-      false,
-    );
-  }, [
-    puzzleActions,
-    puzzle.difficulty,
-    puzzlesSolvedForVariantUnlocks,
-    persistence.currentPhase,
-    orchestrationActions,
-    resetSpeedRun,
-  ]);
-
   // Present the daily-login grant only on a quiet home screen — never over the
   // puzzle, the victory flow, a post-victory intro, or a queued ceremony. The
   // grant itself was already credited; this gates presentation only, so a claim
@@ -4020,13 +4000,18 @@ function MainApp() {
           </View>
 
           <TouchableOpacity
+            ref={difficultyChipRef}
             style={[
               styles.difficultyButton,
               persistence.currentPhase >= 3 && styles.difficultyButtonDark,
               persistence.currentPhase >= 4 && styles.difficultyButtonVoid,
               showSetupSelectorIntro && styles.difficultyButtonHighlighted,
             ]}
-            onPress={() => puzzleActions.setShowDifficultyMenu(!puzzle.showDifficultyMenu)}
+            onPress={() => {
+              const opening = !puzzle.showDifficultyMenu;
+              if (opening) measureDifficultyChip();
+              puzzleActions.setShowDifficultyMenu(opening);
+            }}
             accessibilityLabel={`Difficulty ${chipDifficulty}, style ${VARIANT_CONFIGS[puzzle.selectedVariant]?.title || 'Standard'}. Tap to change puzzle setup`}
             accessibilityRole="button"
           >
@@ -4045,17 +4030,16 @@ function MainApp() {
           <DifficultyMenu
             visible={puzzle.showDifficultyMenu}
             onClose={() => puzzleActions.setShowDifficultyMenu(false)}
+            anchorTop={difficultyMenuAnchorTop}
             currentDifficulty={puzzle.difficulty}
             gameMode={puzzle.gameMode}
             phase={persistence.currentPhase}
             currentVariant={puzzle.selectedVariant}
             activeVariant={puzzle.currentVariant}
             variantOptions={variantSelectorOptions}
-            comboOptions={comboSelectorOptions}
             onSelectDifficulty={handleSelectDifficulty}
             onToggleChallengeMode={handleToggleChallengeMode}
             onSelectVariant={handleSelectVariant}
-            onSelectCombo={handleSelectCombo}
             showChallengeToggle={puzzlesSolvedForVariantUnlocks >= CHALLENGE_TOGGLE_UNLOCK_PUZZLES}
             blindActive={puzzle.blindMode}
             onToggleBlindMode={handleToggleBlindMode}
