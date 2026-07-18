@@ -472,6 +472,11 @@ const COMPACT_DIALOGUE_SPRITES = new Set<string>(['axolotl', 'fennec_fox', 'aye_
 // remounts and resets only on app relaunch (module reload).
 let heavyHarvestNudgeShownThisSession = false;
 
+// Settle delay before the first-gate lore intro opens, comfortably past the
+// 300ms delay on a just-unlocked animal's own intro (useUnlockFlow) so the two
+// intro cards never flicker over each other.
+const GATED_ROOM_INTRO_SETTLE_MS = 500;
+
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   onPlayPuzzle,
   onStartDaily,
@@ -506,6 +511,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [introDialogueIndex, setIntroDialogueIndex] = useState(0);
   const [introOverrideLines, setIntroOverrideLines] = useState<string[] | null>(null);
   const [introContext, setIntroContext] = useState<'animal_intro' | 'challenge_intro' | 'pit_nudge' | 'daily_challenge_intro' | 'gated_room_intro' | 'harvest_gate_intro' | 'harvest_heavy_nudge' | 'unbroken_weave_intro' | 'offering_intro'>('animal_intro');
+  // Live mirror of "is any intro currently claiming the dialogue surface" — the
+  // gated-room intro reads this AFTER a settle delay to yield to a just-unlocked
+  // animal's own intro (which opens on a 300ms delay in useUnlockFlow), so the
+  // two can never flicker over each other.
+  const introSurfaceBusyRef = useRef(false);
+  useEffect(() => {
+    introSurfaceBusyRef.current = showIntroDialogue || !!introOverrideLines;
+  }, [showIntroDialogue, introOverrideLines]);
   // Journal spotlight intro state
   const [journalSpotlightActive, setJournalSpotlightActive] = useState(false);
   const [journalSpotlightIndex, setJournalSpotlightIndex] = useState(0);
@@ -936,46 +949,53 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // blocking (below the room's minPuzzles), so a fast player who blew past the
   // gate gets no needless explanation.
   //
-  // It fires whether the player is idling on home OR has already opened the
-  // room's unlock modal (the intro dialogue renders on top of it, so dismissing
-  // reveals the Reserve/Skip buttons underneath). This is deliberate: the
-  // blocking window can be brief — a player who unlocks the prior animal, then
-  // immediately taps the gated room and reserves/skips it, would otherwise never
-  // get a clean render with the modal closed, and the intro would be skipped.
+  // It fires the moment the wall appears, REGARDLESS of whether the player can
+  // yet afford Reserve/Skip. A fast solver reaches a gate with empty pockets and
+  // used to get NO explanation at all (the old affordability gate only spoke
+  // once amber >= cost, i.e. long after the frustrating first-wall moment) — a
+  // bare locked room reads as a dead-end. The intro copy is CONDITIONAL ("if you
+  // have the amber, you need not wait...") so it lands as expectation-setting,
+  // not a button-press instruction, even when nothing is affordable yet.
+  //
+  // The only reason the old code waited: the previous animal's own intro opens
+  // on a 300ms delay (useUnlockFlow), and the gated room becomes "next" the
+  // instant that animal is bought — so firing immediately flickered the two
+  // cards over each other. We dodge that with a settle delay that re-checks the
+  // shared intro surface via a ref, so the animal intro always wins that window;
+  // if it claims the surface, this simply re-fires once the surface frees (the
+  // one-time "seen" flag is set only when the player actually closes the card).
+  // It fires whether the player is idling on home OR has opened the room's
+  // unlock modal (the intro renders on top, so dismissing reveals Reserve/Skip).
   useEffect(() => {
     if (!progress || isOnboarding || showIntroDialogue || introOverrideLines) return;
     const nu = unlockFlow.nextUnlock;
     if (!nu || nu.type !== 'room' || nu.minPuzzles === undefined) return;
     if ((progress.puzzlesSolved || 0) >= nu.minPuzzles) return; // gate already open — no wall
-    // Fire only once the player can actually AFFORD to reserve the gated room —
-    // Reserve/Skip advice is noise before it's actionable, and firing at the
-    // moment the gate first appears collided with the just-unlocked animal's
-    // own intro (the previous animal in the progression unlocks seconds before
-    // the gated room becomes next).
-    if ((progress.amber ?? 0) < nu.cost) return;
 
     let cancelled = false;
-    (async () => {
-      const seen = await hasSeenGatedUnlockIntro();
-      if (seen || cancelled) return;
+    const timer = setTimeout(() => {
+      if (cancelled || introSurfaceBusyRef.current) return;
+      (async () => {
+        const seen = await hasSeenGatedUnlockIntro();
+        if (seen || cancelled || introSurfaceBusyRef.current) return;
 
-      const fox = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
-      if (!fox) return;
+        const fox = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
+        if (!fox) return;
 
-      setIntroAnimal(fox);
-      setIntroDialogueIndex(0);
-      setIntroOverrideLines(getGatedRoomIntroLines(progress.currentPhase, nu.name));
-      setIntroContext('gated_room_intro');
-      setShowIntroDialogue(true);
-    })();
+        setIntroAnimal(fox);
+        setIntroDialogueIndex(0);
+        setIntroOverrideLines(getGatedRoomIntroLines(progress.currentPhase, nu.name));
+        setIntroContext('gated_room_intro');
+        setShowIntroDialogue(true);
+      })();
+    }, GATED_ROOM_INTRO_SETTLE_MS);
 
-    return () => { cancelled = true; };
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [
     unlockFlow.nextUnlock,
     unlockFlow.showRoomUnlock,
     progress?.puzzlesSolved,
     progress?.currentPhase,
-    progress?.amber,
     isOnboarding,
     showIntroDialogue,
     introOverrideLines,

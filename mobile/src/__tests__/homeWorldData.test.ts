@@ -565,12 +565,12 @@ describe('reserve-ahead (pay-now, build-when-gate-opens)', () => {
     });
 
     test('gate offer line: gate level plus current level', () => {
-      expect(getReserveGateText(42, 35)).toBe("Unlocks at level 42. You're at 35");
+      expect(getReserveGateText(42, 35)).toBe("Still growing here. Opens at level 42 (you're at 35)");
     });
 
     test('degrade gracefully when an unlock has no gate (defensive)', () => {
       expect(getReservedArrivalText(undefined, 35)).toBe('✓ Reserved');
-      expect(getReserveGateText(undefined, 35)).toBe("Unlocks later. You're at level 35");
+      expect(getReserveGateText(undefined, 35)).toBe("Still growing here. You're at level 35");
     });
   });
 
