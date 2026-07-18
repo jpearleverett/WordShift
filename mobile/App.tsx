@@ -249,11 +249,8 @@ import {
   getVariantTimeLimit,
   getVariantTimeLimitForDifficulty,
   getVariantSelectorOptions,
-  getComboSelectorOptions,
   getBlindUnlockHint,
   isVariantUnlocked,
-  isComboUnlocked,
-  ComboPreset,
   PuzzleVariant,
   VARIANT_CONFIGS,
   CHALLENGE_TOGGLE_UNLOCK_PUZZLES,
@@ -330,14 +327,6 @@ function MainApp() {
     // uiPhase intentionally matches currentPhase — we use the confirmed phase
     // for text tone stability rather than the pending transition target
     return getVariantSelectorOptions(
-      puzzlesSolvedForVariantUnlocks,
-      persistence.currentPhase,
-      persistence.currentPhase
-    );
-  }, [puzzlesSolvedForVariantUnlocks, persistence.currentPhase]);
-
-  const comboSelectorOptions = useMemo(() => {
-    return getComboSelectorOptions(
       puzzlesSolvedForVariantUnlocks,
       persistence.currentPhase,
       persistence.currentPhase
@@ -3558,31 +3547,6 @@ function MainApp() {
   // Combination styles: one tap arms a variant plus its trial rung atomically
   // on a fresh board (never two sequential startNewGame calls, which would
   // race the toggle logic against stale mode state).
-  const handleSelectCombo = useCallback((combo: ComboPreset) => {
-    if (!isComboUnlocked(combo, puzzlesSolvedForVariantUnlocks, persistence.currentPhase)) {
-      return;
-    }
-    hapticSelection();
-    soundSelection();
-    orchestrationActions.setCompletionCoda(null);
-    resetSpeedRun();
-    puzzleActions.setSelectedVariant(combo.variant);
-    puzzleActions.startNewGame(
-      puzzle.difficulty,
-      combo.challenge || combo.blind ? 'challenge' : 'standard',
-      combo.variant,
-      combo.blind,
-      false,
-    );
-  }, [
-    puzzleActions,
-    puzzle.difficulty,
-    puzzlesSolvedForVariantUnlocks,
-    persistence.currentPhase,
-    orchestrationActions,
-    resetSpeedRun,
-  ]);
-
   // Present the daily-login grant only on a quiet home screen — never over the
   // puzzle, the victory flow, a post-victory intro, or a queued ceremony. The
   // grant itself was already credited; this gates presentation only, so a claim
@@ -4073,11 +4037,9 @@ function MainApp() {
             currentVariant={puzzle.selectedVariant}
             activeVariant={puzzle.currentVariant}
             variantOptions={variantSelectorOptions}
-            comboOptions={comboSelectorOptions}
             onSelectDifficulty={handleSelectDifficulty}
             onToggleChallengeMode={handleToggleChallengeMode}
             onSelectVariant={handleSelectVariant}
-            onSelectCombo={handleSelectCombo}
             showChallengeToggle={puzzlesSolvedForVariantUnlocks >= CHALLENGE_TOGGLE_UNLOCK_PUZZLES}
             blindActive={puzzle.blindMode}
             onToggleBlindMode={handleToggleBlindMode}

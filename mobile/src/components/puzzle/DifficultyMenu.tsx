@@ -22,10 +22,7 @@ import { DialoguePhase } from '../../types/homeWorld';
 import {
   PuzzleVariant,
   VariantSelectorOption,
-  ComboSelectorOption,
-  ComboPreset,
   getVariantDescription,
-  getComboDescription,
 } from '../../services/puzzleVariety';
 import { BODY_FONT, BODY_FONT_ITALIC, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
@@ -127,11 +124,9 @@ interface DifficultyMenuProps {
   currentVariant: PuzzleVariant;
   activeVariant?: PuzzleVariant;
   variantOptions: VariantSelectorOption[];
-  comboOptions?: ComboSelectorOption[];
   phase?: DialoguePhase;
   onSelectDifficulty: (difficulty: Difficulty) => void;
   onSelectVariant: (variant: PuzzleVariant) => void;
-  onSelectCombo?: (preset: ComboPreset) => void;
   onToggleChallengeMode: () => void;
   showChallengeToggle?: boolean;
   blindActive?: boolean;
@@ -157,11 +152,9 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   currentVariant,
   activeVariant,
   variantOptions,
-  comboOptions = [],
   phase = 0,
   onSelectDifficulty,
   onSelectVariant,
-  onSelectCombo,
   onToggleChallengeMode,
   showChallengeToggle = true,
   blindActive = false,
@@ -188,7 +181,6 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   // the next mechanical goal is always on screen.
   const coreOptions = variantOptions.filter(option => option.group === 'core');
   const baseOptions = variantOptions.filter(option => option.group === 'base');
-  const comboRows = onSelectCombo ? comboOptions : [];
   const hasNonStandardVariants = !introMode && baseOptions.length > 0;
 
   const activeBadge = dark
@@ -301,27 +293,6 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
       onPress: () => onSelectVariant(option.variant),
     });
 
-  const renderComboItem = (option: ComboSelectorOption) => {
-    const { preset } = option;
-    // A combo is "selected" when its variant is the chosen one AND its trial
-    // rung matches the toggles (blind presets run under gameMode 'challenge'
-    // with blindMode on; challenge presets require blind off).
-    const rungMatches = preset.blind
-      ? blindActive
-      : gameMode === 'challenge' && !blindActive;
-    return renderStyleRow({
-      key: preset.id,
-      icon: preset.icon,
-      title: preset.title,
-      description: getComboDescription(preset, phase),
-      locked: !option.unlocked,
-      unlockHint: option.unlockHint,
-      isSelected: option.unlocked && preset.variant === currentVariant && rungMatches,
-      isActive: option.unlocked && preset.variant === activeVariant && rungMatches,
-      onPress: () => onSelectCombo?.(preset),
-    });
-  };
-
   return (
     <Modal
       visible={visible}
@@ -401,20 +372,6 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
             <Text style={[styles.sectionTitle, { color: t.muted }]}>{styleTitle}</Text>
             {coreOptions.map(renderVariantItem)}
             {baseOptions.map(renderVariantItem)}
-
-            {comboRows.length > 0 && (
-              <Text style={[styles.sectionTitle, { color: t.muted }]}>
-                COMBINATION STYLES
-              </Text>
-            )}
-            {comboRows.map(renderComboItem)}
-            {comboRows.length === 0 && (
-              <Text style={[styles.combosComingText, { color: t.muted }]}>
-                {phase >= 3
-                  ? 'More layered arrangements will reveal themselves.'
-                  : 'More combo styles unlock later as you progress.'}
-              </Text>
-            )}
           </>
         ) : (
           <View
@@ -665,14 +622,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 3,
     paddingHorizontal: 6,
-  },
-  combosComingText: {
-    fontFamily: BODY_FONT,
-    fontSize: 12,
-    lineHeight: 16,
-    marginTop: 2,
-    marginBottom: 4,
-    paddingHorizontal: 8,
   },
   menuRow: {
     flexDirection: 'row',
