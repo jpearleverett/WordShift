@@ -70,6 +70,13 @@ interface UseUnlockFlowReturn {
    * Accepts the freshly-loaded rooms and animals arrays to avoid stale closure issues.
    */
   refreshUnlockData: (freshRooms: Room[], freshAnimals: Animal[]) => Promise<void>;
+  /**
+   * Recompute only the affordability-derived flags (canReserve/canSkip/
+   * unlockAvailability/speed-up) for the current nextUnlock. Cheap re-check to
+   * run whenever the player's amber changes without a full loadAllData, so the
+   * Reserve/Skip buttons appear the instant a credit crosses the threshold.
+   */
+  recheckAffordability: () => Promise<void>;
 }
 
 /**
@@ -166,19 +173,42 @@ export function useUnlockFlow({
     }
   }, []);
 
+  // Recompute ONLY the affordability-derived flags for the CURRENT nextUnlock
+  // (no rooms/animals/unlocks reload). Run on every amber change so the
+  // Reserve/Skip buttons appear the instant a credit crosses the threshold: the
+  // local `setProgress({...prev, amber})` bumps on the home screen (quest claim,
+  // daily reward, spend) update the balance WITHOUT a loadAllData, and these
+  // flags used to stay frozen from before the change until the next full
+  // refresh (navigate away and back). All of these read the authoritative amber.
+  const recheckAffordability = useCallback(async () => {
+    const unlock = nextUnlock;
+    if (!unlock) return;
+    const [availability, reservable, skippable, speedable, reserved] = await Promise.all([
+      isUnlockAvailable(unlock.id),
+      canReserveUnlock(unlock.id),
+      canSkipUnlockGate(unlock.id),
+      canSpeedUpReservedUnlock(unlock.id),
+      getReservedUnlockId(),
+    ]);
+    setUnlockAvailability(availability);
+    setCanReserve(reservable);
+    setCanSkip(skippable);
+    setSkipCost(skippable ? getUnlockSkipCost(unlock) : 0);
+    setCanSpeedUpReserved(speedable);
+    setReservedSkipCost(reserved === unlock.id ? getReservedSkipCost(unlock) : 0);
+  }, [nextUnlock]);
+
   // Handle room tap (for locked rooms or rooms needing animals)
   const handleRoomPress = useCallback((room: Room) => {
     hapticLight();
     setPurchaseError(null);
     if (!room.isUnlocked) {
       setShowRoomUnlock(room);
-      // Re-check availability when modal opens so puzzle gate info is fresh
+      // Refresh ALL affordability flags when the modal opens (gate info AND
+      // Reserve/Skip), so the buttons reflect the current amber even if it
+      // changed since the last full refresh — not just unlockAvailability.
       if (nextUnlock && nextUnlock.targetId === room.id) {
-        isUnlockAvailable(nextUnlock.id)
-          .then(avail => {
-            setUnlockAvailability(avail);
-          })
-          .catch(() => {});
+        recheckAffordability().catch(() => {});
       }
       return;
     }
@@ -188,7 +218,7 @@ export function useUnlockFlow({
     if (roomAnimal && !roomAnimal.isUnlocked && nextUnlock && nextUnlock.targetId === roomAnimal.id) {
       setShowInvitePrompt(true);
     }
-  }, [animals, nextUnlock]);
+  }, [animals, nextUnlock, recheckAffordability]);
 
   // Reserve a puzzle-gated unlock (pay now, auto-builds when the level opens).
   const handleReserve = useCallback(async (unlock: Unlockable) => {
@@ -330,5 +360,6 @@ export function useUnlockFlow({
     setShowRoomUnlock,
     setShowInvitePrompt,
     refreshUnlockData,
+    recheckAffordability,
   };
 }

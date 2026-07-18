@@ -14,6 +14,7 @@ import {
   ImageSourcePropType,
   StyleProp,
   ViewStyle,
+  TextStyle,
 } from 'react-native';
 // Note: HomeScreen's own UI (header, modals) is outside GestureHandlerRootView,
 // so we use react-native's TouchableOpacity here. RoomView and AnimalSprite
@@ -457,6 +458,27 @@ const BevelRowButton: React.FC<{
   );
 };
 
+// Amber-cost button label ("prefix [gem] amount"), laid out as explicit flex-row
+// siblings rather than an inline gem inside one <Text>. RN baseline-aligns an
+// <Image> embedded in a <Text>, and on short centered labels that flakily
+// crowds the gem over the adjacent digit (the Reserve button rendered "[gem]00"
+// instead of "[gem] 200"). A real row with a margin'd gem can never overlap.
+// bevelContent is already flexDirection:'row', so the fragment's children lay
+// out horizontally; the button's own accessibilityLabel carries the full text.
+const AmberCostLabel: React.FC<{
+  prefix: string;
+  amount: number;
+  color: string;
+  textStyle?: StyleProp<TextStyle>;
+  iconSize?: number;
+}> = ({ prefix, amount, color, textStyle = styles.bevelBtnText, iconSize = 16 }) => (
+  <>
+    <Text style={[textStyle, { color }]}>{prefix}</Text>
+    <AmberInline size={iconSize} style={styles.bevelAmberIcon} />
+    <Text style={[textStyle, { color }]}>{amount}</Text>
+  </>
+);
+
 // The axolotl (scuba mask) and fennec (tall ears) are framed tighter in their
 // source sprites and read larger than the other animals in the dialogue alcove;
 // render those two a touch smaller so they don't clip the card.
@@ -786,6 +808,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     if (refreshSignal > 0) loadAllData();
   // eslint-disable-next-line react-hooks/exhaustive-deps -- loadAllData identity is render-scoped; the signal is the trigger
   }, [refreshSignal]);
+
+  // Recompute Reserve/Skip affordability the INSTANT the player's amber changes,
+  // not only on a full loadAllData. Several home-local paths bump progress.amber
+  // via setProgress (quest claim, daily reward, spend) without reloading unlock
+  // data — which left the Reserve/Skip buttons (and the greyed "Unlock for N")
+  // frozen from before the credit until the screen remounted (navigate away and
+  // back). recheckAffordability re-reads the authoritative amber for the current
+  // next unlock; it's idempotent, so running it alongside loadAllData is safe.
+  useEffect(() => {
+    if (progress?.amber == null) return;
+    unlockFlow.recheckAffordability();
+  }, [progress?.amber, unlockFlow.recheckAffordability]);
 
   // Onboarding: auto-show invite prompt when data is loaded during home_empty step
   useEffect(() => {
@@ -2467,9 +2501,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       <View style={[styles.reservedChip, { backgroundColor: panelSt.secondaryBg, borderColor: panelSt.secondaryBorder }]}>
                         <Text style={[styles.reservedChipText, { color: panelSt.secondaryText }]}>Reserved ✓</Text>
                         {unlockFlow.reservedSkipCost > 0 && (
-                          <Text style={[styles.reservedChipSubtext, { color: panelSt.muted }]}>
-                            Speed up <AmberInline /> {unlockFlow.reservedSkipCost}
-                          </Text>
+                          <View style={styles.reservedChipSpeedRow}>
+                            <AmberCostLabel
+                              prefix="Speed up"
+                              amount={unlockFlow.reservedSkipCost}
+                              color={panelSt.muted}
+                              textStyle={styles.reservedChipSubtext}
+                              iconSize={13}
+                            />
+                          </View>
                         )}
                       </View>
                     )
@@ -2778,9 +2818,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             onPress={() => unlockFlow.handleSpeedUpReserved(unlockFlow.nextUnlock!)}
                             accessibilityLabel={`Speed up ${unlockFlow.nextUnlock!.name} and unlock now for ${unlockFlow.reservedSkipCost} amber`}
                           >
-                            <Text style={[styles.bevelBtnText, { color: pixelSkin.ink.primary }]}>
-                              Speed it up for <AmberInline /> {unlockFlow.reservedSkipCost}
-                            </Text>
+                            <AmberCostLabel prefix="Speed it up for" amount={unlockFlow.reservedSkipCost} color={pixelSkin.ink.primary} />
                           </BevelRowButton>
                         ) : unlockFlow.reservedSkipCost > 0 ? (
                           <Text style={[styles.shopSubtitle, { color: panelSt.muted, marginTop: 6, fontStyle: 'italic', fontFamily: BODY_FONT_ITALIC }]}>
@@ -2806,9 +2844,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                           onPress={() => unlockFlow.handleReserve(unlockFlow.nextUnlock!)}
                           accessibilityLabel={`Reserve room for ${unlockFlow.nextUnlock!.cost} amber; builds at level ${unlockFlow.nextUnlock!.minPuzzles}, you're at ${progress.puzzlesSolved}`}
                         >
-                          <Text style={[styles.bevelBtnText, { color: pixelSkin.ink.secondary }]}>
-                            Reserve for <AmberInline /> {unlockFlow.nextUnlock!.cost}
-                          </Text>
+                          <AmberCostLabel prefix="Reserve for" amount={unlockFlow.nextUnlock!.cost} color={pixelSkin.ink.secondary} />
                         </BevelRowButton>
                         {unlockFlow.canSkip && (
                           <BevelRowButton
@@ -2819,9 +2855,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             onPress={() => unlockFlow.handleSkip(unlockFlow.nextUnlock!)}
                             accessibilityLabel={`Skip the wait and unlock ${unlockFlow.nextUnlock!.name} now for ${unlockFlow.skipCost} amber`}
                           >
-                            <Text style={[styles.bevelBtnText, { color: pixelSkin.ink.primary }]}>
-                              Skip the wait for <AmberInline /> {unlockFlow.skipCost}
-                            </Text>
+                            <AmberCostLabel prefix="Skip the wait for" amount={unlockFlow.skipCost} color={pixelSkin.ink.primary} />
                           </BevelRowButton>
                         )}
                       </>
@@ -4113,6 +4147,12 @@ const styles = StyleSheet.create({
     marginTop: 2,
     textAlign: 'center',
   },
+  reservedChipSpeedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
   // Pixel bevel button anatomy (mirrors CandyButton; needed for labels
   // that embed <AmberInline /> inside the Text run)
   bevelStrip: {
@@ -4138,6 +4178,11 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.4,
     textAlign: 'center',
+  },
+  // Spacing on both sides of the gem when it's a flex-row sibling (AmberCostLabel),
+  // standing in for the spaces that used to sit around the inline gem.
+  bevelAmberIcon: {
+    marginHorizontal: 5,
   },
   questModal: {
     maxHeight: SCREEN_HEIGHT * 0.8,

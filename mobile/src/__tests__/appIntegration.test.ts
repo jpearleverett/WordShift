@@ -249,9 +249,11 @@ describe('verb-depth preview gate threading', () => {
     expect(APP_TSX).toMatch(/previewValidityVisible=\{puzzle\.previewValidityVisible\}/);
   });
 
-  test('the one-time graduation toast waits for the first fully neutral board', () => {
+  test('the one-time graduation card fires unmissably on the first fully neutral board', () => {
     expect(APP_TSX).toMatch(/PREVIEW_GRADUATION_SEEN_KEY/);
-    expect(APP_TSX).toMatch(/getPreviewGraduationMessage\(persistence\.currentPhase\)/);
+    // Delivered as a BLOCKING cottage card (showGameAlert host), not a fading
+    // toast, so the "the checks are gone" moment can never be missed.
+    expect(APP_TSX).toMatch(/showGameAlert\(\s*getPreviewGraduationTitle\(phase\),\s*getPreviewGraduationMessage\(phase\)/);
     // Rescue boards start with hidden checks too, but must not consume the
     // graduation beat. Blind Offering and onboarding remain excluded.
     expect(APP_TSX).toMatch(/puzzle\.previewGradingMode !== 'neutral' \|\| puzzle\.blindMode/);
