@@ -57,7 +57,7 @@ const VALID_STEPS: Set<string> = new Set([
 // ACTIONS in order (tap a letter up top, then tap a spot below). The earlier
 // "move a letter down into the word below" read as abstract and first-timers
 // tapped around lost. Charm never at the cost of the first 30 seconds.
-export const COLD_OPEN_INSTRUCTION = "Oh, you're here! Tap a letter in the top word to pick it up, then tap a spot in the word below to drop it in. Just keep both words real.";
+export const COLD_OPEN_INSTRUCTION = "Oh, you're here! Tap a letter in the top word to pick it up, then tap a spot in the word below to drop it in. The green checks will show you the spots that make real words.";
 
 /** Shown once, the instant the player lands their first valid move on the cold-open board. */
 export const COLD_OPEN_FIRST_MOVE = "There! Oh, lovely. Feel how the whole house settled around that word? Keep going, you have the knack for this.";
