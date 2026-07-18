@@ -46,13 +46,18 @@ const VALID_STEPS: Set<string> = new Set([
 // The cold-open opener is a self-directed first board, but it must not open on
 // a soulless rules tooltip: for a game whose whole promise is warmth (later
 // betrayed), the very first line should already be a voice, not a system
-// message. A warm, unnamed presence teaches the ONE rule (never points at the
+// message. A warm, unnamed presence teaches the moves (never points at the
 // exact letter — the solve stays the player's own), then reacts with delight to
 // the first successful move. The player learns who was speaking when they let
 // Fox in on the home screen a moment later ("I'm Ember!"), which turns the
 // opener into a quiet hook: something warm was already helping, before you ever
 // invited it in. No em dashes (player-facing).
-export const COLD_OPEN_INSTRUCTION = "Oh, you're here! Move a letter down into the word below, and keep both words real. Go on, tap one and try.";
+//
+// Tester-verified clarity rule for this line: it must name the PHYSICAL
+// ACTIONS in order (tap a letter up top, then tap a spot below). The earlier
+// "move a letter down into the word below" read as abstract and first-timers
+// tapped around lost. Charm never at the cost of the first 30 seconds.
+export const COLD_OPEN_INSTRUCTION = "Oh, you're here! Tap a letter in the top word to pick it up, then tap a spot in the word below to drop it in. Just keep both words real.";
 
 /** Shown once, the instant the player lands their first valid move on the cold-open board. */
 export const COLD_OPEN_FIRST_MOVE = "There! Oh, lovely. Feel how the whole house settled around that word? Keep going, you have the knack for this.";
@@ -64,7 +69,7 @@ export const COLD_OPEN_FIRST_MOVE = "There! Oh, lovely. Feel how the whole house
  * (green check / red cross) and names undo, so the tools are taught at the
  * exact moment they first matter.
  */
-export const COLD_OPEN_PREVIEW_TEACH = "See those faint little words? A green check means both words stay real, a red cross means one would break. And undo takes any move back, so try freely.";
+export const COLD_OPEN_PREVIEW_TEACH = "Those little words show what each spot would spell. Tap a spot with a green check to drop your letter there. A red cross would not make a real word. And UNDO takes any move back, so try freely.";
 
 export type ColdOpenLaunchRoute = 'restore' | 'home_empty' | 'new_board';
 

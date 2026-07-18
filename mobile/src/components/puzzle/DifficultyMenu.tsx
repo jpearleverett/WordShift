@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,8 @@ import {
   StyleSheet,
   ScrollView,
   ViewStyle,
-  useWindowDimensions,
+  Modal,
+  Pressable,
   Image,
   ImageStyle,
   TextStyle,
@@ -47,31 +48,28 @@ const ModeIcon: React.FC<{
   );
 };
 
-// The menu floats at top: 52 inside the puzzle screen's statsRow, which itself
-// sits below the header block (16 top pad + ~59 wordmark + up to ~28 phase
-// badge + 8 bottom pad) and the row's own 8 top pad. This is that worst-case
-// chrome plus the 52 anchor: the panel's top edge sits ~(insets.top + this)
-// below the window top. The usable height is computed per-render from the
-// LIVE window height + safe-area insets (see menuMaxHeight in the component)
-// and refined by measuring the panel's real on-screen top — the old
-// screen-height-minus-140 budget ignored the header block and the bottom
-// inset entirely, so on device the panel ran past the viewport and the last
-// rows (BLIND) were clipped beyond reach.
+// STRUCTURAL LAYOUT CONTRACT (third and final fix for the "menu runs off the
+// bottom, unscrollable" device bug). The menu previously rendered as an
+// absolutely-positioned child of the puzzle screen's ~50dp-tall statsRow and
+// OVERFLOWED it by hundreds of dp. Two arithmetic fixes (window-height math,
+// position-measurement refinement) shipped and still failed on device: the
+// structure itself is unfixable on Android: touch events are not reliably
+// delivered to children rendered outside their parent's bounds (the overflow
+// region of the dropdown could not scroll no matter what bound it carried),
+// and edge-to-edge inset quirks poisoned every height computation. The menu
+// now renders inside a transparent full-window Modal: the OS provides the
+// bounds (top+bottom padded flex container -> definite height, panel capped
+// at maxHeight '100%'), the whole window is a native touch surface, Android
+// back closes it, and tapping outside dismisses. There is no measurement and
+// no window arithmetic left to be wrong. Do NOT move this back inline.
+//
+// Panel top offset below the top inset, matching the old visual anchor
+// (header block + statsRow chrome + the 52dp drop below the setup chip).
 const MENU_ANCHOR_BELOW_INSET = 171;
 // Breathing room kept between the panel's bottom edge and the safe area.
 const MENU_BOTTOM_MARGIN = 12;
-// Floor so the panel stays usable even on absurdly short windows (the scroll
-// area + generous bottom padding keeps every row reachable there) and a cap
-// so tablets don't get a monolith.
-const MENU_MIN_HEIGHT = 300;
-const MENU_HEIGHT_CAP = 900;
-// Panel chrome around the scroll area: top padding (30, clearing the top wood
-// band) + title (~26) + a bottom clearance (28 > the wood band) so the final
-// row always scrolls into clear parchment, never under the frame's
-// overflow:hidden.
-const MENU_CHROME_HEIGHT = 88;
-// Base bottom padding inside the scroll content; the bottom safe-area inset
-// is added per-render so the last row (BLIND) always clears gesture bars.
+// Bottom padding inside the scroll content so the last row (BLIND / weave)
+// always settles onto clear parchment above the frame's wood band.
 const SCROLL_BOTTOM_PAD = 28;
 
 /** Semantic difficulty ring colors (shared candy identity with the header dot). */
@@ -113,6 +111,9 @@ export function getDifficultyChipLabel(value: unknown): string {
 
 interface DifficultyMenuProps {
   visible: boolean;
+  /** Dismiss the menu: backdrop tap and the Android back button both route
+   *  here (the setup chip toggle remains the explicit open/close control). */
+  onClose?: () => void;
   currentDifficulty: Difficulty;
   gameMode: GameMode;
   currentVariant: PuzzleVariant;
@@ -141,6 +142,7 @@ interface DifficultyMenuProps {
 
 export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   visible,
+  onClose,
   currentDifficulty,
   gameMode,
   currentVariant,
@@ -167,64 +169,7 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
 }) => {
   // Hooks must run on every render (before the visibility early-return).
   const screenInsets = useScreenInsets();
-  // LIVE window height (module-scope Dimensions.get is a one-shot snapshot and
-  // never updates) — the bound below must track the real visible area.
-  const { height: windowHeight } = useWindowDimensions();
-  // The panel is position:absolute below a VARIABLE-height header, so a static
-  // estimate of the space above it (MENU_ANCHOR_BELOW_INSET) can run the panel
-  // — and its inner ScrollView — off the bottom of the screen on a taller
-  // header, leaving the lowest rows (e.g. the Challenge toggle) below the fold
-  // and unreachable even at the scroll end. Measure the panel's REAL on-screen
-  // top once it lays out and size it to the actual space beneath it.
-  const panelWrapRef = useRef<View>(null);
-  const [measuredMaxHeight, setMeasuredMaxHeight] = useState<number | null>(null);
-  const measurePanelTop = useCallback(() => {
-    const node = panelWrapRef.current;
-    if (!node || typeof node.measureInWindow !== 'function') return;
-    node.measureInWindow((_x, y, _w, _h) => {
-      if (typeof y !== 'number' || !Number.isFinite(y) || y <= 0) return;
-      const avail = windowHeight - y - screenInsets.bottom - MENU_BOTTOM_MARGIN;
-      const bounded = Math.max(MENU_MIN_HEIGHT, Math.min(avail, MENU_HEIGHT_CAP));
-      setMeasuredMaxHeight(prev => (prev === bounded ? prev : bounded));
-    });
-  }, [windowHeight, screenInsets.bottom]);
-  const handlePanelLayout = measurePanelTop;
-  // Root-cause guard for the "panel runs past the bottom, unscrollable" bug:
-  // measureInWindow can report a zero frame if it lands while the mount commit
-  // is still in flight; the old code rejected that sample and — because
-  // onLayout never re-fires for an unchanged frame — was stranded on the
-  // static header estimate forever, which under-models tall headers and let
-  // the panel overflow the screen. Re-attempt shortly after every open so the
-  // exact measured bound always lands. (setTimeout, not rAF: same behavior in
-  // the Node test env.)
-  useEffect(() => {
-    if (!visible) return undefined;
-    const immediate = setTimeout(measurePanelTop, 0);
-    const settle = setTimeout(measurePanelTop, 150);
-    return () => {
-      clearTimeout(immediate);
-      clearTimeout(settle);
-    };
-  }, [visible, measurePanelTop]);
   if (!visible) return null;
-
-  // Bound the panel to the space actually below its anchor. Prefer the measured
-  // height (exact, device-independent); fall back to the static estimate for the
-  // first frame before measurement lands.
-  const estimatedMaxHeight = Math.max(
-    MENU_MIN_HEIGHT,
-    Math.min(
-      windowHeight - screenInsets.top - MENU_ANCHOR_BELOW_INSET - screenInsets.bottom - MENU_BOTTOM_MARGIN,
-      MENU_HEIGHT_CAP
-    )
-  );
-  const menuMaxHeight = measuredMaxHeight ?? estimatedMaxHeight;
-  // Defensive secondary bound for the scroll region. The PRIMARY bound is
-  // structural (styles.scrollArea flexShrink inside the maxHeight-bounded
-  // panel, which cannot drift when chrome changes); this arithmetic cap is
-  // kept as a backstop so the region can never exceed the panel budget even
-  // if a layout engine quirk ignores the shrink.
-  const scrollMaxHeight = Math.max(120, menuMaxHeight - MENU_CHROME_HEIGHT);
 
   const t = getSurfaceTheme(phase);
   const dark = phase >= 3;
@@ -251,10 +196,14 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   const challengeIncluded = blindActive;
   const blindName = phase >= 3 ? 'the Blind Offering' : 'Blind Mode';
 
+  // maxHeight '100%' is DEFINITE here: the panel's parent is the Modal's
+  // top/bottom-padded flex container, whose height the OS provides. A short
+  // menu keeps its natural height; a tall one caps and its ScrollView
+  // (flexShrink) takes the remainder and scrolls.
   const panelStyle = StyleSheet.flatten([
     styles.difficultyMenu,
     !hasNonStandardVariants && styles.difficultyMenuCompact,
-    { shadowColor: t.screenBg, maxHeight: menuMaxHeight },
+    { shadowColor: t.screenBg, maxHeight: '100%' as const },
   ]) as ViewStyle;
 
   /**
@@ -365,15 +314,37 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   };
 
   return (
-    <View ref={panelWrapRef} onLayout={handlePanelLayout} style={styles.difficultyMenuAnchor}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="none"
+      statusBarTranslucent
+      onRequestClose={onClose}
+    >
+      {/* Backdrop: tap anywhere outside the panel to dismiss (also gives the
+          menu the whole window as a native touch surface — see the layout
+          contract comment at the top of this file). */}
+      <Pressable
+        style={StyleSheet.absoluteFill}
+        onPress={onClose}
+        accessibilityLabel="Close puzzle setup"
+        accessibilityRole="button"
+      />
+      <View
+        pointerEvents="box-none"
+        style={[
+          styles.menuLayer,
+          {
+            paddingTop: screenInsets.top + MENU_ANCHOR_BELOW_INSET,
+            paddingBottom: screenInsets.bottom + MENU_BOTTOM_MARGIN,
+          },
+        ]}
+      >
     <PanelCard phase={phase} kind="panel" style={panelStyle}>
       <Text style={[styles.menuTitle, { color: t.title }]}>{title}</Text>
       <ScrollView
-        style={[styles.scrollArea, { maxHeight: scrollMaxHeight }]}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: SCROLL_BOTTOM_PAD + screenInsets.bottom },
-        ]}
+        style={styles.scrollArea}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={true}
       >
         <Text style={[styles.sectionTitle, { color: t.muted }]}>DIFFICULTY</Text>
@@ -624,25 +595,25 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
         )}
       </ScrollView>
     </PanelCard>
-    </View>
+      </View>
+    </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  // Positioning wrapper: carries the absolute anchor (below the difficulty
-  // button) + a ref so the panel can measure its real on-screen top and size
-  // its ScrollView to the space actually beneath it (see handlePanelLayout).
-  difficultyMenuAnchor: {
-    position: 'absolute',
-    right: 20,
-    top: 52,
-    zIndex: 200,
+  // Full-window layer inside the transparent Modal. Its top/bottom paddings
+  // (applied inline with the live insets) give the panel's parent a DEFINITE
+  // height, so the panel's maxHeight '100%' is a hard OS-provided bound —
+  // no measurement, no window arithmetic. box-none so only the panel itself
+  // eats touches; everything else falls through to the dismiss backdrop.
+  menuLayer: {
+    flex: 1,
+    alignItems: 'flex-end',
+    paddingRight: 20,
   },
   difficultyMenu: {
     width: 290,
-    // maxHeight is applied inline (menuMaxHeight) — it depends on the live
-    // safe-area insets / measured position, so it cannot live in the static
-    // stylesheet.
+    // maxHeight '100%' is applied inline (definite inside the padded layer).
     // Must clear the cottage panel frame's 24dp top wood band, or the title
     // sits inside the wood and reads as clipped against the top edge.
     paddingTop: 30,
@@ -664,18 +635,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 3,
   },
-  // The option list must SHRINK to fit inside the maxHeight-bounded panel
-  // (and then scroll) rather than grow the auto-height absolute anchor past
-  // the screen edge — a ScrollView inside an unbounded container lays out at
-  // its full content height and never scrolls. flexGrow: 0 keeps a short list
-  // at its natural height.
+  // The option list SHRINKS to fit inside the '100%'-capped panel (then
+  // scrolls); flexGrow: 0 keeps a short list at its natural height.
   scrollArea: {
     flexGrow: 0,
     flexShrink: 1,
   },
   scrollContent: {
     paddingHorizontal: 10,
-    paddingBottom: 24,
+    paddingBottom: SCROLL_BOTTOM_PAD,
   },
   sectionTitle: {
     fontFamily: PIXEL_FONT_BOLD,
