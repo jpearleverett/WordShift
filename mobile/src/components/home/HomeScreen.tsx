@@ -809,6 +809,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps -- loadAllData identity is render-scoped; the signal is the trigger
   }, [refreshSignal]);
 
+  // Recompute Reserve/Skip affordability the INSTANT the player's amber changes,
+  // not only on a full loadAllData. Several home-local paths bump progress.amber
+  // via setProgress (quest claim, daily reward, spend) without reloading unlock
+  // data — which left the Reserve/Skip buttons (and the greyed "Unlock for N")
+  // frozen from before the credit until the screen remounted (navigate away and
+  // back). recheckAffordability re-reads the authoritative amber for the current
+  // next unlock; it's idempotent, so running it alongside loadAllData is safe.
+  useEffect(() => {
+    if (progress?.amber == null) return;
+    unlockFlow.recheckAffordability();
+  }, [progress?.amber, unlockFlow.recheckAffordability]);
+
   // Onboarding: auto-show invite prompt when data is loaded during home_empty step
   useEffect(() => {
     if (onboardingStep === 'home_empty' && progress && unlockFlow.nextUnlock) {
