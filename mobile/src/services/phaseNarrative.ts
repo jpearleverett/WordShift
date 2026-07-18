@@ -2373,6 +2373,20 @@ export function getPreviewGraduationMessage(phase: number): string {
   return 'The little checks step back now, and stay back. From here you judge the words yourself. Trust your ear for a real word.';
 }
 
+/** Short in-world title for the one-time preview-graduation card (see App). */
+export function getPreviewGraduationTitle(phase: number): string {
+  if (phase >= 4) return 'Your Hands Know';
+  if (phase >= 2) return 'Judgment Sharpened';
+  return 'Trust Your Ear';
+}
+
+/** Warm acknowledgment button for the one-time preview-graduation card. */
+export function getPreviewGraduationConfirm(phase: number): string {
+  if (phase >= 4) return 'I know them';
+  if (phase >= 2) return 'I trust it';
+  return 'Got it';
+}
+
 // ============================================================================
 // SWIFT VICTORY POINTER — one-time hint that a quicker victory style exists in
 // Settings. In-world voice (the house offers), never a tutorial voice.

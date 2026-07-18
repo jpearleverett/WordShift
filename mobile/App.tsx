@@ -118,6 +118,8 @@ import {
   getDailyLadderTrendLabel,
   getEventDailyBonusLine,
   getPreviewGraduationMessage,
+  getPreviewGraduationTitle,
+  getPreviewGraduationConfirm,
   getSwiftVictoryHintMessage,
   getStreakHeldMessage,
   getDwellLine,
@@ -2649,12 +2651,17 @@ function MainApp() {
     }
   }, [boardIdentity]);
 
-  // One-time preview-graduation beat: the FIRST fully-neutral board after the
-  // rescue window explains, in-world, that the player's word judgment has
-  // sharpened. A rescue board also starts with hidden checks, so gate on the
-  // underlying mode rather than previewValidityVisible or solve 12 would
-  // consume this beat early. Blind Offering and onboarding stay excluded.
-  // Device-local one-time flag; the session ref keeps one storage read.
+  // One-time preview-graduation beat: the FIRST fully-neutral board (after the
+  // 12-solve full-grading window) explains, in-world, that the checks have
+  // stepped back and the player judges words themselves now. This used to be a
+  // fading Toast that raced the board-start line and was trivially missed; a
+  // "the rules just changed" moment must be UNMISSABLE, so it now fires as a
+  // BLOCKING cottage card (showGameAlert host) that covers the board until the
+  // player acknowledges it — the player sees the change and the reason together,
+  // then dismisses to the (now ungraded) board. Gated on the underlying mode
+  // (not previewValidityVisible or the raw solve count) so a hidden-preview
+  // rescue board can't consume it early. Blind Offering and onboarding excluded.
+  // One time EVER via the device flag; the session ref keeps one storage read.
   const graduationCheckedRef = useRef(false);
   useEffect(() => {
     if (boardIdentity === null) return;
@@ -2666,7 +2673,12 @@ function MainApp() {
     (async () => {
       if (await hasSeenOneTimeFlag(PREVIEW_GRADUATION_SEEN_KEY)) return;
       await markOneTimeFlagSeen(PREVIEW_GRADUATION_SEEN_KEY);
-      puzzleActions.setMessage(getPreviewGraduationMessage(persistence.currentPhase));
+      const phase = persistence.currentPhase;
+      showGameAlert(
+        getPreviewGraduationTitle(phase),
+        getPreviewGraduationMessage(phase),
+        [{ text: getPreviewGraduationConfirm(phase) }],
+      );
     })().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fires per fresh board; actions/phase read at fire time
   }, [boardIdentity, puzzle.gameState, puzzle.previewGradingMode, puzzle.blindMode, onboardingFlow.isOnboarding]);
