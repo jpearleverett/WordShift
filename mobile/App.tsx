@@ -201,7 +201,13 @@ const HOUSE_ASK_LINE_DELAY_MS = 2200;
 // One-time, DEVICE-LOCAL UX pointer flags (deliberately not cloud-synced and
 // not cleared by Reset All owners' service clears: they mark "this device's
 // player has seen this pointer", not game progress).
-const PREVIEW_GRADUATION_SEEN_KEY = 'wordshift_preview_graduation_seen';
+// v2: the key is versioned. The original toast delivery marked the un-versioned
+// key seen the moment it decided to speak, then showed a fading toast that the
+// post-phase-transition moment routinely clobbered — so real devices consumed
+// the beat invisibly (observed on-device: checks went neutral with no message,
+// flag burned). The rename gives every such device one guaranteed showing of
+// the now-blocking card; a device that genuinely saw the card marks v2 as usual.
+const PREVIEW_GRADUATION_SEEN_KEY = 'wordshift_preview_graduation_seen_v2';
 const SWIFT_HINT_SEEN_KEY = 'wordshift_swift_hint_seen';
 // The first-stuck mercy flag is device-local ON PURPOSE (never in cloudSave
 // SYNC_KEYS): a returning player on a new device may deserve the mercy once
@@ -2672,12 +2678,18 @@ function MainApp() {
     graduationCheckedRef.current = true;
     (async () => {
       if (await hasSeenOneTimeFlag(PREVIEW_GRADUATION_SEEN_KEY)) return;
-      await markOneTimeFlagSeen(PREVIEW_GRADUATION_SEEN_KEY);
       const phase = persistence.currentPhase;
+      // Seen = ACKNOWLEDGED (the mandatory-harvest contract): the flag commits
+      // when the player dismisses the card, not when we decide to show it — a
+      // kill between decision and render re-fires the beat on the next neutral
+      // board instead of burning it invisibly (the old toast's failure mode).
       showGameAlert(
         getPreviewGraduationTitle(phase),
         getPreviewGraduationMessage(phase),
-        [{ text: getPreviewGraduationConfirm(phase) }],
+        [{
+          text: getPreviewGraduationConfirm(phase),
+          onPress: () => { markOneTimeFlagSeen(PREVIEW_GRADUATION_SEEN_KEY).catch(() => {}); },
+        }],
       );
     })().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fires per fresh board; actions/phase read at fire time
