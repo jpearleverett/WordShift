@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View,
   Text,
@@ -179,6 +180,13 @@ export async function performFullReset(): Promise<string[]> {
     ['offeringRequests', clearOfferingRequests],
     ['reviewPrompt', clearReviewPrompt],
     ['syncStatus', clearSyncStatus],
+    // The preview-graduation card is a TEACHING beat about a rules change that
+    // recurs at solve 12 after any reset, so unlike the device-sticky mercy/
+    // pointer flags (first-stuck, swift-hint) it must re-arm with progress —
+    // observed on-device: a Reset All replay hit the neutral handoff with the
+    // beat still consumed from the prior run. Literal key mirrors
+    // PREVIEW_GRADUATION_SEEN_KEY in App.tsx (drift pinned by appIntegration).
+    ['previewGraduation', () => AsyncStorage.removeItem('wordshift_preview_graduation_seen_v2')],
   ];
 
   // The async wrapper converts a synchronous throw (e.g. a broken import
