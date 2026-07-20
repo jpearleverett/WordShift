@@ -254,9 +254,27 @@ describe('verb-depth preview gate threading', () => {
     // Delivered as a BLOCKING cottage card (showGameAlert host), not a fading
     // toast, so the "the checks are gone" moment can never be missed.
     expect(APP_TSX).toMatch(/showGameAlert\(\s*getPreviewGraduationTitle\(phase\),\s*getPreviewGraduationMessage\(phase\)/);
+    // Seen = ACKNOWLEDGED: the flag commits in the card's button onPress, never
+    // at decision time (the old toast burned the beat invisibly on real devices).
+    expect(APP_TSX).toMatch(/onPress: \(\) => \{ markOneTimeFlagSeen\(PREVIEW_GRADUATION_SEEN_KEY\)/);
     // Rescue boards start with hidden checks too, but must not consume the
     // graduation beat. Blind Offering and onboarding remain excluded.
     expect(APP_TSX).toMatch(/puzzle\.previewGradingMode !== 'neutral' \|\| puzzle\.blindMode/);
+  });
+
+  test('Reset All re-arms the graduation beat and both files agree on the key', () => {
+    const SETTINGS_TSX = fs.readFileSync(
+      path.resolve(__dirname, '../components/SettingsScreen.tsx'),
+      'utf8'
+    );
+    // App.tsx owns the constant; performFullReset clears the same literal key
+    // (a teaching beat about a rules change must re-fire on a from-scratch
+    // replay, unlike the device-sticky mercy/pointer flags). This pin keeps the
+    // two literals from drifting when the key is next versioned.
+    const keyMatch = APP_TSX.match(/PREVIEW_GRADUATION_SEEN_KEY = '([^']+)'/);
+    expect(keyMatch).not.toBeNull();
+    expect(SETTINGS_TSX).toContain(`AsyncStorage.removeItem('${keyMatch![1]}')`);
+    expect(SETTINGS_TSX).toMatch(/\['previewGraduation',/);
   });
 });
 

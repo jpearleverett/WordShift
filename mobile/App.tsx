@@ -1229,19 +1229,24 @@ function MainApp() {
     const stats = await getCumulativeStats();
     if ((stats?.totalPuzzlesCompleted ?? 0) < SETUP_SELECTOR_INTRO_MIN_PUZZLES) return;
 
+    // SEQUENCED, not stacked (Modal regression fix): the intro used to open
+    // the setup menu TOGETHER with the Fox card, which worked when the menu
+    // was an inline dropdown — but the menu is now a fullscreen native Modal,
+    // which stacks above the entire app hierarchy: the Fox card rendered
+    // half-hidden UNDER the menu panel and taps on it hit the Modal backdrop.
+    // Now Fox speaks first (menu closed, chip highlighted); the menu opens
+    // when the card's last line is acknowledged (see handleAdvance below).
     setSetupSelectorIntroIndex(0);
     setTimeout(() => {
       setShowSetupSelectorIntro(true);
-      puzzleActions.setShowDifficultyMenu(true);
     }, 250);
-  }, [onboardingFlow.isOnboarding, puzzleActions]);
+  }, [onboardingFlow.isOnboarding]);
 
   const dismissSetupSelectorIntro = useCallback(async () => {
     await markSetupSelectorIntroSeen();
     setShowSetupSelectorIntro(false);
-    // Close the menu the intro auto-opened. Leaving it floating after the Fox
-    // card was dismissed read as a stuck modal (and picking a row regenerated
-    // the fresh board underneath).
+    // Close the menu if the intro opened it. Leaving it floating after the
+    // intro ended read as a stuck modal.
     puzzleActions.setShowDifficultyMenu(false);
   }, [puzzleActions]);
 
@@ -1252,8 +1257,28 @@ function MainApp() {
       return;
     }
 
-    await dismissSetupSelectorIntro();
-  }, [setupSelectorIntroIndex, setupSelectorLines.length, dismissSetupSelectorIntro]);
+    // Last line acknowledged: NOW open the menu (introMode: difficulty rows +
+    // the hint line). The Fox card hides while the menu is up (render gate),
+    // and the menu-close effect below completes the intro.
+    puzzleActions.setShowDifficultyMenu(true);
+  }, [setupSelectorIntroIndex, setupSelectorLines.length, puzzleActions]);
+
+  // Complete the setup intro when its menu closes by ANY path: backdrop tap,
+  // Android back, the chip toggle, or a difficulty pick (the hook closes the
+  // menu inside startNewGame). Transition-edge detection (open -> closed) so
+  // the card phase, where the menu was never open, can't complete it early.
+  const introMenuWasOpenRef = useRef(false);
+  useEffect(() => {
+    if (!showSetupSelectorIntro) {
+      introMenuWasOpenRef.current = false;
+      return;
+    }
+    if (introMenuWasOpenRef.current && !puzzle.showDifficultyMenu) {
+      dismissSetupSelectorIntro();
+      return;
+    }
+    introMenuWasOpenRef.current = puzzle.showDifficultyMenu;
+  }, [showSetupSelectorIntro, puzzle.showDifficultyMenu, dismissSetupSelectorIntro]);
 
   const advanceQueuedPostVictoryIntro = useCallback(async () => {
     const nextIntro = queuedPostVictoryIntrosRef.current.shift() ?? null;
@@ -4506,7 +4531,9 @@ function MainApp() {
             }
           />
         )}
-        {!onboardingFlow.isOnboarding && showSetupSelectorIntro && (
+        {/* Hidden while the setup menu (a fullscreen Modal that stacks above
+            this hierarchy) is open — the intro SEQUENCES card then menu. */}
+        {!onboardingFlow.isOnboarding && showSetupSelectorIntro && !puzzle.showDifficultyMenu && (
           <FoxGuide
             visible={true}
             variant="dialogue"
