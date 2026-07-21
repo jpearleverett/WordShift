@@ -8,7 +8,7 @@
  * reduced-motion aware. All narrative copy comes from phaseNarrative; the
  * spend/claim logic lives in seasonPass.ts (this file only orchestrates + renders).
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Modal,
   View,
@@ -16,9 +16,12 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
+  Animated,
+  Easing,
 } from 'react-native';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
 import { getSurfaceTheme, SURFACE } from '../theme/surfaces';
+import { getSettingsSync } from '../services/settings';
 import { PanelCard } from './ui/PanelCard';
 import { CandyButton } from './ui/CandyButton';
 import { PixelPlaque } from './ui/PixelPlaque';
@@ -72,6 +75,59 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
   useEffect(() => {
     if (visible) refresh().catch(() => {});
   }, [visible, refresh]);
+
+  // House entrance (was the OS animationType="fade" — a modal-choreography
+  // violator): a backdrop fade + a SURFACE.modalIn spring on the card, with the
+  // design system's asymmetric fast exit. Reduced motion pins everything shown.
+  const reducedMotion = getSettingsSync().reducedMotion;
+  const backdropOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const cardScale = useRef(new Animated.Value(reducedMotion ? 1 : 0.92)).current;
+  const cardOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const closingRef = useRef(false);
+
+  useEffect(() => {
+    if (!visible) return;
+    closingRef.current = false;
+    if (reducedMotion) {
+      backdropOpacity.setValue(1);
+      cardScale.setValue(1);
+      cardOpacity.setValue(1);
+      return;
+    }
+    backdropOpacity.setValue(0);
+    cardScale.setValue(0.92);
+    cardOpacity.setValue(0);
+    const anim = Animated.parallel([
+      Animated.timing(backdropOpacity, { toValue: 1, duration: 180, useNativeDriver: true }),
+      Animated.spring(cardScale, { toValue: 1, ...SURFACE.modalIn, useNativeDriver: true }),
+      Animated.timing(cardOpacity, { toValue: 1, duration: 180, useNativeDriver: true }),
+    ]);
+    anim.start();
+    return () => anim.stop();
+  }, [visible, reducedMotion, backdropOpacity, cardScale, cardOpacity]);
+
+  const handleClose = useCallback(() => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    if (reducedMotion) {
+      onClose();
+      return;
+    }
+    Animated.parallel([
+      Animated.timing(backdropOpacity, {
+        toValue: 0,
+        duration: SURFACE.modalOutMs,
+        easing: Easing.in(Easing.ease),
+        useNativeDriver: true,
+      }),
+      Animated.timing(cardOpacity, {
+        toValue: 0,
+        duration: SURFACE.modalOutMs,
+        easing: Easing.in(Easing.ease),
+        useNativeDriver: true,
+      }),
+    ]).start(() => onClose());
+  }, [reducedMotion, backdropOpacity, cardOpacity, onClose]);
 
   const claim = useCallback(
     async (tier: number, track: 'free' | 'premium') => {
@@ -145,8 +201,15 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
   const cost = getSeasonPremiumAmberCost();
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={[styles.overlay, { backgroundColor: t.overlay }]}>
+    <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
+      <View style={styles.overlay}>
+        <Animated.View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, { backgroundColor: t.overlay, opacity: backdropOpacity }]}
+        />
+        <Animated.View
+          style={[styles.cardWrap, { transform: [{ scale: cardScale }], opacity: cardOpacity }]}
+        >
         <PanelCard phase={phase} kind="panel" style={styles.card}>
           <PixelPlaque phase={phase} label={'SEASON PASS'} style={styles.plaque} />
           <Text style={[styles.title, { color: t.title }]}>{copy.title}</Text>
@@ -263,10 +326,11 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
             variant="quiet"
             phase={phase}
             hostDark={hostDark}
-            onPress={() => { hapticLight(); onClose(); }}
+            onPress={() => { hapticLight(); handleClose(); }}
             style={styles.closeBtn}
           />
         </PanelCard>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -274,7 +338,11 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 18 },
-  card: { width: '100%', maxWidth: 460, maxHeight: '90%', paddingTop: 18, paddingHorizontal: 18, paddingBottom: 16 },
+  // The entrance wrapper is the direct flex child of the definite-height overlay
+  // (like StoreModal's animated card), so its maxHeight resolves; the PanelCard
+  // inside fills it and its ScrollView bounds against that height.
+  cardWrap: { width: '100%', maxWidth: 460, maxHeight: '90%' },
+  card: { width: '100%', maxHeight: '100%', paddingTop: 18, paddingHorizontal: 18, paddingBottom: 16 },
   plaque: { alignSelf: 'center', marginBottom: 8 },
   title: { fontFamily: PIXEL_FONT_BOLD, fontSize: 22, textAlign: 'center' },
   tagline: { fontFamily: BODY_FONT, fontSize: 14, textAlign: 'center', marginTop: 4, marginBottom: 10 },
