@@ -321,6 +321,32 @@ describe('Row drop effects are visual-only', () => {
   });
 });
 
+// --- Board-serve entrance cascade --------------------------------------------
+// A fresh board materializes top-to-bottom (rows fade + rise, staggered by
+// rowIndex) instead of snapping in. It rides a run-once-on-mount effect because
+// App keys each Row by row.id, so a genuine serve remounts every Row while the
+// frequent arc-toggle tile remounts leave the Row instance intact. Guard-by-
+// source: it must stay native-driver and gated for reduced-motion / low tier.
+describe('Row board-serve entrance', () => {
+  const rowSrc = require('fs').readFileSync(
+    require('path').join(__dirname, '../components/Row.tsx'),
+    'utf8',
+  );
+  test('serves a native-driver fade+rise gated for reduced motion / low tier', () => {
+    expect(rowSrc).toContain('serveAnimates');
+    expect(rowSrc).toContain('BOARD_SERVE_STAGGER_MS');
+    // Decided once at mount from the accessibility settings + device tier.
+    expect(rowSrc).toMatch(/serveAnimates = useRef\(\s*!getSettingsSync\(\)\.reducedMotion && !shouldSimplifyAnimations\(\)/);
+    // The entrance transforms are native-driver only (opacity + translateY).
+    const serveBlock = rowSrc.slice(
+      rowSrc.indexOf('if (!serveAnimates) return;'),
+      rowSrc.indexOf('anim.start();'),
+    );
+    expect(serveBlock).toContain('useNativeDriver: true');
+    expect(serveBlock).not.toContain('useNativeDriver: false');
+  });
+});
+
 // ─── ShareCard honest performance grid ──────────────────────────────────────
 // The shared PNG/preview must show the SAME grid as the shared text
 // (generateShareText): one square per move in play order when moveOutcomes is

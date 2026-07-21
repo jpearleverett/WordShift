@@ -36,6 +36,17 @@ const ARC_ROTATION = 12; // Max rotation in degrees for edge elements (steeper f
 const ARC_LIFT = 18; // How much center elements lift up relative to edges
 const SLOT_HEIGHT = 52; // Height to match letter tiles vertically
 
+// Board-serve entrance: a fresh board materializes top-to-bottom instead of
+// snapping in. This Row component mounts fresh ONLY on a genuine board serve —
+// App keys each Row by row.id (unique per generated board), so a new board
+// remounts every Row, while the frequent arc-toggle tile remounts within a
+// board leave the Row INSTANCE intact. So a run-once-on-mount entrance fires
+// exactly on serves and never mid-solve. Reduced motion / low-tier skip it.
+const BOARD_SERVE_RISE = 14; // px the row rises from as it fades in
+const BOARD_SERVE_STAGGER_MS = 55; // per-row cascade delay
+const BOARD_SERVE_MAX_STAGGER_ROWS = 6; // cap so long boards never crawl in
+const BOARD_SERVE_FADE_MS = 260;
+
 /** Preview data for a single slot position */
 export interface SlotPreview {
   word: string;
@@ -639,6 +650,46 @@ export const Row: React.FC<RowProps> = memo(({
   measureCbRef.current = (node: View | null) => onMeasureRef?.(rowIndex, node);
   const stableMeasureRef = useRef((node: View | null) => measureCbRef.current(node)).current;
 
+  // Board-serve entrance (see BOARD_SERVE_* above). Decided once at mount so the
+  // initial values don't flash: an animating serve starts hidden + risen and
+  // settles; a reduced-motion / low-tier serve starts already in place. The
+  // outer wrapper owns opacity/translateY so it never contends with the inner
+  // row-transition opacity/scale/slide.
+  const serveAnimates = useRef(
+    !getSettingsSync().reducedMotion && !shouldSimplifyAnimations()
+  ).current;
+  const serveOpacity = useRef(new Animated.Value(serveAnimates ? 0 : 1)).current;
+  const serveTranslateY = useRef(new Animated.Value(serveAnimates ? BOARD_SERVE_RISE : 0)).current;
+
+  useEffect(() => {
+    if (!serveAnimates) return;
+    const delay = Math.min(rowIndex, BOARD_SERVE_MAX_STAGGER_ROWS) * BOARD_SERVE_STAGGER_MS;
+    const anim = Animated.sequence([
+      Animated.delay(delay),
+      Animated.parallel([
+        Animated.timing(serveOpacity, {
+          toValue: 1,
+          duration: BOARD_SERVE_FADE_MS,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.spring(serveTranslateY, {
+          toValue: 0,
+          friction: 7,
+          tension: 90,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]);
+    anim.start();
+    return () => {
+      anim.stop();
+      serveOpacity.stopAnimation();
+      serveTranslateY.stopAnimation();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once on mount (a genuine board serve); anim values are stable refs
+  }, []);
+
   useEffect(() => {
     // Animate row transitions
     if (isSource) {
@@ -1051,6 +1102,16 @@ export const Row: React.FC<RowProps> = memo(({
 
   return (
     <Animated.View
+      // Board-serve entrance wrapper: fades + rises the whole row in on a fresh
+      // board serve (staggered by rowIndex). Kept OUTSIDE the row-transition
+      // wrapper so its opacity/translateY compose cleanly with the inner
+      // scale/opacity/slide instead of fighting them for the same props.
+      style={{
+        opacity: serveOpacity,
+        transform: [{ translateY: serveTranslateY }],
+      }}
+    >
+    <Animated.View
       style={[
         styles.rowWrapper,
         // Source row with drag needs higher zIndex so floating tile renders above subsequent rows
@@ -1119,6 +1180,7 @@ export const Row: React.FC<RowProps> = memo(({
           )}
         </View>
       </View>
+    </Animated.View>
     </Animated.View>
   );
 });
