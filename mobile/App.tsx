@@ -425,6 +425,15 @@ function MainApp() {
     }
   }, []);
 
+  // Endgame cinematics (FINAL_PUZZLE_EVENT / POST_REVELATION_EVENT) are the
+  // game's climax, but their completion flags persist BEFORE the cinematic is
+  // queued on a 1.5s victory timeout. A habitual exit inside that window runs
+  // startVictoryExitFlow -> clearVictoryTimeouts, which drops the queued event
+  // FOREVER (the flag is set, so the next win never re-queues it). Hold the
+  // queued event here so an exit in the window can play it instead of losing
+  // it — the PhaseTransitionOverlay renders at App root above every screen.
+  const pendingEndgameEventRef = useRef<PhaseTransitionEvent | null>(null);
+
   // HOUSE ASKS — the small optional per-board constraint (services/houseAsks):
   // on some standard boards the house asks that one letter travel, or that it
   // stay untouched. App-level state ONLY, on purpose: the ask deliberately
@@ -1324,7 +1333,24 @@ function MainApp() {
     await dismissPostVictoryIntro();
   }, [postVictoryIntro, postVictoryIntroIndex, dismissPostVictoryIntro]);
 
+  // Queue an endgame cinematic on the usual 1.5s beat, but also record it so a
+  // victory exit inside the window can rescue it (see pendingEndgameEventRef).
+  const queueEndgameCinematic = useCallback((event: PhaseTransitionEvent) => {
+    pendingEndgameEventRef.current = event;
+    addVictoryTimeout(() => {
+      pendingEndgameEventRef.current = null;
+      setPhaseTransitionEvent(event);
+    }, 1500);
+  }, [addVictoryTimeout]);
+
   const startVictoryExitFlow = useCallback((action: () => void) => {
+    // Rescue a queued endgame cinematic before clearVictoryTimeouts drops its
+    // timer: play it now, over the navigation, instead of losing it forever.
+    const pendingEndgame = pendingEndgameEventRef.current;
+    if (pendingEndgame) {
+      pendingEndgameEventRef.current = null;
+      setPhaseTransitionEvent(pendingEndgame);
+    }
     clearVictoryTimeouts();
     clearVictoryToastQueue();
     // The completed puzzle's autosave must never be resumable from Play
@@ -2344,7 +2370,7 @@ function MainApp() {
                     ? 'You finished what was being built. There is no pretending now.'
                     : 'You completed the house and reached the final path.',
                 });
-                addVictoryTimeout(() => setPhaseTransitionEvent(FINAL_PUZZLE_EVENT), 1500);
+                queueEndgameCinematic(FINAL_PUZZLE_EVENT);
               } else if (!(await isFinaleArmed())) {
                 // Dwell gate: the finale used to fire on the FIRST Phase-4
                 // victory, so the whole cult-reveal era flashed past in one
@@ -2379,7 +2405,7 @@ function MainApp() {
                   title: 'THE PATTERN REMEMBERS YOU',
                   text: 'You saw it through to the end. The arrangement is complete, and your words remain in every wall.',
                 });
-                addVictoryTimeout(() => setPhaseTransitionEvent(POST_REVELATION_EVENT), 1500);
+                queueEndgameCinematic(POST_REVELATION_EVENT);
               }
             }
           }
