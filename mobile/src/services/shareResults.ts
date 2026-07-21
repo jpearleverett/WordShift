@@ -324,16 +324,63 @@ export function decodeChallengeLink(url: string): string[] | null {
 }
 
 /**
+ * Phase-aware, spoiler-safe challenge taunts. The starting chain in the link IS
+ * the challenge (non-daily), so nothing here reveals more than that; the tone
+ * simply follows the SENDER's descent, exactly like the ShareCard's phase decay
+ * and the intrigue taglines, so a late-game challenge carries the "cozy word
+ * game, but something is off" lure without ever leaking the puzzle. Never names
+ * the entity; no em dashes. Exported so unit tests and the noEmDashes sweep can
+ * reach the pool.
+ */
+export interface ChallengeTaunt {
+  named: (name: string) => string;
+  anon: string;
+}
+
+export const CHALLENGE_TAUNTS: Record<0 | 2 | 3 | 4, ChallengeTaunt> = {
+  // Bright (phases 0-1): playful.
+  0: {
+    named: (n) => `${n} challenges you to a WordShift puzzle. Think you can shift it?`,
+    anon: 'I challenge you to a WordShift puzzle. Think you can shift it?',
+  },
+  // Deeper questions (phase 2): the warmth thins.
+  2: {
+    named: (n) => `${n} left you a WordShift puzzle. See if the words still behave for you.`,
+    anon: 'A WordShift puzzle for you. See if the words still behave.',
+  },
+  // Growing shadows (phase 3): dread creeping in.
+  3: {
+    named: (n) => `${n} sends you a WordShift puzzle. The letters have gone strange. Try it anyway.`,
+    anon: 'A WordShift puzzle for you. The letters have gone strange. Try it anyway.',
+  },
+  // The horizon / terrible peace (phases 4-5): reverent, abstract, still spoiler-safe.
+  4: {
+    named: (n) => `${n} offers you a WordShift puzzle. Solve it, and see what you bring closer.`,
+    anon: 'A WordShift puzzle waits for you. Solve it, and see what you bring closer.',
+  },
+};
+
+/** Bucket a phase to its taunt tier (0-1 bright, 2, 3, 4-5 revealed/peace). */
+function challengeTauntTier(phase: number): 0 | 2 | 3 | 4 {
+  const p = Math.round(phase);
+  if (p <= 1) return 0;
+  if (p === 2) return 2;
+  if (p === 3) return 3;
+  return 4;
+}
+
+/**
  * Build share text for challenging a friend with a specific starting chain.
  * The starting words ARE the challenge (non-daily), so encoding them in the
- * link is not a spoiler; nothing beyond the starting chain is included.
+ * link is not a spoiler; nothing beyond the starting chain is included. The
+ * taunt is phase-aware (see CHALLENGE_TAUNTS) so it decays with the sender's
+ * descent; `phase` defaults to 0 (bright) for callers that don't thread it.
  */
-export function buildChallengeShareText(words: string[], playerName?: string): string {
+export function buildChallengeShareText(words: string[], playerName?: string, phase = 0): string {
   const link = encodeChallengeLink(words);
-  const taunt = playerName
-    ? `${playerName} challenges you to a WordShift puzzle. Think you can shift it?`
-    : 'I challenge you to a WordShift puzzle. Think you can shift it?';
-  return [taunt, link, `Get WordShift: ${PLAY_STORE_URL}`].join('\n');
+  const taunt = CHALLENGE_TAUNTS[challengeTauntTier(phase)];
+  const line = playerName ? taunt.named(playerName) : taunt.anon;
+  return [line, link, `Get WordShift: ${PLAY_STORE_URL}`].join('\n');
 }
 
 const SHARE_BONUS_KEY = 'wordshift_share_bonus_date';

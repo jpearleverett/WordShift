@@ -59,7 +59,7 @@ import React from 'react';
 import { Row } from '../components/Row';
 import { LetterTile } from '../components/LetterTile';
 import { DraggableTile } from '../components/DraggableTile';
-import { ShareCard, gridSquareKinds, SQUARE_COLORS, getShareDecay } from '../components/share/ShareCard';
+import { ShareCard, gridSquareKinds, SQUARE_COLORS, getShareDecay, INSTALL_URL_DISPLAY } from '../components/share/ShareCard';
 import type { HintHighlight, ArrivalMark } from '../hooks/usePuzzleGame';
 import type { ShareableResult, MoveOutcome } from '../services/shareResults';
 
@@ -376,5 +376,30 @@ describe('ShareCard phase decay', () => {
     expect(text).not.toContain('The Offering');
     // ...but the corruption IS present on the daily card.
     expect(findByTestID(tree, 'share-decay-underlay')).not.toBeNull();
+  });
+});
+
+// ─── ShareCard install-URL footer (the viral loop's way home from an image) ──
+describe('ShareCard install URL', () => {
+  test('is a real https host stripped to a tidy footer form', () => {
+    expect(INSTALL_URL_DISPLAY).not.toMatch(/^https?:\/\//);
+    expect(INSTALL_URL_DISPLAY).not.toMatch(/\/$/);
+    expect(INSTALL_URL_DISPLAY.length).toBeGreaterThan(0);
+  });
+
+  test('the shared card carries the install URL on a non-daily card', () => {
+    const tree = renderCardTree({ ...baseShareResult, phase: 0 });
+    expect(collectText(tree).join(' ')).toContain(INSTALL_URL_DISPLAY);
+  });
+
+  test('the install URL is present AND spoiler-safe on the daily card', () => {
+    const tree = renderCardTree({
+      ...baseShareResult, phase: 2, isDaily: true, dailyDate: '2026-07-07',
+      wordChain: ['VOID', 'AVOID'], incantationName: 'Offering: VOID',
+    });
+    const text = collectText(tree).join(' ');
+    expect(text).toContain(INSTALL_URL_DISPLAY);
+    expect(text).not.toContain('VOID');
+    expect(text).not.toContain('Offering: VOID');
   });
 });

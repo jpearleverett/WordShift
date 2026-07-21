@@ -5,6 +5,7 @@ import { PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { getShareCardTagline } from '../../services/phaseNarrative';
 import { pickShareIntrigueTagline } from '../../services/shareResults';
 import type { ShareableResult, MoveOutcome } from '../../services/shareResults';
+import { WEB_LANDING_URL } from '../../constants/links';
 
 /**
  * The shareable result card — a polished, spoiler-free, phase-aware artifact the
@@ -25,6 +26,16 @@ import type { ShareableResult, MoveOutcome } from '../../services/shareResults';
  */
 
 const CARD_WIDTH = 320;
+
+/**
+ * The real, universally-openable install URL baked INTO the card art. An image
+ * share carries no accompanying text on Android (both shareFile paths drop the
+ * message), so the visible URL on the footer is the recipient's only way home
+ * from a shared PNG. Scheme + trailing slash stripped so it reads as a tidy
+ * footer line. Spoiler-safe (a URL, never words); shown identically on daily
+ * and non-daily cards. Exported so the render tests can pin it.
+ */
+export const INSTALL_URL_DISPLAY = WEB_LANDING_URL.replace(/^https?:\/\//, '').replace(/\/+$/, '');
 
 interface ShareCardProps {
   result: ShareableResult;
@@ -221,10 +232,14 @@ export const ShareCard = forwardRef<View, ShareCardProps>(({ result }, ref) => {
           {pickShareIntrigueTagline(result) ?? getShareCardTagline(phase)}
         </Text>
 
-        {/* Footer */}
+        {/* Footer — carries the visible install URL so a shared IMAGE (which
+            drops any accompanying text on Android) still shows the way home */}
         <View style={[styles.footer, { borderTopColor: cardBorder }]}>
-          <Text style={[styles.footerText, { color: subColor }]}>
+          <Text style={[styles.footerText, { color: textColor }]}>
             {result.isDaily ? 'Take today’s daily challenge' : 'Play WordShift'}
+          </Text>
+          <Text style={[styles.footerUrl, { color: subColor }]} numberOfLines={1}>
+            {INSTALL_URL_DISPLAY}
           </Text>
         </View>
 
@@ -309,6 +324,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   footerText: { fontSize: 12.5, fontWeight: '700', letterSpacing: 0.3, fontFamily: PIXEL_FONT_BOLD },
+  footerUrl: { fontSize: 10.5, fontWeight: '700', letterSpacing: 0.2, marginTop: 3, fontFamily: PIXEL_FONT_BOLD },
 });
 
 export { CARD_WIDTH };
