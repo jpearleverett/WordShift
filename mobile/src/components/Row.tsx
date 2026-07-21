@@ -524,20 +524,28 @@ const Slot: React.FC<{
             opacity: previewOpacity,
             transform: [{ scale: previewScale }],
           }]}>
-            <Text
-              style={[
-                styles.slotPreviewText,
-                compact && styles.slotPreviewTextCompact,
-                validityVisible
-                  ? (preview.isValid ? styles.slotPreviewValid : styles.slotPreviewInvalid)
-                  : styles.slotPreviewNeutral,
-                validityVisible && preview.isValid && styles.slotPreviewValidBold,
-              ]}
-              numberOfLines={1}
-              maxFontSizeMultiplier={1.2}
-            >
-              {validityVisible ? (preview.isValid ? '✓ ' : '✗ ') : ''}{preview.word}
-            </Text>
+            {/* The preview word rides a small dark scrim chip so the core
+                judge-the-word channel is legible at every phase (the bare ink
+                over the translucent target-row fill computed 1.2-2.8:1). Light
+                inks on the chip compute >=4.5:1; valid/invalid is still carried
+                by the ✓/✗ prefix + bold, and the neutral gate keeps ONE ink and
+                ONE weight for every slot (no validity leak). */}
+            <View style={styles.slotPreviewChip}>
+              <Text
+                style={[
+                  styles.slotPreviewText,
+                  compact && styles.slotPreviewTextCompact,
+                  validityVisible
+                    ? (preview.isValid ? styles.slotPreviewValid : styles.slotPreviewInvalid)
+                    : styles.slotPreviewNeutral,
+                  validityVisible && preview.isValid && styles.slotPreviewValidBold,
+                ]}
+                numberOfLines={1}
+                maxFontSizeMultiplier={1.2}
+              >
+                {validityVisible ? (preview.isValid ? '✓ ' : '✗ ') : ''}{preview.word}
+              </Text>
+            </View>
           </Animated.View>
         )}
       </Animated.View>
@@ -1353,10 +1361,20 @@ const styles = StyleSheet.create({
   },
   slotPreviewContainer: {
     position: 'absolute',
-    bottom: -16,
+    bottom: -18,
     alignItems: 'center',
     justifyContent: 'center',
     width: 60,
+  },
+  // The dark scrim chip that backs the preview word — a single dark tint that
+  // becomes the controlled background so light inks read at >=4.5:1 regardless
+  // of the phase or the translucent target-row fill behind it.
+  slotPreviewChip: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 7,
+    backgroundColor: 'rgba(16, 10, 34, 0.62)',
+    maxWidth: 60,
   },
   slotPreviewText: {
     fontFamily: PIXEL_FONT_BOLD,
@@ -1369,29 +1387,24 @@ const styles = StyleSheet.create({
     fontFamily: BODY_FONT,
     fontSize: 9,
   },
+  // Light inks on the dark chip. Valid/invalid stays distinguished by the
+  // ✓/✗ prefix + bold weight (never color alone); the hues are light tints
+  // that clear 4.5:1 on the chip.
   slotPreviewValid: {
-    color: CandyColors.green.main,
-    opacity: 0.85,
+    color: '#8BF0AE',
   },
   slotPreviewValidBold: {
     fontFamily: BODY_FONT_BOLD,
     fontWeight: '800',
   },
   slotPreviewInvalid: {
-    // Tester-verified legibility fix: red.light at 0.45 opacity was a faint
-    // pink ghost on the lavender board and first-timers could not read the
-    // invalid words at all. The invalid verdict must be READABLE (the ✗
-    // prefix plus a clearly weaker treatment than the bold green ✓ carries
-    // the hierarchy, never invisibility).
-    color: CandyColors.red.dark,
-    opacity: 0.8,
+    color: '#FF9DA2',
   },
-  // Neutral ghost preview (validity gate closed): ONE dimmed ink for every
-  // slot — the current valid-green/invalid-red split must never leak through
-  // weight, color, or opacity when the player is meant to judge the word.
+  // Neutral ghost preview (validity gate closed): ONE ink + ONE weight for
+  // every slot — the valid/invalid split must never leak through color,
+  // weight, or opacity when the player is meant to judge the word.
   slotPreviewNeutral: {
-    color: CandyColors.gray[600],
-    opacity: 0.6,
+    color: '#EDE8F8',
   },
 });
 
