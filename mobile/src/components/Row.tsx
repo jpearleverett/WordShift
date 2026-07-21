@@ -586,9 +586,21 @@ export const Row: React.FC<RowProps> = memo(({
   const glowAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
   const arcAnim = useRef(new Animated.Value(0)).current; // 0 = flat, 1 = full arc
+  // Slot-wrapper fade/scale that plays alongside the fan's flatten on collapse,
+  // so the slots don't pop out of existence when the arc subtree unmounts.
+  const slotCollapseAnim = useRef(new Animated.Value(1)).current; // 1 = shown, 0 = collapsed
+  // Tracks whether the fan is currently open/opening, so a letter switch can
+  // update previews in place instead of hard-cutting the fan back to flat.
+  const arcOpenRef = useRef(false);
   const invalidShakeX = useRef(new Animated.Value(0)).current;
   const successBounceScale = useRef(new Animated.Value(1)).current;
   const glowLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+
+  // The arc fan stays MOUNTED through its close animation (see the arc effect):
+  // while collapsing, showSlots is already false but arcVisible keeps the
+  // subtree alive so the 300ms flatten plays against live views instead of an
+  // already-unmounted subtree.
+  const [arcVisible, setArcVisible] = useState(false);
 
   // Inter-slot tap guidance: tapping a letter tile in the target row (between
   // drop slots) pulses its two ADJACENT slots. Letter i sits between slots i
@@ -704,11 +716,32 @@ export const Row: React.FC<RowProps> = memo(({
     };
   }, [isSource, isTarget, isCompleted, guidanceActive]);
 
-  // Animate arc when slots appear/disappear - smooth glide effect
-  // Depends on both showSlots AND selectedLetter to replay animation on each selection
+  // Animate the arc fan open/closed with real motion. The fan stays MOUNTED
+  // through its collapse (local arcVisible state) so the 300ms close plays
+  // against live views instead of an already-unmounted subtree; a letter switch
+  // while the fan is open updates previews in place without hard-cutting the fan
+  // flat; a committed move (the row's role changed, so isTarget is already
+  // false) accepts the snap, which the catch-bounce + arrival settle mask.
+  // Reduced motion / low-tier devices set everything instantly.
   useEffect(() => {
+    const instant = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
     if (showSlots) {
-      // Reset to 0 first, then animate to 1 - ensures animation replays each time
+      setArcVisible(true);
+      if (instant) {
+        arcAnim.setValue(1);
+        slotCollapseAnim.setValue(1);
+        arcOpenRef.current = true;
+        return;
+      }
+      if (arcOpenRef.current) {
+        // Fan already open (letter switch): keep it in place, let the Slot
+        // preview effects update the ghost words. No setValue(0) flash.
+        slotCollapseAnim.setValue(1);
+        return;
+      }
+      // Fresh open glide.
+      arcOpenRef.current = true;
+      slotCollapseAnim.setValue(1);
       arcAnim.setValue(0);
       Animated.timing(arcAnim, {
         toValue: 1,
@@ -716,14 +749,43 @@ export const Row: React.FC<RowProps> = memo(({
         easing: Easing.out(Easing.cubic), // Smooth deceleration
         useNativeDriver: true,
       }).start();
-    } else {
+      return;
+    }
+
+    // showSlots is false.
+    if (!arcOpenRef.current) return; // nothing open to collapse
+    arcOpenRef.current = false;
+    // A deselect leaves this the target row (isTarget stays true); a committed
+    // move flips the row's role so isTarget is already false -> snap instead.
+    const gracefulDeselect = isTarget;
+    if (instant || !gracefulDeselect) {
+      arcAnim.setValue(0);
+      slotCollapseAnim.setValue(1);
+      setArcVisible(false);
+      return;
+    }
+    // Deselect (board unchanged): flatten the fan and fade the slots, then
+    // unmount only once the collapse finishes.
+    Animated.parallel([
       Animated.timing(arcAnim, {
         toValue: 0,
         duration: 300, // Faster collapse
         easing: Easing.in(Easing.cubic),
         useNativeDriver: true,
-      }).start();
-    }
+      }),
+      Animated.timing(slotCollapseAnim, {
+        toValue: 0,
+        duration: 300,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start(({ finished }) => {
+      if (finished) {
+        setArcVisible(false);
+        slotCollapseAnim.setValue(1); // reset for the next open
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- isTarget rides with showSlots; anim values are stable refs
   }, [showSlots, selectedLetter?.id]);
 
   // Micro-shake the target row on invalid drop attempts. Visual-only: the
@@ -781,6 +843,13 @@ export const Row: React.FC<RowProps> = memo(({
     const totalElements = letters.length * 2 + 1;
     const elements: React.ReactNode[] = [];
 
+    // Slots fade + shrink slightly as the fan collapses (rests at 1 while open),
+    // so their disappearance is smoothed rather than a hard unmount pop.
+    const slotCollapseScale = slotCollapseAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0.82, 1],
+    });
+
     for (let i = 0; i < totalElements; i++) {
       const isSlot = i % 2 === 0;
       const { yMultiplier, rotationMultiplier } = getArcMultipliers(i, totalElements);
@@ -802,7 +871,10 @@ export const Row: React.FC<RowProps> = memo(({
             key={`slot-${slotIndex}`}
             style={[
               styles.arcSlotWrapper,
-              { transform: [{ translateY }, { rotate }] },
+              {
+                opacity: slotCollapseAnim,
+                transform: [{ translateY }, { rotate }, { scale: slotCollapseScale }],
+              },
             ]}
           >
             <Slot
@@ -946,6 +1018,12 @@ export const Row: React.FC<RowProps> = memo(({
     return styles.rowFuture;
   };
 
+  // Render the arc while slots are shown AND through the collapse that follows a
+  // deselect (arcVisible). Gated on isTarget so a committed move (row role
+  // flipped) shows the standard layout immediately — no one-frame arc-on-source
+  // flash while the effect resets the collapse state.
+  const arcMounted = isTarget && (!!showSlots || arcVisible);
+
   return (
     <Animated.View
       style={[
@@ -1001,10 +1079,11 @@ export const Row: React.FC<RowProps> = memo(({
         )}
 
         {/* Content area */}
-        <View style={[styles.contentWrapper, showSlots && styles.contentWrapperArc, isSource && !!onLetterDragDrop && styles.contentWrapperDraggable]}>
-          {showSlots ? (
-            // Arc layout for DROP row - letters overflow container
-            <View style={styles.arcRow}>
+        <View style={[styles.contentWrapper, arcMounted && styles.contentWrapperArc, isSource && !!onLetterDragDrop && styles.contentWrapperDraggable]}>
+          {arcMounted ? (
+            // Arc layout for DROP row - letters overflow container. While the
+            // fan is collapsing (showSlots already false) the slots are inert.
+            <View style={styles.arcRow} pointerEvents={showSlots ? 'auto' : 'none'}>
               {renderArcContent()}
             </View>
           ) : (
