@@ -521,6 +521,13 @@ render('amber_earn', 0.55, (s, rand) => {
   strike(s, { freq: N.E6, start: 0.12, dur: 0.24, vol: 0.26, partials: CELESTA, decayShape: 5.5, unison: 3, detune: 0.004, rand });
 }, { reverb: { wet: 0.12, tail: 0.3 }, peak: 0.65 });
 
+// pit_devour: a word lands in the offering pit — a hollow low strike with a
+// soft lowpassed-noise "swallow" pulling it under. The dark mirror adds a sub-hum.
+render('pit_devour', 0.35, (s, rand) => {
+  strike(s, { freq: D.C3, dur: 0.24, vol: 0.5, partials: HOLLOW, attack: 0.003, decayShape: 6, bend: -0.08, unison: 2, detune: 0.003, rand });
+  noiseBurst(s, { start: 0.02, dur: 0.3, vol: 0.28, lp: 0.09, attack: 0.06, decayShape: 4, rand });
+}, { reverb: { wet: 0.2, damp: 0.5, tail: 0.3 }, peak: 0.5 });
+
 // achievement: proud little fanfare climbing to a handbell accent.
 render('achievement', 1.3, (s, rand) => {
   const line = [ [N.G4, 0, 0.45], [N.C5, 0.12, 0.5], [N.E5, 0.24, 0.5], [N.G5, 0.36, 0.5] ];
@@ -637,6 +644,20 @@ render('amber_earn_dark', 0.6, (s, rand) => {
   strike(s, { freq: D.Bb4, start: 0.09, dur: 0.32, vol: 0.4, partials: DARK_BELL, attack: 0.005, decayShape: 4.5, unison: 2, detune: 0.004, rand });
 }, { reverb: { wet: 0.22, damp: 0.55, tail: 0.4 }, peak: 0.55 });
 
+// pit_devour_dark: the same swallow, hungrier — a sub-hum opens beneath it.
+render('pit_devour_dark', 0.35, (s, rand) => {
+  strike(s, { freq: D.C3, dur: 0.24, vol: 0.5, partials: HOLLOW, attack: 0.004, decayShape: 6, bend: -0.1, unison: 2, detune: 0.003, rand });
+  noiseBurst(s, { start: 0.02, dur: 0.3, vol: 0.26, lp: 0.07, attack: 0.06, decayShape: 3.8, rand });
+  swell(s, { freq: D.C2, start: 0.01, dur: 0.32, vol: 0.3, attack: 0.04, release: 0.18, unison: 2, detune: 0.005, rand });
+}, { reverb: { wet: 0.24, damp: 0.6, tail: 0.35 }, peak: 0.5 });
+
+// hint_dark: the hint sparkle gone cold — a falling dark-bell pair, not celesta.
+render('hint_dark', 0.5, (s, rand) => {
+  strike(s, { freq: D.Ab4, dur: 0.2, vol: 0.32, partials: DARK_BELL, attack: 0.006, decayShape: 5, rand });
+  strike(s, { freq: D.Eb4, start: 0.09, dur: 0.3, vol: 0.32, partials: DARK_BELL, attack: 0.008, decayShape: 4.5, bend: -0.04, unison: 2, detune: 0.004, rand });
+  noiseBurst(s, { start: 0.02, dur: 0.2, vol: 0.06, lp: 0.5, hp: 0.4, decayShape: 4, rand });
+}, { reverb: { wet: 0.24, damp: 0.55, tail: 0.4 }, peak: 0.5 });
+
 // dialogue_dark: low hollow blip (quiet — fires on every line).
 render('dialogue_dark', 0.2, (s, rand) => {
   strike(s, { freq: D.C4, dur: 0.15, vol: 0.45, partials: HOLLOW, attack: 0.004, decayShape: 7, unison: 2, detune: 0.004, rand });
@@ -677,6 +698,26 @@ render('ui_tap_dark', 0.2, (s, rand) => {
 render('ui_tick_dark', 0.16, (s, rand) => {
   strike(s, { freq: D.Eb4, dur: 0.11, vol: 0.4, partials: HOLLOW, attack: 0.003, decayShape: 8, unison: 2, detune: 0.004, rand });
 }, { reverb: { wet: 0.1, damp: 0.6, tail: 0.12 }, peak: 0.38 });
+
+// ===========================================================================
+// HORROR CUES: standalone wrong-notes for the post-victory orchestration. No
+// dark mirror — they are ALREADY the wrongness, at any phase, and stay quiet.
+// ===========================================================================
+
+// glitch: a moment of wrong authorship — a detuned dark bell bends downward
+// while two torn high-noise stutters skip at 0 and 70ms. Peak kept low.
+render('glitch', 0.45, (s, rand) => {
+  strike(s, { freq: D.Gb4, dur: 0.4, vol: 0.4, partials: DARK_BELL, attack: 0.004, decayShape: 4.5, bend: -0.12, unison: 3, detune: 0.02, rand });
+  noiseBurst(s, { start: 0, dur: 0.05, vol: 0.3, lp: 0.9, hp: 0.9, decayShape: 8, rand });
+  noiseBurst(s, { start: 0.07, dur: 0.05, vol: 0.28, lp: 0.9, hp: 0.9, decayShape: 8, rand });
+}, { reverb: { wet: 0.18, damp: 0.5, tail: 0.3 }, peak: 0.35 });
+
+// whisper: airy presence, no pitch — a band-limited breath swell. The sound of
+// being noticed. Very quiet.
+render('whisper', 0.9, (s, rand) => {
+  noiseBurst(s, { start: 0, dur: 0.85, vol: 0.4, lp: 0.5, hp: 0.6, attack: 0.25, decayShape: 2.2, rand });
+  noiseBurst(s, { start: 0.2, dur: 0.6, vol: 0.18, lp: 0.7, hp: 0.8, attack: 0.2, decayShape: 2.5, rand });
+}, { reverb: { wet: 0.3, damp: 0.45, tail: 0.5 }, peak: 0.3 });
 
 // ===========================================================================
 // AMBIENT MUSIC BEDS: three seamless loops sharing one musical DNA.

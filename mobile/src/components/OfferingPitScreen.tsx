@@ -1810,6 +1810,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         setDisplayBalance(newBalance);
         onAmberChange?.(newBalance);
         spawnAmberRise(result.amberAwarded);
+        playUiSound('amber_earn');
         hapticMedium();
         showResultToast(getPitOfferResultMessage(phase, result.wordsOffered, result.amberAwarded));
         // Remembered by name: if the offered batch carried a dread word, the pit
@@ -1848,6 +1849,8 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     // so an actively-tapping player is never preempted by the auto-offer.
     stallRescueRef.current?.arm();
     flashPitSurge();
+    // The word lands in the pit — sound the impact (self-gates on soundEnabled).
+    playUiSound('devour');
     spawnImpactBurst();
     spawnShockwave();
     if (!devouredPerBatch.current.has(fw.batchId)) {
@@ -2039,6 +2042,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       if (mountedRef.current) {
         setDisplayBalance(finalBalance);
         spawnAmberRise(result.amberAwarded);
+        playUiSound('amber_earn');
         showResultToast(getPitOfferResultMessage(phase, totalWordCount, result.amberAwarded));
         nameDreadOffering();
         const freshState = await getHarvestState();
@@ -2069,7 +2073,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         fw.floatLoopX?.stop(); fw.floatLoopX = null;
         fw.floatLoopY?.stop(); fw.floatLoopY = null;
 
-        if (i % 3 === 0) spawnTrail(currentPos.x, currentPos.y);
+        if (i % 3 === 0) { spawnTrail(currentPos.x, currentPos.y); playUiSound('devour'); }
         const duration = timing.wordDurationMs;
 
         // Count the displayed total up and the visual pending amber down as
@@ -2136,6 +2140,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         // to it; this also corrects any drift from a concurrent credit).
         setDisplayBalance(finalBalance);
         spawnAmberRise(result.amberAwarded);
+        playUiSound('amber_earn');
         showResultToast(getPitOfferResultMessage(phase, totalWordCount, result.amberAwarded));
         nameDreadOffering();
         setHarvestState({ ...freshState, pendingBatches: [...freshState.pendingBatches] });

@@ -42,6 +42,12 @@ const SOUND_SOURCES: Record<string, any> = {
   dialogue: require('../../assets/sounds/dialogue.wav'),
   phase_change: require('../../assets/sounds/phase_change.wav'),
   daily_ready: require('../../assets/sounds/daily_ready.wav'),
+  // Offering Pit: a word landing in the pit (dark mirror hungrier at Phase 3+).
+  pit_devour: require('../../assets/sounds/pit_devour.wav'),
+  // Horror cues for the post-victory orchestration — no dark mirror, they are
+  // already the wrongness at any phase.
+  glitch: require('../../assets/sounds/glitch.wav'),
+  whisper: require('../../assets/sounds/whisper.wav'),
   // Dedicated UI sounds (menus / dialogue / navigation): a warm confirm tap and
   // a soft selection tick, distinct from the board's tap/letter_select so menu
   // taps never read as gameplay.
@@ -57,7 +63,9 @@ const SOUND_SOURCES: Record<string, any> = {
   valid_move_4_dark: require('../../assets/sounds/valid_move_4_dark.wav'),
   invalid_move_dark: require('../../assets/sounds/invalid_move_dark.wav'),
   undo_dark: require('../../assets/sounds/undo_dark.wav'),
+  hint_dark: require('../../assets/sounds/hint_dark.wav'),
   amber_earn_dark: require('../../assets/sounds/amber_earn_dark.wav'),
+  pit_devour_dark: require('../../assets/sounds/pit_devour_dark.wav'),
   dialogue_dark: require('../../assets/sounds/dialogue_dark.wav'),
   victory_dark: require('../../assets/sounds/victory_dark.wav'),
   perfect_dark: require('../../assets/sounds/perfect_dark.wav'),
@@ -96,6 +104,7 @@ const PRELOAD_SOUND_NAMES = [
   'ui_tick',
   'valid_move_dark', // hot path once the descent deepens (Phase 3+)
   'valid_move_2_dark',
+  'pit_devour', // fires on every tap-devour + the Offer-All cascade in the pit
 ];
 
 const SOUND_VOLUME = 0.8;
@@ -315,6 +324,21 @@ export async function soundSelection(): Promise<void> {
 /** Amber earned. Cold coin at Phase 3+. */
 export async function soundAmberEarn(): Promise<void> {
   await playSound(resolveSfxForPhase('amber_earn', audioPhase));
+}
+
+/** A word devoured by the Offering Pit. Sub-hum swallow at Phase 3+. */
+export async function soundPitDevour(): Promise<void> {
+  await playSound(resolveSfxForPhase('pit_devour', audioPhase));
+}
+
+/** Post-victory glitch flash — a moment of wrongness. No dark mirror. */
+export async function soundGlitch(): Promise<void> {
+  await playSound(resolveSfxForPhase('glitch', audioPhase));
+}
+
+/** Post-victory whisper / ambient breath — the sound of being noticed. No dark mirror. */
+export async function soundWhisper(): Promise<void> {
+  await playSound(resolveSfxForPhase('whisper', audioPhase));
 }
 
 /** Achievement unlocked */

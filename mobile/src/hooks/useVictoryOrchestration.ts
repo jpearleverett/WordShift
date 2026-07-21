@@ -11,6 +11,10 @@ import {
 } from '../services/phaseNarrative';
 import { getFullProgress } from '../services/amberCurrency';
 import { recordWhisper } from '../services/whisperGallery';
+// Audio routes through the guarded uiSound bridge (never a static expo-audio
+// import) so this hook stays Jest-safe; haptics self-gate on hapticsEnabled.
+import { playUiSound } from '../services/uiSound';
+import { hapticWarning, hapticLight } from '../services/haptics';
 import {
   VICTORY_ANIMATION_LOCK_MS,
   WHISPER_DELAY_MS,
@@ -109,6 +113,12 @@ export interface ProcessVictoryParams {
    * micro-beat fires on the same win — one narrative voice per victory.
    */
   dwellLine?: string | null;
+  /**
+   * Whether this win is on the bespoke FINAL board. Suppresses the horror
+   * audio/haptic cues (glitch, whisper) so the finale's silent-victory contract
+   * holds. Wire it from App's `isFinalBoard` at the processVictory call site.
+   */
+  isFinalBoard?: boolean;
 }
 
 /** Display duration for the dwell-window held-breath line (ambient overlay). */
@@ -204,7 +214,12 @@ export function useVictoryOrchestration(): [
       puzzlesSinceHomeVisit,
       firstFreeWin,
       dwellLine,
+      isFinalBoard,
     } = params;
+
+    // The finale runs silent (no chime/confetti); its orchestration must not
+    // sneak a glitch/whisper cue in either.
+    const suppressCeremonyCues = !!isFinalBoard;
 
     const gen = ++generationRef.current;
 
@@ -226,6 +241,12 @@ export function useVictoryOrchestration(): [
         setVictoryGlitch(glitchText);
         setVictoryGlitchProminent(prominent);
         setShowVictoryGlitch(true);
+        // Only the PROMINENT glitch (first free win) gets a felt wrong-note; the
+        // ~8% ambient flickers stay subliminal (no sound/haptic). Never on the finale.
+        if (prominent && !suppressCeremonyCues) {
+          playUiSound('glitch');
+          hapticWarning();
+        }
         addTimeout(
           () => setShowVictoryGlitch(false),
           prominent ? VICTORY_GLITCH_FIRST_DURATION_MS : VICTORY_GLITCH_DURATION_MS,
@@ -264,6 +285,12 @@ export function useVictoryOrchestration(): [
           if (gen !== generationRef.current) return;
           setMicroBeat(finalBeat);
           setShowMicroBeat(true);
+          // Micro-beat cues: a held glitch_title tears (glitch + warning), an
+          // ambient_whisper breathes (whisper + light). Suppressed on the finale.
+          if (!suppressCeremonyCues) {
+            if (finalBeat.type === 'glitch_title') { playUiSound('glitch'); hapticWarning(); }
+            else if (finalBeat.type === 'ambient_whisper') { playUiSound('whisper'); hapticLight(); }
+          }
           addTimeout(() => setShowMicroBeat(false), finalBeat.durationMs);
         }, delay);
       }
@@ -297,6 +324,8 @@ export function useVictoryOrchestration(): [
           if (whisperData) {
             setWhisper({ animalName: whisperData.animalName, text: whisperData.text });
             setShowWhisper(true);
+            // A whisper surfaces — the sound of being noticed. Not on the finale.
+            if (!suppressCeremonyCues) { playUiSound('whisper'); hapticLight(); }
             // Record whisper in gallery
             recordWhisper({
               animalType: whisperData.animalType || 'unknown',
