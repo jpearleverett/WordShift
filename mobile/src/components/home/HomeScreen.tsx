@@ -1746,7 +1746,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   <Image source={AMBER_ICON} style={styles.amberIconImage} />
                 </Animated.View>
                 <Text style={styles.amberCount} numberOfLines={1}>{progress.amber}</Text>
-                {!isOnboarding && <AmberSparkle />}
+                {!isOnboarding && <AmberSparkle phase={progress.currentPhase} />}
               </View>
             </TouchableOpacity>
             {(progress.currentStreak > 1 || isStreakAtRisk) && (
@@ -1970,6 +1970,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               onPlayPuzzle();
             }}
             bounceScale={0.9}
+            phase={progress.currentPhase}
             accessibilityLabel="Play puzzle"
             accessibilityRole="button"
           >

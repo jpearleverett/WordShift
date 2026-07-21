@@ -10,6 +10,8 @@ import {
 } from 'react-native';
 import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
 import { PIXEL_FONT_BOLD } from '../theme/fonts';
+import { hapticSuccess } from '../services/haptics';
+import { playUiSound } from '../services/uiSound';
 import { PanelCard } from './ui/PanelCard';
 import { CandyButton } from './ui/CandyButton';
 import { AmberInline } from './AmberInline';
@@ -50,6 +52,10 @@ export const DailyLoginModal: React.FC<DailyLoginModalProps> = ({ grant, phase, 
   useEffect(() => {
     if (!visible) return;
     closingRef.current = false;
+    // The 7-day reward reveal had no sound AND no haptic — the jackpot appeared
+    // in silence. Mark the reward moment (self-gated on the sound/haptic prefs).
+    hapticSuccess();
+    playUiSound('amber_earn');
     if (reducedMotion) {
       backdropOpacity.setValue(1);
       cardScale.setValue(1);
