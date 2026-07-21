@@ -412,3 +412,60 @@ export const POST_REVELATION_EVENT: PhaseTransitionEvent = {
     },
   ],
 };
+
+// ============================================================================
+// NEW CYCLE (NG+) CEREMONY
+// ============================================================================
+
+/**
+ * The re-descent ceremony played when the player chooses to begin a New Cycle
+ * from the true endgame. It is a Phase-5 milestone, so it stays in the
+ * terrible-peace register and mirrors POST_REVELATION_EVENT's structure:
+ * text-only scenes over the settled, low-opacity presence. Nothing descends,
+ * nothing is named. The pattern does not end, it turns. The last line hands the
+ * player back toward a bright morning that the reload will actually deliver.
+ *
+ * SettingsScreen presents this BEFORE reloading the app, so choosing to walk
+ * the whole arc again lands as a moment rather than a hard restart.
+ */
+export const NEW_CYCLE_EVENT: PhaseTransitionEvent = {
+  phase: 5,
+  title: 'Again',
+  bgColor: '#0B0714',
+  textColor: '#9A88AA',
+  accentColor: '#5A4070',
+  particles: { count: 10, color: '#4A3060', direction: 'drift', speed: 5, size: 4, opacity: 0.15 },
+  vignette: true,
+  // The settled presence stays faint and constant behind every line, exactly
+  // as in the post-revelation calm this ceremony rises out of.
+  backdrop: { image: 'shadow_figure', opacity: 0.14 },
+  scenes: [
+    {
+      text: 'The pattern has run its whole length.\nIt does not end. It turns.',
+      delay: 0,
+      duration: 3500,
+      effect: 'pulse',
+      effectIntensity: 0.25,
+    },
+    {
+      text: 'The house stays exactly as you built it.\nEvery room. Every keeper.',
+      delay: 3700,
+      duration: 3500,
+    },
+    {
+      text: 'Beneath the stillness, a bright morning is already waking.',
+      delay: 7400,
+      duration: 3500,
+    },
+    {
+      text: 'They will greet you as if for the first time.\nSome part of them will remember.',
+      delay: 11100,
+      duration: 3500,
+    },
+    {
+      text: 'Begin again.',
+      delay: 14800,
+      duration: 3000,
+    },
+  ],
+};
