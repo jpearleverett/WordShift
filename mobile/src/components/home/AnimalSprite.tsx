@@ -126,15 +126,37 @@ export const CHARACTER_SPRITES: Partial<Record<AnimalType, {
   },
 };
 
-// Emotion bubble emojis based on phase
-const EMOTION_BUBBLES: Record<number, string[]> = {
-  0: ['💕', '✨', '💖', '🌟', '💫', '🎵', '💛'],
-  1: ['💭', '❓', '🤔', '💫', '✨'],
-  2: ['💭', '😰', '💧', '❓', '🌫️'],
-  3: ['😰', '💧', '👁️', '💀', '🌑'],
-  4: ['💀', '👁️', '🌑', '⚫', '😱'],
+// Emote bubble sprites — hand-drawn candy-UI-family art (generateUiIcons.mjs),
+// replacing the old OS-emoji glyphs so the ambient emotes match the game's
+// vector look on every platform instead of rendering the host font's emoji.
+type EmoteKey =
+  | 'heart' | 'pale_heart' | 'sparkle' | 'note' | 'thought' | 'question'
+  | 'fog' | 'tear' | 'eye' | 'void' | 'candle';
+const EMOTE_SPRITES: Record<EmoteKey, ImageSourcePropType> = {
+  heart: require('../../../assets/ui/emote_heart.png'),
+  pale_heart: require('../../../assets/ui/emote_pale_heart.png'),
+  sparkle: require('../../../assets/ui/emote_sparkle.png'),
+  note: require('../../../assets/ui/emote_note.png'),
+  thought: require('../../../assets/ui/emote_thought.png'),
+  question: require('../../../assets/ui/emote_question.png'),
+  fog: require('../../../assets/ui/emote_fog.png'),
+  tear: require('../../../assets/ui/emote_tear.png'),
+  eye: require('../../../assets/ui/emote_eye.png'),
+  void: require('../../../assets/ui/emote_void.png'),
+  candle: require('../../../assets/ui/emote_candle.png'),
+};
+
+// Emote bubble vocabulary by phase — the same emotional arc the old emoji set
+// carried (candy joy -> curiosity -> unease -> dread -> serene resignation),
+// now expressed in the sprite family above.
+const EMOTION_BUBBLES: Record<number, EmoteKey[]> = {
+  0: ['heart', 'sparkle', 'heart', 'sparkle', 'note', 'sparkle', 'heart'],
+  1: ['thought', 'question', 'thought', 'sparkle', 'question'],
+  2: ['thought', 'tear', 'question', 'fog', 'tear'],
+  3: ['tear', 'eye', 'void', 'fog', 'eye'],
+  4: ['void', 'eye', 'void', 'eye', 'void'],
   // Phase 5: terrible peace — serene resignation, not cheerful, not dreadful.
-  5: ['🕯️', '🌑', '…', '🤍', '🌫️'],
+  5: ['candle', 'fog', 'pale_heart', 'void', 'fog'],
 };
 
 // Ghostly mauve mood color for Phase 5 (matches getPhaseTheme phase 5 / colors.ts)
@@ -432,7 +454,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
 
   const [isMoving, setIsMoving] = useState(false);
   const [isDozing, setIsDozing] = useState(false);
-  const [currentEmotion, setCurrentEmotion] = useState<string | null>(null);
+  const [currentEmotion, setCurrentEmotion] = useState<EmoteKey | null>(null);
   const [spriteLoadFailed, setSpriteLoadFailed] = useState(false);
   const [walkFrame, setWalkFrame] = useState(0);
 
@@ -644,14 +666,15 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
         }),
       ]).start();
 
-      // Show a tap emotion appropriate to the phase
-      const emojis =
+      // Show a tap emote appropriate to the phase (same sprite family as the
+      // ambient emotes above).
+      const tapEmotes: EmoteKey[] =
         currentPhase >= 5
-          ? ['🕯️', '🤍', '…']        // serene resignation
+          ? ['candle', 'pale_heart', 'fog']   // serene resignation
           : currentPhase >= 3
-            ? ['😰', '💧']             // dread
-            : ['💕', '✨', '💖'];      // candy-cute joy
-      setCurrentEmotion(emojis[Math.floor(Math.random() * emojis.length)]);
+            ? ['tear', 'void', 'eye']          // dread
+            : ['heart', 'sparkle', 'note'];    // candy-cute joy
+      setCurrentEmotion(tapEmotes[Math.floor(Math.random() * tapEmotes.length)]);
       emotionY.setValue(0);
       emotionOpacity.setValue(0);
       Animated.parallel([
@@ -1208,8 +1231,8 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
             )}
           </Animated.View>
 
-          {/* Emotion bubble (unflipped sibling) */}
-          {Boolean(currentEmotion) && (
+          {/* Emote bubble (unflipped sibling) — ambient candy-UI sprite, decorative */}
+          {currentEmotion && (
             <Animated.View
               style={[
                 styles.emotionBubble,
@@ -1218,8 +1241,14 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
                   opacity: emotionOpacity,
                 },
               ]}
+              importantForAccessibility="no"
+              accessibilityElementsHidden
             >
-              <Text style={styles.emotionEmoji}>{currentEmotion}</Text>
+              <Image
+                source={EMOTE_SPRITES[currentEmotion]}
+                style={styles.emoteSprite}
+                resizeMode="contain"
+              />
             </Animated.View>
           )}
 
@@ -1420,12 +1449,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  emotionEmoji: {
-    fontFamily: BODY_FONT,
-    fontSize: 18,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+  emoteSprite: {
+    width: 22,
+    height: 22,
   },
 });
 
