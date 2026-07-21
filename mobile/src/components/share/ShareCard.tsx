@@ -89,6 +89,24 @@ const DIFFICULTY_DOT: Record<string, string> = {
  * visibility is phase-gated by the `aberration` opacity, so Phase 0 shows none. */
 const GLITCH_GHOST_WARM = SQUARE_COLORS.both; // '#E0524D'
 const GLITCH_GHOST_COOL = '#4DAFFF';
+
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'];
+
+/**
+ * Humanize the daily's stored local-day key ("2026-07-21" → "July 21") for the
+ * handcrafted card — the raw ISO string read as engineering text on parchment.
+ * Manual month table (not toLocaleDateString: Hermes' ICU support is spotty on
+ * Android) and LOCAL component parsing per the repo's day-bucketing rule; any
+ * unexpected format falls back to the raw string.
+ */
+export function formatDailyDate(dailyDate: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dailyDate);
+  if (!m) return dailyDate;
+  const month = MONTH_NAMES[Number(m[2]) - 1];
+  if (!month) return dailyDate;
+  return `${month} ${Number(m[3])}`;
+}
 /** Scanline positions, % from the card top. */
 const SCANLINE_TOPS = [10, 22, 34, 46, 58, 70, 82];
 
@@ -115,7 +133,12 @@ export function getShareDecay(phase: number): ShareDecay {
     case 0:  return { scrim: 0,    scanline: 0,    soot: 0,    tear: 0,    aberration: 0,    aberrationShift: 0    };
     case 1:  return { scrim: 0.06, scanline: 0.03, soot: 0,    tear: 0,    aberration: 0,    aberrationShift: 0    };
     case 2:  return { scrim: 0.12, scanline: 0.05, soot: 0.10, tear: 0.10, aberration: 0.10, aberrationShift: 0.5  };
-    case 3:  return { scrim: 0.20, scanline: 0.08, soot: 0.20, tear: 0.18, aberration: 0.22, aberrationShift: 1.0  };
+    // Phase 3's scrim is deliberately LIGHTER than the pre-cottage card's 0.20:
+    // storm is the only skin pairing light parchment with DARK ink, and the
+    // audited ink contrast assumes the raw parchment — a heavy veil under dark
+    // text muddied the chain/tagline. The other decay channels carry Phase 3's
+    // wrongness; Phases 4-5 keep heavier scrims safely (cream ink on dark fill).
+    case 3:  return { scrim: 0.12, scanline: 0.08, soot: 0.20, tear: 0.18, aberration: 0.22, aberrationShift: 1.0  };
     case 4:  return { scrim: 0.30, scanline: 0.12, soot: 0.32, tear: 0.26, aberration: 0.42, aberrationShift: 1.5  };
     case 5:
     default: return { scrim: 0.26, scanline: 0.05, soot: 0.28, tear: 0.12, aberration: 0.30, aberrationShift: 1.25 };
@@ -180,7 +203,7 @@ export const ShareCard = forwardRef<View, ShareCardProps>(({ result }, ref) => {
             <Image source={WORDMARK_IMG} style={styles.wordmark} accessibilityLabel="WordShift" />
           </View>
           {result.isDaily && result.dailyDate && (
-            <Text style={[styles.daily, { color: t.muted }]}>Daily · {result.dailyDate}</Text>
+            <Text style={[styles.daily, { color: t.muted }]}>Daily · {formatDailyDate(result.dailyDate)}</Text>
           )}
 
           {/* Hero row: Ember (always the cute sprite — see spoiler rule above)
@@ -188,7 +211,11 @@ export const ShareCard = forwardRef<View, ShareCardProps>(({ result }, ref) => {
           <View style={styles.heroRow}>
             <Image source={FOX_IMG} style={styles.fox} accessibilityLabel="Ember the fox" />
             <View style={styles.heroCol}>
-              <View style={styles.starsRow}>
+              <View
+                style={styles.starsRow}
+                accessible
+                accessibilityLabel={`${result.stars} of 3 stars`}
+              >
                 {[0, 1, 2].map(i => (
                   <Image
                     key={i}
