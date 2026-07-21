@@ -46,6 +46,7 @@ import { DailyLeaderboardCard } from '../social/DailyLeaderboardCard';
 import { getBeatPercentText, DailyRank } from '../../services/leaderboard';
 import { RewardedAdButton } from '../monetization/RewardedAdButton';
 import { isAdFreeSync } from '../../services/entitlements';
+import { announceForA11y } from '../../services/a11yAnnounce';
 import { BODY_FONT, BODY_FONT_ITALIC, PIXEL_FONT_BOLD } from '../../theme/fonts';
 
 // Candy-styled UI sprite icons (replace emoji for critical info)
@@ -351,6 +352,27 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
     setEntranceComplete(false);
   }, [visible, compactMode, hushedBeat]);
 
+  // Assistive-access announce: once the modal has settled, speak the victory
+  // payoff (the SAME title + amber the player sees, so it stays spoiler and
+  // tone consistent with the visible content) to screen readers. Guarded to
+  // fire exactly once per open so async lines (rank/social proof) can't respeak
+  // it, and reset when the modal closes.
+  const announcedRef = useRef(false);
+  useEffect(() => {
+    if (!visible) {
+      announcedRef.current = false;
+      return;
+    }
+    if (!entranceComplete || announcedRef.current) return;
+    announcedRef.current = true;
+    const title = getVictoryTitle(earnedStars, phase);
+    const total = victoryData?.amberEarned ?? 0;
+    const amberPhrase = victoryData?.autoCollected
+      ? `${total} amber earned`
+      : `${total} amber gathered for the pit`;
+    announceForA11y(`${title}. ${amberPhrase}.`);
+  }, [visible, entranceComplete, earnedStars, phase, victoryData]);
+
   const handleSkipEntrance = useCallback(() => {
     cascadeAnimRef.current?.stop();
     cascadeAnimRef.current = null;
@@ -375,9 +397,17 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   if (compactMode) {
     const compactTotal = victoryData?.amberEarned ?? 0;
     return (
-      <View style={[styles.modalOverlay, {
-        backgroundColor: phaseTheme.modalOverlayColor,
-      }]}>
+      <View
+        style={[styles.modalOverlay, {
+          backgroundColor: phaseTheme.modalOverlayColor,
+        }]}
+        // Focus fencing: mark the overlay an assistive-tech modal so screen
+        // reader focus stays inside the result surface (iOS) and cannot wander
+        // into the board occluded behind the scrim. The container itself is not
+        // `accessible` (its labelled children keep their own focus order).
+        accessibilityViewIsModal
+        accessibilityLabel="Results"
+      >
         <View style={styles.compactWrap}>
           <View style={[styles.compactCard, {
             backgroundColor: phaseTheme.modalBgColor,
@@ -573,9 +603,17 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   }
 
   return (
-    <View style={[styles.modalOverlay, {
-      backgroundColor: phaseTheme.modalOverlayColor,
-    }]}>
+    <View
+      style={[styles.modalOverlay, {
+        backgroundColor: phaseTheme.modalOverlayColor,
+      }]}
+      // Focus fencing: mark the overlay an assistive-tech modal so screen
+      // reader focus stays inside the result surface (iOS) and cannot wander
+      // into the board occluded behind the scrim. The container itself is not
+      // `accessible` (its labelled children keep their own focus order).
+      accessibilityViewIsModal
+      accessibilityLabel="Results"
+    >
       <ScrollView
         contentContainerStyle={styles.victoryScrollContent}
         showsVerticalScrollIndicator={false}
@@ -701,11 +739,17 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             <Animated.View style={{ opacity: contentOpacity1 }}>
             {/* Harvested words (queued for the pit) */}
             {victoryData?.harvestedWords && victoryData.harvestedWords.length > 0 && (
-              <View style={[styles.harvestWordContainer, {
-                backgroundColor: btn.harvestPill.bg,
-                borderColor: btn.harvestPill.border,
-              }]}>
-                <Text style={styles.harvestWordIcon}>{'\uD83C\uDF3E'}</Text>
+              <View
+                style={[styles.harvestWordContainer, {
+                  backgroundColor: btn.harvestPill.bg,
+                  borderColor: btn.harvestPill.border,
+                }]}
+                // Group the row so the decorative sheaf glyph is not read as its
+                // own emoji; the label speaks the same count + verb shown.
+                accessible
+                accessibilityLabel={`${victoryData.harvestedWords.length} ${victoryData.harvestedWords.length === 1 ? 'word' : 'words'} ${getPitHarvestLabel(phase).toLowerCase()}`}
+              >
+                <Text style={styles.harvestWordIcon} importantForAccessibility="no">{'\uD83C\uDF3E'}</Text>
                 <Text style={[styles.harvestWordText, { color: btn.harvestPill.text }]}>
                   {victoryData.harvestedWords.length} {victoryData.harvestedWords.length === 1 ? 'word' : 'words'} {getPitHarvestLabel(phase).toLowerCase()}
                 </Text>
