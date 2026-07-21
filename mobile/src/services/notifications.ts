@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DialoguePhase } from '../types/homeWorld';
 import { getLocalDateString } from './dateUtils';
-import { getWinBackMessage } from './phaseNarrative';
+import { getWinBackMessage, getNotificationTitle } from './phaseNarrative';
 
 /**
  * Push notification scheduling service for WordShift.
@@ -53,30 +53,30 @@ interface ScheduledNotification {
 
 const DAILY_REMINDER_MESSAGES: Record<number, string[]> = {
   0: [
-    'Your daily puzzle is ready! Come play with words.',
-    'A fresh puzzle awaits. Start your day with WordShift!',
-    'The words are waiting for you. Solve today\'s puzzle!',
+    'Today\'s puzzle is ready, and the words are in a playful mood. Come shift a few.',
+    'A fresh puzzle is waiting at the house. A minute or two is all it takes.',
+    'The words are all set out for you. Come make something lovely of them.',
   ],
   1: [
-    'Today\'s puzzle is ready. The words have arranged themselves.',
-    'A new arrangement awaits. Have you noticed the patterns?',
+    'Today\'s puzzle is ready. The words have arranged themselves overnight.',
+    'A new arrangement is waiting for you. The patterns are clearer some mornings than others.',
   ],
   2: [
-    'The daily puzzle awaits. The words remember you.',
-    'Another puzzle. Another arrangement. They keep coming.',
+    'The daily puzzle is waiting. The words remember your hands.',
+    'Another arrangement has settled into place. They keep coming, one each day.',
   ],
   3: [
-    'The daily puzzle is prepared. The letters tremble.',
-    'A new arrangement. Something stirs when you solve them.',
+    'The daily puzzle is prepared. The letters tremble a little before you touch them.',
+    'A new arrangement waits. Something stirs, quietly, each time you solve one.',
   ],
   4: [
-    'The daily offering awaits.',
-    'The arrangement requires your attention.',
-    'The void has prepared today\'s incantation.',
+    'The daily offering is prepared. The arrangement waits for your hands.',
+    'Today\'s incantation is set out. The void has counted on you.',
+    'The arrangement has readied a puzzle. Only your hands are missing.',
   ],
   5: [
-    'The daily puzzle is here. The pattern continues.',
-    'Another day, another arrangement. Breathe.',
+    'The daily puzzle has settled into place. The pattern continues, gently.',
+    'Another day, another quiet arrangement. Come when you like, there is no hurry.',
   ],
 };
 
@@ -512,7 +512,10 @@ async function scheduleDailyReminder(
         : getEarlyReminderMessage(phase);
       await mod.scheduleNotificationAsync({
         content: {
-          title: 'WordShift',
+          // In-world, phase-aware hook — never the brand name. Once the daily
+          // is unlocked the title names the ready puzzle; before then it is a
+          // gentle come-back that never advertises content the player can't reach.
+          title: getNotificationTitle(phase, dailyUnlocked ? 'daily' : 'comeBack'),
           body: message,
           sound: true,
           data: { target: dailyUnlocked ? 'daily' : 'home' },
@@ -562,7 +565,7 @@ async function scheduleWinBackLadder(
 
       await mod.scheduleNotificationAsync({
         content: {
-          title: 'WordShift',
+          title: getNotificationTitle(phase, 'winBack'),
           body: getWinBackMessage(phase, rung, finished),
           sound: true,
           data: { target: 'home' },
@@ -692,7 +695,7 @@ async function scheduleQuestExpiry(
 
     await mod.scheduleNotificationAsync({
       content: {
-        title: 'WordShift',
+        title: getNotificationTitle(phase, 'questExpiry'),
         body: message,
         sound: true,
         data: { target: 'home' },
@@ -728,7 +731,7 @@ async function scheduleStreakRisk(
 
     await mod.scheduleNotificationAsync({
       content: {
-        title: 'WordShift',
+        title: getNotificationTitle(phase, 'streakRisk'),
         body: message,
         sound: true,
         data: { target: 'daily' },

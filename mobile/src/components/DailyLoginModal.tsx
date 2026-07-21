@@ -18,8 +18,9 @@ import { AmberInline } from './AmberInline';
 import { DailyLoginGrant, DAILY_LOGIN_REWARDS, DAILY_LOGIN_CYCLE_LENGTH } from '../services/dailyLoginReward';
 import { getSettingsSync } from '../services/settings';
 // First-ever-claim copy: a brand-new player has never left, so "Welcome Back"
-// is wrong. Lives in phaseNarrative with the rest of the player-facing text.
-import { getDailyLoginFirstClaimCopy } from '../services/phaseNarrative';
+// is wrong. The returning-player welcome/reset/received/jackpot/collect copy is
+// phase-aware too. Both live in phaseNarrative with the rest of the text.
+import { getDailyLoginFirstClaimCopy, getDailyLoginModalCopy } from '../services/phaseNarrative';
 
 const AMBER_ICON = require('../../assets/ui/amber.png');
 
@@ -123,6 +124,7 @@ export const DailyLoginModal: React.FC<DailyLoginModalProps> = ({ grant, phase, 
 
   const claimedDay = grant.day;
   const firstClaimCopy = grant.isFirstClaim ? getDailyLoginFirstClaimCopy(phase) : null;
+  const copy = getDailyLoginModalCopy(phase);
 
   return (
     <Modal
@@ -149,7 +151,7 @@ export const DailyLoginModal: React.FC<DailyLoginModalProps> = ({ grant, phase, 
             <View style={[styles.glow, { backgroundColor: t.glow }]} />
 
             <Text style={[styles.title, { color: t.title }]}>
-              {firstClaimCopy ? firstClaimCopy.title : 'Welcome Back'}
+              {firstClaimCopy ? firstClaimCopy.title : copy.welcomeTitle}
             </Text>
 
             {firstClaimCopy && (
@@ -160,7 +162,7 @@ export const DailyLoginModal: React.FC<DailyLoginModalProps> = ({ grant, phase, 
 
             {!firstClaimCopy && grant.reset && (
               <Text style={[styles.resetLine, { color: t.muted }]}>
-                A new chain begins
+                {copy.resetLine}
               </Text>
             )}
 
@@ -224,23 +226,23 @@ export const DailyLoginModal: React.FC<DailyLoginModalProps> = ({ grant, phase, 
             {/* Claimed amount, prominent */}
             <View style={styles.claimedBanner}>
               <Text style={[styles.claimedText, { color: t.title }]}>
-                You received <AmberInline size={18} /> {grant.amount + grant.comebackBonus}
+                {copy.received} <AmberInline size={18} /> {grant.amount + grant.comebackBonus}
               </Text>
               {/* Win-back line: a first claim can never be a comeback. */}
               {!grant.isFirstClaim && grant.comebackBonus > 0 && (
                 <Text style={[styles.jackpotText, { color: t.amberText }]}>
-                  +{grant.comebackBonus} welcome-back bonus
+                  +{grant.comebackBonus} {copy.comebackBonus}
                 </Text>
               )}
               {claimedDay === DAILY_LOGIN_CYCLE_LENGTH && (
                 <Text style={[styles.jackpotText, { color: t.amberText }]}>
-                  Jackpot!
+                  {copy.jackpot}
                 </Text>
               )}
             </View>
 
             <CandyButton
-              label="Collect"
+              label={copy.collect}
               onPress={handleClose}
               phase={phase}
               variant="primary"
