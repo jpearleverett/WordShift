@@ -180,6 +180,42 @@ The 52 P2 and 27 P3 findings are catalogued in the appendix data; the recurring 
 | Asset hygiene | 300-row mirrored "kaleidoscope" strip at the bottom of all five skies (`reworkSkies.mjs:30`); descent-trio sprites soft-render vs the cel-pixel grid; 4 rooms break the 1456×720 standard (~2.5MB wasted); ~26MB truecolor backgrounds could be indexed (~17MB saving); UI icon set reads flat-app not cottage | repaint strips; re-finish 9 frames; downscale + indexed PNG |
 | Choreography tail | Android hardware-back during victory bypasses teardown (ghost whisper replay, review sheet over home); interjection-behind-whisper pops mid-lifecycle; post-victory two-voices overlap; 120ms autosave races the record | route back through `handleReturnHome`; a narrative-slot arbiter |
 
+### 4.4 Extended coverage — critic-surfaced systems
+
+The completeness sweep surfaced six surfaces the original 13 auditors did not own, adding 25 findings (2 P0-adjacent, several P1). These confirm the report's central thesis — strong writing/materials, unfinished sensory and motion delivery — on new ground: the complicity rite, the tension modes, the alert layer, perceived performance, the viral loop, and the money moments.
+
+**Offering / sacrifice altar (4.5)** — AAA writing (calm/leaning/fervent pools, devotion tiers, the monument line) wrapped in correct cottage chrome, but the *rite* is undelivered.
+- *P1:* the altar's one focal object — the candle — is a 50px Android system emoji (`HomeScreen.tsx:3193`), flat and off-material against the near-black world, when an in-world `FLAME_ICON` sprite is already imported. *Target:* swap the `Animated.Text` emoji for an `Animated.Image` flame sprite under the existing `sacrificePulse`. Hours.
+- *P1:* devotion-streak escalation, tier-up, milestone, and "offer everything" are tone-only — every offering is one identical `hapticMedium` + fixed flare with zero audio. *Target:* ramp the flare + switch to `hapticHeavy` for fervent/milestone/tier-up, add a sacrifice sound. Days.
+- *P2:* the "monument" running total snaps instead of climbing; *P3:* the candle glow is the one phase-fixed element in an otherwise phase-aware panel.
+
+**Variant tension modes (5.5)** — Speed genuinely *feels* alive (final-5s tick = sound + escalating haptic + native-driver pop + critical-red pill); the mastery variants under-deliver their signatures.
+- *P1:* Blind Offering's once-at-the-end judgment has **no bespoke reveal or rejection** — the apex mode falls straight into the identical victory choreography, so its whole reason to exist is unmarked. *Target:* a 600-900ms judgment beat on both branches (success = green validity cascade + rising chime down the rows; failure = the undo prompt with weight). Days.
+- *P2:* the speed timer renders raw ⏱/🔥 emoji beside candy sprite badges; the Reverse midpoint turn is a lone haptic with no sound or "second act" visual. *P3:* speed-escalation cues under-marked.
+
+**Alert / blocking-card layer (4.5)** — the card is cottage-skinned and ages, but the layer hosts authored beats it doesn't dramatize.
+- *P1:* `GameAlertModal` is the sole restyled-kit surface still on the stock OS `animationType="fade"` with zero `Animated` — a limp crossfade where every other modal springs. *Target:* mirror `NotificationPromptModal`'s backdrop + card spring. Hours.
+- *P1:* the authored **"UNMISSABLE" preview-graduation beat** ("the rules just changed") is visually identical to a mundane utility confirm — same scrim, card, button. *Target:* a `tone:'beat'` variant (deepened scrim, distinct treatment). Hours.
+- *P1:* the `destructive` button style is silently dropped, so on the onboarding skip-confirm "Skip it all" reads as the loud primary. *Target:* a real destructive variant or map it to quiet so it can't out-emphasize "Keep going." Hours.
+
+**Perceived performance / jank (6.0)** — the first 60 seconds are well-protected (curated instant cold-open, native-driver transitions); the collection surfaces are not.
+- *P1:* the Word Ledger, Whisper Gallery, and Stats are non-virtualized `ScrollView + .map()` — the ledger mounts up to **500 chips flat on open**. *Target:* `FlatList`/`SectionList` with windowing. Days.
+- *P2:* `generateReverseChain` yields to the event loop only every 200ms (13× coarser than the other generators); room backgrounds are 1456×720 bitmaps all mounted at once. *P3:* the first board past puzzle 13 runs up to 160 synchronous branching analyses on the JS thread.
+
+**Share flow / viral loop (5.0)** — the `ShareCard` artifact is AAA (wooden wordmark, Ember, phase-decay, dual-path spoiler-safety); the flow around it is inert.
+- *P1:* **image share silently drops the install link/CTA** — both `shareFile` paths ignore the message arg, so the viral loop's primary path carries no way back to the store. *Target:* bake a real short URL into the card footer art itself (it can't ride an Android image share as text). Hours.
+- *P1:* the promised **+5 daily-share reward is never acknowledged** — dangled three times pre-share, then on success only a silent refresh. *Target:* `hapticSuccess` + share sound + swap the hint into an earned-state confirmation. Hours.
+- *P2:* the preview materializes flatly (no "here is your card" reveal); capture is a bare stock spinner. *P3:* the challenge-a-friend taunt is phase-fixed bright.
+
+**Monetization reward loop (5.0)** — solid purchase-modal fundamentals (cottage panels, fallback prices, honest failure state), inert payoffs.
+- *P1:* every watched-ad reward (the +60 faucet, quest-double, victory 2x) resolves to a static text line + a silently-jumping number. *Target:* one reusable `RewardReveal` (count-up + celebration proportional to amount). Days.
+- *P1:* the paid **first-purchase 2× gift and the Keeper's Welcome starter** — the marquee real-money moments — land as an appended text line, not a gift. *Target:* a bespoke one-shot gift overlay (reuse the `DailyLoginModal` card anatomy). Days.
+- *P2:* `RewardedAdButton`'s tap→ad handoff is a raw unlabeled spinner (reads as a stall); *P3:* the Stats banner ad is a raw Google rectangle with no cottage framing.
+
+*Verification note:* these 25 were surfaced by the completeness critic and their adversarial verifiers were still draining when the report was compiled; the finder pass that produced them carried the same 0-refuted reliability as the original 127, and the highest-impact claims (emoji candle, dropped share CTA, unacknowledged +5, non-virtualized ledger, `GameAlertModal` stock fade) were hand-checked against their cited lines.
+
+**Updated totals:** 152 findings across 19 surfaces. None displaces the Top 10 — but the *dropped share-link CTA* and the *unacknowledged +5 share reward* are cheap P1 additions to Sprint A (both hours, both on the growth loop), and the *emoji candle* + *`GameAlertModal` stock fade* join the emoji/motion quick-win batches.
+
 ---
 
 ## 5. The Delight Roadmap
