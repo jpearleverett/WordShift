@@ -66,6 +66,34 @@ jest.mock('react-native', () => ({
   Platform: { OS: 'ios', select: (spec: Record<string, unknown>) => spec.ios },
   Dimensions: { get: () => ({ width: 400, height: 800 }) },
   useWindowDimensions: () => ({ width: 400, height: 800 }),
+  // The setup menu now plays a house entrance (backdrop fade + modalIn spring);
+  // start(cb) invokes its completion callback so the animated close still calls
+  // onClose synchronously (preserving the backdrop-dismiss assertion below).
+  Animated: {
+    View: 'AnimatedView',
+    Text: 'AnimatedText',
+    Image: 'AnimatedImage',
+    Value: jest.fn().mockImplementation((val: number) => ({
+      _value: val,
+      interpolate: jest.fn().mockReturnValue('interpolated'),
+      setValue: jest.fn(),
+      stopAnimation: jest.fn(),
+    })),
+    timing: jest.fn().mockReturnValue({ start: (cb?: () => void) => cb && cb(), stop: jest.fn() }),
+    spring: jest.fn().mockReturnValue({ start: (cb?: () => void) => cb && cb(), stop: jest.fn() }),
+    parallel: jest.fn().mockReturnValue({ start: (cb?: () => void) => cb && cb(), stop: jest.fn() }),
+    sequence: jest.fn().mockReturnValue({ start: (cb?: () => void) => cb && cb(), stop: jest.fn() }),
+    delay: jest.fn().mockReturnValue({ start: (cb?: () => void) => cb && cb(), stop: jest.fn() }),
+  },
+  Easing: {
+    in: (fn: unknown) => fn,
+    out: (fn: unknown) => fn,
+    inOut: (fn: unknown) => fn,
+    ease: (t: number) => t,
+    quad: (t: number) => t,
+    cubic: (t: number) => t,
+    sin: (t: number) => t,
+  },
   StyleSheet: {
     absoluteFill: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 },
     create: (styles: unknown) => styles,
