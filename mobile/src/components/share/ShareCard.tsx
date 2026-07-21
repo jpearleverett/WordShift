@@ -309,7 +309,9 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   heroRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12, gap: 14 },
-  fox: { width: 62, height: 62, resizeMode: 'contain' },
+  // The sprite art carries transparent padding (subject ≈61% of the box), so
+  // the box is sized up so Ember reads at a friendly ~46dp on the card.
+  fox: { width: 76, height: 76, resizeMode: 'contain' },
   heroCol: { alignItems: 'flex-start', gap: 6 },
   starsRow: { flexDirection: 'row', gap: 5 },
   star: { width: 26, height: 26, resizeMode: 'contain' },
