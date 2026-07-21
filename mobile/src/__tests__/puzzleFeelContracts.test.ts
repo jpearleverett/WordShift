@@ -14,6 +14,7 @@
 jest.mock('react-native', () => ({
   View: 'View',
   Text: 'Text',
+  Image: 'Image',
   TouchableOpacity: 'TouchableOpacity',
   StyleSheet: { create: (styles: any) => styles, absoluteFill: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } },
   Animated: {

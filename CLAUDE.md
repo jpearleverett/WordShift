@@ -195,7 +195,7 @@ mobile/
 │   │   ├── monetization/        # StoreModal.tsx (amber/hint/starter/bundle packs + daily amber faucet), PatronModal.tsx, RewardedAdButton.tsx (opt-in rewarded ad, Patron-suppressed)
 │   │   ├── NotificationPromptModal.tsx # Styled phase-aware in-game daily-reminder pre-permission prompt (replaces the stock OS Alert)
 │   │   ├── ui/GameAlertModal.tsx # Cottage-skinned host for gameAlert.ts (App mounts it last so it layers over everything)
-│   │   ├── share/ShareCard.tsx  # Phase-aware, spoiler-free shareable result card (forwardRef for PNG capture)
+│   │   ├── share/ShareCard.tsx  # Phase-aware, spoiler-free shareable result card (forwardRef for PNG capture); cottage-skinned: PanelCard wood/parchment frame (ages with phase), real wooden wordmark art + tinted-ghost glitch, Ember idle sprite (NEVER robed — spoiler rule), sprite stars, candy-shine grid; the scrim/scanline/soot/tear decay layers persist over the furniture. Contract pins in puzzleFeelContracts.test.ts
 │   │   ├── share/ShareResultModal.tsx # Victory share preview → shares image (or text fallback)
 │   │   ├── WhisperGalleryScreen.tsx # Collectible whisper/dialogue archive
 │   │   ├── WordLedger.tsx       # Ritual word history screen
