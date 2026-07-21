@@ -1,7 +1,8 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { View, Text, StyleSheet, Animated, Platform } from 'react-native';
 import { CandyColors, getPhaseTheme } from '../../theme/colors';
 import { getSettingsSync } from '../../services/settings';
+import { announceForA11y } from '../../services/a11yAnnounce';
 import { PIXEL_FONT_BOLD } from '../../theme/fonts';
 
 interface ToastProps {
@@ -50,6 +51,8 @@ export const Toast: React.FC<ToastProps> = ({ message, isError, phase = 0 }) => 
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const enterAnimRef = useRef<Animated.CompositeAnimation | null>(null);
   const shakeAnimRef = useRef<Animated.CompositeAnimation | null>(null);
+  // Last message spoken via the iOS announce fallback (dedupe guard).
+  const lastAnnouncedRef = useRef<string | null>(null);
 
   const toastTheme = getToastTheme(phase);
 
@@ -102,6 +105,19 @@ export const Toast: React.FC<ToastProps> = ({ message, isError, phase = 0 }) => 
       shakeAnimRef.current?.stop();
     };
   }, [message, isError]);
+
+  // iOS live-region fallback: the visual accessibilityLiveRegion below is
+  // Android-only, so move feedback and receipts would go unspoken on iOS. Speak
+  // the toast text through the announce bridge when it changes, guarded against
+  // empty and duplicate messages so it can't spam or double-speak on Android
+  // (which the live region already handles).
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    const trimmed = (message ?? '').trim();
+    if (!trimmed || trimmed === lastAnnouncedRef.current) return;
+    lastAnnouncedRef.current = trimmed;
+    announceForA11y(trimmed);
+  }, [message]);
 
   return (
     <Animated.View
