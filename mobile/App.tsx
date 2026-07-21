@@ -2750,6 +2750,10 @@ function MainApp() {
           text: getPreviewGraduationConfirm(phase),
           onPress: () => { markOneTimeFlagSeen(PREVIEW_GRADUATION_SEEN_KEY).catch(() => {}); },
         }],
+        // "The rules just changed" — an authored narrative beat, not a mundane
+        // utility confirm. The 'beat' tone deepens the scrim, pops from further
+        // back, and wears a soft accent glow so this once-ever moment is felt.
+        'beat',
       );
     })().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fires per fresh board; actions/phase read at fire time

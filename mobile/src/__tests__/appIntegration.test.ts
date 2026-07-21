@@ -257,6 +257,10 @@ describe('verb-depth preview gate threading', () => {
     // Seen = ACKNOWLEDGED: the flag commits in the card's button onPress, never
     // at decision time (the old toast burned the beat invisibly on real devices).
     expect(APP_TSX).toMatch(/onPress: \(\) => \{ markOneTimeFlagSeen\(PREVIEW_GRADUATION_SEEN_KEY\)/);
+    // "The rules just changed" is an authored narrative beat, not a mundane
+    // utility confirm: the card must request the 'beat' tone (deepened scrim,
+    // further pop, accent glow) so it never reads as identical to a stock alert.
+    expect(APP_TSX).toMatch(/markOneTimeFlagSeen\(PREVIEW_GRADUATION_SEEN_KEY\)[\s\S]*?\}\],\s*(?:\/\/[^\n]*\n\s*)*'beat',/);
     // Rescue boards start with hidden checks too, but must not consume the
     // graduation beat. Blind Offering and onboarding remain excluded.
     expect(APP_TSX).toMatch(/puzzle\.previewGradingMode !== 'neutral' \|\| puzzle\.blindMode/);
