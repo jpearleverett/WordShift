@@ -22,9 +22,14 @@ import { RoomView, computeEmbellishmentIntensity } from './RoomView';
 import { CandyColors } from '../../theme/colors';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { isOnCooldown, getSessionStatus } from '../../services/dialogueSession';
-import { clampHomeScenePanY, resolveHomeScenePanY } from '../../services/homeScenePan';
+import {
+  clampHomeScenePanY,
+  resolveHomeScenePanY,
+  computePanSettleTarget,
+  rubberBandPanY,
+} from '../../services/homeScenePan';
 import { getSettingsSync } from '../../services/settings';
-import { shouldSimplifyAnimations } from '../../services/deviceTier';
+import { shouldSimplifyAnimations, getDeviceTier } from '../../services/deviceTier';
 import { getTendingIntensity } from '../../services/tending';
 
 // Environment assets
@@ -55,8 +60,16 @@ const SHADOW_FIGURE_IMG = require('../../../assets/environment/shadow_figure.png
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // ═══════════════════════════════════════════════════════════════════════════
-// PARTICLE SYSTEM - Floating sparkles, leaves, fireflies
+// AMBIENT PARTICLE SYSTEM — phase-graded living atmosphere
 // ═══════════════════════════════════════════════════════════════════════════
+// Tinted-View motes (not emoji glyphs) drifting over the diorama. They age with
+// the phase ladder: warm bright pollen/spark at 0-1, dimmer desaturated drift
+// at 2-3, sparse crimson-tinged embers that FALL at 4-5. Native-driver
+// transform + opacity only; the tint is a static per-particle backgroundColor
+// (no JS-bridge color animation). Density scales down off the high tier and is
+// zeroed entirely under reducedMotion / low-tier (see the spawner effect).
+
+type ParticleDirection = 'up' | 'down';
 
 interface Particle {
   id: number;
@@ -64,36 +77,66 @@ interface Particle {
   y: Animated.Value;
   opacity: Animated.Value;
   scale: Animated.Value;
-  rotation: Animated.Value;
-  emoji: string;
+  /** Static tint (no animated backgroundColor). */
+  color: string;
+  /** Base dot size in dp (scaled by the animated `scale`). */
+  size: number;
   duration: number;
+  direction: ParticleDirection;
+  /** Horizontal sway amplitude in dp. */
+  drift: number;
+  peakOpacity: number;
+  /** Draw a soft same-color halo behind the core (bright/ember phases). */
+  glow: boolean;
 }
 
-const PARTICLE_EMOJIS_BY_PHASE: Record<number, string[]> = {
-  0: ['✨', '🌸', '🍃', '💛', '⭐'],
-  1: ['✨', '🍂', '💫', '⭐'],
-  2: ['🍂', '💭', '🌫️', '💫'],
-  3: ['👁️', '🌫️', '💀', '🔮'],
-  4: ['💀', '👁️', '⚫', '🔮'],
-  5: ['✨', '💜', '💫'],
+interface AmbientParticleConfig {
+  /** Tint palette (all tinted, phase-appropriate; no pure white/black/gray). */
+  colors: string[];
+  size: number;
+  /** Simultaneous-particle ceiling at the high tier (scaled down on medium). */
+  maxCount: number;
+  /** Spawn interval in ms (sparser as the dread grows). */
+  spawnMs: number;
+  durationMin: number;
+  durationRange: number;
+  direction: ParticleDirection;
+  peakOpacity: number;
+  drift: number;
+  glow: boolean;
+}
+
+// Phase register: warm gold motes rising (0-1) -> dimmer desaturated lavender
+// drift (2-3) -> sparse crimson embers sinking heavily (4-5).
+const AMBIENT_PARTICLES_BY_PHASE: Record<number, AmbientParticleConfig> = {
+  0: { colors: ['#FFE9A8', '#FFD27A', '#FFF3C4', '#FBE7B0'], size: 6, maxCount: 8, spawnMs: 1900, durationMin: 8000, durationRange: 5000, direction: 'up', peakOpacity: 0.85, drift: 60, glow: true },
+  1: { colors: ['#FCE0A0', '#EBD9B4', '#F0C98A'], size: 5, maxCount: 7, spawnMs: 2300, durationMin: 9000, durationRange: 5000, direction: 'up', peakOpacity: 0.7, drift: 52, glow: true },
+  2: { colors: ['#C9B6D6', '#B7A6C4', '#A69AB8'], size: 5, maxCount: 5, spawnMs: 3200, durationMin: 11000, durationRange: 5000, direction: 'up', peakOpacity: 0.5, drift: 42, glow: false },
+  3: { colors: ['#8E7EA0', '#7C6E8E', '#6E6480'], size: 4, maxCount: 4, spawnMs: 4200, durationMin: 13000, durationRange: 6000, direction: 'up', peakOpacity: 0.42, drift: 32, glow: false },
+  4: { colors: ['#C25A3A', '#A83C2A', '#8B2E22'], size: 4, maxCount: 4, spawnMs: 4200, durationMin: 12000, durationRange: 5000, direction: 'down', peakOpacity: 0.5, drift: 28, glow: true },
+  5: { colors: ['#7A5C86', '#8B2E4A', '#6B5B8A'], size: 4, maxCount: 3, spawnMs: 5000, durationMin: 14000, durationRange: 6000, direction: 'down', peakOpacity: 0.45, drift: 24, glow: true },
 };
 
 const FloatingParticle: React.FC<{ particle: Particle }> = ({ particle }) => {
   useEffect(() => {
     const startX = Math.random() * SCREEN_WIDTH;
-    const endX = startX + (Math.random() - 0.5) * 100;
+    const endX = startX + (Math.random() - 0.5) * particle.drift * 2;
+    const rising = particle.direction === 'up';
+    // Rising motes climb from below; sinking embers fall from above the frame.
+    const startY = rising ? SCREEN_HEIGHT + 20 : -30;
+    const endY = rising ? -50 : SCREEN_HEIGHT + 40;
 
     particle.x.setValue(startX);
-    particle.y.setValue(SCREEN_HEIGHT + 20);
+    particle.y.setValue(startY);
     particle.opacity.setValue(0);
-    particle.scale.setValue(0.3 + Math.random() * 0.5);
+    particle.scale.setValue(0.6 + Math.random() * 0.6);
 
     const anim = Animated.parallel([
-      // Float up
+      // Vertical travel — embers accelerate downward (heavy), motes drift even.
       Animated.timing(particle.y, {
-        toValue: -50,
+        toValue: endY,
         duration: particle.duration,
-        easing: Easing.linear,
+        easing: rising ? Easing.linear : Easing.in(Easing.quad),
         useNativeDriver: true,
       }),
       // Gentle sway
@@ -103,41 +146,30 @@ const FloatingParticle: React.FC<{ particle: Particle }> = ({ particle }) => {
         easing: Easing.inOut(Easing.sin),
         useNativeDriver: true,
       }),
-      // Fade in then out
+      // Fade in, hold, fade out
       Animated.sequence([
         Animated.timing(particle.opacity, {
-          toValue: 0.8,
+          toValue: particle.peakOpacity,
           duration: particle.duration * 0.2,
           useNativeDriver: true,
         }),
         Animated.timing(particle.opacity, {
-          toValue: 0.8,
-          duration: particle.duration * 0.6,
+          toValue: particle.peakOpacity,
+          duration: particle.duration * 0.55,
           useNativeDriver: true,
         }),
         Animated.timing(particle.opacity, {
           toValue: 0,
-          duration: particle.duration * 0.2,
+          duration: particle.duration * 0.25,
           useNativeDriver: true,
         }),
       ]),
-      // Gentle rotation
-      Animated.timing(particle.rotation, {
-        toValue: Math.random() > 0.5 ? 360 : -360,
-        duration: particle.duration,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }),
     ]);
     anim.start();
     return () => anim.stop();
   }, []);
 
-  const rotate = particle.rotation.interpolate({
-    inputRange: [0, 360],
-    outputRange: ['0deg', '360deg'],
-  });
-
+  const halo = particle.size * 2;
   return (
     <Animated.View
       style={{
@@ -146,13 +178,33 @@ const FloatingParticle: React.FC<{ particle: Particle }> = ({ particle }) => {
           { translateX: particle.x },
           { translateY: particle.y },
           { scale: particle.scale },
-          { rotate },
         ],
         opacity: particle.opacity,
       }}
       pointerEvents="none"
     >
-      <Text style={{ fontFamily: BODY_FONT, fontSize: 16 }}>{particle.emoji}</Text>
+      {particle.glow && (
+        <View
+          style={{
+            position: 'absolute',
+            left: -particle.size * 0.5,
+            top: -particle.size * 0.5,
+            width: halo,
+            height: halo,
+            borderRadius: halo / 2,
+            backgroundColor: particle.color,
+            opacity: 0.22,
+          }}
+        />
+      )}
+      <View
+        style={{
+          width: particle.size,
+          height: particle.size,
+          borderRadius: particle.size / 2,
+          backgroundColor: particle.color,
+        }}
+      />
     </Animated.View>
   );
 };
@@ -980,6 +1032,11 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   // State tracking for gestures
   const baseTranslateY = useRef(0);
   const currentPanYRef = useRef<number | null>(null);
+  // Momentum settle animation (spring) currently decelerating the scene after
+  // a release. A new gesture stops it; the physics is instant (no momentum /
+  // rubber-band) under reducedMotion or on low-tier devices.
+  const settleAnimRef = useRef<Animated.CompositeAnimation | null>(null);
+  const panPhysicsEnabled = !getSettingsSync().reducedMotion && !shouldSimplifyAnimations();
 
   // Track container height for proper initial positioning
   const [containerHeight, setContainerHeight] = useState<number | null>(null);
@@ -1005,32 +1062,41 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   const [particles, setParticles] = useState<Particle[]>([]);
   const particleIdRef = useRef(0);
 
-  // Spawn particles based on phase
+  // Spawn phase-graded ambient particles. `ambientMotionEnabled` is already
+  // false under reducedMotion / low-tier (zero particles there — the mandate's
+  // "off on low tier"); the medium tier gets a reduced ceiling on top.
   useEffect(() => {
     if (!ambientMotionEnabled) {
       setParticles([]);
       return;
     }
 
+    const config = AMBIENT_PARTICLES_BY_PHASE[currentPhase] ?? AMBIENT_PARTICLES_BY_PHASE[0];
+    // High tier keeps the full count; medium thins it (density scales DOWN).
+    const tierScale = getDeviceTier() === 'high' ? 1 : 0.6;
+    const maxCount = Math.max(2, Math.round(config.maxCount * tierScale));
+
     const spawnParticle = () => {
-      const emojis = PARTICLE_EMOJIS_BY_PHASE[currentPhase] || PARTICLE_EMOJIS_BY_PHASE[0];
       const newParticle: Particle = {
         id: particleIdRef.current++,
         x: new Animated.Value(0),
         y: new Animated.Value(0),
         opacity: new Animated.Value(0),
         scale: new Animated.Value(1),
-        rotation: new Animated.Value(0),
-        emoji: emojis[Math.floor(Math.random() * emojis.length)],
-        duration: 8000 + Math.random() * 6000,
+        color: config.colors[Math.floor(Math.random() * config.colors.length)],
+        size: config.size,
+        duration: config.durationMin + Math.random() * config.durationRange,
+        direction: config.direction,
+        drift: config.drift,
+        peakOpacity: config.peakOpacity,
+        glow: config.glow,
       };
 
-      setParticles(prev => [...prev.slice(-8), newParticle]); // Keep max 8 particles
+      // Bounded: keep only the last (maxCount - 1) + the new one.
+      setParticles(prev => [...prev.slice(-(maxCount - 1)), newParticle]);
     };
 
-    // Spawn particles more frequently at lower phases (happy), less at higher (dread)
-    const spawnRate = currentPhase >= 3 ? 4000 : currentPhase >= 2 ? 3000 : 2000;
-    const interval = setInterval(spawnParticle, spawnRate);
+    const interval = setInterval(spawnParticle, config.spawnMs);
     spawnParticle(); // Spawn one immediately
 
     return () => clearInterval(interval);
@@ -1082,6 +1148,11 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   }, [containerHeight, houseHeight, numRows, onPitPress, houseBottomMargin]);
 
   const syncPanPosition = useCallback((nextPanY: number, notify = false) => {
+    // Cancel any in-flight momentum settle before hard-setting the position, so
+    // a programmatic reposition (house grew / saved-pan restore) can't fight a
+    // running native spring.
+    settleAnimRef.current?.stop();
+    settleAnimRef.current = null;
     const clampedPanY = clampHomeScenePanY(nextPanY, panBounds.max);
     translateY.setValue(clampedPanY);
     currentPanYRef.current = clampedPanY;
@@ -1091,22 +1162,89 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     }
   }, [onPanYChange, panBounds.max, translateY]);
 
-  // Pan gesture handler - vertical only to prevent horizontal gaps
+  // Stop a decelerating settle at the start of a fresh gesture, capturing the
+  // live (possibly native-driven) value so the drag continues from there.
+  const stopSettle = useCallback(() => {
+    settleAnimRef.current?.stop();
+    settleAnimRef.current = null;
+    translateY.stopAnimation((value: number) => {
+      baseTranslateY.current = value;
+    });
+  }, [translateY]);
+
+  // Pan gesture handler — vertical only. Past the bounds the raw drag is
+  // rubber-banded (progressive resistance) instead of hard-clamped, so the
+  // scene reads as a physical thing you can nudge; the logical (clamped)
+  // position is tracked separately for the saved-pan restore.
   const onPanGestureEvent = (event: PanGestureHandlerGestureEvent) => {
     const { translationY } = event.nativeEvent;
+    const rawY = baseTranslateY.current + translationY;
 
-    const newY = clampHomeScenePanY(baseTranslateY.current + translationY, panBounds.max);
-
-    translateY.setValue(newY);
-    currentPanYRef.current = newY;
+    if (panPhysicsEnabled) {
+      const viewport = containerHeight ?? SCREEN_HEIGHT;
+      const maxOverscroll = Math.min(viewport * 0.3, 120);
+      translateY.setValue(rubberBandPanY(rawY, panBounds.max, viewport, undefined, maxOverscroll));
+    } else {
+      translateY.setValue(clampHomeScenePanY(rawY, panBounds.max));
+    }
+    currentPanYRef.current = clampHomeScenePanY(rawY, panBounds.max);
   };
 
   const onPanHandlerStateChange = (event: PanGestureHandlerGestureEvent) => {
-    if (event.nativeEvent.state === State.END) {
-      const { translationY } = event.nativeEvent;
-      syncPanPosition(baseTranslateY.current + translationY, true);
+    const { state, translationY, velocityY } = event.nativeEvent;
+
+    if (state === State.BEGAN) {
+      stopSettle();
+      return;
     }
+    if (state !== State.END) return;
+
+    const logicalRelease = clampHomeScenePanY(baseTranslateY.current + translationY, panBounds.max);
+
+    // Reduced motion / low tier / no scroll range: settle instantly, no
+    // momentum, no bounce.
+    if (!panPhysicsEnabled || panBounds.max <= 0) {
+      syncPanPosition(logicalRelease, true);
+      return;
+    }
+
+    // Carry the release velocity into a decelerating spring toward the
+    // momentum-projected rest point. A projection past a bound clamps the
+    // target, and the seeded velocity overshoots into the rubber-band zone and
+    // settles back — the spring-back bounce.
+    const settleTarget = computePanSettleTarget({
+      releasePanY: logicalRelease,
+      velocityY,
+      maxPanY: panBounds.max,
+    });
+    currentPanYRef.current = settleTarget;
+
+    const spring = Animated.spring(translateY, {
+      toValue: settleTarget,
+      velocity: velocityY,
+      friction: 9,
+      tension: 45,
+      useNativeDriver: true,
+    });
+    settleAnimRef.current = spring;
+    spring.start(({ finished }) => {
+      if (!finished) return;
+      settleAnimRef.current = null;
+      baseTranslateY.current = settleTarget;
+      currentPanYRef.current = settleTarget;
+      onPanYChange?.(settleTarget);
+    });
   };
+
+  // Stop any running settle spring on unmount so no native animation is left
+  // driving a torn-down value.
+  useEffect(() => {
+    return () => {
+      settleAnimRef.current?.stop();
+      settleAnimRef.current = null;
+      translateY.stopAnimation();
+    };
+  }, [translateY]);
 
   // Preserve the current viewport when the house grows or helper UI changes the
   // available height, and restore the last viewport when the home screen remounts.
