@@ -8,7 +8,7 @@
 
 ## 1. How to read this audit
 
-**Method.** Thirteen parallel per-system auditors read the code and assets first (docs were treated as unverified claims — correctly, since they still describe fonts the game no longer ships). Every finding was then re-read at its cited lines by an independent adversarial verifier whose default stance was *refuted*; findings could survive as CONFIRMED, be corrected in place (ADJUSTED), or die. A completeness critic then swept for uncovered ground until dry. Separately, six pixel-accurate HTML recreations of shipped screens were built from the real assets and fonts and screenshotted headlessly — the render evidence in §3 is derived from code, not from imagination. Verification stats: 127 findings filed, 0 refuted outright, ~42% adjusted (usually to *sharpen* evidence or add feasibility caveats, not weaken claims).
+**Method.** Thirteen parallel per-system auditors read the code and assets first (docs were treated as unverified claims — correctly, since they still describe fonts the game no longer ships). Every finding was then re-read at its cited lines by an independent adversarial verifier whose default stance was *refuted*; findings could survive as CONFIRMED, be corrected in place (ADJUSTED), or die. A completeness critic then swept for uncovered ground across two rounds, growing coverage from the 13 mapped systems to **25 surfaces**. Separately, six pixel-accurate HTML recreations of shipped screens were built from the real assets and fonts and screenshotted headlessly — the render evidence in §3 is derived from code, not from imagination. Final verification stats: **180 findings filed, 179 surviving (1 refuted), 112 confirmed verbatim, 67 adjusted** (adjustments usually *sharpen* evidence or add feasibility caveats, not weaken claims).
 
 **Three tests, applied per system:**
 - **Screenshot Test** — would a random frame sell the game?
@@ -87,7 +87,7 @@ Two batches waiting, one ward lit. **Proves:** the pit environment art is the si
 
 ## 4. Findings ledger
 
-127 findings survived verification across 13 systems (0 refuted; ~42% adjusted, almost always to *tighten* evidence). Severity distribution: **5 P0**, 43 P1, 52 P2, 27 P3. Every entry below is anchored to `file:line` and carries a concrete target state. Findings whose verifier had not yet run when this document was compiled are marked *(pending verify)* — their evidence was still spot-checked by hand for this report.
+179 findings survived verification across 25 surfaces (1 refuted; 112 confirmed, 67 adjusted — adjustments almost always *tighten* evidence). Severity distribution: **5 P0, 53 P1, 84 P2, 37 P3**. The 13 mapped systems (§4.1-4.3) produced the 127 findings the report analyzes in full; two completeness-critic rounds then added 12 more surfaces and 52 findings (§4.4-4.5). Every entry is anchored to `file:line` and carries a concrete target state.
 
 Severity key: **P0** = a bug or defect that actively damages delight or identity right now; **P1** = a major gap a first-session player would feel; **P2** = a real polish gap; **P3** = nice-to-have.
 
@@ -180,9 +180,9 @@ The 52 P2 and 27 P3 findings are catalogued in the appendix data; the recurring 
 | Asset hygiene | 300-row mirrored "kaleidoscope" strip at the bottom of all five skies (`reworkSkies.mjs:30`); descent-trio sprites soft-render vs the cel-pixel grid; 4 rooms break the 1456×720 standard (~2.5MB wasted); ~26MB truecolor backgrounds could be indexed (~17MB saving); UI icon set reads flat-app not cottage | repaint strips; re-finish 9 frames; downscale + indexed PNG |
 | Choreography tail | Android hardware-back during victory bypasses teardown (ghost whisper replay, review sheet over home); interjection-behind-whisper pops mid-lifecycle; post-victory two-voices overlap; 120ms autosave races the record | route back through `handleReturnHome`; a narrative-slot arbiter |
 
-### 4.4 Extended coverage — critic-surfaced systems
+### 4.4 Extended coverage — critic-surfaced systems (round 1)
 
-The completeness sweep surfaced six surfaces the original 13 auditors did not own, adding 25 findings (2 P0-adjacent, several P1). These confirm the report's central thesis — strong writing/materials, unfinished sensory and motion delivery — on new ground: the complicity rite, the tension modes, the alert layer, perceived performance, the viral loop, and the money moments.
+The first completeness sweep surfaced six surfaces the original 13 auditors did not own, adding 25 findings (several P1). These confirm the report's central thesis — strong writing/materials, unfinished sensory and motion delivery — on new ground: the complicity rite, the tension modes, the alert layer, perceived performance, the viral loop, and the money moments.
 
 **Offering / sacrifice altar (4.5)** — AAA writing (calm/leaning/fervent pools, devotion tiers, the monument line) wrapped in correct cottage chrome, but the *rite* is undelivered.
 - *P1:* the altar's one focal object — the candle — is a 50px Android system emoji (`HomeScreen.tsx:3193`), flat and off-material against the near-black world, when an in-world `FLAME_ICON` sprite is already imported. *Target:* swap the `Animated.Text` emoji for an `Animated.Image` flame sprite under the existing `sacrificePulse`. Hours.
@@ -212,9 +212,38 @@ The completeness sweep surfaced six surfaces the original 13 auditors did not ow
 - *P1:* the paid **first-purchase 2× gift and the Keeper's Welcome starter** — the marquee real-money moments — land as an appended text line, not a gift. *Target:* a bespoke one-shot gift overlay (reuse the `DailyLoginModal` card anatomy). Days.
 - *P2:* `RewardedAdButton`'s tap→ad handoff is a raw unlabeled spinner (reads as a stall); *P3:* the Stats banner ad is a raw Google rectangle with no cottage framing.
 
-*Verification note:* these 25 were surfaced by the completeness critic and their adversarial verifiers were still draining when the report was compiled; the finder pass that produced them carried the same 0-refuted reliability as the original 127, and the highest-impact claims (emoji candle, dropped share CTA, unacknowledged +5, non-virtualized ledger, `GameAlertModal` stock fade) were hand-checked against their cited lines.
+### 4.5 Extended coverage — critic-surfaced systems (round 2)
 
-**Updated totals:** 152 findings across 19 surfaces. None displaces the Top 10 — but the *dropped share-link CTA* and the *unacknowledged +5 share reward* are cheap P1 additions to Sprint A (both hours, both on the growth loop), and the *emoji candle* + *`GameAlertModal` stock fade* join the emoji/motion quick-win batches.
+A second sweep found six more surfaces, adding 27 findings — mostly the accessibility, adaptivity, and reward-acknowledgment depth the mapped systems touched only glancingly.
+
+**Assistive-access semantics (5.0)** — the board's static interaction layer is genuinely good (roles, labels, no over-promised roles on inert tiles), but the moments around it fail assistive tech.
+- *P1:* every full-screen plain-View overlay (victory modal, ceremonies, Time's-Up) leaks screen-reader focus into the occluded board/home/pit — no `accessibilityViewIsModal`/`importantForAccessibility` fencing. *Target:* fence each overlay so focus can't escape behind it. Hours.
+- *P1:* no announce/focus-move pipeline — the victory payoff and every deferred ceremony reveal are silent to a screen reader. *Target:* an `AccessibilityInfo.announceForAccessibility` (with focus move) at each reveal. Days.
+- *P2:* horror micro-beats have no coherent SR treatment (prominent beats unspoken, subliminal ones would over-speak); *P3:* live-region announcements are Android-only with no iOS fallback.
+
+**Dynamic type & adaptive layout (5.0)** — at default font scale on a 360-400dp phone it photographs beautifully; it does not adapt.
+- *P1:* no app-wide font-scale policy — OS large-font scales chrome text but the cottage frames are fixed-height, so enlarged text clips inside its wood panels. *Target:* cap `allowFontScaling` on fixed-geometry chrome and let content panels grow. Days.
+- *P2:* layout frozen at module-load `Dimensions.get` (no `useWindowDimensions` anywhere) so foldables/rotation don't reflow; the board arc row overflows ≤360dp screens (fixed tile geometry, no scale-to-fit). *P3:* on tablets the fixed-width board is marooned in a central column with vast dead margins.
+
+**Free-progression reward moments (4.5)** — the loop is complete and handsomely skinned (the `DailyLoginModal` meets the bar), but the acknowledgments are uniformly flat.
+- *P1:* the home `CelebrationConfetti` is hardcoded bright-rainbow and phase-blind (the same finding the house-world and motion audits flagged — it surfaces here because the descent-trio unlocks are the worst-hit). Hours.
+- *P2:* no count-up anywhere and a magnitude-blind pill pulse (+2 reads the same as +100); quest claim, streak milestones (up to +100), and the free streak-freeze grant all land as flat toasts/alerts. *P3:* the milestone hint-trickle gift is a text toast while the HINT count swaps silently. *Target:* one shared count-up + magnitude-scaled acknowledgment (this is the same `RewardReveal` the monetization loop needs — build once, use everywhere).
+
+**Re-engagement / notification fiction (5.5)** — a genuinely AAA back half (the phase- and rung-aware win-back ladder and streak-risk pools) attached to an under-crafted front.
+- *P1:* the notification-permission prompt — the app's single most consequential ask — is a generic OS-nag with no value framing or in-world voice. *Target:* a phase-aware pre-permission rationale in the game's register. Hours.
+- *P2:* the streak-freeze relief moment and the `DailyLoginModal` welcome are hardcoded non-phase-aware, and the daily reminder (the most-delivered ping) has the weakest, brand-naming copy. *P3:* every re-engagement notification wastes its prime title line on the redundant brand name "WordShift."
+
+**Settings, data management & New Cycle (4.0)** — competently skinned with careful cloud-safety engineering, dragged down by three things.
+- *P1:* the cloud-conflict fork is neither safe nor legible — "Use the newer save" wipes local progress on one unlabeled tap. *Target:* a clear diff/consequence and a confirm. Hours.
+- *P1:* the New Cycle (NG+) climax — a narrative milestone — has no ceremony: a generic confirm, a hard app reload, a plain one-OK card. *Target:* a bespoke re-descent ceremony. Days.
+- *P2:* the Reset-All confirm understates the blast radius (house, all animals, amber lost); the settings toggles are stock platform `Switch`es, off-brand against the fully pixel-skinned app.
+
+**Puzzle HUD chrome & controls (6.0)** — scoped to the chrome around the grid. The bottom `ActionButton`s are genuinely AAA (springy, phase-aged, reduced-motion aware); the badge layer isn't a system.
+- *P2:* the `Toast` replays a full fade-from-zero + slide-in on every move message, so text flickers above the board; two HUD badges ship raw system emoji beside candy sprites; HUD chrome ages in a single binary jump at phase 3 (skipping the phase-2 dusk the board already shows); status badges hard-cut in and out. *P3:* secondary controls lack the primary buttons' tactile weight. *Target:* a persistent Toast that cross-fades text in place, one badge material, and phase-2 HUD aging.
+
+*Verification note (all of §4.4-4.5):* these 52 findings were surfaced by the two critic rounds and fully adversarially verified in the completed run (112 confirmed / 67 adjusted / 1 refuted across the whole audit). The lone refutation was an assets-inventory claim that the Play Store screenshots are "low-res stylized mocks" — the verifier established they are real captures of the shipped UI in the documented folder, so that claim was dropped.
+
+**Final totals:** 179 surviving findings across 25 surfaces (5 P0, 53 P1, 84 P2, 37 P3). None displaces the Top 10, but three cheap P1s fold straight into the sprints: the *dropped share-link CTA* and *unacknowledged +5 share reward* into Sprint A (growth loop), and the *notification-permission value-framing* alongside them. The recurring cross-system signal — **no count-up / magnitude-blind reward acknowledgment** — is one reusable `RewardReveal` component that pays off in the monetization loop, the free-progression loop, quests, streaks, and the daily faucet at once; promote it to a Sprint-B system.
 
 ---
 
@@ -396,7 +425,7 @@ These survived the same adversarial scrutiny as the findings. Do not "improve" t
 
 ## Appendix A — Method & verification integrity
 
-Thirteen per-system auditors read code and assets first (docs treated as unverified). Each of the 127 findings was re-read at its cited lines by an independent adversarial verifier defaulting to *refuted*: **0 were refuted, ~58% confirmed verbatim, ~42% adjusted** (evidence lines sharpened, severity corrected, or feasibility caveats added — the adjustment rate reflects tightening, not weakening). A completeness-critic sweep ran to catch uncovered surfaces. A subset of the `first-60s` and `assets-inventory` verifiers plus the final critic pass were still finalizing when this report was compiled (the run was repeatedly interrupted by session usage limits and resumed from cache); those findings are marked *(pending verify)* and were hand-checked against their cited lines for inclusion. If the critic surfaces material new gaps, they append here.
+Thirteen per-system auditors read code and assets first (docs treated as unverified). Two completeness-critic rounds then grew coverage to 25 surfaces. Every one of the 180 findings was re-read at its cited lines by an independent adversarial verifier defaulting to *refuted*. Final outcome across the completed 207-agent run (0 agent errors): **1 refuted, 112 confirmed verbatim, 67 adjusted** (adjustments sharpen evidence, correct severity, or add feasibility caveats — tightening, not weakening). The lone refutation (an assets-inventory claim mischaracterizing the shipped Play Store screenshots) was dropped. The run was repeatedly interrupted by session usage limits and resumed from cache without loss; a handful of `first-60s` findings that read *(pending verify)* in the body were compiled before their verifiers landed but have since verified — they were also hand-checked against their cited lines. No further critic gaps remain (two rounds ran to dry).
 
 Six current-state screens and three after-mocks were rendered as pixel-accurate HTML recreations from the real assets/fonts and captured headlessly at 412×915 @2x; every render carries a fidelity note disclosing its approximations (in the render generators under the session scratchpad).
 
@@ -420,4 +449,4 @@ Condensed from the auditor justifications; full text in the finding data.
 
 ## Appendix C — Data
 
-The complete verified finding set (all 127, with full `current`/`target`/evidence/verdict fields), the motion-vocabulary inventory (~510 `Animated` call sites across 33 files), the emoji→sprite swap list, the sound/haptic pairing map, and the full asset census (494 files, ~59MB runtime payload) are preserved in the audit workflow's structured output. The render HTML generators (current + after) live in the session scratchpad and reproduce every frame in `renders/`.
+The complete verified finding set (all 180, with full `current`/`target`/evidence/verdict fields across 25 surfaces), the motion-vocabulary inventory (~510 `Animated` call sites across 33 files), the emoji→sprite swap list, the sound/haptic pairing map, and the full asset census (494 files, ~59MB runtime payload) are preserved in the audit workflow's structured output. The render HTML generators (current + after) live in the session scratchpad and reproduce every frame in `renders/`.
