@@ -68,6 +68,7 @@ import {
   HOUSE_COMPLETION_EVENT,
   FINAL_PUZZLE_EVENT,
   POST_REVELATION_EVENT,
+  NEW_CYCLE_EVENT,
   PhaseTransitionEvent,
 } from '../services/phaseEvents';
 import { DialoguePhase } from '../types/homeWorld';
@@ -78,6 +79,7 @@ const ALL_EVENTS: PhaseTransitionEvent[] = [
   HOUSE_COMPLETION_EVENT,
   FINAL_PUZZLE_EVENT,
   POST_REVELATION_EVENT,
+  NEW_CYCLE_EVENT,
 ];
 
 type ElementLike = { props?: { children?: unknown; accessibilityLabel?: string } };
@@ -208,5 +210,21 @@ describe('POST_REVELATION_EVENT — terrible peace', () => {
       expect(scene.image).toBeUndefined();
       expect(scene.effect).not.toBe('descend');
     }
+  });
+});
+
+describe('NEW_CYCLE_EVENT — the serene re-descent', () => {
+  test('stays in the terrible-peace register: text-only over the settled backdrop, no arrival', () => {
+    // A Phase-5 milestone ceremony, mirroring POST_REVELATION_EVENT's shape.
+    expect(NEW_CYCLE_EVENT.phase).toBe(5);
+    expect(NEW_CYCLE_EVENT.backdrop).toBeDefined();
+    expect(NEW_CYCLE_EVENT.backdrop!.image).toBe('shadow_figure');
+    expect(NEW_CYCLE_EVENT.backdrop!.opacity).toBeLessThanOrEqual(0.2);
+    for (const scene of NEW_CYCLE_EVENT.scenes) {
+      // Nothing descends, nothing named — the pattern only turns.
+      expect(scene.image).toBeUndefined();
+      expect(scene.effect).not.toBe('descend');
+    }
+    expect(NEW_CYCLE_EVENT.scenes.length).toBeGreaterThanOrEqual(3);
   });
 });
