@@ -165,7 +165,7 @@ import { DailyChallengeCard } from '../DailyChallengeCard';
 import { isDailyChallengeUnlocked, getDailyStatus } from '../../services/dailyChallenge';
 import { areUpgradesAvailable, getPurchasedUpgrades, getDeepenedRooms, getAttunedRooms } from '../../services/roomUpgrades';
 import { getTendingLevel } from '../../services/tending';
-import { hapticLight, hapticSelection, hapticMedium } from '../../services/haptics';
+import { hapticLight, hapticSelection, hapticMedium, hapticHeavy } from '../../services/haptics';
 import { playUiSound, type UiSoundKind } from '../../services/uiSound';
 import { logEvent } from '../../services/eventLogger';
 
@@ -1237,13 +1237,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setOfferingCount(result.count);
     setOfferingTierUp(result.tierUp ? result.tierUp.title : null);
     setConfirmEverything(false);
-    hapticMedium();
+    // Feedback ramps with the weight of the offering: a fervent in-session
+    // streak, a milestone, a devotion tier-up, or giving everything all land as
+    // a heavier haptic and a flare that HOLDS at its peak before settling,
+    // where an ordinary offering gets the medium tap and a quick flare. Every
+    // offering now also has a voice — the arrangement swallowing it (the pit
+    // devour cue) instead of the old silence.
+    const intenseOffering = everything || result.isMilestone || !!result.tierUp || nextStreak >= 6;
+    if (intenseOffering) hapticHeavy(); else hapticMedium();
+    playUiSound('devour');
     const rm = getSettingsSync().reducedMotion;
     if (!rm) {
       sacrificePulse.setValue(0);
       Animated.sequence([
-        Animated.timing(sacrificePulse, { toValue: 1, duration: 160, useNativeDriver: true }),
-        Animated.timing(sacrificePulse, { toValue: 0, duration: 520, useNativeDriver: true }),
+        Animated.timing(sacrificePulse, { toValue: 1, duration: intenseOffering ? 180 : 160, useNativeDriver: true }),
+        ...(intenseOffering ? [Animated.delay(200)] : []),
+        Animated.timing(sacrificePulse, { toValue: 0, duration: intenseOffering ? 640 : 520, useNativeDriver: true }),
       ]).start();
     }
     // Milestone offerings become permanent collectibles in the Whisper Gallery,
