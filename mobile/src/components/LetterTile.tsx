@@ -4,6 +4,7 @@ import { Letter } from '../types';
 import { getTileColor, CandyColors, getPhaseTheme, getResonanceConfig } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
 import { shouldSimplifyAnimations } from '../services/deviceTier';
+import { getPressSpring } from '../theme/surfaces';
 import {
   STANDARD_TILE_W,
   STANDARD_TILE_MARGIN_H,
@@ -88,6 +89,9 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
   const guidePulseAnim = useRef(new Animated.Value(0)).current;
   const arrivalScaleAnim = useRef(new Animated.Value(1)).current;
   const arrivalTranslateYAnim = useRef(new Animated.Value(0)).current;
+  // Squash-and-stretch on the arrival landing (rest at 1 outside the settle).
+  const arrivalSquashXAnim = useRef(new Animated.Value(1)).current;
+  const arrivalSquashYAnim = useRef(new Animated.Value(1)).current;
 
   // Loop refs for proper cleanup (prevents memory leaks)
   const glowLoopRef = useRef<Animated.CompositeAnimation | null>(null);
@@ -162,6 +166,19 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
     if (phase >= 2) return 2.4;
     if (phase >= 1) return 2.8;
     return 3;
+  };
+
+  // Squash-and-stretch on the arrival landing: a brief wide-and-short impact
+  // that springs back through a stretch overshoot. Crisper and snappier in the
+  // bright days, heavier and slower by the reveal — the same weight ladder the
+  // rest of the tile speaks. `amount` is the peak scale deviation (scaleX up,
+  // scaleY down); the spring provides the single settling overshoot.
+  const getSquashParams = () => {
+    if (phase >= 4) return { amount: 0.09, friction: 8, tension: 90 };
+    if (phase >= 3) return { amount: 0.10, friction: 7, tension: 120 };
+    if (phase >= 2) return { amount: 0.12, friction: 6, tension: 150 };
+    if (phase >= 1) return { amount: 0.13, friction: 5, tension: 180 };
+    return { amount: 0.15, friction: 4, tension: 220 };
   };
 
   // Get consistent color based on letter
@@ -463,13 +480,19 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
     if (settings.reducedMotion || shouldSimplifyAnimations()) {
       arrivalScaleAnim.setValue(1);
       arrivalTranslateYAnim.setValue(0);
+      arrivalSquashXAnim.setValue(1);
+      arrivalSquashYAnim.setValue(1);
       return;
     }
 
     const springParams = getSelectedSpringParams();
+    const squash = getSquashParams();
     arrivalScaleAnim.setValue(0.65);
     // 'down' move = the letter came from the row above → slide down into place.
     arrivalTranslateYAnim.setValue(arrivalDirection === 'up' ? 14 : -14);
+    // Landing impact: wide + short, then spring back through a stretch overshoot.
+    arrivalSquashXAnim.setValue(1 + squash.amount);
+    arrivalSquashYAnim.setValue(1 - squash.amount);
     const arrivalAnim = Animated.parallel([
       Animated.spring(arrivalScaleAnim, {
         toValue: 1,
@@ -483,6 +506,18 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
         tension: springParams.tension,
         useNativeDriver: true,
       }),
+      Animated.spring(arrivalSquashXAnim, {
+        toValue: 1,
+        friction: squash.friction,
+        tension: squash.tension,
+        useNativeDriver: true,
+      }),
+      Animated.spring(arrivalSquashYAnim, {
+        toValue: 1,
+        friction: squash.friction,
+        tension: squash.tension,
+        useNativeDriver: true,
+      }),
     ]);
     arrivalAnimRef.current = arrivalAnim;
     arrivalAnim.start();
@@ -494,6 +529,8 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
       }
       arrivalScaleAnim.setValue(1);
       arrivalTranslateYAnim.setValue(0);
+      arrivalSquashXAnim.setValue(1);
+      arrivalSquashYAnim.setValue(1);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps -- anim values are stable refs; direction/phase ride with moveId
   }, [arrivalMoveId, settings.reducedMotion]);
@@ -566,10 +603,14 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
   const handlePressOut = () => {
     if (settings.reducedMotion) return;
     if (isInteractable || isSelected) {
+      // The RELEASE ages with the phase (bright snaps back, the reveal releases
+      // heavily) via the shared tile weight language; the press-DOWN stays
+      // constant — the hand does not age.
+      const releaseSpring = getPressSpring(phase);
       Animated.spring(scaleAnim, {
         toValue: isSelected ? 1.08 : 1,
-        friction: 3,
-        tension: 200,
+        friction: releaseSpring.friction,
+        tension: releaseSpring.tension,
         useNativeDriver: true,
       }).start();
     }
@@ -780,8 +821,13 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
         {
           transform: [
             // Arrival settle composes with the press/bounce animations
-            // (arrival values rest at 1/0 outside the settle window).
+            // (arrival values rest at 1/0 outside the settle window). The
+            // squash scaleX/scaleY rest at 1 and only deviate during the
+            // landing, giving it a non-uniform impact (never a shear: the tile
+            // is not selected while arriving, so rotate is 0deg here).
             { scale: Animated.multiply(scaleAnim, arrivalScaleAnim) },
+            { scaleX: arrivalSquashXAnim },
+            { scaleY: arrivalSquashYAnim },
             { translateY: Animated.add(bounceAnim, arrivalTranslateYAnim) },
             { rotate: isSelected ? wobbleRotate : '0deg' },
           ],
