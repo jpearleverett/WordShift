@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -29,6 +29,14 @@ import {
   UnbrokenWeaveMastery,
 } from '../services/masteryRecords';
 import { DialoguePhase } from '../types/homeWorld';
+import {
+  EntranceCascadeItem,
+  getCascadeDelayMs,
+  countUpDisplayValue,
+  getCountUpDurationMs,
+} from './ui/RewardReveal';
+import { getSettingsSync } from '../services/settings';
+import { shouldSimplifyAnimations } from '../services/deviceTier';
 
 const STAR_FILLED = require('../../assets/ui/star_filled.png');
 const STAR_EMPTY = require('../../assets/ui/star_empty.png');
@@ -50,6 +58,86 @@ export function formatPersonalBestSummary(pb: PersonalBest): string {
 
 /** Tinted chip fill for chrome sitting directly on the deep screen base. */
 const CHROME_CHIP_BG = `rgba(255, 255, 255, ${SURFACE.highlightAlpha})`;
+
+/** Content rows wait this long so the header reads as settling in first. */
+const HEADER_CASCADE_BASE_MS = 120;
+
+interface HeroStatSpec {
+  value: number;
+  label: string;
+}
+
+/**
+ * The hero stat row: the three headline numbers count up together once on
+ * mount (a single, one-shot beat, not an idle loop). The count runs on the JS
+ * thread via a plain rAF stepper (never an Animated listener under the native
+ * driver). Reduced motion / low-tier devices show the final numbers instantly,
+ * and each Text exposes its final value to screen readers regardless.
+ */
+function HeroStatsRow({
+  stats,
+  phase,
+  animate,
+  sectionBg,
+  sectionBorder,
+  valueColor,
+  labelColor,
+}: {
+  stats: HeroStatSpec[];
+  phase: number;
+  animate: boolean;
+  sectionBg: string;
+  sectionBorder: string;
+  valueColor: string;
+  labelColor: string;
+}) {
+  const [fraction, setFraction] = useState(animate ? 0 : 1);
+  const rafRef = useRef(0);
+
+  useEffect(() => {
+    if (!animate) {
+      setFraction(1);
+      return;
+    }
+    const reduced = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
+    const maxTarget = stats.reduce((m, s) => Math.max(m, Math.abs(s.value)), 0);
+    const duration = reduced ? 0 : getCountUpDurationMs(maxTarget, phase);
+    if (duration <= 0) {
+      setFraction(1);
+      return;
+    }
+    const startedAt = Date.now();
+    const tick = () => {
+      const f = Math.min(1, (Date.now() - startedAt) / duration);
+      setFraction(f);
+      if (f < 1) rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <View style={styles.heroRow}>
+      {stats.map(s => (
+        <View
+          key={s.label}
+          style={[styles.heroStat, { backgroundColor: sectionBg, borderColor: sectionBorder }]}
+        >
+          <Text
+            style={[styles.heroValue, { color: valueColor }]}
+            accessibilityLabel={`${s.value} ${s.label}`}
+          >
+            {countUpDisplayValue(fraction, s.value)}
+          </Text>
+          <Text style={[styles.heroLabel, { color: labelColor }]}>{s.label}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
 
 interface StatsScreenProps {
   onClose: () => void;
@@ -85,6 +173,9 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
   // as the first-paint fallback, clamped so a broken mirror can never show a
   // negative balance.
   const [liveAmberBalance, setLiveAmberBalance] = useState<number | null>(null);
+  // Latch so the hero count-up runs only the first time the overview appears
+  // (persists across tab switches; a re-shown hero snaps to its final values).
+  const heroCountedRef = useRef(false);
 
   useEffect(() => {
     getAmberBalance().then(setLiveAmberBalance).catch(() => {});
@@ -107,6 +198,10 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
   }, []);
 
   if (!stats) return null;
+
+  // First appearance of the overview animates the hero; later shows are static.
+  const animateHero = !heroCountedRef.current;
+  heroCountedRef.current = true;
 
   const t = getSurfaceTheme(effectivePhase);
   const isDarkPhase = effectivePhase >= 3;
@@ -137,7 +232,9 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
         >
           <Text style={[styles.backChipText, { color: t.headerTitle }]}>{'<'} Back</Text>
         </TouchableOpacity>
-        <Text style={[styles.title, { color: t.headerTitle }]}>Statistics</Text>
+        <EntranceCascadeItem phase={effectivePhase}>
+          <Text style={[styles.title, { color: t.headerTitle }]}>Statistics</Text>
+        </EntranceCascadeItem>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -194,29 +291,35 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {selectedTab === 'overview' ? (
           <>
-            {/* Hero stats — panel card with a soft glow blob behind */}
-            <PanelCard phase={effectivePhase} kind="panel" style={styles.heroCard}>
-              <View
-                pointerEvents="none"
-                style={[styles.heroGlow, { backgroundColor: t.glow }]}
-              />
-              <View style={styles.heroRow}>
-                <View style={[styles.heroStat, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}>
-                  <Text style={[styles.heroValue, { color: t.title }]}>{stats.totalPuzzlesCompleted}</Text>
-                  <Text style={[styles.heroLabel, { color: t.muted }]}>Puzzles</Text>
-                </View>
-                <View style={[styles.heroStat, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}>
-                  <Text style={[styles.heroValue, { color: t.title }]}>{stats.totalStars}</Text>
-                  <Text style={[styles.heroLabel, { color: t.muted }]}>Stars</Text>
-                </View>
-                <View style={[styles.heroStat, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}>
-                  <Text style={[styles.heroValue, { color: t.title }]}>{currentStreak}</Text>
-                  <Text style={[styles.heroLabel, { color: t.muted }]}>Streak</Text>
-                </View>
-              </View>
-            </PanelCard>
+            {/* Hero stats: panel card with a soft glow blob behind. The three
+                headline numbers count up once on mount (the single hero beat). */}
+            <EntranceCascadeItem
+              phase={effectivePhase}
+              delay={getCascadeDelayMs(0, { baseMs: HEADER_CASCADE_BASE_MS })}
+            >
+              <PanelCard phase={effectivePhase} kind="panel" style={styles.heroCard}>
+                <View
+                  pointerEvents="none"
+                  style={[styles.heroGlow, { backgroundColor: t.glow }]}
+                />
+                <HeroStatsRow
+                  phase={effectivePhase}
+                  animate={animateHero}
+                  sectionBg={t.sectionBg}
+                  sectionBorder={t.sectionBorder}
+                  valueColor={t.title}
+                  labelColor={t.muted}
+                  stats={[
+                    { value: stats.totalPuzzlesCompleted, label: 'Puzzles' },
+                    { value: stats.totalStars, label: 'Stars' },
+                    { value: currentStreak, label: 'Streak' },
+                  ]}
+                />
+              </PanelCard>
+            </EntranceCascadeItem>
 
             {/* Star breakdown */}
+            <EntranceCascadeItem phase={effectivePhase} delay={getCascadeDelayMs(1, { baseMs: HEADER_CASCADE_BASE_MS })}>
             <PanelCard phase={effectivePhase} style={styles.sectionCard}>
               <PixelPlaque phase={effectivePhase} label={'STAR BREAKDOWN'} style={styles.sectionPlaque} />
               <StarBar label="3 Stars" stars={3} count={stats.threeStarCount} total={stats.totalPuzzlesCompleted} color={CandyColors.yellow.main} trackColor={t.rowBorder} countColor={t.body} />
@@ -236,11 +339,13 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
                 )}
               </View>
             </PanelCard>
+            </EntranceCascadeItem>
 
-            {/* Mastery — private skill records (best speed run, scanning pace).
+            {/* Mastery: private skill records (best speed run, scanning pace).
                 Only shown once there's something to show, so it never clutters a
                 new player's overview. */}
             {(bestSpeedRound > 0 || resonantChoices > 0 || paceImproving || effectivePhase === 5 || (unbrokenWeaveMastery !== null && unbrokenWeaveMastery.wins > 0)) && (
+              <EntranceCascadeItem phase={effectivePhase} delay={getCascadeDelayMs(2, { baseMs: HEADER_CASCADE_BASE_MS })}>
               <PanelCard phase={effectivePhase} style={styles.sectionCard}>
                 <PixelPlaque phase={effectivePhase} label={'MASTERY'} style={styles.sectionPlaque} />
                 {bestSpeedRound > 0 && (
@@ -281,9 +386,11 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
                   </>
                 )}
               </PanelCard>
+              </EntranceCascadeItem>
             )}
 
             {/* Difficulty breakdown */}
+            <EntranceCascadeItem phase={effectivePhase} delay={getCascadeDelayMs(3, { baseMs: HEADER_CASCADE_BASE_MS })}>
             <PanelCard phase={effectivePhase} style={styles.sectionCard}>
               <PixelPlaque phase={effectivePhase} label={'BY DIFFICULTY'} style={styles.sectionPlaque} />
               <DifficultyRow
@@ -315,6 +422,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
                 avgColor={t.title}
               />
             </PanelCard>
+            </EntranceCascadeItem>
 
             {/* Personal bests — cleanest solves at each difficulty. Sprite
                 policy (no raw emoji in stats chrome): a perfect best gets the
@@ -322,6 +430,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
                 words ("1 hint, 2 mistakes"); a difficulty with no best yet
                 says so explicitly instead of hiding the row. */}
             {stats.personalBests && Object.keys(stats.personalBests).length > 0 && (
+              <EntranceCascadeItem phase={effectivePhase} delay={getCascadeDelayMs(4, { baseMs: HEADER_CASCADE_BASE_MS })}>
               <PanelCard phase={effectivePhase} style={styles.sectionCard}>
                 <PixelPlaque phase={effectivePhase} label={'PERSONAL BESTS'} style={styles.sectionPlaque} />
                 {(['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'] as Difficulty[]).map((diff, i) => {
@@ -360,9 +469,11 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
                   Fewest hints and mistakes at each difficulty
                 </Text>
               </PanelCard>
+              </EntranceCascadeItem>
             )}
 
             {/* Journey progress */}
+            <EntranceCascadeItem phase={effectivePhase} delay={getCascadeDelayMs(5, { baseMs: HEADER_CASCADE_BASE_MS })}>
             <PanelCard phase={effectivePhase} style={styles.sectionCard}>
               <PixelPlaque phase={effectivePhase} label={'YOUR JOURNEY'} style={styles.sectionPlaque} />
               <View style={styles.journeyRow}>
@@ -395,11 +506,12 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
                 <Text style={[styles.journeyValue, { color: t.title }]}>{stats.totalInvalidAttempts}</Text>
               </View>
             </PanelCard>
+            </EntranceCascadeItem>
           </>
         ) : (
           <>
             {/* Achievement categories */}
-            {(['puzzle', 'mastery', 'streak', 'collection', 'journey'] as const).map(category => {
+            {(['puzzle', 'mastery', 'streak', 'collection', 'journey'] as const).map((category, categoryIndex) => {
               const categoryAchievements = achievements.filter(a => a.category === category);
               const categoryName = {
                 puzzle: 'PUZZLES',
@@ -410,7 +522,12 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
               }[category];
 
               return (
-                <PanelCard key={category} phase={effectivePhase} style={styles.sectionCard}>
+                <EntranceCascadeItem
+                  key={category}
+                  phase={effectivePhase}
+                  delay={getCascadeDelayMs(categoryIndex, { baseMs: HEADER_CASCADE_BASE_MS })}
+                >
+                <PanelCard phase={effectivePhase} style={styles.sectionCard}>
                   <PixelPlaque phase={effectivePhase} label={categoryName} style={styles.sectionPlaque} />
                   {categoryAchievements.map((achievement, i) => (
                     <View
@@ -449,6 +566,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
                     </View>
                   ))}
                 </PanelCard>
+                </EntranceCascadeItem>
               );
             })}
           </>

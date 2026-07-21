@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,10 +9,15 @@ import {
   Dimensions,
   ActivityIndicator,
   Image,
+  Animated,
+  Easing,
 } from 'react-native';
 import { BODY_FONT, BODY_FONT_ITALIC, PIXEL_FONT_BOLD } from '../theme/fonts';
 import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
 import { PanelCard } from './ui/PanelCard';
+import { EntranceCascadeItem, getCascadeDelayMs } from './ui/RewardReveal';
+import { getSettingsSync } from '../services/settings';
+import { shouldSimplifyAnimations } from '../services/deviceTier';
 import { useScreenInsets } from '../hooks/useScreenInsets';
 import {
   getGroupedEntries,
@@ -40,6 +45,56 @@ const ENTRY_TYPE_ICONS: Record<string, ReturnType<typeof require>> = {
 };
 const SCROLL_ICON = require('../../assets/ui/scroll.png');
 const getEntryTypeIcon = (type: string) => ENTRY_TYPE_ICONS[type] || SCROLL_ICON;
+
+// Content waits this long so the header reads as settling in first.
+const HEADER_CASCADE_BASE_MS = 120;
+
+/**
+ * A one-time light sweep across the newest (top) collection card, then it
+ * rests (unmounts) so nothing keeps animating idle. Native-driven transform +
+ * opacity only; reduced motion / low-tier devices skip it entirely.
+ */
+const HeaderShimmer: React.FC<{ phase: number }> = ({ phase }) => {
+  const anim = useRef(new Animated.Value(0)).current;
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    if (getSettingsSync().reducedMotion || shouldSimplifyAnimations()) {
+      setDone(true);
+      return;
+    }
+    const animation = Animated.timing(anim, {
+      toValue: 1,
+      duration: 900,
+      delay: 260,
+      easing: Easing.inOut(Easing.quad),
+      useNativeDriver: true,
+    });
+    animation.start(({ finished }) => {
+      if (finished) setDone(true);
+    });
+    return () => animation.stop();
+  }, [anim]);
+
+  if (done) return null;
+
+  const t = getSurfaceTheme(phase);
+  const translateX = anim.interpolate({ inputRange: [0, 1], outputRange: [-60, SCREEN_WIDTH] });
+  const opacity = anim.interpolate({
+    inputRange: [0, 0.15, 0.85, 1],
+    outputRange: [0, 0.5, 0.5, 0],
+  });
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        styles.shimmerBand,
+        { backgroundColor: t.glow, opacity, transform: [{ translateX }, { rotate: '18deg' }] },
+      ]}
+    />
+  );
+};
 
 interface WhisperGalleryScreenProps {
   phase: number;
@@ -95,10 +150,12 @@ export const WhisperGalleryScreen: React.FC<WhisperGalleryScreenProps> = ({
         >
           <Text style={[styles.backChipText, { color: t.title }]}>{'<'} Back</Text>
         </TouchableOpacity>
-        <PanelCard phase={phase} kind="card" style={styles.titlePlaque}>
-          <Text style={[styles.title, { color: t.title }]}>{title}</Text>
-          <Text style={[styles.subtitle, { color: t.muted }]}>{subtitle}</Text>
-        </PanelCard>
+        <EntranceCascadeItem phase={phase}>
+          <PanelCard phase={phase} kind="card" style={styles.titlePlaque}>
+            <Text style={[styles.title, { color: t.title }]}>{title}</Text>
+            <Text style={[styles.subtitle, { color: t.muted }]}>{subtitle}</Text>
+          </PanelCard>
+        </EntranceCascadeItem>
       </View>
 
       <ScrollView
@@ -123,16 +180,23 @@ export const WhisperGalleryScreen: React.FC<WhisperGalleryScreenProps> = ({
           </View>
         )}
 
-        {animalTypes.map(animalType => {
+        {animalTypes.map((animalType, sectionIndex) => {
           const entries = grouped[animalType];
           const typedAnimal = animalType as keyof typeof ANIMAL_INFO;
           const animalName = ANIMAL_INFO[typedAnimal]?.name || animalType;
           const animalEmoji = ANIMAL_INFO[typedAnimal]?.emoji || '🐾';
           const animalSprite = CHARACTER_SPRITES[animalType as AnimalType]?.idle;
           const isExpanded = expandedAnimal === animalType;
+          const isNewest = sectionIndex === 0;
 
           return (
-            <View key={animalType} style={styles.animalSection}>
+            <EntranceCascadeItem
+              key={animalType}
+              phase={phase}
+              delay={getCascadeDelayMs(sectionIndex, { baseMs: HEADER_CASCADE_BASE_MS })}
+              style={styles.animalSection}
+            >
+              <View style={isNewest ? styles.shimmerClip : undefined}>
               <TouchableOpacity
                 onPress={() => setExpandedAnimal(isExpanded ? null : animalType)}
                 accessibilityLabel={`${animalName}: ${entries.length} entries`}
@@ -175,6 +239,8 @@ export const WhisperGalleryScreen: React.FC<WhisperGalleryScreenProps> = ({
                   </View>
                 </PanelCard>
               </TouchableOpacity>
+              {isNewest && <HeaderShimmer phase={phase} />}
+              </View>
 
               {isExpanded && entries.map((entry, i) => (
                 <View
@@ -196,7 +262,7 @@ export const WhisperGalleryScreen: React.FC<WhisperGalleryScreenProps> = ({
                   </Text>
                 </View>
               ))}
-            </View>
+            </EntranceCascadeItem>
           );
         })}
       </ScrollView>
@@ -290,6 +356,18 @@ const styles = StyleSheet.create({
   },
   animalSection: {
     marginBottom: 12,
+  },
+  // Clips the one-time shimmer sweep to the newest card's bounds. Rectangular
+  // (no borderRadius) so it never rounds the card's baked pixel-frame corners.
+  shimmerClip: {
+    overflow: 'hidden',
+  },
+  shimmerBand: {
+    position: 'absolute',
+    top: -24,
+    bottom: -24,
+    left: 0,
+    width: 56,
   },
   animalHeader: {
     flexDirection: 'row',

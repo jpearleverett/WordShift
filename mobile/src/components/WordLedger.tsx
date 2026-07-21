@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,14 +7,25 @@ import {
   TouchableOpacity,
   Image,
   Dimensions,
+  Animated,
+  Easing,
 } from 'react-native';
 import { PIXEL_FONT_BOLD } from '../theme/fonts';
 import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
+import { getResonanceConfig } from '../theme/colors';
 import { PanelCard } from './ui/PanelCard';
+import { EntranceCascadeItem, getCascadeDelayMs } from './ui/RewardReveal';
 import { useScreenInsets } from '../hooks/useScreenInsets';
 import { DialoguePhase } from '../types/homeWorld';
 import { getFullProgress } from '../services/amberCurrency';
 import { getWordsOfferedText } from '../services/phaseNarrative';
+import { getSettingsSync } from '../services/settings';
+import { shouldSimplifyAnimations } from '../services/deviceTier';
+
+// Cap the staggered chips so a long ledger (up to 500 words) snaps the rest in.
+const CHIP_CASCADE_CAP = 10;
+// Content waits this long so the header reads as settling in first.
+const HEADER_CASCADE_BASE_MS = 120;
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -75,6 +86,47 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
 
   const isDread = (word: string): boolean => DREAD_WORD_SET.has(word.toUpperCase());
 
+  // The one idle element on this surface: a single breathing driver shared by
+  // every dread chip's glow overlay (reusing the letter-tile resonance visual
+  // language). One loop, many overlays, native-driven opacity only.
+  const dreadAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const reduced = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
+    if (phase < 2 || reduced) {
+      dreadAnim.setValue(phase < 2 ? 0 : 0.5);
+      return;
+    }
+    dreadAnim.setValue(0);
+    const cycle = phase >= 4 ? 2000 : 2600;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(dreadAnim, {
+          toValue: 1,
+          duration: cycle,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(dreadAnim, {
+          toValue: 0,
+          duration: cycle,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    loop.start();
+    return () => {
+      loop.stop();
+      dreadAnim.stopAnimation();
+    };
+  }, [phase, dreadAnim]);
+
+  const resonance = getResonanceConfig(phase);
+  const dreadGlowOpacity = dreadAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [resonance.minOpacity, resonance.maxOpacity],
+  });
+
   return (
     <View style={[styles.container, { backgroundColor: t.screenBg, paddingTop: screenInsets.top + 16 }]}>
       {/* Soft vignette glow behind the content */}
@@ -90,6 +142,7 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
         >
           <Text style={[styles.backChipText, { color: t.title }]}>← Back</Text>
         </TouchableOpacity>
+        <EntranceCascadeItem phase={phase}>
         <PanelCard phase={phase} kind="card" style={styles.titlePlaque}>
           <Text style={[styles.title, { color: t.title }]}>
             {getTitle()}
@@ -108,6 +161,7 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
             </Text>
           </View>
         </PanelCard>
+        </EntranceCascadeItem>
       </View>
 
       {/* Word grid */}
@@ -131,15 +185,23 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
           <View style={styles.wordChips}>
             {words.map((word, index) => {
               const dread = isDread(word) && phase >= 2;
-              return (
+              const chip = (
                 <View
-                  key={`${word}-${index}`}
                   style={[
                     styles.wordChip,
                     { backgroundColor: t.sectionBg, borderColor: t.sectionBorder },
                     dread && styles.wordChipDread,
                   ]}
                 >
+                  {dread && (
+                    <Animated.View
+                      pointerEvents="none"
+                      style={[
+                        styles.dreadGlow,
+                        { backgroundColor: resonance.color, opacity: dreadGlowOpacity },
+                      ]}
+                    />
+                  )}
                   <Text style={[
                     styles.wordText,
                     { color: t.body },
@@ -149,6 +211,19 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
                   </Text>
                 </View>
               );
+              // First rows cascade in; the rest snap in (a long ledger must not crawl).
+              if (index < CHIP_CASCADE_CAP) {
+                return (
+                  <EntranceCascadeItem
+                    key={`${word}-${index}`}
+                    phase={phase}
+                    delay={getCascadeDelayMs(index, { baseMs: HEADER_CASCADE_BASE_MS })}
+                  >
+                    {chip}
+                  </EntranceCascadeItem>
+                );
+              }
+              return <React.Fragment key={`${word}-${index}`}>{chip}</React.Fragment>;
             })}
           </View>
         )}
@@ -247,6 +322,17 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     borderRadius: 12,
     borderWidth: 1.5,
+    overflow: 'hidden',
+  },
+  // Breathing dread aura, clipped to the chip's rounded rect. Native-driven
+  // opacity is supplied at render from the shared dread driver.
+  dreadGlow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 12,
   },
   // Dread words keep their crimson highlight (Phase 2+ only reaches here on
   // the dark screen backgrounds), now framed like every other chip.
