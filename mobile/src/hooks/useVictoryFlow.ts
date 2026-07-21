@@ -3,6 +3,7 @@ import { Animated } from 'react-native';
 import { VictoryData } from './useGamePersistence';
 import { getSettingsSync } from '../services/settings';
 import { hapticLight, hapticHeavy } from '../services/haptics';
+import { getCelebrationSpring } from '../theme/surfaces';
 
 /**
  * Where the victory flow currently is:
@@ -130,11 +131,11 @@ export interface VictoryFlowState {
 export interface VictoryFlowActions {
   setVictoryData: (data: VictoryData | null) => void;
   setProcessingVictory: (processing: boolean) => void;
-  playVictorySequence: (stars: number) => void;
+  playVictorySequence: (stars: number, phase?: number, hushed?: boolean) => void;
   playPhaseChangeFlash: () => void;
   resetVictory: () => void;
   /** Instantly complete victory animation (tap-to-skip-forward) */
-  skipToEnd: (stars: number) => void;
+  skipToEnd: (stars: number, hushed?: boolean) => void;
 }
 
 export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
@@ -202,10 +203,17 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
     }
   }, [clearSpinner]);
 
-  const playVictorySequence = useCallback((stars: number) => {
+  const playVictorySequence = useCallback((stars: number, phase = 0, hushed = false) => {
     clearSpinner();
     const settings = getSettingsSync();
     const reducedMotion = settings.reducedMotion;
+    // The celebration entrance is a WORLD arrival: it ages with the descent so
+    // the stars stop candy-bouncing at the reveal (see getCelebrationSpring).
+    const cel = getCelebrationSpring(phase);
+    // The modal reveal is heavier than the stars (softer tension, more friction)
+    // so the card settles rather than snaps; at phase 0 this is the original
+    // {6, 80}, deepening to a slow heave at the reveal.
+    const modalSpring = { friction: cel.friction + 2, tension: Math.max(40, cel.tension - 40) };
     // Swift Victories: a routine win renders the compact result strip, which
     // needs no entrance choreography — settle instantly (same path reduced
     // motion takes, so the two compose instead of fighting). Special beats
@@ -214,10 +222,13 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
       victoryDataRef.current,
       settings.swiftVictories === true
     );
-    // THE marked final board: the choreography still plays (the stars are
-    // earned) but the celebration RHYTHM is hushed — one soft settle instead
-    // of tap-tap-tap-THUD. The quiet is the moment; the arrival follows.
+    // THE marked final board AND the scripted silent-victory beat are HUSHED:
+    // the choreography still plays (the stars are earned) but the celebration
+    // RHYTHM is one soft settle instead of tap-tap-tap-THUD, and no success
+    // buzz. The quiet is the moment; the arrival follows. (finalBoard kept for
+    // back-compat; App also passes the computed hushed flag.)
     const finalBoard = victoryDataRef.current?.finalBoard === true;
+    const isHushed = hushed || finalBoard;
     if (reducedMotion || swiftCompact) {
       victoryStar1.setValue(stars >= 1 ? 1 : 0);
       victoryStar2.setValue(stars >= 2 ? 1 : 0);
@@ -225,7 +236,7 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
       victoryModalScale.setValue(1);
       victoryModalOpacity.setValue(1);
       setVictoryStage('settled');
-      if (finalBoard) {
+      if (isHushed) {
         hapticLight();
       } else {
         hapticHeavy();
@@ -243,17 +254,17 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
     const starAnims: Animated.CompositeAnimation[] = [];
     if (stars >= 1) {
       starAnims.push(
-        Animated.spring(victoryStar1, { toValue: 1, friction: 4, tension: 120, useNativeDriver: true })
+        Animated.spring(victoryStar1, { toValue: 1, friction: cel.friction, tension: cel.tension, useNativeDriver: true })
       );
     }
     if (stars >= 2) {
       starAnims.push(
-        Animated.spring(victoryStar2, { toValue: 1, friction: 4, tension: 120, useNativeDriver: true })
+        Animated.spring(victoryStar2, { toValue: 1, friction: cel.friction, tension: cel.tension, useNativeDriver: true })
       );
     }
     if (stars >= 3) {
       starAnims.push(
-        Animated.spring(victoryStar3, { toValue: 1, friction: 4, tension: 120, useNativeDriver: true })
+        Animated.spring(victoryStar3, { toValue: 1, friction: cel.friction, tension: cel.tension, useNativeDriver: true })
       );
     }
 
@@ -262,7 +273,7 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
     // (no spinner), and the star pops are actually visible instead of playing
     // behind a fully transparent card.
     const sequence = Animated.parallel([
-      Animated.spring(victoryModalScale, { toValue: 1, friction: 6, tension: 80, useNativeDriver: true }),
+      Animated.spring(victoryModalScale, { toValue: 1, friction: modalSpring.friction, tension: modalSpring.tension, useNativeDriver: true }),
       Animated.timing(victoryModalOpacity, { toValue: 1, duration: 250, useNativeDriver: true }),
       Animated.sequence([
         Animated.delay(STAR_POP_DELAY_MS),
@@ -281,8 +292,15 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
     hapticTimeouts.current.forEach(clearTimeout);
     hapticTimeouts.current = [];
     const firstHapticAt = STAR_POP_DELAY_MS + STAR_HAPTIC_OFFSET_MS;
-    if (finalBoard) {
+    if (isHushed) {
+      // One soft settle, no celebration rhythm — the quiet is the moment.
       hapticTimeouts.current.push(setTimeout(() => hapticLight(), firstHapticAt + stars * STAR_STAGGER_MS + 150));
+    } else if (phase >= 4) {
+      // At the reveal the stars land like stones: two slow medium pulses
+      // instead of three quick taps, keeping the settling THUD.
+      hapticTimeouts.current.push(setTimeout(() => hapticLight(), firstHapticAt));
+      if (stars >= 3) hapticTimeouts.current.push(setTimeout(() => hapticLight(), firstHapticAt + STAR_STAGGER_MS * 1.5));
+      hapticTimeouts.current.push(setTimeout(() => hapticHeavy(), firstHapticAt + stars * STAR_STAGGER_MS + 200));
     } else {
       if (stars >= 1) hapticTimeouts.current.push(setTimeout(() => hapticLight(), firstHapticAt));
       if (stars >= 2) hapticTimeouts.current.push(setTimeout(() => hapticLight(), firstHapticAt + STAR_STAGGER_MS));
@@ -305,13 +323,13 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
     ]).start();
   }, [phaseFlashOpacity]);
 
-  const skipToEnd = useCallback((stars: number) => {
+  const skipToEnd = useCallback((stars: number, hushed = false) => {
     // Stop the running victory sequence to prevent in-flight callbacks
     // from overwriting the final values we're about to set.
     runningAnimRef.current?.stop();
     runningAnimRef.current = null;
     // Pending star haptics would land after the visuals settled — replace
-    // the remaining rhythm with the settle THUD right now.
+    // the remaining rhythm with the settle right now.
     hapticTimeouts.current.forEach(clearTimeout);
     hapticTimeouts.current = [];
     victoryStar1.setValue(stars >= 1 ? 1 : 0);
@@ -320,7 +338,10 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
     victoryModalScale.setValue(1);
     victoryModalOpacity.setValue(1);
     setVictoryStage('settled');
-    hapticHeavy();
+    // Skipping a hushed beat (finale / silent victory) must not fire the
+    // celebration THUD — the screen is performing silence.
+    const finalBoard = victoryDataRef.current?.finalBoard === true;
+    if (hushed || finalBoard) hapticLight(); else hapticHeavy();
   }, [victoryStar1, victoryStar2, victoryStar3, victoryModalScale, victoryModalOpacity]);
 
   const resetVictory = useCallback(() => {

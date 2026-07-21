@@ -32,6 +32,7 @@ import {
   getRewardedDoubleConfirm,
   getDailyLadderTrendLabel,
   getResonanceBonusLabel,
+  isSilentVictoryBeat,
 } from '../../services/phaseNarrative';
 import { DialoguePhase } from '../../types/homeWorld';
 import { VARIANT_CONFIGS } from '../../services/puzzleVariety';
@@ -95,6 +96,8 @@ export interface VictoryData {
   phaseTransitionPending?: boolean;
   /** Monotonic real-puzzle count — early wins keep the full ceremony */
   puzzlesSolved?: number;
+  /** THE marked final board's win — a hushed beat (no success buzz on open) */
+  finalBoard?: boolean;
   unbrokenWeaveRank?: number;
   unbrokenWeaveTitle?: string;
   unbrokenWeaveNextObjective?: string | null;
@@ -265,6 +268,12 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
     !forceFullCeremony &&
     isRoutineVictory(victoryData);
 
+  // The two hushed beats perform silence on screen — the finale board and the
+  // scripted silent victory. Used to suppress the modal-open success haptic.
+  const hushedBeat =
+    victoryData?.finalBoard === true ||
+    isSilentVictoryBeat(victoryData?.puzzlesSolved ?? 0);
+
   // Ritual echo chain + de-duplicated feedback register: the performance
   // feedback line and the ritual-echo footer occupy the same emotional slot,
   // so when the chain renders with a footer (Phase 1+), the footer wins.
@@ -305,7 +314,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 
   useEffect(() => {
     if (visible) {
-      hapticSuccess();
+      if (!hushedBeat) hapticSuccess();
       if (compactMode || getSettingsSync().reducedMotion) {
         // Reveal all cascade groups instantly — skip the stagger. The compact
         // strip has no entrance choreography at all (and renders no skip
@@ -340,7 +349,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
       };
     }
     setEntranceComplete(false);
-  }, [visible, compactMode]);
+  }, [visible, compactMode, hushedBeat]);
 
   const handleSkipEntrance = useCallback(() => {
     cascadeAnimRef.current?.stop();

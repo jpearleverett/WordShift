@@ -2336,8 +2336,12 @@ function MainApp() {
       }, 1800);
 
       // Play choreographed victory sequence (the modal gates tap-to-skip to
-      // its own entrance window via onSkip)
-      victoryActions.playVictorySequence(victory.earnedStars);
+      // its own entrance window via onSkip). The ceremony ages with the phase
+      // (heavier springs / stone-like haptics at the reveal), and BOTH quiet
+      // beats (the final board and the scripted silent victory) are hushed so
+      // the phone never celebrates while the screen performs silence.
+      const victoryHushed = wasFinalBoard || isSilentVictoryBeat(completedTotal);
+      victoryActions.playVictorySequence(victory.earnedStars, persistence.currentPhase, victoryHushed);
 
       // Phase transitions are now DEFERRED to the Offering Pit.
       // When phaseTransitionPending is true, the phase change will be confirmed
@@ -3506,7 +3510,12 @@ function MainApp() {
 
   const handleVictoryTapAccelerate = useCallback(() => {
     if (!victoryFlow.victoryData) return;
-    victoryActions.skipToEnd(victoryFlow.victoryData.earnedStars);
+    // Skipping a hushed beat keeps its soft settle instead of the celebration
+    // THUD (the finale board OR the scripted silent victory).
+    const hushed =
+      victoryFlow.victoryData.finalBoard === true ||
+      isSilentVictoryBeat(victoryFlow.victoryData.puzzlesSolved ?? 0);
+    victoryActions.skipToEnd(victoryFlow.victoryData.earnedStars, hushed);
   }, [victoryFlow.victoryData, victoryActions]);
 
   const handleSelectDifficulty = useCallback((d: Difficulty) => {

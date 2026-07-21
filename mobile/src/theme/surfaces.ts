@@ -53,6 +53,21 @@ export function getPressSpring(phase: number): { friction: number; tension: numb
   return { friction: 4, tension: 200 };
 }
 
+/**
+ * The celebration spring for the victory ceremony (star pops, modal reveal).
+ * The win is a WORLD arrival, so it takes the phase ladder like the letter
+ * tiles: bright candy bounce in the early days, a heavy stone-like settle at
+ * the reveal, so a triple candy-bounce star never contradicts the doctrine
+ * that a phase-3+ victory "feels hollow". Mirrors the tile ladder shape
+ * (LetterTile getSelectedSpringParams: friction 3->9, tension 200->80).
+ */
+export function getCelebrationSpring(phase: number): { friction: number; tension: number } {
+  if (phase >= 4) return { friction: 9, tension: 80 };
+  if (phase >= 3) return { friction: 7, tension: 95 };
+  if (phase >= 2) return { friction: 5, tension: 105 };
+  return { friction: 4, tension: 120 };
+}
+
 // ---------------------------------------------------------------------------
 // Surface palette — the consolidated phase-aware theme for menu chrome.
 // (Supersedes the per-file getStoreSurfaceTheme copies in StoreModal /
