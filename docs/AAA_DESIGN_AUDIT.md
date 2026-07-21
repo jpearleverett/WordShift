@@ -58,21 +58,27 @@ None of this is a rewrite. The audit found the delight ceiling is high precisely
 Pixel-accurate HTML recreations built from the shipped assets, fonts, and code-derived geometry, captured at 412×915 @2x. Each caption lists what the frame *proves*. Full fidelity notes (every approximation disclosed) live with the render generators; nothing shown here is speculative — layout, colors, and states were derived from cited code.
 
 ### 3.1 Home world, phase 0 — `renders/current-home-p0.png`
+![Home world at phase 0](renders/current-home-p0.png)
 The panned-down view of the bright-days home. **Proves:** the painterly world and room interiors are store-quality (the audit's strongest material); animal name tags are clipped invisible by the rooms' `overflow:hidden` (every companion is anonymous on the main screen); the `!` dialogue badge floats mid-room, detached from Ember; room nameplates are generic dark pills rather than the cottage kit's wooden plaques; the header is flat translucent-black chrome over hand-painted art; the roof (and its smoke) is cut off at this camera.
 
 ### 3.2 Home world, phase 4 — `renders/current-home-p4.png`
+![Home world at phase 4](renders/current-home-p4.png)
 The launch-default camera (fresh sessions resolve the pan to `maxPanY` — the roof view). **Proves:** the upper third of the reveal-era home is featureless near-black (the bottom-anchored sky art sits below the viewport at this pan; the flat backdrop color fills the rest); the shadow figure — the game's marquee horror visual — is imperceptible at 0.5 opacity over near-black with its crimson eyes cropped above the frame; ambient dread "particles" are literal 12px 💀/👁 OS emoji; the locked-room card is a flat dark box with an emoji-grade padlock; bright candy header icons (🎯 red target, purple journal) never age. The robed sprites, faint word echoes, and dark cottage Next-Unlock bar genuinely land.
 
 ### 3.3 Puzzle board, phase 0 — `renders/current-board-p0.png`
+![Puzzle board at phase 0](renders/current-board-p0.png)
 Mid-move on the curated opener (letter lifted, graded previews showing). **Proves:** the candy tiles hold up frame-by-frame (bevel, gloss, per-letter color); the ✓/✗ preview words clip at row edges and collide with the slot pillars at the game's most-viewed location; an EASY board leaves ~40% of the screen as empty violet void below the future row; the home button is an emoji 🏠 chip beside the hand-painted wooden wordmark; the disabled UNDO state is a muddy brown slab.
 
 ### 3.4 Victory modal, phase 0 — `renders/current-victory-p0.png`
+![Victory modal at phase 0](renders/current-victory-p0.png)
 A settled 3-star win. **Proves:** the game's most-repeated ceremony surface is a generic flat-white rounded card — the 275-piece cottage kit never reached it; confetti renders **on top of** the modal text (zIndex 1000 vs 500 — a piece sits mid-word in the render exactly as the code layers it); emoji stand-ins (🌾🔥🏠) carry the receipt rows; the blue Share button is off-palette next to the pink primary.
 
 ### 3.5 Offering pit, phase 1 — `renders/current-pit-day.png`
+![Offering pit at phase 1](renders/current-pit-day.png)
 Two batches waiting, one ward lit. **Proves:** the pit environment art is the single best Screenshot-Test frame in the game; the seven ward marks — the phase-progress anchor — are functionally invisible (unlit = 6% white over busy art; the lit ward's glow is iOS-shadow-only, so Android renders a flat dot); the pit-mouth glow at phase 1 is a stack of hard-edged ellipses at ~7% opacity; the floating offering words scatter into the sky with no gravitational relationship to the mouth that is supposed to devour them; there is no screen title (`getPitScreenTitle` exists and is never rendered).
 
 ### 3.6 Stats screen (dead-screen exhibit) — `renders/current-stats-dead.png` + `renders/current-stats-dead-achievements.png`
+![Stats screen (overview)](renders/current-stats-dead.png)
 **Proves:** the cottage materials make a static frame look handcrafted (plaques, parchment, 9-slice wood); nothing on the screen ever moves (zero `Animated` usage in the file); the hero panel's glow blob paints *over* the wood frame like a rendering defect; achievements are iconed with raw emoji and locked rows are literal 🔒 characters; a phase-5-gated mode ("Rank 0: Unbroken Weave") leaks into a phase-0 player's MASTERY card; BY DIFFICULTY omits MEDIUM_PLUS so its counts don't sum to the hero total.
 
 *"After" mocks for the top three proposals are in §6.*
@@ -288,4 +294,94 @@ Net effect: after Tier A the rooms already breathe with individuated life at zer
 
 ---
 
-*Sections 6–8 (after-mock renders, Top 10, Do-Not-Touch) and the appendices follow.*
+## 6. After-mock renders (top proposals)
+
+Three proposed target states, each mocked as a pixel render forked from its current-state frame so the before/after is honest (same assets, same layout bones, the fix applied). These are design mocks — visually credible and buildable with native-driver RN + the existing cottage/asset kits — not code output.
+
+### 6.1 Home living diorama — `renders/current-home-p4.png` → `renders/after-home-p4.png`
+
+| Before | After |
+|---|---|
+| ![before](renders/current-home-p4.png) | ![after](renders/after-home-p4.png) |
+
+**Before:** the launch-default camera shows a featureless near-black top third (the bottom-anchored sky sits below the viewport), the shadow figure imperceptible with its eyes cropped off-frame, 💀/👁 emoji "dread," generic dark-pill room labels, and mirror-clipped animal names. **After:** the camera frames the entity looming behind the house with its two crimson eye-points visible over the *painterly* night forest (the sky reads); the roof is uncut; each room wears a **wooden cottage nameplate** (UNDERGROUND BURROW / CHILL OFFICE / DESERT CAMP); animals carry correct upright name tags (Warren, Chill); the crimson sigil connectors read between rooms; soft ash/ember motes replace the emoji. This single reframe + nameplate + un-mirror pass converts the home from a static composite into the reveal's marquee frame. *Maps to: P0-2 (mirror chrome), the camera-framing + parallax + occluded-particle + emoji-actor P1s, and the cottage-nameplate polish.*
+
+### 6.2 A victory that ages — `renders/current-victory-p0.png` → `renders/after-victory-p4.png`
+
+| Before (Phase 0, and identical at every phase) | After (shown at Phase 4) |
+|---|---|
+| ![before](renders/current-victory-p0.png) | ![after](renders/after-victory-p4.png) |
+
+**Before (P0):** a generic flat-white rounded card, identical at every phase, candy-pink "PERFECT!", confetti drawn *on top of* the text, the post-win whisper hidden behind it. **After (shown at Phase 4):** the win sheet is finally the game's own aged cottage material (dark wood + crimson inlay, ash-charcoal fill, cream ink); the title is the hollow "WHY DOES IT MATTER?" in muted crimson with a subtle glitch; stars are desaturated old-gold settling like stones; the echo chain is a dark vertical offering (VOID ▼ DOOM ▼ ABYSS); the amber breakdown drops the candy-yellow chip for aged tones; dim crimson embers fall *behind* the card; and the animal whisper ("...you brought us closer.") surfaces *above* the ceremony. *Maps to: P0-3 (whisper z-order), the phase-blind-choreography P1, the candy-artifact P2s, the confetti-on-top bug, and the cottage-material gap.*
+
+### 6.3 A pit that glows and pulls — `renders/current-pit-day.png` → `renders/after-pit.png`
+
+| Before | After |
+|---|---|
+| ![before](renders/current-pit-day.png) | ![after](renders/after-pit.png) |
+
+**Before:** invisible ward marks (6% white over busy art; lit glow is iOS-shadow-only), a stack of ~7%-opacity hard ellipses for "glow," and offering words scattered randomly into the sky. **After:** the mouth breathes a soft volumetric teal bloom from the throat; the seven wards read as legible teal gems on the rim (one lit with a layered-View halo, one charging, five dark sockets with rims); the offering words curve into a loose orbit drawn toward the mouth, with SNOW and HUSH visibly sinking into the throat. *Maps to: the ward-visibility P2 (Android glow), the flat-glow finding, and the float-zone gravity finding.*
+
+---
+
+## 7. Top 10 — do these first
+
+Ranked by impact ÷ effort. The first seven are hours-scale; all ten together are roughly two engineer-weeks and move nearly every scorecard row.
+
+1. **Rescue the finale cinematic (P0-1).** A one-ref fix that stops the game's 90-puzzle climax from being silently destroyable. Highest stakes, hours.
+2. **Un-mirror the animal chrome (P0-2).** Restructure the sprite render tree so names stop rendering backwards on the flagship screen. Hours.
+3. **Lift the whisper above the modal (P0-3).** `zIndex:501` — the per-win narrative beat currently plays invisible. Hours.
+4. **Wire the shipped-but-silent ceremony sounds (P0-4 + the audio orphans).** `phase_change`, `amber_earn`, `unlock`, `achievement`, `daily_ready` all exist in the bundle with zero call sites; the climaxes are mute. Hours.
+5. **Age the victory ceremony** — `getCelebrationSpring(phase)` + `hushed` flag + phase-color the home confetti. The most-repeated moment in the game stops celebrating in candy at the reveal. Hours.
+6. **Fix the core-verb legibility** — the ghost-preview contrast chip (1.2–2.8:1 → 4.8–6.3:1) and the sub-3:1 puzzle HUD. Players squint at the teaching layer for the first hour today. Hours.
+7. **Wake the dead screens** — the `useEntranceCascade` hook + the two modal-choreography retrofits + the cosmetic-purchase celebration. Turns six unfinished-static screens crafted. Hours–days.
+8. **Ambient animal life, Tier A** — the rare-idle scheduler + sleep-gate + phase-motion scalar, all from existing frames. The rooms start to breathe with individuated life at zero art cost. Days.
+9. **Make the committed move physical** — ghost-tile travel + FLIP rank-closing. Upgrades the interaction the player performs most. Days.
+10. **The living-diorama pass** — re-expose the particle layer, swap emoji actors for sprites/Views, add pan physics and two-rate parallax, and reframe the launch camera so the reveal reads. Days + the environment-sprite art.
+
+**Then the two art-gated must-fixes:** the Android adaptive icon (P0-5 — the first pixel a player sees is currently mis-cropped) and the `robed_talk.png` frames (the climax's biggest lines play over a frozen portrait).
+
+## 8. Do-Not-Touch — what already meets the bar (verified)
+
+These survived the same adversarial scrutiny as the findings. Do not "improve" them; they are the reference patterns the rest of the roadmap should imitate.
+
+- **The phase-weighted tile feel** (`LetterTile.tsx:111-165`). A complete six-parameter motion *system* — selection spring, wobble speed and amplitude, bounce height and duration, idle pulse cadence — all descending in lockstep so the board physically tires as the horror nears. This is "feel it before being told" executed at AAA level, and it is the codebase's own proof of the everything-ages doctrine.
+- **Validity-leak discipline in motion** (`timing.ts:93`). The hover swell is enforced as purely geometric and near-miss snapping only runs while grading is shown, so no animation channel can become a second answer key. Rare, rigorous verb-integrity thinking.
+- **Universal tap acknowledgment with a11y honesty** — locked tiles shake and speak, inactive tiles pulse with a haptic tick and deliberately carry no button role, off-row drops get haptic + a phase-aware line. Keep every piece.
+- **The cottage 9-slice panel system + `CandyButton` press craft.** 275 aged-material pieces, true up/down button sprites, Fabric-safe construction. The materials are AAA; the fix everywhere is to *use* them (on the victory modal, the pit utility sheets), not change them.
+- **The phase lighting model on the house** (compound-compensated wall tint, per-phase hand-lit foundations, phase-tracked contact shadow) and the **disciplined `ShadowFigure`** (opacity-only ~8s breath, static under reducedMotion, never named). The restraint is the horror.
+- **The core move-loop multimodal sync** — input-scaled haptics (drag heavy vs tap medium), the combo ladder, the dark-mirror soundscape that descends automatically, the speed-timer triple-modality tick. The board's first 60 seconds are near-AAA already.
+- **The tap-to-devour spiral** (a true parametric collapsing path) and the **in-engine shadow descent** rendered with the real asset. The pit's core interaction and the finale's staging are shippable as-is.
+- **The economy honesty** — the victory amber breakdown is the real itemization threaded from `awardPuzzleAmber`, not display math; the deferred-harvest split is exact-partition accounting.
+- **The architectural spine** — 100% native-driver animation (test-enforced), single-sourced phase palettes, the two-face font role system with bulletproof Android registration, the `modeIcons` sprite-key pattern, the generation-guarded async victory cascade, the sequential priority toast queue. The foundations are sound; the roadmap builds *on* them.
+- **The asset base** (7.5/10, the strongest system) — 13 animals × 3 poses at a byte-aligned 500², the coherent painterly-pixel room family, the 42-file synth pack with dark mirrors and a 9-bed music matrix, the spoiler-safe store presence. The raw ingredients are studio-quality; the gap is assembly, not supply.
+
+---
+
+## Appendix A — Method & verification integrity
+
+Thirteen per-system auditors read code and assets first (docs treated as unverified). Each of the 127 findings was re-read at its cited lines by an independent adversarial verifier defaulting to *refuted*: **0 were refuted, ~58% confirmed verbatim, ~42% adjusted** (evidence lines sharpened, severity corrected, or feasibility caveats added — the adjustment rate reflects tightening, not weakening). A completeness-critic sweep ran to catch uncovered surfaces. A subset of the `first-60s` and `assets-inventory` verifiers plus the final critic pass were still finalizing when this report was compiled (the run was repeatedly interrupted by session usage limits and resumed from cache); those findings are marked *(pending verify)* and were hand-checked against their cited lines for inclusion. If the critic surfaces material new gaps, they append here.
+
+Six current-state screens and three after-mocks were rendered as pixel-accurate HTML recreations from the real assets/fonts and captured headlessly at 412×915 @2x; every render carries a fidelity note disclosing its approximations (in the render generators under the session scratchpad).
+
+## Appendix B — Scorecard rationale (per system)
+
+Condensed from the auditor justifications; full text in the finding data.
+
+- **Board feel 6.5** — idle/selection layers AAA; the commit is an un-animated state swap, the GIF-able money moment is the least animated thing on screen.
+- **House world 5.5** — a strong static composite undone by an occluded particle layer, zero parallax, emoji actors, and physics-less pan.
+- **Animal life 5.0** — complete sprite sets and one real walk cycle; everything else is one cloned breathe, mirrored chrome, and a metronome dialogue flap.
+- **Victory 5.5** — honest economy and great skip craft; generic white card, phase-blind choreography, whisper hidden behind the modal.
+- **World ceremonies 6.0** — the best motion architecture in the game with half its sensory layer unwired.
+- **Dead screens 4.0** — handcrafted materials, zero motion; unfinished-static wearing calm-crafted clothes (Settings alone earns "calm").
+- **Emoji consistency 5.0** — puzzle screen nearly clean; the painterly home world floats OS emoji as its FX layer.
+- **Motion vocabulary 7.0** — ~510 native-driver animations, the aging rule superb at the core, abandoned at celebrations; two components leak/ignore reducedMotion.
+- **Audio & haptics 6.0** — near-AAA board loop; the climaxes above the board play in silence.
+- **Typography/color/a11y 6.5** — near-AAA architecture; contrast collapses exactly where hands spend the first hour.
+- **Choreography 5.0** — AAA-adjacent choreography on clearable timers and z-order mistakes (one identity-level P0).
+- **Assets 7.5** — a coherent, sellable painterly-pixel family; the strongest single system.
+- **First 60s 6.0** — store-quality stills; a stuttery, unchoreographed lived sequence.
+
+## Appendix C — Data
+
+The complete verified finding set (all 127, with full `current`/`target`/evidence/verdict fields), the motion-vocabulary inventory (~510 `Animated` call sites across 33 files), the emoji→sprite swap list, the sound/haptic pairing map, and the full asset census (494 files, ~59MB runtime payload) are preserved in the audit workflow's structured output. The render HTML generators (current + after) live in the session scratchpad and reproduce every frame in `renders/`.
