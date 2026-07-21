@@ -14,7 +14,7 @@ import { hapticSuccess } from '../services/haptics';
 import { playUiSound } from '../services/uiSound';
 import { PanelCard } from './ui/PanelCard';
 import { CandyButton } from './ui/CandyButton';
-import { AmberInline } from './AmberInline';
+import { RewardReveal } from './ui/RewardReveal';
 import { DailyLoginGrant, DAILY_LOGIN_REWARDS, DAILY_LOGIN_CYCLE_LENGTH } from '../services/dailyLoginReward';
 import { getSettingsSync } from '../services/settings';
 // First-ever-claim copy: a brand-new player has never left, so "Welcome Back"
@@ -223,11 +223,17 @@ export const DailyLoginModal: React.FC<DailyLoginModalProps> = ({ grant, phase, 
               })}
             </View>
 
-            {/* Claimed amount, prominent */}
+            {/* Claimed amount, prominent — counts up with an amber-icon pop and
+                a soft glow (the shared RewardReveal, so the daily claim gets the
+                same magnitude-aware acknowledgment as the other reward moments
+                instead of a static number appearing all at once). */}
             <View style={styles.claimedBanner}>
-              <Text style={[styles.claimedText, { color: t.title }]}>
-                {copy.received} <AmberInline size={18} /> {grant.amount + grant.comebackBonus}
-              </Text>
+              <RewardReveal
+                amount={grant.amount + grant.comebackBonus}
+                icon={AMBER_ICON}
+                label={copy.received}
+                phase={phase}
+              />
               {/* Win-back line: a first claim can never be a comeback. */}
               {!grant.isFirstClaim && grant.comebackBonus > 0 && (
                 <Text style={[styles.jackpotText, { color: t.amberText }]}>
@@ -351,11 +357,6 @@ const styles = StyleSheet.create({
   claimedBanner: {
     marginTop: 18,
     alignItems: 'center',
-  },
-  claimedText: {
-    fontSize: 18,
-    fontWeight: '700',
-    fontFamily: PIXEL_FONT_BOLD,
   },
   jackpotText: {
     fontSize: 15,
