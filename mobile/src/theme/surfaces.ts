@@ -165,7 +165,10 @@ const COTTAGE: Record<'bright' | 'dusk' | 'storm' | 'dark' | 'serene', Omit<Surf
     primaryBg: '#D97F2E', primaryEdge: '#733D12', primaryText: '#2A1A10',
     pillBg: '#D97F2E', pillEdge: '#733D12', pillText: '#2A1A10',
     secondaryBg: 'rgba(122, 82, 56, 0.18)', secondaryBorder: '#613E2B', secondaryText: '#2F1F14',
-    dangerText: '#8A2F22',
+    // Deepened from #8A2F22 (4.11:1 on cardBg / 3.60:1 on sectionBg — below the
+    // >= 4.5:1 contract) to #6E2015 (5.49:1 on cardBg, 4.81:1 on sectionBg),
+    // keeping the danger-red hue.
+    dangerText: '#6E2015',
   },
   dark: {
     screenBg: '#171013', headerTitle: '#E8D5B7', headerMuted: '#BBA68E', headerChipBorder: 'rgba(232, 213, 183, 0.30)', cardBg: '#352A31', cardBorder: '#0F0A10',

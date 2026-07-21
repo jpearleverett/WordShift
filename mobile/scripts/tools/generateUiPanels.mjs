@@ -209,6 +209,12 @@ Object.assign(PALETTES.dark, {
 });
 Object.assign(PALETTES.dark.btn.primary, { face: '#A83A28', hi: '#D65B33', hi2: '#C04A2C', lo: '#6E2014', lo2: '#54160D' });
 Object.assign(PALETTES.dark.btn.quiet, { face: '#3E323A', hi: '#4C3E48', hi2: '#453840', lo: '#2A2026', lo2: '#221820' });
+// Plaque nameplate ink: the derived ember (#A55B2E) only reaches ~3.2:1 on the
+// dark plaque face (#321B15) — below the >= 4.5:1 contract. Lifted to a lighter
+// ember (5.5:1) while staying in the plaque hue family. Text isn't baked into
+// the plaque PNG (rendered at runtime via skin.ink.plaque), so this changes
+// only the generated ink string, not any sprite.
+Object.assign(PALETTES.dark.plaque, { text: '#CE8654' });
 Object.assign(PALETTES.serene, {
   outline: '#151019',
   wood: { rim: '#715866', light: '#5E4653', base: '#4A3742', mid: '#392A34', dark: '#291D26', seam: '#1C1219' },

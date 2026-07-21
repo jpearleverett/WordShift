@@ -227,9 +227,15 @@ const styles = StyleSheet.create({
   actionButtonLabel: {
     fontFamily: PIXEL_FONT_BOLD,
     marginTop: 12,
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '900',
-    color: 'rgba(255, 255, 255, 0.8)',
+    // Full-opacity white + a dark legibility shadow: the labels sit directly
+    // on the board (no chip), so the shadow anchors them against the bright
+    // phase-0/1 background where a 0.8 white washed out.
+    color: '#FFFFFF',
+    textShadowColor: 'rgba(0, 0, 0, 0.55)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
     letterSpacing: 1.5,
   },
 });

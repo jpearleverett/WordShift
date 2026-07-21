@@ -195,7 +195,12 @@ export const appStyles = StyleSheet.create({
   difficultyButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    // Dark translucent fill (not translucent-white) so the white label reads
+    // >= 4.5:1 over the bright phase-0/1 board — a translucent-white pill left
+    // 12px white text at sub-3:1. Mirrors the overlay-banner container pattern.
+    backgroundColor: 'rgba(20, 10, 40, 0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(180, 150, 220, 0.25)',
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 16,
@@ -340,35 +345,10 @@ export const appStyles = StyleSheet.create({
     marginTop: 16,
     gap: 12,
   },
-  timeUpButtonPrimary: {
-    backgroundColor: CandyColors.green.main,
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 22,
-    borderBottomWidth: 3,
-    borderBottomColor: CandyColors.green.shadow,
-  },
-  timeUpButtonSecondary: {
-    backgroundColor: CandyColors.gray[200],
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 22,
-    borderBottomWidth: 3,
-    borderBottomColor: CandyColors.gray[400],
-  },
-  timeUpButtonText: {
-    fontSize: 15,
-    fontFamily: BODY_FONT_BOLD,
-    fontWeight: '800',
-    color: CandyColors.white,
-    letterSpacing: 0.3,
-  },
-  timeUpButtonTextSecondary: {
-    fontSize: 15,
-    fontFamily: BODY_FONT_BOLD,
-    fontWeight: '800',
-    color: CandyColors.gray[700],
-    letterSpacing: 0.3,
+  // The Try Again / Home actions are now phase-aware CandyButtons (same cottage
+  // bevel GameAlertModal uses); each takes an equal share of the row.
+  timeUpButtonFlex: {
+    flex: 1,
   },
   // Speed rescue — opt-in rewarded continue inside the Time's-Up card
   speedRescueButton: {
@@ -502,7 +482,10 @@ export const appStyles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 10,
-    backgroundColor: 'rgba(255, 201, 77, 0.22)',
+    // Dark translucent fill (was a translucent-amber tint that composited over
+    // the red CHALLENGE pill and left the amber label at ~2.3:1). The amber
+    // keeps its currency identity via the border + text and now reads >= 8:1.
+    backgroundColor: 'rgba(20, 10, 40, 0.62)',
     borderWidth: 1,
     borderColor: 'rgba(255, 201, 77, 0.5)',
   },
@@ -513,6 +496,8 @@ export const appStyles = StyleSheet.create({
     fontSize: 11,
     fontFamily: BODY_FONT_BOLD,
     fontWeight: '900',
+    // #FFD479 on the dark chip above computes 8.16:1 (was 2.26:1 on the amber
+    // tint over red).
     color: '#FFD479',
   },
   speedTimerContainer: {
@@ -557,7 +542,12 @@ export const appStyles = StyleSheet.create({
     marginTop: 2,
   },
   variantBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    // Dark translucent fill (not translucent-white) so the badge label reads
+    // >= 9:1 over the bright board — the old rgba white fill left the 9px
+    // label at ~2.5:1. Matches the overlay-banner container treatment.
+    backgroundColor: 'rgba(20, 10, 40, 0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(180, 150, 220, 0.25)',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 10,
@@ -580,10 +570,10 @@ export const appStyles = StyleSheet.create({
     height: 15,
   },
   variantBadgeText: {
-    fontSize: 9,
+    fontSize: 11,
     fontFamily: BODY_FONT_BOLD,
     fontWeight: '800',
-    color: 'rgba(255, 255, 255, 0.85)',
+    color: '#FFFFFF',
     letterSpacing: 0.2,
     flexShrink: 1,
   },

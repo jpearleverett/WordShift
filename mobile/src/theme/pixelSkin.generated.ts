@@ -78,7 +78,7 @@ export const PIXEL_SKINS: Record<'bright' | 'dusk' | 'storm' | 'dark' | 'serene'
     fillCard: '#2E2429',
     accent: '#9E3B2A',
     accentLo: '#77281C',
-    ink: { primary: '#F5E3CB', secondary: '#E8D5B7', quiet: '#BBA68E', plaque: '#A55B2E' },
+    ink: { primary: '#F5E3CB', secondary: '#E8D5B7', quiet: '#BBA68E', plaque: '#CE8654' },
   },
   serene: {
     panel: { tl: require('../../assets/ui/panels/serene/panel_tl.png'), tr: require('../../assets/ui/panels/serene/panel_tr.png'), bl: require('../../assets/ui/panels/serene/panel_bl.png'), br: require('../../assets/ui/panels/serene/panel_br.png'), top: require('../../assets/ui/panels/serene/panel_top.png'), bottom: require('../../assets/ui/panels/serene/panel_bottom.png'), left: require('../../assets/ui/panels/serene/panel_left.png'), right: require('../../assets/ui/panels/serene/panel_right.png') },

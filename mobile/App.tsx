@@ -10,7 +10,6 @@ import {
   Dimensions,
   Animated,
   AppState,
-  Pressable,
   Linking,
   BackHandler,
   Image,
@@ -25,6 +24,8 @@ import { HomeScreen } from './src/components/home';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { AmberInline } from './src/components/AmberInline';
 import { CandyColors } from './src/theme/colors';
+import { getSurfaceTheme } from './src/theme/surfaces';
+import { CandyButton } from './src/components/ui/CandyButton';
 import { usePuzzleGame } from './src/hooks/usePuzzleGame';
 import { useGamePersistence } from './src/hooks/useGamePersistence';
 import { useVictoryFlow, isRoutineVictory } from './src/hooks/useVictoryFlow';
@@ -3870,6 +3871,10 @@ function MainApp() {
     // Text renders nothing for undefined — so both the dot and the label go
     // through the normalizer (MEDIUM fallback, the hook's own default).
     const chipDifficulty = normalizeDifficulty(puzzle.difficulty);
+    // Phase-aware surface for the pause-state cards (board-gen / victory-record
+    // spinner + the speed Time's-Up overlay) so they track the descent instead
+    // of flashing Phase-0 white candy whenever the game pauses.
+    const pauseSurface = getSurfaceTheme(persistence.currentPhase);
     return (
       <ErrorBoundary
         fallbackMessage="Something went wrong with the puzzle. Tap to return home."
@@ -4181,13 +4186,13 @@ function MainApp() {
               flashes a spinner over the celebration. */}
           {(puzzle.gameState === GameState.LOADING || puzzle.isProcessing || victoryFlow.victorySpinnerVisible) && (
             <View style={styles.loadingOverlay}>
-              <View style={styles.loadingBox}>
-                <ActivityIndicator size="large" color={CandyColors.pink.main} />
-                <Text style={styles.loadingGlyph}>{persistence.currentPhase >= 3 ? '◈' : '✦'}</Text>
-                <Text style={styles.loadingText}>
+              <View style={[styles.loadingBox, { backgroundColor: pauseSurface.cardBg, borderWidth: 1, borderColor: pauseSurface.cardBorder }]}>
+                <ActivityIndicator size="large" color={pauseSurface.amberText} />
+                <Text style={[styles.loadingGlyph, { color: pauseSurface.title }]}>{persistence.currentPhase >= 3 ? '◈' : '✦'}</Text>
+                <Text style={[styles.loadingText, { color: pauseSurface.title }]}>
                   {getLoadingMessage(persistence.currentPhase)}
                 </Text>
-                <Text style={styles.loadingHint}>
+                <Text style={[styles.loadingHint, { color: pauseSurface.muted }]}>
                   {persistence.currentPhase >= 3
                     ? 'The pattern settles into place...'
                     : 'This should only take a moment.'}
@@ -4199,9 +4204,9 @@ function MainApp() {
           {/* Time's Up overlay — speed variant only (GAME_OVER is set solely on time-up) */}
           {puzzle.gameState === GameState.GAME_OVER && (
             <View style={styles.loadingOverlay} accessibilityRole="alert">
-              <View style={styles.loadingBox}>
-                <Text style={styles.loadingGlyph}>{persistence.currentPhase >= 3 ? '◈' : '⏱'}</Text>
-                <Text style={styles.timeUpText}>
+              <View style={[styles.loadingBox, { backgroundColor: pauseSurface.cardBg, borderWidth: 1, borderColor: pauseSurface.cardBorder }]}>
+                <Text style={[styles.loadingGlyph, { color: pauseSurface.title }]}>{persistence.currentPhase >= 3 ? '◈' : '⏱'}</Text>
+                <Text style={[styles.timeUpText, { color: pauseSurface.title }]}>
                   {puzzle.message || getSpeedTimeUpMessage(persistence.currentPhase)}
                 </Text>
                 {/* Opt-in rewarded rescue — once per board. RewardedAdButton
@@ -4218,8 +4223,12 @@ function MainApp() {
                   />
                 )}
                 <View style={styles.timeUpButtonRow}>
-                  <Pressable
-                    style={styles.timeUpButtonPrimary}
+                  <CandyButton
+                    label="Try Again"
+                    phase={persistence.currentPhase}
+                    variant="primary"
+                    style={styles.timeUpButtonFlex}
+                    soundKind="none"
                     onPress={() => {
                       hapticLight();
                       // Abandoning the timed-out run resets the escalation
@@ -4228,24 +4237,22 @@ function MainApp() {
                       resetSpeedRun();
                       puzzleActions.startNewGame();
                     }}
-                    accessibilityRole="button"
                     accessibilityLabel="Try again with a new puzzle"
-                  >
-                    <Text style={styles.timeUpButtonText}>Try Again</Text>
-                  </Pressable>
-                  <Pressable
-                    style={styles.timeUpButtonSecondary}
+                  />
+                  <CandyButton
+                    label="Home"
+                    phase={persistence.currentPhase}
+                    variant="secondary"
+                    style={styles.timeUpButtonFlex}
+                    soundKind="none"
                     onPress={() => {
                       hapticLight();
                       resetSpeedRun();
                       setCurrentScreen('home');
                       puzzleActions.setGameState(GameState.IDLE);
                     }}
-                    accessibilityRole="button"
                     accessibilityLabel="Return home"
-                  >
-                    <Text style={styles.timeUpButtonTextSecondary}>Home</Text>
-                  </Pressable>
+                  />
                 </View>
               </View>
             </View>
