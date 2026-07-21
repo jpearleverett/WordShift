@@ -1929,7 +1929,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
         {/* Celebration Confetti */}
         {showCelebration && (
-          <CelebrationConfetti onComplete={() => setShowCelebration(false)} />
+          <CelebrationConfetti phase={progress.currentPhase} onComplete={() => setShowCelebration(false)} />
         )}
       </View>
 

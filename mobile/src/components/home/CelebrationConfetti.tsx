@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Animated, Easing, Dimensions } from 'react-native';
+import { getPhaseTheme } from '../../theme/colors';
+import { getSettingsSync } from '../../services/settings';
+import { shouldSimplifyAnimations } from '../../services/deviceTier';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -13,11 +16,20 @@ interface ConfettiPiece {
   color: string;
 }
 
-export const CelebrationConfetti: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
+export const CelebrationConfetti: React.FC<{ onComplete: () => void; phase?: number }> = ({ onComplete, phase = 0 }) => {
   const [pieces, setPieces] = useState<ConfettiPiece[]>([]);
 
   useEffect(() => {
-    const colors = ['#FF6B6B', '#4ECDC4', '#FFE66D', '#95E1D3', '#F38181', '#AA96DA', '#FCBAD3'];
+    // Reduced-motion / low-tier: no confetti storm, just resolve the callback so
+    // the celebration flow continues (the unlock still lands, minus the shower).
+    if (getSettingsSync().reducedMotion || shouldSimplifyAnimations()) {
+      const t = setTimeout(onComplete, 400);
+      return () => clearTimeout(t);
+    }
+    // Phase-source the palette so late-game unlocks (the descent trio at 84/88/
+    // 92, house completion ~96-100) rain the muted crimson/ash of the reveal,
+    // not bright candy over the near-black world.
+    const colors = getPhaseTheme(phase).confettiColors;
     const newPieces: ConfettiPiece[] = [];
 
     for (let i = 0; i < 30; i++) {
@@ -74,7 +86,7 @@ export const CelebrationConfetti: React.FC<{ onComplete: () => void }> = ({ onCo
 
     const timeout = setTimeout(onComplete, 2500);
     return () => clearTimeout(timeout);
-  }, []);
+  }, [phase, onComplete]);
 
   return (
     <View style={styles.container} pointerEvents="none">
