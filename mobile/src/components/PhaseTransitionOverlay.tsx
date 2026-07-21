@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Animated, Dimensions, TouchableOpacity, Image }
 import { PhaseTransitionEvent, PhaseScene, SceneImage, CinematicParticleConfig } from '../services/phaseEvents';
 import { getSettingsSync } from '../services/settings';
 import { hapticLight, hapticMedium, hapticHeavy, hapticWarning } from '../services/haptics';
+import { playUiSound } from '../services/uiSound';
 import { BODY_FONT_BOLD } from '../theme/fonts';
 import { getPhaseTheme } from '../theme/colors';
 
@@ -40,6 +41,12 @@ const DESCEND_DISTANCE = 90;
 function fireSceneHaptic(scene: PhaseScene, shakeIntensity?: number): void {
   const isIntense = (shakeIntensity ?? 0) >= 0.5;
   switch (scene.effect) {
+    case 'descend':
+      // The Arrival: the entity's descent begins on a warning pulse (the
+      // heaviest scene of the game); the landing settle is scheduled
+      // separately at descendMs by the caller.
+      hapticWarning();
+      break;
     case 'flash':
     case 'shake':
       isIntense ? hapticWarning() : hapticHeavy();
@@ -365,6 +372,20 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
         anim.start();
         break;
       }
+      case 'pulse': {
+        // A soft breathing swell (previously a no-op that still fired a haptic).
+        // Reuses the flash layer at a gentle peak so the scene "breathes".
+        setFlashColor(getFlashColor(phase));
+        flashOpacity.setValue(0);
+        const peak = (0.2 + 0.25 * intensity);
+        const anim = Animated.sequence([
+          Animated.timing(flashOpacity, { toValue: peak, duration: 260, useNativeDriver: true }),
+          Animated.timing(flashOpacity, { toValue: 0, duration: 360, useNativeDriver: true }),
+        ]);
+        effectAnimsRef.current.push(anim);
+        anim.start();
+        break;
+      }
       default:
         break;
     }
@@ -416,6 +437,23 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
       }).start();
     }
 
+    // Honor the event-level vignette flag (previously dead code): a base
+    // atmospheric darkening at open, so the endgame ceremonies (house
+    // completion, the finale, post-revelation) that declare no 'vignette_close'
+    // scene still get their declared vignette. Scenes that DO close in compose
+    // a stronger frame on top (their 0.5-0.9 targets exceed this 0.35 base).
+    if (event.vignette) {
+      if (reducedMotion) {
+        vignetteOpacity.setValue(0.35);
+      } else {
+        Animated.timing(vignetteOpacity, {
+          toValue: 0.35,
+          duration: 700 * timeScale,
+          useNativeDriver: true,
+        }).start();
+      }
+    }
+
     // Opening haptic beat
     if (!reducedMotion) {
       hapticMedium();
@@ -426,9 +464,20 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
       const showTimer = setTimeout(() => {
         setActiveSceneIndex(index);
         runSceneImage(scene, timeScale, reducedMotion);
+        // The Arrival's dark ritual swell (soundPhaseChange resolves its dark
+        // variant by audioPhase at phase 3+) rides the descent. Audio self-
+        // gates on soundEnabled and must play even under reducedMotion (which
+        // governs motion, not sound).
+        if (scene.effect === 'descend') playUiSound('phase_change');
         if (!reducedMotion) {
           fireSceneHaptic(scene, event.shakeIntensity);
           runSceneEffect(scene, event.shakeIntensity ?? 0, event.phase);
+          if (scene.effect === 'descend') {
+            // A heavy settle lands with the figure at descendMs. Timer parked
+            // in timersRef so handleSkip/cleanup clear it.
+            const descendMs = Math.min(scene.duration * 0.75, 3800) * timeScale;
+            timersRef.current.push(setTimeout(() => hapticHeavy(), descendMs));
+          }
         }
         if (reducedMotion) {
           sceneOpacity.setValue(1);
