@@ -123,6 +123,8 @@ import {
   getPreviewGraduationConfirm,
   getSwiftVictoryHintMessage,
   getStreakHeldMessage,
+  getStreakFreezeReliefMessage,
+  getStreakFreezeGrantedMessage,
   getDwellLine,
   getPostCapDwellLine,
   getNoValidMovesMessage,
@@ -1064,7 +1066,7 @@ function MainApp() {
       if (granted && !onboardingFlow.isOnboarding && !isRollover) {
         showGameAlert(
           'Free Streak Freeze',
-          'Your streak is protected for one missed day. Keep the chain alive.'
+          getStreakFreezeGrantedMessage(persistence.currentPhase)
         );
       }
     } catch {
@@ -2112,8 +2114,9 @@ function MainApp() {
             enqueueVictoryToast(`${milestone.message} (+${milestone.amber} amber)`, 'receipt');
           } else if (dailyProgress.streakSavedByFreeze) {
             // A banked freeze forgave a missed day — let the player know the
-            // chain survived so the protection feels real, not silent.
-            enqueueVictoryToast('🛡️ A missed day, but your daily streak held.');
+            // chain survived so the protection feels real, not silent. Phase-
+            // aware copy (the house protects warmly at every register).
+            enqueueVictoryToast(`🛡️ ${getStreakFreezeReliefMessage(persistence.currentPhase, true)}`);
           } else if (dailyProgress.streakDecayedTo != null) {
             // Decay-to-milestone: the lapse cost the climb, not the streak —
             // name the checkpoint it held at (phase-aware copy).
@@ -2263,9 +2266,10 @@ function MainApp() {
       // (enqueueVictoryToast) — receipts first, informational lines after,
       // nudges last — so no message clobbers another on a stacked win.
 
-      // Surface the "your streak was protected" moment when a freeze was consumed
+      // Surface the "your streak was protected" moment when a freeze was
+      // consumed — phase-aware copy (warm at every register, never scolds).
       if (victory.streakSaved) {
-        enqueueVictoryToast('🛡️ A streak freeze protected your streak!');
+        enqueueVictoryToast(`🛡️ ${getStreakFreezeReliefMessage(persistence.currentPhase, false)}`);
       }
 
       // Show streak milestone toast if threshold was just crossed
@@ -3486,7 +3490,13 @@ function MainApp() {
     let challengeText: string | null = null;
     if (!isPlayingDaily && puzzle.currentVariant === 'standard') {
       try {
-        challengeText = buildChallengeShareText(puzzle.rows.map(r => r.originalWord));
+        // Thread the sender's phase so the taunt tone decays with the descent
+        // (spoiler-safe: never names the entity, only tints the lure).
+        challengeText = buildChallengeShareText(
+          puzzle.rows.map(r => r.originalWord),
+          undefined,
+          persistence.currentPhase,
+        );
       } catch {
         challengeText = null;
       }

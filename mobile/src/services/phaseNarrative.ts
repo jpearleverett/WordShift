@@ -3832,6 +3832,20 @@ export function getStreakFreezeReliefMessage(phase: number, daily = false): stri
   return `A missed day, forgiven. A freeze kept your ${chain} alive. The house had you covered.`;
 }
 
+// A free streak freeze was just GRANTED (banked ahead of any miss), not
+// consumed — the launch-moment courtesy. Distinct register from the relief
+// copy above, and phase-aware so a Phase-4 grant does not chirp "keep the
+// chain alive" under a storm sky. Warm, never a chore instruction.
+export function getStreakFreezeGrantedMessage(phase: number): string {
+  if (phase >= 4) {
+    return 'A freeze is set aside for you. One missed day will not break the pattern.';
+  }
+  if (phase >= 2) {
+    return 'A freeze is set aside for you. Miss a day and your streak still holds.';
+  }
+  return 'A freeze is set aside for you. Miss a day and your streak stays safe.';
+}
+
 // ============================================================================
 // DAILY-LOGIN MODAL COPY — the returning-player welcome (NOT the first-ever
 // claim, which lives in getDailyLoginFirstClaimCopy). Was hardcoded and
