@@ -787,23 +787,10 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
         accessibilityLabel={`${animal.name} the ${animal.type}`}
         accessibilityRole="button"
       >
-        <Animated.View
-          style={[
-            styles.spriteContainer,
-            {
-              transform: [
-                { scaleX },
-                { scale: Animated.multiply(tapScale, breatheScale) },
-                { rotate: wiggleRotate },
-                // Procedural gait bundle (neutral at rest: 0 / 0deg / 1).
-                { translateY: gaitBob },
-                { rotate: gaitLean },
-                { scaleY: gaitScaleY },
-              ],
-            },
-          ]}
-        >
-          {/* Shadow - scales with tap */}
+        <View style={styles.spriteContainer}>
+          {/* Shadow - scales with tap, grounded OUTSIDE the body transform so
+              it neither mirrors with the facing flip nor bobs with the gait
+              (a contact shadow should stay planted on the floor). */}
           <Animated.View
             style={[
               styles.shadow,
@@ -811,76 +798,97 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
             ]}
           />
 
-          {/* Animal body */}
-          {CHARACTER_SPRITES[animal.type] && !spriteLoadFailed ? (
-            (() => {
-              const sprites = CHARACTER_SPRITES[animal.type]!;
-              const staticSource =
-                currentPhase >= 4 && sprites.robed ? sprites.robed : sprites.idle;
-              const dreadTint = getSpriteDreadTint(currentPhase);
-              // Walk frames stay MOUNTED (opacity-switched) whenever they
-              // could play — swapping one Image's `source` mid-gait forces an
-              // async decode per frame the first time through the cycle,
-              // which reads as flicker. Mounting decodes everything up front.
-              // Skipped when the walk can never run (robed phases, reduced
-              // motion, low-tier devices) so those paths pay no decode cost.
-              const mountWalkStack = Boolean(
-                walkFrames &&
-                walkFrames.length > 0 &&
-                currentPhase < 4 &&
-                !getSettingsSync().reducedMotion &&
-                !shouldSimplifyAnimations()
-              );
-              // Phases 1-3 layer a tinted copy on top of each layer (tintColor
-              // honours the sprite's alpha, so only the animal shape cools).
-              const renderTint = (source: ImageSourcePropType) =>
-                dreadTint ? (
-                  <Image
-                    source={source}
-                    style={[
-                      styles.spriteLayer,
-                      { tintColor: dreadTint.color, opacity: dreadTint.opacity },
-                    ]}
-                    resizeMode="contain"
-                    importantForAccessibility="no"
-                    accessibilityElementsHidden
-                  />
-                ) : null;
-              return (
-                <View style={styles.spriteImage}>
-                  {/* Idle/robed base — hidden (not unmounted) while walking */}
-                  <View style={[styles.spriteLayer, { opacity: walkActive ? 0 : 1 }]}>
+          {/* Animal BODY — the ONLY layer that carries the facing flip (scaleX),
+              breathe, tap, wiggle, and gait. The name tag, badges, emote bubble
+              and sleeping Z's are unflipped, untransformed siblings below, so a
+              facing-left animal never renders its name in mirror-writing and no
+              chrome squashes with the footfall. */}
+          <Animated.View
+            style={[
+              styles.body,
+              {
+                transform: [
+                  { scaleX },
+                  { scale: Animated.multiply(tapScale, breatheScale) },
+                  { rotate: wiggleRotate },
+                  // Procedural gait bundle (neutral at rest: 0 / 0deg / 1).
+                  { translateY: gaitBob },
+                  { rotate: gaitLean },
+                  { scaleY: gaitScaleY },
+                ],
+              },
+            ]}
+          >
+            {CHARACTER_SPRITES[animal.type] && !spriteLoadFailed ? (
+              (() => {
+                const sprites = CHARACTER_SPRITES[animal.type]!;
+                const staticSource =
+                  currentPhase >= 4 && sprites.robed ? sprites.robed : sprites.idle;
+                const dreadTint = getSpriteDreadTint(currentPhase);
+                // Walk frames stay MOUNTED (opacity-switched) whenever they
+                // could play — swapping one Image's `source` mid-gait forces an
+                // async decode per frame the first time through the cycle,
+                // which reads as flicker. Mounting decodes everything up front.
+                // Skipped when the walk can never run (robed phases, reduced
+                // motion, low-tier devices) so those paths pay no decode cost.
+                const mountWalkStack = Boolean(
+                  walkFrames &&
+                  walkFrames.length > 0 &&
+                  currentPhase < 4 &&
+                  !getSettingsSync().reducedMotion &&
+                  !shouldSimplifyAnimations()
+                );
+                // Phases 1-3 layer a tinted copy on top of each layer (tintColor
+                // honours the sprite's alpha, so only the animal shape cools).
+                const renderTint = (source: ImageSourcePropType) =>
+                  dreadTint ? (
                     <Image
-                      source={staticSource}
-                      style={styles.spriteFill}
-                      resizeMode="contain"
-                      onError={() => setSpriteLoadFailed(true)}
-                    />
-                    {renderTint(staticSource)}
-                  </View>
-                  {mountWalkStack && walkFrames!.map((frameSource, idx) => (
-                    <View
-                      key={idx}
+                      source={source}
                       style={[
                         styles.spriteLayer,
-                        // Scale the walk art up a hair to match the idle
-                        // silhouette, kept feet-planted (see WALK_MATCH_SCALE).
-                        { transform: [{ translateY: WALK_FEET_CORRECTION }, { scale: WALK_MATCH_SCALE }] },
-                        { opacity: walkActive && idx === walkFrame % walkFrames!.length ? 1 : 0 },
+                        { tintColor: dreadTint.color, opacity: dreadTint.opacity },
                       ]}
-                    >
-                      <Image source={frameSource} style={styles.spriteFill} resizeMode="contain" />
-                      {renderTint(frameSource)}
+                      resizeMode="contain"
+                      importantForAccessibility="no"
+                      accessibilityElementsHidden
+                    />
+                  ) : null;
+                return (
+                  <View style={styles.spriteImage}>
+                    {/* Idle/robed base — hidden (not unmounted) while walking */}
+                    <View style={[styles.spriteLayer, { opacity: walkActive ? 0 : 1 }]}>
+                      <Image
+                        source={staticSource}
+                        style={styles.spriteFill}
+                        resizeMode="contain"
+                        onError={() => setSpriteLoadFailed(true)}
+                      />
+                      {renderTint(staticSource)}
                     </View>
-                  ))}
-                </View>
-              );
-            })()
-          ) : (
-            <View style={[styles.emojiBody, { borderColor: getMoodColor() }]}>
-              <Text style={styles.emoji}>{ANIMAL_EMOJIS[animal.type]}</Text>
-            </View>
-          )}
+                    {mountWalkStack && walkFrames!.map((frameSource, idx) => (
+                      <View
+                        key={idx}
+                        style={[
+                          styles.spriteLayer,
+                          // Scale the walk art up a hair to match the idle
+                          // silhouette, kept feet-planted (see WALK_MATCH_SCALE).
+                          { transform: [{ translateY: WALK_FEET_CORRECTION }, { scale: WALK_MATCH_SCALE }] },
+                          { opacity: walkActive && idx === walkFrame % walkFrames!.length ? 1 : 0 },
+                        ]}
+                      >
+                        <Image source={frameSource} style={styles.spriteFill} resizeMode="contain" />
+                        {renderTint(frameSource)}
+                      </View>
+                    ))}
+                  </View>
+                );
+              })()
+            ) : (
+              <View style={[styles.emojiBody, { borderColor: getMoodColor() }]}>
+                <Text style={styles.emoji}>{ANIMAL_EMOJIS[animal.type]}</Text>
+              </View>
+            )}
+          </Animated.View>
 
           {/* Emotion bubble */}
           {Boolean(currentEmotion) && (
@@ -943,7 +951,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
               </Text>
             </View>
           )}
-        </Animated.View>
+        </View>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -960,9 +968,16 @@ const styles = StyleSheet.create({
   spriteContainer: {
     alignItems: 'center',
   },
+  // Carries the facing flip + breathe + wiggle + gait; wraps ONLY the sprite so
+  // chrome siblings never inherit the mirror/deform (P0 fix).
+  body: {
+    alignItems: 'center',
+  },
   shadow: {
     position: 'absolute',
-    bottom: 0,
+    // Grounded at the base of the 90px sprite body (top of the flex column),
+    // not at the bottom of the whole column below the name tag.
+    top: 78,
     width: 60,
     height: 12,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
