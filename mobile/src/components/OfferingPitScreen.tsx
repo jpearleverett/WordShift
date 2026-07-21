@@ -81,7 +81,7 @@ import {
 import { getSettingsSync } from '../services/settings';
 import { logEvent } from '../services/eventLogger';
 import { hapticLight, hapticMedium, hapticHeavy } from '../services/haptics';
-import { playUiSound } from '../services/uiSound';
+import { playUiSound, stopCeremonyMusic } from '../services/uiSound';
 import { getDeviceTier, shouldSimplifyAnimations } from '../services/deviceTier';
 import { getBulkOfferTiming } from '../services/pitOfferTiming';
 
@@ -1551,6 +1551,10 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       wardPulseLoop.current = null;
 
       hapticMedium();
+      // Stop the (now-wrong-phase) ambient bed so the ritual swell owns the
+      // soundscape; App's music effect restarts the new phase's bed once the
+      // phaseTransitionEvent clears after the ceremony.
+      stopCeremonyMusic();
 
       // Sequential ward ignition
       for (let i = 0; i < PIT_WARD_COUNT; i++) {
@@ -1573,6 +1577,9 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         if (!mountedRef.current) return;
         setCeremonyStatus('erupting');
         hapticHeavy();
+        // The bespoke 2.6s ritual swell (soundPhaseChange) resolves its dark
+        // mirror by phase; it lands with the eruption, over the silenced bed.
+        playUiSound('phase_change');
         flashPitSurge();
         spawnShockwave();
         const sw1 = setTimeout(() => { if (mountedRef.current) spawnShockwave(); }, 150);

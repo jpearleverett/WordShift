@@ -14,17 +14,54 @@
  * errors internally, so callers just fire and forget.
  */
 
-/** Which UI sound to play. See audio.ts: soundUiTap / soundSelection / soundDialogue. */
-export type UiSoundKind = 'tap' | 'selection' | 'dialogue';
+/**
+ * Which UI/ceremony sound to play. The first three are the everyday UI ticks;
+ * the rest are ceremony/celebration cues that ship in the SFX pack and are
+ * routed through this guarded bridge so presentational/ceremony components can
+ * fire them without a static expo-audio import. Each maps to a sound* helper in
+ * audio.ts, which self-resolves its dark mirror by phase.
+ */
+export type UiSoundKind =
+  | 'tap'
+  | 'selection'
+  | 'dialogue'
+  | 'phase_change'
+  | 'amber_earn'
+  | 'unlock'
+  | 'achievement'
+  | 'daily_ready';
 
-/** Fire a UI sound by role. No-op (never throws) when audio is unavailable. */
+/** Fire a UI/ceremony sound by role. No-op (never throws) when audio is unavailable. */
 export function playUiSound(kind: UiSoundKind = 'tap'): void {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const audio = require('./audio');
-    if (kind === 'selection') audio.soundSelection?.();
-    else if (kind === 'dialogue') audio.soundDialogue?.();
-    else audio.soundUiTap?.();
+    switch (kind) {
+      case 'selection': audio.soundSelection?.(); break;
+      case 'dialogue': audio.soundDialogue?.(); break;
+      case 'phase_change': audio.soundPhaseChange?.(); break;
+      case 'amber_earn': audio.soundAmberEarn?.(); break;
+      case 'unlock': audio.soundUnlock?.(); break;
+      case 'achievement': audio.soundAchievement?.(); break;
+      case 'daily_ready': audio.soundDailyReady?.(); break;
+      default: audio.soundUiTap?.();
+    }
+  } catch {
+    // No native audio layer in this environment — silent by design.
+  }
+}
+
+/**
+ * Stop the looping ambient music bed for a ceremony so a ritual cue can own the
+ * soundscape. The new phase's bed is restarted by App's music effect once the
+ * phaseTransitionEvent clears. Guarded like playUiSound. Deliberately routed
+ * here (not a direct audio import) so ceremony components stay expo-audio-free.
+ */
+export function stopCeremonyMusic(): void {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const audio = require('./audio');
+    audio.stopMusic?.();
   } catch {
     // No native audio layer in this environment — silent by design.
   }
