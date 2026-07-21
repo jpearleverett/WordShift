@@ -19,6 +19,12 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 jest.mock('../services/eventLogger', () => ({
   logEvent: jest.fn(),
 }));
+// The hook statically imports haptics; stub it so importing the module in Node
+// never pulls expo-haptics' raw TS entry (ts-jest does not transform node_modules).
+jest.mock('../services/haptics', () => ({
+  hapticWarning: jest.fn(),
+  hapticLight: jest.fn(),
+}));
 
 const HOOK_SRC = fs.readFileSync(
   path.resolve(__dirname, '../hooks/useVictoryOrchestration.ts'),

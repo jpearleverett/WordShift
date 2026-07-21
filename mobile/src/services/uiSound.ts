@@ -16,10 +16,10 @@
 
 /**
  * Which UI/ceremony sound to play. The first three are the everyday UI ticks;
- * the rest are ceremony/celebration cues that ship in the SFX pack and are
- * routed through this guarded bridge so presentational/ceremony components can
- * fire them without a static expo-audio import. Each maps to a sound* helper in
- * audio.ts, which self-resolves its dark mirror by phase.
+ * the rest are ceremony/celebration/atmosphere cues that ship in the SFX pack
+ * and are routed through this guarded bridge so presentational/ceremony
+ * components can fire them without a static expo-audio import. Each maps to a
+ * sound* helper in audio.ts, which self-resolves its dark mirror by phase.
  */
 export type UiSoundKind =
   | 'tap'
@@ -29,7 +29,10 @@ export type UiSoundKind =
   | 'amber_earn'
   | 'unlock'
   | 'achievement'
-  | 'daily_ready';
+  | 'daily_ready'
+  | 'devour'
+  | 'glitch'
+  | 'whisper';
 
 /** Fire a UI/ceremony sound by role. No-op (never throws) when audio is unavailable. */
 export function playUiSound(kind: UiSoundKind = 'tap'): void {
@@ -44,6 +47,9 @@ export function playUiSound(kind: UiSoundKind = 'tap'): void {
       case 'unlock': audio.soundUnlock?.(); break;
       case 'achievement': audio.soundAchievement?.(); break;
       case 'daily_ready': audio.soundDailyReady?.(); break;
+      case 'devour': audio.soundPitDevour?.(); break;
+      case 'glitch': audio.soundGlitch?.(); break;
+      case 'whisper': audio.soundWhisper?.(); break;
       default: audio.soundUiTap?.();
     }
   } catch {

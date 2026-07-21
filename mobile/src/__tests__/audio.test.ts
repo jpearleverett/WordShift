@@ -106,10 +106,12 @@ describe('audio', () => {
       'letter_select',
       'invalid_move',
       'undo',
+      'hint',
       'amber_earn',
       'dialogue',
       'victory',
       'perfect',
+      'pit_devour',
     ];
 
     test.each(withDark)('%s swaps to its dark variant at Phase 3+', (name) => {
@@ -123,7 +125,9 @@ describe('audio', () => {
     });
 
     test('sounds without a registered dark variant keep their base name', () => {
-      for (const name of ['hint', 'achievement', 'unlock', 'phase_change', 'daily_ready']) {
+      // glitch/whisper are horror cues with no dark mirror — always their base
+      // name; achievement/unlock/phase_change/daily_ready never had one either.
+      for (const name of ['achievement', 'unlock', 'phase_change', 'daily_ready', 'glitch', 'whisper']) {
         expect(resolveSfxForPhase(name, 4)).toBe(name);
       }
     });
