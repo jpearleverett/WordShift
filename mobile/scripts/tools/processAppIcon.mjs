@@ -32,12 +32,12 @@ const src = PNG.sync.read(fs.readFileSync(SRC));
 const { width: sw, height: sh } = src;
 
 // Alpha-weighted box-average downscale sw x sh -> OUT x OUT.
-function downscale(flatten) {
-  const out = new PNG({ width: OUT, height: OUT });
-  const sxScale = sw / OUT, syScale = sh / OUT;
-  for (let dy = 0; dy < OUT; dy++) {
+function downscale(flatten, target = OUT) {
+  const out = new PNG({ width: target, height: target });
+  const sxScale = sw / target, syScale = sh / target;
+  for (let dy = 0; dy < target; dy++) {
     const sy0 = dy * syScale, sy1 = (dy + 1) * syScale;
-    for (let dx = 0; dx < OUT; dx++) {
+    for (let dx = 0; dx < target; dx++) {
       const sx0 = dx * sxScale, sx1 = (dx + 1) * sxScale;
       let r = 0, g = 0, b = 0, a = 0, wsum = 0;
       for (let sy = Math.floor(sy0); sy < Math.ceil(sy1); sy++) {
@@ -51,7 +51,7 @@ function downscale(flatten) {
           a += pa * w; wsum += w;
         }
       }
-      const o = (dy * OUT + dx) * 4;
+      const o = (dy * target + dx) * 4;
       const alpha = wsum > 0 ? a / wsum : 0;
       if (alpha > 0.0001) {
         const rr = r / a, gg = g / a, bb = b / a;
@@ -72,6 +72,31 @@ function downscale(flatten) {
   return out;
 }
 
+// iOS / store icon: the full-bleed opaque art (iOS applies its own corner mask).
 fs.writeFileSync(path.join(ASSETS, 'icon.png'), PNG.sync.write(downscale(true)));
-fs.writeFileSync(path.join(ASSETS, 'adaptive-icon.png'), PNG.sync.write(downscale(true)));
-console.log(`wrote icon.png + adaptive-icon.png (${OUT}x${OUT}) from ${path.basename(SRC)}`);
+
+// Android ADAPTIVE foreground: the full-bleed art was byte-identical to the
+// square icon, so Android's launcher mask (which shows only the central ~66%)
+// cropped the fox's ears, the W/S tiles and the amber gem — the elements that
+// say "word game". Instead, place the whole composition inside the guaranteed-
+// visible safe zone (66% of the 1024 canvas, centered) on a fully transparent
+// surround; the app.json adaptiveIcon.backgroundColor (#FFF0F5) fills behind
+// it. Now the mask crops only the decorative rounded-corner margin, never the
+// identity. (Un-baking icon.png's own rounded corners needs new art and is a
+// documented follow-up.)
+const SAFE = Math.round(OUT * 0.66); // 676
+const fg = downscale(false, SAFE);   // transparent-surround art at 66% size
+const canvas = new PNG({ width: OUT, height: OUT }); // zero-filled = transparent
+const offset = Math.round((OUT - SAFE) / 2);
+for (let y = 0; y < SAFE; y++) {
+  for (let x = 0; x < SAFE; x++) {
+    const s = (y * SAFE + x) * 4;
+    const d = ((y + offset) * OUT + (x + offset)) * 4;
+    canvas.data[d] = fg.data[s];
+    canvas.data[d + 1] = fg.data[s + 1];
+    canvas.data[d + 2] = fg.data[s + 2];
+    canvas.data[d + 3] = fg.data[s + 3];
+  }
+}
+fs.writeFileSync(path.join(ASSETS, 'adaptive-icon.png'), PNG.sync.write(canvas));
+console.log(`wrote icon.png (${OUT}) + adaptive-icon.png (${SAFE} art centered in ${OUT}, safe-zone) from ${path.basename(SRC)}`);
