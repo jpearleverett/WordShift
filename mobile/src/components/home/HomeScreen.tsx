@@ -80,6 +80,10 @@ const HINT_ICON = require('../../../assets/ui/hint.png');
 const STAR_ICON = require('../../../assets/ui/star_filled.png');
 const QUEST_ICON = require('../../../assets/ui/quest.png');
 const MENU_ICON = require('../../../assets/ui/menu.png');
+// Phase-mood sprites (generateUiIcons candy-UI family) de-emoji the descent's
+// hero moments: the sacrifice altar's focal candle and the phase-4 temple crest.
+const CANDLE_ICON = require('../../../assets/ui/candle.png');
+const VOID_ICON = require('../../../assets/ui/void.png');
 import {
   getChallengeIntroLines,
   getHouseCompletionText,
@@ -3186,13 +3190,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   transform: [{ scale: sacrificePulse.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1.7] }) }],
                 }]}
               />
-              <Animated.Text
-                style={[styles.sacrificeEmoji, {
+              <Animated.Image
+                source={CANDLE_ICON}
+                accessibilityLabel="the altar candle"
+                style={[styles.sacrificeCandleImg, {
                   transform: [{ scale: sacrificePulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.3] }) }],
                 }]}
-              >
-                🕯️
-              </Animated.Text>
+              />
             </View>
             <Text style={[styles.sacrificeTitle, { color: panelSt.title }]}>
               {getSacrificePrompt(progress.currentPhase).title}
@@ -3322,9 +3326,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               const lines = getHouseCompletionText();
               return (
                 <>
-                  <Text style={styles.houseCompletionEmoji}>
-                    {progress.currentPhase >= 4 ? '🌑' : '🏠'}
-                  </Text>
+                  {progress.currentPhase >= 4 ? (
+                    // The temple crest: the void sprite reads far cleaner than a
+                    // flat system emoji against the near-black completion card.
+                    <Image
+                      source={VOID_ICON}
+                      accessibilityLabel="the temple"
+                      style={styles.houseCompletionCrestImg}
+                    />
+                  ) : (
+                    <Text style={styles.houseCompletionEmoji}>🏠</Text>
+                  )}
                   <Text style={[
                     styles.houseCompletionTitle,
                     { color: panelSt.title },
@@ -4546,9 +4558,10 @@ const styles = StyleSheet.create({
     borderRadius: 46,
     backgroundColor: '#FFB347',
   },
-  sacrificeEmoji: {
-    fontFamily: BODY_FONT,
-    fontSize: 50,
+  sacrificeCandleImg: {
+    width: 50,
+    height: 50,
+    resizeMode: 'contain',
   },
   sacrificeTitle: {
     fontFamily: PIXEL_FONT_BOLD,
@@ -4691,6 +4704,12 @@ const styles = StyleSheet.create({
     fontFamily: BODY_FONT,
     fontSize: 60,
     marginBottom: 16,
+  },
+  houseCompletionCrestImg: {
+    width: 64,
+    height: 64,
+    marginBottom: 16,
+    resizeMode: 'contain',
   },
   houseCompletionTitle: {
     fontFamily: PIXEL_FONT_BOLD,
