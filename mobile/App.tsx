@@ -4085,6 +4085,7 @@ function MainApp() {
             {persistence.currentPhase > 0 && (
               <View style={[
                 styles.phaseBadge,
+                persistence.currentPhase === 2 && styles.phaseBadgeDusk,
                 persistence.currentPhase >= 3 && styles.phaseBadgeDark,
                 persistence.currentPhase >= 4 && styles.phaseBadgeVoid,
               ]}
@@ -4121,6 +4122,7 @@ function MainApp() {
             {puzzle.gameMode === 'challenge' && !puzzle.blindMode && (
               <BadgeAppear style={[
                 styles.challengeBadge,
+                persistence.currentPhase === 2 && styles.challengeBadgeDusk,
                 persistence.currentPhase >= 3 && styles.challengeBadgeDark,
                 persistence.currentPhase >= 4 && styles.challengeBadgeVoid,
               ]}>

@@ -52,7 +52,18 @@ export function getActionButtonColors(
     hint: { bg: CandyColors.blue.main, border: CandyColors.blue.shadow, glow: CandyColors.blue.glow },
     restart: { bg: CandyColors.green.main, border: CandyColors.green.shadow, glow: CandyColors.green.glow },
   } as const;
-  if (phase < 3) return candy[kind];
+  if (phase < 2) return candy[kind];
+  if (phase < 3) {
+    // Phase 2 (dusk): the candy COOLS one step — a desaturated, slightly
+    // darker version of each hue — so the HUD ages gradually (bright -> cooled
+    // -> dread -> void) instead of jumping straight from bright to dread at 3.
+    const cooled = {
+      undo: { bg: '#C9A94E', border: '#8E7530', glow: 'rgba(185, 150, 85, 0.4)' },
+      hint: { bg: '#5A7BA8', border: '#3B547E', glow: 'rgba(105, 145, 195, 0.4)' },
+      restart: { bg: '#57926E', border: '#356048', glow: 'rgba(95, 155, 120, 0.4)' },
+    } as const;
+    return cooled[kind];
+  }
   // Dread-shifted: muted, darker, low-glow — hue preserved so each button is
   // still recognizable, but the whole cluster recedes toward the board.
   const dusk = {
@@ -457,6 +468,11 @@ export const appStyles = StyleSheet.create({
   // The CHALLENGE pill keeps its red identity (the danger signal) but sinks
   // toward a dread crimson as the story darkens, so it stops reading as a
   // bright candy chip against a near-black board.
+  // Phase 2 (dusk) — cooled one step before the phase-3 dread, so the pill
+  // ages in the same three coherent steps as the rest of the HUD.
+  challengeBadgeDusk: {
+    backgroundColor: '#C24A52',
+  },
   challengeBadgeDark: {
     backgroundColor: CandyColors.red.dark,
   },
@@ -614,6 +630,11 @@ export const appStyles = StyleSheet.create({
     borderRadius: 10,
     marginTop: 4,
     gap: 4,
+  },
+  // Phase 2 (dusk) — a cooled violet tint one step before the phase-3 dread,
+  // so the atmosphere badge ages in step with the rest of the HUD.
+  phaseBadgeDusk: {
+    backgroundColor: 'rgba(120, 90, 150, 0.28)',
   },
   phaseBadgeDark: {
     backgroundColor: 'rgba(60, 30, 80, 0.4)',
