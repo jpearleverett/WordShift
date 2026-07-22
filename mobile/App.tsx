@@ -4677,16 +4677,20 @@ function MainApp() {
 
         {/* Narrative Micro-Beat — surprise moments at puzzle milestones */}
         {orchestration.showMicroBeat && orchestration.microBeat && (
-          <View style={[
+          // F38: fade + settle in/out via the orchestration hook's drivers
+          // (glitch_title hard-cuts — the hook snaps its opacity/translateY to
+          // 1/0 instantly; the whisper beats animate them).
+          <Animated.View style={[
             styles.victoryGlitchOverlay,
             (orchestration.microBeat.type === 'ambient_whisper' || orchestration.microBeat.type === 'silent_victory') && styles.microBeatWhisperOverlay,
+            { opacity: orchestration.microBeatOpacity, transform: [{ translateY: orchestration.microBeatTranslateY }] },
           ]} pointerEvents="none">
             <Text style={[
               orchestration.microBeat.type === 'glitch_title' ? styles.victoryGlitchText : styles.microBeatWhisperText,
             ]}>
               {orchestration.microBeat.type === 'glitch_title' ? orchestration.microBeat.glitchTitle : orchestration.microBeat.text}
             </Text>
-          </View>
+          </Animated.View>
         )}
 
         {/* Animal Whisper — ghost-like message from an animal after puzzle completion */}
@@ -4703,14 +4707,18 @@ function MainApp() {
           // pointerEvents="none": a decorative overlay that lives up to 4s —
           // it must never swallow taps meant for the board/buttons under it
           // (the whisper overlay already does the same).
-          <View style={styles.interjectionContainer} pointerEvents="none">
+          // F38: fade + settle in/out via the orchestration hook's drivers.
+          <Animated.View style={[
+            styles.interjectionContainer,
+            { opacity: orchestration.interjectionOpacity, transform: [{ translateY: orchestration.interjectionTranslateY }] },
+          ]} pointerEvents="none">
             <Text style={[
               styles.interjectionText,
               persistence.currentPhase >= 3 && styles.interjectionTextDark,
             ]}>
               {orchestration.interjection.text}
             </Text>
-          </View>
+          </Animated.View>
         )}
 
         {/* Dread Pulse — subtle dark flash when a dread word is formed */}
