@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Animated, Dimensions, TouchableOpacity, Image }
 import { PhaseTransitionEvent, PhaseScene, SceneImage, CinematicParticleConfig } from '../services/phaseEvents';
 import { getSettingsSync } from '../services/settings';
 import { hapticLight, hapticMedium, hapticHeavy, hapticWarning } from '../services/haptics';
-import { playUiSound } from '../services/uiSound';
+import { playUiSound, stopCeremonyMusic } from '../services/uiSound';
 import { BODY_FONT_BOLD } from '../theme/fonts';
 import { getPhaseTheme } from '../theme/colors';
 
@@ -82,7 +82,7 @@ interface PhaseTransitionOverlayProps {
   onComplete: () => void;
 }
 
-const CinematicParticle: React.FC<{
+const CinematicParticleBase: React.FC<{
   config: CinematicParticleConfig;
   index: number;
 }> = ({ config, index }) => {
@@ -91,6 +91,11 @@ const CinematicParticle: React.FC<{
   const loopRef = useRef<Animated.CompositeAnimation | null>(null);
 
   const startX = useRef(Math.random() * SCREEN_WIDTH).current;
+  // Horizontal-drift particles keep a STABLE top across scene changes (stored in
+  // a ref, like startX). Previously it was an inline Math.random() at render, so
+  // every setActiveSceneIndex re-render teleported all drift particles to a new
+  // random Y, breaking the continuous ambient motion.
+  const startTop = useRef(Math.random() * SCREEN_HEIGHT).current;
   const startDelay = useRef(index * 300 + Math.random() * 500).current;
 
   useEffect(() => {
@@ -141,7 +146,7 @@ const CinematicParticle: React.FC<{
       style={{
         position: 'absolute',
         left: isVertical ? startX : -50,
-        top: isVertical ? startY : Math.random() * SCREEN_HEIGHT,
+        top: isVertical ? startY : startTop,
         width: config.size,
         height: config.size,
         borderRadius: config.size / 2,
@@ -154,6 +159,9 @@ const CinematicParticle: React.FC<{
     />
   );
 };
+// Memoized so a scene change (setActiveSceneIndex) does not re-render every
+// ambient particle and restart its motion — the drift stays continuous.
+const CinematicParticle = React.memo(CinematicParticleBase);
 
 // Stepped translucent edge bands, alpha fading toward the center.
 const VIGNETTE_STEPS = 5;
@@ -417,6 +425,13 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     imageOpacity.setValue(0);
     imageTranslateY.setValue(0);
     setActiveImage(null);
+    // Reset the SCENE drivers too, so a fresh ceremony always opens dark. Without
+    // this, a skipped cinematic left activeSceneIndex/sceneOpacity from the prior
+    // event, and the next ceremony could flash the wrong scene line at full
+    // opacity before its own first scene timer fired.
+    setActiveSceneIndex(-1);
+    sceneOpacity.setValue(0);
+    sceneTranslateY.setValue(20);
 
     const reducedMotion = getSettingsSync().reducedMotion;
     // Scale ALL timing: 0.4x in reduced motion (not just skip animations),
@@ -468,7 +483,14 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
         // variant by audioPhase at phase 3+) rides the descent. Audio self-
         // gates on soundEnabled and must play even under reducedMotion (which
         // governs motion, not sound).
-        if (scene.effect === 'descend') playUiSound('phase_change');
+        if (scene.effect === 'descend') {
+          // Duck the looping music bed so the dark ritual swell owns the Arrival
+          // soundscape (App's music effect restarts the phase's bed once the
+          // event clears on complete). Guarded bridge, so it is a no-op without
+          // the native audio layer.
+          stopCeremonyMusic();
+          playUiSound('phase_change');
+        }
         if (!reducedMotion) {
           fireSceneHaptic(scene, event.shakeIntensity);
           runSceneEffect(scene, event.shakeIntensity ?? 0, event.phase);
