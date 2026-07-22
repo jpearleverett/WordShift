@@ -144,6 +144,9 @@ const TARGETS = [
   ['rooms/aquarium.png', 1456],
   ['rooms/jungle.png', 1092],
   ['rooms/office.png', 1092],
+  ['rooms/observatory.png', 1456],
+  ['rooms/workshop.png', 1456],
+  ['rooms/desert.png', 1456],
 ];
 
 for (const [rel, maxW] of TARGETS) {
