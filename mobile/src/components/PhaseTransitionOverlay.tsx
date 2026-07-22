@@ -163,6 +163,69 @@ const CinematicParticleBase: React.FC<{
 // ambient particle and restart its motion — the drift stays continuous.
 const CinematicParticle = React.memo(CinematicParticleBase);
 
+// ---------------------------------------------------------------------------
+// One-shot cinematic burst — a short spray of particles for a `particles_rise`
+// / `particles_fall` scene (previously a declared-but-dead no-op). Each
+// particle runs a SINGLE native-driven pass across the screen at ~3x ambient
+// speed over the scene's dwell, then the whole layer is unmounted by the
+// caller (keyed by nonce). Transform/opacity only; the caller only mounts it
+// when motion is on.
+// ---------------------------------------------------------------------------
+const BURST_PARTICLE_COUNT = 12;
+const BurstParticleBase: React.FC<{
+  direction: 'rise' | 'fall';
+  color: string;
+  size: number;
+  durationMs: number;
+}> = ({ direction, color, size, durationMs }) => {
+  const translateY = useRef(new Animated.Value(0)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+  const startX = useRef(Math.random() * SCREEN_WIDTH).current;
+  // Stagger the spray across the first third of the dwell.
+  const startDelay = useRef(Math.random() * (durationMs * 0.35)).current;
+  const startY = direction === 'rise' ? SCREEN_HEIGHT + size : -size;
+  const travel = direction === 'rise'
+    ? -(SCREEN_HEIGHT + size * 2)
+    : SCREEN_HEIGHT + size * 2;
+
+  useEffect(() => {
+    const dur = Math.max(360, durationMs - startDelay);
+    const anim = Animated.parallel([
+      Animated.sequence([
+        Animated.delay(startDelay),
+        Animated.timing(translateY, { toValue: travel, duration: dur, useNativeDriver: true }),
+      ]),
+      Animated.sequence([
+        Animated.delay(startDelay),
+        Animated.timing(opacity, { toValue: 1, duration: dur * 0.2, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0, duration: dur * 0.8, useNativeDriver: true }),
+      ]),
+    ]);
+    anim.start();
+    return () => anim.stop();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only one-shot; the
+  // whole layer is remounted (nonce key) on each new burst.
+  }, []);
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        left: startX,
+        top: startY,
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        backgroundColor: color,
+        opacity,
+        transform: [{ translateY }],
+      }}
+    />
+  );
+};
+const BurstParticle = React.memo(BurstParticleBase);
+
 // Stepped translucent edge bands, alpha fading toward the center.
 const VIGNETTE_STEPS = 5;
 const VIGNETTE_ALPHAS = [0.85, 0.55, 0.32, 0.16, 0.06];
@@ -241,6 +304,16 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
   const [activeImage, setActiveImage] = useState<SceneImage | null>(null);
   const effectAnimsRef = useRef<Animated.CompositeAnimation[]>([]);
   const [flashColor, setFlashColor] = useState('#FFFFFF');
+  // One-shot particle burst for particles_rise/fall scenes (keyed by nonce so a
+  // fresh burst remounts the layer). Null = no burst on screen.
+  const [burst, setBurst] = useState<{
+    direction: 'rise' | 'fall';
+    color: string;
+    size: number;
+    durationMs: number;
+    nonce: number;
+  } | null>(null);
+  const burstNonceRef = useRef(0);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const hasSkipped = useRef(false);
 
@@ -410,6 +483,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     stopEffectAnims();
     overlayOpacity.stopAnimation();
     overlayOpacity.setValue(0);
+    setBurst(null);
     onComplete();
   };
 
@@ -432,6 +506,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     setActiveSceneIndex(-1);
     sceneOpacity.setValue(0);
     sceneTranslateY.setValue(20);
+    setBurst(null);
 
     const reducedMotion = getSettingsSync().reducedMotion;
     // Scale ALL timing: 0.4x in reduced motion (not just skip animations),
@@ -494,6 +569,24 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
         if (!reducedMotion) {
           fireSceneHaptic(scene, event.shakeIntensity);
           runSceneEffect(scene, event.shakeIntensity ?? 0, event.phase);
+          if (scene.effect === 'particles_rise' || scene.effect === 'particles_fall') {
+            // One-shot burst for the scene's dwell; cleared shortly after.
+            burstNonceRef.current += 1;
+            const nonce = burstNonceRef.current;
+            const durationMs = scene.duration * timeScale;
+            setBurst({
+              direction: scene.effect === 'particles_rise' ? 'rise' : 'fall',
+              color: event.particles?.color ?? event.accentColor,
+              size: event.particles?.size ?? 8,
+              durationMs,
+              nonce,
+            });
+            timers.push(
+              setTimeout(() => {
+                setBurst((b) => (b && b.nonce === nonce ? null : b));
+              }, durationMs + 200)
+            );
+          }
           if (scene.effect === 'descend') {
             // A heavy settle lands with the figure at descendMs. Timer parked
             // in timersRef so handleSkip/cleanup clear it.
@@ -631,6 +724,21 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
           {Array.from({ length: event.particles.count }, (_, i) => (
             <CinematicParticle key={i} config={event.particles!} index={i} />
+          ))}
+        </View>
+      )}
+
+      {/* One-shot burst for particles_rise/fall scenes (keyed so it remounts) */}
+      {burst && (
+        <View key={`burst-${burst.nonce}`} style={StyleSheet.absoluteFill} pointerEvents="none">
+          {Array.from({ length: BURST_PARTICLE_COUNT }, (_, i) => (
+            <BurstParticle
+              key={i}
+              direction={burst.direction}
+              color={burst.color}
+              size={burst.size}
+              durationMs={burst.durationMs}
+            />
           ))}
         </View>
       )}
