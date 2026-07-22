@@ -33,6 +33,12 @@ interface DraggableTileProps {
 }
 
 const DRAG_THRESHOLD = 10;
+// The floating drag ghost used to ride directly under the finger, occluding
+// both the tile itself and the ~18px slot beneath it (F7). Lifting the ghost
+// above the finger keeps both visible; the same offset is subtracted from the
+// position reported to onMove/onDragEnd so hit-testing still aims at the
+// ghost's actual visible center rather than the (now-uncovered) fingertip.
+const DRAG_LIFT_DP = 44;
 
 /**
  * Wraps a LetterTile child with drag-and-drop capability.
@@ -60,6 +66,9 @@ export function DraggableTile({
 }: DraggableTileProps) {
   const translateX = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(0)).current;
+  // Lift (F7): 0 at rest, springs to -DRAG_LIFT_DP once the drag activates so
+  // the ghost rides above the finger instead of directly under it.
+  const liftAnim = useRef(new Animated.Value(0)).current;
   const isDragging = useRef(false);
   const startPos = useRef({ x: 0, y: 0 });
   const dragActivated = useRef(false);
@@ -108,6 +117,7 @@ export function DraggableTile({
         dragActivated.current = false;
         translateX.setValue(0);
         translateY.setValue(0);
+        liftAnim.setValue(0);
         // Disable parent ScrollView immediately on touch to prevent scroll race
         onDragActiveChangeRef.current?.(true);
       },
@@ -132,18 +142,26 @@ export function DraggableTile({
               tension: 200,
               useNativeDriver: true,
             }).start();
+            Animated.spring(liftAnim, {
+              toValue: -DRAG_LIFT_DP,
+              friction: 7,
+              tension: 120,
+              useNativeDriver: true,
+            }).start();
+          } else {
+            liftAnim.setValue(-DRAG_LIFT_DP);
           }
         }
 
         if (dragActivated.current) {
           translateX.setValue(dx);
           translateY.setValue(dy);
-          // Live hover feedback: report the finger's page position. The
-          // consumer ref-compares the derived slot index before any setState,
-          // so this stays cheap on the move path.
+          // Live hover feedback: report the finger's page position, lifted by
+          // the same DRAG_LIFT_DP the ghost visually rides at (F7) — the aim
+          // point stays the ghost's visible center, not the covered fingertip.
           onMoveRef.current?.({
             x: startPos.current.x + dx,
-            y: startPos.current.y + dy,
+            y: startPos.current.y + dy - DRAG_LIFT_DP,
           });
         }
       },
@@ -153,9 +171,10 @@ export function DraggableTile({
         onDragActiveChangeRef.current?.(false);
 
         if (dragActivated.current) {
-          // Drag was active — fire drop callback with finger position
+          // Drag was active — fire drop callback with the finger position,
+          // lifted by DRAG_LIFT_DP to match the ghost's visible center (F7).
           const dropX = startPos.current.x + gestureState.dx;
-          const dropY = startPos.current.y + gestureState.dy;
+          const dropY = startPos.current.y + gestureState.dy - DRAG_LIFT_DP;
 
           const settings = getSettingsSync();
           if (!settings.reducedMotion) {
@@ -186,12 +205,14 @@ export function DraggableTile({
               // Reset after animation
               translateX.setValue(0);
               translateY.setValue(0);
+              liftAnim.setValue(0);
               floatingScale.setValue(1);
               sourceOpacity.setValue(1);
             });
           } else {
             translateX.setValue(0);
             translateY.setValue(0);
+            liftAnim.setValue(0);
             floatingOpacity.setValue(0);
             floatingScale.setValue(1);
             sourceOpacity.setValue(1);
@@ -214,6 +235,7 @@ export function DraggableTile({
         onDragActiveChangeRef.current?.(false);
         translateX.setValue(0);
         translateY.setValue(0);
+        liftAnim.setValue(0);
         floatingOpacity.setValue(0);
         floatingScale.setValue(1);
         sourceOpacity.setValue(1);
@@ -247,7 +269,9 @@ export function DraggableTile({
             opacity: floatingOpacity,
             transform: [
               { translateX },
-              { translateY },
+              // Lifted above the raw finger translateY (F7) so the ghost
+              // never occludes the tile it came from or the slot beneath it.
+              { translateY: Animated.add(translateY, liftAnim) },
               { scale: floatingScale },
             ],
             shadowColor,
