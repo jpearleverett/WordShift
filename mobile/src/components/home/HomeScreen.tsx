@@ -3251,6 +3251,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <Animated.View
                 pointerEvents="none"
                 style={[styles.sacrificeCandleGlow, {
+                  // Phase-age the flare so it isn't the one bright-orange element
+                  // on an otherwise dark/serene panel: an ember at the reveal, a
+                  // mauve at the terrible peace.
+                  backgroundColor: progress.currentPhase >= 5 ? '#9B7BAE' : progress.currentPhase >= 4 ? '#C8703A' : '#FFB347',
                   opacity: sacrificePulse.interpolate({ inputRange: [0, 1], outputRange: [0, 0.55] }),
                   transform: [{ scale: sacrificePulse.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1.7] }) }],
                 }]}

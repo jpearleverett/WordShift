@@ -17,6 +17,7 @@ import React from 'react';
 import { View, Platform, StyleSheet } from 'react-native';
 import { shouldShowBanner } from '../../services/ads';
 import { isAdFreeSync } from '../../services/entitlements';
+import { getSurfaceTheme } from '../../theme/surfaces';
 
 interface BannerAdProps {
   /** Narrative phase (banners suppress from Phase 4+). */
@@ -75,9 +76,15 @@ export const BannerAd: React.FC<BannerAdProps> = ({ phase, onboarding = false })
 
   const NativeBanner = mod.BannerAd;
   const size = mod.BannerAdSize?.ANCHORED_ADAPTIVE_BANNER ?? 'ANCHORED_ADAPTIVE_BANNER';
+  // A subtle phase-aware "shelf" so the raw Google rectangle sits on the cottage
+  // surface instead of floating bare (no overflow:hidden — a native ad view must
+  // not be clipped; the frame is just a tinted bordered tray around it).
+  const t = getSurfaceTheme(phase);
   return (
     <View style={styles.wrap} pointerEvents="box-none">
-      <NativeBanner unitId={unitId} size={size} requestOptions={{}} />
+      <View style={[styles.frame, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+        <NativeBanner unitId={unitId} size={size} requestOptions={{}} />
+      </View>
     </View>
   );
 };
@@ -87,6 +94,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 4,
+  },
+  frame: {
+    padding: 5,
+    borderRadius: 14,
+    borderWidth: 1,
   },
 });
 

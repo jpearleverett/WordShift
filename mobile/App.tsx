@@ -4388,6 +4388,7 @@ function MainApp() {
             icon="↩"
             label="UNDO"
             colors={getActionButtonColors('undo', persistence.currentPhase)}
+            phase={persistence.currentPhase}
             onPress={handleUndo}
             disabled={puzzle.history.length === 0 || puzzle.gameState !== GameState.PLAYING}
           />
@@ -4395,6 +4396,7 @@ function MainApp() {
             icon="💡"
             label={puzzle.gameMode === 'challenge' ? 'HINT' : `HINT · ${puzzle.hintBalance}`}
             colors={getActionButtonColors('hint', persistence.currentPhase)}
+            phase={persistence.currentPhase}
             onPress={handleHintPress}
             disabled={puzzle.gameState !== GameState.PLAYING}
             accessibilityLabel={
@@ -4408,6 +4410,7 @@ function MainApp() {
               icon="⏭"
               label={getColdOpenSkipLabel()}
               colors={getActionButtonColors('restart', persistence.currentPhase)}
+              phase={persistence.currentPhase}
               onPress={handleColdOpenSkipPress}
               disabled={false}
               accessibilityLabel={getColdOpenSkipAccessibilityLabel()}
@@ -4418,6 +4421,7 @@ function MainApp() {
             icon="🔄"
             label={puzzle.gameState === GameState.PLAYING ? "RESTART" : "NEW"}
             colors={getActionButtonColors('restart', persistence.currentPhase)}
+            phase={persistence.currentPhase}
             onPress={() => {
               hapticLight();
               // RESTART while playing resets THIS board (a true retry); NEW (idle)

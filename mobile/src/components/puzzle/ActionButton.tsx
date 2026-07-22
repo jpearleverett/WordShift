@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { getSettingsSync } from '../../services/settings';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
+import { getPressSpring } from '../../theme/surfaces';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 
 // Generated candy-style sprites (assets/ui, generateUiIcons.mjs) replacing the
@@ -35,6 +36,10 @@ interface ActionButtonProps {
   onPress: () => void;
   disabled: boolean;
   accessibilityLabel?: string;
+  /** Narrative phase — ages the release spring so the secondary controls carry
+   *  the same tactile weight language as the primary buttons (bright snaps back,
+   *  the reveal releases heavily). Defaults to phase 0. */
+  phase?: number;
 }
 
 export const ActionButton: React.FC<ActionButtonProps> = ({
@@ -44,6 +49,7 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
   onPress,
   disabled,
   accessibilityLabel,
+  phase = 0,
 }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
@@ -87,10 +93,14 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
   };
 
   const handlePressOut = () => {
+    // The RELEASE ages with the phase (bright snaps, the reveal releases
+    // heavily) via the shared tile/button weight language; the press-DOWN above
+    // stays constant — the hand does not age.
+    const release = getPressSpring(phase);
     Animated.spring(scaleAnim, {
       toValue: 1,
-      friction: 3,
-      tension: 150,
+      friction: release.friction,
+      tension: release.tension,
       useNativeDriver: true,
     }).start();
   };
