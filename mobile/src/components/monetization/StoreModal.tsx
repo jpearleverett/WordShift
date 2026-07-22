@@ -25,6 +25,7 @@ import {
   ConsumableProductInfo,
   STARTER_PACK_INFO,
   getProducts,
+  isBillingReady,
   purchaseConsumable,
   purchaseStarterPack,
   purchaseProduct,
@@ -171,6 +172,16 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     let cancelled = false;
     (async () => {
       try {
+        // Cold-start race: initIAP() is fire-and-forget, so the modal can open
+        // before RevenueCat has finished configuring. If we fetch then, getProducts
+        // returns [] and every purchase reads "not available" until a reopen. Wait
+        // briefly (bounded) for billing to become ready, then fetch, and retry once
+        // if it still comes back empty. This never touches the purchase path, so it
+        // cannot abort a real in-progress purchase.
+        for (let i = 0; i < 10 && !isBillingReady() && !cancelled; i++) {
+          await new Promise((r) => setTimeout(r, 300));
+        }
+        if (cancelled) return;
         const ids = [
           PRODUCT_IDS.STARTER_PACK,
           ...AMBER_PACK_IDS,
@@ -178,7 +189,11 @@ export const StoreModal: React.FC<StoreModalProps> = ({
           PRODUCT_IDS.COSMETIC_BUNDLE,
           PRODUCT_IDS.SUPPORTER_SUB,
         ];
-        const products: IapProduct[] = await getProducts(ids);
+        let products: IapProduct[] = await getProducts(ids);
+        if (products.length === 0 && !cancelled) {
+          await new Promise((r) => setTimeout(r, 600));
+          products = await getProducts(ids);
+        }
         if (!cancelled) {
           const map: Record<string, string> = {};
           for (const p of products) if (p.priceString) map[p.productId] = p.priceString;

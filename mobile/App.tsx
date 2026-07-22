@@ -784,9 +784,17 @@ function MainApp() {
     });
   }, [transitionOverlay, screenRevealAnim, persistence.currentPhase]);
 
-  // Keep root background in sync with current screen + phase (handles phase changes without transitions)
+  // Keep root background AND the transition-cover color in sync with the current
+  // screen + phase (handles phase changes without transitions). The cover color
+  // must track the screen at REST, or the next transition's fade-IN covers the
+  // OUTGOING screen with a stale color (its init '#1A1A2E', or the previous
+  // transition's destination) and briefly washes the screen dark before the
+  // swap. Syncing it here makes every fade-in an invisible same-color cover; the
+  // mid-transition swap to the destination color (in transitionTo) is unchanged.
   useEffect(() => {
-    setRootBgColor(getScreenBackgroundColor(currentScreen, persistence.currentPhase));
+    const c = getScreenBackgroundColor(currentScreen, persistence.currentPhase);
+    setRootBgColor(c);
+    setTransitionOverlayColor(c);
   }, [currentScreen, persistence.currentPhase]);
 
   // ========================================================================
