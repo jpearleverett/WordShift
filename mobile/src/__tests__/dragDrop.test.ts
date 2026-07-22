@@ -12,7 +12,7 @@ jest.mock('react-native', () => ({
   },
 }));
 
-import { estimateSlotIndex, findClosestValidSlot } from '../services/slotEstimation';
+import { estimateSlotIndex, findClosestValidSlot, computeBoardScale } from '../services/slotEstimation';
 
 describe('estimateSlotIndex', () => {
   // With a 400px screen width:
@@ -72,6 +72,58 @@ describe('estimateSlotIndex', () => {
     // Edge case: 0-letter word → 1 slot
     const result = estimateSlotIndex(200, 1, 0);
     expect(result).toBe(0);
+  });
+
+  describe('board scale (F139/F140)', () => {
+    it('scale=1 (explicit) matches the default no-scale result exactly', () => {
+      for (const [x, slots, wl] of [[0, 5, 4], [200, 5, 4], [400, 5, 4], [123, 6, 5], [400, 8, 7]] as const) {
+        expect(estimateSlotIndex(x, slots, wl, undefined, 1)).toBe(estimateSlotIndex(x, slots, wl));
+      }
+    });
+
+    it('still maps ends and center correctly when the board is scaled down', () => {
+      const scale = 0.8;
+      expect(estimateSlotIndex(0, 6, 5, undefined, scale)).toBe(0); // far left -> first slot
+      expect(estimateSlotIndex(400, 6, 5, undefined, scale)).toBe(5); // far right -> last slot
+      expect(estimateSlotIndex(200, 6, 5, undefined, scale)).toBeGreaterThanOrEqual(2);
+      expect(estimateSlotIndex(200, 6, 5, undefined, scale)).toBeLessThanOrEqual(3);
+    });
+
+    it('rightward drops resolve to non-decreasing slot indices at a scaled width', () => {
+      const scale = 0.75;
+      let prev = -1;
+      for (let x = 0; x <= 400; x += 20) {
+        const slot = estimateSlotIndex(x, 6, 5, undefined, scale);
+        expect(slot).toBeGreaterThanOrEqual(prev);
+        prev = slot;
+      }
+    });
+  });
+});
+
+describe('computeBoardScale', () => {
+  it('leaves ordinary phones at exactly 1 (no perturbation)', () => {
+    // A 4-letter board (widest row reaches 5 letters, ~356px) fits a 400dp
+    // inner width, and 400 is below the tablet threshold.
+    expect(computeBoardScale(400, 4)).toBe(1);
+    expect(computeBoardScale(411, 4)).toBe(1);
+  });
+
+  it('scales DOWN below 1 when the widest row would overflow a narrow screen', () => {
+    const s = computeBoardScale(320, 5); // 5-letter board on a 320dp phone
+    expect(s).toBeGreaterThan(0);
+    expect(s).toBeLessThan(1);
+  });
+
+  it('scales UP (capped) on a tablet-width screen', () => {
+    const s = computeBoardScale(768, 4);
+    expect(s).toBeGreaterThan(1);
+    expect(s).toBeLessThanOrEqual(1.2);
+  });
+
+  it('never returns a non-positive or NaN scale for degenerate widths', () => {
+    expect(computeBoardScale(0, 4)).toBe(1);
+    expect(Number.isFinite(computeBoardScale(300, 5))).toBe(true);
   });
 });
 

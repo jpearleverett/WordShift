@@ -251,7 +251,7 @@ let pendingRestoreNotice = false;
 import { markPendingChanges, uploadToCloud, installCloudProviderIfConfigured, maybeAutoRestoreOnFreshInstall, holdUploadsUntil } from './src/services/cloudSave';
 import * as Sentry from '@sentry/react-native';
 import { getSentryDsn } from './src/services/supabaseClient';
-import { estimateSlotIndex, findClosestValidSlot } from './src/services/slotEstimation';
+import { estimateSlotIndex, findClosestValidSlot, computeBoardScale } from './src/services/slotEstimation';
 import { DROP_SHAKE_KEYFRAME_MS, DROP_SHAKE_INTENSITY, SPEED_ESCALATION_STEP_SEC, SPEED_ESCALATION_MIN_SEC, SPEED_TICK_CRITICAL_SEC, SWIFT_HINT_TOAST_DELAY_MS, SCREEN_FADE_COVER_MS, SCREEN_FADE_REVEAL_MS, speedTickKind } from './src/constants/timing';
 import { OfferingPitScreen } from './src/components/OfferingPitScreen';
 import { ShopScreen } from './src/components/shop/ShopScreen';
@@ -2853,6 +2853,30 @@ function MainApp() {
   activeRowIndexRef.current = puzzle.activeRowIndex;
   moveDirectionRef.current = puzzle.moveDirection;
   rowsRef.current = puzzle.rows;
+
+  // Board scale-to-fit (F139/F140). Reads the LIVE window width (F138 for the
+  // board: reacts to split-screen / fold / resize) and the board's base word
+  // length to pick a single uniform scale — < 1 to fit a narrow screen where
+  // the fixed arc geometry would clip, up to a modest cap on a tablet. Captured
+  // at board change so it never wobbles mid-move (a fresh board's rows are all
+  // at base length). Ordinary phones resolve to exactly 1, so their rendering
+  // and drag math are byte-identical. The ref mirror lets the drag callbacks
+  // feed the same scale into estimateSlotIndex without rebuilding on resize.
+  const { width: boardWindowWidth } = useWindowDimensions();
+  const boardFirstRowId = puzzle.rows.length > 0 ? puzzle.rows[0].id : null;
+  const boardBaseWordLen = useMemo(
+    () => (puzzle.rows.length > 0 ? Math.max(...puzzle.rows.map((r) => r.words.length)) : 4),
+    // Capture at board change only; rows are all at base length the instant a
+    // new board mounts, so this is the stable base (never the mid-move max).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [boardFirstRowId],
+  );
+  const boardScale = useMemo(
+    () => computeBoardScale(boardWindowWidth, boardBaseWordLen),
+    [boardWindowWidth, boardBaseWordLen],
+  );
+  const boardScaleRef = useRef(1);
+  boardScaleRef.current = boardScale;
   const rowNodeRefs = useRef(new Map<number, any>());
   const registerRowNode = useCallback((rowIndex: number, node: any) => {
     if (node) rowNodeRefs.current.set(rowIndex, node);
@@ -2912,7 +2936,7 @@ function MainApp() {
         (position.y >= bounds.y - bounds.h && position.y <= bounds.y + bounds.h * 2);
       if (inBand) {
         const slotCount = targetRow.words.length + 1;
-        const slotIndex = estimateSlotIndex(position.x, slotCount, targetRow.words.length);
+        const slotIndex = estimateSlotIndex(position.x, slotCount, targetRow.words.length, undefined, boardScaleRef.current);
         next = { rowIndex: targetIdx, slotIndex };
       }
     }
@@ -3139,6 +3163,7 @@ function MainApp() {
         slotCount,
         targetWordLength,
         estimateOut,
+        boardScaleRef.current,
       );
 
       // Near-miss forgiveness: arc slots are only ~28px wide on a finger-driven
@@ -4563,6 +4588,11 @@ function MainApp() {
             accessibilityRole="list"
             accessibilityLabel={`Puzzle with ${puzzle.rows.length} word rows`}
           >
+            {/* Board scale-to-fit wrapper (F139/F140): a single uniform scale
+                around the board's horizontal center. undefined at scale 1 (the
+                ordinary-phone case), so the wrapper is layout-transparent there;
+                the drag math is fed the same scale so drops stay aligned. */}
+            <View style={boardScale !== 1 ? { transform: [{ scale: boardScale }] } : undefined}>
             {puzzle.rows.map((row, idx) => (
               <Row
                 key={row.id}
@@ -4615,6 +4645,7 @@ function MainApp() {
                 }
               />
             ))}
+            </View>
           </ScrollView>
           {/* Blind Offering judgment beat — overlays the board (pointer-
               transparent), plays only when a blind board resolves. */}
