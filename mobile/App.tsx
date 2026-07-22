@@ -924,6 +924,7 @@ function MainApp() {
     activeRowIndex: puzzle.activeRowIndex,
     selectedLetter: puzzle.selectedLetter,
     gameState: puzzle.gameState,
+    isProcessingVictory: victoryFlow.isProcessingVictory,
     message: puzzle.message,
     history: puzzle.history,
     invalidAttempts: puzzle.invalidAttempts,

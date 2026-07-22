@@ -11,6 +11,11 @@ export interface AutosaveDeps {
   activeRowIndex: number;
   selectedLetter: any;
   gameState: GameState;
+  /** True from the instant a victory begins processing (set BEFORE the async
+   *  recordVictory awaits, and long before gameState flips to WON). The save
+   *  must skip while this holds, or the debounce can re-persist the just-cleared
+   *  won board as a restartable PLAYING save during the record window. */
+  isProcessingVictory: boolean;
   message: string;
   history: any[];
   invalidAttempts: number;
@@ -56,11 +61,19 @@ export function useAutosave(deps: AutosaveDeps): void {
       timerRef.current = null;
     }
 
-    if (deps.gameState === GameState.PLAYING && deps.currentScreen === 'puzzle') {
+    if (deps.gameState === GameState.PLAYING && deps.currentScreen === 'puzzle' && !deps.isProcessingVictory) {
       timerRef.current = setTimeout(() => {
         // Re-check at fire time: the puzzle may have completed (or the player
-        // left the screen) since this save was scheduled.
-        if (depsRef.current.gameState !== GameState.PLAYING || depsRef.current.currentScreen !== 'puzzle') {
+        // left the screen) since this save was scheduled. gameState alone is
+        // insufficient — App flips it to WON only AFTER the async recordVictory,
+        // so a slow record leaves a window where the board is cleared/won but
+        // still reads PLAYING; isProcessingVictory closes that window (it is set
+        // synchronously before the record await).
+        if (
+          depsRef.current.gameState !== GameState.PLAYING ||
+          depsRef.current.currentScreen !== 'puzzle' ||
+          depsRef.current.isProcessingVictory
+        ) {
           return;
         }
         const saveData: Partial<SavedPuzzleState> = {
@@ -116,6 +129,7 @@ export function useAutosave(deps: AutosaveDeps): void {
     deps.activeRowIndex,
     deps.selectedLetter,
     deps.gameState,
+    deps.isProcessingVictory,
     deps.message,
     deps.history,
     deps.invalidAttempts,

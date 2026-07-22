@@ -34,6 +34,7 @@ describe('useAutosave Unbroken Weave shape', () => {
       activeRowIndex: 1,
       selectedLetter: null,
       gameState: GameState.PLAYING,
+      isProcessingVictory: false,
       message: 'The weave holds.',
       history: [],
       invalidAttempts: 0,
@@ -65,5 +66,46 @@ describe('useAutosave Unbroken Weave shape', () => {
       unbrokenWeaveMode: true,
       spentLetters: ['S', 'L'],
     }));
+  });
+
+  test('does NOT persist while a victory is processing (guards the won-board race)', () => {
+    useAutosave({
+      currentScreen: 'puzzle',
+      isPlayingDaily: false,
+      rows: [],
+      activeRowIndex: 1,
+      selectedLetter: null,
+      // gameState still reads PLAYING (App flips to WON only after the async
+      // recordVictory), but the victory is being processed — the save must skip.
+      gameState: GameState.PLAYING,
+      isProcessingVictory: true,
+      message: 'The pattern accepts.',
+      history: [],
+      invalidAttempts: 0,
+      hintsUsed: 0,
+      undosRemaining: Infinity,
+      difficulty: 'HARD',
+      currentWordLength: 5,
+      hint: '',
+      solution: [],
+      reverseSolution: undefined,
+      gameMode: 'standard',
+      blindMode: false,
+      unbrokenWeaveMode: false,
+      spentLetters: [],
+      currentVariant: 'standard',
+      selectedVariant: 'standard',
+      moveDirection: 'down',
+      currentPhase: 5,
+      lastFormedWord: 'PLAIN',
+      doubleShiftPhase: null,
+      speedTimeRemaining: null,
+      isSharedChallenge: false,
+      isFinalBoard: false,
+    });
+
+    jest.runOnlyPendingTimers();
+
+    expect(savePuzzleState).not.toHaveBeenCalled();
   });
 });
