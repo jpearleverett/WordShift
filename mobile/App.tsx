@@ -93,7 +93,7 @@ import { consumeSharePrompt, getSharePromptInvite } from './src/services/sharePr
 import { initShareImage } from './src/services/shareImage';
 import { ShareResultModal } from './src/components/share/ShareResultModal';
 import { getLocalDateString } from './src/services/dateUtils';
-import { getSettingsSync } from './src/services/settings';
+import { getSettingsSync, getSettings } from './src/services/settings';
 import { announceForA11y } from './src/services/a11yAnnounce';
 import { initAudio, setAudioPhase, startMusicForScreen, type MusicScreen, soundVictory, soundPerfect, soundValidMove, soundMidpointTurn, soundInvalidMove, soundUndo, soundHint, soundTap, soundUiTap, soundSelection, soundLetterSelect, soundDailyReady } from './src/services/audio';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -4831,14 +4831,25 @@ function MainApp() {
           onComplete={orchestrationActions.dismissWhisper}
         />
 
-        {/* Animal Interjection — brief message pulling player to home screen */}
-        {orchestration.showInterjection && orchestration.interjection && !orchestration.showWhisper && (
+        {/* Animal Interjection — brief message pulling player to home screen.
+            The narrative-slot arbiter (revealWhenFree / isNarrativeVoiceActive)
+            already guarantees the whisper and interjection never reveal at the
+            same time, so the render no longer ALSO gates on !showWhisper — that
+            extra gate hard-unmounted the interjection mid-fade if a late whisper
+            flipped showWhisper, reading as a flash. Now it always fades out via
+            its own driver. */}
+        {orchestration.showInterjection && orchestration.interjection && (
           // pointerEvents="none": a decorative overlay that lives up to 4s —
           // it must never swallow taps meant for the board/buttons under it
           // (the whisper overlay already does the same).
           // F38: fade + settle in/out via the orchestration hook's drivers.
           <Animated.View style={[
             styles.interjectionContainer,
+            persistence.currentPhase >= 3
+              ? styles.interjectionContainerDark
+              : persistence.currentPhase === 2
+                ? styles.interjectionContainerMuted
+                : styles.interjectionContainerLight,
             { opacity: orchestration.interjectionOpacity, transform: [{ translateY: orchestration.interjectionTranslateY }] },
           ]} pointerEvents="none"
             // Transient atmospheric nudge: keep it out of the screen-reader
@@ -4848,7 +4859,11 @@ function MainApp() {
             accessibilityElementsHidden>
             <Text style={[
               styles.interjectionText,
-              persistence.currentPhase >= 3 && styles.interjectionTextDark,
+              persistence.currentPhase >= 3
+                ? styles.interjectionTextDark
+                : persistence.currentPhase === 2
+                  ? styles.interjectionTextMuted
+                  : styles.interjectionTextLight,
             ]}>
               {orchestration.interjection.text}
             </Text>
@@ -5206,7 +5221,14 @@ function App() {
         // Patron/ad-free status and the Store's 2x-first-purchase badge.
         // loadPixelFonts registers the cottage dialogue/chrome font before the
         // first frame (never throws — falls back to system font on failure).
-        await Promise.all([initCosmetics(), initHints(), loadEntitlements(), loadPixelFonts()]);
+        // getSettings() warms the settings cache BEFORE the first frame. Every
+        // render-path consumer reads getSettingsSync() (settingsCache ||
+        // DEFAULT_SETTINGS); without this warm, a fresh launch returns DEFAULTS
+        // until some audio/haptic call happens to warm the cache first — so a
+        // persisted preference (Swift Victories, Reduced Motion, Sound/Haptics
+        // off) silently reads as its default on early renders. Warming it here
+        // makes getSettingsSync authoritative from frame one.
+        await Promise.all([getSettings(), initCosmetics(), initHints(), loadEntitlements(), loadPixelFonts()]);
         // Recover any consumable purchase whose reward never landed (app killed
         // between the store success and the grant). Apply-then-ack gives
         // at-least-once delivery: a crash mid-recovery replays rather than
