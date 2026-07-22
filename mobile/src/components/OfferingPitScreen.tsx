@@ -93,10 +93,13 @@ import { getBulkOfferTiming } from '../services/pitOfferTiming';
 // Assets & Constants
 // ---------------------------------------------------------------------------
 
-const PIT_DAY = require('../../assets/environment/pitt_day.png');
-const PIT_AFTERNOON = require('../../assets/environment/pitt_afternoon.png');
-const PIT_DUSK = require('../../assets/environment/pitt_dusk.png');
-const PIT_NIGHT = require('../../assets/environment/pitt_night.png');
+// Full-screen pit backdrops ship as WebP (q90): ~10MB of PNG became ~1.6MB with
+// no visible loss. Dimensions unchanged (941x1672). Re-encode via
+// scripts/tools/encodeBackgroundsWebp.mjs.
+const PIT_DAY = require('../../assets/environment/pitt_day.webp');
+const PIT_AFTERNOON = require('../../assets/environment/pitt_afternoon.webp');
+const PIT_DUSK = require('../../assets/environment/pitt_dusk.webp');
+const PIT_NIGHT = require('../../assets/environment/pitt_night.webp');
 const TENDING_ICON = require('../../assets/ui/tending.png');
 const MENU_ICON = require('../../assets/ui/menu.png');
 const HOME_ICON = require('../../assets/ui/home.png');

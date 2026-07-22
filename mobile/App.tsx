@@ -93,7 +93,7 @@ import { consumeSharePrompt, getSharePromptInvite } from './src/services/sharePr
 import { initShareImage } from './src/services/shareImage';
 import { ShareResultModal } from './src/components/share/ShareResultModal';
 import { getLocalDateString } from './src/services/dateUtils';
-import { getSettingsSync } from './src/services/settings';
+import { getSettingsSync, getSettings } from './src/services/settings';
 import { announceForA11y } from './src/services/a11yAnnounce';
 import { initAudio, setAudioPhase, startMusicForScreen, type MusicScreen, soundVictory, soundPerfect, soundValidMove, soundMidpointTurn, soundInvalidMove, soundUndo, soundHint, soundTap, soundUiTap, soundSelection, soundLetterSelect, soundDailyReady } from './src/services/audio';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -251,7 +251,7 @@ let pendingRestoreNotice = false;
 import { markPendingChanges, uploadToCloud, installCloudProviderIfConfigured, maybeAutoRestoreOnFreshInstall, holdUploadsUntil } from './src/services/cloudSave';
 import * as Sentry from '@sentry/react-native';
 import { getSentryDsn } from './src/services/supabaseClient';
-import { estimateSlotIndex, findClosestValidSlot } from './src/services/slotEstimation';
+import { estimateSlotIndex, findClosestValidSlot, computeBoardScale } from './src/services/slotEstimation';
 import { DROP_SHAKE_KEYFRAME_MS, DROP_SHAKE_INTENSITY, SPEED_ESCALATION_STEP_SEC, SPEED_ESCALATION_MIN_SEC, SPEED_TICK_CRITICAL_SEC, SWIFT_HINT_TOAST_DELAY_MS, SCREEN_FADE_COVER_MS, SCREEN_FADE_REVEAL_MS, speedTickKind } from './src/constants/timing';
 import { OfferingPitScreen } from './src/components/OfferingPitScreen';
 import { ShopScreen } from './src/components/shop/ShopScreen';
@@ -328,6 +328,14 @@ function MainApp() {
   const screenInsets = useScreenInsets();
   // Screen navigation
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('home');
+  // Launch-route gate: currentScreen defaults to 'home', but a cold launch may
+  // resolve into the puzzle or pit (an interrupted-onboarding resume). Until the
+  // resume effect decides, we keep showing the branded boot screen rather than
+  // painting 'home' for a frame and then swapping to the board (the F141 home
+  // flash). Cleared by the resume effect (every branch) and, as a brick-proof
+  // backstop, by a short timeout so a stalled decision can never trap the boot
+  // screen.
+  const [bootRouting, setBootRouting] = useState(true);
   const [homePanY, setHomePanY] = useState<number | null>(null);
 
   // Custom hooks - game logic & persistence separated from UI
@@ -365,6 +373,15 @@ function MainApp() {
     const t = setTimeout(() => setLoadingGraceVisible(true), 250);
     return () => clearTimeout(t);
   }, [puzzle.gameState, puzzle.isProcessing]);
+
+  // Brick-proof backstop for the launch-route gate: if the resume decision
+  // never lands (e.g. onboarding load stalls), lift the boot screen anyway so
+  // the app can never hang on it. Worst case this restores the pre-fix behavior
+  // (a possible home flash), never a stuck screen.
+  useEffect(() => {
+    const t = setTimeout(() => setBootRouting(false), 800);
+    return () => clearTimeout(t);
+  }, []);
   // Tracked timer for the one-time Swift-Victories hint (F110): cleared on
   // unmount so a raw setTimeout can't fire into a torn-down tree.
   const swiftHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -767,9 +784,17 @@ function MainApp() {
     });
   }, [transitionOverlay, screenRevealAnim, persistence.currentPhase]);
 
-  // Keep root background in sync with current screen + phase (handles phase changes without transitions)
+  // Keep root background AND the transition-cover color in sync with the current
+  // screen + phase (handles phase changes without transitions). The cover color
+  // must track the screen at REST, or the next transition's fade-IN covers the
+  // OUTGOING screen with a stale color (its init '#1A1A2E', or the previous
+  // transition's destination) and briefly washes the screen dark before the
+  // swap. Syncing it here makes every fade-in an invisible same-color cover; the
+  // mid-transition swap to the destination color (in transitionTo) is unchanged.
   useEffect(() => {
-    setRootBgColor(getScreenBackgroundColor(currentScreen, persistence.currentPhase));
+    const c = getScreenBackgroundColor(currentScreen, persistence.currentPhase);
+    setRootBgColor(c);
+    setTransitionOverlayColor(c);
   }, [currentScreen, persistence.currentPhase]);
 
   // ========================================================================
@@ -900,10 +925,14 @@ function MainApp() {
       transitionTo('home', () => {
         puzzleActions.clearBoard();
       });
+      setBootRouting(false);
       return;
     }
 
+    // Set the screen BEFORE lifting the boot gate so the board paints directly,
+    // never a frame of 'home' in between.
     setCurrentScreen('puzzle');
+    setBootRouting(false);
     if (route === 'restore' && saved) {
       // Restored boards never carry (or roll) a house ask.
       houseAskRestoreSuppressRef.current = true;
@@ -1117,15 +1146,23 @@ function MainApp() {
       const step = onboardingFlow.onboardingStep;
       if (step === 'going_to_pit' || step === 'pit_intro' || step === 'pit_offering') {
         setCurrentScreen('pit');
+        setBootRouting(false);
       } else if (step === 'cold_open_puzzle') {
         // A kill during the self-directed opener resumes the exact autosaved
         // board when possible; otherwise start curated EASY puzzle 0.
-        launchColdOpenPuzzle().catch(() => {});
+        // launchColdOpenPuzzle lifts the boot gate itself once it has set the
+        // screen (so the board, not home, is what appears); clear on failure too.
+        launchColdOpenPuzzle().catch(() => setBootRouting(false));
       } else if (step === 'puzzle_tutorial') {
         // Re-init the guided tutorial puzzle so the player resumes a live,
         // winnable board with the Fox overlay rather than a dead screen.
         setCurrentScreen('puzzle');
         puzzleActions.startNewGame('EASY', 'standard', 'standard', false, false);
+        setBootRouting(false);
+      } else {
+        // Normal launch (onboarding complete, or a non-puzzle step): home is the
+        // correct destination, so lift the boot gate and let it paint.
+        setBootRouting(false);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2824,6 +2861,30 @@ function MainApp() {
   activeRowIndexRef.current = puzzle.activeRowIndex;
   moveDirectionRef.current = puzzle.moveDirection;
   rowsRef.current = puzzle.rows;
+
+  // Board scale-to-fit (F139/F140). Reads the LIVE window width (F138 for the
+  // board: reacts to split-screen / fold / resize) and the board's base word
+  // length to pick a single uniform scale — < 1 to fit a narrow screen where
+  // the fixed arc geometry would clip, up to a modest cap on a tablet. Captured
+  // at board change so it never wobbles mid-move (a fresh board's rows are all
+  // at base length). Ordinary phones resolve to exactly 1, so their rendering
+  // and drag math are byte-identical. The ref mirror lets the drag callbacks
+  // feed the same scale into estimateSlotIndex without rebuilding on resize.
+  const { width: boardWindowWidth } = useWindowDimensions();
+  const boardFirstRowId = puzzle.rows.length > 0 ? puzzle.rows[0].id : null;
+  const boardBaseWordLen = useMemo(
+    () => (puzzle.rows.length > 0 ? Math.max(...puzzle.rows.map((r) => r.words.length)) : 4),
+    // Capture at board change only; rows are all at base length the instant a
+    // new board mounts, so this is the stable base (never the mid-move max).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [boardFirstRowId],
+  );
+  const boardScale = useMemo(
+    () => computeBoardScale(boardWindowWidth, boardBaseWordLen),
+    [boardWindowWidth, boardBaseWordLen],
+  );
+  const boardScaleRef = useRef(1);
+  boardScaleRef.current = boardScale;
   const rowNodeRefs = useRef(new Map<number, any>());
   const registerRowNode = useCallback((rowIndex: number, node: any) => {
     if (node) rowNodeRefs.current.set(rowIndex, node);
@@ -2883,7 +2944,7 @@ function MainApp() {
         (position.y >= bounds.y - bounds.h && position.y <= bounds.y + bounds.h * 2);
       if (inBand) {
         const slotCount = targetRow.words.length + 1;
-        const slotIndex = estimateSlotIndex(position.x, slotCount, targetRow.words.length);
+        const slotIndex = estimateSlotIndex(position.x, slotCount, targetRow.words.length, undefined, boardScaleRef.current);
         next = { rowIndex: targetIdx, slotIndex };
       }
     }
@@ -3110,6 +3171,7 @@ function MainApp() {
         slotCount,
         targetWordLength,
         estimateOut,
+        boardScaleRef.current,
       );
 
       // Near-miss forgiveness: arc slots are only ~28px wide on a finger-driven
@@ -3884,8 +3946,13 @@ function MainApp() {
   // Render
   // ========================================================================
 
-  // Show loading while onboarding state is being determined
-  if (!onboardingFlow.onboardingReady) {
+  // Show loading while onboarding state is being determined AND while the
+  // launch route is still resolving (bootRouting). Extending the hold across
+  // the resume decision means a cold launch that resolves into the board or pit
+  // never paints 'home' for a frame first (the F141 home flash) — the same
+  // branded card simply stays up one beat longer, then the real destination
+  // appears directly.
+  if (!onboardingFlow.onboardingReady || bootRouting) {
     // The SAME window-relative branded hold as the bootstrap gate, so the
     // native-splash -> bootstrap-gate -> MainApp-hydration holds read as ONE
     // continuous branded moment instead of blinking through the old near-black
@@ -4529,6 +4596,11 @@ function MainApp() {
             accessibilityRole="list"
             accessibilityLabel={`Puzzle with ${puzzle.rows.length} word rows`}
           >
+            {/* Board scale-to-fit wrapper (F139/F140): a single uniform scale
+                around the board's horizontal center. undefined at scale 1 (the
+                ordinary-phone case), so the wrapper is layout-transparent there;
+                the drag math is fed the same scale so drops stay aligned. */}
+            <View style={boardScale !== 1 ? { transform: [{ scale: boardScale }] } : undefined}>
             {puzzle.rows.map((row, idx) => (
               <Row
                 key={row.id}
@@ -4581,6 +4653,7 @@ function MainApp() {
                 }
               />
             ))}
+            </View>
           </ScrollView>
           {/* Blind Offering judgment beat — overlays the board (pointer-
               transparent), plays only when a blind board resolves. */}
@@ -4766,14 +4839,25 @@ function MainApp() {
           onComplete={orchestrationActions.dismissWhisper}
         />
 
-        {/* Animal Interjection — brief message pulling player to home screen */}
-        {orchestration.showInterjection && orchestration.interjection && !orchestration.showWhisper && (
+        {/* Animal Interjection — brief message pulling player to home screen.
+            The narrative-slot arbiter (revealWhenFree / isNarrativeVoiceActive)
+            already guarantees the whisper and interjection never reveal at the
+            same time, so the render no longer ALSO gates on !showWhisper — that
+            extra gate hard-unmounted the interjection mid-fade if a late whisper
+            flipped showWhisper, reading as a flash. Now it always fades out via
+            its own driver. */}
+        {orchestration.showInterjection && orchestration.interjection && (
           // pointerEvents="none": a decorative overlay that lives up to 4s —
           // it must never swallow taps meant for the board/buttons under it
           // (the whisper overlay already does the same).
           // F38: fade + settle in/out via the orchestration hook's drivers.
           <Animated.View style={[
             styles.interjectionContainer,
+            persistence.currentPhase >= 3
+              ? styles.interjectionContainerDark
+              : persistence.currentPhase === 2
+                ? styles.interjectionContainerMuted
+                : styles.interjectionContainerLight,
             { opacity: orchestration.interjectionOpacity, transform: [{ translateY: orchestration.interjectionTranslateY }] },
           ]} pointerEvents="none"
             // Transient atmospheric nudge: keep it out of the screen-reader
@@ -4783,7 +4867,11 @@ function MainApp() {
             accessibilityElementsHidden>
             <Text style={[
               styles.interjectionText,
-              persistence.currentPhase >= 3 && styles.interjectionTextDark,
+              persistence.currentPhase >= 3
+                ? styles.interjectionTextDark
+                : persistence.currentPhase === 2
+                  ? styles.interjectionTextMuted
+                  : styles.interjectionTextLight,
             ]}>
               {orchestration.interjection.text}
             </Text>
@@ -5141,7 +5229,14 @@ function App() {
         // Patron/ad-free status and the Store's 2x-first-purchase badge.
         // loadPixelFonts registers the cottage dialogue/chrome font before the
         // first frame (never throws — falls back to system font on failure).
-        await Promise.all([initCosmetics(), initHints(), loadEntitlements(), loadPixelFonts()]);
+        // getSettings() warms the settings cache BEFORE the first frame. Every
+        // render-path consumer reads getSettingsSync() (settingsCache ||
+        // DEFAULT_SETTINGS); without this warm, a fresh launch returns DEFAULTS
+        // until some audio/haptic call happens to warm the cache first — so a
+        // persisted preference (Swift Victories, Reduced Motion, Sound/Haptics
+        // off) silently reads as its default on early renders. Warming it here
+        // makes getSettingsSync authoritative from frame one.
+        await Promise.all([getSettings(), initCosmetics(), initHints(), loadEntitlements(), loadPixelFonts()]);
         // Recover any consumable purchase whose reward never landed (app killed
         // between the store success and the grant). Apply-then-ack gives
         // at-least-once delivery: a crash mid-recovery replays rather than

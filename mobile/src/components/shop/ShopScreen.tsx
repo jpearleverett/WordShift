@@ -315,10 +315,20 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   }, [houseFade, reducedMotion, refreshHouse]);
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
-      await Promise.all([refresh(), refreshHouse()]);
-      setLoading(false);
+      // The spinner is only lifted here, so this MUST always reach the finally,
+      // or a rejected/hung load leaves the whole shop spinning forever with no
+      // recovery. allSettled so one bad key can't blank the screen either.
+      try {
+        await Promise.allSettled([refresh(), refreshHouse()]);
+      } catch (e) {
+        console.warn('[Shop] initial load failed:', e);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     })();
+    return () => { cancelled = true; };
   }, [refresh, refreshHouse]);
 
   useEffect(() => { setBalance(amberBalance); }, [amberBalance]);

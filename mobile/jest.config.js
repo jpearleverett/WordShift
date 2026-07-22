@@ -22,6 +22,6 @@ module.exports = {
     // at runtime (theme/fonts.ts), so stub it for the Node test env.
     '^expo-font$': '<rootDir>/src/__tests__/__mocks__/expoFont.ts',
     // Stub static assets (sound/image/font require()s) for Node test resolution
-    '\\.(wav|png|ttf)$': '<rootDir>/src/__tests__/__mocks__/fileMock.js',
+    '\\.(wav|png|webp|ttf)$': '<rootDir>/src/__tests__/__mocks__/fileMock.js',
   },
 };

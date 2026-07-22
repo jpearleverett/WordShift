@@ -720,28 +720,47 @@ export const appStyles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 8,
   },
+  // The post-victory interjection ("X has something to tell you") mirrors the
+  // AnimalWhisper tray it shares the bottom-center slot with: a centered,
+  // maxWidth ghost tray (not a full-width bar over the CTAs), layered above the
+  // victory modal on BOTH platforms (zIndex 501 + elevation 12 — Android paints
+  // by elevation, so without it the pill fought the modal's elevated cards), and
+  // a phase-tiered translucent background so it stops reading as an opaque
+  // purple box on the purple modal scrim.
   interjectionContainer: {
     position: 'absolute',
     bottom: 100,
-    left: 20,
-    right: 20,
+    alignSelf: 'center',
+    maxWidth: '85%',
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 14,
     alignItems: 'center',
-    zIndex: 500,
+    zIndex: 501,
+    elevation: 12,
+  },
+  interjectionContainerLight: {
+    backgroundColor: 'rgba(120, 80, 165, 0.42)',
+  },
+  interjectionContainerMuted: {
+    backgroundColor: 'rgba(80, 50, 110, 0.55)',
+  },
+  interjectionContainerDark: {
+    backgroundColor: 'rgba(24, 12, 32, 0.72)',
   },
   interjectionText: {
     fontSize: FONT_SIZE.body,
     fontFamily: BODY_FONT_BOLD,
     fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'center',
-    backgroundColor: 'rgba(100, 60, 140, 0.6)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 12,
-    overflow: 'hidden',
+  },
+  interjectionTextLight: {
+    color: 'rgba(255, 255, 255, 0.96)',
+  },
+  interjectionTextMuted: {
+    color: 'rgba(224, 208, 238, 0.96)',
   },
   interjectionTextDark: {
-    color: 'rgba(200, 160, 180, 0.9)',
-    backgroundColor: 'rgba(30, 15, 40, 0.7)',
+    color: 'rgba(212, 168, 188, 0.95)',
   },
 });
