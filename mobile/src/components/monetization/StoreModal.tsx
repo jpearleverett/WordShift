@@ -54,6 +54,7 @@ import {
   DailyAmberStatus,
 } from '../../services/dailyAmberReward';
 import { DAILY_AMBER_REWARD, SUPPORTER_MONTHLY_AMBER } from '../../constants/gameBalance';
+import { FONT_SIZE } from '../../theme/typeScale';
 
 const HINT_ICON = require('../../../assets/ui/hint.png');
 const AMBER_ICON = require('../../../assets/ui/amber.png');
@@ -809,7 +810,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 8,
   },
-  title: { fontSize: 24, fontWeight: '900', letterSpacing: 0.5, fontFamily: PIXEL_FONT_BOLD },
+  title: { fontSize: FONT_SIZE.display, fontWeight: '900', letterSpacing: 0.5, fontFamily: PIXEL_FONT_BOLD },
   balances: {
     flexDirection: 'row',
     gap: 12,
@@ -818,7 +819,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  balanceText: { fontSize: 14, fontWeight: '700', fontFamily: PIXEL_FONT_BOLD },
+  balanceText: { fontSize: FONT_SIZE.bodyLg, fontWeight: '700', fontFamily: PIXEL_FONT_BOLD },
   // Wraps the amber balance so the one-cycle AmberSparkle burst has a
   // positioned anchor to overlay on credit.
   amberBalanceWrap: { position: 'relative' },
@@ -827,7 +828,7 @@ const styles = StyleSheet.create({
   scroll: { flexGrow: 0 },
   scrollContent: { paddingBottom: 4 },
   sectionLabel: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '800',
     fontFamily: PIXEL_FONT_BOLD,
     letterSpacing: SURFACE.sectionLetterSpacing,
@@ -841,7 +842,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   heroRibbonRow: { flexDirection: 'row', marginBottom: 8 },
-  heroTitle: { fontSize: 18, fontWeight: '900', marginBottom: 2, fontFamily: PIXEL_FONT_BOLD },
+  heroTitle: { fontSize: FONT_SIZE.title, fontWeight: '900', marginBottom: 2, fontFamily: PIXEL_FONT_BOLD },
   heroCta: { marginTop: 12 },
 
   // Section rows — layered PanelCard material; consistent heights.
@@ -855,9 +856,9 @@ const styles = StyleSheet.create({
   },
   rowInfo: { flex: 1, paddingRight: 12 },
   rowTitleLine: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  rowTitle: { fontSize: 15, fontWeight: '800', fontFamily: PIXEL_FONT_BOLD },
+  rowTitle: { fontSize: FONT_SIZE.callout, fontWeight: '800', fontFamily: PIXEL_FONT_BOLD },
   ribbon: {
-    fontSize: 9,
+    fontSize: FONT_SIZE.micro,
     fontWeight: '900',
     fontFamily: PIXEL_FONT_BOLD,
     letterSpacing: 0.5,
@@ -866,18 +867,18 @@ const styles = StyleSheet.create({
     borderRadius: 7,
     overflow: 'hidden',
   },
-  rowDesc: { fontSize: 12.5, marginTop: 3, lineHeight: 17, fontFamily: BODY_FONT },
+  rowDesc: { fontSize: FONT_SIZE.small, marginTop: 3, lineHeight: 17, fontFamily: BODY_FONT },
 
   // Price pill — chunky amber CandyButton (the single warm accent).
   pricePill: { minWidth: 84 },
-  ownedText: { fontSize: 13, fontWeight: '800', paddingHorizontal: 8, fontFamily: PIXEL_FONT_BOLD },
+  ownedText: { fontSize: FONT_SIZE.body, fontWeight: '800', paddingHorizontal: 8, fontFamily: PIXEL_FONT_BOLD },
 
   patronLink: {
     marginTop: 16,
     paddingVertical: 12,
     paddingHorizontal: 14,
   },
-  patronLinkText: { fontSize: 13, lineHeight: 18, textAlign: 'center', fontFamily: BODY_FONT },
+  patronLinkText: { fontSize: FONT_SIZE.body, lineHeight: 18, textAlign: 'center', fontFamily: BODY_FONT },
 
   successBox: {
     marginTop: 12,
@@ -886,7 +887,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
   },
-  successText: { fontSize: 12.5, lineHeight: 17, textAlign: 'center', fontWeight: '700', fontFamily: PIXEL_FONT_BOLD },
+  successText: { fontSize: FONT_SIZE.small, lineHeight: 17, textAlign: 'center', fontWeight: '700', fontFamily: PIXEL_FONT_BOLD },
   // Faucet claim reward reveal (magnitude-aware count-up in place of a static line).
   rewardBox: { marginTop: 12, alignItems: 'center' },
   unavailableBox: {
@@ -896,7 +897,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
   },
-  unavailableText: { fontSize: 12.5, lineHeight: 17, textAlign: 'center', fontFamily: BODY_FONT },
+  unavailableText: { fontSize: FONT_SIZE.small, lineHeight: 17, textAlign: 'center', fontFamily: BODY_FONT },
   workingRow: { marginTop: 12, alignItems: 'center' },
   closeBtn: { marginTop: 12 },
 });

@@ -43,6 +43,7 @@ import {
   SeasonPassView,
 } from '../services/seasonPass';
 import { logEvent } from '../services/eventLogger';
+import { FONT_SIZE } from '../theme/typeScale';
 
 interface SeasonPassModalProps {
   visible: boolean;
@@ -514,15 +515,15 @@ const styles = StyleSheet.create({
   card: { width: '100%', maxHeight: '100%', paddingTop: 18, paddingHorizontal: 18, paddingBottom: 16 },
   plaque: { alignSelf: 'center', marginBottom: 8 },
   headerBalanceRow: { alignItems: 'center', marginBottom: 2 },
-  headerBalance: { fontFamily: PIXEL_FONT_BOLD, fontSize: 13, fontWeight: '800' },
-  title: { fontFamily: PIXEL_FONT_BOLD, fontSize: 22, textAlign: 'center' },
-  tagline: { fontFamily: BODY_FONT, fontSize: 14, textAlign: 'center', marginTop: 4, marginBottom: 10 },
-  progress: { fontFamily: PIXEL_FONT_BOLD, fontSize: 13, textAlign: 'center', marginBottom: 10 },
+  headerBalance: { fontFamily: PIXEL_FONT_BOLD, fontSize: FONT_SIZE.body, fontWeight: '800' },
+  title: { fontFamily: PIXEL_FONT_BOLD, fontSize: FONT_SIZE.headline, textAlign: 'center' },
+  tagline: { fontFamily: BODY_FONT, fontSize: FONT_SIZE.bodyLg, textAlign: 'center', marginTop: 4, marginBottom: 10 },
+  progress: { fontFamily: PIXEL_FONT_BOLD, fontSize: FONT_SIZE.body, textAlign: 'center', marginBottom: 10 },
   premiumBox: { padding: 14, marginBottom: 10 },
-  premiumLocked: { fontFamily: BODY_FONT, fontSize: 13.5, textAlign: 'center', marginBottom: 10 },
+  premiumLocked: { fontFamily: BODY_FONT, fontSize: FONT_SIZE.body, textAlign: 'center', marginBottom: 10 },
   premiumBtn: { alignSelf: 'center' },
-  subscribeLink: { fontFamily: BODY_FONT, fontSize: 12.5, textAlign: 'center', marginTop: 10 },
-  premiumActive: { fontFamily: PIXEL_FONT_BOLD, fontSize: 13, textAlign: 'center', marginBottom: 8 },
+  subscribeLink: { fontFamily: BODY_FONT, fontSize: FONT_SIZE.small, textAlign: 'center', marginTop: 10 },
+  premiumActive: { fontFamily: PIXEL_FONT_BOLD, fontSize: FONT_SIZE.body, textAlign: 'center', marginBottom: 8 },
   track: { flexGrow: 0, marginBottom: 8 },
   tierRow: {
     flexDirection: 'row',
@@ -542,9 +543,9 @@ const styles = StyleSheet.create({
   // The current-tier badge gets a thicker amber ring; its breathing scale is
   // applied inline via the shared currentTierPulse transform.
   tierBadgeCurrent: { borderWidth: 2.5 },
-  tierNum: { fontFamily: PIXEL_FONT_BOLD, fontSize: 15 },
+  tierNum: { fontFamily: PIXEL_FONT_BOLD, fontSize: FONT_SIZE.callout },
   tierRewards: { flex: 1 },
-  tierReward: { fontFamily: BODY_FONT, fontSize: 12.5, lineHeight: 18 },
+  tierReward: { fontFamily: BODY_FONT, fontSize: FONT_SIZE.small, lineHeight: 18 },
   tierActions: { flexDirection: 'row', gap: 6, position: 'relative' },
   // Claim feedback: the "+N" amount springs up 12dp and fades where the claim
   // button used to be.
@@ -553,7 +554,7 @@ const styles = StyleSheet.create({
     right: 4,
     top: -4,
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '800',
   },
   claimBtn: {},

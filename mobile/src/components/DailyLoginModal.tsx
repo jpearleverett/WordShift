@@ -21,6 +21,7 @@ import { getSettingsSync } from '../services/settings';
 // is wrong. The returning-player welcome/reset/received/jackpot/collect copy is
 // phase-aware too. Both live in phaseNarrative with the rest of the text.
 import { getDailyLoginFirstClaimCopy, getDailyLoginModalCopy } from '../services/phaseNarrative';
+import { FONT_SIZE } from '../theme/typeScale';
 
 const AMBER_ICON = require('../../assets/ui/amber.png');
 
@@ -362,13 +363,13 @@ const styles = StyleSheet.create({
     borderRadius: 100,
   },
   title: {
-    fontSize: 26,
+    fontSize: FONT_SIZE.display,
     fontWeight: '900',
     fontFamily: PIXEL_FONT_BOLD,
     letterSpacing: 0.5,
   },
   resetLine: {
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '600',
     fontFamily: PIXEL_FONT_BOLD,
     marginTop: 4,
@@ -416,13 +417,13 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
   dayLabel: {
-    fontSize: 9,
+    fontSize: FONT_SIZE.micro,
     fontWeight: '700',
     fontFamily: PIXEL_FONT_BOLD,
     marginBottom: 3,
   },
   checkMark: {
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     fontWeight: '800',
     fontFamily: PIXEL_FONT_BOLD,
   },
@@ -436,12 +437,12 @@ const styles = StyleSheet.create({
     marginRight: 2,
   },
   dayAmountText: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '700',
     fontFamily: PIXEL_FONT_BOLD,
   },
   dayAmountClaimed: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '800',
     fontFamily: PIXEL_FONT_BOLD,
   },
@@ -450,7 +451,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   jackpotText: {
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '800',
     fontFamily: PIXEL_FONT_BOLD,
     marginTop: 4,

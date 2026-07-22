@@ -82,6 +82,7 @@ import { clearMasteryRecords } from '../services/masteryRecords';
 import { clearDailyLadder } from '../services/dailyLadder';
 import { clearOfferingRequests } from '../services/offeringRequests';
 import { clearReviewPrompt } from '../services/reviewPrompt';
+import { FONT_SIZE } from '../theme/typeScale';
 
 const AMBER_ICON = require('../../assets/ui/amber.png');
 
@@ -1151,7 +1152,7 @@ const styles = StyleSheet.create({
   },
   backChipText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '700',
     letterSpacing: 0.3,
   },
@@ -1160,7 +1161,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 24,
+    fontSize: FONT_SIZE.display,
     fontWeight: '900',
     letterSpacing: 0.5,
   },
@@ -1174,7 +1175,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '800',
     letterSpacing: SURFACE.sectionLetterSpacing,
     paddingHorizontal: 16,
@@ -1232,12 +1233,12 @@ const styles = StyleSheet.create({
   },
   settingLabel: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     fontWeight: '700',
   },
   settingDescription: {
     fontFamily: BODY_FONT,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     marginTop: 2,
   },
   freezeDim: {
@@ -1254,12 +1255,12 @@ const styles = StyleSheet.create({
   },
   dangerText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     fontWeight: '700',
   },
   dangerDescription: {
     fontFamily: BODY_FONT,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     marginTop: 2,
   },
   aboutRow: {
@@ -1275,21 +1276,21 @@ const styles = StyleSheet.create({
   },
   aboutLabel: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '600',
   },
   aboutValue: {
     fontFamily: BODY_FONT,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
   },
   linkText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '600',
   },
   linkChevron: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '700',
   },
   bottomSpacer: {
@@ -1305,14 +1306,14 @@ const styles = StyleSheet.create({
   },
   recoveryCodeText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 22,
+    fontSize: FONT_SIZE.headline,
     fontWeight: '900',
     letterSpacing: 2,
     textAlign: 'center',
   },
   recoveryCodeHint: {
     fontFamily: BODY_FONT,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     textAlign: 'center',
     marginTop: 6,
   },
@@ -1333,14 +1334,14 @@ const styles = StyleSheet.create({
   },
   restoreTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 22,
+    fontSize: FONT_SIZE.headline,
     fontWeight: '900',
     letterSpacing: 0.3,
     marginBottom: 8,
   },
   restoreHint: {
     fontFamily: BODY_FONT,
-    fontSize: 13.5,
+    fontSize: FONT_SIZE.body,
     marginBottom: 16,
     lineHeight: 19,
   },
@@ -1350,7 +1351,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    fontSize: 18,
+    fontSize: FONT_SIZE.title,
     fontWeight: '700',
     letterSpacing: 1.5,
     textAlign: 'center',
@@ -1398,7 +1399,7 @@ const styles = StyleSheet.create({
   },
   restoreConfirmText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '800',
     letterSpacing: 0.4,
   },

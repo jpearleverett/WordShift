@@ -62,6 +62,7 @@ import {
 } from '../../services/phaseNarrative';
 import { hapticLight, hapticMedium, hapticSuccess } from '../../services/haptics';
 import { isPatronSync } from '../../services/entitlements';
+import { FONT_SIZE } from '../../theme/typeScale';
 
 interface ShopScreenProps {
   phase: number;
@@ -888,15 +889,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   backChipText: {
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '700',
     fontFamily: PIXEL_FONT_BOLD,
     letterSpacing: 0.3,
   },
   headerCenter: { flex: 1, alignItems: 'center', paddingHorizontal: 6 },
-  title: { fontSize: 22, fontWeight: '900', letterSpacing: 0.5, fontFamily: PIXEL_FONT_BOLD },
+  title: { fontSize: FONT_SIZE.headline, fontWeight: '900', letterSpacing: 0.5, fontFamily: PIXEL_FONT_BOLD },
   subtitle: {
-    fontSize: 12.5,
+    fontSize: FONT_SIZE.small,
     fontWeight: '500',
     fontFamily: BODY_FONT,
     textAlign: 'center',
@@ -914,21 +915,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
-  amberPillText: { fontSize: 15, fontWeight: '900', fontFamily: PIXEL_FONT_BOLD },
+  amberPillText: { fontSize: FONT_SIZE.callout, fontWeight: '900', fontFamily: PIXEL_FONT_BOLD },
   patronBanner: {
     paddingVertical: 18,
     paddingHorizontal: 18,
     marginBottom: 18,
   },
-  patronBannerTitle: { fontSize: 16, fontWeight: '900', marginBottom: 4, fontFamily: PIXEL_FONT_BOLD },
+  patronBannerTitle: { fontSize: FONT_SIZE.large, fontWeight: '900', marginBottom: 4, fontFamily: PIXEL_FONT_BOLD },
   // Washes only the parchment, never the painted wood frame.
   tintInset: { position: 'absolute', top: 12, left: 12, right: 12, bottom: 12 },
-  patronBannerSub: { fontSize: 12.5, fontWeight: '600', fontFamily: PIXEL_FONT_BOLD },
+  patronBannerSub: { fontSize: FONT_SIZE.small, fontWeight: '600', fontFamily: PIXEL_FONT_BOLD },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingBottom: 48 },
   loading: { paddingTop: 80, alignItems: 'center' },
   sectionLabel: {
-    fontSize: 12.5,
+    fontSize: FONT_SIZE.small,
     fontWeight: '800',
     fontFamily: PIXEL_FONT_BOLD,
     letterSpacing: SURFACE.sectionLetterSpacing,
@@ -944,8 +945,8 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   cardBody: { flex: 1, paddingHorizontal: 12 },
-  cardName: { fontSize: 16, fontWeight: '800', fontFamily: PIXEL_FONT_BOLD },
-  cardDesc: { fontSize: 12.5, fontWeight: '500', marginTop: 3, lineHeight: 17, fontFamily: BODY_FONT },
+  cardName: { fontSize: FONT_SIZE.large, fontWeight: '800', fontFamily: PIXEL_FONT_BOLD },
+  cardDesc: { fontSize: FONT_SIZE.small, fontWeight: '500', marginTop: 3, lineHeight: 17, fontFamily: BODY_FONT },
   previewRow: { flexDirection: 'row', width: 96, flexWrap: 'wrap', gap: 4 },
   previewTile: {
     width: 22,
@@ -955,7 +956,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  previewTileText: { color: CandyColors.white, fontSize: 12, fontWeight: '900', fontFamily: PIXEL_FONT_BOLD },
+  previewTileText: { color: CandyColors.white, fontSize: FONT_SIZE.small, fontWeight: '900', fontFamily: PIXEL_FONT_BOLD },
   previewConfetti: {
     width: 96,
     height: 52,
@@ -969,15 +970,15 @@ const styles = StyleSheet.create({
   actionSlot: { minWidth: 96 },
   houseCardBody: { flex: 1, paddingRight: 12 },
   houseFeedback: {
-    fontSize: 12.5,
+    fontSize: FONT_SIZE.small,
     fontWeight: '600',
     fontFamily: BODY_FONT,
     lineHeight: 17,
     marginBottom: 10,
   },
-  houseCost: { fontSize: 13, fontWeight: '800', fontFamily: PIXEL_FONT_BOLD, marginTop: 6 },
+  houseCost: { fontSize: FONT_SIZE.body, fontWeight: '800', fontFamily: PIXEL_FONT_BOLD, marginTop: 6 },
   attuneLevel: {
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '700',
     fontFamily: PIXEL_FONT_BOLD,
     letterSpacing: 0.4,
@@ -997,8 +998,8 @@ const styles = StyleSheet.create({
     // Settled, lifted tint: the framed "this one is worn" state.
     backgroundColor: `rgba(255, 255, 255, ${SURFACE.highlightAlpha})`,
   },
-  equippedChipText: { fontSize: 13, fontWeight: '800', fontFamily: PIXEL_FONT_BOLD },
-  lockedChipText: { fontSize: 12, fontWeight: '700', textAlign: 'center', fontFamily: PIXEL_FONT_BOLD },
+  equippedChipText: { fontSize: FONT_SIZE.body, fontWeight: '800', fontFamily: PIXEL_FONT_BOLD },
+  lockedChipText: { fontSize: FONT_SIZE.small, fontWeight: '700', textAlign: 'center', fontFamily: PIXEL_FONT_BOLD },
   // In-card purchase resolution chip (F50): amber inset + check + short line.
   resolveChip: {
     minWidth: 96,
@@ -1011,8 +1012,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  resolveCheck: { fontSize: 18, fontWeight: '900', fontFamily: PIXEL_FONT_BOLD },
-  resolveMsg: { fontSize: 10.5, fontWeight: '700', textAlign: 'center', fontFamily: PIXEL_FONT_BOLD, marginTop: 2 },
+  resolveCheck: { fontSize: FONT_SIZE.title, fontWeight: '900', fontFamily: PIXEL_FONT_BOLD },
+  resolveMsg: { fontSize: FONT_SIZE.micro, fontWeight: '700', textAlign: 'center', fontFamily: PIXEL_FONT_BOLD, marginTop: 2 },
   storeBridge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1022,11 +1023,11 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   storeBridgeBody: { flex: 1 },
-  storeBridgeTitle: { fontSize: 14.5, fontWeight: '800', marginBottom: 2, fontFamily: PIXEL_FONT_BOLD },
-  storeBridgeSub: { fontSize: 12, fontWeight: '600', fontFamily: PIXEL_FONT_BOLD },
-  storeBridgeChevron: { fontSize: 18, fontWeight: '900', marginLeft: 10, fontFamily: PIXEL_FONT_BOLD },
+  storeBridgeTitle: { fontSize: FONT_SIZE.bodyLg, fontWeight: '800', marginBottom: 2, fontFamily: PIXEL_FONT_BOLD },
+  storeBridgeSub: { fontSize: FONT_SIZE.small, fontWeight: '600', fontFamily: PIXEL_FONT_BOLD },
+  storeBridgeChevron: { fontSize: FONT_SIZE.title, fontWeight: '900', marginLeft: 10, fontFamily: PIXEL_FONT_BOLD },
   footnote: {
-    fontSize: 11.5,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '500',
     fontFamily: BODY_FONT,
     textAlign: 'center',

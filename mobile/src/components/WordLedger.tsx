@@ -22,6 +22,7 @@ import { getFullProgress } from '../services/amberCurrency';
 import { getWordsOfferedText } from '../services/phaseNarrative';
 import { getSettingsSync } from '../services/settings';
 import { shouldSimplifyAnimations } from '../services/deviceTier';
+import { FONT_SIZE } from '../theme/typeScale';
 
 // Cap the staggered chips so a long ledger (up to 500 words) snaps the rest in.
 const CHIP_CASCADE_CAP = 10;
@@ -382,7 +383,7 @@ const styles = StyleSheet.create({
   },
   backChipText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '800',
     letterSpacing: 0.4,
   },
@@ -393,7 +394,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 24,
+    fontSize: FONT_SIZE.display,
     fontWeight: '900',
     letterSpacing: 0.5,
     textAlign: 'center',
@@ -401,7 +402,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '600',
     textAlign: 'center',
     paddingHorizontal: 12,
@@ -418,7 +419,7 @@ const styles = StyleSheet.create({
   },
   countText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '700',
     letterSpacing: 0.5,
     textAlign: 'center',
@@ -464,7 +465,7 @@ const styles = StyleSheet.create({
   },
   wordText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '700',
     letterSpacing: 0.5,
   },
@@ -493,7 +494,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '600',
     textAlign: 'center',
     lineHeight: 22,

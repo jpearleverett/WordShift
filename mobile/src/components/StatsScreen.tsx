@@ -49,6 +49,7 @@ import {
 } from './ui/RewardReveal';
 import { getSettingsSync } from '../services/settings';
 import { shouldSimplifyAnimations } from '../services/deviceTier';
+import { FONT_SIZE } from '../theme/typeScale';
 
 const STAR_FILLED = require('../../assets/ui/star_filled.png');
 const STAR_EMPTY = require('../../assets/ui/star_empty.png');
@@ -888,7 +889,7 @@ const styles = StyleSheet.create({
   },
   backChipText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '800',
     letterSpacing: 0.3,
   },
@@ -897,7 +898,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 22,
+    fontSize: FONT_SIZE.headline,
     fontWeight: '900',
     letterSpacing: 0.5,
   },
@@ -919,7 +920,7 @@ const styles = StyleSheet.create({
   },
   tabText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '700',
     textAlign: 'center',
   },
@@ -963,12 +964,12 @@ const styles = StyleSheet.create({
   },
   heroValue: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 30,
+    fontSize: FONT_SIZE.hero,
     fontWeight: '900',
   },
   heroLabel: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '700',
     letterSpacing: 1,
     marginTop: 4,
@@ -988,7 +989,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '800',
     letterSpacing: SURFACE.sectionLetterSpacing,
     paddingHorizontal: 16,
@@ -1031,7 +1032,7 @@ const styles = StyleSheet.create({
     fontFamily: PIXEL_FONT_BOLD,
     width: 36,
     textAlign: 'right',
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '700',
   },
   starSummary: {
@@ -1041,7 +1042,7 @@ const styles = StyleSheet.create({
   },
   starSummaryText: {
     fontFamily: BODY_FONT,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     textAlign: 'center',
   },
 
@@ -1055,17 +1056,17 @@ const styles = StyleSheet.create({
   },
   masteryLabel: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '600',
   },
   masteryValue: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     fontWeight: '800',
   },
   masteryPace: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '700',
     fontStyle: 'italic',
     textAlign: 'center',
@@ -1089,18 +1090,18 @@ const styles = StyleSheet.create({
   },
   difficultyLabel: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '700',
     width: 70,
   },
   difficultyCount: {
     fontFamily: BODY_FONT,
     flex: 1,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
   },
   difficultyAvg: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '700',
   },
 
@@ -1114,12 +1115,12 @@ const styles = StyleSheet.create({
   },
   journeyLabel: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '600',
   },
   journeyValue: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '700',
   },
   personalBestValueRow: {
@@ -1133,7 +1134,7 @@ const styles = StyleSheet.create({
   },
   personalBestLegend: {
     fontFamily: BODY_FONT,
-    fontSize: 10,
+    fontSize: FONT_SIZE.micro,
     textAlign: 'center',
     paddingTop: 8,
     paddingBottom: 12,
@@ -1187,19 +1188,19 @@ const styles = StyleSheet.create({
   },
   achievementProgressText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '700',
     minWidth: 42,
     textAlign: 'right',
   },
   achievementTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '700',
   },
   achievementDesc: {
     fontFamily: BODY_FONT,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     marginTop: 2,
   },
   achievementReward: {
@@ -1212,12 +1213,12 @@ const styles = StyleSheet.create({
   },
   achievementRewardText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '800',
   },
   achievementCheck: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 18,
+    fontSize: FONT_SIZE.title,
     color: CandyColors.green.main,
     fontWeight: '900',
     marginLeft: 8,
@@ -1254,7 +1255,7 @@ const styles = StyleSheet.create({
   },
   bannerTrayLabel: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 9,
+    fontSize: FONT_SIZE.micro,
     fontWeight: '800',
     letterSpacing: SURFACE.sectionLetterSpacing,
     textTransform: 'uppercase',

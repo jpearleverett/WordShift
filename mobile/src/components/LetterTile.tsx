@@ -12,6 +12,7 @@ import {
   COMPACT_TILE_MARGIN_H,
 } from '../constants/tileLayout';
 import { BODY_FONT_BOLD } from '../theme/fonts';
+import { FONT_SIZE } from '../theme/typeScale';
 
 interface LetterTileProps {
   letter: Letter;
@@ -59,7 +60,7 @@ const COMPACT_OUTER_W = COMPACT_TILE_W; // 42
 const COMPACT_OUTER_H = 52;
 const COMPACT_BODY_W = 42;
 const COMPACT_BODY_H = 46;
-const COMPACT_FONT = 20;
+const COMPACT_FONT = FONT_SIZE.headline;
 
 /**
  * Squash-and-stretch on the arrival landing (F9): a brief wide-and-short
@@ -1179,7 +1180,7 @@ const styles = StyleSheet.create({
     // face's 26/21 since the body face runs a little wider at the same
     // metrics; keeps 'W' clear of the tile edge at both sizes.
     fontFamily: BODY_FONT_BOLD,
-    fontSize: 24,
+    fontSize: FONT_SIZE.display,
     fontWeight: '900',
     textShadowColor: 'rgba(0, 0, 0, 0.2)',
     textShadowOffset: { width: 0, height: 2 },

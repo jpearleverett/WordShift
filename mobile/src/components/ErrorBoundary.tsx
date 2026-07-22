@@ -4,6 +4,7 @@ import { getSurfaceTheme, SurfaceTheme } from '../theme/surfaces';
 import { getCurrentPhaseSync } from '../services/amberCurrency';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
 import { reportError } from '../services/errorReporting';
+import { FONT_SIZE } from '../theme/typeScale';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -113,18 +114,18 @@ const styles = StyleSheet.create({
   },
   mark: {
     fontFamily: BODY_FONT,
-    fontSize: 44,
+    fontSize: FONT_SIZE.giant,
     marginBottom: 14,
   },
   title: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 28,
+    fontSize: FONT_SIZE.hero,
     fontWeight: '900',
     marginBottom: 12,
   },
   message: {
     fontFamily: BODY_FONT,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: 24,
@@ -137,7 +138,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 18,
+    fontSize: FONT_SIZE.title,
     fontWeight: '800',
   },
 });

@@ -30,6 +30,7 @@ import {
 import { BODY_FONT, BODY_FONT_ITALIC, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import type { UnbrokenWeaveMastery } from '../../services/masteryRecords';
+import { FONT_SIZE } from '../../theme/typeScale';
 
 // The bare mode emoji in the variant/combo selector and the challenge/blind/
 // weave toggles now render as generated candy sprites (shared with the
@@ -671,7 +672,7 @@ const styles = StyleSheet.create({
   },
   menuTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '900',
     letterSpacing: SURFACE.sectionLetterSpacing,
     paddingHorizontal: 16,
@@ -689,7 +690,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '900',
     letterSpacing: SURFACE.sectionLetterSpacing,
     marginTop: 4,
@@ -716,7 +717,7 @@ const styles = StyleSheet.create({
   },
   menuRowText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '800',
     letterSpacing: 0.3,
   },
@@ -728,7 +729,7 @@ const styles = StyleSheet.create({
   },
   challengeMenuIcon: {
     fontFamily: BODY_FONT,
-    fontSize: 17,
+    fontSize: FONT_SIZE.large,
     marginRight: 10,
   },
   challengeMenuIconImage: {
@@ -741,18 +742,18 @@ const styles = StyleSheet.create({
   },
   challengeMenuDesc: {
     fontFamily: BODY_FONT,
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     marginTop: 1,
   },
   weaveMasteryTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '800',
     marginTop: 4,
   },
   weaveMasteryObjective: {
     fontFamily: BODY_FONT_ITALIC,
-    fontSize: 10.5,
+    fontSize: FONT_SIZE.micro,
     lineHeight: 14,
     marginTop: 1,
   },
@@ -769,7 +770,7 @@ const styles = StyleSheet.create({
   },
   variantIcon: {
     fontFamily: BODY_FONT,
-    fontSize: 17,
+    fontSize: FONT_SIZE.large,
     marginRight: 8,
     marginTop: 1,
   },
@@ -790,17 +791,17 @@ const styles = StyleSheet.create({
   },
   variantTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '800',
   },
   variantDescription: {
     fontFamily: BODY_FONT,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     lineHeight: 16,
   },
   variantBadge: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 9,
+    fontSize: FONT_SIZE.micro,
     fontWeight: '900',
     letterSpacing: 0.5,
     marginLeft: 6,
@@ -814,7 +815,7 @@ const styles = StyleSheet.create({
   },
   lockedHintText: {
     fontFamily: BODY_FONT_ITALIC,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     lineHeight: 16,
     fontStyle: 'italic',
   },
@@ -829,7 +830,7 @@ const styles = StyleSheet.create({
   },
   variantUnlockHintText: {
     fontFamily: BODY_FONT_ITALIC,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     lineHeight: 16,
     textAlign: 'center',
     fontStyle: 'italic',

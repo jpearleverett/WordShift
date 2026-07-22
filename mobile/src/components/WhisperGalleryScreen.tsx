@@ -31,6 +31,7 @@ import { ANIMAL_INFO } from '../services/animalDialogue';
 import { getWhisperGalleryEmptyText } from '../services/phaseNarrative';
 import { AnimalType, DialoguePhase } from '../types/homeWorld';
 import { CHARACTER_SPRITES } from './home/AnimalSprite';
+import { FONT_SIZE } from '../theme/typeScale';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -404,7 +405,7 @@ const styles = StyleSheet.create({
   },
   backChipText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '800',
     letterSpacing: 0.4,
   },
@@ -415,14 +416,14 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 24,
+    fontSize: FONT_SIZE.display,
     fontWeight: '900',
     letterSpacing: 0.5,
     textAlign: 'center',
   },
   subtitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '600',
     marginTop: 4,
     textAlign: 'center',
@@ -452,7 +453,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '600',
     textAlign: 'center',
     lineHeight: 22,
@@ -494,11 +495,11 @@ const styles = StyleSheet.create({
   },
   animalEmoji: {
     fontFamily: BODY_FONT,
-    fontSize: 22,
+    fontSize: FONT_SIZE.headline,
   },
   animalName: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     fontWeight: '800',
     letterSpacing: 0.3,
     flex: 1,
@@ -513,7 +514,7 @@ const styles = StyleSheet.create({
   },
   entryCount: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '700',
   },
   // Rotated-View chevron replaces the old text-triangle disclosure glyph.
@@ -549,13 +550,13 @@ const styles = StyleSheet.create({
   },
   entryType: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '700',
     letterSpacing: 0.8,
   },
   entryText: {
     fontFamily: BODY_FONT_ITALIC,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     lineHeight: 20,
     fontStyle: 'italic',
   },

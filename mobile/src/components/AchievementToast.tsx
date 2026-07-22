@@ -8,6 +8,7 @@ import { Achievement, ACHIEVEMENT_CATEGORY_ICONS } from '../services/achievement
 import { AmberInline } from './AmberInline';
 import { getSettingsSync } from '../services/settings';
 import { announceForA11y } from '../services/a11yAnnounce';
+import { FONT_SIZE } from '../theme/typeScale';
 
 /**
  * Phase-aware entrance spring (local, since the shared token file is out of this
@@ -189,20 +190,20 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   label: {
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '800',
     fontFamily: PIXEL_FONT_BOLD,
     letterSpacing: SURFACE.sectionLetterSpacing,
     textTransform: 'uppercase',
   },
   title: {
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     fontWeight: '900',
     fontFamily: PIXEL_FONT_BOLD,
     marginTop: 2,
   },
   reward: {
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '900',
     fontFamily: PIXEL_FONT_BOLD,
     marginLeft: 8,

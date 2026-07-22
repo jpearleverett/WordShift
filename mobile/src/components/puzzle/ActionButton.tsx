@@ -14,6 +14,7 @@ import { shouldSimplifyAnimations } from '../../services/deviceTier';
 import { hapticSelection } from '../../services/haptics';
 import { getPressSpring } from '../../theme/surfaces';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
+import { FONT_SIZE } from '../../theme/typeScale';
 
 // Generated candy-style sprites (assets/ui, generateUiIcons.mjs) replacing the
 // emoji icons App.tsx passes. Unknown icon strings still render as text, so
@@ -280,7 +281,7 @@ const styles = StyleSheet.create({
   },
   actionButtonIconText: {
     fontFamily: BODY_FONT,
-    fontSize: 28,
+    fontSize: FONT_SIZE.hero,
   },
   // Matches the visual footprint of the fontSize-28 emoji it replaces
   actionButtonIconImage: {
@@ -290,7 +291,7 @@ const styles = StyleSheet.create({
   actionButtonLabel: {
     fontFamily: PIXEL_FONT_BOLD,
     marginTop: 12,
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '900',
     // Full-opacity white + a dark legibility shadow: the labels sit directly
     // on the board (no chip), so the shadow anchors them against the bright

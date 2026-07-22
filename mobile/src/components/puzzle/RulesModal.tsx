@@ -16,6 +16,7 @@ import { getSettingsSync } from '../../services/settings';
 import { getRulesText } from '../../services/phaseNarrative';
 import { DialoguePhase } from '../../types/homeWorld';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
+import { FONT_SIZE } from '../../theme/typeScale';
 
 /**
  * Numbered step-chip hue rotation. The candy cycle survives every phase; only
@@ -215,7 +216,7 @@ const styles = StyleSheet.create({
   },
   rulesTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 26,
+    fontSize: FONT_SIZE.display,
     fontWeight: '900',
     letterSpacing: 0.4,
     textAlign: 'center',
@@ -240,7 +241,7 @@ const styles = StyleSheet.create({
   },
   ruleNumberText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 20,
+    fontSize: FONT_SIZE.headline,
     fontWeight: '900',
   },
   ruleContent: {
@@ -248,13 +249,13 @@ const styles = StyleSheet.create({
   },
   ruleHeading: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     fontWeight: '800',
     marginBottom: 2,
   },
   ruleDesc: {
     fontFamily: BODY_FONT,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     lineHeight: 19,
   },
   gotItButton: {
