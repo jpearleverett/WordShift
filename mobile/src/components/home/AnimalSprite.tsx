@@ -40,6 +40,16 @@ export const CHARACTER_SPRITES: Partial<Record<AnimalType, {
   talk?: ImageSourcePropType;
   robed?: ImageSourcePropType;
   /**
+   * Optional Phase 4-5 robed TALK frame (F26) — the reveal counterpart of
+   * `talk`. When present, a dialogue portrait opacity-switches robed<->
+   * robedTalk exactly like idle<->talk at earlier phases, so the climax's
+   * biggest lines no longer play over a frozen robed still. No animal has
+   * this frame today (only idle/talk/robed exist on disk for all 13) — a
+   * portrait consumer must check for it and fall back to the static `robed`
+   * frame rather than assuming it exists.
+   */
+  robedTalk?: ImageSourcePropType;
+  /**
    * Optional walk cycle, played while the animal wanders its room (frames
    * face RIGHT like idle.png; the container's scaleX flip handles leftward
    * walks). Frames were extracted from source video (assets/raw/*_walk_
