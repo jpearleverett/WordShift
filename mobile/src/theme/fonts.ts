@@ -96,6 +96,20 @@ export async function loadPixelFonts(): Promise<void> {
  *
  * Must run once at App module load, before the first render.
  */
+
+/**
+ * App-wide OS-font-scale ceiling. The cottage chrome is drawn on FIXED-height
+ * pixel frames (plaques, bevel buttons, badges, fixed rows), so an uncapped OS
+ * large-font setting (which can reach ~3.1x) overflows text out of its wood
+ * panels. The same global-Text wrapper that injects the base family also sets a
+ * DEFAULT `maxFontSizeMultiplier`, so every Text respects a sane ceiling without
+ * touching call sites — while still growing ~35% for readability. Any component
+ * that needs a tighter cap (or, on a genuinely flexible-height content panel, a
+ * looser one) sets its own `maxFontSizeMultiplier`, which always wins (the
+ * wrapper only supplies the default, the caller's prop overrides it).
+ */
+export const GLOBAL_MAX_FONT_SCALE = 1.35;
+
 let globalFontInstalled = false;
 export function installGlobalFont(): void {
   if (globalFontInstalled) return;
@@ -129,8 +143,11 @@ export function installGlobalFont(): void {
           | undefined;
         if (typeof Orig !== 'function' || Orig.__fontWrapped) return;
 
-        const Wrapped = (props: { style?: unknown }) =>
+        const Wrapped = (props: { style?: unknown; maxFontSizeMultiplier?: number }) =>
           React.createElement(Orig, {
+            // DEFAULT the OS-font-scale ceiling; a caller's own
+            // maxFontSizeMultiplier (spread below) always overrides it.
+            maxFontSizeMultiplier: GLOBAL_MAX_FONT_SCALE,
             ...props,
             style: [base, props?.style],
           });
