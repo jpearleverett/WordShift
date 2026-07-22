@@ -5,6 +5,7 @@ import { getModalInSpring } from '../../theme/surfaces';
 import { getSettingsSync } from '../../services/settings';
 import { announceForA11y } from '../../services/a11yAnnounce';
 import { PIXEL_FONT_BOLD, BODY_FONT_ITALIC } from '../../theme/fonts';
+import { FONT_SIZE } from '../../theme/typeScale';
 
 interface ToastProps {
   message: string;
@@ -218,14 +219,14 @@ const styles = StyleSheet.create({
   },
   toastText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '800',
   },
   // The cold-open voice: the cottage's handwritten italic, a touch larger and
   // lighter than the system-toast weight, so it reads as a warm aside.
   toastVoiceText: {
     fontFamily: BODY_FONT_ITALIC,
-    fontSize: 15.5,
+    fontSize: FONT_SIZE.callout,
     fontStyle: 'italic',
   },
 });

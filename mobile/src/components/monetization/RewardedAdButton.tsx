@@ -11,6 +11,7 @@ import { isPatronSync } from '../../services/entitlements';
 import { hapticLight, hapticMedium } from '../../services/haptics';
 import { getSettingsSync } from '../../services/settings';
 import { AmberInline } from '../AmberInline';
+import { FONT_SIZE } from '../../theme/typeScale';
 
 // Phase-aware busy-state copy for the tap->ad handoff: a bare "Loading..."
 // read as a stall. Bright days stay plain; the descent frames the same wait
@@ -231,7 +232,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(180, 110, 70, 0.4)',
   },
   disabled: { opacity: 0.4 },
-  label: { fontSize: 13.5, fontWeight: '800', fontFamily: PIXEL_FONT_BOLD },
+  label: { fontSize: FONT_SIZE.body, fontWeight: '800', fontFamily: PIXEL_FONT_BOLD },
   // Dark amber ink on the light gold pill (matches freeDoubleTextLight in the
   // victory modal); the old #FFD479 was near-invisible on cream surfaces, and
   // #755A00 measured only ~3:1 over the storm skin's deeper parchment —

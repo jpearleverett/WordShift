@@ -13,6 +13,7 @@ import { PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { SURFACE, getSurfaceTheme, getPressSpring } from '../../theme/surfaces';
 import { getSettingsSync } from '../../services/settings';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
+import { FONT_SIZE } from '../../theme/typeScale';
 
 // ---------------------------------------------------------------------------
 // Pure helpers (unit-tested in rewardReveal.test.ts).
@@ -305,12 +306,12 @@ const styles = StyleSheet.create({
   },
   amount: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 34,
+    fontSize: FONT_SIZE.hero,
     fontWeight: '900',
   },
   label: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '700',
     letterSpacing: 0.5,
     marginTop: 4,

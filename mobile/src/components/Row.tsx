@@ -35,6 +35,7 @@ import {
   DRAG_HOVER_SCALE,
 } from '../constants/timing';
 import { BODY_FONT_BOLD, PIXEL_FONT_BOLD } from '../theme/fonts';
+import { FONT_SIZE } from '../theme/typeScale';
 
 // Arc layout configuration
 const ARC_ROTATION = 12; // Max rotation in degrees for edge elements (steeper fan)
@@ -1470,7 +1471,7 @@ const styles = StyleSheet.create({
   badgeText: {
     fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '900',
     letterSpacing: 1.5,
     textShadowColor: 'rgba(0, 0, 0, 0.2)',
@@ -1499,7 +1500,7 @@ const styles = StyleSheet.create({
   checkText: {
     fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '900',
   },
 
@@ -1610,7 +1611,7 @@ const styles = StyleSheet.create({
   slotGuideText: {
     fontFamily: PIXEL_FONT_BOLD,
     position: 'absolute',
-    fontSize: 18,
+    fontSize: FONT_SIZE.title,
     lineHeight: 18,
     textAlign: 'center',
     includeFontPadding: false, // Android: strip font padding so the arrow truly centers
@@ -1639,13 +1640,13 @@ const styles = StyleSheet.create({
     // standard width and BODY_FONT at compact, so the preview visibly changed
     // typeface the moment a word crossed 6 letters.
     fontFamily: BODY_FONT_BOLD,
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '700',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
   slotPreviewTextCompact: {
-    fontSize: 9,
+    fontSize: FONT_SIZE.micro,
   },
   // Light inks on the dark chip. Valid/invalid stays distinguished by the
   // ✓/✗ prefix + bold weight (never color alone); the hues are light tints
