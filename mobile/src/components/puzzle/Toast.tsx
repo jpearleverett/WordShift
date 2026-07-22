@@ -3,13 +3,17 @@ import { View, Text, StyleSheet, Animated, Platform } from 'react-native';
 import { CandyColors, getPhaseTheme } from '../../theme/colors';
 import { getSettingsSync } from '../../services/settings';
 import { announceForA11y } from '../../services/a11yAnnounce';
-import { PIXEL_FONT_BOLD } from '../../theme/fonts';
+import { PIXEL_FONT_BOLD, BODY_FONT_ITALIC } from '../../theme/fonts';
 
 interface ToastProps {
   message: string;
   isError: boolean;
   /** Current narrative phase (0-5) — drives the toast's surface colors. */
   phase?: number;
+  /** The cold-open's warm unnamed voice: render in the cottage's handwritten
+   *  italic on a warm parchment tray with a small ember glyph, so Ember's guiding
+   *  lines don't wear the same system-toast chrome as a rules/error message. */
+  isVoice?: boolean;
 }
 
 /**
@@ -45,7 +49,7 @@ export function getToastTheme(phase: number) {
   };
 }
 
-export const Toast: React.FC<ToastProps> = ({ message, isError, phase = 0 }) => {
+export const Toast: React.FC<ToastProps> = ({ message, isError, phase = 0, isVoice = false }) => {
   const slideAnim = useRef(new Animated.Value(-20)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const shakeAnim = useRef(new Animated.Value(0)).current;
@@ -156,7 +160,7 @@ export const Toast: React.FC<ToastProps> = ({ message, isError, phase = 0 }) => 
       style={[
         styles.toast,
         {
-          backgroundColor: isError ? toastTheme.errorBg : toastTheme.normalBg,
+          backgroundColor: isVoice && !isError ? '#FBEEDA' : (isError ? toastTheme.errorBg : toastTheme.normalBg),
           shadowColor: toastTheme.shadow,
         },
         {
@@ -170,9 +174,14 @@ export const Toast: React.FC<ToastProps> = ({ message, isError, phase = 0 }) => 
       accessibilityLiveRegion="polite"
       accessibilityRole="alert"
     >
-      <View style={[styles.toastShine, { backgroundColor: toastTheme.shine }]} />
-      <Text style={[styles.toastText, { color: isError ? toastTheme.errorText : toastTheme.normalText }]}>
-        {message}
+      <View style={[styles.toastShine, { backgroundColor: isVoice && !isError ? 'rgba(255,255,255,0.35)' : toastTheme.shine }]} />
+      <Text
+        style={[
+          isVoice && !isError ? styles.toastVoiceText : styles.toastText,
+          { color: isVoice && !isError ? '#5A4326' : (isError ? toastTheme.errorText : toastTheme.normalText) },
+        ]}
+      >
+        {isVoice && !isError ? `✻  ${message}` : message}
       </Text>
     </Animated.View>
   );
@@ -202,5 +211,12 @@ const styles = StyleSheet.create({
     fontFamily: PIXEL_FONT_BOLD,
     fontSize: 15,
     fontWeight: '800',
+  },
+  // The cold-open voice: the cottage's handwritten italic, a touch larger and
+  // lighter than the system-toast weight, so it reads as a warm aside.
+  toastVoiceText: {
+    fontFamily: BODY_FONT_ITALIC,
+    fontSize: 15.5,
+    fontStyle: 'italic',
   },
 });

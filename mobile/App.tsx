@@ -4348,9 +4348,20 @@ function MainApp() {
         </View>
         )}
 
-        {/* Toast Message */}
+        {/* Toast Message — the cold-open's guiding lines wear a warm "voice"
+            skin (cottage italic on parchment) instead of the system chrome. */}
         <View style={styles.toastContainer}>
-          <Toast message={puzzle.error || puzzle.message} isError={!!puzzle.error} phase={persistence.currentPhase} />
+          <Toast
+            message={puzzle.error || puzzle.message}
+            isError={!!puzzle.error}
+            phase={persistence.currentPhase}
+            isVoice={
+              !puzzle.error &&
+              (puzzle.message === COLD_OPEN_INSTRUCTION ||
+                puzzle.message === COLD_OPEN_FIRST_MOVE ||
+                puzzle.message === COLD_OPEN_PREVIEW_TEACH)
+            }
+          />
         </View>
 
         {/* Speed Timer — prominent display */}
