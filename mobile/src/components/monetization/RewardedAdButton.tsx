@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { PIXEL_FONT_BOLD } from '../../theme/fonts';
 import {
   showRewarded,
@@ -132,7 +132,14 @@ export const RewardedAdButton: React.FC<RewardedAdButtonProps> = ({
       accessibilityLabel={label}
     >
       {busy ? (
-        <ActivityIndicator size="small" color={isDark ? '#FFD479' : '#4E3C00'} />
+        // A bare spinner read as a stall. Pair it with a label so the tap->ad
+        // handoff is legible as work-in-progress, not a frozen button.
+        <View style={styles.busyRow}>
+          <ActivityIndicator size="small" color={isDark ? '#FFD479' : '#4E3C00'} />
+          <Text style={[styles.label, isDark ? styles.labelDark : styles.labelLight, styles.busyLabel]}>
+            Loading...
+          </Text>
+        </View>
       ) : (
         <Text style={[styles.label, isDark ? styles.labelDark : styles.labelLight]}>
           {'▷ '}
@@ -144,6 +151,13 @@ export const RewardedAdButton: React.FC<RewardedAdButtonProps> = ({
 };
 
 const styles = StyleSheet.create({
+  busyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  busyLabel: {
+    marginLeft: 8,
+  },
   button: {
     paddingHorizontal: 16,
     paddingVertical: 11,
