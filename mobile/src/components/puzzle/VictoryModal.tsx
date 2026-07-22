@@ -42,11 +42,13 @@ import type { AmberBreakdown } from '../../hooks/useGamePersistence';
 import { hapticSuccess } from '../../services/haptics';
 import { isDailyShareBonusAvailable, DAILY_SHARE_BONUS_AMBER } from '../../services/shareResults';
 import { getSettingsSync } from '../../services/settings';
+import { shouldSimplifyAnimations } from '../../services/deviceTier';
 import { DailyLeaderboardCard } from '../social/DailyLeaderboardCard';
 import { getBeatPercentText, DailyRank } from '../../services/leaderboard';
 import { RewardedAdButton } from '../monetization/RewardedAdButton';
 import { isAdFreeSync } from '../../services/entitlements';
 import { announceForA11y } from '../../services/a11yAnnounce';
+import { countUpDisplayValue, getCountUpDurationMs } from '../ui/RewardReveal';
 import { BODY_FONT, BODY_FONT_ITALIC, PIXEL_FONT_BOLD } from '../../theme/fonts';
 
 // Candy-styled UI sprite icons (replace emoji for critical info)
@@ -55,6 +57,10 @@ const STAR_EMPTY = require('../../../assets/ui/star_empty.png');
 const AMBER_ICON = require('../../../assets/ui/amber.png');
 const FLAME_ICON = require('../../../assets/ui/flame.png');
 const SHARE_ICON = require('../../../assets/ui/share.png');
+// The Collect Now pill leads to the Offering Pit, so the pit sprite (the same
+// one that stands in for the pit-entrance emoji elsewhere) is the on-brand
+// cottage replacement for the raw sheaf emoji that used to prefix the label.
+const PIT_ICON = require('../../../assets/ui/pit.png');
 
 export interface VictoryData {
   earnedStars: number;
@@ -423,6 +429,54 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
     onSkip?.();
   }, [contentOpacity1, contentOpacity2, contentOpacity3, contentOpacity4, onSkip]);
 
+  // Watched-ad reward count-up. The rewarded "double" grants a bonus equal to
+  // the earned amber, so the DISPLAYED total goes from `victoryTotalAmber` to
+  // `rewardedDoubleTarget` (2x) the instant `rewardedDoubleClaimed` flips true.
+  // Rather than jump, tick the number up (JS-thread rAF, mirroring RewardReveal
+  // / the Stats hero count-ups). This must live at the component top level —
+  // hooks cannot run inside the nested amber-breakdown render IIFE below.
+  const victoryTotalAmber = victoryData?.amberEarned ?? 0;
+  const rewardedDoubleTarget =
+    victoryTotalAmber + (rewardedDoubleClaimed ? victoryTotalAmber : 0);
+  // Initialize at the target so the FIRST render (modal open) shows the settled
+  // number with no count-up — only a fresh double claim animates.
+  const [animatedTotal, setAnimatedTotal] = useState(rewardedDoubleTarget);
+  const totalCountUpRafRef = useRef(0);
+  const prevRewardedDoubleClaimedRef = useRef<boolean | undefined>(rewardedDoubleClaimed);
+  useEffect(() => {
+    const wasClaimed = prevRewardedDoubleClaimedRef.current;
+    prevRewardedDoubleClaimedRef.current = rewardedDoubleClaimed;
+    // Only count up on a fresh false -> true double claim. Every other reason
+    // this effect runs (modal open, a new board, target recompute) snaps.
+    const justClaimed = !!rewardedDoubleClaimed && !wasClaimed;
+    if (!justClaimed) {
+      setAnimatedTotal(rewardedDoubleTarget);
+      return;
+    }
+    if (getSettingsSync().reducedMotion || shouldSimplifyAnimations()) {
+      setAnimatedTotal(rewardedDoubleTarget);
+      return;
+    }
+    const start = victoryTotalAmber;
+    const duration = getCountUpDurationMs(rewardedDoubleTarget, phase);
+    if (duration <= 0) {
+      setAnimatedTotal(rewardedDoubleTarget);
+      return;
+    }
+    const startedAt = Date.now();
+    const tick = () => {
+      const fraction = Math.min(1, (Date.now() - startedAt) / duration);
+      setAnimatedTotal(countUpDisplayValue(fraction, rewardedDoubleTarget, start));
+      if (fraction < 1) {
+        totalCountUpRafRef.current = requestAnimationFrame(tick);
+      }
+    };
+    totalCountUpRafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (totalCountUpRafRef.current) cancelAnimationFrame(totalCountUpRafRef.current);
+    };
+  }, [rewardedDoubleClaimed, rewardedDoubleTarget, victoryTotalAmber, phase]);
+
   if (!visible) return null;
 
   // ---------------------------------------------------------------------
@@ -557,9 +611,17 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                   borderColor: btn.harvestPill.border,
                 }]}
               >
-                <Text style={[styles.collectNowText, { color: btn.harvestPill.text }]}>
-                  {`${'🌾'} Collect Now  ›`}
-                </Text>
+                <View style={styles.collectNowRow}>
+                  <Image
+                    source={PIT_ICON}
+                    style={styles.collectNowIcon}
+                    importantForAccessibility="no"
+                    accessibilityElementsHidden
+                  />
+                  <Text style={[styles.collectNowText, { color: btn.harvestPill.text }]}>
+                    {'Collect Now  ›'}
+                  </Text>
+                </View>
               </TouchableOpacity>
             )}
 
@@ -873,7 +935,19 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                   accessible
                   accessibilityLabel={`${phaseNarrative.title}. ${phaseNarrative.body}`}
                 >
-                  <Text style={styles.phaseChangeEmoji}>{phaseNarrative.emoji}</Text>
+                  {/* No sprite maps to the phase-change glyphs, and a raw OS
+                      color emoji would break the cottage skin — a small
+                      monochrome diamond stands in, tinted mauve once the card
+                      goes dark so it ages with the descent (spoiler-safe: the
+                      glyph reveals nothing the card does not already say). */}
+                  <Text
+                    style={[styles.phaseChangeGlyph, {
+                      color: victoryData!.newPhase >= 3 ? '#C9A9FF' : CandyColors.white,
+                    }]}
+                    importantForAccessibility="no"
+                  >
+                    {'◈'}
+                  </Text>
                   <Text style={styles.phaseChangeTitle}>{phaseNarrative.title}</Text>
                   <Text style={styles.phaseChangeText}>{phaseNarrative.body}</Text>
                 </View>
@@ -1044,12 +1118,11 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               const streakMilestoneAmber = victoryData.streakMilestoneBonus ?? 0;
               const totalAmber = victoryData.amberEarned ?? 0;
               // The rewarded "double" grants a bonus equal to amberEarned (a true
-              // 2x, credited to the balance in App). Reflect it in the displayed
-              // total + a breakdown line so the number the player sees AFTER the
-              // ad matches the amber they actually received — otherwise it reads
-              // as "I watched an ad and got nothing."
+              // 2x, credited to the balance in App). Reflect it in the breakdown
+              // line so the itemization sums to the doubled total. The TOTAL row
+              // itself renders the top-level `animatedTotal` (which counts up on
+              // a fresh claim), never this static value.
               const rewardDoubleBonus = rewardedDoubleClaimed ? totalAmber : 0;
-              const displayTotal = totalAmber + rewardDoubleBonus;
 
               return (
                 <>
@@ -1065,7 +1138,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                         <View style={styles.earlyVictoryValueRow}>
                           <Image source={AMBER_ICON} style={styles.amberIconLarge} />
                           <Text style={[styles.earlyVictoryValue, { color: phaseTheme.modalTextColor }]}>
-                            {displayTotal}
+                            {animatedTotal}
                           </Text>
                         </View>
                       </>
@@ -1097,7 +1170,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                         {surpriseBonusAmber > 0 && (
                           <View style={styles.bonusRow}>
                             <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
-                              {'✨'} Lucky Find
+                              {'◈'} Lucky Find
                             </Text>
                             <Text style={[styles.bonusValue, { color: accent.gold }]}>+{surpriseBonusAmber}</Text>
                           </View>
@@ -1129,7 +1202,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                         {(victoryData.freshVariantBonus ?? 0) > 0 && (
                           <View style={styles.bonusRow}>
                             <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
-                              {'✨'} Fresh variant
+                              {'◈'} Fresh variant
                             </Text>
                             <Text style={[styles.bonusValue, { color: accent.variant }]}>+{victoryData.freshVariantBonus}</Text>
                           </View>
@@ -1189,7 +1262,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                       <View style={styles.amberValueRow}>
                         <Image source={AMBER_ICON} style={[styles.amberIcon, styles.amberIconTotal]} />
                         <Text style={[styles.bonusValue, { color: phaseTheme.modalTextColor, fontSize: 19, fontWeight: '900' }]}>
-                          {displayTotal}
+                          {animatedTotal}
                         </Text>
                       </View>
                     </View>
@@ -1257,13 +1330,28 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                           borderColor: btn.harvestPill.border,
                         }]}
                       >
-                        <Text style={[styles.collectNowText, { color: btn.harvestPill.text }]}>
-                          {phaseTransitionPending
-                            ? getPitMandatoryCTA(phase as DialoguePhase)
-                            : mandatoryHarvest
-                            ? getMandatoryHarvestCTA(phase as DialoguePhase)
-                            : `${'\uD83C\uDF3E'} Collect Now  \u203A`}
-                        </Text>
+                        <View style={styles.collectNowRow}>
+                          {/* Only the plain "Collect Now" case carried the sheaf
+                              emoji, so the pit sprite stands in there. The
+                              phase-transition / mandatory CTAs are their own copy
+                              (no icon), so the sprite shows only for the optional
+                              collect. */}
+                          {!phaseTransitionPending && !mandatoryHarvest && (
+                            <Image
+                              source={PIT_ICON}
+                              style={styles.collectNowIcon}
+                              importantForAccessibility="no"
+                              accessibilityElementsHidden
+                            />
+                          )}
+                          <Text style={[styles.collectNowText, { color: btn.harvestPill.text }]}>
+                            {phaseTransitionPending
+                              ? getPitMandatoryCTA(phase as DialoguePhase)
+                              : mandatoryHarvest
+                              ? getMandatoryHarvestCTA(phase as DialoguePhase)
+                              : 'Collect Now  \u203A'}
+                          </Text>
+                        </View>
                       </TouchableOpacity>
                       </>
                     )}
@@ -1981,6 +2069,16 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textAlign: 'center',
   },
+  collectNowRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  collectNowIcon: {
+    width: 15,
+    height: 15,
+    marginRight: 6,
+  },
 
   // === Harvest info pill ===
   harvestWordContainer: {
@@ -2144,9 +2242,10 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: CandyColors.purple.main,
   },
-  phaseChangeEmoji: {
+  // Monochrome diamond glyph that replaces the phase-change color emoji.
+  phaseChangeGlyph: {
     fontFamily: BODY_FONT,
-    fontSize: 32,
+    fontSize: 22,
     marginBottom: 8,
   },
   phaseChangeTitle: {
