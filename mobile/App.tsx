@@ -2854,6 +2854,10 @@ function MainApp() {
     ) {
       return;
     }
+    // Tick the hand on a genuine crossing INTO a slot (not when leaving to
+    // empty space): the visual hover swell now has a matching haptic, so the
+    // slot boundary is felt, not only seen. hapticSelection is settings-gated.
+    if (next !== null) hapticSelection();
     hoverSlotRef.current = next;
     setHoverSlot(next);
   }, []);
