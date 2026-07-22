@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ScrollView,
   FlatList,
+  Animated,
 } from 'react-native';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
 import { CandyColors } from '../theme/colors';
@@ -14,6 +15,8 @@ import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
 import { PanelCard } from './ui/PanelCard';
 import { PixelPlaque } from './ui/PixelPlaque';
 import { BannerAd } from './monetization/BannerAd';
+import { shouldShowBanner } from '../services/ads';
+import { isAdFreeSync } from '../services/entitlements';
 import { useScreenInsets } from '../hooks/useScreenInsets';
 import { AmberInline } from './AmberInline';
 import { CumulativeStats, PersonalBest, getCumulativeStats, getAverageStars, getThreeStarRate } from '../services/starRating';
@@ -193,6 +196,22 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
   // (persists across tab switches; a re-shown hero snaps to its final values).
   const heroCountedRef = useRef(false);
 
+  // Cross-fade the tab content on swap: a 120ms dip-to-0.4-and-back instead of
+  // the previous single-frame content swap. Reduced motion keeps it instant.
+  const tabFade = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (getSettingsSync().reducedMotion) return;
+    tabFade.setValue(0.4);
+    const anim = Animated.timing(tabFade, {
+      toValue: 1,
+      duration: 120,
+      useNativeDriver: true,
+    });
+    anim.start();
+    return () => anim.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTab]);
+
   useEffect(() => {
     getAmberBalance().then(setLiveAmberBalance).catch(() => {});
     getCumulativeStats().then(setStats);
@@ -213,7 +232,40 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
     })();
   }, []);
 
-  if (!stats) return null;
+  // Skeleton: render the header + a few empty PanelCards from static props
+  // while the async loads land, so the reveal never exposes a blank screen —
+  // combined with the entrance cascade, real content cascades in as it
+  // arrives instead of popping fully-formed once everything resolves.
+  if (!stats) {
+    const st = getSurfaceTheme(effectivePhase);
+    return (
+      <View style={[styles.container, { backgroundColor: st.screenBg }]}>
+        <View style={[styles.header, { paddingTop: screenInsets.top + 16 }]}>
+          <TouchableOpacity
+            style={[styles.backChip, { backgroundColor: CHROME_CHIP_BG, borderColor: st.headerChipBorder }]}
+            onPress={onClose}
+            accessibilityRole="button"
+            accessibilityLabel="Back to home"
+          >
+            <Text style={[styles.backChipText, { color: st.headerTitle }]}>{'<'} Back</Text>
+          </TouchableOpacity>
+          <Text style={[styles.title, { color: st.headerTitle }]}>Statistics</Text>
+          <View style={styles.headerSpacer} />
+        </View>
+        <View style={styles.content}>
+          <PanelCard phase={effectivePhase} kind="panel" style={styles.heroCard}>
+            <View style={styles.skeletonBlock} />
+          </PanelCard>
+          <PanelCard phase={effectivePhase} style={styles.sectionCard}>
+            <View style={styles.skeletonBlock} />
+          </PanelCard>
+          <PanelCard phase={effectivePhase} style={styles.sectionCard}>
+            <View style={styles.skeletonBlock} />
+          </PanelCard>
+        </View>
+      </View>
+    );
+  }
 
   // First appearance of the overview animates the hero; later shows are static.
   const animateHero = !heroCountedRef.current;
@@ -370,6 +422,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
         </TouchableOpacity>
       </View>
 
+      <Animated.View style={[styles.tabContent, { opacity: tabFade }]}>
       {overviewSelected ? (
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           <>
@@ -404,9 +457,9 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
             <EntranceCascadeItem phase={effectivePhase} delay={getCascadeDelayMs(1, { baseMs: HEADER_CASCADE_BASE_MS })}>
             <PanelCard phase={effectivePhase} style={styles.sectionCard}>
               <PixelPlaque phase={effectivePhase} label={'STAR BREAKDOWN'} style={styles.sectionPlaque} />
-              <StarBar label="3 Stars" stars={3} count={stats.threeStarCount} total={stats.totalPuzzlesCompleted} color={CandyColors.yellow.main} trackColor={t.rowBorder} countColor={t.body} />
-              <StarBar label="2 Stars" stars={2} count={stats.twoStarCount} total={stats.totalPuzzlesCompleted} color={CandyColors.orange.main} trackColor={t.rowBorder} countColor={t.body} />
-              <StarBar label="1 Star" stars={1} count={stats.oneStarCount} total={stats.totalPuzzlesCompleted} color={t.muted} trackColor={t.rowBorder} countColor={t.body} />
+              <StarBar label="3 Stars" stars={3} count={stats.threeStarCount} total={stats.totalPuzzlesCompleted} color={CandyColors.yellow.main} trackColor={t.rowBorder} countColor={t.body} delay={0} />
+              <StarBar label="2 Stars" stars={2} count={stats.twoStarCount} total={stats.totalPuzzlesCompleted} color={CandyColors.orange.main} trackColor={t.rowBorder} countColor={t.body} delay={SURFACE.staggerMs * 3} />
+              <StarBar label="1 Star" stars={1} count={stats.oneStarCount} total={stats.totalPuzzlesCompleted} color={t.muted} trackColor={t.rowBorder} countColor={t.body} delay={SURFACE.staggerMs * 6} />
               <View style={styles.starSummary}>
                 <Text style={[styles.starSummaryText, { color: t.muted }]}>
                   Avg: {avgStars.toFixed(1)} stars | Perfect rate: {perfectRate.toFixed(0)}%
@@ -590,7 +643,12 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
             </PanelCard>
             </EntranceCascadeItem>
           </>
-          <BannerAd phase={effectivePhase} />
+          {shouldShowBanner({ phase: effectivePhase as DialoguePhase, isAdFree: isAdFreeSync(), onboarding: false }) && (
+            <View style={[styles.bannerTray, { backgroundColor: t.sectionBg, borderTopColor: t.sectionBorder }]}>
+              <Text style={[styles.bannerTrayLabel, { color: t.muted }]}>ADVERTISEMENT</Text>
+              <BannerAd phase={effectivePhase} />
+            </View>
+          )}
           <View style={styles.bottomSpacer} />
         </ScrollView>
       ) : (
@@ -608,18 +666,31 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
           ListFooterComponent={
             <>
               {/* Menu-surface banner (low friction; self-suppresses for ad-free /
-                  onboarding / Phase 4+, and when no ad backend is configured). */}
-              <BannerAd phase={effectivePhase} />
+                  onboarding / Phase 4+, and when no ad backend is configured),
+                  wrapped in a labeled tray with a reserved height so it reads
+                  as a deliberate menu zone and never shifts the layout below
+                  it as the native banner loads in. */}
+              {shouldShowBanner({ phase: effectivePhase as DialoguePhase, isAdFree: isAdFreeSync(), onboarding: false }) && (
+                <View style={[styles.bannerTray, { backgroundColor: t.sectionBg, borderTopColor: t.sectionBorder }]}>
+                  <Text style={[styles.bannerTrayLabel, { color: t.muted }]}>ADVERTISEMENT</Text>
+                  <BannerAd phase={effectivePhase} />
+                </View>
+              )}
               <View style={styles.bottomSpacer} />
             </>
           }
         />
       )}
+      </Animated.View>
     </View>
   );
 };
 
-// Star distribution bar sub-component
+// Star distribution bar sub-component. The one data-viz moment on the
+// screen: the fill grows in on first mount via a left-anchored native-driver
+// scaleX (the track is measured via onLayout, the fill renders at its final
+// pixel width and scales from 0 with a counter-translate so its left edge
+// stays pinned), staggered per bar via `delay`. Reduced motion pins it full.
 function StarBar({
   label,
   stars,
@@ -628,6 +699,7 @@ function StarBar({
   color,
   trackColor,
   countColor,
+  delay = 0,
 }: {
   label: string;
   stars: number;
@@ -636,8 +708,34 @@ function StarBar({
   color: string;
   trackColor: string;
   countColor: string;
+  delay?: number;
 }) {
   const pct = total > 0 ? (count / total) * 100 : 0;
+  const fillFraction = Math.max(0.02, pct / 100);
+  const reducedMotion = getSettingsSync().reducedMotion;
+  const [trackWidth, setTrackWidth] = useState(0);
+  const anim = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+
+  useEffect(() => {
+    if (reducedMotion || trackWidth === 0) {
+      anim.setValue(1);
+      return;
+    }
+    anim.setValue(0);
+    const a = Animated.spring(anim, {
+      toValue: 1,
+      friction: 8,
+      tension: 60,
+      delay,
+      useNativeDriver: true,
+    });
+    a.start();
+    return () => a.stop();
+  }, [trackWidth, reducedMotion, delay, anim]);
+
+  const fillWidth = trackWidth * fillFraction;
+  const translateX = anim.interpolate({ inputRange: [0, 1], outputRange: [-fillWidth / 2, 0] });
+
   return (
     <View
       style={styles.starBarContainer}
@@ -656,8 +754,20 @@ function StarBar({
           />
         ))}
       </View>
-      <View style={[styles.starBarTrack, { backgroundColor: trackColor }]}>
-        <View style={[styles.starBarFill, { width: `${Math.max(pct, 2)}%`, backgroundColor: color }]} />
+      <View
+        style={[styles.starBarTrack, { backgroundColor: trackColor }]}
+        onLayout={e => setTrackWidth(e.nativeEvent.layout.width)}
+      >
+        <Animated.View
+          style={[
+            styles.starBarFill,
+            {
+              width: fillWidth,
+              backgroundColor: color,
+              transform: [{ translateX }, { scaleX: anim }],
+            },
+          ]}
+        />
       </View>
       <Text style={[styles.starBarCount, { color: countColor }]}>{count}</Text>
     </View>
@@ -1026,5 +1136,39 @@ const styles = StyleSheet.create({
 
   bottomSpacer: {
     height: 60,
+  },
+
+  // Cross-fades the whole tab content area on swap (a 120ms dip-to-0.4-and-
+  // back), on top of whichever of ScrollView/FlatList is currently mounted.
+  tabContent: {
+    flex: 1,
+  },
+
+  // Skeleton placeholder block (empty card body while loads land).
+  skeletonBlock: {
+    height: 96,
+  },
+
+  // Banner cottage tray (F152): a tinted shelf with a quiet uppercase label +
+  // reserved height so the native rectangle reads as a deliberate menu zone
+  // and never shifts the content below it as the ad loads in.
+  bannerTray: {
+    marginTop: 8,
+    marginBottom: 8,
+    paddingTop: 8,
+    paddingBottom: 8,
+    borderTopWidth: 1,
+    borderRadius: 12,
+    minHeight: 90,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bannerTrayLabel: {
+    fontFamily: PIXEL_FONT_BOLD,
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: SURFACE.sectionLetterSpacing,
+    textTransform: 'uppercase',
+    marginBottom: 6,
   },
 });

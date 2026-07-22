@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -48,6 +48,41 @@ const DREAD_WORD_SET = new Set([
   'GATE', 'PORTAL', 'RIFT', 'SUMMON', 'RITUAL', 'VOID', 'NOTHING',
   'OBLIVION', 'DARKNESS', 'SILENCE', 'STILL', 'FROZEN', 'DEAD', 'BONE',
 ]);
+
+const isDread = (word: string): boolean => DREAD_WORD_SET.has(word.toUpperCase());
+
+// The newest dread chips (post-reversal) that visibly breathe with a slow
+// opacity pulse once the dread arc has truly deepened (phase >= 3) -- the
+// ledger should feel faintly alive, not lit up.
+const DREAD_BREATHE_CAP = 6;
+const DREAD_BREATHE_MIN = 0.75;
+const DREAD_BREATHE_MAX = 1;
+const DREAD_BREATHE_CYCLE_MS = 2400;
+const DREAD_BREATHE_SEGMENTS = 12;
+
+/** A 0..1 triangle wave (period 1, peak at 0.5). */
+function triangleWave(x: number): number {
+  const t = ((x % 1) + 1) % 1;
+  return t < 0.5 ? t * 2 : (1 - t) * 2;
+}
+
+/**
+ * Sample a phase-shifted triangle wave of a single continuously-looping
+ * `driver` value into an Animated interpolation over [min, max]. Several
+ * chips (plus the shared dread glow) can read their own out-of-sync breathing
+ * curve from ONE driver + ONE loop (this surface's one idle animator) via a
+ * static lookup table each — no extra Animated nodes or timers.
+ */
+function breatheInterpolation(
+  driver: Animated.Value,
+  phaseOffset: number,
+  min: number,
+  max: number,
+) {
+  const inputRange = Array.from({ length: DREAD_BREATHE_SEGMENTS + 1 }, (_, k) => k / DREAD_BREATHE_SEGMENTS);
+  const outputRange = inputRange.map(x => min + triangleWave(x + phaseOffset) * (max - min));
+  return driver.interpolate({ inputRange, outputRange });
+}
 
 /** A windowed row-group of ledger chips. `startIndex` is the group's first
  *  chip's global position (preserves the original order and per-chip stagger). */
@@ -115,42 +150,37 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
     return 'The record of offerings. Written in your hand.';
   };
 
-  const isDread = (word: string): boolean => DREAD_WORD_SET.has(word.toUpperCase());
+  // Newest offerings first — the latest words the player formed lead the
+  // ledger instead of being buried under up to 500 older chips.
+  const displayWords = useMemo(() => words.slice().reverse(), [words]);
 
-  // The one idle element on this surface: a single breathing driver shared by
-  // every dread chip's glow overlay (reusing the letter-tile resonance visual
-  // language). One loop, many overlays, native-driven opacity only.
-  const dreadAnim = useRef(new Animated.Value(0)).current;
+  // The one idle element on this surface: a single continuously-looping
+  // driver shared by the dread glow overlay AND the capped breathing chips
+  // (native-driven opacity only). Breathing only starts once the dread arc
+  // has truly deepened (phase >= 3); below that (or under reduced motion /
+  // a low-tier device) it parks at a stable resting frame.
+  const breatheEnabled = phase >= 3 && !getSettingsSync().reducedMotion && !shouldSimplifyAnimations();
+  const dreadAnim = useRef(new Animated.Value(0.25)).current;
   useEffect(() => {
-    const reduced = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
-    if (phase < 2 || reduced) {
-      dreadAnim.setValue(phase < 2 ? 0 : 0.5);
+    if (!breatheEnabled) {
+      dreadAnim.setValue(phase < 2 ? 0 : 0.25);
       return;
     }
     dreadAnim.setValue(0);
-    const cycle = phase >= 4 ? 2000 : 2600;
     const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(dreadAnim, {
-          toValue: 1,
-          duration: cycle,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(dreadAnim, {
-          toValue: 0,
-          duration: cycle,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ]),
+      Animated.timing(dreadAnim, {
+        toValue: 1,
+        duration: DREAD_BREATHE_CYCLE_MS,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
     );
     loop.start();
     return () => {
       loop.stop();
       dreadAnim.stopAnimation();
     };
-  }, [phase, dreadAnim]);
+  }, [breatheEnabled, phase, dreadAnim]);
 
   // Entrance-cascade latch: arm on mount, disarm once the initial stagger has
   // settled so a windowed group scrolled back into view never re-triggers the
@@ -165,12 +195,24 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
   }, []);
 
   const resonance = getResonanceConfig(phase);
-  const dreadGlowOpacity = dreadAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [resonance.minOpacity, resonance.maxOpacity],
-  });
+  // The shared dread-glow overlay (every dread chip, phase >= 2) reads offset
+  // 0 of the same driver — a plain sample when at rest, a smooth pulse once
+  // breathing is enabled.
+  const dreadGlowOpacity = breatheInterpolation(dreadAnim, 0, resonance.minOpacity, resonance.maxOpacity);
 
-  const groups = groupLedgerWords(words, LEDGER_GROUP_SIZE);
+  // Only the first DREAD_BREATHE_CAP dread chips (by newest-first display
+  // order) get the whole-chip breathing treatment; each gets its own rank so
+  // it reads its own phase-shifted slice of the shared driver.
+  const breatheRank = useMemo(() => {
+    const m = new Map<number, number>();
+    if (phase < 3) return m;
+    for (let i = 0; i < displayWords.length && m.size < DREAD_BREATHE_CAP; i++) {
+      if (isDread(displayWords[i])) m.set(i, m.size);
+    }
+    return m;
+  }, [displayWords, phase]);
+
+  const groups = groupLedgerWords(displayWords, LEDGER_GROUP_SIZE);
 
   // Each windowed item is one flex-wrap group; the chips inside keep their
   // global index so the first on-screen chips still cascade in original order.
@@ -179,14 +221,15 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
       {item.words.map((word, i) => {
         const globalIndex = item.startIndex + i;
         const dread = isDread(word) && phase >= 2;
-        const chip = (
-          <View
-            style={[
-              styles.wordChip,
-              { backgroundColor: t.sectionBg, borderColor: t.sectionBorder },
-              dread && styles.wordChipDread,
-            ]}
-          >
+        const rank = breatheRank.get(globalIndex);
+        const breathingChip = breatheEnabled && dread && rank !== undefined;
+        const chipStyle = [
+          styles.wordChip,
+          { backgroundColor: t.sectionBg, borderColor: t.sectionBorder },
+          dread && styles.wordChipDread,
+        ];
+        const chipInner = (
+          <>
             {dread && (
               <Animated.View
                 pointerEvents="none"
@@ -203,7 +246,19 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
             ]}>
               {word}
             </Text>
-          </View>
+          </>
+        );
+        const chip = breathingChip ? (
+          <Animated.View
+            style={[
+              chipStyle,
+              { opacity: breatheInterpolation(dreadAnim, rank! / DREAD_BREATHE_CAP, DREAD_BREATHE_MIN, DREAD_BREATHE_MAX) },
+            ]}
+          >
+            {chipInner}
+          </Animated.View>
+        ) : (
+          <View style={chipStyle}>{chipInner}</View>
         );
         // Only the first on-screen chips cascade, and only while armed; the
         // rest snap in (a long ledger must not crawl, and a scrolled-in group

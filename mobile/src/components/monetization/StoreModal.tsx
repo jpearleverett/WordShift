@@ -18,6 +18,7 @@ import { NineSliceFrame } from '../ui/NineSlice';
 import { CandyButton } from '../ui/CandyButton';
 import { PanelCard } from '../ui/PanelCard';
 import { AmberInline } from '../AmberInline';
+import { AmberSparkle } from '../home/AmberSparkle';
 import {
   PRODUCT_IDS,
   CONSUMABLE_PRODUCTS,
@@ -206,6 +207,68 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     anim.start();
     return () => anim.stop();
   }, [visible, reducedMotion, cardScale, cardOpacity]);
+
+  // Header amber balance: ticks from the old to the new value over ~400ms
+  // (plain setState steps at ~30ms intervals, text-only) instead of an
+  // instant number swap, with a one-cycle AmberSparkle burst on the pill.
+  const [displayedAmber, setDisplayedAmber] = useState(amberBalance);
+  const prevAmberRef = useRef(amberBalance);
+  const [amberBurst, setAmberBurst] = useState(false);
+  useEffect(() => {
+    if (!visible) {
+      prevAmberRef.current = amberBalance;
+      setDisplayedAmber(amberBalance);
+      setAmberBurst(false);
+      return;
+    }
+    const prev = prevAmberRef.current;
+    if (prev === amberBalance) return;
+    if (reducedMotion) {
+      setDisplayedAmber(amberBalance);
+      prevAmberRef.current = amberBalance;
+      return;
+    }
+    const start = prev;
+    const end = amberBalance;
+    const steps = 13; // ~400ms at ~30ms/step
+    let i = 0;
+    setAmberBurst(true);
+    const id = setInterval(() => {
+      i++;
+      const fraction = Math.min(1, i / steps);
+      setDisplayedAmber(Math.round(start + (end - start) * fraction));
+      if (i >= steps) {
+        clearInterval(id);
+        prevAmberRef.current = end;
+        setAmberBurst(false);
+      }
+    }, 30);
+    return () => clearInterval(id);
+  }, [amberBalance, visible, reducedMotion]);
+
+  // successBox springs in (scale 0.9 -> 1 + fade) instead of popping.
+  const successBoxScale = useRef(new Animated.Value(reducedMotion ? 1 : 0.9)).current;
+  const successBoxOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  useEffect(() => {
+    if (!successMsg) {
+      successBoxOpacity.setValue(0);
+      successBoxScale.setValue(0.9);
+      return;
+    }
+    if (reducedMotion) {
+      successBoxOpacity.setValue(1);
+      successBoxScale.setValue(1);
+      return;
+    }
+    successBoxOpacity.setValue(0);
+    successBoxScale.setValue(0.9);
+    const anim = Animated.parallel([
+      Animated.spring(successBoxScale, { toValue: 1, friction: 6, tension: 140, useNativeDriver: true }),
+      Animated.timing(successBoxOpacity, { toValue: 1, duration: 220, useNativeDriver: true }),
+    ]);
+    anim.start();
+    return () => anim.stop();
+  }, [successMsg, reducedMotion, successBoxScale, successBoxOpacity]);
 
   const priceLabel = useCallback(
     (info: ConsumableProductInfo) => prices[info.productId] ?? info.fallbackPrice,
@@ -492,9 +555,12 @@ export const StoreModal: React.FC<StoreModalProps> = ({
           <View style={styles.headerRow}>
             <Text style={[styles.title, { color: t.title }]}>Store</Text>
             <View style={[styles.balances, { backgroundColor: t.rowBg, borderColor: t.rowBorder }]}>
-              <Text style={[styles.balanceText, { color: t.amberText }]}>
-                <AmberInline size={13} /> {amberBalance}
-              </Text>
+              <View style={styles.amberBalanceWrap}>
+                <Text style={[styles.balanceText, { color: t.amberText }]} accessibilityLabel={`${displayedAmber} amber`}>
+                  <AmberInline size={13} /> {displayedAmber}
+                </Text>
+                {amberBurst && <AmberSparkle phase={phase} />}
+              </View>
               <Text style={[styles.balanceText, { color: t.body }]}>
                 <Image source={HINT_ICON} style={styles.hintInline} accessibilityLabel="hints" />{' '}
                 {hintBalance}
@@ -642,12 +708,16 @@ export const StoreModal: React.FC<StoreModalProps> = ({
           )}
 
           {successMsg && !faucetReveal && flow !== 'unavailable' && (
-            <View
-              style={[styles.successBox, { backgroundColor: t.amberTint, borderColor: t.amberTintBorder }]}
+            <Animated.View
+              style={[
+                styles.successBox,
+                { backgroundColor: t.amberTint, borderColor: t.amberTintBorder },
+                { opacity: successBoxOpacity, transform: [{ scale: successBoxScale }] },
+              ]}
               accessibilityLiveRegion="polite"
             >
               <Text style={[styles.successText, { color: t.amberText }]}>{successMsg}</Text>
-            </View>
+            </Animated.View>
           )}
 
           {flow === 'unavailable' && (
@@ -730,6 +800,9 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   balanceText: { fontSize: 14, fontWeight: '700', fontFamily: PIXEL_FONT_BOLD },
+  // Wraps the amber balance so the one-cycle AmberSparkle burst has a
+  // positioned anchor to overlay on credit.
+  amberBalanceWrap: { position: 'relative' },
   hintInline: { width: 13, height: 13 },
   hintInlineSmall: { width: 11, height: 11 },
   scroll: { flexGrow: 0 },

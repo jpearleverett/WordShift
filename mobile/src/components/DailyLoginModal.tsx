@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -97,28 +97,73 @@ export const DailyLoginModal: React.FC<DailyLoginModalProps> = ({ grant, phase, 
     return () => anim.stop();
   }, [visible, reducedMotion, backdropOpacity, cardScale, cardOpacity, claimedPop]);
 
+  // Amber-gem particle burst from the claimed day cell on Collect. The cell
+  // reports its own layout (measured once it renders as the claimed cell);
+  // reset on every fresh grant so a stale layout can never anchor a new burst.
+  const [claimedCellLayout, setClaimedCellLayout] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [burstActive, setBurstActive] = useState(false);
+  const BURST_PARTICLE_COUNT = 5;
+  const burstParticles = useRef(
+    Array.from({ length: BURST_PARTICLE_COUNT }, () => ({
+      tx: new Animated.Value(0),
+      ty: new Animated.Value(0),
+      opacity: new Animated.Value(0),
+      scale: new Animated.Value(0.6),
+    })),
+  ).current;
+
+  useEffect(() => {
+    if (!visible) return;
+    setBurstActive(false);
+    setClaimedCellLayout(null);
+  }, [visible]);
+
   const handleClose = useCallback(() => {
     if (closingRef.current) return;
     closingRef.current = true;
+    // The Collect handler now plays its own semantic sound (the button
+    // itself is soundKind="none").
+    playUiSound('selection');
     if (reducedMotion) {
       onClose();
       return;
     }
+    const showBurst = claimedCellLayout !== null;
+    if (showBurst) {
+      setBurstActive(true);
+      burstParticles.forEach((p, i) => {
+        p.tx.setValue(0);
+        p.ty.setValue(0);
+        p.opacity.setValue(1);
+        p.scale.setValue(0.6);
+        const angle = (i / burstParticles.length) * Math.PI * 2 + Math.random() * 0.5;
+        const dist = 22 + Math.random() * 14;
+        Animated.parallel([
+          Animated.timing(p.tx, { toValue: Math.cos(angle) * dist, duration: 340, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+          Animated.timing(p.ty, { toValue: Math.sin(angle) * dist - 8, duration: 340, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+          Animated.timing(p.opacity, { toValue: 0, duration: 340, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+          Animated.spring(p.scale, { toValue: 1, friction: 4, useNativeDriver: true }),
+        ]).start();
+      });
+    }
+    const closeDelayMs = showBurst ? 350 : 0;
     Animated.parallel([
       Animated.timing(backdropOpacity, {
         toValue: 0,
         duration: SURFACE.modalOutMs,
+        delay: closeDelayMs,
         easing: Easing.in(Easing.ease),
         useNativeDriver: true,
       }),
       Animated.timing(cardOpacity, {
         toValue: 0,
         duration: SURFACE.modalOutMs,
+        delay: closeDelayMs,
         easing: Easing.in(Easing.ease),
         useNativeDriver: true,
       }),
     ]).start(() => onClose());
-  }, [reducedMotion, backdropOpacity, cardOpacity, onClose]);
+  }, [reducedMotion, backdropOpacity, cardOpacity, onClose, claimedCellLayout, burstParticles]);
 
   if (!grant) return null;
 
@@ -180,6 +225,7 @@ export const DailyLoginModal: React.FC<DailyLoginModalProps> = ({ grant, phase, 
                 return (
                   <Animated.View
                     key={dayNum}
+                    onLayout={isClaimed ? (e) => setClaimedCellLayout(e.nativeEvent.layout) : undefined}
                     style={[
                       styles.dayCell,
                       { backgroundColor: t.sectionBg, borderColor: t.sectionBorder },
@@ -221,6 +267,30 @@ export const DailyLoginModal: React.FC<DailyLoginModalProps> = ({ grant, phase, 
                   </Animated.View>
                 );
               })}
+              {/* Amber-gem particle burst from the claimed day cell on Collect,
+                  ~350ms before the modal closes. Reduced motion skips it (kept
+                  sound + haptic; see handleClose). */}
+              {burstActive && claimedCellLayout && (
+                <View
+                  pointerEvents="none"
+                  style={[
+                    styles.burstAnchor,
+                    { left: claimedCellLayout.x + claimedCellLayout.width / 2, top: claimedCellLayout.y + claimedCellLayout.height / 2 },
+                  ]}
+                >
+                  {burstParticles.map((p, i) => (
+                    <Animated.View
+                      key={i}
+                      style={[
+                        styles.burstGem,
+                        { opacity: p.opacity, transform: [{ translateX: p.tx }, { translateY: p.ty }, { scale: p.scale }] },
+                      ]}
+                    >
+                      <Image source={AMBER_ICON} style={styles.burstGemIcon} />
+                    </Animated.View>
+                  ))}
+                </View>
+              )}
             </View>
 
             {/* Claimed amount, prominent — counts up with an amber-icon pop and
@@ -255,6 +325,7 @@ export const DailyLoginModal: React.FC<DailyLoginModalProps> = ({ grant, phase, 
               size="lg"
               style={styles.collectButton}
               accessibilityLabel="Collect daily reward"
+              soundKind="none"
             />
           </PanelCard>
         </Animated.View>
@@ -304,11 +375,31 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   cycleRow: {
+    position: 'relative',
     flexDirection: 'row',
     justifyContent: 'center',
     flexWrap: 'wrap',
     marginTop: 20,
     marginBottom: 4,
+  },
+  // Amber-gem particle burst anchor, positioned at the claimed cell's center
+  // (see claimedCellLayout); each gem is a small absolutely-positioned Image
+  // that flies outward + fades on Collect.
+  burstAnchor: {
+    position: 'absolute',
+    width: 0,
+    height: 0,
+  },
+  burstGem: {
+    position: 'absolute',
+    left: -7,
+    top: -7,
+    width: 14,
+    height: 14,
+  },
+  burstGemIcon: {
+    width: 14,
+    height: 14,
   },
   dayCell: {
     width: 42,
