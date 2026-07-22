@@ -141,7 +141,7 @@ export const CHARACTER_SPRITES: Partial<Record<AnimalType, {
 // vector look on every platform instead of rendering the host font's emoji.
 type EmoteKey =
   | 'heart' | 'pale_heart' | 'sparkle' | 'note' | 'thought' | 'question'
-  | 'fog' | 'tear' | 'eye' | 'void' | 'candle';
+  | 'fog' | 'tear' | 'eye' | 'void' | 'candle' | 'sleep';
 const EMOTE_SPRITES: Record<EmoteKey, ImageSourcePropType> = {
   heart: require('../../../assets/ui/emote_heart.png'),
   pale_heart: require('../../../assets/ui/emote_pale_heart.png'),
@@ -154,7 +154,25 @@ const EMOTE_SPRITES: Record<EmoteKey, ImageSourcePropType> = {
   eye: require('../../../assets/ui/emote_eye.png'),
   void: require('../../../assets/ui/emote_void.png'),
   candle: require('../../../assets/ui/emote_candle.png'),
+  // Cottage sleep glyph — replaces the raw 💤 OS emoji in the cooldown name tag
+  // (the last OS emoji on the animal chrome), keeping the sprite look everywhere.
+  sleep: require('../../../assets/ui/emote_sleep.png'),
 };
+
+// Phase-aware parchment puff drawn BEHIND the ambient emote sprite, so the
+// emote reads as a small cottage speech puff rather than a bare floating icon.
+// It ages with the descent: warm cream in the bright days, ashen night later
+// (so a Phase-4 emote never floats on a bright bubble).
+const EMOTE_BUBBLE_THEME: Record<number, { bg: string; border: string }> = {
+  0: { bg: '#FDF3DC', border: '#E7C98A' },
+  1: { bg: '#F6E9CF', border: '#DBBE86' },
+  2: { bg: '#E7D6C0', border: '#B79B77' },
+  3: { bg: '#2C2A3E', border: '#4A4568' },
+  4: { bg: '#1C1A2A', border: '#3A2E4E' },
+  5: { bg: '#241F33', border: '#463C5C' },
+};
+const getEmoteBubbleTheme = (phase: number): { bg: string; border: string } =>
+  EMOTE_BUBBLE_THEME[phase] ?? EMOTE_BUBBLE_THEME[0];
 
 // Emote bubble vocabulary by phase — the same emotional arc the old emoji set
 // carried (candy joy -> curiosity -> unease -> dread -> serene resignation),
@@ -537,6 +555,27 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
   const gaitScaleY = gaitAnim.interpolate({
     inputRange: [0, 0.25, 0.5, 0.75, 1],
     outputRange: [1, 1.03, 0.97, 1.03, 1],
+  });
+
+  // Contact shadow behavior. A real contact shadow stays PLANTED on the floor
+  // and shrinks + softens as the body rises — it never lifts with the hop. The
+  // gait bob (gaitBob) and the rare-idle hop (idleHopY) live on the `body`
+  // layer, so the shadow (an unflipped SIBLING of `body`) never inherits their
+  // translate; the container's moving bounce (bounceY) IS inherited, so the
+  // shadow cancels it below. The shadow reacts to the combined body lift with
+  // SCALE + OPACITY only (per the "may scale slightly with hop height, must not
+  // translate up" contract). All three lift sources pin to 0 under reduced
+  // motion / low tier, so the shadow resolves to a static full-size oval there.
+  const bodyLift = Animated.add(Animated.add(bounceY, gaitBob), idleHopY);
+  const shadowLiftScale = bodyLift.interpolate({
+    inputRange: [-10, 0],
+    outputRange: [0.82, 1],
+    extrapolate: 'clamp',
+  });
+  const shadowLiftOpacity = bodyLift.interpolate({
+    inputRange: [-10, 0],
+    outputRange: [0.55, 1],
+    extrapolate: 'clamp',
   });
 
   // Rare-idle rotate: idleRot carries a fraction of ±10deg, so the sloth's
@@ -1091,6 +1130,9 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
   // Per-animal nudge so feet land on the floor (some sprite art sits high in frame).
   const floorOffset = FLOOR_OFFSET[animal.type] ?? 0;
 
+  // Phase-aware cottage puff behind the ambient emote sprite.
+  const emoteBubbleTheme = getEmoteBubbleTheme(currentPhase);
+
   return (
     <Animated.View
       style={[
@@ -1116,11 +1158,23 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
           {/* Contact shadow - a grounded, unflipped sibling OUTSIDE the body
               transform, so it never bobs with the gait or lifts with a rare-idle
               hop (a shadow stays planted on the floor while the feet leave it).
-              It still responds to the tap squash via its own scaleX. */}
+              It cancels the container's moving bounce (bounceY) so it stays on
+              the floor there too, shrinks + softens with the body's lift, and
+              still responds to the tap squash via its own scaleX. */}
           <Animated.View
             style={[
               styles.shadow,
-              { transform: [{ scaleX: tapScale }] },
+              {
+                opacity: shadowLiftOpacity,
+                transform: [
+                  // Keep the shadow on the ground: undo the outer container's
+                  // bounceY translate (the gait/idle hops live on `body`, which
+                  // the shadow never inherits, so only bounceY needs cancelling).
+                  { translateY: Animated.multiply(bounceY, -1) },
+                  { scaleX: tapScale },
+                  { scale: shadowLiftScale },
+                ],
+              },
             ]}
           />
 
@@ -1241,7 +1295,9 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
             )}
           </Animated.View>
 
-          {/* Emote bubble (unflipped sibling) — ambient candy-UI sprite, decorative */}
+          {/* Emote bubble (unflipped sibling) — a candy-UI sprite on a phase-aware
+              cottage parchment puff, so the ambient emote reads as an in-world
+              speech puff rather than a bare floating icon. Decorative. */}
           {currentEmotion && (
             <Animated.View
               style={[
@@ -1254,11 +1310,18 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
               importantForAccessibility="no"
               accessibilityElementsHidden
             >
-              <Image
-                source={EMOTE_SPRITES[currentEmotion]}
-                style={styles.emoteSprite}
-                resizeMode="contain"
-              />
+              <View
+                style={[
+                  styles.emotePuff,
+                  { backgroundColor: emoteBubbleTheme.bg, borderColor: emoteBubbleTheme.border },
+                ]}
+              >
+                <Image
+                  source={EMOTE_SPRITES[currentEmotion]}
+                  style={styles.emoteSprite}
+                  resizeMode="contain"
+                />
+              </View>
             </Animated.View>
           )}
 
@@ -1290,7 +1353,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
               {animal.name}
             </Text>
             {isOnCooldown && (
-              <Text style={styles.cooldownIndicator}>💤</Text>
+              <Image source={EMOTE_SPRITES.sleep} style={styles.cooldownIcon} resizeMode="contain" />
             )}
           </View>
 
@@ -1422,9 +1485,10 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
   },
-  cooldownIndicator: {
-    fontFamily: BODY_FONT,
-    fontSize: 10,
+  // Cottage sleep sprite in the cooldown name tag (replaces the raw 💤 emoji).
+  cooldownIcon: {
+    width: 12,
+    height: 12,
     marginLeft: 2,
   },
   nameTagDark: {
@@ -1456,6 +1520,15 @@ const styles = StyleSheet.create({
   emotionBubble: {
     position: 'absolute',
     top: -10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Cottage parchment puff behind the emote sprite (fill/border set per phase).
+  emotePuff: {
+    paddingHorizontal: 5,
+    paddingVertical: 4,
+    borderRadius: 9,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
