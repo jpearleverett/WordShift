@@ -335,6 +335,15 @@ function MainApp() {
   const setPuzzleMessage = puzzleActions.setMessage;
   const setSelectedVariant = puzzleActions.setSelectedVariant;
 
+  // Live mirrors of gameState + victory-lock for callbacks that must read the
+  // CURRENT value without capturing it in a stale closure (e.g. the speed
+  // timer's onTimeUp, which can otherwise fire a loss buzz after a winning
+  // commit — a buzzer-beater race).
+  const gameStateRef = useRef(puzzle.gameState);
+  useEffect(() => { gameStateRef.current = puzzle.gameState; }, [puzzle.gameState]);
+  const isProcessingVictoryRef = useRef(victoryFlow.isProcessingVictory);
+  useEffect(() => { isProcessingVictoryRef.current = victoryFlow.isProcessingVictory; }, [victoryFlow.isProcessingVictory]);
+
   const puzzlesSolvedForVariantUnlocks = persistence.cumulativeStats?.totalPuzzlesCompleted ?? 0;
   const variantSelectorOptions = useMemo(() => {
     // uiPhase intentionally matches currentPhase — we use the confirmed phase
@@ -693,6 +702,10 @@ function MainApp() {
   // Time's-Up overlay exits (Try Again / Home) — every other fresh-run path
   // already resets it.
   const onSpeedTimeUp = useCallback(() => {
+    // Buzzer-beater guard: a winning commit that lands in the same frame as the
+    // clock hitting 0 must NOT get loss feedback. If the victory flow is
+    // already processing, or the board is no longer PLAYING, swallow the timeout.
+    if (isProcessingVictoryRef.current || gameStateRef.current !== GameState.PLAYING) return;
     setPuzzleGameState(GameState.GAME_OVER);
     hapticWarning();
     soundInvalidMove();
@@ -1908,6 +1921,13 @@ function MainApp() {
 
     if (result?.completed) {
       isDragDropRef.current = false;
+      // Stop the speed clock SYNCHRONOUSLY at the win so a buzzer-beater commit
+      // can't let the countdown reach 0 and fire loss feedback before the
+      // gameState render effect tears the timer down (onSpeedTimeUp also guards
+      // on the victory lock, but stopping here closes the window entirely).
+      if (hasVariantModifier(puzzle.currentVariant, 'speed')) {
+        stopSpeedTimer();
+      }
       // Blind Offering's end-of-board reveal (accepted): validity was hidden the
       // whole board, so the chain validating IS the payoff. Fire the green
       // accept-sweep + a rising chime + a success haptic, distinct from an
@@ -3446,6 +3466,15 @@ function MainApp() {
         handleGoToPit();
         return true;
       }
+      // A plain victory back must run the SAME exit as the modal's Home button
+      // (handleReturnHome) so it inherits the full teardown — clear victory
+      // timeouts, reset victory + orchestration, clear the board, and honor the
+      // interstitial exemptions — instead of a bare transitionTo that left the
+      // victory flow half-torn-down.
+      if (currentScreen === 'puzzle' && puzzle.gameState === GameState.WON) {
+        handleReturnHome();
+        return true;
+      }
       if (currentScreen !== 'home') {
         // Mirror the in-UI home button: reset transient puzzle UI state
         // (mid-puzzle progress itself is preserved by autosave).
@@ -3465,7 +3494,7 @@ function MainApp() {
       return false;
     });
     return () => subscription.remove();
-  }, [currentScreen, transitionTo, onboardingFlow.isOnboarding, puzzleActions, puzzle.gameState, puzzle.unbrokenWeaveMode, victoryFlow.victoryData, persistence.pendingPhaseTransition, handleGoToPit]);
+  }, [currentScreen, transitionTo, onboardingFlow.isOnboarding, puzzleActions, puzzle.gameState, puzzle.unbrokenWeaveMode, victoryFlow.victoryData, persistence.pendingPhaseTransition, handleGoToPit, handleReturnHome]);
 
   // Optional rewarded "double the reward": credits a bonus equal to this
   // puzzle's amber (a true 2x), reward-only — never phase progress. One claim
