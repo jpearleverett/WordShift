@@ -95,7 +95,7 @@ import { ShareResultModal } from './src/components/share/ShareResultModal';
 import { getLocalDateString } from './src/services/dateUtils';
 import { getSettingsSync } from './src/services/settings';
 import { announceForA11y } from './src/services/a11yAnnounce';
-import { initAudio, setAudioPhase, startMusicForScreen, type MusicScreen, soundVictory, soundPerfect, soundValidMove, soundMidpointTurn, soundInvalidMove, soundUndo, soundHint, soundTap, soundUiTap, soundSelection, soundLetterSelect } from './src/services/audio';
+import { initAudio, setAudioPhase, startMusicForScreen, type MusicScreen, soundVictory, soundPerfect, soundValidMove, soundMidpointTurn, soundInvalidMove, soundUndo, soundHint, soundTap, soundUiTap, soundSelection, soundLetterSelect, soundDailyReady } from './src/services/audio';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess, hapticWarning, hapticError, hapticSelection } from './src/services/haptics';
 import { getVariantTutorialIntroLines } from './src/services/animalDialogue';
@@ -2251,6 +2251,11 @@ function MainApp() {
           if (milestone) {
             const newBalance = await awardBonusAmber(milestone.amber, 'daily_streak_milestone');
             persistenceActions.setAmberBalance(newBalance);
+            // A daily-streak milestone is a distinct celebration, not a plain
+            // receipt: fire the (previously-unwired) daily_ready chime + a
+            // success haptic so it doesn't land silently like a trivial line.
+            hapticSuccess();
+            soundDailyReady();
             enqueueVictoryToast(`${milestone.message} (+${milestone.amber} amber)`, 'receipt');
           } else if (dailyProgress.streakSavedByFreeze) {
             // A banked freeze forgave a missed day — let the player know the
@@ -2398,7 +2403,9 @@ function MainApp() {
           result.completedWords
         );
         if (microEvent) {
-          puzzleActions.setMessage(microEvent);
+          // Route through the in-modal victory toast queue (not the board Toast,
+          // which renders UNDER the victory modal scrim and would bury it).
+          enqueueVictoryToast(microEvent, 'info');
         }
       }
 
