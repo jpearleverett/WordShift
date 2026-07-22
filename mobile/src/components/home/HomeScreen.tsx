@@ -87,6 +87,26 @@ const MENU_ICON = require('../../../assets/ui/menu.png');
 // hero moments: the sacrifice altar's focal candle and the phase-4 temple crest.
 const CANDLE_ICON = require('../../../assets/ui/candle.png');
 const VOID_ICON = require('../../../assets/ui/void.png');
+// Journal-spotlight step sprites (generateUiIcons family) replace the old raw
+// emoji glyphs. Keyed on the step's stable id so the mapping never depends on
+// an emoji codepoint. JOURNAL_ICON (above) covers the cover + ledger steps.
+const SCROLL_ICON = require('../../../assets/ui/scroll.png');
+const CALENDAR_ICON = require('../../../assets/ui/calendar.png');
+const SPARKLE_ICON = require('../../../assets/ui/emote_sparkle.png');
+function getJournalSpotlightStepSprite(stepId: string) {
+  switch (stepId) {
+    case 'gallery':
+      return SCROLL_ICON;
+    case 'quests':
+      return CALENDAR_ICON;
+    case 'open':
+      return SPARKLE_ICON;
+    case 'cover':
+    case 'ledger':
+    default:
+      return JOURNAL_ICON;
+  }
+}
 import {
   getChallengeIntroLines,
   getHouseCompletionText,
@@ -518,6 +538,14 @@ let heavyHarvestNudgeShownThisSession = false;
 // intro cards never flicker over each other.
 const GATED_ROOM_INTRO_SETTLE_MS = 500;
 
+// Onboarding (home_empty): how long the empty-home reveal breathes before the
+// invite prompt slides in. Long enough for the player to read Ember's ~15-word
+// payoff line ("Hello up there!") before the modal scrim covers it. The safety
+// net below stays a short beat BEHIND this so it never preempts the readable
+// pause on the happy path (it only fires when the primary invite never armed).
+const INVITE_PROMPT_REVEAL_DELAY_MS = 2600;
+const INVITE_PROMPT_SAFETY_DELAY_MS = INVITE_PROMPT_REVEAL_DELAY_MS + 200;
+
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   onPlayPuzzle,
   onStartDaily,
@@ -893,14 +921,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   }, [progress?.amber, unlockFlow.recheckAffordability]);
 
   // Onboarding: auto-show invite prompt when data is loaded during home_empty.
-  // Deferred ~1.3s so the empty-home reveal (the little den) lands FIRST — the
-  // invite prompt's "Hello up there!" then reads as a response to the player
-  // discovering the den, not a modal that buries the moment under its scrim
-  // the instant data loads. Tracked timer, cleared if the step/unlock changes.
+  // Deferred ~2.6s so the empty-home reveal (the little den) lands FIRST AND the
+  // player can comfortably READ Ember's payoff line before the modal scrim
+  // covers it — the invite prompt's "Hello up there!" then reads as a response
+  // to the player discovering the den, not a modal that buries the moment under
+  // its scrim too fast. Tracked timer, cleared if the step/unlock changes.
   useEffect(() => {
     if (onboardingStep === 'home_empty' && progress && unlockFlow.nextUnlock) {
       if (unlockFlow.nextUnlock.type === 'character' && unlockFlow.nextUnlock.cost === 0) {
-        const t = setTimeout(() => unlockFlow.setShowInvitePrompt(true), 1300);
+        const t = setTimeout(() => unlockFlow.setShowInvitePrompt(true), INVITE_PROMPT_REVEAL_DELAY_MS);
         return () => clearTimeout(t);
       }
     }
@@ -927,7 +956,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         homeEmptyRecoveryAttemptsRef.current += 1;
         loadAllData();
       }
-    }, 1500);
+    }, INVITE_PROMPT_SAFETY_DELAY_MS);
     return () => clearTimeout(t);
   }, [onboardingStep, unlockFlow.showInvitePrompt, unlockFlow.nextUnlock]);
 
@@ -1496,7 +1525,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     }
   }, [showIntroDialogue, journalSpotlightVisible]);
 
-  // Slide animation for intro dialogue (matches normal dialogue)
+  // Slide animation for intro dialogue (matches normal dialogue). The entrance
+  // spring ages with the descent like every other surface (bright springy
+  // overshoot -> heavy dark settle).
   useEffect(() => {
     if (showIntroDialogue) {
       introDialogueSlide.setValue(0);
@@ -1504,15 +1535,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       if (settings.reducedMotion) {
         introDialogueSlide.setValue(1);
       } else {
+        const entranceSpring = getModalInSpring(progress?.currentPhase ?? 0);
         Animated.spring(introDialogueSlide, {
           toValue: 1,
-          friction: 8,
-          tension: 65,
+          friction: entranceSpring.friction,
+          tension: entranceSpring.tension,
           useNativeDriver: true,
         }).start();
       }
     }
-  }, [showIntroDialogue, introDialogueSlide]);
+  }, [showIntroDialogue, introDialogueSlide, progress?.currentPhase]);
 
   // Count the header amber up to its new total and pop the gem, scaling the pop
   // to the SIZE of the gain (a small win taps, a windfall bursts) instead of a
@@ -3686,7 +3718,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   edgeDp={CARD_EDGE_DP}
                   fillColor={pixelSkin.fillCard}
                 />
-                <Text style={styles.journalSpotlightHeroBadgeText}>{currentJournalSpotlightStep.icon}</Text>
+                <Image
+                  source={getJournalSpotlightStepSprite(currentJournalSpotlightStep.id)}
+                  style={styles.journalSpotlightHeroBadgeIcon}
+                  resizeMode="contain"
+                />
               </View>
 
               <View style={styles.journalSpotlightHeroText}>
@@ -3723,7 +3759,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       edgeDp={CARD_EDGE_DP}
                       fillColor={pixelSkin.fillCard}
                     />
-                    <Text style={styles.journalSpotlightCardIcon}>{step.icon}</Text>
+                    <Image
+                      source={getJournalSpotlightStepSprite(step.id)}
+                      style={styles.journalSpotlightCardIconImage}
+                      resizeMode="contain"
+                    />
                     <Text
                       style={[
                         styles.journalSpotlightCardTitle,
@@ -5116,9 +5156,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  journalSpotlightHeroBadgeText: {
-    fontFamily: BODY_FONT,
-    fontSize: FONT_SIZE.hero,
+  journalSpotlightHeroBadgeIcon: {
+    width: 34,
+    height: 34,
   },
   journalSpotlightHeroText: {
     flex: 1,
@@ -5170,9 +5210,9 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 4,
   },
-  journalSpotlightCardIcon: {
-    fontFamily: BODY_FONT,
-    fontSize: FONT_SIZE.title,
+  journalSpotlightCardIconImage: {
+    width: 26,
+    height: 26,
     marginBottom: 8,
   },
   journalSpotlightCardTitle: {

@@ -72,6 +72,7 @@ import {
   hashSeed,
 } from '../services/tending';
 import { buildPhase5Pool } from '../services/dialogue/phase5Pool';
+import { getModalInSpring } from '../theme/surfaces';
 
 /**
  * Maximum characters shown per dialogue page. Lines longer than this are split
@@ -1038,15 +1039,17 @@ export function useDialogueFlow({
     const status = getSessionStatus(animal.id, getSessionBonus(animal));
     setSessionInfo(status);
 
-    // Animate dialogue modal in
+    // Animate dialogue modal in — the entrance spring ages with the descent
+    // like every other surface (bright springy overshoot -> heavy dark settle).
     if (getSettingsSync().reducedMotion) {
       dialogueSlide.setValue(1);
     } else {
       dialogueSlide.setValue(0);
+      const entranceSpring = getModalInSpring(progress?.currentPhase ?? 0);
       Animated.spring(dialogueSlide, {
         toValue: 1,
-        friction: 8,
-        tension: 40,
+        friction: entranceSpring.friction,
+        tension: entranceSpring.tension,
         useNativeDriver: true,
       }).start();
     }
