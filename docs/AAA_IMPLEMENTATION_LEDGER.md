@@ -27,6 +27,39 @@
 
 ---
 
+## Session 2 delta (implementation pass over the remaining 121)
+
+A follow-up pass drove the remaining findings via (a) direct serial implementation of the shared-file / ceremony / App findings, and (b) a fleet of six background agents on the per-system leaf files. **Key caveat that shaped the merge:** the six agents branched from a stale ancestor (`9ace204`), *behind* the audit branch, and re-implemented findings from the pre-audit state. Their work therefore overlaps files the audit branch had already improved. Rather than force-merge (which would revert shipped audit work or double-implement), each agent's output was integrated **surgically**: the decoupled, regression-safe files were taken whole, and the overlapping files were either left on the (more complete) audit version or had the specific net-new fix ported by hand. Everything below is committed and verified green (typecheck 0, lint 0 errors, full suite 119 suites / 2934 tests pass).
+
+**Delivered this pass — direct (serial) implementation:**
+- F54 / F62 / F63 — ceremony cinematic: Arrival music-duck, continuous drift particles, stale-scene reset.
+- F55 — `particles_rise`/`particles_fall` one-shot burst (was a dead no-op).
+- F56 — ward-ignition glow made Android-safe (layered halo discs, not iOS shadow) + ceremony tap-to-advance.
+- F57 — Offer-All cascade crescendo (>20-word stretch, intensity ramp, per-3rd/final haptics, valid_move SFX ladder across quarters).
+- F35 — victory receipts moved INTO the modal (were painting under it at zIndex 50).
+- F153 / F154 — a11y: occluded-content fence under blocking overlays + announce pipeline (victory stars/flawless, cinematic titles, ward lines).
+- F105 / F106 — speed buzzer-beater loss-feedback race fixed; Android-back-during-victory now runs the full teardown.
+- F177 / F179 / F135 — house-ask badge sprite; shared BadgeAppear entrance; speed Round-badge pop + sting.
+- F165 / F166 — streak-freeze/milestone reward magnitude; deferred HINT-count pulse.
+
+**Delivered this pass — merged/ported from agents (decoupled or surgical):**
+- F41 / F74 / F3 (Confetti per-phase fall + StarBurst comboTier), F43 / F50 (ShopScreen), F48 / F68 / F75 (achievement progress + toast sprites/spring) — from a5d4c, taken whole.
+- F86 (Phase-5 "peace" music beds wired into `audio.ts`), F116 (assetBundlePatterns narrowed, ~30MB source dropped from the bundle) — from acaa.
+- F30 / F67 / F78 (RoomView unbuilt rooms, trophy/lock sprites, phase-scaled card pulses) — from ac519.
+- F29 (FoxGuide pre-mount frames) — from a3746.
+- F99 / F102 (the two remaining WCAG-failing inks: serene plaque + phase-2 victory title) — ported surgically onto the audit `colors.ts`/`pixelSkin.generated.ts`; guard test `pixelSkinContrast.test.ts` brought in.
+
+**Deferred (with reason), available on the six `worktree-agent-*` branches:**
+- Menu-surface polish on files the audit branch already revamped (StatsScreen bars/skeletons, WordLedger virtualization, WhisperGallery/SeasonPass/StoreModal/DailyLogin entrances — a5d4c F44/F46/F47/F49/F51/F52/F59/F152/F173): overlapping 3-way merges against the surface-feel-kit; several are already partly covered on the audit branch.
+- Home-diorama rewrites (ac519 F11/F12/F13/F16/F17/F18/F20/F64): the audit branch carries its own HouseWorld diorama work (sky geometry, sigils, pit glow); the agent's from-stale-base rewrite would collide.
+- Animal-life reveal (a3746 F25/F26/F31): the per-character dialogue reveal is coupled to the audit HomeScreen render; needs a surgical HomeScreen port.
+- Board-feel (ae2e): the board agent never committed (hung mid-run); its uncommitted, stale-base changes overlap the core LetterTile/Row/ActionButton the audit branch already improved — highest regression risk, lowest finish state.
+- Remaining serial P2/P3 (F6, F60, F61, F91, F97, F119, F123–F125, F134, F139, F151, F155, F156, F178, F180): not reached this pass.
+
+Net: this pass advanced roughly **30 additional findings** to done (verified, committed) on top of the audit branch's 55, and cleanly scoped the rest. The stale-base agent branches remain a source for a dedicated, careful follow-up merge of the deferred items.
+
+---
+
 ## Per-finding status by system
 
 Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a pinned core system) · ❌ not addressed.
