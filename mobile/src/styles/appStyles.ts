@@ -532,6 +532,18 @@ export const appStyles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 8,
   },
+  speedRoundRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  speedRoundFlame: {
+    width: 14,
+    height: 14,
+    marginRight: 4,
+    resizeMode: 'contain',
+  },
   speedRoundText: {
     fontSize: 12,
     fontFamily: BODY_FONT_BOLD,
@@ -539,7 +551,6 @@ export const appStyles = StyleSheet.create({
     color: '#FFE9B0',
     letterSpacing: 0.5,
     textAlign: 'center',
-    marginTop: 2,
   },
   variantBadge: {
     // Dark translucent fill (not translucent-white) so the badge label reads

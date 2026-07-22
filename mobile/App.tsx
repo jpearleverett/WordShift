@@ -106,6 +106,7 @@ import {
   getNotificationPromptText,
   getSpeedTimeUpMessage,
   getDragMissMessage,
+  getReverseMidpointMessage,
   getFirstDailyMercyMessage,
   getSpeedRescueLabel,
   getDailyLockedMessage,
@@ -2555,11 +2556,13 @@ function MainApp() {
         }
       }
 
-      // Reverse-shift midpoint: mark the descent-complete milestone with a
-      // distinct celebratory haptic so the return leg feels like a second act
-      // rather than a continuation.
+      // Reverse-shift midpoint: mark the descent->ascent turn as its own "second
+      // act" — a distinct celebratory haptic, a rising turn chime, AND a phase-
+      // aware beat line (was a lone haptic with no sound or message).
       if (result.reverseMidpoint) {
         hapticSuccess();
+        soundValidMove(3);
+        puzzleActions.setMessage(getReverseMidpointMessage(persistence.currentPhase));
       }
 
       // Dread word visual feedback — subtle dark pulse when a dread word is formed
@@ -4201,16 +4204,20 @@ function MainApp() {
                 speedTimer.speedTimeRemaining <= 10 && styles.speedTimerTextUrgent,
                 speedTimer.speedTimeRemaining <= SPEED_TICK_CRITICAL_SEC && styles.speedTimerTextCritical,
               ]}>
-                {'\u23F1'} {speedTimer.speedTimeRemaining}s
+                {speedTimer.speedTimeRemaining}s
               </Text>
             </Animated.View>
             {speedRound > 0 && (
-              <Text
-                style={styles.speedRoundText}
+              <View
+                style={styles.speedRoundRow}
                 accessibilityLabel={`Speed round ${speedRound + 1}, faster clock`}
               >
-                {'\uD83D\uDD25'} Round {speedRound + 1}
-              </Text>
+                <Image
+                  source={require('./assets/ui/flame.png')}
+                  style={styles.speedRoundFlame}
+                />
+                <Text style={styles.speedRoundText}>Round {speedRound + 1}</Text>
+              </View>
             )}
           </View>
         )}

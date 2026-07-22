@@ -3846,6 +3846,20 @@ export function getStreakFreezeGrantedMessage(phase: number): string {
   return 'A freeze is set aside for you. Miss a day and your streak stays safe.';
 }
 
+// Reverse Shift's descent->ascent turn: the player has reached the bottom of the
+// chain and now walks it back up. It used to be a lone haptic; this line + a
+// distinct turn chime mark the "second act" so the return leg reads as its own
+// movement, not a continuation. Phase-aware.
+export function getReverseMidpointMessage(phase: number): string {
+  if (phase >= 4) {
+    return 'The bottom. Now the long way back up.';
+  }
+  if (phase >= 2) {
+    return 'You have reached the turn. The way back begins.';
+  }
+  return 'Halfway there... now climb back up!';
+}
+
 // ============================================================================
 // DAILY-LOGIN MODAL COPY — the returning-player welcome (NOT the first-ever
 // claim, which lives in getDailyLoginFirstClaimCopy). Was hardcoded and
