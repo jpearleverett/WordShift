@@ -721,6 +721,48 @@ export async function getAchievementsWithStatus(): Promise<
 }
 
 /**
+ * Build the full AchievementCheckState from the live services (stats, progress,
+ * variant/blind wins, daily completions, share count). Used by surfaces that
+ * want to draw progress-toward on locked, countable achievements (StatsScreen).
+ *
+ * Services are lazy-required so importing achievements.ts never pulls the
+ * economy graph in at module load (the same cycle-avoidance the amber credit in
+ * checkAchievements uses). This mirrors the state useAchievementQueue assembles
+ * on a victory, but reads the current stored stats directly.
+ */
+export async function buildAchievementCheckState(): Promise<AchievementCheckState> {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { getCumulativeStats } = require('./starRating');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { getFullProgress, getVariantWinStats } = require('./amberCurrency');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { getDailyStatus } = require('./dailyChallenge');
+
+  const [stats, progress, variantStats, daily, shareCount] = await Promise.all([
+    getCumulativeStats(),
+    getFullProgress(),
+    getVariantWinStats(),
+    getDailyStatus(),
+    getShareCount(),
+  ]);
+
+  return {
+    stats,
+    puzzlesSolved: progress.puzzlesSolved,
+    currentPhase: progress.currentPhase,
+    currentStreak: progress.currentStreak ?? 0,
+    unlockedAnimals: (progress.unlockedAnimals ?? []).length,
+    unlockedRooms: (progress.unlockedRooms ?? []).length,
+    amberEarned: progress.totalAmberEarned,
+    dailyChallengesCompleted: daily.totalCompleted,
+    shareCount,
+    challengeCompletions: progress.challengeCompletions || 0,
+    variantWins: variantStats.variantWins,
+    blindWins: variantStats.blindWins,
+  };
+}
+
+/**
  * Get count of unlocked achievements
  */
 export async function getUnlockedCount(): Promise<number> {

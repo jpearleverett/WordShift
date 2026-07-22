@@ -41,6 +41,7 @@ import { awardBonusAmber } from '../../services/amberCurrency';
 import { addHints } from '../../services/hints';
 import { getSettingsSync } from '../../services/settings';
 import { hapticLight, hapticMedium } from '../../services/haptics';
+import { announceForA11y } from '../../services/a11yAnnounce';
 import { logEvent } from '../../services/eventLogger';
 import { RewardedAdButton } from './RewardedAdButton';
 import { RewardReveal } from '../ui/RewardReveal';
@@ -269,6 +270,21 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     anim.start();
     return () => anim.stop();
   }, [successMsg, reducedMotion, successBoxScale, successBoxOpacity]);
+
+  // Cross-platform screen-reader fallback for the store's transient messages:
+  // accessibilityLiveRegion (below) is Android-only, so these announce the same
+  // copy under VoiceOver too (announceForA11y is a no-op when no reader runs).
+  useEffect(() => {
+    if (successMsg) announceForA11y(successMsg);
+  }, [successMsg]);
+  useEffect(() => {
+    if (faucetReveal) announceForA11y(`Added ${faucetReveal.amount} amber`);
+  }, [faucetReveal]);
+  useEffect(() => {
+    if (flow === 'unavailable') {
+      announceForA11y('The store is not available right now. Nothing was charged.');
+    }
+  }, [flow]);
 
   const priceLabel = useCallback(
     (info: ConsumableProductInfo) => prices[info.productId] ?? info.fallbackPrice,
@@ -538,6 +554,9 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     >
       <View style={[styles.overlay, { backgroundColor: t.overlay }]}>
         <Animated.View
+          // VoiceOver: treat the store card as a modal so the reader stays
+          // within it (accessibilityLiveRegion elsewhere is Android-only).
+          accessibilityViewIsModal
           style={[
             styles.card,
             { opacity: cardOpacity, transform: [{ scale: cardScale }] },
