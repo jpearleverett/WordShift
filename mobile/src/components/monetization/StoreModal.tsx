@@ -11,7 +11,7 @@ import {
   Image,
 } from 'react-native';
 import { CandyColors } from '../../theme/colors';
-import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
+import { SURFACE, getSurfaceTheme, getModalInSpring } from '../../theme/surfaces';
 import { getPixelSkin, PANEL_CORNER_DP, PANEL_EDGE_DP } from '../../theme/pixelSkin.generated';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { NineSliceFrame } from '../ui/NineSlice';
@@ -202,7 +202,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     cardScale.setValue(0.92);
     cardOpacity.setValue(0);
     const anim = Animated.parallel([
-      Animated.spring(cardScale, { toValue: 1, ...SURFACE.modalIn, useNativeDriver: true }),
+      Animated.spring(cardScale, { toValue: 1, ...getModalInSpring(phase), useNativeDriver: true }),
       Animated.timing(cardOpacity, { toValue: 1, duration: 180, useNativeDriver: true }),
     ]);
     anim.start();

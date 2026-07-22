@@ -6,7 +6,7 @@ import { shareResultImage, isImageShareAvailable } from '../../services/shareIma
 import { getChallengeFriendLabel } from '../../services/phaseNarrative';
 import { hapticLight, hapticSuccess } from '../../services/haptics';
 import { playUiSound } from '../../services/uiSound';
-import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
+import { SURFACE, getSurfaceTheme, getModalInSpring } from '../../theme/surfaces';
 import { PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { PanelCard } from '../ui/PanelCard';
 import { CandyButton } from '../ui/CandyButton';
@@ -88,7 +88,7 @@ export const ShareResultModal: React.FC<ShareResultModalProps> = ({ result, onCl
       }),
       Animated.spring(contentScale, {
         toValue: 1,
-        ...SURFACE.modalIn,
+        ...getModalInSpring(result?.phase ?? 0),
         useNativeDriver: true,
       }),
       Animated.timing(contentOpacity, {
@@ -102,7 +102,7 @@ export const ShareResultModal: React.FC<ShareResultModalProps> = ({ result, onCl
         Animated.parallel([
           Animated.spring(cardScale, {
             toValue: 1,
-            ...SURFACE.modalIn,
+            ...getModalInSpring(result?.phase ?? 0),
             useNativeDriver: true,
           }),
           Animated.timing(cardOpacity, {

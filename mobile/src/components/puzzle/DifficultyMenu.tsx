@@ -16,7 +16,7 @@ import {
   Easing,
 } from 'react-native';
 import { CandyColors } from '../../theme/colors';
-import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
+import { SURFACE, getSurfaceTheme, getModalInSpring } from '../../theme/surfaces';
 import { getSettingsSync } from '../../services/settings';
 import { PanelCard } from '../ui/PanelCard';
 import { getModeIconSprite } from './modeIcons';
@@ -201,7 +201,7 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
     cardOpacity.setValue(0);
     const anim = Animated.parallel([
       Animated.timing(backdropOpacity, { toValue: 1, duration: 180, useNativeDriver: true }),
-      Animated.spring(cardScale, { toValue: 1, ...SURFACE.modalIn, useNativeDriver: true }),
+      Animated.spring(cardScale, { toValue: 1, ...getModalInSpring(phase), useNativeDriver: true }),
       Animated.timing(cardOpacity, { toValue: 1, duration: 180, useNativeDriver: true }),
     ]);
     anim.start();

@@ -8,7 +8,7 @@ import {
   Modal,
   Image,
 } from 'react-native';
-import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
+import { SURFACE, getSurfaceTheme, getModalInSpring } from '../theme/surfaces';
 import { PIXEL_FONT_BOLD } from '../theme/fonts';
 import { hapticSuccess } from '../services/haptics';
 import { playUiSound } from '../services/uiSound';
@@ -77,7 +77,7 @@ export const DailyLoginModal: React.FC<DailyLoginModalProps> = ({ grant, phase, 
         }),
         Animated.spring(cardScale, {
           toValue: 1,
-          ...SURFACE.modalIn,
+          ...getModalInSpring(phase),
           useNativeDriver: true,
         }),
         Animated.timing(cardOpacity, {

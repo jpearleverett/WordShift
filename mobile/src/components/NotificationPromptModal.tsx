@@ -8,7 +8,7 @@ import {
   Image,
   Modal,
 } from 'react-native';
-import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
+import { SURFACE, getSurfaceTheme, getModalInSpring } from '../theme/surfaces';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
 import { PanelCard } from './ui/PanelCard';
 import { CandyButton } from './ui/CandyButton';
@@ -73,7 +73,7 @@ export const NotificationPromptModal: React.FC<NotificationPromptModalProps> = (
       }),
       Animated.spring(cardScale, {
         toValue: 1,
-        ...SURFACE.modalIn,
+        ...getModalInSpring(phase),
         useNativeDriver: true,
       }),
       Animated.timing(cardOpacity, {

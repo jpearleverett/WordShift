@@ -9,7 +9,7 @@ import {
   Easing,
 } from 'react-native';
 import { CandyColors } from '../../theme/colors';
-import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
+import { SURFACE, getSurfaceTheme, getModalInSpring } from '../../theme/surfaces';
 import { PanelCard } from '../ui/PanelCard';
 import { CandyButton } from '../ui/CandyButton';
 import { getSettingsSync } from '../../services/settings';
@@ -83,7 +83,7 @@ export const RulesModal: React.FC<RulesModalProps> = ({
       }),
       Animated.spring(cardScale, {
         toValue: 1,
-        ...SURFACE.modalIn,
+        ...getModalInSpring(phase),
         useNativeDriver: true,
       }),
       Animated.timing(cardOpacity, {

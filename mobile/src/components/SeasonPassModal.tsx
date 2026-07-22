@@ -20,7 +20,7 @@ import {
   Easing,
 } from 'react-native';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
-import { getSurfaceTheme, SURFACE } from '../theme/surfaces';
+import { getSurfaceTheme, SURFACE, getModalInSpring } from '../theme/surfaces';
 import { CONFETTI_THEMES } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
 import { shouldSimplifyAnimations } from '../services/deviceTier';
@@ -104,7 +104,7 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
     cardOpacity.setValue(0);
     const anim = Animated.parallel([
       Animated.timing(backdropOpacity, { toValue: 1, duration: 180, useNativeDriver: true }),
-      Animated.spring(cardScale, { toValue: 1, ...SURFACE.modalIn, useNativeDriver: true }),
+      Animated.spring(cardScale, { toValue: 1, ...getModalInSpring(phase), useNativeDriver: true }),
       Animated.timing(cardOpacity, { toValue: 1, duration: 180, useNativeDriver: true }),
     ]);
     anim.start();

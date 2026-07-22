@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { CandyColors } from '../../theme/colors';
-import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
+import { SURFACE, getSurfaceTheme, getModalInSpring } from '../../theme/surfaces';
 import { getPixelSkin, PANEL_CORNER_DP, PANEL_EDGE_DP } from '../../theme/pixelSkin.generated';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { NineSliceFrame } from '../ui/NineSlice';
@@ -142,7 +142,7 @@ export const PatronModal: React.FC<PatronModalProps> = ({
     const anim = Animated.parallel([
       Animated.spring(cardScale, {
         toValue: 1,
-        ...SURFACE.modalIn,
+        ...getModalInSpring(phase),
         useNativeDriver: true,
       }),
       Animated.timing(cardOpacity, {
