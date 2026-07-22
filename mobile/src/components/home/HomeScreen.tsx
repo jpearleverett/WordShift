@@ -39,6 +39,7 @@ import { NineSliceFrame, ThreeSliceStrip } from '../ui/NineSlice';
 import { PixelPlaque } from '../ui/PixelPlaque';
 import { CandyButton } from '../ui/CandyButton';
 import { PanelCard } from '../ui/PanelCard';
+import { RewardReveal } from '../ui/RewardReveal';
 import {
   getFullProgress,
   markIntroSeen,
@@ -585,7 +586,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Weekly quest hub
   const [weeklyQuestState, setWeeklyQuestState] = useState<CombinedQuestState | null>(null);
   const [showQuestModal, setShowQuestModal] = useState(false);
-  const [questFeedback, setQuestFeedback] = useState<string | null>(null);
+  // Quest reward reveal: the claim (and the opt-in watch-to-double) pays out as
+  // a RewardReveal count-up + amber-icon pop instead of a static text line. The
+  // id remounts the reveal so each payout re-animates (claim, then double).
+  const [questReward, setQuestReward] = useState<{ amount: number; label: string; id: number } | null>(null);
+  const questRewardIdRef = useRef(0);
   // After a quest is claimed, an OPT-IN rewarded ad can double that reward
   // (placement 'quest_bonus'). Holds the just-claimed reward so the button
   // knows how much bonus amber to grant; cleared on double, re-claim, or reopen.
@@ -1544,7 +1549,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       });
       setWeeklyQuestState(refreshed);
     }
-    setQuestFeedback(null);
+    setQuestReward(null);
     setDoubleQuestOffer(null);
     setShowQuestModal(true);
   }, [progress, animals]);
@@ -1557,7 +1562,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const newBalance = await awardBonusAmber(reward.amber, 'quest_reward');
     onAmberChange?.(newBalance);
     setProgress(prev => prev ? { ...prev, amber: newBalance } : prev);
-    setQuestFeedback(`Claimed +${reward.amber} amber!`);
+    questRewardIdRef.current += 1;
+    setQuestReward({ amount: reward.amber, label: 'Claimed', id: questRewardIdRef.current });
     // Offer an opt-in "watch to double it" rewarded ad for this claim.
     setDoubleQuestOffer({ questId, amber: reward.amber });
     logEvent({ type: 'quest_reward_claimed', data: { questId, amber: reward.amber } });
@@ -1589,7 +1595,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const newBalance = await awardBonusAmber(amber, 'quest_bonus');
     onAmberChange?.(newBalance);
     setProgress(prev => (prev ? { ...prev, amber: newBalance } : prev));
-    setQuestFeedback(`Doubled! +${amber} more amber.`);
+    questRewardIdRef.current += 1;
+    setQuestReward({ amount: amber, label: 'Doubled', id: questRewardIdRef.current });
     logEvent({ type: 'quest_reward_claimed', data: { questId, amber, doubled: true } });
   }, [progress, doubleQuestOffer, onAmberChange]);
 
@@ -2637,10 +2644,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               label="Quests"
               style={styles.modalPlaque}
             />
-            {questFeedback && (
-              <Text style={[styles.shopFeedbackText, { color: panelSt.title }]}>
-                {questFeedback}
-              </Text>
+            {questReward && (
+              <RewardReveal
+                key={questReward.id}
+                amount={questReward.amount}
+                icon={AMBER_ICON}
+                label={questReward.label}
+                phase={progress.currentPhase}
+                style={styles.questRewardReveal}
+              />
             )}
             {doubleQuestOffer && (
               <RewardedAdButton
@@ -4099,6 +4111,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     textAlign: 'center',
+    marginBottom: 12,
+  },
+  questRewardReveal: {
     marginBottom: 12,
   },
   // Pixel-card hub rows (Journal / Utility menus) — the NineSliceFrame is the
