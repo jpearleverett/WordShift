@@ -92,6 +92,7 @@ import { initShareImage } from './src/services/shareImage';
 import { ShareResultModal } from './src/components/share/ShareResultModal';
 import { getLocalDateString } from './src/services/dateUtils';
 import { getSettingsSync } from './src/services/settings';
+import { announceForA11y } from './src/services/a11yAnnounce';
 import { initAudio, setAudioPhase, startMusicForScreen, type MusicScreen, soundVictory, soundPerfect, soundValidMove, soundInvalidMove, soundUndo, soundHint, soundTap, soundUiTap, soundSelection, soundLetterSelect } from './src/services/audio';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess, hapticWarning, hapticError, hapticSelection } from './src/services/haptics';
@@ -995,6 +996,13 @@ function MainApp() {
   // Reduced motion pins it fully visible.
   useEffect(() => {
     if (!(orchestration.showVictoryGlitch && orchestration.victoryGlitchProminent)) return;
+    // Screen-reader treatment (F155): the PROMINENT held glitch (the guaranteed
+    // first-win "something else is here" beat) is spoken so its wrong-note lands
+    // for a screen-reader player too. The SUBLIMINAL ~8% ambient glitches are
+    // NOT prominent, so they stay silent by design — a flicker, not a caption.
+    if (orchestration.victoryGlitch) {
+      announceForA11y(orchestration.victoryGlitch);
+    }
     if (getSettingsSync().reducedMotion) {
       glitchStutter.setValue(1);
       return;
@@ -1007,7 +1015,7 @@ function MainApp() {
     ]);
     seq.start();
     return () => { seq.stop(); glitchStutter.setValue(1); };
-  }, [orchestration.showVictoryGlitch, orchestration.victoryGlitchProminent, glitchStutter]);
+  }, [orchestration.showVictoryGlitch, orchestration.victoryGlitchProminent, orchestration.victoryGlitch, glitchStutter]);
 
   // New Cycle (NG+) opening beat — once per new cycle, on the first quiet home
   // landing after it begins, the bright days announce themselves (wrongly).
@@ -3521,6 +3529,14 @@ function MainApp() {
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       if (onboardingFlow.isOnboarding) {
+        // On the very first interactive screen (the cold-open opener, nothing
+        // committed yet), back should EXIT the app like any first screen — a
+        // dead back button reads as broken. State is persisted; relaunch
+        // resumes the opener via resolveColdOpenLaunchRoute. Every LATER guided
+        // step still swallows back so a stray press can't abort the tutorial.
+        if (onboardingFlow.onboardingStep === 'cold_open_puzzle' && puzzle.history.length === 0) {
+          return false;
+        }
         return true;
       }
       // A pit-mandatory victory (first-harvest gate or pending ward ceremony)
@@ -3562,7 +3578,7 @@ function MainApp() {
       return false;
     });
     return () => subscription.remove();
-  }, [currentScreen, transitionTo, onboardingFlow.isOnboarding, puzzleActions, puzzle.gameState, puzzle.unbrokenWeaveMode, victoryFlow.victoryData, persistence.pendingPhaseTransition, handleGoToPit, handleReturnHome]);
+  }, [currentScreen, transitionTo, onboardingFlow.isOnboarding, onboardingFlow.onboardingStep, puzzleActions, puzzle.gameState, puzzle.history.length, puzzle.unbrokenWeaveMode, victoryFlow.victoryData, persistence.pendingPhaseTransition, handleGoToPit, handleReturnHome]);
 
   // Optional rewarded "double the reward": credits a bonus equal to this
   // puzzle's amber (a true 2x), reward-only — never phase progress. One claim
