@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, StyleSheet, Animated, Dimensions, Easing } from 'react-native';
 import { getSettingsSync } from '../services/settings';
 import { getPhaseTheme, CONFETTI_THEMES } from '../theme/colors';
-import { getMaxConfettiCount } from '../services/deviceTier';
+import { getMaxConfettiCount, shouldSimplifyAnimations } from '../services/deviceTier';
 import { getEquippedSync } from '../services/cosmetics';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -347,6 +347,9 @@ interface StarBurstProps {
 
 export const StarBurst: React.FC<StarBurstProps> = ({ active, x, y, phase = 0, comboTier = 0 }) => {
   const reducedMotion = getSettingsSync().reducedMotion;
+  // Low-tier devices skip the decorative burst entirely (the move still lands
+  // its haptic + sound); treat it exactly like reduced motion.
+  const simplify = shouldSimplifyAnimations();
   const tier = Math.max(0, Math.min(3, Math.floor(comboTier)));
   const count = STAR_COUNT_BY_TIER[tier];
 
@@ -365,11 +368,14 @@ export const StarBurst: React.FC<StarBurstProps> = ({ active, x, y, phase = 0, c
   );
 
   useEffect(() => {
-    if (active && !reducedMotion) {
+    if (active && !reducedMotion && !simplify) {
       const runningAnims: Animated.CompositeAnimation[] = [];
       // A deep tier at a dark phase damps one step (a heavier settle).
       const popFriction = phase >= 3 ? 6 : 4;
       const popTension = phase >= 3 ? 150 : 200;
+      // Each tier pops a little larger too, so a streak reads as richer, not just
+      // wider. Tier 0 stays exactly 1.0 so the default burst is unchanged.
+      const peakScale = 1 + tier * 0.12;
       stars.forEach((star, i) => {
         star.scale.setValue(0);
         star.translateX.setValue(0);
@@ -382,7 +388,7 @@ export const StarBurst: React.FC<StarBurstProps> = ({ active, x, y, phase = 0, c
         const anim = Animated.parallel([
           Animated.sequence([
             Animated.spring(star.scale, {
-              toValue: 1,
+              toValue: peakScale,
               friction: popFriction,
               tension: popTension,
               useNativeDriver: true,
@@ -419,9 +425,9 @@ export const StarBurst: React.FC<StarBurstProps> = ({ active, x, y, phase = 0, c
       });
       return () => runningAnims.forEach(a => a.stop());
     }
-  }, [active, reducedMotion, stars, tier, phase]);
+  }, [active, reducedMotion, simplify, stars, tier, phase]);
 
-  if (!active || reducedMotion) return null;
+  if (!active || reducedMotion || simplify) return null;
 
   const palette = STAR_BURST_COLORS[phase] || STAR_BURST_COLORS[0];
 
