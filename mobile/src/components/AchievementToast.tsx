@@ -7,6 +7,7 @@ import { NineSliceFrame } from './ui/NineSlice';
 import { Achievement, ACHIEVEMENT_CATEGORY_ICONS } from '../services/achievements';
 import { AmberInline } from './AmberInline';
 import { getSettingsSync } from '../services/settings';
+import { announceForA11y } from '../services/a11yAnnounce';
 
 /**
  * Phase-aware entrance spring (local, since the shared token file is out of this
@@ -42,6 +43,11 @@ export const AchievementToast: React.FC<AchievementToastProps> = ({
 
   useEffect(() => {
     if (achievement) {
+      // Cross-platform screen-reader announce (accessibilityLiveRegion below is
+      // Android-only; announceForA11y is a no-op when no reader is running).
+      announceForA11y(
+        `Achievement unlocked: ${achievement.title}. ${achievement.description}.${achievement.rewardAmber > 0 ? ` Earned ${achievement.rewardAmber} amber.` : ''}`,
+      );
       const reducedMotion = getSettingsSync().reducedMotion;
       let entrance: Animated.CompositeAnimation | null = null;
       let exit: Animated.CompositeAnimation | null = null;

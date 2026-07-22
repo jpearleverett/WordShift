@@ -16,6 +16,7 @@ import { CandyButton } from '../ui/CandyButton';
 import { PanelCard } from '../ui/PanelCard';
 import { AmberInline } from '../AmberInline';
 import { Confetti } from '../Confetti';
+import { RewardReveal } from '../ui/RewardReveal';
 import { getSettingsSync } from '../../services/settings';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
@@ -59,7 +60,7 @@ import {
   getShopPatronLockedLabel,
   getShopStoreBridgeText,
 } from '../../services/phaseNarrative';
-import { hapticLight, hapticMedium } from '../../services/haptics';
+import { hapticLight, hapticMedium, hapticSuccess } from '../../services/haptics';
 import { isPatronSync } from '../../services/entitlements';
 
 interface ShopScreenProps {
@@ -76,6 +77,20 @@ interface ShopScreenProps {
 const AMBER_ICON = require('../../../assets/ui/amber.png');
 
 const PREVIEW_LETTERS = ['A', 'B', 'C', 'D'];
+
+/**
+ * Short, phase-aware acknowledgment shown beneath the spend count-up when a
+ * cosmetic is equipped, so the game's biggest expression purchase lands as a
+ * moment rather than a silent chip swap. Kept local (there is no phaseNarrative
+ * helper for the shop celebration and this file cannot add one); the copy stays
+ * phase-aware and em-dash-free like every other player-facing string.
+ */
+function getCosmeticEquippedLine(phase: number): string {
+  if (phase >= 4) return 'It settles into the arrangement.';
+  if (phase >= 2) return 'Equipped. The pattern shifts.';
+  if (phase >= 1) return 'Equipped. It suits you.';
+  return 'Equipped. Wear it proudly.';
+}
 
 const previewMotionAllowed = () => !getSettingsSync().reducedMotion && !shouldSimplifyAnimations();
 
@@ -215,6 +230,14 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   const chipBg = `rgba(255, 255, 255, ${SURFACE.highlightAlpha})`;
 
   const [balance, setBalance] = useState(amberBalance);
+  // The header amber pill ticks from the old value to the new one on any change
+  // (a spend, or a prop refresh) instead of an instant swap, so a purchase reads
+  // as amber leaving the pouch.
+  const [displayedBalance, setDisplayedBalance] = useState(amberBalance);
+  const prevBalanceRef = useRef(amberBalance);
+  // Cosmetic-purchase reward moment (F43): a magnitude-aware count-up of the
+  // spend + a phase-aware in-world line, auto-clearing after a read beat.
+  const [purchaseReveal, setPurchaseReveal] = useState<{ amount: number; line: string; nonce: number } | null>(null);
   const [owned, setOwned] = useState<Record<string, boolean>>({});
   const [equipped, setEquipped] = useState<Partial<Record<CosmeticCategory, string>>>({});
   const [loading, setLoading] = useState(true);
@@ -294,6 +317,40 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
 
   useEffect(() => { setBalance(amberBalance); }, [amberBalance]);
 
+  // Tick the displayed pill value toward the real balance (~400ms). Reduced
+  // motion snaps to the final value.
+  useEffect(() => {
+    const prev = prevBalanceRef.current;
+    if (prev === balance) return;
+    if (reducedMotion) {
+      setDisplayedBalance(balance);
+      prevBalanceRef.current = balance;
+      return;
+    }
+    const start = prev;
+    const end = balance;
+    const steps = 13; // ~400ms at ~30ms/step
+    let i = 0;
+    const id = setInterval(() => {
+      i++;
+      const fraction = Math.min(1, i / steps);
+      setDisplayedBalance(Math.round(start + (end - start) * fraction));
+      if (i >= steps) {
+        clearInterval(id);
+        prevBalanceRef.current = end;
+      }
+    }, 30);
+    return () => clearInterval(id);
+  }, [balance, reducedMotion]);
+
+  // The purchase reveal auto-clears after a read beat (the confetti + preview
+  // pulse + chip spring carry the rest of the celebration).
+  useEffect(() => {
+    if (!purchaseReveal) return;
+    const id = setTimeout(() => setPurchaseReveal(null), 1900);
+    return () => clearTimeout(id);
+  }, [purchaseReveal]);
+
   const handleBuy = useCallback(async (item: CosmeticItem) => {
     if (busy || item.acquisition.kind !== 'amber') return;
     const cost = item.acquisition.cost;
@@ -306,10 +363,12 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
       onAmberChange?.(spend.newBalance);
       await recordAmberCosmeticPurchase(item.id);
       await equipCosmetic(item.id); // auto-equip on purchase
-      hapticMedium();
-      // Celebrate the biggest expression purchase: burst the purchased palette,
-      // pulse the preview, and spring the Equipped chip. Confetti self-skips
-      // under reduced motion; the palette drives the color either way.
+      hapticSuccess();
+      // Celebrate the biggest expression purchase: a count-up of the spend + a
+      // phase-aware in-world line, plus a burst of the purchased palette, a
+      // preview pulse, and the Equipped chip spring. Confetti self-skips under
+      // reduced motion; the palette drives the color either way.
+      setPurchaseReveal({ amount: cost, line: getCosmeticEquippedLine(phase), nonce: Date.now() });
       const palette =
         item.category === 'tile_theme'
           ? (TILE_THEMES[item.id]?.map(c => c.bg) ?? [])
@@ -320,7 +379,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     } finally {
       setBusy(null);
     }
-  }, [busy, balance, onAmberChange, refresh]);
+  }, [busy, balance, onAmberChange, refresh, phase]);
 
   const handleEquip = useCallback(async (item: CosmeticItem) => {
     if (busy) return;
@@ -649,7 +708,12 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
           </Text>
         </View>
         <View style={[styles.amberPill, { backgroundColor: t.sectionBg, borderColor: t.amberTintBorder }]}>
-          <Text style={[styles.amberPillText, { color: t.amberText }]}><AmberInline size={14} /> {Math.max(0, balance)}</Text>
+          <Text
+            style={[styles.amberPillText, { color: t.amberText }]}
+            accessibilityLabel={`${Math.max(0, balance)} amber`}
+          >
+            <AmberInline size={14} /> {Math.max(0, displayedBalance)}
+          </Text>
         </View>
       </View>
 
@@ -773,6 +837,23 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
           </>
         )}
       </ScrollView>
+
+      {/* Cosmetic-purchase reward moment (F43): a magnitude-aware count-up of
+          the spend + a phase-aware in-world line, over the just-bought palette
+          burst below. Pointer-transparent, auto-clears after a read beat. */}
+      {purchaseReveal && (
+        <View pointerEvents="none" style={styles.purchaseRevealOverlay}>
+          <View style={[styles.purchaseRevealCard, { backgroundColor: t.sectionBg, borderColor: t.amberTintBorder }]}>
+            <RewardReveal
+              key={purchaseReveal.nonce}
+              amount={purchaseReveal.amount}
+              icon={AMBER_ICON}
+              label={purchaseReveal.line}
+              phase={phase}
+            />
+          </View>
+        </View>
+      )}
 
       {/* Purchase celebration burst (F43), painted in the just-bought palette.
           Self-skips under reduced motion. */}
@@ -952,5 +1033,20 @@ const styles = StyleSheet.create({
     marginTop: 8,
     lineHeight: 16,
     opacity: 0.75,
+  },
+  // Cosmetic-purchase reward moment: a small centered tray floating above the
+  // dock, showing the spend count-up + the in-world line.
+  purchaseRevealOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 90,
+    alignItems: 'center',
+  },
+  purchaseRevealCard: {
+    paddingVertical: 14,
+    paddingHorizontal: 22,
+    borderRadius: SURFACE.cardRadius,
+    borderWidth: 1.5,
   },
 });

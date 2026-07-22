@@ -20,7 +20,15 @@ import { isAdFreeSync } from '../services/entitlements';
 import { useScreenInsets } from '../hooks/useScreenInsets';
 import { AmberInline } from './AmberInline';
 import { CumulativeStats, PersonalBest, getCumulativeStats, getAverageStars, getThreeStarRate } from '../services/starRating';
-import { getAchievementsWithStatus, Achievement, getTotalCount } from '../services/achievements';
+import {
+  getAchievementsWithStatus,
+  Achievement,
+  getTotalCount,
+  buildAchievementCheckState,
+  ACHIEVEMENT_CATEGORY_ICONS,
+  ACHIEVEMENT_LOCK_ICON,
+  AchievementCheckState,
+} from '../services/achievements';
 import { getDailyStatus } from '../services/dailyChallenge';
 import { getStreakInfo, getAmberBalance } from '../services/amberCurrency';
 import { Difficulty } from '../types';
@@ -184,6 +192,11 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
   const [resonantChoices, setResonantChoices] = useState(0);
   const [paceImproving, setPaceImproving] = useState(false);
   const [unbrokenWeaveMastery, setUnbrokenWeaveMastery] = useState<UnbrokenWeaveMastery | null>(null);
+  // Full achievement check-state, so locked countable achievements can draw a
+  // "how close am I" progress track (the 51-item chase was otherwise invisible).
+  // Loaded best-effort in its own guarded effect; the progress bar simply waits
+  // for it and never blocks the rest of the screen.
+  const [achievementCheckState, setAchievementCheckState] = useState<AchievementCheckState | null>(null);
   // Live spendable balance read straight from the amberCurrency store on
   // mount (this screen mounts fresh on every visit). The amberBalance PROP is
   // App's React-state mirror, which can drift stale (or, via a bad caller
@@ -228,6 +241,15 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
       for (const d of diffs) {
         const trend = await getSolveTrend(d);
         if (trend?.improving) { setPaceImproving(true); return; }
+      }
+    })();
+    // Full check-state for the locked-achievement progress tracks. Guarded so a
+    // load failure (or a stubbed service in tests) never throws in the effect.
+    (async () => {
+      try {
+        setAchievementCheckState(await buildAchievementCheckState());
+      } catch {
+        /* leave progress tracks unfilled; the rest of the screen is unaffected */
       }
     })();
   }, []);
@@ -303,42 +325,80 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
     const card = (
       <PanelCard phase={effectivePhase} style={styles.sectionCard}>
         <PixelPlaque phase={effectivePhase} label={ACHIEVEMENT_CATEGORY_NAMES[category]} style={styles.sectionPlaque} />
-        {categoryAchievements.map((achievement, i) => (
-          <View
-            key={achievement.id}
-            style={[
-              styles.achievementRow,
-              i % 2 === 1 && { backgroundColor: rowAltTint },
-              !achievement.isUnlocked && styles.achievementLocked,
-            ]}
-          >
-            <Text style={[
-              styles.achievementIcon,
-              !achievement.isUnlocked && styles.achievementIconLocked,
-            ]}>
-              {achievement.isUnlocked ? achievement.icon : '🔒'}
-            </Text>
-            <View style={styles.achievementInfo}>
-              <Text style={[
-                styles.achievementTitle,
-                { color: achievement.isUnlocked ? t.title : t.muted },
-              ]}>
-                {achievement.title}
-              </Text>
-              <Text style={[styles.achievementDesc, { color: t.muted }]}>
-                {achievement.description}
-              </Text>
+        {categoryAchievements.map((achievement, i) => {
+          // Progress-toward for a still-locked countable achievement (puzzle
+          // counts, stars, streaks, variant wins...). One-shot achievements have
+          // no `progress` spec; the whole track is skipped for them. `current`
+          // is already clamped to `target` in achievements.ts.
+          const prog =
+            !achievement.isUnlocked && achievement.progress && achievementCheckState
+              ? achievement.progress(achievementCheckState)
+              : null;
+          const progPct = prog && prog.target > 0
+            ? Math.min(100, Math.max(0, Math.round((prog.current / prog.target) * 100)))
+            : 0;
+          return (
+            <View
+              key={achievement.id}
+              style={[
+                styles.achievementRow,
+                i % 2 === 1 && { backgroundColor: rowAltTint },
+              ]}
+            >
+              {/* Category sprite (unlocked) / lock sprite (locked) — the chrome
+                  renders one shared generated sprite per category, matching the
+                  AchievementToast; the per-achievement emoji stays a data key. */}
+              <View
+                style={[
+                  styles.achievementIconBadge,
+                  { backgroundColor: t.sectionBg, borderColor: t.sectionBorder },
+                  !achievement.isUnlocked && styles.achievementIconBadgeLocked,
+                ]}
+              >
+                <Image
+                  source={achievement.isUnlocked ? ACHIEVEMENT_CATEGORY_ICONS[achievement.category] : ACHIEVEMENT_LOCK_ICON}
+                  style={styles.achievementIconImage}
+                  resizeMode="contain"
+                />
+              </View>
+              <View style={styles.achievementInfo}>
+                <Text style={[
+                  styles.achievementTitle,
+                  { color: achievement.isUnlocked ? t.title : t.muted },
+                ]}>
+                  {achievement.title}
+                </Text>
+                <Text style={[styles.achievementDesc, { color: t.muted }]}>
+                  {achievement.description}
+                </Text>
+                {prog && (
+                  <View
+                    style={styles.achievementProgress}
+                    accessible
+                    accessibilityRole="progressbar"
+                    accessibilityLabel={`Progress: ${prog.current} of ${prog.target}`}
+                    accessibilityValue={{ min: 0, max: prog.target, now: prog.current }}
+                  >
+                    <View style={[styles.achievementProgressTrack, { backgroundColor: t.rowBorder }]}>
+                      <View style={[styles.achievementProgressFill, { width: `${progPct}%`, backgroundColor: t.amberText }]} />
+                    </View>
+                    <Text style={[styles.achievementProgressText, { color: t.muted }]}>
+                      {prog.current}/{prog.target}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <View style={[styles.achievementReward, { backgroundColor: t.amberTint, borderColor: t.amberTintBorder }]}>
+                <Text style={[styles.achievementRewardText, { color: t.amberText }]}>
+                  <AmberInline size={12} /> +{achievement.rewardAmber}
+                </Text>
+              </View>
+              {achievement.isUnlocked && (
+                <Text style={styles.achievementCheck}>✓</Text>
+              )}
             </View>
-            <View style={[styles.achievementReward, { backgroundColor: t.amberTint, borderColor: t.amberTintBorder }]}>
-              <Text style={[styles.achievementRewardText, { color: t.amberText }]}>
-                <AmberInline size={12} /> +{achievement.rewardAmber}
-              </Text>
-            </View>
-            {achievement.isUnlocked && (
-              <Text style={styles.achievementCheck}>✓</Text>
-            )}
-          </View>
-        ))}
+          );
+        })}
       </PanelCard>
     );
     if (categoryIndex < ACHIEVEMENT_CASCADE_WINDOW) {
@@ -657,7 +717,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
           data={ACHIEVEMENT_CATEGORIES}
           keyExtractor={category => category}
           renderItem={renderAchievementCategory}
-          extraData={`${effectivePhase}-${achievements.length}`}
+          extraData={`${effectivePhase}-${achievements.length}-${achievementCheckState ? 1 : 0}`}
           showsVerticalScrollIndicator={false}
           initialNumToRender={3}
           maxToRenderPerBatch={2}
@@ -1086,22 +1146,51 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  achievementLocked: {
-    opacity: 0.5,
-  },
-  achievementIcon: {
-    fontFamily: BODY_FONT,
-    fontSize: 28,
+  // Generated candy sprite alcove (one per category / a lock when unearned),
+  // replacing the raw color emoji + 🔒 that fought the cottage chrome.
+  achievementIconBadge: {
     width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  achievementIconLocked: {
-    fontFamily: BODY_FONT,
-    fontSize: 20,
+  achievementIconBadgeLocked: {
+    opacity: 0.7,
+  },
+  achievementIconImage: {
+    width: 24,
+    height: 24,
   },
   achievementInfo: {
     flex: 1,
     marginLeft: 8,
     marginRight: 8,
+  },
+  // Progress-toward track on a locked, countable achievement.
+  achievementProgress: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    gap: 8,
+  },
+  achievementProgressTrack: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  achievementProgressFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  achievementProgressText: {
+    fontFamily: PIXEL_FONT_BOLD,
+    fontSize: 11,
+    fontWeight: '700',
+    minWidth: 42,
+    textAlign: 'right',
   },
   achievementTitle: {
     fontFamily: PIXEL_FONT_BOLD,
