@@ -6,19 +6,52 @@
 
 | Status | Count | Share |
 |---|--:|--:|
-| ✅ done | 162 | 90% |
-| 🟡 partial | 11 | 6% |
-| ⏸️ deferred | 7 | 4% |
+| ✅ done | 169 | 94% |
+| 🟡 partial | 3 | 2% |
+| ⏸️ deferred | 8 | 4% |
 | ❌ not addressed | 0 | 0% |
 | **Total** | **180** | |
 
-**Fully done: 162 of 180.** Meaningful progress (done + partial): 173. **Nothing is un-addressed** — the remaining 18 are 11 partials (each with a concrete residual) + 7 deferrals (art / device / encoder / the audit's own architectural deferrals).
+**Fully done: 169 of 180.** Meaningful progress (done + partial): 172. **Nothing is un-addressed** — the remaining 11 are 3 partials (each with a concrete residual) + 8 deferrals (art / device / WebP encoder / a global responsive-layout migration / the audit's own architectural deferrals).
+
+> **Session 5 — full-adversarial re-verification + residual close-out (2026-07-22).** A fresh, from-scratch blind adversarial pass (18 agents: 9 verifiers over all 180 findings, blind to the claimed status, + a refute pass on every DONE) landed at 154 done / 17 partial / 3 open / 6 deferred and surfaced a **build-breaking regression** (F130: a `require('assets/ui/pit.png')` against a file the bundle-hygiene pass had removed — Metro/AAPT would have failed). I fixed the regression and closed 14 more residuals this pass (10 in a serial hot-file pass + 4 correctly-based worktree agents on disjoint files): **F130** (pit.png restored), **F98/F96** (last stray color emoji → sprites/plain), **F103** (HUD chrome typeface role), **F108** (last raw font-size literals snapped), **F161** (undo-refill chip entrance), **F153** (graduated speed drain envelope), **F91** (graduated streak-milestone magnitude), **F157** (apex-mode swap now an acknowledged beat card), **F6** (undo takeback settle on the returned tile), **F75** (ShopScreen entrance cascade), **F86** (banner cottage tray + reserved height), **F15** (phase-aware dialogue slide), **F142** (readable invite payoff), **F121** (pit ward-ceremony SR fence on Android/TalkBack). Net 154 → 169 done. Full suite green (119 suites / 2938 tests), typecheck 0, lint 0 errors. Detail in "Session 5 delta" below.
 
 > **Finish-the-rest pass (after the post-verification correction).** Closed 10 more: the type scale (❌→✅: a canonical 12-token `FONT_SIZE` scale, applied across ~30 files), the home + VictoryModal chrome emoji (settings/shop/quest/lock/empty-house/streak/Collect-Now/Lucky/phase-change → sprites or monochrome glyphs), the VictoryModal rewarded-double count-up, the room-family aspect (office/jungle → 1456×720) + bundle-sprite hygiene, the board LOADING grace-gate, the onboarding invite-prompt beat, and the house-upgrade reward moment (an under-claim the verifier had confirmed done). The undo/restart finding moved ❌→🟡 (RESTART gained a distinct sound; the reverse-travel undo takeback stays deferred as core-input-hook work). The 11 remaining partials + 7 deferrals are itemized in "Session 4 — finish-the-rest remainder" below.
 
 > **These are the post-verification numbers.** After the Session-4 fan-out I claimed 159 done; an independent adversarial re-verification (5 read-only agents that re-checked every claimed closure against current code, blind to my verdict) found ~15 over-claims. I then **fixed 8** of them (including a real autosave correctness bug), **honestly downgraded 8** to 🟡 (over-claims I chose not to rush-fix), and **upgraded 1** the verifiers found I had *under*-claimed (New Cycle in-place rebuild). Net 159 → 152 done. The correction detail is in "Session 4 — post-verification correction" below.
 
 > Updated after the **Session-4 fan-out** (seven correctly-based worktree agents on disjoint file clusters + a serial App.tsx/theme pass). Most of the 109 findings the Session-3 ledger still listed as ❌/🟡 turned out **already satisfied on the branch** (the verdicts predated Waves 1-5 and the Session 2-3 work); each was re-verified line-by-line before flipping, and the genuine gaps were closed. The remaining **21 not-fully-done** break down as: **12 partial** (mostly minor polish or intentional atmospheric accents), **7 deferred** (architectural trade-offs the audit itself deferred, plus WebP-encoder and on-device-screenshot blockers this environment can't clear), and **2 not addressed** (the board undo/restart takeback — deliberately not risked against the core input hook — and the app-wide type-scale consolidation — a large visual-QA-bound refactor). The authoritative per-finding current status is the **"Session 4 — fan-out reconciliation"** section below; the per-system rows further down preserve the audit + Session 2-3 evidence trail.
+
+## Session 5 delta — full-adversarial re-verify + residual close-out (2026-07-22)
+
+**The verification.** 18 agents in a two-phase workflow: 9 blind verifiers deep-checked all 180 findings against current HEAD (given only the ORIGINAL audited defect + stale evidence, NOT the ledger's claimed status), then a per-batch refute pass tried to break every DONE. Result: **154 done / 17 partial / 3 open / 6 deferred** — i.e. the fresh pass was more conservative than the ledger's 162 claim, and it caught a real regression the ledger had not.
+
+**The regression (fixed first).** **F130** — the bundle-hygiene pass (commit 82b64df) removed `assets/ui/pit.png` as "unreferenced", then the VictoryModal chrome de-emoji pass added `require('../../../assets/ui/pit.png')` (PIT_ICON, the Collect-Now pill icon at two sites). That left a require against a missing file — Metro resolution / the Android release resource merge would have failed. `pit.png` is a generated UI sprite; regenerated deterministically (only pit.png changed, no other sprite churn). Committed on its own as a priority fix.
+
+**Closed this pass (15, incl. F130).** Serial hot-file pass (owned App.tsx / appStyles / phaseNarrative / VictoryModal / timing / usePuzzleGame):
+- **F98** — stripped the stray `🔥` from the Phase-0 "On fire!" combo line (monochrome-glyph discipline).
+- **F96** — de-emojied the challenge-friend label + the five journal-spotlight step icons; the sword / journal / scroll / calendar / sparkle sprites render instead (label swap here, sprite render in ShareResultModal + HomeScreen via the agent).
+- **F103** — HUD chrome labels (difficulty / loading / time-up / speed-timer / variant-badge) moved to the chrome typeface role (Figtree / `PIXEL_FONT_BOLD`), matching the documented header-vs-body split.
+- **F108** — snapped the last raw font-size literals to `FONT_SIZE` (the CTA's WCAG-load-bearing 19 snapped UP to headline/20 to stay above the large-text bold threshold; victory title 42→giant; total 19→title; difficulty arrow 8→micro) — plus the agent's 5-file sweep below.
+- **F161** — the "+1 undo" refill chip now mounts with its own `BadgeAppear` entrance instead of hard-cutting into the challenge badge mid-board.
+- **F153** — the speed drain envelope RAMPS instead of staying flat until the wire: a felt "soft" pre-tick from 10..6s below the existing normal (5..4) / critical (3..1) zones (`speedTickKind` + test updated).
+- **F91** — every streak milestone now rings a felt success haptic + a combo-ladder ping whose tier scales with the reward (3/7-day at tier 2, 50/65 at tier 3, 100 at tier 4), so the small ones no longer land silent like a trivial receipt.
+- **F157** — the deliberate Unbroken Weave apex-mode swap is announced by an acknowledged `'beat'`-tone `showGameAlert` card the player dismisses, not a fading move toast (new `getUnbrokenWeaveUnavailableTitle`, 3 call sites rerouted, test updated).
+- **F6** — undo now replays the arrival settle on the tile that RETURNED to the source row (geometric direction, correct for reverse ascents too), so a takeback reads as the letter travelling back rather than silently vanishing/reappearing.
+
+Four correctly-based worktree agents on disjoint files (all forked from the pit.png-fix HEAD, verified base, merged `--no-ff` with zero conflicts):
+- **F75 + F86** (ShopScreen / StatsScreen / BannerAd) — ShopScreen gained the shared `EntranceCascadeItem` staggered entrance; the banner ad now renders its own muted `ADVERTISEMENT` cottage-tray label + a reserved `minHeight` (and a same-height spacer when unavailable) so it never shifts layout; the now-redundant StatsScreen tray was removed.
+- **F108** (DailyLeaderboardCard / DailyChallengeCard / LevelDisplay / RoomView / GameAlertModal) — every residual raw fontSize snapped to `FONT_SIZE` per the scale's own absorption rules.
+- **F15 + F96 + F142** (HomeScreen / useDialogueFlow / ShareResultModal) — both animal-dialogue slide entrances now age with the phase via `getModalInSpring`; the journal-spotlight icons + challenge-friend button render sprites; the auto-invite reveal delay raised 1300→2600ms so Ember's payoff line is readable before the scrim (safety-net timer re-anchored to preserve its invariant).
+- **F121** (OfferingPitScreen) — the pit chrome behind the ward-ignition ceremony is now fenced with `importantForAccessibility="no-hide-descendants"` + `accessibilityElementsHidden`, driven by a ceremony-inclusive boolean, so Android/TalkBack no longer leaks focus into the occluded pit during the ceremony (the iOS `accessibilityViewIsModal` complement is kept).
+
+**The honest remainder (11).**
+- **🟡 partial (3):** **F1** cross-row "flying ghost" on a committed move — the neighbour-tile teleport is fixed, but true inter-row travel of the moved tile is a `usePuzzleGame` source-position/animation-architecture change, deferred by design; **F37** robed Phase 4-5 dialogue portraits have no distinct talk FRAME — needs `robedTalk.png` art for 13 animals (a subtle whole-image bob already plays); **F141** cold-launch-into-puzzle still flashes `home` before the board — the near-black boot blink is fixed, but the `currentScreen` default + raw `setCurrentScreen('puzzle')` route is a structural change held back as too risky for a polish pass.
+- **⏸️ deferred (8):** **F131** WebP re-encode (no VP8L/WebP encoder installed in this environment — documented `cwebp` plan); **F132** Play screenshots need real on-device capture ≥1080px; **F148** store screenshot #5 advertises +50% Challenge amber vs the shipped +25% — the listing COPY is corrected and LAUNCH_CHECKLIST now flags the binary PNG as a required pre-submission re-capture (a device-asset task, same class as F132); **F135** room-bitmap pan-windowing + **F136** async-chunked cold branching analyses + **F139** board-arc scale-to-fit ≤360dp + **F140** tablet large-aspect layout (the audit's own four documented architectural deferrals); **F138** global `useWindowDimensions` migration so fold/split-screen/resize re-lays-out — a genuine open architectural gap (not one of the audit's blessed four), but a large every-surface refactor against module-load `Dimensions.get()` (tile geometry, Row arc, pit spawn math…) with real regression risk, so deferred rather than rushed.
+
+**Verification.** Typecheck 0 errors; ESLint 0 errors; full suite **119 suites / 2938 tests green**. Every agent forked from the fix-HEAD, reset-hard to it, reported its verified base, and touched a disjoint file set — all four merged with zero conflicts.
+
+---
 
 ### By severity (Session-4 final)
 

@@ -8,9 +8,15 @@ the codebase and are the remaining gates to submission.
 
 - [x] **Store listing live in Play Console** — DONE (2026-07-13): the 8 final
       screenshots, feature graphic, and descriptions from `docs/STORE_LISTING.md`
-      uploaded to Main store listing. (Note: screenshot #5's setup-menu copy
-      predates the same-day trial-ladder rebalance — see the optional regen
-      note in STORE_LISTING.md; not misleading, safe to ship.)
+      uploaded to Main store listing.
+- [ ] **RE-CAPTURE store screenshot #5 (`05_master_every_mode`) before the next
+      store update** — the uploaded PNG predates the trial-ladder rebalance and
+      advertises "+50% Challenge amber", but the shipped setup menu delivers
+      +25% (1.25x). This overstates a benefit the game does not give, so it must
+      be re-shot from the running build (needs an on-device capture, same as the
+      screenshot-refresh task below) and re-uploaded. The listing COPY in
+      STORE_LISTING.md is already corrected; only the binary PNG is stale. Do
+      not ship a store update that keeps the +50% image.
 - [x] **Verify one REAL purchase of each SKU kind on a Play internal build**
       — DONE (2026-07-13): every SKU kind verified working on the Play
       internal build (consumables, starter one-time, Remove Ads / Patron
