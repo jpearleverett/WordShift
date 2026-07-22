@@ -20,6 +20,7 @@ import {
 import { ThreeSliceStrip } from './NineSlice';
 import { getSettingsSync } from '../../services/settings';
 import { playUiSound, type UiSoundKind } from '../../services/uiSound';
+import { playUiHaptic } from '../../services/uiHaptic';
 import { PIXEL_FONT_BOLD } from '../../theme/fonts';
 
 export type CandyButtonVariant = 'primary' | 'amber' | 'secondary' | 'quiet';
@@ -87,6 +88,11 @@ export const CandyButton: React.FC<CandyButtonProps> = ({
   const handlePress = useCallback(() => {
     if (soundKind !== 'none') {
       playUiSound(soundKind ?? (variant === 'secondary' || variant === 'quiet' ? 'selection' : 'tap'));
+      // Pair the press sound with a haptic (F88): a cottage button that only
+      // clicks felt half-there. Quiet/secondary get a lighter selection tick;
+      // the primary/amber CTAs get a slightly weightier light impact. Skipped
+      // when the caller opts out of press feedback (soundKind 'none').
+      playUiHaptic(variant === 'secondary' || variant === 'quiet' ? 'selection' : 'light');
     }
     onPress();
   }, [onPress, soundKind, variant]);
