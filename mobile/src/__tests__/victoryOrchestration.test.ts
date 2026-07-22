@@ -25,6 +25,11 @@ jest.mock('../services/haptics', () => ({
   hapticWarning: jest.fn(),
   hapticLight: jest.fn(),
 }));
+// a11yAnnounce statically imports react-native (AccessibilityInfo); stub it so
+// importing the hook in Node never pulls the untransformed RN entry.
+jest.mock('../services/a11yAnnounce', () => ({
+  announceForA11y: jest.fn(),
+}));
 
 const HOOK_SRC = fs.readFileSync(
   path.resolve(__dirname, '../hooks/useVictoryOrchestration.ts'),

@@ -14,6 +14,7 @@ import { recordWhisper } from '../services/whisperGallery';
 // Audio routes through the guarded uiSound bridge (never a static expo-audio
 // import) so this hook stays Jest-safe; haptics self-gate on hapticsEnabled.
 import { playUiSound } from '../services/uiSound';
+import { announceForA11y } from '../services/a11yAnnounce';
 import { hapticWarning, hapticLight } from '../services/haptics';
 import {
   VICTORY_ANIMATION_LOCK_MS,
@@ -285,6 +286,19 @@ export function useVictoryOrchestration(): [
           if (gen !== generationRef.current) return;
           setMicroBeat(finalBeat);
           setShowMicroBeat(true);
+          // Screen-reader treatment (finding 4.6): a beat's READABLE atmospheric
+          // line (ambient_whisper, the stark silent-victory line) is spoken so a
+          // SR player gets the horror content — content delivery, not a cue, so
+          // it fires even when the finale suppresses the celebratory audio. The
+          // glitch_title (a visual TITLE-swap wrongness) and color_shift (purely
+          // visual) are deliberately NOT spoken: read plainly they would either
+          // over-speak or land as a real victory title.
+          if (
+            (finalBeat.type === 'ambient_whisper' || finalBeat.type === 'silent_victory') &&
+            finalBeat.text
+          ) {
+            announceForA11y(finalBeat.text);
+          }
           // Micro-beat cues: a held glitch_title tears (glitch + warning), an
           // ambient_whisper breathes (whisper + light). Suppressed on the finale.
           if (!suppressCeremonyCues) {
