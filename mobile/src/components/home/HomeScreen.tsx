@@ -171,6 +171,7 @@ import { getTendingLevel } from '../../services/tending';
 import { hapticLight, hapticSelection, hapticMedium, hapticHeavy, hapticSuccess } from '../../services/haptics';
 import { playUiSound, type UiSoundKind } from '../../services/uiSound';
 import { playUiHaptic } from '../../services/uiHaptic';
+import { announceForA11y } from '../../services/a11yAnnounce';
 import { logEvent } from '../../services/eventLogger';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -857,6 +858,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     loadAllData();
     loadDialogueSessions(); // Load session data
   }, []);
+
+  // iOS live-region fallback for the dialogue cooldown toast: accessibilityLiveRegion
+  // is Android-only, so speak the message through the announce bridge on iOS when
+  // it appears (guarded against empty so it never announces a cleared toast).
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    const msg = (dialogueFlow.cooldownMessage ?? '').trim();
+    if (msg) announceForA11y(msg);
+  }, [dialogueFlow.cooldownMessage]);
 
   // Reload when an App-level amber-changing modal (Store/Patron) closes over
   // home — without this, a purchased amber pack doesn't register against the
