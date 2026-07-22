@@ -66,6 +66,7 @@ import { shouldSimplifyAnimations } from '../../services/deviceTier';
 import { AUTO_COLLECT_PUZZLE_LIMIT, HARVEST_NUDGE_MIN_AMBER, JOURNAL_UNLOCK_PUZZLES } from '../../constants/gameBalance';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { AmberInline } from '../AmberInline';
+import { getModeIconSprite } from '../puzzle/modeIcons';
 
 // Candy-style UI icon sprites (cross-platform consistent, replaces emoji)
 const AMBER_ICON = require('../../../assets/ui/amber.png');
@@ -2132,11 +2133,36 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       accessibilityLabel={`${dialogueFlow.selectedAnimal.name} portrait`}
                     >
                       {progress.currentPhase >= 4 && CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]?.robed ? (
-                        <Image
-                          source={CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]!.robed!}
-                          style={styles.dialogueSpriteLayer}
-                          resizeMode="cover"
-                        />
+                        /* Robed + robedTalk (F26) follow the exact same
+                           pre-mounted opacity-switch as idle/talk above, so
+                           the climax's biggest lines no longer play over a
+                           frozen still. No animal has a robedTalk frame yet
+                           (idle/talk/robed only) — the talk layer only mounts
+                           when Boolean(...robedTalk) holds, so this renders
+                           byte-identical to today (a static robed image)
+                           until that art lands for a given animal. */
+                        <>
+                          <Image
+                            source={CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]!.robed!}
+                            style={[
+                              styles.dialogueSpriteLayer,
+                              dialogueFlow.isTalking &&
+                                Boolean(CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]?.robedTalk) &&
+                                styles.dialogueSpriteLayerHidden,
+                            ]}
+                            resizeMode="cover"
+                          />
+                          {Boolean(CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]?.robedTalk) && (
+                            <Image
+                              source={CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]!.robedTalk!}
+                              style={[
+                                styles.dialogueSpriteLayer,
+                                !dialogueFlow.isTalking && styles.dialogueSpriteLayerHidden,
+                              ]}
+                              resizeMode="cover"
+                            />
+                          )}
+                        </>
                       ) : (
                         <>
                           <Image
@@ -2180,15 +2206,27 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
                 {/* Text column - 70% width */}
                 <View style={styles.dialogueTextCol}>
-                  <View style={styles.dialogueBubble}>
+                  {/* The bubble renders the progressively-revealed text (F25);
+                      tapping it while the reveal is still in progress jumps
+                      straight to the full line instead of waiting it out.
+                      Once landed, the tap is inert (disabled) so a settled
+                      line doesn't flash touch feedback for no reason. */}
+                  <TouchableOpacity
+                    style={styles.dialogueBubble}
+                    activeOpacity={0.85}
+                    disabled={!dialogueFlow.revealInProgress}
+                    onPress={dialogueFlow.completeReveal}
+                    accessibilityRole="button"
+                    accessibilityLabel="Show full line"
+                  >
                     <NineSliceFrame
                       skin={pixelSkin.card}
                       cornerDp={CARD_CORNER_DP}
                       edgeDp={CARD_EDGE_DP}
                       fillColor={pixelSkin.fillCard}
                     />
-                    <Text style={[styles.dialogueText, { color: panelSt.body }]}>{dialogueFlow.dialogueText}</Text>
-                  </View>
+                    <Text style={[styles.dialogueText, { color: panelSt.body }]}>{dialogueFlow.revealedText}</Text>
+                  </TouchableOpacity>
 
                   {/* Dialogue choice buttons (Phase 3 choice points) */}
                   {dialogueFlow.activeChoice && dialogueFlow.dialogueText === dialogueFlow.activeChoice.prompt ? (
@@ -2253,7 +2291,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       phase={progress.currentPhase}
                       variant="primary"
                       hostDark={dtHostDark}
-                      onPress={dialogueFlow.handleNextDialogue}
+                      onPress={() => {
+                        // Tapping Next/Close while the line is still revealing
+                        // (F25) completes the reveal first; it never advances
+                        // the dialogue on the same tap that finishes the text.
+                        if (dialogueFlow.revealInProgress) {
+                          dialogueFlow.completeReveal();
+                        } else {
+                          dialogueFlow.handleNextDialogue();
+                        }
+                      }}
                       soundKind="dialogue"
                       accessibilityLabel="Continue dialogue"
                       style={styles.dialogueContinueBevel}
@@ -3404,7 +3451,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       style={styles.houseCompletionCrestImg}
                     />
                   ) : (
-                    <Text style={styles.houseCompletionEmoji}>🏠</Text>
+                    // The lit-house crest (F101): a generated candy sprite
+                    // instead of the raw OS emoji, matching the temple crest
+                    // above at the darker phases.
+                    <Image
+                      source={getModeIconSprite('house')!}
+                      accessibilityLabel="the house"
+                      style={styles.houseCompletionCrestImg}
+                    />
                   )}
                   <Text style={[
                     styles.houseCompletionTitle,
@@ -4771,11 +4825,6 @@ const styles = StyleSheet.create({
     height: 160,
     borderRadius: 80,
     opacity: 0.3,
-  },
-  houseCompletionEmoji: {
-    fontFamily: BODY_FONT,
-    fontSize: 60,
-    marginBottom: 16,
   },
   houseCompletionCrestImg: {
     width: 64,
