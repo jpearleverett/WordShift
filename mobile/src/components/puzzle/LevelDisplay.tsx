@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { CandyColors } from '../../theme/colors';
 import { PIXEL_FONT_BOLD } from '../../theme/fonts';
+import { FONT_SIZE } from '../../theme/typeScale';
 
 interface LevelDisplayProps {
   level: number;
@@ -30,7 +31,7 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 9,
+    fontSize: FONT_SIZE.micro,
     fontWeight: '700',
     color: 'rgba(255, 255, 255, 0.7)',
     letterSpacing: 1,
@@ -46,7 +47,7 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 18,
+    fontSize: FONT_SIZE.title,
     fontWeight: '900',
     color: CandyColors.white,
   },

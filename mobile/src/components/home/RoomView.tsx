@@ -13,6 +13,7 @@ import { Room, Animal, RoomTheme, DialoguePhase } from '../../types/homeWorld';
 import { ROOM_THEME_COLORS } from '../../services/homeWorldData';
 import { AnimalSprite } from './AnimalSprite';
 import { CandyColors } from '../../theme/colors';
+import { FONT_SIZE } from '../../theme/typeScale';
 import { getPixelSkin, CARD_CORNER_DP, CARD_EDGE_DP } from '../../theme/pixelSkin.generated';
 import { NineSliceFrame } from '../ui/NineSlice';
 import { BODY_FONT, BODY_FONT_BOLD } from '../../theme/fonts';
@@ -81,9 +82,9 @@ const WINDOW_TINT: Record<number, { color: string; opacity: number }> = {
 
 // Word echo configuration by phase (ritual words inscribed in rooms)
 const WORD_ECHO_CONFIG: Record<number, { count: number; opacity: number; fontSize: number; color: string }> = {
-  2: { count: 3, opacity: 0.08, fontSize: 9, color: '#FFFFFF' },
-  3: { count: 4, opacity: 0.15, fontSize: 10, color: '#9B7FCF' },
-  4: { count: 5, opacity: 0.25, fontSize: 11, color: '#8B2252' },
+  2: { count: 3, opacity: 0.08, fontSize: FONT_SIZE.micro, color: '#FFFFFF' },
+  3: { count: 4, opacity: 0.15, fontSize: FONT_SIZE.micro, color: '#9B7FCF' },
+  4: { count: 5, opacity: 0.25, fontSize: FONT_SIZE.caption, color: '#8B2252' },
 };
 
 // Predefined scattered positions for word echoes within each room
@@ -792,7 +793,7 @@ const styles = StyleSheet.create({
   roomName: {
     fontFamily: BODY_FONT_BOLD,
     color: CandyColors.white,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '700',
     textAlign: 'center',
     textShadowColor: 'rgba(0, 0, 0, 0.5)',
@@ -1038,7 +1039,7 @@ const styles = StyleSheet.create({
   },
   lockedCardName: {
     fontFamily: BODY_FONT_BOLD,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '800',
     textAlign: 'center',
     maxWidth: 130,
@@ -1050,7 +1051,7 @@ const styles = StyleSheet.create({
   },
   lockedCostLabel: {
     fontFamily: BODY_FONT_BOLD,
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '700',
   },
   lockedCostGem: {
@@ -1061,12 +1062,12 @@ const styles = StyleSheet.create({
   },
   lockedCostAmount: {
     fontFamily: BODY_FONT_BOLD,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '800',
   },
   lockedCardSub: {
     fontFamily: BODY_FONT_BOLD,
-    fontSize: 10,
+    fontSize: FONT_SIZE.micro,
     fontWeight: '700',
     textAlign: 'center',
     marginTop: 2,
@@ -1127,13 +1128,13 @@ const styles = StyleSheet.create({
   inviteCostAmount: {
     fontFamily: BODY_FONT_BOLD,
     color: CandyColors.purple.main,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '800',
   },
   inviteAnimalText: {
     fontFamily: BODY_FONT_BOLD,
     color: CandyColors.purple.main,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '800',
     textAlign: 'center',
   },
@@ -1152,7 +1153,7 @@ const styles = StyleSheet.create({
   inviteAnimalCostSubtext: {
     fontFamily: BODY_FONT_BOLD,
     color: CandyColors.gray[600],
-    fontSize: 10,
+    fontSize: FONT_SIZE.micro,
     fontWeight: '700',
     textAlign: 'center',
   },
