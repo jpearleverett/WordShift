@@ -21,7 +21,7 @@ import * as Application from 'expo-application';
 import { isSupabaseConfigured } from '../services/supabaseClient';
 import { getOrCreateRecoveryCode, linkRecoveryCode, downloadFromCloud, clearSyncStatus, uploadToCloud, getSyncStatus } from '../services/cloudSave';
 import { showGameAlert } from '../services/gameAlert';
-import { SURFACE, getSurfaceTheme, SurfaceTheme } from '../theme/surfaces';
+import { SURFACE, getSurfaceTheme, getModalInSpring, SurfaceTheme } from '../theme/surfaces';
 import { PanelCard } from './ui/PanelCard';
 import { PixelPlaque } from './ui/PixelPlaque';
 import { CandyButton } from './ui/CandyButton';
@@ -378,7 +378,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
       }
       const enter = Animated.parallel([
         Animated.timing(restoreBackdrop, { toValue: 1, duration: 180, useNativeDriver: true }),
-        Animated.spring(restoreScale, { toValue: 1, ...SURFACE.modalIn, useNativeDriver: true }),
+        Animated.spring(restoreScale, { toValue: 1, ...getModalInSpring(phase), useNativeDriver: true }),
       ]);
       enter.start();
       return () => enter.stop();

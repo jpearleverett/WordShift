@@ -23,7 +23,7 @@ import { Animal, Room, HomeWorldProgress } from '../../types/homeWorld';
 import { HouseWorld } from './HouseWorld';
 import { CHARACTER_SPRITES } from './AnimalSprite';
 import { CandyColors, getDialogueTheme, getPhaseTheme } from '../../theme/colors';
-import { SURFACE, getPressSpring, getSurfaceTheme } from '../../theme/surfaces';
+import { SURFACE, getPressSpring, getSurfaceTheme, getModalInSpring } from '../../theme/surfaces';
 import {
   getPixelSkin,
   PANEL_CORNER_DP,
@@ -292,15 +292,18 @@ export const getQuestPillAccessibilityLabel = (
 const SpringIn: React.FC<{
   style?: StyleProp<ViewStyle>;
   claimTouches?: boolean;
+  /** Narrative phase — ages the entrance spring so home modals settle heavier
+   *  with the descent instead of bouncing candy-bright at every phase. */
+  phase?: number;
   children: React.ReactNode;
-}> = ({ style, claimTouches, children }) => {
+}> = ({ style, claimTouches, phase = 0, children }) => {
   const reducedMotion = getSettingsSync().reducedMotion;
   const scale = useRef(new Animated.Value(reducedMotion ? 1 : 0.92)).current;
   useEffect(() => {
     if (reducedMotion) return;
     const anim = Animated.spring(scale, {
       toValue: 1,
-      ...SURFACE.modalIn,
+      ...getModalInSpring(phase),
       useNativeDriver: true,
     });
     anim.start();
@@ -1834,7 +1837,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       <View style={styles.loadingContainer}>
         <View style={styles.loadingCard}>
           <Animated.View style={{ transform: [{ scale: amberPulse }] }}>
-            <Text style={styles.loadingEmoji}>🏡</Text>
+            <Image source={require('../../../assets/ui/home.png')} style={styles.loadingSprite} resizeMode="contain" />
           </Animated.View>
           <Text style={styles.loadingText}>Loading your home...</Text>
           <Text style={styles.loadingSubtext}>Placing rooms and waking friends.</Text>
@@ -2471,6 +2474,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           accessibilityRole="button"
         >
           <SpringIn
+            phase={progress?.currentPhase ?? 0}
             claimTouches
             style={styles.compactHubModal}
           >
@@ -2571,6 +2575,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           accessibilityRole="button"
         >
           <SpringIn
+            phase={progress?.currentPhase ?? 0}
             claimTouches
             style={styles.compactHubModal}
           >
@@ -2691,6 +2696,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           accessibilityRole="button"
         >
           <SpringIn
+            phase={progress?.currentPhase ?? 0}
             claimTouches
             style={styles.shopModal}
           >
@@ -2856,6 +2862,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             accessibilityRole="button"
           />
           <SpringIn
+            phase={progress?.currentPhase ?? 0}
             style={[styles.shopModal, styles.questModal]}
           >
             <NineSliceFrame
@@ -3019,6 +3026,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           accessibilityRole="button"
         >
           <SpringIn
+            phase={progress?.currentPhase ?? 0}
             claimTouches
             style={styles.shopModal}
           >
@@ -3167,6 +3175,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       >
         <View style={[styles.centeredOverlay, { backgroundColor: st.overlay }]}>
           <SpringIn
+            phase={progress?.currentPhase ?? 0}
             claimTouches
             style={styles.inviteModal}
           >
@@ -3419,6 +3428,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       >
         <View style={[styles.centeredOverlay, { backgroundColor: st.overlay }]}>
           <SpringIn
+            phase={progress?.currentPhase ?? 0}
             claimTouches
             style={styles.sacrificeModal}
           >
@@ -3565,6 +3575,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       >
         <View style={[styles.centeredOverlay, { backgroundColor: st.overlay }]}>
           <SpringIn
+            phase={progress?.currentPhase ?? 0}
             claimTouches
             style={[
               styles.houseCompletionModal,
@@ -3870,6 +3881,12 @@ const styles = StyleSheet.create({
   loadingEmoji: {
     fontFamily: BODY_FONT,
     fontSize: 34,
+  },
+  // The home loading mascot: the generated house sprite (assets/ui/home.png),
+  // replacing the raw 🏡 emoji so the boot/loading chrome stays in-world.
+  loadingSprite: {
+    width: 46,
+    height: 46,
   },
   loadingText: {
     fontFamily: PIXEL_FONT_BOLD,

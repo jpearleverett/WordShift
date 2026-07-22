@@ -232,6 +232,12 @@ export const appStyles = StyleSheet.create({
   // cools from candy-translucent-white into the dread palette so it tracks the
   // board instead of staying bright while everything around it darkens. The
   // difficulty DOT keeps its meaningful color at every phase.
+  // Phase-2 dusk step — the intermediate cool the board already shows, so the
+  // setup pill doesn't hard-cut bright->dark at phase 3 (matches the other HUD
+  // badges' dusk tier).
+  difficultyButtonDusk: {
+    backgroundColor: 'rgba(45, 25, 70, 0.5)',
+  },
   difficultyButtonDark: {
     backgroundColor: 'rgba(60, 30, 80, 0.4)',
   },

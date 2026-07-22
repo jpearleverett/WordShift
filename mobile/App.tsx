@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  ActivityIndicator,
   StatusBar,
   Dimensions,
   useWindowDimensions,
@@ -4308,6 +4307,7 @@ function MainApp() {
             ref={difficultyChipRef}
             style={[
               styles.difficultyButton,
+              persistence.currentPhase === 2 && styles.difficultyButtonDusk,
               persistence.currentPhase >= 3 && styles.difficultyButtonDark,
               persistence.currentPhase >= 4 && styles.difficultyButtonVoid,
               showSetupSelectorIntro && styles.difficultyButtonHighlighted,
@@ -4436,7 +4436,7 @@ function MainApp() {
           {puzzle.gameState === GameState.GAME_OVER && (
             <View style={styles.loadingOverlay} accessibilityRole="alert">
               <View style={[styles.loadingBox, { backgroundColor: pauseSurface.cardBg, borderWidth: 1, borderColor: pauseSurface.cardBorder }]}>
-                <Text style={[styles.loadingGlyph, { color: pauseSurface.title }]}>{persistence.currentPhase >= 3 ? '◈' : '⏱'}</Text>
+                <Text style={[styles.loadingGlyph, { color: pauseSurface.title }]}>{'◈'}</Text>
                 <Text style={[styles.timeUpText, { color: pauseSurface.title }]}>
                   {puzzle.message || getSpeedTimeUpMessage(persistence.currentPhase)}
                 </Text>
@@ -5032,7 +5032,7 @@ function BootHold() {
         style={{ width: wordmarkWidth, height: Math.round(wordmarkWidth * 0.25) }}
         resizeMode="contain"
       />
-      <ActivityIndicator size="small" color="#8B7BB8" style={{ marginTop: Math.round(gap * 1.4) }} />
+      <BrandedLoader size={30} style={{ marginTop: Math.round(gap * 1.4) }} />
     </View>
   );
 }
