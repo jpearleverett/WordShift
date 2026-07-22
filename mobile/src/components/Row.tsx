@@ -9,19 +9,24 @@ import {
   GestureResponderEvent,
 } from 'react-native';
 import { Letter, RowData } from '../types';
-import { LetterTile } from './LetterTile';
+import { LetterTile, getGuideGlowConfig, getSquashParams } from './LetterTile';
 import { DraggableTile } from './DraggableTile';
 import { CandyColors, getPhaseTheme } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
 import { hapticSelection } from '../services/haptics';
 import { shouldSimplifyAnimations } from '../services/deviceTier';
 import { getWordPhaseTier } from '../services/localGenerator';
+import { getPressSpring } from '../theme/surfaces';
 import {
   ROW_HORIZONTAL_MARGIN,
   ROW_PADDING,
   ARC_SLOT_RENDERED_WIDTH,
   ARC_LETTER_MARGIN_H,
   ARC_SLOT_MARGIN_H,
+  STANDARD_TILE_W,
+  STANDARD_TILE_MARGIN_H,
+  COMPACT_TILE_W,
+  COMPACT_TILE_MARGIN_H,
 } from '../constants/tileLayout';
 import {
   INTER_SLOT_PULSE_SCALE,
@@ -29,7 +34,7 @@ import {
   INTER_SLOT_PULSE_OUT_MS,
   DRAG_HOVER_SCALE,
 } from '../constants/timing';
-import { BODY_FONT, BODY_FONT_BOLD, PIXEL_FONT_BOLD } from '../theme/fonts';
+import { BODY_FONT_BOLD, PIXEL_FONT_BOLD } from '../theme/fonts';
 
 // Arc layout configuration
 const ARC_ROTATION = 12; // Max rotation in degrees for edge elements (steeper fan)
@@ -230,10 +235,15 @@ const Slot: React.FC<{
 }> = ({ onPress, index, slotCount = 0, compact = false, phase = 0, isGuided = false, preview, validityVisible = true, isHovered = false, pulseSignal = 0, triggerCatch = 0 }) => {
   const settings = getSettingsSync();
   const phaseColors = getPhaseRowColors(phase);
+  const guideGlow = getGuideGlowConfig(phase);
   const scaleAnim = useRef(new Animated.Value(settings.reducedMotion ? 1 : 0)).current;
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
-  const catchBounceAnim = useRef(new Animated.Value(1)).current;
+  // Catch-landing squash pair (F9/F76): replaces the old uniform catchBounceAnim
+  // scale bump with a phase-weighted squash-and-stretch (getSquashParams),
+  // matching LetterTile's own arrival landing instead of a fixed f5/t200 bounce.
+  const catchSquashXAnim = useRef(new Animated.Value(1)).current;
+  const catchSquashYAnim = useRef(new Animated.Value(1)).current;
   const hoverScaleAnim = useRef(new Animated.Value(1)).current;
   const adjacentPulseAnim = useRef(new Animated.Value(0)).current;
   const previewOpacity = useRef(new Animated.Value(0)).current;
@@ -258,7 +268,11 @@ const Slot: React.FC<{
 
     // Skip decorative loops on low-end devices
     if (shouldSimplifyAnimations()) {
-      return () => { scaleAnim.stopAnimation(); catchBounceAnim.stopAnimation(); };
+      return () => {
+        scaleAnim.stopAnimation();
+        catchSquashXAnim.stopAnimation();
+        catchSquashYAnim.stopAnimation();
+      };
     }
 
     // Continuous pulse
@@ -308,18 +322,28 @@ const Slot: React.FC<{
     };
   }, []);
 
-  // Catch bounce when a letter lands
+  // Catch squash-and-stretch when a letter lands (F9: split from a uniform
+  // scale bounce; F76: the spring itself now ages with phase via
+  // getSquashParams instead of a fixed f5/t200 bounce at every phase).
   useEffect(() => {
     if (triggerCatch > 0 && !settings.reducedMotion) {
-      catchBounceAnim.setValue(1.2);
-      Animated.spring(catchBounceAnim, {
+      const squash = getSquashParams(phase);
+      catchSquashXAnim.setValue(1 + squash.amount);
+      catchSquashYAnim.setValue(1 - squash.amount);
+      Animated.spring(catchSquashXAnim, {
         toValue: 1,
-        friction: 5,
-        tension: 200,
+        friction: squash.friction,
+        tension: squash.tension,
+        useNativeDriver: true,
+      }).start();
+      Animated.spring(catchSquashYAnim, {
+        toValue: 1,
+        friction: squash.friction,
+        tension: squash.tension,
         useNativeDriver: true,
       }).start();
     }
-  }, [triggerCatch, settings.reducedMotion]);
+  }, [triggerCatch, settings.reducedMotion, phase]);
 
   // Live drag-hover swell: the slot under the finger scales up slightly while
   // hovered. Purely GEOMETRIC feedback (never validity-filtered) — it answers
@@ -454,10 +478,14 @@ const Slot: React.FC<{
             transform: [
               {
                 scale: Animated.multiply(
-                  Animated.multiply(Animated.multiply(scaleAnim, pulseScale), catchBounceAnim),
+                  Animated.multiply(scaleAnim, pulseScale),
                   Animated.multiply(hoverScaleAnim, adjacentPulseScale)
                 ),
               },
+              // Catch-landing squash (F9/F76), layered independently of the
+              // uniform scale above — mirrors LetterTile's arrival squash.
+              { scaleX: catchSquashXAnim },
+              { scaleY: catchSquashYAnim },
             ],
           },
         ]}
@@ -468,7 +496,7 @@ const Slot: React.FC<{
             styles.slotGlow,
             {
               opacity: glowOpacity,
-              backgroundColor: isGuided ? CandyColors.yellow.main : phaseColors.slotGlowColor,
+              backgroundColor: isGuided ? guideGlow.accent : phaseColors.slotGlowColor,
             },
           ]}
         />
@@ -478,6 +506,9 @@ const Slot: React.FC<{
             style={[
               styles.guidedSlotHalo,
               {
+                borderColor: guideGlow.accent,
+                backgroundColor: guideGlow.haloWash,
+                shadowColor: guideGlow.accent,
                 opacity: glowOpacity,
                 transform: [{ scale: pulseScale }],
               },
@@ -491,8 +522,8 @@ const Slot: React.FC<{
           style={[
             styles.slot,
             compact && styles.slotCompact,
-            { borderColor: isGuided ? CandyColors.yellow.main : phaseColors.slotBorderColor },
-            isGuided && [styles.slotGuided, { borderWidth: 3 }],
+            { borderColor: isGuided ? guideGlow.accent : phaseColors.slotBorderColor },
+            isGuided && { borderWidth: 3, backgroundColor: guideGlow.slotFill },
           ]}
         >
           {/* Inner shimmer */}
@@ -624,6 +655,18 @@ export const Row: React.FC<RowProps> = memo(({
   const invalidShakeX = useRef(new Animated.Value(0)).current;
   const successBounceScale = useRef(new Animated.Value(1)).current;
   const glowLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+  // F1 (neighbour rank-closing) — per-tile translateX cache + the last
+  // rendered STANDARD-layout id order, used by the rank-shift effect below.
+  const prevStandardIdsRef = useRef<string[] | null>(null);
+  const rankShiftAnims = useRef(new Map<string, Animated.Value>()).current;
+  const getRankShiftAnim = (id: string): Animated.Value => {
+    let anim = rankShiftAnims.get(id);
+    if (!anim) {
+      anim = new Animated.Value(0);
+      rankShiftAnims.set(id, anim);
+    }
+    return anim;
+  };
 
   // The arc fan stays MOUNTED through its close animation (see the arc effect):
   // while collapsing, showSlots is already false but arcVisible keeps the
@@ -874,18 +917,22 @@ export const Row: React.FC<RowProps> = memo(({
 
   // Brief scale bounce on the target row when a letter successfully lands.
   // Visual-only: App.tsx owns the landing haptic (weighted heavy for a drag vs
-  // medium for a tap), so this effect must not fire a second impact.
+  // medium for a tap), so this effect must not fire a second impact. The
+  // release spring itself ages with phase (F76) via getPressSpring — the same
+  // ladder LetterTile's own press-out already uses — so the drop lands
+  // soft-heavy at Phase 4 instead of the same bright f5/t200 bounce forever.
   useEffect(() => {
     if (!isTarget || successDropSignal <= 0) return;
     if (getSettingsSync().reducedMotion) return;
+    const releaseSpring = getPressSpring(phase);
     successBounceScale.setValue(1.08);
     Animated.spring(successBounceScale, {
       toValue: 1,
-      friction: 5,
-      tension: 200,
+      friction: releaseSpring.friction,
+      tension: releaseSpring.tension,
       useNativeDriver: true,
     }).start();
-  }, [successDropSignal, isTarget, successBounceScale]);
+  }, [successDropSignal, isTarget, successBounceScale, phase]);
 
   // Calculate arc multipliers for position in sequence
   const getArcMultipliers = (index: number, totalElements: number) => {
@@ -1020,7 +1067,6 @@ export const Row: React.FC<RowProps> = memo(({
       const canDrag = isSource && !isProcessing && !letter.isLocked && !!onLetterDragDrop;
       const tile = (
         <LetterTile
-          key={canDrag ? undefined : letter.id}
           letter={displayLetter}
           isSelected={selectedLetter?.id === letter.id}
           isInteractable={isSource && !isProcessing && !letter.isLocked}
@@ -1055,29 +1101,35 @@ export const Row: React.FC<RowProps> = memo(({
         />
       );
 
-      if (canDrag) {
-        return (
-          <DraggableTile
-            key={letter.id}
-            enabled={!isProcessing}
-            letterChar={displayLetter.char}
-            onDragStart={() => {
-              if (!selectedLetter || selectedLetter.id !== letter.id) {
-                onLetterPress(letter, rowIndex);
-              }
-            }}
-            onDragEnd={(pos) => onLetterDragDrop!(letter, rowIndex, pos)}
-            onMove={onLetterDragMove}
-            onTap={() => onLetterPress(letter, rowIndex)}
-            phase={phase}
-            onDragActiveChange={onDragActiveChange}
-          >
-            {tile}
-          </DraggableTile>
-        );
-      }
+      const inner = canDrag ? (
+        <DraggableTile
+          enabled={!isProcessing}
+          letterChar={displayLetter.char}
+          onDragStart={() => {
+            if (!selectedLetter || selectedLetter.id !== letter.id) {
+              onLetterPress(letter, rowIndex);
+            }
+          }}
+          onDragEnd={(pos) => onLetterDragDrop!(letter, rowIndex, pos)}
+          onMove={onLetterDragMove}
+          onTap={() => onLetterPress(letter, rowIndex)}
+          phase={phase}
+          onDragActiveChange={onDragActiveChange}
+        >
+          {tile}
+        </DraggableTile>
+      ) : tile;
 
-      return tile;
+      // F1 (neighbour rank-closing): wraps every standard-layout tile in a
+      // cheap native-driver translateX (rests at 0) so a word-length change
+      // on THIS row can smoothly close ranks instead of flexbox-teleporting
+      // the remaining tiles to their re-centered spots. See the rank-shift
+      // effect below for when/why it actually moves.
+      return (
+        <Animated.View key={letter.id} style={{ transform: [{ translateX: getRankShiftAnim(letter.id) }] }}>
+          {inner}
+        </Animated.View>
+      );
     });
   };
 
@@ -1099,6 +1151,68 @@ export const Row: React.FC<RowProps> = memo(({
   // flipped) shows the standard layout immediately — no one-frame arc-on-source
   // flash while the effect resets the collapse state.
   const arcMounted = isTarget && (!!showSlots || arcVisible);
+
+  // ─── F1 (neighbour rank-closing, achievable half) ──────────────────────────
+  // When this row's rendered word length changes while it stays on the
+  // STANDARD (non-arc) layout throughout — the old source row shrinking to
+  // `completed` as its picked letter departs — the remaining tiles would
+  // otherwise flexbox-teleport straight to their re-centered positions. Each
+  // remaining tile instead starts at its PRE-shrink offset (a half-tile-
+  // footprint nudge, from tileLayout.ts) and native-springs to 0, so ranks
+  // visibly close / make room instead of snapping.
+  //
+  // Deliberately scoped to same-layout-path changes: the arc->standard flip
+  // when a row becomes the new source (letters were previously laid out in
+  // the fan, not this standard row) has no previous STANDARD baseline to
+  // diff against here, so it is left alone — that transition is already
+  // masked by the arc-collapse animation plus the arriving letter's own
+  // arrival settle. A true cross-row "flying ghost" (a tile visibly
+  // travelling from the source row's position into the target slot) needs
+  // usePuzzleGame to hand down the source tile's measured screen position
+  // and is out of scope for this file.
+  useEffect(() => {
+    if (arcMounted) return;
+    const currentIds = rowData.words.map((l) => l.id);
+    const prevIds = prevStandardIdsRef.current;
+    const instant = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
+
+    if (instant) {
+      currentIds.forEach((id) => getRankShiftAnim(id).setValue(0));
+      prevStandardIdsRef.current = currentIds;
+      return;
+    }
+
+    const started: Animated.CompositeAnimation[] = [];
+    if (prevIds && prevIds.length !== currentIds.length) {
+      const footprint = compactTiles
+        ? COMPACT_TILE_W + COMPACT_TILE_MARGIN_H * 2
+        : STANDARD_TILE_W + STANDARD_TILE_MARGIN_H * 2;
+      const half = footprint / 2;
+      const releaseSpring = getPressSpring(phase);
+      currentIds.forEach((id, newIdx) => {
+        const oldIdx = prevIds.indexOf(id);
+        if (oldIdx === -1) return; // a newly-arrived tile owns its own arrival settle
+        let startOffset: number | null = null;
+        if (newIdx === oldIdx) startOffset = -half; // sat before the departed tile
+        else if (newIdx < oldIdx) startOffset = half; // sat after it; the gap closed under it
+        if (startOffset === null) return;
+        const anim = getRankShiftAnim(id);
+        anim.setValue(startOffset);
+        const spring = Animated.spring(anim, {
+          toValue: 0,
+          friction: releaseSpring.friction,
+          tension: releaseSpring.tension,
+          useNativeDriver: true,
+        });
+        spring.start();
+        started.push(spring);
+      });
+    }
+
+    prevStandardIdsRef.current = currentIds;
+    return () => { started.forEach((a) => a.stop()); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- rankShiftAnims/prevStandardIdsRef/getRankShiftAnim are stable refs recreated fresh each run
+  }, [arcMounted, rowData.words, compactTiles, phase]);
 
   return (
     <Animated.View
@@ -1399,6 +1513,8 @@ const styles = StyleSheet.create({
     backgroundColor: CandyColors.pink.main,
   },
   guidedSlotHalo: {
+    // Colors (borderColor/backgroundColor/shadowColor) are phase-aware — see
+    // getGuideGlowConfig, applied inline at the JSX call site.
     position: 'absolute',
     top: -10,
     left: -10,
@@ -1406,9 +1522,6 @@ const styles = StyleSheet.create({
     bottom: -10,
     borderRadius: 16,
     borderWidth: 3,
-    borderColor: CandyColors.yellow.main,
-    backgroundColor: 'rgba(250, 204, 21, 0.15)',
-    shadowColor: CandyColors.yellow.main,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.6,
     shadowRadius: 8,
@@ -1424,9 +1537,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
-  },
-  slotGuided: {
-    backgroundColor: 'rgba(255, 230, 100, 0.95)',
   },
   slotCompact: {
     width: ARC_SLOT_RENDERED_WIDTH, // Slightly wider than SLOT_WIDTH for trapezoid visibility
@@ -1518,14 +1628,16 @@ const styles = StyleSheet.create({
     maxWidth: 60,
   },
   slotPreviewText: {
-    fontFamily: PIXEL_FONT_BOLD,
+    // Same face at every size (F5) — was PIXEL_FONT_BOLD (the chrome sans) at
+    // standard width and BODY_FONT at compact, so the preview visibly changed
+    // typeface the moment a word crossed 6 letters.
+    fontFamily: BODY_FONT_BOLD,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
   slotPreviewTextCompact: {
-    fontFamily: BODY_FONT,
     fontSize: 9,
   },
   // Light inks on the dark chip. Valid/invalid stays distinguished by the

@@ -11,7 +11,7 @@ import {
   COMPACT_TILE_W,
   COMPACT_TILE_MARGIN_H,
 } from '../constants/tileLayout';
-import { PIXEL_FONT_BOLD } from '../theme/fonts';
+import { BODY_FONT_BOLD } from '../theme/fonts';
 
 interface LetterTileProps {
   letter: Letter;
@@ -59,7 +59,62 @@ const COMPACT_OUTER_W = COMPACT_TILE_W; // 42
 const COMPACT_OUTER_H = 52;
 const COMPACT_BODY_W = 42;
 const COMPACT_BODY_H = 46;
-const COMPACT_FONT = 21;
+const COMPACT_FONT = 20;
+
+/**
+ * Squash-and-stretch on the arrival landing (F9): a brief wide-and-short
+ * impact that springs back through a stretch overshoot. Crisper and snappier
+ * in the bright days, heavier and slower by the reveal (the same weight
+ * ladder the rest of the tile speaks). `amount` is the peak scale deviation
+ * (scaleX up, scaleY down); the spring provides the single settling
+ * overshoot. Exported (module-level, not a component closure) so Row's own
+ * "catch" landing can share the identical shape/weight language instead of a
+ * uniform-scale bounce that never ages with phase.
+ */
+export function getSquashParams(phase: number): { amount: number; friction: number; tension: number } {
+  if (phase >= 4) return { amount: 0.09, friction: 8, tension: 90 };
+  if (phase >= 3) return { amount: 0.10, friction: 7, tension: 120 };
+  if (phase >= 2) return { amount: 0.12, friction: 6, tension: 150 };
+  if (phase >= 1) return { amount: 0.13, friction: 5, tension: 180 };
+  return { amount: 0.15, friction: 4, tension: 220 };
+}
+
+export interface GuideGlowConfig {
+  /** Opaque accent color for guide-ring/hint borders, shadows, and glows. */
+  accent: string;
+  /** ~0.30 alpha wash — the guide ring's soft halo fill. */
+  ringWash: string;
+  /** ~0.25 alpha wash — the recommended tile's body fill. */
+  tileWash: string;
+  /** ~0.15 alpha wash — the guided drop slot's halo fill. */
+  haloWash: string;
+  /** ~0.95 alpha near-solid fill — the guided slot's interior. */
+  slotFill: string;
+}
+
+/**
+ * Phase-aware hint/guide glow (F4): the tutorial + hint highlight was
+ * hardcoded candy-yellow at every phase, breaking the aging-world doctrine
+ * that every other tile effect (trail glow, resonance) already follows. Warm
+ * gold in the bright days, ageing to violet at Phase 3, ember crimson at
+ * Phase 4, and a settled mauve at Phase 5. Onboarding's tutorial glow
+ * (guidanceActive) only ever fires at Phase 0 (onboarding never runs later),
+ * so it stays gold automatically without any special-casing here.
+ */
+export function getGuideGlowConfig(phase: number): GuideGlowConfig {
+  const accent =
+    phase >= 5 ? '#7B6B8A' :
+    phase >= 4 ? '#C03050' :
+    phase >= 3 ? '#7B2FBE' :
+    CandyColors.yellow.main;
+  return {
+    accent,
+    ringWash: `${accent}4D`,
+    tileWash: `${accent}40`,
+    haloWash: `${accent}26`,
+    slotFill: `${accent}F2`,
+  };
+}
 
 const LetterTileComponent: React.FC<LetterTileProps> = ({
   letter,
@@ -168,21 +223,10 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
     return 3;
   };
 
-  // Squash-and-stretch on the arrival landing: a brief wide-and-short impact
-  // that springs back through a stretch overshoot. Crisper and snappier in the
-  // bright days, heavier and slower by the reveal — the same weight ladder the
-  // rest of the tile speaks. `amount` is the peak scale deviation (scaleX up,
-  // scaleY down); the spring provides the single settling overshoot.
-  const getSquashParams = () => {
-    if (phase >= 4) return { amount: 0.09, friction: 8, tension: 90 };
-    if (phase >= 3) return { amount: 0.10, friction: 7, tension: 120 };
-    if (phase >= 2) return { amount: 0.12, friction: 6, tension: 150 };
-    if (phase >= 1) return { amount: 0.13, friction: 5, tension: 180 };
-    return { amount: 0.15, friction: 4, tension: 220 };
-  };
-
   // Get consistent color based on letter
   const tileColor = getTileColor(letter.char);
+  // Phase-aware guide/hint glow (F4) — see getGuideGlowConfig above.
+  const guideGlow = getGuideGlowConfig(phase);
 
   // Idle animation for interactable tiles
   useEffect(() => {
@@ -486,7 +530,7 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
     }
 
     const springParams = getSelectedSpringParams();
-    const squash = getSquashParams();
+    const squash = getSquashParams(phase);
     arrivalScaleAnim.setValue(0.65);
     // 'down' move = the letter came from the row above → slide down into place.
     arrivalTranslateYAnim.setValue(arrivalDirection === 'up' ? 14 : -14);
@@ -876,6 +920,9 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
           style={[
             styles.guideRing,
             {
+              borderColor: guideGlow.accent,
+              backgroundColor: guideGlow.ringWash,
+              shadowColor: guideGlow.accent,
               opacity: guideRingOpacity,
               transform: [{ scale: guideRingScale }],
             },
@@ -912,7 +959,10 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
             borderBottomColor: tileStyles.borderColor,
             shadowColor: tileStyles.shadowColor,
           },
-          isGuided && styles.tileBodyGuided,
+          isGuided && [
+            styles.tileBodyGuided,
+            { backgroundColor: guideGlow.tileWash, borderColor: guideGlow.accent },
+          ],
           isSelected && styles.tileBodySelected,
           highlight === 'locked' && styles.tileBodyLocked,
         ]}
@@ -1049,6 +1099,8 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   guideRing: {
+    // Colors (borderColor/backgroundColor/shadowColor) are phase-aware — see
+    // getGuideGlowConfig, applied inline at the JSX call site.
     position: 'absolute',
     top: -6,
     left: -6,
@@ -1056,9 +1108,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     borderRadius: 18,
     borderWidth: 3,
-    borderColor: CandyColors.yellow.main,
-    backgroundColor: 'rgba(250, 204, 21, 0.30)',
-    shadowColor: CandyColors.yellow.main,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.7,
     shadowRadius: 10,
@@ -1078,9 +1127,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   tileBodyGuided: {
-    backgroundColor: 'rgba(250, 204, 21, 0.25)',
+    // Colors (backgroundColor/borderColor) are phase-aware — see
+    // getGuideGlowConfig, applied inline at the JSX call site.
     borderWidth: 2,
-    borderColor: CandyColors.yellow.main,
   },
   tileBodySelected: {
     shadowOpacity: 0.5,
@@ -1125,8 +1174,12 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   letterText: {
-    fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 26,
+    // The signature tile look: BODY_FONT_BOLD (the running-text/body face),
+    // never the chrome/header sans (F5) — sized down a touch from the header
+    // face's 26/21 since the body face runs a little wider at the same
+    // metrics; keeps 'W' clear of the tile edge at both sizes.
+    fontFamily: BODY_FONT_BOLD,
+    fontSize: 24,
     fontWeight: '900',
     textShadowColor: 'rgba(0, 0, 0, 0.2)',
     textShadowOffset: { width: 0, height: 2 },
