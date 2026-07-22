@@ -39,7 +39,7 @@ import { NineSliceFrame, ThreeSliceStrip } from '../ui/NineSlice';
 import { PixelPlaque } from '../ui/PixelPlaque';
 import { CandyButton } from '../ui/CandyButton';
 import { PanelCard } from '../ui/PanelCard';
-import { RewardReveal } from '../ui/RewardReveal';
+import { RewardReveal, countUpDisplayValue, getCountUpDurationMs } from '../ui/RewardReveal';
 import {
   getFullProgress,
   markIntroSeen,
@@ -573,6 +573,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [showSacrificeModal, setShowSacrificeModal] = useState(false);
   const [sacrificeMessage, setSacrificeMessage] = useState<string | null>(null);
   const [offeringTotal, setOfferingTotal] = useState(0);
+  // The monument line's number CLIMBS when an offering raises it (was a snap).
+  // Snaps on the first read after the altar opens (never counts the lifetime
+  // total up from 0) and under reduced motion.
+  const [displayedOfferingTotal, setDisplayedOfferingTotal] = useState(0);
+  const displayedTotalRef = useRef(0);
+  const monumentInitedRef = useRef(false);
+  const monumentRafRef = useRef(0);
   const [offeringCount, setOfferingCount] = useState(0);
   const [offerStreak, setOfferStreak] = useState(0);
   const [offeringTierUp, setOfferingTierUp] = useState<string | null>(null);
@@ -1220,6 +1227,43 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     })();
     return () => { cancelled = true; };
   }, [showSacrificeModal]);
+
+  // Reset the monument climb latch when the altar closes so the next open snaps
+  // to the loaded total instead of counting the whole lifetime up from zero.
+  useEffect(() => {
+    if (!showSacrificeModal) monumentInitedRef.current = false;
+  }, [showSacrificeModal]);
+
+  // Climb the monument total when an offering raises it (snap on first read /
+  // reduced motion / a non-increase). JS-thread rAF tick, cancelled on change.
+  useEffect(() => {
+    const from = displayedTotalRef.current;
+    const to = offeringTotal;
+    const reduced = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
+    if (!monumentInitedRef.current || reduced || to <= from) {
+      monumentInitedRef.current = true;
+      displayedTotalRef.current = to;
+      setDisplayedOfferingTotal(to);
+      return;
+    }
+    const duration = getCountUpDurationMs(to - from, progress?.currentPhase ?? 0);
+    if (duration <= 0) {
+      displayedTotalRef.current = to;
+      setDisplayedOfferingTotal(to);
+      return;
+    }
+    const startedAt = Date.now();
+    const tick = () => {
+      const f = Math.min(1, (Date.now() - startedAt) / duration);
+      const v = countUpDisplayValue(f, to, from);
+      displayedTotalRef.current = v;
+      setDisplayedOfferingTotal(v);
+      if (f < 1) monumentRafRef.current = requestAnimationFrame(tick);
+    };
+    monumentRafRef.current = requestAnimationFrame(tick);
+    return () => { if (monumentRafRef.current) cancelAnimationFrame(monumentRafRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- climb keyed on the total; phase read at fire time
+  }, [offeringTotal]);
 
   // Shared offering action for both the amount chips and "Offer everything".
   // The altar stays OPEN: it updates the running monument + the in-session
@@ -3243,7 +3287,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     </>
                   )}
                   <Text style={[styles.offeringHolds, { color: panelSt.body }]}>
-                    {getArrangementHoldsLine(offeringTotal, progress.currentPhase)}
+                    {getArrangementHoldsLine(displayedOfferingTotal, progress.currentPhase)}
                   </Text>
                 </View>
               );
