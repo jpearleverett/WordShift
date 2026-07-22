@@ -2321,242 +2321,263 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
 
   if (!harvestState) return null;
 
+  // F121: the ward-ignition ceremony overlay (rendered below) occludes the pit
+  // while it plays. It fences iOS via accessibilityViewIsModal; on Android the
+  // pit content behind it must be hidden explicitly. This flag drives that
+  // Android/underlying fence and is true for the whole ceremony (ward ignition
+  // through eruption and the transition text), the window before the app-level
+  // PhaseTransitionOverlay takes over at 'complete'.
+  const blockingOverlayActive =
+    ceremonyStatus !== 'idle' && ceremonyStatus !== 'complete';
+
   return (
     <View style={[styles.container, { backgroundColor: PIT_BG_COLORS[phase] ?? PIT_BG_COLORS[0] }]}>
       <Image source={getPitBackground(phase)} style={styles.backgroundImage} resizeMode="cover" />
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
-      {/* Layered breathing glow — outer halo (faintest, largest) */}
-      <Animated.View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          left: PIT_CENTER.x - GLOW_OUTER_SIZE / 2,
-          top: PIT_CENTER.y - GLOW_OUTER_SIZE / 2,
-          width: GLOW_OUTER_SIZE,
-          height: GLOW_OUTER_SIZE,
-          borderRadius: GLOW_OUTER_SIZE / 2,
-          backgroundColor: glowColor,
-          opacity: breathOpacityOuter,
-          transform: [{ scaleX: GLOW_OUTER_SCALE_X }, { scale: breathScale }],
-        }}
-      />
-      {/* Middle glow */}
-      <Animated.View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          left: PIT_CENTER.x - GLOW_MIDDLE_SIZE / 2,
-          top: PIT_CENTER.y - GLOW_MIDDLE_SIZE / 2,
-          width: GLOW_MIDDLE_SIZE,
-          height: GLOW_MIDDLE_SIZE,
-          borderRadius: GLOW_MIDDLE_SIZE / 2,
-          backgroundColor: glowColor,
-          opacity: breathOpacityMiddle,
-          transform: [{ scaleX: GLOW_MIDDLE_SCALE_X }, { scale: breathScale }],
-        }}
-      />
-      {/* Inner glow — brightest, smallest */}
-      <Animated.View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          left: PIT_CENTER.x - GLOW_INNER_SIZE / 2,
-          top: PIT_CENTER.y - GLOW_INNER_SIZE / 2,
-          width: GLOW_INNER_SIZE,
-          height: GLOW_INNER_SIZE,
-          borderRadius: GLOW_INNER_SIZE / 2,
-          backgroundColor: glowColor,
-          opacity: breathOpacityInner,
-          transform: [{ scaleX: GLOW_INNER_SCALE_X }, { scale: breathScale }],
-        }}
-      />
-      {/* Dark pit core — creates depth illusion */}
-      <Animated.View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          left: PIT_CENTER.x - GLOW_CORE_SIZE / 2,
-          top: PIT_CENTER.y - GLOW_CORE_SIZE / 2,
-          width: GLOW_CORE_SIZE,
-          height: GLOW_CORE_SIZE,
-          borderRadius: GLOW_CORE_SIZE / 2,
-          backgroundColor: coreColor,
-          opacity: breathOpacityCore,
-          transform: [{ scaleX: GLOW_CORE_SCALE_X }, { scale: breathScale }],
-        }}
-      />
-      {/* Pit rim ring — subtle edge definition (circle + scaleX for true ellipse) */}
+      {/* F121: fence the occluded pit visuals behind the ward-ignition
+          ceremony from TalkBack. While the ceremony plays the overlay below
+          uses accessibilityViewIsModal on iOS; this View hides its
+          descendants on Android (accessibilityElementsHidden mirrors it on
+          iOS). box-none keeps the ward tap target reachable when idle. */}
       <View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          left: PIT_CENTER.x - GLOW_RIM_SIZE_Y / 2,
-          top: PIT_CENTER.y - GLOW_RIM_SIZE_Y / 2,
-          width: GLOW_RIM_SIZE_Y,
-          height: GLOW_RIM_SIZE_Y,
-          borderRadius: GLOW_RIM_SIZE_Y / 2,
-          borderWidth: 1,
-          borderColor: glowColor + '25',
-          transform: [{ scaleX: GLOW_RIM_SCALE_X }],
-        }}
-      />
+        style={StyleSheet.absoluteFill}
+        pointerEvents="box-none"
+        accessibilityElementsHidden={blockingOverlayActive}
+        importantForAccessibility={blockingOverlayActive ? 'no-hide-descendants' : 'auto'}
+      >
+        {/* Layered breathing glow — outer halo (faintest, largest) */}
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            left: PIT_CENTER.x - GLOW_OUTER_SIZE / 2,
+            top: PIT_CENTER.y - GLOW_OUTER_SIZE / 2,
+            width: GLOW_OUTER_SIZE,
+            height: GLOW_OUTER_SIZE,
+            borderRadius: GLOW_OUTER_SIZE / 2,
+            backgroundColor: glowColor,
+            opacity: breathOpacityOuter,
+            transform: [{ scaleX: GLOW_OUTER_SCALE_X }, { scale: breathScale }],
+          }}
+        />
+        {/* Middle glow */}
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            left: PIT_CENTER.x - GLOW_MIDDLE_SIZE / 2,
+            top: PIT_CENTER.y - GLOW_MIDDLE_SIZE / 2,
+            width: GLOW_MIDDLE_SIZE,
+            height: GLOW_MIDDLE_SIZE,
+            borderRadius: GLOW_MIDDLE_SIZE / 2,
+            backgroundColor: glowColor,
+            opacity: breathOpacityMiddle,
+            transform: [{ scaleX: GLOW_MIDDLE_SCALE_X }, { scale: breathScale }],
+          }}
+        />
+        {/* Inner glow — brightest, smallest */}
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            left: PIT_CENTER.x - GLOW_INNER_SIZE / 2,
+            top: PIT_CENTER.y - GLOW_INNER_SIZE / 2,
+            width: GLOW_INNER_SIZE,
+            height: GLOW_INNER_SIZE,
+            borderRadius: GLOW_INNER_SIZE / 2,
+            backgroundColor: glowColor,
+            opacity: breathOpacityInner,
+            transform: [{ scaleX: GLOW_INNER_SCALE_X }, { scale: breathScale }],
+          }}
+        />
+        {/* Dark pit core — creates depth illusion */}
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            left: PIT_CENTER.x - GLOW_CORE_SIZE / 2,
+            top: PIT_CENTER.y - GLOW_CORE_SIZE / 2,
+            width: GLOW_CORE_SIZE,
+            height: GLOW_CORE_SIZE,
+            borderRadius: GLOW_CORE_SIZE / 2,
+            backgroundColor: coreColor,
+            opacity: breathOpacityCore,
+            transform: [{ scaleX: GLOW_CORE_SCALE_X }, { scale: breathScale }],
+          }}
+        />
+        {/* Pit rim ring — subtle edge definition (circle + scaleX for true ellipse) */}
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            left: PIT_CENTER.x - GLOW_RIM_SIZE_Y / 2,
+            top: PIT_CENTER.y - GLOW_RIM_SIZE_Y / 2,
+            width: GLOW_RIM_SIZE_Y,
+            height: GLOW_RIM_SIZE_Y,
+            borderRadius: GLOW_RIM_SIZE_Y / 2,
+            borderWidth: 1,
+            borderColor: glowColor + '25',
+            transform: [{ scaleX: GLOW_RIM_SCALE_X }],
+          }}
+        />
 
-      {/* Pit surge glow layers — flash on devour impact / inhale */}
-      <Animated.View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          left: PIT_CENTER.x - GLOW_OUTER_SIZE / 2,
-          top: PIT_CENTER.y - GLOW_OUTER_SIZE / 2,
-          width: GLOW_OUTER_SIZE,
-          height: GLOW_OUTER_SIZE,
-          borderRadius: GLOW_OUTER_SIZE / 2,
-          backgroundColor: glowColor,
-          opacity: pitSurgeOpacity.interpolate({
-            inputRange: [0, 1],
-            outputRange: [0, 0.5],
-          }),
-          transform: [{ scaleX: GLOW_OUTER_SCALE_X }, { scale: pitSurgeScale }],
-        }}
-      />
-      <Animated.View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          left: PIT_CENTER.x - GLOW_INNER_SIZE / 2,
-          top: PIT_CENTER.y - GLOW_INNER_SIZE / 2,
-          width: GLOW_INNER_SIZE,
-          height: GLOW_INNER_SIZE,
-          borderRadius: GLOW_INNER_SIZE / 2,
-          backgroundColor: glowColor,
-          opacity: pitSurgeOpacity,
-          transform: [{ scaleX: GLOW_INNER_SCALE_X }, { scale: pitSurgeScale }],
-        }}
-      />
-
-      {/* Ambient rim particles — embers rising from pit edge */}
-      {rimParticles.map(p => <RimParticleView key={p.id} p={p} />)}
-
-      {/* Shockwave rings — expanding ripple on word impact */}
-      {shockwaveRings.map(ring => <ShockwaveRingView key={ring.id} ring={ring} />)}
-
-      {/* Ward marks — phase progression indicators around the pit rim */}
-      {phase < 4 && (litCount > 0 || wardChargeFraction > 0.02 || pendingPhaseTransition != null) && (
-        <>
-          {wardPositions.map((pos, idx) => {
-            const isLit = idx < litCount;
-            const isPending = pendingPhaseTransition != null && ceremonyStatus === 'idle';
-            const isIgnited = ceremonyStatus === 'igniting' && idx <= ceremonyIgniteStep;
-            // The next unlit ward brightens continuously with sub-dot progress.
-            const isCharging = !isPending && !isIgnited && !isLit && idx === litCount && wardChargeFraction > 0.02;
-            const flashAnim = wardFlashAnims[idx];
-
-            const baseColor = isIgnited
-              ? wardColors.pendingPulse
-              : isLit
-                ? (isPending ? wardColors.pendingPulse : wardColors.lit)
-                : isCharging
-                  ? wardColors.lit
-                  : wardColors.unlit;
-
-            const flashScale = flashAnim.interpolate({
+        {/* Pit surge glow layers — flash on devour impact / inhale */}
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            left: PIT_CENTER.x - GLOW_OUTER_SIZE / 2,
+            top: PIT_CENTER.y - GLOW_OUTER_SIZE / 2,
+            width: GLOW_OUTER_SIZE,
+            height: GLOW_OUTER_SIZE,
+            borderRadius: GLOW_OUTER_SIZE / 2,
+            backgroundColor: glowColor,
+            opacity: pitSurgeOpacity.interpolate({
               inputRange: [0, 1],
-              outputRange: [1, 2.5],
-            });
+              outputRange: [0, 0.5],
+            }),
+            transform: [{ scaleX: GLOW_OUTER_SCALE_X }, { scale: pitSurgeScale }],
+          }}
+        />
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            left: PIT_CENTER.x - GLOW_INNER_SIZE / 2,
+            top: PIT_CENTER.y - GLOW_INNER_SIZE / 2,
+            width: GLOW_INNER_SIZE,
+            height: GLOW_INNER_SIZE,
+            borderRadius: GLOW_INNER_SIZE / 2,
+            backgroundColor: glowColor,
+            opacity: pitSurgeOpacity,
+            transform: [{ scaleX: GLOW_INNER_SCALE_X }, { scale: pitSurgeScale }],
+          }}
+        />
 
-            // Android-safe glow: a translucent halo disc behind glow-worthy
-            // marks (the pit's own layered-opacity technique) instead of the
-            // iOS-only shadow props, which rendered as flat dots on Android.
-            const glowWorthy = isLit || isIgnited || isCharging || isPending;
-            const haloOpacity = isIgnited
-              ? 0.5
-              : isPending
-                ? 0.4
+        {/* Ambient rim particles — embers rising from pit edge */}
+        {rimParticles.map(p => <RimParticleView key={p.id} p={p} />)}
+
+        {/* Shockwave rings — expanding ripple on word impact */}
+        {shockwaveRings.map(ring => <ShockwaveRingView key={ring.id} ring={ring} />)}
+
+        {/* Ward marks — phase progression indicators around the pit rim */}
+        {phase < 4 && (litCount > 0 || wardChargeFraction > 0.02 || pendingPhaseTransition != null) && (
+          <>
+            {wardPositions.map((pos, idx) => {
+              const isLit = idx < litCount;
+              const isPending = pendingPhaseTransition != null && ceremonyStatus === 'idle';
+              const isIgnited = ceremonyStatus === 'igniting' && idx <= ceremonyIgniteStep;
+              // The next unlit ward brightens continuously with sub-dot progress.
+              const isCharging = !isPending && !isIgnited && !isLit && idx === litCount && wardChargeFraction > 0.02;
+              const flashAnim = wardFlashAnims[idx];
+
+              const baseColor = isIgnited
+                ? wardColors.pendingPulse
                 : isLit
-                  ? 0.35
+                  ? (isPending ? wardColors.pendingPulse : wardColors.lit)
                   : isCharging
-                    ? 0.28 * wardChargeFraction
-                    : 0;
-            const dotScale = isPending ? wardPulseScale : (isIgnited ? flashScale : 1);
+                    ? wardColors.lit
+                    : wardColors.unlit;
 
-            return (
-              <React.Fragment key={`ward-${idx}`}>
-                {glowWorthy && !simplify && (
+              const flashScale = flashAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [1, 2.5],
+              });
+
+              // Android-safe glow: a translucent halo disc behind glow-worthy
+              // marks (the pit's own layered-opacity technique) instead of the
+              // iOS-only shadow props, which rendered as flat dots on Android.
+              const glowWorthy = isLit || isIgnited || isCharging || isPending;
+              const haloOpacity = isIgnited
+                ? 0.5
+                : isPending
+                  ? 0.4
+                  : isLit
+                    ? 0.35
+                    : isCharging
+                      ? 0.28 * wardChargeFraction
+                      : 0;
+              const dotScale = isPending ? wardPulseScale : (isIgnited ? flashScale : 1);
+
+              return (
+                <React.Fragment key={`ward-${idx}`}>
+                  {glowWorthy && !simplify && (
+                    <Animated.View
+                      pointerEvents="none"
+                      style={{
+                        position: 'absolute',
+                        left: pos.x - 12,
+                        top: pos.y - 12,
+                        width: 24,
+                        height: 24,
+                        borderRadius: 12,
+                        backgroundColor: wardColors.glow,
+                        opacity: haloOpacity,
+                        transform: [{ scale: dotScale }],
+                      }}
+                    />
+                  )}
                   <Animated.View
                     pointerEvents="none"
                     style={{
                       position: 'absolute',
-                      left: pos.x - 12,
-                      top: pos.y - 12,
-                      width: 24,
-                      height: 24,
-                      borderRadius: 12,
-                      backgroundColor: wardColors.glow,
-                      opacity: haloOpacity,
+                      left: pos.x - 6,
+                      top: pos.y - 6,
+                      width: 12,
+                      height: 12,
+                      borderRadius: 6,
+                      backgroundColor: baseColor,
+                      opacity: isPending
+                        ? wardPulseOpacity
+                        : isLit
+                          ? 0.9
+                          : isCharging
+                            ? 0.2 + 0.6 * wardChargeFraction
+                            : 1,
                       transform: [{ scale: dotScale }],
                     }}
                   />
-                )}
-                <Animated.View
-                  pointerEvents="none"
-                  style={{
-                    position: 'absolute',
-                    left: pos.x - 6,
-                    top: pos.y - 6,
-                    width: 12,
-                    height: 12,
-                    borderRadius: 6,
-                    backgroundColor: baseColor,
-                    opacity: isPending
-                      ? wardPulseOpacity
-                      : isLit
-                        ? 0.9
-                        : isCharging
-                          ? 0.2 + 0.6 * wardChargeFraction
-                          : 1,
-                    transform: [{ scale: dotScale }],
-                  }}
-                />
-              </React.Fragment>
-            );
-          })}
-          {/* Tap target for ward ring when transition is pending */}
-          {pendingPhaseTransition != null && ceremonyStatus === 'idle' && (
-            <TouchableOpacity
-              style={{
-                position: 'absolute',
-                left: PIT_CENTER.x - PIT_OVAL.radiusX * 1.3,
-                top: PIT_CENTER.y - PIT_OVAL.radiusY * 3,
-                width: PIT_OVAL.radiusX * 2.6,
-                height: PIT_OVAL.radiusY * 4,
-              }}
-              onPress={() => {
-                hapticMedium();
-                startCeremony();
-              }}
-              accessibilityLabel="Activate the ward marks"
-              accessibilityRole="button"
-            />
-          )}
-        </>
-      )}
+                </React.Fragment>
+              );
+            })}
+            {/* Tap target for ward ring when transition is pending */}
+            {pendingPhaseTransition != null && ceremonyStatus === 'idle' && (
+              <TouchableOpacity
+                style={{
+                  position: 'absolute',
+                  left: PIT_CENTER.x - PIT_OVAL.radiusX * 1.3,
+                  top: PIT_CENTER.y - PIT_OVAL.radiusY * 3,
+                  width: PIT_OVAL.radiusX * 2.6,
+                  height: PIT_OVAL.radiusY * 4,
+                }}
+                onPress={() => {
+                  hapticMedium();
+                  startCeremony();
+                }}
+                accessibilityLabel="Activate the ward marks"
+                accessibilityRole="button"
+              />
+            )}
+          </>
+        )}
 
-      {/* Ward hint / ready text — shown above the pit */}
-      {/* Ward hint — boxless atmospheric whisper over the pit (player
-          feedback: no framed sign here). A pending transition keeps its
-          ward-color glow; the idle hint reads cream with a warm shadow. */}
-      {wardHintText && ceremonyStatus === 'idle' && (
-        <View style={styles.wardHintContainer} pointerEvents="none">
-          <Text style={[styles.wardHintText, {
-            color: pendingPhaseTransition != null ? wardColors.pendingPulse : '#FBF0D9',
-            fontSize: pendingPhaseTransition != null ? 18 : 15,
-          }]}>
-            {wardHintText}
-          </Text>
-        </View>
-      )}
+        {/* Ward hint / ready text — shown above the pit */}
+        {/* Ward hint — boxless atmospheric whisper over the pit (player
+            feedback: no framed sign here). A pending transition keeps its
+            ward-color glow; the idle hint reads cream with a warm shadow. */}
+        {wardHintText && ceremonyStatus === 'idle' && (
+          <View style={styles.wardHintContainer} pointerEvents="none">
+            <Text style={[styles.wardHintText, {
+              color: pendingPhaseTransition != null ? wardColors.pendingPulse : '#FBF0D9',
+              fontSize: pendingPhaseTransition != null ? 18 : 15,
+            }]}>
+              {wardHintText}
+            </Text>
+          </View>
+        )}
 
+      </View>
       {/* Ceremony overlay — text during phase transition. Tappable during the
           text phase so a player can pace the lines (tap advances early). */}
       {(ceremonyStatus === 'text' || ceremonyStatus === 'erupting') && (
@@ -2586,326 +2607,337 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         </Animated.View>
       )}
 
-      {/* Particle layers */}
-      {trailParticles.map(p => <TrailParticleView key={p.id} p={p} />)}
-      {impactParticles.map(p => <ImpactParticleView key={p.id} p={p} />)}
-      {amberParticles.map(p => <AmberParticleView key={p.id} p={p} />)}
-
-      {/* Floating word chips — taps disabled during onboarding except during pit_offering step */}
-      {flyingWords.map(fw => (
-        <FloatingWordChip key={fw.id} fw={fw} onTap={isPitWordTapEnabled(isOnboarding, onboardingStep) ? stableDevourWord : noopDevour} />
-      ))}
-
-      {/* Header — matches HomeScreen frosted glass style; safe-area aware */}
-      <View style={[styles.header, { paddingTop: screenInsets.top + 16 }]}>
-        <View style={styles.headerLeft}>
-          {/* Amber pill taps through to the Store, same as the home header. */}
-          <TouchableOpacity
-            style={styles.amberContainer}
-            onPress={() => { hapticLight(); playUiSound('tap'); onOpenStore?.(); }}
-            disabled={!onOpenStore || isOnboarding}
-            accessibilityLabel={
-              onOpenStore && !isOnboarding
-                ? `${Math.max(0, displayBalance)} amber. Tap to open the store`
-                : `${Math.max(0, displayBalance)} amber`
-            }
-            accessibilityRole={onOpenStore && !isOnboarding ? 'button' : undefined}
-          >
-            <View style={styles.amberInner}>
-              <AmberInline size={20} />
-              <Text style={styles.amberCount}>{Math.max(0, displayBalance)}</Text>
-            </View>
-          </TouchableOpacity>
-          {pendingAmber - pendingAmberOffset > 0 && (
-            <View style={styles.pendingBadge}>
-              <Text style={styles.pendingBadgeText}>+{pendingAmber - pendingAmberOffset}</Text>
-            </View>
-          )}
-        </View>
-        {!isOnboarding && (
-          <View style={styles.headerRight}>
-            {tendingEnabled && !isOnboarding && (
-              <TouchableOpacity
-                style={styles.headerIconBtn}
-                onPress={() => { hapticLight(); playUiSound('tap'); refreshTending(); setShowTendingModal(true); }}
-                accessibilityLabel={`Tend the pattern, ${getTendingLevelLabel(tendingLevel)}`}
-                accessibilityRole="button"
-              >
-                <Image source={TENDING_ICON} style={styles.headerIconImage} />
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              style={styles.headerIconBtn}
-              onPress={() => { hapticLight(); playUiSound('tap'); setShowUtilityModal(true); }}
-              accessibilityLabel="Open utility menu"
-              accessibilityRole="button"
-            >
-              <Image source={MENU_ICON} style={styles.headerIconImage} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.headerIconBtn}
-              onPress={() => { hapticLight(); playUiSound('tap'); onClose(); }}
-              accessibilityLabel="Return home"
-              accessibilityRole="button"
-            >
-              <Image source={HOME_ICON} style={styles.headerIconImage} />
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
-
-      <Modal
-        visible={showUtilityModal}
-        transparent
-        statusBarTranslucent
-        animationType="fade"
-        onRequestClose={() => setShowUtilityModal(false)}
+      {/* F121: the pit chrome that renders in FRONT of the ceremony overlay
+          (word tiles, header, summary bar), fenced by the same boolean so a
+          screen reader cannot focus it while the ward ceremony plays.
+          box-none keeps the overlay's tap-to-advance reachable underneath. */}
+      <View
+        style={StyleSheet.absoluteFill}
+        pointerEvents="box-none"
+        accessibilityElementsHidden={blockingOverlayActive}
+        importantForAccessibility={blockingOverlayActive ? 'no-hide-descendants' : 'auto'}
       >
-        <TouchableOpacity
-          style={styles.utilityOverlay}
-          activeOpacity={1}
-          onPress={() => setShowUtilityModal(false)}
-          accessibilityLabel="Close utility menu"
-          accessibilityRole="button"
-        >
-          <View style={styles.utilityModal} onStartShouldSetResponder={() => true}>
-            {/* Cottage pixel frame (openBottom sheet); text uses the audited
-                surface inks, never raw white on parchment. */}
-            <NineSliceFrame
-              skin={pitSkin.panel}
-              cornerDp={PANEL_CORNER_DP}
-              edgeDp={PANEL_EDGE_DP}
-              fillColor={pitSkin.fill}
-              openBottom
-            />
-            <Text style={[styles.utilityTitle, { color: pitSurface.title }]}>Menu</Text>
-            {onOpenStats && (
-              <TouchableOpacity
-                style={styles.utilityButton}
-                onPress={() => {
-                  setShowUtilityModal(false);
-                  onOpenStats?.();
-                }}
-                accessibilityLabel="View stats"
-                accessibilityRole="button"
-              >
-                <ThreeSliceStrip skin={pitSkin.buttons.secondary.md.up} capDp={BTN_CAP_DP} />
-                <View style={styles.utilityButtonRow}>
-                  <Image source={STATS_ICON} style={styles.utilityButtonIcon} />
-                  <Text style={[styles.utilityButtonText, { color: pitSkin.ink.primary }]}>Statistics</Text>
-                </View>
-              </TouchableOpacity>
-            )}
-            {onOpenSettings && (
-              <TouchableOpacity
-                style={styles.utilityButton}
-                onPress={() => {
-                  setShowUtilityModal(false);
-                  onOpenSettings?.();
-                }}
-                accessibilityLabel="Open settings"
-                accessibilityRole="button"
-              >
-                <ThreeSliceStrip skin={pitSkin.buttons.secondary.md.up} capDp={BTN_CAP_DP} />
-                <View style={styles.utilityButtonRow}>
-                  <Image source={GEAR_ICON} style={styles.utilityButtonIcon} />
-                  <Text style={[styles.utilityButtonText, { color: pitSkin.ink.primary }]}>Settings</Text>
-                </View>
-              </TouchableOpacity>
-            )}
-          </View>
-        </TouchableOpacity>
-      </Modal>
+        {/* Particle layers */}
+        {trailParticles.map(p => <TrailParticleView key={p.id} p={p} />)}
+        {impactParticles.map(p => <ImpactParticleView key={p.id} p={p} />)}
+        {amberParticles.map(p => <AmberParticleView key={p.id} p={p} />)}
 
-      {/* Tending Shrine modal — Phase 5 cosmetic amber sink */}
-      <Modal
-        visible={showTendingModal}
-        transparent
-        statusBarTranslucent
-        animationType="fade"
-        onRequestClose={() => setShowTendingModal(false)}
-      >
-        <TouchableOpacity
-          style={styles.utilityOverlay}
-          activeOpacity={1}
-          onPress={() => setShowTendingModal(false)}
-          accessibilityLabel="Close tending"
-          accessibilityRole="button"
-        >
-          <View style={styles.tendingModal} onStartShouldSetResponder={() => true}>
-            {/* Cottage pixel frame (openBottom sheet); serene surface inks, no
-                raw white on parchment (the reverted reskin's contrast trap). */}
-            <NineSliceFrame
-              skin={pitSkin.panel}
-              cornerDp={PANEL_CORNER_DP}
-              edgeDp={PANEL_EDGE_DP}
-              fillColor={pitSkin.fill}
-              openBottom
-            />
-            <Text style={[styles.tendingTitle, { color: pitSurface.title }]}>{getTendingTitle()}</Text>
-            <Animated.Text style={[styles.tendingDepth, { color: pitSurface.amberText, transform: [{ scale: tendPulseScale }] }]}>
-              {getTendingLevelLabel(tendingLevel)}
-            </Animated.Text>
-            <Text style={[styles.tendingSubtitle, { color: pitSurface.body }]}>{getTendingSubtitle(tendingLevel)}</Text>
+        {/* Floating word chips — taps disabled during onboarding except during pit_offering step */}
+        {flyingWords.map(fw => (
+          <FloatingWordChip key={fw.id} fw={fw} onTap={isPitWordTapEnabled(isOnboarding, onboardingStep) ? stableDevourWord : noopDevour} />
+        ))}
 
-            {tendingNext && (
-              <>
-                <View style={styles.tendingCostRow}>
-                  <Text style={[styles.tendingCostText, { color: pitSurface.amberText }]}>
-                    <AmberInline size={20} /> {tendingNext.cost}
-                  </Text>
-                  {tendingNext.dailyBonusApplied && (
-                    <Text style={[styles.tendingCostStrike, { color: pitSurface.muted }]}>{tendingNext.baseCost}</Text>
-                  )}
-                </View>
-                {tendingNext.dailyBonusApplied && (
-                  <Text style={[styles.tendingBonusHint, { color: pitSurface.body }]}>{getTendingDailyBonusHint()}</Text>
-                )}
-                <TouchableOpacity
-                  style={[
-                    styles.tendingButton,
-                    (tendingBusy || displayBalance < tendingNext.cost) && styles.tendingButtonDisabled,
-                  ]}
-                  disabled={tendingBusy || displayBalance < tendingNext.cost}
-                  onPress={handleDeepenPattern}
-                  accessibilityLabel={`${getTendingButtonLabel()} for ${tendingNext.cost} amber`}
-                  accessibilityRole="button"
-                  accessibilityState={{ disabled: tendingBusy || displayBalance < tendingNext.cost }}
-                >
-                  <ThreeSliceStrip skin={pitSkin.buttons.primary.lg.up} capDp={BTN_CAP_DP} />
-                  <Text style={[styles.tendingButtonText, { color: pitSkin.ink.primary }]}>{getTendingButtonLabel()}</Text>
-                </TouchableOpacity>
-                {displayBalance < tendingNext.cost && (
-                  <Text style={[styles.tendingInsufficient, { color: pitSurface.muted }]}>
-                    Earn more amber to deepen the pattern further.
-                  </Text>
-                )}
-                {/* No rewarded ad here by design: the shrine is serene
-                    custodianship, not a treadmill — the Store's daily faucet
-                    is the one rewarded-amber surface. */}
-              </>
-            )}
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* Empty state — boxless atmospheric text (player feedback: a framed
-          sign floating over the pit art read as clutter). Suppressed while a
-          phase transition owns the pit (pending ward ignition or the ceremony
-          itself): "nothing left to give" under an erupting ward read as a
-          contradiction. */}
-      {pendingWordCount === 0 && !resultMessage
-        && pendingPhaseTransition == null && ceremonyStatus === 'idle' && (
-        <View style={styles.emptyContainer} pointerEvents="none">
-          <Text style={styles.emptyText}>
-            {getPitEmptyMessage(phase)}
-          </Text>
-        </View>
-      )}
-
-      {/* Overflow indicator */}
-      {overflowCount > 0 && (
-        <View style={styles.overflowContainer}>
-          <Text style={[styles.overflowText, { color: getOverlayBannerTheme(phase).secondaryTextColor }]}>
-            {getPitOverflowText(phase as DialoguePhase, overflowCount)}
-          </Text>
-        </View>
-      )}
-
-      {/* Result toast — hidden during onboarding to avoid overlapping FoxGuide */}
-      {resultMessage && !isOnboarding && (
-        <Animated.View
-          style={[styles.resultToast, {
-            backgroundColor: phase >= 3 ? 'rgba(139, 26, 58, 0.9)' : 'rgba(100, 60, 180, 0.9)',
-            opacity: resultOpacity,
-          }]}
-          pointerEvents="none"
-        >
-          <Text style={styles.resultToastText}>{resultMessage}</Text>
-        </Animated.View>
-      )}
-
-      {/* Bottom panel — hidden during onboarding (FoxGuide occupies this space) */}
-      {!isOnboarding && (
-        <View style={[styles.bottomPanel, { paddingBottom: Math.max(Platform.OS === 'ios' ? 34 : 16, screenInsets.bottom) }]}>
-          <View style={styles.summaryRow}>
-            <NineSliceFrame
-              skin={pitSkin.card}
-              cornerDp={CARD_CORNER_DP}
-              edgeDp={CARD_EDGE_DP}
-              fillColor={pitSkin.fillCard}
-            />
-            <View style={styles.summaryItem}>
-              <Text style={[styles.summaryValue, { color: pitSurface.title }]}>
-                <AmberInline size={16} /> {Math.max(0, pendingAmber - pendingAmberOffset)}
-              </Text>
-              <Text style={[styles.summaryLabel, { color: pitSurface.muted }]}>
-                {getPitPendingAmberLabel(phase)}
-              </Text>
-            </View>
-            <View style={[styles.summaryDivider, { backgroundColor: pitSurface.sectionBorder }]} />
-            <View style={styles.summaryItem}>
-              <Text style={[styles.summaryValue, { color: pitSurface.title }]}>{harvestState.totalWordsOffered}</Text>
-              <Text style={[styles.summaryLabel, { color: pitSurface.muted }]}>
-                Lifetime {getPitHarvestLabel(phase)}
-              </Text>
-            </View>
-          </View>
-
-          {pendingWordCount > 0 && pendingAmber - pendingAmberOffset > 0 && (
+        {/* Header — matches HomeScreen frosted glass style; safe-area aware */}
+        <View style={[styles.header, { paddingTop: screenInsets.top + 16 }]}>
+          <View style={styles.headerLeft}>
+            {/* Amber pill taps through to the Store, same as the home header. */}
             <TouchableOpacity
-              style={[
-                styles.harvestAllButton,
-                pendingPhaseTransition == null && styles.harvestAllButtonPrimary,
-                { opacity: isOffering ? 0.5 : 1 },
-              ]}
-              onPress={() => { playUiSound('tap'); handleHarvestAll(); }}
-              disabled={isOffering}
-              activeOpacity={0.85}
-              accessibilityLabel={`${getPitOfferAllLabel(phase)}: ${Math.max(0, pendingAmber - pendingAmberOffset)} amber from ${pendingWordCount} words`}
-              accessibilityRole="button"
+              style={styles.amberContainer}
+              onPress={() => { hapticLight(); playUiSound('tap'); onOpenStore?.(); }}
+              disabled={!onOpenStore || isOnboarding}
+              accessibilityLabel={
+                onOpenStore && !isOnboarding
+                  ? `${Math.max(0, displayBalance)} amber. Tap to open the store`
+                  : `${Math.max(0, displayBalance)} amber`
+              }
+              accessibilityRole={onOpenStore && !isOnboarding ? 'button' : undefined}
             >
-              <ThreeSliceStrip
-                skin={pendingPhaseTransition == null ? pitSkin.buttons.primary.lg.up : pitSkin.buttons.secondary.lg.up}
-                capDp={BTN_CAP_DP}
-              />
-              {/* Row layout, NOT an inline <Image> inside the Text run: the
-                  900-weight letter-spaced font shifts inline-image baselines
-                  on device and the gem overlapped the amount. */}
-              <View style={styles.harvestAllContent}>
-                <Text style={[styles.harvestAllText, { color: pitSkin.ink.primary }]}>
-                  {getPitOfferAllLabel(phase)} (
-                </Text>
-                <AmberInline size={14} />
-                <Text style={[styles.harvestAllText, { color: pitSkin.ink.primary }]}>
-                  {' '}{Math.max(0, pendingAmber - pendingAmberOffset)})
-                </Text>
+              <View style={styles.amberInner}>
+                <AmberInline size={20} />
+                <Text style={styles.amberCount}>{Math.max(0, displayBalance)}</Text>
               </View>
             </TouchableOpacity>
+            {pendingAmber - pendingAmberOffset > 0 && (
+              <View style={styles.pendingBadge}>
+                <Text style={styles.pendingBadgeText}>+{pendingAmber - pendingAmberOffset}</Text>
+              </View>
+            )}
+          </View>
+          {!isOnboarding && (
+            <View style={styles.headerRight}>
+              {tendingEnabled && !isOnboarding && (
+                <TouchableOpacity
+                  style={styles.headerIconBtn}
+                  onPress={() => { hapticLight(); playUiSound('tap'); refreshTending(); setShowTendingModal(true); }}
+                  accessibilityLabel={`Tend the pattern, ${getTendingLevelLabel(tendingLevel)}`}
+                  accessibilityRole="button"
+                >
+                  <Image source={TENDING_ICON} style={styles.headerIconImage} />
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={styles.headerIconBtn}
+                onPress={() => { hapticLight(); playUiSound('tap'); setShowUtilityModal(true); }}
+                accessibilityLabel="Open utility menu"
+                accessibilityRole="button"
+              >
+                <Image source={MENU_ICON} style={styles.headerIconImage} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.headerIconBtn}
+                onPress={() => { hapticLight(); playUiSound('tap'); onClose(); }}
+                accessibilityLabel="Return home"
+                accessibilityRole="button"
+              >
+                <Image source={HOME_ICON} style={styles.headerIconImage} />
+              </TouchableOpacity>
+            </View>
           )}
         </View>
-      )}
 
-      {/* Fox explains the first manual harvest on arrival (repeat-until-
-          learned: a real offer sets the learned flag; dismissing this card
-          does not). The floating words stay tappable behind the card, and
-          any successful offer still teaches regardless of the card state. */}
-      {harvestIntroLines != null && (
-        <FoxGuide
-          visible={true}
-          variant="dialogue"
-          text={harvestIntroLines[Math.min(harvestIntroIndex, harvestIntroLines.length - 1)]}
-          buttonText={harvestIntroIndex < harvestIntroLines.length - 1 ? 'Next' : 'Got it'}
-          onContinue={() => {
-            if (harvestIntroIndex < harvestIntroLines.length - 1) {
-              setHarvestIntroIndex(i => i + 1);
-            } else {
-              setHarvestIntroLines(null);
-            }
-          }}
-          position="bottom"
-        />
-      )}
+        <Modal
+          visible={showUtilityModal}
+          transparent
+          statusBarTranslucent
+          animationType="fade"
+          onRequestClose={() => setShowUtilityModal(false)}
+        >
+          <TouchableOpacity
+            style={styles.utilityOverlay}
+            activeOpacity={1}
+            onPress={() => setShowUtilityModal(false)}
+            accessibilityLabel="Close utility menu"
+            accessibilityRole="button"
+          >
+            <View style={styles.utilityModal} onStartShouldSetResponder={() => true}>
+              {/* Cottage pixel frame (openBottom sheet); text uses the audited
+                  surface inks, never raw white on parchment. */}
+              <NineSliceFrame
+                skin={pitSkin.panel}
+                cornerDp={PANEL_CORNER_DP}
+                edgeDp={PANEL_EDGE_DP}
+                fillColor={pitSkin.fill}
+                openBottom
+              />
+              <Text style={[styles.utilityTitle, { color: pitSurface.title }]}>Menu</Text>
+              {onOpenStats && (
+                <TouchableOpacity
+                  style={styles.utilityButton}
+                  onPress={() => {
+                    setShowUtilityModal(false);
+                    onOpenStats?.();
+                  }}
+                  accessibilityLabel="View stats"
+                  accessibilityRole="button"
+                >
+                  <ThreeSliceStrip skin={pitSkin.buttons.secondary.md.up} capDp={BTN_CAP_DP} />
+                  <View style={styles.utilityButtonRow}>
+                    <Image source={STATS_ICON} style={styles.utilityButtonIcon} />
+                    <Text style={[styles.utilityButtonText, { color: pitSkin.ink.primary }]}>Statistics</Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+              {onOpenSettings && (
+                <TouchableOpacity
+                  style={styles.utilityButton}
+                  onPress={() => {
+                    setShowUtilityModal(false);
+                    onOpenSettings?.();
+                  }}
+                  accessibilityLabel="Open settings"
+                  accessibilityRole="button"
+                >
+                  <ThreeSliceStrip skin={pitSkin.buttons.secondary.md.up} capDp={BTN_CAP_DP} />
+                  <View style={styles.utilityButtonRow}>
+                    <Image source={GEAR_ICON} style={styles.utilityButtonIcon} />
+                    <Text style={[styles.utilityButtonText, { color: pitSkin.ink.primary }]}>Settings</Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* Tending Shrine modal — Phase 5 cosmetic amber sink */}
+        <Modal
+          visible={showTendingModal}
+          transparent
+          statusBarTranslucent
+          animationType="fade"
+          onRequestClose={() => setShowTendingModal(false)}
+        >
+          <TouchableOpacity
+            style={styles.utilityOverlay}
+            activeOpacity={1}
+            onPress={() => setShowTendingModal(false)}
+            accessibilityLabel="Close tending"
+            accessibilityRole="button"
+          >
+            <View style={styles.tendingModal} onStartShouldSetResponder={() => true}>
+              {/* Cottage pixel frame (openBottom sheet); serene surface inks, no
+                  raw white on parchment (the reverted reskin's contrast trap). */}
+              <NineSliceFrame
+                skin={pitSkin.panel}
+                cornerDp={PANEL_CORNER_DP}
+                edgeDp={PANEL_EDGE_DP}
+                fillColor={pitSkin.fill}
+                openBottom
+              />
+              <Text style={[styles.tendingTitle, { color: pitSurface.title }]}>{getTendingTitle()}</Text>
+              <Animated.Text style={[styles.tendingDepth, { color: pitSurface.amberText, transform: [{ scale: tendPulseScale }] }]}>
+                {getTendingLevelLabel(tendingLevel)}
+              </Animated.Text>
+              <Text style={[styles.tendingSubtitle, { color: pitSurface.body }]}>{getTendingSubtitle(tendingLevel)}</Text>
+
+              {tendingNext && (
+                <>
+                  <View style={styles.tendingCostRow}>
+                    <Text style={[styles.tendingCostText, { color: pitSurface.amberText }]}>
+                      <AmberInline size={20} /> {tendingNext.cost}
+                    </Text>
+                    {tendingNext.dailyBonusApplied && (
+                      <Text style={[styles.tendingCostStrike, { color: pitSurface.muted }]}>{tendingNext.baseCost}</Text>
+                    )}
+                  </View>
+                  {tendingNext.dailyBonusApplied && (
+                    <Text style={[styles.tendingBonusHint, { color: pitSurface.body }]}>{getTendingDailyBonusHint()}</Text>
+                  )}
+                  <TouchableOpacity
+                    style={[
+                      styles.tendingButton,
+                      (tendingBusy || displayBalance < tendingNext.cost) && styles.tendingButtonDisabled,
+                    ]}
+                    disabled={tendingBusy || displayBalance < tendingNext.cost}
+                    onPress={handleDeepenPattern}
+                    accessibilityLabel={`${getTendingButtonLabel()} for ${tendingNext.cost} amber`}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: tendingBusy || displayBalance < tendingNext.cost }}
+                  >
+                    <ThreeSliceStrip skin={pitSkin.buttons.primary.lg.up} capDp={BTN_CAP_DP} />
+                    <Text style={[styles.tendingButtonText, { color: pitSkin.ink.primary }]}>{getTendingButtonLabel()}</Text>
+                  </TouchableOpacity>
+                  {displayBalance < tendingNext.cost && (
+                    <Text style={[styles.tendingInsufficient, { color: pitSurface.muted }]}>
+                      Earn more amber to deepen the pattern further.
+                    </Text>
+                  )}
+                  {/* No rewarded ad here by design: the shrine is serene
+                      custodianship, not a treadmill — the Store's daily faucet
+                      is the one rewarded-amber surface. */}
+                </>
+              )}
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* Empty state — boxless atmospheric text (player feedback: a framed
+            sign floating over the pit art read as clutter). Suppressed while a
+            phase transition owns the pit (pending ward ignition or the ceremony
+            itself): "nothing left to give" under an erupting ward read as a
+            contradiction. */}
+        {pendingWordCount === 0 && !resultMessage
+          && pendingPhaseTransition == null && ceremonyStatus === 'idle' && (
+          <View style={styles.emptyContainer} pointerEvents="none">
+            <Text style={styles.emptyText}>
+              {getPitEmptyMessage(phase)}
+            </Text>
+          </View>
+        )}
+
+        {/* Overflow indicator */}
+        {overflowCount > 0 && (
+          <View style={styles.overflowContainer}>
+            <Text style={[styles.overflowText, { color: getOverlayBannerTheme(phase).secondaryTextColor }]}>
+              {getPitOverflowText(phase as DialoguePhase, overflowCount)}
+            </Text>
+          </View>
+        )}
+
+        {/* Result toast — hidden during onboarding to avoid overlapping FoxGuide */}
+        {resultMessage && !isOnboarding && (
+          <Animated.View
+            style={[styles.resultToast, {
+              backgroundColor: phase >= 3 ? 'rgba(139, 26, 58, 0.9)' : 'rgba(100, 60, 180, 0.9)',
+              opacity: resultOpacity,
+            }]}
+            pointerEvents="none"
+          >
+            <Text style={styles.resultToastText}>{resultMessage}</Text>
+          </Animated.View>
+        )}
+
+        {/* Bottom panel — hidden during onboarding (FoxGuide occupies this space) */}
+        {!isOnboarding && (
+          <View style={[styles.bottomPanel, { paddingBottom: Math.max(Platform.OS === 'ios' ? 34 : 16, screenInsets.bottom) }]}>
+            <View style={styles.summaryRow}>
+              <NineSliceFrame
+                skin={pitSkin.card}
+                cornerDp={CARD_CORNER_DP}
+                edgeDp={CARD_EDGE_DP}
+                fillColor={pitSkin.fillCard}
+              />
+              <View style={styles.summaryItem}>
+                <Text style={[styles.summaryValue, { color: pitSurface.title }]}>
+                  <AmberInline size={16} /> {Math.max(0, pendingAmber - pendingAmberOffset)}
+                </Text>
+                <Text style={[styles.summaryLabel, { color: pitSurface.muted }]}>
+                  {getPitPendingAmberLabel(phase)}
+                </Text>
+              </View>
+              <View style={[styles.summaryDivider, { backgroundColor: pitSurface.sectionBorder }]} />
+              <View style={styles.summaryItem}>
+                <Text style={[styles.summaryValue, { color: pitSurface.title }]}>{harvestState.totalWordsOffered}</Text>
+                <Text style={[styles.summaryLabel, { color: pitSurface.muted }]}>
+                  Lifetime {getPitHarvestLabel(phase)}
+                </Text>
+              </View>
+            </View>
+
+            {pendingWordCount > 0 && pendingAmber - pendingAmberOffset > 0 && (
+              <TouchableOpacity
+                style={[
+                  styles.harvestAllButton,
+                  pendingPhaseTransition == null && styles.harvestAllButtonPrimary,
+                  { opacity: isOffering ? 0.5 : 1 },
+                ]}
+                onPress={() => { playUiSound('tap'); handleHarvestAll(); }}
+                disabled={isOffering}
+                activeOpacity={0.85}
+                accessibilityLabel={`${getPitOfferAllLabel(phase)}: ${Math.max(0, pendingAmber - pendingAmberOffset)} amber from ${pendingWordCount} words`}
+                accessibilityRole="button"
+              >
+                <ThreeSliceStrip
+                  skin={pendingPhaseTransition == null ? pitSkin.buttons.primary.lg.up : pitSkin.buttons.secondary.lg.up}
+                  capDp={BTN_CAP_DP}
+                />
+                {/* Row layout, NOT an inline <Image> inside the Text run: the
+                    900-weight letter-spaced font shifts inline-image baselines
+                    on device and the gem overlapped the amount. */}
+                <View style={styles.harvestAllContent}>
+                  <Text style={[styles.harvestAllText, { color: pitSkin.ink.primary }]}>
+                    {getPitOfferAllLabel(phase)} (
+                  </Text>
+                  <AmberInline size={14} />
+                  <Text style={[styles.harvestAllText, { color: pitSkin.ink.primary }]}>
+                    {' '}{Math.max(0, pendingAmber - pendingAmberOffset)})
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        {/* Fox explains the first manual harvest on arrival (repeat-until-
+            learned: a real offer sets the learned flag; dismissing this card
+            does not). The floating words stay tappable behind the card, and
+            any successful offer still teaches regardless of the card state. */}
+        {harvestIntroLines != null && (
+          <FoxGuide
+            visible={true}
+            variant="dialogue"
+            text={harvestIntroLines[Math.min(harvestIntroIndex, harvestIntroLines.length - 1)]}
+            buttonText={harvestIntroIndex < harvestIntroLines.length - 1 ? 'Next' : 'Got it'}
+            onContinue={() => {
+              if (harvestIntroIndex < harvestIntroLines.length - 1) {
+                setHarvestIntroIndex(i => i + 1);
+              } else {
+                setHarvestIntroLines(null);
+              }
+            }}
+            position="bottom"
+          />
+        )}
+      </View>
     </View>
   );
 };
