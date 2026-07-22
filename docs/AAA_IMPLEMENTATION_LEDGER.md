@@ -6,13 +6,15 @@
 
 | Status | Count | Share |
 |---|--:|--:|
-| ✅ done | 152 | 84% |
-| 🟡 partial | 19 | 11% |
+| ✅ done | 162 | 90% |
+| 🟡 partial | 11 | 6% |
 | ⏸️ deferred | 7 | 4% |
-| ❌ not addressed | 2 | 1% |
+| ❌ not addressed | 0 | 0% |
 | **Total** | **180** | |
 
-**Fully done: 152 of 180.** Meaningful progress (done + partial): 171. Only-genuinely-open (not addressed): 2.
+**Fully done: 162 of 180.** Meaningful progress (done + partial): 173. **Nothing is un-addressed** — the remaining 18 are 11 partials (each with a concrete residual) + 7 deferrals (art / device / encoder / the audit's own architectural deferrals).
+
+> **Finish-the-rest pass (after the post-verification correction).** Closed 10 more: the type scale (❌→✅: a canonical 12-token `FONT_SIZE` scale, applied across ~30 files), the home + VictoryModal chrome emoji (settings/shop/quest/lock/empty-house/streak/Collect-Now/Lucky/phase-change → sprites or monochrome glyphs), the VictoryModal rewarded-double count-up, the room-family aspect (office/jungle → 1456×720) + bundle-sprite hygiene, the board LOADING grace-gate, the onboarding invite-prompt beat, and the house-upgrade reward moment (an under-claim the verifier had confirmed done). The undo/restart finding moved ❌→🟡 (RESTART gained a distinct sound; the reverse-travel undo takeback stays deferred as core-input-hook work). The 11 remaining partials + 7 deferrals are itemized in "Session 4 — finish-the-rest remainder" below.
 
 > **These are the post-verification numbers.** After the Session-4 fan-out I claimed 159 done; an independent adversarial re-verification (5 read-only agents that re-checked every claimed closure against current code, blind to my verdict) found ~15 over-claims. I then **fixed 8** of them (including a real autosave correctness bug), **honestly downgraded 8** to 🟡 (over-claims I chose not to rush-fix), and **upgraded 1** the verifiers found I had *under*-claimed (New Cycle in-place rebuild). Net 159 → 152 done. The correction detail is in "Session 4 — post-verification correction" below.
 
@@ -174,13 +176,41 @@ The remaining 19 partials and 2 not-addressed are genuine and itemized; the ⏸�
 
 ---
 
+## Session 4 — finish-the-rest remainder (the honest 18)
+
+After the finish-the-rest pass, **nothing is un-addressed (❌ = 0)**. What remains is 11 partials and 7 deferrals, each with a concrete, honest reason — not hand-waving:
+
+**🟡 partial (11) — a real residual remains:**
+1. **Board — cross-row "flying ghost" travel.** The neighbour rank-closing half ships; a tile visibly travelling from the source row into the target slot needs `usePuzzleGame` to hand down the source tile's measured screen position (core-input change).
+2. **Board — undo reverse-takeback.** RESTART now has a distinct sound + the board-serve exhale; the reverse-travel animation on *undo* would rewrite the board cluster's deliberate `setLastArrival(null)`-on-undo contract (core-input risk).
+3. **Animal life — robed talk *frame*.** The Phase-4/5 portrait gets the shared talk *transform* (lift/scale) while speaking, but there is no mouth-open robed *frame* — that art does not exist for any animal.
+4. **Choreography — beat-scrim tappability.** The narrative-slot arbiter fixed "two voices at once"; the occluding beat scrim still lets a blind tap reach a victory button under it. Changing its `pointerEvents` risks breaking tap-to-skip / board input, unverifiable without a device.
+5. **First 60s — cold-open home-flash.** The near-black launch flash is fixed; the cold-open still swaps home→puzzle via a raw `setCurrentScreen` (not `transitionTo`), so that one swap is unchoreographed.
+6. **Variant — speed drain envelope.** The "Round N" badge pops with a sting and the timer visually ramps (10s urgent / 5s critical); the per-second *audio* cue stays danger-zone-only by anti-annoyance design.
+7. **Free-progression — streak-milestone visual.** Audio + haptic differentiation ship (incl. the daily_ready chime); a distinct *visual* reward-moment (vs the shared receipt toast) is the residual.
+8. **Alert — apex-mode swap.** Blind/Weave first entry is momentous via the intro cards; the rare downgrade-to-standard notice stays a transient toast rather than a prominent card.
+9. **Dynamic type — resize reactivity.** `useWindowDimensions` powers BootHold; a full sweep of the module-scope `Dimensions.get` sites into reactive hooks needs a StyleSheet restructure + device QA.
+10. **HUD — phase-indicator glyph.** An intentional spoiler-safe atmospheric emoji (☀️/🌙/🌑) with an a11y label; no matching sprite exists, so it stays an accent (a deliberate keep, flagged for transparency).
+11. **Assets — trio-sprite visual parity (F113).** The 36-colour cel-quantize shipped; pixel-parity with the other ten animals' grid needs a human eye on-device.
+
+**⏸️ deferred (7) — blocked in this environment or the audit's own architectural deferrals:**
+1. **F117 WebP re-encode** — no VP8L writer available here (documented `cwebp` swap plan).
+2. **F118 Play screenshots** — need real on-device captures ≥1080px.
+3. **F7 store-screenshot claim** — the listing copy is corrected; the PNG is a design/device asset.
+4. **Perf — room-bitmap pan-windowing** — the audit's own documented deferral.
+5. **Perf — first-board branching cold-cost** — the audit's own documented deferral.
+6. **Adaptive layout — board arc scale-to-fit (≤360dp)** — the audit's own documented deferral.
+7. **Adaptive layout — tablet large-aspect** — the audit's own documented deferral.
+
+---
+
 ## Per-finding status by system
 
 Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a pinned core system) · ❌ not addressed.
 
 > **The section headers below carry the Session-4 final tallies.** Individual rows preserve the audit + Session 2-3 evidence trail; where a row still reads ❌/🟡 but the Session-4 reconciliation above marks it ✅, the reconciliation (re-verified line-by-line at current HEAD) is authoritative.
 
-### Board feel  ·  ✅8 🟡1 ⏸️0 ❌1
+### Board feel  ·  ✅8 🟡2 ⏸️0 ❌0
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | 🟡 | P1 | A committed move reads as a state swap, not a physical move: no cross-row travel, neighbor tiles teleport | The achievable half shipped (commit 16d2235): each standard-row tile is wrapped in a native-driver translateX that starts at its pre-shrink half-tile offset and springs to 0 on a word-length change (Row.tsx:1155-1209, reduced-motion/tier gated), so neighbours rank-close instead of flexbox-teleporting. The true cross-row "flying ghost" (a tile visibly travelling from the source row into the target slot) is still deferred — it needs usePuzzleGame to hand down the source tile's measured screen position, out of scope for Row.tsx alone. |
@@ -237,7 +267,7 @@ Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a p
 | ✅ | P2 | Candy artifacts survive into the dark-phase win sheet: milestone chip candy-yellow, victory title keeps pink drop shadow at Phase 4-5 | milestoneContainerDark is applied at phase>=3 (VictoryModal.tsx:838, style 2058) to swap the candy-yellow chip for the dark material, and getVictoryTitleShadowColor(phase) (213) drives the victory title's textShadowColor (716) off CandyColors.pink.shadow through the descent — the candy artifacts no longer survive into the Phase 4-5 sheet (commit 4fb9b7e). |
 | ❌ | P3 | Confetti at Phase 3+ only changes color — same count, pop-in spring, wobble, and 2-3.5s fall as Phase 0 | Confetti receives phase but uses it only for theme.confettiColors (line 201); generateConfetti/ConfettiPieceComponent take no phase, so count (baseCount+energyBonus), pop-in spring (friction 4/tension 100), wobble (30+rand*50), spin, fallDuration (2000+rand*1500), and uniform-random shape are identical at every phase. |
 
-### Dead screens  ·  ✅10 🟡1 ⏸️0 ❌0
+### Dead screens  ·  ✅11 🟡0 ⏸️0 ❌0
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | ✅ | P1 | DifficultyMenu (the most-touched config surface) pops in and out with literally zero transition | DifficultyMenu.tsx now runs the house entrance: backdropOpacity/cardScale/cardOpacity refs (lines 185-187), an Animated.parallel with SURFACE.modalIn spring on mount (202-207), a fast SURFACE.modalOutMs timed exit (220-233), reducedMotion pins, and the PanelCard wrapped in an Animated.View (397) with the scrim fading in (368). Matches commit b4f95e8. (Minor: uses scale+opacity, not the -8dp translateY origin bias.) |
@@ -267,7 +297,7 @@ Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a p
 | ❌ | P3 | Post-revelation cinematic's drifting particles teleport to new random Y on every scene change | CinematicParticle still computes the drift particle's top with an inline Math.random()*SCREEN_HEIGHT at render (PhaseTransitionOverlay.tsx:144) rather than a useRef, and the component is still a plain React.FC with no React.memo (85, rendered at 611), so every setActiveSceneIndex re-render re-rolls all drift positions. |
 | ❌ | P3 | Skipping a cinematic leaves stale scene state: the next ceremony can flash the wrong scene line at full opacity | The event-open reset effect (PhaseTransitionOverlay.tsx:407-418) resets shake/flash/vignette/image drivers but still never calls setActiveSceneIndex(-1) or sceneOpacity.setValue(0), and handleSkip (395-405) doesn't reset them either — so a fresh event opens indexing its scenes with the previous event's leftover activeSceneIndex/opacity until the first showTimer fires. |
 
-### Emoji consistency  ·  ✅4 🟡3 ⏸️0 ❌0
+### Emoji consistency  ·  ✅7 🟡0 ⏸️0 ❌0
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | 🟡 | P1 | Home-world ambient FX layer is OS color emoji floating over the painterly world (skull/eye particles, emoji smoke, emoji bird, emoji shooting star) | The register-breaking phase particles are now tinted-View motes (AMBIENT_PARTICLES_BY_PHASE + FloatingParticle draws borderRadius Views, HouseWorld.tsx:108-208, commit c3dd498) and AmberSparkle is a tinted circle View, but chimney smoke (💨 :302), the bird (🐦 :385) and the shooting star (⭐ :464, still spawned at phases 2-4 over the dark skies) remain raw emoji Text. |
@@ -307,7 +337,7 @@ Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a p
 | ✅ | P3 | Hint keeps its warm candy chime at Phase 3+ (no dark mirror) | hint_dark is minted (generateSounds.mjs:655, falling minor pair on hollow partials) and registered in SOUND_SOURCES (audio.ts:66), so resolveSfxForPhase('hint',>=3) now returns hint_dark automatically with no call-site change (commit 8ef7752). |
 | ✅ | P3 | Reverse Shift's midpoint turn gets a celebratory haptic but no sound | A bespoke midpoint_turn (+ midpoint_turn_dark) sound is now minted in generateSounds.mjs and registered in SOUND_SOURCES; App.tsx pairs hapticSuccess() with soundMidpointTurn() at the reverseMidpoint (App.tsx:2694), so the descent→ascent turn reads as a chapter break rather than reusing the move ladder's tier-3 combo step. |
 
-### Typography, color, a11y  ·  ✅10 🟡0 ⏸️0 ❌1
+### Typography, color, a11y  ·  ✅11 🟡0 ⏸️0 ❌0
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | ✅ | P0 | Ghost word previews are near-invisible on the board (1.0-1.6:1) — the core judge-the-word channel fails at every phase | Row.tsx now backs every preview with slotPreviewChip (backgroundColor rgba(16,10,34,0.62)) and light inks — neutral #EDE8F8, graded #8BF0AE/#FF9DA2 with ✓/✗ prefix — which compute ~7.5-12:1 over all five phase bgPrimary values; the one-ink/one-weight neutral no-leak contract is preserved. (The suggested WCAG unit test wasn't added, but the P0 legibility problem is unambiguously resolved.) |
@@ -334,7 +364,7 @@ Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a p
 | ❌ | P2 | 120ms autosave debounce races the async victory record: a completed board can persist as a restorable PLAYING save | The autosave fire-time re-check (useAutosave.ts:63) still reads only gameState/currentScreen — which stay PLAYING through the async record until App.tsx:2282 — with no isProcessingVictory or boardCompletedRef in AutosaveDeps or the call site (App.tsx:827); the back-during-WON branch also still omits clearPuzzleState for the normal path. |
 | ❌ | P3 | One-time Swift Victories pointer rides an untracked raw setTimeout and burns its once-ever flag on clobbered/invisible delivery | maybeShowSwiftVictoryHint (App.tsx:3321-3335) still marks the once-ever flag seen (line 3331) before a raw untracked setTimeout (line 3332) that writes via puzzleActions.setMessage — not addVictoryTimeout, not the toast queue — so the flag is spent even when the board-start/house-ask line clobbers it or the player navigates away. |
 
-### Assets  ·  ✅3 🟡3 ⏸️2 ❌0
+### Assets  ·  ✅5 🟡1 ⏸️2 ❌0
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | 🟡 | P0 | Android adaptive icon is the full-bleed store icon — launcher masks crop the ears, W/S tiles and amber gem; corners are baked opaque black | Commit 340aca9 rewrote processAppIcon.mjs to place the whole composition inside the 66% safe zone on a transparent surround; adaptive-icon.png now has transparent corners/edges (pixel(0,0)=[0,0,0,0]) so the launcher mask no longer crops the identity. But icon.png is byte-unchanged (md5 still 7fcab4b5..., corner still baked opaque [1,1,1,255]) and splash.png is still 1600x1600 with the pre-rounded icon — the icon.png un-baking and splash rebuild are explicitly deferred in the commit as needing new source art. |
@@ -346,7 +376,7 @@ Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a p
 | ❌ | P3 | 26MB of full-screen backgrounds ship as truecolor PNG — a ~17MB install-size win is on the table | No .webp assets exist and no .webp require() calls in src; the five skies still ship as color-type-6 RGBA PNG (sky_day 3.37MB) and pit backdrops as PNG, with PNG crunch still disabled (enablePngCrunchInReleaseBuilds:false). |
 | ❌ | P3 | Play Store screenshot set is low-res stylized mocks whose UI doesn't match the shipped game | The four titled shots (01-04) are still 864x1536 (below Play's 1080px short-side), and the four file_00000000*.png AI drafts (941x1672) are still present in assets/Play_store — no real-device re-shoot or draft deletion happened. |
 
-### First 60 seconds  ·  ✅5 🟡3 ⏸️1 ❌0
+### First 60 seconds  ·  ✅7 🟡1 ⏸️1 ❌0
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | ❌ | P1 | Every launch blinks through a near-black Phase-4 screen and an unchoreographed home flash before the first board | All three target parts are unchanged: appStyles.initialLoadingContainer is still backgroundColor '#1A1A2E' with the glass card + large ActivityIndicator + 'Preparing your house...' (appStyles.ts:76, App.tsx:3692-3702); currentScreen still initializes to 'home' with no initialScreen prop (App.tsx:326); and the cold-open swap is still a raw setCurrentScreen('puzzle') at App.tsx:795 (and 1008), never routed through transitionTo. |
@@ -403,7 +433,7 @@ Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a p
 | ✅ | P2 | Capture-in-progress is a bare stock ActivityIndicator — off-brand grey spinner on a cottage-pixel game | ActivityIndicator is gone entirely from the share components; while sharing, a phase-tinted parchment status chip (t.cardBg/t.amberTintBorder) with a native-driven breathing 'capturing...' label (capturePulse, t.amberText) masks the Share button (lines ~281-290). |
 | ✅ | P3 | Challenge-a-friend shared text is a fixed bright taunt regardless of phase, and never personalized | buildChallengeShareText now selects from a phase-aware CHALLENGE_TAUNTS pool (tiers 0/2/3/4, named+anon) via challengeTauntTier(phase); App.tsx:3524 threads persistence.currentPhase at the call site (playerName supported but undefined, as the game has no player-name concept). |
 
-### Monetization reward loop  ·  ✅3 🟡1 ⏸️0 ❌0
+### Monetization reward loop  ·  ✅4 🟡0 ⏸️0 ❌0
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | 🟡 | P1 | Watched-ad rewards resolve to a static text line + a silently-jumping number — no count-up, no celebration proportional to the amount | The reusable RewardReveal count-up was built (src/components/ui/RewardReveal.tsx, rAF count-up + icon spring + phase glow) and wired into the faucet (StoreModal setFaucetReveal→RewardReveal, the cited anchor), quest claim/double (HomeScreen ~L2692), and daily-login; but the target's third consumer, victory-2x, still renders displayTotal as a plain jumping number in VictoryModal (only a labeled 'Doubled' breakdown line, no count-up). |
