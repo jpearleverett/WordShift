@@ -1,12 +1,23 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { View, Text, Image, StyleSheet, Animated } from 'react-native';
 import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
-import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
+import { PIXEL_FONT_BOLD } from '../theme/fonts';
 import { getPixelSkin, CARD_CORNER_DP, CARD_EDGE_DP } from '../theme/pixelSkin.generated';
 import { NineSliceFrame } from './ui/NineSlice';
-import { Achievement } from '../services/achievements';
+import { Achievement, ACHIEVEMENT_CATEGORY_ICONS } from '../services/achievements';
 import { AmberInline } from './AmberInline';
 import { getSettingsSync } from '../services/settings';
+
+/**
+ * Phase-aware entrance spring (local, since the shared token file is out of this
+ * pass's scope): the toast settles harder as the world darkens. Bright phases
+ * keep the original soft overshoot; the dark phases land heavier with no bounce.
+ */
+function getToastInSpring(phase: number): { friction: number; tension: number } {
+  if (phase >= 4) return { friction: 10, tension: 48 };
+  if (phase >= 3) return { friction: 8, tension: 55 };
+  return { friction: 8, tension: 60 };
+}
 
 interface AchievementToastProps {
   achievement: Achievement | null;
@@ -40,12 +51,13 @@ export const AchievementToast: React.FC<AchievementToastProps> = ({
         slideAnim.setValue(0);
         opacityAnim.setValue(1);
       } else {
-        // Slide in
+        // Slide in — the spring ages with the phase (see getToastInSpring).
+        const inSpring = getToastInSpring(phase);
         entrance = Animated.parallel([
           Animated.spring(slideAnim, {
             toValue: 0,
-            friction: 8,
-            tension: 60,
+            friction: inSpring.friction,
+            tension: inSpring.tension,
             useNativeDriver: true,
           }),
           Animated.timing(opacityAnim, {
@@ -115,7 +127,11 @@ export const AchievementToast: React.FC<AchievementToastProps> = ({
           fillColor={skin.fillCard}
         />
         <View style={[styles.iconBadge, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}>
-          <Text style={styles.icon}>{achievement.icon}</Text>
+          <Image
+            source={ACHIEVEMENT_CATEGORY_ICONS[achievement.category]}
+            style={styles.icon}
+            resizeMode="contain"
+          />
         </View>
         <View style={styles.textContainer}>
           <Text style={[styles.label, { color: t.muted }]}>Achievement Unlocked!</Text>
@@ -160,8 +176,8 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   icon: {
-    fontSize: 24,
-    fontFamily: BODY_FONT,
+    width: 26,
+    height: 26,
   },
   textContainer: {
     flex: 1,
