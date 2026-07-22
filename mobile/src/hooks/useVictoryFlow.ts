@@ -105,7 +105,17 @@ const VICTORY_SPINNER_GRACE_MS = 400;
 // FIRST, invisibly, behind the card's 0 opacity, leaving a dead ~700ms wait.
 const STAR_POP_DELAY_MS = 150;
 const STAR_STAGGER_MS = 200;
+// At the dark phases the stars land like stones settling one at a time, not
+// a bright candy rat-a-tat: the stagger itself widens alongside the spring's
+// heavier friction/tension (getCelebrationSpring), so the entrance TIMING
+// ages with the descent, not just the bounce.
+const STAR_STAGGER_MS_DARK = 300;
 const STAR_HAPTIC_OFFSET_MS = 100; // haptic lands just after each star's spring begins
+
+/** Star-pop stagger interval, widened at phase>=3 (see STAR_STAGGER_MS_DARK). */
+function getStarStaggerMs(phase: number): number {
+  return phase >= 3 ? STAR_STAGGER_MS_DARK : STAR_STAGGER_MS;
+}
 
 export interface VictoryFlowState {
   victoryData: VictoryData | null;
@@ -215,6 +225,9 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
     // so the card settles rather than snaps; at phase 0 this is the original
     // {6, 80}, deepening to a slow heave at the reveal.
     const modalSpring = { friction: cel.friction + 2, tension: Math.max(40, cel.tension - 40) };
+    // The star-pop stagger itself widens at the dark phases (see
+    // STAR_STAGGER_MS_DARK) so the entrance timing ages alongside the spring.
+    const starStaggerMs = getStarStaggerMs(phase);
     // Swift Victories: a routine win renders the compact result strip, which
     // needs no entrance choreography — settle instantly (same path reduced
     // motion takes, so the two compose instead of fighting). Special beats
@@ -278,7 +291,7 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
       Animated.timing(victoryModalOpacity, { toValue: 1, duration: 250, useNativeDriver: true }),
       Animated.sequence([
         Animated.delay(STAR_POP_DELAY_MS),
-        Animated.stagger(STAR_STAGGER_MS, starAnims),
+        Animated.stagger(starStaggerMs, starAnims),
       ]),
     ]);
     runningAnimRef.current = sequence;
@@ -295,21 +308,21 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
     const firstHapticAt = STAR_POP_DELAY_MS + STAR_HAPTIC_OFFSET_MS;
     if (isHushed) {
       // One soft settle, no celebration rhythm — the quiet is the moment.
-      hapticTimeouts.current.push(setTimeout(() => hapticLight(), firstHapticAt + stars * STAR_STAGGER_MS + 150));
+      hapticTimeouts.current.push(setTimeout(() => hapticLight(), firstHapticAt + stars * starStaggerMs + 150));
     } else if (phase >= 4) {
       // At the reveal the stars land like stones: two slow medium pulses
       // instead of three quick taps, keeping the settling THUD. A star_pop note
       // rides each pulse (its dark hollow mirror at Phase 3+, so the pops SINK).
       hapticTimeouts.current.push(setTimeout(() => { hapticLight(); playUiSound('star_pop', 1); }, firstHapticAt));
-      if (stars >= 3) hapticTimeouts.current.push(setTimeout(() => { hapticLight(); playUiSound('star_pop', 2); }, firstHapticAt + STAR_STAGGER_MS * 1.5));
-      hapticTimeouts.current.push(setTimeout(() => hapticHeavy(), firstHapticAt + stars * STAR_STAGGER_MS + 200));
+      if (stars >= 3) hapticTimeouts.current.push(setTimeout(() => { hapticLight(); playUiSound('star_pop', 2); }, firstHapticAt + starStaggerMs * 1.5));
+      hapticTimeouts.current.push(setTimeout(() => hapticHeavy(), firstHapticAt + stars * starStaggerMs + 200));
     } else {
       // A rising celesta note per star, fired in the SAME setTimeout as its
       // haptic so ear and hand land together (tap-tap-tap-THUD).
       if (stars >= 1) hapticTimeouts.current.push(setTimeout(() => { hapticLight(); playUiSound('star_pop', 1); }, firstHapticAt));
-      if (stars >= 2) hapticTimeouts.current.push(setTimeout(() => { hapticLight(); playUiSound('star_pop', 2); }, firstHapticAt + STAR_STAGGER_MS));
-      if (stars >= 3) hapticTimeouts.current.push(setTimeout(() => { hapticLight(); playUiSound('star_pop', 3); }, firstHapticAt + STAR_STAGGER_MS * 2));
-      hapticTimeouts.current.push(setTimeout(() => hapticHeavy(), firstHapticAt + stars * STAR_STAGGER_MS + 150));
+      if (stars >= 2) hapticTimeouts.current.push(setTimeout(() => { hapticLight(); playUiSound('star_pop', 2); }, firstHapticAt + starStaggerMs));
+      if (stars >= 3) hapticTimeouts.current.push(setTimeout(() => { hapticLight(); playUiSound('star_pop', 3); }, firstHapticAt + starStaggerMs * 2));
+      hapticTimeouts.current.push(setTimeout(() => hapticHeavy(), firstHapticAt + stars * starStaggerMs + 150));
     }
   }, [clearSpinner, victoryStar1, victoryStar2, victoryStar3, victoryModalScale, victoryModalOpacity]);
 
