@@ -9,10 +9,14 @@ describe('getBulkOfferTiming', () => {
     (wordCount, phase) => {
       const timing = getBulkOfferTiming(wordCount, phase, false);
 
+      // Brisk cap for ≤20 words; big harvests may stretch to ~1600ms so they
+      // read bigger (per-word stagger stays capped — nothing lands slower).
+      const cap = wordCount > 20 ? 1600 : 1000;
       expect(timing.staggerMs).toBeGreaterThanOrEqual(0);
+      expect(timing.staggerMs).toBeLessThanOrEqual(80);
       expect(timing.wordDurationMs).toBeGreaterThanOrEqual(0);
       expect(timing.cascadeDurationMs).toBeGreaterThanOrEqual(0);
-      expect(timing.cascadeDurationMs).toBeLessThanOrEqual(1000);
+      expect(timing.cascadeDurationMs).toBeLessThanOrEqual(cap);
       expect(timing.cascadeDurationMs).toBeGreaterThanOrEqual(
         (wordCount - 1) * timing.staggerMs + timing.wordDurationMs,
       );

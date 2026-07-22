@@ -575,6 +575,10 @@ const AmberParticleView = React.memo(({ p }: { p: AmberParticle }) => (
 AmberParticleView.displayName = 'AmberParticleView';
 
 const RimParticleView = React.memo(({ p }: { p: RimParticle }) => (
+  // Android-safe ember glow: a 2-layer core + translucent halo disc (the
+  // pit's own concentric-glow technique) instead of iOS-only shadow props,
+  // which render as flat dots on Android. Parent carries the animated
+  // transform/opacity; children are static layers within it.
   <Animated.View
     pointerEvents="none"
     style={{
@@ -583,17 +587,36 @@ const RimParticleView = React.memo(({ p }: { p: RimParticle }) => (
       left: 0,
       width: 7,
       height: 7,
-      borderRadius: 3.5,
-      backgroundColor: p.color,
-      shadowColor: p.color,
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.8,
-      shadowRadius: 4,
-      elevation: 3,
       transform: [{ translateX: p.x }, { translateY: p.y }, { scale: p.scale }],
       opacity: p.opacity,
     }}
-  />
+  >
+    <View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        top: -4.5,
+        left: -4.5,
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        backgroundColor: p.color,
+        opacity: 0.28,
+      }}
+    />
+    <View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: 7,
+        height: 7,
+        borderRadius: 3.5,
+        backgroundColor: p.color,
+      }}
+    />
+  </Animated.View>
 ));
 RimParticleView.displayName = 'RimParticleView';
 
@@ -924,6 +947,10 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const [ceremonyIgniteStep, setCeremonyIgniteStep] = useState(-1);
   const [ceremonyTextIndex, setCeremonyTextIndex] = useState(-1);
   const ceremonyTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  // Tap-to-advance: the pending "advance to next line" action, so a tap can
+  // pace the sequence (an NG+ player's fourth ignition need not sit through
+  // the fixed 2.5s-per-line auto-advance).
+  const ceremonyAdvanceRef = useRef<(() => void) | null>(null);
   const popInTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const amberRiseTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const trailTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -1019,6 +1046,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   useEffect(() => {
     return () => {
       ceremonyTimers.current.forEach(clearTimeout);
+      ceremonyAdvanceRef.current = null;
       popInTimeoutsRef.current.forEach(clearTimeout);
       amberRiseTimeoutsRef.current.forEach(clearTimeout);
       trailTimeoutsRef.current.forEach(clearTimeout);
@@ -1406,18 +1434,24 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   }, [reducedMotion, simplify]);
 
   // ---- Pit surge flash (on devour impact) ----
-  const flashPitSurge = useCallback(() => {
+  const flashPitSurge = useCallback((intensity: number = 1) => {
     if (reducedMotion) return;
     const colors = DEVOUR_COLORS[phase] ?? DEVOUR_COLORS[0];
+    // intensity ramps the surge over a big Offer-All cascade (a crescendo) —
+    // 1.0 is the normal single-word surge. Peak scale/opacity scale with it,
+    // capped so the glow can't balloon off the pit.
+    const clamped = Math.max(0.5, Math.min(1.6, intensity));
+    const peakScale = Math.min(1.7, 1.3 * clamped);
+    const peakOpacity = Math.min(1, colors.glowOpacity * clamped);
     pitSurgeScale.setValue(0.8);
     Animated.parallel([
       Animated.sequence([
-        Animated.timing(pitSurgeOpacity, { toValue: colors.glowOpacity, duration: 120, useNativeDriver: true }),
+        Animated.timing(pitSurgeOpacity, { toValue: peakOpacity, duration: 120, useNativeDriver: true }),
         Animated.delay(40),
         Animated.timing(pitSurgeOpacity, { toValue: 0, duration: 350, useNativeDriver: true }),
       ]),
       Animated.sequence([
-        Animated.spring(pitSurgeScale, { toValue: 1.3, friction: 4, tension: 200, useNativeDriver: true }),
+        Animated.spring(pitSurgeScale, { toValue: peakScale, friction: 4, tension: 200, useNativeDriver: true }),
         Animated.timing(pitSurgeScale, { toValue: 0.8, duration: 300, useNativeDriver: true }),
       ]),
     ]).start();
@@ -1546,6 +1580,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
 
       ceremonyTimers.current.forEach(clearTimeout);
       ceremonyTimers.current = [];
+      ceremonyAdvanceRef.current = null;
 
       wardPulseLoop.current?.stop();
       wardPulseLoop.current = null;
@@ -1599,25 +1634,9 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
           }).start();
 
           const texts = getPitTransitionCeremonyText(pendingPhaseTransition!);
-          let delay = 0;
-          const textTimers: ReturnType<typeof setTimeout>[] = [];
-          for (let j = 0; j < texts.length; j++) {
-            const showTimer = setTimeout(() => {
-              if (!mountedRef.current) return;
-              setCeremonyTextIndex(j);
-              ceremonyTextOpacity.setValue(0);
-              Animated.timing(ceremonyTextOpacity, {
-                toValue: 1,
-                duration: 400,
-                useNativeDriver: true,
-              }).start();
-            }, delay);
-            textTimers.push(showTimer);
-            delay += 2500;
-          }
-          ceremonyTimers.current.push(...textTimers);
 
-          const completeTimer = setTimeout(async () => {
+          const runComplete = async () => {
+            ceremonyAdvanceRef.current = null;
             if (!mountedRef.current) return;
             const result = await confirmPhaseTransition();
             if (result && mountedRef.current) {
@@ -1637,8 +1656,30 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
               }).start();
               setCeremonyStatus('idle');
             }
-          }, delay + 1500);
-          ceremonyTimers.current.push(completeTimer);
+          };
+
+          // Self-rescheduling line runner: each line auto-advances after 2.5s,
+          // but ceremonyAdvanceRef lets a tap jump ahead immediately (clearing
+          // the pending auto timer). The final line settles then completes.
+          const showLine = (j: number) => {
+            if (!mountedRef.current) return;
+            setCeremonyTextIndex(j);
+            ceremonyTextOpacity.setValue(0);
+            Animated.timing(ceremonyTextOpacity, {
+              toValue: 1,
+              duration: 400,
+              useNativeDriver: true,
+            }).start();
+            const isLast = j >= texts.length - 1;
+            const step = () => (isLast ? runComplete() : showLine(j + 1));
+            const autoTimer = setTimeout(step, isLast ? 1500 : 2500);
+            ceremonyTimers.current.push(autoTimer);
+            ceremonyAdvanceRef.current = () => {
+              clearTimeout(autoTimer);
+              step();
+            };
+          };
+          showLine(0);
         }, 800);
         ceremonyTimers.current.push(textTimer);
       }, PIT_WARD_COUNT * 200 + 200);
@@ -2070,6 +2111,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     // within one second while individual tap-to-devour keeps its own cadence.
     const timing = getBulkOfferTiming(words.length, phase, reducedMotion);
 
+    const lastIndex = words.length - 1;
     words.forEach((fw, i) => {
       fw.isDevoured = true;
       setTimeout(() => {
@@ -2081,6 +2123,12 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         fw.floatLoopY?.stop(); fw.floatLoopY = null;
 
         if (i % 3 === 0) { spawnTrail(currentPos.x, currentPos.y); playUiSound('devour'); }
+        // Map the 4-step valid_move SFX ladder across the cascade's quarters —
+        // the rising chime the ladder was built for, played once per quarter
+        // boundary (never per-word) so it reads as a build, not a machine gun.
+        const quarter = Math.min(3, Math.floor((i / words.length) * 4));
+        const prevQuarter = i === 0 ? -1 : Math.min(3, Math.floor(((i - 1) / words.length) * 4));
+        if (quarter !== prevQuarter) playUiSound('valid_move', quarter + 1);
         const duration = timing.wordDurationMs;
 
         // Count the displayed total up and the visual pending amber down as
@@ -2131,8 +2179,15 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
           ]),
         ]).start(() => {
           if (mountedRef.current) {
-            flashPitSurge();
+            // Surge intensity crescendos from 1.0 to 1.6 across the cascade so
+            // the pit's pull reads bigger as the harvest pours in.
+            const surgeIntensity = lastIndex > 0 ? 1 + 0.6 * (i / lastIndex) : 1;
+            flashPitSurge(surgeIntensity);
             if (i % 4 === 0) { spawnImpactBurst(); spawnShockwave(); }
+            // Escalating hand feedback: a light tick every 3rd word landing,
+            // and a heavy success beat on the final word landing.
+            if (i === lastIndex) hapticHeavy();
+            else if (i % 3 === 0) hapticLight();
           }
         });
       }, i * timing.staggerMs);
@@ -2384,36 +2439,60 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
               outputRange: [1, 2.5],
             });
 
+            // Android-safe glow: a translucent halo disc behind glow-worthy
+            // marks (the pit's own layered-opacity technique) instead of the
+            // iOS-only shadow props, which rendered as flat dots on Android.
+            const glowWorthy = isLit || isIgnited || isCharging || isPending;
+            const haloOpacity = isIgnited
+              ? 0.5
+              : isPending
+                ? 0.4
+                : isLit
+                  ? 0.35
+                  : isCharging
+                    ? 0.28 * wardChargeFraction
+                    : 0;
+            const dotScale = isPending ? wardPulseScale : (isIgnited ? flashScale : 1);
+
             return (
-              <Animated.View
-                key={`ward-${idx}`}
-                pointerEvents="none"
-                style={{
-                  position: 'absolute',
-                  left: pos.x - 6,
-                  top: pos.y - 6,
-                  width: 12,
-                  height: 12,
-                  borderRadius: 6,
-                  backgroundColor: baseColor,
-                  opacity: isPending
-                    ? wardPulseOpacity
-                    : isLit
-                      ? 0.9
-                      : isCharging
-                        ? 0.2 + 0.6 * wardChargeFraction
-                        : 1,
-                  transform: [
-                    { scale: isPending ? wardPulseScale : (isIgnited ? flashScale : 1) },
-                  ],
-                  ...(isLit && !simplify ? {
-                    shadowColor: wardColors.glow,
-                    shadowOffset: { width: 0, height: 0 },
-                    shadowOpacity: 0.8,
-                    shadowRadius: 6,
-                  } : {}),
-                }}
-              />
+              <React.Fragment key={`ward-${idx}`}>
+                {glowWorthy && !simplify && (
+                  <Animated.View
+                    pointerEvents="none"
+                    style={{
+                      position: 'absolute',
+                      left: pos.x - 12,
+                      top: pos.y - 12,
+                      width: 24,
+                      height: 24,
+                      borderRadius: 12,
+                      backgroundColor: wardColors.glow,
+                      opacity: haloOpacity,
+                      transform: [{ scale: dotScale }],
+                    }}
+                  />
+                )}
+                <Animated.View
+                  pointerEvents="none"
+                  style={{
+                    position: 'absolute',
+                    left: pos.x - 6,
+                    top: pos.y - 6,
+                    width: 12,
+                    height: 12,
+                    borderRadius: 6,
+                    backgroundColor: baseColor,
+                    opacity: isPending
+                      ? wardPulseOpacity
+                      : isLit
+                        ? 0.9
+                        : isCharging
+                          ? 0.2 + 0.6 * wardChargeFraction
+                          : 1,
+                    transform: [{ scale: dotScale }],
+                  }}
+                />
+              </React.Fragment>
             );
           })}
           {/* Tap target for ward ring when transition is pending */}
@@ -2452,19 +2531,28 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         </View>
       )}
 
-      {/* Ceremony overlay — text during phase transition */}
+      {/* Ceremony overlay — text during phase transition. Tappable during the
+          text phase so a player can pace the lines (tap advances early). */}
       {(ceremonyStatus === 'text' || ceremonyStatus === 'erupting') && (
         <Animated.View
           style={[styles.ceremonyOverlay, { opacity: ceremonyOverlayOpacity }]}
-          pointerEvents="none"
+          pointerEvents={ceremonyStatus === 'text' ? 'auto' : 'none'}
         >
           {ceremonyStatus === 'text' && ceremonyTextIndex >= 0 && (
-            <Animated.Text style={[styles.ceremonyText, {
-              color: wardColors.pendingPulse,
-              opacity: ceremonyTextOpacity,
-            }]}>
-              {(getPitTransitionCeremonyText(pendingPhaseTransition ?? 1 as DialoguePhase))[ceremonyTextIndex] ?? ''}
-            </Animated.Text>
+            <TouchableOpacity
+              activeOpacity={1}
+              style={styles.ceremonyTapArea}
+              onPress={() => { hapticLight(); ceremonyAdvanceRef.current?.(); }}
+              accessibilityLabel="Continue the ceremony"
+              accessibilityRole="button"
+            >
+              <Animated.Text style={[styles.ceremonyText, {
+                color: wardColors.pendingPulse,
+                opacity: ceremonyTextOpacity,
+              }]}>
+                {(getPitTransitionCeremonyText(pendingPhaseTransition ?? 1 as DialoguePhase))[ceremonyTextIndex] ?? ''}
+              </Animated.Text>
+            </TouchableOpacity>
           )}
         </Animated.View>
       )}
@@ -3112,6 +3200,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  ceremonyTapArea: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
   },

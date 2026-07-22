@@ -32,10 +32,15 @@ export type UiSoundKind =
   | 'daily_ready'
   | 'devour'
   | 'glitch'
-  | 'whisper';
+  | 'whisper'
+  | 'valid_move';
 
-/** Fire a UI/ceremony sound by role. No-op (never throws) when audio is unavailable. */
-export function playUiSound(kind: UiSoundKind = 'tap'): void {
+/**
+ * Fire a UI/ceremony sound by role. No-op (never throws) when audio is
+ * unavailable. `arg` carries an optional numeric parameter for kinds that take
+ * one (currently only 'valid_move', whose 1-4 combo tier climbs the SFX ladder).
+ */
+export function playUiSound(kind: UiSoundKind = 'tap', arg?: number): void {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const audio = require('./audio');
@@ -50,6 +55,7 @@ export function playUiSound(kind: UiSoundKind = 'tap'): void {
       case 'devour': audio.soundPitDevour?.(); break;
       case 'glitch': audio.soundGlitch?.(); break;
       case 'whisper': audio.soundWhisper?.(); break;
+      case 'valid_move': audio.soundValidMove?.(arg ?? 0); break;
       default: audio.soundUiTap?.();
     }
   } catch {
