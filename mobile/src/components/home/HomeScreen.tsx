@@ -169,6 +169,7 @@ import { areUpgradesAvailable, getPurchasedUpgrades, getDeepenedRooms, getAttune
 import { getTendingLevel } from '../../services/tending';
 import { hapticLight, hapticSelection, hapticMedium, hapticHeavy } from '../../services/haptics';
 import { playUiSound, type UiSoundKind } from '../../services/uiSound';
+import { playUiHaptic } from '../../services/uiHaptic';
 import { logEvent } from '../../services/eventLogger';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -424,9 +425,15 @@ const BevelRowButton: React.FC<{
   const [pressed, setPressed] = useState(false);
   const buttonSkin = skin.buttons[variant === 'secondary' ? 'secondary' : 'primary'].md;
   const handlePress = useCallback(() => {
-    if (soundKind !== 'none') playUiSound(soundKind);
+    if (soundKind !== 'none') {
+      // F88: pair the press sound with a light haptic so the shared cottage
+      // buttons speak one touch vocabulary (CandyButton does the same). A
+      // 'none' button opts out of both — its handler owns any feedback.
+      playUiSound(soundKind);
+      playUiHaptic(variant === 'secondary' ? 'selection' : 'light');
+    }
     onPress();
-  }, [soundKind, onPress]);
+  }, [soundKind, onPress, variant]);
   const handlePressIn = useCallback(() => {
     setPressed(true);
     if (reducedMotion) return;
