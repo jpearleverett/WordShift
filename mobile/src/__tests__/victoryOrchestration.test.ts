@@ -30,6 +30,22 @@ jest.mock('../services/haptics', () => ({
 jest.mock('../services/a11yAnnounce', () => ({
   announceForA11y: jest.fn(),
 }));
+// The hook now drives the micro-beat/interjection fade (F38) via a couple of
+// Animated.Value refs, so importing it in Node needs react-native's real
+// (untransformed, Flow-syntax) entry stubbed out, mirroring victoryFlow.test.ts's
+// fake Animated.
+jest.mock('react-native', () => ({
+  Animated: {
+    Value: class {
+      _value: number;
+      constructor(v: number) { this._value = v; }
+      setValue(v: number) { this._value = v; }
+      interpolate() { return 'interpolated'; }
+    },
+    timing: jest.fn(() => ({ start: jest.fn(), stop: jest.fn() })),
+    parallel: jest.fn(() => ({ start: jest.fn(), stop: jest.fn() })),
+  },
+}));
 
 const HOOK_SRC = fs.readFileSync(
   path.resolve(__dirname, '../hooks/useVictoryOrchestration.ts'),

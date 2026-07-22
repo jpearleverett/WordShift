@@ -207,6 +207,15 @@ function getButtonTheme(phase: DialoguePhase) {
   };
 }
 
+// The victory title's drop shadow (F40): a bright candy pink shadow reads as
+// a leftover candy artifact once the sheet has gone near-black. The shadow
+// itself deepens into the dread register right alongside the title's ink.
+function getVictoryTitleShadowColor(phase: DialoguePhase): string {
+  if (phase >= 4) return '#150610'; // near-black recede at the reveal
+  if (phase >= 3) return '#5C1030'; // deep crimson, growing shadows
+  return CandyColors.pink.shadow; // bright candy phases 0-2
+}
+
 export const VictoryModal: React.FC<VictoryModalProps> = ({
   visible,
   earnedStars,
@@ -307,11 +316,21 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
     return () => { cancelled = true; };
   }, [visible]);
 
-  // Cascade animation — 4 staggered content groups
+  // Cascade animation — 4 staggered content groups. The reveal ages with the
+  // descent (F34): the stagger widens and each group settles in from a small
+  // translateY instead of a flat fade at the dark phases, so the entrance
+  // reads as heavier, not merely darker (mirrors the star-pop stagger widening
+  // in useVictoryFlow's getStarStaggerMs).
+  const cascadeStaggerMs = phase >= 3 ? 280 : 200;
+  const cascadeSettleDp = phase >= 3 ? 12 : 8;
   const contentOpacity1 = useRef(new Animated.Value(0)).current;
   const contentOpacity2 = useRef(new Animated.Value(0)).current;
   const contentOpacity3 = useRef(new Animated.Value(0)).current;
   const contentOpacity4 = useRef(new Animated.Value(0)).current;
+  const contentTranslateY1 = contentOpacity1.interpolate({ inputRange: [0, 1], outputRange: [cascadeSettleDp, 0] });
+  const contentTranslateY2 = contentOpacity2.interpolate({ inputRange: [0, 1], outputRange: [cascadeSettleDp, 0] });
+  const contentTranslateY3 = contentOpacity3.interpolate({ inputRange: [0, 1], outputRange: [cascadeSettleDp, 0] });
+  const contentTranslateY4 = contentOpacity4.interpolate({ inputRange: [0, 1], outputRange: [cascadeSettleDp, 0] });
   // In-modal victory receipt slot: fades each queued line in fresh as it cycles.
   const receiptOpacity = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -349,7 +368,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
       contentOpacity2.setValue(0);
       contentOpacity3.setValue(0);
       contentOpacity4.setValue(0);
-      const cascade = Animated.stagger(200, [
+      const cascade = Animated.stagger(cascadeStaggerMs, [
         Animated.timing(contentOpacity1, { toValue: 1, duration: 350, useNativeDriver: true }),
         Animated.timing(contentOpacity2, { toValue: 1, duration: 350, useNativeDriver: true }),
         Animated.timing(contentOpacity3, { toValue: 1, duration: 350, useNativeDriver: true }),
@@ -694,6 +713,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 
             <Text style={[styles.victoryTitle, {
               color: phaseTheme.victoryTitleColor,
+              textShadowColor: getVictoryTitleShadowColor(phase),
             }]}>
               {getVictoryTitle(earnedStars, phase)}
             </Text>
@@ -765,7 +785,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             )}
 
             {/* Group 1: Harvest, bonuses, streak, milestone */}
-            <Animated.View style={{ opacity: contentOpacity1 }}>
+            <Animated.View style={{ opacity: contentOpacity1, transform: [{ translateY: contentTranslateY1 }] }}>
             {/* Harvested words (queued for the pit) */}
             {victoryData?.harvestedWords && victoryData.harvestedWords.length > 0 && (
               <View
@@ -815,12 +835,12 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             {/* Milestone bonus */}
             {victoryData && victoryData.milestoneBonus > 0 && Boolean(victoryData.milestoneMessage) && (
               <View
-                style={styles.milestoneContainer}
+                style={[styles.milestoneContainer, phase >= 3 && styles.milestoneContainerDark]}
                 accessible
                 accessibilityLabel={`Milestone: ${victoryData.milestoneMessage}`}
               >
                 <Text style={styles.milestoneEmoji}>{'\uD83C\uDFC6'}</Text>
-                <Text style={styles.milestoneMessage}>{victoryData.milestoneMessage}</Text>
+                <Text style={[styles.milestoneMessage, phase >= 3 && styles.milestoneMessageDark]}>{victoryData.milestoneMessage}</Text>
               </View>
             )}
 
@@ -892,7 +912,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             </Animated.View>
 
             {/* Group 2: Ritual echo chain */}
-            <Animated.View style={{ opacity: contentOpacity2 }}>
+            <Animated.View style={{ opacity: contentOpacity2, transform: [{ translateY: contentTranslateY2 }] }}>
             {/* Ritual Echo — word chain from completed puzzle (all phases) */}
             {echoWords && (
               <View style={[
@@ -907,13 +927,22 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 ]}>
                   {getRitualEchoHeader(phase)}
                 </Text>
-                <View style={styles.ritualEchoChain}>
+                {/* The chain descends at Phase 3+ (the "offering" register): a
+                    vertical stack of chips with a centered down-arrow between
+                    each, instead of the bright horizontal wrap-row. Long
+                    finale-length chains (6-7 words) get slightly smaller
+                    chips so the column stays readable inside the scroll. */}
+                <View style={[
+                  styles.ritualEchoChain,
+                  phase >= 3 && styles.ritualEchoChainDescending,
+                ]}>
                   {echoWords.map((word, i) => (
                     <React.Fragment key={i}>
                       <Text style={[
                         styles.ritualEchoWord,
                         phase <= 1 && styles.ritualEchoWordBright,
                         phase >= 3 && styles.ritualEchoWordDark,
+                        phase >= 3 && echoWords.length >= 6 && styles.ritualEchoWordCompact,
                       ]}>
                         {word}
                       </Text>
@@ -922,6 +951,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                           styles.ritualEchoArrow,
                           phase <= 1 && styles.ritualEchoArrowBright,
                           phase >= 3 && styles.ritualEchoArrowDark,
+                          phase >= 3 && styles.ritualEchoArrowDescending,
                         ]}>
                           {phase >= 3 ? '\u2193' : '\u2192'}
                         </Text>
@@ -985,7 +1015,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             </Animated.View>
 
             {/* Group 3: Amber breakdown + Collect Now */}
-            <Animated.View style={{ opacity: contentOpacity3, width: '100%' }}>
+            <Animated.View style={{ opacity: contentOpacity3, width: '100%', transform: [{ translateY: contentTranslateY3 }] }}>
             {victoryData && (() => {
               // Prefer the REAL itemization from the economy (amberBreakdown,
               // threaded through recordVictory) — the local AMBER_REWARDS +
@@ -1260,7 +1290,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             )}
 
             {/* Group 4: Action buttons — 3D candy style */}
-            <Animated.View style={{ opacity: contentOpacity4, width: '100%' }}>
+            <Animated.View style={{ opacity: contentOpacity4, width: '100%', transform: [{ translateY: contentTranslateY4 }] }}>
             {isOnboarding ? (
             <View style={styles.victoryButtonRow}>
               {/* Onboarding: single "Continue" button */}
@@ -2022,6 +2052,13 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginBottom: 12,
   },
+  // Phase 3+: the candy-yellow chip would be the last bright-candy artifact
+  // on an otherwise near-black sheet. Mirrors phaseChangeContainerDark's
+  // deep-tinted-bg + ember/amber-border treatment.
+  milestoneContainerDark: {
+    backgroundColor: '#2A1608',
+    borderColor: 'rgba(234, 136, 40, 0.5)',
+  },
   milestoneEmoji: {
     fontFamily: BODY_FONT,
     fontSize: 28,
@@ -2034,6 +2071,9 @@ const styles = StyleSheet.create({
     // Deep amber-brown — 6.6:1 on the yellow.light chip (yellow.dark was 1.5:1)
     color: '#713F12',
     marginBottom: 2,
+  },
+  milestoneMessageDark: {
+    color: '#FFD9A8', // cream-amber, high contrast on the dark ember chip
   },
   questCompletedContainer: {
     gap: 6,
@@ -2175,6 +2215,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
   },
+  // Phase 3+: the chain visibly DESCENDS (the "offering" register) — a
+  // vertical stack of chips with a down-arrow between each, instead of the
+  // bright horizontal wrap-row.
+  ritualEchoChainDescending: {
+    flexDirection: 'column',
+    flexWrap: 'nowrap',
+    gap: 2,
+  },
   ritualEchoWord: {
     fontFamily: PIXEL_FONT_BOLD,
     fontSize: 15,
@@ -2193,6 +2241,14 @@ const styles = StyleSheet.create({
     color: '#C77DBA', // 4.6:1 on the dark chip
     backgroundColor: 'rgba(100, 30, 60, 0.3)',
   },
+  // Long finale-length chains (6-7 words) descending in a column need a
+  // smaller chip so the whole rite stays legible without dominating the
+  // scroll — caps the visual height rather than letting it sprawl.
+  ritualEchoWordCompact: {
+    fontSize: 12,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
   ritualEchoArrow: {
     fontFamily: BODY_FONT,
     fontSize: 12,
@@ -2201,6 +2257,12 @@ const styles = StyleSheet.create({
   },
   ritualEchoArrowDark: {
     color: CandyColors.gray[400],
+  },
+  // The descending column reads top-to-bottom, so the arrow's breathing room
+  // moves from horizontal to vertical.
+  ritualEchoArrowDescending: {
+    marginHorizontal: 0,
+    marginVertical: 1,
   },
   ritualIncantationName: {
     fontFamily: PIXEL_FONT_BOLD,
