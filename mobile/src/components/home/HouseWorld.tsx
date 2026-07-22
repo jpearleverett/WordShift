@@ -1296,17 +1296,29 @@ const moonGlowStyles = StyleSheet.create({
 // PIT ATTENTION GLOW - Warm pulse around the pit entrance when offerings wait
 // ═══════════════════════════════════════════════════════════════════════════
 
+// F78: the pit's attention pulse slows into a smolder as the descent deepens —
+// same warm halo, longer breath (bright base 1400ms -> ~2200ms at Phase 3 ->
+// ~2800ms at Phase 4+). Mirrors DailyChallengeCard's phase-scaled pulse so both
+// attention cues age together instead of staying brightly-cadenced late.
+const getPitPulseMs = (phase: number): number => {
+  if (phase >= 4) return 2800;
+  if (phase >= 3) return 2200;
+  return 1400;
+};
+
 /**
  * PitAttentionGlow — a soft warm halo behind the pit entrance, shown when
  * harvest batches are waiting to be offered. Four concentric graduated ovals
  * (130/100/70/45%, low stepped alphas) so the edge dissolves instead of
  * reading as a hard orange sticker (F17). One native-driven opacity loop, peak
  * wrapper opacity capped at 0.85 so the edge never fully hardens; renders at a
- * static mid-opacity under reducedMotion / simplified animations.
+ * static mid-opacity under reducedMotion / simplified animations. The pulse
+ * period lengthens with the phase (F78) so the cue smolders, not sparkles, late.
  */
-const PitAttentionGlow: React.FC = () => {
+const PitAttentionGlow: React.FC<{ phase: number }> = ({ phase }) => {
   const pulse = useRef(new Animated.Value(0)).current;
   const isStatic = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
+  const halfCycle = getPitPulseMs(phase);
 
   useEffect(() => {
     if (isStatic) return;
@@ -1314,13 +1326,13 @@ const PitAttentionGlow: React.FC = () => {
       Animated.sequence([
         Animated.timing(pulse, {
           toValue: 1,
-          duration: 1400,
+          duration: halfCycle,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
         Animated.timing(pulse, {
           toValue: 0,
-          duration: 1400,
+          duration: halfCycle,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
@@ -1328,7 +1340,7 @@ const PitAttentionGlow: React.FC = () => {
     );
     loop.start();
     return () => loop.stop();
-  }, [isStatic, pulse]);
+  }, [isStatic, halfCycle, pulse]);
 
   const opacity = isStatic
     ? 0.6 // static mid-opacity — still reads as "the pit wants attention"
@@ -2082,7 +2094,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                     accessibilityRole="button"
                     activeOpacity={0.8}
                   >
-                    {pitNeedsAttention && <PitAttentionGlow />}
+                    {pitNeedsAttention && <PitAttentionGlow phase={currentPhase} />}
                     <Image
                       source={PIT_ENTRANCE_IMG}
                       style={styles.pitEntranceImage}
