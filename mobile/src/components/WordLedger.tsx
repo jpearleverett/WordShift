@@ -3,7 +3,8 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
+  FlatList,
+  ListRenderItem,
   TouchableOpacity,
   Image,
   Dimensions,
@@ -26,6 +27,13 @@ import { shouldSimplifyAnimations } from '../services/deviceTier';
 const CHIP_CASCADE_CAP = 10;
 // Content waits this long so the header reads as settling in first.
 const HEADER_CASCADE_BASE_MS = 120;
+// Chips per windowed FlatList row-group. Grouping lets the wrap-cloud layout
+// survive virtualization: each list item is a self-contained flex-wrap block
+// the list can mount/unmount, instead of 500 chips flat in one ScrollView.
+const LEDGER_GROUP_SIZE = 18;
+// Once the initial entrance has settled we disarm the cascade so a first-group
+// remount (scrolling a long ledger to the bottom and back) can never replay it.
+const LEDGER_CASCADE_SETTLE_MS = 1500;
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -40,6 +48,29 @@ const DREAD_WORD_SET = new Set([
   'GATE', 'PORTAL', 'RIFT', 'SUMMON', 'RITUAL', 'VOID', 'NOTHING',
   'OBLIVION', 'DARKNESS', 'SILENCE', 'STILL', 'FROZEN', 'DEAD', 'BONE',
 ]);
+
+/** A windowed row-group of ledger chips. `startIndex` is the group's first
+ *  chip's global position (preserves the original order and per-chip stagger). */
+export interface LedgerChipGroup {
+  key: string;
+  startIndex: number;
+  words: string[];
+}
+
+/**
+ * Chunk the flat word list into fixed-size groups for a windowed FlatList.
+ * Pure + deterministic (unit-tested): each group carries its global
+ * `startIndex` so the renderer can keep the original chip order and stagger.
+ * A non-positive size falls back to 1 so a bad caller can never spin.
+ */
+export function groupLedgerWords(words: string[], size: number): LedgerChipGroup[] {
+  const groupSize = size > 0 ? Math.floor(size) : 1;
+  const groups: LedgerChipGroup[] = [];
+  for (let i = 0; i < words.length; i += groupSize) {
+    groups.push({ key: `g${i}`, startIndex: i, words: words.slice(i, i + groupSize) });
+  }
+  return groups;
+}
 
 interface WordLedgerProps {
   phase: DialoguePhase;
@@ -121,11 +152,77 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
     };
   }, [phase, dreadAnim]);
 
+  // Entrance-cascade latch: arm on mount, disarm once the initial stagger has
+  // settled so a windowed group scrolled back into view never re-triggers the
+  // fade+rise. Reduced motion / low tier never arm it (chips appear instantly).
+  const cascadeReducedMotion = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
+  const [cascadeArmed, setCascadeArmed] = useState(!cascadeReducedMotion);
+  useEffect(() => {
+    if (cascadeReducedMotion) return;
+    const timer = setTimeout(() => setCascadeArmed(false), LEDGER_CASCADE_SETTLE_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const resonance = getResonanceConfig(phase);
   const dreadGlowOpacity = dreadAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [resonance.minOpacity, resonance.maxOpacity],
   });
+
+  const groups = groupLedgerWords(words, LEDGER_GROUP_SIZE);
+
+  // Each windowed item is one flex-wrap group; the chips inside keep their
+  // global index so the first on-screen chips still cascade in original order.
+  const renderGroup: ListRenderItem<LedgerChipGroup> = ({ item }) => (
+    <View style={styles.wordChips}>
+      {item.words.map((word, i) => {
+        const globalIndex = item.startIndex + i;
+        const dread = isDread(word) && phase >= 2;
+        const chip = (
+          <View
+            style={[
+              styles.wordChip,
+              { backgroundColor: t.sectionBg, borderColor: t.sectionBorder },
+              dread && styles.wordChipDread,
+            ]}
+          >
+            {dread && (
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  styles.dreadGlow,
+                  { backgroundColor: resonance.color, opacity: dreadGlowOpacity },
+                ]}
+              />
+            )}
+            <Text style={[
+              styles.wordText,
+              { color: t.body },
+              dread && styles.wordTextDread,
+            ]}>
+              {word}
+            </Text>
+          </View>
+        );
+        // Only the first on-screen chips cascade, and only while armed; the
+        // rest snap in (a long ledger must not crawl, and a scrolled-in group
+        // must not replay the entrance).
+        if (cascadeArmed && globalIndex < CHIP_CASCADE_CAP) {
+          return (
+            <EntranceCascadeItem
+              key={`${word}-${globalIndex}`}
+              phase={phase}
+              delay={getCascadeDelayMs(globalIndex, { baseMs: HEADER_CASCADE_BASE_MS })}
+            >
+              {chip}
+            </EntranceCascadeItem>
+          );
+        }
+        return <React.Fragment key={`${word}-${globalIndex}`}>{chip}</React.Fragment>;
+      })}
+    </View>
+  );
 
   return (
     <View style={[styles.container, { backgroundColor: t.screenBg, paddingTop: screenInsets.top + 16 }]}>
@@ -164,13 +261,21 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
         </EntranceCascadeItem>
       </View>
 
-      {/* Word grid */}
-      <ScrollView
+      {/* Word grid — windowed so a 500-word ledger never mounts every chip. */}
+      <FlatList
         style={styles.scrollView}
+        data={groups}
+        keyExtractor={item => item.key}
+        renderItem={renderGroup}
+        extraData={`${cascadeArmed}-${phase}`}
         contentContainerStyle={[styles.wordGrid, { paddingBottom: Math.max(40, screenInsets.bottom) }]}
+        ItemSeparatorComponent={ChipGroupSeparator}
         showsVerticalScrollIndicator={false}
-      >
-        {words.length === 0 ? (
+        initialNumToRender={3}
+        maxToRenderPerBatch={4}
+        windowSize={5}
+        removeClippedSubviews
+        ListEmptyComponent={
           <View style={styles.emptyState}>
             <PanelCard phase={phase} kind="card" style={styles.emptyCard}>
               <Image source={JOURNAL_ICON} style={styles.emptyIcon} resizeMode="contain" />
@@ -181,56 +286,15 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
               </Text>
             </PanelCard>
           </View>
-        ) : (
-          <View style={styles.wordChips}>
-            {words.map((word, index) => {
-              const dread = isDread(word) && phase >= 2;
-              const chip = (
-                <View
-                  style={[
-                    styles.wordChip,
-                    { backgroundColor: t.sectionBg, borderColor: t.sectionBorder },
-                    dread && styles.wordChipDread,
-                  ]}
-                >
-                  {dread && (
-                    <Animated.View
-                      pointerEvents="none"
-                      style={[
-                        styles.dreadGlow,
-                        { backgroundColor: resonance.color, opacity: dreadGlowOpacity },
-                      ]}
-                    />
-                  )}
-                  <Text style={[
-                    styles.wordText,
-                    { color: t.body },
-                    dread && styles.wordTextDread,
-                  ]}>
-                    {word}
-                  </Text>
-                </View>
-              );
-              // First rows cascade in; the rest snap in (a long ledger must not crawl).
-              if (index < CHIP_CASCADE_CAP) {
-                return (
-                  <EntranceCascadeItem
-                    key={`${word}-${index}`}
-                    phase={phase}
-                    delay={getCascadeDelayMs(index, { baseMs: HEADER_CASCADE_BASE_MS })}
-                  >
-                    {chip}
-                  </EntranceCascadeItem>
-                );
-              }
-              return <React.Fragment key={`${word}-${index}`}>{chip}</React.Fragment>;
-            })}
-          </View>
-        )}
-      </ScrollView>
+        }
+      />
     </View>
   );
 };
+
+// Vertical breathing room between windowed chip groups (matches the in-group
+// 8dp gap so group boundaries read as ordinary wrap rows).
+const ChipGroupSeparator: React.FC = () => <View style={styles.groupSeparator} />;
 
 const styles = StyleSheet.create({
   container: {
@@ -316,6 +380,9 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'center',
     gap: 8,
+  },
+  groupSeparator: {
+    height: 8,
   },
   wordChip: {
     paddingHorizontal: 12,

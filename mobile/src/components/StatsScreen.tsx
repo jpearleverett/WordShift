@@ -6,6 +6,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  FlatList,
 } from 'react-native';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
 import { CandyColors } from '../theme/colors';
@@ -61,6 +62,21 @@ const CHROME_CHIP_BG = `rgba(255, 255, 255, ${SURFACE.highlightAlpha})`;
 
 /** Content rows wait this long so the header reads as settling in first. */
 const HEADER_CASCADE_BASE_MS = 120;
+
+/** The five achievement-category cards, in display order (also the windowed
+ *  list's data). Bounded and fixed — the list virtualizes the tall cards, not
+ *  a growing history. */
+const ACHIEVEMENT_CATEGORIES = ['puzzle', 'mastery', 'streak', 'collection', 'journey'] as const;
+/** Only the first on-screen category cards cascade in; later ones scrolled into
+ *  the windowed list appear without re-triggering the entrance. */
+const ACHIEVEMENT_CASCADE_WINDOW = 3;
+const ACHIEVEMENT_CATEGORY_NAMES: Record<(typeof ACHIEVEMENT_CATEGORIES)[number], string> = {
+  puzzle: 'PUZZLES',
+  mastery: 'MASTERY',
+  streak: 'STREAKS',
+  collection: 'COLLECTION',
+  journey: 'JOURNEY',
+};
 
 interface HeroStatSpec {
   value: number;
@@ -220,6 +236,72 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
   const overviewSelected = selectedTab === 'overview';
   const achievementsSelected = selectedTab === 'achievements';
 
+  // One windowed list item = one framed achievement-category card (preserving
+  // the cottage frame + per-category cascade). Windowing at card granularity
+  // unmounts off-screen categories so the tall multi-row cards aren't all
+  // mounted at once.
+  const renderAchievementCategory = ({
+    item: category,
+    index: categoryIndex,
+  }: {
+    item: (typeof ACHIEVEMENT_CATEGORIES)[number];
+    index: number;
+  }) => {
+    const categoryAchievements = achievements.filter(a => a.category === category);
+    const card = (
+      <PanelCard phase={effectivePhase} style={styles.sectionCard}>
+        <PixelPlaque phase={effectivePhase} label={ACHIEVEMENT_CATEGORY_NAMES[category]} style={styles.sectionPlaque} />
+        {categoryAchievements.map((achievement, i) => (
+          <View
+            key={achievement.id}
+            style={[
+              styles.achievementRow,
+              i % 2 === 1 && { backgroundColor: rowAltTint },
+              !achievement.isUnlocked && styles.achievementLocked,
+            ]}
+          >
+            <Text style={[
+              styles.achievementIcon,
+              !achievement.isUnlocked && styles.achievementIconLocked,
+            ]}>
+              {achievement.isUnlocked ? achievement.icon : '🔒'}
+            </Text>
+            <View style={styles.achievementInfo}>
+              <Text style={[
+                styles.achievementTitle,
+                { color: achievement.isUnlocked ? t.title : t.muted },
+              ]}>
+                {achievement.title}
+              </Text>
+              <Text style={[styles.achievementDesc, { color: t.muted }]}>
+                {achievement.description}
+              </Text>
+            </View>
+            <View style={[styles.achievementReward, { backgroundColor: t.amberTint, borderColor: t.amberTintBorder }]}>
+              <Text style={[styles.achievementRewardText, { color: t.amberText }]}>
+                <AmberInline size={12} /> +{achievement.rewardAmber}
+              </Text>
+            </View>
+            {achievement.isUnlocked && (
+              <Text style={styles.achievementCheck}>✓</Text>
+            )}
+          </View>
+        ))}
+      </PanelCard>
+    );
+    if (categoryIndex < ACHIEVEMENT_CASCADE_WINDOW) {
+      return (
+        <EntranceCascadeItem
+          phase={effectivePhase}
+          delay={getCascadeDelayMs(categoryIndex, { baseMs: HEADER_CASCADE_BASE_MS })}
+        >
+          {card}
+        </EntranceCascadeItem>
+      );
+    }
+    return card;
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: t.screenBg }]}>
       {/* Header */}
@@ -288,8 +370,8 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {selectedTab === 'overview' ? (
+      {overviewSelected ? (
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           <>
             {/* Hero stats: panel card with a soft glow blob behind. The three
                 headline numbers count up once on mount (the single hero beat). */}
@@ -508,76 +590,31 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
             </PanelCard>
             </EntranceCascadeItem>
           </>
-        ) : (
-          <>
-            {/* Achievement categories */}
-            {(['puzzle', 'mastery', 'streak', 'collection', 'journey'] as const).map((category, categoryIndex) => {
-              const categoryAchievements = achievements.filter(a => a.category === category);
-              const categoryName = {
-                puzzle: 'PUZZLES',
-                mastery: 'MASTERY',
-                streak: 'STREAKS',
-                collection: 'COLLECTION',
-                journey: 'JOURNEY',
-              }[category];
-
-              return (
-                <EntranceCascadeItem
-                  key={category}
-                  phase={effectivePhase}
-                  delay={getCascadeDelayMs(categoryIndex, { baseMs: HEADER_CASCADE_BASE_MS })}
-                >
-                <PanelCard phase={effectivePhase} style={styles.sectionCard}>
-                  <PixelPlaque phase={effectivePhase} label={categoryName} style={styles.sectionPlaque} />
-                  {categoryAchievements.map((achievement, i) => (
-                    <View
-                      key={achievement.id}
-                      style={[
-                        styles.achievementRow,
-                        i % 2 === 1 && { backgroundColor: rowAltTint },
-                        !achievement.isUnlocked && styles.achievementLocked,
-                      ]}
-                    >
-                      <Text style={[
-                        styles.achievementIcon,
-                        !achievement.isUnlocked && styles.achievementIconLocked,
-                      ]}>
-                        {achievement.isUnlocked ? achievement.icon : '🔒'}
-                      </Text>
-                      <View style={styles.achievementInfo}>
-                        <Text style={[
-                          styles.achievementTitle,
-                          { color: achievement.isUnlocked ? t.title : t.muted },
-                        ]}>
-                          {achievement.title}
-                        </Text>
-                        <Text style={[styles.achievementDesc, { color: t.muted }]}>
-                          {achievement.description}
-                        </Text>
-                      </View>
-                      <View style={[styles.achievementReward, { backgroundColor: t.amberTint, borderColor: t.amberTintBorder }]}>
-                        <Text style={[styles.achievementRewardText, { color: t.amberText }]}>
-                          <AmberInline size={12} /> +{achievement.rewardAmber}
-                        </Text>
-                      </View>
-                      {achievement.isUnlocked && (
-                        <Text style={styles.achievementCheck}>✓</Text>
-                      )}
-                    </View>
-                  ))}
-                </PanelCard>
-                </EntranceCascadeItem>
-              );
-            })}
-          </>
-        )}
-
-        {/* Menu-surface banner (low friction; self-suppresses for ad-free /
-            onboarding / Phase 4+, and when no ad backend is configured). */}
-        <BannerAd phase={effectivePhase} />
-
-        <View style={styles.bottomSpacer} />
-      </ScrollView>
+          <BannerAd phase={effectivePhase} />
+          <View style={styles.bottomSpacer} />
+        </ScrollView>
+      ) : (
+        <FlatList
+          style={styles.content}
+          data={ACHIEVEMENT_CATEGORIES}
+          keyExtractor={category => category}
+          renderItem={renderAchievementCategory}
+          extraData={`${effectivePhase}-${achievements.length}`}
+          showsVerticalScrollIndicator={false}
+          initialNumToRender={3}
+          maxToRenderPerBatch={2}
+          windowSize={3}
+          removeClippedSubviews
+          ListFooterComponent={
+            <>
+              {/* Menu-surface banner (low friction; self-suppresses for ad-free /
+                  onboarding / Phase 4+, and when no ad backend is configured). */}
+              <BannerAd phase={effectivePhase} />
+              <View style={styles.bottomSpacer} />
+            </>
+          }
+        />
+      )}
     </View>
   );
 };
