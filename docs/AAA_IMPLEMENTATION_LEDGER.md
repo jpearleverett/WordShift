@@ -6,13 +6,15 @@
 
 | Status | Count | Share |
 |---|--:|--:|
-| ✅ done | 159 | 88% |
-| 🟡 partial | 12 | 7% |
+| ✅ done | 152 | 84% |
+| 🟡 partial | 19 | 11% |
 | ⏸️ deferred | 7 | 4% |
 | ❌ not addressed | 2 | 1% |
 | **Total** | **180** | |
 
-**Fully done: 159 of 180.** Meaningful progress (done + partial): 171. Only-genuinely-open (not addressed): 2.
+**Fully done: 152 of 180.** Meaningful progress (done + partial): 171. Only-genuinely-open (not addressed): 2.
+
+> **These are the post-verification numbers.** After the Session-4 fan-out I claimed 159 done; an independent adversarial re-verification (5 read-only agents that re-checked every claimed closure against current code, blind to my verdict) found ~15 over-claims. I then **fixed 8** of them (including a real autosave correctness bug), **honestly downgraded 8** to 🟡 (over-claims I chose not to rush-fix), and **upgraded 1** the verifiers found I had *under*-claimed (New Cycle in-place rebuild). Net 159 → 152 done. The correction detail is in "Session 4 — post-verification correction" below.
 
 > Updated after the **Session-4 fan-out** (seven correctly-based worktree agents on disjoint file clusters + a serial App.tsx/theme pass). Most of the 109 findings the Session-3 ledger still listed as ❌/🟡 turned out **already satisfied on the branch** (the verdicts predated Waves 1-5 and the Session 2-3 work); each was re-verified line-by-line before flipping, and the genuine gaps were closed. The remaining **21 not-fully-done** break down as: **12 partial** (mostly minor polish or intentional atmospheric accents), **7 deferred** (architectural trade-offs the audit itself deferred, plus WebP-encoder and on-device-screenshot blockers this environment can't clear), and **2 not addressed** (the board undo/restart takeback — deliberately not risked against the core input hook — and the app-wide type-scale consolidation — a large visual-QA-bound refactor). The authoritative per-finding current status is the **"Session 4 — fan-out reconciliation"** section below; the per-system rows further down preserve the audit + Session 2-3 evidence trail.
 
@@ -144,6 +146,34 @@ Nothing was falsely marked done. Everything shipped is behind reduced-motion + d
 
 ---
 
+## Session 4 — post-verification correction
+
+The reconciliation above was itself **adversarially re-verified**: five read-only agents re-checked every one of the 107 claimed closures against the actual code at HEAD, blind to my per-finding verdict, with a "still-open until the code proves otherwise" stance. They found **~15 over-claims** — the reconciliation had been too generous on the App.tsx cluster in particular. This is the corrected record (full suite still green: 119 suites / 2937 tests, typecheck 0, lint 0 errors).
+
+**Fixed in response (8 — now genuinely ✅):**
+- **Autosave won-board race (correctness bug).** The re-check guarded only `gameState`, which App flips to `WON` *after* the async `recordVictory` — so the 120ms debounce could re-persist a completed board as a restartable PLAYING save during the record window. Added `isProcessingVictory` (set synchronously before the await) to `AutosaveDeps` + both guards; new test pins that a save is suppressed mid-victory.
+- **Ritual micro-event buried under the modal.** It still wrote via `setMessage` to the board Toast (zIndex 50, under the modal scrim); routed through `enqueueVictoryToast('info')` like the other victory beats.
+- **BootHold branded loader** (the last stock `ActivityIndicator`); **Time's-Up ⏱ emoji** → on-brand `◈` at all phases; **difficulty setup chip** gained the phase-2 dusk tier; **home loading 🏡** → `home.png` sprite; **modalIn aging** extended to the 3 sites the sweep missed (home SpringIn panel ×8, SettingsScreen restore, GiftOverlay); **`daily_ready` sound wired** (+ haptic) to the daily-streak milestone (was minted but call-site-less).
+
+**Honestly downgraded (8 — ✅ → 🟡, not rush-fixed):**
+- **Robed Phase-4/5 talk portrait** — the portrait gets the shared `dialogueSpriteTalking` lift transform while speaking (so it is not fully frozen), but there is genuinely **no robed talk frame** (no mouth movement; the art does not exist for any animal) — an honest 🟡, not ✅.
+- **Overlay coordination (C5)** — the narrative-slot arbiter fixed "two voices at once", but the beat scrim (`absoluteFill`, zIndex 999, `pointerEvents="none"`) still leaves victory buttons invisible-but-tappable, and the achievement check still fires with no micro-beat deferral.
+- **Launch home-flash (F1)** — the near-black flash is fixed, but the cold-open still does a raw `setCurrentScreen('puzzle')` (not routed through `transitionTo`), so the home→puzzle swap is unchoreographed.
+- **Board LOADING grace (F3)** — the Row cascade ships, but the fast-bank-pick LOADING overlay still renders with no grace delay / opacity fade.
+- **Watched-ad reward count-up** — the store faucet, quest-double, and daily-login watched-ad rewards count up, but the **VictoryModal rewarded-double total still jumps** (it lives inside a nested render IIFE where a count-up hook can't cleanly live; the "✦ Doubled" breakdown line is the only acknowledgment).
+- **Streak-milestone visual** — audio + haptic differentiation shipped (and the daily-streak milestone now gets `daily_ready`), but the milestones still land on the same flat receipt-toast / alert surface as trivial receipts (no distinct confetti/visual reward moment).
+- **Speed drain envelope** — the "Round N" badge pops with a sting, but the per-second drain cue is still flat outside the 5→1s danger zone.
+- **Assets bundle hygiene (F116)** — the `**/*` pattern is narrowed and the 30MB `raw`/`Play_store` dirs are excluded from the bundle, but three tiny unreferenced sprites (`ui/pit.png`, `environment/ground.png`, `environment/tree.png`) still sit in bundled dirs (the latter two are documented "intentionally kept", so not deleted unilaterally).
+
+**Upgraded (1 — I had *under*-claimed):**
+- **New Cycle in-place rebuild** — the shipping path calls `onCloudRestored()` → `rebuildSessionFromStorage` (in-place); `Updates.reloadAsync` survives only as the no-host fallback. The verifier confirmed the hard-reload is gone, so this is ✅, not the 🟡 I had recorded.
+
+**Also confirmed still-open (consistent with the remainder above):** the phase-change-card / chrome-button / micro-chrome raw emoji (Emoji 🟡), the invite-modal scrim timing (F2 🟡), the apex-mode swap toast (Alert 🟡), useWindowDimensions resize-reactivity (🟡), board undo/restart takeback (❌), and the app-wide type scale (❌).
+
+The remaining 19 partials and 2 not-addressed are genuine and itemized; the ⏸️ deferrals (WebP encoder, on-device screenshots, the audit's own perf/tablet deferrals) are unchanged.
+
+---
+
 ## Per-finding status by system
 
 Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a pinned core system) · ❌ not addressed.
@@ -179,7 +209,7 @@ Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a p
 | ❌ | P3 | Full-moon event nights change nothing in the world | HouseWorld.tsx contains no isEventDay/getActiveEvent reference and its sky selection is still a pure phase ladder (:1294-1304); HomeScreen passes no event flag into HouseWorld (:1904-1926) even though it imports getActiveEvent only for the ambient text line (:1365). No moon-glow/star-boost world treatment exists. |
 | ❌ | P3 | Mirror-extension artifacts in the sky art are visible at the resting camera | The five sky assets are unchanged — git shows sky_shadow.png last modified 2026-07-14 in commit 3750a7f (before the audit-branch fixes) — and the mirrored-meadow-extension comment is still present (HouseWorld.tsx:932); no seam-retouch commit exists, and the audit's own §5.6 still lists the mirrored 'kaleidoscope' strip as an open art item. |
 
-### Animal life & rooms  ·  ✅11 🟡0 ⏸️0 ❌0
+### Animal life & rooms  ·  ✅10 🟡1 ⏸️0 ❌0
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | ✅ | P0 | Facing-left flip (scaleX -1) mirrors the name tag, '!' badge, cooldown text, and emote bubble; all UI chrome also inherits breathe/wiggle/gait deformation | AnimalSprite.tsx now splits the tree: outer container carries only position+bounceY (1085-1096), a `body` wrapper (1123-1144) carries scaleX+breathe+tap+wiggle+gait+idle and wraps ONLY the sprite stack, and shadow/emote bubble/SleepingZs/notification badge/name tag/cooldown badge render as unflipped, untransformed siblings (1110-1300). Commit 8428b57 'P0: un-mirror animal chrome'. |
@@ -292,7 +322,7 @@ Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a p
 | 🟡 | P2 | The house-completion ceremony is headlined by an OS emoji; the ask badge mixes emoji into a sprite row | The completion ceremony now shows the VOID_ICON sprite at phase>=4 (the actual reveal moment) but still the raw 🏠 emoji at phase<4, and no dedicated lit/eclipsed house-crest art was made; the statsRow house-ask badge (App.tsx:4124) still renders 🏠 as Text while siblings use getModeIconSprite, and MODE_ICON_SPRITES has no 'house' glyph. |
 | 🟡 | P3 | Bright-phase victory titles sit at ~3.4:1 — passable only because they are display-size | colors.ts deepened phase 0 victoryTitleColor to pink.dark #DB2777 (4.6:1 on white) and phase 1 to #BC4A78 (4.5:1), but phase 2 is still #9868A8 on modalBg #E8E0F0 — the exact flagged pairing at ~3.35:1, unchanged. |
 
-### Choreography  ·  ✅8 🟡0 ⏸️0 ❌0
+### Choreography  ·  ✅7 🟡1 ⏸️0 ❌0
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | ✅ | P0 | Exiting the victory screen within ~1.5s permanently cancels the finale and post-revelation cinematics | App.tsx queueEndgameCinematic (line ~1351) sets pendingEndgameEventRef synchronously, and startVictoryExitFlow (line ~1362-1366) plays that queued event via setPhaseTransitionEvent before clearVictoryTimeouts() drops it — exactly the target; landed in commit 8dcc497 'P0-1: rescue the finale / post-revelation cinematic on victory exit'. |
@@ -304,7 +334,7 @@ Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a p
 | ❌ | P2 | 120ms autosave debounce races the async victory record: a completed board can persist as a restorable PLAYING save | The autosave fire-time re-check (useAutosave.ts:63) still reads only gameState/currentScreen — which stay PLAYING through the async record until App.tsx:2282 — with no isProcessingVictory or boardCompletedRef in AutosaveDeps or the call site (App.tsx:827); the back-during-WON branch also still omits clearPuzzleState for the normal path. |
 | ❌ | P3 | One-time Swift Victories pointer rides an untracked raw setTimeout and burns its once-ever flag on clobbered/invisible delivery | maybeShowSwiftVictoryHint (App.tsx:3321-3335) still marks the once-ever flag seen (line 3331) before a raw untracked setTimeout (line 3332) that writes via puzzleActions.setMessage — not addVictoryTimeout, not the toast queue — so the flag is spent even when the board-start/house-ask line clobbers it or the player navigates away. |
 
-### Assets  ·  ✅4 🟡2 ⏸️2 ❌0
+### Assets  ·  ✅3 🟡3 ⏸️2 ❌0
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | 🟡 | P0 | Android adaptive icon is the full-bleed store icon — launcher masks crop the ears, W/S tiles and amber gem; corners are baked opaque black | Commit 340aca9 rewrote processAppIcon.mjs to place the whole composition inside the 66% safe zone on a transparent surround; adaptive-icon.png now has transparent corners/edges (pixel(0,0)=[0,0,0,0]) so the launcher mask no longer crops the identity. But icon.png is byte-unchanged (md5 still 7fcab4b5..., corner still baked opaque [1,1,1,255]) and splash.png is still 1600x1600 with the pre-rounded icon — the icon.png un-baking and splash rebuild are explicitly deferred in the commit as needing new source art. |
@@ -316,7 +346,7 @@ Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a p
 | ❌ | P3 | 26MB of full-screen backgrounds ship as truecolor PNG — a ~17MB install-size win is on the table | No .webp assets exist and no .webp require() calls in src; the five skies still ship as color-type-6 RGBA PNG (sky_day 3.37MB) and pit backdrops as PNG, with PNG crunch still disabled (enablePngCrunchInReleaseBuilds:false). |
 | ❌ | P3 | Play Store screenshot set is low-res stylized mocks whose UI doesn't match the shipped game | The four titled shots (01-04) are still 864x1536 (below Play's 1080px short-side), and the four file_00000000*.png AI drafts (941x1672) are still present in assets/Play_store — no real-device re-shoot or draft deletion happened. |
 
-### First 60 seconds  ·  ✅7 🟡1 ⏸️1 ❌0
+### First 60 seconds  ·  ✅5 🟡3 ⏸️1 ❌0
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | ❌ | P1 | Every launch blinks through a near-black Phase-4 screen and an unchoreographed home flash before the first board | All three target parts are unchanged: appStyles.initialLoadingContainer is still backgroundColor '#1A1A2E' with the glass card + large ActivityIndicator + 'Preparing your house...' (appStyles.ts:76, App.tsx:3692-3702); currentScreen still initializes to 'home' with no initialScreen prop (App.tsx:326); and the cold-open swap is still a raw setCurrentScreen('puzzle') at App.tsx:795 (and 1008), never routed through transitionTo. |
@@ -338,7 +368,7 @@ Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a p
 | ✅ | P2 | The 'monument' running total SNAPS instead of climbing — the system's own stated reward has no payoff moment | A useEffect keyed on offeringTotal (commit 36c0126) tweens displayedOfferingTotal from the previous value via requestAnimationFrame using countUpDisplayValue over getCountUpDurationMs (phase-scaled 320-1300ms), snapping only on first read / reduced motion / non-increase; the monument line at ~3294 renders displayedOfferingTotal. |
 | ✅ | P3 | Candle glow color is a phase-fixed warm orange — the only non-phase-aware element in an otherwise phase-consistent altar | The glow's inline backgroundColor at HomeScreen.tsx ~3257 (commit 29d193f) is now phase-derived: phase>=5 → '#9B7BAE' mauve, phase>=4 → '#C8703A' ember, else '#FFB347', overriding the static style default — an ember at the reveal, a serene mauve at Phase 5. |
 
-### Variant tension modes  ·  ✅4 🟡0 ⏸️0 ❌0
+### Variant tension modes  ·  ✅3 🟡1 ⏸️0 ❌0
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | ✅ | P1 | Blind Offering's once-at-the-end judgment has no bespoke reveal (success) or rejection (failure) — the apex mode's whole reason to exist is unmarked | New BlindJudgmentOverlay.tsx (commit 5be43a5) is wired at App.tsx:4373; App fires fireBlindJudgment('accepted') at 1906 with soundValidMove(3)+hapticSuccess (finale excluded) and 'rejected' at 2495, and the overlay runs a 680ms native-driver green sweep top→bottom on accept / crimson double-throb on reject with a reducedMotion→instant flash on both branches. |
@@ -373,7 +403,7 @@ Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a p
 | ✅ | P2 | Capture-in-progress is a bare stock ActivityIndicator — off-brand grey spinner on a cottage-pixel game | ActivityIndicator is gone entirely from the share components; while sharing, a phase-tinted parchment status chip (t.cardBg/t.amberTintBorder) with a native-driven breathing 'capturing...' label (capturePulse, t.amberText) masks the Share button (lines ~281-290). |
 | ✅ | P3 | Challenge-a-friend shared text is a fixed bright taunt regardless of phase, and never personalized | buildChallengeShareText now selects from a phase-aware CHALLENGE_TAUNTS pool (tiers 0/2/3/4, named+anon) via challengeTauntTier(phase); App.tsx:3524 threads persistence.currentPhase at the call site (playerName supported but undefined, as the game has no player-name concept). |
 
-### Monetization reward loop  ·  ✅4 🟡0 ⏸️0 ❌0
+### Monetization reward loop  ·  ✅3 🟡1 ⏸️0 ❌0
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | 🟡 | P1 | Watched-ad rewards resolve to a static text line + a silently-jumping number — no count-up, no celebration proportional to the amount | The reusable RewardReveal count-up was built (src/components/ui/RewardReveal.tsx, rAF count-up + icon spring + phase glow) and wired into the faucet (StoreModal setFaucetReveal→RewardReveal, the cited anchor), quest claim/double (HomeScreen ~L2692), and daily-login; but the target's third consumer, victory-2x, still renders displayTotal as a plain jumping number in VictoryModal (only a labeled 'Doubled' breakdown line, no count-up). |
@@ -397,7 +427,7 @@ Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a p
 | ⏸️ | P2 | Board arc row overflows narrow (<=360dp) screens: fixed tile/slot geometry, no scale-to-fit, so 5-letter drop rows clip their outer slots + preview labels at the screen edge | Matches documented deferral (a). tileLayout.ts still ships fixed constants (STANDARD_TILE_W 52, ARC_SLOT_RENDERED_WIDTH 18) with no per-board scale-to-fit; Row.tsx/LetterTile.tsx contain only animation scales, no window-width-derived tile scaling. |
 | ⏸️ | P3 | Tablet / large-aspect: the fixed-width board is marooned in a small central column with vast dead bands on iPad/large Androids | Matches documented deferral (b). No responsive breakpoint / isTablet helper anywhere in src; board is still built from the fixed tileLayout.ts constants and app.json keeps supportsTablet:true, so the board is not scaled up or re-centered on large widths. |
 
-### Free-progression reward moments  ·  ✅6 🟡0 ⏸️0 ❌0
+### Free-progression reward moments  ·  ✅5 🟡1 ⏸️0 ❌0
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | 🟡 | P2 | No count-up anywhere and a magnitude-blind pill pulse: every amber gain feels identical, +2 reads the same as +100 | A reusable count-up primitive (countUpDisplayValue / getCountUpDurationMs in src/components/ui/RewardReveal.tsx) was built and applied to the sacrifice monument (HomeScreen.tsx:1249-1266), GiftOverlay, and quest reveal, but the cited header amber pill still renders a bare `{progress.amber}` that jumps (HomeScreen.tsx:1812) and its pulse still fires a fixed toValue:1.2 on any change regardless of gain size (HomeScreen.tsx:1459-1474). |
@@ -417,8 +447,7 @@ Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a p
 | ✅ | P2 | DailyLoginModal - the returning-player welcome - is almost entirely hardcoded and not phase-aware, so a dread/serene player gets a bright cheery welcome | DailyLoginModal.tsx now pulls copy = getDailyLoginModalCopy(phase) for the recurring/comeback path, threading welcomeTitle/resetLine/received/comebackBonus/jackpot/collect that shift register per phase (welcomeTitle 'Welcome Back'→'You Returned'→'You Came Back'→'You Returned to the Pattern'→'You Came Home'), phaseNarrative.ts:3880. |
 | ✅ | P3 | Every re-engagement notification wastes its prime title line on the redundant brand name 'WordShift' | All four title sites in notifications.ts (daily/comeBack:518, winBack:568, questExpiry:698, streakRisk:734) now call getNotificationTitle(phase, kind), which returns distinct phase-aware in-world hooks (e.g. streakRisk phase-4 'The chain is still counting', winBack phase-4 'The arrangement is incomplete'); the only 'WordShift' left in the file is a header comment, no title uses the brand. |
 
-### Settings, data & New Cycle  ·  ✅3 🟡1 ⏸️0 ❌0
-
+### Settings, data & New Cycle  ·  ✅4 🟡0 ⏸️0 ❌0
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | ✅ | P1 | Cloud-conflict fork is neither safe nor legible: 'Use the newer save' wipes local progress on one unconfirmed tap and is styled as the recommended option | handleUseCloudSave (SettingsScreen.tsx:515-529) now gates the restore behind a destructive showGameAlert confirm that names the loss ("This device's current progress will be replaced ... will be lost. This cannot be undone."), matching the equal-weight handleKeepThisDevice confirm; the banner is neutral ("Choose which one to keep. Either choice replaces the other") so neither side reads as recommended (commit cb2352d). |
