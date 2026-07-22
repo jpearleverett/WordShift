@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { getSettingsSync } from '../../services/settings';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
+import { hapticSelection } from '../../services/haptics';
 import { getPressSpring } from '../../theme/surfaces';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 
@@ -57,6 +58,9 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
 }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
+  // Disabled-tap acknowledgment shake — parity with the locked tiles (a tap on
+  // an inert control is felt, not silently swallowed).
+  const shakeAnim = useRef(new Animated.Value(0)).current;
 
   // One-shot acknowledgment pulse when pulseSignal changes (e.g. a milestone
   // hint gift raised the count while the button was off-screen — the pulse
@@ -130,12 +134,31 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
 
   const iconSprite = getActionIconSprite(icon);
 
+  // A tap on a disabled control shakes + ticks (parity with locked tiles), then
+  // does nothing else. Keeping the touchable enabled (not the `disabled` prop)
+  // is what lets the inert tap be acknowledged at all.
+  const handlePress = () => {
+    if (disabled) {
+      hapticSelection();
+      if (!getSettingsSync().reducedMotion) {
+        shakeAnim.setValue(0);
+        Animated.sequence([
+          Animated.timing(shakeAnim, { toValue: 4, duration: 40, useNativeDriver: true }),
+          Animated.timing(shakeAnim, { toValue: -4, duration: 40, useNativeDriver: true }),
+          Animated.timing(shakeAnim, { toValue: 2, duration: 40, useNativeDriver: true }),
+          Animated.timing(shakeAnim, { toValue: 0, duration: 40, useNativeDriver: true }),
+        ]).start();
+      }
+      return;
+    }
+    onPress();
+  };
+
   return (
     <TouchableOpacity
-      onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      disabled={disabled}
+      onPress={handlePress}
+      onPressIn={disabled ? undefined : handlePressIn}
+      onPressOut={disabled ? undefined : handlePressOut}
       activeOpacity={1}
       accessibilityLabel={accessibilityLabel || label}
       accessibilityRole="button"
@@ -145,7 +168,7 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
         style={[
           styles.actionButton,
           disabled && styles.actionButtonDisabled,
-          { transform: [{ scale: scaleAnim }] },
+          { transform: [{ scale: scaleAnim }, { translateX: shakeAnim }] },
         ]}
       >
         {/* Glow effect */}
@@ -158,15 +181,15 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
           />
         )}
 
-        {/* Button body */}
+        {/* Button body — disabled flattens to an inert grey face (no candy bg). */}
         <View
           style={[
             styles.actionButtonIcon,
-            { backgroundColor: colors.bg },
+            { backgroundColor: disabled ? '#8C8A94' : colors.bg },
           ]}
         >
-          {/* Top bevel */}
-          <View style={styles.actionButtonBevel} />
+          {/* Top bevel — dropped when disabled so the face reads flat/inert. */}
+          {!disabled && <View style={styles.actionButtonBevel} />}
 
           {/* Icon */}
           {iconSprite !== null ? (
@@ -180,13 +203,15 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
           )}
         </View>
 
-        {/* 3D edge */}
-        <View
-          style={[
-            styles.actionButtonEdge,
-            { backgroundColor: colors.border },
-          ]}
-        />
+        {/* 3D edge — dropped when disabled (a flat control has no raised lip). */}
+        {!disabled && (
+          <View
+            style={[
+              styles.actionButtonEdge,
+              { backgroundColor: colors.border },
+            ]}
+          />
+        )}
 
         {/* Label */}
         <Text style={styles.actionButtonLabel}>{label}</Text>

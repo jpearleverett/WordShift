@@ -37,6 +37,18 @@ jest.mock('react-native', () => ({
   Dimensions: { get: jest.fn().mockReturnValue({ width: 400, height: 800 }) },
 }));
 
+// ActionButton now imports haptics (disabled-tap acknowledgment); stub it with a
+// factory so the Node test env never loads the native expo-haptics module.
+jest.mock('../services/haptics', () => ({
+  hapticSelection: jest.fn(),
+  hapticLight: jest.fn(),
+  hapticMedium: jest.fn(),
+  hapticHeavy: jest.fn(),
+  hapticSuccess: jest.fn(),
+  hapticWarning: jest.fn(),
+  hapticError: jest.fn(),
+}));
+
 import { getActionIconSprite } from '../components/puzzle/ActionButton';
 
 const UI_DIR = path.resolve(__dirname, '../../assets/ui');

@@ -679,6 +679,13 @@ function MainApp() {
 
   // Screen transition overlay — fades in to cover old screen, swaps, fades out to reveal new screen
   const transitionOverlay = useRef(new Animated.Value(0)).current;
+  // Per-destination screen reveal signature (F60): as the transition overlay
+  // lifts, the arriving screen settles with a native-driver motion keyed to the
+  // destination — puzzle/home breathe in (scale 1.02->1.0), the pit sinks in
+  // (translateY -14->0, "underground"). 0 = at rest; 1 = the start-of-reveal
+  // extreme. Rests at 0 so the wrapper transform is neutral between transitions.
+  const screenRevealAnim = useRef(new Animated.Value(0)).current;
+  const [screenRevealKind, setScreenRevealKind] = useState<'lift' | 'sink' | 'none'>('none');
   // Opacity stutter for the prominent first-victory glitch (held at 1 under
   // reduced motion).
   const glitchStutter = useRef(new Animated.Value(1)).current;
@@ -710,6 +717,12 @@ function MainApp() {
 
       setCurrentScreen(screen);
       callback?.();
+      // Arm the destination reveal signature: the pit sinks in, every other
+      // screen breathes in. Set the anim to its start extreme now (hidden under
+      // the opaque overlay), then settle it as the overlay lifts.
+      const kind: 'lift' | 'sink' = screen === 'pit' ? 'sink' : 'lift';
+      setScreenRevealKind(kind);
+      screenRevealAnim.setValue(1);
       // Wait one frame for React to render the new screen before revealing
       requestAnimationFrame(() => {
         // Fade overlay OUT — now blends through destination-matching color
@@ -718,9 +731,16 @@ function MainApp() {
           duration: 180,
           useNativeDriver: true,
         }).start();
+        // Settle the reveal signature (springs the arriving screen into place).
+        Animated.spring(screenRevealAnim, {
+          toValue: 0,
+          friction: 8,
+          tension: 90,
+          useNativeDriver: true,
+        }).start();
       });
     });
-  }, [transitionOverlay, persistence.currentPhase]);
+  }, [transitionOverlay, screenRevealAnim, persistence.currentPhase]);
 
   // Keep root background in sync with current screen + phase (handles phase changes without transitions)
   useEffect(() => {
@@ -4785,8 +4805,13 @@ function MainApp() {
           boundaries; this outer one covers the secondary screens (settings,
           stats, ledger, gallery, pit) so a render error on any of them returns
           the player home instead of crashing the entire app. */}
-      <View
-        style={{ flex: 1 }}
+      <Animated.View
+        style={{
+          flex: 1,
+          transform: screenRevealKind === 'sink'
+            ? [{ translateY: screenRevealAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -14] }) }]
+            : [{ scale: screenRevealAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.02] }) }],
+        }}
         accessibilityElementsHidden={blockingOverlayActive}
         importantForAccessibility={blockingOverlayActive ? 'no-hide-descendants' : 'auto'}
       >
@@ -4796,7 +4821,7 @@ function MainApp() {
       >
         {renderScreen()}
       </ErrorBoundary>
-      </View>
+      </Animated.View>
       {/* Screen transition overlay — solid cover that fades in/out during navigation */}
       <Animated.View
         pointerEvents="none"
