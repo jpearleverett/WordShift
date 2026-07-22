@@ -1,7 +1,10 @@
 import React from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Image } from 'react-native';
 import { CandyColors, getPhaseTheme } from '../../theme/colors';
-import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
+import { PIXEL_FONT_BOLD } from '../../theme/fonts';
+
+// Chrome iconography is a sprite, not emoji (F67).
+const TROPHY_ICON = require('../../../assets/ui/trophy.png');
 
 interface DailyLeaderboardCardProps {
   /** 1-based standing (1 = best). Omit/undefined while loading or no data. */
@@ -85,10 +88,8 @@ export const DailyLeaderboardCard: React.FC<DailyLeaderboardCardProps> = ({
       accessibilityRole="text"
     >
       <View style={styles.row}>
-        {/* Icon + text both carry the meaning — never color alone. */}
-        <Text style={styles.icon} accessibilityElementsHidden>
-          🏆
-        </Text>
+        {/* Sprite + text both carry the meaning — never color alone. */}
+        <Image source={TROPHY_ICON} style={styles.iconImg} accessibilityElementsHidden />
         <Text style={[styles.title, { color: titleColor }]}>Daily Standing</Text>
       </View>
 
@@ -154,9 +155,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 2,
   },
-  icon: {
-    fontFamily: BODY_FONT,
-    fontSize: 14,
+  iconImg: {
+    width: 16,
+    height: 16,
     marginRight: 6,
   },
   title: {

@@ -21,6 +21,15 @@ const FLAME_ICON = require('../../assets/ui/flame.png');
 const CALENDAR_ICON = require('../../assets/ui/calendar.png');
 const MOON_ICON = require('../../assets/ui/moon.png');
 
+// F78: attention pulses slow into a smolder as the descent deepens — same
+// colors, longer breath (bright base 1200ms -> ~2200ms at Phase 3 -> ~2800ms
+// at Phase 4+). Easing is unchanged at the call sites.
+const getPhaseScaledPulseMs = (phase: number, brightMs: number): number => {
+  if (phase >= 4) return 2800;
+  if (phase >= 3) return 2200;
+  return brightMs;
+};
+
 interface DailyChallengeCardProps {
   onStartDaily: (difficulty: Difficulty) => void;
   phase?: number;
@@ -76,16 +85,17 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
     }
 
     if (!isCompleted) {
+      const halfCycle = getPhaseScaledPulseMs(phase, 1200);
       pulseLoopRef.current = Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
             toValue: 1.08,
-            duration: 1200,
+            duration: halfCycle,
             useNativeDriver: true,
           }),
           Animated.timing(pulseAnim, {
             toValue: 1,
-            duration: 1200,
+            duration: halfCycle,
             useNativeDriver: true,
           }),
         ])
@@ -96,12 +106,12 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
         Animated.sequence([
           Animated.timing(glowAnim, {
             toValue: 0.8,
-            duration: 1200,
+            duration: halfCycle,
             useNativeDriver: true,
           }),
           Animated.timing(glowAnim, {
             toValue: 0.3,
-            duration: 1200,
+            duration: halfCycle,
             useNativeDriver: true,
           }),
         ])
@@ -124,7 +134,7 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
       pulseAnim.stopAnimation();
       glowAnim.stopAnimation();
     };
-  }, [isCompleted]);
+  }, [isCompleted, phase]);
 
   const loadStatus = async () => {
     const status = await getDailyStatus();
