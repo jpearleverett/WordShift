@@ -354,6 +354,10 @@ function MainApp() {
   // rather than swapping in silently.
   const [hintPulseSignal, setHintPulseSignal] = useState(0);
   const hintPulsePendingRef = useRef(false);
+  // Tracked timer for the one-time Swift-Victories hint (F110): cleared on
+  // unmount so a raw setTimeout can't fire into a torn-down tree.
+  const swiftHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (swiftHintTimerRef.current) clearTimeout(swiftHintTimerRef.current); }, []);
   useEffect(() => {
     if (puzzle.gameState === GameState.PLAYING && hintPulsePendingRef.current) {
       hintPulsePendingRef.current = false;
@@ -3453,9 +3457,14 @@ function MainApp() {
     const phase = persistence.currentPhase;
     (async () => {
       if (await hasSeenOneTimeFlag(SWIFT_HINT_SEEN_KEY)) return;
-      await markOneTimeFlagSeen(SWIFT_HINT_SEEN_KEY);
-      setTimeout(() => {
+      // TRACKED timer (cleared on unmount) — and the seen-flag is set only when
+      // the hint actually shows, so an interrupted exit can't burn the one-time
+      // beat unseen (the same class of bug the preview-graduation card had).
+      if (swiftHintTimerRef.current) clearTimeout(swiftHintTimerRef.current);
+      swiftHintTimerRef.current = setTimeout(() => {
+        swiftHintTimerRef.current = null;
         puzzleActions.setMessage(getSwiftVictoryHintMessage(phase));
+        markOneTimeFlagSeen(SWIFT_HINT_SEEN_KEY).catch(() => {});
       }, SWIFT_HINT_TOAST_DELAY_MS);
     })().catch(() => {});
   }, [victoryFlow.victoryData, onboardingFlow.isOnboarding, persistence.currentPhase, puzzleActions]);
