@@ -265,8 +265,8 @@ export const getJournalQuestLabel = (
   actionableCount: number,
   claimableAmber: number,
 ): string => {
-  if (claimableAmber > 0) return `🗓 Quests (+${claimableAmber})`;
-  return actionableCount > 0 ? `🗓 Quests (${actionableCount})` : '🗓 Quests';
+  if (claimableAmber > 0) return `Quests (+${claimableAmber})`;
+  return actionableCount > 0 ? `Quests (${actionableCount})` : 'Quests';
 };
 
 /** Screen-reader label for the quest pill: actionable count, claimable amber, daily reset. */
@@ -2525,6 +2525,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 phase={progress.currentPhase}
                 hostDark={dtHostDark}
                 label={getJournalQuestLabel(actionableQuestCount, claimableQuestAmber)}
+                icon={QUEST_ICON}
                 onPress={() => {
                   setShowJournalModal(false);
                   handleOpenQuestModal().catch(() => {});
@@ -2612,7 +2613,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <HubRow
                 phase={progress.currentPhase}
                 hostDark={dtHostDark}
-                label={`✨ ${getShopTitle(progress.currentPhase)}`}
+                label={getShopTitle(progress.currentPhase)}
+                icon={require('../../../assets/ui/emote_sparkle.png')}
                 onPress={() => {
                   setShowUtilityModal(false);
                   onOpenShop?.();
@@ -2648,7 +2650,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <HubRow
                 phase={progress.currentPhase}
                 hostDark={dtHostDark}
-                label="⚙️ Settings"
+                label="Settings"
+                icon={require('../../../assets/ui/gear.png')}
                 onPress={() => {
                   setShowUtilityModal(false);
                   onOpenSettings?.();
@@ -3040,7 +3043,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             {unlockFlow.showRoomUnlock && (
               <>
                 <View style={[styles.lockBadge, { backgroundColor: panelSt.sectionBg, borderColor: panelSt.sectionBorder }]}>
-                  <Text style={styles.lockBadgeEmoji}>🔒</Text>
+                  <Image source={require('../../../assets/ui/lock.png')} style={styles.lockBadgeIcon} resizeMode="contain" />
                 </View>
                 <PixelPlaque
                   phase={progress.currentPhase}
@@ -4610,6 +4613,10 @@ const styles = StyleSheet.create({
   lockBadgeEmoji: {
     fontFamily: BODY_FONT,
     fontSize: 24,
+  },
+  lockBadgeIcon: {
+    width: 26,
+    height: 26,
   },
   lockedRoomName: {
     fontFamily: PIXEL_FONT_BOLD,

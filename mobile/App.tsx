@@ -2261,7 +2261,7 @@ function MainApp() {
             // A banked freeze forgave a missed day — let the player know the
             // chain survived so the protection feels real, not silent. Phase-
             // aware copy (the house protects warmly at every register).
-            enqueueVictoryToast(`🛡️ ${getStreakFreezeReliefMessage(persistence.currentPhase, true)}`);
+            enqueueVictoryToast(getStreakFreezeReliefMessage(persistence.currentPhase, true));
           } else if (dailyProgress.streakDecayedTo != null) {
             // Decay-to-milestone: the lapse cost the climb, not the streak —
             // name the checkpoint it held at (phase-aware copy).
@@ -2416,7 +2416,7 @@ function MainApp() {
       // Surface the "your streak was protected" moment when a freeze was
       // consumed — phase-aware copy (warm at every register, never scolds).
       if (victory.streakSaved) {
-        enqueueVictoryToast(`🛡️ ${getStreakFreezeReliefMessage(persistence.currentPhase, false)}`);
+        enqueueVictoryToast(getStreakFreezeReliefMessage(persistence.currentPhase, false));
       }
 
       // Show streak milestone toast if threshold was just crossed. Scale the
