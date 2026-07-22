@@ -126,10 +126,18 @@ describe('audio', () => {
 
     test('sounds without a registered dark variant keep their base name', () => {
       // glitch/whisper are horror cues with no dark mirror — always their base
-      // name; achievement/unlock/phase_change/daily_ready never had one either.
-      for (const name of ['achievement', 'unlock', 'phase_change', 'daily_ready', 'glitch', 'whisper']) {
+      // name; phase_change/daily_ready are already the dark end of the palette.
+      // (achievement/unlock DO have dark mirrors now — covered above.)
+      for (const name of ['phase_change', 'daily_ready', 'glitch', 'whisper']) {
         expect(resolveSfxForPhase(name, 4)).toBe(name);
       }
+    });
+
+    test('achievement and unlock swap to their dark variants at Phase 3+', () => {
+      expect(resolveSfxForPhase('achievement', 4)).toBe('achievement_dark');
+      expect(resolveSfxForPhase('unlock', 3)).toBe('unlock_dark');
+      expect(resolveSfxForPhase('achievement', 2)).toBe('achievement');
+      expect(resolveSfxForPhase('unlock', 1)).toBe('unlock');
     });
   });
 

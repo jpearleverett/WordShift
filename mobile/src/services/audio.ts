@@ -44,7 +44,11 @@ const SOUND_SOURCES: Record<string, any> = {
   perfect: require('../../assets/sounds/perfect.wav'),
   amber_earn: require('../../assets/sounds/amber_earn.wav'),
   achievement: require('../../assets/sounds/achievement.wav'),
+  // Dark mirrors (Phase 3+) auto-resolved by resolveSfxForPhase — the rising
+  // celebration goes reverent (minor dark-bell ascent into a hollow toll).
+  achievement_dark: require('../../assets/sounds/achievement_dark.wav'),
   unlock: require('../../assets/sounds/unlock.wav'),
+  unlock_dark: require('../../assets/sounds/unlock_dark.wav'),
   dialogue: require('../../assets/sounds/dialogue.wav'),
   phase_change: require('../../assets/sounds/phase_change.wav'),
   daily_ready: require('../../assets/sounds/daily_ready.wav'),

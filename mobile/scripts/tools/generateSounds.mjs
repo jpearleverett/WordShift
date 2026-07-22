@@ -587,6 +587,29 @@ render('unlock', 1.0, (s, rand) => {
   strike(s, { freq: N.C6, start: 0.32, dur: 0.6, vol: 0.3, partials: HANDBELL, decayShape: 4, attack: 0.004, rand });
 }, { reverb: { wet: 0.25, tail: 0.55 }, peak: 0.68 });
 
+// achievement_dark: the same rising line gone reverent — a dark-bell ascent
+// on the minor mode, resolving into a low hollow toll instead of a toy-piano
+// sparkle. Fires at Phase 3+ via resolveSfxForPhase.
+render('achievement_dark', 1.3, (s, rand) => {
+  const line = [ [D.G3, 0, 0.42], [D.Bb3, 0.13, 0.46], [D.Eb4, 0.26, 0.46], [D.Bb4, 0.39, 0.46] ];
+  for (const [f, t, v] of line) {
+    noiseBurst(s, { start: t, dur: 0.012, vol: 0.14, lp: 0.35, decayShape: 11, rand });
+    strike(s, { freq: f, start: t, dur: 0.5, vol: v, partials: DARK_BELL, decayShape: 4.8, unison: 2, detune: 0.004, rand });
+  }
+  strike(s, { freq: D.C5, start: 0.55, dur: 0.9, vol: 0.3, partials: HOLLOW, decayShape: 3.4, attack: 0.006, bend: -0.03, unison: 2, detune: 0.003, rand });
+  noiseBurst(s, { start: 0.5, dur: 0.5, vol: 0.05, lp: 0.5, hp: 0.2, decayShape: 3.6, rand });
+}, { reverb: { wet: 0.3, decay: 0.85, damp: 0.55, tail: 0.9 }, peak: 0.66 });
+
+// unlock_dark: the marimba triad gone cold — a dark-bell rise into a low toll.
+render('unlock_dark', 1.0, (s, rand) => {
+  const line = [ [D.C3, 0], [D.Eb3, 0.1], [D.G3, 0.2] ];
+  for (const [f, t] of line) {
+    noiseBurst(s, { start: t, dur: 0.02, vol: 0.18, lp: 0.18, decayShape: 10, rand });
+    strike(s, { freq: f, start: t, dur: 0.3, vol: 0.46, partials: DARK_BELL, decayShape: 5.2, unison: 2, detune: 0.003, rand });
+  }
+  strike(s, { freq: D.C5, start: 0.34, dur: 0.75, vol: 0.28, partials: HOLLOW, decayShape: 3.8, attack: 0.006, bend: -0.03, unison: 2, detune: 0.003, rand });
+}, { reverb: { wet: 0.27, damp: 0.55, tail: 0.6 }, peak: 0.62 });
+
 // dialogue: tiny soft celesta blip (fires on every dialogue line — stays quiet).
 render('dialogue', 0.15, (s, rand) => {
   noiseBurst(s, { start: 0, dur: 0.008, vol: 0.15, lp: 0.45, decayShape: 12, rand });
