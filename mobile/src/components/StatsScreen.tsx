@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  FlatList,
 } from 'react-native';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
 import { CandyColors } from '../theme/colors';
@@ -18,7 +19,7 @@ import { AmberInline } from './AmberInline';
 import { CumulativeStats, PersonalBest, getCumulativeStats, getAverageStars, getThreeStarRate } from '../services/starRating';
 import { getAchievementsWithStatus, Achievement, getTotalCount } from '../services/achievements';
 import { getDailyStatus } from '../services/dailyChallenge';
-import { getStreakInfo } from '../services/amberCurrency';
+import { getStreakInfo, getAmberBalance } from '../services/amberCurrency';
 import { Difficulty } from '../types';
 import { getJourneyAtmosphereText, getPaceTrendMessage } from '../services/phaseNarrative';
 import {
@@ -29,12 +30,130 @@ import {
   UnbrokenWeaveMastery,
 } from '../services/masteryRecords';
 import { DialoguePhase } from '../types/homeWorld';
+import {
+  EntranceCascadeItem,
+  getCascadeDelayMs,
+  countUpDisplayValue,
+  getCountUpDurationMs,
+} from './ui/RewardReveal';
+import { getSettingsSync } from '../services/settings';
+import { shouldSimplifyAnimations } from '../services/deviceTier';
 
 const STAR_FILLED = require('../../assets/ui/star_filled.png');
 const STAR_EMPTY = require('../../assets/ui/star_empty.png');
 
+/** True when a personal best is clean on both counts: zero hints AND zero mistakes. */
+export function isPerfectPersonalBest(pb: PersonalBest): boolean {
+  return pb.fewestHints === 0 && pb.fewestInvalidAttempts === 0;
+}
+
+/**
+ * Plain-words personal-best summary ("1 hint, 0 mistakes") for a non-perfect
+ * best. Each field is an independent fewest-ever minimum (see starRating).
+ */
+export function formatPersonalBestSummary(pb: PersonalBest): string {
+  const hints = `${pb.fewestHints} hint${pb.fewestHints === 1 ? '' : 's'}`;
+  const mistakes = `${pb.fewestInvalidAttempts} mistake${pb.fewestInvalidAttempts === 1 ? '' : 's'}`;
+  return `${hints}, ${mistakes}`;
+}
+
 /** Tinted chip fill for chrome sitting directly on the deep screen base. */
 const CHROME_CHIP_BG = `rgba(255, 255, 255, ${SURFACE.highlightAlpha})`;
+
+/** Content rows wait this long so the header reads as settling in first. */
+const HEADER_CASCADE_BASE_MS = 120;
+
+/** The five achievement-category cards, in display order (also the windowed
+ *  list's data). Bounded and fixed — the list virtualizes the tall cards, not
+ *  a growing history. */
+const ACHIEVEMENT_CATEGORIES = ['puzzle', 'mastery', 'streak', 'collection', 'journey'] as const;
+/** Only the first on-screen category cards cascade in; later ones scrolled into
+ *  the windowed list appear without re-triggering the entrance. */
+const ACHIEVEMENT_CASCADE_WINDOW = 3;
+const ACHIEVEMENT_CATEGORY_NAMES: Record<(typeof ACHIEVEMENT_CATEGORIES)[number], string> = {
+  puzzle: 'PUZZLES',
+  mastery: 'MASTERY',
+  streak: 'STREAKS',
+  collection: 'COLLECTION',
+  journey: 'JOURNEY',
+};
+
+interface HeroStatSpec {
+  value: number;
+  label: string;
+}
+
+/**
+ * The hero stat row: the three headline numbers count up together once on
+ * mount (a single, one-shot beat, not an idle loop). The count runs on the JS
+ * thread via a plain rAF stepper (never an Animated listener under the native
+ * driver). Reduced motion / low-tier devices show the final numbers instantly,
+ * and each Text exposes its final value to screen readers regardless.
+ */
+function HeroStatsRow({
+  stats,
+  phase,
+  animate,
+  sectionBg,
+  sectionBorder,
+  valueColor,
+  labelColor,
+}: {
+  stats: HeroStatSpec[];
+  phase: number;
+  animate: boolean;
+  sectionBg: string;
+  sectionBorder: string;
+  valueColor: string;
+  labelColor: string;
+}) {
+  const [fraction, setFraction] = useState(animate ? 0 : 1);
+  const rafRef = useRef(0);
+
+  useEffect(() => {
+    if (!animate) {
+      setFraction(1);
+      return;
+    }
+    const reduced = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
+    const maxTarget = stats.reduce((m, s) => Math.max(m, Math.abs(s.value)), 0);
+    const duration = reduced ? 0 : getCountUpDurationMs(maxTarget, phase);
+    if (duration <= 0) {
+      setFraction(1);
+      return;
+    }
+    const startedAt = Date.now();
+    const tick = () => {
+      const f = Math.min(1, (Date.now() - startedAt) / duration);
+      setFraction(f);
+      if (f < 1) rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <View style={styles.heroRow}>
+      {stats.map(s => (
+        <View
+          key={s.label}
+          style={[styles.heroStat, { backgroundColor: sectionBg, borderColor: sectionBorder }]}
+        >
+          <Text
+            style={[styles.heroValue, { color: valueColor }]}
+            accessibilityLabel={`${s.value} ${s.label}`}
+          >
+            {countUpDisplayValue(fraction, s.value)}
+          </Text>
+          <Text style={[styles.heroLabel, { color: labelColor }]}>{s.label}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
 
 interface StatsScreenProps {
   onClose: () => void;
@@ -62,8 +181,20 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
   const [resonantChoices, setResonantChoices] = useState(0);
   const [paceImproving, setPaceImproving] = useState(false);
   const [unbrokenWeaveMastery, setUnbrokenWeaveMastery] = useState<UnbrokenWeaveMastery | null>(null);
+  // Live spendable balance read straight from the amberCurrency store on
+  // mount (this screen mounts fresh on every visit). The amberBalance PROP is
+  // App's React-state mirror, which can drift stale (or, via a bad caller
+  // computation, even negative) between refreshes — the home header reads the
+  // store directly and this screen must agree with it. The prop serves only
+  // as the first-paint fallback, clamped so a broken mirror can never show a
+  // negative balance.
+  const [liveAmberBalance, setLiveAmberBalance] = useState<number | null>(null);
+  // Latch so the hero count-up runs only the first time the overview appears
+  // (persists across tab switches; a re-shown hero snaps to its final values).
+  const heroCountedRef = useRef(false);
 
   useEffect(() => {
+    getAmberBalance().then(setLiveAmberBalance).catch(() => {});
     getCumulativeStats().then(setStats);
     getAchievementsWithStatus().then(setAchievements);
     getDailyStatus().then(s => setDailyStatus({ totalCompleted: s.totalCompleted, bestStreak: s.bestStreak }));
@@ -84,11 +215,18 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
 
   if (!stats) return null;
 
+  // First appearance of the overview animates the hero; later shows are static.
+  const animateHero = !heroCountedRef.current;
+  heroCountedRef.current = true;
+
   const t = getSurfaceTheme(effectivePhase);
   const isDarkPhase = effectivePhase >= 3;
   // Alternating row depth: a whisper of the panel's own shade/highlight
   // material instead of hairline dividers.
   const rowAltTint = isDarkPhase ? 'rgba(255, 255, 255, 0.05)' : 'rgba(10, 6, 24, 0.05)';
+
+  // Truth-first display: live store value once loaded, clamped prop before.
+  const displayedAmberBalance = Math.max(0, liveAmberBalance ?? amberBalance);
 
   const avgStars = getAverageStars(stats);
   const perfectRate = getThreeStarRate(stats);
@@ -97,6 +235,72 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
 
   const overviewSelected = selectedTab === 'overview';
   const achievementsSelected = selectedTab === 'achievements';
+
+  // One windowed list item = one framed achievement-category card (preserving
+  // the cottage frame + per-category cascade). Windowing at card granularity
+  // unmounts off-screen categories so the tall multi-row cards aren't all
+  // mounted at once.
+  const renderAchievementCategory = ({
+    item: category,
+    index: categoryIndex,
+  }: {
+    item: (typeof ACHIEVEMENT_CATEGORIES)[number];
+    index: number;
+  }) => {
+    const categoryAchievements = achievements.filter(a => a.category === category);
+    const card = (
+      <PanelCard phase={effectivePhase} style={styles.sectionCard}>
+        <PixelPlaque phase={effectivePhase} label={ACHIEVEMENT_CATEGORY_NAMES[category]} style={styles.sectionPlaque} />
+        {categoryAchievements.map((achievement, i) => (
+          <View
+            key={achievement.id}
+            style={[
+              styles.achievementRow,
+              i % 2 === 1 && { backgroundColor: rowAltTint },
+              !achievement.isUnlocked && styles.achievementLocked,
+            ]}
+          >
+            <Text style={[
+              styles.achievementIcon,
+              !achievement.isUnlocked && styles.achievementIconLocked,
+            ]}>
+              {achievement.isUnlocked ? achievement.icon : '🔒'}
+            </Text>
+            <View style={styles.achievementInfo}>
+              <Text style={[
+                styles.achievementTitle,
+                { color: achievement.isUnlocked ? t.title : t.muted },
+              ]}>
+                {achievement.title}
+              </Text>
+              <Text style={[styles.achievementDesc, { color: t.muted }]}>
+                {achievement.description}
+              </Text>
+            </View>
+            <View style={[styles.achievementReward, { backgroundColor: t.amberTint, borderColor: t.amberTintBorder }]}>
+              <Text style={[styles.achievementRewardText, { color: t.amberText }]}>
+                <AmberInline size={12} /> +{achievement.rewardAmber}
+              </Text>
+            </View>
+            {achievement.isUnlocked && (
+              <Text style={styles.achievementCheck}>✓</Text>
+            )}
+          </View>
+        ))}
+      </PanelCard>
+    );
+    if (categoryIndex < ACHIEVEMENT_CASCADE_WINDOW) {
+      return (
+        <EntranceCascadeItem
+          phase={effectivePhase}
+          delay={getCascadeDelayMs(categoryIndex, { baseMs: HEADER_CASCADE_BASE_MS })}
+        >
+          {card}
+        </EntranceCascadeItem>
+      );
+    }
+    return card;
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: t.screenBg }]}>
@@ -110,7 +314,9 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
         >
           <Text style={[styles.backChipText, { color: t.headerTitle }]}>{'<'} Back</Text>
         </TouchableOpacity>
-        <Text style={[styles.title, { color: t.headerTitle }]}>Statistics</Text>
+        <EntranceCascadeItem phase={effectivePhase}>
+          <Text style={[styles.title, { color: t.headerTitle }]}>Statistics</Text>
+        </EntranceCascadeItem>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -164,32 +370,38 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {selectedTab === 'overview' ? (
+      {overviewSelected ? (
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           <>
-            {/* Hero stats — panel card with a soft glow blob behind */}
-            <PanelCard phase={effectivePhase} kind="panel" style={styles.heroCard}>
-              <View
-                pointerEvents="none"
-                style={[styles.heroGlow, { backgroundColor: t.glow }]}
-              />
-              <View style={styles.heroRow}>
-                <View style={[styles.heroStat, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}>
-                  <Text style={[styles.heroValue, { color: t.title }]}>{stats.totalPuzzlesCompleted}</Text>
-                  <Text style={[styles.heroLabel, { color: t.muted }]}>Puzzles</Text>
-                </View>
-                <View style={[styles.heroStat, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}>
-                  <Text style={[styles.heroValue, { color: t.title }]}>{stats.totalStars}</Text>
-                  <Text style={[styles.heroLabel, { color: t.muted }]}>Stars</Text>
-                </View>
-                <View style={[styles.heroStat, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}>
-                  <Text style={[styles.heroValue, { color: t.title }]}>{currentStreak}</Text>
-                  <Text style={[styles.heroLabel, { color: t.muted }]}>Streak</Text>
-                </View>
-              </View>
-            </PanelCard>
+            {/* Hero stats: panel card with a soft glow blob behind. The three
+                headline numbers count up once on mount (the single hero beat). */}
+            <EntranceCascadeItem
+              phase={effectivePhase}
+              delay={getCascadeDelayMs(0, { baseMs: HEADER_CASCADE_BASE_MS })}
+            >
+              <PanelCard phase={effectivePhase} kind="panel" style={styles.heroCard}>
+                <View
+                  pointerEvents="none"
+                  style={[styles.heroGlow, { backgroundColor: t.glow }]}
+                />
+                <HeroStatsRow
+                  phase={effectivePhase}
+                  animate={animateHero}
+                  sectionBg={t.sectionBg}
+                  sectionBorder={t.sectionBorder}
+                  valueColor={t.title}
+                  labelColor={t.muted}
+                  stats={[
+                    { value: stats.totalPuzzlesCompleted, label: 'Puzzles' },
+                    { value: stats.totalStars, label: 'Stars' },
+                    { value: currentStreak, label: 'Streak' },
+                  ]}
+                />
+              </PanelCard>
+            </EntranceCascadeItem>
 
             {/* Star breakdown */}
+            <EntranceCascadeItem phase={effectivePhase} delay={getCascadeDelayMs(1, { baseMs: HEADER_CASCADE_BASE_MS })}>
             <PanelCard phase={effectivePhase} style={styles.sectionCard}>
               <PixelPlaque phase={effectivePhase} label={'STAR BREAKDOWN'} style={styles.sectionPlaque} />
               <StarBar label="3 Stars" stars={3} count={stats.threeStarCount} total={stats.totalPuzzlesCompleted} color={CandyColors.yellow.main} trackColor={t.rowBorder} countColor={t.body} />
@@ -209,11 +421,13 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
                 )}
               </View>
             </PanelCard>
+            </EntranceCascadeItem>
 
-            {/* Mastery — private skill records (best speed run, scanning pace).
+            {/* Mastery: private skill records (best speed run, scanning pace).
                 Only shown once there's something to show, so it never clutters a
                 new player's overview. */}
             {(bestSpeedRound > 0 || resonantChoices > 0 || paceImproving || effectivePhase === 5 || (unbrokenWeaveMastery !== null && unbrokenWeaveMastery.wins > 0)) && (
+              <EntranceCascadeItem phase={effectivePhase} delay={getCascadeDelayMs(2, { baseMs: HEADER_CASCADE_BASE_MS })}>
               <PanelCard phase={effectivePhase} style={styles.sectionCard}>
                 <PixelPlaque phase={effectivePhase} label={'MASTERY'} style={styles.sectionPlaque} />
                 {bestSpeedRound > 0 && (
@@ -254,9 +468,11 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
                   </>
                 )}
               </PanelCard>
+              </EntranceCascadeItem>
             )}
 
             {/* Difficulty breakdown */}
+            <EntranceCascadeItem phase={effectivePhase} delay={getCascadeDelayMs(3, { baseMs: HEADER_CASCADE_BASE_MS })}>
             <PanelCard phase={effectivePhase} style={styles.sectionCard}>
               <PixelPlaque phase={effectivePhase} label={'BY DIFFICULTY'} style={styles.sectionPlaque} />
               <DifficultyRow
@@ -288,34 +504,58 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
                 avgColor={t.title}
               />
             </PanelCard>
+            </EntranceCascadeItem>
 
-            {/* Personal bests */}
+            {/* Personal bests — cleanest solves at each difficulty. Sprite
+                policy (no raw emoji in stats chrome): a perfect best gets the
+                star sprite + the word "Perfect"; anything else reads in plain
+                words ("1 hint, 2 mistakes"); a difficulty with no best yet
+                says so explicitly instead of hiding the row. */}
             {stats.personalBests && Object.keys(stats.personalBests).length > 0 && (
+              <EntranceCascadeItem phase={effectivePhase} delay={getCascadeDelayMs(4, { baseMs: HEADER_CASCADE_BASE_MS })}>
               <PanelCard phase={effectivePhase} style={styles.sectionCard}>
                 <PixelPlaque phase={effectivePhase} label={'PERSONAL BESTS'} style={styles.sectionPlaque} />
-                {(['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'] as Difficulty[])
-                  .map(diff => ({ diff, pb: stats.personalBests?.[diff] }))
-                  .filter((entry): entry is { diff: Difficulty; pb: PersonalBest } => !!entry.pb)
-                  .map((entry, i) => {
-                    const label = entry.diff === 'MEDIUM_PLUS' ? 'MED+' : entry.diff;
-                    return (
-                      <View
-                        key={entry.diff}
-                        style={[styles.journeyRow, i % 2 === 1 && { backgroundColor: rowAltTint }]}
-                      >
-                        <Text style={[styles.journeyLabel, { color: t.body }]}>{label}</Text>
-                        <Text style={[styles.journeyValue, { color: t.title }]}>
-                          {entry.pb.fewestHints === 0 ? '✨ ' : `${entry.pb.fewestHints}h `}
-                          {entry.pb.fewestInvalidAttempts === 0 ? '✨' : `${entry.pb.fewestInvalidAttempts}m`}
-                        </Text>
-                      </View>
-                    );
-                  })}
-                <Text style={[styles.personalBestLegend, { color: t.muted }]}>h = hints · m = mistakes · ✨ = perfect</Text>
+                {(['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'] as Difficulty[]).map((diff, i) => {
+                  const pb = stats.personalBests?.[diff];
+                  const label = diff === 'MEDIUM_PLUS' ? 'MED+' : diff;
+                  const perfect = !!pb && isPerfectPersonalBest(pb);
+                  const summary = pb ? formatPersonalBestSummary(pb) : null;
+                  return (
+                    <View
+                      key={diff}
+                      style={[styles.journeyRow, i % 2 === 1 && { backgroundColor: rowAltTint }]}
+                      accessible
+                      accessibilityLabel={
+                        pb
+                          ? `${label} best: ${perfect ? 'perfect, no hints, no mistakes' : summary}`
+                          : `${label}: no best yet`
+                      }
+                    >
+                      <Text style={[styles.journeyLabel, { color: t.body }]}>{label}</Text>
+                      {pb ? (
+                        perfect ? (
+                          <View style={styles.personalBestValueRow}>
+                            <Image source={STAR_FILLED} style={styles.personalBestStarIcon} resizeMode="contain" />
+                            <Text style={[styles.journeyValue, { color: t.amberText }]}>Perfect</Text>
+                          </View>
+                        ) : (
+                          <Text style={[styles.journeyValue, { color: t.title }]}>{summary}</Text>
+                        )
+                      ) : (
+                        <Text style={[styles.journeyValue, { color: t.muted }]}>No best yet</Text>
+                      )}
+                    </View>
+                  );
+                })}
+                <Text style={[styles.personalBestLegend, { color: t.muted }]}>
+                  Fewest hints and mistakes at each difficulty
+                </Text>
               </PanelCard>
+              </EntranceCascadeItem>
             )}
 
             {/* Journey progress */}
+            <EntranceCascadeItem phase={effectivePhase} delay={getCascadeDelayMs(5, { baseMs: HEADER_CASCADE_BASE_MS })}>
             <PanelCard phase={effectivePhase} style={styles.sectionCard}>
               <PixelPlaque phase={effectivePhase} label={'YOUR JOURNEY'} style={styles.sectionPlaque} />
               <View style={styles.journeyRow}>
@@ -324,7 +564,12 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
               </View>
               <View style={[styles.journeyRow, { backgroundColor: rowAltTint }]}>
                 <Text style={[styles.journeyLabel, { color: t.body }]}>Amber Balance</Text>
-                <Text style={[styles.journeyValue, { color: t.amberText }]}><AmberInline /> {amberBalance}</Text>
+                <Text
+                  style={[styles.journeyValue, { color: t.amberText }]}
+                  accessibilityLabel={`${displayedAmberBalance} amber`}
+                >
+                  <AmberInline /> {displayedAmberBalance}
+                </Text>
               </View>
               <View style={styles.journeyRow}>
                 <Text style={[styles.journeyLabel, { color: t.body }]}>Daily Challenges</Text>
@@ -343,71 +588,33 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
                 <Text style={[styles.journeyValue, { color: t.title }]}>{stats.totalInvalidAttempts}</Text>
               </View>
             </PanelCard>
+            </EntranceCascadeItem>
           </>
-        ) : (
-          <>
-            {/* Achievement categories */}
-            {(['puzzle', 'mastery', 'streak', 'collection', 'journey'] as const).map(category => {
-              const categoryAchievements = achievements.filter(a => a.category === category);
-              const categoryName = {
-                puzzle: 'PUZZLES',
-                mastery: 'MASTERY',
-                streak: 'STREAKS',
-                collection: 'COLLECTION',
-                journey: 'JOURNEY',
-              }[category];
-
-              return (
-                <PanelCard key={category} phase={effectivePhase} style={styles.sectionCard}>
-                  <PixelPlaque phase={effectivePhase} label={categoryName} style={styles.sectionPlaque} />
-                  {categoryAchievements.map((achievement, i) => (
-                    <View
-                      key={achievement.id}
-                      style={[
-                        styles.achievementRow,
-                        i % 2 === 1 && { backgroundColor: rowAltTint },
-                        !achievement.isUnlocked && styles.achievementLocked,
-                      ]}
-                    >
-                      <Text style={[
-                        styles.achievementIcon,
-                        !achievement.isUnlocked && styles.achievementIconLocked,
-                      ]}>
-                        {achievement.isUnlocked ? achievement.icon : '🔒'}
-                      </Text>
-                      <View style={styles.achievementInfo}>
-                        <Text style={[
-                          styles.achievementTitle,
-                          { color: achievement.isUnlocked ? t.title : t.muted },
-                        ]}>
-                          {achievement.title}
-                        </Text>
-                        <Text style={[styles.achievementDesc, { color: t.muted }]}>
-                          {achievement.description}
-                        </Text>
-                      </View>
-                      <View style={[styles.achievementReward, { backgroundColor: t.amberTint, borderColor: t.amberTintBorder }]}>
-                        <Text style={[styles.achievementRewardText, { color: t.amberText }]}>
-                          <AmberInline size={12} /> +{achievement.rewardAmber}
-                        </Text>
-                      </View>
-                      {achievement.isUnlocked && (
-                        <Text style={styles.achievementCheck}>✓</Text>
-                      )}
-                    </View>
-                  ))}
-                </PanelCard>
-              );
-            })}
-          </>
-        )}
-
-        {/* Menu-surface banner (low friction; self-suppresses for ad-free /
-            onboarding / Phase 4+, and when no ad backend is configured). */}
-        <BannerAd phase={effectivePhase} />
-
-        <View style={styles.bottomSpacer} />
-      </ScrollView>
+          <BannerAd phase={effectivePhase} />
+          <View style={styles.bottomSpacer} />
+        </ScrollView>
+      ) : (
+        <FlatList
+          style={styles.content}
+          data={ACHIEVEMENT_CATEGORIES}
+          keyExtractor={category => category}
+          renderItem={renderAchievementCategory}
+          extraData={`${effectivePhase}-${achievements.length}`}
+          showsVerticalScrollIndicator={false}
+          initialNumToRender={3}
+          maxToRenderPerBatch={2}
+          windowSize={3}
+          removeClippedSubviews
+          ListFooterComponent={
+            <>
+              {/* Menu-surface banner (low friction; self-suppresses for ad-free /
+                  onboarding / Phase 4+, and when no ad backend is configured). */}
+              <BannerAd phase={effectivePhase} />
+              <View style={styles.bottomSpacer} />
+            </>
+          }
+        />
+      )}
     </View>
   );
 };
@@ -600,6 +807,11 @@ const styles = StyleSheet.create({
   // Sections
   sectionCard: {
     marginBottom: 18,
+    // The card frame's wood band is 12dp; without extra padding the last
+    // row's box ran to the card's bottom pixel and its content sat only
+    // ~2dp of parchment above the wood (the cramped HARD row). 16dp keeps
+    // every last row clear of the band with breathing room, on every card.
+    paddingBottom: 16,
   },
   sectionPlaque: {
     marginBottom: 12,
@@ -739,6 +951,15 @@ const styles = StyleSheet.create({
     fontFamily: PIXEL_FONT_BOLD,
     fontSize: 14,
     fontWeight: '700',
+  },
+  personalBestValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  personalBestStarIcon: {
+    width: 14,
+    height: 14,
+    marginRight: 5,
   },
   personalBestLegend: {
     fontFamily: BODY_FONT,
