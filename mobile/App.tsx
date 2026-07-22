@@ -354,6 +354,17 @@ function MainApp() {
   // rather than swapping in silently.
   const [hintPulseSignal, setHintPulseSignal] = useState(0);
   const hintPulsePendingRef = useRef(false);
+  // Grace-gate the board LOADING overlay: a fast bank pick sets LOADING for a
+  // few ms, which used to flash the whole loading card. Only show it once
+  // LOADING/isProcessing has persisted past a short window (mirrors the
+  // victorySpinnerVisible grace on the record/persist gap).
+  const [loadingGraceVisible, setLoadingGraceVisible] = useState(false);
+  useEffect(() => {
+    const loading = puzzle.gameState === GameState.LOADING || puzzle.isProcessing;
+    if (!loading) { setLoadingGraceVisible(false); return; }
+    const t = setTimeout(() => setLoadingGraceVisible(true), 250);
+    return () => clearTimeout(t);
+  }, [puzzle.gameState, puzzle.isProcessing]);
   // Tracked timer for the one-time Swift-Victories hint (F110): cleared on
   // unmount so a raw setTimeout can't fire into a torn-down tree.
   const swiftHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -4422,7 +4433,7 @@ function MainApp() {
           {/* victorySpinnerVisible only turns true when the victory record/
               persist gap outlasts a grace window — the normal brief gap never
               flashes a spinner over the celebration. */}
-          {(puzzle.gameState === GameState.LOADING || puzzle.isProcessing || victoryFlow.victorySpinnerVisible) && (
+          {(loadingGraceVisible || victoryFlow.victorySpinnerVisible) && (
             <View style={styles.loadingOverlay}>
               <View style={[styles.loadingBox, { backgroundColor: pauseSurface.cardBg, borderWidth: 1, borderColor: pauseSurface.cardBorder }]}>
                 <BrandedLoader size={44} />

@@ -891,12 +891,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     unlockFlow.recheckAffordability();
   }, [progress?.amber, unlockFlow.recheckAffordability]);
 
-  // Onboarding: auto-show invite prompt when data is loaded during home_empty step
+  // Onboarding: auto-show invite prompt when data is loaded during home_empty.
+  // Deferred ~1.3s so the empty-home reveal (the little den) lands FIRST — the
+  // invite prompt's "Hello up there!" then reads as a response to the player
+  // discovering the den, not a modal that buries the moment under its scrim
+  // the instant data loads. Tracked timer, cleared if the step/unlock changes.
   useEffect(() => {
     if (onboardingStep === 'home_empty' && progress && unlockFlow.nextUnlock) {
-      // Automatically show the invite prompt for Fox
       if (unlockFlow.nextUnlock.type === 'character' && unlockFlow.nextUnlock.cost === 0) {
-        unlockFlow.setShowInvitePrompt(true);
+        const t = setTimeout(() => unlockFlow.setShowInvitePrompt(true), 1300);
+        return () => clearTimeout(t);
       }
     }
   }, [onboardingStep, progress, unlockFlow.nextUnlock]);
