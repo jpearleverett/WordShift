@@ -156,13 +156,14 @@ describe('audio', () => {
   });
 
   describe('ambient music', () => {
-    test('musicTrackForPhase maps the descent: bright 0-1, dusk 2, dark 3+', () => {
+    test('musicTrackForPhase maps the descent: bright 0-1, dusk 2, dark 3-4, peace 5', () => {
       expect(musicTrackForPhase(0)).toBe('music_bright');
       expect(musicTrackForPhase(1)).toBe('music_bright');
       expect(musicTrackForPhase(2)).toBe('music_dusk');
       expect(musicTrackForPhase(3)).toBe('music_dark');
       expect(musicTrackForPhase(4)).toBe('music_dark');
-      expect(musicTrackForPhase(5)).toBe('music_dark');
+      // Post-revelation resolves to the "terrible peace" bed.
+      expect(musicTrackForPhase(5)).toBe('music_peace');
     });
 
     test('musicTrackForContext picks the screen family and keeps the phase band', () => {
@@ -177,7 +178,9 @@ describe('audio', () => {
       // Pit family too.
       expect(musicTrackForContext('pit', 0)).toBe('music_pit_bright');
       expect(musicTrackForContext('pit', 2)).toBe('music_pit_dusk');
-      expect(musicTrackForContext('pit', 5)).toBe('music_pit_dark');
+      expect(musicTrackForContext('pit', 4)).toBe('music_pit_dark');
+      // Phase 5 resolves to the peace band on every screen family.
+      expect(musicTrackForContext('pit', 5)).toBe('music_pit_peace');
     });
 
     test('startMusicForScreen plays the screen-specific bed and crossfades on a screen change', async () => {

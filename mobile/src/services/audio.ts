@@ -88,6 +88,11 @@ const MUSIC_SOURCES: Record<string, any> = {
   music_pit_bright: require('../../assets/sounds/music_pit_bright.wav'),
   music_pit_dusk: require('../../assets/sounds/music_pit_dusk.wav'),
   music_pit_dark: require('../../assets/sounds/music_pit_dark.wav'),
+  // Phase-5 "terrible peace" beds — the dark DNA resolved low and slow (the
+  // C-add9 restored, tolls softened), the serene register after the arrival.
+  music_peace: require('../../assets/sounds/music_peace.wav'),
+  music_puzzle_peace: require('../../assets/sounds/music_puzzle_peace.wav'),
+  music_pit_peace: require('../../assets/sounds/music_pit_peace.wav'),
 };
 
 // Hot-path sounds preloaded at init for latency-free first playback
@@ -378,6 +383,8 @@ const MUSIC_FADE_STEPS = 16;
 const MUSIC_DUSK_PHASE = 2;
 /** Phase at/above which the bed corrupts to dark. */
 const MUSIC_DARK_PHASE = 3;
+/** Phase at/above which the bed resolves to the post-revelation "peace" band. */
+const MUSIC_PEACE_PHASE = 5;
 
 /**
  * The screen context a music bed belongs to. 'home' is also the bed for every
@@ -393,8 +400,10 @@ const MUSIC_FAMILY: Record<MusicScreen, string> = {
   pit: 'music_pit',
 };
 
-/** Pure phase → corruption band (bright / dusk / dark) — the descent. */
-function musicBandForPhase(phase: number): 'bright' | 'dusk' | 'dark' {
+/** Pure phase → corruption band (bright / dusk / dark / peace) — the descent
+ *  then the terrible peace of post-revelation. */
+function musicBandForPhase(phase: number): 'bright' | 'dusk' | 'dark' | 'peace' {
+  if (phase >= MUSIC_PEACE_PHASE) return 'peace';
   if (phase >= MUSIC_DARK_PHASE) return 'dark';
   if (phase >= MUSIC_DUSK_PHASE) return 'dusk';
   return 'bright';
