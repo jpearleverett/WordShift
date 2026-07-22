@@ -33,6 +33,10 @@ const SOUND_SOURCES: Record<string, any> = {
   valid_move_4: require('../../assets/sounds/valid_move_4.wav'),
   // Reverse-shift midpoint pivot (rising marimba into a handbell; dark mirror sinks).
   midpoint_turn: require('../../assets/sounds/midpoint_turn.wav'),
+  // Victory star pops: one celesta note per star (rising; dark mirrors sink).
+  star_pop_1: require('../../assets/sounds/star_pop_1.wav'),
+  star_pop_2: require('../../assets/sounds/star_pop_2.wav'),
+  star_pop_3: require('../../assets/sounds/star_pop_3.wav'),
   invalid_move: require('../../assets/sounds/invalid_move.wav'),
   undo: require('../../assets/sounds/undo.wav'),
   hint: require('../../assets/sounds/hint.wav'),
@@ -64,6 +68,9 @@ const SOUND_SOURCES: Record<string, any> = {
   valid_move_3_dark: require('../../assets/sounds/valid_move_3_dark.wav'),
   valid_move_4_dark: require('../../assets/sounds/valid_move_4_dark.wav'),
   midpoint_turn_dark: require('../../assets/sounds/midpoint_turn_dark.wav'),
+  star_pop_1_dark: require('../../assets/sounds/star_pop_1_dark.wav'),
+  star_pop_2_dark: require('../../assets/sounds/star_pop_2_dark.wav'),
+  star_pop_3_dark: require('../../assets/sounds/star_pop_3_dark.wav'),
   invalid_move_dark: require('../../assets/sounds/invalid_move_dark.wav'),
   undo_dark: require('../../assets/sounds/undo_dark.wav'),
   hint_dark: require('../../assets/sounds/hint_dark.wav'),
@@ -107,6 +114,7 @@ const PRELOAD_SOUND_NAMES = [
   'valid_move_3',
   'invalid_move',
   'victory',
+  'star_pop_1', // fires in the victory choreography, right after 'victory'
   'amber_earn',
   'ui_tap', // UI taps fire from the very first menu interaction
   'ui_tick',
@@ -285,6 +293,13 @@ export async function soundValidMove(comboTier: number = 0): Promise<void> {
  *  (a chapter break, above the move ladder); sinks to its hollow mirror at Phase 3+. */
 export async function soundMidpointTurn(): Promise<void> {
   await playSound(resolveSfxForPhase('midpoint_turn', audioPhase));
+}
+
+/** Victory star pop (index 1-3): one celesta note per star as it lands, so ear
+ *  and hand sync in the choreography. Sinks to its hollow mirror at Phase 3+. */
+export async function soundStarPop(index: number): Promise<void> {
+  const i = Math.max(1, Math.min(3, Math.round(index)));
+  await playSound(resolveSfxForPhase(`star_pop_${i}`, audioPhase));
 }
 
 /** Invalid move attempted. Deeper thud at Phase 3+. */

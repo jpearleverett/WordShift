@@ -3,6 +3,7 @@ import { Animated } from 'react-native';
 import { VictoryData } from './useGamePersistence';
 import { getSettingsSync } from '../services/settings';
 import { hapticLight, hapticHeavy } from '../services/haptics';
+import { playUiSound } from '../services/uiSound';
 import { getCelebrationSpring } from '../theme/surfaces';
 
 /**
@@ -297,14 +298,17 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
       hapticTimeouts.current.push(setTimeout(() => hapticLight(), firstHapticAt + stars * STAR_STAGGER_MS + 150));
     } else if (phase >= 4) {
       // At the reveal the stars land like stones: two slow medium pulses
-      // instead of three quick taps, keeping the settling THUD.
-      hapticTimeouts.current.push(setTimeout(() => hapticLight(), firstHapticAt));
-      if (stars >= 3) hapticTimeouts.current.push(setTimeout(() => hapticLight(), firstHapticAt + STAR_STAGGER_MS * 1.5));
+      // instead of three quick taps, keeping the settling THUD. A star_pop note
+      // rides each pulse (its dark hollow mirror at Phase 3+, so the pops SINK).
+      hapticTimeouts.current.push(setTimeout(() => { hapticLight(); playUiSound('star_pop', 1); }, firstHapticAt));
+      if (stars >= 3) hapticTimeouts.current.push(setTimeout(() => { hapticLight(); playUiSound('star_pop', 2); }, firstHapticAt + STAR_STAGGER_MS * 1.5));
       hapticTimeouts.current.push(setTimeout(() => hapticHeavy(), firstHapticAt + stars * STAR_STAGGER_MS + 200));
     } else {
-      if (stars >= 1) hapticTimeouts.current.push(setTimeout(() => hapticLight(), firstHapticAt));
-      if (stars >= 2) hapticTimeouts.current.push(setTimeout(() => hapticLight(), firstHapticAt + STAR_STAGGER_MS));
-      if (stars >= 3) hapticTimeouts.current.push(setTimeout(() => hapticLight(), firstHapticAt + STAR_STAGGER_MS * 2));
+      // A rising celesta note per star, fired in the SAME setTimeout as its
+      // haptic so ear and hand land together (tap-tap-tap-THUD).
+      if (stars >= 1) hapticTimeouts.current.push(setTimeout(() => { hapticLight(); playUiSound('star_pop', 1); }, firstHapticAt));
+      if (stars >= 2) hapticTimeouts.current.push(setTimeout(() => { hapticLight(); playUiSound('star_pop', 2); }, firstHapticAt + STAR_STAGGER_MS));
+      if (stars >= 3) hapticTimeouts.current.push(setTimeout(() => { hapticLight(); playUiSound('star_pop', 3); }, firstHapticAt + STAR_STAGGER_MS * 2));
       hapticTimeouts.current.push(setTimeout(() => hapticHeavy(), firstHapticAt + stars * STAR_STAGGER_MS + 150));
     }
   }, [clearSpinner, victoryStar1, victoryStar2, victoryStar3, victoryModalScale, victoryModalOpacity]);
@@ -341,7 +345,14 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
     // Skipping a hushed beat (finale / silent victory) must not fire the
     // celebration THUD — the screen is performing silence.
     const finalBoard = victoryDataRef.current?.finalBoard === true;
-    if (hushed || finalBoard) hapticLight(); else hapticHeavy();
+    if (hushed || finalBoard) {
+      hapticLight();
+    } else {
+      hapticHeavy();
+      // The stagger was skipped, so land a single top star note (never the
+      // full ladder) to acknowledge the pop-in the player fast-forwarded.
+      if (stars >= 1) playUiSound('star_pop', stars);
+    }
   }, [victoryStar1, victoryStar2, victoryStar3, victoryModalScale, victoryModalOpacity]);
 
   const resetVictory = useCallback(() => {

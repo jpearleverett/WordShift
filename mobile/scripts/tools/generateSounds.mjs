@@ -477,6 +477,28 @@ render('midpoint_turn_dark', 0.6, (s, rand) => {
   strike(s, { freq: D.Bb2, start: 0.26, dur: 0.55, vol: 0.3, partials: DARK_BELL, attack: 0.012, decayShape: 4, rand });
 }, { reverb: { wet: 0.3, tail: 0.6 }, peak: 0.62 });
 
+// star_pop_1/2/3: one celesta note per star as it pops in (rising C6/E6/G6) so
+// ear and hand land together in the victory choreography. Dark mirrors SINK
+// (Eb4/C4/G3 hollow) — the stars land like cold stones at the reveal.
+render('star_pop_1', 0.32, (s, rand) => {
+  strike(s, { freq: N.C6, dur: 0.24, vol: 0.4, partials: CELESTA, decayShape: 6, rand });
+}, { reverb: { wet: 0.16, tail: 0.3 }, peak: 0.55 });
+render('star_pop_2', 0.32, (s, rand) => {
+  strike(s, { freq: N.E6, dur: 0.24, vol: 0.4, partials: CELESTA, decayShape: 6, rand });
+}, { reverb: { wet: 0.16, tail: 0.3 }, peak: 0.55 });
+render('star_pop_3', 0.34, (s, rand) => {
+  strike(s, { freq: N.G6, dur: 0.26, vol: 0.42, partials: CELESTA, decayShape: 5.5, rand });
+}, { reverb: { wet: 0.18, tail: 0.32 }, peak: 0.58 });
+render('star_pop_1_dark', 0.42, (s, rand) => {
+  strike(s, { freq: D.Eb4, dur: 0.3, vol: 0.38, partials: HOLLOW, attack: 0.006, decayShape: 5, unison: 2, detune: 0.004, rand });
+}, { reverb: { wet: 0.22, tail: 0.4 }, peak: 0.5 });
+render('star_pop_2_dark', 0.42, (s, rand) => {
+  strike(s, { freq: D.C4, dur: 0.3, vol: 0.38, partials: HOLLOW, attack: 0.007, decayShape: 5, unison: 2, detune: 0.004, rand });
+}, { reverb: { wet: 0.22, tail: 0.4 }, peak: 0.5 });
+render('star_pop_3_dark', 0.44, (s, rand) => {
+  strike(s, { freq: D.G3, dur: 0.32, vol: 0.4, partials: HOLLOW, attack: 0.008, decayShape: 4.5, unison: 2, detune: 0.005, rand });
+}, { reverb: { wet: 0.24, tail: 0.42 }, peak: 0.5 });
+
 // invalid_move: gentle wooden double-thock, dry and tactile, never punishing.
 render('invalid_move', 0.38, (s, rand) => {
   noiseBurst(s, { start: 0, dur: 0.03, vol: 0.35, lp: 0.12, decayShape: 9, rand });

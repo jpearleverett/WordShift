@@ -33,7 +33,8 @@ export type UiSoundKind =
   | 'devour'
   | 'glitch'
   | 'whisper'
-  | 'valid_move';
+  | 'valid_move'
+  | 'star_pop';
 
 /**
  * Fire a UI/ceremony sound by role. No-op (never throws) when audio is
@@ -56,6 +57,7 @@ export function playUiSound(kind: UiSoundKind = 'tap', arg?: number): void {
       case 'glitch': audio.soundGlitch?.(); break;
       case 'whisper': audio.soundWhisper?.(); break;
       case 'valid_move': audio.soundValidMove?.(arg ?? 0); break;
+      case 'star_pop': audio.soundStarPop?.(arg ?? 1); break;
       default: audio.soundUiTap?.();
     }
   } catch {
