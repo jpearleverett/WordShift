@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FONT_SIZE } from '../../theme/typeScale';
 import {
   View,
   Text,
@@ -1577,14 +1578,14 @@ const styles = StyleSheet.create({
   },
   compactTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 26,
+    fontSize: FONT_SIZE.display,
     fontWeight: '900',
     marginBottom: 2,
     textAlign: 'center',
   },
   compactFlawless: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '800',
     letterSpacing: 1.2,
     textAlign: 'center',
@@ -1597,7 +1598,7 @@ const styles = StyleSheet.create({
   },
   compactWeaveObjective: {
     fontFamily: BODY_FONT_ITALIC,
-    fontSize: 10.5,
+    fontSize: FONT_SIZE.micro,
     lineHeight: 14,
     textAlign: 'center',
   },
@@ -1611,7 +1612,7 @@ const styles = StyleSheet.create({
   },
   compactAmberText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 22,
+    fontSize: FONT_SIZE.headline,
     fontWeight: '900',
   },
   victoryModal: {
@@ -1664,7 +1665,7 @@ const styles = StyleSheet.create({
   },
   streakMilestoneHint: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '600',
     textAlign: 'center',
     marginTop: 2,
@@ -1705,7 +1706,7 @@ const styles = StyleSheet.create({
   },
   victorySubtitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     fontWeight: '700',
     color: CandyColors.gray[500],
     marginBottom: 4,
@@ -1720,7 +1721,7 @@ const styles = StyleSheet.create({
   },
   flawlessBadgeText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '800',
     letterSpacing: 1.5,
     textAlign: 'center',
@@ -1737,27 +1738,27 @@ const styles = StyleSheet.create({
   },
   weaveProgressTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 10,
+    fontSize: FONT_SIZE.micro,
     fontWeight: '900',
     letterSpacing: 1.4,
   },
   weaveProgressRank: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '800',
     textAlign: 'center',
     marginTop: 2,
   },
   weaveProgressLine: {
     fontFamily: BODY_FONT_ITALIC,
-    fontSize: 11.5,
+    fontSize: FONT_SIZE.caption,
     lineHeight: 16,
     textAlign: 'center',
     marginTop: 3,
   },
   socialProofLine: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 12.5,
+    fontSize: FONT_SIZE.small,
     fontWeight: '600',
     fontStyle: 'italic',
     textAlign: 'center',
@@ -1768,7 +1769,7 @@ const styles = StyleSheet.create({
   },
   receiptLine: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '700',
     textAlign: 'center',
     marginTop: 6,
@@ -1780,7 +1781,7 @@ const styles = StyleSheet.create({
   },
   rewardedDoubleConfirm: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '700',
     textAlign: 'center',
     marginTop: 10,
@@ -1802,14 +1803,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(150, 90, 60, 0.18)',
     borderColor: 'rgba(180, 110, 70, 0.4)',
   },
-  freeDoubleText: { fontFamily: PIXEL_FONT_BOLD, fontSize: 13.5, fontWeight: '800' },
+  freeDoubleText: { fontFamily: PIXEL_FONT_BOLD, fontSize: FONT_SIZE.body, fontWeight: '800' },
   // Deep antique gold — 5.8:1 on the pale gold pill over light stat cards
   // (the old #FFD479 measured ~1.3:1, gold-on-cream)
   freeDoubleTextLight: { color: '#755A00' },
   freeDoubleTextDark: { color: '#E0B080' }, // 7.3:1 on the dark pill
   victoryFeedback: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '600',
     marginBottom: 10,
     textAlign: 'center',
@@ -1828,14 +1829,14 @@ const styles = StyleSheet.create({
   },
   earlyVictoryLabel: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: 6,
   },
   earlyVictoryValue: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 28,
+    fontSize: FONT_SIZE.hero,
     fontWeight: '900',
     textAlign: 'center',
     marginBottom: 2,
@@ -1849,13 +1850,13 @@ const styles = StyleSheet.create({
   },
   bonusLabel: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '600',
     color: CandyColors.gray[500],
   },
   bonusValue: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '800',
     color: CandyColors.purple.main,
   },
@@ -1877,13 +1878,13 @@ const styles = StyleSheet.create({
   },
   cumulativeStatValue: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 18,
+    fontSize: FONT_SIZE.title,
     fontWeight: '800',
     color: CandyColors.purple.main,
   },
   cumulativeStatLabel: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 10,
+    fontSize: FONT_SIZE.micro,
     fontWeight: '600',
     color: CandyColors.gray[400],
     marginTop: 2,
@@ -1968,7 +1969,7 @@ const styles = StyleSheet.create({
   btn3dSecondaryText: {
     fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '900',
     letterSpacing: 1,
     textShadowColor: 'rgba(0, 0, 0, 0.25)',
@@ -1979,7 +1980,7 @@ const styles = StyleSheet.create({
   // Pit phase transition hint
   pitHintText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '700',
     fontStyle: 'italic',
     textAlign: 'center',
@@ -1990,7 +1991,7 @@ const styles = StyleSheet.create({
   // Mandatory pit text (shown when phase transition pending)
   pitMandatoryText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '700',
     fontStyle: 'italic',
     textAlign: 'center',
@@ -2003,7 +2004,7 @@ const styles = StyleSheet.create({
   // because it's a first-time teaching beat that reads as Fox/house speaking.
   mandatoryHarvestText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13.5,
+    fontSize: FONT_SIZE.body,
     fontWeight: '700',
     textAlign: 'center',
     lineHeight: 19,
@@ -2015,7 +2016,7 @@ const styles = StyleSheet.create({
   // Lore caption under the amber total while the pit auto-collects early rewards
   autoCollectCaption: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 11.5,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '600',
     fontStyle: 'italic',
     textAlign: 'center',
@@ -2034,7 +2035,7 @@ const styles = StyleSheet.create({
   },
   btnFlatUniform: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '700',
   },
   // Share button content row — keeps "📤 Share" + gem + "+N" on one centered
@@ -2065,7 +2066,7 @@ const styles = StyleSheet.create({
   },
   collectNowText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '800',
     textAlign: 'center',
   },
@@ -2094,17 +2095,17 @@ const styles = StyleSheet.create({
   },
   harvestWordIcon: {
     fontFamily: BODY_FONT,
-    fontSize: 22,
+    fontSize: FONT_SIZE.headline,
     marginRight: 8,
   },
   harvestWordText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     fontWeight: '900',
   },
   harvestBonusHint: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '600',
     textAlign: 'center',
     marginBottom: 8,
@@ -2127,7 +2128,7 @@ const styles = StyleSheet.create({
   },
   winStreakEmoji: {
     fontFamily: BODY_FONT,
-    fontSize: 20,
+    fontSize: FONT_SIZE.headline,
     marginRight: 6,
   },
   winStreakIcon: {
@@ -2137,7 +2138,7 @@ const styles = StyleSheet.create({
   },
   winStreakText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '800',
   },
   milestoneContainer: {
@@ -2159,12 +2160,12 @@ const styles = StyleSheet.create({
   },
   milestoneEmoji: {
     fontFamily: BODY_FONT,
-    fontSize: 28,
+    fontSize: FONT_SIZE.hero,
     marginBottom: 4,
   },
   milestoneMessage: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     fontWeight: '800',
     // Deep amber-brown — 6.6:1 on the yellow.light chip (yellow.dark was 1.5:1)
     color: '#713F12',
@@ -2190,11 +2191,11 @@ const styles = StyleSheet.create({
   },
   questBadgeIcon: {
     fontFamily: BODY_FONT,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
   },
   questBadgeText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '600',
   },
   completionCodaContainer: {
@@ -2212,7 +2213,7 @@ const styles = StyleSheet.create({
   },
   completionCodaTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '900',
     color: CandyColors.blue.dark,
     letterSpacing: 0.5,
@@ -2224,7 +2225,7 @@ const styles = StyleSheet.create({
   },
   completionCodaText: {
     fontFamily: BODY_FONT,
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     lineHeight: 16,
     color: CandyColors.gray[700],
     textAlign: 'center',
@@ -2245,12 +2246,12 @@ const styles = StyleSheet.create({
   // Monochrome diamond glyph that replaces the phase-change color emoji.
   phaseChangeGlyph: {
     fontFamily: BODY_FONT,
-    fontSize: 22,
+    fontSize: FONT_SIZE.headline,
     marginBottom: 8,
   },
   phaseChangeTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     fontWeight: '900',
     color: CandyColors.white,
     marginBottom: 4,
@@ -2258,7 +2259,7 @@ const styles = StyleSheet.create({
   },
   phaseChangeText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '600',
     color: 'rgba(255, 255, 255, 0.92)', // 5.1:1 on purple.dark (0.8 was 4.2:1)
     textAlign: 'center',
@@ -2294,7 +2295,7 @@ const styles = StyleSheet.create({
   },
   ritualEchoHeader: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 10,
+    fontSize: FONT_SIZE.micro,
     fontWeight: '700',
     color: '#655483', // 4.7:1 on the Phase 2 container (gray[400] was 1.8:1)
     letterSpacing: 2,
@@ -2324,7 +2325,7 @@ const styles = StyleSheet.create({
   },
   ritualEchoWord: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '800',
     color: CandyColors.purple.shadow, // 5.5:1 on the word chip (purple.main was 3.3:1)
     backgroundColor: 'rgba(147, 51, 234, 0.1)',
@@ -2344,13 +2345,13 @@ const styles = StyleSheet.create({
   // smaller chip so the whole rite stays legible without dominating the
   // scroll — caps the visual height rather than letting it sprawl.
   ritualEchoWordCompact: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
   ritualEchoArrow: {
     fontFamily: BODY_FONT,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     color: '#655483',
     marginHorizontal: 2,
   },
@@ -2365,7 +2366,7 @@ const styles = StyleSheet.create({
   },
   ritualIncantationName: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '700',
     fontStyle: 'italic',
     color: CandyColors.purple.shadow, // 6.3:1 on the Phase 2 container (purple.dark was 4.0:1)
@@ -2382,7 +2383,7 @@ const styles = StyleSheet.create({
   },
   ritualEchoFooter: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 10,
+    fontSize: FONT_SIZE.micro,
     fontWeight: '600',
     color: '#655483', // 4.7:1 on the Phase 2 container (gray[400] was 1.8:1)
     marginTop: 6,
@@ -2393,7 +2394,7 @@ const styles = StyleSheet.create({
   },
   wordsOfferedText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '600',
     marginBottom: 12,
     textAlign: 'center',

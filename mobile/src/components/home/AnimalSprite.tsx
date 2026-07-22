@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { FONT_SIZE } from '../../theme/typeScale';
 import {
   View,
   Text,
@@ -277,9 +278,9 @@ const SleepingZs: React.FC = () => {
 const sleepStyles = StyleSheet.create({
   container: { position: 'absolute', top: -10, right: -5 },
   z: { fontFamily: PIXEL_FONT_BOLD, position: 'absolute', fontWeight: 'bold', color: CandyColors.purple.main },
-  z1: { fontFamily: PIXEL_FONT_BOLD, fontSize: 10, right: 0 },
-  z2: { fontFamily: PIXEL_FONT_BOLD, fontSize: 12, right: 8, top: -5 },
-  z3: { fontFamily: PIXEL_FONT_BOLD, fontSize: 14, right: 16, top: -12 },
+  z1: { fontFamily: PIXEL_FONT_BOLD, fontSize: FONT_SIZE.micro, right: 0 },
+  z2: { fontFamily: PIXEL_FONT_BOLD, fontSize: FONT_SIZE.small, right: 8, top: -5 },
+  z3: { fontFamily: PIXEL_FONT_BOLD, fontSize: FONT_SIZE.bodyLg, right: 16, top: -12 },
 });
 
 interface AnimalSpriteProps {
@@ -1421,7 +1422,7 @@ const styles = StyleSheet.create({
   },
   emoji: {
     fontFamily: BODY_FONT,
-    fontSize: 38,
+    fontSize: FONT_SIZE.giant,
   },
   spriteImage: {
     width: 90,
@@ -1461,7 +1462,7 @@ const styles = StyleSheet.create({
   notificationText: {
     fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '900',
   },
   nameTag: {
@@ -1477,7 +1478,7 @@ const styles = StyleSheet.create({
   nameText: {
     fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '700',
   },
   moodDot: {
@@ -1510,7 +1511,7 @@ const styles = StyleSheet.create({
   cooldownCountText: {
     fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.gray[300],
-    fontSize: 10,
+    fontSize: FONT_SIZE.micro,
     fontWeight: '600',
     textAlign: 'center',
   },

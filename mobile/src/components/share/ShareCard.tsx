@@ -1,4 +1,5 @@
 import React, { forwardRef } from 'react';
+import { FONT_SIZE } from '../../theme/typeScale';
 import { View, Text, StyleSheet } from 'react-native';
 import { getPhaseTheme } from '../../theme/colors';
 import { PIXEL_FONT_BOLD } from '../../theme/fonts';
@@ -284,26 +285,26 @@ const styles = StyleSheet.create({
   sootBR: { bottom: -28, right: -28 },
   tearLine: { position: 'absolute', top: '17%', left: '9%', right: '31%', height: 2 },
   wordmark: {
-    fontSize: 26,
+    fontSize: FONT_SIZE.display,
     fontWeight: '900',
     fontFamily: PIXEL_FONT_BOLD,
     letterSpacing: 1,
   },
   wordmarkWrap: { position: 'relative', alignItems: 'center', justifyContent: 'center' },
   wordmarkGhost: { position: 'absolute', left: 0, right: 0, top: 0, textAlign: 'center' },
-  tagline: { fontSize: 11.5, fontWeight: '600', fontStyle: 'italic', marginTop: 16, letterSpacing: 0.3, textAlign: 'center', fontFamily: PIXEL_FONT_BOLD },
+  tagline: { fontSize: FONT_SIZE.caption, fontWeight: '600', fontStyle: 'italic', marginTop: 16, letterSpacing: 0.3, textAlign: 'center', fontFamily: PIXEL_FONT_BOLD },
   daily: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '700',
     fontFamily: PIXEL_FONT_BOLD,
     marginTop: 2,
     letterSpacing: 0.5,
   },
   starsRow: { flexDirection: 'row', marginTop: 14, gap: 6 },
-  star: { fontSize: 30, fontWeight: '900', fontFamily: PIXEL_FONT_BOLD },
+  star: { fontSize: FONT_SIZE.hero, fontWeight: '900', fontFamily: PIXEL_FONT_BOLD },
   diffRow: { flexDirection: 'row', alignItems: 'center', marginTop: 10, gap: 7 },
   diffDot: { width: 10, height: 10, borderRadius: 5 },
-  diffText: { fontSize: 14, fontWeight: '800', letterSpacing: 0.5, fontFamily: PIXEL_FONT_BOLD },
+  diffText: { fontSize: FONT_SIZE.bodyLg, fontWeight: '800', letterSpacing: 0.5, fontFamily: PIXEL_FONT_BOLD },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -313,9 +314,9 @@ const styles = StyleSheet.create({
     maxWidth: CARD_WIDTH - 56,
   },
   square: { width: 22, height: 22, borderRadius: 5 },
-  badge: { fontSize: 13, fontWeight: '800', marginTop: 14, fontFamily: PIXEL_FONT_BOLD },
-  chain: { fontSize: 13, fontWeight: '700', marginTop: 14, textAlign: 'center', letterSpacing: 0.5, fontFamily: PIXEL_FONT_BOLD },
-  incantation: { fontSize: 12.5, fontWeight: '600', fontStyle: 'italic', marginTop: 6, textAlign: 'center', fontFamily: PIXEL_FONT_BOLD },
+  badge: { fontSize: FONT_SIZE.body, fontWeight: '800', marginTop: 14, fontFamily: PIXEL_FONT_BOLD },
+  chain: { fontSize: FONT_SIZE.body, fontWeight: '700', marginTop: 14, textAlign: 'center', letterSpacing: 0.5, fontFamily: PIXEL_FONT_BOLD },
+  incantation: { fontSize: FONT_SIZE.small, fontWeight: '600', fontStyle: 'italic', marginTop: 6, textAlign: 'center', fontFamily: PIXEL_FONT_BOLD },
   footer: {
     marginTop: 18,
     paddingTop: 12,
@@ -323,8 +324,8 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
   },
-  footerText: { fontSize: 12.5, fontWeight: '700', letterSpacing: 0.3, fontFamily: PIXEL_FONT_BOLD },
-  footerUrl: { fontSize: 10.5, fontWeight: '700', letterSpacing: 0.2, marginTop: 3, fontFamily: PIXEL_FONT_BOLD },
+  footerText: { fontSize: FONT_SIZE.small, fontWeight: '700', letterSpacing: 0.3, fontFamily: PIXEL_FONT_BOLD },
+  footerUrl: { fontSize: FONT_SIZE.micro, fontWeight: '700', letterSpacing: 0.2, marginTop: 3, fontFamily: PIXEL_FONT_BOLD },
 });
 
 export { CARD_WIDTH };

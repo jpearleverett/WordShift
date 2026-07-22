@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { FONT_SIZE } from '../theme/typeScale';
 import { View, Text, StyleSheet, Animated, Dimensions, TouchableOpacity, Image } from 'react-native';
 import { PhaseTransitionEvent, PhaseScene, SceneImage, CinematicParticleConfig } from '../services/phaseEvents';
 import { getSettingsSync } from '../services/settings';
@@ -819,7 +820,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: BODY_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '800',
     letterSpacing: 3,
     textTransform: 'uppercase',
@@ -844,7 +845,7 @@ const styles = StyleSheet.create({
   },
   sceneText: {
     fontFamily: BODY_FONT_BOLD,
-    fontSize: 20,
+    fontSize: FONT_SIZE.headline,
     fontWeight: '600',
     textAlign: 'center',
     lineHeight: 30,
@@ -874,7 +875,7 @@ const styles = StyleSheet.create({
   },
   skipText: {
     fontFamily: BODY_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '600',
   },
   flash: {

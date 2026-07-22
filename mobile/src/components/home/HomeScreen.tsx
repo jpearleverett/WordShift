@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { FONT_SIZE } from '../../theme/typeScale';
 import {
   View,
   Text,
@@ -3887,7 +3888,7 @@ const styles = StyleSheet.create({
   },
   loadingEmoji: {
     fontFamily: BODY_FONT,
-    fontSize: 34,
+    fontSize: FONT_SIZE.hero,
   },
   // The home loading mascot: the generated house sprite (assets/ui/home.png),
   // replacing the raw 🏡 emoji so the boot/loading chrome stays in-world.
@@ -3898,14 +3899,14 @@ const styles = StyleSheet.create({
   loadingText: {
     fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
-    fontSize: 18,
+    fontSize: FONT_SIZE.title,
     fontWeight: '700',
   },
   loadingSubtext: {
     fontFamily: PIXEL_FONT_BOLD,
     marginTop: 6,
     color: 'rgba(255,255,255,0.8)',
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '600',
     letterSpacing: 0.2,
   },
@@ -3957,12 +3958,12 @@ const styles = StyleSheet.create({
   },
   amberEmoji: {
     fontFamily: BODY_FONT,
-    fontSize: 20,
+    fontSize: FONT_SIZE.headline,
   },
   amberCount: {
     fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     fontWeight: '800',
     flexShrink: 1,
   },
@@ -3983,11 +3984,11 @@ const styles = StyleSheet.create({
   },
   streakBadgeEmoji: {
     fontFamily: BODY_FONT,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
   },
   streakBadgeCount: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '700',
     color: '#FF8C00',
   },
@@ -4021,7 +4022,7 @@ const styles = StyleSheet.create({
   questPillText: {
     fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '800',
     marginLeft: 4,
   },
@@ -4040,12 +4041,12 @@ const styles = StyleSheet.create({
   headerBadgeText: {
     fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
-    fontSize: 10,
+    fontSize: FONT_SIZE.micro,
     fontWeight: '800',
   },
   headerIconText: {
     fontFamily: BODY_FONT,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
   },
   headerIconImage: {
     width: 25,
@@ -4117,7 +4118,7 @@ const styles = StyleSheet.create({
   playButtonText: {
     fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
-    fontSize: 17,
+    fontSize: FONT_SIZE.large,
     fontWeight: '900',
     letterSpacing: 2.5,
     textShadowColor: 'rgba(0, 0, 0, 0.25)',
@@ -4140,7 +4141,7 @@ const styles = StyleSheet.create({
   },
   wordsOfferedHomeText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '600',
     color: 'rgba(255, 255, 255, 0.6)',
     letterSpacing: 0.5,
@@ -4175,14 +4176,14 @@ const styles = StyleSheet.create({
   },
   unlockProgressLabel: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 12.5,
+    fontSize: FONT_SIZE.small,
     fontWeight: '800',
     letterSpacing: 0.5,
     flex: 1,
   },
   unlockProgressText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 11.5,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '800',
     letterSpacing: 0.3,
   },
@@ -4276,7 +4277,7 @@ const styles = StyleSheet.create({
   // Portrait nameplate: sits under the sprite, centered in the alcove.
   dialogueAnimalName: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '900',
     letterSpacing: 0.5,
     textAlign: 'center',
@@ -4303,7 +4304,7 @@ const styles = StyleSheet.create({
   },
   dialogueText: {
     fontFamily: BODY_FONT,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     lineHeight: 25,
     letterSpacing: 0.2,
   },
@@ -4319,7 +4320,7 @@ const styles = StyleSheet.create({
   },
   nextFriendButtonText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '800',
   },
   dialogueFooter: {
@@ -4329,7 +4330,7 @@ const styles = StyleSheet.create({
   },
   continueButtonText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     fontWeight: '800',
   },
 
@@ -4360,7 +4361,7 @@ const styles = StyleSheet.create({
   },
   shopTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 24,
+    fontSize: FONT_SIZE.display,
     fontWeight: '900',
     letterSpacing: 0.5,
     textAlign: 'center',
@@ -4368,13 +4369,13 @@ const styles = StyleSheet.create({
   },
   shopSubtitle: {
     fontFamily: BODY_FONT,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     textAlign: 'center',
     marginBottom: 24,
   },
   shopFeedbackText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: 12,
@@ -4399,7 +4400,7 @@ const styles = StyleSheet.create({
   },
   hubRowText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '800',
     letterSpacing: 0.2,
   },
@@ -4408,7 +4409,7 @@ const styles = StyleSheet.create({
   },
   nextUnlockLabel: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '700',
     letterSpacing: SURFACE.sectionLetterSpacing,
     marginBottom: 12,
@@ -4440,13 +4441,13 @@ const styles = StyleSheet.create({
   },
   reservedChipText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '800',
     letterSpacing: 0.4,
   },
   reservedChipSubtext: {
     fontFamily: BODY_FONT,
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     marginTop: 2,
     textAlign: 'center',
   },
@@ -4477,7 +4478,7 @@ const styles = StyleSheet.create({
   },
   bevelBtnText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '800',
     letterSpacing: 0.4,
     textAlign: 'center',
@@ -4514,12 +4515,12 @@ const styles = StyleSheet.create({
   },
   questTabText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '700' as const,
   },
   questTabTimer: {
     fontFamily: BODY_FONT,
-    fontSize: 10,
+    fontSize: FONT_SIZE.micro,
     marginTop: 2,
   },
   // Real quest progress bar: tinted track + amber fill
@@ -4551,23 +4552,23 @@ const styles = StyleSheet.create({
   },
   unlockName: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     fontWeight: '800',
   },
   unlockDescription: {
     fontFamily: BODY_FONT,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     marginTop: 2,
   },
   unlockCost: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '700',
     marginTop: 6,
   },
   questProgressText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '700',
     marginTop: 6,
   },
@@ -4580,25 +4581,25 @@ const styles = StyleSheet.create({
   },
   questSectionTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '800',
     letterSpacing: 0.3,
   },
   questSectionTimer: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '600',
   },
   unlockBlockedText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '600',
     marginTop: 4,
     fontStyle: 'italic',
   },
   allUnlockedText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     textAlign: 'center',
     fontWeight: '700',
     marginBottom: 24,
@@ -4616,7 +4617,7 @@ const styles = StyleSheet.create({
   },
   lockBadgeEmoji: {
     fontFamily: BODY_FONT,
-    fontSize: 24,
+    fontSize: FONT_SIZE.display,
   },
   lockBadgeIcon: {
     width: 26,
@@ -4624,14 +4625,14 @@ const styles = StyleSheet.create({
   },
   lockedRoomName: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 18,
+    fontSize: FONT_SIZE.title,
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: 8,
   },
   amberBalance: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 18,
+    fontSize: FONT_SIZE.title,
     fontWeight: '700',
     textAlign: 'center',
     marginTop: 16,
@@ -4657,7 +4658,7 @@ const styles = StyleSheet.create({
   cooldownToastText: {
     fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '700',
     textAlign: 'center',
   },
@@ -4702,7 +4703,7 @@ const styles = StyleSheet.create({
   },
   inviteText: {
     fontFamily: BODY_FONT,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: 12,
@@ -4714,7 +4715,7 @@ const styles = StyleSheet.create({
   },
   inviteCost: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     fontWeight: '700',
     marginTop: 12,
   },
@@ -4725,7 +4726,7 @@ const styles = StyleSheet.create({
   // Intro dialogue progress text (inline in footer)
   introProgressInline: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '600',
     marginRight: 12,
   },
@@ -4737,7 +4738,7 @@ const styles = StyleSheet.create({
   },
   introDialogueProgress: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '600',
   },
   // Dialogue choice buttons (Phase 3)
@@ -4757,7 +4758,7 @@ const styles = StyleSheet.create({
   },
   dialogueChoiceBtnText: {
     fontFamily: BODY_FONT,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '700',
     textAlign: 'center',
   },
@@ -4795,7 +4796,7 @@ const styles = StyleSheet.create({
   },
   actionRowButtonText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '700',
     color: 'rgba(255, 255, 255, 0.9)',
   },
@@ -4811,7 +4812,7 @@ const styles = StyleSheet.create({
   ambientLineText: {
     fontFamily: PIXEL_FONT_BOLD,
     color: '#FBF0D9',
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '600',
     fontStyle: 'italic',
     textAlign: 'center',
@@ -4835,7 +4836,7 @@ const styles = StyleSheet.create({
   reservedArrivalText: {
     fontFamily: PIXEL_FONT_BOLD,
     color: '#FBF0D9',
-    fontSize: 18,
+    fontSize: FONT_SIZE.title,
     fontWeight: '700',
     fontStyle: 'italic',
     textAlign: 'center',
@@ -4883,14 +4884,14 @@ const styles = StyleSheet.create({
   },
   sacrificeTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 20,
+    fontSize: FONT_SIZE.headline,
     fontWeight: '900',
     textAlign: 'center',
     marginBottom: 8,
   },
   sacrificeSubtitle: {
     fontFamily: BODY_FONT,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 16,
@@ -4898,7 +4899,7 @@ const styles = StyleSheet.create({
   },
   sacrificeBalance: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     fontWeight: '700',
     marginBottom: 16,
   },
@@ -4922,12 +4923,12 @@ const styles = StyleSheet.create({
   },
   sacrificeAmountText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '800',
   },
   sacrificeNoAmber: {
     fontFamily: BODY_FONT_ITALIC,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     textAlign: 'center',
     fontStyle: 'italic',
   },
@@ -4941,7 +4942,7 @@ const styles = StyleSheet.create({
   },
   sacrificeResponseText: {
     fontFamily: BODY_FONT_ITALIC,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     lineHeight: 22,
     textAlign: 'center',
     fontStyle: 'italic',
@@ -4957,14 +4958,14 @@ const styles = StyleSheet.create({
   },
   offeringTierTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '900',
     letterSpacing: 0.5,
     textAlign: 'center',
   },
   offeringTierRegard: {
     fontFamily: BODY_FONT_ITALIC,
-    fontSize: 12.5,
+    fontSize: FONT_SIZE.small,
     fontStyle: 'italic',
     textAlign: 'center',
     marginTop: 2,
@@ -4972,13 +4973,13 @@ const styles = StyleSheet.create({
   },
   offeringHolds: {
     fontFamily: BODY_FONT,
-    fontSize: 12.5,
+    fontSize: FONT_SIZE.small,
     textAlign: 'center',
     lineHeight: 18,
   },
   offeringTierUp: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13.5,
+    fontSize: FONT_SIZE.body,
     fontWeight: '800',
     textAlign: 'center',
     marginBottom: 8,
@@ -4994,7 +4995,7 @@ const styles = StyleSheet.create({
   },
   offeringEverythingText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '800',
     textAlign: 'center',
   },
@@ -5026,7 +5027,7 @@ const styles = StyleSheet.create({
   },
   houseCompletionTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 22,
+    fontSize: FONT_SIZE.headline,
     fontWeight: '900',
     textAlign: 'center',
     marginBottom: 20,
@@ -5034,7 +5035,7 @@ const styles = StyleSheet.create({
   },
   houseCompletionText: {
     fontFamily: BODY_FONT,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: 24,
@@ -5075,7 +5076,7 @@ const styles = StyleSheet.create({
   },
   journalSpotlightPointerText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '700',
     lineHeight: 17,
   },
@@ -5117,33 +5118,33 @@ const styles = StyleSheet.create({
   },
   journalSpotlightHeroBadgeText: {
     fontFamily: BODY_FONT,
-    fontSize: 28,
+    fontSize: FONT_SIZE.hero,
   },
   journalSpotlightHeroText: {
     flex: 1,
   },
   journalSpotlightEyebrow: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '800',
     letterSpacing: 1,
     marginBottom: 4,
   },
   journalSpotlightTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 22,
+    fontSize: FONT_SIZE.headline,
     fontWeight: '900',
     letterSpacing: 0.3,
   },
   journalSpotlightSubtitle: {
     fontFamily: BODY_FONT,
     marginTop: 4,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     lineHeight: 18,
   },
   journalSpotlightCounter: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '700',
     alignSelf: 'flex-start',
     marginTop: 2,
@@ -5171,19 +5172,19 @@ const styles = StyleSheet.create({
   },
   journalSpotlightCardIcon: {
     fontFamily: BODY_FONT,
-    fontSize: 18,
+    fontSize: FONT_SIZE.title,
     marginBottom: 8,
   },
   journalSpotlightCardTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '800',
     lineHeight: 17,
   },
   journalSpotlightCardIndex: {
     fontFamily: PIXEL_FONT_BOLD,
     marginTop: 6,
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '600',
   },
   journalSpotlightDialogueRow: {
@@ -5212,7 +5213,7 @@ const styles = StyleSheet.create({
   // Portrait nameplate below the framed portrait, centered in the alcove.
   journalSpotlightSpeaker: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '900',
     letterSpacing: 0.5,
     textAlign: 'center',

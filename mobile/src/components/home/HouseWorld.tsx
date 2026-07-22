@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
+import { FONT_SIZE } from '../../theme/typeScale';
 import {
   View,
   StyleSheet,
@@ -2414,7 +2415,7 @@ const styles = StyleSheet.create({
   },
   emptyHouseSubtext: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     color: CandyColors.white,
     fontWeight: '700',
   },

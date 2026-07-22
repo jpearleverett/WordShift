@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { FONT_SIZE } from '../theme/typeScale';
 import {
   View,
   Text,
@@ -2953,7 +2954,7 @@ const styles = StyleSheet.create({
   amberCount: {
     fontFamily: PIXEL_FONT_BOLD,
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     fontWeight: '800',
   },
   pendingBadge: {
@@ -2964,7 +2965,7 @@ const styles = StyleSheet.create({
   },
   pendingBadgeText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '700',
     color: '#FFBF00',
   },
@@ -2983,7 +2984,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerIconText: {
-    fontFamily: BODY_FONT, fontSize: 16 },
+    fontFamily: BODY_FONT, fontSize: FONT_SIZE.large },
   headerIconImage: {
     width: 22,
     height: 22,
@@ -3003,7 +3004,7 @@ const styles = StyleSheet.create({
   },
   utilityTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 24,
+    fontSize: FONT_SIZE.display,
     fontWeight: '900',
     textAlign: 'center',
     marginBottom: 16,
@@ -3028,7 +3029,7 @@ const styles = StyleSheet.create({
   },
   utilityButtonText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '800',
   },
   // ---- Tending Shrine modal ----
@@ -3039,14 +3040,14 @@ const styles = StyleSheet.create({
   },
   tendingTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 24,
+    fontSize: FONT_SIZE.display,
     fontWeight: '900',
     textAlign: 'center',
     letterSpacing: 0.5,
   },
   tendingDepth: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '800',
     textAlign: 'center',
     marginTop: 4,
@@ -3054,7 +3055,7 @@ const styles = StyleSheet.create({
   },
   tendingSubtitle: {
     fontFamily: BODY_FONT,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '500',
     textAlign: 'center',
     lineHeight: 22,
@@ -3069,18 +3070,18 @@ const styles = StyleSheet.create({
   },
   tendingCostText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 22,
+    fontSize: FONT_SIZE.headline,
     fontWeight: '900',
   },
   tendingCostStrike: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '700',
     textDecorationLine: 'line-through',
   },
   tendingBonusHint: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 12.5,
+    fontSize: FONT_SIZE.small,
     fontWeight: '600',
     textAlign: 'center',
     marginTop: 6,
@@ -3099,13 +3100,13 @@ const styles = StyleSheet.create({
   },
   tendingButtonText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 17,
+    fontSize: FONT_SIZE.large,
     fontWeight: '900',
     letterSpacing: 0.5,
   },
   tendingInsufficient: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 12.5,
+    fontSize: FONT_SIZE.small,
     fontWeight: '600',
     textAlign: 'center',
     marginTop: 12,
@@ -3123,7 +3124,7 @@ const styles = StyleSheet.create({
   emptyText: {
     fontFamily: PIXEL_FONT_BOLD,
     color: '#FBF0D9',
-    fontSize: 17, fontWeight: '700',
+    fontSize: FONT_SIZE.large, fontWeight: '700',
     textAlign: 'center', lineHeight: 26,
     letterSpacing: 0.3,
     textShadowColor: 'rgba(20, 10, 6, 0.9)',
@@ -3138,7 +3139,7 @@ const styles = StyleSheet.create({
   },
   overflowText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 12, fontWeight: '700', fontStyle: 'italic',
+    fontSize: FONT_SIZE.small, fontWeight: '700', fontStyle: 'italic',
     textShadowColor: 'rgba(0,0,0,0.4)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
@@ -3155,7 +3156,7 @@ const styles = StyleSheet.create({
   resultToastText: {
     fontFamily: PIXEL_FONT_BOLD,
     color: '#FFFFFF',
-    fontSize: 14, fontWeight: '700', textAlign: 'center',
+    fontSize: FONT_SIZE.bodyLg, fontWeight: '700', textAlign: 'center',
   },
   // ---- Bottom panel ----
   bottomPanel: {
@@ -3180,12 +3181,12 @@ const styles = StyleSheet.create({
   summaryItem: { flex: 1, alignItems: 'center' },
   summaryValue: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 18, fontWeight: '900',
+    fontSize: FONT_SIZE.title, fontWeight: '900',
     letterSpacing: 0.3,
   },
   summaryLabel: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 10.5, fontWeight: '700', marginTop: 2, textAlign: 'center',
+    fontSize: FONT_SIZE.micro, fontWeight: '700', marginTop: 2, textAlign: 'center',
     letterSpacing: 0.4,
   },
   summaryDivider: { width: 1.5, height: 28 },
@@ -3209,7 +3210,7 @@ const styles = StyleSheet.create({
   },
   harvestAllText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 16, fontWeight: '900', letterSpacing: 1, textAlign: 'center',
+    fontSize: FONT_SIZE.large, fontWeight: '900', letterSpacing: 1, textAlign: 'center',
   },
   // ---- Ward mark & ceremony ----
   wardHintContainer: {
@@ -3246,7 +3247,7 @@ const styles = StyleSheet.create({
   },
   ceremonyText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 20,
+    fontSize: FONT_SIZE.headline,
     fontWeight: '800',
     textAlign: 'center',
     paddingHorizontal: 30,

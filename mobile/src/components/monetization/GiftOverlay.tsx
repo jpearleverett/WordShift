@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef } from 'react';
+import { FONT_SIZE } from '../../theme/typeScale';
 import {
   View,
   Text,
@@ -226,14 +227,14 @@ const styles = StyleSheet.create({
     borderRadius: 100,
   },
   eyebrow: {
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '800',
     fontFamily: PIXEL_FONT_BOLD,
     letterSpacing: 3,
     textAlign: 'center',
   },
   title: {
-    fontSize: 25,
+    fontSize: FONT_SIZE.display,
     fontWeight: '900',
     fontFamily: PIXEL_FONT_BOLD,
     letterSpacing: 0.4,
@@ -241,7 +242,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   subtitle: {
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '600',
     fontFamily: BODY_FONT,
     textAlign: 'center',
