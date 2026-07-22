@@ -98,6 +98,7 @@ import {
   getHarvestHomeIntroLines,
   getHarvestNudgeLine,
   getUnbrokenWeaveIntroLines,
+  getReservedBuiltItselfLine,
 } from '../../services/phaseNarrative';
 import {
   ROOMS,
@@ -167,7 +168,7 @@ import { DailyChallengeCard } from '../DailyChallengeCard';
 import { isDailyChallengeUnlocked, getDailyStatus } from '../../services/dailyChallenge';
 import { areUpgradesAvailable, getPurchasedUpgrades, getDeepenedRooms, getAttunedRooms } from '../../services/roomUpgrades';
 import { getTendingLevel } from '../../services/tending';
-import { hapticLight, hapticSelection, hapticMedium, hapticHeavy } from '../../services/haptics';
+import { hapticLight, hapticSelection, hapticMedium, hapticHeavy, hapticSuccess } from '../../services/haptics';
 import { playUiSound, type UiSoundKind } from '../../services/uiSound';
 import { playUiHaptic } from '../../services/uiHaptic';
 import { logEvent } from '../../services/eventLogger';
@@ -565,8 +566,26 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const introDialogueSlide = useRef(new Animated.Value(0)).current;
   const [highlightPlayButton, setHighlightPlayButton] = useState(false);
 
+  // Header amber count-up: the pill's number CLIMBS to its new total (rAF, JS
+  // thread) and the gem pops scaled to the size of the gain instead of a
+  // magnitude-blind fixed pop. Snaps (no climb/pop) on the first read, on a
+  // spend (decrease), and under reduced motion / low-tier devices.
+  const [displayAmber, setDisplayAmber] = useState(0);
+  const displayAmberRef = useRef(0);
+  const amberInitedRef = useRef(false);
+  const amberCountRafRef = useRef(0);
+
   // Celebration state
   const [showCelebration, setShowCelebration] = useState(false);
+  // A reserved room that finished its own wait gets a bespoke in-world arrival
+  // line (fades in over the world with the celebration confetti, cleared when
+  // the confetti completes).
+  const [reservedArrivalLine, setReservedArrivalLine] = useState<string | null>(null);
+  const reservedArrivalOpacity = useRef(new Animated.Value(0)).current;
+  // Quest-card cash-out: the just-claimed card pops + settles (native driver,
+  // reduced-motion aware) so the reward visibly leaves the card.
+  const [claimedFlashId, setClaimedFlashId] = useState<string | null>(null);
+  const questCashOut = useRef(new Animated.Value(1)).current;
 
   // House completion ceremony state
   const [showHouseCompletion, setShowHouseCompletion] = useState(false);
@@ -681,6 +700,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     ]);
 
     if (claimed) {
+      // Distinct arrival for a reserved room that finished its own wait: a
+      // success haptic, a bespoke in-world line, and the phase-aware celebration
+      // confetti (never the silent generic pop).
+      hapticSuccess();
+      setReservedArrivalLine(getReservedBuiltItselfLine(progressData.currentPhase));
+      const reducedArrival = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
+      reservedArrivalOpacity.setValue(reducedArrival ? 1 : 0);
+      if (!reducedArrival) {
+        Animated.timing(reservedArrivalOpacity, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }).start();
+      }
       setShowCelebration(true);
     }
 
@@ -1463,29 +1496,71 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     }
   }, [showIntroDialogue, introDialogueSlide]);
 
-  // Animate amber when it changes
+  // Count the header amber up to its new total and pop the gem, scaling the pop
+  // to the SIZE of the gain (a small win taps, a windfall bursts) instead of a
+  // fixed magnitude-blind 1.2. The number ticks on the JS thread (rAF), the gem
+  // scales on the native driver. Snaps (no climb/pop) on the first read, on a
+  // spend, and under reduced motion / low-tier devices.
   useEffect(() => {
-    if (progress) {
-      // Reduced motion: no pop (mirrors the playPulse effect below).
-      if (getSettingsSync().reducedMotion) {
-        amberPulse.setValue(1);
-        return;
-      }
-      // The currency's excitement cools with the house: a smaller pop at Phase 4+.
-      const peak = progress.currentPhase >= 4 ? 1.12 : 1.2;
-      Animated.sequence([
-        Animated.timing(amberPulse, {
-          toValue: peak,
-          duration: 150,
-          useNativeDriver: true,
-        }),
-        Animated.timing(amberPulse, {
-          toValue: 1,
-          duration: 150,
-          useNativeDriver: true,
-        }),
-      ]).start();
+    if (!progress) return;
+    const to = progress.amber;
+    const from = displayAmberRef.current;
+    const reduced = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
+
+    if (amberCountRafRef.current) {
+      cancelAnimationFrame(amberCountRafRef.current);
+      amberCountRafRef.current = 0;
     }
+
+    // First read, a spend, or reduced motion: snap the number, hold the gem.
+    if (!amberInitedRef.current || reduced || to <= from) {
+      amberInitedRef.current = true;
+      displayAmberRef.current = to;
+      setDisplayAmber(to);
+      amberPulse.setValue(1);
+      return;
+    }
+
+    const gain = to - from;
+
+    // Count-up (rAF, JS thread) using the shared RewardReveal tick math.
+    const duration = getCountUpDurationMs(gain, progress.currentPhase);
+    if (duration <= 0) {
+      displayAmberRef.current = to;
+      setDisplayAmber(to);
+    } else {
+      const startedAt = Date.now();
+      const tick = () => {
+        const f = Math.min(1, (Date.now() - startedAt) / duration);
+        const v = countUpDisplayValue(f, to, from);
+        displayAmberRef.current = v;
+        setDisplayAmber(v);
+        if (f < 1) {
+          amberCountRafRef.current = requestAnimationFrame(tick);
+        } else {
+          amberCountRafRef.current = 0;
+        }
+      };
+      amberCountRafRef.current = requestAnimationFrame(tick);
+    }
+
+    // Pop the gem, scaled to the gain. The currency's excitement still cools
+    // with the house (a smaller ceiling at Phase 4+).
+    const basePeakDelta = progress.currentPhase >= 4 ? 0.12 : 0.2;
+    const magnitude = Math.min(1, Math.max(0.25, gain / 60));
+    const peak = 1 + basePeakDelta * magnitude;
+    amberPulse.setValue(1);
+    Animated.sequence([
+      Animated.timing(amberPulse, { toValue: peak, duration: 150, useNativeDriver: true }),
+      Animated.timing(amberPulse, { toValue: 1, duration: 150, useNativeDriver: true }),
+    ]).start();
+
+    return () => {
+      if (amberCountRafRef.current) {
+        cancelAnimationFrame(amberCountRafRef.current);
+        amberCountRafRef.current = 0;
+      }
+    };
   }, [progress?.amber]);
 
   // Highlight pulse for the PLAY button when Fox nudges the player onward.
@@ -1613,6 +1688,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setShowQuestModal(true);
   }, [progress, animals]);
 
+  // Cash out the just-claimed quest card: a native-driver scale pop that settles
+  // so the reward visibly leaves the card (reduced-motion / low-tier pins it).
+  const runQuestCashOut = useCallback((questId: string) => {
+    setClaimedFlashId(questId);
+    if (getSettingsSync().reducedMotion || shouldSimplifyAnimations()) {
+      questCashOut.setValue(1);
+      setClaimedFlashId(null);
+      return;
+    }
+    questCashOut.setValue(1);
+    Animated.sequence([
+      Animated.timing(questCashOut, { toValue: 1.06, duration: 150, useNativeDriver: true }),
+      Animated.spring(questCashOut, { toValue: 1, friction: 5, tension: 140, useNativeDriver: true }),
+    ]).start(() => setClaimedFlashId(null));
+  }, [questCashOut]);
+
   const handleClaimQuest = useCallback(async (questId: string) => {
     if (!progress) return;
     const reward = await claimQuestReward(questId, progress.currentPhase);
@@ -1642,7 +1733,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       daily: { ...refreshed.daily, quests: refreshed.daily.quests.map(q => ({ ...q })) },
       weekly: { ...refreshed.weekly, quests: refreshed.weekly.quests.map(q => ({ ...q })) },
     });
-  }, [progress, onAmberChange, animals]);
+    // A claim is a payoff: buzz it and cash the just-claimed card out (the
+    // header amber pill has already begun counting the reward up).
+    hapticSuccess();
+    runQuestCashOut(questId);
+  }, [progress, onAmberChange, animals, runQuestCashOut]);
 
   // Opt-in "double your quest reward" — fired only when the player watched the
   // full rewarded ad (RewardedAdButton onReward). Grants a second helping of the
@@ -1824,7 +1919,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <Animated.View style={{ transform: [{ scale: amberPulse }] }}>
                   <Image source={AMBER_ICON} style={styles.amberIconImage} />
                 </Animated.View>
-                <Text style={styles.amberCount} numberOfLines={1}>{progress.amber}</Text>
+                <Text style={styles.amberCount} numberOfLines={1}>
+                  {amberInitedRef.current ? displayAmber : progress.amber}
+                </Text>
                 {!isOnboarding && <AmberSparkle phase={progress.currentPhase} />}
               </View>
             </TouchableOpacity>
@@ -2006,9 +2103,24 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
         </View>
 
-        {/* Celebration Confetti */}
+        {/* Celebration Confetti — and, for a reserved-room arrival, its bespoke
+            in-world line (fades in over the world, cleared with the confetti). */}
+        {showCelebration && reservedArrivalLine && (
+          <Animated.View
+            style={[styles.reservedArrivalBanner, { opacity: reservedArrivalOpacity }]}
+            pointerEvents="none"
+          >
+            <Text style={styles.reservedArrivalText}>{reservedArrivalLine}</Text>
+          </Animated.View>
+        )}
         {showCelebration && (
-          <CelebrationConfetti phase={progress.currentPhase} onComplete={() => setShowCelebration(false)} />
+          <CelebrationConfetti
+            phase={progress.currentPhase}
+            onComplete={() => {
+              setShowCelebration(false);
+              setReservedArrivalLine(null);
+            }}
+          />
         )}
       </View>
 
@@ -2812,8 +2924,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   ? 100
                   : Math.max(0, Math.min(100, Math.round((quest.progress / Math.max(1, quest.target)) * 100)));
                 return (
-                  <PanelCard
+                  <Animated.View
                     key={quest.id}
+                    style={quest.id === claimedFlashId ? { transform: [{ scale: questCashOut }] } : null}
+                  >
+                  <PanelCard
                     phase={progress.currentPhase}
                 hostDark={dtHostDark}
                     kind="card"
@@ -2861,6 +2976,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       }
                     />
                   </PanelCard>
+                  </Animated.View>
                 );
               })}
             </ScrollView>
@@ -4666,6 +4782,30 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(20, 10, 6, 0.85)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
+  },
+  // Reserved-room arrival banner — the bespoke in-world line over the world,
+  // shown with the celebration confetti. Boxless cream ink like the ambient
+  // line, but centered higher and a touch larger so it reads as an event.
+  reservedArrivalBanner: {
+    position: 'absolute',
+    top: '32%',
+    left: 24,
+    right: 24,
+    alignItems: 'center',
+    zIndex: 60,
+  },
+  reservedArrivalText: {
+    fontFamily: PIXEL_FONT_BOLD,
+    color: '#FBF0D9',
+    fontSize: 18,
+    fontWeight: '700',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    letterSpacing: 0.5,
+    lineHeight: 26,
+    textShadowColor: 'rgba(20, 10, 6, 0.9)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 5,
   },
 
   // Sacrifice modal — chrome comes from the NineSliceFrame pixel panel. The
