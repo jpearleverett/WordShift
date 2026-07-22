@@ -19,6 +19,8 @@ export const MODE_ICON_SPRITES: { [glyph: string]: ImageSourcePropType } = {
   '🌑': require('../../../assets/ui/blind.png'),
   '👁': require('../../../assets/ui/eye.png'),
   '🧵': require('../../../assets/ui/weave.png'),
+  // Named (non-emoji) keys for HUD/crest sprites that have no single mode glyph.
+  'house': require('../../../assets/ui/home.png'),
 };
 
 const stripVariationSelector = (glyph: string): string => glyph.replace(/\uFE0F/g, '');

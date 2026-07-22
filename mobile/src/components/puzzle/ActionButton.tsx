@@ -40,6 +40,9 @@ interface ActionButtonProps {
    *  the same tactile weight language as the primary buttons (bright snaps back,
    *  the reveal releases heavily). Defaults to phase 0. */
   phase?: number;
+  /** Bump this to acknowledge a value change (e.g. the hint count just rose):
+   *  a one-shot scale pulse fires whenever it changes. reducedMotion → skipped. */
+  pulseSignal?: number;
 }
 
 export const ActionButton: React.FC<ActionButtonProps> = ({
@@ -50,9 +53,24 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
   disabled,
   accessibilityLabel,
   phase = 0,
+  pulseSignal,
 }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
+
+  // One-shot acknowledgment pulse when pulseSignal changes (e.g. a milestone
+  // hint gift raised the count while the button was off-screen — the pulse
+  // fires on the next puzzle-screen render so the count doesn't swap silently).
+  const prevPulseRef = useRef(pulseSignal ?? 0);
+  useEffect(() => {
+    if (pulseSignal === undefined || pulseSignal === prevPulseRef.current) return;
+    prevPulseRef.current = pulseSignal;
+    if (getSettingsSync().reducedMotion || shouldSimplifyAnimations()) return;
+    Animated.sequence([
+      Animated.timing(scaleAnim, { toValue: 1.2, duration: 140, useNativeDriver: true }),
+      Animated.spring(scaleAnim, { toValue: 1, friction: 4, tension: 200, useNativeDriver: true }),
+    ]).start();
+  }, [pulseSignal, scaleAnim]);
 
   useEffect(() => {
     if (!disabled) {

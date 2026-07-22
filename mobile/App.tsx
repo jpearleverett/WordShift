@@ -20,6 +20,7 @@ import { AnimatedBackground } from './src/components/AnimatedBackground';
 import { Confetti, StarBurst } from './src/components/Confetti';
 import { BlindJudgmentOverlay, type BlindJudgmentSignal } from './src/components/BlindJudgmentOverlay';
 import { ActionButton, AnimatedLogo, Toast, VictoryModal, RulesModal, DifficultyMenu } from './src/components/puzzle';
+import { BadgeAppear } from './src/components/puzzle/BadgeAppear';
 import { isValidDifficulty, normalizeDifficulty, getDifficultyChipLabel } from './src/components/puzzle/DifficultyMenu';
 import { HomeScreen } from './src/components/home';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
@@ -344,6 +345,19 @@ function MainApp() {
   const isProcessingVictoryRef = useRef(victoryFlow.isProcessingVictory);
   useEffect(() => { isProcessingVictoryRef.current = victoryFlow.isProcessingVictory; }, [victoryFlow.isProcessingVictory]);
 
+  // Milestone hint-gift acknowledgment: the trickle grants a hint during the
+  // victory window (HINT button occluded by the modal). Defer a one-shot pulse
+  // on the HINT button to the NEXT board so the raised count is acknowledged
+  // rather than swapping in silently.
+  const [hintPulseSignal, setHintPulseSignal] = useState(0);
+  const hintPulsePendingRef = useRef(false);
+  useEffect(() => {
+    if (puzzle.gameState === GameState.PLAYING && hintPulsePendingRef.current) {
+      hintPulsePendingRef.current = false;
+      setHintPulseSignal((s) => s + 1);
+    }
+  }, [puzzle.gameState]);
+
   const puzzlesSolvedForVariantUnlocks = persistence.cumulativeStats?.totalPuzzlesCompleted ?? 0;
   const variantSelectorOptions = useMemo(() => {
     // uiPhase intentionally matches currentPhase — we use the confirmed phase
@@ -614,6 +628,26 @@ function MainApp() {
   // thread, independent of React re-renders.
   const speedPulseScale = useRef(new Animated.Value(1)).current;
   const prevSpeedRemainingRef = useRef<number | null>(null);
+  // Speed escalation cue: the "Round N" badge pops (and rings a bright sting)
+  // each time the streak tightens the clock, so the ladder is a felt moment
+  // instead of a silent number change.
+  const speedRoundPulse = useRef(new Animated.Value(1)).current;
+  const prevSpeedRoundRef = useRef(0);
+  useEffect(() => {
+    const prev = prevSpeedRoundRef.current;
+    prevSpeedRoundRef.current = speedRound;
+    if (speedRound > prev && speedRound > 0) {
+      if (getSettingsSync().reducedMotion) {
+        speedRoundPulse.setValue(1);
+      } else {
+        speedRoundPulse.setValue(0.6);
+        Animated.spring(speedRoundPulse, { toValue: 1, friction: 5, tension: 180, useNativeDriver: true }).start();
+      }
+      // A bright rising ping (the top rung of the move ladder) marks the tighter
+      // clock — distinct from the completing move's own streak-tiered chime.
+      soundValidMove(4);
+    }
+  }, [speedRound, speedRoundPulse]);
 
   // Setup-chip anchor: the difficulty menu (a Modal) hangs from the chip's real
   // window position, measured on open. Cosmetic-only — the Modal owns its bounds
@@ -1098,6 +1132,10 @@ function MainApp() {
       // The notice is a launch-moment courtesy only — on a mid-session day
       // rollover the player may be mid-puzzle, so the grant stays silent.
       if (granted && !onboardingFlow.isOnboarding && !isRollover) {
+        // A gift, not a trivial receipt: a success haptic + a bright ping so
+        // the free freeze reads as something earned, not a stray alert.
+        hapticSuccess();
+        soundValidMove(3);
         showGameAlert(
           'Free Streak Freeze',
           getStreakFreezeGrantedMessage(persistence.currentPhase)
@@ -2323,9 +2361,16 @@ function MainApp() {
         enqueueVictoryToast(`🛡️ ${getStreakFreezeReliefMessage(persistence.currentPhase, false)}`);
       }
 
-      // Show streak milestone toast if threshold was just crossed
+      // Show streak milestone toast if threshold was just crossed. Scale the
+      // celebration to the milestone's magnitude: the larger tiers (50+ amber,
+      // i.e. 14/21/30 days) ring the bright top-of-ladder ping so a long streak
+      // clearly outweighs a 3-day one (the victory confetti + haptic already
+      // fire for every win; the distinct ping is the magnitude tell).
       if (victory.streakMilestoneMessage) {
         enqueueVictoryToast(`${victory.streakMilestoneMessage} (+${victory.streakMilestoneBonus} amber)`, 'receipt');
+        if ((victory.streakMilestoneBonus ?? 0) >= 50) {
+          soundValidMove(4);
+        }
       }
 
       // Milestone hint trickle: a win that crossed a puzzle-count milestone
@@ -2337,6 +2382,9 @@ function MainApp() {
           if (granted) {
             puzzleActions.refreshHintBalance();
             enqueueVictoryToast(getHintGrantMessage(persistence.currentPhase), 'receipt');
+            // Acknowledge the raised count with a HINT-button pulse on the next
+            // board (the button is occluded by the victory modal right now).
+            hintPulsePendingRef.current = true;
           }
         }).catch(() => {});
       }
@@ -4051,7 +4099,7 @@ function MainApp() {
                 meaningless there and the double chip read as a bug. The Blind
                 badge below is the mode's one standing indicator. */}
             {puzzle.gameMode === 'challenge' && !puzzle.blindMode && (
-              <View style={[
+              <BadgeAppear style={[
                 styles.challengeBadge,
                 persistence.currentPhase >= 3 && styles.challengeBadgeDark,
                 persistence.currentPhase >= 4 && styles.challengeBadgeVoid,
@@ -4078,10 +4126,10 @@ function MainApp() {
                     </Text>
                   </TouchableOpacity>
                 )}
-              </View>
+              </BadgeAppear>
             )}
             {puzzle.currentVariant !== 'standard' && (
-              <View style={[
+              <BadgeAppear style={[
                 styles.variantBadge,
                 persistence.currentPhase === 2 && styles.variantBadgeDusk,
                 persistence.currentPhase >= 3 && styles.variantBadgeDark,
@@ -4103,13 +4151,13 @@ function MainApp() {
                 ]}>
                   {VARIANT_CONFIGS[puzzle.currentVariant]?.title || 'Variant'}
                 </Text>
-              </View>
+              </BadgeAppear>
             )}
             {/* Blind Offering badge — the previews are hidden, so without a
                 standing indicator the player has no way to tell blind is on
                 (or remember to turn it off). Same chrome as the variant badge. */}
             {puzzle.blindMode && (
-              <View
+              <BadgeAppear
                 style={[
                   styles.variantBadge,
                   persistence.currentPhase === 2 && styles.variantBadgeDusk,
@@ -4126,10 +4174,10 @@ function MainApp() {
                 ]}>
                   {persistence.currentPhase >= 2 ? 'Blind Offering' : 'Blind'}
                 </Text>
-              </View>
+              </BadgeAppear>
             )}
             {puzzle.unbrokenWeaveMode && (
-              <View
+              <BadgeAppear
                 style={[
                   styles.variantBadge,
                   styles.variantBadgeDark,
@@ -4144,15 +4192,15 @@ function MainApp() {
                 ]}>
                   {puzzle.spentLetters.length}
                 </Text>
-              </View>
+              </BadgeAppear>
             )}
             {/* House Ask badge — the small standing reminder while an ask is
                 live on this board (soft-fail: it simply disappears unkept,
-                never scolds). Same chrome as the variant badge; the full
-                phase-aware ask line rides the accessibility label. The 🏠 is
-                an intentional emoji accent (labeled), like 🏆/📋/✨. */}
+                never scolds). Same chrome AND sprite treatment as the variant
+                badges (home.png), so no raw emoji sits beside candy sprites;
+                the full phase-aware ask line rides the accessibility label. */}
             {houseAsk !== null && (
-              <View
+              <BadgeAppear
                 style={[
                   styles.variantBadge,
                   persistence.currentPhase === 2 && styles.variantBadgeDusk,
@@ -4161,7 +4209,11 @@ function MainApp() {
                 accessible
                 accessibilityLabel={getHouseAskLine(persistence.currentPhase, houseAsk.kind, houseAsk.letter)}
               >
-                <Text style={styles.variantBadgeIcon}>🏠</Text>
+                {getModeIconSprite('house') ? (
+                  <Image source={getModeIconSprite('house')!} style={styles.variantBadgeIconImage} />
+                ) : (
+                  <Text style={styles.variantBadgeIcon}>🏠</Text>
+                )}
                 <Text style={[
                   styles.variantBadgeText,
                   persistence.currentPhase === 2 && styles.variantBadgeTextDusk,
@@ -4169,7 +4221,7 @@ function MainApp() {
                 ]}>
                   {houseAsk.letter.toUpperCase()}
                 </Text>
-              </View>
+              </BadgeAppear>
             )}
           </View>
 
@@ -4254,8 +4306,8 @@ function MainApp() {
               </Text>
             </Animated.View>
             {speedRound > 0 && (
-              <View
-                style={styles.speedRoundRow}
+              <Animated.View
+                style={[styles.speedRoundRow, { transform: [{ scale: speedRoundPulse }], opacity: speedRoundPulse }]}
                 accessibilityLabel={`Speed round ${speedRound + 1}, faster clock`}
               >
                 <Image
@@ -4263,7 +4315,7 @@ function MainApp() {
                   style={styles.speedRoundFlame}
                 />
                 <Text style={styles.speedRoundText}>Round {speedRound + 1}</Text>
-              </View>
+              </Animated.View>
             )}
           </View>
         )}
@@ -4437,6 +4489,7 @@ function MainApp() {
             label={puzzle.gameMode === 'challenge' ? 'HINT' : `HINT · ${puzzle.hintBalance}`}
             colors={getActionButtonColors('hint', persistence.currentPhase)}
             phase={persistence.currentPhase}
+            pulseSignal={hintPulseSignal}
             onPress={handleHintPress}
             disabled={puzzle.gameState !== GameState.PLAYING}
             accessibilityLabel={
