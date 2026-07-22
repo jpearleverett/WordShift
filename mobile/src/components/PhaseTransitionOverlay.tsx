@@ -4,6 +4,7 @@ import { PhaseTransitionEvent, PhaseScene, SceneImage, CinematicParticleConfig }
 import { getSettingsSync } from '../services/settings';
 import { hapticLight, hapticMedium, hapticHeavy, hapticWarning } from '../services/haptics';
 import { playUiSound, stopCeremonyMusic } from '../services/uiSound';
+import { announceForA11y } from '../services/a11yAnnounce';
 import { BODY_FONT_BOLD } from '../theme/fonts';
 import { getPhaseTheme } from '../theme/colors';
 
@@ -203,8 +204,7 @@ const BurstParticleBase: React.FC<{
     ]);
     anim.start();
     return () => anim.stop();
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only one-shot; the
-  // whole layer is remounted (nonce key) on each new burst.
+    // mount-only one-shot; the whole layer is remounted (nonce key) per burst.
   }, []);
 
   return (
@@ -548,6 +548,16 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     if (!reducedMotion) {
       hapticMedium();
     }
+
+    // Announce the ceremony to screen readers — a deferred cinematic reveal is
+    // otherwise silent (the accessibilityRole="alert" root doesn't reliably
+    // re-announce a mounted overlay). Speak the title, or the first scene line
+    // for title-less events (the finale / post-revelation).
+    announceForA11y(
+      event.showTitle === false
+        ? (event.scenes[0]?.text ?? 'A moment passes.')
+        : event.title
+    );
 
     // Schedule each scene
     event.scenes.forEach((scene, index) => {

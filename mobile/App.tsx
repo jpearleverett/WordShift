@@ -409,11 +409,15 @@ function MainApp() {
     const next = victoryToastQueueRef.current.shift();
     if (!next) {
       victoryToastTimerRef.current = null;
+      setVictoryReceipt(null);
       return;
     }
-    puzzleActions.setMessage(next.message);
+    // Route into the in-modal receipt slot (VictoryModal), NOT the board Toast
+    // which renders under the modal overlay and would be invisible during the
+    // victory window.
+    setVictoryReceipt(next.message);
     victoryToastTimerRef.current = setTimeout(showNext, VICTORY_TOAST_DURATION_MS);
-  }, [puzzleActions]);
+  }, []);
   const enqueueVictoryToast = useCallback((
     message: string,
     priority: 'receipt' | 'info' | 'nudge' = 'info'
@@ -436,6 +440,7 @@ function MainApp() {
       clearTimeout(victoryToastTimerRef.current);
       victoryToastTimerRef.current = null;
     }
+    setVictoryReceipt(null);
   }, []);
 
   // Endgame cinematics (FINAL_PUZZLE_EVENT / POST_REVELATION_EVENT) are the
@@ -530,6 +535,12 @@ function MainApp() {
   // Full-moon event bonus line, shown inside the VictoryModal on event-day
   // daily completions (the puzzle toast renders UNDER the modal overlay).
   const [eventBonusLine, setEventBonusLine] = useState<string | null>(null);
+  // Victory receipt line: the sequential victory-toast queue plays through this
+  // IN-MODAL slot (VictoryModal renders it), not the board Toast — the board
+  // Toast is zIndex 50, UNDER the modal's 500, so victory receipts were
+  // effectively invisible. The board Toast is now reserved for board-time
+  // messages only. Cleared with the queue on every victory-exit path.
+  const [victoryReceipt, setVictoryReceipt] = useState<string | null>(null);
   const [dailyLadderTrend, setDailyLadderTrend] = useState<'up' | 'down' | 'flat' | null>(null);
   // Quiet, spoiler-safe aggregate social-proof line for the victory modal
   const [socialProofLine, setSocialProofLine] = useState<string | null>(null);
@@ -4463,6 +4474,7 @@ function MainApp() {
           dailyTrend={dailyLadderTrend}
           socialProofLine={socialProofLine}
           eventBonusLine={eventBonusLine}
+          receiptLine={victoryReceipt}
           forceFullCeremony={phaseTransitionEvent != null}
           rewardedDoubleEnabled={victoryDoubleOffer}
           rewardedDoubleClaimed={victoryDoubleClaimed}
@@ -4670,6 +4682,20 @@ function MainApp() {
     );
   };
 
+  // A blocking full-screen overlay (the victory modal, the Time's-Up GAME_OVER
+  // overlay, or a phase-transition cinematic) is up: the screen underneath is
+  // visually occluded, so it must be hidden from the screen reader too, or
+  // VoiceOver/TalkBack focus leaks into the board/home behind the overlay.
+  const victoryModalVisible =
+    puzzle.gameState === GameState.WON &&
+    !(onboardingFlow.isOnboarding &&
+      (onboardingFlow.onboardingStep === 'puzzle_complete' ||
+        onboardingFlow.onboardingStep === 'going_to_pit'));
+  const blockingOverlayActive =
+    victoryModalVisible ||
+    puzzle.gameState === GameState.GAME_OVER ||
+    phaseTransitionEvent != null;
+
   // Render screen with global overlays on top
   return (
     <View style={{ flex: 1, backgroundColor: rootBgColor }}>
@@ -4677,12 +4703,18 @@ function MainApp() {
           boundaries; this outer one covers the secondary screens (settings,
           stats, ledger, gallery, pit) so a render error on any of them returns
           the player home instead of crashing the entire app. */}
+      <View
+        style={{ flex: 1 }}
+        accessibilityElementsHidden={blockingOverlayActive}
+        importantForAccessibility={blockingOverlayActive ? 'no-hide-descendants' : 'auto'}
+      >
       <ErrorBoundary
         fallbackMessage="Something went wrong. Tap to return home."
         onReset={() => setCurrentScreen('home')}
       >
         {renderScreen()}
       </ErrorBoundary>
+      </View>
       {/* Screen transition overlay — solid cover that fades in/out during navigation */}
       <Animated.View
         pointerEvents="none"

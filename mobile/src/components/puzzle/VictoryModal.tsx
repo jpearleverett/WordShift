@@ -123,6 +123,10 @@ interface VictoryModalProps {
   socialProofLine?: string | null;
   /** Full-moon event bonus line for daily completions on event days. */
   eventBonusLine?: string | null;
+  /** Sequential victory-toast receipt line (streak/quest/milestone receipts,
+   *  pace beats, nudges). Rendered as an in-modal fading slot so it is visible
+   *  over the modal instead of the board Toast, which sits under the overlay. */
+  receiptLine?: string | null;
   /** App-level override: a queued cinematic (final puzzle / post-revelation)
    *  must always get the full ceremony, never the compact strip. */
   forceFullCeremony?: boolean;
@@ -215,6 +219,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   dailyTrend,
   socialProofLine,
   eventBonusLine,
+  receiptLine,
   forceFullCeremony,
   rewardedDoubleEnabled,
   rewardedDoubleClaimed,
@@ -307,6 +312,18 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   const contentOpacity2 = useRef(new Animated.Value(0)).current;
   const contentOpacity3 = useRef(new Animated.Value(0)).current;
   const contentOpacity4 = useRef(new Animated.Value(0)).current;
+  // In-modal victory receipt slot: fades each queued line in fresh as it cycles.
+  const receiptOpacity = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!receiptLine) {
+      if (getSettingsSync().reducedMotion) { receiptOpacity.setValue(0); return; }
+      Animated.timing(receiptOpacity, { toValue: 0, duration: 160, useNativeDriver: true }).start();
+      return;
+    }
+    if (getSettingsSync().reducedMotion) { receiptOpacity.setValue(1); return; }
+    receiptOpacity.setValue(0);
+    Animated.timing(receiptOpacity, { toValue: 1, duration: 240, useNativeDriver: true }).start();
+  }, [receiptLine, receiptOpacity]);
   // While the entrance choreography (stars + content cascade) runs, a
   // tap-anywhere layer skips it; once complete the layer unmounts so the
   // action buttons receive touches normally.
@@ -366,11 +383,13 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
     if (!entranceComplete || announcedRef.current) return;
     announcedRef.current = true;
     const title = getVictoryTitle(earnedStars, phase);
+    const starsPhrase = `${earnedStars} of 3 stars`;
+    const flawlessPhrase = victoryData?.flawless ? `${getFlawlessHonorific(phase)}. ` : '';
     const total = victoryData?.amberEarned ?? 0;
     const amberPhrase = victoryData?.autoCollected
       ? `${total} amber earned`
       : `${total} amber gathered for the pit`;
-    announceForA11y(`${title}. ${amberPhrase}.`);
+    announceForA11y(`${title}. ${starsPhrase}. ${flawlessPhrase}${amberPhrase}.`);
   }, [visible, entranceComplete, earnedStars, phase, victoryData]);
 
   const handleSkipEntrance = useCallback(() => {
@@ -467,6 +486,16 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               <Text style={[styles.compactFlawless, { color: phaseTheme.modalSecondaryTextColor }]}>
                 {eventBonusLine}
               </Text>
+            )}
+            {/* Victory receipt (pace beats / nudges still fire on routine wins) —
+                shown here so it is visible over the modal, not the board Toast. */}
+            {!!receiptLine && (
+              <Animated.Text
+                style={[styles.receiptLine, { color: phaseTheme.modalSecondaryTextColor, opacity: receiptOpacity }]}
+                accessibilityLabel={receiptLine ?? undefined}
+              >
+                {receiptLine}
+              </Animated.Text>
             )}
             {/* The amber is QUEUED in a harvest batch, not credited — the strip
                 must keep the pit affordance (and the 2x opt-in) or routine wins
@@ -1216,6 +1245,20 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 
             </Animated.View>
 
+            {/* Victory receipt slot: the sequential victory-toast queue cycles
+                its lines HERE (in-modal, over the overlay) instead of the board
+                Toast, which renders under the modal and was invisible. */}
+            {!!receiptLine && (
+              <Animated.View style={{ opacity: receiptOpacity, width: '100%' }} pointerEvents="none">
+                <Text
+                  style={[styles.receiptLine, { color: phaseTheme.modalSecondaryTextColor }]}
+                  accessibilityLabel={receiptLine ?? undefined}
+                >
+                  {receiptLine}
+                </Text>
+              </Animated.View>
+            )}
+
             {/* Group 4: Action buttons — 3D candy style */}
             <Animated.View style={{ opacity: contentOpacity4, width: '100%' }}>
             {isOnboarding ? (
@@ -1604,6 +1647,15 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     // No opacity fade — the phase secondary text color is already AA-tuned;
     // dimming it below 4.5:1 was the old readability bug.
+  },
+  receiptLine: {
+    fontFamily: PIXEL_FONT_BOLD,
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginTop: 6,
+    marginBottom: 6,
+    paddingHorizontal: 12,
   },
   rewardedDoubleButton: {
     marginTop: 10,

@@ -82,6 +82,7 @@ import { getSettingsSync } from '../services/settings';
 import { logEvent } from '../services/eventLogger';
 import { hapticLight, hapticMedium, hapticHeavy } from '../services/haptics';
 import { playUiSound, stopCeremonyMusic } from '../services/uiSound';
+import { announceForA11y } from '../services/a11yAnnounce';
 import { getDeviceTier, shouldSimplifyAnimations } from '../services/deviceTier';
 import { getBulkOfferTiming } from '../services/pitOfferTiming';
 
@@ -1664,6 +1665,9 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
           const showLine = (j: number) => {
             if (!mountedRef.current) return;
             setCeremonyTextIndex(j);
+            // Speak each ward-ignition line — a deferred ceremony reveal is
+            // otherwise silent to screen readers.
+            if (texts[j]) announceForA11y(texts[j]);
             ceremonyTextOpacity.setValue(0);
             Animated.timing(ceremonyTextOpacity, {
               toValue: 1,
