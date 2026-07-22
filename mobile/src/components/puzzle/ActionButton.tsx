@@ -11,7 +11,10 @@ import {
 } from 'react-native';
 import { getSettingsSync } from '../../services/settings';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
+import { hapticSelection } from '../../services/haptics';
+import { getPressSpring } from '../../theme/surfaces';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
+import { FONT_SIZE } from '../../theme/typeScale';
 
 // Generated candy-style sprites (assets/ui, generateUiIcons.mjs) replacing the
 // emoji icons App.tsx passes. Unknown icon strings still render as text, so
@@ -35,6 +38,13 @@ interface ActionButtonProps {
   onPress: () => void;
   disabled: boolean;
   accessibilityLabel?: string;
+  /** Narrative phase — ages the release spring so the secondary controls carry
+   *  the same tactile weight language as the primary buttons (bright snaps back,
+   *  the reveal releases heavily). Defaults to phase 0. */
+  phase?: number;
+  /** Bump this to acknowledge a value change (e.g. the hint count just rose):
+   *  a one-shot scale pulse fires whenever it changes. reducedMotion → skipped. */
+  pulseSignal?: number;
 }
 
 export const ActionButton: React.FC<ActionButtonProps> = ({
@@ -44,9 +54,28 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
   onPress,
   disabled,
   accessibilityLabel,
+  phase = 0,
+  pulseSignal,
 }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
+  // Disabled-tap acknowledgment shake — parity with the locked tiles (a tap on
+  // an inert control is felt, not silently swallowed).
+  const shakeAnim = useRef(new Animated.Value(0)).current;
+
+  // One-shot acknowledgment pulse when pulseSignal changes (e.g. a milestone
+  // hint gift raised the count while the button was off-screen — the pulse
+  // fires on the next puzzle-screen render so the count doesn't swap silently).
+  const prevPulseRef = useRef(pulseSignal ?? 0);
+  useEffect(() => {
+    if (pulseSignal === undefined || pulseSignal === prevPulseRef.current) return;
+    prevPulseRef.current = pulseSignal;
+    if (getSettingsSync().reducedMotion || shouldSimplifyAnimations()) return;
+    Animated.sequence([
+      Animated.timing(scaleAnim, { toValue: 1.2, duration: 140, useNativeDriver: true }),
+      Animated.spring(scaleAnim, { toValue: 1, friction: 4, tension: 200, useNativeDriver: true }),
+    ]).start();
+  }, [pulseSignal, scaleAnim]);
 
   useEffect(() => {
     if (!disabled) {
@@ -78,6 +107,11 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
   }, [disabled]);
 
   const handlePressIn = () => {
+    // Reduced motion: pin the pressed scale instantly (no spring travel).
+    if (getSettingsSync().reducedMotion) {
+      scaleAnim.setValue(0.94);
+      return;
+    }
     Animated.spring(scaleAnim, {
       toValue: 0.9,
       friction: 5,
@@ -87,10 +121,19 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
   };
 
   const handlePressOut = () => {
+    // Reduced motion: snap back instantly, no phase-weighted release travel.
+    if (getSettingsSync().reducedMotion) {
+      scaleAnim.setValue(1);
+      return;
+    }
+    // The RELEASE ages with the phase (bright snaps, the reveal releases
+    // heavily) via the shared tile/button weight language; the press-DOWN above
+    // stays constant — the hand does not age.
+    const release = getPressSpring(phase);
     Animated.spring(scaleAnim, {
       toValue: 1,
-      friction: 3,
-      tension: 150,
+      friction: release.friction,
+      tension: release.tension,
       useNativeDriver: true,
     }).start();
   };
@@ -102,12 +145,31 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
 
   const iconSprite = getActionIconSprite(icon);
 
+  // A tap on a disabled control shakes + ticks (parity with locked tiles), then
+  // does nothing else. Keeping the touchable enabled (not the `disabled` prop)
+  // is what lets the inert tap be acknowledged at all.
+  const handlePress = () => {
+    if (disabled) {
+      hapticSelection();
+      if (!getSettingsSync().reducedMotion) {
+        shakeAnim.setValue(0);
+        Animated.sequence([
+          Animated.timing(shakeAnim, { toValue: 4, duration: 40, useNativeDriver: true }),
+          Animated.timing(shakeAnim, { toValue: -4, duration: 40, useNativeDriver: true }),
+          Animated.timing(shakeAnim, { toValue: 2, duration: 40, useNativeDriver: true }),
+          Animated.timing(shakeAnim, { toValue: 0, duration: 40, useNativeDriver: true }),
+        ]).start();
+      }
+      return;
+    }
+    onPress();
+  };
+
   return (
     <TouchableOpacity
-      onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      disabled={disabled}
+      onPress={handlePress}
+      onPressIn={disabled ? undefined : handlePressIn}
+      onPressOut={disabled ? undefined : handlePressOut}
       activeOpacity={1}
       accessibilityLabel={accessibilityLabel || label}
       accessibilityRole="button"
@@ -117,7 +179,7 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
         style={[
           styles.actionButton,
           disabled && styles.actionButtonDisabled,
-          { transform: [{ scale: scaleAnim }] },
+          { transform: [{ scale: scaleAnim }, { translateX: shakeAnim }] },
         ]}
       >
         {/* Glow effect */}
@@ -130,15 +192,15 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
           />
         )}
 
-        {/* Button body */}
+        {/* Button body — disabled flattens to an inert grey face (no candy bg). */}
         <View
           style={[
             styles.actionButtonIcon,
-            { backgroundColor: colors.bg },
+            { backgroundColor: disabled ? '#8C8A94' : colors.bg },
           ]}
         >
-          {/* Top bevel */}
-          <View style={styles.actionButtonBevel} />
+          {/* Top bevel — dropped when disabled so the face reads flat/inert. */}
+          {!disabled && <View style={styles.actionButtonBevel} />}
 
           {/* Icon */}
           {iconSprite !== null ? (
@@ -152,13 +214,15 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
           )}
         </View>
 
-        {/* 3D edge */}
-        <View
-          style={[
-            styles.actionButtonEdge,
-            { backgroundColor: colors.border },
-          ]}
-        />
+        {/* 3D edge — dropped when disabled (a flat control has no raised lip). */}
+        {!disabled && (
+          <View
+            style={[
+              styles.actionButtonEdge,
+              { backgroundColor: colors.border },
+            ]}
+          />
+        )}
 
         {/* Label */}
         <Text style={styles.actionButtonLabel}>{label}</Text>
@@ -217,7 +281,7 @@ const styles = StyleSheet.create({
   },
   actionButtonIconText: {
     fontFamily: BODY_FONT,
-    fontSize: 28,
+    fontSize: FONT_SIZE.hero,
   },
   // Matches the visual footprint of the fontSize-28 emoji it replaces
   actionButtonIconImage: {
@@ -227,9 +291,15 @@ const styles = StyleSheet.create({
   actionButtonLabel: {
     fontFamily: PIXEL_FONT_BOLD,
     marginTop: 12,
-    fontSize: 10,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '900',
-    color: 'rgba(255, 255, 255, 0.8)',
+    // Full-opacity white + a dark legibility shadow: the labels sit directly
+    // on the board (no chip), so the shadow anchors them against the bright
+    // phase-0/1 background where a 0.8 white washed out.
+    color: '#FFFFFF',
+    textShadowColor: 'rgba(0, 0, 0, 0.55)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
     letterSpacing: 1.5,
   },
 });

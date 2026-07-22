@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { CandyColors } from '../theme/colors';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
+import { FONT_SIZE } from '../theme/typeScale';
 import { getDailyStatus } from '../services/dailyChallenge';
 import { getActiveEvent } from '../services/liveEvents';
 import { getEventBadgeLabel } from '../services/phaseNarrative';
@@ -20,6 +21,15 @@ import { getSettingsSync } from '../services/settings';
 const FLAME_ICON = require('../../assets/ui/flame.png');
 const CALENDAR_ICON = require('../../assets/ui/calendar.png');
 const MOON_ICON = require('../../assets/ui/moon.png');
+
+// F78: attention pulses slow into a smolder as the descent deepens — same
+// colors, longer breath (bright base 1200ms -> ~2200ms at Phase 3 -> ~2800ms
+// at Phase 4+). Easing is unchanged at the call sites.
+const getPhaseScaledPulseMs = (phase: number, brightMs: number): number => {
+  if (phase >= 4) return 2800;
+  if (phase >= 3) return 2200;
+  return brightMs;
+};
 
 interface DailyChallengeCardProps {
   onStartDaily: (difficulty: Difficulty) => void;
@@ -76,16 +86,17 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
     }
 
     if (!isCompleted) {
+      const halfCycle = getPhaseScaledPulseMs(phase, 1200);
       pulseLoopRef.current = Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
             toValue: 1.08,
-            duration: 1200,
+            duration: halfCycle,
             useNativeDriver: true,
           }),
           Animated.timing(pulseAnim, {
             toValue: 1,
-            duration: 1200,
+            duration: halfCycle,
             useNativeDriver: true,
           }),
         ])
@@ -96,12 +107,12 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
         Animated.sequence([
           Animated.timing(glowAnim, {
             toValue: 0.8,
-            duration: 1200,
+            duration: halfCycle,
             useNativeDriver: true,
           }),
           Animated.timing(glowAnim, {
             toValue: 0.3,
-            duration: 1200,
+            duration: halfCycle,
             useNativeDriver: true,
           }),
         ])
@@ -124,7 +135,7 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
       pulseAnim.stopAnimation();
       glowAnim.stopAnimation();
     };
-  }, [isCompleted]);
+  }, [isCompleted, phase]);
 
   const loadStatus = async () => {
     const status = await getDailyStatus();
@@ -254,7 +265,7 @@ const styles = StyleSheet.create({
   },
   calendarIcon: {
     fontFamily: BODY_FONT,
-    fontSize: 18,
+    fontSize: FONT_SIZE.title,
   },
   calendarIconImage: {
     width: 24,
@@ -266,14 +277,14 @@ const styles = StyleSheet.create({
   },
   checkIcon: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '900',
     color: CandyColors.green.main,
     marginTop: -1,
   },
   miniStars: {
     fontFamily: BODY_FONT,
-    fontSize: 7,
+    fontSize: FONT_SIZE.micro,
     color: CandyColors.yellow.main,
     marginTop: -2,
     letterSpacing: 0.5,
@@ -298,7 +309,7 @@ const styles = StyleSheet.create({
   },
   streakBadgeText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 9,
+    fontSize: FONT_SIZE.micro,
     fontWeight: '900',
     color: CandyColors.white,
   },
@@ -327,7 +338,7 @@ const styles = StyleSheet.create({
   },
   moonBadgeText: {
     fontFamily: BODY_FONT,
-    fontSize: 9,
+    fontSize: FONT_SIZE.micro,
   },
   moonBadgeIcon: {
     width: 12,

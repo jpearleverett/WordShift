@@ -5,12 +5,12 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  ActivityIndicator,
   StatusBar,
   Dimensions,
+  useWindowDimensions,
   Animated,
+  Easing,
   AppState,
-  Pressable,
   Linking,
   BackHandler,
   Image,
@@ -19,12 +19,17 @@ import { GameState, Difficulty } from './src/types';
 import { Row } from './src/components/Row';
 import { AnimatedBackground } from './src/components/AnimatedBackground';
 import { Confetti, StarBurst } from './src/components/Confetti';
+import { BlindJudgmentOverlay, type BlindJudgmentSignal } from './src/components/BlindJudgmentOverlay';
 import { ActionButton, AnimatedLogo, Toast, VictoryModal, RulesModal, DifficultyMenu } from './src/components/puzzle';
+import { BadgeAppear } from './src/components/puzzle/BadgeAppear';
+import { BrandedLoader } from './src/components/puzzle/BrandedLoader';
 import { isValidDifficulty, normalizeDifficulty, getDifficultyChipLabel } from './src/components/puzzle/DifficultyMenu';
 import { HomeScreen } from './src/components/home';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { AmberInline } from './src/components/AmberInline';
 import { CandyColors } from './src/theme/colors';
+import { getSurfaceTheme } from './src/theme/surfaces';
+import { CandyButton } from './src/components/ui/CandyButton';
 import { usePuzzleGame } from './src/hooks/usePuzzleGame';
 import { useGamePersistence } from './src/hooks/useGamePersistence';
 import { useVictoryFlow, isRoutineVictory } from './src/hooks/useVictoryFlow';
@@ -89,7 +94,8 @@ import { initShareImage } from './src/services/shareImage';
 import { ShareResultModal } from './src/components/share/ShareResultModal';
 import { getLocalDateString } from './src/services/dateUtils';
 import { getSettingsSync } from './src/services/settings';
-import { initAudio, setAudioPhase, startMusicForScreen, type MusicScreen, soundVictory, soundPerfect, soundValidMove, soundInvalidMove, soundUndo, soundHint, soundTap, soundUiTap, soundSelection, soundLetterSelect } from './src/services/audio';
+import { announceForA11y } from './src/services/a11yAnnounce';
+import { initAudio, setAudioPhase, startMusicForScreen, type MusicScreen, soundVictory, soundPerfect, soundValidMove, soundMidpointTurn, soundInvalidMove, soundUndo, soundHint, soundTap, soundUiTap, soundSelection, soundLetterSelect, soundDailyReady } from './src/services/audio';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess, hapticWarning, hapticError, hapticSelection } from './src/services/haptics';
 import { getVariantTutorialIntroLines } from './src/services/animalDialogue';
@@ -104,6 +110,7 @@ import {
   getNotificationPromptText,
   getSpeedTimeUpMessage,
   getDragMissMessage,
+  getReverseMidpointMessage,
   getFirstDailyMercyMessage,
   getSpeedRescueLabel,
   getDailyLockedMessage,
@@ -122,6 +129,8 @@ import {
   getPreviewGraduationConfirm,
   getSwiftVictoryHintMessage,
   getStreakHeldMessage,
+  getStreakFreezeReliefMessage,
+  getStreakFreezeGrantedMessage,
   getDwellLine,
   getPostCapDwellLine,
   getNoValidMovesMessage,
@@ -243,7 +252,7 @@ import { markPendingChanges, uploadToCloud, installCloudProviderIfConfigured, ma
 import * as Sentry from '@sentry/react-native';
 import { getSentryDsn } from './src/services/supabaseClient';
 import { estimateSlotIndex, findClosestValidSlot } from './src/services/slotEstimation';
-import { DROP_SHAKE_KEYFRAME_MS, DROP_SHAKE_INTENSITY, SPEED_ESCALATION_STEP_SEC, SPEED_ESCALATION_MIN_SEC, SPEED_TICK_CRITICAL_SEC, SWIFT_HINT_TOAST_DELAY_MS, speedTickKind } from './src/constants/timing';
+import { DROP_SHAKE_KEYFRAME_MS, DROP_SHAKE_INTENSITY, SPEED_ESCALATION_STEP_SEC, SPEED_ESCALATION_MIN_SEC, SPEED_TICK_CRITICAL_SEC, SWIFT_HINT_TOAST_DELAY_MS, SCREEN_FADE_COVER_MS, SCREEN_FADE_REVEAL_MS, speedTickKind } from './src/constants/timing';
 import { OfferingPitScreen } from './src/components/OfferingPitScreen';
 import { ShopScreen } from './src/components/shop/ShopScreen';
 import { loadPuzzleState, clearPuzzleState } from './src/services/puzzleSaveState';
@@ -330,6 +339,43 @@ function MainApp() {
   const setPuzzleMessage = puzzleActions.setMessage;
   const setSelectedVariant = puzzleActions.setSelectedVariant;
 
+  // Live mirrors of gameState + victory-lock for callbacks that must read the
+  // CURRENT value without capturing it in a stale closure (e.g. the speed
+  // timer's onTimeUp, which can otherwise fire a loss buzz after a winning
+  // commit — a buzzer-beater race).
+  const gameStateRef = useRef(puzzle.gameState);
+  useEffect(() => { gameStateRef.current = puzzle.gameState; }, [puzzle.gameState]);
+  const isProcessingVictoryRef = useRef(victoryFlow.isProcessingVictory);
+  useEffect(() => { isProcessingVictoryRef.current = victoryFlow.isProcessingVictory; }, [victoryFlow.isProcessingVictory]);
+
+  // Milestone hint-gift acknowledgment: the trickle grants a hint during the
+  // victory window (HINT button occluded by the modal). Defer a one-shot pulse
+  // on the HINT button to the NEXT board so the raised count is acknowledged
+  // rather than swapping in silently.
+  const [hintPulseSignal, setHintPulseSignal] = useState(0);
+  const hintPulsePendingRef = useRef(false);
+  // Grace-gate the board LOADING overlay: a fast bank pick sets LOADING for a
+  // few ms, which used to flash the whole loading card. Only show it once
+  // LOADING/isProcessing has persisted past a short window (mirrors the
+  // victorySpinnerVisible grace on the record/persist gap).
+  const [loadingGraceVisible, setLoadingGraceVisible] = useState(false);
+  useEffect(() => {
+    const loading = puzzle.gameState === GameState.LOADING || puzzle.isProcessing;
+    if (!loading) { setLoadingGraceVisible(false); return; }
+    const t = setTimeout(() => setLoadingGraceVisible(true), 250);
+    return () => clearTimeout(t);
+  }, [puzzle.gameState, puzzle.isProcessing]);
+  // Tracked timer for the one-time Swift-Victories hint (F110): cleared on
+  // unmount so a raw setTimeout can't fire into a torn-down tree.
+  const swiftHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (swiftHintTimerRef.current) clearTimeout(swiftHintTimerRef.current); }, []);
+  useEffect(() => {
+    if (puzzle.gameState === GameState.PLAYING && hintPulsePendingRef.current) {
+      hintPulsePendingRef.current = false;
+      setHintPulseSignal((s) => s + 1);
+    }
+  }, [puzzle.gameState]);
+
   const puzzlesSolvedForVariantUnlocks = persistence.cumulativeStats?.totalPuzzlesCompleted ?? 0;
   const variantSelectorOptions = useMemo(() => {
     // uiPhase intentionally matches currentPhase — we use the confirmed phase
@@ -358,12 +404,25 @@ function MainApp() {
     puzzleActions.setCurrentPhase(persistence.currentPhase);
   }, [persistence.currentPhase, puzzleActions.setCurrentPhase]);
 
-  // StarBurst effect state for valid moves
-  const [starBurst, setStarBurst] = useState<{ active: boolean; x: number; y: number }>({
-    active: false, x: 0, y: 0,
+  // StarBurst effect state for valid moves. comboTier drives the burst's
+  // size/count escalation (Confetti.StarBurst) so a rising clean-move streak
+  // visibly grows the celebration instead of firing an identical 8-square pop.
+  const [starBurst, setStarBurst] = useState<{ active: boolean; x: number; y: number; comboTier: number }>({
+    active: false, x: 0, y: 0, comboTier: 0,
   });
+  // Cold-open first-move settle (F61): a one-shot warm success haptic so the
+  // "Feel that?" line describes something the hands actually felt. Fires once.
+  const coldOpenSettleFiredRef = useRef(false);
   const [invalidDropSignal, setInvalidDropSignal] = useState(0);
   const [successDropSignal, setSuccessDropSignal] = useState(0);
+  // Blind Offering's once-at-the-end judgment beat (see BlindJudgmentOverlay):
+  // an id-bumped signal so the accept-sweep / reject-pulse re-fires each time.
+  const [blindJudgmentSignal, setBlindJudgmentSignal] = useState<BlindJudgmentSignal | null>(null);
+  const blindJudgmentIdRef = useRef(0);
+  const fireBlindJudgment = useCallback((kind: 'accepted' | 'rejected') => {
+    blindJudgmentIdRef.current += 1;
+    setBlindJudgmentSignal({ kind, id: blindJudgmentIdRef.current });
+  }, []);
 
   // Track whether the current slot press originated from a drag-drop (for haptic/effect escalation)
   const isDragDropRef = useRef(false);
@@ -396,11 +455,15 @@ function MainApp() {
     const next = victoryToastQueueRef.current.shift();
     if (!next) {
       victoryToastTimerRef.current = null;
+      setVictoryReceipt(null);
       return;
     }
-    puzzleActions.setMessage(next.message);
+    // Route into the in-modal receipt slot (VictoryModal), NOT the board Toast
+    // which renders under the modal overlay and would be invisible during the
+    // victory window.
+    setVictoryReceipt(next.message);
     victoryToastTimerRef.current = setTimeout(showNext, VICTORY_TOAST_DURATION_MS);
-  }, [puzzleActions]);
+  }, []);
   const enqueueVictoryToast = useCallback((
     message: string,
     priority: 'receipt' | 'info' | 'nudge' = 'info'
@@ -423,7 +486,17 @@ function MainApp() {
       clearTimeout(victoryToastTimerRef.current);
       victoryToastTimerRef.current = null;
     }
+    setVictoryReceipt(null);
   }, []);
+
+  // Endgame cinematics (FINAL_PUZZLE_EVENT / POST_REVELATION_EVENT) are the
+  // game's climax, but their completion flags persist BEFORE the cinematic is
+  // queued on a 1.5s victory timeout. A habitual exit inside that window runs
+  // startVictoryExitFlow -> clearVictoryTimeouts, which drops the queued event
+  // FOREVER (the flag is set, so the next win never re-queues it). Hold the
+  // queued event here so an exit in the window can play it instead of losing
+  // it — the PhaseTransitionOverlay renders at App root above every screen.
+  const pendingEndgameEventRef = useRef<PhaseTransitionEvent | null>(null);
 
   // HOUSE ASKS — the small optional per-board constraint (services/houseAsks):
   // on some standard boards the house asks that one letter travel, or that it
@@ -508,6 +581,12 @@ function MainApp() {
   // Full-moon event bonus line, shown inside the VictoryModal on event-day
   // daily completions (the puzzle toast renders UNDER the modal overlay).
   const [eventBonusLine, setEventBonusLine] = useState<string | null>(null);
+  // Victory receipt line: the sequential victory-toast queue plays through this
+  // IN-MODAL slot (VictoryModal renders it), not the board Toast — the board
+  // Toast is zIndex 50, UNDER the modal's 500, so victory receipts were
+  // effectively invisible. The board Toast is now reserved for board-time
+  // messages only. Cleared with the queue on every victory-exit path.
+  const [victoryReceipt, setVictoryReceipt] = useState<string | null>(null);
   const [dailyLadderTrend, setDailyLadderTrend] = useState<'up' | 'down' | 'flat' | null>(null);
   // Quiet, spoiler-safe aggregate social-proof line for the victory modal
   const [socialProofLine, setSocialProofLine] = useState<string | null>(null);
@@ -572,6 +651,26 @@ function MainApp() {
   // thread, independent of React re-renders.
   const speedPulseScale = useRef(new Animated.Value(1)).current;
   const prevSpeedRemainingRef = useRef<number | null>(null);
+  // Speed escalation cue: the "Round N" badge pops (and rings a bright sting)
+  // each time the streak tightens the clock, so the ladder is a felt moment
+  // instead of a silent number change.
+  const speedRoundPulse = useRef(new Animated.Value(1)).current;
+  const prevSpeedRoundRef = useRef(0);
+  useEffect(() => {
+    const prev = prevSpeedRoundRef.current;
+    prevSpeedRoundRef.current = speedRound;
+    if (speedRound > prev && speedRound > 0) {
+      if (getSettingsSync().reducedMotion) {
+        speedRoundPulse.setValue(1);
+      } else {
+        speedRoundPulse.setValue(0.6);
+        Animated.spring(speedRoundPulse, { toValue: 1, friction: 5, tension: 180, useNativeDriver: true }).start();
+      }
+      // A bright rising ping (the top rung of the move ladder) marks the tighter
+      // clock — distinct from the completing move's own streak-tiered chime.
+      soundValidMove(4);
+    }
+  }, [speedRound, speedRoundPulse]);
 
   // Setup-chip anchor: the difficulty menu (a Modal) hangs from the chip's real
   // window position, measured on open. Cosmetic-only — the Modal owns its bounds
@@ -603,6 +702,13 @@ function MainApp() {
 
   // Screen transition overlay — fades in to cover old screen, swaps, fades out to reveal new screen
   const transitionOverlay = useRef(new Animated.Value(0)).current;
+  // Per-destination screen reveal signature (F60): as the transition overlay
+  // lifts, the arriving screen settles with a native-driver motion keyed to the
+  // destination — puzzle/home breathe in (scale 1.02->1.0), the pit sinks in
+  // (translateY -14->0, "underground"). 0 = at rest; 1 = the start-of-reveal
+  // extreme. Rests at 0 so the wrapper transform is neutral between transitions.
+  const screenRevealAnim = useRef(new Animated.Value(0)).current;
+  const [screenRevealKind, setScreenRevealKind] = useState<'lift' | 'sink' | 'none'>('none');
   // Opacity stutter for the prominent first-victory glitch (held at 1 under
   // reduced motion).
   const glitchStutter = useRef(new Animated.Value(1)).current;
@@ -624,7 +730,8 @@ function MainApp() {
     // Fade overlay IN (covers old screen)
     Animated.timing(transitionOverlay, {
       toValue: 1,
-      duration: 120,
+      duration: SCREEN_FADE_COVER_MS,
+      easing: Easing.out(Easing.quad),
       useNativeDriver: true,
     }).start(() => {
       // While fully opaque: swap colors to match destination screen
@@ -634,17 +741,31 @@ function MainApp() {
 
       setCurrentScreen(screen);
       callback?.();
+      // Arm the destination reveal signature: the pit sinks in, every other
+      // screen breathes in. Set the anim to its start extreme now (hidden under
+      // the opaque overlay), then settle it as the overlay lifts.
+      const kind: 'lift' | 'sink' = screen === 'pit' ? 'sink' : 'lift';
+      setScreenRevealKind(kind);
+      screenRevealAnim.setValue(1);
       // Wait one frame for React to render the new screen before revealing
       requestAnimationFrame(() => {
         // Fade overlay OUT — now blends through destination-matching color
         Animated.timing(transitionOverlay, {
           toValue: 0,
-          duration: 180,
+          duration: SCREEN_FADE_REVEAL_MS,
+          easing: Easing.in(Easing.quad),
+          useNativeDriver: true,
+        }).start();
+        // Settle the reveal signature (springs the arriving screen into place).
+        Animated.spring(screenRevealAnim, {
+          toValue: 0,
+          friction: 8,
+          tension: 90,
           useNativeDriver: true,
         }).start();
       });
     });
-  }, [transitionOverlay, persistence.currentPhase]);
+  }, [transitionOverlay, screenRevealAnim, persistence.currentPhase]);
 
   // Keep root background in sync with current screen + phase (handles phase changes without transitions)
   useEffect(() => {
@@ -660,6 +781,10 @@ function MainApp() {
   // Time's-Up overlay exits (Try Again / Home) — every other fresh-run path
   // already resets it.
   const onSpeedTimeUp = useCallback(() => {
+    // Buzzer-beater guard: a winning commit that lands in the same frame as the
+    // clock hitting 0 must NOT get loss feedback. If the victory flow is
+    // already processing, or the board is no longer PLAYING, swallow the timeout.
+    if (isProcessingVictoryRef.current || gameStateRef.current !== GameState.PLAYING) return;
     setPuzzleGameState(GameState.GAME_OVER);
     hapticWarning();
     soundInvalidMove();
@@ -669,11 +794,12 @@ function MainApp() {
   const [speedTimer, speedTimerActions] = useSpeedTimer(onSpeedTimeUp);
   const { startSpeedTimer, stopSpeedTimer } = speedTimerActions;
 
-  // Final-countdown tick. Fires once per second inside the danger zone (5,4,3,2,1
-  // only, never on the start, never on a rescue that raises the clock, never at
-  // 0) with a native-driver pop; escalates to a heavier haptic + bigger pop at
-  // the critical threshold. Sound/haptics self-gate on their own settings; the
-  // visual pop is suppressed under reduced motion.
+  // Countdown tick. The drain envelope ramps rather than staying flat until the
+  // wire: a gentle 'soft' pre-tick from 10..6s (no sound, faint haptic, tiny
+  // pop), then a 'normal' tick inside the tension zone (5..4), then 'critical'
+  // (3..1, heavier haptic + bigger pop). Never on the start, never on a rescue
+  // that raises the clock, never at 0. Sound/haptics self-gate on their own
+  // settings; the visual pop is suppressed under reduced motion.
   useEffect(() => {
     const r = speedTimer.speedTimeRemaining;
     const prev = prevSpeedRemainingRef.current;
@@ -684,12 +810,19 @@ function MainApp() {
       return;
     }
     const critical = kind === 'critical';
-    soundTap();
-    if (critical) { hapticMedium(); } else { hapticSelection(); }
+    const soft = kind === 'soft';
+    // The soft pre-tick is felt, not heard: a faint haptic keeps the drain
+    // present without a per-second chime crowding the whole run with sound.
+    if (soft) {
+      hapticSelection();
+    } else {
+      soundTap();
+      if (critical) { hapticMedium(); } else { hapticSelection(); }
+    }
     if (!getSettingsSync().reducedMotion) {
       speedPulseScale.setValue(1);
       Animated.sequence([
-        Animated.timing(speedPulseScale, { toValue: critical ? 1.28 : 1.16, duration: 90, useNativeDriver: true }),
+        Animated.timing(speedPulseScale, { toValue: critical ? 1.28 : soft ? 1.07 : 1.16, duration: 90, useNativeDriver: true }),
         Animated.spring(speedPulseScale, { toValue: 1, friction: 4, tension: 140, useNativeDriver: true }),
       ]).start();
     }
@@ -809,6 +942,7 @@ function MainApp() {
     activeRowIndex: puzzle.activeRowIndex,
     selectedLetter: puzzle.selectedLetter,
     gameState: puzzle.gameState,
+    isProcessingVictory: victoryFlow.isProcessingVictory,
     message: puzzle.message,
     history: puzzle.history,
     invalidAttempts: puzzle.invalidAttempts,
@@ -895,6 +1029,13 @@ function MainApp() {
   // Reduced motion pins it fully visible.
   useEffect(() => {
     if (!(orchestration.showVictoryGlitch && orchestration.victoryGlitchProminent)) return;
+    // Screen-reader treatment (F155): the PROMINENT held glitch (the guaranteed
+    // first-win "something else is here" beat) is spoken so its wrong-note lands
+    // for a screen-reader player too. The SUBLIMINAL ~8% ambient glitches are
+    // NOT prominent, so they stay silent by design — a flicker, not a caption.
+    if (orchestration.victoryGlitch) {
+      announceForA11y(orchestration.victoryGlitch);
+    }
     if (getSettingsSync().reducedMotion) {
       glitchStutter.setValue(1);
       return;
@@ -907,7 +1048,7 @@ function MainApp() {
     ]);
     seq.start();
     return () => { seq.stop(); glitchStutter.setValue(1); };
-  }, [orchestration.showVictoryGlitch, orchestration.victoryGlitchProminent, glitchStutter]);
+  }, [orchestration.showVictoryGlitch, orchestration.victoryGlitchProminent, orchestration.victoryGlitch, glitchStutter]);
 
   // New Cycle (NG+) opening beat — once per new cycle, on the first quiet home
   // landing after it begins, the bright days announce themselves (wrongly).
@@ -1002,6 +1143,15 @@ function MainApp() {
     if (puzzle.gameState !== GameState.PLAYING) return;
     if (puzzle.history.length === 1) {
       puzzleActions.setMessage(COLD_OPEN_FIRST_MOVE);
+      // Make the delight FELT, not just told: ~150ms after the commit (letting
+      // the move's own catch bounce + star burst land first), a warm SUCCESS
+      // haptic — a step above the ordinary move haptic — so the hands feel the
+      // beat the line describes. Once ever.
+      if (!coldOpenSettleFiredRef.current) {
+        coldOpenSettleFiredRef.current = true;
+        const t = setTimeout(() => { hapticSuccess(); }, 150);
+        return () => clearTimeout(t);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onboardingFlow.onboardingStep, puzzle.gameState, puzzle.history.length]);
@@ -1052,9 +1202,13 @@ function MainApp() {
       // The notice is a launch-moment courtesy only — on a mid-session day
       // rollover the player may be mid-puzzle, so the grant stays silent.
       if (granted && !onboardingFlow.isOnboarding && !isRollover) {
+        // A gift, not a trivial receipt: a success haptic + a bright ping so
+        // the free freeze reads as something earned, not a stray alert.
+        hapticSuccess();
+        soundValidMove(3);
         showGameAlert(
           'Free Streak Freeze',
-          'Your streak is protected for one missed day. Keep the chain alive.'
+          getStreakFreezeGrantedMessage(persistence.currentPhase)
         );
       }
     } catch {
@@ -1324,7 +1478,24 @@ function MainApp() {
     await dismissPostVictoryIntro();
   }, [postVictoryIntro, postVictoryIntroIndex, dismissPostVictoryIntro]);
 
+  // Queue an endgame cinematic on the usual 1.5s beat, but also record it so a
+  // victory exit inside the window can rescue it (see pendingEndgameEventRef).
+  const queueEndgameCinematic = useCallback((event: PhaseTransitionEvent) => {
+    pendingEndgameEventRef.current = event;
+    addVictoryTimeout(() => {
+      pendingEndgameEventRef.current = null;
+      setPhaseTransitionEvent(event);
+    }, 1500);
+  }, [addVictoryTimeout]);
+
   const startVictoryExitFlow = useCallback((action: () => void) => {
+    // Rescue a queued endgame cinematic before clearVictoryTimeouts drops its
+    // timer: play it now, over the navigation, instead of losing it forever.
+    const pendingEndgame = pendingEndgameEventRef.current;
+    if (pendingEndgame) {
+      pendingEndgameEventRef.current = null;
+      setPhaseTransitionEvent(pendingEndgame);
+    }
     clearVictoryTimeouts();
     clearVictoryToastQueue();
     // The completed puzzle's autosave must never be resumable from Play
@@ -1858,6 +2029,23 @@ function MainApp() {
 
     if (result?.completed) {
       isDragDropRef.current = false;
+      // Stop the speed clock SYNCHRONOUSLY at the win so a buzzer-beater commit
+      // can't let the countdown reach 0 and fire loss feedback before the
+      // gameState render effect tears the timer down (onSpeedTimeUp also guards
+      // on the victory lock, but stopping here closes the window entirely).
+      if (hasVariantModifier(puzzle.currentVariant, 'speed')) {
+        stopSpeedTimer();
+      }
+      // Blind Offering's end-of-board reveal (accepted): validity was hidden the
+      // whole board, so the chain validating IS the payoff. Fire the green
+      // accept-sweep + a rising chime + a success haptic, distinct from an
+      // ordinary win, in the window before the victory modal covers the board
+      // (the stars pop over the board first). The finale board keeps its silence.
+      if (puzzle.blindMode && !puzzle.isFinalBoard) {
+        fireBlindJudgment('accepted');
+        soundValidMove(3);
+        hapticSuccess();
+      }
       // This win owns the review-destack flag from here on — a stale value
       // from an earlier win must not swallow this exit's nudges.
       reviewPromptFiredRef.current = false;
@@ -2082,11 +2270,17 @@ function MainApp() {
           if (milestone) {
             const newBalance = await awardBonusAmber(milestone.amber, 'daily_streak_milestone');
             persistenceActions.setAmberBalance(newBalance);
+            // A daily-streak milestone is a distinct celebration, not a plain
+            // receipt: fire the (previously-unwired) daily_ready chime + a
+            // success haptic so it doesn't land silently like a trivial line.
+            hapticSuccess();
+            soundDailyReady();
             enqueueVictoryToast(`${milestone.message} (+${milestone.amber} amber)`, 'receipt');
           } else if (dailyProgress.streakSavedByFreeze) {
             // A banked freeze forgave a missed day — let the player know the
-            // chain survived so the protection feels real, not silent.
-            enqueueVictoryToast('🛡️ A missed day, but your daily streak held.');
+            // chain survived so the protection feels real, not silent. Phase-
+            // aware copy (the house protects warmly at every register).
+            enqueueVictoryToast(getStreakFreezeReliefMessage(persistence.currentPhase, true));
           } else if (dailyProgress.streakDecayedTo != null) {
             // Decay-to-milestone: the lapse cost the climb, not the streak —
             // name the checkpoint it held at (phase-aware copy).
@@ -2228,7 +2422,9 @@ function MainApp() {
           result.completedWords
         );
         if (microEvent) {
-          puzzleActions.setMessage(microEvent);
+          // Route through the in-modal victory toast queue (not the board Toast,
+          // which renders UNDER the victory modal scrim and would bury it).
+          enqueueVictoryToast(microEvent, 'info');
         }
       }
 
@@ -2236,14 +2432,23 @@ function MainApp() {
       // (enqueueVictoryToast) — receipts first, informational lines after,
       // nudges last — so no message clobbers another on a stacked win.
 
-      // Surface the "your streak was protected" moment when a freeze was consumed
+      // Surface the "your streak was protected" moment when a freeze was
+      // consumed — phase-aware copy (warm at every register, never scolds).
       if (victory.streakSaved) {
-        enqueueVictoryToast('🛡️ A streak freeze protected your streak!');
+        enqueueVictoryToast(getStreakFreezeReliefMessage(persistence.currentPhase, false));
       }
 
-      // Show streak milestone toast if threshold was just crossed
+      // Show streak milestone toast if threshold was just crossed. Scale the
+      // celebration to the milestone's magnitude so a 30-day chain clearly
+      // outweighs a 3-day one: EVERY milestone rings a felt success haptic and a
+      // combo-ladder ping, and the ping's tier climbs with the reward (the 3/7
+      // day tiers at tier 2, the 50/65 tiers at tier 3, the 100 crown at tier 4)
+      // instead of the small milestones landing silent like a trivial receipt.
       if (victory.streakMilestoneMessage) {
         enqueueVictoryToast(`${victory.streakMilestoneMessage} (+${victory.streakMilestoneBonus} amber)`, 'receipt');
+        const streakBonus = victory.streakMilestoneBonus ?? 0;
+        hapticSuccess();
+        soundValidMove(streakBonus >= 100 ? 4 : streakBonus >= 50 ? 3 : 2);
       }
 
       // Milestone hint trickle: a win that crossed a puzzle-count milestone
@@ -2255,6 +2460,9 @@ function MainApp() {
           if (granted) {
             puzzleActions.refreshHintBalance();
             enqueueVictoryToast(getHintGrantMessage(persistence.currentPhase), 'receipt');
+            // Acknowledge the raised count with a HINT-button pulse on the next
+            // board (the button is occluded by the victory modal right now).
+            hintPulsePendingRef.current = true;
           }
         }).catch(() => {});
       }
@@ -2310,8 +2518,12 @@ function MainApp() {
       }, 1800);
 
       // Play choreographed victory sequence (the modal gates tap-to-skip to
-      // its own entrance window via onSkip)
-      victoryActions.playVictorySequence(victory.earnedStars);
+      // its own entrance window via onSkip). The ceremony ages with the phase
+      // (heavier springs / stone-like haptics at the reveal), and BOTH quiet
+      // beats (the final board and the scripted silent victory) are hushed so
+      // the phone never celebrates while the screen performs silence.
+      const victoryHushed = wasFinalBoard || isSilentVictoryBeat(completedTotal);
+      victoryActions.playVictorySequence(victory.earnedStars, persistence.currentPhase, victoryHushed);
 
       // Phase transitions are now DEFERRED to the Offering Pit.
       // When phaseTransitionPending is true, the phase change will be confirmed
@@ -2344,7 +2556,7 @@ function MainApp() {
                     ? 'You finished what was being built. There is no pretending now.'
                     : 'You completed the house and reached the final path.',
                 });
-                addVictoryTimeout(() => setPhaseTransitionEvent(FINAL_PUZZLE_EVENT), 1500);
+                queueEndgameCinematic(FINAL_PUZZLE_EVENT);
               } else if (!(await isFinaleArmed())) {
                 // Dwell gate: the finale used to fire on the FIRST Phase-4
                 // victory, so the whole cult-reveal era flashed past in one
@@ -2379,7 +2591,7 @@ function MainApp() {
                   title: 'THE PATTERN REMEMBERS YOU',
                   text: 'You saw it through to the end. The arrangement is complete, and your words remain in every wall.',
                 });
-                addVictoryTimeout(() => setPhaseTransitionEvent(POST_REVELATION_EVENT), 1500);
+                queueEndgameCinematic(POST_REVELATION_EVENT);
               }
             }
           }
@@ -2430,11 +2642,14 @@ function MainApp() {
       // No action
       isDragDropRef.current = false;
     } else if (result.blindFailed) {
-      // Blind Offering's end-of-board reveal: the final letter landed but the
-      // chain contains a non-word. The move committed (the hook's message
-      // tells the player to undo); feedback here is the full error language,
-      // never the half-move click this result shape would otherwise hit.
+      // Blind Offering's end-of-board reveal (rejected): the final letter landed
+      // but the chain contains a non-word. The move committed (the hook's
+      // message tells the player to undo); feedback here is the full error
+      // language, never the half-move click this result shape would otherwise
+      // hit — plus the bespoke crimson reject-pulse so the apex mode's refusal
+      // lands with weight instead of a bare shake.
       isDragDropRef.current = false;
+      fireBlindJudgment('rejected');
       hapticError();
       soundInvalidMove();
       setInvalidDropSignal(prev => prev + 1);
@@ -2470,8 +2685,9 @@ function MainApp() {
         active: true,
         x: feedbackOrigin?.x ?? SCREEN_WIDTH / 2,
         y: feedbackOrigin?.y ?? SCREEN_HEIGHT * 0.4,
+        comboTier: result.comboTier ?? 0,
       });
-      addVictoryTimeout(() => setStarBurst({ active: false, x: 0, y: 0 }), 600);
+      addVictoryTimeout(() => setStarBurst({ active: false, x: 0, y: 0, comboTier: 0 }), 600);
 
       // Target-row catch bounce on BOTH inputs so the placed tile always
       // "lands" — the default/accessible tap path used to skip this and feel
@@ -2498,11 +2714,25 @@ function MainApp() {
         }
       }
 
-      // Reverse-shift midpoint: mark the descent-complete milestone with a
-      // distinct celebratory haptic so the return leg feels like a second act
-      // rather than a continuation.
+      // Reverse-shift midpoint: mark the descent->ascent turn as its own "second
+      // act" — a distinct celebratory haptic, its OWN dedicated turn chime (a
+      // rising marimba into a handbell, above the move ladder so it reads as a
+      // chapter break, not another combo step; sinks at Phase 3+), AND a phase-
+      // aware beat line (was a lone haptic with no sound or message).
       if (result.reverseMidpoint) {
         hapticSuccess();
+        soundMidpointTurn();
+        puzzleActions.setMessage(getReverseMidpointMessage(persistence.currentPhase));
+        // The descent->ascent turn gets a distinct VISUAL second act: re-fire a
+        // top-tier star burst (bigger/denser than a move's) at the board center
+        // so the chapter break is seen as well as felt/heard.
+        setStarBurst({
+          active: true,
+          x: SCREEN_WIDTH / 2,
+          y: SCREEN_HEIGHT * 0.4,
+          comboTier: 3,
+        });
+        addVictoryTimeout(() => setStarBurst({ active: false, x: 0, y: 0, comboTier: 0 }), 700);
       }
 
       // Dread word visual feedback — subtle dark pulse when a dread word is formed
@@ -2664,6 +2894,10 @@ function MainApp() {
     ) {
       return;
     }
+    // Tick the hand on a genuine crossing INTO a slot (not when leaving to
+    // empty space): the visual hover swell now has a matching haptic, so the
+    // slot boundary is felt, not only seen. hapticSelection is settings-gated.
+    if (next !== null) hapticSelection();
     hoverSlotRef.current = next;
     setHoverSlot(next);
   }, []);
@@ -2715,6 +2949,10 @@ function MainApp() {
           text: getPreviewGraduationConfirm(phase),
           onPress: () => { markOneTimeFlagSeen(PREVIEW_GRADUATION_SEEN_KEY).catch(() => {}); },
         }],
+        // "The rules just changed" — an authored narrative beat, not a mundane
+        // utility confirm. The 'beat' tone deepens the scrim, pops from further
+        // back, and wears a soft accent glow so this once-ever moment is felt.
+        'beat',
       );
     })().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fires per fresh board; actions/phase read at fire time
@@ -3264,9 +3502,14 @@ function MainApp() {
     const phase = persistence.currentPhase;
     (async () => {
       if (await hasSeenOneTimeFlag(SWIFT_HINT_SEEN_KEY)) return;
-      await markOneTimeFlagSeen(SWIFT_HINT_SEEN_KEY);
-      setTimeout(() => {
+      // TRACKED timer (cleared on unmount) — and the seen-flag is set only when
+      // the hint actually shows, so an interrupted exit can't burn the one-time
+      // beat unseen (the same class of bug the preview-graduation card had).
+      if (swiftHintTimerRef.current) clearTimeout(swiftHintTimerRef.current);
+      swiftHintTimerRef.current = setTimeout(() => {
+        swiftHintTimerRef.current = null;
         puzzleActions.setMessage(getSwiftVictoryHintMessage(phase));
+        markOneTimeFlagSeen(SWIFT_HINT_SEEN_KEY).catch(() => {});
       }, SWIFT_HINT_TOAST_DELAY_MS);
     })().catch(() => {});
   }, [victoryFlow.victoryData, onboardingFlow.isOnboarding, persistence.currentPhase, puzzleActions]);
@@ -3358,6 +3601,14 @@ function MainApp() {
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       if (onboardingFlow.isOnboarding) {
+        // On the very first interactive screen (the cold-open opener, nothing
+        // committed yet), back should EXIT the app like any first screen — a
+        // dead back button reads as broken. State is persisted; relaunch
+        // resumes the opener via resolveColdOpenLaunchRoute. Every LATER guided
+        // step still swallows back so a stray press can't abort the tutorial.
+        if (onboardingFlow.onboardingStep === 'cold_open_puzzle' && puzzle.history.length === 0) {
+          return false;
+        }
         return true;
       }
       // A pit-mandatory victory (first-harvest gate or pending ward ceremony)
@@ -3369,6 +3620,15 @@ function MainApp() {
         (victoryFlow.victoryData?.mandatoryHarvest || persistence.pendingPhaseTransition != null)
       ) {
         handleGoToPit();
+        return true;
+      }
+      // A plain victory back must run the SAME exit as the modal's Home button
+      // (handleReturnHome) so it inherits the full teardown — clear victory
+      // timeouts, reset victory + orchestration, clear the board, and honor the
+      // interstitial exemptions — instead of a bare transitionTo that left the
+      // victory flow half-torn-down.
+      if (currentScreen === 'puzzle' && puzzle.gameState === GameState.WON) {
+        handleReturnHome();
         return true;
       }
       if (currentScreen !== 'home') {
@@ -3390,7 +3650,7 @@ function MainApp() {
       return false;
     });
     return () => subscription.remove();
-  }, [currentScreen, transitionTo, onboardingFlow.isOnboarding, puzzleActions, puzzle.gameState, puzzle.unbrokenWeaveMode, victoryFlow.victoryData, persistence.pendingPhaseTransition, handleGoToPit]);
+  }, [currentScreen, transitionTo, onboardingFlow.isOnboarding, onboardingFlow.onboardingStep, puzzleActions, puzzle.gameState, puzzle.history.length, puzzle.unbrokenWeaveMode, victoryFlow.victoryData, persistence.pendingPhaseTransition, handleGoToPit, handleReturnHome]);
 
   // Optional rewarded "double the reward": credits a bonus equal to this
   // puzzle's amber (a true 2x), reward-only — never phase progress. One claim
@@ -3455,7 +3715,13 @@ function MainApp() {
     let challengeText: string | null = null;
     if (!isPlayingDaily && puzzle.currentVariant === 'standard') {
       try {
-        challengeText = buildChallengeShareText(puzzle.rows.map(r => r.originalWord));
+        // Thread the sender's phase so the taunt tone decays with the descent
+        // (spoiler-safe: never names the entity, only tints the lure).
+        challengeText = buildChallengeShareText(
+          puzzle.rows.map(r => r.originalWord),
+          undefined,
+          persistence.currentPhase,
+        );
       } catch {
         challengeText = null;
       }
@@ -3480,7 +3746,12 @@ function MainApp() {
 
   const handleVictoryTapAccelerate = useCallback(() => {
     if (!victoryFlow.victoryData) return;
-    victoryActions.skipToEnd(victoryFlow.victoryData.earnedStars);
+    // Skipping a hushed beat keeps its soft settle instead of the celebration
+    // THUD (the finale board OR the scripted silent victory).
+    const hushed =
+      victoryFlow.victoryData.finalBoard === true ||
+      isSilentVictoryBeat(victoryFlow.victoryData.puzzlesSolved ?? 0);
+    victoryActions.skipToEnd(victoryFlow.victoryData.earnedStars, hushed);
   }, [victoryFlow.victoryData, victoryActions]);
 
   const handleSelectDifficulty = useCallback((d: Difficulty) => {
@@ -3615,16 +3886,11 @@ function MainApp() {
 
   // Show loading while onboarding state is being determined
   if (!onboardingFlow.onboardingReady) {
-    return (
-      <View style={styles.initialLoadingContainer}>
-        <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-        <View style={styles.initialLoadingCard}>
-          <ActivityIndicator size="large" color={CandyColors.pink.main} />
-          <Text style={styles.initialLoadingTitle}>WordShift</Text>
-          <Text style={styles.initialLoadingSubtitle}>Preparing your house...</Text>
-        </View>
-      </View>
-    );
+    // The SAME window-relative branded hold as the bootstrap gate, so the
+    // native-splash -> bootstrap-gate -> MainApp-hydration holds read as ONE
+    // continuous branded moment instead of blinking through the old near-black
+    // (#1A1A2E, a Phase-4 color) card — or a differently-sized icon — on launch.
+    return <BootHold />;
   }
 
   // Helper: render the active screen content
@@ -3835,6 +4101,10 @@ function MainApp() {
     // Text renders nothing for undefined — so both the dot and the label go
     // through the normalizer (MEDIUM fallback, the hook's own default).
     const chipDifficulty = normalizeDifficulty(puzzle.difficulty);
+    // Phase-aware surface for the pause-state cards (board-gen / victory-record
+    // spinner + the speed Time's-Up overlay) so they track the descent instead
+    // of flashing Phase-0 white candy whenever the game pauses.
+    const pauseSurface = getSurfaceTheme(persistence.currentPhase);
     return (
       <ErrorBoundary
         fallbackMessage="Something went wrong with the puzzle. Tap to return home."
@@ -3850,7 +4120,7 @@ function MainApp() {
         <Confetti active={puzzle.showConfetti} phase={persistence.currentPhase} ritualEnergy={victoryFlow.victoryData?.ritualEnergy ?? 0} />
 
         {/* Star burst effect on valid moves */}
-        <StarBurst active={starBurst.active} x={starBurst.x} y={starBurst.y} phase={persistence.currentPhase} />
+        <StarBurst active={starBurst.active} x={starBurst.x} y={starBurst.y} phase={persistence.currentPhase} comboTier={starBurst.comboTier} />
 
         {/* Phase change dramatic flash overlay */}
         <Animated.View
@@ -3893,11 +4163,12 @@ function MainApp() {
           )}
 
           <View style={styles.headerTitleArea}>
-            <AnimatedLogo />
+            <AnimatedLogo phase={persistence.currentPhase} />
             {/* Phase indicator badge */}
             {persistence.currentPhase > 0 && (
               <View style={[
                 styles.phaseBadge,
+                persistence.currentPhase === 2 && styles.phaseBadgeDusk,
                 persistence.currentPhase >= 3 && styles.phaseBadgeDark,
                 persistence.currentPhase >= 4 && styles.phaseBadgeVoid,
               ]}
@@ -3932,8 +4203,9 @@ function MainApp() {
                 meaningless there and the double chip read as a bug. The Blind
                 badge below is the mode's one standing indicator. */}
             {puzzle.gameMode === 'challenge' && !puzzle.blindMode && (
-              <View style={[
+              <BadgeAppear style={[
                 styles.challengeBadge,
+                persistence.currentPhase === 2 && styles.challengeBadgeDusk,
                 persistence.currentPhase >= 3 && styles.challengeBadgeDark,
                 persistence.currentPhase >= 4 && styles.challengeBadgeVoid,
               ]}>
@@ -3944,26 +4216,32 @@ function MainApp() {
                   </Text>
                 )}
                 {puzzle.undosRemaining === 0 && puzzle.gameState === GameState.PLAYING && (
-                  <TouchableOpacity
-                    style={[
-                      styles.buyUndoButton,
-                      persistence.amberBalance < AMBER_UNDO_REFILL_COST && styles.buyUndoButtonDisabled,
-                    ]}
-                    onPress={handleBuyUndo}
-                    disabled={persistence.amberBalance < AMBER_UNDO_REFILL_COST}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Refill one undo for ${AMBER_UNDO_REFILL_COST} amber`}
-                  >
-                    <Text style={styles.buyUndoText}>
-                      {'\u21a9'} +1 {'\u00b7'} {AMBER_UNDO_REFILL_COST} <AmberInline size={11} />
-                    </Text>
-                  </TouchableOpacity>
+                  // The refill chip mounts mid-board the instant undos hit 0, so
+                  // it gets its own BadgeAppear entrance rather than hard-cutting
+                  // into the already-mounted challenge badge.
+                  <BadgeAppear>
+                    <TouchableOpacity
+                      style={[
+                        styles.buyUndoButton,
+                        persistence.amberBalance < AMBER_UNDO_REFILL_COST && styles.buyUndoButtonDisabled,
+                      ]}
+                      onPress={handleBuyUndo}
+                      disabled={persistence.amberBalance < AMBER_UNDO_REFILL_COST}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Refill one undo for ${AMBER_UNDO_REFILL_COST} amber`}
+                    >
+                      <Text style={styles.buyUndoText}>
+                        {'\u21a9'} +1 {'\u00b7'} {AMBER_UNDO_REFILL_COST} <AmberInline size={11} />
+                      </Text>
+                    </TouchableOpacity>
+                  </BadgeAppear>
                 )}
-              </View>
+              </BadgeAppear>
             )}
             {puzzle.currentVariant !== 'standard' && (
-              <View style={[
+              <BadgeAppear style={[
                 styles.variantBadge,
+                persistence.currentPhase === 2 && styles.variantBadgeDusk,
                 persistence.currentPhase >= 3 && styles.variantBadgeDark,
               ]}>
                 {getModeIconSprite(VARIANT_CONFIGS[puzzle.currentVariant]?.icon || '') ? (
@@ -3978,19 +4256,21 @@ function MainApp() {
                 )}
                 <Text style={[
                   styles.variantBadgeText,
+                  persistence.currentPhase === 2 && styles.variantBadgeTextDusk,
                   persistence.currentPhase >= 3 && styles.variantBadgeTextDark,
                 ]}>
                   {VARIANT_CONFIGS[puzzle.currentVariant]?.title || 'Variant'}
                 </Text>
-              </View>
+              </BadgeAppear>
             )}
             {/* Blind Offering badge — the previews are hidden, so without a
                 standing indicator the player has no way to tell blind is on
                 (or remember to turn it off). Same chrome as the variant badge. */}
             {puzzle.blindMode && (
-              <View
+              <BadgeAppear
                 style={[
                   styles.variantBadge,
+                  persistence.currentPhase === 2 && styles.variantBadgeDusk,
                   persistence.currentPhase >= 3 && styles.variantBadgeDark,
                 ]}
                 accessible
@@ -3999,14 +4279,15 @@ function MainApp() {
                 <Image source={getModeIconSprite('🌑')!} style={styles.variantBadgeIconImage} />
                 <Text style={[
                   styles.variantBadgeText,
+                  persistence.currentPhase === 2 && styles.variantBadgeTextDusk,
                   persistence.currentPhase >= 3 && styles.variantBadgeTextDark,
                 ]}>
                   {persistence.currentPhase >= 2 ? 'Blind Offering' : 'Blind'}
                 </Text>
-              </View>
+              </BadgeAppear>
             )}
             {puzzle.unbrokenWeaveMode && (
-              <View
+              <BadgeAppear
                 style={[
                   styles.variantBadge,
                   styles.variantBadgeDark,
@@ -4021,30 +4302,36 @@ function MainApp() {
                 ]}>
                   {puzzle.spentLetters.length}
                 </Text>
-              </View>
+              </BadgeAppear>
             )}
             {/* House Ask badge — the small standing reminder while an ask is
                 live on this board (soft-fail: it simply disappears unkept,
-                never scolds). Same chrome as the variant badge; the full
-                phase-aware ask line rides the accessibility label. The 🏠 is
-                an intentional emoji accent (labeled), like 🏆/📋/✨. */}
+                never scolds). Same chrome AND sprite treatment as the variant
+                badges (home.png), so no raw emoji sits beside candy sprites;
+                the full phase-aware ask line rides the accessibility label. */}
             {houseAsk !== null && (
-              <View
+              <BadgeAppear
                 style={[
                   styles.variantBadge,
+                  persistence.currentPhase === 2 && styles.variantBadgeDusk,
                   persistence.currentPhase >= 3 && styles.variantBadgeDark,
                 ]}
                 accessible
                 accessibilityLabel={getHouseAskLine(persistence.currentPhase, houseAsk.kind, houseAsk.letter)}
               >
-                <Text style={styles.variantBadgeIcon}>🏠</Text>
+                {getModeIconSprite('house') ? (
+                  <Image source={getModeIconSprite('house')!} style={styles.variantBadgeIconImage} />
+                ) : (
+                  <Text style={styles.variantBadgeIcon}>🏠</Text>
+                )}
                 <Text style={[
                   styles.variantBadgeText,
+                  persistence.currentPhase === 2 && styles.variantBadgeTextDusk,
                   persistence.currentPhase >= 3 && styles.variantBadgeTextDark,
                 ]}>
                   {houseAsk.letter.toUpperCase()}
                 </Text>
-              </View>
+              </BadgeAppear>
             )}
           </View>
 
@@ -4052,6 +4339,7 @@ function MainApp() {
             ref={difficultyChipRef}
             style={[
               styles.difficultyButton,
+              persistence.currentPhase === 2 && styles.difficultyButtonDusk,
               persistence.currentPhase >= 3 && styles.difficultyButtonDark,
               persistence.currentPhase >= 4 && styles.difficultyButtonVoid,
               showSetupSelectorIntro && styles.difficultyButtonHighlighted,
@@ -4107,9 +4395,20 @@ function MainApp() {
         </View>
         )}
 
-        {/* Toast Message */}
+        {/* Toast Message — the cold-open's guiding lines wear a warm "voice"
+            skin (cottage italic on parchment) instead of the system chrome. */}
         <View style={styles.toastContainer}>
-          <Toast message={puzzle.error || puzzle.message} isError={!!puzzle.error} phase={persistence.currentPhase} />
+          <Toast
+            message={puzzle.error || puzzle.message}
+            isError={!!puzzle.error}
+            phase={persistence.currentPhase}
+            isVoice={
+              !puzzle.error &&
+              (puzzle.message === COLD_OPEN_INSTRUCTION ||
+                puzzle.message === COLD_OPEN_FIRST_MOVE ||
+                puzzle.message === COLD_OPEN_PREVIEW_TEACH)
+            }
+          />
         </View>
 
         {/* Speed Timer — prominent display */}
@@ -4125,16 +4424,20 @@ function MainApp() {
                 speedTimer.speedTimeRemaining <= 10 && styles.speedTimerTextUrgent,
                 speedTimer.speedTimeRemaining <= SPEED_TICK_CRITICAL_SEC && styles.speedTimerTextCritical,
               ]}>
-                {'\u23F1'} {speedTimer.speedTimeRemaining}s
+                {speedTimer.speedTimeRemaining}s
               </Text>
             </Animated.View>
             {speedRound > 0 && (
-              <Text
-                style={styles.speedRoundText}
+              <Animated.View
+                style={[styles.speedRoundRow, { transform: [{ scale: speedRoundPulse }], opacity: speedRoundPulse }]}
                 accessibilityLabel={`Speed round ${speedRound + 1}, faster clock`}
               >
-                {'\uD83D\uDD25'} Round {speedRound + 1}
-              </Text>
+                <Image
+                  source={require('./assets/ui/flame.png')}
+                  style={styles.speedRoundFlame}
+                />
+                <Text style={styles.speedRoundText}>Round {speedRound + 1}</Text>
+              </Animated.View>
             )}
           </View>
         )}
@@ -4144,15 +4447,15 @@ function MainApp() {
           {/* victorySpinnerVisible only turns true when the victory record/
               persist gap outlasts a grace window — the normal brief gap never
               flashes a spinner over the celebration. */}
-          {(puzzle.gameState === GameState.LOADING || puzzle.isProcessing || victoryFlow.victorySpinnerVisible) && (
+          {(loadingGraceVisible || victoryFlow.victorySpinnerVisible) && (
             <View style={styles.loadingOverlay}>
-              <View style={styles.loadingBox}>
-                <ActivityIndicator size="large" color={CandyColors.pink.main} />
-                <Text style={styles.loadingGlyph}>{persistence.currentPhase >= 3 ? '◈' : '✦'}</Text>
-                <Text style={styles.loadingText}>
+              <View style={[styles.loadingBox, { backgroundColor: pauseSurface.cardBg, borderWidth: 1, borderColor: pauseSurface.cardBorder }]}>
+                <BrandedLoader size={44} />
+                <Text style={[styles.loadingGlyph, { color: pauseSurface.title }]}>{persistence.currentPhase >= 3 ? '◈' : '✦'}</Text>
+                <Text style={[styles.loadingText, { color: pauseSurface.title }]}>
                   {getLoadingMessage(persistence.currentPhase)}
                 </Text>
-                <Text style={styles.loadingHint}>
+                <Text style={[styles.loadingHint, { color: pauseSurface.muted }]}>
                   {persistence.currentPhase >= 3
                     ? 'The pattern settles into place...'
                     : 'This should only take a moment.'}
@@ -4164,9 +4467,9 @@ function MainApp() {
           {/* Time's Up overlay — speed variant only (GAME_OVER is set solely on time-up) */}
           {puzzle.gameState === GameState.GAME_OVER && (
             <View style={styles.loadingOverlay} accessibilityRole="alert">
-              <View style={styles.loadingBox}>
-                <Text style={styles.loadingGlyph}>{persistence.currentPhase >= 3 ? '◈' : '⏱'}</Text>
-                <Text style={styles.timeUpText}>
+              <View style={[styles.loadingBox, { backgroundColor: pauseSurface.cardBg, borderWidth: 1, borderColor: pauseSurface.cardBorder }]}>
+                <Text style={[styles.loadingGlyph, { color: pauseSurface.title }]}>{'◈'}</Text>
+                <Text style={[styles.timeUpText, { color: pauseSurface.title }]}>
                   {puzzle.message || getSpeedTimeUpMessage(persistence.currentPhase)}
                 </Text>
                 {/* Opt-in rewarded rescue — once per board. RewardedAdButton
@@ -4183,8 +4486,12 @@ function MainApp() {
                   />
                 )}
                 <View style={styles.timeUpButtonRow}>
-                  <Pressable
-                    style={styles.timeUpButtonPrimary}
+                  <CandyButton
+                    label="Try Again"
+                    phase={persistence.currentPhase}
+                    variant="primary"
+                    style={styles.timeUpButtonFlex}
+                    soundKind="none"
                     onPress={() => {
                       hapticLight();
                       // Abandoning the timed-out run resets the escalation
@@ -4193,24 +4500,22 @@ function MainApp() {
                       resetSpeedRun();
                       puzzleActions.startNewGame();
                     }}
-                    accessibilityRole="button"
                     accessibilityLabel="Try again with a new puzzle"
-                  >
-                    <Text style={styles.timeUpButtonText}>Try Again</Text>
-                  </Pressable>
-                  <Pressable
-                    style={styles.timeUpButtonSecondary}
+                  />
+                  <CandyButton
+                    label="Home"
+                    phase={persistence.currentPhase}
+                    variant="secondary"
+                    style={styles.timeUpButtonFlex}
+                    soundKind="none"
                     onPress={() => {
                       hapticLight();
                       resetSpeedRun();
                       setCurrentScreen('home');
                       puzzleActions.setGameState(GameState.IDLE);
                     }}
-                    accessibilityRole="button"
                     accessibilityLabel="Return home"
-                  >
-                    <Text style={styles.timeUpButtonTextSecondary}>Home</Text>
-                  </Pressable>
+                  />
                 </View>
               </View>
             </View>
@@ -4277,6 +4582,9 @@ function MainApp() {
               />
             ))}
           </ScrollView>
+          {/* Blind Offering judgment beat — overlays the board (pointer-
+              transparent), plays only when a blind board resolves. */}
+          <BlindJudgmentOverlay signal={blindJudgmentSignal} phase={persistence.currentPhase} />
         </View>
 
         {/* No stuck-panel / no immediate "unwinnable" announcement — product
@@ -4294,6 +4602,7 @@ function MainApp() {
             icon="↩"
             label="UNDO"
             colors={getActionButtonColors('undo', persistence.currentPhase)}
+            phase={persistence.currentPhase}
             onPress={handleUndo}
             disabled={puzzle.history.length === 0 || puzzle.gameState !== GameState.PLAYING}
           />
@@ -4301,6 +4610,8 @@ function MainApp() {
             icon="💡"
             label={puzzle.gameMode === 'challenge' ? 'HINT' : `HINT · ${puzzle.hintBalance}`}
             colors={getActionButtonColors('hint', persistence.currentPhase)}
+            phase={persistence.currentPhase}
+            pulseSignal={hintPulseSignal}
             onPress={handleHintPress}
             disabled={puzzle.gameState !== GameState.PLAYING}
             accessibilityLabel={
@@ -4314,6 +4625,7 @@ function MainApp() {
               icon="⏭"
               label={getColdOpenSkipLabel()}
               colors={getActionButtonColors('restart', persistence.currentPhase)}
+              phase={persistence.currentPhase}
               onPress={handleColdOpenSkipPress}
               disabled={false}
               accessibilityLabel={getColdOpenSkipAccessibilityLabel()}
@@ -4324,11 +4636,15 @@ function MainApp() {
             icon="🔄"
             label={puzzle.gameState === GameState.PLAYING ? "RESTART" : "NEW"}
             colors={getActionButtonColors('restart', persistence.currentPhase)}
+            phase={persistence.currentPhase}
             onPress={() => {
               hapticLight();
               // RESTART while playing resets THIS board (a true retry); NEW (idle)
               // fetches a fresh puzzle.
               if (puzzle.gameState === GameState.PLAYING) {
+                // A distinct "taking the board back" sound (the reset re-runs the
+                // Row board-serve cascade, which supplies the visual exhale).
+                soundUndo();
                 puzzleActions.resetCurrentPuzzle();
               } else {
                 puzzleActions.startNewGame();
@@ -4365,6 +4681,7 @@ function MainApp() {
           dailyTrend={dailyLadderTrend}
           socialProofLine={socialProofLine}
           eventBonusLine={eventBonusLine}
+          receiptLine={victoryReceipt}
           forceFullCeremony={phaseTransitionEvent != null}
           rewardedDoubleEnabled={victoryDoubleOffer}
           rewardedDoubleClaimed={victoryDoubleClaimed}
@@ -4398,6 +4715,12 @@ function MainApp() {
               orchestration.victoryGlitchProminent && styles.victoryGlitchOverlayProminent,
             ]}
             pointerEvents="none"
+            // The flicker is a subliminal atmospheric flash, not reading matter:
+            // keep it OUT of the screen-reader swipe order (pointerEvents alone
+            // doesn't remove it). The prominent glitch is spoken deliberately via
+            // announceForA11y (see the glitchStutter effect), so nothing is lost.
+            importantForAccessibility="no-hide-descendants"
+            accessibilityElementsHidden
           >
             <Animated.Text
               style={[
@@ -4413,16 +4736,25 @@ function MainApp() {
 
         {/* Narrative Micro-Beat — surprise moments at puzzle milestones */}
         {orchestration.showMicroBeat && orchestration.microBeat && (
-          <View style={[
+          // F38: fade + settle in/out via the orchestration hook's drivers
+          // (glitch_title hard-cuts — the hook snaps its opacity/translateY to
+          // 1/0 instantly; the whisper beats animate them).
+          <Animated.View style={[
             styles.victoryGlitchOverlay,
             (orchestration.microBeat.type === 'ambient_whisper' || orchestration.microBeat.type === 'silent_victory') && styles.microBeatWhisperOverlay,
-          ]} pointerEvents="none">
+            { opacity: orchestration.microBeatOpacity, transform: [{ translateY: orchestration.microBeatTranslateY }] },
+          ]} pointerEvents="none"
+            // Atmospheric flash; the ambient_whisper/silent_victory beats are
+            // spoken via the announce pipeline, so keep the visual node out of
+            // the screen-reader swipe order.
+            importantForAccessibility="no-hide-descendants"
+            accessibilityElementsHidden>
             <Text style={[
               orchestration.microBeat.type === 'glitch_title' ? styles.victoryGlitchText : styles.microBeatWhisperText,
             ]}>
               {orchestration.microBeat.type === 'glitch_title' ? orchestration.microBeat.glitchTitle : orchestration.microBeat.text}
             </Text>
-          </View>
+          </Animated.View>
         )}
 
         {/* Animal Whisper — ghost-like message from an animal after puzzle completion */}
@@ -4439,14 +4771,23 @@ function MainApp() {
           // pointerEvents="none": a decorative overlay that lives up to 4s —
           // it must never swallow taps meant for the board/buttons under it
           // (the whisper overlay already does the same).
-          <View style={styles.interjectionContainer} pointerEvents="none">
+          // F38: fade + settle in/out via the orchestration hook's drivers.
+          <Animated.View style={[
+            styles.interjectionContainer,
+            { opacity: orchestration.interjectionOpacity, transform: [{ translateY: orchestration.interjectionTranslateY }] },
+          ]} pointerEvents="none"
+            // Transient atmospheric nudge: keep it out of the screen-reader
+            // swipe order (the load-bearing narrative rides the whisper +
+            // announce pipeline).
+            importantForAccessibility="no-hide-descendants"
+            accessibilityElementsHidden>
             <Text style={[
               styles.interjectionText,
               persistence.currentPhase >= 3 && styles.interjectionTextDark,
             ]}>
               {orchestration.interjection.text}
             </Text>
-          </View>
+          </Animated.View>
         )}
 
         {/* Dread Pulse — subtle dark flash when a dread word is formed */}
@@ -4572,6 +4913,20 @@ function MainApp() {
     );
   };
 
+  // A blocking full-screen overlay (the victory modal, the Time's-Up GAME_OVER
+  // overlay, or a phase-transition cinematic) is up: the screen underneath is
+  // visually occluded, so it must be hidden from the screen reader too, or
+  // VoiceOver/TalkBack focus leaks into the board/home behind the overlay.
+  const victoryModalVisible =
+    puzzle.gameState === GameState.WON &&
+    !(onboardingFlow.isOnboarding &&
+      (onboardingFlow.onboardingStep === 'puzzle_complete' ||
+        onboardingFlow.onboardingStep === 'going_to_pit'));
+  const blockingOverlayActive =
+    victoryModalVisible ||
+    puzzle.gameState === GameState.GAME_OVER ||
+    phaseTransitionEvent != null;
+
   // Render screen with global overlays on top
   return (
     <View style={{ flex: 1, backgroundColor: rootBgColor }}>
@@ -4579,12 +4934,23 @@ function MainApp() {
           boundaries; this outer one covers the secondary screens (settings,
           stats, ledger, gallery, pit) so a render error on any of them returns
           the player home instead of crashing the entire app. */}
+      <Animated.View
+        style={{
+          flex: 1,
+          transform: screenRevealKind === 'sink'
+            ? [{ translateY: screenRevealAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -14] }) }]
+            : [{ scale: screenRevealAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.02] }) }],
+        }}
+        accessibilityElementsHidden={blockingOverlayActive}
+        importantForAccessibility={blockingOverlayActive ? 'no-hide-descendants' : 'auto'}
+      >
       <ErrorBoundary
         fallbackMessage="Something went wrong. Tap to return home."
         onReset={() => setCurrentScreen('home')}
       >
         {renderScreen()}
       </ErrorBoundary>
+      </Animated.View>
       {/* Screen transition overlay — solid cover that fades in/out during navigation */}
       <Animated.View
         pointerEvents="none"
@@ -4670,6 +5036,41 @@ function MainApp() {
 // migrations and remount MainApp (restoreFromCloudData already invalidates
 // the service caches, so the remount re-reads the restored save).
 const BOOT_RESTORE_RACE_MS = 2500;
+
+/**
+ * The branded boot hold (F97/F119/F127): the fox icon card + wooden wordmark +
+ * quiet spinner on the splash cream, sized RELATIVE TO THE WINDOW so it mirrors
+ * the native splash's `contain` math (square 1600 art master) on every device
+ * instead of a fixed 152/244px that jumped on the splash->JS handoff. Shared by
+ * the App bootstrap gate and MainApp's onboarding-hydration gate so all three
+ * holds (native splash, bootstrap, hydration) read as ONE continuous frame.
+ */
+function BootHold() {
+  const { width, height } = useWindowDimensions();
+  const m = Math.min(width, height);
+  const iconSize = Math.round(m * (740 / 1600));
+  const wordmarkWidth = Math.round(m * (810 / 1600));
+  const gap = Math.round(m * (64 / 1600));
+  return (
+    <View style={bootStyles.container}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
+      <View style={[bootStyles.iconCard, { width: iconSize, height: iconSize, borderRadius: Math.round(iconSize * 0.18), marginBottom: gap }]}>
+        <Image
+          source={require('./assets/icon.png')}
+          style={bootStyles.iconImage}
+          resizeMode="cover"
+          accessibilityLabel="WordShift"
+        />
+      </View>
+      <Image
+        source={require('./assets/ui/wordmark.png')}
+        style={{ width: wordmarkWidth, height: Math.round(wordmarkWidth * 0.25) }}
+        resizeMode="contain"
+      />
+      <BrandedLoader size={30} style={{ marginTop: Math.round(gap * 1.4) }} />
+    </View>
+  );
+}
 
 function App() {
   const [bootReady, setBootReady] = useState(false);
@@ -4778,25 +5179,7 @@ function App() {
       {bootReady ? (
         <MainApp key={appEpoch} />
       ) : (
-        <View style={bootStyles.container}>
-          {/* Fox app-icon art as a rounded card + wooden wordmark — mirrors the
-              native splash composition so the OS-splash -> JS-boot handoff reads
-              as one continuous branded hold, not a hard cut. */}
-          <View style={bootStyles.iconCard}>
-            <Image
-              source={require('./assets/icon.png')}
-              style={bootStyles.iconImage}
-              resizeMode="cover"
-              accessibilityLabel="WordShift"
-            />
-          </View>
-          <Image
-            source={require('./assets/ui/wordmark.png')}
-            style={bootStyles.wordmark}
-            resizeMode="contain"
-          />
-          <ActivityIndicator size="small" color="#8B7BB8" style={bootStyles.spinner} />
-        </View>
+        <BootHold />
       )}
     </SafeAreaProvider>
   );
@@ -4812,19 +5195,11 @@ const bootStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // Rounded fox card — corner radius matches the icon's own ~18% baked rounding
-  // and the native splash mask, with a soft shadow for the same lifted look.
+  // Rounded fox card — width/height/borderRadius/marginBottom are supplied
+  // window-relative by BootHold (F127). No shadow: the native splash card is
+  // shadowless, so a boot shadow made the handoff visibly pop.
   iconCard: {
-    width: 152,
-    height: 152,
-    borderRadius: 28,
     overflow: 'hidden',
-    marginBottom: 22,
-    shadowColor: '#28142A',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.18,
-    shadowRadius: 14,
-    elevation: 8,
   },
   iconImage: {
     width: '100%',

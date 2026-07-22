@@ -8,11 +8,12 @@ import {
   Image,
   Modal,
 } from 'react-native';
-import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
+import { SURFACE, getSurfaceTheme, getModalInSpring } from '../theme/surfaces';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
 import { PanelCard } from './ui/PanelCard';
 import { CandyButton } from './ui/CandyButton';
 import { getSettingsSync } from '../services/settings';
+import { FONT_SIZE } from '../theme/typeScale';
 
 const BELL_ICON = require('../../assets/ui/bell.png');
 
@@ -73,7 +74,7 @@ export const NotificationPromptModal: React.FC<NotificationPromptModalProps> = (
       }),
       Animated.spring(cardScale, {
         toValue: 1,
-        ...SURFACE.modalIn,
+        ...getModalInSpring(phase),
         useNativeDriver: true,
       }),
       Animated.timing(cardOpacity, {
@@ -214,7 +215,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   iconGlyph: {
-    fontSize: 30,
+    fontSize: FONT_SIZE.hero,
     fontFamily: BODY_FONT,
   },
   iconImage: {
@@ -222,14 +223,14 @@ const styles = StyleSheet.create({
     height: 38,
   },
   title: {
-    fontSize: 22,
+    fontSize: FONT_SIZE.headline,
     fontWeight: '900',
     fontFamily: PIXEL_FONT_BOLD,
     letterSpacing: 0.3,
     textAlign: 'center',
   },
   body: {
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '600',
     fontFamily: PIXEL_FONT_BOLD,
     lineHeight: 21,

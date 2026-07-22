@@ -32,6 +32,7 @@ import {
 } from '../theme/pixelSkin.generated';
 import { NineSliceFrame, ThreeSliceStrip } from './ui/NineSlice';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
+import { FONT_SIZE } from '../theme/typeScale';
 
 // FoxGuide is always a Phase-0 tutorial moment → bright cottage skin.
 const FOX_SKIN = getPixelSkin(0);
@@ -66,7 +67,7 @@ const foxBevelStyles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingBottom: BTN_SHADOW_DP,
   },
-  label: { fontFamily: PIXEL_FONT_BOLD, fontSize: 15, fontWeight: '800', letterSpacing: 0.4 },
+  label: { fontFamily: PIXEL_FONT_BOLD, fontSize: FONT_SIZE.callout, fontWeight: '800', letterSpacing: 0.4 },
 });
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -260,10 +261,11 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
   // is a Phase-0 Fox moment)
   const dt = getDialogueTheme(0);
   const isCompact = variant === 'compact';
-  // Talk frame while the toggle is "on" (same source selection as the
-  // HomeScreen dialogue portrait); fall back across missing sprites so the
-  // portrait never flips to the emoji mid-conversation.
-  const foxSprite = isTalking && foxTalkSprite ? foxTalkSprite : (foxIdleSprite ?? foxTalkSprite);
+  // Idle + talk are PRE-MOUNTED and opacity-switched (never swap one Image's
+  // `source` per talk tick — the async re-decode flickers the first cycle, the
+  // exact anti-pattern the codebase bans; F29). Mirrors the HomeScreen portrait.
+  const hasFoxSprite = Boolean(foxIdleSprite || foxTalkSprite);
+  const showTalkFox = Boolean(isTalking && foxTalkSprite);
 
   return (
     <Animated.View
@@ -302,13 +304,26 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
               (the accent rail was removed with the home dialogue's). */}
           <View style={isCompact ? styles.compactSpriteCol : styles.dialogueSpriteCol}>
             <Animated.View style={{ transform: [{ translateY: bounceAnim }] }}>
-              {foxSprite ? (
-                <Image
-                  source={foxSprite}
+              {hasFoxSprite ? (
+                <View
                   style={isCompact ? styles.compactSpriteImage : styles.dialogueSpriteImage}
-                  resizeMode="cover"
                   accessibilityLabel="Ember portrait"
-                />
+                >
+                  {foxIdleSprite && (
+                    <Image
+                      source={foxIdleSprite}
+                      style={[styles.foxSpriteLayer, showTalkFox && styles.foxSpriteLayerHidden]}
+                      resizeMode="cover"
+                    />
+                  )}
+                  {foxTalkSprite && (
+                    <Image
+                      source={foxTalkSprite}
+                      style={[styles.foxSpriteLayer, !showTalkFox && Boolean(foxIdleSprite) && styles.foxSpriteLayerHidden]}
+                      resizeMode="cover"
+                    />
+                  )}
+                </View>
               ) : (
                 <Text style={isCompact ? styles.compactSpriteEmoji : styles.dialogueSpriteEmoji}>🦊</Text>
               )}
@@ -440,6 +455,18 @@ const styles = StyleSheet.create({
     width: SCREEN_WIDTH * 0.36,
     height: SCREEN_WIDTH * 0.48,
   },
+  // Pre-mounted idle/talk stack (F29): absolute layers with EXPLICIT 100% size
+  // (an inset-only Image collapses to intrinsic size on Fabric).
+  foxSpriteLayer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+  },
+  foxSpriteLayerHidden: {
+    opacity: 0,
+  },
   dialogueSpriteEmoji: {
     fontFamily: BODY_FONT,
     fontSize: Math.min(80, SCREEN_WIDTH * 0.2),
@@ -456,7 +483,7 @@ const styles = StyleSheet.create({
   // Portrait nameplate below the sprite, centered in the alcove.
   dialogueName: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '900',
     letterSpacing: 0.5,
     textAlign: 'center',
@@ -480,7 +507,7 @@ const styles = StyleSheet.create({
   },
   dialogueText: {
     fontFamily: BODY_FONT,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     lineHeight: 25,
     letterSpacing: 0.2,
   },
@@ -495,7 +522,7 @@ const styles = StyleSheet.create({
   },
   dialogueSkipText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '600',
   },
 
@@ -523,7 +550,7 @@ const styles = StyleSheet.create({
   },
   compactSpriteEmoji: {
     fontFamily: BODY_FONT,
-    fontSize: 48,
+    fontSize: FONT_SIZE.giant,
   },
   compactTextCol: {
     flex: 1,
@@ -533,7 +560,7 @@ const styles = StyleSheet.create({
   },
   compactName: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '900',
     letterSpacing: 0.4,
     textAlign: 'center',
@@ -557,7 +584,7 @@ const styles = StyleSheet.create({
   },
   compactText: {
     fontFamily: BODY_FONT,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     lineHeight: 22,
     letterSpacing: 0.2,
   },
@@ -572,7 +599,7 @@ const styles = StyleSheet.create({
   },
   compactSkipText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '600',
     lineHeight: 17,
     letterSpacing: 0.4,

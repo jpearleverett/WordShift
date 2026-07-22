@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { FONT_SIZE } from '../../theme/typeScale';
 import {
   View,
   Text,
@@ -23,7 +24,7 @@ import { Animal, Room, HomeWorldProgress } from '../../types/homeWorld';
 import { HouseWorld } from './HouseWorld';
 import { CHARACTER_SPRITES } from './AnimalSprite';
 import { CandyColors, getDialogueTheme, getPhaseTheme } from '../../theme/colors';
-import { SURFACE, getPressSpring, getSurfaceTheme } from '../../theme/surfaces';
+import { SURFACE, getPressSpring, getSurfaceTheme, getModalInSpring } from '../../theme/surfaces';
 import {
   getPixelSkin,
   PANEL_CORNER_DP,
@@ -39,6 +40,7 @@ import { NineSliceFrame, ThreeSliceStrip } from '../ui/NineSlice';
 import { PixelPlaque } from '../ui/PixelPlaque';
 import { CandyButton } from '../ui/CandyButton';
 import { PanelCard } from '../ui/PanelCard';
+import { RewardReveal, countUpDisplayValue, getCountUpDurationMs } from '../ui/RewardReveal';
 import {
   getFullProgress,
   markIntroSeen,
@@ -65,6 +67,7 @@ import { shouldSimplifyAnimations } from '../../services/deviceTier';
 import { AUTO_COLLECT_PUZZLE_LIMIT, HARVEST_NUDGE_MIN_AMBER, JOURNAL_UNLOCK_PUZZLES } from '../../constants/gameBalance';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { AmberInline } from '../AmberInline';
+import { getModeIconSprite } from '../puzzle/modeIcons';
 
 // Candy-style UI icon sprites (cross-platform consistent, replaces emoji)
 const AMBER_ICON = require('../../../assets/ui/amber.png');
@@ -80,6 +83,30 @@ const HINT_ICON = require('../../../assets/ui/hint.png');
 const STAR_ICON = require('../../../assets/ui/star_filled.png');
 const QUEST_ICON = require('../../../assets/ui/quest.png');
 const MENU_ICON = require('../../../assets/ui/menu.png');
+// Phase-mood sprites (generateUiIcons candy-UI family) de-emoji the descent's
+// hero moments: the sacrifice altar's focal candle and the phase-4 temple crest.
+const CANDLE_ICON = require('../../../assets/ui/candle.png');
+const VOID_ICON = require('../../../assets/ui/void.png');
+// Journal-spotlight step sprites (generateUiIcons family) replace the old raw
+// emoji glyphs. Keyed on the step's stable id so the mapping never depends on
+// an emoji codepoint. JOURNAL_ICON (above) covers the cover + ledger steps.
+const SCROLL_ICON = require('../../../assets/ui/scroll.png');
+const CALENDAR_ICON = require('../../../assets/ui/calendar.png');
+const SPARKLE_ICON = require('../../../assets/ui/emote_sparkle.png');
+function getJournalSpotlightStepSprite(stepId: string) {
+  switch (stepId) {
+    case 'gallery':
+      return SCROLL_ICON;
+    case 'quests':
+      return CALENDAR_ICON;
+    case 'open':
+      return SPARKLE_ICON;
+    case 'cover':
+    case 'ledger':
+    default:
+      return JOURNAL_ICON;
+  }
+}
 import {
   getChallengeIntroLines,
   getHouseCompletionText,
@@ -92,6 +119,7 @@ import {
   getHarvestHomeIntroLines,
   getHarvestNudgeLine,
   getUnbrokenWeaveIntroLines,
+  getReservedBuiltItselfLine,
 } from '../../services/phaseNarrative';
 import {
   ROOMS,
@@ -161,8 +189,10 @@ import { DailyChallengeCard } from '../DailyChallengeCard';
 import { isDailyChallengeUnlocked, getDailyStatus } from '../../services/dailyChallenge';
 import { areUpgradesAvailable, getPurchasedUpgrades, getDeepenedRooms, getAttunedRooms } from '../../services/roomUpgrades';
 import { getTendingLevel } from '../../services/tending';
-import { hapticLight, hapticSelection, hapticMedium } from '../../services/haptics';
+import { hapticLight, hapticSelection, hapticMedium, hapticHeavy, hapticSuccess } from '../../services/haptics';
 import { playUiSound, type UiSoundKind } from '../../services/uiSound';
+import { playUiHaptic } from '../../services/uiHaptic';
+import { announceForA11y } from '../../services/a11yAnnounce';
 import { logEvent } from '../../services/eventLogger';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -256,8 +286,8 @@ export const getJournalQuestLabel = (
   actionableCount: number,
   claimableAmber: number,
 ): string => {
-  if (claimableAmber > 0) return `🗓 Quests (+${claimableAmber})`;
-  return actionableCount > 0 ? `🗓 Quests (${actionableCount})` : '🗓 Quests';
+  if (claimableAmber > 0) return `Quests (+${claimableAmber})`;
+  return actionableCount > 0 ? `Quests (${actionableCount})` : 'Quests';
 };
 
 /** Screen-reader label for the quest pill: actionable count, claimable amber, daily reset. */
@@ -283,15 +313,18 @@ export const getQuestPillAccessibilityLabel = (
 const SpringIn: React.FC<{
   style?: StyleProp<ViewStyle>;
   claimTouches?: boolean;
+  /** Narrative phase — ages the entrance spring so home modals settle heavier
+   *  with the descent instead of bouncing candy-bright at every phase. */
+  phase?: number;
   children: React.ReactNode;
-}> = ({ style, claimTouches, children }) => {
+}> = ({ style, claimTouches, phase = 0, children }) => {
   const reducedMotion = getSettingsSync().reducedMotion;
   const scale = useRef(new Animated.Value(reducedMotion ? 1 : 0.92)).current;
   useEffect(() => {
     if (reducedMotion) return;
     const anim = Animated.spring(scale, {
       toValue: 1,
-      ...SURFACE.modalIn,
+      ...getModalInSpring(phase),
       useNativeDriver: true,
     });
     anim.start();
@@ -418,9 +451,15 @@ const BevelRowButton: React.FC<{
   const [pressed, setPressed] = useState(false);
   const buttonSkin = skin.buttons[variant === 'secondary' ? 'secondary' : 'primary'].md;
   const handlePress = useCallback(() => {
-    if (soundKind !== 'none') playUiSound(soundKind);
+    if (soundKind !== 'none') {
+      // F88: pair the press sound with a light haptic so the shared cottage
+      // buttons speak one touch vocabulary (CandyButton does the same). A
+      // 'none' button opts out of both — its handler owns any feedback.
+      playUiSound(soundKind);
+      playUiHaptic(variant === 'secondary' ? 'selection' : 'light');
+    }
     onPress();
-  }, [soundKind, onPress]);
+  }, [soundKind, onPress, variant]);
   const handlePressIn = useCallback(() => {
     setPressed(true);
     if (reducedMotion) return;
@@ -499,6 +538,14 @@ let heavyHarvestNudgeShownThisSession = false;
 // intro cards never flicker over each other.
 const GATED_ROOM_INTRO_SETTLE_MS = 500;
 
+// Onboarding (home_empty): how long the empty-home reveal breathes before the
+// invite prompt slides in. Long enough for the player to read Ember's ~15-word
+// payoff line ("Hello up there!") before the modal scrim covers it. The safety
+// net below stays a short beat BEHIND this so it never preempts the readable
+// pause on the happy path (it only fires when the primary invite never armed).
+const INVITE_PROMPT_REVEAL_DELAY_MS = 2600;
+const INVITE_PROMPT_SAFETY_DELAY_MS = INVITE_PROMPT_REVEAL_DELAY_MS + 200;
+
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   onPlayPuzzle,
   onStartDaily,
@@ -552,8 +599,26 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const introDialogueSlide = useRef(new Animated.Value(0)).current;
   const [highlightPlayButton, setHighlightPlayButton] = useState(false);
 
+  // Header amber count-up: the pill's number CLIMBS to its new total (rAF, JS
+  // thread) and the gem pops scaled to the size of the gain instead of a
+  // magnitude-blind fixed pop. Snaps (no climb/pop) on the first read, on a
+  // spend (decrease), and under reduced motion / low-tier devices.
+  const [displayAmber, setDisplayAmber] = useState(0);
+  const displayAmberRef = useRef(0);
+  const amberInitedRef = useRef(false);
+  const amberCountRafRef = useRef(0);
+
   // Celebration state
   const [showCelebration, setShowCelebration] = useState(false);
+  // A reserved room that finished its own wait gets a bespoke in-world arrival
+  // line (fades in over the world with the celebration confetti, cleared when
+  // the confetti completes).
+  const [reservedArrivalLine, setReservedArrivalLine] = useState<string | null>(null);
+  const reservedArrivalOpacity = useRef(new Animated.Value(0)).current;
+  // Quest-card cash-out: the just-claimed card pops + settles (native driver,
+  // reduced-motion aware) so the reward visibly leaves the card.
+  const [claimedFlashId, setClaimedFlashId] = useState<string | null>(null);
+  const questCashOut = useRef(new Animated.Value(1)).current;
 
   // House completion ceremony state
   const [showHouseCompletion, setShowHouseCompletion] = useState(false);
@@ -568,6 +633,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [showSacrificeModal, setShowSacrificeModal] = useState(false);
   const [sacrificeMessage, setSacrificeMessage] = useState<string | null>(null);
   const [offeringTotal, setOfferingTotal] = useState(0);
+  // The monument line's number CLIMBS when an offering raises it (was a snap).
+  // Snaps on the first read after the altar opens (never counts the lifetime
+  // total up from 0) and under reduced motion.
+  const [displayedOfferingTotal, setDisplayedOfferingTotal] = useState(0);
+  const displayedTotalRef = useRef(0);
+  const monumentInitedRef = useRef(false);
+  const monumentRafRef = useRef(0);
   const [offeringCount, setOfferingCount] = useState(0);
   const [offerStreak, setOfferStreak] = useState(0);
   const [offeringTierUp, setOfferingTierUp] = useState<string | null>(null);
@@ -581,7 +653,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Weekly quest hub
   const [weeklyQuestState, setWeeklyQuestState] = useState<CombinedQuestState | null>(null);
   const [showQuestModal, setShowQuestModal] = useState(false);
-  const [questFeedback, setQuestFeedback] = useState<string | null>(null);
+  // Quest reward reveal: the claim (and the opt-in watch-to-double) pays out as
+  // a RewardReveal count-up + amber-icon pop instead of a static text line. The
+  // id remounts the reveal so each payout re-animates (claim, then double).
+  const [questReward, setQuestReward] = useState<{ amount: number; label: string; id: number } | null>(null);
+  const questRewardIdRef = useRef(0);
   // After a quest is claimed, an OPT-IN rewarded ad can double that reward
   // (placement 'quest_bonus'). Holds the just-claimed reward so the button
   // knows how much bonus amber to grant; cleared on double, re-claim, or reopen.
@@ -657,6 +733,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     ]);
 
     if (claimed) {
+      // Distinct arrival for a reserved room that finished its own wait: a
+      // success haptic, a bespoke in-world line, and the phase-aware celebration
+      // confetti (never the silent generic pop).
+      hapticSuccess();
+      setReservedArrivalLine(getReservedBuiltItselfLine(progressData.currentPhase));
+      const reducedArrival = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
+      reservedArrivalOpacity.setValue(reducedArrival ? 1 : 0);
+      if (!reducedArrival) {
+        Animated.timing(reservedArrivalOpacity, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }).start();
+      }
       setShowCelebration(true);
     }
 
@@ -801,6 +891,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     loadDialogueSessions(); // Load session data
   }, []);
 
+  // iOS live-region fallback for the dialogue cooldown toast: accessibilityLiveRegion
+  // is Android-only, so speak the message through the announce bridge on iOS when
+  // it appears (guarded against empty so it never announces a cleared toast).
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    const msg = (dialogueFlow.cooldownMessage ?? '').trim();
+    if (msg) announceForA11y(msg);
+  }, [dialogueFlow.cooldownMessage]);
+
   // Reload when an App-level amber-changing modal (Store/Patron) closes over
   // home — without this, a purchased amber pack doesn't register against the
   // next unlock (bar, Reserve/Skip affordability) until the screen remounts.
@@ -821,12 +920,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     unlockFlow.recheckAffordability();
   }, [progress?.amber, unlockFlow.recheckAffordability]);
 
-  // Onboarding: auto-show invite prompt when data is loaded during home_empty step
+  // Onboarding: auto-show invite prompt when data is loaded during home_empty.
+  // Deferred ~2.6s so the empty-home reveal (the little den) lands FIRST AND the
+  // player can comfortably READ Ember's payoff line before the modal scrim
+  // covers it — the invite prompt's "Hello up there!" then reads as a response
+  // to the player discovering the den, not a modal that buries the moment under
+  // its scrim too fast. Tracked timer, cleared if the step/unlock changes.
   useEffect(() => {
     if (onboardingStep === 'home_empty' && progress && unlockFlow.nextUnlock) {
-      // Automatically show the invite prompt for Fox
       if (unlockFlow.nextUnlock.type === 'character' && unlockFlow.nextUnlock.cost === 0) {
-        unlockFlow.setShowInvitePrompt(true);
+        const t = setTimeout(() => unlockFlow.setShowInvitePrompt(true), INVITE_PROMPT_REVEAL_DELAY_MS);
+        return () => clearTimeout(t);
       }
     }
   }, [onboardingStep, progress, unlockFlow.nextUnlock]);
@@ -852,7 +956,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         homeEmptyRecoveryAttemptsRef.current += 1;
         loadAllData();
       }
-    }, 1500);
+    }, INVITE_PROMPT_SAFETY_DELAY_MS);
     return () => clearTimeout(t);
   }, [onboardingStep, unlockFlow.showInvitePrompt, unlockFlow.nextUnlock]);
 
@@ -1212,6 +1316,43 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     return () => { cancelled = true; };
   }, [showSacrificeModal]);
 
+  // Reset the monument climb latch when the altar closes so the next open snaps
+  // to the loaded total instead of counting the whole lifetime up from zero.
+  useEffect(() => {
+    if (!showSacrificeModal) monumentInitedRef.current = false;
+  }, [showSacrificeModal]);
+
+  // Climb the monument total when an offering raises it (snap on first read /
+  // reduced motion / a non-increase). JS-thread rAF tick, cancelled on change.
+  useEffect(() => {
+    const from = displayedTotalRef.current;
+    const to = offeringTotal;
+    const reduced = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
+    if (!monumentInitedRef.current || reduced || to <= from) {
+      monumentInitedRef.current = true;
+      displayedTotalRef.current = to;
+      setDisplayedOfferingTotal(to);
+      return;
+    }
+    const duration = getCountUpDurationMs(to - from, progress?.currentPhase ?? 0);
+    if (duration <= 0) {
+      displayedTotalRef.current = to;
+      setDisplayedOfferingTotal(to);
+      return;
+    }
+    const startedAt = Date.now();
+    const tick = () => {
+      const f = Math.min(1, (Date.now() - startedAt) / duration);
+      const v = countUpDisplayValue(f, to, from);
+      displayedTotalRef.current = v;
+      setDisplayedOfferingTotal(v);
+      if (f < 1) monumentRafRef.current = requestAnimationFrame(tick);
+    };
+    monumentRafRef.current = requestAnimationFrame(tick);
+    return () => { if (monumentRafRef.current) cancelAnimationFrame(monumentRafRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- climb keyed on the total; phase read at fire time
+  }, [offeringTotal]);
+
   // Shared offering action for both the amount chips and "Offer everything".
   // The altar stays OPEN: it updates the running monument + the in-session
   // devotion streak (which escalates the arrangement's response) and flares the
@@ -1233,13 +1374,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setOfferingCount(result.count);
     setOfferingTierUp(result.tierUp ? result.tierUp.title : null);
     setConfirmEverything(false);
-    hapticMedium();
+    // Feedback ramps with the weight of the offering: a fervent in-session
+    // streak, a milestone, a devotion tier-up, or giving everything all land as
+    // a heavier haptic and a flare that HOLDS at its peak before settling,
+    // where an ordinary offering gets the medium tap and a quick flare. Every
+    // offering now also has a voice — the arrangement swallowing it (the pit
+    // devour cue) instead of the old silence.
+    const intenseOffering = everything || result.isMilestone || !!result.tierUp || nextStreak >= 6;
+    if (intenseOffering) hapticHeavy(); else hapticMedium();
+    playUiSound('devour');
     const rm = getSettingsSync().reducedMotion;
     if (!rm) {
       sacrificePulse.setValue(0);
       Animated.sequence([
-        Animated.timing(sacrificePulse, { toValue: 1, duration: 160, useNativeDriver: true }),
-        Animated.timing(sacrificePulse, { toValue: 0, duration: 520, useNativeDriver: true }),
+        Animated.timing(sacrificePulse, { toValue: 1, duration: intenseOffering ? 180 : 160, useNativeDriver: true }),
+        ...(intenseOffering ? [Animated.delay(200)] : []),
+        Animated.timing(sacrificePulse, { toValue: 0, duration: intenseOffering ? 640 : 520, useNativeDriver: true }),
       ]).start();
     }
     // Milestone offerings become permanent collectibles in the Whisper Gallery,
@@ -1375,7 +1525,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     }
   }, [showIntroDialogue, journalSpotlightVisible]);
 
-  // Slide animation for intro dialogue (matches normal dialogue)
+  // Slide animation for intro dialogue (matches normal dialogue). The entrance
+  // spring ages with the descent like every other surface (bright springy
+  // overshoot -> heavy dark settle).
   useEffect(() => {
     if (showIntroDialogue) {
       introDialogueSlide.setValue(0);
@@ -1383,32 +1535,82 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       if (settings.reducedMotion) {
         introDialogueSlide.setValue(1);
       } else {
+        const entranceSpring = getModalInSpring(progress?.currentPhase ?? 0);
         Animated.spring(introDialogueSlide, {
           toValue: 1,
-          friction: 8,
-          tension: 65,
+          friction: entranceSpring.friction,
+          tension: entranceSpring.tension,
           useNativeDriver: true,
         }).start();
       }
     }
-  }, [showIntroDialogue, introDialogueSlide]);
+  }, [showIntroDialogue, introDialogueSlide, progress?.currentPhase]);
 
-  // Animate amber when it changes
+  // Count the header amber up to its new total and pop the gem, scaling the pop
+  // to the SIZE of the gain (a small win taps, a windfall bursts) instead of a
+  // fixed magnitude-blind 1.2. The number ticks on the JS thread (rAF), the gem
+  // scales on the native driver. Snaps (no climb/pop) on the first read, on a
+  // spend, and under reduced motion / low-tier devices.
   useEffect(() => {
-    if (progress) {
-      Animated.sequence([
-        Animated.timing(amberPulse, {
-          toValue: 1.2,
-          duration: 150,
-          useNativeDriver: true,
-        }),
-        Animated.timing(amberPulse, {
-          toValue: 1,
-          duration: 150,
-          useNativeDriver: true,
-        }),
-      ]).start();
+    if (!progress) return;
+    const to = progress.amber;
+    const from = displayAmberRef.current;
+    const reduced = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
+
+    if (amberCountRafRef.current) {
+      cancelAnimationFrame(amberCountRafRef.current);
+      amberCountRafRef.current = 0;
     }
+
+    // First read, a spend, or reduced motion: snap the number, hold the gem.
+    if (!amberInitedRef.current || reduced || to <= from) {
+      amberInitedRef.current = true;
+      displayAmberRef.current = to;
+      setDisplayAmber(to);
+      amberPulse.setValue(1);
+      return;
+    }
+
+    const gain = to - from;
+
+    // Count-up (rAF, JS thread) using the shared RewardReveal tick math.
+    const duration = getCountUpDurationMs(gain, progress.currentPhase);
+    if (duration <= 0) {
+      displayAmberRef.current = to;
+      setDisplayAmber(to);
+    } else {
+      const startedAt = Date.now();
+      const tick = () => {
+        const f = Math.min(1, (Date.now() - startedAt) / duration);
+        const v = countUpDisplayValue(f, to, from);
+        displayAmberRef.current = v;
+        setDisplayAmber(v);
+        if (f < 1) {
+          amberCountRafRef.current = requestAnimationFrame(tick);
+        } else {
+          amberCountRafRef.current = 0;
+        }
+      };
+      amberCountRafRef.current = requestAnimationFrame(tick);
+    }
+
+    // Pop the gem, scaled to the gain. The currency's excitement still cools
+    // with the house (a smaller ceiling at Phase 4+).
+    const basePeakDelta = progress.currentPhase >= 4 ? 0.12 : 0.2;
+    const magnitude = Math.min(1, Math.max(0.25, gain / 60));
+    const peak = 1 + basePeakDelta * magnitude;
+    amberPulse.setValue(1);
+    Animated.sequence([
+      Animated.timing(amberPulse, { toValue: peak, duration: 150, useNativeDriver: true }),
+      Animated.timing(amberPulse, { toValue: 1, duration: 150, useNativeDriver: true }),
+    ]).start();
+
+    return () => {
+      if (amberCountRafRef.current) {
+        cancelAnimationFrame(amberCountRafRef.current);
+        amberCountRafRef.current = 0;
+      }
+    };
   }, [progress?.amber]);
 
   // Highlight pulse for the PLAY button when Fox nudges the player onward.
@@ -1531,10 +1733,26 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       });
       setWeeklyQuestState(refreshed);
     }
-    setQuestFeedback(null);
+    setQuestReward(null);
     setDoubleQuestOffer(null);
     setShowQuestModal(true);
   }, [progress, animals]);
+
+  // Cash out the just-claimed quest card: a native-driver scale pop that settles
+  // so the reward visibly leaves the card (reduced-motion / low-tier pins it).
+  const runQuestCashOut = useCallback((questId: string) => {
+    setClaimedFlashId(questId);
+    if (getSettingsSync().reducedMotion || shouldSimplifyAnimations()) {
+      questCashOut.setValue(1);
+      setClaimedFlashId(null);
+      return;
+    }
+    questCashOut.setValue(1);
+    Animated.sequence([
+      Animated.timing(questCashOut, { toValue: 1.06, duration: 150, useNativeDriver: true }),
+      Animated.spring(questCashOut, { toValue: 1, friction: 5, tension: 140, useNativeDriver: true }),
+    ]).start(() => setClaimedFlashId(null));
+  }, [questCashOut]);
 
   const handleClaimQuest = useCallback(async (questId: string) => {
     if (!progress) return;
@@ -1544,7 +1762,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const newBalance = await awardBonusAmber(reward.amber, 'quest_reward');
     onAmberChange?.(newBalance);
     setProgress(prev => prev ? { ...prev, amber: newBalance } : prev);
-    setQuestFeedback(`Claimed +${reward.amber} amber!`);
+    questRewardIdRef.current += 1;
+    setQuestReward({ amount: reward.amber, label: 'Claimed', id: questRewardIdRef.current });
     // Offer an opt-in "watch to double it" rewarded ad for this claim.
     setDoubleQuestOffer({ questId, amber: reward.amber });
     logEvent({ type: 'quest_reward_claimed', data: { questId, amber: reward.amber } });
@@ -1564,7 +1783,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       daily: { ...refreshed.daily, quests: refreshed.daily.quests.map(q => ({ ...q })) },
       weekly: { ...refreshed.weekly, quests: refreshed.weekly.quests.map(q => ({ ...q })) },
     });
-  }, [progress, onAmberChange, animals]);
+    // A claim is a payoff: buzz it and cash the just-claimed card out (the
+    // header amber pill has already begun counting the reward up).
+    hapticSuccess();
+    runQuestCashOut(questId);
+  }, [progress, onAmberChange, animals, runQuestCashOut]);
 
   // Opt-in "double your quest reward" — fired only when the player watched the
   // full rewarded ad (RewardedAdButton onReward). Grants a second helping of the
@@ -1576,7 +1799,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const newBalance = await awardBonusAmber(amber, 'quest_bonus');
     onAmberChange?.(newBalance);
     setProgress(prev => (prev ? { ...prev, amber: newBalance } : prev));
-    setQuestFeedback(`Doubled! +${amber} more amber.`);
+    questRewardIdRef.current += 1;
+    setQuestReward({ amount: amber, label: 'Doubled', id: questRewardIdRef.current });
     logEvent({ type: 'quest_reward_claimed', data: { questId, amber, doubled: true } });
   }, [progress, doubleQuestOffer, onAmberChange]);
 
@@ -1650,7 +1874,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       <View style={styles.loadingContainer}>
         <View style={styles.loadingCard}>
           <Animated.View style={{ transform: [{ scale: amberPulse }] }}>
-            <Text style={styles.loadingEmoji}>🏡</Text>
+            <Image source={require('../../../assets/ui/home.png')} style={styles.loadingSprite} resizeMode="contain" />
           </Animated.View>
           <Text style={styles.loadingText}>Loading your home...</Text>
           <Text style={styles.loadingSubtext}>Placing rooms and waking friends.</Text>
@@ -1745,8 +1969,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <Animated.View style={{ transform: [{ scale: amberPulse }] }}>
                   <Image source={AMBER_ICON} style={styles.amberIconImage} />
                 </Animated.View>
-                <Text style={styles.amberCount} numberOfLines={1}>{progress.amber}</Text>
-                {!isOnboarding && <AmberSparkle />}
+                <Text style={styles.amberCount} numberOfLines={1}>
+                  {amberInitedRef.current ? displayAmber : progress.amber}
+                </Text>
+                {!isOnboarding && <AmberSparkle phase={progress.currentPhase} />}
               </View>
             </TouchableOpacity>
             {(progress.currentStreak > 1 || isStreakAtRisk) && (
@@ -1927,9 +2153,24 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
         </View>
 
-        {/* Celebration Confetti */}
+        {/* Celebration Confetti — and, for a reserved-room arrival, its bespoke
+            in-world line (fades in over the world, cleared with the confetti). */}
+        {showCelebration && reservedArrivalLine && (
+          <Animated.View
+            style={[styles.reservedArrivalBanner, { opacity: reservedArrivalOpacity }]}
+            pointerEvents="none"
+          >
+            <Text style={styles.reservedArrivalText}>{reservedArrivalLine}</Text>
+          </Animated.View>
+        )}
         {showCelebration && (
-          <CelebrationConfetti onComplete={() => setShowCelebration(false)} />
+          <CelebrationConfetti
+            phase={progress.currentPhase}
+            onComplete={() => {
+              setShowCelebration(false);
+              setReservedArrivalLine(null);
+            }}
+          />
         )}
       </View>
 
@@ -1970,6 +2211,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               onPlayPuzzle();
             }}
             bounceScale={0.9}
+            phase={progress.currentPhase}
             accessibilityLabel="Play puzzle"
             accessibilityRole="button"
           >
@@ -2067,11 +2309,36 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       accessibilityLabel={`${dialogueFlow.selectedAnimal.name} portrait`}
                     >
                       {progress.currentPhase >= 4 && CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]?.robed ? (
-                        <Image
-                          source={CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]!.robed!}
-                          style={styles.dialogueSpriteLayer}
-                          resizeMode="cover"
-                        />
+                        /* Robed + robedTalk (F26) follow the exact same
+                           pre-mounted opacity-switch as idle/talk above, so
+                           the climax's biggest lines no longer play over a
+                           frozen still. No animal has a robedTalk frame yet
+                           (idle/talk/robed only) — the talk layer only mounts
+                           when Boolean(...robedTalk) holds, so this renders
+                           byte-identical to today (a static robed image)
+                           until that art lands for a given animal. */
+                        <>
+                          <Image
+                            source={CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]!.robed!}
+                            style={[
+                              styles.dialogueSpriteLayer,
+                              dialogueFlow.isTalking &&
+                                Boolean(CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]?.robedTalk) &&
+                                styles.dialogueSpriteLayerHidden,
+                            ]}
+                            resizeMode="cover"
+                          />
+                          {Boolean(CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]?.robedTalk) && (
+                            <Image
+                              source={CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]!.robedTalk!}
+                              style={[
+                                styles.dialogueSpriteLayer,
+                                !dialogueFlow.isTalking && styles.dialogueSpriteLayerHidden,
+                              ]}
+                              resizeMode="cover"
+                            />
+                          )}
+                        </>
                       ) : (
                         <>
                           <Image
@@ -2115,15 +2382,27 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
                 {/* Text column - 70% width */}
                 <View style={styles.dialogueTextCol}>
-                  <View style={styles.dialogueBubble}>
+                  {/* The bubble renders the progressively-revealed text (F25);
+                      tapping it while the reveal is still in progress jumps
+                      straight to the full line instead of waiting it out.
+                      Once landed, the tap is inert (disabled) so a settled
+                      line doesn't flash touch feedback for no reason. */}
+                  <TouchableOpacity
+                    style={styles.dialogueBubble}
+                    activeOpacity={0.85}
+                    disabled={!dialogueFlow.revealInProgress}
+                    onPress={dialogueFlow.completeReveal}
+                    accessibilityRole="button"
+                    accessibilityLabel="Show full line"
+                  >
                     <NineSliceFrame
                       skin={pixelSkin.card}
                       cornerDp={CARD_CORNER_DP}
                       edgeDp={CARD_EDGE_DP}
                       fillColor={pixelSkin.fillCard}
                     />
-                    <Text style={[styles.dialogueText, { color: panelSt.body }]}>{dialogueFlow.dialogueText}</Text>
-                  </View>
+                    <Text style={[styles.dialogueText, { color: panelSt.body }]}>{dialogueFlow.revealedText}</Text>
+                  </TouchableOpacity>
 
                   {/* Dialogue choice buttons (Phase 3 choice points) */}
                   {dialogueFlow.activeChoice && dialogueFlow.dialogueText === dialogueFlow.activeChoice.prompt ? (
@@ -2188,7 +2467,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       phase={progress.currentPhase}
                       variant="primary"
                       hostDark={dtHostDark}
-                      onPress={dialogueFlow.handleNextDialogue}
+                      onPress={() => {
+                        // Tapping Next/Close while the line is still revealing
+                        // (F25) completes the reveal first; it never advances
+                        // the dialogue on the same tap that finishes the text.
+                        if (dialogueFlow.revealInProgress) {
+                          dialogueFlow.completeReveal();
+                        } else {
+                          dialogueFlow.handleNextDialogue();
+                        }
+                      }}
                       soundKind="dialogue"
                       accessibilityLabel="Continue dialogue"
                       style={styles.dialogueContinueBevel}
@@ -2223,6 +2511,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           accessibilityRole="button"
         >
           <SpringIn
+            phase={progress?.currentPhase ?? 0}
             claimTouches
             style={styles.compactHubModal}
           >
@@ -2273,6 +2562,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 phase={progress.currentPhase}
                 hostDark={dtHostDark}
                 label={getJournalQuestLabel(actionableQuestCount, claimableQuestAmber)}
+                icon={QUEST_ICON}
                 onPress={() => {
                   setShowJournalModal(false);
                   handleOpenQuestModal().catch(() => {});
@@ -2323,6 +2613,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           accessibilityRole="button"
         >
           <SpringIn
+            phase={progress?.currentPhase ?? 0}
             claimTouches
             style={styles.compactHubModal}
           >
@@ -2359,7 +2650,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <HubRow
                 phase={progress.currentPhase}
                 hostDark={dtHostDark}
-                label={`✨ ${getShopTitle(progress.currentPhase)}`}
+                label={getShopTitle(progress.currentPhase)}
+                icon={require('../../../assets/ui/emote_sparkle.png')}
                 onPress={() => {
                   setShowUtilityModal(false);
                   onOpenShop?.();
@@ -2395,7 +2687,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <HubRow
                 phase={progress.currentPhase}
                 hostDark={dtHostDark}
-                label="⚙️ Settings"
+                label="Settings"
+                icon={require('../../../assets/ui/gear.png')}
                 onPress={() => {
                   setShowUtilityModal(false);
                   onOpenSettings?.();
@@ -2443,6 +2736,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           accessibilityRole="button"
         >
           <SpringIn
+            phase={progress?.currentPhase ?? 0}
             claimTouches
             style={styles.shopModal}
           >
@@ -2608,6 +2902,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             accessibilityRole="button"
           />
           <SpringIn
+            phase={progress?.currentPhase ?? 0}
             style={[styles.shopModal, styles.questModal]}
           >
             <NineSliceFrame
@@ -2623,10 +2918,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               label="Quests"
               style={styles.modalPlaque}
             />
-            {questFeedback && (
-              <Text style={[styles.shopFeedbackText, { color: panelSt.title }]}>
-                {questFeedback}
-              </Text>
+            {questReward && (
+              <RewardReveal
+                key={questReward.id}
+                amount={questReward.amount}
+                icon={AMBER_ICON}
+                label={questReward.label}
+                phase={progress.currentPhase}
+                style={styles.questRewardReveal}
+              />
             )}
             {doubleQuestOffer && (
               <RewardedAdButton
@@ -2681,8 +2981,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   ? 100
                   : Math.max(0, Math.min(100, Math.round((quest.progress / Math.max(1, quest.target)) * 100)));
                 return (
-                  <PanelCard
+                  <Animated.View
                     key={quest.id}
+                    style={quest.id === claimedFlashId ? { transform: [{ scale: questCashOut }] } : null}
+                  >
+                  <PanelCard
                     phase={progress.currentPhase}
                 hostDark={dtHostDark}
                     kind="card"
@@ -2730,6 +3033,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       }
                     />
                   </PanelCard>
+                  </Animated.View>
                 );
               })}
             </ScrollView>
@@ -2762,6 +3066,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           accessibilityRole="button"
         >
           <SpringIn
+            phase={progress?.currentPhase ?? 0}
             claimTouches
             style={styles.shopModal}
           >
@@ -2775,7 +3080,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             {unlockFlow.showRoomUnlock && (
               <>
                 <View style={[styles.lockBadge, { backgroundColor: panelSt.sectionBg, borderColor: panelSt.sectionBorder }]}>
-                  <Text style={styles.lockBadgeEmoji}>🔒</Text>
+                  <Image source={require('../../../assets/ui/lock.png')} style={styles.lockBadgeIcon} resizeMode="contain" />
                 </View>
                 <PixelPlaque
                   phase={progress.currentPhase}
@@ -2910,6 +3215,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       >
         <View style={[styles.centeredOverlay, { backgroundColor: st.overlay }]}>
           <SpringIn
+            phase={progress?.currentPhase ?? 0}
             claimTouches
             style={styles.inviteModal}
           >
@@ -3162,6 +3468,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       >
         <View style={[styles.centeredOverlay, { backgroundColor: st.overlay }]}>
           <SpringIn
+            phase={progress?.currentPhase ?? 0}
             claimTouches
             style={styles.sacrificeModal}
           >
@@ -3181,17 +3488,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <Animated.View
                 pointerEvents="none"
                 style={[styles.sacrificeCandleGlow, {
+                  // Phase-age the flare so it isn't the one bright-orange element
+                  // on an otherwise dark/serene panel: an ember at the reveal, a
+                  // mauve at the terrible peace.
+                  backgroundColor: progress.currentPhase >= 5 ? '#9B7BAE' : progress.currentPhase >= 4 ? '#C8703A' : '#FFB347',
                   opacity: sacrificePulse.interpolate({ inputRange: [0, 1], outputRange: [0, 0.55] }),
                   transform: [{ scale: sacrificePulse.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1.7] }) }],
                 }]}
               />
-              <Animated.Text
-                style={[styles.sacrificeEmoji, {
+              <Animated.Image
+                source={CANDLE_ICON}
+                accessibilityLabel="the altar candle"
+                style={[styles.sacrificeCandleImg, {
                   transform: [{ scale: sacrificePulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.3] }) }],
                 }]}
-              >
-                🕯️
-              </Animated.Text>
+              />
             </View>
             <Text style={[styles.sacrificeTitle, { color: panelSt.title }]}>
               {getSacrificePrompt(progress.currentPhase).title}
@@ -3217,7 +3528,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     </>
                   )}
                   <Text style={[styles.offeringHolds, { color: panelSt.body }]}>
-                    {getArrangementHoldsLine(offeringTotal, progress.currentPhase)}
+                    {getArrangementHoldsLine(displayedOfferingTotal, progress.currentPhase)}
                   </Text>
                 </View>
               );
@@ -3304,6 +3615,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       >
         <View style={[styles.centeredOverlay, { backgroundColor: st.overlay }]}>
           <SpringIn
+            phase={progress?.currentPhase ?? 0}
             claimTouches
             style={[
               styles.houseCompletionModal,
@@ -3321,9 +3633,24 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               const lines = getHouseCompletionText();
               return (
                 <>
-                  <Text style={styles.houseCompletionEmoji}>
-                    {progress.currentPhase >= 4 ? '🌑' : '🏠'}
-                  </Text>
+                  {progress.currentPhase >= 4 ? (
+                    // The temple crest: the void sprite reads far cleaner than a
+                    // flat system emoji against the near-black completion card.
+                    <Image
+                      source={VOID_ICON}
+                      accessibilityLabel="the temple"
+                      style={styles.houseCompletionCrestImg}
+                    />
+                  ) : (
+                    // The lit-house crest (F101): a generated candy sprite
+                    // instead of the raw OS emoji, matching the temple crest
+                    // above at the darker phases.
+                    <Image
+                      source={getModeIconSprite('house')!}
+                      accessibilityLabel="the house"
+                      style={styles.houseCompletionCrestImg}
+                    />
+                  )}
                   <Text style={[
                     styles.houseCompletionTitle,
                     { color: panelSt.title },
@@ -3391,7 +3718,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   edgeDp={CARD_EDGE_DP}
                   fillColor={pixelSkin.fillCard}
                 />
-                <Text style={styles.journalSpotlightHeroBadgeText}>{currentJournalSpotlightStep.icon}</Text>
+                <Image
+                  source={getJournalSpotlightStepSprite(currentJournalSpotlightStep.id)}
+                  style={styles.journalSpotlightHeroBadgeIcon}
+                  resizeMode="contain"
+                />
               </View>
 
               <View style={styles.journalSpotlightHeroText}>
@@ -3428,7 +3759,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       edgeDp={CARD_EDGE_DP}
                       fillColor={pixelSkin.fillCard}
                     />
-                    <Text style={styles.journalSpotlightCardIcon}>{step.icon}</Text>
+                    <Image
+                      source={getJournalSpotlightStepSprite(step.id)}
+                      style={styles.journalSpotlightCardIconImage}
+                      resizeMode="contain"
+                    />
                     <Text
                       style={[
                         styles.journalSpotlightCardTitle,
@@ -3593,19 +3928,25 @@ const styles = StyleSheet.create({
   },
   loadingEmoji: {
     fontFamily: BODY_FONT,
-    fontSize: 34,
+    fontSize: FONT_SIZE.hero,
+  },
+  // The home loading mascot: the generated house sprite (assets/ui/home.png),
+  // replacing the raw 🏡 emoji so the boot/loading chrome stays in-world.
+  loadingSprite: {
+    width: 46,
+    height: 46,
   },
   loadingText: {
     fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
-    fontSize: 18,
+    fontSize: FONT_SIZE.title,
     fontWeight: '700',
   },
   loadingSubtext: {
     fontFamily: PIXEL_FONT_BOLD,
     marginTop: 6,
     color: 'rgba(255,255,255,0.8)',
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '600',
     letterSpacing: 0.2,
   },
@@ -3657,12 +3998,12 @@ const styles = StyleSheet.create({
   },
   amberEmoji: {
     fontFamily: BODY_FONT,
-    fontSize: 20,
+    fontSize: FONT_SIZE.headline,
   },
   amberCount: {
     fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     fontWeight: '800',
     flexShrink: 1,
   },
@@ -3683,11 +4024,11 @@ const styles = StyleSheet.create({
   },
   streakBadgeEmoji: {
     fontFamily: BODY_FONT,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
   },
   streakBadgeCount: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '700',
     color: '#FF8C00',
   },
@@ -3721,7 +4062,7 @@ const styles = StyleSheet.create({
   questPillText: {
     fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '800',
     marginLeft: 4,
   },
@@ -3740,12 +4081,12 @@ const styles = StyleSheet.create({
   headerBadgeText: {
     fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
-    fontSize: 10,
+    fontSize: FONT_SIZE.micro,
     fontWeight: '800',
   },
   headerIconText: {
     fontFamily: BODY_FONT,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
   },
   headerIconImage: {
     width: 25,
@@ -3817,7 +4158,7 @@ const styles = StyleSheet.create({
   playButtonText: {
     fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
-    fontSize: 17,
+    fontSize: FONT_SIZE.large,
     fontWeight: '900',
     letterSpacing: 2.5,
     textShadowColor: 'rgba(0, 0, 0, 0.25)',
@@ -3840,7 +4181,7 @@ const styles = StyleSheet.create({
   },
   wordsOfferedHomeText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '600',
     color: 'rgba(255, 255, 255, 0.6)',
     letterSpacing: 0.5,
@@ -3875,14 +4216,14 @@ const styles = StyleSheet.create({
   },
   unlockProgressLabel: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 12.5,
+    fontSize: FONT_SIZE.small,
     fontWeight: '800',
     letterSpacing: 0.5,
     flex: 1,
   },
   unlockProgressText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 11.5,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '800',
     letterSpacing: 0.3,
   },
@@ -3976,7 +4317,7 @@ const styles = StyleSheet.create({
   // Portrait nameplate: sits under the sprite, centered in the alcove.
   dialogueAnimalName: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '900',
     letterSpacing: 0.5,
     textAlign: 'center',
@@ -4003,7 +4344,7 @@ const styles = StyleSheet.create({
   },
   dialogueText: {
     fontFamily: BODY_FONT,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     lineHeight: 25,
     letterSpacing: 0.2,
   },
@@ -4019,7 +4360,7 @@ const styles = StyleSheet.create({
   },
   nextFriendButtonText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '800',
   },
   dialogueFooter: {
@@ -4029,7 +4370,7 @@ const styles = StyleSheet.create({
   },
   continueButtonText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     fontWeight: '800',
   },
 
@@ -4060,7 +4401,7 @@ const styles = StyleSheet.create({
   },
   shopTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 24,
+    fontSize: FONT_SIZE.display,
     fontWeight: '900',
     letterSpacing: 0.5,
     textAlign: 'center',
@@ -4068,15 +4409,18 @@ const styles = StyleSheet.create({
   },
   shopSubtitle: {
     fontFamily: BODY_FONT,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     textAlign: 'center',
     marginBottom: 24,
   },
   shopFeedbackText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '700',
     textAlign: 'center',
+    marginBottom: 12,
+  },
+  questRewardReveal: {
     marginBottom: 12,
   },
   // Pixel-card hub rows (Journal / Utility menus) — the NineSliceFrame is the
@@ -4096,7 +4440,7 @@ const styles = StyleSheet.create({
   },
   hubRowText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '800',
     letterSpacing: 0.2,
   },
@@ -4105,7 +4449,7 @@ const styles = StyleSheet.create({
   },
   nextUnlockLabel: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '700',
     letterSpacing: SURFACE.sectionLetterSpacing,
     marginBottom: 12,
@@ -4137,13 +4481,13 @@ const styles = StyleSheet.create({
   },
   reservedChipText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '800',
     letterSpacing: 0.4,
   },
   reservedChipSubtext: {
     fontFamily: BODY_FONT,
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     marginTop: 2,
     textAlign: 'center',
   },
@@ -4174,7 +4518,7 @@ const styles = StyleSheet.create({
   },
   bevelBtnText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '800',
     letterSpacing: 0.4,
     textAlign: 'center',
@@ -4211,12 +4555,12 @@ const styles = StyleSheet.create({
   },
   questTabText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '700' as const,
   },
   questTabTimer: {
     fontFamily: BODY_FONT,
-    fontSize: 10,
+    fontSize: FONT_SIZE.micro,
     marginTop: 2,
   },
   // Real quest progress bar: tinted track + amber fill
@@ -4248,23 +4592,23 @@ const styles = StyleSheet.create({
   },
   unlockName: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     fontWeight: '800',
   },
   unlockDescription: {
     fontFamily: BODY_FONT,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     marginTop: 2,
   },
   unlockCost: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '700',
     marginTop: 6,
   },
   questProgressText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '700',
     marginTop: 6,
   },
@@ -4277,25 +4621,25 @@ const styles = StyleSheet.create({
   },
   questSectionTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '800',
     letterSpacing: 0.3,
   },
   questSectionTimer: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '600',
   },
   unlockBlockedText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '600',
     marginTop: 4,
     fontStyle: 'italic',
   },
   allUnlockedText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     textAlign: 'center',
     fontWeight: '700',
     marginBottom: 24,
@@ -4313,18 +4657,22 @@ const styles = StyleSheet.create({
   },
   lockBadgeEmoji: {
     fontFamily: BODY_FONT,
-    fontSize: 24,
+    fontSize: FONT_SIZE.display,
+  },
+  lockBadgeIcon: {
+    width: 26,
+    height: 26,
   },
   lockedRoomName: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 18,
+    fontSize: FONT_SIZE.title,
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: 8,
   },
   amberBalance: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 18,
+    fontSize: FONT_SIZE.title,
     fontWeight: '700',
     textAlign: 'center',
     marginTop: 16,
@@ -4350,7 +4698,7 @@ const styles = StyleSheet.create({
   cooldownToastText: {
     fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '700',
     textAlign: 'center',
   },
@@ -4395,7 +4743,7 @@ const styles = StyleSheet.create({
   },
   inviteText: {
     fontFamily: BODY_FONT,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: 12,
@@ -4407,7 +4755,7 @@ const styles = StyleSheet.create({
   },
   inviteCost: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     fontWeight: '700',
     marginTop: 12,
   },
@@ -4418,7 +4766,7 @@ const styles = StyleSheet.create({
   // Intro dialogue progress text (inline in footer)
   introProgressInline: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '600',
     marginRight: 12,
   },
@@ -4430,7 +4778,7 @@ const styles = StyleSheet.create({
   },
   introDialogueProgress: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '600',
   },
   // Dialogue choice buttons (Phase 3)
@@ -4450,7 +4798,7 @@ const styles = StyleSheet.create({
   },
   dialogueChoiceBtnText: {
     fontFamily: BODY_FONT,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '700',
     textAlign: 'center',
   },
@@ -4488,7 +4836,7 @@ const styles = StyleSheet.create({
   },
   actionRowButtonText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '700',
     color: 'rgba(255, 255, 255, 0.9)',
   },
@@ -4504,7 +4852,7 @@ const styles = StyleSheet.create({
   ambientLineText: {
     fontFamily: PIXEL_FONT_BOLD,
     color: '#FBF0D9',
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '600',
     fontStyle: 'italic',
     textAlign: 'center',
@@ -4513,6 +4861,30 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(20, 10, 6, 0.85)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
+  },
+  // Reserved-room arrival banner — the bespoke in-world line over the world,
+  // shown with the celebration confetti. Boxless cream ink like the ambient
+  // line, but centered higher and a touch larger so it reads as an event.
+  reservedArrivalBanner: {
+    position: 'absolute',
+    top: '32%',
+    left: 24,
+    right: 24,
+    alignItems: 'center',
+    zIndex: 60,
+  },
+  reservedArrivalText: {
+    fontFamily: PIXEL_FONT_BOLD,
+    color: '#FBF0D9',
+    fontSize: FONT_SIZE.title,
+    fontWeight: '700',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    letterSpacing: 0.5,
+    lineHeight: 26,
+    textShadowColor: 'rgba(20, 10, 6, 0.9)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 5,
   },
 
   // Sacrifice modal — chrome comes from the NineSliceFrame pixel panel. The
@@ -4545,20 +4917,21 @@ const styles = StyleSheet.create({
     borderRadius: 46,
     backgroundColor: '#FFB347',
   },
-  sacrificeEmoji: {
-    fontFamily: BODY_FONT,
-    fontSize: 50,
+  sacrificeCandleImg: {
+    width: 50,
+    height: 50,
+    resizeMode: 'contain',
   },
   sacrificeTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 20,
+    fontSize: FONT_SIZE.headline,
     fontWeight: '900',
     textAlign: 'center',
     marginBottom: 8,
   },
   sacrificeSubtitle: {
     fontFamily: BODY_FONT,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 16,
@@ -4566,7 +4939,7 @@ const styles = StyleSheet.create({
   },
   sacrificeBalance: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     fontWeight: '700',
     marginBottom: 16,
   },
@@ -4590,12 +4963,12 @@ const styles = StyleSheet.create({
   },
   sacrificeAmountText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '800',
   },
   sacrificeNoAmber: {
     fontFamily: BODY_FONT_ITALIC,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     textAlign: 'center',
     fontStyle: 'italic',
   },
@@ -4609,7 +4982,7 @@ const styles = StyleSheet.create({
   },
   sacrificeResponseText: {
     fontFamily: BODY_FONT_ITALIC,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     lineHeight: 22,
     textAlign: 'center',
     fontStyle: 'italic',
@@ -4625,14 +4998,14 @@ const styles = StyleSheet.create({
   },
   offeringTierTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '900',
     letterSpacing: 0.5,
     textAlign: 'center',
   },
   offeringTierRegard: {
     fontFamily: BODY_FONT_ITALIC,
-    fontSize: 12.5,
+    fontSize: FONT_SIZE.small,
     fontStyle: 'italic',
     textAlign: 'center',
     marginTop: 2,
@@ -4640,13 +5013,13 @@ const styles = StyleSheet.create({
   },
   offeringHolds: {
     fontFamily: BODY_FONT,
-    fontSize: 12.5,
+    fontSize: FONT_SIZE.small,
     textAlign: 'center',
     lineHeight: 18,
   },
   offeringTierUp: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13.5,
+    fontSize: FONT_SIZE.body,
     fontWeight: '800',
     textAlign: 'center',
     marginBottom: 8,
@@ -4662,7 +5035,7 @@ const styles = StyleSheet.create({
   },
   offeringEverythingText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '800',
     textAlign: 'center',
   },
@@ -4686,14 +5059,15 @@ const styles = StyleSheet.create({
     borderRadius: 80,
     opacity: 0.3,
   },
-  houseCompletionEmoji: {
-    fontFamily: BODY_FONT,
-    fontSize: 60,
+  houseCompletionCrestImg: {
+    width: 64,
+    height: 64,
     marginBottom: 16,
+    resizeMode: 'contain',
   },
   houseCompletionTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 22,
+    fontSize: FONT_SIZE.headline,
     fontWeight: '900',
     textAlign: 'center',
     marginBottom: 20,
@@ -4701,7 +5075,7 @@ const styles = StyleSheet.create({
   },
   houseCompletionText: {
     fontFamily: BODY_FONT,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: 24,
@@ -4742,7 +5116,7 @@ const styles = StyleSheet.create({
   },
   journalSpotlightPointerText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '700',
     lineHeight: 17,
   },
@@ -4782,35 +5156,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  journalSpotlightHeroBadgeText: {
-    fontFamily: BODY_FONT,
-    fontSize: 28,
+  journalSpotlightHeroBadgeIcon: {
+    width: 34,
+    height: 34,
   },
   journalSpotlightHeroText: {
     flex: 1,
   },
   journalSpotlightEyebrow: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '800',
     letterSpacing: 1,
     marginBottom: 4,
   },
   journalSpotlightTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 22,
+    fontSize: FONT_SIZE.headline,
     fontWeight: '900',
     letterSpacing: 0.3,
   },
   journalSpotlightSubtitle: {
     fontFamily: BODY_FONT,
     marginTop: 4,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     lineHeight: 18,
   },
   journalSpotlightCounter: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '700',
     alignSelf: 'flex-start',
     marginTop: 2,
@@ -4836,21 +5210,21 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 4,
   },
-  journalSpotlightCardIcon: {
-    fontFamily: BODY_FONT,
-    fontSize: 18,
+  journalSpotlightCardIconImage: {
+    width: 26,
+    height: 26,
     marginBottom: 8,
   },
   journalSpotlightCardTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '800',
     lineHeight: 17,
   },
   journalSpotlightCardIndex: {
     fontFamily: PIXEL_FONT_BOLD,
     marginTop: 6,
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '600',
   },
   journalSpotlightDialogueRow: {
@@ -4879,7 +5253,7 @@ const styles = StyleSheet.create({
   // Portrait nameplate below the framed portrait, centered in the alcove.
   journalSpotlightSpeaker: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '900',
     letterSpacing: 0.5,
     textAlign: 'center',

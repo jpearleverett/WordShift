@@ -11,16 +11,24 @@ import { CandyColors } from '../theme/colors';
 
 /**
  * The bottom action buttons (UNDO / HINT / RESTART) must track the descent:
- * candy-bright through the early phases, then darkened into the dread register
- * from Phase 3 so they stop glowing against a near-black board. Their hue
- * identity (warm undo / cool hint / green restart) must survive at every phase
- * so muscle memory holds.
+ * candy-bright through phases 0-1, a cooled dusk step at Phase 2 (F178), then
+ * darkened into the dread register from Phase 3 so they stop glowing against a
+ * near-black board. Their hue identity (warm undo / cool hint / green restart)
+ * must survive at every phase so muscle memory holds.
  */
+const lum = (hex: string): number => {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return 0.299 * r + 0.587 * g + 0.114 * b;
+};
+
 describe('getActionButtonColors — phase-aware bottom controls', () => {
   const KINDS = ['undo', 'hint', 'restart'] as const;
 
-  test('phases 0-2 are the original candy colors, pixel-identical', () => {
-    for (const phase of [0, 1, 2]) {
+  test('phases 0-1 are the original candy colors, pixel-identical', () => {
+    for (const phase of [0, 1]) {
       expect(getActionButtonColors('undo', phase)).toEqual({
         bg: CandyColors.yellow.main,
         border: CandyColors.yellow.shadow,
@@ -39,14 +47,21 @@ describe('getActionButtonColors — phase-aware bottom controls', () => {
     }
   });
 
+  test('Phase 2 is a cooled dusk step: not candy, and lighter than Phase 3 dread (F178)', () => {
+    for (const kind of KINDS) {
+      const bright = getActionButtonColors(kind, 0).bg;
+      const cooled = getActionButtonColors(kind, 2).bg;
+      const dread = getActionButtonColors(kind, 3).bg;
+      // A distinct intermediate tier — neither the bright candy nor the dread.
+      expect(cooled).not.toBe(bright);
+      expect(cooled).not.toBe(dread);
+      // Cooled sits between bright and dread on luminance (the gradual descent).
+      expect(lum(cooled)).toBeLessThan(lum(bright));
+      expect(lum(cooled)).toBeGreaterThan(lum(dread));
+    }
+  });
+
   test('the buttons darken at Phase 3 and again at Phase 4 (monotonic descent)', () => {
-    const lum = (hex: string): number => {
-      const h = hex.replace('#', '');
-      const r = parseInt(h.slice(0, 2), 16);
-      const g = parseInt(h.slice(2, 4), 16);
-      const b = parseInt(h.slice(4, 6), 16);
-      return 0.299 * r + 0.587 * g + 0.114 * b;
-    };
     for (const kind of KINDS) {
       const bright = lum(getActionButtonColors(kind, 0).bg);
       const dusk = lum(getActionButtonColors(kind, 3).bg);

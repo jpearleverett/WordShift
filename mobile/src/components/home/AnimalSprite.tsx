@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { FONT_SIZE } from '../../theme/typeScale';
 import {
   View,
   Text,
@@ -39,6 +40,16 @@ export const CHARACTER_SPRITES: Partial<Record<AnimalType, {
   idle: ImageSourcePropType;
   talk?: ImageSourcePropType;
   robed?: ImageSourcePropType;
+  /**
+   * Optional Phase 4-5 robed TALK frame (F26) — the reveal counterpart of
+   * `talk`. When present, a dialogue portrait opacity-switches robed<->
+   * robedTalk exactly like idle<->talk at earlier phases, so the climax's
+   * biggest lines no longer play over a frozen robed still. No animal has
+   * this frame today (only idle/talk/robed exist on disk for all 13) — a
+   * portrait consumer must check for it and fall back to the static `robed`
+   * frame rather than assuming it exists.
+   */
+  robedTalk?: ImageSourcePropType;
   /**
    * Optional walk cycle, played while the animal wanders its room (frames
    * face RIGHT like idle.png; the container's scaleX flip handles leftward
@@ -126,15 +137,55 @@ export const CHARACTER_SPRITES: Partial<Record<AnimalType, {
   },
 };
 
-// Emotion bubble emojis based on phase
-const EMOTION_BUBBLES: Record<number, string[]> = {
-  0: ['💕', '✨', '💖', '🌟', '💫', '🎵', '💛'],
-  1: ['💭', '❓', '🤔', '💫', '✨'],
-  2: ['💭', '😰', '💧', '❓', '🌫️'],
-  3: ['😰', '💧', '👁️', '💀', '🌑'],
-  4: ['💀', '👁️', '🌑', '⚫', '😱'],
+// Emote bubble sprites — hand-drawn candy-UI-family art (generateUiIcons.mjs),
+// replacing the old OS-emoji glyphs so the ambient emotes match the game's
+// vector look on every platform instead of rendering the host font's emoji.
+type EmoteKey =
+  | 'heart' | 'pale_heart' | 'sparkle' | 'note' | 'thought' | 'question'
+  | 'fog' | 'tear' | 'eye' | 'void' | 'candle' | 'sleep';
+const EMOTE_SPRITES: Record<EmoteKey, ImageSourcePropType> = {
+  heart: require('../../../assets/ui/emote_heart.png'),
+  pale_heart: require('../../../assets/ui/emote_pale_heart.png'),
+  sparkle: require('../../../assets/ui/emote_sparkle.png'),
+  note: require('../../../assets/ui/emote_note.png'),
+  thought: require('../../../assets/ui/emote_thought.png'),
+  question: require('../../../assets/ui/emote_question.png'),
+  fog: require('../../../assets/ui/emote_fog.png'),
+  tear: require('../../../assets/ui/emote_tear.png'),
+  eye: require('../../../assets/ui/emote_eye.png'),
+  void: require('../../../assets/ui/emote_void.png'),
+  candle: require('../../../assets/ui/emote_candle.png'),
+  // Cottage sleep glyph — replaces the raw 💤 OS emoji in the cooldown name tag
+  // (the last OS emoji on the animal chrome), keeping the sprite look everywhere.
+  sleep: require('../../../assets/ui/emote_sleep.png'),
+};
+
+// Phase-aware parchment puff drawn BEHIND the ambient emote sprite, so the
+// emote reads as a small cottage speech puff rather than a bare floating icon.
+// It ages with the descent: warm cream in the bright days, ashen night later
+// (so a Phase-4 emote never floats on a bright bubble).
+const EMOTE_BUBBLE_THEME: Record<number, { bg: string; border: string }> = {
+  0: { bg: '#FDF3DC', border: '#E7C98A' },
+  1: { bg: '#F6E9CF', border: '#DBBE86' },
+  2: { bg: '#E7D6C0', border: '#B79B77' },
+  3: { bg: '#2C2A3E', border: '#4A4568' },
+  4: { bg: '#1C1A2A', border: '#3A2E4E' },
+  5: { bg: '#241F33', border: '#463C5C' },
+};
+const getEmoteBubbleTheme = (phase: number): { bg: string; border: string } =>
+  EMOTE_BUBBLE_THEME[phase] ?? EMOTE_BUBBLE_THEME[0];
+
+// Emote bubble vocabulary by phase — the same emotional arc the old emoji set
+// carried (candy joy -> curiosity -> unease -> dread -> serene resignation),
+// now expressed in the sprite family above.
+const EMOTION_BUBBLES: Record<number, EmoteKey[]> = {
+  0: ['heart', 'sparkle', 'heart', 'sparkle', 'note', 'sparkle', 'heart'],
+  1: ['thought', 'question', 'thought', 'sparkle', 'question'],
+  2: ['thought', 'tear', 'question', 'fog', 'tear'],
+  3: ['tear', 'eye', 'void', 'fog', 'eye'],
+  4: ['void', 'eye', 'void', 'eye', 'void'],
   // Phase 5: terrible peace — serene resignation, not cheerful, not dreadful.
-  5: ['🕯️', '🌑', '…', '🤍', '🌫️'],
+  5: ['candle', 'fog', 'pale_heart', 'void', 'fog'],
 };
 
 // Ghostly mauve mood color for Phase 5 (matches getPhaseTheme phase 5 / colors.ts)
@@ -227,9 +278,9 @@ const SleepingZs: React.FC = () => {
 const sleepStyles = StyleSheet.create({
   container: { position: 'absolute', top: -10, right: -5 },
   z: { fontFamily: PIXEL_FONT_BOLD, position: 'absolute', fontWeight: 'bold', color: CandyColors.purple.main },
-  z1: { fontFamily: PIXEL_FONT_BOLD, fontSize: 10, right: 0 },
-  z2: { fontFamily: PIXEL_FONT_BOLD, fontSize: 12, right: 8, top: -5 },
-  z3: { fontFamily: PIXEL_FONT_BOLD, fontSize: 14, right: 16, top: -12 },
+  z1: { fontFamily: PIXEL_FONT_BOLD, fontSize: FONT_SIZE.micro, right: 0 },
+  z2: { fontFamily: PIXEL_FONT_BOLD, fontSize: FONT_SIZE.small, right: 8, top: -5 },
+  z3: { fontFamily: PIXEL_FONT_BOLD, fontSize: FONT_SIZE.bodyLg, right: 16, top: -12 },
 });
 
 interface AnimalSpriteProps {
@@ -275,6 +326,47 @@ const BOUNCE_HEIGHT: Record<AnimalType, number> = {
   aye_aye: 3,
   kakapo: 2, // Grounded shuffle
 };
+
+// ---------------------------------------------------------------------------
+// Phase-descending motion.
+// The wander / bounce / breathe language slows and flattens as the house
+// darkens (the tiles already age on a phase ladder; the animals never did).
+// Bright days keep the candy tempo. Phase 3 slows travel ~1.4x and halves the
+// bounce. Phase 4+ robed figures GLIDE (a 0-1px slow sine drift, never the
+// candy hop), pause twice as long, and breathe heavily and slow. Phase 5 is
+// serene-slow. Amplitudes/pause scalars only; nothing here touches game state.
+// ---------------------------------------------------------------------------
+interface PhaseMotion {
+  speedMul: number; // × MOVEMENT_SPEED (larger = slower travel)
+  pauseMul: number; // × the wait between wanders
+  bounceMul: number; // × BOUNCE_HEIGHT (0 disables the hop)
+  breatheMs: number; // breathe half-cycle duration (slower = heavier)
+  glide: boolean; // Phase 4+: replace the hop with a 0-1px sine drift
+}
+
+export function getPhaseMotionScale(phase: number): PhaseMotion {
+  if (phase >= 5) return { speedMul: 2.0, pauseMul: 2.4, bounceMul: 0, breatheMs: 3200, glide: true };
+  if (phase >= 4) return { speedMul: 1.8, pauseMul: 2.0, bounceMul: 0, breatheMs: 3000, glide: true };
+  if (phase === 3) return { speedMul: 1.4, pauseMul: 1.4, bounceMul: 0.5, breatheMs: 2200, glide: false };
+  if (phase === 2) return { speedMul: 1.15, pauseMul: 1.15, bounceMul: 0.8, breatheMs: 1800, glide: false };
+  return { speedMul: 1, pauseMul: 1, bounceMul: 1, breatheMs: 1500, glide: false };
+}
+
+// Where a sleeping animal settles (posX interpolates [0,100] → floor space).
+const REST_POS_X = 30;
+// Slow, heavy breath while sleeping (independent of the phase scalar).
+const SLEEP_BREATHE_MS = 2600;
+
+// ---------------------------------------------------------------------------
+// Rare-idle scheduler turnstile (the "alive" system).
+// AnimalSprite instances are independent, so a per-instance timer would let
+// every animal on screen fire an idle beat at once. A single module-scope
+// token gates the whole house to ONE idle beat at a time: an instance may only
+// play a beat while it holds the token, and releases it the instant the beat
+// (or its cleanup) finishes.
+// ---------------------------------------------------------------------------
+let idleBeatTokenHolder: number | null = null;
+let idleInstanceSeq = 0;
 
 // ---------------------------------------------------------------------------
 // Procedural gait (the 12 animals without real walk frames).
@@ -371,12 +463,36 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
   const emotionY = useRef(new Animated.Value(0)).current;
   const wiggleRotation = useRef(new Animated.Value(0)).current;
 
+  // Rare-idle beat transforms (native-driver only). Neutral at rest, animated
+  // by the rare-idle scheduler one beat at a time. Live on the inner "body"
+  // layer alongside the gait — never on the unflipped name/badge chrome.
+  const idleTalkOpacity = useRef(new Animated.Value(0)).current; // pre-mounted talk-layer crossfade (chirp/mutter)
+  const idlePerkScaleY = useRef(new Animated.Value(1)).current; // chirp scaleY perk
+  const idleHopY = useRef(new Animated.Value(0)).current; // rabbit hop-in-place
+  const idleShiftX = useRef(new Animated.Value(0)).current; // aye-aye tap-tap ticks
+  const idleRot = useRef(new Animated.Value(0)).current; // sloth lean / aye-aye / pangolin stir (fraction of ±10deg)
+  const idleScale = useRef(new Animated.Value(1)).current; // kakapo inflate
+
   const currentXRef = useRef(animal.position.x);
+  // Live mirrors read by the async rare-idle scheduler without re-subscribing.
+  const isMovingRef = useRef(false);
+  const cooldownRef = useRef(isOnCooldown);
+  // Stable per-instance id for the module-scope idle turnstile.
+  const idleIdRef = useRef<number | null>(null);
+  if (idleIdRef.current === null) idleIdRef.current = ++idleInstanceSeq;
 
   const [isMoving, setIsMoving] = useState(false);
-  const [currentEmotion, setCurrentEmotion] = useState<string | null>(null);
+  const [isDozing, setIsDozing] = useState(false);
+  const [currentEmotion, setCurrentEmotion] = useState<EmoteKey | null>(null);
   const [spriteLoadFailed, setSpriteLoadFailed] = useState(false);
   const [walkFrame, setWalkFrame] = useState(0);
+
+  useEffect(() => {
+    isMovingRef.current = isMoving;
+  }, [isMoving]);
+  useEffect(() => {
+    cooldownRef.current = isOnCooldown;
+  }, [isOnCooldown]);
 
   // Real walk-cycle frames play while the animal wanders (currently the fox).
   // Robed figures (Phase 4+) don't stroll — they keep the gliding reverence —
@@ -385,6 +501,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
   const hasWalkFrames = Boolean(walkFrames && walkFrames.length > 0);
   const walkActive = Boolean(
     isMoving &&
+    !isOnCooldown &&
     hasWalkFrames &&
     currentPhase < 4 &&
     !spriteLoadFailed &&
@@ -398,6 +515,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
   const gaitAnim = useRef(new Animated.Value(0)).current;
   const gaitActive = Boolean(
     isMoving &&
+    !isOnCooldown &&
     !hasWalkFrames &&
     currentPhase < 4 &&
     !getSettingsSync().reducedMotion &&
@@ -440,6 +558,34 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
     outputRange: [1, 1.03, 0.97, 1.03, 1],
   });
 
+  // Contact shadow behavior. A real contact shadow stays PLANTED on the floor
+  // and shrinks + softens as the body rises — it never lifts with the hop. The
+  // gait bob (gaitBob) and the rare-idle hop (idleHopY) live on the `body`
+  // layer, so the shadow (an unflipped SIBLING of `body`) never inherits their
+  // translate; the container's moving bounce (bounceY) IS inherited, so the
+  // shadow cancels it below. The shadow reacts to the combined body lift with
+  // SCALE + OPACITY only (per the "may scale slightly with hop height, must not
+  // translate up" contract). All three lift sources pin to 0 under reduced
+  // motion / low tier, so the shadow resolves to a static full-size oval there.
+  const bodyLift = Animated.add(Animated.add(bounceY, gaitBob), idleHopY);
+  const shadowLiftScale = bodyLift.interpolate({
+    inputRange: [-10, 0],
+    outputRange: [0.82, 1],
+    extrapolate: 'clamp',
+  });
+  const shadowLiftOpacity = bodyLift.interpolate({
+    inputRange: [-10, 0],
+    outputRange: [0.55, 1],
+    extrapolate: 'clamp',
+  });
+
+  // Rare-idle rotate: idleRot carries a fraction of ±10deg, so the sloth's
+  // 6deg doze lean drives it to 0.6, the aye-aye's small knock to 0.2, etc.
+  const idleRotate = idleRot.interpolate({
+    inputRange: [-1, 0, 1],
+    outputRange: ['-10deg', '0deg', '10deg'],
+  });
+
   // Cycle gait frames while walking; reset to the first frame on stop so the
   // next stroll always starts at the cycle's beginning.
   useEffect(() => {
@@ -453,23 +599,29 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
     return () => clearInterval(interval);
   }, [walkActive, walkFrames?.length]);
 
-  // Breathing animation (subtle scale pulse)
+  // Breathing animation (subtle scale pulse) — phase-scaled: it slows and
+  // deepens as the house darkens, and slows to a heavy sleep breath on
+  // cooldown. Deps carry currentPhase + isOnCooldown so the pace actually
+  // changes with the descent (the effect was empty-dep / phase-invariant).
   useEffect(() => {
     if (getSettingsSync().reducedMotion) {
       breatheScale.setValue(1);
       return;
     }
+    const halfMs = isOnCooldown ? SLEEP_BREATHE_MS : getPhaseMotionScale(currentPhase).breatheMs;
+    // Heavier (deeper) chest as the dread sets in; sleep is the deepest.
+    const depth = isOnCooldown ? 1.06 : currentPhase >= 3 ? 1.06 : 1.05;
     const breatheAnimation = Animated.loop(
       Animated.sequence([
         Animated.timing(breatheScale, {
-          toValue: 1.05,
-          duration: 1500,
+          toValue: depth,
+          duration: halfMs,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
         Animated.timing(breatheScale, {
           toValue: 1,
-          duration: 1500,
+          duration: halfMs,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
@@ -477,7 +629,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
     );
     breatheAnimation.start();
     return () => breatheAnimation.stop();
-  }, []);
+  }, [currentPhase, isOnCooldown]);
 
   // Random emotion bubble popup
   useEffect(() => {
@@ -564,14 +716,15 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
         }),
       ]).start();
 
-      // Show a tap emotion appropriate to the phase
-      const emojis =
+      // Show a tap emote appropriate to the phase (same sprite family as the
+      // ambient emotes above).
+      const tapEmotes: EmoteKey[] =
         currentPhase >= 5
-          ? ['🕯️', '🤍', '…']        // serene resignation
+          ? ['candle', 'pale_heart', 'fog']   // serene resignation
           : currentPhase >= 3
-            ? ['😰', '💧']             // dread
-            : ['💕', '✨', '💖'];      // candy-cute joy
-      setCurrentEmotion(emojis[Math.floor(Math.random() * emojis.length)]);
+            ? ['tear', 'void', 'eye']          // dread
+            : ['heart', 'sparkle', 'note'];    // candy-cute joy
+      setCurrentEmotion(tapEmotes[Math.floor(Math.random() * tapEmotes.length)]);
       emotionY.setValue(0);
       emotionOpacity.setValue(0);
       Animated.parallel([
@@ -605,7 +758,11 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
     outputRange: ['-8deg', '0deg', '8deg'],
   });
 
-  // Walking animation - random movement within room bounds
+  // Walking animation - random movement within room bounds.
+  // Sleep gate: a "sleeping" (on-cooldown) animal no longer sleepwalks — it
+  // eases to a rest spot and stops. Phase gate: travel and pauses slow with
+  // the descent (currentPhase + isOnCooldown are in the deps so the effect
+  // actually re-arms when either changes; resumes on cooldown clear).
   useEffect(() => {
     if (getSettingsSync().reducedMotion) {
       // Set to a static position, no movement
@@ -614,6 +771,20 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
       return;
     }
 
+    // Sleeping: settle at a rest spot and stay put (no wander, no bounce).
+    if (isOnCooldown) {
+      setIsMoving(false);
+      currentXRef.current = REST_POS_X;
+      Animated.timing(posX, {
+        toValue: REST_POS_X,
+        duration: 1200,
+        easing: Easing.inOut(Easing.ease),
+        useNativeDriver: true,
+      }).start();
+      return;
+    }
+
+    const motion = getPhaseMotionScale(currentPhase);
     let movementTimeout: NodeJS.Timeout;
     let isMounted = true;
 
@@ -640,66 +811,100 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
 
       setIsMoving(true);
 
-      // Move to target
+      // Move to target (slower with the descent)
+      const travelMs = MOVEMENT_SPEED[animal.type] * motion.speedMul;
       Animated.parallel([
         Animated.timing(posX, {
           toValue: targetX,
-          duration: MOVEMENT_SPEED[animal.type],
+          duration: travelMs,
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
         Animated.timing(posY, {
           toValue: targetY,
-          duration: MOVEMENT_SPEED[animal.type],
+          duration: travelMs,
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
       ]).start(() => {
         if (isMounted) {
           setIsMoving(false);
-          // Wait before next movement (3-8 seconds)
-          movementTimeout = setTimeout(moveToRandomPosition, 3000 + Math.random() * 5000);
+          // Wait before next movement (3-8 seconds base, longer as it darkens)
+          const pauseMs = (3000 + Math.random() * 5000) * motion.pauseMul;
+          movementTimeout = setTimeout(moveToRandomPosition, pauseMs);
         }
       });
     };
 
     // Start movement after initial delay
-    movementTimeout = setTimeout(moveToRandomPosition, 1000 + Math.random() * 2000);
+    movementTimeout = setTimeout(moveToRandomPosition, (1000 + Math.random() * 2000) * motion.pauseMul);
 
     return () => {
       isMounted = false;
       clearTimeout(movementTimeout);
     };
-  }, [animal.type]);
+  }, [animal.type, currentPhase, isOnCooldown]);
 
   // Bounce animation while moving. Suppressed when real walk frames play OR
   // the procedural gait runs — either already carries the vertical bob, and
-  // stacking the glide-bounce on top reads as skipping.
+  // stacking the glide-bounce on top reads as skipping. Low-tier devices and
+  // sleeping animals stay static. Phase-descending: the candy hop halves at
+  // Phase 3 and is REPLACED by a 0-1px slow sine glide at Phase 4+ (robed
+  // figures drift with reverence, they never regress to the springy hop).
   useEffect(() => {
-    if (getSettingsSync().reducedMotion || walkActive || gaitActive) {
+    if (
+      getSettingsSync().reducedMotion ||
+      shouldSimplifyAnimations() ||
+      walkActive ||
+      gaitActive ||
+      isOnCooldown
+    ) {
       bounceY.setValue(0);
       return;
     }
 
-    let bounceAnimation: Animated.CompositeAnimation;
+    let bounceAnimation: Animated.CompositeAnimation | undefined;
 
     if (isMoving) {
-      bounceAnimation = Animated.loop(
-        Animated.sequence([
-          Animated.timing(bounceY, {
-            toValue: -BOUNCE_HEIGHT[animal.type],
-            duration: animal.type === 'rabbit' ? 150 : 250,
-            easing: Easing.out(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.timing(bounceY, {
-            toValue: 0,
-            duration: animal.type === 'rabbit' ? 150 : 250,
-            easing: Easing.in(Easing.ease),
-            useNativeDriver: true,
-          }),
-        ])
-      );
+      const motion = getPhaseMotionScale(currentPhase);
+      if (motion.glide) {
+        // Phase 4+: a barely-there 0-1px drift, slow and heavy.
+        bounceAnimation = Animated.loop(
+          Animated.sequence([
+            Animated.timing(bounceY, {
+              toValue: -1,
+              duration: 1600,
+              easing: Easing.inOut(Easing.sin),
+              useNativeDriver: true,
+            }),
+            Animated.timing(bounceY, {
+              toValue: 0,
+              duration: 1600,
+              easing: Easing.inOut(Easing.sin),
+              useNativeDriver: true,
+            }),
+          ])
+        );
+      } else {
+        const height = BOUNCE_HEIGHT[animal.type] * motion.bounceMul;
+        const stepMs = (animal.type === 'rabbit' ? 150 : 250) * motion.speedMul;
+        bounceAnimation = Animated.loop(
+          Animated.sequence([
+            Animated.timing(bounceY, {
+              toValue: -height,
+              duration: stepMs,
+              easing: Easing.out(Easing.ease),
+              useNativeDriver: true,
+            }),
+            Animated.timing(bounceY, {
+              toValue: 0,
+              duration: stepMs,
+              easing: Easing.in(Easing.ease),
+              useNativeDriver: true,
+            }),
+          ])
+        );
+      }
       bounceAnimation.start();
     } else {
       bounceY.setValue(0);
@@ -708,7 +913,167 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
     return () => {
       bounceAnimation?.stop();
     };
-  }, [isMoving, animal.type, walkActive, gaitActive]);
+  }, [isMoving, animal.type, walkActive, gaitActive, currentPhase, isOnCooldown]);
+
+  // ---------------------------------------------------------------------------
+  // Rare-idle scheduler (the "alive" system). ~1 beat every 20-45s, but only
+  // ONE animal in the whole house plays at a time (module-scope turnstile, so
+  // independent instances never all fire together). Every beat is built from
+  // existing frames + transforms — no new art. Gated exactly like the walk/
+  // gait: lively beats are Phase 0-3 only (robed Phase-4+ figures keep their
+  // gliding reverence — no chirps, no hops), never under reduced motion or on
+  // low-tier devices. The tarsier is deliberately skipped: her unblinking
+  // stillness IS her idle. Every timer is cleaned up on unmount.
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (getSettingsSync().reducedMotion || shouldSimplifyAnimations()) return;
+    if (currentPhase >= 4) return; // robed reverence: no lively idle beats
+    if (animal.type === 'tarsier') return; // the Witness never fidgets
+
+    const sprites = CHARACTER_SPRITES[animal.type];
+    const hasTalk = Boolean(sprites?.talk);
+    const myId = idleIdRef.current!;
+
+    let cancelled = false;
+    let scheduleTimer: ReturnType<typeof setTimeout>;
+    let activeAnim: Animated.CompositeAnimation | null = null;
+
+    const releaseToken = () => {
+      if (idleBeatTokenHolder === myId) idleBeatTokenHolder = null;
+    };
+
+    const resetIdleValues = () => {
+      idleTalkOpacity.setValue(0);
+      idlePerkScaleY.setValue(1);
+      idleHopY.setValue(0);
+      idleShiftX.setValue(0);
+      idleRot.setValue(0);
+      idleScale.setValue(1);
+    };
+
+    const finishBeat = () => {
+      activeAnim = null;
+      resetIdleValues();
+      setIsDozing(false);
+      releaseToken();
+    };
+
+    // A pre-mounted talk-layer crossfade + a small scaleY perk — the shared
+    // "chirp". The talk frame is opacity-switched (never a source swap), so
+    // there is no first-cycle decode flicker.
+    const chirp = (): Animated.CompositeAnimation =>
+      Animated.parallel([
+        hasTalk
+          ? Animated.sequence([
+              Animated.timing(idleTalkOpacity, { toValue: 1, duration: 70, useNativeDriver: true }),
+              Animated.delay(480),
+              Animated.timing(idleTalkOpacity, { toValue: 0, duration: 90, useNativeDriver: true }),
+            ])
+          : Animated.delay(560),
+        Animated.sequence([
+          Animated.timing(idlePerkScaleY, { toValue: 1.04, duration: 160, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+          Animated.timing(idlePerkScaleY, { toValue: 1, duration: 240, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        ]),
+      ]);
+
+    // Build one species-appropriate idle beat from existing assets/transforms.
+    const buildBeat = (): Animated.CompositeAnimation => {
+      switch (animal.type) {
+        case 'rabbit': // double hop-in-place
+          return Animated.sequence([
+            Animated.timing(idleHopY, { toValue: -8, duration: 150, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+            Animated.timing(idleHopY, { toValue: 0, duration: 150, easing: Easing.in(Easing.ease), useNativeDriver: true }),
+            Animated.timing(idleHopY, { toValue: -8, duration: 150, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+            Animated.timing(idleHopY, { toValue: 0, duration: 150, easing: Easing.in(Easing.ease), useNativeDriver: true }),
+          ]);
+        case 'sloth': // slow ~6deg lean into a ~10s doze, reusing SleepingZs
+          setIsDozing(true);
+          return Animated.sequence([
+            Animated.timing(idleRot, { toValue: 0.6, duration: 800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+            Animated.delay(9000),
+            Animated.timing(idleRot, { toValue: 0, duration: 1000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          ]);
+        case 'aye_aye': // two small translateX ticks + a slight rotate (the diviner's knock)
+          return Animated.parallel([
+            Animated.sequence([
+              Animated.timing(idleShiftX, { toValue: 3, duration: 90, useNativeDriver: true }),
+              Animated.timing(idleShiftX, { toValue: 0, duration: 90, useNativeDriver: true }),
+              Animated.timing(idleShiftX, { toValue: 3, duration: 90, useNativeDriver: true }),
+              Animated.timing(idleShiftX, { toValue: 0, duration: 90, useNativeDriver: true }),
+            ]),
+            Animated.sequence([
+              Animated.timing(idleRot, { toValue: 0.2, duration: 180, useNativeDriver: true }),
+              Animated.timing(idleRot, { toValue: 0, duration: 180, useNativeDriver: true }),
+            ]),
+          ]);
+        case 'kakapo': // slow 1.0 -> 1.08 -> 1.0 "boom" inflate
+          return Animated.sequence([
+            Animated.timing(idleScale, { toValue: 1.08, duration: 900, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+            Animated.timing(idleScale, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          ]);
+        case 'capybara': { // 2s pause + a sleepy talk-frame mutter
+          const mouth: Animated.CompositeAnimation = hasTalk
+            ? Animated.sequence([
+                Animated.timing(idleTalkOpacity, { toValue: 1, duration: 120, useNativeDriver: true }),
+                Animated.delay(1800),
+                Animated.timing(idleTalkOpacity, { toValue: 0, duration: 140, useNativeDriver: true }),
+              ])
+            : Animated.delay(2060);
+          return Animated.parallel([
+            mouth,
+            Animated.sequence([
+              Animated.timing(idlePerkScaleY, { toValue: 1.02, duration: 300, useNativeDriver: true }),
+              Animated.delay(1400),
+              Animated.timing(idlePerkScaleY, { toValue: 1, duration: 300, useNativeDriver: true }),
+            ]),
+          ]);
+        }
+        case 'pangolin': // a periodic stir wiggle
+          return Animated.sequence([
+            Animated.timing(idleRot, { toValue: 0.4, duration: 300, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+            Animated.timing(idleRot, { toValue: -0.4, duration: 400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+            Animated.timing(idleRot, { toValue: 0.3, duration: 300, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+            Animated.timing(idleRot, { toValue: 0, duration: 300, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          ]);
+        case 'axolotl': // scuba mask can't talk: transform-only perk (chirp without the mouth)
+          return Animated.sequence([
+            Animated.timing(idlePerkScaleY, { toValue: 1.04, duration: 180, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+            Animated.timing(idlePerkScaleY, { toValue: 1, duration: 260, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          ]);
+        default: // fox, owl, fennec_fox, red_panda, wombat: talk-frame chirp
+          return chirp();
+      }
+    };
+
+    const tryBeat = () => {
+      if (cancelled) return;
+      // Only fire on a genuine idle moment, and only if the house turnstile is free.
+      if (!cooldownRef.current && !isMovingRef.current && idleBeatTokenHolder === null) {
+        idleBeatTokenHolder = myId;
+        const anim = buildBeat();
+        activeAnim = anim;
+        anim.start(() => finishBeat());
+      }
+      schedule();
+    };
+
+    const schedule = () => {
+      if (cancelled) return;
+      scheduleTimer = setTimeout(tryBeat, 20000 + Math.random() * 25000);
+    };
+
+    // Initial stagger so the house doesn't all tick on at once.
+    scheduleTimer = setTimeout(tryBeat, 8000 + Math.random() * 20000);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(scheduleTimer);
+      activeAnim?.stop();
+      setIsDozing(false);
+      releaseToken();
+      resetIdleValues();
+    };
+  }, [animal.type, currentPhase]);
 
   // Notification pulse for new dialogue
   useEffect(() => {
@@ -766,6 +1131,9 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
   // Per-animal nudge so feet land on the floor (some sprite art sits high in frame).
   const floorOffset = FLOOR_OFFSET[animal.type] ?? 0;
 
+  // Phase-aware cottage puff behind the ambient emote sprite.
+  const emoteBubbleTheme = getEmoteBubbleTheme(currentPhase);
+
   return (
     <Animated.View
       style={[
@@ -787,103 +1155,151 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
         accessibilityLabel={`${animal.name} the ${animal.type}`}
         accessibilityRole="button"
       >
-        <Animated.View
-          style={[
-            styles.spriteContainer,
-            {
-              transform: [
-                { scaleX },
-                { scale: Animated.multiply(tapScale, breatheScale) },
-                { rotate: wiggleRotate },
-                // Procedural gait bundle (neutral at rest: 0 / 0deg / 1).
-                { translateY: gaitBob },
-                { rotate: gaitLean },
-                { scaleY: gaitScaleY },
-              ],
-            },
-          ]}
-        >
-          {/* Shadow - scales with tap */}
+        <View style={styles.spriteContainer}>
+          {/* Contact shadow - a grounded, unflipped sibling OUTSIDE the body
+              transform, so it never bobs with the gait or lifts with a rare-idle
+              hop (a shadow stays planted on the floor while the feet leave it).
+              It cancels the container's moving bounce (bounceY) so it stays on
+              the floor there too, shrinks + softens with the body's lift, and
+              still responds to the tap squash via its own scaleX. */}
           <Animated.View
             style={[
               styles.shadow,
-              { transform: [{ scaleX: tapScale }] },
+              {
+                opacity: shadowLiftOpacity,
+                transform: [
+                  // Keep the shadow on the ground: undo the outer container's
+                  // bounceY translate (the gait/idle hops live on `body`, which
+                  // the shadow never inherits, so only bounceY needs cancelling).
+                  { translateY: Animated.multiply(bounceY, -1) },
+                  { scaleX: tapScale },
+                  { scale: shadowLiftScale },
+                ],
+              },
             ]}
           />
 
-          {/* Animal body */}
-          {CHARACTER_SPRITES[animal.type] && !spriteLoadFailed ? (
-            (() => {
-              const sprites = CHARACTER_SPRITES[animal.type]!;
-              const staticSource =
-                currentPhase >= 4 && sprites.robed ? sprites.robed : sprites.idle;
-              const dreadTint = getSpriteDreadTint(currentPhase);
-              // Walk frames stay MOUNTED (opacity-switched) whenever they
-              // could play — swapping one Image's `source` mid-gait forces an
-              // async decode per frame the first time through the cycle,
-              // which reads as flicker. Mounting decodes everything up front.
-              // Skipped when the walk can never run (robed phases, reduced
-              // motion, low-tier devices) so those paths pay no decode cost.
-              const mountWalkStack = Boolean(
-                walkFrames &&
-                walkFrames.length > 0 &&
-                currentPhase < 4 &&
-                !getSettingsSync().reducedMotion &&
-                !shouldSimplifyAnimations()
-              );
-              // Phases 1-3 layer a tinted copy on top of each layer (tintColor
-              // honours the sprite's alpha, so only the animal shape cools).
-              const renderTint = (source: ImageSourcePropType) =>
-                dreadTint ? (
-                  <Image
-                    source={source}
-                    style={[
-                      styles.spriteLayer,
-                      { tintColor: dreadTint.color, opacity: dreadTint.opacity },
-                    ]}
-                    resizeMode="contain"
-                    importantForAccessibility="no"
-                    accessibilityElementsHidden
-                  />
-                ) : null;
-              return (
-                <View style={styles.spriteImage}>
-                  {/* Idle/robed base — hidden (not unmounted) while walking */}
-                  <View style={[styles.spriteLayer, { opacity: walkActive ? 0 : 1 }]}>
+          {/* Animal BODY — the ONLY layer that carries the facing flip (scaleX),
+              breathe, tap, wiggle, procedural gait, AND the rare-idle beats.
+              The emote bubble, sleeping Z's, notification badge, name tag and
+              cooldown chrome are unflipped, untransformed SIBLINGS below, so a
+              facing-left animal never renders its name in mirror-writing and no
+              chrome squashes with a footfall or an idle beat. */}
+          <Animated.View
+            style={[
+              styles.body,
+              {
+                transform: [
+                  { scaleX },
+                  { scale: Animated.multiply(tapScale, breatheScale) },
+                  { rotate: wiggleRotate },
+                  // Procedural gait bundle (neutral at rest: 0 / 0deg / 1).
+                  { translateY: gaitBob },
+                  { rotate: gaitLean },
+                  { scaleY: gaitScaleY },
+                  // Rare-idle beat bundle (neutral at rest: 0 / 0deg / 1).
+                  { translateY: idleHopY },
+                  { translateX: idleShiftX },
+                  { rotate: idleRotate },
+                  { scaleY: idlePerkScaleY },
+                  { scale: idleScale },
+                ],
+              },
+            ]}
+          >
+            {/* Animal body sprite stack */}
+            {CHARACTER_SPRITES[animal.type] && !spriteLoadFailed ? (
+              (() => {
+                const sprites = CHARACTER_SPRITES[animal.type]!;
+                const staticSource =
+                  currentPhase >= 4 && sprites.robed ? sprites.robed : sprites.idle;
+                const dreadTint = getSpriteDreadTint(currentPhase);
+                // Walk frames stay MOUNTED (opacity-switched) whenever they
+                // could play — swapping one Image's `source` mid-gait forces an
+                // async decode per frame the first time through the cycle,
+                // which reads as flicker. Mounting decodes everything up front.
+                // Skipped when the walk can never run (robed phases, reduced
+                // motion, low-tier devices) so those paths pay no decode cost.
+                const mountWalkStack = Boolean(
+                  walkFrames &&
+                  walkFrames.length > 0 &&
+                  currentPhase < 4 &&
+                  !getSettingsSync().reducedMotion &&
+                  !shouldSimplifyAnimations()
+                );
+                // The rare-idle "chirp"/"mutter" beats crossfade to the talk
+                // frame. Like the walk stack it is PRE-MOUNTED (opacity-switch,
+                // never a source swap) so the first chirp never decode-flickers.
+                // Same gates as the scheduler that drives it.
+                const mountIdleTalkLayer = Boolean(
+                  sprites.talk &&
+                  currentPhase < 4 &&
+                  !getSettingsSync().reducedMotion &&
+                  !shouldSimplifyAnimations()
+                );
+                // Phases 1-3 layer a tinted copy on top of each layer (tintColor
+                // honours the sprite's alpha, so only the animal shape cools).
+                const renderTint = (source: ImageSourcePropType) =>
+                  dreadTint ? (
                     <Image
-                      source={staticSource}
-                      style={styles.spriteFill}
-                      resizeMode="contain"
-                      onError={() => setSpriteLoadFailed(true)}
-                    />
-                    {renderTint(staticSource)}
-                  </View>
-                  {mountWalkStack && walkFrames!.map((frameSource, idx) => (
-                    <View
-                      key={idx}
+                      source={source}
                       style={[
                         styles.spriteLayer,
-                        // Scale the walk art up a hair to match the idle
-                        // silhouette, kept feet-planted (see WALK_MATCH_SCALE).
-                        { transform: [{ translateY: WALK_FEET_CORRECTION }, { scale: WALK_MATCH_SCALE }] },
-                        { opacity: walkActive && idx === walkFrame % walkFrames!.length ? 1 : 0 },
+                        { tintColor: dreadTint.color, opacity: dreadTint.opacity },
                       ]}
-                    >
-                      <Image source={frameSource} style={styles.spriteFill} resizeMode="contain" />
-                      {renderTint(frameSource)}
+                      resizeMode="contain"
+                      importantForAccessibility="no"
+                      accessibilityElementsHidden
+                    />
+                  ) : null;
+                return (
+                  <View style={styles.spriteImage}>
+                    {/* Idle/robed base — hidden (not unmounted) while walking */}
+                    <View style={[styles.spriteLayer, { opacity: walkActive ? 0 : 1 }]}>
+                      <Image
+                        source={staticSource}
+                        style={styles.spriteFill}
+                        resizeMode="contain"
+                        onError={() => setSpriteLoadFailed(true)}
+                      />
+                      {renderTint(staticSource)}
                     </View>
-                  ))}
-                </View>
-              );
-            })()
-          ) : (
-            <View style={[styles.emojiBody, { borderColor: getMoodColor() }]}>
-              <Text style={styles.emoji}>{ANIMAL_EMOJIS[animal.type]}</Text>
-            </View>
-          )}
+                    {mountWalkStack && walkFrames!.map((frameSource, idx) => (
+                      <View
+                        key={idx}
+                        style={[
+                          styles.spriteLayer,
+                          // Scale the walk art up a hair to match the idle
+                          // silhouette, kept feet-planted (see WALK_MATCH_SCALE).
+                          { transform: [{ translateY: WALK_FEET_CORRECTION }, { scale: WALK_MATCH_SCALE }] },
+                          { opacity: walkActive && idx === walkFrame % walkFrames!.length ? 1 : 0 },
+                        ]}
+                      >
+                        <Image source={frameSource} style={styles.spriteFill} resizeMode="contain" />
+                        {renderTint(frameSource)}
+                      </View>
+                    ))}
+                    {/* Pre-mounted talk layer for the rare-idle chirp/mutter */}
+                    {mountIdleTalkLayer && (
+                      <Animated.View style={[styles.spriteLayer, { opacity: idleTalkOpacity }]}>
+                        <Image source={sprites.talk!} style={styles.spriteFill} resizeMode="contain" />
+                        {renderTint(sprites.talk!)}
+                      </Animated.View>
+                    )}
+                  </View>
+                );
+              })()
+            ) : (
+              <View style={[styles.emojiBody, { borderColor: getMoodColor() }]}>
+                <Text style={styles.emoji}>{ANIMAL_EMOJIS[animal.type]}</Text>
+              </View>
+            )}
+          </Animated.View>
 
-          {/* Emotion bubble */}
-          {Boolean(currentEmotion) && (
+          {/* Emote bubble (unflipped sibling) — a candy-UI sprite on a phase-aware
+              cottage parchment puff, so the ambient emote reads as an in-world
+              speech puff rather than a bare floating icon. Decorative. */}
+          {currentEmotion && (
             <Animated.View
               style={[
                 styles.emotionBubble,
@@ -892,13 +1308,26 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
                   opacity: emotionOpacity,
                 },
               ]}
+              importantForAccessibility="no"
+              accessibilityElementsHidden
             >
-              <Text style={styles.emotionEmoji}>{currentEmotion}</Text>
+              <View
+                style={[
+                  styles.emotePuff,
+                  { backgroundColor: emoteBubbleTheme.bg, borderColor: emoteBubbleTheme.border },
+                ]}
+              >
+                <Image
+                  source={EMOTE_SPRITES[currentEmotion]}
+                  style={styles.emoteSprite}
+                  resizeMode="contain"
+                />
+              </View>
             </Animated.View>
           )}
 
-          {/* Sleeping Z's when on cooldown */}
-          {isOnCooldown && <SleepingZs />}
+          {/* Sleeping Z's while asleep (on cooldown) or mid-doze (sloth idle) */}
+          {(isOnCooldown || isDozing) && <SleepingZs />}
 
           {/* New dialogue indicator - hidden when on cooldown */}
           {animal.hasNewDialogue && !isOnCooldown && (
@@ -925,7 +1354,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
               {animal.name}
             </Text>
             {isOnCooldown && (
-              <Text style={styles.cooldownIndicator}>💤</Text>
+              <Image source={EMOTE_SPRITES.sleep} style={styles.cooldownIcon} resizeMode="contain" />
             )}
           </View>
 
@@ -943,7 +1372,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
               </Text>
             </View>
           )}
-        </Animated.View>
+        </View>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -960,9 +1389,18 @@ const styles = StyleSheet.create({
   spriteContainer: {
     alignItems: 'center',
   },
+  // Carries the facing flip + breathe + tap + wiggle + gait + rare-idle beats;
+  // wraps ONLY the sprite so the chrome siblings (and the grounded contact
+  // shadow) never inherit the mirror/deform (the un-mirror render-tree fix
+  // these behaviors build on).
+  body: {
+    alignItems: 'center',
+  },
   shadow: {
     position: 'absolute',
-    bottom: 0,
+    // Grounded at the base of the 90px sprite body (top of the flex column),
+    // not below the name tag — a contact shadow sits at the feet.
+    top: 78,
     width: 60,
     height: 12,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
@@ -984,7 +1422,7 @@ const styles = StyleSheet.create({
   },
   emoji: {
     fontFamily: BODY_FONT,
-    fontSize: 38,
+    fontSize: FONT_SIZE.giant,
   },
   spriteImage: {
     width: 90,
@@ -1024,7 +1462,7 @@ const styles = StyleSheet.create({
   notificationText: {
     fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '900',
   },
   nameTag: {
@@ -1040,7 +1478,7 @@ const styles = StyleSheet.create({
   nameText: {
     fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '700',
   },
   moodDot: {
@@ -1048,9 +1486,10 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
   },
-  cooldownIndicator: {
-    fontFamily: BODY_FONT,
-    fontSize: 10,
+  // Cottage sleep sprite in the cooldown name tag (replaces the raw 💤 emoji).
+  cooldownIcon: {
+    width: 12,
+    height: 12,
     marginLeft: 2,
   },
   nameTagDark: {
@@ -1072,7 +1511,7 @@ const styles = StyleSheet.create({
   cooldownCountText: {
     fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.gray[300],
-    fontSize: 10,
+    fontSize: FONT_SIZE.micro,
     fontWeight: '600',
     textAlign: 'center',
   },
@@ -1085,12 +1524,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  emotionEmoji: {
-    fontFamily: BODY_FONT,
-    fontSize: 18,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+  // Cottage parchment puff behind the emote sprite (fill/border set per phase).
+  emotePuff: {
+    paddingHorizontal: 5,
+    paddingVertical: 4,
+    borderRadius: 9,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emoteSprite: {
+    width: 22,
+    height: 22,
   },
 });
 

@@ -14,7 +14,13 @@
       "policy": "appVersion"
     },
     "assetBundlePatterns": [
-      "**/*"
+      "assets/characters/**",
+      "assets/environment/**",
+      "assets/fonts/**",
+      "assets/rooms/**",
+      "assets/sounds/**",
+      "assets/ui/**",
+      "assets/*.png"
     ],
     "ios": {
       "supportsTablet": true,

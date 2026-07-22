@@ -162,6 +162,7 @@ describe('no em/en dashes in player-facing text', () => {
     collectStrings(phaseEvents.HOUSE_COMPLETION_EVENT, strings);
     collectStrings(phaseEvents.FINAL_PUZZLE_EVENT, strings);
     collectStrings(phaseEvents.POST_REVELATION_EVENT, strings);
+    collectStrings(phaseEvents.NEW_CYCLE_EVENT, strings);
     for (const p of PHASES) {
       collectStrings(phaseEvents.getPhaseTransitionEvent(p), strings);
     }

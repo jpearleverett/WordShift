@@ -34,8 +34,12 @@ export const ONBOARDING_TRANSITION_DELAY_MS = 300;
 export const ONBOARDING_PUZZLE_COMPLETE_DELAY_MS = 1000;
 
 // === SCREEN TRANSITIONS ===
-export const SCREEN_FADE_OUT_MS = 150;
-export const SCREEN_FADE_IN_MS = 200;
+// The navigation dip: the opaque overlay fades IN to cover the old screen
+// (fast), the React swap happens while hidden, then it fades OUT to reveal the
+// destination (a touch slower so the arrival breathes). These are the shipped
+// values, now the single source of truth (App.tsx reads them).
+export const SCREEN_FADE_COVER_MS = 120;
+export const SCREEN_FADE_REVEAL_MS = 180;
 
 // === AUTOSAVE ===
 export const AUTOSAVE_DEBOUNCE_MS = 120;
@@ -47,25 +51,32 @@ export const SPEED_TIMER_INTERVAL_MS = 250;
 // keeps a speed streak tense instead of letting skilled players idle.
 export const SPEED_ESCALATION_STEP_SEC = 5;
 export const SPEED_ESCALATION_MIN_SEC = 30;
+/** Speed clock enters the SOFT warning band at/below this many seconds (gentle pre-tick). */
+export const SPEED_TICK_SOFT_SEC = 10;
 /** Speed clock enters the final-countdown tension zone at/below this many seconds. */
 export const SPEED_TICK_THRESHOLD_SEC = 5;
 /** At/below this, the countdown intensifies (heavier haptic, bigger pop, brighter color). */
 export const SPEED_TICK_CRITICAL_SEC = 3;
 
 /**
- * Pure decision for the final-countdown tick: given the previous and next
- * displayed whole-second values, should a tick fire and how intense? Fires only
- * on a genuine downward step INTO the zone (never on the null->value start, and
- * never when a rescue raises the value back up), and never at 0.
+ * Pure decision for the countdown tick: given the previous and next displayed
+ * whole-second values, should a tick fire and how intense? The drain envelope
+ * now RAMPS instead of staying flat until the last few seconds: a gentle 'soft'
+ * pre-tick from the soft band (10..6) draws the ear in, then 'normal' inside the
+ * tension zone (5..4), then 'critical' at the wire (3..1). Fires only on a
+ * genuine downward step INTO a band (never on the null->value start, and never
+ * when a rescue raises the value back up), and never at 0.
  */
 export function speedTickKind(
   prev: number | null,
   next: number | null,
   threshold: number = SPEED_TICK_THRESHOLD_SEC,
   critical: number = SPEED_TICK_CRITICAL_SEC,
-): 'none' | 'normal' | 'critical' {
-  if (next === null || next > threshold || next <= 0) return 'none';
+  soft: number = SPEED_TICK_SOFT_SEC,
+): 'none' | 'soft' | 'normal' | 'critical' {
+  if (next === null || next > soft || next <= 0) return 'none';
   if (prev === null || next >= prev) return 'none';
+  if (next > threshold) return 'soft';
   return next <= critical ? 'critical' : 'normal';
 }
 

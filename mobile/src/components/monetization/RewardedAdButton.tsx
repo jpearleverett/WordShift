@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { PIXEL_FONT_BOLD } from '../../theme/fonts';
 import {
   showRewarded,
@@ -9,6 +9,18 @@ import {
 } from '../../services/ads';
 import { isPatronSync } from '../../services/entitlements';
 import { hapticLight, hapticMedium } from '../../services/haptics';
+import { getSettingsSync } from '../../services/settings';
+import { AmberInline } from '../AmberInline';
+import { FONT_SIZE } from '../../theme/typeScale';
+
+// Phase-aware busy-state copy for the tap->ad handoff: a bare "Loading..."
+// read as a stall. Bright days stay plain; the descent frames the same wait
+// as the house/arrangement doing its own quiet work. Short, no em dashes.
+function getRewardedBusyLabel(phase: number): string {
+  if (phase >= 4) return 'the arrangement gathers...';
+  if (phase >= 2) return 'the offering gathers...';
+  return 'preparing...';
+}
 
 interface RewardedAdButtonProps {
   /** The opt-in placement (analytics/policy key in ads.ts). */
@@ -74,6 +86,8 @@ export const RewardedAdButton: React.FC<RewardedAdButtonProps> = ({
   const [capReached, setCapReached] = useState(false);
   const [busy, setBusy] = useState(false);
   const mounted = useRef(true);
+  const busyOpacity = useRef(new Animated.Value(1)).current;
+  const busyLoopRef = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
     mounted.current = true;
@@ -81,6 +95,42 @@ export const RewardedAdButton: React.FC<RewardedAdButtonProps> = ({
       mounted.current = false;
     };
   }, []);
+
+  // Subtle "summoning the reward" shimmer on the pill while busy, in place of
+  // a flat disabled dimming. Reduced-motion holds a static opacity instead.
+  useEffect(() => {
+    busyLoopRef.current?.stop();
+    busyLoopRef.current = null;
+
+    if (!busy) {
+      busyOpacity.setValue(1);
+      return;
+    }
+    if (getSettingsSync().reducedMotion) {
+      busyOpacity.setValue(0.85);
+      return;
+    }
+    busyLoopRef.current = Animated.loop(
+      Animated.sequence([
+        Animated.timing(busyOpacity, {
+          toValue: 0.6,
+          duration: 450,
+          useNativeDriver: true,
+        }),
+        Animated.timing(busyOpacity, {
+          toValue: 1,
+          duration: 450,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    busyLoopRef.current.start();
+
+    return () => {
+      busyLoopRef.current?.stop();
+      busyLoopRef.current = null;
+    };
+  }, [busy, busyOpacity]);
 
   // Check the daily cap once when potentially visible.
   useEffect(() => {
@@ -124,7 +174,9 @@ export const RewardedAdButton: React.FC<RewardedAdButtonProps> = ({
 
   return (
     <TouchableOpacity
-      style={[styles.button, isDark ? styles.buttonDark : styles.buttonLight, disabled && styles.disabled, style]}
+      // The flat disabled dim is reserved for the unavailable state; while
+      // busy the shimmer on busyRow carries the "still working" tell instead.
+      style={[styles.button, isDark ? styles.buttonDark : styles.buttonLight, unavailable && styles.disabled, style]}
       onPress={handlePress}
       disabled={disabled}
       accessibilityRole="button"
@@ -132,7 +184,16 @@ export const RewardedAdButton: React.FC<RewardedAdButtonProps> = ({
       accessibilityLabel={label}
     >
       {busy ? (
-        <ActivityIndicator size="small" color={isDark ? '#FFD479' : '#4E3C00'} />
+        // Branded tap->ad handoff: keep the play glyph, name what's happening
+        // in-world (phase-aware), and show a small amber pip so it reads as
+        // "summoning your reward" rather than a generic frozen spinner.
+        <Animated.View style={[styles.busyRow, { opacity: busyOpacity }]}>
+          <Text style={[styles.label, isDark ? styles.labelDark : styles.labelLight]}>{'▷'}</Text>
+          <AmberInline size={13} style={styles.busyPip} />
+          <Text style={[styles.label, isDark ? styles.labelDark : styles.labelLight, styles.busyLabel]}>
+            {getRewardedBusyLabel(phase)}
+          </Text>
+        </Animated.View>
       ) : (
         <Text style={[styles.label, isDark ? styles.labelDark : styles.labelLight]}>
           {'▷ '}
@@ -144,6 +205,16 @@ export const RewardedAdButton: React.FC<RewardedAdButtonProps> = ({
 };
 
 const styles = StyleSheet.create({
+  busyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  busyPip: {
+    marginLeft: 6,
+  },
+  busyLabel: {
+    marginLeft: 6,
+  },
   button: {
     paddingHorizontal: 16,
     paddingVertical: 11,
@@ -161,7 +232,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(180, 110, 70, 0.4)',
   },
   disabled: { opacity: 0.4 },
-  label: { fontSize: 13.5, fontWeight: '800', fontFamily: PIXEL_FONT_BOLD },
+  label: { fontSize: FONT_SIZE.body, fontWeight: '800', fontFamily: PIXEL_FONT_BOLD },
   // Dark amber ink on the light gold pill (matches freeDoubleTextLight in the
   // victory modal); the old #FFD479 was near-invisible on cream surfaces, and
   // #755A00 measured only ~3:1 over the storm skin's deeper parchment —

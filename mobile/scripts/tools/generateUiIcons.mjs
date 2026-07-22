@@ -208,18 +208,43 @@ fs.mkdirSync(UI, { recursive: true });
   savePNG(path.join(UI, 'flame.png'), W, W, down2(cv, W, W));
 }
 
-// === journal.png (256) — book for the journal hub ============================
+// === journal.png (256) — a closed leather-bound tome (the Journal hub) ========
+// Cottage reskin of the old flat "notes-app page": a burgundy leather cover with
+// a wooden spine, brass corner braces, an amber cover boss, a parchment page
+// block and a crimson ribbon bookmark. Reads as a real in-world journal on the
+// dark header pill (the amber boss + parchment edge stay bright).
 {
   const W = 256, cv = C(W * 2, W * 2), c = W;
-  roundRect(cv, c, c + 14, 150, 168, 22, '#2A2040', 0.4);                  // drop shadow
-  roundRect(cv, c - 6, c, 150, 168, 20, '#A98BFF', 1, '#8257EA');          // cover
-  roundRect(cv, c + 118, c, 26, 168, 10, '#6B3FD0');                       // spine edge
-  roundRect(cv, c - 24, c, 116, 150, 12, '#FFFFFF', 1, '#F0EBFC');         // pages
-  for (const dy of [-86, -38, 10, 58]) {                                   // page lines
-    roundRect(cv, c - 24, c + dy, 86, 8, 4, '#B9A8E4');
+  const INK = '#2C2114';
+  const LEA = '#A24A38', LEA_DK = '#6C2C22', LEA_HI = '#C4694E';
+  const PAGE = '#F3E6C2', PAGE_LO = '#DEC488';
+  const BRASS = '#E4B85E', BRASS_DK = '#9A6A2E';
+  const AMB = '#FFC845', AMB_DK = '#B5730A';
+  roundRect(cv, c + 6, c + 18, 138, 178, 20, INK, 0.34);                   // drop shadow
+  // parchment page block, peeking to the right of the cover
+  roundRect(cv, c + 16, c + 2, 132, 168, 12, PAGE, 1, PAGE_LO);
+  for (const dx of [122, 132, 142]) capsule(cv, c + dx, c - 146, c + dx, c + 150, 4, PAGE_LO, 0.9); // page striations
+  // leather cover (shifted left so the pages peek)
+  roundRect(cv, c - 8, c, 126, 172, 16, LEA, 1, LEA_DK);
+  roundRect(cv, c - 8, c - 150, 108, 18, 9, LEA_HI, 0.4);                  // top sheen
+  // wooden/darker spine band with two raised ridges
+  roundRect(cv, c - 110, c, 24, 172, 8, LEA_DK);
+  for (const dy of [-84, 84]) capsule(cv, c - 128, c + dy, c - 92, c + dy, 9, LEA_HI, 0.55);
+  // brass corner braces (L-shapes)
+  for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    const bx = c - 8 + sx * 106, by = c + sy * 150;
+    capsule(cv, bx, by, bx - sx * 40, by, 14, INK); capsule(cv, bx, by, bx, by - sy * 40, 14, INK);
+    capsule(cv, bx, by, bx - sx * 34, by, 8, BRASS, 1); capsule(cv, bx, by, bx, by - sy * 34, 8, BRASS, 1);
   }
-  roundRect(cv, c - 96, c - 112, 24, 36, 8, '#FFD968', 1, '#F5B82E');      // bookmark
-  roundRect(cv, c - 6, c - 152, 150, 16, 8, '#FFFFFF', 0.4);               // top sheen
+  // amber cover boss (a small faceted gem)
+  const bcx = c - 8, bcy = c;
+  poly(cv, hexPts(bcx, bcy, 44), INK);
+  poly(cv, hexPts(bcx, bcy, 36), AMB, 1, AMB_DK);
+  ellipse(cv, bcx - 10, bcy - 10, 12, 12, '#FFF0B0', 0.7);
+  // crimson ribbon bookmark hanging past the bottom edge
+  capsule(cv, c + 66, c - 168, c + 66, c + 190, 24, INK, 0.5);            // ribbon shadow edge
+  capsule(cv, c + 66, c - 168, c + 66, c + 186, 18, '#B23A4A', 1);        // ribbon
+  capsule(cv, c + 60, c - 150, c + 60, c + 150, 5, '#E67488', 0.6);       // ribbon highlight
   savePNG(path.join(UI, 'journal.png'), W, W, down2(cv, W, W));
 }
 
@@ -371,20 +396,35 @@ fs.mkdirSync(UI, { recursive: true });
   savePNG(path.join(UI, 'amber.png'), W, W, down2(cv, W, W));
 }
 
-// === quest.png (256) — glossy target/dartboard for the header quest pill ======
-// Bright candy rings so it reads on the dark translucent header pill next to
-// the amber gem + journal book (which it now visually matches).
+// === quest.png (256) — a painted wooden archery target (goals / quests) =======
+// Cottage reskin of the old flat candy dartboard: a warm layered wooden rim with
+// mounting pegs, muted painted bands (wine + parchment), and an amber bullseye.
+// Reads as a crafted "goal/target" on the dark header pill (the amber bull +
+// cream bands stay bright).
 {
   const W = 256, cv = C(W * 2, W * 2), c = W;
-  ellipse(cv, c + 6, c + 22, 198, 198, '#2A2040', 0.28, 26);     // soft drop shadow
-  ellipse(cv, c, c, 208, 208, '#7A1F33');                        // dark red outline
-  ellipse(cv, c, c, 194, 194, '#FF5A6E');                        // outer red ring
-  ellipse(cv, c, c, 152, 152, '#FFF3F0');                        // cream ring
-  ellipse(cv, c, c, 110, 110, '#FF5A6E');                        // red ring
-  ellipse(cv, c, c, 68, 68, '#FFF3F0');                          // cream ring
-  ellipse(cv, c, c, 34, 34, '#FFC845');                          // gold bullseye
-  ellipse(cv, c - 10, c - 10, 10, 10, '#FFFFFF', 0.92);          // center glint
-  ellipse(cv, c - 66, c - 74, 42, 32, '#FFFFFF', 0.28, 34);      // glossy top-left sheen
+  const INK = '#2C2114', WOOD = '#B87A3E', WOOD_DK = '#754A24', WOOD_HI = '#E4C282';
+  const WINE = '#A84B5E', PARCH = '#F3E6C2', AMB = '#FFC845', AMB_DK = '#B5730A';
+  ellipse(cv, c + 6, c + 22, 200, 200, INK, 0.26, 30);           // soft drop shadow
+  ellipse(cv, c, c, 210, 210, INK);                              // warm outline
+  ellipse(cv, c, c, 202, 202, WOOD_HI);                          // rim highlight
+  ellipse(cv, c, c, 192, 192, WOOD);                             // rim body
+  ellipse(cv, c, c, 180, 180, WOOD_DK);                          // rim inner groove
+  ellipse(cv, c, c, 170, 170, INK);                              // face inset ring
+  ellipse(cv, c, c, 162, 162, WINE);                             // painted band (outer)
+  ellipse(cv, c, c, 130, 130, PARCH);                            //   cream
+  ellipse(cv, c, c, 100, 100, WINE);                             //   wine
+  ellipse(cv, c, c, 62, 62, PARCH);                              //   cream
+  ellipse(cv, c, c, 34, 34, AMB_DK);                             // bull rim
+  ellipse(cv, c, c, 27, 27, AMB);                                // amber bullseye
+  ellipse(cv, c - 9, c - 9, 8, 8, '#FFF3C8', 0.9);               // bull glint
+  // mounting pegs on the wooden rim (N/E/S/W) — a crafted, in-world target
+  for (const [px, py] of [[0, -186], [186, 0], [0, 186], [-186, 0]]) {
+    ellipse(cv, c + px, c + py, 10, 10, INK);
+    ellipse(cv, c + px - 2, c + py - 2, 4, 4, WOOD_HI, 0.8);
+  }
+  arcStroke(cv, c, c, 196, 4, Math.PI * 1.08, Math.PI * 1.62, WOOD_HI, 0.4); // rim grain glint
+  ellipse(cv, c - 66, c - 74, 40, 30, '#FFFFFF', 0.14, 34);      // soft top-left sheen
   savePNG(path.join(UI, 'quest.png'), W, W, down2(cv, W, W));
 }
 
@@ -477,17 +517,26 @@ fs.mkdirSync(UI, { recursive: true });
   savePNG(path.join(UI, 'moon.png'), W, W, down2(cv, W, W));
 }
 
-// === share.png (256) — up-arrow rising from an open tray (share/upload) =======
+// === share.png (256) — an amber arrow rising from a wooden crate (share) ======
+// Cottage reskin of the old flat candy tray+arrow: a planked wooden crate with
+// corner posts and an open top, and a bright amber arrow rising out of it (send
+// / share / export). The amber stays legible on the dark victory modal.
 {
   const W = 256, cv = C(W * 2, W * 2), c = W;
-  roundRect(cv, c, c + 74, 130, 84, 22, '#2A2040', 0.26);       // shadow
-  roundRect(cv, c, c + 60, 124, 92, 22, '#6B3FD0');             // tray outer
-  roundRect(cv, c, c + 78, 96, 66, 14, '#EFE9FB');              // tray inner (open box)
-  roundRect(cv, c, c + 8, 42, 138, 16, '#E8455C');             // arrow shaft edge
-  capsule(cv, c, c + 60, c, c - 150, 40, '#FF8FA3');            // arrow shaft
-  tri(cv, [c, c - 204], [c + 84, c - 104], [c - 84, c - 104], '#C23048');        // head outline
-  tri(cv, [c, c - 190], [c + 74, c - 108], [c - 74, c - 108], '#FF6B7E');        // head
-  capsule(cv, c - 12, c - 120, c - 12, c + 20, 10, '#FFC3CE', 0.7);              // shaft sheen
+  const INK = '#2C2114', WOOD = '#B87A3E', WOOD_DK = '#754A24', WOOD_HI = '#E4C282';
+  const AMB = '#FFC845', AMB_HI = '#FFE39A';
+  roundRect(cv, c, c + 100, 132, 20, 12, INK, 0.26);            // crate shadow
+  roundRect(cv, c, c + 72, 128, 92, 18, INK);                   // crate ink
+  roundRect(cv, c, c + 72, 116, 82, 14, WOOD, 1, WOOD_DK);      // crate wood
+  roundRect(cv, c, c + 40, 86, 20, 8, WOOD_DK);                 // open-top dark slot
+  for (const dx of [-66, 66]) capsule(cv, c + dx, c + 44, c + dx, c + 150, 9, WOOD_DK, 0.85); // corner posts
+  capsule(cv, c - 100, c + 76, c + 100, c + 76, 7, WOOD_HI, 0.45); // mid plank light
+  const ax = c;
+  capsule(cv, ax, c + 66, ax, c - 152, 46, INK);               // shaft ink
+  tri(cv, [ax, c - 210], [ax + 94, c - 104], [ax - 94, c - 104], INK);   // head ink
+  capsule(cv, ax, c + 60, ax, c - 146, 30, AMB, 1);            // amber shaft
+  tri(cv, [ax, c - 198], [ax + 78, c - 108], [ax - 78, c - 108], AMB, 1); // amber head
+  capsule(cv, ax - 8, c - 122, ax - 8, c + 44, 9, AMB_HI, 0.65); // shaft sheen
   savePNG(path.join(UI, 'share.png'), W, W, down2(cv, W, W));
 }
 
@@ -741,14 +790,24 @@ function downArrow(cv, cx, topY, botY, shaftTh, headHalf, headLen, body, ink) {
   savePNG(path.join(UI, 'gear.png'), W, W, down2(cv, W, W));
 }
 
-// stats.png — bar chart (Statistics)
+// stats.png — painted bars on a wooden shelf (Statistics)
+// Cottage reskin of the old flat candy bar-chart: muted cottage paint (sage /
+// dusty-blue / amber) over warm-ink outlines, standing on a wooden shelf with a
+// top-lit edge. Reads clearly as "stats/growth" while matching the cozy chrome.
 {
   const W = 256, cv = C(W * 2, W * 2), c = W;
-  const baseY = c + 128;
-  const bars = [[-94, 118, '#5EEAD4', '#14B8A6'], [0, 178, '#7EC7F5', '#4FA8E8'], [94, 236, '#FFC845', '#F5A315']];
-  for (const [bx, h] of bars) roundRect(cv, c + bx, baseY - h / 2, 33, h / 2 + 6, 14, '#3A2E52');  // ink
-  for (const [bx, h, col, dk] of bars) roundRect(cv, c + bx, baseY - h / 2, 26, h / 2, 11, col, 1, dk);
-  roundRect(cv, c, baseY + 18, 150, 9, 5, '#3A2E52');             // baseline
+  const INK = '#2C2114', WOOD = '#B87A3E', WOOD_DK = '#754A24', WOOD_HI = '#E4C282';
+  const baseY = c + 150;
+  roundRect(cv, c, baseY + 12, 172, 24, 10, INK, 0.9);                     // shelf ink
+  roundRect(cv, c, baseY + 8, 162, 16, 7, WOOD, 1, WOOD_DK);              // shelf wood
+  capsule(cv, c - 148, baseY + 2, c + 148, baseY + 2, 5, WOOD_HI, 0.6);   // shelf top light
+  const bars = [[-98, 116, '#7FA86A', '#587A48'], [0, 186, '#6E8FB0', '#496A8A'], [98, 248, '#E7A93A', '#B5730A']];
+  for (const [bx, h] of bars) roundRect(cv, c + bx, baseY - 4 - h / 2, 38, h / 2 + 6, 14, INK); // ink outline
+  for (const [bx, h, col, dk] of bars) {
+    roundRect(cv, c + bx, baseY - 6 - h / 2, 28, h / 2, 10, col, 1, dk);  // painted body
+    capsule(cv, c + bx - 8, baseY - 6 - h + 16, c + bx - 8, baseY - 22, 6, '#FFFFFF', 0.22); // left highlight
+    capsule(cv, c + bx - 18, baseY - 4 - h + 10, c + bx + 18, baseY - 4 - h + 10, 5, '#FFFFFF', 0.32); // top edge light
+  }
   savePNG(path.join(UI, 'stats.png'), W, W, down2(cv, W, W));
 }
 
@@ -775,15 +834,28 @@ function downArrow(cv, cx, topY, botY, shaftTh, headHalf, headLen, body, ink) {
   savePNG(path.join(UI, 'speech.png'), W, W, down2(cv, W, W));
 }
 
-// link.png — two chain-link rings (Whisper Gallery: cross-reference entries)
+// link.png — two interlocked forged bronze links (Whisper Gallery: cross-refs)
+// Cottage reskin of the old flat candy rings: warm forged bronze with a top-left
+// metallic highlight and a woven over/under at the crossing, so it reads as a
+// real chain "link/connection" instead of two flat vector circles.
 {
   const W = 256, cv = C(W * 2, W * 2), c = W;
-  const ring = (cx, cy, r, col, ink) => {
-    arcStroke(cv, cx, cy, r, 46, 0.01, Math.PI * 2, ink);
-    arcStroke(cv, cx, cy, r, 30, 0.01, Math.PI * 2, col);
+  const INK = '#2C2114', BR = '#C68A3E', BR_DK = '#835626', BR_HI = '#F0C878';
+  const R = 84;
+  const link = (cx, cy) => {
+    arcStroke(cv, cx, cy, R, 52, 0.01, Math.PI * 2, INK);                 // ink
+    arcStroke(cv, cx, cy, R, 38, 0.01, Math.PI * 2, BR_DK);               // dark bronze
+    arcStroke(cv, cx, cy, R, 26, 0.01, Math.PI * 2, BR);                  // bronze
+    arcStroke(cv, cx, cy, R, 9, Math.PI * 1.05, Math.PI * 1.72, BR_HI, 0.85); // top-left sheen
   };
-  ring(c - 58, c - 58, 86, '#8FA0DE', '#2E3355');
-  ring(c + 58, c + 58, 86, '#B79BFF', '#3A2E52');
+  link(c - 58, c - 58);   // upper-left link
+  link(c + 58, c + 58);   // lower-right link (drawn over)
+  // weave the first link back over the crossing so the two interlock
+  const cx1 = c - 58, cy1 = c - 58;
+  arcStroke(cv, cx1, cy1, R, 52, Math.PI * 0.12, Math.PI * 0.63, INK);
+  arcStroke(cv, cx1, cy1, R, 38, Math.PI * 0.12, Math.PI * 0.63, BR_DK);
+  arcStroke(cv, cx1, cy1, R, 26, Math.PI * 0.12, Math.PI * 0.63, BR);
+  arcStroke(cv, cx1, cy1, R, 9, Math.PI * 0.16, Math.PI * 0.4, BR_HI, 0.7);
   savePNG(path.join(UI, 'link.png'), W, W, down2(cv, W, W));
 }
 
@@ -798,4 +870,280 @@ function downArrow(cv, cx, topY, botY, shaftTh, headHalf, headLen, body, ink) {
   roundRect(cv, c, c + 138, 134, 30, 15, '#8A5A22');             // bottom roll ink
   roundRect(cv, c, c + 142, 126, 24, 12, '#C08A44', 1, '#9A6A2E');
   savePNG(path.join(UI, 'scroll.png'), W, W, down2(cv, W, W));
+}
+
+// ===================== De-emoji sprite kit (emotes + phase-mood) ==============
+// New sprites that replace OS emoji rendered over the painterly art. The 12
+// emote bubbles (128 sq, candy-UI family, bold shapes so they read at 18-24dp)
+// swap the OS-emoji emote bubbles floated above the animals; the dread-ward set
+// (eye/void/candle/fog/pale_heart/sleep) stays on-brand rather than cartoonish.
+// The 4 phase-mood icons (256 sq) de-emoji the puzzle-header atmosphere badge,
+// the phase-change card, the sacrifice altar candle, and the house-completion
+// crest. moon.png and eye.png already exist and are intentionally NOT touched.
+// A later pass wires these; this script only generates the pixels.
+
+// parametric heart outline, vertically centered on (cx, cy); s scales it
+function heartPts(cx, cy, s) {
+  const raw = [];
+  let minY = Infinity, maxY = -Infinity;
+  for (let i = 0; i < 72; i++) {
+    const t = (i / 72) * Math.PI * 2;
+    const x = 16 * Math.pow(Math.sin(t), 3);
+    const y = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
+    raw.push([x, y]);
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  }
+  const midY = (minY + maxY) / 2;
+  return raw.map(([x, y]) => [cx + x * s, cy + (y - midY) * s]);
+}
+// 4-point twinkle (8 vertices: sharp long points N/E/S/W, tight inner diagonals)
+const spark4Pts = (cx, cy, rOut, rIn, rot = -Math.PI / 2) => Array.from({ length: 8 }, (_, i) => {
+  const r = i % 2 ? rIn : rOut, a = rot + (i * Math.PI) / 4;
+  return [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
+});
+// a single "Z" glyph from three capsules (top bar, diagonal, bottom bar)
+function drawZ(cv, cx, cy, size, th, color, alpha = 1) {
+  const hw = size * 0.42, hh = size * 0.5;
+  capsule(cv, cx - hw, cy - hh, cx + hw, cy - hh, th, color, alpha);   // top bar
+  capsule(cv, cx + hw, cy - hh, cx - hw, cy + hh, th, color, alpha);   // diagonal
+  capsule(cv, cx - hw, cy + hh, cx + hw, cy + hh, th, color, alpha);   // bottom bar
+}
+
+// ------------------------- Emote kit (128 sq) --------------------------------
+
+// emote_heart.png — candy heart (warmth / affection)
+{
+  const W = 128, cv = C(W * 2, W * 2), c = W;
+  poly(cv, heartPts(c + 5, c + 12, 6.0), '#7A1F33', 0.30);       // drop shadow
+  poly(cv, heartPts(c, c, 6.2), '#7A1F33');                       // dark outline
+  poly(cv, heartPts(c, c - 2, 5.7), '#FF6B7E', 1, '#E8455C');     // candy body
+  poly(cv, heartPts(c, c - 6, 3.3), '#FF9FAD', 0.5);             // inner bloom
+  ellipse(cv, c - 34, c - 30, 16, 20, '#FFC3CE', 0.85, 10);      // lobe sheen
+  ellipse(cv, c - 18, c - 46, 7, 7, '#FFFFFF', 0.8, 4);         // glint
+  savePNG(path.join(UI, 'emote_heart.png'), W, W, down2(cv, W, W));
+}
+
+// emote_sparkle.png — 4-point twinkle (delight)
+{
+  const W = 128, cv = C(W * 2, W * 2), c = W;
+  ellipse(cv, c, c, 118, 118, '#FFE9A0', 0.22, 80);             // warm aura
+  poly(cv, spark4Pts(c, c, 116, 30), '#B8860B');                 // gold outline
+  poly(cv, spark4Pts(c, c, 104, 26), '#FFD84E', 1, '#F5A623');   // gold body
+  poly(cv, spark4Pts(c, c, 60, 18), '#FFF0A8', 0.7);            // hot inner
+  ellipse(cv, c, c, 20, 20, '#FFFDF0', 0.9);                    // core
+  poly(cv, spark4Pts(c + 78, c - 74, 34, 9), '#FFE585', 0.95);  // satellite
+  poly(cv, spark4Pts(c - 82, c + 66, 24, 7), '#FFEFB0', 0.85);  // small satellite
+  savePNG(path.join(UI, 'emote_sparkle.png'), W, W, down2(cv, W, W));
+}
+
+// emote_note.png — eighth note (song / contentment)
+{
+  const W = 128, cv = C(W * 2, W * 2), c = W;
+  const ink = '#3A2E52';
+  capsule(cv, c + 30, c + 62, c + 30, c - 106, 30, ink);        // stem ink
+  poly(cv, [[c + 30, c - 108], [c + 102, c - 66], [c + 90, c - 16], [c + 30, c - 52]], ink); // flag ink
+  ellipse(cv, c - 16, c + 66, 60, 48, ink);                     // head ink
+  capsule(cv, c + 30, c + 58, c + 30, c - 102, 18, '#B79BFF');  // stem
+  poly(cv, [[c + 30, c - 102], [c + 92, c - 66], [c + 82, c - 24], [c + 30, c - 48]], '#B79BFF', 1, '#8257EA'); // flag
+  ellipse(cv, c - 16, c + 66, 50, 38, '#B79BFF', 1);            // head
+  ellipse(cv, c - 34, c + 54, 16, 11, '#E7DCFF', 0.7);         // head sheen
+  savePNG(path.join(UI, 'emote_note.png'), W, W, down2(cv, W, W));
+}
+
+// emote_question.png — question mark (curiosity)
+{
+  const W = 128, cv = C(W * 2, W * 2), c = W;
+  const ink = '#274A5E', body = '#8ED0FF';
+  const ax = c, ay = c - 44, R = 56, a0 = -Math.PI * 1.05, a1 = Math.PI * 0.33;
+  const ex = ax + Math.cos(a1) * R, ey = ay + Math.sin(a1) * R;
+  arcStroke(cv, ax, ay, R, 52, a0, a1, ink);                    // hook ink
+  capsule(cv, ex, ey, c - 4, c + 34, 50, ink);                  // tail ink
+  ellipse(cv, c, c + 94, 30, 30, ink);                          // dot ink
+  arcStroke(cv, ax, ay, R, 36, a0, a1, body);                   // hook
+  capsule(cv, ex, ey, c - 4, c + 34, 34, body);                 // tail
+  ellipse(cv, c, c + 94, 20, 20, body);                         // dot
+  ellipse(cv, c - 22, c - 66, 12, 12, '#E7F4FF', 0.7);         // glint
+  savePNG(path.join(UI, 'emote_question.png'), W, W, down2(cv, W, W));
+}
+
+// emote_thought.png — small thought bubble with three dots (pondering)
+{
+  const W = 128, cv = C(W * 2, W * 2), c = W;
+  const cloud = [[-58, -26, 50, 42], [-4, -50, 60, 50], [58, -22, 48, 40], [30, 26, 46, 38], [-38, 24, 44, 36], [8, 0, 66, 50]];
+  for (const [dx, dy, rx, ry] of cloud) ellipse(cv, c + dx, c + dy - 6, rx + 7, ry + 7, '#B7ADC9'); // ink
+  for (const [dx, dy, rx, ry] of cloud) ellipse(cv, c + dx, c + dy - 6, rx, ry, '#FFFFFF', 1, 3);
+  for (const dx of [-40, 0, 40]) ellipse(cv, c + dx, c - 8, 12, 12, '#8A7FB0');                     // three dots
+  ellipse(cv, c - 62, c + 74, 22, 18, '#B7ADC9'); ellipse(cv, c - 62, c + 74, 15, 12, '#FFFFFF', 1, 2); // trailing
+  ellipse(cv, c - 92, c + 108, 14, 12, '#B7ADC9'); ellipse(cv, c - 92, c + 108, 8, 7, '#FFFFFF');
+  savePNG(path.join(UI, 'emote_thought.png'), W, W, down2(cv, W, W));
+}
+
+// emote_tear.png — a single teardrop (sadness)
+{
+  const W = 128, cv = C(W * 2, W * 2), c = W;
+  const cx = c, by = c + 54, r = 64;
+  ellipse(cv, cx + 2, by + 2, r + 7, r + 7, '#274A5E');                          // ink bottom
+  tri(cv, [cx - r - 5, by - 26], [cx + r + 5, by - 26], [cx, c - 118], '#274A5E'); // ink point
+  ellipse(cv, cx, by, r, r, '#4FA8E8');                                          // body bottom
+  tri(cv, [cx - r + 2, by - 28], [cx + r - 2, by - 28], [cx, c - 108], '#5AB0EE'); // body point
+  ellipse(cv, cx, by - 8, r - 8, r - 8, '#7EC7F5', 0.6, 30);                     // top-lit sheen
+  ellipse(cv, cx - 22, by - 20, 18, 24, '#DCF0FF', 0.7, 14);                     // specular
+  ellipse(cv, cx - 12, c - 40, 8, 14, '#EAF6FF', 0.6, 6);                        // upper glint
+  savePNG(path.join(UI, 'emote_tear.png'), W, W, down2(cv, W, W));
+}
+
+// emote_fog.png — drifting mist bands (unease / confusion)
+{
+  const W = 128, cv = C(W * 2, W * 2), c = W;
+  const bands = [
+    [c - 78, c - 62, c + 62, 32, '#D4CEE4'],
+    [c - 92, c - 16, c + 82, 34, '#BDB4D2'],
+    [c - 70, c + 30, c + 88, 32, '#CFC8E0'],
+    [c - 60, c + 74, c + 54, 28, '#B0A7C6'],
+  ];
+  for (const [x0, y, x1, th] of bands) capsule(cv, x0, y, x1, y, th + 12, '#8E86AD', 0.35);        // soft under-halo
+  for (const [x0, y, x1, th, col] of bands) capsule(cv, x0, y, x1, y, th, col, 0.95);              // band
+  for (const [x0, y, x1, th] of bands) capsule(cv, x0 + 14, y - th * 0.24, x1 - 14, y - th * 0.24, th * 0.32, '#F1ECFC', 0.5); // top sheen
+  savePNG(path.join(UI, 'emote_fog.png'), W, W, down2(cv, W, W));
+}
+
+// emote_eye.png — a watching eye with a crimson iris (dread)
+{
+  const W = 128, cv = C(W * 2, W * 2), c = W;
+  const [ir, ig, ib] = hex('#241B33');
+  const [wr, wg, wb] = hex('#F3EEF7');
+  // almond = intersection of two large circles offset above/below center
+  const almond = (off, rad, xs, cr, cg, cb, bx, byy) => {
+    for (let y = ~~(c - byy); y <= ~~(c + byy); y++)
+      for (let x = ~~(c - bx); x <= ~~(c + bx); x++) {
+        const dT = Math.hypot((x + 0.5 - c) * xs, y + 0.5 - (c + off)) - rad;
+        const dB = Math.hypot((x + 0.5 - c) * xs, y + 0.5 - (c - off)) - rad;
+        const a = Math.max(0, Math.min(1, 0.5 - dT)) * Math.max(0, Math.min(1, 0.5 - dB));
+        if (a > 0) blend(cv, x, y, cr, cg, cb, a);
+      }
+  };
+  almond(60, 116, 0.70, ir, ig, ib, 124, 66);       // ink almond (eyelid rim)
+  almond(56, 108, 0.72, wr, wg, wb, 118, 60);       // white sclera
+  ellipse(cv, c, c, 50, 50, '#7A1F33');             // crimson iris ring
+  ellipse(cv, c, c, 38, 38, '#B0324A', 1, 6);       // iris
+  ellipse(cv, c, c, 21, 21, '#0E0714');             // pupil
+  ellipse(cv, c - 13, c - 13, 10, 10, '#FFFFFF', 0.85); // catchlight
+  savePNG(path.join(UI, 'emote_eye.png'), W, W, down2(cv, W, W));
+}
+
+// emote_void.png — a small dark void with a crimson ring (dread)
+{
+  const W = 128, cv = C(W * 2, W * 2), c = W;
+  ellipse(cv, c, c, 116, 116, '#8B2A3A', 0.20, 60);   // faint crimson aura
+  ellipse(cv, c, c, 100, 100, '#2A1830');             // rim
+  ellipse(cv, c, c, 90, 90, '#8B2A3A', 0.9, 5);       // crimson ring
+  ellipse(cv, c, c, 82, 82, '#120A1E');               // void mouth
+  ellipse(cv, c, c, 60, 60, '#000000', 0.95, 22);     // pulling depth
+  ellipse(cv, c - 18, c - 18, 26, 26, '#3A1220', 0.5, 20); // faint inner crimson swirl
+  savePNG(path.join(UI, 'emote_void.png'), W, W, down2(cv, W, W));
+}
+
+// emote_candle.png — a lit taper (reverence)
+{
+  const W = 128, cv = C(W * 2, W * 2), c = W;
+  ellipse(cv, c, c - 44, 72, 92, '#FFE9A0', 0.22, 66);          // flame glow
+  ellipse(cv, c, c + 118, 52, 14, '#3A2E52', 0.25, 12);         // base contact shadow
+  roundRect(cv, c + 2, c + 58, 26, 66, 11, '#8A5A22', 0.30);    // body shadow
+  roundRect(cv, c, c + 54, 28, 66, 11, '#F0E7D9', 1, '#D8C6A6'); // wax body
+  capsule(cv, c - 14, c - 2, c - 14, c + 108, 6, '#FFFFFF', 0.5); // wax highlight
+  roundRect(cv, c, c - 12, 30, 8, 6, '#E4D4B4', 1, '#F4ECDC');   // melted rim/top
+  capsule(cv, c, c - 8, c, c - 24, 5, '#3A2E52');               // wick
+  flameLobe(cv, c, c - 112, c - 6, 38, '#E8511D');              // flame outer
+  flameLobe(cv, c, c - 100, c - 8, 29, '#FF7A28');              // mid
+  flameLobe(cv, c - 2, c - 84, c - 10, 19, '#FFB23E');          // inner
+  flameLobe(cv, c - 3, c - 64, c - 14, 10, '#FFE08A');          // hot core
+  ellipse(cv, c - 12, c - 76, 5, 8, '#FFF6D8', 0.7, 4);         // flame glint
+  savePNG(path.join(UI, 'emote_candle.png'), W, W, down2(cv, W, W));
+}
+
+// emote_pale_heart.png — a faded mauve heart (serene grief, Phase 5)
+{
+  const W = 128, cv = C(W * 2, W * 2), c = W;
+  poly(cv, heartPts(c + 4, c + 12, 6.0), '#5B4F72', 0.24);       // soft shadow
+  poly(cv, heartPts(c, c, 6.2), '#6B5F86');                       // muted outline
+  poly(cv, heartPts(c, c - 2, 5.7), '#C9A7E8', 1, '#A98BFF');     // pale mauve body
+  poly(cv, heartPts(c, c - 6, 3.3), '#E3D2F4', 0.5);            // inner bloom
+  ellipse(cv, c - 34, c - 30, 15, 19, '#F0E6FA', 0.7, 10);       // soft sheen
+  savePNG(path.join(UI, 'emote_pale_heart.png'), W, W, down2(cv, W, W));
+}
+
+// emote_sleep.png — three ascending Z's (drowsy / at rest)
+{
+  const W = 128, cv = C(W * 2, W * 2), c = W;
+  const zs = [[c - 46, c + 62, 56, '#4FA8E8'], [c + 6, c + 6, 78, '#5AB0EE'], [c + 66, c - 66, 102, '#7EC7F5']];
+  for (const [x, y, s] of zs) drawZ(cv, x, y, s, s * 0.34, '#274A5E');  // ink
+  for (const [x, y, s, body] of zs) drawZ(cv, x, y, s, s * 0.24, body); // body
+  savePNG(path.join(UI, 'emote_sleep.png'), W, W, down2(cv, W, W));
+}
+
+// ------------------------- Phase-mood icons (256 sq) -------------------------
+
+// thought.png — a soft dreamy cloud-puff (curious/pondering atmosphere)
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  const puffs = [[-118, -30, 96, 78], [-16, -96, 118, 96], [116, -34, 92, 76], [64, 54, 88, 72], [-78, 52, 84, 68], [12, 6, 128, 96]];
+  for (const [dx, dy, rx, ry] of puffs) ellipse(cv, c + dx, c + dy + 8, rx + 12, ry + 12, '#B7ADC9'); // soft ink
+  for (const [dx, dy, rx, ry] of puffs) ellipse(cv, c + dx, c + dy, rx, ry, '#FBFAFE', 1, 6);          // white body
+  ellipse(cv, c - 40, c - 70, 70, 50, '#FFFFFF', 0.6, 40);                                             // top sheen
+  ellipse(cv, c + 40, c + 34, 96, 70, '#EDE9F6', 0.5, 40);                                             // lavender underside
+  savePNG(path.join(UI, 'thought.png'), W, W, down2(cv, W, W));
+}
+
+// void.png — a dark disc with a faint crimson rim (dread; distinct from blind)
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  ellipse(cv, c, c, 230, 230, '#8B2A3A', 0.16, 90);   // faint crimson aura
+  ellipse(cv, c, c, 196, 196, '#2A1428');             // outer rim
+  ellipse(cv, c, c, 180, 180, '#8B2A3A', 0.85, 6);    // crimson rim ring
+  ellipse(cv, c, c, 168, 168, '#160A1E');             // void body
+  ellipse(cv, c, c, 120, 120, '#050208', 0.95, 40);   // pulling depth
+  ellipse(cv, c, c, 60, 60, '#000000', 1, 30);        // absolute dark core
+  ellipse(cv, c - 40, c - 40, 54, 54, '#3A1020', 0.4, 40); // faint inner crimson swirl
+  savePNG(path.join(UI, 'void.png'), W, W, down2(cv, W, W));
+}
+
+// dove.png — a pale serene bird in flight (peace; house-completion crest)
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  const ink = '#B0A6C4', pale = '#FBFAFE', paleLo = '#E7DEF2', wing = '#F1EAF9';
+  ellipse(cv, c, c, 214, 172, '#EAE2F4', 0.22, 90);                          // serene aura
+  poly(cv, [[c - 64, c + 26], [c - 202, c - 12], [c - 150, c + 30], [c - 196, c + 74], [c - 74, c + 76]], ink); // tail ink
+  poly(cv, [[c - 34, c - 4], [c - 104, c - 168], [c + 10, c - 124], [c + 70, c - 20]], ink);                    // wing ink
+  ellipse(cv, c - 6, c + 22, 112, 70, ink);                                  // body ink
+  ellipse(cv, c + 82, c - 38, 52, 50, ink);                                  // head ink
+  poly(cv, [[c - 66, c + 30], [c - 190, c - 4], [c - 144, c + 32], [c - 184, c + 68], [c - 72, c + 70]], paleLo); // tail
+  poly(cv, [[c - 30, c - 6], [c - 94, c - 158], [c + 8, c - 116], [c + 62, c - 22]], wing);                       // wing
+  ellipse(cv, c - 6, c + 20, 104, 62, pale, 1, paleLo);                      // body
+  ellipse(cv, c + 80, c - 38, 44, 42, pale, 1, paleLo);                      // head
+  tri(cv, [c + 116, c - 44], [c + 168, c - 32], [c + 116, c - 18], '#F5B82E'); // beak
+  ellipse(cv, c + 96, c - 46, 9, 9, '#5B4F72');                              // eye
+  capsule(cv, c - 34, c - 60, c + 2, c - 96, 9, '#DCCFEC', 0.8);            // wing feather line
+  capsule(cv, c - 12, c - 30, c + 20, c - 70, 9, '#DCCFEC', 0.7);           // wing feather line
+  ellipse(cv, c - 30, c + 2, 40, 26, '#FFFFFF', 0.5, 26);                    // breast sheen
+  savePNG(path.join(UI, 'dove.png'), W, W, down2(cv, W, W));
+}
+
+// candle.png — a lit taper (sacrifice altar; reuses the flameLobe helper)
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  ellipse(cv, c, c - 74, 150, 190, '#FFE9A0', 0.24, 120);        // flame glow
+  ellipse(cv, c, c + 236, 96, 26, '#3A2E52', 0.22, 20);          // base contact shadow
+  roundRect(cv, c + 4, c + 116, 50, 128, 18, '#8A5A22', 0.28);   // body shadow
+  roundRect(cv, c, c + 110, 52, 128, 18, '#F0E7D9', 1, '#D6C4A2'); // wax taper
+  roundRect(cv, c, c - 18, 56, 14, 12, '#E4D4B4', 1, '#F4ECDC');  // melted rim/top
+  capsule(cv, c - 26, c + 4, c - 26, c + 210, 11, '#FFFFFF', 0.5); // wax highlight
+  capsule(cv, c + 30, c + 40, c + 24, c + 200, 12, '#D6C4A2', 0.6); // side wax drip shade
+  capsule(cv, c, c - 12, c, c - 44, 8, '#3A2E52');               // wick
+  flameLobe(cv, c, c - 224, c - 8, 74, '#E8511D');               // flame outer
+  flameLobe(cv, c, c - 202, c - 12, 58, '#FF7A28');              // mid
+  flameLobe(cv, c - 4, c - 168, c - 18, 40, '#FFB23E');          // inner
+  flameLobe(cv, c - 6, c - 126, c - 26, 22, '#FFE08A');          // hot core
+  ellipse(cv, c - 24, c - 150, 11, 18, '#FFF6D8', 0.7, 8);       // flame glint
+  savePNG(path.join(UI, 'candle.png'), W, W, down2(cv, W, W));
 }

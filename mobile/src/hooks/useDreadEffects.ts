@@ -1,5 +1,5 @@
 import { useRef, useCallback, useEffect } from 'react';
-import { Animated } from 'react-native';
+import { Animated, Easing } from 'react-native';
 import { getSettingsSync } from '../services/settings';
 import { hapticLight, hapticMedium } from '../services/haptics';
 import {
@@ -11,6 +11,27 @@ import {
   DREAD_PULSE_OPACITY,
   SCREEN_SHAKE_INTENSITY,
 } from '../constants/gameBalance';
+
+/**
+ * F79: the pulse's intensity already ages with phase (DREAD_PULSE_OPACITY),
+ * but its ENVELOPE didn't — every phase used the same flat 300ms decay. The
+ * ATTACK (DREAD_PULSE_FADE_IN_MS) stays fixed at every phase: a dread flash
+ * must still startle instantly, even in the deep descent. Only the RELEASE
+ * lengthens as the phases darken, so the dread lingers a beat longer before
+ * fading, rather than snapping off the same way it did on Phase 0.
+ */
+const DREAD_PULSE_FADE_OUT_BY_PHASE: Record<number, number> = {
+  0: DREAD_PULSE_FADE_OUT_MS,
+  1: DREAD_PULSE_FADE_OUT_MS,
+  2: DREAD_PULSE_FADE_OUT_MS,
+  3: 450,
+  4: 700,
+  5: 700,
+};
+
+function getDreadPulseFadeOutMs(phase: number): number {
+  return DREAD_PULSE_FADE_OUT_BY_PHASE[phase] ?? (phase >= 4 ? 700 : DREAD_PULSE_FADE_OUT_MS);
+}
 
 export interface DreadEffectsState {
   /** Animated opacity for the crimson dread-pulse overlay. */
@@ -67,7 +88,9 @@ export function useDreadEffects(): [DreadEffectsState, DreadEffectsActions] {
     pulseAnimRef.current?.stop();
     shakeAnimRef.current?.stop();
 
-    // Crimson overlay pulse.
+    // Crimson overlay pulse. The attack (startle) stays constant at every
+    // phase; only the release lengthens and eases out as the phases darken
+    // (F79), so the dread visibly lingers instead of snapping off uniformly.
     const maxOpacity = DREAD_PULSE_OPACITY[phase] ?? (phase >= 4 ? 0.25 : 0.10);
     pulseAnimRef.current = Animated.sequence([
       Animated.timing(dreadPulseOpacity, {
@@ -77,7 +100,8 @@ export function useDreadEffects(): [DreadEffectsState, DreadEffectsActions] {
       }),
       Animated.timing(dreadPulseOpacity, {
         toValue: 0,
-        duration: DREAD_PULSE_FADE_OUT_MS,
+        duration: getDreadPulseFadeOutMs(phase),
+        easing: Easing.out(Easing.quad),
         useNativeDriver: true,
       }),
     ]);

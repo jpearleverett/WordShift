@@ -36,6 +36,7 @@ import {
   MAX_CHALLENGE_WORDS,
   pickShareIntrigueTagline,
   SHARE_INTRIGUE_TAGLINES,
+  CHALLENGE_TAUNTS,
 } from '../services/shareResults';
 import type { ShareableResult } from '../services/shareResults';
 import { PLAY_STORE_URL, WEB_LANDING_URL } from '../constants/links';
@@ -345,6 +346,30 @@ describe('shareResults', () => {
       const text = buildChallengeShareText(['CAT', 'COAT', 'GOAT']);
       expect(text).toContain('wordshift://challenge/p?w=CAT-COAT-GOAT');
       expect(text).toContain(PLAY_STORE_URL);
+    });
+
+    test('challenge taunt is phase-aware (bright playful vs dread) yet always spoiler-safe', () => {
+      const words = ['FLAME', 'FAME', 'FRAME'];
+      const bright = buildChallengeShareText(words, undefined, 0);
+      const dread = buildChallengeShareText(words, undefined, 4);
+      // The taunt line differs by phase...
+      expect(bright.split('\n')[0]).not.toBe(dread.split('\n')[0]);
+      expect(bright).toContain('Think you can shift it?');
+      // ...while every phase keeps the exact link + store CTA and 3-line shape.
+      for (const phase of [0, 1, 2, 3, 4, 5]) {
+        const text = buildChallengeShareText(words, undefined, phase);
+        expect(text).toContain('wordshift://challenge/p?w=FLAME-FAME-FRAME');
+        expect(text).toContain(PLAY_STORE_URL);
+        expect(text.split('\n')).toHaveLength(3);
+      }
+    });
+
+    test('challenge taunt pools are dash-free (named and anon, every tier)', () => {
+      const DASH = /[–—]/;
+      for (const tier of Object.values(CHALLENGE_TAUNTS)) {
+        expect(DASH.test(tier.anon)).toBe(false);
+        expect(DASH.test(tier.named('Ember'))).toBe(false);
+      }
     });
 
     test('word-count bounds are exported as the single source of truth (3-6)', () => {

@@ -106,10 +106,12 @@ describe('audio', () => {
       'letter_select',
       'invalid_move',
       'undo',
+      'hint',
       'amber_earn',
       'dialogue',
       'victory',
       'perfect',
+      'pit_devour',
     ];
 
     test.each(withDark)('%s swaps to its dark variant at Phase 3+', (name) => {
@@ -123,9 +125,19 @@ describe('audio', () => {
     });
 
     test('sounds without a registered dark variant keep their base name', () => {
-      for (const name of ['hint', 'achievement', 'unlock', 'phase_change', 'daily_ready']) {
+      // glitch/whisper are horror cues with no dark mirror — always their base
+      // name; phase_change/daily_ready are already the dark end of the palette.
+      // (achievement/unlock DO have dark mirrors now — covered above.)
+      for (const name of ['phase_change', 'daily_ready', 'glitch', 'whisper']) {
         expect(resolveSfxForPhase(name, 4)).toBe(name);
       }
+    });
+
+    test('achievement and unlock swap to their dark variants at Phase 3+', () => {
+      expect(resolveSfxForPhase('achievement', 4)).toBe('achievement_dark');
+      expect(resolveSfxForPhase('unlock', 3)).toBe('unlock_dark');
+      expect(resolveSfxForPhase('achievement', 2)).toBe('achievement');
+      expect(resolveSfxForPhase('unlock', 1)).toBe('unlock');
     });
   });
 
@@ -152,13 +164,14 @@ describe('audio', () => {
   });
 
   describe('ambient music', () => {
-    test('musicTrackForPhase maps the descent: bright 0-1, dusk 2, dark 3+', () => {
+    test('musicTrackForPhase maps the descent: bright 0-1, dusk 2, dark 3-4, peace 5', () => {
       expect(musicTrackForPhase(0)).toBe('music_bright');
       expect(musicTrackForPhase(1)).toBe('music_bright');
       expect(musicTrackForPhase(2)).toBe('music_dusk');
       expect(musicTrackForPhase(3)).toBe('music_dark');
       expect(musicTrackForPhase(4)).toBe('music_dark');
-      expect(musicTrackForPhase(5)).toBe('music_dark');
+      // Post-revelation resolves to the "terrible peace" bed.
+      expect(musicTrackForPhase(5)).toBe('music_peace');
     });
 
     test('musicTrackForContext picks the screen family and keeps the phase band', () => {
@@ -173,7 +186,9 @@ describe('audio', () => {
       // Pit family too.
       expect(musicTrackForContext('pit', 0)).toBe('music_pit_bright');
       expect(musicTrackForContext('pit', 2)).toBe('music_pit_dusk');
-      expect(musicTrackForContext('pit', 5)).toBe('music_pit_dark');
+      expect(musicTrackForContext('pit', 4)).toBe('music_pit_dark');
+      // Phase 5 resolves to the peace band on every screen family.
+      expect(musicTrackForContext('pit', 5)).toBe('music_pit_peace');
     });
 
     test('startMusicForScreen plays the screen-specific bed and crossfades on a screen change', async () => {

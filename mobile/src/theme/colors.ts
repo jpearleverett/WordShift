@@ -331,7 +331,10 @@ export function getPhaseTheme(phase: number): PhaseTheme {
           '#FF6B9D', '#C44DFF', '#4DAFFF', '#4DE8C2',
           '#FFD84D', '#FF8C4D', '#FF4D6A', '#9D4DFF',
         ],
-        victoryTitleColor: CandyColors.pink.main,
+        // pink.dark (#DB2777) reads 4.6:1 on the white modal (pink.main #EC4899
+        // was only 3.5:1 — passable at display size but under the 4.5:1 bar);
+        // still unmistakably candy pink.
+        victoryTitleColor: CandyColors.pink.dark,
         victoryGlowColor: CandyColors.yellow.light,
         modalOverlayColor: 'rgba(76, 29, 149, 0.7)',
         modalBgColor: CandyColors.white,
@@ -363,7 +366,9 @@ export function getPhaseTheme(phase: number): PhaseTheme {
           '#E06090', '#A040DD', '#4090DD', '#40C8A0',
           '#E0C040', '#E08040', '#E04060', '#8040DD',
         ],
-        victoryTitleColor: '#D06090',
+        // Deepened rose (#BC4A78) reads 4.5:1 on the Phase-1 modal (#FAF8FF);
+        // #D06090 was 3.5:1. Keeps the muted-lavender-pink character.
+        victoryTitleColor: '#BC4A78',
         victoryGlowColor: '#E8D080',
         modalOverlayColor: 'rgba(60, 25, 120, 0.7)',
         modalBgColor: '#FAF8FF',
@@ -395,7 +400,9 @@ export function getPhaseTheme(phase: number): PhaseTheme {
           '#B05080', '#8838B8', '#3878B8', '#38A888',
           '#B8A038', '#B86838', '#B83858', '#6838B8',
         ],
-        victoryTitleColor: '#9868A8',
+        // WCAG AA: #7A4E8E = 4.94:1 on modalBg #E8E0F0 (was #9868A8 at 3.35:1).
+        // Same cool violet identity, one step deeper.
+        victoryTitleColor: '#7A4E8E',
         victoryGlowColor: '#A8A0C0',
         modalOverlayColor: 'rgba(40, 20, 80, 0.75)',
         modalBgColor: '#E8E0F0',

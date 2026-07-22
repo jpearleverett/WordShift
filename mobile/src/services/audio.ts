@@ -31,6 +31,12 @@ const SOUND_SOURCES: Record<string, any> = {
   valid_move_2: require('../../assets/sounds/valid_move_2.wav'),
   valid_move_3: require('../../assets/sounds/valid_move_3.wav'),
   valid_move_4: require('../../assets/sounds/valid_move_4.wav'),
+  // Reverse-shift midpoint pivot (rising marimba into a handbell; dark mirror sinks).
+  midpoint_turn: require('../../assets/sounds/midpoint_turn.wav'),
+  // Victory star pops: one celesta note per star (rising; dark mirrors sink).
+  star_pop_1: require('../../assets/sounds/star_pop_1.wav'),
+  star_pop_2: require('../../assets/sounds/star_pop_2.wav'),
+  star_pop_3: require('../../assets/sounds/star_pop_3.wav'),
   invalid_move: require('../../assets/sounds/invalid_move.wav'),
   undo: require('../../assets/sounds/undo.wav'),
   hint: require('../../assets/sounds/hint.wav'),
@@ -38,10 +44,20 @@ const SOUND_SOURCES: Record<string, any> = {
   perfect: require('../../assets/sounds/perfect.wav'),
   amber_earn: require('../../assets/sounds/amber_earn.wav'),
   achievement: require('../../assets/sounds/achievement.wav'),
+  // Dark mirrors (Phase 3+) auto-resolved by resolveSfxForPhase — the rising
+  // celebration goes reverent (minor dark-bell ascent into a hollow toll).
+  achievement_dark: require('../../assets/sounds/achievement_dark.wav'),
   unlock: require('../../assets/sounds/unlock.wav'),
+  unlock_dark: require('../../assets/sounds/unlock_dark.wav'),
   dialogue: require('../../assets/sounds/dialogue.wav'),
   phase_change: require('../../assets/sounds/phase_change.wav'),
   daily_ready: require('../../assets/sounds/daily_ready.wav'),
+  // Offering Pit: a word landing in the pit (dark mirror hungrier at Phase 3+).
+  pit_devour: require('../../assets/sounds/pit_devour.wav'),
+  // Horror cues for the post-victory orchestration — no dark mirror, they are
+  // already the wrongness at any phase.
+  glitch: require('../../assets/sounds/glitch.wav'),
+  whisper: require('../../assets/sounds/whisper.wav'),
   // Dedicated UI sounds (menus / dialogue / navigation): a warm confirm tap and
   // a soft selection tick, distinct from the board's tap/letter_select so menu
   // taps never read as gameplay.
@@ -55,9 +71,15 @@ const SOUND_SOURCES: Record<string, any> = {
   valid_move_2_dark: require('../../assets/sounds/valid_move_2_dark.wav'),
   valid_move_3_dark: require('../../assets/sounds/valid_move_3_dark.wav'),
   valid_move_4_dark: require('../../assets/sounds/valid_move_4_dark.wav'),
+  midpoint_turn_dark: require('../../assets/sounds/midpoint_turn_dark.wav'),
+  star_pop_1_dark: require('../../assets/sounds/star_pop_1_dark.wav'),
+  star_pop_2_dark: require('../../assets/sounds/star_pop_2_dark.wav'),
+  star_pop_3_dark: require('../../assets/sounds/star_pop_3_dark.wav'),
   invalid_move_dark: require('../../assets/sounds/invalid_move_dark.wav'),
   undo_dark: require('../../assets/sounds/undo_dark.wav'),
+  hint_dark: require('../../assets/sounds/hint_dark.wav'),
   amber_earn_dark: require('../../assets/sounds/amber_earn_dark.wav'),
+  pit_devour_dark: require('../../assets/sounds/pit_devour_dark.wav'),
   dialogue_dark: require('../../assets/sounds/dialogue_dark.wav'),
   victory_dark: require('../../assets/sounds/victory_dark.wav'),
   perfect_dark: require('../../assets/sounds/perfect_dark.wav'),
@@ -80,6 +102,11 @@ const MUSIC_SOURCES: Record<string, any> = {
   music_pit_bright: require('../../assets/sounds/music_pit_bright.wav'),
   music_pit_dusk: require('../../assets/sounds/music_pit_dusk.wav'),
   music_pit_dark: require('../../assets/sounds/music_pit_dark.wav'),
+  // Phase-5 "terrible peace" beds — the dark DNA resolved low and slow (the
+  // C-add9 restored, tolls softened), the serene register after the arrival.
+  music_peace: require('../../assets/sounds/music_peace.wav'),
+  music_puzzle_peace: require('../../assets/sounds/music_puzzle_peace.wav'),
+  music_pit_peace: require('../../assets/sounds/music_pit_peace.wav'),
 };
 
 // Hot-path sounds preloaded at init for latency-free first playback
@@ -91,11 +118,13 @@ const PRELOAD_SOUND_NAMES = [
   'valid_move_3',
   'invalid_move',
   'victory',
+  'star_pop_1', // fires in the victory choreography, right after 'victory'
   'amber_earn',
   'ui_tap', // UI taps fire from the very first menu interaction
   'ui_tick',
   'valid_move_dark', // hot path once the descent deepens (Phase 3+)
   'valid_move_2_dark',
+  'pit_devour', // fires on every tap-devour + the Offer-All cascade in the pit
 ];
 
 const SOUND_VOLUME = 0.8;
@@ -264,6 +293,19 @@ export async function soundValidMove(comboTier: number = 0): Promise<void> {
   await playSound(validMoveSoundName(comboTier, audioPhase));
 }
 
+/** Reverse-shift descent->ascent pivot: a bright rising marimba into a handbell
+ *  (a chapter break, above the move ladder); sinks to its hollow mirror at Phase 3+. */
+export async function soundMidpointTurn(): Promise<void> {
+  await playSound(resolveSfxForPhase('midpoint_turn', audioPhase));
+}
+
+/** Victory star pop (index 1-3): one celesta note per star as it lands, so ear
+ *  and hand sync in the choreography. Sinks to its hollow mirror at Phase 3+. */
+export async function soundStarPop(index: number): Promise<void> {
+  const i = Math.max(1, Math.min(3, Math.round(index)));
+  await playSound(resolveSfxForPhase(`star_pop_${i}`, audioPhase));
+}
+
 /** Invalid move attempted. Deeper thud at Phase 3+. */
 export async function soundInvalidMove(): Promise<void> {
   await playSound(resolveSfxForPhase('invalid_move', audioPhase));
@@ -317,6 +359,21 @@ export async function soundAmberEarn(): Promise<void> {
   await playSound(resolveSfxForPhase('amber_earn', audioPhase));
 }
 
+/** A word devoured by the Offering Pit. Sub-hum swallow at Phase 3+. */
+export async function soundPitDevour(): Promise<void> {
+  await playSound(resolveSfxForPhase('pit_devour', audioPhase));
+}
+
+/** Post-victory glitch flash — a moment of wrongness. No dark mirror. */
+export async function soundGlitch(): Promise<void> {
+  await playSound(resolveSfxForPhase('glitch', audioPhase));
+}
+
+/** Post-victory whisper / ambient breath — the sound of being noticed. No dark mirror. */
+export async function soundWhisper(): Promise<void> {
+  await playSound(resolveSfxForPhase('whisper', audioPhase));
+}
+
 /** Achievement unlocked */
 export async function soundAchievement(): Promise<void> {
   await playSound(resolveSfxForPhase('achievement', audioPhase));
@@ -354,6 +411,8 @@ const MUSIC_FADE_STEPS = 16;
 const MUSIC_DUSK_PHASE = 2;
 /** Phase at/above which the bed corrupts to dark. */
 const MUSIC_DARK_PHASE = 3;
+/** Phase at/above which the bed resolves to the post-revelation "peace" band. */
+const MUSIC_PEACE_PHASE = 5;
 
 /**
  * The screen context a music bed belongs to. 'home' is also the bed for every
@@ -369,8 +428,10 @@ const MUSIC_FAMILY: Record<MusicScreen, string> = {
   pit: 'music_pit',
 };
 
-/** Pure phase → corruption band (bright / dusk / dark) — the descent. */
-function musicBandForPhase(phase: number): 'bright' | 'dusk' | 'dark' {
+/** Pure phase → corruption band (bright / dusk / dark / peace) — the descent
+ *  then the terrible peace of post-revelation. */
+function musicBandForPhase(phase: number): 'bright' | 'dusk' | 'dark' | 'peace' {
+  if (phase >= MUSIC_PEACE_PHASE) return 'peace';
   if (phase >= MUSIC_DARK_PHASE) return 'dark';
   if (phase >= MUSIC_DUSK_PHASE) return 'dusk';
   return 'bright';

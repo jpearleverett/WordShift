@@ -5,7 +5,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Switch,
+  Pressable,
   ScrollView,
   Linking,
   Modal,
@@ -21,10 +21,13 @@ import * as Application from 'expo-application';
 import { isSupabaseConfigured } from '../services/supabaseClient';
 import { getOrCreateRecoveryCode, linkRecoveryCode, downloadFromCloud, clearSyncStatus, uploadToCloud, getSyncStatus } from '../services/cloudSave';
 import { showGameAlert } from '../services/gameAlert';
-import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
+import { SURFACE, getSurfaceTheme, getModalInSpring, SurfaceTheme } from '../theme/surfaces';
 import { PanelCard } from './ui/PanelCard';
 import { PixelPlaque } from './ui/PixelPlaque';
 import { CandyButton } from './ui/CandyButton';
+import { PhaseTransitionOverlay } from './PhaseTransitionOverlay';
+import { NEW_CYCLE_EVENT, PhaseTransitionEvent } from '../services/phaseEvents';
+import { shouldSimplifyAnimations } from '../services/deviceTier';
 import { useScreenInsets } from '../hooks/useScreenInsets';
 import { EXTERNAL_LINKS, getSupportMailto } from '../constants/links';
 import { GameSettings, getSettings, updateSetting, resetSettings } from '../services/settings';
@@ -79,6 +82,7 @@ import { clearMasteryRecords } from '../services/masteryRecords';
 import { clearDailyLadder } from '../services/dailyLadder';
 import { clearOfferingRequests } from '../services/offeringRequests';
 import { clearReviewPrompt } from '../services/reviewPrompt';
+import { FONT_SIZE } from '../theme/typeScale';
 
 const AMBER_ICON = require('../../assets/ui/amber.png');
 
@@ -250,6 +254,88 @@ export async function performNewCycle(): Promise<number> {
   return cycle;
 }
 
+// ---------------------------------------------------------------------------
+// CottageSwitch — an on-brand toggle that replaces the stock platform Switch
+// (off-brand against the fully pixel-skinned app). It draws a cottage/surface-
+// palette track + thumb from getSurfaceTheme, slides the thumb with a native-
+// driver transform, and cross-fades the ON-state track fill via native-driver
+// opacity (so the color change never needs a JS-bridge backgroundColor anim).
+// Reduced motion OR a low-tier device snaps to the end state instantly. It
+// keeps the SAME onValueChange(value) API and accessibility contract
+// (accessibilityRole "switch" + accessibilityState.checked) as the old Switch.
+// RN uses border-box sizing: content box = size - 2*(border + pad).
+// ---------------------------------------------------------------------------
+const SWITCH_WIDTH = 52;
+const SWITCH_HEIGHT = 30;
+const SWITCH_BORDER = 2;
+const SWITCH_PAD = 3;
+const SWITCH_INSET = SWITCH_BORDER + SWITCH_PAD;
+const SWITCH_THUMB = SWITCH_HEIGHT - SWITCH_INSET * 2; // 20
+const SWITCH_TRAVEL = SWITCH_WIDTH - SWITCH_INSET * 2 - SWITCH_THUMB; // 22
+
+interface CottageSwitchProps {
+  value: boolean;
+  onValueChange: (value: boolean) => void;
+  theme: SurfaceTheme;
+  reducedMotion: boolean;
+  accessibilityLabel?: string;
+}
+
+const CottageSwitch: React.FC<CottageSwitchProps> = ({
+  value,
+  onValueChange,
+  theme,
+  reducedMotion,
+  accessibilityLabel,
+}) => {
+  const anim = useRef(new Animated.Value(value ? 1 : 0)).current;
+
+  useEffect(() => {
+    if (reducedMotion || shouldSimplifyAnimations()) {
+      anim.setValue(value ? 1 : 0);
+      return;
+    }
+    const slide = Animated.timing(anim, {
+      toValue: value ? 1 : 0,
+      duration: 160,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: true,
+    });
+    slide.start();
+    return () => slide.stop();
+  }, [value, reducedMotion, anim]);
+
+  const translateX = anim.interpolate({ inputRange: [0, 1], outputRange: [0, SWITCH_TRAVEL] });
+
+  return (
+    <Pressable
+      onPress={() => onValueChange(!value)}
+      accessibilityRole="switch"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ checked: value }}
+      hitSlop={10}
+      style={[styles.switchTrack, { backgroundColor: theme.sectionBorder, borderColor: theme.cardBorder }]}
+    >
+      {/* ON-state fill cross-fades in (native-driver opacity) so the track
+          color shift never needs a JS-bridge backgroundColor animation. */}
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.switchTrackOn, { backgroundColor: theme.primaryBg, opacity: anim }]}
+      />
+      <Animated.View
+        style={[
+          styles.switchThumb,
+          {
+            backgroundColor: theme.headerTitle,
+            borderColor: theme.cardBorder,
+            transform: [{ translateX }],
+          },
+        ]}
+      />
+    </Pressable>
+  );
+};
+
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, onReset, onCloudRestored }) => {
   const screenInsets = useScreenInsets();
   const [settings, setSettings] = useState<GameSettings | null>(null);
@@ -273,6 +359,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
   // source of truth): backdrop fade + panel spring in, fast timing out.
   // New Cycle (NG+) availability — only at the true endgame (post-revelation).
   const [canCycle, setCanCycle] = useState(false);
+  // The re-descent ceremony that plays BEFORE the reload once the player
+  // confirms a New Cycle (null = not playing). PhaseTransitionOverlay renders
+  // it; its onComplete performs the reload so the milestone lands first.
+  const [cycleCeremony, setCycleCeremony] = useState<PhaseTransitionEvent | null>(null);
   // `restoreVisible` keeps the Modal mounted while the exit animation plays.
   const [restoreVisible, setRestoreVisible] = useState(false);
   const restoreBackdrop = useRef(new Animated.Value(0)).current;
@@ -289,7 +379,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
       }
       const enter = Animated.parallel([
         Animated.timing(restoreBackdrop, { toValue: 1, duration: 180, useNativeDriver: true }),
-        Animated.spring(restoreScale, { toValue: 1, ...SURFACE.modalIn, useNativeDriver: true }),
+        Animated.spring(restoreScale, { toValue: 1, ...getModalInSpring(phase), useNativeDriver: true }),
       ]);
       enter.start();
       return () => enter.stop();
@@ -399,9 +489,11 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
   }, []);
 
   // A newer cloud save exists on another device (upload conflict guard fired).
-  // Surface it with an explicit choice instead of silently clobbering either side.
-  const handleUseCloudSave = () => {
-    hapticLight();
+  // Surface it with an explicit choice instead of silently clobbering either
+  // side. Restoring the cloud save is DESTRUCTIVE to this device's progress, so
+  // it is gated behind a confirm that spells out exactly what is kept vs lost
+  // (the old one-tap "Use the newer save" wiped local progress with no warning).
+  const runCloudRestore = () => {
     (async () => {
       try {
         const restored = await downloadFromCloud();
@@ -421,15 +513,32 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
     })();
   };
 
+  const handleUseCloudSave = () => {
+    hapticLight();
+    showGameAlert(
+      'Restore the newer cloud save?',
+      "The save from your other device is newer. This device's current progress will be replaced by the cloud save, and anything you have played here since will be lost. This cannot be undone.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Replace this device',
+          style: 'destructive',
+          onPress: runCloudRestore,
+        },
+      ],
+    );
+  };
+
   const handleKeepThisDevice = () => {
     hapticLight();
     showGameAlert(
-      'Keep this device?',
-      'This will overwrite the newer save from your other device with this one.',
+      "Keep this device's save?",
+      "This device's progress will be uploaded and will overwrite the newer save from your other device. The cloud copy will be lost. This cannot be undone.",
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Keep this device',
+          style: 'destructive',
           onPress: async () => {
             try {
               // Clear the conflict only when the forced upload actually
@@ -450,6 +559,33 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
     );
   };
 
+  // The New Cycle (NG+) session rebuild, run AFTER the re-descent ceremony has
+  // played so the milestone lands as a moment rather than a hard restart.
+  // performNewCycle() already committed the new cycle to storage before the
+  // ceremony played, so this reuses the SAME in-place session rebuild the
+  // cloud-restore conflict path already uses (App.tsx wires onCloudRestored to
+  // rebuildSessionFromStorage({ restartOnboarding: false })) — New Cycle keeps
+  // the running session exactly like that path, so no hard Updates.reloadAsync
+  // is needed to pick up the new cycle's state. Only when no host rebuild is
+  // wired (a bare render in isolation) does this fall back to the old
+  // reload-or-manual-restart path, so the cycle can never be stranded.
+  const handleCycleCeremonyComplete = () => {
+    setCycleCeremony(null);
+    if (onCloudRestored) {
+      onCloudRestored();
+      return;
+    }
+    (async () => {
+      try {
+        await Updates.reloadAsync();
+      } catch {
+        showGameAlert('The pattern turns', 'Restart WordShift to begin again.', [
+          { text: 'OK', onPress: onClose },
+        ]);
+      }
+    })();
+  };
+
   const handleNewCycle = () => {
     hapticLight();
     showGameAlert(
@@ -460,16 +596,11 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
         {
           text: getNewCycleCTA(),
           onPress: async () => {
+            // Commit the new cycle to storage (force-uploads it as the cloud
+            // row inside performNewCycle), then play the serene re-descent
+            // ceremony; its onComplete performs the reload.
             await performNewCycle();
-            try {
-              await Updates.reloadAsync();
-            } catch {
-              // Expo Go / dev: reload throws. The reset is committed to storage;
-              // ask the player to restart so the fresh cycle loads cleanly.
-              showGameAlert('The pattern turns', 'Restart WordShift to begin again.', [
-                { text: 'OK', onPress: onClose },
-              ]);
-            }
+            setCycleCeremony(NEW_CYCLE_EVENT);
           },
         },
       ]
@@ -559,8 +690,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
 
   const handleResetData = () => {
     showGameAlert(
-      'Reset All Data',
-      'This will reset all your progress, achievements, and statistics. This cannot be undone.',
+      'Reset All Progress',
+      'This erases everything on this device. Your house and every room, all your animal friends, and all your amber are lost, along with achievements, statistics, streaks, and daily challenge history. The game starts over from the very beginning. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -606,13 +737,46 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
     );
   };
 
-  if (!settings) return null;
+  // Skeleton: render the header + a few empty PanelCards from static props
+  // while the settings load lands, so the reveal never exposes a blank
+  // screen — content cascades in as it arrives instead of popping
+  // fully-formed once everything resolves.
+  if (!settings) {
+    const st = getSurfaceTheme(phase);
+    const skeletonChipBg = `rgba(255, 255, 255, ${SURFACE.highlightAlpha})`;
+    return (
+      <View style={[styles.container, { backgroundColor: st.screenBg }]}>
+        <View style={[styles.header, { paddingTop: screenInsets.top + 16 }]}>
+          <TouchableOpacity
+            style={[styles.backChip, { backgroundColor: skeletonChipBg, borderColor: st.headerChipBorder }]}
+            onPress={onClose}
+            accessibilityRole="button"
+            accessibilityLabel="Back to home"
+          >
+            <Text style={[styles.backChipText, { color: st.headerTitle }]}>{'<'} Back</Text>
+          </TouchableOpacity>
+          <Text style={[styles.title, { color: st.headerTitle }]}>Settings</Text>
+          <View style={styles.headerSpacer} />
+        </View>
+        <View style={styles.content}>
+          <PanelCard phase={phase} kind="panel" style={styles.section}>
+            <View style={styles.skeletonBlock} />
+          </PanelCard>
+          <PanelCard phase={phase} kind="panel" style={styles.section}>
+            <View style={styles.skeletonBlock} />
+          </PanelCard>
+          <PanelCard phase={phase} kind="panel" style={styles.section}>
+            <View style={styles.skeletonBlock} />
+          </PanelCard>
+        </View>
+      </View>
+    );
+  }
 
   const t = getSurfaceTheme(phase);
   // Framed light lift for the back chip — the kit's own highlight band alpha
   // over the deep screen base, framed with the panel border tint.
   const chipBg = `rgba(255, 255, 255, ${SURFACE.highlightAlpha})`;
-  const switchTrack = { false: t.sectionBorder, true: t.primaryBg };
   const rowTint = { backgroundColor: t.rowBg };
 
   return (
@@ -639,14 +803,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
               <Text style={[styles.settingLabel, { color: t.title }]}>Sound Effects</Text>
               <Text style={[styles.settingDescription, { color: t.muted }]}>Play sounds on moves and victories</Text>
             </View>
-            <Switch
+            <CottageSwitch
               value={settings.soundEnabled}
               onValueChange={(v) => handleToggle('soundEnabled', v)}
-              trackColor={switchTrack}
-              thumbColor={settings.soundEnabled ? t.primaryText : t.secondaryText}
-              accessibilityRole="switch"
+              theme={t}
+              reducedMotion={reducedMotion}
               accessibilityLabel="Sound effects"
-              accessibilityState={{ checked: settings.soundEnabled }}
             />
           </View>
 
@@ -655,14 +817,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
               <Text style={[styles.settingLabel, { color: t.title }]}>Music</Text>
               <Text style={[styles.settingDescription, { color: t.muted }]}>Gentle background music that follows the mood</Text>
             </View>
-            <Switch
+            <CottageSwitch
               value={settings.musicEnabled}
               onValueChange={handleMusicToggle}
-              trackColor={switchTrack}
-              thumbColor={settings.musicEnabled ? t.primaryText : t.secondaryText}
-              accessibilityRole="switch"
+              theme={t}
+              reducedMotion={reducedMotion}
               accessibilityLabel="Music"
-              accessibilityState={{ checked: settings.musicEnabled }}
             />
           </View>
 
@@ -671,14 +831,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
               <Text style={[styles.settingLabel, { color: t.title }]}>Haptic Feedback</Text>
               <Text style={[styles.settingDescription, { color: t.muted }]}>Vibration on taps and interactions</Text>
             </View>
-            <Switch
+            <CottageSwitch
               value={settings.hapticsEnabled}
               onValueChange={(v) => handleToggle('hapticsEnabled', v)}
-              trackColor={switchTrack}
-              thumbColor={settings.hapticsEnabled ? t.primaryText : t.secondaryText}
-              accessibilityRole="switch"
+              theme={t}
+              reducedMotion={reducedMotion}
               accessibilityLabel="Haptic feedback"
-              accessibilityState={{ checked: settings.hapticsEnabled }}
             />
           </View>
         </PanelCard>
@@ -691,14 +849,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
               <Text style={[styles.settingLabel, { color: t.title }]}>Reduced Motion</Text>
               <Text style={[styles.settingDescription, { color: t.muted }]}>Minimize animations for accessibility</Text>
             </View>
-            <Switch
+            <CottageSwitch
               value={settings.reducedMotion}
               onValueChange={(v) => handleToggle('reducedMotion', v)}
-              trackColor={switchTrack}
-              thumbColor={settings.reducedMotion ? t.primaryText : t.secondaryText}
-              accessibilityRole="switch"
+              theme={t}
+              reducedMotion={reducedMotion}
               accessibilityLabel="Reduced motion"
-              accessibilityState={{ checked: settings.reducedMotion }}
             />
           </View>
 
@@ -709,14 +865,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
                 A quicker results card after each solve. Big moments still play in full.
               </Text>
             </View>
-            <Switch
+            <CottageSwitch
               value={settings.swiftVictories}
               onValueChange={(v) => handleToggle('swiftVictories', v)}
-              trackColor={switchTrack}
-              thumbColor={settings.swiftVictories ? t.primaryText : t.secondaryText}
-              accessibilityRole="switch"
+              theme={t}
+              reducedMotion={reducedMotion}
               accessibilityLabel="Swift victories"
-              accessibilityState={{ checked: settings.swiftVictories }}
             />
           </View>
         </PanelCard>
@@ -729,13 +883,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
               <Text style={[styles.settingLabel, { color: t.title }]}>Daily Reminders</Text>
               <Text style={[styles.settingDescription, { color: t.muted }]}>Daily puzzle reminder</Text>
             </View>
-            <Switch
+            <CottageSwitch
               value={dailyRemindersOn}
               onValueChange={handleDailyReminderToggle}
-              trackColor={switchTrack}
-              thumbColor={dailyRemindersOn ? t.primaryText : t.secondaryText}
-              accessibilityRole="switch"
-              accessibilityState={{ checked: dailyRemindersOn }}
+              theme={t}
+              reducedMotion={reducedMotion}
+              accessibilityLabel="Daily reminders"
             />
           </View>
         </PanelCard>
@@ -785,13 +938,13 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
             {syncConflict && (
               <View style={[styles.recoveryCodeBox, { backgroundColor: t.rowBg, borderColor: t.amberTintBorder }]}>
                 <Text style={[styles.recoveryCodeHint, { color: t.title }]}>
-                  A newer save was found from another device.
+                  A newer save was found on another device. Choose which one to keep. Either choice replaces the other and cannot be undone.
                 </Text>
-                <TouchableOpacity style={styles.aboutRow} onPress={handleUseCloudSave} accessibilityRole="button" accessibilityLabel="Use the newer save">
-                  <Text style={[styles.linkText, { color: t.amberText }]}>Use the newer save</Text>
+                <TouchableOpacity style={styles.aboutRow} onPress={handleUseCloudSave} accessibilityRole="button" accessibilityLabel="Restore the newer cloud save, replacing this device">
+                  <Text style={[styles.linkText, { color: t.amberText }]}>Restore the newer cloud save</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.aboutRow} onPress={handleKeepThisDevice} accessibilityRole="button" accessibilityLabel="Keep this device's progress">
-                  <Text style={[styles.linkText, { color: t.secondaryText }]}>{"Keep this device's progress"}</Text>
+                <TouchableOpacity style={styles.aboutRow} onPress={handleKeepThisDevice} accessibilityRole="button" accessibilityLabel="Keep this device's save, replacing the cloud copy">
+                  <Text style={[styles.linkText, { color: t.secondaryText }]}>{"Keep this device's save"}</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -823,7 +976,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
           <TouchableOpacity style={styles.dangerRow} onPress={handleResetData}>
             <Text style={[styles.dangerText, { color: t.dangerText }]}>Reset All Progress</Text>
             <Text style={[styles.dangerDescription, { color: t.muted }]}>
-              Clears statistics, achievements, and daily challenge history
+              Erases your house, animals, and amber, plus statistics, achievements, and daily challenge history. Cannot be undone.
             </Text>
           </TouchableOpacity>
         </PanelCard>
@@ -967,6 +1120,11 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
           </Animated.View>
         </View>
       </Modal>
+
+      {/* New Cycle (NG+) re-descent ceremony — plays over everything before the
+          app reloads, so the milestone lands as a moment (see handleNewCycle).
+          Renders null until a cycle is confirmed. */}
+      <PhaseTransitionOverlay event={cycleCeremony} onComplete={handleCycleCeremonyComplete} />
     </View>
   );
 };
@@ -994,7 +1152,7 @@ const styles = StyleSheet.create({
   },
   backChipText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '700',
     letterSpacing: 0.3,
   },
@@ -1003,7 +1161,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 24,
+    fontSize: FONT_SIZE.display,
     fontWeight: '900',
     letterSpacing: 0.5,
   },
@@ -1017,7 +1175,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '800',
     letterSpacing: SURFACE.sectionLetterSpacing,
     paddingHorizontal: 16,
@@ -1029,6 +1187,35 @@ const styles = StyleSheet.create({
     paddingTop: 18,
     paddingHorizontal: 20,
     paddingBottom: 18,
+  },
+  // Skeleton placeholder block (empty card body while the settings load lands).
+  skeletonBlock: {
+    height: 96,
+  },
+  // Cottage-styled toggle (replaces the stock platform Switch).
+  switchTrack: {
+    width: SWITCH_WIDTH,
+    height: SWITCH_HEIGHT,
+    borderRadius: SWITCH_HEIGHT / 2,
+    borderWidth: SWITCH_BORDER,
+    padding: SWITCH_PAD,
+    alignItems: 'center',
+    flexDirection: 'row',
+    overflow: 'hidden',
+  },
+  switchTrackOn: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: SWITCH_HEIGHT / 2,
+  },
+  switchThumb: {
+    width: SWITCH_THUMB,
+    height: SWITCH_THUMB,
+    borderRadius: SWITCH_THUMB / 2,
+    borderWidth: 1,
   },
   settingRow: {
     flexDirection: 'row',
@@ -1046,12 +1233,12 @@ const styles = StyleSheet.create({
   },
   settingLabel: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     fontWeight: '700',
   },
   settingDescription: {
     fontFamily: BODY_FONT,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     marginTop: 2,
   },
   freezeDim: {
@@ -1068,12 +1255,12 @@ const styles = StyleSheet.create({
   },
   dangerText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     fontWeight: '700',
   },
   dangerDescription: {
     fontFamily: BODY_FONT,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     marginTop: 2,
   },
   aboutRow: {
@@ -1089,21 +1276,21 @@ const styles = StyleSheet.create({
   },
   aboutLabel: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '600',
   },
   aboutValue: {
     fontFamily: BODY_FONT,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
   },
   linkText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '600',
   },
   linkChevron: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '700',
   },
   bottomSpacer: {
@@ -1119,14 +1306,14 @@ const styles = StyleSheet.create({
   },
   recoveryCodeText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 22,
+    fontSize: FONT_SIZE.headline,
     fontWeight: '900',
     letterSpacing: 2,
     textAlign: 'center',
   },
   recoveryCodeHint: {
     fontFamily: BODY_FONT,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     textAlign: 'center',
     marginTop: 6,
   },
@@ -1147,14 +1334,14 @@ const styles = StyleSheet.create({
   },
   restoreTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 22,
+    fontSize: FONT_SIZE.headline,
     fontWeight: '900',
     letterSpacing: 0.3,
     marginBottom: 8,
   },
   restoreHint: {
     fontFamily: BODY_FONT,
-    fontSize: 13.5,
+    fontSize: FONT_SIZE.body,
     marginBottom: 16,
     lineHeight: 19,
   },
@@ -1164,7 +1351,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    fontSize: 18,
+    fontSize: FONT_SIZE.title,
     fontWeight: '700',
     letterSpacing: 1.5,
     textAlign: 'center',
@@ -1212,7 +1399,7 @@ const styles = StyleSheet.create({
   },
   restoreConfirmText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '800',
     letterSpacing: 0.4,
   },

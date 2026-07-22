@@ -9,19 +9,24 @@ import {
   GestureResponderEvent,
 } from 'react-native';
 import { Letter, RowData } from '../types';
-import { LetterTile } from './LetterTile';
+import { LetterTile, getGuideGlowConfig, getSquashParams } from './LetterTile';
 import { DraggableTile } from './DraggableTile';
 import { CandyColors, getPhaseTheme } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
 import { hapticSelection } from '../services/haptics';
 import { shouldSimplifyAnimations } from '../services/deviceTier';
 import { getWordPhaseTier } from '../services/localGenerator';
+import { getPressSpring } from '../theme/surfaces';
 import {
   ROW_HORIZONTAL_MARGIN,
   ROW_PADDING,
   ARC_SLOT_RENDERED_WIDTH,
   ARC_LETTER_MARGIN_H,
   ARC_SLOT_MARGIN_H,
+  STANDARD_TILE_W,
+  STANDARD_TILE_MARGIN_H,
+  COMPACT_TILE_W,
+  COMPACT_TILE_MARGIN_H,
 } from '../constants/tileLayout';
 import {
   INTER_SLOT_PULSE_SCALE,
@@ -29,12 +34,24 @@ import {
   INTER_SLOT_PULSE_OUT_MS,
   DRAG_HOVER_SCALE,
 } from '../constants/timing';
-import { BODY_FONT, BODY_FONT_BOLD, PIXEL_FONT_BOLD } from '../theme/fonts';
+import { BODY_FONT_BOLD, PIXEL_FONT_BOLD } from '../theme/fonts';
+import { FONT_SIZE } from '../theme/typeScale';
 
 // Arc layout configuration
 const ARC_ROTATION = 12; // Max rotation in degrees for edge elements (steeper fan)
 const ARC_LIFT = 18; // How much center elements lift up relative to edges
 const SLOT_HEIGHT = 52; // Height to match letter tiles vertically
+
+// Board-serve entrance: a fresh board materializes top-to-bottom instead of
+// snapping in. This Row component mounts fresh ONLY on a genuine board serve —
+// App keys each Row by row.id (unique per generated board), so a new board
+// remounts every Row, while the frequent arc-toggle tile remounts within a
+// board leave the Row INSTANCE intact. So a run-once-on-mount entrance fires
+// exactly on serves and never mid-solve. Reduced motion / low-tier skip it.
+const BOARD_SERVE_RISE = 14; // px the row rises from as it fades in
+const BOARD_SERVE_STAGGER_MS = 55; // per-row cascade delay
+const BOARD_SERVE_MAX_STAGGER_ROWS = 6; // cap so long boards never crawl in
+const BOARD_SERVE_FADE_MS = 260;
 
 /** Preview data for a single slot position */
 export interface SlotPreview {
@@ -219,10 +236,15 @@ const Slot: React.FC<{
 }> = ({ onPress, index, slotCount = 0, compact = false, phase = 0, isGuided = false, preview, validityVisible = true, isHovered = false, pulseSignal = 0, triggerCatch = 0 }) => {
   const settings = getSettingsSync();
   const phaseColors = getPhaseRowColors(phase);
+  const guideGlow = getGuideGlowConfig(phase);
   const scaleAnim = useRef(new Animated.Value(settings.reducedMotion ? 1 : 0)).current;
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
-  const catchBounceAnim = useRef(new Animated.Value(1)).current;
+  // Catch-landing squash pair (F9/F76): replaces the old uniform catchBounceAnim
+  // scale bump with a phase-weighted squash-and-stretch (getSquashParams),
+  // matching LetterTile's own arrival landing instead of a fixed f5/t200 bounce.
+  const catchSquashXAnim = useRef(new Animated.Value(1)).current;
+  const catchSquashYAnim = useRef(new Animated.Value(1)).current;
   const hoverScaleAnim = useRef(new Animated.Value(1)).current;
   const adjacentPulseAnim = useRef(new Animated.Value(0)).current;
   const previewOpacity = useRef(new Animated.Value(0)).current;
@@ -247,21 +269,32 @@ const Slot: React.FC<{
 
     // Skip decorative loops on low-end devices
     if (shouldSimplifyAnimations()) {
-      return () => { scaleAnim.stopAnimation(); catchBounceAnim.stopAnimation(); };
+      return () => {
+        scaleAnim.stopAnimation();
+        catchSquashXAnim.stopAnimation();
+        catchSquashYAnim.stopAnimation();
+      };
     }
+
+    // The active-slot pulse/glow tempo ages with the descent: the board's own
+    // heartbeat slows as the world darkens (bright 800/1000ms -> ~1300/1600ms at
+    // the reveal), so the slot indicator doesn't keep a chirpy phase-0 cadence
+    // over a Phase-4 board. Mirrors the tile-wobble slowdown.
+    const pulseMs = phase >= 4 ? 1300 : phase >= 3 ? 1100 : phase >= 2 ? 950 : 800;
+    const glowMs = phase >= 4 ? 1600 : phase >= 3 ? 1350 : phase >= 2 ? 1150 : 1000;
 
     // Continuous pulse
     const pulseLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
           toValue: 1,
-          duration: 800,
+          duration: pulseMs,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
         Animated.timing(pulseAnim, {
           toValue: 0,
-          duration: 800,
+          duration: pulseMs,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
@@ -274,13 +307,13 @@ const Slot: React.FC<{
       Animated.sequence([
         Animated.timing(glowAnim, {
           toValue: 1,
-          duration: 1000,
+          duration: glowMs,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
         Animated.timing(glowAnim, {
           toValue: 0,
-          duration: 1000,
+          duration: glowMs,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
@@ -297,18 +330,28 @@ const Slot: React.FC<{
     };
   }, []);
 
-  // Catch bounce when a letter lands
+  // Catch squash-and-stretch when a letter lands (F9: split from a uniform
+  // scale bounce; F76: the spring itself now ages with phase via
+  // getSquashParams instead of a fixed f5/t200 bounce at every phase).
   useEffect(() => {
     if (triggerCatch > 0 && !settings.reducedMotion) {
-      catchBounceAnim.setValue(1.2);
-      Animated.spring(catchBounceAnim, {
+      const squash = getSquashParams(phase);
+      catchSquashXAnim.setValue(1 + squash.amount);
+      catchSquashYAnim.setValue(1 - squash.amount);
+      Animated.spring(catchSquashXAnim, {
         toValue: 1,
-        friction: 5,
-        tension: 200,
+        friction: squash.friction,
+        tension: squash.tension,
+        useNativeDriver: true,
+      }).start();
+      Animated.spring(catchSquashYAnim, {
+        toValue: 1,
+        friction: squash.friction,
+        tension: squash.tension,
         useNativeDriver: true,
       }).start();
     }
-  }, [triggerCatch, settings.reducedMotion]);
+  }, [triggerCatch, settings.reducedMotion, phase]);
 
   // Live drag-hover swell: the slot under the finger scales up slightly while
   // hovered. Purely GEOMETRIC feedback (never validity-filtered) — it answers
@@ -443,10 +486,14 @@ const Slot: React.FC<{
             transform: [
               {
                 scale: Animated.multiply(
-                  Animated.multiply(Animated.multiply(scaleAnim, pulseScale), catchBounceAnim),
+                  Animated.multiply(scaleAnim, pulseScale),
                   Animated.multiply(hoverScaleAnim, adjacentPulseScale)
                 ),
               },
+              // Catch-landing squash (F9/F76), layered independently of the
+              // uniform scale above — mirrors LetterTile's arrival squash.
+              { scaleX: catchSquashXAnim },
+              { scaleY: catchSquashYAnim },
             ],
           },
         ]}
@@ -457,7 +504,7 @@ const Slot: React.FC<{
             styles.slotGlow,
             {
               opacity: glowOpacity,
-              backgroundColor: isGuided ? CandyColors.yellow.main : phaseColors.slotGlowColor,
+              backgroundColor: isGuided ? guideGlow.accent : phaseColors.slotGlowColor,
             },
           ]}
         />
@@ -467,6 +514,9 @@ const Slot: React.FC<{
             style={[
               styles.guidedSlotHalo,
               {
+                borderColor: guideGlow.accent,
+                backgroundColor: guideGlow.haloWash,
+                shadowColor: guideGlow.accent,
                 opacity: glowOpacity,
                 transform: [{ scale: pulseScale }],
               },
@@ -480,8 +530,8 @@ const Slot: React.FC<{
           style={[
             styles.slot,
             compact && styles.slotCompact,
-            { borderColor: isGuided ? CandyColors.yellow.main : phaseColors.slotBorderColor },
-            isGuided && [styles.slotGuided, { borderWidth: 3 }],
+            { borderColor: isGuided ? guideGlow.accent : phaseColors.slotBorderColor },
+            isGuided && { borderWidth: 3, backgroundColor: guideGlow.slotFill },
           ]}
         >
           {/* Inner shimmer */}
@@ -524,20 +574,28 @@ const Slot: React.FC<{
             opacity: previewOpacity,
             transform: [{ scale: previewScale }],
           }]}>
-            <Text
-              style={[
-                styles.slotPreviewText,
-                compact && styles.slotPreviewTextCompact,
-                validityVisible
-                  ? (preview.isValid ? styles.slotPreviewValid : styles.slotPreviewInvalid)
-                  : styles.slotPreviewNeutral,
-                validityVisible && preview.isValid && styles.slotPreviewValidBold,
-              ]}
-              numberOfLines={1}
-              maxFontSizeMultiplier={1.2}
-            >
-              {validityVisible ? (preview.isValid ? '✓ ' : '✗ ') : ''}{preview.word}
-            </Text>
+            {/* The preview word rides a small dark scrim chip so the core
+                judge-the-word channel is legible at every phase (the bare ink
+                over the translucent target-row fill computed 1.2-2.8:1). Light
+                inks on the chip compute >=4.5:1; valid/invalid is still carried
+                by the ✓/✗ prefix + bold, and the neutral gate keeps ONE ink and
+                ONE weight for every slot (no validity leak). */}
+            <View style={styles.slotPreviewChip}>
+              <Text
+                style={[
+                  styles.slotPreviewText,
+                  compact && styles.slotPreviewTextCompact,
+                  validityVisible
+                    ? (preview.isValid ? styles.slotPreviewValid : styles.slotPreviewInvalid)
+                    : styles.slotPreviewNeutral,
+                  validityVisible && preview.isValid && styles.slotPreviewValidBold,
+                ]}
+                numberOfLines={1}
+                maxFontSizeMultiplier={1.2}
+              >
+                {validityVisible ? (preview.isValid ? '✓ ' : '✗ ') : ''}{preview.word}
+              </Text>
+            </View>
           </Animated.View>
         )}
       </Animated.View>
@@ -596,9 +654,33 @@ export const Row: React.FC<RowProps> = memo(({
   const glowAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
   const arcAnim = useRef(new Animated.Value(0)).current; // 0 = flat, 1 = full arc
+  // Slot-wrapper fade/scale that plays alongside the fan's flatten on collapse,
+  // so the slots don't pop out of existence when the arc subtree unmounts.
+  const slotCollapseAnim = useRef(new Animated.Value(1)).current; // 1 = shown, 0 = collapsed
+  // Tracks whether the fan is currently open/opening, so a letter switch can
+  // update previews in place instead of hard-cutting the fan back to flat.
+  const arcOpenRef = useRef(false);
   const invalidShakeX = useRef(new Animated.Value(0)).current;
   const successBounceScale = useRef(new Animated.Value(1)).current;
   const glowLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+  // F1 (neighbour rank-closing) — per-tile translateX cache + the last
+  // rendered STANDARD-layout id order, used by the rank-shift effect below.
+  const prevStandardIdsRef = useRef<string[] | null>(null);
+  const rankShiftAnims = useRef(new Map<string, Animated.Value>()).current;
+  const getRankShiftAnim = (id: string): Animated.Value => {
+    let anim = rankShiftAnims.get(id);
+    if (!anim) {
+      anim = new Animated.Value(0);
+      rankShiftAnims.set(id, anim);
+    }
+    return anim;
+  };
+
+  // The arc fan stays MOUNTED through its close animation (see the arc effect):
+  // while collapsing, showSlots is already false but arcVisible keeps the
+  // subtree alive so the 300ms flatten plays against live views instead of an
+  // already-unmounted subtree.
+  const [arcVisible, setArcVisible] = useState(false);
 
   // Inter-slot tap guidance: tapping a letter tile in the target row (between
   // drop slots) pulses its two ADJACENT slots. Letter i sits between slots i
@@ -618,6 +700,46 @@ export const Row: React.FC<RowProps> = memo(({
   const measureCbRef = useRef<(node: View | null) => void>(() => {});
   measureCbRef.current = (node: View | null) => onMeasureRef?.(rowIndex, node);
   const stableMeasureRef = useRef((node: View | null) => measureCbRef.current(node)).current;
+
+  // Board-serve entrance (see BOARD_SERVE_* above). Decided once at mount so the
+  // initial values don't flash: an animating serve starts hidden + risen and
+  // settles; a reduced-motion / low-tier serve starts already in place. The
+  // outer wrapper owns opacity/translateY so it never contends with the inner
+  // row-transition opacity/scale/slide.
+  const serveAnimates = useRef(
+    !getSettingsSync().reducedMotion && !shouldSimplifyAnimations()
+  ).current;
+  const serveOpacity = useRef(new Animated.Value(serveAnimates ? 0 : 1)).current;
+  const serveTranslateY = useRef(new Animated.Value(serveAnimates ? BOARD_SERVE_RISE : 0)).current;
+
+  useEffect(() => {
+    if (!serveAnimates) return;
+    const delay = Math.min(rowIndex, BOARD_SERVE_MAX_STAGGER_ROWS) * BOARD_SERVE_STAGGER_MS;
+    const anim = Animated.sequence([
+      Animated.delay(delay),
+      Animated.parallel([
+        Animated.timing(serveOpacity, {
+          toValue: 1,
+          duration: BOARD_SERVE_FADE_MS,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.spring(serveTranslateY, {
+          toValue: 0,
+          friction: 7,
+          tension: 90,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]);
+    anim.start();
+    return () => {
+      anim.stop();
+      serveOpacity.stopAnimation();
+      serveTranslateY.stopAnimation();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once on mount (a genuine board serve); anim values are stable refs
+  }, []);
 
   useEffect(() => {
     // Animate row transitions
@@ -714,11 +836,32 @@ export const Row: React.FC<RowProps> = memo(({
     };
   }, [isSource, isTarget, isCompleted, guidanceActive]);
 
-  // Animate arc when slots appear/disappear - smooth glide effect
-  // Depends on both showSlots AND selectedLetter to replay animation on each selection
+  // Animate the arc fan open/closed with real motion. The fan stays MOUNTED
+  // through its collapse (local arcVisible state) so the 300ms close plays
+  // against live views instead of an already-unmounted subtree; a letter switch
+  // while the fan is open updates previews in place without hard-cutting the fan
+  // flat; a committed move (the row's role changed, so isTarget is already
+  // false) accepts the snap, which the catch-bounce + arrival settle mask.
+  // Reduced motion / low-tier devices set everything instantly.
   useEffect(() => {
+    const instant = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
     if (showSlots) {
-      // Reset to 0 first, then animate to 1 - ensures animation replays each time
+      setArcVisible(true);
+      if (instant) {
+        arcAnim.setValue(1);
+        slotCollapseAnim.setValue(1);
+        arcOpenRef.current = true;
+        return;
+      }
+      if (arcOpenRef.current) {
+        // Fan already open (letter switch): keep it in place, let the Slot
+        // preview effects update the ghost words. No setValue(0) flash.
+        slotCollapseAnim.setValue(1);
+        return;
+      }
+      // Fresh open glide.
+      arcOpenRef.current = true;
+      slotCollapseAnim.setValue(1);
       arcAnim.setValue(0);
       Animated.timing(arcAnim, {
         toValue: 1,
@@ -726,14 +869,43 @@ export const Row: React.FC<RowProps> = memo(({
         easing: Easing.out(Easing.cubic), // Smooth deceleration
         useNativeDriver: true,
       }).start();
-    } else {
+      return;
+    }
+
+    // showSlots is false.
+    if (!arcOpenRef.current) return; // nothing open to collapse
+    arcOpenRef.current = false;
+    // A deselect leaves this the target row (isTarget stays true); a committed
+    // move flips the row's role so isTarget is already false -> snap instead.
+    const gracefulDeselect = isTarget;
+    if (instant || !gracefulDeselect) {
+      arcAnim.setValue(0);
+      slotCollapseAnim.setValue(1);
+      setArcVisible(false);
+      return;
+    }
+    // Deselect (board unchanged): flatten the fan and fade the slots, then
+    // unmount only once the collapse finishes.
+    Animated.parallel([
       Animated.timing(arcAnim, {
         toValue: 0,
         duration: 300, // Faster collapse
         easing: Easing.in(Easing.cubic),
         useNativeDriver: true,
-      }).start();
-    }
+      }),
+      Animated.timing(slotCollapseAnim, {
+        toValue: 0,
+        duration: 300,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start(({ finished }) => {
+      if (finished) {
+        setArcVisible(false);
+        slotCollapseAnim.setValue(1); // reset for the next open
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- isTarget rides with showSlots; anim values are stable refs
   }, [showSlots, selectedLetter?.id]);
 
   // Micro-shake the target row on invalid drop attempts. Visual-only: the
@@ -753,18 +925,22 @@ export const Row: React.FC<RowProps> = memo(({
 
   // Brief scale bounce on the target row when a letter successfully lands.
   // Visual-only: App.tsx owns the landing haptic (weighted heavy for a drag vs
-  // medium for a tap), so this effect must not fire a second impact.
+  // medium for a tap), so this effect must not fire a second impact. The
+  // release spring itself ages with phase (F76) via getPressSpring — the same
+  // ladder LetterTile's own press-out already uses — so the drop lands
+  // soft-heavy at Phase 4 instead of the same bright f5/t200 bounce forever.
   useEffect(() => {
     if (!isTarget || successDropSignal <= 0) return;
     if (getSettingsSync().reducedMotion) return;
+    const releaseSpring = getPressSpring(phase);
     successBounceScale.setValue(1.08);
     Animated.spring(successBounceScale, {
       toValue: 1,
-      friction: 5,
-      tension: 200,
+      friction: releaseSpring.friction,
+      tension: releaseSpring.tension,
       useNativeDriver: true,
     }).start();
-  }, [successDropSignal, isTarget, successBounceScale]);
+  }, [successDropSignal, isTarget, successBounceScale, phase]);
 
   // Calculate arc multipliers for position in sequence
   const getArcMultipliers = (index: number, totalElements: number) => {
@@ -791,6 +967,13 @@ export const Row: React.FC<RowProps> = memo(({
     const totalElements = letters.length * 2 + 1;
     const elements: React.ReactNode[] = [];
 
+    // Slots fade + shrink slightly as the fan collapses (rests at 1 while open),
+    // so their disappearance is smoothed rather than a hard unmount pop.
+    const slotCollapseScale = slotCollapseAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0.82, 1],
+    });
+
     for (let i = 0; i < totalElements; i++) {
       const isSlot = i % 2 === 0;
       const { yMultiplier, rotationMultiplier } = getArcMultipliers(i, totalElements);
@@ -812,7 +995,10 @@ export const Row: React.FC<RowProps> = memo(({
             key={`slot-${slotIndex}`}
             style={[
               styles.arcSlotWrapper,
-              { transform: [{ translateY }, { rotate }] },
+              {
+                opacity: slotCollapseAnim,
+                transform: [{ translateY }, { rotate }, { scale: slotCollapseScale }],
+              },
             ]}
           >
             <Slot
@@ -889,7 +1075,6 @@ export const Row: React.FC<RowProps> = memo(({
       const canDrag = isSource && !isProcessing && !letter.isLocked && !!onLetterDragDrop;
       const tile = (
         <LetterTile
-          key={canDrag ? undefined : letter.id}
           letter={displayLetter}
           isSelected={selectedLetter?.id === letter.id}
           isInteractable={isSource && !isProcessing && !letter.isLocked}
@@ -924,29 +1109,35 @@ export const Row: React.FC<RowProps> = memo(({
         />
       );
 
-      if (canDrag) {
-        return (
-          <DraggableTile
-            key={letter.id}
-            enabled={!isProcessing}
-            letterChar={displayLetter.char}
-            onDragStart={() => {
-              if (!selectedLetter || selectedLetter.id !== letter.id) {
-                onLetterPress(letter, rowIndex);
-              }
-            }}
-            onDragEnd={(pos) => onLetterDragDrop!(letter, rowIndex, pos)}
-            onMove={onLetterDragMove}
-            onTap={() => onLetterPress(letter, rowIndex)}
-            phase={phase}
-            onDragActiveChange={onDragActiveChange}
-          >
-            {tile}
-          </DraggableTile>
-        );
-      }
+      const inner = canDrag ? (
+        <DraggableTile
+          enabled={!isProcessing}
+          letterChar={displayLetter.char}
+          onDragStart={() => {
+            if (!selectedLetter || selectedLetter.id !== letter.id) {
+              onLetterPress(letter, rowIndex);
+            }
+          }}
+          onDragEnd={(pos) => onLetterDragDrop!(letter, rowIndex, pos)}
+          onMove={onLetterDragMove}
+          onTap={() => onLetterPress(letter, rowIndex)}
+          phase={phase}
+          onDragActiveChange={onDragActiveChange}
+        >
+          {tile}
+        </DraggableTile>
+      ) : tile;
 
-      return tile;
+      // F1 (neighbour rank-closing): wraps every standard-layout tile in a
+      // cheap native-driver translateX (rests at 0) so a word-length change
+      // on THIS row can smoothly close ranks instead of flexbox-teleporting
+      // the remaining tiles to their re-centered spots. See the rank-shift
+      // effect below for when/why it actually moves.
+      return (
+        <Animated.View key={letter.id} style={{ transform: [{ translateX: getRankShiftAnim(letter.id) }] }}>
+          {inner}
+        </Animated.View>
+      );
     });
   };
 
@@ -963,7 +1154,85 @@ export const Row: React.FC<RowProps> = memo(({
     return styles.rowFuture;
   };
 
+  // Render the arc while slots are shown AND through the collapse that follows a
+  // deselect (arcVisible). Gated on isTarget so a committed move (row role
+  // flipped) shows the standard layout immediately — no one-frame arc-on-source
+  // flash while the effect resets the collapse state.
+  const arcMounted = isTarget && (!!showSlots || arcVisible);
+
+  // ─── F1 (neighbour rank-closing, achievable half) ──────────────────────────
+  // When this row's rendered word length changes while it stays on the
+  // STANDARD (non-arc) layout throughout — the old source row shrinking to
+  // `completed` as its picked letter departs — the remaining tiles would
+  // otherwise flexbox-teleport straight to their re-centered positions. Each
+  // remaining tile instead starts at its PRE-shrink offset (a half-tile-
+  // footprint nudge, from tileLayout.ts) and native-springs to 0, so ranks
+  // visibly close / make room instead of snapping.
+  //
+  // Deliberately scoped to same-layout-path changes: the arc->standard flip
+  // when a row becomes the new source (letters were previously laid out in
+  // the fan, not this standard row) has no previous STANDARD baseline to
+  // diff against here, so it is left alone — that transition is already
+  // masked by the arc-collapse animation plus the arriving letter's own
+  // arrival settle. A true cross-row "flying ghost" (a tile visibly
+  // travelling from the source row's position into the target slot) needs
+  // usePuzzleGame to hand down the source tile's measured screen position
+  // and is out of scope for this file.
+  useEffect(() => {
+    if (arcMounted) return;
+    const currentIds = rowData.words.map((l) => l.id);
+    const prevIds = prevStandardIdsRef.current;
+    const instant = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
+
+    if (instant) {
+      currentIds.forEach((id) => getRankShiftAnim(id).setValue(0));
+      prevStandardIdsRef.current = currentIds;
+      return;
+    }
+
+    const started: Animated.CompositeAnimation[] = [];
+    if (prevIds && prevIds.length !== currentIds.length) {
+      const footprint = compactTiles
+        ? COMPACT_TILE_W + COMPACT_TILE_MARGIN_H * 2
+        : STANDARD_TILE_W + STANDARD_TILE_MARGIN_H * 2;
+      const half = footprint / 2;
+      const releaseSpring = getPressSpring(phase);
+      currentIds.forEach((id, newIdx) => {
+        const oldIdx = prevIds.indexOf(id);
+        if (oldIdx === -1) return; // a newly-arrived tile owns its own arrival settle
+        let startOffset: number | null = null;
+        if (newIdx === oldIdx) startOffset = -half; // sat before the departed tile
+        else if (newIdx < oldIdx) startOffset = half; // sat after it; the gap closed under it
+        if (startOffset === null) return;
+        const anim = getRankShiftAnim(id);
+        anim.setValue(startOffset);
+        const spring = Animated.spring(anim, {
+          toValue: 0,
+          friction: releaseSpring.friction,
+          tension: releaseSpring.tension,
+          useNativeDriver: true,
+        });
+        spring.start();
+        started.push(spring);
+      });
+    }
+
+    prevStandardIdsRef.current = currentIds;
+    return () => { started.forEach((a) => a.stop()); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- rankShiftAnims/prevStandardIdsRef/getRankShiftAnim are stable refs recreated fresh each run
+  }, [arcMounted, rowData.words, compactTiles, phase]);
+
   return (
+    <Animated.View
+      // Board-serve entrance wrapper: fades + rises the whole row in on a fresh
+      // board serve (staggered by rowIndex). Kept OUTSIDE the row-transition
+      // wrapper so its opacity/translateY compose cleanly with the inner
+      // scale/opacity/slide instead of fighting them for the same props.
+      style={{
+        opacity: serveOpacity,
+        transform: [{ translateY: serveTranslateY }],
+      }}
+    >
     <Animated.View
       style={[
         styles.rowWrapper,
@@ -1018,10 +1287,11 @@ export const Row: React.FC<RowProps> = memo(({
         )}
 
         {/* Content area */}
-        <View style={[styles.contentWrapper, showSlots && styles.contentWrapperArc, isSource && !!onLetterDragDrop && styles.contentWrapperDraggable]}>
-          {showSlots ? (
-            // Arc layout for DROP row - letters overflow container
-            <View style={styles.arcRow}>
+        <View style={[styles.contentWrapper, arcMounted && styles.contentWrapperArc, isSource && !!onLetterDragDrop && styles.contentWrapperDraggable]}>
+          {arcMounted ? (
+            // Arc layout for DROP row - letters overflow container. While the
+            // fan is collapsing (showSlots already false) the slots are inert.
+            <View style={styles.arcRow} pointerEvents={showSlots ? 'auto' : 'none'}>
               {renderArcContent()}
             </View>
           ) : (
@@ -1032,6 +1302,7 @@ export const Row: React.FC<RowProps> = memo(({
           )}
         </View>
       </View>
+    </Animated.View>
     </Animated.View>
   );
 });
@@ -1200,7 +1471,7 @@ const styles = StyleSheet.create({
   badgeText: {
     fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '900',
     letterSpacing: 1.5,
     textShadowColor: 'rgba(0, 0, 0, 0.2)',
@@ -1229,7 +1500,7 @@ const styles = StyleSheet.create({
   checkText: {
     fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '900',
   },
 
@@ -1250,6 +1521,8 @@ const styles = StyleSheet.create({
     backgroundColor: CandyColors.pink.main,
   },
   guidedSlotHalo: {
+    // Colors (borderColor/backgroundColor/shadowColor) are phase-aware — see
+    // getGuideGlowConfig, applied inline at the JSX call site.
     position: 'absolute',
     top: -10,
     left: -10,
@@ -1257,9 +1530,6 @@ const styles = StyleSheet.create({
     bottom: -10,
     borderRadius: 16,
     borderWidth: 3,
-    borderColor: CandyColors.yellow.main,
-    backgroundColor: 'rgba(250, 204, 21, 0.15)',
-    shadowColor: CandyColors.yellow.main,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.6,
     shadowRadius: 8,
@@ -1275,9 +1545,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
-  },
-  slotGuided: {
-    backgroundColor: 'rgba(255, 230, 100, 0.95)',
   },
   slotCompact: {
     width: ARC_SLOT_RENDERED_WIDTH, // Slightly wider than SLOT_WIDTH for trapezoid visibility
@@ -1344,7 +1611,7 @@ const styles = StyleSheet.create({
   slotGuideText: {
     fontFamily: PIXEL_FONT_BOLD,
     position: 'absolute',
-    fontSize: 18,
+    fontSize: FONT_SIZE.title,
     lineHeight: 18,
     textAlign: 'center',
     includeFontPadding: false, // Android: strip font padding so the arrow truly centers
@@ -1353,45 +1620,52 @@ const styles = StyleSheet.create({
   },
   slotPreviewContainer: {
     position: 'absolute',
-    bottom: -16,
+    bottom: -18,
     alignItems: 'center',
     justifyContent: 'center',
     width: 60,
   },
+  // The dark scrim chip that backs the preview word — a single dark tint that
+  // becomes the controlled background so light inks read at >=4.5:1 regardless
+  // of the phase or the translucent target-row fill behind it.
+  slotPreviewChip: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 7,
+    backgroundColor: 'rgba(16, 10, 34, 0.62)',
+    maxWidth: 60,
+  },
   slotPreviewText: {
-    fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 11,
+    // Same face at every size (F5) — was PIXEL_FONT_BOLD (the chrome sans) at
+    // standard width and BODY_FONT at compact, so the preview visibly changed
+    // typeface the moment a word crossed 6 letters.
+    fontFamily: BODY_FONT_BOLD,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '700',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
   slotPreviewTextCompact: {
-    fontFamily: BODY_FONT,
-    fontSize: 9,
+    fontSize: FONT_SIZE.micro,
   },
+  // Light inks on the dark chip. Valid/invalid stays distinguished by the
+  // ✓/✗ prefix + bold weight (never color alone); the hues are light tints
+  // that clear 4.5:1 on the chip.
   slotPreviewValid: {
-    color: CandyColors.green.main,
-    opacity: 0.85,
+    color: '#8BF0AE',
   },
   slotPreviewValidBold: {
     fontFamily: BODY_FONT_BOLD,
     fontWeight: '800',
   },
   slotPreviewInvalid: {
-    // Tester-verified legibility fix: red.light at 0.45 opacity was a faint
-    // pink ghost on the lavender board and first-timers could not read the
-    // invalid words at all. The invalid verdict must be READABLE (the ✗
-    // prefix plus a clearly weaker treatment than the bold green ✓ carries
-    // the hierarchy, never invisibility).
-    color: CandyColors.red.dark,
-    opacity: 0.8,
+    color: '#FF9DA2',
   },
-  // Neutral ghost preview (validity gate closed): ONE dimmed ink for every
-  // slot — the current valid-green/invalid-red split must never leak through
-  // weight, color, or opacity when the player is meant to judge the word.
+  // Neutral ghost preview (validity gate closed): ONE ink + ONE weight for
+  // every slot — the valid/invalid split must never leak through color,
+  // weight, or opacity when the player is meant to judge the word.
   slotPreviewNeutral: {
-    color: CandyColors.gray[600],
-    opacity: 0.6,
+    color: '#EDE8F8',
   },
 });
 

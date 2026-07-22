@@ -233,11 +233,11 @@ describe('getJournalQuestLabel (Journal Hub row shares the same count)', () => {
       [makeQuest({ id: 'd1' }), makeQuest({ id: 'd2' })],
       [makeQuest({ id: 'w1', tier: 'weekly' })]
     );
-    expect(getJournalQuestLabel(getActionableQuestCount(state), 0)).toBe('🗓 Quests');
+    expect(getJournalQuestLabel(getActionableQuestCount(state), 0)).toBe('Quests');
   });
 
   test('claimable amber takes precedence over the plain count', () => {
-    expect(getJournalQuestLabel(2, 45)).toBe('🗓 Quests (+45)');
+    expect(getJournalQuestLabel(2, 45)).toBe('Quests (+45)');
   });
 
   test('ALL quests completed AND claimed: no count suffix at all', () => {
@@ -247,7 +247,7 @@ describe('getJournalQuestLabel (Journal Hub row shares the same count)', () => {
     );
     const count = getActionableQuestCount(state);
     const label = getJournalQuestLabel(count, getUnclaimedAmber(state, 0));
-    expect(label).toBe('🗓 Quests');
+    expect(label).toBe('Quests');
     expect(label).not.toMatch(/\d/);
     expect(label).not.toContain('(');
   });

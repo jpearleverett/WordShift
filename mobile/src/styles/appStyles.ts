@@ -1,7 +1,8 @@
 import { StyleSheet } from 'react-native';
+import { FONT_SIZE } from '../theme/typeScale';
 import { CandyColors, getPhaseTheme } from '../theme/colors';
 import { getSurfaceTheme } from '../theme/surfaces';
-import { BODY_FONT, BODY_FONT_BOLD, BODY_FONT_ITALIC } from '../theme/fonts';
+import { BODY_FONT, BODY_FONT_BOLD, BODY_FONT_ITALIC, PIXEL_FONT_BOLD } from '../theme/fonts';
 
 /**
  * Returns the dominant background color for a given screen at a given phase.
@@ -52,7 +53,18 @@ export function getActionButtonColors(
     hint: { bg: CandyColors.blue.main, border: CandyColors.blue.shadow, glow: CandyColors.blue.glow },
     restart: { bg: CandyColors.green.main, border: CandyColors.green.shadow, glow: CandyColors.green.glow },
   } as const;
-  if (phase < 3) return candy[kind];
+  if (phase < 2) return candy[kind];
+  if (phase < 3) {
+    // Phase 2 (dusk): the candy COOLS one step — a desaturated, slightly
+    // darker version of each hue — so the HUD ages gradually (bright -> cooled
+    // -> dread -> void) instead of jumping straight from bright to dread at 3.
+    const cooled = {
+      undo: { bg: '#C9A94E', border: '#8E7530', glow: 'rgba(185, 150, 85, 0.4)' },
+      hint: { bg: '#5A7BA8', border: '#3B547E', glow: 'rgba(105, 145, 195, 0.4)' },
+      restart: { bg: '#57926E', border: '#356048', glow: 'rgba(95, 155, 120, 0.4)' },
+    } as const;
+    return cooled[kind];
+  }
   // Dread-shifted: muted, darker, low-glow — hue preserved so each button is
   // still recognizable, but the whole cluster recedes toward the board.
   const dusk = {
@@ -90,7 +102,7 @@ export const appStyles = StyleSheet.create({
   },
   initialLoadingTitle: {
     marginTop: 14,
-    fontSize: 22,
+    fontSize: FONT_SIZE.headline,
     fontFamily: BODY_FONT_BOLD,
     fontWeight: '900',
     color: CandyColors.white,
@@ -98,7 +110,7 @@ export const appStyles = StyleSheet.create({
   },
   initialLoadingSubtitle: {
     marginTop: 8,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontFamily: BODY_FONT,
     color: 'rgba(255, 255, 255, 0.75)',
     letterSpacing: 0.4,
@@ -128,7 +140,7 @@ export const appStyles = StyleSheet.create({
     overflow: 'hidden',
   },
   headerHomeText: {
-    fontSize: 20,
+    fontSize: FONT_SIZE.headline,
     fontFamily: BODY_FONT,
   },
   // Invisible layout stand-in for the withheld home button during onboarding:
@@ -149,7 +161,7 @@ export const appStyles = StyleSheet.create({
     borderRadius: 12,
   },
   dailyBadgeText: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontFamily: BODY_FONT_BOLD,
     fontWeight: '900',
     color: CandyColors.gray[800],
@@ -175,7 +187,7 @@ export const appStyles = StyleSheet.create({
     borderTopRightRadius: 20,
   },
   helpButtonText: {
-    fontSize: 22,
+    fontSize: FONT_SIZE.headline,
     fontFamily: BODY_FONT_BOLD,
     fontWeight: '900',
     color: CandyColors.white,
@@ -195,7 +207,12 @@ export const appStyles = StyleSheet.create({
   difficultyButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    // Dark translucent fill (not translucent-white) so the white label reads
+    // >= 4.5:1 over the bright phase-0/1 board — a translucent-white pill left
+    // 12px white text at sub-3:1. Mirrors the overlay-banner container pattern.
+    backgroundColor: 'rgba(20, 10, 40, 0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(180, 150, 220, 0.25)',
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 16,
@@ -216,6 +233,12 @@ export const appStyles = StyleSheet.create({
   // cools from candy-translucent-white into the dread palette so it tracks the
   // board instead of staying bright while everything around it darkens. The
   // difficulty DOT keeps its meaningful color at every phase.
+  // Phase-2 dusk step — the intermediate cool the board already shows, so the
+  // setup pill doesn't hard-cut bright->dark at phase 3 (matches the other HUD
+  // badges' dusk tier).
+  difficultyButtonDusk: {
+    backgroundColor: 'rgba(45, 25, 70, 0.5)',
+  },
   difficultyButtonDark: {
     backgroundColor: 'rgba(60, 30, 80, 0.4)',
   },
@@ -253,14 +276,14 @@ export const appStyles = StyleSheet.create({
     backgroundColor: CandyColors.red.main,
   },
   difficultyText: {
-    fontSize: 12,
-    fontFamily: BODY_FONT_BOLD,
+    fontSize: FONT_SIZE.small,
+    fontFamily: PIXEL_FONT_BOLD,
     fontWeight: '800',
     color: CandyColors.white,
     marginRight: 6,
   },
   difficultyArrow: {
-    fontSize: 8,
+    fontSize: FONT_SIZE.micro,
     fontFamily: BODY_FONT,
     color: 'rgba(255, 255, 255, 0.7)',
   },
@@ -305,21 +328,21 @@ export const appStyles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    fontSize: 14,
-    fontFamily: BODY_FONT_BOLD,
+    fontSize: FONT_SIZE.bodyLg,
+    fontFamily: PIXEL_FONT_BOLD,
     fontWeight: '700',
     color: CandyColors.purple.main,
   },
   loadingGlyph: {
     marginTop: 8,
-    fontSize: 18,
+    fontSize: FONT_SIZE.title,
     fontFamily: BODY_FONT,
     color: CandyColors.purple.main,
     opacity: 0.8,
   },
   loadingHint: {
     marginTop: 6,
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     fontFamily: BODY_FONT_BOLD,
     color: CandyColors.gray[500],
     fontWeight: '600',
@@ -328,8 +351,8 @@ export const appStyles = StyleSheet.create({
   timeUpText: {
     marginTop: 10,
     marginBottom: 4,
-    fontSize: 16,
-    fontFamily: BODY_FONT_BOLD,
+    fontSize: FONT_SIZE.large,
+    fontFamily: PIXEL_FONT_BOLD,
     fontWeight: '800',
     color: CandyColors.purple.main,
     textAlign: 'center',
@@ -340,35 +363,10 @@ export const appStyles = StyleSheet.create({
     marginTop: 16,
     gap: 12,
   },
-  timeUpButtonPrimary: {
-    backgroundColor: CandyColors.green.main,
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 22,
-    borderBottomWidth: 3,
-    borderBottomColor: CandyColors.green.shadow,
-  },
-  timeUpButtonSecondary: {
-    backgroundColor: CandyColors.gray[200],
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 22,
-    borderBottomWidth: 3,
-    borderBottomColor: CandyColors.gray[400],
-  },
-  timeUpButtonText: {
-    fontSize: 15,
-    fontFamily: BODY_FONT_BOLD,
-    fontWeight: '800',
-    color: CandyColors.white,
-    letterSpacing: 0.3,
-  },
-  timeUpButtonTextSecondary: {
-    fontSize: 15,
-    fontFamily: BODY_FONT_BOLD,
-    fontWeight: '800',
-    color: CandyColors.gray[700],
-    letterSpacing: 0.3,
+  // The Try Again / Home actions are now phase-aware CandyButtons (same cottage
+  // bevel GameAlertModal uses); each takes an equal share of the row.
+  timeUpButtonFlex: {
+    flex: 1,
   },
   // Speed rescue — opt-in rewarded continue inside the Time's-Up card
   speedRescueButton: {
@@ -403,7 +401,7 @@ export const appStyles = StyleSheet.create({
     elevation: 5,
   },
   stuckPanelTitle: {
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     fontFamily: BODY_FONT_BOLD,
     fontWeight: '800',
     color: CandyColors.gray[800],
@@ -411,7 +409,7 @@ export const appStyles = StyleSheet.create({
     marginBottom: 4,
   },
   stuckPanelBody: {
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontFamily: BODY_FONT_BOLD,
     fontWeight: '600',
     color: CandyColors.gray[600],
@@ -443,7 +441,7 @@ export const appStyles = StyleSheet.create({
     opacity: 0.75,
   },
   stuckPanelButtonText: {
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontFamily: BODY_FONT_BOLD,
     fontWeight: '800',
     color: '#FFFFFF',
@@ -477,6 +475,11 @@ export const appStyles = StyleSheet.create({
   // The CHALLENGE pill keeps its red identity (the danger signal) but sinks
   // toward a dread crimson as the story darkens, so it stops reading as a
   // bright candy chip against a near-black board.
+  // Phase 2 (dusk) — cooled one step before the phase-3 dread, so the pill
+  // ages in the same three coherent steps as the rest of the HUD.
+  challengeBadgeDusk: {
+    backgroundColor: '#C24A52',
+  },
   challengeBadgeDark: {
     backgroundColor: CandyColors.red.dark,
   },
@@ -484,14 +487,14 @@ export const appStyles = StyleSheet.create({
     backgroundColor: '#7A1030',
   },
   challengeBadgeText: {
-    fontSize: 10,
+    fontSize: FONT_SIZE.micro,
     fontFamily: BODY_FONT_BOLD,
     fontWeight: '900',
     color: CandyColors.white,
     letterSpacing: 1,
   },
   challengeUndoText: {
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     fontFamily: BODY_FONT_BOLD,
     fontWeight: '800',
     color: '#FFFFFF',
@@ -502,7 +505,10 @@ export const appStyles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 10,
-    backgroundColor: 'rgba(255, 201, 77, 0.22)',
+    // Dark translucent fill (was a translucent-amber tint that composited over
+    // the red CHALLENGE pill and left the amber label at ~2.3:1). The amber
+    // keeps its currency identity via the border + text and now reads >= 8:1.
+    backgroundColor: 'rgba(20, 10, 40, 0.62)',
     borderWidth: 1,
     borderColor: 'rgba(255, 201, 77, 0.5)',
   },
@@ -510,9 +516,11 @@ export const appStyles = StyleSheet.create({
     opacity: 0.4,
   },
   buyUndoText: {
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     fontFamily: BODY_FONT_BOLD,
     fontWeight: '900',
+    // #FFD479 on the dark chip above computes 8.16:1 (was 2.26:1 on the amber
+    // tint over red).
     color: '#FFD479',
   },
   speedTimerContainer: {
@@ -528,8 +536,8 @@ export const appStyles = StyleSheet.create({
     backgroundColor: 'rgba(210, 40, 70, 0.85)',
   },
   speedTimerText: {
-    fontSize: 28,
-    fontFamily: BODY_FONT_BOLD,
+    fontSize: FONT_SIZE.hero,
+    fontFamily: PIXEL_FONT_BOLD,
     fontWeight: '900',
     color: CandyColors.white,
     letterSpacing: 1,
@@ -547,17 +555,33 @@ export const appStyles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 8,
   },
+  speedRoundRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  speedRoundFlame: {
+    width: 14,
+    height: 14,
+    marginRight: 4,
+    resizeMode: 'contain',
+  },
   speedRoundText: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontFamily: BODY_FONT_BOLD,
     fontWeight: '800',
     color: '#FFE9B0',
     letterSpacing: 0.5,
     textAlign: 'center',
-    marginTop: 2,
   },
   variantBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    // Dark translucent fill (not translucent-white) so the badge label reads
+    // >= 9:1 over the bright board — the old rgba white fill left the 9px
+    // label at ~2.5:1. Matches the overlay-banner container treatment.
+    backgroundColor: 'rgba(20, 10, 40, 0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(180, 150, 220, 0.25)',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 10,
@@ -566,13 +590,25 @@ export const appStyles = StyleSheet.create({
     gap: 4,
     maxWidth: 180,
   },
+  // Phase-2 dusk: the board already shows the dusk sky at phase 2, but the HUD
+  // badges used to hold their bright fill until a single binary jump to dark at
+  // phase 3. This intermediate tier ages the chrome WITH the board through the
+  // dusk phase instead of skipping it.
+  variantBadgeDusk: {
+    backgroundColor: 'rgba(28, 15, 48, 0.62)',
+    borderWidth: 1,
+    borderColor: 'rgba(150, 100, 170, 0.30)',
+  },
+  variantBadgeTextDusk: {
+    color: 'rgba(226, 200, 224, 0.95)',
+  },
   variantBadgeDark: {
     backgroundColor: 'rgba(35, 18, 45, 0.75)',
     borderWidth: 1,
     borderColor: 'rgba(130, 70, 120, 0.35)',
   },
   variantBadgeIcon: {
-    fontSize: 10,
+    fontSize: FONT_SIZE.micro,
     fontFamily: BODY_FONT,
   },
   variantBadgeIconImage: {
@@ -580,10 +616,10 @@ export const appStyles = StyleSheet.create({
     height: 15,
   },
   variantBadgeText: {
-    fontSize: 9,
-    fontFamily: BODY_FONT_BOLD,
+    fontSize: FONT_SIZE.caption,
+    fontFamily: PIXEL_FONT_BOLD,
     fontWeight: '800',
-    color: 'rgba(255, 255, 255, 0.85)',
+    color: '#FFFFFF',
     letterSpacing: 0.2,
     flexShrink: 1,
   },
@@ -602,6 +638,11 @@ export const appStyles = StyleSheet.create({
     marginTop: 4,
     gap: 4,
   },
+  // Phase 2 (dusk) — a cooled violet tint one step before the phase-3 dread,
+  // so the atmosphere badge ages in step with the rest of the HUD.
+  phaseBadgeDusk: {
+    backgroundColor: 'rgba(120, 90, 150, 0.28)',
+  },
   phaseBadgeDark: {
     backgroundColor: 'rgba(60, 30, 80, 0.4)',
   },
@@ -611,11 +652,11 @@ export const appStyles = StyleSheet.create({
     borderColor: 'rgba(120, 40, 80, 0.4)',
   },
   phaseBadgeIcon: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontFamily: BODY_FONT,
   },
   phaseBadgeText: {
-    fontSize: 10,
+    fontSize: FONT_SIZE.micro,
     fontFamily: BODY_FONT_BOLD,
     fontWeight: '700',
     color: 'rgba(255, 255, 255, 0.8)',
@@ -645,7 +686,7 @@ export const appStyles = StyleSheet.create({
   },
   victoryGlitchText: {
     color: '#FF0040',
-    fontSize: 28,
+    fontSize: FONT_SIZE.hero,
     fontFamily: BODY_FONT_BOLD,
     fontWeight: '900',
     letterSpacing: 4,
@@ -659,7 +700,7 @@ export const appStyles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.92)',
   },
   victoryGlitchTextProminent: {
-    fontSize: 40,
+    fontSize: FONT_SIZE.giant,
     letterSpacing: 6,
     textShadowRadius: 22,
   },
@@ -668,7 +709,7 @@ export const appStyles = StyleSheet.create({
   },
   microBeatWhisperText: {
     color: 'rgba(200, 180, 220, 0.9)',
-    fontSize: 18,
+    fontSize: FONT_SIZE.title,
     fontFamily: BODY_FONT_ITALIC,
     fontWeight: '500',
     fontStyle: 'italic',
@@ -688,7 +729,7 @@ export const appStyles = StyleSheet.create({
     zIndex: 500,
   },
   interjectionText: {
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontFamily: BODY_FONT_BOLD,
     fontWeight: '600',
     color: 'rgba(255, 255, 255, 0.8)',

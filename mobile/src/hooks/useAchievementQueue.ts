@@ -9,6 +9,7 @@ import { getFullProgress, getVariantWinStats } from '../services/amberCurrency';
 import { getDailyStatus } from '../services/dailyChallenge';
 import { VictoryData } from './useGamePersistence';
 import { hapticHeavy } from '../services/haptics';
+import { playUiSound } from '../services/uiSound';
 
 export interface AchievementQueueState {
   currentAchievement: Achievement | null;
@@ -72,6 +73,9 @@ export function useAchievementQueue(): [AchievementQueueState, AchievementQueueA
       const newAchievements = await checkAchievements(state);
       if (newAchievements.length > 0) {
         hapticHeavy();
+        // achievement.wav (a composed 1.3s fanfare) shipped in the pack but was
+        // never played; it resolves its dark mirror by phase automatically.
+        playUiSound('achievement');
         setQueue(prev => {
           const existingIds = new Set(prev.map(a => a.id));
           const uniqueNew = newAchievements.filter(a => !existingIds.has(a.id));

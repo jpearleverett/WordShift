@@ -17,6 +17,7 @@ import {
 } from '../services/homeWorldData';
 import { getAmberBalance, getReservedUnlockId } from '../services/amberCurrency';
 import { hapticError, hapticLight, hapticSuccess } from '../services/haptics';
+import { playUiSound } from '../services/uiSound';
 
 interface UseUnlockFlowParams {
   progress: HomeWorldProgress | null;
@@ -243,6 +244,7 @@ export function useUnlockFlow({
     const result = await skipUnlockGate(unlock.id);
     if (result.success) {
       hapticSuccess();
+      playUiSound('unlock');
       setShowCelebration(true);
       if (typeof result.newBalance === 'number') onAmberChange?.(result.newBalance);
       await loadAllData();
@@ -272,6 +274,7 @@ export function useUnlockFlow({
     const result = await skipReservedUnlock(unlock.id);
     if (result.success) {
       hapticSuccess();
+      playUiSound('unlock');
       setShowCelebration(true);
       if (typeof result.newBalance === 'number') onAmberChange?.(result.newBalance);
       await loadAllData();
@@ -300,6 +303,7 @@ export function useUnlockFlow({
     const result = await purchaseUnlock(unlock.id);
     if (result.success) {
       hapticSuccess();
+      playUiSound('unlock');
       setShowCelebration(true);
 
       await loadAllData();

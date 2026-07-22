@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   StatusBar,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
 import { CandyColors, TILE_THEMES, CONFETTI_THEMES } from '../../theme/colors';
 import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
@@ -14,6 +15,10 @@ import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { CandyButton } from '../ui/CandyButton';
 import { PanelCard } from '../ui/PanelCard';
 import { AmberInline } from '../AmberInline';
+import { Confetti } from '../Confetti';
+import { RewardReveal, EntranceCascadeItem, getCascadeDelayMs } from '../ui/RewardReveal';
+import { getSettingsSync } from '../../services/settings';
+import { shouldSimplifyAnimations } from '../../services/deviceTier';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import {
   getCosmeticsByCategory,
@@ -55,8 +60,9 @@ import {
   getShopPatronLockedLabel,
   getShopStoreBridgeText,
 } from '../../services/phaseNarrative';
-import { hapticLight, hapticMedium } from '../../services/haptics';
+import { hapticLight, hapticMedium, hapticSuccess } from '../../services/haptics';
 import { isPatronSync } from '../../services/entitlements';
+import { FONT_SIZE } from '../../theme/typeScale';
 
 interface ShopScreenProps {
   phase: number;
@@ -73,37 +79,145 @@ const AMBER_ICON = require('../../../assets/ui/amber.png');
 
 const PREVIEW_LETTERS = ['A', 'B', 'C', 'D'];
 
-/** A small row of tiles previewing a tile palette. */
-const ThemePreview: React.FC<{ themeId: string | null }> = ({ themeId }) => {
+/** Content blocks wait this long so the header reads as settling in first
+ *  (matches StatsScreen / WhisperGallery so every secondary screen cascades in
+ *  the same way). EntranceCascadeItem pins instantly under reduced motion. */
+const HEADER_CASCADE_BASE_MS = 120;
+
+/**
+ * Short, phase-aware acknowledgment shown beneath the spend count-up when a
+ * cosmetic is equipped, so the game's biggest expression purchase lands as a
+ * moment rather than a silent chip swap. Kept local (there is no phaseNarrative
+ * helper for the shop celebration and this file cannot add one); the copy stays
+ * phase-aware and em-dash-free like every other player-facing string.
+ */
+function getCosmeticEquippedLine(phase: number): string {
+  if (phase >= 4) return 'It settles into the arrangement.';
+  if (phase >= 2) return 'Equipped. The pattern shifts.';
+  if (phase >= 1) return 'Equipped. It suits you.';
+  return 'Equipped. Wear it proudly.';
+}
+
+const previewMotionAllowed = () => !getSettingsSync().reducedMotion && !shouldSimplifyAnimations();
+
+/**
+ * Play a one-shot staggered scale pulse over a set of Animated.Values (1 ->
+ * 1.15 -> 1), 60ms apart. Returns the composite so the caller can stop it.
+ */
+function playPulse(values: Animated.Value[]): Animated.CompositeAnimation {
+  const anim = Animated.stagger(
+    60,
+    values.map(v =>
+      Animated.sequence([
+        Animated.spring(v, { toValue: 1.15, friction: 5, tension: 220, useNativeDriver: true }),
+        Animated.spring(v, { toValue: 1, friction: 6, tension: 180, useNativeDriver: true }),
+      ]),
+    ),
+  );
+  return anim;
+}
+
+interface PreviewProps {
+  themeId: string | null;
+  /** Bumped by the parent on purchase to celebrate this item; also self-plays on tap. */
+  pulseToken?: number;
+}
+
+/** A small row of tiles previewing a tile palette. Tappable to demo the pulse. */
+const ThemePreview: React.FC<PreviewProps> = ({ themeId, pulseToken = 0 }) => {
   const palette = themeId && TILE_THEMES[themeId] ? TILE_THEMES[themeId] : CandyColors.tileColors;
+  const scales = useRef(PREVIEW_LETTERS.map(() => new Animated.Value(1))).current;
+
+  const pulse = useCallback(() => {
+    if (!previewMotionAllowed()) return;
+    const a = playPulse(scales);
+    a.start();
+  }, [scales]);
+
+  useEffect(() => {
+    if (pulseToken > 0) pulse();
+  }, [pulseToken, pulse]);
+
   return (
-    <View style={styles.previewRow}>
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={pulse}
+      accessibilityRole="button"
+      accessibilityLabel="Preview this tile theme"
+      style={styles.previewRow}
+    >
       {PREVIEW_LETTERS.map((ch, i) => {
         const c = palette[i % palette.length];
         return (
-          <View
+          <Animated.View
             key={ch}
-            style={[styles.previewTile, { backgroundColor: c.bg, borderColor: c.border }]}
+            style={[
+              styles.previewTile,
+              { backgroundColor: c.bg, borderColor: c.border, transform: [{ scale: scales[i] }] },
+            ]}
           >
             <Text style={styles.previewTileText}>{ch}</Text>
-          </View>
+          </Animated.View>
         );
       })}
-    </View>
+    </TouchableOpacity>
   );
 };
 
 const DEFAULT_CONFETTI = ['#FF6B9D', '#C44DFF', '#4DAFFF', '#FFD84D', '#4DE8C2', '#FF8C4D'];
 
-/** A small scatter of dots previewing a confetti palette. */
-const ConfettiPreview: React.FC<{ themeId: string | null }> = ({ themeId }) => {
+/** A small scatter of dots previewing a confetti palette. Tappable to demo a mini-burst. */
+const ConfettiPreview: React.FC<PreviewProps> = ({ themeId, pulseToken = 0 }) => {
   const palette = themeId && CONFETTI_THEMES[themeId] ? CONFETTI_THEMES[themeId] : DEFAULT_CONFETTI;
+  const scales = useRef([0, 1, 2, 3, 4, 5].map(() => new Animated.Value(1))).current;
+
+  const pulse = useCallback(() => {
+    if (!previewMotionAllowed()) return;
+    const a = playPulse(scales);
+    a.start();
+  }, [scales]);
+
+  useEffect(() => {
+    if (pulseToken > 0) pulse();
+  }, [pulseToken, pulse]);
+
   return (
-    <View style={styles.previewConfetti}>
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={pulse}
+      accessibilityRole="button"
+      accessibilityLabel="Preview this confetti palette"
+      style={styles.previewConfetti}
+    >
       {[0, 1, 2, 3, 4, 5].map(i => (
-        <View key={i} style={[styles.previewDot, { backgroundColor: palette[i % palette.length] }]} />
+        <Animated.View
+          key={i}
+          style={[styles.previewDot, { backgroundColor: palette[i % palette.length], transform: [{ scale: scales[i] }] }]}
+        />
       ))}
-    </View>
+    </TouchableOpacity>
+  );
+};
+
+/** The "Equipped ✓" chip. Springs in from scale 0.8 when it was just purchased. */
+const AnimatedEquippedChip: React.FC<{ spring: boolean; borderColor: string; textColor: string }> = ({
+  spring,
+  borderColor,
+  textColor,
+}) => {
+  const animate = spring && previewMotionAllowed();
+  const scale = useRef(new Animated.Value(animate ? 0.8 : 1)).current;
+  useEffect(() => {
+    if (!animate) return;
+    scale.setValue(0.8);
+    const a = Animated.spring(scale, { toValue: 1, friction: 5, tension: 200, useNativeDriver: true });
+    a.start();
+    return () => a.stop();
+  }, [animate, scale]);
+  return (
+    <Animated.View style={[styles.statusChip, styles.equippedChip, { borderColor, transform: [{ scale }] }]}>
+      <Text style={[styles.equippedChipText, { color: textColor }]}>Equipped ✓</Text>
+    </Animated.View>
   );
 };
 
@@ -122,6 +236,14 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   const chipBg = `rgba(255, 255, 255, ${SURFACE.highlightAlpha})`;
 
   const [balance, setBalance] = useState(amberBalance);
+  // The header amber pill ticks from the old value to the new one on any change
+  // (a spend, or a prop refresh) instead of an instant swap, so a purchase reads
+  // as amber leaving the pouch.
+  const [displayedBalance, setDisplayedBalance] = useState(amberBalance);
+  const prevBalanceRef = useRef(amberBalance);
+  // Cosmetic-purchase reward moment (F43): a magnitude-aware count-up of the
+  // spend + a phase-aware in-world line, auto-clearing after a read beat.
+  const [purchaseReveal, setPurchaseReveal] = useState<{ amount: number; line: string; nonce: number } | null>(null);
   const [owned, setOwned] = useState<Record<string, boolean>>({});
   const [equipped, setEquipped] = useState<Partial<Record<CosmeticCategory, string>>>({});
   const [loading, setLoading] = useState(true);
@@ -135,6 +257,16 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   const [purchasedDeepenings, setPurchasedDeepenings] = useState<Record<string, number>>({});
   const [attunedRooms, setAttunedRooms] = useState<Record<string, number>>({});
   const [houseFeedback, setHouseFeedback] = useState<string | null>(null);
+
+  const reducedMotion = getSettingsSync().reducedMotion;
+  // Cosmetic-purchase celebration (F43): the just-bought palette bursts confetti,
+  // pulses its preview, and springs its Equipped chip.
+  const [celebration, setCelebration] = useState<{ id: string; palette: string[]; token: number } | null>(null);
+  const [confettiActive, setConfettiActive] = useState(false);
+  // House-upgrade in-card resolution (F50): the bought card holds its feedback in
+  // place, fades, THEN the list reflows.
+  const [resolving, setResolving] = useState<{ key: string; message: string } | null>(null);
+  const houseFade = useRef(new Animated.Value(1)).current;
 
   const tileThemes = useMemo(() => getCosmeticsByCategory('tile_theme'), []);
   const confettiThemes = useMemo(() => getCosmeticsByCategory('confetti'), []);
@@ -165,6 +297,23 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     setAttunedRooms(attunements);
   }, []);
 
+  // In-card purchase resolution (F50): keep the bought card mounted for a read
+  // beat showing its feedback in place of the button, fade it, THEN refresh so
+  // the reflow happens while nothing draws attention to it.
+  const resolveHousePurchase = useCallback(async (key: string, message: string) => {
+    setResolving({ key, message });
+    houseFade.setValue(1);
+    await new Promise<void>(r => setTimeout(r, 900));
+    if (!reducedMotion) {
+      await new Promise<void>(r => {
+        Animated.timing(houseFade, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => r());
+      });
+    }
+    await refreshHouse();
+    setResolving(null);
+    setHouseFeedback(null);
+  }, [houseFade, reducedMotion, refreshHouse]);
+
   useEffect(() => {
     (async () => {
       await Promise.all([refresh(), refreshHouse()]);
@@ -173,6 +322,40 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   }, [refresh, refreshHouse]);
 
   useEffect(() => { setBalance(amberBalance); }, [amberBalance]);
+
+  // Tick the displayed pill value toward the real balance (~400ms). Reduced
+  // motion snaps to the final value.
+  useEffect(() => {
+    const prev = prevBalanceRef.current;
+    if (prev === balance) return;
+    if (reducedMotion) {
+      setDisplayedBalance(balance);
+      prevBalanceRef.current = balance;
+      return;
+    }
+    const start = prev;
+    const end = balance;
+    const steps = 13; // ~400ms at ~30ms/step
+    let i = 0;
+    const id = setInterval(() => {
+      i++;
+      const fraction = Math.min(1, i / steps);
+      setDisplayedBalance(Math.round(start + (end - start) * fraction));
+      if (i >= steps) {
+        clearInterval(id);
+        prevBalanceRef.current = end;
+      }
+    }, 30);
+    return () => clearInterval(id);
+  }, [balance, reducedMotion]);
+
+  // The purchase reveal auto-clears after a read beat (the confetti + preview
+  // pulse + chip spring carry the rest of the celebration).
+  useEffect(() => {
+    if (!purchaseReveal) return;
+    const id = setTimeout(() => setPurchaseReveal(null), 1900);
+    return () => clearTimeout(id);
+  }, [purchaseReveal]);
 
   const handleBuy = useCallback(async (item: CosmeticItem) => {
     if (busy || item.acquisition.kind !== 'amber') return;
@@ -186,12 +369,23 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
       onAmberChange?.(spend.newBalance);
       await recordAmberCosmeticPurchase(item.id);
       await equipCosmetic(item.id); // auto-equip on purchase
-      hapticMedium();
+      hapticSuccess();
+      // Celebrate the biggest expression purchase: a count-up of the spend + a
+      // phase-aware in-world line, plus a burst of the purchased palette, a
+      // preview pulse, and the Equipped chip spring. Confetti self-skips under
+      // reduced motion; the palette drives the color either way.
+      setPurchaseReveal({ amount: cost, line: getCosmeticEquippedLine(phase), nonce: Date.now() });
+      const palette =
+        item.category === 'tile_theme'
+          ? (TILE_THEMES[item.id]?.map(c => c.bg) ?? [])
+          : (CONFETTI_THEMES[item.id] ?? []);
+      setCelebration(prev => ({ id: item.id, palette, token: (prev?.token ?? 0) + 1 }));
+      if (palette.length > 0) setConfettiActive(true);
       await refresh();
     } finally {
       setBusy(null);
     }
-  }, [busy, balance, onAmberChange, refresh]);
+  }, [busy, balance, onAmberChange, refresh, phase]);
 
   const handleEquip = useCallback(async (item: CosmeticItem) => {
     if (busy) return;
@@ -282,14 +476,13 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
       }
       onAmberChange?.(spendResult.newBalance);
       setBalance(spendResult.newBalance);
-      setHouseFeedback(`${upgrade.name} added.`);
       logEvent({ type: 'room_upgrade_purchased', data: { roomId, cost: upgrade.cost } });
       hapticMedium();
-      await refreshHouse();
+      await resolveHousePurchase(`upgrade_${roomId}`, `${upgrade.name} added.`);
     } finally {
       setBusy(null);
     }
-  }, [busy, onAmberChange, refreshHouse]);
+  }, [busy, onAmberChange, resolveHousePurchase]);
 
   const handleBuyDeepening = useCallback(async (roomId: string) => {
     if (busy) return;
@@ -309,14 +502,13 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
       }
       onAmberChange?.(spendResult.newBalance);
       setBalance(spendResult.newBalance);
-      setHouseFeedback(`${deepening.name} settles in.`);
       logEvent({ type: 'room_upgrade_purchased', data: { roomId, cost: deepening.cost, tier: 2 } });
       hapticMedium();
-      await refreshHouse();
+      await resolveHousePurchase(`deepen_${roomId}`, `${deepening.name} settles in.`);
     } finally {
       setBusy(null);
     }
-  }, [busy, onAmberChange, refreshHouse]);
+  }, [busy, onAmberChange, resolveHousePurchase]);
 
   const handleBuyAttunement = useCallback(async (roomId: string) => {
     if (busy) return;
@@ -336,14 +528,13 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
       }
       onAmberChange?.(spendResult.newBalance);
       setBalance(spendResult.newBalance);
-      setHouseFeedback(`The room is ${info.name.toLowerCase()} now.`);
       logEvent({ type: 'room_upgrade_purchased', data: { roomId, cost: info.cost, tier: 3, level: info.level } });
       hapticMedium();
-      await refreshHouse();
+      await resolveHousePurchase(`attune_${roomId}`, `The room is ${info.name.toLowerCase()} now.`);
     } finally {
       setBusy(null);
     }
-  }, [busy, attunedRooms, onAmberChange, refreshHouse]);
+  }, [busy, attunedRooms, onAmberChange, resolveHousePurchase]);
 
   const showHouseUpgrades =
     areUpgradesAvailable(housePhase) &&
@@ -356,9 +547,11 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     const isEquipped = equipped[item.category] === item.id;
     if (isEquipped) {
       return (
-        <View style={[styles.statusChip, styles.equippedChip, { borderColor: t.sectionBorder }]}>
-          <Text style={[styles.equippedChipText, { color: t.body }]}>Equipped ✓</Text>
-        </View>
+        <AnimatedEquippedChip
+          spring={celebration?.id === item.id}
+          borderColor={t.sectionBorder}
+          textColor={t.body}
+        />
       );
     }
     if (isOwned) {
@@ -404,7 +597,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     defaultName: string,
     defaultDesc: string,
     items: CosmeticItem[],
-    Preview: React.FC<{ themeId: string | null }>,
+    Preview: React.FC<PreviewProps>,
   ) => {
     const defaultEquipped = equipped[category] === undefined;
     return (
@@ -437,7 +630,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
 
         {items.map(item => (
           <PanelCard key={item.id} phase={phase} kind="card" style={styles.card}>
-            <Preview themeId={item.id} />
+            <Preview themeId={item.id} pulseToken={celebration?.id === item.id ? celebration.token : 0} />
             <View style={styles.cardBody}>
               <Text style={[styles.cardName, { color: t.title }]}>{item.name}</Text>
               <Text style={[styles.cardDesc, { color: t.body }]} numberOfLines={2}>
@@ -448,6 +641,56 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
           </PanelCard>
         ))}
       </View>
+    );
+  };
+
+  // A house-upgrade card that, once bought, holds its feedback in place and fades
+  // (F50) instead of vanishing in an abrupt reflow. `extraLine` carries the
+  // attunement "level X of Y" line.
+  const renderHouseCard = (
+    key: string,
+    title: string,
+    description: string,
+    cost: number,
+    buyLabel: string,
+    onBuy: () => void,
+    a11y: string,
+    extraLine?: string,
+  ) => {
+    const isResolving = resolving?.key === key;
+    return (
+      <Animated.View key={key} style={isResolving ? { opacity: houseFade } : undefined}>
+        <PanelCard phase={phase} kind="card" style={styles.card}>
+          <View style={styles.houseCardBody}>
+            <Text style={[styles.cardName, { color: t.title }]}>{title}</Text>
+            {extraLine ? (
+              <Text style={[styles.attuneLevel, { color: t.muted }]}>{extraLine}</Text>
+            ) : null}
+            <Text style={[styles.cardDesc, { color: t.body }]}>{description}</Text>
+            <Text style={[styles.houseCost, { color: t.amberText }]}>
+              <AmberInline size={12} /> {cost}
+            </Text>
+          </View>
+          {isResolving ? (
+            <View style={[styles.resolveChip, { backgroundColor: t.amberTint, borderColor: t.amberTintBorder }]}>
+              <Text style={[styles.resolveCheck, { color: t.amberText }]}>✓</Text>
+              <Text style={[styles.resolveMsg, { color: t.amberText }]} numberOfLines={2}>
+                {resolving?.message}
+              </Text>
+            </View>
+          ) : (
+            <CandyButton
+              label={buyLabel}
+              onPress={onBuy}
+              phase={phase}
+              variant="amber"
+              disabled={balance < cost || busy != null}
+              style={styles.actionSlot}
+              accessibilityLabel={a11y}
+            />
+          )}
+        </PanelCard>
+      </Animated.View>
     );
   };
 
@@ -471,7 +714,12 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
           </Text>
         </View>
         <View style={[styles.amberPill, { backgroundColor: t.sectionBg, borderColor: t.amberTintBorder }]}>
-          <Text style={[styles.amberPillText, { color: t.amberText }]}><AmberInline size={14} /> {Math.max(0, balance)}</Text>
+          <Text
+            style={[styles.amberPillText, { color: t.amberText }]}
+            accessibilityLabel={`${Math.max(0, balance)} amber`}
+          >
+            <AmberInline size={14} /> {Math.max(0, displayedBalance)}
+          </Text>
         </View>
       </View>
 
@@ -487,6 +735,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
         ) : (
           <>
             {onOpenPatron && !isPatronSync() && (
+              <EntranceCascadeItem phase={phase} delay={getCascadeDelayMs(0, { baseMs: HEADER_CASCADE_BASE_MS })}>
               <TouchableOpacity
                 onPress={() => { hapticLight(); onOpenPatron(); }}
                 accessibilityLabel="Become a Patron"
@@ -503,7 +752,9 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                   <Text style={[styles.patronBannerSub, { color: t.body }]}>Support WordShift. A small amber bonus + an exclusive gold tile set</Text>
                 </PanelCard>
               </TouchableOpacity>
+              </EntranceCascadeItem>
             )}
+            <EntranceCascadeItem phase={phase} delay={getCascadeDelayMs(1, { baseMs: HEADER_CASCADE_BASE_MS })}>
             {renderSection(
               'tile_theme',
               getShopThemeSectionLabel(phase),
@@ -512,6 +763,8 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
               tileThemes,
               ThemePreview,
             )}
+            </EntranceCascadeItem>
+            <EntranceCascadeItem phase={phase} delay={getCascadeDelayMs(2, { baseMs: HEADER_CASCADE_BASE_MS })}>
             {renderSection(
               'confetti',
               getShopConfettiSectionLabel(phase),
@@ -520,88 +773,55 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
               confettiThemes,
               ConfettiPreview,
             )}
+            </EntranceCascadeItem>
 
             {showHouseUpgrades && (
+              <EntranceCascadeItem phase={phase} delay={getCascadeDelayMs(3, { baseMs: HEADER_CASCADE_BASE_MS })}>
               <View>
                 <Text style={[styles.sectionLabel, { color: t.headerMuted }]}>HOUSE UPGRADES</Text>
                 {houseFeedback != null && (
                   <Text style={[styles.houseFeedback, { color: t.headerMuted }]}>{houseFeedback}</Text>
                 )}
-                {availableUpgrades.map(({ room, upgrade }) => (
-                  <PanelCard key={`upgrade_${room.id}`} phase={phase} kind="card" style={styles.card}>
-                    <View style={styles.houseCardBody}>
-                      <Text style={[styles.cardName, { color: t.title }]}>
-                        {room.name}: {upgrade.name}
-                      </Text>
-                      <Text style={[styles.cardDesc, { color: t.body }]}>
-                        {getUpgradeDescription(room.id, housePhase)}
-                      </Text>
-                      <Text style={[styles.houseCost, { color: t.amberText }]}>
-                        <AmberInline size={12} /> {upgrade.cost}
-                      </Text>
-                    </View>
-                    <CandyButton
-                      label="Decorate"
-                      onPress={() => handleBuyUpgrade(room.id)}
-                      phase={phase}
-                      variant="amber"
-                      disabled={balance < upgrade.cost || busy != null}
-                      style={styles.actionSlot}
-                      accessibilityLabel={`Decorate ${room.name} with ${upgrade.name} for ${upgrade.cost} amber`}
-                    />
-                  </PanelCard>
-                ))}
-                {areDeepeningsAvailable(housePhase) && availableDeepenings.map(({ room, deepening }) => (
-                  <PanelCard key={`deepen_${room.id}`} phase={phase} kind="card" style={styles.card}>
-                    <View style={styles.houseCardBody}>
-                      <Text style={[styles.cardName, { color: t.title }]}>
-                        {room.name}: {deepening.name}
-                      </Text>
-                      <Text style={[styles.cardDesc, { color: t.body }]}>{deepening.description}</Text>
-                      <Text style={[styles.houseCost, { color: t.amberText }]}>
-                        <AmberInline size={12} /> {deepening.cost}
-                      </Text>
-                    </View>
-                    <CandyButton
-                      label="Deepen"
-                      onPress={() => handleBuyDeepening(room.id)}
-                      phase={phase}
-                      variant="amber"
-                      disabled={balance < deepening.cost || busy != null}
-                      style={styles.actionSlot}
-                      accessibilityLabel={`Deepen ${room.name} with ${deepening.name} for ${deepening.cost} amber`}
-                    />
-                  </PanelCard>
-                ))}
-                {areAttunementsAvailable(housePhase) && availableAttunements.map(({ room, info }) => (
-                  <PanelCard key={`attune_${room.id}`} phase={phase} kind="card" style={styles.card}>
-                    <View style={styles.houseCardBody}>
-                      <Text style={[styles.cardName, { color: t.title }]}>
-                        {room.name}: {info.name}
-                      </Text>
-                      <Text style={[styles.attuneLevel, { color: t.muted }]}>
-                        Attunement {info.level} of {MAX_ATTUNEMENT_LEVEL}
-                      </Text>
-                      <Text style={[styles.cardDesc, { color: t.body }]}>{info.description}</Text>
-                      <Text style={[styles.houseCost, { color: t.amberText }]}>
-                        <AmberInline size={12} /> {info.cost}
-                      </Text>
-                    </View>
-                    <CandyButton
-                      label="Attune"
-                      onPress={() => handleBuyAttunement(room.id)}
-                      phase={phase}
-                      variant="amber"
-                      disabled={balance < info.cost || busy != null}
-                      style={styles.actionSlot}
-                      accessibilityLabel={`Attune ${room.name}, level ${info.level} of ${MAX_ATTUNEMENT_LEVEL}, ${info.name}, for ${info.cost} amber`}
-                    />
-                  </PanelCard>
-                ))}
+                {availableUpgrades.map(({ room, upgrade }) =>
+                  renderHouseCard(
+                    `upgrade_${room.id}`,
+                    `${room.name}: ${upgrade.name}`,
+                    getUpgradeDescription(room.id, housePhase),
+                    upgrade.cost,
+                    'Decorate',
+                    () => handleBuyUpgrade(room.id),
+                    `Decorate ${room.name} with ${upgrade.name} for ${upgrade.cost} amber`,
+                  ),
+                )}
+                {areDeepeningsAvailable(housePhase) && availableDeepenings.map(({ room, deepening }) =>
+                  renderHouseCard(
+                    `deepen_${room.id}`,
+                    `${room.name}: ${deepening.name}`,
+                    deepening.description,
+                    deepening.cost,
+                    'Deepen',
+                    () => handleBuyDeepening(room.id),
+                    `Deepen ${room.name} with ${deepening.name} for ${deepening.cost} amber`,
+                  ),
+                )}
+                {areAttunementsAvailable(housePhase) && availableAttunements.map(({ room, info }) =>
+                  renderHouseCard(
+                    `attune_${room.id}`,
+                    `${room.name}: ${info.name}`,
+                    info.description,
+                    info.cost,
+                    'Attune',
+                    () => handleBuyAttunement(room.id),
+                    `Attune ${room.name}, level ${info.level} of ${MAX_ATTUNEMENT_LEVEL}, ${info.name}, for ${info.cost} amber`,
+                    `Attunement ${info.level} of ${MAX_ATTUNEMENT_LEVEL}`,
+                  ),
+                )}
               </View>
+              </EntranceCascadeItem>
             )}
 
             {onOpenStore && (
+              <EntranceCascadeItem phase={phase} delay={getCascadeDelayMs(4, { baseMs: HEADER_CASCADE_BASE_MS })}>
               <TouchableOpacity
                 onPress={() => { hapticLight(); onOpenStore(); }}
                 accessibilityRole="button"
@@ -623,15 +843,44 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                   <Text style={[styles.storeBridgeChevron, { color: t.amberText }]}>{'>'}</Text>
                 </PanelCard>
               </TouchableOpacity>
+              </EntranceCascadeItem>
             )}
 
+            <EntranceCascadeItem phase={phase} delay={getCascadeDelayMs(5, { baseMs: HEADER_CASCADE_BASE_MS })}>
             <Text style={[styles.footnote, { color: t.headerMuted }]}>
               Cosmetics are for expression only. They never change the puzzle, the
               story, or your progress.
             </Text>
+            </EntranceCascadeItem>
           </>
         )}
       </ScrollView>
+
+      {/* Cosmetic-purchase reward moment (F43): a magnitude-aware count-up of
+          the spend + a phase-aware in-world line, over the just-bought palette
+          burst below. Pointer-transparent, auto-clears after a read beat. */}
+      {purchaseReveal && (
+        <View pointerEvents="none" style={styles.purchaseRevealOverlay}>
+          <View style={[styles.purchaseRevealCard, { backgroundColor: t.sectionBg, borderColor: t.amberTintBorder }]}>
+            <RewardReveal
+              key={purchaseReveal.nonce}
+              amount={purchaseReveal.amount}
+              icon={AMBER_ICON}
+              label={purchaseReveal.line}
+              phase={phase}
+            />
+          </View>
+        </View>
+      )}
+
+      {/* Purchase celebration burst (F43), painted in the just-bought palette.
+          Self-skips under reduced motion. */}
+      <Confetti
+        active={confettiActive}
+        colors={celebration?.palette}
+        phase={phase}
+        onComplete={() => setConfettiActive(false)}
+      />
     </View>
   );
 };
@@ -657,15 +906,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   backChipText: {
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '700',
     fontFamily: PIXEL_FONT_BOLD,
     letterSpacing: 0.3,
   },
   headerCenter: { flex: 1, alignItems: 'center', paddingHorizontal: 6 },
-  title: { fontSize: 22, fontWeight: '900', letterSpacing: 0.5, fontFamily: PIXEL_FONT_BOLD },
+  title: { fontSize: FONT_SIZE.headline, fontWeight: '900', letterSpacing: 0.5, fontFamily: PIXEL_FONT_BOLD },
   subtitle: {
-    fontSize: 12.5,
+    fontSize: FONT_SIZE.small,
     fontWeight: '500',
     fontFamily: BODY_FONT,
     textAlign: 'center',
@@ -683,21 +932,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
-  amberPillText: { fontSize: 15, fontWeight: '900', fontFamily: PIXEL_FONT_BOLD },
+  amberPillText: { fontSize: FONT_SIZE.callout, fontWeight: '900', fontFamily: PIXEL_FONT_BOLD },
   patronBanner: {
     paddingVertical: 18,
     paddingHorizontal: 18,
     marginBottom: 18,
   },
-  patronBannerTitle: { fontSize: 16, fontWeight: '900', marginBottom: 4, fontFamily: PIXEL_FONT_BOLD },
+  patronBannerTitle: { fontSize: FONT_SIZE.large, fontWeight: '900', marginBottom: 4, fontFamily: PIXEL_FONT_BOLD },
   // Washes only the parchment, never the painted wood frame.
   tintInset: { position: 'absolute', top: 12, left: 12, right: 12, bottom: 12 },
-  patronBannerSub: { fontSize: 12.5, fontWeight: '600', fontFamily: PIXEL_FONT_BOLD },
+  patronBannerSub: { fontSize: FONT_SIZE.small, fontWeight: '600', fontFamily: PIXEL_FONT_BOLD },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingBottom: 48 },
   loading: { paddingTop: 80, alignItems: 'center' },
   sectionLabel: {
-    fontSize: 12.5,
+    fontSize: FONT_SIZE.small,
     fontWeight: '800',
     fontFamily: PIXEL_FONT_BOLD,
     letterSpacing: SURFACE.sectionLetterSpacing,
@@ -713,8 +962,8 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   cardBody: { flex: 1, paddingHorizontal: 12 },
-  cardName: { fontSize: 16, fontWeight: '800', fontFamily: PIXEL_FONT_BOLD },
-  cardDesc: { fontSize: 12.5, fontWeight: '500', marginTop: 3, lineHeight: 17, fontFamily: BODY_FONT },
+  cardName: { fontSize: FONT_SIZE.large, fontWeight: '800', fontFamily: PIXEL_FONT_BOLD },
+  cardDesc: { fontSize: FONT_SIZE.small, fontWeight: '500', marginTop: 3, lineHeight: 17, fontFamily: BODY_FONT },
   previewRow: { flexDirection: 'row', width: 96, flexWrap: 'wrap', gap: 4 },
   previewTile: {
     width: 22,
@@ -724,7 +973,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  previewTileText: { color: CandyColors.white, fontSize: 12, fontWeight: '900', fontFamily: PIXEL_FONT_BOLD },
+  previewTileText: { color: CandyColors.white, fontSize: FONT_SIZE.small, fontWeight: '900', fontFamily: PIXEL_FONT_BOLD },
   previewConfetti: {
     width: 96,
     height: 52,
@@ -738,15 +987,15 @@ const styles = StyleSheet.create({
   actionSlot: { minWidth: 96 },
   houseCardBody: { flex: 1, paddingRight: 12 },
   houseFeedback: {
-    fontSize: 12.5,
+    fontSize: FONT_SIZE.small,
     fontWeight: '600',
     fontFamily: BODY_FONT,
     lineHeight: 17,
     marginBottom: 10,
   },
-  houseCost: { fontSize: 13, fontWeight: '800', fontFamily: PIXEL_FONT_BOLD, marginTop: 6 },
+  houseCost: { fontSize: FONT_SIZE.body, fontWeight: '800', fontFamily: PIXEL_FONT_BOLD, marginTop: 6 },
   attuneLevel: {
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '700',
     fontFamily: PIXEL_FONT_BOLD,
     letterSpacing: 0.4,
@@ -766,8 +1015,22 @@ const styles = StyleSheet.create({
     // Settled, lifted tint: the framed "this one is worn" state.
     backgroundColor: `rgba(255, 255, 255, ${SURFACE.highlightAlpha})`,
   },
-  equippedChipText: { fontSize: 13, fontWeight: '800', fontFamily: PIXEL_FONT_BOLD },
-  lockedChipText: { fontSize: 12, fontWeight: '700', textAlign: 'center', fontFamily: PIXEL_FONT_BOLD },
+  equippedChipText: { fontSize: FONT_SIZE.body, fontWeight: '800', fontFamily: PIXEL_FONT_BOLD },
+  lockedChipText: { fontSize: FONT_SIZE.small, fontWeight: '700', textAlign: 'center', fontFamily: PIXEL_FONT_BOLD },
+  // In-card purchase resolution chip (F50): amber inset + check + short line.
+  resolveChip: {
+    minWidth: 96,
+    maxWidth: 130,
+    minHeight: 46,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: SURFACE.buttonRadius,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  resolveCheck: { fontSize: FONT_SIZE.title, fontWeight: '900', fontFamily: PIXEL_FONT_BOLD },
+  resolveMsg: { fontSize: FONT_SIZE.micro, fontWeight: '700', textAlign: 'center', fontFamily: PIXEL_FONT_BOLD, marginTop: 2 },
   storeBridge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -777,16 +1040,31 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   storeBridgeBody: { flex: 1 },
-  storeBridgeTitle: { fontSize: 14.5, fontWeight: '800', marginBottom: 2, fontFamily: PIXEL_FONT_BOLD },
-  storeBridgeSub: { fontSize: 12, fontWeight: '600', fontFamily: PIXEL_FONT_BOLD },
-  storeBridgeChevron: { fontSize: 18, fontWeight: '900', marginLeft: 10, fontFamily: PIXEL_FONT_BOLD },
+  storeBridgeTitle: { fontSize: FONT_SIZE.bodyLg, fontWeight: '800', marginBottom: 2, fontFamily: PIXEL_FONT_BOLD },
+  storeBridgeSub: { fontSize: FONT_SIZE.small, fontWeight: '600', fontFamily: PIXEL_FONT_BOLD },
+  storeBridgeChevron: { fontSize: FONT_SIZE.title, fontWeight: '900', marginLeft: 10, fontFamily: PIXEL_FONT_BOLD },
   footnote: {
-    fontSize: 11.5,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '500',
     fontFamily: BODY_FONT,
     textAlign: 'center',
     marginTop: 8,
     lineHeight: 16,
     opacity: 0.75,
+  },
+  // Cosmetic-purchase reward moment: a small centered tray floating above the
+  // dock, showing the spend count-up + the in-world line.
+  purchaseRevealOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 90,
+    alignItems: 'center',
+  },
+  purchaseRevealCard: {
+    paddingVertical: 14,
+    paddingHorizontal: 22,
+    borderRadius: SURFACE.cardRadius,
+    borderWidth: 1.5,
   },
 });

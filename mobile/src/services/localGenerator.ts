@@ -1050,8 +1050,11 @@ async function generateReverseChain(
   let bestScore = -1;
   let checksCount = 0;
 
-  // Yield to event loop periodically to respect timeouts
-  const YIELD_INTERVAL = 200;
+  // Yield to the event loop once per frame so the UI stays responsive during
+  // reverse generation (which can run up to ~25s). This used to be 200ms, ~13x
+  // coarser than the standard/double generators (both yield at 15ms), which let
+  // the JS thread stall in 200ms chunks while a reverse board was searched.
+  const YIELD_INTERVAL = 15;
   let lastYield = Date.now();
 
   while (Date.now() - startTime < timeoutMs) {

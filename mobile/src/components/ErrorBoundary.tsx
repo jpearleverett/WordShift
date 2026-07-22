@@ -1,8 +1,10 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { CandyColors } from '../theme/colors';
+import { getSurfaceTheme, SurfaceTheme } from '../theme/surfaces';
+import { getCurrentPhaseSync } from '../services/amberCurrency';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
 import { reportError } from '../services/errorReporting';
+import { FONT_SIZE } from '../theme/typeScale';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -40,23 +42,53 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     this.props.onReset?.();
   };
 
+  // Read the last-known phase off the synchronous cache so the crash screen
+  // tracks the descent instead of flashing candy purple. Fully guarded — the
+  // fallback UI must never itself throw; any failure falls back to bright.
+  private surface(): SurfaceTheme {
+    try {
+      return getSurfaceTheme(getCurrentPhaseSync());
+    } catch {
+      return getSurfaceTheme(0);
+    }
+  }
+
+  // Phase-aware title so the crash card doesn't stay chirpy "Oops!" through the
+  // descent. Kept short + clear (a crash screen prioritizes legibility) and
+  // fully guarded — the fallback UI must never itself throw.
+  private title(): string {
+    try {
+      const p = getCurrentPhaseSync();
+      if (p >= 4) return 'The pattern slipped.';
+      if (p >= 2) return 'Something slipped.';
+    } catch {
+      // fall through to the bright default
+    }
+    return 'Oops!';
+  }
+
   render() {
     if (this.state.hasError) {
+      const t = this.surface();
       return (
-        <View style={styles.container}>
-          <Text style={styles.emoji}>😵</Text>
-          <Text style={styles.title}>Oops!</Text>
-          <Text style={styles.message}>
-            {this.props.fallbackMessage || 'Something went wrong. Please try again.'}
-          </Text>
-          <TouchableOpacity
-            style={styles.button}
-            onPress={this.handleReset}
-            accessibilityLabel="Try again"
-            accessibilityRole="button"
-          >
-            <Text style={styles.buttonText}>Try Again</Text>
-          </TouchableOpacity>
+        <View style={[styles.container, { backgroundColor: t.screenBg }]}>
+          <View style={[styles.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+            {/* Neutral on-brand mark (the game's own settle glyph), never a
+                face emoji that reads as flippant during the descent. */}
+            <Text style={[styles.mark, { color: t.muted }]}>{'◈'}</Text>
+            <Text style={[styles.title, { color: t.title }]}>{this.title()}</Text>
+            <Text style={[styles.message, { color: t.body }]}>
+              {this.props.fallbackMessage || 'Something went wrong. Please try again.'}
+            </Text>
+            <TouchableOpacity
+              style={[styles.button, { backgroundColor: t.primaryBg, borderBottomColor: t.primaryEdge }]}
+              onPress={this.handleReset}
+              accessibilityLabel="Try again"
+              accessibilityRole="button"
+            >
+              <Text style={[styles.buttonText, { color: t.primaryText }]}>Try Again</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       );
     }
@@ -70,44 +102,43 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: CandyColors.purple.main,
     padding: 32,
   },
-  emoji: {
+  card: {
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 28,
+    paddingVertical: 30,
+    maxWidth: 360,
+  },
+  mark: {
     fontFamily: BODY_FONT,
-    fontSize: 64,
-    marginBottom: 16,
+    fontSize: FONT_SIZE.giant,
+    marginBottom: 14,
   },
   title: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 28,
+    fontSize: FONT_SIZE.hero,
     fontWeight: '900',
-    color: CandyColors.white,
     marginBottom: 12,
   },
   message: {
     fontFamily: BODY_FONT,
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: FONT_SIZE.large,
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: 24,
   },
   button: {
-    backgroundColor: CandyColors.pink.main,
     paddingHorizontal: 32,
     paddingVertical: 16,
-    borderRadius: 20,
-    shadowColor: CandyColors.pink.dark,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 6,
+    borderRadius: 18,
+    borderBottomWidth: 3,
   },
   buttonText: {
     fontFamily: PIXEL_FONT_BOLD,
-    color: CandyColors.white,
-    fontSize: 18,
+    fontSize: FONT_SIZE.title,
     fontWeight: '800',
   },
 });

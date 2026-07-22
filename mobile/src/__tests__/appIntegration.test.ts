@@ -257,6 +257,10 @@ describe('verb-depth preview gate threading', () => {
     // Seen = ACKNOWLEDGED: the flag commits in the card's button onPress, never
     // at decision time (the old toast burned the beat invisibly on real devices).
     expect(APP_TSX).toMatch(/onPress: \(\) => \{ markOneTimeFlagSeen\(PREVIEW_GRADUATION_SEEN_KEY\)/);
+    // "The rules just changed" is an authored narrative beat, not a mundane
+    // utility confirm: the card must request the 'beat' tone (deepened scrim,
+    // further pop, accent glow) so it never reads as identical to a stock alert.
+    expect(APP_TSX).toMatch(/markOneTimeFlagSeen\(PREVIEW_GRADUATION_SEEN_KEY\)[\s\S]*?\}\],\s*(?:\/\/[^\n]*\n\s*)*'beat',/);
     // Rescue boards start with hidden checks too, but must not consume the
     // graduation beat. Blind Offering and onboarding remain excluded.
     expect(APP_TSX).toMatch(/puzzle\.previewGradingMode !== 'neutral' \|\| puzzle\.blindMode/);
@@ -275,6 +279,19 @@ describe('verb-depth preview gate threading', () => {
     expect(keyMatch).not.toBeNull();
     expect(SETTINGS_TSX).toContain(`AsyncStorage.removeItem('${keyMatch![1]}')`);
     expect(SETTINGS_TSX).toMatch(/\['previewGraduation',/);
+  });
+});
+
+describe('Blind Offering judgment beat', () => {
+  test('both blind branches fire the bespoke judgment overlay (accept / reject)', () => {
+    // Blind hides validity the whole board, so the once-at-the-end judgment is
+    // the mode's payoff — it must be MARKED on both branches, not fall into the
+    // identical victory choreography (success) or a bare shake (failure).
+    expect(APP_TSX).toMatch(/<BlindJudgmentOverlay signal=\{blindJudgmentSignal\}/);
+    // Success: green accept-sweep + a rising chime, in the blind + non-final path.
+    expect(APP_TSX).toMatch(/puzzle\.blindMode && !puzzle\.isFinalBoard[\s\S]*?fireBlindJudgment\('accepted'\)/);
+    // Failure: the crimson reject-pulse rides the existing blindFailed feedback.
+    expect(APP_TSX).toMatch(/fireBlindJudgment\('rejected'\)/);
   });
 });
 
@@ -465,7 +482,20 @@ describe('finale staging (armed, not retroactive)', () => {
   test('the cinematic fires only on the marked final board', () => {
     // Firing path: only the marked final board's win completes the finale.
     expect(APP_TSX).toMatch(/if \(wasFinalBoard\) \{[\s\S]{0,400}?markFinalPuzzleCompleted\(\)/);
-    expect(APP_TSX).toMatch(/setPhaseTransitionEvent\(FINAL_PUZZLE_EVENT\)/);
+    // The finale event is queued via queueEndgameCinematic, which both schedules
+    // the 1.5s beat AND records the event so a victory exit in the window can
+    // rescue it instead of clearVictoryTimeouts dropping the climax forever.
+    expect(APP_TSX).toMatch(/queueEndgameCinematic\(FINAL_PUZZLE_EVENT\)/);
+    expect(APP_TSX).toMatch(/pendingEndgameEventRef\.current = event;[\s\S]{0,200}?setPhaseTransitionEvent\(event\)/);
+  });
+
+  test('a victory exit rescues a queued endgame cinematic instead of dropping it', () => {
+    // startVictoryExitFlow must play any pending endgame event BEFORE
+    // clearVictoryTimeouts drops its timer (the completion flag already
+    // persisted, so it would never re-queue).
+    expect(APP_TSX).toMatch(
+      /const pendingEndgame = pendingEndgameEventRef\.current;[\s\S]{0,200}?setPhaseTransitionEvent\(pendingEndgame\);[\s\S]{0,120}?clearVictoryTimeouts\(\)/
+    );
   });
 
   test('the final board win is silent: no chime, no confetti (the quiet IS the moment)', () => {

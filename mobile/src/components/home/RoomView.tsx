@@ -9,18 +9,24 @@ import {
   Animated,
   Easing,
 } from 'react-native';
-import { AmberInline } from '../AmberInline';
 import { Room, Animal, RoomTheme, DialoguePhase } from '../../types/homeWorld';
 import { ROOM_THEME_COLORS } from '../../services/homeWorldData';
 import { AnimalSprite } from './AnimalSprite';
 import { CandyColors } from '../../theme/colors';
+import { FONT_SIZE } from '../../theme/typeScale';
 import { getPixelSkin, CARD_CORNER_DP, CARD_EDGE_DP } from '../../theme/pixelSkin.generated';
 import { NineSliceFrame } from '../ui/NineSlice';
 import { BODY_FONT, BODY_FONT_BOLD } from '../../theme/fonts';
 import { getSettingsSync } from '../../services/settings';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
 
-// Room background images - maps theme to image asset
+// Room background images - maps theme to image asset. Backgrounds render
+// cover-fit at ~250dp, so any source ≥ 750px clears the 3x requirement.
+// ASSET-SIZE EXCEPTION (F115): desert / observatory (star_loft) / workshop
+// (belfry) currently ship at 1783x882, above the 1456x720 family standard, and
+// are pending a downscale (their window masks are cover-fit too, so a
+// proportional downscale keeps alignment). jungle (1092x540) / office
+// (1092x534) are accepted as-is (both exceed 750px).
 const ROOM_BACKGROUNDS: Record<RoomTheme, ImageSourcePropType> = {
   cozy_den: require('../../../assets/rooms/cozy_den.png'),
   kitchen: require('../../../assets/rooms/kitchen.png'),
@@ -76,9 +82,9 @@ const WINDOW_TINT: Record<number, { color: string; opacity: number }> = {
 
 // Word echo configuration by phase (ritual words inscribed in rooms)
 const WORD_ECHO_CONFIG: Record<number, { count: number; opacity: number; fontSize: number; color: string }> = {
-  2: { count: 3, opacity: 0.08, fontSize: 9, color: '#FFFFFF' },
-  3: { count: 4, opacity: 0.15, fontSize: 10, color: '#9B7FCF' },
-  4: { count: 5, opacity: 0.25, fontSize: 11, color: '#8B2252' },
+  2: { count: 3, opacity: 0.08, fontSize: FONT_SIZE.micro, color: '#FFFFFF' },
+  3: { count: 4, opacity: 0.15, fontSize: FONT_SIZE.micro, color: '#9B7FCF' },
+  4: { count: 5, opacity: 0.25, fontSize: FONT_SIZE.caption, color: '#8B2252' },
 };
 
 // Predefined scattered positions for word echoes within each room
@@ -95,6 +101,8 @@ const WORD_ECHO_POSITIONS = [
 // size and a consistent 4px gap on one shared baseline — text-embedded images
 // at this small font size render with inconsistent spacing/baselines.
 const AMBER_ICON = require('../../../assets/ui/amber.png');
+// Chrome iconography is sprites, not emoji (F67): the locked-room padlock.
+const LOCK_ICON = require('../../../assets/ui/lock.png');
 
 /**
  * Content contract for the invite chip shown in an unlocked room whose
@@ -153,7 +161,12 @@ export const computeEmbellishmentIntensity = (
 };
 
 export interface EmbellishmentVisuals {
-  /** Tier-1 hearth glow (the replacement for the old sparkle glyph). */
+  /**
+   * Whether to show the tier-1 embellishment glow (the replacement for the old
+   * sparkle glyph). The glow's HUE + anchor come per-room from
+   * getRoomGlowVariant — fire only in real hearth rooms, room-appropriate
+   * light everywhere else — so this flag is the on/off, not the fire itself.
+   */
   showHearthGlow: boolean;
   /** Peak opacity of the glow stack — capped so rooms stay readable. */
   glowMaxOpacity: number;
@@ -204,6 +217,55 @@ export const getSigilColors = (phase: number): { line: string; glow: string } =>
   return { line: '#9B7FCF', glow: '#7B5FB0' };
 };
 
+// ---------------------------------------------------------------------------
+// Per-room embellishment glow. The tier-1 investment glow used to be a single
+// warm FIRE oval in EVERY upgraded room — a fireplace in the aquarium, a
+// campfire in the desert camp. Only genuine hearth-bearing rooms (a fire: the
+// cozy den's fireplace, the kitchen's oven) glow with fire now; every other
+// room glows in its own register (a reading lamp, water shimmer, foliage, a
+// starlit night), so the mark reads as THAT room's own light rather than a
+// misplaced hearth. The investment INTENSITY (getRoomEmbellishmentIntensity,
+// fed in as a prop) still drives opacity/scale; the room IDENTITY (room.theme)
+// now drives the hue + anchor. All colors are decorative overlay fills.
+// ---------------------------------------------------------------------------
+export type GlowAnchor = 'bottom' | 'center';
+export interface RoomGlowVariant {
+  outer: string;
+  mid: string;
+  core: string;
+  /** Where the glow sits: on the floor (a hearth/undergrowth) or ambient center. */
+  anchor: GlowAnchor;
+  /** True ONLY for genuine fire rooms — the only rooms that get the warm hearth. */
+  isHearth: boolean;
+}
+
+// Five room registers. Fire is reserved for the two hearth rooms.
+const GLOW_FIRE: RoomGlowVariant = { outer: '#F2953F', mid: '#FFB65C', core: '#FFD9A0', anchor: 'bottom', isHearth: true };
+const GLOW_LAMP: RoomGlowVariant = { outer: '#C9922F', mid: '#E6C066', core: '#FCEBB8', anchor: 'center', isHearth: false };
+const GLOW_WATER: RoomGlowVariant = { outer: '#2E7C93', mid: '#4FA9C0', core: '#AEE6EF', anchor: 'center', isHearth: false };
+const GLOW_FOLIAGE: RoomGlowVariant = { outer: '#3E7A4A', mid: '#5FA866', core: '#BCE3A6', anchor: 'bottom', isHearth: false };
+const GLOW_NIGHT: RoomGlowVariant = { outer: '#4A4A7E', mid: '#7272AE', core: '#B8B8E0', anchor: 'center', isHearth: false };
+
+const ROOM_GLOW_VARIANTS: Record<RoomTheme, RoomGlowVariant> = {
+  cozy_den: GLOW_FIRE,      // Fox's fireplace — the archetypal hearth
+  kitchen: GLOW_FIRE,       // the chef's oven / stove
+  study: GLOW_LAMP,         // the owl's reading lamp
+  aquarium: GLOW_WATER,     // the axolotl's lit tank (never a fire)
+  jungle: GLOW_FOLIAGE,     // the sloth's canopy
+  desert: GLOW_NIGHT,       // the fennec's night camp (explicitly NOT fire)
+  office: GLOW_LAMP,        // the capybara's desk lamp
+  burrow: GLOW_LAMP,        // the wombat's warm earthen den
+  garden: GLOW_FOLIAGE,     // the rabbit's garden patio
+  bamboo: GLOW_FOLIAGE,     // the red panda's bamboo attic
+  star_loft: GLOW_NIGHT,    // the tarsier's starlit observatory
+  belfry: GLOW_LAMP,        // the aye-aye's workshop lamp
+  sky_garden: GLOW_FOLIAGE, // the kakapo's rooftop garden
+};
+
+/** Room-appropriate tier-1 glow variant (warm fire ONLY in real hearth rooms). */
+export const getRoomGlowVariant = (theme: RoomTheme): RoomGlowVariant =>
+  ROOM_GLOW_VARIANTS[theme] ?? GLOW_LAMP;
+
 /** Wall spots for up to 4 sigil marks (percent insets; mirrored pairs). */
 const SIGIL_SPOTS: { top: string; left?: string; right?: string }[] = [
   { top: '26%', left: '9%' },
@@ -213,14 +275,18 @@ const SIGIL_SPOTS: { top: string; left?: string; right?: string }[] = [
 ];
 
 /**
- * Tier-1 hearth glow: 2-3 stacked feathered ovals with a slow native-driven
- * opacity breathing. Static (steady glow) under reduced motion / low tier.
+ * Tier-1 embellishment glow: 2-3 stacked feathered ovals with a slow
+ * native-driven opacity breathing, recolored + anchored per ROOM (variant).
+ * Hearth rooms get the warm fire palette anchored at the floor; other rooms
+ * get their own register (lamp / water / foliage / night). Static (steady
+ * glow) under reduced motion / low tier.
  */
-const HearthGlow: React.FC<{ maxOpacity: number; scale: number; animate: boolean }> = ({
-  maxOpacity,
-  scale,
-  animate,
-}) => {
+const EmbellishmentGlow: React.FC<{
+  variant: RoomGlowVariant;
+  maxOpacity: number;
+  scale: number;
+  animate: boolean;
+}> = ({ variant, maxOpacity, scale, animate }) => {
   const breathe = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -252,7 +318,8 @@ const HearthGlow: React.FC<{ maxOpacity: number; scale: number; animate: boolean
   return (
     <Animated.View
       style={[
-        styles.hearthGlowWrap,
+        styles.glowWrap,
+        variant.anchor === 'center' ? styles.glowWrapCenter : styles.glowWrapBottom,
         {
           opacity: animate ? breathe.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] }) : 1,
           transform: [{ scale }],
@@ -260,9 +327,9 @@ const HearthGlow: React.FC<{ maxOpacity: number; scale: number; animate: boolean
       ]}
       pointerEvents="none"
     >
-      <View style={[styles.hearthGlowOuter, { opacity: maxOpacity * 0.45 }]} />
-      <View style={[styles.hearthGlowMid, { opacity: maxOpacity * 0.7 }]} />
-      <View style={[styles.hearthGlowCore, { opacity: maxOpacity }]} />
+      <View style={[styles.glowOuter, { backgroundColor: variant.outer, opacity: maxOpacity * 0.45 }]} />
+      <View style={[styles.glowMid, { backgroundColor: variant.mid, opacity: maxOpacity * 0.7 }]} />
+      <View style={[styles.glowCore, { backgroundColor: variant.core, opacity: maxOpacity }]} />
     </Animated.View>
   );
 };
@@ -384,12 +451,19 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
     embellishmentIntensity > 0 ? embellishmentIntensity : undefined
   );
   const sigilColors = getSigilColors(currentPhase);
+  // Room-appropriate tier-1 glow (fire only in real hearth rooms).
+  const glowVariant = getRoomGlowVariant(room.theme);
   // Decorative-layer motion gate (breathing glow, motes). The layers still
   // render statically under reduced motion; only the movement is skipped.
   const embellishMotion = !getSettingsSync().reducedMotion && !shouldSimplifyAnimations();
 
   if (!room.isUnlocked) {
-    // Locked room appearance
+    // Locked room: an "unbuilt" painterly interior (timber studs, a shuttered
+    // window, a draped dust sheet) instead of a flat gray box, with the cost
+    // chip on the established cottage NineSlice card (F30). The house's phase
+    // scrim (bodyRoomScrim in HouseWorld) darkens it for free.
+    const lockedSkin = getPixelSkin(currentPhase);
+    const affordable = unlockCost !== null && amberBalance >= unlockCost;
     return (
       <Pressable
         style={({ pressed }) => [
@@ -406,26 +480,63 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
             : `Unlock ${room.name}`
         }
       >
-        <View style={styles.lockedOverlay}>
-          <Text style={styles.lockIcon}>🔒</Text>
-          <Text style={styles.lockedText}>{room.name}</Text>
-          {unlockCost !== null ? (
-            <>
-              <Text style={styles.lockedCost}>Build: <AmberInline /> {unlockCost}</Text>
-              <Text
-                style={[
-                  styles.lockedSubtext,
-                  amberBalance >= unlockCost ? styles.lockedSubtextAffordable : styles.lockedSubtextMuted,
-                ]}
-              >
-                {amberBalance >= unlockCost
-                  ? 'Tap to build this room'
-                  : <><AmberInline /> {amberBalance} / {unlockCost}</>}
-              </Text>
-            </>
-          ) : (
-            <Text style={styles.lockedSubtext}>Tap to unlock</Text>
-          )}
+        {/* Unbuilt interior: framing studs + cross-beam, a shuttered window,
+            and a draped dust sheet — a room mid-construction, not cardboard. */}
+        <View style={styles.unbuiltInterior} pointerEvents="none" importantForAccessibility="no-hide-descendants">
+          <View style={[styles.stud, { left: '16%' }]} />
+          <View style={[styles.stud, { left: '38%' }]} />
+          <View style={[styles.stud, { left: '60%' }]} />
+          <View style={[styles.stud, { left: '82%' }]} />
+          <View style={styles.crossBeam} />
+          <View style={styles.crossBeamLow} />
+          {/* Shuttered window (a boarded-up opening) */}
+          <View style={styles.shutterWindow}>
+            <View style={styles.shutterSlat} />
+            <View style={styles.shutterSlat} />
+            <View style={styles.shutterSlat} />
+          </View>
+          {/* Draped dust sheet over the near corner */}
+          <View style={styles.dustSheet} />
+          <View style={styles.dustSheetFold} />
+        </View>
+        {/* Soft inner shade so the interior reads as an unlit, unfinished space */}
+        <View style={styles.unbuiltShade} pointerEvents="none" />
+
+        {/* Cost chip on a cottage card (mirrors the invite chip). box-none so
+            only the card catches taps; the Pressable owns the action. */}
+        <View style={styles.lockedCardWrap} pointerEvents="box-none">
+          <View style={styles.lockedCard}>
+            <NineSliceFrame
+              skin={lockedSkin.card}
+              cornerDp={CARD_CORNER_DP}
+              edgeDp={CARD_EDGE_DP}
+              fillColor={lockedSkin.fillCard}
+            />
+            <Image source={LOCK_ICON} style={styles.lockIconImg} />
+            <Text style={[styles.lockedCardName, { color: lockedSkin.ink.primary }]} numberOfLines={1}>
+              {room.name}
+            </Text>
+            {unlockCost !== null ? (
+              <>
+                <View style={styles.lockedCostRow}>
+                  <Text style={[styles.lockedCostLabel, { color: lockedSkin.ink.secondary }]}>Build</Text>
+                  <Image source={AMBER_ICON} style={styles.lockedCostGem} />
+                  <Text style={[styles.lockedCostAmount, { color: lockedSkin.ink.primary }]}>{unlockCost}</Text>
+                </View>
+                {affordable ? (
+                  <Text style={[styles.lockedCardSub, styles.lockedCardSubAffordable]}>Tap to build</Text>
+                ) : (
+                  <View style={styles.lockedBalanceRow}>
+                    <Text style={[styles.lockedCardSub, { color: lockedSkin.ink.quiet }]}>You:</Text>
+                    <Image source={AMBER_ICON} style={styles.lockedBalanceGem} />
+                    <Text style={[styles.lockedCardSub, { color: lockedSkin.ink.quiet }]}>{amberBalance}</Text>
+                  </View>
+                )}
+              </>
+            ) : (
+              <Text style={[styles.lockedCardSub, { color: lockedSkin.ink.secondary }]}>Tap to unlock</Text>
+            )}
+          </View>
         </View>
       </Pressable>
     );
@@ -486,7 +597,8 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
             />
           )}
           {embellish.showHearthGlow && (
-            <HearthGlow
+            <EmbellishmentGlow
+              variant={glowVariant}
               maxOpacity={embellish.glowMaxOpacity}
               scale={embellish.glowScale}
               animate={embellishMotion}
@@ -681,7 +793,7 @@ const styles = StyleSheet.create({
   roomName: {
     fontFamily: BODY_FONT_BOLD,
     color: CandyColors.white,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '700',
     textAlign: 'center',
     textShadowColor: 'rgba(0, 0, 0, 0.5)',
@@ -718,39 +830,43 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
   },
-  // Hearth glow: bottom-center stack of feathered warm ovals (core brightest).
-  hearthGlowWrap: {
+  // Embellishment glow: a stack of feathered ovals (core brightest). Colors are
+  // set per-room at the call site (variant fill); the anchor variant places the
+  // wrap at the floor (hearth/undergrowth) or ambient center.
+  glowWrap: {
     position: 'absolute',
-    bottom: 4,
     alignSelf: 'center',
     width: 120,
     height: 70,
     alignItems: 'center',
     justifyContent: 'flex-end',
   },
-  hearthGlowOuter: {
+  glowWrapBottom: {
+    bottom: 4,
+  },
+  glowWrapCenter: {
+    top: '34%',
+  },
+  glowOuter: {
     position: 'absolute',
     bottom: 0,
     width: 120,
     height: 64,
     borderRadius: 999,
-    backgroundColor: '#F2953F',
   },
-  hearthGlowMid: {
+  glowMid: {
     position: 'absolute',
     bottom: 6,
     width: 82,
     height: 44,
     borderRadius: 999,
-    backgroundColor: '#FFB65C',
   },
-  hearthGlowCore: {
+  glowCore: {
     position: 'absolute',
     bottom: 12,
     width: 48,
     height: 26,
     borderRadius: 999,
-    backgroundColor: '#FFD9A0',
   },
   // Deepening sigils: thin angled line pair + a fatter low-opacity underlay
   // pair standing in for blur (Android-safe: no shadowRadius glow).
@@ -803,49 +919,172 @@ const styles = StyleSheet.create({
     height: 3,
     borderRadius: 1.5,
   },
+  // Warm dark timber base for the unbuilt room (never flat gray cardboard).
   lockedRoom: {
-    backgroundColor: CandyColors.gray[700],
+    backgroundColor: '#4A3826',
   },
-  lockedOverlay: {
-    flex: 1,
+  // ---- Unbuilt (under-construction) interior ----
+  unbuiltInterior: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    overflow: 'hidden',
+    borderRadius: 8,
+  },
+  // Vertical framing studs (raw timber).
+  stud: {
+    position: 'absolute',
+    top: '8%',
+    width: 7,
+    height: '84%',
+    backgroundColor: '#5E4931',
+    borderRadius: 1,
+  },
+  crossBeam: {
+    position: 'absolute',
+    top: '22%',
+    left: '6%',
+    right: '6%',
+    height: 6,
+    backgroundColor: '#6B5238',
+    borderRadius: 1,
+  },
+  crossBeamLow: {
+    position: 'absolute',
+    top: '68%',
+    left: '6%',
+    right: '6%',
+    height: 6,
+    backgroundColor: '#5A4530',
+    borderRadius: 1,
+  },
+  // A boarded / shuttered window opening.
+  shutterWindow: {
+    position: 'absolute',
+    top: '30%',
+    right: '12%',
+    width: 40,
+    height: 30,
+    backgroundColor: '#2E2416',
+    borderRadius: 2,
+    borderWidth: 2,
+    borderColor: '#6B5238',
+    justifyContent: 'space-evenly',
+    paddingVertical: 3,
+  },
+  shutterSlat: {
+    height: 4,
+    marginHorizontal: 3,
+    backgroundColor: '#7A5E3E',
+    borderRadius: 1,
+  },
+  // A draped dust sheet over the near corner.
+  dustSheet: {
+    position: 'absolute',
+    bottom: '6%',
+    left: '8%',
+    width: 66,
+    height: 40,
+    backgroundColor: '#C9BFA8',
+    opacity: 0.5,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 8,
+    transform: [{ rotate: '-6deg' }],
+  },
+  dustSheetFold: {
+    position: 'absolute',
+    bottom: '6%',
+    left: '30%',
+    width: 30,
+    height: 34,
+    backgroundColor: '#B7AC93',
+    opacity: 0.5,
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 14,
+    transform: [{ rotate: '4deg' }],
+  },
+  unbuiltShade: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(10, 6, 2, 0.34)',
+    borderRadius: 8,
+  },
+  // ---- Locked cottage cost card (mirrors the invite chip) ----
+  lockedCardWrap: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
-  // Compact: the whole stack (icon + name + cost + progress) must fit the
-  // ~123dp room height with the body face's tall metrics, or the bottom line
-  // overlaps the room's lower frame (the "Bamboo Attic 147/400" defect).
-  lockIcon: {
-    fontFamily: BODY_FONT,
-    fontSize: 22,
+  lockedCard: {
+    minWidth: 108,
+    minHeight: 58,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  lockIconImg: {
+    width: 18,
+    height: 18,
     marginBottom: 2,
   },
-  lockedText: {
+  lockedCardName: {
     fontFamily: BODY_FONT_BOLD,
-    color: CandyColors.white,
-    fontSize: 13,
-    fontWeight: '700',
-    marginBottom: 2,
-  },
-  lockedSubtext: {
-    fontFamily: BODY_FONT,
-    color: CandyColors.gray[300],
-    fontSize: 10,
-  },
-  lockedSubtextAffordable: {
-    fontFamily: BODY_FONT_BOLD,
-    color: '#D6FFD6',
-    fontWeight: '700',
-  },
-  lockedSubtextMuted: {
-    color: CandyColors.gray[300],
-  },
-  lockedCost: {
-    fontFamily: BODY_FONT_BOLD,
-    color: CandyColors.yellow.main,
-    fontSize: 11,
+    fontSize: FONT_SIZE.small,
     fontWeight: '800',
-    marginBottom: 2,
+    textAlign: 'center',
+    maxWidth: 130,
+  },
+  lockedCostRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  lockedCostLabel: {
+    fontFamily: BODY_FONT_BOLD,
+    fontSize: FONT_SIZE.caption,
+    fontWeight: '700',
+  },
+  lockedCostGem: {
+    width: 14,
+    height: 14,
+    marginLeft: 5,
+    marginRight: 3,
+  },
+  lockedCostAmount: {
+    fontFamily: BODY_FONT_BOLD,
+    fontSize: FONT_SIZE.small,
+    fontWeight: '800',
+  },
+  lockedCardSub: {
+    fontFamily: BODY_FONT_BOLD,
+    fontSize: FONT_SIZE.micro,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  lockedCardSubAffordable: {
+    color: CandyColors.green.shadow,
+  },
+  lockedBalanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  lockedBalanceGem: {
+    width: 11,
+    height: 11,
+    marginLeft: 4,
+    marginRight: 3,
   },
   // Invite chip: absolute-fill wrapper centers the chip in the room without
   // hardcoded offsets; box-none keeps touches limited to the chip itself.
@@ -889,13 +1128,13 @@ const styles = StyleSheet.create({
   inviteCostAmount: {
     fontFamily: BODY_FONT_BOLD,
     color: CandyColors.purple.main,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '800',
   },
   inviteAnimalText: {
     fontFamily: BODY_FONT_BOLD,
     color: CandyColors.purple.main,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '800',
     textAlign: 'center',
   },
@@ -914,7 +1153,7 @@ const styles = StyleSheet.create({
   inviteAnimalCostSubtext: {
     fontFamily: BODY_FONT_BOLD,
     color: CandyColors.gray[600],
-    fontSize: 10,
+    fontSize: FONT_SIZE.micro,
     fontWeight: '700',
     textAlign: 'center',
   },

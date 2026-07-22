@@ -72,6 +72,7 @@ import {
   hashSeed,
 } from '../services/tending';
 import { buildPhase5Pool } from '../services/dialogue/phase5Pool';
+import { getModalInSpring } from '../theme/surfaces';
 
 /**
  * Maximum characters shown per dialogue page. Lines longer than this are split
@@ -81,6 +82,31 @@ import { buildPhase5Pool } from '../services/dialogue/phase5Pool';
  * or any persistence.
  */
 export const DIALOGUE_PAGE_CHAR_BUDGET = 420;
+
+/**
+ * Per-character dialogue reveal (F25): the visible page materializes one
+ * character at a time (typewriter cadence) instead of appearing whole, so the
+ * text reads as spoken rather than dumped. Fixed across every animal; only
+ * the mouth-flap cadence below varies by species. Instant under reduced
+ * motion (see the reveal effect in the hook body).
+ */
+export const DIALOGUE_REVEAL_CHAR_MS = 22;
+
+/**
+ * Per-species mouth-flap cadence (F25): how fast the talk/idle sprite layers
+ * alternate while a line is still revealing (the flap stops dead the instant
+ * the text finishes landing). Slow, ponderous animals flap slower; quick or
+ * anxious ones flap faster. Animals not listed use DEFAULT_FLAP_CADENCE_MS.
+ */
+const FLAP_CADENCE_MS: Partial<Record<AnimalType, number>> = {
+  sloth: 500,
+  red_panda: 420,
+  kakapo: 380,
+  tarsier: 260,
+  fennec_fox: 230,
+  rabbit: 200,
+};
+const DEFAULT_FLAP_CADENCE_MS = 300;
 
 interface SentenceUnit {
   /** Sentence text with its terminal punctuation kept attached. */
@@ -281,7 +307,20 @@ interface UseDialogueFlowParams {
 interface UseDialogueFlowReturn {
   selectedAnimal: Animal | null;
   showDialogue: boolean;
+  /** The current page's FULL text (unchanged contract: HomeScreen's choice-
+   * prompt equality check and pagination logic key off this exact value). */
   dialogueText: string;
+  /**
+   * The progressively-revealed substring of `dialogueText` (F25): a prefix
+   * that grows one character at a time until it equals `dialogueText`.
+   * Reduced motion (or the modal being closed) resolves this to the full
+   * text immediately.
+   */
+  revealedText: string;
+  /** True while `revealedText` is still shorter than `dialogueText`. */
+  revealInProgress: boolean;
+  /** Jump the current reveal straight to the full text. No-op once complete. */
+  completeReveal: () => void;
   sessionInfo: SessionInfo | null;
   cooldownMessage: string | null;
   cooldownOpacity: Animated.Value;
@@ -334,6 +373,13 @@ export function useDialogueFlow({
   const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null);
   const [cooldownMessage, setCooldownMessage] = useState<string | null>(null);
   const [isTalking, setIsTalking] = useState(false);
+
+  // Per-character dialogue reveal (F25): revealedChars is how much of the
+  // CURRENT visible page has materialized. The reveal effect further down
+  // (declared after getDialogueText, which it depends on) resets this to 0
+  // whenever the visible text changes and ticks it up to full length.
+  const [revealedChars, setRevealedChars] = useState(0);
+  const revealTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Pre-dialogue pages: shown before regular dialogue, one at a time
   // These are trigger reactions, cross-animal refs, coordinated events, etc.
@@ -514,21 +560,11 @@ export function useDialogueFlow({
     }
   }, [cooldownMessage]);
 
-  // Talking animation - alternate between idle and talk sprites
-  useEffect(() => {
-    if (showDialogue) {
-      if (getSettingsSync().reducedMotion) {
-        setIsTalking(true);
-        return;
-      }
-      const interval = setInterval(() => {
-        setIsTalking(prev => !prev);
-      }, 300);
-      return () => clearInterval(interval);
-    } else {
-      setIsTalking(false);
-    }
-  }, [showDialogue]);
+  // Talking animation (F25): isTalking now flaps only while the current
+  // line's per-character reveal is still in progress, at a per-species
+  // cadence, and settles the instant the text finishes landing (see the
+  // reveal + flap effects declared below getDialogueText, which they depend
+  // on for the visible text length).
 
   // Get the current dialogue line's FULL text — pre-dialogue pages first, then
   // regular dialogue. This is the single source of the visible line; the
@@ -609,6 +645,91 @@ export function useDialogueFlow({
     const next = resolveDialogueIndex(selectedAnimal.type, cur + 1, animalPhase, unlocked);
     return next < getTotalDialogueCount(selectedAnimal.type, animalPhase);
   };
+
+  // The current page's full text, computed once per render and shared by the
+  // reveal/flap effects below and the returned `dialogueText` (still the
+  // unchanged FULL page value — HomeScreen's choice-prompt equality check and
+  // every pagination test key off this exact field; the reveal is a purely
+  // presentational layer on top via `revealedText`).
+  const visibleDialogueText = getDialogueText();
+  const reducedMotionNow = getSettingsSync().reducedMotion;
+  // A reveal is "in progress" only while the modal is up, motion isn't
+  // reduced, and the typewriter hasn't caught up to the full page yet.
+  const revealInProgress =
+    showDialogue && !reducedMotionNow && revealedChars < visibleDialogueText.length;
+  // The visible (possibly partial) text: reduced motion and a closed modal
+  // both resolve to the full page instantly, so there's never a stuck partial
+  // render outside an active, motion-enabled session.
+  const revealedText =
+    reducedMotionNow || !showDialogue
+      ? visibleDialogueText
+      : visibleDialogueText.slice(0, revealedChars);
+
+  // Per-character reveal effect (F25): whenever the visible text changes (new
+  // line, new page, or a fresh session opens) restart the typewriter from
+  // character 0 and tick up to the full length at DIALOGUE_REVEAL_CHAR_MS per
+  // character. Instant under reduced motion or once the modal is closed. The
+  // interval is always cleared on the next dependency change (or unmount) so
+  // a reveal for a line that's no longer showing can never keep ticking into
+  // the next one.
+  useEffect(() => {
+    if (revealTimerRef.current) {
+      clearInterval(revealTimerRef.current);
+      revealTimerRef.current = null;
+    }
+    if (!showDialogue || !visibleDialogueText || getSettingsSync().reducedMotion) {
+      setRevealedChars(visibleDialogueText.length);
+      return;
+    }
+    setRevealedChars(0);
+    const total = visibleDialogueText.length;
+    revealTimerRef.current = setInterval(() => {
+      setRevealedChars(prev => {
+        const next = prev + 1;
+        if (next >= total && revealTimerRef.current) {
+          clearInterval(revealTimerRef.current);
+          revealTimerRef.current = null;
+        }
+        return Math.min(next, total);
+      });
+    }, DIALOGUE_REVEAL_CHAR_MS);
+    return () => {
+      if (revealTimerRef.current) {
+        clearInterval(revealTimerRef.current);
+        revealTimerRef.current = null;
+      }
+    };
+  }, [visibleDialogueText, showDialogue]);
+
+  // Mouth-flap effect (F25): the talk/idle sprite layers alternate at a
+  // per-species cadence ONLY while a reveal is in progress, and settle to a
+  // static closed-mouth pose (isTalking false, no interval) the instant the
+  // line finishes landing or the modal closes. Reduced motion never reaches
+  // here with revealInProgress true (the reveal effect above completes
+  // instantly), so this alone is enough to keep the pose static.
+  useEffect(() => {
+    if (!revealInProgress) {
+      setIsTalking(false);
+      return;
+    }
+    const cadence = selectedAnimal
+      ? FLAP_CADENCE_MS[selectedAnimal.type] ?? DEFAULT_FLAP_CADENCE_MS
+      : DEFAULT_FLAP_CADENCE_MS;
+    const interval = setInterval(() => {
+      setIsTalking(prev => !prev);
+    }, cadence);
+    return () => clearInterval(interval);
+  }, [revealInProgress, selectedAnimal]);
+
+  /** Complete the current reveal instantly (tap-to-complete). A no-op once the
+   * line has already fully landed. Never advances the dialogue itself. */
+  const completeReveal = useCallback(() => {
+    if (revealTimerRef.current) {
+      clearInterval(revealTimerRef.current);
+      revealTimerRef.current = null;
+    }
+    setRevealedChars(visibleDialogueText.length);
+  }, [visibleDialogueText]);
 
   // Handle animal tap
   const handleAnimalTap = useCallback(async (animal: Animal) => {
@@ -918,15 +1039,17 @@ export function useDialogueFlow({
     const status = getSessionStatus(animal.id, getSessionBonus(animal));
     setSessionInfo(status);
 
-    // Animate dialogue modal in
+    // Animate dialogue modal in — the entrance spring ages with the descent
+    // like every other surface (bright springy overshoot -> heavy dark settle).
     if (getSettingsSync().reducedMotion) {
       dialogueSlide.setValue(1);
     } else {
       dialogueSlide.setValue(0);
+      const entranceSpring = getModalInSpring(progress?.currentPhase ?? 0);
       Animated.spring(dialogueSlide, {
         toValue: 1,
-        friction: 8,
-        tension: 40,
+        friction: entranceSpring.friction,
+        tension: entranceSpring.tension,
         useNativeDriver: true,
       }).start();
     }
@@ -1287,7 +1410,10 @@ export function useDialogueFlow({
   return {
     selectedAnimal,
     showDialogue,
-    dialogueText: getDialogueText(),
+    dialogueText: visibleDialogueText,
+    revealedText,
+    revealInProgress,
+    completeReveal,
     sessionInfo,
     cooldownMessage,
     cooldownOpacity,

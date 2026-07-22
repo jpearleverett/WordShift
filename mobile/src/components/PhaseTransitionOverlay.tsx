@@ -1,8 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { FONT_SIZE } from '../theme/typeScale';
 import { View, Text, StyleSheet, Animated, Dimensions, TouchableOpacity, Image } from 'react-native';
 import { PhaseTransitionEvent, PhaseScene, SceneImage, CinematicParticleConfig } from '../services/phaseEvents';
 import { getSettingsSync } from '../services/settings';
 import { hapticLight, hapticMedium, hapticHeavy, hapticWarning } from '../services/haptics';
+import { playUiSound, stopCeremonyMusic } from '../services/uiSound';
+import { announceForA11y } from '../services/a11yAnnounce';
 import { BODY_FONT_BOLD } from '../theme/fonts';
 import { getPhaseTheme } from '../theme/colors';
 
@@ -40,6 +43,12 @@ const DESCEND_DISTANCE = 90;
 function fireSceneHaptic(scene: PhaseScene, shakeIntensity?: number): void {
   const isIntense = (shakeIntensity ?? 0) >= 0.5;
   switch (scene.effect) {
+    case 'descend':
+      // The Arrival: the entity's descent begins on a warning pulse (the
+      // heaviest scene of the game); the landing settle is scheduled
+      // separately at descendMs by the caller.
+      hapticWarning();
+      break;
     case 'flash':
     case 'shake':
       isIntense ? hapticWarning() : hapticHeavy();
@@ -75,7 +84,7 @@ interface PhaseTransitionOverlayProps {
   onComplete: () => void;
 }
 
-const CinematicParticle: React.FC<{
+const CinematicParticleBase: React.FC<{
   config: CinematicParticleConfig;
   index: number;
 }> = ({ config, index }) => {
@@ -84,6 +93,11 @@ const CinematicParticle: React.FC<{
   const loopRef = useRef<Animated.CompositeAnimation | null>(null);
 
   const startX = useRef(Math.random() * SCREEN_WIDTH).current;
+  // Horizontal-drift particles keep a STABLE top across scene changes (stored in
+  // a ref, like startX). Previously it was an inline Math.random() at render, so
+  // every setActiveSceneIndex re-render teleported all drift particles to a new
+  // random Y, breaking the continuous ambient motion.
+  const startTop = useRef(Math.random() * SCREEN_HEIGHT).current;
   const startDelay = useRef(index * 300 + Math.random() * 500).current;
 
   useEffect(() => {
@@ -134,7 +148,7 @@ const CinematicParticle: React.FC<{
       style={{
         position: 'absolute',
         left: isVertical ? startX : -50,
-        top: isVertical ? startY : Math.random() * SCREEN_HEIGHT,
+        top: isVertical ? startY : startTop,
         width: config.size,
         height: config.size,
         borderRadius: config.size / 2,
@@ -147,6 +161,71 @@ const CinematicParticle: React.FC<{
     />
   );
 };
+// Memoized so a scene change (setActiveSceneIndex) does not re-render every
+// ambient particle and restart its motion — the drift stays continuous.
+const CinematicParticle = React.memo(CinematicParticleBase);
+
+// ---------------------------------------------------------------------------
+// One-shot cinematic burst — a short spray of particles for a `particles_rise`
+// / `particles_fall` scene (previously a declared-but-dead no-op). Each
+// particle runs a SINGLE native-driven pass across the screen at ~3x ambient
+// speed over the scene's dwell, then the whole layer is unmounted by the
+// caller (keyed by nonce). Transform/opacity only; the caller only mounts it
+// when motion is on.
+// ---------------------------------------------------------------------------
+const BURST_PARTICLE_COUNT = 12;
+const BurstParticleBase: React.FC<{
+  direction: 'rise' | 'fall';
+  color: string;
+  size: number;
+  durationMs: number;
+}> = ({ direction, color, size, durationMs }) => {
+  const translateY = useRef(new Animated.Value(0)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+  const startX = useRef(Math.random() * SCREEN_WIDTH).current;
+  // Stagger the spray across the first third of the dwell.
+  const startDelay = useRef(Math.random() * (durationMs * 0.35)).current;
+  const startY = direction === 'rise' ? SCREEN_HEIGHT + size : -size;
+  const travel = direction === 'rise'
+    ? -(SCREEN_HEIGHT + size * 2)
+    : SCREEN_HEIGHT + size * 2;
+
+  useEffect(() => {
+    const dur = Math.max(360, durationMs - startDelay);
+    const anim = Animated.parallel([
+      Animated.sequence([
+        Animated.delay(startDelay),
+        Animated.timing(translateY, { toValue: travel, duration: dur, useNativeDriver: true }),
+      ]),
+      Animated.sequence([
+        Animated.delay(startDelay),
+        Animated.timing(opacity, { toValue: 1, duration: dur * 0.2, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0, duration: dur * 0.8, useNativeDriver: true }),
+      ]),
+    ]);
+    anim.start();
+    return () => anim.stop();
+    // mount-only one-shot; the whole layer is remounted (nonce key) per burst.
+  }, []);
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        left: startX,
+        top: startY,
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        backgroundColor: color,
+        opacity,
+        transform: [{ translateY }],
+      }}
+    />
+  );
+};
+const BurstParticle = React.memo(BurstParticleBase);
 
 // Stepped translucent edge bands, alpha fading toward the center.
 const VIGNETTE_STEPS = 5;
@@ -226,6 +305,16 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
   const [activeImage, setActiveImage] = useState<SceneImage | null>(null);
   const effectAnimsRef = useRef<Animated.CompositeAnimation[]>([]);
   const [flashColor, setFlashColor] = useState('#FFFFFF');
+  // One-shot particle burst for particles_rise/fall scenes (keyed by nonce so a
+  // fresh burst remounts the layer). Null = no burst on screen.
+  const [burst, setBurst] = useState<{
+    direction: 'rise' | 'fall';
+    color: string;
+    size: number;
+    durationMs: number;
+    nonce: number;
+  } | null>(null);
+  const burstNonceRef = useRef(0);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const hasSkipped = useRef(false);
 
@@ -365,6 +454,20 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
         anim.start();
         break;
       }
+      case 'pulse': {
+        // A soft breathing swell (previously a no-op that still fired a haptic).
+        // Reuses the flash layer at a gentle peak so the scene "breathes".
+        setFlashColor(getFlashColor(phase));
+        flashOpacity.setValue(0);
+        const peak = (0.2 + 0.25 * intensity);
+        const anim = Animated.sequence([
+          Animated.timing(flashOpacity, { toValue: peak, duration: 260, useNativeDriver: true }),
+          Animated.timing(flashOpacity, { toValue: 0, duration: 360, useNativeDriver: true }),
+        ]);
+        effectAnimsRef.current.push(anim);
+        anim.start();
+        break;
+      }
       default:
         break;
     }
@@ -381,6 +484,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     stopEffectAnims();
     overlayOpacity.stopAnimation();
     overlayOpacity.setValue(0);
+    setBurst(null);
     onComplete();
   };
 
@@ -396,6 +500,14 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     imageOpacity.setValue(0);
     imageTranslateY.setValue(0);
     setActiveImage(null);
+    // Reset the SCENE drivers too, so a fresh ceremony always opens dark. Without
+    // this, a skipped cinematic left activeSceneIndex/sceneOpacity from the prior
+    // event, and the next ceremony could flash the wrong scene line at full
+    // opacity before its own first scene timer fired.
+    setActiveSceneIndex(-1);
+    sceneOpacity.setValue(0);
+    sceneTranslateY.setValue(20);
+    setBurst(null);
 
     const reducedMotion = getSettingsSync().reducedMotion;
     // Scale ALL timing: 0.4x in reduced motion (not just skip animations),
@@ -416,19 +528,82 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
       }).start();
     }
 
+    // Honor the event-level vignette flag (previously dead code): a base
+    // atmospheric darkening at open, so the endgame ceremonies (house
+    // completion, the finale, post-revelation) that declare no 'vignette_close'
+    // scene still get their declared vignette. Scenes that DO close in compose
+    // a stronger frame on top (their 0.5-0.9 targets exceed this 0.35 base).
+    if (event.vignette) {
+      if (reducedMotion) {
+        vignetteOpacity.setValue(0.35);
+      } else {
+        Animated.timing(vignetteOpacity, {
+          toValue: 0.35,
+          duration: 700 * timeScale,
+          useNativeDriver: true,
+        }).start();
+      }
+    }
+
     // Opening haptic beat
     if (!reducedMotion) {
       hapticMedium();
     }
+
+    // Announce the ceremony to screen readers — a deferred cinematic reveal is
+    // otherwise silent (the accessibilityRole="alert" root doesn't reliably
+    // re-announce a mounted overlay). Speak the title, or the first scene line
+    // for title-less events (the finale / post-revelation).
+    announceForA11y(
+      event.showTitle === false
+        ? (event.scenes[0]?.text ?? 'A moment passes.')
+        : event.title
+    );
 
     // Schedule each scene
     event.scenes.forEach((scene, index) => {
       const showTimer = setTimeout(() => {
         setActiveSceneIndex(index);
         runSceneImage(scene, timeScale, reducedMotion);
+        // The Arrival's dark ritual swell (soundPhaseChange resolves its dark
+        // variant by audioPhase at phase 3+) rides the descent. Audio self-
+        // gates on soundEnabled and must play even under reducedMotion (which
+        // governs motion, not sound).
+        if (scene.effect === 'descend') {
+          // Duck the looping music bed so the dark ritual swell owns the Arrival
+          // soundscape (App's music effect restarts the phase's bed once the
+          // event clears on complete). Guarded bridge, so it is a no-op without
+          // the native audio layer.
+          stopCeremonyMusic();
+          playUiSound('phase_change');
+        }
         if (!reducedMotion) {
           fireSceneHaptic(scene, event.shakeIntensity);
           runSceneEffect(scene, event.shakeIntensity ?? 0, event.phase);
+          if (scene.effect === 'particles_rise' || scene.effect === 'particles_fall') {
+            // One-shot burst for the scene's dwell; cleared shortly after.
+            burstNonceRef.current += 1;
+            const nonce = burstNonceRef.current;
+            const durationMs = scene.duration * timeScale;
+            setBurst({
+              direction: scene.effect === 'particles_rise' ? 'rise' : 'fall',
+              color: event.particles?.color ?? event.accentColor,
+              size: event.particles?.size ?? 8,
+              durationMs,
+              nonce,
+            });
+            timers.push(
+              setTimeout(() => {
+                setBurst((b) => (b && b.nonce === nonce ? null : b));
+              }, durationMs + 200)
+            );
+          }
+          if (scene.effect === 'descend') {
+            // A heavy settle lands with the figure at descendMs. Timer parked
+            // in timersRef so handleSkip/cleanup clear it.
+            const descendMs = Math.min(scene.duration * 0.75, 3800) * timeScale;
+            timersRef.current.push(setTimeout(() => hapticHeavy(), descendMs));
+          }
         }
         if (reducedMotion) {
           sceneOpacity.setValue(1);
@@ -506,6 +681,10 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
         },
       ]}
       accessibilityRole="alert"
+      // Fence the occluded screen behind this full-screen cinematic so a screen
+      // reader can only reach the ceremony while it plays (iOS honors
+      // accessibilityViewIsModal; the announce above speaks the reveal).
+      accessibilityViewIsModal={true}
       accessibilityLabel={
         event.showTitle === false
           ? (event.scenes[0]?.text ?? 'Narrative transition')
@@ -560,6 +739,21 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
           {Array.from({ length: event.particles.count }, (_, i) => (
             <CinematicParticle key={i} config={event.particles!} index={i} />
+          ))}
+        </View>
+      )}
+
+      {/* One-shot burst for particles_rise/fall scenes (keyed so it remounts) */}
+      {burst && (
+        <View key={`burst-${burst.nonce}`} style={StyleSheet.absoluteFill} pointerEvents="none">
+          {Array.from({ length: BURST_PARTICLE_COUNT }, (_, i) => (
+            <BurstParticle
+              key={i}
+              direction={burst.direction}
+              color={burst.color}
+              size={burst.size}
+              durationMs={burst.durationMs}
+            />
           ))}
         </View>
       )}
@@ -626,7 +820,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: BODY_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '800',
     letterSpacing: 3,
     textTransform: 'uppercase',
@@ -651,7 +845,7 @@ const styles = StyleSheet.create({
   },
   sceneText: {
     fontFamily: BODY_FONT_BOLD,
-    fontSize: 20,
+    fontSize: FONT_SIZE.headline,
     fontWeight: '600',
     textAlign: 'center',
     lineHeight: 30,
@@ -681,7 +875,7 @@ const styles = StyleSheet.create({
   },
   skipText: {
     fontFamily: BODY_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '600',
   },
   flash: {

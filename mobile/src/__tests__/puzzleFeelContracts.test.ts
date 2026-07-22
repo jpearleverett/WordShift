@@ -60,7 +60,7 @@ import React from 'react';
 import { Row } from '../components/Row';
 import { LetterTile } from '../components/LetterTile';
 import { DraggableTile } from '../components/DraggableTile';
-import { ShareCard, gridSquareKinds, SQUARE_COLORS, getShareDecay } from '../components/share/ShareCard';
+import { ShareCard, gridSquareKinds, SQUARE_COLORS, getShareDecay, INSTALL_URL_DISPLAY } from '../components/share/ShareCard';
 import type { HintHighlight, ArrivalMark } from '../hooks/usePuzzleGame';
 import type { ShareableResult, MoveOutcome } from '../services/shareResults';
 
@@ -321,6 +321,32 @@ describe('Row drop effects are visual-only', () => {
   });
 });
 
+// --- Board-serve entrance cascade --------------------------------------------
+// A fresh board materializes top-to-bottom (rows fade + rise, staggered by
+// rowIndex) instead of snapping in. It rides a run-once-on-mount effect because
+// App keys each Row by row.id, so a genuine serve remounts every Row while the
+// frequent arc-toggle tile remounts leave the Row instance intact. Guard-by-
+// source: it must stay native-driver and gated for reduced-motion / low tier.
+describe('Row board-serve entrance', () => {
+  const rowSrc = require('fs').readFileSync(
+    require('path').join(__dirname, '../components/Row.tsx'),
+    'utf8',
+  );
+  test('serves a native-driver fade+rise gated for reduced motion / low tier', () => {
+    expect(rowSrc).toContain('serveAnimates');
+    expect(rowSrc).toContain('BOARD_SERVE_STAGGER_MS');
+    // Decided once at mount from the accessibility settings + device tier.
+    expect(rowSrc).toMatch(/serveAnimates = useRef\(\s*!getSettingsSync\(\)\.reducedMotion && !shouldSimplifyAnimations\(\)/);
+    // The entrance transforms are native-driver only (opacity + translateY).
+    const serveBlock = rowSrc.slice(
+      rowSrc.indexOf('if (!serveAnimates) return;'),
+      rowSrc.indexOf('anim.start();'),
+    );
+    expect(serveBlock).toContain('useNativeDriver: true');
+    expect(serveBlock).not.toContain('useNativeDriver: false');
+  });
+});
+
 // ─── ShareCard honest performance grid ──────────────────────────────────────
 // The shared PNG/preview must show the SAME grid as the shared text
 // (generateShareText): one square per move in play order when moveOutcomes is
@@ -482,5 +508,30 @@ describe('ShareCard phase decay', () => {
     expect(text).not.toContain('The Offering');
     // ...but the corruption IS present on the daily card.
     expect(findByTestID(tree, 'share-decay-underlay')).not.toBeNull();
+  });
+});
+
+// ─── ShareCard install-URL footer (the viral loop's way home from an image) ──
+describe('ShareCard install URL', () => {
+  test('is a real https host stripped to a tidy footer form', () => {
+    expect(INSTALL_URL_DISPLAY).not.toMatch(/^https?:\/\//);
+    expect(INSTALL_URL_DISPLAY).not.toMatch(/\/$/);
+    expect(INSTALL_URL_DISPLAY.length).toBeGreaterThan(0);
+  });
+
+  test('the shared card carries the install URL on a non-daily card', () => {
+    const tree = renderCardTree({ ...baseShareResult, phase: 0 });
+    expect(collectText(tree).join(' ')).toContain(INSTALL_URL_DISPLAY);
+  });
+
+  test('the install URL is present AND spoiler-safe on the daily card', () => {
+    const tree = renderCardTree({
+      ...baseShareResult, phase: 2, isDaily: true, dailyDate: '2026-07-07',
+      wordChain: ['VOID', 'AVOID'], incantationName: 'Offering: VOID',
+    });
+    const text = collectText(tree).join(' ');
+    expect(text).toContain(INSTALL_URL_DISPLAY);
+    expect(text).not.toContain('VOID');
+    expect(text).not.toContain('Offering: VOID');
   });
 });

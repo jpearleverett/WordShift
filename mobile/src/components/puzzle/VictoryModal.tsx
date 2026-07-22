@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FONT_SIZE } from '../../theme/typeScale';
 import {
   View,
   Text,
@@ -32,6 +33,7 @@ import {
   getRewardedDoubleConfirm,
   getDailyLadderTrendLabel,
   getResonanceBonusLabel,
+  isSilentVictoryBeat,
 } from '../../services/phaseNarrative';
 import { DialoguePhase } from '../../types/homeWorld';
 import { VARIANT_CONFIGS } from '../../services/puzzleVariety';
@@ -41,10 +43,13 @@ import type { AmberBreakdown } from '../../hooks/useGamePersistence';
 import { hapticSuccess } from '../../services/haptics';
 import { isDailyShareBonusAvailable, DAILY_SHARE_BONUS_AMBER } from '../../services/shareResults';
 import { getSettingsSync } from '../../services/settings';
+import { shouldSimplifyAnimations } from '../../services/deviceTier';
 import { DailyLeaderboardCard } from '../social/DailyLeaderboardCard';
 import { getBeatPercentText, DailyRank } from '../../services/leaderboard';
 import { RewardedAdButton } from '../monetization/RewardedAdButton';
 import { isAdFreeSync } from '../../services/entitlements';
+import { announceForA11y } from '../../services/a11yAnnounce';
+import { countUpDisplayValue, getCountUpDurationMs } from '../ui/RewardReveal';
 import { BODY_FONT, BODY_FONT_ITALIC, PIXEL_FONT_BOLD } from '../../theme/fonts';
 
 // Candy-styled UI sprite icons (replace emoji for critical info)
@@ -53,6 +58,10 @@ const STAR_EMPTY = require('../../../assets/ui/star_empty.png');
 const AMBER_ICON = require('../../../assets/ui/amber.png');
 const FLAME_ICON = require('../../../assets/ui/flame.png');
 const SHARE_ICON = require('../../../assets/ui/share.png');
+// The Collect Now pill leads to the Offering Pit, so the pit sprite (the same
+// one that stands in for the pit-entrance emoji elsewhere) is the on-brand
+// cottage replacement for the raw sheaf emoji that used to prefix the label.
+const PIT_ICON = require('../../../assets/ui/pit.png');
 
 export interface VictoryData {
   earnedStars: number;
@@ -95,6 +104,8 @@ export interface VictoryData {
   phaseTransitionPending?: boolean;
   /** Monotonic real-puzzle count — early wins keep the full ceremony */
   puzzlesSolved?: number;
+  /** THE marked final board's win — a hushed beat (no success buzz on open) */
+  finalBoard?: boolean;
   unbrokenWeaveRank?: number;
   unbrokenWeaveTitle?: string;
   unbrokenWeaveNextObjective?: string | null;
@@ -119,6 +130,10 @@ interface VictoryModalProps {
   socialProofLine?: string | null;
   /** Full-moon event bonus line for daily completions on event days. */
   eventBonusLine?: string | null;
+  /** Sequential victory-toast receipt line (streak/quest/milestone receipts,
+   *  pace beats, nudges). Rendered as an in-modal fading slot so it is visible
+   *  over the modal instead of the board Toast, which sits under the overlay. */
+  receiptLine?: string | null;
   /** App-level override: a queued cinematic (final puzzle / post-revelation)
    *  must always get the full ceremony, never the compact strip. */
   forceFullCeremony?: boolean;
@@ -199,6 +214,15 @@ function getButtonTheme(phase: DialoguePhase) {
   };
 }
 
+// The victory title's drop shadow (F40): a bright candy pink shadow reads as
+// a leftover candy artifact once the sheet has gone near-black. The shadow
+// itself deepens into the dread register right alongside the title's ink.
+function getVictoryTitleShadowColor(phase: DialoguePhase): string {
+  if (phase >= 4) return '#150610'; // near-black recede at the reveal
+  if (phase >= 3) return '#5C1030'; // deep crimson, growing shadows
+  return CandyColors.pink.shadow; // bright candy phases 0-2
+}
+
 export const VictoryModal: React.FC<VictoryModalProps> = ({
   visible,
   earnedStars,
@@ -211,6 +235,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   dailyTrend,
   socialProofLine,
   eventBonusLine,
+  receiptLine,
   forceFullCeremony,
   rewardedDoubleEnabled,
   rewardedDoubleClaimed,
@@ -265,6 +290,12 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
     !forceFullCeremony &&
     isRoutineVictory(victoryData);
 
+  // The two hushed beats perform silence on screen — the finale board and the
+  // scripted silent victory. Used to suppress the modal-open success haptic.
+  const hushedBeat =
+    victoryData?.finalBoard === true ||
+    isSilentVictoryBeat(victoryData?.puzzlesSolved ?? 0);
+
   // Ritual echo chain + de-duplicated feedback register: the performance
   // feedback line and the ritual-echo footer occupy the same emotional slot,
   // so when the chain renders with a footer (Phase 1+), the footer wins.
@@ -292,11 +323,33 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
     return () => { cancelled = true; };
   }, [visible]);
 
-  // Cascade animation — 4 staggered content groups
+  // Cascade animation — 4 staggered content groups. The reveal ages with the
+  // descent (F34): the stagger widens and each group settles in from a small
+  // translateY instead of a flat fade at the dark phases, so the entrance
+  // reads as heavier, not merely darker (mirrors the star-pop stagger widening
+  // in useVictoryFlow's getStarStaggerMs).
+  const cascadeStaggerMs = phase >= 3 ? 280 : 200;
+  const cascadeSettleDp = phase >= 3 ? 12 : 8;
   const contentOpacity1 = useRef(new Animated.Value(0)).current;
   const contentOpacity2 = useRef(new Animated.Value(0)).current;
   const contentOpacity3 = useRef(new Animated.Value(0)).current;
   const contentOpacity4 = useRef(new Animated.Value(0)).current;
+  const contentTranslateY1 = contentOpacity1.interpolate({ inputRange: [0, 1], outputRange: [cascadeSettleDp, 0] });
+  const contentTranslateY2 = contentOpacity2.interpolate({ inputRange: [0, 1], outputRange: [cascadeSettleDp, 0] });
+  const contentTranslateY3 = contentOpacity3.interpolate({ inputRange: [0, 1], outputRange: [cascadeSettleDp, 0] });
+  const contentTranslateY4 = contentOpacity4.interpolate({ inputRange: [0, 1], outputRange: [cascadeSettleDp, 0] });
+  // In-modal victory receipt slot: fades each queued line in fresh as it cycles.
+  const receiptOpacity = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!receiptLine) {
+      if (getSettingsSync().reducedMotion) { receiptOpacity.setValue(0); return; }
+      Animated.timing(receiptOpacity, { toValue: 0, duration: 160, useNativeDriver: true }).start();
+      return;
+    }
+    if (getSettingsSync().reducedMotion) { receiptOpacity.setValue(1); return; }
+    receiptOpacity.setValue(0);
+    Animated.timing(receiptOpacity, { toValue: 1, duration: 240, useNativeDriver: true }).start();
+  }, [receiptLine, receiptOpacity]);
   // While the entrance choreography (stars + content cascade) runs, a
   // tap-anywhere layer skips it; once complete the layer unmounts so the
   // action buttons receive touches normally.
@@ -305,7 +358,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 
   useEffect(() => {
     if (visible) {
-      hapticSuccess();
+      if (!hushedBeat) hapticSuccess();
       if (compactMode || getSettingsSync().reducedMotion) {
         // Reveal all cascade groups instantly — skip the stagger. The compact
         // strip has no entrance choreography at all (and renders no skip
@@ -322,7 +375,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
       contentOpacity2.setValue(0);
       contentOpacity3.setValue(0);
       contentOpacity4.setValue(0);
-      const cascade = Animated.stagger(200, [
+      const cascade = Animated.stagger(cascadeStaggerMs, [
         Animated.timing(contentOpacity1, { toValue: 1, duration: 350, useNativeDriver: true }),
         Animated.timing(contentOpacity2, { toValue: 1, duration: 350, useNativeDriver: true }),
         Animated.timing(contentOpacity3, { toValue: 1, duration: 350, useNativeDriver: true }),
@@ -340,7 +393,30 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
       };
     }
     setEntranceComplete(false);
-  }, [visible, compactMode]);
+  }, [visible, compactMode, hushedBeat]);
+
+  // Assistive-access announce: once the modal has settled, speak the victory
+  // payoff (the SAME title + amber the player sees, so it stays spoiler and
+  // tone consistent with the visible content) to screen readers. Guarded to
+  // fire exactly once per open so async lines (rank/social proof) can't respeak
+  // it, and reset when the modal closes.
+  const announcedRef = useRef(false);
+  useEffect(() => {
+    if (!visible) {
+      announcedRef.current = false;
+      return;
+    }
+    if (!entranceComplete || announcedRef.current) return;
+    announcedRef.current = true;
+    const title = getVictoryTitle(earnedStars, phase);
+    const starsPhrase = `${earnedStars} of 3 stars`;
+    const flawlessPhrase = victoryData?.flawless ? `${getFlawlessHonorific(phase)}. ` : '';
+    const total = victoryData?.amberEarned ?? 0;
+    const amberPhrase = victoryData?.autoCollected
+      ? `${total} amber earned`
+      : `${total} amber gathered for the pit`;
+    announceForA11y(`${title}. ${starsPhrase}. ${flawlessPhrase}${amberPhrase}.`);
+  }, [visible, entranceComplete, earnedStars, phase, victoryData]);
 
   const handleSkipEntrance = useCallback(() => {
     cascadeAnimRef.current?.stop();
@@ -354,6 +430,54 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
     onSkip?.();
   }, [contentOpacity1, contentOpacity2, contentOpacity3, contentOpacity4, onSkip]);
 
+  // Watched-ad reward count-up. The rewarded "double" grants a bonus equal to
+  // the earned amber, so the DISPLAYED total goes from `victoryTotalAmber` to
+  // `rewardedDoubleTarget` (2x) the instant `rewardedDoubleClaimed` flips true.
+  // Rather than jump, tick the number up (JS-thread rAF, mirroring RewardReveal
+  // / the Stats hero count-ups). This must live at the component top level —
+  // hooks cannot run inside the nested amber-breakdown render IIFE below.
+  const victoryTotalAmber = victoryData?.amberEarned ?? 0;
+  const rewardedDoubleTarget =
+    victoryTotalAmber + (rewardedDoubleClaimed ? victoryTotalAmber : 0);
+  // Initialize at the target so the FIRST render (modal open) shows the settled
+  // number with no count-up — only a fresh double claim animates.
+  const [animatedTotal, setAnimatedTotal] = useState(rewardedDoubleTarget);
+  const totalCountUpRafRef = useRef(0);
+  const prevRewardedDoubleClaimedRef = useRef<boolean | undefined>(rewardedDoubleClaimed);
+  useEffect(() => {
+    const wasClaimed = prevRewardedDoubleClaimedRef.current;
+    prevRewardedDoubleClaimedRef.current = rewardedDoubleClaimed;
+    // Only count up on a fresh false -> true double claim. Every other reason
+    // this effect runs (modal open, a new board, target recompute) snaps.
+    const justClaimed = !!rewardedDoubleClaimed && !wasClaimed;
+    if (!justClaimed) {
+      setAnimatedTotal(rewardedDoubleTarget);
+      return;
+    }
+    if (getSettingsSync().reducedMotion || shouldSimplifyAnimations()) {
+      setAnimatedTotal(rewardedDoubleTarget);
+      return;
+    }
+    const start = victoryTotalAmber;
+    const duration = getCountUpDurationMs(rewardedDoubleTarget, phase);
+    if (duration <= 0) {
+      setAnimatedTotal(rewardedDoubleTarget);
+      return;
+    }
+    const startedAt = Date.now();
+    const tick = () => {
+      const fraction = Math.min(1, (Date.now() - startedAt) / duration);
+      setAnimatedTotal(countUpDisplayValue(fraction, rewardedDoubleTarget, start));
+      if (fraction < 1) {
+        totalCountUpRafRef.current = requestAnimationFrame(tick);
+      }
+    };
+    totalCountUpRafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (totalCountUpRafRef.current) cancelAnimationFrame(totalCountUpRafRef.current);
+    };
+  }, [rewardedDoubleClaimed, rewardedDoubleTarget, victoryTotalAmber, phase]);
+
   if (!visible) return null;
 
   // ---------------------------------------------------------------------
@@ -366,9 +490,17 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   if (compactMode) {
     const compactTotal = victoryData?.amberEarned ?? 0;
     return (
-      <View style={[styles.modalOverlay, {
-        backgroundColor: phaseTheme.modalOverlayColor,
-      }]}>
+      <View
+        style={[styles.modalOverlay, {
+          backgroundColor: phaseTheme.modalOverlayColor,
+        }]}
+        // Focus fencing: mark the overlay an assistive-tech modal so screen
+        // reader focus stays inside the result surface (iOS) and cannot wander
+        // into the board occluded behind the scrim. The container itself is not
+        // `accessible` (its labelled children keep their own focus order).
+        accessibilityViewIsModal
+        accessibilityLabel="Results"
+      >
         <View style={styles.compactWrap}>
           <View style={[styles.compactCard, {
             backgroundColor: phaseTheme.modalBgColor,
@@ -429,6 +561,16 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 {eventBonusLine}
               </Text>
             )}
+            {/* Victory receipt (pace beats / nudges still fire on routine wins) —
+                shown here so it is visible over the modal, not the board Toast. */}
+            {!!receiptLine && (
+              <Animated.Text
+                style={[styles.receiptLine, { color: phaseTheme.modalSecondaryTextColor, opacity: receiptOpacity }]}
+                accessibilityLabel={receiptLine ?? undefined}
+              >
+                {receiptLine}
+              </Animated.Text>
+            )}
             {/* The amber is QUEUED in a harvest batch, not credited — the strip
                 must keep the pit affordance (and the 2x opt-in) or routine wins
                 lose their only in-victory collection path. */}
@@ -470,9 +612,17 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                   borderColor: btn.harvestPill.border,
                 }]}
               >
-                <Text style={[styles.collectNowText, { color: btn.harvestPill.text }]}>
-                  {`${'🌾'} Collect Now  ›`}
-                </Text>
+                <View style={styles.collectNowRow}>
+                  <Image
+                    source={PIT_ICON}
+                    style={styles.collectNowIcon}
+                    importantForAccessibility="no"
+                    accessibilityElementsHidden
+                  />
+                  <Text style={[styles.collectNowText, { color: btn.harvestPill.text }]}>
+                    {'Collect Now  ›'}
+                  </Text>
+                </View>
               </TouchableOpacity>
             )}
 
@@ -564,9 +714,17 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   }
 
   return (
-    <View style={[styles.modalOverlay, {
-      backgroundColor: phaseTheme.modalOverlayColor,
-    }]}>
+    <View
+      style={[styles.modalOverlay, {
+        backgroundColor: phaseTheme.modalOverlayColor,
+      }]}
+      // Focus fencing: mark the overlay an assistive-tech modal so screen
+      // reader focus stays inside the result surface (iOS) and cannot wander
+      // into the board occluded behind the scrim. The container itself is not
+      // `accessible` (its labelled children keep their own focus order).
+      accessibilityViewIsModal
+      accessibilityLabel="Results"
+    >
       <ScrollView
         contentContainerStyle={styles.victoryScrollContent}
         showsVerticalScrollIndicator={false}
@@ -618,6 +776,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 
             <Text style={[styles.victoryTitle, {
               color: phaseTheme.victoryTitleColor,
+              textShadowColor: getVictoryTitleShadowColor(phase),
             }]}>
               {getVictoryTitle(earnedStars, phase)}
             </Text>
@@ -689,14 +848,20 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             )}
 
             {/* Group 1: Harvest, bonuses, streak, milestone */}
-            <Animated.View style={{ opacity: contentOpacity1 }}>
+            <Animated.View style={{ opacity: contentOpacity1, transform: [{ translateY: contentTranslateY1 }] }}>
             {/* Harvested words (queued for the pit) */}
             {victoryData?.harvestedWords && victoryData.harvestedWords.length > 0 && (
-              <View style={[styles.harvestWordContainer, {
-                backgroundColor: btn.harvestPill.bg,
-                borderColor: btn.harvestPill.border,
-              }]}>
-                <Text style={styles.harvestWordIcon}>{'\uD83C\uDF3E'}</Text>
+              <View
+                style={[styles.harvestWordContainer, {
+                  backgroundColor: btn.harvestPill.bg,
+                  borderColor: btn.harvestPill.border,
+                }]}
+                // Group the row so the decorative sheaf glyph is not read as its
+                // own emoji; the label speaks the same count + verb shown.
+                accessible
+                accessibilityLabel={`${victoryData.harvestedWords.length} ${victoryData.harvestedWords.length === 1 ? 'word' : 'words'} ${getPitHarvestLabel(phase).toLowerCase()}`}
+              >
+                <Text style={styles.harvestWordIcon} importantForAccessibility="no">{'\uD83C\uDF3E'}</Text>
                 <Text style={[styles.harvestWordText, { color: btn.harvestPill.text }]}>
                   {victoryData.harvestedWords.length} {victoryData.harvestedWords.length === 1 ? 'word' : 'words'} {getPitHarvestLabel(phase).toLowerCase()}
                 </Text>
@@ -733,12 +898,12 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             {/* Milestone bonus */}
             {victoryData && victoryData.milestoneBonus > 0 && Boolean(victoryData.milestoneMessage) && (
               <View
-                style={styles.milestoneContainer}
+                style={[styles.milestoneContainer, phase >= 3 && styles.milestoneContainerDark]}
                 accessible
                 accessibilityLabel={`Milestone: ${victoryData.milestoneMessage}`}
               >
                 <Text style={styles.milestoneEmoji}>{'\uD83C\uDFC6'}</Text>
-                <Text style={styles.milestoneMessage}>{victoryData.milestoneMessage}</Text>
+                <Text style={[styles.milestoneMessage, phase >= 3 && styles.milestoneMessageDark]}>{victoryData.milestoneMessage}</Text>
               </View>
             )}
 
@@ -771,7 +936,19 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                   accessible
                   accessibilityLabel={`${phaseNarrative.title}. ${phaseNarrative.body}`}
                 >
-                  <Text style={styles.phaseChangeEmoji}>{phaseNarrative.emoji}</Text>
+                  {/* No sprite maps to the phase-change glyphs, and a raw OS
+                      color emoji would break the cottage skin — a small
+                      monochrome diamond stands in, tinted mauve once the card
+                      goes dark so it ages with the descent (spoiler-safe: the
+                      glyph reveals nothing the card does not already say). */}
+                  <Text
+                    style={[styles.phaseChangeGlyph, {
+                      color: victoryData!.newPhase >= 3 ? '#C9A9FF' : CandyColors.white,
+                    }]}
+                    importantForAccessibility="no"
+                  >
+                    {'◈'}
+                  </Text>
                   <Text style={styles.phaseChangeTitle}>{phaseNarrative.title}</Text>
                   <Text style={styles.phaseChangeText}>{phaseNarrative.body}</Text>
                 </View>
@@ -810,7 +987,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             </Animated.View>
 
             {/* Group 2: Ritual echo chain */}
-            <Animated.View style={{ opacity: contentOpacity2 }}>
+            <Animated.View style={{ opacity: contentOpacity2, transform: [{ translateY: contentTranslateY2 }] }}>
             {/* Ritual Echo — word chain from completed puzzle (all phases) */}
             {echoWords && (
               <View style={[
@@ -825,13 +1002,22 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 ]}>
                   {getRitualEchoHeader(phase)}
                 </Text>
-                <View style={styles.ritualEchoChain}>
+                {/* The chain descends at Phase 3+ (the "offering" register): a
+                    vertical stack of chips with a centered down-arrow between
+                    each, instead of the bright horizontal wrap-row. Long
+                    finale-length chains (6-7 words) get slightly smaller
+                    chips so the column stays readable inside the scroll. */}
+                <View style={[
+                  styles.ritualEchoChain,
+                  phase >= 3 && styles.ritualEchoChainDescending,
+                ]}>
                   {echoWords.map((word, i) => (
                     <React.Fragment key={i}>
                       <Text style={[
                         styles.ritualEchoWord,
                         phase <= 1 && styles.ritualEchoWordBright,
                         phase >= 3 && styles.ritualEchoWordDark,
+                        phase >= 3 && echoWords.length >= 6 && styles.ritualEchoWordCompact,
                       ]}>
                         {word}
                       </Text>
@@ -840,6 +1026,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                           styles.ritualEchoArrow,
                           phase <= 1 && styles.ritualEchoArrowBright,
                           phase >= 3 && styles.ritualEchoArrowDark,
+                          phase >= 3 && styles.ritualEchoArrowDescending,
                         ]}>
                           {phase >= 3 ? '\u2193' : '\u2192'}
                         </Text>
@@ -903,7 +1090,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             </Animated.View>
 
             {/* Group 3: Amber breakdown + Collect Now */}
-            <Animated.View style={{ opacity: contentOpacity3, width: '100%' }}>
+            <Animated.View style={{ opacity: contentOpacity3, width: '100%', transform: [{ translateY: contentTranslateY3 }] }}>
             {victoryData && (() => {
               // Prefer the REAL itemization from the economy (amberBreakdown,
               // threaded through recordVictory) — the local AMBER_REWARDS +
@@ -932,12 +1119,11 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               const streakMilestoneAmber = victoryData.streakMilestoneBonus ?? 0;
               const totalAmber = victoryData.amberEarned ?? 0;
               // The rewarded "double" grants a bonus equal to amberEarned (a true
-              // 2x, credited to the balance in App). Reflect it in the displayed
-              // total + a breakdown line so the number the player sees AFTER the
-              // ad matches the amber they actually received — otherwise it reads
-              // as "I watched an ad and got nothing."
+              // 2x, credited to the balance in App). Reflect it in the breakdown
+              // line so the itemization sums to the doubled total. The TOTAL row
+              // itself renders the top-level `animatedTotal` (which counts up on
+              // a fresh claim), never this static value.
               const rewardDoubleBonus = rewardedDoubleClaimed ? totalAmber : 0;
-              const displayTotal = totalAmber + rewardDoubleBonus;
 
               return (
                 <>
@@ -953,7 +1139,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                         <View style={styles.earlyVictoryValueRow}>
                           <Image source={AMBER_ICON} style={styles.amberIconLarge} />
                           <Text style={[styles.earlyVictoryValue, { color: phaseTheme.modalTextColor }]}>
-                            {displayTotal}
+                            {animatedTotal}
                           </Text>
                         </View>
                       </>
@@ -985,7 +1171,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                         {surpriseBonusAmber > 0 && (
                           <View style={styles.bonusRow}>
                             <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
-                              {'✨'} Lucky Find
+                              {'◈'} Lucky Find
                             </Text>
                             <Text style={[styles.bonusValue, { color: accent.gold }]}>+{surpriseBonusAmber}</Text>
                           </View>
@@ -1017,7 +1203,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                         {(victoryData.freshVariantBonus ?? 0) > 0 && (
                           <View style={styles.bonusRow}>
                             <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
-                              {'✨'} Fresh variant
+                              {'◈'} Fresh variant
                             </Text>
                             <Text style={[styles.bonusValue, { color: accent.variant }]}>+{victoryData.freshVariantBonus}</Text>
                           </View>
@@ -1076,8 +1262,8 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                       <Text style={[styles.bonusLabel, { color: phaseTheme.modalTextColor, fontWeight: '800' }]}>Total</Text>
                       <View style={styles.amberValueRow}>
                         <Image source={AMBER_ICON} style={[styles.amberIcon, styles.amberIconTotal]} />
-                        <Text style={[styles.bonusValue, { color: phaseTheme.modalTextColor, fontSize: 19, fontWeight: '900' }]}>
-                          {displayTotal}
+                        <Text style={[styles.bonusValue, { color: phaseTheme.modalTextColor, fontSize: FONT_SIZE.title, fontWeight: '900' }]}>
+                          {animatedTotal}
                         </Text>
                       </View>
                     </View>
@@ -1145,13 +1331,28 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                           borderColor: btn.harvestPill.border,
                         }]}
                       >
-                        <Text style={[styles.collectNowText, { color: btn.harvestPill.text }]}>
-                          {phaseTransitionPending
-                            ? getPitMandatoryCTA(phase as DialoguePhase)
-                            : mandatoryHarvest
-                            ? getMandatoryHarvestCTA(phase as DialoguePhase)
-                            : `${'\uD83C\uDF3E'} Collect Now  \u203A`}
-                        </Text>
+                        <View style={styles.collectNowRow}>
+                          {/* Only the plain "Collect Now" case carried the sheaf
+                              emoji, so the pit sprite stands in there. The
+                              phase-transition / mandatory CTAs are their own copy
+                              (no icon), so the sprite shows only for the optional
+                              collect. */}
+                          {!phaseTransitionPending && !mandatoryHarvest && (
+                            <Image
+                              source={PIT_ICON}
+                              style={styles.collectNowIcon}
+                              importantForAccessibility="no"
+                              accessibilityElementsHidden
+                            />
+                          )}
+                          <Text style={[styles.collectNowText, { color: btn.harvestPill.text }]}>
+                            {phaseTransitionPending
+                              ? getPitMandatoryCTA(phase as DialoguePhase)
+                              : mandatoryHarvest
+                              ? getMandatoryHarvestCTA(phase as DialoguePhase)
+                              : 'Collect Now  \u203A'}
+                          </Text>
+                        </View>
                       </TouchableOpacity>
                       </>
                     )}
@@ -1163,8 +1364,22 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 
             </Animated.View>
 
+            {/* Victory receipt slot: the sequential victory-toast queue cycles
+                its lines HERE (in-modal, over the overlay) instead of the board
+                Toast, which renders under the modal and was invisible. */}
+            {!!receiptLine && (
+              <Animated.View style={{ opacity: receiptOpacity, width: '100%' }} pointerEvents="none">
+                <Text
+                  style={[styles.receiptLine, { color: phaseTheme.modalSecondaryTextColor }]}
+                  accessibilityLabel={receiptLine ?? undefined}
+                >
+                  {receiptLine}
+                </Text>
+              </Animated.View>
+            )}
+
             {/* Group 4: Action buttons — 3D candy style */}
-            <Animated.View style={{ opacity: contentOpacity4, width: '100%' }}>
+            <Animated.View style={{ opacity: contentOpacity4, width: '100%', transform: [{ translateY: contentTranslateY4 }] }}>
             {isOnboarding ? (
             <View style={styles.victoryButtonRow}>
               {/* Onboarding: single "Continue" button */}
@@ -1363,14 +1578,14 @@ const styles = StyleSheet.create({
   },
   compactTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 26,
+    fontSize: FONT_SIZE.display,
     fontWeight: '900',
     marginBottom: 2,
     textAlign: 'center',
   },
   compactFlawless: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '800',
     letterSpacing: 1.2,
     textAlign: 'center',
@@ -1383,7 +1598,7 @@ const styles = StyleSheet.create({
   },
   compactWeaveObjective: {
     fontFamily: BODY_FONT_ITALIC,
-    fontSize: 10.5,
+    fontSize: FONT_SIZE.micro,
     lineHeight: 14,
     textAlign: 'center',
   },
@@ -1397,7 +1612,7 @@ const styles = StyleSheet.create({
   },
   compactAmberText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 22,
+    fontSize: FONT_SIZE.headline,
     fontWeight: '900',
   },
   victoryModal: {
@@ -1450,7 +1665,7 @@ const styles = StyleSheet.create({
   },
   streakMilestoneHint: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '600',
     textAlign: 'center',
     marginTop: 2,
@@ -1481,7 +1696,7 @@ const styles = StyleSheet.create({
   },
   victoryTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 42,
+    fontSize: FONT_SIZE.giant,
     fontWeight: '900',
     marginBottom: 6,
     textShadowColor: CandyColors.pink.shadow,
@@ -1491,7 +1706,7 @@ const styles = StyleSheet.create({
   },
   victorySubtitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     fontWeight: '700',
     color: CandyColors.gray[500],
     marginBottom: 4,
@@ -1506,7 +1721,7 @@ const styles = StyleSheet.create({
   },
   flawlessBadgeText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '800',
     letterSpacing: 1.5,
     textAlign: 'center',
@@ -1523,27 +1738,27 @@ const styles = StyleSheet.create({
   },
   weaveProgressTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 10,
+    fontSize: FONT_SIZE.micro,
     fontWeight: '900',
     letterSpacing: 1.4,
   },
   weaveProgressRank: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '800',
     textAlign: 'center',
     marginTop: 2,
   },
   weaveProgressLine: {
     fontFamily: BODY_FONT_ITALIC,
-    fontSize: 11.5,
+    fontSize: FONT_SIZE.caption,
     lineHeight: 16,
     textAlign: 'center',
     marginTop: 3,
   },
   socialProofLine: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 12.5,
+    fontSize: FONT_SIZE.small,
     fontWeight: '600',
     fontStyle: 'italic',
     textAlign: 'center',
@@ -1552,12 +1767,21 @@ const styles = StyleSheet.create({
     // No opacity fade — the phase secondary text color is already AA-tuned;
     // dimming it below 4.5:1 was the old readability bug.
   },
+  receiptLine: {
+    fontFamily: PIXEL_FONT_BOLD,
+    fontSize: FONT_SIZE.body,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginTop: 6,
+    marginBottom: 6,
+    paddingHorizontal: 12,
+  },
   rewardedDoubleButton: {
     marginTop: 10,
   },
   rewardedDoubleConfirm: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '700',
     textAlign: 'center',
     marginTop: 10,
@@ -1579,14 +1803,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(150, 90, 60, 0.18)',
     borderColor: 'rgba(180, 110, 70, 0.4)',
   },
-  freeDoubleText: { fontFamily: PIXEL_FONT_BOLD, fontSize: 13.5, fontWeight: '800' },
+  freeDoubleText: { fontFamily: PIXEL_FONT_BOLD, fontSize: FONT_SIZE.body, fontWeight: '800' },
   // Deep antique gold — 5.8:1 on the pale gold pill over light stat cards
   // (the old #FFD479 measured ~1.3:1, gold-on-cream)
   freeDoubleTextLight: { color: '#755A00' },
   freeDoubleTextDark: { color: '#E0B080' }, // 7.3:1 on the dark pill
   victoryFeedback: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '600',
     marginBottom: 10,
     textAlign: 'center',
@@ -1605,14 +1829,14 @@ const styles = StyleSheet.create({
   },
   earlyVictoryLabel: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: 6,
   },
   earlyVictoryValue: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 28,
+    fontSize: FONT_SIZE.hero,
     fontWeight: '900',
     textAlign: 'center',
     marginBottom: 2,
@@ -1626,13 +1850,13 @@ const styles = StyleSheet.create({
   },
   bonusLabel: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '600',
     color: CandyColors.gray[500],
   },
   bonusValue: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '800',
     color: CandyColors.purple.main,
   },
@@ -1654,13 +1878,13 @@ const styles = StyleSheet.create({
   },
   cumulativeStatValue: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 18,
+    fontSize: FONT_SIZE.title,
     fontWeight: '800',
     color: CandyColors.purple.main,
   },
   cumulativeStatLabel: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 10,
+    fontSize: FONT_SIZE.micro,
     fontWeight: '600',
     color: CandyColors.gray[400],
     marginTop: 2,
@@ -1733,9 +1957,10 @@ const styles = StyleSheet.create({
   btn3dPrimaryText: {
     fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
-    // 19px/900 qualifies as WCAG large text (3:1 threshold — white on the
-    // candy-pink body is 3.5:1) and gives the primary CTA its visual rank.
-    fontSize: 19,
+    // headline (20px)/900 clears the WCAG large-text bold threshold (>=18.66px
+    // bold, 3:1 — white on the candy-pink body is 3.5:1) and gives the primary
+    // CTA its visual rank. Kept above 18 on purpose so the contrast rule holds.
+    fontSize: FONT_SIZE.headline,
     fontWeight: '900',
     letterSpacing: 2,
     textShadowColor: 'rgba(0, 0, 0, 0.25)',
@@ -1745,7 +1970,7 @@ const styles = StyleSheet.create({
   btn3dSecondaryText: {
     fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '900',
     letterSpacing: 1,
     textShadowColor: 'rgba(0, 0, 0, 0.25)',
@@ -1756,7 +1981,7 @@ const styles = StyleSheet.create({
   // Pit phase transition hint
   pitHintText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '700',
     fontStyle: 'italic',
     textAlign: 'center',
@@ -1767,7 +1992,7 @@ const styles = StyleSheet.create({
   // Mandatory pit text (shown when phase transition pending)
   pitMandatoryText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '700',
     fontStyle: 'italic',
     textAlign: 'center',
@@ -1780,7 +2005,7 @@ const styles = StyleSheet.create({
   // because it's a first-time teaching beat that reads as Fox/house speaking.
   mandatoryHarvestText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13.5,
+    fontSize: FONT_SIZE.body,
     fontWeight: '700',
     textAlign: 'center',
     lineHeight: 19,
@@ -1792,7 +2017,7 @@ const styles = StyleSheet.create({
   // Lore caption under the amber total while the pit auto-collects early rewards
   autoCollectCaption: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 11.5,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '600',
     fontStyle: 'italic',
     textAlign: 'center',
@@ -1811,7 +2036,7 @@ const styles = StyleSheet.create({
   },
   btnFlatUniform: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '700',
   },
   // Share button content row — keeps "📤 Share" + gem + "+N" on one centered
@@ -1842,9 +2067,19 @@ const styles = StyleSheet.create({
   },
   collectNowText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '800',
     textAlign: 'center',
+  },
+  collectNowRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  collectNowIcon: {
+    width: 15,
+    height: 15,
+    marginRight: 6,
   },
 
   // === Harvest info pill ===
@@ -1861,17 +2096,17 @@ const styles = StyleSheet.create({
   },
   harvestWordIcon: {
     fontFamily: BODY_FONT,
-    fontSize: 22,
+    fontSize: FONT_SIZE.headline,
     marginRight: 8,
   },
   harvestWordText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     fontWeight: '900',
   },
   harvestBonusHint: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '600',
     textAlign: 'center',
     marginBottom: 8,
@@ -1894,7 +2129,7 @@ const styles = StyleSheet.create({
   },
   winStreakEmoji: {
     fontFamily: BODY_FONT,
-    fontSize: 20,
+    fontSize: FONT_SIZE.headline,
     marginRight: 6,
   },
   winStreakIcon: {
@@ -1904,7 +2139,7 @@ const styles = StyleSheet.create({
   },
   winStreakText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '800',
   },
   milestoneContainer: {
@@ -1917,18 +2152,28 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginBottom: 12,
   },
+  // Phase 3+: the candy-yellow chip would be the last bright-candy artifact
+  // on an otherwise near-black sheet. Mirrors phaseChangeContainerDark's
+  // deep-tinted-bg + ember/amber-border treatment.
+  milestoneContainerDark: {
+    backgroundColor: '#2A1608',
+    borderColor: 'rgba(234, 136, 40, 0.5)',
+  },
   milestoneEmoji: {
     fontFamily: BODY_FONT,
-    fontSize: 28,
+    fontSize: FONT_SIZE.hero,
     marginBottom: 4,
   },
   milestoneMessage: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     fontWeight: '800',
     // Deep amber-brown — 6.6:1 on the yellow.light chip (yellow.dark was 1.5:1)
     color: '#713F12',
     marginBottom: 2,
+  },
+  milestoneMessageDark: {
+    color: '#FFD9A8', // cream-amber, high contrast on the dark ember chip
   },
   questCompletedContainer: {
     gap: 6,
@@ -1947,11 +2192,11 @@ const styles = StyleSheet.create({
   },
   questBadgeIcon: {
     fontFamily: BODY_FONT,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
   },
   questBadgeText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '600',
   },
   completionCodaContainer: {
@@ -1969,7 +2214,7 @@ const styles = StyleSheet.create({
   },
   completionCodaTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '900',
     color: CandyColors.blue.dark,
     letterSpacing: 0.5,
@@ -1981,7 +2226,7 @@ const styles = StyleSheet.create({
   },
   completionCodaText: {
     fontFamily: BODY_FONT,
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     lineHeight: 16,
     color: CandyColors.gray[700],
     textAlign: 'center',
@@ -1999,14 +2244,15 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: CandyColors.purple.main,
   },
-  phaseChangeEmoji: {
+  // Monochrome diamond glyph that replaces the phase-change color emoji.
+  phaseChangeGlyph: {
     fontFamily: BODY_FONT,
-    fontSize: 32,
+    fontSize: FONT_SIZE.headline,
     marginBottom: 8,
   },
   phaseChangeTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     fontWeight: '900',
     color: CandyColors.white,
     marginBottom: 4,
@@ -2014,7 +2260,7 @@ const styles = StyleSheet.create({
   },
   phaseChangeText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '600',
     color: 'rgba(255, 255, 255, 0.92)', // 5.1:1 on purple.dark (0.8 was 4.2:1)
     textAlign: 'center',
@@ -2050,7 +2296,7 @@ const styles = StyleSheet.create({
   },
   ritualEchoHeader: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 10,
+    fontSize: FONT_SIZE.micro,
     fontWeight: '700',
     color: '#655483', // 4.7:1 on the Phase 2 container (gray[400] was 1.8:1)
     letterSpacing: 2,
@@ -2070,9 +2316,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
   },
+  // Phase 3+: the chain visibly DESCENDS (the "offering" register) — a
+  // vertical stack of chips with a down-arrow between each, instead of the
+  // bright horizontal wrap-row.
+  ritualEchoChainDescending: {
+    flexDirection: 'column',
+    flexWrap: 'nowrap',
+    gap: 2,
+  },
   ritualEchoWord: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '800',
     color: CandyColors.purple.shadow, // 5.5:1 on the word chip (purple.main was 3.3:1)
     backgroundColor: 'rgba(147, 51, 234, 0.1)',
@@ -2088,18 +2342,32 @@ const styles = StyleSheet.create({
     color: '#C77DBA', // 4.6:1 on the dark chip
     backgroundColor: 'rgba(100, 30, 60, 0.3)',
   },
+  // Long finale-length chains (6-7 words) descending in a column need a
+  // smaller chip so the whole rite stays legible without dominating the
+  // scroll — caps the visual height rather than letting it sprawl.
+  ritualEchoWordCompact: {
+    fontSize: FONT_SIZE.small,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
   ritualEchoArrow: {
     fontFamily: BODY_FONT,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     color: '#655483',
     marginHorizontal: 2,
   },
   ritualEchoArrowDark: {
     color: CandyColors.gray[400],
   },
+  // The descending column reads top-to-bottom, so the arrow's breathing room
+  // moves from horizontal to vertical.
+  ritualEchoArrowDescending: {
+    marginHorizontal: 0,
+    marginVertical: 1,
+  },
   ritualIncantationName: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '700',
     fontStyle: 'italic',
     color: CandyColors.purple.shadow, // 6.3:1 on the Phase 2 container (purple.dark was 4.0:1)
@@ -2116,7 +2384,7 @@ const styles = StyleSheet.create({
   },
   ritualEchoFooter: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 10,
+    fontSize: FONT_SIZE.micro,
     fontWeight: '600',
     color: '#655483', // 4.7:1 on the Phase 2 container (gray[400] was 1.8:1)
     marginTop: 6,
@@ -2127,7 +2395,7 @@ const styles = StyleSheet.create({
   },
   wordsOfferedText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '600',
     marginBottom: 12,
     textAlign: 'center',

@@ -461,6 +461,44 @@ brightMove('valid_move_4', N.G5, N.D6, N.G6, { gap: 0.065, sparkleVol: 0.16, wet
   noiseBurst(s, { start: 0.11, dur: 0.18, vol: 0.06, lp: 0.9, hp: 0.85, decayShape: 5, rand });
 } });
 
+// midpoint_turn: the reverse-shift descent->ascent PIVOT. Two rising marimba
+// strikes into a soft handbell ringout — brighter and taller than the top of
+// the valid_move ladder, so the turn reads as a chapter break, not another
+// combo step. The dark mirror sinks (hollow marimba falling into a dark bell).
+render('midpoint_turn', 0.55, (s, rand) => {
+  strike(s, { freq: N.G5, dur: 0.2, vol: 0.5, partials: MARIMBA, decayShape: 6, unison: 2, detune: 0.003, rand });
+  strike(s, { freq: N.D6, start: 0.1, dur: 0.24, vol: 0.48, partials: MARIMBA, decayShape: 5.5, unison: 2, detune: 0.003, rand });
+  strike(s, { freq: N.G6, start: 0.22, dur: 0.5, vol: 0.28, partials: HANDBELL, decayShape: 3.6, attack: 0.004, rand });
+  noiseBurst(s, { start: 0.2, dur: 0.02, vol: 0.12, lp: 0.6, decayShape: 10, rand });
+}, { reverb: { wet: 0.22, tail: 0.5 }, peak: 0.7 });
+render('midpoint_turn_dark', 0.6, (s, rand) => {
+  strike(s, { freq: D.G3, dur: 0.24, vol: 0.5, partials: HOLLOW, attack: 0.008, decayShape: 5.5, unison: 2, detune: 0.005, rand });
+  strike(s, { freq: D.Eb3, start: 0.12, dur: 0.3, vol: 0.46, partials: HOLLOW, attack: 0.01, decayShape: 5, unison: 2, detune: 0.005, rand });
+  strike(s, { freq: D.Bb2, start: 0.26, dur: 0.55, vol: 0.3, partials: DARK_BELL, attack: 0.012, decayShape: 4, rand });
+}, { reverb: { wet: 0.3, tail: 0.6 }, peak: 0.62 });
+
+// star_pop_1/2/3: one celesta note per star as it pops in (rising C6/E6/G6) so
+// ear and hand land together in the victory choreography. Dark mirrors SINK
+// (Eb4/C4/G3 hollow) — the stars land like cold stones at the reveal.
+render('star_pop_1', 0.32, (s, rand) => {
+  strike(s, { freq: N.C6, dur: 0.24, vol: 0.4, partials: CELESTA, decayShape: 6, rand });
+}, { reverb: { wet: 0.16, tail: 0.3 }, peak: 0.55 });
+render('star_pop_2', 0.32, (s, rand) => {
+  strike(s, { freq: N.E6, dur: 0.24, vol: 0.4, partials: CELESTA, decayShape: 6, rand });
+}, { reverb: { wet: 0.16, tail: 0.3 }, peak: 0.55 });
+render('star_pop_3', 0.34, (s, rand) => {
+  strike(s, { freq: N.G6, dur: 0.26, vol: 0.42, partials: CELESTA, decayShape: 5.5, rand });
+}, { reverb: { wet: 0.18, tail: 0.32 }, peak: 0.58 });
+render('star_pop_1_dark', 0.42, (s, rand) => {
+  strike(s, { freq: D.Eb4, dur: 0.3, vol: 0.38, partials: HOLLOW, attack: 0.006, decayShape: 5, unison: 2, detune: 0.004, rand });
+}, { reverb: { wet: 0.22, tail: 0.4 }, peak: 0.5 });
+render('star_pop_2_dark', 0.42, (s, rand) => {
+  strike(s, { freq: D.C4, dur: 0.3, vol: 0.38, partials: HOLLOW, attack: 0.007, decayShape: 5, unison: 2, detune: 0.004, rand });
+}, { reverb: { wet: 0.22, tail: 0.4 }, peak: 0.5 });
+render('star_pop_3_dark', 0.44, (s, rand) => {
+  strike(s, { freq: D.G3, dur: 0.32, vol: 0.4, partials: HOLLOW, attack: 0.008, decayShape: 4.5, unison: 2, detune: 0.005, rand });
+}, { reverb: { wet: 0.24, tail: 0.42 }, peak: 0.5 });
+
 // invalid_move: gentle wooden double-thock, dry and tactile, never punishing.
 render('invalid_move', 0.38, (s, rand) => {
   noiseBurst(s, { start: 0, dur: 0.03, vol: 0.35, lp: 0.12, decayShape: 9, rand });
@@ -521,6 +559,13 @@ render('amber_earn', 0.55, (s, rand) => {
   strike(s, { freq: N.E6, start: 0.12, dur: 0.24, vol: 0.26, partials: CELESTA, decayShape: 5.5, unison: 3, detune: 0.004, rand });
 }, { reverb: { wet: 0.12, tail: 0.3 }, peak: 0.65 });
 
+// pit_devour: a word lands in the offering pit — a hollow low strike with a
+// soft lowpassed-noise "swallow" pulling it under. The dark mirror adds a sub-hum.
+render('pit_devour', 0.35, (s, rand) => {
+  strike(s, { freq: D.C3, dur: 0.24, vol: 0.5, partials: HOLLOW, attack: 0.003, decayShape: 6, bend: -0.08, unison: 2, detune: 0.003, rand });
+  noiseBurst(s, { start: 0.02, dur: 0.3, vol: 0.28, lp: 0.09, attack: 0.06, decayShape: 4, rand });
+}, { reverb: { wet: 0.2, damp: 0.5, tail: 0.3 }, peak: 0.5 });
+
 // achievement: proud little fanfare climbing to a handbell accent.
 render('achievement', 1.3, (s, rand) => {
   const line = [ [N.G4, 0, 0.45], [N.C5, 0.12, 0.5], [N.E5, 0.24, 0.5], [N.G5, 0.36, 0.5] ];
@@ -541,6 +586,29 @@ render('unlock', 1.0, (s, rand) => {
   }
   strike(s, { freq: N.C6, start: 0.32, dur: 0.6, vol: 0.3, partials: HANDBELL, decayShape: 4, attack: 0.004, rand });
 }, { reverb: { wet: 0.25, tail: 0.55 }, peak: 0.68 });
+
+// achievement_dark: the same rising line gone reverent — a dark-bell ascent
+// on the minor mode, resolving into a low hollow toll instead of a toy-piano
+// sparkle. Fires at Phase 3+ via resolveSfxForPhase.
+render('achievement_dark', 1.3, (s, rand) => {
+  const line = [ [D.G3, 0, 0.42], [D.Bb3, 0.13, 0.46], [D.Eb4, 0.26, 0.46], [D.Bb4, 0.39, 0.46] ];
+  for (const [f, t, v] of line) {
+    noiseBurst(s, { start: t, dur: 0.012, vol: 0.14, lp: 0.35, decayShape: 11, rand });
+    strike(s, { freq: f, start: t, dur: 0.5, vol: v, partials: DARK_BELL, decayShape: 4.8, unison: 2, detune: 0.004, rand });
+  }
+  strike(s, { freq: D.C5, start: 0.55, dur: 0.9, vol: 0.3, partials: HOLLOW, decayShape: 3.4, attack: 0.006, bend: -0.03, unison: 2, detune: 0.003, rand });
+  noiseBurst(s, { start: 0.5, dur: 0.5, vol: 0.05, lp: 0.5, hp: 0.2, decayShape: 3.6, rand });
+}, { reverb: { wet: 0.3, decay: 0.85, damp: 0.55, tail: 0.9 }, peak: 0.66 });
+
+// unlock_dark: the marimba triad gone cold — a dark-bell rise into a low toll.
+render('unlock_dark', 1.0, (s, rand) => {
+  const line = [ [D.C3, 0], [D.Eb3, 0.1], [D.G3, 0.2] ];
+  for (const [f, t] of line) {
+    noiseBurst(s, { start: t, dur: 0.02, vol: 0.18, lp: 0.18, decayShape: 10, rand });
+    strike(s, { freq: f, start: t, dur: 0.3, vol: 0.46, partials: DARK_BELL, decayShape: 5.2, unison: 2, detune: 0.003, rand });
+  }
+  strike(s, { freq: D.C5, start: 0.34, dur: 0.75, vol: 0.28, partials: HOLLOW, decayShape: 3.8, attack: 0.006, bend: -0.03, unison: 2, detune: 0.003, rand });
+}, { reverb: { wet: 0.27, damp: 0.55, tail: 0.6 }, peak: 0.62 });
 
 // dialogue: tiny soft celesta blip (fires on every dialogue line — stays quiet).
 render('dialogue', 0.15, (s, rand) => {
@@ -637,6 +705,20 @@ render('amber_earn_dark', 0.6, (s, rand) => {
   strike(s, { freq: D.Bb4, start: 0.09, dur: 0.32, vol: 0.4, partials: DARK_BELL, attack: 0.005, decayShape: 4.5, unison: 2, detune: 0.004, rand });
 }, { reverb: { wet: 0.22, damp: 0.55, tail: 0.4 }, peak: 0.55 });
 
+// pit_devour_dark: the same swallow, hungrier — a sub-hum opens beneath it.
+render('pit_devour_dark', 0.35, (s, rand) => {
+  strike(s, { freq: D.C3, dur: 0.24, vol: 0.5, partials: HOLLOW, attack: 0.004, decayShape: 6, bend: -0.1, unison: 2, detune: 0.003, rand });
+  noiseBurst(s, { start: 0.02, dur: 0.3, vol: 0.26, lp: 0.07, attack: 0.06, decayShape: 3.8, rand });
+  swell(s, { freq: D.C2, start: 0.01, dur: 0.32, vol: 0.3, attack: 0.04, release: 0.18, unison: 2, detune: 0.005, rand });
+}, { reverb: { wet: 0.24, damp: 0.6, tail: 0.35 }, peak: 0.5 });
+
+// hint_dark: the hint sparkle gone cold — a falling dark-bell pair, not celesta.
+render('hint_dark', 0.5, (s, rand) => {
+  strike(s, { freq: D.Ab4, dur: 0.2, vol: 0.32, partials: DARK_BELL, attack: 0.006, decayShape: 5, rand });
+  strike(s, { freq: D.Eb4, start: 0.09, dur: 0.3, vol: 0.32, partials: DARK_BELL, attack: 0.008, decayShape: 4.5, bend: -0.04, unison: 2, detune: 0.004, rand });
+  noiseBurst(s, { start: 0.02, dur: 0.2, vol: 0.06, lp: 0.5, hp: 0.4, decayShape: 4, rand });
+}, { reverb: { wet: 0.24, damp: 0.55, tail: 0.4 }, peak: 0.5 });
+
 // dialogue_dark: low hollow blip (quiet — fires on every line).
 render('dialogue_dark', 0.2, (s, rand) => {
   strike(s, { freq: D.C4, dur: 0.15, vol: 0.45, partials: HOLLOW, attack: 0.004, decayShape: 7, unison: 2, detune: 0.004, rand });
@@ -677,6 +759,26 @@ render('ui_tap_dark', 0.2, (s, rand) => {
 render('ui_tick_dark', 0.16, (s, rand) => {
   strike(s, { freq: D.Eb4, dur: 0.11, vol: 0.4, partials: HOLLOW, attack: 0.003, decayShape: 8, unison: 2, detune: 0.004, rand });
 }, { reverb: { wet: 0.1, damp: 0.6, tail: 0.12 }, peak: 0.38 });
+
+// ===========================================================================
+// HORROR CUES: standalone wrong-notes for the post-victory orchestration. No
+// dark mirror — they are ALREADY the wrongness, at any phase, and stay quiet.
+// ===========================================================================
+
+// glitch: a moment of wrong authorship — a detuned dark bell bends downward
+// while two torn high-noise stutters skip at 0 and 70ms. Peak kept low.
+render('glitch', 0.45, (s, rand) => {
+  strike(s, { freq: D.Gb4, dur: 0.4, vol: 0.4, partials: DARK_BELL, attack: 0.004, decayShape: 4.5, bend: -0.12, unison: 3, detune: 0.02, rand });
+  noiseBurst(s, { start: 0, dur: 0.05, vol: 0.3, lp: 0.9, hp: 0.9, decayShape: 8, rand });
+  noiseBurst(s, { start: 0.07, dur: 0.05, vol: 0.28, lp: 0.9, hp: 0.9, decayShape: 8, rand });
+}, { reverb: { wet: 0.18, damp: 0.5, tail: 0.3 }, peak: 0.35 });
+
+// whisper: airy presence, no pitch — a band-limited breath swell. The sound of
+// being noticed. Very quiet.
+render('whisper', 0.9, (s, rand) => {
+  noiseBurst(s, { start: 0, dur: 0.85, vol: 0.4, lp: 0.5, hp: 0.6, attack: 0.25, decayShape: 2.2, rand });
+  noiseBurst(s, { start: 0.2, dur: 0.6, vol: 0.18, lp: 0.7, hp: 0.8, attack: 0.2, decayShape: 2.5, rand });
+}, { reverb: { wet: 0.3, damp: 0.45, tail: 0.5 }, peak: 0.3 });
 
 // ===========================================================================
 // AMBIENT MUSIC BEDS: three seamless loops sharing one musical DNA.

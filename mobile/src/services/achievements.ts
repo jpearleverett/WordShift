@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ImageSourcePropType } from 'react-native';
 import { Difficulty } from '../types';
 import { CumulativeStats } from './starRating';
 import { ANIMALS, ROOMS } from './homeWorldData';
@@ -18,9 +19,33 @@ export interface Achievement {
   rewardAmber: number;
   /** Check function returns true if unlocked based on current state */
   check: (state: AchievementCheckState) => boolean;
+  /**
+   * Progress toward a countable achievement (puzzle counts, stars, streaks,
+   * variant wins...). Present only on the ~35 countable ones; one-shot
+   * achievements leave it undefined. `current` is clamped to `target`. Attached
+   * from ACHIEVEMENT_PROGRESS below so the definitions stay declarative.
+   */
+  progress?: (state: AchievementCheckState) => { current: number; target: number };
 }
 
 export type AchievementCategory = 'puzzle' | 'mastery' | 'streak' | 'collection' | 'journey';
+
+/**
+ * Category -> generated candy sprite (assets/ui). The per-achievement `icon`
+ * emoji stays in the data as a semantic key (the modeIcons precedent); the
+ * chrome renders one shared sprite per category in the StatsScreen row + the
+ * AchievementToast alcove. flame/star_filled ship two categories on day one.
+ */
+export const ACHIEVEMENT_CATEGORY_ICONS: Record<AchievementCategory, ImageSourcePropType> = {
+  puzzle: require('../../assets/ui/quest.png'),
+  mastery: require('../../assets/ui/star_filled.png'),
+  streak: require('../../assets/ui/flame.png'),
+  collection: require('../../assets/ui/home.png'),
+  journey: require('../../assets/ui/moon.png'),
+};
+
+/** Locked-row icon sprite (replaces the raw 🔒 emoji). */
+export const ACHIEVEMENT_LOCK_ICON: ImageSourcePropType = require('../../assets/ui/lock.png');
 
 /**
  * Achievement progress (persisted)
@@ -546,6 +571,63 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
 ];
 
+/**
+ * Countable-achievement progress specs (id -> current-value getter + target).
+ * Attached to the matching Achievement's `progress` below so the definitions
+ * stay declarative and the StatsScreen can draw a "{current}/{target}" track on
+ * locked rows. One-shot achievements (first_puzzle, phase_*, share...) are
+ * intentionally absent — they have no meaningful partial state.
+ */
+type ProgressSpec = { current: (s: AchievementCheckState) => number; target: number };
+const ACHIEVEMENT_PROGRESS: Record<string, ProgressSpec> = {
+  // Puzzle counts
+  puzzle_10: { current: (s) => s.stats.totalPuzzlesCompleted, target: 10 },
+  puzzle_25: { current: (s) => s.stats.totalPuzzlesCompleted, target: 25 },
+  puzzle_35: { current: (s) => s.stats.totalPuzzlesCompleted, target: 35 },
+  puzzle_50: { current: (s) => s.stats.totalPuzzlesCompleted, target: 50 },
+  puzzle_100: { current: (s) => s.stats.totalPuzzlesCompleted, target: 100 },
+  puzzle_250: { current: (s) => s.stats.totalPuzzlesCompleted, target: 250 },
+  puzzle_500: { current: (s) => s.stats.totalPuzzlesCompleted, target: 500 },
+  puzzle_750: { current: (s) => s.stats.totalPuzzlesCompleted, target: 750 },
+  // Mastery — stars, hard runs, no-hints, flawless, variant/blind wins
+  perfect_10: { current: (s) => s.stats.threeStarCount, target: 10 },
+  perfect_25: { current: (s) => s.stats.threeStarCount, target: 25 },
+  perfect_50: { current: (s) => s.stats.threeStarCount, target: 50 },
+  hard_10: { current: (s) => s.stats.byDifficulty.HARD.completed, target: 10 },
+  no_hints_10: { current: (s) => s.stats.noHintPuzzleCount || 0, target: 10 },
+  flawless_25: { current: (s) => s.stats.flawlessCount || 0, target: 25 },
+  reverse_15: { current: (s) => s.variantWins?.reverse || 0, target: 15 },
+  double_15: { current: (s) => s.variantWins?.double_shift || 0, target: 15 },
+  speed_15: { current: (s) => s.variantWins?.speed || 0, target: 15 },
+  blind_10: { current: (s) => s.blindWins || 0, target: 10 },
+  challenge_10: { current: (s) => s.challengeCompletions, target: 10 },
+  challenge_25: { current: (s) => s.challengeCompletions, target: 25 },
+  challenge_50: { current: (s) => s.challengeCompletions, target: 50 },
+  // Streaks
+  streak_3: { current: (s) => s.currentStreak, target: 3 },
+  streak_7: { current: (s) => s.currentStreak, target: 7 },
+  streak_14: { current: (s) => s.currentStreak, target: 14 },
+  streak_30: { current: (s) => s.currentStreak, target: 30 },
+  streak_60: { current: (s) => s.currentStreak, target: 60 },
+  streak_100: { current: (s) => s.currentStreak, target: 100 },
+  // Collection
+  animals_5: { current: (s) => s.unlockedAnimals, target: 5 },
+  all_animals: { current: (s) => s.unlockedAnimals, target: ANIMALS.length },
+  all_rooms: { current: (s) => s.unlockedRooms, target: ROOMS.length },
+  amber_1000: { current: (s) => s.amberEarned, target: 1000 },
+  amber_5000: { current: (s) => s.amberEarned, target: 5000 },
+  // Journey — daily completions
+  daily_7: { current: (s) => s.dailyChallengesCompleted, target: 7 },
+  daily_30: { current: (s) => s.dailyChallengesCompleted, target: 30 },
+};
+
+for (const a of ACHIEVEMENTS) {
+  const spec = ACHIEVEMENT_PROGRESS[a.id];
+  if (spec) {
+    a.progress = (s) => ({ current: Math.min(spec.current(s), spec.target), target: spec.target });
+  }
+}
+
 // In-memory cache
 let progressCache: AchievementProgress | null = null;
 
@@ -636,6 +718,48 @@ export async function getAchievementsWithStatus(): Promise<
     isUnlocked: progress.unlockedIds.includes(a.id),
     unlockedAt: progress.unlockDates[a.id] || null,
   }));
+}
+
+/**
+ * Build the full AchievementCheckState from the live services (stats, progress,
+ * variant/blind wins, daily completions, share count). Used by surfaces that
+ * want to draw progress-toward on locked, countable achievements (StatsScreen).
+ *
+ * Services are lazy-required so importing achievements.ts never pulls the
+ * economy graph in at module load (the same cycle-avoidance the amber credit in
+ * checkAchievements uses). This mirrors the state useAchievementQueue assembles
+ * on a victory, but reads the current stored stats directly.
+ */
+export async function buildAchievementCheckState(): Promise<AchievementCheckState> {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { getCumulativeStats } = require('./starRating');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { getFullProgress, getVariantWinStats } = require('./amberCurrency');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { getDailyStatus } = require('./dailyChallenge');
+
+  const [stats, progress, variantStats, daily, shareCount] = await Promise.all([
+    getCumulativeStats(),
+    getFullProgress(),
+    getVariantWinStats(),
+    getDailyStatus(),
+    getShareCount(),
+  ]);
+
+  return {
+    stats,
+    puzzlesSolved: progress.puzzlesSolved,
+    currentPhase: progress.currentPhase,
+    currentStreak: progress.currentStreak ?? 0,
+    unlockedAnimals: (progress.unlockedAnimals ?? []).length,
+    unlockedRooms: (progress.unlockedRooms ?? []).length,
+    amberEarned: progress.totalAmberEarned,
+    dailyChallengesCompleted: daily.totalCompleted,
+    shareCount,
+    challengeCompletions: progress.challengeCompletions || 0,
+    variantWins: variantStats.variantWins,
+    blindWins: variantStats.blindWins,
+  };
 }
 
 /**

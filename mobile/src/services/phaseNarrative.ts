@@ -506,7 +506,7 @@ export const COMBO_MOVE_POOLS: Record<DialoguePhase, [string[], string[], string
     ['Nice! 2 in a row!', 'Two in a row! Keep it rolling!', 'Double sweet! Two straight!'],
     ["Sweet! 3 chain!", "Three straight! You're glowing!", 'Triple treat! Three clean!'],
     [
-      'On fire! 🔥',
+      'On fire! Nothing is stopping you now!',
       "Unstoppable! The tiles can't keep up!",
       'What a run! Still going!',
       'Legendary streak! Keep it alive!',
@@ -731,6 +731,24 @@ const UNBROKEN_WEAVE_UNAVAILABLE_MESSAGES: Record<DialoguePhase, string> = {
 
 export function getUnbrokenWeaveUnavailableMessage(phase: DialoguePhase): string {
   return UNBROKEN_WEAVE_UNAVAILABLE_MESSAGES[phase];
+}
+
+const UNBROKEN_WEAVE_UNAVAILABLE_TITLES: Record<DialoguePhase, string> = {
+  0: 'The Weave Rests',
+  1: 'The Thread Rests',
+  2: 'The Thread Rests',
+  3: 'The Thread Rests',
+  4: 'The Thread Rests',
+  5: 'The Thread Rests',
+};
+
+/**
+ * Title for the acknowledged "Unbroken Weave could not be served" beat card. The
+ * deliberate apex-mode swap is announced with a dismissible beat, not a fading
+ * toast, so the player KNOWS the mode they chose did not apply.
+ */
+export function getUnbrokenWeaveUnavailableTitle(phase: DialoguePhase): string {
+  return UNBROKEN_WEAVE_UNAVAILABLE_TITLES[phase];
 }
 
 // ============================================================================
@@ -3684,9 +3702,12 @@ export function getShopPatronLockedLabel(): string {
 
 // ============================================================================
 // NOTIFICATION PRE-PERMISSION PROMPT — In-app card shown before the system
-// permission dialog, asking to enable the daily puzzle reminder.
-// Tone shifts with phase but stays functional and honest — never deceptive
-// about what is being enabled.
+// permission dialog, asking to enable the daily puzzle reminder. This is the
+// single most consequential ask in the app, so the copy earns the permission
+// with an in-world RATIONALE (why the house would like to reach you) and a
+// clear value ("so the day doesn't slip past") rather than a generic OS-nag.
+// Tone shifts with phase but stays honest — it never overstates what the
+// permission does, and always points at Settings.
 // ============================================================================
 
 interface NotificationPromptText {
@@ -3699,37 +3720,37 @@ interface NotificationPromptText {
 const NOTIFICATION_PROMPT_TEXT: Record<DialoguePhase, NotificationPromptText> = {
   0: {
     title: 'Daily reminder?',
-    body: 'Want a gentle nudge when a fresh puzzle is ready? You can change this anytime in Settings.',
+    body: 'The house likes knowing you\'ll come back. Want us to tap on the window when a fresh puzzle is ready, so it doesn\'t sit here unsolved? You can change this anytime in Settings.',
     accept: 'Sounds good',
     decline: 'Not now',
   },
   1: {
-    title: 'A daily reminder?',
-    body: 'We could let you know when a new puzzle is waiting for you. You can change this anytime in Settings.',
+    title: 'A word when it\'s ready?',
+    body: 'The words arrange themselves each day, whether you are here or not. Let us tell you when a new one is waiting, so you never miss it. You can change this anytime in Settings.',
     accept: 'Yes, please',
     decline: 'Not now',
   },
   2: {
     title: 'Shall we call for you?',
-    body: 'A quiet reminder when the day\'s puzzle is ready, nothing more. You can turn this off anytime in Settings.',
+    body: 'The house keeps a puzzle for you each day. We could send word the moment it is ready, so the day does not slip past unnoticed. You can turn this off anytime in Settings.',
     accept: 'Remind me',
     decline: 'Not now',
   },
   3: {
     title: 'A reminder, each day',
-    body: 'The puzzles continue whether you arrive or not. We can remind you when one is ready. Settings can silence this whenever you wish.',
+    body: 'The puzzles continue whether you arrive or not. Let us tell you when one is ready, so you are never the last to know. Settings can silence this whenever you wish.',
     accept: 'Remind me',
     decline: 'Not yet',
   },
   4: {
     title: 'The arrangement keeps its hours',
-    body: 'Each day, a puzzle is prepared. We can tell you when it is ready. That is all this enables. Settings can end it at any time.',
+    body: 'Each day a puzzle is prepared and set aside for your hands. We can tell you the moment it is ready. That is all this does, nothing more. Settings can end it at any time.',
     accept: 'Tell me',
     decline: 'Not now',
   },
   5: {
     title: 'The pattern continues',
-    body: 'A new puzzle settles into place each day. We can let you know, if you like. You can change this anytime in Settings.',
+    body: 'A new puzzle settles into place each day, and the house would rather you did not miss it. We can let you know, gently, if you like. You can change this anytime in Settings.',
     accept: 'Let me know',
     decline: 'Not now',
   },
@@ -3737,6 +3758,193 @@ const NOTIFICATION_PROMPT_TEXT: Record<DialoguePhase, NotificationPromptText> = 
 
 export function getNotificationPromptText(phase: DialoguePhase): NotificationPromptText {
   return NOTIFICATION_PROMPT_TEXT[phase];
+}
+
+// ============================================================================
+// NOTIFICATION TITLES — the prime line of every re-engagement ping. It must
+// NEVER lead with the brand name "WordShift" (a wasted, redundant title line);
+// instead each ping's title is a short, phase-aware, in-world hook that says
+// something about WHY the house is reaching out. The body carries the detail.
+// One pool per notification kind, per phase, all dash-free and in-register.
+// ============================================================================
+
+export type NotificationKind =
+  | 'daily'      // the daily puzzle is ready
+  | 'comeBack'   // pre-daily-unlock generic come-back (routed home, never names the daily)
+  | 'winBack'    // lapsed-player ladder
+  | 'streakRisk' // streak about to break
+  | 'questExpiry'; // weekly quests about to reset
+
+const NOTIFICATION_TITLES: Record<NotificationKind, Record<DialoguePhase, string>> = {
+  daily: {
+    0: 'A fresh puzzle',
+    1: 'A new arrangement',
+    2: 'The words remember you',
+    3: 'Something is prepared',
+    4: 'The offering is ready',
+    5: 'The pattern continues',
+  },
+  comeBack: {
+    0: 'The house misses you',
+    1: 'The house is thinking of you',
+    2: 'The house is quiet',
+    3: 'The house waits',
+    4: 'The arrangement waits',
+    5: 'The house rests',
+  },
+  winBack: {
+    0: 'Your friends miss you',
+    1: 'The house has been thinking',
+    2: 'The house is quieter',
+    3: 'The house holds its breath',
+    4: 'The arrangement is incomplete',
+    5: 'The house remembers you',
+  },
+  streakRisk: {
+    0: 'Your streak needs you',
+    1: 'A pattern worth keeping',
+    2: 'The chain grows thin',
+    3: 'The chain trembles',
+    4: 'The chain is still counting',
+    5: 'The chain rests',
+  },
+  questExpiry: {
+    0: 'The week is closing',
+    1: 'The week is turning',
+    2: 'The week dissolves soon',
+    3: 'The week closes',
+    4: 'Unfinished offerings',
+    5: 'The week turns',
+  },
+};
+
+/**
+ * The prime title line for a re-engagement notification: a short, phase-aware,
+ * in-world hook. Deliberately never the brand name. Falls back to the daily
+ * pool for an unrecognized kind so it always returns a valid string.
+ */
+export function getNotificationTitle(phase: number, kind: NotificationKind = 'daily'): string {
+  const clampedPhase = Math.min(5, Math.max(0, Math.floor(Number(phase) || 0))) as DialoguePhase;
+  const pool = NOTIFICATION_TITLES[kind] ?? NOTIFICATION_TITLES.daily;
+  return pool[clampedPhase];
+}
+
+// ============================================================================
+// STREAK-FREEZE RELIEF — a banked freeze forgave a missed day, so the streak
+// survived instead of resetting. Distinct from getStreakHeldMessage (which
+// names a decay-to-milestone checkpoint): here the chain is whole, a promise
+// kept. Warm at every register; the house protected you, it never scolds.
+// `daily` distinguishes the Daily-Challenge streak from the main play streak.
+// ============================================================================
+
+export function getStreakFreezeReliefMessage(phase: number, daily = false): string {
+  const chain = daily ? 'daily streak' : 'streak';
+  if (phase >= 4) {
+    return daily
+      ? 'The daily chain bent, and a freeze kept it whole.'
+      : 'The chain bent, and a freeze kept it whole.';
+  }
+  if (phase >= 2) {
+    return `A day slipped past, but a freeze held your ${chain}. The thread did not thin.`;
+  }
+  return `A missed day, forgiven. A freeze kept your ${chain} alive. The house had you covered.`;
+}
+
+// A free streak freeze was just GRANTED (banked ahead of any miss), not
+// consumed — the launch-moment courtesy. Distinct register from the relief
+// copy above, and phase-aware so a Phase-4 grant does not chirp "keep the
+// chain alive" under a storm sky. Warm, never a chore instruction.
+export function getStreakFreezeGrantedMessage(phase: number): string {
+  if (phase >= 4) {
+    return 'A freeze is set aside for you. One missed day will not break the pattern.';
+  }
+  if (phase >= 2) {
+    return 'A freeze is set aside for you. Miss a day and your streak still holds.';
+  }
+  return 'A freeze is set aside for you. Miss a day and your streak stays safe.';
+}
+
+// Reverse Shift's descent->ascent turn: the player has reached the bottom of the
+// chain and now walks it back up. It used to be a lone haptic; this line + a
+// distinct turn chime mark the "second act" so the return leg reads as its own
+// movement, not a continuation. Phase-aware.
+export function getReverseMidpointMessage(phase: number): string {
+  if (phase >= 4) {
+    return 'The bottom. Now the long way back up.';
+  }
+  if (phase >= 2) {
+    return 'You have reached the turn. The way back begins.';
+  }
+  return 'Halfway there... now climb back up!';
+}
+
+// ============================================================================
+// DAILY-LOGIN MODAL COPY — the returning-player welcome (NOT the first-ever
+// claim, which lives in getDailyLoginFirstClaimCopy). Was hardcoded and
+// phase-blind; now the welcome, the reset line, the received label, the
+// comeback-bonus suffix, the jackpot flourish, and the collect button all
+// shift with the descent. The `received` label reads as "<received> [amber] N".
+// ============================================================================
+
+interface DailyLoginModalCopy {
+  welcomeTitle: string;
+  resetLine: string;
+  received: string;
+  comebackBonus: string;
+  jackpot: string;
+  collect: string;
+}
+
+export function getDailyLoginModalCopy(phase: number): DailyLoginModalCopy {
+  const p = Math.min(5, Math.max(0, Math.floor(Number(phase) || 0)));
+  if (p >= 5) {
+    return {
+      welcomeTitle: 'You Came Home',
+      resetLine: 'The pattern begins again',
+      received: 'The house left you',
+      comebackBonus: 'for your return',
+      jackpot: 'The whole day',
+      collect: 'Accept',
+    };
+  }
+  if (p >= 4) {
+    return {
+      welcomeTitle: 'You Returned to the Pattern',
+      resetLine: 'The count begins again',
+      received: 'The arrangement kept',
+      comebackBonus: 'for your return',
+      jackpot: 'The full offering',
+      collect: 'Accept',
+    };
+  }
+  if (p >= 3) {
+    return {
+      welcomeTitle: 'You Came Back',
+      resetLine: 'The chain begins again',
+      received: 'The house set aside',
+      comebackBonus: 'for your return',
+      jackpot: 'The whole day',
+      collect: 'Take it',
+    };
+  }
+  if (p >= 2) {
+    return {
+      welcomeTitle: 'You Returned',
+      resetLine: 'A new chain begins',
+      received: 'The house set aside',
+      comebackBonus: 'for your return',
+      jackpot: 'The whole day',
+      collect: 'Take it',
+    };
+  }
+  return {
+    welcomeTitle: 'Welcome Back',
+    resetLine: 'A new chain begins',
+    received: 'You received',
+    comebackBonus: 'welcome-back bonus',
+    jackpot: 'Jackpot',
+    collect: 'Collect',
+  };
 }
 
 // ============================================================================
@@ -3854,10 +4062,10 @@ export function getUnplayableChallengeMessage(phase: number): string {
 
 /** Label for the friend-challenge share button on the share preview. */
 export function getChallengeFriendLabel(phase: number): string {
-  if (phase >= 5) return '⚔️ Pass the pattern along';
-  if (phase >= 4) return '⚔️ Draw a friend in';
-  if (phase >= 2) return '⚔️ Send this to a friend';
-  return '⚔️ Challenge a friend';
+  if (phase >= 5) return 'Pass the pattern along';
+  if (phase >= 4) return 'Draw a friend in';
+  if (phase >= 2) return 'Send this to a friend';
+  return 'Challenge a friend';
 }
 
 /** Cosmetic-shop → Store bridge row (title + subtitle). */
@@ -3981,6 +4189,22 @@ export const EVENT_QUEST_DESCRIPTION_TEMPLATES = {
   bright: 'Solve {target} puzzles under the full moon',
   dark: 'The moon asks for {target} arrangements tonight',
 } as const;
+
+/**
+ * Arrival line for a RESERVED room whose level gate opened on its own while the
+ * player was away (claimReservedUnlockIfReady). The reserved room "built itself"
+ * in the background, so its arrival gets a bespoke in-world voice instead of the
+ * silent generic confetti. Phase-aware, spoiler-safe (no phase labels, the
+ * entity is never named), no em dashes.
+ */
+export function getReservedBuiltItselfLine(phase: number): string {
+  if (phase >= 5) return 'The house tends itself now. The room you set aside settled quietly into place.';
+  if (phase >= 4) return 'The arrangement finishes what you leave for it. The room you set aside is ready, and waiting.';
+  if (phase >= 3) return 'The house built on in the dark. What you set aside has taken shape.';
+  if (phase >= 2) return 'Something in the house kept working without you. The room you set aside is here.';
+  if (phase >= 1) return 'The house kept building while you were away. The room you set aside is ready.';
+  return 'Look... the room you set aside finished itself while you were away.';
+}
 
 // ============================================================================
 // SEASON PASS — phase-aware copy for the monthly cosmetic reward track.

@@ -1,14 +1,21 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { View, Text, StyleSheet, Animated, Platform } from 'react-native';
 import { CandyColors, getPhaseTheme } from '../../theme/colors';
+import { getModalInSpring } from '../../theme/surfaces';
 import { getSettingsSync } from '../../services/settings';
-import { PIXEL_FONT_BOLD } from '../../theme/fonts';
+import { announceForA11y } from '../../services/a11yAnnounce';
+import { PIXEL_FONT_BOLD, BODY_FONT_ITALIC } from '../../theme/fonts';
+import { FONT_SIZE } from '../../theme/typeScale';
 
 interface ToastProps {
   message: string;
   isError: boolean;
   /** Current narrative phase (0-5) — drives the toast's surface colors. */
   phase?: number;
+  /** The cold-open's warm unnamed voice: render in the cottage's handwritten
+   *  italic on a warm parchment tray with a small ember glyph, so Ember's guiding
+   *  lines don't wear the same system-toast chrome as a rules/error message. */
+  isVoice?: boolean;
 }
 
 /**
@@ -44,12 +51,23 @@ export function getToastTheme(phase: number) {
   };
 }
 
-export const Toast: React.FC<ToastProps> = ({ message, isError, phase = 0 }) => {
+export const Toast: React.FC<ToastProps> = ({ message, isError, phase = 0, isVoice = false }) => {
   const slideAnim = useRef(new Animated.Value(-20)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const enterAnimRef = useRef<Animated.CompositeAnimation | null>(null);
   const shakeAnimRef = useRef<Animated.CompositeAnimation | null>(null);
+  // Last message spoken via the iOS announce fallback (dedupe guard).
+  const lastAnnouncedRef = useRef<string | null>(null);
+  // The message currently seated in the pill, so a REPLACEMENT (one move
+  // message swapping for another while the pill is already up) refreshes the
+  // text in place instead of flying a fresh pill in from scratch every time.
+  const seatedMessageRef = useRef<string>('');
+  // Live phase for the entrance spring, read inside the message-change effect
+  // without making phase an effect dependency (a phase shift shouldn't re-fly a
+  // seated pill; the next message picks up the new weight).
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
 
   const toastTheme = getToastTheme(phase);
 
@@ -58,9 +76,17 @@ export const Toast: React.FC<ToastProps> = ({ message, isError, phase = 0 }) => 
     enterAnimRef.current?.stop();
     shakeAnimRef.current?.stop();
 
-    slideAnim.setValue(-20);
-    opacityAnim.setValue(0);
-    shakeAnim.setValue(0);
+    const trimmed = (message ?? '').trim();
+    const seated = seatedMessageRef.current;
+    seatedMessageRef.current = trimmed;
+
+    // Empty message: keep the pill fully hidden — never fly an empty bubble in.
+    if (!trimmed) {
+      slideAnim.setValue(-20);
+      opacityAnim.setValue(0);
+      shakeAnim.setValue(0);
+      return;
+    }
 
     if (getSettingsSync().reducedMotion) {
       slideAnim.setValue(0);
@@ -69,21 +95,44 @@ export const Toast: React.FC<ToastProps> = ({ message, isError, phase = 0 }) => 
       return;
     }
 
-    const enterAnim = Animated.parallel([
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        friction: 5,
-        tension: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(opacityAnim, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]);
-    enterAnimRef.current = enterAnim;
-    enterAnim.start(() => { enterAnimRef.current = null; });
+    shakeAnim.setValue(0);
+    const isReplacement = seated !== '' && seated !== trimmed;
+
+    if (isReplacement) {
+      // In-place cross-fade: the pill stays seated (no slide from -20, no
+      // opacity 0), and a quick dip + restore masks the text swap. Kills the
+      // full fade-from-zero + slide that flickered above the board on every
+      // consecutive move message.
+      slideAnim.setValue(0);
+      const refresh = Animated.sequence([
+        Animated.timing(opacityAnim, { toValue: 0.4, duration: 90, useNativeDriver: true }),
+        Animated.timing(opacityAnim, { toValue: 1, duration: 170, useNativeDriver: true }),
+      ]);
+      enterAnimRef.current = refresh;
+      refresh.start(() => { enterAnimRef.current = null; });
+    } else {
+      // Fresh appearance (the pill was empty): the full slide + fade entrance.
+      // The entrance spring ages with the descent (getModalInSpring) so the pill
+      // no longer bounces in candy-bright over a dark board.
+      slideAnim.setValue(-20);
+      opacityAnim.setValue(0);
+      const entranceSpring = getModalInSpring(phaseRef.current);
+      const enterAnim = Animated.parallel([
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          friction: entranceSpring.friction,
+          tension: entranceSpring.tension,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]);
+      enterAnimRef.current = enterAnim;
+      enterAnim.start(() => { enterAnimRef.current = null; });
+    }
 
     if (isError) {
       const shakeSeq = Animated.sequence([
@@ -103,12 +152,25 @@ export const Toast: React.FC<ToastProps> = ({ message, isError, phase = 0 }) => 
     };
   }, [message, isError]);
 
+  // iOS live-region fallback: the visual accessibilityLiveRegion below is
+  // Android-only, so move feedback and receipts would go unspoken on iOS. Speak
+  // the toast text through the announce bridge when it changes, guarded against
+  // empty and duplicate messages so it can't spam or double-speak on Android
+  // (which the live region already handles).
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    const trimmed = (message ?? '').trim();
+    if (!trimmed || trimmed === lastAnnouncedRef.current) return;
+    lastAnnouncedRef.current = trimmed;
+    announceForA11y(trimmed);
+  }, [message]);
+
   return (
     <Animated.View
       style={[
         styles.toast,
         {
-          backgroundColor: isError ? toastTheme.errorBg : toastTheme.normalBg,
+          backgroundColor: isVoice && !isError ? '#FBEEDA' : (isError ? toastTheme.errorBg : toastTheme.normalBg),
           shadowColor: toastTheme.shadow,
         },
         {
@@ -122,9 +184,14 @@ export const Toast: React.FC<ToastProps> = ({ message, isError, phase = 0 }) => 
       accessibilityLiveRegion="polite"
       accessibilityRole="alert"
     >
-      <View style={[styles.toastShine, { backgroundColor: toastTheme.shine }]} />
-      <Text style={[styles.toastText, { color: isError ? toastTheme.errorText : toastTheme.normalText }]}>
-        {message}
+      <View style={[styles.toastShine, { backgroundColor: isVoice && !isError ? 'rgba(255,255,255,0.35)' : toastTheme.shine }]} />
+      <Text
+        style={[
+          isVoice && !isError ? styles.toastVoiceText : styles.toastText,
+          { color: isVoice && !isError ? '#5A4326' : (isError ? toastTheme.errorText : toastTheme.normalText) },
+        ]}
+      >
+        {isVoice && !isError ? `✻  ${message}` : message}
       </Text>
     </Animated.View>
   );
@@ -152,7 +219,14 @@ const styles = StyleSheet.create({
   },
   toastText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '800',
+  },
+  // The cold-open voice: the cottage's handwritten italic, a touch larger and
+  // lighter than the system-toast weight, so it reads as a warm aside.
+  toastVoiceText: {
+    fontFamily: BODY_FONT_ITALIC,
+    fontSize: FONT_SIZE.callout,
+    fontStyle: 'italic',
   },
 });

@@ -1,11 +1,12 @@
 import React, { useCallback, useRef, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Modal, Animated, Easing, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Modal, Animated, Easing } from 'react-native';
 import { ShareCard } from './ShareCard';
 import { ShareableResult, isDailyShareBonusAvailable, shareChallengeText, DAILY_SHARE_BONUS_AMBER } from '../../services/shareResults';
 import { shareResultImage, isImageShareAvailable } from '../../services/shareImage';
 import { getChallengeFriendLabel } from '../../services/phaseNarrative';
-import { hapticLight } from '../../services/haptics';
-import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
+import { hapticLight, hapticSuccess } from '../../services/haptics';
+import { playUiSound } from '../../services/uiSound';
+import { SURFACE, getSurfaceTheme, getModalInSpring } from '../../theme/surfaces';
 import { PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { PanelCard } from '../ui/PanelCard';
 import { CandyButton } from '../ui/CandyButton';
@@ -30,33 +31,55 @@ export const ShareResultModal: React.FC<ShareResultModalProps> = ({ result, onCl
   const cardRef = useRef<View>(null);
   const [sharing, setSharing] = useState(false);
   const [bonusAvailable, setBonusAvailable] = useState(false);
+  // The +5 daily-share reward, once actually earned by a completed share: the
+  // pre-share hint swaps into an earned confirmation instead of a silent refresh.
+  const [bonusEarned, setBonusEarned] = useState(false);
+  const bonusAvailableRef = useRef(false);
 
   const reducedMotion = getSettingsSync().reducedMotion;
   const backdropOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
   const contentScale = useRef(new Animated.Value(reducedMotion ? 1 : 0.92)).current;
   const contentOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  // The card gets its own small "here is your card" reveal a beat after the panel.
+  const cardScale = useRef(new Animated.Value(reducedMotion ? 1 : 0.95)).current;
+  const cardOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  // Breathing opacity for the on-brand "capturing..." label (native driver).
+  const capturePulse = useRef(new Animated.Value(1)).current;
+  // Earned-reward pop for the "+5 amber" confirmation.
+  const earnedScale = useRef(new Animated.Value(reducedMotion ? 1 : 0.8)).current;
+  const earnedOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
   const closingRef = useRef(false);
 
   const visible = result != null;
 
   useEffect(() => {
     if (result) {
-      isDailyShareBonusAvailable().then(setBonusAvailable).catch(() => {});
+      isDailyShareBonusAvailable()
+        .then((v) => {
+          setBonusAvailable(v);
+          bonusAvailableRef.current = v;
+        })
+        .catch(() => {});
     }
   }, [result]);
 
   useEffect(() => {
     if (!visible) return;
     closingRef.current = false;
+    setBonusEarned(false);
     if (reducedMotion) {
       backdropOpacity.setValue(1);
       contentScale.setValue(1);
       contentOpacity.setValue(1);
+      cardScale.setValue(1);
+      cardOpacity.setValue(1);
       return;
     }
     backdropOpacity.setValue(0);
     contentScale.setValue(0.92);
     contentOpacity.setValue(0);
+    cardScale.setValue(0.95);
+    cardOpacity.setValue(0);
     const anim = Animated.parallel([
       Animated.timing(backdropOpacity, {
         toValue: 1,
@@ -65,7 +88,7 @@ export const ShareResultModal: React.FC<ShareResultModalProps> = ({ result, onCl
       }),
       Animated.spring(contentScale, {
         toValue: 1,
-        ...SURFACE.modalIn,
+        ...getModalInSpring(result?.phase ?? 0),
         useNativeDriver: true,
       }),
       Animated.timing(contentOpacity, {
@@ -73,10 +96,44 @@ export const ShareResultModal: React.FC<ShareResultModalProps> = ({ result, onCl
         duration: 180,
         useNativeDriver: true,
       }),
+      // The card materializes as its own beat, just after the panel settles.
+      Animated.sequence([
+        Animated.delay(120),
+        Animated.parallel([
+          Animated.spring(cardScale, {
+            toValue: 1,
+            ...getModalInSpring(result?.phase ?? 0),
+            useNativeDriver: true,
+          }),
+          Animated.timing(cardOpacity, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]),
     ]);
     anim.start();
     return () => anim.stop();
-  }, [visible, reducedMotion, backdropOpacity, contentScale, contentOpacity]);
+  }, [visible, reducedMotion, backdropOpacity, contentScale, contentOpacity, cardScale, cardOpacity]);
+
+  // On-brand "capturing..." breathe while a share is in flight (native driver,
+  // reduced-motion pins to steady).
+  useEffect(() => {
+    if (!sharing || reducedMotion) {
+      capturePulse.setValue(1);
+      return;
+    }
+    capturePulse.setValue(0.55);
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(capturePulse, { toValue: 1, duration: 520, useNativeDriver: true }),
+        Animated.timing(capturePulse, { toValue: 0.55, duration: 520, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [sharing, reducedMotion, capturePulse]);
 
   const handleClose = useCallback(() => {
     if (closingRef.current) return;
@@ -101,13 +158,42 @@ export const ShareResultModal: React.FC<ShareResultModalProps> = ({ result, onCl
     ]).start(() => onClose());
   }, [reducedMotion, backdropOpacity, contentOpacity, onClose]);
 
+  // Called on any completed share. Beyond the caller's onShared refresh, it
+  // acknowledges the +5 daily-share reward when a share actually claims it:
+  // haptic + share sound + the pre-share hint swapping into an earned state
+  // (re-checking availability so we never fake the reward).
+  const acknowledgeShareSuccess = useCallback(async () => {
+    onShared?.();
+    if (!bonusAvailableRef.current) return;
+    const stillAvailable = await isDailyShareBonusAvailable().catch(() => true);
+    if (stillAvailable) return;
+    bonusAvailableRef.current = false;
+    setBonusAvailable(false);
+    setBonusEarned(true);
+    hapticSuccess();
+    // 'amber_earn' is not in this build's UiSoundKind, so pair the success
+    // haptic with the existing confirmation tick.
+    playUiSound('tap');
+    if (reducedMotion) {
+      earnedScale.setValue(1);
+      earnedOpacity.setValue(1);
+      return;
+    }
+    earnedScale.setValue(0.8);
+    earnedOpacity.setValue(0);
+    Animated.parallel([
+      Animated.spring(earnedScale, { toValue: 1, friction: 6, tension: 90, useNativeDriver: true }),
+      Animated.timing(earnedOpacity, { toValue: 1, duration: 180, useNativeDriver: true }),
+    ]).start();
+  }, [onShared, reducedMotion, earnedScale, earnedOpacity]);
+
   const handleShare = async () => {
     if (!result || sharing) return;
     hapticLight();
     setSharing(true);
     try {
       const ok = await shareResultImage(cardRef.current, result);
-      if (ok) onShared?.();
+      if (ok) await acknowledgeShareSuccess();
     } finally {
       setSharing(false);
     }
@@ -122,7 +208,7 @@ export const ShareResultModal: React.FC<ShareResultModalProps> = ({ result, onCl
       // success (share count + first-share-of-day bonus) like every other
       // share path; a dismissed sheet / OS rejection resolves false.
       const ok = await shareChallengeText(challengeText);
-      if (ok) onShared?.();
+      if (ok) await acknowledgeShareSuccess();
     } finally {
       setSharing(false);
     }
@@ -155,14 +241,26 @@ export const ShareResultModal: React.FC<ShareResultModalProps> = ({ result, onCl
         >
           {result && (
             <>
-              <ShareCard ref={cardRef} result={result} />
+              <Animated.View style={{ transform: [{ scale: cardScale }], opacity: cardOpacity }}>
+                <ShareCard ref={cardRef} result={result} />
+              </Animated.View>
 
               <PanelCard phase={phase} kind="card" style={styles.actionPanel}>
-                {bonusAvailable && (
+                {bonusEarned ? (
+                  <Animated.Text
+                    accessibilityLiveRegion="polite"
+                    style={[
+                      styles.bonusHint,
+                      { color: t.amberText, opacity: earnedOpacity, transform: [{ scale: earnedScale }] },
+                    ]}
+                  >
+                    Shared. +{DAILY_SHARE_BONUS_AMBER} amber
+                  </Animated.Text>
+                ) : bonusAvailable ? (
                   <Text style={[styles.bonusHint, { color: t.amberText }]}>
                     +{DAILY_SHARE_BONUS_AMBER} amber for your first share today
                   </Text>
-                )}
+                ) : null}
                 <Text style={[styles.captureHint, { color: t.muted }]}>
                   {isImageShareAvailable()
                     ? 'Shares as an image.'
@@ -181,8 +279,13 @@ export const ShareResultModal: React.FC<ShareResultModalProps> = ({ result, onCl
                       accessibilityLabel="Share result"
                     />
                     {sharing && (
-                      <View style={styles.spinnerOverlay} pointerEvents="none">
-                        <ActivityIndicator color={t.primaryText} />
+                      <View
+                        style={[styles.spinnerOverlay, styles.captureFill, { backgroundColor: t.cardBg, borderColor: t.amberTintBorder }]}
+                        pointerEvents="none"
+                      >
+                        <Animated.Text style={[styles.captureLabel, { color: t.amberText, opacity: capturePulse }]}>
+                          capturing...
+                        </Animated.Text>
                       </View>
                     )}
                   </View>
@@ -200,6 +303,7 @@ export const ShareResultModal: React.FC<ShareResultModalProps> = ({ result, onCl
                 {challengeText != null && (
                   <CandyButton
                     label={getChallengeFriendLabel(phase)}
+                    icon={require('../../../assets/ui/variant_swords.png')}
                     onPress={handleChallengeShare}
                     phase={phase}
                     variant="secondary"
@@ -269,6 +373,17 @@ const styles = StyleSheet.create({
     bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // Parchment status chip that masks the "Share" label while capturing.
+  captureFill: {
+    borderRadius: 14,
+    borderWidth: 1.5,
+  },
+  captureLabel: {
+    fontSize: 13,
+    fontWeight: '800',
+    fontFamily: PIXEL_FONT_BOLD,
+    letterSpacing: 0.4,
   },
   challengeBtn: {
     alignSelf: 'stretch',

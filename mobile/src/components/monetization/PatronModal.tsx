@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { CandyColors } from '../../theme/colors';
-import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
+import { SURFACE, getSurfaceTheme, getModalInSpring } from '../../theme/surfaces';
 import { getPixelSkin, PANEL_CORNER_DP, PANEL_EDGE_DP } from '../../theme/pixelSkin.generated';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { NineSliceFrame } from '../ui/NineSlice';
@@ -27,6 +27,7 @@ import { PATRON_AMBER_BONUS } from '../../constants/gameBalance';
 import { getSettingsSync } from '../../services/settings';
 import { hapticLight, hapticMedium } from '../../services/haptics';
 import { logEvent } from '../../services/eventLogger';
+import { FONT_SIZE } from '../../theme/typeScale';
 
 interface PatronModalProps {
   visible: boolean;
@@ -142,7 +143,7 @@ export const PatronModal: React.FC<PatronModalProps> = ({
     const anim = Animated.parallel([
       Animated.spring(cardScale, {
         toValue: 1,
-        ...SURFACE.modalIn,
+        ...getModalInSpring(phase),
         useNativeDriver: true,
       }),
       Animated.timing(cardOpacity, {
@@ -436,14 +437,14 @@ const styles = StyleSheet.create({
     borderRadius: 100,
   },
   eyebrow: {
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '800',
     fontFamily: PIXEL_FONT_BOLD,
     letterSpacing: 3,
     textAlign: 'center',
   },
   title: {
-    fontSize: 26,
+    fontSize: FONT_SIZE.display,
     fontWeight: '900',
     fontFamily: PIXEL_FONT_BOLD,
     letterSpacing: 0.4,
@@ -451,7 +452,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   subtitle: {
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '500',
     fontFamily: BODY_FONT,
     textAlign: 'center',
@@ -469,7 +470,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   benefitBullet: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '900',
     fontFamily: PIXEL_FONT_BOLD,
     marginRight: 10,
@@ -477,7 +478,7 @@ const styles = StyleSheet.create({
   },
   benefitText: {
     flex: 1,
-    fontSize: 13.5,
+    fontSize: FONT_SIZE.body,
     fontWeight: '500',
     fontFamily: BODY_FONT,
     lineHeight: 19,
@@ -487,13 +488,13 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   patronActiveTitle: {
-    fontSize: 16,
+    fontSize: FONT_SIZE.large,
     fontWeight: '900',
     fontFamily: PIXEL_FONT_BOLD,
     textAlign: 'center',
   },
   patronActiveBody: {
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '500',
     fontFamily: BODY_FONT,
     textAlign: 'center',
@@ -507,7 +508,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   unavailableText: {
-    fontSize: 12.5,
+    fontSize: FONT_SIZE.small,
     fontWeight: '500',
     fontFamily: BODY_FONT,
     textAlign: 'center',
@@ -521,7 +522,7 @@ const styles = StyleSheet.create({
     marginTop: 18,
   },
   removeAdsHint: {
-    fontSize: 12.5,
+    fontSize: FONT_SIZE.small,
     fontWeight: '500',
     fontFamily: BODY_FONT,
     textAlign: 'center',
@@ -529,7 +530,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   adFreeNote: {
-    fontSize: 12.5,
+    fontSize: FONT_SIZE.small,
     fontWeight: '600',
     fontFamily: PIXEL_FONT_BOLD,
     textAlign: 'center',
@@ -543,7 +544,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   footnote: {
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '500',
     fontFamily: BODY_FONT,
     textAlign: 'center',

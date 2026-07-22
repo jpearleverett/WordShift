@@ -44,6 +44,20 @@ export const SURFACE = {
 } as const;
 
 /**
+ * Modal / toast entrance spring, phase-aware. SURFACE.modalIn stays the fixed
+ * default for surfaces with no phase context; this ages the entrance with the
+ * descent (bright springy overshoot -> heavy dark settle) for the surfaces that
+ * DO know their phase, so a cottage sheet doesn't bounce in candy-bright over a
+ * Phase-4 board. Mirrors the celebration/press ladders.
+ */
+export function getModalInSpring(phase: number): { friction: number; tension: number } {
+  if (phase >= 4) return { friction: 10, tension: 55 };
+  if (phase >= 3) return { friction: 8, tension: 60 };
+  if (phase >= 2) return { friction: 7, tension: 62 };
+  return SURFACE.modalIn;
+}
+
+/**
  * Press-feedback spring, phase-aware: bright phases snap back playfully, dark
  * phases release heavily — the same weight language the letter tiles speak.
  */
@@ -51,6 +65,21 @@ export function getPressSpring(phase: number): { friction: number; tension: numb
   if (phase >= 4) return { friction: 9, tension: 90 };
   if (phase >= 3) return { friction: 7, tension: 120 };
   return { friction: 4, tension: 200 };
+}
+
+/**
+ * The celebration spring for the victory ceremony (star pops, modal reveal).
+ * The win is a WORLD arrival, so it takes the phase ladder like the letter
+ * tiles: bright candy bounce in the early days, a heavy stone-like settle at
+ * the reveal, so a triple candy-bounce star never contradicts the doctrine
+ * that a phase-3+ victory "feels hollow". Mirrors the tile ladder shape
+ * (LetterTile getSelectedSpringParams: friction 3->9, tension 200->80).
+ */
+export function getCelebrationSpring(phase: number): { friction: number; tension: number } {
+  if (phase >= 4) return { friction: 9, tension: 80 };
+  if (phase >= 3) return { friction: 7, tension: 95 };
+  if (phase >= 2) return { friction: 5, tension: 105 };
+  return { friction: 4, tension: 120 };
 }
 
 // ---------------------------------------------------------------------------
@@ -150,7 +179,10 @@ const COTTAGE: Record<'bright' | 'dusk' | 'storm' | 'dark' | 'serene', Omit<Surf
     primaryBg: '#D97F2E', primaryEdge: '#733D12', primaryText: '#2A1A10',
     pillBg: '#D97F2E', pillEdge: '#733D12', pillText: '#2A1A10',
     secondaryBg: 'rgba(122, 82, 56, 0.18)', secondaryBorder: '#613E2B', secondaryText: '#2F1F14',
-    dangerText: '#8A2F22',
+    // Deepened from #8A2F22 (4.11:1 on cardBg / 3.60:1 on sectionBg — below the
+    // >= 4.5:1 contract) to #6E2015 (5.49:1 on cardBg, 4.81:1 on sectionBg),
+    // keeping the danger-red hue.
+    dangerText: '#6E2015',
   },
   dark: {
     screenBg: '#171013', headerTitle: '#E8D5B7', headerMuted: '#BBA68E', headerChipBorder: 'rgba(232, 213, 183, 0.30)', cardBg: '#352A31', cardBorder: '#0F0A10',

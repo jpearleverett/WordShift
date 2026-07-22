@@ -11,13 +11,14 @@ import {
   Image,
 } from 'react-native';
 import { CandyColors } from '../../theme/colors';
-import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
+import { SURFACE, getSurfaceTheme, getModalInSpring } from '../../theme/surfaces';
 import { getPixelSkin, PANEL_CORNER_DP, PANEL_EDGE_DP } from '../../theme/pixelSkin.generated';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { NineSliceFrame } from '../ui/NineSlice';
 import { CandyButton } from '../ui/CandyButton';
 import { PanelCard } from '../ui/PanelCard';
 import { AmberInline } from '../AmberInline';
+import { AmberSparkle } from '../home/AmberSparkle';
 import {
   PRODUCT_IDS,
   CONSUMABLE_PRODUCTS,
@@ -40,8 +41,11 @@ import { awardBonusAmber } from '../../services/amberCurrency';
 import { addHints } from '../../services/hints';
 import { getSettingsSync } from '../../services/settings';
 import { hapticLight, hapticMedium } from '../../services/haptics';
+import { announceForA11y } from '../../services/a11yAnnounce';
 import { logEvent } from '../../services/eventLogger';
 import { RewardedAdButton } from './RewardedAdButton';
+import { RewardReveal } from '../ui/RewardReveal';
+import { GiftOverlay, GiftItem } from './GiftOverlay';
 import { isAdsReady } from '../../services/ads';
 import {
   getDailyAmberStatus,
@@ -50,8 +54,10 @@ import {
   DailyAmberStatus,
 } from '../../services/dailyAmberReward';
 import { DAILY_AMBER_REWARD, SUPPORTER_MONTHLY_AMBER } from '../../constants/gameBalance';
+import { FONT_SIZE } from '../../theme/typeScale';
 
 const HINT_ICON = require('../../../assets/ui/hint.png');
+const AMBER_ICON = require('../../../assets/ui/amber.png');
 
 /**
  * Fallback price label for The Keeper's Collection when the store product isn't
@@ -130,6 +136,17 @@ export const StoreModal: React.FC<StoreModalProps> = ({
   );
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [amberFaucet, setAmberFaucet] = useState<DailyAmberStatus | null>(null);
+  // The daily faucet claim resolves into a magnitude-aware RewardReveal count-up
+  // (nonce forces a fresh reveal each claim, since the faucet allows 2/day).
+  const [faucetReveal, setFaucetReveal] = useState<{ amount: number; nonce: number } | null>(null);
+  // The marquee gift moment (starter pack / first-purchase 2x) — presented as a
+  // real gift overlay instead of an appended success line. Presentation only;
+  // the grant + pending-ledger ack already ran on the success path.
+  const [gift, setGift] = useState<{
+    title: string;
+    subtitle?: string;
+    items: GiftItem[];
+  } | null>(null);
 
   const cardScale = useRef(new Animated.Value(reducedMotion ? 1 : 0.92)).current;
   const cardOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
@@ -141,6 +158,8 @@ export const StoreModal: React.FC<StoreModalProps> = ({
       setIsSupporterActive(hasEntitlementSync(ENTITLEMENTS.SUPPORTER));
       setFirstAmberDouble(!hasMadeAmberPurchaseSync());
       setSuccessMsg(null);
+      setFaucetReveal(null);
+      setGift(null);
       getDailyAmberStatus().then(setAmberFaucet).catch(() => {});
       logEvent({ type: 'store_opened', data: { surface: 'store_modal' } });
     }
@@ -184,12 +203,89 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     cardScale.setValue(0.92);
     cardOpacity.setValue(0);
     const anim = Animated.parallel([
-      Animated.spring(cardScale, { toValue: 1, ...SURFACE.modalIn, useNativeDriver: true }),
+      Animated.spring(cardScale, { toValue: 1, ...getModalInSpring(phase), useNativeDriver: true }),
       Animated.timing(cardOpacity, { toValue: 1, duration: 180, useNativeDriver: true }),
     ]);
     anim.start();
     return () => anim.stop();
   }, [visible, reducedMotion, cardScale, cardOpacity]);
+
+  // Header amber balance: ticks from the old to the new value over ~400ms
+  // (plain setState steps at ~30ms intervals, text-only) instead of an
+  // instant number swap, with a one-cycle AmberSparkle burst on the pill.
+  const [displayedAmber, setDisplayedAmber] = useState(amberBalance);
+  const prevAmberRef = useRef(amberBalance);
+  const [amberBurst, setAmberBurst] = useState(false);
+  useEffect(() => {
+    if (!visible) {
+      prevAmberRef.current = amberBalance;
+      setDisplayedAmber(amberBalance);
+      setAmberBurst(false);
+      return;
+    }
+    const prev = prevAmberRef.current;
+    if (prev === amberBalance) return;
+    if (reducedMotion) {
+      setDisplayedAmber(amberBalance);
+      prevAmberRef.current = amberBalance;
+      return;
+    }
+    const start = prev;
+    const end = amberBalance;
+    const steps = 13; // ~400ms at ~30ms/step
+    let i = 0;
+    setAmberBurst(true);
+    const id = setInterval(() => {
+      i++;
+      const fraction = Math.min(1, i / steps);
+      setDisplayedAmber(Math.round(start + (end - start) * fraction));
+      if (i >= steps) {
+        clearInterval(id);
+        prevAmberRef.current = end;
+        setAmberBurst(false);
+      }
+    }, 30);
+    return () => clearInterval(id);
+  }, [amberBalance, visible, reducedMotion]);
+
+  // successBox springs in (scale 0.9 -> 1 + fade) instead of popping.
+  const successBoxScale = useRef(new Animated.Value(reducedMotion ? 1 : 0.9)).current;
+  const successBoxOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  useEffect(() => {
+    if (!successMsg) {
+      successBoxOpacity.setValue(0);
+      successBoxScale.setValue(0.9);
+      return;
+    }
+    if (reducedMotion) {
+      successBoxOpacity.setValue(1);
+      successBoxScale.setValue(1);
+      return;
+    }
+    successBoxOpacity.setValue(0);
+    successBoxScale.setValue(0.9);
+    const anim = Animated.parallel([
+      Animated.spring(successBoxScale, { toValue: 1, friction: 6, tension: 140, useNativeDriver: true }),
+      Animated.timing(successBoxOpacity, { toValue: 1, duration: 220, useNativeDriver: true }),
+    ]);
+    anim.start();
+    return () => anim.stop();
+  }, [successMsg, reducedMotion, successBoxScale, successBoxOpacity]);
+
+  // Cross-platform screen-reader fallback for the store's transient messages:
+  // accessibilityLiveRegion (below) is Android-only, so these announce the same
+  // copy under VoiceOver too (announceForA11y is a no-op when no reader runs).
+  useEffect(() => {
+    if (successMsg) announceForA11y(successMsg);
+  }, [successMsg]);
+  useEffect(() => {
+    if (faucetReveal) announceForA11y(`Added ${faucetReveal.amount} amber`);
+  }, [faucetReveal]);
+  useEffect(() => {
+    if (flow === 'unavailable') {
+      announceForA11y('The store is not available right now. Nothing was charged.');
+    }
+  }, [flow]);
 
   const priceLabel = useCallback(
     (info: ConsumableProductInfo) => prices[info.productId] ?? info.fallbackPrice,
@@ -213,7 +309,9 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     }
     const balance = await awardBonusAmber(grant, 'rewarded_daily_amber');
     onAmberChange?.(balance);
-    setSuccessMsg(`+${grant} amber added.`);
+    // Present the claim as a magnitude-aware count-up, not a static line.
+    setSuccessMsg(null);
+    setFaucetReveal({ amount: grant, nonce: Date.now() });
     logEvent({ type: 'daily_amber_claimed', data: { amount: grant, remaining: result.remaining } });
   }, [onAmberChange]);
 
@@ -222,6 +320,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
       if (flow === 'working') return;
       setFlow('working');
       setSuccessMsg(null);
+      setFaucetReveal(null);
       hapticLight();
       logEvent({ type: 'purchase_initiated', data: { productId: info.productId, kind: info.reward.kind } });
       try {
@@ -231,11 +330,18 @@ export const StoreModal: React.FC<StoreModalProps> = ({
             const balance = await awardBonusAmber(result.reward.amount, `iap_${info.productId}`);
             onAmberChange?.(balance);
             setFirstAmberDouble(!hasMadeAmberPurchaseSync());
-            setSuccessMsg(
-              result.firstPurchaseDoubled
-                ? `+${result.reward.amount} amber added. 2× first purchase!`
-                : `+${result.reward.amount} amber added.`,
-            );
+            if (result.firstPurchaseDoubled) {
+              // The one-time first-purchase 2x is a marquee moment: present it
+              // as a real gift, not an appended line. The amount is already
+              // doubled by the iap layer.
+              setGift({
+                title: 'Doubled, with thanks',
+                subtitle: 'The house returns your very first gift twice over. Just this once.',
+                items: [{ icon: AMBER_ICON, amount: result.reward.amount, label: 'amber' }],
+              });
+            } else {
+              setSuccessMsg(`+${result.reward.amount} amber added.`);
+            }
           } else {
             const balance = await addHints(result.reward.amount, `iap_${info.productId}`);
             onHintsChange?.(balance);
@@ -271,6 +377,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     if (flow === 'working' || ownsStarter) return;
     setFlow('working');
     setSuccessMsg(null);
+    setFaucetReveal(null);
     hapticLight();
     logEvent({ type: 'purchase_initiated', data: { productId: STARTER_PACK_INFO.productId, kind: 'starter' } });
     try {
@@ -289,7 +396,16 @@ export const StoreModal: React.FC<StoreModalProps> = ({
           acknowledgeConsumableGrant(result.grantIds.hints).catch(() => {});
         }
         setOwnsStarter(true);
-        setSuccessMsg(`+${result.reward.amber} amber and +${result.reward.hints} hints added.`);
+        // The Keeper's Welcome is a marquee moment: present the bundle as a
+        // real gift (amber + hints each counting up), not an appended line.
+        setGift({
+          title: STARTER_PACK_INFO.name,
+          subtitle: 'A welcome gift, set on the shelf for you.',
+          items: [
+            { icon: AMBER_ICON, amount: result.reward.amber, label: 'amber' },
+            { icon: HINT_ICON, amount: result.reward.hints, label: 'hints' },
+          ],
+        });
         logEvent({ type: 'iap_purchase', data: { productId: STARTER_PACK_INFO.productId, kind: 'starter' } });
         hapticMedium();
         setFlow('idle');
@@ -317,6 +433,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     if (flow === 'working' || ownsBundle) return;
     setFlow('working');
     setSuccessMsg(null);
+    setFaucetReveal(null);
     hapticLight();
     logEvent({ type: 'purchase_initiated', data: { productId: PRODUCT_IDS.COSMETIC_BUNDLE, kind: 'cosmetic' } });
     try {
@@ -345,6 +462,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     if (flow === 'working' || isSupporterActive) return;
     setFlow('working');
     setSuccessMsg(null);
+    setFaucetReveal(null);
     hapticLight();
     logEvent({ type: 'purchase_initiated', data: { productId: PRODUCT_IDS.SUPPORTER_SUB, kind: 'supporter' } });
     try {
@@ -373,6 +491,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
   const handleClose = useCallback(() => {
     setFlow('idle');
     setSuccessMsg(null);
+    setFaucetReveal(null);
     onClose();
   }, [onClose]);
 
@@ -436,6 +555,9 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     >
       <View style={[styles.overlay, { backgroundColor: t.overlay }]}>
         <Animated.View
+          // VoiceOver: treat the store card as a modal so the reader stays
+          // within it (accessibilityLiveRegion elsewhere is Android-only).
+          accessibilityViewIsModal
           style={[
             styles.card,
             { opacity: cardOpacity, transform: [{ scale: cardScale }] },
@@ -453,9 +575,12 @@ export const StoreModal: React.FC<StoreModalProps> = ({
           <View style={styles.headerRow}>
             <Text style={[styles.title, { color: t.title }]}>Store</Text>
             <View style={[styles.balances, { backgroundColor: t.rowBg, borderColor: t.rowBorder }]}>
-              <Text style={[styles.balanceText, { color: t.amberText }]}>
-                <AmberInline size={13} /> {amberBalance}
-              </Text>
+              <View style={styles.amberBalanceWrap}>
+                <Text style={[styles.balanceText, { color: t.amberText }]} accessibilityLabel={`${displayedAmber} amber`}>
+                  <AmberInline size={13} /> {displayedAmber}
+                </Text>
+                {amberBurst && <AmberSparkle phase={phase} />}
+              </View>
               <Text style={[styles.balanceText, { color: t.body }]}>
                 <Image source={HINT_ICON} style={styles.hintInline} accessibilityLabel="hints" />{' '}
                 {hintBalance}
@@ -590,13 +715,29 @@ export const StoreModal: React.FC<StoreModalProps> = ({
             )}
           </ScrollView>
 
-          {successMsg && flow !== 'unavailable' && (
-            <View
-              style={[styles.successBox, { backgroundColor: t.amberTint, borderColor: t.amberTintBorder }]}
+          {faucetReveal && flow !== 'unavailable' && (
+            <View style={styles.rewardBox}>
+              <RewardReveal
+                key={faucetReveal.nonce}
+                amount={faucetReveal.amount}
+                icon={AMBER_ICON}
+                label="added to your amber"
+                phase={phase}
+              />
+            </View>
+          )}
+
+          {successMsg && !faucetReveal && flow !== 'unavailable' && (
+            <Animated.View
+              style={[
+                styles.successBox,
+                { backgroundColor: t.amberTint, borderColor: t.amberTintBorder },
+                { opacity: successBoxOpacity, transform: [{ scale: successBoxScale }] },
+              ]}
               accessibilityLiveRegion="polite"
             >
               <Text style={[styles.successText, { color: t.amberText }]}>{successMsg}</Text>
-            </View>
+            </Animated.View>
           )}
 
           {flow === 'unavailable' && (
@@ -622,6 +763,18 @@ export const StoreModal: React.FC<StoreModalProps> = ({
             style={styles.closeBtn}
           />
         </Animated.View>
+
+        {/* Marquee gift moment (starter pack / first-purchase 2x) — presented
+            as a real gift over the store. Presentation only; the grant already
+            landed on the success path. */}
+        <GiftOverlay
+          visible={gift !== null}
+          phase={phase}
+          title={gift?.title ?? ''}
+          subtitle={gift?.subtitle}
+          items={gift?.items ?? []}
+          onClose={() => setGift(null)}
+        />
       </View>
     </Modal>
   );
@@ -657,7 +810,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 8,
   },
-  title: { fontSize: 24, fontWeight: '900', letterSpacing: 0.5, fontFamily: PIXEL_FONT_BOLD },
+  title: { fontSize: FONT_SIZE.display, fontWeight: '900', letterSpacing: 0.5, fontFamily: PIXEL_FONT_BOLD },
   balances: {
     flexDirection: 'row',
     gap: 12,
@@ -666,13 +819,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  balanceText: { fontSize: 14, fontWeight: '700', fontFamily: PIXEL_FONT_BOLD },
+  balanceText: { fontSize: FONT_SIZE.bodyLg, fontWeight: '700', fontFamily: PIXEL_FONT_BOLD },
+  // Wraps the amber balance so the one-cycle AmberSparkle burst has a
+  // positioned anchor to overlay on credit.
+  amberBalanceWrap: { position: 'relative' },
   hintInline: { width: 13, height: 13 },
   hintInlineSmall: { width: 11, height: 11 },
   scroll: { flexGrow: 0 },
   scrollContent: { paddingBottom: 4 },
   sectionLabel: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '800',
     fontFamily: PIXEL_FONT_BOLD,
     letterSpacing: SURFACE.sectionLetterSpacing,
@@ -686,7 +842,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   heroRibbonRow: { flexDirection: 'row', marginBottom: 8 },
-  heroTitle: { fontSize: 18, fontWeight: '900', marginBottom: 2, fontFamily: PIXEL_FONT_BOLD },
+  heroTitle: { fontSize: FONT_SIZE.title, fontWeight: '900', marginBottom: 2, fontFamily: PIXEL_FONT_BOLD },
   heroCta: { marginTop: 12 },
 
   // Section rows — layered PanelCard material; consistent heights.
@@ -700,9 +856,9 @@ const styles = StyleSheet.create({
   },
   rowInfo: { flex: 1, paddingRight: 12 },
   rowTitleLine: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  rowTitle: { fontSize: 15, fontWeight: '800', fontFamily: PIXEL_FONT_BOLD },
+  rowTitle: { fontSize: FONT_SIZE.callout, fontWeight: '800', fontFamily: PIXEL_FONT_BOLD },
   ribbon: {
-    fontSize: 9,
+    fontSize: FONT_SIZE.micro,
     fontWeight: '900',
     fontFamily: PIXEL_FONT_BOLD,
     letterSpacing: 0.5,
@@ -711,18 +867,18 @@ const styles = StyleSheet.create({
     borderRadius: 7,
     overflow: 'hidden',
   },
-  rowDesc: { fontSize: 12.5, marginTop: 3, lineHeight: 17, fontFamily: BODY_FONT },
+  rowDesc: { fontSize: FONT_SIZE.small, marginTop: 3, lineHeight: 17, fontFamily: BODY_FONT },
 
   // Price pill — chunky amber CandyButton (the single warm accent).
   pricePill: { minWidth: 84 },
-  ownedText: { fontSize: 13, fontWeight: '800', paddingHorizontal: 8, fontFamily: PIXEL_FONT_BOLD },
+  ownedText: { fontSize: FONT_SIZE.body, fontWeight: '800', paddingHorizontal: 8, fontFamily: PIXEL_FONT_BOLD },
 
   patronLink: {
     marginTop: 16,
     paddingVertical: 12,
     paddingHorizontal: 14,
   },
-  patronLinkText: { fontSize: 13, lineHeight: 18, textAlign: 'center', fontFamily: BODY_FONT },
+  patronLinkText: { fontSize: FONT_SIZE.body, lineHeight: 18, textAlign: 'center', fontFamily: BODY_FONT },
 
   successBox: {
     marginTop: 12,
@@ -731,7 +887,9 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
   },
-  successText: { fontSize: 12.5, lineHeight: 17, textAlign: 'center', fontWeight: '700', fontFamily: PIXEL_FONT_BOLD },
+  successText: { fontSize: FONT_SIZE.small, lineHeight: 17, textAlign: 'center', fontWeight: '700', fontFamily: PIXEL_FONT_BOLD },
+  // Faucet claim reward reveal (magnitude-aware count-up in place of a static line).
+  rewardBox: { marginTop: 12, alignItems: 'center' },
   unavailableBox: {
     marginTop: 12,
     borderRadius: 12,
@@ -739,7 +897,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
   },
-  unavailableText: { fontSize: 12.5, lineHeight: 17, textAlign: 'center', fontFamily: BODY_FONT },
+  unavailableText: { fontSize: FONT_SIZE.small, lineHeight: 17, textAlign: 'center', fontFamily: BODY_FONT },
   workingRow: { marginTop: 12, alignItems: 'center' },
   closeBtn: { marginTop: 12 },
 });

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,9 +12,12 @@ import {
   ImageStyle,
   TextStyle,
   StyleProp,
+  Animated,
+  Easing,
 } from 'react-native';
 import { CandyColors } from '../../theme/colors';
-import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
+import { SURFACE, getSurfaceTheme, getModalInSpring } from '../../theme/surfaces';
+import { getSettingsSync } from '../../services/settings';
 import { PanelCard } from '../ui/PanelCard';
 import { getModeIconSprite } from './modeIcons';
 import { Difficulty, GameMode } from '../../types';
@@ -27,6 +30,7 @@ import {
 import { BODY_FONT, BODY_FONT_ITALIC, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import type { UnbrokenWeaveMastery } from '../../services/masteryRecords';
+import { FONT_SIZE } from '../../theme/typeScale';
 
 // The bare mode emoji in the variant/combo selector and the challenge/blind/
 // weave toggles now render as generated candy sprites (shared with the
@@ -171,6 +175,65 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
 }) => {
   // Hooks must run on every render (before the visibility early-return).
   const screenInsets = useScreenInsets();
+
+  // House entrance: this config surface used to pop in and out with zero
+  // transition (animationType="none"). Match RulesModal's sibling pattern — a
+  // backdrop fade + a SURFACE.modalIn spring on the panel — with the design
+  // system's asymmetric exit (springy in, fast out). Reduced motion pins
+  // everything shown. Refs/effect live BEFORE the visibility early-return so the
+  // hook order never changes.
+  const reducedMotion = getSettingsSync().reducedMotion;
+  const backdropOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const cardScale = useRef(new Animated.Value(reducedMotion ? 1 : 0.92)).current;
+  const cardOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const closingRef = useRef(false);
+
+  useEffect(() => {
+    if (!visible) return;
+    closingRef.current = false;
+    if (reducedMotion) {
+      backdropOpacity.setValue(1);
+      cardScale.setValue(1);
+      cardOpacity.setValue(1);
+      return;
+    }
+    backdropOpacity.setValue(0);
+    cardScale.setValue(0.92);
+    cardOpacity.setValue(0);
+    const anim = Animated.parallel([
+      Animated.timing(backdropOpacity, { toValue: 1, duration: 180, useNativeDriver: true }),
+      Animated.spring(cardScale, { toValue: 1, ...getModalInSpring(phase), useNativeDriver: true }),
+      Animated.timing(cardOpacity, { toValue: 1, duration: 180, useNativeDriver: true }),
+    ]);
+    anim.start();
+    return () => anim.stop();
+  }, [visible, reducedMotion, backdropOpacity, cardScale, cardOpacity]);
+
+  // Fast, asymmetric exit: fade the panel + scrim, then hand back to the parent
+  // (which owns `visible`). A guard stops a double-dismiss from racing.
+  const handleClose = useCallback(() => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    if (reducedMotion) {
+      onClose?.();
+      return;
+    }
+    Animated.parallel([
+      Animated.timing(backdropOpacity, {
+        toValue: 0,
+        duration: SURFACE.modalOutMs,
+        easing: Easing.in(Easing.ease),
+        useNativeDriver: true,
+      }),
+      Animated.timing(cardOpacity, {
+        toValue: 0,
+        duration: SURFACE.modalOutMs,
+        easing: Easing.in(Easing.ease),
+        useNativeDriver: true,
+      }),
+    ]).start(() => onClose?.());
+  }, [reducedMotion, backdropOpacity, cardOpacity, onClose]);
+
   if (!visible) return null;
 
   const t = getSurfaceTheme(phase);
@@ -299,14 +362,20 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
       transparent
       animationType="none"
       statusBarTranslucent
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
     >
+      {/* Backdrop scrim fades in with the panel (native-driver opacity),
+          giving the house entrance without touching the anchor layout. */}
+      <Animated.View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, { backgroundColor: t.overlay, opacity: backdropOpacity }]}
+      />
       {/* Backdrop: tap anywhere outside the panel to dismiss (also gives the
           menu the whole window as a native touch surface — see the layout
           contract comment at the top of this file). */}
       <Pressable
         style={StyleSheet.absoluteFill}
-        onPress={onClose}
+        onPress={handleClose}
         accessibilityLabel="Close puzzle setup"
         accessibilityRole="button"
       />
@@ -323,6 +392,10 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
           },
         ]}
       >
+    {/* Entrance wrapper: springs the panel in (scale) + fades it (opacity),
+        native-driver. Shrink-wraps under menuLayer's flex-end anchor so the
+        panel stays pinned below the setup chip. */}
+    <Animated.View style={{ transform: [{ scale: cardScale }], opacity: cardOpacity }}>
     <PanelCard phase={phase} kind="panel" style={panelStyle}>
       <Text style={[styles.menuTitle, { color: t.title }]}>{title}</Text>
       <ScrollView
@@ -564,6 +637,7 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
         )}
       </ScrollView>
     </PanelCard>
+    </Animated.View>
       </View>
     </Modal>
   );
@@ -598,7 +672,7 @@ const styles = StyleSheet.create({
   },
   menuTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '900',
     letterSpacing: SURFACE.sectionLetterSpacing,
     paddingHorizontal: 16,
@@ -616,7 +690,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '900',
     letterSpacing: SURFACE.sectionLetterSpacing,
     marginTop: 4,
@@ -643,7 +717,7 @@ const styles = StyleSheet.create({
   },
   menuRowText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '800',
     letterSpacing: 0.3,
   },
@@ -655,7 +729,7 @@ const styles = StyleSheet.create({
   },
   challengeMenuIcon: {
     fontFamily: BODY_FONT,
-    fontSize: 17,
+    fontSize: FONT_SIZE.large,
     marginRight: 10,
   },
   challengeMenuIconImage: {
@@ -668,18 +742,18 @@ const styles = StyleSheet.create({
   },
   challengeMenuDesc: {
     fontFamily: BODY_FONT,
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     marginTop: 1,
   },
   weaveMasteryTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 11,
+    fontSize: FONT_SIZE.caption,
     fontWeight: '800',
     marginTop: 4,
   },
   weaveMasteryObjective: {
     fontFamily: BODY_FONT_ITALIC,
-    fontSize: 10.5,
+    fontSize: FONT_SIZE.micro,
     lineHeight: 14,
     marginTop: 1,
   },
@@ -696,7 +770,7 @@ const styles = StyleSheet.create({
   },
   variantIcon: {
     fontFamily: BODY_FONT,
-    fontSize: 17,
+    fontSize: FONT_SIZE.large,
     marginRight: 8,
     marginTop: 1,
   },
@@ -717,17 +791,17 @@ const styles = StyleSheet.create({
   },
   variantTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '800',
   },
   variantDescription: {
     fontFamily: BODY_FONT,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     lineHeight: 16,
   },
   variantBadge: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 9,
+    fontSize: FONT_SIZE.micro,
     fontWeight: '900',
     letterSpacing: 0.5,
     marginLeft: 6,
@@ -741,7 +815,7 @@ const styles = StyleSheet.create({
   },
   lockedHintText: {
     fontFamily: BODY_FONT_ITALIC,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     lineHeight: 16,
     fontStyle: 'italic',
   },
@@ -756,7 +830,7 @@ const styles = StyleSheet.create({
   },
   variantUnlockHintText: {
     fontFamily: BODY_FONT_ITALIC,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     lineHeight: 16,
     textAlign: 'center',
     fontStyle: 'italic',

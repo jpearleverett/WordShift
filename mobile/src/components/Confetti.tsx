@@ -1,8 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, StyleSheet, Animated, Dimensions, Easing } from 'react-native';
 import { getSettingsSync } from '../services/settings';
 import { getPhaseTheme, CONFETTI_THEMES } from '../theme/colors';
-import { getMaxConfettiCount } from '../services/deviceTier';
+import { getMaxConfettiCount, shouldSimplifyAnimations } from '../services/deviceTier';
 import { getEquippedSync } from '../services/cosmetics';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -12,6 +12,74 @@ type ConfettiShape = 'rect' | 'square' | 'circle' | 'triangle' | 'spark';
 // Modest shape variety keeps the celebration lively; the phase-aware palette
 // (bright rainbow -> dark muted) and the native-driven fall are unchanged.
 const CONFETTI_SHAPES: ConfettiShape[] = ['rect', 'square', 'circle', 'triangle', 'spark'];
+// Dark phases bias toward embers (sparks) instead of party shapes.
+const DARK_CONFETTI_SHAPES: ConfettiShape[] = ['spark', 'spark', 'circle', 'square'];
+
+/**
+ * Per-phase-group fall profile. The dark phases don't just recolor the party —
+ * the pieces fall like ash: fewer wobble cycles, barely any spin, a longer fall
+ * with a stronger ease-in, a plain scale-to-1 instead of a bouncy pop, and a
+ * denser bias toward ember sparks. Phase 5 drifts slower still. All transforms
+ * stay native-driver.
+ */
+interface FallProfile {
+  countScale: number;
+  fallBase: number;
+  fallRand: number;
+  wobbleCycles: number;
+  spinBase: number;
+  spinRand: number;
+  strongEaseIn: boolean;
+  popSpring: boolean;
+  sparkBias: boolean;
+  maxDurationMs: number;
+}
+
+const getFallProfile = (phase: number): FallProfile => {
+  if (phase >= 5) {
+    // Terrible peace: a slow, near-straight drift.
+    return {
+      countScale: 0.55,
+      fallBase: 3400,
+      fallRand: 1500,
+      wobbleCycles: 2,
+      spinBase: 1,
+      spinRand: 0.5,
+      strongEaseIn: true,
+      popSpring: false,
+      sparkBias: true,
+      maxDurationMs: 5900,
+    };
+  }
+  if (phase >= 3) {
+    // Growing shadows / the horizon: fewer wobbles, ~1 spin, a longer heavier fall.
+    return {
+      countScale: 0.6,
+      fallBase: 2800,
+      fallRand: 1500,
+      wobbleCycles: 3,
+      spinBase: 1,
+      spinRand: 1,
+      strongEaseIn: true,
+      popSpring: false,
+      sparkBias: true,
+      maxDurationMs: 5100,
+    };
+  }
+  // Bright phases keep the original party physics.
+  return {
+    countScale: 1,
+    fallBase: 2000,
+    fallRand: 1500,
+    wobbleCycles: 6,
+    spinBase: 3,
+    spinRand: 3,
+    strongEaseIn: false,
+    popSpring: true,
+    sparkBias: false,
+    maxDurationMs: 4200,
+  };
+};
 
 interface ConfettiPiece {
   id: number;
@@ -23,8 +91,9 @@ interface ConfettiPiece {
   shape: ConfettiShape;
 }
 
-const generateConfetti = (count: number, colors?: string[]): ConfettiPiece[] => {
-  const confettiColors = colors || getPhaseTheme(0).confettiColors;
+const generateConfetti = (count: number, colors: string[], sparkBias: boolean): ConfettiPiece[] => {
+  const confettiColors = colors.length > 0 ? colors : getPhaseTheme(0).confettiColors;
+  const shapePool = sparkBias ? DARK_CONFETTI_SHAPES : CONFETTI_SHAPES;
   const pieces: ConfettiPiece[] = [];
   for (let i = 0; i < count; i++) {
     const x = Math.random() * SCREEN_WIDTH;
@@ -36,13 +105,13 @@ const generateConfetti = (count: number, colors?: string[]): ConfettiPiece[] => 
       size: 8 + Math.random() * 12,
       rotation: Math.random() * 360,
       delay: distFromCenter * 400 + Math.random() * 100,
-      shape: CONFETTI_SHAPES[Math.floor(Math.random() * CONFETTI_SHAPES.length)],
+      shape: shapePool[Math.floor(Math.random() * shapePool.length)],
     });
   }
   return pieces;
 };
 
-const ConfettiPieceComponent: React.FC<{ piece: ConfettiPiece }> = ({ piece }) => {
+const ConfettiPieceComponent: React.FC<{ piece: ConfettiPiece; profile: FallProfile }> = ({ piece, profile }) => {
   const translateY = useRef(new Animated.Value(-50)).current;
   const translateX = useRef(new Animated.Value(0)).current;
   const rotate = useRef(new Animated.Value(0)).current;
@@ -50,40 +119,51 @@ const ConfettiPieceComponent: React.FC<{ piece: ConfettiPiece }> = ({ piece }) =
   const scale = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const wobbleAmount = 30 + Math.random() * 50;
-    const fallDuration = 2000 + Math.random() * 1500;
+    // Dark phases wobble less, so the amplitude is softer too (ash doesn't dance).
+    const wobbleAmount = (profile.sparkBias ? 14 : 30) + Math.random() * (profile.sparkBias ? 22 : 50);
+    const fallDuration = profile.fallBase + Math.random() * profile.fallRand;
+    const wobbleCycles = profile.wobbleCycles;
 
-    const anim = Animated.sequence([
-      Animated.delay(piece.delay),
-      Animated.parallel([
-        // Pop in
-        Animated.spring(scale, {
+    // Pop in: a bouncy spring in the bright phases, a plain settle in the dark.
+    const popIn = profile.popSpring
+      ? Animated.spring(scale, {
           toValue: 1,
           friction: 4,
           tension: 100,
           useNativeDriver: true,
-        }),
-        // Fall down
+        })
+      : Animated.timing(scale, {
+          toValue: 1,
+          duration: 300,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        });
+
+    const anim = Animated.sequence([
+      Animated.delay(piece.delay),
+      Animated.parallel([
+        popIn,
+        // Fall down — stronger ease-in in the dark phases so pieces sink.
         Animated.timing(translateY, {
           toValue: SCREEN_HEIGHT + 100,
           duration: fallDuration,
-          easing: Easing.in(Easing.quad),
+          easing: profile.strongEaseIn ? Easing.in(Easing.cubic) : Easing.in(Easing.quad),
           useNativeDriver: true,
         }),
-        // Wobble side to side
-        Animated.sequence([
-          ...Array(6).fill(0).map((_, i) =>
+        // Wobble side to side (fewer cycles in the dark phases)
+        Animated.sequence(
+          Array(wobbleCycles).fill(0).map((_, i) =>
             Animated.timing(translateX, {
-              toValue: (i % 2 === 0 ? 1 : -1) * wobbleAmount * (1 - i * 0.15),
-              duration: fallDuration / 6,
+              toValue: (i % 2 === 0 ? 1 : -1) * wobbleAmount * (1 - i * (0.9 / Math.max(1, wobbleCycles))),
+              duration: fallDuration / wobbleCycles,
               easing: Easing.inOut(Easing.sin),
               useNativeDriver: true,
             })
           ),
-        ]),
-        // Spin
+        ),
+        // Spin — full tumbles in the bright phases, one lazy turn in the dark.
         Animated.timing(rotate, {
-          toValue: 3 + Math.random() * 3,
+          toValue: profile.spinBase + Math.random() * profile.spinRand,
           duration: fallDuration,
           easing: Easing.linear,
           useNativeDriver: true,
@@ -186,10 +266,17 @@ interface ConfettiProps {
   phase?: number;
   /** Ritual energy of the completed puzzle — scales confetti density */
   ritualEnergy?: number;
+  /**
+   * Explicit palette override (e.g. a shop purchase bursting the just-bought
+   * theme). When omitted, an equipped confetti cosmetic wins, else the phase
+   * default. The physics still follow the phase (expression changes color only).
+   */
+  colors?: string[];
 }
 
-export const Confetti: React.FC<ConfettiProps> = ({ active, onComplete, phase = 0, ritualEnergy = 0 }) => {
+export const Confetti: React.FC<ConfettiProps> = ({ active, onComplete, phase = 0, ritualEnergy = 0, colors }) => {
   const [pieces, setPieces] = useState<ConfettiPiece[]>([]);
+  const profile = useMemo(() => getFallProfile(phase), [phase]);
 
   useEffect(() => {
     if (active) {
@@ -202,80 +289,108 @@ export const Confetti: React.FC<ConfettiProps> = ({ active, onComplete, phase = 
       const baseCount = getMaxConfettiCount();
       // Scale confetti density with ritual energy
       const energyBonus = ritualEnergy >= 7 ? Math.floor(baseCount * 0.4) : ritualEnergy >= 4 ? Math.floor(baseCount * 0.2) : 0;
-      // An equipped cosmetic confetti palette overrides the phase default (pure
-      // expression); with none equipped the confetti stays phase-aware.
+      // Dark phases thin the fall (~40% fewer pieces) so it reads as embers, not a party.
+      const count = Math.max(6, Math.round((baseCount + energyBonus) * profile.countScale));
+      // An explicit palette wins (shop purchase burst); else an equipped cosmetic
+      // confetti palette overrides the phase default (pure expression); with none
+      // equipped the confetti stays phase-aware.
       const equippedConfetti = getEquippedSync('confetti');
-      const confettiColors = equippedConfetti && CONFETTI_THEMES[equippedConfetti]
+      const confettiColors = colors
+        ? colors
+        : equippedConfetti && CONFETTI_THEMES[equippedConfetti]
         ? CONFETTI_THEMES[equippedConfetti]
         : theme.confettiColors;
-      setPieces(generateConfetti(baseCount + energyBonus, confettiColors));
-      // Max animation time: up to 500ms delay + 3500ms fall = 4000ms
+      setPieces(generateConfetti(count, confettiColors, profile.sparkBias));
       const timeout = setTimeout(() => {
         onComplete?.();
-      }, 4200);
+      }, profile.maxDurationMs);
       return () => clearTimeout(timeout);
     } else {
       setPieces([]);
     }
-  }, [active, onComplete, phase, ritualEnergy]);
+  }, [active, onComplete, phase, ritualEnergy, colors, profile]);
 
   if (!active || pieces.length === 0) return null;
 
   return (
     <View style={styles.container} pointerEvents="none">
       {pieces.map((piece) => (
-        <ConfettiPieceComponent key={piece.id} piece={piece} />
+        <ConfettiPieceComponent key={piece.id} piece={piece} profile={profile} />
       ))}
     </View>
   );
 };
 
-// Star burst effect for successful moves — colors shift with narrative phase
-const STAR_BURST_COLORS: Record<number, { bg: string; shadow: string }> = {
-  0: { bg: '#FFD700', shadow: '#FFD700' },
-  1: { bg: '#F0C050', shadow: '#D4A030' },
-  2: { bg: '#B088D0', shadow: '#8B5FB0' },
-  3: { bg: '#9050B0', shadow: '#6A2080' },
-  4: { bg: '#C03050', shadow: '#901030' },
-  5: { bg: '#7B6B8A', shadow: '#5A4B6A' },  // Ghostly mauve (Phase 5: terrible peace)
+// Star burst effect for successful moves — colors shift with narrative phase.
+// `accent` is a second tint that appears on the higher combo tiers so a deep
+// streak reads as richer, not just bigger.
+const STAR_BURST_COLORS: Record<number, { bg: string; shadow: string; accent: string }> = {
+  0: { bg: '#FFD700', shadow: '#FFD700', accent: '#FFFFFF' },
+  1: { bg: '#F0C050', shadow: '#D4A030', accent: '#FFE9A8' },
+  2: { bg: '#B088D0', shadow: '#8B5FB0', accent: '#E4CCF6' },
+  3: { bg: '#9050B0', shadow: '#6A2080', accent: '#C79AE0' },
+  4: { bg: '#C03050', shadow: '#901030', accent: '#F07890' },
+  5: { bg: '#7B6B8A', shadow: '#5A4B6A', accent: '#B7A8C4' },  // Ghostly mauve (Phase 5: terrible peace)
 };
+
+// Combo escalation: a deeper clean-move streak throws a bigger, further burst.
+const STAR_COUNT_BY_TIER = [8, 10, 12, 14];
 
 interface StarBurstProps {
   active: boolean;
   x: number;
   y: number;
   phase?: number;
+  /** Clean-move combo tier (0-3) — scales the burst count, spread, and richness. */
+  comboTier?: number;
 }
 
-export const StarBurst: React.FC<StarBurstProps> = ({ active, x, y, phase = 0 }) => {
+export const StarBurst: React.FC<StarBurstProps> = ({ active, x, y, phase = 0, comboTier = 0 }) => {
   const reducedMotion = getSettingsSync().reducedMotion;
-  const stars = useRef(
-    Array(8).fill(0).map((_, i) => ({
-      scale: new Animated.Value(0),
-      translateX: new Animated.Value(0),
-      translateY: new Animated.Value(0),
-      opacity: new Animated.Value(1),
-      angle: (i / 8) * Math.PI * 2,
-    }))
-  ).current;
+  // Low-tier devices skip the decorative burst entirely (the move still lands
+  // its haptic + sound); treat it exactly like reduced motion.
+  const simplify = shouldSimplifyAnimations();
+  const tier = Math.max(0, Math.min(3, Math.floor(comboTier)));
+  const count = STAR_COUNT_BY_TIER[tier];
+
+  // Rebuild the animated set when the tier (and thus count) changes. The values
+  // only run while `active`, so recreating them on a rare tier change is cheap.
+  const stars = useMemo(
+    () =>
+      Array(count).fill(0).map((_, i) => ({
+        scale: new Animated.Value(0),
+        translateX: new Animated.Value(0),
+        translateY: new Animated.Value(0),
+        opacity: new Animated.Value(1),
+        angle: (i / count) * Math.PI * 2,
+      })),
+    [count],
+  );
 
   useEffect(() => {
-    if (active && !reducedMotion) {
+    if (active && !reducedMotion && !simplify) {
       const runningAnims: Animated.CompositeAnimation[] = [];
+      // A deep tier at a dark phase damps one step (a heavier settle).
+      const popFriction = phase >= 3 ? 6 : 4;
+      const popTension = phase >= 3 ? 150 : 200;
+      // Each tier pops a little larger too, so a streak reads as richer, not just
+      // wider. Tier 0 stays exactly 1.0 so the default burst is unchanged.
+      const peakScale = 1 + tier * 0.12;
       stars.forEach((star, i) => {
         star.scale.setValue(0);
         star.translateX.setValue(0);
         star.translateY.setValue(0);
         star.opacity.setValue(1);
 
-        const distance = 40 + Math.random() * 30;
+        // Base distance grows with the combo tier so a streak flings further.
+        const distance = 40 + tier * 12 + Math.random() * 30;
 
         const anim = Animated.parallel([
           Animated.sequence([
             Animated.spring(star.scale, {
-              toValue: 1,
-              friction: 4,
-              tension: 200,
+              toValue: peakScale,
+              friction: popFriction,
+              tension: popTension,
               useNativeDriver: true,
             }),
             Animated.timing(star.scale, {
@@ -310,33 +425,39 @@ export const StarBurst: React.FC<StarBurstProps> = ({ active, x, y, phase = 0 })
       });
       return () => runningAnims.forEach(a => a.stop());
     }
-  }, [active, reducedMotion]);
+  }, [active, reducedMotion, simplify, stars, tier, phase]);
 
-  if (!active || reducedMotion) return null;
+  if (!active || reducedMotion || simplify) return null;
+
+  const palette = STAR_BURST_COLORS[phase] || STAR_BURST_COLORS[0];
 
   return (
     <View style={[styles.starBurstContainer, { left: x - 50, top: y - 50 }]} pointerEvents="none">
-      {stars.map((star, i) => (
-        <Animated.View
-          key={i}
-          style={[
-            styles.star,
-            {
-              transform: [
-                { translateX: star.translateX },
-                { translateY: star.translateY },
-                { scale: star.scale },
-              ],
-              opacity: star.opacity,
-            },
-          ]}
-        >
-          <View style={[styles.starInner, {
-            backgroundColor: (STAR_BURST_COLORS[phase] || STAR_BURST_COLORS[0]).bg,
-            shadowColor: (STAR_BURST_COLORS[phase] || STAR_BURST_COLORS[0]).shadow,
-          }]} />
-        </Animated.View>
-      ))}
+      {stars.map((star, i) => {
+        // From tier 2 up, alternate stars carry the phase accent for extra life.
+        const coreColor = tier >= 2 && i % 2 === 1 ? palette.accent : palette.bg;
+        return (
+          <Animated.View
+            key={i}
+            style={[
+              styles.star,
+              {
+                transform: [
+                  { translateX: star.translateX },
+                  { translateY: star.translateY },
+                  { scale: star.scale },
+                ],
+                opacity: star.opacity,
+              },
+            ]}
+          >
+            {/* Two-layer glow (Android-safe): a soft halo View behind a bright
+                core diamond, so the sparkle exists without an iOS-only shadow. */}
+            <View style={[styles.starHalo, { backgroundColor: coreColor }]} />
+            <View style={[styles.starCore, { backgroundColor: coreColor }]} />
+          </Animated.View>
+        );
+      })}
     </View>
   );
 };
@@ -371,19 +492,26 @@ const styles = StyleSheet.create({
   },
   star: {
     position: 'absolute',
-    width: 16,
-    height: 16,
+    width: 20,
+    height: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  starInner: {
+  // Soft 20px halo (low opacity) so the sparkle reads on Android, where the old
+  // iOS-only shadowRadius glow drew nothing.
+  starHalo: {
+    position: 'absolute',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    opacity: 0.32,
+  },
+  // Bright 12px core diamond.
+  starCore: {
     width: 12,
     height: 12,
     borderRadius: 2,
     transform: [{ rotate: '45deg' }],
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 6,
   },
 });
 

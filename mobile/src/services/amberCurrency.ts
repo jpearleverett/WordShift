@@ -951,6 +951,15 @@ export function getReservedUnlockIdSync(): string | null {
 }
 
 /**
+ * Synchronous last-known phase off the in-memory cache (0 until warmed).
+ * Non-throwing, no I/O — safe to read from a render path (e.g. the
+ * ErrorBoundary fallback, which cannot await the async getCurrentPhase).
+ */
+export function getCurrentPhaseSync(): DialoguePhase {
+  return progressCache?.currentPhase ?? 0;
+}
+
+/**
  * Commit a previously-reserved target into the unlocked list WITHOUT spending
  * (it was paid for at reserve time) and clear the reservation. Idempotent.
  */

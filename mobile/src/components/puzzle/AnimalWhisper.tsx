@@ -83,6 +83,15 @@ export const AnimalWhisper: React.FC<AnimalWhisperProps> = ({
 
   if (!visible) return null;
 
+  // The whisper is the per-win narrative beat and must layer ABOVE the victory
+  // modal scrim (zIndex 500). A small upward drift derived from the same
+  // opacity value reads the "ghost rising" (native driver; under reducedMotion
+  // the opacity jump carries the translate instantly, which is correct).
+  const driftY = opacityAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [8, 0],
+  });
+
   const containerStyle = phase >= 3
     ? styles.containerDark
     : phase === 2
@@ -103,7 +112,7 @@ export const AnimalWhisper: React.FC<AnimalWhisperProps> = ({
 
   return (
     <Animated.View
-      style={[styles.container, containerStyle, { opacity: opacityAnim }]}
+      style={[styles.container, containerStyle, { opacity: opacityAnim, transform: [{ translateY: driftY }] }]}
       pointerEvents="none"
       accessibilityRole="text"
       accessibilityLabel={`${animalName} whispers: ${whisperText}`}
@@ -124,6 +133,11 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     maxWidth: '85%',
     alignItems: 'center',
+    // Layer above the victory modal overlay (zIndex 500) so the whisper is
+    // not occluded at its only surfacing moment. elevation mirrors it for
+    // Android's separate paint-order model.
+    zIndex: 501,
+    elevation: 12,
   },
   containerLight: {
     backgroundColor: 'rgba(236, 72, 153, 0.15)',

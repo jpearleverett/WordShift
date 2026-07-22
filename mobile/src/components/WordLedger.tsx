@@ -1,20 +1,40 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
+  FlatList,
+  ListRenderItem,
   TouchableOpacity,
   Image,
   Dimensions,
+  Animated,
+  Easing,
 } from 'react-native';
 import { PIXEL_FONT_BOLD } from '../theme/fonts';
 import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
+import { getResonanceConfig } from '../theme/colors';
 import { PanelCard } from './ui/PanelCard';
+import { EntranceCascadeItem, getCascadeDelayMs } from './ui/RewardReveal';
 import { useScreenInsets } from '../hooks/useScreenInsets';
 import { DialoguePhase } from '../types/homeWorld';
 import { getFullProgress } from '../services/amberCurrency';
 import { getWordsOfferedText } from '../services/phaseNarrative';
+import { getSettingsSync } from '../services/settings';
+import { shouldSimplifyAnimations } from '../services/deviceTier';
+import { FONT_SIZE } from '../theme/typeScale';
+
+// Cap the staggered chips so a long ledger (up to 500 words) snaps the rest in.
+const CHIP_CASCADE_CAP = 10;
+// Content waits this long so the header reads as settling in first.
+const HEADER_CASCADE_BASE_MS = 120;
+// Chips per windowed FlatList row-group. Grouping lets the wrap-cloud layout
+// survive virtualization: each list item is a self-contained flex-wrap block
+// the list can mount/unmount, instead of 500 chips flat in one ScrollView.
+const LEDGER_GROUP_SIZE = 18;
+// Once the initial entrance has settled we disarm the cascade so a first-group
+// remount (scrolling a long ledger to the bottom and back) can never replay it.
+const LEDGER_CASCADE_SETTLE_MS = 1500;
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -29,6 +49,64 @@ const DREAD_WORD_SET = new Set([
   'GATE', 'PORTAL', 'RIFT', 'SUMMON', 'RITUAL', 'VOID', 'NOTHING',
   'OBLIVION', 'DARKNESS', 'SILENCE', 'STILL', 'FROZEN', 'DEAD', 'BONE',
 ]);
+
+const isDread = (word: string): boolean => DREAD_WORD_SET.has(word.toUpperCase());
+
+// The newest dread chips (post-reversal) that visibly breathe with a slow
+// opacity pulse once the dread arc has truly deepened (phase >= 3) -- the
+// ledger should feel faintly alive, not lit up.
+const DREAD_BREATHE_CAP = 6;
+const DREAD_BREATHE_MIN = 0.75;
+const DREAD_BREATHE_MAX = 1;
+const DREAD_BREATHE_CYCLE_MS = 2400;
+const DREAD_BREATHE_SEGMENTS = 12;
+
+/** A 0..1 triangle wave (period 1, peak at 0.5). */
+function triangleWave(x: number): number {
+  const t = ((x % 1) + 1) % 1;
+  return t < 0.5 ? t * 2 : (1 - t) * 2;
+}
+
+/**
+ * Sample a phase-shifted triangle wave of a single continuously-looping
+ * `driver` value into an Animated interpolation over [min, max]. Several
+ * chips (plus the shared dread glow) can read their own out-of-sync breathing
+ * curve from ONE driver + ONE loop (this surface's one idle animator) via a
+ * static lookup table each — no extra Animated nodes or timers.
+ */
+function breatheInterpolation(
+  driver: Animated.Value,
+  phaseOffset: number,
+  min: number,
+  max: number,
+) {
+  const inputRange = Array.from({ length: DREAD_BREATHE_SEGMENTS + 1 }, (_, k) => k / DREAD_BREATHE_SEGMENTS);
+  const outputRange = inputRange.map(x => min + triangleWave(x + phaseOffset) * (max - min));
+  return driver.interpolate({ inputRange, outputRange });
+}
+
+/** A windowed row-group of ledger chips. `startIndex` is the group's first
+ *  chip's global position (preserves the original order and per-chip stagger). */
+export interface LedgerChipGroup {
+  key: string;
+  startIndex: number;
+  words: string[];
+}
+
+/**
+ * Chunk the flat word list into fixed-size groups for a windowed FlatList.
+ * Pure + deterministic (unit-tested): each group carries its global
+ * `startIndex` so the renderer can keep the original chip order and stagger.
+ * A non-positive size falls back to 1 so a bad caller can never spin.
+ */
+export function groupLedgerWords(words: string[], size: number): LedgerChipGroup[] {
+  const groupSize = size > 0 ? Math.floor(size) : 1;
+  const groups: LedgerChipGroup[] = [];
+  for (let i = 0; i < words.length; i += groupSize) {
+    groups.push({ key: `g${i}`, startIndex: i, words: words.slice(i, i + groupSize) });
+  }
+  return groups;
+}
 
 interface WordLedgerProps {
   phase: DialoguePhase;
@@ -73,7 +151,134 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
     return 'The record of offerings. Written in your hand.';
   };
 
-  const isDread = (word: string): boolean => DREAD_WORD_SET.has(word.toUpperCase());
+  // Newest offerings first — the latest words the player formed lead the
+  // ledger instead of being buried under up to 500 older chips.
+  const displayWords = useMemo(() => words.slice().reverse(), [words]);
+
+  // The one idle element on this surface: a single continuously-looping
+  // driver shared by the dread glow overlay AND the capped breathing chips
+  // (native-driven opacity only). Breathing only starts once the dread arc
+  // has truly deepened (phase >= 3); below that (or under reduced motion /
+  // a low-tier device) it parks at a stable resting frame.
+  const breatheEnabled = phase >= 3 && !getSettingsSync().reducedMotion && !shouldSimplifyAnimations();
+  const dreadAnim = useRef(new Animated.Value(0.25)).current;
+  useEffect(() => {
+    if (!breatheEnabled) {
+      dreadAnim.setValue(phase < 2 ? 0 : 0.25);
+      return;
+    }
+    dreadAnim.setValue(0);
+    const loop = Animated.loop(
+      Animated.timing(dreadAnim, {
+        toValue: 1,
+        duration: DREAD_BREATHE_CYCLE_MS,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
+    loop.start();
+    return () => {
+      loop.stop();
+      dreadAnim.stopAnimation();
+    };
+  }, [breatheEnabled, phase, dreadAnim]);
+
+  // Entrance-cascade latch: arm on mount, disarm once the initial stagger has
+  // settled so a windowed group scrolled back into view never re-triggers the
+  // fade+rise. Reduced motion / low tier never arm it (chips appear instantly).
+  const cascadeReducedMotion = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
+  const [cascadeArmed, setCascadeArmed] = useState(!cascadeReducedMotion);
+  useEffect(() => {
+    if (cascadeReducedMotion) return;
+    const timer = setTimeout(() => setCascadeArmed(false), LEDGER_CASCADE_SETTLE_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const resonance = getResonanceConfig(phase);
+  // The shared dread-glow overlay (every dread chip, phase >= 2) reads offset
+  // 0 of the same driver — a plain sample when at rest, a smooth pulse once
+  // breathing is enabled.
+  const dreadGlowOpacity = breatheInterpolation(dreadAnim, 0, resonance.minOpacity, resonance.maxOpacity);
+
+  // Only the first DREAD_BREATHE_CAP dread chips (by newest-first display
+  // order) get the whole-chip breathing treatment; each gets its own rank so
+  // it reads its own phase-shifted slice of the shared driver.
+  const breatheRank = useMemo(() => {
+    const m = new Map<number, number>();
+    if (phase < 3) return m;
+    for (let i = 0; i < displayWords.length && m.size < DREAD_BREATHE_CAP; i++) {
+      if (isDread(displayWords[i])) m.set(i, m.size);
+    }
+    return m;
+  }, [displayWords, phase]);
+
+  const groups = groupLedgerWords(displayWords, LEDGER_GROUP_SIZE);
+
+  // Each windowed item is one flex-wrap group; the chips inside keep their
+  // global index so the first on-screen chips still cascade in original order.
+  const renderGroup: ListRenderItem<LedgerChipGroup> = ({ item }) => (
+    <View style={styles.wordChips}>
+      {item.words.map((word, i) => {
+        const globalIndex = item.startIndex + i;
+        const dread = isDread(word) && phase >= 2;
+        const rank = breatheRank.get(globalIndex);
+        const breathingChip = breatheEnabled && dread && rank !== undefined;
+        const chipStyle = [
+          styles.wordChip,
+          { backgroundColor: t.sectionBg, borderColor: t.sectionBorder },
+          dread && styles.wordChipDread,
+        ];
+        const chipInner = (
+          <>
+            {dread && (
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  styles.dreadGlow,
+                  { backgroundColor: resonance.color, opacity: dreadGlowOpacity },
+                ]}
+              />
+            )}
+            <Text style={[
+              styles.wordText,
+              { color: t.body },
+              dread && styles.wordTextDread,
+            ]}>
+              {word}
+            </Text>
+          </>
+        );
+        const chip = breathingChip ? (
+          <Animated.View
+            style={[
+              chipStyle,
+              { opacity: breatheInterpolation(dreadAnim, rank! / DREAD_BREATHE_CAP, DREAD_BREATHE_MIN, DREAD_BREATHE_MAX) },
+            ]}
+          >
+            {chipInner}
+          </Animated.View>
+        ) : (
+          <View style={chipStyle}>{chipInner}</View>
+        );
+        // Only the first on-screen chips cascade, and only while armed; the
+        // rest snap in (a long ledger must not crawl, and a scrolled-in group
+        // must not replay the entrance).
+        if (cascadeArmed && globalIndex < CHIP_CASCADE_CAP) {
+          return (
+            <EntranceCascadeItem
+              key={`${word}-${globalIndex}`}
+              phase={phase}
+              delay={getCascadeDelayMs(globalIndex, { baseMs: HEADER_CASCADE_BASE_MS })}
+            >
+              {chip}
+            </EntranceCascadeItem>
+          );
+        }
+        return <React.Fragment key={`${word}-${globalIndex}`}>{chip}</React.Fragment>;
+      })}
+    </View>
+  );
 
   return (
     <View style={[styles.container, { backgroundColor: t.screenBg, paddingTop: screenInsets.top + 16 }]}>
@@ -90,6 +295,7 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
         >
           <Text style={[styles.backChipText, { color: t.title }]}>← Back</Text>
         </TouchableOpacity>
+        <EntranceCascadeItem phase={phase}>
         <PanelCard phase={phase} kind="card" style={styles.titlePlaque}>
           <Text style={[styles.title, { color: t.title }]}>
             {getTitle()}
@@ -108,15 +314,24 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
             </Text>
           </View>
         </PanelCard>
+        </EntranceCascadeItem>
       </View>
 
-      {/* Word grid */}
-      <ScrollView
+      {/* Word grid — windowed so a 500-word ledger never mounts every chip. */}
+      <FlatList
         style={styles.scrollView}
+        data={groups}
+        keyExtractor={item => item.key}
+        renderItem={renderGroup}
+        extraData={`${cascadeArmed}-${phase}`}
         contentContainerStyle={[styles.wordGrid, { paddingBottom: Math.max(40, screenInsets.bottom) }]}
+        ItemSeparatorComponent={ChipGroupSeparator}
         showsVerticalScrollIndicator={false}
-      >
-        {words.length === 0 ? (
+        initialNumToRender={3}
+        maxToRenderPerBatch={4}
+        windowSize={5}
+        removeClippedSubviews
+        ListEmptyComponent={
           <View style={styles.emptyState}>
             <PanelCard phase={phase} kind="card" style={styles.emptyCard}>
               <Image source={JOURNAL_ICON} style={styles.emptyIcon} resizeMode="contain" />
@@ -127,35 +342,15 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
               </Text>
             </PanelCard>
           </View>
-        ) : (
-          <View style={styles.wordChips}>
-            {words.map((word, index) => {
-              const dread = isDread(word) && phase >= 2;
-              return (
-                <View
-                  key={`${word}-${index}`}
-                  style={[
-                    styles.wordChip,
-                    { backgroundColor: t.sectionBg, borderColor: t.sectionBorder },
-                    dread && styles.wordChipDread,
-                  ]}
-                >
-                  <Text style={[
-                    styles.wordText,
-                    { color: t.body },
-                    dread && styles.wordTextDread,
-                  ]}>
-                    {word}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
-        )}
-      </ScrollView>
+        }
+      />
     </View>
   );
 };
+
+// Vertical breathing room between windowed chip groups (matches the in-group
+// 8dp gap so group boundaries read as ordinary wrap rows).
+const ChipGroupSeparator: React.FC = () => <View style={styles.groupSeparator} />;
 
 const styles = StyleSheet.create({
   container: {
@@ -188,7 +383,7 @@ const styles = StyleSheet.create({
   },
   backChipText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '800',
     letterSpacing: 0.4,
   },
@@ -199,7 +394,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 24,
+    fontSize: FONT_SIZE.display,
     fontWeight: '900',
     letterSpacing: 0.5,
     textAlign: 'center',
@@ -207,7 +402,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '600',
     textAlign: 'center',
     paddingHorizontal: 12,
@@ -224,7 +419,7 @@ const styles = StyleSheet.create({
   },
   countText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '700',
     letterSpacing: 0.5,
     textAlign: 'center',
@@ -242,11 +437,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
+  groupSeparator: {
+    height: 8,
+  },
   wordChip: {
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 12,
     borderWidth: 1.5,
+    overflow: 'hidden',
+  },
+  // Breathing dread aura, clipped to the chip's rounded rect. Native-driven
+  // opacity is supplied at render from the shared dread driver.
+  dreadGlow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 12,
   },
   // Dread words keep their crimson highlight (Phase 2+ only reaches here on
   // the dark screen backgrounds), now framed like every other chip.
@@ -256,7 +465,7 @@ const styles = StyleSheet.create({
   },
   wordText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: FONT_SIZE.body,
     fontWeight: '700',
     letterSpacing: 0.5,
   },
@@ -285,7 +494,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: FONT_SIZE.callout,
     fontWeight: '600',
     textAlign: 'center',
     lineHeight: 22,
