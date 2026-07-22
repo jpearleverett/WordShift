@@ -42,6 +42,8 @@ import { getSettingsSync } from '../../services/settings';
 import { hapticLight, hapticMedium } from '../../services/haptics';
 import { logEvent } from '../../services/eventLogger';
 import { RewardedAdButton } from './RewardedAdButton';
+import { RewardReveal } from '../ui/RewardReveal';
+import { GiftOverlay, GiftItem } from './GiftOverlay';
 import { isAdsReady } from '../../services/ads';
 import {
   getDailyAmberStatus,
@@ -52,6 +54,7 @@ import {
 import { DAILY_AMBER_REWARD, SUPPORTER_MONTHLY_AMBER } from '../../constants/gameBalance';
 
 const HINT_ICON = require('../../../assets/ui/hint.png');
+const AMBER_ICON = require('../../../assets/ui/amber.png');
 
 /**
  * Fallback price label for The Keeper's Collection when the store product isn't
@@ -130,6 +133,17 @@ export const StoreModal: React.FC<StoreModalProps> = ({
   );
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [amberFaucet, setAmberFaucet] = useState<DailyAmberStatus | null>(null);
+  // The daily faucet claim resolves into a magnitude-aware RewardReveal count-up
+  // (nonce forces a fresh reveal each claim, since the faucet allows 2/day).
+  const [faucetReveal, setFaucetReveal] = useState<{ amount: number; nonce: number } | null>(null);
+  // The marquee gift moment (starter pack / first-purchase 2x) — presented as a
+  // real gift overlay instead of an appended success line. Presentation only;
+  // the grant + pending-ledger ack already ran on the success path.
+  const [gift, setGift] = useState<{
+    title: string;
+    subtitle?: string;
+    items: GiftItem[];
+  } | null>(null);
 
   const cardScale = useRef(new Animated.Value(reducedMotion ? 1 : 0.92)).current;
   const cardOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
@@ -141,6 +155,8 @@ export const StoreModal: React.FC<StoreModalProps> = ({
       setIsSupporterActive(hasEntitlementSync(ENTITLEMENTS.SUPPORTER));
       setFirstAmberDouble(!hasMadeAmberPurchaseSync());
       setSuccessMsg(null);
+      setFaucetReveal(null);
+      setGift(null);
       getDailyAmberStatus().then(setAmberFaucet).catch(() => {});
       logEvent({ type: 'store_opened', data: { surface: 'store_modal' } });
     }
@@ -213,7 +229,9 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     }
     const balance = await awardBonusAmber(grant, 'rewarded_daily_amber');
     onAmberChange?.(balance);
-    setSuccessMsg(`+${grant} amber added.`);
+    // Present the claim as a magnitude-aware count-up, not a static line.
+    setSuccessMsg(null);
+    setFaucetReveal({ amount: grant, nonce: Date.now() });
     logEvent({ type: 'daily_amber_claimed', data: { amount: grant, remaining: result.remaining } });
   }, [onAmberChange]);
 
@@ -222,6 +240,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
       if (flow === 'working') return;
       setFlow('working');
       setSuccessMsg(null);
+      setFaucetReveal(null);
       hapticLight();
       logEvent({ type: 'purchase_initiated', data: { productId: info.productId, kind: info.reward.kind } });
       try {
@@ -231,11 +250,18 @@ export const StoreModal: React.FC<StoreModalProps> = ({
             const balance = await awardBonusAmber(result.reward.amount, `iap_${info.productId}`);
             onAmberChange?.(balance);
             setFirstAmberDouble(!hasMadeAmberPurchaseSync());
-            setSuccessMsg(
-              result.firstPurchaseDoubled
-                ? `+${result.reward.amount} amber added. 2× first purchase!`
-                : `+${result.reward.amount} amber added.`,
-            );
+            if (result.firstPurchaseDoubled) {
+              // The one-time first-purchase 2x is a marquee moment: present it
+              // as a real gift, not an appended line. The amount is already
+              // doubled by the iap layer.
+              setGift({
+                title: 'Doubled, with thanks',
+                subtitle: 'The house returns your very first gift twice over. Just this once.',
+                items: [{ icon: AMBER_ICON, amount: result.reward.amount, label: 'amber' }],
+              });
+            } else {
+              setSuccessMsg(`+${result.reward.amount} amber added.`);
+            }
           } else {
             const balance = await addHints(result.reward.amount, `iap_${info.productId}`);
             onHintsChange?.(balance);
@@ -271,6 +297,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     if (flow === 'working' || ownsStarter) return;
     setFlow('working');
     setSuccessMsg(null);
+    setFaucetReveal(null);
     hapticLight();
     logEvent({ type: 'purchase_initiated', data: { productId: STARTER_PACK_INFO.productId, kind: 'starter' } });
     try {
@@ -289,7 +316,16 @@ export const StoreModal: React.FC<StoreModalProps> = ({
           acknowledgeConsumableGrant(result.grantIds.hints).catch(() => {});
         }
         setOwnsStarter(true);
-        setSuccessMsg(`+${result.reward.amber} amber and +${result.reward.hints} hints added.`);
+        // The Keeper's Welcome is a marquee moment: present the bundle as a
+        // real gift (amber + hints each counting up), not an appended line.
+        setGift({
+          title: STARTER_PACK_INFO.name,
+          subtitle: 'A welcome gift, set on the shelf for you.',
+          items: [
+            { icon: AMBER_ICON, amount: result.reward.amber, label: 'amber' },
+            { icon: HINT_ICON, amount: result.reward.hints, label: 'hints' },
+          ],
+        });
         logEvent({ type: 'iap_purchase', data: { productId: STARTER_PACK_INFO.productId, kind: 'starter' } });
         hapticMedium();
         setFlow('idle');
@@ -317,6 +353,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     if (flow === 'working' || ownsBundle) return;
     setFlow('working');
     setSuccessMsg(null);
+    setFaucetReveal(null);
     hapticLight();
     logEvent({ type: 'purchase_initiated', data: { productId: PRODUCT_IDS.COSMETIC_BUNDLE, kind: 'cosmetic' } });
     try {
@@ -345,6 +382,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     if (flow === 'working' || isSupporterActive) return;
     setFlow('working');
     setSuccessMsg(null);
+    setFaucetReveal(null);
     hapticLight();
     logEvent({ type: 'purchase_initiated', data: { productId: PRODUCT_IDS.SUPPORTER_SUB, kind: 'supporter' } });
     try {
@@ -373,6 +411,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
   const handleClose = useCallback(() => {
     setFlow('idle');
     setSuccessMsg(null);
+    setFaucetReveal(null);
     onClose();
   }, [onClose]);
 
@@ -590,7 +629,19 @@ export const StoreModal: React.FC<StoreModalProps> = ({
             )}
           </ScrollView>
 
-          {successMsg && flow !== 'unavailable' && (
+          {faucetReveal && flow !== 'unavailable' && (
+            <View style={styles.rewardBox}>
+              <RewardReveal
+                key={faucetReveal.nonce}
+                amount={faucetReveal.amount}
+                icon={AMBER_ICON}
+                label="added to your amber"
+                phase={phase}
+              />
+            </View>
+          )}
+
+          {successMsg && !faucetReveal && flow !== 'unavailable' && (
             <View
               style={[styles.successBox, { backgroundColor: t.amberTint, borderColor: t.amberTintBorder }]}
               accessibilityLiveRegion="polite"
@@ -622,6 +673,18 @@ export const StoreModal: React.FC<StoreModalProps> = ({
             style={styles.closeBtn}
           />
         </Animated.View>
+
+        {/* Marquee gift moment (starter pack / first-purchase 2x) — presented
+            as a real gift over the store. Presentation only; the grant already
+            landed on the success path. */}
+        <GiftOverlay
+          visible={gift !== null}
+          phase={phase}
+          title={gift?.title ?? ''}
+          subtitle={gift?.subtitle}
+          items={gift?.items ?? []}
+          onClose={() => setGift(null)}
+        />
       </View>
     </Modal>
   );
@@ -732,6 +795,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   successText: { fontSize: 12.5, lineHeight: 17, textAlign: 'center', fontWeight: '700', fontFamily: PIXEL_FONT_BOLD },
+  // Faucet claim reward reveal (magnitude-aware count-up in place of a static line).
+  rewardBox: { marginTop: 12, alignItems: 'center' },
   unavailableBox: {
     marginTop: 12,
     borderRadius: 12,
