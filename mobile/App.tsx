@@ -328,6 +328,14 @@ function MainApp() {
   const screenInsets = useScreenInsets();
   // Screen navigation
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('home');
+  // Launch-route gate: currentScreen defaults to 'home', but a cold launch may
+  // resolve into the puzzle or pit (an interrupted-onboarding resume). Until the
+  // resume effect decides, we keep showing the branded boot screen rather than
+  // painting 'home' for a frame and then swapping to the board (the F141 home
+  // flash). Cleared by the resume effect (every branch) and, as a brick-proof
+  // backstop, by a short timeout so a stalled decision can never trap the boot
+  // screen.
+  const [bootRouting, setBootRouting] = useState(true);
   const [homePanY, setHomePanY] = useState<number | null>(null);
 
   // Custom hooks - game logic & persistence separated from UI
@@ -365,6 +373,15 @@ function MainApp() {
     const t = setTimeout(() => setLoadingGraceVisible(true), 250);
     return () => clearTimeout(t);
   }, [puzzle.gameState, puzzle.isProcessing]);
+
+  // Brick-proof backstop for the launch-route gate: if the resume decision
+  // never lands (e.g. onboarding load stalls), lift the boot screen anyway so
+  // the app can never hang on it. Worst case this restores the pre-fix behavior
+  // (a possible home flash), never a stuck screen.
+  useEffect(() => {
+    const t = setTimeout(() => setBootRouting(false), 800);
+    return () => clearTimeout(t);
+  }, []);
   // Tracked timer for the one-time Swift-Victories hint (F110): cleared on
   // unmount so a raw setTimeout can't fire into a torn-down tree.
   const swiftHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -900,10 +917,14 @@ function MainApp() {
       transitionTo('home', () => {
         puzzleActions.clearBoard();
       });
+      setBootRouting(false);
       return;
     }
 
+    // Set the screen BEFORE lifting the boot gate so the board paints directly,
+    // never a frame of 'home' in between.
     setCurrentScreen('puzzle');
+    setBootRouting(false);
     if (route === 'restore' && saved) {
       // Restored boards never carry (or roll) a house ask.
       houseAskRestoreSuppressRef.current = true;
@@ -1117,15 +1138,23 @@ function MainApp() {
       const step = onboardingFlow.onboardingStep;
       if (step === 'going_to_pit' || step === 'pit_intro' || step === 'pit_offering') {
         setCurrentScreen('pit');
+        setBootRouting(false);
       } else if (step === 'cold_open_puzzle') {
         // A kill during the self-directed opener resumes the exact autosaved
         // board when possible; otherwise start curated EASY puzzle 0.
-        launchColdOpenPuzzle().catch(() => {});
+        // launchColdOpenPuzzle lifts the boot gate itself once it has set the
+        // screen (so the board, not home, is what appears); clear on failure too.
+        launchColdOpenPuzzle().catch(() => setBootRouting(false));
       } else if (step === 'puzzle_tutorial') {
         // Re-init the guided tutorial puzzle so the player resumes a live,
         // winnable board with the Fox overlay rather than a dead screen.
         setCurrentScreen('puzzle');
         puzzleActions.startNewGame('EASY', 'standard', 'standard', false, false);
+        setBootRouting(false);
+      } else {
+        // Normal launch (onboarding complete, or a non-puzzle step): home is the
+        // correct destination, so lift the boot gate and let it paint.
+        setBootRouting(false);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -3884,8 +3913,13 @@ function MainApp() {
   // Render
   // ========================================================================
 
-  // Show loading while onboarding state is being determined
-  if (!onboardingFlow.onboardingReady) {
+  // Show loading while onboarding state is being determined AND while the
+  // launch route is still resolving (bootRouting). Extending the hold across
+  // the resume decision means a cold launch that resolves into the board or pit
+  // never paints 'home' for a frame first (the F141 home flash) — the same
+  // branded card simply stays up one beat longer, then the real destination
+  // appears directly.
+  if (!onboardingFlow.onboardingReady || bootRouting) {
     // The SAME window-relative branded hold as the bootstrap gate, so the
     // native-splash -> bootstrap-gate -> MainApp-hydration holds read as ONE
     // continuous branded moment instead of blinking through the old near-black
