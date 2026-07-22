@@ -4172,6 +4172,22 @@ export const EVENT_QUEST_DESCRIPTION_TEMPLATES = {
   dark: 'The moon asks for {target} arrangements tonight',
 } as const;
 
+/**
+ * Arrival line for a RESERVED room whose level gate opened on its own while the
+ * player was away (claimReservedUnlockIfReady). The reserved room "built itself"
+ * in the background, so its arrival gets a bespoke in-world voice instead of the
+ * silent generic confetti. Phase-aware, spoiler-safe (no phase labels, the
+ * entity is never named), no em dashes.
+ */
+export function getReservedBuiltItselfLine(phase: number): string {
+  if (phase >= 5) return 'The house tends itself now. The room you set aside settled quietly into place.';
+  if (phase >= 4) return 'The arrangement finishes what you leave for it. The room you set aside is ready, and waiting.';
+  if (phase >= 3) return 'The house built on in the dark. What you set aside has taken shape.';
+  if (phase >= 2) return 'Something in the house kept working without you. The room you set aside is here.';
+  if (phase >= 1) return 'The house kept building while you were away. The room you set aside is ready.';
+  return 'Look... the room you set aside finished itself while you were away.';
+}
+
 // ============================================================================
 // SEASON PASS — phase-aware copy for the monthly cosmetic reward track.
 // Structural verbs ("Claim", "Close") stay in the UI; the evocative season
