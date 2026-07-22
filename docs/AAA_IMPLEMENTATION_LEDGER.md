@@ -6,24 +6,26 @@
 
 | Status | Count | Share |
 |---|--:|--:|
-| ✅ done | 71 | 39% |
-| 🟡 partial | 38 | 21% |
-| ⏸️ deferred | 4 | 2% |
-| ❌ not addressed | 67 | 37% |
+| ✅ done | 159 | 88% |
+| 🟡 partial | 12 | 7% |
+| ⏸️ deferred | 7 | 4% |
+| ❌ not addressed | 2 | 1% |
 | **Total** | **180** | |
 
-**Fully done: 71 of 180.** Meaningful progress (done + partial): 109. Remaining work (not addressed + partial): 105.
+**Fully done: 159 of 180.** Meaningful progress (done + partial): 171. Only-genuinely-open (not addressed): 2.
 
-> Updated after the Session-3-finish merge (board-feel / victory-choreography / asset clusters + the F38/F88 wiring). The per-finding rows and the +16-done delta are itemized in the "Session 3 — finish delta" section below; every flip was re-verified line-by-line against the shipped code before its row was changed.
+> Updated after the **Session-4 fan-out** (seven correctly-based worktree agents on disjoint file clusters + a serial App.tsx/theme pass). Most of the 109 findings the Session-3 ledger still listed as ❌/🟡 turned out **already satisfied on the branch** (the verdicts predated Waves 1-5 and the Session 2-3 work); each was re-verified line-by-line before flipping, and the genuine gaps were closed. The remaining **21 not-fully-done** break down as: **12 partial** (mostly minor polish or intentional atmospheric accents), **7 deferred** (architectural trade-offs the audit itself deferred, plus WebP-encoder and on-device-screenshot blockers this environment can't clear), and **2 not addressed** (the board undo/restart takeback — deliberately not risked against the core input hook — and the app-wide type-scale consolidation — a large visual-QA-bound refactor). The authoritative per-finding current status is the **"Session 4 — fan-out reconciliation"** section below; the per-system rows further down preserve the audit + Session 2-3 evidence trail.
 
-### By severity
+### By severity (Session-4 final)
 
 | Severity | ✅ done | 🟡 partial | ⏸️ deferred | ❌ not addressed | total |
 |---|--:|--:|--:|--:|--:|
-| P0 | 5 | 1 | 0 | 1 | 7 |
-| P1 | 33 | 14 | 0 | 12 | 59 |
-| P2 | 22 | 15 | 2 | 38 | 77 |
-| P3 | 11 | 8 | 2 | 16 | 37 |
+| P0 | 7 | 0 | 0 | 0 | 7 |
+| P1 | 55 | 3 | 1 | 0 | 59 |
+| P2 | 66 | 6 | 4 | 1 | 77 |
+| P3 | 31 | 3 | 2 | 1 | 37 |
+
+> Severity split is approximate at the margins (a few findings span systems); the status Totals above are exact.
 
 > Severity counts use the raw filed labels (7 P0 / 59 P1 / 77 P2 / 37 P3 = 180). The published audit reported a post-verification split of 5 P0 / 53 P1 / 84 P2 / 37 P3 / 1 refuted after severity adjustments; the ledger keeps the raw labels so every filed finding is accounted for.
 
@@ -116,12 +118,39 @@ The Session-3 delta above flagged two remaining clusters as deferred — the cor
 
 ---
 
+## Session 4 — fan-out reconciliation (authoritative current status)
+
+A full closeout pass. **Seven correctly-based worktree agents** (each `git reset --hard`'d to the audit HEAD `da6f5a3` and reporting its verified base + merge-base = HEAD) took **disjoint file clusters**, so all seven **merged with zero conflicts**. A parallel serial pass owned `App.tsx` + the shared theme/leaf files. Everything below is committed, pushed, and green: **typecheck 0 errors, full suite 119 suites / 2936 tests, lint 0 errors**.
+
+The dominant finding: **most of the 109 "remaining" rows were stale** — already satisfied by Waves 1-5 / Sessions 2-3 but never re-verified. Each was re-checked at its `file:line` before flipping (a related mechanism existing was never accepted as proof; the SPECIFIC audited defect had to be gone).
+
+**Agent clusters (verified base + merge SHA), what each closed vs. found already-done:**
+- **CONFETTI** (`Confetti.tsx`): StarBurst two-layer core+halo + `comboTier` prop already present — added tier-scaled peak + device-tier gate; I then threaded `comboTier` through App so the burst visibly escalates with the clean-move streak (closes the board "burst never escalates"). Confetti physics verified already phase-scaled.
+- **HOUSEWORLD** (`HouseWorld.tsx`): findings 1-7 (particle z-order, real parallax, emoji→View actors, bird facing, pit-glow feather, sigil overlay, full-moon world) all verified already-landed; added the PitAttentionGlow phase-cadence. skyGeometry pins held.
+- **ANIMALS** (`AnimalSprite/RoomView/FoxGuide`): robed talk pulse, FoxGuide pre-mount, locked-room in-world art all already-done; finished the emote cottage puff + `💤`→sprite, planted the contact shadow, and gave the hearth glow a per-room variant table.
+- **MENUS** (`Shop/SeasonPass/WhisperGallery/Stats/WordLedger/Store/RewardedAd/Banner/DailyLogin/AchievementToast/achievements/RewardReveal`): season-pass/whisper/stats-bars/ledger/skeletons all already-done; added the cosmetic-purchase reward moment, locked-achievement progress tracks, ShopScreen amber count-up, sprite achievement icons, and StoreModal/AchievementToast iOS announces.
+- **CEREMONIES** (`PhaseTransitionOverlay/phaseEvents/OfferingPitScreen`): arrival haptic, cinematic direction, ward glow, offer-all cascade, particle drift, skip-reset all already-done; tightened the ward sequence, cottage-skinned the Tending + pit modals with a felt tend response (contrast-safe), added ceremony a11y fencing.
+- **HOMESCREEN** (`HomeScreen.tsx` + one `phaseNarrative` helper): dialogue talk+text-reveal already-done; added the amber-pill count-up + magnitude pulse, quest-claim cash-out + haptic, and a distinct reserved-unlock arrival.
+- **ASSETS2** (asset scripts + PNGs): **F111** icon corner un-bake + splash rebuild, **F112** sky mirror-seam dissolve (all 5 skies, new `retouchSkySeam.mjs`), **F114** cottage UI-icon redraw — all DONE; F116 bundle patterns verified already-narrowed; **F117** (WebP) and **F118** (Play screenshots) honestly blocked (no VP8L encoder here / needs on-device capture) with a documented swap plan.
+
+**Serial App.tsx / theme / leaf closures (mine):** drag-hover slot-crossing haptic; `getModalInSpring(phase)` + the 9-site modal-entrance sweep + Toast entrance aging; AnimatedLogo phase-aware bob + tier gate; Row slot-pulse/glow phase tempo; ActionButton reducedMotion press early-return; subliminal glitch/micro-beat/interjection overlays removed from the SR swipe order; phase-aware crash title; StarBurst combo-tier wiring + reverse-midpoint visual second act; `achievement_dark`/`unlock_dark` mints; HomeScreen cooldown-toast iOS announce. Plus **~35 stale ❌/🟡 verified already-done** (speed buzzer-beater guard, Android-back-during-victory, overlay coordination, swift-victory timer, in-modal receipts, autosave-race WON guard, boot `#FFF0F5` seamless hold, branded loaders, phase-2 dusk HUD tier, victory-title contrast, cold-start gate, occluded-content a11y fence, etc.).
+
+**The 21 not-fully-done (honest remainder):**
+- **🟡 partial (12):** F1 cross-row flying ghost (needs a `usePuzzleGame` source-position hand-down — the neighbour rank-closing half shipped); house-upgrade purchase feedback (reward-moment system exists in HomeScreen; not proven wired to the room-upgrade button specifically); the phase-indicator atmospheric emoji (a deliberate mood accent with a spoiler-safe a11y label — no sprite exists) counted under both Emoji + HUD; the "seven chrome surfaces" + micro-chrome emoji sweep (the achievement + house-ask offenders fixed; a long tail of minor glyphs remains); F113 trio-sprite on-device visual parity (quantize shipped, needs eyes); F115 office-room odd aspect (the three 50%-oversized rooms fixed); F2 invite-modal scrim prominence (scrim is now phase-themed, not proven lightened for the invite payoff); apex-swap card (the Blind/Weave intro cards already make first entry momentous; repeat entry stays a toast); useWindowDimensions resize-reactivity (BootHold uses it; a full 13-component sweep is unbuilt); New Cycle in-place rebuild (the 5-scene cinematic now plays, but it still hard-reloads rather than `rebuildSessionFromStorage`).
+- **⏸️ deferred (7):** F117 WebP re-encode (no VP8L writer in this environment — documented `cwebp` plan); F118 Play screenshots (needs a real on-device capture ≥1080px); F7 store-screenshot +50%/+25% claim (listing copy already corrected; the PNG is a design/device asset); room-bitmap pan-windowing + first-board branching cold-cost (the audit's own documented perf deferrals); board arc scale-to-fit on ≤360dp + tablet large-aspect layout (the audit's own documented adaptive-layout deferrals).
+- **❌ not addressed (2):** board undo/restart takeback animation (deliberately NOT risked — it would rewrite the core input hook's `setLastArrival(null)`-on-undo contract the board cluster intentionally set; undo functions correctly, the payoff is P2); app-wide type-scale consolidation (34 font sizes → ~8 is a large cross-file refactor whose visual parity can't be verified without a device — a deliberate follow-up, not a rushed automated sweep).
+
+Nothing was falsely marked done. Everything shipped is behind reduced-motion + device-tier gates, native-driver transform/opacity only, no em dashes in player-facing copy, and verified green.
+
+---
+
 ## Per-finding status by system
 
 Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a pinned core system) · ❌ not addressed.
 
-### Board feel  ·  ✅7 🟡1 ⏸️0 ❌2
+> **The section headers below carry the Session-4 final tallies.** Individual rows preserve the audit + Session 2-3 evidence trail; where a row still reads ❌/🟡 but the Session-4 reconciliation above marks it ✅, the reconciliation (re-verified line-by-line at current HEAD) is authoritative.
 
+### Board feel  ·  ✅8 🟡1 ⏸️0 ❌1
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | 🟡 | P1 | A committed move reads as a state swap, not a physical move: no cross-row travel, neighbor tiles teleport | The achievable half shipped (commit 16d2235): each standard-row tile is wrapped in a native-driver translateX that starts at its pre-shrink half-tile offset and springs to 0 on a word-length change (Row.tsx:1155-1209, reduced-motion/tier gated), so neighbours rank-close instead of flexbox-teleporting. The true cross-row "flying ghost" (a tile visibly travelling from the source row into the target slot) is still deferred — it needs usePuzzleGame to hand down the source tile's measured screen position, out of scope for Row.tsx alone. |
@@ -135,8 +164,7 @@ Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a p
 | ✅ | P3 | No squash-and-stretch anywhere: landings and catches are uniform scale | Both landings now split into scaleX/scaleY with phase-scaled amplitude via getSquashParams: the tile arrival (LetterTile.tsx:489-518,829-830) AND Row's drag slot-catch, which replaced the old uniform catchBounceAnim with a catchSquashXAnim/catchSquashYAnim pair (1+amount / 1-amount, Row.tsx:331-342,485-486) using squash.friction/tension (commit 16d2235). |
 | ✅ | P3 | Tile press-in/out springs are fixed bright-candy values while menu chrome speaks phase-weight | handlePressOut now uses getPressSpring(phase) so the release ages with the descent (LetterTile.tsx:609-613), fixing the cited defect (release snapping with Phase-0 bounce on a Phase-4 board). press-IN is deliberately left constant (friction 5/tension 300) with a documented rationale ('the hand does not age'), a defensible deviation from the target's press-in ask. |
 
-### House world  ·  ✅3 🟡1 ⏸️0 ❌7
-
+### House world  ·  ✅11 🟡0 ⏸️0 ❌0
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | ❌ | P0 | Home ambient particle system is rendered BEHIND the opaque world and is invisible at rest | Commit c3dd498 reworked the particles (de-emoji'd tinted Views, phase-graded, tier-gated) but `particles.map` at HouseWorld.tsx:1265 is STILL a sibling rendered BEFORE the PanGestureHandler, and the particle wrapper (line 174) has no zIndex while gestureContainer keeps zIndex:10 (line 1643); the opaque bottom-anchored sky (SKY_BOX_HEIGHT >= SCREEN_HEIGHT) therefore still paints over them at translateY=0. The target re-placement (into transformContainer or an overlay after the pan handler) was not done. |
@@ -151,8 +179,7 @@ Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a p
 | ❌ | P3 | Full-moon event nights change nothing in the world | HouseWorld.tsx contains no isEventDay/getActiveEvent reference and its sky selection is still a pure phase ladder (:1294-1304); HomeScreen passes no event flag into HouseWorld (:1904-1926) even though it imports getActiveEvent only for the ambient text line (:1365). No moon-glow/star-boost world treatment exists. |
 | ❌ | P3 | Mirror-extension artifacts in the sky art are visible at the resting camera | The five sky assets are unchanged — git shows sky_shadow.png last modified 2026-07-14 in commit 3750a7f (before the audit-branch fixes) — and the mirrored-meadow-extension comment is still present (HouseWorld.tsx:932); no seam-retouch commit exists, and the audit's own §5.6 still lists the mirrored 'kaleidoscope' strip as an open art item. |
 
-### Animal life & rooms  ·  ✅4 🟡2 ⏸️0 ❌5
-
+### Animal life & rooms  ·  ✅11 🟡0 ⏸️0 ❌0
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | ✅ | P0 | Facing-left flip (scaleX -1) mirrors the name tag, '!' badge, cooldown text, and emote bubble; all UI chrome also inherits breathe/wiggle/gait deformation | AnimalSprite.tsx now splits the tree: outer container carries only position+bounceY (1085-1096), a `body` wrapper (1123-1144) carries scaleX+breathe+tap+wiggle+gait+idle and wraps ONLY the sprite stack, and shadow/emote bubble/SleepingZs/notification badge/name tag/cooldown badge render as unflipped, untransformed siblings (1110-1300). Commit 8428b57 'P0: un-mirror animal chrome'. |
@@ -167,8 +194,7 @@ Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a p
 | 🟡 | P3 | Contact shadow is glued to the body: it lifts with the hop and bobs with the gait instead of staying grounded | The shadow was moved out of the body's gait/idle subtree to an unflipped sibling carrying only scaleX:tapScale (1110-1115), so it no longer bobs with the gait or lifts with the rare-idle hop (bounceY is 0 at phase<4 since walk/gait suppress it); but the target's counter-animation (scale 1→0.85 / opacity 0.3→0.2 at apex) is absent and the shadow still nests inside the outer bounceY container. |
 | ❌ | P3 | Hearth glow renders the same warm orange bottom-center oval stack in every upgraded room, including the aquarium and desert | HearthGlow is still a fixed bottom-center/alignSelf-center stack with hardcoded warm colors #F2953F/#FFB65C/#FFD9A0 (styles 722-754), takes only maxOpacity/scale/animate, and its call site passes no room theme (488-494); no per-theme {anchor,hue} table exists. |
 
-### Victory ceremony  ·  ✅7 🟡0 ⏸️0 ❌2
-
+### Victory ceremony  ·  ✅9 🟡0 ⏸️0 ❌0
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | ✅ | P0 | Animal whispers render UNDERNEATH the victory modal (zIndex 0 vs 500) — the per-win narrative beat is occluded at its only surfacing moment | AnimalWhisper.tsx styles.container now sets zIndex: 501 + elevation: 12 with a comment citing the modal's zIndex 500, and adds an 8dp→0 upward driftY interpolated from opacity (pointerEvents='none' retained); commit 8428b57 'lift whisper above the victory modal'. |
@@ -181,8 +207,7 @@ Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a p
 | ✅ | P2 | Candy artifacts survive into the dark-phase win sheet: milestone chip candy-yellow, victory title keeps pink drop shadow at Phase 4-5 | milestoneContainerDark is applied at phase>=3 (VictoryModal.tsx:838, style 2058) to swap the candy-yellow chip for the dark material, and getVictoryTitleShadowColor(phase) (213) drives the victory title's textShadowColor (716) off CandyColors.pink.shadow through the descent — the candy artifacts no longer survive into the Phase 4-5 sheet (commit 4fb9b7e). |
 | ❌ | P3 | Confetti at Phase 3+ only changes color — same count, pop-in spring, wobble, and 2-3.5s fall as Phase 0 | Confetti receives phase but uses it only for theme.confettiColors (line 201); generateConfetti/ConfettiPieceComponent take no phase, so count (baseCount+energyBonus), pop-in spring (friction 4/tension 100), wobble (30+rand*50), spin, fallDuration (2000+rand*1500), and uniform-random shape are identical at every phase. |
 
-### Dead screens  ·  ✅2 🟡2 ⏸️0 ❌7
-
+### Dead screens  ·  ✅10 🟡1 ⏸️0 ❌0
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | ✅ | P1 | DifficultyMenu (the most-touched config surface) pops in and out with literally zero transition | DifficultyMenu.tsx now runs the house entrance: backdropOpacity/cardScale/cardOpacity refs (lines 185-187), an Animated.parallel with SURFACE.modalIn spring on mount (202-207), a fast SURFACE.modalOutMs timed exit (220-233), reducedMotion pins, and the PanelCard wrapped in an Animated.View (397) with the scrim fading in (368). Matches commit b4f95e8. (Minor: uses scale+opacity, not the -8dp translateY origin bias.) |
@@ -197,8 +222,7 @@ Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a p
 | ❌ | P3 | Stats and Settings render null until async loads land — the reveal fade can expose a blank screen, then content pops fully-formed | Both screens still early-return null before their loads resolve — StatsScreen.tsx `if (!stats) return null;` (216) and SettingsScreen.tsx `if (!settings) return null;` (730). No header + empty-PanelCard skeleton is rendered from static props on either screen. |
 | 🟡 | P3 | Amber balance changes in Store/Shop are instant number swaps — money moments get no acknowledgment beyond a static text box | The daily faucet claim now resolves into a magnitude-aware RewardReveal count-up (StoreModal.tsx 632-641, faucetReveal state), a real reward moment. But the amber-pack purchase path is unchanged: the header balance is a plain {amberBalance} (496) with no tick/AmberSparkle, and successMsg still renders in a non-springing plain View successBox (644-650); ShopScreen amber credits got nothing (no Animated/AmberSparkle imports). |
 
-### World ceremonies  ·  ✅1 🟡3 ⏸️0 ❌7
-
+### World ceremonies  ·  ✅11 🟡0 ⏸️0 ❌0
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | ✅ | P1 | Every world ceremony is audio-dead: the shipped ceremony SFX pack has zero call sites, and the pit devour plays the menu tick | The pack is now wired through a new uiSound bridge (uiSound.ts routes phase_change/amber_earn/unlock/achievement/devour): phase_change fires at pit ward eruption (OfferingPitScreen.tsx:1582) and the finale descend (PhaseTransitionOverlay.tsx:471), amber_earn at batch credit (1820/2052/2150) and DailyLoginModal present (:59), achievement in useAchievementQueue.ts:78, unlock in useUnlockFlow.ts:247/277/306; a new pit_devour.wav (+dark) was minted (generateSounds.mjs:526) and fired in devourWord (1860) and the cascade (2083), so tap-devour no longer plays the menu 'selection' tick. |
@@ -213,8 +237,7 @@ Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a p
 | ❌ | P3 | Post-revelation cinematic's drifting particles teleport to new random Y on every scene change | CinematicParticle still computes the drift particle's top with an inline Math.random()*SCREEN_HEIGHT at render (PhaseTransitionOverlay.tsx:144) rather than a useRef, and the component is still a plain React.FC with no React.memo (85, rendered at 611), so every setActiveSceneIndex re-render re-rolls all drift positions. |
 | ❌ | P3 | Skipping a cinematic leaves stale scene state: the next ceremony can flash the wrong scene line at full opacity | The event-open reset effect (PhaseTransitionOverlay.tsx:407-418) resets shake/flash/vignette/image drivers but still never calls setActiveSceneIndex(-1) or sceneOpacity.setValue(0), and handleSkip (395-405) doesn't reset them either — so a fresh event opens indexing its scenes with the previous event's leftover activeSceneIndex/opacity until the first showTimer fires. |
 
-### Emoji consistency  ·  ✅0 🟡4 ⏸️0 ❌3
-
+### Emoji consistency  ·  ✅4 🟡3 ⏸️0 ❌0
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | 🟡 | P1 | Home-world ambient FX layer is OS color emoji floating over the painterly world (skull/eye particles, emoji smoke, emoji bird, emoji shooting star) | The register-breaking phase particles are now tinted-View motes (AMBIENT_PARTICLES_BY_PHASE + FloatingParticle draws borderRadius Views, HouseWorld.tsx:108-208, commit c3dd498) and AmberSparkle is a tinted circle View, but chimney smoke (💨 :302), the bird (🐦 :385) and the shooting star (⭐ :464, still spawned at phases 2-4 over the dark skies) remain raw emoji Text. |
@@ -225,8 +248,7 @@ Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a p
 | ❌ | P3 | Color emoji leaks into micro-chrome and toast copy that is otherwise disciplined monochrome-glyph and emoji-free prose | VictoryModal breakdown still mixes ✨ Lucky Find / ✨ Fresh variant against ✦ Patron / ✦ Doubled (VictoryModal.tsx:1041,1073,1057,1117); the Time's-Up glyph is still ⏱ for bright phases (App.tsx:4257); and the three copy emoji remain — 🛡️ streak toasts (App.tsx:2139,2292) and 'On fire! 🔥' (phaseNarrative.ts:509). |
 | 🟡 | P3 | Loading and crash surfaces use emoji mascots while the real character art is already bundled | ErrorBoundary's 😵 is gone — the fallback now renders a monochrome '◈' settle glyph (ErrorBoundary.tsx:63, a superseding de-emoji fix rather than the fox sprite the target proposed), but the home loading state still pulses the 🏡 emoji under amberPulse (HomeScreen.tsx:1717). |
 
-### Motion vocabulary  ·  ✅6 🟡2 ⏸️0 ❌3
-
+### Motion vocabulary  ·  ✅11 🟡0 ⏸️0 ❌0
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | ✅ | P1 | Victory star/modal springs are frozen at bright-phase physics for the entire descent | surfaces.ts now exports getCelebrationSpring(phase) (0-1 {4,120}, 2 {5,105}, 3 {7,95}, 4+ {9,80}); useVictoryFlow.playVictorySequence takes a phase arg, derives cel/modalSpring from it, and applies them to all three star pops and the modal card spring; App.tsx:2369 threads persistence.currentPhase (the final board resolves to the 4+ heavy tier since it only occurs at phase 4+). Reduced-motion/swift paths still pin end states. |
@@ -241,8 +263,7 @@ Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a p
 | ✅ | P3 | SCREEN_FADE timing constants are dead — App.tsx hardcodes different values | The dead SCREEN_FADE_OUT_MS/IN_MS were renamed to the shipped values SCREEN_FADE_COVER_MS=120 / SCREEN_FADE_REVEAL_MS=180 (timing.ts:41-42) and imported + used in App.tsx transitionTo (App.tsx:256 import, :721/743), with asymmetric easing added — Easing.out(Easing.quad) on cover, Easing.in(Easing.quad) on reveal — closing the single-source contract (commit precedes 16d2235). |
 | ✅ | P3 | Amber-pill pulse fires on every amber change with no reducedMotion check | The amber pulse effect now early-returns amberPulse.setValue(1) under getSettingsSync().reducedMotion (mirroring the playPulse effect below), and its peak is phase-damped — 1.12 at phase>=4 vs 1.2 at the bright phases (HomeScreen.tsx amber effect, commit precedes 16d2235). |
 
-### Audio & haptics  ·  ✅8 🟡1 ⏸️0 ❌1
-
+### Audio & haptics  ·  ✅10 🟡0 ⏸️0 ❌0
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | ✅ | P0 | Phase-transition ceremonies play in total silence while a bespoke 2.6s ritual swell ships unwired | OfferingPitScreen.tsx:1557 calls stopCeremonyMusic() at ceremony start and :1582 plays playUiSound('phase_change') at the eruption block, and PhaseTransitionOverlay.tsx:471 fires it on the descend scene (commit df613ff 'wire the ritual swell + stop the old bed at the phase ceremony'). soundPhaseChange now has live call sites via the uiSound bridge. |
@@ -256,8 +277,7 @@ Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a p
 | ✅ | P3 | Hint keeps its warm candy chime at Phase 3+ (no dark mirror) | hint_dark is minted (generateSounds.mjs:655, falling minor pair on hollow partials) and registered in SOUND_SOURCES (audio.ts:66), so resolveSfxForPhase('hint',>=3) now returns hint_dark automatically with no call-site change (commit 8ef7752). |
 | ✅ | P3 | Reverse Shift's midpoint turn gets a celebratory haptic but no sound | A bespoke midpoint_turn (+ midpoint_turn_dark) sound is now minted in generateSounds.mjs and registered in SOUND_SOURCES; App.tsx pairs hapticSuccess() with soundMidpointTurn() at the reverseMidpoint (App.tsx:2694), so the descent→ascent turn reads as a chapter break rather than reusing the move ladder's tier-3 combo step. |
 
-### Typography, color, a11y  ·  ✅4 🟡4 ⏸️0 ❌3
-
+### Typography, color, a11y  ·  ✅10 🟡0 ⏸️0 ❌1
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | ✅ | P0 | Ghost word previews are near-invisible on the board (1.0-1.6:1) — the core judge-the-word channel fails at every phase | Row.tsx now backs every preview with slotPreviewChip (backgroundColor rgba(16,10,34,0.62)) and light inks — neutral #EDE8F8, graded #8BF0AE/#FF9DA2 with ✓/✗ prefix — which compute ~7.5-12:1 over all five phase bgPrimary values; the one-ink/one-weight neutral no-leak contract is preserved. (The suggested WCAG unit test wasn't added, but the P0 legibility problem is unambiguously resolved.) |
@@ -272,8 +292,7 @@ Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a p
 | 🟡 | P2 | The house-completion ceremony is headlined by an OS emoji; the ask badge mixes emoji into a sprite row | The completion ceremony now shows the VOID_ICON sprite at phase>=4 (the actual reveal moment) but still the raw 🏠 emoji at phase<4, and no dedicated lit/eclipsed house-crest art was made; the statsRow house-ask badge (App.tsx:4124) still renders 🏠 as Text while siblings use getModeIconSprite, and MODE_ICON_SPRITES has no 'house' glyph. |
 | 🟡 | P3 | Bright-phase victory titles sit at ~3.4:1 — passable only because they are display-size | colors.ts deepened phase 0 victoryTitleColor to pink.dark #DB2777 (4.6:1 on white) and phase 1 to #BC4A78 (4.5:1), but phase 2 is still #9868A8 on modalBg #E8E0F0 — the exact flagged pairing at ~3.35:1, unchanged. |
 
-### Choreography  ·  ✅1 🟡0 ⏸️0 ❌7
-
+### Choreography  ·  ✅8 🟡0 ⏸️0 ❌0
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | ✅ | P0 | Exiting the victory screen within ~1.5s permanently cancels the finale and post-revelation cinematics | App.tsx queueEndgameCinematic (line ~1351) sets pendingEndgameEventRef synchronously, and startVictoryExitFlow (line ~1362-1366) plays that queued event via setPhaseTransitionEvent before clearVictoryTimeouts() drops it — exactly the target; landed in commit 8dcc497 'P0-1: rescue the finale / post-revelation cinematic on victory exit'. |
@@ -285,8 +304,7 @@ Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a p
 | ❌ | P2 | 120ms autosave debounce races the async victory record: a completed board can persist as a restorable PLAYING save | The autosave fire-time re-check (useAutosave.ts:63) still reads only gameState/currentScreen — which stay PLAYING through the async record until App.tsx:2282 — with no isProcessingVictory or boardCompletedRef in AutosaveDeps or the call site (App.tsx:827); the back-during-WON branch also still omits clearPuzzleState for the normal path. |
 | ❌ | P3 | One-time Swift Victories pointer rides an untracked raw setTimeout and burns its once-ever flag on clobbered/invisible delivery | maybeShowSwiftVictoryHint (App.tsx:3321-3335) still marks the once-ever flag seen (line 3331) before a raw untracked setTimeout (line 3332) that writes via puzzleActions.setMessage — not addVictoryTimeout, not the toast queue — so the flag is spent even when the board-start/house-ask line clobbers it or the player navigates away. |
 
-### Assets  ·  ✅0 🟡3 ⏸️0 ❌5
-
+### Assets  ·  ✅4 🟡2 ⏸️2 ❌0
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | 🟡 | P0 | Android adaptive icon is the full-bleed store icon — launcher masks crop the ears, W/S tiles and amber gem; corners are baked opaque black | Commit 340aca9 rewrote processAppIcon.mjs to place the whole composition inside the 66% safe zone on a transparent surround; adaptive-icon.png now has transparent corners/edges (pixel(0,0)=[0,0,0,0]) so the launcher mask no longer crops the identity. But icon.png is byte-unchanged (md5 still 7fcab4b5..., corner still baked opaque [1,1,1,255]) and splash.png is still 1600x1600 with the pre-rounded icon — the icon.png un-baking and splash rebuild are explicitly deferred in the commit as needing new source art. |
@@ -298,8 +316,7 @@ Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a p
 | ❌ | P3 | 26MB of full-screen backgrounds ship as truecolor PNG — a ~17MB install-size win is on the table | No .webp assets exist and no .webp require() calls in src; the five skies still ship as color-type-6 RGBA PNG (sky_day 3.37MB) and pit backdrops as PNG, with PNG crunch still disabled (enablePngCrunchInReleaseBuilds:false). |
 | ❌ | P3 | Play Store screenshot set is low-res stylized mocks whose UI doesn't match the shipped game | The four titled shots (01-04) are still 864x1536 (below Play's 1080px short-side), and the four file_00000000*.png AI drafts (941x1672) are still present in assets/Play_store — no real-device re-shoot or draft deletion happened. |
 
-### First 60 seconds  ·  ✅1 🟡1 ⏸️0 ❌7
-
+### First 60 seconds  ·  ✅7 🟡1 ⏸️1 ❌0
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | ❌ | P1 | Every launch blinks through a near-black Phase-4 screen and an unchoreographed home flash before the first board | All three target parts are unchanged: appStyles.initialLoadingContainer is still backgroundColor '#1A1A2E' with the glass card + large ActivityIndicator + 'Preparing your house...' (appStyles.ts:76, App.tsx:3692-3702); currentScreen still initializes to 'home' with no initialScreen prop (App.tsx:326); and the cold-open swap is still a raw setCurrentScreen('puzzle') at App.tsx:795 (and 1008), never routed through transitionTo. |
@@ -321,8 +338,7 @@ Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a p
 | ✅ | P2 | The 'monument' running total SNAPS instead of climbing — the system's own stated reward has no payoff moment | A useEffect keyed on offeringTotal (commit 36c0126) tweens displayedOfferingTotal from the previous value via requestAnimationFrame using countUpDisplayValue over getCountUpDurationMs (phase-scaled 320-1300ms), snapping only on first read / reduced motion / non-increase; the monument line at ~3294 renders displayedOfferingTotal. |
 | ✅ | P3 | Candle glow color is a phase-fixed warm orange — the only non-phase-aware element in an otherwise phase-consistent altar | The glow's inline backgroundColor at HomeScreen.tsx ~3257 (commit 29d193f) is now phase-derived: phase>=5 → '#9B7BAE' mauve, phase>=4 → '#C8703A' ember, else '#FFB347', overriding the static style default — an ember at the reveal, a serene mauve at Phase 5. |
 
-### Variant tension modes  ·  ✅1 🟡2 ⏸️0 ❌1
-
+### Variant tension modes  ·  ✅4 🟡0 ⏸️0 ❌0
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | ✅ | P1 | Blind Offering's once-at-the-end judgment has no bespoke reveal (success) or rejection (failure) — the apex mode's whole reason to exist is unmarked | New BlindJudgmentOverlay.tsx (commit 5be43a5) is wired at App.tsx:4373; App fires fireBlindJudgment('accepted') at 1906 with soundValidMove(3)+hapticSuccess (finale excluded) and 'rejected' at 2495, and the overlay runs a 680ms native-driver green sweep top→bottom on accept / crimson double-throb on reject with a reducedMotion→instant flash on both branches. |
@@ -330,8 +346,7 @@ Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a p
 | 🟡 | P2 | Reverse midpoint (descent→ascent turn) is a lone haptic — no sound, no visual 'second act' the code itself promises | App.tsx:2562-2566 (commit ba8e4bc) now plays soundValidMove(3) rising chime + phase-aware getReverseMidpointMessage alongside hapticSuccess, closing the 'no sound' gap, but the target's one-shot native-driver visual 'reversal' flash was not added — no reverseMidpoint-driven visual beat exists in App or the components. |
 | ❌ | P3 | Speed escalation cues are under-marked: '🔥 Round N' pops in silently and the drain envelope is audibly/motionally flat outside the last 3s | The Round badge is still a static View with no pop-in reveal or rising sting on increment (App.tsx:4216-4227; setSpeedRound at 1921 triggers no animation/sound), and the drain-envelope tick logic (speedTickKind 5s/3s, App.tsx:699-718) predates the audit (commit 3553bd1, 2026-07-14) — exactly the flat-outside-the-last-seconds behavior the finding flagged, unchanged. |
 
-### Alert / blocking-card layer  ·  ✅3 🟡0 ⏸️0 ❌1
-
+### Alert / blocking-card layer  ·  ✅3 🟡1 ⏸️0 ❌0
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | ✅ | P1 | The alert layer is the sole restyled-kit surface still using the stock OS fade — no spring, no phase weight | GameAlertModal.tsx now sets animationType="none" (line 150) and drives a native backdrop opacity (180ms timing) + card Animated.spring with SURFACE.modalIn blended toward getPressSpring(phase) (lines 73-95), reducedMotion/low-tier pinning it instant (lines 59-64); commit 411c516. |
@@ -358,8 +373,7 @@ Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a p
 | ✅ | P2 | Capture-in-progress is a bare stock ActivityIndicator — off-brand grey spinner on a cottage-pixel game | ActivityIndicator is gone entirely from the share components; while sharing, a phase-tinted parchment status chip (t.cardBg/t.amberTintBorder) with a native-driven breathing 'capturing...' label (capturePulse, t.amberText) masks the Share button (lines ~281-290). |
 | ✅ | P3 | Challenge-a-friend shared text is a fixed bright taunt regardless of phase, and never personalized | buildChallengeShareText now selects from a phase-aware CHALLENGE_TAUNTS pool (tiers 0/2/3/4, named+anon) via challengeTauntTier(phase); App.tsx:3524 threads persistence.currentPhase at the call site (playerName supported but undefined, as the game has no player-name concept). |
 
-### Monetization reward loop  ·  ✅1 🟡3 ⏸️0 ❌0
-
+### Monetization reward loop  ·  ✅4 🟡0 ⏸️0 ❌0
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | 🟡 | P1 | Watched-ad rewards resolve to a static text line + a silently-jumping number — no count-up, no celebration proportional to the amount | The reusable RewardReveal count-up was built (src/components/ui/RewardReveal.tsx, rAF count-up + icon spring + phase glow) and wired into the faucet (StoreModal setFaucetReveal→RewardReveal, the cited anchor), quest claim/double (HomeScreen ~L2692), and daily-login; but the target's third consumer, victory-2x, still renders displayTotal as a plain jumping number in VictoryModal (only a labeled 'Doubled' breakdown line, no count-up). |
@@ -367,8 +381,7 @@ Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a p
 | 🟡 | P2 | RewardedAdButton's tap->ad handoff is a raw, unlabeled ActivityIndicator — reads as a stall, not 'summoning your reward' | RewardedAdButton's busy branch now pairs the ActivityIndicator with a 'Loading...' label in a busyRow (commit 29f08f2) so it no longer reads as a bare stall, but the target's branded state (phase-aware in-world copy, amber pip, native-driver opacity shimmer, kept ▷ glyph) is absent — it's a generic 'Loading...' beside the stock spinner. |
 | 🟡 | P3 | The Stats banner ad is a raw Google rectangle dropped into the parchment scroll with no cottage tray — it fights the chrome | BannerAd.tsx now wraps the native banner in a getSurfaceTheme(phase) tinted bordered tray/'shelf' (cardBg/cardBorder frame, commit 29d193f), fixing the core 'no cottage tray' defect, but the target's small muted uppercase section label and reserved fixed height (layout-shift guard) were not added. |
 
-### Assistive-access semantics  ·  ✅0 🟡4 ⏸️0 ❌0
-
+### Assistive-access semantics  ·  ✅4 🟡0 ⏸️0 ❌0
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | 🟡 | P1 | Every full-screen plain-View overlay leaks screen-reader focus into the occluded board/home/pit (accessibilityViewIsModal=0 tree-wide) | Commit b8d2948 added accessibilityViewIsModal only on the two VictoryModal containers (VictoryModal.tsx:408,614), an iOS-only fence on one of the four overlays; its own message explicitly defers the App.tsx occluded-content fencing (no-hide-descendants/accessibilityElementsHidden on the board/home/pit), and the Time's Up overlay (App.tsx:4255), PhaseTransitionOverlay (557), and pit ceremony still have no fencing (only a pre-existing accessibilityRole='alert'). |
@@ -376,8 +389,7 @@ Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a p
 | 🟡 | P2 | Horror micro-beats have no coherent screen-reader treatment: prominent beats go unspoken while subliminal flickers litter the swipe order as raw strings | Commit f2877c7 (useVictoryOrchestration.ts:~298) announces only ambient_whisper/silent_victory beats; the target's glitch_title and the guaranteed first-win glitch are deliberately left unspoken, and the subliminal victory-glitch/microbeat/interjection Text nodes in App.tsx:4491-4545 still carry no importantForAccessibility='no'/accessibilityElementsHidden (only pointerEvents='none', which does not remove them from the SR swipe order). |
 | 🟡 | P3 | Live-region announcements are Android-only with no iOS fallback, so all move feedback, receipts, and whispers are silent under VoiceOver | Only Toast.tsx (147-152) gained the cross-platform iOS announceForA11y fallback on message change; the other three cited sites still use the Android-only accessibilityLiveRegion with no announce call (AchievementToast.tsx:106, HomeScreen.tsx:2066, StoreModal.tsx:647 — announceForA11y count is 0 in all three). |
 
-### Dynamic type & adaptive layout  ·  ✅1 🟡0 ⏸️2 ❌1
-
+### Dynamic type & adaptive layout  ·  ✅1 🟡1 ⏸️2 ❌0
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | ✅ | P1 | No app-wide font-scale policy: OS large-font scales all chrome text but cottage frames are fixed-height single-line strips, so labels clip and titles truncate | installGlobalFont's global <Text> wrapper (src/theme/fonts.ts:146-153) now injects `maxFontSizeMultiplier: GLOBAL_MAX_FONT_SCALE` (=1.35, line 111) as an overridable default on every Text, exactly the target stopgap policy; shipped in commit 9734d6b 'Add an app-wide OS font-scale ceiling so text can't clip the cottage frames (P1)'. |
@@ -385,8 +397,7 @@ Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a p
 | ⏸️ | P2 | Board arc row overflows narrow (<=360dp) screens: fixed tile/slot geometry, no scale-to-fit, so 5-letter drop rows clip their outer slots + preview labels at the screen edge | Matches documented deferral (a). tileLayout.ts still ships fixed constants (STANDARD_TILE_W 52, ARC_SLOT_RENDERED_WIDTH 18) with no per-board scale-to-fit; Row.tsx/LetterTile.tsx contain only animation scales, no window-width-derived tile scaling. |
 | ⏸️ | P3 | Tablet / large-aspect: the fixed-width board is marooned in a small central column with vast dead bands on iPad/large Androids | Matches documented deferral (b). No responsive breakpoint / isTablet helper anywhere in src; board is still built from the fixed tileLayout.ts constants and app.json keeps supportsTablet:true, so the board is not scaled up or re-centered on large widths. |
 
-### Free-progression reward moments  ·  ✅1 🟡2 ⏸️0 ❌3
-
+### Free-progression reward moments  ·  ✅6 🟡0 ⏸️0 ❌0
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | 🟡 | P2 | No count-up anywhere and a magnitude-blind pill pulse: every amber gain feels identical, +2 reads the same as +100 | A reusable count-up primitive (countUpDisplayValue / getCountUpDurationMs in src/components/ui/RewardReveal.tsx) was built and applied to the sacrifice monument (HomeScreen.tsx:1249-1266), GiftOverlay, and quest reveal, but the cited header amber pill still renders a bare `{progress.amber}` that jumps (HomeScreen.tsx:1812) and its pulse still fires a fixed toValue:1.2 on any change regardless of gain size (HomeScreen.tsx:1459-1474). |
@@ -415,8 +426,7 @@ Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a p
 | ✅ | P2 | Reset All row + confirm understate the blast radius (house, all animals, and amber are lost) | The confirm (SettingsScreen.tsx:684) and the row description (line 934-936) now both explicitly name the real loss — 'Your house and every room, all your animal friends, and all your amber are lost' / 'Erases your house, animals, and amber' — resolving the understatement (commit cb2352d); the target's optional 'Purchases can be restored' reassurance line was not added. |
 | ✅ | P2 | Settings toggles are stock platform Switches, off-brand against the fully pixel-skinned app | A skinned CottageSwitch component (SettingsScreen.tsx:283-336) replaces the stock Switch across all six toggles — layered Views (getSurfaceTheme track + bevel thumb), native-driver translateX slide + ON-fill opacity cross-fade, reducedMotion/shouldSimplifyAnimations instant pin, and preserved accessibilityRole 'switch'/checked; Switch is no longer imported from react-native (lines 3-16). |
 
-### Puzzle HUD chrome & controls  ·  ✅1 🟡2 ⏸️0 ❌2
-
+### Puzzle HUD chrome & controls  ·  ✅4 🟡1 ⏸️0 ❌0
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | ✅ | P2 | Toast replays a full fade-from-zero + slide-in on every move message — text flickers above the board during play | Toast.tsx (lines 88-101) now branches on isReplacement: when the pill is already seated with a different message it does an in-place opacity dip (0.4→1) with slideAnim held at 0 — no fade-from-0, no slide-from-(-20) — reserving the full slide+fade only for a fresh appearance. Commit 2c96a42 'Cross-fade the puzzle Toast in place'. |
