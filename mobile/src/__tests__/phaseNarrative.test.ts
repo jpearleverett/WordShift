@@ -815,7 +815,7 @@ describe('getComboMoveMessage', () => {
 
   test('signature lines survive as pool members', () => {
     expect(COMBO_MOVE_POOLS[4][2]).toContain('A flawless verse. It hears.');
-    expect(COMBO_MOVE_POOLS[0][2]).toContain('On fire! 🔥');
+    expect(COMBO_MOVE_POOLS[0][2]).toContain('On fire! Nothing is stopping you now!');
     expect(COMBO_MOVE_POOLS[5][2]).toContain('The weave sings, unbroken.');
   });
 
