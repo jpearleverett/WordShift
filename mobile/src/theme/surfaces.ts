@@ -44,6 +44,20 @@ export const SURFACE = {
 } as const;
 
 /**
+ * Modal / toast entrance spring, phase-aware. SURFACE.modalIn stays the fixed
+ * default for surfaces with no phase context; this ages the entrance with the
+ * descent (bright springy overshoot -> heavy dark settle) for the surfaces that
+ * DO know their phase, so a cottage sheet doesn't bounce in candy-bright over a
+ * Phase-4 board. Mirrors the celebration/press ladders.
+ */
+export function getModalInSpring(phase: number): { friction: number; tension: number } {
+  if (phase >= 4) return { friction: 10, tension: 55 };
+  if (phase >= 3) return { friction: 8, tension: 60 };
+  if (phase >= 2) return { friction: 7, tension: 62 };
+  return SURFACE.modalIn;
+}
+
+/**
  * Press-feedback spring, phase-aware: bright phases snap back playfully, dark
  * phases release heavily — the same weight language the letter tiles speak.
  */

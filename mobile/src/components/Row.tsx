@@ -275,18 +275,25 @@ const Slot: React.FC<{
       };
     }
 
+    // The active-slot pulse/glow tempo ages with the descent: the board's own
+    // heartbeat slows as the world darkens (bright 800/1000ms -> ~1300/1600ms at
+    // the reveal), so the slot indicator doesn't keep a chirpy phase-0 cadence
+    // over a Phase-4 board. Mirrors the tile-wobble slowdown.
+    const pulseMs = phase >= 4 ? 1300 : phase >= 3 ? 1100 : phase >= 2 ? 950 : 800;
+    const glowMs = phase >= 4 ? 1600 : phase >= 3 ? 1350 : phase >= 2 ? 1150 : 1000;
+
     // Continuous pulse
     const pulseLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
           toValue: 1,
-          duration: 800,
+          duration: pulseMs,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
         Animated.timing(pulseAnim, {
           toValue: 0,
-          duration: 800,
+          duration: pulseMs,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
@@ -299,13 +306,13 @@ const Slot: React.FC<{
       Animated.sequence([
         Animated.timing(glowAnim, {
           toValue: 1,
-          duration: 1000,
+          duration: glowMs,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
         Animated.timing(glowAnim, {
           toValue: 0,
-          duration: 1000,
+          duration: glowMs,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),

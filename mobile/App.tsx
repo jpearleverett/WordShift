@@ -4123,7 +4123,7 @@ function MainApp() {
           )}
 
           <View style={styles.headerTitleArea}>
-            <AnimatedLogo />
+            <AnimatedLogo phase={persistence.currentPhase} />
             {/* Phase indicator badge */}
             {persistence.currentPhase > 0 && (
               <View style={[

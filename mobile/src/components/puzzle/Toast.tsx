@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Platform } from 'react-native';
 import { CandyColors, getPhaseTheme } from '../../theme/colors';
+import { getModalInSpring } from '../../theme/surfaces';
 import { getSettingsSync } from '../../services/settings';
 import { announceForA11y } from '../../services/a11yAnnounce';
 import { PIXEL_FONT_BOLD, BODY_FONT_ITALIC } from '../../theme/fonts';
@@ -61,6 +62,11 @@ export const Toast: React.FC<ToastProps> = ({ message, isError, phase = 0, isVoi
   // message swapping for another while the pill is already up) refreshes the
   // text in place instead of flying a fresh pill in from scratch every time.
   const seatedMessageRef = useRef<string>('');
+  // Live phase for the entrance spring, read inside the message-change effect
+  // without making phase an effect dependency (a phase shift shouldn't re-fly a
+  // seated pill; the next message picks up the new weight).
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
 
   const toastTheme = getToastTheme(phase);
 
@@ -105,13 +111,16 @@ export const Toast: React.FC<ToastProps> = ({ message, isError, phase = 0, isVoi
       refresh.start(() => { enterAnimRef.current = null; });
     } else {
       // Fresh appearance (the pill was empty): the full slide + fade entrance.
+      // The entrance spring ages with the descent (getModalInSpring) so the pill
+      // no longer bounces in candy-bright over a dark board.
       slideAnim.setValue(-20);
       opacityAnim.setValue(0);
+      const entranceSpring = getModalInSpring(phaseRef.current);
       const enterAnim = Animated.parallel([
         Animated.spring(slideAnim, {
           toValue: 0,
-          friction: 5,
-          tension: 100,
+          friction: entranceSpring.friction,
+          tension: entranceSpring.tension,
           useNativeDriver: true,
         }),
         Animated.timing(opacityAnim, {
