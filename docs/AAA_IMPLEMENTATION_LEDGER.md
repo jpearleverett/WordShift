@@ -60,6 +60,23 @@ Net: this pass advanced roughly **30 additional findings** to done (verified, co
 
 ---
 
+## Session 3 delta (the follow-up merge + finish pass)
+
+The stale-base problem was **root-caused and fixed**: the earlier agents forked from `main` (`9ace204`), *114 commits behind* the audit branch. A probe agent confirmed that a fresh worktree now forks from the audit-branch HEAD, and every agent this pass additionally ran `git reset --hard <audit-HEAD>` and reported its verified base. Three correctly-based agents (menus / home-diorama / animal-life) therefore **merged with zero conflicts**, and their branches share the audit HEAD as their merge-base — the entanglement that forced the surgical Session-2 approach is gone.
+
+**Delivered this pass (all committed, pushed, full suite green — 119 suites / 2935 tests, 0 typecheck/lint errors):**
+- Serial (direct): **F151** rewarded-ad busy state, **F180** disabled-button feel, **F60** screen-transition reveal, **F178** phase-2 dusk HUD tier, **F125** cold-open back-to-exit, **F155** prominent-glitch a11y announce, **F97/F119/F123** branded loading holds, **F61** cold-open felt beat, **F124** cold-open voice toast, **F91** minted reverse-midpoint turn sound, **F87/F39** victory star-pop notes (minted + wired), **F88** shared-button press haptic.
+- Correctly-based agent merges: **F11/F12/F13/F16/F17/F18/F20** (home diorama; F64 already satisfied), **F25/F26/F101** (animal-life), **F44/F46/F47/F49/F51/F52/F59/F152/F173** (menus/monetization).
+
+**Reconciliation against the original 121-finding "remaining" target:** **77 delivered or verified-already-satisfied**, 44 nominally remaining. But the `remaining.json` verdicts pre-date the audit branch's own Waves 1-5, so a meaningful share of the "44" are already satisfied on the shipped branch (verified: **F111** P0 adaptive icon = safe-zone foreground; **F28/F65** emote sprites; **F96** in-world crash screen; **F133** speed-timer sprite; **F104** in-modal receipts (= F35); **F161/F163/F164** reward-moment count-up/haptic/confetti; **F31** grounded shadow). The **genuinely-outstanding** remainder is:
+- **Core-board / victory-choreography rewrites** (F1 cross-row ghost travel, F34 phase-blind victory, F6 undo/restart, F7 drag-ghost offset, F37/F38/F40 dark-phase victory artifacts, F76/F77/F9 board-motion, F107/F108/F109 overlay coordination, F139 apex alert): deferred — these touch the core board / victory / startNewGame paths, which already function; a botched rewrite regresses the game's spine, not worth the P2/P3 payoff under an automated pass.
+- **Asset re-authoring** (F112 sky mirror band, F113 trio sprite quantize, F114 UI-icon redraw, F117 WebP re-encode, F118 store screenshots, F115/F127/F21/F126): need art tooling / device captures the automated toolchain can't produce (the assets agent documented F117 as encoder-blocked).
+- **A small achievable tail** (F84 celebration re-synthesis, F58 tending-modal skin, F89 drag-hover tick, F95/F100 type scale, F80/F81 motion constants, F120/F121/F149/F66 first-60s/reward polish): reachable in a follow-up, not attempted this pass.
+
+Everything shipped this pass is behind reduced-motion + device-tier gates, native-driver transform/opacity only, no em dashes in player-facing copy, and verified green.
+
+---
+
 ## Per-finding status by system
 
 Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a pinned core system) · ❌ not addressed.
