@@ -4628,6 +4628,9 @@ function MainApp() {
               // RESTART while playing resets THIS board (a true retry); NEW (idle)
               // fetches a fresh puzzle.
               if (puzzle.gameState === GameState.PLAYING) {
+                // A distinct "taking the board back" sound (the reset re-runs the
+                // Row board-serve cascade, which supplies the visual exhale).
+                soundUndo();
                 puzzleActions.resetCurrentPuzzle();
               } else {
                 puzzleActions.startNewGame();
