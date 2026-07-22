@@ -400,7 +400,9 @@ export function getPhaseTheme(phase: number): PhaseTheme {
           '#B05080', '#8838B8', '#3878B8', '#38A888',
           '#B8A038', '#B86838', '#B83858', '#6838B8',
         ],
-        victoryTitleColor: '#9868A8',
+        // WCAG AA: #7A4E8E = 4.94:1 on modalBg #E8E0F0 (was #9868A8 at 3.35:1).
+        // Same cool violet identity, one step deeper.
+        victoryTitleColor: '#7A4E8E',
         victoryGlowColor: '#A8A0C0',
         modalOverlayColor: 'rgba(40, 20, 80, 0.75)',
         modalBgColor: '#E8E0F0',

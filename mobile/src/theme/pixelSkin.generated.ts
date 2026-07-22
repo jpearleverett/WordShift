@@ -93,7 +93,7 @@ export const PIXEL_SKINS: Record<'bright' | 'dusk' | 'storm' | 'dark' | 'serene'
     fillCard: '#2C2431',
     accent: '#8A6E96',
     accentLo: '#6B5277',
-    ink: { primary: '#1F1512', secondary: '#D9C8D4', quiet: '#A793A6', plaque: '#A95341' },
+    ink: { primary: '#1F1512', secondary: '#D9C8D4', quiet: '#A793A6', plaque: '#D9A79A' },
   },
 };
 
