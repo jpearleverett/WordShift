@@ -392,6 +392,9 @@ function MainApp() {
   const [starBurst, setStarBurst] = useState<{ active: boolean; x: number; y: number }>({
     active: false, x: 0, y: 0,
   });
+  // Cold-open first-move settle (F61): a one-shot warm success haptic so the
+  // "Feel that?" line describes something the hands actually felt. Fires once.
+  const coldOpenSettleFiredRef = useRef(false);
   const [invalidDropSignal, setInvalidDropSignal] = useState(0);
   const [successDropSignal, setSuccessDropSignal] = useState(0);
   // Blind Offering's once-at-the-end judgment beat (see BlindJudgmentOverlay):
@@ -1111,6 +1114,15 @@ function MainApp() {
     if (puzzle.gameState !== GameState.PLAYING) return;
     if (puzzle.history.length === 1) {
       puzzleActions.setMessage(COLD_OPEN_FIRST_MOVE);
+      // Make the delight FELT, not just told: ~150ms after the commit (letting
+      // the move's own catch bounce + star burst land first), a warm SUCCESS
+      // haptic — a step above the ordinary move haptic — so the hands feel the
+      // beat the line describes. Once ever.
+      if (!coldOpenSettleFiredRef.current) {
+        coldOpenSettleFiredRef.current = true;
+        const t = setTimeout(() => { hapticSuccess(); }, 150);
+        return () => clearTimeout(t);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onboardingFlow.onboardingStep, puzzle.gameState, puzzle.history.length]);
