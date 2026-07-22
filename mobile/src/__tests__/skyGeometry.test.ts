@@ -30,19 +30,46 @@ const HOUSE_WORLD = fs.readFileSync(
 
 const SKIES = ['sky_day', 'sky_afternoon', 'sky_dusk', 'sky_storm', 'sky_shadow'];
 
-/** Read a PNG's dimensions straight from the IHDR chunk (no image lib needed). */
-function pngDimensions(file: string): { width: number; height: number } {
+/**
+ * Read a WebP's dimensions from its header (no image lib needed). The skies
+ * ship as WebP (the ~15MB->~1.5MB install-size win); sharp writes them as the
+ * simple lossy `VP8 ` variant, but this handles VP8/VP8L/VP8X so the tripwire
+ * survives a future re-encode to any variant.
+ */
+function webpDimensions(file: string): { width: number; height: number } {
   const fd = fs.openSync(file, 'r');
-  const buf = Buffer.alloc(24);
-  fs.readSync(fd, buf, 0, 24, 0);
+  const buf = Buffer.alloc(30);
+  fs.readSync(fd, buf, 0, 30, 0);
   fs.closeSync(fd);
-  // bytes 0-7 signature, 8-15 IHDR length+type, 16-19 width, 20-23 height
-  return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+  if (buf.toString('ascii', 0, 4) !== 'RIFF' || buf.toString('ascii', 8, 12) !== 'WEBP') {
+    throw new Error(`${file}: not a WebP`);
+  }
+  const fourcc = buf.toString('ascii', 12, 16);
+  if (fourcc === 'VP8 ') {
+    // Lossy: 14-bit width/height little-endian after the 3-byte start code.
+    return { width: buf.readUInt16LE(26) & 0x3fff, height: buf.readUInt16LE(28) & 0x3fff };
+  }
+  if (fourcc === 'VP8X') {
+    // Extended: 24-bit LE canvas (width-1) at 24, (height-1) at 27.
+    return {
+      width: 1 + (buf[24] | (buf[25] << 8) | (buf[26] << 16)),
+      height: 1 + (buf[27] | (buf[28] << 8) | (buf[29] << 16)),
+    };
+  }
+  if (fourcc === 'VP8L') {
+    // Lossless: after the 0x2f signature, 14-bit (width-1) then (height-1).
+    const b0 = buf[21], b1 = buf[22], b2 = buf[23], b3 = buf[24];
+    return {
+      width: 1 + (((b1 & 0x3f) << 8) | b0),
+      height: 1 + (((b3 & 0x0f) << 10) | (b2 << 2) | ((b1 & 0xc0) >> 6)),
+    };
+  }
+  throw new Error(`${file}: unknown WebP variant ${fourcc}`);
 }
 
 describe('sky asset dimensions', () => {
-  test.each(SKIES)('%s.png is 941x1972 (meadow-extended)', (name) => {
-    const dims = pngDimensions(path.join(ENV_DIR, `${name}.png`));
+  test.each(SKIES)('%s.webp is 941x1972 (meadow-extended)', (name) => {
+    const dims = webpDimensions(path.join(ENV_DIR, `${name}.webp`));
     expect(dims).toEqual({ width: 941, height: 1972 });
   });
 });

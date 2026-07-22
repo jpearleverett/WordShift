@@ -35,11 +35,15 @@ import { getTendingIntensity } from '../../services/tending';
 import { getActiveEvent } from '../../services/liveEvents';
 
 // Environment assets
-const SKY_DAY = require('../../../assets/environment/sky_day.png');
-const SKY_AFTERNOON = require('../../../assets/environment/sky_afternoon.png');
-const SKY_DUSK = require('../../../assets/environment/sky_dusk.png');
-const SKY_STORM = require('../../../assets/environment/sky_storm.png');
-const SKY_SHADOW = require('../../../assets/environment/sky_shadow.png');
+// Full-screen sky backdrops ship as WebP (q90): ~15MB of PNG became ~1.5MB with
+// no visible loss on the painterly art. Dimensions are unchanged (941x1972);
+// the seat-geometry contract in skyGeometry.test.ts still holds. Re-encode via
+// scripts/tools/encodeBackgroundsWebp.mjs.
+const SKY_DAY = require('../../../assets/environment/sky_day.webp');
+const SKY_AFTERNOON = require('../../../assets/environment/sky_afternoon.webp');
+const SKY_DUSK = require('../../../assets/environment/sky_dusk.webp');
+const SKY_STORM = require('../../../assets/environment/sky_storm.webp');
+const SKY_SHADOW = require('../../../assets/environment/sky_shadow.webp');
 const ROOF_IMG = require('../../../assets/environment/roof.png');
 // Per-phase foundations (hand-lit per phase: day green -> dusk dry -> night
 // blue), indexed by game phase; phase 5 reuses the shadow foundation, like the
