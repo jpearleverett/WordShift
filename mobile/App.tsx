@@ -394,9 +394,11 @@ function MainApp() {
     puzzleActions.setCurrentPhase(persistence.currentPhase);
   }, [persistence.currentPhase, puzzleActions.setCurrentPhase]);
 
-  // StarBurst effect state for valid moves
-  const [starBurst, setStarBurst] = useState<{ active: boolean; x: number; y: number }>({
-    active: false, x: 0, y: 0,
+  // StarBurst effect state for valid moves. comboTier drives the burst's
+  // size/count escalation (Confetti.StarBurst) so a rising clean-move streak
+  // visibly grows the celebration instead of firing an identical 8-square pop.
+  const [starBurst, setStarBurst] = useState<{ active: boolean; x: number; y: number; comboTier: number }>({
+    active: false, x: 0, y: 0, comboTier: 0,
   });
   // Cold-open first-move settle (F61): a one-shot warm success haptic so the
   // "Feel that?" line describes something the hands actually felt. Fires once.
@@ -2656,8 +2658,9 @@ function MainApp() {
         active: true,
         x: feedbackOrigin?.x ?? SCREEN_WIDTH / 2,
         y: feedbackOrigin?.y ?? SCREEN_HEIGHT * 0.4,
+        comboTier: result.comboTier ?? 0,
       });
-      addVictoryTimeout(() => setStarBurst({ active: false, x: 0, y: 0 }), 600);
+      addVictoryTimeout(() => setStarBurst({ active: false, x: 0, y: 0, comboTier: 0 }), 600);
 
       // Target-row catch bounce on BOTH inputs so the placed tile always
       // "lands" — the default/accessible tap path used to skip this and feel
@@ -2693,6 +2696,16 @@ function MainApp() {
         hapticSuccess();
         soundMidpointTurn();
         puzzleActions.setMessage(getReverseMidpointMessage(persistence.currentPhase));
+        // The descent->ascent turn gets a distinct VISUAL second act: re-fire a
+        // top-tier star burst (bigger/denser than a move's) at the board center
+        // so the chapter break is seen as well as felt/heard.
+        setStarBurst({
+          active: true,
+          x: SCREEN_WIDTH / 2,
+          y: SCREEN_HEIGHT * 0.4,
+          comboTier: 3,
+        });
+        addVictoryTimeout(() => setStarBurst({ active: false, x: 0, y: 0, comboTier: 0 }), 700);
       }
 
       // Dread word visual feedback — subtle dark pulse when a dread word is formed
@@ -4080,7 +4093,7 @@ function MainApp() {
         <Confetti active={puzzle.showConfetti} phase={persistence.currentPhase} ritualEnergy={victoryFlow.victoryData?.ritualEnergy ?? 0} />
 
         {/* Star burst effect on valid moves */}
-        <StarBurst active={starBurst.active} x={starBurst.x} y={starBurst.y} phase={persistence.currentPhase} />
+        <StarBurst active={starBurst.active} x={starBurst.x} y={starBurst.y} phase={persistence.currentPhase} comboTier={starBurst.comboTier} />
 
         {/* Phase change dramatic flash overlay */}
         <Animated.View
