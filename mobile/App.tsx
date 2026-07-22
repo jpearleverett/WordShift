@@ -21,6 +21,7 @@ import { Confetti, StarBurst } from './src/components/Confetti';
 import { BlindJudgmentOverlay, type BlindJudgmentSignal } from './src/components/BlindJudgmentOverlay';
 import { ActionButton, AnimatedLogo, Toast, VictoryModal, RulesModal, DifficultyMenu } from './src/components/puzzle';
 import { BadgeAppear } from './src/components/puzzle/BadgeAppear';
+import { BrandedLoader } from './src/components/puzzle/BrandedLoader';
 import { isValidDifficulty, normalizeDifficulty, getDifficultyChipLabel } from './src/components/puzzle/DifficultyMenu';
 import { HomeScreen } from './src/components/home';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
@@ -3814,14 +3815,27 @@ function MainApp() {
 
   // Show loading while onboarding state is being determined
   if (!onboardingFlow.onboardingReady) {
+    // Mirror the boot screen EXACTLY (same #FFF0F5, icon card, wordmark, quiet
+    // spinner) so the native-splash -> bootstrap-gate -> MainApp-hydration holds
+    // read as ONE continuous branded moment instead of blinking through the old
+    // near-black (#1A1A2E, a Phase-4 color) card on every launch.
     return (
-      <View style={styles.initialLoadingContainer}>
-        <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-        <View style={styles.initialLoadingCard}>
-          <ActivityIndicator size="large" color={CandyColors.pink.main} />
-          <Text style={styles.initialLoadingTitle}>WordShift</Text>
-          <Text style={styles.initialLoadingSubtitle}>Preparing your house...</Text>
+      <View style={bootStyles.container}>
+        <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
+        <View style={bootStyles.iconCard}>
+          <Image
+            source={require('./assets/icon.png')}
+            style={bootStyles.iconImage}
+            resizeMode="cover"
+            accessibilityLabel="WordShift"
+          />
         </View>
+        <Image
+          source={require('./assets/ui/wordmark.png')}
+          style={bootStyles.wordmark}
+          resizeMode="contain"
+        />
+        <ActivityIndicator size="small" color="#8B7BB8" style={bootStyles.spinner} />
       </View>
     );
   }
@@ -4366,7 +4380,7 @@ function MainApp() {
           {(puzzle.gameState === GameState.LOADING || puzzle.isProcessing || victoryFlow.victorySpinnerVisible) && (
             <View style={styles.loadingOverlay}>
               <View style={[styles.loadingBox, { backgroundColor: pauseSurface.cardBg, borderWidth: 1, borderColor: pauseSurface.cardBorder }]}>
-                <ActivityIndicator size="large" color={pauseSurface.amberText} />
+                <BrandedLoader size={44} />
                 <Text style={[styles.loadingGlyph, { color: pauseSurface.title }]}>{persistence.currentPhase >= 3 ? '◈' : '✦'}</Text>
                 <Text style={[styles.loadingText, { color: pauseSurface.title }]}>
                   {getLoadingMessage(persistence.currentPhase)}
