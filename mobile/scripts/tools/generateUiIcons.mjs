@@ -208,18 +208,43 @@ fs.mkdirSync(UI, { recursive: true });
   savePNG(path.join(UI, 'flame.png'), W, W, down2(cv, W, W));
 }
 
-// === journal.png (256) — book for the journal hub ============================
+// === journal.png (256) — a closed leather-bound tome (the Journal hub) ========
+// Cottage reskin of the old flat "notes-app page": a burgundy leather cover with
+// a wooden spine, brass corner braces, an amber cover boss, a parchment page
+// block and a crimson ribbon bookmark. Reads as a real in-world journal on the
+// dark header pill (the amber boss + parchment edge stay bright).
 {
   const W = 256, cv = C(W * 2, W * 2), c = W;
-  roundRect(cv, c, c + 14, 150, 168, 22, '#2A2040', 0.4);                  // drop shadow
-  roundRect(cv, c - 6, c, 150, 168, 20, '#A98BFF', 1, '#8257EA');          // cover
-  roundRect(cv, c + 118, c, 26, 168, 10, '#6B3FD0');                       // spine edge
-  roundRect(cv, c - 24, c, 116, 150, 12, '#FFFFFF', 1, '#F0EBFC');         // pages
-  for (const dy of [-86, -38, 10, 58]) {                                   // page lines
-    roundRect(cv, c - 24, c + dy, 86, 8, 4, '#B9A8E4');
+  const INK = '#2C2114';
+  const LEA = '#A24A38', LEA_DK = '#6C2C22', LEA_HI = '#C4694E';
+  const PAGE = '#F3E6C2', PAGE_LO = '#DEC488';
+  const BRASS = '#E4B85E', BRASS_DK = '#9A6A2E';
+  const AMB = '#FFC845', AMB_DK = '#B5730A';
+  roundRect(cv, c + 6, c + 18, 138, 178, 20, INK, 0.34);                   // drop shadow
+  // parchment page block, peeking to the right of the cover
+  roundRect(cv, c + 16, c + 2, 132, 168, 12, PAGE, 1, PAGE_LO);
+  for (const dx of [122, 132, 142]) capsule(cv, c + dx, c - 146, c + dx, c + 150, 4, PAGE_LO, 0.9); // page striations
+  // leather cover (shifted left so the pages peek)
+  roundRect(cv, c - 8, c, 126, 172, 16, LEA, 1, LEA_DK);
+  roundRect(cv, c - 8, c - 150, 108, 18, 9, LEA_HI, 0.4);                  // top sheen
+  // wooden/darker spine band with two raised ridges
+  roundRect(cv, c - 110, c, 24, 172, 8, LEA_DK);
+  for (const dy of [-84, 84]) capsule(cv, c - 128, c + dy, c - 92, c + dy, 9, LEA_HI, 0.55);
+  // brass corner braces (L-shapes)
+  for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    const bx = c - 8 + sx * 106, by = c + sy * 150;
+    capsule(cv, bx, by, bx - sx * 40, by, 14, INK); capsule(cv, bx, by, bx, by - sy * 40, 14, INK);
+    capsule(cv, bx, by, bx - sx * 34, by, 8, BRASS, 1); capsule(cv, bx, by, bx, by - sy * 34, 8, BRASS, 1);
   }
-  roundRect(cv, c - 96, c - 112, 24, 36, 8, '#FFD968', 1, '#F5B82E');      // bookmark
-  roundRect(cv, c - 6, c - 152, 150, 16, 8, '#FFFFFF', 0.4);               // top sheen
+  // amber cover boss (a small faceted gem)
+  const bcx = c - 8, bcy = c;
+  poly(cv, hexPts(bcx, bcy, 44), INK);
+  poly(cv, hexPts(bcx, bcy, 36), AMB, 1, AMB_DK);
+  ellipse(cv, bcx - 10, bcy - 10, 12, 12, '#FFF0B0', 0.7);
+  // crimson ribbon bookmark hanging past the bottom edge
+  capsule(cv, c + 66, c - 168, c + 66, c + 190, 24, INK, 0.5);            // ribbon shadow edge
+  capsule(cv, c + 66, c - 168, c + 66, c + 186, 18, '#B23A4A', 1);        // ribbon
+  capsule(cv, c + 60, c - 150, c + 60, c + 150, 5, '#E67488', 0.6);       // ribbon highlight
   savePNG(path.join(UI, 'journal.png'), W, W, down2(cv, W, W));
 }
 
@@ -371,20 +396,35 @@ fs.mkdirSync(UI, { recursive: true });
   savePNG(path.join(UI, 'amber.png'), W, W, down2(cv, W, W));
 }
 
-// === quest.png (256) — glossy target/dartboard for the header quest pill ======
-// Bright candy rings so it reads on the dark translucent header pill next to
-// the amber gem + journal book (which it now visually matches).
+// === quest.png (256) — a painted wooden archery target (goals / quests) =======
+// Cottage reskin of the old flat candy dartboard: a warm layered wooden rim with
+// mounting pegs, muted painted bands (wine + parchment), and an amber bullseye.
+// Reads as a crafted "goal/target" on the dark header pill (the amber bull +
+// cream bands stay bright).
 {
   const W = 256, cv = C(W * 2, W * 2), c = W;
-  ellipse(cv, c + 6, c + 22, 198, 198, '#2A2040', 0.28, 26);     // soft drop shadow
-  ellipse(cv, c, c, 208, 208, '#7A1F33');                        // dark red outline
-  ellipse(cv, c, c, 194, 194, '#FF5A6E');                        // outer red ring
-  ellipse(cv, c, c, 152, 152, '#FFF3F0');                        // cream ring
-  ellipse(cv, c, c, 110, 110, '#FF5A6E');                        // red ring
-  ellipse(cv, c, c, 68, 68, '#FFF3F0');                          // cream ring
-  ellipse(cv, c, c, 34, 34, '#FFC845');                          // gold bullseye
-  ellipse(cv, c - 10, c - 10, 10, 10, '#FFFFFF', 0.92);          // center glint
-  ellipse(cv, c - 66, c - 74, 42, 32, '#FFFFFF', 0.28, 34);      // glossy top-left sheen
+  const INK = '#2C2114', WOOD = '#B87A3E', WOOD_DK = '#754A24', WOOD_HI = '#E4C282';
+  const WINE = '#A84B5E', PARCH = '#F3E6C2', AMB = '#FFC845', AMB_DK = '#B5730A';
+  ellipse(cv, c + 6, c + 22, 200, 200, INK, 0.26, 30);           // soft drop shadow
+  ellipse(cv, c, c, 210, 210, INK);                              // warm outline
+  ellipse(cv, c, c, 202, 202, WOOD_HI);                          // rim highlight
+  ellipse(cv, c, c, 192, 192, WOOD);                             // rim body
+  ellipse(cv, c, c, 180, 180, WOOD_DK);                          // rim inner groove
+  ellipse(cv, c, c, 170, 170, INK);                              // face inset ring
+  ellipse(cv, c, c, 162, 162, WINE);                             // painted band (outer)
+  ellipse(cv, c, c, 130, 130, PARCH);                            //   cream
+  ellipse(cv, c, c, 100, 100, WINE);                             //   wine
+  ellipse(cv, c, c, 62, 62, PARCH);                              //   cream
+  ellipse(cv, c, c, 34, 34, AMB_DK);                             // bull rim
+  ellipse(cv, c, c, 27, 27, AMB);                                // amber bullseye
+  ellipse(cv, c - 9, c - 9, 8, 8, '#FFF3C8', 0.9);               // bull glint
+  // mounting pegs on the wooden rim (N/E/S/W) — a crafted, in-world target
+  for (const [px, py] of [[0, -186], [186, 0], [0, 186], [-186, 0]]) {
+    ellipse(cv, c + px, c + py, 10, 10, INK);
+    ellipse(cv, c + px - 2, c + py - 2, 4, 4, WOOD_HI, 0.8);
+  }
+  arcStroke(cv, c, c, 196, 4, Math.PI * 1.08, Math.PI * 1.62, WOOD_HI, 0.4); // rim grain glint
+  ellipse(cv, c - 66, c - 74, 40, 30, '#FFFFFF', 0.14, 34);      // soft top-left sheen
   savePNG(path.join(UI, 'quest.png'), W, W, down2(cv, W, W));
 }
 
@@ -477,17 +517,26 @@ fs.mkdirSync(UI, { recursive: true });
   savePNG(path.join(UI, 'moon.png'), W, W, down2(cv, W, W));
 }
 
-// === share.png (256) — up-arrow rising from an open tray (share/upload) =======
+// === share.png (256) — an amber arrow rising from a wooden crate (share) ======
+// Cottage reskin of the old flat candy tray+arrow: a planked wooden crate with
+// corner posts and an open top, and a bright amber arrow rising out of it (send
+// / share / export). The amber stays legible on the dark victory modal.
 {
   const W = 256, cv = C(W * 2, W * 2), c = W;
-  roundRect(cv, c, c + 74, 130, 84, 22, '#2A2040', 0.26);       // shadow
-  roundRect(cv, c, c + 60, 124, 92, 22, '#6B3FD0');             // tray outer
-  roundRect(cv, c, c + 78, 96, 66, 14, '#EFE9FB');              // tray inner (open box)
-  roundRect(cv, c, c + 8, 42, 138, 16, '#E8455C');             // arrow shaft edge
-  capsule(cv, c, c + 60, c, c - 150, 40, '#FF8FA3');            // arrow shaft
-  tri(cv, [c, c - 204], [c + 84, c - 104], [c - 84, c - 104], '#C23048');        // head outline
-  tri(cv, [c, c - 190], [c + 74, c - 108], [c - 74, c - 108], '#FF6B7E');        // head
-  capsule(cv, c - 12, c - 120, c - 12, c + 20, 10, '#FFC3CE', 0.7);              // shaft sheen
+  const INK = '#2C2114', WOOD = '#B87A3E', WOOD_DK = '#754A24', WOOD_HI = '#E4C282';
+  const AMB = '#FFC845', AMB_HI = '#FFE39A';
+  roundRect(cv, c, c + 100, 132, 20, 12, INK, 0.26);            // crate shadow
+  roundRect(cv, c, c + 72, 128, 92, 18, INK);                   // crate ink
+  roundRect(cv, c, c + 72, 116, 82, 14, WOOD, 1, WOOD_DK);      // crate wood
+  roundRect(cv, c, c + 40, 86, 20, 8, WOOD_DK);                 // open-top dark slot
+  for (const dx of [-66, 66]) capsule(cv, c + dx, c + 44, c + dx, c + 150, 9, WOOD_DK, 0.85); // corner posts
+  capsule(cv, c - 100, c + 76, c + 100, c + 76, 7, WOOD_HI, 0.45); // mid plank light
+  const ax = c;
+  capsule(cv, ax, c + 66, ax, c - 152, 46, INK);               // shaft ink
+  tri(cv, [ax, c - 210], [ax + 94, c - 104], [ax - 94, c - 104], INK);   // head ink
+  capsule(cv, ax, c + 60, ax, c - 146, 30, AMB, 1);            // amber shaft
+  tri(cv, [ax, c - 198], [ax + 78, c - 108], [ax - 78, c - 108], AMB, 1); // amber head
+  capsule(cv, ax - 8, c - 122, ax - 8, c + 44, 9, AMB_HI, 0.65); // shaft sheen
   savePNG(path.join(UI, 'share.png'), W, W, down2(cv, W, W));
 }
 
@@ -741,14 +790,24 @@ function downArrow(cv, cx, topY, botY, shaftTh, headHalf, headLen, body, ink) {
   savePNG(path.join(UI, 'gear.png'), W, W, down2(cv, W, W));
 }
 
-// stats.png — bar chart (Statistics)
+// stats.png — painted bars on a wooden shelf (Statistics)
+// Cottage reskin of the old flat candy bar-chart: muted cottage paint (sage /
+// dusty-blue / amber) over warm-ink outlines, standing on a wooden shelf with a
+// top-lit edge. Reads clearly as "stats/growth" while matching the cozy chrome.
 {
   const W = 256, cv = C(W * 2, W * 2), c = W;
-  const baseY = c + 128;
-  const bars = [[-94, 118, '#5EEAD4', '#14B8A6'], [0, 178, '#7EC7F5', '#4FA8E8'], [94, 236, '#FFC845', '#F5A315']];
-  for (const [bx, h] of bars) roundRect(cv, c + bx, baseY - h / 2, 33, h / 2 + 6, 14, '#3A2E52');  // ink
-  for (const [bx, h, col, dk] of bars) roundRect(cv, c + bx, baseY - h / 2, 26, h / 2, 11, col, 1, dk);
-  roundRect(cv, c, baseY + 18, 150, 9, 5, '#3A2E52');             // baseline
+  const INK = '#2C2114', WOOD = '#B87A3E', WOOD_DK = '#754A24', WOOD_HI = '#E4C282';
+  const baseY = c + 150;
+  roundRect(cv, c, baseY + 12, 172, 24, 10, INK, 0.9);                     // shelf ink
+  roundRect(cv, c, baseY + 8, 162, 16, 7, WOOD, 1, WOOD_DK);              // shelf wood
+  capsule(cv, c - 148, baseY + 2, c + 148, baseY + 2, 5, WOOD_HI, 0.6);   // shelf top light
+  const bars = [[-98, 116, '#7FA86A', '#587A48'], [0, 186, '#6E8FB0', '#496A8A'], [98, 248, '#E7A93A', '#B5730A']];
+  for (const [bx, h] of bars) roundRect(cv, c + bx, baseY - 4 - h / 2, 38, h / 2 + 6, 14, INK); // ink outline
+  for (const [bx, h, col, dk] of bars) {
+    roundRect(cv, c + bx, baseY - 6 - h / 2, 28, h / 2, 10, col, 1, dk);  // painted body
+    capsule(cv, c + bx - 8, baseY - 6 - h + 16, c + bx - 8, baseY - 22, 6, '#FFFFFF', 0.22); // left highlight
+    capsule(cv, c + bx - 18, baseY - 4 - h + 10, c + bx + 18, baseY - 4 - h + 10, 5, '#FFFFFF', 0.32); // top edge light
+  }
   savePNG(path.join(UI, 'stats.png'), W, W, down2(cv, W, W));
 }
 
@@ -775,15 +834,28 @@ function downArrow(cv, cx, topY, botY, shaftTh, headHalf, headLen, body, ink) {
   savePNG(path.join(UI, 'speech.png'), W, W, down2(cv, W, W));
 }
 
-// link.png — two chain-link rings (Whisper Gallery: cross-reference entries)
+// link.png — two interlocked forged bronze links (Whisper Gallery: cross-refs)
+// Cottage reskin of the old flat candy rings: warm forged bronze with a top-left
+// metallic highlight and a woven over/under at the crossing, so it reads as a
+// real chain "link/connection" instead of two flat vector circles.
 {
   const W = 256, cv = C(W * 2, W * 2), c = W;
-  const ring = (cx, cy, r, col, ink) => {
-    arcStroke(cv, cx, cy, r, 46, 0.01, Math.PI * 2, ink);
-    arcStroke(cv, cx, cy, r, 30, 0.01, Math.PI * 2, col);
+  const INK = '#2C2114', BR = '#C68A3E', BR_DK = '#835626', BR_HI = '#F0C878';
+  const R = 84;
+  const link = (cx, cy) => {
+    arcStroke(cv, cx, cy, R, 52, 0.01, Math.PI * 2, INK);                 // ink
+    arcStroke(cv, cx, cy, R, 38, 0.01, Math.PI * 2, BR_DK);               // dark bronze
+    arcStroke(cv, cx, cy, R, 26, 0.01, Math.PI * 2, BR);                  // bronze
+    arcStroke(cv, cx, cy, R, 9, Math.PI * 1.05, Math.PI * 1.72, BR_HI, 0.85); // top-left sheen
   };
-  ring(c - 58, c - 58, 86, '#8FA0DE', '#2E3355');
-  ring(c + 58, c + 58, 86, '#B79BFF', '#3A2E52');
+  link(c - 58, c - 58);   // upper-left link
+  link(c + 58, c + 58);   // lower-right link (drawn over)
+  // weave the first link back over the crossing so the two interlock
+  const cx1 = c - 58, cy1 = c - 58;
+  arcStroke(cv, cx1, cy1, R, 52, Math.PI * 0.12, Math.PI * 0.63, INK);
+  arcStroke(cv, cx1, cy1, R, 38, Math.PI * 0.12, Math.PI * 0.63, BR_DK);
+  arcStroke(cv, cx1, cy1, R, 26, Math.PI * 0.12, Math.PI * 0.63, BR);
+  arcStroke(cv, cx1, cy1, R, 9, Math.PI * 0.16, Math.PI * 0.4, BR_HI, 0.7);
   savePNG(path.join(UI, 'link.png'), W, W, down2(cv, W, W));
 }
 
