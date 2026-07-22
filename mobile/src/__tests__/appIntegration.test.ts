@@ -282,6 +282,19 @@ describe('verb-depth preview gate threading', () => {
   });
 });
 
+describe('Blind Offering judgment beat', () => {
+  test('both blind branches fire the bespoke judgment overlay (accept / reject)', () => {
+    // Blind hides validity the whole board, so the once-at-the-end judgment is
+    // the mode's payoff — it must be MARKED on both branches, not fall into the
+    // identical victory choreography (success) or a bare shake (failure).
+    expect(APP_TSX).toMatch(/<BlindJudgmentOverlay signal=\{blindJudgmentSignal\}/);
+    // Success: green accept-sweep + a rising chime, in the blind + non-final path.
+    expect(APP_TSX).toMatch(/puzzle\.blindMode && !puzzle\.isFinalBoard[\s\S]*?fireBlindJudgment\('accepted'\)/);
+    // Failure: the crimson reject-pulse rides the existing blindFailed feedback.
+    expect(APP_TSX).toMatch(/fireBlindJudgment\('rejected'\)/);
+  });
+});
+
 describe('drag hover highlight', () => {
   test('hover derives geometrically and threads to the target Row', () => {
     expect(APP_TSX).toMatch(/onLetterDragMove=\{handleLetterDragMove\}/);

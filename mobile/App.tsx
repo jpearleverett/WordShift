@@ -18,6 +18,7 @@ import { GameState, Difficulty } from './src/types';
 import { Row } from './src/components/Row';
 import { AnimatedBackground } from './src/components/AnimatedBackground';
 import { Confetti, StarBurst } from './src/components/Confetti';
+import { BlindJudgmentOverlay, type BlindJudgmentSignal } from './src/components/BlindJudgmentOverlay';
 import { ActionButton, AnimatedLogo, Toast, VictoryModal, RulesModal, DifficultyMenu } from './src/components/puzzle';
 import { isValidDifficulty, normalizeDifficulty, getDifficultyChipLabel } from './src/components/puzzle/DifficultyMenu';
 import { HomeScreen } from './src/components/home';
@@ -367,6 +368,14 @@ function MainApp() {
   });
   const [invalidDropSignal, setInvalidDropSignal] = useState(0);
   const [successDropSignal, setSuccessDropSignal] = useState(0);
+  // Blind Offering's once-at-the-end judgment beat (see BlindJudgmentOverlay):
+  // an id-bumped signal so the accept-sweep / reject-pulse re-fires each time.
+  const [blindJudgmentSignal, setBlindJudgmentSignal] = useState<BlindJudgmentSignal | null>(null);
+  const blindJudgmentIdRef = useRef(0);
+  const fireBlindJudgment = useCallback((kind: 'accepted' | 'rejected') => {
+    blindJudgmentIdRef.current += 1;
+    setBlindJudgmentSignal({ kind, id: blindJudgmentIdRef.current });
+  }, []);
 
   // Track whether the current slot press originated from a drag-drop (for haptic/effect escalation)
   const isDragDropRef = useRef(false);
@@ -1887,6 +1896,16 @@ function MainApp() {
 
     if (result?.completed) {
       isDragDropRef.current = false;
+      // Blind Offering's end-of-board reveal (accepted): validity was hidden the
+      // whole board, so the chain validating IS the payoff. Fire the green
+      // accept-sweep + a rising chime + a success haptic, distinct from an
+      // ordinary win, in the window before the victory modal covers the board
+      // (the stars pop over the board first). The finale board keeps its silence.
+      if (puzzle.blindMode && !puzzle.isFinalBoard) {
+        fireBlindJudgment('accepted');
+        soundValidMove(3);
+        hapticSuccess();
+      }
       // This win owns the review-destack flag from here on — a stale value
       // from an earlier win must not swallow this exit's nudges.
       reviewPromptFiredRef.current = false;
@@ -2465,11 +2484,14 @@ function MainApp() {
       // No action
       isDragDropRef.current = false;
     } else if (result.blindFailed) {
-      // Blind Offering's end-of-board reveal: the final letter landed but the
-      // chain contains a non-word. The move committed (the hook's message
-      // tells the player to undo); feedback here is the full error language,
-      // never the half-move click this result shape would otherwise hit.
+      // Blind Offering's end-of-board reveal (rejected): the final letter landed
+      // but the chain contains a non-word. The move committed (the hook's
+      // message tells the player to undo); feedback here is the full error
+      // language, never the half-move click this result shape would otherwise
+      // hit — plus the bespoke crimson reject-pulse so the apex mode's refusal
+      // lands with weight instead of a bare shake.
       isDragDropRef.current = false;
+      fireBlindJudgment('rejected');
       hapticError();
       soundInvalidMove();
       setInvalidDropSignal(prev => prev + 1);
@@ -4333,6 +4355,9 @@ function MainApp() {
               />
             ))}
           </ScrollView>
+          {/* Blind Offering judgment beat — overlays the board (pointer-
+              transparent), plays only when a blind board resolves. */}
+          <BlindJudgmentOverlay signal={blindJudgmentSignal} phase={persistence.currentPhase} />
         </View>
 
         {/* No stuck-panel / no immediate "unwinnable" announcement — product
