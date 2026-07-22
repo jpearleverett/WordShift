@@ -16,7 +16,7 @@ import { CandyButton } from '../ui/CandyButton';
 import { PanelCard } from '../ui/PanelCard';
 import { AmberInline } from '../AmberInline';
 import { Confetti } from '../Confetti';
-import { RewardReveal } from '../ui/RewardReveal';
+import { RewardReveal, EntranceCascadeItem, getCascadeDelayMs } from '../ui/RewardReveal';
 import { getSettingsSync } from '../../services/settings';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
@@ -78,6 +78,11 @@ interface ShopScreenProps {
 const AMBER_ICON = require('../../../assets/ui/amber.png');
 
 const PREVIEW_LETTERS = ['A', 'B', 'C', 'D'];
+
+/** Content blocks wait this long so the header reads as settling in first
+ *  (matches StatsScreen / WhisperGallery so every secondary screen cascades in
+ *  the same way). EntranceCascadeItem pins instantly under reduced motion. */
+const HEADER_CASCADE_BASE_MS = 120;
 
 /**
  * Short, phase-aware acknowledgment shown beneath the spend count-up when a
@@ -730,6 +735,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
         ) : (
           <>
             {onOpenPatron && !isPatronSync() && (
+              <EntranceCascadeItem phase={phase} delay={getCascadeDelayMs(0, { baseMs: HEADER_CASCADE_BASE_MS })}>
               <TouchableOpacity
                 onPress={() => { hapticLight(); onOpenPatron(); }}
                 accessibilityLabel="Become a Patron"
@@ -746,7 +752,9 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                   <Text style={[styles.patronBannerSub, { color: t.body }]}>Support WordShift. A small amber bonus + an exclusive gold tile set</Text>
                 </PanelCard>
               </TouchableOpacity>
+              </EntranceCascadeItem>
             )}
+            <EntranceCascadeItem phase={phase} delay={getCascadeDelayMs(1, { baseMs: HEADER_CASCADE_BASE_MS })}>
             {renderSection(
               'tile_theme',
               getShopThemeSectionLabel(phase),
@@ -755,6 +763,8 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
               tileThemes,
               ThemePreview,
             )}
+            </EntranceCascadeItem>
+            <EntranceCascadeItem phase={phase} delay={getCascadeDelayMs(2, { baseMs: HEADER_CASCADE_BASE_MS })}>
             {renderSection(
               'confetti',
               getShopConfettiSectionLabel(phase),
@@ -763,8 +773,10 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
               confettiThemes,
               ConfettiPreview,
             )}
+            </EntranceCascadeItem>
 
             {showHouseUpgrades && (
+              <EntranceCascadeItem phase={phase} delay={getCascadeDelayMs(3, { baseMs: HEADER_CASCADE_BASE_MS })}>
               <View>
                 <Text style={[styles.sectionLabel, { color: t.headerMuted }]}>HOUSE UPGRADES</Text>
                 {houseFeedback != null && (
@@ -805,9 +817,11 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                   ),
                 )}
               </View>
+              </EntranceCascadeItem>
             )}
 
             {onOpenStore && (
+              <EntranceCascadeItem phase={phase} delay={getCascadeDelayMs(4, { baseMs: HEADER_CASCADE_BASE_MS })}>
               <TouchableOpacity
                 onPress={() => { hapticLight(); onOpenStore(); }}
                 accessibilityRole="button"
@@ -829,12 +843,15 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                   <Text style={[styles.storeBridgeChevron, { color: t.amberText }]}>{'>'}</Text>
                 </PanelCard>
               </TouchableOpacity>
+              </EntranceCascadeItem>
             )}
 
+            <EntranceCascadeItem phase={phase} delay={getCascadeDelayMs(5, { baseMs: HEADER_CASCADE_BASE_MS })}>
             <Text style={[styles.footnote, { color: t.headerMuted }]}>
               Cosmetics are for expression only. They never change the puzzle, the
               story, or your progress.
             </Text>
+            </EntranceCascadeItem>
           </>
         )}
       </ScrollView>
