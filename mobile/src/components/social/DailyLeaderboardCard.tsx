@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Image } from 'react-native';
 import { CandyColors, getPhaseTheme } from '../../theme/colors';
 import { PIXEL_FONT_BOLD } from '../../theme/fonts';
+import { FONT_SIZE } from '../../theme/typeScale';
 
 // Chrome iconography is a sprite, not emoji (F67).
 const TROPHY_ICON = require('../../../assets/ui/trophy.png');
@@ -162,25 +163,25 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '700',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
   rank: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 28,
+    fontSize: FONT_SIZE.hero,
     fontWeight: '900',
     marginTop: 2,
   },
   rankTotal: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '600',
   },
   beatText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '600',
     marginTop: 4,
     textAlign: 'center',
@@ -195,13 +196,13 @@ const styles = StyleSheet.create({
   },
   historyText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 12,
+    fontSize: FONT_SIZE.small,
     fontWeight: '700',
     textAlign: 'center',
   },
   trendText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 10.5,
+    fontSize: FONT_SIZE.micro,
     fontWeight: '800',
     marginLeft: 8,
     textTransform: 'uppercase',

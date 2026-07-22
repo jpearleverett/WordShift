@@ -4,6 +4,7 @@ import { SURFACE, getSurfaceTheme, getPressSpring } from '../../theme/surfaces';
 import { PanelCard } from './PanelCard';
 import { CandyButton, CandyButtonVariant } from './CandyButton';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
+import { FONT_SIZE } from '../../theme/typeScale';
 import { getSettingsSync } from '../../services/settings';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
 import {
@@ -242,14 +243,14 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 17,
+    fontSize: FONT_SIZE.large,
     fontWeight: '800',
     textAlign: 'center',
     marginBottom: 8,
   },
   message: {
     fontFamily: BODY_FONT,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     lineHeight: 20,
     textAlign: 'center',
     marginBottom: 14,

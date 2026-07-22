@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { CandyColors } from '../theme/colors';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
+import { FONT_SIZE } from '../theme/typeScale';
 import { getDailyStatus } from '../services/dailyChallenge';
 import { getActiveEvent } from '../services/liveEvents';
 import { getEventBadgeLabel } from '../services/phaseNarrative';
@@ -264,7 +265,7 @@ const styles = StyleSheet.create({
   },
   calendarIcon: {
     fontFamily: BODY_FONT,
-    fontSize: 18,
+    fontSize: FONT_SIZE.title,
   },
   calendarIconImage: {
     width: 24,
@@ -276,14 +277,14 @@ const styles = StyleSheet.create({
   },
   checkIcon: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 14,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '900',
     color: CandyColors.green.main,
     marginTop: -1,
   },
   miniStars: {
     fontFamily: BODY_FONT,
-    fontSize: 7,
+    fontSize: FONT_SIZE.micro,
     color: CandyColors.yellow.main,
     marginTop: -2,
     letterSpacing: 0.5,
@@ -308,7 +309,7 @@ const styles = StyleSheet.create({
   },
   streakBadgeText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 9,
+    fontSize: FONT_SIZE.micro,
     fontWeight: '900',
     color: CandyColors.white,
   },
@@ -337,7 +338,7 @@ const styles = StyleSheet.create({
   },
   moonBadgeText: {
     fontFamily: BODY_FONT,
-    fontSize: 9,
+    fontSize: FONT_SIZE.micro,
   },
   moonBadgeIcon: {
     width: 12,
