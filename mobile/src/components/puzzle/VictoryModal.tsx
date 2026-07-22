@@ -1262,7 +1262,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                       <Text style={[styles.bonusLabel, { color: phaseTheme.modalTextColor, fontWeight: '800' }]}>Total</Text>
                       <View style={styles.amberValueRow}>
                         <Image source={AMBER_ICON} style={[styles.amberIcon, styles.amberIconTotal]} />
-                        <Text style={[styles.bonusValue, { color: phaseTheme.modalTextColor, fontSize: 19, fontWeight: '900' }]}>
+                        <Text style={[styles.bonusValue, { color: phaseTheme.modalTextColor, fontSize: FONT_SIZE.title, fontWeight: '900' }]}>
                           {animatedTotal}
                         </Text>
                       </View>
@@ -1696,7 +1696,7 @@ const styles = StyleSheet.create({
   },
   victoryTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 42,
+    fontSize: FONT_SIZE.giant,
     fontWeight: '900',
     marginBottom: 6,
     textShadowColor: CandyColors.pink.shadow,
@@ -1957,9 +1957,10 @@ const styles = StyleSheet.create({
   btn3dPrimaryText: {
     fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
-    // 19px/900 qualifies as WCAG large text (3:1 threshold — white on the
-    // candy-pink body is 3.5:1) and gives the primary CTA its visual rank.
-    fontSize: 19,
+    // headline (20px)/900 clears the WCAG large-text bold threshold (>=18.66px
+    // bold, 3:1 — white on the candy-pink body is 3.5:1) and gives the primary
+    // CTA its visual rank. Kept above 18 on purpose so the contrast rule holds.
+    fontSize: FONT_SIZE.headline,
     fontWeight: '900',
     letterSpacing: 2,
     textShadowColor: 'rgba(0, 0, 0, 0.25)',

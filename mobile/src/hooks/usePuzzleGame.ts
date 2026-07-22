@@ -22,7 +22,8 @@ import {
   RESONANT_BOARD_CAP_AMBER,
 } from '../constants/gameBalance';
 import { CHALLENGE_MODE_CONFIG, DialoguePhase } from '../types/homeWorld';
-import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getOutOfHintsMessage, getLoadingMessage, getStartMessage, getInvalidWordMessage, getBlockedWordMessage, getBlindFailMessage, getLockedLetterMessage, getEchoPuzzleMessage, getFinalBoardStartMessage, getFinalBoardUndoRefusal, getResonantMoveMessage, getUnbrokenWeaveSpentLetterMessage, getUnbrokenWeaveUnavailableMessage } from '../services/phaseNarrative';
+import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getOutOfHintsMessage, getLoadingMessage, getStartMessage, getInvalidWordMessage, getBlockedWordMessage, getBlindFailMessage, getLockedLetterMessage, getEchoPuzzleMessage, getFinalBoardStartMessage, getFinalBoardUndoRefusal, getResonantMoveMessage, getUnbrokenWeaveSpentLetterMessage, getUnbrokenWeaveUnavailableMessage, getUnbrokenWeaveUnavailableTitle } from '../services/phaseNarrative';
+import { showGameAlert } from '../services/gameAlert';
 import { getHintBalanceSync, hasHintSync, consumeHintSync } from '../services/hints';
 import { getPreferredPuzzleVariant, setPreferredPuzzleVariant, getFullProgress, getRitualWords } from '../services/amberCurrency';
 import {
@@ -1104,6 +1105,18 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       setUnbrokenWeaveMode(false);
       setSpentLetterSet(new Set());
     };
+    // The player deliberately chose the Phase-5 apex mode; when no eligible
+    // board can be served it silently swapped to a standard one. Announce that
+    // with an acknowledged 'beat' card the player dismisses (not a fading move
+    // toast that blinks past while they wonder why the board looks ordinary).
+    const announceWeaveUnavailable = () => {
+      showGameAlert(
+        getUnbrokenWeaveUnavailableTitle(currentPhase),
+        getUnbrokenWeaveUnavailableMessage(currentPhase),
+        undefined,
+        'beat',
+      );
+    };
     if (unbrokenWeaveOverride !== undefined) {
       unbrokenWeaveModeRef.current = unbrokenWeaveOverride;
       setUnbrokenWeaveMode(unbrokenWeaveOverride);
@@ -1308,11 +1321,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
               const config = VARIANT_CONFIGS[variant];
               setMessage(getVariantInstruction(config, currentPhase, requestedDifficulty));
             } else {
-              setMessage(
-                unbrokenWeaveFallback
-                  ? getUnbrokenWeaveUnavailableMessage(currentPhase)
-                  : getStartMessage(currentPhase),
-              );
+              setMessage(getStartMessage(currentPhase));
+              if (unbrokenWeaveFallback) announceWeaveUnavailable();
             }
             return;
           }
@@ -1374,7 +1384,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
             : 'That puzzle style wasn\'t available. Here\'s a standard puzzle instead.'
         );
       } else if (unbrokenWeaveFallback) {
-        setMessage(getUnbrokenWeaveUnavailableMessage(currentPhase));
+        setMessage(getStartMessage(currentPhase));
+        announceWeaveUnavailable();
       }
     } catch (localErr) {
       console.log("Local generation failed, using fallback:", localErr);
@@ -1419,7 +1430,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
             : 'That puzzle style wasn\'t available. Starting a standard puzzle instead.'
         );
       } else if (unbrokenWeaveFallback) {
-        setMessage(getUnbrokenWeaveUnavailableMessage(currentPhase));
+        setMessage(getStartMessage(currentPhase));
+        announceWeaveUnavailable();
       }
     }
   }, [difficulty, initGame, gameMode, currentPhase, generatePuzzleForVariant, selectedVariant, setSelectedVariant]);
@@ -2514,7 +2526,19 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setError(null);
     setIsStuck(false);
     setHintHighlight(null);
-    setLastArrival(null);
+    // Takeback feedback: replay the arrival settle on the tile that RETURNED to
+    // the source row, so an undo reads as the letter travelling back rather than
+    // silently vanishing and reappearing. Direction is geometric (the tile
+    // settles in from whichever side the target row sat on), so it is correct
+    // for forward and reverse-ascent chains alike. Reduced motion pins the
+    // settle instantly downstream in LetterTile.
+    setLastArrival({
+      rowIndex: delta.sourceRowIndex,
+      slotIndex: delta.sourceLetterIndex,
+      letterId: delta.movedLetterId,
+      direction: delta.targetRowIndex > delta.sourceRowIndex ? 'up' : 'down',
+      moveId: ++arrivalMoveIdRef.current,
+    });
     // Pop the undone move's outcome and re-merge its flags into the pending
     // window: a hint/mistake spent on the undone move still marks whatever
     // move replaces it — the share grid stays honest across undo/redo.

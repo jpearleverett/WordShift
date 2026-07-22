@@ -506,7 +506,7 @@ export const COMBO_MOVE_POOLS: Record<DialoguePhase, [string[], string[], string
     ['Nice! 2 in a row!', 'Two in a row! Keep it rolling!', 'Double sweet! Two straight!'],
     ["Sweet! 3 chain!", "Three straight! You're glowing!", 'Triple treat! Three clean!'],
     [
-      'On fire! 🔥',
+      'On fire! Nothing is stopping you now!',
       "Unstoppable! The tiles can't keep up!",
       'What a run! Still going!',
       'Legendary streak! Keep it alive!',
@@ -731,6 +731,24 @@ const UNBROKEN_WEAVE_UNAVAILABLE_MESSAGES: Record<DialoguePhase, string> = {
 
 export function getUnbrokenWeaveUnavailableMessage(phase: DialoguePhase): string {
   return UNBROKEN_WEAVE_UNAVAILABLE_MESSAGES[phase];
+}
+
+const UNBROKEN_WEAVE_UNAVAILABLE_TITLES: Record<DialoguePhase, string> = {
+  0: 'The Weave Rests',
+  1: 'The Thread Rests',
+  2: 'The Thread Rests',
+  3: 'The Thread Rests',
+  4: 'The Thread Rests',
+  5: 'The Thread Rests',
+};
+
+/**
+ * Title for the acknowledged "Unbroken Weave could not be served" beat card. The
+ * deliberate apex-mode swap is announced with a dismissible beat, not a fading
+ * toast, so the player KNOWS the mode they chose did not apply.
+ */
+export function getUnbrokenWeaveUnavailableTitle(phase: DialoguePhase): string {
+  return UNBROKEN_WEAVE_UNAVAILABLE_TITLES[phase];
 }
 
 // ============================================================================
@@ -4044,10 +4062,10 @@ export function getUnplayableChallengeMessage(phase: number): string {
 
 /** Label for the friend-challenge share button on the share preview. */
 export function getChallengeFriendLabel(phase: number): string {
-  if (phase >= 5) return '⚔️ Pass the pattern along';
-  if (phase >= 4) return '⚔️ Draw a friend in';
-  if (phase >= 2) return '⚔️ Send this to a friend';
-  return '⚔️ Challenge a friend';
+  if (phase >= 5) return 'Pass the pattern along';
+  if (phase >= 4) return 'Draw a friend in';
+  if (phase >= 2) return 'Send this to a friend';
+  return 'Challenge a friend';
 }
 
 /** Cosmetic-shop → Store bridge row (title + subtitle). */

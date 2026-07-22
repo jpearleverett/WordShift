@@ -96,6 +96,11 @@ jest.mock('../services/phaseNarrative', () => ({
   getResonantMoveMessage: jest.fn((_p: number) => 'Oh, lovely choice. That word sits deep in the house.'),
   getUnbrokenWeaveSpentLetterMessage: jest.fn((letter: string, _p: number) => `${letter} has already crossed the chain.`),
   getUnbrokenWeaveUnavailableMessage: jest.fn((_p: number) => 'The thread breaks before it can begin. A plain offering remains.'),
+  getUnbrokenWeaveUnavailableTitle: jest.fn((_p: number) => 'The Thread Rests'),
+}));
+
+jest.mock('../services/gameAlert', () => ({
+  showGameAlert: jest.fn(),
 }));
 
 jest.mock('../services/hints', () => ({
@@ -2340,18 +2345,29 @@ describe('usePuzzleGame', () => {
       expect(state.lastArrival).toBeNull();
     });
 
-    test('cleared by undo', async () => {
+    test('undo replays a takeback arrival on the returned tile', async () => {
       resetHookState();
-      let [, actions] = callHook();
+      let [state, actions] = callHook();
       actions.initGame(['ABCD', 'EFGH', 'IJKL']);
+      [state] = callHook();
+      const movedId = state.rows[0].words[0].id;
       await playMove('A', 0);
-      let [state] = callHook();
+      [state] = callHook();
       expect(state.lastArrival).not.toBeNull();
+      const committedMoveId = state.lastArrival!.moveId;
 
       [, actions] = callHook();
       actions.handleUndo();
       [state] = callHook();
-      expect(state.lastArrival).toBeNull();
+      // The takeback settle lands on the tile that returned to the source row
+      // (row 0, slot 0), travelling back UP from the lower target row, with a
+      // fresh moveId so LetterTile replays it.
+      expect(state.lastArrival).not.toBeNull();
+      expect(state.lastArrival!.rowIndex).toBe(0);
+      expect(state.lastArrival!.slotIndex).toBe(0);
+      expect(state.lastArrival!.letterId).toBe(movedId);
+      expect(state.lastArrival!.direction).toBe('up');
+      expect(state.lastArrival!.moveId).toBeGreaterThan(committedMoveId);
     });
 
     test('reverse ascent arrivals travel up', async () => {
@@ -3044,7 +3060,17 @@ describe('usePuzzleGame', () => {
 
       const [state] = callHook();
       expect(state.unbrokenWeaveMode).toBe(false);
-      expect(state.message).toBe('The thread breaks before it can begin. A plain offering remains.');
+      // The deliberate apex-mode swap is now announced by an acknowledged 'beat'
+      // card, not a fading move toast — the board underneath carries the normal
+      // start message while the beat explains the fallback.
+      expect(state.message).toBe('Tap a tile to begin!');
+      const { showGameAlert } = require('../services/gameAlert');
+      expect(showGameAlert).toHaveBeenCalledWith(
+        'The Thread Rests',
+        'The thread breaks before it can begin. A plain offering remains.',
+        undefined,
+        'beat',
+      );
       expect(bank.getGuaranteedExtendedStandardFallback).not.toHaveBeenCalled();
     });
   });

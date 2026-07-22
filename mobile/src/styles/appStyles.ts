@@ -2,7 +2,7 @@ import { StyleSheet } from 'react-native';
 import { FONT_SIZE } from '../theme/typeScale';
 import { CandyColors, getPhaseTheme } from '../theme/colors';
 import { getSurfaceTheme } from '../theme/surfaces';
-import { BODY_FONT, BODY_FONT_BOLD, BODY_FONT_ITALIC } from '../theme/fonts';
+import { BODY_FONT, BODY_FONT_BOLD, BODY_FONT_ITALIC, PIXEL_FONT_BOLD } from '../theme/fonts';
 
 /**
  * Returns the dominant background color for a given screen at a given phase.
@@ -277,13 +277,13 @@ export const appStyles = StyleSheet.create({
   },
   difficultyText: {
     fontSize: FONT_SIZE.small,
-    fontFamily: BODY_FONT_BOLD,
+    fontFamily: PIXEL_FONT_BOLD,
     fontWeight: '800',
     color: CandyColors.white,
     marginRight: 6,
   },
   difficultyArrow: {
-    fontSize: 8,
+    fontSize: FONT_SIZE.micro,
     fontFamily: BODY_FONT,
     color: 'rgba(255, 255, 255, 0.7)',
   },
@@ -329,7 +329,7 @@ export const appStyles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: FONT_SIZE.bodyLg,
-    fontFamily: BODY_FONT_BOLD,
+    fontFamily: PIXEL_FONT_BOLD,
     fontWeight: '700',
     color: CandyColors.purple.main,
   },
@@ -352,7 +352,7 @@ export const appStyles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 4,
     fontSize: FONT_SIZE.large,
-    fontFamily: BODY_FONT_BOLD,
+    fontFamily: PIXEL_FONT_BOLD,
     fontWeight: '800',
     color: CandyColors.purple.main,
     textAlign: 'center',
@@ -537,7 +537,7 @@ export const appStyles = StyleSheet.create({
   },
   speedTimerText: {
     fontSize: FONT_SIZE.hero,
-    fontFamily: BODY_FONT_BOLD,
+    fontFamily: PIXEL_FONT_BOLD,
     fontWeight: '900',
     color: CandyColors.white,
     letterSpacing: 1,
@@ -617,7 +617,7 @@ export const appStyles = StyleSheet.create({
   },
   variantBadgeText: {
     fontSize: FONT_SIZE.caption,
-    fontFamily: BODY_FONT_BOLD,
+    fontFamily: PIXEL_FONT_BOLD,
     fontWeight: '800',
     color: '#FFFFFF',
     letterSpacing: 0.2,

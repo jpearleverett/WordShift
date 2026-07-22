@@ -794,11 +794,12 @@ function MainApp() {
   const [speedTimer, speedTimerActions] = useSpeedTimer(onSpeedTimeUp);
   const { startSpeedTimer, stopSpeedTimer } = speedTimerActions;
 
-  // Final-countdown tick. Fires once per second inside the danger zone (5,4,3,2,1
-  // only, never on the start, never on a rescue that raises the clock, never at
-  // 0) with a native-driver pop; escalates to a heavier haptic + bigger pop at
-  // the critical threshold. Sound/haptics self-gate on their own settings; the
-  // visual pop is suppressed under reduced motion.
+  // Countdown tick. The drain envelope ramps rather than staying flat until the
+  // wire: a gentle 'soft' pre-tick from 10..6s (no sound, faint haptic, tiny
+  // pop), then a 'normal' tick inside the tension zone (5..4), then 'critical'
+  // (3..1, heavier haptic + bigger pop). Never on the start, never on a rescue
+  // that raises the clock, never at 0. Sound/haptics self-gate on their own
+  // settings; the visual pop is suppressed under reduced motion.
   useEffect(() => {
     const r = speedTimer.speedTimeRemaining;
     const prev = prevSpeedRemainingRef.current;
@@ -809,12 +810,19 @@ function MainApp() {
       return;
     }
     const critical = kind === 'critical';
-    soundTap();
-    if (critical) { hapticMedium(); } else { hapticSelection(); }
+    const soft = kind === 'soft';
+    // The soft pre-tick is felt, not heard: a faint haptic keeps the drain
+    // present without a per-second chime crowding the whole run with sound.
+    if (soft) {
+      hapticSelection();
+    } else {
+      soundTap();
+      if (critical) { hapticMedium(); } else { hapticSelection(); }
+    }
     if (!getSettingsSync().reducedMotion) {
       speedPulseScale.setValue(1);
       Animated.sequence([
-        Animated.timing(speedPulseScale, { toValue: critical ? 1.28 : 1.16, duration: 90, useNativeDriver: true }),
+        Animated.timing(speedPulseScale, { toValue: critical ? 1.28 : soft ? 1.07 : 1.16, duration: 90, useNativeDriver: true }),
         Animated.spring(speedPulseScale, { toValue: 1, friction: 4, tension: 140, useNativeDriver: true }),
       ]).start();
     }
@@ -2431,15 +2439,16 @@ function MainApp() {
       }
 
       // Show streak milestone toast if threshold was just crossed. Scale the
-      // celebration to the milestone's magnitude: the larger tiers (50+ amber,
-      // i.e. 14/21/30 days) ring the bright top-of-ladder ping so a long streak
-      // clearly outweighs a 3-day one (the victory confetti + haptic already
-      // fire for every win; the distinct ping is the magnitude tell).
+      // celebration to the milestone's magnitude so a 30-day chain clearly
+      // outweighs a 3-day one: EVERY milestone rings a felt success haptic and a
+      // combo-ladder ping, and the ping's tier climbs with the reward (the 3/7
+      // day tiers at tier 2, the 50/65 tiers at tier 3, the 100 crown at tier 4)
+      // instead of the small milestones landing silent like a trivial receipt.
       if (victory.streakMilestoneMessage) {
         enqueueVictoryToast(`${victory.streakMilestoneMessage} (+${victory.streakMilestoneBonus} amber)`, 'receipt');
-        if ((victory.streakMilestoneBonus ?? 0) >= 50) {
-          soundValidMove(4);
-        }
+        const streakBonus = victory.streakMilestoneBonus ?? 0;
+        hapticSuccess();
+        soundValidMove(streakBonus >= 100 ? 4 : streakBonus >= 50 ? 3 : 2);
       }
 
       // Milestone hint trickle: a win that crossed a puzzle-count milestone
@@ -4207,20 +4216,25 @@ function MainApp() {
                   </Text>
                 )}
                 {puzzle.undosRemaining === 0 && puzzle.gameState === GameState.PLAYING && (
-                  <TouchableOpacity
-                    style={[
-                      styles.buyUndoButton,
-                      persistence.amberBalance < AMBER_UNDO_REFILL_COST && styles.buyUndoButtonDisabled,
-                    ]}
-                    onPress={handleBuyUndo}
-                    disabled={persistence.amberBalance < AMBER_UNDO_REFILL_COST}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Refill one undo for ${AMBER_UNDO_REFILL_COST} amber`}
-                  >
-                    <Text style={styles.buyUndoText}>
-                      {'\u21a9'} +1 {'\u00b7'} {AMBER_UNDO_REFILL_COST} <AmberInline size={11} />
-                    </Text>
-                  </TouchableOpacity>
+                  // The refill chip mounts mid-board the instant undos hit 0, so
+                  // it gets its own BadgeAppear entrance rather than hard-cutting
+                  // into the already-mounted challenge badge.
+                  <BadgeAppear>
+                    <TouchableOpacity
+                      style={[
+                        styles.buyUndoButton,
+                        persistence.amberBalance < AMBER_UNDO_REFILL_COST && styles.buyUndoButtonDisabled,
+                      ]}
+                      onPress={handleBuyUndo}
+                      disabled={persistence.amberBalance < AMBER_UNDO_REFILL_COST}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Refill one undo for ${AMBER_UNDO_REFILL_COST} amber`}
+                    >
+                      <Text style={styles.buyUndoText}>
+                        {'\u21a9'} +1 {'\u00b7'} {AMBER_UNDO_REFILL_COST} <AmberInline size={11} />
+                      </Text>
+                    </TouchableOpacity>
+                  </BadgeAppear>
                 )}
               </BadgeAppear>
             )}
