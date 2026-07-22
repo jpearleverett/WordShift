@@ -9,6 +9,7 @@ import {
   StatusBar,
   Dimensions,
   Animated,
+  Easing,
   AppState,
   Linking,
   BackHandler,
@@ -251,7 +252,7 @@ import { markPendingChanges, uploadToCloud, installCloudProviderIfConfigured, ma
 import * as Sentry from '@sentry/react-native';
 import { getSentryDsn } from './src/services/supabaseClient';
 import { estimateSlotIndex, findClosestValidSlot } from './src/services/slotEstimation';
-import { DROP_SHAKE_KEYFRAME_MS, DROP_SHAKE_INTENSITY, SPEED_ESCALATION_STEP_SEC, SPEED_ESCALATION_MIN_SEC, SPEED_TICK_CRITICAL_SEC, SWIFT_HINT_TOAST_DELAY_MS, speedTickKind } from './src/constants/timing';
+import { DROP_SHAKE_KEYFRAME_MS, DROP_SHAKE_INTENSITY, SPEED_ESCALATION_STEP_SEC, SPEED_ESCALATION_MIN_SEC, SPEED_TICK_CRITICAL_SEC, SWIFT_HINT_TOAST_DELAY_MS, SCREEN_FADE_COVER_MS, SCREEN_FADE_REVEAL_MS, speedTickKind } from './src/constants/timing';
 import { OfferingPitScreen } from './src/components/OfferingPitScreen';
 import { ShopScreen } from './src/components/shop/ShopScreen';
 import { loadPuzzleState, clearPuzzleState } from './src/services/puzzleSaveState';
@@ -712,7 +713,8 @@ function MainApp() {
     // Fade overlay IN (covers old screen)
     Animated.timing(transitionOverlay, {
       toValue: 1,
-      duration: 120,
+      duration: SCREEN_FADE_COVER_MS,
+      easing: Easing.out(Easing.quad),
       useNativeDriver: true,
     }).start(() => {
       // While fully opaque: swap colors to match destination screen
@@ -733,7 +735,8 @@ function MainApp() {
         // Fade overlay OUT — now blends through destination-matching color
         Animated.timing(transitionOverlay, {
           toValue: 0,
-          duration: 180,
+          duration: SCREEN_FADE_REVEAL_MS,
+          easing: Easing.in(Easing.quad),
           useNativeDriver: true,
         }).start();
         // Settle the reveal signature (springs the arriving screen into place).

@@ -34,8 +34,12 @@ export const ONBOARDING_TRANSITION_DELAY_MS = 300;
 export const ONBOARDING_PUZZLE_COMPLETE_DELAY_MS = 1000;
 
 // === SCREEN TRANSITIONS ===
-export const SCREEN_FADE_OUT_MS = 150;
-export const SCREEN_FADE_IN_MS = 200;
+// The navigation dip: the opaque overlay fades IN to cover the old screen
+// (fast), the React swap happens while hidden, then it fades OUT to reveal the
+// destination (a touch slower so the arrival breathes). These are the shipped
+// values, now the single source of truth (App.tsx reads them).
+export const SCREEN_FADE_COVER_MS = 120;
+export const SCREEN_FADE_REVEAL_MS = 180;
 
 // === AUTOSAVE ===
 export const AUTOSAVE_DEBOUNCE_MS = 120;

@@ -1459,9 +1459,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Animate amber when it changes
   useEffect(() => {
     if (progress) {
+      // Reduced motion: no pop (mirrors the playPulse effect below).
+      if (getSettingsSync().reducedMotion) {
+        amberPulse.setValue(1);
+        return;
+      }
+      // The currency's excitement cools with the house: a smaller pop at Phase 4+.
+      const peak = progress.currentPhase >= 4 ? 1.12 : 1.2;
       Animated.sequence([
         Animated.timing(amberPulse, {
-          toValue: 1.2,
+          toValue: peak,
           duration: 150,
           useNativeDriver: true,
         }),
