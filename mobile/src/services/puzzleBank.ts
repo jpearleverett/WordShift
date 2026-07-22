@@ -48,6 +48,16 @@ const BRANCHING_CONTEXT_CANDIDATES = 160;
 // freshness edge (the old 12-point cap was routinely drowned by the novelty
 // bonuses, leaving the reorder pass as the only effective lever).
 const BRANCHING_BONUS_CAP = 24;
+// Chunk size for the cold-cache branching-analysis loop below. On the first
+// standard board past BRANCHING_UNLOCK_PUZZLES the metrics cache is empty, so up
+// to BRANCHING_CONTEXT_CANDIDATES heavy analyzeStandardBranching traversals
+// would otherwise run in ONE synchronous burst on the JS thread and jank the
+// board serve (audit F136). The selector is async, so it yields to the event
+// loop after every this-many analyses (about 6 yields over 160 candidates) so
+// the frame can paint and input stays responsive between chunks. Small enough
+// to unblock the thread, large enough not to over-fragment into a yield per
+// item. This changes ONLY the yielding cadence, never the selection result.
+const BRANCHING_ANALYSIS_CHUNK = 24;
 // Trap steering (planning depth): once route-finding is established, boards
 // where several LEGAL moves exist but only some complete the chain reward
 // look-ahead (reverse mode's 15.9% dead-end states play much deeper than the
@@ -617,7 +627,22 @@ export async function selectPreGeneratedPuzzle(
   if (variant === 'standard' && puzzlesSolved >= BRANCHING_UNLOCK_PUZZLES) {
     const candidateCount = Math.min(BRANCHING_CONTEXT_CANDIDATES, scored.length);
     const metricSource = extensionRequired ? 'extended' : 'source';
-    const depthCandidates = scored.slice(0, candidateCount).map(candidate => {
+    const contextCandidates = scored.slice(0, candidateCount);
+    // Same as the former .map(), but as an awaitable loop so the cold-cache
+    // batch of analyzeStandardBranching traversals can yield the JS thread every
+    // BRANCHING_ANALYSIS_CHUNK analyses instead of blocking the board serve in
+    // one synchronous burst (F136). Candidates are visited in the same order,
+    // scored identically, and the metrics cache is populated identically; the
+    // await between chunks is the only difference.
+    const depthCandidates: ((typeof contextCandidates)[number] & {
+      completePathCount: number;
+      trapStepFraction: number;
+    })[] = [];
+    for (let i = 0; i < contextCandidates.length; i++) {
+      if (i > 0 && i % BRANCHING_ANALYSIS_CHUNK === 0) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      }
+      const candidate = contextCandidates[i];
       const metricsCacheKey = `${bankKey}:${candidate.puzzle.id}:${metricSource}`;
       let metrics = branchingMetricsCache.get(metricsCacheKey);
       if (!metrics) {
@@ -630,13 +655,13 @@ export async function selectPreGeneratedPuzzle(
         );
         branchingMetricsCache.set(metricsCacheKey, metrics);
       }
-      return {
+      depthCandidates.push({
         ...candidate,
         score: candidate.score + Math.min(BRANCHING_BONUS_CAP, metrics.structuralBonus),
         completePathCount: metrics.completePathCount,
         trapStepFraction: metrics.trapStepFraction,
-      };
-    });
+      });
+    }
     depthCandidates.sort((a, b) => b.score - a.score);
     // Trap preference is a SECONDARY criterion behind the multi-route tiering,
     // and only where planning depth is the point: the 5-letter banks
