@@ -4666,6 +4666,12 @@ function MainApp() {
               orchestration.victoryGlitchProminent && styles.victoryGlitchOverlayProminent,
             ]}
             pointerEvents="none"
+            // The flicker is a subliminal atmospheric flash, not reading matter:
+            // keep it OUT of the screen-reader swipe order (pointerEvents alone
+            // doesn't remove it). The prominent glitch is spoken deliberately via
+            // announceForA11y (see the glitchStutter effect), so nothing is lost.
+            importantForAccessibility="no-hide-descendants"
+            accessibilityElementsHidden
           >
             <Animated.Text
               style={[
@@ -4688,7 +4694,12 @@ function MainApp() {
             styles.victoryGlitchOverlay,
             (orchestration.microBeat.type === 'ambient_whisper' || orchestration.microBeat.type === 'silent_victory') && styles.microBeatWhisperOverlay,
             { opacity: orchestration.microBeatOpacity, transform: [{ translateY: orchestration.microBeatTranslateY }] },
-          ]} pointerEvents="none">
+          ]} pointerEvents="none"
+            // Atmospheric flash; the ambient_whisper/silent_victory beats are
+            // spoken via the announce pipeline, so keep the visual node out of
+            // the screen-reader swipe order.
+            importantForAccessibility="no-hide-descendants"
+            accessibilityElementsHidden>
             <Text style={[
               orchestration.microBeat.type === 'glitch_title' ? styles.victoryGlitchText : styles.microBeatWhisperText,
             ]}>
@@ -4715,7 +4726,12 @@ function MainApp() {
           <Animated.View style={[
             styles.interjectionContainer,
             { opacity: orchestration.interjectionOpacity, transform: [{ translateY: orchestration.interjectionTranslateY }] },
-          ]} pointerEvents="none">
+          ]} pointerEvents="none"
+            // Transient atmospheric nudge: keep it out of the screen-reader
+            // swipe order (the load-bearing narrative rides the whisper +
+            // announce pipeline).
+            importantForAccessibility="no-hide-descendants"
+            accessibilityElementsHidden>
             <Text style={[
               styles.interjectionText,
               persistence.currentPhase >= 3 && styles.interjectionTextDark,

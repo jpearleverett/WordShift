@@ -52,6 +52,20 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     }
   }
 
+  // Phase-aware title so the crash card doesn't stay chirpy "Oops!" through the
+  // descent. Kept short + clear (a crash screen prioritizes legibility) and
+  // fully guarded — the fallback UI must never itself throw.
+  private title(): string {
+    try {
+      const p = getCurrentPhaseSync();
+      if (p >= 4) return 'The pattern slipped.';
+      if (p >= 2) return 'Something slipped.';
+    } catch {
+      // fall through to the bright default
+    }
+    return 'Oops!';
+  }
+
   render() {
     if (this.state.hasError) {
       const t = this.surface();
@@ -61,7 +75,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             {/* Neutral on-brand mark (the game's own settle glyph), never a
                 face emoji that reads as flippant during the descent. */}
             <Text style={[styles.mark, { color: t.muted }]}>{'◈'}</Text>
-            <Text style={[styles.title, { color: t.title }]}>Oops!</Text>
+            <Text style={[styles.title, { color: t.title }]}>{this.title()}</Text>
             <Text style={[styles.message, { color: t.body }]}>
               {this.props.fallbackMessage || 'Something went wrong. Please try again.'}
             </Text>

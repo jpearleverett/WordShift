@@ -106,6 +106,11 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
   }, [disabled]);
 
   const handlePressIn = () => {
+    // Reduced motion: pin the pressed scale instantly (no spring travel).
+    if (getSettingsSync().reducedMotion) {
+      scaleAnim.setValue(0.94);
+      return;
+    }
     Animated.spring(scaleAnim, {
       toValue: 0.9,
       friction: 5,
@@ -115,6 +120,11 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
   };
 
   const handlePressOut = () => {
+    // Reduced motion: snap back instantly, no phase-weighted release travel.
+    if (getSettingsSync().reducedMotion) {
+      scaleAnim.setValue(1);
+      return;
+    }
     // The RELEASE ages with the phase (bright snaps, the reveal releases
     // heavily) via the shared tile/button weight language; the press-DOWN above
     // stays constant — the hand does not age.
