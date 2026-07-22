@@ -704,11 +704,12 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
             </PanelCard>
             </EntranceCascadeItem>
           </>
+          {/* Menu-surface banner: BannerAd renders its own labeled cottage tray
+              at a reserved height, so the layout never shifts as the native ad
+              loads in. Self-suppresses for ad-free / onboarding / Phase 4+ and
+              when no ad backend is configured. */}
           {shouldShowBanner({ phase: effectivePhase as DialoguePhase, isAdFree: isAdFreeSync(), onboarding: false }) && (
-            <View style={[styles.bannerTray, { backgroundColor: t.sectionBg, borderTopColor: t.sectionBorder }]}>
-              <Text style={[styles.bannerTrayLabel, { color: t.muted }]}>ADVERTISEMENT</Text>
-              <BannerAd phase={effectivePhase} />
-            </View>
+            <BannerAd phase={effectivePhase} />
           )}
           <View style={styles.bottomSpacer} />
         </ScrollView>
@@ -727,15 +728,12 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
           ListFooterComponent={
             <>
               {/* Menu-surface banner (low friction; self-suppresses for ad-free /
-                  onboarding / Phase 4+, and when no ad backend is configured),
-                  wrapped in a labeled tray with a reserved height so it reads
-                  as a deliberate menu zone and never shifts the layout below
-                  it as the native banner loads in. */}
+                  onboarding / Phase 4+, and when no ad backend is configured).
+                  BannerAd renders its own labeled cottage tray at a reserved
+                  height, so the native rectangle reads as a deliberate menu zone
+                  and never shifts the layout below it as the ad loads in. */}
               {shouldShowBanner({ phase: effectivePhase as DialoguePhase, isAdFree: isAdFreeSync(), onboarding: false }) && (
-                <View style={[styles.bannerTray, { backgroundColor: t.sectionBg, borderTopColor: t.sectionBorder }]}>
-                  <Text style={[styles.bannerTrayLabel, { color: t.muted }]}>ADVERTISEMENT</Text>
-                  <BannerAd phase={effectivePhase} />
-                </View>
+                <BannerAd phase={effectivePhase} />
               )}
               <View style={styles.bottomSpacer} />
             </>
@@ -1237,28 +1235,5 @@ const styles = StyleSheet.create({
   // Skeleton placeholder block (empty card body while loads land).
   skeletonBlock: {
     height: 96,
-  },
-
-  // Banner cottage tray (F152): a tinted shelf with a quiet uppercase label +
-  // reserved height so the native rectangle reads as a deliberate menu zone
-  // and never shifts the content below it as the ad loads in.
-  bannerTray: {
-    marginTop: 8,
-    marginBottom: 8,
-    paddingTop: 8,
-    paddingBottom: 8,
-    borderTopWidth: 1,
-    borderRadius: 12,
-    minHeight: 90,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bannerTrayLabel: {
-    fontFamily: PIXEL_FONT_BOLD,
-    fontSize: FONT_SIZE.micro,
-    fontWeight: '800',
-    letterSpacing: SURFACE.sectionLetterSpacing,
-    textTransform: 'uppercase',
-    marginBottom: 6,
   },
 });

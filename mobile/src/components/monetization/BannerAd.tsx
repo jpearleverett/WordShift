@@ -14,10 +14,12 @@
  * app.json → extra (admobBannerIdIos / admobBannerIdAndroid). Empty id → nothing.
  */
 import React from 'react';
-import { View, Platform, StyleSheet } from 'react-native';
+import { View, Text, Platform, StyleSheet } from 'react-native';
 import { shouldShowBanner } from '../../services/ads';
 import { isAdFreeSync } from '../../services/entitlements';
-import { getSurfaceTheme } from '../../theme/surfaces';
+import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
+import { PIXEL_FONT_BOLD } from '../../theme/fonts';
+import { FONT_SIZE } from '../../theme/typeScale';
 
 interface BannerAdProps {
   /** Narrative phase (banners suppress from Phase 4+). */
@@ -62,28 +64,46 @@ function resolveBannerUnitId(mod: any): string | undefined {
 }
 
 /**
- * Renders an anchored adaptive banner, or nothing. Mount it at the bottom of a
- * menu screen; it self-suppresses by policy and availability.
+ * Renders an anchored adaptive banner inside a labeled cottage tray, or nothing.
+ * Mount it at the bottom of a menu screen; it self-suppresses by policy.
+ *
+ * Two suppression reasons, handled differently so the surrounding layout never
+ * jumps as the async native banner loads in (or fails to fill):
+ *   - POLICY (ad-free / onboarding / Phase 4+ via shouldShowBanner): render
+ *     nothing at all, the honest non-nagging default (no empty shelf for a
+ *     paying ad-free player; the menu consumers also policy-gate this View).
+ *   - AVAILABILITY (SDK / unit id absent, e.g. Expo Go): the policy still wants
+ *     a banner here, so keep the labeled tray at its RESERVED height with an
+ *     empty reserved slot instead of collapsing, so shown vs. not-yet-loaded
+ *     occupy the same space and nothing below shifts.
  */
 export const BannerAd: React.FC<BannerAdProps> = ({ phase, onboarding = false }) => {
   if (!shouldShowBanner({ phase: phase as any, isAdFree: isAdFreeSync(), onboarding })) {
     return null;
   }
   const mod = loadAdsModule();
-  if (!mod?.BannerAd) return null;
-  const unitId = resolveBannerUnitId(mod);
-  if (!unitId) return null; // no banner unit configured → nothing (graceful)
+  const NativeBanner = mod?.BannerAd;
+  const unitId = NativeBanner ? resolveBannerUnitId(mod) : undefined;
+  const size = mod?.BannerAdSize?.ANCHORED_ADAPTIVE_BANNER ?? 'ANCHORED_ADAPTIVE_BANNER';
+  const canRenderNative = !!(NativeBanner && unitId);
 
-  const NativeBanner = mod.BannerAd;
-  const size = mod.BannerAdSize?.ANCHORED_ADAPTIVE_BANNER ?? 'ANCHORED_ADAPTIVE_BANNER';
   // A subtle phase-aware "shelf" so the raw Google rectangle sits on the cottage
   // surface instead of floating bare (no overflow:hidden — a native ad view must
-  // not be clipped; the frame is just a tinted bordered tray around it).
+  // not be clipped; the frame is just a tinted bordered tray around it). The wrap
+  // carries a fixed minHeight (label + banner + padding) so it reserves the same
+  // space whether the native banner has loaded, or isn't available yet.
   const t = getSurfaceTheme(phase);
   return (
     <View style={styles.wrap} pointerEvents="box-none">
+      <Text style={[styles.label, { color: t.muted }]}>ADVERTISEMENT</Text>
       <View style={[styles.frame, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-        <NativeBanner unitId={unitId} size={size} requestOptions={{}} />
+        {canRenderNative ? (
+          <NativeBanner unitId={unitId} size={size} requestOptions={{}} />
+        ) : (
+          // Availability suppression: hold the reserved slot so the tray keeps its
+          // height and nothing below jumps when an ad is (or isn't) present.
+          <View style={styles.reservedSlot} />
+        )}
       </View>
     </View>
   );
@@ -94,11 +114,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 4,
+    // Reserved: label (~20) + banner (~60) + frame/wrap padding (~18). Keeps the
+    // menu layout stable as the async native banner loads in or fails to fill.
+    minHeight: 100,
+  },
+  // Small muted uppercase plaque, matching the section-label type treatment used
+  // across the menu screens (e.g. StatsScreen's banner tray).
+  label: {
+    fontFamily: PIXEL_FONT_BOLD,
+    fontSize: FONT_SIZE.micro,
+    fontWeight: '800',
+    letterSpacing: SURFACE.sectionLetterSpacing,
+    textTransform: 'uppercase',
+    marginBottom: 6,
   },
   frame: {
     padding: 5,
     borderRadius: 14,
     borderWidth: 1,
+  },
+  // Empty banner-sized reservation shown when the native view isn't available,
+  // so the framed slot keeps a loaded ad's footprint.
+  reservedSlot: {
+    width: 320,
+    height: 50,
   },
 });
 
