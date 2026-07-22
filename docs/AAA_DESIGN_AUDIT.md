@@ -6,22 +6,24 @@
 
 ---
 
-## 0. Implementation status (post-audit build)
+## 0. Implementation status (verified line-by-line)
 
-> The audit below was the first deliverable; the branch then **implemented the findings end to end**. This section records what shipped. The tree is green throughout: **typecheck clean, lint 0 errors, full suite passing** after every change.
+> The audit was the first deliverable; the branch then implemented a large slice of it. This status was **re-verified adversarially** — one skeptical reviewer per system re-checked all 180 filed findings at their cited `file:line` against the shipped HEAD (default stance: *not done without proof*). It **supersedes an earlier cluster-level estimate that over-counted** (that estimate credited a whole system as "done" when only its headline finding shipped). The full per-finding table lives in **[`AAA_IMPLEMENTATION_LEDGER.md`](./AAA_IMPLEMENTATION_LEDGER.md)**.
 
-**Shipped (verified green):**
-- **All P0s** — finale/post-revelation cinematic rescue, un-mirrored animal chrome, whisper above the victory modal, ceremony audio (ritual swell + bed handoff), adaptive-icon crop.
-- **All P1s** — victory ceremony ages with phase (+ hushed beats), the Arrival gains weight, phase-aware home confetti, ghost-preview scrim, board-feel (arc-fan close + squash-and-stretch + phase press-out) + the **board-serve entrance cascade**, the **animal-life** ambient system, **audio identity** (pit-devour + post-victory horror layer), the alert layer (spring entrance + `tone:'beat'` for the preview-graduation moment + destructive de-emphasis), **a11y** (focus fencing + announce pipeline + HUD/pause/crash contrast + horror-micro-beat announce), notifications (re-engagement copy + permission value-framing + non-brand titles), the share viral loop (baked install CTA + the +5 ack + card reveal + phase-aware taunt), settings (cloud-fork safety + New Cycle ceremony + skinned switches + blast-radius Reset copy), the **emote + phase-mood sprite** de-emoji, both **modal-choreography** entrances (DifficultyMenu + SeasonPassModal), the **Blind Offering judgment beat**, the app-wide **font-scale ceiling**, **list virtualization** (Ledger/Gallery/Stats windowed, cascades preserved), the **RewardReveal** system wired across daily-login / quest-claim+double / daily faucet, the **GiftOverlay** for the real-money starter/first-purchase moments, and the sacrifice-altar feedback ramp.
-- **The large majority of P2/P3s** — Toast cross-fade-in-place, speed-timer/reverse-midpoint feedback, phase-2 HUD aging, the sacrifice monument count-up, the reverse-generator per-frame yield, the RewardedAdButton loading label, the phase-aware candle glow, phase-weighted secondary buttons, the banner cottage shelf, and more (each detailed in §4).
+**Verified totals (of 180 filed findings):**
 
-**Deliberately deferred (4 items) — each needs on-device QA or risks a pinned core system; not shipped blind:**
-1. **Board arc-row fit on ≤360dp screens** (§4.3 responsive, P2) — the fix couples to the drag-drop slot math (the primary mechanic) and must be verified on a small physical screen; the app is portrait-locked, so the rotation/reflow half of that finding is moot.
-2. **Tablet dead-margins** (§4.3, P3) — cosmetic, needs tablet QA.
-3. **Room-background virtualization in HouseWorld** (§4.3 perf, P2) — the backgrounds are already downscaled and only *unlocked* rooms mount; viewport-culling would touch HouseWorld's pinned Fabric workarounds + the freshly-added pan physics, with a memory benefit that can't be measured without device profiling.
-4. **Async chunking of the cold-cache branching analyses** (§4.3 perf, P3) — already capped + cached after the first board; an async refactor risks the bank selection's determinism.
+| Status | Count | Share |
+|---|--:|--:|
+| ✅ done | 55 | 31% |
+| 🟡 partial | 38 | 21% |
+| ⏸️ deferred (device QA / pinned-system risk) | 4 | 2% |
+| ❌ not addressed | 83 | 46% |
 
-A handful of receipt-style acknowledgments (streak-milestone / hint-trickle toasts, status-badge appear/disappear) were intentionally left on their current surface — a sequential victory toast is the right home for a receipt, where the block `RewardReveal` is not.
+By severity (raw filed labels): **P0** 5✅ 1🟡 1❌ · **P1** 32✅ 14🟡 13❌ · **P2** 12✅ 14🟡 2⏸️ 49❌ · **P3** 6✅ 9🟡 2⏸️ 20❌.
+
+**What that means honestly:** the highest-severity, highest-leverage work landed — 5 of 7 P0s and 32 of 59 P1s are fully done, and the systemic wins shipped (RewardReveal + GiftOverlay across the reward loops, list virtualization, the Blind judgment beat, both modal entrances, the animal-life system, board-feel + board-serve, audio identity, a11y focus/announce, the share loop, settings/New-Cycle, the emote/phase-mood de-emoji, font-scale, and the whole quick-win sprint). But **the long P2/P3 tail is mostly still open** (49 P2 + 20 P3 not addressed), and 38 findings are only partially done. The tree is **green throughout** (typecheck clean, lint 0 errors, full suite passing) for everything that did ship.
+
+**The 4 deliberate deferrals** (each needs on-device QA or risks a pinned core system, so not shipped blind): board arc-row fit on ≤360dp (drag-drop math + small-screen QA), tablet dead-margins (tablet QA), room-background virtualization in HouseWorld (pinned Fabric workarounds + new pan physics, benefit unmeasurable without profiling), and async-chunking the branching analyses (bank-selection determinism). Everything else marked ❌/🟡 is genuinely remaining work, not a deferral.
 
 ---
 
