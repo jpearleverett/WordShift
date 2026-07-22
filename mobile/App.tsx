@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   StatusBar,
   Dimensions,
+  useWindowDimensions,
   Animated,
   Easing,
   AppState,
@@ -3841,29 +3842,11 @@ function MainApp() {
 
   // Show loading while onboarding state is being determined
   if (!onboardingFlow.onboardingReady) {
-    // Mirror the boot screen EXACTLY (same #FFF0F5, icon card, wordmark, quiet
-    // spinner) so the native-splash -> bootstrap-gate -> MainApp-hydration holds
-    // read as ONE continuous branded moment instead of blinking through the old
-    // near-black (#1A1A2E, a Phase-4 color) card on every launch.
-    return (
-      <View style={bootStyles.container}>
-        <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
-        <View style={bootStyles.iconCard}>
-          <Image
-            source={require('./assets/icon.png')}
-            style={bootStyles.iconImage}
-            resizeMode="cover"
-            accessibilityLabel="WordShift"
-          />
-        </View>
-        <Image
-          source={require('./assets/ui/wordmark.png')}
-          style={bootStyles.wordmark}
-          resizeMode="contain"
-        />
-        <ActivityIndicator size="small" color="#8B7BB8" style={bootStyles.spinner} />
-      </View>
-    );
+    // The SAME window-relative branded hold as the bootstrap gate, so the
+    // native-splash -> bootstrap-gate -> MainApp-hydration holds read as ONE
+    // continuous branded moment instead of blinking through the old near-black
+    // (#1A1A2E, a Phase-4 color) card — or a differently-sized icon — on launch.
+    return <BootHold />;
   }
 
   // Helper: render the active screen content
@@ -4977,6 +4960,41 @@ function MainApp() {
 // the service caches, so the remount re-reads the restored save).
 const BOOT_RESTORE_RACE_MS = 2500;
 
+/**
+ * The branded boot hold (F97/F119/F127): the fox icon card + wooden wordmark +
+ * quiet spinner on the splash cream, sized RELATIVE TO THE WINDOW so it mirrors
+ * the native splash's `contain` math (square 1600 art master) on every device
+ * instead of a fixed 152/244px that jumped on the splash->JS handoff. Shared by
+ * the App bootstrap gate and MainApp's onboarding-hydration gate so all three
+ * holds (native splash, bootstrap, hydration) read as ONE continuous frame.
+ */
+function BootHold() {
+  const { width, height } = useWindowDimensions();
+  const m = Math.min(width, height);
+  const iconSize = Math.round(m * (740 / 1600));
+  const wordmarkWidth = Math.round(m * (810 / 1600));
+  const gap = Math.round(m * (64 / 1600));
+  return (
+    <View style={bootStyles.container}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
+      <View style={[bootStyles.iconCard, { width: iconSize, height: iconSize, borderRadius: Math.round(iconSize * 0.18), marginBottom: gap }]}>
+        <Image
+          source={require('./assets/icon.png')}
+          style={bootStyles.iconImage}
+          resizeMode="cover"
+          accessibilityLabel="WordShift"
+        />
+      </View>
+      <Image
+        source={require('./assets/ui/wordmark.png')}
+        style={{ width: wordmarkWidth, height: Math.round(wordmarkWidth * 0.25) }}
+        resizeMode="contain"
+      />
+      <ActivityIndicator size="small" color="#8B7BB8" style={{ marginTop: Math.round(gap * 1.4) }} />
+    </View>
+  );
+}
+
 function App() {
   const [bootReady, setBootReady] = useState(false);
   // Bumped when a slow cloud restore lands after boot — remounts MainApp so
@@ -5084,25 +5102,7 @@ function App() {
       {bootReady ? (
         <MainApp key={appEpoch} />
       ) : (
-        <View style={bootStyles.container}>
-          {/* Fox app-icon art as a rounded card + wooden wordmark — mirrors the
-              native splash composition so the OS-splash -> JS-boot handoff reads
-              as one continuous branded hold, not a hard cut. */}
-          <View style={bootStyles.iconCard}>
-            <Image
-              source={require('./assets/icon.png')}
-              style={bootStyles.iconImage}
-              resizeMode="cover"
-              accessibilityLabel="WordShift"
-            />
-          </View>
-          <Image
-            source={require('./assets/ui/wordmark.png')}
-            style={bootStyles.wordmark}
-            resizeMode="contain"
-          />
-          <ActivityIndicator size="small" color="#8B7BB8" style={bootStyles.spinner} />
-        </View>
+        <BootHold />
       )}
     </SafeAreaProvider>
   );
@@ -5118,19 +5118,11 @@ const bootStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // Rounded fox card — corner radius matches the icon's own ~18% baked rounding
-  // and the native splash mask, with a soft shadow for the same lifted look.
+  // Rounded fox card — width/height/borderRadius/marginBottom are supplied
+  // window-relative by BootHold (F127). No shadow: the native splash card is
+  // shadowless, so a boot shadow made the handoff visibly pop.
   iconCard: {
-    width: 152,
-    height: 152,
-    borderRadius: 28,
     overflow: 'hidden',
-    marginBottom: 22,
-    shadowColor: '#28142A',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.18,
-    shadowRadius: 14,
-    elevation: 8,
   },
   iconImage: {
     width: '100%',
