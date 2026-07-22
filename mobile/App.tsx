@@ -4043,6 +4043,7 @@ function MainApp() {
             {puzzle.currentVariant !== 'standard' && (
               <View style={[
                 styles.variantBadge,
+                persistence.currentPhase === 2 && styles.variantBadgeDusk,
                 persistence.currentPhase >= 3 && styles.variantBadgeDark,
               ]}>
                 {getModeIconSprite(VARIANT_CONFIGS[puzzle.currentVariant]?.icon || '') ? (
@@ -4057,6 +4058,7 @@ function MainApp() {
                 )}
                 <Text style={[
                   styles.variantBadgeText,
+                  persistence.currentPhase === 2 && styles.variantBadgeTextDusk,
                   persistence.currentPhase >= 3 && styles.variantBadgeTextDark,
                 ]}>
                   {VARIANT_CONFIGS[puzzle.currentVariant]?.title || 'Variant'}
@@ -4070,6 +4072,7 @@ function MainApp() {
               <View
                 style={[
                   styles.variantBadge,
+                  persistence.currentPhase === 2 && styles.variantBadgeDusk,
                   persistence.currentPhase >= 3 && styles.variantBadgeDark,
                 ]}
                 accessible
@@ -4078,6 +4081,7 @@ function MainApp() {
                 <Image source={getModeIconSprite('🌑')!} style={styles.variantBadgeIconImage} />
                 <Text style={[
                   styles.variantBadgeText,
+                  persistence.currentPhase === 2 && styles.variantBadgeTextDusk,
                   persistence.currentPhase >= 3 && styles.variantBadgeTextDark,
                 ]}>
                   {persistence.currentPhase >= 2 ? 'Blind Offering' : 'Blind'}
@@ -4111,6 +4115,7 @@ function MainApp() {
               <View
                 style={[
                   styles.variantBadge,
+                  persistence.currentPhase === 2 && styles.variantBadgeDusk,
                   persistence.currentPhase >= 3 && styles.variantBadgeDark,
                 ]}
                 accessible
@@ -4119,6 +4124,7 @@ function MainApp() {
                 <Text style={styles.variantBadgeIcon}>🏠</Text>
                 <Text style={[
                   styles.variantBadgeText,
+                  persistence.currentPhase === 2 && styles.variantBadgeTextDusk,
                   persistence.currentPhase >= 3 && styles.variantBadgeTextDark,
                 ]}>
                   {houseAsk.letter.toUpperCase()}

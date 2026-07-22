@@ -567,6 +567,18 @@ export const appStyles = StyleSheet.create({
     gap: 4,
     maxWidth: 180,
   },
+  // Phase-2 dusk: the board already shows the dusk sky at phase 2, but the HUD
+  // badges used to hold their bright fill until a single binary jump to dark at
+  // phase 3. This intermediate tier ages the chrome WITH the board through the
+  // dusk phase instead of skipping it.
+  variantBadgeDusk: {
+    backgroundColor: 'rgba(28, 15, 48, 0.62)',
+    borderWidth: 1,
+    borderColor: 'rgba(150, 100, 170, 0.30)',
+  },
+  variantBadgeTextDusk: {
+    color: 'rgba(226, 200, 224, 0.95)',
+  },
   variantBadgeDark: {
     backgroundColor: 'rgba(35, 18, 45, 0.75)',
     borderWidth: 1,
