@@ -6,13 +6,23 @@
 
 | Status | Count | Share |
 |---|--:|--:|
-| ✅ done | 169 | 94% |
+| ✅ done | 174 | 97% |
 | 🟡 partial | 3 | 2% |
-| ⏸️ deferred | 8 | 4% |
+| ⏸️ deferred | 3 | 2% |
 | ❌ not addressed | 0 | 0% |
 | **Total** | **180** | |
 
-**Fully done: 169 of 180.** Meaningful progress (done + partial): 172. **Nothing is un-addressed** — the remaining 11 are 3 partials (each with a concrete residual) + 8 deferrals (art / device / WebP encoder / a global responsive-layout migration / the audit's own architectural deferrals).
+**Fully done: 174 of 180.** The remaining 6 are 3 partials + 3 deferrals; the honest split is below.
+
+> **Session 5b — "everything code-possible" pass (2026-07-22).** After the re-verify close-out, a probe of the environment (npm reachable; `sharp` installs; Chromium present) reclassified several "deferred" items as actually doable, and they were closed: **F131** WebP (verified — the 9 full-screen backgrounds went ~25MB -> ~3.1MB via a build-time sharp tool; dims preserved, skyGeometry tripwire now reads WebP headers), **F136** async-chunked cold branching (agent), **F141** boot-gate through launch routing (no home flash), and **F139/F140/F138-board** the board scale-to-fit + tablet + resize-reactive board (a single `computeBoardScale`, unit-tested through the drag math so drops stay aligned; exactly 1 on ordinary phones). Net 169 -> 174 done.
+>
+> **The honest remaining 6:**
+> - **🟡 F1** cross-row flying ghost — a real animation-architecture change (an overlay tile travelling source->target on commit) on the core board loop, whose VISUAL result cannot be verified without a device; the neighbour rank-shift half already shipped. Held rather than dumped blind into a build.
+> - **🟡 F37** robed Phase 4-5 talk frame — needs `robedTalk.png` character art for 13 animals (no image-generation model here; procedural code makes geometric art, not portraits). Player-supplied art is how the other frames landed.
+> - **🟡 F138** the FULL app-wide `useWindowDimensions` sweep (10 non-board components still capture SCREEN_WIDTH at module load) — deliberately low value: the app is `orientation: portrait`-locked, so only split-screen/fold benefit, and the churn touches module-level StyleSheets. The board (the surface that matters) is now reactive.
+> - **⏸️ F135** room-background pan-windowing/virtualization — the audit's OWN documented architectural deferral; culling rooms in the pannable HouseWorld risks visible pop-in and cannot be verified without a device.
+> - **⏸️ F132** real Play screenshots ≥1080px — needs on-device capture of the running app (a high-fidelity mock would still be a mock, which is the exact defect).
+> - **⏸️ F148** store screenshot #5 (+50% vs shipped +25%) — the listing copy is corrected and LAUNCH_CHECKLIST flags the binary PNG as a required device re-capture; I will not fabricate a screenshot that misrepresents the app.
 
 > **Session 5 — full-adversarial re-verification + residual close-out (2026-07-22).** A fresh, from-scratch blind adversarial pass (18 agents: 9 verifiers over all 180 findings, blind to the claimed status, + a refute pass on every DONE) landed at 154 done / 17 partial / 3 open / 6 deferred and surfaced a **build-breaking regression** (F130: a `require('assets/ui/pit.png')` against a file the bundle-hygiene pass had removed — Metro/AAPT would have failed). I fixed the regression and closed 14 more residuals this pass (10 in a serial hot-file pass + 4 correctly-based worktree agents on disjoint files): **F130** (pit.png restored), **F98/F96** (last stray color emoji → sprites/plain), **F103** (HUD chrome typeface role), **F108** (last raw font-size literals snapped), **F161** (undo-refill chip entrance), **F153** (graduated speed drain envelope), **F91** (graduated streak-milestone magnitude), **F157** (apex-mode swap now an acknowledged beat card), **F6** (undo takeback settle on the returned tile), **F75** (ShopScreen entrance cascade), **F86** (banner cottage tray + reserved height), **F15** (phase-aware dialogue slide), **F142** (readable invite payoff), **F121** (pit ward-ceremony SR fence on Android/TalkBack). Net 154 → 169 done. Full suite green (119 suites / 2938 tests), typecheck 0, lint 0 errors. Detail in "Session 5 delta" below.
 
