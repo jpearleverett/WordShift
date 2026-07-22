@@ -53,6 +53,10 @@ export const Toast: React.FC<ToastProps> = ({ message, isError, phase = 0 }) => 
   const shakeAnimRef = useRef<Animated.CompositeAnimation | null>(null);
   // Last message spoken via the iOS announce fallback (dedupe guard).
   const lastAnnouncedRef = useRef<string | null>(null);
+  // The message currently seated in the pill, so a REPLACEMENT (one move
+  // message swapping for another while the pill is already up) refreshes the
+  // text in place instead of flying a fresh pill in from scratch every time.
+  const seatedMessageRef = useRef<string>('');
 
   const toastTheme = getToastTheme(phase);
 
@@ -61,9 +65,17 @@ export const Toast: React.FC<ToastProps> = ({ message, isError, phase = 0 }) => 
     enterAnimRef.current?.stop();
     shakeAnimRef.current?.stop();
 
-    slideAnim.setValue(-20);
-    opacityAnim.setValue(0);
-    shakeAnim.setValue(0);
+    const trimmed = (message ?? '').trim();
+    const seated = seatedMessageRef.current;
+    seatedMessageRef.current = trimmed;
+
+    // Empty message: keep the pill fully hidden — never fly an empty bubble in.
+    if (!trimmed) {
+      slideAnim.setValue(-20);
+      opacityAnim.setValue(0);
+      shakeAnim.setValue(0);
+      return;
+    }
 
     if (getSettingsSync().reducedMotion) {
       slideAnim.setValue(0);
@@ -72,21 +84,41 @@ export const Toast: React.FC<ToastProps> = ({ message, isError, phase = 0 }) => 
       return;
     }
 
-    const enterAnim = Animated.parallel([
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        friction: 5,
-        tension: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(opacityAnim, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]);
-    enterAnimRef.current = enterAnim;
-    enterAnim.start(() => { enterAnimRef.current = null; });
+    shakeAnim.setValue(0);
+    const isReplacement = seated !== '' && seated !== trimmed;
+
+    if (isReplacement) {
+      // In-place cross-fade: the pill stays seated (no slide from -20, no
+      // opacity 0), and a quick dip + restore masks the text swap. Kills the
+      // full fade-from-zero + slide that flickered above the board on every
+      // consecutive move message.
+      slideAnim.setValue(0);
+      const refresh = Animated.sequence([
+        Animated.timing(opacityAnim, { toValue: 0.4, duration: 90, useNativeDriver: true }),
+        Animated.timing(opacityAnim, { toValue: 1, duration: 170, useNativeDriver: true }),
+      ]);
+      enterAnimRef.current = refresh;
+      refresh.start(() => { enterAnimRef.current = null; });
+    } else {
+      // Fresh appearance (the pill was empty): the full slide + fade entrance.
+      slideAnim.setValue(-20);
+      opacityAnim.setValue(0);
+      const enterAnim = Animated.parallel([
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          friction: 5,
+          tension: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]);
+      enterAnimRef.current = enterAnim;
+      enterAnim.start(() => { enterAnimRef.current = null; });
+    }
 
     if (isError) {
       const shakeSeq = Animated.sequence([
