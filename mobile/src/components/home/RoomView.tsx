@@ -160,7 +160,12 @@ export const computeEmbellishmentIntensity = (
 };
 
 export interface EmbellishmentVisuals {
-  /** Tier-1 hearth glow (the replacement for the old sparkle glyph). */
+  /**
+   * Whether to show the tier-1 embellishment glow (the replacement for the old
+   * sparkle glyph). The glow's HUE + anchor come per-room from
+   * getRoomGlowVariant — fire only in real hearth rooms, room-appropriate
+   * light everywhere else — so this flag is the on/off, not the fire itself.
+   */
   showHearthGlow: boolean;
   /** Peak opacity of the glow stack — capped so rooms stay readable. */
   glowMaxOpacity: number;
@@ -211,6 +216,55 @@ export const getSigilColors = (phase: number): { line: string; glow: string } =>
   return { line: '#9B7FCF', glow: '#7B5FB0' };
 };
 
+// ---------------------------------------------------------------------------
+// Per-room embellishment glow. The tier-1 investment glow used to be a single
+// warm FIRE oval in EVERY upgraded room — a fireplace in the aquarium, a
+// campfire in the desert camp. Only genuine hearth-bearing rooms (a fire: the
+// cozy den's fireplace, the kitchen's oven) glow with fire now; every other
+// room glows in its own register (a reading lamp, water shimmer, foliage, a
+// starlit night), so the mark reads as THAT room's own light rather than a
+// misplaced hearth. The investment INTENSITY (getRoomEmbellishmentIntensity,
+// fed in as a prop) still drives opacity/scale; the room IDENTITY (room.theme)
+// now drives the hue + anchor. All colors are decorative overlay fills.
+// ---------------------------------------------------------------------------
+export type GlowAnchor = 'bottom' | 'center';
+export interface RoomGlowVariant {
+  outer: string;
+  mid: string;
+  core: string;
+  /** Where the glow sits: on the floor (a hearth/undergrowth) or ambient center. */
+  anchor: GlowAnchor;
+  /** True ONLY for genuine fire rooms — the only rooms that get the warm hearth. */
+  isHearth: boolean;
+}
+
+// Five room registers. Fire is reserved for the two hearth rooms.
+const GLOW_FIRE: RoomGlowVariant = { outer: '#F2953F', mid: '#FFB65C', core: '#FFD9A0', anchor: 'bottom', isHearth: true };
+const GLOW_LAMP: RoomGlowVariant = { outer: '#C9922F', mid: '#E6C066', core: '#FCEBB8', anchor: 'center', isHearth: false };
+const GLOW_WATER: RoomGlowVariant = { outer: '#2E7C93', mid: '#4FA9C0', core: '#AEE6EF', anchor: 'center', isHearth: false };
+const GLOW_FOLIAGE: RoomGlowVariant = { outer: '#3E7A4A', mid: '#5FA866', core: '#BCE3A6', anchor: 'bottom', isHearth: false };
+const GLOW_NIGHT: RoomGlowVariant = { outer: '#4A4A7E', mid: '#7272AE', core: '#B8B8E0', anchor: 'center', isHearth: false };
+
+const ROOM_GLOW_VARIANTS: Record<RoomTheme, RoomGlowVariant> = {
+  cozy_den: GLOW_FIRE,      // Fox's fireplace — the archetypal hearth
+  kitchen: GLOW_FIRE,       // the chef's oven / stove
+  study: GLOW_LAMP,         // the owl's reading lamp
+  aquarium: GLOW_WATER,     // the axolotl's lit tank (never a fire)
+  jungle: GLOW_FOLIAGE,     // the sloth's canopy
+  desert: GLOW_NIGHT,       // the fennec's night camp (explicitly NOT fire)
+  office: GLOW_LAMP,        // the capybara's desk lamp
+  burrow: GLOW_LAMP,        // the wombat's warm earthen den
+  garden: GLOW_FOLIAGE,     // the rabbit's garden patio
+  bamboo: GLOW_FOLIAGE,     // the red panda's bamboo attic
+  star_loft: GLOW_NIGHT,    // the tarsier's starlit observatory
+  belfry: GLOW_LAMP,        // the aye-aye's workshop lamp
+  sky_garden: GLOW_FOLIAGE, // the kakapo's rooftop garden
+};
+
+/** Room-appropriate tier-1 glow variant (warm fire ONLY in real hearth rooms). */
+export const getRoomGlowVariant = (theme: RoomTheme): RoomGlowVariant =>
+  ROOM_GLOW_VARIANTS[theme] ?? GLOW_LAMP;
+
 /** Wall spots for up to 4 sigil marks (percent insets; mirrored pairs). */
 const SIGIL_SPOTS: { top: string; left?: string; right?: string }[] = [
   { top: '26%', left: '9%' },
@@ -220,14 +274,18 @@ const SIGIL_SPOTS: { top: string; left?: string; right?: string }[] = [
 ];
 
 /**
- * Tier-1 hearth glow: 2-3 stacked feathered ovals with a slow native-driven
- * opacity breathing. Static (steady glow) under reduced motion / low tier.
+ * Tier-1 embellishment glow: 2-3 stacked feathered ovals with a slow
+ * native-driven opacity breathing, recolored + anchored per ROOM (variant).
+ * Hearth rooms get the warm fire palette anchored at the floor; other rooms
+ * get their own register (lamp / water / foliage / night). Static (steady
+ * glow) under reduced motion / low tier.
  */
-const HearthGlow: React.FC<{ maxOpacity: number; scale: number; animate: boolean }> = ({
-  maxOpacity,
-  scale,
-  animate,
-}) => {
+const EmbellishmentGlow: React.FC<{
+  variant: RoomGlowVariant;
+  maxOpacity: number;
+  scale: number;
+  animate: boolean;
+}> = ({ variant, maxOpacity, scale, animate }) => {
   const breathe = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -259,7 +317,8 @@ const HearthGlow: React.FC<{ maxOpacity: number; scale: number; animate: boolean
   return (
     <Animated.View
       style={[
-        styles.hearthGlowWrap,
+        styles.glowWrap,
+        variant.anchor === 'center' ? styles.glowWrapCenter : styles.glowWrapBottom,
         {
           opacity: animate ? breathe.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] }) : 1,
           transform: [{ scale }],
@@ -267,9 +326,9 @@ const HearthGlow: React.FC<{ maxOpacity: number; scale: number; animate: boolean
       ]}
       pointerEvents="none"
     >
-      <View style={[styles.hearthGlowOuter, { opacity: maxOpacity * 0.45 }]} />
-      <View style={[styles.hearthGlowMid, { opacity: maxOpacity * 0.7 }]} />
-      <View style={[styles.hearthGlowCore, { opacity: maxOpacity }]} />
+      <View style={[styles.glowOuter, { backgroundColor: variant.outer, opacity: maxOpacity * 0.45 }]} />
+      <View style={[styles.glowMid, { backgroundColor: variant.mid, opacity: maxOpacity * 0.7 }]} />
+      <View style={[styles.glowCore, { backgroundColor: variant.core, opacity: maxOpacity }]} />
     </Animated.View>
   );
 };
@@ -391,6 +450,8 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
     embellishmentIntensity > 0 ? embellishmentIntensity : undefined
   );
   const sigilColors = getSigilColors(currentPhase);
+  // Room-appropriate tier-1 glow (fire only in real hearth rooms).
+  const glowVariant = getRoomGlowVariant(room.theme);
   // Decorative-layer motion gate (breathing glow, motes). The layers still
   // render statically under reduced motion; only the movement is skipped.
   const embellishMotion = !getSettingsSync().reducedMotion && !shouldSimplifyAnimations();
@@ -535,7 +596,8 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
             />
           )}
           {embellish.showHearthGlow && (
-            <HearthGlow
+            <EmbellishmentGlow
+              variant={glowVariant}
               maxOpacity={embellish.glowMaxOpacity}
               scale={embellish.glowScale}
               animate={embellishMotion}
@@ -767,39 +829,43 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
   },
-  // Hearth glow: bottom-center stack of feathered warm ovals (core brightest).
-  hearthGlowWrap: {
+  // Embellishment glow: a stack of feathered ovals (core brightest). Colors are
+  // set per-room at the call site (variant fill); the anchor variant places the
+  // wrap at the floor (hearth/undergrowth) or ambient center.
+  glowWrap: {
     position: 'absolute',
-    bottom: 4,
     alignSelf: 'center',
     width: 120,
     height: 70,
     alignItems: 'center',
     justifyContent: 'flex-end',
   },
-  hearthGlowOuter: {
+  glowWrapBottom: {
+    bottom: 4,
+  },
+  glowWrapCenter: {
+    top: '34%',
+  },
+  glowOuter: {
     position: 'absolute',
     bottom: 0,
     width: 120,
     height: 64,
     borderRadius: 999,
-    backgroundColor: '#F2953F',
   },
-  hearthGlowMid: {
+  glowMid: {
     position: 'absolute',
     bottom: 6,
     width: 82,
     height: 44,
     borderRadius: 999,
-    backgroundColor: '#FFB65C',
   },
-  hearthGlowCore: {
+  glowCore: {
     position: 'absolute',
     bottom: 12,
     width: 48,
     height: 26,
     borderRadius: 999,
-    backgroundColor: '#FFD9A0',
   },
   // Deepening sigils: thin angled line pair + a fatter low-opacity underlay
   // pair standing in for blur (Android-safe: no shadowRadius glow).
