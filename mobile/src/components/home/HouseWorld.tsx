@@ -31,6 +31,7 @@ import {
 import { getSettingsSync } from '../../services/settings';
 import { shouldSimplifyAnimations, getDeviceTier } from '../../services/deviceTier';
 import { getTendingIntensity } from '../../services/tending';
+import { getActiveEvent } from '../../services/liveEvents';
 
 // Environment assets
 const SKY_DAY = require('../../../assets/environment/sky_day.png');
@@ -38,8 +39,6 @@ const SKY_AFTERNOON = require('../../../assets/environment/sky_afternoon.png');
 const SKY_DUSK = require('../../../assets/environment/sky_dusk.png');
 const SKY_STORM = require('../../../assets/environment/sky_storm.png');
 const SKY_SHADOW = require('../../../assets/environment/sky_shadow.png');
-const CLOUD_1 = require('../../../assets/environment/cloud_1.png');
-const CLOUD_2 = require('../../../assets/environment/cloud_2.png');
 const ROOF_IMG = require('../../../assets/environment/roof.png');
 // Per-phase foundations (hand-lit per phase: day green -> dusk dry -> night
 // blue), indexed by game phase; phase 5 reuses the shadow foundation, like the
@@ -213,7 +212,7 @@ const FloatingParticle: React.FC<{ particle: Particle }> = ({ particle }) => {
 // SMOKE PUFF ANIMATION
 // ═══════════════════════════════════════════════════════════════════════════
 
-const SmokePuff: React.FC<{ delay: number; isStatic?: boolean }> = ({ delay, isStatic = false }) => {
+const SmokePuff: React.FC<{ delay: number; isStatic?: boolean; tint?: string }> = ({ delay, isStatic = false, tint }) => {
   const y = useRef(new Animated.Value(0)).current;
   const x = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(0)).current;
@@ -291,6 +290,9 @@ const SmokePuff: React.FC<{ delay: number; isStatic?: boolean }> = ({ delay, isS
     };
   }, [isStatic, delay, y, x, opacity, scale]);
 
+  // Soft volumetric puff: three overlapping feathered borderRadius circles (no
+  // 💨 glyph). `tint` lets it darken toward ash as the phase deepens.
+  const puffColor = tint ?? 'rgba(214, 214, 214, 0.85)';
   return (
     <Animated.View
       style={{
@@ -298,20 +300,64 @@ const SmokePuff: React.FC<{ delay: number; isStatic?: boolean }> = ({ delay, isS
         transform: [{ translateX: x }, { translateY: y }, { scale }],
         opacity,
       }}
+      pointerEvents="none"
     >
-      <Text style={{ fontFamily: BODY_FONT, fontSize: 20, color: '#999' }}>💨</Text>
+      <View style={smokeStyles.puffCluster}>
+        <View style={[smokeStyles.puffLobeA, { backgroundColor: puffColor }]} />
+        <View style={[smokeStyles.puffLobeB, { backgroundColor: puffColor }]} />
+        <View style={[smokeStyles.puffLobeC, { backgroundColor: puffColor }]} />
+      </View>
     </Animated.View>
   );
 };
+
+const smokeStyles = StyleSheet.create({
+  puffCluster: {
+    width: 20,
+    height: 16,
+  },
+  puffLobeA: {
+    position: 'absolute',
+    left: 2,
+    top: 4,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    opacity: 0.85,
+  },
+  puffLobeB: {
+    position: 'absolute',
+    left: 8,
+    top: 1,
+    width: 11,
+    height: 11,
+    borderRadius: 5.5,
+    opacity: 0.7,
+  },
+  puffLobeC: {
+    position: 'absolute',
+    left: 6,
+    top: 6,
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
+    opacity: 0.6,
+  },
+});
 
 // ═══════════════════════════════════════════════════════════════════════════
 // FLYING BIRD ANIMATION
 // ═══════════════════════════════════════════════════════════════════════════
 
+// A small dark bird silhouette (no emoji): a shallow wing "V" + a body dot + a
+// leading head bump. Wings flap via scaleY; the whole bird flips with scaleX
+// so it always faces its travel direction (F16). The caller only renders this
+// at the bright phases (F16) — songbirds don't cross the dread-phase skies.
 const FlyingBird: React.FC<{ startDelay: number; yPosition: number }> = ({ startDelay, yPosition }) => {
   const x = useRef(new Animated.Value(-50)).current;
   const y = useRef(new Animated.Value(yPosition)).current;
   const flapRotation = useRef(new Animated.Value(0)).current;
+  const [facingRight, setFacingRight] = useState(true);
   const mountedRef = useRef(true);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flapAnimRef = useRef<Animated.CompositeAnimation | null>(null);
@@ -324,6 +370,7 @@ const FlyingBird: React.FC<{ startDelay: number; yPosition: number }> = ({ start
       if (!mountedRef.current) return;
 
       const goingRight = Math.random() > 0.5;
+      setFacingRight(goingRight);
       x.setValue(goingRight ? -50 : SCREEN_WIDTH + 50);
       y.setValue(yPosition + (Math.random() - 0.5) * 40);
 
@@ -378,14 +425,69 @@ const FlyingBird: React.FC<{ startDelay: number; yPosition: number }> = ({ start
     <Animated.View
       style={{
         position: 'absolute',
-        transform: [{ translateX: x }, { translateY: y }, { scaleY }],
+        transform: [{ translateX: x }, { translateY: y }, { scaleX: facingRight ? 1 : -1 }],
       }}
       pointerEvents="none"
     >
-      <Text style={{ fontFamily: BODY_FONT, fontSize: 18 }}>🐦</Text>
+      <Animated.View style={{ transform: [{ scaleY }] }}>
+        <View style={birdStyles.wingBox}>
+          <View style={birdStyles.wingLeft} />
+          <View style={birdStyles.wingRight} />
+          <View style={birdStyles.body} />
+          <View style={birdStyles.head} />
+        </View>
+      </Animated.View>
     </Animated.View>
   );
 };
+
+const BIRD_COLOR = '#3B3B4E';
+const birdStyles = StyleSheet.create({
+  wingBox: {
+    width: 22,
+    height: 12,
+  },
+  // Two thin rotated wings meeting at the body — a shallow gull "V".
+  wingLeft: {
+    position: 'absolute',
+    top: 3,
+    left: 1,
+    width: 11,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: BIRD_COLOR,
+    transform: [{ rotate: '18deg' }],
+  },
+  wingRight: {
+    position: 'absolute',
+    top: 3,
+    left: 10,
+    width: 11,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: BIRD_COLOR,
+    transform: [{ rotate: '-18deg' }],
+  },
+  body: {
+    position: 'absolute',
+    top: 4,
+    left: 9,
+    width: 5,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: BIRD_COLOR,
+  },
+  // A tiny head bump on the leading (right, pre-flip) side so the flip reads.
+  head: {
+    position: 'absolute',
+    top: 3.5,
+    left: 13,
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: BIRD_COLOR,
+  },
+});
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SHOOTING STAR (appears at higher phases)
@@ -461,10 +563,98 @@ const ShootingStar: React.FC = () => {
       }}
       pointerEvents="none"
     >
-      <Text style={{ fontFamily: BODY_FONT, fontSize: 14 }}>⭐</Text>
+      {/* A thin light streak angled along the fall path, with a brighter head
+          dot — no ⭐ glyph. */}
+      <View style={shootingStarStyles.streak} />
+      <View style={shootingStarStyles.head} />
     </Animated.View>
   );
 };
+
+const shootingStarStyles = StyleSheet.create({
+  streak: {
+    width: 16,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    transform: [{ rotate: '30deg' }],
+  },
+  head: {
+    position: 'absolute',
+    right: -1,
+    top: 3,
+    width: 3.5,
+    height: 3.5,
+    borderRadius: 1.75,
+    backgroundColor: '#FFFFFF',
+  },
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// NIGHT STAR GLINT - two-View sparkle (replaces the ✦ glyph, F13/F64)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const NIGHT_STAR_COLOR = 'rgba(240, 244, 255, 1)';
+
+const NightStarGlint: React.FC<{
+  left: `${number}%`;
+  top: `${number}%`;
+  size: number;
+  baseOpacity: number;
+  twinkle: boolean;
+  delay: number;
+}> = ({ left, top, size, baseOpacity, twinkle, delay }) => {
+  const pulse = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (!twinkle) {
+      pulse.setValue(1);
+      return;
+    }
+    pulse.setValue(0.45);
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.delay(delay),
+        Animated.timing(pulse, { toValue: 1, duration: 1400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0.45, duration: 1400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [twinkle, delay, pulse]);
+
+  const s = size * 0.9;
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        left,
+        top,
+        width: s,
+        height: s,
+        alignItems: 'center',
+        justifyContent: 'center',
+        opacity: twinkle ? Animated.multiply(pulse, baseOpacity) : baseOpacity,
+      }}
+    >
+      <View style={[nightStarStyles.square, { backgroundColor: NIGHT_STAR_COLOR }]} />
+      <View style={[nightStarStyles.diamond, { backgroundColor: NIGHT_STAR_COLOR }]} />
+    </Animated.View>
+  );
+};
+
+const nightStarStyles = StyleSheet.create({
+  square: {
+    ...StyleSheet.absoluteFill,
+    borderRadius: 1,
+  },
+  diamond: {
+    ...StyleSheet.absoluteFill,
+    borderRadius: 1,
+    transform: [{ rotate: '45deg' }],
+  },
+});
 
 // Phase-aware backdrop colors behind the sky image. Each value is the average
 // of the TOP row of pixels of that phase's sky asset, so when the scene is
@@ -696,6 +886,173 @@ const arrangementStyles = StyleSheet.create({
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// HOUSE SIGIL OVERLAY - the true "Arrangement pattern" (F18)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * HouseSigilOverlay — an absolute, non-interactive layer spanning the whole
+ * house body that draws a zig-zag geometric figure connecting alternating
+ * room-column corners, plus node dots at the joints. Replaces the old 10dp
+ * hairline dash hidden between room cards with a pattern that actually reads
+ * as inscribed across the facade.
+ *
+ * Phase register: barely subliminal at Phase 2 (0.06-0.1 - "felt before
+ * told"), lavender/dusk through the shadows, crimson with the same
+ * Android-safe layered-View glow technique as ArrangementConnector at Phase 4.
+ * tendingIntensity extends the figure with extra segments at Phase 5. Pure
+ * Views + one shared native opacity pulse (glow states only); static under
+ * reduced motion / low-tier devices.
+ */
+const HouseSigilOverlay: React.FC<{
+  phase: number;
+  bodyWidth: number;
+  bodyHeight: number;
+  tendingIntensity?: number;
+}> = ({ phase, bodyWidth, bodyHeight, tendingIntensity = 0 }) => {
+  const t = phase === 5 ? Math.max(0, Math.min(1, tendingIntensity)) : 0;
+
+  const lineColor = phase === 5 ? '#6B5B8A' : phase >= 4 ? '#8B2252' : phase >= 3 ? '#6B4C8A' : '#9B7FCF';
+  let baseOpacity = phase >= 4 ? 0.5 : phase === 3 ? 0.22 : 0.08; // phase 2 stays subliminal
+  const lineThickness = phase >= 4 ? 2.5 : phase >= 3 ? 2 : 1.5;
+  let showGlow = phase === 4;
+  if (t > 0) {
+    baseOpacity = 0.18 + t * 0.45;
+    showGlow = t > 0.4;
+  }
+
+  const pulse = useRef(new Animated.Value(1)).current;
+  const animatePulse = showGlow && !getSettingsSync().reducedMotion && !shouldSimplifyAnimations();
+
+  useEffect(() => {
+    if (!animatePulse) {
+      pulse.setValue(1);
+      return;
+    }
+    pulse.setValue(0.7);
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 2200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0.7, duration: 2200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [animatePulse, pulse]);
+
+  // The zig-zag: anchor points alternate between a left and right column,
+  // evenly spaced top-to-bottom. Node count grows a touch with tending so the
+  // figure visibly "extends" as the player deepens the pattern at Phase 5.
+  const geometry = useMemo(() => {
+    if (bodyWidth <= 0 || bodyHeight <= 0) return null;
+    const inset = 0.14;
+    const usableTop = bodyHeight * inset;
+    const usableBottom = bodyHeight * (1 - inset);
+    const nodeCount = Math.max(4, Math.min(9, 5 + Math.round(t * 3)));
+    const leftX = bodyWidth * 0.28;
+    const rightX = bodyWidth * 0.72;
+    const points: { x: number; y: number }[] = [];
+    for (let i = 0; i < nodeCount; i++) {
+      const frac = nodeCount === 1 ? 0 : i / (nodeCount - 1);
+      points.push({
+        x: i % 2 === 0 ? leftX : rightX,
+        y: usableTop + (usableBottom - usableTop) * frac,
+      });
+    }
+    // RN rotates a View about its own center, so each bar is placed with its
+    // center at the segment midpoint and rotated to the p->q angle.
+    const segments = points.slice(0, -1).map((p, i) => {
+      const q = points[i + 1];
+      const dx = q.x - p.x;
+      const dy = q.y - p.y;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      const angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
+      return { midX: (p.x + q.x) / 2, midY: (p.y + q.y) / 2, len, angleDeg };
+    });
+    return { points, segments };
+  }, [bodyWidth, bodyHeight, t]);
+
+  if (!geometry || phase < 2) return null;
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[sigilOverlayStyles.overlay, { opacity: showGlow ? Animated.multiply(pulse, baseOpacity) : baseOpacity }]}
+      importantForAccessibility="no-hide-descendants"
+    >
+      {geometry.segments.map((seg, i) => (
+        <React.Fragment key={`sigil-seg-${i}`}>
+          {showGlow && (
+            <View
+              style={[
+                sigilOverlayStyles.segment,
+                {
+                  left: seg.midX - seg.len / 2,
+                  top: seg.midY - (lineThickness + 5) / 2,
+                  width: seg.len,
+                  height: lineThickness + 5,
+                  borderRadius: (lineThickness + 5) / 2,
+                  backgroundColor: lineColor,
+                  opacity: 0.35,
+                  transform: [{ rotate: `${seg.angleDeg}deg` }],
+                },
+              ]}
+            />
+          )}
+          <View
+            style={[
+              sigilOverlayStyles.segment,
+              {
+                left: seg.midX - seg.len / 2,
+                top: seg.midY - lineThickness / 2,
+                width: seg.len,
+                height: lineThickness,
+                backgroundColor: lineColor,
+                transform: [{ rotate: `${seg.angleDeg}deg` }],
+              },
+            ]}
+          />
+        </React.Fragment>
+      ))}
+      {geometry.points.map((p, i) => (
+        <View
+          key={`sigil-node-${i}`}
+          style={[
+            sigilOverlayStyles.node,
+            {
+              left: p.x - 3,
+              top: p.y - 3,
+              borderColor: lineColor,
+              backgroundColor: showGlow || t > 0 ? lineColor : 'transparent',
+            },
+          ]}
+        />
+      ))}
+    </Animated.View>
+  );
+};
+
+const sigilOverlayStyles = StyleSheet.create({
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  // Each segment is a thin rotated bar centered on the segment midpoint.
+  segment: {
+    position: 'absolute',
+  },
+  node: {
+    position: 'absolute',
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    borderWidth: 1,
+  },
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 // SHADOW FIGURE - The entity. It is never named, never explained.
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -772,8 +1129,23 @@ const ShadowFigure: React.FC<{ phase: number }> = ({ phase }) => {
 // DRIFTING CLOUD - Soft cloud sprites crossing the sky (Phase 0-2 only)
 // ═══════════════════════════════════════════════════════════════════════════
 
+// Soft volumetric cloud drawn from overlapping feathered rounded Views (no
+// hollow outline PNG, F13/F64). `tint` lets the cloud dim from bright white
+// toward a dusky grey as the phase darkens.
+const CloudShape: React.FC<{ width: number; tint: string }> = ({ width, tint }) => {
+  const h = width / 2;
+  return (
+    <View style={{ width, height: h }}>
+      <View style={{ position: 'absolute', left: width * 0.06, top: h * 0.42, width: width * 0.5, height: h * 0.58, borderRadius: h * 0.3, backgroundColor: tint, opacity: 0.85 }} />
+      <View style={{ position: 'absolute', left: width * 0.42, top: h * 0.42, width: width * 0.52, height: h * 0.58, borderRadius: h * 0.3, backgroundColor: tint, opacity: 0.8 }} />
+      <View style={{ position: 'absolute', left: width * 0.24, top: h * 0.16, width: width * 0.36, height: h * 0.7, borderRadius: h * 0.35, backgroundColor: tint, opacity: 0.95 }} />
+      <View style={{ position: 'absolute', left: width * 0.5, top: h * 0.24, width: width * 0.3, height: h * 0.62, borderRadius: h * 0.31, backgroundColor: tint, opacity: 0.9 }} />
+      <View style={{ position: 'absolute', left: width * 0.12, top: h * 0.5, width: width * 0.8, height: h * 0.4, borderRadius: h * 0.2, backgroundColor: tint, opacity: 0.7 }} />
+    </View>
+  );
+};
+
 const DriftingCloud: React.FC<{
-  source: number;
   width: number;
   top: number;
   /** Full screen-traverse duration in ms */
@@ -781,7 +1153,9 @@ const DriftingCloud: React.FC<{
   /** 0..1 starting position across the sky */
   initialProgress: number;
   opacity: number;
-}> = ({ source, width, top, duration, initialProgress, opacity }) => {
+  /** Cloud body color (phase-dimmed by the caller). */
+  tint: string;
+}> = ({ width, top, duration, initialProgress, opacity, tint }) => {
   const travel = SCREEN_WIDTH + width;
   const x = useRef(new Animated.Value(-width + travel * initialProgress)).current;
   const mountedRef = useRef(true);
@@ -817,21 +1191,106 @@ const DriftingCloud: React.FC<{
   }, []);
 
   return (
-    <Animated.Image
-      source={source}
-      resizeMode="contain"
+    <Animated.View
+      pointerEvents="none"
       style={{
         position: 'absolute',
         left: 0,
         top,
         width,
-        height: width / 2, // cloud PNGs are 512x256
+        height: width / 2,
         opacity,
         transform: [{ translateX: x }],
       }}
-    />
+    >
+      <CloudShape width={width} tint={tint} />
+    </Animated.View>
   );
 };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MOON GLOW - Full-moon live-event world treatment high in the night sky (F20)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * MoonGlow — a soft cool halo high in the sky on full-moon event nights
+ * (deterministic local-calendar event; see liveEvents.ts). Only shown from
+ * Phase 2 on (the dusk/night skies) — the bright day skies of Phases 0-1 get
+ * nothing, since daytime is honest about the event. Four graduated cool ovals
+ * (the same layered-glow technique used elsewhere) with a very slow
+ * native-driven breath; static under reduced motion / low-tier devices. Pure
+ * Views + one opacity loop, no new art.
+ */
+const MoonGlow: React.FC = () => {
+  const breathe = useRef(new Animated.Value(0)).current;
+  const isStatic = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
+
+  useEffect(() => {
+    if (isStatic) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(breathe, { toValue: 1, duration: 5200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(breathe, { toValue: 0, duration: 5200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [isStatic, breathe]);
+
+  const opacity = isStatic ? 0.7 : breathe.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0.85] });
+
+  return (
+    <Animated.View pointerEvents="none" style={[moonGlowStyles.wrap, { left: SCREEN_WIDTH * 0.62, opacity }]}>
+      <View style={moonGlowStyles.halo1} />
+      <View style={moonGlowStyles.halo2} />
+      <View style={moonGlowStyles.halo3} />
+      <View style={moonGlowStyles.disc} />
+    </Animated.View>
+  );
+};
+
+const MOON_HALO = 'rgba(198, 206, 236, 1)';
+const moonGlowStyles = StyleSheet.create({
+  wrap: {
+    position: 'absolute',
+    top: 26,
+    width: 120,
+    height: 120,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  halo1: {
+    position: 'absolute',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: MOON_HALO,
+    opacity: 0.07,
+  },
+  halo2: {
+    position: 'absolute',
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: MOON_HALO,
+    opacity: 0.11,
+  },
+  halo3: {
+    position: 'absolute',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: MOON_HALO,
+    opacity: 0.18,
+  },
+  disc: {
+    position: 'absolute',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(226, 230, 246, 0.9)',
+  },
+});
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PIT ATTENTION GLOW - Warm pulse around the pit entrance when offerings wait
@@ -839,9 +1298,11 @@ const DriftingCloud: React.FC<{
 
 /**
  * PitAttentionGlow — a soft warm halo behind the pit entrance, shown when
- * harvest batches are waiting to be offered. Pre-styled overlay Views with a
- * single native-driven opacity loop (no JS-bridge color animation); renders
- * at a static mid-opacity under reducedMotion / simplified animations.
+ * harvest batches are waiting to be offered. Four concentric graduated ovals
+ * (130/100/70/45%, low stepped alphas) so the edge dissolves instead of
+ * reading as a hard orange sticker (F17). One native-driven opacity loop, peak
+ * wrapper opacity capped at 0.85 so the edge never fully hardens; renders at a
+ * static mid-opacity under reducedMotion / simplified animations.
  */
 const PitAttentionGlow: React.FC = () => {
   const pulse = useRef(new Animated.Value(0)).current;
@@ -870,13 +1331,15 @@ const PitAttentionGlow: React.FC = () => {
   }, [isStatic, pulse]);
 
   const opacity = isStatic
-    ? 0.7 // static mid-opacity — still reads as "the pit wants attention"
-    : pulse.interpolate({ inputRange: [0, 1], outputRange: [0.35, 1] });
+    ? 0.6 // static mid-opacity — still reads as "the pit wants attention"
+    : pulse.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.85] });
 
   return (
     <Animated.View pointerEvents="none" style={[styles.pitGlow, { opacity }]}>
-      <View style={styles.pitGlowOuter} />
-      <View style={styles.pitGlowInner} />
+      <View style={styles.pitGlowRing1} />
+      <View style={styles.pitGlowRing2} />
+      <View style={styles.pitGlowRing3} />
+      <View style={styles.pitGlowRing4} />
     </Animated.View>
   );
 };
@@ -1014,6 +1477,10 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   const tendingIntensity = getTendingIntensity(tendingLevel);
   const ambientMotionEnabled = !getSettingsSync().reducedMotion && !shouldSimplifyAnimations();
   const houseTint = PHASE_HOUSE_TINT[currentPhase] ?? PHASE_HOUSE_TINT[0];
+  // Full-moon live event (deterministic local-calendar math, see liveEvents.ts
+  // — no network, no Math.random). Cheap pure call; the world treatment below
+  // (F20) is gated to Phase 2+, since the bright day skies stay honest.
+  const isFullMoon = getActiveEvent() != null;
   // Wall texture sits UNDER the whole-body room scrim, so its own overlay is
   // compensated to land the compound wall tint exactly on `ext`.
   const wallTintOpacity = houseTint.room >= 1
@@ -1023,6 +1490,15 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   // survives the night phases instead of washing to flat black.
   const pitTintOpacity = Math.min(houseTint.ext, 0.4);
   const contactShadow = CONTACT_SHADOW[currentPhase] ?? CONTACT_SHADOW[0];
+  // Chimney smoke color: warm pale grey while the days are bright, cooling to
+  // ash as the descent deepens (F13/F64).
+  const smokeTint = currentPhase >= 4
+    ? 'rgba(150, 150, 168, 0.8)'
+    : currentPhase >= 3
+      ? 'rgba(176, 176, 190, 0.82)'
+      : currentPhase >= 2
+        ? 'rgba(200, 196, 206, 0.85)'
+        : 'rgba(220, 220, 224, 0.9)';
   // Animated values
   const translateY = useRef(new Animated.Value(0)).current;
 
@@ -1047,16 +1523,20 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     }
   }, []);
 
-  // Memoize night star positions/sizes to prevent flicker on re-render
-  const nightStars = useMemo(() =>
-    [...Array(12)].map((_, i) => ({
+  // Memoize night star glint positions/sizes to prevent flicker on re-render.
+  // Full-moon event nights raise the count +30% (F20) — cheap, tier-gated.
+  const nightStars = useMemo(() => {
+    const count = isFullMoon ? 16 : 12;
+    return [...Array(count)].map((_, i) => ({
       id: i,
       left: `${10 + (i * 7) % 80}%` as `${number}%`,
       top: `${5 + (i * 11) % 15}%` as `${number}%`,
       opacity: 0.3 + (((i * 17 + 7) % 10) / 10) * 0.5,
-      fontSize: 8 + (((i * 13 + 3) % 10) / 10) * 6,
-    })),
-  []);
+      size: 8 + (((i * 13 + 3) % 10) / 10) * 6,
+      // Staggered twinkle phase so the glints don't pulse in lockstep.
+      twinkleDelay: (i % 4) * 500,
+    }));
+  }, [isFullMoon]);
 
   // Particle system state
   const [particles, setParticles] = useState<Particle[]>([]);
@@ -1074,7 +1554,11 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     const config = AMBIENT_PARTICLES_BY_PHASE[currentPhase] ?? AMBIENT_PARTICLES_BY_PHASE[0];
     // High tier keeps the full count; medium thins it (density scales DOWN).
     const tierScale = getDeviceTier() === 'high' ? 1 : 0.6;
-    const maxCount = Math.max(2, Math.round(config.maxCount * tierScale));
+    // Full-moon event nights get a denser firefly drift from dusk on (F20) —
+    // a modest boost, still capped by the tier scale above.
+    const eventFireflyBoost = isFullMoon && currentPhase >= 2;
+    const maxCount = Math.max(2, Math.round(config.maxCount * tierScale * (eventFireflyBoost ? 1.4 : 1)));
+    const spawnMs = eventFireflyBoost ? Math.round(config.spawnMs * 0.7) : config.spawnMs;
 
     const spawnParticle = () => {
       const newParticle: Particle = {
@@ -1096,11 +1580,11 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
       setParticles(prev => [...prev.slice(-(maxCount - 1)), newParticle]);
     };
 
-    const interval = setInterval(spawnParticle, config.spawnMs);
+    const interval = setInterval(spawnParticle, spawnMs);
     spawnParticle(); // Spawn one immediately
 
     return () => clearInterval(interval);
-  }, [currentPhase, ambientMotionEnabled]);
+  }, [currentPhase, ambientMotionEnabled, isFullMoon]);
 
 
 
@@ -1146,6 +1630,30 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
       max: Math.max(0, overflow + 50),
     };
   }, [containerHeight, houseHeight, numRows, onPitPress, houseBottomMargin]);
+
+  // ─── Two-rate parallax (F12) ─────────────────────────────────────────────
+  // The sky (+ clouds/night stars/shooting stars) rides a camera-slow layer
+  // nested inside transformContainer: a -0.7×translateY counter-transform on
+  // top of the parent's own translateY leaves a NET sky shift of 0.3×
+  // translateY, so the diorama gains real depth on every pan instead of
+  // moving as one rigid plane. Disabled (net 1:1, current behavior) under
+  // reducedMotion / low tier, same gate as the rest of the ambient motion.
+  const parallaxEnabled = ambientMotionEnabled;
+  const skyParallax = useMemo(
+    () => (parallaxEnabled ? Animated.multiply(translateY, -0.7) : new Animated.Value(0)),
+    [parallaxEnabled, translateY]
+  );
+  // Because the sky now lags the house by 0.7×translateY at the top of the
+  // pan range, the fixed SKY_BOX_HEIGHT floor is no longer tall enough to
+  // keep the art covering the frame there (the old "sky abandons the frame
+  // after ~230dp of pan" defect). Grow the rendered height — bounded, never
+  // shrinking below the pinned SKY_BOX_HEIGHT floor — by the parallax layer's
+  // own worst-case net travel, recomputed alongside panBounds.max.
+  const skyLayerHeight = useMemo(() => {
+    if (!parallaxEnabled) return SKY_BOX_HEIGHT;
+    const grown = (containerHeight ?? SCREEN_HEIGHT) + Math.ceil(0.3 * panBounds.max);
+    return Math.max(SKY_BOX_HEIGHT, grown);
+  }, [parallaxEnabled, containerHeight, panBounds.max]);
 
   const syncPanPosition = useCallback((nextPanY: number, notify = false) => {
     // Cancel any in-flight momentum settle before hard-setting the position, so
@@ -1261,11 +1769,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
 
   return (
     <GestureHandlerRootView style={[styles.container, { backgroundColor: PHASE_BG_COLORS[currentPhase] || PHASE_BG_COLORS[0] }]}>
-      {/* Floating particles */}
-      {particles.map(particle => (
-        <FloatingParticle key={particle.id} particle={particle} />
-      ))}
-
       {/* Pan gesture handler - vertical only */}
       <PanGestureHandler
         ref={panRef}
@@ -1286,80 +1789,98 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
               },
             ]}
           >
-              {/* Sky background - inside transform so it moves with the scene.
-                  Bottom-anchored: the artwork's bottom row sits exactly on the
-                  container bottom (see the SKY_BOX_HEIGHT geometry notes), so
-                  the art always covers every visible pixel and the house seats
-                  at a device-independent spot on the meadow below the river. */}
-              <Image
-                source={
-                  currentPhase >= 4 ? SKY_SHADOW :
-                  currentPhase >= 3 ? SKY_STORM :
-                  currentPhase >= 2 ? SKY_DUSK :
-                  currentPhase >= 1 ? SKY_AFTERNOON :
-                  SKY_DAY
-                }
-                style={styles.skyBackground}
-                resizeMode="cover"
-              />
-
-              {/* Ground seam guard: a band below the container bottom (1px
-                  overlap) in the art's own bottom-row grass color, purely to
-                  guard against sub-pixel rounding seams at the art's bottom
-                  edge. Never visibly a "fill" — the artwork itself reaches
-                  the last visible row. */}
-              <View
+              {/* Camera-slow sky layer (F12): sky + clouds + celestials ride a
+                  -0.7×pan counter-transform so the net motion is 0.3×pan —
+                  real parallax depth on every drag. Under the static fallback
+                  (reduced motion / low tier) the counter is 0, so the sky
+                  tracks the house 1:1 exactly as before. */}
+              <Animated.View
+                style={[styles.skyParallaxLayer, { transform: [{ translateY: skyParallax }] }]}
                 pointerEvents="none"
-                style={[
-                  styles.groundExtension,
-                  { backgroundColor: PHASE_GROUND_COLORS[currentPhase] ?? PHASE_GROUND_COLORS[0] },
-                ]}
-              />
+              >
+                {/* Sky background - inside transform so it moves with the scene.
+                    Bottom-anchored: the artwork's bottom row sits exactly on the
+                    container bottom (see the SKY_BOX_HEIGHT geometry notes), so
+                    the art always covers every visible pixel and the house seats
+                    at a device-independent spot on the meadow below the river.
+                    The height is grown (never shrunk below the pinned floor) to
+                    keep covering the frame across the parallax layer's own net
+                    travel — see the skyLayerHeight notes above (F12). */}
+                <Image
+                  source={
+                    currentPhase >= 4 ? SKY_SHADOW :
+                    currentPhase >= 3 ? SKY_STORM :
+                    currentPhase >= 2 ? SKY_DUSK :
+                    currentPhase >= 1 ? SKY_AFTERNOON :
+                    SKY_DAY
+                  }
+                  style={[styles.skyBackground, { height: skyLayerHeight }]}
+                  resizeMode="cover"
+                />
 
-              {/* Drifting clouds - Phase 0-2 only; the storm sky takes over at Phase 3.
-                  Rendered before the house so they layer behind the shadow figure. */}
-              {currentPhase <= 2 && (
-                <>
-                  <DriftingCloud source={CLOUD_1} width={170} top={26} duration={80000} initialProgress={0.15} opacity={currentPhase >= 2 ? 0.4 : 0.85} />
-                  <DriftingCloud source={CLOUD_2} width={130} top={88} duration={105000} initialProgress={0.55} opacity={currentPhase >= 2 ? 0.4 : 0.85} />
-                  <DriftingCloud source={CLOUD_1} width={120} top={58} duration={65000} initialProgress={0.8} opacity={currentPhase >= 2 ? 0.35 : 0.75} />
-                </>
-              )}
+                {/* Ground seam guard: a band below the container bottom (1px
+                    overlap) in the art's own bottom-row grass color, purely to
+                    guard against sub-pixel rounding seams at the art's bottom
+                    edge. Never visibly a "fill" — the artwork itself reaches
+                    the last visible row. */}
+                <View
+                  pointerEvents="none"
+                  style={[
+                    styles.groundExtension,
+                    { backgroundColor: PHASE_GROUND_COLORS[currentPhase] ?? PHASE_GROUND_COLORS[0] },
+                  ]}
+                />
 
+                {/* Drifting clouds - Phase 0-2 only; the storm sky takes over at
+                    Phase 3. Soft View blobs (no hollow outline PNG, F13/F64),
+                    phase-dimmed. */}
+                {currentPhase <= 2 && (
+                  <>
+                    <DriftingCloud width={170} top={26} duration={80000} initialProgress={0.15} opacity={currentPhase >= 2 ? 0.4 : 0.85} tint={currentPhase >= 2 ? '#CFC7DA' : '#FFFFFF'} />
+                    <DriftingCloud width={130} top={88} duration={105000} initialProgress={0.55} opacity={currentPhase >= 2 ? 0.4 : 0.85} tint={currentPhase >= 2 ? '#CFC7DA' : '#FFFFFF'} />
+                    <DriftingCloud width={120} top={58} duration={65000} initialProgress={0.8} opacity={currentPhase >= 2 ? 0.35 : 0.75} tint={currentPhase >= 2 ? '#C6BED2' : '#F4F2FA'} />
+                  </>
+                )}
 
-              {/* Stars at night (phase 3-4) */}
-              {currentPhase >= 3 && (
-                <View style={styles.starsContainer} pointerEvents="none">
-                  {nightStars.map((star) => (
-                    <Text
-                      key={star.id}
-                      style={[
-                        styles.star,
-                        {
-                          left: star.left,
-                          top: star.top,
-                          opacity: star.opacity,
-                          fontSize: star.fontSize,
-                        }
-                      ]}
-                    >
-                      ✦
-                    </Text>
-                  ))}
-                </View>
-              )}
+                {/* Full-moon world treatment (F20): a soft moon-glow halo high
+                    in the sky on event nights, from Phase 2 on. The bright day
+                    skies of Phases 0-1 get nothing — daytime is honest. */}
+                {isFullMoon && currentPhase >= 2 && <MoonGlow />}
 
-              {/* Shooting stars (only at higher phases) */}
-              {ambientMotionEnabled && currentPhase >= 2 && <ShootingStar />}
-              {ambientMotionEnabled && currentPhase >= 3 && <ShootingStar />}
-              {ambientMotionEnabled && currentPhase >= 4 && <ShootingStar />}
+                {/* Night star glints (phase 3-4) - two-View sparkles (F13/F64),
+                    not the old ✦ glyph. Twinkle when ambient motion is on. */}
+                {currentPhase >= 3 && (
+                  <View style={styles.starsContainer} pointerEvents="none">
+                    {nightStars.map((star) => (
+                      <NightStarGlint
+                        key={star.id}
+                        left={star.left}
+                        top={star.top}
+                        size={star.size}
+                        baseOpacity={star.opacity}
+                        twinkle={ambientMotionEnabled}
+                        delay={star.twinkleDelay}
+                      />
+                    ))}
+                  </View>
+                )}
 
-              {/* Flying birds */}
-              {ambientMotionEnabled && (
+                {/* Shooting stars (only at higher phases) */}
+                {ambientMotionEnabled && currentPhase >= 2 && <ShootingStar />}
+                {ambientMotionEnabled && currentPhase >= 3 && <ShootingStar />}
+                {ambientMotionEnabled && currentPhase >= 4 && <ShootingStar />}
+              </Animated.View>
+
+              {/* Songbirds cross only the bright phases (F16); from Phase 3 on
+                  the sky stays honestly empty rather than an unnatural cross-
+                  ing. Dark silhouettes flip to face their travel direction and
+                  stay on the house's own 1.0× rate (they fly near the roofline,
+                  not the distant sky backdrop). */}
+              {ambientMotionEnabled && currentPhase <= 2 && (
                 <>
                   <FlyingBird startDelay={0} yPosition={80} />
                   <FlyingBird startDelay={3000} yPosition={50} />
-                  {currentPhase < 3 && <FlyingBird startDelay={6000} yPosition={110} />}
+                  <FlyingBird startDelay={6000} yPosition={110} />
                 </>
               )}
 
@@ -1404,9 +1925,9 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                   )}
                   {/* Animated smoke puffs rising from the baked-in chimney */}
                   <View style={styles.smokeContainer}>
-                    <SmokePuff delay={0} isStatic={!ambientMotionEnabled} />
-                    <SmokePuff delay={1000} isStatic={!ambientMotionEnabled} />
-                    <SmokePuff delay={2000} isStatic={!ambientMotionEnabled} />
+                    <SmokePuff delay={0} isStatic={!ambientMotionEnabled} tint={smokeTint} />
+                    <SmokePuff delay={1000} isStatic={!ambientMotionEnabled} tint={smokeTint} />
+                    <SmokePuff delay={2000} isStatic={!ambientMotionEnabled} tint={smokeTint} />
                   </View>
                 </View>
 
@@ -1506,6 +2027,19 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                     />
                   )}
 
+                  {/* Arrangement sigil overlay (F18): the true pattern
+                      inscribed OVER the house facade, a zig-zag connecting
+                      alternating room corners with node dots at the joints.
+                      Barely subliminal at Phase 2 (felt before told), crimson +
+                      glowing at Phase 4, extending as the player tends at
+                      Phase 5. Pointer-transparent. */}
+                  <HouseSigilOverlay
+                    phase={currentPhase}
+                    bodyWidth={HOUSE_BODY_WIDTH}
+                    bodyHeight={houseHeight - HOUSE_PADDING}
+                    tendingIntensity={tendingIntensity}
+                  />
+
                   {/* Soft shadowed side edges (replaces the flat brown outline).
                       The wall reaches the true body edge; these gradients darken
                       the outer strip so the house corners read as receding into
@@ -1567,6 +2101,17 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
             </Animated.View>
         </Animated.View>
       </PanGestureHandler>
+
+      {/* Ambient particle overlay (F11). Rendered AFTER the pan handler in a
+          screen-space absolute-fill layer (zIndex above the gesture
+          container, pointer-transparent), so the bottom-anchored opaque sky
+          can never paint over the particles at rest — the defect where they
+          were invisible at translateY=0 in every phase. */}
+      <View style={styles.particleOverlay} pointerEvents="none">
+        {particles.map(particle => (
+          <FloatingParticle key={particle.id} particle={particle} />
+        ))}
+      </View>
     </GestureHandlerRootView>
   );
 };
@@ -1593,6 +2138,13 @@ const styles = StyleSheet.create({
     height: SKY_BOX_HEIGHT,
     zIndex: -1,
   },
+  // Camera-slow parallax layer (F12) — absolute-fills the transform container
+  // and carries the sky + celestials at 0.3× the house pan. Sits BEHIND the
+  // house (negative zIndex), same as the bare sky Image did before.
+  skyParallaxLayer: {
+    ...StyleSheet.absoluteFill,
+    zIndex: -1,
+  },
   // Below the container bottom with a 1px overlap over the art's bottom row —
   // sub-pixel seam insurance only (see PHASE_GROUND_COLORS notes).
   groundExtension: {
@@ -1603,16 +2155,12 @@ const styles = StyleSheet.create({
     height: SCREEN_HEIGHT + 1,
     zIndex: -1,
   },
-  // Clouds - inside transform container
-  cloud: {
-    position: 'absolute',
-    flexDirection: 'row',
-    zIndex: 200,
-  },
-  cloudEmoji: {
-    fontFamily: BODY_FONT,
-    fontSize: 45,
-    opacity: 0.9,
+  // Screen-space ambient particle overlay: rendered after the pan handler,
+  // above the gesture container, pointer-transparent — so the opaque sky can
+  // never paint over the particles at rest (F11).
+  particleOverlay: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 20,
   },
 
   // Stars for night sky
@@ -1623,11 +2171,6 @@ const styles = StyleSheet.create({
     right: 0,
     height: SCREEN_HEIGHT * 0.3,
     zIndex: 150,
-  },
-  star: {
-    fontFamily: BODY_FONT,
-    position: 'absolute',
-    color: '#FFFFFF',
   },
 
   // Smoke container
@@ -1699,37 +2242,47 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  // Warm attention halo behind the pit entrance (offerings waiting). Layered
-  // rgba ovals under a single animated-opacity wrapper — no color animation.
+  // Warm attention halo behind the pit entrance (offerings waiting). Four
+  // concentric graduated ovals (130/100/70/45%) with low stepped alphas under
+  // a single animated-opacity wrapper — the outer rings feather the edge so it
+  // dissolves instead of reading as a hard orange sticker (F17). No color
+  // animation.
   pitGlow: {
     position: 'absolute',
-    top: -10,
-    left: -20,
-    right: -20,
-    bottom: -8,
+    top: -30,
+    left: -34,
+    right: -34,
+    bottom: -24,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  pitGlowOuter: {
+  pitGlowRing1: {
+    position: 'absolute',
+    width: '130%',
+    height: '130%',
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 176, 74, 0.06)',
+  },
+  pitGlowRing2: {
     position: 'absolute',
     width: '100%',
     height: '100%',
-    borderRadius: 80,
-    backgroundColor: 'rgba(255, 176, 74, 0.32)',
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 186, 92, 0.10)',
   },
-  pitGlowInner: {
+  pitGlowRing3: {
     position: 'absolute',
-    width: '62%',
-    height: '58%',
-    borderRadius: 48,
-    backgroundColor: 'rgba(255, 214, 130, 0.38)',
+    width: '70%',
+    height: '70%',
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 200, 110, 0.16)',
   },
-  smokeEmoji: {
-    fontFamily: BODY_FONT,
-    fontSize: 18,
+  pitGlowRing4: {
     position: 'absolute',
-    top: -25,
-    opacity: 0.6,
+    width: '45%',
+    height: '45%',
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 216, 140, 0.26)',
   },
 
   // House body
