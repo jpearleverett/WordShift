@@ -31,6 +31,8 @@ const SOUND_SOURCES: Record<string, any> = {
   valid_move_2: require('../../assets/sounds/valid_move_2.wav'),
   valid_move_3: require('../../assets/sounds/valid_move_3.wav'),
   valid_move_4: require('../../assets/sounds/valid_move_4.wav'),
+  // Reverse-shift midpoint pivot (rising marimba into a handbell; dark mirror sinks).
+  midpoint_turn: require('../../assets/sounds/midpoint_turn.wav'),
   invalid_move: require('../../assets/sounds/invalid_move.wav'),
   undo: require('../../assets/sounds/undo.wav'),
   hint: require('../../assets/sounds/hint.wav'),
@@ -61,6 +63,7 @@ const SOUND_SOURCES: Record<string, any> = {
   valid_move_2_dark: require('../../assets/sounds/valid_move_2_dark.wav'),
   valid_move_3_dark: require('../../assets/sounds/valid_move_3_dark.wav'),
   valid_move_4_dark: require('../../assets/sounds/valid_move_4_dark.wav'),
+  midpoint_turn_dark: require('../../assets/sounds/midpoint_turn_dark.wav'),
   invalid_move_dark: require('../../assets/sounds/invalid_move_dark.wav'),
   undo_dark: require('../../assets/sounds/undo_dark.wav'),
   hint_dark: require('../../assets/sounds/hint_dark.wav'),
@@ -276,6 +279,12 @@ export function validMoveSoundName(comboTier: number, phase: number): string {
  */
 export async function soundValidMove(comboTier: number = 0): Promise<void> {
   await playSound(validMoveSoundName(comboTier, audioPhase));
+}
+
+/** Reverse-shift descent->ascent pivot: a bright rising marimba into a handbell
+ *  (a chapter break, above the move ladder); sinks to its hollow mirror at Phase 3+. */
+export async function soundMidpointTurn(): Promise<void> {
+  await playSound(resolveSfxForPhase('midpoint_turn', audioPhase));
 }
 
 /** Invalid move attempted. Deeper thud at Phase 3+. */

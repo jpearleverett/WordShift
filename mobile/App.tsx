@@ -94,7 +94,7 @@ import { ShareResultModal } from './src/components/share/ShareResultModal';
 import { getLocalDateString } from './src/services/dateUtils';
 import { getSettingsSync } from './src/services/settings';
 import { announceForA11y } from './src/services/a11yAnnounce';
-import { initAudio, setAudioPhase, startMusicForScreen, type MusicScreen, soundVictory, soundPerfect, soundValidMove, soundInvalidMove, soundUndo, soundHint, soundTap, soundUiTap, soundSelection, soundLetterSelect } from './src/services/audio';
+import { initAudio, setAudioPhase, startMusicForScreen, type MusicScreen, soundVictory, soundPerfect, soundValidMove, soundMidpointTurn, soundInvalidMove, soundUndo, soundHint, soundTap, soundUiTap, soundSelection, soundLetterSelect } from './src/services/audio';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess, hapticWarning, hapticError, hapticSelection } from './src/services/haptics';
 import { getVariantTutorialIntroLines } from './src/services/animalDialogue';
@@ -2677,11 +2677,13 @@ function MainApp() {
       }
 
       // Reverse-shift midpoint: mark the descent->ascent turn as its own "second
-      // act" — a distinct celebratory haptic, a rising turn chime, AND a phase-
+      // act" — a distinct celebratory haptic, its OWN dedicated turn chime (a
+      // rising marimba into a handbell, above the move ladder so it reads as a
+      // chapter break, not another combo step; sinks at Phase 3+), AND a phase-
       // aware beat line (was a lone haptic with no sound or message).
       if (result.reverseMidpoint) {
         hapticSuccess();
-        soundValidMove(3);
+        soundMidpointTurn();
         puzzleActions.setMessage(getReverseMidpointMessage(persistence.currentPhase));
       }
 

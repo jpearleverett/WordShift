@@ -461,6 +461,22 @@ brightMove('valid_move_4', N.G5, N.D6, N.G6, { gap: 0.065, sparkleVol: 0.16, wet
   noiseBurst(s, { start: 0.11, dur: 0.18, vol: 0.06, lp: 0.9, hp: 0.85, decayShape: 5, rand });
 } });
 
+// midpoint_turn: the reverse-shift descent->ascent PIVOT. Two rising marimba
+// strikes into a soft handbell ringout — brighter and taller than the top of
+// the valid_move ladder, so the turn reads as a chapter break, not another
+// combo step. The dark mirror sinks (hollow marimba falling into a dark bell).
+render('midpoint_turn', 0.55, (s, rand) => {
+  strike(s, { freq: N.G5, dur: 0.2, vol: 0.5, partials: MARIMBA, decayShape: 6, unison: 2, detune: 0.003, rand });
+  strike(s, { freq: N.D6, start: 0.1, dur: 0.24, vol: 0.48, partials: MARIMBA, decayShape: 5.5, unison: 2, detune: 0.003, rand });
+  strike(s, { freq: N.G6, start: 0.22, dur: 0.5, vol: 0.28, partials: HANDBELL, decayShape: 3.6, attack: 0.004, rand });
+  noiseBurst(s, { start: 0.2, dur: 0.02, vol: 0.12, lp: 0.6, decayShape: 10, rand });
+}, { reverb: { wet: 0.22, tail: 0.5 }, peak: 0.7 });
+render('midpoint_turn_dark', 0.6, (s, rand) => {
+  strike(s, { freq: D.G3, dur: 0.24, vol: 0.5, partials: HOLLOW, attack: 0.008, decayShape: 5.5, unison: 2, detune: 0.005, rand });
+  strike(s, { freq: D.Eb3, start: 0.12, dur: 0.3, vol: 0.46, partials: HOLLOW, attack: 0.01, decayShape: 5, unison: 2, detune: 0.005, rand });
+  strike(s, { freq: D.Bb2, start: 0.26, dur: 0.55, vol: 0.3, partials: DARK_BELL, attack: 0.012, decayShape: 4, rand });
+}, { reverb: { wet: 0.3, tail: 0.6 }, peak: 0.62 });
+
 // invalid_move: gentle wooden double-thock, dry and tactile, never punishing.
 render('invalid_move', 0.38, (s, rand) => {
   noiseBurst(s, { start: 0, dur: 0.03, vol: 0.35, lp: 0.12, decayShape: 9, rand });
