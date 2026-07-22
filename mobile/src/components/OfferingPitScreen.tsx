@@ -14,7 +14,6 @@ import {
 } from 'react-native';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
 import {
-  CandyColors,
   getOverlayBannerTheme,
   getPhaseTheme,
   getTileColor,
@@ -56,7 +55,10 @@ import {
   getPixelSkin,
   CARD_CORNER_DP,
   CARD_EDGE_DP,
+  PANEL_CORNER_DP,
+  PANEL_EDGE_DP,
   BTN_CAP_DP,
+  BTN_MD_DP,
   BTN_LG_DP,
   BTN_SHADOW_DP,
 } from '../theme/pixelSkin.generated';
@@ -883,6 +885,10 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const [tendingBusy, setTendingBusy] = useState(false);
   // Pending ceremony/result toast timers, tracked so they're cleared on unmount.
   const tendTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  // Felt response for "deepen the pattern": a native-driven bloom on the depth
+  // reading when the level rises (reduced-motion pins to no motion).
+  const tendPulse = useRef(new Animated.Value(0)).current;
+  const tendPulseScale = tendPulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.16] });
 
   const devouredPerBatch = useRef<Map<string, Set<string>>>(new Map());
   const batchWordCounts = useRef<Map<string, number>>(new Map());
@@ -1676,7 +1682,10 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
             }).start();
             const isLast = j >= texts.length - 1;
             const step = () => (isLast ? runComplete() : showLine(j + 1));
-            const autoTimer = setTimeout(step, isLast ? 1500 : 2500);
+            // Tightened dwell (was 2500/1500): the ~11.5s ceremony dragged. The
+            // lines are 3-5 words, so ~2s reads comfortably, and a tap still
+            // advances immediately (ceremonyAdvanceRef).
+            const autoTimer = setTimeout(step, isLast ? 1300 : 2000);
             ceremonyTimers.current.push(autoTimer);
             ceremonyAdvanceRef.current = () => {
               clearTimeout(autoTimer);
@@ -1684,7 +1693,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
             };
           };
           showLine(0);
-        }, 800);
+        }, 650);
         ceremonyTimers.current.push(textTimer);
       }, PIT_WARD_COUNT * 200 + 200);
       ceremonyTimers.current.push(eruptTimer);
@@ -1776,6 +1785,16 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       await refreshTending();
       if (!mountedRef.current) return;
 
+      // Felt response: the depth reading blooms as the pattern deepens (a text
+      // toast alone read as flat). Native-driver scale, reduced-motion pins.
+      if (!reducedMotion) {
+        tendPulse.setValue(0);
+        Animated.sequence([
+          Animated.timing(tendPulse, { toValue: 1, duration: 220, useNativeDriver: true }),
+          Animated.timing(tendPulse, { toValue: 0, duration: 460, useNativeDriver: true }),
+        ]).start();
+      }
+
       // Schedule a toast on a tracked timer (cleared on unmount).
       const schedule = (msg: string, delay: number, heavy = false) => {
         const t = setTimeout(() => {
@@ -1789,8 +1808,10 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       let nextDelay = 0;
       if (result.milestone != null) {
         // Milestone: close the modal and sequence the serene ceremony lines.
+        // The modal is gone, so the pit itself answers with a surge + ring.
         setShowTendingModal(false);
         hapticHeavy();
+        if (!reducedMotion) { flashPitSurge(1.4); spawnShockwave(); }
         const lines = getTendingMilestoneCeremonyText(result.milestone);
         lines.forEach((line, i) => schedule(line, i * 2600, i === 0));
         nextDelay = lines.length * 2600;
@@ -1814,7 +1835,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     } finally {
       if (mountedRef.current) setTendingBusy(false);
     }
-  }, [tendingBusy, tendingNext, displayBalance, onAmberChange, phase, refreshTending, showResultToast]);
+  }, [tendingBusy, tendingNext, displayBalance, onAmberChange, phase, refreshTending, showResultToast, reducedMotion, flashPitSurge, spawnShockwave, tendPulse]);
 
   // ---- Batch completion ----
   const tryFinalizeBatch = useCallback(async (batchId: string) => {
@@ -2541,6 +2562,9 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         <Animated.View
           style={[styles.ceremonyOverlay, { opacity: ceremonyOverlayOpacity }]}
           pointerEvents={ceremonyStatus === 'text' ? 'auto' : 'none'}
+          // Fence the pit chrome behind the ward ceremony while it plays (each
+          // ceremony line is spoken via announceForA11y in the runner above).
+          accessibilityViewIsModal={true}
         >
           {ceremonyStatus === 'text' && ceremonyTextIndex >= 0 && (
             <TouchableOpacity
@@ -2644,7 +2668,16 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
           accessibilityRole="button"
         >
           <View style={styles.utilityModal} onStartShouldSetResponder={() => true}>
-            <Text style={styles.utilityTitle}>Menu</Text>
+            {/* Cottage pixel frame (openBottom sheet); text uses the audited
+                surface inks, never raw white on parchment. */}
+            <NineSliceFrame
+              skin={pitSkin.panel}
+              cornerDp={PANEL_CORNER_DP}
+              edgeDp={PANEL_EDGE_DP}
+              fillColor={pitSkin.fill}
+              openBottom
+            />
+            <Text style={[styles.utilityTitle, { color: pitSurface.title }]}>Menu</Text>
             {onOpenStats && (
               <TouchableOpacity
                 style={styles.utilityButton}
@@ -2655,9 +2688,10 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
                 accessibilityLabel="View stats"
                 accessibilityRole="button"
               >
+                <ThreeSliceStrip skin={pitSkin.buttons.secondary.md.up} capDp={BTN_CAP_DP} />
                 <View style={styles.utilityButtonRow}>
                   <Image source={STATS_ICON} style={styles.utilityButtonIcon} />
-                  <Text style={styles.utilityButtonText}>Statistics</Text>
+                  <Text style={[styles.utilityButtonText, { color: pitSkin.ink.primary }]}>Statistics</Text>
                 </View>
               </TouchableOpacity>
             )}
@@ -2671,9 +2705,10 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
                 accessibilityLabel="Open settings"
                 accessibilityRole="button"
               >
+                <ThreeSliceStrip skin={pitSkin.buttons.secondary.md.up} capDp={BTN_CAP_DP} />
                 <View style={styles.utilityButtonRow}>
                   <Image source={GEAR_ICON} style={styles.utilityButtonIcon} />
-                  <Text style={styles.utilityButtonText}>Settings</Text>
+                  <Text style={[styles.utilityButtonText, { color: pitSkin.ink.primary }]}>Settings</Text>
                 </View>
               </TouchableOpacity>
             )}
@@ -2697,22 +2732,33 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
           accessibilityRole="button"
         >
           <View style={styles.tendingModal} onStartShouldSetResponder={() => true}>
-            <Text style={styles.tendingTitle}>{getTendingTitle()}</Text>
-            <Text style={styles.tendingDepth}>{getTendingLevelLabel(tendingLevel)}</Text>
-            <Text style={styles.tendingSubtitle}>{getTendingSubtitle(tendingLevel)}</Text>
+            {/* Cottage pixel frame (openBottom sheet); serene surface inks, no
+                raw white on parchment (the reverted reskin's contrast trap). */}
+            <NineSliceFrame
+              skin={pitSkin.panel}
+              cornerDp={PANEL_CORNER_DP}
+              edgeDp={PANEL_EDGE_DP}
+              fillColor={pitSkin.fill}
+              openBottom
+            />
+            <Text style={[styles.tendingTitle, { color: pitSurface.title }]}>{getTendingTitle()}</Text>
+            <Animated.Text style={[styles.tendingDepth, { color: pitSurface.amberText, transform: [{ scale: tendPulseScale }] }]}>
+              {getTendingLevelLabel(tendingLevel)}
+            </Animated.Text>
+            <Text style={[styles.tendingSubtitle, { color: pitSurface.body }]}>{getTendingSubtitle(tendingLevel)}</Text>
 
             {tendingNext && (
               <>
                 <View style={styles.tendingCostRow}>
-                  <Text style={styles.tendingCostText}>
+                  <Text style={[styles.tendingCostText, { color: pitSurface.amberText }]}>
                     <AmberInline size={20} /> {tendingNext.cost}
                   </Text>
                   {tendingNext.dailyBonusApplied && (
-                    <Text style={styles.tendingCostStrike}>{tendingNext.baseCost}</Text>
+                    <Text style={[styles.tendingCostStrike, { color: pitSurface.muted }]}>{tendingNext.baseCost}</Text>
                   )}
                 </View>
                 {tendingNext.dailyBonusApplied && (
-                  <Text style={styles.tendingBonusHint}>{getTendingDailyBonusHint()}</Text>
+                  <Text style={[styles.tendingBonusHint, { color: pitSurface.body }]}>{getTendingDailyBonusHint()}</Text>
                 )}
                 <TouchableOpacity
                   style={[
@@ -2725,10 +2771,11 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
                   accessibilityRole="button"
                   accessibilityState={{ disabled: tendingBusy || displayBalance < tendingNext.cost }}
                 >
-                  <Text style={styles.tendingButtonText}>{getTendingButtonLabel()}</Text>
+                  <ThreeSliceStrip skin={pitSkin.buttons.primary.lg.up} capDp={BTN_CAP_DP} />
+                  <Text style={[styles.tendingButtonText, { color: pitSkin.ink.primary }]}>{getTendingButtonLabel()}</Text>
                 </TouchableOpacity>
                 {displayBalance < tendingNext.cost && (
-                  <Text style={styles.tendingInsufficient}>
+                  <Text style={[styles.tendingInsufficient, { color: pitSurface.muted }]}>
                     Earn more amber to deepen the pattern further.
                   </Text>
                 )}
@@ -2946,35 +2993,33 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     backgroundColor: 'rgba(8, 8, 18, 0.45)',
   },
+  // Cottage bottom-sheet: NineSliceFrame owns the look (no flat bg/border/
+  // radius). Padding clears the panel wood band; openBottom runs the fill to
+  // the screen edge.
   utilityModal: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
+    paddingHorizontal: 30,
+    paddingTop: 34,
     paddingBottom: 32,
-    backgroundColor: 'rgba(20, 16, 36, 0.98)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
   },
   utilityTitle: {
     fontFamily: PIXEL_FONT_BOLD,
     fontSize: 24,
     fontWeight: '900',
-    color: CandyColors.white,
     textAlign: 'center',
     marginBottom: 16,
   },
+  // Cottage pixel bevel (ThreeSliceStrip owns the fill); the shadow row is
+  // baked into the sprite height, so content clears it via paddingBottom.
   utilityButton: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    height: BTN_MD_DP + BTN_SHADOW_DP,
+    justifyContent: 'center',
+    paddingBottom: BTN_SHADOW_DP,
     marginBottom: 10,
   },
   utilityButtonRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 10,
   },
   utilityButtonIcon: {
@@ -2983,25 +3028,19 @@ const styles = StyleSheet.create({
   },
   utilityButtonText: {
     fontFamily: PIXEL_FONT_BOLD,
-    color: CandyColors.white,
     fontSize: 15,
     fontWeight: '800',
   },
   // ---- Tending Shrine modal ----
   tendingModal: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
+    paddingHorizontal: 30,
+    paddingTop: 36,
     paddingBottom: 36,
-    backgroundColor: 'rgba(18, 14, 32, 0.99)',
-    borderWidth: 1,
-    borderColor: 'rgba(180, 150, 220, 0.3)',
   },
   tendingTitle: {
     fontFamily: PIXEL_FONT_BOLD,
     fontSize: 24,
     fontWeight: '900',
-    color: CandyColors.white,
     textAlign: 'center',
     letterSpacing: 0.5,
   },
@@ -3009,7 +3048,6 @@ const styles = StyleSheet.create({
     fontFamily: PIXEL_FONT_BOLD,
     fontSize: 14,
     fontWeight: '800',
-    color: 'rgba(206, 184, 232, 0.95)',
     textAlign: 'center',
     marginTop: 4,
     letterSpacing: 1.5,
@@ -3018,7 +3056,6 @@ const styles = StyleSheet.create({
     fontFamily: BODY_FONT,
     fontSize: 15,
     fontWeight: '500',
-    color: 'rgba(225, 215, 240, 0.85)',
     textAlign: 'center',
     lineHeight: 22,
     marginTop: 12,
@@ -3034,39 +3071,34 @@ const styles = StyleSheet.create({
     fontFamily: PIXEL_FONT_BOLD,
     fontSize: 22,
     fontWeight: '900',
-    color: '#FFD479',
   },
   tendingCostStrike: {
     fontFamily: PIXEL_FONT_BOLD,
     fontSize: 15,
     fontWeight: '700',
-    color: 'rgba(225, 215, 240, 0.5)',
     textDecorationLine: 'line-through',
   },
   tendingBonusHint: {
     fontFamily: PIXEL_FONT_BOLD,
     fontSize: 12.5,
     fontWeight: '600',
-    color: 'rgba(180, 210, 170, 0.9)',
     textAlign: 'center',
     marginTop: 6,
     lineHeight: 18,
   },
   tendingButton: {
     marginTop: 18,
-    backgroundColor: 'rgba(120, 80, 180, 0.65)',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(200, 170, 240, 0.45)',
-    paddingVertical: 16,
+    height: BTN_LG_DP + BTN_SHADOW_DP,
+    alignSelf: 'stretch',
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: BTN_SHADOW_DP,
   },
   tendingButtonDisabled: {
     opacity: 0.45,
   },
   tendingButtonText: {
     fontFamily: PIXEL_FONT_BOLD,
-    color: CandyColors.white,
     fontSize: 17,
     fontWeight: '900',
     letterSpacing: 0.5,
@@ -3075,7 +3107,6 @@ const styles = StyleSheet.create({
     fontFamily: PIXEL_FONT_BOLD,
     fontSize: 12.5,
     fontWeight: '600',
-    color: 'rgba(225, 215, 240, 0.6)',
     textAlign: 'center',
     marginTop: 12,
   },

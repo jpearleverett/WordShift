@@ -680,6 +680,10 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
         },
       ]}
       accessibilityRole="alert"
+      // Fence the occluded screen behind this full-screen cinematic so a screen
+      // reader can only reach the ceremony while it plays (iOS honors
+      // accessibilityViewIsModal; the announce above speaks the reveal).
+      accessibilityViewIsModal={true}
       accessibilityLabel={
         event.showTitle === false
           ? (event.scenes[0]?.text ?? 'Narrative transition')
