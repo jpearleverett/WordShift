@@ -83,6 +83,22 @@ jest.mock('react-native', () => ({
   Image: 'Image',
   TouchableOpacity: 'TouchableOpacity',
   ScrollView: 'ScrollView',
+  FlatList: 'FlatList',
+  Animated: {
+    View: 'Animated.View',
+    Text: 'Animated.Text',
+    Value: jest.fn().mockImplementation((val: number) => ({
+      _value: val,
+      setValue: jest.fn(),
+      interpolate: jest.fn().mockReturnValue('interpolated'),
+      stopAnimation: jest.fn(),
+    })),
+    timing: jest.fn().mockReturnValue({ start: (cb?: () => void) => cb && cb(), stop: jest.fn() }),
+    spring: jest.fn().mockReturnValue({ start: (cb?: () => void) => cb && cb(), stop: jest.fn() }),
+    parallel: jest.fn().mockReturnValue({ start: (cb?: () => void) => cb && cb(), stop: jest.fn() }),
+    sequence: jest.fn().mockReturnValue({ start: (cb?: () => void) => cb && cb(), stop: jest.fn() }),
+    loop: jest.fn().mockReturnValue({ start: (cb?: () => void) => cb && cb(), stop: jest.fn() }),
+  },
   StyleSheet: {
     create: (s: unknown) => s,
     absoluteFill: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
@@ -106,6 +122,11 @@ jest.mock('../components/ui/PanelCard', () => ({ PanelCard: 'PanelCard' }));
 jest.mock('../components/ui/PixelPlaque', () => ({ PixelPlaque: 'PixelPlaque' }));
 jest.mock('../components/AmberInline', () => ({ AmberInline: 'AmberInline' }));
 jest.mock('../components/monetization/BannerAd', () => ({ BannerAd: () => null }));
+// The banner cottage tray (F152) is gated on the same policy the real BannerAd
+// uses; keep it off by default here so the banner tray doesn't add noise to
+// unrelated assertions in this suite.
+jest.mock('../services/ads', () => ({ shouldShowBanner: () => false }));
+jest.mock('../services/entitlements', () => ({ isAdFreeSync: () => false }));
 
 jest.mock('../hooks/useScreenInsets', () => ({
   useScreenInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),

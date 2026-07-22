@@ -112,6 +112,44 @@ const HeaderShimmer: React.FC<{ phase: number }> = ({ phase }) => {
   );
 };
 
+/**
+ * Disclosure chevron: rotates open/closed over ~180ms via a native-driver
+ * interpolation instead of swapping two static rotated styles. Reduced
+ * motion / low-tier devices snap to the target rotation instantly.
+ */
+const AnimatedChevron: React.FC<{ expanded: boolean; color: string }> = ({ expanded, color }) => {
+  const anim = useRef(new Animated.Value(expanded ? 1 : 0)).current;
+
+  useEffect(() => {
+    const reduced = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
+    if (reduced) {
+      anim.setValue(expanded ? 1 : 0);
+      return;
+    }
+    const animation = Animated.timing(anim, {
+      toValue: expanded ? 1 : 0,
+      duration: 180,
+      easing: Easing.inOut(Easing.ease),
+      useNativeDriver: true,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [expanded, anim]);
+
+  const rotate = anim.interpolate({ inputRange: [0, 1], outputRange: ['45deg', '-135deg'] });
+  // Small vertical nudge (was a per-state marginTop) reproduced as a
+  // native-driver-safe translateY instead of an animated layout property.
+  const nudgeY = anim.interpolate({ inputRange: [0, 1], outputRange: [-3, 3] });
+
+  return (
+    <View style={styles.chevronBox}>
+      <Animated.View
+        style={[styles.chevron, { borderColor: color, transform: [{ rotate }, { translateY: nudgeY }] }]}
+      />
+    </View>
+  );
+};
+
 interface WhisperGalleryScreenProps {
   phase: number;
   onClose: () => void;
@@ -217,13 +255,7 @@ export const WhisperGalleryScreen: React.FC<WhisperGalleryScreenProps> = ({
                 {entriesTotal}
               </Text>
             </View>
-            <View style={styles.chevronBox}>
-              <View style={[
-                styles.chevron,
-                { borderColor: t.muted },
-                isExpanded ? styles.chevronUp : styles.chevronDown,
-              ]} />
-            </View>
+            <AnimatedChevron expanded={isExpanded} color={t.muted} />
           </PanelCard>
         </TouchableOpacity>
         {isNewest && <HeaderShimmer phase={phase} />}
@@ -244,23 +276,41 @@ export const WhisperGalleryScreen: React.FC<WhisperGalleryScreenProps> = ({
     return headerBody;
   };
 
-  const renderEntry = ({ item }: { item: WhisperEntry }) => (
-    <View style={[styles.entryCard, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}>
-      <View
-        style={styles.entryTypeRow}
-        accessible
-        accessibilityLabel={getPhaseEraName(item.phase)}
-      >
-        <Image source={getEntryTypeIcon(item.type)} style={styles.entryTypeIcon} />
-        <Text style={[styles.entryType, { color: t.muted }]}>
-          {getPhaseEraName(item.phase)}
+  // Entries fade in on expand (opacity 0->1 + translateY 8->0), staggered by
+  // SURFACE.staggerMs and capped at the first 8 (the rest appear alongside the
+  // 8th) — the game's most atmospheric collection finally has some motion.
+  // EntranceCascadeItem already lengthens the fade at deeper phases (~350ms by
+  // phase 3+, matching "entries should surface, not pop") and pins the
+  // settled state instantly under reduced motion / low-tier devices.
+  const ENTRY_CASCADE_CAP = 8;
+  const renderEntry = ({ item, index }: { item: WhisperEntry; index: number }) => {
+    const card = (
+      <View style={[styles.entryCard, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}>
+        <View
+          style={styles.entryTypeRow}
+          accessible
+          accessibilityLabel={getPhaseEraName(item.phase)}
+        >
+          <Image source={getEntryTypeIcon(item.type)} style={styles.entryTypeIcon} />
+          <Text style={[styles.entryType, { color: t.muted }]}>
+            {getPhaseEraName(item.phase)}
+          </Text>
+        </View>
+        <Text style={[styles.entryText, { color: t.body }]}>
+          &ldquo;{item.text}&rdquo;
         </Text>
       </View>
-      <Text style={[styles.entryText, { color: t.body }]}>
-        &ldquo;{item.text}&rdquo;
-      </Text>
-    </View>
-  );
+    );
+    return (
+      <EntranceCascadeItem
+        phase={phase}
+        delay={getCascadeDelayMs(index, { maxStaggered: ENTRY_CASCADE_CAP })}
+        riseFrom={8}
+      >
+        {card}
+      </EntranceCascadeItem>
+    );
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: t.screenBg }]}>
@@ -478,14 +528,6 @@ const styles = StyleSheet.create({
     height: 10,
     borderRightWidth: 2.5,
     borderBottomWidth: 2.5,
-  },
-  chevronDown: {
-    transform: [{ rotate: '45deg' }],
-    marginTop: -3,
-  },
-  chevronUp: {
-    transform: [{ rotate: '-135deg' }],
-    marginTop: 3,
   },
   entryCard: {
     marginTop: 8,

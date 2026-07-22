@@ -558,13 +558,22 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
     );
   };
 
-  // The New Cycle (NG+) reload, run AFTER the re-descent ceremony has played so
-  // the milestone lands as a moment rather than a hard restart. reloadAsync
-  // throws in Expo Go / dev; there we ask the player to restart (the cycle is
-  // already committed to storage). Clears the ceremony first either way so a
-  // failed reload doesn't leave the overlay stranded on screen.
+  // The New Cycle (NG+) session rebuild, run AFTER the re-descent ceremony has
+  // played so the milestone lands as a moment rather than a hard restart.
+  // performNewCycle() already committed the new cycle to storage before the
+  // ceremony played, so this reuses the SAME in-place session rebuild the
+  // cloud-restore conflict path already uses (App.tsx wires onCloudRestored to
+  // rebuildSessionFromStorage({ restartOnboarding: false })) — New Cycle keeps
+  // the running session exactly like that path, so no hard Updates.reloadAsync
+  // is needed to pick up the new cycle's state. Only when no host rebuild is
+  // wired (a bare render in isolation) does this fall back to the old
+  // reload-or-manual-restart path, so the cycle can never be stranded.
   const handleCycleCeremonyComplete = () => {
     setCycleCeremony(null);
+    if (onCloudRestored) {
+      onCloudRestored();
+      return;
+    }
     (async () => {
       try {
         await Updates.reloadAsync();
@@ -727,7 +736,41 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
     );
   };
 
-  if (!settings) return null;
+  // Skeleton: render the header + a few empty PanelCards from static props
+  // while the settings load lands, so the reveal never exposes a blank
+  // screen — content cascades in as it arrives instead of popping
+  // fully-formed once everything resolves.
+  if (!settings) {
+    const st = getSurfaceTheme(phase);
+    const skeletonChipBg = `rgba(255, 255, 255, ${SURFACE.highlightAlpha})`;
+    return (
+      <View style={[styles.container, { backgroundColor: st.screenBg }]}>
+        <View style={[styles.header, { paddingTop: screenInsets.top + 16 }]}>
+          <TouchableOpacity
+            style={[styles.backChip, { backgroundColor: skeletonChipBg, borderColor: st.headerChipBorder }]}
+            onPress={onClose}
+            accessibilityRole="button"
+            accessibilityLabel="Back to home"
+          >
+            <Text style={[styles.backChipText, { color: st.headerTitle }]}>{'<'} Back</Text>
+          </TouchableOpacity>
+          <Text style={[styles.title, { color: st.headerTitle }]}>Settings</Text>
+          <View style={styles.headerSpacer} />
+        </View>
+        <View style={styles.content}>
+          <PanelCard phase={phase} kind="panel" style={styles.section}>
+            <View style={styles.skeletonBlock} />
+          </PanelCard>
+          <PanelCard phase={phase} kind="panel" style={styles.section}>
+            <View style={styles.skeletonBlock} />
+          </PanelCard>
+          <PanelCard phase={phase} kind="panel" style={styles.section}>
+            <View style={styles.skeletonBlock} />
+          </PanelCard>
+        </View>
+      </View>
+    );
+  }
 
   const t = getSurfaceTheme(phase);
   // Framed light lift for the back chip — the kit's own highlight band alpha
@@ -1143,6 +1186,10 @@ const styles = StyleSheet.create({
     paddingTop: 18,
     paddingHorizontal: 20,
     paddingBottom: 18,
+  },
+  // Skeleton placeholder block (empty card body while the settings load lands).
+  skeletonBlock: {
+    height: 96,
   },
   // Cottage-styled toggle (replaces the stock platform Switch).
   switchTrack: {
