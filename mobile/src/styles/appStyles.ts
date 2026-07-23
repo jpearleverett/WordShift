@@ -721,32 +721,39 @@ export const appStyles = StyleSheet.create({
     textShadowRadius: 8,
   },
   // The post-victory interjection ("X has something to tell you") mirrors the
-  // AnimalWhisper tray it shares the bottom-center slot with: a centered,
-  // maxWidth ghost tray (not a full-width bar over the CTAs), layered above the
-  // victory modal on BOTH platforms (zIndex 501 + elevation 12 — Android paints
-  // by elevation, so without it the pill fought the modal's elevated cards), and
-  // a phase-tiered translucent background so it stops reading as an opaque
-  // purple box on the purple modal scrim.
+  // AnimalWhisper banner it shares the narrative slot with: TOP-anchored (the
+  // exact top is set inline from the safe-area inset), centered, layered above
+  // the victory modal on BOTH platforms (zIndex 501 + elevation 14 — Android
+  // paints by elevation), with a SOLID readable background + hairline border and
+  // a soft lift, so it never reads as a faint box lost over the modal's CTAs.
   interjectionContainer: {
     position: 'absolute',
-    bottom: 100,
+    top: 12,
     alignSelf: 'center',
-    maxWidth: '85%',
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 14,
+    maxWidth: '88%',
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    borderRadius: 18,
     alignItems: 'center',
+    borderWidth: 1,
     zIndex: 501,
-    elevation: 12,
+    elevation: 14,
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
   },
   interjectionContainerLight: {
-    backgroundColor: 'rgba(120, 80, 165, 0.42)',
+    backgroundColor: 'rgba(70, 34, 120, 0.95)',
+    borderColor: 'rgba(255, 255, 255, 0.22)',
   },
   interjectionContainerMuted: {
-    backgroundColor: 'rgba(80, 50, 110, 0.55)',
+    backgroundColor: 'rgba(52, 34, 78, 0.96)',
+    borderColor: 'rgba(210, 180, 230, 0.22)',
   },
   interjectionContainerDark: {
-    backgroundColor: 'rgba(24, 12, 32, 0.72)',
+    backgroundColor: 'rgba(18, 9, 14, 0.96)',
+    borderColor: 'rgba(200, 70, 80, 0.30)',
   },
   interjectionText: {
     fontSize: FONT_SIZE.body,

@@ -4837,6 +4837,7 @@ function MainApp() {
           whisperText={orchestration.whisper?.text || ''}
           phase={persistence.currentPhase}
           onComplete={orchestrationActions.dismissWhisper}
+          topInset={screenInsets.top}
         />
 
         {/* Animal Interjection — brief message pulling player to home screen.
@@ -4858,7 +4859,7 @@ function MainApp() {
               : persistence.currentPhase === 2
                 ? styles.interjectionContainerMuted
                 : styles.interjectionContainerLight,
-            { opacity: orchestration.interjectionOpacity, transform: [{ translateY: orchestration.interjectionTranslateY }] },
+            { top: screenInsets.top + 12, opacity: orchestration.interjectionOpacity, transform: [{ translateY: orchestration.interjectionTranslateY }] },
           ]} pointerEvents="none"
             // Transient atmospheric nudge: keep it out of the screen-reader
             // swipe order (the load-bearing narrative rides the whisper +

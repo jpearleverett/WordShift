@@ -2,7 +2,6 @@ import React, { useEffect, useRef } from 'react';
 import { Text, StyleSheet, Animated } from 'react-native';
 import { DialoguePhase } from '../../types/homeWorld';
 import { getSettingsSync } from '../../services/settings';
-import { CandyColors } from '../../theme/colors';
 import { BODY_FONT_ITALIC, PIXEL_FONT_BOLD } from '../../theme/fonts';
 
 interface AnimalWhisperProps {
@@ -11,6 +10,8 @@ interface AnimalWhisperProps {
   whisperText: string;
   phase: DialoguePhase;
   onComplete: () => void;
+  /** Safe-area top inset so the banner clears the status bar / notch. */
+  topInset?: number;
 }
 
 const FADE_IN_DURATION = 400;
@@ -28,6 +29,7 @@ export const AnimalWhisper: React.FC<AnimalWhisperProps> = ({
   whisperText,
   phase,
   onComplete,
+  topInset = 0,
 }) => {
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -84,12 +86,14 @@ export const AnimalWhisper: React.FC<AnimalWhisperProps> = ({
   if (!visible) return null;
 
   // The whisper is the per-win narrative beat and must layer ABOVE the victory
-  // modal scrim (zIndex 500). A small upward drift derived from the same
-  // opacity value reads the "ghost rising" (native driver; under reducedMotion
-  // the opacity jump carries the translate instantly, which is correct).
+  // modal scrim (zIndex 500). It banners in at the TOP of the screen (below the
+  // notch) — the bottom is where the modal's Next Level / Home / Share CTAs
+  // live, and a translucent pill there was both occluded and unreadable. A
+  // small downward settle derived from the same opacity value reads the banner
+  // dropping in (native driver; reduced motion carries the translate instantly).
   const driftY = opacityAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [8, 0],
+    outputRange: [-10, 0],
   });
 
   const containerStyle = phase >= 3
@@ -112,7 +116,7 @@ export const AnimalWhisper: React.FC<AnimalWhisperProps> = ({
 
   return (
     <Animated.View
-      style={[styles.container, containerStyle, { opacity: opacityAnim, transform: [{ translateY: driftY }] }]}
+      style={[styles.container, containerStyle, { top: topInset + 12, opacity: opacityAnim, transform: [{ translateY: driftY }] }]}
       pointerEvents="none"
       accessibilityRole="text"
       accessibilityLabel={`${animalName} whispers: ${whisperText}`}
@@ -126,27 +130,40 @@ export const AnimalWhisper: React.FC<AnimalWhisperProps> = ({
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: 100,
+    // Top-anchored (the exact top is set inline from the safe-area inset) so it
+    // banners in below the notch, clear of the modal's bottom CTAs.
+    top: 12,
     alignSelf: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 22,
     paddingVertical: 12,
-    borderRadius: 16,
-    maxWidth: '85%',
+    borderRadius: 18,
+    maxWidth: '88%',
     alignItems: 'center',
+    borderWidth: 1,
     // Layer above the victory modal overlay (zIndex 500) so the whisper is
     // not occluded at its only surfacing moment. elevation mirrors it for
     // Android's separate paint-order model.
     zIndex: 501,
-    elevation: 12,
+    elevation: 14,
+    // Soft lift off the bright modal so it reads as a floating banner.
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
   },
+  // Solid, readable banners (the old translucent pills vanished on the bright
+  // modal). Each carries a matching hairline border for definition.
   containerLight: {
-    backgroundColor: 'rgba(236, 72, 153, 0.15)',
+    backgroundColor: 'rgba(70, 34, 120, 0.95)',
+    borderColor: 'rgba(255, 255, 255, 0.22)',
   },
   containerMuted: {
-    backgroundColor: 'rgba(90, 56, 120, 0.25)',
+    backgroundColor: 'rgba(52, 34, 78, 0.96)',
+    borderColor: 'rgba(210, 180, 230, 0.22)',
   },
   containerDark: {
-    backgroundColor: 'rgba(20, 10, 15, 0.55)',
+    backgroundColor: 'rgba(18, 9, 14, 0.96)',
+    borderColor: 'rgba(200, 70, 80, 0.30)',
   },
   nameText: {
     fontFamily: PIXEL_FONT_BOLD,
@@ -156,14 +173,17 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginBottom: 4,
   },
+  // Light inks on the now-solid dark banners (were dark inks tuned for the old
+  // translucent light pill, which vanished on the bright modal). All clear
+  // >=4.5:1 on their banner background.
   nameLight: {
-    color: CandyColors.pink.dark,
+    color: '#FBD0E4',
   },
   nameMuted: {
-    color: 'rgba(180, 150, 200, 0.8)',
+    color: 'rgba(216, 190, 234, 0.96)',
   },
   nameDark: {
-    color: 'rgba(180, 60, 70, 0.9)',
+    color: 'rgba(232, 116, 126, 0.96)',
   },
   whisperText: {
     fontFamily: BODY_FONT_ITALIC,
@@ -173,12 +193,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   textLight: {
-    color: CandyColors.purple.dark,
+    color: 'rgba(255, 255, 255, 0.96)',
   },
   textMuted: {
-    color: 'rgba(160, 140, 180, 0.85)',
+    color: 'rgba(236, 226, 246, 0.96)',
   },
   textDark: {
-    color: 'rgba(200, 80, 90, 0.85)',
+    color: 'rgba(236, 202, 206, 0.94)',
   },
 });

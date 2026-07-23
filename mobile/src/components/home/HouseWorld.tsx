@@ -1699,7 +1699,14 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     if (panPhysicsEnabled) {
       const viewport = containerHeight ?? SCREEN_HEIGHT;
       const maxOverscroll = Math.min(viewport * 0.3, 120);
-      houseY = rubberBandPanY(rawY, panBounds.max, viewport, undefined, maxOverscroll);
+      // Rubber-band only the ROOF end (translateY > max): overscrolling there
+      // reveals more of the sky-top-colored background, which blends seamlessly.
+      // The PIT end is a HARD floor (translateY >= 0): the sky is bottom-anchored
+      // to the container bottom, so lifting the scene off it would expose the
+      // flat ground fill BELOW the artwork ("green beneath the background"). The
+      // ground is solid; only the sky gives. This restores the pre-diorama
+      // invariant "the art can never lift off the container bottom".
+      houseY = Math.max(0, rubberBandPanY(rawY, panBounds.max, viewport, undefined, maxOverscroll));
     } else {
       houseY = clampHomeScenePanY(rawY, panBounds.max);
     }
@@ -1738,10 +1745,13 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
 
     // One native spring drives the whole scene — the entire painterly plane
     // (sky, meadow, house, pit) settles together, so there is nothing for a
-    // second layer to desync from.
+    // second layer to desync from. At the PIT floor (settleTarget 0) we drop the
+    // seeded velocity so the underdamped spring can't overshoot below 0 and
+    // flash the ground fill beneath the art; the roof end keeps its momentum
+    // bounce (it overscrolls into seamless sky-colored background).
     const settle = Animated.spring(translateY, {
       toValue: settleTarget,
-      velocity: velocityY,
+      velocity: settleTarget <= 0 ? 0 : velocityY,
       friction: 9,
       tension: 45,
       useNativeDriver: true,
