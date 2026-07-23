@@ -114,13 +114,12 @@ describe('HouseWorld sky anchoring', () => {
     expect(HOUSE_WORLD).toMatch(/const PIT_DOCK_CLEARANCE = 80;/);
   });
 
-  test('the panned diorama is promoted to a cached GPU texture (scroll-flicker fix)', () => {
-    // The pan drives one translateY on the transformContainer. Without a cached
-    // layer, Fabric/Android re-composites all of its overlapping/negative-z
-    // children (full-bleed sky + ground + body scrims) every frame, which
-    // shimmers while scrolling. Rasterizing the subtree turns that per-frame
-    // recomposite into a per-frame texture blit. Both platform hints must ride
-    // the SAME Animated.View that carries the translateY transform.
+  test('the pannable diorama is NOT layer-rasterized (rasterization clips the overflow sky)', () => {
+    // The pan is OVERFLOW-BASED: the sky Image overflows the transformContainer's
+    // top and panning reveals it. Rasterizing that container (shouldRasterizeIOS /
+    // renderToHardwareTextureAndroid) clips it to its bounds, so a non-zero pan
+    // exposes the flat PHASE_BG_COLORS backdrop as a band above the scene. These
+    // props must never ride the transform container again.
     const containerStart = HOUSE_WORLD.indexOf(
       '<Animated.View',
       HOUSE_WORLD.indexOf('styles.gestureContainer')
@@ -129,8 +128,8 @@ describe('HouseWorld sky anchoring', () => {
       containerStart,
       HOUSE_WORLD.indexOf('transform: [', containerStart)
     );
-    expect(container).toContain('renderToHardwareTextureAndroid');
-    expect(container).toContain('shouldRasterizeIOS');
+    expect(container).not.toContain('renderToHardwareTextureAndroid');
+    expect(container).not.toContain('shouldRasterizeIOS');
   });
 
   test('the ambient particle system is a memoized child (never re-renders the pan scene)', () => {

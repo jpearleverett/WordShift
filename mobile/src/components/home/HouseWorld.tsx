@@ -1826,15 +1826,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
       >
         <Animated.View style={styles.gestureContainer} onLayout={onContainerLayout}>
           <Animated.View
-            // Promote the moving diorama to a single cached GPU texture. The pan
-            // drives one translateY on this container; without this, Fabric/Android
-            // re-composites all of its overlapping/negative-z children (the
-            // full-bleed sky + ground + house body scrims) every frame, which
-            // shimmers as you scroll. Caching the subtree turns the per-frame child
-            // recomposite into a per-frame texture blit. Paired with the extracted,
-            // memoized particle layer so a spawn tick never invalidates the cache.
-            renderToHardwareTextureAndroid
-            shouldRasterizeIOS
             style={[
               styles.transformContainer,
               {
