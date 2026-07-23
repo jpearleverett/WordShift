@@ -99,6 +99,16 @@ describe('HouseWorld sky anchoring', () => {
     expect(HOUSE_WORLD).not.toMatch(/SKY_BOTTOM_TUCK/);
   });
 
+  test('the pan hard-floors at the pit end (art never lifts off the container bottom)', () => {
+    // The sky is bottom-anchored, so overscrolling PAST the pit end (translateY
+    // < 0) would lift the scene and expose the flat ground fill beneath the art
+    // ("green beneath the background"). The drag clamps the bottom to a hard 0
+    // (Math.max(0, rubberBandPanY(...))) and the settle drops its seeded velocity
+    // at the floor, so only the roof end can overscroll (into seamless sky bg).
+    expect(HOUSE_WORLD).toMatch(/Math\.max\(0,\s*rubberBandPanY\(/);
+    expect(HOUSE_WORLD).toMatch(/velocity:\s*settleTarget\s*<=\s*0\s*\?\s*0\s*:\s*velocityY/);
+  });
+
   test('house-vs-art seat margins stay pinned', () => {
     expect(HOUSE_WORLD).toMatch(/const HOUSE_BOTTOM_MARGIN = 30;/);
     expect(HOUSE_WORLD).toMatch(/const PIT_DOCK_CLEARANCE = 80;/);
