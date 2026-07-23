@@ -796,9 +796,9 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.small,
     fontWeight: '700',
     textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    // No textShadow: a blurred text shadow re-rasterizes on every frame the
+    // house transforms (6 rooms = 6 blur passes per scroll frame). The
+    // namePlate's rgba(0,0,0,0.65) background already guarantees contrast.
   },
   // Nameplate ornament row: tiny warm lantern pips (procedural, not emoji).
   pipRow: {
@@ -1107,11 +1107,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 15,
     paddingHorizontal: 18,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 5,
+    // No elevation/shadow: the NineSlice cottage frame already owns the edge, and
+    // an Android elevation shadow re-projects every frame the house scrolls
+    // (per-frame composite cost that fed the scroll judder).
   },
   // Action line: "Invite [gem] 100" as an explicit row so the 16px gem and
   // the bold amount share one baseline with a fixed 4px gap.

@@ -1207,15 +1207,18 @@ const ShadowFigure: React.FC<{ phase: number }> = ({ phase }) => {
 // Soft volumetric cloud drawn from overlapping feathered rounded Views (no
 // hollow outline PNG, F13/F64). `tint` lets the cloud dim from bright white
 // toward a dusky grey as the phase darkens.
+// Three overlapping feathered lobes (a balanced left-base / right-base / center
+// peak). This was five lobes; each is a large, full-sky-width TRANSLUCENT View,
+// and three drifting clouds x five lobes = fifteen alpha-blended layers redrawn
+// every scroll frame was a leading fill-rate/overdraw contributor to home-scroll
+// judder. Three lobes keep the puffy silhouette at ~40% less cloud overdraw.
 const CloudShape: React.FC<{ width: number; tint: string }> = ({ width, tint }) => {
   const h = width / 2;
   return (
     <View style={{ width, height: h }}>
       <View style={{ position: 'absolute', left: width * 0.06, top: h * 0.42, width: width * 0.5, height: h * 0.58, borderRadius: h * 0.3, backgroundColor: tint, opacity: 0.85 }} />
-      <View style={{ position: 'absolute', left: width * 0.42, top: h * 0.42, width: width * 0.52, height: h * 0.58, borderRadius: h * 0.3, backgroundColor: tint, opacity: 0.8 }} />
+      <View style={{ position: 'absolute', left: width * 0.42, top: h * 0.42, width: width * 0.52, height: h * 0.58, borderRadius: h * 0.3, backgroundColor: tint, opacity: 0.82 }} />
       <View style={{ position: 'absolute', left: width * 0.24, top: h * 0.16, width: width * 0.36, height: h * 0.7, borderRadius: h * 0.35, backgroundColor: tint, opacity: 0.95 }} />
-      <View style={{ position: 'absolute', left: width * 0.5, top: h * 0.24, width: width * 0.3, height: h * 0.62, borderRadius: h * 0.31, backgroundColor: tint, opacity: 0.9 }} />
-      <View style={{ position: 'absolute', left: width * 0.12, top: h * 0.5, width: width * 0.8, height: h * 0.4, borderRadius: h * 0.2, backgroundColor: tint, opacity: 0.7 }} />
     </View>
   );
 };
