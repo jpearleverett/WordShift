@@ -15,6 +15,14 @@ interface PixelPlaqueProps {
   label: string;
   hostDark?: boolean;
   style?: ViewStyle;
+  /**
+   * Uniform downscale for space-constrained hosts (e.g. the small in-house room
+   * labels, where a full 42dp plaque would swamp a ~123dp room). Scales height,
+   * end caps, font, and padding TOGETHER by the same factor, so the 3-slice
+   * pixel sprite's aspect ratio (capDp / height) is preserved and the wood never
+   * distorts. Default 1 — every existing full-size plaque is unchanged.
+   */
+  scale?: number;
 }
 
 /**
@@ -23,12 +31,26 @@ interface PixelPlaqueProps {
  * scripts/tools/generateUiPanels.mjs). Overlap a parent panel's top edge
  * (negative marginTop) to read as a nameplate nailed onto the furniture.
  */
-export const PixelPlaque: React.FC<PixelPlaqueProps> = ({ phase, label, hostDark = false, style }) => {
+export const PixelPlaque: React.FC<PixelPlaqueProps> = ({ phase, label, hostDark = false, style, scale = 1 }) => {
   const skin = getPixelSkin(phase, hostDark);
+  const capDp = PLAQUE_CAP_DP * scale;
   return (
-    <View style={[styles.plaque, style]}>
-      <ThreeSliceStrip skin={skin.plaque} capDp={PLAQUE_CAP_DP} />
-      <Text numberOfLines={1} style={[styles.label, { color: skin.ink.plaque }]}>
+    <View
+      style={[
+        styles.plaque,
+        {
+          height: PLAQUE_H_DP * scale,
+          paddingHorizontal: capDp + 8 * scale,
+          minWidth: capDp * 2 + 40 * scale,
+        },
+        style,
+      ]}
+    >
+      <ThreeSliceStrip skin={skin.plaque} capDp={capDp} />
+      <Text
+        numberOfLines={1}
+        style={[styles.label, { color: skin.ink.plaque, fontSize: 14 * scale, textShadowOffset: { width: 0, height: 3 * scale } }]}
+      >
         {label.toUpperCase()}
       </Text>
     </View>
@@ -37,21 +59,16 @@ export const PixelPlaque: React.FC<PixelPlaqueProps> = ({ phase, label, hostDark
 
 const styles = StyleSheet.create({
   plaque: {
-    height: PLAQUE_H_DP,
     alignSelf: 'center',
     justifyContent: 'center',
-    paddingHorizontal: PLAQUE_CAP_DP + 8,
-    minWidth: PLAQUE_CAP_DP * 2 + 40,
   },
   label: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 14,
     fontWeight: '900',
     letterSpacing: SURFACE.sectionLetterSpacing,
     textAlign: 'center',
     // Hard 1-art-px shadow, zero blur — the classic pixel label treatment.
     textShadowColor: 'rgba(20, 10, 6, 0.5)',
-    textShadowOffset: { width: 0, height: 3 },
     textShadowRadius: 0,
   },
 });

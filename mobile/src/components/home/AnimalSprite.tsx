@@ -1453,10 +1453,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 2,
     borderColor: CandyColors.white,
-    // No elevation/shadow: Android re-projects a real-time shadow every frame an
-    // ancestor transforms, and this pulsing badge appears many times on screen,
-    // so its per-frame shadow reprojection was a top contributor to home-scroll
-    // judder. The 2px white border + red fill already separate it from the room.
+    shadowColor: CandyColors.red.dark,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
+    shadowRadius: 2,
+    elevation: 3,
   },
   notificationText: {
     fontFamily: PIXEL_FONT_BOLD,
