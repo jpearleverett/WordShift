@@ -198,7 +198,7 @@ function saveCheckpoint(cp: GatedCheckpoint): void {
 // Imports — after mocks
 // ============================================================================
 
-import { generateLocalPuzzle, isDreadWord, getWordPhaseTier, getSemanticCluster } from '../src/services/localGenerator';
+import { generateLocalPuzzle, isDreadWord, getWordPhaseTier, getSemanticCluster, getFeaturedRank } from '../src/services/localGenerator';
 import { analyzeStandardBranching } from '../src/services/puzzleBranching';
 import { COMMON_WORDS } from '../src/constants/wordLists';
 import { PreGeneratedPuzzle } from '../src/data/puzzleBankTypes';
@@ -222,16 +222,68 @@ const TOTAL_TARGET = Object.values(PHASE_TARGETS).reduce((a, b) => a + b, 0);
 // stops a bank that can never fill from burning wall-clock forever.
 const ATTEMPTS_PER_TARGET_UNIT = 120;
 
-// Acceptance gate: multiple real completing routes on every board.
-const MIN_COMPLETE_PATHS = 2;
-// Phase 0-2 boards: the standard multi-path bar. Phase 3-4 boards: looser —
-// the dread vocabulary is less connected, and the marquee dread supply must
-// stay alive.
-const MAX_SINGLE_CHOICE_EARLY = 0.65;
-const MAX_SINGLE_CHOICE_LATE = 0.75;
+// ============================================================================
+// Per-difficulty acceptance gate (the depth-lever regeneration).
+// The four difficulties are genuinely differentiated on THREE axes now that the
+// 2x dictionary makes it feasible: branching pressure (singleChoice + minPaths),
+// trap density (bank-level floor on the hard banks), and the playable-vocabulary
+// FEATURED band (displayed chain + answer words within a per-difficulty
+// frequency-rank ceiling; dread words exempt so the descent still lands).
+// Phase 0-2 boards use the dense common vocabulary, so they carry the demanding
+// bars; phase 3-4 dread vocabulary is less connected, so those bars relax.
+// ============================================================================
 
+interface GateParams {
+  minPathsEarly: number;   // phase 0-2 completePathCount floor
+  minPathsLate: number;    // phase 3-4 completePathCount floor
+  singleChoiceEarly: number;
+  singleChoiceLate: number;
+  featuredCeiling: number; // max getFeaturedRank for a non-dread FEATURED word
+  deadEndCeiling: number;  // max deadEndStateFraction (wander-into-nothing bound)
+  trapFloor: number;       // bank-level min fraction of trap-bearing accepts
+}
+
+// singleChoiceFraction is the primary "choice-rich" lever (fraction of decision
+// states that are forced); completePathCount >= 2 is the floor beneath it. The
+// per-difficulty single-choice ceilings tighten toward the bright phases where
+// the dense common vocabulary supports pervasive choice; phase 3-4 dread
+// vocabulary is less connected so those relax. featuredCeiling bounds a board's
+// RAREST displayed word to exclude only the obscure tail (measured per-board
+// max displayed rank is p50 ~0.77-0.87), a light backstop against obscure
+// answers on top of the scorer's own de-rarify preference. The heavy difficulty
+// differentiation is the single-choice ceiling + the trap floor.
+const GATE_BY_BANK: Record<BankName, GateParams> = {
+  EASY:        { minPathsEarly: 2, minPathsLate: 2, singleChoiceEarly: 0.50, singleChoiceLate: 0.62, featuredCeiling: 0.90, deadEndCeiling: 0.25, trapFloor: 0 },
+  MEDIUM:      { minPathsEarly: 2, minPathsLate: 2, singleChoiceEarly: 0.50, singleChoiceLate: 0.65, featuredCeiling: 0.92, deadEndCeiling: 0.25, trapFloor: 0 },
+  MEDIUM_PLUS: { minPathsEarly: 2, minPathsLate: 2, singleChoiceEarly: 0.55, singleChoiceLate: 0.68, featuredCeiling: 0.94, deadEndCeiling: 0.25, trapFloor: 0.30 },
+  HARD:        { minPathsEarly: 2, minPathsLate: 2, singleChoiceEarly: 0.58, singleChoiceLate: 0.72, featuredCeiling: 0.96, deadEndCeiling: 0.25, trapFloor: 0.35 },
+};
+const GATE = GATE_BY_BANK[BANK_NAME];
+
+function minPathsForPhase(phase: number): number {
+  return phase >= 3 ? GATE.minPathsLate : GATE.minPathsEarly;
+}
 function maxSingleChoiceForPhase(phase: number): number {
-  return phase >= 3 ? MAX_SINGLE_CHOICE_LATE : MAX_SINGLE_CHOICE_EARLY;
+  return phase >= 3 ? GATE.singleChoiceLate : GATE.singleChoiceEarly;
+}
+
+// Playable-vocabulary policy. The DISPLAYED chain words (what the player reads
+// on the board) must sit within the difficulty's frequency-rank ceiling so the
+// board is recognizable and difficulties differ by vocabulary. The FORMED /
+// transient answer words are discovered mid-solve and are inherently rarer
+// (the +1-length word space is larger), so they only get a loose backstop
+// against the genuinely-obscure tail. Dread words are exempt everywhere so the
+// descent vocabulary still lands. The generator still TRAVERSES the full
+// dictionary for connectivity; this only bounds what is FEATURED.
+const FEATURED_TRANSIENT_CEILING = 0.98;
+function featuredBandOk(displayed: string[], allWords: string[]): boolean {
+  for (const w of displayed) {
+    if (getFeaturedRank(w) > GATE.featuredCeiling && !isDreadWord(w)) return false;
+  }
+  for (const w of allWords) {
+    if (getFeaturedRank(w) > FEATURED_TRANSIENT_CEILING && !isDreadWord(w)) return false;
+  }
+  return true;
 }
 
 const SIDECAR_PATH = path.join(
@@ -291,8 +343,9 @@ function checkBranchingGate(words: string[], phase: number): GateResult {
     word => COMMON_WORDS.has(word.toUpperCase()),
   );
   return {
-    pass: metrics.completePathCount >= MIN_COMPLETE_PATHS &&
-      metrics.singleChoiceFraction <= maxSingleChoiceForPhase(phase),
+    pass: metrics.completePathCount >= minPathsForPhase(phase) &&
+      metrics.singleChoiceFraction <= maxSingleChoiceForPhase(phase) &&
+      metrics.deadEndStateFraction <= GATE.deadEndCeiling,
     hasTrap: metrics.trapStepFraction > 0,
   };
 }
@@ -304,9 +357,12 @@ function writeSidecar(puzzles: PreGeneratedPuzzle[], trapAccepts: number): void 
   const fileContent = `// AUTO-GENERATED by scripts/generateGatedBank.test.ts (gated full regeneration)
 // Sidecar replacement for src/data/${CONFIG.liveFileName} — swapped in by scripts/swapGatedBanks.mjs.
 // Bank: ${CONFIG.bank} (${CONFIG.difficulty}), bank-wide word-usage cap ${CONFIG.wordCap}.
-// Acceptance gate (every puzzle): non-duplicate chain; cap-safe; analyzeStandardBranching
-// completePathCount >= ${MIN_COMPLETE_PATHS}; singleChoiceFraction <= ${MAX_SINGLE_CHOICE_EARLY} (phase 0-2 boards) / <= ${MAX_SINGLE_CHOICE_LATE} (phase 3-4 boards).
-// Trap-bearing accepts (trapStepFraction > 0, soft preference, never gated): ${trapAccepts}/${puzzles.length}.
+// Per-difficulty acceptance gate (every puzzle): non-duplicate chain; cap-safe;
+// FEATURED words within rank ceiling ${GATE.featuredCeiling} (dread exempt);
+// completePathCount >= ${GATE.minPathsEarly}/${GATE.minPathsLate} (phase 0-2/3-4);
+// singleChoiceFraction <= ${GATE.singleChoiceEarly}/${GATE.singleChoiceLate} (phase 0-2/3-4);
+// deadEndStateFraction <= ${GATE.deadEndCeiling}.
+// Trap-bearing accepts (trapStepFraction > 0; bank-level floor ${GATE.trapFloor}): ${trapAccepts}/${puzzles.length}.
 // Do not edit manually. Re-run the generator to update.
 // Generated: ${new Date().toISOString()}
 // Total puzzles: ${puzzles.length}
@@ -353,6 +409,9 @@ describe(`Gated Full-Regeneration Generator — ${BANK_NAME} Standard`, () => {
     let rejectedDup = 0;
     let rejectedCap = 0;
     let rejectedBranching = 0;
+    let rejectedFeatured = 0;
+    let rejectedTrapFloor = 0;
+    let trapFloorStreak = 0;
     let genFailures = 0;
 
     const logProgress = (): void => {
@@ -363,7 +422,7 @@ describe(`Gated Full-Regeneration Generator — ${BANK_NAME} Standard`, () => {
       process.stdout.write(
         `[${BANK_NAME}] ${allPuzzles.length}/${TOTAL_TARGET} accepted | ` +
         `run ${runAccepts}/${runAttempts} attempts (${pct}%) | phases ${fill} | ` +
-        `rej dup ${rejectedDup} cap ${rejectedCap} branching ${rejectedBranching} genFail ${genFailures} | ` +
+        `rej dup ${rejectedDup} cap ${rejectedCap} feat ${rejectedFeatured} branch ${rejectedBranching} trapfloor ${rejectedTrapFloor} genFail ${genFailures} | ` +
         `traps ${checkpoint.trapAccepts}/${allPuzzles.length}\n`,
       );
     };
@@ -415,12 +474,33 @@ describe(`Gated Full-Regeneration Generator — ${BANK_NAME} Standard`, () => {
             continue;
           }
 
+          // Playable-vocabulary policy: displayed words recognizable per
+          // difficulty, formed answers at a loose backstop (dread exempt).
+          if (!featuredBandOk(puzzle.words, puzzleWords)) {
+            rejectedFeatured++;
+            continue;
+          }
+
           // The point of this campaign: only choice-rich boards ship.
           const gate = checkBranchingGate(puzzle.words, phase);
           if (!gate.pass) {
             rejectedBranching++;
             continue;
           }
+
+          // Bank-level trap floor (MP/HARD): while the bank is below its trap
+          // target, drop non-trap accepts so trap-bearing (planning-depth)
+          // boards accumulate. A streak guard forces an accept if traps go
+          // momentarily scarce, so generation can never stall on this.
+          if (GATE.trapFloor > 0 && !gate.hasTrap) {
+            const trapFrac = allPuzzles.length > 0 ? checkpoint.trapAccepts / allPuzzles.length : 0;
+            if (trapFrac < GATE.trapFloor && trapFloorStreak < 25) {
+              trapFloorStreak++;
+              rejectedTrapFloor++;
+              continue;
+            }
+          }
+          trapFloorStreak = 0;
 
           const id = puzzleId(puzzle.words);
           const dreadTier = computeDreadTier(puzzleWords);
@@ -432,7 +512,7 @@ describe(`Gated Full-Regeneration Generator — ${BANK_NAME} Standard`, () => {
             words: puzzle.words,
             solution: puzzle.solution || [],
             wordLength: puzzle.wordLength || CONFIG.defaultWordLength,
-            qualityScore: 50,
+            qualityScore: Math.round(puzzle.qualityScore ?? 50),
             dreadTier,
             dreadWordCount,
             allWords: puzzleWords,
@@ -474,7 +554,7 @@ describe(`Gated Full-Regeneration Generator — ${BANK_NAME} Standard`, () => {
       `\nRUN SUMMARY ${BANK_NAME}: accepted ${runAccepts}/${runAttempts} attempts this run (${runPct}%), ` +
       `trap-bearing ${runTrapAccepts}; cumulative ${allPuzzles.length}/${TOTAL_TARGET} ` +
       `(${totalAttemptsSoFar} attempts, traps ${checkpoint.trapAccepts}/${allPuzzles.length}); ` +
-      `rej dup ${rejectedDup} cap ${rejectedCap} branching ${rejectedBranching} genFail ${genFailures}\n`,
+      `rej dup ${rejectedDup} cap ${rejectedCap} feat ${rejectedFeatured} branch ${rejectedBranching} trapfloor ${rejectedTrapFloor} genFail ${genFailures}\n`,
     );
     logProgress();
 

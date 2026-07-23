@@ -65,6 +65,23 @@ for (const key of Object.keys(WORD_ARRAYS)) {
   WORD_INDEX[len] = map;
 }
 
+/**
+ * Frequency rank of a word within its length bucket: 0 = most common, ~1 =
+ * rarest. The dictionary is TRUE-frequency-sorted, so this is an accurate
+ * familiarity proxy. Powers the gated generator's 3-tier playable-vocabulary
+ * policy: FEATURED words (the displayed chain + the answer words the player
+ * must recognize) are kept within a per-difficulty rank ceiling, while the
+ * generator still TRAVERSES the full dictionary graph for connectivity. Dread
+ * words are exempted by the caller so the descent vocabulary still lands.
+ * Returns 1 (treated as rarest) for a word absent from its length bucket.
+ */
+export function getFeaturedRank(word: string): number {
+  const arr = WORD_ARRAYS[word.length];
+  if (!arr || arr.length === 0) return 1;
+  const idx = WORD_INDEX[word.length]?.get(word.toUpperCase());
+  return idx === undefined ? 1 : idx / arr.length;
+}
+
 // ============================================================================
 // PRE-COMPUTED ADJACENCY INDEX — instant candidate lookup for puzzle generation
 // ============================================================================
@@ -1513,7 +1530,11 @@ export const generateLocalPuzzle = async (
     words,
     hint: `Start by shifting '${solution[0].letterToMove}'`,
     solution,
-    wordLength
+    wordLength,
+    // Real chain score of the delivered board (0-100). Consumers that persist
+    // banks store this instead of a flat 50 so within-bank selection can rank
+    // by genuine quality (see puzzleBank scorePuzzleForContext + A7).
+    qualityScore: bestPuzzle.score,
   };
 };
 

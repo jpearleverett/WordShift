@@ -51,6 +51,10 @@ export interface PuzzleConfig {
   wordLength?: number;
   /** When true, this puzzle uses double-shift mechanics (2 letters per step). */
   isDoubleShift?: boolean;
+  /** Real chain quality score (0-100) of the generated board, when available.
+   * Persisted into pre-generated banks so selection can rank by genuine
+   * quality; runtime play ignores it. */
+  qualityScore?: number;
 }
 
 /**
