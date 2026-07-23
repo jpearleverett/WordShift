@@ -1621,12 +1621,13 @@ const styles = StyleSheet.create({
   slotPreviewContainer: {
     position: 'absolute',
     bottom: -18,
-    // Span the slot (left:0/right:0) and center the chip on it, so the preview
-    // sits centered UNDER its slot instead of anchored to the slot's left edge.
-    // The chip is wider than the narrow slot and overflows symmetrically, which
-    // is what centers the full word on the slot.
-    left: 0,
-    right: 0,
+    // Symmetric negative insets center a WIDE box on the narrow slot: the box
+    // spans slotWidth + 88 (~106dp), centered, so the chip inside it sits
+    // centered UNDER the slot AND has room to show the full candidate word.
+    // (left:0/right:0 made the box the slot's ~18dp width, which truncated the
+    // word to a bare "..."; a fixed left-only width anchored it off to one side.)
+    left: -44,
+    right: -44,
     alignItems: 'center',
     justifyContent: 'center',
   },
