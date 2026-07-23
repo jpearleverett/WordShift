@@ -831,8 +831,17 @@ export function scorePuzzleChain(chain: PathNode[], recencyMap?: Map<string, num
     const node = chain[i];
     if (node.letterToGive && node.moveFromIndex !== undefined) {
       const nextNode = chain[i + 1];
+      // moveFromIndex indexes into the row's CURRENT state (tempState, after it
+      // received the previous move's letter), NOT the original displayed word.
+      // Passing node.word here made sourceWord[charIndex] undefined on every
+      // move past the first, silently disabling ALL removal-side anti-boring
+      // penalties (and misclassifying an end-of-word S-pull as a rewarded
+      // middle move). Use the real source state so the scorer works on every
+      // move. Target side stays nextNode.word: moveToIndex is the insertion
+      // position into the PRE-insertion target (matches SolutionStep).
+      const sourceState = node.tempState ?? node.word;
       const moveScore = scoreMoveQuality(
-        node.word,
+        sourceState,
         node.moveFromIndex,
         nextNode.word,
         node.moveToIndex || 0,
@@ -847,7 +856,7 @@ export function scorePuzzleChain(chain: PathNode[], recencyMap?: Map<string, num
       moveCount++;
 
       const normalizedPos = node.moveFromIndex === 0 ? 0 :
-                           node.moveFromIndex === node.word.length - 1 ? 2 : 1;
+                           node.moveFromIndex === sourceState.length - 1 ? 2 : 1;
       movePositions.push(normalizedPos);
     }
   }

@@ -103,6 +103,17 @@ export function analyzeStandardBranching(
     let completePaths = 0;
     let legalChoices = 0;
     let completingChoices = 0;
+    // Dedupe by DISTINCT outcome, not by (removeAt, insertAt) index pair: two
+    // mechanically-different moves that leave the identical board (e.g.
+    // removing either 'O' from MOON, or inserting a letter beside its twin)
+    // are the SAME choice to the player and must count once. Without this, a
+    // repeated letter fakes multi-route (completePathCount 1->2,
+    // singleChoiceFraction 1->0.5) with zero real decision. Signature captures
+    // char + lock flag of both resulting rows, so genuinely different lock
+    // positions (which constrain the future differently) still count apart.
+    const seenOutcomes = new Set<string>();
+    const cellSig = (cells: Cell[]): string =>
+      cells.map(cell => `${cell.char}${cell.locked ? '1' : '0'}`).join('');
 
     for (let removeAt = 0; removeAt < source.length; removeAt++) {
       if (source[removeAt].locked) continue;
@@ -116,6 +127,10 @@ export function analyzeStandardBranching(
           ...target.slice(insertAt).map(cell => ({ ...cell, locked: false })),
         ];
         if (!isValidWord(rowWord(nextTarget))) continue;
+
+        const outcomeSig = `${cellSig(remaining)}>${cellSig(nextTarget)}`;
+        if (seenOutcomes.has(outcomeSig)) continue;
+        seenOutcomes.add(outcomeSig);
 
         legalChoices++;
 

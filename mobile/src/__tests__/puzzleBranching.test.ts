@@ -45,6 +45,21 @@ describe('analyzeStandardBranching', () => {
     expect(metrics.structuralBonus).toBeGreaterThan(0);
   });
 
+  it('does NOT count a duplicate-letter removal as a second route (D3 regression)', () => {
+    // MOON has two O's; removing either yields the identical remaining word
+    // MON, and inserting the O into CAT yields the identical COAT. That is ONE
+    // choice to the player, not two. Before the dedup fix this scored
+    // completePathCount 2 / singleChoiceFraction 0 (fake multi-route).
+    const metrics = analyzeStandardBranching(
+      ['MOON', 'CAT'],
+      validator(['MON', 'COAT']),
+    );
+
+    expect(metrics.completePathCount).toBe(1);
+    expect(metrics.singleChoiceFraction).toBe(1);
+    expect(metrics.structuralBonus).toBe(0);
+  });
+
   it('measures single-choice decisions across distinct reachable states', () => {
     const metrics = analyzeStandardBranching(
       ['ABC', 'DEF', 'GHI'],
