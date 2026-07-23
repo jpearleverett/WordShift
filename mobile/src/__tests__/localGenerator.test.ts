@@ -64,6 +64,25 @@ describe('scorePuzzleChain anti-boring on late moves (D1 regression)', () => {
     // fire only when the source state is read correctly.
     expect(scoreMiddle - scoreBoring).toBeGreaterThan(15);
   });
+
+  test('an S-shuffle chain (S moved twice) scores far below a varied chain (A6)', () => {
+    // Identical displayed words BAT/CAR/DOG, so word/semantic components match.
+    const sShuffle = [
+      { word: 'BAT', tempState: 'BATS', letterToGive: 'S', moveFromIndex: 3, moveToIndex: 2 },
+      { word: 'CAR', tempState: 'CARS', letterToGive: 'S', moveFromIndex: 3, moveToIndex: 2 },
+      { word: 'DOG', tempState: 'DOGS' },
+    ] as unknown as Parameters<typeof scorePuzzleChain>[0];
+    const varied = [
+      { word: 'BAT', tempState: 'BATS', letterToGive: 'S', moveFromIndex: 3, moveToIndex: 2 },
+      { word: 'CAR', tempState: 'CARD', letterToGive: 'D', moveFromIndex: 3, moveToIndex: 2 },
+      { word: 'DOG', tempState: 'DOGS' },
+    ] as unknown as Parameters<typeof scorePuzzleChain>[0];
+    // The moved-letter-repeat, S-cap and plural-answer penalties drive the
+    // S-shuffle chain to the floor while the varied chain survives.
+    expect(scorePuzzleChain(sShuffle)).toBeLessThan(scorePuzzleChain(varied));
+    expect(scorePuzzleChain(sShuffle)).toBeLessThanOrEqual(5);
+    expect(scorePuzzleChain(varied) - scorePuzzleChain(sShuffle)).toBeGreaterThanOrEqual(8);
+  });
 });
 
 describe('getIncantationName', () => {

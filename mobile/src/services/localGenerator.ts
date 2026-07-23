@@ -150,6 +150,7 @@ const PENALTY = {
   INSERT_SUFFIX_AT_END: 35,   // Adding boring suffix letter at end
   INSERT_G_FOR_ING: 50,       // Adding G to form -ING
   INSERT_Y_FOR_LY: 45,        // Adding Y to form -LY
+  GEMINATION: 30,             // Inserting a letter beside its own twin (POSE->POSSE): cheap, unvaried
 } as const;
 
 // Letters that are BORING when moved to/from word edges
@@ -242,6 +243,13 @@ function getBoringTransformPenalty(
   if (char === 'Y' && insertionIndex === targetLen &&
       targetLen >= 1 && targetWord[targetLen - 1] === 'L') {
     penalty += PENALTY.INSERT_Y_FOR_LY;
+  }
+
+  // Penalize gemination: inserting a letter directly beside its own twin
+  // (POSE->POSSE, CORAL->CORRAL, PURE->PUREE). Visually you just doubled a
+  // letter — cheap and unvaried, previously unpenalized.
+  if (targetWord[insertionIndex - 1] === char || targetWord[insertionIndex] === char) {
+    penalty += PENALTY.GEMINATION;
   }
 
   return penalty;
@@ -813,6 +821,8 @@ export function scorePuzzleChain(chain: PathNode[], recencyMap?: Map<string, num
 
   let totalScore = 0;
   const movePositions: number[] = [];
+  const movedLetters: string[] = [];
+  const formedWords: string[] = [];
 
   // Score individual words (25% weight) - includes freshness penalty
   const wordScores = chain.map(node => {
@@ -854,6 +864,8 @@ export function scorePuzzleChain(chain: PathNode[], recencyMap?: Map<string, num
 
       moveScoreSum += moveScore;
       moveCount++;
+      movedLetters.push(node.letterToGive);
+      formedWords.push(nextNode.tempState ?? nextNode.word);
 
       const normalizedPos = node.moveFromIndex === 0 ? 0 :
                            node.moveFromIndex === sourceState.length - 1 ? 2 : 1;
@@ -868,6 +880,30 @@ export function scorePuzzleChain(chain: PathNode[], recencyMap?: Map<string, num
   // Heavy penalty if any move is boring
   if (hasBoringMove) {
     totalScore -= 20;
+  }
+
+  // === Chain-level variety (skipped for reverse, which has its own scoring) ===
+  // Attacks the S-shuffle monotony the current banks are dominated by: same
+  // letter moved twice, S doing most of the moving, plural-shaped answers.
+  if (!relaxBoring && moveCount > 0) {
+    // Repeating the same moved letter (S then S) is monotony, not variety —
+    // position variety alone never caught it.
+    const uniqueMoved = new Set(movedLetters).size;
+    totalScore -= 14 * (moveCount - uniqueMoved);
+
+    // S is the runaway most-moved letter (~22% of HARD moves). A single S-move
+    // is fine; TWO or more on one board is the S-shuffle. Penalize per extra
+    // S-move so it scales with the abuse and never punishes one S.
+    const sMoves = movedLetters.filter(c => c === 'S').length;
+    totalScore -= 20 * Math.max(0, sMoves - 1);
+
+    // Plural-shaped answers: formed words ending in S ran 30-45% of moves in the
+    // banks; push it down toward a third.
+    const pluralFormed = formedWords.filter(w => w.endsWith('S')).length;
+    const pluralShare = pluralFormed / moveCount;
+    if (pluralShare > 0.34) {
+      totalScore -= Math.round(15 * (pluralShare - 0.34) / 0.66);
+    }
   }
 
   // Score semantic distance start→end (20% weight)
