@@ -28,11 +28,19 @@ if (!Number.isFinite(THRESHOLD) || THRESHOLD < 0) {
   process.exit(1);
 }
 
+// `sidecar` is the dot-prefixed sidecar basename each generator writes; standard
+// banks use .gatedRegen_<key>_output.ts, reverse banks .gatedRegenReverse_<key>_output.ts.
+// A bank whose sidecar does not exist is simply skipped, so this one script
+// swaps whichever banks have a finished sidecar (standard and/or reverse).
 const BANKS = [
-  { bank: 'EASY', key: 'easy', liveFile: 'puzzleBankEasy.ts', exportName: 'PUZZLE_BANK_EASY' },
-  { bank: 'MEDIUM', key: 'medium', liveFile: 'puzzleBankMedium.ts', exportName: 'PUZZLE_BANK_MEDIUM' },
-  { bank: 'MEDIUM_PLUS', key: 'medium_plus', liveFile: 'puzzleBankMediumPlus.ts', exportName: 'PUZZLE_BANK_MEDIUM_PLUS' },
-  { bank: 'HARD', key: 'hard', liveFile: 'puzzleBankHard.ts', exportName: 'PUZZLE_BANK_HARD' },
+  { bank: 'EASY', key: 'easy', liveFile: 'puzzleBankEasy.ts', exportName: 'PUZZLE_BANK_EASY', sidecar: '.gatedRegen_easy_output.ts' },
+  { bank: 'MEDIUM', key: 'medium', liveFile: 'puzzleBankMedium.ts', exportName: 'PUZZLE_BANK_MEDIUM', sidecar: '.gatedRegen_medium_output.ts' },
+  { bank: 'MEDIUM_PLUS', key: 'medium_plus', liveFile: 'puzzleBankMediumPlus.ts', exportName: 'PUZZLE_BANK_MEDIUM_PLUS', sidecar: '.gatedRegen_medium_plus_output.ts' },
+  { bank: 'HARD', key: 'hard', liveFile: 'puzzleBankHard.ts', exportName: 'PUZZLE_BANK_HARD', sidecar: '.gatedRegen_hard_output.ts' },
+  { bank: 'REVERSE_EASY', key: 'reverse_easy', liveFile: 'puzzleBankReverseEasy.ts', exportName: 'PUZZLE_BANK_REVERSE_EASY', sidecar: '.gatedRegenReverse_reverse_easy_output.ts' },
+  { bank: 'REVERSE_MEDIUM', key: 'reverse_medium', liveFile: 'puzzleBankReverseMedium.ts', exportName: 'PUZZLE_BANK_REVERSE_MEDIUM', sidecar: '.gatedRegenReverse_reverse_medium_output.ts' },
+  { bank: 'REVERSE_MEDIUM_PLUS', key: 'reverse_medium_plus', liveFile: 'puzzleBankReverseMediumPlus.ts', exportName: 'PUZZLE_BANK_REVERSE_MEDIUM_PLUS', sidecar: '.gatedRegenReverse_reverse_medium_plus_output.ts' },
+  { bank: 'REVERSE_HARD', key: 'reverse_hard', liveFile: 'puzzleBankReverseHard.ts', exportName: 'PUZZLE_BANK_REVERSE_HARD', sidecar: '.gatedRegenReverse_reverse_hard_output.ts' },
 ];
 
 /** Count serialized puzzles by their id fields (robust to header drift). */
@@ -45,8 +53,8 @@ let refused = 0;
 let skipped = 0;
 let failed = 0;
 
-for (const { bank, key, liveFile, exportName } of BANKS) {
-  const sidecarPath = path.join(DATA_DIR, `.gatedRegen_${key}_output.ts`);
+for (const { bank, key, liveFile, exportName, sidecar } of BANKS) {
+  const sidecarPath = path.join(DATA_DIR, sidecar);
   const livePath = path.join(DATA_DIR, liveFile);
   const backupPath = path.join(DATA_DIR, `.pre_gated_${key}.ts.bak`);
 
