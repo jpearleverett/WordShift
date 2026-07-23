@@ -150,7 +150,7 @@ mobile/
 │   │   ├── links.ts             # Live legal/store URLs (PLAY_STORE_URL, WEB_LANDING_URL)
 │   │   ├── tileLayout.ts        # Shared arc-layout geometry (single source of truth for Row/LetterTile/slotEstimation)
 │   │   └── timing.ts            # Animation/interaction timing constants
-│   ├── dictionary.ts            # 11,404-word dictionary (3-7 letters, profanity-filtered)
+│   ├── dictionary.ts            # 22,868-word dictionary (3-7 letters, frequency-ordered, profanity-filtered). Expanded from 11,404 via a common-word pass: inflections of existing words (plurals/tenses) + common 5-7 letter lemmas + a hand-picked 3-4 letter set, all through a 4-layer family-safe filter (blocklist + stem scan + an independent name/place/profanity-gazetteer audit + a profanity-list cross-check). New words are APPENDED in frequency order, so existing generation/commonness ranks are unchanged; the win is validation coverage (far fewer "but that's a word!" rejections). Bank REGENERATION to exploit the density is a documented follow-up.
 │   ├── data/                    # Pre-generated puzzle banks (12 banks, ~4,500 puzzles total, diversity-capped; standard banks fully regenerated multi-route in the Depth Levers Pass; lazy-loaded)
 │   │   ├── puzzleBankTypes.ts   # PreGeneratedPuzzle interface
 │   │   ├── puzzleBankEasy.ts .. puzzleBankHard.ts           # Standard banks

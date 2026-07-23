@@ -38,6 +38,10 @@ export const BLOCKED_WORDS = [
   'STUPID', 'THUG', 'THUGS', 'URINE', 'UTERUS', 'VIRGIN', 'VIRGINS',
   'VOMIT', 'VOMITED', 'VOMITING', 'VOMITS',
   'BRAD', 'TROY',
+  // Added during the dictionary-expansion vetting (caught by the profanity-list
+  // cross-check / stem scan so they can never re-enter via a future regeneration).
+  'FECAL', 'FIGGING', 'RIMMING', 'SPASTIC', 'TOSSER', 'SLAG', 'SLAGS',
+  'DUMBER', 'DUMBEST', 'HEROINS', 'SKEET',
 ] as const;
 
 export const BLOCKED_WORD_SET: ReadonlySet<string> = new Set(BLOCKED_WORDS);

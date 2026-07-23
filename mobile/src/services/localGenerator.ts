@@ -52,6 +52,19 @@ const WORD_ARRAYS: Record<number, string[]> = {
   7: WORDS_7,
 };
 
+// Precomputed word -> position maps for O(1) commonness lookup. The scorer runs
+// in the generation hot loop and used wordArray.indexOf (O(n)); with the
+// expanded dictionary (~2x) that linear scan is a real cost, so the position is
+// mapped once at module load instead. Values are identical to indexOf.
+const WORD_INDEX: Record<number, Map<string, number>> = {};
+for (const key of Object.keys(WORD_ARRAYS)) {
+  const len = Number(key);
+  const arr = WORD_ARRAYS[len];
+  const map = new Map<string, number>();
+  for (let i = 0; i < arr.length; i++) map.set(arr[i], i);
+  WORD_INDEX[len] = map;
+}
+
 // ============================================================================
 // PRE-COMPUTED ADJACENCY INDEX — instant candidate lookup for puzzle generation
 // ============================================================================
@@ -602,7 +615,9 @@ function scoreWordInterestingness(
   // read as unfair, not clever.
   const wordArray = WORD_ARRAYS[wordLength];
   if (wordArray) {
-    const index = wordArray.indexOf(word);
+    // O(1) position lookup (was wordArray.indexOf); -1 when absent, matching
+    // indexOf's old return so the branch behavior below is unchanged.
+    const index = WORD_INDEX[wordLength]?.get(word) ?? -1;
     if (index < wordArray.length * 0.1) {
       score -= 8; // Ultra-common head: boring filler words (unchanged)
     } else if (index < wordArray.length * 0.6) {
