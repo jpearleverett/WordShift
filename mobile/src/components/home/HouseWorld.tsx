@@ -217,10 +217,9 @@ const FloatingParticle: React.FC<{ particle: Particle }> = ({ particle }) => {
  * Ambient particle layer, extracted into its own memoized component so its
  * ~2s spawn setState never re-renders the parent HouseWorld. If it lived on
  * HouseWorld, a spawn tick would re-commit the pan's `translateY` transform
- * (with its stale JS value mid-settle-spring, a one-frame jump) AND invalidate
- * the transformContainer's cached hardware texture (fix #1). Rendered in screen
- * space (absolute-fill, pointer-transparent) ABOVE the pan handler, so the
- * bottom-anchored opaque sky can never paint over it at rest.
+ * (with its stale JS value mid-settle-spring, a one-frame jump on the scene).
+ * Rendered in screen space (absolute-fill, pointer-transparent) ABOVE the pan
+ * handler, so the bottom-anchored opaque sky can never paint over it at rest.
  */
 const AmbientParticles: React.FC<{
   phase: DialoguePhase;
@@ -1836,14 +1835,17 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
               },
             ]}
           >
-              {/* Sky layer: sky + clouds + celestials. It rides transformContainer
-                  1:1 (no counter-transform) so the baked-in meadow stays exactly
-                  under the house at every pan offset — the whole scene is one
-                  plane. Clouds/stars still drift on their own timers for life. */}
-              <View
-                style={styles.skyParallaxLayer}
-                pointerEvents="none"
-              >
+              {/* Sky + clouds + celestials ride transformContainer 1:1 (no
+                  counter-transform) so the baked-in meadow stays exactly under
+                  the house at every pan offset; the whole scene is one plane.
+                  These are FLAT direct children of transformContainer (the
+                  proven pre-audit structure), NOT nested in a wrapper View: an
+                  extra viewport-sized negative-z absoluteFill layer nesting the
+                  overflowing sky raster made Fabric/Android promote + recomposite
+                  it each pan frame, which shimmered while scrolling. The sky Image
+                  and groundExtension keep their own zIndex:-1 (behind the house);
+                  clouds/stars keep theirs. Clouds/stars still drift on their own
+                  timers for life. */}
                 {/* Sky background - inside transform so it moves with the scene.
                     Bottom-anchored: the artwork's bottom row sits exactly on the
                     container bottom (see the SKY_BOX_HEIGHT geometry notes), so
@@ -1915,7 +1917,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                 {ambientMotionEnabled && currentPhase >= 2 && <ShootingStar />}
                 {ambientMotionEnabled && currentPhase >= 3 && <ShootingStar />}
                 {ambientMotionEnabled && currentPhase >= 4 && <ShootingStar />}
-              </View>
 
               {/* Songbirds cross only the bright phases (F16); from Phase 3 on
                   the sky stays honestly empty rather than an unnatural cross-
@@ -2183,13 +2184,6 @@ const styles = StyleSheet.create({
     left: 0,
     width: SCREEN_WIDTH,
     height: SKY_BOX_HEIGHT,
-    zIndex: -1,
-  },
-  // Camera-slow parallax layer (F12) — absolute-fills the transform container
-  // and carries the sky + celestials at 0.3× the house pan. Sits BEHIND the
-  // house (negative zIndex), same as the bare sky Image did before.
-  skyParallaxLayer: {
-    ...StyleSheet.absoluteFill,
     zIndex: -1,
   },
   // Below the container bottom with a 1px overlap over the art's bottom row —

@@ -132,6 +132,16 @@ describe('HouseWorld sky anchoring', () => {
     expect(container).not.toContain('shouldRasterizeIOS');
   });
 
+  test('the sky/celestials are FLAT direct children of the pan container (no wrapper layer)', () => {
+    // The audit added a `skyParallaxLayer` absoluteFill wrapper (for a parallax
+    // that was later removed 1:1). That vestigial viewport-sized negative-z layer
+    // nesting the ~940px overflowing sky raster made Fabric/Android promote +
+    // recomposite it each pan frame, which shimmered while scrolling. The proven
+    // pre-audit structure renders the sky Image + groundExtension + clouds/stars
+    // as DIRECT children of transformContainer. Keep it flat — no wrapper.
+    expect(HOUSE_WORLD).not.toMatch(/skyParallaxLayer/);
+  });
+
   test('the ambient particle system is a memoized child (never re-renders the pan scene)', () => {
     // The ~2s particle spawn setState must NOT live on HouseWorld — a spawn tick
     // would re-commit the pan transform (stale JS value mid-settle) and
