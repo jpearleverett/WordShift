@@ -1621,19 +1621,25 @@ const styles = StyleSheet.create({
   slotPreviewContainer: {
     position: 'absolute',
     bottom: -18,
+    // Span the slot (left:0/right:0) and center the chip on it, so the preview
+    // sits centered UNDER its slot instead of anchored to the slot's left edge.
+    // The chip is wider than the narrow slot and overflows symmetrically, which
+    // is what centers the full word on the slot.
+    left: 0,
+    right: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    width: 60,
   },
   // The dark scrim chip that backs the preview word — a single dark tint that
   // becomes the controlled background so light inks read at >=4.5:1 regardless
-  // of the phase or the translucent target-row fill behind it.
+  // of the phase or the translucent target-row fill behind it. It sizes to the
+  // FULL word (no maxWidth / no truncation): the whole candidate word is always
+  // shown, never abbreviated to "CHAR...".
   slotPreviewChip: {
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 7,
     backgroundColor: 'rgba(16, 10, 34, 0.62)',
-    maxWidth: 60,
   },
   slotPreviewText: {
     // Same face at every size (F5) — was PIXEL_FONT_BOLD (the chrome sans) at
