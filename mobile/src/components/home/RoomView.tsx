@@ -16,9 +16,15 @@ import { CandyColors } from '../../theme/colors';
 import { FONT_SIZE } from '../../theme/typeScale';
 import { getPixelSkin, CARD_CORNER_DP, CARD_EDGE_DP } from '../../theme/pixelSkin.generated';
 import { NineSliceFrame } from '../ui/NineSlice';
-import { BODY_FONT, BODY_FONT_BOLD } from '../../theme/fonts';
+import { PixelPlaque } from '../ui/PixelPlaque';
+import { BODY_FONT_BOLD } from '../../theme/fonts';
 import { getSettingsSync } from '../../services/settings';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
+
+// Room name plate scale: the full 42dp PixelPlaque would swamp a ~123dp room,
+// so the wooden nameplate is uniformly scaled to ~34dp tall / ~11dp caps — big
+// enough to read the room name, small enough to sit as a tidy label at the top.
+const ROOM_PLAQUE_SCALE = 0.8;
 
 // Room background images - maps theme to image asset. Backgrounds render
 // cover-fit at ~250dp, so any source ≥ 750px clears the 3x requirement.
@@ -633,9 +639,11 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
       {/* Room frame */}
       <View style={[styles.frame, { borderColor: themeColors.accent }]} />
 
-      {/* Room name plate */}
+      {/* Room name plate — the wooden cottage PixelPlaque (matching the dialogue
+          nameplates), compact-scaled to sit proportionately in the small room.
+          Phase-aware wood: bright cottage -> dusk -> storm -> charred -> mauve. */}
       <View style={styles.namePlate}>
-        <Text style={styles.roomName}>{room.name}</Text>
+        <PixelPlaque phase={currentPhase} label={room.name} scale={ROOM_PLAQUE_SCALE} />
         {/* Procedural ornament row: one warm lantern pip per investment step
             (tier-1 + each attunement level). Replaces the old lone glyph. */}
         {embellish.namePips > 0 && (
@@ -779,26 +787,15 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: 'transparent',
   },
+  // Positioning wrapper only — the wooden PixelPlaque owns the frame now (the
+  // old flat dark chip bg/border/padding are gone). Sits near the top of the
+  // room and centers the plaque + its pip ornament row.
   namePlate: {
     position: 'absolute',
-    top: 6,
+    top: 4,
     alignSelf: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-  },
-  roomName: {
-    fontFamily: BODY_FONT_BOLD,
-    color: CandyColors.white,
-    fontSize: FONT_SIZE.small,
-    fontWeight: '700',
-    textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    alignItems: 'center',
+    maxWidth: '96%',
   },
   // Nameplate ornament row: tiny warm lantern pips (procedural, not emoji).
   pipRow: {
