@@ -113,6 +113,34 @@ describe('HouseWorld sky anchoring', () => {
     expect(HOUSE_WORLD).toMatch(/const HOUSE_BOTTOM_MARGIN = 30;/);
     expect(HOUSE_WORLD).toMatch(/const PIT_DOCK_CLEARANCE = 80;/);
   });
+
+  test('the panned diorama is promoted to a cached GPU texture (scroll-flicker fix)', () => {
+    // The pan drives one translateY on the transformContainer. Without a cached
+    // layer, Fabric/Android re-composites all of its overlapping/negative-z
+    // children (full-bleed sky + ground + body scrims) every frame, which
+    // shimmers while scrolling. Rasterizing the subtree turns that per-frame
+    // recomposite into a per-frame texture blit. Both platform hints must ride
+    // the SAME Animated.View that carries the translateY transform.
+    const containerStart = HOUSE_WORLD.indexOf(
+      '<Animated.View',
+      HOUSE_WORLD.indexOf('styles.gestureContainer')
+    );
+    const container = HOUSE_WORLD.slice(
+      containerStart,
+      HOUSE_WORLD.indexOf('transform: [', containerStart)
+    );
+    expect(container).toContain('renderToHardwareTextureAndroid');
+    expect(container).toContain('shouldRasterizeIOS');
+  });
+
+  test('the ambient particle system is a memoized child (never re-renders the pan scene)', () => {
+    // The ~2s particle spawn setState must NOT live on HouseWorld — a spawn tick
+    // would re-commit the pan transform (stale JS value mid-settle) and
+    // invalidate the cached texture above. It lives in a memoized child.
+    expect(HOUSE_WORLD).toMatch(/const AmbientParticles: React\.FC<[^>]*>\s*=\s*React\.memo\(/);
+    // And HouseWorld must render that child rather than mapping particles inline.
+    expect(HOUSE_WORLD).toMatch(/<AmbientParticles\b/);
+  });
 });
 
 describe('phase lighting settles the house into each sky', () => {

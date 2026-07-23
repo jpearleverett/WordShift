@@ -213,6 +213,77 @@ const FloatingParticle: React.FC<{ particle: Particle }> = ({ particle }) => {
   );
 };
 
+/**
+ * Ambient particle layer, extracted into its own memoized component so its
+ * ~2s spawn setState never re-renders the parent HouseWorld. If it lived on
+ * HouseWorld, a spawn tick would re-commit the pan's `translateY` transform
+ * (with its stale JS value mid-settle-spring, a one-frame jump) AND invalidate
+ * the transformContainer's cached hardware texture (fix #1). Rendered in screen
+ * space (absolute-fill, pointer-transparent) ABOVE the pan handler, so the
+ * bottom-anchored opaque sky can never paint over it at rest.
+ */
+const AmbientParticles: React.FC<{
+  phase: DialoguePhase;
+  ambientMotionEnabled: boolean;
+  isFullMoon: boolean;
+}> = React.memo(({ phase, ambientMotionEnabled, isFullMoon }) => {
+  const [particles, setParticles] = useState<Particle[]>([]);
+  const particleIdRef = useRef(0);
+
+  // Spawn phase-graded ambient particles. `ambientMotionEnabled` is already
+  // false under reducedMotion / low-tier (zero particles there); the medium
+  // tier gets a reduced ceiling on top.
+  useEffect(() => {
+    if (!ambientMotionEnabled) {
+      setParticles([]);
+      return;
+    }
+
+    const config = AMBIENT_PARTICLES_BY_PHASE[phase] ?? AMBIENT_PARTICLES_BY_PHASE[0];
+    // High tier keeps the full count; medium thins it (density scales DOWN).
+    const tierScale = getDeviceTier() === 'high' ? 1 : 0.6;
+    // Full-moon event nights get a denser firefly drift from dusk on (F20) —
+    // a modest boost, still capped by the tier scale above.
+    const eventFireflyBoost = isFullMoon && phase >= 2;
+    const maxCount = Math.max(2, Math.round(config.maxCount * tierScale * (eventFireflyBoost ? 1.4 : 1)));
+    const spawnMs = eventFireflyBoost ? Math.round(config.spawnMs * 0.7) : config.spawnMs;
+
+    const spawnParticle = () => {
+      const newParticle: Particle = {
+        id: particleIdRef.current++,
+        x: new Animated.Value(0),
+        y: new Animated.Value(0),
+        opacity: new Animated.Value(0),
+        scale: new Animated.Value(1),
+        color: config.colors[Math.floor(Math.random() * config.colors.length)],
+        size: config.size,
+        duration: config.durationMin + Math.random() * config.durationRange,
+        direction: config.direction,
+        drift: config.drift,
+        peakOpacity: config.peakOpacity,
+        glow: config.glow,
+      };
+
+      // Bounded: keep only the last (maxCount - 1) + the new one.
+      setParticles(prev => [...prev.slice(-(maxCount - 1)), newParticle]);
+    };
+
+    const interval = setInterval(spawnParticle, spawnMs);
+    spawnParticle(); // Spawn one immediately
+
+    return () => clearInterval(interval);
+  }, [phase, ambientMotionEnabled, isFullMoon]);
+
+  return (
+    <View style={styles.particleOverlay} pointerEvents="none">
+      {particles.map(particle => (
+        <FloatingParticle key={particle.id} particle={particle} />
+      ))}
+    </View>
+  );
+});
+AmbientParticles.displayName = 'AmbientParticles';
+
 // ═══════════════════════════════════════════════════════════════════════════
 // SMOKE PUFF ANIMATION
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1555,55 +1626,9 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     }));
   }, [isFullMoon]);
 
-  // Particle system state
-  const [particles, setParticles] = useState<Particle[]>([]);
-  const particleIdRef = useRef(0);
-
-  // Spawn phase-graded ambient particles. `ambientMotionEnabled` is already
-  // false under reducedMotion / low-tier (zero particles there — the mandate's
-  // "off on low tier"); the medium tier gets a reduced ceiling on top.
-  useEffect(() => {
-    if (!ambientMotionEnabled) {
-      setParticles([]);
-      return;
-    }
-
-    const config = AMBIENT_PARTICLES_BY_PHASE[currentPhase] ?? AMBIENT_PARTICLES_BY_PHASE[0];
-    // High tier keeps the full count; medium thins it (density scales DOWN).
-    const tierScale = getDeviceTier() === 'high' ? 1 : 0.6;
-    // Full-moon event nights get a denser firefly drift from dusk on (F20) —
-    // a modest boost, still capped by the tier scale above.
-    const eventFireflyBoost = isFullMoon && currentPhase >= 2;
-    const maxCount = Math.max(2, Math.round(config.maxCount * tierScale * (eventFireflyBoost ? 1.4 : 1)));
-    const spawnMs = eventFireflyBoost ? Math.round(config.spawnMs * 0.7) : config.spawnMs;
-
-    const spawnParticle = () => {
-      const newParticle: Particle = {
-        id: particleIdRef.current++,
-        x: new Animated.Value(0),
-        y: new Animated.Value(0),
-        opacity: new Animated.Value(0),
-        scale: new Animated.Value(1),
-        color: config.colors[Math.floor(Math.random() * config.colors.length)],
-        size: config.size,
-        duration: config.durationMin + Math.random() * config.durationRange,
-        direction: config.direction,
-        drift: config.drift,
-        peakOpacity: config.peakOpacity,
-        glow: config.glow,
-      };
-
-      // Bounded: keep only the last (maxCount - 1) + the new one.
-      setParticles(prev => [...prev.slice(-(maxCount - 1)), newParticle]);
-    };
-
-    const interval = setInterval(spawnParticle, spawnMs);
-    spawnParticle(); // Spawn one immediately
-
-    return () => clearInterval(interval);
-  }, [currentPhase, ambientMotionEnabled, isFullMoon]);
-
-
+  // The ambient particle system lives in the memoized <AmbientParticles> child
+  // (below, in screen space) so its ~2s spawn setState never re-renders this
+  // component and never invalidates the pan container's cached texture.
 
   // Get unlocked rooms plus a single "next room" preview (if the next unlock is a room).
   // This allows players to tap the house itself to build, instead of using header controls.
@@ -1801,6 +1826,15 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
       >
         <Animated.View style={styles.gestureContainer} onLayout={onContainerLayout}>
           <Animated.View
+            // Promote the moving diorama to a single cached GPU texture. The pan
+            // drives one translateY on this container; without this, Fabric/Android
+            // re-composites all of its overlapping/negative-z children (the
+            // full-bleed sky + ground + house body scrims) every frame, which
+            // shimmers as you scroll. Caching the subtree turns the per-frame child
+            // recomposite into a per-frame texture blit. Paired with the extracted,
+            // memoized particle layer so a spawn tick never invalidates the cache.
+            renderToHardwareTextureAndroid
+            shouldRasterizeIOS
             style={[
               styles.transformContainer,
               {
@@ -2127,12 +2161,13 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
           screen-space absolute-fill layer (zIndex above the gesture
           container, pointer-transparent), so the bottom-anchored opaque sky
           can never paint over the particles at rest — the defect where they
-          were invisible at translateY=0 in every phase. */}
-      <View style={styles.particleOverlay} pointerEvents="none">
-        {particles.map(particle => (
-          <FloatingParticle key={particle.id} particle={particle} />
-        ))}
-      </View>
+          were invisible at translateY=0 in every phase. Memoized child: its
+          spawn setState never re-renders the pan scene (flicker fix). */}
+      <AmbientParticles
+        phase={currentPhase}
+        ambientMotionEnabled={ambientMotionEnabled}
+        isFullMoon={isFullMoon}
+      />
     </GestureHandlerRootView>
   );
 };
