@@ -1207,18 +1207,18 @@ const ShadowFigure: React.FC<{ phase: number }> = ({ phase }) => {
 // Soft volumetric cloud drawn from overlapping feathered rounded Views (no
 // hollow outline PNG, F13/F64). `tint` lets the cloud dim from bright white
 // toward a dusky grey as the phase darkens.
-// Three overlapping feathered lobes (a balanced left-base / right-base / center
-// peak). This was five lobes; each is a large, full-sky-width TRANSLUCENT View,
-// and three drifting clouds x five lobes = fifteen alpha-blended layers redrawn
-// every scroll frame was a leading fill-rate/overdraw contributor to home-scroll
-// judder. Three lobes keep the puffy silhouette at ~40% less cloud overdraw.
+// Soft volumetric cloud drawn from overlapping feathered rounded Views (no
+// hollow outline PNG, F13/F64). `tint` lets the cloud dim from bright white
+// toward a dusky grey as the phase darkens.
 const CloudShape: React.FC<{ width: number; tint: string }> = ({ width, tint }) => {
   const h = width / 2;
   return (
     <View style={{ width, height: h }}>
       <View style={{ position: 'absolute', left: width * 0.06, top: h * 0.42, width: width * 0.5, height: h * 0.58, borderRadius: h * 0.3, backgroundColor: tint, opacity: 0.85 }} />
-      <View style={{ position: 'absolute', left: width * 0.42, top: h * 0.42, width: width * 0.52, height: h * 0.58, borderRadius: h * 0.3, backgroundColor: tint, opacity: 0.82 }} />
+      <View style={{ position: 'absolute', left: width * 0.42, top: h * 0.42, width: width * 0.52, height: h * 0.58, borderRadius: h * 0.3, backgroundColor: tint, opacity: 0.8 }} />
       <View style={{ position: 'absolute', left: width * 0.24, top: h * 0.16, width: width * 0.36, height: h * 0.7, borderRadius: h * 0.35, backgroundColor: tint, opacity: 0.95 }} />
+      <View style={{ position: 'absolute', left: width * 0.5, top: h * 0.24, width: width * 0.3, height: h * 0.62, borderRadius: h * 0.31, backgroundColor: tint, opacity: 0.9 }} />
+      <View style={{ position: 'absolute', left: width * 0.12, top: h * 0.5, width: width * 0.8, height: h * 0.4, borderRadius: h * 0.2, backgroundColor: tint, opacity: 0.7 }} />
     </View>
   );
 };
@@ -1598,6 +1598,14 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   // State tracking for gestures
   const baseTranslateY = useRef(0);
   const currentPanYRef = useRef<number | null>(null);
+  // Synchronous mirror of translateY's live value. The settle spring runs on the
+  // NATIVE driver, so translateY's JS value lags the real native value between
+  // frames, and translateY.stopAnimation()'s callback is ASYNC — reading the base
+  // from it left the FIRST onPanGestureEvent of a fresh drag using a stale base,
+  // flashing the scene toward the bottom for one frame before it corrected.
+  // Attaching a listener makes RN stream native->JS updates every frame, so this
+  // ref is always current and the base can be captured synchronously at BEGAN.
+  const liveTranslateYRef = useRef(0);
   // Momentum settle animation (spring) currently decelerating the scene after
   // a release. A new gesture stops it; the physics is instant (no momentum /
   // rubber-band) under reducedMotion or on low-tier devices.
@@ -1702,14 +1710,26 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     }
   }, [onPanYChange, panBounds.max, translateY]);
 
-  // Stop a decelerating settle at the start of a fresh gesture, capturing the
-  // live (possibly native-driven) value so the drag continues from there.
+  // Keep liveTranslateYRef synchronously current. Adding a listener also forces
+  // the native driver to report the settle spring's value to JS every frame, so
+  // the mirror never lags the on-screen position.
+  useEffect(() => {
+    liveTranslateYRef.current = (translateY as unknown as { __getValue: () => number }).__getValue();
+    const id = translateY.addListener(({ value }) => {
+      liveTranslateYRef.current = value;
+    });
+    return () => translateY.removeListener(id);
+  }, [translateY]);
+
+  // Stop a decelerating settle at the start of a fresh gesture. Capture the base
+  // SYNCHRONOUSLY from the listener-backed live mirror (not translateY.stopAnimation's
+  // async callback, which for a native-driven value fires a frame or more later —
+  // leaving the drag's first frame on a stale base and flashing the scene).
   const stopSettle = useCallback(() => {
     settleAnimRef.current?.stop();
     settleAnimRef.current = null;
-    translateY.stopAnimation((value: number) => {
-      baseTranslateY.current = value;
-    });
+    translateY.stopAnimation();
+    baseTranslateY.current = liveTranslateYRef.current;
   }, [translateY]);
 
   // Pan gesture handler — vertical only. Past the bounds the raw drag is
