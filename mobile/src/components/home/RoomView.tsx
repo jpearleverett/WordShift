@@ -22,9 +22,9 @@ import { getSettingsSync } from '../../services/settings';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
 
 // Room name plate scale: the full 42dp PixelPlaque would swamp a ~123dp room,
-// so the wooden nameplate is uniformly scaled to ~34dp tall / ~11dp caps — big
+// so the wooden nameplate is uniformly scaled to ~29dp tall / ~9.5dp font — big
 // enough to read the room name, small enough to sit as a tidy label at the top.
-const ROOM_PLAQUE_SCALE = 0.8;
+const ROOM_PLAQUE_SCALE = 0.68;
 
 // Room background images - maps theme to image asset. Backgrounds render
 // cover-fit at ~250dp, so any source ≥ 750px clears the 3x requirement.
