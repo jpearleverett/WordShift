@@ -1406,13 +1406,6 @@ const HOUSE_BOTTOM_MARGIN = 30;
 // entrance fully above the dock at rest.
 const PIT_DOCK_CLEARANCE = 80;
 
-// The foreground meadow band (BUG 2) tucks its top edge this far UP behind the
-// foundation base, so the seam where it meets the foundation's baked grass is
-// hidden by the opaque foundation and no gap can open during a pan. Not a seat
-// constant (SKY_BOX_HEIGHT / HOUSE_BOTTOM_MARGIN / PIT_DOCK_CLEARANCE /
-// PIT_FLOW_HEIGHT are untouched) — purely how high the band tucks.
-const GROUND_BAND_FOUNDATION_OVERLAP = 16;
-
 // ─── Sky geometry: the house sits BELOW the river, on every device ─────────
 // All five sky assets are 941x1972 (skyGeometry.test.ts pins this). The river
 // crosses the artwork no lower than row ~1335 in every variant; rows
@@ -1655,34 +1648,17 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     };
   }, [containerHeight, houseHeight, numRows, onPitPress, houseBottomMargin]);
 
-  // ─── Two-rate parallax (F12) ─────────────────────────────────────────────
-  // The sky (+ clouds/night stars/shooting stars) rides a camera-slow layer
-  // nested inside transformContainer: a -0.7×translateY counter-transform on
-  // top of the parent's own translateY leaves a NET sky shift of 0.3×
-  // translateY, so the diorama gains real depth on every pan instead of
-  // moving as one rigid plane. Disabled (net 1:1, current behavior) under
-  // reducedMotion / low tier, same gate as the rest of the ambient motion.
-  const parallaxEnabled = ambientMotionEnabled;
-  // The sky gets its OWN Animated.Value, driven by the IDENTICAL mechanism as
-  // the house in BOTH pan paths (JS setValue during the drag, native spring on
-  // release) — NOT a cross-driver Animated.multiply node, which on Fabric could
-  // land a frame out of step with the house's native transform and shimmer
-  // along the sky/house seam (BUG 1). skyTranslateY holds -0.7 * (house
-  // translateY), so nested under transformContainer's own translateY the NET
-  // sky shift stays 0.3 * pan (house + sky = house + (-0.7 * house)). It stays
-  // pinned at 0 when parallax is off, so the sky rides the house 1:1 as before.
-  const skyTranslateY = useRef(new Animated.Value(0)).current;
-  // Because the sky now lags the house by 0.7×translateY at the top of the
-  // pan range, the fixed SKY_BOX_HEIGHT floor is no longer tall enough to
-  // keep the art covering the frame there (the old "sky abandons the frame
-  // after ~230dp of pan" defect). Grow the rendered height — bounded, never
-  // shrinking below the pinned SKY_BOX_HEIGHT floor — by the parallax layer's
-  // own worst-case net travel, recomputed alongside panBounds.max.
-  const skyLayerHeight = useMemo(() => {
-    if (!parallaxEnabled) return SKY_BOX_HEIGHT;
-    const grown = (containerHeight ?? SCREEN_HEIGHT) + Math.ceil(0.3 * panBounds.max);
-    return Math.max(SKY_BOX_HEIGHT, grown);
-  }, [parallaxEnabled, containerHeight, panBounds.max]);
+  // ─── One cohesive scene (no vertical-pan parallax) ───────────────────────
+  // The meadow the house stands on is BAKED INTO the sky artwork. A two-rate
+  // parallax (F12) that moved the sky slower than the house therefore slid the
+  // house off its own ground — it read as "floating" — and forced an ugly flat
+  // foreground band to give the house something at 1.0x to stand on. It also
+  // shimmered along the seam: two independent native springs (house + sky)
+  // cannot stay perfectly frame-locked. So the sky now rides the scene 1:1 —
+  // the whole painterly landscape (meadow, river, forest, house, pit) pans as
+  // one plane, the house stays planted in the real grass, and there is a single
+  // animated driver so nothing can desync. Atmospheric depth still comes from
+  // the independently DRIFTING clouds + ambient sprites, which are unaffected.
 
   const syncPanPosition = useCallback((nextPanY: number, notify = false) => {
     // Cancel any in-flight momentum settle before hard-setting the position, so
@@ -1692,16 +1668,12 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     settleAnimRef.current = null;
     const clampedPanY = clampHomeScenePanY(nextPanY, panBounds.max);
     translateY.setValue(clampedPanY);
-    // Keep the sky's own value in lockstep (-0.7x) so a programmatic reposition
-    // (house grew / saved-pan restore) never desyncs the two layers (BUG 1).
-    // Pinned to 0 when parallax is off, so the sky rides the house 1:1.
-    skyTranslateY.setValue(parallaxEnabled ? -0.7 * clampedPanY : 0);
     currentPanYRef.current = clampedPanY;
     baseTranslateY.current = clampedPanY;
     if (notify) {
       onPanYChange?.(clampedPanY);
     }
-  }, [onPanYChange, panBounds.max, translateY, parallaxEnabled, skyTranslateY]);
+  }, [onPanYChange, panBounds.max, translateY]);
 
   // Stop a decelerating settle at the start of a fresh gesture, capturing the
   // live (possibly native-driven) value so the drag continues from there.
@@ -1710,11 +1682,8 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     settleAnimRef.current = null;
     translateY.stopAnimation((value: number) => {
       baseTranslateY.current = value;
-      // Re-pin the sky to the captured house value (-0.7x) so the fresh drag
-      // resumes with the two layers already in lockstep (BUG 1).
-      skyTranslateY.setValue(parallaxEnabled ? -0.7 * value : 0);
     });
-  }, [translateY, parallaxEnabled, skyTranslateY]);
+  }, [translateY]);
 
   // Pan gesture handler — vertical only. Past the bounds the raw drag is
   // rubber-banded (progressive resistance) instead of hard-clamped, so the
@@ -1735,7 +1704,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
       houseY = clampHomeScenePanY(rawY, panBounds.max);
     }
     translateY.setValue(houseY);
-    skyTranslateY.setValue(parallaxEnabled ? -0.7 * houseY : 0);
     currentPanYRef.current = clampHomeScenePanY(rawY, panBounds.max);
   };
 
@@ -1768,27 +1736,16 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     });
     currentPanYRef.current = settleTarget;
 
-    // Settle BOTH layers with one native spring each, run in parallel with
-    // identical friction/tension and proportional (-0.7x) initial position +
-    // velocity. The spring ODE is linear, so sky(t) = -0.7 * house(t) at every
-    // instant — the layers stay in exact lockstep through the whole settle
-    // (BUG 1), with no cross-driver derived node. The sky spring targets 0 (a
-    // no-op) when parallax is off.
-    const houseSpring = Animated.spring(translateY, {
+    // One native spring drives the whole scene — the entire painterly plane
+    // (sky, meadow, house, pit) settles together, so there is nothing for a
+    // second layer to desync from.
+    const settle = Animated.spring(translateY, {
       toValue: settleTarget,
       velocity: velocityY,
       friction: 9,
       tension: 45,
       useNativeDriver: true,
     });
-    const skySpring = Animated.spring(skyTranslateY, {
-      toValue: parallaxEnabled ? -0.7 * settleTarget : 0,
-      velocity: parallaxEnabled ? -0.7 * velocityY : 0,
-      friction: 9,
-      tension: 45,
-      useNativeDriver: true,
-    });
-    const settle = Animated.parallel([houseSpring, skySpring]);
     settleAnimRef.current = settle;
     settle.start(({ finished }) => {
       if (!finished) return;
@@ -1806,9 +1763,8 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
       settleAnimRef.current?.stop();
       settleAnimRef.current = null;
       translateY.stopAnimation();
-      skyTranslateY.stopAnimation();
     };
-  }, [translateY, skyTranslateY]);
+  }, [translateY]);
 
   // Preserve the current viewport when the house grows or helper UI changes the
   // available height, and restore the last viewport when the home screen remounts.
@@ -1845,13 +1801,12 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
               },
             ]}
           >
-              {/* Camera-slow sky layer (F12): sky + clouds + celestials ride a
-                  -0.7×pan counter-transform so the net motion is 0.3×pan —
-                  real parallax depth on every drag. Under the static fallback
-                  (reduced motion / low tier) the counter is 0, so the sky
-                  tracks the house 1:1 exactly as before. */}
-              <Animated.View
-                style={[styles.skyParallaxLayer, { transform: [{ translateY: skyTranslateY }] }]}
+              {/* Sky layer: sky + clouds + celestials. It rides transformContainer
+                  1:1 (no counter-transform) so the baked-in meadow stays exactly
+                  under the house at every pan offset — the whole scene is one
+                  plane. Clouds/stars still drift on their own timers for life. */}
+              <View
+                style={styles.skyParallaxLayer}
                 pointerEvents="none"
               >
                 {/* Sky background - inside transform so it moves with the scene.
@@ -1859,9 +1814,9 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                     container bottom (see the SKY_BOX_HEIGHT geometry notes), so
                     the art always covers every visible pixel and the house seats
                     at a device-independent spot on the meadow below the river.
-                    The height is grown (never shrunk below the pinned floor) to
-                    keep covering the frame across the parallax layer's own net
-                    travel — see the skyLayerHeight notes above (F12). */}
+                    Height is the fixed SKY_BOX_HEIGHT floor: with the scene now
+                    panning as one 1:1 plane, the art covers the frame across the
+                    whole pan range exactly as the seat geometry was tuned for. */}
                 <Image
                   source={
                     currentPhase >= 4 ? SKY_SHADOW :
@@ -1870,7 +1825,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                     currentPhase >= 1 ? SKY_AFTERNOON :
                     SKY_DAY
                   }
-                  style={[styles.skyBackground, { height: skyLayerHeight }]}
+                  style={[styles.skyBackground, { height: SKY_BOX_HEIGHT }]}
                   resizeMode="cover"
                 />
 
@@ -1925,37 +1880,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                 {ambientMotionEnabled && currentPhase >= 2 && <ShootingStar />}
                 {ambientMotionEnabled && currentPhase >= 3 && <ShootingStar />}
                 {ambientMotionEnabled && currentPhase >= 4 && <ShootingStar />}
-              </Animated.View>
-
-              {/* Foreground meadow band (BUG 2): the ground the house actually
-                  stands on. The meadow is baked into the SKY image, which now
-                  rides the 0.3x parallax layer — so at any pan the house column
-                  (1.0x) would slide off that distant grass and read as floating.
-                  This band is a sibling of the house INSIDE transformContainer,
-                  so it rides translateY at the house's exact 1.0x rate; the
-                  foundation's baked grass tufts + the contact-shadow blob land on
-                  it at every pan offset and the house stays planted, while the
-                  distant upper sky keeps its 0.3x depth. Painted in the sky's own
-                  bottom-row grass color (PHASE_GROUND_COLORS) so it blends with
-                  the baked meadow seam. Declared BEFORE the house (no zIndex) so
-                  it paints behind the house body + pit, and its top tucks up
-                  behind the foundation so it never covers them. In front of the
-                  zIndex:-1 sky layer. Pure static View — no animation, native-
-                  driver-neutral, reduced-motion irrelevant. */}
-              <View
-                pointerEvents="none"
-                style={[
-                  styles.foregroundGround,
-                  {
-                    height:
-                      SCREEN_HEIGHT +
-                      houseBottomMargin +
-                      (onPitPress ? PIT_FLOW_HEIGHT : 0) +
-                      GROUND_BAND_FOUNDATION_OVERLAP,
-                    backgroundColor: PHASE_GROUND_COLORS[Math.min(currentPhase, 4)],
-                  },
-                ]}
-              />
+              </View>
 
               {/* Songbirds cross only the bright phases (F16); from Phase 3 on
                   the sky stays honestly empty rather than an unnatural cross-
@@ -2230,19 +2155,6 @@ const styles = StyleSheet.create({
   skyParallaxLayer: {
     ...StyleSheet.absoluteFill,
     zIndex: -1,
-  },
-  // Foreground meadow band (BUG 2) — a sibling of the house INSIDE the transform
-  // container, so it rides translateY at the house's exact 1.0x rate (unlike the
-  // sky's baked meadow, which now travels at the 0.3x parallax rate, leaving the
-  // house floating). Anchored to the container bottom and extended far below it;
-  // the height (set inline) lifts its top edge just above the foundation base.
-  // No zIndex: declared before the house so it paints behind it, and in front of
-  // the zIndex:-1 sky layer.
-  foregroundGround: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: -SCREEN_HEIGHT,
   },
   // Below the container bottom with a 1px overlap over the art's bottom row —
   // sub-pixel seam insurance only (see PHASE_GROUND_COLORS notes).
