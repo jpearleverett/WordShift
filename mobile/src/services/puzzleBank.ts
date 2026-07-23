@@ -223,6 +223,22 @@ function getBankWordFrequency(bankKey: string): Map<string, number> {
   return freq;
 }
 
+// Highest per-word count in a bank (~= its word cap once saturated), cached per
+// frequency-map object so the hub-word penalty can calibrate to each bank's own
+// saturation instead of fixed thresholds that no longer match the caps.
+const bankMaxFreqCache = new WeakMap<Map<string, number>, number>();
+function bankMaxFreq(wordFrequency: Map<string, number>): number {
+  let m = bankMaxFreqCache.get(wordFrequency);
+  if (m === undefined) {
+    m = 0;
+    for (const v of wordFrequency.values()) {
+      if (v > m) m = v;
+    }
+    bankMaxFreqCache.set(wordFrequency, m);
+  }
+  return m;
+}
+
 /**
  * Derive a "bank key" from difficulty + variant to route to the correct
  * storage, cache, and bank data. Returns a discriminator string.
@@ -486,12 +502,22 @@ function scorePuzzleForContext(
 
   // Hub-word penalty: words the generator over-used across this bank cost
   // score regardless of play history, so the vocabulary long tail surfaces.
+  // Calibrated to the bank's OWN saturation (its observed max frequency ~= its
+  // word cap): the old fixed 10/18/30 thresholds predated the 3/7/10/12 caps
+  // and could NEVER fire on EASY (cap 3) or MEDIUM (cap 7), leaving the penalty
+  // dead on most banks. Ratio-to-max makes it bite on every bank.
+  const cap = Math.max(1, bankMaxFreq(wordFrequency));
   for (const word of puzzle.allWords) {
-    const freq = wordFrequency.get(word) ?? 0;
-    if (freq >= 30) score -= 14;
-    else if (freq >= 18) score -= 9;
-    else if (freq >= 10) score -= 4;
+    const ratio = (wordFrequency.get(word) ?? 0) / cap;
+    if (ratio >= 0.85) score -= 14;
+    else if (ratio >= 0.6) score -= 9;
+    else if (ratio >= 0.4) score -= 4;
   }
+
+  // Prefer genuinely higher-quality boards. The real scorePuzzleChain result is
+  // stored at generation (gated regeneration); legacy banks store a flat 50 so
+  // this term is neutral for them and only differentiates regenerated banks.
+  score += (puzzle.qualityScore - 50) * 0.3;
 
   // Random jitter (prevents deterministic ordering)
   score += Math.random() * 15;

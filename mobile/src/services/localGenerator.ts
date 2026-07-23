@@ -933,7 +933,11 @@ export function scorePuzzleChain(chain: PathNode[], recencyMap?: Map<string, num
       { pathCap: 8, stateCap: 500 },
     );
     totalScore += Math.min(10, branching.structuralBonus * 0.75);
-    if (branching.completePathCount === 1) totalScore -= 3;
+    // Single-route boards are a forced rail. -3 was too weak to steer the
+    // best-of-3 pick away from them; -8 makes on-device standard generation
+    // lean multi-route to match the gated banks (the gated generator still
+    // hard-rejects single-route boards on top of this).
+    if (branching.completePathCount <= 1) totalScore -= 8;
   }
 
   return Math.round(Math.max(0, Math.min(100, totalScore)));

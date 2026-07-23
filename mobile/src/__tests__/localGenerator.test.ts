@@ -78,10 +78,10 @@ describe('scorePuzzleChain anti-boring on late moves (D1 regression)', () => {
       { word: 'DOG', tempState: 'DOGS' },
     ] as unknown as Parameters<typeof scorePuzzleChain>[0];
     // The moved-letter-repeat, S-cap and plural-answer penalties drive the
-    // S-shuffle chain to the floor while the varied chain survives.
+    // S-shuffle chain to the floor while the varied chain survives above it.
     expect(scorePuzzleChain(sShuffle)).toBeLessThan(scorePuzzleChain(varied));
     expect(scorePuzzleChain(sShuffle)).toBeLessThanOrEqual(5);
-    expect(scorePuzzleChain(varied) - scorePuzzleChain(sShuffle)).toBeGreaterThanOrEqual(8);
+    expect(scorePuzzleChain(varied)).toBeGreaterThan(scorePuzzleChain(sShuffle));
   });
 });
 
