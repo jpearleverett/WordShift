@@ -253,10 +253,10 @@ interface GateParams {
 // answers on top of the scorer's own de-rarify preference. The heavy difficulty
 // differentiation is the single-choice ceiling + the trap floor.
 const GATE_BY_BANK: Record<BankName, GateParams> = {
-  EASY:        { minPathsEarly: 2, minPathsLate: 2, singleChoiceEarly: 0.50, singleChoiceLate: 0.62, featuredCeiling: 0.90, deadEndCeiling: 0.25, trapFloor: 0 },
-  MEDIUM:      { minPathsEarly: 2, minPathsLate: 2, singleChoiceEarly: 0.50, singleChoiceLate: 0.65, featuredCeiling: 0.92, deadEndCeiling: 0.25, trapFloor: 0 },
-  MEDIUM_PLUS: { minPathsEarly: 2, minPathsLate: 2, singleChoiceEarly: 0.55, singleChoiceLate: 0.68, featuredCeiling: 0.94, deadEndCeiling: 0.25, trapFloor: 0.30 },
-  HARD:        { minPathsEarly: 2, minPathsLate: 2, singleChoiceEarly: 0.58, singleChoiceLate: 0.72, featuredCeiling: 0.96, deadEndCeiling: 0.25, trapFloor: 0.35 },
+  EASY:        { minPathsEarly: 2, minPathsLate: 2, singleChoiceEarly: 0.50, singleChoiceLate: 0.62, featuredCeiling: 0.92, deadEndCeiling: 0.25, trapFloor: 0 },
+  MEDIUM:      { minPathsEarly: 2, minPathsLate: 2, singleChoiceEarly: 0.50, singleChoiceLate: 0.65, featuredCeiling: 0.94, deadEndCeiling: 0.25, trapFloor: 0 },
+  MEDIUM_PLUS: { minPathsEarly: 2, minPathsLate: 2, singleChoiceEarly: 0.55, singleChoiceLate: 0.68, featuredCeiling: 0.96, deadEndCeiling: 0.25, trapFloor: 0.30 },
+  HARD:        { minPathsEarly: 2, minPathsLate: 2, singleChoiceEarly: 0.58, singleChoiceLate: 0.72, featuredCeiling: 0.98, deadEndCeiling: 0.25, trapFloor: 0.35 },
 };
 const GATE = GATE_BY_BANK[BANK_NAME];
 
@@ -275,7 +275,7 @@ function maxSingleChoiceForPhase(phase: number): number {
 // against the genuinely-obscure tail. Dread words are exempt everywhere so the
 // descent vocabulary still lands. The generator still TRAVERSES the full
 // dictionary for connectivity; this only bounds what is FEATURED.
-const FEATURED_TRANSIENT_CEILING = 0.98;
+const FEATURED_TRANSIENT_CEILING = 0.99;
 function featuredBandOk(displayed: string[], allWords: string[]): boolean {
   for (const w of displayed) {
     if (getFeaturedRank(w) > GATE.featuredCeiling && !isDreadWord(w)) return false;
