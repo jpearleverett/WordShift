@@ -2587,7 +2587,7 @@ function MainApp() {
       //
       // The finale is no longer declared retroactively on an ordinary win:
       // only a capped eight-win dwell AND completedTotal >=
-      // FINALE_ARM_MIN_PUZZLES (160) arm finaleArmed. The NEXT standard board
+      // FINALE_ARM_MIN_PUZZLES (115) arm finaleArmed. The NEXT standard board
       // start then serves the marked FINAL BOARD (usePuzzleGame.startNewGame).
       // Its victory — and only its victory — plays FINAL_PUZZLE_EVENT. The win
       // after that triggers POST_REVELATION_EVENT + markPostRevelation,

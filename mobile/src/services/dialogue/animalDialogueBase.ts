@@ -3,7 +3,8 @@ import { AnimalType, Dialogue, DialoguePhase } from '../../types/homeWorld';
 /**
  * All dialogue content organized by animal and phase
  * Each animal has a unique personality that evolves from contentment to existential crisis
- * 56 dialogues per animal to support extended dialogue sessions
+ * 134 dialogues per animal (24/28/22/30/30 across phases 0-4, plus 20
+ * post-revelation) to support extended dialogue sessions
  */
 
 // RED PANDA (Bamboo) - Zen practitioner whose enlightenment leads to unsettling truths
@@ -1981,7 +1982,8 @@ export function getTotalDialogueCount(
 
 // ============================================================================
 // PHASE 2 EXHAUSTION POOL
-// Phase 2 spans the longest stretch of the game (~80 puzzles); even with 22
+// Phase 2 spans one of the longest single stretches (~33-40 puzzles on the
+// compressed arc; it was ~80 before); even with 22
 // base lines per animal, chatty players exhaust the block and would re-read
 // the last line verbatim for dozens of puzzles. These extra lines are served
 // (in order, then cycling) once an animal's Phase-2 base block is exhausted

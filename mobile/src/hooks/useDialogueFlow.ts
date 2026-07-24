@@ -462,8 +462,10 @@ export function useDialogueFlow({
   // arc is not consumed unheard after the Sky Garden gate at 135, and a
   // lagging-tier animal at global Phase 4, which converges to phase 4 at the
   // reveal and gains its whole Phase-4 block with the finale ~32 puzzles out.
-  // House completion/recruit is ~136, capped dwell ~143, arming 160, the
-  // final board ~161, and post-revelation ~162. Computed per call from
+  // Post-compression geography: house completion/recruit is ~96-100, capped
+  // dwell ~104-108, arming 115 (FINALE_ARM_MIN_PUZZLES), the final board ~116,
+  // and post-revelation ~117-122 (MIN_PUZZLES_FOR_PHASE[5] = 120). The older
+  // 136/143/160/161/162 figures predate two arc compressions. Computed per call from
   // current state and passed into the session layer, which stays a pure
   // counter. The newly-unlocked grace period is untouched (that's cooldowns).
   const getSessionBonus = (animal: Animal): number => {

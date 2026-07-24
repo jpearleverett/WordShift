@@ -2036,11 +2036,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     setJournalSpotlightActive(false);
                     setShowJournalModal(true);
                   } : handleOpenJournal}
-                  accessibilityLabel={journalSpotlightActive ? 'Tap to open journal' : `Open journal${claimableQuestAmber > 0 ? `, ${claimableQuestAmber} amber ready in quests` : ''}`}
+                  accessibilityLabel={journalSpotlightActive
+                    ? 'Tap to open journal'
+                    : `Open journal${claimableQuestAmber > 0 ? `, ${claimableQuestAmber} amber ready in quests` : ''}${seasonClaimable > 0 ? `, ${seasonClaimable} season rewards ready` : ''}`}
                   accessibilityRole="button"
                 >
                   <Image source={JOURNAL_ICON} style={styles.headerIconImage} />
-                  {!journalSpotlightActive && claimableQuestAmber > 0 && (
+                  {/* The badge must track EVERY claimable thing behind this
+                      icon, not just quests. The Season Pass lives two taps
+                      deep (journal hub -> Season Pass row) with no home-screen
+                      surface at all, so earned rewards sat unclaimed simply
+                      because nothing ever said they existed. */}
+                  {!journalSpotlightActive && (claimableQuestAmber > 0 || seasonClaimable > 0) && (
                     <View style={styles.headerBadge}>
                       <Text style={styles.headerBadgeText}>!</Text>
                     </View>

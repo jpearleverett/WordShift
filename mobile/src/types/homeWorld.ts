@@ -519,7 +519,9 @@ export function getPuzzlesBetweenSessions(phase: DialoguePhase): number {
 
 /**
  * Phase descriptions for UI
- * Phases are spread across ~300 puzzles for extended gameplay
+ * Phases are spread across ~120 puzzles (see PHASE_THRESHOLDS and
+ * MIN_PUZZLES_FOR_PHASE in constants/gameBalance.ts; the arc was compressed
+ * twice from its original ~300-puzzle geography)
  */
 export const PHASE_DESCRIPTIONS: Record<DialoguePhase, { title: string; mood: string }> = {
   0: { title: 'Bright Days', mood: 'Everything seems wonderful!' },

@@ -59,8 +59,17 @@ const VALID_STEPS: Set<string> = new Set([
 // tapped around lost. Charm never at the cost of the first 30 seconds.
 export const COLD_OPEN_INSTRUCTION = "Oh, you're here! Tap a letter in the top word to pick it up, then tap a spot in the word below to drop it in. The green checks will show you the spots that make real words.";
 
-/** Shown once, the instant the player lands their first valid move on the cold-open board. */
-export const COLD_OPEN_FIRST_MOVE = "There! Oh, lovely. Feel how the whole house settled around that word? Keep going, you have the knack for this.";
+/** Shown once, the instant the player lands their first valid move on the cold-open board.
+ *
+ * Also the ONLY place HINT is ever taught. The button renders during the cold
+ * open with a live balance right beside UNDO, but the line that explained it
+ * (`puzzle_tutorial_valid_move`, below) belongs to the legacy guided-tutorial
+ * step, which a fresh install never enters — so every new player met a lit,
+ * unexplained, spendable control. Named here rather than in the preview-teach
+ * line because that one is already carrying the marks and undo, and because
+ * "if you get stuck" reads better right after a success than before one.
+ */
+export const COLD_OPEN_FIRST_MOVE = "There! Oh, lovely. Feel how the whole house settled around that word? If a board ever puzzles you, HINT will nudge you along. Keep going, you have the knack for this.";
 
 /**
  * Shown once, the first time the player picks a letter up on the cold-open
