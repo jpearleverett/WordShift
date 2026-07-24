@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -49,6 +49,73 @@ const ModeIcon: React.FC<{
   );
 };
 
+/**
+ * Stack emblem — the "cool visual" for a combined loadout. The individual
+ * modifier rows highlight on their own, but a player may not realize they LAYER
+ * (onto the chosen style and onto each other). When 2+ layers are live (a
+ * non-standard style + any modifiers, or 2+ modifiers), this emblem materializes
+ * at the head of the modifier section: the active mode glyphs render as an
+ * OVERLAPPING FANNED STACK (literally stacked, like a dealt hand) with a `xN`
+ * layer count and a dynamic name, so the combination reads as one built thing.
+ * Springs in on mount (reduced-motion pins it), amber-accented like every
+ * reward-tier surface. Pure presentational — no state, no side effects.
+ */
+const StackEmblem: React.FC<{
+  glyphs: string[];
+  title: string;
+  subtitle: string;
+  count: number;
+  t: ReturnType<typeof getSurfaceTheme>;
+}> = ({ glyphs, title, subtitle, count, t }) => {
+  const reduced = getSettingsSync().reducedMotion;
+  const scale = useRef(new Animated.Value(reduced ? 1 : 0.86)).current;
+  const opacity = useRef(new Animated.Value(reduced ? 1 : 0)).current;
+  useEffect(() => {
+    if (reduced) return;
+    const anim = Animated.parallel([
+      Animated.spring(scale, { toValue: 1, friction: 6, tension: 170, useNativeDriver: true }),
+      Animated.timing(opacity, { toValue: 1, duration: 170, useNativeDriver: true }),
+    ]);
+    anim.start();
+    return () => anim.stop();
+  }, [reduced, scale, opacity]);
+  return (
+    <Animated.View
+      accessible
+      accessibilityLabel={`${count} modifiers stacked: ${title}`}
+      style={[
+        styles.stackCard,
+        { backgroundColor: t.amberTint, borderColor: t.amberTintBorder, opacity, transform: [{ scale }] },
+      ]}
+    >
+      <View style={styles.stackFan}>
+        {glyphs.map((g, i) => (
+          <View
+            key={`${g}-${i}`}
+            style={[
+              styles.stackChip,
+              {
+                backgroundColor: t.cardBg,
+                borderColor: t.amberText,
+                marginLeft: i === 0 ? 0 : -9,
+                zIndex: i + 1,
+                transform: [{ rotate: i % 2 === 0 ? '-6deg' : '6deg' }],
+              },
+            ]}
+          >
+            <ModeIcon glyph={g} textStyle={styles.stackChipGlyph} imageStyle={styles.stackChipImage} />
+          </View>
+        ))}
+        <View style={[styles.stackCountPill, { backgroundColor: t.amberText }]}>
+          <Text style={[styles.stackCountText, { color: t.primaryText }]}>{`×${count}`}</Text>
+        </View>
+      </View>
+      <Text style={[styles.stackTitle, { color: t.amberText }]}>{title}</Text>
+      <Text style={[styles.stackSubtitle, { color: t.muted }]}>{subtitle}</Text>
+    </Animated.View>
+  );
+};
+
 // STRUCTURAL LAYOUT CONTRACT (third and final fix for the "menu runs off the
 // bottom, unscrollable" device bug). The menu previously rendered as an
 // absolutely-positioned child of the puzzle screen's ~50dp-tall statsRow and
@@ -73,6 +140,10 @@ const ModeIcon: React.FC<{
 const MENU_ANCHOR_BELOW_INSET = 171;
 // Breathing room kept between the panel's bottom edge and the safe area.
 const MENU_BOTTOM_MARGIN = 12;
+// Opacity ramp for the "more below" fade cue — transparent at the top, near
+// the parchment fill at the bottom, so the last visible row dissolves rather
+// than hard-cutting at the frame edge (the apex Unbroken Weave row sits last).
+const SCROLL_FADE_STOPS = [0.0, 0.22, 0.46, 0.72, 0.95];
 // Bottom padding inside the scroll content so the last row (BLIND / weave)
 // always settles onto clear parchment above the frame's wood band.
 const SCROLL_BOTTOM_PAD = 28;
@@ -258,6 +329,41 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
     ]).start(() => onClose?.());
   }, [reducedMotion, backdropOpacity, cardOpacity, onClose]);
 
+  // Scroll discoverability. Once every modifier is unlocked (the phase-5 menu is
+  // four sections deep), the option list overflows the height-capped panel. The
+  // native scroll indicator alone is easy to miss, and the apex Unbroken Weave
+  // row sits at the very end, so a soft parchment fade + a down-chevron cue at
+  // the base signals "there is more below." It shows only while the list
+  // overflows AND the player has not reached the bottom, and fades out at the
+  // end. `menuAtBottom` starts false so the cue is visible immediately on an
+  // overflowing menu (before any scroll), not only after the first drag.
+  const [menuOverflowing, setMenuOverflowing] = useState(false);
+  const [menuAtBottom, setMenuAtBottom] = useState(false);
+  const scrollCueOpacity = useRef(new Animated.Value(0)).current;
+  const contentHeightRef = useRef(0);
+  const viewportHeightRef = useRef(0);
+
+  const recomputeMenuOverflow = useCallback(() => {
+    const overflowing = contentHeightRef.current > viewportHeightRef.current + 2;
+    setMenuOverflowing(prev => (prev === overflowing ? prev : overflowing));
+  }, []);
+
+  useEffect(() => {
+    if (!visible) return;
+    const showCue = menuOverflowing && !menuAtBottom;
+    if (reducedMotion) {
+      scrollCueOpacity.setValue(showCue ? 1 : 0);
+      return;
+    }
+    const anim = Animated.timing(scrollCueOpacity, {
+      toValue: showCue ? 1 : 0,
+      duration: 150,
+      useNativeDriver: true,
+    });
+    anim.start();
+    return () => anim.stop();
+  }, [visible, menuOverflowing, menuAtBottom, reducedMotion, scrollCueOpacity]);
+
   if (!visible) return null;
 
   const t = getSurfaceTheme(phase);
@@ -268,6 +374,12 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   // Weave) so they read as optional add-ons, distinct from the single-select
   // DIFFICULTY and STYLE sections above. Phase-aware like the other headers.
   const modifierTitle = phase >= 3 ? 'TRIALS' : 'MODIFIERS';
+  // Stackability is not obvious from the toggle rows alone: a player may not
+  // realize these layer onto the chosen style AND onto each other (Challenge +
+  // Blind + Lexicon can all ride one board). One quiet line says so.
+  const modifierHint = phase >= 3
+    ? 'Layer any of these onto your arrangement.'
+    : 'Stack any of these on your style.';
   // Locked options render as visibly locked rows (teased, non-selectable) so
   // the next mechanical goal is always on screen.
   const coreOptions = variantOptions.filter(option => option.group === 'core');
@@ -285,6 +397,33 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   // hidden AND undos capped).
   const challengeActive = undoLimited;
   const blindName = phase >= 3 ? 'the Blind Offering' : 'Blind Mode';
+
+  // Combined-loadout ("stack") readout. The layers are the non-standard style
+  // plus every active modifier; the emblem shows when 2+ are live, so a single
+  // toggle never triggers it (that's just one modifier, not a stack). Glyphs are
+  // gathered in the same order they read down the menu (style, then modifiers).
+  const selectedVariantIcon =
+    currentVariant !== 'standard'
+      ? variantOptions.find(option => option.variant === currentVariant)?.config.icon
+      : undefined;
+  const stackGlyphs: string[] = [];
+  if (selectedVariantIcon) stackGlyphs.push(selectedVariantIcon);
+  if (undoLimited) stackGlyphs.push('🔓');
+  if (blindActive) stackGlyphs.push('🌑');
+  if (lexiconActive) stackGlyphs.push('📖');
+  if (unbrokenWeaveActive) stackGlyphs.push('🧵');
+  const stackCount = stackGlyphs.length;
+  const showStackEmblem = stackCount >= 2;
+  const stackTitle =
+    stackCount >= 4
+      // The fullest loadout (a style + Challenge + Blind + Lexicon) — the same
+      // combination the "Full Arrangement" apex achievement rewards.
+      ? 'THE FULL ARRANGEMENT'
+      : undoLimited && blindActive
+        ? phase >= 3 ? 'THE MAXIMAL OFFERING' : 'MAXIMAL TRIAL'
+        : phase >= 3 ? 'LAYERED OFFERING' : 'STACKED PLAY';
+  const stackSubtitle =
+    phase >= 3 ? 'All layered onto one arrangement.' : 'All active on one board.';
 
   // maxHeight '100%' is DEFINITE here: the panel's parent is the Modal's
   // top/bottom-padded flex container, whose height the OS provides. A short
@@ -424,10 +563,26 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
     <Animated.View style={{ transform: [{ scale: cardScale }], opacity: cardOpacity }}>
     <PanelCard phase={phase} kind="panel" style={panelStyle}>
       <Text style={[styles.menuTitle, { color: t.title }]}>{title}</Text>
+      <View style={styles.scrollWrap}>
       <ScrollView
         style={styles.scrollArea}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={true}
+        persistentScrollbar={true}
+        scrollEventThrottle={32}
+        onLayout={e => {
+          viewportHeightRef.current = e.nativeEvent.layout.height;
+          recomputeMenuOverflow();
+        }}
+        onContentSizeChange={(_w, h) => {
+          contentHeightRef.current = h;
+          recomputeMenuOverflow();
+        }}
+        onScroll={e => {
+          const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+          const atBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - 6;
+          setMenuAtBottom(prev => (prev === atBottom ? prev : atBottom));
+        }}
       >
         <Text style={[styles.sectionTitle, { color: t.muted }]}>DIFFICULTY</Text>
         {DIFFICULTY_LEVELS.map(d => {
@@ -501,6 +656,17 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
           <>
             <View style={[styles.sectionDivider, { backgroundColor: t.sectionBorder }]} />
             <Text style={[styles.sectionTitle, { color: t.muted }]}>{modifierTitle}</Text>
+            <Text style={[styles.sectionSubtitle, { color: t.muted }]}>{modifierHint}</Text>
+
+            {showStackEmblem && (
+              <StackEmblem
+                glyphs={stackGlyphs}
+                title={stackTitle}
+                subtitle={stackSubtitle}
+                count={stackCount}
+                t={t}
+              />
+            )}
 
             <TouchableOpacity
               style={[
@@ -721,6 +887,21 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
           </TouchableOpacity>
         )}
       </ScrollView>
+      {/* "More below" cue: a soft parchment fade + a down-chevron, shown only
+          while the list overflows and the player is not at the bottom (pointer-
+          transparent, reduced-motion pins its opacity with no animation). */}
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.scrollCue, { opacity: scrollCueOpacity }]}
+      >
+        <View style={StyleSheet.absoluteFill}>
+          {SCROLL_FADE_STOPS.map((o, i) => (
+            <View key={i} style={{ flex: 1, backgroundColor: t.cardBg, opacity: o }} />
+          ))}
+        </View>
+        <View style={[styles.scrollCueChevron, { borderColor: t.muted }]} />
+      </Animated.View>
+      </View>
     </PanelCard>
     </Animated.View>
       </View>
@@ -763,11 +944,40 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 3,
   },
+  // Wraps the ScrollView + the "more below" fade cue so the cue can pin to the
+  // scroll region's own bottom edge. Carries the shrinkable flex role inside the
+  // '100%'-capped panel; the ScrollView keeps its own flexShrink so it compresses
+  // and scrolls in lockstep (pinned by puzzleChromeFixes.test.ts).
+  scrollWrap: {
+    flexShrink: 1,
+    minHeight: 0,
+  },
   // The option list SHRINKS to fit inside the '100%'-capped panel (then
   // scrolls); flexGrow: 0 keeps a short list at its natural height.
   scrollArea: {
     flexGrow: 0,
     flexShrink: 1,
+  },
+  // The "more below" cue: a short band pinned to the scroll region's bottom.
+  scrollCue: {
+    position: 'absolute',
+    left: 8,
+    right: 8,
+    bottom: 0,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    overflow: 'hidden',
+  },
+  // Font-independent down-chevron (rotated corner borders — no glyph coverage
+  // risk); color is set inline to the phase's muted ink.
+  scrollCueChevron: {
+    width: 8,
+    height: 8,
+    borderRightWidth: 2,
+    borderBottomWidth: 2,
+    transform: [{ rotate: '45deg' }],
+    marginBottom: 4,
   },
   scrollContent: {
     paddingHorizontal: 10,
@@ -781,6 +991,79 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 3,
     paddingHorizontal: 6,
+  },
+  // One quiet line under the MODIFIERS/TRIALS header telling the player these
+  // toggles stack (onto the chosen style and onto each other).
+  sectionSubtitle: {
+    fontFamily: BODY_FONT_ITALIC,
+    fontSize: FONT_SIZE.caption,
+    lineHeight: 14,
+    fontStyle: 'italic',
+    marginTop: -1,
+    marginBottom: 5,
+    paddingHorizontal: 6,
+  },
+  // Stack emblem — the fused-loadout card shown when 2+ layers are live.
+  stackCard: {
+    marginTop: 4,
+    marginBottom: 7,
+    marginHorizontal: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    alignItems: 'center',
+  },
+  stackFan: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+    // The first chip carries no negative margin; the rest overlap leftward, so
+    // the row's left edge is the first chip and the fan reads as a stack.
+    paddingLeft: 3,
+  },
+  stackChip: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+  },
+  stackChipGlyph: {
+    fontFamily: BODY_FONT,
+    fontSize: FONT_SIZE.bodyLg,
+  },
+  stackChipImage: {
+    width: 18,
+    height: 18,
+  },
+  stackCountPill: {
+    marginLeft: 9,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  stackCountText: {
+    fontFamily: PIXEL_FONT_BOLD,
+    fontSize: FONT_SIZE.caption,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+  },
+  stackTitle: {
+    fontFamily: PIXEL_FONT_BOLD,
+    fontSize: FONT_SIZE.small,
+    fontWeight: '900',
+    letterSpacing: 0.6,
+    textAlign: 'center',
+  },
+  stackSubtitle: {
+    fontFamily: BODY_FONT_ITALIC,
+    fontSize: FONT_SIZE.caption,
+    lineHeight: 14,
+    fontStyle: 'italic',
+    marginTop: 1,
+    textAlign: 'center',
   },
   menuRow: {
     flexDirection: 'row',
