@@ -41,6 +41,10 @@ const BANKS = [
   { bank: 'REVERSE_MEDIUM', key: 'reverse_medium', liveFile: 'puzzleBankReverseMedium.ts', exportName: 'PUZZLE_BANK_REVERSE_MEDIUM', sidecar: '.gatedRegenReverse_reverse_medium_output.ts' },
   { bank: 'REVERSE_MEDIUM_PLUS', key: 'reverse_medium_plus', liveFile: 'puzzleBankReverseMediumPlus.ts', exportName: 'PUZZLE_BANK_REVERSE_MEDIUM_PLUS', sidecar: '.gatedRegenReverse_reverse_medium_plus_output.ts' },
   { bank: 'REVERSE_HARD', key: 'reverse_hard', liveFile: 'puzzleBankReverseHard.ts', exportName: 'PUZZLE_BANK_REVERSE_HARD', sidecar: '.gatedRegenReverse_reverse_hard_output.ts' },
+  { bank: 'DOUBLE_EASY', key: 'double_easy', liveFile: 'puzzleBankDoubleShiftEasy.ts', exportName: 'PUZZLE_BANK_DOUBLE_SHIFT_EASY', sidecar: '.gatedRegenDouble_double_easy_output.ts' },
+  { bank: 'DOUBLE_MEDIUM', key: 'double_medium', liveFile: 'puzzleBankDoubleShiftMedium.ts', exportName: 'PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM', sidecar: '.gatedRegenDouble_double_medium_output.ts' },
+  { bank: 'DOUBLE_MEDIUM_PLUS', key: 'double_medium_plus', liveFile: 'puzzleBankDoubleShiftMediumPlus.ts', exportName: 'PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM_PLUS', sidecar: '.gatedRegenDouble_double_medium_plus_output.ts' },
+  { bank: 'DOUBLE_HARD', key: 'double_hard', liveFile: 'puzzleBankDoubleShiftHard.ts', exportName: 'PUZZLE_BANK_DOUBLE_SHIFT_HARD', sidecar: '.gatedRegenDouble_double_hard_output.ts' },
 ];
 
 /** Count serialized puzzles by their id fields (robust to header drift). */

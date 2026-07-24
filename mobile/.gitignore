@@ -46,4 +46,7 @@ src/data/.gatedRegen_*.log
 src/data/.gatedRegenReverse_*_progress.json*
 src/data/.gatedRegenReverse_*_output.ts*
 src/data/.gatedRegenReverse_*.log
+src/data/.gatedRegenDouble_*_progress.json*
+src/data/.gatedRegenDouble_*_output.ts*
+src/data/.gatedRegenDouble_*.log
 src/data/.pre_gated_*.ts.bak

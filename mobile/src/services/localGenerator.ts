@@ -3105,6 +3105,7 @@ export async function generateDoubleShiftPuzzle(
     solution,
     wordLength,
     isDoubleShift: true,
+    qualityScore: bestPuzzle.score,
   };
 }
 
