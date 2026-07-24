@@ -252,11 +252,18 @@ interface GateParams {
 // max displayed rank is p50 ~0.77-0.87), a light backstop against obscure
 // answers on top of the scorer's own de-rarify preference. The heavy difficulty
 // differentiation is the single-choice ceiling + the trap floor.
+// 5-letter bright (phase 0-2) boards are the scarcest choice-rich boards (the
+// less-connected common vocabulary), so the ultra-tight 0.55/0.58 bright bars
+// starved MP/HARD bright supply and skewed them dread-heavy. MP/HARD bright
+// ceilings are relaxed toward the original gated regen's 0.65 to restore bright
+// supply + phase balance while staying tighter than the old dread bar and
+// keeping every other win (anti-boring, featured band, clean vocab, traps). The
+// 4-letter EASY/MEDIUM banks fill bright phases fine at 0.50, so they stay tight.
 const GATE_BY_BANK: Record<BankName, GateParams> = {
   EASY:        { minPathsEarly: 2, minPathsLate: 2, singleChoiceEarly: 0.50, singleChoiceLate: 0.62, featuredCeiling: 0.92, deadEndCeiling: 0.25, trapFloor: 0 },
   MEDIUM:      { minPathsEarly: 2, minPathsLate: 2, singleChoiceEarly: 0.50, singleChoiceLate: 0.65, featuredCeiling: 0.94, deadEndCeiling: 0.25, trapFloor: 0 },
-  MEDIUM_PLUS: { minPathsEarly: 2, minPathsLate: 2, singleChoiceEarly: 0.55, singleChoiceLate: 0.68, featuredCeiling: 0.96, deadEndCeiling: 0.25, trapFloor: 0.30 },
-  HARD:        { minPathsEarly: 2, minPathsLate: 2, singleChoiceEarly: 0.58, singleChoiceLate: 0.72, featuredCeiling: 0.98, deadEndCeiling: 0.25, trapFloor: 0.35 },
+  MEDIUM_PLUS: { minPathsEarly: 2, minPathsLate: 2, singleChoiceEarly: 0.62, singleChoiceLate: 0.70, featuredCeiling: 0.96, deadEndCeiling: 0.28, trapFloor: 0.30 },
+  HARD:        { minPathsEarly: 2, minPathsLate: 2, singleChoiceEarly: 0.66, singleChoiceLate: 0.74, featuredCeiling: 0.98, deadEndCeiling: 0.28, trapFloor: 0.30 },
 };
 const GATE = GATE_BY_BANK[BANK_NAME];
 
