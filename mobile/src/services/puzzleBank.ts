@@ -153,12 +153,13 @@ const BANK_REGISTRY: Record<string, BankRegistryEntry> = {
   ds_medium:      { storageKey: 'wordshift_played_ds_medium_puzzle_ids',    loadBank: () => require('../data/puzzleBankDoubleShiftMedium').PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM,  bankData: null, cache: null, idToWords: null },
   ds_mp:          { storageKey: 'wordshift_played_ds_mp_puzzle_ids',        loadBank: () => require('../data/puzzleBankDoubleShiftMediumPlus').PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM_PLUS, bankData: null, cache: null, idToWords: null },
   ds_hard:        { storageKey: 'wordshift_played_ds_hard_puzzle_ids',      loadBank: () => require('../data/puzzleBankDoubleShiftHard').PUZZLE_BANK_DOUBLE_SHIFT_HARD,      bankData: null, cache: null, idToWords: null },
-  // EXPERT (apex): standard 6-letter/5-row bank + double 5-letter/7-row bank.
-  // EXPERT + REVERSE has no bank — 6-letter reverse-solvable is scarce, so (like
-  // the Lexicon reverse combos) it generates ON-DEVICE (getBankKey returns
-  // reverse_expert, absent here → getBankForSelection null → on-device path).
+  // EXPERT (apex): standard 6-letter/5-row bank + double 5-letter/7-row bank +
+  // a 6-letter reverse bank (added after the hours-long gated reverse run — fair
+  // 6-letter reverse-solvable chains are scarce but reachable; the bank is
+  // smaller than the E/M/MP/H reverse banks, and recycling handles the size).
   std_expert:     { storageKey: 'wordshift_played_std_expert_puzzle_ids',   loadBank: () => require('../data/puzzleBankExpert').PUZZLE_BANK_EXPERT,                          bankData: null, cache: null, idToWords: null },
   ds_expert:      { storageKey: 'wordshift_played_ds_expert_puzzle_ids',     loadBank: () => require('../data/puzzleBankDoubleShiftExpert').PUZZLE_BANK_DOUBLE_SHIFT_EXPERT,   bankData: null, cache: null, idToWords: null },
+  reverse_expert: { storageKey: 'wordshift_played_reverse_expert_puzzle_ids', loadBank: () => require('../data/puzzleBankReverseExpert').PUZZLE_BANK_REVERSE_EXPERT,          bankData: null, cache: null, idToWords: null },
   // LEXICON (rare-word mode): a rare-vocabulary bank per variant x difficulty,
   // selected when the Lexicon toggle is on (composes with any variant/difficulty).
   lex_std_easy:      { storageKey: 'wordshift_played_lex_std_easy_puzzle_ids',   loadBank: () => require('../data/lexiconBankEasy').LEXICON_BANK_EASY,                                 bankData: null, cache: null, idToWords: null },
@@ -166,10 +167,17 @@ const BANK_REGISTRY: Record<string, BankRegistryEntry> = {
   lex_std_mp:        { storageKey: 'wordshift_played_lex_std_mp_puzzle_ids',     loadBank: () => require('../data/lexiconBankMediumPlus').LEXICON_BANK_MEDIUM_PLUS,                    bankData: null, cache: null, idToWords: null },
   lex_std_hard:      { storageKey: 'wordshift_played_lex_std_hard_puzzle_ids',   loadBank: () => require('../data/lexiconBankHard').LEXICON_BANK_HARD,                                 bankData: null, cache: null, idToWords: null },
   lex_std_expert:    { storageKey: 'wordshift_played_lex_std_expert_puzzle_ids', loadBank: () => require('../data/lexiconBankExpert').LEXICON_BANK_EXPERT,                             bankData: null, cache: null, idToWords: null },
-  // Lexicon + REVERSE has no dedicated bank: rare + reverse-solvable is the
-  // scarcest supply, so it generates ON-DEVICE with the rare lean (like
-  // Lexicon + Speed). getBankKey still returns lex_rev_*, but the missing
-  // registry entry makes getBankForSelection return null → on-device path.
+  // Lexicon + REVERSE: the four larger tiers (EASY/MEDIUM/MEDIUM_PLUS/HARD) DO
+  // have banks now (added after the hours-long gated rare-reverse run). Only
+  // lex_rev_EXPERT stays ON-DEVICE: rare + reverse-solvable + 6-letter is the
+  // scarcest corner of the dictionary and it plateaued at ~1 puzzle, so
+  // getBankKey returns lex_rev_expert but the absent registry entry makes
+  // getBankForSelection return null → on-device rare-lean path (like Lexicon +
+  // Speed, which likewise has no bank).
+  lex_rev_easy:      { storageKey: 'wordshift_played_lex_rev_easy_puzzle_ids',    loadBank: () => require('../data/lexiconBankReverseEasy').LEXICON_BANK_REVERSE_EASY,                 bankData: null, cache: null, idToWords: null },
+  lex_rev_medium:    { storageKey: 'wordshift_played_lex_rev_medium_puzzle_ids',  loadBank: () => require('../data/lexiconBankReverseMedium').LEXICON_BANK_REVERSE_MEDIUM,             bankData: null, cache: null, idToWords: null },
+  lex_rev_mp:        { storageKey: 'wordshift_played_lex_rev_mp_puzzle_ids',      loadBank: () => require('../data/lexiconBankReverseMediumPlus').LEXICON_BANK_REVERSE_MEDIUM_PLUS,    bankData: null, cache: null, idToWords: null },
+  lex_rev_hard:      { storageKey: 'wordshift_played_lex_rev_hard_puzzle_ids',    loadBank: () => require('../data/lexiconBankReverseHard').LEXICON_BANK_REVERSE_HARD,                 bankData: null, cache: null, idToWords: null },
   lex_ds_easy:       { storageKey: 'wordshift_played_lex_ds_easy_puzzle_ids',    loadBank: () => require('../data/lexiconBankDoubleShiftEasy').LEXICON_BANK_DOUBLE_EASY,               bankData: null, cache: null, idToWords: null },
   lex_ds_medium:     { storageKey: 'wordshift_played_lex_ds_medium_puzzle_ids',  loadBank: () => require('../data/lexiconBankDoubleShiftMedium').LEXICON_BANK_DOUBLE_MEDIUM,           bankData: null, cache: null, idToWords: null },
   lex_ds_mp:         { storageKey: 'wordshift_played_lex_ds_mp_puzzle_ids',      loadBank: () => require('../data/lexiconBankDoubleShiftMediumPlus').LEXICON_BANK_DOUBLE_MEDIUM_PLUS,  bankData: null, cache: null, idToWords: null },

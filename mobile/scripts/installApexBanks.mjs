@@ -36,6 +36,18 @@ for (const [key, Cap] of DIFFS) {
   BANKS.push([`.gatedRegenDouble_lexicon_double_${key}_output.ts`, `lexiconBankDoubleShift${Cap}.ts`, `LEXICON_BANK_DOUBLE_${key.toUpperCase()}`]);
 }
 
+// The REVERSE apex banks were generated later (hours-long rare/reverse runs) and
+// DO get pre-generated banks now — one EXPERT-reverse bank + the four larger
+// Lexicon-reverse banks. `lexicon_reverse_expert` is deliberately absent: rare +
+// reverse-solvable + 6-letter is the scarcest corner of the dictionary and it
+// plateaued at ~1 puzzle, so that one combo stays on on-device generation (its
+// sidecar falls under MIN_COUNT and is skipped automatically — no live file, no
+// registry entry). EXPERT-reverse (fair) reached a usable bank.
+BANKS.push(['.gatedRegenReverse_reverse_expert_output.ts', 'puzzleBankReverseExpert.ts', 'PUZZLE_BANK_REVERSE_EXPERT']);
+for (const [key, Cap] of DIFFS) {
+  BANKS.push([`.gatedRegenReverse_lexicon_reverse_${key}_output.ts`, `lexiconBankReverse${Cap}.ts`, `LEXICON_BANK_REVERSE_${key.toUpperCase()}`]);
+}
+
 const countPuzzles = (content) => (content.match(/\{id:'/g) ?? []).length;
 
 let installed = 0, skipped = 0, failed = 0;

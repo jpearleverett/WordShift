@@ -25,16 +25,23 @@ import { PUZZLE_BANK_DOUBLE_SHIFT_EASY } from '../data/puzzleBankDoubleShiftEasy
 import { PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM } from '../data/puzzleBankDoubleShiftMedium';
 import { PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM_PLUS } from '../data/puzzleBankDoubleShiftMediumPlus';
 import { PUZZLE_BANK_DOUBLE_SHIFT_HARD } from '../data/puzzleBankDoubleShiftHard';
-// EXPERT (apex) banks — standard + double (reverse is on-device, no bank)
+// EXPERT (apex) banks — standard + double + a 6-letter reverse bank (added after
+// the gated rare/reverse run; EXPERT+reverse+Lexicon stays on-device).
 import { PUZZLE_BANK_EXPERT } from '../data/puzzleBankExpert';
 import { PUZZLE_BANK_DOUBLE_SHIFT_EXPERT } from '../data/puzzleBankDoubleShiftExpert';
+import { PUZZLE_BANK_REVERSE_EXPERT } from '../data/puzzleBankReverseExpert';
 // Lexicon (rare-word) banks — standard/reverse/double x 5 difficulties
 import { LEXICON_BANK_EASY } from '../data/lexiconBankEasy';
 import { LEXICON_BANK_MEDIUM } from '../data/lexiconBankMedium';
 import { LEXICON_BANK_MEDIUM_PLUS } from '../data/lexiconBankMediumPlus';
 import { LEXICON_BANK_HARD } from '../data/lexiconBankHard';
 import { LEXICON_BANK_EXPERT } from '../data/lexiconBankExpert';
-// Lexicon + REVERSE has no bank (on-device rare-reverse generation), so nothing to import here.
+// Lexicon + REVERSE: the four larger tiers have banks (added after the gated
+// rare/reverse run); only lex_rev_EXPERT stays on-device (plateaued at ~1).
+import { LEXICON_BANK_REVERSE_EASY } from '../data/lexiconBankReverseEasy';
+import { LEXICON_BANK_REVERSE_MEDIUM } from '../data/lexiconBankReverseMedium';
+import { LEXICON_BANK_REVERSE_MEDIUM_PLUS } from '../data/lexiconBankReverseMediumPlus';
+import { LEXICON_BANK_REVERSE_HARD } from '../data/lexiconBankReverseHard';
 import { LEXICON_BANK_DOUBLE_EASY } from '../data/lexiconBankDoubleShiftEasy';
 import { LEXICON_BANK_DOUBLE_MEDIUM } from '../data/lexiconBankDoubleShiftMedium';
 import { LEXICON_BANK_DOUBLE_MEDIUM_PLUS } from '../data/lexiconBankDoubleShiftMediumPlus';
@@ -77,6 +84,11 @@ describe('bank solvability (shipped rules)', () => {
     ['DS_HARD', 'double_shift', PUZZLE_BANK_DOUBLE_SHIFT_HARD],
     ['EXPERT', 'standard', PUZZLE_BANK_EXPERT],
     ['DS_EXPERT', 'double_shift', PUZZLE_BANK_DOUBLE_SHIFT_EXPERT],
+    ['REVERSE_EXPERT', 'reverse', PUZZLE_BANK_REVERSE_EXPERT],
+    ['LEX_REV_EASY', 'reverse', LEXICON_BANK_REVERSE_EASY],
+    ['LEX_REV_MEDIUM', 'reverse', LEXICON_BANK_REVERSE_MEDIUM],
+    ['LEX_REV_MEDIUM_PLUS', 'reverse', LEXICON_BANK_REVERSE_MEDIUM_PLUS],
+    ['LEX_REV_HARD', 'reverse', LEXICON_BANK_REVERSE_HARD],
     ['LEX_EASY', 'standard', LEXICON_BANK_EASY],
     ['LEX_MEDIUM', 'standard', LEXICON_BANK_MEDIUM],
     ['LEX_MEDIUM_PLUS', 'standard', LEXICON_BANK_MEDIUM_PLUS],

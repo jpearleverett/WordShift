@@ -73,6 +73,14 @@ import { LEXICON_BANK_DOUBLE_MEDIUM } from '../data/lexiconBankDoubleShiftMedium
 import { LEXICON_BANK_DOUBLE_MEDIUM_PLUS } from '../data/lexiconBankDoubleShiftMediumPlus';
 import { LEXICON_BANK_DOUBLE_HARD } from '../data/lexiconBankDoubleShiftHard';
 import { LEXICON_BANK_DOUBLE_EXPERT } from '../data/lexiconBankDoubleShiftExpert';
+// Reverse apex banks (added after the gated rare/reverse run): a 6-letter EXPERT
+// reverse bank + the four larger Lexicon-reverse tiers. lex_rev_EXPERT stays
+// on-device (plateaued at ~1), so it has no bank/row.
+import { PUZZLE_BANK_REVERSE_EXPERT } from '../data/puzzleBankReverseExpert';
+import { LEXICON_BANK_REVERSE_EASY } from '../data/lexiconBankReverseEasy';
+import { LEXICON_BANK_REVERSE_MEDIUM } from '../data/lexiconBankReverseMedium';
+import { LEXICON_BANK_REVERSE_MEDIUM_PLUS } from '../data/lexiconBankReverseMediumPlus';
+import { LEXICON_BANK_REVERSE_HARD } from '../data/lexiconBankReverseHard';
 import { PreGeneratedPuzzle } from '../data/puzzleBankTypes';
 
 interface BankSpec {
@@ -141,6 +149,19 @@ const BANKS: BankSpec[] = [
   { name: 'LEX_DS_HARD', bank: LEXICON_BANK_DOUBLE_HARD, cap: 10, minUnique: 985, minPuzzles: 175 },
   // LEX_DS_EXPERT 62 / max 6 / 552 unique (niche combo)
   { name: 'LEX_DS_EXPERT', bank: LEXICON_BANK_DOUBLE_EXPERT, cap: 10, minUnique: 470, minPuzzles: 55 },
+  // Reverse apex banks (2026-07 gated rare/reverse run). Smaller than the E/M/MP/H
+  // reverse banks — fair 6-letter reverse (EXPERT) and rare reverse-solvable
+  // (Lexicon) are scarcer supply. Floors ~90% of measured; caps = measured max.
+  // REVERSE_EXPERT 200 / max 10 / 1182 unique
+  { name: 'REVERSE_EXPERT', bank: PUZZLE_BANK_REVERSE_EXPERT, cap: 10, minUnique: 1060, minPuzzles: 180 },
+  // LEX_REV_EASY 239 / max 6 / 1193 unique
+  { name: 'LEX_REV_EASY', bank: LEXICON_BANK_REVERSE_EASY, cap: 6, minUnique: 1070, minPuzzles: 215 },
+  // LEX_REV_MEDIUM 240 / max 8 / 1392 unique
+  { name: 'LEX_REV_MEDIUM', bank: LEXICON_BANK_REVERSE_MEDIUM, cap: 8, minUnique: 1250, minPuzzles: 216 },
+  // LEX_REV_MEDIUM_PLUS 240 / max 10 / 1433 unique
+  { name: 'LEX_REV_MEDIUM_PLUS', bank: LEXICON_BANK_REVERSE_MEDIUM_PLUS, cap: 10, minUnique: 1285, minPuzzles: 216 },
+  // LEX_REV_HARD 149 / max 12 / 1128 unique (niche: rare + reverse + 5-letter)
+  { name: 'LEX_REV_HARD', bank: LEXICON_BANK_REVERSE_HARD, cap: 12, minUnique: 1010, minPuzzles: 134 },
 ];
 
 /** All words a player sees in a puzzle: the starting chain + every formed word. */
