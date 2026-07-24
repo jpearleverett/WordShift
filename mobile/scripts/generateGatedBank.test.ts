@@ -262,8 +262,15 @@ interface GateParams {
 const GATE_BY_BANK: Record<BankName, GateParams> = {
   EASY:        { minPathsEarly: 2, minPathsLate: 2, singleChoiceEarly: 0.50, singleChoiceLate: 0.62, featuredCeiling: 0.92, deadEndCeiling: 0.25, trapFloor: 0 },
   MEDIUM:      { minPathsEarly: 2, minPathsLate: 2, singleChoiceEarly: 0.50, singleChoiceLate: 0.65, featuredCeiling: 0.94, deadEndCeiling: 0.25, trapFloor: 0 },
-  MEDIUM_PLUS: { minPathsEarly: 2, minPathsLate: 2, singleChoiceEarly: 0.62, singleChoiceLate: 0.70, featuredCeiling: 0.96, deadEndCeiling: 0.28, trapFloor: 0.30 },
-  HARD:        { minPathsEarly: 2, minPathsLate: 2, singleChoiceEarly: 0.66, singleChoiceLate: 0.74, featuredCeiling: 0.98, deadEndCeiling: 0.28, trapFloor: 0.30 },
+  // The D3 fix (path-count dedup) made completePathCount stricter than the
+  // original gated regen measured, so the 5-letter single-choice bars are
+  // relaxed further than the old 0.65/0.75 to restore comparable supply AND let
+  // the dread phases (3-4) fill — an over-tight HARD starved its marquee
+  // VOID/OMEN/TOMB dread boards. completePathCount>=2 (the multi-route
+  // guarantee) is kept; the trap floor eases so dread supply wins over trap
+  // density on the hardest banks.
+  MEDIUM_PLUS: { minPathsEarly: 2, minPathsLate: 2, singleChoiceEarly: 0.68, singleChoiceLate: 0.76, featuredCeiling: 0.96, deadEndCeiling: 0.30, trapFloor: 0.20 },
+  HARD:        { minPathsEarly: 2, minPathsLate: 2, singleChoiceEarly: 0.72, singleChoiceLate: 0.82, featuredCeiling: 0.98, deadEndCeiling: 0.30, trapFloor: 0.20 },
 };
 const GATE = GATE_BY_BANK[BANK_NAME];
 
