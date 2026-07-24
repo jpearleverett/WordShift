@@ -143,4 +143,56 @@ describe.each(BANKS)('bank diversity: $name', ({ bank, cap, minUnique, minPuzzle
     const keys = new Set(bank.map(p => p.words.join('-')));
     expect(keys.size).toBe(bank.length);
   });
+
+  // Structural-monotony guards (B1): a word-cap alone can't see a bank that is
+  // dominated by one starting letter, one moved letter (the S-shuffle), or one
+  // shift shape. Thresholds sit well above the measured maxima (start ~18%,
+  // moved ~18%, S-share ~20%) so they pass today and catch a future regression.
+  it('no single starting letter dominates the chains', () => {
+    const starts = new Map<string, number>();
+    for (const p of bank) starts.set(p.words[0][0], (starts.get(p.words[0][0]) ?? 0) + 1);
+    const maxShare = Math.max(...starts.values()) / bank.length;
+    expect(maxShare).toBeLessThanOrEqual(0.30);
+  });
+
+  it('no single first-moved letter dominates', () => {
+    const moved = new Map<string, number>();
+    for (const p of bank) {
+      const ml = (p.solution?.[0]?.letterToMove ?? '').toUpperCase();
+      if (ml) moved.set(ml, (moved.get(ml) ?? 0) + 1);
+    }
+    const maxShare = Math.max(...moved.values()) / bank.length;
+    expect(maxShare).toBeLessThanOrEqual(0.30);
+  });
+
+  it('S is not the runaway moved letter (S-shuffle guard)', () => {
+    let sMoves = 0, allMoves = 0;
+    for (const p of bank) for (const step of p.solution ?? []) {
+      allMoves++;
+      if ((step.letterToMove ?? '').toUpperCase() === 'S') sMoves++;
+    }
+    expect(sMoves / allMoves).toBeLessThanOrEqual(0.30);
+  });
+});
+
+// Cross-bank overlap guard (B2): the per-bank cap/dedup can't see the same
+// chain shipped in two different banks. Currently 0 chains are shared across
+// any two banks; keep it that way so players moving between difficulties/
+// variants never re-solve an identical board.
+describe('cross-bank chain overlap', () => {
+  it('no chain appears in more than one bank', () => {
+    const chainToBanks = new Map<string, Set<string>>();
+    for (const { name, bank } of BANKS) {
+      for (const p of bank) {
+        const key = p.words.join('-');
+        if (!chainToBanks.has(key)) chainToBanks.set(key, new Set());
+        chainToBanks.get(key)!.add(name);
+      }
+    }
+    const shared = [...chainToBanks.entries()]
+      .filter(([, banks]) => banks.size > 1)
+      .slice(0, 10)
+      .map(([chain, banks]) => `${chain} in ${[...banks].join(',')}`);
+    expect(shared).toEqual([]);
+  });
 });
