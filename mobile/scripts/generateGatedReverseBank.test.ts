@@ -87,6 +87,13 @@ const CONFIG: ReverseBankConfig = LEXICON
       featuredCeiling: 0.86, // fair ceiling: excludes the obscure inflection tail
       featuredFloorMean: LEXICON_FLOOR_BY_BANK[BANK_NAME],
       maxSShare: Math.max(BASE_CONFIG.maxSShare, 0.60), // rare vocab; ease the S cap
+      // Word-usage cap. EXPERT (rare + reverse-solvable + 6-letter) is the
+      // scarcest supply — the rare 6-letter vocabulary is small, so words hit
+      // the default cap fast and cap the bank at ~76. Raising ONLY the
+      // lexicon-EXPERT cap lets each rare word appear in a few more boards, so
+      // the bank grows (~110-120) with the rarity untouched — a modest diversity
+      // trade for the game's scarcest niche. The other tiers reached 240 fine.
+      wordCap: BANK_NAME === 'EXPERT' ? 15 : BASE_CONFIG.wordCap,
     }
   : BASE_CONFIG;
 const RARITY_LEAN = LEXICON ? 2 : 0; // EXPERT (a difficulty) keeps the fair default scorer
@@ -184,7 +191,15 @@ import { PreGeneratedPuzzle } from '../src/data/puzzleBankTypes';
 // EXPERT reverse (6-letter) and Lexicon reverse (rare) generation is slower and
 // scarcer, so they target a smaller total (recycling handles small reverse banks).
 const PHASE_TARGETS: Record<number, number> = LEXICON
-  ? { 0: 60, 1: 50, 2: 50, 3: 50, 4: 30 }   // 240 (rare reverse is the thinnest supply; plateau handles the rest)
+  ? (BANK_NAME === 'EXPERT'
+      // lex_rev_expert (rare + reverse + 6-letter — the scarcest corner) has no
+      // dread gate on acceptance, and its rare DREAD supply is near-empty, so the
+      // even 60/50/50/50/30 split starved the later buckets and capped it ~76.
+      // Front-load the plentiful bright bucket (the boards are bright-dominated
+      // regardless) so the bank can actually grow; the plateau exit handles the
+      // real ceiling.
+      ? { 0: 140, 1: 40, 2: 30, 3: 20, 4: 10 }   // 240
+      : { 0: 60, 1: 50, 2: 50, 3: 50, 4: 30 })   // 240 (E/M/MP/H reached this fine)
   : BANK_NAME === 'EXPERT'
   ? { 0: 90, 1: 75, 2: 75, 3: 75, 4: 40 }   // 355
   : { 0: 120, 1: 100, 2: 100, 3: 100, 4: 80 }; // 500
