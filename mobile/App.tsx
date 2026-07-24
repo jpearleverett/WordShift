@@ -182,7 +182,7 @@ import { recordInterstitialSeen, consumePatronNudge, armRemoveAdsNudgeIfEligible
 import { createRevenueCatBillingProvider } from './src/services/providers/revenueCatBilling';
 import { createAdMobAdProvider } from './src/services/providers/googleAdMobAds';
 import { installGlobalErrorHandler, setErrorForwarder } from './src/services/errorReporting';
-import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST, STARTER_INTRO_MIN_PUZZLES, FINALE_DWELL_PUZZLES, INTERSTITIAL_MIN_PUZZLES, HOUSE_ASK_MIN_PUZZLES, HOUSE_ASK_CHANCE, HOUSE_ASK_REWARD_AMBER, REWARDED_HINT_GRANT, EXPERT_DIFFICULTY_UNLOCK_PUZZLES, LEXICON_UNLOCK_PUZZLES } from './src/constants/gameBalance';
+import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST, STARTER_INTRO_MIN_PUZZLES, FINALE_DWELL_PUZZLES, FINALE_ARM_MIN_PUZZLES, INTERSTITIAL_MIN_PUZZLES, HOUSE_ASK_MIN_PUZZLES, HOUSE_ASK_CHANCE, HOUSE_ASK_REWARD_AMBER, REWARDED_HINT_GRANT, EXPERT_DIFFICULTY_UNLOCK_PUZZLES, LEXICON_UNLOCK_PUZZLES } from './src/constants/gameBalance';
 import { pickHouseAsk, evaluateHouseAsk, HouseAsk } from './src/services/houseAsks';
 import { getCumulativeStats } from './src/services/starRating';
 
@@ -2596,18 +2596,41 @@ function MainApp() {
       if (!victory.phaseChanged && persistence.currentPhase >= 4) {
         try {
           const houseComplete = await isHouseCompleted();
-          if (houseComplete) {
+          // ENDGAME ELIGIBILITY. This used to require houseComplete OUTRIGHT,
+          // which made a SOFT CURRENCY load-bearing for narrative completion:
+          // markPostRevelation() is the only route to Phase 5, and it sat
+          // inside this branch. Completing the house costs 4,615 amber on a
+          // specific ladder, while ~5,600 amber of cosmetics is ungated and
+          // visible from solve 0 — so a player who spent on cosmetics, or who
+          // simply earned slowly, was silently and permanently locked out of
+          // the revelation with no warning surface anywhere in the game.
+          //
+          // The design rule is that amber must never ACCELERATE the story, and
+          // that still holds exactly: the fallback below is a REAL-SOLVE floor
+          // (115), which no amount of amber or cash can buy. The rule simply
+          // needed its mirror — amber must not be able to BLOCK the story
+          // either. The house stays the intended route (it completes ~96-100,
+          // comfortably before the arming floor), so for virtually every player
+          // nothing changes; this only stops the ending being strandable.
+          const endgameEligible = houseComplete || completedTotal >= FINALE_ARM_MIN_PUZZLES;
+          if (endgameEligible) {
             const finalDone = await isFinalPuzzleCompleted();
             if (!finalDone) {
               if (wasFinalBoard) {
                 // The last arrangement is complete. markFinalPuzzleCompleted
                 // also disarms the finale (single atomic write).
                 await markFinalPuzzleCompleted();
+                // The coda must not claim a finished house on the solve-floor
+                // fallback path (see endgameEligible above) — a player who
+                // reached the last arrangement with rooms still unbuilt would
+                // be told they completed something they can see they did not.
                 orchestrationActions.setCompletionCoda({
-                  title: 'THE HOUSE STANDS COMPLETE',
-                  text: persistence.currentPhase >= 3
-                    ? 'You finished what was being built. There is no pretending now.'
-                    : 'You completed the house and reached the final path.',
+                  title: houseComplete ? 'THE HOUSE STANDS COMPLETE' : 'THE ARRANGEMENT IS COMPLETE',
+                  text: houseComplete
+                    ? (persistence.currentPhase >= 3
+                        ? 'You finished what was being built. There is no pretending now.'
+                        : 'You completed the house and reached the final path.')
+                    : 'The rooms are not all standing, and it did not need them. It only ever needed the words.',
                 });
                 queueEndgameCinematic(FINAL_PUZZLE_EVENT);
               } else if (!(await isFinaleArmed())) {
@@ -3537,12 +3560,25 @@ function MainApp() {
       victoryFlow.victoryData?.puzzlesSolved ??
       persistence.cumulativeStats?.totalPuzzlesCompleted ??
       0;
-    if (!(await canShowExitNudge(solved))) return;
-    if (await maybeShowSharePrompt()) {
-      await recordExitNudgeShown(solved);
+    // Notification permission is RETENTION INFRASTRUCTURE, not a nudge, so it
+    // runs BEFORE the nudge gate. scheduleAllNotifications() no-ops entirely
+    // without permission, so until this is granted the whole ladder — win-back
+    // rungs, streak-risk pings, quest expiry, daily reminders — is inert.
+    // Behind the gate it was unreachable until EXIT_NUDGE_MIN_PUZZLES (12),
+    // and it sat BELOW the share prompt, which fires on the first flawless win
+    // (trivially common on curated/EASY boards) and short-circuits the chain.
+    // Add the 5-solve spacing and the ad/review-sheet skips and the realistic
+    // first ask was solve ~18-23 — so every player who lapsed before that was
+    // permanently unreachable, which is precisely the cohort the win-back
+    // ladder exists to recover. It keeps all its own guards (not onboarding,
+    // no Fox intro queued, asked-once, already-granted) and still consumes the
+    // exit-nudge slot once past the gate, so it can never stack with another.
+    if (await maybePromptForNotifications()) {
+      if (await canShowExitNudge(solved)) await recordExitNudgeShown(solved);
       return;
     }
-    if (await maybePromptForNotifications()) {
+    if (!(await canShowExitNudge(solved))) return;
+    if (await maybeShowSharePrompt()) {
       await recordExitNudgeShown(solved);
       return;
     }

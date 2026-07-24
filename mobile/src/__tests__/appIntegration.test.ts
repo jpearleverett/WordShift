@@ -409,9 +409,34 @@ describe('proactive share prompt', () => {
     // shown prompt must end the chain before the remove-ads / patron nudges.
     expect(APP_TSX).toMatch(/const maybePromptForNotifications = useCallback\(async \(\): Promise<boolean>/);
     expect(APP_TSX).toMatch(/if \(await maybeShowSharePrompt\(\)\) \{\s*await recordExitNudgeShown\(solved\);\s*return;\s*\}/);
-    expect(APP_TSX).toMatch(/if \(await maybePromptForNotifications\(\)\) \{\s*await recordExitNudgeShown\(solved\);\s*return;\s*\}/);
     expect(APP_TSX).toMatch(/if \(await maybeShowRemoveAdsOffer\(\)\) \{\s*await recordExitNudgeShown\(solved\);\s*return;\s*\}/);
     expect(APP_TSX).toMatch(/if \(await maybeShowPatronNudge\(\)\) \{\s*await recordExitNudgeShown\(solved\);\s*\}/);
+  });
+
+  test('notification permission is asked BEFORE the nudge gate (retention infrastructure, not a nudge)', () => {
+    // scheduleAllNotifications() no-ops without permission, so the entire
+    // ladder — win-back rungs, streak-risk pings, quest expiry, daily
+    // reminders — stays inert until this is granted. Behind the gate it was
+    // unreachable until EXIT_NUDGE_MIN_PUZZLES and sat below the share prompt
+    // (which fires on the first flawless win and short-circuits), pushing the
+    // realistic first ask to ~solve 18-23 and leaving every earlier lapse
+    // permanently unreachable. It must run before canShowExitNudge, and must
+    // still consume the exit-nudge slot once past the gate so it cannot stack.
+    const flowStart = APP_TSX.indexOf('const runVictoryExitNudges = useCallback');
+    expect(flowStart).toBeGreaterThan(-1);
+    const flow = APP_TSX.slice(flowStart, flowStart + 3000);
+    const notifyAt = flow.indexOf('await maybePromptForNotifications()');
+    const gateAt = flow.indexOf('if (!(await canShowExitNudge(solved))) return;');
+    const shareAt = flow.indexOf('await maybeShowSharePrompt()');
+    expect(notifyAt).toBeGreaterThan(-1);
+    expect(gateAt).toBeGreaterThan(-1);
+    expect(shareAt).toBeGreaterThan(-1);
+    expect(notifyAt).toBeLessThan(gateAt);
+    expect(notifyAt).toBeLessThan(shareAt);
+    // Still records against the cadence when it fires past the gate.
+    expect(flow).toMatch(
+      /if \(await maybePromptForNotifications\(\)\) \{\s*if \(await canShowExitNudge\(solved\)\) await recordExitNudgeShown\(solved\);\s*return;\s*\}/
+    );
   });
 
   test('the shared exit cadence gates the whole chain and records only presented prompts', () => {

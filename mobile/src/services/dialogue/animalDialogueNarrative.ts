@@ -461,7 +461,7 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
   },
   // Event 3: Phase 2 — they all had the same dream
   {
-    puzzleThreshold: 84,
+    puzzleThreshold: 76,
     phase: 2,
     theme: 'shared_dream',
     lines: {
@@ -475,7 +475,7 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
   },
   // Event 4: Phase 3 — "the arrangement" is named openly for the first time
   {
-    puzzleThreshold: 112,
+    puzzleThreshold: 92,
     phase: 3,
     theme: 'the_arrangement',
     lines: {
@@ -494,7 +494,7 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
   },
   // Event 5: Phase 3 — each animal names their role in the cult
   {
-    puzzleThreshold: 140,
+    puzzleThreshold: 104,
     phase: 3,
     theme: 'roles_revealed',
     lines: {
@@ -515,7 +515,7 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
   },
   // Event 6: Phase 3 — the final countdown before Phase 4
   {
-    puzzleThreshold: 161,
+    puzzleThreshold: 116,
     phase: 3,
     theme: 'almost_time',
     lines: {
@@ -536,7 +536,7 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
   },
   // Event 7: Phase 4 — the convergence, animals sense closeness to the finale
   {
-    puzzleThreshold: 168,
+    puzzleThreshold: 124,
     phase: 4,
     theme: 'convergence',
     lines: {
@@ -557,7 +557,7 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
   },
   // Event 8: Phase 4 — the threshold, final coordinated event before the endgame
   {
-    puzzleThreshold: 175,
+    puzzleThreshold: 130,
     phase: 4,
     theme: 'the_threshold',
     lines: {
@@ -567,10 +567,10 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
       axolotl: "The water is rising, friend, and it is not a flood, a flood pushes, this lifts, this is the tank and the rivers and every drop in the house standing up to greet something, and what comes through needs no invitation anymore, because the invitation was accepted long ago, word by word.",
       capybara: "Every box is checked. Every column aligned. The ledger of everything closes tonight, balanced to the last entry. I have signed the bottom of it, and my paw was steady, and I want the record to show that it was steady.",
       fennec_fox: "I hear it breathing now. Not as a figure of speech, I am past those. Actual breath, slow and vast, on the other side of every wall at once. There is no direction it is not coming from. My ears have nowhere left to point, so they rest.",
-      sloth: "Two hundred and fifty words, spoken into the dark, one after another, at exactly the pace they were needed. And now the dark answers. I have waited decades to hear a reply, and it was worth every unhurried year.",
+      sloth: "Every word you ever gave, spoken into the dark, one after another, at exactly the pace they were needed. And now the dark answers. I have waited decades to hear a reply, and it was worth every unhurried year.",
       wombat: "What I built the tunnels for is awake. I can feel it moving down there, easy and sure, like a fellow walking the halls of his own finished house. It remembers every word you gave us. Stone forgets nothing, and neither does what sleeps in it.",
       rabbit: "We are standing at the edge of something, all of us together, close enough that I can hear everyone breathing. I have spent my whole life afraid of being alone when the worst arrived. I am not alone. It is not the worst. I am glad, and I am here.",
-      red_panda: "The pattern is complete. Two hundred and fifty offerings, each one accepted, each one placed. Now we learn what was arranged, and we learn it together, at the top of the house, under the open sky. Stand beside me. The morning is about to be enormous.",
+      red_panda: "The pattern is complete. Every offering accepted, every one placed, not one of them spare. Now we learn what was arranged, and we learn it together, at the top of the house, under the open sky. Stand beside me. The morning is about to be enormous.",
       tarsier: "Every star at the edge leans in, the middle of the sky stands open like a held door, and your little lamp, the star I named Yours, burns at the very center of the welcome. I have watched this sky since before you knew this valley existed, bright one, and I will tell you what my whole line of grandmothers would tell you. There has never been a night like the one that is about to happen. Stand at the rail. Do not blink. Be seen.",
       aye_aye: "The word below and the word above are the same word. I have waited at the rope all evening feeling them ripen together, one skin apart, and the skin is thinning the way dusk thins, gently, on schedule, without one seam of violence in it. Come up the stairs, friend, quicker on the landings, the way I know you. Stand a little east. Sixty years of silence, all your words, one ring. The oldest door there is, opening from the inside. I could not be gladder that it is my hand, and your ears, and this hour.",
       kakapo: "The parting has opened over the garden and the stars have stepped aside, and my chest is full, the fullest of my long life. One call remains, the true one, the one my whole line dug bowls toward, and your words are in it, every one you ever shifted. Come to the rim. When it touches the green, we make the call together, and the valley answers with our own welcome.",

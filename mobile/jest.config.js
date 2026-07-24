@@ -2,7 +2,11 @@ module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   roots: ['<rootDir>/src'],
-  testMatch: ['**/__tests__/**/*.test.ts'],
+  // Must match .tsx as well as .ts. A component render test is naturally named
+  // `Foo.test.tsx`, and with a `.test.ts`-only pattern such a file is SILENTLY
+  // never collected — the suite stays green while the test never runs, which is
+  // the worst failure mode a test config has.
+  testMatch: ['**/__tests__/**/*.test.ts', '**/__tests__/**/*.test.tsx'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {

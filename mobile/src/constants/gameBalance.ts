@@ -87,8 +87,11 @@ export const FIRST_COMPLETION_BONUS: Record<Difficulty, number> = {
   EXPERT: 75,
 };
 
-/** Challenge mode amber multiplier (applied on top of base + star bonuses). */
-export const CHALLENGE_AMBER_MULTIPLIER = 1.5;
+// NOTE: a dead `CHALLENGE_AMBER_MULTIPLIER = 1.5` used to live here. Nothing
+// imported it — the live lever is CHALLENGE_MODE_CONFIG.AMBER_MULTIPLIER
+// (1.25), further down this file. Two constants claiming to be the same tuning
+// value is a live-ops trap: a retune aimed at the wrong one changes nothing and
+// reads as a broken deploy. Removed rather than reconciled.
 
 // ============================================================================
 // MONETIZATION (scaffold — inert behind NoOp providers)
@@ -268,7 +271,17 @@ export const HINT_PACK_GRANTS = {
  * account — enforced via the `starter_pack` entitlement in entitlements.ts.
  */
 export const STARTER_PACK_GRANTS = {
-  amber: 400,
+  // The starter pack is the store's HERO card and the designated first
+  // purchase, so it must be the best entry deal — it was the worst. At 400
+  // amber for $1.99 it paid ~201 amber/$ while the $0.99 pack paid 606/$ and
+  // the $6.99 pack 787/$ (1,574/$ once FIRST_PURCHASE_AMBER_MULTIPLIER
+  // applies, which starter is deliberately NOT part of, since it grants no
+  // entitlement-free consumable). A player who took the recommended path was
+  // quietly punished for it, at the single highest-leverage moment in the
+  // funnel. 1,200 matches the small pack's amber-per-dollar AND bundles the
+  // hints on top, so the hero card is now honestly the best way in — without
+  // touching the doubler, which stays a distinct second-purchase hook.
+  amber: 1200,
   hints: 5,
 } as const;
 

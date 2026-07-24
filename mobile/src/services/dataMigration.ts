@@ -195,7 +195,13 @@ const MIGRATIONS: Migration[] = [
 export async function getSchemaVersion(): Promise<number> {
   try {
     const stored = await AsyncStorage.getItem(SCHEMA_VERSION_KEY);
-    return stored ? parseInt(stored, 10) : 0;
+    // A corrupt/non-numeric value must fall back to 0, not NaN. With NaN the
+    // gate reads as "not yet current" (NaN >= CURRENT is false, so migration
+    // proceeds) but MIGRATIONS.filter(m => m.version > NaN) is EMPTY — so zero
+    // migrations run, silently, on every launch, forever. The player is pinned
+    // to an unmigrated schema with no error and no recovery path.
+    const parsed = stored ? parseInt(stored, 10) : 0;
+    return Number.isFinite(parsed) ? parsed : 0;
   } catch {
     return 0;
   }

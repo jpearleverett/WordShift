@@ -97,7 +97,7 @@ export interface SyncStatus {
 // (wordshift_monet_prompts — device UX, like ad pacing), entitlements
 // (wordshift_entitlements — restored authoritatively from the store, not the
 // cloud), and the sync-status meta key are intentionally excluded.
-const SYNC_KEYS = [
+export const SYNC_KEYS = [
   // Core progression & economy
   'wordshift_home_progress',
   'wordshift_amber_transactions',
@@ -149,6 +149,11 @@ const SYNC_KEYS = [
   'wordshift_fox_play_nudge_seen', // one-time Fox "here is Play" nudge
   'wordshift_pit_nudge_seen', // one-time pit-arrival nudge
   'wordshift_starter_intro_seen', // one-time Keeper's Welcome starter intro
+  // The guaranteed first-free-victory glitch — the opening "something else is
+  // here" promise. Its sibling one-time narrative flags were all synced and
+  // this one was missed, so restoring onto a new device mid-game replayed a
+  // Phase-0 beat under a dark sky. Caught by storageKeyRegistry.test.ts.
+  'wordshift_first_win_glitch',
   'wordshift_micro_beats_seen',
   'wordshift_cycle_beats_seen', // New Cycle micro-beat seen set (per-cycle keyed)
 ];
