@@ -403,9 +403,25 @@ describe('puzzleBank', () => {
       expect(medium!.wordLength).toBe(4);   // 4-letter words
     });
 
-    it('returns null for unsupported variants', async () => {
+    it('serves Speed from the standard bank family (zero-wait, no on-device gen)', async () => {
+      // Speed is a standard board played against the clock, so it reuses the
+      // STANDARD bank (getBankKey maps speed -> std_<diff>) instead of
+      // generating on-device. HARD speed => a 5-letter / 5-row standard board.
       const speed = await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'speed');
-      expect(speed).toBeNull();
+      expect(speed).not.toBeNull();
+      expect(speed!.wordLength).toBe(5);
+      expect(speed!.words.length).toBe(5);
+      expect(speed!.reverseSolution).toBeUndefined(); // standard-shaped, not reverse
+    });
+
+    it('serves Lexicon+reverse+EXPERT from the fair EXPERT-reverse bank (no rare bank exists)', async () => {
+      // lex_rev_expert has no rare bank (scarcest supply); getBankKey remaps it
+      // to reverse_expert so the combo is instant instead of on-device. It stays
+      // a 6-letter reverse board (just not rare).
+      const board = await selectPreGeneratedPuzzle('EXPERT', 0, emptyRecencyMap(), 'reverse', 0, { lexicon: true });
+      expect(board).not.toBeNull();
+      expect(board!.wordLength).toBe(6);
+      expect(board!.reverseSolution).toBeDefined();
     });
 
     if (hasReversePuzzles) {

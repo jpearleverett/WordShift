@@ -1362,8 +1362,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         }
       }
 
-      // Use pre-generated puzzle bank for standard/reverse/double_shift variants at all difficulties
-      const bankVariants: PuzzleVariant[] = ['standard', 'reverse', 'double_shift'];
+      // Use pre-generated puzzle banks for every variant. Speed reuses the
+      // standard bank family (a standard board played against the clock — see
+      // getBankForSelection), so it no longer generates on-device. On-device
+      // generation now only runs as a fallback if a bank selection genuinely
+      // fails (recycling makes that near-impossible).
+      const bankVariants: PuzzleVariant[] = ['standard', 'reverse', 'double_shift', 'speed'];
       const shouldUseBank = bankVariants.includes(variant);
       if (shouldUseBank) {
         try {

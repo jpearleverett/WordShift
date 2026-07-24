@@ -283,7 +283,16 @@ function getBankKey(difficulty: Difficulty, variant: PuzzleVariant, lexicon = fa
   // Lexicon (rare-word) banks are uniform per variant x difficulty: lex_<fam>_<diff>.
   if (lexicon) {
     const fam = variant === 'double_shift' ? 'ds' : variant === 'reverse' ? 'rev' : 'std';
-    return `lex_${fam}_${DIFFICULTY_SUFFIX[difficulty]}`;
+    const key = `lex_${fam}_${DIFFICULTY_SUFFIX[difficulty]}`;
+    // lex_rev_expert (Lexicon + reverse + EXPERT) has NO rare bank — rare +
+    // reverse-solvable + 6-letter is the scarcest corner of the dictionary and
+    // it plateaued at ~1 board. Rather than generate on-device (a wait), serve
+    // the FAIR EXPERT-reverse bank: still 6-letter reverse-solvable (and still
+    // pays the Lexicon amber bonus), just not rare. Zero-wait beats
+    // strictly-rare for this ultra-niche 3-toggle-plus-apex combo. Remapping the
+    // KEY (not just the bank data) keeps storage/recency/extension consistent.
+    if (key === 'lex_rev_expert') return 'reverse_expert';
+    return key;
   }
   // Double shift variants — each difficulty has its own bank (3/4/5/6/7 rows, all 5-letter words)
   if (variant === 'double_shift') {
@@ -447,9 +456,17 @@ async function markPuzzlePlayed(puzzleId: string, bankKey: string = 'standard'):
  * Returns null if no bank exists for this combination.
  */
 function getBankForSelection(difficulty: Difficulty, variant: PuzzleVariant, lexicon = false): PreGeneratedPuzzle[] | null {
-  // Only standard, reverse, and double_shift variants have pre-generated banks.
-  // Speed variant generates on-device in real-time (Lexicon speed too).
-  if (variant !== 'standard' && variant !== 'reverse' && variant !== 'double_shift') return null;
+  // standard / reverse / double_shift each have their own bank family. SPEED
+  // reuses the STANDARD family: getBankKey maps speed -> std_<diff> (or
+  // lex_std_<diff>), so a Speed board is a standard board played against the
+  // clock, served from the pre-generated bank instead of generating on-device
+  // (zero-wait). The +1 extension stays gated to variant === 'standard', so a
+  // speed board keeps its base size. Any future variant without a bank family
+  // returns null here and falls back to on-device generation.
+  const hasBankFamily =
+    variant === 'standard' || variant === 'reverse' ||
+    variant === 'double_shift' || variant === 'speed';
+  if (!hasBankFamily) return null;
 
   const bankKey = getBankKey(difficulty, variant, lexicon);
   if (!BANK_REGISTRY[bankKey]) return null;
