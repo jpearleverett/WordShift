@@ -46,6 +46,8 @@ export interface AmberBreakdown {
   starBonus: number;
   streakBonus: number;
   challengeBonus: number;
+  /** Lexicon rare-word bonus (amber-only, never phase progress). */
+  lexiconBonus: number;
   patronBonus: number;
   surpriseBonus: number;
   /** Resonant deep-word choices this board (per-move, board-capped; amber-only). */
@@ -173,7 +175,8 @@ export interface PersistenceActions {
     undosUsed?: number,
     blind?: boolean,
     isSharedChallenge?: boolean,
-    resonantChoiceCount?: number
+    resonantChoiceCount?: number,
+    lexicon?: boolean
   ) => Promise<VictoryData>;
   setAmberBalance: (balance: number) => void;
   refreshStats: () => Promise<void>;
@@ -261,7 +264,10 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
     // Resonant deep-word choices this board (from usePuzzleGame's tally).
     // Pays a small itemized amber bonus (per-move, board-capped) and feeds
     // the cumulative mastery stat — never phase progression.
-    resonantChoiceCount: number = 0
+    resonantChoiceCount: number = 0,
+    // Lexicon (rare-word) win: pays the itemized rare-vocabulary amber bonus
+    // (never phase progress) and feeds the lifetime lexicon-win counter.
+    lexicon: boolean = false
   ): Promise<VictoryData> => {
     const stars = calculateStars(hintsUsed, invalidAttempts);
     const flawless = isFlawless(hintsUsed, invalidAttempts, undosUsed);
@@ -322,6 +328,8 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         skipPhaseProgress: isSharedChallenge,
         // Blind Offering pays the apex rung (2x amber, 2x progress cap).
         blind,
+        // Lexicon (rare-word) bonus — amber-only, never phase progress.
+        lexicon,
         // Amber-only resonance bonus (itemized by the economy, never progress).
         resonanceBonus,
       });
@@ -358,10 +366,10 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         amberResult.amount += variantBonus + freshVariantBonus;
       }
 
-      // Track the variant/blind win for achievements + the variant-offer nudge.
-      // Runs for blind standard boards too (blind composes with any variant).
-      if (variant !== 'standard' || blind) {
-        await recordVariantWin(variant, blind);
+      // Track the variant/blind/lexicon win for achievements + the variant-offer
+      // nudge. Runs for blind/lexicon standard boards too (both compose with any variant).
+      if (variant !== 'standard' || blind || lexicon) {
+        await recordVariantWin(variant, blind, lexicon);
       }
 
       // Crediting split: ONLY the per-puzzle amber (amount — incl. the variant/
@@ -384,6 +392,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         starBonus: amberResult.starBonusAmber ?? 0,
         streakBonus: amberResult.streakBonus ?? 0,
         challengeBonus: amberResult.challengeBonus ?? 0,
+        lexiconBonus: amberResult.lexiconBonus ?? 0,
         patronBonus: amberResult.patronBonus ?? 0,
         surpriseBonus: amberResult.surpriseBonus ?? 0,
         resonanceBonus: amberResult.resonanceBonus ?? 0,

@@ -145,6 +145,12 @@ interface DifficultyMenuProps {
   /** EXPERT (6-letter) difficulty gated: render a teased locked row until earned. */
   expertLocked?: boolean;
   expertUnlockHint?: string;
+  /** Lexicon (rare-word) composable toggle — stacks on any difficulty/variant. */
+  lexiconActive?: boolean;
+  onToggleLexiconMode?: () => void;
+  showLexiconToggle?: boolean;
+  lexiconLocked?: boolean;
+  lexiconUnlockHint?: string;
   unbrokenWeaveActive?: boolean;
   onToggleUnbrokenWeave?: () => void;
   showUnbrokenWeave?: boolean;
@@ -174,6 +180,11 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   blindUnlockHint,
   expertLocked = false,
   expertUnlockHint,
+  lexiconActive = false,
+  onToggleLexiconMode,
+  showLexiconToggle = false,
+  lexiconLocked = false,
+  lexiconUnlockHint,
   unbrokenWeaveActive = false,
   onToggleUnbrokenWeave,
   showUnbrokenWeave = false,
@@ -602,6 +613,70 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
                 {blindActive
                   ? 'No hints, no previews, free shifts. Judged once, at the end. 2x amber.'
                   : 'No hints, no previews, free shifts, judged only at the end, 2x amber'}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        )}
+
+        {/* Lexicon (rare-word) toggle — a composable modifier that stacks on any
+            difficulty + variant. Teased as a locked row until its late gate,
+            then a live on/off toggle. */}
+        {showLexiconToggle && !introMode && lexiconLocked && !lexiconActive && (
+          <TouchableOpacity
+            style={[styles.menuRow, styles.lockedRow]}
+            disabled
+            accessibilityRole="button"
+            accessibilityState={{ disabled: true }}
+            accessibilityLabel={`Lexicon, locked. ${lexiconUnlockHint || ''}`}
+          >
+            <ModeIcon
+              glyph={'🔒'}
+              textStyle={styles.challengeMenuIcon}
+              imageStyle={styles.challengeMenuIconImage}
+            />
+            <View style={styles.challengeMenuContent}>
+              <Text style={[styles.menuRowText, { color: t.muted }]}>LEXICON</Text>
+              {lexiconUnlockHint ? (
+                <Text style={[styles.lockedHintText, { color: t.muted }]}>
+                  {lexiconUnlockHint}
+                </Text>
+              ) : null}
+            </View>
+          </TouchableOpacity>
+        )}
+
+        {showLexiconToggle && !introMode && (!lexiconLocked || lexiconActive) && onToggleLexiconMode && (
+          <TouchableOpacity
+            style={[
+              styles.menuRow,
+              lexiconActive && {
+                backgroundColor: t.amberText + '14',
+                borderColor: t.amberText + '55',
+              },
+            ]}
+            onPress={onToggleLexiconMode}
+            accessibilityRole="button"
+            accessibilityState={{ selected: lexiconActive }}
+            accessibilityLabel={`Lexicon rare-word mode, ${lexiconActive ? 'on' : 'off'}. Rarer words, on any style.`}
+          >
+            <ModeIcon
+              glyph={'📖'}
+              textStyle={styles.challengeMenuIcon}
+              imageStyle={styles.challengeMenuIconImage}
+            />
+            <View style={styles.challengeMenuContent}>
+              <Text
+                style={[
+                  styles.menuRowText,
+                  { color: lexiconActive ? t.amberText : t.body },
+                ]}
+              >
+                LEXICON
+              </Text>
+              <Text style={[styles.challengeMenuDesc, { color: t.muted }]}>
+                {phase >= 3
+                  ? 'Rarer, stranger words, on any style. The older pages.'
+                  : 'Rarer words, on any difficulty or style.'}
               </Text>
             </View>
           </TouchableOpacity>

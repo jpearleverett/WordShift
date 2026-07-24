@@ -558,6 +558,17 @@ const DREAD_WORDS = new Set([
 // Current phase for word selection (cached, updated during generation)
 let currentDreadPhase: DialoguePhase = 0;
 
+// Rarity lean for word selection (set around a generation call, reset after).
+// 0 = OFF: the default de-rarify scoring (prefer the mainstream [10%,60%] band).
+// 1 = MILD (EXPERT, "uncommon-but-fair"): shift the sweet spot into the
+//     [60%,90%) uncommon band, away from the ultra-common head.
+// 2 = STRONG (Lexicon, "rare a lot"): reward the rare tail hard so the
+//     generator PRODUCES rare boards (instead of the harness rejecting the
+//     common boards the default scorer would otherwise favour). This keeps
+//     bank generation feasible AND drives on-device Lexicon play directly.
+// Default 0 leaves every normal EASY-HARD board unchanged.
+let currentRarityLean = 0;
+
 /**
  * Score how "interesting" a word is (0-100)
  * Higher = more interesting/fun to play with
@@ -643,14 +654,36 @@ function scoreWordInterestingness(
     // O(1) position lookup (was wordArray.indexOf); -1 when absent, matching
     // indexOf's old return so the branch behavior below is unchanged.
     const index = WORD_INDEX[wordLength]?.get(word) ?? -1;
-    if (index < wordArray.length * 0.1) {
-      score -= 8; // Ultra-common head: boring filler words (unchanged)
-    } else if (index < wordArray.length * 0.6) {
-      score += 8; // Mainstream band [10%, 60%): the words players enjoy recognizing
-    } else if (index >= wordArray.length * 0.85) {
-      score -= 10; // Obscure tail [85%+): rare words read as unfair
+    const frac = index / wordArray.length;
+    if (index < 0) {
+      // absent (shouldn't happen for dictionary words): no positional bias
+    } else if (currentRarityLean >= 2) {
+      // STRONG rarity lean (Lexicon): steer HARD toward the rare-but-FAIR band.
+      // The fair band tops out ~0.85 rank; beyond that the dictionary is obscure
+      // validity-only inflections (RIPED/HARED/ABLER) the playable-vocab policy
+      // says must never be featured, so the rare tail is AVOIDED, not chased.
+      if (frac < 0.35) score -= 22;      // common: strongly avoid
+      else if (frac < 0.60) score -= 4;  // lower-mid: mild avoid
+      else if (frac < 0.85) score += 14; // rare-but-fair: the Lexicon sweet spot
+      else score -= 12;                  // obscure tail: avoid (reads as unfair)
+    } else if (currentRarityLean === 1) {
+      // MILD rarity lean (EXPERT, "uncommon-but-fair"): sweet spot in the
+      // uncommon band, away from the ultra-common head AND the obscure tail.
+      if (frac < 0.10) score -= 14;      // ultra-common head: avoid
+      else if (frac < 0.45) score -= 2;  // mainstream: slight avoid
+      else if (frac < 0.85) score += 10; // uncommon-but-fair: the target band
+      else score -= 10;                  // obscure tail: avoid (ceiling also bars it)
+    } else {
+      // Default de-rarify scoring (unchanged): prefer the mainstream band.
+      if (frac < 0.1) {
+        score -= 8; // Ultra-common head: boring filler words (unchanged)
+      } else if (frac < 0.6) {
+        score += 8; // Mainstream band [10%, 60%): the words players enjoy recognizing
+      } else if (frac >= 0.85) {
+        score -= 10; // Obscure tail [85%+): rare words read as unfair
+      }
+      // [60%, 85%) stays neutral: uncommon-but-fair.
     }
-    // [60%, 85%) stays neutral: uncommon-but-fair.
   }
 
   return Math.max(0, Math.min(100, score));
@@ -1306,7 +1339,7 @@ export function pickMultiRouteCandidate<T extends { score: number }>(
 
 export const generateLocalPuzzle = async (
   difficulty: Difficulty = 'MEDIUM',
-  overrides?: { wordLength?: number; targetRows?: number; startWord?: string; requireReverseSolvable?: boolean; relaxBoring?: boolean }
+  overrides?: { wordLength?: number; targetRows?: number; startWord?: string; requireReverseSolvable?: boolean; relaxBoring?: boolean; rarityLean?: number }
 ): Promise<PuzzleConfig> => {
   const targetRows = overrides?.targetRows ?? (
     difficulty === 'EASY' ? 3 :
@@ -1325,6 +1358,9 @@ export const generateLocalPuzzle = async (
   const forcedStartWord = overrides?.startWord?.toUpperCase();
   const requireReverse = overrides?.requireReverseSolvable ?? false;
   const relaxBoring = overrides?.relaxBoring ?? requireReverse;
+  // Rarity lean (0 off / 1 mild-EXPERT / 2 strong-Lexicon). Set per call; every
+  // generation resets it so no lean leaks across calls (mirrors currentDreadPhase).
+  currentRarityLean = overrides?.rarityLean ?? 0;
 
   // Load word history for diversity scoring
   const recencyMap = await getWordHistoryWithRecency();
@@ -2995,7 +3031,7 @@ function scoreDoubleShiftChain(chain: DoubleShiftPathNode[], recencyMap?: Map<st
  */
 export async function generateDoubleShiftPuzzle(
   difficulty: Difficulty = 'MEDIUM',
-  overrides?: { wordLength?: number; targetRows?: number }
+  overrides?: { wordLength?: number; targetRows?: number; rarityLean?: number }
 ): Promise<PuzzleConfig> {
   const wordLength = overrides?.wordLength ?? 5;
   const targetRows = overrides?.targetRows ?? (
@@ -3005,6 +3041,8 @@ export async function generateDoubleShiftPuzzle(
     difficulty === 'EXPERT' ? 7 : // apex: 6L double-shift is impossible (needs 8-letter
     6 // HARD                     // grow-targets), so differentiate by a longer 7-row chain
   );
+  // Rarity lean (0/1/2), reset per call (see generateLocalPuzzle).
+  currentRarityLean = overrides?.rarityLean ?? 0;
 
   const recencyMap = await getWordHistoryWithRecency();
 

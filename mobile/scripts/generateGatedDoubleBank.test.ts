@@ -18,32 +18,55 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 
-type BankName = 'EASY' | 'MEDIUM' | 'MEDIUM_PLUS' | 'HARD';
+type BankName = 'EASY' | 'MEDIUM' | 'MEDIUM_PLUS' | 'HARD' | 'EXPERT';
+type GenDifficulty = 'EASY' | 'MEDIUM' | 'MEDIUM_PLUS' | 'HARD' | 'EXPERT';
 
 interface DoubleBankConfig {
   bank: BankName;
   key: string;
-  difficulty: 'EASY' | 'MEDIUM' | 'MEDIUM_PLUS' | 'HARD';
+  difficulty: GenDifficulty;
   wordCap: number;
   exportName: string;
   liveFileName: string;
   featuredCeiling: number;
+  /** Uncommon-but-fair MEAN rarity floor on non-dread displayed words (EXPERT). */
+  featuredFloorMean: number;
 }
 
 // Double-shift is ALWAYS 5-letter; caps match the shipped double banks (3/5/8/10).
+// EXPERT double differentiates by chain LENGTH (7 rows — 6L double-shift is
+// structurally impossible, needing 8-letter grow-targets) plus a light rarity lean.
 const BANK_CONFIGS: Record<BankName, DoubleBankConfig> = {
-  EASY:        { bank: 'EASY', key: 'double_easy', difficulty: 'EASY', wordCap: 3, exportName: 'PUZZLE_BANK_DOUBLE_SHIFT_EASY', liveFileName: 'puzzleBankDoubleShiftEasy.ts', featuredCeiling: 0.92 },
-  MEDIUM:      { bank: 'MEDIUM', key: 'double_medium', difficulty: 'MEDIUM', wordCap: 5, exportName: 'PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM', liveFileName: 'puzzleBankDoubleShiftMedium.ts', featuredCeiling: 0.94 },
-  MEDIUM_PLUS: { bank: 'MEDIUM_PLUS', key: 'double_medium_plus', difficulty: 'MEDIUM_PLUS', wordCap: 8, exportName: 'PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM_PLUS', liveFileName: 'puzzleBankDoubleShiftMediumPlus.ts', featuredCeiling: 0.96 },
-  HARD:        { bank: 'HARD', key: 'double_hard', difficulty: 'HARD', wordCap: 10, exportName: 'PUZZLE_BANK_DOUBLE_SHIFT_HARD', liveFileName: 'puzzleBankDoubleShiftHard.ts', featuredCeiling: 0.98 },
+  EASY:        { bank: 'EASY', key: 'double_easy', difficulty: 'EASY', wordCap: 3, exportName: 'PUZZLE_BANK_DOUBLE_SHIFT_EASY', liveFileName: 'puzzleBankDoubleShiftEasy.ts', featuredCeiling: 0.92, featuredFloorMean: 0 },
+  MEDIUM:      { bank: 'MEDIUM', key: 'double_medium', difficulty: 'MEDIUM', wordCap: 5, exportName: 'PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM', liveFileName: 'puzzleBankDoubleShiftMedium.ts', featuredCeiling: 0.94, featuredFloorMean: 0 },
+  MEDIUM_PLUS: { bank: 'MEDIUM_PLUS', key: 'double_medium_plus', difficulty: 'MEDIUM_PLUS', wordCap: 8, exportName: 'PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM_PLUS', liveFileName: 'puzzleBankDoubleShiftMediumPlus.ts', featuredCeiling: 0.96, featuredFloorMean: 0 },
+  HARD:        { bank: 'HARD', key: 'double_hard', difficulty: 'HARD', wordCap: 10, exportName: 'PUZZLE_BANK_DOUBLE_SHIFT_HARD', liveFileName: 'puzzleBankDoubleShiftHard.ts', featuredCeiling: 0.98, featuredFloorMean: 0 },
+  EXPERT:      { bank: 'EXPERT', key: 'double_expert', difficulty: 'EXPERT', wordCap: 10, exportName: 'PUZZLE_BANK_DOUBLE_SHIFT_EXPERT', liveFileName: 'puzzleBankDoubleShiftExpert.ts', featuredCeiling: 0.85, featuredFloorMean: 0 },
 };
 
 const BANK_NAME = String(process.env.GATED_BANK ?? 'MEDIUM').toUpperCase() as BankName;
-const CONFIG = BANK_CONFIGS[BANK_NAME];
-if (!CONFIG) throw new Error(`GATED_BANK must be EASY|MEDIUM|MEDIUM_PLUS|HARD (got '${process.env.GATED_BANK}')`);
+const BASE_CONFIG = BANK_CONFIGS[BANK_NAME];
+if (!BASE_CONFIG) throw new Error(`GATED_BANK must be EASY|MEDIUM|MEDIUM_PLUS|HARD|EXPERT (got '${process.env.GATED_BANK}')`);
+
+// Lexicon overlay (GATED_LEXICON=1): rare-word DOUBLE-SHIFT bank per difficulty.
+const LEXICON = process.env.GATED_LEXICON === '1';
+const LEXICON_FLOOR_BY_BANK: Record<BankName, number> = {
+  EASY: 0.50, MEDIUM: 0.55, MEDIUM_PLUS: 0.60, HARD: 0.65, EXPERT: 0.70,
+};
+const CONFIG: DoubleBankConfig = LEXICON
+  ? {
+      ...BASE_CONFIG,
+      key: `lexicon_${BASE_CONFIG.key}`,
+      exportName: `LEXICON_BANK_DOUBLE_${BANK_NAME}`,
+      liveFileName: `lexiconBankDoubleShift${BANK_NAME.split('_').map(s => s.charAt(0) + s.slice(1).toLowerCase()).join('')}.ts`,
+      featuredCeiling: 0.86, // fair ceiling: excludes the obscure inflection tail
+      featuredFloorMean: LEXICON_FLOOR_BY_BANK[BANK_NAME],
+    }
+  : BASE_CONFIG;
+const RARITY_LEAN = LEXICON ? 2 : 0; // EXPERT (a difficulty) keeps the fair default scorer
 
 const RUN_DEADLINE_MS = Number(process.env.GATED_SMOKE_MS ?? process.env.GATED_RUN_MS ?? 540_000);
-const FEATURED_TRANSIENT_CEILING = 0.99;
+const FEATURED_TRANSIENT_CEILING = LEXICON ? 0.97 : 0.99;
 
 let mockPhase = 0;
 jest.mock('../src/services/amberCurrency', () => ({
@@ -104,7 +127,13 @@ function saveCheckpoint(cp: GatedCheckpoint): void {
 import { generateDoubleShiftPuzzle, isDreadWord, getWordPhaseTier, getSemanticCluster, getFeaturedRank } from '../src/services/localGenerator';
 import { PreGeneratedPuzzle } from '../src/data/puzzleBankTypes';
 
-const PHASE_TARGETS: Record<number, number> = { 0: 120, 1: 100, 2: 100, 3: 100, 4: 80 };
+// EXPERT double (5-letter, 7 rows) is the scarcest double board (a longer chain
+// + the rarity lean), so it targets a smaller total; recycling handles it.
+const PHASE_TARGETS: Record<number, number> = LEXICON
+  ? { 0: 70, 1: 55, 2: 55, 3: 55, 4: 30 }   // 265
+  : BANK_NAME === 'EXPERT'
+  ? { 0: 70, 1: 55, 2: 55, 3: 55, 4: 30 }   // 265
+  : { 0: 120, 1: 100, 2: 100, 3: 100, 4: 80 }; // 500
 const TOTAL_TARGET = Object.values(PHASE_TARGETS).reduce((a, b) => a + b, 0);
 const ATTEMPTS_PER_TARGET_UNIT = 150;
 const SIDECAR_PATH = path.join(__dirname, '..', 'src', 'data', `.gatedRegenDouble_${CONFIG.key}_output.ts`);
@@ -117,6 +146,13 @@ function computeSemanticTags(words: string[]): string[] { const s = new Set<stri
 function featuredBandOk(displayed: string[], allWords: string[]): boolean {
   for (const w of displayed) if (getFeaturedRank(w) > CONFIG.featuredCeiling && !isDreadWord(w)) return false;
   for (const w of allWords) if (getFeaturedRank(w) > FEATURED_TRANSIENT_CEILING && !isDreadWord(w)) return false;
+  if (CONFIG.featuredFloorMean > 0) {
+    const nonDread = displayed.filter(w => !isDreadWord(w));
+    if (nonDread.length > 0) {
+      const mean = nonDread.reduce((s, w) => s + getFeaturedRank(w), 0) / nonDread.length;
+      if (mean < CONFIG.featuredFloorMean) return false;
+    }
+  }
   return true;
 }
 
@@ -185,7 +221,7 @@ describe(`Gated Double-Shift Regeneration — ${BANK_NAME}`, () => {
         phaseAttempts++; runAttempts++;
         checkpoint.phaseAttempts[phaseStr] = phaseAttempts;
         try {
-          const puzzle = await generateDoubleShiftPuzzle(CONFIG.difficulty);
+          const puzzle = await generateDoubleShiftPuzzle(CONFIG.difficulty, { rarityLean: RARITY_LEAN });
           const chainKey = puzzle.words.join('-');
           if (seenChains.has(chainKey)) { rejectedDup++; continue; }
           seenChains.add(chainKey);

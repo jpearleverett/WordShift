@@ -1012,6 +1012,7 @@ describe('usePuzzleGame', () => {
         expect.any(Map),
         'standard',
         100,
+        { lexicon: false },
       );
     });
 

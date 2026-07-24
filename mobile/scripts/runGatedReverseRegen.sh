@@ -5,22 +5,32 @@
 # Reverse banks are legitimately smaller (reverse-solvable chains are scarcer),
 # so the plateau exit does most of the terminating.
 #
-# Usage: cd mobile && bash scripts/runGatedReverseRegen.sh <EASY|MEDIUM|MEDIUM_PLUS|HARD>
+# Usage: cd mobile && bash scripts/runGatedReverseRegen.sh <EASY|MEDIUM|MEDIUM_PLUS|HARD|EXPERT>
 
 set -u
 
 BANK="${1:-}"
+MODE="${2:-}"
 case "$BANK" in
-  EASY|MEDIUM|MEDIUM_PLUS|HARD) ;;
-  *) echo "Usage: bash scripts/runGatedReverseRegen.sh <EASY|MEDIUM|MEDIUM_PLUS|HARD>" >&2; exit 1 ;;
+  EASY|MEDIUM|MEDIUM_PLUS|HARD|EXPERT) ;;
+  *) echo "Usage: bash scripts/runGatedReverseRegen.sh <EASY|MEDIUM|MEDIUM_PLUS|HARD|EXPERT> [LEXICON]" >&2; exit 1 ;;
 esac
 
 cd "$(dirname "$0")/.." || exit 1
 
 KEY="reverse_$(echo "$BANK" | tr '[:upper:]' '[:lower:]')"
+LEXICON_ENV=""
+if [ "$MODE" = "LEXICON" ]; then
+  KEY="lexicon_${KEY}"
+  LEXICON_ENV="1"
+  TARGET=150
+elif [ "$BANK" = "EXPERT" ]; then
+  TARGET=210
+else
+  TARGET=500
+fi
 CHECKPOINT="src/data/.gatedRegenReverse_${KEY}_progress.json"
 LOG="src/data/.gatedRegenReverse_${KEY}.log"
-TARGET=500
 MIN_RUN_ACCEPTS=3
 PLATEAU_RUNS=2
 MAX_RUNS=200
@@ -48,7 +58,7 @@ while :; do
 
   run=$((run + 1))
   echo "--- run $run: starting at ${count}/${TARGET} ($(date -u +%FT%TZ)) ---" >> "$LOG"
-  GATED_BANK="$BANK" NODE_OPTIONS="--max-old-space-size=4096" \
+  GATED_BANK="$BANK" GATED_LEXICON="$LEXICON_ENV" NODE_OPTIONS="--max-old-space-size=4096" \
     ./node_modules/.bin/jest --config scripts/jest.config.js --no-coverage --forceExit \
     --testTimeout 570000 scripts/generateGatedReverseBank.test.ts >> "$LOG" 2>&1
 

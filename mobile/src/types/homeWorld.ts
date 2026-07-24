@@ -373,6 +373,8 @@ export interface HomeWorldProgress {
   variantWins?: Record<string, number>;
   // Lifetime Blind Offering wins (blind composes with any variant, tracked apart).
   blindWins?: number;
+  // Lifetime Lexicon (rare-word) wins (composes with any variant, tracked apart).
+  lexiconWins?: number;
   // Local date (YYYY-MM-DD) each variant last earned its once-per-day fresh bonus.
   variantFreshDates?: Record<string, string>;
   // Local date the player last saw the variant-offer nudge (once-per-day cap).

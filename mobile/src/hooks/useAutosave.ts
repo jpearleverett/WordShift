@@ -28,6 +28,7 @@ export interface AutosaveDeps {
   reverseSolution: any;
   gameMode: string;
   blindMode: boolean;
+  lexiconMode: boolean;
   unbrokenWeaveMode: boolean;
   spentLetters: string[];
   currentVariant: string;
@@ -93,6 +94,7 @@ export function useAutosave(deps: AutosaveDeps): void {
           reverseSolution: deps.reverseSolution,
           gameMode: deps.gameMode as any,
           blindMode: deps.blindMode,
+          lexiconMode: deps.lexiconMode,
           unbrokenWeaveMode: deps.unbrokenWeaveMode,
           spentLetters: deps.spentLetters,
           currentVariant: deps.currentVariant as any,
@@ -142,6 +144,7 @@ export function useAutosave(deps: AutosaveDeps): void {
     deps.reverseSolution,
     deps.gameMode,
     deps.blindMode,
+    deps.lexiconMode,
     deps.unbrokenWeaveMode,
     deps.spentLetters,
     deps.currentVariant,

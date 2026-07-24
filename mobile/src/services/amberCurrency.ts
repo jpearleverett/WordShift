@@ -32,6 +32,7 @@ import {
   FINALE_ARM_MIN_PUZZLES,
   FINALE_DWELL_PUZZLES,
   RESONANT_BOARD_CAP_AMBER,
+  LEXICON_AMBER_MULTIPLIER,
 } from '../constants/gameBalance';
 import { isPatronSync } from './entitlements';
 
@@ -552,6 +553,9 @@ export async function awardPuzzleAmber(
     /** Blind Offering win (challenge limits + end-judged blind play): pays the
      *  apex amber multiplier and the 2.0x phase-progress cap. */
     blind?: boolean;
+    /** Lexicon (rare-word) win: pays the LEXICON_AMBER_MULTIPLIER bonus on the
+     *  subtotal. Amber-only, REWARD-only — NEVER feeds phase progression. */
+    lexicon?: boolean;
     /**
      * Resonance bonus for the board (resonant deep-word choices, already
      * per-move-priced by the caller). Amber-only, REWARD-only: added to the
@@ -569,6 +573,8 @@ export async function awardPuzzleAmber(
   starBonusAmber: number;
   streakBonus: number;
   challengeBonus: number;
+  /** Lexicon rare-word bonus actually credited (0 when not a Lexicon board). */
+  lexiconBonus: number;
   patronBonus: number;
   surpriseBonus: number;
   /** Clamped resonance bonus actually credited (0 when none). */
@@ -632,6 +638,18 @@ export async function awardPuzzleAmber(
 
     // Track challenge completions
     progress.challengeCompletions = (progress.challengeCompletions || 0) + 1;
+  }
+
+  // Lexicon (rare-word) bonus: a harder vocabulary board pays a bonus on the
+  // running subtotal (base + star + streak + trial). Additive to the REWARD
+  // only — like the Patron/surprise/resonance bonuses it NEVER touches phase
+  // progression (computed separately below), so a rare board pays more amber but
+  // never accelerates the descent. Composes on top of the variant multiplier
+  // (applied by the caller) and the trial bonus above.
+  let lexiconBonus = 0;
+  if (options.lexicon === true) {
+    lexiconBonus = Math.floor(totalAmount * (LEXICON_AMBER_MULTIPLIER - 1));
+    totalAmount += lexiconBonus;
   }
 
   // Patron's Key: flat per-puzzle amber bonus. Additive to the REWARD only — it must
@@ -809,6 +827,7 @@ export async function awardPuzzleAmber(
     starBonusAmber,
     streakBonus,
     challengeBonus,
+    lexiconBonus,
     patronBonus,
     surpriseBonus,
     resonanceBonus,
@@ -1539,8 +1558,8 @@ export async function applyVariantAmberBonus(
  * and the variant-offer nudge. Standard non-blind wins are a no-op. Idempotent
  * per call (one win = one increment).
  */
-export async function recordVariantWin(variant: string, blind: boolean): Promise<void> {
-  if ((!variant || variant === 'standard') && !blind) return;
+export async function recordVariantWin(variant: string, blind: boolean, lexicon: boolean = false): Promise<void> {
+  if ((!variant || variant === 'standard') && !blind && !lexicon) return;
   const progress = await loadProgress();
   if (variant && variant !== 'standard') {
     if (!progress.variantWins) progress.variantWins = {};
@@ -1549,16 +1568,20 @@ export async function recordVariantWin(variant: string, blind: boolean): Promise
   if (blind) {
     progress.blindWins = (progress.blindWins || 0) + 1;
   }
+  if (lexicon) {
+    progress.lexiconWins = (progress.lexiconWins || 0) + 1;
+  }
   progressCache = progress;
   await saveProgress();
 }
 
-/** Read per-variant + blind lifetime win counts (for achievements / nudges). */
-export async function getVariantWinStats(): Promise<{ variantWins: Record<string, number>; blindWins: number }> {
+/** Read per-variant + blind + lexicon lifetime win counts (achievements / nudges). */
+export async function getVariantWinStats(): Promise<{ variantWins: Record<string, number>; blindWins: number; lexiconWins: number }> {
   const progress = await loadProgress();
   return {
     variantWins: progress.variantWins || {},
     blindWins: progress.blindWins || 0,
+    lexiconWins: progress.lexiconWins || 0,
   };
 }
 

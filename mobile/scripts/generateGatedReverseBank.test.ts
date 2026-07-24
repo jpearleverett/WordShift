@@ -32,12 +32,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 
-type BankName = 'EASY' | 'MEDIUM' | 'MEDIUM_PLUS' | 'HARD';
+type BankName = 'EASY' | 'MEDIUM' | 'MEDIUM_PLUS' | 'HARD' | 'EXPERT';
+type GenDifficulty = 'EASY' | 'MEDIUM' | 'MEDIUM_PLUS' | 'HARD' | 'EXPERT';
 
 interface ReverseBankConfig {
   bank: BankName;
   key: string;
-  difficulty: 'EASY' | 'MEDIUM' | 'MEDIUM_PLUS' | 'HARD';
+  difficulty: GenDifficulty;
   wordCap: number;
   defaultWordLength: number;
   exportName: string;
@@ -46,26 +47,52 @@ interface ReverseBankConfig {
   maxSShare: number;
   /** FEATURED displayed-word frequency-rank ceiling (dread exempt). */
   featuredCeiling: number;
+  /** Uncommon-but-fair MEAN rarity floor on non-dread displayed words (EXPERT). */
+  featuredFloorMean: number;
 }
 
 // Reverse difficulties share word lengths with standard (EASY/MEDIUM 4-letter,
-// MEDIUM_PLUS/HARD 5-letter). Caps LOWER than the legacy banks (7/11/12/16) so
-// the 2x-dictionary supply spreads instead of pinning hubs.
+// MEDIUM_PLUS/HARD 5-letter, EXPERT 6-letter). Caps LOWER than the legacy banks
+// (7/11/12/16) so the 2x-dictionary supply spreads instead of pinning hubs.
 const BANK_CONFIGS: Record<BankName, ReverseBankConfig> = {
-  EASY:        { bank: 'EASY', key: 'reverse_easy', difficulty: 'EASY', wordCap: 6, defaultWordLength: 4, exportName: 'PUZZLE_BANK_REVERSE_EASY', liveFileName: 'puzzleBankReverseEasy.ts', maxSShare: 0.50, featuredCeiling: 0.92 },
-  MEDIUM:      { bank: 'MEDIUM', key: 'reverse_medium', difficulty: 'MEDIUM', wordCap: 8, defaultWordLength: 4, exportName: 'PUZZLE_BANK_REVERSE_MEDIUM', liveFileName: 'puzzleBankReverseMedium.ts', maxSShare: 0.50, featuredCeiling: 0.94 },
-  MEDIUM_PLUS: { bank: 'MEDIUM_PLUS', key: 'reverse_medium_plus', difficulty: 'MEDIUM_PLUS', wordCap: 10, defaultWordLength: 5, exportName: 'PUZZLE_BANK_REVERSE_MEDIUM_PLUS', liveFileName: 'puzzleBankReverseMediumPlus.ts', maxSShare: 0.55, featuredCeiling: 0.96 },
-  HARD:        { bank: 'HARD', key: 'reverse_hard', difficulty: 'HARD', wordCap: 12, defaultWordLength: 5, exportName: 'PUZZLE_BANK_REVERSE_HARD', liveFileName: 'puzzleBankReverseHard.ts', maxSShare: 0.60, featuredCeiling: 0.98 },
+  EASY:        { bank: 'EASY', key: 'reverse_easy', difficulty: 'EASY', wordCap: 6, defaultWordLength: 4, exportName: 'PUZZLE_BANK_REVERSE_EASY', liveFileName: 'puzzleBankReverseEasy.ts', maxSShare: 0.50, featuredCeiling: 0.92, featuredFloorMean: 0 },
+  MEDIUM:      { bank: 'MEDIUM', key: 'reverse_medium', difficulty: 'MEDIUM', wordCap: 8, defaultWordLength: 4, exportName: 'PUZZLE_BANK_REVERSE_MEDIUM', liveFileName: 'puzzleBankReverseMedium.ts', maxSShare: 0.50, featuredCeiling: 0.94, featuredFloorMean: 0 },
+  MEDIUM_PLUS: { bank: 'MEDIUM_PLUS', key: 'reverse_medium_plus', difficulty: 'MEDIUM_PLUS', wordCap: 10, defaultWordLength: 5, exportName: 'PUZZLE_BANK_REVERSE_MEDIUM_PLUS', liveFileName: 'puzzleBankReverseMediumPlus.ts', maxSShare: 0.55, featuredCeiling: 0.96, featuredFloorMean: 0 },
+  HARD:        { bank: 'HARD', key: 'reverse_hard', difficulty: 'HARD', wordCap: 12, defaultWordLength: 5, exportName: 'PUZZLE_BANK_REVERSE_HARD', liveFileName: 'puzzleBankReverseHard.ts', maxSShare: 0.60, featuredCeiling: 0.98, featuredFloorMean: 0 },
+  // EXPERT reverse: 6-letter. A difficulty, so fair/recognizable words (no rarity
+  // lean/floor); the ceiling still excludes the obscure inflection tail.
+  EXPERT:      { bank: 'EXPERT', key: 'reverse_expert', difficulty: 'EXPERT', wordCap: 10, defaultWordLength: 6, exportName: 'PUZZLE_BANK_REVERSE_EXPERT', liveFileName: 'puzzleBankReverseExpert.ts', maxSShare: 0.55, featuredCeiling: 0.85, featuredFloorMean: 0 },
 };
 
 const BANK_NAME = String(process.env.GATED_BANK ?? 'MEDIUM').toUpperCase() as BankName;
-const CONFIG = BANK_CONFIGS[BANK_NAME];
-if (!CONFIG) {
-  throw new Error(`GATED_BANK must be one of EASY|MEDIUM|MEDIUM_PLUS|HARD (got '${process.env.GATED_BANK}')`);
+const BASE_CONFIG = BANK_CONFIGS[BANK_NAME];
+if (!BASE_CONFIG) {
+  throw new Error(`GATED_BANK must be one of EASY|MEDIUM|MEDIUM_PLUS|HARD|EXPERT (got '${process.env.GATED_BANK}')`);
 }
 
+// Lexicon overlay (GATED_LEXICON=1): rare-word REVERSE bank per difficulty. The
+// rarity floor ramps across difficulty; the ceiling opens to the obscure tail;
+// the generator's rarity lean (RARITY_LEAN=2) does the heavy lifting so
+// reverse-solvable rare chains still generate. Own lexicon_ key/export/live-file.
+const LEXICON = process.env.GATED_LEXICON === '1';
+const LEXICON_FLOOR_BY_BANK: Record<BankName, number> = {
+  EASY: 0.50, MEDIUM: 0.55, MEDIUM_PLUS: 0.60, HARD: 0.65, EXPERT: 0.70,
+};
+const CONFIG: ReverseBankConfig = LEXICON
+  ? {
+      ...BASE_CONFIG,
+      key: `lexicon_${BASE_CONFIG.key}`,
+      exportName: `LEXICON_BANK_REVERSE_${BANK_NAME}`,
+      liveFileName: `lexiconBankReverse${BANK_NAME.split('_').map(s => s.charAt(0) + s.slice(1).toLowerCase()).join('')}.ts`,
+      featuredCeiling: 0.86, // fair ceiling: excludes the obscure inflection tail
+      featuredFloorMean: LEXICON_FLOOR_BY_BANK[BANK_NAME],
+      maxSShare: Math.max(BASE_CONFIG.maxSShare, 0.60), // rare vocab; ease the S cap
+    }
+  : BASE_CONFIG;
+const RARITY_LEAN = LEXICON ? 2 : 0; // EXPERT (a difficulty) keeps the fair default scorer
+
 const RUN_DEADLINE_MS = Number(process.env.GATED_SMOKE_MS ?? process.env.GATED_RUN_MS ?? 540_000);
-const FEATURED_TRANSIENT_CEILING = 0.99;
+const FEATURED_TRANSIENT_CEILING = LEXICON ? 0.97 : 0.99;
 
 // ---------------------------------------------------------------------------
 // Mocks (before imports that use them)
@@ -138,7 +165,13 @@ import { generateLocalPuzzle, isDreadWord, getWordPhaseTier, getSemanticCluster,
 import { COMMON_WORDS } from '../src/constants/wordLists';
 import { PreGeneratedPuzzle } from '../src/data/puzzleBankTypes';
 
-const PHASE_TARGETS: Record<number, number> = { 0: 120, 1: 100, 2: 100, 3: 100, 4: 80 };
+// EXPERT reverse (6-letter) and Lexicon reverse (rare) generation is slower and
+// scarcer, so they target a smaller total (recycling handles small reverse banks).
+const PHASE_TARGETS: Record<number, number> = LEXICON
+  ? { 0: 40, 1: 30, 2: 30, 3: 30, 4: 20 }   // 150 (rare reverse is the thinnest supply; plateau handles the rest)
+  : BANK_NAME === 'EXPERT'
+  ? { 0: 55, 1: 45, 2: 45, 3: 45, 4: 20 }   // 210
+  : { 0: 120, 1: 100, 2: 100, 3: 100, 4: 80 }; // 500
 const TOTAL_TARGET = Object.values(PHASE_TARGETS).reduce((a, b) => a + b, 0);
 const ATTEMPTS_PER_TARGET_UNIT = 200; // reverse generation is slower; more budget headroom
 
@@ -165,13 +198,21 @@ function forwardSShare(solution: StepLike[] | undefined): number {
 }
 
 // FEATURED band: displayed words within the difficulty ceiling; all words
-// (incl. reverse-leg transients) within the loose backstop; dread exempt.
+// (incl. reverse-leg transients) within the loose backstop; dread exempt. EXPERT
+// adds an uncommon-but-fair MEAN rarity floor on the non-dread displayed words.
 function featuredBandOk(displayed: string[], allWords: string[]): boolean {
   for (const w of displayed) {
     if (getFeaturedRank(w) > CONFIG.featuredCeiling && !isDreadWord(w)) return false;
   }
   for (const w of allWords) {
     if (getFeaturedRank(w) > FEATURED_TRANSIENT_CEILING && !isDreadWord(w)) return false;
+  }
+  if (CONFIG.featuredFloorMean > 0) {
+    const nonDread = displayed.filter(w => !isDreadWord(w));
+    if (nonDread.length > 0) {
+      const mean = nonDread.reduce((s, w) => s + getFeaturedRank(w), 0) / nonDread.length;
+      if (mean < CONFIG.featuredFloorMean) return false;
+    }
   }
   return true;
 }
@@ -250,7 +291,7 @@ describe(`Gated Reverse Regeneration — ${BANK_NAME}`, () => {
         phaseAttempts++; runAttempts++;
         checkpoint.phaseAttempts[phaseStr] = phaseAttempts;
         try {
-          const puzzle = await generateLocalPuzzle(CONFIG.difficulty, { requireReverseSolvable: true });
+          const puzzle = await generateLocalPuzzle(CONFIG.difficulty, { requireReverseSolvable: true, rarityLean: RARITY_LEAN });
           if (!puzzle.reverseSolution || puzzle.reverseSolution.length === 0) { rejectedNoReverse++; continue; }
 
           const chainKey = puzzle.words.join('-');

@@ -496,6 +496,8 @@ export interface PuzzleGameState {
   gameMode: GameMode;
   /** Blind Offering modifier active (ghost previews hidden). */
   blindMode: boolean;
+  /** Lexicon (rare-word) modifier active (rare-but-fair vocabulary boards). */
+  lexiconMode: boolean;
   /** Phase-5 mastery mode: each moved character may cross only once. */
   unbrokenWeaveMode: boolean;
   /** Characters already moved on the current Unbroken Weave board. */
@@ -599,6 +601,7 @@ export interface PuzzleGameActions {
     variant?: PuzzleVariant,
     blind?: boolean,
     unbrokenWeave?: boolean,
+    lexicon?: boolean,
   ) => Promise<void>;
   handleLetterPress: (letter: Letter, rowIndex: number) => void;
   /**
@@ -630,6 +633,8 @@ export interface PuzzleGameActions {
     solveTimeMs?: number;
     /** Whether this board was played with the Blind Offering modifier on. */
     blind?: boolean;
+    /** Whether this board was played with the Lexicon (rare-word) modifier on. */
+    lexicon?: boolean;
     /** Resonant choices across the whole board (present on the completing move). */
     resonantChoiceCount?: number;
     /** Capped resonance amber for the board (present on the completing move). */
@@ -756,6 +761,15 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   // across Next Level like gameMode; forced OFF on daily/shared-challenge
   // boards. Composes with any variant/difficulty.
   const [blindMode, setBlindMode] = useState(false);
+  // Lexicon (rare-word) mode: a COMPOSABLE toggle (stacks on any variant +
+  // difficulty) that serves rare-but-fair vocabulary boards from the dedicated
+  // Lexicon banks (on-device generation leans rare via rarityLean). Sticky
+  // across Next Level like blindMode; forced OFF on daily/shared/finale boards
+  // (a shared board must be identical for everyone; the finale is bespoke).
+  // Amber-neutral: it plays the underlying difficulty/variant, only the WORDS
+  // change — so it never alters rewards or phase progress.
+  const [lexiconMode, setLexiconMode] = useState(false);
+  const lexiconModeRef = useRef(false);
   const [unbrokenWeaveMode, setUnbrokenWeaveMode] = useState(false);
   const unbrokenWeaveModeRef = useRef(false);
   const [spentLetterSet, setSpentLetterSet] = useState<ReadonlySet<string>>(
@@ -1023,17 +1037,23 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     selectedDifficulty: Difficulty,
     variant: PuzzleVariant,
     timeoutPromise: Promise<never>,
-    startWord?: string
+    startWord?: string,
+    // Lexicon on-device fallback: steer the generator toward rare-but-fair
+    // vocabulary (2 = strong Lexicon lean; used when the Lexicon bank is
+    // unavailable/exhausted, or for the Lexicon speed variant which is always
+    // on-device). 0 = off.
+    rarityLean?: number,
   ): Promise<{ puzzle: { words: string[]; hint?: string; solution?: PuzzleSolutionStep[]; reverseSolution?: PuzzleSolutionStep[]; wordLength?: number; isDoubleShift?: boolean }; activeVariant: PuzzleVariant }> => {
     let activeVariant = variant;
     const isDoubleShiftVariant = hasVariantModifier(activeVariant, 'double_shift');
     const isReverseVariant = hasVariantModifier(activeVariant, 'reverse');
     const variantOverrides = getVariantOverrides(activeVariant, selectedDifficulty);
+    const leanOverride = rarityLean ? { rarityLean } : {};
 
     // Double shift uses its own generator
     if (isDoubleShiftVariant) {
       let puzzle = await Promise.race([
-        generateDoubleShiftPuzzle(selectedDifficulty, variantOverrides),
+        generateDoubleShiftPuzzle(selectedDifficulty, { ...variantOverrides, ...leanOverride }),
         timeoutPromise,
       ]);
       return { puzzle, activeVariant };
@@ -1041,12 +1061,13 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
 
     const generationOverrides = {
       ...variantOverrides,
+      ...leanOverride,
       ...(startWord ? { startWord } : {}),
       // For reverse variants, let the generator handle reverse-solvability
       // internally so it can try many start words within the timeout.
       // relaxBoring widens the candidate pool by skipping anti-boring penalties.
       ...(isReverseVariant ? { requireReverseSolvable: true, relaxBoring: true } : {}),
-    } as { targetRows?: number; wordLength?: number; startWord?: string; requireReverseSolvable?: boolean; relaxBoring?: boolean };
+    } as { targetRows?: number; wordLength?: number; startWord?: string; requireReverseSolvable?: boolean; relaxBoring?: boolean; rarityLean?: number };
 
     let puzzle = await Promise.race([
       generateLocalPuzzle(selectedDifficulty, generationOverrides),
@@ -1077,6 +1098,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         puzzle = await Promise.race([
           generateLocalPuzzle(selectedDifficulty, {
             ...getVariantOverrides('standard', selectedDifficulty),
+            ...leanOverride,
             ...(startWord ? { startWord } : {}),
           }),
           timeoutPromise,
@@ -1093,6 +1115,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     variantOverride?: PuzzleVariant,
     blindOverride?: boolean,
     unbrokenWeaveOverride?: boolean,
+    lexiconOverride?: boolean,
   ) => {
     const requestedDifficulty = selectedDifficulty ?? preferredDifficultyRef.current;
     if (selectedDifficulty !== undefined) {
@@ -1121,14 +1144,23 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       unbrokenWeaveModeRef.current = unbrokenWeaveOverride;
       setUnbrokenWeaveMode(unbrokenWeaveOverride);
     }
+    // Lexicon (rare-word) mode: sticky like blind; the weave apex and the
+    // finale/daily/shared paths force it off (handled below + in their setters).
+    if (lexiconOverride !== undefined) {
+      lexiconModeRef.current = lexiconOverride;
+      setLexiconMode(lexiconOverride);
+    }
     if (requestedUnbrokenWeave) {
       gameModeRef.current = 'standard';
       setGameMode('standard');
       setBlindMode(false);
+      lexiconModeRef.current = false;
+      setLexiconMode(false);
       setSelectedVariant('standard');
     } else if (blindOverride !== undefined) {
       setBlindMode(blindOverride);
     }
+    const requestedLexicon = requestedUnbrokenWeave ? false : lexiconModeRef.current;
     // Claim this generation. Any initGame commit below is skipped if a newer
     // startNewGame call has since superseded this one (see generationIdRef).
     const genId = ++generationIdRef.current;
@@ -1207,6 +1239,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         gameModeRef.current = 'standard';
         setGameMode('standard');
         setBlindMode(false);
+        lexiconModeRef.current = false;
+        setLexiconMode(false);
         difficultyRef.current = 'HARD';
         setDifficulty('HARD');
         setUndosRemaining(Infinity);
@@ -1312,6 +1346,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
                 recencyMap,
                 variant,
                 puzzlesSolved,
+                { lexicon: requestedLexicon },
               );
           if (bankPuzzle) {
             if (isStale()) return;
@@ -1350,7 +1385,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       const { puzzle, activeVariant } = await generatePuzzleForVariant(
         requestedDifficulty,
         variant,
-        timeoutPromise
+        timeoutPromise,
+        undefined,
+        requestedLexicon ? 2 : 0, // Lexicon on-device fallback leans rare-but-fair
       );
       if (isStale()) return;
       let puzzleToServe = puzzle;
@@ -1449,6 +1486,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     gameModeRef.current = 'standard';
     setGameMode('standard');
     setBlindMode(false); // the daily is a shared board — never blind
+    lexiconModeRef.current = false;
+    setLexiconMode(false); // the daily is identical for everyone — never Lexicon
     unbrokenWeaveModeRef.current = false;
     setUnbrokenWeaveMode(false);
     setIsSharedChallenge(false);
@@ -1492,6 +1531,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     gameModeRef.current = 'standard';
     setGameMode('standard');
     setBlindMode(false); // a friend's shared board — never blind
+    lexiconModeRef.current = false;
+    setLexiconMode(false); // a friend's shared board — never Lexicon
     unbrokenWeaveModeRef.current = false;
     setUnbrokenWeaveMode(false);
     setIsDailyBoard(false);
@@ -2195,6 +2236,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         variant: currentVariant,
         solveTimeMs,
         blind: blindMode,
+        lexicon: lexiconMode,
         // THE marked final board's win — App silences the fanfare and fires
         // the finale (ref mirror: set at board start, immune to stale closures).
         isFinalBoard: isFinalBoardRef.current,
@@ -2718,6 +2760,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     // blindMode restores with the board — a restored blind board keeps its
     // always-free undos (the rule derives from the mode, not per-board state).
     setBlindMode(restoreUnbrokenWeave ? false : (saved.blindMode ?? false));
+    // lexiconMode restores with the board (rare vocabulary is a property of the
+    // served board); the weave apex forces it off like the other modifiers.
+    lexiconModeRef.current = restoreUnbrokenWeave ? false : (saved.lexiconMode ?? false);
+    setLexiconMode(restoreUnbrokenWeave ? false : (saved.lexiconMode ?? false));
     unbrokenWeaveModeRef.current = restoreUnbrokenWeave;
     setUnbrokenWeaveMode(restoreUnbrokenWeave);
     setSpentLetterSet(restoredSpentLetters);
@@ -2878,6 +2924,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     earnedStars,
     gameMode,
     blindMode,
+    lexiconMode,
     unbrokenWeaveMode,
     spentLetters: [...spentLetterSet],
     isSharedChallenge,

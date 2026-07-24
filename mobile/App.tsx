@@ -182,7 +182,7 @@ import { recordInterstitialSeen, consumePatronNudge, armRemoveAdsNudgeIfEligible
 import { createRevenueCatBillingProvider } from './src/services/providers/revenueCatBilling';
 import { createAdMobAdProvider } from './src/services/providers/googleAdMobAds';
 import { installGlobalErrorHandler, setErrorForwarder } from './src/services/errorReporting';
-import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST, STARTER_INTRO_MIN_PUZZLES, FINALE_DWELL_PUZZLES, INTERSTITIAL_MIN_PUZZLES, HOUSE_ASK_MIN_PUZZLES, HOUSE_ASK_CHANCE, HOUSE_ASK_REWARD_AMBER, REWARDED_HINT_GRANT, EXPERT_DIFFICULTY_UNLOCK_PUZZLES } from './src/constants/gameBalance';
+import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST, STARTER_INTRO_MIN_PUZZLES, FINALE_DWELL_PUZZLES, INTERSTITIAL_MIN_PUZZLES, HOUSE_ASK_MIN_PUZZLES, HOUSE_ASK_CHANCE, HOUSE_ASK_REWARD_AMBER, REWARDED_HINT_GRANT, EXPERT_DIFFICULTY_UNLOCK_PUZZLES, LEXICON_UNLOCK_PUZZLES } from './src/constants/gameBalance';
 import { pickHouseAsk, evaluateHouseAsk, HouseAsk } from './src/services/houseAsks';
 import { getCumulativeStats } from './src/services/starRating';
 
@@ -267,6 +267,7 @@ import {
   getVariantTimeLimitForDifficulty,
   getVariantSelectorOptions,
   getBlindUnlockHint,
+  getLexiconUnlockHint,
   isVariantUnlocked,
   PuzzleVariant,
   VARIANT_CONFIGS,
@@ -984,6 +985,7 @@ function MainApp() {
     reverseSolution: puzzle.reverseSolution,
     gameMode: puzzle.gameMode,
     blindMode: puzzle.blindMode,
+    lexiconMode: puzzle.lexiconMode,
     unbrokenWeaveMode: puzzle.unbrokenWeaveMode,
     spentLetters: puzzle.spentLetters,
     currentVariant: puzzle.currentVariant,
@@ -2166,7 +2168,9 @@ function MainApp() {
         puzzle.isSharedChallenge ?? false,
         // Resonant choices made on this board (amber-only bonus, capped in
         // the economy layer; never phase progress).
-        result.resonantChoiceCount ?? 0
+        result.resonantChoiceCount ?? 0,
+        // Lexicon (rare-word) board: pays the itemized rare-vocabulary bonus.
+        result.lexicon ?? false
       );
 
       // Aggregate social proof: contribute this puzzle's words to the global
@@ -3904,6 +3908,29 @@ function MainApp() {
     }
   }, [puzzleActions, puzzle.difficulty, puzzle.selectedVariant, puzzle.blindMode, puzzlesSolvedForVariantUnlocks, orchestrationActions, resetSpeedRun]);
 
+  // Lexicon (rare-word) toggle: a COMPOSABLE modifier that stacks on any
+  // difficulty + variant (and blind/challenge). Toggling it re-serves the board
+  // with the rare-but-fair flag flipped, keeping the player's mode/variant/blind
+  // intact; the weave apex is turned off (a separate Phase-5 pursuit). Gated at
+  // LEXICON_UNLOCK_PUZZLES; turning it OFF is always allowed.
+  const handleToggleLexiconMode = useCallback(() => {
+    if (!puzzle.lexiconMode && puzzlesSolvedForVariantUnlocks < LEXICON_UNLOCK_PUZZLES) {
+      return;
+    }
+    hapticMedium();
+    soundSelection();
+    orchestrationActions.setCompletionCoda(null);
+    resetSpeedRun();
+    puzzleActions.startNewGame(
+      puzzle.difficulty,
+      undefined,             // keep gameMode (composes with challenge/blind)
+      puzzle.selectedVariant,
+      undefined,             // keep blind
+      false,                 // weave off (separate apex mode)
+      !puzzle.lexiconMode,   // flip the rare-word flag
+    );
+  }, [puzzleActions, puzzle.difficulty, puzzle.selectedVariant, puzzle.lexiconMode, puzzlesSolvedForVariantUnlocks, orchestrationActions, resetSpeedRun]);
+
   const handleToggleUnbrokenWeave = useCallback(() => {
     if (persistence.currentPhase !== 5) return;
     hapticMedium();
@@ -4353,6 +4380,28 @@ function MainApp() {
                 </Text>
               </BadgeAppear>
             )}
+            {/* Lexicon (rare-word) badge — a standing indicator the rare-vocabulary
+                mode is on (and a reminder to turn it off). Same chrome as the
+                variant/blind badges; a book glyph since there is no mode sprite. */}
+            {puzzle.lexiconMode && (
+              <BadgeAppear
+                style={[
+                  styles.variantBadge,
+                  persistence.currentPhase === 2 && styles.variantBadgeDusk,
+                  persistence.currentPhase >= 3 && styles.variantBadgeDark,
+                ]}
+                accessible
+                accessibilityLabel="Lexicon is on: rare-word boards"
+              >
+                <Text style={[
+                  styles.variantBadgeText,
+                  persistence.currentPhase === 2 && styles.variantBadgeTextDusk,
+                  persistence.currentPhase >= 3 && styles.variantBadgeTextDark,
+                ]}>
+                  {`\u{1F4D6} Lexicon`}
+                </Text>
+              </BadgeAppear>
+            )}
             {puzzle.unbrokenWeaveMode && (
               <BadgeAppear
                 style={[
@@ -4454,6 +4503,13 @@ function MainApp() {
             blindUnlockHint={getBlindUnlockHint(puzzlesSolvedForVariantUnlocks, persistence.currentPhase)}
             expertLocked={puzzlesSolvedForVariantUnlocks < EXPERT_DIFFICULTY_UNLOCK_PUZZLES}
             expertUnlockHint={`6-letter apex. Opens at ${EXPERT_DIFFICULTY_UNLOCK_PUZZLES} (you're at ${puzzlesSolvedForVariantUnlocks})`}
+            lexiconActive={puzzle.lexiconMode}
+            onToggleLexiconMode={handleToggleLexiconMode}
+            // The Lexicon row joins the trial-ladder section (with blind), teased
+            // as a locked row until its own late gate at LEXICON_UNLOCK_PUZZLES.
+            showLexiconToggle={puzzlesSolvedForVariantUnlocks >= BLIND_TOGGLE_UNLOCK_PUZZLES}
+            lexiconLocked={puzzlesSolvedForVariantUnlocks < LEXICON_UNLOCK_PUZZLES}
+            lexiconUnlockHint={getLexiconUnlockHint(puzzlesSolvedForVariantUnlocks, persistence.currentPhase)}
             showUnbrokenWeave={persistence.currentPhase === 5}
             unbrokenWeaveActive={puzzle.unbrokenWeaveMode}
             onToggleUnbrokenWeave={handleToggleUnbrokenWeave}

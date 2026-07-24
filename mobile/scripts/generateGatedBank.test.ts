@@ -42,13 +42,14 @@ import * as crypto from 'crypto';
 // Bank parametrization (read before mocks so the word cap is fixed per run)
 // ============================================================================
 
-type BankName = 'EASY' | 'MEDIUM' | 'MEDIUM_PLUS' | 'HARD';
+type BankName = 'EASY' | 'MEDIUM' | 'MEDIUM_PLUS' | 'HARD' | 'EXPERT';
+type GenDifficulty = 'EASY' | 'MEDIUM' | 'MEDIUM_PLUS' | 'HARD' | 'EXPERT';
 
 interface GatedBankConfig {
   bank: BankName;
-  /** Lowercase file-name key: easy | medium | medium_plus | hard. */
+  /** Lowercase file-name key: easy | medium | medium_plus | hard | expert. */
   key: string;
-  difficulty: 'EASY' | 'MEDIUM' | 'MEDIUM_PLUS' | 'HARD';
+  difficulty: GenDifficulty;
   /** Bank-wide word-usage cap (matches the shipped banks' pinned caps). */
   wordCap: number;
   defaultWordLength: number;
@@ -80,13 +81,37 @@ const BANK_CONFIGS: Record<BankName, GatedBankConfig> = {
     defaultWordLength: 5, exportName: 'PUZZLE_BANK_HARD',
     liveFileName: 'puzzleBankHard.ts', typeReExport: true,
   },
+  // EXPERT (apex): 6-letter words, 5 rows. Transients 5/7 both exist in the
+  // dictionary, so 6L standard boards are feasible (7L would need 8-letter
+  // grow-targets, which don't exist). The bank folds in a moderate
+  // "uncommon-but-fair" vocabulary lean (see GATE_BY_BANK.EXPERT).
+  EXPERT: {
+    bank: 'EXPERT', key: 'expert', difficulty: 'EXPERT', wordCap: 10,
+    defaultWordLength: 6, exportName: 'PUZZLE_BANK_EXPERT',
+    liveFileName: 'puzzleBankExpert.ts', typeReExport: false,
+  },
 };
 
 const BANK_NAME = String(process.env.GATED_BANK ?? 'MEDIUM').toUpperCase() as BankName;
-const CONFIG = BANK_CONFIGS[BANK_NAME];
-if (!CONFIG) {
-  throw new Error(`GATED_BANK must be one of EASY|MEDIUM|MEDIUM_PLUS|HARD (got '${process.env.GATED_BANK}')`);
+const BASE_CONFIG = BANK_CONFIGS[BANK_NAME];
+if (!BASE_CONFIG) {
+  throw new Error(`GATED_BANK must be one of EASY|MEDIUM|MEDIUM_PLUS|HARD|EXPERT (got '${process.env.GATED_BANK}')`);
 }
+
+// Lexicon overlay (GATED_LEXICON=1): a rare-word STANDARD bank per difficulty
+// (own key/export/live-file, gitignored sidecar), sharing all the machinery
+// below. The rarity gate itself is applied in GATE further down.
+const LEXICON = process.env.GATED_LEXICON === '1';
+const CONFIG: GatedBankConfig = LEXICON
+  ? {
+      ...BASE_CONFIG,
+      key: `lexicon_${BASE_CONFIG.key}`,
+      exportName: `LEXICON_BANK_${BANK_NAME}`,
+      // e.g. lexiconBankEasy.ts, lexiconBankMediumPlus.ts, lexiconBankExpert.ts
+      liveFileName: `lexiconBank${BANK_NAME.split('_').map(s => s.charAt(0) + s.slice(1).toLowerCase()).join('')}.ts`,
+      typeReExport: false,
+    }
+  : BASE_CONFIG;
 
 // Internal wall-clock deadline: finalize (sidecar write) happens BEFORE the
 // driver's jest --testTimeout 570000 can kill the process, mirroring the
@@ -207,14 +232,16 @@ import { PreGeneratedPuzzle } from '../src/data/puzzleBankTypes';
 // Targets and acceptance gate
 // ============================================================================
 
-// The original per-phase targets (500 total).
-const PHASE_TARGETS: Record<number, number> = {
-  0: 120,
-  1: 100,
-  2: 100,
-  3: 100,
-  4: 80,
-};
+// Per-phase targets. The four base difficulties target 500 (120/100/100/100/80).
+// EXPERT (apex, 6-letter, uncommon-but-fair) and Lexicon (rare-word) are niche
+// late-unlock modes with scarcer supply and recycling handling small banks, so
+// they target smaller totals — right-sized for reliable, bounded generation.
+const PHASE_TARGETS: Record<number, number> =
+  LEXICON
+    ? { 0: 70, 1: 55, 2: 55, 3: 55, 4: 30 }   // 265 (rare supply is thin)
+    : BANK_NAME === 'EXPERT'
+    ? { 0: 90, 1: 75, 2: 75, 3: 75, 4: 45 }    // 360
+    : { 0: 120, 1: 100, 2: 100, 3: 100, 4: 80 }; // 500
 const TOTAL_TARGET = Object.values(PHASE_TARGETS).reduce((a, b) => a + b, 0);
 
 // Cumulative attempt budget per phase (spans re-runs via the checkpoint).
@@ -241,6 +268,12 @@ interface GateParams {
   featuredCeiling: number; // max getFeaturedRank for a non-dread FEATURED word
   deadEndCeiling: number;  // max deadEndStateFraction (wander-into-nothing bound)
   trapFloor: number;       // bank-level min fraction of trap-bearing accepts
+  // "Uncommon-but-fair" rarity lean (EXPERT + Lexicon): the MEAN featured-rank
+  // of the board's non-dread DISPLAYED words must be >= this. Applied to the
+  // mean (not every word) so the board reads rarer overall without the brittle
+  // per-word AND that would starve generation. 0 disables it (the four base
+  // difficulties, which stay recognizable-mainstream by design).
+  featuredFloorMean: number;
 }
 
 // singleChoiceFraction is the primary "choice-rich" lever (fraction of decision
@@ -260,8 +293,8 @@ interface GateParams {
 // keeping every other win (anti-boring, featured band, clean vocab, traps). The
 // 4-letter EASY/MEDIUM banks fill bright phases fine at 0.50, so they stay tight.
 const GATE_BY_BANK: Record<BankName, GateParams> = {
-  EASY:        { minPathsEarly: 2, minPathsLate: 2, singleChoiceEarly: 0.50, singleChoiceLate: 0.62, featuredCeiling: 0.92, deadEndCeiling: 0.25, trapFloor: 0 },
-  MEDIUM:      { minPathsEarly: 2, minPathsLate: 2, singleChoiceEarly: 0.50, singleChoiceLate: 0.65, featuredCeiling: 0.94, deadEndCeiling: 0.25, trapFloor: 0 },
+  EASY:        { minPathsEarly: 2, minPathsLate: 2, singleChoiceEarly: 0.50, singleChoiceLate: 0.62, featuredCeiling: 0.92, deadEndCeiling: 0.25, trapFloor: 0, featuredFloorMean: 0 },
+  MEDIUM:      { minPathsEarly: 2, minPathsLate: 2, singleChoiceEarly: 0.50, singleChoiceLate: 0.65, featuredCeiling: 0.94, deadEndCeiling: 0.25, trapFloor: 0, featuredFloorMean: 0 },
   // The D3 fix (path-count dedup) made completePathCount stricter than the
   // original gated regen measured, so the 5-letter single-choice bars are
   // relaxed further than the old 0.65/0.75 to restore comparable supply AND let
@@ -269,10 +302,52 @@ const GATE_BY_BANK: Record<BankName, GateParams> = {
   // VOID/OMEN/TOMB dread boards. completePathCount>=2 (the multi-route
   // guarantee) is kept; the trap floor eases so dread supply wins over trap
   // density on the hardest banks.
-  MEDIUM_PLUS: { minPathsEarly: 2, minPathsLate: 2, singleChoiceEarly: 0.68, singleChoiceLate: 0.76, featuredCeiling: 0.96, deadEndCeiling: 0.30, trapFloor: 0.20 },
-  HARD:        { minPathsEarly: 2, minPathsLate: 2, singleChoiceEarly: 0.72, singleChoiceLate: 0.82, featuredCeiling: 0.98, deadEndCeiling: 0.30, trapFloor: 0.20 },
+  MEDIUM_PLUS: { minPathsEarly: 2, minPathsLate: 2, singleChoiceEarly: 0.68, singleChoiceLate: 0.76, featuredCeiling: 0.96, deadEndCeiling: 0.30, trapFloor: 0.20, featuredFloorMean: 0 },
+  HARD:        { minPathsEarly: 2, minPathsLate: 2, singleChoiceEarly: 0.72, singleChoiceLate: 0.82, featuredCeiling: 0.98, deadEndCeiling: 0.30, trapFloor: 0.20, featuredFloorMean: 0 },
+  // EXPERT (6-letter): a DIFFICULTY (unlocks at 50), so its words stay FAIR and
+  // recognizable — the challenge is the 6-tile length + longer chains, not rare
+  // vocabulary (that is Lexicon's job). No rarity lean/floor; the default
+  // de-rarify scorer keeps it mainstream-to-uncommon, and the ceiling excludes
+  // only the obscure inflection tail. 6L words are less connected than 5L, so the
+  // single-choice bars relax over HARD's; completePathCount>=2 (multi-route) kept.
+  EXPERT:      { minPathsEarly: 2, minPathsLate: 2, singleChoiceEarly: 0.78, singleChoiceLate: 0.86, featuredCeiling: 0.85, deadEndCeiling: 0.32, trapFloor: 0.20, featuredFloorMean: 0 },
 };
-const GATE = GATE_BY_BANK[BANK_NAME];
+
+// Lexicon overlay (GATED_LEXICON=1): the same board machinery, but the
+// vocabulary is pushed HARD toward the rare tail and the lean RAMPS across the
+// difficulty axis (EASY rare-ish -> EXPERT very rare). Composable-mode banks,
+// standard boards only. The mean rarity floor climbs and the ceiling opens up
+// to admit the obscure tail (Lexicon is precisely a rare-word mode); the
+// branching/trap/dead-end structure is inherited from the base difficulty so
+// the boards stay solvable and choice-rich, only the WORDS get harder. (The
+// LEXICON flag + Lexicon-aware CONFIG are defined near the top so the
+// checkpoint/sidecar paths pick up the lexicon_ key.)
+// The rarity floor RAMPS across difficulty (EASY rare-ish -> EXPERT very rare),
+// but every board stays under a FAIR ceiling: the dictionary's rare tail
+// (rank > ~0.85) is obscure validity-only inflections, so Lexicon leans rare
+// WITHOUT crossing into unfair. The generator's strong rarity lean produces
+// words in this band directly, so acceptance stays healthy.
+const LEXICON_FLOOR_BY_BANK: Record<BankName, number> = {
+  EASY: 0.50, MEDIUM: 0.55, MEDIUM_PLUS: 0.60, HARD: 0.65, EXPERT: 0.70,
+};
+const LEXICON_CEILING = 0.86; // fair ceiling: excludes the obscure inflection tail
+const GATE: GateParams = LEXICON
+  ? {
+      ...GATE_BY_BANK[BANK_NAME],
+      featuredFloorMean: LEXICON_FLOOR_BY_BANK[BANK_NAME],
+      featuredCeiling: LEXICON_CEILING,
+      // Rare vocabulary is less connected; ease branching so Lexicon can fill.
+      singleChoiceEarly: Math.max(GATE_BY_BANK[BANK_NAME].singleChoiceEarly, 0.85),
+      singleChoiceLate: Math.max(GATE_BY_BANK[BANK_NAME].singleChoiceLate, 0.90),
+      trapFloor: 0, // don't stack a trap floor on the already-scarce rare supply
+    }
+  : GATE_BY_BANK[BANK_NAME];
+
+// Generator rarity lean: 2 (strong) for Lexicon rare banks, 0 otherwise. EXPERT
+// is a difficulty, so it keeps the default (fair, mainstream-to-uncommon)
+// scorer — rarity is Lexicon's job. This makes Lexicon PRODUCE rare boards
+// directly (the featured floor is then a light confirmation, not a grind).
+const RARITY_LEAN = LEXICON ? 2 : 0;
 
 function minPathsForPhase(phase: number): number {
   return phase >= 3 ? GATE.minPathsLate : GATE.minPathsEarly;
@@ -289,13 +364,25 @@ function maxSingleChoiceForPhase(phase: number): number {
 // against the genuinely-obscure tail. Dread words are exempt everywhere so the
 // descent vocabulary still lands. The generator still TRAVERSES the full
 // dictionary for connectivity; this only bounds what is FEATURED.
-const FEATURED_TRANSIENT_CEILING = 0.99;
+const FEATURED_TRANSIENT_CEILING = LEXICON ? 0.97 : 0.99;
 function featuredBandOk(displayed: string[], allWords: string[]): boolean {
   for (const w of displayed) {
     if (getFeaturedRank(w) > GATE.featuredCeiling && !isDreadWord(w)) return false;
   }
   for (const w of allWords) {
     if (getFeaturedRank(w) > FEATURED_TRANSIENT_CEILING && !isDreadWord(w)) return false;
+  }
+  // "Uncommon-but-fair" rarity lean (EXPERT + Lexicon): the MEAN featured-rank
+  // of the non-dread displayed words must clear the floor, so the whole board
+  // reads rarer without any single word needing to be obscure. Dread words are
+  // excluded from the mean (thematic, not a rarity signal); an all-dread board
+  // skips the floor.
+  if (GATE.featuredFloorMean > 0) {
+    const nonDread = displayed.filter(w => !isDreadWord(w));
+    if (nonDread.length > 0) {
+      const mean = nonDread.reduce((s, w) => s + getFeaturedRank(w), 0) / nonDread.length;
+      if (mean < GATE.featuredFloorMean) return false;
+    }
   }
   return true;
 }
@@ -472,7 +559,7 @@ describe(`Gated Full-Regeneration Generator — ${BANK_NAME} Standard`, () => {
         checkpoint.phaseAttempts[phaseStr] = phaseAttempts;
 
         try {
-          const puzzle = await generateLocalPuzzle(CONFIG.difficulty);
+          const puzzle = await generateLocalPuzzle(CONFIG.difficulty, { rarityLean: RARITY_LEAN });
           const chainKey = puzzle.words.join('-');
 
           if (seenChains.has(chainKey)) {

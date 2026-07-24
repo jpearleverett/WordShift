@@ -670,6 +670,26 @@ export const DAILY_CHALLENGE_UNLOCK_PUZZLES = 8;
 export const EXPERT_DIFFICULTY_UNLOCK_PUZZLES = 50;
 
 /**
+ * Lexicon mode gate: the rare-word mode is a late-unlock mastery pursuit. It is
+ * a COMPOSABLE toggle (stacks on any difficulty EASY-EXPERT and any variant) that
+ * ramps the vocabulary rarity hard across the difficulty axis, so it opens deep
+ * enough that the player owns the core verb and reads "rare but fair" words as a
+ * vocabulary challenge, not noise. Past the Blind Offering apex (80), before the
+ * finale (~116). Amber-only; never feeds phase progress.
+ */
+export const LEXICON_UNLOCK_PUZZLES = 100;
+
+/**
+ * Lexicon (rare-word) amber bonus multiplier. Solving a rare-vocabulary board is
+ * harder, so it pays a bonus on the base+star+streak+trial subtotal — itemized
+ * in the victory breakdown. Amber-only, REWARD-only: like the Patron/surprise/
+ * resonance bonuses it NEVER touches phase progression, so a rare board pays more
+ * amber but never accelerates the descent. Composes on top of variant/trial
+ * multipliers (a Lexicon+Reverse board is genuinely harder than either alone).
+ */
+export const LEXICON_AMBER_MULTIPLIER = 1.4;
+
+/**
  * One-time hint mercy granted when the player starts their very first Daily
  * Challenge. The daily is always HARD; a small hint cushion softens that first
  * collision. Convenience only: hints still cost stars, and the puzzle itself

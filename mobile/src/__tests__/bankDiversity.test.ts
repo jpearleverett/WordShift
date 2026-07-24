@@ -59,6 +59,20 @@ import { PUZZLE_BANK_DOUBLE_SHIFT_EASY } from '../data/puzzleBankDoubleShiftEasy
 import { PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM } from '../data/puzzleBankDoubleShiftMedium';
 import { PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM_PLUS } from '../data/puzzleBankDoubleShiftMediumPlus';
 import { PUZZLE_BANK_DOUBLE_SHIFT_HARD } from '../data/puzzleBankDoubleShiftHard';
+// Apex banks (EXPERT std/double; Lexicon std/double x 5 difficulties) — the
+// reverse combos are on-device (no bank).
+import { PUZZLE_BANK_EXPERT } from '../data/puzzleBankExpert';
+import { PUZZLE_BANK_DOUBLE_SHIFT_EXPERT } from '../data/puzzleBankDoubleShiftExpert';
+import { LEXICON_BANK_EASY } from '../data/lexiconBankEasy';
+import { LEXICON_BANK_MEDIUM } from '../data/lexiconBankMedium';
+import { LEXICON_BANK_MEDIUM_PLUS } from '../data/lexiconBankMediumPlus';
+import { LEXICON_BANK_HARD } from '../data/lexiconBankHard';
+import { LEXICON_BANK_EXPERT } from '../data/lexiconBankExpert';
+import { LEXICON_BANK_DOUBLE_EASY } from '../data/lexiconBankDoubleShiftEasy';
+import { LEXICON_BANK_DOUBLE_MEDIUM } from '../data/lexiconBankDoubleShiftMedium';
+import { LEXICON_BANK_DOUBLE_MEDIUM_PLUS } from '../data/lexiconBankDoubleShiftMediumPlus';
+import { LEXICON_BANK_DOUBLE_HARD } from '../data/lexiconBankDoubleShiftHard';
+import { LEXICON_BANK_DOUBLE_EXPERT } from '../data/lexiconBankDoubleShiftExpert';
 import { PreGeneratedPuzzle } from '../data/puzzleBankTypes';
 
 interface BankSpec {
@@ -99,6 +113,34 @@ const BANKS: BankSpec[] = [
   { name: 'DOUBLE_MEDIUM_PLUS', bank: PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM_PLUS, cap: 8, minUnique: 2275, minPuzzles: 446 },
   // DOUBLE_HARD 491 / max 10 / 2676 unique
   { name: 'DOUBLE_HARD', bank: PUZZLE_BANK_DOUBLE_SHIFT_HARD, cap: 10, minUnique: 2408, minPuzzles: 441 },
+  // Apex banks (2026-07 EXPERT + Lexicon pass). EXPERT is a difficulty (fair
+  // mainstream-to-uncommon 6-letter words); Lexicon is a rare-word mode (rare-
+  // but-fair band). Reverse combos are on-device (no bank). Floors ~10% under
+  // measured; the Lexicon+EXPERT combos are deliberately smaller niche banks.
+  // EXPERT 195 / max 8 / 1018 unique
+  { name: 'EXPERT', bank: PUZZLE_BANK_EXPERT, cap: 10, minUnique: 860, minPuzzles: 175 },
+  // DS_EXPERT 265 / max 9 / 1914 unique
+  { name: 'DS_EXPERT', bank: PUZZLE_BANK_DOUBLE_SHIFT_EXPERT, cap: 10, minUnique: 1620, minPuzzles: 238 },
+  // LEX_EASY 251 / max 3 / 986 unique
+  { name: 'LEX_EASY', bank: LEXICON_BANK_EASY, cap: 3, minUnique: 830, minPuzzles: 225 },
+  // LEX_MEDIUM 247 / max 7 / 1004 unique
+  { name: 'LEX_MEDIUM', bank: LEXICON_BANK_MEDIUM, cap: 7, minUnique: 850, minPuzzles: 222 },
+  // LEX_MEDIUM_PLUS 255 / max 9 / 948 unique
+  { name: 'LEX_MEDIUM_PLUS', bank: LEXICON_BANK_MEDIUM_PLUS, cap: 10, minUnique: 800, minPuzzles: 229 },
+  // LEX_HARD 191 / max 9 / 804 unique
+  { name: 'LEX_HARD', bank: LEXICON_BANK_HARD, cap: 12, minUnique: 680, minPuzzles: 171 },
+  // LEX_EXPERT 101 / max 9 / 519 unique (niche combo)
+  { name: 'LEX_EXPERT', bank: LEXICON_BANK_EXPERT, cap: 10, minUnique: 440, minPuzzles: 90 },
+  // LEX_DS_EASY 265 / max 3 / 1132 unique
+  { name: 'LEX_DS_EASY', bank: LEXICON_BANK_DOUBLE_EASY, cap: 3, minUnique: 960, minPuzzles: 238 },
+  // LEX_DS_MEDIUM 265 / max 5 / 1354 unique
+  { name: 'LEX_DS_MEDIUM', bank: LEXICON_BANK_DOUBLE_MEDIUM, cap: 5, minUnique: 1150, minPuzzles: 238 },
+  // LEX_DS_MEDIUM_PLUS 265 / max 8 / 1370 unique
+  { name: 'LEX_DS_MEDIUM_PLUS', bank: LEXICON_BANK_DOUBLE_MEDIUM_PLUS, cap: 8, minUnique: 1160, minPuzzles: 238 },
+  // LEX_DS_HARD 195 / max 10 / 1163 unique
+  { name: 'LEX_DS_HARD', bank: LEXICON_BANK_DOUBLE_HARD, cap: 10, minUnique: 985, minPuzzles: 175 },
+  // LEX_DS_EXPERT 62 / max 6 / 552 unique (niche combo)
+  { name: 'LEX_DS_EXPERT', bank: LEXICON_BANK_DOUBLE_EXPERT, cap: 10, minUnique: 470, minPuzzles: 55 },
 ];
 
 /** All words a player sees in a puzzle: the starting chain + every formed word. */

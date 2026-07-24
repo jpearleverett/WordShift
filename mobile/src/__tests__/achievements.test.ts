@@ -62,6 +62,7 @@ const defaultState: AchievementCheckState = {
   challengeCompletions: 0,
   variantWins: {},
   blindWins: 0,
+  lexiconWins: 0,
 };
 
 describe('achievements', () => {
@@ -108,6 +109,7 @@ describe('achievements', () => {
       stats: { ...defaultState.stats, flawlessCount: 1 },
       variantWins: { reverse: 1, double_shift: 1, speed: 1 },
       blindWins: 1,
+      lexiconWins: 0,
     };
     const ids = (await checkAchievements(state)).map(a => a.id);
     expect(ids).toContain('flawless_first');
@@ -127,6 +129,7 @@ describe('achievements', () => {
       ...defaultState,
       variantWins: { reverse: 20, double_shift: 20 }, // no speed win
       blindWins: 0,
+      lexiconWins: 0,
     };
     const ids = (await checkAchievements(state)).map(a => a.id);
     expect(ids).toContain('reverse_15');

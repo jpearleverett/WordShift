@@ -1110,6 +1110,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 : 0;
               const patronBonusAmber = breakdown?.patronBonus ?? 0;
               const challengeBonusAmber = victoryData.challengeBonus ?? 0;
+              const lexiconBonusAmber = breakdown?.lexiconBonus ?? 0;
               const surpriseBonusAmber = victoryData.surpriseBonus ?? 0;
               const resonanceBonusAmber = breakdown?.resonanceBonus ?? victoryData.resonanceBonus ?? 0;
               const variantBonusAmber = victoryData.variantBonus ?? 0;
@@ -1166,6 +1167,14 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                               {victoryData.blind ? 'Blind Offering' : 'Challenge'}
                             </Text>
                             <Text style={[styles.bonusValue, { color: accent.challenge }]}>+{challengeBonusAmber}</Text>
+                          </View>
+                        )}
+                        {lexiconBonusAmber > 0 && (
+                          <View style={styles.bonusRow}>
+                            <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
+                              {phase >= 3 ? 'Rare words' : 'Lexicon'}
+                            </Text>
+                            <Text style={[styles.bonusValue, { color: accent.challenge }]}>+{lexiconBonusAmber}</Text>
                           </View>
                         )}
                         {surpriseBonusAmber > 0 && (

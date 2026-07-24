@@ -69,6 +69,7 @@ export function useAchievementQueue(): [AchievementQueueState, AchievementQueueA
         challengeCompletions: progress.challengeCompletions || 0,
         variantWins: variantStats.variantWins,
         blindWins: variantStats.blindWins,
+        lexiconWins: variantStats.lexiconWins,
       };
 
       const newAchievements = await checkAchievements(state);

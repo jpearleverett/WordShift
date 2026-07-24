@@ -76,6 +76,8 @@ export interface AchievementCheckState {
   variantWins: Record<string, number>;
   /** Lifetime Blind Offering wins. */
   blindWins: number;
+  /** Lifetime Lexicon (rare-word) wins. */
+  lexiconWins: number;
 }
 
 // ===== Achievement Definitions =====
@@ -309,6 +311,44 @@ export const ACHIEVEMENTS: Achievement[] = [
     icon: '👁️',
     category: 'mastery',
     check: (s) => (s.blindWins || 0) >= 10,
+  },
+  // EXPERT — the 6-letter apex difficulty
+  {
+    id: 'expert_first',
+    rewardAmber: 40,
+    title: 'Six-Letter Summit',
+    description: 'Solve an EXPERT puzzle',
+    icon: '⛰️',
+    category: 'mastery',
+    check: (s) => (s.stats.byDifficulty.EXPERT?.completed || 0) >= 1,
+  },
+  {
+    id: 'expert_25',
+    rewardAmber: 90,
+    title: 'Apex Solver',
+    description: 'Solve 25 EXPERT puzzles',
+    icon: '🏔️',
+    category: 'mastery',
+    check: (s) => (s.stats.byDifficulty.EXPERT?.completed || 0) >= 25,
+  },
+  // Lexicon — the rare-word composable mode
+  {
+    id: 'lexicon_first',
+    rewardAmber: 40,
+    title: 'Older Pages',
+    description: 'Solve a puzzle in Lexicon mode',
+    icon: '📖',
+    category: 'mastery',
+    check: (s) => (s.lexiconWins || 0) >= 1,
+  },
+  {
+    id: 'lexicon_25',
+    rewardAmber: 90,
+    title: 'Word Hoard',
+    description: 'Solve 25 puzzles in Lexicon mode',
+    icon: '📜',
+    category: 'mastery',
+    check: (s) => (s.lexiconWins || 0) >= 25,
   },
 
   // Streak achievements
@@ -759,6 +799,7 @@ export async function buildAchievementCheckState(): Promise<AchievementCheckStat
     challengeCompletions: progress.challengeCompletions || 0,
     variantWins: variantStats.variantWins,
     blindWins: variantStats.blindWins,
+    lexiconWins: variantStats.lexiconWins,
   };
 }
 

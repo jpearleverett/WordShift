@@ -25,6 +25,21 @@ import { PUZZLE_BANK_DOUBLE_SHIFT_EASY } from '../data/puzzleBankDoubleShiftEasy
 import { PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM } from '../data/puzzleBankDoubleShiftMedium';
 import { PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM_PLUS } from '../data/puzzleBankDoubleShiftMediumPlus';
 import { PUZZLE_BANK_DOUBLE_SHIFT_HARD } from '../data/puzzleBankDoubleShiftHard';
+// EXPERT (apex) banks — standard + double (reverse is on-device, no bank)
+import { PUZZLE_BANK_EXPERT } from '../data/puzzleBankExpert';
+import { PUZZLE_BANK_DOUBLE_SHIFT_EXPERT } from '../data/puzzleBankDoubleShiftExpert';
+// Lexicon (rare-word) banks — standard/reverse/double x 5 difficulties
+import { LEXICON_BANK_EASY } from '../data/lexiconBankEasy';
+import { LEXICON_BANK_MEDIUM } from '../data/lexiconBankMedium';
+import { LEXICON_BANK_MEDIUM_PLUS } from '../data/lexiconBankMediumPlus';
+import { LEXICON_BANK_HARD } from '../data/lexiconBankHard';
+import { LEXICON_BANK_EXPERT } from '../data/lexiconBankExpert';
+// Lexicon + REVERSE has no bank (on-device rare-reverse generation), so nothing to import here.
+import { LEXICON_BANK_DOUBLE_EASY } from '../data/lexiconBankDoubleShiftEasy';
+import { LEXICON_BANK_DOUBLE_MEDIUM } from '../data/lexiconBankDoubleShiftMedium';
+import { LEXICON_BANK_DOUBLE_MEDIUM_PLUS } from '../data/lexiconBankDoubleShiftMediumPlus';
+import { LEXICON_BANK_DOUBLE_HARD } from '../data/lexiconBankDoubleShiftHard';
+import { LEXICON_BANK_DOUBLE_EXPERT } from '../data/lexiconBankDoubleShiftExpert';
 
 const DICT = new Set<string>(DICTIONARY_WORDS);
 const isValid = (w: string) => DICT.has(w.toUpperCase());
@@ -60,6 +75,18 @@ describe('bank solvability (shipped rules)', () => {
     ['DS_MEDIUM', 'double_shift', PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM],
     ['DS_MEDIUM_PLUS', 'double_shift', PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM_PLUS],
     ['DS_HARD', 'double_shift', PUZZLE_BANK_DOUBLE_SHIFT_HARD],
+    ['EXPERT', 'standard', PUZZLE_BANK_EXPERT],
+    ['DS_EXPERT', 'double_shift', PUZZLE_BANK_DOUBLE_SHIFT_EXPERT],
+    ['LEX_EASY', 'standard', LEXICON_BANK_EASY],
+    ['LEX_MEDIUM', 'standard', LEXICON_BANK_MEDIUM],
+    ['LEX_MEDIUM_PLUS', 'standard', LEXICON_BANK_MEDIUM_PLUS],
+    ['LEX_HARD', 'standard', LEXICON_BANK_HARD],
+    ['LEX_EXPERT', 'standard', LEXICON_BANK_EXPERT],
+    ['LEX_DS_EASY', 'double_shift', LEXICON_BANK_DOUBLE_EASY],
+    ['LEX_DS_MEDIUM', 'double_shift', LEXICON_BANK_DOUBLE_MEDIUM],
+    ['LEX_DS_MEDIUM_PLUS', 'double_shift', LEXICON_BANK_DOUBLE_MEDIUM_PLUS],
+    ['LEX_DS_HARD', 'double_shift', LEXICON_BANK_DOUBLE_HARD],
+    ['LEX_DS_EXPERT', 'double_shift', LEXICON_BANK_DOUBLE_EXPERT],
   ];
 
   test.each(CASES)('%s: every puzzle is winnable', (name, variant, bank) => {
