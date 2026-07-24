@@ -166,9 +166,11 @@ const BANKS: BankSpec[] = [
   { name: 'LEX_REV_MEDIUM_PLUS', bank: LEXICON_BANK_REVERSE_MEDIUM_PLUS, cap: 10, minUnique: 1155, minPuzzles: 216 },
   // LEX_REV_HARD 240 / max 12 / 1313 unique (grew 149 -> 240 with the rarity-aware walk)
   { name: 'LEX_REV_HARD', bank: LEXICON_BANK_REVERSE_HARD, cap: 12, minUnique: 1180, minPuzzles: 216 },
-  // LEX_REV_EXPERT 76 / max 10 / 409 unique (rare + reverse + 6-letter — the
-  // scarcest corner; the rarity-aware walk turned a 1-board dead-end into a bank)
-  { name: 'LEX_REV_EXPERT', bank: LEXICON_BANK_REVERSE_EXPERT, cap: 10, minUnique: 365, minPuzzles: 68 },
+  // LEX_REV_EXPERT 114 / max 15 / 521 unique (rare + reverse + 6-letter — the
+  // scarcest corner; the rarity-aware walk turned a 1-board dead-end into a bank,
+  // then word cap 15 + a front-loaded bright bucket grew it 76 -> 114 with the
+  // rarity held at meanRank 0.751 — a modest diversity trade for more supply)
+  { name: 'LEX_REV_EXPERT', bank: LEXICON_BANK_REVERSE_EXPERT, cap: 15, minUnique: 465, minPuzzles: 100 },
 ];
 
 /** All words a player sees in a puzzle: the starting chain + every formed word. */

@@ -47,7 +47,7 @@
         "backgroundColor": "#FFF0F5"
       },
       "package": "com.wordshift.app",
-      "versionCode": 75,
+      "versionCode": 76,
       "blockedPermissions": [
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
