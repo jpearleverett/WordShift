@@ -37,6 +37,13 @@ export interface SavedPuzzleState {
   /** Blind Offering modifier active on this board (previews hidden). Restored so
    *  a kill+relaunch can't hand the player a free peek at the previews. */
   blindMode?: boolean;
+  /** Undo-limit ("Challenge") modifier active on this board. Restored so a
+   *  kill+relaunch keeps the finite undo budget (its remaining count rides in
+   *  undosRemaining) instead of silently freeing undos. Stacks with blindMode. */
+  undoLimited?: boolean;
+  /** Lexicon (rare-word) modifier active on this board. Restored so a
+   *  kill+relaunch keeps serving the same rare board (not a common swap). */
+  lexiconMode?: boolean;
   /** Phase-5 Unbroken Weave mastery mode active on this board. */
   unbrokenWeaveMode?: boolean;
   /** Moved character values already spent by Unbroken Weave. */

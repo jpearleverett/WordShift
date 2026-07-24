@@ -684,8 +684,18 @@ export async function updateQuestProgress(event: {
           break;
         case 'solve_difficulty':
           if (quest.difficulty === 'MEDIUM_PLUS') {
-            // Medium+ quest accepts MEDIUM_PLUS and HARD
-            if (event.difficulty === 'MEDIUM_PLUS' || event.difficulty === 'HARD') progressDelta = 1;
+            // Medium+ quest accepts MEDIUM_PLUS and everything above it. EXPERT
+            // was missing here when the tier landed, so playing the HARDEST
+            // difficulty scored zero toward a "Medium or harder" quest — a
+            // player grinding EXPERT could never complete it.
+            if (
+              event.difficulty === 'MEDIUM_PLUS' ||
+              event.difficulty === 'HARD' ||
+              event.difficulty === 'EXPERT'
+            ) progressDelta = 1;
+          } else if (quest.difficulty === 'HARD') {
+            // Same rule one rung up: EXPERT is strictly harder than HARD.
+            if (event.difficulty === 'HARD' || event.difficulty === 'EXPERT') progressDelta = 1;
           } else if (event.difficulty === quest.difficulty) {
             progressDelta = 1;
           }

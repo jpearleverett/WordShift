@@ -141,10 +141,20 @@ describe('puzzleBank', () => {
     });
 
     it('returns a solvable extended standard board at the depth gate', async () => {
-      const extendable = PUZZLE_BANK_EASY[0];
+      // Not every board is +1-row-extendable, so pick the first that genuinely
+      // is (the bank content changes across regenerations; the old [0]
+      // assumption was brittle), then force selection to it.
+      const extendable = PUZZLE_BANK_EASY.find(p =>
+        extendStandardPuzzle(
+          { words: p.words, solution: p.solution, wordLength: p.wordLength },
+          { excludedWords: new Set(p.allWords) },
+        )?.words.length === p.words.length + 1,
+      )!;
       await AsyncStorage.setItem(
         'wordshift_played_std_easy_puzzle_ids',
-        JSON.stringify(PUZZLE_BANK_EASY.slice(1).map(puzzle => puzzle.id)),
+        JSON.stringify(
+          PUZZLE_BANK_EASY.filter(p => p.id !== extendable.id).map(p => p.id),
+        ),
       );
 
       const result = await selectPreGeneratedPuzzle(
@@ -393,9 +403,24 @@ describe('puzzleBank', () => {
       expect(medium!.wordLength).toBe(4);   // 4-letter words
     });
 
-    it('returns null for unsupported variants', async () => {
+    it('serves Speed from the standard bank family (zero-wait, no on-device gen)', async () => {
+      // Speed is a standard board played against the clock, so it reuses the
+      // STANDARD bank (getBankKey maps speed -> std_<diff>) instead of
+      // generating on-device. HARD speed => a 5-letter / 5-row standard board.
       const speed = await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'speed');
-      expect(speed).toBeNull();
+      expect(speed).not.toBeNull();
+      expect(speed!.wordLength).toBe(5);
+      expect(speed!.words.length).toBe(5);
+      expect(speed!.reverseSolution).toBeUndefined(); // standard-shaped, not reverse
+    });
+
+    it('serves Lexicon+reverse+EXPERT from its own rare bank (rarity-aware gen)', async () => {
+      // lex_rev_expert now has a real rare bank (the rarity-aware reverse walk
+      // unlocked it — rare-seeded, rare-biased). 6-letter reverse-solvable board.
+      const board = await selectPreGeneratedPuzzle('EXPERT', 0, emptyRecencyMap(), 'reverse', 0, { lexicon: true });
+      expect(board).not.toBeNull();
+      expect(board!.wordLength).toBe(6);
+      expect(board!.reverseSolution).toBeDefined();
     });
 
     if (hasReversePuzzles) {

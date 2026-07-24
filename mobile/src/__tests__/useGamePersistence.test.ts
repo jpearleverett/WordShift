@@ -327,7 +327,7 @@ describe('useGamePersistence', () => {
       await actions.recordVictory('MEDIUM', 0, 0, 'standard');
 
       expect(mockAwardPuzzleAmber).toHaveBeenCalledWith(
-        'MEDIUM', 3, 'standard', expect.any(Number), false, { skipPhaseProgress: false, blind: false, resonanceBonus: 0 }
+        'MEDIUM', 3, 'standard', expect.any(Number), false, { skipPhaseProgress: false, blind: false, lexicon: false, resonanceBonus: 0, undoLimited: false }
       );
     });
 
@@ -455,7 +455,7 @@ describe('useGamePersistence', () => {
       await actions.recordVictory('MEDIUM', 0, 0);
 
       expect(mockAwardPuzzleAmber).toHaveBeenCalledWith(
-        'MEDIUM', 3, 'standard', expect.any(Number), false, { skipPhaseProgress: false, blind: false, resonanceBonus: 0 }
+        'MEDIUM', 3, 'standard', expect.any(Number), false, { skipPhaseProgress: false, blind: false, lexicon: false, resonanceBonus: 0, undoLimited: false }
       );
     });
 
@@ -533,7 +533,7 @@ describe('useGamePersistence', () => {
 
       // getThreeStarRate returns 50 (percentage), should be divided by 100 to get ratio 0.5
       expect(mockAwardPuzzleAmber).toHaveBeenCalledWith(
-        'MEDIUM', 3, 'standard', 0.5, false, { skipPhaseProgress: false, blind: false, resonanceBonus: 0 }
+        'MEDIUM', 3, 'standard', 0.5, false, { skipPhaseProgress: false, blind: false, lexicon: false, resonanceBonus: 0, undoLimited: false }
       );
     });
 
@@ -753,7 +753,7 @@ describe('useGamePersistence', () => {
       );
       expect(mockAwardPuzzleAmber).toHaveBeenCalledWith(
         'MEDIUM', 3, 'standard', expect.any(Number), false,
-        { skipPhaseProgress: false, blind: false, resonanceBonus: 4 }
+        { skipPhaseProgress: false, blind: false, lexicon: false, resonanceBonus: 4, undoLimited: false }
       );
     });
 
@@ -765,7 +765,7 @@ describe('useGamePersistence', () => {
       );
       expect(mockAwardPuzzleAmber).toHaveBeenCalledWith(
         'MEDIUM', 3, 'standard', expect.any(Number), false,
-        { skipPhaseProgress: false, blind: false, resonanceBonus: 6 }
+        { skipPhaseProgress: false, blind: false, lexicon: false, resonanceBonus: 6, undoLimited: false }
       );
     });
 
@@ -832,7 +832,7 @@ describe('useGamePersistence', () => {
       );
       expect(mockAwardPuzzleAmber).toHaveBeenCalledWith(
         'MEDIUM', 3, 'standard', expect.any(Number), false,
-        { skipPhaseProgress: false, blind: false, resonanceBonus: 0 }
+        { skipPhaseProgress: false, blind: false, lexicon: false, resonanceBonus: 0, undoLimited: false }
       );
       expect(mockRecordResonantChoices).not.toHaveBeenCalled();
     });
@@ -847,7 +847,7 @@ describe('useGamePersistence', () => {
       );
 
       expect(mockAwardPuzzleAmber).toHaveBeenCalledWith(
-        'MEDIUM', 3, 'standard', expect.any(Number), false, { skipPhaseProgress: true, blind: false, resonanceBonus: 0 }
+        'MEDIUM', 3, 'standard', expect.any(Number), false, { skipPhaseProgress: true, blind: false, lexicon: false, resonanceBonus: 0, undoLimited: false }
       );
     });
 

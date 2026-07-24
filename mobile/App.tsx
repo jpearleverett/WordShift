@@ -182,7 +182,7 @@ import { recordInterstitialSeen, consumePatronNudge, armRemoveAdsNudgeIfEligible
 import { createRevenueCatBillingProvider } from './src/services/providers/revenueCatBilling';
 import { createAdMobAdProvider } from './src/services/providers/googleAdMobAds';
 import { installGlobalErrorHandler, setErrorForwarder } from './src/services/errorReporting';
-import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST, STARTER_INTRO_MIN_PUZZLES, FINALE_DWELL_PUZZLES, INTERSTITIAL_MIN_PUZZLES, HOUSE_ASK_MIN_PUZZLES, HOUSE_ASK_CHANCE, HOUSE_ASK_REWARD_AMBER, REWARDED_HINT_GRANT } from './src/constants/gameBalance';
+import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST, STARTER_INTRO_MIN_PUZZLES, FINALE_DWELL_PUZZLES, FINALE_ARM_MIN_PUZZLES, INTERSTITIAL_MIN_PUZZLES, HOUSE_ASK_MIN_PUZZLES, HOUSE_ASK_CHANCE, HOUSE_ASK_REWARD_AMBER, REWARDED_HINT_GRANT, EXPERT_DIFFICULTY_UNLOCK_PUZZLES, LEXICON_UNLOCK_PUZZLES } from './src/constants/gameBalance';
 import { pickHouseAsk, evaluateHouseAsk, HouseAsk } from './src/services/houseAsks';
 import { getCumulativeStats } from './src/services/starRating';
 
@@ -267,6 +267,7 @@ import {
   getVariantTimeLimitForDifficulty,
   getVariantSelectorOptions,
   getBlindUnlockHint,
+  getLexiconUnlockHint,
   isVariantUnlocked,
   PuzzleVariant,
   VARIANT_CONFIGS,
@@ -984,6 +985,8 @@ function MainApp() {
     reverseSolution: puzzle.reverseSolution,
     gameMode: puzzle.gameMode,
     blindMode: puzzle.blindMode,
+    undoLimited: puzzle.undoLimited,
+    lexiconMode: puzzle.lexiconMode,
     unbrokenWeaveMode: puzzle.unbrokenWeaveMode,
     spentLetters: puzzle.spentLetters,
     currentVariant: puzzle.currentVariant,
@@ -2166,7 +2169,20 @@ function MainApp() {
         puzzle.isSharedChallenge ?? false,
         // Resonant choices made on this board (amber-only bonus, capped in
         // the economy layer; never phase progress).
-        result.resonantChoiceCount ?? 0
+        result.resonantChoiceCount ?? 0,
+        // Lexicon (rare-word) board: pays the itemized rare-vocabulary bonus.
+        result.lexicon ?? false,
+        // Maximal-stack apex win: EXPERT + Challenge (undo-limit) + Blind +
+        // non-standard variant + Lexicon all at once. Never on daily/shared
+        // (both force standard/no-modifiers), so the flags alone are enough.
+        puzzle.difficulty === 'EXPERT' &&
+          (result.undoLimited ?? false) &&
+          (result.blind ?? false) &&
+          (result.variant ?? 'standard') !== 'standard' &&
+          (result.lexicon ?? false),
+        // Undo-limit ("Challenge") constraint. Stacked with blind it pays the
+        // maximal-trial amber rate; alone it is already priced by gameMode.
+        result.undoLimited ?? false
       );
 
       // Aggregate social proof: contribute this puzzle's words to the global
@@ -2571,7 +2587,7 @@ function MainApp() {
       //
       // The finale is no longer declared retroactively on an ordinary win:
       // only a capped eight-win dwell AND completedTotal >=
-      // FINALE_ARM_MIN_PUZZLES (160) arm finaleArmed. The NEXT standard board
+      // FINALE_ARM_MIN_PUZZLES (115) arm finaleArmed. The NEXT standard board
       // start then serves the marked FINAL BOARD (usePuzzleGame.startNewGame).
       // Its victory — and only its victory — plays FINAL_PUZZLE_EVENT. The win
       // after that triggers POST_REVELATION_EVENT + markPostRevelation,
@@ -2580,18 +2596,41 @@ function MainApp() {
       if (!victory.phaseChanged && persistence.currentPhase >= 4) {
         try {
           const houseComplete = await isHouseCompleted();
-          if (houseComplete) {
+          // ENDGAME ELIGIBILITY. This used to require houseComplete OUTRIGHT,
+          // which made a SOFT CURRENCY load-bearing for narrative completion:
+          // markPostRevelation() is the only route to Phase 5, and it sat
+          // inside this branch. Completing the house costs 4,615 amber on a
+          // specific ladder, while ~5,600 amber of cosmetics is ungated and
+          // visible from solve 0 — so a player who spent on cosmetics, or who
+          // simply earned slowly, was silently and permanently locked out of
+          // the revelation with no warning surface anywhere in the game.
+          //
+          // The design rule is that amber must never ACCELERATE the story, and
+          // that still holds exactly: the fallback below is a REAL-SOLVE floor
+          // (115), which no amount of amber or cash can buy. The rule simply
+          // needed its mirror — amber must not be able to BLOCK the story
+          // either. The house stays the intended route (it completes ~96-100,
+          // comfortably before the arming floor), so for virtually every player
+          // nothing changes; this only stops the ending being strandable.
+          const endgameEligible = houseComplete || completedTotal >= FINALE_ARM_MIN_PUZZLES;
+          if (endgameEligible) {
             const finalDone = await isFinalPuzzleCompleted();
             if (!finalDone) {
               if (wasFinalBoard) {
                 // The last arrangement is complete. markFinalPuzzleCompleted
                 // also disarms the finale (single atomic write).
                 await markFinalPuzzleCompleted();
+                // The coda must not claim a finished house on the solve-floor
+                // fallback path (see endgameEligible above) — a player who
+                // reached the last arrangement with rooms still unbuilt would
+                // be told they completed something they can see they did not.
                 orchestrationActions.setCompletionCoda({
-                  title: 'THE HOUSE STANDS COMPLETE',
-                  text: persistence.currentPhase >= 3
-                    ? 'You finished what was being built. There is no pretending now.'
-                    : 'You completed the house and reached the final path.',
+                  title: houseComplete ? 'THE HOUSE STANDS COMPLETE' : 'THE ARRANGEMENT IS COMPLETE',
+                  text: houseComplete
+                    ? (persistence.currentPhase >= 3
+                        ? 'You finished what was being built. There is no pretending now.'
+                        : 'You completed the house and reached the final path.')
+                    : 'The rooms are not all standing, and it did not need them. It only ever needed the words.',
                 });
                 queueEndgameCinematic(FINAL_PUZZLE_EVENT);
               } else if (!(await isFinaleArmed())) {
@@ -3241,13 +3280,13 @@ function MainApp() {
     puzzleActions.handleUndo();
   }, [puzzleActions]);
 
-  // Challenge-only convenience: spend EARNED amber to refill one undo when out.
-  // Convenience, never progress — Challenge stays hint-free by design. Blind
-  // Offering is excluded: its undos are always free and unlimited, so a refill
-  // would charge amber for nothing (the chip is hidden in blind too — this
-  // guard is defense in depth).
+  // Undo-limit convenience: spend EARNED amber to refill one undo when out.
+  // Convenience, never progress — Challenge stays hint-free by design. Keys on
+  // undoLimited (the finite-budget flag), so it works under Blind + Challenge
+  // stacked too. Blind ALONE has free unlimited undos, so a refill would charge
+  // amber for nothing (the chip is hidden then too — this guard is depth).
   const handleBuyUndo = useCallback(async () => {
-    if (puzzle.gameMode !== 'challenge' || puzzle.blindMode) return;
+    if (!puzzle.undoLimited) return;
     if (persistence.amberBalance < AMBER_UNDO_REFILL_COST) {
       puzzleActions.setMessage('Not enough amber for an undo.');
       hapticWarning();
@@ -3260,7 +3299,7 @@ function MainApp() {
       hapticSuccess();
       soundUndo();
     }
-  }, [puzzle.gameMode, puzzle.blindMode, persistence.amberBalance, puzzleActions, persistenceActions]);
+  }, [puzzle.undoLimited, persistence.amberBalance, puzzleActions, persistenceActions]);
 
   const handleHintPress = useCallback(() => {
     hapticSelection();
@@ -3521,12 +3560,25 @@ function MainApp() {
       victoryFlow.victoryData?.puzzlesSolved ??
       persistence.cumulativeStats?.totalPuzzlesCompleted ??
       0;
-    if (!(await canShowExitNudge(solved))) return;
-    if (await maybeShowSharePrompt()) {
-      await recordExitNudgeShown(solved);
+    // Notification permission is RETENTION INFRASTRUCTURE, not a nudge, so it
+    // runs BEFORE the nudge gate. scheduleAllNotifications() no-ops entirely
+    // without permission, so until this is granted the whole ladder — win-back
+    // rungs, streak-risk pings, quest expiry, daily reminders — is inert.
+    // Behind the gate it was unreachable until EXIT_NUDGE_MIN_PUZZLES (12),
+    // and it sat BELOW the share prompt, which fires on the first flawless win
+    // (trivially common on curated/EASY boards) and short-circuits the chain.
+    // Add the 5-solve spacing and the ad/review-sheet skips and the realistic
+    // first ask was solve ~18-23 — so every player who lapsed before that was
+    // permanently unreachable, which is precisely the cohort the win-back
+    // ladder exists to recover. It keeps all its own guards (not onboarding,
+    // no Fox intro queued, asked-once, already-granted) and still consumes the
+    // exit-nudge slot once past the gate, so it can never stack with another.
+    if (await maybePromptForNotifications()) {
+      if (await canShowExitNudge(solved)) await recordExitNudgeShown(solved);
       return;
     }
-    if (await maybePromptForNotifications()) {
+    if (!(await canShowExitNudge(solved))) return;
+    if (await maybeShowSharePrompt()) {
       await recordExitNudgeShown(solved);
       return;
     }
@@ -3849,32 +3901,37 @@ function MainApp() {
     orchestrationActions,
   ]);
 
-  // Trial ladder: Challenge and Blind Offering are mutually exclusive rungs.
-  // Challenge = no hints + limited undos, previews ON. Blind Offering = the
-  // apex rung: no hints (it runs under gameMode 'challenge') PLUS previews
-  // hidden and free moves judged once at the end of the chain — but undos
-  // stay free and unlimited in blind (the challenge undo budget never applies).
+  // Trial constraints: Challenge (no hints + limited undos) and Blind Offering
+  // (no hints + previews hidden + free moves judged once at the end) now STACK.
+  // gameMode 'challenge' is the shared no-hints umbrella, engaged whenever
+  // EITHER is on; the two constraints they add are independent — Blind hides
+  // previews, Challenge caps undos. Blind ALONE frees undos (its repair loop);
+  // Blind + Challenge re-imposes the budget (the maximal trial). Each toggle
+  // flips its own flag and leaves the other untouched.
   const handleToggleChallengeMode = useCallback(() => {
     hapticMedium();
     soundSelection();
     orchestrationActions.setCompletionCoda(null);
     resetSpeedRun();
-    const isChallengeOnly = puzzle.gameMode === 'challenge' && !puzzle.blindMode;
-    const newMode = isChallengeOnly ? 'standard' : 'challenge';
+    const newUndoLimited = !puzzle.undoLimited;
+    // gameMode is 'challenge' while EITHER constraint is on; Blind is preserved.
+    const newMode = (newUndoLimited || puzzle.blindMode) ? 'challenge' : 'standard';
     puzzleActions.startNewGame(
       puzzle.difficulty,
       newMode,
       puzzle.selectedVariant,
-      false,
-      false,
+      undefined,          // keep blind
+      false,              // weave off
+      undefined,          // keep lexicon
+      newUndoLimited,     // flip the undo-limit (Challenge) flag
     );
-  }, [puzzleActions, puzzle.gameMode, puzzle.difficulty, puzzle.selectedVariant, puzzle.blindMode, orchestrationActions]);
+  }, [puzzleActions, puzzle.undoLimited, puzzle.blindMode, puzzle.difficulty, puzzle.selectedVariant, orchestrationActions, resetSpeedRun]);
 
   // Blind Offering: chosen before the board (a fresh board applies it so the
   // player can't toggle previews back on mid-solve to peek). Sticky across Next
-  // Level; selecting it engages the challenge rung (no hints — undos stay free
-  // in blind), deselecting returns to standard. Composes with any
-  // variant/difficulty.
+  // Level; selecting it engages the no-hints umbrella. Undos stay free in blind
+  // UNLESS Challenge is also on, which the toggle leaves untouched. Composes
+  // with any variant/difficulty AND with Challenge.
   const handleToggleBlindMode = useCallback(() => {
     // Gate: Blind Offering is the apex rung and unlocks late. Turning it OFF
     // is always allowed (a restored legacy board may carry it in while locked).
@@ -3885,24 +3942,42 @@ function MainApp() {
     soundSelection();
     orchestrationActions.setCompletionCoda(null);
     resetSpeedRun();
-    if (puzzle.blindMode) {
-      puzzleActions.startNewGame(
-        puzzle.difficulty,
-        'standard',
-        puzzle.selectedVariant,
-        false,
-        false,
-      );
-    } else {
-      puzzleActions.startNewGame(
-        puzzle.difficulty,
-        'challenge',
-        puzzle.selectedVariant,
-        true,
-        false,
-      );
+    const newBlind = !puzzle.blindMode;
+    // gameMode stays 'challenge' if the undo-limit constraint is still on.
+    const newMode = (newBlind || puzzle.undoLimited) ? 'challenge' : 'standard';
+    puzzleActions.startNewGame(
+      puzzle.difficulty,
+      newMode,
+      puzzle.selectedVariant,
+      newBlind,           // flip blind
+      false,              // weave off
+      undefined,          // keep lexicon
+      undefined,          // keep undo-limit (Challenge)
+    );
+  }, [puzzleActions, puzzle.difficulty, puzzle.selectedVariant, puzzle.blindMode, puzzle.undoLimited, puzzlesSolvedForVariantUnlocks, orchestrationActions, resetSpeedRun]);
+
+  // Lexicon (rare-word) toggle: a COMPOSABLE modifier that stacks on any
+  // difficulty + variant (and blind/challenge). Toggling it re-serves the board
+  // with the rare-but-fair flag flipped, keeping the player's mode/variant/blind
+  // intact; the weave apex is turned off (a separate Phase-5 pursuit). Gated at
+  // LEXICON_UNLOCK_PUZZLES; turning it OFF is always allowed.
+  const handleToggleLexiconMode = useCallback(() => {
+    if (!puzzle.lexiconMode && puzzlesSolvedForVariantUnlocks < LEXICON_UNLOCK_PUZZLES) {
+      return;
     }
-  }, [puzzleActions, puzzle.difficulty, puzzle.selectedVariant, puzzle.blindMode, puzzlesSolvedForVariantUnlocks, orchestrationActions, resetSpeedRun]);
+    hapticMedium();
+    soundSelection();
+    orchestrationActions.setCompletionCoda(null);
+    resetSpeedRun();
+    puzzleActions.startNewGame(
+      puzzle.difficulty,
+      undefined,             // keep gameMode (composes with challenge/blind)
+      puzzle.selectedVariant,
+      undefined,             // keep blind
+      false,                 // weave off (separate apex mode)
+      !puzzle.lexiconMode,   // flip the rare-word flag
+    );
+  }, [puzzleActions, puzzle.difficulty, puzzle.selectedVariant, puzzle.lexiconMode, puzzlesSolvedForVariantUnlocks, orchestrationActions, resetSpeedRun]);
 
   const handleToggleUnbrokenWeave = useCallback(() => {
     if (persistence.currentPhase !== 5) return;
@@ -4264,12 +4339,13 @@ function MainApp() {
         {onboardingFlow.isOnboarding ? null : (
         <View style={styles.statsRow}>
           <View style={styles.leftStatsGroup}>
-            {/* Challenge Mode Badge — hidden in Blind Offering. Blind runs
-                under gameMode 'challenge' internally, but its undos are always
-                free, so the undo-budget chrome (count + amber refill chip) is
-                meaningless there and the double chip read as a bug. The Blind
-                badge below is the mode's one standing indicator. */}
-            {puzzle.gameMode === 'challenge' && !puzzle.blindMode && (
+            {/* Challenge (undo-limit) badge — shown whenever the finite undo
+                budget is active, INCLUDING under Blind when the two stack (then
+                previews are hidden AND undos capped). Blind ALONE frees undos,
+                so the undo-budget chrome stays hidden there; the Blind badge
+                below is that mode's standing indicator. Keys on undoLimited,
+                not gameMode (which is 'challenge' whenever either is on). */}
+            {puzzle.undoLimited && (
               <BadgeAppear style={[
                 styles.challengeBadge,
                 persistence.currentPhase === 2 && styles.challengeBadgeDusk,
@@ -4353,6 +4429,28 @@ function MainApp() {
                 </Text>
               </BadgeAppear>
             )}
+            {/* Lexicon (rare-word) badge — a standing indicator the rare-vocabulary
+                mode is on (and a reminder to turn it off). Same chrome as the
+                variant/blind badges; a book glyph since there is no mode sprite. */}
+            {puzzle.lexiconMode && (
+              <BadgeAppear
+                style={[
+                  styles.variantBadge,
+                  persistence.currentPhase === 2 && styles.variantBadgeDusk,
+                  persistence.currentPhase >= 3 && styles.variantBadgeDark,
+                ]}
+                accessible
+                accessibilityLabel="Lexicon is on: rare-word boards"
+              >
+                <Text style={[
+                  styles.variantBadgeText,
+                  persistence.currentPhase === 2 && styles.variantBadgeTextDusk,
+                  persistence.currentPhase >= 3 && styles.variantBadgeTextDark,
+                ]}>
+                  {`\u{1F4D6} Lexicon`}
+                </Text>
+              </BadgeAppear>
+            )}
             {puzzle.unbrokenWeaveMode && (
               <BadgeAppear
                 style={[
@@ -4426,6 +4524,7 @@ function MainApp() {
               chipDifficulty === 'MEDIUM' && styles.difficultyDotMedium,
               chipDifficulty === 'MEDIUM_PLUS' && styles.difficultyDotMediumPlus,
               chipDifficulty === 'HARD' && styles.difficultyDotHard,
+              chipDifficulty === 'EXPERT' && styles.difficultyDotExpert,
             ]} />
             <Text style={styles.difficultyText}>{getDifficultyChipLabel(puzzle.difficulty)}</Text>
             <Text style={styles.difficultyArrow}>{'\u25BC'}</Text>
@@ -4445,6 +4544,7 @@ function MainApp() {
             onToggleChallengeMode={handleToggleChallengeMode}
             onSelectVariant={handleSelectVariant}
             showChallengeToggle={puzzlesSolvedForVariantUnlocks >= CHALLENGE_TOGGLE_UNLOCK_PUZZLES}
+            undoLimited={puzzle.undoLimited}
             blindActive={puzzle.blindMode}
             onToggleBlindMode={handleToggleBlindMode}
             // The blind row appears with the trial-ladder section (challenge
@@ -4452,6 +4552,15 @@ function MainApp() {
             showBlindToggle={puzzlesSolvedForVariantUnlocks >= CHALLENGE_TOGGLE_UNLOCK_PUZZLES}
             blindLocked={puzzlesSolvedForVariantUnlocks < BLIND_TOGGLE_UNLOCK_PUZZLES}
             blindUnlockHint={getBlindUnlockHint(puzzlesSolvedForVariantUnlocks, persistence.currentPhase)}
+            expertLocked={puzzlesSolvedForVariantUnlocks < EXPERT_DIFFICULTY_UNLOCK_PUZZLES}
+            expertUnlockHint={`6-letter apex. Opens at ${EXPERT_DIFFICULTY_UNLOCK_PUZZLES} (you're at ${puzzlesSolvedForVariantUnlocks})`}
+            lexiconActive={puzzle.lexiconMode}
+            onToggleLexiconMode={handleToggleLexiconMode}
+            // The Lexicon row joins the trial-ladder section (with blind), teased
+            // as a locked row until its own late gate at LEXICON_UNLOCK_PUZZLES.
+            showLexiconToggle={puzzlesSolvedForVariantUnlocks >= BLIND_TOGGLE_UNLOCK_PUZZLES}
+            lexiconLocked={puzzlesSolvedForVariantUnlocks < LEXICON_UNLOCK_PUZZLES}
+            lexiconUnlockHint={getLexiconUnlockHint(puzzlesSolvedForVariantUnlocks, persistence.currentPhase)}
             showUnbrokenWeave={persistence.currentPhase === 5}
             unbrokenWeaveActive={puzzle.unbrokenWeaveMode}
             onToggleUnbrokenWeave={handleToggleUnbrokenWeave}

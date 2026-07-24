@@ -54,6 +54,7 @@ export function useAchievementQueue(): [AchievementQueueState, AchievementQueueA
             MEDIUM: { completed: 0, stars: 0 },
             MEDIUM_PLUS: { completed: 0, stars: 0 },
             HARD: { completed: 0, stars: 0 },
+            EXPERT: { completed: 0, stars: 0 },
           },
           lastUpdated: 0,
         },
@@ -68,6 +69,8 @@ export function useAchievementQueue(): [AchievementQueueState, AchievementQueueA
         challengeCompletions: progress.challengeCompletions || 0,
         variantWins: variantStats.variantWins,
         blindWins: variantStats.blindWins,
+        lexiconWins: variantStats.lexiconWins,
+        maxStackWins: variantStats.maxStackWins,
       };
 
       const newAchievements = await checkAchievements(state);

@@ -66,11 +66,12 @@ export const MIN_PUZZLES_FOR_PHASE: Record<DialoguePhase, number> = {
 // ============================================================================
 
 /** Base amber reward per difficulty level. */
-export const AMBER_REWARDS: { EASY: number; MEDIUM: number; MEDIUM_PLUS: number; HARD: number } = {
+export const AMBER_REWARDS: Record<Difficulty, number> = {
   EASY: 8,
   MEDIUM: 10,
   MEDIUM_PLUS: 15,
   HARD: 20,
+  EXPERT: 28, // apex 6-letter tier
 };
 
 /**
@@ -78,15 +79,19 @@ export const AMBER_REWARDS: { EASY: number; MEDIUM: number; MEDIUM_PLUS: number;
  * Creates small windfall moments that feel exciting and incentivize
  * trying harder difficulties.
  */
-export const FIRST_COMPLETION_BONUS: { EASY: number; MEDIUM: number; MEDIUM_PLUS: number; HARD: number } = {
+export const FIRST_COMPLETION_BONUS: Record<Difficulty, number> = {
   EASY: 10,
   MEDIUM: 20,
   MEDIUM_PLUS: 30,
   HARD: 50,
+  EXPERT: 75,
 };
 
-/** Challenge mode amber multiplier (applied on top of base + star bonuses). */
-export const CHALLENGE_AMBER_MULTIPLIER = 1.5;
+// NOTE: a dead `CHALLENGE_AMBER_MULTIPLIER = 1.5` used to live here. Nothing
+// imported it — the live lever is CHALLENGE_MODE_CONFIG.AMBER_MULTIPLIER
+// (1.25), further down this file. Two constants claiming to be the same tuning
+// value is a live-ops trap: a retune aimed at the wrong one changes nothing and
+// reads as a broken deploy. Removed rather than reconciled.
 
 // ============================================================================
 // MONETIZATION (scaffold — inert behind NoOp providers)
@@ -120,11 +125,12 @@ export const PATRON_AMBER_BONUS = 2;
 export const SURPRISE_BONUS_CHANCE = 0.12;
 
 /** Flat surprise amber granted (scaled by difficulty) when the bonus fires. */
-export const SURPRISE_BONUS_AMOUNTS: { EASY: number; MEDIUM: number; MEDIUM_PLUS: number; HARD: number } = {
+export const SURPRISE_BONUS_AMOUNTS: Record<Difficulty, number> = {
   EASY: 6,
   MEDIUM: 8,
   MEDIUM_PLUS: 12,
   HARD: 16,
+  EXPERT: 20,
 };
 
 /**
@@ -265,7 +271,17 @@ export const HINT_PACK_GRANTS = {
  * account — enforced via the `starter_pack` entitlement in entitlements.ts.
  */
 export const STARTER_PACK_GRANTS = {
-  amber: 400,
+  // The starter pack is the store's HERO card and the designated first
+  // purchase, so it must be the best entry deal — it was the worst. At 400
+  // amber for $1.99 it paid ~201 amber/$ while the $0.99 pack paid 606/$ and
+  // the $6.99 pack 787/$ (1,574/$ once FIRST_PURCHASE_AMBER_MULTIPLIER
+  // applies, which starter is deliberately NOT part of, since it grants no
+  // entitlement-free consumable). A player who took the recommended path was
+  // quietly punished for it, at the single highest-leverage moment in the
+  // funnel. 1,200 matches the small pack's amber-per-dollar AND bundles the
+  // hints on top, so the hero card is now honestly the best way in — without
+  // touching the doubler, which stays a distinct second-purchase hook.
+  amber: 1200,
   hints: 5,
 } as const;
 
@@ -546,12 +562,20 @@ export const CHALLENGE_MODE_CONFIG = {
       case 'MEDIUM': return 2;
       case 'MEDIUM_PLUS': return 1;
       case 'HARD': return 1;
+      case 'EXPERT': return 1;
     }
   },
   // Amber reward multiplier for challenge completions (previews on)
   AMBER_MULTIPLIER: 1.25,
   // Amber reward multiplier for Blind Offering completions (the apex rung)
   BLIND_AMBER_MULTIPLIER: 2.0,
+  // Blind + Challenge STACKED (previews hidden AND the undo budget imposed) —
+  // the maximal trial. Strictly harder than Blind alone, which frees undos, so
+  // it pays slightly more. Deliberately a small step (+0.25, not a doubling):
+  // the two constraints overlap in difficulty, and amber is a reward lever, not
+  // a progression one. Phase acceleration is NOT raised to match — blind's 2.0x
+  // is the pacing cap and stacking must never buy a faster descent.
+  BLIND_CHALLENGE_AMBER_MULTIPLIER: 2.25,
   // No hints allowed in challenge mode
   HINTS_ALLOWED: false,
 };
@@ -656,6 +680,36 @@ export const MAX_USED_TRACKED = 500;
 export const DAILY_CHALLENGE_UNLOCK_PUZZLES = 8;
 
 /**
+ * EXPERT difficulty gate: the 6-letter apex tier is the first (and only) gated
+ * difficulty. It unlocks after this many total puzzles solved — deep enough
+ * that the player has mastered HARD and the core verb, so six-letter boards
+ * (more tiles to track, longer chains, a rarer-but-fair vocabulary band) read
+ * as an earned step up, not an early wall. Tunable; between HARD-comfort and
+ * the Blind Offering apex (80).
+ */
+export const EXPERT_DIFFICULTY_UNLOCK_PUZZLES = 50;
+
+/**
+ * Lexicon mode gate: the rare-word mode is a late-unlock mastery pursuit. It is
+ * a COMPOSABLE toggle (stacks on any difficulty EASY-EXPERT and any variant) that
+ * ramps the vocabulary rarity hard across the difficulty axis, so it opens deep
+ * enough that the player owns the core verb and reads "rare but fair" words as a
+ * vocabulary challenge, not noise. Past the Blind Offering apex (80), before the
+ * finale (~116). Amber-only; never feeds phase progress.
+ */
+export const LEXICON_UNLOCK_PUZZLES = 100;
+
+/**
+ * Lexicon (rare-word) amber bonus multiplier. Solving a rare-vocabulary board is
+ * harder, so it pays a bonus on the base+star+streak+trial subtotal — itemized
+ * in the victory breakdown. Amber-only, REWARD-only: like the Patron/surprise/
+ * resonance bonuses it NEVER touches phase progression, so a rare board pays more
+ * amber but never accelerates the descent. Composes on top of variant/trial
+ * multipliers (a Lexicon+Reverse board is genuinely harder than either alone).
+ */
+export const LEXICON_AMBER_MULTIPLIER = 1.4;
+
+/**
  * One-time hint mercy granted when the player starts their very first Daily
  * Challenge. The daily is always HARD; a small hint cushion softens that first
  * collision. Convenience only: hints still cost stars, and the puzzle itself
@@ -686,6 +740,7 @@ export const SPEED_TIME_LIMITS: Record<string, number> = {
   MEDIUM: 60,
   MEDIUM_PLUS: 54,
   HARD: 48,
+  EXPERT: 44, // 6-letter boards take longer to read — but expert, so still tight
 };
 
 // ============================================================================

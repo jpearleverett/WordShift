@@ -24,7 +24,7 @@
 import { Difficulty, PuzzleSolutionStep } from '../types';
 import { isReverseSolvable } from './localGenerator';
 // Speed timers live in the central balance file (single source of truth).
-import { SPEED_TIME_LIMITS as SPEED_TIME_LIMIT_BY_DIFFICULTY } from '../constants/gameBalance';
+import { SPEED_TIME_LIMITS as SPEED_TIME_LIMIT_BY_DIFFICULTY, LEXICON_UNLOCK_PUZZLES } from '../constants/gameBalance';
 
 // ============================================================================
 // Types
@@ -287,6 +287,21 @@ export function getBlindUnlockHint(puzzlesSolved: number, uiPhase: number): stri
   const tease = uiPhase >= 3
     ? 'One day you will offer a whole chain unseeing.'
     : 'The last trial: no previews, judged only at the end.';
+  return formatLockedHint(tease, remaining, uiPhase);
+}
+
+/**
+ * Unlock hint for the Lexicon (rare-word) toggle — a composable modifier that
+ * earns the same visible locked-row tease in the setup menu until its late gate.
+ */
+export function getLexiconUnlockHint(puzzlesSolved: number, uiPhase: number): string {
+  const remaining = Math.max(0, LEXICON_UNLOCK_PUZZLES - puzzlesSolved);
+  if (remaining <= 0) {
+    return uiPhase >= 3 ? 'The rare words are yours to offer.' : 'Unlocked.';
+  }
+  const tease = uiPhase >= 3
+    ? 'Deeper words wait in the older pages.'
+    : 'A mode of rarer, stranger words, on any style.';
   return formatLockedHint(tease, remaining, uiPhase);
 }
 

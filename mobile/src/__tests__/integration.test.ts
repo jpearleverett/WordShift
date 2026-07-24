@@ -81,6 +81,8 @@ describe('Victory Flow Integration', () => {
       challengeCompletions: 0,
       variantWins: {},
       blindWins: 0,
+      lexiconWins: 0,
+      maxStackWins: 0,
     };
     const newAchievements = await checkAchievements(achievementState);
     const ids = newAchievements.map(a => a.id);

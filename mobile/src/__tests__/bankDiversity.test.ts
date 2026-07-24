@@ -59,6 +59,29 @@ import { PUZZLE_BANK_DOUBLE_SHIFT_EASY } from '../data/puzzleBankDoubleShiftEasy
 import { PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM } from '../data/puzzleBankDoubleShiftMedium';
 import { PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM_PLUS } from '../data/puzzleBankDoubleShiftMediumPlus';
 import { PUZZLE_BANK_DOUBLE_SHIFT_HARD } from '../data/puzzleBankDoubleShiftHard';
+// Apex banks (EXPERT std/double; Lexicon std/double x 5 difficulties) — the
+// reverse combos are on-device (no bank).
+import { PUZZLE_BANK_EXPERT } from '../data/puzzleBankExpert';
+import { PUZZLE_BANK_DOUBLE_SHIFT_EXPERT } from '../data/puzzleBankDoubleShiftExpert';
+import { LEXICON_BANK_EASY } from '../data/lexiconBankEasy';
+import { LEXICON_BANK_MEDIUM } from '../data/lexiconBankMedium';
+import { LEXICON_BANK_MEDIUM_PLUS } from '../data/lexiconBankMediumPlus';
+import { LEXICON_BANK_HARD } from '../data/lexiconBankHard';
+import { LEXICON_BANK_EXPERT } from '../data/lexiconBankExpert';
+import { LEXICON_BANK_DOUBLE_EASY } from '../data/lexiconBankDoubleShiftEasy';
+import { LEXICON_BANK_DOUBLE_MEDIUM } from '../data/lexiconBankDoubleShiftMedium';
+import { LEXICON_BANK_DOUBLE_MEDIUM_PLUS } from '../data/lexiconBankDoubleShiftMediumPlus';
+import { LEXICON_BANK_DOUBLE_HARD } from '../data/lexiconBankDoubleShiftHard';
+import { LEXICON_BANK_DOUBLE_EXPERT } from '../data/lexiconBankDoubleShiftExpert';
+// Reverse apex banks (added after the gated rare/reverse run): a 6-letter EXPERT
+// reverse bank + the four larger Lexicon-reverse tiers. lex_rev_EXPERT stays
+// on-device (plateaued at ~1), so it has no bank/row.
+import { PUZZLE_BANK_REVERSE_EXPERT } from '../data/puzzleBankReverseExpert';
+import { LEXICON_BANK_REVERSE_EASY } from '../data/lexiconBankReverseEasy';
+import { LEXICON_BANK_REVERSE_MEDIUM } from '../data/lexiconBankReverseMedium';
+import { LEXICON_BANK_REVERSE_MEDIUM_PLUS } from '../data/lexiconBankReverseMediumPlus';
+import { LEXICON_BANK_REVERSE_HARD } from '../data/lexiconBankReverseHard';
+import { LEXICON_BANK_REVERSE_EXPERT } from '../data/lexiconBankReverseExpert';
 import { PreGeneratedPuzzle } from '../data/puzzleBankTypes';
 
 interface BankSpec {
@@ -70,33 +93,88 @@ interface BankSpec {
 }
 
 const BANKS: BankSpec[] = [
-  // Measured (2026-07 gated full regeneration: every standard-bank board passes
-  // completePathCount >= 2, singleChoiceFraction <= 0.65 bright / <= 0.75 dread
-  // phases — smaller banks, 100% choice-rich; floors ~10% under measured):
-  // EASY 496 puzzles / max 3 / 1417 unique
-  { name: 'EASY', bank: PUZZLE_BANK_EASY, cap: 3, minUnique: 1275, minPuzzles: 445 },
-  // MEDIUM 426 / max 7 / 1256 unique
-  { name: 'MEDIUM', bank: PUZZLE_BANK_MEDIUM, cap: 7, minUnique: 1130, minPuzzles: 380 },
-  // MEDIUM_PLUS 344 / max 10 / 935 unique
-  { name: 'MEDIUM_PLUS', bank: PUZZLE_BANK_MEDIUM_PLUS, cap: 10, minUnique: 840, minPuzzles: 310 },
-  // HARD 310 / max 12 / 933 unique
-  { name: 'HARD', bank: PUZZLE_BANK_HARD, cap: 12, minUnique: 840, minPuzzles: 280 },
-  // REVERSE_EASY 406 / max 7 / 1325 unique
-  { name: 'REVERSE_EASY', bank: PUZZLE_BANK_REVERSE_EASY, cap: 7, minUnique: 1190, minPuzzles: 380 },
-  // REVERSE_MEDIUM 292 / max 11 (solution-repair pass) / 1304 unique
-  { name: 'REVERSE_MEDIUM', bank: PUZZLE_BANK_REVERSE_MEDIUM, cap: 11, minUnique: 1170, minPuzzles: 280 },
-  // REVERSE_MEDIUM_PLUS 219 / max 12 / 877 unique
-  { name: 'REVERSE_MEDIUM_PLUS', bank: PUZZLE_BANK_REVERSE_MEDIUM_PLUS, cap: 12, minUnique: 785, minPuzzles: 195 },
-  // REVERSE_HARD 182 / max 16 / 783 unique
-  { name: 'REVERSE_HARD', bank: PUZZLE_BANK_REVERSE_HARD, cap: 16, minUnique: 700, minPuzzles: 160 },
-  // DOUBLE_EASY 489 / max 3 / 1619 unique
-  { name: 'DOUBLE_EASY', bank: PUZZLE_BANK_DOUBLE_SHIFT_EASY, cap: 3, minUnique: 1455, minPuzzles: 440 },
-  // DOUBLE_MEDIUM 447 / max 5 / 1604 unique
-  { name: 'DOUBLE_MEDIUM', bank: PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM, cap: 5, minUnique: 1440, minPuzzles: 405 },
-  // DOUBLE_MEDIUM_PLUS 463 / max 8 / 1637 unique
-  { name: 'DOUBLE_MEDIUM_PLUS', bank: PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM_PLUS, cap: 8, minUnique: 1470, minPuzzles: 420 },
-  // DOUBLE_HARD 425 / max 10 / 1617 unique
-  { name: 'DOUBLE_HARD', bank: PUZZLE_BANK_DOUBLE_SHIFT_HARD, cap: 10, minUnique: 1450, minPuzzles: 390 },
+  // Measured (2026-07 depth-lever regeneration, all 12 banks: standard banks are
+  // multi-route by construction with the D3-fixed path counting + playable-vocab
+  // FEATURED band; reverse regenerated to full size with a forward-S-share
+  // anti-boring cap; double refreshed on the 2x dictionary. Word diversity is
+  // dramatically higher across the board. Floors ~10% under measured):
+  // EASY 453 / max 3 / 1566 unique
+  { name: 'EASY', bank: PUZZLE_BANK_EASY, cap: 3, minUnique: 1409, minPuzzles: 407 },
+  // MEDIUM 338 / max 7 / 1336 unique
+  { name: 'MEDIUM', bank: PUZZLE_BANK_MEDIUM, cap: 7, minUnique: 1202, minPuzzles: 304 },
+  // MEDIUM_PLUS 500 / max 10 / 1889 unique
+  { name: 'MEDIUM_PLUS', bank: PUZZLE_BANK_MEDIUM_PLUS, cap: 10, minUnique: 1700, minPuzzles: 450 },
+  // HARD 457 / max 12 / 1918 unique
+  { name: 'HARD', bank: PUZZLE_BANK_HARD, cap: 12, minUnique: 1726, minPuzzles: 411 },
+  // REVERSE_EASY 500 / max 6 / 1901 unique
+  { name: 'REVERSE_EASY', bank: PUZZLE_BANK_REVERSE_EASY, cap: 6, minUnique: 1710, minPuzzles: 450 },
+  // REVERSE_MEDIUM 500 / max 8 / 2107 unique
+  { name: 'REVERSE_MEDIUM', bank: PUZZLE_BANK_REVERSE_MEDIUM, cap: 8, minUnique: 1896, minPuzzles: 450 },
+  // REVERSE_MEDIUM_PLUS 500 / max 10 / 2436 unique
+  { name: 'REVERSE_MEDIUM_PLUS', bank: PUZZLE_BANK_REVERSE_MEDIUM_PLUS, cap: 10, minUnique: 2192, minPuzzles: 450 },
+  // REVERSE_HARD 500 / max 12 / 2592 unique
+  { name: 'REVERSE_HARD', bank: PUZZLE_BANK_REVERSE_HARD, cap: 12, minUnique: 2332, minPuzzles: 450 },
+  // DOUBLE_EASY 494 / max 3 / 2047 unique
+  { name: 'DOUBLE_EASY', bank: PUZZLE_BANK_DOUBLE_SHIFT_EASY, cap: 3, minUnique: 1842, minPuzzles: 444 },
+  // DOUBLE_MEDIUM 495 / max 5 / 2370 unique
+  { name: 'DOUBLE_MEDIUM', bank: PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM, cap: 5, minUnique: 2133, minPuzzles: 445 },
+  // DOUBLE_MEDIUM_PLUS 496 / max 8 / 2528 unique
+  { name: 'DOUBLE_MEDIUM_PLUS', bank: PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM_PLUS, cap: 8, minUnique: 2275, minPuzzles: 446 },
+  // DOUBLE_HARD 491 / max 10 / 2676 unique
+  { name: 'DOUBLE_HARD', bank: PUZZLE_BANK_DOUBLE_SHIFT_HARD, cap: 10, minUnique: 2408, minPuzzles: 441 },
+  // Apex banks (2026-07 EXPERT + Lexicon pass). EXPERT is a difficulty (fair
+  // mainstream-to-uncommon 6-letter words); Lexicon is a rare-word mode (rare-
+  // but-fair band). Reverse combos are on-device (no bank). Floors ~10% under
+  // measured; the Lexicon+EXPERT combos are deliberately smaller niche banks.
+  // EXPERT 195 / max 8 / 1018 unique
+  { name: 'EXPERT', bank: PUZZLE_BANK_EXPERT, cap: 10, minUnique: 860, minPuzzles: 175 },
+  // DS_EXPERT 265 / max 9 / 1914 unique
+  { name: 'DS_EXPERT', bank: PUZZLE_BANK_DOUBLE_SHIFT_EXPERT, cap: 10, minUnique: 1620, minPuzzles: 238 },
+  // LEX_EASY 251 / max 3 / 986 unique
+  { name: 'LEX_EASY', bank: LEXICON_BANK_EASY, cap: 3, minUnique: 830, minPuzzles: 225 },
+  // LEX_MEDIUM 247 / max 7 / 1004 unique
+  { name: 'LEX_MEDIUM', bank: LEXICON_BANK_MEDIUM, cap: 7, minUnique: 850, minPuzzles: 222 },
+  // LEX_MEDIUM_PLUS 255 / max 9 / 948 unique
+  { name: 'LEX_MEDIUM_PLUS', bank: LEXICON_BANK_MEDIUM_PLUS, cap: 10, minUnique: 800, minPuzzles: 229 },
+  // LEX_HARD 191 / max 9 / 804 unique
+  { name: 'LEX_HARD', bank: LEXICON_BANK_HARD, cap: 12, minUnique: 680, minPuzzles: 171 },
+  // LEX_EXPERT 101 / max 9 / 519 unique (niche combo)
+  { name: 'LEX_EXPERT', bank: LEXICON_BANK_EXPERT, cap: 10, minUnique: 440, minPuzzles: 90 },
+  // LEX_DS_EASY 265 / max 3 / 1132 unique
+  { name: 'LEX_DS_EASY', bank: LEXICON_BANK_DOUBLE_EASY, cap: 3, minUnique: 960, minPuzzles: 238 },
+  // LEX_DS_MEDIUM 265 / max 5 / 1354 unique
+  { name: 'LEX_DS_MEDIUM', bank: LEXICON_BANK_DOUBLE_MEDIUM, cap: 5, minUnique: 1150, minPuzzles: 238 },
+  // LEX_DS_MEDIUM_PLUS 265 / max 8 / 1370 unique
+  { name: 'LEX_DS_MEDIUM_PLUS', bank: LEXICON_BANK_DOUBLE_MEDIUM_PLUS, cap: 8, minUnique: 1160, minPuzzles: 238 },
+  // LEX_DS_HARD 195 / max 10 / 1163 unique
+  { name: 'LEX_DS_HARD', bank: LEXICON_BANK_DOUBLE_HARD, cap: 10, minUnique: 985, minPuzzles: 175 },
+  // LEX_DS_EXPERT 99 / max 9 / 762 unique. Regenerated 2026-07-24 (62 -> 99)
+  // under a raised word cap (10 -> 15): rare + two-letter moves + a 7-row chain
+  // is the scarcest corner in the game, and the cap bound long before the
+  // search did. Acceptance exhausted at 99 (23 -> 4 -> 0 -> 0 across runs), so
+  // this is the practical ceiling without relaxing the rarity floor.
+  { name: 'LEX_DS_EXPERT', bank: LEXICON_BANK_DOUBLE_EXPERT, cap: 15, minUnique: 685, minPuzzles: 89 },
+  // Reverse apex banks (2026-07 gated rare/reverse run). Smaller than the E/M/MP/H
+  // reverse banks — fair 6-letter reverse (EXPERT) and rare reverse-solvable
+  // (Lexicon) are scarcer supply. Floors ~90% of measured; caps = measured max.
+  // REVERSE_EXPERT 200 / max 10 / 1182 unique
+  { name: 'REVERSE_EXPERT', bank: PUZZLE_BANK_REVERSE_EXPERT, cap: 10, minUnique: 1060, minPuzzles: 180 },
+  // Lexicon-reverse banks REGENERATED with the rarity-aware walk (difficulty-ramped
+  // rare band, meanRank ~0.62 EASY -> ~0.75 EXPERT). Rarer vocab = slightly smaller
+  // unique pools than the pre-fix banks; floors ~90% of measured.
+  // LEX_REV_EASY 240 / max 6 / 1127 unique
+  { name: 'LEX_REV_EASY', bank: LEXICON_BANK_REVERSE_EASY, cap: 6, minUnique: 1010, minPuzzles: 216 },
+  // LEX_REV_MEDIUM 240 / max 8 / 1243 unique
+  { name: 'LEX_REV_MEDIUM', bank: LEXICON_BANK_REVERSE_MEDIUM, cap: 8, minUnique: 1115, minPuzzles: 216 },
+  // LEX_REV_MEDIUM_PLUS 240 / max 10 / 1289 unique
+  { name: 'LEX_REV_MEDIUM_PLUS', bank: LEXICON_BANK_REVERSE_MEDIUM_PLUS, cap: 10, minUnique: 1155, minPuzzles: 216 },
+  // LEX_REV_HARD 240 / max 12 / 1313 unique (grew 149 -> 240 with the rarity-aware walk)
+  { name: 'LEX_REV_HARD', bank: LEXICON_BANK_REVERSE_HARD, cap: 12, minUnique: 1180, minPuzzles: 216 },
+  // LEX_REV_EXPERT 114 / max 15 / 521 unique (rare + reverse + 6-letter — the
+  // scarcest corner; the rarity-aware walk turned a 1-board dead-end into a bank,
+  // then word cap 15 + a front-loaded bright bucket grew it 76 -> 114 with the
+  // rarity held at meanRank 0.751 — a modest diversity trade for more supply)
+  { name: 'LEX_REV_EXPERT', bank: LEXICON_BANK_REVERSE_EXPERT, cap: 15, minUnique: 465, minPuzzles: 100 },
 ];
 
 /** All words a player sees in a puzzle: the starting chain + every formed word. */
@@ -140,5 +218,57 @@ describe.each(BANKS)('bank diversity: $name', ({ bank, cap, minUnique, minPuzzle
   it('has no duplicate chains', () => {
     const keys = new Set(bank.map(p => p.words.join('-')));
     expect(keys.size).toBe(bank.length);
+  });
+
+  // Structural-monotony guards (B1): a word-cap alone can't see a bank that is
+  // dominated by one starting letter, one moved letter (the S-shuffle), or one
+  // shift shape. Thresholds sit well above the measured maxima (start ~18%,
+  // moved ~18%, S-share ~20%) so they pass today and catch a future regression.
+  it('no single starting letter dominates the chains', () => {
+    const starts = new Map<string, number>();
+    for (const p of bank) starts.set(p.words[0][0], (starts.get(p.words[0][0]) ?? 0) + 1);
+    const maxShare = Math.max(...starts.values()) / bank.length;
+    expect(maxShare).toBeLessThanOrEqual(0.30);
+  });
+
+  it('no single first-moved letter dominates', () => {
+    const moved = new Map<string, number>();
+    for (const p of bank) {
+      const ml = (p.solution?.[0]?.letterToMove ?? '').toUpperCase();
+      if (ml) moved.set(ml, (moved.get(ml) ?? 0) + 1);
+    }
+    const maxShare = Math.max(...moved.values()) / bank.length;
+    expect(maxShare).toBeLessThanOrEqual(0.30);
+  });
+
+  it('S is not the runaway moved letter (S-shuffle guard)', () => {
+    let sMoves = 0, allMoves = 0;
+    for (const p of bank) for (const step of p.solution ?? []) {
+      allMoves++;
+      if ((step.letterToMove ?? '').toUpperCase() === 'S') sMoves++;
+    }
+    expect(sMoves / allMoves).toBeLessThanOrEqual(0.30);
+  });
+});
+
+// Cross-bank overlap guard (B2): the per-bank cap/dedup can't see the same
+// chain shipped in two different banks. Currently 0 chains are shared across
+// any two banks; keep it that way so players moving between difficulties/
+// variants never re-solve an identical board.
+describe('cross-bank chain overlap', () => {
+  it('no chain appears in more than one bank', () => {
+    const chainToBanks = new Map<string, Set<string>>();
+    for (const { name, bank } of BANKS) {
+      for (const p of bank) {
+        const key = p.words.join('-');
+        if (!chainToBanks.has(key)) chainToBanks.set(key, new Set());
+        chainToBanks.get(key)!.add(name);
+      }
+    }
+    const shared = [...chainToBanks.entries()]
+      .filter(([, banks]) => banks.size > 1)
+      .slice(0, 10)
+      .map(([chain, banks]) => `${chain} in ${[...banks].join(',')}`);
+    expect(shared).toEqual([]);
   });
 });

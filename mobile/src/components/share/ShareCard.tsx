@@ -95,6 +95,9 @@ const DIFFICULTY_DOT: Record<string, string> = {
   MEDIUM: '#F2C14E',
   MEDIUM_PLUS: '#E8833A',
   HARD: '#E0524D',
+  // Without this an EXPERT share card fell through to the '#888' grey fallback,
+  // so the apex tier looked unranked. Matches DIFFICULTY_RING_COLORS.EXPERT.
+  EXPERT: '#9333EA',
 };
 
 /** Chromatic-aberration ghost hues (an effect pair, like SQUARE_COLORS). Their

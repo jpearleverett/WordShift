@@ -496,6 +496,14 @@ export interface PuzzleGameState {
   gameMode: GameMode;
   /** Blind Offering modifier active (ghost previews hidden). */
   blindMode: boolean;
+  /**
+   * Undo-limit ("Challenge") modifier active (finite undo budget). Decoupled
+   * from blind so the two constraints stack: Blind alone frees undos, Blind +
+   * this re-imposes the budget. gameMode is 'challenge' whenever either is on.
+   */
+  undoLimited: boolean;
+  /** Lexicon (rare-word) modifier active (rare-but-fair vocabulary boards). */
+  lexiconMode: boolean;
   /** Phase-5 mastery mode: each moved character may cross only once. */
   unbrokenWeaveMode: boolean;
   /** Characters already moved on the current Unbroken Weave board. */
@@ -599,6 +607,8 @@ export interface PuzzleGameActions {
     variant?: PuzzleVariant,
     blind?: boolean,
     unbrokenWeave?: boolean,
+    lexicon?: boolean,
+    undoLimited?: boolean,
   ) => Promise<void>;
   handleLetterPress: (letter: Letter, rowIndex: number) => void;
   /**
@@ -630,6 +640,10 @@ export interface PuzzleGameActions {
     solveTimeMs?: number;
     /** Whether this board was played with the Blind Offering modifier on. */
     blind?: boolean;
+    /** Whether this board was played with the undo-limit ("Challenge") modifier on. */
+    undoLimited?: boolean;
+    /** Whether this board was played with the Lexicon (rare-word) modifier on. */
+    lexicon?: boolean;
     /** Resonant choices across the whole board (present on the completing move). */
     resonantChoiceCount?: number;
     /** Capped resonance amber for the board (present on the completing move). */
@@ -688,6 +702,10 @@ export interface PuzzleGameActions {
   setEarnedStars: (stars: number) => void;
   setMessage: (message: string) => void;
   setGameMode: (mode: GameMode) => void;
+  /** Test/edge affordance: set the undo-limit ("Challenge") flag + its ref
+   *  mirror so a following initGame sees the finite budget. Production toggles
+   *  route through startNewGame's undoLimitedOverride instead. */
+  setUndoLimited: (limited: boolean) => void;
   setCurrentPhase: (phase: DialoguePhase) => void;
   setSelectedVariant: (variant: PuzzleVariant) => void;
   restorePuzzleState: (saved: SavedPuzzleState) => void;
@@ -756,6 +774,24 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   // across Next Level like gameMode; forced OFF on daily/shared-challenge
   // boards. Composes with any variant/difficulty.
   const [blindMode, setBlindMode] = useState(false);
+  // Undo-limit ("Challenge") modifier: the finite undo budget. Decoupled from
+  // blind so the two trial constraints STACK — Blind alone frees undos (its
+  // repair loop), but Blind + Challenge re-imposes the budget (previews hidden
+  // AND undos limited: the maximal trial). gameMode 'challenge' is the shared
+  // no-hints umbrella (set when EITHER is on); undoLimited is what actually gates
+  // the budget. freeUndos = blindMode && !undoLimited (see handleUndo). Forced
+  // OFF on daily/shared/finale/weave. Sticky across Next Level.
+  const [undoLimited, setUndoLimited] = useState(false);
+  const undoLimitedRef = useRef(false);
+  // Lexicon (rare-word) mode: a COMPOSABLE toggle (stacks on any variant +
+  // difficulty) that serves rare-but-fair vocabulary boards from the dedicated
+  // Lexicon banks (on-device generation leans rare via rarityLean). Sticky
+  // across Next Level like blindMode; forced OFF on daily/shared/finale boards
+  // (a shared board must be identical for everyone; the finale is bespoke).
+  // Amber-neutral: it plays the underlying difficulty/variant, only the WORDS
+  // change — so it never alters rewards or phase progress.
+  const [lexiconMode, setLexiconMode] = useState(false);
+  const lexiconModeRef = useRef(false);
   const [unbrokenWeaveMode, setUnbrokenWeaveMode] = useState(false);
   const unbrokenWeaveModeRef = useRef(false);
   const [spentLetterSet, setSpentLetterSet] = useState<ReadonlySet<string>>(
@@ -985,12 +1021,14 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       boardTimedRef.current = true;
     }
 
-    // Reset undos for challenge mode (scaled by difficulty). Read the refs,
-    // not the closure state: applyBoard is invoked from async generation
-    // flows whose closures can predate a same-call setGameMode/setDifficulty
-    // (see gameModeRef above).
+    // Reset the undo budget when the undo-limit ("Challenge") constraint is on
+    // (scaled by difficulty). Keys on undoLimitedRef, NOT gameMode: gameMode is
+    // 'challenge' whenever EITHER Blind or Challenge is on, but Blind-alone
+    // keeps undos free (Infinity) — only the undo-limit flag imposes the budget.
+    // Read the refs, not the closure state: applyBoard is invoked from async
+    // generation flows whose closures can predate a same-call setter.
     setUndosRemaining(
-      gameModeRef.current === 'challenge'
+      undoLimitedRef.current
         ? CHALLENGE_MODE_CONFIG.getMaxUndos(difficultyRef.current)
         : Infinity
     );
@@ -1023,17 +1061,23 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     selectedDifficulty: Difficulty,
     variant: PuzzleVariant,
     timeoutPromise: Promise<never>,
-    startWord?: string
+    startWord?: string,
+    // Lexicon on-device fallback: steer the generator toward rare-but-fair
+    // vocabulary (2 = strong Lexicon lean; used when the Lexicon bank is
+    // unavailable/exhausted, or for the Lexicon speed variant which is always
+    // on-device). 0 = off.
+    rarityLean?: number,
   ): Promise<{ puzzle: { words: string[]; hint?: string; solution?: PuzzleSolutionStep[]; reverseSolution?: PuzzleSolutionStep[]; wordLength?: number; isDoubleShift?: boolean }; activeVariant: PuzzleVariant }> => {
     let activeVariant = variant;
     const isDoubleShiftVariant = hasVariantModifier(activeVariant, 'double_shift');
     const isReverseVariant = hasVariantModifier(activeVariant, 'reverse');
     const variantOverrides = getVariantOverrides(activeVariant, selectedDifficulty);
+    const leanOverride = rarityLean ? { rarityLean } : {};
 
     // Double shift uses its own generator
     if (isDoubleShiftVariant) {
       let puzzle = await Promise.race([
-        generateDoubleShiftPuzzle(selectedDifficulty, variantOverrides),
+        generateDoubleShiftPuzzle(selectedDifficulty, { ...variantOverrides, ...leanOverride }),
         timeoutPromise,
       ]);
       return { puzzle, activeVariant };
@@ -1041,12 +1085,13 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
 
     const generationOverrides = {
       ...variantOverrides,
+      ...leanOverride,
       ...(startWord ? { startWord } : {}),
       // For reverse variants, let the generator handle reverse-solvability
       // internally so it can try many start words within the timeout.
       // relaxBoring widens the candidate pool by skipping anti-boring penalties.
       ...(isReverseVariant ? { requireReverseSolvable: true, relaxBoring: true } : {}),
-    } as { targetRows?: number; wordLength?: number; startWord?: string; requireReverseSolvable?: boolean; relaxBoring?: boolean };
+    } as { targetRows?: number; wordLength?: number; startWord?: string; requireReverseSolvable?: boolean; relaxBoring?: boolean; rarityLean?: number };
 
     let puzzle = await Promise.race([
       generateLocalPuzzle(selectedDifficulty, generationOverrides),
@@ -1077,6 +1122,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         puzzle = await Promise.race([
           generateLocalPuzzle(selectedDifficulty, {
             ...getVariantOverrides('standard', selectedDifficulty),
+            ...leanOverride,
             ...(startWord ? { startWord } : {}),
           }),
           timeoutPromise,
@@ -1093,6 +1139,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     variantOverride?: PuzzleVariant,
     blindOverride?: boolean,
     unbrokenWeaveOverride?: boolean,
+    lexiconOverride?: boolean,
+    undoLimitedOverride?: boolean,
   ) => {
     const requestedDifficulty = selectedDifficulty ?? preferredDifficultyRef.current;
     if (selectedDifficulty !== undefined) {
@@ -1121,14 +1169,30 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       unbrokenWeaveModeRef.current = unbrokenWeaveOverride;
       setUnbrokenWeaveMode(unbrokenWeaveOverride);
     }
+    // Lexicon (rare-word) mode: sticky like blind; the weave apex and the
+    // finale/daily/shared paths force it off (handled below + in their setters).
+    if (lexiconOverride !== undefined) {
+      lexiconModeRef.current = lexiconOverride;
+      setLexiconMode(lexiconOverride);
+    }
+    // Undo-limit ("Challenge") modifier — decoupled from blind so they stack.
+    if (undoLimitedOverride !== undefined) {
+      undoLimitedRef.current = undoLimitedOverride;
+      setUndoLimited(undoLimitedOverride);
+    }
     if (requestedUnbrokenWeave) {
       gameModeRef.current = 'standard';
       setGameMode('standard');
       setBlindMode(false);
+      undoLimitedRef.current = false;
+      setUndoLimited(false);
+      lexiconModeRef.current = false;
+      setLexiconMode(false);
       setSelectedVariant('standard');
     } else if (blindOverride !== undefined) {
       setBlindMode(blindOverride);
     }
+    const requestedLexicon = requestedUnbrokenWeave ? false : lexiconModeRef.current;
     // Claim this generation. Any initGame commit below is skipped if a newer
     // startNewGame call has since superseded this one (see generationIdRef).
     const genId = ++generationIdRef.current;
@@ -1146,7 +1210,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     } else if (mode !== undefined) {
       gameModeRef.current = mode;
       setGameMode(mode);
-      setUndosRemaining(mode === 'challenge' ? CHALLENGE_MODE_CONFIG.getMaxUndos(requestedDifficulty) : Infinity);
+      // The budget is imposed by the undo-limit ("Challenge") flag, NOT by
+      // gameMode: gameMode is 'challenge' whenever EITHER Blind or Challenge is
+      // on, but Blind-alone keeps undos free. Only undoLimited caps them.
+      setUndosRemaining(undoLimitedRef.current ? CHALLENGE_MODE_CONFIG.getMaxUndos(requestedDifficulty) : Infinity);
     }
 
     const effectiveMode = requestedUnbrokenWeave ? 'standard' : (mode ?? gameMode);
@@ -1207,6 +1274,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         gameModeRef.current = 'standard';
         setGameMode('standard');
         setBlindMode(false);
+        undoLimitedRef.current = false;
+        setUndoLimited(false);
+        lexiconModeRef.current = false;
+        setLexiconMode(false);
         difficultyRef.current = 'HARD';
         setDifficulty('HARD');
         setUndosRemaining(Infinity);
@@ -1247,6 +1318,14 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       setIsEchoPuzzle(false);
       if (
         !requestedUnbrokenWeave &&
+        // Lexicon boards are never echo-seeded: the echo generator draws from
+        // the player's ritual words with no rarity lean, so an echo board is
+        // ordinary common vocabulary. Serving one while lexiconMode is still on
+        // meant every 5th Lexicon board was a common-word board that still paid
+        // the 1.4x Lexicon bonus and counted toward the Lexicon achievements.
+        // Lexicon unlocks at 100 solves and phase 3 starts far earlier, so this
+        // hit every Lexicon player. The rare bank wins; echo yields.
+        !requestedLexicon &&
         currentPhase >= 3 &&
         puzzlesSolved > 0 &&
         puzzlesSolved % 5 === 0 &&
@@ -1291,8 +1370,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         }
       }
 
-      // Use pre-generated puzzle bank for standard/reverse/double_shift variants at all difficulties
-      const bankVariants: PuzzleVariant[] = ['standard', 'reverse', 'double_shift'];
+      // Use pre-generated puzzle banks for every variant. Speed reuses the
+      // standard bank family (a standard board played against the clock — see
+      // getBankForSelection), so it no longer generates on-device. On-device
+      // generation now only runs as a fallback if a bank selection genuinely
+      // fails (recycling makes that near-impossible).
+      const bankVariants: PuzzleVariant[] = ['standard', 'reverse', 'double_shift', 'speed'];
       const shouldUseBank = bankVariants.includes(variant);
       if (shouldUseBank) {
         try {
@@ -1312,6 +1395,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
                 recencyMap,
                 variant,
                 puzzlesSolved,
+                { lexicon: requestedLexicon },
               );
           if (bankPuzzle) {
             if (isStale()) return;
@@ -1350,14 +1434,24 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       const { puzzle, activeVariant } = await generatePuzzleForVariant(
         requestedDifficulty,
         variant,
-        timeoutPromise
+        timeoutPromise,
+        undefined,
+        requestedLexicon ? 2 : 0, // Lexicon on-device fallback leans rare-but-fair
       );
       if (isStale()) return;
       let puzzleToServe = puzzle;
       if (
         activeVariant === 'standard' &&
         puzzlesSolved >= PUZZLE_EXTENSION_UNLOCK_PUZZLES &&
-        !requestedUnbrokenWeave
+        !requestedUnbrokenWeave &&
+        // Mirror the bank path's rule (puzzleBank.selectPreGeneratedPuzzle):
+        // Lexicon boards are curated rare and are NEVER extended. Beyond
+        // perturbing the vocabulary, the else-arm below falls back to
+        // getGuaranteedExtendedStandardFallback, which draws from the ORDINARY
+        // std_<diff> bank — a common-word board served as Lexicon, still paying
+        // the 1.4x bonus. The extension gate (70) sits below the Lexicon gate
+        // (100), so every Lexicon player cleared it.
+        !requestedLexicon
       ) {
         const extended = extendStandardPuzzle(puzzle);
         puzzleToServe = extended.words.length === puzzle.words.length + 1
@@ -1395,7 +1489,11 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       if (
         variant === 'standard' &&
         puzzlesSolved >= PUZZLE_EXTENSION_UNLOCK_PUZZLES &&
-        !requestedUnbrokenWeave
+        !requestedUnbrokenWeave &&
+        // Same rule as the two paths above: never hand a Lexicon board the
+        // ordinary extended-standard fallback (common vocabulary paid at the
+        // 1.4x Lexicon rate).
+        !requestedLexicon
       ) {
         try {
           const matureFallback = getGuaranteedExtendedStandardFallback(requestedDifficulty);
@@ -1449,6 +1547,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     gameModeRef.current = 'standard';
     setGameMode('standard');
     setBlindMode(false); // the daily is a shared board — never blind
+    undoLimitedRef.current = false;
+    setUndoLimited(false); // the daily always allows unlimited undos
+    lexiconModeRef.current = false;
+    setLexiconMode(false); // the daily is identical for everyone — never Lexicon
     unbrokenWeaveModeRef.current = false;
     setUnbrokenWeaveMode(false);
     setIsSharedChallenge(false);
@@ -1492,6 +1594,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     gameModeRef.current = 'standard';
     setGameMode('standard');
     setBlindMode(false); // a friend's shared board — never blind
+    undoLimitedRef.current = false;
+    setUndoLimited(false); // a friend's shared board — unlimited undos
+    lexiconModeRef.current = false;
+    setLexiconMode(false); // a friend's shared board — never Lexicon
     unbrokenWeaveModeRef.current = false;
     setUnbrokenWeaveMode(false);
     setIsDailyBoard(false);
@@ -2195,6 +2301,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         variant: currentVariant,
         solveTimeMs,
         blind: blindMode,
+        undoLimited,
+        lexicon: lexiconMode,
         // THE marked final board's win — App silences the fanfare and fires
         // the finale (ref mirror: set at board start, immune to stale closures).
         isFinalBoard: isFinalBoardRef.current,
@@ -2421,15 +2529,15 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       return;
     }
 
-    // Challenge mode: limited undos (only applies to committed moves, not
-    // mid-step). Blind Offering runs under gameMode 'challenge' but its undos
-    // are ALWAYS free and unlimited (design ruling): the chain is judged once
-    // at the end, so walking back to a flaw is the mode's core loop — it must
-    // never be blocked by or charged against the challenge budget. (A blind
-    // board's undosRemaining may still hold the finite challenge budget from
-    // applyBoard; it is deliberately never read or decremented on the blind
-    // path, and App hides the undo-budget chrome while blind is on.)
-    const freeUndos = blindMode;
+    // Undo budget (only applies to committed moves, not mid-step). Blind
+    // Offering ALONE keeps undos free and unlimited (design ruling): the chain
+    // is judged once at the end, so walking back to a flaw is the mode's core
+    // loop and must never be blocked by or charged against a budget. But Blind
+    // and Challenge STACK — when the undo-limit ("Challenge") flag is also on,
+    // the budget is re-imposed even under blind (previews hidden AND undos
+    // limited: the maximal trial). So free undos require blind AND no undo
+    // limit; whenever undoLimited is on, the finite budget is read and charged.
+    const freeUndos = blindMode && !undoLimited;
     if (gameMode === 'challenge' && !freeUndos && undosRemaining <= 0) {
       shakeError("No undos remaining in Challenge Mode!");
       return;
@@ -2580,7 +2688,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     if (gameMode === 'challenge' && !freeUndos) {
       setUndosRemaining(prev => prev - 1);
     }
-  }, [history, gameMode, blindMode, unbrokenWeaveMode, undosRemaining, shakeError, gameState, currentVariant, doubleShiftPhase, currentPhase]);
+  }, [history, gameMode, blindMode, undoLimited, unbrokenWeaveMode, undosRemaining, shakeError, gameState, currentVariant, doubleShiftPhase, currentPhase]);
 
   const handleNextLevel = useCallback(() => {
     setShowConfetti(false);
@@ -2718,6 +2826,29 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     // blindMode restores with the board — a restored blind board keeps its
     // always-free undos (the rule derives from the mode, not per-board state).
     setBlindMode(restoreUnbrokenWeave ? false : (saved.blindMode ?? false));
+    // undoLimited ("Challenge") restores with the board (its budget rode in
+    // saved.undosRemaining above); the weave apex forces it off like the rest.
+    //
+    // LEGACY SAVES: `undoLimited` is newer than the Challenge/Blind decoupling
+    // and puzzleSaveState carries no schema version, so a board autosaved by a
+    // pre-decoupling build has `gameMode: 'challenge'` and NO `undoLimited`.
+    // Defaulting that to false breaks the invariant
+    // `gameMode === 'challenge' <=> (undoLimited || blindMode)`, and the stale
+    // 'challenge' gameMode then rides forward through startNewGame() forever —
+    // paying the challenge amber (1.25x) AND phase acceleration (1.5x) with
+    // undosRemaining pinned to Infinity, while the CHALLENGE badge and the
+    // buy-undo chip (which key on undoLimited) stay hidden. Infer it instead:
+    // in the old world `gameMode === 'challenge'` meant Blind (free undos) when
+    // blindMode was set, and the undo-limited Challenge otherwise.
+    const restoredUndoLimited = restoreUnbrokenWeave
+      ? false
+      : (saved.undoLimited ?? (saved.gameMode === 'challenge' && !(saved.blindMode ?? false)));
+    undoLimitedRef.current = restoredUndoLimited;
+    setUndoLimited(restoredUndoLimited);
+    // lexiconMode restores with the board (rare vocabulary is a property of the
+    // served board); the weave apex forces it off like the other modifiers.
+    lexiconModeRef.current = restoreUnbrokenWeave ? false : (saved.lexiconMode ?? false);
+    setLexiconMode(restoreUnbrokenWeave ? false : (saved.lexiconMode ?? false));
     unbrokenWeaveModeRef.current = restoreUnbrokenWeave;
     setUnbrokenWeaveMode(restoreUnbrokenWeave);
     setSpentLetterSet(restoredSpentLetters);
@@ -2878,6 +3009,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     earnedStars,
     gameMode,
     blindMode,
+    undoLimited,
+    lexiconMode,
     unbrokenWeaveMode,
     spentLetters: [...spentLetterSet],
     isSharedChallenge,
@@ -2932,6 +3065,13 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setGameMode: (mode: GameMode) => {
       gameModeRef.current = mode;
       setGameMode(mode);
+    },
+    // Keep the synchronous mirror in step (same reasoning as setGameMode):
+    // applyBoard's undo reset reads undoLimitedRef, so a same-tick
+    // setUndoLimited + initGame must see the new value.
+    setUndoLimited: (limited: boolean) => {
+      undoLimitedRef.current = limited;
+      setUndoLimited(limited);
     },
     setCurrentPhase,
     setSelectedVariant,

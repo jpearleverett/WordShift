@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -49,6 +49,81 @@ const ModeIcon: React.FC<{
   );
 };
 
+/**
+ * Stack emblem — the "cool visual" for a combined loadout. The individual
+ * modifier rows highlight on their own, but a player may not realize they LAYER
+ * (onto the chosen style and onto each other). When 2+ layers are live (a
+ * non-standard style + any modifiers, or 2+ modifiers), this emblem materializes
+ * at the head of the modifier section: the active mode glyphs render as an
+ * OVERLAPPING FANNED STACK (literally stacked, like a dealt hand) with a `xN`
+ * layer count and a dynamic name, so the combination reads as one built thing.
+ * Springs in on mount (reduced-motion pins it), amber-accented like every
+ * reward-tier surface. Pure presentational — no state, no side effects.
+ */
+const StackEmblem: React.FC<{
+  glyphs: string[];
+  title: string;
+  subtitle: string;
+  count: number;
+  /** Names of the active layers, in menu order — the screen-reader rendering of
+   *  the glyph fan (the chips themselves are unlabeled decoration). */
+  layerNames: string[];
+  t: ReturnType<typeof getSurfaceTheme>;
+}> = ({ glyphs, title, subtitle, count, layerNames, t }) => {
+  const reduced = getSettingsSync().reducedMotion;
+  const scale = useRef(new Animated.Value(reduced ? 1 : 0.86)).current;
+  const opacity = useRef(new Animated.Value(reduced ? 1 : 0)).current;
+  useEffect(() => {
+    if (reduced) return;
+    const anim = Animated.parallel([
+      Animated.spring(scale, { toValue: 1, friction: 6, tension: 170, useNativeDriver: true }),
+      Animated.timing(opacity, { toValue: 1, duration: 170, useNativeDriver: true }),
+    ]);
+    anim.start();
+    return () => anim.stop();
+  }, [reduced, scale, opacity]);
+  return (
+    <Animated.View
+      accessible
+      accessibilityLabel={`${title}. ${count} layers active: ${layerNames.join(', ')}. ${subtitle}`}
+      style={[
+        styles.stackCard,
+        { backgroundColor: t.amberTint, borderColor: t.amberTintBorder, opacity, transform: [{ scale }] },
+      ]}
+    >
+      <View style={styles.stackFan}>
+        {glyphs.map((g, i) => (
+          <View
+            key={`${g}-${i}`}
+            style={[
+              styles.stackChip,
+              {
+                backgroundColor: t.cardBg,
+                borderColor: t.amberText,
+                marginLeft: i === 0 ? 0 : -9,
+                zIndex: i + 1,
+                transform: [{ rotate: i % 2 === 0 ? '-6deg' : '6deg' }],
+              },
+            ]}
+          >
+            <ModeIcon glyph={g} textStyle={styles.stackChipGlyph} imageStyle={styles.stackChipImage} />
+          </View>
+        ))}
+        {/* The count pill is a FILL, so it must use the amber-pill trio
+            (pillBg/pillEdge/pillText), not amberText — that token is an INK
+            tuned for text ON the parchment, and pairing it with primaryText
+            gave 1.5-2.1:1 in every phase but 5 (cream-on-cream at phase 4).
+            The pill trio holds >= 4.9:1 across all six skins. */}
+        <View style={[styles.stackCountPill, { backgroundColor: t.pillBg, borderColor: t.pillEdge }]}>
+          <Text style={[styles.stackCountText, { color: t.pillText }]}>{`×${count}`}</Text>
+        </View>
+      </View>
+      <Text style={[styles.stackTitle, { color: t.amberText }]}>{title}</Text>
+      <Text style={[styles.stackSubtitle, { color: t.muted }]}>{subtitle}</Text>
+    </Animated.View>
+  );
+};
+
 // STRUCTURAL LAYOUT CONTRACT (third and final fix for the "menu runs off the
 // bottom, unscrollable" device bug). The menu previously rendered as an
 // absolutely-positioned child of the puzzle screen's ~50dp-tall statsRow and
@@ -73,6 +148,10 @@ const ModeIcon: React.FC<{
 const MENU_ANCHOR_BELOW_INSET = 171;
 // Breathing room kept between the panel's bottom edge and the safe area.
 const MENU_BOTTOM_MARGIN = 12;
+// Opacity ramp for the "more below" fade cue — transparent at the top, near
+// the parchment fill at the bottom, so the last visible row dissolves rather
+// than hard-cutting at the frame edge (the apex Unbroken Weave row sits last).
+const SCROLL_FADE_STOPS = [0.0, 0.22, 0.46, 0.72, 0.95];
 // Bottom padding inside the scroll content so the last row (BLIND / weave)
 // always settles onto clear parchment above the frame's wood band.
 const SCROLL_BOTTOM_PAD = 28;
@@ -83,10 +162,13 @@ const DIFFICULTY_RING_COLORS: Record<Difficulty, string> = {
   MEDIUM: CandyColors.yellow.main,
   MEDIUM_PLUS: CandyColors.orange.main,
   HARD: CandyColors.red.main,
+  EXPERT: CandyColors.purple.main,
 };
 
-/** Canonical difficulty order — the setup rows and the header chip share it. */
-export const DIFFICULTY_LEVELS: readonly Difficulty[] = ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'];
+/** Canonical difficulty order — the setup rows and the header chip share it.
+ * EXPERT (6-letter apex) is last and is gated: it renders as a locked row with
+ * a countdown until EXPERT_UNLOCK_PUZZLES solves (see the row rendering). */
+export const DIFFICULTY_LEVELS: readonly Difficulty[] = ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD', 'EXPERT'];
 
 /** True only for the four real Difficulty union values. */
 export function isValidDifficulty(value: unknown): value is Difficulty {
@@ -133,12 +215,25 @@ interface DifficultyMenuProps {
   onSelectVariant: (variant: PuzzleVariant) => void;
   onToggleChallengeMode: () => void;
   showChallengeToggle?: boolean;
+  /** Undo-limit ("Challenge") constraint active. Decoupled from blind: both can
+   *  be on at once (previews hidden AND undos capped). Derived from undoLimited,
+   *  not gameMode (which is 'challenge' whenever either constraint is on). */
+  undoLimited?: boolean;
   blindActive?: boolean;
   onToggleBlindMode?: () => void;
   showBlindToggle?: boolean;
   /** Blind toggle visible but not yet earned: render a teased locked row. */
   blindLocked?: boolean;
   blindUnlockHint?: string;
+  /** EXPERT (6-letter) difficulty gated: render a teased locked row until earned. */
+  expertLocked?: boolean;
+  expertUnlockHint?: string;
+  /** Lexicon (rare-word) composable toggle — stacks on any difficulty/variant. */
+  lexiconActive?: boolean;
+  onToggleLexiconMode?: () => void;
+  showLexiconToggle?: boolean;
+  lexiconLocked?: boolean;
+  lexiconUnlockHint?: string;
   unbrokenWeaveActive?: boolean;
   onToggleUnbrokenWeave?: () => void;
   showUnbrokenWeave?: boolean;
@@ -161,11 +256,19 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   onSelectVariant,
   onToggleChallengeMode,
   showChallengeToggle = true,
+  undoLimited = false,
   blindActive = false,
   onToggleBlindMode,
   showBlindToggle = false,
   blindLocked = false,
   blindUnlockHint,
+  expertLocked = false,
+  expertUnlockHint,
+  lexiconActive = false,
+  onToggleLexiconMode,
+  showLexiconToggle = false,
+  lexiconLocked = false,
+  lexiconUnlockHint,
   unbrokenWeaveActive = false,
   onToggleUnbrokenWeave,
   showUnbrokenWeave = false,
@@ -234,12 +337,57 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
     ]).start(() => onClose?.());
   }, [reducedMotion, backdropOpacity, cardOpacity, onClose]);
 
+  // Scroll discoverability. Once every modifier is unlocked (the phase-5 menu is
+  // four sections deep), the option list overflows the height-capped panel. The
+  // native scroll indicator alone is easy to miss, and the apex Unbroken Weave
+  // row sits at the very end, so a soft parchment fade + a down-chevron cue at
+  // the base signals "there is more below." It shows only while the list
+  // overflows AND the player has not reached the bottom, and fades out at the
+  // end. `menuAtBottom` starts false so the cue is visible immediately on an
+  // overflowing menu (before any scroll), not only after the first drag.
+  const [menuOverflowing, setMenuOverflowing] = useState(false);
+  const [menuAtBottom, setMenuAtBottom] = useState(false);
+  const scrollCueOpacity = useRef(new Animated.Value(0)).current;
+  const contentHeightRef = useRef(0);
+  const viewportHeightRef = useRef(0);
+
+  const recomputeMenuOverflow = useCallback(() => {
+    const overflowing = contentHeightRef.current > viewportHeightRef.current + 2;
+    setMenuOverflowing(prev => (prev === overflowing ? prev : overflowing));
+  }, []);
+
+  useEffect(() => {
+    if (!visible) return;
+    const showCue = menuOverflowing && !menuAtBottom;
+    if (reducedMotion) {
+      scrollCueOpacity.setValue(showCue ? 1 : 0);
+      return;
+    }
+    const anim = Animated.timing(scrollCueOpacity, {
+      toValue: showCue ? 1 : 0,
+      duration: 150,
+      useNativeDriver: true,
+    });
+    anim.start();
+    return () => anim.stop();
+  }, [visible, menuOverflowing, menuAtBottom, reducedMotion, scrollCueOpacity]);
+
   if (!visible) return null;
 
   const t = getSurfaceTheme(phase);
   const dark = phase >= 3;
   const title = phase >= 3 ? 'ARRANGEMENT SETUP' : 'PUZZLE SETUP';
   const styleTitle = phase >= 3 ? 'ARRANGEMENT STYLE' : 'PUZZLE STYLE';
+  // Header over the stackable modifier toggles (Challenge / Blind / Lexicon /
+  // Weave) so they read as optional add-ons, distinct from the single-select
+  // DIFFICULTY and STYLE sections above. Phase-aware like the other headers.
+  const modifierTitle = phase >= 3 ? 'TRIALS' : 'MODIFIERS';
+  // Stackability is not obvious from the toggle rows alone: a player may not
+  // realize these layer onto the chosen style AND onto each other (Challenge +
+  // Blind + Lexicon can all ride one board). One quiet line says so.
+  const modifierHint = phase >= 3
+    ? 'Layer any of these onto your arrangement.'
+    : 'Stack any of these on your style.';
   // Locked options render as visibly locked rows (teased, non-selectable) so
   // the next mechanical goal is always on screen.
   const coreOptions = variantOptions.filter(option => option.group === 'core');
@@ -250,15 +398,56 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
     ? { bg: CandyColors.green.dark + '33', text: CandyColors.green.light }
     : { bg: CandyColors.green.light + '2E', text: CandyColors.green.shadow };
   const selectedRowStyle = { backgroundColor: t.secondaryBg, borderColor: t.secondaryBorder };
-  // Trial-ladder rungs are mutually exclusive: the CHALLENGE row lights only
-  // for challenge-without-blind (Blind Offering runs under gameMode
-  // 'challenge' too, but its own row carries that state). While blind is on,
-  // the CHALLENGE row renders as folded-in rather than deselected — plain
-  // deselection read as a broken toggle, when in truth blind absorbs the
-  // challenge rung. Tapping the folded row still switches to plain Challenge.
-  const challengeActive = gameMode === 'challenge' && !blindActive;
-  const challengeIncluded = blindActive;
+  // Challenge (undo-limit) and Blind Offering (hidden previews) are INDEPENDENT
+  // constraints that stack — each row lights from its own flag. The CHALLENGE
+  // row keys on undoLimited (not gameMode, which is 'challenge' whenever either
+  // is on); the two can both be selected at once (the maximal trial: previews
+  // hidden AND undos capped).
+  const challengeActive = undoLimited;
   const blindName = phase >= 3 ? 'the Blind Offering' : 'Blind Mode';
+
+  // Combined-loadout ("stack") readout. The layers are the non-standard style
+  // plus every active modifier; the emblem shows when 2+ are live, so a single
+  // toggle never triggers it (that's just one modifier, not a stack). Glyphs are
+  // gathered in the same order they read down the menu (style, then modifiers).
+  const selectedVariantIcon =
+    currentVariant !== 'standard'
+      ? variantOptions.find(option => option.variant === currentVariant)?.config.icon
+      : undefined;
+  const selectedVariantTitle =
+    currentVariant !== 'standard'
+      ? variantOptions.find(option => option.variant === currentVariant)?.config.title
+      : undefined;
+  const stackGlyphs: string[] = [];
+  const stackLayerNames: string[] = [];
+  if (selectedVariantIcon) {
+    stackGlyphs.push(selectedVariantIcon);
+    stackLayerNames.push(selectedVariantTitle ?? 'style');
+  }
+  if (undoLimited) { stackGlyphs.push('🔓'); stackLayerNames.push('Challenge'); }
+  if (blindActive) { stackGlyphs.push('🌑'); stackLayerNames.push(phase >= 3 ? 'Blind Offering' : 'Blind Mode'); }
+  if (lexiconActive) { stackGlyphs.push('📖'); stackLayerNames.push('Lexicon'); }
+  if (unbrokenWeaveActive) { stackGlyphs.push('🧵'); stackLayerNames.push('Unbroken Weave'); }
+  const stackCount = stackGlyphs.length;
+  const showStackEmblem = stackCount >= 2;
+  // The apex title must name the REAL `max_stack` achievement condition
+  // (EXPERT + a non-standard style + Challenge + Blind + Lexicon, see App's
+  // predicate). A bare `stackCount >= 4` claimed it for any four layers — e.g.
+  // MEDIUM with a style + Blind + Lexicon + Weave — promising an award the
+  // player would not receive.
+  const isFullArrangement =
+    currentDifficulty === 'EXPERT' &&
+    currentVariant !== 'standard' &&
+    undoLimited &&
+    blindActive &&
+    lexiconActive;
+  const stackTitle = isFullArrangement
+    ? phase >= 3 ? 'THE FULL ARRANGEMENT' : 'THE FULL STACK'
+    : undoLimited && blindActive
+      ? phase >= 3 ? 'THE MAXIMAL OFFERING' : 'MAXIMAL TRIAL'
+      : phase >= 3 ? 'LAYERED OFFERING' : 'STACKED PLAY';
+  const stackSubtitle =
+    phase >= 3 ? 'All layered onto one arrangement.' : 'All active on one board.';
 
   // maxHeight '100%' is DEFINITE here: the panel's parent is the Modal's
   // top/bottom-padded flex container, whose height the OS provides. A short
@@ -398,34 +587,67 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
     <Animated.View style={{ transform: [{ scale: cardScale }], opacity: cardOpacity }}>
     <PanelCard phase={phase} kind="panel" style={panelStyle}>
       <Text style={[styles.menuTitle, { color: t.title }]}>{title}</Text>
+      <View style={styles.scrollWrap}>
       <ScrollView
         style={styles.scrollArea}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={true}
+        persistentScrollbar={true}
+        scrollEventThrottle={32}
+        onLayout={e => {
+          viewportHeightRef.current = e.nativeEvent.layout.height;
+          recomputeMenuOverflow();
+        }}
+        onContentSizeChange={(_w, h) => {
+          contentHeightRef.current = h;
+          recomputeMenuOverflow();
+        }}
+        onScroll={e => {
+          const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+          const atBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - 6;
+          setMenuAtBottom(prev => (prev === atBottom ? prev : atBottom));
+        }}
       >
         <Text style={[styles.sectionTitle, { color: t.muted }]}>DIFFICULTY</Text>
-        {DIFFICULTY_LEVELS.map(d => (
-          <TouchableOpacity
-            key={d}
-            style={[styles.menuRow, currentDifficulty === d && selectedRowStyle]}
-            onPress={() => onSelectDifficulty(d)}
-            accessibilityRole="button"
-            accessibilityState={{ selected: currentDifficulty === d }}
-            accessibilityLabel={`${d === 'MEDIUM_PLUS' ? 'Medium Plus' : d.charAt(0) + d.slice(1).toLowerCase()} difficulty${currentDifficulty === d ? ', selected' : ''}`}
-          >
-            <View
-              style={[styles.difficultyRing, { borderColor: DIFFICULTY_RING_COLORS[d] }]}
-            />
-            <Text
-              style={[
-                styles.menuRowText,
-                { color: currentDifficulty === d ? t.title : t.body },
-              ]}
+        {DIFFICULTY_LEVELS.map(d => {
+          const locked = d === 'EXPERT' && expertLocked;
+          const label = d === 'MEDIUM_PLUS' ? 'Medium Plus' : d.charAt(0) + d.slice(1).toLowerCase();
+          return (
+            <TouchableOpacity
+              key={d}
+              style={[styles.menuRow, currentDifficulty === d && selectedRowStyle, locked && styles.lockedRow]}
+              onPress={() => { if (!locked) onSelectDifficulty(d); }}
+              disabled={locked}
+              accessibilityRole="button"
+              accessibilityState={{ selected: currentDifficulty === d, disabled: locked }}
+              accessibilityLabel={locked
+                ? `Expert difficulty, locked. ${expertUnlockHint ?? ''}`
+                : `${label} difficulty${currentDifficulty === d ? ', selected' : ''}`}
             >
-              {d === 'MEDIUM_PLUS' ? 'MED+' : d}
-            </Text>
-          </TouchableOpacity>
-        ))}
+              <View
+                style={[styles.difficultyRing, { borderColor: DIFFICULTY_RING_COLORS[d], opacity: locked ? 0.4 : 1 }]}
+              />
+              {/* Title + tease share a flexing column, matching the Blind and
+                  Lexicon locked rows. Previously the hint was a bare sibling
+                  inside a non-wrapping flex ROW with no flex of its own, so the
+                  ~40-character EXPERT tease overflowed the ~110dp remainder of
+                  the 290dp panel and clipped. */}
+              <View style={styles.difficultyRowContent}>
+                <Text
+                  style={[
+                    styles.menuRowText,
+                    { color: locked ? t.muted : (currentDifficulty === d ? t.title : t.body) },
+                  ]}
+                >
+                  {locked ? '🔒 ' : ''}{d === 'MEDIUM_PLUS' ? 'MED+' : d}
+                </Text>
+                {locked && expertUnlockHint ? (
+                  <Text style={[styles.lockedHintText, { color: t.muted }]}>{expertUnlockHint}</Text>
+                ) : null}
+              </View>
+            </TouchableOpacity>
+          );
+        })}
 
         {introMode && introHintText ? (
           <View
@@ -464,6 +686,19 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
         {showChallengeToggle && !introMode && (
           <>
             <View style={[styles.sectionDivider, { backgroundColor: t.sectionBorder }]} />
+            <Text style={[styles.sectionTitle, { color: t.muted }]}>{modifierTitle}</Text>
+            <Text style={[styles.sectionSubtitle, { color: t.muted }]}>{modifierHint}</Text>
+
+            {showStackEmblem && (
+              <StackEmblem
+                glyphs={stackGlyphs}
+                title={stackTitle}
+                subtitle={stackSubtitle}
+                count={stackCount}
+                layerNames={stackLayerNames}
+                t={t}
+              />
+            )}
 
             <TouchableOpacity
               style={[
@@ -472,24 +707,18 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
                   backgroundColor: t.dangerText + '14',
                   borderColor: t.dangerText + '55',
                 },
-                // Folded into blind: share the blind row's amber tint so the
-                // two rows read as one selected rung, never as deselected.
-                challengeIncluded && {
-                  backgroundColor: t.amberText + '14',
-                  borderColor: t.amberText + '55',
-                },
               ]}
               onPress={onToggleChallengeMode}
               accessibilityRole="button"
-              accessibilityState={{ selected: challengeActive || challengeIncluded }}
+              accessibilityState={{ selected: challengeActive }}
               accessibilityLabel={
-                challengeIncluded
-                  ? `Challenge mode, folded into ${blindName}. Tap to switch to Challenge on its own.`
+                blindActive
+                  ? `Challenge mode, ${challengeActive ? 'on' : 'off'}. Stacks with ${blindName}.`
                   : `Challenge mode, ${challengeActive ? 'on' : 'off'}`
               }
             >
               <ModeIcon
-                glyph={challengeIncluded ? '🌑' : challengeActive ? '🔓' : '🔒'}
+                glyph={challengeActive ? '🔓' : '🔒'}
                 textStyle={styles.challengeMenuIcon}
                 imageStyle={styles.challengeMenuIconImage}
               />
@@ -497,25 +726,19 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
                 <Text
                   style={[
                     styles.menuRowText,
-                    {
-                      color: challengeIncluded
-                        ? t.amberText
-                        : challengeActive
-                          ? t.dangerText
-                          : t.body,
-                    },
+                    { color: challengeActive ? t.dangerText : t.body },
                   ]}
                 >
                   CHALLENGE
                 </Text>
                 <Text style={[styles.challengeMenuDesc, { color: t.muted }]}>
-                  {challengeIncluded
-                    ? phase >= 3
-                      ? 'Folded into the Blind Offering.'
-                      : 'Folded into Blind Mode.'
-                    : challengeActive
-                      ? 'No hints, limited undos, 1.25x amber'
-                      : 'No hints, limited undos, +25% amber'}
+                  {/* One notation everywhere (+N% amber): the row used to flip
+                      between "+25%" and "1.25x" for the SAME bonus depending on
+                      its own state, and dropped the figure entirely when
+                      stacked. Stacked with Blind it now names the real rate. */}
+                  {challengeActive && blindActive
+                    ? 'No hints, no guidance, limited undos. +125% amber.'
+                    : 'No hints, limited undos. +25% amber.'}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -564,7 +787,7 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
             onPress={onToggleBlindMode}
             accessibilityRole="button"
             accessibilityState={{ selected: blindActive }}
-            accessibilityLabel={`Blind offering, ${blindActive ? 'on' : 'off'}`}
+            accessibilityLabel={`${phase >= 3 ? 'Blind offering' : 'Blind mode'}, ${blindActive ? 'on' : 'off'}. No guidance, judged at the end. ${blindActive && undoLimited ? '+125% amber, stacked with Challenge.' : '+100% amber.'}`}
           >
             <ModeIcon
               glyph={blindActive ? '🌑' : '👁️'}
@@ -581,9 +804,81 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
                 {phase >= 3 ? 'BLIND OFFERING' : 'BLIND MODE'}
               </Text>
               <Text style={[styles.challengeMenuDesc, { color: t.muted }]}>
-                {blindActive
-                  ? 'No hints, no previews, free shifts. Judged once, at the end. 2x amber.'
-                  : 'No hints, no previews, free shifts, judged only at the end, 2x amber'}
+                {blindActive && undoLimited
+                  ? 'No guidance, judged at the end. +125% amber.'
+                  : 'No guidance, judged at the end. +100% amber.'}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        )}
+
+        {/* Lexicon (rare-word) toggle — a composable modifier that stacks on any
+            difficulty + variant. Teased as a locked row until its late gate,
+            then a live on/off toggle. */}
+        {showLexiconToggle && !introMode && lexiconLocked && !lexiconActive && (
+          <TouchableOpacity
+            style={[styles.menuRow, styles.lockedRow]}
+            disabled
+            accessibilityRole="button"
+            accessibilityState={{ disabled: true }}
+            accessibilityLabel={`Lexicon, locked. ${lexiconUnlockHint || ''}`}
+          >
+            <ModeIcon
+              glyph={'🔒'}
+              textStyle={styles.challengeMenuIcon}
+              imageStyle={styles.challengeMenuIconImage}
+            />
+            <View style={styles.challengeMenuContent}>
+              <Text style={[styles.menuRowText, { color: t.muted }]}>LEXICON</Text>
+              {lexiconUnlockHint ? (
+                <Text style={[styles.lockedHintText, { color: t.muted }]}>
+                  {lexiconUnlockHint}
+                </Text>
+              ) : null}
+            </View>
+          </TouchableOpacity>
+        )}
+
+        {showLexiconToggle && !introMode && (!lexiconLocked || lexiconActive) && onToggleLexiconMode && (
+          <TouchableOpacity
+            style={[
+              styles.menuRow,
+              lexiconActive && {
+                backgroundColor: t.amberText + '14',
+                borderColor: t.amberText + '55',
+              },
+            ]}
+            onPress={onToggleLexiconMode}
+            accessibilityRole="button"
+            accessibilityState={{ selected: lexiconActive }}
+            accessibilityLabel={`Lexicon rare-word mode, ${lexiconActive ? 'on' : 'off'}. Rarer words, on any style. +40% amber.`}
+          >
+            {/* The glyph must SWAP with state, like Challenge (🔒/🔓) and Blind
+                (👁️/🌑). A constant book left the amber tint as the only on/off
+                signal for a sighted player, which is information by color
+                alone; the closed book now reads "off", the open book "on". */}
+            <ModeIcon
+              glyph={lexiconActive ? '📖' : '📕'}
+              textStyle={styles.challengeMenuIcon}
+              imageStyle={styles.challengeMenuIconImage}
+            />
+            <View style={styles.challengeMenuContent}>
+              <Text
+                style={[
+                  styles.menuRowText,
+                  { color: lexiconActive ? t.amberText : t.body },
+                ]}
+              >
+                LEXICON
+              </Text>
+              <Text style={[styles.challengeMenuDesc, { color: t.muted }]}>
+                {lexiconActive
+                  ? (phase >= 3
+                      ? 'On. Rarer, stranger words, from the older pages. +40% amber.'
+                      : 'On. Rarer words, on any style. +40% amber.')
+                  : (phase >= 3
+                      ? 'Off. Rarer, stranger words, from the older pages. +40% amber.'
+                      : 'Off. Rarer words, on any style. +40% amber.')}
               </Text>
             </View>
           </TouchableOpacity>
@@ -636,6 +931,21 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
           </TouchableOpacity>
         )}
       </ScrollView>
+      {/* "More below" cue: a soft parchment fade + a down-chevron, shown only
+          while the list overflows and the player is not at the bottom (pointer-
+          transparent, reduced-motion pins its opacity with no animation). */}
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.scrollCue, { opacity: scrollCueOpacity }]}
+      >
+        <View style={StyleSheet.absoluteFill}>
+          {SCROLL_FADE_STOPS.map((o, i) => (
+            <View key={i} style={{ flex: 1, backgroundColor: t.cardBg, opacity: o }} />
+          ))}
+        </View>
+        <View style={[styles.scrollCueChevron, { borderColor: t.muted }]} />
+      </Animated.View>
+      </View>
     </PanelCard>
     </Animated.View>
       </View>
@@ -678,11 +988,40 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 3,
   },
+  // Wraps the ScrollView + the "more below" fade cue so the cue can pin to the
+  // scroll region's own bottom edge. Carries the shrinkable flex role inside the
+  // '100%'-capped panel; the ScrollView keeps its own flexShrink so it compresses
+  // and scrolls in lockstep (pinned by puzzleChromeFixes.test.ts).
+  scrollWrap: {
+    flexShrink: 1,
+    minHeight: 0,
+  },
   // The option list SHRINKS to fit inside the '100%'-capped panel (then
   // scrolls); flexGrow: 0 keeps a short list at its natural height.
   scrollArea: {
     flexGrow: 0,
     flexShrink: 1,
+  },
+  // The "more below" cue: a short band pinned to the scroll region's bottom.
+  scrollCue: {
+    position: 'absolute',
+    left: 8,
+    right: 8,
+    bottom: 0,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    overflow: 'hidden',
+  },
+  // Font-independent down-chevron (rotated corner borders — no glyph coverage
+  // risk); color is set inline to the phase's muted ink.
+  scrollCueChevron: {
+    width: 8,
+    height: 8,
+    borderRightWidth: 2,
+    borderBottomWidth: 2,
+    transform: [{ rotate: '45deg' }],
+    marginBottom: 4,
   },
   scrollContent: {
     paddingHorizontal: 10,
@@ -697,6 +1036,80 @@ const styles = StyleSheet.create({
     marginBottom: 3,
     paddingHorizontal: 6,
   },
+  // One quiet line under the MODIFIERS/TRIALS header telling the player these
+  // toggles stack (onto the chosen style and onto each other).
+  sectionSubtitle: {
+    fontFamily: BODY_FONT_ITALIC,
+    fontSize: FONT_SIZE.caption,
+    lineHeight: 14,
+    fontStyle: 'italic',
+    marginTop: -1,
+    marginBottom: 5,
+    paddingHorizontal: 6,
+  },
+  // Stack emblem — the fused-loadout card shown when 2+ layers are live.
+  stackCard: {
+    marginTop: 4,
+    marginBottom: 7,
+    marginHorizontal: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    alignItems: 'center',
+  },
+  stackFan: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+    // The first chip carries no negative margin; the rest overlap leftward, so
+    // the row's left edge is the first chip and the fan reads as a stack.
+    paddingLeft: 3,
+  },
+  stackChip: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+  },
+  stackChipGlyph: {
+    fontFamily: BODY_FONT,
+    fontSize: FONT_SIZE.bodyLg,
+  },
+  stackChipImage: {
+    width: 18,
+    height: 18,
+  },
+  stackCountPill: {
+    marginLeft: 9,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  stackCountText: {
+    fontFamily: PIXEL_FONT_BOLD,
+    fontSize: FONT_SIZE.caption,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+  },
+  stackTitle: {
+    fontFamily: PIXEL_FONT_BOLD,
+    fontSize: FONT_SIZE.small,
+    fontWeight: '900',
+    letterSpacing: 0.6,
+    textAlign: 'center',
+  },
+  stackSubtitle: {
+    fontFamily: BODY_FONT_ITALIC,
+    fontSize: FONT_SIZE.caption,
+    lineHeight: 14,
+    fontStyle: 'italic',
+    marginTop: 1,
+    textAlign: 'center',
+  },
   menuRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -707,6 +1120,12 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'transparent',
     marginBottom: 2,
+  },
+  // Flexing column for a difficulty row's label + (when locked) its tease, so a
+  // long unlock hint wraps inside the panel instead of overflowing the row.
+  difficultyRowContent: {
+    flex: 1,
+    minWidth: 0,
   },
   difficultyRing: {
     width: 12,

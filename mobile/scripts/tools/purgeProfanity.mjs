@@ -131,7 +131,13 @@ function entryHasBlockedCanonicalIntermediate(entry) {
   const dataDir = path.join(MOBILE, 'src/data');
   const tokenRe = /'([A-Z]{3,8})'/g;
   const formedRe = /form ([A-Z]{3,8})\./g;
-  for (const name of fs.readdirSync(dataDir).filter(f => f.startsWith('puzzleBank') && f !== 'puzzleBankTypes.ts')) {
+  // Match EVERY generated bank family, not just `puzzleBank*`. This filter was
+  // prefix-scoped when the 15 `lexiconBank*` files shipped, so the rare-word
+  // banks — the family MOST likely to surface ugly vocabulary — were never
+  // purged at all, and slurs reached shipped double-shift drop1 intermediates.
+  // Keep this a suffix/contains match so a future family is covered by default.
+  const isBankFile = f => /Bank.*\.ts$/.test(f) && f !== 'puzzleBankTypes.ts';
+  for (const name of fs.readdirSync(dataDir).filter(isBankFile)) {
     const file = path.join(dataDir, name);
     let src = fs.readFileSync(file, 'utf8');
     const open = src.indexOf('= [');

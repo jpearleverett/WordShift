@@ -119,6 +119,8 @@ export function prioritizeMultiRouteCandidates<T>(
 
 export interface PuzzleBankSelectionOptions {
   unbrokenWeaveOnly?: boolean;
+  /** Lexicon (rare-word) mode: draw from the rare-vocabulary bank for this variant+difficulty. */
+  lexicon?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -151,6 +153,35 @@ const BANK_REGISTRY: Record<string, BankRegistryEntry> = {
   ds_medium:      { storageKey: 'wordshift_played_ds_medium_puzzle_ids',    loadBank: () => require('../data/puzzleBankDoubleShiftMedium').PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM,  bankData: null, cache: null, idToWords: null },
   ds_mp:          { storageKey: 'wordshift_played_ds_mp_puzzle_ids',        loadBank: () => require('../data/puzzleBankDoubleShiftMediumPlus').PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM_PLUS, bankData: null, cache: null, idToWords: null },
   ds_hard:        { storageKey: 'wordshift_played_ds_hard_puzzle_ids',      loadBank: () => require('../data/puzzleBankDoubleShiftHard').PUZZLE_BANK_DOUBLE_SHIFT_HARD,      bankData: null, cache: null, idToWords: null },
+  // EXPERT (apex): standard 6-letter/5-row bank + double 5-letter/7-row bank +
+  // a 6-letter reverse bank (added after the hours-long gated reverse run — fair
+  // 6-letter reverse-solvable chains are scarce but reachable; the bank is
+  // smaller than the E/M/MP/H reverse banks, and recycling handles the size).
+  std_expert:     { storageKey: 'wordshift_played_std_expert_puzzle_ids',   loadBank: () => require('../data/puzzleBankExpert').PUZZLE_BANK_EXPERT,                          bankData: null, cache: null, idToWords: null },
+  ds_expert:      { storageKey: 'wordshift_played_ds_expert_puzzle_ids',     loadBank: () => require('../data/puzzleBankDoubleShiftExpert').PUZZLE_BANK_DOUBLE_SHIFT_EXPERT,   bankData: null, cache: null, idToWords: null },
+  reverse_expert: { storageKey: 'wordshift_played_reverse_expert_puzzle_ids', loadBank: () => require('../data/puzzleBankReverseExpert').PUZZLE_BANK_REVERSE_EXPERT,          bankData: null, cache: null, idToWords: null },
+  // LEXICON (rare-word mode): a rare-vocabulary bank per variant x difficulty,
+  // selected when the Lexicon toggle is on (composes with any variant/difficulty).
+  lex_std_easy:      { storageKey: 'wordshift_played_lex_std_easy_puzzle_ids',   loadBank: () => require('../data/lexiconBankEasy').LEXICON_BANK_EASY,                                 bankData: null, cache: null, idToWords: null },
+  lex_std_medium:    { storageKey: 'wordshift_played_lex_std_medium_puzzle_ids', loadBank: () => require('../data/lexiconBankMedium').LEXICON_BANK_MEDIUM,                             bankData: null, cache: null, idToWords: null },
+  lex_std_mp:        { storageKey: 'wordshift_played_lex_std_mp_puzzle_ids',     loadBank: () => require('../data/lexiconBankMediumPlus').LEXICON_BANK_MEDIUM_PLUS,                    bankData: null, cache: null, idToWords: null },
+  lex_std_hard:      { storageKey: 'wordshift_played_lex_std_hard_puzzle_ids',   loadBank: () => require('../data/lexiconBankHard').LEXICON_BANK_HARD,                                 bankData: null, cache: null, idToWords: null },
+  lex_std_expert:    { storageKey: 'wordshift_played_lex_std_expert_puzzle_ids', loadBank: () => require('../data/lexiconBankExpert').LEXICON_BANK_EXPERT,                             bankData: null, cache: null, idToWords: null },
+  // Lexicon + REVERSE: ALL five tiers now have rare banks. The four larger tiers
+  // landed first; lex_rev_EXPERT (rare + reverse-solvable + 6-letter — the
+  // scarcest corner of the dictionary) was unlocked by the rarity-aware reverse
+  // walk (rare-seeded, rare-biased), which turned a 1-board dead-end into a real
+  // 76-board bank, so it no longer falls back to the fair reverse_expert bank.
+  lex_rev_easy:      { storageKey: 'wordshift_played_lex_rev_easy_puzzle_ids',    loadBank: () => require('../data/lexiconBankReverseEasy').LEXICON_BANK_REVERSE_EASY,                 bankData: null, cache: null, idToWords: null },
+  lex_rev_medium:    { storageKey: 'wordshift_played_lex_rev_medium_puzzle_ids',  loadBank: () => require('../data/lexiconBankReverseMedium').LEXICON_BANK_REVERSE_MEDIUM,             bankData: null, cache: null, idToWords: null },
+  lex_rev_mp:        { storageKey: 'wordshift_played_lex_rev_mp_puzzle_ids',      loadBank: () => require('../data/lexiconBankReverseMediumPlus').LEXICON_BANK_REVERSE_MEDIUM_PLUS,    bankData: null, cache: null, idToWords: null },
+  lex_rev_hard:      { storageKey: 'wordshift_played_lex_rev_hard_puzzle_ids',    loadBank: () => require('../data/lexiconBankReverseHard').LEXICON_BANK_REVERSE_HARD,                 bankData: null, cache: null, idToWords: null },
+  lex_rev_expert:    { storageKey: 'wordshift_played_lex_rev_expert_puzzle_ids',  loadBank: () => require('../data/lexiconBankReverseExpert').LEXICON_BANK_REVERSE_EXPERT,             bankData: null, cache: null, idToWords: null },
+  lex_ds_easy:       { storageKey: 'wordshift_played_lex_ds_easy_puzzle_ids',    loadBank: () => require('../data/lexiconBankDoubleShiftEasy').LEXICON_BANK_DOUBLE_EASY,               bankData: null, cache: null, idToWords: null },
+  lex_ds_medium:     { storageKey: 'wordshift_played_lex_ds_medium_puzzle_ids',  loadBank: () => require('../data/lexiconBankDoubleShiftMedium').LEXICON_BANK_DOUBLE_MEDIUM,           bankData: null, cache: null, idToWords: null },
+  lex_ds_mp:         { storageKey: 'wordshift_played_lex_ds_mp_puzzle_ids',      loadBank: () => require('../data/lexiconBankDoubleShiftMediumPlus').LEXICON_BANK_DOUBLE_MEDIUM_PLUS,  bankData: null, cache: null, idToWords: null },
+  lex_ds_hard:       { storageKey: 'wordshift_played_lex_ds_hard_puzzle_ids',    loadBank: () => require('../data/lexiconBankDoubleShiftHard').LEXICON_BANK_DOUBLE_HARD,               bankData: null, cache: null, idToWords: null },
+  lex_ds_expert:     { storageKey: 'wordshift_played_lex_ds_expert_puzzle_ids',  loadBank: () => require('../data/lexiconBankDoubleShiftExpert').LEXICON_BANK_DOUBLE_EXPERT,           bankData: null, cache: null, idToWords: null },
 };
 
 /**
@@ -223,35 +254,57 @@ function getBankWordFrequency(bankKey: string): Map<string, number> {
   return freq;
 }
 
+// Highest per-word count in a bank (~= its word cap once saturated), cached per
+// frequency-map object so the hub-word penalty can calibrate to each bank's own
+// saturation instead of fixed thresholds that no longer match the caps.
+const bankMaxFreqCache = new WeakMap<Map<string, number>, number>();
+function bankMaxFreq(wordFrequency: Map<string, number>): number {
+  let m = bankMaxFreqCache.get(wordFrequency);
+  if (m === undefined) {
+    m = 0;
+    for (const v of wordFrequency.values()) {
+      if (v > m) m = v;
+    }
+    bankMaxFreqCache.set(wordFrequency, m);
+  }
+  return m;
+}
+
 /**
  * Derive a "bank key" from difficulty + variant to route to the correct
  * storage, cache, and bank data. Returns a discriminator string.
  */
-function getBankKey(difficulty: Difficulty, variant: PuzzleVariant): string {
-  // Double shift variants — each difficulty has its own bank (3/4/5/6 rows, all 5-letter words)
+const DIFFICULTY_SUFFIX: Record<Difficulty, string> = {
+  EASY: 'easy', MEDIUM: 'medium', MEDIUM_PLUS: 'mp', HARD: 'hard', EXPERT: 'expert',
+};
+
+function getBankKey(difficulty: Difficulty, variant: PuzzleVariant, lexicon = false): string {
+  // Lexicon (rare-word) banks are uniform per variant x difficulty: lex_<fam>_<diff>.
+  if (lexicon) {
+    const fam = variant === 'double_shift' ? 'ds' : variant === 'reverse' ? 'rev' : 'std';
+    return `lex_${fam}_${DIFFICULTY_SUFFIX[difficulty]}`;
+  }
+  // Double shift variants — each difficulty has its own bank (3/4/5/6/7 rows, all 5-letter words)
   if (variant === 'double_shift') {
     if (difficulty === 'EASY') return 'ds_easy';
     if (difficulty === 'MEDIUM') return 'ds_medium';
     if (difficulty === 'MEDIUM_PLUS') return 'ds_mp';
+    if (difficulty === 'EXPERT') return 'ds_expert';
     return 'ds_hard';
   }
-  if (difficulty === 'EASY' && variant === 'reverse') {
-    return 'reverse_easy';
-  }
-  if (difficulty === 'MEDIUM' && variant === 'reverse') {
-    return 'reverse_medium';
-  }
-  if (difficulty === 'MEDIUM_PLUS' && variant === 'reverse') {
-    return 'reverse_mp';
-  }
   if (variant === 'reverse') {
-    return 'reverse';
+    if (difficulty === 'EASY') return 'reverse_easy';
+    if (difficulty === 'MEDIUM') return 'reverse_medium';
+    if (difficulty === 'MEDIUM_PLUS') return 'reverse_mp';
+    if (difficulty === 'EXPERT') return 'reverse_expert';
+    return 'reverse'; // HARD
   }
   // Standard variant — route by difficulty
   if (difficulty === 'EASY') return 'std_easy';
   if (difficulty === 'MEDIUM') return 'std_medium';
   if (difficulty === 'MEDIUM_PLUS') return 'std_mp';
-  return 'standard';
+  if (difficulty === 'EXPERT') return 'std_expert';
+  return 'standard'; // HARD
 }
 
 /**
@@ -392,12 +445,20 @@ async function markPuzzlePlayed(puzzleId: string, bankKey: string = 'standard'):
  * Get the appropriate puzzle bank for a difficulty level and variant.
  * Returns null if no bank exists for this combination.
  */
-function getBankForSelection(difficulty: Difficulty, variant: PuzzleVariant): PreGeneratedPuzzle[] | null {
-  // Only standard, reverse, and double_shift variants have pre-generated banks.
-  // Speed variant generates on-device in real-time.
-  if (variant !== 'standard' && variant !== 'reverse' && variant !== 'double_shift') return null;
+function getBankForSelection(difficulty: Difficulty, variant: PuzzleVariant, lexicon = false): PreGeneratedPuzzle[] | null {
+  // standard / reverse / double_shift each have their own bank family. SPEED
+  // reuses the STANDARD family: getBankKey maps speed -> std_<diff> (or
+  // lex_std_<diff>), so a Speed board is a standard board played against the
+  // clock, served from the pre-generated bank instead of generating on-device
+  // (zero-wait). The +1 extension stays gated to variant === 'standard', so a
+  // speed board keeps its base size. Any future variant without a bank family
+  // returns null here and falls back to on-device generation.
+  const hasBankFamily =
+    variant === 'standard' || variant === 'reverse' ||
+    variant === 'double_shift' || variant === 'speed';
+  if (!hasBankFamily) return null;
 
-  const bankKey = getBankKey(difficulty, variant);
+  const bankKey = getBankKey(difficulty, variant, lexicon);
   if (!BANK_REGISTRY[bankKey]) return null;
   const bank = getBank(bankKey);
   return bank.length > 0 ? bank : null;
@@ -486,12 +547,22 @@ function scorePuzzleForContext(
 
   // Hub-word penalty: words the generator over-used across this bank cost
   // score regardless of play history, so the vocabulary long tail surfaces.
+  // Calibrated to the bank's OWN saturation (its observed max frequency ~= its
+  // word cap): the old fixed 10/18/30 thresholds predated the 3/7/10/12 caps
+  // and could NEVER fire on EASY (cap 3) or MEDIUM (cap 7), leaving the penalty
+  // dead on most banks. Ratio-to-max makes it bite on every bank.
+  const cap = Math.max(1, bankMaxFreq(wordFrequency));
   for (const word of puzzle.allWords) {
-    const freq = wordFrequency.get(word) ?? 0;
-    if (freq >= 30) score -= 14;
-    else if (freq >= 18) score -= 9;
-    else if (freq >= 10) score -= 4;
+    const ratio = (wordFrequency.get(word) ?? 0) / cap;
+    if (ratio >= 0.85) score -= 14;
+    else if (ratio >= 0.6) score -= 9;
+    else if (ratio >= 0.4) score -= 4;
   }
+
+  // Prefer genuinely higher-quality boards. The real scorePuzzleChain result is
+  // stored at generation (gated regeneration); legacy banks store a flat 50 so
+  // this term is neutral for them and only differentiates regenerated banks.
+  score += (puzzle.qualityScore - 50) * 0.3;
 
   // Random jitter (prevents deterministic ordering)
   score += Math.random() * 15;
@@ -515,15 +586,17 @@ export async function selectPreGeneratedPuzzle(
   puzzlesSolved: number = 0,
   options: PuzzleBankSelectionOptions = {},
 ): Promise<PuzzleConfig | null> {
-  const bank = getBankForSelection(difficulty, variant);
+  const lexicon = options.lexicon === true;
+  const bank = getBankForSelection(difficulty, variant, lexicon);
   if (!bank) return null;
   if (options.unbrokenWeaveOnly && variant !== 'standard') return null;
 
-  const bankKey = getBankKey(difficulty, variant);
+  const bankKey = getBankKey(difficulty, variant, lexicon);
   const extensionRequired =
     variant === 'standard' &&
     puzzlesSolved >= PUZZLE_EXTENSION_UNLOCK_PUZZLES &&
-    !options.unbrokenWeaveOnly;
+    !options.unbrokenWeaveOnly &&
+    !lexicon; // Lexicon boards are curated rare — never extend (keeps the vocabulary intact)
   const selectableBank = options.unbrokenWeaveOnly
     ? bank.filter(puzzle => isUnbrokenWeaveEligible(puzzle.solution))
     : extensionRequired

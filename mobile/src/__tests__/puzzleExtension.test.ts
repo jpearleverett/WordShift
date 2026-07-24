@@ -193,10 +193,12 @@ describe('extendStandardPuzzle', () => {
   });
 
   it.each([
-    ['EASY', PUZZLE_BANK_EASY, 190],
-    ['MEDIUM', PUZZLE_BANK_MEDIUM, 140],
-    ['MEDIUM_PLUS', PUZZLE_BANK_MEDIUM_PLUS, 130],
-    ['HARD', PUZZLE_BANK_HARD, 110],
+    // Floors ~10% under measured +1-row-extendable pool (2026-07 depth-lever
+    // regen: EASY 226, MEDIUM 142, MEDIUM_PLUS 230, HARD 200).
+    ['EASY', PUZZLE_BANK_EASY, 203],
+    ['MEDIUM', PUZZLE_BANK_MEDIUM, 127],
+    ['MEDIUM_PLUS', PUZZLE_BANK_MEDIUM_PLUS, 207],
+    ['HARD', PUZZLE_BANK_HARD, 180],
   ] as const)(
     '%s bank keeps a large deterministic pool with a valid fallback candidate',
     (_name, bank, floor) => {

@@ -1,4 +1,4 @@
-import { validateWord, generateLocalPuzzle, isReverseSolvable, getInsertionIndex, getIncantationName, getStrongestDreadWord, FORCED_START_MIN_SCORE, pickMultiRouteCandidate } from '../services/localGenerator';
+import { validateWord, generateLocalPuzzle, isReverseSolvable, getInsertionIndex, getIncantationName, getStrongestDreadWord, FORCED_START_MIN_SCORE, pickMultiRouteCandidate, scorePuzzleChain } from '../services/localGenerator';
 
 // Mock amberCurrency to avoid AsyncStorage issues during generation
 jest.mock('../services/amberCurrency', () => ({
@@ -32,6 +32,56 @@ describe('validateWord', () => {
 
   test('rejects empty string', () => {
     expect(validateWord('')).toBe(false);
+  });
+});
+
+describe('scorePuzzleChain anti-boring on late moves (D1 regression)', () => {
+  // Both chains share the identical displayed word chain WIND -> CARS -> POTS,
+  // so word/semantic/branching components are equal. They differ ONLY in
+  // move 2's source state: chain A pulls the plural S from the END of CARDS
+  // (boring), chain B pulls the R from the MIDDLE. moveFromIndex indexes into
+  // the row's tempState (CARDS), not the displayed word (CARS). Before the fix
+  // the scorer read CARS[4] (undefined) and CARS[2], scoring both as harmless
+  // middle moves, so the two chains scored ~equal and every late-move S-pull
+  // escaped its penalty. After the fix the end-S pull is penalized.
+  const base = { word: 'WIND', tempState: 'WIND', letterToGive: 'D', moveFromIndex: 3, moveToIndex: 3 };
+  const boringEndS = [
+    base,
+    { word: 'CARS', tempState: 'CARDS', letterToGive: 'S', moveFromIndex: 4, moveToIndex: 2 },
+    { word: 'POTS', tempState: 'POSTS' },
+  ] as unknown as Parameters<typeof scorePuzzleChain>[0];
+  const middlePluck = [
+    base,
+    { word: 'CARS', tempState: 'CARDS', letterToGive: 'R', moveFromIndex: 2, moveToIndex: 2 },
+    { word: 'POTS', tempState: 'POSTS' },
+  ] as unknown as Parameters<typeof scorePuzzleChain>[0];
+
+  test('a late end-of-word S removal now scores well below a middle pluck', () => {
+    const scoreBoring = scorePuzzleChain(boringEndS);
+    const scoreMiddle = scorePuzzleChain(middlePluck);
+    expect(scoreBoring).toBeLessThan(scoreMiddle);
+    // The gap must be large: the removal penalty + boring-move chain penalty
+    // fire only when the source state is read correctly.
+    expect(scoreMiddle - scoreBoring).toBeGreaterThan(15);
+  });
+
+  test('an S-shuffle chain (S moved twice) scores far below a varied chain (A6)', () => {
+    // Identical displayed words BAT/CAR/DOG, so word/semantic components match.
+    const sShuffle = [
+      { word: 'BAT', tempState: 'BATS', letterToGive: 'S', moveFromIndex: 3, moveToIndex: 2 },
+      { word: 'CAR', tempState: 'CARS', letterToGive: 'S', moveFromIndex: 3, moveToIndex: 2 },
+      { word: 'DOG', tempState: 'DOGS' },
+    ] as unknown as Parameters<typeof scorePuzzleChain>[0];
+    const varied = [
+      { word: 'BAT', tempState: 'BATS', letterToGive: 'S', moveFromIndex: 3, moveToIndex: 2 },
+      { word: 'CAR', tempState: 'CARD', letterToGive: 'D', moveFromIndex: 3, moveToIndex: 2 },
+      { word: 'DOG', tempState: 'DOGS' },
+    ] as unknown as Parameters<typeof scorePuzzleChain>[0];
+    // The moved-letter-repeat, S-cap and plural-answer penalties drive the
+    // S-shuffle chain to the floor while the varied chain survives above it.
+    expect(scorePuzzleChain(sShuffle)).toBeLessThan(scorePuzzleChain(varied));
+    expect(scorePuzzleChain(sShuffle)).toBeLessThanOrEqual(5);
+    expect(scorePuzzleChain(varied)).toBeGreaterThan(scorePuzzleChain(sShuffle));
   });
 });
 

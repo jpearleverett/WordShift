@@ -32,6 +32,7 @@ import {
   FINALE_ARM_MIN_PUZZLES,
   FINALE_DWELL_PUZZLES,
   RESONANT_BOARD_CAP_AMBER,
+  LEXICON_AMBER_MULTIPLIER,
 } from '../constants/gameBalance';
 import { isPatronSync } from './entitlements';
 
@@ -495,8 +496,8 @@ export function calculatePhaseAcceleration(
     multiplier *= NARRATIVE_ACCELERATION.STREAK_MULTIPLIER;
   }
 
-  // Difficulty bonus
-  if (difficulty === 'HARD') {
+  // Difficulty bonus (EXPERT, the 6-letter apex, shares HARD's accel bonus)
+  if (difficulty === 'HARD' || difficulty === 'EXPERT') {
     multiplier *= NARRATIVE_ACCELERATION.HARD_MULTIPLIER;
   } else if (difficulty === 'MEDIUM_PLUS') {
     multiplier *= NARRATIVE_ACCELERATION.MEDIUM_PLUS_MULTIPLIER;
@@ -552,6 +553,15 @@ export async function awardPuzzleAmber(
     /** Blind Offering win (challenge limits + end-judged blind play): pays the
      *  apex amber multiplier and the 2.0x phase-progress cap. */
     blind?: boolean;
+    /** The undo-limit ("Challenge") constraint was ALSO active. Only meaningful
+     *  alongside `blind`: the two stack, and Blind+Challenge (previews hidden
+     *  AND undos capped) pays a small premium over Blind alone, which frees
+     *  undos entirely. AMBER ONLY — phase acceleration stays at blind's 2.0x
+     *  cap either way. */
+    undoLimited?: boolean;
+    /** Lexicon (rare-word) win: pays the LEXICON_AMBER_MULTIPLIER bonus on the
+     *  subtotal. Amber-only, REWARD-only — NEVER feeds phase progression. */
+    lexicon?: boolean;
     /**
      * Resonance bonus for the board (resonant deep-word choices, already
      * per-move-priced by the caller). Amber-only, REWARD-only: added to the
@@ -569,6 +579,8 @@ export async function awardPuzzleAmber(
   starBonusAmber: number;
   streakBonus: number;
   challengeBonus: number;
+  /** Lexicon rare-word bonus actually credited (0 when not a Lexicon board). */
+  lexiconBonus: number;
   patronBonus: number;
   surpriseBonus: number;
   /** Clamped resonance bonus actually credited (0 when none). */
@@ -618,20 +630,39 @@ export async function awardPuzzleAmber(
   let totalAmount = Math.floor(baseAmount * streakMultiplier);
   const streakBonus = totalAmount - baseAmount;
 
-  // Apply the trial-rung bonus. Blind Offering (challenge limits + previews
-  // hidden + end-judged free moves) is the apex rung and pays the top
-  // multiplier; plain Challenge (previews on) pays the modest one. Never
-  // stacked: a blind board runs under gameMode 'challenge'.
+  // Apply the trial-rung bonus. `gameMode === 'challenge'` is the shared
+  // no-hints umbrella, engaged whenever EITHER constraint is on, so the rung is
+  // chosen from the two INDEPENDENT flags:
+  //   Challenge alone (previews on, undos capped) .......... 1.25x
+  //   Blind alone (previews hidden, undos FREE) ............ 2.00x
+  //   Blind + Challenge (hidden AND capped) — maximal ...... 2.25x
+  // The stacked tier exists because the decoupling made Blind-alone strictly
+  // easier than the pair (it frees undos), yet both paid 2.0x. Amber only:
+  // phase acceleration keeps blind's 2.0x cap in every case.
   let challengeBonus = 0;
   if (gameMode === 'challenge') {
     const rungMultiplier = options.blind
-      ? CHALLENGE_MODE_CONFIG.BLIND_AMBER_MULTIPLIER
+      ? (options.undoLimited
+          ? CHALLENGE_MODE_CONFIG.BLIND_CHALLENGE_AMBER_MULTIPLIER
+          : CHALLENGE_MODE_CONFIG.BLIND_AMBER_MULTIPLIER)
       : CHALLENGE_MODE_CONFIG.AMBER_MULTIPLIER;
     challengeBonus = Math.floor(totalAmount * (rungMultiplier - 1));
     totalAmount += challengeBonus;
 
     // Track challenge completions
     progress.challengeCompletions = (progress.challengeCompletions || 0) + 1;
+  }
+
+  // Lexicon (rare-word) bonus: a harder vocabulary board pays a bonus on the
+  // running subtotal (base + star + streak + trial). Additive to the REWARD
+  // only — like the Patron/surprise/resonance bonuses it NEVER touches phase
+  // progression (computed separately below), so a rare board pays more amber but
+  // never accelerates the descent. Composes on top of the variant multiplier
+  // (applied by the caller) and the trial bonus above.
+  let lexiconBonus = 0;
+  if (options.lexicon === true) {
+    lexiconBonus = Math.floor(totalAmount * (LEXICON_AMBER_MULTIPLIER - 1));
+    totalAmount += lexiconBonus;
   }
 
   // Patron's Key: flat per-puzzle amber bonus. Additive to the REWARD only — it must
@@ -809,6 +840,7 @@ export async function awardPuzzleAmber(
     starBonusAmber,
     streakBonus,
     challengeBonus,
+    lexiconBonus,
     patronBonus,
     surpriseBonus,
     resonanceBonus,
@@ -1539,8 +1571,8 @@ export async function applyVariantAmberBonus(
  * and the variant-offer nudge. Standard non-blind wins are a no-op. Idempotent
  * per call (one win = one increment).
  */
-export async function recordVariantWin(variant: string, blind: boolean): Promise<void> {
-  if ((!variant || variant === 'standard') && !blind) return;
+export async function recordVariantWin(variant: string, blind: boolean, lexicon: boolean = false, maxStack: boolean = false): Promise<void> {
+  if ((!variant || variant === 'standard') && !blind && !lexicon && !maxStack) return;
   const progress = await loadProgress();
   if (variant && variant !== 'standard') {
     if (!progress.variantWins) progress.variantWins = {};
@@ -1549,16 +1581,26 @@ export async function recordVariantWin(variant: string, blind: boolean): Promise
   if (blind) {
     progress.blindWins = (progress.blindWins || 0) + 1;
   }
+  if (lexicon) {
+    progress.lexiconWins = (progress.lexiconWins || 0) + 1;
+  }
+  // Maximal-stack apex win (EXPERT + Challenge + Blind + non-standard variant +
+  // Lexicon at once). App is the only caller that ever passes it true.
+  if (maxStack) {
+    progress.maxStackWins = (progress.maxStackWins || 0) + 1;
+  }
   progressCache = progress;
   await saveProgress();
 }
 
-/** Read per-variant + blind lifetime win counts (for achievements / nudges). */
-export async function getVariantWinStats(): Promise<{ variantWins: Record<string, number>; blindWins: number }> {
+/** Read per-variant + blind + lexicon + max-stack lifetime win counts (achievements / nudges). */
+export async function getVariantWinStats(): Promise<{ variantWins: Record<string, number>; blindWins: number; lexiconWins: number; maxStackWins: number }> {
   const progress = await loadProgress();
   return {
     variantWins: progress.variantWins || {},
     blindWins: progress.blindWins || 0,
+    lexiconWins: progress.lexiconWins || 0,
+    maxStackWins: progress.maxStackWins || 0,
   };
 }
 

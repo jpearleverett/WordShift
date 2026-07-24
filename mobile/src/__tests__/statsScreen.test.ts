@@ -392,12 +392,16 @@ describe('Personal Bests card', () => {
   test('difficulties without a best get an explicit "No best yet" row', async () => {
     const tree = await renderWithEffects();
 
+    // The fixture supplies bests for EASY and MEDIUM only, so every OTHER
+    // shipped difficulty must show the explicit empty row — including EXPERT,
+    // which the card omitted entirely until the apex tier was wired in.
     expect(findByA11yLabel(tree, 'MED+: no best yet')).toBeTruthy();
     expect(findByA11yLabel(tree, 'HARD: no best yet')).toBeTruthy();
+    expect(findByA11yLabel(tree, 'EXPERT: no best yet')).toBeTruthy();
     const noBestTexts = findAll(tree, el =>
       el.type === 'Text' && textOf(el).trim() === 'No best yet'
     );
-    expect(noBestTexts.length).toBe(2);
+    expect(noBestTexts.length).toBe(3);
   });
 
   test('the sparkle emoji and the cryptic h/m legend are gone; the caption matches the new rows', async () => {

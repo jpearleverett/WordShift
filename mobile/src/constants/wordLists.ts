@@ -1,6 +1,6 @@
 
 import { DICTIONARY_WORDS } from '../dictionary';
-import type { PuzzleSolutionStep } from '../types';
+import type { PuzzleSolutionStep, Difficulty } from '../types';
 
 // All unique words from dictionary (filtered to 3-7 letters)
 const ALL_UNIQUE_WORDS = DICTIONARY_WORDS;
@@ -100,9 +100,12 @@ export const FALLBACK_PUZZLES_HARD: string[][] = [
 ];
 
 /** Get a random fallback puzzle for the given difficulty */
-export function getRandomFallback(difficulty: 'EASY' | 'MEDIUM' | 'MEDIUM_PLUS' | 'HARD'): string[] {
+export function getRandomFallback(difficulty: Difficulty): string[] {
+  // EXPERT (6-letter) has no dedicated fallback pool; this is a rare emergency
+  // net (banks + on-device generation are the real paths), so it degrades
+  // gracefully to the HARD 5-letter pool — still a solvable board.
   const pool = difficulty === 'EASY' ? FALLBACK_PUZZLES_EASY
-    : difficulty === 'HARD' ? FALLBACK_PUZZLES_HARD
+    : difficulty === 'HARD' || difficulty === 'EXPERT' ? FALLBACK_PUZZLES_HARD
     : difficulty === 'MEDIUM_PLUS' ? FALLBACK_PUZZLES_MEDIUM_PLUS
     : FALLBACK_PUZZLES_MEDIUM;
   return pool[Math.floor(Math.random() * pool.length)];

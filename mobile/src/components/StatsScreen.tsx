@@ -90,6 +90,16 @@ const ACHIEVEMENT_CATEGORY_NAMES: Record<(typeof ACHIEVEMENT_CATEGORIES)[number]
   journey: 'JOURNEY',
 };
 
+/** Semantic per-tier colors for the BY DIFFICULTY rows — the same identity the
+ *  setup menu's difficulty rings and the share card's dot use. */
+const DIFFICULTY_STAT_COLORS: Record<Difficulty, string> = {
+  EASY: CandyColors.green.main,
+  MEDIUM: CandyColors.yellow.main,
+  MEDIUM_PLUS: CandyColors.orange.main,
+  HARD: CandyColors.red.main,
+  EXPERT: CandyColors.purple.main,
+};
+
 interface HeroStatSpec {
   value: number;
   label: string;
@@ -238,7 +248,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
     // Pace trend: improving if the player is quicker at ANY difficulty they've
     // played enough of. Private scanning-speed signal — no leaderboard.
     (async () => {
-      const diffs: Difficulty[] = ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'];
+      const diffs: Difficulty[] = ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD', 'EXPERT'];
       for (const d of diffs) {
         const trend = await getSolveTrend(d);
         if (trend?.improving) { setPaceImproving(true); return; }
@@ -589,34 +599,27 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
             <EntranceCascadeItem phase={effectivePhase} delay={getCascadeDelayMs(3, { baseMs: HEADER_CASCADE_BASE_MS })}>
             <PanelCard phase={effectivePhase} style={styles.sectionCard}>
               <PixelPlaque phase={effectivePhase} label={'BY DIFFICULTY'} style={styles.sectionPlaque} />
-              <DifficultyRow
-                difficulty="EASY"
-                completed={stats.byDifficulty.EASY.completed}
-                stars={stats.byDifficulty.EASY.stars}
-                color={CandyColors.green.main}
-                labelColor={t.body}
-                countColor={t.muted}
-                avgColor={t.title}
-              />
-              <DifficultyRow
-                difficulty="MEDIUM"
-                completed={stats.byDifficulty.MEDIUM.completed}
-                stars={stats.byDifficulty.MEDIUM.stars}
-                color={CandyColors.yellow.main}
-                labelColor={t.body}
-                countColor={t.muted}
-                avgColor={t.title}
-                altBg={rowAltTint}
-              />
-              <DifficultyRow
-                difficulty="HARD"
-                completed={stats.byDifficulty.HARD.completed}
-                stars={stats.byDifficulty.HARD.stars}
-                color={CandyColors.red.main}
-                labelColor={t.body}
-                countColor={t.muted}
-                avgColor={t.title}
-              />
+              {/* Every tier, driven by one list. This block hand-listed EASY,
+                  MEDIUM and HARD, so MEDIUM_PLUS was invisible and EXPERT never
+                  appeared when the apex tier shipped — a player's hardest solves
+                  simply were not in their stats. The bucket falls back to zeroes
+                  so a legacy save mid-backfill can't crash the screen. */}
+              {(['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD', 'EXPERT'] as Difficulty[]).map((diff, i) => {
+                const bucket = stats.byDifficulty?.[diff] ?? { completed: 0, stars: 0 };
+                return (
+                  <DifficultyRow
+                    key={diff}
+                    difficulty={diff}
+                    completed={bucket.completed}
+                    stars={bucket.stars}
+                    color={DIFFICULTY_STAT_COLORS[diff]}
+                    labelColor={t.body}
+                    countColor={t.muted}
+                    avgColor={t.title}
+                    altBg={i % 2 === 1 ? rowAltTint : undefined}
+                  />
+                );
+              })}
             </PanelCard>
             </EntranceCascadeItem>
 
@@ -629,7 +632,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
               <EntranceCascadeItem phase={effectivePhase} delay={getCascadeDelayMs(4, { baseMs: HEADER_CASCADE_BASE_MS })}>
               <PanelCard phase={effectivePhase} style={styles.sectionCard}>
                 <PixelPlaque phase={effectivePhase} label={'PERSONAL BESTS'} style={styles.sectionPlaque} />
-                {(['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'] as Difficulty[]).map((diff, i) => {
+                {(['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD', 'EXPERT'] as Difficulty[]).map((diff, i) => {
                   const pb = stats.personalBests?.[diff];
                   const label = diff === 'MEDIUM_PLUS' ? 'MED+' : diff;
                   const perfect = !!pb && isPerfectPersonalBest(pb);

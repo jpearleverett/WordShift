@@ -373,6 +373,11 @@ export interface HomeWorldProgress {
   variantWins?: Record<string, number>;
   // Lifetime Blind Offering wins (blind composes with any variant, tracked apart).
   blindWins?: number;
+  // Lifetime Lexicon (rare-word) wins (composes with any variant, tracked apart).
+  lexiconWins?: number;
+  // Lifetime maximal-stack apex wins (EXPERT + Challenge + Blind + non-standard
+  // variant + Lexicon all at once) — powers the one-time apex achievement.
+  maxStackWins?: number;
   // Local date (YYYY-MM-DD) each variant last earned its once-per-day fresh bonus.
   variantFreshDates?: Record<string, string>;
   // Local date the player last saw the variant-offer nudge (once-per-day cap).
@@ -410,6 +415,7 @@ export interface AmberReward {
   MEDIUM: number;
   MEDIUM_PLUS: number;
   HARD: number;
+  EXPERT: number;
 }
 
 /**
@@ -513,7 +519,9 @@ export function getPuzzlesBetweenSessions(phase: DialoguePhase): number {
 
 /**
  * Phase descriptions for UI
- * Phases are spread across ~300 puzzles for extended gameplay
+ * Phases are spread across ~120 puzzles (see PHASE_THRESHOLDS and
+ * MIN_PUZZLES_FOR_PHASE in constants/gameBalance.ts; the arc was compressed
+ * twice from its original ~300-puzzle geography)
  */
 export const PHASE_DESCRIPTIONS: Record<DialoguePhase, { title: string; mood: string }> = {
   0: { title: 'Bright Days', mood: 'Everything seems wonderful!' },

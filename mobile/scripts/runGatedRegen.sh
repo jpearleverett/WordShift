@@ -11,15 +11,18 @@
 # Per-run progress (full jest output + a summary line) is appended to
 # src/data/.gatedRegen_<bank>.log so the campaign is observable while running.
 #
-# Usage: cd mobile && bash scripts/runGatedRegen.sh <EASY|MEDIUM|MEDIUM_PLUS|HARD>
+# Usage: cd mobile && bash scripts/runGatedRegen.sh <EASY|MEDIUM|MEDIUM_PLUS|HARD|EXPERT> [LEXICON]
+#   The optional second arg LEXICON builds the rare-word Lexicon bank for that
+#   difficulty instead (GATED_LEXICON=1, own lexicon_ checkpoint/sidecar).
 
 set -u
 
 BANK="${1:-}"
+MODE="${2:-}"
 case "$BANK" in
-  EASY|MEDIUM|MEDIUM_PLUS|HARD) ;;
+  EASY|MEDIUM|MEDIUM_PLUS|HARD|EXPERT) ;;
   *)
-    echo "Usage: bash scripts/runGatedRegen.sh <EASY|MEDIUM|MEDIUM_PLUS|HARD>" >&2
+    echo "Usage: bash scripts/runGatedRegen.sh <EASY|MEDIUM|MEDIUM_PLUS|HARD|EXPERT> [LEXICON]" >&2
     exit 1
     ;;
 esac
@@ -28,9 +31,18 @@ esac
 cd "$(dirname "$0")/.." || exit 1
 
 KEY=$(echo "$BANK" | tr '[:upper:]' '[:lower:]')
+LEXICON_ENV=""
+if [ "$MODE" = "LEXICON" ]; then
+  KEY="lexicon_${KEY}"
+  LEXICON_ENV="1"
+  TARGET=265
+elif [ "$BANK" = "EXPERT" ]; then
+  TARGET=360
+else
+  TARGET=500
+fi
 CHECKPOINT="src/data/.gatedRegen_${KEY}_progress.json"
 LOG="src/data/.gatedRegen_${KEY}.log"
-TARGET=500
 MIN_RUN_ACCEPTS=3   # a run accepting fewer than this counts toward the plateau
 PLATEAU_RUNS=2      # consecutive sub-minimum runs that end the campaign
 MAX_RUNS=200        # hard safety valve; never expected to bind
@@ -66,7 +78,7 @@ while :; do
   # Each run is bounded ~9.5 minutes wall clock: the generator's own internal
   # deadline (default GATED_RUN_MS=540000) finalizes the sidecar before jest's
   # 570s testTimeout can kill the process (finalize-before-jest-deadline).
-  GATED_BANK="$BANK" NODE_OPTIONS="--max-old-space-size=4096" \
+  GATED_BANK="$BANK" GATED_LEXICON="$LEXICON_ENV" NODE_OPTIONS="--max-old-space-size=4096" \
     ./node_modules/.bin/jest --config scripts/jest.config.js --no-coverage --forceExit \
     --testTimeout 570000 scripts/generateGatedBank.test.ts >> "$LOG" 2>&1
   jest_status=$?

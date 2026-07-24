@@ -52,6 +52,36 @@ const WORD_ARRAYS: Record<number, string[]> = {
   7: WORDS_7,
 };
 
+// Precomputed word -> position maps for O(1) commonness lookup. The scorer runs
+// in the generation hot loop and used wordArray.indexOf (O(n)); with the
+// expanded dictionary (~2x) that linear scan is a real cost, so the position is
+// mapped once at module load instead. Values are identical to indexOf.
+const WORD_INDEX: Record<number, Map<string, number>> = {};
+for (const key of Object.keys(WORD_ARRAYS)) {
+  const len = Number(key);
+  const arr = WORD_ARRAYS[len];
+  const map = new Map<string, number>();
+  for (let i = 0; i < arr.length; i++) map.set(arr[i], i);
+  WORD_INDEX[len] = map;
+}
+
+/**
+ * Frequency rank of a word within its length bucket: 0 = most common, ~1 =
+ * rarest. The dictionary is TRUE-frequency-sorted, so this is an accurate
+ * familiarity proxy. Powers the gated generator's 3-tier playable-vocabulary
+ * policy: FEATURED words (the displayed chain + the answer words the player
+ * must recognize) are kept within a per-difficulty rank ceiling, while the
+ * generator still TRAVERSES the full dictionary graph for connectivity. Dread
+ * words are exempted by the caller so the descent vocabulary still lands.
+ * Returns 1 (treated as rarest) for a word absent from its length bucket.
+ */
+export function getFeaturedRank(word: string): number {
+  const arr = WORD_ARRAYS[word.length];
+  if (!arr || arr.length === 0) return 1;
+  const idx = WORD_INDEX[word.length]?.get(word.toUpperCase());
+  return idx === undefined ? 1 : idx / arr.length;
+}
+
 // ============================================================================
 // PRE-COMPUTED ADJACENCY INDEX — instant candidate lookup for puzzle generation
 // ============================================================================
@@ -137,6 +167,7 @@ const PENALTY = {
   INSERT_SUFFIX_AT_END: 35,   // Adding boring suffix letter at end
   INSERT_G_FOR_ING: 50,       // Adding G to form -ING
   INSERT_Y_FOR_LY: 45,        // Adding Y to form -LY
+  GEMINATION: 30,             // Inserting a letter beside its own twin (POSE->POSSE): cheap, unvaried
 } as const;
 
 // Letters that are BORING when moved to/from word edges
@@ -229,6 +260,13 @@ function getBoringTransformPenalty(
   if (char === 'Y' && insertionIndex === targetLen &&
       targetLen >= 1 && targetWord[targetLen - 1] === 'L') {
     penalty += PENALTY.INSERT_Y_FOR_LY;
+  }
+
+  // Penalize gemination: inserting a letter directly beside its own twin
+  // (POSE->POSSE, CORAL->CORRAL, PURE->PUREE). Visually you just doubled a
+  // letter — cheap and unvaried, previously unpenalized.
+  if (targetWord[insertionIndex - 1] === char || targetWord[insertionIndex] === char) {
+    penalty += PENALTY.GEMINATION;
   }
 
   return penalty;
@@ -520,6 +558,25 @@ const DREAD_WORDS = new Set([
 // Current phase for word selection (cached, updated during generation)
 let currentDreadPhase: DialoguePhase = 0;
 
+// Rarity lean for word selection (set around a generation call, reset after).
+// 0 = OFF: the default de-rarify scoring (prefer the mainstream [10%,60%] band).
+// 1 = MILD (EXPERT, "uncommon-but-fair"): shift the sweet spot into the
+//     [60%,90%) uncommon band, away from the ultra-common head.
+// 2 = STRONG (Lexicon, "rare a lot"): reward the rare tail hard so the
+//     generator PRODUCES rare boards (instead of the harness rejecting the
+//     common boards the default scorer would otherwise favour). This keeps
+//     bank generation feasible AND drives on-device Lexicon play directly.
+// Default 0 leaves every normal EASY-HARD board unchanged.
+let currentRarityLean = 0;
+
+// Lower edge of the "uncommon but fair" band the rarity-aware REVERSE walk seeds
+// and steers toward (getFeaturedRank scale; the upper edge is fixed at 0.86, the
+// obscure-tail cutoff). Difficulty-dependent so the Lexicon-reverse rarity RAMPS
+// (gentle EASY -> distinctly rarer EXPERT) instead of collapsing to one flat
+// band. Set per generation via the rareBandLo override; default 0.60 suits the
+// apex tiers. Only consulted when currentRarityLean > 0.
+let currentReverseRareBandLo = 0.60;
+
 /**
  * Score how "interesting" a word is (0-100)
  * Higher = more interesting/fun to play with
@@ -602,15 +659,39 @@ function scoreWordInterestingness(
   // read as unfair, not clever.
   const wordArray = WORD_ARRAYS[wordLength];
   if (wordArray) {
-    const index = wordArray.indexOf(word);
-    if (index < wordArray.length * 0.1) {
-      score -= 8; // Ultra-common head: boring filler words (unchanged)
-    } else if (index < wordArray.length * 0.6) {
-      score += 8; // Mainstream band [10%, 60%): the words players enjoy recognizing
-    } else if (index >= wordArray.length * 0.85) {
-      score -= 10; // Obscure tail [85%+): rare words read as unfair
+    // O(1) position lookup (was wordArray.indexOf); -1 when absent, matching
+    // indexOf's old return so the branch behavior below is unchanged.
+    const index = WORD_INDEX[wordLength]?.get(word) ?? -1;
+    const frac = index / wordArray.length;
+    if (index < 0) {
+      // absent (shouldn't happen for dictionary words): no positional bias
+    } else if (currentRarityLean >= 2) {
+      // STRONG rarity lean (Lexicon): steer HARD toward the rare-but-FAIR band.
+      // The fair band tops out ~0.85 rank; beyond that the dictionary is obscure
+      // validity-only inflections (RIPED/HARED/ABLER) the playable-vocab policy
+      // says must never be featured, so the rare tail is AVOIDED, not chased.
+      if (frac < 0.35) score -= 22;      // common: strongly avoid
+      else if (frac < 0.60) score -= 4;  // lower-mid: mild avoid
+      else if (frac < 0.85) score += 14; // rare-but-fair: the Lexicon sweet spot
+      else score -= 12;                  // obscure tail: avoid (reads as unfair)
+    } else if (currentRarityLean === 1) {
+      // MILD rarity lean (EXPERT, "uncommon-but-fair"): sweet spot in the
+      // uncommon band, away from the ultra-common head AND the obscure tail.
+      if (frac < 0.10) score -= 14;      // ultra-common head: avoid
+      else if (frac < 0.45) score -= 2;  // mainstream: slight avoid
+      else if (frac < 0.85) score += 10; // uncommon-but-fair: the target band
+      else score -= 10;                  // obscure tail: avoid (ceiling also bars it)
+    } else {
+      // Default de-rarify scoring (unchanged): prefer the mainstream band.
+      if (frac < 0.1) {
+        score -= 8; // Ultra-common head: boring filler words (unchanged)
+      } else if (frac < 0.6) {
+        score += 8; // Mainstream band [10%, 60%): the words players enjoy recognizing
+      } else if (frac >= 0.85) {
+        score -= 10; // Obscure tail [85%+): rare words read as unfair
+      }
+      // [60%, 85%) stays neutral: uncommon-but-fair.
     }
-    // [60%, 85%) stays neutral: uncommon-but-fair.
   }
 
   return Math.max(0, Math.min(100, score));
@@ -798,6 +879,8 @@ export function scorePuzzleChain(chain: PathNode[], recencyMap?: Map<string, num
 
   let totalScore = 0;
   const movePositions: number[] = [];
+  const movedLetters: string[] = [];
+  const formedWords: string[] = [];
 
   // Score individual words (25% weight) - includes freshness penalty
   const wordScores = chain.map(node => {
@@ -816,8 +899,17 @@ export function scorePuzzleChain(chain: PathNode[], recencyMap?: Map<string, num
     const node = chain[i];
     if (node.letterToGive && node.moveFromIndex !== undefined) {
       const nextNode = chain[i + 1];
+      // moveFromIndex indexes into the row's CURRENT state (tempState, after it
+      // received the previous move's letter), NOT the original displayed word.
+      // Passing node.word here made sourceWord[charIndex] undefined on every
+      // move past the first, silently disabling ALL removal-side anti-boring
+      // penalties (and misclassifying an end-of-word S-pull as a rewarded
+      // middle move). Use the real source state so the scorer works on every
+      // move. Target side stays nextNode.word: moveToIndex is the insertion
+      // position into the PRE-insertion target (matches SolutionStep).
+      const sourceState = node.tempState ?? node.word;
       const moveScore = scoreMoveQuality(
-        node.word,
+        sourceState,
         node.moveFromIndex,
         nextNode.word,
         node.moveToIndex || 0,
@@ -830,9 +922,11 @@ export function scorePuzzleChain(chain: PathNode[], recencyMap?: Map<string, num
 
       moveScoreSum += moveScore;
       moveCount++;
+      movedLetters.push(node.letterToGive);
+      formedWords.push(nextNode.tempState ?? nextNode.word);
 
       const normalizedPos = node.moveFromIndex === 0 ? 0 :
-                           node.moveFromIndex === node.word.length - 1 ? 2 : 1;
+                           node.moveFromIndex === sourceState.length - 1 ? 2 : 1;
       movePositions.push(normalizedPos);
     }
   }
@@ -844,6 +938,30 @@ export function scorePuzzleChain(chain: PathNode[], recencyMap?: Map<string, num
   // Heavy penalty if any move is boring
   if (hasBoringMove) {
     totalScore -= 20;
+  }
+
+  // === Chain-level variety (skipped for reverse, which has its own scoring) ===
+  // Attacks the S-shuffle monotony the current banks are dominated by: same
+  // letter moved twice, S doing most of the moving, plural-shaped answers.
+  if (!relaxBoring && moveCount > 0) {
+    // Repeating the same moved letter (S then S) is monotony, not variety —
+    // position variety alone never caught it.
+    const uniqueMoved = new Set(movedLetters).size;
+    totalScore -= 14 * (moveCount - uniqueMoved);
+
+    // S is the runaway most-moved letter (~22% of HARD moves). A single S-move
+    // is fine; TWO or more on one board is the S-shuffle. Penalize per extra
+    // S-move so it scales with the abuse and never punishes one S.
+    const sMoves = movedLetters.filter(c => c === 'S').length;
+    totalScore -= 20 * Math.max(0, sMoves - 1);
+
+    // Plural-shaped answers: formed words ending in S ran 30-45% of moves in the
+    // banks; push it down toward a third.
+    const pluralFormed = formedWords.filter(w => w.endsWith('S')).length;
+    const pluralShare = pluralFormed / moveCount;
+    if (pluralShare > 0.34) {
+      totalScore -= Math.round(15 * (pluralShare - 0.34) / 0.66);
+    }
   }
 
   // Score semantic distance start→end (20% weight)
@@ -873,7 +991,11 @@ export function scorePuzzleChain(chain: PathNode[], recencyMap?: Map<string, num
       { pathCap: 8, stateCap: 500 },
     );
     totalScore += Math.min(10, branching.structuralBonus * 0.75);
-    if (branching.completePathCount === 1) totalScore -= 3;
+    // Single-route boards are a forced rail. -3 was too weak to steer the
+    // best-of-3 pick away from them; -8 makes on-device standard generation
+    // lean multi-route to match the gated banks (the gated generator still
+    // hard-rejects single-route boards on top of this).
+    if (branching.completePathCount <= 1) totalScore -= 8;
   }
 
   return Math.round(Math.max(0, Math.min(100, totalScore)));
@@ -1057,6 +1179,28 @@ async function generateReverseChain(
   const YIELD_INTERVAL = 15;
   let lastYield = Date.now();
 
+  // Rarity-aware reverse walk (Lexicon reverse banks). When a rarity lean is
+  // active (currentRarityLean > 0 — set ONLY by the Lexicon reverse generation),
+  // the walk SEEDS from uncommon words and BIASES each step toward uncommon
+  // neighbors, so it explores the rare region of the reverse-move graph instead
+  // of building a common chain that the post-hoc rarity gate then rejects. This
+  // is the intelligent inversion that makes rare + reverse-solvable tractable
+  // (random sampling of both constraints at once starves, e.g. 6-letter EXPERT).
+  // Inert for the fair banks (currentRarityLean === 0 -> the original random
+  // walk, byte-for-byte). getFeaturedRank: 0 = most common for its length,
+  // 1 = rarest; [RARE_LO, RARE_HI] is the "uncommon but fair" band — above the
+  // mainstream, below the obscure validity-only inflection tail.
+  const rareLean = currentRarityLean > 0;
+  const RARE_LO = currentReverseRareBandLo, RARE_HI = 0.86;
+  const inRareBand = (w: string): boolean => {
+    const r = getFeaturedRank(w);
+    return r >= RARE_LO && r <= RARE_HI;
+  };
+  // Seed pool computed once. Fall back to the full array if the rare band is
+  // somehow empty for this length (never fail to generate for rarity).
+  const rareStartPool = rareLean ? dicts.baseArray.filter(inRareBand) : dicts.baseArray;
+  const startArray = rareStartPool.length > 0 ? rareStartPool : dicts.baseArray;
+
   while (Date.now() - startTime < timeoutMs) {
     // Yield periodically
     if (Date.now() - lastYield > YIELD_INTERVAL) {
@@ -1064,8 +1208,9 @@ async function generateReverseChain(
       lastYield = Date.now();
     }
 
-    // Pick a random start word
-    const w0 = dicts.baseArray[Math.floor(Math.random() * dicts.baseArray.length)];
+    // Pick a start word. Under a rarity lean, seed from the uncommon-but-fair
+    // pool so the whole chain begins rare; otherwise uniform random.
+    const w0 = startArray[Math.floor(Math.random() * startArray.length)];
 
     // Try to build a chain from w0 by making random valid moves at each step
     const chain: PathNode[] = [{ word: w0, tempState: w0 }];
@@ -1109,6 +1254,11 @@ async function generateReverseChain(
         const t = targets[Math.floor(Math.random() * targets.length)];
         if (usedWords.has(t.baseWord) || usedWords.has(t.result)) continue;
         if (recencyMap && isInHardCooldown(t.baseWord, recencyMap)) continue;
+        // Rarity lean: prefer an uncommon next word so the whole chain stays in
+        // the rare band. Reserve the final few attempts as an "accept any valid
+        // target" fallback, so a step never fails to extend purely because no
+        // rare neighbor happened to be sampled (keeps reverse-solvability yield).
+        if (rareLean && attempt < maxTries - 5 && !inRareBand(t.baseWord)) continue;
 
         // Build chain node
         const updatedPrev: PathNode = {
@@ -1225,23 +1375,29 @@ export function pickMultiRouteCandidate<T extends { score: number }>(
 
 export const generateLocalPuzzle = async (
   difficulty: Difficulty = 'MEDIUM',
-  overrides?: { wordLength?: number; targetRows?: number; startWord?: string; requireReverseSolvable?: boolean; relaxBoring?: boolean }
+  overrides?: { wordLength?: number; targetRows?: number; startWord?: string; requireReverseSolvable?: boolean; relaxBoring?: boolean; rarityLean?: number; rareBandLo?: number }
 ): Promise<PuzzleConfig> => {
   const targetRows = overrides?.targetRows ?? (
     difficulty === 'EASY' ? 3 :
     difficulty === 'MEDIUM' ? 4 :
     difficulty === 'MEDIUM_PLUS' ? 4 :
+    difficulty === 'EXPERT' ? 5 :
     5 // HARD
   );
   const wordLength = overrides?.wordLength ?? (
     difficulty === 'EASY' ? 4 :
     difficulty === 'MEDIUM' ? 4 :
     difficulty === 'MEDIUM_PLUS' ? 5 :
+    difficulty === 'EXPERT' ? 6 : // apex: 6-letter words (transients 5/7 both exist)
     5 // HARD
   );
   const forcedStartWord = overrides?.startWord?.toUpperCase();
   const requireReverse = overrides?.requireReverseSolvable ?? false;
   const relaxBoring = overrides?.relaxBoring ?? requireReverse;
+  // Rarity lean (0 off / 1 mild-EXPERT / 2 strong-Lexicon). Set per call; every
+  // generation resets it so no lean leaks across calls (mirrors currentDreadPhase).
+  currentRarityLean = overrides?.rarityLean ?? 0;
+  currentReverseRareBandLo = overrides?.rareBandLo ?? 0.60;
 
   // Load word history for diversity scoring
   const recencyMap = await getWordHistoryWithRecency();
@@ -1449,7 +1605,11 @@ export const generateLocalPuzzle = async (
     words,
     hint: `Start by shifting '${solution[0].letterToMove}'`,
     solution,
-    wordLength
+    wordLength,
+    // Real chain score of the delivered board (0-100). Consumers that persist
+    // banks store this instead of a flat 50 so within-bank selection can rank
+    // by genuine quality (see puzzleBank scorePuzzleForContext + A7).
+    qualityScore: bestPuzzle.score,
   };
 };
 
@@ -2908,15 +3068,18 @@ function scoreDoubleShiftChain(chain: DoubleShiftPathNode[], recencyMap?: Map<st
  */
 export async function generateDoubleShiftPuzzle(
   difficulty: Difficulty = 'MEDIUM',
-  overrides?: { wordLength?: number; targetRows?: number }
+  overrides?: { wordLength?: number; targetRows?: number; rarityLean?: number }
 ): Promise<PuzzleConfig> {
   const wordLength = overrides?.wordLength ?? 5;
   const targetRows = overrides?.targetRows ?? (
     difficulty === 'EASY' ? 3 :
     difficulty === 'MEDIUM' ? 4 :
     difficulty === 'MEDIUM_PLUS' ? 5 :
-    6 // HARD
+    difficulty === 'EXPERT' ? 7 : // apex: 6L double-shift is impossible (needs 8-letter
+    6 // HARD                     // grow-targets), so differentiate by a longer 7-row chain
   );
+  // Rarity lean (0/1/2), reset per call (see generateLocalPuzzle).
+  currentRarityLean = overrides?.rarityLean ?? 0;
 
   const recencyMap = await getWordHistoryWithRecency();
 
@@ -3020,6 +3183,7 @@ export async function generateDoubleShiftPuzzle(
     solution,
     wordLength,
     isDoubleShift: true,
+    qualityScore: bestPuzzle.score,
   };
 }
 

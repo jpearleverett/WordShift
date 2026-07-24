@@ -353,6 +353,8 @@ export async function applyCreatorSnapshot(target: 'dusk' | 'shadows' | 'reveal'
       challengeCompletions: progress.challengeCompletions ?? 0,
       variantWins: {},
       blindWins: 0,
+      lexiconWins: 0,
+      maxStackWins: 0,
     });
 
     // 7. Sanity check: the snapshot must land EXACTLY on the target phase with

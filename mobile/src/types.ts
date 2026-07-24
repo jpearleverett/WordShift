@@ -19,7 +19,7 @@ export enum GameState {
   GAME_OVER = 'GAME_OVER',
 }
 
-export type Difficulty = 'EASY' | 'MEDIUM' | 'MEDIUM_PLUS' | 'HARD';
+export type Difficulty = 'EASY' | 'MEDIUM' | 'MEDIUM_PLUS' | 'HARD' | 'EXPERT';
 
 export type GameMode = 'standard' | 'challenge';
 
@@ -51,6 +51,10 @@ export interface PuzzleConfig {
   wordLength?: number;
   /** When true, this puzzle uses double-shift mechanics (2 letters per step). */
   isDoubleShift?: boolean;
+  /** Real chain quality score (0-100) of the generated board, when available.
+   * Persisted into pre-generated banks so selection can rank by genuine
+   * quality; runtime play ignores it. */
+  qualityScore?: number;
 }
 
 /**

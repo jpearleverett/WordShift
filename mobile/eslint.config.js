@@ -7,8 +7,11 @@ module.exports = defineConfig([
   {
     ignores: [
       'dist/*',
-      // Auto-generated puzzle banks (5+ MB of data; linting them is pointless)
-      'src/data/puzzleBank*.ts',
+      // Auto-generated puzzle banks (~9.4 MB of data; linting them is
+      // pointless). The glob must cover EVERY generated bank family — it named
+      // only puzzleBank* while the 15 lexiconBank* files (3 MB) shipped, so CI
+      // was linting generated data it could never hand-fix.
+      'src/data/*Bank*.ts',
       'src/dictionary.ts',
       'scripts/tools/*.mjs',
     ],

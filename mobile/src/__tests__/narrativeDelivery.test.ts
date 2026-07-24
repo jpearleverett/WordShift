@@ -13,6 +13,7 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AnimalType } from '../types/homeWorld';
+import { PHASE_THRESHOLDS, FINALE_DWELL_PUZZLES } from '../constants/gameBalance';
 import {
   PHASE2_EXTRA_DIALOGUES,
   getPhase2PoolLine,
@@ -218,22 +219,46 @@ describe('coordinated events keyed on weighted progress', () => {
     expect(second?.theme).toBe(themesInOrder[1]);
   });
 
-  it('regression: the raw puzzle count would strand the pre-finale crescendo that the weighted scale fires', () => {
-    // An accelerated player reaches the finale around 116 REAL puzzles.
-    const rawDelivered = drain(116, 4);
-    const reachableRaw = COORDINATED_EVENTS
-      .filter(e => e.puzzleThreshold <= 116)
-      .map(e => e.theme);
-    expect(rawDelivered).toEqual(reachableRaw);
-    expect(rawDelivered).not.toContain('almost_time');
-    expect(rawDelivered).not.toContain('convergence');
-    expect(rawDelivered).not.toContain('the_threshold');
+  it('every event is reachable BEFORE the arrival, so no pre-arrival dread line lands after it', () => {
+    // These thresholds were authored against a ~300-puzzle arc and were left at
+    // 140/161/168/175 after the arc was compressed twice. Post-revelation now
+    // lands near raw 120, and Phase 5 still serves coordinated-event pages — so
+    // the crescendo ("the last breath before we become part of what
+    // approaches") could fire AFTER the entity had already arrived and settled.
+    //
+    // NOTE ON SCALES: puzzleThreshold is WEIGHTED progress, while
+    // FINALE_ARM_MIN_PUZZLES is a RAW solve count — comparing them directly is
+    // apples-to-oranges. The finale cannot fire before Phase 4 opens (the
+    // endgame block is gated on currentPhase >= 4), and once it opens the
+    // arrangement still has to sit through FINALE_DWELL_PUZZLES dwell wins,
+    // each of which advances weighted progress by at least 1. So the last
+    // event must land within that dwell window measured on the weighted scale:
+    const arrivalBound = PHASE_THRESHOLDS[4] + FINALE_DWELL_PUZZLES;
+    for (const event of COORDINATED_EVENTS) {
+      expect(event.puzzleThreshold).toBeLessThanOrEqual(arrivalBound);
+    }
 
-    // The same player's WEIGHTED progress reaches the crescendo events.
-    const weightedDelivered = drain(230, 4);
-    expect(weightedDelivered).toContain('almost_time');
-    expect(weightedDelivered).toContain('convergence');
-    expect(weightedDelivered).toContain('the_threshold');
+    // A player standing at that bound has received all eight.
+    expect(drain(arrivalBound, 4)).toEqual(themesInOrder);
+  });
+
+  it('each event sits inside the weighted window of the phase it is written for', () => {
+    // PHASE_THRESHOLDS is the weighted scale the events share, so an event
+    // tagged phase N must not be keyed below phase N's opening (it would be
+    // held by the phase gate) nor past the NEXT phase's opening (it would be
+    // delivered in the wrong era, which is how the crescendo drifted).
+    for (const event of COORDINATED_EVENTS) {
+      const opens = PHASE_THRESHOLDS[event.phase];
+      const nextOpens = PHASE_THRESHOLDS[event.phase + 1] ?? Infinity;
+      expect(event.puzzleThreshold).toBeGreaterThanOrEqual(opens);
+      expect(event.puzzleThreshold).toBeLessThan(nextOpens);
+    }
+  });
+
+  it('thresholds are strictly increasing, so the crescendo cannot deliver out of order', () => {
+    const thresholds = COORDINATED_EVENTS.map(e => e.puzzleThreshold);
+    expect(thresholds).toEqual([...thresholds].sort((a, b) => a - b));
+    expect(new Set(thresholds).size).toBe(thresholds.length);
   });
 
   it('already-consumed bookkeeping still suppresses delivered events', () => {

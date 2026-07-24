@@ -636,8 +636,13 @@ export const Row: React.FC<RowProps> = memo(({
   const targetRowIndex = activeRowIndex + (moveDirection === 'down' ? 1 : -1);
   const isSource = rowIndex === activeRowIndex;
   const isTarget = rowIndex === targetRowIndex;
-  // Drop rows compact at 6+ (need room for insertion slots); pick rows compact at 7+
-  const compactTiles = isTarget ? wordLength >= 6 : wordLength >= 7;
+  // Compact tiles at 6+ letters: drop rows need room for insertion slots, and
+  // EXPERT's 6-letter boards (growing to a 7-tile transient row) would overflow
+  // with standard tiles. HARD/MP already render 6-letter drop rows compact, so
+  // this keeps every 6+ row visually consistent. Only EXPERT produces 6-letter
+  // SOURCE/future rows, so tightening the non-target threshold from 7 to 6 is
+  // EXPERT-scoped (all shorter banks are unaffected).
+  const compactTiles = wordLength >= 6;
   const isCompleted = moveDirection === 'down'
     ? rowIndex < activeRowIndex
     : rowIndex > activeRowIndex;
