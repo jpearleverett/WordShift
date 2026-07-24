@@ -141,10 +141,20 @@ describe('puzzleBank', () => {
     });
 
     it('returns a solvable extended standard board at the depth gate', async () => {
-      const extendable = PUZZLE_BANK_EASY[0];
+      // Not every board is +1-row-extendable, so pick the first that genuinely
+      // is (the bank content changes across regenerations; the old [0]
+      // assumption was brittle), then force selection to it.
+      const extendable = PUZZLE_BANK_EASY.find(p =>
+        extendStandardPuzzle(
+          { words: p.words, solution: p.solution, wordLength: p.wordLength },
+          { excludedWords: new Set(p.allWords) },
+        )?.words.length === p.words.length + 1,
+      )!;
       await AsyncStorage.setItem(
         'wordshift_played_std_easy_puzzle_ids',
-        JSON.stringify(PUZZLE_BANK_EASY.slice(1).map(puzzle => puzzle.id)),
+        JSON.stringify(
+          PUZZLE_BANK_EASY.filter(p => p.id !== extendable.id).map(p => p.id),
+        ),
       );
 
       const result = await selectPreGeneratedPuzzle(

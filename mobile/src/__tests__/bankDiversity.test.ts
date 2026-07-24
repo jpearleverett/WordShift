@@ -70,33 +70,35 @@ interface BankSpec {
 }
 
 const BANKS: BankSpec[] = [
-  // Measured (2026-07 gated full regeneration: every standard-bank board passes
-  // completePathCount >= 2, singleChoiceFraction <= 0.65 bright / <= 0.75 dread
-  // phases — smaller banks, 100% choice-rich; floors ~10% under measured):
-  // EASY 496 puzzles / max 3 / 1417 unique
-  { name: 'EASY', bank: PUZZLE_BANK_EASY, cap: 3, minUnique: 1275, minPuzzles: 445 },
-  // MEDIUM 426 / max 7 / 1256 unique
-  { name: 'MEDIUM', bank: PUZZLE_BANK_MEDIUM, cap: 7, minUnique: 1130, minPuzzles: 380 },
-  // MEDIUM_PLUS 344 / max 10 / 935 unique
-  { name: 'MEDIUM_PLUS', bank: PUZZLE_BANK_MEDIUM_PLUS, cap: 10, minUnique: 840, minPuzzles: 310 },
-  // HARD 310 / max 12 / 933 unique
-  { name: 'HARD', bank: PUZZLE_BANK_HARD, cap: 12, minUnique: 840, minPuzzles: 280 },
-  // REVERSE_EASY 406 / max 7 / 1325 unique
-  { name: 'REVERSE_EASY', bank: PUZZLE_BANK_REVERSE_EASY, cap: 7, minUnique: 1190, minPuzzles: 380 },
-  // REVERSE_MEDIUM 292 / max 11 (solution-repair pass) / 1304 unique
-  { name: 'REVERSE_MEDIUM', bank: PUZZLE_BANK_REVERSE_MEDIUM, cap: 11, minUnique: 1170, minPuzzles: 280 },
-  // REVERSE_MEDIUM_PLUS 219 / max 12 / 877 unique
-  { name: 'REVERSE_MEDIUM_PLUS', bank: PUZZLE_BANK_REVERSE_MEDIUM_PLUS, cap: 12, minUnique: 785, minPuzzles: 195 },
-  // REVERSE_HARD 182 / max 16 / 783 unique
-  { name: 'REVERSE_HARD', bank: PUZZLE_BANK_REVERSE_HARD, cap: 16, minUnique: 700, minPuzzles: 160 },
-  // DOUBLE_EASY 489 / max 3 / 1619 unique
-  { name: 'DOUBLE_EASY', bank: PUZZLE_BANK_DOUBLE_SHIFT_EASY, cap: 3, minUnique: 1455, minPuzzles: 440 },
-  // DOUBLE_MEDIUM 447 / max 5 / 1604 unique
-  { name: 'DOUBLE_MEDIUM', bank: PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM, cap: 5, minUnique: 1440, minPuzzles: 405 },
-  // DOUBLE_MEDIUM_PLUS 463 / max 8 / 1637 unique
-  { name: 'DOUBLE_MEDIUM_PLUS', bank: PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM_PLUS, cap: 8, minUnique: 1470, minPuzzles: 420 },
-  // DOUBLE_HARD 425 / max 10 / 1617 unique
-  { name: 'DOUBLE_HARD', bank: PUZZLE_BANK_DOUBLE_SHIFT_HARD, cap: 10, minUnique: 1450, minPuzzles: 390 },
+  // Measured (2026-07 depth-lever regeneration, all 12 banks: standard banks are
+  // multi-route by construction with the D3-fixed path counting + playable-vocab
+  // FEATURED band; reverse regenerated to full size with a forward-S-share
+  // anti-boring cap; double refreshed on the 2x dictionary. Word diversity is
+  // dramatically higher across the board. Floors ~10% under measured):
+  // EASY 453 / max 3 / 1566 unique
+  { name: 'EASY', bank: PUZZLE_BANK_EASY, cap: 3, minUnique: 1409, minPuzzles: 407 },
+  // MEDIUM 338 / max 7 / 1336 unique
+  { name: 'MEDIUM', bank: PUZZLE_BANK_MEDIUM, cap: 7, minUnique: 1202, minPuzzles: 304 },
+  // MEDIUM_PLUS 500 / max 10 / 1889 unique
+  { name: 'MEDIUM_PLUS', bank: PUZZLE_BANK_MEDIUM_PLUS, cap: 10, minUnique: 1700, minPuzzles: 450 },
+  // HARD 457 / max 12 / 1918 unique
+  { name: 'HARD', bank: PUZZLE_BANK_HARD, cap: 12, minUnique: 1726, minPuzzles: 411 },
+  // REVERSE_EASY 500 / max 6 / 1901 unique
+  { name: 'REVERSE_EASY', bank: PUZZLE_BANK_REVERSE_EASY, cap: 6, minUnique: 1710, minPuzzles: 450 },
+  // REVERSE_MEDIUM 500 / max 8 / 2107 unique
+  { name: 'REVERSE_MEDIUM', bank: PUZZLE_BANK_REVERSE_MEDIUM, cap: 8, minUnique: 1896, minPuzzles: 450 },
+  // REVERSE_MEDIUM_PLUS 500 / max 10 / 2436 unique
+  { name: 'REVERSE_MEDIUM_PLUS', bank: PUZZLE_BANK_REVERSE_MEDIUM_PLUS, cap: 10, minUnique: 2192, minPuzzles: 450 },
+  // REVERSE_HARD 500 / max 12 / 2592 unique
+  { name: 'REVERSE_HARD', bank: PUZZLE_BANK_REVERSE_HARD, cap: 12, minUnique: 2332, minPuzzles: 450 },
+  // DOUBLE_EASY 494 / max 3 / 2047 unique
+  { name: 'DOUBLE_EASY', bank: PUZZLE_BANK_DOUBLE_SHIFT_EASY, cap: 3, minUnique: 1842, minPuzzles: 444 },
+  // DOUBLE_MEDIUM 495 / max 5 / 2370 unique
+  { name: 'DOUBLE_MEDIUM', bank: PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM, cap: 5, minUnique: 2133, minPuzzles: 445 },
+  // DOUBLE_MEDIUM_PLUS 496 / max 8 / 2528 unique
+  { name: 'DOUBLE_MEDIUM_PLUS', bank: PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM_PLUS, cap: 8, minUnique: 2275, minPuzzles: 446 },
+  // DOUBLE_HARD 491 / max 10 / 2676 unique
+  { name: 'DOUBLE_HARD', bank: PUZZLE_BANK_DOUBLE_SHIFT_HARD, cap: 10, minUnique: 2408, minPuzzles: 441 },
 ];
 
 /** All words a player sees in a puzzle: the starting chain + every formed word. */
