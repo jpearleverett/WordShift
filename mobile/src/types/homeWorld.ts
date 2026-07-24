@@ -375,6 +375,9 @@ export interface HomeWorldProgress {
   blindWins?: number;
   // Lifetime Lexicon (rare-word) wins (composes with any variant, tracked apart).
   lexiconWins?: number;
+  // Lifetime maximal-stack apex wins (EXPERT + Challenge + Blind + non-standard
+  // variant + Lexicon all at once) — powers the one-time apex achievement.
+  maxStackWins?: number;
   // Local date (YYYY-MM-DD) each variant last earned its once-per-day fresh bonus.
   variantFreshDates?: Record<string, string>;
   // Local date the player last saw the variant-offer nudge (once-per-day cap).

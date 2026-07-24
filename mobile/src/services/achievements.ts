@@ -78,6 +78,9 @@ export interface AchievementCheckState {
   blindWins: number;
   /** Lifetime Lexicon (rare-word) wins. */
   lexiconWins: number;
+  /** Lifetime maximal-stack apex wins (EXPERT + Challenge + Blind + non-standard
+   *  variant + Lexicon all at once). */
+  maxStackWins: number;
 }
 
 // ===== Achievement Definitions =====
@@ -349,6 +352,16 @@ export const ACHIEVEMENTS: Achievement[] = [
     icon: '📜',
     category: 'mastery',
     check: (s) => (s.lexiconWins || 0) >= 25,
+  },
+  // The maximal stack — every trial layered onto one apex board at once
+  {
+    id: 'max_stack',
+    rewardAmber: 150,
+    title: 'The Full Arrangement',
+    description: 'Win one board with Expert, Challenge, Blind, a variant, and Lexicon all at once',
+    icon: '🌌',
+    category: 'mastery',
+    check: (s) => (s.maxStackWins || 0) >= 1,
   },
 
   // Streak achievements
@@ -800,6 +813,7 @@ export async function buildAchievementCheckState(): Promise<AchievementCheckStat
     variantWins: variantStats.variantWins,
     blindWins: variantStats.blindWins,
     lexiconWins: variantStats.lexiconWins,
+    maxStackWins: variantStats.maxStackWins,
   };
 }
 

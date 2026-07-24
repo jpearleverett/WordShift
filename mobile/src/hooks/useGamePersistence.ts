@@ -176,7 +176,8 @@ export interface PersistenceActions {
     blind?: boolean,
     isSharedChallenge?: boolean,
     resonantChoiceCount?: number,
-    lexicon?: boolean
+    lexicon?: boolean,
+    maxStack?: boolean
   ) => Promise<VictoryData>;
   setAmberBalance: (balance: number) => void;
   refreshStats: () => Promise<void>;
@@ -267,7 +268,11 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
     resonantChoiceCount: number = 0,
     // Lexicon (rare-word) win: pays the itemized rare-vocabulary amber bonus
     // (never phase progress) and feeds the lifetime lexicon-win counter.
-    lexicon: boolean = false
+    lexicon: boolean = false,
+    // Maximal-stack win (EXPERT + Challenge + Blind + non-standard variant +
+    // Lexicon all at once) — App computes it from the board's flags; feeds the
+    // one-time apex achievement counter only. Amber/pacing are unaffected.
+    maxStack: boolean = false
   ): Promise<VictoryData> => {
     const stars = calculateStars(hintsUsed, invalidAttempts);
     const flawless = isFlawless(hintsUsed, invalidAttempts, undosUsed);
@@ -369,7 +374,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
       // Track the variant/blind/lexicon win for achievements + the variant-offer
       // nudge. Runs for blind/lexicon standard boards too (both compose with any variant).
       if (variant !== 'standard' || blind || lexicon) {
-        await recordVariantWin(variant, blind, lexicon);
+        await recordVariantWin(variant, blind, lexicon, maxStack);
       }
 
       // Crediting split: ONLY the per-puzzle amber (amount — incl. the variant/

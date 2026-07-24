@@ -1558,8 +1558,8 @@ export async function applyVariantAmberBonus(
  * and the variant-offer nudge. Standard non-blind wins are a no-op. Idempotent
  * per call (one win = one increment).
  */
-export async function recordVariantWin(variant: string, blind: boolean, lexicon: boolean = false): Promise<void> {
-  if ((!variant || variant === 'standard') && !blind && !lexicon) return;
+export async function recordVariantWin(variant: string, blind: boolean, lexicon: boolean = false, maxStack: boolean = false): Promise<void> {
+  if ((!variant || variant === 'standard') && !blind && !lexicon && !maxStack) return;
   const progress = await loadProgress();
   if (variant && variant !== 'standard') {
     if (!progress.variantWins) progress.variantWins = {};
@@ -1571,17 +1571,23 @@ export async function recordVariantWin(variant: string, blind: boolean, lexicon:
   if (lexicon) {
     progress.lexiconWins = (progress.lexiconWins || 0) + 1;
   }
+  // Maximal-stack apex win (EXPERT + Challenge + Blind + non-standard variant +
+  // Lexicon at once). App is the only caller that ever passes it true.
+  if (maxStack) {
+    progress.maxStackWins = (progress.maxStackWins || 0) + 1;
+  }
   progressCache = progress;
   await saveProgress();
 }
 
-/** Read per-variant + blind + lexicon lifetime win counts (achievements / nudges). */
-export async function getVariantWinStats(): Promise<{ variantWins: Record<string, number>; blindWins: number; lexiconWins: number }> {
+/** Read per-variant + blind + lexicon + max-stack lifetime win counts (achievements / nudges). */
+export async function getVariantWinStats(): Promise<{ variantWins: Record<string, number>; blindWins: number; lexiconWins: number; maxStackWins: number }> {
   const progress = await loadProgress();
   return {
     variantWins: progress.variantWins || {},
     blindWins: progress.blindWins || 0,
     lexiconWins: progress.lexiconWins || 0,
+    maxStackWins: progress.maxStackWins || 0,
   };
 }
 

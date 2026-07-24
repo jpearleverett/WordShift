@@ -63,6 +63,7 @@ const defaultState: AchievementCheckState = {
   variantWins: {},
   blindWins: 0,
   lexiconWins: 0,
+  maxStackWins: 0,
 };
 
 describe('achievements', () => {
@@ -110,6 +111,7 @@ describe('achievements', () => {
       variantWins: { reverse: 1, double_shift: 1, speed: 1 },
       blindWins: 1,
       lexiconWins: 0,
+      maxStackWins: 0,
     };
     const ids = (await checkAchievements(state)).map(a => a.id);
     expect(ids).toContain('flawless_first');
@@ -124,12 +126,37 @@ describe('achievements', () => {
     expect(ids).not.toContain('flawless_25');
   });
 
+  test('max_stack unlocks only from a maximal-stack win counter', async () => {
+    // Without a maxStack win, the apex achievement stays locked even when
+    // every component counter is high.
+    const noStack = {
+      ...defaultState,
+      stats: {
+        ...defaultState.stats,
+        byDifficulty: {
+          ...defaultState.stats.byDifficulty,
+          EXPERT: { completed: 30, stars: 3 },
+        },
+      },
+      variantWins: { reverse: 5, double_shift: 5, speed: 5 },
+      blindWins: 5,
+      lexiconWins: 5,
+      maxStackWins: 0,
+    };
+    expect((await checkAchievements(noStack)).map(a => a.id)).not.toContain('max_stack');
+
+    // One recorded maximal-stack win unlocks it.
+    const stacked = { ...defaultState, maxStackWins: 1 };
+    expect((await checkAchievements(stacked)).map(a => a.id)).toContain('max_stack');
+  });
+
   test('variant_explorer requires all three variants, not just one', async () => {
     const state = {
       ...defaultState,
       variantWins: { reverse: 20, double_shift: 20 }, // no speed win
       blindWins: 0,
       lexiconWins: 0,
+      maxStackWins: 0,
     };
     const ids = (await checkAchievements(state)).map(a => a.id);
     expect(ids).toContain('reverse_15');

@@ -871,6 +871,7 @@ describe('usePuzzleGame', () => {
       resetHookState();
       let [, actions] = callHook();
       actions.setGameMode('challenge');
+      actions.setUndoLimited(true); // the finite budget is gated by undoLimited
 
       [, actions] = callHook();
       actions.initGame(['LIME', 'TIME', 'TIED']);
@@ -884,6 +885,7 @@ describe('usePuzzleGame', () => {
       resetHookState();
       let [state, actions] = callHook();
       actions.setGameMode('challenge');
+      actions.setUndoLimited(true); // the finite budget is gated by undoLimited
 
       [state, actions] = callHook();
       actions.initGame(['LIME', 'TIME', 'TIED']);
@@ -908,11 +910,13 @@ describe('usePuzzleGame', () => {
       resetHookState();
       let [, actions] = callHook();
       actions.setGameMode('challenge');
+      actions.setUndoLimited(true); // finite budget (Challenge), so one charge is meaningful
       [, actions] = callHook();
       actions.initGame(['ABCDE', 'FGHIJ'], undefined, undefined, 5, 'double_shift');
 
       let [state] = callHook();
       const undosBefore = state.undosRemaining;
+      expect(undosBefore).toBeLessThan(Infinity); // budget is finite under undoLimited
 
       // Complete one two-letter step (drop1 then drop2).
       await playMove('A', 0);

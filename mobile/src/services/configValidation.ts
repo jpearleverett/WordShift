@@ -192,10 +192,11 @@ export function validatePhaseThresholds(): ValidationResult {
 export function validateAchievements(): ValidationResult {
   const errors: string[] = [];
 
-  // Check total count (55 achievements across 5 categories — includes the
-  // flawless tier, per-variant, Blind Offering, EXPERT, and Lexicon mastery)
-  if (ACHIEVEMENTS.length !== 55) {
-    errors.push(`Expected 55 achievements, got ${ACHIEVEMENTS.length}`);
+  // Check total count (56 achievements across 5 categories — includes the
+  // flawless tier, per-variant, Blind Offering, EXPERT, Lexicon mastery, and
+  // the maximal-stack apex)
+  if (ACHIEVEMENTS.length !== 56) {
+    errors.push(`Expected 56 achievements, got ${ACHIEVEMENTS.length}`);
   }
 
   // Check unique IDs

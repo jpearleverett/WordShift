@@ -136,6 +136,10 @@ interface DifficultyMenuProps {
   onSelectVariant: (variant: PuzzleVariant) => void;
   onToggleChallengeMode: () => void;
   showChallengeToggle?: boolean;
+  /** Undo-limit ("Challenge") constraint active. Decoupled from blind: both can
+   *  be on at once (previews hidden AND undos capped). Derived from undoLimited,
+   *  not gameMode (which is 'challenge' whenever either constraint is on). */
+  undoLimited?: boolean;
   blindActive?: boolean;
   onToggleBlindMode?: () => void;
   showBlindToggle?: boolean;
@@ -173,6 +177,7 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   onSelectVariant,
   onToggleChallengeMode,
   showChallengeToggle = true,
+  undoLimited = false,
   blindActive = false,
   onToggleBlindMode,
   showBlindToggle = false,
@@ -269,14 +274,12 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
     ? { bg: CandyColors.green.dark + '33', text: CandyColors.green.light }
     : { bg: CandyColors.green.light + '2E', text: CandyColors.green.shadow };
   const selectedRowStyle = { backgroundColor: t.secondaryBg, borderColor: t.secondaryBorder };
-  // Trial-ladder rungs are mutually exclusive: the CHALLENGE row lights only
-  // for challenge-without-blind (Blind Offering runs under gameMode
-  // 'challenge' too, but its own row carries that state). While blind is on,
-  // the CHALLENGE row renders as folded-in rather than deselected — plain
-  // deselection read as a broken toggle, when in truth blind absorbs the
-  // challenge rung. Tapping the folded row still switches to plain Challenge.
-  const challengeActive = gameMode === 'challenge' && !blindActive;
-  const challengeIncluded = blindActive;
+  // Challenge (undo-limit) and Blind Offering (hidden previews) are INDEPENDENT
+  // constraints that stack — each row lights from its own flag. The CHALLENGE
+  // row keys on undoLimited (not gameMode, which is 'challenge' whenever either
+  // is on); the two can both be selected at once (the maximal trial: previews
+  // hidden AND undos capped).
+  const challengeActive = undoLimited;
   const blindName = phase >= 3 ? 'the Blind Offering' : 'Blind Mode';
 
   // maxHeight '100%' is DEFINITE here: the panel's parent is the Modal's
@@ -501,24 +504,18 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
                   backgroundColor: t.dangerText + '14',
                   borderColor: t.dangerText + '55',
                 },
-                // Folded into blind: share the blind row's amber tint so the
-                // two rows read as one selected rung, never as deselected.
-                challengeIncluded && {
-                  backgroundColor: t.amberText + '14',
-                  borderColor: t.amberText + '55',
-                },
               ]}
               onPress={onToggleChallengeMode}
               accessibilityRole="button"
-              accessibilityState={{ selected: challengeActive || challengeIncluded }}
+              accessibilityState={{ selected: challengeActive }}
               accessibilityLabel={
-                challengeIncluded
-                  ? `Challenge mode, folded into ${blindName}. Tap to switch to Challenge on its own.`
+                blindActive
+                  ? `Challenge mode, ${challengeActive ? 'on' : 'off'}. Stacks with ${blindName}.`
                   : `Challenge mode, ${challengeActive ? 'on' : 'off'}`
               }
             >
               <ModeIcon
-                glyph={challengeIncluded ? '🌑' : challengeActive ? '🔓' : '🔒'}
+                glyph={challengeActive ? '🔓' : '🔒'}
                 textStyle={styles.challengeMenuIcon}
                 imageStyle={styles.challengeMenuIconImage}
               />
@@ -526,25 +523,17 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
                 <Text
                   style={[
                     styles.menuRowText,
-                    {
-                      color: challengeIncluded
-                        ? t.amberText
-                        : challengeActive
-                          ? t.dangerText
-                          : t.body,
-                    },
+                    { color: challengeActive ? t.dangerText : t.body },
                   ]}
                 >
                   CHALLENGE
                 </Text>
                 <Text style={[styles.challengeMenuDesc, { color: t.muted }]}>
-                  {challengeIncluded
-                    ? phase >= 3
-                      ? 'Folded into the Blind Offering.'
-                      : 'Folded into Blind Mode.'
-                    : challengeActive
-                      ? 'No hints, limited undos, 1.25x amber'
-                      : 'No hints, limited undos, +25% amber'}
+                  {challengeActive
+                    ? blindActive
+                      ? 'No hints, limited undos, blind: the maximal trial'
+                      : 'No hints, limited undos, 1.25x amber'
+                    : 'No hints, limited undos, +25% amber'}
                 </Text>
               </View>
             </TouchableOpacity>

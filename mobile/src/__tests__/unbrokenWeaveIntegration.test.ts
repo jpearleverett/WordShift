@@ -46,8 +46,10 @@ describe('Unbroken Weave player-facing wiring', () => {
     expect(APP_TSX).toMatch(
       /startNewGame\(\s*puzzle\.difficulty,\s*puzzle\.gameMode,\s*variant,\s*undefined,\s*false,\s*\)/s,
     );
+    // The Challenge toggle keeps blind (undefined) but still forces weave off
+    // (the `false` at the 5th arg) and flips the undo-limit flag at the 7th.
     expect(APP_TSX).toMatch(
-      /startNewGame\(\s*puzzle\.difficulty,\s*newMode,\s*puzzle\.selectedVariant,\s*false,\s*false,\s*\)/s,
+      /startNewGame\(\s*puzzle\.difficulty,\s*newMode,\s*puzzle\.selectedVariant,\s*undefined,[^\n]*\n\s*false,[^\n]*\n\s*undefined,[^\n]*\n\s*newUndoLimited,/s,
     );
   });
 });

@@ -985,6 +985,7 @@ function MainApp() {
     reverseSolution: puzzle.reverseSolution,
     gameMode: puzzle.gameMode,
     blindMode: puzzle.blindMode,
+    undoLimited: puzzle.undoLimited,
     lexiconMode: puzzle.lexiconMode,
     unbrokenWeaveMode: puzzle.unbrokenWeaveMode,
     spentLetters: puzzle.spentLetters,
@@ -2170,7 +2171,15 @@ function MainApp() {
         // the economy layer; never phase progress).
         result.resonantChoiceCount ?? 0,
         // Lexicon (rare-word) board: pays the itemized rare-vocabulary bonus.
-        result.lexicon ?? false
+        result.lexicon ?? false,
+        // Maximal-stack apex win: EXPERT + Challenge (undo-limit) + Blind +
+        // non-standard variant + Lexicon all at once. Never on daily/shared
+        // (both force standard/no-modifiers), so the flags alone are enough.
+        puzzle.difficulty === 'EXPERT' &&
+          (result.undoLimited ?? false) &&
+          (result.blind ?? false) &&
+          (result.variant ?? 'standard') !== 'standard' &&
+          (result.lexicon ?? false)
       );
 
       // Aggregate social proof: contribute this puzzle's words to the global
@@ -3245,13 +3254,13 @@ function MainApp() {
     puzzleActions.handleUndo();
   }, [puzzleActions]);
 
-  // Challenge-only convenience: spend EARNED amber to refill one undo when out.
-  // Convenience, never progress — Challenge stays hint-free by design. Blind
-  // Offering is excluded: its undos are always free and unlimited, so a refill
-  // would charge amber for nothing (the chip is hidden in blind too — this
-  // guard is defense in depth).
+  // Undo-limit convenience: spend EARNED amber to refill one undo when out.
+  // Convenience, never progress — Challenge stays hint-free by design. Keys on
+  // undoLimited (the finite-budget flag), so it works under Blind + Challenge
+  // stacked too. Blind ALONE has free unlimited undos, so a refill would charge
+  // amber for nothing (the chip is hidden then too — this guard is depth).
   const handleBuyUndo = useCallback(async () => {
-    if (puzzle.gameMode !== 'challenge' || puzzle.blindMode) return;
+    if (!puzzle.undoLimited) return;
     if (persistence.amberBalance < AMBER_UNDO_REFILL_COST) {
       puzzleActions.setMessage('Not enough amber for an undo.');
       hapticWarning();
@@ -3264,7 +3273,7 @@ function MainApp() {
       hapticSuccess();
       soundUndo();
     }
-  }, [puzzle.gameMode, puzzle.blindMode, persistence.amberBalance, puzzleActions, persistenceActions]);
+  }, [puzzle.undoLimited, persistence.amberBalance, puzzleActions, persistenceActions]);
 
   const handleHintPress = useCallback(() => {
     hapticSelection();
@@ -3853,32 +3862,37 @@ function MainApp() {
     orchestrationActions,
   ]);
 
-  // Trial ladder: Challenge and Blind Offering are mutually exclusive rungs.
-  // Challenge = no hints + limited undos, previews ON. Blind Offering = the
-  // apex rung: no hints (it runs under gameMode 'challenge') PLUS previews
-  // hidden and free moves judged once at the end of the chain — but undos
-  // stay free and unlimited in blind (the challenge undo budget never applies).
+  // Trial constraints: Challenge (no hints + limited undos) and Blind Offering
+  // (no hints + previews hidden + free moves judged once at the end) now STACK.
+  // gameMode 'challenge' is the shared no-hints umbrella, engaged whenever
+  // EITHER is on; the two constraints they add are independent — Blind hides
+  // previews, Challenge caps undos. Blind ALONE frees undos (its repair loop);
+  // Blind + Challenge re-imposes the budget (the maximal trial). Each toggle
+  // flips its own flag and leaves the other untouched.
   const handleToggleChallengeMode = useCallback(() => {
     hapticMedium();
     soundSelection();
     orchestrationActions.setCompletionCoda(null);
     resetSpeedRun();
-    const isChallengeOnly = puzzle.gameMode === 'challenge' && !puzzle.blindMode;
-    const newMode = isChallengeOnly ? 'standard' : 'challenge';
+    const newUndoLimited = !puzzle.undoLimited;
+    // gameMode is 'challenge' while EITHER constraint is on; Blind is preserved.
+    const newMode = (newUndoLimited || puzzle.blindMode) ? 'challenge' : 'standard';
     puzzleActions.startNewGame(
       puzzle.difficulty,
       newMode,
       puzzle.selectedVariant,
-      false,
-      false,
+      undefined,          // keep blind
+      false,              // weave off
+      undefined,          // keep lexicon
+      newUndoLimited,     // flip the undo-limit (Challenge) flag
     );
-  }, [puzzleActions, puzzle.gameMode, puzzle.difficulty, puzzle.selectedVariant, puzzle.blindMode, orchestrationActions]);
+  }, [puzzleActions, puzzle.undoLimited, puzzle.blindMode, puzzle.difficulty, puzzle.selectedVariant, orchestrationActions, resetSpeedRun]);
 
   // Blind Offering: chosen before the board (a fresh board applies it so the
   // player can't toggle previews back on mid-solve to peek). Sticky across Next
-  // Level; selecting it engages the challenge rung (no hints — undos stay free
-  // in blind), deselecting returns to standard. Composes with any
-  // variant/difficulty.
+  // Level; selecting it engages the no-hints umbrella. Undos stay free in blind
+  // UNLESS Challenge is also on, which the toggle leaves untouched. Composes
+  // with any variant/difficulty AND with Challenge.
   const handleToggleBlindMode = useCallback(() => {
     // Gate: Blind Offering is the apex rung and unlocks late. Turning it OFF
     // is always allowed (a restored legacy board may carry it in while locked).
@@ -3889,24 +3903,19 @@ function MainApp() {
     soundSelection();
     orchestrationActions.setCompletionCoda(null);
     resetSpeedRun();
-    if (puzzle.blindMode) {
-      puzzleActions.startNewGame(
-        puzzle.difficulty,
-        'standard',
-        puzzle.selectedVariant,
-        false,
-        false,
-      );
-    } else {
-      puzzleActions.startNewGame(
-        puzzle.difficulty,
-        'challenge',
-        puzzle.selectedVariant,
-        true,
-        false,
-      );
-    }
-  }, [puzzleActions, puzzle.difficulty, puzzle.selectedVariant, puzzle.blindMode, puzzlesSolvedForVariantUnlocks, orchestrationActions, resetSpeedRun]);
+    const newBlind = !puzzle.blindMode;
+    // gameMode stays 'challenge' if the undo-limit constraint is still on.
+    const newMode = (newBlind || puzzle.undoLimited) ? 'challenge' : 'standard';
+    puzzleActions.startNewGame(
+      puzzle.difficulty,
+      newMode,
+      puzzle.selectedVariant,
+      newBlind,           // flip blind
+      false,              // weave off
+      undefined,          // keep lexicon
+      undefined,          // keep undo-limit (Challenge)
+    );
+  }, [puzzleActions, puzzle.difficulty, puzzle.selectedVariant, puzzle.blindMode, puzzle.undoLimited, puzzlesSolvedForVariantUnlocks, orchestrationActions, resetSpeedRun]);
 
   // Lexicon (rare-word) toggle: a COMPOSABLE modifier that stacks on any
   // difficulty + variant (and blind/challenge). Toggling it re-serves the board
@@ -4291,12 +4300,13 @@ function MainApp() {
         {onboardingFlow.isOnboarding ? null : (
         <View style={styles.statsRow}>
           <View style={styles.leftStatsGroup}>
-            {/* Challenge Mode Badge — hidden in Blind Offering. Blind runs
-                under gameMode 'challenge' internally, but its undos are always
-                free, so the undo-budget chrome (count + amber refill chip) is
-                meaningless there and the double chip read as a bug. The Blind
-                badge below is the mode's one standing indicator. */}
-            {puzzle.gameMode === 'challenge' && !puzzle.blindMode && (
+            {/* Challenge (undo-limit) badge — shown whenever the finite undo
+                budget is active, INCLUDING under Blind when the two stack (then
+                previews are hidden AND undos capped). Blind ALONE frees undos,
+                so the undo-budget chrome stays hidden there; the Blind badge
+                below is that mode's standing indicator. Keys on undoLimited,
+                not gameMode (which is 'challenge' whenever either is on). */}
+            {puzzle.undoLimited && (
               <BadgeAppear style={[
                 styles.challengeBadge,
                 persistence.currentPhase === 2 && styles.challengeBadgeDusk,
@@ -4494,6 +4504,7 @@ function MainApp() {
             onToggleChallengeMode={handleToggleChallengeMode}
             onSelectVariant={handleSelectVariant}
             showChallengeToggle={puzzlesSolvedForVariantUnlocks >= CHALLENGE_TOGGLE_UNLOCK_PUZZLES}
+            undoLimited={puzzle.undoLimited}
             blindActive={puzzle.blindMode}
             onToggleBlindMode={handleToggleBlindMode}
             // The blind row appears with the trial-ladder section (challenge

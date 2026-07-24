@@ -528,7 +528,18 @@ describe('recordVariantWin / getVariantWinStats', () => {
     await recordVariantWin('standard', false);
     const stats = await getVariantWinStats();
     expect(stats.blindWins).toBe(0);
+    expect(stats.maxStackWins).toBe(0);
     expect(Object.keys(stats.variantWins)).toHaveLength(0);
+  });
+
+  test('a maximal-stack win records the apex tally alongside its components', async () => {
+    // EXPERT + Challenge + Blind + reverse variant + Lexicon, all at once.
+    await recordVariantWin('reverse', true, true, true);
+    const stats = await getVariantWinStats();
+    expect(stats.variantWins.reverse).toBe(1);
+    expect(stats.blindWins).toBe(1);
+    expect(stats.lexiconWins).toBe(1);
+    expect(stats.maxStackWins).toBe(1);
   });
 });
 

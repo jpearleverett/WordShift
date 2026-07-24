@@ -70,6 +70,7 @@ export function useAchievementQueue(): [AchievementQueueState, AchievementQueueA
         variantWins: variantStats.variantWins,
         blindWins: variantStats.blindWins,
         lexiconWins: variantStats.lexiconWins,
+        maxStackWins: variantStats.maxStackWins,
       };
 
       const newAchievements = await checkAchievements(state);
