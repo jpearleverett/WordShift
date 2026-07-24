@@ -1171,6 +1171,28 @@ async function generateReverseChain(
   const YIELD_INTERVAL = 15;
   let lastYield = Date.now();
 
+  // Rarity-aware reverse walk (Lexicon reverse banks). When a rarity lean is
+  // active (currentRarityLean > 0 — set ONLY by the Lexicon reverse generation),
+  // the walk SEEDS from uncommon words and BIASES each step toward uncommon
+  // neighbors, so it explores the rare region of the reverse-move graph instead
+  // of building a common chain that the post-hoc rarity gate then rejects. This
+  // is the intelligent inversion that makes rare + reverse-solvable tractable
+  // (random sampling of both constraints at once starves, e.g. 6-letter EXPERT).
+  // Inert for the fair banks (currentRarityLean === 0 -> the original random
+  // walk, byte-for-byte). getFeaturedRank: 0 = most common for its length,
+  // 1 = rarest; [RARE_LO, RARE_HI] is the "uncommon but fair" band — above the
+  // mainstream, below the obscure validity-only inflection tail.
+  const rareLean = currentRarityLean > 0;
+  const RARE_LO = 0.60, RARE_HI = 0.86;
+  const inRareBand = (w: string): boolean => {
+    const r = getFeaturedRank(w);
+    return r >= RARE_LO && r <= RARE_HI;
+  };
+  // Seed pool computed once. Fall back to the full array if the rare band is
+  // somehow empty for this length (never fail to generate for rarity).
+  const rareStartPool = rareLean ? dicts.baseArray.filter(inRareBand) : dicts.baseArray;
+  const startArray = rareStartPool.length > 0 ? rareStartPool : dicts.baseArray;
+
   while (Date.now() - startTime < timeoutMs) {
     // Yield periodically
     if (Date.now() - lastYield > YIELD_INTERVAL) {
@@ -1178,8 +1200,9 @@ async function generateReverseChain(
       lastYield = Date.now();
     }
 
-    // Pick a random start word
-    const w0 = dicts.baseArray[Math.floor(Math.random() * dicts.baseArray.length)];
+    // Pick a start word. Under a rarity lean, seed from the uncommon-but-fair
+    // pool so the whole chain begins rare; otherwise uniform random.
+    const w0 = startArray[Math.floor(Math.random() * startArray.length)];
 
     // Try to build a chain from w0 by making random valid moves at each step
     const chain: PathNode[] = [{ word: w0, tempState: w0 }];
@@ -1223,6 +1246,11 @@ async function generateReverseChain(
         const t = targets[Math.floor(Math.random() * targets.length)];
         if (usedWords.has(t.baseWord) || usedWords.has(t.result)) continue;
         if (recencyMap && isInHardCooldown(t.baseWord, recencyMap)) continue;
+        // Rarity lean: prefer an uncommon next word so the whole chain stays in
+        // the rare band. Reserve the final few attempts as an "accept any valid
+        // target" fallback, so a step never fails to extend purely because no
+        // rare neighbor happened to be sampled (keeps reverse-solvability yield).
+        if (rareLean && attempt < maxTries - 5 && !inRareBand(t.baseWord)) continue;
 
         // Build chain node
         const updatedPrev: PathNode = {
