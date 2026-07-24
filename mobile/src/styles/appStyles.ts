@@ -275,6 +275,12 @@ export const appStyles = StyleSheet.create({
   difficultyDotHard: {
     backgroundColor: CandyColors.red.main,
   },
+  // EXPERT must match DIFFICULTY_RING_COLORS.EXPERT in DifficultyMenu — without
+  // it the header chip's dot matched no case and rendered uncolored on the apex
+  // tier (the exact failure the chip-label helper was written to prevent).
+  difficultyDotExpert: {
+    backgroundColor: CandyColors.purple.main,
+  },
   difficultyText: {
     fontSize: FONT_SIZE.small,
     fontFamily: PIXEL_FONT_BOLD,

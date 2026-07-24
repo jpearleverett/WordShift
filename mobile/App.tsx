@@ -4485,6 +4485,7 @@ function MainApp() {
               chipDifficulty === 'MEDIUM' && styles.difficultyDotMedium,
               chipDifficulty === 'MEDIUM_PLUS' && styles.difficultyDotMediumPlus,
               chipDifficulty === 'HARD' && styles.difficultyDotHard,
+              chipDifficulty === 'EXPERT' && styles.difficultyDotExpert,
             ]} />
             <Text style={styles.difficultyText}>{getDifficultyChipLabel(puzzle.difficulty)}</Text>
             <Text style={styles.difficultyArrow}>{'\u25BC'}</Text>

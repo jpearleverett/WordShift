@@ -17,7 +17,32 @@ import { PUZZLE_BANK_DOUBLE_SHIFT_EASY } from '../data/puzzleBankDoubleShiftEasy
 import { PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM } from '../data/puzzleBankDoubleShiftMedium';
 import { PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM_PLUS } from '../data/puzzleBankDoubleShiftMediumPlus';
 import { PUZZLE_BANK_DOUBLE_SHIFT_HARD } from '../data/puzzleBankDoubleShiftHard';
+// EXPERT (apex) banks.
+import { PUZZLE_BANK_EXPERT } from '../data/puzzleBankExpert';
+import { PUZZLE_BANK_REVERSE_EXPERT } from '../data/puzzleBankReverseExpert';
+import { PUZZLE_BANK_DOUBLE_SHIFT_EXPERT } from '../data/puzzleBankDoubleShiftExpert';
+// Lexicon (rare-word) banks — standard/reverse/double x 5 difficulties. These
+// are the HIGHEST-risk vocabulary surface in the game (the mode exists to serve
+// uncommon words), so they must be screened, not exempted.
+import { LEXICON_BANK_EASY } from '../data/lexiconBankEasy';
+import { LEXICON_BANK_MEDIUM } from '../data/lexiconBankMedium';
+import { LEXICON_BANK_MEDIUM_PLUS } from '../data/lexiconBankMediumPlus';
+import { LEXICON_BANK_HARD } from '../data/lexiconBankHard';
+import { LEXICON_BANK_EXPERT } from '../data/lexiconBankExpert';
+import { LEXICON_BANK_REVERSE_EASY } from '../data/lexiconBankReverseEasy';
+import { LEXICON_BANK_REVERSE_MEDIUM } from '../data/lexiconBankReverseMedium';
+import { LEXICON_BANK_REVERSE_MEDIUM_PLUS } from '../data/lexiconBankReverseMediumPlus';
+import { LEXICON_BANK_REVERSE_HARD } from '../data/lexiconBankReverseHard';
+import { LEXICON_BANK_REVERSE_EXPERT } from '../data/lexiconBankReverseExpert';
+import { LEXICON_BANK_DOUBLE_EASY } from '../data/lexiconBankDoubleShiftEasy';
+import { LEXICON_BANK_DOUBLE_MEDIUM } from '../data/lexiconBankDoubleShiftMedium';
+import { LEXICON_BANK_DOUBLE_MEDIUM_PLUS } from '../data/lexiconBankDoubleShiftMediumPlus';
+import { LEXICON_BANK_DOUBLE_HARD } from '../data/lexiconBankDoubleShiftHard';
+import { LEXICON_BANK_DOUBLE_EXPERT } from '../data/lexiconBankDoubleShiftExpert';
 
+// EVERY shipped bank must be listed. This table covered only the original 12
+// while 18 more shipped (EXPERT + the 15 Lexicon banks), leaving ~3,800 boards
+// unscreened against BLOCKED_WORD_SET on the same day the dictionary doubled.
 const BANKS: PreGeneratedPuzzle[][] = [
   PUZZLE_BANK_EASY,
   PUZZLE_BANK_MEDIUM,
@@ -31,6 +56,24 @@ const BANKS: PreGeneratedPuzzle[][] = [
   PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM,
   PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM_PLUS,
   PUZZLE_BANK_DOUBLE_SHIFT_HARD,
+  PUZZLE_BANK_EXPERT,
+  PUZZLE_BANK_REVERSE_EXPERT,
+  PUZZLE_BANK_DOUBLE_SHIFT_EXPERT,
+  LEXICON_BANK_EASY,
+  LEXICON_BANK_MEDIUM,
+  LEXICON_BANK_MEDIUM_PLUS,
+  LEXICON_BANK_HARD,
+  LEXICON_BANK_EXPERT,
+  LEXICON_BANK_REVERSE_EASY,
+  LEXICON_BANK_REVERSE_MEDIUM,
+  LEXICON_BANK_REVERSE_MEDIUM_PLUS,
+  LEXICON_BANK_REVERSE_HARD,
+  LEXICON_BANK_REVERSE_EXPERT,
+  LEXICON_BANK_DOUBLE_EASY,
+  LEXICON_BANK_DOUBLE_MEDIUM,
+  LEXICON_BANK_DOUBLE_MEDIUM_PLUS,
+  LEXICON_BANK_DOUBLE_HARD,
+  LEXICON_BANK_DOUBLE_EXPERT,
 ];
 
 describe('launch vocabulary hygiene', () => {

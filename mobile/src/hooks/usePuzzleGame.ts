@@ -1318,6 +1318,14 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       setIsEchoPuzzle(false);
       if (
         !requestedUnbrokenWeave &&
+        // Lexicon boards are never echo-seeded: the echo generator draws from
+        // the player's ritual words with no rarity lean, so an echo board is
+        // ordinary common vocabulary. Serving one while lexiconMode is still on
+        // meant every 5th Lexicon board was a common-word board that still paid
+        // the 1.4x Lexicon bonus and counted toward the Lexicon achievements.
+        // Lexicon unlocks at 100 solves and phase 3 starts far earlier, so this
+        // hit every Lexicon player. The rare bank wins; echo yields.
+        !requestedLexicon &&
         currentPhase >= 3 &&
         puzzlesSolved > 0 &&
         puzzlesSolved % 5 === 0 &&
@@ -1435,7 +1443,15 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       if (
         activeVariant === 'standard' &&
         puzzlesSolved >= PUZZLE_EXTENSION_UNLOCK_PUZZLES &&
-        !requestedUnbrokenWeave
+        !requestedUnbrokenWeave &&
+        // Mirror the bank path's rule (puzzleBank.selectPreGeneratedPuzzle):
+        // Lexicon boards are curated rare and are NEVER extended. Beyond
+        // perturbing the vocabulary, the else-arm below falls back to
+        // getGuaranteedExtendedStandardFallback, which draws from the ORDINARY
+        // std_<diff> bank — a common-word board served as Lexicon, still paying
+        // the 1.4x bonus. The extension gate (70) sits below the Lexicon gate
+        // (100), so every Lexicon player cleared it.
+        !requestedLexicon
       ) {
         const extended = extendStandardPuzzle(puzzle);
         puzzleToServe = extended.words.length === puzzle.words.length + 1
@@ -1473,7 +1489,11 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       if (
         variant === 'standard' &&
         puzzlesSolved >= PUZZLE_EXTENSION_UNLOCK_PUZZLES &&
-        !requestedUnbrokenWeave
+        !requestedUnbrokenWeave &&
+        // Same rule as the two paths above: never hand a Lexicon board the
+        // ordinary extended-standard fallback (common vocabulary paid at the
+        // 1.4x Lexicon rate).
+        !requestedLexicon
       ) {
         try {
           const matureFallback = getGuaranteedExtendedStandardFallback(requestedDifficulty);
@@ -2808,8 +2828,23 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setBlindMode(restoreUnbrokenWeave ? false : (saved.blindMode ?? false));
     // undoLimited ("Challenge") restores with the board (its budget rode in
     // saved.undosRemaining above); the weave apex forces it off like the rest.
-    undoLimitedRef.current = restoreUnbrokenWeave ? false : (saved.undoLimited ?? false);
-    setUndoLimited(restoreUnbrokenWeave ? false : (saved.undoLimited ?? false));
+    //
+    // LEGACY SAVES: `undoLimited` is newer than the Challenge/Blind decoupling
+    // and puzzleSaveState carries no schema version, so a board autosaved by a
+    // pre-decoupling build has `gameMode: 'challenge'` and NO `undoLimited`.
+    // Defaulting that to false breaks the invariant
+    // `gameMode === 'challenge' <=> (undoLimited || blindMode)`, and the stale
+    // 'challenge' gameMode then rides forward through startNewGame() forever —
+    // paying the challenge amber (1.25x) AND phase acceleration (1.5x) with
+    // undosRemaining pinned to Infinity, while the CHALLENGE badge and the
+    // buy-undo chip (which key on undoLimited) stay hidden. Infer it instead:
+    // in the old world `gameMode === 'challenge'` meant Blind (free undos) when
+    // blindMode was set, and the undo-limited Challenge otherwise.
+    const restoredUndoLimited = restoreUnbrokenWeave
+      ? false
+      : (saved.undoLimited ?? (saved.gameMode === 'challenge' && !(saved.blindMode ?? false)));
+    undoLimitedRef.current = restoredUndoLimited;
+    setUndoLimited(restoredUndoLimited);
     // lexiconMode restores with the board (rare vocabulary is a property of the
     // served board); the weave apex forces it off like the other modifiers.
     lexiconModeRef.current = restoreUnbrokenWeave ? false : (saved.lexiconMode ?? false);

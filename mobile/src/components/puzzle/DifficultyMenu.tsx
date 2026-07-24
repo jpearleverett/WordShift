@@ -65,8 +65,11 @@ const StackEmblem: React.FC<{
   title: string;
   subtitle: string;
   count: number;
+  /** Names of the active layers, in menu order — the screen-reader rendering of
+   *  the glyph fan (the chips themselves are unlabeled decoration). */
+  layerNames: string[];
   t: ReturnType<typeof getSurfaceTheme>;
-}> = ({ glyphs, title, subtitle, count, t }) => {
+}> = ({ glyphs, title, subtitle, count, layerNames, t }) => {
   const reduced = getSettingsSync().reducedMotion;
   const scale = useRef(new Animated.Value(reduced ? 1 : 0.86)).current;
   const opacity = useRef(new Animated.Value(reduced ? 1 : 0)).current;
@@ -82,7 +85,7 @@ const StackEmblem: React.FC<{
   return (
     <Animated.View
       accessible
-      accessibilityLabel={`${count} modifiers stacked: ${title}`}
+      accessibilityLabel={`${title}. ${count} layers active: ${layerNames.join(', ')}. ${subtitle}`}
       style={[
         styles.stackCard,
         { backgroundColor: t.amberTint, borderColor: t.amberTintBorder, opacity, transform: [{ scale }] },
@@ -106,8 +109,13 @@ const StackEmblem: React.FC<{
             <ModeIcon glyph={g} textStyle={styles.stackChipGlyph} imageStyle={styles.stackChipImage} />
           </View>
         ))}
-        <View style={[styles.stackCountPill, { backgroundColor: t.amberText }]}>
-          <Text style={[styles.stackCountText, { color: t.primaryText }]}>{`×${count}`}</Text>
+        {/* The count pill is a FILL, so it must use the amber-pill trio
+            (pillBg/pillEdge/pillText), not amberText — that token is an INK
+            tuned for text ON the parchment, and pairing it with primaryText
+            gave 1.5-2.1:1 in every phase but 5 (cream-on-cream at phase 4).
+            The pill trio holds >= 4.9:1 across all six skins. */}
+        <View style={[styles.stackCountPill, { backgroundColor: t.pillBg, borderColor: t.pillEdge }]}>
+          <Text style={[styles.stackCountText, { color: t.pillText }]}>{`×${count}`}</Text>
         </View>
       </View>
       <Text style={[styles.stackTitle, { color: t.amberText }]}>{title}</Text>
@@ -406,22 +414,38 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
     currentVariant !== 'standard'
       ? variantOptions.find(option => option.variant === currentVariant)?.config.icon
       : undefined;
+  const selectedVariantTitle =
+    currentVariant !== 'standard'
+      ? variantOptions.find(option => option.variant === currentVariant)?.config.title
+      : undefined;
   const stackGlyphs: string[] = [];
-  if (selectedVariantIcon) stackGlyphs.push(selectedVariantIcon);
-  if (undoLimited) stackGlyphs.push('🔓');
-  if (blindActive) stackGlyphs.push('🌑');
-  if (lexiconActive) stackGlyphs.push('📖');
-  if (unbrokenWeaveActive) stackGlyphs.push('🧵');
+  const stackLayerNames: string[] = [];
+  if (selectedVariantIcon) {
+    stackGlyphs.push(selectedVariantIcon);
+    stackLayerNames.push(selectedVariantTitle ?? 'style');
+  }
+  if (undoLimited) { stackGlyphs.push('🔓'); stackLayerNames.push('Challenge'); }
+  if (blindActive) { stackGlyphs.push('🌑'); stackLayerNames.push(phase >= 3 ? 'Blind Offering' : 'Blind Mode'); }
+  if (lexiconActive) { stackGlyphs.push('📖'); stackLayerNames.push('Lexicon'); }
+  if (unbrokenWeaveActive) { stackGlyphs.push('🧵'); stackLayerNames.push('Unbroken Weave'); }
   const stackCount = stackGlyphs.length;
   const showStackEmblem = stackCount >= 2;
-  const stackTitle =
-    stackCount >= 4
-      // The fullest loadout (a style + Challenge + Blind + Lexicon) — the same
-      // combination the "Full Arrangement" apex achievement rewards.
-      ? 'THE FULL ARRANGEMENT'
-      : undoLimited && blindActive
-        ? phase >= 3 ? 'THE MAXIMAL OFFERING' : 'MAXIMAL TRIAL'
-        : phase >= 3 ? 'LAYERED OFFERING' : 'STACKED PLAY';
+  // The apex title must name the REAL `max_stack` achievement condition
+  // (EXPERT + a non-standard style + Challenge + Blind + Lexicon, see App's
+  // predicate). A bare `stackCount >= 4` claimed it for any four layers — e.g.
+  // MEDIUM with a style + Blind + Lexicon + Weave — promising an award the
+  // player would not receive.
+  const isFullArrangement =
+    currentDifficulty === 'EXPERT' &&
+    currentVariant !== 'standard' &&
+    undoLimited &&
+    blindActive &&
+    lexiconActive;
+  const stackTitle = isFullArrangement
+    ? phase >= 3 ? 'THE FULL ARRANGEMENT' : 'THE FULL STACK'
+    : undoLimited && blindActive
+      ? phase >= 3 ? 'THE MAXIMAL OFFERING' : 'MAXIMAL TRIAL'
+      : phase >= 3 ? 'LAYERED OFFERING' : 'STACKED PLAY';
   const stackSubtitle =
     phase >= 3 ? 'All layered onto one arrangement.' : 'All active on one board.';
 
@@ -664,6 +688,7 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
                 title={stackTitle}
                 subtitle={stackSubtitle}
                 count={stackCount}
+                layerNames={stackLayerNames}
                 t={t}
               />
             )}
@@ -1043,6 +1068,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 10,
+    borderWidth: 1,
   },
   stackCountText: {
     fontFamily: PIXEL_FONT_BOLD,

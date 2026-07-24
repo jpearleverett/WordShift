@@ -134,9 +134,26 @@ export async function loadStats(): Promise<CumulativeStats> {
       if (parsed.noHintPuzzleCount === undefined) {
         parsed.noHintPuzzleCount = 0;
       }
-      // Backward compat: add MEDIUM_PLUS if missing from old data
-      if (parsed.byDifficulty && !parsed.byDifficulty.MEDIUM_PLUS) {
-        parsed.byDifficulty.MEDIUM_PLUS = { completed: 0, stars: 0 };
+      // Backward compat: backfill EVERY per-difficulty bucket missing from old
+      // data, derived from getDefaultStats() so the shape has ONE source of
+      // truth. This was hand-listed (MEDIUM_PLUS only) when EXPERT was added,
+      // which meant every pre-EXPERT install carried a blob with no EXPERT
+      // bucket: recordPuzzleCompletion's unguarded
+      // `byDifficulty[difficulty].completed += 1` then threw on the first
+      // EXPERT win — AFTER the running totals were incremented and BEFORE
+      // setItem, so the whole write was silently discarded (stats went
+      // backwards on relaunch, totalPuzzlesCompleted stalled, and the
+      // solve-count gates that feed off it froze). Iterating the defaults means
+      // the next tier widening backfills itself.
+      if (parsed.byDifficulty) {
+        const defaultBuckets = getDefaultStats().byDifficulty;
+        for (const key of Object.keys(defaultBuckets) as Difficulty[]) {
+          if (!parsed.byDifficulty[key]) {
+            parsed.byDifficulty[key] = { completed: 0, stars: 0 };
+          }
+        }
+      } else {
+        parsed.byDifficulty = getDefaultStats().byDifficulty;
       }
       // Backward compat: add personalBests if missing from old data
       if (!parsed.personalBests) {
@@ -195,7 +212,16 @@ export async function recordPuzzleCompletion(
       statsCache!.oneStarCount += 1;
     }
 
-    // Update per-difficulty stats
+    // Update per-difficulty stats. The bucket is created on demand as well as
+    // backfilled in loadStats: this write sits AFTER the running totals are
+    // incremented and BEFORE setItem, so a missing bucket used to throw away
+    // the entire completion record, not just the per-difficulty tally.
+    if (!statsCache!.byDifficulty) {
+      statsCache!.byDifficulty = getDefaultStats().byDifficulty;
+    }
+    if (!statsCache!.byDifficulty[difficulty]) {
+      statsCache!.byDifficulty[difficulty] = { completed: 0, stars: 0 };
+    }
     statsCache!.byDifficulty[difficulty].completed += 1;
     statsCache!.byDifficulty[difficulty].stars += starsEarned;
 
