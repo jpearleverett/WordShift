@@ -167,17 +167,16 @@ const BANK_REGISTRY: Record<string, BankRegistryEntry> = {
   lex_std_mp:        { storageKey: 'wordshift_played_lex_std_mp_puzzle_ids',     loadBank: () => require('../data/lexiconBankMediumPlus').LEXICON_BANK_MEDIUM_PLUS,                    bankData: null, cache: null, idToWords: null },
   lex_std_hard:      { storageKey: 'wordshift_played_lex_std_hard_puzzle_ids',   loadBank: () => require('../data/lexiconBankHard').LEXICON_BANK_HARD,                                 bankData: null, cache: null, idToWords: null },
   lex_std_expert:    { storageKey: 'wordshift_played_lex_std_expert_puzzle_ids', loadBank: () => require('../data/lexiconBankExpert').LEXICON_BANK_EXPERT,                             bankData: null, cache: null, idToWords: null },
-  // Lexicon + REVERSE: the four larger tiers (EASY/MEDIUM/MEDIUM_PLUS/HARD) DO
-  // have banks now (added after the hours-long gated rare-reverse run). Only
-  // lex_rev_EXPERT stays ON-DEVICE: rare + reverse-solvable + 6-letter is the
-  // scarcest corner of the dictionary and it plateaued at ~1 puzzle, so
-  // getBankKey returns lex_rev_expert but the absent registry entry makes
-  // getBankForSelection return null → on-device rare-lean path (like Lexicon +
-  // Speed, which likewise has no bank).
+  // Lexicon + REVERSE: ALL five tiers now have rare banks. The four larger tiers
+  // landed first; lex_rev_EXPERT (rare + reverse-solvable + 6-letter — the
+  // scarcest corner of the dictionary) was unlocked by the rarity-aware reverse
+  // walk (rare-seeded, rare-biased), which turned a 1-board dead-end into a real
+  // 76-board bank, so it no longer falls back to the fair reverse_expert bank.
   lex_rev_easy:      { storageKey: 'wordshift_played_lex_rev_easy_puzzle_ids',    loadBank: () => require('../data/lexiconBankReverseEasy').LEXICON_BANK_REVERSE_EASY,                 bankData: null, cache: null, idToWords: null },
   lex_rev_medium:    { storageKey: 'wordshift_played_lex_rev_medium_puzzle_ids',  loadBank: () => require('../data/lexiconBankReverseMedium').LEXICON_BANK_REVERSE_MEDIUM,             bankData: null, cache: null, idToWords: null },
   lex_rev_mp:        { storageKey: 'wordshift_played_lex_rev_mp_puzzle_ids',      loadBank: () => require('../data/lexiconBankReverseMediumPlus').LEXICON_BANK_REVERSE_MEDIUM_PLUS,    bankData: null, cache: null, idToWords: null },
   lex_rev_hard:      { storageKey: 'wordshift_played_lex_rev_hard_puzzle_ids',    loadBank: () => require('../data/lexiconBankReverseHard').LEXICON_BANK_REVERSE_HARD,                 bankData: null, cache: null, idToWords: null },
+  lex_rev_expert:    { storageKey: 'wordshift_played_lex_rev_expert_puzzle_ids',  loadBank: () => require('../data/lexiconBankReverseExpert').LEXICON_BANK_REVERSE_EXPERT,             bankData: null, cache: null, idToWords: null },
   lex_ds_easy:       { storageKey: 'wordshift_played_lex_ds_easy_puzzle_ids',    loadBank: () => require('../data/lexiconBankDoubleShiftEasy').LEXICON_BANK_DOUBLE_EASY,               bankData: null, cache: null, idToWords: null },
   lex_ds_medium:     { storageKey: 'wordshift_played_lex_ds_medium_puzzle_ids',  loadBank: () => require('../data/lexiconBankDoubleShiftMedium').LEXICON_BANK_DOUBLE_MEDIUM,           bankData: null, cache: null, idToWords: null },
   lex_ds_mp:         { storageKey: 'wordshift_played_lex_ds_mp_puzzle_ids',      loadBank: () => require('../data/lexiconBankDoubleShiftMediumPlus').LEXICON_BANK_DOUBLE_MEDIUM_PLUS,  bankData: null, cache: null, idToWords: null },
@@ -283,16 +282,7 @@ function getBankKey(difficulty: Difficulty, variant: PuzzleVariant, lexicon = fa
   // Lexicon (rare-word) banks are uniform per variant x difficulty: lex_<fam>_<diff>.
   if (lexicon) {
     const fam = variant === 'double_shift' ? 'ds' : variant === 'reverse' ? 'rev' : 'std';
-    const key = `lex_${fam}_${DIFFICULTY_SUFFIX[difficulty]}`;
-    // lex_rev_expert (Lexicon + reverse + EXPERT) has NO rare bank — rare +
-    // reverse-solvable + 6-letter is the scarcest corner of the dictionary and
-    // it plateaued at ~1 board. Rather than generate on-device (a wait), serve
-    // the FAIR EXPERT-reverse bank: still 6-letter reverse-solvable (and still
-    // pays the Lexicon amber bonus), just not rare. Zero-wait beats
-    // strictly-rare for this ultra-niche 3-toggle-plus-apex combo. Remapping the
-    // KEY (not just the bank data) keeps storage/recency/extension consistent.
-    if (key === 'lex_rev_expert') return 'reverse_expert';
-    return key;
+    return `lex_${fam}_${DIFFICULTY_SUFFIX[difficulty]}`;
   }
   // Double shift variants — each difficulty has its own bank (3/4/5/6/7 rows, all 5-letter words)
   if (variant === 'double_shift') {

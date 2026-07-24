@@ -42,6 +42,7 @@ import { LEXICON_BANK_REVERSE_EASY } from '../data/lexiconBankReverseEasy';
 import { LEXICON_BANK_REVERSE_MEDIUM } from '../data/lexiconBankReverseMedium';
 import { LEXICON_BANK_REVERSE_MEDIUM_PLUS } from '../data/lexiconBankReverseMediumPlus';
 import { LEXICON_BANK_REVERSE_HARD } from '../data/lexiconBankReverseHard';
+import { LEXICON_BANK_REVERSE_EXPERT } from '../data/lexiconBankReverseExpert';
 import { LEXICON_BANK_DOUBLE_EASY } from '../data/lexiconBankDoubleShiftEasy';
 import { LEXICON_BANK_DOUBLE_MEDIUM } from '../data/lexiconBankDoubleShiftMedium';
 import { LEXICON_BANK_DOUBLE_MEDIUM_PLUS } from '../data/lexiconBankDoubleShiftMediumPlus';
@@ -89,6 +90,7 @@ describe('bank solvability (shipped rules)', () => {
     ['LEX_REV_MEDIUM', 'reverse', LEXICON_BANK_REVERSE_MEDIUM],
     ['LEX_REV_MEDIUM_PLUS', 'reverse', LEXICON_BANK_REVERSE_MEDIUM_PLUS],
     ['LEX_REV_HARD', 'reverse', LEXICON_BANK_REVERSE_HARD],
+    ['LEX_REV_EXPERT', 'reverse', LEXICON_BANK_REVERSE_EXPERT],
     ['LEX_EASY', 'standard', LEXICON_BANK_EASY],
     ['LEX_MEDIUM', 'standard', LEXICON_BANK_MEDIUM],
     ['LEX_MEDIUM_PLUS', 'standard', LEXICON_BANK_MEDIUM_PLUS],

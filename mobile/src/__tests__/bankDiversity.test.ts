@@ -81,6 +81,7 @@ import { LEXICON_BANK_REVERSE_EASY } from '../data/lexiconBankReverseEasy';
 import { LEXICON_BANK_REVERSE_MEDIUM } from '../data/lexiconBankReverseMedium';
 import { LEXICON_BANK_REVERSE_MEDIUM_PLUS } from '../data/lexiconBankReverseMediumPlus';
 import { LEXICON_BANK_REVERSE_HARD } from '../data/lexiconBankReverseHard';
+import { LEXICON_BANK_REVERSE_EXPERT } from '../data/lexiconBankReverseExpert';
 import { PreGeneratedPuzzle } from '../data/puzzleBankTypes';
 
 interface BankSpec {
@@ -154,14 +155,20 @@ const BANKS: BankSpec[] = [
   // (Lexicon) are scarcer supply. Floors ~90% of measured; caps = measured max.
   // REVERSE_EXPERT 200 / max 10 / 1182 unique
   { name: 'REVERSE_EXPERT', bank: PUZZLE_BANK_REVERSE_EXPERT, cap: 10, minUnique: 1060, minPuzzles: 180 },
-  // LEX_REV_EASY 239 / max 6 / 1193 unique
-  { name: 'LEX_REV_EASY', bank: LEXICON_BANK_REVERSE_EASY, cap: 6, minUnique: 1070, minPuzzles: 215 },
-  // LEX_REV_MEDIUM 240 / max 8 / 1392 unique
-  { name: 'LEX_REV_MEDIUM', bank: LEXICON_BANK_REVERSE_MEDIUM, cap: 8, minUnique: 1250, minPuzzles: 216 },
-  // LEX_REV_MEDIUM_PLUS 240 / max 10 / 1433 unique
-  { name: 'LEX_REV_MEDIUM_PLUS', bank: LEXICON_BANK_REVERSE_MEDIUM_PLUS, cap: 10, minUnique: 1285, minPuzzles: 216 },
-  // LEX_REV_HARD 149 / max 12 / 1128 unique (niche: rare + reverse + 5-letter)
-  { name: 'LEX_REV_HARD', bank: LEXICON_BANK_REVERSE_HARD, cap: 12, minUnique: 1010, minPuzzles: 134 },
+  // Lexicon-reverse banks REGENERATED with the rarity-aware walk (difficulty-ramped
+  // rare band, meanRank ~0.62 EASY -> ~0.75 EXPERT). Rarer vocab = slightly smaller
+  // unique pools than the pre-fix banks; floors ~90% of measured.
+  // LEX_REV_EASY 240 / max 6 / 1127 unique
+  { name: 'LEX_REV_EASY', bank: LEXICON_BANK_REVERSE_EASY, cap: 6, minUnique: 1010, minPuzzles: 216 },
+  // LEX_REV_MEDIUM 240 / max 8 / 1243 unique
+  { name: 'LEX_REV_MEDIUM', bank: LEXICON_BANK_REVERSE_MEDIUM, cap: 8, minUnique: 1115, minPuzzles: 216 },
+  // LEX_REV_MEDIUM_PLUS 240 / max 10 / 1289 unique
+  { name: 'LEX_REV_MEDIUM_PLUS', bank: LEXICON_BANK_REVERSE_MEDIUM_PLUS, cap: 10, minUnique: 1155, minPuzzles: 216 },
+  // LEX_REV_HARD 240 / max 12 / 1313 unique (grew 149 -> 240 with the rarity-aware walk)
+  { name: 'LEX_REV_HARD', bank: LEXICON_BANK_REVERSE_HARD, cap: 12, minUnique: 1180, minPuzzles: 216 },
+  // LEX_REV_EXPERT 76 / max 10 / 409 unique (rare + reverse + 6-letter — the
+  // scarcest corner; the rarity-aware walk turned a 1-board dead-end into a bank)
+  { name: 'LEX_REV_EXPERT', bank: LEXICON_BANK_REVERSE_EXPERT, cap: 10, minUnique: 365, minPuzzles: 68 },
 ];
 
 /** All words a player sees in a puzzle: the starting chain + every formed word. */

@@ -414,10 +414,9 @@ describe('puzzleBank', () => {
       expect(speed!.reverseSolution).toBeUndefined(); // standard-shaped, not reverse
     });
 
-    it('serves Lexicon+reverse+EXPERT from the fair EXPERT-reverse bank (no rare bank exists)', async () => {
-      // lex_rev_expert has no rare bank (scarcest supply); getBankKey remaps it
-      // to reverse_expert so the combo is instant instead of on-device. It stays
-      // a 6-letter reverse board (just not rare).
+    it('serves Lexicon+reverse+EXPERT from its own rare bank (rarity-aware gen)', async () => {
+      // lex_rev_expert now has a real rare bank (the rarity-aware reverse walk
+      // unlocked it — rare-seeded, rare-biased). 6-letter reverse-solvable board.
       const board = await selectPreGeneratedPuzzle('EXPERT', 0, emptyRecencyMap(), 'reverse', 0, { lexicon: true });
       expect(board).not.toBeNull();
       expect(board!.wordLength).toBe(6);
