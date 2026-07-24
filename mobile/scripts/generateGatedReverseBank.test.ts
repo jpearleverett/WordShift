@@ -90,6 +90,22 @@ const CONFIG: ReverseBankConfig = LEXICON
     }
   : BASE_CONFIG;
 const RARITY_LEAN = LEXICON ? 2 : 0; // EXPERT (a difficulty) keeps the fair default scorer
+// Lower edge of the rarity-aware reverse walk's "uncommon but fair" band, RAMPED
+// per difficulty so the Lexicon-reverse rarity climbs gently EASY -> EXPERT (a
+// flat band collapses the ramp — EASY would read as rare as EXPERT). The walk's
+// resulting MEAN displayed rank lands ~0.10-0.12 above this floor; these values
+// target the intended ramp (~0.55 EASY -> ~0.72 EXPERT) while the featuredFloorMean
+// post-gate still enforces each difficulty's hard minimum. Only used under LEXICON.
+// Calibrated so the walk's MEAN displayed rank tracks the lexicon-standard ramp
+// (~0.575 EASY -> ~0.73 EXPERT). The mean lands above the floor by a
+// length-dependent offset (~+0.22 at 4 letters, ~+0.11 at 6), so shorter tiers
+// need a lower floor; the featuredFloorMean post-gate still guarantees each
+// tier's hard minimum, so an imperfect floor only shifts how far ABOVE the
+// minimum the mean sits, never below it.
+const LEXICON_RARE_BAND_LO: Record<BankName, number> = {
+  EASY: 0.35, MEDIUM: 0.38, MEDIUM_PLUS: 0.49, HARD: 0.52, EXPERT: 0.60,
+};
+const RARE_BAND_LO = LEXICON ? LEXICON_RARE_BAND_LO[BANK_NAME] : 0.60;
 
 const RUN_DEADLINE_MS = Number(process.env.GATED_SMOKE_MS ?? process.env.GATED_RUN_MS ?? 540_000);
 const FEATURED_TRANSIENT_CEILING = LEXICON ? 0.97 : 0.99;
@@ -291,7 +307,7 @@ describe(`Gated Reverse Regeneration — ${BANK_NAME}`, () => {
         phaseAttempts++; runAttempts++;
         checkpoint.phaseAttempts[phaseStr] = phaseAttempts;
         try {
-          const puzzle = await generateLocalPuzzle(CONFIG.difficulty, { requireReverseSolvable: true, rarityLean: RARITY_LEAN });
+          const puzzle = await generateLocalPuzzle(CONFIG.difficulty, { requireReverseSolvable: true, rarityLean: RARITY_LEAN, rareBandLo: RARE_BAND_LO });
           if (!puzzle.reverseSolution || puzzle.reverseSolution.length === 0) { rejectedNoReverse++; continue; }
 
           const chainKey = puzzle.words.join('-');

@@ -569,6 +569,14 @@ let currentDreadPhase: DialoguePhase = 0;
 // Default 0 leaves every normal EASY-HARD board unchanged.
 let currentRarityLean = 0;
 
+// Lower edge of the "uncommon but fair" band the rarity-aware REVERSE walk seeds
+// and steers toward (getFeaturedRank scale; the upper edge is fixed at 0.86, the
+// obscure-tail cutoff). Difficulty-dependent so the Lexicon-reverse rarity RAMPS
+// (gentle EASY -> distinctly rarer EXPERT) instead of collapsing to one flat
+// band. Set per generation via the rareBandLo override; default 0.60 suits the
+// apex tiers. Only consulted when currentRarityLean > 0.
+let currentReverseRareBandLo = 0.60;
+
 /**
  * Score how "interesting" a word is (0-100)
  * Higher = more interesting/fun to play with
@@ -1183,7 +1191,7 @@ async function generateReverseChain(
   // 1 = rarest; [RARE_LO, RARE_HI] is the "uncommon but fair" band — above the
   // mainstream, below the obscure validity-only inflection tail.
   const rareLean = currentRarityLean > 0;
-  const RARE_LO = 0.60, RARE_HI = 0.86;
+  const RARE_LO = currentReverseRareBandLo, RARE_HI = 0.86;
   const inRareBand = (w: string): boolean => {
     const r = getFeaturedRank(w);
     return r >= RARE_LO && r <= RARE_HI;
@@ -1367,7 +1375,7 @@ export function pickMultiRouteCandidate<T extends { score: number }>(
 
 export const generateLocalPuzzle = async (
   difficulty: Difficulty = 'MEDIUM',
-  overrides?: { wordLength?: number; targetRows?: number; startWord?: string; requireReverseSolvable?: boolean; relaxBoring?: boolean; rarityLean?: number }
+  overrides?: { wordLength?: number; targetRows?: number; startWord?: string; requireReverseSolvable?: boolean; relaxBoring?: boolean; rarityLean?: number; rareBandLo?: number }
 ): Promise<PuzzleConfig> => {
   const targetRows = overrides?.targetRows ?? (
     difficulty === 'EASY' ? 3 :
@@ -1389,6 +1397,7 @@ export const generateLocalPuzzle = async (
   // Rarity lean (0 off / 1 mild-EXPERT / 2 strong-Lexicon). Set per call; every
   // generation resets it so no lean leaks across calls (mirrors currentDreadPhase).
   currentRarityLean = overrides?.rarityLean ?? 0;
+  currentReverseRareBandLo = overrides?.rareBandLo ?? 0.60;
 
   // Load word history for diversity scoring
   const recencyMap = await getWordHistoryWithRecency();
