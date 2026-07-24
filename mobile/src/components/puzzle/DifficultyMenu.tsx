@@ -264,6 +264,10 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   const dark = phase >= 3;
   const title = phase >= 3 ? 'ARRANGEMENT SETUP' : 'PUZZLE SETUP';
   const styleTitle = phase >= 3 ? 'ARRANGEMENT STYLE' : 'PUZZLE STYLE';
+  // Header over the stackable modifier toggles (Challenge / Blind / Lexicon /
+  // Weave) so they read as optional add-ons, distinct from the single-select
+  // DIFFICULTY and STYLE sections above. Phase-aware like the other headers.
+  const modifierTitle = phase >= 3 ? 'TRIALS' : 'MODIFIERS';
   // Locked options render as visibly locked rows (teased, non-selectable) so
   // the next mechanical goal is always on screen.
   const coreOptions = variantOptions.filter(option => option.group === 'core');
@@ -496,6 +500,7 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
         {showChallengeToggle && !introMode && (
           <>
             <View style={[styles.sectionDivider, { backgroundColor: t.sectionBorder }]} />
+            <Text style={[styles.sectionTitle, { color: t.muted }]}>{modifierTitle}</Text>
 
             <TouchableOpacity
               style={[
@@ -582,7 +587,7 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
             onPress={onToggleBlindMode}
             accessibilityRole="button"
             accessibilityState={{ selected: blindActive }}
-            accessibilityLabel={`Blind offering, ${blindActive ? 'on' : 'off'}`}
+            accessibilityLabel={`${phase >= 3 ? 'Blind offering' : 'Blind mode'}, ${blindActive ? 'on' : 'off'}. No guidance, judged at the end. 2x amber.`}
           >
             <ModeIcon
               glyph={blindActive ? '🌑' : '👁️'}
@@ -599,9 +604,7 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
                 {phase >= 3 ? 'BLIND OFFERING' : 'BLIND MODE'}
               </Text>
               <Text style={[styles.challengeMenuDesc, { color: t.muted }]}>
-                {blindActive
-                  ? 'No hints, no previews, free shifts. Judged once, at the end. 2x amber.'
-                  : 'No hints, no previews, free shifts, judged only at the end, 2x amber'}
+                No guidance, judged at the end. 2x amber.
               </Text>
             </View>
           </TouchableOpacity>
@@ -646,7 +649,7 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
             onPress={onToggleLexiconMode}
             accessibilityRole="button"
             accessibilityState={{ selected: lexiconActive }}
-            accessibilityLabel={`Lexicon rare-word mode, ${lexiconActive ? 'on' : 'off'}. Rarer words, on any style.`}
+            accessibilityLabel={`Lexicon rare-word mode, ${lexiconActive ? 'on' : 'off'}. Rarer words, on any style. +40% amber.`}
           >
             <ModeIcon
               glyph={'📖'}
@@ -664,8 +667,8 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
               </Text>
               <Text style={[styles.challengeMenuDesc, { color: t.muted }]}>
                 {phase >= 3
-                  ? 'Rarer, stranger words, on any style. The older pages.'
-                  : 'Rarer words, on any difficulty or style.'}
+                  ? 'Rarer, stranger words. The older pages. +40% amber.'
+                  : 'Rarer words, on any style. +40% amber.'}
               </Text>
             </View>
           </TouchableOpacity>
