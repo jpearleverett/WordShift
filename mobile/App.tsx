@@ -182,7 +182,7 @@ import { recordInterstitialSeen, consumePatronNudge, armRemoveAdsNudgeIfEligible
 import { createRevenueCatBillingProvider } from './src/services/providers/revenueCatBilling';
 import { createAdMobAdProvider } from './src/services/providers/googleAdMobAds';
 import { installGlobalErrorHandler, setErrorForwarder } from './src/services/errorReporting';
-import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST, STARTER_INTRO_MIN_PUZZLES, FINALE_DWELL_PUZZLES, INTERSTITIAL_MIN_PUZZLES, HOUSE_ASK_MIN_PUZZLES, HOUSE_ASK_CHANCE, HOUSE_ASK_REWARD_AMBER, REWARDED_HINT_GRANT } from './src/constants/gameBalance';
+import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST, STARTER_INTRO_MIN_PUZZLES, FINALE_DWELL_PUZZLES, INTERSTITIAL_MIN_PUZZLES, HOUSE_ASK_MIN_PUZZLES, HOUSE_ASK_CHANCE, HOUSE_ASK_REWARD_AMBER, REWARDED_HINT_GRANT, EXPERT_DIFFICULTY_UNLOCK_PUZZLES } from './src/constants/gameBalance';
 import { pickHouseAsk, evaluateHouseAsk, HouseAsk } from './src/services/houseAsks';
 import { getCumulativeStats } from './src/services/starRating';
 
@@ -4452,6 +4452,8 @@ function MainApp() {
             showBlindToggle={puzzlesSolvedForVariantUnlocks >= CHALLENGE_TOGGLE_UNLOCK_PUZZLES}
             blindLocked={puzzlesSolvedForVariantUnlocks < BLIND_TOGGLE_UNLOCK_PUZZLES}
             blindUnlockHint={getBlindUnlockHint(puzzlesSolvedForVariantUnlocks, persistence.currentPhase)}
+            expertLocked={puzzlesSolvedForVariantUnlocks < EXPERT_DIFFICULTY_UNLOCK_PUZZLES}
+            expertUnlockHint={`6-letter apex. Opens at ${EXPERT_DIFFICULTY_UNLOCK_PUZZLES} (you're at ${puzzlesSolvedForVariantUnlocks})`}
             showUnbrokenWeave={persistence.currentPhase === 5}
             unbrokenWeaveActive={puzzle.unbrokenWeaveMode}
             onToggleUnbrokenWeave={handleToggleUnbrokenWeave}

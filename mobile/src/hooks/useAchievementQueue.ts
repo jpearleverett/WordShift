@@ -54,6 +54,7 @@ export function useAchievementQueue(): [AchievementQueueState, AchievementQueueA
             MEDIUM: { completed: 0, stars: 0 },
             MEDIUM_PLUS: { completed: 0, stars: 0 },
             HARD: { completed: 0, stars: 0 },
+            EXPERT: { completed: 0, stars: 0 },
           },
           lastUpdated: 0,
         },

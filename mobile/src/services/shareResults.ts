@@ -133,6 +133,7 @@ function difficultyEmoji(difficulty: Difficulty): string {
     case 'MEDIUM': return '🟡';
     case 'MEDIUM_PLUS': return '🟠';
     case 'HARD': return '🔴';
+    case 'EXPERT': return '🟣';
   }
 }
 

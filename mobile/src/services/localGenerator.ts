@@ -1312,12 +1312,14 @@ export const generateLocalPuzzle = async (
     difficulty === 'EASY' ? 3 :
     difficulty === 'MEDIUM' ? 4 :
     difficulty === 'MEDIUM_PLUS' ? 4 :
+    difficulty === 'EXPERT' ? 5 :
     5 // HARD
   );
   const wordLength = overrides?.wordLength ?? (
     difficulty === 'EASY' ? 4 :
     difficulty === 'MEDIUM' ? 4 :
     difficulty === 'MEDIUM_PLUS' ? 5 :
+    difficulty === 'EXPERT' ? 6 : // apex: 6-letter words (transients 5/7 both exist)
     5 // HARD
   );
   const forcedStartWord = overrides?.startWord?.toUpperCase();
@@ -3000,7 +3002,8 @@ export async function generateDoubleShiftPuzzle(
     difficulty === 'EASY' ? 3 :
     difficulty === 'MEDIUM' ? 4 :
     difficulty === 'MEDIUM_PLUS' ? 5 :
-    6 // HARD
+    difficulty === 'EXPERT' ? 7 : // apex: 6L double-shift is impossible (needs 8-letter
+    6 // HARD                     // grow-targets), so differentiate by a longer 7-row chain
   );
 
   const recencyMap = await getWordHistoryWithRecency();

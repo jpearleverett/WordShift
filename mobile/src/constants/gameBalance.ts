@@ -66,11 +66,12 @@ export const MIN_PUZZLES_FOR_PHASE: Record<DialoguePhase, number> = {
 // ============================================================================
 
 /** Base amber reward per difficulty level. */
-export const AMBER_REWARDS: { EASY: number; MEDIUM: number; MEDIUM_PLUS: number; HARD: number } = {
+export const AMBER_REWARDS: Record<Difficulty, number> = {
   EASY: 8,
   MEDIUM: 10,
   MEDIUM_PLUS: 15,
   HARD: 20,
+  EXPERT: 28, // apex 6-letter tier
 };
 
 /**
@@ -78,11 +79,12 @@ export const AMBER_REWARDS: { EASY: number; MEDIUM: number; MEDIUM_PLUS: number;
  * Creates small windfall moments that feel exciting and incentivize
  * trying harder difficulties.
  */
-export const FIRST_COMPLETION_BONUS: { EASY: number; MEDIUM: number; MEDIUM_PLUS: number; HARD: number } = {
+export const FIRST_COMPLETION_BONUS: Record<Difficulty, number> = {
   EASY: 10,
   MEDIUM: 20,
   MEDIUM_PLUS: 30,
   HARD: 50,
+  EXPERT: 75,
 };
 
 /** Challenge mode amber multiplier (applied on top of base + star bonuses). */
@@ -120,11 +122,12 @@ export const PATRON_AMBER_BONUS = 2;
 export const SURPRISE_BONUS_CHANCE = 0.12;
 
 /** Flat surprise amber granted (scaled by difficulty) when the bonus fires. */
-export const SURPRISE_BONUS_AMOUNTS: { EASY: number; MEDIUM: number; MEDIUM_PLUS: number; HARD: number } = {
+export const SURPRISE_BONUS_AMOUNTS: Record<Difficulty, number> = {
   EASY: 6,
   MEDIUM: 8,
   MEDIUM_PLUS: 12,
   HARD: 16,
+  EXPERT: 20,
 };
 
 /**
@@ -546,6 +549,7 @@ export const CHALLENGE_MODE_CONFIG = {
       case 'MEDIUM': return 2;
       case 'MEDIUM_PLUS': return 1;
       case 'HARD': return 1;
+      case 'EXPERT': return 1;
     }
   },
   // Amber reward multiplier for challenge completions (previews on)
@@ -656,6 +660,16 @@ export const MAX_USED_TRACKED = 500;
 export const DAILY_CHALLENGE_UNLOCK_PUZZLES = 8;
 
 /**
+ * EXPERT difficulty gate: the 6-letter apex tier is the first (and only) gated
+ * difficulty. It unlocks after this many total puzzles solved — deep enough
+ * that the player has mastered HARD and the core verb, so six-letter boards
+ * (more tiles to track, longer chains, a rarer-but-fair vocabulary band) read
+ * as an earned step up, not an early wall. Tunable; between HARD-comfort and
+ * the Blind Offering apex (80).
+ */
+export const EXPERT_DIFFICULTY_UNLOCK_PUZZLES = 50;
+
+/**
  * One-time hint mercy granted when the player starts their very first Daily
  * Challenge. The daily is always HARD; a small hint cushion softens that first
  * collision. Convenience only: hints still cost stars, and the puzzle itself
@@ -686,6 +700,7 @@ export const SPEED_TIME_LIMITS: Record<string, number> = {
   MEDIUM: 60,
   MEDIUM_PLUS: 54,
   HARD: 48,
+  EXPERT: 44, // 6-letter boards take longer to read — but expert, so still tight
 };
 
 // ============================================================================

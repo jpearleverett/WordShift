@@ -410,6 +410,7 @@ export interface AmberReward {
   MEDIUM: number;
   MEDIUM_PLUS: number;
   HARD: number;
+  EXPERT: number;
 }
 
 /**

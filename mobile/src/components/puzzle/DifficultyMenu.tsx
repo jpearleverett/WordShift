@@ -83,10 +83,13 @@ const DIFFICULTY_RING_COLORS: Record<Difficulty, string> = {
   MEDIUM: CandyColors.yellow.main,
   MEDIUM_PLUS: CandyColors.orange.main,
   HARD: CandyColors.red.main,
+  EXPERT: CandyColors.purple.main,
 };
 
-/** Canonical difficulty order — the setup rows and the header chip share it. */
-export const DIFFICULTY_LEVELS: readonly Difficulty[] = ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'];
+/** Canonical difficulty order — the setup rows and the header chip share it.
+ * EXPERT (6-letter apex) is last and is gated: it renders as a locked row with
+ * a countdown until EXPERT_UNLOCK_PUZZLES solves (see the row rendering). */
+export const DIFFICULTY_LEVELS: readonly Difficulty[] = ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD', 'EXPERT'];
 
 /** True only for the four real Difficulty union values. */
 export function isValidDifficulty(value: unknown): value is Difficulty {
@@ -139,6 +142,9 @@ interface DifficultyMenuProps {
   /** Blind toggle visible but not yet earned: render a teased locked row. */
   blindLocked?: boolean;
   blindUnlockHint?: string;
+  /** EXPERT (6-letter) difficulty gated: render a teased locked row until earned. */
+  expertLocked?: boolean;
+  expertUnlockHint?: string;
   unbrokenWeaveActive?: boolean;
   onToggleUnbrokenWeave?: () => void;
   showUnbrokenWeave?: boolean;
@@ -166,6 +172,8 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   showBlindToggle = false,
   blindLocked = false,
   blindUnlockHint,
+  expertLocked = false,
+  expertUnlockHint,
   unbrokenWeaveActive = false,
   onToggleUnbrokenWeave,
   showUnbrokenWeave = false,
@@ -404,28 +412,38 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
         showsVerticalScrollIndicator={true}
       >
         <Text style={[styles.sectionTitle, { color: t.muted }]}>DIFFICULTY</Text>
-        {DIFFICULTY_LEVELS.map(d => (
-          <TouchableOpacity
-            key={d}
-            style={[styles.menuRow, currentDifficulty === d && selectedRowStyle]}
-            onPress={() => onSelectDifficulty(d)}
-            accessibilityRole="button"
-            accessibilityState={{ selected: currentDifficulty === d }}
-            accessibilityLabel={`${d === 'MEDIUM_PLUS' ? 'Medium Plus' : d.charAt(0) + d.slice(1).toLowerCase()} difficulty${currentDifficulty === d ? ', selected' : ''}`}
-          >
-            <View
-              style={[styles.difficultyRing, { borderColor: DIFFICULTY_RING_COLORS[d] }]}
-            />
-            <Text
-              style={[
-                styles.menuRowText,
-                { color: currentDifficulty === d ? t.title : t.body },
-              ]}
+        {DIFFICULTY_LEVELS.map(d => {
+          const locked = d === 'EXPERT' && expertLocked;
+          const label = d === 'MEDIUM_PLUS' ? 'Medium Plus' : d.charAt(0) + d.slice(1).toLowerCase();
+          return (
+            <TouchableOpacity
+              key={d}
+              style={[styles.menuRow, currentDifficulty === d && selectedRowStyle, locked && styles.lockedRow]}
+              onPress={() => { if (!locked) onSelectDifficulty(d); }}
+              disabled={locked}
+              accessibilityRole="button"
+              accessibilityState={{ selected: currentDifficulty === d, disabled: locked }}
+              accessibilityLabel={locked
+                ? `Expert difficulty, locked. ${expertUnlockHint ?? ''}`
+                : `${label} difficulty${currentDifficulty === d ? ', selected' : ''}`}
             >
-              {d === 'MEDIUM_PLUS' ? 'MED+' : d}
-            </Text>
-          </TouchableOpacity>
-        ))}
+              <View
+                style={[styles.difficultyRing, { borderColor: DIFFICULTY_RING_COLORS[d], opacity: locked ? 0.4 : 1 }]}
+              />
+              <Text
+                style={[
+                  styles.menuRowText,
+                  { color: locked ? t.muted : (currentDifficulty === d ? t.title : t.body) },
+                ]}
+              >
+                {locked ? '🔒 ' : ''}{d === 'MEDIUM_PLUS' ? 'MED+' : d}
+              </Text>
+              {locked && expertUnlockHint ? (
+                <Text style={[styles.lockedHintText, { color: t.muted }]}>{expertUnlockHint}</Text>
+              ) : null}
+            </TouchableOpacity>
+          );
+        })}
 
         {introMode && introHintText ? (
           <View

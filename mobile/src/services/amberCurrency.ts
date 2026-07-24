@@ -495,8 +495,8 @@ export function calculatePhaseAcceleration(
     multiplier *= NARRATIVE_ACCELERATION.STREAK_MULTIPLIER;
   }
 
-  // Difficulty bonus
-  if (difficulty === 'HARD') {
+  // Difficulty bonus (EXPERT, the 6-letter apex, shares HARD's accel bonus)
+  if (difficulty === 'HARD' || difficulty === 'EXPERT') {
     multiplier *= NARRATIVE_ACCELERATION.HARD_MULTIPLIER;
   } else if (difficulty === 'MEDIUM_PLUS') {
     multiplier *= NARRATIVE_ACCELERATION.MEDIUM_PLUS_MULTIPLIER;
