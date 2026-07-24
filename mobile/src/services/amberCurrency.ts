@@ -553,6 +553,12 @@ export async function awardPuzzleAmber(
     /** Blind Offering win (challenge limits + end-judged blind play): pays the
      *  apex amber multiplier and the 2.0x phase-progress cap. */
     blind?: boolean;
+    /** The undo-limit ("Challenge") constraint was ALSO active. Only meaningful
+     *  alongside `blind`: the two stack, and Blind+Challenge (previews hidden
+     *  AND undos capped) pays a small premium over Blind alone, which frees
+     *  undos entirely. AMBER ONLY — phase acceleration stays at blind's 2.0x
+     *  cap either way. */
+    undoLimited?: boolean;
     /** Lexicon (rare-word) win: pays the LEXICON_AMBER_MULTIPLIER bonus on the
      *  subtotal. Amber-only, REWARD-only — NEVER feeds phase progression. */
     lexicon?: boolean;
@@ -624,14 +630,21 @@ export async function awardPuzzleAmber(
   let totalAmount = Math.floor(baseAmount * streakMultiplier);
   const streakBonus = totalAmount - baseAmount;
 
-  // Apply the trial-rung bonus. Blind Offering (challenge limits + previews
-  // hidden + end-judged free moves) is the apex rung and pays the top
-  // multiplier; plain Challenge (previews on) pays the modest one. Never
-  // stacked: a blind board runs under gameMode 'challenge'.
+  // Apply the trial-rung bonus. `gameMode === 'challenge'` is the shared
+  // no-hints umbrella, engaged whenever EITHER constraint is on, so the rung is
+  // chosen from the two INDEPENDENT flags:
+  //   Challenge alone (previews on, undos capped) .......... 1.25x
+  //   Blind alone (previews hidden, undos FREE) ............ 2.00x
+  //   Blind + Challenge (hidden AND capped) — maximal ...... 2.25x
+  // The stacked tier exists because the decoupling made Blind-alone strictly
+  // easier than the pair (it frees undos), yet both paid 2.0x. Amber only:
+  // phase acceleration keeps blind's 2.0x cap in every case.
   let challengeBonus = 0;
   if (gameMode === 'challenge') {
     const rungMultiplier = options.blind
-      ? CHALLENGE_MODE_CONFIG.BLIND_AMBER_MULTIPLIER
+      ? (options.undoLimited
+          ? CHALLENGE_MODE_CONFIG.BLIND_CHALLENGE_AMBER_MULTIPLIER
+          : CHALLENGE_MODE_CONFIG.BLIND_AMBER_MULTIPLIER)
       : CHALLENGE_MODE_CONFIG.AMBER_MULTIPLIER;
     challengeBonus = Math.floor(totalAmount * (rungMultiplier - 1));
     totalAmount += challengeBonus;

@@ -1445,6 +1445,47 @@ describe('phase_reached telemetry', () => {
   });
 });
 
+describe('trial-rung amber ladder (Challenge / Blind / stacked)', () => {
+  // The three rungs must be strictly increasing. Blind ALONE frees undos, so
+  // Blind+Challenge is strictly harder and has to pay more — before the stacked
+  // tier existed both paid 2.0x and the extra undo cap was worth nothing.
+  async function rungBonus(opts: { blind?: boolean; undoLimited?: boolean }) {
+    await clearProgress();
+    const r = await awardPuzzleAmber('HARD', 3, 'challenge', 0, true, opts);
+    return r.challengeBonus;
+  }
+
+  test('Challenge < Blind < Blind+Challenge, strictly increasing', async () => {
+    const challengeOnly = await rungBonus({ undoLimited: true });
+    const blindOnly = await rungBonus({ blind: true });
+    const stacked = await rungBonus({ blind: true, undoLimited: true });
+
+    expect(challengeOnly).toBeGreaterThan(0);
+    expect(blindOnly).toBeGreaterThan(challengeOnly);
+    expect(stacked).toBeGreaterThan(blindOnly);
+  });
+
+  test('the stacked premium is modest, not a second doubling', async () => {
+    const blindOnly = await rungBonus({ blind: true });
+    const stacked = await rungBonus({ blind: true, undoLimited: true });
+    // 2.25x vs 2.00x on the same subtotal: the bonus grows by ~25% of base,
+    // well under a further doubling of the blind bonus itself.
+    expect(stacked).toBeLessThan(blindOnly * 1.5);
+  });
+
+  test('stacking pays amber but NEVER buys extra phase progress', async () => {
+    // Blind is the 2.0x pacing cap; stacking Challenge on top must not exceed it.
+    await clearProgress();
+    const blindOnly = await awardPuzzleAmber('HARD', 3, 'challenge', 0, true, { blind: true });
+    await clearProgress();
+    const stacked = await awardPuzzleAmber('HARD', 3, 'challenge', 0, true, {
+      blind: true,
+      undoLimited: true,
+    });
+    expect(stacked.phaseAcceleration).toBe(blindOnly.phaseAcceleration);
+  });
+});
+
 describe('journal intro tracking', () => {
   test('hasSeenJournalIntro returns false initially', async () => {
     expect(await hasSeenJournalIntro()).toBe(false);

@@ -61,6 +61,15 @@ const CONFIG: DoubleBankConfig = LEXICON
       liveFileName: `lexiconBankDoubleShift${BANK_NAME.split('_').map(s => s.charAt(0) + s.slice(1).toLowerCase()).join('')}.ts`,
       featuredCeiling: 0.86, // fair ceiling: excludes the obscure inflection tail
       featuredFloorMean: LEXICON_FLOOR_BY_BANK[BANK_NAME],
+      // Lexicon + double-shift + EXPERT is the scarcest corner in the game: a
+      // 7-row chain where EVERY step moves two letters, drawn from a rare band
+      // (mean rank >= 0.70) under a fair ceiling (<= 0.86). At the shared cap of
+      // 10 the run plateaued at 62 boards with the word-usage cap accounting for
+      // most rejections — the eligible rare 5-letter vocabulary is simply small,
+      // so the cap binds long before the search does. 15 is the same relief that
+      // took lex_rev_expert from a 76-board plateau to 114 with its rarity ramp
+      // intact; bankDiversity's per-bank cap row must match.
+      wordCap: BANK_NAME === 'EXPERT' ? 15 : BASE_CONFIG.wordCap,
     }
   : BASE_CONFIG;
 const RARITY_LEAN = LEXICON ? 2 : 0; // EXPERT (a difficulty) keeps the fair default scorer
@@ -129,7 +138,14 @@ import { PreGeneratedPuzzle } from '../src/data/puzzleBankTypes';
 
 // EXPERT double (5-letter, 7 rows) is the scarcest double board (a longer chain
 // + the rarity lean), so it targets a smaller total; recycling handles it.
-const PHASE_TARGETS: Record<number, number> = LEXICON
+const PHASE_TARGETS: Record<number, number> = LEXICON && BANK_NAME === 'EXPERT'
+  // Front-loaded like the lexicon-reverse EXPERT bank: the dread-leaning phase
+  // buckets are far harder to fill in this corner (rare + two-letter moves +
+  // 7 rows), and an evenly-split target spends the whole attempt budget
+  // starving on phases 3-4 while phase 0-1 still has room. Bias the budget to
+  // where boards actually exist; phase-aware selection degrades gracefully.
+  ? { 0: 140, 1: 45, 2: 35, 3: 25, 4: 15 }  // 260
+  : LEXICON
   ? { 0: 70, 1: 55, 2: 55, 3: 55, 4: 30 }   // 265
   : BANK_NAME === 'EXPERT'
   ? { 0: 70, 1: 55, 2: 55, 3: 55, 4: 30 }   // 265

@@ -148,8 +148,12 @@ const BANKS: BankSpec[] = [
   { name: 'LEX_DS_MEDIUM_PLUS', bank: LEXICON_BANK_DOUBLE_MEDIUM_PLUS, cap: 8, minUnique: 1160, minPuzzles: 238 },
   // LEX_DS_HARD 195 / max 10 / 1163 unique
   { name: 'LEX_DS_HARD', bank: LEXICON_BANK_DOUBLE_HARD, cap: 10, minUnique: 985, minPuzzles: 175 },
-  // LEX_DS_EXPERT 62 / max 6 / 552 unique (niche combo)
-  { name: 'LEX_DS_EXPERT', bank: LEXICON_BANK_DOUBLE_EXPERT, cap: 10, minUnique: 470, minPuzzles: 55 },
+  // LEX_DS_EXPERT 99 / max 9 / 762 unique. Regenerated 2026-07-24 (62 -> 99)
+  // under a raised word cap (10 -> 15): rare + two-letter moves + a 7-row chain
+  // is the scarcest corner in the game, and the cap bound long before the
+  // search did. Acceptance exhausted at 99 (23 -> 4 -> 0 -> 0 across runs), so
+  // this is the practical ceiling without relaxing the rarity floor.
+  { name: 'LEX_DS_EXPERT', bank: LEXICON_BANK_DOUBLE_EXPERT, cap: 15, minUnique: 685, minPuzzles: 89 },
   // Reverse apex banks (2026-07 gated rare/reverse run). Smaller than the E/M/MP/H
   // reverse banks — fair 6-letter reverse (EXPERT) and rare reverse-solvable
   // (Lexicon) are scarcer supply. Floors ~90% of measured; caps = measured max.

@@ -2179,7 +2179,10 @@ function MainApp() {
           (result.undoLimited ?? false) &&
           (result.blind ?? false) &&
           (result.variant ?? 'standard') !== 'standard' &&
-          (result.lexicon ?? false)
+          (result.lexicon ?? false),
+        // Undo-limit ("Challenge") constraint. Stacked with blind it pays the
+        // maximal-trial amber rate; alone it is already priced by gameMode.
+        result.undoLimited ?? false
       );
 
       // Aggregate social proof: contribute this puzzle's words to the global

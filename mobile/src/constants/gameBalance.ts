@@ -556,6 +556,13 @@ export const CHALLENGE_MODE_CONFIG = {
   AMBER_MULTIPLIER: 1.25,
   // Amber reward multiplier for Blind Offering completions (the apex rung)
   BLIND_AMBER_MULTIPLIER: 2.0,
+  // Blind + Challenge STACKED (previews hidden AND the undo budget imposed) —
+  // the maximal trial. Strictly harder than Blind alone, which frees undos, so
+  // it pays slightly more. Deliberately a small step (+0.25, not a doubling):
+  // the two constraints overlap in difficulty, and amber is a reward lever, not
+  // a progression one. Phase acceleration is NOT raised to match — blind's 2.0x
+  // is the pacing cap and stacking must never buy a faster descent.
+  BLIND_CHALLENGE_AMBER_MULTIPLIER: 2.25,
   // No hints allowed in challenge mode
   HINTS_ALLOWED: false,
 };

@@ -627,17 +627,24 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
               <View
                 style={[styles.difficultyRing, { borderColor: DIFFICULTY_RING_COLORS[d], opacity: locked ? 0.4 : 1 }]}
               />
-              <Text
-                style={[
-                  styles.menuRowText,
-                  { color: locked ? t.muted : (currentDifficulty === d ? t.title : t.body) },
-                ]}
-              >
-                {locked ? '🔒 ' : ''}{d === 'MEDIUM_PLUS' ? 'MED+' : d}
-              </Text>
-              {locked && expertUnlockHint ? (
-                <Text style={[styles.lockedHintText, { color: t.muted }]}>{expertUnlockHint}</Text>
-              ) : null}
+              {/* Title + tease share a flexing column, matching the Blind and
+                  Lexicon locked rows. Previously the hint was a bare sibling
+                  inside a non-wrapping flex ROW with no flex of its own, so the
+                  ~40-character EXPERT tease overflowed the ~110dp remainder of
+                  the 290dp panel and clipped. */}
+              <View style={styles.difficultyRowContent}>
+                <Text
+                  style={[
+                    styles.menuRowText,
+                    { color: locked ? t.muted : (currentDifficulty === d ? t.title : t.body) },
+                  ]}
+                >
+                  {locked ? '🔒 ' : ''}{d === 'MEDIUM_PLUS' ? 'MED+' : d}
+                </Text>
+                {locked && expertUnlockHint ? (
+                  <Text style={[styles.lockedHintText, { color: t.muted }]}>{expertUnlockHint}</Text>
+                ) : null}
+              </View>
             </TouchableOpacity>
           );
         })}
@@ -725,11 +732,13 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
                   CHALLENGE
                 </Text>
                 <Text style={[styles.challengeMenuDesc, { color: t.muted }]}>
-                  {challengeActive
-                    ? blindActive
-                      ? 'No hints, limited undos, blind: the maximal trial'
-                      : 'No hints, limited undos, 1.25x amber'
-                    : 'No hints, limited undos, +25% amber'}
+                  {/* One notation everywhere (+N% amber): the row used to flip
+                      between "+25%" and "1.25x" for the SAME bonus depending on
+                      its own state, and dropped the figure entirely when
+                      stacked. Stacked with Blind it now names the real rate. */}
+                  {challengeActive && blindActive
+                    ? 'No hints, no guidance, limited undos. +125% amber.'
+                    : 'No hints, limited undos. +25% amber.'}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -778,7 +787,7 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
             onPress={onToggleBlindMode}
             accessibilityRole="button"
             accessibilityState={{ selected: blindActive }}
-            accessibilityLabel={`${phase >= 3 ? 'Blind offering' : 'Blind mode'}, ${blindActive ? 'on' : 'off'}. No guidance, judged at the end. 2x amber.`}
+            accessibilityLabel={`${phase >= 3 ? 'Blind offering' : 'Blind mode'}, ${blindActive ? 'on' : 'off'}. No guidance, judged at the end. ${blindActive && undoLimited ? '+125% amber, stacked with Challenge.' : '+100% amber.'}`}
           >
             <ModeIcon
               glyph={blindActive ? '🌑' : '👁️'}
@@ -795,7 +804,9 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
                 {phase >= 3 ? 'BLIND OFFERING' : 'BLIND MODE'}
               </Text>
               <Text style={[styles.challengeMenuDesc, { color: t.muted }]}>
-                No guidance, judged at the end. 2x amber.
+                {blindActive && undoLimited
+                  ? 'No guidance, judged at the end. +125% amber.'
+                  : 'No guidance, judged at the end. +100% amber.'}
               </Text>
             </View>
           </TouchableOpacity>
@@ -842,8 +853,12 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
             accessibilityState={{ selected: lexiconActive }}
             accessibilityLabel={`Lexicon rare-word mode, ${lexiconActive ? 'on' : 'off'}. Rarer words, on any style. +40% amber.`}
           >
+            {/* The glyph must SWAP with state, like Challenge (🔒/🔓) and Blind
+                (👁️/🌑). A constant book left the amber tint as the only on/off
+                signal for a sighted player, which is information by color
+                alone; the closed book now reads "off", the open book "on". */}
             <ModeIcon
-              glyph={'📖'}
+              glyph={lexiconActive ? '📖' : '📕'}
               textStyle={styles.challengeMenuIcon}
               imageStyle={styles.challengeMenuIconImage}
             />
@@ -857,9 +872,13 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
                 LEXICON
               </Text>
               <Text style={[styles.challengeMenuDesc, { color: t.muted }]}>
-                {phase >= 3
-                  ? 'Rarer, stranger words. The older pages. +40% amber.'
-                  : 'Rarer words, on any style. +40% amber.'}
+                {lexiconActive
+                  ? (phase >= 3
+                      ? 'On. Rarer, stranger words, from the older pages. +40% amber.'
+                      : 'On. Rarer words, on any style. +40% amber.')
+                  : (phase >= 3
+                      ? 'Off. Rarer, stranger words, from the older pages. +40% amber.'
+                      : 'Off. Rarer words, on any style. +40% amber.')}
               </Text>
             </View>
           </TouchableOpacity>
@@ -1101,6 +1120,12 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'transparent',
     marginBottom: 2,
+  },
+  // Flexing column for a difficulty row's label + (when locked) its tease, so a
+  // long unlock hint wraps inside the panel instead of overflowing the row.
+  difficultyRowContent: {
+    flex: 1,
+    minWidth: 0,
   },
   difficultyRing: {
     width: 12,
