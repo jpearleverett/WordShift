@@ -168,9 +168,9 @@ import { PreGeneratedPuzzle } from '../src/data/puzzleBankTypes';
 // EXPERT reverse (6-letter) and Lexicon reverse (rare) generation is slower and
 // scarcer, so they target a smaller total (recycling handles small reverse banks).
 const PHASE_TARGETS: Record<number, number> = LEXICON
-  ? { 0: 40, 1: 30, 2: 30, 3: 30, 4: 20 }   // 150 (rare reverse is the thinnest supply; plateau handles the rest)
+  ? { 0: 60, 1: 50, 2: 50, 3: 50, 4: 30 }   // 240 (rare reverse is the thinnest supply; plateau handles the rest)
   : BANK_NAME === 'EXPERT'
-  ? { 0: 55, 1: 45, 2: 45, 3: 45, 4: 20 }   // 210
+  ? { 0: 90, 1: 75, 2: 75, 3: 75, 4: 40 }   // 355
   : { 0: 120, 1: 100, 2: 100, 3: 100, 4: 80 }; // 500
 const TOTAL_TARGET = Object.values(PHASE_TARGETS).reduce((a, b) => a + b, 0);
 const ATTEMPTS_PER_TARGET_UNIT = 200; // reverse generation is slower; more budget headroom

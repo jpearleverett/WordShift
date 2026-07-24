@@ -23,17 +23,20 @@ LEXICON_ENV=""
 if [ "$MODE" = "LEXICON" ]; then
   KEY="lexicon_${KEY}"
   LEXICON_ENV="1"
-  TARGET=150
+  TARGET=240
 elif [ "$BANK" = "EXPERT" ]; then
-  TARGET=210
+  TARGET=355
 else
   TARGET=500
 fi
 CHECKPOINT="src/data/.gatedRegenReverse_${KEY}_progress.json"
 LOG="src/data/.gatedRegenReverse_${KEY}.log"
-MIN_RUN_ACCEPTS=3
-PLATEAU_RUNS=2
-MAX_RUNS=200
+# Grind hard: rare-reverse supply is scarce, so only treat a run as a plateau
+# when a full bounded run yields essentially nothing (a slow-but-nonzero run is
+# still progress worth continuing over the multi-hour campaign).
+MIN_RUN_ACCEPTS=2
+PLATEAU_RUNS=3
+MAX_RUNS=400
 
 count_accepted() {
   node -e "
