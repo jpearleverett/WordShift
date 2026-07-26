@@ -214,6 +214,7 @@ jest.mock('../constants', () => ({
   },
 }));
 
+import { CHALLENGE_MODE_CONFIG } from '../constants/gameBalance';
 import { usePuzzleGame, hasAnyValidMove, canCompleteDoubleShift, hasAnyValidDoubleShiftMove, isBoardSolvableFromState, comboTierForStreak, shouldUseComboMessage, resolvePreviewGradingMode, PuzzleGameState, PuzzleGameActions } from '../hooks/usePuzzleGame';
 // Real values (the hook imports them from gameBalance directly, past the
 // '../constants' mock above) — the grading-window tests pin against them.
@@ -683,6 +684,97 @@ describe('usePuzzleGame', () => {
       [state] = callHook();
       expect(state.undosRemaining).toBe(budget);
       expect(state.rows[0].words.map(le => le.char).join('')).toBe('TIME');
+    });
+
+    // ------------------------------------------------------------------
+    // The undo truth table. ONE rule decides the budget: `undoLimited`
+    // ("Challenge"). gameMode is only the shared no-hints umbrella — it reads
+    // 'challenge' whenever EITHER Blind or Challenge is on, so keying the
+    // budget off it would silently cap Blind-alone. Blind frees undos because
+    // walking the chain back to a flaw IS the mode's repair loop; Challenge
+    // re-imposes the cap wherever it appears, including on top of Blind (the
+    // maximal trial: previews hidden AND undos budgeted).
+    // ------------------------------------------------------------------
+    describe('undo budget truth table (Challenge is the only thing that caps)', () => {
+      /** startNewGame(difficulty, mode, variant, blind, weave, lexicon, undoLimited, speed) */
+      async function boardWith(opts: {
+        blind: boolean; challenge: boolean; lexicon?: boolean; speed?: boolean;
+      }) {
+        resetHookState();
+        let [, actions] = callHook();
+        const mode = opts.blind || opts.challenge ? 'challenge' : 'standard';
+        await actions.startNewGame(
+          'MEDIUM', mode, 'standard',
+          opts.blind, false, opts.lexicon ?? false, opts.challenge, opts.speed ?? false,
+        );
+        [, actions] = callHook();
+        actions.initGame(['TIME', 'TIED']);
+        return callHook();
+      }
+
+      test('Blind ALONE: unlimited undos', async () => {
+        const [state] = await boardWith({ blind: true, challenge: false });
+        expect(state.blindMode).toBe(true);
+        expect(state.undoLimited).toBe(false);
+        expect(state.undosRemaining).toBe(Infinity);
+      });
+
+      test('Challenge ALONE: a finite budget', async () => {
+        const [state] = await boardWith({ blind: false, challenge: true });
+        expect(state.undoLimited).toBe(true);
+        expect(state.undosRemaining).toBe(CHALLENGE_MODE_CONFIG.getMaxUndos('MEDIUM'));
+        expect(state.undosRemaining).toBeLessThan(Infinity);
+      });
+
+      test('Challenge + Blind: the cap WINS (Challenge caps wherever it appears)', async () => {
+        const [state] = await boardWith({ blind: true, challenge: true });
+        expect(state.blindMode).toBe(true);
+        expect(state.undoLimited).toBe(true);
+        expect(state.undosRemaining).toBe(CHALLENGE_MODE_CONFIG.getMaxUndos('MEDIUM'));
+      });
+
+      test('the other modifiers never cap on their own', async () => {
+        // Speed and Lexicon are amber/vocabulary layers; only Challenge budgets
+        // undos, alone or stacked.
+        const [speedOnly] = await boardWith({ blind: false, challenge: false, speed: true });
+        expect(speedOnly.undosRemaining).toBe(Infinity);
+
+        const [lexOnly] = await boardWith({ blind: false, challenge: false, lexicon: true });
+        expect(lexOnly.undosRemaining).toBe(Infinity);
+
+        // ...but Challenge riding along with them still caps.
+        const [speedPlusChallenge] = await boardWith({ blind: false, challenge: true, speed: true });
+        expect(speedPlusChallenge.undosRemaining).toBe(CHALLENGE_MODE_CONFIG.getMaxUndos('MEDIUM'));
+
+        // And Blind + Speed (no Challenge) stays free.
+        const [blindPlusSpeed] = await boardWith({ blind: true, challenge: false, speed: true });
+        expect(blindPlusSpeed.undosRemaining).toBe(Infinity);
+      });
+
+      test('an undo is CHARGED under Challenge and FREE under Blind alone', async () => {
+        // Blind alone: commit a move, undo it, budget untouched.
+        let [state, actions] = await boardWith({ blind: true, challenge: false });
+        let m = state.rows[0].words.find(le => le.char === 'M')!;
+        actions.handleLetterPress(m, 0);
+        [, actions] = callHook();
+        await actions.handleSlotPress(0);
+        [, actions] = callHook();
+        actions.handleUndo();
+        [state] = callHook();
+        expect(state.undosRemaining).toBe(Infinity);
+
+        // Challenge alone: the same undo costs one from the budget.
+        [state, actions] = await boardWith({ blind: false, challenge: true });
+        const budget = state.undosRemaining;
+        m = state.rows[0].words.find(le => le.char === 'M')!;
+        actions.handleLetterPress(m, 0);
+        [, actions] = callHook();
+        await actions.handleSlotPress(2); // M into TIED at 2 -> TIMED (valid)
+        [, actions] = callHook();
+        actions.handleUndo();
+        [state] = callHook();
+        expect(state.undosRemaining).toBe(budget - 1);
+      });
     });
 
     test('a failed judgment keeps undos free for the rest of the board', async () => {
