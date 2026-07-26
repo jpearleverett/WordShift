@@ -14,25 +14,35 @@
  *                          reverse intro waits two boards instead of stacking
  *                          on the same early one-time-beat cluster)
  * 2) Double Shift (25)  -> move two letters per step
- * 3) Speed        (55)  -> short row count + timer pressure
- * The trial-ladder toggles gate separately (Challenge 15, Blind 80), and
- * COMBO_PRESETS layer a variant + a trial rung at 55/70/90/105.
- * Locked variants/combos are SHOWN in the setup menu as teased locked rows,
- * so the player always sees the next mechanical goal.
+ * Speed Shift is NOT in this list: it is a composable MODIFIER (a clock over
+ * whatever style you chose), gated at 55 alongside the other modifier toggles
+ * (Challenge 15, Speed 55, Blind 80, Lexicon 100).
+ * Locked styles are SHOWN in the setup menu as teased locked rows, so the
+ * player always sees the next mechanical goal.
  */
 
 import { Difficulty, PuzzleSolutionStep } from '../types';
 import { isReverseSolvable } from './localGenerator';
 // Speed timers live in the central balance file (single source of truth).
-import { SPEED_TIME_LIMITS as SPEED_TIME_LIMIT_BY_DIFFICULTY, LEXICON_UNLOCK_PUZZLES } from '../constants/gameBalance';
+import {
+  SPEED_TIME_LIMITS as SPEED_TIME_LIMIT_BY_DIFFICULTY,
+  SPEED_STYLE_TIME_MULTIPLIER,
+  SPEED_TOGGLE_UNLOCK_PUZZLES,
+  LEXICON_UNLOCK_PUZZLES,
+} from '../constants/gameBalance';
 
 // ============================================================================
 // Types
 // ============================================================================
 
+// Speed Shift is deliberately ABSENT here. It became a composable MODIFIER (a
+// clock laid over whatever style you are playing) rather than a style of its
+// own, so it no longer travels as a variant key. It mattered that it left this
+// union too and not just PuzzleVariant: had it stayed, every
+// `hasVariantModifier(variant, 'speed')` call would still have type-checked and
+// simply returned false forever, and the clock would quietly never start.
 export type VariantModifier =
   | 'reverse'
-  | 'speed'
   | 'double_shift';
 
 export type PuzzleVariant = 'standard' | VariantModifier;
@@ -72,30 +82,6 @@ export interface VariantSelectorOption {
   unlockHint: string;
 }
 
-/**
- * A combination style: one variant plus one trial-ladder rung, armed together
- * as a single selection. Blind presets run under gameMode 'challenge' with
- * blindMode on (the engine's existing composition); challenge presets run
- * under gameMode 'challenge' with blindMode off.
- */
-export interface ComboPreset {
-  id: 'twin_trial' | 'racing_shadows' | 'blind_return' | 'free_fall';
-  title: string;
-  description: string;
-  /** Phase 3+ dark description */
-  darkDescription: string;
-  icon: string;
-  variant: PuzzleVariant;
-  challenge: boolean;
-  blind: boolean;
-  unlockPuzzles: number;
-}
-
-export interface ComboSelectorOption {
-  preset: ComboPreset;
-  unlocked: boolean;
-  unlockHint: string;
-}
 
 // ============================================================================
 // Variant Definitions
@@ -122,18 +108,6 @@ export const VARIANT_CONFIGS: Record<PuzzleVariant, VariantConfig> = {
     icon: '🔄',
     amberMultiplier: 1.22,
   },
-  speed: {
-    variant: 'speed',
-    title: 'Speed Shift',
-    description: 'Race through a short chain before time runs out.',
-    darkDescription: 'The arrangement does not wait.',
-    instruction: 'Three-row sprint. Move quickly and commit.',
-    darkInstruction: 'No hesitation. The pattern closes fast.',
-    icon: '⚡',
-    amberMultiplier: 1.34,
-    timeLimit: 60,
-    rowOverride: 3,
-  },
   double_shift: {
     variant: 'double_shift',
     title: 'Double Shift',
@@ -149,21 +123,18 @@ export const VARIANT_CONFIGS: Record<PuzzleVariant, VariantConfig> = {
 const VARIANT_MODIFIER_MAP: Record<PuzzleVariant, VariantModifier[]> = {
   standard: [],
   reverse: ['reverse'],
-  speed: ['speed'],
   double_shift: ['double_shift'],
 };
 
-// Selector display order matches unlock order: reverse -> double -> speed.
+// Selector display order matches unlock order: reverse -> double.
 const BASE_VARIANTS: VariantModifier[] = [
   'reverse',
   'double_shift',
-  'speed',
 ];
 
 const VARIANT_UNLOCK_REQUIREMENTS: Record<Exclude<PuzzleVariant, 'standard'>, VariantUnlockRequirement> = {
   reverse: { puzzlesSolved: 10, minDepthPhase: 0 },
   double_shift: { puzzlesSolved: 25, minDepthPhase: 0 },
-  speed: { puzzlesSolved: 55, minDepthPhase: 0 },
 };
 
 /**
@@ -174,6 +145,10 @@ const VARIANT_UNLOCK_REQUIREMENTS: Record<Exclude<PuzzleVariant, 'standard'>, Va
  */
 export const CHALLENGE_TOGGLE_UNLOCK_PUZZLES = 15;
 export const BLIND_TOGGLE_UNLOCK_PUZZLES = 80;
+// Speed Shift's gate is unchanged from when it was a style; it just lives with
+// the other modifier gates now, so the whole ladder (15 -> 55 -> 80 -> 100)
+// reads in one place.
+export { SPEED_TOGGLE_UNLOCK_PUZZLES };
 
 export function isPuzzleVariant(value: string): value is PuzzleVariant {
   return value in VARIANT_CONFIGS;
@@ -236,10 +211,6 @@ const VARIANT_LOCK_TEASES: Record<Exclude<PuzzleVariant, 'standard'>, { light: s
     light: 'Some words will ask for two letters at once.',
     dark: 'Soon the pattern will take two at a time.',
   },
-  speed: {
-    light: 'One day the letters will race you.',
-    dark: 'The arrangement is learning not to wait.',
-  },
 };
 
 function formatLockedHint(tease: string, remainingPuzzles: number, uiPhase: number): string {
@@ -287,6 +258,22 @@ export function getBlindUnlockHint(puzzlesSolved: number, uiPhase: number): stri
   const tease = uiPhase >= 3
     ? 'One day you will offer a whole chain unseeing.'
     : 'The last trial: no previews, judged only at the end.';
+  return formatLockedHint(tease, remaining, uiPhase);
+}
+
+/**
+ * Unlock hint for the Speed Shift toggle. Speed is a MODIFIER now, so it earns
+ * the same visible locked-row tease as Challenge / Blind / Lexicon rather than
+ * a style tease.
+ */
+export function getSpeedUnlockHint(puzzlesSolved: number, uiPhase: number): string {
+  const remaining = Math.max(0, SPEED_TOGGLE_UNLOCK_PUZZLES - puzzlesSolved);
+  if (remaining <= 0) {
+    return uiPhase >= 3 ? 'Ready for the arrangement.' : 'Unlocked.';
+  }
+  const tease = uiPhase >= 3
+    ? 'The arrangement is learning not to wait.'
+    : 'One day the letters will race you, on any board you like.';
   return formatLockedHint(tease, remaining, uiPhase);
 }
 
@@ -339,135 +326,13 @@ export function getVariantSelectorOptions(
 // Combination Styles (variant + trial rung, armed as one selection)
 // ============================================================================
 
-/**
- * Every composition here is engine-verified: challenge is a gameMode that
- * composes with any variant (double-shift even has an atomic paired undo in
- * challenge), and blind runs under gameMode 'challenge' with previews
- * suppressed and one end-of-chain judgment. Blind + reverse has explicit
- * ascent handling in usePuzzleGame; blind + double_shift is safe because the
- * drop1 look-ahead only powers previews (never the commit path) and stuck
- * detection is always false in blind, so no composition can soft-lock.
- */
-export const COMBO_PRESETS: ComboPreset[] = [
-  {
-    id: 'twin_trial',
-    title: 'Twin Trial',
-    description: 'Double Shift under Challenge rules. Two letters a step, no hints, few undos.',
-    darkDescription: 'Two offerings a step, with nothing to catch you.',
-    icon: '⚔️',
-    variant: 'double_shift',
-    challenge: true,
-    blind: false,
-    unlockPuzzles: 55,
-  },
-  {
-    id: 'racing_shadows',
-    title: 'Racing Shadows',
-    description: 'Speed Shift under Challenge rules. Beat the clock with no hints and few undos.',
-    darkDescription: 'Outrun the closing pattern. It will not soften for you.',
-    icon: '🌪️',
-    variant: 'speed',
-    challenge: true,
-    blind: false,
-    unlockPuzzles: 70,
-  },
-  {
-    id: 'blind_return',
-    title: 'Blind Return',
-    description: 'Reverse Shift with no previews. Down and back, judged only at the end.',
-    darkDescription: 'Descend and return unseeing. Only the finished chain is judged.',
-    icon: '🌒',
-    variant: 'reverse',
-    challenge: false,
-    blind: true,
-    unlockPuzzles: 90,
-  },
-  {
-    id: 'free_fall',
-    title: 'Free Fall',
-    description: 'Double Shift with no previews. Two letters a step, judged only at the end.',
-    darkDescription: 'Two at a time, in the dark. The chain speaks only when it is whole.',
-    icon: '🕳️',
-    variant: 'double_shift',
-    challenge: false,
-    blind: true,
-    unlockPuzzles: 105,
-  },
-];
+// The COMBINATION-STYLES presets that used to live here are gone. They pre-armed
+// a style plus a trial rung as a single selection, which was a second, parallel
+// way to arm combinations the player can already build by stacking toggles; the
+// setup menu stopped rendering them long ago, and one of them ("Racing Shadows")
+// was defined in terms of speed-as-a-style, which no longer exists. Stacking is
+// now the ONE way to combine modes.
 
-// Locked-row teases must be LITERAL: at the moment a player reads these they
-// may not have met the component modes yet, so idioms ("no net") and bare
-// jargon ("played blind") read as noise. Name the two things being combined.
-const COMBO_LOCK_TEASES: Record<ComboPreset['id'], { light: string; dark: string }> = {
-  twin_trial: {
-    light: 'Double Shift plus Challenge rules.',
-    dark: 'Two offerings a step, and no mercy.',
-  },
-  racing_shadows: {
-    light: 'Speed Shift plus Challenge rules.',
-    dark: 'A race the arrangement will not soften.',
-  },
-  blind_return: {
-    light: 'Reverse Shift with previews hidden.',
-    dark: 'A blind descent, and a blind return.',
-  },
-  free_fall: {
-    light: 'Double Shift with previews hidden.',
-    dark: 'Two at a time, in the dark.',
-  },
-};
-
-/**
- * A combo unlocks at its own gate, which always sits at or past every gate of
- * its components (variant gate + trial-rung toggle gate) — guarded by tests.
- */
-export function isComboUnlocked(
-  preset: ComboPreset,
-  puzzlesSolved: number,
-  currentPhase: number
-): boolean {
-  if (puzzlesSolved < preset.unlockPuzzles) return false;
-  if (!isVariantUnlocked(preset.variant, puzzlesSolved, currentPhase)) return false;
-  if (preset.challenge && puzzlesSolved < CHALLENGE_TOGGLE_UNLOCK_PUZZLES) return false;
-  if (preset.blind && puzzlesSolved < BLIND_TOGGLE_UNLOCK_PUZZLES) return false;
-  return true;
-}
-
-export function getComboDescription(preset: ComboPreset, phase: number): string {
-  return phase >= 3 ? preset.darkDescription : preset.description;
-}
-
-export function getComboUnlockHint(
-  preset: ComboPreset,
-  puzzlesSolved: number,
-  currentPhase: number,
-  uiPhase: number
-): string {
-  if (isComboUnlocked(preset, puzzlesSolved, currentPhase)) {
-    return uiPhase >= 3 ? 'Ready for the arrangement.' : 'Unlocked.';
-  }
-  const remaining = Math.max(0, preset.unlockPuzzles - puzzlesSolved);
-  const tease = uiPhase >= 3
-    ? COMBO_LOCK_TEASES[preset.id].dark
-    : COMBO_LOCK_TEASES[preset.id].light;
-  return formatLockedHint(tease, remaining, uiPhase);
-}
-
-/**
- * Selector rows for the COMBINATION STYLES section of the setup menu.
- * Locked combos are included (teased, non-selectable), same as variants.
- */
-export function getComboSelectorOptions(
-  puzzlesSolved: number,
-  currentPhase: number,
-  uiPhase: number
-): ComboSelectorOption[] {
-  return COMBO_PRESETS.map(preset => ({
-    preset,
-    unlocked: isComboUnlocked(preset, puzzlesSolved, currentPhase),
-    unlockHint: getComboUnlockHint(preset, puzzlesSolved, currentPhase, uiPhase),
-  }));
-}
 
 /**
  * Get the variant description appropriate for the current phase.
@@ -478,21 +343,9 @@ export function getVariantDescription(config: VariantConfig, phase: number): str
 
 /**
  * Get the first-instruction text for a variant.
- * For speed variants, the row count is injected dynamically based on difficulty.
  */
-export function getVariantInstruction(config: VariantConfig, phase: number, difficulty?: Difficulty): string {
-  // Dark instruction doesn't mention row count, return as-is
-  if (phase >= 3) return config.darkInstruction;
-
-  // For speed variant with known difficulty, compute the actual row count
-  if (difficulty && config.variant === 'speed') {
-    const overrides = getVariantOverrides('speed', difficulty);
-    const rows = overrides.targetRows ?? 3;
-    const rowWord = rows === 3 ? 'Three' : rows === 4 ? 'Four' : rows === 5 ? 'Five' : `${rows}`;
-    return `${rowWord}-row sprint. Move quickly and commit.`;
-  }
-
-  return config.instruction;
+export function getVariantInstruction(config: VariantConfig, phase: number): string {
+  return phase >= 3 ? config.darkInstruction : config.instruction;
 }
 
 /**
@@ -524,45 +377,34 @@ export function getVariantOverrides(
                  baseDifficulty === 'MEDIUM_PLUS' ? 5 : 6;
     return { wordLength: 5, targetRows: rows };
   }
-  if (hasVariantModifier(variant, 'speed')) {
-    return { targetRows: baseDifficulty === 'HARD' ? 4 : 3 };
-  }
+  // Speed used to trim the chain to 3-4 rows here. That override only ever
+  // reached the on-device generator: every speed board has been served from the
+  // banks at full length for a long time, so the "short sprint" identity was
+  // already fiction. As a modifier it is a clock over the board you chose.
   return {};
 }
 
 /**
- * Whether this variant includes speed timing pressure.
+ * Seconds on the clock for a speed board: the difficulty's base time, scaled by
+ * how much work the underlying STYLE asks for.
+ *
+ * Speed is a modifier now, so it can ride a reverse chain (played down and then
+ * all the way back up) or a double shift (two letters per step, up to 7 rows at
+ * EXPERT). The base times were calibrated on a standard chain; handing those
+ * unchanged to a 7-row two-letter board would not be difficulty, it would be an
+ * unwinnable board.
+ *
+ * (This replaces getVariantTimeLimit / getVariantTimeLimitForDifficulty /
+ * isVariantCompleted. The first two were variant-keyed by definition; the third
+ * only ever answered "did the clock run out", which the live timer -> GAME_OVER
+ * path has always decided.)
  */
-export function getVariantTimeLimit(variant: PuzzleVariant): number | null {
-  if (!hasVariantModifier(variant, 'speed')) return null;
-  return VARIANT_CONFIGS[variant].timeLimit || VARIANT_CONFIGS.speed.timeLimit || 60;
-}
-
-/**
- * Difficulty-aware timer for speed variants to preserve pressure at higher tiers.
- */
-export function getVariantTimeLimitForDifficulty(
+export function getSpeedTimeLimit(
+  difficulty: Difficulty,
   variant: PuzzleVariant,
-  difficulty: Difficulty
-): number | null {
-  if (!hasVariantModifier(variant, 'speed')) return null;
-  return SPEED_TIME_LIMIT_BY_DIFFICULTY[difficulty];
-}
-
-/**
- * Check if a variant puzzle was completed within its constraints.
- * For speed variants: checks completion within time limit.
- * For other variants: true (constraints are enforced during play).
- */
-export function isVariantCompleted(
-  variant: PuzzleVariant,
-  elapsedSeconds?: number
-): boolean {
-  const timeLimit = getVariantTimeLimit(variant);
-  if (timeLimit !== null && elapsedSeconds !== undefined) {
-    return elapsedSeconds <= timeLimit;
-  }
-  return true;
+): number {
+  const base = SPEED_TIME_LIMIT_BY_DIFFICULTY[difficulty] ?? SPEED_TIME_LIMIT_BY_DIFFICULTY.MEDIUM;
+  return Math.round(base * (SPEED_STYLE_TIME_MULTIPLIER[variant] ?? 1.0));
 }
 
 /**

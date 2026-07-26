@@ -56,6 +56,8 @@ jest.mock('../services/haptics', () => ({
   hapticSelection: jest.fn(),
 }));
 
+import fs from 'fs';
+import path from 'path';
 import React from 'react';
 import { Row } from '../components/Row';
 import { LetterTile } from '../components/LetterTile';
@@ -533,5 +535,84 @@ describe('ShareCard install URL', () => {
     expect(text).toContain(INSTALL_URL_DISPLAY);
     expect(text).not.toContain('VOID');
     expect(text).not.toContain('Offering: VOID');
+  });
+});
+
+// ===========================================================================
+// Drag z-order: the dragged tile must float ABOVE the row it is carried into
+// ===========================================================================
+//
+// The dragged tile is a floating copy rendered IN PLACE inside DraggableTile,
+// so it can only escape its own row if that row out-ranks its siblings. Paint
+// order among the rows is decided by their OUTERMOST elements. When the
+// board-serve entrance wrapper was added it became that outermost element and
+// carried no zIndex, while the drag lift stayed on the inner row-transition
+// view — where it could only order that view against siblings it does not
+// have. The lift silently became a no-op and the tile passed BEHIND the next
+// row's tiles the moment it crossed into them.
+describe('drag z-order contract', () => {
+  const ROW_SRC = fs.readFileSync(
+    path.resolve(__dirname, '../components/Row.tsx'),
+    'utf8',
+  );
+
+  it('puts the drag lift on the OUTERMOST per-row element', () => {
+    // The serve wrapper is the outermost element the Row returns; the lift
+    // style must be applied there, not on an inner wrapper.
+    expect(ROW_SRC).toMatch(
+      /styles\.serveWrapper,\s*\n\s*isSource && !!onLetterDragDrop && styles\.serveWrapperDragging/,
+    );
+    // And it must NOT have drifted back onto the inner row-transition view.
+    expect(ROW_SRC).not.toMatch(/isSource && !!onLetterDragDrop && \{ zIndex/);
+  });
+
+  it('raises BOTH zIndex and elevation (Android composites by elevation)', () => {
+    const block = ROW_SRC.slice(ROW_SRC.indexOf('serveWrapperDragging: {'));
+    const decl = block.slice(0, block.indexOf('},'));
+    expect(decl).toMatch(/zIndex:\s*\d+/);
+    expect(decl).toMatch(/elevation:\s*\d+/);
+  });
+});
+
+// ===========================================================================
+// The animal nameplate is a STATIC fixture of the room, not sprite chrome
+// ===========================================================================
+describe('animal nameplate contract', () => {
+  const ROOM_SRC = fs.readFileSync(
+    path.resolve(__dirname, '../components/home/RoomView.tsx'),
+    'utf8',
+  );
+  const SPRITE_SRC = fs.readFileSync(
+    path.resolve(__dirname, '../components/home/AnimalSprite.tsx'),
+    'utf8',
+  );
+
+  it('is pinned to the room floor rather than riding the wandering sprite', () => {
+    const block = ROOM_SRC.slice(ROOM_SRC.indexOf('animalPlate: {'));
+    const decl = block.slice(0, block.indexOf('},'));
+    expect(decl).toMatch(/position:\s*'absolute'/);
+    expect(decl).toMatch(/bottom:\s*\d+/);
+    expect(decl).toMatch(/alignSelf:\s*'center'/);
+  });
+
+  it('no longer renders a name tag inside the sprite (it was clipped away)', () => {
+    // A room is ~123dp and the sprite box alone is 90dp plus padding, so a tag
+    // stacked below the sprite started past the room's overflow boundary and
+    // was never visible at all.
+    expect(SPRITE_SRC).not.toMatch(/styles\.nameTag/);
+    expect(SPRITE_SRC).not.toMatch(/nameTag:\s*\{/);
+  });
+
+  it('is decorative on BOTH platforms so the name is announced once', () => {
+    const mount = ROOM_SRC.slice(
+      ROOM_SRC.indexOf('style={[styles.animalPlate'),
+      ROOM_SRC.indexOf('</PixelPlaque') > -1
+        ? ROOM_SRC.indexOf('</PixelPlaque')
+        : ROOM_SRC.indexOf('styles.animalPlate') + 1200,
+    );
+    // importantForAccessibility is Android-only; accessibilityElementsHidden
+    // is iOS-only. Hiding on one alone double-announces on the other.
+    expect(mount).toMatch(/importantForAccessibility="no-hide-descendants"/);
+    expect(mount).toMatch(/accessibilityElementsHidden/);
   });
 });

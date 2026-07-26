@@ -1289,16 +1289,25 @@ export const Row: React.FC<RowProps> = memo(({
       // board serve (staggered by rowIndex). Kept OUTSIDE the row-transition
       // wrapper so its opacity/translateY compose cleanly with the inner
       // scale/opacity/slide instead of fighting them for the same props.
-      style={{
-        opacity: serveOpacity,
-        transform: [{ translateY: serveTranslateY }],
-      }}
+      //
+      // This wrapper is ALSO where the drag lift has to live. Paint order among
+      // the rows is decided by their OUTERMOST elements, which are these
+      // wrappers; a zIndex on the inner row-transition view can only order that
+      // view against its own siblings, so once this wrapper was introduced the
+      // source row silently stopped lifting and a dragged tile passed BEHIND
+      // the next row's tiles the moment it crossed into them.
+      style={[
+        styles.serveWrapper,
+        isSource && !!onLetterDragDrop && styles.serveWrapperDragging,
+        {
+          opacity: serveOpacity,
+          transform: [{ translateY: serveTranslateY }],
+        },
+      ]}
     >
     <Animated.View
       style={[
         styles.rowWrapper,
-        // Source row with drag needs higher zIndex so floating tile renders above subsequent rows
-        isSource && !!onLetterDragDrop && { zIndex: 10 },
         {
           transform: [
             { scale: Animated.multiply(scaleAnim, successBounceScale) },
@@ -1370,6 +1379,21 @@ export const Row: React.FC<RowProps> = memo(({
 Row.displayName = 'Row';
 
 const styles = StyleSheet.create({
+  // Outermost per-row element — the one that decides paint order against the
+  // other rows. `overflow: visible` all the way down is what lets the floating
+  // drag tile escape its row.
+  serveWrapper: {
+    zIndex: 1,
+    overflow: 'visible',
+  },
+  // The row being dragged FROM rides above every other row, so the tile under
+  // the finger is never occluded by the row it is being carried into. Android
+  // composites by elevation, so it is raised to match; the wrapper has no
+  // background, so the elevation casts no shadow of its own.
+  serveWrapperDragging: {
+    zIndex: 20,
+    elevation: 20,
+  },
   rowWrapper: {
     marginVertical: 6,
     marginHorizontal: ROW_HORIZONTAL_MARGIN,

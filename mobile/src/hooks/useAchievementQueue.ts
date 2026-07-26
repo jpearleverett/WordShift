@@ -70,6 +70,7 @@ export function useAchievementQueue(): [AchievementQueueState, AchievementQueueA
         variantWins: variantStats.variantWins,
         blindWins: variantStats.blindWins,
         lexiconWins: variantStats.lexiconWins,
+        speedWins: variantStats.speedWins,
         maxStackWins: variantStats.maxStackWins,
       };
 

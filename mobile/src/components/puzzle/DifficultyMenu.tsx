@@ -229,6 +229,12 @@ interface DifficultyMenuProps {
   expertLocked?: boolean;
   expertUnlockHint?: string;
   /** Lexicon (rare-word) composable toggle — stacks on any difficulty/variant. */
+  /** Speed Shift, the fourth composable modifier: a clock over any style. */
+  speedActive?: boolean;
+  onToggleSpeedMode?: () => void;
+  showSpeedToggle?: boolean;
+  speedLocked?: boolean;
+  speedUnlockHint?: string;
   lexiconActive?: boolean;
   onToggleLexiconMode?: () => void;
   showLexiconToggle?: boolean;
@@ -264,6 +270,11 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   blindUnlockHint,
   expertLocked = false,
   expertUnlockHint,
+  speedActive = false,
+  onToggleSpeedMode,
+  showSpeedToggle = false,
+  speedLocked = false,
+  speedUnlockHint,
   lexiconActive = false,
   onToggleLexiconMode,
   showLexiconToggle = false,
@@ -425,6 +436,7 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
     stackLayerNames.push(selectedVariantTitle ?? 'style');
   }
   if (undoLimited) { stackGlyphs.push('🔓'); stackLayerNames.push('Challenge'); }
+  if (speedActive) { stackGlyphs.push('⚡'); stackLayerNames.push('Speed Shift'); }
   if (blindActive) { stackGlyphs.push('🌑'); stackLayerNames.push(phase >= 3 ? 'Blind Offering' : 'Blind Mode'); }
   if (lexiconActive) { stackGlyphs.push('📖'); stackLayerNames.push('Lexicon'); }
   if (unbrokenWeaveActive) { stackGlyphs.push('🧵'); stackLayerNames.push('Unbroken Weave'); }
@@ -435,10 +447,15 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   // predicate). A bare `stackCount >= 4` claimed it for any four layers — e.g.
   // MEDIUM with a style + Blind + Lexicon + Weave — promising an award the
   // player would not receive.
+  // Must stay identical to App's max_stack predicate: a style plus ALL FOUR
+  // modifiers on EXPERT. Speed joined the set when it stopped being a style, so
+  // this is a four-layer condition now. Changing one side without the other
+  // makes the emblem promise an award the player will not receive.
   const isFullArrangement =
     currentDifficulty === 'EXPERT' &&
     currentVariant !== 'standard' &&
     undoLimited &&
+    speedActive &&
     blindActive &&
     lexiconActive;
   const stackTitle = isFullArrangement
@@ -815,6 +832,75 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
         {/* Lexicon (rare-word) toggle — a composable modifier that stacks on any
             difficulty + variant. Teased as a locked row until its late gate,
             then a live on/off toggle. */}
+        {/* Speed Shift — locked tease */}
+        {showSpeedToggle && !introMode && speedLocked && !speedActive && (
+          <TouchableOpacity
+            style={[styles.menuRow, styles.lockedRow]}
+            disabled
+            accessibilityRole="button"
+            accessibilityState={{ disabled: true }}
+            accessibilityLabel={`Speed Shift, locked. ${speedUnlockHint || ''}`}
+          >
+            <ModeIcon
+              glyph={'🔒'}
+              textStyle={styles.challengeMenuIcon}
+              imageStyle={styles.challengeMenuIconImage}
+            />
+            <View style={styles.challengeMenuContent}>
+              <Text style={[styles.menuRowText, { color: t.muted }]}>SPEED SHIFT</Text>
+              {speedUnlockHint ? (
+                <Text style={[styles.lockedHintText, { color: t.muted }]}>
+                  {speedUnlockHint}
+                </Text>
+              ) : null}
+            </View>
+          </TouchableOpacity>
+        )}
+
+        {/* Speed Shift — live toggle */}
+        {showSpeedToggle && !introMode && (!speedLocked || speedActive) && onToggleSpeedMode && (
+          <TouchableOpacity
+            style={[
+              styles.menuRow,
+              speedActive && {
+                backgroundColor: t.amberText + '14',
+                borderColor: t.amberText + '55',
+              },
+            ]}
+            onPress={onToggleSpeedMode}
+            accessibilityRole="button"
+            accessibilityState={{ selected: speedActive }}
+            accessibilityLabel={`Speed Shift, ${speedActive ? 'on' : 'off'}. A clock on any style. +34% amber.`}
+          >
+            {/* The glyph swaps with state (never colour alone), same rule the
+                Challenge, Blind and Lexicon rows follow. */}
+            <ModeIcon
+              glyph={speedActive ? '⚡' : '⏱️'}
+              textStyle={styles.challengeMenuIcon}
+              imageStyle={styles.challengeMenuIconImage}
+            />
+            <View style={styles.challengeMenuContent}>
+              <Text
+                style={[
+                  styles.menuRowText,
+                  { color: speedActive ? t.amberText : t.body },
+                ]}
+              >
+                SPEED SHIFT
+              </Text>
+              <Text style={[styles.challengeMenuDesc, { color: t.muted }]}>
+                {speedActive
+                  ? (phase >= 3
+                      ? 'On. The arrangement will not wait, whatever style you bring. +34% amber.'
+                      : 'On. Race the clock, on any style. +34% amber.')
+                  : (phase >= 3
+                      ? 'Off. The arrangement will not wait, whatever style you bring. +34% amber.'
+                      : 'Off. Race the clock, on any style. +34% amber.')}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        )}
+
         {showLexiconToggle && !introMode && lexiconLocked && !lexiconActive && (
           <TouchableOpacity
             style={[styles.menuRow, styles.lockedRow]}

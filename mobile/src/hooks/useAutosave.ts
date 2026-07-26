@@ -30,6 +30,7 @@ export interface AutosaveDeps {
   blindMode: boolean;
   undoLimited: boolean;
   lexiconMode: boolean;
+  speedMode: boolean;
   unbrokenWeaveMode: boolean;
   spentLetters: string[];
   currentVariant: string;
@@ -97,6 +98,7 @@ export function useAutosave(deps: AutosaveDeps): void {
           blindMode: deps.blindMode,
           undoLimited: deps.undoLimited,
           lexiconMode: deps.lexiconMode,
+          speedMode: deps.speedMode,
           unbrokenWeaveMode: deps.unbrokenWeaveMode,
           spentLetters: deps.spentLetters,
           currentVariant: deps.currentVariant as any,
@@ -148,6 +150,7 @@ export function useAutosave(deps: AutosaveDeps): void {
     deps.blindMode,
     deps.undoLimited,
     deps.lexiconMode,
+    deps.speedMode,
     deps.unbrokenWeaveMode,
     deps.spentLetters,
     deps.currentVariant,

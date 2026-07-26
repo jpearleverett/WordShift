@@ -78,8 +78,12 @@ export interface AchievementCheckState {
   blindWins: number;
   /** Lifetime Lexicon (rare-word) wins. */
   lexiconWins: number;
-  /** Lifetime maximal-stack apex wins (EXPERT + Challenge + Blind + non-standard
-   *  variant + Lexicon all at once). */
+  /** Lifetime Speed Shift wins. Reads through getVariantWinStats, which folds
+   *  the legacy variantWins.speed counter in, so progress earned while speed
+   *  was a STYLE still counts. */
+  speedWins: number;
+  /** Lifetime maximal-stack apex wins (EXPERT + a non-standard style + all four
+   *  modifiers: Challenge, Speed, Blind, Lexicon). */
   maxStackWins: number;
 }
 
@@ -273,7 +277,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Win a Speed Shift run',
     icon: '⏱️',
     category: 'mastery',
-    check: (s) => (s.variantWins?.speed || 0) >= 1,
+    check: (s) => (s.speedWins || 0) >= 1,
   },
   {
     id: 'speed_15',
@@ -282,19 +286,19 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Win 15 Speed Shift runs',
     icon: '⚡',
     category: 'mastery',
-    check: (s) => (s.variantWins?.speed || 0) >= 15,
+    check: (s) => (s.speedWins || 0) >= 15,
   },
   {
     id: 'variant_explorer',
     rewardAmber: 50,
     title: 'Every Path',
-    description: 'Win at least one Reverse, Double, and Speed puzzle',
+    description: 'Win a Reverse and a Double Shift board, and one against the clock',
     icon: '🧭',
     category: 'mastery',
     check: (s) =>
       (s.variantWins?.reverse || 0) >= 1 &&
       (s.variantWins?.double_shift || 0) >= 1 &&
-      (s.variantWins?.speed || 0) >= 1,
+      (s.speedWins || 0) >= 1,
   },
   // Blind Offering — the opt-in previews-hidden modifier
   {
@@ -358,7 +362,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     id: 'max_stack',
     rewardAmber: 150,
     title: 'The Full Arrangement',
-    description: 'Win one board with Expert, Challenge, Blind, a variant, and Lexicon all at once',
+    description: 'Win one Expert board with a style and all four modifiers at once: Challenge, Speed, Blind and Lexicon',
     icon: '🌌',
     category: 'mastery',
     check: (s) => (s.maxStackWins || 0) >= 1,
@@ -651,7 +655,7 @@ const ACHIEVEMENT_PROGRESS: Record<string, ProgressSpec> = {
   flawless_25: { current: (s) => s.stats.flawlessCount || 0, target: 25 },
   reverse_15: { current: (s) => s.variantWins?.reverse || 0, target: 15 },
   double_15: { current: (s) => s.variantWins?.double_shift || 0, target: 15 },
-  speed_15: { current: (s) => s.variantWins?.speed || 0, target: 15 },
+  speed_15: { current: (s) => s.speedWins || 0, target: 15 },
   blind_10: { current: (s) => s.blindWins || 0, target: 10 },
   challenge_10: { current: (s) => s.challengeCompletions, target: 10 },
   challenge_25: { current: (s) => s.challengeCompletions, target: 25 },
@@ -813,6 +817,7 @@ export async function buildAchievementCheckState(): Promise<AchievementCheckStat
     variantWins: variantStats.variantWins,
     blindWins: variantStats.blindWins,
     lexiconWins: variantStats.lexiconWins,
+    speedWins: variantStats.speedWins,
     maxStackWins: variantStats.maxStackWins,
   };
 }

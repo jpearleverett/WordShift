@@ -504,6 +504,8 @@ export interface PuzzleGameState {
   undoLimited: boolean;
   /** Lexicon (rare-word) modifier active (rare-but-fair vocabulary boards). */
   lexiconMode: boolean;
+  /** Speed Shift modifier: a clock over whatever style is being played. */
+  speedMode: boolean;
   /** Phase-5 mastery mode: each moved character may cross only once. */
   unbrokenWeaveMode: boolean;
   /** Characters already moved on the current Unbroken Weave board. */
@@ -609,6 +611,7 @@ export interface PuzzleGameActions {
     unbrokenWeave?: boolean,
     lexicon?: boolean,
     undoLimited?: boolean,
+    speed?: boolean,
   ) => Promise<void>;
   handleLetterPress: (letter: Letter, rowIndex: number) => void;
   /**
@@ -644,6 +647,8 @@ export interface PuzzleGameActions {
     undoLimited?: boolean;
     /** Whether this board was played with the Lexicon (rare-word) modifier on. */
     lexicon?: boolean;
+    /** Speed Shift modifier was armed on this board. */
+    speed?: boolean;
     /** Resonant choices across the whole board (present on the completing move). */
     resonantChoiceCount?: number;
     /** Capped resonance amber for the board (present on the completing move). */
@@ -792,6 +797,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   // change — so it never alters rewards or phase progress.
   const [lexiconMode, setLexiconMode] = useState(false);
   const lexiconModeRef = useRef(false);
+  // Speed Shift, the fourth composable modifier. Mirrors lexiconMode exactly:
+  // sticky across Next Level, forced off by the weave apex / finale / daily /
+  // shared boards, restored from autosave. The ref mirror is load-bearing —
+  // applyBoard and the async generation closures read refs, not closure state.
+  const [speedMode, setSpeedMode] = useState(false);
+  const speedModeRef = useRef(false);
   const [unbrokenWeaveMode, setUnbrokenWeaveMode] = useState(false);
   const unbrokenWeaveModeRef = useRef(false);
   const [spentLetterSet, setSpentLetterSet] = useState<ReadonlySet<string>>(
@@ -1141,6 +1152,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     unbrokenWeaveOverride?: boolean,
     lexiconOverride?: boolean,
     undoLimitedOverride?: boolean,
+    speedOverride?: boolean,
   ) => {
     const requestedDifficulty = selectedDifficulty ?? preferredDifficultyRef.current;
     if (selectedDifficulty !== undefined) {
@@ -1175,6 +1187,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       lexiconModeRef.current = lexiconOverride;
       setLexiconMode(lexiconOverride);
     }
+    // Speed Shift modifier (the clock). Same contract as lexicon: undefined
+    // means "keep whatever is armed".
+    if (speedOverride !== undefined) {
+      speedModeRef.current = speedOverride;
+      setSpeedMode(speedOverride);
+    }
     // Undo-limit ("Challenge") modifier — decoupled from blind so they stack.
     if (undoLimitedOverride !== undefined) {
       undoLimitedRef.current = undoLimitedOverride;
@@ -1188,6 +1206,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       setUndoLimited(false);
       lexiconModeRef.current = false;
       setLexiconMode(false);
+      speedModeRef.current = false;
+      setSpeedMode(false);
       setSelectedVariant('standard');
     } else if (blindOverride !== undefined) {
       setBlindMode(blindOverride);
@@ -1278,6 +1298,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         setUndoLimited(false);
         lexiconModeRef.current = false;
         setLexiconMode(false);
+        speedModeRef.current = false;
+        setSpeedMode(false); // the finale is a played moment, never a timed one
         difficultyRef.current = 'HARD';
         setDifficulty('HARD');
         setUndosRemaining(Infinity);
@@ -1375,7 +1397,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       // getBankForSelection), so it no longer generates on-device. On-device
       // generation now only runs as a fallback if a bank selection genuinely
       // fails (recycling makes that near-impossible).
-      const bankVariants: PuzzleVariant[] = ['standard', 'reverse', 'double_shift', 'speed'];
+      const bankVariants: PuzzleVariant[] = ['standard', 'reverse', 'double_shift'];
       const shouldUseBank = bankVariants.includes(variant);
       if (shouldUseBank) {
         try {
@@ -1403,7 +1425,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
             await recordPuzzleWords(bankPuzzle.words);
             if (variant !== 'standard') {
               const config = VARIANT_CONFIGS[variant];
-              setMessage(getVariantInstruction(config, currentPhase, requestedDifficulty));
+              setMessage(getVariantInstruction(config, currentPhase));
             } else {
               setMessage(getStartMessage(currentPhase));
               if (unbrokenWeaveFallback) announceWeaveUnavailable();
@@ -1443,6 +1465,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       if (
         activeVariant === 'standard' &&
         puzzlesSolved >= PUZZLE_EXTENSION_UNLOCK_PUZZLES &&
+        // Never lengthen a board that is being played against a clock: the +1
+        // row would be a longer chain on a shorter timer.
+        !speedModeRef.current &&
         !requestedUnbrokenWeave &&
         // Mirror the bank path's rule (puzzleBank.selectPreGeneratedPuzzle):
         // Lexicon boards are curated rare and are NEVER extended. Beyond
@@ -1468,7 +1493,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       );
       if (activeVariant !== 'standard') {
         const config = VARIANT_CONFIGS[activeVariant];
-        setMessage(getVariantInstruction(config, currentPhase, requestedDifficulty));
+        setMessage(getVariantInstruction(config, currentPhase));
       } else if (variant !== 'standard') {
         // The requested variant couldn't be generated and was downgraded to a
         // standard puzzle. Tell the player instead of silently swapping it.
@@ -1489,6 +1514,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       if (
         variant === 'standard' &&
         puzzlesSolved >= PUZZLE_EXTENSION_UNLOCK_PUZZLES &&
+        // Never lengthen a board that is being played against a clock: the +1
+        // row would be a longer chain on a shorter timer.
+        !speedModeRef.current &&
         !requestedUnbrokenWeave &&
         // Same rule as the two paths above: never hand a Lexicon board the
         // ordinary extended-standard fallback (common vocabulary paid at the
@@ -1551,6 +1579,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setUndoLimited(false); // the daily always allows unlimited undos
     lexiconModeRef.current = false;
     setLexiconMode(false); // the daily is identical for everyone — never Lexicon
+    speedModeRef.current = false;
+    setSpeedMode(false); // the daily is identical for everyone — never timed
     unbrokenWeaveModeRef.current = false;
     setUnbrokenWeaveMode(false);
     setIsSharedChallenge(false);
@@ -1598,6 +1628,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setUndoLimited(false); // a friend's shared board — unlimited undos
     lexiconModeRef.current = false;
     setLexiconMode(false); // a friend's shared board — never Lexicon
+    speedModeRef.current = false;
+    setSpeedMode(false); // a friend's shared board — never timed
     unbrokenWeaveModeRef.current = false;
     setUnbrokenWeaveMode(false);
     setIsDailyBoard(false);
@@ -2303,6 +2335,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         blind: blindMode,
         undoLimited,
         lexicon: lexiconMode,
+        speed: speedMode,
         // THE marked final board's win — App silences the fanfare and fires
         // the finale (ref mirror: set at board start, immune to stale closures).
         isFinalBoard: isFinalBoardRef.current,
@@ -2470,6 +2503,13 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     currentPhase,
     gameMode,
     blindMode,
+    // Both are READ into the victory payload this callback returns (the
+    // Blind+Challenge 2.25x amber tier and the max_stack apex achievement are
+    // picked from them in App), so they belong here beside their siblings
+    // gameMode/blindMode. Omitted, the callback could close over a stale flag.
+    undoLimited,
+    lexiconMode,
+    speedMode,
     unbrokenWeaveMode,
     spentLetterSet,
     doubleShiftPhase,
@@ -2849,6 +2889,17 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     // served board); the weave apex forces it off like the other modifiers.
     lexiconModeRef.current = restoreUnbrokenWeave ? false : (saved.lexiconMode ?? false);
     setLexiconMode(restoreUnbrokenWeave ? false : (saved.lexiconMode ?? false));
+    // Speed restores with the board. LEGACY SAVES: puzzleSaveState carries no
+    // schema version, and a board autosaved by a build where speed was a STYLE
+    // holds currentVariant:'speed' — a value that now matches no config, so the
+    // clock would silently never start on it and the badge would read blank.
+    // Coerce it: play it as the standard board it actually is (every speed
+    // board has been bank-served at full standard length for a long time), with
+    // the modifier armed.
+    const legacySpeedVariant = (saved.currentVariant as string) === 'speed';
+    const restoredSpeed = restoreUnbrokenWeave ? false : (saved.speedMode ?? legacySpeedVariant);
+    speedModeRef.current = restoredSpeed;
+    setSpeedMode(restoredSpeed);
     unbrokenWeaveModeRef.current = restoreUnbrokenWeave;
     setUnbrokenWeaveMode(restoreUnbrokenWeave);
     setSpentLetterSet(restoredSpentLetters);
@@ -2864,7 +2915,11 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     // board that was served as final, even across a relaunch.
     isFinalBoardRef.current = saved.isFinalBoard === true;
     setIsFinalBoard(saved.isFinalBoard === true);
-    setCurrentVariant(restoreUnbrokenWeave ? 'standard' : saved.currentVariant);
+    // A legacy 'speed' variant is coerced to 'standard' (see the speedMode
+    // restore above) so it lands on a real config instead of an unknown key.
+    setCurrentVariant(
+      restoreUnbrokenWeave || legacySpeedVariant ? 'standard' : saved.currentVariant
+    );
     setSelectedVariantState(restoreUnbrokenWeave ? 'standard' : saved.selectedVariant);
     setMoveDirection(saved.moveDirection);
     setCurrentPhase(saved.currentPhase);
@@ -2988,6 +3043,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   );
 
   const state: PuzzleGameState = {
+    speedMode,
     rows,
     activeRowIndex,
     selectedLetter,

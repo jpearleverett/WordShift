@@ -266,7 +266,7 @@ describe('resolvePreviewGradingMode', () => {
     expect(resolve(20, { difficulty: 'HARD', variant: 'double_shift' })).toBe('graded');
   });
 
-  test.each(['standard', 'reverse', 'speed'] as const)(
+  test.each(['standard', 'reverse'] as const)(
     '%s goes neutral at FULL_LIMIT and stays neutral',
     (variant) => {
       expect(resolve(12, { difficulty: 'HARD', variant })).toBe('neutral');
@@ -1126,16 +1126,20 @@ describe('usePuzzleGame', () => {
       expect(state.rows).toHaveLength(5);
     });
 
-    test('uses selected variant for new puzzles', async () => {
+    test('remembers the selected style even when the served board falls back', async () => {
+      // The bank mock returns null here, so the board comes from the
+      // guaranteed STANDARD fallback. The player's chosen style must survive
+      // that as a preference for later boards — it is a preference, not a
+      // property of the board that happened to be served.
       resetHookState();
       let [, actions] = callHook();
-      actions.setSelectedVariant('speed');
+      actions.setSelectedVariant('double_shift');
       [, actions] = callHook();
       await actions.startNewGame('MEDIUM');
 
       const [state] = callHook();
-      expect(state.currentVariant).toBe('speed');
-      expect(state.selectedVariant).toBe('speed');
+      expect(state.selectedVariant).toBe('double_shift');
+      expect(state.currentVariant).toBe('standard');
     });
   });
 
@@ -1201,7 +1205,7 @@ describe('usePuzzleGame', () => {
       (bank.selectPreGeneratedPuzzle as jest.Mock).mockClear();
       resetHookState();
       let [, actions] = callHook();
-      actions.setSelectedVariant('speed');
+      actions.setSelectedVariant('double_shift');
 
       (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({
         puzzlesSolved: 162,
@@ -1217,7 +1221,7 @@ describe('usePuzzleGame', () => {
       expect(state.isFinalBoard).toBe(true);
       expect(state.currentVariant).toBe('standard');
       // The player's preferred variant is untouched for later boards.
-      expect(state.selectedVariant).toBe('speed');
+      expect(state.selectedVariant).toBe('double_shift');
       // The current board rewards as HARD, but the no-argument next-board path
       // returns to the player's prior MEDIUM preference.
       expect(state.difficulty).toBe('HARD');
@@ -1228,7 +1232,7 @@ describe('usePuzzleGame', () => {
       await actions.startNewGame(undefined, undefined, 'standard');
       [state] = callHook();
       expect(state.difficulty).toBe('MEDIUM');
-      expect(state.selectedVariant).toBe('speed');
+      expect(state.selectedVariant).toBe('double_shift');
     });
 
     test('after the finale is completed, boards serve normally again', async () => {
@@ -2864,7 +2868,7 @@ describe('usePuzzleGame', () => {
       let [, actions] = callHook();
       actions.setCurrentPhase(5);
       [, actions] = callHook();
-      await actions.startNewGame('MEDIUM', 'challenge', 'speed', true, true);
+      await actions.startNewGame('MEDIUM', 'challenge', 'standard', true, true);
     }
 
     async function playMove(char: string, slot: number) {

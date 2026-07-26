@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Difficulty } from '../types';
 import { getLocalDateString, parseLocalDate } from './dateUtils';
-import { JOURNAL_UNLOCK_PUZZLES } from '../constants/gameBalance';
+import { JOURNAL_UNLOCK_PUZZLES, SPEED_TOGGLE_UNLOCK_PUZZLES } from '../constants/gameBalance';
 import { isEventDay } from './liveEvents';
 import {
   getEventQuestTitle,
@@ -34,6 +34,7 @@ export type QuestType =
   | 'earn_stars'        // Earn N three-star ratings
   | 'no_hints'          // Complete N puzzles without hints
   | 'challenge_mode'    // Complete N puzzles in challenge mode
+  | 'speed_wins'        // Win N boards with the Speed Shift modifier armed
   | 'earn_amber'        // Earn N total amber
   | 'visit_animals'     // Talk to N different animals
   | 'streak_days'       // Maintain a streak for N days
@@ -151,7 +152,7 @@ export const DAILY_QUEST_POOL: QuestTemplate[] = [
   // invisible content and rotation gets a daily reason.
   { type: 'variant_wins', titleTemplate: 'Backward Steps', descTemplate: 'Win a Reverse Shift puzzle', darkDescTemplate: 'Walk the pattern back once', target: 1, rewardAmber: 12, variant: 'reverse' },
   { type: 'variant_wins', titleTemplate: 'Doubled', descTemplate: 'Win a Double Shift puzzle', darkDescTemplate: 'Two letters, one breath', target: 1, rewardAmber: 12, variant: 'double_shift' },
-  { type: 'variant_wins', titleTemplate: 'Beat the Clock', descTemplate: 'Win a Speed Shift run', darkDescTemplate: 'Race the closing dark', target: 1, rewardAmber: 12, variant: 'speed' },
+  { type: 'speed_wins', titleTemplate: 'Beat the Clock', descTemplate: 'Win a board against the clock', darkDescTemplate: 'Race the closing dark', target: 1, rewardAmber: 12 },
   // Tending (Phase 5+ only). Deliberately net-negative — rewards less amber than
   // it asks you to tend, so it pulls amber out of the economy (a sink disguised
   // as a quest) while giving a daily reason to deepen the pattern.
@@ -193,6 +194,7 @@ export function isCasualDailyQuest(q: { type: QuestType; target: number }): bool
     case 'solve_difficulty':
     case 'challenge_mode':
     case 'variant_wins':
+    case 'speed_wins':
       return q.target <= CASUAL_DAILY_SOLVE_BUDGET;
     case 'visit_animals':
       return true;
@@ -229,7 +231,7 @@ export const WEEKLY_QUEST_POOL: QuestTemplate[] = [
   // Variant quests (weekly, higher targets/rewards) — gated to unlocked variants.
   { type: 'variant_wins', titleTemplate: 'The Return', descTemplate: 'Win {target} Reverse Shift puzzles this week', darkDescTemplate: 'Walk the pattern back {target} times', target: 5, rewardAmber: 85, variant: 'reverse' },
   { type: 'variant_wins', titleTemplate: 'Both Hands', descTemplate: 'Win {target} Double Shift puzzles this week', darkDescTemplate: 'Two letters at a time, {target} times over', target: 5, rewardAmber: 85, variant: 'double_shift' },
-  { type: 'variant_wins', titleTemplate: 'Fleet', descTemplate: 'Win {target} Speed Shift runs this week', darkDescTemplate: 'Outrun the dark {target} times', target: 5, rewardAmber: 85, variant: 'speed' },
+  { type: 'speed_wins', titleTemplate: 'Fleet', descTemplate: 'Win {target} boards against the clock this week', darkDescTemplate: 'Outrun the dark {target} times', target: 5, rewardAmber: 85 },
   // Sacrifice (Phase 4+ only). Deliberately net-negative like tend_amber — the
   // quest can only appear at Phase 4+ where the reward multiplier is 2.0x, so
   // the base reward must stay below target/2 or the quest becomes an amber
@@ -367,6 +369,10 @@ function generateQuestsFromPool(
     if (t.type === 'sacrifice_amber' && phase < 4) return false;
     if (t.type === 'tend_amber' && phase < 5) return false;
     if (t.type === 'challenge_mode' && !challengeUnlocked) return false;
+    // Speed is a modifier now, so its quests gate on its own toggle rather than
+    // on a variant being unlocked (a variant_wins quest keyed to 'speed' would
+    // be filtered out of every draw forever, silently losing the content).
+    if (t.type === 'speed_wins' && (context?.puzzlesSolved ?? 0) < SPEED_TOGGLE_UNLOCK_PUZZLES) return false;
     // A variant quest can only appear once its variant is unlocked (else it names
     // a mode the player has never seen).
     if (t.type === 'variant_wins' && (!t.variant || !unlockedVariants.includes(t.variant))) return false;
@@ -647,6 +653,8 @@ export async function updateQuestProgress(event: {
   hintsUsed?: number;
   isDaily?: boolean;
   isChallenge?: boolean;
+  /** Speed Shift modifier was armed on the completed board. */
+  isSpeed?: boolean;
   amberEarned?: number;
   /** Number of distinct animals visited (for visit_animals quests) */
   animalsVisited?: number;
@@ -711,6 +719,9 @@ export async function updateQuestProgress(event: {
           break;
         case 'variant_wins':
           if (event.variant && event.variant === quest.variant) progressDelta = 1;
+          break;
+        case 'speed_wins':
+          if (event.isSpeed) progressDelta = 1;
           break;
         case 'earn_amber':
           progressDelta = event.amberEarned ?? 0;

@@ -33,6 +33,7 @@ import {
   FINALE_DWELL_PUZZLES,
   RESONANT_BOARD_CAP_AMBER,
   LEXICON_AMBER_MULTIPLIER,
+  SPEED_AMBER_MULTIPLIER,
 } from '../constants/gameBalance';
 import { isPatronSync } from './entitlements';
 
@@ -562,6 +563,8 @@ export async function awardPuzzleAmber(
     /** Lexicon (rare-word) win: pays the LEXICON_AMBER_MULTIPLIER bonus on the
      *  subtotal. Amber-only, REWARD-only — NEVER feeds phase progression. */
     lexicon?: boolean;
+    /** Speed Shift modifier: amber-only, like lexicon. Never phase progress. */
+    speed?: boolean;
     /**
      * Resonance bonus for the board (resonant deep-word choices, already
      * per-move-priced by the caller). Amber-only, REWARD-only: added to the
@@ -581,6 +584,7 @@ export async function awardPuzzleAmber(
   challengeBonus: number;
   /** Lexicon rare-word bonus actually credited (0 when not a Lexicon board). */
   lexiconBonus: number;
+  speedBonus: number;
   patronBonus: number;
   surpriseBonus: number;
   /** Clamped resonance bonus actually credited (0 when none). */
@@ -659,6 +663,16 @@ export async function awardPuzzleAmber(
   // progression (computed separately below), so a rare board pays more amber but
   // never accelerates the descent. Composes on top of the variant multiplier
   // (applied by the caller) and the trial bonus above.
+  // Speed rides the same shape as Lexicon: a REWARD-only multiplier on the
+  // running subtotal. It was a variant multiplier before it became a modifier;
+  // the rate is unchanged so nobody's payout moves. Like every other bonus
+  // except blind's, it never touches phase progression — stacking modifiers
+  // pays more amber and never buys a faster descent.
+  let speedBonus = 0;
+  if (options.speed === true) {
+    speedBonus = Math.floor(totalAmount * (SPEED_AMBER_MULTIPLIER - 1));
+    totalAmount += speedBonus;
+  }
   let lexiconBonus = 0;
   if (options.lexicon === true) {
     lexiconBonus = Math.floor(totalAmount * (LEXICON_AMBER_MULTIPLIER - 1));
@@ -841,6 +855,7 @@ export async function awardPuzzleAmber(
     streakBonus,
     challengeBonus,
     lexiconBonus,
+    speedBonus,
     patronBonus,
     surpriseBonus,
     resonanceBonus,
@@ -1571,8 +1586,14 @@ export async function applyVariantAmberBonus(
  * and the variant-offer nudge. Standard non-blind wins are a no-op. Idempotent
  * per call (one win = one increment).
  */
-export async function recordVariantWin(variant: string, blind: boolean, lexicon: boolean = false, maxStack: boolean = false): Promise<void> {
-  if ((!variant || variant === 'standard') && !blind && !lexicon && !maxStack) return;
+export async function recordVariantWin(
+  variant: string,
+  blind: boolean,
+  lexicon: boolean = false,
+  maxStack: boolean = false,
+  speed: boolean = false,
+): Promise<void> {
+  if ((!variant || variant === 'standard') && !blind && !lexicon && !maxStack && !speed) return;
   const progress = await loadProgress();
   if (variant && variant !== 'standard') {
     if (!progress.variantWins) progress.variantWins = {};
@@ -1580,6 +1601,9 @@ export async function recordVariantWin(variant: string, blind: boolean, lexicon:
   }
   if (blind) {
     progress.blindWins = (progress.blindWins || 0) + 1;
+  }
+  if (speed) {
+    progress.speedWins = (progress.speedWins || 0) + 1;
   }
   if (lexicon) {
     progress.lexiconWins = (progress.lexiconWins || 0) + 1;
@@ -1594,12 +1618,16 @@ export async function recordVariantWin(variant: string, blind: boolean, lexicon:
 }
 
 /** Read per-variant + blind + lexicon + max-stack lifetime win counts (achievements / nudges). */
-export async function getVariantWinStats(): Promise<{ variantWins: Record<string, number>; blindWins: number; lexiconWins: number; maxStackWins: number }> {
+export async function getVariantWinStats(): Promise<{ variantWins: Record<string, number>; blindWins: number; lexiconWins: number; maxStackWins: number; speedWins: number }> {
   const progress = await loadProgress();
   return {
     variantWins: progress.variantWins || {},
     blindWins: progress.blindWins || 0,
     lexiconWins: progress.lexiconWins || 0,
+    // Legacy fold: speed used to be a STYLE, so lifetime wins accumulated under
+    // variantWins.speed. Reading both keeps every existing player's Speed
+    // achievement progress intact after the conversion.
+    speedWins: (progress.speedWins || 0) + (progress.variantWins?.speed || 0),
     maxStackWins: progress.maxStackWins || 0,
   };
 }

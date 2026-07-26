@@ -63,6 +63,7 @@ const defaultState: AchievementCheckState = {
   variantWins: {},
   blindWins: 0,
   lexiconWins: 0,
+  speedWins: 0,
   maxStackWins: 0,
 };
 
@@ -108,9 +109,12 @@ describe('achievements', () => {
     const state = {
       ...defaultState,
       stats: { ...defaultState.stats, flawlessCount: 1 },
-      variantWins: { reverse: 1, double_shift: 1, speed: 1 },
+      // Speed is a MODIFIER now, so its wins live on their own counter rather
+      // than under a variant key.
+      variantWins: { reverse: 1, double_shift: 1 },
       blindWins: 1,
       lexiconWins: 0,
+      speedWins: 1,
       maxStackWins: 0,
     };
     const ids = (await checkAchievements(state)).map(a => a.id);
@@ -141,7 +145,8 @@ describe('achievements', () => {
       variantWins: { reverse: 5, double_shift: 5, speed: 5 },
       blindWins: 5,
       lexiconWins: 5,
-      maxStackWins: 0,
+      speedWins: 0,
+  maxStackWins: 0,
     };
     expect((await checkAchievements(noStack)).map(a => a.id)).not.toContain('max_stack');
 
@@ -156,7 +161,8 @@ describe('achievements', () => {
       variantWins: { reverse: 20, double_shift: 20 }, // no speed win
       blindWins: 0,
       lexiconWins: 0,
-      maxStackWins: 0,
+      speedWins: 0,
+  maxStackWins: 0,
     };
     const ids = (await checkAchievements(state)).map(a => a.id);
     expect(ids).toContain('reverse_15');

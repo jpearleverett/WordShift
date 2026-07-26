@@ -48,6 +48,7 @@ export interface AmberBreakdown {
   challengeBonus: number;
   /** Lexicon rare-word bonus (amber-only, never phase progress). */
   lexiconBonus: number;
+  speedBonus: number;
   patronBonus: number;
   surpriseBonus: number;
   /** Resonant deep-word choices this board (per-move, board-capped; amber-only). */
@@ -181,7 +182,8 @@ export interface PersistenceActions {
     resonantChoiceCount?: number,
     lexicon?: boolean,
     maxStack?: boolean,
-    undoLimited?: boolean
+    undoLimited?: boolean,
+    speed?: boolean
   ) => Promise<VictoryData>;
   setAmberBalance: (balance: number) => void;
   refreshStats: () => Promise<void>;
@@ -273,15 +275,19 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
     // Lexicon (rare-word) win: pays the itemized rare-vocabulary amber bonus
     // (never phase progress) and feeds the lifetime lexicon-win counter.
     lexicon: boolean = false,
-    // Maximal-stack win (EXPERT + Challenge + Blind + non-standard variant +
-    // Lexicon all at once) — App computes it from the board's flags; feeds the
-    // one-time apex achievement counter only. Amber/pacing are unaffected.
+    // Maximal-stack win (EXPERT + a non-standard style + ALL FOUR modifiers:
+    // Challenge, Speed, Blind, Lexicon) — App computes it from the board's
+    // flags; feeds the one-time apex achievement counter only. Amber/pacing
+    // are unaffected.
     maxStack: boolean = false,
     // The undo-limit ("Challenge") constraint was active on this board. Only
     // changes the payout when it rides WITH blind: Blind+Challenge is the
     // maximal trial and pays a small premium over Blind alone (which frees
     // undos). Amber only — never phase progress.
-    undoLimited: boolean = false
+    undoLimited: boolean = false,
+    // Speed Shift modifier: an amber-only multiplier (never phase progress) and
+    // the lifetime speed-win counter behind the Speed achievements.
+    speed: boolean = false
   ): Promise<VictoryData> => {
     const stars = calculateStars(hintsUsed, invalidAttempts);
     const flawless = isFlawless(hintsUsed, invalidAttempts, undosUsed);
@@ -347,6 +353,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         undoLimited,
         // Lexicon (rare-word) bonus — amber-only, never phase progress.
         lexicon,
+        speed,
         // Amber-only resonance bonus (itemized by the economy, never progress).
         resonanceBonus,
       });
@@ -385,8 +392,8 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
 
       // Track the variant/blind/lexicon win for achievements + the variant-offer
       // nudge. Runs for blind/lexicon standard boards too (both compose with any variant).
-      if (variant !== 'standard' || blind || lexicon) {
-        await recordVariantWin(variant, blind, lexicon, maxStack);
+      if (variant !== 'standard' || blind || lexicon || speed) {
+        await recordVariantWin(variant, blind, lexicon, maxStack, speed);
       }
 
       // Crediting split: ONLY the per-puzzle amber (amount — incl. the variant/
@@ -410,6 +417,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         streakBonus: amberResult.streakBonus ?? 0,
         challengeBonus: amberResult.challengeBonus ?? 0,
         lexiconBonus: amberResult.lexiconBonus ?? 0,
+        speedBonus: amberResult.speedBonus ?? 0,
         patronBonus: amberResult.patronBonus ?? 0,
         surpriseBonus: amberResult.surpriseBonus ?? 0,
         resonanceBonus: amberResult.resonanceBonus ?? 0,
@@ -529,6 +537,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
           amberEarned: totalEarnedAmber,
           currentStreak: amberResult.currentStreak,
           variant,
+          isSpeed: speed,
         }, effectivePhase);
         questsCompleted = completedQuests.map(q => q.title);
       } catch (_) {

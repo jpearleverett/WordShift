@@ -1144,6 +1144,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               const patronBonusAmber = breakdown?.patronBonus ?? 0;
               const challengeBonusAmber = victoryData.challengeBonus ?? 0;
               const lexiconBonusAmber = breakdown?.lexiconBonus ?? 0;
+              const speedBonusAmber = breakdown?.speedBonus ?? 0;
               const surpriseBonusAmber = victoryData.surpriseBonus ?? 0;
               const resonanceBonusAmber = breakdown?.resonanceBonus ?? victoryData.resonanceBonus ?? 0;
               const variantBonusAmber = victoryData.variantBonus ?? 0;
@@ -1206,6 +1207,14 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                                 : 'Challenge'}
                             </Text>
                             <Text style={[styles.bonusValue, { color: accent.challenge }]}>+{challengeBonusAmber}</Text>
+                          </View>
+                        )}
+                        {speedBonusAmber > 0 && (
+                          <View style={styles.bonusRow}>
+                            <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
+                              {phase >= 3 ? 'Against the clock' : 'Speed Shift'}
+                            </Text>
+                            <Text style={[styles.bonusValue, { color: accent.challenge }]}>+{speedBonusAmber}</Text>
                           </View>
                         )}
                         {lexiconBonusAmber > 0 && (

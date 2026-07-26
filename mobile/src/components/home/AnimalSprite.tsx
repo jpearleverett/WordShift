@@ -184,7 +184,7 @@ export const CHARACTER_SPRITES: Partial<Record<AnimalType, {
 // vector look on every platform instead of rendering the host font's emoji.
 type EmoteKey =
   | 'heart' | 'pale_heart' | 'sparkle' | 'note' | 'thought' | 'question'
-  | 'fog' | 'tear' | 'eye' | 'void' | 'candle' | 'sleep';
+  | 'fog' | 'tear' | 'eye' | 'void' | 'candle';
 const EMOTE_SPRITES: Record<EmoteKey, ImageSourcePropType> = {
   heart: require('../../../assets/ui/emote_heart.png'),
   pale_heart: require('../../../assets/ui/emote_pale_heart.png'),
@@ -197,9 +197,6 @@ const EMOTE_SPRITES: Record<EmoteKey, ImageSourcePropType> = {
   eye: require('../../../assets/ui/emote_eye.png'),
   void: require('../../../assets/ui/emote_void.png'),
   candle: require('../../../assets/ui/emote_candle.png'),
-  // Cottage sleep glyph — replaces the raw 💤 OS emoji in the cooldown name tag
-  // (the last OS emoji on the animal chrome), keeping the sprite look everywhere.
-  sleep: require('../../../assets/ui/emote_sleep.png'),
 };
 
 // Phase-aware parchment puff drawn BEHIND the ambient emote sprite, so the
@@ -1230,7 +1227,15 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
         onPress={handlePress}
         activeOpacity={1}
         style={styles.touchable}
-        accessibilityLabel={`${animal.name} the ${animal.type}`}
+        // The one focusable element for this animal, so it carries everything
+        // the (now decorative) nameplate shows.
+        accessibilityLabel={
+          isOnCooldown
+            ? cooldownPuzzlesLeft != null && cooldownPuzzlesLeft > 0
+              ? `${animal.name} the ${animal.type}, resting for ${cooldownPuzzlesLeft === 1 ? '1 more puzzle' : `${cooldownPuzzlesLeft} more puzzles`}`
+              : `${animal.name} the ${animal.type}, resting`
+            : `${animal.name} the ${animal.type}`
+        }
         accessibilityRole="button"
       >
         <View style={styles.spriteContainer}>
@@ -1259,10 +1264,10 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
 
           {/* Animal BODY — the ONLY layer that carries the facing flip (scaleX),
               breathe, tap, wiggle, procedural gait, AND the rare-idle beats.
-              The emote bubble, sleeping Z's, notification badge, name tag and
-              cooldown chrome are unflipped, untransformed SIBLINGS below, so a
-              facing-left animal never renders its name in mirror-writing and no
-              chrome squashes with a footfall or an idle beat. */}
+              The emote bubble, sleeping Z's and notification badge are
+              unflipped, untransformed SIBLINGS below, so a facing-left animal
+              never mirrors its chrome and nothing squashes with a footfall or
+              an idle beat. */}
           <Animated.View
             style={[
               styles.body,
@@ -1419,48 +1424,13 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
             </Animated.View>
           )}
 
-          {/* Name tag with phase-based mood indicator.
-              Overlaid on the sprite's lower body rather than stacked BELOW it.
-              A room is ~123dp tall and the sprite box alone is 90dp plus its 5dp
-              touch padding, so a tag in normal flow started at ~129dp and was
-              clipped away entirely by RoomView's overflow:hidden — the animals
-              have never actually shown their names. Overlaying is also how the
-              design renders it (a small pill sitting at the animal's base).
-              The `top` is chosen so the tag clears the clip for EVERY animal,
-              including the two carrying the largest FLOOR_OFFSET (15). */}
-          <View style={[
-            styles.nameTag,
-            currentPhase >= 3 && styles.nameTagDark,
-          ]}>
-            <View style={[styles.moodDot, { backgroundColor: getMoodColor() }]} />
-            <Text style={[
-              styles.nameText,
-              currentPhase >= 3 && styles.nameTextDark,
-            ]}>
-              {animal.name}
-            </Text>
-            {/* The remaining-puzzle count rides INSIDE the tag. It used to be a
-                second badge stacked below, which sat even further past the clip
-                boundary; one pill is both visible and tidier. */}
-            {isOnCooldown && (
-              <>
-                <Image source={EMOTE_SPRITES.sleep} style={styles.cooldownIcon} resizeMode="contain" />
-                {cooldownPuzzlesLeft != null && cooldownPuzzlesLeft > 0 && (
-                  <Text
-                    style={[
-                      styles.cooldownCountText,
-                      currentPhase >= 3 && styles.cooldownCountTextDark,
-                    ]}
-                    accessibilityLabel={
-                      cooldownPuzzlesLeft === 1 ? 'resting for 1 more puzzle' : `resting for ${cooldownPuzzlesLeft} more puzzles`
-                    }
-                  >
-                    {cooldownPuzzlesLeft}
-                  </Text>
-                )}
-              </>
-            )}
-          </View>
+          {/* The animal's NAME is deliberately not rendered here.
+              It used to be a small dark pill riding this sprite's own transform
+              stack, so it wandered around the room with the animal and sat over
+              its body. It is now a STATIC cottage nameplate pinned to the bottom
+              of the room (see RoomView's animalPlate): a label belongs to the
+              room, not to a moving character, and a flat dark pill was the last
+              webby chip left in the house. The cooldown state moved with it. */}
         </View>
       </TouchableOpacity>
     </Animated.View>
@@ -1481,7 +1451,8 @@ const styles = StyleSheet.create({
   // Carries the facing flip + breathe + tap + wiggle + gait + rare-idle beats;
   // wraps ONLY the sprite so the chrome siblings (and the grounded contact
   // shadow) never inherit the mirror/deform (the un-mirror render-tree fix
-  // these behaviors build on).
+  // these behaviors build on). The animal's NAME is no longer among them — it
+  // is a static plaque on the room floor now (RoomView.animalPlate).
   body: {
     alignItems: 'center',
   },
@@ -1553,55 +1524,6 @@ const styles = StyleSheet.create({
     color: CandyColors.white,
     fontSize: FONT_SIZE.bodyLg,
     fontWeight: '900',
-  },
-  // Overlaid on the sprite's lower body (see the render note). Budget for the
-  // clip at roomHeight 123.5: translateY tops out ~35.3 (posY 20 of the 20-80
-  // wander band), + FLOOR_OFFSET up to 15, + the touchable's 5dp padding, + this
-  // `top` 50, + the pill's own ~16dp height = ~121.3, inside the room.
-  nameTag: {
-    position: 'absolute',
-    top: 50,
-    alignSelf: 'center',
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.66)',
-    borderRadius: 7,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  nameText: {
-    fontFamily: PIXEL_FONT_BOLD,
-    color: CandyColors.white,
-    fontSize: FONT_SIZE.micro,
-    fontWeight: '700',
-  },
-  moodDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-  },
-  // Cottage sleep sprite in the cooldown name tag (replaces the raw 💤 emoji).
-  cooldownIcon: {
-    width: 11,
-    height: 11,
-    marginLeft: 1,
-  },
-  nameTagDark: {
-    backgroundColor: CandyColors.purple.dark,
-  },
-  nameTextDark: {
-    color: CandyColors.gray[300],
-  },
-  cooldownCountText: {
-    fontFamily: PIXEL_FONT_BOLD,
-    color: CandyColors.gray[300],
-    fontSize: FONT_SIZE.micro,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  cooldownCountTextDark: {
-    color: CandyColors.gray[400],
   },
   emotionBubble: {
     position: 'absolute',

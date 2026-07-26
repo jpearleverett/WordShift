@@ -41,7 +41,7 @@ describe('Unbroken Weave player-facing wiring', () => {
   test('cold-open and incompatible setup choices explicitly turn the mode off', () => {
     expect(APP_TSX).toMatch(/saved\.unbrokenWeaveMode !== true/);
     expect(APP_TSX).toMatch(
-      /startNewGame\('EASY', 'standard', 'standard', false, false\)/,
+      /startNewGame\('EASY', 'standard', 'standard', false, false, undefined, false\)/,
     );
     expect(APP_TSX).toMatch(
       /startNewGame\(\s*puzzle\.difficulty,\s*puzzle\.gameMode,\s*variant,\s*undefined,\s*false,\s*\)/s,
