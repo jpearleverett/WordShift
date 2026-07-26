@@ -60,6 +60,10 @@ import {
   hasSeenFirstWinGlitch,
   markFirstWinGlitchSeen,
   markStarterIntroSeen,
+  hasSeenModifierStackingIntro,
+  markModifierStackingIntroSeen,
+  hasSeenLexiconIntro,
+  markLexiconIntroSeen,
   consumePendingVariantTutorial,
   checkFreeStreakFreeze,
   isHouseCompleted,
@@ -107,6 +111,8 @@ import {
   getHarvestOverflowMessage,
   getFoxSetupSelectorIntroLines,
   getFoxStarterIntroLines,
+  getModifierStackingIntroLines,
+  getLexiconIntroLines,
   getNotificationPromptText,
   getSpeedTimeUpMessage,
   getDragMissMessage,
@@ -282,7 +288,7 @@ import { useScreenInsets } from './src/hooks/useScreenInsets';
 // App screen type — expanded with settings, stats, and ledger
 type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery' | 'pit' | 'shop';
 
-type PostVictoryIntroKind = 'variant_unlock' | 'starter_pack';
+type PostVictoryIntroKind = 'variant_unlock' | 'modifier_stacking' | 'lexicon_unlock' | 'starter_pack';
 interface PostVictoryIntro {
   kind: PostVictoryIntroKind;
   lines: string[];
@@ -1516,6 +1522,15 @@ function MainApp() {
     if (dismissedKind === 'starter_pack') {
       await markStarterIntroSeen();
     }
+    // Marked on DISMISSAL, never at decision time, so an interruption (a kill,
+    // a deep link) can never consume the beat unseen — the same contract the
+    // starter intro and the mandatory-harvest gate use.
+    if (dismissedKind === 'modifier_stacking') {
+      await markModifierStackingIntroSeen();
+    }
+    if (dismissedKind === 'lexicon_unlock') {
+      await markLexiconIntroSeen();
+    }
     setPostVictoryIntro(null);
     await advanceQueuedPostVictoryIntro();
     // After the starter intro closes, open the Store so the "welcome" Fox
@@ -2449,6 +2464,36 @@ function MainApp() {
             lines,
           });
         }
+      }
+      // Speed Shift's unlock is ALSO the moment the player first owns two
+      // modifiers (Challenge 15, then Speed 55), so one card announces the new
+      // modifier and teaches that they layer. Without it nothing in the game
+      // ever says the toggles compose, and a player can own four of them and
+      // still read them as four alternatives. Speed left the style list, so
+      // getNewlyUnlockedVariants can no longer surface it — this is its
+      // announcement now.
+      if (
+        immediateIntros.length === 0 &&
+        completedTotal >= SPEED_TOGGLE_UNLOCK_PUZZLES &&
+        !(await hasSeenModifierStackingIntro())
+      ) {
+        immediateIntros.push({
+          kind: 'modifier_stacking',
+          lines: getModifierStackingIntroLines(finalVictory.newPhase),
+        });
+      }
+      // Lexicon's own unlock beat. It is the one mode that changes nothing the
+      // player can SEE (blind's previews visibly vanish, the clock counts
+      // down), so it needs saying out loud more than any of them.
+      if (
+        immediateIntros.length === 0 &&
+        completedTotal >= LEXICON_UNLOCK_PUZZLES &&
+        !(await hasSeenLexiconIntro())
+      ) {
+        immediateIntros.push({
+          kind: 'lexicon_unlock',
+          lines: getLexiconIntroLines(finalVictory.newPhase),
+        });
       }
       // First harvest gate: fires when the auto-collect window has closed, a
       // real batch waits in the pit, and the player has not yet LEARNED manual

@@ -55,6 +55,13 @@ const STARTER_INTRO_SEEN_KEY = 'wordshift_starter_intro_seen';
 // The guaranteed, prominent first-FREE-victory glitch (opening promise); fired
 // once on the first non-onboarding win, cleared by Reset All so it replays.
 const FIRST_WIN_GLITCH_KEY = 'wordshift_first_win_glitch';
+// The one-time "these layer" beat, fired at the moment the player first owns
+// two modifiers (the Speed gate). Announces Speed AND teaches stacking in one
+// card rather than two interruptions.
+const MODIFIER_STACKING_INTRO_SEEN_KEY = 'wordshift_modifier_stacking_intro_seen';
+// Lexicon's own unlock beat. Every other mode has had one; Lexicon changes
+// nothing the player can see on the board, so it needed one most of all.
+const LEXICON_INTRO_SEEN_KEY = 'wordshift_lexicon_intro_seen';
 const GATED_UNLOCK_INTRO_SEEN_KEY = 'wordshift_gated_unlock_intro_seen';
 const HARVEST_HOME_INTRO_SEEN_KEY = 'wordshift_harvest_home_intro_seen';
 
@@ -1260,6 +1267,8 @@ export async function clearProgress(): Promise<void> {
     await AsyncStorage.removeItem(TRANSACTIONS_STORAGE_KEY);
     await AsyncStorage.removeItem(DAILY_CHALLENGE_INTRO_SEEN_KEY);
     await AsyncStorage.removeItem(CHALLENGE_INTRO_SEEN_KEY);
+    await AsyncStorage.removeItem(MODIFIER_STACKING_INTRO_SEEN_KEY);
+    await AsyncStorage.removeItem(LEXICON_INTRO_SEEN_KEY);
     await AsyncStorage.removeItem(FOX_PLAY_NUDGE_SEEN_KEY);
     await AsyncStorage.removeItem(PIT_NUDGE_SEEN_KEY);
     await AsyncStorage.removeItem(PIT_HARVEST_INTRO_SEEN_KEY);
@@ -1992,6 +2001,34 @@ export async function hasSeenChallengeIntro(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+export async function hasSeenModifierStackingIntro(): Promise<boolean> {
+  try {
+    return (await AsyncStorage.getItem(MODIFIER_STACKING_INTRO_SEEN_KEY)) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export async function markModifierStackingIntroSeen(): Promise<void> {
+  try {
+    await AsyncStorage.setItem(MODIFIER_STACKING_INTRO_SEEN_KEY, 'true');
+  } catch {}
+}
+
+export async function hasSeenLexiconIntro(): Promise<boolean> {
+  try {
+    return (await AsyncStorage.getItem(LEXICON_INTRO_SEEN_KEY)) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export async function markLexiconIntroSeen(): Promise<void> {
+  try {
+    await AsyncStorage.setItem(LEXICON_INTRO_SEEN_KEY, 'true');
+  } catch {}
 }
 
 export async function markChallengeIntroSeen(): Promise<void> {
