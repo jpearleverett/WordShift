@@ -804,7 +804,7 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
             onPress={onToggleBlindMode}
             accessibilityRole="button"
             accessibilityState={{ selected: blindActive }}
-            accessibilityLabel={`${phase >= 3 ? 'Blind offering' : 'Blind mode'}, ${blindActive ? 'on' : 'off'}. No guidance, judged at the end. ${blindActive && undoLimited ? '+125% amber, stacked with Challenge.' : '+100% amber.'}`}
+            accessibilityLabel={`${phase >= 3 ? 'Blind offering' : 'Blind mode'}, ${blindActive ? 'on' : 'off'}. No guidance, judged at the end. ${blindActive && undoLimited ? 'Undos capped by Challenge. +125% amber, stacked with Challenge.' : 'Undos stay free. +100% amber.'}`}
           >
             <ModeIcon
               glyph={blindActive ? '🌑' : '👁️'}
@@ -821,9 +821,15 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
                 {phase >= 3 ? 'BLIND OFFERING' : 'BLIND MODE'}
               </Text>
               <Text style={[styles.challengeMenuDesc, { color: t.muted }]}>
+                {/* The undo clause is the one thing these two rows have to say
+                    out loud. Blind ALONE frees the undos (walking the chain back
+                    to a flaw is its repair loop); adding Challenge re-imposes the
+                    budget. Neither state was ever named here, so a player who
+                    turned Challenge off had nothing confirming the cap had
+                    lifted, and read the pair as refusing to decouple. */}
                 {blindActive && undoLimited
-                  ? 'No guidance, judged at the end. +125% amber.'
-                  : 'No guidance, judged at the end. +100% amber.'}
+                  ? 'No guidance, judged at the end. Undos capped by Challenge. +125% amber.'
+                  : 'No guidance, judged at the end. Undos stay free. +100% amber.'}
               </Text>
             </View>
           </TouchableOpacity>

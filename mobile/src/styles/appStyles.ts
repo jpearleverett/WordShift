@@ -617,6 +617,19 @@ export const appStyles = StyleSheet.create({
   variantBadgeTextDusk: {
     color: 'rgba(226, 200, 224, 0.95)',
   },
+  // Secondary clause inside a badge (currently Blind's free-undo tell). Quieter
+  // than the label so the badge still reads as one chip, but held above the
+  // 4.5:1 floor on the dark translucent fill.
+  variantBadgeSubText: {
+    fontSize: FONT_SIZE.caption,
+    fontFamily: BODY_FONT,
+    color: 'rgba(232, 220, 240, 0.82)',
+    letterSpacing: 0.2,
+    flexShrink: 1,
+  },
+  variantBadgeSubTextDark: {
+    color: 'rgba(214, 170, 200, 0.85)',
+  },
   variantBadgeDark: {
     backgroundColor: 'rgba(35, 18, 45, 0.75)',
     borderWidth: 1,

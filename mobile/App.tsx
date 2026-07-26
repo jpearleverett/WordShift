@@ -4540,7 +4540,13 @@ function MainApp() {
             )}
             {/* Blind Offering badge — the previews are hidden, so without a
                 standing indicator the player has no way to tell blind is on
-                (or remember to turn it off). Same chrome as the variant badge. */}
+                (or remember to turn it off). Same chrome as the variant badge.
+                When Blind runs WITHOUT Challenge it also carries the free-undo
+                tell: the undo budget is Blind-alone's one relaxation, but the
+                chrome for it is the CHALLENGE chip, which correctly disappears
+                when the cap lifts. Removing a chip is a silent signal, so a
+                player coming off a stacked board saw only an absence and kept
+                assuming they were still capped. State it positively instead. */}
             {puzzle.blindMode && (
               <BadgeAppear
                 style={[
@@ -4549,7 +4555,11 @@ function MainApp() {
                   persistence.currentPhase >= 3 && styles.variantBadgeDark,
                 ]}
                 accessible
-                accessibilityLabel="Blind Offering is on: word previews hidden"
+                accessibilityLabel={
+                  puzzle.undoLimited
+                    ? 'Blind Offering is on: word previews hidden, undos limited by Challenge'
+                    : 'Blind Offering is on: word previews hidden, undos unlimited'
+                }
               >
                 <Image source={getModeIconSprite('🌑')!} style={styles.variantBadgeIconImage} />
                 <Text style={[
@@ -4559,6 +4569,14 @@ function MainApp() {
                 ]}>
                   {persistence.currentPhase >= 2 ? 'Blind Offering' : 'Blind'}
                 </Text>
+                {!puzzle.undoLimited && (
+                  <Text style={[
+                    styles.variantBadgeSubText,
+                    persistence.currentPhase >= 3 && styles.variantBadgeSubTextDark,
+                  ]}>
+                    {'· undos free'}
+                  </Text>
+                )}
               </BadgeAppear>
             )}
             {/* Speed Shift badge — a standing indicator the clock is armed.

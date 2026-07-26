@@ -775,6 +775,77 @@ describe('usePuzzleGame', () => {
         [state] = callHook();
         expect(state.undosRemaining).toBe(budget - 1);
       });
+
+      // Reported from device: "I selected both challenge and blind, then
+      // deselected challenge, and it still said I had no undos." Each toggle is
+      // a SEPARATE startNewGame whose other flags come through as `undefined`
+      // ("keep whatever is armed"), which is where a sticky ref would hide — the
+      // fresh-board cases above all pass every flag explicitly and would miss it.
+      // Walk the taps in order, exactly as App's handlers issue them.
+      test("the player's tap sequence: Challenge on, Blind on, Challenge OFF lifts the cap", async () => {
+        resetHookState();
+        let [, actions] = callHook();
+
+        // Tap 1 — CHALLENGE on. blind/lexicon ride as undefined.
+        await actions.startNewGame('MEDIUM', 'challenge', 'standard', undefined, false, undefined, true);
+        [, actions] = callHook();
+        actions.initGame(['TIME', 'TIED']);
+        let [state] = callHook();
+        expect(state.undoLimited).toBe(true);
+        expect(state.undosRemaining).toBe(CHALLENGE_MODE_CONFIG.getMaxUndos('MEDIUM'));
+
+        // Tap 2 — BLIND on. gameMode stays 'challenge' (the shared no-hints
+        // umbrella); the undo-limit flag is deliberately left untouched.
+        [, actions] = callHook();
+        await actions.startNewGame('MEDIUM', 'challenge', 'standard', true, false, undefined, undefined);
+        [, actions] = callHook();
+        actions.initGame(['TIME', 'TIED']);
+        [state] = callHook();
+        expect(state.blindMode).toBe(true);
+        expect(state.undoLimited).toBe(true);
+        expect(state.undosRemaining).toBe(CHALLENGE_MODE_CONFIG.getMaxUndos('MEDIUM'));
+
+        // Tap 3 — CHALLENGE off. Blind is still on, so gameMode STAYS
+        // 'challenge' and only the budget lifts. This is the exact pair the
+        // report said would not decouple.
+        [, actions] = callHook();
+        await actions.startNewGame('MEDIUM', 'challenge', 'standard', undefined, false, undefined, false);
+        [, actions] = callHook();
+        actions.initGame(['TIME', 'TIED']);
+        [state] = callHook();
+        expect(state.blindMode).toBe(true);
+        expect(state.gameMode).toBe('challenge');
+        expect(state.undoLimited).toBe(false);
+        expect(state.undosRemaining).toBe(Infinity);
+
+        // ...and the undo is genuinely free, not merely reported as such.
+        [state, actions] = callHook();
+        const m = state.rows[0].words.find(le => le.char === 'M')!;
+        actions.handleLetterPress(m, 0);
+        [, actions] = callHook();
+        await actions.handleSlotPress(0);
+        [, actions] = callHook();
+        actions.handleUndo();
+        [state] = callHook();
+        expect(state.undosRemaining).toBe(Infinity);
+        expect(state.history.length).toBe(0);
+      });
+
+      // The mirror image: turning BLIND off while Challenge stays on must keep
+      // the budget (nothing about Blind's departure relaxes Challenge).
+      test('turning Blind off leaves the Challenge cap standing', async () => {
+        resetHookState();
+        let [, actions] = callHook();
+        await actions.startNewGame('MEDIUM', 'challenge', 'standard', true, false, undefined, true);
+        [, actions] = callHook();
+        await actions.startNewGame('MEDIUM', 'challenge', 'standard', false, false, undefined, undefined);
+        [, actions] = callHook();
+        actions.initGame(['TIME', 'TIED']);
+        const [state] = callHook();
+        expect(state.blindMode).toBe(false);
+        expect(state.undoLimited).toBe(true);
+        expect(state.undosRemaining).toBe(CHALLENGE_MODE_CONFIG.getMaxUndos('MEDIUM'));
+      });
     });
 
     test('a failed judgment keeps undos free for the rest of the board', async () => {
