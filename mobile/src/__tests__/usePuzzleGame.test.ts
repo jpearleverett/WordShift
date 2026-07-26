@@ -214,6 +214,7 @@ jest.mock('../constants', () => ({
   },
 }));
 
+import { CHALLENGE_MODE_CONFIG } from '../constants/gameBalance';
 import { usePuzzleGame, hasAnyValidMove, canCompleteDoubleShift, hasAnyValidDoubleShiftMove, isBoardSolvableFromState, comboTierForStreak, shouldUseComboMessage, resolvePreviewGradingMode, PuzzleGameState, PuzzleGameActions } from '../hooks/usePuzzleGame';
 // Real values (the hook imports them from gameBalance directly, past the
 // '../constants' mock above) — the grading-window tests pin against them.
@@ -266,7 +267,7 @@ describe('resolvePreviewGradingMode', () => {
     expect(resolve(20, { difficulty: 'HARD', variant: 'double_shift' })).toBe('graded');
   });
 
-  test.each(['standard', 'reverse', 'speed'] as const)(
+  test.each(['standard', 'reverse'] as const)(
     '%s goes neutral at FULL_LIMIT and stays neutral',
     (variant) => {
       expect(resolve(12, { difficulty: 'HARD', variant })).toBe('neutral');
@@ -683,6 +684,168 @@ describe('usePuzzleGame', () => {
       [state] = callHook();
       expect(state.undosRemaining).toBe(budget);
       expect(state.rows[0].words.map(le => le.char).join('')).toBe('TIME');
+    });
+
+    // ------------------------------------------------------------------
+    // The undo truth table. ONE rule decides the budget: `undoLimited`
+    // ("Challenge"). gameMode is only the shared no-hints umbrella — it reads
+    // 'challenge' whenever EITHER Blind or Challenge is on, so keying the
+    // budget off it would silently cap Blind-alone. Blind frees undos because
+    // walking the chain back to a flaw IS the mode's repair loop; Challenge
+    // re-imposes the cap wherever it appears, including on top of Blind (the
+    // maximal trial: previews hidden AND undos budgeted).
+    // ------------------------------------------------------------------
+    describe('undo budget truth table (Challenge is the only thing that caps)', () => {
+      /** startNewGame(difficulty, mode, variant, blind, weave, lexicon, undoLimited, speed) */
+      async function boardWith(opts: {
+        blind: boolean; challenge: boolean; lexicon?: boolean; speed?: boolean;
+      }) {
+        resetHookState();
+        let [, actions] = callHook();
+        const mode = opts.blind || opts.challenge ? 'challenge' : 'standard';
+        await actions.startNewGame(
+          'MEDIUM', mode, 'standard',
+          opts.blind, false, opts.lexicon ?? false, opts.challenge, opts.speed ?? false,
+        );
+        [, actions] = callHook();
+        actions.initGame(['TIME', 'TIED']);
+        return callHook();
+      }
+
+      test('Blind ALONE: unlimited undos', async () => {
+        const [state] = await boardWith({ blind: true, challenge: false });
+        expect(state.blindMode).toBe(true);
+        expect(state.undoLimited).toBe(false);
+        expect(state.undosRemaining).toBe(Infinity);
+      });
+
+      test('Challenge ALONE: a finite budget', async () => {
+        const [state] = await boardWith({ blind: false, challenge: true });
+        expect(state.undoLimited).toBe(true);
+        expect(state.undosRemaining).toBe(CHALLENGE_MODE_CONFIG.getMaxUndos('MEDIUM'));
+        expect(state.undosRemaining).toBeLessThan(Infinity);
+      });
+
+      test('Challenge + Blind: the cap WINS (Challenge caps wherever it appears)', async () => {
+        const [state] = await boardWith({ blind: true, challenge: true });
+        expect(state.blindMode).toBe(true);
+        expect(state.undoLimited).toBe(true);
+        expect(state.undosRemaining).toBe(CHALLENGE_MODE_CONFIG.getMaxUndos('MEDIUM'));
+      });
+
+      test('the other modifiers never cap on their own', async () => {
+        // Speed and Lexicon are amber/vocabulary layers; only Challenge budgets
+        // undos, alone or stacked.
+        const [speedOnly] = await boardWith({ blind: false, challenge: false, speed: true });
+        expect(speedOnly.undosRemaining).toBe(Infinity);
+
+        const [lexOnly] = await boardWith({ blind: false, challenge: false, lexicon: true });
+        expect(lexOnly.undosRemaining).toBe(Infinity);
+
+        // ...but Challenge riding along with them still caps.
+        const [speedPlusChallenge] = await boardWith({ blind: false, challenge: true, speed: true });
+        expect(speedPlusChallenge.undosRemaining).toBe(CHALLENGE_MODE_CONFIG.getMaxUndos('MEDIUM'));
+
+        // And Blind + Speed (no Challenge) stays free.
+        const [blindPlusSpeed] = await boardWith({ blind: true, challenge: false, speed: true });
+        expect(blindPlusSpeed.undosRemaining).toBe(Infinity);
+      });
+
+      test('an undo is CHARGED under Challenge and FREE under Blind alone', async () => {
+        // Blind alone: commit a move, undo it, budget untouched.
+        let [state, actions] = await boardWith({ blind: true, challenge: false });
+        let m = state.rows[0].words.find(le => le.char === 'M')!;
+        actions.handleLetterPress(m, 0);
+        [, actions] = callHook();
+        await actions.handleSlotPress(0);
+        [, actions] = callHook();
+        actions.handleUndo();
+        [state] = callHook();
+        expect(state.undosRemaining).toBe(Infinity);
+
+        // Challenge alone: the same undo costs one from the budget.
+        [state, actions] = await boardWith({ blind: false, challenge: true });
+        const budget = state.undosRemaining;
+        m = state.rows[0].words.find(le => le.char === 'M')!;
+        actions.handleLetterPress(m, 0);
+        [, actions] = callHook();
+        await actions.handleSlotPress(2); // M into TIED at 2 -> TIMED (valid)
+        [, actions] = callHook();
+        actions.handleUndo();
+        [state] = callHook();
+        expect(state.undosRemaining).toBe(budget - 1);
+      });
+
+      // Reported from device: "I selected both challenge and blind, then
+      // deselected challenge, and it still said I had no undos." Each toggle is
+      // a SEPARATE startNewGame whose other flags come through as `undefined`
+      // ("keep whatever is armed"), which is where a sticky ref would hide — the
+      // fresh-board cases above all pass every flag explicitly and would miss it.
+      // Walk the taps in order, exactly as App's handlers issue them.
+      test("the player's tap sequence: Challenge on, Blind on, Challenge OFF lifts the cap", async () => {
+        resetHookState();
+        let [, actions] = callHook();
+
+        // Tap 1 — CHALLENGE on. blind/lexicon ride as undefined.
+        await actions.startNewGame('MEDIUM', 'challenge', 'standard', undefined, false, undefined, true);
+        [, actions] = callHook();
+        actions.initGame(['TIME', 'TIED']);
+        let [state] = callHook();
+        expect(state.undoLimited).toBe(true);
+        expect(state.undosRemaining).toBe(CHALLENGE_MODE_CONFIG.getMaxUndos('MEDIUM'));
+
+        // Tap 2 — BLIND on. gameMode stays 'challenge' (the shared no-hints
+        // umbrella); the undo-limit flag is deliberately left untouched.
+        [, actions] = callHook();
+        await actions.startNewGame('MEDIUM', 'challenge', 'standard', true, false, undefined, undefined);
+        [, actions] = callHook();
+        actions.initGame(['TIME', 'TIED']);
+        [state] = callHook();
+        expect(state.blindMode).toBe(true);
+        expect(state.undoLimited).toBe(true);
+        expect(state.undosRemaining).toBe(CHALLENGE_MODE_CONFIG.getMaxUndos('MEDIUM'));
+
+        // Tap 3 — CHALLENGE off. Blind is still on, so gameMode STAYS
+        // 'challenge' and only the budget lifts. This is the exact pair the
+        // report said would not decouple.
+        [, actions] = callHook();
+        await actions.startNewGame('MEDIUM', 'challenge', 'standard', undefined, false, undefined, false);
+        [, actions] = callHook();
+        actions.initGame(['TIME', 'TIED']);
+        [state] = callHook();
+        expect(state.blindMode).toBe(true);
+        expect(state.gameMode).toBe('challenge');
+        expect(state.undoLimited).toBe(false);
+        expect(state.undosRemaining).toBe(Infinity);
+
+        // ...and the undo is genuinely free, not merely reported as such.
+        [state, actions] = callHook();
+        const m = state.rows[0].words.find(le => le.char === 'M')!;
+        actions.handleLetterPress(m, 0);
+        [, actions] = callHook();
+        await actions.handleSlotPress(0);
+        [, actions] = callHook();
+        actions.handleUndo();
+        [state] = callHook();
+        expect(state.undosRemaining).toBe(Infinity);
+        expect(state.history.length).toBe(0);
+      });
+
+      // The mirror image: turning BLIND off while Challenge stays on must keep
+      // the budget (nothing about Blind's departure relaxes Challenge).
+      test('turning Blind off leaves the Challenge cap standing', async () => {
+        resetHookState();
+        let [, actions] = callHook();
+        await actions.startNewGame('MEDIUM', 'challenge', 'standard', true, false, undefined, true);
+        [, actions] = callHook();
+        await actions.startNewGame('MEDIUM', 'challenge', 'standard', false, false, undefined, undefined);
+        [, actions] = callHook();
+        actions.initGame(['TIME', 'TIED']);
+        const [state] = callHook();
+        expect(state.blindMode).toBe(false);
+        expect(state.undoLimited).toBe(true);
+        expect(state.undosRemaining).toBe(CHALLENGE_MODE_CONFIG.getMaxUndos('MEDIUM'));
+      });
     });
 
     test('a failed judgment keeps undos free for the rest of the board', async () => {
@@ -1126,16 +1289,20 @@ describe('usePuzzleGame', () => {
       expect(state.rows).toHaveLength(5);
     });
 
-    test('uses selected variant for new puzzles', async () => {
+    test('remembers the selected style even when the served board falls back', async () => {
+      // The bank mock returns null here, so the board comes from the
+      // guaranteed STANDARD fallback. The player's chosen style must survive
+      // that as a preference for later boards — it is a preference, not a
+      // property of the board that happened to be served.
       resetHookState();
       let [, actions] = callHook();
-      actions.setSelectedVariant('speed');
+      actions.setSelectedVariant('double_shift');
       [, actions] = callHook();
       await actions.startNewGame('MEDIUM');
 
       const [state] = callHook();
-      expect(state.currentVariant).toBe('speed');
-      expect(state.selectedVariant).toBe('speed');
+      expect(state.selectedVariant).toBe('double_shift');
+      expect(state.currentVariant).toBe('standard');
     });
   });
 
@@ -1201,7 +1368,7 @@ describe('usePuzzleGame', () => {
       (bank.selectPreGeneratedPuzzle as jest.Mock).mockClear();
       resetHookState();
       let [, actions] = callHook();
-      actions.setSelectedVariant('speed');
+      actions.setSelectedVariant('double_shift');
 
       (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({
         puzzlesSolved: 162,
@@ -1217,7 +1384,7 @@ describe('usePuzzleGame', () => {
       expect(state.isFinalBoard).toBe(true);
       expect(state.currentVariant).toBe('standard');
       // The player's preferred variant is untouched for later boards.
-      expect(state.selectedVariant).toBe('speed');
+      expect(state.selectedVariant).toBe('double_shift');
       // The current board rewards as HARD, but the no-argument next-board path
       // returns to the player's prior MEDIUM preference.
       expect(state.difficulty).toBe('HARD');
@@ -1228,7 +1395,7 @@ describe('usePuzzleGame', () => {
       await actions.startNewGame(undefined, undefined, 'standard');
       [state] = callHook();
       expect(state.difficulty).toBe('MEDIUM');
-      expect(state.selectedVariant).toBe('speed');
+      expect(state.selectedVariant).toBe('double_shift');
     });
 
     test('after the finale is completed, boards serve normally again', async () => {
@@ -2864,7 +3031,7 @@ describe('usePuzzleGame', () => {
       let [, actions] = callHook();
       actions.setCurrentPhase(5);
       [, actions] = callHook();
-      await actions.startNewGame('MEDIUM', 'challenge', 'speed', true, true);
+      await actions.startNewGame('MEDIUM', 'challenge', 'standard', true, true);
     }
 
     async function playMove(char: string, slot: number) {

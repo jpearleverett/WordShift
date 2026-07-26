@@ -4259,3 +4259,63 @@ const SEASON_PASS_COPY: Record<DialoguePhase, SeasonPassCopy> = {
 export function getSeasonPassCopy(phase: DialoguePhase): SeasonPassCopy {
   return SEASON_PASS_COPY[phase] ?? SEASON_PASS_COPY[0];
 }
+
+/**
+ * One-time Fox beat at the moment the player first owns TWO modifiers (the
+ * Speed gate). It does double duty on purpose: it announces Speed Shift AND
+ * teaches that the modifiers layer, because those are the same lesson and the
+ * declutter rule says never stack two new-thing beats on one victory.
+ *
+ * The whole point of the modifier set is that it composes, and nothing in the
+ * game had ever said so out loud — the player could own four toggles and still
+ * believe they were four alternatives.
+ */
+export function getModifierStackingIntroLines(phase: DialoguePhase): string[] {
+  if (phase >= 4) {
+    return [
+      'The clock is yours now. Speed Shift. It does not change the arrangement, it only refuses to wait for it.',
+      'And it does not replace anything. Lay it over the reverse. Over the doubled. Over whatever you were already going to offer.',
+      'They stack, all of them. Every layer you add is another thing the pattern gets to watch you carry.',
+    ];
+  }
+  if (phase >= 2) {
+    return [
+      "Something new: Speed Shift. A clock, that's all. Whatever board you were going to play, now it is timed.",
+      'It does not take the place of your style. It sits on top of it. Reverse and timed. Doubled and timed.',
+      'That goes for all of them, actually. Challenge, the clock, and the ones still ahead of you. They layer. You can wear as many as you like.',
+    ];
+  }
+  return [
+    "Ooh, a new one! Speed Shift. It's just a clock, but oh, it does concentrate the mind.",
+    "Here's the lovely part: it doesn't replace your style, it goes ON TOP of it. Reverse AND timed, if you're feeling brave.",
+    "That's true of all the little toggles, you know. Stack as many as you can stand. I'll be watching.",
+  ];
+}
+
+/**
+ * One-time Fox beat when Lexicon unlocks. Lexicon is the only mode that changes
+ * nothing the player can SEE on the board (blind's previews visibly vanish; the
+ * clock counts down; Lexicon just quietly serves rarer words), so without a
+ * beat of its own it was the worst-explained mode in the game.
+ */
+export function getLexiconIntroLines(phase: DialoguePhase): string[] {
+  if (phase >= 4) {
+    return [
+      'There are older pages. Words the house has not needed in a long time.',
+      'Lexicon opens them. The rules do not change, only the vocabulary does, and it gets stranger the deeper you set the difficulty.',
+      'It goes over anything, like the rest of them. The arrangement pays more for the difficult ones. It would.',
+    ];
+  }
+  if (phase >= 2) {
+    return [
+      'The shelves go back further than you would think. Lexicon opens the older part.',
+      'Nothing about the rules changes. The words are simply rarer, and rarer still on the harder boards. Uncommon, never unfair.',
+      'It stacks with everything else you have, and it pays a little more for the trouble.',
+    ];
+  }
+  return [
+    'Oh! You have read enough of the common words. There are stranger ones further in.',
+    'Lexicon just swaps the vocabulary. Same rules, rarer words, and the harder the board the rarer they get. Nothing unfair, I promise.',
+    'It layers onto anything else you have switched on, and it pays a bit more besides.',
+  ];
+}

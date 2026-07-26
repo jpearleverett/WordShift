@@ -60,6 +60,10 @@ import {
   hasSeenFirstWinGlitch,
   markFirstWinGlitchSeen,
   markStarterIntroSeen,
+  hasSeenModifierStackingIntro,
+  markModifierStackingIntroSeen,
+  hasSeenLexiconIntro,
+  markLexiconIntroSeen,
   consumePendingVariantTutorial,
   checkFreeStreakFreeze,
   isHouseCompleted,
@@ -107,6 +111,8 @@ import {
   getHarvestOverflowMessage,
   getFoxSetupSelectorIntroLines,
   getFoxStarterIntroLines,
+  getModifierStackingIntroLines,
+  getLexiconIntroLines,
   getNotificationPromptText,
   getSpeedTimeUpMessage,
   getDragMissMessage,
@@ -263,8 +269,9 @@ import {
   hasVariantModifier,
   getNewlyUnlockedVariants,
   getUnlockedVariants,
-  getVariantTimeLimit,
-  getVariantTimeLimitForDifficulty,
+  getSpeedTimeLimit,
+  getSpeedUnlockHint,
+  SPEED_TOGGLE_UNLOCK_PUZZLES,
   getVariantSelectorOptions,
   getBlindUnlockHint,
   getLexiconUnlockHint,
@@ -281,7 +288,7 @@ import { useScreenInsets } from './src/hooks/useScreenInsets';
 // App screen type — expanded with settings, stats, and ledger
 type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery' | 'pit' | 'shop';
 
-type PostVictoryIntroKind = 'variant_unlock' | 'starter_pack';
+type PostVictoryIntroKind = 'variant_unlock' | 'modifier_stacking' | 'lexicon_unlock' | 'starter_pack';
 interface PostVictoryIntro {
   kind: PostVictoryIntroKind;
   lines: string[];
@@ -864,14 +871,17 @@ function MainApp() {
 
   // Start/stop speed timer based on game state
   useEffect(() => {
-    const isSpeedVariant = hasVariantModifier(puzzle.currentVariant, 'speed');
-    if (!isSpeedVariant || puzzle.gameState !== GameState.PLAYING) {
+    // Speed is a MODIFIER now, so the clock is armed by its own flag rather
+    // than by the style being played. This is the load-bearing predicate: if it
+    // ever silently reads false, speed becomes a badge and an amber bonus with
+    // no clock behind it.
+    if (!puzzle.speedMode || puzzle.gameState !== GameState.PLAYING) {
       stopSpeedTimer();
       return;
     }
-    const baseLimit = getVariantTimeLimitForDifficulty(puzzle.currentVariant, puzzle.difficulty)
-      ?? getVariantTimeLimit(puzzle.currentVariant)
-      ?? 60;
+    // The limit now accounts for the STYLE underneath (a reverse chain is played
+    // down and back up; a double shift moves two letters a step over more rows).
+    const baseLimit = getSpeedTimeLimit(puzzle.difficulty, puzzle.currentVariant);
     // Escalate pressure across a speed streak: each consecutive win trims the
     // clock, floored so it never becomes impossible.
     const escalatedLimit = Math.max(
@@ -882,6 +892,7 @@ function MainApp() {
     restoredSpeedTimeRef.current = null;
     startSpeedTimer(initialRemaining);
   }, [
+    puzzle.speedMode,
     puzzle.currentVariant,
     puzzle.gameState,
     puzzle.difficulty,
@@ -948,7 +959,11 @@ function MainApp() {
       puzzleActions.restorePuzzleState(saved);
     } else {
       if (saved) await clearPuzzleState();
-      await puzzleActions.startNewGame('EASY', 'standard', 'standard', false, false);
+      // undefined + undefined + false: clear the undo-limit too. These clean
+      // standard starts used to leave a sticky Challenge on, which lit the
+      // 'CHALLENGE n undos' chip over a board whose gameMode is 'standard' —
+      // a budget nothing enforced (handleUndo gates on gameMode).
+      await puzzleActions.startNewGame('EASY', 'standard', 'standard', false, false, undefined, false);
     }
     puzzleActions.setMessage(COLD_OPEN_INSTRUCTION);
     logEvent({ type: 'puzzle_started', data: { difficulty: 'EASY', onboarding: true } });
@@ -995,6 +1010,7 @@ function MainApp() {
     blindMode: puzzle.blindMode,
     undoLimited: puzzle.undoLimited,
     lexiconMode: puzzle.lexiconMode,
+    speedMode: puzzle.speedMode,
     unbrokenWeaveMode: puzzle.unbrokenWeaveMode,
     spentLetters: puzzle.spentLetters,
     currentVariant: puzzle.currentVariant,
@@ -1168,7 +1184,7 @@ function MainApp() {
         // Re-init the guided tutorial puzzle so the player resumes a live,
         // winnable board with the Fox overlay rather than a dead screen.
         setCurrentScreen('puzzle');
-        puzzleActions.startNewGame('EASY', 'standard', 'standard', false, false);
+        puzzleActions.startNewGame('EASY', 'standard', 'standard', false, false, undefined, false);
         setBootRouting(false);
       } else {
         // Normal launch (onboarding complete, or a non-puzzle step): home is the
@@ -1506,6 +1522,15 @@ function MainApp() {
     if (dismissedKind === 'starter_pack') {
       await markStarterIntroSeen();
     }
+    // Marked on DISMISSAL, never at decision time, so an interruption (a kill,
+    // a deep link) can never consume the beat unseen — the same contract the
+    // starter intro and the mandatory-harvest gate use.
+    if (dismissedKind === 'modifier_stacking') {
+      await markModifierStackingIntroSeen();
+    }
+    if (dismissedKind === 'lexicon_unlock') {
+      await markLexiconIntroSeen();
+    }
     setPostVictoryIntro(null);
     await advanceQueuedPostVictoryIntro();
     // After the starter intro closes, open the Store so the "welcome" Fox
@@ -1781,7 +1806,7 @@ function MainApp() {
         // Daily generation failed — fall back to a standard HARD puzzle so the
         // player is never stranded on a loading screen.
         setIsPlayingDaily(false);
-        await puzzleActions.startNewGame('HARD', 'standard', 'standard', false, false);
+        await puzzleActions.startNewGame('HARD', 'standard', 'standard', false, false, undefined, false);
       }
     });
   }, [puzzleActions, transitionTo, persistenceActions, orchestrationActions, persistence.currentPhase, maybeShowSetupSelectorIntro, clearVictoryToastQueue]);
@@ -2085,7 +2110,7 @@ function MainApp() {
       // can't let the countdown reach 0 and fire loss feedback before the
       // gameState render effect tears the timer down (onSpeedTimeUp also guards
       // on the victory lock, but stopping here closes the window entirely).
-      if (hasVariantModifier(puzzle.currentVariant, 'speed')) {
+      if (puzzle.speedMode) {
         stopSpeedTimer();
       }
       // Blind Offering's end-of-board reveal (accepted): validity was hidden the
@@ -2107,7 +2132,7 @@ function MainApp() {
       // Speed streak: a completed speed puzzle ratchets up the next clock, and
       // the peak streak is remembered as a best-round record (the in-run counter
       // evaporates on every reset). Surface a new record as an in-world beat.
-      if (hasVariantModifier(puzzle.currentVariant, 'speed')) {
+      if (puzzle.speedMode) {
         const newRound = speedRound + 1;
         setSpeedRound(newRound);
         recordSpeedRound(newRound).then(res => {
@@ -2184,17 +2209,23 @@ function MainApp() {
         result.resonantChoiceCount ?? 0,
         // Lexicon (rare-word) board: pays the itemized rare-vocabulary bonus.
         result.lexicon ?? false,
-        // Maximal-stack apex win: EXPERT + Challenge (undo-limit) + Blind +
-        // non-standard variant + Lexicon all at once. Never on daily/shared
-        // (both force standard/no-modifiers), so the flags alone are enough.
+        // Maximal-stack apex win: EXPERT + a non-standard style + ALL FOUR
+        // modifiers at once (Challenge, Speed, Blind, Lexicon). Speed joined
+        // the set when it stopped being a style, so the apex is a four-layer
+        // loadout now, not three. Never on daily/shared/finale (all force
+        // standard with no modifiers), so the flags alone are enough.
         puzzle.difficulty === 'EXPERT' &&
           (result.undoLimited ?? false) &&
           (result.blind ?? false) &&
           (result.variant ?? 'standard') !== 'standard' &&
-          (result.lexicon ?? false),
+          (result.lexicon ?? false) &&
+          (result.speed ?? false),
         // Undo-limit ("Challenge") constraint. Stacked with blind it pays the
         // maximal-trial amber rate; alone it is already priced by gameMode.
-        result.undoLimited ?? false
+        result.undoLimited ?? false,
+        // Speed Shift modifier: amber-only bonus + the lifetime speed-win
+        // counter behind the Speed achievements.
+        result.speed ?? false
       );
 
       // Aggregate social proof: contribute this puzzle's words to the global
@@ -2433,6 +2464,36 @@ function MainApp() {
             lines,
           });
         }
+      }
+      // Speed Shift's unlock is ALSO the moment the player first owns two
+      // modifiers (Challenge 15, then Speed 55), so one card announces the new
+      // modifier and teaches that they layer. Without it nothing in the game
+      // ever says the toggles compose, and a player can own four of them and
+      // still read them as four alternatives. Speed left the style list, so
+      // getNewlyUnlockedVariants can no longer surface it — this is its
+      // announcement now.
+      if (
+        immediateIntros.length === 0 &&
+        completedTotal >= SPEED_TOGGLE_UNLOCK_PUZZLES &&
+        !(await hasSeenModifierStackingIntro())
+      ) {
+        immediateIntros.push({
+          kind: 'modifier_stacking',
+          lines: getModifierStackingIntroLines(finalVictory.newPhase),
+        });
+      }
+      // Lexicon's own unlock beat. It is the one mode that changes nothing the
+      // player can SEE (blind's previews visibly vanish, the clock counts
+      // down), so it needs saying out loud more than any of them.
+      if (
+        immediateIntros.length === 0 &&
+        completedTotal >= LEXICON_UNLOCK_PUZZLES &&
+        !(await hasSeenLexiconIntro())
+      ) {
+        immediateIntros.push({
+          kind: 'lexicon_unlock',
+          lines: getLexiconIntroLines(finalVictory.newPhase),
+        });
       }
       // First harvest gate: fires when the auto-collect window has closed, a
       // real batch waits in the pit, and the player has not yet LEARNED manual
@@ -3113,6 +3174,9 @@ function MainApp() {
     if (isPlayingDaily || puzzle.isSharedChallenge || puzzle.isFinalBoard) return;
     if (puzzle.currentVariant !== 'standard') return;
     if (puzzle.blindMode || puzzle.unbrokenWeaveMode) return;
+    // Not while the clock runs: the ask arrives as a queued toast a couple of
+    // seconds into the board, which is a meaningful slice of a speed run.
+    if (puzzle.speedMode) return;
     if (puzzlesSolvedForVariantUnlocks < HOUSE_ASK_MIN_PUZZLES) return;
     if (puzzle.moveHistorySummary.length > 0) return; // mid-board state — never roll late
     if (Math.random() >= HOUSE_ASK_CHANCE) return;
@@ -3913,6 +3977,21 @@ function MainApp() {
     orchestrationActions,
   ]);
 
+  // Every modifier toggle re-serves the board (blind in particular MUST apply to
+  // a fresh board so the player can't toggle previews back on to peek), and
+  // startNewGame closes the setup menu as part of that. For a STYLE that is
+  // right: picking one means "give me this board now". For a MODIFIER it was
+  // the single biggest obstacle to the feature: the panel slammed shut on every
+  // tap, so building a loadout meant reopening the menu once per layer and the
+  // stack emblem could never be seen assembling. Worse, a player who had
+  // Challenge on and then turned Blind on never saw that Challenge was still
+  // lit, and read the resulting single undo as the two modes refusing to
+  // decouple. Re-asserting the menu in the SAME tick means React batches it
+  // with startNewGame's close and the panel never visibly flickers.
+  const keepSetupMenuOpen = useCallback(() => {
+    puzzleActions.setShowDifficultyMenu(true);
+  }, [puzzleActions]);
+
   // Trial constraints: Challenge (no hints + limited undos) and Blind Offering
   // (no hints + previews hidden + free moves judged once at the end) now STACK.
   // gameMode 'challenge' is the shared no-hints umbrella, engaged whenever
@@ -3937,7 +4016,8 @@ function MainApp() {
       undefined,          // keep lexicon
       newUndoLimited,     // flip the undo-limit (Challenge) flag
     );
-  }, [puzzleActions, puzzle.undoLimited, puzzle.blindMode, puzzle.difficulty, puzzle.selectedVariant, orchestrationActions, resetSpeedRun]);
+    keepSetupMenuOpen();
+  }, [puzzleActions, keepSetupMenuOpen, puzzle.undoLimited, puzzle.blindMode, puzzle.difficulty, puzzle.selectedVariant, orchestrationActions, resetSpeedRun]);
 
   // Blind Offering: chosen before the board (a fresh board applies it so the
   // player can't toggle previews back on mid-solve to peek). Sticky across Next
@@ -3966,7 +4046,8 @@ function MainApp() {
       undefined,          // keep lexicon
       undefined,          // keep undo-limit (Challenge)
     );
-  }, [puzzleActions, puzzle.difficulty, puzzle.selectedVariant, puzzle.blindMode, puzzle.undoLimited, puzzlesSolvedForVariantUnlocks, orchestrationActions, resetSpeedRun]);
+    keepSetupMenuOpen();
+  }, [puzzleActions, keepSetupMenuOpen, puzzle.difficulty, puzzle.selectedVariant, puzzle.blindMode, puzzle.undoLimited, puzzlesSolvedForVariantUnlocks, orchestrationActions, resetSpeedRun]);
 
   // Lexicon (rare-word) toggle: a COMPOSABLE modifier that stacks on any
   // difficulty + variant (and blind/challenge). Toggling it re-serves the board
@@ -3989,7 +4070,35 @@ function MainApp() {
       false,                 // weave off (separate apex mode)
       !puzzle.lexiconMode,   // flip the rare-word flag
     );
-  }, [puzzleActions, puzzle.difficulty, puzzle.selectedVariant, puzzle.lexiconMode, puzzlesSolvedForVariantUnlocks, orchestrationActions, resetSpeedRun]);
+    keepSetupMenuOpen();
+  }, [puzzleActions, keepSetupMenuOpen, puzzle.difficulty, puzzle.selectedVariant, puzzle.lexiconMode, puzzlesSolvedForVariantUnlocks, orchestrationActions, resetSpeedRun]);
+
+  // Speed Shift: the fourth composable modifier. A clock over whatever style is
+  // already chosen, so unlike the old Speed *style* it never replaces the
+  // player's board — reverse still goes down and back up, double shift still
+  // moves two letters a step, they are just timed. Gated at
+  // SPEED_TOGGLE_UNLOCK_PUZZLES; turning it OFF is always allowed.
+  const handleToggleSpeedMode = useCallback(() => {
+    if (!puzzle.speedMode && puzzlesSolvedForVariantUnlocks < SPEED_TOGGLE_UNLOCK_PUZZLES) {
+      return;
+    }
+    hapticMedium();
+    soundSelection();
+    orchestrationActions.setCompletionCoda(null);
+    // The escalation ladder restarts whenever the modifier is re-armed.
+    resetSpeedRun();
+    puzzleActions.startNewGame(
+      puzzle.difficulty,
+      undefined,             // keep gameMode (composes with challenge/blind)
+      puzzle.selectedVariant,
+      undefined,             // keep blind
+      false,                 // weave off (a separate apex pursuit)
+      undefined,             // keep lexicon
+      undefined,             // keep undo-limit (Challenge)
+      !puzzle.speedMode,     // flip the clock
+    );
+    keepSetupMenuOpen();
+  }, [puzzleActions, keepSetupMenuOpen, puzzle.difficulty, puzzle.selectedVariant, puzzle.speedMode, puzzlesSolvedForVariantUnlocks, orchestrationActions, resetSpeedRun]);
 
   const handleToggleUnbrokenWeave = useCallback(() => {
     if (persistence.currentPhase !== 5) return;
@@ -4004,7 +4113,9 @@ function MainApp() {
       false,
       !puzzle.unbrokenWeaveMode,
     );
+    keepSetupMenuOpen();
   }, [
+    keepSetupMenuOpen,
     persistence.currentPhase,
     puzzleActions,
     puzzle.difficulty,
@@ -4429,7 +4540,13 @@ function MainApp() {
             )}
             {/* Blind Offering badge — the previews are hidden, so without a
                 standing indicator the player has no way to tell blind is on
-                (or remember to turn it off). Same chrome as the variant badge. */}
+                (or remember to turn it off). Same chrome as the variant badge.
+                When Blind runs WITHOUT Challenge it also carries the free-undo
+                tell: the undo budget is Blind-alone's one relaxation, but the
+                chrome for it is the CHALLENGE chip, which correctly disappears
+                when the cap lifts. Removing a chip is a silent signal, so a
+                player coming off a stacked board saw only an absence and kept
+                assuming they were still capped. State it positively instead. */}
             {puzzle.blindMode && (
               <BadgeAppear
                 style={[
@@ -4438,7 +4555,11 @@ function MainApp() {
                   persistence.currentPhase >= 3 && styles.variantBadgeDark,
                 ]}
                 accessible
-                accessibilityLabel="Blind Offering is on: word previews hidden"
+                accessibilityLabel={
+                  puzzle.undoLimited
+                    ? 'Blind Offering is on: word previews hidden, undos limited by Challenge'
+                    : 'Blind Offering is on: word previews hidden, undos unlimited'
+                }
               >
                 <Image source={getModeIconSprite('🌑')!} style={styles.variantBadgeIconImage} />
                 <Text style={[
@@ -4447,6 +4568,37 @@ function MainApp() {
                   persistence.currentPhase >= 3 && styles.variantBadgeTextDark,
                 ]}>
                   {persistence.currentPhase >= 2 ? 'Blind Offering' : 'Blind'}
+                </Text>
+                {!puzzle.undoLimited && (
+                  <Text style={[
+                    styles.variantBadgeSubText,
+                    persistence.currentPhase >= 3 && styles.variantBadgeSubTextDark,
+                  ]}>
+                    {'· undos free'}
+                  </Text>
+                )}
+              </BadgeAppear>
+            )}
+            {/* Speed Shift badge — a standing indicator the clock is armed.
+                The countdown itself is prominent, but the badge is what tells
+                the player the modifier is on before they parse a number, and
+                it keeps the modifier group reading as one row of layers. */}
+            {puzzle.speedMode && (
+              <BadgeAppear
+                style={[
+                  styles.variantBadge,
+                  persistence.currentPhase === 2 && styles.variantBadgeDusk,
+                  persistence.currentPhase >= 3 && styles.variantBadgeDark,
+                ]}
+                accessible
+                accessibilityLabel="Speed Shift is on: this board is timed"
+              >
+                <Text style={[
+                  styles.variantBadgeText,
+                  persistence.currentPhase === 2 && styles.variantBadgeTextDusk,
+                  persistence.currentPhase >= 3 && styles.variantBadgeTextDark,
+                ]}>
+                  {`\u26A1 Speed`}
                 </Text>
               </BadgeAppear>
             )}
@@ -4575,6 +4727,13 @@ function MainApp() {
             blindUnlockHint={getBlindUnlockHint(puzzlesSolvedForVariantUnlocks, persistence.currentPhase)}
             expertLocked={puzzlesSolvedForVariantUnlocks < EXPERT_DIFFICULTY_UNLOCK_PUZZLES}
             expertUnlockHint={`6-letter apex. Opens at ${EXPERT_DIFFICULTY_UNLOCK_PUZZLES} (you're at ${puzzlesSolvedForVariantUnlocks})`}
+            speedActive={puzzle.speedMode}
+            onToggleSpeedMode={handleToggleSpeedMode}
+            // Speed joins the modifier list the moment that section first
+            // appears (the Challenge gate), teased as a locked row until 55.
+            showSpeedToggle={puzzlesSolvedForVariantUnlocks >= CHALLENGE_TOGGLE_UNLOCK_PUZZLES}
+            speedLocked={puzzlesSolvedForVariantUnlocks < SPEED_TOGGLE_UNLOCK_PUZZLES}
+            speedUnlockHint={getSpeedUnlockHint(puzzlesSolvedForVariantUnlocks, persistence.currentPhase)}
             lexiconActive={puzzle.lexiconMode}
             onToggleLexiconMode={handleToggleLexiconMode}
             // The Lexicon row joins the trial-ladder section (with blind), teased

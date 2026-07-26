@@ -403,15 +403,22 @@ describe('puzzleBank', () => {
       expect(medium!.wordLength).toBe(4);   // 4-letter words
     });
 
-    it('serves Speed from the standard bank family (zero-wait, no on-device gen)', async () => {
-      // Speed is a standard board played against the clock, so it reuses the
-      // STANDARD bank (getBankKey maps speed -> std_<diff>) instead of
-      // generating on-device. HARD speed => a 5-letter / 5-row standard board.
-      const speed = await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'speed');
-      expect(speed).not.toBeNull();
-      expect(speed!.wordLength).toBe(5);
-      expect(speed!.words.length).toBe(5);
-      expect(speed!.reverseSolution).toBeUndefined(); // standard-shaped, not reverse
+    it('every style still routes to its own bank family (speed is no longer a variant)', async () => {
+      // Speed became a MODIFIER: a clock over whatever style is chosen, so it
+      // no longer participates in bank routing at all. That makes every
+      // (style x difficulty) bank reachable under the clock with no new bank
+      // work — the timed board IS the style's own board.
+      const std = await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'standard');
+      expect(std).not.toBeNull();
+      expect(std!.reverseSolution).toBeUndefined();
+
+      const rev = await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'reverse');
+      expect(rev).not.toBeNull();
+      expect(rev!.reverseSolution).toBeDefined();
+
+      const dbl = await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'double_shift');
+      expect(dbl).not.toBeNull();
+      expect(dbl!.isDoubleShift).toBe(true);
     });
 
     it('serves Lexicon+reverse+EXPERT from its own rare bank (rarity-aware gen)', async () => {

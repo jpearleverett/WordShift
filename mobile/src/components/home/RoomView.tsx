@@ -26,6 +26,13 @@ import { shouldSimplifyAnimations } from '../../services/deviceTier';
 // enough to read the room name, small enough to sit as a tidy label at the top.
 const ROOM_PLAQUE_SCALE = 0.68;
 
+// The occupant's nameplate is one size below the room's own sign (0.68), so the
+// two read as a hierarchy rather than two competing labels: ~26dp tall against
+// the room sign's ~29dp, inside a ~123dp room. Not smaller than this: at 0.58
+// the label fell to ~8.1dp, well under the room sign's own 9.5dp.
+const ANIMAL_PLAQUE_SCALE = 0.62;
+
+
 // Room background images - maps theme to image asset. Backgrounds render
 // cover-fit at ~250dp, so any source ≥ 750px clears the 3x requirement.
 // ASSET-SIZE EXCEPTION (F115): desert / observatory (star_loft) / workshop
@@ -655,6 +662,42 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
         )}
       </View>
 
+      {/* Animal nameplate — STATIC, pinned to the bottom-centre of the room.
+          It used to live inside AnimalSprite as a flat dark pill riding the
+          sprite's own transform, so it wandered around with the animal and sat
+          over its body. A label belongs to the room. Same wooden PixelPlaque
+          family as the room's own sign, one size down so the room reads first
+          and the occupant second, and it is DECORATIVE for screen readers: the
+          animal's touchable is the single focusable element and already
+          announces the name and the resting state. */}
+      {animal && animal.isUnlocked && (
+        <View
+          style={[styles.animalPlate, isAnimalOnCooldown && styles.animalPlateResting]}
+          pointerEvents="none"
+          // Both platforms: importantForAccessibility is Android-only and
+          // accessibilityElementsHidden is iOS-only, so hiding on one alone
+          // would let VoiceOver announce the name a second time.
+          importantForAccessibility="no-hide-descendants"
+          accessibilityElementsHidden
+        >
+          {/* The resting countdown rides INSIDE the wood rather than floating
+              above it. A bare sprite + number sat unframed on 13 different room
+              backgrounds across 6 phases, which is both a contrast gamble and
+              the one piece that still read as a web chip. The animal's own
+              sleeping Z's already say "asleep"; the plaque just says for how
+              much longer, and dims while it does. */}
+          <PixelPlaque
+            phase={currentPhase}
+            label={
+              isAnimalOnCooldown && cooldownPuzzlesLeft != null && cooldownPuzzlesLeft > 0
+                ? `${animal.name} · ${cooldownPuzzlesLeft}`
+                : animal.name
+            }
+            scale={ANIMAL_PLAQUE_SCALE}
+          />
+        </View>
+      )}
+
       {/* Animal if present and unlocked */}
       {animal && animal.isUnlocked && (
         <AnimalSprite
@@ -797,6 +840,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     maxWidth: '96%',
   },
+  // Occupant nameplate, pinned to the room floor. zIndex clears AnimalSprite's
+  // own container (10) so a wandering animal passes BEHIND its own label rather
+  // than through it.
+  animalPlate: {
+    position: 'absolute',
+    bottom: 3,
+    alignSelf: 'center',
+    alignItems: 'center',
+    maxWidth: '92%',
+    zIndex: 12,
+  },
+  animalPlateResting: {
+    opacity: 0.72,
+  },
   // Nameplate ornament row: tiny warm lantern pips (procedural, not emoji).
   pipRow: {
     flexDirection: 'row',
@@ -838,8 +895,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-end',
   },
+  // Lifted clear of the occupant nameplate at the room's floor. At bottom: 4 the
+  // plate covered most of the glow's brightest core — and that glow is a
+  // purchased amber sink whose entire purpose is visible investment.
   glowWrapBottom: {
-    bottom: 4,
+    bottom: 26,
   },
   glowWrapCenter: {
     top: '34%',

@@ -44,6 +44,10 @@ export interface SavedPuzzleState {
   /** Lexicon (rare-word) modifier active on this board. Restored so a
    *  kill+relaunch keeps serving the same rare board (not a common swap). */
   lexiconMode?: boolean;
+  /** Speed Shift modifier (the clock) armed on this board. Absent on saves
+   *  written before speed became a modifier; restorePuzzleState infers it
+   *  from a legacy `currentVariant: 'speed'` there. */
+  speedMode?: boolean;
   /** Phase-5 Unbroken Weave mastery mode active on this board. */
   unbrokenWeaveMode?: boolean;
   /** Moved character values already spent by Unbroken Weave. */

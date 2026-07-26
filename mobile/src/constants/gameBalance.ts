@@ -734,13 +734,55 @@ export const PHASE_REWARD_MULTIPLIERS: Record<number, number> = {
 // SPEED TIMER
 // ============================================================================
 
-/** Difficulty-aware time limits for speed variant puzzles (seconds). */
+/**
+ * Speed Shift unlock gate. Speed is a composable MODIFIER (a clock laid over
+ * whatever style you are already playing), so its gate lives here beside the
+ * other modifier gates (Challenge 15, Blind 80, Lexicon 100) rather than with
+ * the style unlocks. The number is unchanged from when speed was a style, so no
+ * player's unlock timeline moves.
+ */
+export const SPEED_TOGGLE_UNLOCK_PUZZLES = 55;
+
+/**
+ * Speed amber bonus multiplier. Same shape as LEXICON_AMBER_MULTIPLIER: applied
+ * on the base+star+streak+trial subtotal, itemized in the victory breakdown,
+ * and REWARD-ONLY — it never touches phase progression, so racing the clock
+ * pays more amber and never buys a faster descent. Carried over unchanged from
+ * the old speed VARIANT multiplier so the payout does not move.
+ */
+export const SPEED_AMBER_MULTIPLIER = 1.34;
+
+/**
+ * Difficulty-aware time limits for a speed board (seconds), calibrated against a
+ * full-length STANDARD chain at that difficulty.
+ *
+ * These numbers already described a full board before speed became a modifier:
+ * the old variant declared `rowOverride: 3`, but that override only ever reached
+ * the on-device generator, and every speed board has been served from the
+ * standard banks at full length for a long time. So the base needs no retune —
+ * what it needs is the style term below.
+ */
 export const SPEED_TIME_LIMITS: Record<string, number> = {
   EASY: 65,
   MEDIUM: 60,
   MEDIUM_PLUS: 54,
   HARD: 48,
   EXPERT: 44, // 6-letter boards take longer to read — but expert, so still tight
+};
+
+/**
+ * Style allowance on the clock. As a modifier, speed can now ride a style that
+ * asks for far more work than the standard chain the base times were tuned on:
+ * a reverse board is played DOWN and then all the way back UP, and a double
+ * shift moves two letters per step across more rows (up to 7 at EXPERT). Giving
+ * those the standard clock would not be "hard", it would be impossible — an
+ * EXPERT double shift is a 7-row two-letter board, and 44 seconds is not a
+ * challenge on it, it is a guaranteed loss. Multiplies SPEED_TIME_LIMITS.
+ */
+export const SPEED_STYLE_TIME_MULTIPLIER: Record<string, number> = {
+  standard: 1.0,
+  reverse: 1.9,      // down and back up: roughly twice the moves
+  double_shift: 1.6, // two letters per step, and more rows per difficulty
 };
 
 // ============================================================================

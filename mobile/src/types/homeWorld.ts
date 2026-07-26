@@ -375,6 +375,10 @@ export interface HomeWorldProgress {
   blindWins?: number;
   // Lifetime Lexicon (rare-word) wins (composes with any variant, tracked apart).
   lexiconWins?: number;
+  /** Lifetime Speed Shift wins. Before speed became a modifier these lived
+   *  under variantWins.speed; getVariantWinStats reads BOTH so no player loses
+   *  their Speed achievement progress. */
+  speedWins?: number;
   // Lifetime maximal-stack apex wins (EXPERT + Challenge + Blind + non-standard
   // variant + Lexicon all at once) — powers the one-time apex achievement.
   maxStackWins?: number;

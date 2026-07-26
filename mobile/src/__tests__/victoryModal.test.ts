@@ -647,6 +647,7 @@ describe('amber breakdown threading (economy is the display source of truth)', (
       streakBonus: 0,
       challengeBonus: 0,
       lexiconBonus: 0,
+  speedBonus: 0,
       patronBonus: 0,
       surpriseBonus: 0,
       resonanceBonus: 0,

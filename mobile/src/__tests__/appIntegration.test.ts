@@ -123,7 +123,7 @@ describe('self-directed cold-open onboarding', () => {
     expect(APP_TSX).toMatch(/await loadPuzzleState\(\)/);
     expect(APP_TSX).toMatch(/puzzleActions\.restorePuzzleState\(saved\)/);
     expect(APP_TSX).toMatch(/saved\.unbrokenWeaveMode !== true/);
-    expect(APP_TSX).toMatch(/puzzleActions\.startNewGame\('EASY', 'standard', 'standard', false, false\)/);
+    expect(APP_TSX).toMatch(/puzzleActions\.startNewGame\('EASY', 'standard', 'standard', false, false, undefined, false\)/);
   });
 
   test('routes a recorded cold-open victory before stale autosave restoration', () => {

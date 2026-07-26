@@ -354,6 +354,7 @@ export async function applyCreatorSnapshot(target: 'dusk' | 'shadows' | 'reveal'
       variantWins: {},
       blindWins: 0,
       lexiconWins: 0,
+      speedWins: 0,
       maxStackWins: 0,
     });
 

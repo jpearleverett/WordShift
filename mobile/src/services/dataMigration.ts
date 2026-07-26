@@ -11,7 +11,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const SCHEMA_VERSION_KEY = 'wordshift_schema_version';
 
 /** Current schema version — increment when adding new migrations */
-export const CURRENT_SCHEMA_VERSION = 4;
+export const CURRENT_SCHEMA_VERSION = 5;
 
 // ---------------------------------------------------------------------------
 // v4: dialogue-corpus doubling (67 -> 134 base lines per animal).
@@ -184,6 +184,39 @@ const MIGRATIONS: Migration[] = [
         }
       } catch (error) {
         console.warn('Migration v4: Failed to migrate dialogue indices:', error);
+      }
+    },
+  },
+  {
+    version: 5,
+    description: "Speed Shift became a modifier: retire the stored 'speed' style preference and fold its lifetime wins into speedWins",
+    migrate: async () => {
+      const progressKey = 'wordshift_home_progress';
+      try {
+        const stored = await AsyncStorage.getItem(progressKey);
+        if (!stored) return;
+        const progress = JSON.parse(stored);
+        // 'speed' is no longer a selectable style. A player who left it as
+        // their preference would otherwise start every board on a variant key
+        // that matches no config — no style copy, no bank family, no clock.
+        // Their boards were already full-length standard chains, so standard
+        // is exactly what they were playing; the clock is now a modifier they
+        // re-arm from the menu.
+        if (progress.preferredPuzzleVariant === 'speed') {
+          progress.preferredPuzzleVariant = 'standard';
+        }
+        // Lifetime Speed wins used to accumulate under variantWins.speed.
+        // Fold them forward so the Speed achievements keep their progress.
+        // Idempotent: the legacy key is deleted as it is folded, and
+        // getVariantWinStats sums both sides regardless.
+        const legacySpeedWins = Number(progress.variantWins?.speed) || 0;
+        if (legacySpeedWins > 0) {
+          progress.speedWins = (Number(progress.speedWins) || 0) + legacySpeedWins;
+          delete progress.variantWins.speed;
+        }
+        await AsyncStorage.setItem(progressKey, JSON.stringify(progress));
+      } catch (error) {
+        console.warn('Migration v5: Failed to migrate the speed variant:', error);
       }
     },
   },
