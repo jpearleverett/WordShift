@@ -529,6 +529,15 @@ export const appStyles = StyleSheet.create({
     // tint over red).
     color: '#FFD479',
   },
+  // The refill chip's label + amber gem as a real row, so the gem is centered
+  // against the text box instead of baseline-hung inside the Text run.
+  buyUndoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  buyUndoAmberIcon: {
+    marginLeft: 4,
+  },
   speedTimerContainer: {
     alignSelf: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.14)',

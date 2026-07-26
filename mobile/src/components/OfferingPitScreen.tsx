@@ -127,6 +127,14 @@ const PIT_OVAL = {
   radiusY: SCREEN_HEIGHT * 0.06,
 };
 
+// How far outside the pit opening the ward marks (and the ring they are set
+// into) sit. Shared by the mark positions and the ring geometry so the marks
+// can never drift off their own circle.
+const PIT_WARD_RIM_OFFSET = 10;
+// The ward ring is drawn as a circle + scaleX (a real ellipse, no SVG).
+const WARD_RING_SIZE_Y = (PIT_OVAL.radiusY + PIT_WARD_RIM_OFFSET) * 2;
+const WARD_RING_SCALE_X = ((PIT_OVAL.radiusX + PIT_WARD_RIM_OFFSET) * 2) / WARD_RING_SIZE_Y;
+
 // Pre-inset header-height estimate — only positions the module-level FLOAT_ZONE
 // for spawning word chips. The rendered header uses useScreenInsets instead.
 const STATUS_BAR_HEIGHT =
@@ -986,13 +994,12 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   // misaligned with the pit's curve.)
   const wardPositions = useMemo(() => {
     const positions: { x: number; y: number }[] = [];
-    const RIM_OFFSET = 10;
     for (let i = 0; i < PIT_WARD_COUNT; i++) {
       const t = PIT_WARD_COUNT > 1 ? i / (PIT_WARD_COUNT - 1) : 0.5;
       const angle = -Math.PI * 0.85 + t * Math.PI * 0.7;
       positions.push({
-        x: PIT_CENTER.x + (PIT_OVAL.radiusX + RIM_OFFSET) * Math.cos(angle),
-        y: PIT_CENTER.y + (PIT_OVAL.radiusY + RIM_OFFSET) * Math.sin(angle),
+        x: PIT_CENTER.x + (PIT_OVAL.radiusX + PIT_WARD_RIM_OFFSET) * Math.cos(angle),
+        y: PIT_CENTER.y + (PIT_OVAL.radiusY + PIT_WARD_RIM_OFFSET) * Math.sin(angle),
       });
     }
     return positions;
@@ -1009,6 +1016,17 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const wardChargeFraction = pendingPhaseTransition != null
     ? 0
     : Math.max(0, Math.min(1, phaseProgressFraction * PIT_WARD_COUNT - litCount));
+  // The whole ward apparatus (ring + marks) shows through Phase 3; from the
+  // reveal on, the pit's own dread lighting carries the scene. Previously the
+  // marks additionally required some progress, so a player at exactly zero
+  // progress saw NOTHING — no ring, no track, no indication the pit measured
+  // anything. Showing the empty track is more legible than showing nothing,
+  // and it gives the marks a circle to be set into.
+  const wardsVisible = phase < 4;
+  // 0..1 charge of the whole ring, used for its brightness.
+  const wardRingCharge = pendingPhaseTransition != null
+    ? 1
+    : Math.max(0, Math.min(1, phaseProgressFraction));
 
   // Ward pulse loop for pending state
   useEffect(() => {
@@ -2464,8 +2482,54 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         {/* Shockwave rings — expanding ripple on word impact */}
         {shockwaveRings.map(ring => <ShockwaveRingView key={ring.id} ring={ring} />)}
 
+        {/* Ward ring — the circle the marks are set into.
+            The only ring here used to be the pit's own 1px edge line at ~15%
+            alpha, so the seven marks read as unanchored dots floating over the
+            art instead of stations on a ward circle. This one is drawn on the
+            marks' OWN radius (PIT_WARD_RIM_OFFSET), in the phase's ward colour,
+            and brightens as the phase charges — so the ring visibly fills in
+            with the marks. Circle + scaleX gives a true ellipse without SVG;
+            the soft halo behind it is the Android-safe glow technique used
+            throughout this screen (never shadowRadius). */}
+        {wardsVisible && (
+          <>
+            {!simplify && (
+              <View
+                pointerEvents="none"
+                style={{
+                  position: 'absolute',
+                  left: PIT_CENTER.x - WARD_RING_SIZE_Y / 2,
+                  top: PIT_CENTER.y - WARD_RING_SIZE_Y / 2,
+                  width: WARD_RING_SIZE_Y,
+                  height: WARD_RING_SIZE_Y,
+                  borderRadius: WARD_RING_SIZE_Y / 2,
+                  borderWidth: 7,
+                  borderColor: wardColors.glow,
+                  opacity: 0.06 + 0.14 * wardRingCharge,
+                  transform: [{ scaleX: WARD_RING_SCALE_X }],
+                }}
+              />
+            )}
+            <View
+              pointerEvents="none"
+              style={{
+                position: 'absolute',
+                left: PIT_CENTER.x - WARD_RING_SIZE_Y / 2,
+                top: PIT_CENTER.y - WARD_RING_SIZE_Y / 2,
+                width: WARD_RING_SIZE_Y,
+                height: WARD_RING_SIZE_Y,
+                borderRadius: WARD_RING_SIZE_Y / 2,
+                borderWidth: 2,
+                borderColor: wardColors.lit,
+                opacity: 0.14 + 0.4 * wardRingCharge,
+                transform: [{ scaleX: WARD_RING_SCALE_X }],
+              }}
+            />
+          </>
+        )}
+
         {/* Ward marks — phase progression indicators around the pit rim */}
-        {phase < 4 && (litCount > 0 || wardChargeFraction > 0.02 || pendingPhaseTransition != null) && (
+        {wardsVisible && (
           <>
             {wardPositions.map((pos, idx) => {
               const isLit = idx < litCount;
@@ -2505,6 +2569,22 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
 
               return (
                 <React.Fragment key={`ward-${idx}`}>
+                  {/* Station seat: a dark disc under every mark, so an UNLIT
+                      ward still reads as a station set into the ring rather
+                      than a gap in it. The unlit mark colour is ~8% white,
+                      which over the painted pit art was effectively nothing. */}
+                  <View
+                    pointerEvents="none"
+                    style={{
+                      position: 'absolute',
+                      left: pos.x - 8,
+                      top: pos.y - 8,
+                      width: 16,
+                      height: 16,
+                      borderRadius: 8,
+                      backgroundColor: 'rgba(10, 8, 18, 0.5)',
+                    }}
+                  />
                   {glowWorthy && !simplify && (
                     <Animated.View
                       pointerEvents="none"

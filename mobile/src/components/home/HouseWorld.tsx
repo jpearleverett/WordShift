@@ -1589,8 +1589,18 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
       : currentPhase >= 2
         ? 'rgba(200, 196, 206, 0.85)'
         : 'rgba(220, 220, 224, 0.9)';
-  // Animated values
-  const translateY = useRef(new Animated.Value(0)).current;
+  // ─── Pan driver ──────────────────────────────────────────────────────────
+  // `panRaw` holds the RAW (un-rubber-banded) pan position and is driven
+  // NATIVELY: the gesture writes straight into it via Animated.event, and the
+  // release spring animates the same value. It used to be updated by a JS
+  // callback calling setValue() on every gesture frame, which meant a JS->native
+  // hop plus a style commit per frame while dragging a scene of ~30 animated
+  // children and several full-screen images — that is the pan lag.
+  //
+  // The rubber band is no longer computed in JS either: it is baked into the
+  // interpolation below (panRaw -> rendered translateY), so the whole drag,
+  // including the overscroll give, runs on the native thread with ZERO JS work.
+  const panRaw = useRef(new Animated.Value(0)).current;
 
   // Refs for gesture tracking
   const panRef = useRef<PanGestureHandler>(null);
@@ -1598,13 +1608,13 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   // State tracking for gestures
   const baseTranslateY = useRef(0);
   const currentPanYRef = useRef<number | null>(null);
-  // Synchronous mirror of translateY's live value. The settle spring runs on the
-  // NATIVE driver, so translateY's JS value lags the real native value between
-  // frames, and translateY.stopAnimation()'s callback is ASYNC — reading the base
-  // from it left the FIRST onPanGestureEvent of a fresh drag using a stale base,
-  // flashing the scene toward the bottom for one frame before it corrected.
-  // Attaching a listener makes RN stream native->JS updates every frame, so this
-  // ref is always current and the base can be captured synchronously at BEGAN.
+  // Synchronous mirror of panRaw's live value. Animations run on the NATIVE
+  // driver, so panRaw's JS value lags the real native value between frames, and
+  // stopAnimation()'s callback is ASYNC — reading the base from it left the
+  // FIRST frame of a fresh drag using a stale base, flashing the scene toward
+  // the bottom before it corrected. Attaching a listener makes RN stream
+  // native->JS updates every frame (for native-driven EVENTS too), so this ref
+  // is always current and the base can be captured synchronously at BEGAN.
   const liveTranslateYRef = useRef(0);
   // Momentum settle animation (spring) currently decelerating the scene after
   // a release. A new gesture stops it; the physics is instant (no momentum /
@@ -1695,71 +1705,109 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   // animated driver so nothing can desync. Atmospheric depth still comes from
   // the independently DRIFTING clouds + ambient sprites, which are unaffected.
 
+  // The rendered pan offset: panRaw put through the rubber band.
+  //
+  // Rubber-band only the ROOF end (pan > max): overscrolling there reveals more
+  // of the sky-top-colored background, which blends seamlessly. The PIT end is a
+  // HARD floor (pan >= 0): the sky is bottom-anchored to the container bottom,
+  // so lifting the scene off it would expose the flat ground fill BELOW the
+  // artwork ("green beneath the background"). The ground is solid; only the sky
+  // gives. This preserves the invariant "the art can never lift off the
+  // container bottom".
+  //
+  // rubberBandPanY is non-linear, so it is SAMPLED into a piecewise-linear
+  // interpolation. That is what lets the give run natively — the same curve, one
+  // native node, no JS in the drag loop.
+  const panBoundsMax = panBounds.max;
+  const panTransform = useMemo(() => {
+    const max = Math.max(0, panBoundsMax);
+    const viewport = containerHeight ?? SCREEN_HEIGHT;
+    if (!panPhysicsEnabled || max <= 0) {
+      // Hard clamp, no give (reduced motion / low tier / nothing to scroll).
+      const hi = Math.max(1, max);
+      return { inputRange: [-1, 0, hi, hi + 1], outputRange: [0, 0, max, max] };
+    }
+    const maxOverscroll = Math.min(viewport * 0.3, 120);
+    const inputRange = [-1, 0, max];
+    const outputRange = [0, 0, max];
+    // Sample well past the cap so the curve has flattened before extrapolation.
+    const SAMPLES = 8;
+    const span = maxOverscroll * 3;
+    for (let i = 1; i <= SAMPLES; i++) {
+      const over = (span * i) / SAMPLES;
+      inputRange.push(max + over);
+      outputRange.push(
+        Math.max(0, rubberBandPanY(max + over, max, viewport, undefined, maxOverscroll)),
+      );
+    }
+    return { inputRange, outputRange };
+  }, [panBoundsMax, containerHeight, panPhysicsEnabled]);
+
+  const translateY = useMemo(
+    () => panRaw.interpolate({ ...panTransform, extrapolate: 'clamp' as const }),
+    [panRaw, panTransform],
+  );
+
   const syncPanPosition = useCallback((nextPanY: number, notify = false) => {
     // Cancel any in-flight momentum settle before hard-setting the position, so
     // a programmatic reposition (house grew / saved-pan restore) can't fight a
     // running native spring.
     settleAnimRef.current?.stop();
     settleAnimRef.current = null;
-    const clampedPanY = clampHomeScenePanY(nextPanY, panBounds.max);
-    translateY.setValue(clampedPanY);
+    const clampedPanY = clampHomeScenePanY(nextPanY, panBoundsMax);
+    // Clear any gesture offset first, or the hard set would land relative to
+    // the base captured at the last gesture start.
+    panRaw.setOffset(0);
+    panRaw.setValue(clampedPanY);
+    liveTranslateYRef.current = clampedPanY;
     currentPanYRef.current = clampedPanY;
     baseTranslateY.current = clampedPanY;
     if (notify) {
       onPanYChange?.(clampedPanY);
     }
-  }, [onPanYChange, panBounds.max, translateY]);
+  }, [onPanYChange, panBoundsMax, panRaw]);
 
   // Keep liveTranslateYRef synchronously current. Adding a listener also forces
-  // the native driver to report the settle spring's value to JS every frame, so
-  // the mirror never lags the on-screen position.
+  // the native driver to report values to JS every frame — for the settle spring
+  // AND for the native gesture event — so the mirror never lags the on-screen
+  // position. This is the ONLY per-frame JS during a drag now: a single number
+  // assignment, versus the old setValue + style commit.
+  const panBoundsMaxRef = useRef(panBoundsMax);
+  panBoundsMaxRef.current = panBoundsMax;
   useEffect(() => {
-    liveTranslateYRef.current = (translateY as unknown as { __getValue: () => number }).__getValue();
-    const id = translateY.addListener(({ value }) => {
+    liveTranslateYRef.current = (panRaw as unknown as { __getValue: () => number }).__getValue();
+    const id = panRaw.addListener(({ value }) => {
       liveTranslateYRef.current = value;
+      // Keep the LOGICAL position fresh too, so a mid-gesture layout change
+      // (the house growing) repositions from where the scene actually is.
+      currentPanYRef.current = clampHomeScenePanY(value, panBoundsMaxRef.current);
     });
-    return () => translateY.removeListener(id);
-  }, [translateY]);
+    return () => panRaw.removeListener(id);
+  }, [panRaw]);
 
   // Stop a decelerating settle at the start of a fresh gesture. Capture the base
-  // SYNCHRONOUSLY from the listener-backed live mirror (not translateY.stopAnimation's
+  // SYNCHRONOUSLY from the listener-backed live mirror (not stopAnimation's
   // async callback, which for a native-driven value fires a frame or more later —
-  // leaving the drag's first frame on a stale base and flashing the scene).
+  // leaving the drag's first frame on a stale base and flashing the scene), then
+  // hand it to the native node as the gesture OFFSET so the incoming
+  // translationY stream needs no JS arithmetic at all.
   const stopSettle = useCallback(() => {
     settleAnimRef.current?.stop();
     settleAnimRef.current = null;
-    translateY.stopAnimation();
-    baseTranslateY.current = liveTranslateYRef.current;
-  }, [translateY]);
+    panRaw.stopAnimation();
+    const base = liveTranslateYRef.current;
+    baseTranslateY.current = base;
+    panRaw.setOffset(base);
+    panRaw.setValue(0);
+  }, [panRaw]);
 
-  // Pan gesture handler — vertical only. Past the bounds the raw drag is
-  // rubber-banded (progressive resistance) instead of hard-clamped, so the
-  // scene reads as a physical thing you can nudge; the logical (clamped)
-  // position is tracked separately for the saved-pan restore.
-  const onPanGestureEvent = (event: PanGestureHandlerGestureEvent) => {
-    const { translationY } = event.nativeEvent;
-    const rawY = baseTranslateY.current + translationY;
-
-    // Compute the house value ONCE, then drive BOTH layers in the SAME JS flush
-    // so the sky can never lag the house across a frame (BUG 1).
-    let houseY: number;
-    if (panPhysicsEnabled) {
-      const viewport = containerHeight ?? SCREEN_HEIGHT;
-      const maxOverscroll = Math.min(viewport * 0.3, 120);
-      // Rubber-band only the ROOF end (translateY > max): overscrolling there
-      // reveals more of the sky-top-colored background, which blends seamlessly.
-      // The PIT end is a HARD floor (translateY >= 0): the sky is bottom-anchored
-      // to the container bottom, so lifting the scene off it would expose the
-      // flat ground fill BELOW the artwork ("green beneath the background"). The
-      // ground is solid; only the sky gives. This restores the pre-diorama
-      // invariant "the art can never lift off the container bottom".
-      houseY = Math.max(0, rubberBandPanY(rawY, panBounds.max, viewport, undefined, maxOverscroll));
-    } else {
-      houseY = clampHomeScenePanY(rawY, panBounds.max);
-    }
-    translateY.setValue(houseY);
-    currentPanYRef.current = clampHomeScenePanY(rawY, panBounds.max);
-  };
+  // Native-driven pan: the gesture's translationY IS the animated value (added
+  // to the offset captured at BEGAN). Must stay a pure Animated.event with no
+  // JS listener attached, or RN falls back to the JS path this replaced.
+  const onPanGestureEvent = useMemo(
+    () => Animated.event([{ nativeEvent: { translationY: panRaw } }], { useNativeDriver: true }),
+    [panRaw],
+  );
 
   const onPanHandlerStateChange = (event: PanGestureHandlerGestureEvent) => {
     const { state, translationY, velocityY } = event.nativeEvent;
@@ -1770,14 +1818,19 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     }
     if (state !== State.END) return;
 
-    const logicalRelease = clampHomeScenePanY(baseTranslateY.current + translationY, panBounds.max);
+    const logicalRelease = clampHomeScenePanY(baseTranslateY.current + translationY, panBoundsMax);
 
     // Reduced motion / low tier / no scroll range: settle instantly, no
-    // momentum, no bounce.
-    if (!panPhysicsEnabled || panBounds.max <= 0) {
+    // momentum, no bounce. (syncPanPosition clears the gesture offset.)
+    if (!panPhysicsEnabled || panBoundsMax <= 0) {
       syncPanPosition(logicalRelease, true);
       return;
     }
+
+    // Fold the gesture offset back into the value so the release spring
+    // animates one plain number from exactly where the finger left the scene
+    // (raw, possibly inside the overscroll zone) to its rest point.
+    panRaw.flattenOffset();
 
     // Carry the release velocity into a decelerating spring toward the
     // momentum-projected rest point. A projection past a bound clamps the
@@ -1786,17 +1839,18 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     const settleTarget = computePanSettleTarget({
       releasePanY: logicalRelease,
       velocityY,
-      maxPanY: panBounds.max,
+      maxPanY: panBoundsMax,
     });
     currentPanYRef.current = settleTarget;
 
     // One native spring drives the whole scene — the entire painterly plane
     // (sky, meadow, house, pit) settles together, so there is nothing for a
-    // second layer to desync from. At the PIT floor (settleTarget 0) we drop the
-    // seeded velocity so the underdamped spring can't overshoot below 0 and
+    // second layer to desync from. At the PIT floor (settleTarget 0) the seeded
+    // velocity is dropped so the underdamped spring can't overshoot below 0 and
     // flash the ground fill beneath the art; the roof end keeps its momentum
-    // bounce (it overscrolls into seamless sky-colored background).
-    const settle = Animated.spring(translateY, {
+    // bounce (it overscrolls into seamless sky-colored background, and the
+    // interpolation above rubber-bands that overshoot exactly as the drag does).
+    const settle = Animated.spring(panRaw, {
       toValue: settleTarget,
       velocity: settleTarget <= 0 ? 0 : velocityY,
       friction: 9,
@@ -1819,9 +1873,9 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     return () => {
       settleAnimRef.current?.stop();
       settleAnimRef.current = null;
-      translateY.stopAnimation();
+      panRaw.stopAnimation();
     };
-  }, [translateY]);
+  }, [panRaw]);
 
   // Preserve the current viewport when the house grows or helper UI changes the
   // available height, and restore the last viewport when the home screen remounts.
@@ -1830,11 +1884,11 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     const resolvedPanY = resolveHomeScenePanY({
       currentPanY: currentPanYRef.current,
       savedPanY,
-      maxPanY: panBounds.max,
+      maxPanY: panBoundsMax,
     });
     const shouldNotify = currentPanYRef.current == null || currentPanYRef.current !== resolvedPanY;
     syncPanPosition(resolvedPanY, shouldNotify);
-  }, [containerHeight, panBounds.max, savedPanY, syncPanPosition]);
+  }, [containerHeight, panBoundsMax, savedPanY, syncPanPosition]);
 
   return (
     <GestureHandlerRootView style={[styles.container, { backgroundColor: PHASE_BG_COLORS[currentPhase] || PHASE_BG_COLORS[0] }]}>

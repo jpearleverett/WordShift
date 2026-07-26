@@ -526,6 +526,43 @@ const AmberCostLabel: React.FC<{
 // compact; tarsier at 65% stays standard.)
 const COMPACT_DIALOGUE_SPRITES = new Set<string>(['axolotl', 'fennec_fox', 'aye_aye', 'kakapo']);
 
+// Sampled from the sky assets' top rows (sampleSkyTops scratch script) so the
+// screen background meets the sky PNG without a seam — keep in sync with
+// HouseWorld's PHASE_BG_COLORS and appStyles' getScreenBackgroundColor('home');
+// re-sample if the sky assets regenerate.
+const PHASE_SKY_FILL: Record<number, string> = {
+  0: '#439cf2', 1: '#1583f9', 2: '#684381', 3: '#000000', 4: '#050816', 5: '#050816',
+};
+
+// ─── Last-rendered home scene ────────────────────────────────────────────────
+// HomeScreen unmounts on every navigation away and remounts with empty state,
+// so every return to home rendered the "Loading your home..." card — a bright
+// purple screen with a white card — while loadAllData read storage, and then
+// the rooms' investment layers popped in a few awaits later. On a dark-phase
+// save that flash is the most jarring thing in the app.
+//
+// Keeping the last successfully-rendered scene at module scope lets a remount
+// paint the real house on its FIRST frame. loadAllData still runs on mount and
+// overwrites every field, so the snapshot is only ever authoritative for the
+// frames before the read lands — it is a paint-ahead, not a cache of record.
+// Cleared by resetHomeSceneSnapshot() whenever the session is rebuilt beneath
+// us (Reset All, cloud restore), so a stale house can never outlive its save.
+interface HomeSceneSnapshot {
+  progress: HomeWorldProgress;
+  rooms: Room[];
+  animals: Animal[];
+  upgrades: Record<string, number>;
+  deepened: Record<string, number>;
+  attuned: Record<string, number>;
+  tendingLevel: number;
+}
+let homeSceneSnapshot: HomeSceneSnapshot | null = null;
+
+/** Drop the paint-ahead scene (Reset All / cloud restore rebuilt the save). */
+export function resetHomeSceneSnapshot(): void {
+  homeSceneSnapshot = null;
+}
+
 // Once-per-APP-SESSION guard for the gentle "your pit is getting heavy" nudge.
 // Module-scoped on purpose: HomeScreen unmounts on every navigation, so a
 // component ref re-armed the nudge on every home arrival — an engaged player
@@ -568,9 +605,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 }) => {
   const screenInsets = useScreenInsets();
   const isOnboarding = onboardingStep !== undefined && onboardingStep !== 'complete';
-  const [progress, setProgress] = useState<HomeWorldProgress | null>(null);
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [animals, setAnimals] = useState<Animal[]>([]);
+  // Seeded from the last-rendered scene (see homeSceneSnapshot): HomeScreen
+  // unmounts on every navigation away, so starting from null meant EVERY return
+  // to home rendered the loading card for as long as loadAllData took — a
+  // bright flash between the transition overlay and the real house, and the
+  // "rooms visibly loading" the player sees. loadAllData still runs on mount
+  // and overwrites this, so the snapshot is authoritative for at most one pass.
+  const [progress, setProgress] = useState<HomeWorldProgress | null>(homeSceneSnapshot?.progress ?? null);
+  const [rooms, setRooms] = useState<Room[]>(homeSceneSnapshot?.rooms ?? []);
+  const [animals, setAnimals] = useState<Animal[]>(homeSceneSnapshot?.animals ?? []);
 
   // Decoration shop state
 
@@ -685,10 +728,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Goal suggestion (contextual next-action hint)
 
   // Room upgrades
-  const [purchasedUpgrades, setPurchasedUpgrades] = useState<Record<string, number>>({});
-  const [deepenedRooms, setDeepenedRooms] = useState<Record<string, number>>({});
-  const [attunedRooms, setAttunedRooms] = useState<Record<string, number>>({});
-  const [tendingLevel, setTendingLevel] = useState(0);
+  // Also snapshot-seeded: these land several awaits AFTER the rooms in
+  // loadAllData, so on a cold state the house rendered bare and its investment
+  // layers (hearth glow, sigil marks, dust motes, nameplate pips) popped in a
+  // beat later — a second visible "loading" step on every home arrival.
+  const [purchasedUpgrades, setPurchasedUpgrades] = useState<Record<string, number>>(homeSceneSnapshot?.upgrades ?? {});
+  const [deepenedRooms, setDeepenedRooms] = useState<Record<string, number>>(homeSceneSnapshot?.deepened ?? {});
+  const [attunedRooms, setAttunedRooms] = useState<Record<string, number>>(homeSceneSnapshot?.attuned ?? {});
+  const [tendingLevel, setTendingLevel] = useState(homeSceneSnapshot?.tendingLevel ?? 0);
 
   // Dialogue flow hook
   const dialogueFlow = useDialogueFlow({
@@ -801,7 +848,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setAttunedRooms(attuned);
 
     // Phase-5 Tending Level — drives the visual "deepening" of the house sigils.
-    setTendingLevel(await getTendingLevel());
+    const tending = await getTendingLevel();
+    setTendingLevel(tending);
+
+    // Paint-ahead for the next mount (see homeSceneSnapshot). Written last, so
+    // only a fully-read scene is ever replayed.
+    homeSceneSnapshot = {
+      progress: progressData,
+      rooms: roomsData,
+      animals: animalsData,
+      upgrades,
+      deepened,
+      attuned,
+      tendingLevel: tending,
+    };
   }, [unlockFlow.refreshUnlockData]);
 
   // Keep the ref in sync
@@ -1870,25 +1930,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   );
 
   if (!progress || rooms.length === 0) {
-    return (
-      <View style={styles.loadingContainer}>
-        <View style={styles.loadingCard}>
-          <Animated.View style={{ transform: [{ scale: amberPulse }] }}>
-            <Image source={require('../../../assets/ui/home.png')} style={styles.loadingSprite} resizeMode="contain" />
-          </Animated.View>
-          <Text style={styles.loadingText}>Loading your home...</Text>
-          <Text style={styles.loadingSubtext}>Placing rooms and waking friends.</Text>
-        </View>
-      </View>
-    );
+    // Only reachable on a genuinely cold read (first launch, or right after a
+    // reset dropped the paint-ahead snapshot) — every ordinary return to home
+    // now renders the real house on its first frame. Even here the fill is the
+    // destination sky colour rather than the old bright purple card, so the
+    // gap reads as the screen it is about to become instead of a flash.
+    return <View style={[styles.loadingContainer, { backgroundColor: PHASE_SKY_FILL[currentPhase] ?? PHASE_SKY_FILL[0] }]} />;
   }
 
-  // Sampled from the sky assets' top rows (sampleSkyTops scratch script) so the
-  // screen background meets the sky PNG without a seam — keep in sync with
-  // HouseWorld/appStyles; re-sample if the sky assets regenerate.
-  const phaseBgColor = {
-    0: '#439cf2', 1: '#1583f9', 2: '#684381', 3: '#000000', 4: '#050816', 5: '#050816',
-  }[progress.currentPhase] || '#439cf2';
+  const phaseBgColor = PHASE_SKY_FILL[progress.currentPhase] ?? PHASE_SKY_FILL[0];
 
   // Phase-aware dialogue theme for all modals and dialogue boxes
   const dt = getDialogueTheme(progress.currentPhase);
