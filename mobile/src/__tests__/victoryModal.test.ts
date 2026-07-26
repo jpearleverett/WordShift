@@ -15,9 +15,10 @@
  *     never stack (footer wins when a chain renders one); the generic
  *     "Puzzle Complete" subtitle is trimmed (daily keeps its label); the
  *     social-proof line renders only when provided.
- *  4. Share button — the daily-bonus hint renders as a flex row (label text,
- *     amber gem Image as a sibling, "+N" text), never as an inline image
- *     nested inside Text (which baseline-wrapped onto a second line).
+ *  4. Share button — the daily-bonus hint is stated in the button's own
+ *     label ("Share +N") and in full in its accessibility label. The action
+ *     buttons are cottage CandyButtons, so their internal layout (one
+ *     centered label row) is guaranteed there, not re-asserted here.
  */
 
 // ---------------------------------------------------------------------------
@@ -486,70 +487,43 @@ describe('Unbroken Weave mastery', () => {
 describe('share button bonus layout', () => {
   const bonusLabel = `Share result, earns ${DAILY_SHARE_BONUS_AMBER} amber for the first share today`;
 
-  it('renders label, gem, and +N as siblings in one centered non-wrapping row', async () => {
+  // The share action is now a CandyButton (the shared cottage bevel), so its
+  // internals are owned and guaranteed there: ONE centered label row, so an
+  // <Image> can no longer be nested inside a Text run (the playtest bug this
+  // suite was written for is structurally impossible now). What stays this
+  // file's business is the CONTRACT the victory screen hands the button:
+  // the bonus must be visible in the label AND stated in full for readers.
+  // (This harness does not expand nested function components, so the
+  // assertions read the element's props rather than its rendered tree.)
+
+  it('states the bonus in the visible label and in full for screen readers', async () => {
     (isDailyShareBonusAvailable as jest.Mock).mockResolvedValueOnce(true);
     const tree = await renderWithEffects(baseProps());
 
     const btn = findByA11yLabel(tree, bonusLabel);
     expect(btn).not.toBeNull();
-
-    // Exactly one horizontal content row, centered on both axes. RN's default
-    // flexWrap ('nowrap') is not overridden, so the gem can never wrap onto a
-    // second line (the playtest bug).
-    const rows = findAll(btn, el =>
-      el.type === 'View' && flatStyle((el.props as Record<string, unknown>).style).flexDirection === 'row');
-    expect(rows).toHaveLength(1);
-    const rowStyle = flatStyle((rows[0].props as Record<string, unknown>).style);
-    expect(rowStyle.alignItems).toBe('center');
-    expect(rowStyle.justifyContent).toBe('center');
-    expect(rowStyle.flexWrap).toBeUndefined();
-
-    // Traversal order pins the reading order: share icon, "Share", gem, "+N".
-    // (The old "📤" emoji is now the generated share.png sprite.)
-    const ordered = findAll(rows[0], el => el.type === 'Text' || el.type === 'Image');
-    expect(ordered.map(el => el.type)).toEqual(['Image', 'Text', 'Image', 'Text']);
-    const [shareIcon, label, gem, amount] = ordered;
-
-    expect(textOf(label)).toContain('Share');
-    expect(textOf(amount)).toBe(`+${DAILY_SHARE_BONUS_AMBER}`);
-
-    // The share sprite is decorative (the button's accessibilityLabel speaks).
-    const shareIconProps = shareIcon.props as Record<string, unknown>;
-    expect(shareIconProps.importantForAccessibility).toBe('no');
-    expect(shareIconProps.accessibilityElementsHidden).toBe(true);
-
-    // Both text pieces fit one line and share the button font + phase color.
-    for (const t of [label, amount]) {
-      expect((t.props as Record<string, unknown>).numberOfLines).toBe(1);
-    }
-    const labelStyle = flatStyle((label.props as Record<string, unknown>).style);
-    const amountStyle = flatStyle((amount.props as Record<string, unknown>).style);
-    expect(labelStyle.fontWeight).toBe('700');
-    expect(amountStyle.fontWeight).toBe('700');
-    expect(amountStyle.color).toBe(labelStyle.color);
-
-    // The gem is decorative: the button's accessibilityLabel already announces
-    // the bonus, so the Image carries no label and is hidden from readers.
-    const gemProps = gem.props as Record<string, unknown>;
-    expect(gemProps.accessibilityLabel).toBeUndefined();
-    expect(gemProps.importantForAccessibility).toBe('no');
-    expect(gemProps.accessibilityElementsHidden).toBe(true);
-
-    // The old broken structure: an Image nested INSIDE a Text run.
-    for (const t of [label, amount]) {
-      const nested = findAll((t.props as Record<string, unknown>).children, el => el.type === 'Image');
-      expect(nested).toHaveLength(0);
-    }
+    const props = btn!.props as Record<string, unknown>;
+    expect(props.label).toBe(`Share +${DAILY_SHARE_BONUS_AMBER}`);
+    // A generated sprite, never an OS emoji, sits beside the label. (Jest maps
+    // image requires to a numeric asset stub, so this asserts presence only.)
+    expect(props.icon).not.toBeUndefined();
+    // Supporting action: the single strong CTA above it stays the only primary.
+    expect(props.variant).toBe('secondary');
   });
 
-  it('renders just the share icon + label when no bonus is available (no gem, no +N)', () => {
+  it('drops the "+N" from the label when no bonus is available', () => {
     const tree = render(baseProps());
     const btn = findByA11yLabel(tree, 'Share result');
     expect(btn).not.toBeNull();
-    // Exactly the share sprite (decorative) + the "Share" label — no amber gem.
-    expect(findAll(btn, el => el.type === 'Image')).toHaveLength(1);
-    expect(findAll(btn, el => el.type === 'Text')).toHaveLength(1);
-    expect(textOf(btn)).not.toContain(`+${DAILY_SHARE_BONUS_AMBER}`);
+    expect((btn!.props as Record<string, unknown>).label).toBe('Share');
+  });
+
+  it('keeps exactly one primary CTA on the surface', () => {
+    const tree = render(baseProps());
+    const next = findByA11yLabel(tree, 'Next level');
+    expect(next).not.toBeNull();
+    expect((next!.props as Record<string, unknown>).variant).toBe('primary');
+    expect((findByA11yLabel(tree, 'Return home')!.props as Record<string, unknown>).variant).toBe('secondary');
   });
 });
 

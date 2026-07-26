@@ -51,6 +51,9 @@ import { isAdFreeSync } from '../../services/entitlements';
 import { announceForA11y } from '../../services/a11yAnnounce';
 import { countUpDisplayValue, getCountUpDurationMs } from '../ui/RewardReveal';
 import { BODY_FONT, BODY_FONT_ITALIC, PIXEL_FONT_BOLD } from '../../theme/fonts';
+import { NineSliceFrame } from '../ui/NineSlice';
+import { CandyButton } from '../ui/CandyButton';
+import { getPixelSkin, PANEL_CORNER_DP, PANEL_EDGE_DP } from '../../theme/pixelSkin.generated';
 
 // Candy-styled UI sprite icons (replace emoji for critical info)
 const STAR_FILLED = require('../../../assets/ui/star_filled.png');
@@ -58,6 +61,9 @@ const STAR_EMPTY = require('../../../assets/ui/star_empty.png');
 const AMBER_ICON = require('../../../assets/ui/amber.png');
 const FLAME_ICON = require('../../../assets/ui/flame.png');
 const SHARE_ICON = require('../../../assets/ui/share.png');
+// Cottage house sprite for the Home bevel (replaces the raw OS house emoji the
+// flat button carried — a colour emoji next to a pixel bevel reads as a paste-in).
+const HOME_ICON = require('../../../assets/ui/home.png');
 // The Collect Now pill leads to the Offering Pit, so the pit sprite (the same
 // one that stands in for the pit-entrance emoji elsewhere) is the on-brand
 // cottage replacement for the raw sheaf emoji that used to prefix the label.
@@ -264,6 +270,13 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 }) => {
   const phaseTheme = getPhaseTheme(phase);
   const btn = getButtonTheme(phase);
+  // Cottage material for the result surface. The modal's own fill flips dark at
+  // phase 3 (getPhaseTheme.modalBgColor #2A2040), one phase before the world's
+  // surface theme does, so hostDark runs the frame + buttons onto the dark ash
+  // material there too — otherwise a light storm frame would wrap a dark card
+  // and the button ink polarity would invert against its own panel.
+  const victoryHostDark = phase >= 3;
+  const victorySkin = getPixelSkin(phase, victoryHostDark);
   // getVictoryFeedback draws randomly from a pool: pick ONCE per victory so
   // the line never visibly re-rolls as async lines (rank/social proof) land
   // and re-render the open modal.
@@ -733,15 +746,27 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
         bounces={false}
       >
           <Animated.View style={[styles.victoryModal, {
-            backgroundColor: phaseTheme.modalBgColor,
-            borderColor: btn.modalBorder,
             transform: [{ scale: modalScale }],
             opacity: modalOpacity,
           }]}>
+            {/* Cottage 9-slice wood frame — the same furniture every other
+                surface in the game wears. The result screen was the last
+                bespoke flat card: a plain white rounded rectangle with CSS
+                borders, which read as a different app from the menus around it.
+                The FILL deliberately stays phaseTheme.modalBgColor rather than
+                the skin's parchment, so every contrast pair inside this modal
+                keeps exactly the value it was audited against, and the frame is
+                purely additive. No borderRadius is applied over it — the baked
+                stepped corners ARE the corner treatment. */}
+            <NineSliceFrame
+              skin={victorySkin.panel}
+              cornerDp={PANEL_CORNER_DP}
+              edgeDp={PANEL_EDGE_DP}
+              fillColor={phaseTheme.modalBgColor}
+            />
             <View style={[styles.victoryGlow, {
               backgroundColor: phaseTheme.victoryGlowColor,
             }]} />
-            <View style={styles.modalShine} />
 
             {/* Stars — choreographed pop-in */}
             <View
@@ -850,7 +875,13 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             )}
 
             {/* Group 1: Harvest, bonuses, streak, milestone */}
-            <Animated.View style={{ opacity: contentOpacity1, transform: [{ translateY: contentTranslateY1 }] }}>
+            {/* Every choreography group is laid out at the modal's full content
+                width with centered children. Groups 3/4 already were; 1/2 were
+                not, so they shrink-wrapped to their widest child — which made
+                `width: '100%'` inside them (the ritual-echo container) resolve
+                against an indefinite parent, and left the echo/incantation block
+                sitting on a narrower axis than the amber panel below it. */}
+            <Animated.View style={{ opacity: contentOpacity1, width: '100%', alignItems: 'center', transform: [{ translateY: contentTranslateY1 }] }}>
             {/* Harvested words (queued for the pit) */}
             {victoryData?.harvestedWords && victoryData.harvestedWords.length > 0 && (
               <View
@@ -989,7 +1020,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             </Animated.View>
 
             {/* Group 2: Ritual echo chain */}
-            <Animated.View style={{ opacity: contentOpacity2, transform: [{ translateY: contentTranslateY2 }] }}>
+            <Animated.View style={{ opacity: contentOpacity2, width: '100%', alignItems: 'center', transform: [{ translateY: contentTranslateY2 }] }}>
             {/* Ritual Echo — word chain from completed puzzle (all phases) */}
             {echoWords && (
               <View style={[
@@ -1400,26 +1431,17 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             {isOnboarding ? (
             <View style={styles.victoryButtonRow}>
               {/* Onboarding: single "Continue" button */}
-              <TouchableOpacity
-                onPress={onOnboardingContinue}
-                activeOpacity={0.85}
+              <CandyButton
+                label="CONTINUE"
+                onPress={onOnboardingContinue ?? onNextLevel}
+                phase={phase}
+                hostDark={victoryHostDark}
+                variant="primary"
+                size="lg"
+                soundKind="none"
                 accessibilityLabel="Continue"
-                accessibilityRole="button"
-              >
-                <View style={styles.btn3dWrapper}>
-                  <View style={[styles.btn3dBody, {
-                    backgroundColor: btn.primary.bg,
-                    shadowColor: btn.primary.shadow,
-                  }]}>
-                    <View style={styles.btn3dBevel} />
-                    <View style={styles.btn3dGlossy} />
-                    <Text style={styles.btn3dPrimaryText}>CONTINUE</Text>
-                  </View>
-                  <View style={[styles.btn3dEdge, {
-                    backgroundColor: btn.primary.edge,
-                  }]} />
-                </View>
-              </TouchableOpacity>
+                style={styles.victoryCtaButton}
+              />
             </View>
             ) : mustVisitPit ? (
             // Pit visit required (phase transition or first-harvest gate): the
@@ -1428,91 +1450,50 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             ) : (
             <>
             {/* Early wins stay focused: one strong replay CTA. */}
-            <TouchableOpacity
+            <CandyButton
+              label="NEXT LEVEL"
               onPress={onNextLevel}
-              activeOpacity={0.85}
+              phase={phase}
+              hostDark={victoryHostDark}
+              variant="primary"
+              size="lg"
+              soundKind="none"
               accessibilityLabel="Next level"
-              accessibilityRole="button"
-              style={{ width: '100%' }}
-            >
-              <View style={[styles.btn3dWrapper, { width: '100%' }]}>
-                <View style={[styles.btn3dBody, {
-                  backgroundColor: btn.primary.bg,
-                  shadowColor: btn.primary.shadow,
-                  width: '100%',
-                }]}>
-                  <View style={styles.btn3dBevel} />
-                  <View style={styles.btn3dGlossy} />
-                  <Text style={styles.btn3dPrimaryText}>NEXT LEVEL</Text>
-                </View>
-                <View style={[styles.btn3dEdge, {
-                  backgroundColor: btn.primary.edge,
-                }]} />
-              </View>
-            </TouchableOpacity>
+              style={styles.victoryCtaButton}
+            />
 
             <View style={styles.victoryButtonRowSecondary}>
-              {/* Share — uniform secondary */}
-              <TouchableOpacity
+              {/* Share — cottage secondary bevel. The amber gem that used to
+                  ride beside the bonus is dropped in favour of a plain "+5": a
+                  3-slice strip centres one label row, and an inline <Image> in
+                  a Text baseline-aligns unreliably at this size. The
+                  accessibility label still names the bonus in full. */}
+              <CandyButton
+                label={shareBonusAvailable ? `Share +${DAILY_SHARE_BONUS_AMBER}` : 'Share'}
                 onPress={onShare}
-                activeOpacity={0.8}
-                hitSlop={{ top: 6, bottom: 6, left: 0, right: 0 }}
+                phase={phase}
+                hostDark={victoryHostDark}
+                variant="secondary"
+                icon={SHARE_ICON}
+                soundKind="none"
                 accessibilityLabel={shareBonusAvailable
                   ? `Share result, earns ${DAILY_SHARE_BONUS_AMBER} amber for the first share today`
                   : 'Share result'}
-                accessibilityRole="button"
-                style={{ flex: 1 }}
-              >
-                <View style={[styles.btnFlat, {
-                  backgroundColor: btn.share.bg,
-                  borderColor: btn.share.edge,
-                }]}>
-                  {/* Flex row (not an inline image in Text) \u2014 inline images
-                      baseline-align unreliably and wrap onto their own line
-                      when tight. The row centers the gem properly. */}
-                  <View style={styles.shareBtnRow}>
-                    <Image
-                      source={SHARE_ICON}
-                      style={styles.shareBtnIcon}
-                      importantForAccessibility="no"
-                      accessibilityElementsHidden
-                    />
-                    <Text numberOfLines={1} style={[styles.btnFlatUniform, { color: btn.share.text }]}>
-                      Share
-                    </Text>
-                    {shareBonusAvailable && (
-                      <>
-                        <Image
-                          source={AMBER_ICON}
-                          style={styles.shareBonusIcon}
-                          importantForAccessibility="no"
-                          accessibilityElementsHidden
-                        />
-                        <Text numberOfLines={1} style={[styles.btnFlatUniform, { color: btn.share.text }]}>
-                          {`+${DAILY_SHARE_BONUS_AMBER}`}
-                        </Text>
-                      </>
-                    )}
-                  </View>
-                </View>
-              </TouchableOpacity>
+                style={styles.victorySecondaryButton}
+              />
 
-              {/* Home — uniform secondary */}
-              <TouchableOpacity
+              {/* Home — cottage secondary bevel */}
+              <CandyButton
+                label="Home"
                 onPress={onReturnHome}
-                activeOpacity={0.8}
-                hitSlop={{ top: 6, bottom: 6, left: 0, right: 0 }}
+                phase={phase}
+                hostDark={victoryHostDark}
+                variant="secondary"
+                icon={HOME_ICON}
+                soundKind="none"
                 accessibilityLabel="Return home"
-                accessibilityRole="button"
-                style={{ flex: 1 }}
-              >
-                <View style={[styles.btnFlat, {
-                  backgroundColor: btn.secondary.bg,
-                  borderColor: btn.secondary.edge,
-                }]}>
-                  <Text style={[styles.btnFlatUniform, { color: btn.secondary.text }]}>{'\uD83C\uDFE0'} Home</Text>
-                </View>
-              </TouchableOpacity>
+                style={styles.victorySecondaryButton}
+              />
             </View>
             </>
             )}
@@ -1632,32 +1613,29 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.headline,
     fontWeight: '900',
   },
+  // Cottage-framed result surface. No backgroundColor / borderRadius / border /
+  // shadow: the 9-slice frame supplies the material, the corners and the
+  // silhouette, and rounding a baked pixel corner with CSS is the one thing the
+  // skin must never do. Padding clears the panel frame's 24dp wood band.
   victoryModal: {
-    backgroundColor: CandyColors.white,
-    borderRadius: 32,
-    paddingTop: 28,
-    paddingHorizontal: 16,
-    paddingBottom: 24,
+    paddingTop: 34,
+    paddingHorizontal: 26,
+    paddingBottom: 30,
     alignItems: 'center',
     width: '100%',
     maxWidth: 360,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
-    shadowColor: CandyColors.purple.dark,
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.4,
-    shadowRadius: 32,
-    elevation: 20,
     overflow: 'hidden',
   },
+  // Kept inside the wood band so the celebratory wash never paints over the
+  // frame itself (it used to bleed to -50 and was clipped by the old rounded
+  // card; the frame's own pixels must stay unwashed).
   victoryGlow: {
     position: 'absolute',
-    top: -50,
-    left: -50,
-    right: -50,
-    height: 200,
+    top: PANEL_EDGE_DP,
+    left: PANEL_EDGE_DP,
+    right: PANEL_EDGE_DP,
+    height: 170,
     opacity: 0.3,
-    borderRadius: 100,
   },
   starsContainer: {
     flexDirection: 'row',
@@ -1923,6 +1901,14 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 4,
     width: '100%',
+  },
+  // Cottage bevel CTAs. CandyButton owns its own height (strip + baked shadow),
+  // so these only set the axis sizing.
+  victoryCtaButton: {
+    width: '100%',
+  },
+  victorySecondaryButton: {
+    flex: 1,
   },
   btn3dWrapper: {
     alignItems: 'center',
@@ -2389,6 +2375,11 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     color: CandyColors.purple.shadow, // 6.3:1 on the Phase 2 container (purple.dark was 4.0:1)
     marginTop: 8,
+    // Stretch to the container's inner width so textAlign actually centers the
+    // named incantation on the modal's axis (and centers BOTH lines when a long
+    // "Offering: X to Y" wraps). Shrink-wrapped, a wrapped second line hung
+    // left of the first.
+    alignSelf: 'stretch',
     textAlign: 'center',
   },
   ritualIncantationNameBright: {

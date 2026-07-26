@@ -24,7 +24,7 @@ import { ActionButton, AnimatedLogo, Toast, VictoryModal, RulesModal, Difficulty
 import { BadgeAppear } from './src/components/puzzle/BadgeAppear';
 import { BrandedLoader } from './src/components/puzzle/BrandedLoader';
 import { isValidDifficulty, normalizeDifficulty, getDifficultyChipLabel } from './src/components/puzzle/DifficultyMenu';
-import { HomeScreen } from './src/components/home';
+import { HomeScreen, resetHomeSceneSnapshot } from './src/components/home';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { AmberInline } from './src/components/AmberInline';
 import { CandyColors } from './src/theme/colors';
@@ -765,22 +765,30 @@ function MainApp() {
       const kind: 'lift' | 'sink' = screen === 'pit' ? 'sink' : 'lift';
       setScreenRevealKind(kind);
       screenRevealAnim.setValue(1);
-      // Wait one frame for React to render the new screen before revealing
+      // Wait for the new screen to be COMMITTED AND PAINTED before revealing.
+      // A single rAF was not enough: the setState calls above are batched and
+      // processed asynchronously, so one frame callback can fire before React
+      // has committed the swap — the overlay then began lifting over the
+      // outgoing screen, or over a half-mounted destination, which is the
+      // flicker players see on every navigation. The double rAF puts the reveal
+      // strictly after the frame that paints the new screen, at a cost of ~16ms.
       requestAnimationFrame(() => {
-        // Fade overlay OUT — now blends through destination-matching color
-        Animated.timing(transitionOverlay, {
-          toValue: 0,
-          duration: SCREEN_FADE_REVEAL_MS,
-          easing: Easing.in(Easing.quad),
-          useNativeDriver: true,
-        }).start();
-        // Settle the reveal signature (springs the arriving screen into place).
-        Animated.spring(screenRevealAnim, {
-          toValue: 0,
-          friction: 8,
-          tension: 90,
-          useNativeDriver: true,
-        }).start();
+        requestAnimationFrame(() => {
+          // Fade overlay OUT — now blends through destination-matching color
+          Animated.timing(transitionOverlay, {
+            toValue: 0,
+            duration: SCREEN_FADE_REVEAL_MS,
+            easing: Easing.in(Easing.quad),
+            useNativeDriver: true,
+          }).start();
+          // Settle the reveal signature (springs the arriving screen into place).
+          Animated.spring(screenRevealAnim, {
+            toValue: 0,
+            friction: 8,
+            tension: 90,
+            useNativeDriver: true,
+          }).start();
+        });
       });
     });
   }, [transitionOverlay, screenRevealAnim, persistence.currentPhase]);
@@ -1638,6 +1646,10 @@ function MainApp() {
   // restarted from the cold open instead of dumping the player back onto
   // a home screen still rendering their old save.
   const rebuildSessionFromStorage = useCallback((opts: { restartOnboarding: boolean }) => {
+    // The home screen's paint-ahead scene describes the save we are replacing,
+    // so drop it here or the rebuilt session's first home frame would show the
+    // OLD house for a beat before loadAllData corrects it.
+    resetHomeSceneSnapshot();
     clearVictoryTimeouts();
     clearVictoryToastQueue();
     puzzleActions.clearBoard();
@@ -4373,9 +4385,18 @@ function MainApp() {
                       accessibilityRole="button"
                       accessibilityLabel={`Refill one undo for ${AMBER_UNDO_REFILL_COST} amber`}
                     >
-                      <Text style={styles.buyUndoText}>
-                        {'\u21a9'} +1 {'\u00b7'} {AMBER_UNDO_REFILL_COST} <AmberInline size={11} />
-                      </Text>
+                      {/* Laid out as explicit flex-row siblings, not an inline
+                          gem inside one <Text>. RN baseline-aligns an <Image>
+                          embedded in a Text run, and on a short chip label that
+                          flakily crowds the gem against the adjacent digit and
+                          sits it off the text's optical center (the same defect
+                          AmberCostLabel exists to avoid on HomeScreen). */}
+                      <View style={styles.buyUndoRow}>
+                        <Text style={styles.buyUndoText}>
+                          {'\u21a9'} +1 {'\u00b7'} {AMBER_UNDO_REFILL_COST}
+                        </Text>
+                        <AmberInline size={11} style={styles.buyUndoAmberIcon} />
+                      </View>
                     </TouchableOpacity>
                   </BadgeAppear>
                 )}

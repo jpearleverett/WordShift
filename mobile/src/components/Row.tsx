@@ -27,6 +27,8 @@ import {
   STANDARD_TILE_MARGIN_H,
   COMPACT_TILE_W,
   COMPACT_TILE_MARGIN_H,
+  arcLetterCenterOffset,
+  standardLetterCenterOffset,
 } from '../constants/tileLayout';
 import {
   INTER_SLOT_PULSE_SCALE,
@@ -669,8 +671,9 @@ export const Row: React.FC<RowProps> = memo(({
   const successBounceScale = useRef(new Animated.Value(1)).current;
   const glowLoopRef = useRef<Animated.CompositeAnimation | null>(null);
   // F1 (neighbour rank-closing) — per-tile translateX cache + the last
-  // rendered STANDARD-layout id order, used by the rank-shift effect below.
-  const prevStandardIdsRef = useRef<string[] | null>(null);
+  // rendered layout (id order + whether it was the arc), used by the
+  // rank-shift effect below.
+  const prevRenderRef = useRef<{ ids: string[]; arc: boolean } | null>(null);
   const rankShiftAnims = useRef(new Map<string, Animated.Value>()).current;
   const getRankShiftAnim = (id: string): Animated.Value => {
     let anim = rankShiftAnims.get(id);
@@ -906,8 +909,12 @@ export const Row: React.FC<RowProps> = memo(({
       }),
     ]).start(({ finished }) => {
       if (finished) {
+        // NOT reset to 1 here: setArcVisible is async, so the animated node
+        // would jump back to the open pose for the frame before the unmount
+        // commits — and now that slotCollapseAnim also drives the letters'
+        // glide (collapseGlideX), that frame would visibly fling the ranks
+        // back apart. Every path that opens the fan re-arms it to 1 first.
         setArcVisible(false);
-        slotCollapseAnim.setValue(1); // reset for the next open
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- isTarget rides with showSlots; anim values are stable refs
@@ -1033,13 +1040,29 @@ export const Row: React.FC<RowProps> = memo(({
         const displayLetter = (concealLetters && !isSource)
           ? { ...letter, char: '•' }
           : letter;
+        // Ranks close as the fan flattens. The slots hold real width, so this
+        // row's letters sit further apart in the arc than in the standard run
+        // they revert to; letting the slots simply unmount teleported every
+        // letter inward in one frame ("the row doesn't slide back into place").
+        // Riding the same slotCollapseAnim the slots fade on, each letter
+        // glides to EXACTLY the x the standard layout will give it, so the
+        // unmount lands on an already-correct position. Rests at 0 (the natural
+        // arc spot) while the fan is open, so nothing moves during targeting.
+        const collapseGlideX = slotCollapseAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [
+            standardLetterCenterOffset(letterIndex, letters.length, compactTiles) -
+              arcLetterCenterOffset(letterIndex, letters.length, compactTiles),
+            0,
+          ],
+        });
         // No wrapper View - LetterTile renders directly with animation
         elements.push(
           <Animated.View
             key={letter.id}
             style={[
               styles.arcLetterWrapper,
-              { transform: [{ translateY }, { rotate }] },
+              { transform: [{ translateY }, { translateX: collapseGlideX }, { rotate }] },
             ]}
           >
             <LetterTile
@@ -1174,57 +1197,90 @@ export const Row: React.FC<RowProps> = memo(({
   // footprint nudge, from tileLayout.ts) and native-springs to 0, so ranks
   // visibly close / make room instead of snapping.
   //
-  // Deliberately scoped to same-layout-path changes: the arc->standard flip
-  // when a row becomes the new source (letters were previously laid out in
-  // the fan, not this standard row) has no previous STANDARD baseline to
-  // diff against here, so it is left alone — that transition is already
-  // masked by the arc-collapse animation plus the arriving letter's own
-  // arrival settle. A true cross-row "flying ghost" (a tile visibly
-  // travelling from the source row's position into the target slot) needs
-  // usePuzzleGame to hand down the source tile's measured screen position
-  // and is out of scope for this file.
+  // The arc->standard flip is handled too. When a letter is COMMITTED into this
+  // row it stops being the target mid-flight, so the fan is dropped with a hard
+  // snap (there is no graceful collapse to ride) and every surviving letter
+  // jumped from its wide arc spacing to the tighter standard run in one frame.
+  // Now each one starts at the exact arc x it was last seen at and springs to
+  // its new standard x, so the row visibly makes room for the arriving letter.
+  // The arriving letter itself is skipped — it owns its own arrival settle.
+  //
+  // A graceful DESELECT is deliberately excluded here: the letters already
+  // glided to their standard positions during the collapse (see
+  // collapseGlideX), so re-seeding would yank them back out and replay it.
+  // Detected by the word length being unchanged.
+  //
+  // A true cross-row "flying ghost" (a tile visibly travelling from the source
+  // row's position into the target slot) needs usePuzzleGame to hand down the
+  // source tile's measured screen position and is out of scope for this file.
   useEffect(() => {
-    if (arcMounted) return;
     const currentIds = rowData.words.map((l) => l.id);
-    const prevIds = prevStandardIdsRef.current;
+    const prev = prevRenderRef.current;
+    prevRenderRef.current = { ids: currentIds, arc: arcMounted };
+
+    if (arcMounted) return; // the arc render owns its own motion
     const instant = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
 
     if (instant) {
       currentIds.forEach((id) => getRankShiftAnim(id).setValue(0));
-      prevStandardIdsRef.current = currentIds;
       return;
     }
+    if (!prev || prev.ids.length === currentIds.length) return;
 
+    const releaseSpring = getPressSpring(phase);
     const started: Animated.CompositeAnimation[] = [];
-    if (prevIds && prevIds.length !== currentIds.length) {
+    const seeded = new Set<string>();
+
+    const seed = (id: string, startOffset: number) => {
+      if (Math.abs(startOffset) < 0.5) return;
+      seeded.add(id);
+      const anim = getRankShiftAnim(id);
+      anim.setValue(startOffset);
+      const spring = Animated.spring(anim, {
+        toValue: 0,
+        friction: releaseSpring.friction,
+        tension: releaseSpring.tension,
+        useNativeDriver: true,
+      });
+      spring.start();
+      started.push(spring);
+    };
+
+    if (prev.arc) {
+      // Arc -> standard with a letter added: the real geometric delta.
+      currentIds.forEach((id, newIdx) => {
+        const oldIdx = prev.ids.indexOf(id);
+        if (oldIdx === -1) return; // the arriving letter owns its arrival settle
+        seed(
+          id,
+          arcLetterCenterOffset(oldIdx, prev.ids.length, compactTiles) -
+            standardLetterCenterOffset(newIdx, currentIds.length, compactTiles),
+        );
+      });
+    } else {
+      // Standard -> standard (the old source row shrinking as its picked letter
+      // departs): a half-footprint nudge in the direction the gap closed.
       const footprint = compactTiles
         ? COMPACT_TILE_W + COMPACT_TILE_MARGIN_H * 2
         : STANDARD_TILE_W + STANDARD_TILE_MARGIN_H * 2;
       const half = footprint / 2;
-      const releaseSpring = getPressSpring(phase);
       currentIds.forEach((id, newIdx) => {
-        const oldIdx = prevIds.indexOf(id);
-        if (oldIdx === -1) return; // a newly-arrived tile owns its own arrival settle
-        let startOffset: number | null = null;
-        if (newIdx === oldIdx) startOffset = -half; // sat before the departed tile
-        else if (newIdx < oldIdx) startOffset = half; // sat after it; the gap closed under it
-        if (startOffset === null) return;
-        const anim = getRankShiftAnim(id);
-        anim.setValue(startOffset);
-        const spring = Animated.spring(anim, {
-          toValue: 0,
-          friction: releaseSpring.friction,
-          tension: releaseSpring.tension,
-          useNativeDriver: true,
-        });
-        spring.start();
-        started.push(spring);
+        const oldIdx = prev.ids.indexOf(id);
+        if (oldIdx === -1) return;
+        if (newIdx === oldIdx) seed(id, -half); // sat before the departed tile
+        else if (newIdx < oldIdx) seed(id, half); // sat after it; the gap closed under it
       });
     }
 
-    prevStandardIdsRef.current = currentIds;
+    // Anything not seeded (the arriving letter, or a tile whose delta rounded
+    // away) rests at 0 — a stale offset from a spring the cleanup stopped
+    // mid-flight would otherwise leave that tile permanently nudged.
+    currentIds.forEach((id) => {
+      if (!seeded.has(id)) getRankShiftAnim(id).setValue(0);
+    });
+
     return () => { started.forEach((a) => a.stop()); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- rankShiftAnims/prevStandardIdsRef/getRankShiftAnim are stable refs recreated fresh each run
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- rankShiftAnims/prevRenderRef/getRankShiftAnim are stable refs recreated fresh each run
   }, [arcMounted, rowData.words, compactTiles, phase]);
 
   return (

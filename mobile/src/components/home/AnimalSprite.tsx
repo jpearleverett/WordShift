@@ -21,6 +21,48 @@ import { shouldSimplifyAnimations } from '../../services/deviceTier';
  * a 30-frame gait at 24fps sampled every 3rd frame). */
 const WALK_FRAME_MS = 125;
 
+// ---------------------------------------------------------------------------
+// Gait/travel pace matching (the "walking backwards" fix).
+//
+// A wander leg always lasts MOVEMENT_SPEED[type] ms no matter how far it
+// travels, but the walk frames and the procedural gait cycled at a FIXED
+// cadence. So a short hop played a full-speed gait over almost no ground: the
+// legs churned while the body barely moved, which the eye reads as moonwalking
+// (and, once the sprite is also mid-turn, as walking backwards).
+//
+// Two guards. First, a wander leg must cover at least MIN_TRAVEL_UNITS so the
+// pathological near-zero leg can't happen at all. Second, the gait cadence is
+// scaled by how fast this particular leg actually moves relative to a reference
+// leg, so the feet always keep up with the ground.
+// ---------------------------------------------------------------------------
+
+/** Minimum distance (room units, 0-100) a wander leg may cover. */
+const MIN_TRAVEL_UNITS = 18;
+/** Leg distance the per-species MOVEMENT_SPEED cadence was tuned against. */
+const REFERENCE_TRAVEL_UNITS = 30;
+/** Clamp on the pace multiplier so the gait always stays a plausible walk. */
+const MIN_GAIT_PACE = 0.6;
+const MAX_GAIT_PACE = 2.4;
+
+/**
+ * Multiplier on a gait's frame/cycle duration for a leg of `travelUnits` room
+ * units taking `travelMs`. 1 = the reference pace; >1 slows the gait down for a
+ * short/slow leg; <1 speeds it up for a long/fast one. Pure + exported so the
+ * pacing contract is testable without a renderer.
+ */
+export function getGaitPaceScale(
+  travelUnits: number,
+  travelMs: number,
+  referenceMs: number,
+): number {
+  const units = Math.max(1, Math.abs(travelUnits));
+  const ms = Math.max(1, travelMs);
+  const refMs = Math.max(1, referenceMs);
+  // referenceSpeed / actualSpeed, with speed measured in units per ms.
+  const scale = (REFERENCE_TRAVEL_UNITS / refMs) / (units / ms);
+  return Math.max(MIN_GAIT_PACE, Math.min(MAX_GAIT_PACE, scale));
+}
+
 // The walk-cycle art (upright, mid-stride) reads a touch leaner than the fuller
 // idle pose, so the walking fox looks a little smaller even though its rendered
 // bounding box actually matches idle. Nudge the walk layers up a hair to match
@@ -474,6 +516,11 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
   const idleScale = useRef(new Animated.Value(1)).current; // kakapo inflate
 
   const currentXRef = useRef(animal.position.x);
+  // Gait cadence multiplier for the leg currently underway (see
+  // getGaitPaceScale). Written synchronously just before setIsMoving(true), so
+  // the walk-frame interval / gait loop effects — which re-run every leg as
+  // walkActive/gaitActive toggle — always read this leg's value.
+  const gaitPaceRef = useRef(1);
   // Live mirrors read by the async rare-idle scheduler without re-subscribing.
   const isMovingRef = useRef(false);
   const cooldownRef = useRef(isOnCooldown);
@@ -531,7 +578,9 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
     const loop = Animated.loop(
       Animated.timing(gaitAnim, {
         toValue: 1,
-        duration: getGaitPeriodMs(animal.type),
+        // Paced to this leg's actual ground speed so the footfalls never churn
+        // faster than the animal travels.
+        duration: getGaitPeriodMs(animal.type) * gaitPaceRef.current,
         easing: Easing.linear,
         useNativeDriver: true,
       })
@@ -595,7 +644,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
     }
     const interval = setInterval(() => {
       setWalkFrame(prev => (prev + 1) % (walkFrames?.length ?? 1));
-    }, WALK_FRAME_MS);
+    }, WALK_FRAME_MS * gaitPaceRef.current);
     return () => clearInterval(interval);
   }, [walkActive, walkFrames?.length]);
 
@@ -772,9 +821,19 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
     }
 
     // Sleeping: settle at a rest spot and stay put (no wander, no bounce).
+    // The facing flip rides along: this slide used to move the sprite without
+    // ever touching scaleX, so an animal resting from the right half of the
+    // room glided LEFT while still facing right — the most visible "walking
+    // backwards" case, and it fires after every dialogue session.
     if (isOnCooldown) {
       setIsMoving(false);
+      const restGoingRight = REST_POS_X > currentXRef.current;
       currentXRef.current = REST_POS_X;
+      Animated.timing(scaleX, {
+        toValue: restGoingRight ? 1 : -1,
+        duration: 150,
+        useNativeDriver: true,
+      }).start();
       Animated.timing(posX, {
         toValue: REST_POS_X,
         duration: 1200,
@@ -791,12 +850,23 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
     const moveToRandomPosition = () => {
       if (!isMounted) return;
 
-      // Random target position (20-80% of room to stay away from edges)
-      const targetX = 20 + Math.random() * 60;
+      // Random target position (20-80% of room to stay away from edges).
+      // Rerolled until it is at least MIN_TRAVEL_UNITS away, so a leg always
+      // covers real ground: a near-zero leg still burned the full travel time
+      // playing a full-speed gait in place, which reads as moonwalking. The
+      // reroll is bounded (the fallback mirrors the target across the room, so
+      // it is always far enough) and never blocks.
+      const currentX = currentXRef.current;
+      let targetX = 20 + Math.random() * 60;
+      for (let tries = 0; tries < 4 && Math.abs(targetX - currentX) < MIN_TRAVEL_UNITS; tries++) {
+        targetX = 20 + Math.random() * 60;
+      }
+      if (Math.abs(targetX - currentX) < MIN_TRAVEL_UNITS) {
+        targetX = currentX < 50 ? 80 : 20;
+      }
       const targetY = 20 + Math.random() * 60;
 
       // Determine direction for flip
-      const currentX = currentXRef.current;
       const goingRight = targetX > currentX;
 
       // Update tracked position before animation starts
@@ -809,10 +879,18 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
         useNativeDriver: true,
       }).start();
 
-      setIsMoving(true);
-
       // Move to target (slower with the descent)
       const travelMs = MOVEMENT_SPEED[animal.type] * motion.speedMul;
+      // Match this leg's gait cadence to its ground speed BEFORE the walk /
+      // gait effects re-run off isMoving.
+      gaitPaceRef.current = getGaitPaceScale(
+        targetX - currentX,
+        travelMs,
+        MOVEMENT_SPEED[animal.type],
+      );
+
+      setIsMoving(true);
+
       Animated.parallel([
         Animated.timing(posX, {
           toValue: targetX,
@@ -1341,7 +1419,15 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
             </Animated.View>
           )}
 
-          {/* Name tag with phase-based mood indicator */}
+          {/* Name tag with phase-based mood indicator.
+              Overlaid on the sprite's lower body rather than stacked BELOW it.
+              A room is ~123dp tall and the sprite box alone is 90dp plus its 5dp
+              touch padding, so a tag in normal flow started at ~129dp and was
+              clipped away entirely by RoomView's overflow:hidden — the animals
+              have never actually shown their names. Overlaying is also how the
+              design renders it (a small pill sitting at the animal's base).
+              The `top` is chosen so the tag clears the clip for EVERY animal,
+              including the two carrying the largest FLOOR_OFFSET (15). */}
           <View style={[
             styles.nameTag,
             currentPhase >= 3 && styles.nameTagDark,
@@ -1353,25 +1439,28 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
             ]}>
               {animal.name}
             </Text>
+            {/* The remaining-puzzle count rides INSIDE the tag. It used to be a
+                second badge stacked below, which sat even further past the clip
+                boundary; one pill is both visible and tidier. */}
             {isOnCooldown && (
-              <Image source={EMOTE_SPRITES.sleep} style={styles.cooldownIcon} resizeMode="contain" />
+              <>
+                <Image source={EMOTE_SPRITES.sleep} style={styles.cooldownIcon} resizeMode="contain" />
+                {cooldownPuzzlesLeft != null && cooldownPuzzlesLeft > 0 && (
+                  <Text
+                    style={[
+                      styles.cooldownCountText,
+                      currentPhase >= 3 && styles.cooldownCountTextDark,
+                    ]}
+                    accessibilityLabel={
+                      cooldownPuzzlesLeft === 1 ? 'resting for 1 more puzzle' : `resting for ${cooldownPuzzlesLeft} more puzzles`
+                    }
+                  >
+                    {cooldownPuzzlesLeft}
+                  </Text>
+                )}
+              </>
             )}
           </View>
-
-          {/* Cooldown puzzles remaining indicator */}
-          {isOnCooldown && cooldownPuzzlesLeft != null && cooldownPuzzlesLeft > 0 && (
-            <View style={[
-              styles.cooldownCountBadge,
-              currentPhase >= 3 && styles.cooldownCountBadgeDark,
-            ]}>
-              <Text style={[
-                styles.cooldownCountText,
-                currentPhase >= 3 && styles.cooldownCountTextDark,
-              ]}>
-                {cooldownPuzzlesLeft === 1 ? '1 puzzle' : `${cooldownPuzzlesLeft} puzzles`}
-              </Text>
-            </View>
-          )}
         </View>
       </TouchableOpacity>
     </Animated.View>
@@ -1465,12 +1554,18 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.bodyLg,
     fontWeight: '900',
   },
+  // Overlaid on the sprite's lower body (see the render note). Budget for the
+  // clip at roomHeight 123.5: translateY tops out ~35.3 (posY 20 of the 20-80
+  // wander band), + FLOOR_OFFSET up to 15, + the touchable's 5dp padding, + this
+  // `top` 50, + the pill's own ~16dp height = ~121.3, inside the room.
   nameTag: {
-    marginTop: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    borderRadius: 8,
+    position: 'absolute',
+    top: 50,
+    alignSelf: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.66)',
+    borderRadius: 7,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
@@ -1478,35 +1573,25 @@ const styles = StyleSheet.create({
   nameText: {
     fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
-    fontSize: FONT_SIZE.small,
+    fontSize: FONT_SIZE.micro,
     fontWeight: '700',
   },
   moodDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
   },
   // Cottage sleep sprite in the cooldown name tag (replaces the raw 💤 emoji).
   cooldownIcon: {
-    width: 12,
-    height: 12,
-    marginLeft: 2,
+    width: 11,
+    height: 11,
+    marginLeft: 1,
   },
   nameTagDark: {
     backgroundColor: CandyColors.purple.dark,
   },
   nameTextDark: {
     color: CandyColors.gray[300],
-  },
-  cooldownCountBadge: {
-    marginTop: 2,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    borderRadius: 6,
-  },
-  cooldownCountBadgeDark: {
-    backgroundColor: 'rgba(60, 30, 80, 0.7)',
   },
   cooldownCountText: {
     fontFamily: PIXEL_FONT_BOLD,
