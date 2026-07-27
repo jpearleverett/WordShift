@@ -16,6 +16,49 @@ export const resolveHomeScenePanY = ({
   return clampHomeScenePanY(currentPanY ?? savedPanY ?? maxPanY, maxPanY);
 };
 
+interface GestureBaseInput {
+  /** Is a momentum spring actually mid-flight right now? */
+  settling: boolean;
+  /** JS mirror of the natively-driven animated value. Advisory: see below. */
+  liveMirror: number;
+  /** The last position JS itself put the scene at. The listener never writes it. */
+  lastRestingPanY: number;
+}
+
+/**
+ * Which number a fresh gesture should treat as its starting point.
+ *
+ * Since the pan moved onto the native driver (the change that fixed the scroll
+ * lag), the scene's position lives in a native node behind setOffset, and JS
+ * sees it only through a listener mirror. That mirror is reliable while a
+ * spring is flying, and NOT reliable at rest.
+ *
+ * The unreliability is structural. React Native delivers native updates through
+ * AnimatedValue.__onAnimatedValueUpdateReceived(value, offset), which calls
+ * _updateValue(value) first - firing listeners with `value + this._offset`, the
+ * OLD offset - and assigns the new offset only afterwards. A release calls
+ * flattenOffset(), which zeroes the JS offset immediately but only QUEUES the
+ * native flatten, so any update already in flight is delivered as a raw gesture
+ * translation measured against an offset that is now zero. Tapping a small
+ * animal sprite routinely drags a few dp on the way down, which is a real
+ * (tiny) pan, so that translation is small, and the mirror is left holding a
+ * position near the pit. Nothing moves at the time. The NEXT touch takes it as
+ * its base and hard-sets the scene there.
+ *
+ * So: mid-spring the mirror is the only thing that knows where the scene is,
+ * and it is taken RAW - unclamped, because a release inside the rubber-band
+ * zone legitimately sits past the bound and clamping it would make grabbing the
+ * scene mid-bounce snap instead of catch. At rest, JS's own bookkeeping is both
+ * sufficient and the only thing that cannot have been poisoned.
+ */
+export const resolveGestureBasePanY = ({
+  settling,
+  liveMirror,
+  lastRestingPanY,
+}: GestureBaseInput): number => {
+  return settling ? liveMirror : lastRestingPanY;
+};
+
 interface HomeScenePanRestoreInput extends ResolveHomeScenePanYInput {
   /**
    * Has the player physically touched the scene during THIS mount? Until they
