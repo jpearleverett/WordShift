@@ -233,6 +233,33 @@ describe('HouseWorld pan wiring', () => {
     expect(SRC).toMatch(/intendedPanYRef\.current = settleTarget/);
   });
 
+  it('never repositions the scene under a live finger', () => {
+    // syncPanPosition clears the gesture offset, so a restore mid-drag both
+    // yanks the scene and leaves the rest of the drag on a stale base. The
+    // house really can grow mid-drag (the ghost room landing), so this is
+    // reachable, not theoretical.
+    const resolveAt = SRC.indexOf('const { panY, intendedPanY } = resolveHomeScenePanRestore');
+    const guard = SRC.slice(SRC.lastIndexOf('useEffect(() => {', resolveAt), resolveAt);
+    expect(guard).toMatch(/if \(isPanningRef\.current\) return;/);
+    // Armed on ACTIVE and cleared by EVERY terminal state, not just END, so a
+    // tap (FAILED) or a system cancel cannot strand the flag on.
+    const armed = SRC.indexOf('isPanningRef.current = true;');
+    const cleared = SRC.indexOf('isPanningRef.current = false;');
+    const endGuard = SRC.indexOf('if (state !== State.END) return;');
+    expect(armed).toBeGreaterThan(-1);
+    expect(cleared).toBeGreaterThan(armed);
+    expect(cleared).toBeLessThan(endGuard);
+  });
+
+  it('keeps the per-frame drag listener to a single assignment', () => {
+    // It runs every frame of every drag. It used to also clamp and write a
+    // second ref that nothing read.
+    const listener = SRC.slice(SRC.indexOf('const id = panRaw.addListener'));
+    const body = listener.slice(0, listener.indexOf('});'));
+    expect(body).toMatch(/liveTranslateYRef\.current = value;/);
+    expect(body).not.toMatch(/clampHomeScenePanY/);
+  });
+
   it('does not re-enter the restore effect on its own committed release', () => {
     // onPanYChange writes the released position into App state, which comes
     // straight back down as the savedPanY prop. With savedPanY in this effect's
