@@ -4,6 +4,7 @@ import {
   projectPanMomentum,
   computePanSettleTarget,
   rubberBandPanY,
+  resolveHomeScenePanRestore,
   HOME_PAN_PROJECTION_FACTOR,
 } from '../services/homeScenePan';
 
@@ -115,5 +116,106 @@ describe('rubberBandPanY', () => {
     expect(up).toBeCloseTo(-down);
     expect(down).toBeGreaterThan(0);
     expect(down).toBeLessThan(50);
+  });
+});
+
+// ===========================================================================
+// The restore decision. Getting this wrong is invisible in one frame and only
+// shows up as drift across sessions, which is exactly how it shipped: players
+// reported the house "taking me back down to the bottom" after unlocks.
+// ===========================================================================
+describe('resolveHomeScenePanRestore', () => {
+  // The house mounts before it knows its own height: rooms come from a
+  // paint-ahead snapshot, but the next-unlock ghost room lands several storage
+  // reads later, so the bound is briefly one room (~140dp) short.
+  const ROOM = 140;
+  const TRUE_MAX = 900;
+  const PROVISIONAL_MAX = TRUE_MAX - ROOM;
+
+  test('a mount never commits, so a provisional bound cannot eat the memory', () => {
+    const parkedAtRoof = TRUE_MAX;
+    const early = resolveHomeScenePanRestore({
+      currentPanY: null,
+      savedPanY: parkedAtRoof,
+      maxPanY: PROVISIONAL_MAX,
+      userOwnsPosition: false,
+    });
+    // Rendered against the short bound for now...
+    expect(early.panY).toBe(PROVISIONAL_MAX);
+    // ...but NOT written back. This is the whole fix.
+    expect(early.commit).toBe(false);
+  });
+
+  test('the real bound arriving restores the position the player actually left', () => {
+    const parkedAtRoof = TRUE_MAX;
+    const settled = resolveHomeScenePanRestore({
+      currentPanY: PROVISIONAL_MAX, // what the early pass rendered
+      savedPanY: parkedAtRoof,
+      maxPanY: TRUE_MAX,
+      userOwnsPosition: false,
+    });
+    expect(settled.panY).toBe(parkedAtRoof);
+  });
+
+  test('repeated trips home do not erode the remembered position', () => {
+    // The shipped leak: each mount clamped against the short bound AND wrote
+    // the clamped value back, so a player parked near the roof lost a room per
+    // visit, cumulatively, with no floor. Simulate five round trips.
+    let remembered = TRUE_MAX;
+    for (let trip = 0; trip < 5; trip++) {
+      const early = resolveHomeScenePanRestore({
+        currentPanY: null,
+        savedPanY: remembered,
+        maxPanY: PROVISIONAL_MAX,
+        userOwnsPosition: false,
+      });
+      if (early.commit) remembered = early.panY;
+      const late = resolveHomeScenePanRestore({
+        currentPanY: early.panY,
+        savedPanY: remembered,
+        maxPanY: TRUE_MAX,
+        userOwnsPosition: false,
+      });
+      if (late.commit) remembered = late.panY;
+    }
+    expect(remembered).toBe(TRUE_MAX);
+  });
+
+  test('once the player pans, their live position wins and the house may grow above them', () => {
+    // Rooms are added at the TOP of a bottom-anchored scene, so holding the
+    // number holds the view. Growing the bound must not move them.
+    const held = 420;
+    const grown = resolveHomeScenePanRestore({
+      currentPanY: held,
+      savedPanY: 900,
+      maxPanY: TRUE_MAX + ROOM,
+      userOwnsPosition: true,
+    });
+    expect(grown.panY).toBe(held);
+    expect(grown.commit).toBe(false); // unchanged, nothing to re-record
+  });
+
+  test('a live position that the bound genuinely clamps IS re-recorded', () => {
+    // House completion is the one shrink. If the bound really did move under a
+    // position the player owns, the new truth must be remembered.
+    const clamped = resolveHomeScenePanRestore({
+      currentPanY: 900,
+      savedPanY: 900,
+      maxPanY: 500,
+      userOwnsPosition: true,
+    });
+    expect(clamped.panY).toBe(500);
+    expect(clamped.commit).toBe(true);
+  });
+
+  test('a first-ever launch still frames the roof', () => {
+    const fresh = resolveHomeScenePanRestore({
+      currentPanY: null,
+      savedPanY: null,
+      maxPanY: TRUE_MAX,
+      userOwnsPosition: false,
+    });
+    expect(fresh.panY).toBe(TRUE_MAX);
+    expect(fresh.commit).toBe(false);
   });
 });

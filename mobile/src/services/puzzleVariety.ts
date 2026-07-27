@@ -255,9 +255,15 @@ export function getBlindUnlockHint(puzzlesSolved: number, uiPhase: number): stri
   if (remaining <= 0) {
     return uiPhase >= 3 ? 'Ready for the arrangement.' : 'Unlocked.';
   }
+  // Not "the last trial": Lexicon gates 20 solves later, and Unbroken Weave
+  // waits past the ending, so the superlative was both wrong and a small
+  // spoiler about how much game is left. Describe what it FEELS like instead.
+  // "Deepest" claims difficulty; "last" claimed position. Kept to one line so
+  // the locked row does not grow taller than the rows above it (the hint text
+  // has no numberOfLines and the panel column is only ~206dp).
   const tease = uiPhase >= 3
     ? 'One day you will offer a whole chain unseeing.'
-    : 'The last trial: no previews, judged only at the end.';
+    : 'The deepest trial: no previews at all, judged only at the end.';
   return formatLockedHint(tease, remaining, uiPhase);
 }
 

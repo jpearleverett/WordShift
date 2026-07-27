@@ -16,6 +16,53 @@ export const resolveHomeScenePanY = ({
   return clampHomeScenePanY(currentPanY ?? savedPanY ?? maxPanY, maxPanY);
 };
 
+interface HomeScenePanRestoreInput extends ResolveHomeScenePanYInput {
+  /**
+   * Has the player physically touched the scene during THIS mount? Until they
+   * have, `currentPanY` is only a provisional rendering of `savedPanY` and must
+   * not be treated as the truth.
+   */
+  userOwnsPosition: boolean;
+}
+
+export interface HomeScenePanRestore {
+  /** Where to put the scene now. */
+  panY: number;
+  /** Whether this position is worth REMEMBERING (writing back to the caller). */
+  commit: boolean;
+}
+
+/**
+ * The restore decision for the home diorama, kept pure because getting it wrong
+ * is invisible in a single frame and only shows up as drift over many sessions.
+ *
+ * The house mounts before it knows how tall it is: the room list is seeded from
+ * a paint-ahead snapshot but the "next unlock" ghost room arrives several
+ * storage round trips later, so for that window the pan bound is one room short
+ * of the truth. If the value clamped against that provisional bound is adopted
+ * as the live position AND written back to memory, every trip home shaves a
+ * room's height off a player parked near the roof. It compounds, it never
+ * recovers, and it presents as the house dumping you at the bottom.
+ *
+ * So: before the player has touched the scene, the saved value stays the source
+ * of truth (any clamp is a temporary rendering that a later, larger bound
+ * undoes) and nothing is committed. Once they HAVE touched it, their live
+ * position wins outright, so the house growing above them cannot move it.
+ */
+export const resolveHomeScenePanRestore = ({
+  currentPanY,
+  savedPanY = null,
+  maxPanY,
+  userOwnsPosition,
+}: HomeScenePanRestoreInput): HomeScenePanRestore => {
+  const panY = resolveHomeScenePanY({
+    currentPanY: userOwnsPosition ? currentPanY : null,
+    savedPanY,
+    maxPanY,
+  });
+  return { panY, commit: userOwnsPosition && currentPanY !== panY };
+};
+
 // ─── Pan momentum + rubber-band physics ──────────────────────────────────────
 // Pure math for the home diorama's "snow-globe you can nudge" pan feel. Kept
 // out of the component (which pulls the full native surface) so the physics is

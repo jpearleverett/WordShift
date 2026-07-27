@@ -575,6 +575,75 @@ describe('drag z-order contract', () => {
 });
 
 // ===========================================================================
+// The modifier list doubles as the player's roadmap, so it reads in UNLOCK
+// order. Speed (55) shipped below Blind (80) and read as the further goal
+// while actually being the nearer one.
+// ===========================================================================
+describe('modifier row order is unlock order', () => {
+  const MENU_SRC = fs.readFileSync(
+    path.resolve(__dirname, '../components/puzzle/DifficultyMenu.tsx'),
+    'utf8',
+  );
+
+  // First render site of each modifier's row block, in source order.
+  const rowAt = (needle: string): number => {
+    const i = MENU_SRC.indexOf(needle);
+    expect(i).toBeGreaterThan(-1);
+    return i;
+  };
+
+  it('renders Challenge, then Speed, then Blind, then Lexicon', () => {
+    const challenge = rowAt('{showChallengeToggle && !introMode && (');
+    const speed = rowAt('{showSpeedToggle && !introMode && speedLocked');
+    const blind = rowAt('{showBlindToggle && !introMode && blindLocked');
+    const lexicon = rowAt('{showLexiconToggle && !introMode && lexiconLocked');
+    expect(challenge).toBeLessThan(speed);
+    expect(speed).toBeLessThan(blind);
+    expect(blind).toBeLessThan(lexicon);
+  });
+
+  it('keeps each mode live toggle directly under its own locked tease', () => {
+    // A locked tease that drifts away from its live row means one of the two
+    // got moved alone, which is how the order broke the first time.
+    const pairs: Array<[string, string]> = [
+      ['{showSpeedToggle && !introMode && speedLocked', '{showSpeedToggle && !introMode && (!speedLocked'],
+      ['{showBlindToggle && !introMode && blindLocked', '{showBlindToggle && !introMode && (!blindLocked'],
+      ['{showLexiconToggle && !introMode && lexiconLocked', '{showLexiconToggle && !introMode && (!lexiconLocked'],
+    ];
+    for (const [locked, live] of pairs) {
+      expect(rowAt(locked)).toBeLessThan(rowAt(live));
+    }
+  });
+
+  it('gathers the stack emblem glyphs in that same order', () => {
+    // The emblem renders the glyphs left to right, so a mismatch would show
+    // the loadout in a different order than the menu the player built it in.
+    const challenge = MENU_SRC.indexOf("stackLayerNames.push('Challenge')");
+    const speed = MENU_SRC.indexOf("stackLayerNames.push('Speed Shift')");
+    const blind = MENU_SRC.indexOf("stackGlyphs.push('🌑')");
+    const lexicon = MENU_SRC.indexOf("stackLayerNames.push('Lexicon')");
+    expect(challenge).toBeGreaterThan(-1);
+    expect(challenge).toBeLessThan(speed);
+    expect(speed).toBeLessThan(blind);
+    expect(blind).toBeLessThan(lexicon);
+  });
+
+  it('matches the ascending unlock gates the order claims', () => {
+    const {
+      CHALLENGE_TOGGLE_UNLOCK_PUZZLES,
+      BLIND_TOGGLE_UNLOCK_PUZZLES,
+    } = require('../services/puzzleVariety');
+    const {
+      SPEED_TOGGLE_UNLOCK_PUZZLES,
+      LEXICON_UNLOCK_PUZZLES,
+    } = require('../constants/gameBalance');
+    expect(CHALLENGE_TOGGLE_UNLOCK_PUZZLES).toBeLessThan(SPEED_TOGGLE_UNLOCK_PUZZLES);
+    expect(SPEED_TOGGLE_UNLOCK_PUZZLES).toBeLessThan(BLIND_TOGGLE_UNLOCK_PUZZLES);
+    expect(BLIND_TOGGLE_UNLOCK_PUZZLES).toBeLessThan(LEXICON_UNLOCK_PUZZLES);
+  });
+});
+
+// ===========================================================================
 // The animal nameplate is a STATIC fixture of the room, not sprite chrome
 // ===========================================================================
 describe('animal nameplate contract', () => {
@@ -592,7 +661,53 @@ describe('animal nameplate contract', () => {
     const decl = block.slice(0, block.indexOf('},'));
     expect(decl).toMatch(/position:\s*'absolute'/);
     expect(decl).toMatch(/bottom:\s*\d+/);
-    expect(decl).toMatch(/alignSelf:\s*'center'/);
+  });
+
+  it('stays off the centre axis the room sign owns, and behind the sprite', () => {
+    // Two centred labels in a ~123dp room read as a matched pair. The occupant
+    // caption is corner-anchored and sits UNDER AnimalSprite's container
+    // (zIndex 10) so the animal passes in front of its own name.
+    const block = ROOM_SRC.slice(ROOM_SRC.indexOf('animalPlate: {'));
+    const decl = block.slice(0, block.indexOf('},'));
+    expect(decl).toMatch(/left:\s*\d+/);
+    expect(decl).not.toMatch(/alignSelf:\s*'center'/);
+    const z = decl.match(/zIndex:\s*(\d+)/);
+    expect(z).not.toBeNull();
+    expect(Number(z![1])).toBeLessThan(10);
+  });
+
+  it('is a subordinate tag, not a peer of the room sign', () => {
+    // The two were 0.62 vs 0.68 — 8.8% apart in every dimension, which reads as
+    // a matched pair rather than a hierarchy. The tag must stay materially
+    // shorter, and it can only do that because fontScale decouples the label
+    // from the box (PixelPlaque's font is 14 * scale, so scale alone would have
+    // taken the type under the room sign's own).
+    const roomScale = Number(ROOM_SRC.match(/ROOM_PLAQUE_SCALE = ([\d.]+)/)![1]);
+    const tagScale = Number(ROOM_SRC.match(/ANIMAL_PLAQUE_SCALE = ([\d.]+)/)![1]);
+    expect(tagScale / roomScale).toBeLessThan(0.75);
+
+    const mount = ROOM_SRC.slice(
+      ROOM_SRC.indexOf('style={[styles.animalPlate'),
+      ROOM_SRC.indexOf('{/* Animal if present and unlocked */}'),
+    );
+    // Still on plaque wood: it is the only ink pair in the room audited to
+    // 4.5:1 (pixelSkinContrast), and bare type over 13 backgrounds x 6 phases
+    // has no such guarantee.
+    expect(mount).toMatch(/<PixelPlaque/);
+    expect(mount).toMatch(/fontScale=\{ANIMAL_PLAQUE_FONT_SCALE\}/);
+  });
+
+  it('keeps the plaque fontScale opt-in so the other call sites are untouched', () => {
+    const plaqueSrc = fs.readFileSync(
+      path.resolve(__dirname, '../components/ui/PixelPlaque.tsx'),
+      'utf8',
+    );
+    expect(plaqueSrc).toMatch(/fontScale = 1/);
+    expect(plaqueSrc).toMatch(/fontSize:\s*14 \* scale \* fontScale/);
+    // The wood must keep its baked aspect ratio: caps and height stay on the
+    // uniform `scale` alone, never on fontScale.
+    expect(plaqueSrc).toMatch(/const capDp = PLAQUE_CAP_DP \* scale;/);
+    expect(plaqueSrc).toMatch(/height: PLAQUE_H_DP \* scale,/);
   });
 
   it('no longer renders a name tag inside the sprite (it was clipped away)', () => {
@@ -606,9 +721,7 @@ describe('animal nameplate contract', () => {
   it('is decorative on BOTH platforms so the name is announced once', () => {
     const mount = ROOM_SRC.slice(
       ROOM_SRC.indexOf('style={[styles.animalPlate'),
-      ROOM_SRC.indexOf('</PixelPlaque') > -1
-        ? ROOM_SRC.indexOf('</PixelPlaque')
-        : ROOM_SRC.indexOf('styles.animalPlate') + 1200,
+      ROOM_SRC.indexOf('{/* Animal if present and unlocked */}'),
     );
     // importantForAccessibility is Android-only; accessibilityElementsHidden
     // is iOS-only. Hiding on one alone double-announces on the other.

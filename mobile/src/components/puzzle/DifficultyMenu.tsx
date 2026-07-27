@@ -152,8 +152,9 @@ const MENU_BOTTOM_MARGIN = 12;
 // the parchment fill at the bottom, so the last visible row dissolves rather
 // than hard-cutting at the frame edge (the apex Unbroken Weave row sits last).
 const SCROLL_FADE_STOPS = [0.0, 0.22, 0.46, 0.72, 0.95];
-// Bottom padding inside the scroll content so the last row (BLIND / weave)
-// always settles onto clear parchment above the frame's wood band.
+// Bottom padding inside the scroll content so the last row (LEXICON, or the
+// Unbroken Weave once it opens) always settles onto clear parchment above the
+// frame's wood band.
 const SCROLL_BOTTOM_PAD = 28;
 
 /** Semantic difficulty ring colors (shared candy identity with the header dot). */
@@ -700,6 +701,13 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
           </View>
         )}
 
+        {/* MODIFIER ROW ORDER IS UNLOCK ORDER: Challenge (15), Speed (55),
+            Blind (80), Lexicon (100). The list doubles as the player's roadmap,
+            so a row the player earns sooner must never sit below one they earn
+            later (Speed shipped under Blind and read as the further goal while
+            actually being the nearer one). Keep this identical to the
+            stackGlyphs push order above, which the emblem renders left to
+            right, and to the four unlock constants in gameBalance. */}
         {showChallengeToggle && !introMode && (
           <>
             <View style={[styles.sectionDivider, { backgroundColor: t.sectionBorder }]} />
@@ -762,10 +770,79 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
           </>
         )}
 
-        {/* Blind toggle pre-gate: a visible locked row with the tease (the apex
-            rung stays on screen as a goal). If a restored board somehow has
-            blind active while locked, the live toggle renders instead so the
-            player can always turn it off. */}
+        {/* Speed Shift — locked tease */}
+        {showSpeedToggle && !introMode && speedLocked && !speedActive && (
+          <TouchableOpacity
+            style={[styles.menuRow, styles.lockedRow]}
+            disabled
+            accessibilityRole="button"
+            accessibilityState={{ disabled: true }}
+            accessibilityLabel={`Speed Shift, locked. ${speedUnlockHint || ''}`}
+          >
+            <ModeIcon
+              glyph={'🔒'}
+              textStyle={styles.challengeMenuIcon}
+              imageStyle={styles.challengeMenuIconImage}
+            />
+            <View style={styles.challengeMenuContent}>
+              <Text style={[styles.menuRowText, { color: t.muted }]}>SPEED SHIFT</Text>
+              {speedUnlockHint ? (
+                <Text style={[styles.lockedHintText, { color: t.muted }]}>
+                  {speedUnlockHint}
+                </Text>
+              ) : null}
+            </View>
+          </TouchableOpacity>
+        )}
+
+        {/* Speed Shift — live toggle */}
+        {showSpeedToggle && !introMode && (!speedLocked || speedActive) && onToggleSpeedMode && (
+          <TouchableOpacity
+            style={[
+              styles.menuRow,
+              speedActive && {
+                backgroundColor: t.amberText + '14',
+                borderColor: t.amberText + '55',
+              },
+            ]}
+            onPress={onToggleSpeedMode}
+            accessibilityRole="button"
+            accessibilityState={{ selected: speedActive }}
+            accessibilityLabel={`Speed Shift, ${speedActive ? 'on' : 'off'}. A clock on any style. +34% amber.`}
+          >
+            {/* The glyph swaps with state (never colour alone), same rule the
+                Challenge, Blind and Lexicon rows follow. */}
+            <ModeIcon
+              glyph={speedActive ? '⚡' : '⏱️'}
+              textStyle={styles.challengeMenuIcon}
+              imageStyle={styles.challengeMenuIconImage}
+            />
+            <View style={styles.challengeMenuContent}>
+              <Text
+                style={[
+                  styles.menuRowText,
+                  { color: speedActive ? t.amberText : t.body },
+                ]}
+              >
+                SPEED SHIFT
+              </Text>
+              <Text style={[styles.challengeMenuDesc, { color: t.muted }]}>
+                {speedActive
+                  ? (phase >= 3
+                      ? 'On. The arrangement will not wait, whatever style you bring. +34% amber.'
+                      : 'On. Race the clock, on any style. +34% amber.')
+                  : (phase >= 3
+                      ? 'Off. The arrangement will not wait, whatever style you bring. +34% amber.'
+                      : 'Off. Race the clock, on any style. +34% amber.')}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        )}
+
+        {/* Blind toggle pre-gate: a visible locked row with the tease (the
+            deepest trial rung stays on screen as a goal). If a restored board
+            somehow has blind active while locked, the live toggle renders
+            instead so the player can always turn it off. */}
         {showBlindToggle && !introMode && blindLocked && !blindActive && (
           <TouchableOpacity
             style={[styles.menuRow, styles.lockedRow]}
@@ -838,75 +915,6 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
         {/* Lexicon (rare-word) toggle — a composable modifier that stacks on any
             difficulty + variant. Teased as a locked row until its late gate,
             then a live on/off toggle. */}
-        {/* Speed Shift — locked tease */}
-        {showSpeedToggle && !introMode && speedLocked && !speedActive && (
-          <TouchableOpacity
-            style={[styles.menuRow, styles.lockedRow]}
-            disabled
-            accessibilityRole="button"
-            accessibilityState={{ disabled: true }}
-            accessibilityLabel={`Speed Shift, locked. ${speedUnlockHint || ''}`}
-          >
-            <ModeIcon
-              glyph={'🔒'}
-              textStyle={styles.challengeMenuIcon}
-              imageStyle={styles.challengeMenuIconImage}
-            />
-            <View style={styles.challengeMenuContent}>
-              <Text style={[styles.menuRowText, { color: t.muted }]}>SPEED SHIFT</Text>
-              {speedUnlockHint ? (
-                <Text style={[styles.lockedHintText, { color: t.muted }]}>
-                  {speedUnlockHint}
-                </Text>
-              ) : null}
-            </View>
-          </TouchableOpacity>
-        )}
-
-        {/* Speed Shift — live toggle */}
-        {showSpeedToggle && !introMode && (!speedLocked || speedActive) && onToggleSpeedMode && (
-          <TouchableOpacity
-            style={[
-              styles.menuRow,
-              speedActive && {
-                backgroundColor: t.amberText + '14',
-                borderColor: t.amberText + '55',
-              },
-            ]}
-            onPress={onToggleSpeedMode}
-            accessibilityRole="button"
-            accessibilityState={{ selected: speedActive }}
-            accessibilityLabel={`Speed Shift, ${speedActive ? 'on' : 'off'}. A clock on any style. +34% amber.`}
-          >
-            {/* The glyph swaps with state (never colour alone), same rule the
-                Challenge, Blind and Lexicon rows follow. */}
-            <ModeIcon
-              glyph={speedActive ? '⚡' : '⏱️'}
-              textStyle={styles.challengeMenuIcon}
-              imageStyle={styles.challengeMenuIconImage}
-            />
-            <View style={styles.challengeMenuContent}>
-              <Text
-                style={[
-                  styles.menuRowText,
-                  { color: speedActive ? t.amberText : t.body },
-                ]}
-              >
-                SPEED SHIFT
-              </Text>
-              <Text style={[styles.challengeMenuDesc, { color: t.muted }]}>
-                {speedActive
-                  ? (phase >= 3
-                      ? 'On. The arrangement will not wait, whatever style you bring. +34% amber.'
-                      : 'On. Race the clock, on any style. +34% amber.')
-                  : (phase >= 3
-                      ? 'Off. The arrangement will not wait, whatever style you bring. +34% amber.'
-                      : 'Off. Race the clock, on any style. +34% amber.')}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        )}
-
         {showLexiconToggle && !introMode && lexiconLocked && !lexiconActive && (
           <TouchableOpacity
             style={[styles.menuRow, styles.lockedRow]}

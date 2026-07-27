@@ -26,11 +26,20 @@ import { shouldSimplifyAnimations } from '../../services/deviceTier';
 // enough to read the room name, small enough to sit as a tidy label at the top.
 const ROOM_PLAQUE_SCALE = 0.68;
 
-// The occupant's nameplate is one size below the room's own sign (0.68), so the
-// two read as a hierarchy rather than two competing labels: ~26dp tall against
-// the room sign's ~29dp, inside a ~123dp room. Not smaller than this: at 0.58
-// the label fell to ~8.1dp, well under the room sign's own 9.5dp.
-const ANIMAL_PLAQUE_SCALE = 0.62;
+// The occupant's plate was 0.62 against the room sign's 0.68, which is only
+// 8.8% smaller in EVERY dimension — two near-identical wooden cards at opposite
+// ends of a 123dp room, together eating 44% of its height, with the lower one
+// parked exactly where the animal stands (it hid 34-57% of the sprite box
+// depending on the animal's floor offset, and 100% of its contact shadow).
+//
+// It could not simply shrink: PixelPlaque's font is 14 * scale, so anything
+// under ~0.6 dropped the label below the room sign's own 9.5dp. Hence
+// `fontScale` on the plaque — the wood shrinks to 0.65 the room sign's height
+// while the type gives up only 8%. Combined with the left anchor and the
+// behind-the-sprite z (see animalPlate), the two now read as sign and tag
+// rather than as a pair.
+const ANIMAL_PLAQUE_SCALE = 0.44;   // 18.5dp tall vs the room sign's 28.6dp
+const ANIMAL_PLAQUE_FONT_SCALE = 1.3; // 8.0pt label (was 8.7 at the old 0.62)
 
 
 // Room background images - maps theme to image asset. Backgrounds render
@@ -662,14 +671,24 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
         )}
       </View>
 
-      {/* Animal nameplate — STATIC, pinned to the bottom-centre of the room.
-          It used to live inside AnimalSprite as a flat dark pill riding the
-          sprite's own transform, so it wandered around with the animal and sat
-          over its body. A label belongs to the room. Same wooden PixelPlaque
-          family as the room's own sign, one size down so the room reads first
-          and the occupant second, and it is DECORATIVE for screen readers: the
-          animal's touchable is the single focusable element and already
-          announces the name and the resting state. */}
+      {/* Occupant name tag — a SUBORDINATE tag, not a second room sign.
+          Three changes separate it from the room's own sign, which it used to
+          be a near-twin of: it is 0.65 its height (via the plaque's fontScale,
+          so the wood could shrink without the type going with it), it hangs in
+          the bottom-LEFT corner instead of on the centre axis the sign already
+          owns, and it sits BEHIND the sprite (see animalPlate's zIndex) so an
+          animal that wanders across its own tag passes in FRONT of it. That
+          last one is the actual fix for "blocks the animation": the tag can no
+          longer cover the animal, only be covered by it, which reads as depth.
+
+          It stays on plaque wood deliberately. Bare type over 13 room
+          backgrounds x 6 phases is a contrast gamble with no audited ink pair;
+          the plaque's wood/ink is pinned >= 4.5:1 per skin in
+          pixelSkinContrast.test.ts, and that is the only surface in the room
+          where a label is guaranteed readable.
+
+          DECORATIVE for screen readers: the animal's touchable is the single
+          focusable element and already announces the name and resting state. */}
       {animal && animal.isUnlocked && (
         <View
           style={[styles.animalPlate, isAnimalOnCooldown && styles.animalPlateResting]}
@@ -681,11 +700,10 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
           accessibilityElementsHidden
         >
           {/* The resting countdown rides INSIDE the wood rather than floating
-              above it. A bare sprite + number sat unframed on 13 different room
-              backgrounds across 6 phases, which is both a contrast gamble and
-              the one piece that still read as a web chip. The animal's own
-              sleeping Z's already say "asleep"; the plaque just says for how
-              much longer, and dims while it does. */}
+              above it, and this tag is its only visual surface (elsewhere the
+              number exists just in the sprite's accessibility label). The
+              animal's own sleeping Z's already say "asleep"; the tag says for
+              how much longer, and dims while it does. */}
           <PixelPlaque
             phase={currentPhase}
             label={
@@ -694,6 +712,7 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
                 : animal.name
             }
             scale={ANIMAL_PLAQUE_SCALE}
+            fontScale={ANIMAL_PLAQUE_FONT_SCALE}
           />
         </View>
       )}
@@ -840,19 +859,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     maxWidth: '96%',
   },
-  // Occupant nameplate, pinned to the room floor. zIndex clears AnimalSprite's
-  // own container (10) so a wandering animal passes BEHIND its own label rather
-  // than through it.
+  // Occupant tag, hung in the room's bottom-LEFT corner. Left, not centred, so
+  // it never sits on the axis the room's own sign owns (two centred wooden
+  // labels at opposite ends of the same small room is the canonical "two peers"
+  // reading, which is exactly what players reported). zIndex 2 keeps it UNDER
+  // AnimalSprite's container (10), reversing the old 12: the animal now walks
+  // in FRONT of its own tag. A tag the animal can cover is depth; a tag that
+  // covers the animal is the clutter this replaced.
   animalPlate: {
     position: 'absolute',
-    bottom: 3,
-    alignSelf: 'center',
-    alignItems: 'center',
-    maxWidth: '92%',
-    zIndex: 12,
+    bottom: 2,
+    left: 6,
+    maxWidth: '62%',
+    zIndex: 2,
   },
   animalPlateResting: {
-    opacity: 0.72,
+    opacity: 0.62,
   },
   // Nameplate ornament row: tiny warm lantern pips (procedural, not emoji).
   pipRow: {
@@ -895,11 +917,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-end',
   },
-  // Lifted clear of the occupant nameplate at the room's floor. At bottom: 4 the
-  // plate covered most of the glow's brightest core — and that glow is a
-  // purchased amber sink whose entire purpose is visible investment.
+  // Back down on the floor where a hearth glow belongs. It was lifted to 26 to
+  // clear the occupant's wooden plate, which sat centred over the glow's
+  // brightest core — and that glow is a purchased amber sink whose entire
+  // purpose is visible investment. The caption that replaced the plate is
+  // left-anchored and behind, so the centre is clear again.
   glowWrapBottom: {
-    bottom: 26,
+    bottom: 4,
   },
   glowWrapCenter: {
     top: '34%',
