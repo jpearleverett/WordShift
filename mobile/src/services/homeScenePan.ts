@@ -16,46 +16,6 @@ export const resolveHomeScenePanY = ({
   return clampHomeScenePanY(currentPanY ?? savedPanY ?? maxPanY, maxPanY);
 };
 
-interface GestureBaseInput {
-  /** Is a momentum spring actually mid-flight right now? */
-  settling: boolean;
-  /** JS mirror of the natively-driven animated value. May lie: see below. */
-  liveMirror: number;
-  /** The last position JS itself put the scene at. Never written by the mirror. */
-  lastRestingPanY: number;
-  maxPanY: number;
-}
-
-/**
- * Which number a fresh gesture should treat as its starting point.
- *
- * The subtlety is that the JS mirror of a natively-driven Animated.Value CAN
- * LIE, and specifically it can lie as zero. React Native delivers native value
- * updates through `__onAnimatedValueUpdateReceived(value, offset)`, which calls
- * `_updateValue(value)` FIRST (firing listeners with `value + this._offset`,
- * the OLD offset) and assigns the new offset only afterwards. So an update
- * emitted by native before `flattenOffset()` but delivered to JS after it
- * arrives carrying the raw gesture translation while JS has already zeroed the
- * offset it belonged to. For a tap, or any touch that moves a pixel or two,
- * that translation is ~0 — and the mirror collapses to ~0, which on this scene
- * is the pit end. The next gesture then reads that as its base and the whole
- * house snaps to the bottom.
- *
- * The mirror is only genuinely needed in one window: mid-spring, where JS has
- * no other way to know where the scene is (and where the offset is stably zero,
- * so the race above cannot occur). At rest, JS's own bookkeeping is both
- * sufficient and trustworthy. Clamped either way, so even a mirror corrupted
- * the other direction cannot throw the scene past a bound.
- */
-export const resolveGestureBasePanY = ({
-  settling,
-  liveMirror,
-  lastRestingPanY,
-  maxPanY,
-}: GestureBaseInput): number => {
-  return clampHomeScenePanY(settling ? liveMirror : lastRestingPanY, maxPanY);
-};
-
 interface HomeScenePanRestoreInput extends ResolveHomeScenePanYInput {
   /**
    * Has the player physically touched the scene during THIS mount? Until they
@@ -66,28 +26,40 @@ interface HomeScenePanRestoreInput extends ResolveHomeScenePanYInput {
 }
 
 export interface HomeScenePanRestore {
-  /** Where to put the scene now. */
+  /** Where to put the scene now, clamped for DISPLAY against the current bound. */
   panY: number;
-  /** Whether this position is worth REMEMBERING (writing back to the caller). */
-  commit: boolean;
+  /**
+   * The player's intent, UNCLAMPED. This is what the next restore should reason
+   * from, so that a bound which is momentarily too small can shrink the picture
+   * without ever shrinking the intent.
+   */
+  intendedPanY: number | null;
 }
 
 /**
  * The restore decision for the home diorama, kept pure because getting it wrong
  * is invisible in a single frame and only shows up as drift over many sessions.
  *
- * The house mounts before it knows how tall it is: the room list is seeded from
- * a paint-ahead snapshot but the "next unlock" ghost room arrives several
- * storage round trips later, so for that window the pan bound is one room short
- * of the truth. If the value clamped against that provisional bound is adopted
- * as the live position AND written back to memory, every trip home shaves a
- * room's height off a player parked near the roof. It compounds, it never
- * recovers, and it presents as the house dumping you at the bottom.
+ * THE ONE RULE: A CLAMP IS A RENDERING CONCERN, NEVER A NEW TRUTH.
  *
- * So: before the player has touched the scene, the saved value stays the source
- * of truth (any clamp is a temporary rendering that a later, larger bound
- * undoes) and nothing is committed. Once they HAVE touched it, their live
- * position wins outright, so the house growing above them cannot move it.
+ * The pan bound is not stable. The house mounts before it knows its own height
+ * (rooms come from a paint-ahead snapshot, but the next-unlock ghost room lands
+ * several storage reads later), it shrinks for a beat whenever the unlock flow
+ * clears its pending room before the reload arrives, and it moves again with
+ * every layout change. Each of those windows makes `maxPanY` momentarily one
+ * room (~140dp) short of the truth.
+ *
+ * If the value clamped against a short bound is allowed to become the position
+ * of record, every one of those windows permanently drags the player one room
+ * closer to the pit, cumulatively, with no recovery. That is the whole family
+ * of "it takes me back down to the bottom of the house" reports: not one reset,
+ * a ratchet.
+ *
+ * So the intent is carried UNCLAMPED and the clamp is applied only to what gets
+ * drawn. When a bigger bound arrives, the intent is still intact and the scene
+ * comes back. Nothing here writes to durable memory either: the remembered
+ * position is written by real releases only, so a restore can never record a
+ * position the player did not choose.
  */
 export const resolveHomeScenePanRestore = ({
   currentPanY,
@@ -95,12 +67,10 @@ export const resolveHomeScenePanRestore = ({
   maxPanY,
   userOwnsPosition,
 }: HomeScenePanRestoreInput): HomeScenePanRestore => {
-  const panY = resolveHomeScenePanY({
-    currentPanY: userOwnsPosition ? currentPanY : null,
-    savedPanY,
-    maxPanY,
-  });
-  return { panY, commit: userOwnsPosition && currentPanY !== panY };
+  // Before the player touches the scene, the saved value is the intent; after,
+  // their own live position is.
+  const intendedPanY = (userOwnsPosition ? currentPanY : null) ?? savedPanY ?? maxPanY;
+  return { panY: clampHomeScenePanY(intendedPanY, maxPanY), intendedPanY };
 };
 
 // ─── Pan momentum + rubber-band physics ──────────────────────────────────────
