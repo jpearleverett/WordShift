@@ -5,6 +5,7 @@ import {
   computePanSettleTarget,
   rubberBandPanY,
   resolveHomeScenePanRestore,
+  resolveGestureBasePanY,
   HOME_PAN_PROJECTION_FACTOR,
 } from '../services/homeScenePan';
 
@@ -261,6 +262,35 @@ describe('HouseWorld pan wiring', () => {
     expect(SRC.slice(began, active)).toMatch(/stopSettle\(\);\s*\n\s*return;/);
   });
 
+  it('never takes a fresh gesture base straight off the native mirror', () => {
+    // The mirror must always go through resolveGestureBasePanY, which decides
+    // whether to believe it. Reading it directly is what dropped the house to
+    // the pit on the tap after a modal.
+    const stop = SRC.slice(SRC.indexOf('const stopSettle = useCallback'));
+    const body = stop.slice(0, stop.indexOf('}, [panRaw]);'));
+    expect(body).toMatch(/resolveGestureBasePanY\(/);
+    expect(body).toMatch(/settling: settleAnimRef\.current !== null|const settling = settleAnimRef\.current !== null/);
+    expect(body).not.toMatch(/const base = liveTranslateYRef\.current/);
+  });
+
+  it('repairs the animated value after a touch that never became a pan', () => {
+    // BEGAN splits the value into offset + 0. A tap ends in FAILED/CANCELLED,
+    // never END, so nothing else folds it back.
+    expect(SRC).toMatch(/state === State\.FAILED \|\| state === State\.CANCELLED/);
+    const branch = SRC.slice(SRC.indexOf('State.FAILED || state === State.CANCELLED'));
+    expect(branch.slice(0, branch.indexOf('return;'))).toMatch(/syncPanPosition\(/);
+  });
+
+  it('settles the resting ref at release, not only at spring end', () => {
+    // stopSettle reads baseTranslateY at rest, so an interrupted spring must
+    // not leave it holding the pre-drag position.
+    const release = SRC.slice(
+      SRC.indexOf('const settleTarget = computePanSettleTarget'),
+      SRC.indexOf('const settle = Animated.spring(panRaw'),
+    );
+    expect(release).toMatch(/baseTranslateY\.current = settleTarget/);
+  });
+
   it('commits a release when the settle STARTS, not only when it finishes', () => {
     // A settle stopped in flight never runs its finish callback, which left the
     // remembered position a whole pan behind what the player was looking at.
@@ -269,5 +299,66 @@ describe('HouseWorld pan wiring', () => {
       SRC.indexOf('const settle = Animated.spring(panRaw'),
     );
     expect(release).toMatch(/onPanYChange\?\.\(settleTarget\)/);
+  });
+});
+
+// ===========================================================================
+// Where a fresh gesture starts from. The JS mirror of a natively-driven value
+// can lie, and it lies as ~0, which on this scene is the pit.
+// ===========================================================================
+describe('resolveGestureBasePanY', () => {
+  const MAX = 900;
+
+  test('mid-spring, only the native mirror knows where the scene is', () => {
+    expect(
+      resolveGestureBasePanY({
+        settling: true,
+        liveMirror: 617,
+        lastRestingPanY: 500, // where the spring departed from
+        maxPanY: MAX,
+      }),
+    ).toBe(617);
+  });
+
+  test('at rest, a mirror poisoned to ~0 cannot drop the house to the pit', () => {
+    // The reported bug. RN delivers native updates through
+    // __onAnimatedValueUpdateReceived(value, offset), which fires listeners
+    // with `value + the OLD offset` and only then stores the new one. An update
+    // emitted before flattenOffset() but delivered after it therefore arrives
+    // as a raw gesture translation against a freshly zeroed offset — ~0 for a
+    // tap or a micro-drag. The next touch read that as its base, so the whole
+    // house snapped to the bottom on the tap AFTER the one that opened a modal.
+    expect(
+      resolveGestureBasePanY({
+        settling: false,
+        liveMirror: 0,
+        lastRestingPanY: 500,
+        maxPanY: MAX,
+      }),
+    ).toBe(500);
+  });
+
+  test('at rest, a mirror poisoned the other way cannot fling it to the roof', () => {
+    // The same race in the opposite order double-counts the offset instead.
+    expect(
+      resolveGestureBasePanY({
+        settling: false,
+        liveMirror: 1000,
+        lastRestingPanY: 500,
+        maxPanY: MAX,
+      }),
+    ).toBe(500);
+  });
+
+  test('the result is always inside the bounds, whichever source won', () => {
+    expect(
+      resolveGestureBasePanY({ settling: true, liveMirror: 5000, lastRestingPanY: 0, maxPanY: MAX }),
+    ).toBe(MAX);
+    expect(
+      resolveGestureBasePanY({ settling: true, liveMirror: -80, lastRestingPanY: 0, maxPanY: MAX }),
+    ).toBe(0);
+    expect(
+      resolveGestureBasePanY({ settling: false, liveMirror: 0, lastRestingPanY: -40, maxPanY: MAX }),
+    ).toBe(0);
   });
 });

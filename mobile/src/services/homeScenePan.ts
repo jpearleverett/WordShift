@@ -16,6 +16,46 @@ export const resolveHomeScenePanY = ({
   return clampHomeScenePanY(currentPanY ?? savedPanY ?? maxPanY, maxPanY);
 };
 
+interface GestureBaseInput {
+  /** Is a momentum spring actually mid-flight right now? */
+  settling: boolean;
+  /** JS mirror of the natively-driven animated value. May lie: see below. */
+  liveMirror: number;
+  /** The last position JS itself put the scene at. Never written by the mirror. */
+  lastRestingPanY: number;
+  maxPanY: number;
+}
+
+/**
+ * Which number a fresh gesture should treat as its starting point.
+ *
+ * The subtlety is that the JS mirror of a natively-driven Animated.Value CAN
+ * LIE, and specifically it can lie as zero. React Native delivers native value
+ * updates through `__onAnimatedValueUpdateReceived(value, offset)`, which calls
+ * `_updateValue(value)` FIRST (firing listeners with `value + this._offset`,
+ * the OLD offset) and assigns the new offset only afterwards. So an update
+ * emitted by native before `flattenOffset()` but delivered to JS after it
+ * arrives carrying the raw gesture translation while JS has already zeroed the
+ * offset it belonged to. For a tap, or any touch that moves a pixel or two,
+ * that translation is ~0 — and the mirror collapses to ~0, which on this scene
+ * is the pit end. The next gesture then reads that as its base and the whole
+ * house snaps to the bottom.
+ *
+ * The mirror is only genuinely needed in one window: mid-spring, where JS has
+ * no other way to know where the scene is (and where the offset is stably zero,
+ * so the race above cannot occur). At rest, JS's own bookkeeping is both
+ * sufficient and trustworthy. Clamped either way, so even a mirror corrupted
+ * the other direction cannot throw the scene past a bound.
+ */
+export const resolveGestureBasePanY = ({
+  settling,
+  liveMirror,
+  lastRestingPanY,
+  maxPanY,
+}: GestureBaseInput): number => {
+  return clampHomeScenePanY(settling ? liveMirror : lastRestingPanY, maxPanY);
+};
+
 interface HomeScenePanRestoreInput extends ResolveHomeScenePanYInput {
   /**
    * Has the player physically touched the scene during THIS mount? Until they

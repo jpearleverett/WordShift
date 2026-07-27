@@ -26,6 +26,7 @@ import { isOnCooldown, getSessionStatus } from '../../services/dialogueSession';
 import {
   clampHomeScenePanY,
   resolveHomeScenePanRestore,
+  resolveGestureBasePanY,
   computePanSettleTarget,
   rubberBandPanY,
 } from '../../services/homeScenePan';
@@ -1798,11 +1799,23 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   // hand it to the native node as the gesture OFFSET so the incoming
   // translationY stream needs no JS arithmetic at all.
   const stopSettle = useCallback(() => {
+    // Whether a spring is genuinely in flight decides which number to trust:
+    // mid-flight only the native mirror knows where the scene is, at rest only
+    // JS's own bookkeeping is safe to believe. resolveGestureBasePanY carries
+    // the full reasoning; the short version is that the mirror can report ~0
+    // after a micro-drag, and taking that as a base drops the house to the pit.
+    const settling = settleAnimRef.current !== null;
     settleAnimRef.current?.stop();
     settleAnimRef.current = null;
     panRaw.stopAnimation();
-    const base = liveTranslateYRef.current;
+    const base = resolveGestureBasePanY({
+      settling,
+      liveMirror: liveTranslateYRef.current,
+      lastRestingPanY: baseTranslateY.current,
+      maxPanY: panBoundsMaxRef.current,
+    });
     baseTranslateY.current = base;
+    liveTranslateYRef.current = base;
     panRaw.setOffset(base);
     panRaw.setValue(0);
   }, [panRaw]);
@@ -1832,6 +1845,16 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
       hasUserPannedRef.current = true;
       return;
     }
+    if (state === State.FAILED || state === State.CANCELLED) {
+      // A touch that never became a pan: tapping an animal, or a room to open
+      // its unlock card. BEGAN already split the animated value into
+      // offset + 0 and nothing else will fold it back, so re-assert the resting
+      // position outright. That leaves the value un-split and, just as
+      // importantly, re-syncs the native mirror, which is the ref most likely
+      // to have been left holding a stale gesture translation.
+      syncPanPosition(clampHomeScenePanY(baseTranslateY.current, panBoundsMax), false);
+      return;
+    }
     if (state !== State.END) return;
 
     const logicalRelease = clampHomeScenePanY(baseTranslateY.current + translationY, panBoundsMax);
@@ -1858,6 +1881,11 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
       maxPanY: panBoundsMax,
     });
     currentPanYRef.current = settleTarget;
+    // The resting position is settled the moment the release is computed, not
+    // when the spring lands: an interrupted spring never runs its callback, and
+    // this ref is what the NEXT gesture reads as its base now that the native
+    // mirror is only trusted mid-flight.
+    baseTranslateY.current = settleTarget;
     // Commit the release to memory NOW rather than only from the spring's
     // finish callback. Anything that stops the settle mid-flight (the restore
     // effect re-running because savedPanY / containerHeight / panBoundsMax
