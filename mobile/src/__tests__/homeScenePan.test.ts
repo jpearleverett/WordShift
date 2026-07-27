@@ -219,3 +219,55 @@ describe('resolveHomeScenePanRestore', () => {
     expect(fresh.commit).toBe(false);
   });
 });
+
+// ===========================================================================
+// Source contracts for the HouseWorld wiring around that decision. Both of
+// these are invisible in a single frame and both were live defects.
+// ===========================================================================
+describe('HouseWorld pan wiring', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const SRC: string = fs.readFileSync(
+    path.resolve(__dirname, '../components/home/HouseWorld.tsx'),
+    'utf8',
+  );
+
+  it('does not re-enter the restore effect on its own committed release', () => {
+    // onPanYChange writes the released position into App state, which comes
+    // straight back down as the savedPanY prop. With savedPanY in this effect's
+    // deps, a release re-ran the effect on the next commit and syncPanPosition
+    // STOPS any running settle, so the momentum spring died a frame after it
+    // started: no deceleration, no rubber-band bounce.
+    const effect = SRC.slice(SRC.indexOf('const { panY, commit } = resolveHomeScenePanRestore'));
+    const deps = effect.slice(effect.indexOf('}, ['), effect.indexOf(']);') + 1);
+    expect(deps).toContain('panBoundsMax');
+    expect(deps).toContain('containerHeight');
+    expect(deps).not.toContain('savedPanY');
+    // ...which is only safe because it reads the current value through a ref.
+    expect(SRC).toMatch(/savedPanY: savedPanYRef\.current/);
+  });
+
+  it('hands the position to the player on ACTIVE, never on a bare touch', () => {
+    // BEGAN fires on finger-down, so arming ownership there would hand it to
+    // every TAP — including the tap that opens a room's unlock modal — and make
+    // a provisionally clamped position authoritative for the rest of the mount.
+    const began = SRC.indexOf('if (state === State.BEGAN)');
+    const active = SRC.indexOf('if (state === State.ACTIVE)');
+    const owns = SRC.indexOf('hasUserPannedRef.current = true');
+    expect(began).toBeGreaterThan(-1);
+    expect(active).toBeGreaterThan(began);
+    expect(owns).toBeGreaterThan(active);
+    // And the BEGAN branch returns before reaching it.
+    expect(SRC.slice(began, active)).toMatch(/stopSettle\(\);\s*\n\s*return;/);
+  });
+
+  it('commits a release when the settle STARTS, not only when it finishes', () => {
+    // A settle stopped in flight never runs its finish callback, which left the
+    // remembered position a whole pan behind what the player was looking at.
+    const release = SRC.slice(
+      SRC.indexOf('const settleTarget = computePanSettleTarget'),
+      SRC.indexOf('const settle = Animated.spring(panRaw'),
+    );
+    expect(release).toMatch(/onPanYChange\?\.\(settleTarget\)/);
+  });
+});

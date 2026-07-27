@@ -628,6 +628,20 @@ describe('modifier row order is unlock order', () => {
     expect(blind).toBeLessThan(lexicon);
   });
 
+  it('renders the in-board badges in that order too', () => {
+    // A player who stacks Speed and Blind should not see one order while
+    // building the loadout and a different one on the board.
+    const appSrc = fs.readFileSync(path.resolve(__dirname, '../../App.tsx'), 'utf8');
+    const challenge = appSrc.indexOf('Challenge (undo-limit) badge');
+    const speed = appSrc.indexOf('Speed Shift badge');
+    const blind = appSrc.indexOf('Blind Offering badge');
+    const lexicon = appSrc.indexOf('Lexicon (rare-word) badge');
+    expect(challenge).toBeGreaterThan(-1);
+    expect(challenge).toBeLessThan(speed);
+    expect(speed).toBeLessThan(blind);
+    expect(blind).toBeLessThan(lexicon);
+  });
+
   it('matches the ascending unlock gates the order claims', () => {
     const {
       CHALLENGE_TOGGLE_UNLOCK_PUZZLES,
@@ -656,6 +670,25 @@ describe('animal nameplate contract', () => {
     'utf8',
   );
 
+  // The tag's JSX window is bounded by the comment that opens the sprite block.
+  // Slicing to indexOf(...) === -1 would silently widen the window to the end
+  // of the file and turn every assertion inside it into a false PASS, so the
+  // anchors are checked once, loudly, here.
+  const TAG_MOUNT_START = 'style={[styles.animalPlate';
+  const TAG_MOUNT_END = '{/* Animal if present and unlocked */}';
+  const tagMount = (): string => {
+    const from = ROOM_SRC.indexOf(TAG_MOUNT_START);
+    const to = ROOM_SRC.indexOf(TAG_MOUNT_END);
+    expect(from).toBeGreaterThan(-1);
+    expect(to).toBeGreaterThan(from);
+    return ROOM_SRC.slice(from, to);
+  };
+  const constant = (name: string): number => {
+    const hit = ROOM_SRC.match(new RegExp(`${name} = ([\\d.]+)`));
+    expect(hit).not.toBeNull();
+    return Number(hit![1]);
+  };
+
   it('is pinned to the room floor rather than riding the wandering sprite', () => {
     const block = ROOM_SRC.slice(ROOM_SRC.indexOf('animalPlate: {'));
     const decl = block.slice(0, block.indexOf('},'));
@@ -673,7 +706,15 @@ describe('animal nameplate contract', () => {
     expect(decl).not.toMatch(/alignSelf:\s*'center'/);
     const z = decl.match(/zIndex:\s*(\d+)/);
     expect(z).not.toBeNull();
-    expect(Number(z![1])).toBeLessThan(10);
+    // Read the sprite's own zIndex rather than hardcoding 10: it is the other
+    // half of this contract, and changing it alone would silently invert the
+    // depth the whole redesign rests on.
+    // lastIndexOf: the file has an earlier `container` in the sleep-Z
+    // stylesheet; the sprite's own is the last one declared.
+    const spriteBlock = SPRITE_SRC.slice(SPRITE_SRC.lastIndexOf('  container: {'));
+    const spriteZ = spriteBlock.slice(0, spriteBlock.indexOf('},')).match(/zIndex:\s*(\d+)/);
+    expect(spriteZ).not.toBeNull();
+    expect(Number(z![1])).toBeLessThan(Number(spriteZ![1]));
   });
 
   it('is a subordinate tag, not a peer of the room sign', () => {
@@ -682,14 +723,11 @@ describe('animal nameplate contract', () => {
     // shorter, and it can only do that because fontScale decouples the label
     // from the box (PixelPlaque's font is 14 * scale, so scale alone would have
     // taken the type under the room sign's own).
-    const roomScale = Number(ROOM_SRC.match(/ROOM_PLAQUE_SCALE = ([\d.]+)/)![1]);
-    const tagScale = Number(ROOM_SRC.match(/ANIMAL_PLAQUE_SCALE = ([\d.]+)/)![1]);
+    const roomScale = constant('ROOM_PLAQUE_SCALE');
+    const tagScale = constant('ANIMAL_PLAQUE_SCALE');
     expect(tagScale / roomScale).toBeLessThan(0.75);
 
-    const mount = ROOM_SRC.slice(
-      ROOM_SRC.indexOf('style={[styles.animalPlate'),
-      ROOM_SRC.indexOf('{/* Animal if present and unlocked */}'),
-    );
+    const mount = tagMount();
     // Still on plaque wood: it is the only ink pair in the room audited to
     // 4.5:1 (pixelSkinContrast), and bare type over 13 backgrounds x 6 phases
     // has no such guarantee.
@@ -719,10 +757,7 @@ describe('animal nameplate contract', () => {
   });
 
   it('is decorative on BOTH platforms so the name is announced once', () => {
-    const mount = ROOM_SRC.slice(
-      ROOM_SRC.indexOf('style={[styles.animalPlate'),
-      ROOM_SRC.indexOf('{/* Animal if present and unlocked */}'),
-    );
+    const mount = tagMount();
     // importantForAccessibility is Android-only; accessibilityElementsHidden
     // is iOS-only. Hiding on one alone double-announces on the other.
     expect(mount).toMatch(/importantForAccessibility="no-hide-descendants"/);

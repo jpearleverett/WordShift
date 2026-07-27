@@ -1798,9 +1798,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   // hand it to the native node as the gesture OFFSET so the incoming
   // translationY stream needs no JS arithmetic at all.
   const stopSettle = useCallback(() => {
-    // A real touch on the scene: from here on the player owns the position and
-    // the restore effect stops re-deriving it from savedPanY.
-    hasUserPannedRef.current = true;
     settleAnimRef.current?.stop();
     settleAnimRef.current = null;
     panRaw.stopAnimation();
@@ -1823,6 +1820,16 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
 
     if (state === State.BEGAN) {
       stopSettle();
+      return;
+    }
+    if (state === State.ACTIVE) {
+      // The scene is genuinely being panned, so from here on the player owns
+      // the position and the restore effect stops re-deriving it from
+      // savedPanY. Keyed on ACTIVE, not BEGAN: BEGAN fires on finger-down, so
+      // arming it there would hand ownership to every TAP, including the tap
+      // that opens a room's unlock modal. A tap must not make a provisionally
+      // clamped position authoritative.
+      hasUserPannedRef.current = true;
       return;
     }
     if (state !== State.END) return;
@@ -1919,6 +1926,16 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   // the real bound arrives moments later this effect re-resolves from
   // `savedPanY` and lands where the player left off, and nothing writes to the
   // memory until there is a real gesture to record.
+  // `savedPanY` is read through a ref and is deliberately NOT a dependency.
+  // It is our own echo: onPanYChange writes it into App state, which comes
+  // straight back down as this prop. With it in the deps, committing a release
+  // re-entered this effect on the very next commit, and syncPanPosition STOPS
+  // any running settle (1) — so the momentum spring was killed a frame after it
+  // started and the deceleration and rubber-band bounce never played. Nothing
+  // else ever changes savedPanY (App seeds it null and only this component
+  // writes it), so geometry alone should re-run the restore.
+  const savedPanYRef = useRef(savedPanY);
+  savedPanYRef.current = savedPanY;
   useEffect(() => {
     if (containerHeight === null) return;
     // Once the player has panned, their live position is authoritative and the
@@ -1926,12 +1943,12 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     // and rooms are added at the TOP, so holding the number holds the view).
     const { panY, commit } = resolveHomeScenePanRestore({
       currentPanY: currentPanYRef.current,
-      savedPanY,
+      savedPanY: savedPanYRef.current,
       maxPanY: panBoundsMax,
       userOwnsPosition: hasUserPannedRef.current,
     });
     syncPanPosition(panY, commit);
-  }, [containerHeight, panBoundsMax, savedPanY, syncPanPosition]);
+  }, [containerHeight, panBoundsMax, syncPanPosition]);
 
   return (
     <GestureHandlerRootView style={[styles.container, { backgroundColor: PHASE_BG_COLORS[currentPhase] || PHASE_BG_COLORS[0] }]}>
