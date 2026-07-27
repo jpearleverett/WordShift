@@ -1607,13 +1607,27 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
 
   // State tracking for gestures
   const baseTranslateY = useRef(0);
-  const currentPanYRef = useRef<number | null>(null);
+  // True between gesture ACTIVE and its terminal state. The restore effect must
+  // not touch the scene while a finger is on it: syncPanPosition clears the
+  // gesture offset (panRaw.setOffset(0)), so repositioning mid-drag both yanks
+  // the scene and leaves the rest of the drag running against a stale base.
+  const isPanningRef = useRef(false);
   // Has the player actually touched the scene during THIS mount? Until they
   // have, `savedPanY` stays the source of truth and the live value is only a
   // provisional rendering of it. See the restore effect for why that matters:
   // this component mounts before the house knows how tall it is, so a live
   // value adopted early is a value clamped against the wrong bound.
   const hasUserPannedRef = useRef(false);
+  // The player's INTENDED pan position, deliberately never clamped. Every other
+  // position ref is re-clamped against whatever `panBoundsMax` the current
+  // render happens to hold, and that bound is not stable: it is one room short
+  // while the house is still loading its next-unlock ghost room, and it dips
+  // again for a beat each time the unlock flow clears its pending room before
+  // the reload arrives. Clamping the PICTURE during those windows is correct;
+  // letting the clamped number become the position of record is what ratchets a
+  // player down toward the pit one room at a time. Written only by real
+  // releases and by the restore effect.
+  const intendedPanYRef = useRef<number | null>(null);
   // Synchronous mirror of panRaw's live value. Animations run on the NATIVE
   // driver, so panRaw's JS value lags the real native value between frames, and
   // stopAnimation()'s callback is ASYNC — reading the base from it left the
@@ -1766,7 +1780,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     panRaw.setOffset(0);
     panRaw.setValue(clampedPanY);
     liveTranslateYRef.current = clampedPanY;
-    currentPanYRef.current = clampedPanY;
     baseTranslateY.current = clampedPanY;
     if (notify) {
       onPanYChange?.(clampedPanY);
@@ -1778,15 +1791,11 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   // AND for the native gesture event — so the mirror never lags the on-screen
   // position. This is the ONLY per-frame JS during a drag now: a single number
   // assignment, versus the old setValue + style commit.
-  const panBoundsMaxRef = useRef(panBoundsMax);
-  panBoundsMaxRef.current = panBoundsMax;
   useEffect(() => {
     liveTranslateYRef.current = (panRaw as unknown as { __getValue: () => number }).__getValue();
     const id = panRaw.addListener(({ value }) => {
+      // Deliberately the ONLY work here. This runs every frame of every drag.
       liveTranslateYRef.current = value;
-      // Keep the LOGICAL position fresh too, so a mid-gesture layout change
-      // (the house growing) repositions from where the scene actually is.
-      currentPanYRef.current = clampHomeScenePanY(value, panBoundsMaxRef.current);
     });
     return () => panRaw.removeListener(id);
   }, [panRaw]);
@@ -1830,8 +1839,15 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
       // that opens a room's unlock modal. A tap must not make a provisionally
       // clamped position authoritative.
       hasUserPannedRef.current = true;
+      isPanningRef.current = true;
       return;
     }
+    // Every terminal state releases the scene back to the restore effect,
+    // including FAILED (a tap: BEGAN with no movement past minDist) and
+    // CANCELLED (a second pointer, a view detach). Deliberately NOTHING else
+    // happens here: re-asserting a position on CANCELLED would snap a real
+    // drag back to where the finger started.
+    isPanningRef.current = false;
     if (state !== State.END) return;
 
     const logicalRelease = clampHomeScenePanY(baseTranslateY.current + translationY, panBoundsMax);
@@ -1839,6 +1855,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     // Reduced motion / low tier / no scroll range: settle instantly, no
     // momentum, no bounce. (syncPanPosition clears the gesture offset.)
     if (!panPhysicsEnabled || panBoundsMax <= 0) {
+      intendedPanYRef.current = logicalRelease;
       syncPanPosition(logicalRelease, true);
       return;
     }
@@ -1857,7 +1874,8 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
       velocityY,
       maxPanY: panBoundsMax,
     });
-    currentPanYRef.current = settleTarget;
+    // A real release IS an intent, and the only thing that may set one.
+    intendedPanYRef.current = settleTarget;
     // Commit the release to memory NOW rather than only from the spring's
     // finish callback. Anything that stops the settle mid-flight (the restore
     // effect re-running because savedPanY / containerHeight / panBoundsMax
@@ -1887,7 +1905,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
       if (!finished) return;
       settleAnimRef.current = null;
       baseTranslateY.current = settleTarget;
-      currentPanYRef.current = settleTarget;
       onPanYChange?.(settleTarget);
     });
   };
@@ -1916,7 +1933,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   //
   // The old code adopted the value clamped against that provisional bound as
   // the new live position AND wrote it back through onPanYChange (shouldNotify
-  // was unconditionally true whenever currentPanYRef was null, which is exactly
+  // was unconditionally true whenever the live ref was null, which is exactly
   // the mount case). So every single trip home shaved up to a room's height off
   // a player parked near the roof, permanently and cumulatively — which is what
   // "it takes me back down to the bottom of the house" actually was. It was
@@ -1938,16 +1955,31 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   savedPanYRef.current = savedPanY;
   useEffect(() => {
     if (containerHeight === null) return;
-    // Once the player has panned, their live position is authoritative and the
+    // Never reposition under a live finger. The house can genuinely grow
+    // mid-drag (the next-unlock ghost room landing), and syncPanPosition clears
+    // the gesture offset, so acting here would yank the scene and leave the
+    // rest of the drag running against a stale base. The release re-resolves.
+    if (isPanningRef.current) return;
+    // Resolve from the UNCLAMPED intent, never from the live ref. The live ref
+    // was re-clamped against the live bound on every listener tick, so any
+    // window where the bound is short (see above, plus the beat where the
+    // unlock flow drops its pending room before the reload lands) permanently
+    // bakes the shortfall in. Reading the intent means a short bound shrinks
+    // the PICTURE and the scene springs back the moment the real bound arrives.
+    //
+    // Once the player has panned, their own intent is authoritative and the
     // house growing above them must not move it (the scene is bottom-anchored
     // and rooms are added at the TOP, so holding the number holds the view).
-    const { panY, commit } = resolveHomeScenePanRestore({
-      currentPanY: currentPanYRef.current,
+    const { panY, intendedPanY } = resolveHomeScenePanRestore({
+      currentPanY: intendedPanYRef.current,
       savedPanY: savedPanYRef.current,
       maxPanY: panBoundsMax,
       userOwnsPosition: hasUserPannedRef.current,
     });
-    syncPanPosition(panY, commit);
+    intendedPanYRef.current = intendedPanY;
+    // Never notify from a restore: the remembered position is written by real
+    // releases only, so no clamp can ever be recorded as a choice.
+    syncPanPosition(panY, false);
   }, [containerHeight, panBoundsMax, syncPanPosition]);
 
   return (

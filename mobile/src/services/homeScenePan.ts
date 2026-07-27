@@ -26,28 +26,40 @@ interface HomeScenePanRestoreInput extends ResolveHomeScenePanYInput {
 }
 
 export interface HomeScenePanRestore {
-  /** Where to put the scene now. */
+  /** Where to put the scene now, clamped for DISPLAY against the current bound. */
   panY: number;
-  /** Whether this position is worth REMEMBERING (writing back to the caller). */
-  commit: boolean;
+  /**
+   * The player's intent, UNCLAMPED. This is what the next restore should reason
+   * from, so that a bound which is momentarily too small can shrink the picture
+   * without ever shrinking the intent.
+   */
+  intendedPanY: number | null;
 }
 
 /**
  * The restore decision for the home diorama, kept pure because getting it wrong
  * is invisible in a single frame and only shows up as drift over many sessions.
  *
- * The house mounts before it knows how tall it is: the room list is seeded from
- * a paint-ahead snapshot but the "next unlock" ghost room arrives several
- * storage round trips later, so for that window the pan bound is one room short
- * of the truth. If the value clamped against that provisional bound is adopted
- * as the live position AND written back to memory, every trip home shaves a
- * room's height off a player parked near the roof. It compounds, it never
- * recovers, and it presents as the house dumping you at the bottom.
+ * THE ONE RULE: A CLAMP IS A RENDERING CONCERN, NEVER A NEW TRUTH.
  *
- * So: before the player has touched the scene, the saved value stays the source
- * of truth (any clamp is a temporary rendering that a later, larger bound
- * undoes) and nothing is committed. Once they HAVE touched it, their live
- * position wins outright, so the house growing above them cannot move it.
+ * The pan bound is not stable. The house mounts before it knows its own height
+ * (rooms come from a paint-ahead snapshot, but the next-unlock ghost room lands
+ * several storage reads later), it shrinks for a beat whenever the unlock flow
+ * clears its pending room before the reload arrives, and it moves again with
+ * every layout change. Each of those windows makes `maxPanY` momentarily one
+ * room (~140dp) short of the truth.
+ *
+ * If the value clamped against a short bound is allowed to become the position
+ * of record, every one of those windows permanently drags the player one room
+ * closer to the pit, cumulatively, with no recovery. That is the whole family
+ * of "it takes me back down to the bottom of the house" reports: not one reset,
+ * a ratchet.
+ *
+ * So the intent is carried UNCLAMPED and the clamp is applied only to what gets
+ * drawn. When a bigger bound arrives, the intent is still intact and the scene
+ * comes back. Nothing here writes to durable memory either: the remembered
+ * position is written by real releases only, so a restore can never record a
+ * position the player did not choose.
  */
 export const resolveHomeScenePanRestore = ({
   currentPanY,
@@ -55,12 +67,10 @@ export const resolveHomeScenePanRestore = ({
   maxPanY,
   userOwnsPosition,
 }: HomeScenePanRestoreInput): HomeScenePanRestore => {
-  const panY = resolveHomeScenePanY({
-    currentPanY: userOwnsPosition ? currentPanY : null,
-    savedPanY,
-    maxPanY,
-  });
-  return { panY, commit: userOwnsPosition && currentPanY !== panY };
+  // Before the player touches the scene, the saved value is the intent; after,
+  // their own live position is.
+  const intendedPanY = (userOwnsPosition ? currentPanY : null) ?? savedPanY ?? maxPanY;
+  return { panY: clampHomeScenePanY(intendedPanY, maxPanY), intendedPanY };
 };
 
 // ─── Pan momentum + rubber-band physics ──────────────────────────────────────

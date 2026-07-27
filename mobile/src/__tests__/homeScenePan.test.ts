@@ -125,65 +125,61 @@ describe('rubberBandPanY', () => {
 // reported the house "taking me back down to the bottom" after unlocks.
 // ===========================================================================
 describe('resolveHomeScenePanRestore', () => {
-  // The house mounts before it knows its own height: rooms come from a
-  // paint-ahead snapshot, but the next-unlock ghost room lands several storage
-  // reads later, so the bound is briefly one room (~140dp) short.
+  // The pan bound is not stable. The house mounts before it knows its own
+  // height (the next-unlock ghost room lands several storage reads after the
+  // paint-ahead snapshot), and it dips again for a beat whenever the unlock
+  // flow clears its pending room before the reload arrives. Each window makes
+  // maxPanY one room (~140dp) short of the truth.
   const ROOM = 140;
   const TRUE_MAX = 900;
-  const PROVISIONAL_MAX = TRUE_MAX - ROOM;
+  const SHORT_MAX = TRUE_MAX - ROOM;
 
-  test('a mount never commits, so a provisional bound cannot eat the memory', () => {
-    const parkedAtRoof = TRUE_MAX;
+  test('a short bound shrinks the picture without shrinking the intent', () => {
     const early = resolveHomeScenePanRestore({
       currentPanY: null,
-      savedPanY: parkedAtRoof,
-      maxPanY: PROVISIONAL_MAX,
+      savedPanY: TRUE_MAX,
+      maxPanY: SHORT_MAX,
       userOwnsPosition: false,
     });
-    // Rendered against the short bound for now...
-    expect(early.panY).toBe(PROVISIONAL_MAX);
-    // ...but NOT written back. This is the whole fix.
-    expect(early.commit).toBe(false);
+    expect(early.panY).toBe(SHORT_MAX);       // drawn against what we know now
+    expect(early.intendedPanY).toBe(TRUE_MAX); // ...but the truth is untouched
   });
 
-  test('the real bound arriving restores the position the player actually left', () => {
-    const parkedAtRoof = TRUE_MAX;
+  test('the real bound arriving brings the scene back', () => {
     const settled = resolveHomeScenePanRestore({
-      currentPanY: PROVISIONAL_MAX, // what the early pass rendered
-      savedPanY: parkedAtRoof,
+      currentPanY: TRUE_MAX, // the intent carried forward from the pass above
+      savedPanY: TRUE_MAX,
       maxPanY: TRUE_MAX,
-      userOwnsPosition: false,
+      userOwnsPosition: true,
     });
-    expect(settled.panY).toBe(parkedAtRoof);
+    expect(settled.panY).toBe(TRUE_MAX);
   });
 
-  test('repeated trips home do not erode the remembered position', () => {
-    // The shipped leak: each mount clamped against the short bound AND wrote
-    // the clamped value back, so a player parked near the roof lost a room per
-    // visit, cumulatively, with no floor. Simulate five round trips.
-    let remembered = TRUE_MAX;
-    for (let trip = 0; trip < 5; trip++) {
-      const early = resolveHomeScenePanRestore({
-        currentPanY: null,
-        savedPanY: remembered,
-        maxPanY: PROVISIONAL_MAX,
-        userOwnsPosition: false,
-      });
-      if (early.commit) remembered = early.panY;
-      const late = resolveHomeScenePanRestore({
-        currentPanY: early.panY,
-        savedPanY: remembered,
+  test('a clamp never ratchets, however many times the bound dips', () => {
+    // This is the whole family of "it takes me back down to the bottom"
+    // reports: not one reset, a ratchet. Feed the intent back in as the live
+    // value each round, exactly as the component does.
+    let intent: number | null = TRUE_MAX;
+    for (let dip = 0; dip < 6; dip++) {
+      intent = resolveHomeScenePanRestore({
+        currentPanY: intent,
+        savedPanY: TRUE_MAX,
+        maxPanY: SHORT_MAX,
+        userOwnsPosition: true,
+      }).intendedPanY;
+      intent = resolveHomeScenePanRestore({
+        currentPanY: intent,
+        savedPanY: TRUE_MAX,
         maxPanY: TRUE_MAX,
-        userOwnsPosition: false,
-      });
-      if (late.commit) remembered = late.panY;
+        userOwnsPosition: true,
+      }).intendedPanY;
     }
-    expect(remembered).toBe(TRUE_MAX);
+    expect(intent).toBe(TRUE_MAX);
   });
 
-  test('once the player pans, their live position wins and the house may grow above them', () => {
+  test('once the player pans, the house may grow above them without moving them', () => {
     // Rooms are added at the TOP of a bottom-anchored scene, so holding the
-    // number holds the view. Growing the bound must not move them.
+    // number holds the view.
     const held = 420;
     const grown = resolveHomeScenePanRestore({
       currentPanY: held,
@@ -192,20 +188,7 @@ describe('resolveHomeScenePanRestore', () => {
       userOwnsPosition: true,
     });
     expect(grown.panY).toBe(held);
-    expect(grown.commit).toBe(false); // unchanged, nothing to re-record
-  });
-
-  test('a live position that the bound genuinely clamps IS re-recorded', () => {
-    // House completion is the one shrink. If the bound really did move under a
-    // position the player owns, the new truth must be remembered.
-    const clamped = resolveHomeScenePanRestore({
-      currentPanY: 900,
-      savedPanY: 900,
-      maxPanY: 500,
-      userOwnsPosition: true,
-    });
-    expect(clamped.panY).toBe(500);
-    expect(clamped.commit).toBe(true);
+    expect(grown.intendedPanY).toBe(held);
   });
 
   test('a first-ever launch still frames the roof', () => {
@@ -216,7 +199,6 @@ describe('resolveHomeScenePanRestore', () => {
       userOwnsPosition: false,
     });
     expect(fresh.panY).toBe(TRUE_MAX);
-    expect(fresh.commit).toBe(false);
   });
 });
 
@@ -232,13 +214,59 @@ describe('HouseWorld pan wiring', () => {
     'utf8',
   );
 
+  it('resolves the restore from the unclamped intent, not the live ref', () => {
+    // currentPanYRef is re-clamped against panBoundsMaxRef on every listener
+    // tick, so reading it here bakes in every transient shortfall of the bound.
+    const effect = SRC.slice(SRC.indexOf('const { panY, intendedPanY } = resolveHomeScenePanRestore'));
+    const call = effect.slice(0, effect.indexOf('});'));
+    expect(call).toMatch(/currentPanY: intendedPanYRef\.current/);
+    expect(call).not.toMatch(/currentPanY: currentPanYRef\.current/);
+  });
+
+  it('never records a position from a restore, only from a release', () => {
+    // A clamp is a rendering concern. If a restore may notify, a short bound
+    // becomes a remembered choice and the ratchet is back.
+    const effect = SRC.slice(SRC.indexOf('const { panY, intendedPanY } = resolveHomeScenePanRestore'));
+    expect(effect.slice(0, effect.indexOf('}, ['))).toMatch(/syncPanPosition\(panY, false\)/);
+    // ...and the two real release paths are the ones that set an intent.
+    expect(SRC).toMatch(/intendedPanYRef\.current = logicalRelease/);
+    expect(SRC).toMatch(/intendedPanYRef\.current = settleTarget/);
+  });
+
+  it('never repositions the scene under a live finger', () => {
+    // syncPanPosition clears the gesture offset, so a restore mid-drag both
+    // yanks the scene and leaves the rest of the drag on a stale base. The
+    // house really can grow mid-drag (the ghost room landing), so this is
+    // reachable, not theoretical.
+    const resolveAt = SRC.indexOf('const { panY, intendedPanY } = resolveHomeScenePanRestore');
+    const guard = SRC.slice(SRC.lastIndexOf('useEffect(() => {', resolveAt), resolveAt);
+    expect(guard).toMatch(/if \(isPanningRef\.current\) return;/);
+    // Armed on ACTIVE and cleared by EVERY terminal state, not just END, so a
+    // tap (FAILED) or a system cancel cannot strand the flag on.
+    const armed = SRC.indexOf('isPanningRef.current = true;');
+    const cleared = SRC.indexOf('isPanningRef.current = false;');
+    const endGuard = SRC.indexOf('if (state !== State.END) return;');
+    expect(armed).toBeGreaterThan(-1);
+    expect(cleared).toBeGreaterThan(armed);
+    expect(cleared).toBeLessThan(endGuard);
+  });
+
+  it('keeps the per-frame drag listener to a single assignment', () => {
+    // It runs every frame of every drag. It used to also clamp and write a
+    // second ref that nothing read.
+    const listener = SRC.slice(SRC.indexOf('const id = panRaw.addListener'));
+    const body = listener.slice(0, listener.indexOf('});'));
+    expect(body).toMatch(/liveTranslateYRef\.current = value;/);
+    expect(body).not.toMatch(/clampHomeScenePanY/);
+  });
+
   it('does not re-enter the restore effect on its own committed release', () => {
     // onPanYChange writes the released position into App state, which comes
     // straight back down as the savedPanY prop. With savedPanY in this effect's
     // deps, a release re-ran the effect on the next commit and syncPanPosition
     // STOPS any running settle, so the momentum spring died a frame after it
     // started: no deceleration, no rubber-band bounce.
-    const effect = SRC.slice(SRC.indexOf('const { panY, commit } = resolveHomeScenePanRestore'));
+    const effect = SRC.slice(SRC.indexOf('const { panY, intendedPanY } = resolveHomeScenePanRestore'));
     const deps = effect.slice(effect.indexOf('}, ['), effect.indexOf(']);') + 1);
     expect(deps).toContain('panBoundsMax');
     expect(deps).toContain('containerHeight');
