@@ -5,6 +5,7 @@ import {
   computePanSettleTarget,
   rubberBandPanY,
   resolveHomeScenePanRestore,
+  resolveGestureBasePanY,
   HOME_PAN_PROJECTION_FACTOR,
 } from '../services/homeScenePan';
 
@@ -251,6 +252,39 @@ describe('HouseWorld pan wiring', () => {
     expect(cleared).toBeLessThan(endGuard);
   });
 
+  it('never takes a fresh gesture base straight off the native mirror', () => {
+    // The mirror must go through resolveGestureBasePanY, which decides whether
+    // it is believable. Reading it directly is what dropped the house to the
+    // pit on the tap after a modal.
+    const stop = SRC.slice(SRC.indexOf('const stopSettle = useCallback'));
+    const body = stop.slice(0, stop.indexOf('}, [panRaw]);'));
+    expect(body).toMatch(/resolveGestureBasePanY\(/);
+    expect(body).toMatch(/const settling = settleAnimRef\.current !== null/);
+    expect(body).not.toMatch(/const base = liveTranslateYRef\.current/);
+  });
+
+  it('folds the offset back after a touch that never became a pan', () => {
+    // BEGAN splits the value into offset + 0 and only an END folds it back, so
+    // a tap leaves the position living entirely in native state.
+    const branch = SRC.slice(SRC.indexOf('State.FAILED || state === State.CANCELLED'));
+    const body = branch.slice(0, branch.indexOf('    if (state !== State.END)'));
+    expect(body).toMatch(/syncPanPosition\(/);
+    // ...but a CANCEL that interrupts a REAL drag keeps where the finger was,
+    // rather than throwing the drag away by re-asserting the pre-gesture base.
+    expect(body).toMatch(/if \(wasPanning\)/);
+    expect(body).toMatch(/baseTranslateY\.current \+ translationY/);
+  });
+
+  it('settles the resting ref at release, not only at spring end', () => {
+    // stopSettle reads baseTranslateY at rest, so an interrupted spring must
+    // not leave it holding the pre-drag position.
+    const release = SRC.slice(
+      SRC.indexOf('const settleTarget = computePanSettleTarget'),
+      SRC.indexOf('const settle = Animated.spring(panRaw'),
+    );
+    expect(release).toMatch(/baseTranslateY\.current = settleTarget/);
+  });
+
   it('keeps the per-frame drag listener to a single assignment', () => {
     // It runs every frame of every drag. It used to also clamp and write a
     // second ref that nothing read.
@@ -297,5 +331,46 @@ describe('HouseWorld pan wiring', () => {
       SRC.indexOf('const settle = Animated.spring(panRaw'),
     );
     expect(release).toMatch(/onPanYChange\?\.\(settleTarget\)/);
+  });
+});
+
+// ===========================================================================
+// Where a fresh gesture starts from. Since the pan moved onto the native
+// driver (the change that fixed the scroll lag), JS sees the scene's position
+// only through a listener mirror, and that mirror is not reliable at rest.
+// ===========================================================================
+describe('resolveGestureBasePanY', () => {
+  test('mid-spring, only the native mirror knows where the scene is', () => {
+    expect(
+      resolveGestureBasePanY({ settling: true, liveMirror: 617, lastRestingPanY: 500 }),
+    ).toBe(617);
+  });
+
+  test('mid-spring the mirror is taken RAW, so a bounce is caught not snapped', () => {
+    // A release inside the rubber-band zone legitimately sits past the bound.
+    // Clamping here would make grabbing the scene mid-bounce jump instead of
+    // catch, which is the feature the whole momentum system exists for.
+    expect(
+      resolveGestureBasePanY({ settling: true, liveMirror: 980, lastRestingPanY: 500 }),
+    ).toBe(980);
+  });
+
+  test('at rest, a mirror left holding a raw translation cannot drop the house', () => {
+    // The reported bug. Tapping a small animal sprite drags a few dp on the way
+    // down, which is a real (tiny) pan, so it ends in END and calls
+    // flattenOffset(). That zeroes the JS offset immediately but only queues
+    // the native flatten, and RN fires listeners with `value + the OLD offset`
+    // before storing the new one - so an update already in flight lands as the
+    // bare translation. The mirror is then sitting near the pit, nothing has
+    // moved, and the NEXT touch spends it.
+    expect(
+      resolveGestureBasePanY({ settling: false, liveMirror: 7, lastRestingPanY: 500 }),
+    ).toBe(500);
+  });
+
+  test('at rest the mirror is ignored entirely, however plausible it looks', () => {
+    expect(
+      resolveGestureBasePanY({ settling: false, liveMirror: 499, lastRestingPanY: 500 }),
+    ).toBe(500);
   });
 });

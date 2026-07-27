@@ -26,6 +26,7 @@ import { isOnCooldown, getSessionStatus } from '../../services/dialogueSession';
 import {
   clampHomeScenePanY,
   resolveHomeScenePanRestore,
+  resolveGestureBasePanY,
   computePanSettleTarget,
   rubberBandPanY,
 } from '../../services/homeScenePan';
@@ -1807,11 +1808,21 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   // hand it to the native node as the gesture OFFSET so the incoming
   // translationY stream needs no JS arithmetic at all.
   const stopSettle = useCallback(() => {
+    // Whether a spring is genuinely in flight decides which number to trust.
+    // resolveGestureBasePanY carries the reasoning; the short version is that
+    // the native mirror can be left holding a raw gesture translation after a
+    // release, and taking that as a base hard-sets the house near the pit.
+    const settling = settleAnimRef.current !== null;
     settleAnimRef.current?.stop();
     settleAnimRef.current = null;
     panRaw.stopAnimation();
-    const base = liveTranslateYRef.current;
+    const base = resolveGestureBasePanY({
+      settling,
+      liveMirror: liveTranslateYRef.current,
+      lastRestingPanY: baseTranslateY.current,
+    });
     baseTranslateY.current = base;
+    liveTranslateYRef.current = base;
     panRaw.setOffset(base);
     panRaw.setValue(0);
   }, [panRaw]);
@@ -1842,12 +1853,27 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
       isPanningRef.current = true;
       return;
     }
-    // Every terminal state releases the scene back to the restore effect,
-    // including FAILED (a tap: BEGAN with no movement past minDist) and
-    // CANCELLED (a second pointer, a view detach). Deliberately NOTHING else
-    // happens here: re-asserting a position on CANCELLED would snap a real
-    // drag back to where the finger started.
+    // Every terminal state releases the scene back to the restore effect.
+    const wasPanning = isPanningRef.current;
     isPanningRef.current = false;
+    if (state === State.FAILED || state === State.CANCELLED) {
+      if (wasPanning) {
+        // Cancelled mid-drag (a second pointer, a view detach, the app
+        // backgrounding). Keep the scene where the finger actually left it -
+        // re-asserting the pre-gesture base here would throw the drag away.
+        const cancelledAt = clampHomeScenePanY(baseTranslateY.current + translationY, panBoundsMax);
+        intendedPanYRef.current = cancelledAt;
+        syncPanPosition(cancelledAt, true);
+      } else {
+        // A touch that never became a pan: tapping an animal, or a room to open
+        // its unlock card. BEGAN has already split the animated value into
+        // offset + 0, and only an END folds it back, so at rest the scene's
+        // position would live entirely in native state with JS holding a bare
+        // zero. Re-assert it, which also re-syncs the mirror.
+        syncPanPosition(clampHomeScenePanY(baseTranslateY.current, panBoundsMax), false);
+      }
+      return;
+    }
     if (state !== State.END) return;
 
     const logicalRelease = clampHomeScenePanY(baseTranslateY.current + translationY, panBoundsMax);
@@ -1876,6 +1902,10 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     });
     // A real release IS an intent, and the only thing that may set one.
     intendedPanYRef.current = settleTarget;
+    // The resting position is settled the moment the release is computed, not
+    // when the spring lands: an interrupted spring never runs its callback, and
+    // this ref is what the next gesture reads as its base at rest.
+    baseTranslateY.current = settleTarget;
     // Commit the release to memory NOW rather than only from the spring's
     // finish callback. Anything that stops the settle mid-flight (the restore
     // effect re-running because savedPanY / containerHeight / panBoundsMax
