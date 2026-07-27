@@ -25,7 +25,7 @@ import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { isOnCooldown, getSessionStatus } from '../../services/dialogueSession';
 import {
   clampHomeScenePanY,
-  resolveHomeScenePanY,
+  resolveHomeScenePanRestore,
   computePanSettleTarget,
   rubberBandPanY,
 } from '../../services/homeScenePan';
@@ -1608,6 +1608,12 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   // State tracking for gestures
   const baseTranslateY = useRef(0);
   const currentPanYRef = useRef<number | null>(null);
+  // Has the player actually touched the scene during THIS mount? Until they
+  // have, `savedPanY` stays the source of truth and the live value is only a
+  // provisional rendering of it. See the restore effect for why that matters:
+  // this component mounts before the house knows how tall it is, so a live
+  // value adopted early is a value clamped against the wrong bound.
+  const hasUserPannedRef = useRef(false);
   // Synchronous mirror of panRaw's live value. Animations run on the NATIVE
   // driver, so panRaw's JS value lags the real native value between frames, and
   // stopAnimation()'s callback is ASYNC — reading the base from it left the
@@ -1816,6 +1822,16 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
       stopSettle();
       return;
     }
+    if (state === State.ACTIVE) {
+      // The scene is genuinely being panned, so from here on the player owns
+      // the position and the restore effect stops re-deriving it from
+      // savedPanY. Keyed on ACTIVE, not BEGAN: BEGAN fires on finger-down, so
+      // arming it there would hand ownership to every TAP, including the tap
+      // that opens a room's unlock modal. A tap must not make a provisionally
+      // clamped position authoritative.
+      hasUserPannedRef.current = true;
+      return;
+    }
     if (state !== State.END) return;
 
     const logicalRelease = clampHomeScenePanY(baseTranslateY.current + translationY, panBoundsMax);
@@ -1842,6 +1858,15 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
       maxPanY: panBoundsMax,
     });
     currentPanYRef.current = settleTarget;
+    // Commit the release to memory NOW rather than only from the spring's
+    // finish callback. Anything that stops the settle mid-flight (the restore
+    // effect re-running because savedPanY / containerHeight / panBoundsMax
+    // changed, or a fresh gesture) drops that callback, and the remembered
+    // position would stay a whole pan behind what the player is looking at —
+    // which is then the stale value a later remount restores. The target is
+    // where this gesture is going; if a new gesture supersedes it, that one
+    // commits its own release the same way.
+    onPanYChange?.(settleTarget);
 
     // One native spring drives the whole scene — the entire painterly plane
     // (sky, meadow, house, pit) settles together, so there is nothing for a
@@ -1879,16 +1904,51 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
 
   // Preserve the current viewport when the house grows or helper UI changes the
   // available height, and restore the last viewport when the home screen remounts.
+  //
+  // THE RESTORE IS DELIBERATELY RE-RUN FROM `savedPanY`, NOT FROM THE LIVE
+  // VALUE, UNTIL THE PLAYER TOUCHES THE SCENE. HomeScreen unmounts on every
+  // navigation (that is the premise of its paint-ahead snapshot), so this
+  // component mounts fresh each time the player comes home from a puzzle — and
+  // it mounts BEFORE the house knows its own height. `rooms` is seeded from the
+  // snapshot but `nextUnlock` is not: it starts null and only lands after
+  // several AsyncStorage round trips, while onLayout fires on the first commit.
+  // For that window `panBoundsMax` is one room (~140dp) SHORT of the truth.
+  //
+  // The old code adopted the value clamped against that provisional bound as
+  // the new live position AND wrote it back through onPanYChange (shouldNotify
+  // was unconditionally true whenever currentPanYRef was null, which is exactly
+  // the mount case). So every single trip home shaved up to a room's height off
+  // a player parked near the roof, permanently and cumulatively — which is what
+  // "it takes me back down to the bottom of the house" actually was. It was
+  // never one reset; it was a slow leak with no floor.
+  //
+  // Now the clamp is only ever a temporary RENDERING of the saved value: when
+  // the real bound arrives moments later this effect re-resolves from
+  // `savedPanY` and lands where the player left off, and nothing writes to the
+  // memory until there is a real gesture to record.
+  // `savedPanY` is read through a ref and is deliberately NOT a dependency.
+  // It is our own echo: onPanYChange writes it into App state, which comes
+  // straight back down as this prop. With it in the deps, committing a release
+  // re-entered this effect on the very next commit, and syncPanPosition STOPS
+  // any running settle (1) — so the momentum spring was killed a frame after it
+  // started and the deceleration and rubber-band bounce never played. Nothing
+  // else ever changes savedPanY (App seeds it null and only this component
+  // writes it), so geometry alone should re-run the restore.
+  const savedPanYRef = useRef(savedPanY);
+  savedPanYRef.current = savedPanY;
   useEffect(() => {
     if (containerHeight === null) return;
-    const resolvedPanY = resolveHomeScenePanY({
+    // Once the player has panned, their live position is authoritative and the
+    // house growing above them must not move it (the scene is bottom-anchored
+    // and rooms are added at the TOP, so holding the number holds the view).
+    const { panY, commit } = resolveHomeScenePanRestore({
       currentPanY: currentPanYRef.current,
-      savedPanY,
+      savedPanY: savedPanYRef.current,
       maxPanY: panBoundsMax,
+      userOwnsPosition: hasUserPannedRef.current,
     });
-    const shouldNotify = currentPanYRef.current == null || currentPanYRef.current !== resolvedPanY;
-    syncPanPosition(resolvedPanY, shouldNotify);
-  }, [containerHeight, panBoundsMax, savedPanY, syncPanPosition]);
+    syncPanPosition(panY, commit);
+  }, [containerHeight, panBoundsMax, syncPanPosition]);
 
   return (
     <GestureHandlerRootView style={[styles.container, { backgroundColor: PHASE_BG_COLORS[currentPhase] || PHASE_BG_COLORS[0] }]}>

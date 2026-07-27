@@ -4,6 +4,7 @@ import {
   projectPanMomentum,
   computePanSettleTarget,
   rubberBandPanY,
+  resolveHomeScenePanRestore,
   HOME_PAN_PROJECTION_FACTOR,
 } from '../services/homeScenePan';
 
@@ -115,5 +116,158 @@ describe('rubberBandPanY', () => {
     expect(up).toBeCloseTo(-down);
     expect(down).toBeGreaterThan(0);
     expect(down).toBeLessThan(50);
+  });
+});
+
+// ===========================================================================
+// The restore decision. Getting this wrong is invisible in one frame and only
+// shows up as drift across sessions, which is exactly how it shipped: players
+// reported the house "taking me back down to the bottom" after unlocks.
+// ===========================================================================
+describe('resolveHomeScenePanRestore', () => {
+  // The house mounts before it knows its own height: rooms come from a
+  // paint-ahead snapshot, but the next-unlock ghost room lands several storage
+  // reads later, so the bound is briefly one room (~140dp) short.
+  const ROOM = 140;
+  const TRUE_MAX = 900;
+  const PROVISIONAL_MAX = TRUE_MAX - ROOM;
+
+  test('a mount never commits, so a provisional bound cannot eat the memory', () => {
+    const parkedAtRoof = TRUE_MAX;
+    const early = resolveHomeScenePanRestore({
+      currentPanY: null,
+      savedPanY: parkedAtRoof,
+      maxPanY: PROVISIONAL_MAX,
+      userOwnsPosition: false,
+    });
+    // Rendered against the short bound for now...
+    expect(early.panY).toBe(PROVISIONAL_MAX);
+    // ...but NOT written back. This is the whole fix.
+    expect(early.commit).toBe(false);
+  });
+
+  test('the real bound arriving restores the position the player actually left', () => {
+    const parkedAtRoof = TRUE_MAX;
+    const settled = resolveHomeScenePanRestore({
+      currentPanY: PROVISIONAL_MAX, // what the early pass rendered
+      savedPanY: parkedAtRoof,
+      maxPanY: TRUE_MAX,
+      userOwnsPosition: false,
+    });
+    expect(settled.panY).toBe(parkedAtRoof);
+  });
+
+  test('repeated trips home do not erode the remembered position', () => {
+    // The shipped leak: each mount clamped against the short bound AND wrote
+    // the clamped value back, so a player parked near the roof lost a room per
+    // visit, cumulatively, with no floor. Simulate five round trips.
+    let remembered = TRUE_MAX;
+    for (let trip = 0; trip < 5; trip++) {
+      const early = resolveHomeScenePanRestore({
+        currentPanY: null,
+        savedPanY: remembered,
+        maxPanY: PROVISIONAL_MAX,
+        userOwnsPosition: false,
+      });
+      if (early.commit) remembered = early.panY;
+      const late = resolveHomeScenePanRestore({
+        currentPanY: early.panY,
+        savedPanY: remembered,
+        maxPanY: TRUE_MAX,
+        userOwnsPosition: false,
+      });
+      if (late.commit) remembered = late.panY;
+    }
+    expect(remembered).toBe(TRUE_MAX);
+  });
+
+  test('once the player pans, their live position wins and the house may grow above them', () => {
+    // Rooms are added at the TOP of a bottom-anchored scene, so holding the
+    // number holds the view. Growing the bound must not move them.
+    const held = 420;
+    const grown = resolveHomeScenePanRestore({
+      currentPanY: held,
+      savedPanY: 900,
+      maxPanY: TRUE_MAX + ROOM,
+      userOwnsPosition: true,
+    });
+    expect(grown.panY).toBe(held);
+    expect(grown.commit).toBe(false); // unchanged, nothing to re-record
+  });
+
+  test('a live position that the bound genuinely clamps IS re-recorded', () => {
+    // House completion is the one shrink. If the bound really did move under a
+    // position the player owns, the new truth must be remembered.
+    const clamped = resolveHomeScenePanRestore({
+      currentPanY: 900,
+      savedPanY: 900,
+      maxPanY: 500,
+      userOwnsPosition: true,
+    });
+    expect(clamped.panY).toBe(500);
+    expect(clamped.commit).toBe(true);
+  });
+
+  test('a first-ever launch still frames the roof', () => {
+    const fresh = resolveHomeScenePanRestore({
+      currentPanY: null,
+      savedPanY: null,
+      maxPanY: TRUE_MAX,
+      userOwnsPosition: false,
+    });
+    expect(fresh.panY).toBe(TRUE_MAX);
+    expect(fresh.commit).toBe(false);
+  });
+});
+
+// ===========================================================================
+// Source contracts for the HouseWorld wiring around that decision. Both of
+// these are invisible in a single frame and both were live defects.
+// ===========================================================================
+describe('HouseWorld pan wiring', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const SRC: string = fs.readFileSync(
+    path.resolve(__dirname, '../components/home/HouseWorld.tsx'),
+    'utf8',
+  );
+
+  it('does not re-enter the restore effect on its own committed release', () => {
+    // onPanYChange writes the released position into App state, which comes
+    // straight back down as the savedPanY prop. With savedPanY in this effect's
+    // deps, a release re-ran the effect on the next commit and syncPanPosition
+    // STOPS any running settle, so the momentum spring died a frame after it
+    // started: no deceleration, no rubber-band bounce.
+    const effect = SRC.slice(SRC.indexOf('const { panY, commit } = resolveHomeScenePanRestore'));
+    const deps = effect.slice(effect.indexOf('}, ['), effect.indexOf(']);') + 1);
+    expect(deps).toContain('panBoundsMax');
+    expect(deps).toContain('containerHeight');
+    expect(deps).not.toContain('savedPanY');
+    // ...which is only safe because it reads the current value through a ref.
+    expect(SRC).toMatch(/savedPanY: savedPanYRef\.current/);
+  });
+
+  it('hands the position to the player on ACTIVE, never on a bare touch', () => {
+    // BEGAN fires on finger-down, so arming ownership there would hand it to
+    // every TAP — including the tap that opens a room's unlock modal — and make
+    // a provisionally clamped position authoritative for the rest of the mount.
+    const began = SRC.indexOf('if (state === State.BEGAN)');
+    const active = SRC.indexOf('if (state === State.ACTIVE)');
+    const owns = SRC.indexOf('hasUserPannedRef.current = true');
+    expect(began).toBeGreaterThan(-1);
+    expect(active).toBeGreaterThan(began);
+    expect(owns).toBeGreaterThan(active);
+    // And the BEGAN branch returns before reaching it.
+    expect(SRC.slice(began, active)).toMatch(/stopSettle\(\);\s*\n\s*return;/);
+  });
+
+  it('commits a release when the settle STARTS, not only when it finishes', () => {
+    // A settle stopped in flight never runs its finish callback, which left the
+    // remembered position a whole pan behind what the player was looking at.
+    const release = SRC.slice(
+      SRC.indexOf('const settleTarget = computePanSettleTarget'),
+      SRC.indexOf('const settle = Animated.spring(panRaw'),
+    );
+    expect(release).toMatch(/onPanYChange\?\.\(settleTarget\)/);
   });
 });

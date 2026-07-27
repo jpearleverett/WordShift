@@ -4538,6 +4538,29 @@ function MainApp() {
                 </Text>
               </BadgeAppear>
             )}
+            {/* Speed Shift badge — a standing indicator the clock is armed.
+                The countdown itself is prominent, but the badge is what tells
+                the player the modifier is on before they parse a number, and
+                it keeps the modifier group reading as one row of layers. */}
+            {puzzle.speedMode && (
+              <BadgeAppear
+                style={[
+                  styles.variantBadge,
+                  persistence.currentPhase === 2 && styles.variantBadgeDusk,
+                  persistence.currentPhase >= 3 && styles.variantBadgeDark,
+                ]}
+                accessible
+                accessibilityLabel="Speed Shift is on: this board is timed"
+              >
+                <Text style={[
+                  styles.variantBadgeText,
+                  persistence.currentPhase === 2 && styles.variantBadgeTextDusk,
+                  persistence.currentPhase >= 3 && styles.variantBadgeTextDark,
+                ]}>
+                  {`\u26A1 Speed`}
+                </Text>
+              </BadgeAppear>
+            )}
             {/* Blind Offering badge — the previews are hidden, so without a
                 standing indicator the player has no way to tell blind is on
                 (or remember to turn it off). Same chrome as the variant badge.
@@ -4577,29 +4600,6 @@ function MainApp() {
                     {'· undos free'}
                   </Text>
                 )}
-              </BadgeAppear>
-            )}
-            {/* Speed Shift badge — a standing indicator the clock is armed.
-                The countdown itself is prominent, but the badge is what tells
-                the player the modifier is on before they parse a number, and
-                it keeps the modifier group reading as one row of layers. */}
-            {puzzle.speedMode && (
-              <BadgeAppear
-                style={[
-                  styles.variantBadge,
-                  persistence.currentPhase === 2 && styles.variantBadgeDusk,
-                  persistence.currentPhase >= 3 && styles.variantBadgeDark,
-                ]}
-                accessible
-                accessibilityLabel="Speed Shift is on: this board is timed"
-              >
-                <Text style={[
-                  styles.variantBadgeText,
-                  persistence.currentPhase === 2 && styles.variantBadgeTextDusk,
-                  persistence.currentPhase >= 3 && styles.variantBadgeTextDark,
-                ]}>
-                  {`\u26A1 Speed`}
-                </Text>
               </BadgeAppear>
             )}
             {/* Lexicon (rare-word) badge — a standing indicator the rare-vocabulary

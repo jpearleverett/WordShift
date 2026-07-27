@@ -23,6 +23,15 @@ interface PixelPlaqueProps {
    * distorts. Default 1 — every existing full-size plaque is unchanged.
    */
   scale?: number;
+  /**
+   * Extra multiplier on the LABEL only, so a plaque can be made physically
+   * smaller without dragging its type below legibility. `scale` alone couples
+   * the two (the occupant plate in a house room could not shrink past ~0.6
+   * before its 14 * scale font fell under the room sign's own), which is what
+   * forced two near-identical wooden cards into one 123dp room. The wood keeps
+   * its exact aspect ratio either way — only the text is rescaled. Default 1.
+   */
+  fontScale?: number;
 }
 
 /**
@@ -31,7 +40,7 @@ interface PixelPlaqueProps {
  * scripts/tools/generateUiPanels.mjs). Overlap a parent panel's top edge
  * (negative marginTop) to read as a nameplate nailed onto the furniture.
  */
-export const PixelPlaque: React.FC<PixelPlaqueProps> = ({ phase, label, hostDark = false, style, scale = 1 }) => {
+export const PixelPlaque: React.FC<PixelPlaqueProps> = ({ phase, label, hostDark = false, style, scale = 1, fontScale = 1 }) => {
   const skin = getPixelSkin(phase, hostDark);
   const capDp = PLAQUE_CAP_DP * scale;
   return (
@@ -49,7 +58,7 @@ export const PixelPlaque: React.FC<PixelPlaqueProps> = ({ phase, label, hostDark
       <ThreeSliceStrip skin={skin.plaque} capDp={capDp} />
       <Text
         numberOfLines={1}
-        style={[styles.label, { color: skin.ink.plaque, fontSize: 14 * scale, textShadowOffset: { width: 0, height: 3 * scale } }]}
+        style={[styles.label, { color: skin.ink.plaque, fontSize: 14 * scale * fontScale, textShadowOffset: { width: 0, height: 3 * scale } }]}
       >
         {label.toUpperCase()}
       </Text>
