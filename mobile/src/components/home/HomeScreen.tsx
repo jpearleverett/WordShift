@@ -2369,11 +2369,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         /* Robed + robedTalk (F26) follow the exact same
                            pre-mounted opacity-switch as idle/talk above, so
                            the climax's biggest lines no longer play over a
-                           frozen still. No animal has a robedTalk frame yet
-                           (idle/talk/robed only) — the talk layer only mounts
-                           when Boolean(...robedTalk) holds, so this renders
-                           byte-identical to today (a static robed image)
-                           until that art lands for a given animal. */
+                           frozen still. Twelve animals ship robedTalk;
+                           Axel (axolotl) does not (mask, talk === idle).
+                           The talk layer only mounts when Boolean(...robedTalk)
+                           holds, so a missing frame still renders the static
+                           robe. */
                         <>
                           <Image
                             source={CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]!.robed!}
@@ -3435,11 +3435,31 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       accessibilityLabel={`${introAnimal.name} portrait`}
                     >
                       {progress && progress.currentPhase >= 4 && CHARACTER_SPRITES[introAnimal.type]?.robed ? (
-                        <Image
-                          source={CHARACTER_SPRITES[introAnimal.type]!.robed!}
-                          style={styles.dialogueSpriteLayer}
-                          resizeMode="cover"
-                        />
+                        /* Same robed + robedTalk opacity stack as the main
+                           animal card — a static robe here froze every
+                           Phase-4 intro/override line. */
+                        <>
+                          <Image
+                            source={CHARACTER_SPRITES[introAnimal.type]!.robed!}
+                            style={[
+                              styles.dialogueSpriteLayer,
+                              introIsTalking &&
+                                Boolean(CHARACTER_SPRITES[introAnimal.type]?.robedTalk) &&
+                                styles.dialogueSpriteLayerHidden,
+                            ]}
+                            resizeMode="cover"
+                          />
+                          {Boolean(CHARACTER_SPRITES[introAnimal.type]?.robedTalk) && (
+                            <Image
+                              source={CHARACTER_SPRITES[introAnimal.type]!.robedTalk!}
+                              style={[
+                                styles.dialogueSpriteLayer,
+                                !introIsTalking && styles.dialogueSpriteLayerHidden,
+                              ]}
+                              resizeMode="cover"
+                            />
+                          )}
+                        </>
                       ) : (
                         <>
                           <Image
