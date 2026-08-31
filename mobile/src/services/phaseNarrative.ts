@@ -2307,7 +2307,9 @@ export function getPostCapDwellLine(completedTotal: number, phase: number): stri
 // ============================================================================
 
 export function getStreakHeldMessage(heldAt: number, phase: number = 0): string {
+  if (phase >= 5) return `A quiet day passed and nothing came undone. The chain rests at ${heldAt}, kept.`;
   if (phase >= 4) return `The chain bent, and did not break. It holds at ${heldAt}.`;
+  if (phase >= 3) return `A dark day went unmarked, yet the chain held at ${heldAt}. Something kept count for you.`;
   if (phase >= 2) return `A day slipped past, but the thread held. Your streak stands at ${heldAt}.`;
   return `A missed day, forgiven! Your streak held at ${heldAt}. The house kept the light on for you.`;
 }
@@ -2331,10 +2333,43 @@ export function getNextFriendPrompt(phase: number, name: string): string {
 // framing arrives only when the world has already turned.
 // ============================================================================
 
+const RESONANT_MOVE_MESSAGES: Record<number, string[]> = {
+  0: [
+    'Oh, lovely choice. That word sits deep in the house.',
+    'Of all the words you could have made, that one hums.',
+    'A rich word! The walls like the sound of it.',
+    'That one lands heavier than the others would have. In a good way.',
+  ],
+  2: [
+    'That word rings lower than the others would have. The house noticed.',
+    'You had gentler words to choose. You chose the one with weight.',
+    'The other words would have passed unnoticed. Not that one.',
+    'Something under the floor leaned toward that word.',
+  ],
+  3: [
+    'Of the words on offer, you reached for the darkest. It reached back.',
+    'That word sank further than the rest would have. The house counts these.',
+    'You could have chosen lighter. The choice was heard.',
+    'The other words were doors. That one was a stair, going down.',
+  ],
+  4: [
+    'Of the words you could have made, you made the one it wanted.',
+    'It offered you choices only to see which you would take. It is pleased.',
+    'The lighter words were left where they lay. The arrangement noticed.',
+    'That word was waiting to be chosen. You felt it too.',
+  ],
+  5: [
+    'Of the words you could have made, you made the deep one. Old habits, kindly kept.',
+    'The pattern no longer needs the deep words. It is glad of them anyway.',
+    'You still reach for the words with weight. It remembers that about you.',
+    'A deep word, freely given. Nothing asks for them now. That is what makes it lovely.',
+  ],
+};
+
 export function getResonantMoveMessage(phase: number): string {
-  if (phase >= 4) return 'Of the words you could have made, you made the one it wanted.';
-  if (phase >= 2) return 'That word rings lower than the others would have. The house noticed.';
-  return 'Oh, lovely choice. That word sits deep in the house.';
+  const band = phase >= 5 ? 5 : phase >= 4 ? 4 : phase >= 3 ? 3 : phase >= 2 ? 2 : 0;
+  const pool = RESONANT_MOVE_MESSAGES[band];
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
 /** Label for the resonance line in the victory amber breakdown. */
@@ -2353,17 +2388,23 @@ export function getResonanceBonusLabel(phase: number): string {
 export function getHouseAskLine(phase: number, kind: 'move' | 'keep', letter: string): string {
   const l = letter.toUpperCase();
   if (kind === 'move') {
+    if (phase >= 5) return `One small thing, if you would: let the ${l} travel. The pattern likes to watch it go.`;
     if (phase >= 4) return `It asks one thing of this arrangement: the ${l} must travel.`;
+    if (phase >= 3) return `The house asks, low and certain: the ${l} must not stay where it is.`;
     if (phase >= 2) return `The house asks quietly: let the ${l} move before the end.`;
     return `A little wish from the house: let the letter ${l} travel today.`;
   }
+  if (phase >= 5) return `One small thing, if you would: leave the ${l} be. Some letters have earned their rest.`;
   if (phase >= 4) return `It asks one thing of this arrangement: the ${l} does not move.`;
+  if (phase >= 3) return `The house asks, low and certain: the ${l} is to be left alone.`;
   if (phase >= 2) return `The house asks quietly: leave the ${l} where it sits.`;
   return `A little wish from the house: let the letter ${l} stay right where it is.`;
 }
 
 export function getHouseAskFulfilledMessage(phase: number): string {
+  if (phase >= 5) return 'The small thing was done. The pattern is quietly glad of you.';
   if (phase >= 4) return 'The ask was honored. It does not forget that.';
+  if (phase >= 3) return 'The small ask was kept. Something below the floor is satisfied.';
   if (phase >= 2) return 'The small ask was kept. Something in the walls settles, pleased.';
   return 'You remembered the little wish! The house is delighted.';
 }
@@ -2375,7 +2416,9 @@ export function getHouseAskFulfilledMessage(phase: number): string {
 // ============================================================================
 
 export function getHintGrantMessage(phase: number): string {
+  if (phase >= 5) return 'A hint is set aside for you, though little here still needs solving. Take it as fondness.';
   if (phase >= 4) return 'A small kindness is set aside for you. One hint, kept where the cold cannot reach it.';
+  if (phase >= 3) return 'The house slips a hint into your keeping. The doors ahead are heavier.';
   if (phase >= 2) return 'The house tucks a spare hint into your pocket. For the harder doors ahead.';
   return 'A little gift from the house! One extra hint, saved for a rainy puzzle.';
 }

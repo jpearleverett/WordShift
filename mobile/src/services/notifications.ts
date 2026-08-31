@@ -141,7 +141,7 @@ const STREAK_RISK_MESSAGES: Record<number, string[]> = {
   ],
   5: [
     '{streak} days. The pattern holds, if you wish it to.',
-    'The chain rests at {streak} days. It will wait... but not forever.',
+    'The chain rests at {streak} days. A quiet visit would keep it whole.',
   ],
 };
 

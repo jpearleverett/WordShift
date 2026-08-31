@@ -29,7 +29,7 @@ import { PhaseTransitionOverlay } from './PhaseTransitionOverlay';
 import { NEW_CYCLE_EVENT, PhaseTransitionEvent } from '../services/phaseEvents';
 import { shouldSimplifyAnimations } from '../services/deviceTier';
 import { useScreenInsets } from '../hooks/useScreenInsets';
-import { EXTERNAL_LINKS, getSupportMailto } from '../constants/links';
+import { EXTERNAL_LINKS, PLAY_STORE_URL, getSupportMailto } from '../constants/links';
 import { GameSettings, getSettings, updateSetting, resetSettings } from '../services/settings';
 import { clearStats } from '../services/starRating';
 import { clearAchievements } from '../services/achievements';
@@ -1001,6 +1001,18 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
         {/* About */}
         <PanelCard phase={phase} kind="panel" style={styles.section}>
           <PixelPlaque phase={phase} label={'ABOUT'} style={styles.sectionPlaque} />
+          {/* Passive, player-initiated store link. Deliberately NOT a prompt:
+              the review-bomb guard in reviewPrompt.ts stays the only surface
+              that ever ASKS, and it never asks past Phase 1. */}
+          <TouchableOpacity
+            style={[styles.aboutRow, rowTint]}
+            onPress={() => openLink(PLAY_STORE_URL)}
+            accessibilityRole="link"
+            accessibilityLabel="Rate WordShift"
+          >
+            <Text style={[styles.linkText, { color: t.secondaryText }]}>Rate WordShift</Text>
+            <Text style={[styles.linkChevron, { color: t.muted }]}>{'>'}</Text>
+          </TouchableOpacity>
           <TouchableOpacity
             style={styles.aboutRow}
             onPress={() => openLink(EXTERNAL_LINKS.privacyPolicy)}

@@ -55,6 +55,10 @@ import {
   getDwellLine,
   getPostCapDwellLine,
   getStreakHeldMessage,
+  getResonantMoveMessage,
+  getHouseAskLine,
+  getHouseAskFulfilledMessage,
+  getHintGrantMessage,
   getPreviewGraduationMessage,
   getSwiftVictoryHintMessage,
   getFinalBoardStartMessage,
@@ -1821,6 +1825,82 @@ describe('getStreakHeldMessage', () => {
 
   test('phase defaults to the bright voice when omitted', () => {
     expect(getStreakHeldMessage(5)).toBe(getStreakHeldMessage(5, 0));
+  });
+
+  test('every phase band is distinct (0/2/3/4/5 each carry their own register)', () => {
+    const bands = [0, 2, 3, 4, 5].map(p => getStreakHeldMessage(9, p));
+    expect(new Set(bands).size).toBe(bands.length);
+  });
+});
+
+describe('getResonantMoveMessage', () => {
+  test('draws from a pool at every phase band, dash-free, no phase labels', () => {
+    const realRandom = Math.random;
+    try {
+      for (const p of [0, 1, 2, 3, 4, 5]) {
+        const seen = new Set<string>();
+        for (let k = 0; k < 8; k++) {
+          Math.random = () => (k + 0.5) / 8;
+          const msg = getResonantMoveMessage(p);
+          expect(msg.length).toBeGreaterThan(0);
+          expect(msg).not.toMatch(/[–—]/);
+          expect(msg).not.toMatch(/\bphase\b/i);
+          seen.add(msg);
+        }
+        // A real pool: repeated wins do not repeat one fixed line.
+        expect(seen.size).toBeGreaterThan(1);
+      }
+    } finally {
+      Math.random = realRandom;
+    }
+  });
+
+  test('bright pools never leak dread framing; dread pools never sound bright', () => {
+    const realRandom = Math.random;
+    try {
+      for (let k = 0; k < 8; k++) {
+        Math.random = () => (k + 0.5) / 8;
+        expect(getResonantMoveMessage(0).toLowerCase()).not.toMatch(/arrangement|wanted|dark/);
+        expect(getResonantMoveMessage(4)).not.toMatch(/!/);
+      }
+    } finally {
+      Math.random = realRandom;
+    }
+  });
+});
+
+describe('house ask copy bands', () => {
+  test('ask lines name the letter at every band and kind, deterministically', () => {
+    for (const p of [0, 2, 3, 4, 5]) {
+      for (const kind of ['move', 'keep'] as const) {
+        const line = getHouseAskLine(p, kind, 'r');
+        expect(line).toContain('R');
+        expect(line).not.toMatch(/[–—]/);
+        // Deterministic: the a11y label calls this again and must match.
+        expect(getHouseAskLine(p, kind, 'r')).toBe(line);
+      }
+      expect(getHouseAskLine(p, 'move', 'r')).not.toBe(getHouseAskLine(p, 'keep', 'r'));
+    }
+  });
+
+  test('bands 0/2/3/4/5 are distinct for both kinds, and fulfilled receipts split too', () => {
+    for (const kind of ['move', 'keep'] as const) {
+      const bands = [0, 2, 3, 4, 5].map(p => getHouseAskLine(p, kind, 'e'));
+      expect(new Set(bands).size).toBe(bands.length);
+    }
+    const receipts = [0, 2, 3, 4, 5].map(p => getHouseAskFulfilledMessage(p));
+    expect(new Set(receipts).size).toBe(receipts.length);
+  });
+});
+
+describe('getHintGrantMessage', () => {
+  test('five distinct bands, all hint-naming and dash-free', () => {
+    const bands = [0, 2, 3, 4, 5].map(p => getHintGrantMessage(p));
+    expect(new Set(bands).size).toBe(bands.length);
+    for (const msg of bands) {
+      expect(msg.toLowerCase()).toContain('hint');
+      expect(msg).not.toMatch(/[–—]/);
+    }
   });
 });
 

@@ -115,6 +115,16 @@ line** (proves the locked-down Supabase RPCs end-to-end).
       interaction still commits as a state swap + local settle; the tile never visibly travels.
       Real animation-architecture change (needs measured source-tile position through
       `usePuzzleGame`); deliberately held, but it is the biggest remaining feel item.
+- [x] **Late-game copy passes — DONE (2026-08-31)**: `getResonantMoveMessage` is now a real
+      pool (4 lines × 5 phase bands, was 1 fixed line per 3 bands, firing verbatim through the
+      endgame); `getHouseAskLine`/`getHouseAskFulfilledMessage`/`getHintGrantMessage`/
+      `getStreakHeldMessage` split from 3 bands to 5 (phases 3 and 5 get their own registers);
+      the Phase-5 streak-risk notification's "It will wait... but not forever." tonal break
+      replaced with a serene line. Band-distinctness + pool + register tests added.
+- [x] **Passive "Rate WordShift" row in Settings ABOUT — DONE (2026-08-31)** (tester-report
+      item): player-initiated Play Store link only, never a prompt, so the review-bomb guard
+      (`reviewPrompt.ts`, asks only at Phase 0-1) is untouched; source-pinned in
+      `reviewPrompt.test.ts`.
 
 ## 5. Docs that now lie (quick, cheap fixes)
 
