@@ -164,30 +164,28 @@ the codebase and are the remaining gates to submission.
       one-time SKUs created and activated; RevenueCat products imported (5
       consumable, 4 non-consumable) and 4 entitlements mapped (`patron`,
       `adfree`, `cosmetic_bundle`, `starter_pack`).
-- [ ] **Supporter subscription (revenue pass, 10th SKU / 5th entitlement)** —
-      app-side wired (`com.wordshift.supporter_monthly` → `supporter`
-      entitlement; ad-free + monthly amber stipend + season-pass premium +
-      exclusive confetti). OPEN console-side: create the auto-renewing
-      subscription in Play Console, import it into RevenueCat, and create the
-      **`supporter` entitlement** (identifier EXACTLY `supporter`) attached to
-      it. See `docs/MONETIZATION_SETUP.md`. **This gates the cut**: the
-      StoreModal SUPPORTER section always renders, so with the SKU missing a
-      production player sees a live-looking $3.99/mo buy button that always
-      fails ("The store isn't available right now") — either land the console
-      work before the cut or gate the row out in code; do not ship the dead
-      button. The identifier matters doubly: a mis-named RevenueCat
-      entitlement means a SUCCESSFUL charge grants nothing locally. Once
-      created, device-verify one real license-tester subscription end-to-end
-      (the 2026-07-13 SKU pass predates the subscription-category code).
+- [x] **Supporter subscription (revenue pass, 10th SKU / 5th entitlement)** —
+      DONE console-side (owner-confirmed 2026-08-31): the auto-renewing
+      subscription exists in Play Console, is imported into RevenueCat, and
+      the `supporter` entitlement is created and attached. Remaining
+      companion item: device-verify one real license-tester subscription
+      end-to-end (the 2026-07-13 SKU pass predates the subscription-category
+      code) — folded into the device pass above.
+- [ ] **Google real-time developer notifications (RTDN) for RevenueCat** —
+      deliberately deferred by the owner (2026-08-31). Recommended for prompt
+      subscription cancel/lapse sync: Play Console → Monetization setup →
+      Real-time developer notifications, pointed at the Pub/Sub topic from the
+      RevenueCat app settings. Not launch-blocking (RevenueCat still polls);
+      do before the Supporter base grows.
 - [x] **Banner ad unit — Android (revenue pass)** — DONE (2026-07-16):
       app-side wired (`BannerAd.tsx` + `ads.shouldShowBanner`, menu surfaces
       only); Android Banner AdMob unit created and `admobBannerIdAndroid` set
       (`ca-app-pub-6575205005908086/7787305884`). Serves TEST banners while
       `adsUseTestIds` is `true`. (iOS banner unit + `admobBannerIdIos` remain on
       the iOS track below.)
-- [ ] **Confirm the repriced store tiers** — the in-app fallback labels changed
-      in the revenue pass (Remove-Ads **$5.99**, Patron **$8.99**, Supporter
-      **$3.99/mo**); set the Play Console product **price tiers** to match so the
+- [x] **Confirm the repriced store tiers** — DONE (owner-confirmed
+      2026-08-31): Play Console price tiers match the in-app fallbacks
+      (Remove-Ads **$5.99**, Patron **$8.99**, Supporter **$3.99/mo**), so the
       live `priceString` and the fallback agree.
 - [x] **Data safety + App content declarations** — DONE (2026-07-02): data
       safety, Advertising ID, privacy policy, ads declaration, content rating,

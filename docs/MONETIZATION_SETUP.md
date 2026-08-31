@@ -12,11 +12,13 @@
 >
 > **Remaining Android console work (added in the revenue pass):**
 > - **Supporter subscription** (`com.wordshift.supporter_monthly`, the 10th SKU)
->   — *in progress 2026-07-16.* Create the auto-renewing subscription in Play
->   Console (base plan `monthly`), import it into RevenueCat, and create the
->   **`supporter` entitlement** (the 5th, identifier EXACTLY `supporter`)
->   attached to it. This is the only *subscription*, so it's a third product
->   flavor alongside the non-consumables and consumables.
+>   — ✅ DONE console-side (owner-confirmed 2026-08-31): auto-renewing
+>   subscription created in Play Console (base plan `monthly`), imported into
+>   RevenueCat, and the **`supporter` entitlement** (the 5th, identifier
+>   EXACTLY `supporter`) created and attached. Still recommended: one real
+>   license-tester subscription purchase end-to-end (the 2026-07-13 SKU
+>   verification predates the subscription-category code), and Google RTDN →
+>   RevenueCat Pub/Sub wiring for prompt cancel/lapse sync (owner-deferred).
 > - **Banner ad unit** — ✅ DONE for Android (2026-07-16): Android Banner unit
 >   created and `admobBannerIdAndroid` set in `extra`
 >   (`ca-app-pub-6575205005908086/7787305884`). Serves TEST banners while
