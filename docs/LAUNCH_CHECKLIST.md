@@ -36,16 +36,10 @@ the codebase and are the remaining gates to submission.
       - [ ] Re-check Challenge (previews on) + a deliberate Blind Offering
             failure on a current build (the trial ladder shipped after
             build 44; versionCode is now 88)
-- [ ] **Closed test gate (12 testers / 14 days) — IN PROGRESS, started
-      2026-07-13.** Google requires the closed test with at least 12 testers
-      continuously opted in for 14 consecutive days before a personal account
-      can apply for production access → eligible to apply ~2026-07-27 (as of
-      2026-08-31 that window has long since closed — confirm the application
-      status / production-access grant in Play Console), then
-      Google's application review (typically ≤7 days). Uploading new builds to
-      the closed track during the window is fine and does NOT reset the clock
-      (push build 45 there). Keep the 12+ testers opted in the whole time —
-      dips below 12 pause the clock.
+- [x] **Closed test gate (12 testers / 14 days) — DONE.** Production access
+      was GRANTED (confirmed 2026-08-31). The 12-tester/14-day requirement and
+      Google's application review are behind us; the remaining gates are the
+      production-cut recipe below and the console/device items still open.
 - [x] **30-minute performance session** — DONE (2026-07-13), exceeded: a
       multi-hour mixed session on device reaching Phase 4 (puzzles, home, pit,
       store, dialogue) with no glitches, jank, or lag observed.
@@ -74,9 +68,57 @@ the codebase and are the remaining gates to submission.
       a distinct runtime) — otherwise an `eas update` published after the flip
       serves LIVE ads to testers' existing builds, and an update published
       from a pre-flip commit reverts the production build to test ads.)*
+      *(CI warning, found 2026-08-31: `productionConfig.test.ts` asserts the
+      flag is `true` when `WORDSHIFT_PRODUCTION_CUT` is unset, so the flip
+      commit turns regular CI red. The same cut commit should add
+      `WORDSHIFT_PRODUCTION_CUT: "1"` to the test step's `env` in
+      `.github/workflows/ci.yml`, permanently inverting the guard to enforce
+      the live config — otherwise someone "fixes" CI by reverting the flip.)*
 - [ ] **Bump `android.versionCode`** in `mobile/app.json` for the next release
       (currently **88**, `version` **1.2.2**. autoIncrement is intentionally
-      off — bump manually every time).
+      off — bump manually every time). Do it in the SAME commit as the
+      `adsUseTestIds` flip + the `expo.version` bump — one atomic cut commit,
+      gated by `WORDSHIFT_PRODUCTION_CUT=1 npm test -- --no-coverage
+      --testPathPattern=productionConfig` going 5/5 green.
+- [ ] **Merge the working branch to `main` before the cut** (2026-08-31: 9
+      commits on `claude/game-completion-checklist-mybsmk` are not on `main`,
+      including the EXPERT dread top-up, the flying-tile ghost, all 13
+      `robed_talk.png` sprites, the finale graduation-card guard, and the
+      late-game copy passes — a build cut from `main` today would silently
+      omit all of it).
+- [ ] **Run `npx expo install --fix` + full re-validation before the cut** —
+      as of 2026-08-31 eleven packages sit behind their SDK-56 patch ranges
+      (expo 56.0.15 → ~56.0.21, expo-updates, expo-notifications, ...). Patch
+      lines carry native crash fixes; re-run `npm ci`, the full suite,
+      typecheck, lint, and `npx expo-doctor` afterwards.
+- [ ] **Hermes V1 memory-regression check (expo-doctor, new since 07-24)** —
+      SDK 56 bundles Hermes V1 250829098.0.10; doctor flags ≤ .0.15 for a
+      known memory regression (fixed in .0.16, which needs SDK 57 / RN
+      0.86.2+). Before the cut, check Sentry/closed-test data for OOM or
+      memory-pressure crashes: if clean, ship on SDK 56 and schedule the SDK
+      57 upgrade as the first post-launch release; if not, take the upgrade
+      first.
+- [ ] **Re-shoot the FULL screenshot set at ≥1080 px short side** — measured
+      2026-08-31: the four titled uploads are 864×1536, below Play's 1080 px
+      promotion-eligibility bar (a growth cost, not a rejection risk). Fold in
+      the #5 "+25%" fix below in the same on-device session, and prune the
+      four unnamed AI-draft PNGs from `assets/Play_store/`.
+- [ ] **Decide the Supabase operational tier before real players arrive** —
+      the free tier auto-pauses on inactivity, which would silently take down
+      cloud save, the daily leaderboard, and telemetry (the app degrades
+      gracefully, but players lose cross-device sync with no error). Paid tier
+      or documented acceptance; set a backup/PITR policy and a usage alarm.
+- [ ] **Configure Sentry alert rules** — the DSN is wired and source maps
+      upload, but alerting is console-side; without rules the first production
+      crash notifies no one. After the first production build, confirm a
+      symbolicated test event arrives.
+- [ ] **Promotion path (by design):** `eas submit --profile production` lands
+      on the INTERNAL track. Verify there (incl. LIVE ad fill on a real
+      install — never yet observed, test units served throughout dev), then
+      promote internal → production in Play Console with a staged rollout
+      (10-20%), watching Android Vitals and Sentry during the ramp. Post-live:
+      link the Play listing in AdMob so the "Requires review" badge and
+      app-ads.txt verification clear.
 - [x] **Billing category fix + boot entitlement restore** — DONE (2026-07-10):
       RevenueCat `getProducts` now passes the NON_SUBSCRIPTION category
       (Android one-time products returned `[]` without it — the "purchases not
@@ -128,7 +170,15 @@ the codebase and are the remaining gates to submission.
       exclusive confetti). OPEN console-side: create the auto-renewing
       subscription in Play Console, import it into RevenueCat, and create the
       **`supporter` entitlement** (identifier EXACTLY `supporter`) attached to
-      it. See `docs/MONETIZATION_SETUP.md`.
+      it. See `docs/MONETIZATION_SETUP.md`. **This gates the cut**: the
+      StoreModal SUPPORTER section always renders, so with the SKU missing a
+      production player sees a live-looking $3.99/mo buy button that always
+      fails ("The store isn't available right now") — either land the console
+      work before the cut or gate the row out in code; do not ship the dead
+      button. The identifier matters doubly: a mis-named RevenueCat
+      entitlement means a SUCCESSFUL charge grants nothing locally. Once
+      created, device-verify one real license-tester subscription end-to-end
+      (the 2026-07-13 SKU pass predates the subscription-category code).
 - [x] **Banner ad unit — Android (revenue pass)** — DONE (2026-07-16):
       app-side wired (`BannerAd.tsx` + `ads.shouldShowBanner`, menu surfaces
       only); Android Banner AdMob unit created and `admobBannerIdAndroid` set
