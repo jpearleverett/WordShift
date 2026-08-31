@@ -1,7 +1,7 @@
 # WordShift — Press & Creator Kit
 
 > A cozy word puzzle that is secretly something else. This kit tells you what,
-> how to show it responsibly, and how to skip 150 puzzles of slow burn using a
+> how to show it responsibly, and how to skip a ~90-puzzle slow burn using a
 > reviewer fast-forward built into the game.
 
 **Spoiler policy at a glance:** everything above the marked **SPOILERS** line is
@@ -33,16 +33,18 @@ exactly why what follows lands.
 | **Price** | Free. Optional in-app purchases (currency/hint packs, cosmetics, one-time Remove Ads) and occasional ads with an opt-in rewarded tier |
 | **Monetization stance** | Convenience and cosmetics only — the story unfolds at the same pace for everyone; nothing narrative is purchasable |
 | **Accounts** | None required; core puzzles play offline |
-| **Current version** | 1.5.0 |
+| **Current version** | 1.2.2 |
 | **Content rating** | ESRB Teen / PEGI 12 / Apple 12+ — mild horror themes; no gore, no violence, no profanity (the dictionary is filtered) |
 | **Genre** | Word puzzle / narrative slow burn |
 | **Session length** | 2–5 minutes per puzzle; the full arc is tens of hours |
 | **Press contact** | `[press contact email — provided with your creator code]` |
 
 **By the numbers:** 13 animal companions, a 13-room house built bottom-up,
-4 difficulty tiers, 3 variant modes (Reverse, Double Shift, timed Speed runs),
-a shared Daily Challenge with leaderboard, 51 achievements, an 11,400-word
-dictionary, and ~4,700 hand-vetted pre-generated puzzles plus on-device
+5 difficulty tiers (topped by a 6-letter EXPERT), 3 play styles (standard,
+Reverse, Double Shift) with 4 stackable modifiers (Challenge, timed Speed
+runs, the previews-off Blind Offering, and the rare-word Lexicon), a shared
+Daily Challenge with leaderboard, 56 achievements, a 22,749-word dictionary,
+and ~9,576 quality-gated pre-generated puzzles across 30 banks plus on-device
 generation.
 
 ## Why this clips well (creator notes, spoiler-safe)
@@ -55,16 +57,17 @@ generation.
 - **The animals carry it.** Each companion has a distinct voice and a long
   written arc. Reaction content ("wait, what did the owl just say?") writes
   itself.
-- **The puzzle core holds up on its own.** The letter-shift rule with live
-  valid/invalid previews is legible on stream at a glance, and chat can play
-  along.
+- **The puzzle core holds up on its own.** The letter-shift rule is legible on
+  stream at a glance — ghost previews show the word each drop would form, with
+  valid/invalid grading on EASY and the earliest boards (past that, judging
+  the word yourself is the skill) — and chat can play along.
 - **It respects the bit.** No fourth-wall winks, no "gotcha" jump scares. The
   game never tells you what is happening; it lets you notice.
 
 ## The creator fast-forward (reviewer save states)
 
-The game's later eras sit **~155+ puzzles deep by design** — that pacing is the
-point for players, and a wall for reviewers. Creator-enabled builds therefore
+The game's reveal sits **~90+ puzzles deep by design** (the finale lands around
+puzzle 116) — that pacing is the point for players, and a wall for reviewers. Creator-enabled builds therefore
 ship with a private fast-forward that installs a coherent late-game save:
 correct puzzle counts, currency, house progress, unlocked companions, and
 era-appropriate dialogue, with all tutorials already behind you. It is the same
@@ -93,10 +96,10 @@ save a real long-term player would have, minus the weeks.
 
 | `era=` | In-game era | You get |
 |---|---|---|
-| `dusk` | Deeper Questions | ~70 puzzles in. The first act's warmth with a visible tilt: dusk skies, uneasy conversations, a half-built house |
-| `shadows` | Growing Shadows | ~140 puzzles in. The slow burn at full heat, original house complete, the mood unmistakably wrong |
-| `reveal` | The Horizon | ~200 puzzles in. The late game, house complete. **Spoiler-heavy** |
-| `peace` | Terrible Peace | ~260 puzzles in. The post-story state. **Spoiler-heavy** |
+| `dusk` | Deeper Questions | ~50 puzzles in. The first act's warmth with a visible tilt: dusk skies, uneasy conversations, a half-built house |
+| `shadows` | Growing Shadows | ~85 puzzles in. The slow burn at full heat, the house nearly complete, the mood unmistakably wrong |
+| `reveal` | The Horizon | ~140 puzzles in. The late game, house complete. **Spoiler-heavy** |
+| `peace` | Terrible Peace | ~180 puzzles in. The post-story state. **Spoiler-heavy** |
 
 > ⚠️ **Warning: applying an era OVERWRITES all progress on that device.** There
 > is no undo. Use a spare device or profile if you have a personal save you
@@ -208,4 +211,4 @@ Design rules the game never breaks (useful framing for reviews):
 
 *This document is the creator/press kit for WordShift. The creator code is
 distributed privately; if you received this kit without one, request it via
-the press contact above. Kit last updated for v1.5.0.*
+the press contact above. Kit last updated for v1.2.2, 2026-08-31.*

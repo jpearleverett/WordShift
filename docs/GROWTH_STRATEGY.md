@@ -50,7 +50,7 @@ Convenience/expression only. Nothing here touches phase progression.
 |---|---|---|
 | Interstitials | Auto, victory exits only | Every 6 puzzles (Ph 0–2), every 10 (Ph 3), **silent Ph 4–5**. Pit-exit exempt by design. |
 | Rewarded (opt-in) | victory 2×, hint recovery, speed rescue, daily amber, **quest double** | Global cap 8/day; never auto-shown; Patron/ad-free suppressed. |
-| Banner | Menu-surface only (Stats) | Suppressed for ad-free / onboarding / Ph 4+. Inert until a banner ad unit id is configured. |
+| Banner | Menu-surface only (Stats) | Suppressed for ad-free / onboarding / Ph 4+. Android unit id is configured (test creatives while `adsUseTestIds` is true); iOS stays inert until the iOS keys land. |
 | Amber packs | $0.99 / $2.99 / $6.99 | First pack 2×. Convenience faucet for cosmetics/sinks. |
 | Hint packs | $0.99 / $2.99 | Convenience; hints still cost stars. |
 | Remove-Ads | one-time (fallback **$5.99**) | Ad-free only. |
@@ -85,7 +85,14 @@ These are the human/store steps the code is waiting on:
    iOS store products. Worth ~2× total revenue.
 2. **Create store products**: `com.wordshift.supporter_monthly` (auto-renewing
    subscription) and price tiers for the repriced Remove-Ads / Patron.
-3. **Create an AdMob banner unit** and fill `admobBannerIdAndroid` (banners are
-   inert until then).
-4. **Confirm `adsUseTestIds: false`** ships in the production build (now the
-   default in `app.json`).
+3. **Done (Android):** the AdMob banner unit is created and
+   `admobBannerIdAndroid` is filled in `app.json → extra`. The iOS banner unit
+   rides item 1.
+4. **Flip `adsUseTestIds` to `false` at the production cut — and only then.**
+   It is deliberately `true` in `app.json` today and stays `true` through dev
+   and internal/closed testing (a revenue-pass flip to `false` was reverted
+   2026-07-16 to protect the live closed test — tapping your own live ads on a
+   test build is an AdMob policy violation). Only `__DEV__` or the flag forces
+   Google test units, so a `false` value means every release build serves live
+   ads. After flipping, verify with the production-gate test:
+   `WORDSHIFT_PRODUCTION_CUT=1 npm test -- --no-coverage --testPathPattern=productionConfig`.

@@ -37,7 +37,7 @@ They are warm, funny, thoughtful, and very glad you found them.
 
 MASTER EVERY KIND OF SHIFT
 
-• Four difficulty levels for quick or demanding sessions
+• Five difficulty levels for quick or demanding sessions
 • Reverse Shift journeys down the chain and back again
 • Double Shift moves two letters at every step
 • Speed Shift tests how quickly you can see the pattern
@@ -46,7 +46,7 @@ MASTER EVERY KIND OF SHIFT
 
 RETURN EACH DAY
 
-Take on a shared Daily Challenge, protect your streak, complete daily and weekly quests, unlock 51 achievements, and chase flawless solves with no hints, mistakes, or undos.
+Take on a shared Daily Challenge, protect your streak, complete daily and weekly quests, unlock 56 achievements, and chase flawless solves with no hints, mistakes, or undos.
 
 A COZY GAME. MOSTLY.
 
@@ -161,6 +161,6 @@ store assets — the reveal is the product.
 ## Release notes template (1.0)
 
 > The house is ready. The animals are waiting.
-> • Thousands of letter-shifting puzzles across four difficulties
+> • Thousands of letter-shifting puzzles across five difficulties
 > • 13 animal friends, a house to build, a daily challenge to share
 > • Streaks, quests, achievements, and a story that unfolds the longer you stay

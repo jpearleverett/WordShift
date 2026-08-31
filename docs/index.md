@@ -22,8 +22,11 @@ coming back. And pay attention to your animal friends. They notice things.
 
 ## Features
 
-- Thousands of hand-tuned word chains across four difficulties (4–6 letters)
-- Three twist modes: Reverse Shift, Double Shift, and timed Speed Shift
+- Thousands of hand-tuned word chains across five difficulties (4–6 letters),
+  topped by the EXPERT apex
+- Two twist styles — Reverse Shift and Double Shift — plus four stackable
+  trials: Challenge, timed Speed, the previews-hidden Blind Offering, and the
+  rare-word Lexicon
 - A daily challenge shared by every player, with streaks and a leaderboard
 - Build a house, room by room, for thirteen animal companions — each with their
   own voice, moods, and an unfolding story

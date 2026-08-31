@@ -126,8 +126,11 @@ const BANKS: BankSpec[] = [
   // mainstream-to-uncommon 6-letter words); Lexicon is a rare-word mode (rare-
   // but-fair band). Reverse combos are on-device (no bank). Floors ~10% under
   // measured; the Lexicon+EXPERT combos are deliberately smaller niche banks.
-  // EXPERT 195 / max 8 / 1018 unique
-  { name: 'EXPERT', bank: PUZZLE_BANK_EXPERT, cap: 10, minUnique: 860, minPuzzles: 175 },
+  // EXPERT 230 / max 10 / 1143 unique. Dread top-up 2026-08-31
+  // (scripts/generateExpertDreadTopUp.test.ts): +35 tier>=3 boards (14 -> 49,
+  // ~21% of the bank — matching HARD's dread ratio) under the same gated bars;
+  // acceptance plateaued on the word cap (the 73-word 6L dread pool saturates).
+  { name: 'EXPERT', bank: PUZZLE_BANK_EXPERT, cap: 10, minUnique: 1025, minPuzzles: 207 },
   // DS_EXPERT 265 / max 9 / 1914 unique
   { name: 'DS_EXPERT', bank: PUZZLE_BANK_DOUBLE_SHIFT_EXPERT, cap: 10, minUnique: 1620, minPuzzles: 238 },
   // LEX_EASY 251 / max 3 / 986 unique

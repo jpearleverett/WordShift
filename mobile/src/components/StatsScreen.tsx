@@ -576,7 +576,13 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
                     {getPaceTrendMessage(effectivePhase as DialoguePhase)}
                   </Text>
                 )}
-                {unbrokenWeaveMastery && (
+                {/* The weave ladder is a phase-5 (post-revelation) pursuit, and
+                    getUnbrokenWeaveMastery() always resolves a rank object — so
+                    without this gate, any mid-game player who opened the card via
+                    a speed round or resonant choice saw "Rank 0: Unbroken Weave"
+                    (naming a mode that must not exist for them yet). Match the
+                    DifficultyMenu: show it only once earned or at phase 5. */}
+                {unbrokenWeaveMastery && (unbrokenWeaveMastery.wins > 0 || effectivePhase === 5) && (
                   <>
                     <View style={styles.masteryRow}>
                       <Text style={[styles.masteryLabel, { color: t.body }]}>Unbroken Weave</Text>

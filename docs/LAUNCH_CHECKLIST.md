@@ -34,11 +34,14 @@ the codebase and are the remaining gates to submission.
       - [ ] Deep links (`wordshift://challenge/...`)
       - [ ] Sharing (PNG share card)
       - [ ] Re-check Challenge (previews on) + a deliberate Blind Offering
-            failure on build 45 (the trial ladder shipped after build 44)
+            failure on a current build (the trial ladder shipped after
+            build 44; versionCode is now 88)
 - [ ] **Closed test gate (12 testers / 14 days) — IN PROGRESS, started
       2026-07-13.** Google requires the closed test with at least 12 testers
       continuously opted in for 14 consecutive days before a personal account
-      can apply for production access → eligible to apply ~2026-07-27, then
+      can apply for production access → eligible to apply ~2026-07-27 (as of
+      2026-08-31 that window has long since closed — confirm the application
+      status / production-access grant in Play Console), then
       Google's application review (typically ≤7 days). Uploading new builds to
       the closed track during the window is fine and does NOT reset the clock
       (push build 45 there). Keep the 12+ testers opted in the whole time —
@@ -64,9 +67,15 @@ the codebase and are the remaining gates to submission.
       the live closed test from serving real ads — do NOT re-flip it until the
       production cut. Only `__DEV__` or this flag forces test ads, so a `false`
       value means EVERY release/testing build serves live ads.)*
+      *(EAS Updates warning: the flag is read at RUNTIME from the manifest and
+      rides EAS Updates. Closed-test and production builds are both built on
+      the shared `production` channel with `runtimeVersion` policy
+      `appVersion`, so the flip commit MUST also bump `expo.version` (creating
+      a distinct runtime) — otherwise an `eas update` published after the flip
+      serves LIVE ads to testers' existing builds, and an update published
+      from a pre-flip commit reverts the production build to test ads.)*
 - [ ] **Bump `android.versionCode`** in `mobile/app.json` for the next release
-      (currently **47**, `version` **1.5.0**; the revenue pass rode on top of the
-      2026-07-13 playtest/trial-ladder builds. autoIncrement is intentionally
+      (currently **88**, `version` **1.2.2**. autoIncrement is intentionally
       off — bump manually every time).
 - [x] **Billing category fix + boot entitlement restore** — DONE (2026-07-10):
       RevenueCat `getProducts` now passes the NON_SUBSCRIPTION category
@@ -86,7 +95,10 @@ the codebase and are the remaining gates to submission.
       deprecated top-level `splash` / `newArchEnabled` keys removed.
 - [x] **Store-listing counts corrected** — DONE (2026-07-10):
       `docs/STORE_LISTING.md` now reads thirteen animal friends / 51
-      achievements (description + release-notes template).
+      achievements (description + release-notes template). (Went stale again —
+      the app now ships **56** achievements; `docs/STORE_LISTING.md` was
+      re-corrected to 56 on 2026-08-31, so push the refreshed copy to the live
+      Play listing with the next store update.)
 - [x] **Press kit created** — DONE (2026-07-10): `docs/PRESS_KIT.md` + the
       `wordshift://creator?code=&era=` fast-forward deep link (era snapshots
       for reviewers; inert without `creatorCode`).
@@ -130,13 +142,13 @@ the codebase and are the remaining gates to submission.
 - [x] **Data safety + App content declarations** — DONE (2026-07-02): data
       safety, Advertising ID, privacy policy, ads declaration, content rating,
       target audience actioned in Play Console → App content.
-- [x] First manual Play upload already happened (v12 era; versionCode now 43);
+- [x] First manual Play upload already happened (v12 era; versionCode now 88);
       `eas submit -p android` works from here (service account wired).
 
 ## iOS (separate track — blocked until the values below exist)
 
 All of these come from consoles only the account owner can access. Once the
-four starred values are handed over, wiring them into the repo is a
+five starred values are handed over, wiring them into the repo is a
 five-minute code change and iOS becomes buildable.
 
 - [ ] **Apple Developer Program** membership active; app created in
@@ -150,6 +162,8 @@ five-minute code change and iOS becomes buildable.
       SDK without this crashes at launch).
 - [ ] ★ **AdMob iOS interstitial unit ID** → `expo.extra.admobInterstitialIdIos`.
 - [ ] ★ **AdMob iOS rewarded unit ID** → `expo.extra.admobRewardedIdIos`.
+- [ ] ★ **AdMob iOS banner unit ID** → `expo.extra.admobBannerIdIos` (blank
+      today, so banners stay inert on iOS).
 - [ ] **AdMob GDPR message for iOS** — add the iOS app to the published
       European-regulations message (or create a second message); the Android
       one only covers the Android app entry.
