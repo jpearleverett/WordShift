@@ -22,7 +22,7 @@ import {
   RESONANT_BOARD_CAP_AMBER,
 } from '../constants/gameBalance';
 import { CHALLENGE_MODE_CONFIG, DialoguePhase } from '../types/homeWorld';
-import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getOutOfHintsMessage, getLoadingMessage, getStartMessage, getInvalidWordMessage, getBlockedWordMessage, getBlindFailMessage, getLockedLetterMessage, getEchoPuzzleMessage, getFinalBoardStartMessage, getFinalBoardUndoRefusal, getResonantMoveMessage, getUnbrokenWeaveSpentLetterMessage, getUnbrokenWeaveUnavailableMessage, getUnbrokenWeaveUnavailableTitle } from '../services/phaseNarrative';
+import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getOutOfHintsMessage, getLoadingMessage, getStartMessage, getInvalidWordMessage, getBlockedWordMessage, getBlindFailMessage, getLockedLetterMessage, getEchoPuzzleMessage, getFinalBoardStartMessage, getFinalBoardUndoRefusal, getFinalBoardMoveMessage, getResonantMoveMessage, getUnbrokenWeaveSpentLetterMessage, getUnbrokenWeaveUnavailableMessage, getUnbrokenWeaveUnavailableTitle } from '../services/phaseNarrative';
 import { showGameAlert } from '../services/gameAlert';
 import { getHintBalanceSync, hasHintSync, consumeHintSync } from '../services/hints';
 import { getPreferredPuzzleVariant, setPreferredPuzzleVariant, getFullProgress, getRitualWords } from '../services/amberCurrency';
@@ -2396,8 +2396,15 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     // A resonant choice REPLACES the normal move message for that commit only —
     // the line IS the acknowledgment (never stacked with the pool draw). The
     // streak/combo bookkeeping inside moveMessageFor still runs identically.
+    // The FINAL board overrides both: the last arrangement speaks in its own
+    // hushed voice, with no combo escalation and no resonance line (resonance
+    // never fires on the finale anyway, but the guard keeps the voice single).
     const applyMoveMessage = (stuck: boolean) => {
       const normal = moveMessageFor(stuck);
+      if (isFinalBoardRef.current) {
+        setMessage(getFinalBoardMoveMessage(currentPhase));
+        return;
+      }
       setMessage(resonantMove ? getResonantMoveMessage(currentPhase) : normal);
     };
 

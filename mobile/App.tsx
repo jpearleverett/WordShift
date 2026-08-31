@@ -78,6 +78,7 @@ import {
   isFinaleArmed,
   consumeVariantNudge,
   getFullProgress,
+  getRitualWords,
   consumeCycleOpening,
 } from './src/services/amberCurrency';
 import { claimDailyLoginReward, DailyLoginGrant } from './src/services/dailyLoginReward';
@@ -103,6 +104,7 @@ import { standardLetterCenterOffset } from './src/constants/tileLayout';
 import { shouldSimplifyAnimations } from './src/services/deviceTier';
 import { announceForA11y } from './src/services/a11yAnnounce';
 import { initAudio, setAudioPhase, startMusicForScreen, type MusicScreen, soundVictory, soundPerfect, soundValidMove, soundMidpointTurn, soundInvalidMove, soundUndo, soundHint, soundTap, soundUiTap, soundSelection, soundLetterSelect, soundDailyReady } from './src/services/audio';
+import { stopCeremonyMusic } from './src/services/uiSound';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess, hapticWarning, hapticError, hapticSelection } from './src/services/haptics';
 import { getVariantTutorialIntroLines } from './src/services/animalDialogue';
@@ -162,7 +164,7 @@ import {
   UnbrokenWeaveMastery,
 } from './src/services/masteryRecords';
 import { maybePromptReview } from './src/services/reviewPrompt';
-import { getPhaseTransitionEvent, PhaseTransitionEvent, HOUSE_COMPLETION_EVENT, FINAL_PUZZLE_EVENT, POST_REVELATION_EVENT } from './src/services/phaseEvents';
+import { getPhaseTransitionEvent, PhaseTransitionEvent, HOUSE_COMPLETION_EVENT, FINAL_PUZZLE_EVENT, buildFinalPuzzleEvent, POST_REVELATION_EVENT } from './src/services/phaseEvents';
 import { generateDailyPuzzle, prewarmDailyPuzzle, isDailyChallengeUnlocked, recordDailyCompletion, getDailyStatus, checkDailyStreakMilestone, grantFirstDailyMercy, getDailyHostName, getDailyDifficulty } from './src/services/dailyChallenge';
 import { recordDailyLadderResult, getDailyLadderSummary, shouldShowTrend } from './src/services/dailyLadder';
 import { startFrameMonitoring, stopFrameMonitoring } from './src/services/performanceMonitor';
@@ -1071,16 +1073,35 @@ function MainApp() {
   const musicScreenRef = useRef(musicScreen);
   musicScreenRef.current = musicScreen;
   const musicHydratedRef = useRef(false);
+  // Hushed-win silence: set at the victory commit for the scripted silent
+  // victory and the finale win, cleared on the victory-exit paths (see
+  // startVictoryExitFlow). A ref, not state — the music effect re-runs on the
+  // win's own cumulativeStats change and must read the CURRENT hush.
+  const victoryMusicHushRef = useRef(false);
+  const puzzleIsFinalRef = useRef(false);
+  puzzleIsFinalRef.current = puzzle.isFinalBoard;
   useEffect(() => {
     if (persistence.cumulativeStats === null) return;
     musicHydratedRef.current = true;
     if (phaseTransitionEvent !== null) return;
+    // The last arrangement is played in true silence: after 100+ solves of
+    // continuous beds, the one board with no music says "this is different"
+    // before a single tile moves. The hush ref extends the same silence
+    // through the scripted silent-victory beat ("No music this time. Only
+    // the quiet after." must not be a lie).
+    if (musicScreen === 'puzzle' && (puzzle.isFinalBoard || victoryMusicHushRef.current)) {
+      stopCeremonyMusic();
+      return;
+    }
     startMusicForScreen(musicScreen, persistence.currentPhase).catch(() => {});
-  }, [persistence.cumulativeStats, persistence.currentPhase, phaseTransitionEvent, musicScreen]);
+  }, [persistence.cumulativeStats, persistence.currentPhase, phaseTransitionEvent, musicScreen, puzzle.isFinalBoard]);
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state !== 'active') return;
       if (!musicHydratedRef.current) return;
+      // Never resume the bed over an authored silence (finale / hushed win).
+      if (victoryMusicHushRef.current) return;
+      if (musicScreenRef.current === 'puzzle' && puzzleIsFinalRef.current) return;
       startMusicForScreen(musicScreenRef.current, musicPhaseRef.current).catch(() => {});
     });
     return () => subscription.remove();
@@ -1582,6 +1603,19 @@ function MainApp() {
     puzzleActions.setShowConfetti(false);
     victoryActions.resetVictory();
     orchestrationActions.resetOrchestration();
+    // A hushed win's authored silence ends at the exit: clear the hush and
+    // resume the bed explicitly (Next Level changes no music-effect dep, so
+    // the effect alone would leave the world silent). Skip the resume when an
+    // endgame cinematic is about to play — the effect restarts the bed when
+    // the overlay clears.
+    if (victoryMusicHushRef.current) {
+      victoryMusicHushRef.current = false;
+      // On the finale itself, wait for the board to clear instead (the music
+      // effect restarts the bed when isFinalBoard flips / the screen changes).
+      if (!pendingEndgame && musicHydratedRef.current && !puzzleIsFinalRef.current) {
+        startMusicForScreen(musicScreenRef.current, musicPhaseRef.current).catch(() => {});
+      }
+    }
 
     if (queuedPostVictoryIntrosRef.current.length > 0) {
       pendingPostVictoryActionRef.current = action;
@@ -2655,6 +2689,14 @@ function MainApp() {
       // beats (the final board and the scripted silent victory) are hushed so
       // the phone never celebrates while the screen performs silence.
       const victoryHushed = wasFinalBoard || isSilentVictoryBeat(completedTotal);
+      // The hushed wins are ACTUALLY silent: fade the ambient bed out too
+      // (the silent-victory line "No music this time" was a lie while the bed
+      // looped on). The hush holds until a victory-exit path clears it; the
+      // music effect and the foreground-resume listener both honor the ref.
+      if (victoryHushed) {
+        victoryMusicHushRef.current = true;
+        stopCeremonyMusic();
+      }
       victoryActions.playVictorySequence(victory.earnedStars, persistence.currentPhase, victoryHushed);
 
       // Phase transitions are now DEFERRED to the Offering Pit.
@@ -2711,7 +2753,16 @@ function MainApp() {
                         : 'You completed the house and reached the final path.')
                     : 'The rooms are not all standing, and it did not need them. It only ever needed the words.',
                 });
-                queueEndgameCinematic(FINAL_PUZZLE_EVENT);
+                // The Arrival names the player's own deepest words (the
+                // evidence was their hands). Falls back to the generic
+                // event when the ritual memory holds too few dread words.
+                let arrivalEvent = FINAL_PUZZLE_EVENT;
+                try {
+                  arrivalEvent = buildFinalPuzzleEvent(await getRitualWords());
+                } catch {
+                  arrivalEvent = FINAL_PUZZLE_EVENT;
+                }
+                queueEndgameCinematic(arrivalEvent);
               } else if (!(await isFinaleArmed())) {
                 // Dwell gate: the finale used to fire on the FIRST Phase-4
                 // victory, so the whole cult-reveal era flashed past in one
@@ -2770,7 +2821,9 @@ function MainApp() {
         }
       }
 
-      // Post-victory orchestration: glitch, micro-beat, whisper, interjection
+      // Post-victory orchestration: glitch, micro-beat, whisper, interjection.
+      // isFinalBoard suppresses the whisper/interjection rolls entirely so the
+      // finale win carries one voice: the silence, then the Arrival.
       orchestrationActions.processVictory({
         phase: persistence.currentPhase,
         totalPuzzlesCompleted: finalVictory.cumulativeStats?.totalPuzzlesCompleted ?? 1,
@@ -2779,6 +2832,7 @@ function MainApp() {
         puzzlesSinceHomeVisit: puzzlesSinceHomeVisit.current,
         firstFreeWin,
         dwellLine: dwellLineForWin,
+        isFinalBoard: wasFinalBoard,
       });
 
       // Re-schedule notifications after puzzle completion

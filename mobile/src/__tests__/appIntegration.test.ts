@@ -359,8 +359,37 @@ describe('ambient music wiring', () => {
     expect(APP_TSX).toMatch(/startMusicForScreen\(musicScreenRef\.current, musicPhaseRef\.current\)/);
     // Backgrounding relies on expo-audio's shouldPlayInBackground:false
     // auto-pause — App must not tear the player down on every app switch
-    // (no stopMusic CALL anywhere in App; the word may appear in comments).
+    // (no bare stopMusic CALL anywhere in App; the AUTHORED silences below go
+    // through the guarded stopCeremonyMusic bridge instead).
     expect(APP_TSX).not.toMatch(/^\s*(?:await\s+)?stopMusic\(/m);
+    // The foreground-resume listener must honor the authored silences too.
+    expect(APP_TSX).toMatch(/if \(victoryMusicHushRef\.current\) return;/);
+  });
+
+  test('the finale board and the hushed wins are ACTUALLY silent', () => {
+    // The last arrangement plays with no bed: the music effect stops (via the
+    // guarded ceremony bridge) instead of starting while the final board is up.
+    expect(APP_TSX).toMatch(
+      /musicScreen === 'puzzle' && \(puzzle\.isFinalBoard \|\| victoryMusicHushRef\.current\)/
+    );
+    // The hush is set exactly at the hushed-victory commit...
+    expect(APP_TSX).toMatch(
+      /if \(victoryHushed\) \{\s*\n\s*victoryMusicHushRef\.current = true;\s*\n\s*stopCeremonyMusic\(\);/
+    );
+    // ...and cleared (with an explicit resume) on the victory-exit path, so
+    // Next Level after the silent-victory beat never strands a silent world.
+    expect(APP_TSX).toMatch(/victoryMusicHushRef\.current = false;/);
+  });
+});
+
+describe('finale orchestration wiring', () => {
+  test('processVictory receives isFinalBoard so whisper/interjection stay off the Arrival', () => {
+    expect(APP_TSX).toMatch(/isFinalBoard: wasFinalBoard,/);
+  });
+
+  test('the Arrival is personalized from the ritual memory with a generic fallback', () => {
+    expect(APP_TSX).toMatch(/buildFinalPuzzleEvent\(await getRitualWords\(\)\)/);
+    expect(APP_TSX).toMatch(/queueEndgameCinematic\(arrivalEvent\)/);
   });
 });
 
@@ -496,7 +525,7 @@ describe('proactive share prompt', () => {
   test('the prominent opening glitch fires on the first FREE win, not the tutorial', () => {
     expect(APP_TSX).toMatch(/firstFreeWin = !\(await hasSeenFirstWinGlitch\(\)\)/);
     // firstFreeWin (and the dwell-window voice line) thread into processVictory.
-    expect(APP_TSX).toMatch(/firstFreeWin,\s*\n\s*dwellLine: dwellLineForWin,\s*\n\s*\}\);/);
+    expect(APP_TSX).toMatch(/firstFreeWin,\s*\n\s*dwellLine: dwellLineForWin,\s*\n\s*isFinalBoard: wasFinalBoard,\s*\n\s*\}\);/);
   });
 });
 
@@ -515,7 +544,7 @@ describe('finale staging (armed, not retroactive)', () => {
     // The finale event is queued via queueEndgameCinematic, which both schedules
     // the 1.5s beat AND records the event so a victory exit in the window can
     // rescue it instead of clearVictoryTimeouts dropping the climax forever.
-    expect(APP_TSX).toMatch(/queueEndgameCinematic\(FINAL_PUZZLE_EVENT\)/);
+    expect(APP_TSX).toMatch(/queueEndgameCinematic\(arrivalEvent\)/);
     expect(APP_TSX).toMatch(/pendingEndgameEventRef\.current = event;[\s\S]{0,200}?setPhaseTransitionEvent\(event\)/);
   });
 

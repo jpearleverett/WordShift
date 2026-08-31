@@ -67,10 +67,12 @@ import {
   getEventDuration,
   HOUSE_COMPLETION_EVENT,
   FINAL_PUZZLE_EVENT,
+  buildFinalPuzzleEvent,
   POST_REVELATION_EVENT,
   NEW_CYCLE_EVENT,
   PhaseTransitionEvent,
 } from '../services/phaseEvents';
+import { getWordPhaseTier } from '../services/localGenerator';
 import { DialoguePhase } from '../types/homeWorld';
 import { PhaseTransitionOverlay } from '../components/PhaseTransitionOverlay';
 
@@ -181,6 +183,43 @@ describe('FINAL_PUZZLE_EVENT — the in-engine arrival', () => {
     const shippedMs = getEventDuration(FINAL_PUZZLE_EVENT) * 1.25;
     expect(shippedMs).toBeGreaterThanOrEqual(27000);
     expect(shippedMs).toBeLessThanOrEqual(35000);
+  });
+
+  test('a held breath precedes the descent: the scene before it carries no image', () => {
+    const idx = FINAL_PUZZLE_EVENT.scenes.findIndex(s => s.effect === 'descend');
+    expect(idx).toBeGreaterThan(0);
+    expect(FINAL_PUZZLE_EVENT.scenes[idx - 1].image).toBeUndefined();
+  });
+});
+
+describe('buildFinalPuzzleEvent — the personalized Arrival', () => {
+  test('names the player deepest ritual words in the incantation scene', () => {
+    const dread = ['void', 'tomb', 'grave'].filter(
+      w => getWordPhaseTier(w.toUpperCase()) >= 2
+    );
+    expect(dread.length).toBeGreaterThanOrEqual(2); // sanity: real dread words
+    const event = buildFinalPuzzleEvent(['apple', ...dread, 'sunny']);
+    expect(event).not.toBe(FINAL_PUZZLE_EVENT);
+    const line = event.scenes[1].text;
+    for (const w of dread) expect(line).toContain(w.toUpperCase());
+    expect(line).toContain('incantation');
+    expect(line).not.toMatch(/[–—]/);
+    // Only the incantation scene changes; the descend choreography and scene
+    // count are untouched.
+    expect(event.scenes.filter(s => s.effect === 'descend')).toHaveLength(1);
+    expect(event.scenes.length).toBe(FINAL_PUZZLE_EVENT.scenes.length);
+  });
+
+  test('falls back to the generic event when fewer than two dread words exist', () => {
+    expect(buildFinalPuzzleEvent([])).toBe(FINAL_PUZZLE_EVENT);
+    expect(buildFinalPuzzleEvent(['SUNNY', 'HAPPY'])).toBe(FINAL_PUZZLE_EVENT);
+    expect(buildFinalPuzzleEvent(['VOID'])).toBe(FINAL_PUZZLE_EVENT);
+  });
+
+  test('never mutates the shared FINAL_PUZZLE_EVENT constant', () => {
+    const before = FINAL_PUZZLE_EVENT.scenes[1].text;
+    buildFinalPuzzleEvent(['VOID', 'TOMB', 'GRAVE', 'ABYSS']);
+    expect(FINAL_PUZZLE_EVENT.scenes[1].text).toBe(before);
   });
 });
 

@@ -1,4 +1,5 @@
 import { DialoguePhase } from '../types/homeWorld';
+import { getWordPhaseTier } from './localGenerator';
 
 /**
  * Phase transition narrative events.
@@ -275,7 +276,10 @@ export const HOUSE_COMPLETION_EVENT: PhaseTransitionEvent = {
       duration: 3000,
     },
     {
-      text: 'Every room. Every keeper.\nEach in their place.',
+      // The roll-call: first recruit and last recruit by name. Both are
+      // guaranteed unlocked here (the ceremony requires the full house, and
+      // unlock order is fixed: Ember first, Moss last).
+      text: 'Ember lit the first hearth. Moss answered from the roof.\nEleven keepers found their rooms between them.',
       delay: 3200,
       duration: 3500,
     },
@@ -285,7 +289,9 @@ export const HOUSE_COMPLETION_EVENT: PhaseTransitionEvent = {
       duration: 3500,
     },
     {
-      text: 'Every room is a chamber.\nEvery animal is a keeper.',
+      // The oldest planted seed pays off: Ember's onboarding wrong-note
+      // ("hoping for someone like you") is revealed as recruitment.
+      text: 'On your first day, Ember said she had hoped for someone like you.\nShe was not hoping only for herself.',
       delay: 10600,
       duration: 3500,
     },
@@ -337,13 +343,20 @@ export const FINAL_PUZZLE_EVENT: PhaseTransitionEvent = {
       duration: 4000,
     },
     {
+      // A held breath before the descent: near-empty dark, no image, so the
+      // entity arrives out of real stillness rather than mid-paragraph.
+      text: 'The house holds its breath.',
+      delay: 12100,
+      duration: 2000,
+    },
+    {
       // The arrival, in engine: the entity itself descends behind the text —
       // slow translateY down + opacity-in (static fade under reduced motion).
       text: 'Something descends from above the attic.\nSomething that has no name.',
       image: 'shadow_figure',
       imageOpacity: 0.7,
       effect: 'descend',
-      delay: 12100,
+      delay: 14300,
       duration: 5000,
     },
     {
@@ -352,18 +365,48 @@ export const FINAL_PUZZLE_EVENT: PhaseTransitionEvent = {
       text: 'It was always coming.\nYou just gave it the words.',
       image: 'shadow_figure',
       imageOpacity: 0.7,
-      delay: 17300,
+      delay: 19500,
       duration: 4000,
     },
     {
       text: 'The arrangement is complete.',
       image: 'shadow_figure',
       imageOpacity: 0.45,
-      delay: 21500,
+      delay: 23700,
       duration: 3000,
     },
   ],
 };
+
+/**
+ * The Arrival, personalized: rewrite the incantation scene to name the
+ * player's own deepest ritual words — the reveal that the evidence was their
+ * hands. Ranks the ritual memory by dread tier (deepest first, most recent
+ * first within a tier), keeps the distinct top three at tier 2+, and falls
+ * back to the generic FINAL_PUZZLE_EVENT when fewer than two qualify. Pure:
+ * the caller fetches the ritual words.
+ */
+export function buildFinalPuzzleEvent(ritualWords: string[]): PhaseTransitionEvent {
+  const seen = new Set<string>();
+  const ranked: { word: string; tier: number }[] = [];
+  for (let i = ritualWords.length - 1; i >= 0; i--) {
+    const word = (ritualWords[i] || '').toUpperCase().trim();
+    if (!word || seen.has(word)) continue;
+    seen.add(word);
+    const tier = getWordPhaseTier(word);
+    if (tier >= 2) ranked.push({ word, tier });
+  }
+  // Stable sort: within a tier the most recently formed word leads.
+  ranked.sort((a, b) => b.tier - a.tier);
+  const top = ranked.slice(0, 3).map(r => r.word);
+  if (top.length < 2) return FINAL_PUZZLE_EVENT;
+  const scenes = FINAL_PUZZLE_EVENT.scenes.map(scene => ({ ...scene }));
+  scenes[1] = {
+    ...scenes[1],
+    text: `${top.join('. ')}.\nEvery one an incantation. Every puzzle a verse.`,
+  };
+  return { ...FINAL_PUZZLE_EVENT, scenes };
+}
 
 // ============================================================================
 // POST-REVELATION EVENT

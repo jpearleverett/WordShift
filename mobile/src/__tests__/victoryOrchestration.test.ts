@@ -72,7 +72,7 @@ describe('whisper roll placement', () => {
   test('the roll happens BEFORE generation, so a skipped win also skips the gallery record', () => {
     // The whole whisper block — including recordWhisper — must sit behind the
     // single gate; a whisper the player never saw must not fill the archive.
-    expect(HOOK_SRC).toMatch(/!onboarding && Math\.random\(\) < getWhisperChance\(phase\)/);
+    expect(HOOK_SRC).toMatch(/!onboarding && !suppressCeremonyCues && Math\.random\(\) < getWhisperChance\(phase\)/);
     const gateIdx = HOOK_SRC.indexOf('Math.random() < getWhisperChance(phase)');
     const recordIdx = HOOK_SRC.indexOf('recordWhisper({');
     expect(gateIdx).toBeGreaterThan(-1);
@@ -80,6 +80,6 @@ describe('whisper roll placement', () => {
   });
 
   test('onboarding wins still never whisper', () => {
-    expect(HOOK_SRC).toContain('!onboarding && Math.random()');
+    expect(HOOK_SRC).toContain('!onboarding && !suppressCeremonyCues && Math.random()');
   });
 });

@@ -2481,6 +2481,25 @@ export function getFinalBoardUndoRefusal(phase: number): string {
   return 'Not this one. What is given now is given for good.';
 }
 
+// The last arrangement speaks in its own hushed voice: no combo escalation,
+// no arcade energy — every committed word lands the same quiet way. Drawn
+// once per commit; replaces the normal move-message pools entirely on the
+// finale board (see usePuzzleGame applyMoveMessage).
+const FINAL_BOARD_MOVE_MESSAGES = [
+  'Placed. Kept.',
+  'It hears this one.',
+  'The word settles where it was always going.',
+  'One more, and the house leans closer.',
+  'Set down gently. Held completely.',
+  'The letters know their places now.',
+];
+
+export function getFinalBoardMoveMessage(_phase: number): string {
+  return FINAL_BOARD_MOVE_MESSAGES[
+    Math.floor(Math.random() * FINAL_BOARD_MOVE_MESSAGES.length)
+  ];
+}
+
 // ============================================================================
 // NEW CYCLE MICRO-BEATS — quiet half-memories for a second descent. Keyed by
 // CYCLE-RELATIVE puzzle count (puzzles solved since the cycle began). The
