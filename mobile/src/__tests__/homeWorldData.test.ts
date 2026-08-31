@@ -19,6 +19,7 @@ import {
   getSkipGateText,
   canSpeedUpReservedUnlock,
   skipReservedUnlock,
+  isDescentTrioRoomUnlock,
   getReservedSkipCost,
 } from '../services/homeWorldData';
 import { clearProgress, loadProgress, devAddAmber, getReservedUnlockId } from '../services/amberCurrency';
@@ -655,6 +656,54 @@ describe('skip the wait (pay premium, unlock now)', () => {
 
   test('getSkipGateText names the premium cost', () => {
     expect(getSkipGateText(300)).toBe('Skip the wait now for 300 amber');
+  });
+
+  // NARRATIVE GUARD: the descent-trio rooms (the ones admitting the
+  // LATE_PHASE_RECRUITS animals) may never be skip-purchased before global
+  // Phase 3 — organically their 84/88/92 solve gates imply Phase 3+, but a
+  // paid skip bypasses the solve gate and amber is purchasable, so an
+  // unguarded skip was a cash -> amber -> early-trio "story for sale" leak
+  // (and could fire the house-completion ceremony in the bright phases).
+  describe('descent-trio phase guard', () => {
+    test('isDescentTrioRoomUnlock derives exactly the three trio rooms from the data', () => {
+      const trio = UNLOCK_PROGRESSION.filter(isDescentTrioRoomUnlock).map(u => u.id);
+      expect(trio).toEqual(['unlock_star_loft', 'unlock_belfry', 'unlock_sky_garden']);
+    });
+
+    test('canSkipUnlockGate refuses a trio room below Phase 3 and allows it at Phase 3', async () => {
+      // Prerequisite purchases must clear their own gates (jungle 19 ... bamboo 74),
+      // while star_loft's 84 gate stays unmet — 80 solves threads that needle.
+      (await loadProgress()).puzzlesSolved = 80;
+      await unlockUpTo('unlock_star_loft');
+      const p = await loadProgress();
+      p.currentPhase = 2;
+      expect(await canSkipUnlockGate('unlock_star_loft')).toBe(false);
+      p.currentPhase = 3;
+      expect(await canSkipUnlockGate('unlock_star_loft')).toBe(true);
+    });
+
+    test('a reserved trio room cannot be sped past its gate below Phase 3 (reservation intact)', async () => {
+      (await loadProgress()).puzzlesSolved = 80;
+      await unlockUpTo('unlock_star_loft');
+      let p = await loadProgress();
+      p.currentPhase = 2;
+      await reserveNextUnlock('unlock_star_loft');
+      expect(await canSpeedUpReservedUnlock('unlock_star_loft')).toBe(false);
+      const res = await skipReservedUnlock('unlock_star_loft');
+      expect(res.success).toBe(false);
+      p = await loadProgress();
+      expect(p.reservedUnlockId).toBe('unlock_star_loft'); // still reserved, nothing lost
+      expect(p.unlockedRooms).not.toContain('star_loft');
+      p.currentPhase = 3;
+      expect(await canSpeedUpReservedUnlock('unlock_star_loft')).toBe(true);
+    });
+
+    test('non-trio gated rooms are untouched by the guard (jungle skips at Phase 0)', async () => {
+      await unlockUpTo('unlock_jungle');
+      // jungle's own prerequisites are ungated, so no solves are needed here
+      expect((await loadProgress()).currentPhase).toBeLessThan(3);
+      expect(await canSkipUnlockGate('unlock_jungle')).toBe(true);
+    });
   });
 });
 
