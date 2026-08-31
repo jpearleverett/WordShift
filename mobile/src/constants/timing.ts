@@ -104,6 +104,18 @@ export const INTER_SLOT_PULSE_OUT_MS = 140;
 // validity-filtered (hover must not become a second snapping tell).
 export const DRAG_HOVER_SCALE = 1.1;
 
+/**
+ * Cross-row tile flight (the "flying ghost", audit F1): a tap-committed move
+ * flies a ghost copy of the moved tile from the source tile's position into
+ * the landing slot, handing over to the arriving tile's settle spring as it
+ * lands. Short on purpose — the flight overlaps the settle (which starts at
+ * scale 0.65), so the ghost reads as BECOMING the tile, never as a second
+ * tile chasing it.
+ */
+export const TILE_FLIGHT_MS = 260;
+/** Slight upward bow on the flight path so the move reads as a throw. */
+export const TILE_FLIGHT_LIFT_DP = 10;
+
 // === ONE-TIME POINTERS ===
 // Delay before the one-time Swift Victories pointer toast lands after a
 // routine-victory exit (long enough for the next board's start message to

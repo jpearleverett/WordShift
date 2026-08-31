@@ -108,7 +108,10 @@ line** (proves the locked-down Supabase RPCs end-to-end).
       live browser playthrough of a creator-kit era save (graduation unfired + finale armed popped
       the blocking "Your Hands Know" card over the last arrangement). The gate now skips
       `isFinalBoard` without consuming the beat; pinned in `appIntegration.test.ts`.
-- [ ] **Cross-row "flying ghost" move animation** (design audit Top-10 #9) — the most-performed
+- [x] **Cross-row "flying ghost" move animation — DONE (2026-08-31)**: tap commits fly a ghost
+      tile from the source position into the landing slot (window-coord overlay, analytic X +
+      measured row Y, native driver), handing over to the arrival settle. Verified live on web.
+      Previously (design audit Top-10 #9) — the most-performed
       interaction still commits as a state swap + local settle; the tile never visibly travels.
       Real animation-architecture change (needs measured source-tile position through
       `usePuzzleGame`); deliberately held, but it is the biggest remaining feel item.

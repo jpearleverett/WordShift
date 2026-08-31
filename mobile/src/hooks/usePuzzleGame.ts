@@ -471,6 +471,21 @@ export interface ArrivalMark {
   direction: 'down' | 'up';
   /** Monotonic per-board id so consumers can detect a fresh arrival. */
   moveId: number;
+  /**
+   * Cross-row flight endpoints (the "flying ghost", audit F1) — OPTIONAL and
+   * present only on full tap-committed moves. App combines these with the
+   * measured row nodes + the analytic letter-center offsets (tileLayout) to
+   * fly a ghost tile from the source tile's position into the landing slot.
+   * Absent on drag (its floating tile IS the travel), double-shift drop1
+   * half-moves, undo takebacks, and autosave restores — no flight there.
+   */
+  flightChar?: string;
+  sourceRowIndex?: number;
+  sourceLetterIndex?: number;
+  /** Source word length BEFORE the letter left it. */
+  sourceWordLength?: number;
+  /** Target word length AFTER the letter landed (the letter's index is slotIndex). */
+  targetWordLength?: number;
 }
 
 export interface PuzzleGameState {
@@ -2300,6 +2315,15 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         letterId: selectedLetter.id,
         direction: moveDirection,
         moveId: ++arrivalMoveIdRef.current,
+        // Flight endpoints for the cross-row ghost (audit F1): the source
+        // geometry is pre-commit (index in the word the letter LEFT), the
+        // target geometry post-commit (the letter's index in the grown word
+        // is the insert slot index). App resolves these to window coords.
+        flightChar: selectedLetter.char,
+        sourceRowIndex: activeRowIndex,
+        sourceLetterIndex,
+        sourceWordLength: sourceRow.words.length,
+        targetWordLength: newTargetLetters.length,
       });
     } else {
       setLastArrival(null);

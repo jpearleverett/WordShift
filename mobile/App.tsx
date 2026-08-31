@@ -98,6 +98,9 @@ import { initShareImage } from './src/services/shareImage';
 import { ShareResultModal } from './src/components/share/ShareResultModal';
 import { getLocalDateString } from './src/services/dateUtils';
 import { getSettingsSync, getSettings } from './src/services/settings';
+import { FlyingTileGhost, TileFlight } from './src/components/puzzle/FlyingTileGhost';
+import { standardLetterCenterOffset } from './src/constants/tileLayout';
+import { shouldSimplifyAnimations } from './src/services/deviceTier';
 import { announceForA11y } from './src/services/a11yAnnounce';
 import { initAudio, setAudioPhase, startMusicForScreen, type MusicScreen, soundVictory, soundPerfect, soundValidMove, soundMidpointTurn, soundInvalidMove, soundUndo, soundHint, soundTap, soundUiTap, soundSelection, soundLetterSelect, soundDailyReady } from './src/services/audio';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -432,6 +435,9 @@ function MainApp() {
   // StarBurst effect state for valid moves. comboTier drives the burst's
   // size/count escalation (Confetti.StarBurst) so a rising clean-move streak
   // visibly grows the celebration instead of firing an identical 8-square pop.
+  // Cross-row flying ghost (audit F1): resolved endpoints for the tap-commit
+  // tile flight. Set by the lastArrival effect below; cleared when it lands.
+  const [tileFlight, setTileFlight] = useState<TileFlight | null>(null);
   const [starBurst, setStarBurst] = useState<{ active: boolean; x: number; y: number; comboTier: number }>({
     active: false, x: 0, y: 0, comboTier: 0,
   });
@@ -3003,6 +3009,54 @@ function MainApp() {
     else rowNodeRefs.current.delete(rowIndex);
   }, []);
 
+  // Cross-row flying ghost (audit F1): when a tap-committed arrival carries
+  // flight endpoints, resolve them to window coordinates — X analytically
+  // (standardLetterCenterOffset in unscaled board units x boardScale around
+  // the window centerline, the estimateSlotIndex precedent), Y from the
+  // registered row nodes. Rows keep their positions across a commit (only
+  // their tiles change), so measuring after the commit is race-free. The
+  // ghost overlaps the arriving tile's settle (which starts at scale 0.65)
+  // and hands over as it lands. Reduced-motion / low-tier devices skip the
+  // flight entirely — the settle is already their feedback.
+  useEffect(() => {
+    const a = puzzle.lastArrival;
+    if (
+      !a || a.flightChar === undefined || a.sourceRowIndex === undefined ||
+      a.sourceLetterIndex === undefined || a.sourceWordLength === undefined ||
+      a.targetWordLength === undefined
+    ) return;
+    if (getSettingsSync().reducedMotion || shouldSimplifyAnimations()) return;
+    const srcNode = rowNodeRefs.current.get(a.sourceRowIndex);
+    const dstNode = rowNodeRefs.current.get(a.rowIndex);
+    if (!srcNode?.measureInWindow || !dstNode?.measureInWindow) return;
+    const scale = boardScaleRef.current || 1;
+    const centerX = boardWindowWidth / 2;
+    const fromX = centerX + standardLetterCenterOffset(a.sourceLetterIndex, a.sourceWordLength, a.sourceWordLength >= 6) * scale;
+    const toX = centerX + standardLetterCenterOffset(a.slotIndex, a.targetWordLength, a.targetWordLength >= 6) * scale;
+    const moveId = a.moveId;
+    const flightChar = a.flightChar;
+    const compact = a.targetWordLength >= 6;
+    srcNode.measureInWindow((_sx: number, sy: number, _sw: number, sh: number) => {
+      dstNode.measureInWindow((_dx: number, dy: number, _dw: number, dh: number) => {
+        if (!sh || !dh) return;
+        setTileFlight({
+          id: moveId,
+          char: flightChar,
+          fromX,
+          fromY: sy + sh / 2,
+          toX,
+          toY: dy + dh / 2,
+          compact,
+          phase: persistence.currentPhase,
+        });
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the arrival; scale/width/phase read at fire time
+  }, [puzzle.lastArrival]);
+  const handleFlightDone = useCallback((id: number) => {
+    setTileFlight(prev => (prev && prev.id === id ? null : prev));
+  }, []);
+
   // Disable puzzle ScrollView during drag to prevent scroll-vs-drag conflict.
   // Toggled by DraggableTile via onDragActiveChange callback. Drag start also
   // measures the target row's window bounds ONCE (cheap, async) so the
@@ -4392,6 +4446,7 @@ function MainApp() {
 
         {/* Star burst effect on valid moves */}
         <StarBurst active={starBurst.active} x={starBurst.x} y={starBurst.y} phase={persistence.currentPhase} comboTier={starBurst.comboTier} />
+        <FlyingTileGhost flight={tileFlight} onDone={handleFlightDone} />
 
         {/* Phase change dramatic flash overlay */}
         <Animated.View
