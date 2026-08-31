@@ -3106,6 +3106,12 @@ function MainApp() {
     if (puzzle.gameState !== GameState.PLAYING) return;
     if (puzzle.previewGradingMode !== 'neutral' || puzzle.blindMode) return;
     if (onboardingFlow.isOnboarding) return;
+    // Never on THE final board: a save where graduation hasn't fired before the
+    // finale arms (creator-kit era snapshots; any restore skipping 13-115) would
+    // otherwise pop this card over the last arrangement — the one board no
+    // teaching beat may touch. Returning BEFORE the session latch keeps the
+    // beat alive for the next ordinary neutral board.
+    if (puzzle.isFinalBoard) return;
     if (graduationCheckedRef.current) return;
     graduationCheckedRef.current = true;
     (async () => {
@@ -3129,7 +3135,7 @@ function MainApp() {
       );
     })().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fires per fresh board; actions/phase read at fire time
-  }, [boardIdentity, puzzle.gameState, puzzle.previewGradingMode, puzzle.blindMode, onboardingFlow.isOnboarding]);
+  }, [boardIdentity, puzzle.gameState, puzzle.previewGradingMode, puzzle.blindMode, puzzle.isFinalBoard, onboardingFlow.isOnboarding]);
 
   // First-stuck mercy — the ONLY consumer of puzzle.isStuck. Stuck detection
   // stays silent by product decision (discovering a dead end and choosing

@@ -264,6 +264,11 @@ describe('verb-depth preview gate threading', () => {
     // Rescue boards start with hidden checks too, but must not consume the
     // graduation beat. Blind Offering and onboarding remain excluded.
     expect(APP_TSX).toMatch(/puzzle\.previewGradingMode !== 'neutral' \|\| puzzle\.blindMode/);
+    // Never on THE final board (a creator-kit era save can reach the finale with
+    // the beat unfired; no teaching card may cover the last arrangement), and
+    // the finale return must come BEFORE the session latch so the beat still
+    // fires on the next ordinary neutral board.
+    expect(APP_TSX).toMatch(/if \(puzzle\.isFinalBoard\) return;[\s\S]{0,200}graduationCheckedRef\.current = true;/);
   });
 
   test('Reset All re-arms the graduation beat and both files agree on the key', () => {
