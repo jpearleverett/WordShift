@@ -96,7 +96,7 @@ line** (proves the locked-down Supabase RPCs end-to-end).
       (vs ~93/457 HARD), so the marquee horror vocabulary is thinnest at the apex tier during the
       climax. Needs an offline gated-regeneration run (6-letter dread words are genuinely scarce;
       the toolkit exists).
-- [ ] **`robed_talk.png` for all 13 animals** — the design audit's remaining P1 art gap: Phase 4-5
+- [x] **`robed_talk.png` for all 13 animals — DONE (2026-08-31)**: generated procedurally (idle→talk mouth-delta transplant onto robed with local palette fitting; hand-drawn mouths for the three timid talkers; closed-mouth frames for owl/rabbit whose robed art is drawn open), wired into `CHARACTER_SPRITES` + the intro modal, pinned by tests, verified animating live. Previously the audit's remaining P1 art gap: Phase 4-5
       climax dialogue plays over a mouth-static robed portrait (a lift/scale transform ships as
       mitigation). Needs 13 commissioned 500×500 frames, framing-identical to `robed.png`.
 - [x] **"Rank 0: Unbroken Weave" leak — FIXED (2026-08-31)** (row gated on wins > 0 or

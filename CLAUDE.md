@@ -782,7 +782,7 @@ Client-side sync layer with a pluggable `CloudProvider` interface. A live Supaba
 ```
 mobile/assets/
 ├── characters/{fox,pangolin,owl,axolotl,capybara,sloth,fennec_fox,wombat,rabbit,red_panda,tarsier,aye_aye,kakapo}/
-│   └── idle.png, talk.png, robed.png (+ fox: walk_0..9.png room walk cycle)
+│   └── idle.png, talk.png, robed.png, robed_talk.png (+ fox: walk_0..9.png room walk cycle)
 ├── rooms/{cozy_den,kitchen,study,aquarium,jungle,desert,office,burrow,garden,bamboo,observatory,workshop,rainforest}.png (+ windows/ per-room window-sky masks)
 ├── world art (roof/foundation/clouds/pit_entrance/shadow_figure) rendered in HouseWorld
 └── environment/     # sky_day/afternoon/dusk/storm/shadow.png, pitt_day/afternoon/dusk/night.png

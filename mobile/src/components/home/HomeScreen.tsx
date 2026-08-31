@@ -3435,11 +3435,31 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       accessibilityLabel={`${introAnimal.name} portrait`}
                     >
                       {progress && progress.currentPhase >= 4 && CHARACTER_SPRITES[introAnimal.type]?.robed ? (
-                        <Image
-                          source={CHARACTER_SPRITES[introAnimal.type]!.robed!}
-                          style={styles.dialogueSpriteLayer}
-                          resizeMode="cover"
-                        />
+                        /* Robed + robedTalk stack, mirroring the main dialogue
+                           card: late-recruit intros land AT Phase 4, so the
+                           reveal-era intro portrait mouth-flaps too. */
+                        <>
+                          <Image
+                            source={CHARACTER_SPRITES[introAnimal.type]!.robed!}
+                            style={[
+                              styles.dialogueSpriteLayer,
+                              introIsTalking &&
+                                Boolean(CHARACTER_SPRITES[introAnimal.type]?.robedTalk) &&
+                                styles.dialogueSpriteLayerHidden,
+                            ]}
+                            resizeMode="cover"
+                          />
+                          {Boolean(CHARACTER_SPRITES[introAnimal.type]?.robedTalk) && (
+                            <Image
+                              source={CHARACTER_SPRITES[introAnimal.type]!.robedTalk!}
+                              style={[
+                                styles.dialogueSpriteLayer,
+                                !introIsTalking && styles.dialogueSpriteLayerHidden,
+                              ]}
+                              resizeMode="cover"
+                            />
+                          )}
+                        </>
                       ) : (
                         <>
                           <Image
