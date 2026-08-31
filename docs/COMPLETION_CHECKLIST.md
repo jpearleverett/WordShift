@@ -3,7 +3,9 @@
 *Compiled 2026-08-31 from a full repo audit (release config, docs, design-audit ledger, code markers,
 known gaps, store/backend readiness, content/assets, plus a clean-room CI run). Items were
 adversarially verified against the repo at HEAD (`claude/game-completion-checklist-mybsmk`,
-based on versionCode 88 / v1.2.2).*
+based on versionCode 88 / v1.2.2). Updated the same day: the code/content/docs items marked
+[x] below were closed on this branch (Stats weave-leak fix, EXPERT dread top-up 195→230,
+eight doc corrections, the finale graduation-card fix), verified by a full green suite.*
 
 ## Snapshot: where the game actually stands
 
@@ -88,17 +90,24 @@ line** (proves the locked-down Supabase RPCs end-to-end).
 - [ ] **Re-shoot all Play screenshots at ≥1080px short side.** The four titled shots in
       `mobile/assets/Play_store/` are 864×1536 (below Play's promotion-eligibility bar), and four
       AI drafts still sit in the folder. Needs on-device capture.
-- [ ] **EXPERT bank dread thinness** — only 14 of 195 EXPERT standard boards carry dread tier ≥ 3
+- [x] **EXPERT bank dread thinness — DONE (2026-08-31)**: a dread-targeted top-up run
+      (`scripts/generateExpertDreadTopUp.test.ts`) grew the bank 195 → 230 with tier ≥3 boards
+      14 → 49 (~21%, matching HARD's ratio); guards recalibrated and green. Previously: only 14 of 195 EXPERT standard boards carried dread tier ≥ 3
       (vs ~93/457 HARD), so the marquee horror vocabulary is thinnest at the apex tier during the
       climax. Needs an offline gated-regeneration run (6-letter dread words are genuinely scarce;
       the toolkit exists).
 - [ ] **`robed_talk.png` for all 13 animals** — the design audit's remaining P1 art gap: Phase 4-5
       climax dialogue plays over a mouth-static robed portrait (a lift/scale transform ships as
       mitigation). Needs 13 commissioned 500×500 frames, framing-identical to `robed.png`.
-- [ ] **"Rank 0: Unbroken Weave" leaks into the Stats MASTERY card pre-Phase-5.** Any mid-game
+- [x] **"Rank 0: Unbroken Weave" leak — FIXED (2026-08-31)** (row gated on wins > 0 or
+      phase 5; three regression tests pin it). Previously: Any mid-game
       player with a speed round / resonant choice opens the card, and the weave row renders
       unconditionally (`StatsScreen.tsx:579-590`; `getUnbrokenWeaveMastery()` always resolves),
       naming a post-revelation mode early. One-line fix: gate the row on wins > 0 or phase 5.
+- [x] **Preview-graduation card could fire ON the final board — FIXED (2026-08-31)**: found in a
+      live browser playthrough of a creator-kit era save (graduation unfired + finale armed popped
+      the blocking "Your Hands Know" card over the last arrangement). The gate now skips
+      `isFinalBoard` without consuming the beat; pinned in `appIntegration.test.ts`.
 - [ ] **Cross-row "flying ghost" move animation** (design audit Top-10 #9) — the most-performed
       interaction still commits as a state swap + local settle; the tile never visibly travels.
       Real animation-architecture change (needs measured source-tile position through
@@ -106,25 +115,27 @@ line** (proves the locked-down Supabase RPCs end-to-end).
 
 ## 5. Docs that now lie (quick, cheap fixes)
 
-- [ ] `docs/GROWTH_STRATEGY.md:88-91` claims `adsUseTestIds: false` is "now the default" — it is
-      `true`, deliberately. **This is the dangerous one** (could cause a premature or skipped
-      flip); correct it first.
-- [ ] `docs/LAUNCH_CHECKLIST.md` says versionCode 47 / v1.5.0; actual 88 / 1.2.2. Re-sync its open
-      boxes with reality while at it (much of §3 above may already be informally done).
-- [ ] `docs/PRESS_KIT.md` — unfilled press-contact placeholder (line 40) and badly stale facts:
+- [x] `docs/GROWTH_STRATEGY.md` — corrected 2026-08-31 (now states the flag is deliberately
+      `true` until the production cut, with the gate-test procedure).
+- [x] `docs/LAUNCH_CHECKLIST.md` — re-synced 2026-08-31 (versionCode 88 / v1.2.2, the OTA
+      runtime-coupling warning added to the ads-flip item, closed-test status note, fifth starred
+      iOS value `admobBannerIdIos`). Open boxes left honest — confirm the device-pass items.
+- [x] `docs/PRESS_KIT.md` — facts refreshed 2026-08-31 (v1.2.2, 56 achievements, 22,749 words,
+      ~9,576 puzzles, real era depths). STILL OPEN: the press-contact placeholder (only the owner
+      knows the address). Previously stale:
       "v1.5.0", "51 achievements" (56), "11,400-word dictionary" (22,749), "~4,700 puzzles"
       (~9,576 / 30 banks), "3 variant modes", era depths ~70/~140/~200/~260 (actual 50/85/140/180).
       Must be refreshed before it is ever handed to press.
-- [ ] `docs/STORE_LISTING.md` — "51 achievements" (56), "Four difficulty levels" (five with
-      EXPERT).
-- [ ] `docs/index.md` (the **live** GitHub Pages landing page, linked from every share CTA) —
-      "four difficulties", "Three twist modes"; EXPERT/Blind/Lexicon unmentioned, Speed is now a
-      modifier. Auto-republishes on edit.
-- [ ] `docs/AAA_DESIGN_AUDIT.md` §0 still reports 83 findings "not addressed"; the ledger's true
-      count is 174 done / 3 partial / 3 deferred / 0 not addressed. Refresh the snapshot.
-- [ ] `docs/PUZZLE_REGENERATION_PLAN.md` claims no regeneration has run — it fully ran 2026-07-23.
-- [ ] `CLAUDE.md` — still lists reverse-bank regeneration-for-size as an open follow-up (done:
-      reverse is 500×4) and the roomUpgrades comment-drift note (comment already fixed).
+- [x] `docs/STORE_LISTING.md` — corrected 2026-08-31 (56 achievements, five difficulties).
+      The live Play Console listing copy still needs the same refresh at the next store update.
+- [x] `docs/index.md` — corrected 2026-08-31 (five difficulties; styles + stackable trials);
+      auto-republishes via Pages.
+- [x] `docs/AAA_DESIGN_AUDIT.md` §0 — snapshot refreshed 2026-08-31 to the ledger's
+      174 / 3 / 3 / 0 truth.
+- [x] `docs/PUZZLE_REGENERATION_PLAN.md` — status note added 2026-08-31 (executed 2026-07-23;
+      historical record).
+- [x] `CLAUDE.md` — stale claims corrected 2026-08-31 (reverse-bank regen marked done, comment-
+      drift note dropped, EXPERT dread gap marked closed).
 
 ## 6. Post-launch / deliberately deferred (recorded so "finished" has a definition)
 
