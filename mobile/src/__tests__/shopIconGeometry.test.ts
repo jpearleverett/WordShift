@@ -1,6 +1,7 @@
 /**
- * Geometry guards for the generated shop icons (assets/ui/shop, drawn by
- * scripts/tools/generateShopIcons.mjs).
+ * Geometry guards for the generated cottage icon sets: the shop's purchasables
+ * (assets/ui/shop, scripts/tools/generateShopIcons.mjs) and the store's
+ * purchasables (assets/ui/store, scripts/tools/generateStoreIcons.mjs).
  *
  * These exist because a blind art review caught a defect class that is invisible
  * in a diff and easy to reintroduce: a subject drawn slightly too large reaches
@@ -16,25 +17,43 @@ import fs from 'fs';
 import path from 'path';
 import sharp from 'sharp';
 
-const SHOP_DIR = path.resolve(__dirname, '../../assets/ui/shop');
+/**
+ * Both generated sets, checked by the same rules. The store set is drawn by a
+ * different script but sits in the same rows at the same size, so it inherits
+ * the same defect class (and the same guard) rather than being trusted because
+ * its generator is newer.
+ */
+const ICON_DIRS: ReadonlyArray<[string, string]> = [
+  ['shop', path.resolve(__dirname, '../../assets/ui/shop')],
+  ['store', path.resolve(__dirname, '../../assets/ui/store')],
+];
 
 /** Every icon is drawn at this size so a ~56dp row thumbnail never upscales. */
 const EXPECTED_SIZE = 192;
 /** Alpha above this counts as painted; below it is anti-aliasing tail. */
 const ALPHA_FLOOR = 8;
 
-const files = fs
-  .readdirSync(SHOP_DIR)
-  .filter((f) => f.endsWith('.png'))
-  .sort();
+/** [label, absolute path] for every PNG in both sets, so a failure names the set. */
+const files: Array<[string, string]> = ICON_DIRS.flatMap(([set, dir]) =>
+  fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith('.png'))
+    .sort()
+    .map((f) => [`${set}/${f}`, path.join(dir, f)] as [string, string]),
+);
 
-describe('shop icon geometry', () => {
-  it('has at least one icon to check', () => {
-    expect(files.length).toBeGreaterThan(0);
+describe('generated icon geometry', () => {
+  it('has icons from both sets to check', () => {
+    for (const [set] of ICON_DIRS) {
+      expect({ set, found: files.some(([label]) => label.startsWith(`${set}/`)) }).toEqual({
+        set,
+        found: true,
+      });
+    }
   });
 
-  it.each(files)('%s is 192x192 with transparent edges and real content', async (file) => {
-    const { data, info } = await sharp(path.join(SHOP_DIR, file))
+  it.each(files)('%s is 192x192 with transparent edges and real content', async (file, filePath) => {
+    const { data, info } = await sharp(filePath)
       .ensureAlpha()
       .raw()
       .toBuffer({ resolveWithObject: true });
