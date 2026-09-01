@@ -12,7 +12,11 @@ import { getSettings } from './settings';
  *
  * Phase awareness: App mirrors the narrative phase here via setAudioPhase().
  * At Phase 3+ any sound with a registered `<name>_dark` variant automatically
- * swaps to it, so the whole soundscape descends together.
+ * swaps to it, so the whole soundscape descends together. At Phase 5 a third
+ * tier takes precedence: any sound with a `<name>_peace` variant plays it
+ * instead (the most frequent sounds go serene after the arrival — soft settled
+ * bells, no rising or sinking); sounds without one keep their dark mirror,
+ * which reads as the settled-dark palette.
  *
  * Combo ladder: soundValidMove(comboTier) escalates the move chime across
  * clean-move streaks (bright = rising pentatonic steps; dark = sinking lower).
@@ -93,6 +97,19 @@ const SOUND_SOURCES: Record<string, any> = {
   perfect_dark: require('../../assets/sounds/perfect_dark.wav'),
   ui_tap_dark: require('../../assets/sounds/ui_tap_dark.wav'),
   ui_tick_dark: require('../../assets/sounds/ui_tick_dark.wav'),
+  // Terrible Peace variants (Phase 5): the most frequent sounds resolved into
+  // soft settled bells — the streak ladder assembles the house's C-add9 chord
+  // at a constant root instead of rising or sinking, and the victory pair is
+  // quiet resolved bells with no tritone. Picked first by resolveSfxForPhase
+  // at Phase 5; everything without a `_peace` here keeps its dark mirror.
+  valid_move_peace: require('../../assets/sounds/valid_move_peace.wav'),
+  valid_move_2_peace: require('../../assets/sounds/valid_move_2_peace.wav'),
+  valid_move_3_peace: require('../../assets/sounds/valid_move_3_peace.wav'),
+  valid_move_4_peace: require('../../assets/sounds/valid_move_4_peace.wav'),
+  victory_peace: require('../../assets/sounds/victory_peace.wav'),
+  perfect_peace: require('../../assets/sounds/perfect_peace.wav'),
+  dialogue_peace: require('../../assets/sounds/dialogue_peace.wav'),
+  letter_select_peace: require('../../assets/sounds/letter_select_peace.wav'),
 };
 
 // Ambient music beds (looping) — kept out of SOUND_SOURCES so a stray
@@ -132,6 +149,7 @@ const PRELOAD_SOUND_NAMES = [
   'ui_tick',
   'valid_move_dark', // hot path once the descent deepens (Phase 3+)
   'valid_move_2_dark',
+  'valid_move_peace', // hot path for post-revelation players (Phase 5)
   'pit_devour', // fires on every tap-devour + the Offer-All cascade in the pit
 ];
 
@@ -143,16 +161,22 @@ const SOUND_VOLUME = 0.8;
 let audioPhase = 0;
 /** Phase at/above which SFX with a registered dark variant switch to it. */
 const DARK_SFX_PHASE = 3;
+/** Phase at/above which SFX with a registered peace variant switch to IT
+ *  (takes precedence over the dark mirror — the post-revelation serene tier). */
+const PEACE_SFX_PHASE = 5;
 export function setAudioPhase(phase: number): void {
   audioPhase = phase;
 }
 
 /**
- * Pure variant resolver: returns `<name>_dark` when the phase is deep enough
- * AND a dark variant is registered, otherwise the base name. Exported for
+ * Pure variant resolver: at Phase 5 a registered `<name>_peace` wins; else at
+ * Phase 3+ a registered `<name>_dark` wins; else the base name. Exported for
  * tests; call sites go through the sound* helpers.
  */
 export function resolveSfxForPhase(name: string, phase: number): string {
+  if (phase >= PEACE_SFX_PHASE && SOUND_SOURCES[`${name}_peace`] !== undefined) {
+    return `${name}_peace`;
+  }
   if (phase >= DARK_SFX_PHASE && SOUND_SOURCES[`${name}_dark`] !== undefined) {
     return `${name}_dark`;
   }

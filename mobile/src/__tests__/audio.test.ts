@@ -88,11 +88,18 @@ describe('audio', () => {
       expect(validMoveSoundName(NaN, 0)).toBe('valid_move');
     });
 
-    test('the dark ladder takes over at Phase 3+ (sinking, not celebrating)', () => {
+    test('the dark ladder takes over at Phase 3-4 (sinking, not celebrating)', () => {
       expect(validMoveSoundName(0, 3)).toBe('valid_move_dark');
       expect(validMoveSoundName(1, 3)).toBe('valid_move_2_dark');
       expect(validMoveSoundName(2, 4)).toBe('valid_move_3_dark');
-      expect(validMoveSoundName(3, 5)).toBe('valid_move_4_dark');
+      expect(validMoveSoundName(3, 4)).toBe('valid_move_4_dark');
+    });
+
+    test('the peace ladder takes over at Phase 5 (the chord assembles, nothing rises or sinks)', () => {
+      expect(validMoveSoundName(0, 5)).toBe('valid_move_peace');
+      expect(validMoveSoundName(1, 5)).toBe('valid_move_2_peace');
+      expect(validMoveSoundName(2, 5)).toBe('valid_move_3_peace');
+      expect(validMoveSoundName(3, 5)).toBe('valid_move_4_peace');
     });
 
     test('stays bright through Phase 2', () => {
@@ -101,25 +108,35 @@ describe('audio', () => {
   });
 
   describe('dark variant resolution (resolveSfxForPhase)', () => {
-    const withDark = [
+    // Names with a dark mirror but NO peace variant — dark from 3 all the way
+    // through 5 (the settled-dark palette carries the less frequent sounds).
+    const darkOnly = [
       'tap',
-      'letter_select',
       'invalid_move',
       'undo',
       'hint',
       'amber_earn',
-      'dialogue',
-      'victory',
-      'perfect',
       'pit_devour',
     ];
+    // The most frequent sounds carry a Phase-5 peace variant on top.
+    const withPeace = ['letter_select', 'dialogue', 'victory', 'perfect'];
 
-    test.each(withDark)('%s swaps to its dark variant at Phase 3+', (name) => {
+    test.each([...darkOnly, ...withPeace])('%s swaps to its dark variant at Phase 3-4', (name) => {
       expect(resolveSfxForPhase(name, 3)).toBe(`${name}_dark`);
+      expect(resolveSfxForPhase(name, 4)).toBe(`${name}_dark`);
+    });
+
+    test.each(darkOnly)('%s keeps its dark mirror at Phase 5 (no peace variant)', (name) => {
       expect(resolveSfxForPhase(name, 5)).toBe(`${name}_dark`);
     });
 
-    test.each(withDark)('%s stays bright below Phase 3', (name) => {
+    test.each(withPeace)('%s resolves to its PEACE variant at Phase 5 (serene tier wins over dark)', (name) => {
+      expect(resolveSfxForPhase(name, 5)).toBe(`${name}_peace`);
+      // The peace tier never leaks below Phase 5.
+      expect(resolveSfxForPhase(name, 4)).toBe(`${name}_dark`);
+    });
+
+    test.each([...darkOnly, ...withPeace])('%s stays bright below Phase 3', (name) => {
       expect(resolveSfxForPhase(name, 0)).toBe(name);
       expect(resolveSfxForPhase(name, 2)).toBe(name);
     });
