@@ -170,18 +170,36 @@ describe('HomeScreen wiring', () => {
     expect(effect).not.toContain('markKeeperRecordSeen');
   });
 
-  test('records the gallery keepsake and defers the weave intro one landing', () => {
-    expect(HOME_SCREEN).toMatch(/keeperRecordShownThisLandingRef/);
+  test('records the gallery keepsake on CLOSE (with the flag), never at fire', () => {
+    // Recording at fire time let an interrupted reading re-fire with a
+    // shifted ledger and leave a near-duplicate "record's heart" entry —
+    // the keepsake lands exactly where the reading counts as heard.
     const effect = HOME_SCREEN.slice(
       HOME_SCREEN.indexOf('// The Keeper\'s Record:'),
       HOME_SCREEN.indexOf('// Unbroken Weave intro:')
     );
-    expect(effect).toContain('recordWhisper');
-    // The weave effect must yield the landing the record fired on.
+    expect(effect).not.toMatch(/recordWhisper\(\{/);
+    // Both close handlers record it beside markKeeperRecordSeen.
+    const keepsakeSites = HOME_SCREEN.match(
+      /markKeeperRecordSeen\(\);[\s\S]{0,600}?recordWhisper\(\{/g
+    ) ?? [];
+    expect(keepsakeSites.length).toBe(2);
+  });
+
+  test('defers the weave intro one landing, guarded past the awaits', () => {
+    expect(HOME_SCREEN).toMatch(/keeperRecordShownThisLandingRef/);
+    // The weave effect must yield the landing the record fired on — both at
+    // schedule time AND inside its timer callback (a JS stall spanning both
+    // timers runs the expired callbacks back-to-back, before React cleanup
+    // can cancel the weave's).
     const weaveEffect = HOME_SCREEN.slice(
       HOME_SCREEN.indexOf('// Unbroken Weave intro:'),
-      HOME_SCREEN.indexOf('hasSeenUnbrokenWeaveIntro()')
+      HOME_SCREEN.indexOf('// One-time invitation to The Offering')
     );
-    expect(weaveEffect).toContain('keeperRecordShownThisLandingRef.current) return');
+    const refChecks = weaveEffect.match(/keeperRecordShownThisLandingRef\.current/g) ?? [];
+    expect(refChecks.length).toBeGreaterThanOrEqual(2);
+    expect(weaveEffect).toMatch(
+      /seen \|\| cancelled \|\| introSurfaceBusyRef\.current \|\| keeperRecordShownThisLandingRef\.current/
+    );
   });
 });

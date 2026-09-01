@@ -1310,8 +1310,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Weave intro (shorter settle timer), and the landing that shows it holds
   // the weave intro to the NEXT visit so the epilogue is not immediately
   // chased by a mode pitch. Marked seen on CLOSE (not at fire) so an
-  // interrupted reading re-fires; the whisper keepsake dedupes by content,
-  // so a re-fire never double-records it. Forever-once across cycles.
+  // interrupted reading re-fires; the gallery keepsake is recorded in the
+  // close handlers alongside the flag, so a re-fire with a shifted ledger
+  // can never leave a near-duplicate entry. Forever-once across cycles.
   useEffect(() => {
     if (!progress || isOnboarding || showIntroDialogue || introOverrideLines) return;
     if (progress.currentPhase !== 5 || progress.postRevelation !== true) return;
@@ -1351,14 +1352,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         setIntroOverrideLines(lines);
         setIntroContext('keeper_record_intro');
         setShowIntroDialogue(true);
-        // The word-memory line is the record's heart — keep it in the gallery.
-        recordWhisper({
-          animalType: 'fox',
-          animalName: ember.name,
-          text: lines[1],
-          phase: 5,
-          type: 'dialogue',
-        }).catch(() => {});
+        // The gallery keepsake is recorded in the CLOSE handlers, alongside
+        // the seen flag — recording at fire time let an interrupted reading
+        // re-fire later with a shifted ledger and leave a second,
+        // near-duplicate "record's heart" entry.
       })().catch(() => {});
     }, 600);
 
@@ -1391,7 +1388,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const timer = setTimeout(() => {
       (async () => {
         const seen = await hasSeenUnbrokenWeaveIntro();
-        if (seen || cancelled) return;
+        // Post-await re-check of the shared surface AND the keeper ref: a JS
+        // stall spanning both timers' due times runs both expired callbacks
+        // back-to-back, BEFORE React's cleanup can flip `cancelled` — without
+        // this the weave pitch could clobber the Keeper's Record on the very
+        // landing the ref was meant to protect.
+        if (seen || cancelled || introSurfaceBusyRef.current || keeperRecordShownThisLandingRef.current) return;
 
         const fox = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
         if (!fox) return;
@@ -1842,6 +1844,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         // Marked at presentation so the quiet one-time landing cannot re-fire.
       } else if (introContext === 'keeper_record_intro') {
         await markKeeperRecordSeen();
+        // The word-memory line is the record's heart — kept in the gallery
+        // exactly once, at the moment the reading counts as heard (recording
+        // at fire time let an interrupted reading re-fire with a shifted
+        // ledger and leave a near-duplicate entry).
+        if (introOverrideLines && introOverrideLines[1]) {
+          recordWhisper({
+            animalType: 'fox',
+            animalName: introAnimal.name,
+            text: introOverrideLines[1],
+            phase: 5,
+            type: 'dialogue',
+          }).catch(() => {});
+        }
       } else {
         await markIntroSeen(introAnimal.id);
       }
@@ -1876,6 +1891,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       } else if (introContext === 'keeper_record_intro') {
         // An early close still counts as heard — never force a re-read.
         await markKeeperRecordSeen();
+        // Keepsake recorded here too: heard is heard, however it ended.
+        if (introOverrideLines && introOverrideLines[1]) {
+          recordWhisper({
+            animalType: 'fox',
+            animalName: introAnimal.name,
+            text: introOverrideLines[1],
+            phase: 5,
+            type: 'dialogue',
+          }).catch(() => {});
+        }
       } else {
         await markIntroSeen(introAnimal.id);
       }
