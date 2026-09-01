@@ -64,7 +64,7 @@ import {
   BTN_LG_DP,
   BTN_SHADOW_DP,
 } from '../theme/pixelSkin.generated';
-import { getSurfaceTheme } from '../theme/surfaces';
+import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
 import { UtilityMenu } from './ui/UtilityMenu';
 import {
   loadTendingState,
@@ -3264,7 +3264,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     // Cottage card frame background; clear its 12dp wood band top/bottom.
     paddingVertical: 16,
-    paddingHorizontal: 18,
+    paddingHorizontal: SURFACE.cardPadX,
     marginBottom: 10,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },

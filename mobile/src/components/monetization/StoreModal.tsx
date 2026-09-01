@@ -801,7 +801,8 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 420,
     maxHeight: '86%',
-    padding: 24,
+    paddingVertical: 24,
+    paddingHorizontal: SURFACE.panelPadX,
     shadowColor: CandyColors.purple.dark,
     shadowOffset: { width: 0, height: 16 },
     shadowOpacity: 0.4,
@@ -853,7 +854,8 @@ const styles = StyleSheet.create({
 
   // Starter pack hero — first card, framed by the amber accent border.
   heroCard: {
-    padding: 14,
+    paddingVertical: 14,
+    paddingHorizontal: SURFACE.cardPadX,
     marginTop: 12,
   },
   heroRibbonRow: { flexDirection: 'row', marginBottom: 8 },
@@ -865,11 +867,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 12,
+    paddingVertical: 12,
+    paddingHorizontal: SURFACE.cardPadX,
     marginBottom: 8,
     minHeight: 68,
   },
-  rowInfo: { flex: 1, paddingRight: 12 },
+  rowInfo: { flex: 1, paddingRight: 8 },
   rowTitleLine: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   rowTitle: { fontSize: FONT_SIZE.callout, fontWeight: '800', fontFamily: PIXEL_FONT_BOLD },
   ribbon: {
@@ -891,7 +894,7 @@ const styles = StyleSheet.create({
   patronLink: {
     marginTop: 16,
     paddingVertical: 12,
-    paddingHorizontal: 14,
+    paddingHorizontal: SURFACE.cardPadX,
   },
   patronLinkText: { fontSize: FONT_SIZE.body, lineHeight: 18, textAlign: 'center', fontFamily: BODY_FONT },
 

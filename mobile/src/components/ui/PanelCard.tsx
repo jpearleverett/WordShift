@@ -30,10 +30,13 @@ interface PanelCardProps {
  * scripts/tools/generateUiPanels.mjs). Every phase is the same furniture in
  * an aging material: bright cottage wood → dusk → storm → charred → mauve.
  *
- * Consumers keep their own content padding; the frame's visual wood band is
- * 21dp (panel) / 12dp (card) so the common 12–28dp paddings clear it. No
- * borderRadius/overflow rounding is applied — the stepped pixel corners ARE
- * the corner treatment (CSS-rounding them is the #1 cozy-pixel anti-pattern).
+ * Consumers keep their own content padding. The frame strip is 30dp (panel) /
+ * 18dp (card), of which 24dp / 15dp is wood + accent inlay + the parchment
+ * transition ring that content must clear — so horizontal content padding
+ * should come from SURFACE.panelPadX / SURFACE.cardPadX (theme/surfaces.ts)
+ * rather than a hand-picked number. No borderRadius/overflow rounding is
+ * applied — the stepped pixel corners ARE the corner treatment (CSS-rounding
+ * them is the #1 cozy-pixel anti-pattern).
  */
 export const PanelCard: React.FC<PanelCardProps> = ({
   phase,

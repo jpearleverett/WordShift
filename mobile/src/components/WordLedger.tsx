@@ -469,7 +469,7 @@ const styles = StyleSheet.create({
   titlePlaque: {
     alignItems: 'center',
     paddingVertical: 18,
-    paddingHorizontal: 16,
+    paddingHorizontal: SURFACE.cardPadX,
   },
   title: {
     fontFamily: PIXEL_FONT_BOLD,

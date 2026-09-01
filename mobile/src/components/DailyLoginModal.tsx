@@ -349,7 +349,7 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     paddingTop: 28,
-    paddingHorizontal: 24,
+    paddingHorizontal: SURFACE.panelPadX,
     paddingBottom: 24,
     alignItems: 'center',
   },

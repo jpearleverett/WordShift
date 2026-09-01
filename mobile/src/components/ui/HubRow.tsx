@@ -6,7 +6,7 @@ import {
   Text,
   TouchableOpacity,
 } from 'react-native';
-import { getSurfaceTheme } from '../../theme/surfaces';
+import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
 import { getPixelSkin, CARD_CORNER_DP, CARD_EDGE_DP } from '../../theme/pixelSkin.generated';
 import { NineSliceFrame } from './NineSlice';
 import { PIXEL_FONT_BOLD } from '../../theme/fonts';
@@ -51,11 +51,12 @@ export const HubRow: React.FC<{
 
 const styles = StyleSheet.create({
   // Pixel-card hub rows (Journal / Utility menus) — the NineSliceFrame is the
-  // chrome; padding clears the card frame edge (CARD_EDGE_DP = 15).
+  // chrome; padding must clear the 18dp card strip (12dp wood + transition +
+  // vignette), which is what SURFACE.cardPadX is for.
   hubRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 18,
+    paddingHorizontal: SURFACE.cardPadX,
     paddingVertical: 15,
     minHeight: 56,
     marginBottom: 10,

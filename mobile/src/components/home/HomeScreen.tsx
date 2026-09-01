@@ -3935,8 +3935,8 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: 4,
     marginBottom: 4,
-    // Cottage card frame background; clear its 12dp wood band.
-    paddingHorizontal: 18,
+    // Cottage card frame background; clear the 18dp card strip.
+    paddingHorizontal: SURFACE.cardPadX,
     paddingVertical: 16,
     zIndex: 10,
     shadowColor: '#000000',
@@ -3994,8 +3994,10 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 12,
     paddingTop: PANEL_EDGE_DP - 6,
-    paddingLeft: PANEL_EDGE_DP - 8,
-    paddingRight: PANEL_EDGE_DP - 12,
+    // Both edges were under the band and 4dp apart, so the sheet read as
+    // tighter on the right than the left. One token, both sides.
+    paddingLeft: SURFACE.panelPadX,
+    paddingRight: SURFACE.panelPadX,
   },
   dialogueAccentLine: {
     height: 3,
@@ -4049,7 +4051,10 @@ const styles = StyleSheet.create({
     // Name moved below the sprite — the bubble now starts near the top.
     paddingTop: 6,
     paddingBottom: 34,
-    paddingHorizontal: 18,
+    // Inner gutter, NOT frame clearance (the bubble carries its own card frame
+    // and its own cardPadX). It shrinks by exactly what dialogueModal's panel
+    // clearance took, so the narrative text column keeps its pre-token width.
+    paddingHorizontal: 10,
   },
   // Portrait nameplate: sits under the sprite, centered in the alcove.
   dialogueAnimalName: {
@@ -4068,10 +4073,10 @@ const styles = StyleSheet.create({
     opacity: 0.5,
     alignSelf: 'center',
   },
-  // Cottage parchment tray (NineSliceFrame card background); clear its 12dp
-  // wood band. No borderRadius/borderWidth — the pixel frame owns the edge.
+  // Cottage parchment tray (NineSliceFrame card background); clear the 18dp
+  // card strip. No borderRadius/borderWidth — the pixel frame owns the edge.
   dialogueBubble: {
-    paddingHorizontal: 18,
+    paddingHorizontal: SURFACE.cardPadX,
     paddingVertical: 16,
     marginBottom: 14,
     // Stable-ish height so paging short and 2-3 line lines doesn't resize the
@@ -4112,9 +4117,11 @@ const styles = StyleSheet.create({
   },
 
   // Shop modal — chrome comes from the NineSliceFrame pixel panel; the style
-  // keeps layout only (padding clears PANEL_EDGE_DP = 24).
+  // keeps layout only (the 30dp panel strip's 24dp wood+transition band is
+  // cleared by SURFACE.panelPadX).
   shopModal: {
-    padding: 24,
+    paddingVertical: 24,
+    paddingHorizontal: SURFACE.panelPadX,
     paddingBottom: 40,
   },
   // Scrollable middle of the Unlock Progress modal (title/subtitle above and
@@ -4128,7 +4135,8 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   compactHubModal: {
-    padding: 24,
+    paddingVertical: 24,
+    paddingHorizontal: SURFACE.panelPadX,
     paddingBottom: 32,
   },
   // Wooden nameplate title overlapping the panel's top frame edge.
@@ -4173,7 +4181,8 @@ const styles = StyleSheet.create({
   unlockItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    paddingVertical: 16,
+    paddingHorizontal: SURFACE.cardPadX,
   },
   // Shared action placement inside rows / at panel foot
   rowAction: {
@@ -4505,9 +4514,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   dialogueChoiceBtn: {
-    // Cottage card frame background; clear its wood band; ≥44dp for the caps.
+    // Cottage card frame background; clear the 18dp card strip; ≥44dp caps.
     paddingVertical: 14,
-    paddingHorizontal: 18,
+    paddingHorizontal: SURFACE.cardPadX,
     minHeight: 46,
     justifyContent: 'center',
     alignItems: 'center',
@@ -4707,8 +4716,8 @@ const styles = StyleSheet.create({
   journalSpotlightHeroRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    // Clear the 24dp panel wood band (the panel itself carries no padding).
-    paddingHorizontal: 24,
+    // Clear the panel band (the panel itself carries no padding of its own).
+    paddingHorizontal: SURFACE.panelPadX,
     paddingTop: 24,
     paddingBottom: 14,
     gap: 12,
@@ -4756,14 +4765,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    paddingHorizontal: 24,
+    paddingHorizontal: SURFACE.panelPadX,
     paddingBottom: 12,
   },
   journalSpotlightCard: {
     width: '48%',
     minHeight: 84,
-    // Cottage card frame owns the edge; clear its 12dp wood band comfortably.
-    paddingHorizontal: 16,
+    // Cottage card frame owns the edge; clear the 18dp card strip.
+    paddingHorizontal: SURFACE.cardPadX,
     paddingVertical: 14,
   },
   journalSpotlightCardActive: {
@@ -4792,7 +4801,7 @@ const styles = StyleSheet.create({
   },
   journalSpotlightDialogueRow: {
     flexDirection: 'row',
-    paddingHorizontal: 24,
+    paddingHorizontal: SURFACE.panelPadX,
     paddingBottom: 22,
     gap: 12,
   },
@@ -4825,8 +4834,8 @@ const styles = StyleSheet.create({
     maxWidth: 100,
   },
   journalSpotlightBubble: {
-    // Cottage parchment tray; clear the 12dp wood band, ≥44dp for the caps.
-    paddingHorizontal: 18,
+    // Cottage parchment tray; clear the 18dp card strip, ≥44dp for the caps.
+    paddingHorizontal: SURFACE.cardPadX,
     paddingVertical: 16,
     marginBottom: 14,
     minHeight: 44,

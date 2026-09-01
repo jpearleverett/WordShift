@@ -500,7 +500,7 @@ const styles = StyleSheet.create({
   titlePlaque: {
     alignItems: 'center',
     paddingVertical: 16,
-    paddingHorizontal: 16,
+    paddingHorizontal: SURFACE.cardPadX,
   },
   title: {
     fontFamily: PIXEL_FONT_BOLD,
@@ -566,7 +566,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
-    paddingHorizontal: 14,
+    paddingHorizontal: SURFACE.cardPadX,
     gap: 10,
   },
   animalPortrait: {

@@ -1071,7 +1071,12 @@ const styles = StyleSheet.create({
     // sits inside the wood and reads as clipped against the top edge.
     paddingTop: 30,
     paddingBottom: 26,
-    paddingHorizontal: 10,
+    // NOT SURFACE.panelPadX: at 28 the rows would be only ~206dp wide inside
+    // this 290dp panel. The text was already clear (panel + scrollContent +
+    // menuRow); the defect was that the selected-row HIGHLIGHT box started
+    // 4dp INSIDE the wood band and painted over the frame. 16 here + 8 on
+    // scrollContent lands the row boxes exactly on the 24dp band edge.
+    paddingHorizontal: 16,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.45,
     shadowRadius: 18,
@@ -1085,7 +1090,8 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.small,
     fontWeight: '900',
     letterSpacing: SURFACE.sectionLetterSpacing,
-    paddingHorizontal: 16,
+    // Compensates the panel's 10 -> 16: the title keeps its ~28dp inset.
+    paddingHorizontal: 12,
     paddingBottom: 3,
   },
   // Wraps the ScrollView + the "more below" fade cue so the cue can pin to the
@@ -1105,8 +1111,9 @@ const styles = StyleSheet.create({
   // The "more below" cue: a short band pinned to the scroll region's bottom.
   scrollCue: {
     position: 'absolute',
-    left: 8,
-    right: 8,
+    // Flush with the scroll region so the fade band never overlaps the wood.
+    left: 0,
+    right: 0,
     bottom: 0,
     height: 34,
     alignItems: 'center',
@@ -1124,7 +1131,9 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   scrollContent: {
-    paddingHorizontal: 10,
+    // Row boxes start at difficultyMenu.paddingHorizontal + this = 24dp, the
+    // panel band edge, so a selected row never paints on the painted wood.
+    paddingHorizontal: 8,
     paddingBottom: SCROLL_BOTTOM_PAD,
   },
   sectionTitle: {

@@ -165,7 +165,8 @@ const styles = StyleSheet.create({
   inner: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    paddingVertical: 12,
+    paddingHorizontal: SURFACE.cardPadX,
     overflow: 'hidden',
     shadowColor: 'rgba(10, 6, 24, 1)',
     shadowOffset: { width: 0, height: 6 },

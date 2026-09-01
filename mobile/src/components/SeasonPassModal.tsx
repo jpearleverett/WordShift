@@ -512,14 +512,14 @@ const styles = StyleSheet.create({
   // (like StoreModal's animated card), so its maxHeight resolves; the PanelCard
   // inside fills it and its ScrollView bounds against that height.
   cardWrap: { width: '100%', maxWidth: 460, maxHeight: '90%' },
-  card: { width: '100%', maxHeight: '100%', paddingTop: 18, paddingHorizontal: 18, paddingBottom: 16 },
+  card: { width: '100%', maxHeight: '100%', paddingTop: 18, paddingHorizontal: SURFACE.panelPadX, paddingBottom: 16 },
   plaque: { alignSelf: 'center', marginBottom: 8 },
   headerBalanceRow: { alignItems: 'center', marginBottom: 2 },
   headerBalance: { fontFamily: PIXEL_FONT_BOLD, fontSize: FONT_SIZE.body, fontWeight: '800' },
   title: { fontFamily: PIXEL_FONT_BOLD, fontSize: FONT_SIZE.headline, textAlign: 'center' },
   tagline: { fontFamily: BODY_FONT, fontSize: FONT_SIZE.bodyLg, textAlign: 'center', marginTop: 4, marginBottom: 10 },
   progress: { fontFamily: PIXEL_FONT_BOLD, fontSize: FONT_SIZE.body, textAlign: 'center', marginBottom: 10 },
-  premiumBox: { padding: 14, marginBottom: 10 },
+  premiumBox: { paddingVertical: 14, paddingHorizontal: SURFACE.cardPadX, marginBottom: 10 },
   premiumLocked: { fontFamily: BODY_FONT, fontSize: FONT_SIZE.body, textAlign: 'center', marginBottom: 10 },
   premiumBtn: { alignSelf: 'center' },
   subscribeLink: { fontFamily: BODY_FONT, fontSize: FONT_SIZE.small, textAlign: 'center', marginTop: 10 },

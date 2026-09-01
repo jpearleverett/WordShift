@@ -334,7 +334,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
     paddingTop: 14,
     paddingBottom: 16,
-    paddingHorizontal: 16,
+    paddingHorizontal: SURFACE.cardPadX,
     alignItems: 'center',
   },
   bonusHint: {

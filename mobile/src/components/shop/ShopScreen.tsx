@@ -1135,7 +1135,7 @@ const styles = StyleSheet.create({
   amberPillText: { fontSize: FONT_SIZE.callout, fontWeight: '900', fontFamily: PIXEL_FONT_BOLD },
   patronBanner: {
     paddingVertical: 18,
-    paddingHorizontal: 18,
+    paddingHorizontal: SURFACE.cardPadX,
     marginBottom: 18,
   },
   patronBannerTitle: { fontSize: FONT_SIZE.large, fontWeight: '900', marginBottom: 4, fontFamily: PIXEL_FONT_BOLD },
@@ -1158,10 +1158,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 18,
-    paddingHorizontal: 16,
+    paddingHorizontal: SURFACE.cardPadX,
     marginBottom: 14,
   },
-  cardBody: { flex: 1, paddingHorizontal: 12 },
+  // The name/desc column is the tightest budget on the screen (a 96dp preview
+  // and a 96dp action slot flank it), so its own gutter shrinks by exactly what
+  // the card frame clearance took: text width is net-unchanged at 360dp.
+  cardBody: { flex: 1, paddingHorizontal: 8 },
   cardName: { fontSize: FONT_SIZE.large, fontWeight: '800', fontFamily: PIXEL_FONT_BOLD },
   cardDesc: { fontSize: FONT_SIZE.small, fontWeight: '500', marginTop: 3, lineHeight: 17, fontFamily: BODY_FONT },
   // The leading column of a cosmetic card: cottage thumbnail over the live
@@ -1240,7 +1243,7 @@ const styles = StyleSheet.create({
   previewSparkCore: { width: 9, height: 9, borderRadius: 2, transform: [{ rotate: '45deg' }] },
   previewSparkCoreLarge: { width: 12, height: 12, borderRadius: 2, transform: [{ rotate: '45deg' }] },
   actionSlot: { minWidth: 96 },
-  houseCardBody: { flex: 1, paddingHorizontal: 12 },
+  houseCardBody: { flex: 1, paddingHorizontal: 8 },
   houseFeedback: {
     fontSize: FONT_SIZE.small,
     fontWeight: '600',
@@ -1290,7 +1293,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 18,
-    paddingHorizontal: 18,
+    paddingHorizontal: SURFACE.cardPadX,
     marginTop: 8,
     marginBottom: 4,
   },

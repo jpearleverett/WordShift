@@ -418,7 +418,8 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     maxWidth: 420,
-    padding: 24,
+    paddingVertical: 24,
+    paddingHorizontal: SURFACE.panelPadX,
     shadowColor: CandyColors.purple.dark,
     shadowOffset: { width: 0, height: 16 },
     shadowOpacity: 0.4,
@@ -463,7 +464,8 @@ const styles = StyleSheet.create({
   benefits: {
     marginTop: 20,
     gap: 12,
-    padding: 14,
+    paddingVertical: 14,
+    paddingHorizontal: SURFACE.cardPadX,
   },
   benefitRow: {
     flexDirection: 'row',
@@ -485,7 +487,8 @@ const styles = StyleSheet.create({
   },
   patronActiveBox: {
     marginTop: 20,
-    padding: 16,
+    paddingVertical: 16,
+    paddingHorizontal: SURFACE.cardPadX,
   },
   patronActiveTitle: {
     fontSize: FONT_SIZE.large,

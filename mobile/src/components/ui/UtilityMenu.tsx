@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { DialoguePhase } from '../../types/homeWorld';
-import { getSurfaceTheme } from '../../theme/surfaces';
+import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
 import { getPixelSkin, PANEL_CORNER_DP, PANEL_EDGE_DP } from '../../theme/pixelSkin.generated';
 import { BODY_FONT } from '../../theme/fonts';
 import { FONT_SIZE } from '../../theme/typeScale';
@@ -241,7 +241,8 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   compactHubModal: {
-    padding: 24,
+    paddingVertical: 24,
+    paddingHorizontal: SURFACE.panelPadX,
     paddingBottom: 32,
   },
   // Wooden nameplate title overlapping the panel's top frame edge.
