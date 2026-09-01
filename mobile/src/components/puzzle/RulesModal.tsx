@@ -7,10 +7,12 @@ import {
   Modal,
   Animated,
   Easing,
+  Image,
 } from 'react-native';
 import { CandyColors } from '../../theme/colors';
 import { SURFACE, getSurfaceTheme, getModalInSpring } from '../../theme/surfaces';
 import { PanelCard } from '../ui/PanelCard';
+import { getRulesStepArt } from './difficultyArt';
 import { CandyButton } from '../ui/CandyButton';
 import { getSettingsSync } from '../../services/settings';
 import { getRulesText } from '../../services/phaseNarrative';
@@ -158,14 +160,34 @@ export const RulesModal: React.FC<RulesModalProps> = ({
                 const chip = getStepChipColors(idx, phase);
                 return (
                   <View key={idx} style={styles.ruleItem}>
-                    <View
-                      style={[
-                        styles.ruleNumber,
-                        { backgroundColor: chip.bg, borderColor: chip.border },
-                      ]}
-                    >
-                      <Text style={[styles.ruleNumberText, { color: chip.text }]}>{idx + 1}</Text>
-                    </View>
+                    {/* The step's own generated diagram (assets/ui/rules, built
+                        from the game's candy tile) with the numbered candy chip
+                        pinned to its corner, so the hue rotation survives and
+                        the number stays readable. A step past the drawn set
+                        keeps the plain chip. */}
+                    {getRulesStepArt(idx) ? (
+                      <View style={styles.ruleArtWrap}>
+                        <Image source={getRulesStepArt(idx)!} style={styles.ruleArt} resizeMode="contain" accessible={false} />
+                        <View
+                          style={[
+                            styles.ruleNumber,
+                            styles.ruleNumberMini,
+                            { backgroundColor: chip.bg, borderColor: chip.border },
+                          ]}
+                        >
+                          <Text style={[styles.ruleNumberText, styles.ruleNumberTextMini, { color: chip.text }]}>{idx + 1}</Text>
+                        </View>
+                      </View>
+                    ) : (
+                      <View
+                        style={[
+                          styles.ruleNumber,
+                          { backgroundColor: chip.bg, borderColor: chip.border },
+                        ]}
+                      >
+                        <Text style={[styles.ruleNumberText, { color: chip.text }]}>{idx + 1}</Text>
+                      </View>
+                    )}
                     <View style={styles.ruleContent}>
                       <Text style={[styles.ruleHeading, { color: t.title }]}>{step.heading}</Text>
                       <Text style={[styles.ruleDesc, { color: t.body }]}>{step.desc}</Text>
@@ -244,6 +266,30 @@ const styles = StyleSheet.create({
     fontFamily: PIXEL_FONT_BOLD,
     fontSize: FONT_SIZE.headline,
     fontWeight: '900',
+  },
+  // Diagram + corner chip. The wrap is a touch wider than the art so the
+  // chip can overhang its bottom-right corner without clipping.
+  ruleArtWrap: {
+    width: 58,
+    height: 56,
+    marginRight: 14,
+    alignItems: 'flex-start',
+  },
+  ruleArt: {
+    width: 52,
+    height: 52,
+  },
+  ruleNumberMini: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    width: 22,
+    height: 22,
+    borderRadius: 8,
+    marginRight: 0,
+  },
+  ruleNumberTextMini: {
+    fontSize: FONT_SIZE.caption,
   },
   ruleContent: {
     flex: 1,

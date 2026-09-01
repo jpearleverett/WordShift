@@ -22,6 +22,8 @@ import {
 import { Animal, Room, HomeWorldProgress } from '../../types/homeWorld';
 import { HouseWorld } from './HouseWorld';
 import { CHARACTER_SPRITES } from './AnimalSprite';
+import { getQuestArt } from '../questArt';
+import { CHROME_ICONS, SPOT_ART } from '../ui/chromeIcons';
 import { CandyColors, getDialogueTheme, getPhaseTheme } from '../../theme/colors';
 import { SURFACE, getPressSpring, getSurfaceTheme, getModalInSpring } from '../../theme/surfaces';
 import {
@@ -72,7 +74,6 @@ import { shouldSimplifyAnimations } from '../../services/deviceTier';
 import { AUTO_COLLECT_PUZZLE_LIMIT, HARVEST_NUDGE_MIN_AMBER, JOURNAL_UNLOCK_PUZZLES } from '../../constants/gameBalance';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { AmberInline } from '../AmberInline';
-import { getModeIconSprite } from '../puzzle/modeIcons';
 
 // Candy-style UI icon sprites (cross-platform consistent, replaces emoji)
 const AMBER_ICON = require('../../../assets/ui/amber.png');
@@ -85,6 +86,9 @@ let eventAmbientShownSession = false;
 const FLAME_ICON = require('../../../assets/ui/flame.png');
 const JOURNAL_ICON = require('../../../assets/ui/journal.png');
 const QUEST_ICON = require('../../../assets/ui/quest.png');
+// The Season Pass hub row was the one journal row with no leading sprite at
+// all; the ribboned pass card (generateGameIcons chrome) fills the gap.
+const SEASON_PASS_ICON = require('../../../assets/ui/season_pass.png');
 const MENU_ICON = require('../../../assets/ui/menu.png');
 // Phase-mood sprite (generateUiIcons candy-UI family) de-emojis the descent's
 // phase-4 temple crest.
@@ -1978,9 +1982,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     </Text>
                   )}
                   {claimableQuestAmber > 0 && (
-                    <View style={styles.headerBadge}>
-                      <Text style={styles.headerBadgeText}>!</Text>
-                    </View>
+                    <Image source={CHROME_ICONS.alertPip} style={styles.headerBadgeIcon} resizeMode="contain" accessible={false} />
                   )}
                 </TouchableOpacity>
               )}
@@ -2009,9 +2011,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       surface at all, so earned rewards sat unclaimed simply
                       because nothing ever said they existed. */}
                   {!journalSpotlightActive && (claimableQuestAmber > 0 || seasonClaimable > 0) && (
-                    <View style={styles.headerBadge}>
-                      <Text style={styles.headerBadgeText}>!</Text>
-                    </View>
+                    <Image source={CHROME_ICONS.alertPip} style={styles.headerBadgeIcon} resizeMode="contain" accessible={false} />
                   )}
                 </TouchableOpacity>
               )}
@@ -2541,6 +2541,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <HubRow
               phase={progress.currentPhase}
               hostDark={dtHostDark}
+              icon={SEASON_PASS_ICON}
               label={seasonClaimable > 0 ? `Season Pass (${seasonClaimable})` : 'Season Pass'}
               onPress={() => {
                 setShowJournalModal(false);
@@ -2657,7 +2658,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       />
                     ) : (
                       <View style={[styles.reservedChip, { backgroundColor: panelSt.secondaryBg, borderColor: panelSt.secondaryBorder }]}>
-                        <Text style={[styles.reservedChipText, { color: panelSt.secondaryText }]}>Reserved ✓</Text>
+                        <Text style={[styles.reservedChipText, { color: panelSt.secondaryText }]}>Reserved <Image source={CHROME_ICONS.check} style={styles.inlineMark} /></Text>
                         {unlockFlow.reservedSkipCost > 0 && (
                           <View style={styles.reservedChipSpeedRow}>
                             <AmberCostLabel
@@ -2855,6 +2856,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     kind="card"
                     style={StyleSheet.flatten([styles.unlockItem, styles.questItem])}
                   >
+                    {/* One painted object per quest TYPE (assets/ui/quests): the
+                        rows used to be the only list in the game with no
+                        leading visual. Decorative; the title carries the words. */}
+                    <Image source={getQuestArt(quest.type)} style={styles.questArt} resizeMode="contain" accessible={false} />
                     <View style={styles.unlockInfo}>
                       <Text style={[styles.unlockName, { color: panelSt.body }]}>{quest.title}</Text>
                       <Text style={[styles.unlockDescription, { color: panelSt.muted }]}>
@@ -3379,11 +3384,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       style={styles.houseCompletionCrestImg}
                     />
                   ) : (
-                    // The lit-house crest (F101): a generated candy sprite
-                    // instead of the raw OS emoji, matching the temple crest
-                    // above at the darker phases.
+                    // The whole-house crest (assets/ui/spots/house_whole.png):
+                    // the finished cottage with every window lit, drawn at
+                    // spot size instead of the 20dp-class chrome house icon.
                     <Image
-                      source={getModeIconSprite('house')!}
+                      source={SPOT_ART.houseWhole}
                       accessibilityLabel="the house"
                       style={styles.houseCompletionCrestImg}
                     />
@@ -3803,23 +3808,19 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginLeft: 4,
   },
-  headerBadge: {
+  // The candy alert pip (generateGameIcons chrome) replaces the flat orange
+  // circle + '!' Text pair on the journal / quest header buttons.
+  headerBadgeIcon: {
     position: 'absolute',
-    right: -4,
-    top: -4,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    paddingHorizontal: 3,
-    backgroundColor: CandyColors.orange.main,
-    justifyContent: 'center',
-    alignItems: 'center',
+    right: -6,
+    top: -6,
+    width: 18,
+    height: 18,
   },
-  headerBadgeText: {
-    fontFamily: PIXEL_FONT_BOLD,
-    color: CandyColors.white,
-    fontSize: FONT_SIZE.micro,
-    fontWeight: '800',
+  // Inline check mark, x-height sized.
+  inlineMark: {
+    width: 12,
+    height: 12,
   },
   headerIconText: {
     fontFamily: BODY_FONT,
@@ -4312,6 +4313,11 @@ const styles = StyleSheet.create({
   questItem: {
     marginBottom: 10,
   },
+  questArt: {
+    width: 44,
+    height: 44,
+    marginRight: 12,
+  },
   unlockInfo: {
     flex: 1,
   },
@@ -4632,8 +4638,8 @@ const styles = StyleSheet.create({
     opacity: 0.3,
   },
   houseCompletionCrestImg: {
-    width: 64,
-    height: 64,
+    width: 92,
+    height: 92,
     marginBottom: 16,
     resizeMode: 'contain',
   },

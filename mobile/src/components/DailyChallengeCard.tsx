@@ -21,6 +21,11 @@ import { getSettingsSync } from '../services/settings';
 const FLAME_ICON = require('../../assets/ui/flame.png');
 const CALENDAR_ICON = require('../../assets/ui/calendar.png');
 const MOON_ICON = require('../../assets/ui/moon.png');
+// Completed state: the carved check + the real star sprites (the card used to
+// draw a '✓' glyph over a '★★☆' text string beside candy sprite badges).
+const CHECK_ICON = require('../../assets/ui/check.png');
+const STAR_FILLED = require('../../assets/ui/star_filled.png');
+const STAR_EMPTY = require('../../assets/ui/star_empty.png');
 
 // F78: attention pulses slow into a smolder as the descent deepens — same
 // colors, longer breath (bright base 1200ms -> ~2200ms at Phase 3 -> ~2800ms
@@ -202,10 +207,17 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
 
         {isCompleted ? (
           <View style={styles.completedContent}>
-            <Text style={styles.checkIcon}>✓</Text>
-            <Text style={styles.miniStars}>
-              {'★'.repeat(stars)}{'☆'.repeat(3 - stars)}
-            </Text>
+            <Image source={CHECK_ICON} style={styles.checkIconImage} resizeMode="contain" accessible={false} />
+            <View style={styles.miniStarsRow} accessible={false}>
+              {[1, 2, 3].map(slot => (
+                <Image
+                  key={slot}
+                  source={slot <= stars ? STAR_FILLED : STAR_EMPTY}
+                  style={styles.miniStarIcon}
+                  resizeMode="contain"
+                />
+              ))}
+            </View>
           </View>
         ) : (
           <Image source={CALENDAR_ICON} style={styles.calendarIconImage} />
@@ -275,19 +287,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkIcon: {
-    fontFamily: PIXEL_FONT_BOLD,
-    fontSize: FONT_SIZE.bodyLg,
-    fontWeight: '900',
-    color: CandyColors.green.main,
+  checkIconImage: {
+    width: 14,
+    height: 14,
     marginTop: -1,
   },
-  miniStars: {
-    fontFamily: BODY_FONT,
-    fontSize: FONT_SIZE.micro,
-    color: CandyColors.yellow.main,
-    marginTop: -2,
-    letterSpacing: 0.5,
+  miniStarsRow: {
+    flexDirection: 'row',
+    marginTop: 1,
+  },
+  miniStarIcon: {
+    width: 9,
+    height: 9,
+    marginHorizontal: 0.5,
   },
   streakBadge: {
     position: 'absolute',

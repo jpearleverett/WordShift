@@ -7,7 +7,9 @@ import {
   Animated,
   Easing,
   GestureResponderEvent,
+  Image,
 } from 'react-native';
+import { CHROME_ICONS } from './ui/chromeIcons';
 import { Letter, RowData } from '../types';
 import { LetterTile, getGuideGlowConfig, getSquashParams } from './LetterTile';
 import { DraggableTile } from './DraggableTile';
@@ -1332,9 +1334,10 @@ export const Row: React.FC<RowProps> = memo(({
         </View>
       )}
       {isCompleted && (
-        <View style={styles.floatingCheckBadge}>
-          <Text style={styles.checkText}>✓</Text>
-        </View>
+        /* The generated candy check badge (assets/ui/check_badge.png), the same
+           material as the PICK/DROP candy badges, in place of a flat green
+           circle with a '✓' glyph. */
+        <Image source={CHROME_ICONS.checkBadge} style={styles.floatingCheckBadge} resizeMode="contain" />
       )}
 
       {/* Outer glow for source row */}
@@ -1567,26 +1570,11 @@ const styles = StyleSheet.create({
   // Check badge for completed
   floatingCheckBadge: {
     position: 'absolute',
-    left: 12,
-    top: 8,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: CandyColors.green.main,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: CandyColors.green.main,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
-    shadowRadius: 4,
-    elevation: 8,
-    zIndex: 20,
-  },
-  checkText: {
-    fontFamily: PIXEL_FONT_BOLD,
-    color: CandyColors.white,
-    fontSize: FONT_SIZE.bodyLg,
-    fontWeight: '900',
+    left: 10,
+    top: 6,
+    width: 28,
+    height: 28,
+    zIndex: 5,
   },
 
   // Slot styles

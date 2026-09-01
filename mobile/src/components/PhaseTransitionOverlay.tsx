@@ -19,7 +19,14 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const SCENE_IMAGE_SOURCES: Record<SceneImage, ReturnType<typeof require>> = {
   shadow_figure: require('../../assets/environment/shadow_figure.png'),
   house: require('../../assets/environment/roof.png'),
+  // Phase 1-3 ceremony emblems (512px, generateGameIcons): luminous painted
+  // subjects for the three transitions that had no image of their own.
+  ceremony_curious: require('../../assets/ui/spots/ceremony_curious.png'),
+  ceremony_deeper: require('../../assets/ui/spots/ceremony_deeper.png'),
+  ceremony_shadows: require('../../assets/ui/spots/ceremony_shadows.png'),
 };
+/** The square ceremony emblems share one size: ~60% of the screen width. */
+const CEREMONY_EMBLEM_SIZE = { width: Math.round(SCREEN_WIDTH * 0.6), height: Math.round(SCREEN_WIDTH * 0.6) };
 
 // Rendered sizes preserve each asset's aspect (shadow_figure 600x1200,
 // roof 792x283) and sit behind the centered scene text.
@@ -32,6 +39,9 @@ const SCENE_IMAGE_SIZES: Record<SceneImage, { width: number; height: number }> =
     width: Math.round(SCREEN_WIDTH * 0.72),
     height: Math.round(SCREEN_WIDTH * 0.72 * (283 / 792)),
   },
+  ceremony_curious: CEREMONY_EMBLEM_SIZE,
+  ceremony_deeper: CEREMONY_EMBLEM_SIZE,
+  ceremony_shadows: CEREMONY_EMBLEM_SIZE,
 };
 
 /** Default peak opacity for a scene image when the scene doesn't set one. */

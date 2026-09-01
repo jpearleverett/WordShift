@@ -1,5 +1,10 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+
+// The crash card's spot (assets/ui/spots): an overturned inkpot beside a
+// cracked tile. A static require resolves at bundle time, so it cannot itself
+// throw inside the boundary that is rendering the fallback.
+const SPILLED_INK = require('../../assets/ui/spots/spilled_ink.png');
 import { getSurfaceTheme, SurfaceTheme } from '../theme/surfaces';
 import { getCurrentPhaseSync } from '../services/amberCurrency';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
@@ -73,9 +78,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       return (
         <View style={[styles.container, { backgroundColor: t.screenBg }]}>
           <View style={[styles.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-            {/* Neutral on-brand mark (the game's own settle glyph), never a
+            {/* Neutral on-brand spot (spilled ink, a cracked tile), never a
                 face emoji that reads as flippant during the descent. */}
-            <Text style={[styles.mark, { color: t.muted }]}>{'◈'}</Text>
+            <Image source={SPILLED_INK} style={styles.markImage} resizeMode="contain" accessible={false} />
             <Text style={[styles.title, { color: t.title }]}>{this.title()}</Text>
             <Text style={[styles.message, { color: t.body }]}>
               {this.props.fallbackMessage || 'Something went wrong. Please try again.'}
@@ -112,9 +117,9 @@ const styles = StyleSheet.create({
     paddingVertical: 30,
     maxWidth: 360,
   },
-  mark: {
-    fontFamily: BODY_FONT,
-    fontSize: FONT_SIZE.giant,
+  markImage: {
+    width: 72,
+    height: 72,
     marginBottom: 14,
   },
   title: {

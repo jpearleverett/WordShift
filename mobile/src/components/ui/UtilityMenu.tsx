@@ -23,10 +23,14 @@ import { canStartNewCycle } from '../../services/amberCurrency';
 // Candy-style UI icon sprites (cross-platform consistent, replaces emoji)
 const STAR_ICON = require('../../../assets/ui/star_filled.png');
 const AMBER_ICON = require('../../../assets/ui/amber.png');
-const HINT_ICON = require('../../../assets/ui/hint.png');
+// The How-to-Play row wore the hint bulb (a sprite that means "spend a hint"
+// on the board); the signpost (generateGameIcons chrome) says what it is.
+const RULES_ICON = require('../../../assets/ui/rules.png');
 const FLAME_ICON = require('../../../assets/ui/flame.png');
 const VOID_ICON = require('../../../assets/ui/void.png');
-const SPARKLE_ICON = require('../../../assets/ui/emote_sparkle.png');
+// The Cosmetic Shop row borrowed an emote sparkle; the hanging shop sign is
+// the shop's own mark.
+const SHOP_ICON = require('../../../assets/ui/shop_sign.png');
 const GEAR_ICON = require('../../../assets/ui/gear.png');
 
 interface UtilityMenuProps {
@@ -136,7 +140,7 @@ export const UtilityMenu: React.FC<UtilityMenuProps> = ({
                 phase={phase}
                 hostDark={dtHostDark}
                 label={getShopTitle(phase)}
-                icon={SPARKLE_ICON}
+                icon={SHOP_ICON}
                 onPress={() => {
                   onClose();
                   onOpenShop?.();
@@ -160,7 +164,7 @@ export const UtilityMenu: React.FC<UtilityMenuProps> = ({
             <HubRow
               phase={phase}
               hostDark={dtHostDark}
-              icon={HINT_ICON}
+              icon={RULES_ICON}
               label="How to Play"
               onPress={() => {
                 onClose();

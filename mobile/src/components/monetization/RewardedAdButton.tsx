@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { Text, StyleSheet, TouchableOpacity, Animated, Image, View } from 'react-native';
+import { CHROME_ICONS } from '../ui/chromeIcons';
 import { PIXEL_FONT_BOLD } from '../../theme/fonts';
 import {
   showRewarded,
@@ -188,17 +189,19 @@ export const RewardedAdButton: React.FC<RewardedAdButtonProps> = ({
         // in-world (phase-aware), and show a small amber pip so it reads as
         // "summoning your reward" rather than a generic frozen spinner.
         <Animated.View style={[styles.busyRow, { opacity: busyOpacity }]}>
-          <Text style={[styles.label, isDark ? styles.labelDark : styles.labelLight]}>{'▷'}</Text>
+          <Image source={CHROME_ICONS.play} style={styles.playIcon} resizeMode="contain" accessible={false} />
           <AmberInline size={13} style={styles.busyPip} />
           <Text style={[styles.label, isDark ? styles.labelDark : styles.labelLight, styles.busyLabel]}>
             {getRewardedBusyLabel(phase)}
           </Text>
         </Animated.View>
       ) : (
-        <Text style={[styles.label, isDark ? styles.labelDark : styles.labelLight]}>
-          {'▷ '}
-          {label}
-        </Text>
+        /* The amber candy play mark (generateGameIcons chrome) leads the label
+           where a '▷' glyph used to. */
+        <View style={styles.busyRow}>
+          <Image source={CHROME_ICONS.play} style={styles.playIcon} resizeMode="contain" accessible={false} />
+          <Text style={[styles.label, isDark ? styles.labelDark : styles.labelLight]}>{label}</Text>
+        </View>
       )}
     </TouchableOpacity>
   );
@@ -211,6 +214,11 @@ const styles = StyleSheet.create({
   },
   busyPip: {
     marginLeft: 6,
+  },
+  playIcon: {
+    width: 13,
+    height: 13,
+    marginRight: 6,
   },
   busyLabel: {
     marginLeft: 6,

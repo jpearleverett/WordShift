@@ -4,7 +4,8 @@ import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
 import { PIXEL_FONT_BOLD } from '../theme/fonts';
 import { getPixelSkin, CARD_CORNER_DP, CARD_EDGE_DP } from '../theme/pixelSkin.generated';
 import { NineSliceFrame } from './ui/NineSlice';
-import { Achievement, ACHIEVEMENT_CATEGORY_ICONS } from '../services/achievements';
+import { Achievement } from '../services/achievements';
+import { getAchievementArt } from './achievementArt';
 import { AmberInline } from './AmberInline';
 import { getSettingsSync } from '../services/settings';
 import { announceForA11y } from '../services/a11yAnnounce';
@@ -135,7 +136,7 @@ export const AchievementToast: React.FC<AchievementToastProps> = ({
         />
         <View style={[styles.iconBadge, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}>
           <Image
-            source={ACHIEVEMENT_CATEGORY_ICONS[achievement.category]}
+            source={getAchievementArt(achievement.id, achievement.category)}
             style={styles.icon}
             resizeMode="contain"
           />
@@ -184,8 +185,8 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   icon: {
-    width: 26,
-    height: 26,
+    width: 32,
+    height: 32,
   },
   textContainer: {
     flex: 1,

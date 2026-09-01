@@ -17,6 +17,7 @@ import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { NineSliceFrame } from '../ui/NineSlice';
 import { CandyButton } from '../ui/CandyButton';
 import { PanelCard } from '../ui/PanelCard';
+import { CHROME_ICONS } from '../ui/chromeIcons';
 import { AmberInline } from '../AmberInline';
 import { AmberSparkle } from '../home/AmberSparkle';
 import {
@@ -719,7 +720,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
                 </View>
               </View>
               {isSupporterActive ? (
-                <Text style={[styles.ownedText, { color: t.amberText }]}>Active ✦</Text>
+                <Text style={[styles.ownedText, { color: t.amberText }]}>Active <Image source={CHROME_ICONS.starBullet} style={styles.inlineMark} /></Text>
               ) : (
                 renderPricePill(
                   prices[PRODUCT_IDS.SUPPORTER_SUB] ?? SUPPORTER_SUB_FALLBACK_PRICE,
@@ -741,7 +742,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
                 </View>
               </View>
               {ownsBundle ? (
-                <Text style={[styles.ownedText, { color: t.amberText }]}>Owned ✦</Text>
+                <Text style={[styles.ownedText, { color: t.amberText }]}>Owned <Image source={CHROME_ICONS.starBullet} style={styles.inlineMark} /></Text>
               ) : (
                 renderPricePill(
                   prices[PRODUCT_IDS.COSMETIC_BUNDLE] ?? COSMETIC_BUNDLE_FALLBACK_PRICE,
@@ -764,7 +765,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
                 <PanelCard phase={phase} style={styles.patronLink}>
                   <Text style={[styles.patronLinkText, { color: t.body }]}>
                     Want a quieter table and a little amber every puzzle?{' '}
-                    <Text style={{ fontWeight: '800', color: t.title }}>Become a Patron →</Text>
+                    <Text style={{ fontWeight: '800', color: t.title }}>Become a Patron <Image source={CHROME_ICONS.chevron} style={styles.inlineMark} /></Text>
                   </Text>
                 </PanelCard>
               </TouchableOpacity>
@@ -950,6 +951,11 @@ const styles = StyleSheet.create({
   pricePill: { minWidth: 84, alignSelf: 'flex-end', marginTop: 10 },
   // Same slot, for the rewarded-clip button on the Daily Amber row.
   rowAction: { alignSelf: 'flex-end', marginTop: 10 },
+  // Inline brass star / chevron marks (generateGameIcons chrome), x-height sized.
+  inlineMark: {
+    width: 12,
+    height: 12,
+  },
   ownedText: {
     fontSize: FONT_SIZE.body,
     fontWeight: '800',

@@ -20,6 +20,7 @@ import { SURFACE, getSurfaceTheme, getModalInSpring } from '../../theme/surfaces
 import { getSettingsSync } from '../../services/settings';
 import { PanelCard } from '../ui/PanelCard';
 import { getModeIconSprite } from './modeIcons';
+import { DIFFICULTY_ART } from './difficultyArt';
 import { Difficulty, GameMode } from '../../types';
 import { DialoguePhase } from '../../types/homeWorld';
 import {
@@ -158,14 +159,6 @@ const SCROLL_FADE_STOPS = [0.0, 0.22, 0.46, 0.72, 0.95];
 const SCROLL_BOTTOM_PAD = 28;
 
 /** Semantic difficulty ring colors (shared candy identity with the header dot). */
-const DIFFICULTY_RING_COLORS: Record<Difficulty, string> = {
-  EASY: CandyColors.green.main,
-  MEDIUM: CandyColors.yellow.main,
-  MEDIUM_PLUS: CandyColors.orange.main,
-  HARD: CandyColors.red.main,
-  EXPERT: CandyColors.purple.main,
-};
-
 /** Canonical difficulty order — the setup rows and the header chip share it.
  * EXPERT (6-letter apex) is last and is gated: it renders as a locked row with
  * a countdown until EXPERT_UNLOCK_PUZZLES solves (see the row rendering). */
@@ -642,8 +635,10 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
                 ? `Expert difficulty, locked. ${expertUnlockHint ?? ''}`
                 : `${label} difficulty${currentDifficulty === d ? ', selected' : ''}`}
             >
-              <View
-                style={[styles.difficultyRing, { borderColor: DIFFICULTY_RING_COLORS[d], opacity: locked ? 0.4 : 1 }]}
+              <Image
+                source={DIFFICULTY_ART[d]}
+                style={[styles.difficultySeal, locked && styles.difficultySealLocked]}
+                resizeMode="contain"
               />
               {/* Title + tease share a flexing column, matching the Blind and
                   Lexicon locked rows. Previously the hint was a bare sibling
@@ -1236,12 +1231,16 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
-  difficultyRing: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    borderWidth: 3,
+  // The tier's wax-seal emblem (assets/ui/difficulty): the seal colour still
+  // carries the tier hue, but the embossed symbol tells the tiers apart by
+  // silhouette too, where the old 12dp ring was colour alone.
+  difficultySeal: {
+    width: 28,
+    height: 28,
     marginRight: 10,
+  },
+  difficultySealLocked: {
+    opacity: 0.4,
   },
   menuRowText: {
     fontFamily: PIXEL_FONT_BOLD,

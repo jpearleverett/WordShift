@@ -19,12 +19,42 @@ export const MODE_ICON_SPRITES: { [glyph: string]: ImageSourcePropType } = {
   '🌑': require('../../../assets/ui/blind.png'),
   '👁': require('../../../assets/ui/eye.png'),
   '🧵': require('../../../assets/ui/weave.png'),
+  // Lexicon off/on and the Speed Shift off-state (generateGameIcons chrome):
+  // the closed book, the open book, and the hourglass. Before these existed the
+  // DifficultyMenu fell back to raw OS emoji for exactly these three glyphs.
+  '📕': require('../../../assets/ui/book_closed.png'),
+  '📖': require('../../../assets/ui/book_open.png'),
+  '⏱': require('../../../assets/ui/hourglass.png'),
   // Named (non-emoji) keys for HUD/crest sprites that have no single mode glyph.
   'house': require('../../../assets/ui/home.png'),
   'moon': require('../../../assets/ui/moon.png'),
+  // The phase-mood family (puzzle-header atmosphere badge + the victory
+  // phase-change card): one sprite per phase, 0..5.
+  'sun': require('../../../assets/ui/sun.png'),
+  'thought': require('../../../assets/ui/thought.png'),
+  'eye': require('../../../assets/ui/eye.png'),
+  'void': require('../../../assets/ui/void.png'),
+  'dove': require('../../../assets/ui/dove.png'),
+  // Victory-receipt bullets and the Time's Up overlay.
+  'hourglass': require('../../../assets/ui/hourglass.png'),
+  'clover': require('../../../assets/ui/clover.png'),
+  'ribbon': require('../../../assets/ui/ribbon.png'),
 };
 
+/** Phase 0..5 -> the phase-mood sprite key (sun, thought, moon, eye, void, dove). */
+const PHASE_INDICATOR_KEYS = ['sun', 'thought', 'moon', 'eye', 'void', 'dove'] as const;
+
 const stripVariationSelector = (glyph: string): string => glyph.replace(/\uFE0F/g, '');
+
+/**
+ * The phase-mood sprite for a dialogue phase (clamped to 0..5). Replaces the
+ * raw ☀️/💭/🌙/👁️/🌑/🕊️ emoji `getPhaseIndicator` still carries as a semantic
+ * key, on the puzzle header badge and the victory phase-change card.
+ */
+export function getPhaseIndicatorSprite(phase: number): ImageSourcePropType {
+  const idx = Math.max(0, Math.min(PHASE_INDICATOR_KEYS.length - 1, Math.floor(phase)));
+  return MODE_ICON_SPRITES[PHASE_INDICATOR_KEYS[idx]];
+}
 
 /** The candy sprite for a mode glyph, or null if unmapped (caller renders text). */
 export function getModeIconSprite(glyph: string): ImageSourcePropType | null {
