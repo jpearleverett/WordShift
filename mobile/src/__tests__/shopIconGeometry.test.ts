@@ -67,7 +67,7 @@ const ICON_SETS: ReadonlyArray<IconSet> = [
     dir: ui('.'),
     size: 256,
     minCoverage: 0.06,
-    only: ['check.png', 'check_badge.png', 'chevron.png', 'alert_pip.png', 'play.png', 'star_bullet.png', 'close.png'],
+    only: ['check.png', 'check_badge.png', 'chevron.png', 'alert_pip.png', 'play.png', 'star_bullet.png', 'close.png', 'cycle_loop.png', 'ledger_quill.png', 'word_echo.png', 'paper_plane.png'],
   },
 ];
 /** Alpha above this counts as painted; below it is anti-aliasing tail. */

@@ -24,6 +24,14 @@ export const CHROME_ICONS = {
   starBullet: require('../../../assets/ui/star_bullet.png') as ImageSourcePropType,
   /** A carved X with a brass face: the close mark. */
   close: require('../../../assets/ui/close.png') as ImageSourcePropType,
+  /** A serpent ring biting its tail, serene mauve: the Phase-5 New Cycle door row. */
+  cycleLoop: require('../../../assets/ui/cycle_loop.png') as ImageSourcePropType,
+  /** A quill standing in an inkpot: the Word Ledger row (the ledger's own mark). */
+  ledgerQuill: require('../../../assets/ui/ledger_quill.png') as ImageSourcePropType,
+  /** A candy letter tile with a speech ripple: a puzzle word that made an animal react. */
+  wordEcho: require('../../../assets/ui/word_echo.png') as ImageSourcePropType,
+  /** A folded paper plane: the challenge-a-friend share button. */
+  paperPlane: require('../../../assets/ui/paper_plane.png') as ImageSourcePropType,
 } as const;
 
 /** Scene spots (256px) for the cards that had no image at all. */
@@ -42,4 +50,6 @@ export const SPOT_ART = {
   emptyLedger: require('../../../assets/ui/spots/empty_ledger.png') as ImageSourcePropType,
   /** An empty picture frame on a nail: the Whisper Gallery empty state. */
   emptyGallery: require('../../../assets/ui/spots/empty_gallery.png') as ImageSourcePropType,
+  /** A rolled blueprint with a pencil: the empty house before the first room. */
+  emptyHouse: require('../../../assets/ui/spots/empty_house.png') as ImageSourcePropType,
 } as const;

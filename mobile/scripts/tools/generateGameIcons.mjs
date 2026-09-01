@@ -16,6 +16,7 @@
 //   gameIcons/chromeB.mjs                    7 more chrome marks (check, check badge, chevron, alert pip, play, star bullet, close)
 //   gameIcons/spotsB.mjs                     5 spot pieces (house whole, gathering kettle, shrine, spilled ink, notice)  -> assets/ui/spots
 //   gameIcons/ceremony.mjs                   3 phase 1-3 ceremony emblems (512px) for the PhaseTransitionOverlay -> assets/ui/spots
+//   gameIcons/chromeC.mjs                    4 more chrome marks (cycle loop, ledger quill, word echo, paper plane) + the empty-house spot
 //
 // Run: node scripts/tools/generateGameIcons.mjs
 import fs from 'node:fs';
@@ -30,6 +31,7 @@ import { draw as drawChromeSpots } from './gameIcons/chromeSpots.mjs';
 import { draw as drawChromeB } from './gameIcons/chromeB.mjs';
 import { draw as drawSpotsB } from './gameIcons/spotsB.mjs';
 import { draw as drawCeremony } from './gameIcons/ceremony.mjs';
+import { draw as drawChromeC } from './gameIcons/chromeC.mjs';
 
 const UI = path.resolve(import.meta.dirname, '../../assets/ui');
 for (const d of ['achievements', 'quests', 'difficulty', 'rules', 'spots']) fs.mkdirSync(path.join(UI, d), { recursive: true });
@@ -44,6 +46,7 @@ drawChromeSpots();
 drawChromeB();
 drawSpotsB();
 drawCeremony();
+drawChromeC();
 
 for (const d of ['achievements', 'quests', 'difficulty', 'rules', 'spots']) {
   const n = fs.readdirSync(path.join(UI, d)).filter(f => f.endsWith('.png')).length;

@@ -32,7 +32,9 @@ const RULES_ICON = require('../../../assets/ui/rules.png');
 // The Offering row shares the altar's own lit taper with SacrificeModal (the
 // streak flame it used to borrow means "days in a row" on every other surface).
 const CANDLE_ICON = require('../../../assets/ui/candle.png');
-const VOID_ICON = require('../../../assets/ui/void.png');
+// The New Cycle door wears its own serpent-ring mark (generateGameIcons chrome)
+// rather than the phase-4 void disc it used to borrow from the mood badge.
+const CYCLE_ICON = require('../../../assets/ui/cycle_loop.png');
 // The Cosmetic Shop row borrowed an emote sparkle; the hanging shop sign is
 // the shop's own mark.
 const SHOP_ICON = require('../../../assets/ui/shop_sign.png');
@@ -211,7 +213,7 @@ export const UtilityMenu: React.FC<UtilityMenuProps> = ({
               <HubRow
                 phase={phase}
                 hostDark={dtHostDark}
-                icon={VOID_ICON}
+                icon={CYCLE_ICON}
                 label={getNewCycleTitle()}
                 onPress={() => {
                   onClose();

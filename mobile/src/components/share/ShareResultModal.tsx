@@ -303,7 +303,7 @@ export const ShareResultModal: React.FC<ShareResultModalProps> = ({ result, onCl
                 {challengeText != null && (
                   <CandyButton
                     label={getChallengeFriendLabel(phase)}
-                    icon={require('../../../assets/ui/variant_swords.png')}
+                    icon={require('../../../assets/ui/paper_plane.png')}
                     onPress={handleChallengeShare}
                     phase={phase}
                     variant="secondary"

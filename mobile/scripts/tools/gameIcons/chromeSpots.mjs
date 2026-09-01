@@ -19,9 +19,12 @@
  *                    fat rays fanning above it. The horizon is the tell.
  *   season_pass.png  the store's season premium is a TICKET (notched, stubbed).
  *                    This is a landscape PASS CARD: a parchment card inside a
- *                    plum border, two plum title bars, and a big crimson wax
- *                    seal at the lower right with two notched red ribbon tails
- *                    hanging off the card. No notches, no stub, no perforation.
+ *                    plum border, two plum title bars, a red SASH laid
+ *                    diagonally across the lower-right corner (both ends
+ *                    dovetailed just past the card) and a smooth crimson wax
+ *                    seal with a plain pressed ring where the sash crosses the
+ *                    corner. No notches, no stub, no perforation, and no
+ *                    pleats or star, so it is not ribbon.png's rosette either.
  *   book_closed/open the shipped journal.png is a BURGUNDY tome with brass
  *                    corner braces, an amber boss and a crimson bookmark. This
  *                    book is FOREST-GREEN leather with a plain blind-embossed
@@ -38,9 +41,13 @@
  *   rules.png        a wooden signpost: one post seated in an earth mound, ONE
  *                    arrow board pointing right, two nail heads.
  *   shop_sign.png    a plank sign hanging by two iron links from an iron
- *                    bracket rod, with a fat paintbrush lying diagonally across
- *                    its face (wine handle, brass ferrule, candy-pink paint on
- *                    the bristles).
+ *                    bracket rod that runs well past the plank with a ball
+ *                    finial at each end (a short rod over a wide plank read as
+ *                    a briefcase handle at 24dp), with a flat house-painter's
+ *                    brush lying diagonally across its face (wine handle,
+ *                    brass ferrule, a bristle head WIDER than the handle,
+ *                    square-cut and dipped in candy-pink paint; a thin
+ *                    tapered head read as a pencil).
  *   clover.png       a four-leaf clover: four heart-shaped leaves on the
  *                    diagonals around a dark hub, the two upper leaves lit and
  *                    the lower two shaded, one short stem down-right.
@@ -290,8 +297,10 @@ export function draw() {
     const sx = c, sy = c + 56, R = 126;
     contactShadow(cv, c + 8, sy + 106, 176, 18, 0.3);
     withOutline(cv, t => {
+      // five rays, fat enough (30px root, 18px tip on the 512 supersample) to
+      // stay solid bars rather than hairs once the file is 24dp wide
       for (const deg of [-158, -124, -90, -56, -22]) {
-        poly(t, wedgePts(sx, sy, (deg * Math.PI) / 180, 138, 206, 23, 12), SUN.hi, 1, SUN.lo);
+        poly(t, wedgePts(sx, sy, (deg * Math.PI) / 180, 136, 210, 30, 18), SUN.hi, 1, SUN.lo);
       }
       poly(t, domePts(sx, sy, R, R, sy + 28), SUN.lite, 1, SUN.mid);
       // the disc's own bevel: a deeper band where it meets the horizon, and a
@@ -353,9 +362,10 @@ export function draw() {
       roundRect(t, bx + 20, by - 4, 58, 96, 9, LEATHER.deep, 0.6);
       roundRect(t, bx + 20, by - 4, 44, 82, 6, LEATHER.base, 1, LEATHER.lo);
       // the clasp: a strap over the fore-edge with a brass buckle at its end
-      roundRect(t, bx + HW - 8, by + 8, 46, 21, 8, STRAP.hi, 1, STRAP.lo);
-      roundRect(t, bx + HW + 34, by + 8, 21, 31, 7, BR.hi, 1, BR.lo);
-      ellipse(t, bx + HW + 34, by + 8, 7, 10, STRAP.lo, 0.9, 2);
+      // (sized so the buckle is still a visible brass block, not a nub, at 24dp)
+      roundRect(t, bx + HW - 6, by + 8, 52, 26, 9, STRAP.hi, 1, STRAP.lo);
+      roundRect(t, bx + HW + 38, by + 8, 27, 39, 8, BR.hi, 1, BR.lo);
+      ellipse(t, bx + HW + 38, by + 8, 9, 13, STRAP.lo, 0.9, 2);
     }, CHROME);
     sheen(cv, bx - 40, by - 122, 34, 13, 0.45);
     save(cv, path.join(OUT, 'book_closed.png'));
@@ -368,44 +378,55 @@ export function draw() {
     withOutline(cv, t => {
       openBook(t, c, by, 198, 122, 22, 16, LEATHER, PAGE, { lines: true });
       // the clasp buckle hangs off the right cover's outer edge
-      roundRect(t, c + 186, by + 30, 22, 18, 7, STRAP.hi, 1, STRAP.lo);
-      roundRect(t, c + 206, by + 30, 18, 28, 7, BR.hi, 1, BR.lo);
-      ellipse(t, c + 206, by + 30, 6, 9, STRAP.lo, 0.9, 2);
+      roundRect(t, c + 186, by + 30, 24, 22, 8, STRAP.hi, 1, STRAP.lo);
+      roundRect(t, c + 208, by + 30, 22, 34, 8, BR.hi, 1, BR.lo);
+      ellipse(t, c + 208, by + 30, 7, 11, STRAP.lo, 0.9, 2);
     }, CHROME);
     sheen(cv, c - 150, by - 96, 34, 12, 0.4);
     save(cv, path.join(OUT, 'book_open.png'));
   }
 
   { // === season_pass.png — ribboned pass card with a wax seal ================
+    // The first draft hung two notched tails straight down from a lumpy,
+    // star-stamped seal, which was the rosette of ribbon.png in miniature: at
+    // 24dp rows 5 and 9 were twins. The ribbon is now a SASH laid diagonally
+    // across the card's lower-right corner, both ends dovetailed just past the
+    // card's edges, and the seal is a smooth wax disc with a plain pressed ring
+    // sitting where the sash crosses the corner. Card + sash + seal is the
+    // silhouette; nothing here has pleats or a star.
     const cv = fresh();
-    const kx = c, ky = c - 14, HW = 190, HH = 120;
+    const kx = c, ky = c - 10, HW = 190, HH = 122;
     contactShadow(cv, kx + 12, ky + HH + 30, 170, 22, 0.3);
+    const wx = kx + 118, wy = ky + 58, wr = 54;                     // the seal
+    const ux = 0.62, uy = -0.785;                                    // sash direction
     withOutline(cv, t => {
-      // ribbon tails first, so they emerge from under the seal
-      poly(t, tailPts(c + 96, c + 90, c + 62, c + 190, 34, 16), RED.base, 1, RED.lo);
-      poly(t, tailPts(c + 126, c + 90, c + 160, c + 186, 34, 16), RED.base, 1, RED.lo);
       // the card: plum border, parchment face
       roundRect(t, kx, ky, HW, HH, 18, PLUM.hi, 1, PLUM.lo);
       roundRect(t, kx, ky, HW - 18, HH - 18, 10, PARCH.hi, 1, PARCH.dim);
       capsule(t, kx - HW + 26, ky - HH + 10, kx + HW - 26, ky - HH + 10, 8, '#B4729F', 0.7);
       // two plum title bars on the left half
-      roundRect(t, kx - 66, ky - 54, 92, 15, 7, PLUM.base, 1, PLUM.lo);
-      roundRect(t, kx - 86, ky - 12, 72, 11, 5, PLUM.base, 0.85, PLUM.lo);
-      roundRect(t, kx - 86, ky + 26, 72, 11, 5, PLUM.base, 0.85, PLUM.lo);
-      // the wax seal, lower right, overlapping the border
-      const wx = c + 110, wy = c + 62, wr = 58;
-      for (let i = 0; i < 9; i++) {                                   // pressed lumpy rim
-        const a = (i / 9) * Math.PI * 2 + 0.3;
-        ellipse(t, wx + Math.cos(a) * (wr - 6), wy + Math.sin(a) * (wr - 6), 15, 15, WAX.base, 1, 3);
+      roundRect(t, kx - 66, ky - 56, 92, 15, 7, PLUM.base, 1, PLUM.lo);
+      roundRect(t, kx - 86, ky - 14, 72, 11, 5, PLUM.base, 0.85, PLUM.lo);
+      roundRect(t, kx - 86, ky + 24, 72, 11, 5, PLUM.base, 0.85, PLUM.lo);
+      // the sash: two dovetailed halves running out from the seal's centre so
+      // each end past the card is a notched ribbon tail
+      poly(t, tailPts(wx, wy, wx + ux * 150, wy + uy * 150, 46, 18), RED.hi, 1, RED.base);
+      poly(t, tailPts(wx, wy, wx - ux * 156, wy - uy * 156, 46, 18), RED.base, 1, RED.lo);
+      capsule(t, wx - ux * 120 - 6, wy - uy * 120 - 8, wx + ux * 120 - 6, wy + uy * 120 - 8, 8, RED.lite, 0.45);
+      // the wax seal: a gently lumpy blob, a lit crescent, a plain pressed ring
+      for (let i = 0; i < 7; i++) {
+        const a = (i / 7) * Math.PI * 2 + 0.4;
+        ellipse(t, wx + Math.cos(a) * (wr - 8), wy + Math.sin(a) * (wr - 8), 13, 13, WAX.base, 1, 3);
       }
-      ellipse(t, wx, wy, wr - 4, wr - 4, WAX.base, 1, 3);
-      arcStroke(t, wx, wy, wr - 16, 14, 0.4, Math.PI - 0.4, WAX.lo, 0.7);
-      arcStroke(t, wx, wy, wr - 16, 12, -Math.PI + 0.5, -0.5, WAX.hi, 0.75);
-      ellipse(t, wx, wy, 34, 34, WAX.lo, 1, 3);                       // the impression
-      poly(t, starPts(wx, wy - 1, 24, 11), WAX.hi, 1);
+      ellipse(t, wx, wy, wr - 5, wr - 5, WAX.base, 1, 3);
+      arcStroke(t, wx, wy, wr - 17, 12, 0.5, Math.PI - 0.5, WAX.lo, 0.65);
+      arcStroke(t, wx, wy, wr - 17, 11, -Math.PI + 0.6, -0.6, WAX.hi, 0.7);
+      arcStroke(t, wx, wy, 24, 12, -Math.PI, Math.PI, WAX.lo, 0.95);
+      arcStroke(t, wx - 1, wy - 2, 24, 6, -Math.PI + 0.4, -0.4, WAX.hi, 0.6);
+      ellipse(t, wx, wy, 9, 9, WAX.lo, 1, 3);
     }, CHROME);
-    sheen(cv, kx - 140, ky - 84, 30, 12, 0.4);
-    sheen(cv, c + 90, c + 40, 9, 6, 0.5);
+    sheen(cv, kx - 140, ky - 86, 30, 12, 0.4);
+    sheen(cv, wx - 20, wy - 22, 9, 6, 0.5);
     save(cv, path.join(OUT, 'season_pass.png'));
   }
 
@@ -436,41 +457,53 @@ export function draw() {
   }
 
   { // === shop_sign.png — hanging wooden shop sign with a paintbrush ===========
+    // Two lessons from the first draft at 24dp. A short rod with two links
+    // over a wide plank is the outline of a BRIEFCASE and its handle, so the
+    // bracket rod now runs well past the plank on both sides with a ball
+    // finial at each end (a rod, not a handle). And a thin tapering stick with
+    // a pink tip is a PENCIL, so the brush is now a flat house-painter's brush:
+    // a short wine handle, a brass ferrule, and a bristle head WIDER than the
+    // handle with a square-cut end dipped in candy-pink paint, hanging off the
+    // plank's lower-right corner.
     const cv = fresh();
-    const py = c + 30;
-    contactShadow(cv, c + 10, py + 128, 160, 18, 0.32);
-    // the paintbrush lies along d = (0.80, -0.60) from its butt at (x0, y0)
-    const x0 = c - 128, y0 = py + 78, dx = 0.8, dy = -0.6, nx = 0.6, ny = 0.8;
+    const py = c + 34;
+    contactShadow(cv, c + 10, py + 132, 160, 18, 0.32);
+    // the brush lies along d = (0.80, 0.60) from its butt at (x0, y0)
+    const x0 = c - 152, y0 = py - 74, dx = 0.8, dy = 0.6, nx = -0.6, ny = 0.8;
     const P = (tt, s) => [x0 + dx * tt + nx * s, y0 + dy * tt + ny * s];
     withOutline(cv, t => {
-      capsule(t, c - 156, c - 168, c + 156, c - 168, 22, IRON.base);     // bracket rod
-      capsule(t, c - 150, c - 174, c + 150, c - 174, 7, IRON.hi, 0.7);
-      for (const x of [c - 122, c + 122]) {                              // two links
-        capsule(t, x, c - 162, x, py - 96, 16, IRON.lo);
-        capsule(t, x - 4, c - 156, x - 4, py - 100, 5, IRON.hi, 0.6);
+      capsule(t, c - 196, c - 166, c + 196, c - 166, 20, IRON.base);     // bracket rod
+      capsule(t, c - 190, c - 172, c + 190, c - 172, 6, IRON.hi, 0.7);
+      for (const x of [c - 200, c + 200]) {                              // ball finials
+        ellipse(t, x, c - 166, 17, 17, IRON.base, 1, 3);
+        ellipse(t, x - 4, c - 171, 7, 6, IRON.hi, 0.8, 2);
+      }
+      for (const x of [c - 134, c + 134]) {                              // two links
+        capsule(t, x, c - 160, x, py - 100, 16, IRON.lo);
+        capsule(t, x - 4, c - 154, x - 4, py - 104, 5, IRON.hi, 0.6);
       }
       roundRect(t, c, py, 178, 112, 14, WOOD.light, 1, WOOD.dark);       // plank
       roundRect(t, c, py, 160, 94, 10, WOOD.seam, 0.5);                  // border groove
       roundRect(t, c, py, 150, 84, 8, WOOD.light, 1, WOOD.base);
       capsule(t, c - 156, py - 104, c + 156, py - 104, 9, '#F7D8A8', 0.7);
       // the brush: handle, ferrule, bristles, paint
-      const hA = P(0, 0), hB = P(186, 0);
-      capsule(t, hA[0], hA[1], hB[0], hB[1], 44, INK, 0.92);
-      capsule(t, hA[0], hA[1], hB[0], hB[1], 38, RED.base);
-      const cA = P(6, -8), cB = P(180, -8);
-      capsule(t, cA[0], cA[1], cB[0], cB[1], 11, RED.lite, 0.65);
-      const fA = P(180, 0), fB = P(230, 0);
-      capsule(t, fA[0], fA[1], fB[0], fB[1], 54, INK, 0.92);
-      capsule(t, fA[0], fA[1], fB[0], fB[1], 48, BR.hi, 1);
-      const rA = P(184, -12), rB = P(226, -12);
-      capsule(t, rA[0], rA[1], rB[0], rB[1], 10, BR.lite, 0.8);
-      const rC = P(184, 14), rD = P(226, 14);
-      capsule(t, rC[0], rC[1], rD[0], rD[1], 10, BR.deep, 0.6);
-      const bristle = [P(226, -25), P(300, -22), P(318, -6), P(318, 6), P(300, 22), P(226, 25)];
+      const hA = P(0, 0), hB = P(150, 0);
+      capsule(t, hA[0], hA[1], hB[0], hB[1], 42, INK, 0.92);
+      capsule(t, hA[0], hA[1], hB[0], hB[1], 36, RED.base);
+      const cA = P(8, -9), cB = P(146, -9);
+      capsule(t, cA[0], cA[1], cB[0], cB[1], 10, RED.lite, 0.6);
+      const ferrule = [P(146, -30), P(198, -32), P(198, 32), P(146, 30)];
+      poly(t, grow(ferrule, 6), INK, 0.92);
+      poly(t, ferrule, BR.hi, 1, BR.lo);
+      const rA = P(150, -18), rB = P(194, -19);
+      capsule(t, rA[0], rA[1], rB[0], rB[1], 9, BR.lite, 0.8);
+      const bristle = [P(196, -34), P(292, -38), P(300, -30), P(300, 30), P(292, 38), P(196, 34)];
       poly(t, grow(bristle, 6), INK, 0.92);
       poly(t, bristle, CREAM.hi, 1, CREAM.lo);
-      const tip = [P(280, -23), P(300, -22), P(318, -6), P(318, 6), P(300, 22), P(280, 23)];
+      const tip = [P(250, -37), P(292, -38), P(300, -30), P(300, 30), P(292, 38), P(250, 37)];
       poly(t, tip, PINK.hi, 1, PINK.lo);
+      const dA = P(300, 12), dB = P(322, 14);                             // a paint drip
+      capsule(t, dA[0], dA[1], dB[0], dB[1], 16, PINK.base);
     }, CHROME);
     sheen(cv, c - 132, py - 74, 30, 10, 0.45);
     save(cv, path.join(OUT, 'shop_sign.png'));
@@ -495,10 +528,12 @@ export function draw() {
       leaf(t, hx, hy, Q, k, CLOVER.base, CLOVER.lo);                  // lower right, shaded
       leaf(t, hx, hy, -Q, k, CLOVER.hi, CLOVER.base);                 // lower left
       // seams between the leaves and a dark hub
+      // (12px seams: at 24dp anything thinner averages away and the four
+      // leaves fuse into one green blob)
       for (const a of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
-        capsule(t, hx, hy, hx + Math.cos(a) * 118, hy + Math.sin(a) * 118, 8, CLOVER.deep, 0.75);
+        capsule(t, hx, hy, hx + Math.cos(a) * 120, hy + Math.sin(a) * 120, 12, CLOVER.deep, 0.85);
       }
-      ellipse(t, hx, hy, 17, 17, CLOVER.deep, 1, 3);
+      ellipse(t, hx, hy, 20, 20, CLOVER.deep, 1, 3);
     }, CHROME);
     sheen(cv, hx - 96, hy - 92, 26, 16, 0.5);
     save(cv, path.join(OUT, 'clover.png'));

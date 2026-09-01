@@ -46,7 +46,9 @@ const ENTRY_TYPE_ICONS: Record<string, ReturnType<typeof require>> = {
   whisper: require('../../assets/ui/whisper.png'),
   dialogue: require('../../assets/ui/speech.png'),
   cross_reference: require('../../assets/ui/link.png'),
-  trigger_reaction: require('../../assets/ui/variant_speed.png'),
+  // A candy tile with a speech ripple (generateGameIcons chrome): a puzzle word
+  // an animal reacted to, where the Speed Shift bolt used to stand in.
+  trigger_reaction: require('../../assets/ui/word_echo.png'),
 };
 const SCROLL_ICON = require('../../assets/ui/scroll.png');
 const getEntryTypeIcon = (type: string) => ENTRY_TYPE_ICONS[type] || SCROLL_ICON;

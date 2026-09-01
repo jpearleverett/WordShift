@@ -180,6 +180,11 @@ describe('chrome marks, scene spots and ceremony emblems (round 2)', () => {
     ['ErrorBoundary spot', '../components/ErrorBoundary.tsx', 'assets/ui/spots/spilled_ink.png'],
     ['Tending Shrine spot', '../components/OfferingPitScreen.tsx', 'assets/ui/spots/shrine.png'],
     ['Daily card check', '../components/DailyChallengeCard.tsx', 'assets/ui/check.png'],
+    ['Utility menu New Cycle row', '../components/ui/UtilityMenu.tsx', 'assets/ui/cycle_loop.png'],
+    ['Journal Word Ledger row', '../components/home/HomeScreen.tsx', 'assets/ui/ledger_quill.png'],
+    ['Gallery trigger-reaction entries', '../components/WhisperGalleryScreen.tsx', 'assets/ui/word_echo.png'],
+    ['Challenge-a-friend button', '../components/share/ShareResultModal.tsx', 'assets/ui/paper_plane.png'],
+    ['Empty house placeholder', '../components/home/HouseWorld.tsx', 'assets/ui/spots/empty_house.png'],
   ])('%s requires a file that exists', (_where, sourceRel, expected) => {
     const refs = referencedPngs(sourceRel);
     expect(refs).toContain(expected);

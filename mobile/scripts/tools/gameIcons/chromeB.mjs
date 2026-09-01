@@ -167,57 +167,95 @@ function creamStroke(t, x1, y1, x2, y2, th, shade) {
   capsule(t, x1 - 3, y1 - 5, x2 - 3, y2 - 5, th * 0.52, CR.hi, 0.9);
 }
 
+/**
+ * A thick round-capped stroke along an open polyline, painted as a carved
+ * ENAMEL mark: a bevel band `rim` wide inside the edge, coloured by how each
+ * edge faces the upper-left light (rimLit where the outward normal points at
+ * the light, rimDark where it points away, blended across the turn), and an
+ * inset face top-lit by y from faceTop to faceBot, split along the stroke's
+ * midline into a lit half (mixed toward faceLite) and a shaded half (mixed
+ * toward faceDeep). One distance field, so caps, joins and bevel are one body.
+ */
+function enamelStroke(t, pts, th, rim, pal) {
+  const half = th / 2, faceR = half - rim;
+  const L = [-0.7071, -0.7071];
+  const FT = hex(pal.faceTop), FB = hex(pal.faceBot), FL = hex(pal.faceLite), FD = hex(pal.faceDeep);
+  const RL = hex(pal.rimLit), RD = hex(pal.rimDark);
+  const mix = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];
+  const smooth = (e0, e1, v) => { const k = Math.max(0, Math.min(1, (v - e0) / (e1 - e0))); return k * k * (3 - 2 * k); };
+  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  const minY = Math.min(...ys) - half, maxY = Math.max(...ys) + half;
+  const x0 = Math.max(0, ~~(Math.min(...xs) - half - 2)), x1 = Math.min(t.w - 1, ~~(Math.max(...xs) + half + 2));
+  const y0 = Math.max(0, ~~(minY - 2)), y1 = Math.min(t.h - 1, ~~(maxY + 2));
+  for (let y = y0; y <= y1; y++) {
+    const ty = Math.max(0, Math.min(1, (y - minY) / (maxY - minY)));
+    for (let x = x0; x <= x1; x++) {
+      const px = x + 0.5, py = y + 0.5;
+      let d = Infinity, qx = 0, qy = 0, side = 0;
+      for (let i = 0; i + 1 < pts.length; i++) {
+        const [ax, ay] = pts[i], [bx, by] = pts[i + 1];
+        const vx = bx - ax, vy = by - ay, len2 = vx * vx + vy * vy || 1;
+        const k = Math.max(0, Math.min(1, ((px - ax) * vx + (py - ay) * vy) / len2));
+        const cx = ax + vx * k, cy = ay + vy * k;
+        const dd = Math.hypot(px - cx, py - cy);
+        if (dd < d) {
+          d = dd; qx = cx; qy = cy;
+          // signed distance from the centreline, positive on the UP side
+          const len = Math.sqrt(len2);
+          let nx = -vy / len, ny = vx / len;
+          if (ny > 0) { nx = -nx; ny = -ny; }
+          side = (px - cx) * nx + (py - cy) * ny;
+        }
+      }
+      const a = Math.max(0, Math.min(1, 0.5 - (d - half)));
+      if (a <= 0) continue;
+      // face: y gradient, then the midline split
+      let col = mix(FT, FB, ty);
+      const lit = smooth(-5, 5, side);
+      col = mix(mix(col, FD, 0.35), mix(col, FL, 0.35), lit);
+      // rim: light-facing bevel band, anti-aliased at the face edge
+      const nx = (px - qx) / (d || 1), ny = (py - qy) / (d || 1);
+      const facing = d > 0.5 ? nx * L[0] + ny * L[1] : 0;
+      const rimCol = mix(RD, RL, smooth(-0.35, 0.45, facing));
+      const rimA = Math.max(0, Math.min(1, 0.5 + (d - faceR)));
+      col = mix(col, rimCol, rimA);
+      blend(t, x, y, col[0], col[1], col[2], a);
+    }
+  }
+}
+
 export function draw() {
   fs.mkdirSync(OUT, { recursive: true });
 
   { // === check.png — one bold green-enamel tick in a brass bevel rim ========
-    // A single silhouette. The whole mark is drawn at K = 0.78 of its first
-    // pass: that pass painted 0.95 x 0.89 of the frame (a 3px margin at 256)
-    // and rendered visibly larger than close/check_badge/alert_pip beside it;
-    // at K the painted bbox sits at ~0.75 of the frame with a >= 28px clear
-    // margin, matching its siblings. The arms are 106px across in the
-    // supersample (still over 1/5 of the frame), the brass rim 19px each side
-    // (~1px at 20dp), the enamel face 68px. The face is split along each arm's
-    // midline into a lit upper half and a deep lower half (two value steps),
-    // the rim is lit along its upper-left run and dark along its lower-right,
-    // and the INK contact shadow is tucked under the long arm's lower run,
-    // offset down-right, so the bezel-only mark never reads as floating.
+    // ONE silhouette: a bare V-hook, no seat, no disc. The mark is a single
+    // distance-field stroke (`enamelStroke`, below) so the whole tick is one
+    // rounded body: 100px across in the supersample (50 at 256 = 0.195 of the
+    // frame, well over the 1/8 floor), the short arm 0.38 of the long arm, the
+    // elbow parked left-of-centre at the frame's lower third, the painted bbox
+    // ~0.74 of the frame with a clear >= 30px margin. Inside the contour:
+    //   - a 16px BRASS bevel band (1/32 of the frame) whose colour follows the
+    //     edge normal against the upper-left light: warm gold where an edge
+    //     faces the light, dark bronze where it faces away, so the brass of
+    //     the brief is the carved SETTING of the mark, never a second shape;
+    //   - a green-ENAMEL face top-lit by y (mint at the tip, deep green at the
+    //     heel) and split along each arm's midline into a lit upper half and a
+    //     shaded lower half: two clear value steps at 14px, not a wash.
+    // Contact shadow (INK 0.30, down-right of the heel) before the contour,
+    // one small sheen on the upper-left of the SHORT arm after it.
     const cv = C(S, S);
-    const K = 0.78;
-    const P = (dx, dy) => [c + dx * K, c + dy * K];
-    const A = P(-152, 2), B = P(-34, 130), T = P(148, -140);                 // tick
-    const TH = Math.round(136 * K), RIM = Math.round(24 * K), FACE = TH - RIM * 2;
-    // up-facing normals of each arm (unit), for the lit half of the face
-    const nLong = [-0.829, -0.559], nShort = [0.735, -0.678];
-    const off = (Q, n, k) => [Q[0] + n[0] * k, Q[1] + n[1] * k];
-    const lerp = (Q, R, k) => [Q[0] + (R[0] - Q[0]) * k, Q[1] + (R[1] - Q[1]) * k];
-    const Sd = lerp(B, T, 0.28);
-    contactShadow(cv, Sd[0] + 14, Sd[1] + TH / 2 + 10, 96, 20, 0.32);
+    const B = [c - 42, c + 112];                              // elbow (heel)
+    const T = [c + 116, c - 113];                             // long arm tip
+    const A = [c - 116, c + 38];                              // short arm tip
+    const TH = 100, RIM = 16;
+    contactShadow(cv, B[0] + 34, B[1] + 62, 92, 18, 0.30);
     withOutline(cv, t => {
-      // brass rim: dark run first, then the lit run set up-left so the bevel
-      // has a genuine top and bottom
-      capsule(t, A[0], A[1], B[0], B[1], TH, BR.lo);
-      capsule(t, B[0], B[1], T[0], T[1], TH, BR.lo);
-      capsule(t, A[0] - 7, A[1] - 7, B[0] - 7, B[1] - 7, TH - 5, BR.hi);
-      capsule(t, B[0] - 7, B[1] - 7, T[0] - 7, T[1] - 7, TH - 5, BR.hi);
-      // enamel face: deep green body, then the lit half of each arm
-      capsule(t, A[0], A[1], B[0], B[1], FACE, GR.lo);
-      capsule(t, B[0], B[1], T[0], T[1], FACE, GR.lo);
-      capsule(t, B[0], B[1], B[0], B[1], FACE, GR.lo);                 // solid heel
-      // (each lit half stops short of the heel, so the joint stays deep and
-      // the two halves never cross into a pale X at the foot)
-      const Bs = lerp(A, B, 0.72), Bl = lerp(B, T, 0.2);
-      const a1 = off(A, nShort, FACE / 4), b1 = off(Bs, nShort, FACE / 4);
-      const b2 = off(Bl, nLong, FACE / 4), t2 = off(T, nLong, FACE / 4);
-      capsule(t, a1[0], a1[1], b1[0], b1[1], FACE / 2, GR.hi);
-      capsule(t, b2[0], b2[1], t2[0], t2[1], FACE / 2, GR.hi);
-      // a thin mint crest along the very top of the lit half (candy edge)
-      const a3 = off(A, nShort, FACE * 0.38), b3 = off(Bs, nShort, FACE * 0.38);
-      const b4 = off(Bl, nLong, FACE * 0.38), t4 = off(T, nLong, FACE * 0.38);
-      capsule(t, a3[0], a3[1], b3[0], b3[1], FACE * 0.16, GR.lite, 0.7);
-      capsule(t, b4[0], b4[1], t4[0], t4[1], FACE * 0.16, GR.lite, 0.7);
+      enamelStroke(t, [A, B, T], TH, RIM, {
+        faceTop: '#9FE0A8', faceBot: '#3E8A4C', faceLite: '#C9F2C6', faceDeep: '#2E6E3C',
+        rimLit: '#F4CF74', rimDark: '#6B4419',
+      });
     }, OUTLINE);
-    sheen(cv, c + 39, c - 50, 12, 20, 0.5);
+    sheen(cv, c - 86, c + 46, 9, 15, 0.5);                   // short arm, upper-left
     savePNG(path.join(OUT, 'check.png'), 256, 256, down2(cv, 256, 256));
   }
 

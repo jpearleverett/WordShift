@@ -101,6 +101,9 @@ const SPARKLE_ICON = require('../../../assets/ui/emote_sparkle.png');
 // The gallery's own mark (generateUiIcons drew whisper.png for exactly this);
 // the hub row used to borrow the streak flame.
 const WHISPER_ICON = require('../../../assets/ui/whisper.png');
+// The ledger's own mark (a quill in an inkpot, generateGameIcons chrome); the
+// hub row used to repeat the header's journal book.
+const LEDGER_ICON = require('../../../assets/ui/ledger_quill.png');
 function getJournalSpotlightStepSprite(stepId: string) {
   switch (stepId) {
     case 'gallery':
@@ -2507,7 +2510,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <HubRow
                 phase={progress.currentPhase}
                 hostDark={dtHostDark}
-                icon={JOURNAL_ICON}
+                icon={LEDGER_ICON}
                 label="Word Ledger"
                 onPress={() => {
                   setShowJournalModal(false);

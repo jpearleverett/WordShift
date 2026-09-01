@@ -2363,7 +2363,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
 
                   {displayRooms.length === 0 && (
                     <View style={styles.emptyHouse}>
-                      <Image source={require('../../../assets/ui/home.png')} style={styles.emptyHouseIcon} resizeMode="contain" />
+                      <Image source={require('../../../assets/ui/spots/empty_house.png')} style={styles.emptyHouseIcon} resizeMode="contain" />
                       <Text style={styles.emptyHouseSubtext}>Your house awaits!</Text>
                     </View>
                   )}
@@ -2741,8 +2741,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   emptyHouseIcon: {
-    width: 64,
-    height: 64,
+    width: 96,
+    height: 96,
     marginBottom: 10,
   },
   emptyHouseSubtext: {
