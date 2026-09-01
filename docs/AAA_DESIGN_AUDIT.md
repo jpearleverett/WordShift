@@ -14,12 +14,14 @@
 
 | Status | Count | Share |
 |---|--:|--:|
-| ✅ done | 174 | 97% |
-| 🟡 partial | 3 | 2% |
+| ✅ done | 176 | 98% |
+| 🟡 partial | 1 | <1% |
 | ⏸️ deferred | 3 | 2% |
 | ❌ not addressed | 0 | 0% |
 
-The ledger's reconciliation is the authoritative status — the remaining 6 are its **"honest remaining"** set: 3 partials (**F1** cross-row flying ghost, **F37** robed Phase 4-5 talk frames, **F138** the full app-wide `useWindowDimensions` sweep) and 3 deferrals (**F135** room-background pan-windowing, **F132** real on-device Play screenshots, **F148** store screenshot #5 re-capture), each held with a concrete stated reason rather than shipped blind.
+The ledger's reconciliation is the authoritative status — the remaining 4 are its **"honest remaining"** set: 1 partial (**F138** the full app-wide `useWindowDimensions` sweep; the board itself is already resize-reactive) and 3 deferrals (**F135** room-background pan-windowing, **F132** real on-device Play screenshots, **F148** store screenshot #5 re-capture), each held with a concrete stated reason rather than shipped blind.
+
+**F1** (cross-row flying ghost) and **F37** (robed Phase 4-5 talk frames) were both closed on 2026-08-31 and are counted as done above; **F141** (cold-launch home flash) was closed in Session 5b.
 
 ---
 

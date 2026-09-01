@@ -3,16 +3,22 @@
 *Compiled 2026-08-31 from a full repo audit (release config, docs, design-audit ledger, code markers,
 known gaps, store/backend readiness, content/assets, plus a clean-room CI run). Items were
 adversarially verified against the repo at HEAD (`claude/game-completion-checklist-mybsmk`,
-based on versionCode 88 / v1.2.2). Updated the same day: the code/content/docs items marked
+based on versionCode 88 / v1.2.2). Updated 2026-09-01: the code/content/docs items marked
 [x] below were closed on this branch (Stats weave-leak fix, EXPERT dread top-up 195→230,
-eight doc corrections, the finale graduation-card fix), verified by a full green suite.*
+eight doc corrections, the finale graduation-card fix, the cross-row flying ghost, all 13
+`robed_talk.png` frames, the late-game copy passes, the passive Rate-WordShift row), followed by
+the SDK-56 patch sync and a design/audio pass (bespoke Arrival cue + ceremony swell banding,
+Terrible Peace sky/pit/foundation art, the Keeper's Record Phase-5 epilogue, the Phase-5 peace SFX
+tier, NG+ home entry, HUD aging, glitch ghosts) and a docs fact-check. All verified by a full
+green suite.*
 
 ## Snapshot: where the game actually stands
 
 **The codebase is effectively done and healthy.** Fresh `npm ci` → typecheck **0 errors** → lint
-**0 errors** (1,158 accepted warnings) → **122/122 suites, 3,192/3,192 tests green**. The
-AAA design audit is at **174/180 findings done, 0 unaddressed** (the audit doc's own §0 summary is
-stale — see Docs below). What remains is almost entirely: the Android production cut procedure,
+**0 errors** (1,176 accepted warnings) → **123/123 suites, 3,258/3,258 tests green**. The
+AAA design audit is at **176/180 findings done, 0 unaddressed** (F1 cross-row flight and F37 robed
+talk frames were closed on this branch; the audit's §0 table and the ledger's Totals row have been
+re-summed to match). What remains is almost entirely: the Android production cut procedure,
 console-side work only the account owner can do, a handful of device verifications, four real
 product/content gaps, a stack of stale docs, and the deliberately-deferred iOS track.
 
@@ -25,9 +31,14 @@ screen-reader modal fencing is closed at HEAD despite a stale ledger row saying 
 
 ## 1. The Android production cut (launch-critical, in order)
 
-- [ ] **Confirm Play production access.** The 12-tester/14-day closed test started 2026-07-13 and
-      was eligible for the production-access application ~2026-07-27. It is now 2026-08-31 —
-      confirm the application was submitted/approved in Play Console (unverifiable from the repo).
+> **`docs/LAUNCH_CHECKLIST.md` is the single source of truth for launch gates.** The items in
+> §1-§3 below are a summary of it and have drifted out of sync before (four entries here once sat
+> open while the launch checklist recorded them owner-confirmed). When the two disagree, believe
+> the launch checklist and re-sync this one.
+
+- [x] **Play production access — GRANTED** (owner-confirmed 2026-08-31; see
+      `docs/LAUNCH_CHECKLIST.md`). The 12-tester/14-day closed test and Google's application
+      review are behind us; what remains is the cut recipe below.
 - [ ] **Flip `expo.extra.adsUseTestIds` → `false`** in `mobile/app.json` (currently `true`, which
       is *correct* for the live closed test — live ads on a test build is an AdMob policy
       violation). Then run the gate:
@@ -41,8 +52,10 @@ screen-reader modal fencing is closed at HEAD despite a stale ledger row saying 
       production build to zero-revenue test ads. A distinct runtime severs the two.
       (Evidence: `googleAdMobAds.ts:83` reads the flag from `Constants.expoConfig.extra`;
       `eas.json` production channel; `docs/OTA_UPDATES.md` channels table.)
-- [ ] **Run `npx expo install --check`** — 10 Expo packages sit 1-2 patches behind SDK-56
-      (expo-doctor 20/21 as of 2026-07-24).
+- [x] **SDK-56 patch drift synced (2026-08-31)** — `npx expo install --check` reports
+      "Dependencies are up to date"; expo-doctor is 21/22, the one failure being the Hermes V1
+      memory-regression advisory (needs SDK 57 — decision procedure in `docs/LAUNCH_CHECKLIST.md`).
+      Re-run both once more immediately before the cut.
 - [ ] **Verify live ad fill on a real production install** before wide rollout.
 - [ ] **Promote past the internal track.** `eas.json` `submit.production.android` still targets
       track `internal`; the promote-to-production step is undocumented. While there: review the
@@ -52,14 +65,15 @@ screen-reader modal fencing is closed at HEAD despite a stale ledger row saying 
 
 ## 2. Console-side work (owner accounts only)
 
-- [ ] **Supporter subscription (10th SKU / 5th entitlement).** App-side is fully wired
-      (`com.wordshift.supporter_monthly` → `supporter`). Console-side is still open: create the
-      auto-renewing subscription in Play Console, import into RevenueCat, create the entitlement
-      with identifier **exactly `supporter`**, then **store-verify one real purchase** — the
-      2026-07-13 SKU verification pass predates this SKU, so it has never been verified end-to-end.
-      See `docs/MONETIZATION_SETUP.md`.
-- [ ] **Confirm Play price tiers match the repriced fallbacks** (Remove-Ads $5.99, Patron $8.99,
-      Supporter $3.99/mo) so live `priceString` and fallback labels agree.
+- [ ] **Supporter subscription — device verification only.** App-side AND console-side are both
+      done (owner-confirmed 2026-08-31): `com.wordshift.supporter_monthly` → `supporter`, the
+      auto-renewing subscription exists in Play Console, is imported into RevenueCat, and the
+      entitlement is created and attached. What remains: **store-verify one real license-tester
+      subscription end-to-end** — the 2026-07-13 SKU verification pass predates this SKU and the
+      subscription-category code path. See `docs/MONETIZATION_SETUP.md`.
+- [x] **Play price tiers confirmed (owner-confirmed 2026-08-31)** — Console tiers match the in-app
+      fallbacks (Remove-Ads $5.99, Patron $8.99, Supporter $3.99/mo), so live `priceString` and
+      fallback labels agree.
 - [ ] **Supabase operations.** `BACKEND_SETUP.md` covers security only. Decide and record: project
       tier (free tier has **no PITR** and **auto-pauses on inactivity**, which would silently break
       cloud saves/leaderboards for a live game), backup cadence, a usage-quota alarm, and enable
@@ -134,7 +148,7 @@ line** (proves the locked-down Supabase RPCs end-to-end).
       runtime-coupling warning added to the ads-flip item, closed-test status note, fifth starred
       iOS value `admobBannerIdIos`). Open boxes left honest — confirm the device-pass items.
 - [x] `docs/PRESS_KIT.md` — facts refreshed 2026-08-31 (v1.2.2, 56 achievements, 22,749 words,
-      ~9,576 puzzles, real era depths). STILL OPEN: the press-contact placeholder (only the owner
+      ~9,611 puzzles across 30 banks, real era depths). STILL OPEN: the press-contact placeholder (only the owner
       knows the address). Previously stale:
       "v1.5.0", "51 achievements" (56), "11,400-word dictionary" (22,749), "~4,700 puzzles"
       (~9,576 / 30 banks), "3 variant modes", era depths ~70/~140/~200/~260 (actual 50/85/140/180).
@@ -154,11 +168,11 @@ line** (proves the locked-down Supabase RPCs end-to-end).
 
 - **The entire iOS track** (~2× revenue, blocked on owner consoles): Apple Developer + App Store
   Connect app, `revenueCatIosKey`, AdMob iOS **app id** (without it an iOS build crashes at
-  launch) + interstitial/rewarded/banner unit ids (note: `admobBannerIdIos` is missing from the
-  checklist's starred list — add it), iOS on the GDPR/UMP message, the 10 SKUs in ASC, privacy
+  launch) + interstitial/rewarded/banner unit ids (all five starred values are listed in
+  `docs/LAUNCH_CHECKLIST.md`, including `admobBannerIdIos`), iOS on the GDPR/UMP message, the 10 SKUs in ASC, privacy
   nutrition labels, 6.7"/6.9" screenshots, EAS iOS credentials.
 - **Economy retune on live data**: ritual-energy double-accelerator magnitude
-  (`amberCurrency.ts:1348-1358`), `UNLOCK_SKIP_PREMIUM` (`gameBalance.ts:446-449`), Tending cost
+  (`amberCurrency.ts:1366-1377`), `UNLOCK_SKIP_PREMIUM` (`gameBalance.ts:446-449`), Tending cost
   curve (`gameBalance.ts:804`) — all explicitly deferred in code comments to post-launch telemetry.
 - **Cloud-save conflict guard**: replace cross-device wall-clock comparison with a server-assigned
   monotonic version (documented backend follow-up).
@@ -170,4 +184,4 @@ line** (proves the locked-down Supabase RPCs end-to-end).
   localization as a cheap first step).
 - Optional polish parking lot: Tier-B/C ambient animal art (blink/rest/signature frames, 12
   missing walk cycles), HouseWorld room pan-culling, the full `useWindowDimensions` sweep
-  (portrait-locked, low value), lint-warning triage (baseline drifted 815 → 1,158).
+  (portrait-locked, low value), lint-warning triage (baseline drifted 815 → 1,176).

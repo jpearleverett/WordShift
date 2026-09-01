@@ -144,9 +144,9 @@ After each regenerated bank: run `purgeProfanity.mjs`, then update the test floo
 
 ## 5. Test-recalibration checklist (after regeneration)
 - **`bankDiversity.test.ts`** — `cap` (= measured max), `minUnique`, `minPuzzles` (~10% under measured) for **every regenerated bank**. *Primary; fails loudly if skipped.*
-- **`unbrokenWeaveBankEligibility.test.ts`** — `minEligible` per standard bank (420/350/280/195). **Standard regen only.**
-- **`puzzleExtension.test.ts`** — extendable-pool floors (190/140/130/110) + the `.slice(0,30)` real-bank test. **Standard regen only.**
-- **`bankSolvability.test.ts`** — must-pass (0 unsolvable / 0 inconclusive under shipped rules) for **all 12 banks**. *Run after `purgeProfanity.mjs`.* The non-negotiable gate, especially for reverse.
+- **`unbrokenWeaveBankEligibility.test.ts`** — `minEligible` per standard bank (currently 407/289/425/363 for EASY/MEDIUM/MEDIUM_PLUS/HARD; 420/350/280/195 were the pre-regeneration values). **Standard regen only.**
+- **`puzzleExtension.test.ts`** — extendable-pool floors (currently 203/127/207/180; 190/140/130/110 were the pre-regeneration values) + the `.slice(0,30)` real-bank test. **Standard regen only.**
+- **`bankSolvability.test.ts`** — must-pass (0 unsolvable / 0 inconclusive under shipped rules) for **all 30 shipped banks** (12 core + 3 EXPERT + 15 Lexicon; this plan said 12 because the EXPERT and Lexicon banks did not exist yet). *Run after `purgeProfanity.mjs`.* The non-negotiable gate, especially for reverse.
 - **`puzzleBank.test.ts`** — existence checks; keep green.
 - **`vocabularyHygiene` / `noEmDashes`** — after the corpus purge.
 - Set every numeric floor **~10% under what the run measures**, never speculatively above it (over-eager floors starve the HARD/dread banks first).
