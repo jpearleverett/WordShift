@@ -87,10 +87,11 @@ describe('journal spotlight portrait (the screenshot bug)', () => {
 });
 
 describe('intro/override dialogue portrait', () => {
-  // From the intro modal comment to the next modal's comment.
+  // From the intro modal comment to the next modal's comment (the sacrifice
+  // altar moved out to the shared UtilityMenu, so completion is now next).
   const introModal = () => {
     const start = src.indexOf('{/* Intro Dialogue Modal */}');
-    const end = src.indexOf('{/* Sacrifice Modal');
+    const end = src.indexOf('{/* House Completion Ceremony Modal */}');
     expect(start).toBeGreaterThanOrEqual(0);
     expect(end).toBeGreaterThan(start);
     return src.slice(start, end);

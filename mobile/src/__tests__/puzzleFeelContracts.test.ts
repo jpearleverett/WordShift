@@ -674,7 +674,7 @@ describe('animal nameplate contract', () => {
   // Slicing to indexOf(...) === -1 would silently widen the window to the end
   // of the file and turn every assertion inside it into a false PASS, so the
   // anchors are checked once, loudly, here.
-  const TAG_MOUNT_START = 'style={[styles.animalPlate';
+  const TAG_MOUNT_START = 'styles.animalPlate';
   const TAG_MOUNT_END = '{/* Animal if present and unlocked */}';
   const tagMount = (): string => {
     const from = ROOM_SRC.indexOf(TAG_MOUNT_START);
@@ -762,5 +762,119 @@ describe('animal nameplate contract', () => {
     // is iOS-only. Hiding on one alone double-announces on the other.
     expect(mount).toMatch(/importantForAccessibility="no-hide-descendants"/);
     expect(mount).toMatch(/accessibilityElementsHidden/);
+  });
+});
+
+// ===========================================================================
+// A dialogue cooldown changes NOTHING about how an animal moves
+// ===========================================================================
+describe('animal cooldown motion contract', () => {
+  const SPRITE_SRC = fs.readFileSync(
+    path.resolve(__dirname, '../components/home/AnimalSprite.tsx'),
+    'utf8',
+  );
+  const ROOM_SRC = fs.readFileSync(
+    path.resolve(__dirname, '../components/home/RoomView.tsx'),
+    'utf8',
+  );
+
+  it('never gates motion on isOnCooldown', () => {
+    // A cooled-down animal used to slide to a fixed rest spot, freeze, drop its
+    // walk frames/gait/bounce/emotes and sprout sleeping Z's. It now wanders
+    // exactly like an available one; the only tell is the missing "!" badge.
+    expect(SPRITE_SRC).not.toMatch(/REST_POS_X/);
+    expect(SPRITE_SRC).not.toMatch(/SLEEP_BREATHE_MS/);
+    expect(SPRITE_SRC).not.toMatch(/if \(isOnCooldown\)/);
+    expect(SPRITE_SRC).not.toMatch(/!isOnCooldown &&\s*\n\s*(hasWalkFrames|!hasWalkFrames)/);
+    // Stale deps would tear down and re-arm the wander/bounce loops on every
+    // cooldown transition, keeping the visible hitch even without the branch.
+    expect(SPRITE_SRC).not.toMatch(/currentPhase, isOnCooldown\]/);
+  });
+
+  it('leaves isOnCooldown only the badge and the accessibility label', () => {
+    const uses = SPRITE_SRC.match(/isOnCooldown/g) ?? [];
+    // prop decl, default destructure, a11y label, badge gate.
+    expect(uses.length).toBe(4);
+    expect(SPRITE_SRC).toMatch(/animal\.hasNewDialogue && !isOnCooldown &&/);
+    expect(SPRITE_SRC).toMatch(/isOnCooldown\s*\n\s*\?\s*cooldownPuzzlesLeft/);
+  });
+
+  it('keeps the sloth doze beat, which is personality and not a state read-out', () => {
+    // The Z's survive for the rare-idle doze only.
+    expect(SPRITE_SRC).toMatch(/\{isDozing && <SleepingZs \/>\}/);
+    expect(SPRITE_SRC).toMatch(/case 'sloth':/);
+  });
+
+  it('shows no cooldown countdown on the room nameplate', () => {
+    // With the sleep chrome gone, a bare digit next to the name would be the
+    // last unexplained cooldown signal in the room.
+    expect(ROOM_SRC).toMatch(/label=\{animal\.name\}/);
+    expect(ROOM_SRC).not.toMatch(/animalPlateResting/);
+    expect(ROOM_SRC).not.toMatch(/\$\{animal\.name\} · \$\{cooldownPuzzlesLeft\}/);
+  });
+});
+
+// ===========================================================================
+// The "!" new-dialogue badge hugs the animal art, not the container corner
+// ===========================================================================
+describe('new-dialogue badge anchor contract', () => {
+  const SPRITE_SRC = fs.readFileSync(
+    path.resolve(__dirname, '../components/home/AnimalSprite.tsx'),
+    'utf8',
+  );
+  const TYPES_SRC = fs.readFileSync(
+    path.resolve(__dirname, '../types/homeWorld.ts'),
+    'utf8',
+  );
+
+  const animalTypes = (): string[] => {
+    const decl = TYPES_SRC.slice(TYPES_SRC.indexOf('export type AnimalType ='));
+    const body = decl.slice(0, decl.indexOf(';'));
+    const hits = body.match(/'([a-z_]+)'/g) ?? [];
+    expect(hits.length).toBeGreaterThan(0);
+    return hits.map((h) => h.replace(/'/g, ''));
+  };
+
+  const anchorTable = (): Record<string, { top: number; right: number }> => {
+    const from = SPRITE_SRC.indexOf('const BADGE_ANCHOR');
+    expect(from).toBeGreaterThan(-1);
+    const block = SPRITE_SRC.slice(from, SPRITE_SRC.indexOf('};', from));
+    const out: Record<string, { top: number; right: number }> = {};
+    const re = /(\w+): \{ top: (-?\d+), right: (-?\d+) \}/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(block)) !== null) {
+      out[m[1]] = { top: Number(m[2]), right: Number(m[3]) };
+    }
+    return out;
+  };
+
+  it('covers every animal type', () => {
+    const table = anchorTable();
+    for (const type of animalTypes()) {
+      expect(table[type]).toBeDefined();
+    }
+  });
+
+  it('pulls the badge inside the 90dp sprite box for every animal', () => {
+    // The old corner pin (top -8 / right -8) put the badge centre entirely
+    // outside the box, ~13-20dp from the nearest painted pixel. Every tuned
+    // anchor must sit at or inside the box edge (right >= -1, top >= -5) and
+    // stay in the upper-right quadrant.
+    for (const a of Object.values(anchorTable())) {
+      expect(a.right).toBeGreaterThan(-2);
+      expect(a.right).toBeLessThan(35);
+      expect(a.top).toBeGreaterThan(-6);
+      expect(a.top).toBeLessThan(35);
+    }
+  });
+
+  it('stays an unflipped sibling of the facing-flipped body', () => {
+    // `body` carries scaleX; the badge must never be inside it or the "!"
+    // mirrors when the animal faces left.
+    const bodyOpen = SPRITE_SRC.indexOf('styles.body,');
+    const badge = SPRITE_SRC.indexOf('styles.notificationBadge,');
+    const bodyClose = SPRITE_SRC.indexOf('</Animated.View>', bodyOpen);
+    expect(bodyOpen).toBeGreaterThan(-1);
+    expect(badge).toBeGreaterThan(bodyClose);
   });
 });

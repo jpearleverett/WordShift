@@ -26,6 +26,7 @@ import {
   countUpDisplayValue,
   getCountUpDurationMs,
   getCascadeDelayMs,
+  getGroupedCascadeDelayMs,
 } from '../components/ui/RewardReveal';
 
 describe('countUpDisplayValue', () => {
@@ -102,5 +103,44 @@ describe('getCascadeDelayMs', () => {
 
   test('defaults to the shared SURFACE stagger interval', () => {
     expect(getCascadeDelayMs(2)).toBe(2 * 50);
+  });
+});
+
+describe('getGroupedCascadeDelayMs', () => {
+  test('the first chip of the first group has no delay beyond the base', () => {
+    expect(getGroupedCascadeDelayMs(0, 0)).toBe(0);
+    expect(getGroupedCascadeDelayMs(0, 0, { baseMs: 120 })).toBe(120);
+  });
+
+  test('the in-group stagger is never capped (this is what animates every chip)', () => {
+    expect(getGroupedCascadeDelayMs(0, 17, { staggerMs: 28 })).toBe(476);
+    expect(getGroupedCascadeDelayMs(0, 200, { staggerMs: 28 })).toBe(200 * 28);
+    expect(getGroupedCascadeDelayMs(0, 200, { staggerMs: 28 }))
+      .toBeGreaterThan(getGroupedCascadeDelayMs(0, 17, { staggerMs: 28 }));
+  });
+
+  test('the group base IS capped so a deep group never sits blank waiting', () => {
+    const opts = { groupStaggerMs: 70, maxStaggeredGroups: 2 };
+    expect(getGroupedCascadeDelayMs(2, 0, opts)).toBe(140);
+    expect(getGroupedCascadeDelayMs(9, 0, opts)).toBe(140);
+    expect(getGroupedCascadeDelayMs(99, 0, opts)).toBe(140);
+  });
+
+  test('the per-chip delay stays bounded by the GROUP size, not the list size', () => {
+    const worst = getGroupedCascadeDelayMs(999, 17, {
+      staggerMs: 28,
+      groupStaggerMs: 70,
+      maxStaggeredGroups: 2,
+      baseMs: 120,
+    });
+    expect(worst).toBe(120 + 140 + 476);
+  });
+
+  test('a negative index clamps to the group base', () => {
+    expect(getGroupedCascadeDelayMs(1, -4, { groupStaggerMs: 70, baseMs: 120 })).toBe(190);
+  });
+
+  test('defaults to the shared SURFACE stagger for the in-group step', () => {
+    expect(getGroupedCascadeDelayMs(0, 2)).toBe(2 * 50);
   });
 });

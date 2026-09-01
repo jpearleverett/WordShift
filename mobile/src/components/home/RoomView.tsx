@@ -696,7 +696,7 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
           focusable element and already announces the name and resting state. */}
       {animal && animal.isUnlocked && (
         <View
-          style={[styles.animalPlate, isAnimalOnCooldown && styles.animalPlateResting]}
+          style={styles.animalPlate}
           pointerEvents="none"
           // Both platforms: importantForAccessibility is Android-only and
           // accessibilityElementsHidden is iOS-only, so hiding on one alone
@@ -704,18 +704,16 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
           importantForAccessibility="no-hide-descendants"
           accessibilityElementsHidden
         >
-          {/* The resting countdown rides INSIDE the wood rather than floating
-              above it, and this tag is its only visual surface (elsewhere the
-              number exists just in the sprite's accessibility label). The
-              animal's own sleeping Z's already say "asleep"; the tag says for
-              how much longer, and dims while it does. */}
+          {/* The tag shows the name and nothing else. It used to append the
+              dialogue-cooldown countdown and dim while it ran, back when the
+              animal also froze under sleeping Z's. The animal now just keeps
+              wandering with no explanation offered, so a bare digit beside its
+              name would be the last unexplained state read-out left in the
+              room. The count survives only in the sprite's accessibility
+              label, where a screen-reader user has no other signal. */}
           <PixelPlaque
             phase={currentPhase}
-            label={
-              isAnimalOnCooldown && cooldownPuzzlesLeft != null && cooldownPuzzlesLeft > 0
-                ? `${animal.name} · ${cooldownPuzzlesLeft}`
-                : animal.name
-            }
+            label={animal.name}
             scale={ANIMAL_PLAQUE_SCALE}
             fontScale={ANIMAL_PLAQUE_FONT_SCALE}
           />
@@ -877,9 +875,6 @@ const styles = StyleSheet.create({
     left: 6,
     maxWidth: '62%',
     zIndex: 2,
-  },
-  animalPlateResting: {
-    opacity: 0.62,
   },
   // Nameplate ornament row: tiny warm lantern pips (procedural, not emoji).
   pipRow: {

@@ -207,6 +207,23 @@ export function validateAchievements(): ValidationResult {
     errors.push(`Duplicate achievement IDs: ${[...new Set(dupes)].join(', ')}`);
   }
 
+  // Check unique display titles. Several achievements can unlock on the same
+  // win (a flawless solve is also a 3-star solve), so two entries sharing a
+  // title read as one achievement firing twice in the toast queue.
+  const titles = ACHIEVEMENTS.map((a) => a.title);
+  const uniqueTitles = new Set(titles);
+  if (uniqueTitles.size !== titles.length) {
+    const dupeTitles = titles.filter((t, i) => titles.indexOf(t) !== i);
+    errors.push(`Duplicate achievement titles: ${[...new Set(dupeTitles)].join(', ')}`);
+  }
+
+  // Check unique descriptions for the same reason.
+  const descriptions = ACHIEVEMENTS.map((a) => a.description);
+  if (new Set(descriptions).size !== descriptions.length) {
+    const dupeDescs = descriptions.filter((d, i) => descriptions.indexOf(d) !== i);
+    errors.push(`Duplicate achievement descriptions: ${[...new Set(dupeDescs)].join(', ')}`);
+  }
+
   // Check that all expected categories are represented.
   // The actual AchievementCategory type in the codebase defines the canonical set.
   const EXPECTED_CATEGORIES: AchievementCategory[] = [

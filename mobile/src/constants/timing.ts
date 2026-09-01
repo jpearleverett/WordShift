@@ -40,6 +40,20 @@ export const ONBOARDING_PUZZLE_COMPLETE_DELAY_MS = 1000;
 // values, now the single source of truth (App.tsx reads them).
 export const SCREEN_FADE_COVER_MS = 120;
 export const SCREEN_FADE_REVEAL_MS = 180;
+/**
+ * Hard cap on how long the cover waits for a destination that paints nothing on
+ * its first frame (the pit / ledger / gallery / shop, see services/screenReady).
+ * Deliberately small: these are warm AsyncStorage reads, so the real wait is
+ * usually a frame or two, and a screen that is already ready never waits at
+ * all. The cover must never be able to hang, so this cap always wins.
+ */
+export const SCREEN_READY_TIMEOUT_MS = 220;
+/**
+ * The arriving screen's settle (the reveal "signature" motion). Kept just past
+ * the reveal fade so the motion finishes with the cover instead of sliding on
+ * under a fully-visible screen.
+ */
+export const SCREEN_REVEAL_SETTLE_MS = 260;
 
 // === AUTOSAVE ===
 export const AUTOSAVE_DEBOUNCE_MS = 120;

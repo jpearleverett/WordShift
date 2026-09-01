@@ -35,6 +35,28 @@ export const SURFACE = {
   highlightAlpha: 0.10,
   /** Uppercase section-label letterSpacing (replaces the web gray-caption look). */
   sectionLetterSpacing: 1.2,
+  /**
+   * Horizontal content inset for a cottage PANEL frame (a NineSliceFrame at
+   * PANEL_CORNER_DP/PANEL_EDGE_DP, or <PanelCard kind="panel">).
+   *
+   * The 30dp panel strip is 21dp of opaque wood + accent inlay, then a 3dp
+   * parchment transition ring (24dp cumulative — the clearance the generator
+   * itself names), then 6dp of graded parchment vignette. Content at exactly
+   * 24 starts ON the darkest vignette ring and reads as touching the frame;
+   * 28 leaves 4dp of clean paper. Kept as a literal on purpose: surfaces.ts is
+   * imported almost everywhere and must not pull in pixelSkin.generated.ts
+   * (~200 asset requires at module scope). Pinned against PANEL_EDGE_DP by
+   * __tests__/surfaceClearance.test.ts.
+   */
+  panelPadX: 28,
+  /**
+   * Horizontal content inset for a cottage CARD frame (CARD_CORNER_DP/
+   * CARD_EDGE_DP, or <PanelCard> at its default kind). The 18dp card strip is
+   * 12dp wood + a 3dp transition ring + a 3dp vignette ring; 20 clears the
+   * whole strip with 2dp to spare. Pinned against CARD_EDGE_DP by
+   * __tests__/surfaceClearance.test.ts.
+   */
+  cardPadX: 20,
   /** Stagger interval for content cascade inside freshly opened panels. */
   staggerMs: 50,
   /** Modal entrance: springy (one soft overshoot). */

@@ -1,9 +1,11 @@
 /**
- * Late-game amber cosmetic catalog — the deepened sink added on top of the
- * launch trio (theme_ember/tide/bone + 3 confetti). Pins the new IDs, their
- * prices, the amber-catalog totals, and the render-path resolution (tile theme
- * via getTileColor, confetti via getEquippedSync + CONFETTI_THEMES — mirroring
- * Confetti.tsx).
+ * Amber cosmetic catalog — everything added on top of the launch trio
+ * (theme_ember/tide/bone + 3 confetti): the late-game palette themes, the
+ * FINISH-LED tile themes (sold on their material, not their hue), and the move
+ * sparks. Pins the IDs, their prices, the amber-catalog totals, and the
+ * render-path resolution each surface actually uses — tile palette via
+ * getTileColor, tile material via getTileFinish, confetti and spark via
+ * getEquippedSync + their palette table (mirroring Confetti.tsx).
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -21,10 +23,17 @@ import {
 import {
   getTileColor,
   getEquippedTileTheme,
+  getTileFinish,
+  getTileFinishForTheme,
   TILE_THEMES,
+  TILE_FINISHES,
+  DEFAULT_TILE_FINISH,
   CONFETTI_THEMES,
+  SPARK_THEMES,
   CandyColors,
 } from '../theme/colors';
+import * as fs from 'fs';
+import * as path from 'path';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('./helpers/mockAsyncStorage').createMockAsyncStorage()
@@ -46,7 +55,27 @@ const NEW_CONFETTI: Record<string, number> = {
   confetti_sovereign: 550,
 };
 
-const amberItems = (category: 'tile_theme' | 'confetti') =>
+/**
+ * FINISH-LED tile themes — sold on their material (TILE_FINISHES), not on hue.
+ * These are the ones a player can see on tiles they are not touching.
+ */
+const FINISH_TILE_THEMES: Record<string, number> = {
+  theme_beeswax: 550,
+  theme_glasswork: 700,
+  theme_mothwing: 750,
+  theme_obsidian: 850,
+};
+
+/** Move sparks — the star burst that fires on every committed move. */
+const SPARK_ITEMS: Record<string, number> = {
+  spark_hearth: 250,
+  spark_pollen: 300,
+  spark_saltgrain: 350,
+  spark_thread: 400,
+  spark_ash: 450,
+};
+
+const amberItems = (category: 'tile_theme' | 'confetti' | 'spark') =>
   COSMETICS.filter(c => c.category === category && c.acquisition.kind === 'amber');
 
 const amberCost = (id: string): number => {
@@ -83,12 +112,19 @@ describe('late-game amber catalog', () => {
       .reduce((sum, c) => sum + (c.acquisition.kind === 'amber' ? c.acquisition.cost : 0), 0);
     const confettiTotal = amberItems('confetti')
       .reduce((sum, c) => sum + (c.acquisition.kind === 'amber' ? c.acquisition.cost : 0), 0);
-    // Launch trio (300+400+500) + late-game (650+800+1000)
-    expect(tileTotal).toBe(3650);
+    const sparkTotal = amberItems('spark')
+      .reduce((sum, c) => sum + (c.acquisition.kind === 'amber' ? c.acquisition.cost : 0), 0);
+    // Launch trio (300+400+500) + late-game (650+800+1000) + finish-led (550+700+750+850)
+    expect(tileTotal).toBe(6500);
     // Launch (250+350+350) + late-game (450+550)
     expect(confettiTotal).toBe(1950);
-    // Total amber sink across the cosmetic catalog
-    expect(tileTotal + confettiTotal).toBe(5600);
+    // Move sparks (250+300+350+400+450)
+    expect(sparkTotal).toBe(1750);
+    // Total amber sink across the cosmetic catalog. Sits well under the amber
+    // sinks that already exist (attunements alone are ~7,800) and against a
+    // permanent post-revelation milestone faucet, so it stays a sane sink for
+    // the endgame surplus rather than an unreachable wall.
+    expect(tileTotal + confettiTotal + sparkTotal).toBe(10200);
     // The deepening itself adds 3,450 of new sinks
     const newTotal = [...Object.values(NEW_TILE_THEMES), ...Object.values(NEW_CONFETTI)]
       .reduce((a, b) => a + b, 0);
@@ -194,4 +230,154 @@ describe('render-path resolution of new themes', () => {
       expect(getEquippedSync('confetti')).toBeUndefined();
     }
   );
+});
+
+// ===========================================================================
+// finish-led tile themes (the material, not the hue)
+// ===========================================================================
+
+describe('finish-led tile themes', () => {
+  it('registers each finish-led theme at its price with a full palette', () => {
+    for (const [id, cost] of Object.entries(FINISH_TILE_THEMES)) {
+      const item = getCosmetic(id);
+      expect(item).toBeDefined();
+      expect(item!.category).toBe('tile_theme');
+      expect(item!.acquisition).toEqual({ kind: 'amber', cost });
+      const palette = TILE_THEMES[id];
+      expect(palette).toHaveLength(8);
+      for (const c of palette) {
+        expect(c.bg).toMatch(/^#[0-9A-F]{6}$/i);
+        expect(c.border).toMatch(/^#[0-9A-F]{6}$/i);
+        expect(c.glow).toMatch(/^rgba\(/);
+      }
+    }
+  });
+
+  it('every finish-led theme actually carries a distinct finish', () => {
+    for (const id of Object.keys(FINISH_TILE_THEMES)) {
+      const finish = TILE_FINISHES[id];
+      expect(finish).toBeDefined();
+      // A finish that matched the default would be a palette swap wearing a
+      // material's price tag.
+      expect(finish).not.toEqual(DEFAULT_TILE_FINISH);
+    }
+  });
+
+  it('every id in TILE_FINISHES is a real tile theme', () => {
+    for (const id of Object.keys(TILE_FINISHES)) {
+      expect(TILE_THEMES[id]).toBeDefined();
+    }
+  });
+
+  it('palette-led themes have no finish entry, so they keep the candy material', () => {
+    for (const id of ['theme_ember', 'theme_tide', 'theme_bone', 'theme_verdant',
+                      'theme_static', 'theme_sovereign', 'theme_patron', 'theme_eclipse']) {
+      expect(TILE_FINISHES[id]).toBeUndefined();
+      expect(getTileFinishForTheme(id)).toBe(DEFAULT_TILE_FINISH);
+    }
+  });
+
+  it.each(Object.keys(FINISH_TILE_THEMES))('getTileFinish resolves %s once equipped', async id => {
+    expect(getTileFinish()).toBe(DEFAULT_TILE_FINISH);
+    await recordAmberCosmeticPurchase(id);
+    await equipCosmetic(id);
+    expect(getTileFinish()).toEqual(TILE_FINISHES[id]);
+    await unequipCosmetic('tile_theme');
+    expect(getTileFinish()).toBe(DEFAULT_TILE_FINISH);
+  });
+
+  it('nothing equipped resolves to the default material', () => {
+    expect(getTileFinish()).toBe(DEFAULT_TILE_FINISH);
+    expect(getTileFinishForTheme(null)).toBe(DEFAULT_TILE_FINISH);
+    expect(getTileFinishForTheme('theme_does_not_exist')).toBe(DEFAULT_TILE_FINISH);
+  });
+
+  /**
+   * Source pin: the promise that a player who bought nothing sees NO change
+   * rests entirely on DEFAULT_TILE_FINISH reproducing the four literals the
+   * LetterTile styles still declare. A typo in one alpha would silently
+   * restyle every tile for every player.
+   */
+  it('DEFAULT_TILE_FINISH still matches the literals in LetterTile styles', () => {
+    const src = fs.readFileSync(
+      path.join(__dirname, '..', 'components', 'LetterTile.tsx'),
+      'utf-8'
+    );
+    const colorAfter = (styleName: string): string => {
+      const block = src.split(`${styleName}: {`)[1];
+      expect(block).toBeDefined();
+      const match = /backgroundColor: '([^']+)'/.exec(block.split('},')[0]);
+      expect(match).not.toBeNull();
+      return match![1];
+    };
+    expect(colorAfter('bevelTop')).toBe(DEFAULT_TILE_FINISH.bevel);
+    expect(colorAfter('glossyShine')).toBe(DEFAULT_TILE_FINISH.gloss);
+    expect(colorAfter('specularDot')).toBe(DEFAULT_TILE_FINISH.specularColor);
+    expect(colorAfter('shineSweep')).toBe(DEFAULT_TILE_FINISH.sweep);
+    expect(DEFAULT_TILE_FINISH.specular).toBe('dot');
+  });
+});
+
+// ===========================================================================
+// move sparks
+// ===========================================================================
+
+describe('move sparks', () => {
+  it('registers every spark at its price with a palette', () => {
+    for (const [id, cost] of Object.entries(SPARK_ITEMS)) {
+      const item = getCosmetic(id);
+      expect(item).toBeDefined();
+      expect(item!.category).toBe('spark');
+      expect(item!.acquisition).toEqual({ kind: 'amber', cost });
+      const palette = SPARK_THEMES[id];
+      expect(palette).toBeDefined();
+      expect(palette.bg).toMatch(/^#[0-9A-F]{6}$/i);
+      expect(palette.accent).toMatch(/^#[0-9A-F]{6}$/i);
+      expect(palette.halo).toMatch(/^#[0-9A-F]{6}$/i);
+    }
+  });
+
+  it('every id in SPARK_THEMES is a real catalog item, and vice versa', () => {
+    for (const id of Object.keys(SPARK_THEMES)) {
+      expect(getCosmetic(id)).toBeDefined();
+    }
+    for (const item of COSMETICS.filter(c => c.category === 'spark')) {
+      expect(SPARK_THEMES[item.id]).toBeDefined();
+    }
+  });
+
+  it.each(Object.keys(SPARK_ITEMS))('%s is purchasable and equippable via amber', async id => {
+    expect(await ownsCosmetic(id)).toBe(false);
+    expect(await recordAmberCosmeticPurchase(id)).toBe(true);
+    expect(await recordAmberCosmeticPurchase(id)).toBe(false);
+    expect(await equipCosmetic(id)).toBe(true);
+    expect(await getEquipped('spark')).toBe(id);
+    expect(getEquippedSync('spark')).toBe(id);
+  });
+
+  it('the spark override resolves the way Confetti.tsx StarBurst does', async () => {
+    await recordAmberCosmeticPurchase('spark_ash');
+    await equipCosmetic('spark_ash');
+    // StarBurst: getEquippedSync('spark') → SPARK_THEMES[id] ?? phase default
+    const equipped = getEquippedSync('spark');
+    expect(equipped).toBe('spark_ash');
+    expect(equipped && SPARK_THEMES[equipped]).toEqual(SPARK_THEMES.spark_ash);
+    await unequipCosmetic('spark');
+    expect(getEquippedSync('spark')).toBeUndefined();
+  });
+
+  it('equipping a spark leaves the tile theme and confetti selections alone', async () => {
+    await recordAmberCosmeticPurchase('theme_beeswax');
+    await equipCosmetic('theme_beeswax');
+    await recordAmberCosmeticPurchase('spark_pollen');
+    await equipCosmetic('spark_pollen');
+    expect(getEquippedSync('tile_theme')).toBe('theme_beeswax');
+    expect(getEquippedSync('spark')).toBe('spark_pollen');
+    expect(getEquippedSync('confetti')).toBeUndefined();
+  });
+
+  it('equipping an unowned spark is rejected', async () => {
+    expect(await equipCosmetic('spark_thread')).toBe(false);
+    expect(await getEquipped('spark')).toBeUndefined();
+  });
 });

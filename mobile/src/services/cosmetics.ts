@@ -1,15 +1,17 @@
 /**
  * Cosmetics — owned/equipped cosmetic state.
  *
- * Pure data layer for the cosmetic shop (tile themes, confetti palettes).
+ * Pure data layer for the cosmetic shop (tile themes + finishes, confetti
+ * palettes, move sparks).
  * Ownership comes from two sources:
  *   - amber purchases (spent via amberCurrency.spendAmber, recorded here locally), and
  *   - entitlement grants (recorded in entitlements.ts).
  * `ownsCosmetic()` checks both. Mirrors the roomUpgrades.ts cache pattern; native-free.
  *
  * The equipped tile theme is pushed into theme/colors.ts via `setEquippedTileTheme()`
- * and resolved synchronously in `getTileColor()`; ShopScreen.tsx is the player-facing
- * surface. All themes stay phase-aware so a purchased theme still darkens with the
+ * and resolved synchronously in `getTileColor()` (palette) and `getTileFinish()`
+ * (material); confetti and spark selections are read on the render path with
+ * `getEquippedSync()`. ShopScreen.tsx is the player-facing surface. All themes stay phase-aware so a purchased theme still darkens with the
  * story (the tone contract).
  */
 
@@ -23,7 +25,7 @@ const STORAGE_KEY = 'wordshift_cosmetics';
 // Catalog
 // ---------------------------------------------------------------------------
 
-export type CosmeticCategory = 'tile_theme' | 'confetti' | 'room_accent';
+export type CosmeticCategory = 'tile_theme' | 'confetti' | 'spark' | 'room_accent';
 
 /** How a cosmetic is acquired. */
 export type CosmeticAcquisition =
@@ -70,8 +72,21 @@ export const COSMETICS: CosmeticItem[] = [
     description: 'A hushed, desaturated set for the terrible peace.',
     acquisition: { kind: 'amber', cost: 500 },
   },
-  // Late-game amber tile themes — deeper sinks for players sitting on a full
-  // house and a long faucet tail. Palettes live in TILE_THEMES (theme/colors.ts).
+  // FINISH-LED tile themes. Unlike the palette-led sets above, these are sold on
+  // their MATERIAL: the finish in TILE_FINISHES (theme/colors.ts) repaints the
+  // bevel, gloss, specular, sweep, rim and speckle on EVERY tile of the board,
+  // so the purchase reads on tiles the player is not currently touching. Hue is
+  // still phase-owned, so the board darkens with the story exactly as before.
+  {
+    id: 'theme_beeswax',
+    category: 'tile_theme',
+    name: 'Beeswax and Honey',
+    description: "Soft wax, still warm from Panko's kitchen. Fingerprints stay in it for a while, and then they do not.",
+    acquisition: { kind: 'amber', cost: 550 },
+  },
+  // Late-game palette-led sinks for players sitting on a full house and a long
+  // faucet tail. Palettes live in TILE_THEMES (theme/colors.ts). The list is
+  // ordered by price, so the finish-led sets above and below interleave.
   {
     id: 'theme_verdant',
     category: 'tile_theme',
@@ -80,11 +95,32 @@ export const COSMETICS: CosmeticItem[] = [
     acquisition: { kind: 'amber', cost: 650 },
   },
   {
+    id: 'theme_glasswork',
+    category: 'tile_theme',
+    name: 'Cathedral Glass',
+    description: 'Colored panes with dark lead running between them. Archimedes says the window is older than the study, and will not say how much older.',
+    acquisition: { kind: 'amber', cost: 700 },
+  },
+  {
+    id: 'theme_mothwing',
+    category: 'tile_theme',
+    name: 'Moth-wing',
+    description: 'Pale dust that comes off on your fingers. It was going toward a light. It found the house instead.',
+    acquisition: { kind: 'amber', cost: 750 },
+  },
+  {
     id: 'theme_static',
     category: 'tile_theme',
     name: 'Between-signals',
     description: 'The gray between stations, and one cold signal that is not noise.',
     acquisition: { kind: 'amber', cost: 800 },
+  },
+  {
+    id: 'theme_obsidian',
+    category: 'tile_theme',
+    name: 'Cut Obsidian',
+    description: 'Black stone, cut until it holds an edge. It shows you your own face a little wrong, and you keep looking.',
+    acquisition: { kind: 'amber', cost: 850 },
   },
   {
     id: 'theme_sovereign',
@@ -136,6 +172,44 @@ export const COSMETICS: CosmeticItem[] = [
     name: 'Crowned Fall',
     description: 'Violet and old gold for a well-arranged victory.',
     acquisition: { kind: 'amber', cost: 550 },
+  },
+  // Amber-bought MOVE SPARKS. The star burst fires on every committed move, so
+  // this is the most-seen effect in the game. IDs match SPARK_THEMES in
+  // theme/colors.ts; the burst's count, spread and physics stay phase-owned.
+  {
+    id: 'spark_hearth',
+    category: 'spark',
+    name: 'Hearth Sparks',
+    description: 'The little sparks a settling log throws. Ember says a fire that never throws them is only pretending to be one.',
+    acquisition: { kind: 'amber', cost: 250 },
+  },
+  {
+    id: 'spark_pollen',
+    category: 'spark',
+    name: 'Pollen',
+    description: 'Pale gold that comes off the flowers and gets on everything. Thyme says it means the garden is pleased with you.',
+    acquisition: { kind: 'amber', cost: 300 },
+  },
+  {
+    id: 'spark_saltgrain',
+    category: 'spark',
+    name: 'Salt Grain',
+    description: 'Coarse white salt, thrown at the doorway. Warren says it is only for the floors. He puts it down anyway.',
+    acquisition: { kind: 'amber', cost: 350 },
+  },
+  {
+    id: 'spark_thread',
+    category: 'spark',
+    name: 'Cut Thread',
+    description: 'Gold and mauve, snipped short. Every one of them used to be part of something longer.',
+    acquisition: { kind: 'amber', cost: 400 },
+  },
+  {
+    id: 'spark_ash',
+    category: 'spark',
+    name: 'Ash and Ember',
+    description: 'Grey, mostly. The red ones are the ones still deciding.',
+    acquisition: { kind: 'amber', cost: 450 },
   },
   // "The Keeper's Collection" — a one-time IAP cosmetic bundle. Both items are
   // owned together via the COSMETIC_BUNDLE entitlement (granted by the bundle

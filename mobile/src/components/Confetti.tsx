@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, StyleSheet, Animated, Dimensions, Easing } from 'react-native';
 import { getSettingsSync } from '../services/settings';
-import { getPhaseTheme, CONFETTI_THEMES } from '../theme/colors';
+import { getPhaseTheme, CONFETTI_THEMES, SPARK_THEMES, SparkPalette } from '../theme/colors';
 import { getMaxConfettiCount, shouldSimplifyAnimations } from '../services/deviceTier';
 import { getEquippedSync } from '../services/cosmetics';
 
@@ -323,7 +323,9 @@ export const Confetti: React.FC<ConfettiProps> = ({ active, onComplete, phase = 
 
 // Star burst effect for successful moves — colors shift with narrative phase.
 // `accent` is a second tint that appears on the higher combo tiers so a deep
-// streak reads as richer, not just bigger.
+// streak reads as richer, not just bigger. An equipped 'spark' cosmetic
+// replaces this palette (pure expression); the count, spread and physics below
+// stay phase-owned and combo-owned.
 const STAR_BURST_COLORS: Record<number, { bg: string; shadow: string; accent: string }> = {
   0: { bg: '#FFD700', shadow: '#FFD700', accent: '#FFFFFF' },
   1: { bg: '#F0C050', shadow: '#D4A030', accent: '#FFE9A8' },
@@ -429,7 +431,12 @@ export const StarBurst: React.FC<StarBurstProps> = ({ active, x, y, phase = 0, c
 
   if (!active || reducedMotion || simplify) return null;
 
-  const palette = STAR_BURST_COLORS[phase] || STAR_BURST_COLORS[0];
+  // An equipped move spark wins; with none equipped the burst stays phase-aware.
+  // The phase entries carry no `halo`, so the halo falls back to the core color
+  // exactly as it always has.
+  const equippedSpark = getEquippedSync('spark');
+  const themedSpark = equippedSpark ? SPARK_THEMES[equippedSpark] : undefined;
+  const palette: SparkPalette = themedSpark ?? (STAR_BURST_COLORS[phase] || STAR_BURST_COLORS[0]);
 
   return (
     <View style={[styles.starBurstContainer, { left: x - 50, top: y - 50 }]} pointerEvents="none">
@@ -453,7 +460,7 @@ export const StarBurst: React.FC<StarBurstProps> = ({ active, x, y, phase = 0, c
           >
             {/* Two-layer glow (Android-safe): a soft halo View behind a bright
                 core diamond, so the sparkle exists without an iOS-only shadow. */}
-            <View style={[styles.starHalo, { backgroundColor: coreColor }]} />
+            <View style={[styles.starHalo, { backgroundColor: palette.halo ?? coreColor }]} />
             <View style={[styles.starCore, { backgroundColor: coreColor }]} />
           </Animated.View>
         );

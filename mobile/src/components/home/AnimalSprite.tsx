@@ -407,11 +407,6 @@ export function getPhaseMotionScale(phase: number): PhaseMotion {
   return { speedMul: 1, pauseMul: 1, bounceMul: 1, breatheMs: 1500, glide: false };
 }
 
-// Where a sleeping animal settles (posX interpolates [0,100] → floor space).
-const REST_POS_X = 30;
-// Slow, heavy breath while sleeping (independent of the phase scalar).
-const SLEEP_BREATHE_MS = 2600;
-
 // ---------------------------------------------------------------------------
 // Rare-idle scheduler turnstile (the "alive" system).
 // AnimalSprite instances are independent, so a per-instance timer would let
@@ -472,6 +467,40 @@ const FLOOR_OFFSET: Record<AnimalType, number> = {
   aye_aye: 0,
   kakapo: 0,
 };
+
+// Where the "!" new-dialogue badge sits, per animal (dp inside the 90x90 sprite
+// box; the pair is the badge's own absolute top/right inset). Measured off the
+// art like FLOOR_OFFSET, not guessed: every character PNG is 500x500 drawn
+// `contain` into a 90dp box and none of them fills it, so a badge pinned to the
+// CONTAINER corner floated 13-20dp out in dead space instead of hugging the
+// animal. Derivation (re-run if character art is re-exported): take the alpha
+// bbox point P that maximises (x - y) in dp space (the up-right extreme of the
+// silhouette), put the 20dp badge's centre at P + (4.95, -4.95) so it sits
+// tangent to that diagonal with a ~3dp bite; repeat on the mirrored art (the
+// up-LEFT extreme, since `body` carries a scaleX facing flip the badge never
+// inherits) and average the two so the anchor holds in both facings. Then
+// right = 80 - centreX and top = centreY - 10. Values are the idle/robed
+// average, rounded to whole dp.
+const BADGE_ANCHOR: Record<AnimalType, { top: number; right: number }> = {
+  axolotl: { top: 0, right: -1 },
+  aye_aye: { top: -4, right: 6 },
+  capybara: { top: 6, right: 17 },
+  fennec_fox: { top: 3, right: 6 },
+  fox: { top: 5, right: 19 },
+  kakapo: { top: 0, right: 21 },
+  owl: { top: 7, right: 20 },
+  pangolin: { top: 12, right: 18 },
+  rabbit: { top: -2, right: 18 },
+  red_panda: { top: 4, right: 15 },
+  sloth: { top: 9, right: 19 },
+  tarsier: { top: 3, right: 15 },
+  wombat: { top: 5, right: 17 },
+};
+
+// The emoji fallback body is a 70dp circle, not the 90dp sprite box (see
+// styles.emojiBody), so the sprite anchors would land well inside it. Tangent
+// to that circle instead, by the same 3dp-bite rule.
+const EMOJI_BADGE_ANCHOR = { top: -5, right: -5 };
 
 /**
  * Progressive "dread" treatment for the idle sprite across Phases 1-3 — the
@@ -534,9 +563,8 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
   // the walk-frame interval / gait loop effects — which re-run every leg as
   // walkActive/gaitActive toggle — always read this leg's value.
   const gaitPaceRef = useRef(1);
-  // Live mirrors read by the async rare-idle scheduler without re-subscribing.
+  // Live mirror read by the async rare-idle scheduler without re-subscribing.
   const isMovingRef = useRef(false);
-  const cooldownRef = useRef(isOnCooldown);
   // Stable per-instance id for the module-scope idle turnstile.
   const idleIdRef = useRef<number | null>(null);
   if (idleIdRef.current === null) idleIdRef.current = ++idleInstanceSeq;
@@ -550,9 +578,6 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
   useEffect(() => {
     isMovingRef.current = isMoving;
   }, [isMoving]);
-  useEffect(() => {
-    cooldownRef.current = isOnCooldown;
-  }, [isOnCooldown]);
 
   // Real walk-cycle frames play while the animal wanders (currently the fox).
   // Robed figures (Phase 4+) don't stroll — they keep the gliding reverence —
@@ -561,7 +586,6 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
   const hasWalkFrames = Boolean(walkFrames && walkFrames.length > 0);
   const walkActive = Boolean(
     isMoving &&
-    !isOnCooldown &&
     hasWalkFrames &&
     currentPhase < 4 &&
     !spriteLoadFailed &&
@@ -575,7 +599,6 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
   const gaitAnim = useRef(new Animated.Value(0)).current;
   const gaitActive = Boolean(
     isMoving &&
-    !isOnCooldown &&
     !hasWalkFrames &&
     currentPhase < 4 &&
     !getSettingsSync().reducedMotion &&
@@ -662,17 +685,17 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
   }, [walkActive, walkFrames?.length]);
 
   // Breathing animation (subtle scale pulse) — phase-scaled: it slows and
-  // deepens as the house darkens, and slows to a heavy sleep breath on
-  // cooldown. Deps carry currentPhase + isOnCooldown so the pace actually
-  // changes with the descent (the effect was empty-dep / phase-invariant).
+  // deepens as the house darkens. currentPhase is in the deps so the pace
+  // actually changes with the descent (the effect was empty-dep /
+  // phase-invariant).
   useEffect(() => {
     if (getSettingsSync().reducedMotion) {
       breatheScale.setValue(1);
       return;
     }
-    const halfMs = isOnCooldown ? SLEEP_BREATHE_MS : getPhaseMotionScale(currentPhase).breatheMs;
-    // Heavier (deeper) chest as the dread sets in; sleep is the deepest.
-    const depth = isOnCooldown ? 1.06 : currentPhase >= 3 ? 1.06 : 1.05;
+    const halfMs = getPhaseMotionScale(currentPhase).breatheMs;
+    // Heavier (deeper) chest as the dread sets in.
+    const depth = currentPhase >= 3 ? 1.06 : 1.05;
     const breatheAnimation = Animated.loop(
       Animated.sequence([
         Animated.timing(breatheScale, {
@@ -691,11 +714,10 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
     );
     breatheAnimation.start();
     return () => breatheAnimation.stop();
-  }, [currentPhase, isOnCooldown]);
+  }, [currentPhase]);
 
   // Random emotion bubble popup
   useEffect(() => {
-    if (isOnCooldown) return; // No emotions while sleeping
     if (getSettingsSync().reducedMotion) return; // Skip decorative animations
 
     const showEmotion = () => {
@@ -733,7 +755,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
     }, 8000 + Math.random() * 7000);
 
     return () => clearInterval(interval);
-  }, [currentPhase, isOnCooldown]);
+  }, [currentPhase]);
 
   // Tap reaction animation
   const handlePress = useCallback(() => {
@@ -821,38 +843,18 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
   });
 
   // Walking animation - random movement within room bounds.
-  // Sleep gate: a "sleeping" (on-cooldown) animal no longer sleepwalks — it
-  // eases to a rest spot and stops. Phase gate: travel and pauses slow with
-  // the descent (currentPhase + isOnCooldown are in the deps so the effect
-  // actually re-arms when either changes; resumes on cooldown clear).
+  // Dialogue cooldown is deliberately NOT a gate here: an animal with nothing
+  // left to say wanders exactly like an available one, with no explanation
+  // offered. It used to slide to a fixed rest spot and freeze under sleeping
+  // Z's, which read as the character breaking rather than resting. The only
+  // remaining difference is the missing "!" badge. Phase gate: travel and
+  // pauses slow with the descent (currentPhase is in the deps so the effect
+  // re-arms when it changes).
   useEffect(() => {
     if (getSettingsSync().reducedMotion) {
       // Set to a static position, no movement
       posX.setValue(animal.position.x);
       posY.setValue(animal.position.y);
-      return;
-    }
-
-    // Sleeping: settle at a rest spot and stay put (no wander, no bounce).
-    // The facing flip rides along: this slide used to move the sprite without
-    // ever touching scaleX, so an animal resting from the right half of the
-    // room glided LEFT while still facing right — the most visible "walking
-    // backwards" case, and it fires after every dialogue session.
-    if (isOnCooldown) {
-      setIsMoving(false);
-      const restGoingRight = REST_POS_X > currentXRef.current;
-      currentXRef.current = REST_POS_X;
-      Animated.timing(scaleX, {
-        toValue: restGoingRight ? 1 : -1,
-        duration: 150,
-        useNativeDriver: true,
-      }).start();
-      Animated.timing(posX, {
-        toValue: REST_POS_X,
-        duration: 1200,
-        easing: Easing.inOut(Easing.ease),
-        useNativeDriver: true,
-      }).start();
       return;
     }
 
@@ -934,21 +936,20 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
       isMounted = false;
       clearTimeout(movementTimeout);
     };
-  }, [animal.type, currentPhase, isOnCooldown]);
+  }, [animal.type, currentPhase]);
 
   // Bounce animation while moving. Suppressed when real walk frames play OR
   // the procedural gait runs — either already carries the vertical bob, and
-  // stacking the glide-bounce on top reads as skipping. Low-tier devices and
-  // sleeping animals stay static. Phase-descending: the candy hop halves at
-  // Phase 3 and is REPLACED by a 0-1px slow sine glide at Phase 4+ (robed
-  // figures drift with reverence, they never regress to the springy hop).
+  // stacking the glide-bounce on top reads as skipping. Low-tier devices stay
+  // static. Phase-descending: the candy hop halves at Phase 3 and is REPLACED
+  // by a 0-1px slow sine glide at Phase 4+ (robed figures drift with
+  // reverence, they never regress to the springy hop).
   useEffect(() => {
     if (
       getSettingsSync().reducedMotion ||
       shouldSimplifyAnimations() ||
       walkActive ||
-      gaitActive ||
-      isOnCooldown
+      gaitActive
     ) {
       bounceY.setValue(0);
       return;
@@ -1004,7 +1005,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
     return () => {
       bounceAnimation?.stop();
     };
-  }, [isMoving, animal.type, walkActive, gaitActive, currentPhase, isOnCooldown]);
+  }, [isMoving, animal.type, walkActive, gaitActive, currentPhase]);
 
   // ---------------------------------------------------------------------------
   // Rare-idle scheduler (the "alive" system). ~1 beat every 20-45s, but only
@@ -1139,7 +1140,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
     const tryBeat = () => {
       if (cancelled) return;
       // Only fire on a genuine idle moment, and only if the house turnstile is free.
-      if (!cooldownRef.current && !isMovingRef.current && idleBeatTokenHolder === null) {
+      if (!isMovingRef.current && idleBeatTokenHolder === null) {
         idleBeatTokenHolder = myId;
         const anim = buildBeat();
         activeAnim = anim;
@@ -1280,10 +1281,10 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
 
           {/* Animal BODY — the ONLY layer that carries the facing flip (scaleX),
               breathe, tap, wiggle, procedural gait, AND the rare-idle beats.
-              The emote bubble, sleeping Z's and notification badge are
-              unflipped, untransformed SIBLINGS below, so a facing-left animal
-              never mirrors its chrome and nothing squashes with a footfall or
-              an idle beat. */}
+              The emote bubble, doze Z's and notification badge are unflipped,
+              untransformed SIBLINGS below, so a facing-left animal never
+              mirrors its chrome and nothing squashes with a footfall or an
+              idle beat. */}
           <Animated.View
             style={[
               styles.body,
@@ -1425,14 +1426,24 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
             </Animated.View>
           )}
 
-          {/* Sleeping Z's while asleep (on cooldown) or mid-doze (sloth idle) */}
-          {(isOnCooldown || isDozing) && <SleepingZs />}
+          {/* Z's ONLY for the sloth's rare-idle doze beat (a personality
+              flourish, not a state read-out). A dialogue cooldown deliberately
+              shows no sleep chrome at all: the animal just keeps wandering. */}
+          {isDozing && <SleepingZs />}
 
-          {/* New dialogue indicator - hidden when on cooldown */}
+          {/* New dialogue indicator - hidden when on cooldown, which is the one
+              and only visible tell that an animal has nothing left to say. Its
+              anchor is per-animal (BADGE_ANCHOR) because the art does not fill
+              its 90dp box, so a container-corner badge floated in dead space
+              beside the head. It stays an UNFLIPPED sibling of `body`, so the
+              "!" never mirrors with facing. */}
           {animal.hasNewDialogue && !isOnCooldown && (
             <Animated.View
               style={[
                 styles.notificationBadge,
+                CHARACTER_SPRITES[animal.type] && !spriteLoadFailed
+                  ? BADGE_ANCHOR[animal.type]
+                  : EMOJI_BADGE_ANCHOR,
                 { transform: [{ scale: notificationPulse }] },
               ]}
             >
@@ -1446,7 +1457,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
               its body. It is now a STATIC cottage nameplate pinned to the bottom
               of the room (see RoomView's animalPlate): a label belongs to the
               room, not to a moving character, and a flat dark pill was the last
-              webby chip left in the house. The cooldown state moved with it. */}
+              webby chip left in the house. */}
         </View>
       </TouchableOpacity>
     </Animated.View>
@@ -1519,8 +1530,12 @@ const styles = StyleSheet.create({
   },
   notificationBadge: {
     position: 'absolute',
-    top: -8,
-    right: -8,
+    // Default only — the live inset comes from BADGE_ANCHOR per animal (the art
+    // does not fill the 90dp box, so a corner-pinned badge reads detached).
+    // This pair is the table's mean, safe for any animal added without a tuned
+    // entry.
+    top: 4,
+    right: 15,
     width: 20,
     height: 20,
     borderRadius: 10,
@@ -1533,7 +1548,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.5,
     shadowRadius: 2,
-    elevation: 3,
+    // Android z-order among siblings is elevation-driven: the badge now sits ON
+    // the animal, and the emoji fallback body carries elevation 5, so 3 would
+    // let that body paint over the badge.
+    elevation: 6,
   },
   notificationText: {
     fontFamily: PIXEL_FONT_BOLD,

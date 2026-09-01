@@ -1198,7 +1198,7 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 20,
     paddingTop: 18,
-    paddingHorizontal: 20,
+    paddingHorizontal: SURFACE.panelPadX,
     paddingBottom: 18,
   },
   // Skeleton placeholder block (empty card body while the settings load lands).
@@ -1237,7 +1237,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 12,
     borderRadius: 12,
-    marginHorizontal: 8,
+    marginHorizontal: 4,
     marginBottom: 6,
   },
   settingInfo: {
@@ -1261,7 +1261,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 12,
     borderRadius: 12,
-    marginHorizontal: 8,
+    marginHorizontal: 4,
     marginBottom: 6,
     minHeight: 44,
     justifyContent: 'center',
@@ -1283,7 +1283,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 12,
     borderRadius: 12,
-    marginHorizontal: 8,
+    marginHorizontal: 4,
     marginBottom: 6,
     minHeight: 44,
   },
@@ -1310,7 +1310,7 @@ const styles = StyleSheet.create({
     height: 60,
   },
   recoveryCodeBox: {
-    marginHorizontal: 8,
+    marginHorizontal: 4,
     marginBottom: 6,
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -1343,7 +1343,8 @@ const styles = StyleSheet.create({
     bottom: 0,
   },
   restoreCard: {
-    padding: 22,
+    paddingVertical: 22,
+    paddingHorizontal: SURFACE.panelPadX,
   },
   restoreTitle: {
     fontFamily: PIXEL_FONT_BOLD,

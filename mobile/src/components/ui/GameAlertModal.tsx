@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
   },
   card: {
     paddingVertical: 26,
-    paddingHorizontal: 26,
+    paddingHorizontal: SURFACE.panelPadX,
   },
   title: {
     fontFamily: PIXEL_FONT_BOLD,

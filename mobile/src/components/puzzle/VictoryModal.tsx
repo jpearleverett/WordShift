@@ -54,6 +54,7 @@ import { BODY_FONT, BODY_FONT_ITALIC, PIXEL_FONT_BOLD } from '../../theme/fonts'
 import { NineSliceFrame } from '../ui/NineSlice';
 import { CandyButton } from '../ui/CandyButton';
 import { getPixelSkin, PANEL_CORNER_DP, PANEL_EDGE_DP } from '../../theme/pixelSkin.generated';
+import { SURFACE } from '../../theme/surfaces';
 
 // Candy-styled UI sprite icons (replace emoji for critical info)
 const STAR_FILLED = require('../../../assets/ui/star_filled.png');
@@ -1625,10 +1626,11 @@ const styles = StyleSheet.create({
   // Cottage-framed result surface. No backgroundColor / borderRadius / border /
   // shadow: the 9-slice frame supplies the material, the corners and the
   // silhouette, and rounding a baked pixel corner with CSS is the one thing the
-  // skin must never do. Padding clears the panel frame's 24dp wood band.
+  // skin must never do. Horizontal padding comes from SURFACE.panelPadX, which
+  // clears the panel frame's 24dp wood+transition band with breathing room.
   victoryModal: {
     paddingTop: 34,
-    paddingHorizontal: 26,
+    paddingHorizontal: SURFACE.panelPadX,
     paddingBottom: 30,
     alignItems: 'center',
     width: '100%',

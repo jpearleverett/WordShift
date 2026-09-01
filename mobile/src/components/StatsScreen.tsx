@@ -946,7 +946,7 @@ const styles = StyleSheet.create({
   heroCard: {
     marginBottom: 18,
     paddingVertical: 24,
-    paddingHorizontal: 22,
+    paddingHorizontal: SURFACE.panelPadX,
   },
   heroGlow: {
     position: 'absolute',
@@ -959,7 +959,10 @@ const styles = StyleSheet.create({
   },
   heroRow: {
     flexDirection: 'row',
-    padding: 16,
+    // Nested inside heroCard: its own inset shrinks as the panel padding grows
+    // so the three stat boxes keep the same total 38dp inset from the frame.
+    paddingVertical: 16,
+    paddingHorizontal: 10,
     gap: 10,
   },
   heroStat: {
@@ -1000,7 +1003,7 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.small,
     fontWeight: '800',
     letterSpacing: SURFACE.sectionLetterSpacing,
-    paddingHorizontal: 16,
+    paddingHorizontal: SURFACE.cardPadX,
     paddingTop: 14,
     paddingBottom: 6,
   },
@@ -1009,7 +1012,7 @@ const styles = StyleSheet.create({
   starBarContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: SURFACE.cardPadX,
     paddingVertical: 10,
   },
   starBarStars: {
@@ -1044,7 +1047,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   starSummary: {
-    paddingHorizontal: 16,
+    paddingHorizontal: SURFACE.cardPadX,
     paddingBottom: 12,
     paddingTop: 4,
   },
@@ -1059,7 +1062,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: SURFACE.cardPadX,
     paddingVertical: 8,
   },
   masteryLabel: {
@@ -1078,7 +1081,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontStyle: 'italic',
     textAlign: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: SURFACE.cardPadX,
     paddingBottom: 12,
     paddingTop: 2,
   },
@@ -1087,7 +1090,7 @@ const styles = StyleSheet.create({
   difficultyRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: SURFACE.cardPadX,
     paddingVertical: 14,
   },
   difficultyDot: {
@@ -1118,7 +1121,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: SURFACE.cardPadX,
     paddingVertical: 14,
   },
   journeyLabel: {
@@ -1152,7 +1155,7 @@ const styles = StyleSheet.create({
   achievementRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: SURFACE.cardPadX,
     paddingVertical: 12,
   },
   // Generated candy sprite alcove (one per category / a lock when unearned),

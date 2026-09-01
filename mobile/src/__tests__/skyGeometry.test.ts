@@ -23,6 +23,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import sharp from 'sharp';
 
 const ENV_DIR = path.resolve(__dirname, '../../assets/environment');
 const HOUSE_WORLD = fs.readFileSync(
@@ -273,4 +274,104 @@ describe('foundation seats below the river on real devices', () => {
   ])('at %ix%idp the foundation top is below the river', (sw, sh) => {
     expect(foundationTopArtRow(sw, sh)).toBeGreaterThan(RIVER_BOTTOM_ROW);
   });
+});
+
+/**
+ * Pixel-level guards for the two retouches that made the world art meet its
+ * neighbours cleanly. Unlike the rest of this file these decode the real
+ * assets: the property under test IS the pixels, so a source scan cannot see
+ * it. `sharp` is already a devDependency (the art tools use it) and reads both
+ * WebP and PNG, so no second decoder is pulled in.
+ */
+
+const hexRgb = (hex: string): [number, number, number] => [
+  parseInt(hex.slice(1, 3), 16),
+  parseInt(hex.slice(3, 5), 16),
+  parseInt(hex.slice(5, 7), 16),
+];
+
+/** The declared backdrop fill per phase, read from HouseWorld's own map. */
+function declaredSkyFills(): string[] {
+  const start = HOUSE_WORLD.indexOf('const PHASE_BG_COLORS');
+  const map = HOUSE_WORLD.slice(start, HOUSE_WORLD.indexOf('};', start));
+  return SKIES.map((sky, phase) => {
+    const match = map.match(new RegExp(`\\n  ${phase}: '(#[0-9a-fA-F]{6})'`));
+    if (!match) throw new Error(`PHASE_BG_COLORS has no entry for phase ${phase} (${sky})`);
+    return match[1].toLowerCase();
+  });
+}
+
+describe('sky top band blends into the flat backdrop fill', () => {
+  // HouseWorld paints PHASE_BG_COLORS[phase] above the bottom-anchored sky, so
+  // panning up exposes that flat colour meeting the sky's row 0. The art's own
+  // row 0 varied horizontally by up to 40/255 (sky_dusk), which no flat fill can
+  // match, so a seam line sat at the join. scripts/tools/retouchSkyTopSeam.mjs
+  // now holds the top rows at EXACTLY the declared hex and smoothsteps back into
+  // the art below, which makes the fill constant a CONTRACT rather than a sample.
+  // The stored WebP is lossy, so the decoded row can sit 1/255 off what the tool
+  // wrote; anything beyond that means the retouch was lost (a sky regenerated
+  // without re-running the tool) or a fill hex was "re-sampled" and drifted.
+  const TOLERANCE = 1;
+  const fills = declaredSkyFills();
+
+  test.each(SKIES.map((sky, phase) => [sky, phase] as const))(
+    '%s row 0 is flat across the full width and matches its declared fill',
+    async (sky, phase) => {
+      const expected = hexRgb(fills[phase]);
+      const { data, info } = await sharp(path.join(ENV_DIR, `${sky}.webp`))
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      expect(info.width).toBe(941);
+
+      const offenders: Record<string, number>[] = [];
+      for (let c = 0; c < 3; c++) {
+        let min = 255;
+        let max = 0;
+        for (let x = 0; x < info.width; x++) {
+          const v = data[x * info.channels + c];
+          if (v < min) min = v;
+          if (v > max) max = v;
+        }
+        // Flat (no horizontal variation for the flat backdrop to fail to match)
+        // AND sitting on the colour the app paints above it.
+        const deviation = Math.max(Math.abs(min - expected[c]), Math.abs(max - expected[c]));
+        if (max - min > TOLERANCE || deviation > TOLERANCE) {
+          offenders.push({ channel: c, min, max, expected: expected[c] });
+        }
+      }
+      expect(offenders).toEqual([]);
+    }
+  );
+});
+
+describe('the pit road runs up under the house at every phase', () => {
+  // scripts/tools/carveFoundationRoad.mjs carves the pit's dirt road through the
+  // foundation's vegetation band (corridor x 302..493) and forces the corridor
+  // opaque down to the last row, because the foundations' own bottom alpha is
+  // ragged and on some phases stops short of the corridor entirely — which left
+  // a notch where the road meets the pit art (PIT_MARGIN_TOP is 0, so the two
+  // butt together). The outermost ~5 columns each side are the deliberately
+  // feathered verge, so the assertion covers the road's core.
+  const ROAD_X0 = 302;
+  const ROAD_X1 = 493;
+  const VERGE_FEATHER = 8;
+
+  test.each([0, 1, 2, 3, 4, 5])(
+    'foundation_%i.png is opaque across the road corridor at its bottom row',
+    async (phase) => {
+      const { data, info } = await sharp(path.join(ENV_DIR, `foundation_${phase}.png`))
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      expect({ width: info.width, height: info.height }).toEqual({ width: 792, height: 120 });
+
+      const bottom = info.height - 1;
+      const transparent: number[] = [];
+      for (let x = ROAD_X0 + VERGE_FEATHER; x <= ROAD_X1 - VERGE_FEATHER; x++) {
+        if (data[(bottom * info.width + x) * info.channels + 3] !== 255) transparent.push(x);
+      }
+      expect(transparent).toEqual([]);
+    }
+  );
 });

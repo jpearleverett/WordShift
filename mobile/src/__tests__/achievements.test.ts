@@ -82,6 +82,39 @@ describe('achievements', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
+  test('all achievements have unique titles and descriptions', () => {
+    const titles = ACHIEVEMENTS.map(a => a.title);
+    const dupeTitles = [...new Set(titles.filter((t, i) => titles.indexOf(t) !== i))];
+    expect(dupeTitles).toEqual([]);
+
+    const descriptions = ACHIEVEMENTS.map(a => a.description);
+    const dupeDescs = [...new Set(descriptions.filter((d, i) => descriptions.indexOf(d) !== i))];
+    expect(dupeDescs).toEqual([]);
+  });
+
+  test('the 3-star tier and the flawless tier are named distinctly', () => {
+    const threeStar = ACHIEVEMENTS.find(a => a.id === 'first_perfect')!;
+    const flawless = ACHIEVEMENTS.find(a => a.id === 'flawless_first')!;
+    // Any flawless solve is also a 3-star solve, so both unlock on the same win
+    // and their toasts must not read as the same achievement twice.
+    expect(threeStar.title).not.toBe(flawless.title);
+    expect(flawless.title).toMatch(/flawless/i);
+    expect(threeStar.title).not.toMatch(/flawless/i);
+  });
+
+  test('a first perfect solve unlocks two distinctly named achievements', async () => {
+    const state = {
+      ...defaultState,
+      stats: { ...defaultState.stats, threeStarCount: 1, flawlessCount: 1 },
+    };
+    const unlocked = await checkAchievements(state);
+    const ids = unlocked.map(a => a.id);
+    expect(ids).toContain('first_perfect');
+    expect(ids).toContain('flawless_first');
+    const unlockedTitles = unlocked.map(a => a.title);
+    expect(new Set(unlockedTitles).size).toBe(unlockedTitles.length);
+  });
+
   test('getTotalCount returns correct number', () => {
     expect(getTotalCount()).toBe(ACHIEVEMENTS.length);
   });

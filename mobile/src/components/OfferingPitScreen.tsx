@@ -18,6 +18,8 @@ import {
   getOverlayBannerTheme,
   getPhaseTheme,
   getTileColor,
+  getTileFinish,
+  DEFAULT_TILE_FINISH,
   PIT_BACKGROUND_COLORS as PIT_BG_COLORS,
   PIT_DEVOUR_COLORS as DEVOUR_COLORS,
 } from '../theme/colors';
@@ -59,11 +61,11 @@ import {
   PANEL_CORNER_DP,
   PANEL_EDGE_DP,
   BTN_CAP_DP,
-  BTN_MD_DP,
   BTN_LG_DP,
   BTN_SHADOW_DP,
 } from '../theme/pixelSkin.generated';
-import { getSurfaceTheme } from '../theme/surfaces';
+import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
+import { UtilityMenu } from './ui/UtilityMenu';
 import {
   loadTendingState,
   getNextTendingInfo,
@@ -88,6 +90,7 @@ import { playUiSound, stopCeremonyMusic } from '../services/uiSound';
 import { announceForA11y } from '../services/a11yAnnounce';
 import { getDeviceTier, shouldSimplifyAnimations } from '../services/deviceTier';
 import { getBulkOfferTiming } from '../services/pitOfferTiming';
+import { markScreenReady } from '../services/screenReady';
 
 // ---------------------------------------------------------------------------
 // Assets & Constants
@@ -107,8 +110,6 @@ const PIT_PEACE = require('../../assets/environment/pitt_peace.webp');
 const TENDING_ICON = require('../../assets/ui/tending.png');
 const MENU_ICON = require('../../assets/ui/menu.png');
 const HOME_ICON = require('../../assets/ui/home.png');
-const STATS_ICON = require('../../assets/ui/stats.png');
-const GEAR_ICON = require('../../assets/ui/gear.png');
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -375,15 +376,28 @@ interface ShockwaveRing {
 
 const MiniCandyTile = React.memo(({ char }: { char: string }) => {
   const color = getTileColor(char);
+  // The equipped tile theme's MATERIAL, so a bought finish reads at the pit too
+  // (bevel, specular treatment and ink only — the speckle is deliberately not
+  // extended here, since the pit floats many words at once).
+  const finish = getTileFinish();
+  const finishActive = finish !== DEFAULT_TILE_FINISH;
   return (
     <View style={tileStyles.outer}>
       <View style={[tileStyles.body, { backgroundColor: color.bg }]}>
         {/* Top bevel highlight */}
-        <View style={tileStyles.bevel} />
-        {/* Specular dot */}
-        <View style={tileStyles.specular} />
+        <View style={[tileStyles.bevel, finishActive && { backgroundColor: finish.bevel }]} />
+        {/* Specular dot (a hard glint or nothing, per the finish) */}
+        {finish.specular !== 'none' && (
+          <View
+            style={[
+              tileStyles.specular,
+              finishActive && { backgroundColor: finish.specularColor },
+              finish.specular === 'star' && tileStyles.specularStar,
+            ]}
+          />
+        )}
         {/* Letter */}
-        <Text style={tileStyles.letter}>{char}</Text>
+        <Text style={[tileStyles.letter, !!finish.ink && { color: finish.ink }]}>{char}</Text>
       </View>
       {/* 3D bottom edge */}
       <View style={[tileStyles.edge, { backgroundColor: color.border }]} />
@@ -424,6 +438,10 @@ const tileStyles = StyleSheet.create({
     height: 4,
     borderRadius: 2,
     backgroundColor: 'rgba(255,255,255,0.65)',
+  },
+  specularStar: {
+    borderRadius: 0,
+    transform: [{ rotate: '45deg' }],
   },
   letter: {
     fontFamily: PIXEL_FONT_BOLD,
@@ -836,6 +854,10 @@ interface OfferingPitScreenProps {
   onOpenSettings?: () => void;
   /** Open the amber Store (the header amber pill taps through, like home). */
   onOpenStore?: () => void;
+  /** Open the cosmetic Shop (a row of the shared utility menu). */
+  onOpenShop?: () => void;
+  /** Begin a New Cycle (the shared menu's Phase-5 door). */
+  onStartNewCycle?: () => void;
   /** 0.0 to 1.0 — how close the player is to the next phase */
   phaseProgressFraction: number;
   /** Non-null when a phase transition is pending and ready to confirm */
@@ -861,6 +883,8 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   onOpenStats,
   onOpenSettings,
   onOpenStore,
+  onOpenShop,
+  onStartNewCycle,
   phaseProgressFraction,
   pendingPhaseTransition,
   onPhaseTransitionConfirmed,
@@ -1301,8 +1325,16 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
 
   // ---- Load harvest state ----
   const loadState = useCallback(async () => {
-    const state = await getHarvestState();
-    if (mountedRef.current) setHarvestState(state);
+    try {
+      const state = await getHarvestState();
+      if (mountedRef.current) setHarvestState(state);
+    } finally {
+      // The pit renders null until harvestState lands, so the navigation cover
+      // holds for exactly this read instead of lifting on an empty frame. In
+      // the finally: a failed read must still release the cover (it is capped
+      // anyway, but the player should never wait out the cap for nothing).
+      markScreenReady('pit');
+    }
   }, []);
 
   useEffect(() => { loadState(); }, [loadState]);
@@ -2801,68 +2833,20 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
           )}
         </View>
 
-        <Modal
+        {/* The SHARED utility menu (same component the home screen renders),
+            so the pit's ☰ can never drift into a different menu again. */}
+        <UtilityMenu
           visible={showUtilityModal}
-          transparent
-          statusBarTranslucent
-          animationType="fade"
-          onRequestClose={() => setShowUtilityModal(false)}
-        >
-          <TouchableOpacity
-            style={styles.utilityOverlay}
-            activeOpacity={1}
-            onPress={() => setShowUtilityModal(false)}
-            accessibilityLabel="Close utility menu"
-            accessibilityRole="button"
-          >
-            <View style={styles.utilityModal} onStartShouldSetResponder={() => true}>
-              {/* Cottage pixel frame (openBottom sheet); text uses the audited
-                  surface inks, never raw white on parchment. */}
-              <NineSliceFrame
-                skin={pitSkin.panel}
-                cornerDp={PANEL_CORNER_DP}
-                edgeDp={PANEL_EDGE_DP}
-                fillColor={pitSkin.fill}
-                openBottom
-              />
-              <Text style={[styles.utilityTitle, { color: pitSurface.title }]}>Menu</Text>
-              {onOpenStats && (
-                <TouchableOpacity
-                  style={styles.utilityButton}
-                  onPress={() => {
-                    setShowUtilityModal(false);
-                    onOpenStats?.();
-                  }}
-                  accessibilityLabel="View stats"
-                  accessibilityRole="button"
-                >
-                  <ThreeSliceStrip skin={pitSkin.buttons.secondary.md.up} capDp={BTN_CAP_DP} />
-                  <View style={styles.utilityButtonRow}>
-                    <Image source={STATS_ICON} style={styles.utilityButtonIcon} />
-                    <Text style={[styles.utilityButtonText, { color: pitSkin.ink.primary }]}>Statistics</Text>
-                  </View>
-                </TouchableOpacity>
-              )}
-              {onOpenSettings && (
-                <TouchableOpacity
-                  style={styles.utilityButton}
-                  onPress={() => {
-                    setShowUtilityModal(false);
-                    onOpenSettings?.();
-                  }}
-                  accessibilityLabel="Open settings"
-                  accessibilityRole="button"
-                >
-                  <ThreeSliceStrip skin={pitSkin.buttons.secondary.md.up} capDp={BTN_CAP_DP} />
-                  <View style={styles.utilityButtonRow}>
-                    <Image source={GEAR_ICON} style={styles.utilityButtonIcon} />
-                    <Text style={[styles.utilityButtonText, { color: pitSkin.ink.primary }]}>Settings</Text>
-                  </View>
-                </TouchableOpacity>
-              )}
-            </View>
-          </TouchableOpacity>
-        </Modal>
+          phase={phase}
+          onClose={() => setShowUtilityModal(false)}
+          amber={amberBalance}
+          onAmberChange={onAmberChange}
+          onOpenStats={onOpenStats}
+          onOpenShop={onOpenShop}
+          onOpenStore={onOpenStore}
+          onOpenSettings={onOpenSettings}
+          onStartNewCycle={onStartNewCycle}
+        />
 
         {/* Tending Shrine modal — Phase 5 cosmetic amber sink */}
         <Modal
@@ -3142,44 +3126,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     backgroundColor: 'rgba(8, 8, 18, 0.45)',
   },
-  // Cottage bottom-sheet: NineSliceFrame owns the look (no flat bg/border/
-  // radius). Padding clears the panel wood band; openBottom runs the fill to
-  // the screen edge.
-  utilityModal: {
-    paddingHorizontal: 30,
-    paddingTop: 34,
-    paddingBottom: 32,
-  },
-  utilityTitle: {
-    fontFamily: PIXEL_FONT_BOLD,
-    fontSize: FONT_SIZE.display,
-    fontWeight: '900',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  // Cottage pixel bevel (ThreeSliceStrip owns the fill); the shadow row is
-  // baked into the sprite height, so content clears it via paddingBottom.
-  utilityButton: {
-    height: BTN_MD_DP + BTN_SHADOW_DP,
-    justifyContent: 'center',
-    paddingBottom: BTN_SHADOW_DP,
-    marginBottom: 10,
-  },
-  utilityButtonRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-  },
-  utilityButtonIcon: {
-    width: 22,
-    height: 22,
-  },
-  utilityButtonText: {
-    fontFamily: PIXEL_FONT_BOLD,
-    fontSize: FONT_SIZE.callout,
-    fontWeight: '800',
-  },
   // ---- Tending Shrine modal ----
   tendingModal: {
     paddingHorizontal: 30,
@@ -3318,7 +3264,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     // Cottage card frame background; clear its 12dp wood band top/bottom.
     paddingVertical: 16,
-    paddingHorizontal: 18,
+    paddingHorizontal: SURFACE.cardPadX,
     marginBottom: 10,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },

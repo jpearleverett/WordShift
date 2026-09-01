@@ -206,7 +206,8 @@ const styles = StyleSheet.create({
   },
   rulesModal: {
     width: '100%',
-    padding: 28,
+    paddingVertical: 28,
+    paddingHorizontal: SURFACE.panelPadX,
   },
   closeButton: {
     position: 'absolute',

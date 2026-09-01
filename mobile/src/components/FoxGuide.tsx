@@ -19,7 +19,7 @@ import {
   getSkipConfirmStayLabel,
   getSkipConfirmLeaveLabel,
 } from '../services/phaseNarrative';
-import { getSurfaceTheme } from '../theme/surfaces';
+import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
 import {
   getPixelSkin,
   CARD_CORNER_DP,
@@ -440,8 +440,8 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 12,
     paddingTop: PANEL_EDGE_DP - 8,
-    paddingLeft: PANEL_EDGE_DP - 12,
-    paddingRight: PANEL_EDGE_DP - 14,
+    paddingLeft: SURFACE.panelPadX,
+    paddingRight: SURFACE.panelPadX,
     paddingBottom: PANEL_EDGE_DP - 12,
   },
   // Sprite column - 30% width, zoomed in to fill (transparent — parchment shows)
@@ -478,7 +478,10 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: 8,
     paddingBottom: 6,
-    paddingHorizontal: 12,
+    // Inner gutter, NOT frame clearance (the bubble owns a card frame + its own
+    // cardPadX). Compensates dialogueCard's rise to panelPadX so the cold-open
+    // copy does not lose a character per line on the narrowest card in the game.
+    paddingHorizontal: 6,
   },
   // Portrait nameplate below the sprite, centered in the alcove.
   dialogueName: {
@@ -499,7 +502,7 @@ const styles = StyleSheet.create({
   },
   // Cottage parchment tray (NineSliceFrame card); clear the 12dp wood band.
   dialogueBubble: {
-    paddingHorizontal: 18,
+    paddingHorizontal: SURFACE.cardPadX,
     paddingVertical: 16,
     marginBottom: 14,
     minHeight: 44,
@@ -535,7 +538,7 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
     paddingVertical: CARD_EDGE_DP - 6,
-    paddingHorizontal: CARD_EDGE_DP - 6,
+    paddingHorizontal: SURFACE.cardPadX,
   },
   compactSpriteCol: {
     width: 72,
@@ -556,7 +559,8 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: 4,
     paddingBottom: 2,
-    paddingHorizontal: 8,
+    // Inner gutter; compensates compactCard's rise to cardPadX.
+    paddingHorizontal: 4,
   },
   compactName: {
     fontFamily: PIXEL_FONT_BOLD,

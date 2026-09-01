@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing } from 'react-native';
 import { Letter } from '../types';
-import { getTileColor, CandyColors, getPhaseTheme, getResonanceConfig } from '../theme/colors';
+import { getTileColor, getTileFinish, CandyColors, getPhaseTheme, getResonanceConfig } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
 import { shouldSimplifyAnimations } from '../services/deviceTier';
 import { getPressSpring } from '../theme/surfaces';
@@ -226,6 +226,13 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
 
   // Get consistent color based on letter
   const tileColor = getTileColor(letter.char);
+  // The equipped theme's MATERIAL. A palette only reaches the source row's
+  // unlocked tiles (the one branch of getStyles below that reads tileColor);
+  // the finish repaints the bevel/gloss/specular/sweep on EVERY tile, so a
+  // bought theme is visible across the whole board. Unthemed players resolve to
+  // DEFAULT_TILE_FINISH, whose values are the same literals the styles below
+  // used to hardcode, so nothing changes for them.
+  const finish = getTileFinish();
   // Phase-aware guide/hint glow (F4) — see getGuideGlowConfig above.
   const guideGlow = getGuideGlowConfig(phase);
 
@@ -733,7 +740,9 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
       return {
         bgColor: tileColor.bg,
         borderColor: tileColor.border,
-        textColor: CandyColors.white,
+        // Ink is finish-owned ONLY here, where the tile body is theme-colored.
+        // The locked/selected/default branches keep their phase inks.
+        textColor: finish.ink ?? CandyColors.white,
         shadowColor: tileColor.bg,
       };
     }
@@ -909,7 +918,7 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
           style={[
             styles.glowOuter,
             {
-              backgroundColor: tileStyles.shadowColor,
+              backgroundColor: finish.aura ?? tileStyles.shadowColor,
               opacity: isSelected ? 0.6 : glowOpacity,
             },
           ]}
@@ -968,11 +977,37 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
           highlight === 'locked' && styles.tileBodyLocked,
         ]}
       >
-        {/* Top highlight (bevel effect) */}
-        <View style={styles.bevelTop} />
+        {/* Top highlight (bevel effect) — finish-owned */}
+        <View style={[styles.bevelTop, { backgroundColor: finish.bevel }]} />
 
-        {/* Glossy shine overlay */}
-        <View style={styles.glossyShine} />
+        {/* Glossy shine overlay — finish-owned */}
+        <View style={[styles.glossyShine, { backgroundColor: finish.gloss }]} />
+
+        {/* Cut rim (lead came / a stone edge). A plain View inside the tile
+            body, not a 9-slice frame, so a borderRadius here is fine. */}
+        {!!finish.rim && (
+          <View
+            style={[
+              styles.finishRim,
+              compact && { borderRadius: 12 },
+              { borderColor: finish.rim },
+            ]}
+            pointerEvents="none"
+          />
+        )}
+
+        {/* Static speckle (wing dust). Not motion, so it is NOT reduced-motion
+            gated; it is gated on device tier purely for node count. */}
+        {finish.grain === 'speckle' && !shouldSimplifyAnimations() && (
+          <View style={StyleSheet.absoluteFill} pointerEvents="none">
+            {SPECKLE_SPOTS.map((spot, i) => (
+              <View
+                key={i}
+                style={[styles.speck, spot, { backgroundColor: finish.grainColor }]}
+              />
+            ))}
+          </View>
+        )}
 
         {/* Resonance glow — inner light for dread/ritual words */}
         {resonanceConfig && (
@@ -1001,9 +1036,15 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
           {letter.char}
         </Text>
 
-        {/* Specular highlight dot */}
-        {highlight !== 'locked' && (
-          <View style={styles.specularDot} />
+        {/* Specular highlight — a soft dot, a hard star glint, or nothing */}
+        {highlight !== 'locked' && finish.specular !== 'none' && (
+          <View
+            style={[
+              styles.specularDot,
+              finish.specular === 'star' && styles.specularStar,
+              { backgroundColor: finish.specularColor },
+            ]}
+          />
         )}
 
         {/* Moving shine effect */}
@@ -1012,6 +1053,7 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
             style={[
               styles.shineSweep,
               {
+                backgroundColor: finish.sweep,
                 transform: [{ translateX: shineTranslate }],
               },
             ]}
@@ -1217,7 +1259,34 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     borderRadius: 14,
   },
+  // Finish extras (color supplied inline from the equipped TileFinish).
+  finishRim: {
+    ...StyleSheet.absoluteFill,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  specularStar: {
+    borderRadius: 1,
+    transform: [{ rotate: '45deg' }],
+  },
+  speck: {
+    position: 'absolute',
+    width: 2,
+    height: 2,
+    borderRadius: 1,
+  },
 });
+
+// Fixed speckle positions for the 'speckle' grain, expressed as percentages so
+// the same five specks land sensibly on standard and compact tiles. Static
+// decoration only: no animation, no layout cost beyond five 2x2 Views.
+const SPECKLE_SPOTS = [
+  { top: '18%' as const, left: '24%' as const },
+  { top: '31%' as const, left: '68%' as const },
+  { top: '54%' as const, left: '16%' as const },
+  { top: '66%' as const, left: '52%' as const },
+  { top: '80%' as const, left: '78%' as const },
+];
 
 const trailStyles = StyleSheet.create({
   container: {
