@@ -594,7 +594,11 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
           // event clears on complete). Guarded bridge, so it is a no-op without
           // the native audio layer.
           stopCeremonyMusic();
-          playUiSound('phase_change');
+          // The Arrival's own cue, heard exactly once in the whole game: the
+          // pad dying downward into one enormous slow bell whose strike lands
+          // with the settle haptic below. Never the ceremony swell the player
+          // has already heard at every ward ignition.
+          playUiSound('arrival');
         }
         if (!reducedMotion) {
           fireSceneHaptic(scene, event.shakeIntensity);

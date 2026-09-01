@@ -50,7 +50,15 @@ const SOUND_SOURCES: Record<string, any> = {
   unlock: require('../../assets/sounds/unlock.wav'),
   unlock_dark: require('../../assets/sounds/unlock_dark.wav'),
   dialogue: require('../../assets/sounds/dialogue.wav'),
+  // Ceremony swell pair: warm C-add9 handbell rise for the BRIGHT ward
+  // ignitions, the low ritual sub-swell for the Phase 3+ ones. Resolution
+  // keys on the ceremony's TARGET phase (soundPhaseChange), never audioPhase
+  // — the swell fires BEFORE confirmPhaseTransition, so audioPhase still
+  // holds the OLD phase at that moment.
   phase_change: require('../../assets/sounds/phase_change.wav'),
+  phase_change_dark: require('../../assets/sounds/phase_change_dark.wav'),
+  // The Arrival (finale cinematic only) — no dark mirror, it IS the wrongness.
+  arrival: require('../../assets/sounds/arrival.wav'),
   daily_ready: require('../../assets/sounds/daily_ready.wav'),
   // Offering Pit: a word landing in the pit (dark mirror hungrier at Phase 3+).
   pit_devour: require('../../assets/sounds/pit_devour.wav'),
@@ -389,9 +397,20 @@ export async function soundDialogue(): Promise<void> {
   await playSound(resolveSfxForPhase('dialogue', audioPhase));
 }
 
-/** Phase transition */
-export async function soundPhaseChange(): Promise<void> {
-  await playSound(resolveSfxForPhase('phase_change', audioPhase));
+/**
+ * Phase-transition ceremony swell. Keys on the ceremony's TARGET phase when
+ * given (the pit passes pendingPhaseTransition): the swell fires BEFORE
+ * confirmPhaseTransition, so audioPhase still holds the OLD phase and would
+ * band the ignition INTO Growing Shadows bright. Dark from target 3 up.
+ */
+export async function soundPhaseChange(targetPhase?: number): Promise<void> {
+  const phase = targetPhase ?? audioPhase;
+  await playSound(phase >= 3 ? 'phase_change_dark' : 'phase_change');
+}
+
+/** The Arrival — the finale cinematic's bespoke descent cue. */
+export async function soundArrival(): Promise<void> {
+  await playSound('arrival');
 }
 
 /** Daily challenge available */

@@ -33,6 +33,7 @@ export type UiSoundKind =
   | 'devour'
   | 'glitch'
   | 'whisper'
+  | 'arrival'
   | 'valid_move'
   | 'star_pop';
 
@@ -48,7 +49,10 @@ export function playUiSound(kind: UiSoundKind = 'tap', arg?: number): void {
     switch (kind) {
       case 'selection': audio.soundSelection?.(); break;
       case 'dialogue': audio.soundDialogue?.(); break;
-      case 'phase_change': audio.soundPhaseChange?.(); break;
+      // 'phase_change' takes the ceremony's TARGET phase as its arg (the pit
+      // passes pendingPhaseTransition) so the swell bands dark from target 3.
+      case 'phase_change': audio.soundPhaseChange?.(arg); break;
+      case 'arrival': audio.soundArrival?.(); break;
       case 'amber_earn': audio.soundAmberEarn?.(); break;
       case 'unlock': audio.soundUnlock?.(); break;
       case 'achievement': audio.soundAchievement?.(); break;

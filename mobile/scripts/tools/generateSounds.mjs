@@ -616,14 +616,56 @@ render('dialogue', 0.15, (s, rand) => {
   strike(s, { freq: N.D5, dur: 0.11, vol: 0.4, partials: CELESTA, decayShape: 7.5, unison: 2, detune: 0.003, rand });
 }, { reverb: { wet: 0.06, tail: 0.1 }, peak: 0.42 });
 
-// phase_change: low ritual swell — sub pad, tritone shading, distant dark bell.
+// phase_change: WARM ceremony swell — the C-add9 house chord rising into a
+// handbell hour-strike, for the BRIGHT ward ignitions (target phase 0-2). One
+// lowered-7th (Bb) shade drifts under the warmth: the seed of wrongness, the
+// same device the dusk music beds use. The Phase 3+ ceremonies play
+// phase_change_dark below (audio.soundPhaseChange keys on the ceremony's
+// TARGET phase), so the descent is earned by ear too — the ignition INTO
+// Growing Shadows is the first ceremony that sounds wrong.
 render('phase_change', 2.6, (s, rand) => {
+  swell(s, { freq: D.C3, dur: 2.4, vol: 0.26, partials: [{ r: 1, g: 1 }, { r: 2, g: 0.35 }, { r: 3, g: 0.1 }], attack: 0.6, release: 1.0, unison: 3, detune: 0.005, rand });
+  swell(s, { freq: D.G3, start: 0.15, dur: 2.2, vol: 0.16, partials: [{ r: 1, g: 1 }, { r: 2, g: 0.25 }], attack: 0.7, release: 1.0, unison: 3, detune: 0.006, rand });
+  swell(s, { freq: N.D4, start: 0.35, dur: 1.9, vol: 0.11, attack: 0.7, release: 0.9, unison: 3, detune: 0.006, rand });
+  swell(s, { freq: N.E4, start: 0.55, dur: 1.7, vol: 0.09, attack: 0.65, release: 0.9, unison: 2, detune: 0.005, rand });
+  // The wrong-note: a lowered seventh drifting under the add9.
+  swell(s, { freq: D.Bb3, start: 0.9, dur: 1.2, vol: 0.05, attack: 0.6, release: 0.7, unison: 2, detune: 0.007, rand });
+  strike(s, { freq: N.C5, start: 1.1, dur: 1.3, vol: 0.3, partials: HANDBELL, attack: 0.006, decayShape: 3.8, unison: 2, detune: 0.003, rand });
+  noiseBurst(s, { start: 0.3, dur: 1.6, vol: 0.05, lp: 0.7, hp: 0.6, attack: 0.5, decayShape: 3.5, rand });
+}, { reverb: { wet: 0.32, decay: 0.82, damp: 0.45, tail: 1.0 }, peak: 0.68 });
+
+// phase_change_dark: the original low ritual swell — sub pad, tritone shading,
+// distant dark bell. Now explicitly the Phase 3+ ceremony voice.
+render('phase_change_dark', 2.6, (s, rand) => {
   swell(s, { freq: D.C2, dur: 2.4, vol: 0.3, partials: [{ r: 1, g: 1 }, { r: 2, g: 0.4 }, { r: 3, g: 0.12 }], attack: 0.7, release: 1.1, unison: 3, detune: 0.006, rand });
   swell(s, { freq: D.C3, start: 0.2, dur: 2.1, vol: 0.16, partials: [{ r: 1, g: 1 }, { r: 2, g: 0.25 }], attack: 0.8, release: 1.0, unison: 3, detune: 0.007, rand });
   swell(s, { freq: D.Gb3, start: 0.7, dur: 1.6, vol: 0.09, attack: 0.7, release: 0.8, unison: 3, detune: 0.008, rand });
   strike(s, { freq: D.C4, start: 1.1, dur: 1.3, vol: 0.28, partials: DARK_BELL, attack: 0.01, decayShape: 4, unison: 2, detune: 0.003, rand });
   noiseBurst(s, { start: 0.2, dur: 2.0, vol: 0.1, lp: 0.03, attack: 0.5, decayShape: 3.5, rand });
 }, { reverb: { wet: 0.35, decay: 0.85, damp: 0.5, tail: 1.1 }, peak: 0.72 });
+
+// arrival: THE descent's own sound (finale cinematic only; no dark mirror —
+// it IS the wrongness at any phase). ~8s: the world's pad dying downward
+// through minor steps, then ONE enormous slow-attack bell whose strike lands
+// with the overlay's settle haptic (~4.7s wall-clock at the shipped 1.25x
+// time scale), and a sub breath receding into the tail. Deliberate
+// mid-frequency body (C3/C4 bell pair, HOLLOW steps) so phone speakers,
+// which lose the sub, still carry the moment.
+render('arrival', 8.0, (s, rand) => {
+  swell(s, { freq: D.C2, dur: 5.2, vol: 0.3, partials: [{ r: 1, g: 1 }, { r: 2, g: 0.45 }, { r: 3, g: 0.15 }], attack: 1.2, release: 2.4, unison: 3, detune: 0.007, rand });
+  swell(s, { freq: D.C3, start: 0.4, dur: 4.6, vol: 0.18, partials: [{ r: 1, g: 1 }, { r: 2, g: 0.3 }], attack: 1.1, release: 2.2, unison: 3, detune: 0.008, rand });
+  swell(s, { freq: D.Gb3, start: 1.2, dur: 3.4, vol: 0.08, attack: 1.0, release: 1.6, unison: 3, detune: 0.009, rand });
+  // Descending minor steps as it comes down: Eb3 -> C3 -> G2.
+  strike(s, { freq: D.Eb3, start: 1.6, dur: 1.4, vol: 0.14, partials: HOLLOW, attack: 0.05, decayShape: 3.2, unison: 2, detune: 0.005, rand });
+  strike(s, { freq: D.C3, start: 2.7, dur: 1.6, vol: 0.16, partials: HOLLOW, attack: 0.05, decayShape: 3.0, unison: 2, detune: 0.005, rand });
+  strike(s, { freq: D.G2, start: 3.6, dur: 1.8, vol: 0.16, partials: HOLLOW, attack: 0.06, decayShape: 2.8, unison: 2, detune: 0.006, rand });
+  // THE bell: one enormous slow-attack strike, landing with the settle.
+  strike(s, { freq: D.C4, start: 4.4, dur: 3.2, vol: 0.42, partials: DARK_BELL, attack: 0.28, decayShape: 2.6, unison: 2, detune: 0.004, rand });
+  strike(s, { freq: D.C3, start: 4.45, dur: 3.0, vol: 0.2, partials: DARK_BELL, attack: 0.3, decayShape: 2.6, rand });
+  // Sub breath: gathers under the descent, exhales with the bell.
+  noiseBurst(s, { start: 0.1, dur: 4.0, vol: 0.08, lp: 0.05, attack: 1.2, decayShape: 2.8, rand });
+  noiseBurst(s, { start: 4.4, dur: 2.6, vol: 0.1, lp: 0.08, attack: 0.25, decayShape: 3.0, rand });
+}, { reverb: { wet: 0.4, decay: 0.9, damp: 0.5, tail: 1.6 }, peak: 0.74 });
 
 // daily_ready: warm handbell pair, G5 then C6.
 render('daily_ready', 1.0, (s, rand) => {

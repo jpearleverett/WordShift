@@ -1641,9 +1641,11 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         if (!mountedRef.current) return;
         setCeremonyStatus('erupting');
         hapticHeavy();
-        // The bespoke 2.6s ritual swell (soundPhaseChange) resolves its dark
-        // mirror by phase; it lands with the eruption, over the silenced bed.
-        playUiSound('phase_change');
+        // The 2.6s ceremony swell lands with the eruption, over the silenced
+        // bed. It bands on the ceremony's TARGET phase (the transition has
+        // not confirmed yet, so audioPhase still holds the old phase): warm
+        // handbell rise into phases 0-2, the dark ritual swell from 3 up.
+        playUiSound('phase_change', pendingPhaseTransition ?? undefined);
         flashPitSurge();
         spawnShockwave();
         const sw1 = setTimeout(() => { if (mountedRef.current) spawnShockwave(); }, 150);
