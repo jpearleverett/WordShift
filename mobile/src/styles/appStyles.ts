@@ -14,9 +14,9 @@ export function getScreenBackgroundColor(screen: string, phase: number): string 
     case 'home':
       // Must match PHASE_BG_COLORS in HouseWorld.tsx: each value is sampled
       // from the TOP row of that phase's sky asset (sky_day/afternoon/dusk/
-      // storm/shadow.png; Phase 5 reuses sky_shadow) so the backdrop extends
-      // the sky seamlessly. Re-sample if the sky assets are regenerated.
-      return { 0: '#439cf2', 1: '#1583f9', 2: '#684381', 3: '#000000', 4: '#050816', 5: '#050816' }[phase] ?? '#439cf2';
+      // storm/shadow/peace) so the backdrop extends the sky seamlessly.
+      // Re-sample if the sky assets are regenerated.
+      return { 0: '#439cf2', 1: '#1583f9', 2: '#684381', 3: '#000000', 4: '#050816', 5: '#181328' }[phase] ?? '#439cf2';
     case 'puzzle':
       return getPhaseTheme(phase as any).bgPrimary;
     case 'settings':

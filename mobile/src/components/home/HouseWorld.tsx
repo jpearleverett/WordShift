@@ -45,16 +45,22 @@ const SKY_AFTERNOON = require('../../../assets/environment/sky_afternoon.webp');
 const SKY_DUSK = require('../../../assets/environment/sky_dusk.webp');
 const SKY_STORM = require('../../../assets/environment/sky_storm.webp');
 const SKY_SHADOW = require('../../../assets/environment/sky_shadow.webp');
+// Terrible Peace sky: derived from sky_shadow by scripts/tools/settleSkies.mjs
+// (ember eyes extinguished, crimson drained, mauve settle) — the shadow has
+// settled, so Phase 5 no longer reuses the Phase-4 art.
+const SKY_PEACE = require('../../../assets/environment/sky_peace.webp');
 const ROOF_IMG = require('../../../assets/environment/roof.png');
 // Per-phase foundations (hand-lit per phase: day green -> dusk dry -> night
-// blue), indexed by game phase; phase 5 reuses the shadow foundation, like the
-// sky. All normalized to one box size so the house never jumps between phases.
+// blue -> settled mauve), indexed by game phase. foundation_5 is derived from
+// foundation_4 by settleSkies.mjs (alpha preserved). All normalized to one box
+// size so the house never jumps between phases.
 const FOUNDATION_IMGS = [
   require('../../../assets/environment/foundation_0.png'),
   require('../../../assets/environment/foundation_1.png'),
   require('../../../assets/environment/foundation_2.png'),
   require('../../../assets/environment/foundation_3.png'),
   require('../../../assets/environment/foundation_4.png'),
+  require('../../../assets/environment/foundation_5.png'),
 ];
 const WALL_IMG = require('../../../assets/environment/wall.png');
 const EDGE_SHADOW_IMG = require('../../../assets/environment/wall_edge_shadow.png');
@@ -814,14 +820,15 @@ const nightStarStyles = StyleSheet.create({
 // Sampled from assets/environment/sky_*.png (scripts/tools/reworkSkies.mjs
 // prints the storm/shadow samples; re-sample if the sky assets regenerate).
 // Phase→sky mapping mirrors the <Image source> below: 0=day, 1=afternoon,
-// 2=dusk, 3=storm, 4+=shadow (Phase 5 reuses sky_shadow).
+// 2=dusk, 3=storm, 4=shadow, 5=peace (settleSkies.mjs prints the peace
+// samples).
 const PHASE_BG_COLORS: Record<number, string> = {
   0: '#439cf2', // sky_day.png top row
   1: '#1583f9', // sky_afternoon.png top row
   2: '#684381', // sky_dusk.png top row
   3: '#000000', // sky_storm.png top row (post-rework pre-storm night)
   4: '#050816', // sky_shadow.png top row
-  5: '#050816', // Phase 5 renders sky_shadow too — same top row
+  5: '#181328', // sky_peace.webp top row (settled mauve night)
 };
 
 // Ground seam guard below the sky image. The sky Image is bottom-anchored to
@@ -837,7 +844,7 @@ const PHASE_GROUND_COLORS: Record<number, string> = {
   2: '#6d4018', // sky_dusk.png bottom row
   3: '#192330', // sky_storm.png bottom row (post-rework drained meadow)
   4: '#182131', // sky_shadow.png bottom row
-  5: '#182131', // Phase 5 renders sky_shadow too
+  5: '#2d273d', // sky_peace.webp bottom row (mauve-settled meadow)
 };
 
 // Per-phase house lighting. The house art is drawn in daylight; these tints
@@ -2135,6 +2142,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                     whole pan range exactly as the seat geometry was tuned for. */}
                 <Image
                   source={
+                    currentPhase >= 5 ? SKY_PEACE :
                     currentPhase >= 4 ? SKY_SHADOW :
                     currentPhase >= 3 ? SKY_STORM :
                     currentPhase >= 2 ? SKY_DUSK :

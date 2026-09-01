@@ -828,7 +828,7 @@ export const PIT_BACKGROUND_COLORS: Record<number, string> = {
   2: '#514378',
   3: '#060612',
   4: '#1a122a',
-  5: '#1d1830', // post-revelation: settled, muted purple
+  5: '#0e0f2e', // post-revelation: pitt_peace.webp top row (settled mauve)
 };
 
 /**

@@ -4,9 +4,11 @@
  * The home screen's "house sits just below the river" fix rests on three
  * facts that live in different places and can silently drift apart:
  *
- *   1. All five sky assets are 941x1972, where rows 1672-1971 are a mirrored
+ *   1. All six sky assets are 941x1972, where rows 1672-1971 are a mirrored
  *      meadow extension and the river never reaches below row ~1335 in any
- *      variant (measured via pngjs scans of every sky).
+ *      variant (measured via pngjs scans of every sky; sky_peace is derived
+ *      pixel-for-pixel from sky_shadow by settleSkies.mjs, so its geometry is
+ *      identical by construction).
  *   2. HouseWorld anchors the sky Image to the container BOTTOM with a box
  *      height that forces height-driven cover scaling, so the art's bottom
  *      row sits exactly on the container bottom on every device (no fill
@@ -28,7 +30,7 @@ const HOUSE_WORLD = fs.readFileSync(
   'utf8'
 );
 
-const SKIES = ['sky_day', 'sky_afternoon', 'sky_dusk', 'sky_storm', 'sky_shadow'];
+const SKIES = ['sky_day', 'sky_afternoon', 'sky_dusk', 'sky_storm', 'sky_shadow', 'sky_peace'];
 
 /**
  * Read a WebP's dimensions from its header (no image lib needed). The skies
@@ -97,6 +99,17 @@ describe('HouseWorld sky anchoring', () => {
 
   test('the tuck/offset era stays gone (top-anchored sky broke house-vs-art alignment)', () => {
     expect(HOUSE_WORLD).not.toMatch(/SKY_BOTTOM_TUCK/);
+  });
+
+  test('phase 5 serves its own settled sky and foundation (Terrible Peace art)', () => {
+    // The shadow no longer looms at phase 5 — sky_peace (ember eyes
+    // extinguished, mauve settle) and foundation_5 are derived from the
+    // phase-4 art by settleSkies.mjs. Phase 5 must never fall back to the
+    // shadow sky again.
+    expect(HOUSE_WORLD).toMatch(/currentPhase >= 5 \? SKY_PEACE :/);
+    expect(HOUSE_WORLD).toMatch(/sky_peace\.webp/);
+    expect(HOUSE_WORLD).toMatch(/foundation_5\.png/);
+    expect(fs.existsSync(path.join(ENV_DIR, 'foundation_5.png'))).toBe(true);
   });
 
   test('the pan hard-floors at the pit end (art never lifts off the container bottom)', () => {

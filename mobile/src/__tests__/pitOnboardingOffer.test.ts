@@ -329,24 +329,31 @@ describe('shouldShowHarvestPitIntro (first-manual-harvest Fox beat)', () => {
 });
 
 // ============================================================================
-// Phase scrim over the shared night art (phases 3/4/5 all serve pitt_night).
+// Phase scrim over the shared night art (phases 3 and 4 both serve pitt_night).
 // The caps are the contract: strong enough to be FELT at the reveal's own
 // site, capped low so the pit's teal glow layers survive the night phases.
+// Phase 5 serves its own settled art (pitt_peace) and takes NO scrim — a
+// second wash over already-graded art would double-dip.
 // ============================================================================
 describe('getPitPhaseScrim', () => {
-  test('nothing through phase 3; a crimson-black deepen at 4; a mauve settle at 5', () => {
+  test('nothing through phase 3; a crimson-black deepen at 4; none at 5 (pitt_peace carries the settle)', () => {
     for (const p of [0, 1, 2, 3]) expect(getPitPhaseScrim(p)).toBeNull();
     const reveal = getPitPhaseScrim(4);
-    const peace = getPitPhaseScrim(5);
     expect(reveal).not.toBeNull();
-    expect(peace).not.toBeNull();
-    expect(reveal!.color).not.toBe(peace!.color);
+    expect(getPitPhaseScrim(5)).toBeNull();
   });
 
   test('opacity stays capped so the glow layers survive', () => {
-    for (const p of [4, 5]) {
-      expect(getPitPhaseScrim(p)!.opacity).toBeLessThanOrEqual(0.2);
-      expect(getPitPhaseScrim(p)!.opacity).toBeGreaterThan(0);
-    }
+    expect(getPitPhaseScrim(4)!.opacity).toBeLessThanOrEqual(0.2);
+    expect(getPitPhaseScrim(4)!.opacity).toBeGreaterThan(0);
+  });
+
+  test('phase 5 routes to its own art, not the shared night art', () => {
+    const src = fs.readFileSync(
+      path.join(__dirname, '..', 'components', 'OfferingPitScreen.tsx'),
+      'utf8'
+    );
+    expect(src).toMatch(/pitt_peace\.webp/);
+    expect(src).toMatch(/phase >= 5\) return PIT_PEACE/);
   });
 });
