@@ -89,7 +89,9 @@ describe('difficulty seals and rules diagrams', () => {
   const TIERS: Difficulty[] = ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD', 'EXPERT'];
 
   it('has a seal for every tier', () => {
-    expect(TIERS.filter((d) => !DIFFICULTY_ART[d])).toEqual([]);
+    // jest maps every PNG require to one file-mock value, so check presence of
+    // the key rather than truthiness of the mocked module.
+    expect(TIERS.filter((d) => !(d in DIFFICULTY_ART))).toEqual([]);
     expect(Object.keys(DIFFICULTY_ART).sort()).toEqual([...TIERS].sort());
   });
 

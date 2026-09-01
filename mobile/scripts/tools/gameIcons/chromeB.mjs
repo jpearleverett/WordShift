@@ -21,10 +21,14 @@
  *     yellow smudge on yellow paper.
  *
  * Two pairs here share a shape family and MUST NOT be twins:
- *   check.png       a green-ENAMEL tick on a small round BRASS seat. The tick is
- *                   the subject: it is larger than its seat and its long arm
- *                   rises clear of the disc, so the silhouette is a tick with a
- *                   coin behind its heel, not a button.
+ *   check.png       ONE bold tick, a green-ENAMEL face set inside a thick BRASS
+ *                   bevel rim. There is no seat: the first pass tucked a brass
+ *                   coin behind the heel and the blind review saw two things (a
+ *                   check laid over a disc) and a twin of the badge below. The
+ *                   brass is now the carved SETTING of the mark itself, so the
+ *                   silhouette is a check and nothing else, and it is told from
+ *                   the badge by shape AND by colour inversion (green face in a
+ *                   brass rim here; green ball with a cream tick there).
  *   check_badge.png a round green CANDY BUTTON carrying a raised CREAM tick. The
  *                   button is the subject: the tick sits wholly inside the disc,
  *                   so the silhouette is a plain circle.
@@ -166,33 +170,54 @@ function creamStroke(t, x1, y1, x2, y2, th, shade) {
 export function draw() {
   fs.mkdirSync(OUT, { recursive: true });
 
-  { // === check.png — green-enamel tick on a small round brass seat =========
-    // The tick is the object; the seat is a coin tucked behind its heel. The
-    // long arm rises well past the seat's rim, which is what keeps this from
-    // being a twin of the badge below: a spike, not a circle.
+  { // === check.png — one bold green-enamel tick in a brass bevel rim ========
+    // A single silhouette. The whole mark is drawn at K = 0.78 of its first
+    // pass: that pass painted 0.95 x 0.89 of the frame (a 3px margin at 256)
+    // and rendered visibly larger than close/check_badge/alert_pip beside it;
+    // at K the painted bbox sits at ~0.75 of the frame with a >= 28px clear
+    // margin, matching its siblings. The arms are 106px across in the
+    // supersample (still over 1/5 of the frame), the brass rim 19px each side
+    // (~1px at 20dp), the enamel face 68px. The face is split along each arm's
+    // midline into a lit upper half and a deep lower half (two value steps),
+    // the rim is lit along its upper-left run and dark along its lower-right,
+    // and the INK contact shadow is tucked under the long arm's lower run,
+    // offset down-right, so the bezel-only mark never reads as floating.
     const cv = C(S, S);
-    const sx = c - 6, sy = c + 62, sr = 128;                     // seat
-    const A = [c - 128, c + 14], B = [c - 46, c + 122], T = [c + 142, c - 118]; // tick
-    const TH = 82;
-    contactShadow(cv, sx + 8, sy + sr + 14, 112, 22, 0.32);
+    const K = 0.78;
+    const P = (dx, dy) => [c + dx * K, c + dy * K];
+    const A = P(-152, 2), B = P(-34, 130), T = P(148, -140);                 // tick
+    const TH = Math.round(136 * K), RIM = Math.round(24 * K), FACE = TH - RIM * 2;
+    // up-facing normals of each arm (unit), for the lit half of the face
+    const nLong = [-0.829, -0.559], nShort = [0.735, -0.678];
+    const off = (Q, n, k) => [Q[0] + n[0] * k, Q[1] + n[1] * k];
+    const lerp = (Q, R, k) => [Q[0] + (R[0] - Q[0]) * k, Q[1] + (R[1] - Q[1]) * k];
+    const Sd = lerp(B, T, 0.28);
+    contactShadow(cv, Sd[0] + 14, Sd[1] + TH / 2 + 10, 96, 20, 0.32);
     withOutline(cv, t => {
-      // brass seat: top-lit disc, a deep bevel band inside the rim, a lit crest
-      roundRect(t, sx, sy, sr, sr, sr, BR.hi, 1, BR.lo);
-      ringStroke(t, sx, sy, sr - 14, 18, BR.deep, 0.5);
-      arcStroke(t, sx, sy, sr - 18, 16, -Math.PI + 0.5, -0.5, BR.lite, 0.6);
-      // the tick's drop onto the seat, then the enamel: dark body, lit crest
-      capsule(t, A[0] + 8, A[1] + 12, B[0] + 8, B[1] + 12, TH + 4, INK, 0.5);
-      capsule(t, B[0] + 8, B[1] + 12, T[0] + 8, T[1] + 12, TH + 4, INK, 0.5);
-      capsule(t, A[0], A[1], B[0], B[1], TH, GR.lo);
-      capsule(t, B[0], B[1], T[0], T[1], TH, GR.lo);
-      capsule(t, B[0], B[1], B[0], B[1], TH, GR.lo);                  // solid heel
-      capsule(t, A[0] - 4, A[1] - 6, B[0] - 4, B[1] - 6, TH * 0.56, GR.hi);
-      capsule(t, B[0] - 4, B[1] - 6, T[0] - 4, T[1] - 6, TH * 0.56, GR.hi);
-      capsule(t, A[0] - 10, A[1] - 14, B[0] - 10, B[1] - 14, TH * 0.22, GR.lite, 0.75);
-      capsule(t, B[0] - 10, B[1] - 14, T[0] - 10, T[1] - 14, TH * 0.22, GR.lite, 0.75);
+      // brass rim: dark run first, then the lit run set up-left so the bevel
+      // has a genuine top and bottom
+      capsule(t, A[0], A[1], B[0], B[1], TH, BR.lo);
+      capsule(t, B[0], B[1], T[0], T[1], TH, BR.lo);
+      capsule(t, A[0] - 7, A[1] - 7, B[0] - 7, B[1] - 7, TH - 5, BR.hi);
+      capsule(t, B[0] - 7, B[1] - 7, T[0] - 7, T[1] - 7, TH - 5, BR.hi);
+      // enamel face: deep green body, then the lit half of each arm
+      capsule(t, A[0], A[1], B[0], B[1], FACE, GR.lo);
+      capsule(t, B[0], B[1], T[0], T[1], FACE, GR.lo);
+      capsule(t, B[0], B[1], B[0], B[1], FACE, GR.lo);                 // solid heel
+      // (each lit half stops short of the heel, so the joint stays deep and
+      // the two halves never cross into a pale X at the foot)
+      const Bs = lerp(A, B, 0.72), Bl = lerp(B, T, 0.2);
+      const a1 = off(A, nShort, FACE / 4), b1 = off(Bs, nShort, FACE / 4);
+      const b2 = off(Bl, nLong, FACE / 4), t2 = off(T, nLong, FACE / 4);
+      capsule(t, a1[0], a1[1], b1[0], b1[1], FACE / 2, GR.hi);
+      capsule(t, b2[0], b2[1], t2[0], t2[1], FACE / 2, GR.hi);
+      // a thin mint crest along the very top of the lit half (candy edge)
+      const a3 = off(A, nShort, FACE * 0.38), b3 = off(Bs, nShort, FACE * 0.38);
+      const b4 = off(Bl, nLong, FACE * 0.38), t4 = off(T, nLong, FACE * 0.38);
+      capsule(t, a3[0], a3[1], b3[0], b3[1], FACE * 0.16, GR.lite, 0.7);
+      capsule(t, b4[0], b4[1], t4[0], t4[1], FACE * 0.16, GR.lite, 0.7);
     }, OUTLINE);
-    sheen(cv, c + 82, c - 74, 16, 22, 0.5);
-    sheen(cv, sx - 74, sy - 62, 20, 12, 0.4);
+    sheen(cv, c + 39, c - 50, 12, 20, 0.5);
     savePNG(path.join(OUT, 'check.png'), 256, 256, down2(cv, 256, 256));
   }
 
@@ -283,38 +308,57 @@ export function draw() {
     savePNG(path.join(OUT, 'play.png'), 256, 256, down2(cv, 256, 256));
   }
 
-  { // === star_bullet.png — small brass four-point star =======================
-    // Fat waist (rIn 80 against rOut 198) so the arms are bars, not needles:
-    // the body across the centre is ~113px, and the tips are filleted so they
-    // do not vanish to a hair. Each arm is split down its axis into a lit and a
-    // shaded facet, which is what makes it a cut metal star and not a sticker.
+  { // === star_bullet.png — small brass four-point star (the ✦ bullet) =======
+    // A true ✦ silhouette. The first passes gave the star a fat waist (rIn 80
+    // against rOut 198), split each arm into four facets with ridge lines and
+    // set a brass boss at the hub; at 14px the ridges and the boss collapsed
+    // into a dark centre knot and the shallow concaves read as a fat PLUS, and
+    // the mark was a rotation-twin of close.png (same gold, same mass, four
+    // constant-width arms). Now the concaves are cut deep: the waist sits at
+    // rIn 50, so the hub is ~71px across (0.19 of the 372px span, under the
+    // 1/4 ceiling) and each arm TAPERS from that hub to a sharp tip. There is
+    // no boss and no ridge: each arm is modelled with exactly two value steps,
+    // a lit half on the side whose outer edge faces the upper-left light and a
+    // shaded half on the other, each a top-lit gradient. The mass is smaller
+    // and the lit step brighter than close.png's bars, so the two brass marks
+    // differ by silhouette (tapered spark vs rounded constant-width bars) AND
+    // by mass, and the negative space between the arms is unmistakable.
     const cv = C(S, S);
-    const rOut = 198, rIn = 80;
+    const rOut = 186, rIn = 50;
     const pts = spark4Pts(c, c, rOut, rIn);
-    contactShadow(cv, c + 10, c + 206, 72, 18, 0.3);
+    // fillet the eight vertices (a hair at the tips so they do not vanish, a
+    // little more at the waists so the concaves are candy, not razor cuts)
+    const N = 8;
+    const R = roundPts(pts, 7, N);
+    const idx = (v, m) => R[v * (N + 1) + m];
+    const run = (v, m0, m1) => { const o = []; for (let m = m0; m <= m1; m++) o.push(idx(v, m)); return o; };
+    const LIT = { top: '#F6DC96', bot: '#DFAE55' };
+    const SHD = { top: '#B07C34', bot: '#7E5522' };
+    contactShadow(cv, c + 10, c + 196, 66, 16, 0.3);
     withOutline(cv, t => {
-      poly(t, roundPts(pts, 12, 6), BR.hi, 1, BR.lo);
-      // facets: for each arm, the two triangles (centre, tip, waist)
-      const L = [-0.707, -0.707];
-      for (let i = 0; i < 8; i += 2) {
-        const tip = pts[i], w1 = pts[(i + 7) % 8], w2 = pts[i + 1];
-        for (const w of [w1, w2]) {
-          const ex = w[0] - tip[0], ey = w[1] - tip[1];
-          // outward normal of the outer edge tip->w: away from the centre
-          let nx = -ey, ny = ex;
-          const mx = (tip[0] + w[0]) / 2 - c, my = (tip[1] + w[1]) / 2 - c;
+      poly(t, R, BR.mid, 1, BR.lo);                                   // seed fill under the seams
+      const Lv = [-0.707, -0.707];
+      for (let k = 0; k < 4; k++) {
+        const tip = k * 2, wPrev = (tip + 7) % 8, wNext = tip + 1;
+        // half A runs from the previous waist's arc midpoint to the tip's arc
+        // midpoint; half B from there on to the next waist's midpoint
+        const halves = [
+          [[c, c], ...run(wPrev, N / 2, N), ...run(tip, 0, N / 2)],
+          [[c, c], ...run(tip, N / 2, N), ...run(wNext, 0, N / 2)],
+        ];
+        for (const h of halves) {
+          // outer-edge normal of this half, pointing away from the centre
+          const a = pts[tip], w = h === halves[0] ? pts[wPrev] : pts[wNext];
+          let nx = -(w[1] - a[1]), ny = w[0] - a[0];
+          const mx = (a[0] + w[0]) / 2 - c, my = (a[1] + w[1]) / 2 - c;
           if (nx * mx + ny * my < 0) { nx = -nx; ny = -ny; }
           const nl = Math.hypot(nx, ny) || 1;
-          const lit = (nx / nl) * L[0] + (ny / nl) * L[1];
-          const inset = ([x, y]) => [c + (x - c) * 0.9, c + (y - c) * 0.9];
-          if (lit > 0.2) poly(t, [inset([c, c]), inset(tip), inset(w)], BR.lite, 0.55);
-          else if (lit < -0.2) poly(t, [inset([c, c]), inset(tip), inset(w)], BR.deep, 0.5);
+          const lit = (nx / nl) * Lv[0] + (ny / nl) * Lv[1] > 0;
+          poly(t, h, lit ? LIT.top : SHD.top, 1, lit ? LIT.bot : SHD.bot);
         }
       }
-      ellipse(t, c - 2, c - 2, 26, 26, BR.hi, 1, 3);                     // hub
-      ellipse(t, c - 8, c - 8, 12, 12, BR.lite, 0.9, 3);
     }, OUTLINE);
-    sheen(cv, c - 28, c - 96, 10, 22, 0.5);
+    sheen(cv, c - 13, c - 104, 8, 20, 0.5);                             // upper arm, lit half
     savePNG(path.join(OUT, 'star_bullet.png'), 256, 256, down2(cv, 256, 256));
   }
 
