@@ -22,7 +22,7 @@
  *   patron_key         "Become a Patron"    +2 amber a puzzle, Patron tiles, quiet
  *   remove_ads         "Remove Ads"         the cheaper one-time quiet
  *   season_premium     the Season Pass premium track (amber or Supporter)
- *   store_placeholder  the unmapped-id fallback
+ *   (the unmapped-id fallback reuses the shop's parcel; see the note in draw())
  *
  * TWO RULES SPECIFIC TO THIS SET, ON TOP OF THE SHOP'S DOCTRINE.
  *
@@ -48,11 +48,16 @@
  *      pouch    the crock at collar 172px, ONE gem
  *      jar      the same crock at 236px,   THREE
  *      hoard    the same crock at 316px,   SIX, heaped in two rows
- *      handful  THREE bulbs strapped at the neck              280px
- *      satchel  a flapped bag with FOUR of the same bulbs     345px
- *    The hint pair follows the same discipline: same bulb size on both rungs
- *    (the first pass had the SMALLER pack carrying the BIGGER bulbs), and the
- *    satchel's own strap and buckle bind the handful, so the two read as family.
+ *      handful  the satchel at 152px wide, TWO bulbs
+ *      satchel  the same satchel at 312px, FIVE
+ *
+ *    That fixed the amber trio; the hint pair kept its own arrangement for one
+ *    more pass and a later blind read caught it: "hints_large is a chest,
+ *    hints_small is a bare strap with a buckle and no body, and the step is 4
+ *    bulbs vs 3, a single unit. At 56dp they read as two different products, not
+ *    one product at two sizes." Both halves are now the crock's rule exactly —
+ *    ONE bag at two widths, ONE bulb size, and a count step of two against five,
+ *    because two against five reads at a glance and three against four does not.
  *
  * 2. THESE COST MONEY, SO THE ART IS HONEST. Every icon draws what the player
  *    actually receives — amber is the game's own faceted gem (assets/ui/amber.png),
@@ -66,12 +71,39 @@
  *    with a little amber in it, and its gem is smaller than the pouch's by
  *    contract.
  *
- * The two subscription-shaped products cannot be a literal pile of goods, so
- * they are the objects a cottage would use for them: Supporter is a bound wreath
- * with one amber gem at its knot (a thing that comes round again, and the amber
- * it brings), the season premium track is a sealed pass. Remove Ads is a mug of
- * tea, still steaming: what that product buys is the quieter table the store row
- * promises. None of them promises anything the store row beside it does not.
+ * 3. THREE PRODUCTS ARE NOT A PILE OF GOODS, so they are the objects a cottage
+ *    would use for them. Getting these right took the longest, and two of the
+ *    three were only settled by a blind read finding them pointing at each other:
+ *
+ *      supporter        A STRAW SKEP. It was the leaf wreath, and blind that
+ *                       read as SEASONAL. A hive is the cottage object for a
+ *                       thing that keeps giving for as long as you keep it, and
+ *                       its dome is a silhouette neither set owns — a lantern
+ *                       (shop/deepen_star_loft), a bell (shop/deepen_belfry), a
+ *                       mug (shop/theme_bone) and a teapot (shop/upgrade_kitchen)
+ *                       are all taken, which ruled out the obvious alternatives.
+ *      season_premium   THE WREATH, which is where its reading already pointed;
+ *                       it carries the pass's own teal seal at the knot, so the
+ *                       track and confetti_season still match. It replaces a
+ *                       star-stamped document that graded as a premium
+ *                       credential, i.e. as Supporter.
+ *      remove_ads       CLOSED, LATCHED SHUTTERS. Four drafts died first (a
+ *                       shuttered window drawn as architecture, a bell on its
+ *                       side that graded as a megaphone, a muffled bell that
+ *                       graded as a cone on a cushion, and a mug of tea that was
+ *                       nameable but duplicated shop/theme_bone outright). The
+ *                       full account is at the icon.
+ *
+ *    Supporter, the season pass and the Patron key otherwise crowd one
+ *    support-and-prestige space, so the three must stay separable at 56dp: a
+ *    dome, a ring of leaves, a long diagonal of brass. None of them promises
+ *    anything the store row beside it does not.
+ *
+ * 4. WHERE TWO PARTS COME CLOSE, A REAL MATERIAL GOES IN THE GAP — never the
+ *    contour. `withOutline` cannot outline a notch narrower than twice its own
+ *    stroke; it fills it. Five icons had visibly flooded gaps at one point, so
+ *    every cluster in this file now goes down through `grouped` (see there for
+ *    the mechanism and the review that found it).
  *
  * House doctrine, inherited from shopIcons/_draw.mjs and followed exactly:
  *   - contact shadow and any halo go on `cv` BEFORE withOutline, so light and
@@ -108,8 +140,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   canvas, savePNG, down2, W, contactShadow, sheen, withOutline, INK,
-  WOOD, PARCH, ACCENT, BRASS,
-  ellipse, roundRect, poly, capsule, tri, hexPts, starPts,
+  WOOD, ACCENT, BRASS,
+  C, hex, blend, ellipse, roundRect, poly, capsule, tri, hexPts, starPts,
 } from '../shopIcons/_draw.mjs';
 
 const OUT = path.resolve(import.meta.dirname, '../../../assets/ui/store');
@@ -122,7 +154,16 @@ const AMBER = { hi: '#FFF0BB', up: '#FFD264', mid: '#F5A81C', lo: '#C4760B', dee
 /** The hint bulb, matched to assets/ui/hint.png: warm yellow glass over a
  *  lavender collar. The collar is what keeps a bulb from reading as a gem. */
 const BULB = { hi: '#FFF3B8', up: '#FFDF74', mid: '#F3C13C', lo: '#C89416' };
-const CAP = { hi: '#C9BFE4', base: '#A79BC8', lo: '#786C9E' };
+/** The bulb's collar. It was the shipped hint icon's lavender, which is a hue
+ *  the reference set's metals (cream, grey, gold) do not contain, so the one
+ *  cool plastic-looking part in the store sat beside 58 cottage objects. This is
+ *  a pewter with just enough of that lavender left in it to still read as the
+ *  same bulb: grey first, lavender second. */
+const CAP = { hi: '#D8D2DC', base: '#ADA7B4', lo: '#6F6A78' };
+/** Forged iron, for hinges, straps and latches. Grey, like the set's metals. */
+const IRON = { hi: '#8F8A7F', base: '#6A655B', lo: '#3E3931' };
+/** Sun-bleached straw, for the Supporter's skep. */
+const STRAW = { hi: '#F2D693', up: '#E0B667', base: '#C2934A', mid: '#9C7233', lo: '#6E4E20' };
 /** Tanned leather for the hint satchel and the strap that binds the handful. */
 const LEATH = { hi: '#E0AC72', base: '#C08A4C', mid: '#96632F', lo: '#6B441F' };
 /** Glazed kitchen stoneware, with a cobalt stripe: the material of the WHOLE
@@ -154,6 +195,110 @@ function shade(colorHex, f) {
   const ch = i => Math.max(0, Math.min(255, Math.round(((n >> i) & 255) * f)));
   const v = (ch(16) << 16) | (ch(8) << 8) | ch(0);
   return '#' + (v | 0x1000000).toString(16).slice(1).toUpperCase();
+}
+
+/**
+ * Chamfer 3-4 distance transform of a binary mask (0 inside, growing outward).
+ * The same two-pass walk withOutline uses, pulled out so `grouped` below can
+ * run it twice without duplicating it.
+ */
+function chamferDT(seed, w, h) {
+  const BIG = 1e9, D1 = 1, D2 = 1.4142;
+  const d = new Float64Array(w * h);
+  for (let i = 0; i < w * h; i++) d[i] = seed[i] ? 0 : BIG;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x; let v = d[i]; if (v === 0) continue;
+    if (x > 0) v = Math.min(v, d[i - 1] + D1);
+    if (y > 0) v = Math.min(v, d[i - w] + D1);
+    if (x > 0 && y > 0) v = Math.min(v, d[i - w - 1] + D2);
+    if (x < w - 1 && y > 0) v = Math.min(v, d[i - w + 1] + D2);
+    d[i] = v;
+  }
+  for (let y = h - 1; y >= 0; y--) for (let x = w - 1; x >= 0; x--) {
+    const i = y * w + x; let v = d[i]; if (v === 0) continue;
+    if (x < w - 1) v = Math.min(v, d[i + 1] + D1);
+    if (y < h - 1) v = Math.min(v, d[i + w] + D1);
+    if (x < w - 1 && y < h - 1) v = Math.min(v, d[i + w + 1] + D2);
+    if (x > 0 && y < h - 1) v = Math.min(v, d[i + w - 1] + D2);
+    d[i] = v;
+  }
+  return d;
+}
+
+/**
+ * DRAW A CLUSTER OF PARTS WITH A REAL MATERIAL IN THE GAPS BETWEEN THEM.
+ *
+ * This is the one systematic fix in the set, and it closes the single defect a
+ * blind review said most separated this batch from the 58 shop icons it sits
+ * beside: "wherever two shapes come close, the whole gap floods with contour
+ * brown instead of holding a constant stroke width and letting background or a
+ * real fill show." It was visible in five icons at once — a wedge two to three
+ * strokes wide between two gems in the hoard, a whole black cavity in the
+ * starter tray, a dark field between two confetti petals, a bar across the
+ * satchel mouth, the bottom of the wreath.
+ *
+ * The cause is mechanical, not a matter of taste. `withOutline` lays a contour
+ * of `width` px on every side of the union silhouette, so ANY notch narrower
+ * than about 2x width is not outlined — it is filled, edge to edge, in outline
+ * colour. Two gems resting against each other leave exactly that notch above
+ * and below the contact point, and it grows with every part you add.
+ *
+ * So the fix is to leave no such notch. The cluster is drawn to a scratch
+ * canvas, its alpha is morphologically CLOSED (dilate by `radius`, erode by
+ * `radius`, each a chamfer pass), and the closed region is painted in a real
+ * material — amber shadow between gems, dark leather inside a bag, plum between
+ * petals — before the parts are composited back over it. Every gap narrower
+ * than 2 * radius therefore shows MATERIAL; every gap wider than that is a
+ * genuine opening the contour walks at its normal constant width on both sides.
+ * Each part keeps its own keyline either way, so the reading is always
+ * keyline / material / keyline rather than one pooled brown mass.
+ *
+ * `radius` must clear withOutline's `width` (10 everywhere here) or the fill
+ * stops short of where flooding starts and the notch is bedded twice, in two
+ * different browns. 15 is used throughout: it closes gaps up to 30px in the
+ * 384 supersample, comfortably past the ~22px withOutline can flood.
+ *
+ * Closing is idempotent on a convex part, so passing a single gem or a single
+ * bulb through this changes nothing — clusters and lone objects can go through
+ * the same call site.
+ */
+function grouped(t, drawParts, { fill, gradTo = null, radius = 15 }) {
+  const { w, h } = t;
+  const s = C(w, h);
+  drawParts(s);
+  const inside = new Uint8Array(w * h);
+  let any = false;
+  for (let i = 0; i < w * h; i++) if (s.px[i * 4 + 3] > 0.5) { inside[i] = 1; any = true; }
+  if (!any) return;
+  const dOut = chamferDT(inside, w, h);
+  const notDilated = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) notDilated[i] = dOut[i] > radius ? 1 : 0;
+  const dIn = chamferDT(notDilated, w, h);
+  // The closed set is what survives eroding the dilated set back by `radius`.
+  let minY = h, maxY = 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (dIn[y * w + x] > radius) { if (y < minY) minY = y; if (y > maxY) maxY = y; }
+  }
+  if (minY > maxY) return;
+  const [r, g, b] = hex(fill);
+  const gr = gradTo ? hex(gradTo) : null;
+  const span = (maxY - minY) || 1;
+  for (let y = minY; y <= maxY; y++) {
+    const u = (y - minY) / span;
+    const rr = gr ? r + (gr[0] - r) * u : r;
+    const gg = gr ? g + (gr[1] - g) * u : g;
+    const bb = gr ? b + (gr[2] - b) * u : b;
+    for (let x = 0; x < w; x++) {
+      const a = Math.max(0, Math.min(1, dIn[y * w + x] - radius));
+      if (a > 0) blend(t, x, y, rr, gg, bb, a);
+    }
+  }
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const o = (y * w + x) * 4;
+    const sa = s.px[o + 3];
+    if (sa <= 0) continue;
+    blend(t, x, y, s.px[o] / (sa || 1), s.px[o + 1] / (sa || 1), s.px[o + 2] / (sa || 1), sa);
+  }
 }
 
 /**
@@ -222,10 +367,10 @@ function leafPts(bx, by, tx, ty, width, bend, steps = 18) {
  * per gem a heap collapses into one gold blob at 56dp, which would destroy the
  * count that carries the whole ladder.
  */
-function amberGem(t, cx, cy, R) {
+function amberGem(t, cx, cy, R, keyW = 7) {
   const P = hexPts(cx, cy, R);
   const inner = hexPts(cx, cy - R * 0.05, R * 0.76);
-  poly(t, hexPts(cx, cy, R + 7), INK, 0.95);                 // keyline
+  poly(t, hexPts(cx, cy, R + keyW), INK, 0.95);              // keyline
   poly(t, P, AMBER.up, 1, AMBER.lo);                         // body, top-lit
   poly(t, inner, AMBER.hi, 1, AMBER.mid);                    // table facet
   // one hard pale facet upper-left and one deep facet lower-right: two big value
@@ -240,10 +385,17 @@ function amberGem(t, cx, cy, R) {
  * lavender collar, with the filament's chevron inside. No radiating rays — at
  * 56dp a fan of thin rays averages to grey fuzz, and the halo already says lit.
  * `cy` is the centre of the glass; the collar hangs below it.
+ *
+ * The keyline behind the collar used to be R*0.44 x R*0.40 against a collar of
+ * R*0.40 x R*0.34, which leaves R*0.04 of dark showing — one pixel at ship size,
+ * i.e. a hairline, i.e. in practice no contour at all. It was the only part in
+ * either set that broke the contour rule, and a review caught it. It is now
+ * R*0.50 x R*0.52, so the collar carries a real keyline at every bulb size and
+ * the lower band still sits inside it.
  */
 function hintBulb(t, cx, cy, R) {
   const neckY = cy + R * 0.86;
-  roundRect(t, cx, neckY + R * 0.30, R * 0.44, R * 0.40, 6, INK, 0.95);      // neck keyline
+  roundRect(t, cx, neckY + R * 0.32, R * 0.50, R * 0.52, 9, INK, 0.95);      // collar keyline
   ellipse(t, cx, cy, R + 6, R + 6, INK, 0.95, 3);                            // glass keyline
   roundRect(t, cx, cy, R, R, R, BULB.hi, 1, BULB.lo);                        // glass
   roundRect(t, cx, cy + R * 0.16, R * 0.74, R * 0.74, R * 0.74, BULB.up, 0.85, BULB.mid);
@@ -306,10 +458,68 @@ function amberCrock(t, { bellyHw, bellyHh, collarHw, collarHh, lipHh, gems }) {
   roundRect(t, 192, collarCy, collarHw, collarHh, 11, WARE.hi, 1, WARE.mid);           // collar
   ellipse(t, 192, mouthCy, collarHw - 16, collarHh * 0.55, '#3A2E22', 1, 3);           // the mouth, dark,
   ellipse(t, 192, mouthCy - 2, collarHw - 30, collarHh * 0.36, '#241B12', 1, 3);       // so gems sit IN it
-  for (const [gx, gy] of gems) amberGem(t, gx, gy, GEM_R);
+  // The heap goes down as ONE cluster bedded in amber shadow, never as loose
+  // gems: see `grouped` for why. Before this, the V notch where two gems rest
+  // against each other was narrower than twice withOutline's stroke, so the
+  // whole notch filled with contour brown — a wedge two to three strokes wide in
+  // the hoard, and in the jar a stray sliver of the collar's cream was left
+  // marooned inside that brown, which read as a loose highlight with no shape.
+  grouped(t, g => { for (const [gx, gy] of gems) amberGem(g, gx, gy, GEM_R); },
+    { fill: AMBER.deep, gradTo: shade(AMBER.deep, 0.62) });
   roundRect(t, 192, collarCy + collarHh * 0.55, collarHw, lipHh, 7, WARE.base, 1, WARE.lo);  // front lip
 }
 
+
+/**
+ * THE HINT VESSEL — ONE satchel, drawn two widths, and NOTHING else changes.
+ *
+ * The amber ladder was fixed by holding everything constant except the two
+ * things that ARE the ladder, and a blind review then found the hint pair had
+ * never had the same treatment done to it: "hints_large is a chest, hints_small
+ * is a bare strap with a buckle and no body, and the step is 4 bulbs vs 3, a
+ * single unit. At 56dp they read as two different products, not one product at
+ * two sizes." Both halves of that are fixed here by copying the crock exactly:
+ *
+ *      handful of hints   bag 152px wide   TWO bulbs
+ *      satchel of hints   bag 312px wide   FIVE
+ *
+ * One bag, one leather, one flap, one strap, one brass buckle, one shelf line,
+ * and ONE BULB SIZE on both rungs. Two against five is a step the eye can take
+ * at a glance; three against four is not (the amber ladder learned the same
+ * lesson, which is why it steps 1 / 3 / 6).
+ *
+ * The bulbs go down through `grouped`, so the notches where one bulb rests
+ * against the next carry the bag's own dark leather rather than pooled contour,
+ * and the bag's inside is that same leather a shade darker — a MATERIAL, drawn
+ * as a material. The first pass painted it #3A2412, which is INK to within a
+ * point in every channel, and a review read it exactly as what it was: "a solid
+ * dark bar spans the whole chest mouth behind the bulbs".
+ */
+const HINT_BULB_R = 32;                 // identical on both rungs, by contract
+const SATCHEL_BASE = 348;               // one shelf line, so the pair stands together
+
+function hintSatchel(t, { bodyHw, bulbs }) {
+  const INSIDE = shade(LEATH.lo, 0.66);
+  // The bag's inside, kept narrower than the bulb cluster so it can never poke
+  // out beside the outermost bulb, and set high enough that the flap meets the
+  // collars. All that shows of it is the shadow between and just under the
+  // bulbs, in leather, at a couple of dp: never the black bar across the mouth
+  // a review found in the first pass.
+  roundRect(t, 192, 194, bodyHw - 16, 30, 12, INSIDE, 1, shade(LEATH.lo, 0.5));
+  // radius 22 rather than the default 15: bulbs are round, so the V between two
+  // of them stays narrow for longer than it does between two flat-sided gems,
+  // and at 15 the last few pixels at the top of each V were left for the two
+  // contours to close on their own — a black spike between every pair.
+  grouped(t, g => { for (const bx of bulbs) hintBulb(g, bx, 150, HINT_BULB_R); },
+    { fill: INSIDE, gradTo: shade(LEATH.lo, 0.5), radius: 22 });
+  roundRect(t, 192, SATCHEL_BASE - 60, bodyHw, 60, 20, LEATH.base, 1, LEATH.lo);  // body
+  roundRect(t, 192, 248, bodyHw + 6, 52, 24, LEATH.hi, 1, LEATH.base);            // the flap
+  roundRect(t, 192, 288, bodyHw + 6, 12, 5, LEATH.mid, 0.8);                      // its edge
+  roundRect(t, 192, 326, bodyHw + 4, 22, 10, LEATH.hi, 1, LEATH.mid);             // front
+  roundRect(t, 192, 292, 28, 56, 9, LEATH.lo, 1);                                 // strap
+  roundRect(t, 192, 296, 32, 21, 8, BRASS.hi, 1, BRASS.lo);                       // buckle
+  roundRect(t, 192, 296, 13, 10, 4, LEATH.lo, 1);                                 // its tongue
+}
 
 export function draw() {
   fs.mkdirSync(OUT, { recursive: true });
@@ -324,12 +534,20 @@ export function draw() {
     contactShadow(cv, 198, 344, 140, 22, 0.32);
     ellipse(cv, 192, 196, 172, 172, '#FFF3D2', 0.24, 38);
     withOutline(cv, t => {
-      // back wall + the shadowed inside, so the goods sit DOWN IN the tray
+      // back wall + the shadowed inside, so the goods sit DOWN IN the tray. That
+      // inside was #43290F, which is INK to within a few points, so the whole
+      // cavity graded as "a black void" rather than as the inside of a wooden
+      // tray. It is now the tray's own timber in shadow, with a lit back edge,
+      // and the two goods go down through `grouped` so the notch where the gem
+      // meets the bulb carries that same timber instead of pooled contour.
       roundRect(t, 192, 258, 150, 84, 16, WOOD.base, 1, WOOD.dark);
-      roundRect(t, 192, 238, 134, 46, 12, '#43290F', 1);
+      roundRect(t, 192, 238, 134, 46, 12, WOOD.mid, 1, WOOD.dark);
+      roundRect(t, 192, 198, 134, 10, 4, WOOD.base, 0.9);
       // the goods
-      amberGem(t, 134, 172, 80);
-      hintBulb(t, 260, 176, 58);
+      grouped(t, g => {
+        amberGem(g, 134, 172, 80, 14);
+        hintBulb(g, 260, 176, 58);
+      }, { fill: WOOD.dark, gradTo: WOOD.seam });
       // front wall over their bases
       roundRect(t, 192, 292, 150, 48, 14, WOOD.light, 1, WOOD.mid);
       roundRect(t, 192, 270, 150, 12, 5, WOOD.rim, 0.9);              // lip
@@ -360,27 +578,36 @@ export function draw() {
     // contract, so it can never read as the bottom rung of something you buy.
     // The disc is big and the rays are short bumps on purpose — a small centre
     // with long points is a STAR, and the season pass already owns a star.
+    //
+    // Two review fixes on the rays. They were drawn twice, an INK ray to len 142
+    // under a gold ray to len 130, so the last 12px of every point was outline
+    // colour with no gold in it at all, and where a wide base met its neighbour
+    // the contour closed the gap between them: "ray tips are uneven, some choked
+    // shut with contour and no gold reaching the point". The INK pass is gone —
+    // the rays are part of the disc's own silhouette, so withOutline contours
+    // them at its one constant width and the gold now reaches every point — and
+    // the bases are narrow enough that the notch between two rays stays wider
+    // than that contour can bridge. The gem also carries a heavier keyline
+    // (`keyW`): every other gem in the set sits against a dark vessel mouth that
+    // reinforces its edge, and this one sits alone on a pale disc, where the
+    // shared 7px read at about half the weight of its siblings.
     const { cv } = canvas();
     const SX = 192, SY = 188;
-    const ray = (t, len, wide, colr, alpha, grad) => {
-      for (let i = 0; i < 8; i++) {
-        const a = (i / 8) * Math.PI * 2 - Math.PI / 2;
-        poly(t, [
-          [SX + Math.cos(a) * len, SY + Math.sin(a) * len],
-          [SX + Math.cos(a - wide) * 84, SY + Math.sin(a - wide) * 84],
-          [SX + Math.cos(a + wide) * 84, SY + Math.sin(a + wide) * 84],
-        ], colr, alpha, grad);
-      }
-    };
     contactShadow(cv, 196, 348, 92, 16, 0.28);
     ellipse(cv, 192, 188, 170, 170, '#FFF3D2', 0.30, 36);
     ellipse(cv, 192, 188, 104, 104, '#FFFBEC', 0.30, 26);
     withOutline(cv, t => {
-      ray(t, 142, 0.36, INK, 0.95, null);             // each ray keeps its own
-      ray(t, 130, 0.285, '#F6D485', 1, '#D89B2C');    // edge, never a soft fan
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2 - Math.PI / 2;
+        poly(t, [
+          [SX + Math.cos(a) * 136, SY + Math.sin(a) * 136],
+          [SX + Math.cos(a - 0.225) * 78, SY + Math.sin(a - 0.225) * 78],
+          [SX + Math.cos(a + 0.225) * 78, SY + Math.sin(a + 0.225) * 78],
+        ], '#F6D485', 1, '#D89B2C');
+      }
       roundRect(t, SX, SY, 92, 92, 92, '#FFEBAE', 1, '#EAB85E');   // the disc
       roundRect(t, SX, SY, 76, 76, 76, '#FFF6D8', 1, '#F6D68E');
-      amberGem(t, SX, SY, 32);                        // smaller than the pouch's
+      amberGem(t, SX, SY, 32, 12);                    // smaller than the pouch's
     }, { width: 10 });
     sheen(cv, 160, 152, 16, 12, 0.4);
     savePNG(path.join(OUT, 'daily_amber.png'), W, W, down2(cv, W, W));
@@ -441,99 +668,96 @@ export function draw() {
     savePNG(path.join(OUT, 'amber_large.png'), W, W, down2(cv, W, W));
   }
   { // === hints_small.png — "Handful of Hints", 5 =============================
-    // LADDER STEP 1 of the hint pair: exactly what "a handful" is — three bulbs
-    // strapped at the neck. No container, so the satchel above it can never be
-    // mistaken for the smaller one, and the strap and buckle are the SATCHEL's
-    // own, so the two rungs read as one family.
+    // LADDER STEP 1 of the hint pair: the narrow satchel, TWO bulbs. See
+    // hintSatchel above for why both rungs are now the same bag in the same
+    // leather with the same bulb size, and why the step is two against five.
     //
-    // Three review fixes. The bulbs are the SAME SIZE as the satchel's, and the
-    // same size as each other: the first pass mixed R48 and R60 here and R44-50
-    // there, so the SMALLER pack carried the BIGGER bulbs — the amber ladder's
-    // own mistake, in the other list. They sit on one line, because a raised
-    // middle one put its collar 40px above its neighbours' and no single binding
-    // could credibly cross all three. And the binding took three tries: rope
-    // with two hanging cut ends read as crossed sticks attached to nothing (the
-    // review's finding), rope without them read as a bone-coloured bar, and a
-    // sage ribbon read as a hedge the bulbs were planted in. What a horizontal
-    // band needs is a PART in the middle of it, so the eye reads a strap rather
-    // than a bar; a buckle is that part.
+    // The three drafts this replaces are worth keeping: three bulbs bound by a
+    // rope with two hanging cut ends read as crossed sticks attached to nothing,
+    // the same rope without them read as a bone-coloured bar, and a leather
+    // strap with a brass buckle finally read as a strap — but a strap with no
+    // bag under it is not a smaller version of a bag, which is the whole job of
+    // a bottom rung. The dark nicks a review found on the top edge of that strap
+    // (where the bulbs' outlines merged into it) go with it.
     const { cv } = canvas();
-    contactShadow(cv, 196, 300, 106, 16, 0.3);
-    ellipse(cv, 192, 196, 158, 158, '#FFF6DC', 0.26, 34);
+    contactShadow(cv, 196, 356, 92, 14, 0.32);
+    ellipse(cv, 192, 214, 152, 152, '#FFF6DC', 0.22, 34);
     withOutline(cv, t => {
-      for (const bx of [100, 192, 284]) hintBulb(t, bx, 192, 42);
-      roundRect(t, 192, 262, 110, 20, 6, LEATH.base, 1, LEATH.lo);     // the strap
-      roundRect(t, 192, 255, 110, 6, 3, LEATH.hi, 0.65);
-      roundRect(t, 226, 262, 46, 15, 5, LEATH.mid, 1, LEATH.lo);       // its loose end
-      roundRect(t, 192, 262, 31, 31, 9, INK, 0.95);                    // and the buckle
-      roundRect(t, 192, 262, 26, 26, 7, BRASS.hi, 1, BRASS.lo);
-      roundRect(t, 192, 262, 10, 10, 3, LEATH.lo, 1);
+      hintSatchel(t, { bodyHw: 76, bulbs: [161, 223] });
     }, { width: 10 });
-    sheen(cv, 146, 260, 20, 5, 0.3);
+    sheen(cv, 142, 276, 18, 12, 0.3);
+    sheen(cv, 148, 132, 10, 8, 0.4);
     savePNG(path.join(OUT, 'hints_small.png'), W, W, down2(cv, W, W));
   }
   { // === hints_large.png — "Satchel of Hints", 20 (BEST VALUE) ===============
-    // LADDER STEP 2: a flapped leather satchel (the widest thing in the pair)
-    // with FOUR bulbs coming out of the top, against the bundle's three.
-    //
-    // Two review fixes, both about the repeated object actually repeating. The
-    // first pass fanned four bulbs at four heights and two sizes; where a low
-    // bulb met a high one the two keylines and the contour pooled in the deep
-    // notch between them and punched what read as a HOLE in the cluster, and the
-    // outer two sat low enough that the bag ate their lavender collars while the
-    // inner two kept theirs. Four identical bulbs on ONE line fix both at once:
-    // the notches between neighbours are shallow and symmetric (a bulb resting
-    // against a bulb), and all four collars clear the bag by the same amount.
+    // LADDER STEP 2: the same satchel, twice as wide, FIVE of the same bulbs.
+    // Nothing else moves — same leather, same flap, same strap, same brass
+    // buckle, same shelf line, same bulb size.
     const { cv } = canvas();
-    contactShadow(cv, 196, 350, 140, 16, 0.33);
-    ellipse(cv, 192, 200, 170, 170, '#FFF6DC', 0.24, 36);
+    contactShadow(cv, 196, 356, 152, 15, 0.34);
+    ellipse(cv, 192, 202, 174, 174, '#FFF6DC', 0.24, 36);
     withOutline(cv, t => {
-      // the bag's dark inside, BEHIND the bulbs. Four circles standing in a row
-      // leave a V of bare canvas between each pair, and against the pale halo
-      // those Vs read as light wedges punched through the cluster; against the
-      // inside of the bag they read as what they are, the gaps between bulbs.
-      roundRect(t, 192, 202, 132, 48, 18, '#3A2412', 1);
-      for (const bx of [74, 152, 230, 308]) hintBulb(t, bx, 150, 42);
-      roundRect(t, 192, 272, 140, 62, 20, LEATH.base, 1, LEATH.lo);    // bag body
-      roundRect(t, 192, 262, 148, 50, 24, LEATH.hi, 1, LEATH.base);    // the flap
-      roundRect(t, 192, 296, 148, 12, 5, LEATH.mid, 0.8);              // its edge
-      roundRect(t, 192, 318, 146, 30, 12, LEATH.hi, 1, LEATH.mid);     // front
-      roundRect(t, 192, 306, 30, 50, 9, LEATH.lo, 1);                  // strap
-      roundRect(t, 192, 310, 34, 22, 8, BRASS.hi, 1, BRASS.lo);        // buckle
-      roundRect(t, 192, 310, 14, 11, 4, LEATH.lo, 1);                  // its tongue
+      hintSatchel(t, { bodyHw: 156, bulbs: [68, 130, 192, 254, 316] });
     }, { width: 10 });
-    sheen(cv, 128, 244, 30, 10, 0.28);
-    sheen(cv, 184, 304, 7, 4, 0.4);
+    sheen(cv, 92, 272, 22, 12, 0.3);
+    sheen(cv, 56, 132, 10, 8, 0.4);
     savePNG(path.join(OUT, 'hints_large.png'), W, W, down2(cv, W, W));
   }
-  { // === supporter.png — the monthly subscription ============================
-    // A subscription is a relationship, not an object, so this is the object a
-    // cottage keeps for one: a bound wreath — the thing that comes round again —
-    // with a single amber gem at its knot for the 300 amber it brings each month.
-    // Seven OVERSIZED leaves on a twine ring, never a scatter of small ones.
+
+  { // === supporter.png — the monthly subscription =========================
+    // A straw skep on its board.
+    //
+    // This icon used to be the leaf wreath, and blind it read as SEASONAL — the
+    // season pass's job, which was meanwhile drawn as a star-stamped document
+    // and read as a premium credential. The two were pointing at each other, so
+    // the wreath went to the season and Supporter needed an object of its own.
+    // The brief for it is narrow: an ongoing relationship rather than a stock of
+    // goods, and distinguishable at 56dp from a key and from a certificate,
+    // because Supporter, Patron and the season pass otherwise crowd one
+    // support-and-prestige space.
+    //
+    // A hive is the cottage object for a thing that keeps giving, month after
+    // month, for as long as you keep it. The dome is the one silhouette neither
+    // set already owns — a lantern (deepen_star_loft), a bell (deepen_belfry), a
+    // mug (theme_bone) and a teapot (upgrade_kitchen) are all taken, which is
+    // what ruled out the obvious alternatives — and it cannot be mistaken for a
+    // long diagonal metal thing or for a flat card at any size.
+    //
+    // Six coils, each oversized, each top-lit with its own shadow under it, and
+    // one big arched entrance at the foot: the entrance is the tell that makes a
+    // skep a skep instead of a haystack, so it is drawn large and dark with a
+    // lit landing board under it. Nothing is promised that the store row does
+    // not: no honey, no swarm, no goods spilling out.
     const { cv } = canvas();
-    contactShadow(cv, 196, 338, 112, 18, 0.3);
-    ellipse(cv, 192, 184, 168, 168, '#FFF3D2', 0.22, 36);
-    const RC = { x: 192, y: 182, r: 102 };
+    contactShadow(cv, 196, 350, 148, 14, 0.32);
+    ellipse(cv, 192, 196, 172, 172, '#FFF3D2', 0.22, 36);
     withOutline(cv, t => {
-      ringWalk(t, RC.x, RC.y, RC.r, 32, shade(ROPE.lo, 0.8), 1);
-      ringWalk(t, RC.x, RC.y, RC.r, 23, ROPE.hi, 1);
-      ringWalk(t, RC.x, RC.y, RC.r, 9, ROPE.base, 0.5);
-      const LEAVES = [-96, -45, 6, 57, 114, 165, 216];                 // degrees
-      for (const deg of LEAVES) {
-        const a = (deg * Math.PI) / 180;
-        const ca = Math.cos(a), sa = Math.sin(a);
-        const bx = RC.x + ca * 62, by = RC.y + sa * 62;
-        const tx = RC.x + ca * 148, ty = RC.y + sa * 148;
-        poly(t, leafPts(bx, by, tx, ty, 56, 20), INK, 0.95);
-        poly(t, leafPts(bx, by, tx, ty, 46, 18), ACCENT.main, 1, ACCENT.lo);
-        capsule(t, bx, by, tx, ty, 7, shade(ACCENT.lo, 0.8), 0.5);     // one big midrib
+      // the board it stands on
+      roundRect(t, 192, 336, 152, 11, 5, WOOD.light, 1, WOOD.mid);
+      // The coils. Their widths follow a DOME, not a taper: 1.00, .98, .93, .84,
+      // .71, .54, .32 of the base. An even taper drew a ziggurat, which is the
+      // shape of a stacked cake and not of a skep, and the whole naming of this
+      // icon rests on the profile. Each course is a full capsule (corner radius
+      // = its own half-height) with a shaded underside, so the coils read as
+      // rope of straw laid up in rounds rather than as flat discs with hairline
+      // grooves between them, and each overlaps the one below by ~5px so no
+      // notch can open between two courses.
+      const COILS = [
+        [308, 142, 22], [272, 139, 21], [236, 132, 20], [202, 119, 19],
+        [170, 101, 18], [140, 76, 17], [112, 46, 16],
+      ];
+      for (const [cy, hw, hh] of COILS) {
+        roundRect(t, 192, cy, hw, hh, hh, STRAW.hi, 1, STRAW.base);
+        roundRect(t, 192, cy + hh * 0.56, hw * 0.96, hh * 0.36, hh * 0.36, STRAW.mid, 0.75);
       }
-      cord(t, 152, 288, 232, 288, 32, ROPE);                            // the knot
-      amberGem(t, 192, 300, 48);
+      roundRect(t, 192, 84, 17, 13, 9, STRAW.up, 1, STRAW.mid);        // the crown knot
+      // the entrance: an arch cut down to the board, dark enough to be a way in
+      roundRect(t, 192, 302, 27, 24, 22, '#4A2D10', 1, '#261606');
+      roundRect(t, 192, 316, 27, 12, 3, '#2C1A08', 1);
+      roundRect(t, 192, 328, 40, 9, 4, STRAW.hi, 1, STRAW.mid);        // landing board
     }, { width: 10 });
-    sheen(cv, 128, 118, 26, 17, 0.35);
-    sheen(cv, 170, 278, 15, 10, 0.5);
+    sheen(cv, 168, 104, 16, 10, 0.42);
+    sheen(cv, 106, 234, 15, 24, 0.28);
     savePNG(path.join(OUT, 'supporter.png'), W, W, down2(cv, W, W));
   }
 
@@ -554,17 +778,25 @@ export function draw() {
     ellipse(cv, 192, 186, 168, 168, '#FBF0FF', 0.26, 36);
     withOutline(cv, t => {
       // the confetti bloom: six OVERSIZED lobes around a pale core
+      // The bloom goes down as one bedded cluster: six petals radiating from a
+      // hub leave a narrow V between every neighbouring pair, and a review found
+      // the pair at the top reading as "a broad dark field between two petals" —
+      // withOutline filling that V edge to edge in contour brown. Bedded in the
+      // palette's own deep plum, the same gap reads as the shadow under the
+      // bloom, and each petal keeps its own keyline at constant width.
       const BX = 274, BY = 146;
       const LOBES = [[-90, ECL.rose], [-30, ECL.iris], [30, ECL.plum], [90, ECL.rose], [150, ECL.iris], [210, ECL.plum]];
-      for (const [deg, colr] of LOBES) {
-        const a = (deg * Math.PI) / 180;
-        const cx = BX + Math.cos(a) * 46, cy = BY + Math.sin(a) * 46;
-        poly(t, roundRectPts(cx, cy, 46, 28, 25, a), INK, 0.95);
-        poly(t, roundRectPts(cx, cy, 40, 22, 21, a), colr, 1, shade(colr, 0.6));
-      }
-      ellipse(t, BX, BY, 30, 30, INK, 0.95, 3);
-      ellipse(t, BX, BY, 24, 24, '#E8DCF5', 1, 3);
-      ellipse(t, BX - 7, BY - 8, 10, 8, '#FFFFFF', 0.8, 4);
+      grouped(t, g => {
+        for (const [deg, colr] of LOBES) {
+          const a = (deg * Math.PI) / 180;
+          const cx = BX + Math.cos(a) * 46, cy = BY + Math.sin(a) * 46;
+          poly(g, roundRectPts(cx, cy, 46, 28, 25, a), INK, 0.95);
+          poly(g, roundRectPts(cx, cy, 40, 22, 21, a), colr, 1, shade(colr, 0.6));
+        }
+        ellipse(g, BX, BY, 30, 30, INK, 0.95, 3);
+        ellipse(g, BX, BY, 24, 24, '#E8DCF5', 1, 3);
+        ellipse(g, BX - 7, BY - 8, 10, 8, '#FFFFFF', 0.8, 4);
+      }, { fill: ECL.deep, gradTo: shade(ECL.deep, 0.7) });
       // the tile, extruded: base plane, side plane, face, bevel, gloss, specular
       const ang = (-8 * Math.PI) / 180;
       const TC = { x: 150, y: 208, hw: 88, hh: 92 };
@@ -610,16 +842,33 @@ export function draw() {
       // gold lump sitting in the middle of the hole with half its outline
       // missing. A key's bow has to stay a hole; the shaft now meets the ring's
       // outer band and stops there.
-      capsule(t, 186, 182, 288, 286, 46, G.mid);
-      capsule(t, 192, 190, 282, 280, 20, G.up, 0.9);
-      // THE BIT. Two SQUARE teeth as thick as the shaft, set along its last
-      // third — the widest part of the silhouette is the bit, which is what
-      // makes a key a key rather than the magnifying glass an earlier pass read
-      // as (a ring on a stick with nothing heavy at the far end).
-      capsule(t, 236, 234, 190, 280, 46, G.mid);
-      capsule(t, 230, 228, 186, 272, 18, G.up, 0.8);
-      capsule(t, 282, 280, 226, 336, 46, G.mid);
-      capsule(t, 276, 274, 222, 328, 18, G.up, 0.8);
+      capsule(t, 186, 182, 274, 270, 46, G.mid);
+      capsule(t, 192, 190, 268, 264, 20, G.up, 0.9);
+      // THE BIT, as ONE polygon.
+      //
+      // It was four capsules laid across the shaft, and a review took it apart
+      // at pixel level: "a contour-coloured bar starts and stops INSIDE the gold
+      // fill with a squared-off end on no silhouette edge; a detached lighter-
+      // gold rounded square belongs to no shape; and where the two teeth merge
+      // the union leaves an asymmetric lump with a concave notch. At 56dp the
+      // bit is a formless blob, so the key is not readable as a key below full
+      // size." All three are the same fault: a bit built by unioning round-capped
+      // strokes has caps and seams that belong to no edge of the thing.
+      //
+      // So it is now a single comb, computed in the shaft's own frame (u along
+      // the shaft, v across it) and filled once: a web hanging off the shaft's
+      // lower flank with two square teeth at its ends and one square notch
+      // between them. One outline, one fill, no seams, and the widest part of
+      // the silhouette is the bit — which is what makes a key a key rather than
+      // the magnifying glass an earlier pass read as.
+      const KA = Math.PI / 4, KC = Math.cos(KA), KSn = Math.sin(KA);
+      const KP = (u, v) => [120 + u * KC - v * KSn, 116 + u * KSn + v * KC];
+      const comb = (uA, uB, uC, uD, vTop, vWeb, vTip) => [
+        KP(uA, vTop), KP(uB, vTop), KP(uB, vTip), KP(uD, vTip),
+        KP(uD, vWeb), KP(uC, vWeb), KP(uC, vTip), KP(uA, vTip),
+      ];
+      poly(t, comb(146, 238, 176, 208, 12, 66, 100), G.lo, 1);
+      poly(t, comb(153, 231, 169, 215, 19, 57, 91), G.hi, 1, G.mid);
       // the bow, left open so the contour runs round the hole as well
       ringWalk(t, 120, 116, 62, 40, G.lo, 1);
       ringWalk(t, 120, 116, 62, 29, G.hi, 1);
@@ -631,128 +880,155 @@ export function draw() {
       const CA = -Math.PI / 4;
       poly(t, roundRectPts(191, 185, 56, 38, 14, CA), INK, 0.95);
       poly(t, roundRectPts(191, 185, 49, 31, 11, CA), G.hi, 1, G.mid);
-      amberGem(t, 191, 185, 30);
+      amberGem(t, 191, 185, 30, 9);
     }, { width: 10 });
     sheen(cv, 77, 73, 15, 9, 0.42);
     sheen(cv, 183, 177, 8, 6, 0.45);
     savePNG(path.join(OUT, 'patron_key.png'), W, W, down2(cv, W, W));
   }
   { // === remove_ads.png — the cheaper one-time quiet =========================
-    // The first pass drew a shuttered window: sage-green leaves (a hue outside
-    // the set's palette) with a crescent cut across the mullion. Three blind
-    // reviewers could not name it as a product at all, the crescent's lower horn
-    // forked into two ragged spikes, and it straddled the seam with no shadow,
-    // so it graded as a scratch on the glass. It was also the only full-bleed
-    // architectural PANEL in either set, where every other icon is a discrete
-    // object floating on its own contact shadow.
+    // A pair of cottage shutters, closed and latched.
     //
-    // Redrawn from the concept up. What this product actually buys is the thing
-    // the store row calls it: a quieter table. So it is the object a cottage
-    // keeps for that — a glazed mug, still steaming, nobody interrupting.
-    // Two bell drafts died on the way here and are worth recording, because both
-    // failures were failures of READING rather than of craft: a bell laid on its
-    // side is seen mouth-on, and a bell seen mouth-on is a horn, so the tile
-    // graded as a MEGAPHONE, the symbol of the very thing this product removes;
-    // and a bell muffled under a cloth loses the flare that makes it a bell, so
-    // it graded as a cone on a cushion. The mug is cobalt because that is
-    // already the crockery glaze on the amber crocks — one cottage's ware — and
-    // because a big blue mass is the one shape in this set that cannot be
-    // confused with a gold one.
+    // FOUR drafts died before this one, and they are worth recording because
+    // three of the four failed at READING rather than at craft.
+    //   1. A shuttered window drawn as architecture: sage leaves with a crescent
+    //      cut across the mullion. Three blind readers could not name it as a
+    //      product, and it was the only full-bleed PANEL in either set where
+    //      every other icon is a discrete object on its own contact shadow.
+    //   2. A bell laid on its side. A bell seen mouth-on is a horn, so the tile
+    //      graded as a MEGAPHONE: the symbol of the very thing this removes.
+    //   3. A bell muffled under a cloth. Muffling it costs the flare that makes
+    //      a bell a bell, so it graded as a cone on a cushion. (Bells were then
+    //      ruled out outright: assets/ui/bell.png and shop/deepen_belfry are
+    //      both already bells.)
+    //   4. A steaming mug. Nameable, which the first three were not — but three
+    //      readers still could not get from it to the product, and worse, it
+    //      DUPLICATED shop/theme_bone, which is a mug at the same three-quarter
+    //      angle with the same silhouette in a different colour. Two mugs
+    //      meaning unrelated things in a 71-icon set is an identification
+    //      failure whatever the craft.
+    //
+    // So: an object, not a panel; a silhouette no other icon in either set owns;
+    // and a thing that says "not now" by what it is doing rather than by
+    // symbolism. Shutters pulled to and latched are that. The louvres give a
+    // texture nothing else here has, the central seam and the iron hasp across
+    // it are what say CLOSED rather than merely wooden, and the two hinges on
+    // the outer edges are what say shutters rather than a crate lid.
+    //
+    // The slats are deliberately fat with fat gaps (15px on 46px of pitch in the
+    // supersample, so ~2dp of shadow between courses at ship size) because a
+    // louvre drawn at true scale is a stack of hairlines that averages to grey
+    // fuzz. The gaps are the recess showing through, which is a real material —
+    // they are interior to the leaf, so no contour is involved anywhere in them.
     const { cv } = canvas();
-    const MX = 158;
-    contactShadow(cv, 186, 352, 116, 16, 0.32);
-    ellipse(cv, 192, 196, 168, 168, '#FFF3D2', 0.20, 36);
+    contactShadow(cv, 196, 352, 112, 15, 0.32);
+    ellipse(cv, 192, 192, 168, 168, '#FFF3D2', 0.20, 36);
     withOutline(cv, t => {
-      ringWalk(t, 266, 246, 48, 30, COBALT.lo, 1);                       // the handle,
-      ringWalk(t, 266, 246, 48, 20, COBALT.hi, 1);                       // a real hole
-      roundRect(t, MX, 254, 92, 84, 26, COBALT.hi, 1, COBALT.lo);        // body
-      roundRect(t, MX, 300, 88, 38, 22, COBALT.lo, 1, shade(COBALT.lo, 0.72));
-      roundRect(t, MX, 332, 76, 13, 6, shade(COBALT.lo, 0.8), 1);        // foot
-      // two curls of steam, bases tucked behind the rim so they rise OUT of the
-      // cup, and drawn as TAPERING curls rather than leaves: a leaf is widest at
-      // its middle, and two of them standing over a mug read unmistakably as a
-      // pair of rabbit ears. Oversized on purpose either way — a thin wisp
-      // averages to grey fuzz at 56dp. Both bases sit ON the rim's centre line,
-      // where the rim ellipse is at its widest and swallows them; started lower
-      // they poked out under it as two dark stubs.
-      const curl = (x0, y0, amp, h, th, colr, alpha) => {
-        let px = x0, py = y0;
-        for (let i = 1; i <= 20; i++) {
-          const u = i / 20;
-          const x = x0 + Math.sin(u * Math.PI * 1.5) * amp, y = y0 - u * h;
-          capsule(t, px, py, x, y, th * (1 - u * 0.68), colr, alpha);
-          px = x; py = y;
+      // the two hinges, behind the leaves so they read as straps pinned on
+      for (const hx of [80, 304]) {
+        for (const hy of [110, 274]) {
+          roundRect(t, hx, hy, 24, 16, 5, IRON.hi, 1, IRON.lo);
+          ellipse(t, hx - 9, hy, 5, 5, IRON.lo, 1, 2);
         }
-      };
-      curl(MX - 34, 178, 20, 128, 32, INK, 0.95);
-      curl(MX - 34, 178, 20, 128, 21, PARCH.hi, 1);
-      curl(MX + 42, 176, 17, 100, 28, INK, 0.95);
-      curl(MX + 42, 176, 17, 100, 18, PARCH.hi, 1);
-      ellipse(t, MX, 172, 94, 24, INK, 0.95, 3);                         // the rim,
-      ellipse(t, MX, 172, 87, 18, WARE.hi, 1, 3);                        // cream glaze
-      ellipse(t, MX, 175, 70, 12, '#6E3A16', 1, 3);                      // and the tea
-      ellipse(t, MX, 173, 58, 8, '#95511F', 1, 3);
+      }
+      // the leaves, overlapping by a pixel at the centre so no notch can open
+      // along the seam for the contour to flood
+      for (const lx of [141, 243]) {
+        roundRect(t, lx, 192, 52, 150, 9, WOOD.base, 1, WOOD.mid);        // stile frame
+        roundRect(t, lx, 192, 38, 128, 6, shade(WOOD.seam, 0.8), 1, shade(WOOD.seam, 0.6));
+        // The louvres are TILTED, which is the point: a stack of level bars in a
+        // wooden frame is a crate, and slats set at an angle in the same frame
+        // can only be a louvre. Each casts a shadow up into the recess behind it.
+        for (const dy of [-105, -63, -21, 21, 63, 105]) {
+          poly(t, roundRectPts(lx, 192 + dy - 7, 36, 5, 5, -0.15), shade(WOOD.seam, 0.55), 0.85);
+          poly(t, roundRectPts(lx, 192 + dy, 36, 9, 8, -0.15), WOOD.light, 1, WOOD.mid);
+        }
+        roundRect(t, lx, 60, 48, 8, 4, WOOD.rim, 0.85);                    // lit top rail
+        roundRect(t, lx, 326, 48, 8, 4, WOOD.mid, 0.7);                    // shaded bottom rail
+      }
+      roundRect(t, 192, 192, 5, 148, 2, shade(WOOD.seam, 0.7), 0.95);     // the meeting seam
+      // The hasp: an iron bar thrown across that seam, with its boss and its
+      // staple. This is the whole reading of the icon — shutters that are merely
+      // shut are a cupboard, shutters that are FASTENED are the product — so it
+      // is the heaviest, darkest part and it carries its own keyline.
+      roundRect(t, 192, 192, 70, 22, 9, INK, 0.95);
+      roundRect(t, 192, 192, 64, 16, 7, IRON.hi, 1, IRON.base);
+      roundRect(t, 158, 192, 9, 20, 4, IRON.lo, 1);                       // the staple it drops over
+      ellipse(t, 192, 192, 22, 22, INK, 0.95, 3);
+      ellipse(t, 192, 192, 16, 16, IRON.base, 1, 3);
+      ellipse(t, 192, 192, 7, 7, IRON.lo, 1, 2);
+      ellipse(t, 187, 186, 5, 4, IRON.hi, 0.9, 3);
     }, { width: 10 });
-    sheen(cv, 110, 224, 19, 28, 0.3);
+    sheen(cv, 108, 84, 20, 11, 0.3);
+    sheen(cv, 172, 180, 7, 5, 0.45);
     savePNG(path.join(OUT, 'remove_ads.png'), W, W, down2(cv, W, W));
   }
+
   { // === season_premium.png — the Season Pass premium track ==================
-    // Bought with amber or carried by a Supporter, and what it opens is a track
-    // of rewards, so the object is the pass itself: a parchment card with a heavy
-    // teal wax seal stamped with an amber star. Teal is confetti_season's own
-    // colour in shopIcons, so the pass and the confetti it ends on match.
+    // THE WREATH LIVES HERE NOW.
+    //
+    // Blind, this icon and Supporter pointed at each other: the leaf wreath
+    // (drawn for Supporter) read as SEASONAL, and the star-badge document
+    // (drawn for the season pass) read as a premium credential. The wreath is
+    // the stronger drawing of the two, so it goes to the product it was already
+    // naming — a season is a thing that comes round, a wreath is the object for
+    // that — and Supporter takes a new one. The pass's own teal seal comes with
+    // it as the medallion at the knot, so the track and the confetti it ends on
+    // are still visibly the same season, and the amber star is still the pass's
+    // mark.
+    //
+    // The card this replaces had two pixel defects a review named, and both go
+    // with it: a sliver of the back card punching through the top contour of the
+    // teal header (the outline bulging to take it), and a tan crescent of card
+    // fill trapped fully inside outline colour under the badge.
+    //
+    // The whole assembly goes down through `grouped`. A leaf crossing a rope
+    // ring, and a medallion meeting that ring, both make long shallow wedges,
+    // and every one of them was filling with contour brown — the review found it
+    // as "the bottom third of the wreath interior". Bedded in the leaves' own
+    // deep green they read as shadow under the binding instead. That also
+    // settles the two point defects flagged on the wreath itself: the amber gem
+    // with no dark contour of its own, which read as a hole punched through and
+    // filled with amber, and the two cream slivers of the band marooned in
+    // outline colour beside it. The gem is now a keylined medallion big enough
+    // to close the bottom of the ring on its own.
     const { cv } = canvas();
-    contactShadow(cv, 198, 336, 124, 20, 0.3);
-    ellipse(cv, 192, 184, 164, 164, '#FFF3D2', 0.2, 36);
+    contactShadow(cv, 196, 344, 116, 17, 0.3);
+    ellipse(cv, 192, 182, 164, 164, '#FFF3D2', 0.22, 36);
+    const RC = { x: 192, y: 176, r: 102 };
     withOutline(cv, t => {
-      const A2 = (9 * Math.PI) / 180, A1 = (-7 * Math.PI) / 180;
-      // the card behind: the track continues past this season
-      poly(t, roundRectPts(216, 188, 94, 120, 16, A2), PARCH.dim, 1, PARCH.shadow);
-      poly(t, roundRectPts(216, 188, 94, 120, 16, A2), INK, 0.14);
-      // the pass itself
-      poly(t, roundRectPts(178, 184, 100, 126, 16, A1), PARCH.hi, 1, PARCH.dim);
-      const L = (lx, ly) => [178 + lx * Math.cos(A1) - ly * Math.sin(A1), 184 + lx * Math.sin(A1) + ly * Math.cos(A1)];
-      poly(t, roundRectPts(...L(0, -92), 100, 34, 14, A1), TEAL.base, 1, TEAL.lo);   // header band
-      poly(t, roundRectPts(...L(0, -100), 88, 9, 6, A1), TEAL.hi, 0.8);
-      poly(t, roundRectPts(...L(-6, -18), 68, 13, 7, A1), PARCH.shadow, 0.85);       // one thick line
-      poly(t, roundRectPts(...L(-22, 22), 52, 13, 7, A1), PARCH.shadow, 0.6);
-      // the seal, over the card's lower edge
-      ellipse(t, 246, 264, 60, 60, INK, 0.95, 3);
-      ellipse(t, 246, 264, 53, 53, TEAL.base, 1, 3);
-      ellipse(t, 246, 258, 42, 42, TEAL.hi, 1, 5);
-      poly(t, starPts(246, 262, 34, 15), INK, 0.9);
-      poly(t, starPts(246, 260, 28, 12), AMBER.up, 1, AMBER.mid);
+      grouped(t, g => {
+        ringWalk(g, RC.x, RC.y, RC.r, 32, shade(ROPE.lo, 0.8), 1);
+        ringWalk(g, RC.x, RC.y, RC.r, 23, ROPE.hi, 1);
+        ringWalk(g, RC.x, RC.y, RC.r, 9, ROPE.base, 0.5);
+        const LEAVES = [-96, -45, 6, 57, 114, 165, 216];                 // degrees
+        for (const deg of LEAVES) {
+          const a = (deg * Math.PI) / 180;
+          const ca = Math.cos(a), sa = Math.sin(a);
+          const bx = RC.x + ca * 62, by = RC.y + sa * 62;
+          const tx = RC.x + ca * 146, ty = RC.y + sa * 146;
+          poly(g, leafPts(bx, by, tx, ty, 56, 20), INK, 0.95);
+          poly(g, leafPts(bx, by, tx, ty, 46, 18), ACCENT.main, 1, ACCENT.lo);
+          capsule(g, bx, by, tx, ty, 7, shade(ACCENT.lo, 0.8), 0.5);     // one big midrib
+        }
+        cord(g, 152, 286, 232, 286, 30, ROPE);                           // the knot
+        // the season's seal, hung at the knot: teal, keylined, amber star
+        ellipse(g, 192, 296, 58, 58, INK, 0.95, 3);
+        ellipse(g, 192, 296, 51, 51, TEAL.base, 1, 3);
+        ellipse(g, 192, 290, 40, 40, TEAL.hi, 1, 5);
+        poly(g, starPts(192, 294, 33, 15), INK, 0.9);
+        poly(g, starPts(192, 292, 27, 12), AMBER.up, 1, AMBER.mid);
+      }, { fill: shade(ACCENT.lo, 0.5), gradTo: shade(ACCENT.lo, 0.34) });
     }, { width: 10 });
-    sheen(cv, 128, 118, 30, 20, 0.4);
-    sheen(cv, 224, 240, 16, 11, 0.45);
+    sheen(cv, 128, 112, 26, 17, 0.35);
+    sheen(cv, 170, 274, 14, 10, 0.5);
     savePNG(path.join(OUT, 'season_premium.png'), W, W, down2(cv, W, W));
   }
 
-  { // === store_placeholder.png — the unmapped-id fallback ====================
-    // Brown paper, twine, no bow. Drawn so a SKU added later can never render a
-    // hole in the store list, and deliberately the dullest object in the set: it
-    // should read as "something, unopened", and never as a mystery worth buying.
-    const { cv } = canvas();
-    const bx = 192, by = 200, hw = 126, hh = 132;
-    contactShadow(cv, bx + 6, by + hh + 16, 118, 22, 0.33);
-    withOutline(cv, t => {
-      roundRect(t, bx, by, hw, hh, 18, KRAFT.hi, 1, KRAFT.lo);
-      const CREASES = [
-        [-96, -92, -30, -104], [30, -84, 98, -96], [-88, 66, -26, 80],
-        [38, 78, 100, 62], [-56, -14, -14, -28], [52, 18, 100, 30],
-      ];
-      for (const [x1, y1, x2, y2] of CREASES) {
-        capsule(t, bx + x1, by + y1, bx + x2, by + y2, 5, KRAFT.crease, 0.17);
-      }
-      roundRect(t, bx + hw - 38, by - hh + 34, 38, 34, 9, KRAFT.base, 0.8, KRAFT.lo);
-      cord(t, bx - 14, by - hh - 4, bx - 14, by + hh + 4, 26);
-      cord(t, bx - hw - 4, by - 30, bx + hw + 4, by - 30, 26);
-      roundRect(t, bx - 14, by - 30, 33, 29, 12, INK, 0.9);
-      roundRect(t, bx - 14, by - 33, 26, 22, 9, TWINE.hi, 1, TWINE.lo);
-      capsule(t, bx - 28, by - 46, bx - 28, by - 14, 5, TWINE.lo, 0.5);
-      capsule(t, bx, by - 46, bx, by - 14, 5, TWINE.lo, 0.5);
-    }, { width: 10 });
-    sheen(cv, bx - 78, by - 82, 44, 20, 0.3);
-    savePNG(path.join(OUT, 'store_placeholder.png'), W, W, down2(cv, W, W));
-  }
+  // NOTE: there is deliberately no store_placeholder.png. The unmapped-id
+  // fallback reuses the Cosmetic Shop's parcel (assets/ui/shop/shop_placeholder.png)
+  // via storeArt.ts. Three blind reviewers found a store-local parcel
+  // indistinguishable from the shop's at 56dp; since both mean exactly the same
+  // thing and never share a screen, one asset is the fix and a second unrelated
+  // object drawn only to avoid the collision would be the wrong one.
 }

@@ -67,20 +67,21 @@ describe('store art registry', () => {
   });
 
   it('maps every key to a real file on disk', () => {
-    const onDisk = new Set(
-      fs.readdirSync(STORE_DIR).filter((f) => f.endsWith('.png')),
-    );
     // The registry uses static require() literals, so this cross-checks the
     // paths in the same way a Metro bundle would: one PNG per mapped key.
-    const files = fs
-      .readFileSync(
-        path.resolve(__dirname, '../components/monetization/storeArt.ts'),
-        'utf8',
-      )
-      .match(/assets\/ui\/store\/([\w.]+\.png)/g)
-      ?.map((m) => m.split('/').pop() as string) ?? [];
-    expect(files.length).toBe(Object.keys(STORE_ART).length);
-    const absent = files.filter((f) => !onDisk.has(f));
+    // Note one path deliberately points OUTSIDE assets/ui/store: the
+    // unmapped-id fallback reuses the Cosmetic Shop's parcel rather than
+    // shipping a second, visually identical one (see storeArt.ts), so both
+    // directories are searched.
+    const source = fs.readFileSync(
+      path.resolve(__dirname, '../components/monetization/storeArt.ts'),
+      'utf8',
+    );
+    const referenced = source.match(/assets\/ui\/(store|shop)\/[\w.]+\.png/g) ?? [];
+    expect(referenced.length).toBe(Object.keys(STORE_ART).length);
+    const absent = referenced.filter(
+      (rel) => !fs.existsSync(path.resolve(__dirname, '../../assets/ui', rel.split('assets/ui/')[1])),
+    );
     expect(absent).toEqual([]);
   });
 

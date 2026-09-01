@@ -38,7 +38,13 @@ export const STORE_ART: { [key: string]: ImageSourcePropType } = {
   season_premium: require('../../../assets/ui/store/season_premium.png'),
 
   // --- Fallback --------------------------------------------------------------
-  store_placeholder: require('../../../assets/ui/store/store_placeholder.png'),
+  // Deliberately the SHOP's parcel, not a second one of our own. Three blind
+  // reviewers independently flagged a store-local parcel as indistinguishable
+  // from the shop's at 56dp, and they were right: the two mean exactly the same
+  // thing (art is missing for this id) and never appear on the same screen, so
+  // two drawings of it is a duplicate with no upside. Sharing the asset removes
+  // the collision instead of inventing a second unrelated object to avoid it.
+  store_placeholder: require('../../../assets/ui/shop/shop_placeholder.png'),
 };
 
 /** Registry key of the brown-paper parcel fallback. */
