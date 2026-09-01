@@ -2241,6 +2241,34 @@ async function markMicroBeatSeen(puzzleCount: number): Promise<void> {
  * Check if a narrative micro-beat should fire at this puzzle count.
  * Returns the beat config (and marks it as consumed) or null.
  */
+/**
+ * Resolve a beat's `{word}` token to the player's strongest dread word
+ * (uppercased), falling back to the baked wordless variant. Returns null ONLY
+ * when a templated beat has no fallback (the caller must then leave the beat
+ * unconsumed — never burn a beat invisibly); non-templated beats pass through
+ * untouched. Shared by BOTH delivery tracks (first descent and New Cycle), so
+ * the token can never reach the player raw. Guarded lazy requires keep it
+ * Jest-safe and cycle-free.
+ */
+async function resolveMicroBeatText(beat: NarrativeMicroBeat): Promise<NarrativeMicroBeat | null> {
+  if (!beat.text || !beat.text.includes('{word}')) return beat;
+  let resolvedText: string | null = null;
+  try {
+    const { getRitualWords } = require('./amberCurrency');
+    const { getStrongestDreadWord } = require('./localGenerator');
+    const words: string[] = await getRitualWords();
+    const strongest = getStrongestDreadWord(words || []);
+    if (strongest && strongest.word) {
+      resolvedText = beat.text.replace(/\{word\}/g, String(strongest.word).toUpperCase());
+    }
+  } catch {
+    resolvedText = null;
+  }
+  const finalText = resolvedText ?? beat.fallbackText;
+  if (!finalText) return null;
+  return { ...beat, text: finalText };
+}
+
 export async function checkNarrativeMicroBeat(
   puzzlesSolved: number,
 ): Promise<NarrativeMicroBeat | null> {
@@ -2254,28 +2282,12 @@ export async function checkNarrativeMicroBeat(
   // (resolve-then-mark, never consume-then-fail — the preview-graduation _v2
   // incident is the cautionary tale). Keys are exact-count so deferral is
   // impossible; the baked fallback is the correct shape for a player with no
-  // dread word yet. Guarded lazy requires keep this Jest-safe and cycle-free.
-  if (beat.text && beat.text.includes('{word}')) {
-    let resolvedText: string | null = null;
-    try {
-      const { getRitualWords } = require('./amberCurrency');
-      const { getStrongestDreadWord } = require('./localGenerator');
-      const words: string[] = await getRitualWords();
-      const strongest = getStrongestDreadWord(words || []);
-      if (strongest && strongest.word) {
-        resolvedText = beat.text.replace(/\{word\}/g, String(strongest.word).toUpperCase());
-      }
-    } catch {
-      resolvedText = null;
-    }
-    const finalText = resolvedText ?? beat.fallbackText;
-    if (!finalText) return null; // unconsumed: never burn a beat invisibly
-    await markMicroBeatSeen(puzzlesSolved);
-    return { ...beat, text: finalText };
-  }
+  // dread word yet.
+  const resolved = await resolveMicroBeatText(beat);
+  if (!resolved) return null; // unconsumed: never burn a beat invisibly
 
   await markMicroBeatSeen(puzzlesSolved);
-  return beat;
+  return resolved;
 }
 
 /**
@@ -2605,8 +2617,10 @@ export const CYCLE_MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
   // first descent's verbatim rerun — the approach lands as almost-memory.
   // Same rule as the six above: never explicit, never 'last time'.
   88: {
+    // The cycle's house is already whole (house completion is a precondition
+    // of entering a cycle), so the construction is REMEMBERED, not occurring.
     type: 'ambient_whisper',
-    text: 'The house keeps making room, and its hands do not hesitate anywhere. Walls only go up this smoothly the second time. It does not ask itself how it knows that.',
+    text: 'The house has not needed to make room in a long while. It still remembers how smoothly these walls went up, smoother than a first attempt has any right to be. It does not ask itself how it knows that.',
     durationMs: 4500,
   },
   106: {
@@ -2703,8 +2717,14 @@ export async function checkCycleNarrativeMicroBeat(
   const seen = await loadCycleBeatsSeen(cycleCount);
   if (seen.has(cycleRelativeCount)) return null;
 
+  // A re-fired regular beat may carry the {word} template (the beat at 72) —
+  // resolve it on THIS track too, or the raw token reaches the player.
+  // Resolve-then-mark, same as the first-descent path.
+  const resolved = await resolveMicroBeatText(beat);
+  if (!resolved) return null;
+
   await markCycleBeatSeen(cycleCount, cycleRelativeCount);
-  return beat;
+  return resolved;
 }
 
 /**

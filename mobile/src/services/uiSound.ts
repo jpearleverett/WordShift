@@ -70,12 +70,6 @@ export function playUiSound(kind: UiSoundKind = 'tap', arg?: number): void {
 }
 
 /**
- * Stop the looping ambient music bed for a ceremony so a ritual cue can own the
- * soundscape. The new phase's bed is restarted by App's music effect once the
- * phaseTransitionEvent clears. Guarded like playUiSound. Deliberately routed
- * here (not a direct audio import) so ceremony components stay expo-audio-free.
- */
-/**
  * Guarded selection haptic for presentational components — the touch twin of
  * playUiSound (never a static expo-haptics import in their graph, so Node-env
  * component tests keep loading without native stubs). Settings gating happens
@@ -91,6 +85,12 @@ export function uiHapticSelection(): void {
   }
 }
 
+/**
+ * Stop the looping ambient music bed for a ceremony so a ritual cue can own the
+ * soundscape. The new phase's bed is restarted by App's music effect once the
+ * phaseTransitionEvent clears. Guarded like playUiSound. Deliberately routed
+ * here (not a direct audio import) so ceremony components stay expo-audio-free.
+ */
 export function stopCeremonyMusic(): void {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports

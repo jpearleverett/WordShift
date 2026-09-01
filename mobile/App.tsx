@@ -1134,6 +1134,20 @@ function MainApp() {
     });
     return () => subscription.remove();
   }, []);
+  // Clears a hushed win's authored silence and (optionally) resumes the bed.
+  // Called by the victory-exit flow AND by the board-start paths reachable
+  // while a hushed victory modal is still up — a deep link or notification tap
+  // routes straight to startDailyBoard / the shared-challenge start, bypassing
+  // startVictoryExitFlow, and would otherwise leave the whole next board in
+  // unintended silence (the music effect and the foreground-resume listener
+  // both honor the ref).
+  const clearVictoryMusicHush = useCallback((resume: boolean) => {
+    if (!victoryMusicHushRef.current) return;
+    victoryMusicHushRef.current = false;
+    if (resume && musicHydratedRef.current && !puzzleIsFinalRef.current) {
+      startMusicForScreen(musicScreenRef.current, musicPhaseRef.current).catch(() => {});
+    }
+  }, []);
 
   // Glitch stutter for the prominent first-victory glitch: a short on/off
   // flicker so a held 1.4s glitch reads as a genuine tear, not a caption.
@@ -1636,14 +1650,10 @@ function MainApp() {
     // the effect alone would leave the world silent). Skip the resume when an
     // endgame cinematic is about to play — the effect restarts the bed when
     // the overlay clears.
-    if (victoryMusicHushRef.current) {
-      victoryMusicHushRef.current = false;
-      // On the finale itself, wait for the board to clear instead (the music
-      // effect restarts the bed when isFinalBoard flips / the screen changes).
-      if (!pendingEndgame && musicHydratedRef.current && !puzzleIsFinalRef.current) {
-        startMusicForScreen(musicScreenRef.current, musicPhaseRef.current).catch(() => {});
-      }
-    }
+    // On the finale itself, or when a rescued cinematic is about to play,
+    // skip the resume (the music effect restarts the bed when isFinalBoard
+    // flips / the screen changes / the overlay clears).
+    clearVictoryMusicHush(!pendingEndgame);
 
     if (queuedPostVictoryIntrosRef.current.length > 0) {
       pendingPostVictoryActionRef.current = action;
@@ -1656,7 +1666,7 @@ function MainApp() {
     }
 
     action();
-  }, [clearVictoryTimeouts, clearVictoryToastQueue, puzzleActions, victoryActions, orchestrationActions, advanceQueuedPostVictoryIntro]);
+  }, [clearVictoryTimeouts, clearVictoryToastQueue, clearVictoryMusicHush, puzzleActions, victoryActions, orchestrationActions, advanceQueuedPostVictoryIntro]);
 
   // ========================================================================
   // Navigation & puzzle lifecycle handlers
@@ -1769,6 +1779,12 @@ function MainApp() {
     pendingPostVictoryActionRef.current = null;
     setHomePanY(null);
     puzzlesSinceHomeVisit.current = 0;
+    // A rebuild that lands while the HomeScreen is ALREADY mounted (the
+    // home-launched New Cycle: transitionTo('home') no-ops on the same
+    // screen) must still re-read the world, or the shadow sky and robed
+    // keepers linger over a bright-reset session. The refresh signal re-runs
+    // loadAllData on the mounted screen; a remounting home ignores it.
+    setHomeRefreshSignal(n => n + 1);
     // Re-read the rebuilt persistence (amber, phase, stats, pending transition).
     persistenceActions.refreshStats().catch(() => {});
     getUnbrokenWeaveMastery().then(setUnbrokenWeaveMastery).catch(() => {});
@@ -1819,11 +1835,16 @@ function MainApp() {
         {
           text: getNewCycleCTA(),
           onPress: async () => {
+            let cycle = 0;
             try {
-              await performNewCycle();
+              cycle = await performNewCycle();
             } catch {
               return; // nothing committed — no ceremony, no rebuild
             }
+            // performNewCycle returns 0 when the eligibility re-check fails
+            // (e.g. a stale row after a cycle already started elsewhere) —
+            // no ceremony over a world that did not change.
+            if (!cycle) return;
             pendingCycleRebuildRef.current = true;
             setPhaseTransitionEvent(NEW_CYCLE_EVENT);
           },
@@ -1862,6 +1883,9 @@ function MainApp() {
   // The daily board start proper — reached only through handleStartDaily's
   // replay guard below.
   const startDailyBoard = useCallback(() => {
+    // A hushed win's silence must not leak onto a link/notification-routed
+    // daily start (this path bypasses startVictoryExitFlow's clear).
+    clearVictoryMusicHush(true);
     persistenceActions.refreshStats();
     orchestrationActions.setCompletionCoda(null);
     setIsPlayingDaily(true);
@@ -1907,7 +1931,7 @@ function MainApp() {
         await puzzleActions.startNewGame('HARD', 'standard', 'standard', false, false, undefined, false);
       }
     });
-  }, [puzzleActions, transitionTo, persistenceActions, orchestrationActions, persistence.currentPhase, maybeShowSetupSelectorIntro, clearVictoryToastQueue]);
+  }, [puzzleActions, transitionTo, persistenceActions, orchestrationActions, persistence.currentPhase, maybeShowSetupSelectorIntro, clearVictoryToastQueue, clearVictoryMusicHush]);
 
   // Start the Daily Challenge (seeded; difficulty follows the week ramp).
   const handleStartDaily = useCallback((_difficulty: Difficulty) => {
@@ -1945,13 +1969,16 @@ function MainApp() {
     }
     hapticLight();
     soundTap();
+    // Same hush-leak guard as startDailyBoard: a challenge link can arrive
+    // over a hushed victory modal.
+    clearVictoryMusicHush(true);
     setIsPlayingDaily(false);
     resetSpeedRun();
     orchestrationActions.setCompletionCoda(null);
     persistenceActions.refreshStats();
     logEvent({ type: 'puzzle_started', data: { shared: true, words: words.length } });
     transitionTo('puzzle');
-  }, [puzzleActions, transitionTo, persistenceActions, orchestrationActions, persistence.currentPhase]);
+  }, [puzzleActions, transitionTo, persistenceActions, orchestrationActions, persistence.currentPhase, clearVictoryMusicHush]);
 
   const handleIncomingLink = useCallback((url: string) => {
     // Scheme/host matching is case-insensitive on Android intents, so compare

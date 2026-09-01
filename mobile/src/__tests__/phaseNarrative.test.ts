@@ -2114,3 +2114,42 @@ describe('checkCycleNarrativeMicroBeat + resolveVictoryMicroBeat', () => {
     expect(await checkCycleNarrativeMicroBeat(3, 1)).not.toBeNull();
   });
 });
+
+// ============================================================================
+// Review fix: the {word} template must resolve on the CYCLE track too — an
+// NG+ player's re-fired beat 72 previously showed the literal token.
+// ============================================================================
+describe('cycle path resolves the {word} template (never the raw token)', () => {
+  beforeEach(async () => {
+    (AsyncStorage.clear as jest.Mock)();
+    await resetMicroBeats();
+  });
+
+  test('a re-fired regular beat at cycle-relative 72 names the dread word', async () => {
+    const amber = require('../services/amberCurrency');
+    const spy = jest.spyOn(amber, 'getRitualWords').mockResolvedValue(['VOID']);
+    try {
+      const beat = await checkCycleNarrativeMicroBeat(72, 7);
+      expect(beat).not.toBeNull();
+      expect(beat!.text).toContain('VOID');
+      expect(beat!.text).not.toContain('{word}');
+      // Consumed for this cycle (resolve-then-mark on this track too).
+      expect(await checkCycleNarrativeMicroBeat(72, 7)).toBeNull();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test('falls back to the baked wordless variant on the cycle path as well', async () => {
+    const amber = require('../services/amberCurrency');
+    const spy = jest.spyOn(amber, 'getRitualWords').mockResolvedValue(['SUNNY']);
+    try {
+      const beat = await checkCycleNarrativeMicroBeat(72, 8);
+      expect(beat).not.toBeNull();
+      expect(beat!.text).toBe(MICRO_BEATS[72].fallbackText);
+      expect(beat!.text).not.toContain('{word}');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});

@@ -584,10 +584,8 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
       const showTimer = setTimeout(() => {
         setActiveSceneIndex(index);
         runSceneImage(scene, timeScale, reducedMotion);
-        // The Arrival's dark ritual swell (soundPhaseChange resolves its dark
-        // variant by audioPhase at phase 3+) rides the descent. Audio self-
-        // gates on soundEnabled and must play even under reducedMotion (which
-        // governs motion, not sound).
+        // Audio self-gates on soundEnabled and must play even under
+        // reducedMotion (which governs motion, not sound).
         if (scene.effect === 'descend') {
           // Duck the looping music bed so the dark ritual swell owns the Arrival
           // soundscape (App's music effect restarts the phase's bed once the
