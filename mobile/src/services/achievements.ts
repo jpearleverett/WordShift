@@ -159,7 +159,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   {
     id: 'first_perfect',
     rewardAmber: 10,
-    title: 'Flawless',
+    title: 'First Light',
     description: 'Get 3 stars on a puzzle',
     icon: '⭐',
     category: 'mastery',
@@ -218,8 +218,8 @@ export const ACHIEVEMENTS: Achievement[] = [
   {
     id: 'flawless_first',
     rewardAmber: 20,
-    title: 'Flawless',
-    description: 'Solve a puzzle with no hints, no mistakes, and no undos',
+    title: 'Flawless Offering',
+    description: 'Solve a puzzle flawlessly: no hints, no mistakes, no undos',
     icon: '💠',
     category: 'mastery',
     check: (s) => (s.stats.flawlessCount || 0) >= 1,
@@ -493,7 +493,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   {
     id: 'daily_first',
     rewardAmber: 15,
-    title: 'Daily Challenger',
+    title: 'Marked the Day',
     description: 'Complete your first daily challenge',
     icon: '📰',
     category: 'journey',
@@ -531,7 +531,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   {
     id: 'challenge_10',
     rewardAmber: 30,
-    title: 'Fearless Champion',
+    title: 'Steady Nerve',
     description: 'Complete 10 puzzles in Challenge Mode',
     icon: '🛡️',
     category: 'mastery',

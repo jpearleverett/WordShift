@@ -61,6 +61,32 @@ export function getCascadeDelayMs(
   return baseMs + capped * staggerMs;
 }
 
+/**
+ * Stagger delay for the item at `indexInGroup` inside the `groupIndex`-th
+ * windowed group of a virtualized list. The per-group base is capped so a
+ * group reached late still starts promptly, while the in-group stagger is
+ * never capped, which is what lets a windowed list animate ALL of its content
+ * instead of only a global first N.
+ */
+export function getGroupedCascadeDelayMs(
+  groupIndex: number,
+  indexInGroup: number,
+  opts: {
+    staggerMs?: number;
+    groupStaggerMs?: number;
+    maxStaggeredGroups?: number;
+    baseMs?: number;
+  } = {},
+): number {
+  const groupBase = getCascadeDelayMs(groupIndex, {
+    staggerMs: opts.groupStaggerMs ?? 70,
+    maxStaggered: opts.maxStaggeredGroups ?? 2,
+    baseMs: opts.baseMs ?? 0,
+  });
+  const i = indexInGroup > 0 ? indexInGroup : 0;
+  return groupBase + i * (opts.staggerMs ?? SURFACE.staggerMs);
+}
+
 /** Entrance fade/rise duration, phase-weighted (bright quick, dark heavier). */
 function entranceDurationMs(phase: number): number {
   return 240 + Math.min(Math.max(phase, 0), 5) * 34;

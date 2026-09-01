@@ -12,7 +12,6 @@ import {
   Image,
   ScrollView,
   Pressable,
-  ImageSourcePropType,
   StyleProp,
   ViewStyle,
   TextStyle,
@@ -41,11 +40,13 @@ import { PixelPlaque } from '../ui/PixelPlaque';
 import { CandyButton } from '../ui/CandyButton';
 import { PanelCard } from '../ui/PanelCard';
 import { RewardReveal, countUpDisplayValue, getCountUpDurationMs } from '../ui/RewardReveal';
+import { SpringIn } from '../ui/SpringIn';
+import { HubRow } from '../ui/HubRow';
+import { UtilityMenu } from '../ui/UtilityMenu';
 import {
   getFullProgress,
   markIntroSeen,
   markHouseCompleted,
-  spendAmber,
   awardBonusAmber,
   hasSeenChallengeIntro,
   markChallengeIntroSeen,
@@ -66,7 +67,6 @@ import {
   markKeeperRecordSeen,
   getRitualWords,
   getTotalWordsFormed,
-  canStartNewCycle,
 } from '../../services/amberCurrency';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
 import { AUTO_COLLECT_PUZZLE_LIMIT, HARVEST_NUDGE_MIN_AMBER, JOURNAL_UNLOCK_PUZZLES } from '../../constants/gameBalance';
@@ -84,13 +84,10 @@ let preferGoalSuggestionSession = false;
 let eventAmbientShownSession = false;
 const FLAME_ICON = require('../../../assets/ui/flame.png');
 const JOURNAL_ICON = require('../../../assets/ui/journal.png');
-const HINT_ICON = require('../../../assets/ui/hint.png');
-const STAR_ICON = require('../../../assets/ui/star_filled.png');
 const QUEST_ICON = require('../../../assets/ui/quest.png');
 const MENU_ICON = require('../../../assets/ui/menu.png');
-// Phase-mood sprites (generateUiIcons candy-UI family) de-emoji the descent's
-// hero moments: the sacrifice altar's focal candle and the phase-4 temple crest.
-const CANDLE_ICON = require('../../../assets/ui/candle.png');
+// Phase-mood sprite (generateUiIcons candy-UI family) de-emojis the descent's
+// phase-4 temple crest.
 const VOID_ICON = require('../../../assets/ui/void.png');
 // Journal-spotlight step sprites (generateUiIcons family) replace the old raw
 // emoji glyphs. Keyed on the step's stable id so the mapping never depends on
@@ -139,7 +136,6 @@ import {
   getReservedArrivalText,
   getReserveGateText,
 } from '../../services/homeWorldData';
-import { RulesModal } from '../puzzle/RulesModal';
 import { RewardedAdButton } from '../monetization/RewardedAdButton';
 import { SeasonPassModal } from '../SeasonPassModal';
 import { getSeasonClaimableCount } from '../../services/seasonPass';
@@ -165,18 +161,11 @@ import { Difficulty } from '../../types';
 import { OnboardingStep } from '../../services/onboarding';
 import {
   isSacrificeAvailable,
-  getSacrificeAmounts,
-  getSacrificePrompt,
-  performSacrifice,
-  getSacrificeStats,
-  getDevotionTier,
-  getArrangementHoldsLine,
   hasSeenOfferingIntro,
   markOfferingIntroSeen,
 } from '../../services/sacrifice';
 import { getGalleryTitle, recordWhisper } from '../../services/whisperGallery';
 import {
-  updateQuestProgress,
   loadWeeklyQuests,
   claimQuestReward,
   getQuestDescription,
@@ -190,13 +179,13 @@ import { getSettingsSync } from '../../services/settings';
 import { getUnlockedVariants } from '../../services/puzzleVariety';
 import { getPendingHarvestSummary, HarvestSummary } from '../../services/wordHarvest';
 import { getLocalDateString, daysAgoLocal } from '../../services/dateUtils';
-import { getHomeAmbientLine, getFoxPitNudgeLines, getShopTitle, getGoalSuggestion, getEventAmbientLine, getNextFriendPrompt, getNewCycleTitle } from '../../services/phaseNarrative';
+import { getHomeAmbientLine, getFoxPitNudgeLines, getGoalSuggestion, getEventAmbientLine, getNextFriendPrompt } from '../../services/phaseNarrative';
 import { getActiveEvent } from '../../services/liveEvents';
 import { DailyChallengeCard } from '../DailyChallengeCard';
 import { isDailyChallengeUnlocked, getDailyStatus } from '../../services/dailyChallenge';
 import { areUpgradesAvailable, getPurchasedUpgrades, getDeepenedRooms, getAttunedRooms } from '../../services/roomUpgrades';
 import { getTendingLevel } from '../../services/tending';
-import { hapticLight, hapticSelection, hapticMedium, hapticHeavy, hapticSuccess } from '../../services/haptics';
+import { hapticLight, hapticSelection, hapticSuccess } from '../../services/haptics';
 import { playUiSound, type UiSoundKind } from '../../services/uiSound';
 import { playUiHaptic } from '../../services/uiHaptic';
 import { announceForA11y } from '../../services/a11yAnnounce';
@@ -319,41 +308,6 @@ export const getQuestPillAccessibilityLabel = (
 // --- Local feel-kit primitives (shared anatomy for this file's modals) ---
 
 /**
- * Springy modal-panel entrance: scale 0.92 -> 1 (SURFACE.modalIn). Mounts fresh
- * each time its Modal opens, so the spring runs once per open. Reduced motion
- * pins the end state. Native driver only.
- */
-const SpringIn: React.FC<{
-  style?: StyleProp<ViewStyle>;
-  claimTouches?: boolean;
-  /** Narrative phase — ages the entrance spring so home modals settle heavier
-   *  with the descent instead of bouncing candy-bright at every phase. */
-  phase?: number;
-  children: React.ReactNode;
-}> = ({ style, claimTouches, phase = 0, children }) => {
-  const reducedMotion = getSettingsSync().reducedMotion;
-  const scale = useRef(new Animated.Value(reducedMotion ? 1 : 0.92)).current;
-  useEffect(() => {
-    if (reducedMotion) return;
-    const anim = Animated.spring(scale, {
-      toValue: 1,
-      ...getModalInSpring(phase),
-      useNativeDriver: true,
-    });
-    anim.start();
-    return () => anim.stop();
-  }, [scale, reducedMotion]);
-  return (
-    <Animated.View
-      style={[style, { transform: [{ scale }] }]}
-      onStartShouldSetResponder={claimTouches ? () => true : undefined}
-    >
-      {children}
-    </Animated.View>
-  );
-};
-
-/**
  * Phase-aware colors for the PLAY dock button. Same candy-glass anatomy at
  * every phase (translucent body, lit top edge, deep 4px bottom edge, gloss);
  * only the material ages with the descent: bright candy green → cooled dusk
@@ -398,43 +352,6 @@ function getPlayDockColors(phase: number): {
     shadow: CandyColors.green.shadow, glossOpacity: 0.28,
   };
 }
-
-/**
- * Framed hub-row (Journal / Utility menus): cottage pixel card frame with an
- * optional ui-sprite icon — replaces the old uniform ghost rows.
- */
-const HubRow: React.FC<{
-  phase: number;
-  label: string;
-  onPress: () => void;
-  accessibilityLabel: string;
-  icon?: ImageSourcePropType;
-  /** Host panel is dt.modalBg, which darkens at phase 2 (see dtHostDark). */
-  hostDark?: boolean;
-}> = ({ phase, label, onPress, accessibilityLabel, icon, hostDark = false }) => {
-  // Mirror getPixelSkin's hostDark ladder (2 → storm, 3 → dark) so the ink
-  // tokens always match the skin fill's polarity.
-  const t = getSurfaceTheme(hostDark ? (phase < 3 ? 3 : phase === 3 ? 4 : phase) : phase);
-  const skin = getPixelSkin(phase, hostDark);
-  return (
-    <TouchableOpacity
-      style={styles.hubRow}
-      onPress={onPress}
-      activeOpacity={0.8}
-      accessibilityLabel={accessibilityLabel}
-      accessibilityRole="button"
-    >
-      <NineSliceFrame
-        skin={skin.card}
-        cornerDp={CARD_CORNER_DP}
-        edgeDp={CARD_EDGE_DP}
-        fillColor={skin.fillCard}
-      />
-      {icon ? <Image source={icon} style={styles.hubRowIcon} resizeMode="contain" /> : null}
-      <Text style={[styles.hubRowText, { color: t.body }]}>{label}</Text>
-    </TouchableOpacity>
-  );
-};
 
 /**
  * Cottage pixel bevel button that accepts arbitrary children (needed where
@@ -688,26 +605,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // the final animal's intro dialogue is on screen (see the effect below).
   const [pendingHouseCompletion, setPendingHouseCompletion] = useState(false);
 
-  // Sacrifice ("The Offering") modal state (Phase 4+). The altar stays OPEN
-  // across repeated offerings now; these track the running monument + the
-  // in-session devotion streak that escalates the arrangement's response.
-  const [showSacrificeModal, setShowSacrificeModal] = useState(false);
-  const [sacrificeMessage, setSacrificeMessage] = useState<string | null>(null);
-  const [offeringTotal, setOfferingTotal] = useState(0);
-  // The monument line's number CLIMBS when an offering raises it (was a snap).
-  // Snaps on the first read after the altar opens (never counts the lifetime
-  // total up from 0) and under reduced motion.
-  const [displayedOfferingTotal, setDisplayedOfferingTotal] = useState(0);
-  const displayedTotalRef = useRef(0);
-  const monumentInitedRef = useRef(false);
-  const monumentRafRef = useRef(0);
-  const [offeringCount, setOfferingCount] = useState(0);
-  const [offerStreak, setOfferStreak] = useState(0);
-  const [offeringTierUp, setOfferingTierUp] = useState<string | null>(null);
-  const [confirmEverything, setConfirmEverything] = useState(false);
-  // Candle flare on each offering (native driver, reduced-motion aware).
-  const sacrificePulse = useRef(new Animated.Value(0)).current;
-
   // Pending harvest summary for pit badge
   const [pendingHarvest, setPendingHarvest] = useState<HarvestSummary | null>(null);
 
@@ -728,9 +625,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [showSeasonModal, setShowSeasonModal] = useState(false);
   const [seasonClaimable, setSeasonClaimable] = useState(0);
   const [showUtilityModal, setShowUtilityModal] = useState(false);
-  // Whether the New Cycle door shows in the utility menu (true endgame only).
-  const [canCycle, setCanCycle] = useState(false);
-  const [showRulesModal, setShowRulesModal] = useState(false);
 
   // Ambient home line (atmospheric text when idle)
   const [ambientLine, setAmbientLine] = useState<string | null>(null);
@@ -798,11 +692,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       getRoomsWithStatus(),
       getAnimalsWithStatus(),
     ]);
-
-    // The New Cycle door in the utility menu (Phase-5 true endgame only —
-    // canStartNewCycle gates on post-revelation, so this stays false for the
-    // whole first descent).
-    canStartNewCycle().then(setCanCycle).catch(() => {});
 
     if (claimed) {
       // Distinct arrival for a reserved room that finished its own wait: a
@@ -1460,115 +1349,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     pitPhaseReady,
     animals,
   ]);
-
-  // When the altar opens, load the running monument (total + count) and reset
-  // the session: no lingering response, streak from zero, no half-armed confirm.
-  useEffect(() => {
-    if (!showSacrificeModal) return;
-    let cancelled = false;
-    setSacrificeMessage(null);
-    setOfferStreak(0);
-    setOfferingTierUp(null);
-    setConfirmEverything(false);
-    (async () => {
-      const stats = await getSacrificeStats();
-      if (cancelled) return;
-      setOfferingTotal(stats.totalSacrificed);
-      setOfferingCount(stats.count);
-    })();
-    return () => { cancelled = true; };
-  }, [showSacrificeModal]);
-
-  // Reset the monument climb latch when the altar closes so the next open snaps
-  // to the loaded total instead of counting the whole lifetime up from zero.
-  useEffect(() => {
-    if (!showSacrificeModal) monumentInitedRef.current = false;
-  }, [showSacrificeModal]);
-
-  // Climb the monument total when an offering raises it (snap on first read /
-  // reduced motion / a non-increase). JS-thread rAF tick, cancelled on change.
-  useEffect(() => {
-    const from = displayedTotalRef.current;
-    const to = offeringTotal;
-    const reduced = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
-    if (!monumentInitedRef.current || reduced || to <= from) {
-      monumentInitedRef.current = true;
-      displayedTotalRef.current = to;
-      setDisplayedOfferingTotal(to);
-      return;
-    }
-    const duration = getCountUpDurationMs(to - from, progress?.currentPhase ?? 0);
-    if (duration <= 0) {
-      displayedTotalRef.current = to;
-      setDisplayedOfferingTotal(to);
-      return;
-    }
-    const startedAt = Date.now();
-    const tick = () => {
-      const f = Math.min(1, (Date.now() - startedAt) / duration);
-      const v = countUpDisplayValue(f, to, from);
-      displayedTotalRef.current = v;
-      setDisplayedOfferingTotal(v);
-      if (f < 1) monumentRafRef.current = requestAnimationFrame(tick);
-    };
-    monumentRafRef.current = requestAnimationFrame(tick);
-    return () => { if (monumentRafRef.current) cancelAnimationFrame(monumentRafRef.current); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- climb keyed on the total; phase read at fire time
-  }, [offeringTotal]);
-
-  // Shared offering action for both the amount chips and "Offer everything".
-  // The altar stays OPEN: it updates the running monument + the in-session
-  // devotion streak (which escalates the arrangement's response) and flares the
-  // candle, so the player can fall into a rhythm instead of reopening a form.
-  const handleOffer = useCallback(async (amount: number, everything: boolean) => {
-    if (!progress || amount <= 0) return;
-    const spendResult = await spendAmber(amount, 'sacrifice');
-    if (!spendResult.success) return;
-    const nextStreak = offerStreak + 1;
-    const result = await performSacrifice(amount, progress.currentPhase, {
-      sessionStreak: nextStreak,
-      everything,
-    });
-    setProgress(prev => (prev ? { ...prev, amber: spendResult.newBalance } : prev));
-    onAmberChange?.(spendResult.newBalance);
-    setSacrificeMessage(result.message);
-    setOfferStreak(nextStreak);
-    setOfferingTotal(result.total);
-    setOfferingCount(result.count);
-    setOfferingTierUp(result.tierUp ? result.tierUp.title : null);
-    setConfirmEverything(false);
-    // Feedback ramps with the weight of the offering: a fervent in-session
-    // streak, a milestone, a devotion tier-up, or giving everything all land as
-    // a heavier haptic and a flare that HOLDS at its peak before settling,
-    // where an ordinary offering gets the medium tap and a quick flare. Every
-    // offering now also has a voice — the arrangement swallowing it (the pit
-    // devour cue) instead of the old silence.
-    const intenseOffering = everything || result.isMilestone || !!result.tierUp || nextStreak >= 6;
-    if (intenseOffering) hapticHeavy(); else hapticMedium();
-    playUiSound('devour');
-    const rm = getSettingsSync().reducedMotion;
-    if (!rm) {
-      sacrificePulse.setValue(0);
-      Animated.sequence([
-        Animated.timing(sacrificePulse, { toValue: 1, duration: intenseOffering ? 180 : 160, useNativeDriver: true }),
-        ...(intenseOffering ? [Animated.delay(200)] : []),
-        Animated.timing(sacrificePulse, { toValue: 0, duration: intenseOffering ? 640 : 520, useNativeDriver: true }),
-      ]).start();
-    }
-    // Milestone offerings become permanent collectibles in the Whisper Gallery,
-    // attributed to Ember (the flame-oracle who introduced the rite; the
-    // arrangement keeps no gallery of its own).
-    if (result.isMilestone) {
-      recordWhisper({
-        animalType: 'fox',
-        animalName: 'Ember',
-        text: result.message,
-        phase: progress.currentPhase,
-        type: 'whisper',
-      }).catch(() => {});
-    }
-    updateQuestProgress({ amberSacrificed: amount }, progress.currentPhase).catch(() => {});
-  }, [progress, offerStreak, onAmberChange, sacrificePulse]);
 
   // Ambient home line — atmospheric text when no dialogue is active
   // Fades in, holds for 5s, then fades out to avoid persistent visual clutter.
@@ -2785,144 +2565,23 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         onSubscribe={onOpenStore ? () => { setShowSeasonModal(false); onOpenStore(); } : undefined}
       />
 
-      {/* Utility Hub Modal */}
-      <Modal
+      {/* Utility Hub Modal — the SHARED menu (same component the Offering
+          Pit renders), so the two surfaces cannot drift apart again. It owns
+          its own How-to-Play and Offering altar. */}
+      <UtilityMenu
         visible={showUtilityModal}
-        transparent
-        statusBarTranslucent
-        animationType="fade"
-        onRequestClose={() => setShowUtilityModal(false)}
-      >
-        <TouchableOpacity
-          style={[styles.modalOverlay, { backgroundColor: st.overlay }]}
-          activeOpacity={1}
-          onPress={() => setShowUtilityModal(false)}
-          accessibilityLabel="Close utility menu"
-          accessibilityRole="button"
-        >
-          <SpringIn
-            phase={progress?.currentPhase ?? 0}
-            claimTouches
-            style={styles.compactHubModal}
-          >
-            <NineSliceFrame
-              skin={pixelSkin.panel}
-              cornerDp={PANEL_CORNER_DP}
-              edgeDp={PANEL_EDGE_DP}
-              fillColor={pixelSkin.fill}
-              openBottom
-            />
-            <PixelPlaque
-              phase={progress.currentPhase}
-              hostDark={dtHostDark}
-              label="Menu"
-              style={styles.modalPlaque}
-            />
-            <Text style={[styles.shopSubtitle, { color: panelSt.muted }]}>
-              Everything else can stay tucked away until you need it.
-            </Text>
-            {onOpenStats && (
-              <HubRow
-                phase={progress.currentPhase}
-                hostDark={dtHostDark}
-                icon={STAR_ICON}
-                label="Statistics"
-                onPress={() => {
-                  setShowUtilityModal(false);
-                  onOpenStats?.();
-                }}
-                accessibilityLabel="Open statistics"
-              />
-            )}
-            {onOpenShop && (
-              <HubRow
-                phase={progress.currentPhase}
-                hostDark={dtHostDark}
-                label={getShopTitle(progress.currentPhase)}
-                icon={require('../../../assets/ui/emote_sparkle.png')}
-                onPress={() => {
-                  setShowUtilityModal(false);
-                  onOpenShop?.();
-                }}
-                accessibilityLabel={`Open ${getShopTitle(progress.currentPhase)}`}
-              />
-            )}
-            {onOpenStore && (
-              <HubRow
-                phase={progress.currentPhase}
-                hostDark={dtHostDark}
-                icon={AMBER_ICON}
-                label="Store"
-                onPress={() => {
-                  setShowUtilityModal(false);
-                  onOpenStore?.();
-                }}
-                accessibilityLabel="Open store"
-              />
-            )}
-            <HubRow
-              phase={progress.currentPhase}
-                hostDark={dtHostDark}
-              icon={HINT_ICON}
-              label="How to Play"
-              onPress={() => {
-                setShowUtilityModal(false);
-                setShowRulesModal(true);
-              }}
-              accessibilityLabel="How to play"
-            />
-            {onOpenSettings && (
-              <HubRow
-                phase={progress.currentPhase}
-                hostDark={dtHostDark}
-                label="Settings"
-                icon={require('../../../assets/ui/gear.png')}
-                onPress={() => {
-                  setShowUtilityModal(false);
-                  onOpenSettings?.();
-                }}
-                accessibilityLabel="Open settings"
-              />
-            )}
-            {isSacrificeAvailable(progress.currentPhase) && (
-              <HubRow
-                phase={progress.currentPhase}
-                hostDark={dtHostDark}
-                icon={FLAME_ICON}
-                label={getSacrificePrompt(progress.currentPhase).title}
-                onPress={() => {
-                  setShowUtilityModal(false);
-                  setShowSacrificeModal(true);
-                }}
-                accessibilityLabel="Open sacrifice"
-              />
-            )}
-            {/* The Pattern Continues — the New Cycle door, IN the world the
-                Phase-5 player actually lives on. Previously findable only in
-                Settings, which the in-world pointer lines are forbidden from
-                naming; this row IS the door those lines allude to. */}
-            {canCycle && onStartNewCycle && (
-              <HubRow
-                phase={progress.currentPhase}
-                hostDark={dtHostDark}
-                icon={VOID_ICON}
-                label={getNewCycleTitle()}
-                onPress={() => {
-                  setShowUtilityModal(false);
-                  onStartNewCycle();
-                }}
-                accessibilityLabel={getNewCycleTitle()}
-              />
-            )}
-          </SpringIn>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* How to Play — phase-aware rules recap, reachable any time from home */}
-      <RulesModal
-        visible={showRulesModal}
         phase={progress.currentPhase}
-        onClose={() => setShowRulesModal(false)}
+        onClose={() => setShowUtilityModal(false)}
+        amber={progress.amber ?? 0}
+        onAmberChange={(bal) => {
+          onAmberChange?.(bal);
+          setProgress(prev => (prev ? { ...prev, amber: bal } : prev));
+        }}
+        onOpenStats={onOpenStats}
+        onOpenShop={onOpenShop}
+        onOpenStore={onOpenStore}
+        onOpenSettings={onOpenSettings}
+        onStartNewCycle={onStartNewCycle}
       />
 
       {/* Shop Modal */}
@@ -3681,153 +3340,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             )}
           </Animated.View>
         </TouchableOpacity>
-      </Modal>
-
-      {/* Sacrifice Modal (Phase 4+) */}
-      <Modal
-        visible={showSacrificeModal}
-        transparent
-        statusBarTranslucent
-        animationType="fade"
-        onRequestClose={() => setShowSacrificeModal(false)}
-      >
-        <View style={[styles.centeredOverlay, { backgroundColor: st.overlay }]}>
-          <SpringIn
-            phase={progress?.currentPhase ?? 0}
-            claimTouches
-            style={styles.sacrificeModal}
-          >
-            <NineSliceFrame
-              skin={pixelSkin.panel}
-              cornerDp={PANEL_CORNER_DP}
-              edgeDp={PANEL_EDGE_DP}
-              fillColor={pixelSkin.fill}
-            />
-            <ScrollView
-              style={styles.sacrificeScroll}
-              contentContainerStyle={styles.sacrificeScrollContent}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            >
-            <View style={styles.sacrificeCandleWrap}>
-              <Animated.View
-                pointerEvents="none"
-                style={[styles.sacrificeCandleGlow, {
-                  // Phase-age the flare so it isn't the one bright-orange element
-                  // on an otherwise dark/serene panel: an ember at the reveal, a
-                  // mauve at the terrible peace.
-                  backgroundColor: progress.currentPhase >= 5 ? '#9B7BAE' : progress.currentPhase >= 4 ? '#C8703A' : '#FFB347',
-                  opacity: sacrificePulse.interpolate({ inputRange: [0, 1], outputRange: [0, 0.55] }),
-                  transform: [{ scale: sacrificePulse.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1.7] }) }],
-                }]}
-              />
-              <Animated.Image
-                source={CANDLE_ICON}
-                accessibilityLabel="the altar candle"
-                style={[styles.sacrificeCandleImg, {
-                  transform: [{ scale: sacrificePulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.3] }) }],
-                }]}
-              />
-            </View>
-            <Text style={[styles.sacrificeTitle, { color: panelSt.title }]}>
-              {getSacrificePrompt(progress.currentPhase).title}
-            </Text>
-            <Text style={[styles.sacrificeSubtitle, { color: panelSt.muted }]}>
-              {getSacrificePrompt(progress.currentPhase).subtitle}
-            </Text>
-
-            {/* The monument: what the arrangement now holds of you, and the
-                private "regard" that grows with repeat giving. */}
-            {offeringCount > 0 && (() => {
-              const devotion = getDevotionTier(offeringCount);
-              return (
-                <View style={styles.offeringMonument}>
-                  {devotion && (
-                    <>
-                      <Text style={[styles.offeringTierTitle, { color: panelSt.title }]}>
-                        {devotion.title}
-                      </Text>
-                      <Text style={[styles.offeringTierRegard, { color: panelSt.muted }]}>
-                        {devotion.regard}
-                      </Text>
-                    </>
-                  )}
-                  <Text style={[styles.offeringHolds, { color: panelSt.body }]}>
-                    {getArrangementHoldsLine(displayedOfferingTotal, progress.currentPhase)}
-                  </Text>
-                </View>
-              );
-            })()}
-
-            <Text style={[styles.sacrificeBalance, { color: panelSt.body }]}>
-              Your Amber: <AmberInline /> {progress.amber}
-            </Text>
-
-            {/* Persistent response: shown ABOVE the still-tappable amounts so
-                the player can keep offering without the altar closing. */}
-            {sacrificeMessage && (
-              <View style={[styles.sacrificeResponseBox, { backgroundColor: panelSt.sectionBg, borderColor: panelSt.sectionBorder }]}>
-                {offeringTierUp && (
-                  <Text style={[styles.offeringTierUp, { color: panelSt.title }]}>
-                    {`The arrangement's regard deepens... ${offeringTierUp}`}
-                  </Text>
-                )}
-                <Text style={[styles.sacrificeResponseText, { color: panelSt.body }]}>
-                  {sacrificeMessage}
-                </Text>
-              </View>
-            )}
-
-            <View style={styles.sacrificeAmounts}>
-              {getSacrificeAmounts(progress.amber).map(amount => (
-                <TouchableOpacity
-                  key={amount}
-                  style={[styles.sacrificeAmountBtn, { backgroundColor: panelSt.sectionBg, borderColor: panelSt.sectionBorder }]}
-                  onPress={() => handleOffer(amount, false)}
-                  accessibilityLabel={`Offer ${amount} amber`}
-                  accessibilityRole="button"
-                >
-                  <Text style={[styles.sacrificeAmountText, { color: panelSt.body }]}>
-                    <AmberInline /> {amount}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-              {getSacrificeAmounts(progress.amber).length === 0 && progress.amber <= 0 && (
-                <Text style={[styles.sacrificeNoAmber, { color: panelSt.muted }]}>
-                  You have nothing left to offer.
-                </Text>
-              )}
-            </View>
-
-            {/* The fullest gesture: give the whole balance at once. Two-tap
-                confirm so it can never be an accident. */}
-            {progress.amber > 0 && (
-              <TouchableOpacity
-                style={[styles.offeringEverythingBtn, { borderColor: panelSt.sectionBorder }]}
-                onPress={() => {
-                  if (confirmEverything) handleOffer(progress.amber, true);
-                  else setConfirmEverything(true);
-                }}
-                accessibilityLabel={confirmEverything ? `Confirm offering all ${progress.amber} amber` : 'Offer everything'}
-                accessibilityRole="button"
-              >
-                <Text style={[styles.offeringEverythingText, { color: confirmEverything ? panelSt.title : panelSt.muted }]}>
-                  {confirmEverything ? `Give all ${progress.amber}? Tap again.` : 'Offer everything'}
-                </Text>
-              </TouchableOpacity>
-            )}
-
-            <CandyButton
-              label={sacrificeMessage ? 'Done' : 'Not now'}
-              variant="quiet"
-              phase={progress.currentPhase}
-              hostDark={dtHostDark}
-              style={styles.closeAction}
-              onPress={() => setShowSacrificeModal(false)}
-            />
-            </ScrollView>
-          </SpringIn>
-        </View>
       </Modal>
 
       {/* House Completion Ceremony Modal */}
@@ -4648,27 +4160,6 @@ const styles = StyleSheet.create({
   questRewardReveal: {
     marginBottom: 12,
   },
-  // Pixel-card hub rows (Journal / Utility menus) — the NineSliceFrame is the
-  // chrome; padding clears the card frame edge (CARD_EDGE_DP = 15).
-  hubRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 18,
-    paddingVertical: 15,
-    minHeight: 56,
-    marginBottom: 10,
-  },
-  hubRowIcon: {
-    width: 20,
-    height: 20,
-    marginRight: 10,
-  },
-  hubRowText: {
-    fontFamily: PIXEL_FONT_BOLD,
-    fontSize: FONT_SIZE.callout,
-    fontWeight: '800',
-    letterSpacing: 0.2,
-  },
   nextUnlockContainer: {
     marginBottom: 24,
   },
@@ -5110,159 +4601,6 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(20, 10, 6, 0.9)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 5,
-  },
-
-  // Sacrifice modal — chrome comes from the NineSliceFrame pixel panel. The
-  // altar now stays open across offerings (monument + response + amounts +
-  // "offer everything"), so the body scrolls to stay safe on short screens.
-  sacrificeModal: {
-    padding: 30,
-    marginHorizontal: 20,
-    alignItems: 'center',
-    maxWidth: 380,
-    width: '90%',
-    maxHeight: '86%',
-  },
-  sacrificeScroll: {
-    alignSelf: 'stretch',
-  },
-  sacrificeScrollContent: {
-    alignItems: 'center',
-  },
-  sacrificeCandleWrap: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  // Warm flare behind the candle on each offering (opacity/scale animated).
-  sacrificeCandleGlow: {
-    position: 'absolute',
-    width: 92,
-    height: 92,
-    borderRadius: 46,
-    backgroundColor: '#FFB347',
-  },
-  sacrificeCandleImg: {
-    width: 50,
-    height: 50,
-    resizeMode: 'contain',
-  },
-  sacrificeTitle: {
-    fontFamily: PIXEL_FONT_BOLD,
-    fontSize: FONT_SIZE.headline,
-    fontWeight: '900',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  sacrificeSubtitle: {
-    fontFamily: BODY_FONT,
-    fontSize: FONT_SIZE.body,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 16,
-    paddingHorizontal: 10,
-  },
-  sacrificeBalance: {
-    fontFamily: PIXEL_FONT_BOLD,
-    fontSize: FONT_SIZE.large,
-    fontWeight: '700',
-    marginBottom: 16,
-  },
-  sacrificeAmounts: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 10,
-    marginBottom: 16,
-  },
-  // Framed selectable offering chips (colors from the surface theme inline —
-  // dark phases keep the dread tone via getSurfaceTheme's dark values)
-  sacrificeAmountBtn: {
-    paddingHorizontal: 18,
-    minHeight: 46,
-    minWidth: 84,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sacrificeAmountText: {
-    fontFamily: PIXEL_FONT_BOLD,
-    fontSize: FONT_SIZE.bodyLg,
-    fontWeight: '800',
-  },
-  sacrificeNoAmber: {
-    fontFamily: BODY_FONT_ITALIC,
-    fontSize: FONT_SIZE.body,
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
-  sacrificeResponseBox: {
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    width: '100%',
-    borderWidth: 1,
-    alignItems: 'center',
-  },
-  sacrificeResponseText: {
-    fontFamily: BODY_FONT_ITALIC,
-    fontSize: FONT_SIZE.callout,
-    lineHeight: 22,
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
-  sacrificeCloseAction: {
-    alignSelf: 'stretch',
-  },
-  // The monument: private devotion standing + what the arrangement holds of you.
-  offeringMonument: {
-    alignItems: 'center',
-    marginBottom: 14,
-    paddingHorizontal: 8,
-  },
-  offeringTierTitle: {
-    fontFamily: PIXEL_FONT_BOLD,
-    fontSize: FONT_SIZE.callout,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-    textAlign: 'center',
-  },
-  offeringTierRegard: {
-    fontFamily: BODY_FONT_ITALIC,
-    fontSize: FONT_SIZE.small,
-    fontStyle: 'italic',
-    textAlign: 'center',
-    marginTop: 2,
-    marginBottom: 6,
-  },
-  offeringHolds: {
-    fontFamily: BODY_FONT,
-    fontSize: FONT_SIZE.small,
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  offeringTierUp: {
-    fontFamily: PIXEL_FONT_BOLD,
-    fontSize: FONT_SIZE.body,
-    fontWeight: '800',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  offeringEverythingBtn: {
-    borderWidth: 1.5,
-    borderRadius: 14,
-    paddingVertical: 11,
-    paddingHorizontal: 18,
-    alignSelf: 'stretch',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  offeringEverythingText: {
-    fontFamily: PIXEL_FONT_BOLD,
-    fontSize: FONT_SIZE.bodyLg,
-    fontWeight: '800',
-    textAlign: 'center',
   },
 
   // House completion ceremony styles — chrome from the NineSliceFrame panel

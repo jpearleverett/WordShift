@@ -13,7 +13,7 @@ module.exports = defineConfig([
       // was linting generated data it could never hand-fix.
       'src/data/*Bank*.ts',
       'src/dictionary.ts',
-      'scripts/tools/*.mjs',
+      'scripts/tools/**/*.mjs',
     ],
   },
   {

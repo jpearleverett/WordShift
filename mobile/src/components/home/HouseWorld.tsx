@@ -814,14 +814,19 @@ const nightStarStyles = StyleSheet.create({
   },
 });
 
-// Phase-aware backdrop colors behind the sky image. Each value is the average
-// of the TOP row of pixels of that phase's sky asset, so when the scene is
+// Phase-aware backdrop colors behind the sky image, so when the scene is
 // panned up the sky appears to extend upward seamlessly (no color step).
-// Sampled from assets/environment/sky_*.png (scripts/tools/reworkSkies.mjs
-// prints the storm/shadow samples; re-sample if the sky assets regenerate).
+// These hexes are a CONTRACT, not a sample: the ART is held to them, not the
+// other way round. scripts/tools/retouchSkyTopSeam.mjs pins each sky's top 26
+// rows to EXACTLY the value below and smoothsteps back into the painting by
+// row 140 (the painterly row 0 varied horizontally by up to 40/255 on
+// sky_dusk, which no flat fill can match, so a seam line sat at the join).
+// Do NOT "re-sample and correct" these values — that reopens the seam. Re-run
+// the tool instead; it reads the pristine assets/raw/sky_*_pretop.png, so it
+// never compounds. skyGeometry.test.ts pins that every sky's row 0 is flat and
+// matches this map (within the 1/255 the lossy WebP round-trip allows).
 // Phase→sky mapping mirrors the <Image source> below: 0=day, 1=afternoon,
-// 2=dusk, 3=storm, 4=shadow, 5=peace (settleSkies.mjs prints the peace
-// samples).
+// 2=dusk, 3=storm, 4=shadow, 5=peace.
 const PHASE_BG_COLORS: Record<number, string> = {
   0: '#439cf2', // sky_day.png top row
   1: '#1583f9', // sky_afternoon.png top row
@@ -1541,9 +1546,17 @@ const HOUSE_BODY_WIDTH = ROOM_WIDTH + HOUSE_PADDING;
 // keep these aspect constants in sync with the processed asset dims).
 const ROOF_WIDTH = HOUSE_WIDTH + 30; // Rendered roof width (slight overhang)
 const ROOF_RENDER_HEIGHT = Math.round(ROOF_WIDTH * (283 / 792)); // roof.png 792x283
-// Foundations are all normalized to 792x120 — stone courses with grass tufts +
-// a center dirt path gap baked into the base (the house plants itself into the
-// meadow). One box size across phases so the house never jumps.
+// Foundations are all normalized to 792x120 — stone courses with grass tufts
+// baked into the base (the house plants itself into the meadow). One box size
+// across phases so the house never jumps.
+// The raw art lays its vegetation band across the FULL width, including the
+// stretch the pit's dirt road has to occupy, so the road ran up to the house
+// and was cut off by a strip of grass. scripts/tools/carveFoundationRoad.mjs
+// carves the road through that band (art x 302..493, y 84..119) on every
+// phase, sampling the road pixels out of pit_entrance.png's own road so the
+// two halves are literally the same road; it also forces the corridor opaque
+// down to the last row so the join with the pit art has no notch (see the
+// PIT_MARGIN_TOP note below — the two butt together with no overlap).
 const FOUNDATION_RENDER_HEIGHT = Math.round(HOUSE_WIDTH * (120 / 792));
 // pit_entrance.png is 460x496 (stone well + a stone path leading up to it).
 // Rendered box + the tuck under the foundation edge.

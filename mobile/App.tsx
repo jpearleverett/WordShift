@@ -1818,8 +1818,9 @@ function MainApp() {
     rebuildSessionFromStorage({ restartOnboarding: true });
   }, [rebuildSessionFromStorage]);
 
-  // New Cycle from the HOME surface (the Phase-5 player's actual home). The
-  // Settings "The Pattern" section remains; this is the discoverable door —
+  // New Cycle from the shared ☰ utility menu (home and the Offering Pit both
+  // render it). The Settings "The Pattern" section remains; this is the
+  // discoverable door —
   // the in-world pointer lines allude to a way to begin again, and a player
   // who never browses Settings previously had no path to it at all. Same
   // confirm, same committed performNewCycle, same serene ceremony; the
@@ -4441,6 +4442,8 @@ function MainApp() {
             onOpenStats={() => transitionTo('stats')}
             onOpenSettings={() => transitionTo('settings')}
             onOpenStore={() => setShowStoreModal(true)}
+            onOpenShop={() => transitionTo('shop')}
+            onStartNewCycle={handleStartNewCycleFromHome}
             phaseProgressFraction={persistence.phaseProgressFraction}
             pendingPhaseTransition={persistence.pendingPhaseTransition}
             onPhaseTransitionConfirmed={(newPhase) => {

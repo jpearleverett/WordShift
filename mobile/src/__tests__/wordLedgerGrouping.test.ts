@@ -41,6 +41,7 @@ jest.mock('../components/ui/PanelCard', () => ({ PanelCard: 'PanelCard' }));
 jest.mock('../components/ui/RewardReveal', () => ({
   EntranceCascadeItem: 'EntranceCascadeItem',
   getCascadeDelayMs: () => 0,
+  getGroupedCascadeDelayMs: () => 0,
 }));
 jest.mock('../hooks/useScreenInsets', () => ({
   useScreenInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -49,6 +50,9 @@ jest.mock('../services/amberCurrency', () => ({ getFullProgress: jest.fn() }));
 jest.mock('../services/phaseNarrative', () => ({ getWordsOfferedText: () => '' }));
 jest.mock('../services/settings', () => ({ getSettingsSync: () => ({ reducedMotion: false }) }));
 jest.mock('../services/deviceTier', () => ({ shouldSimplifyAnimations: () => false }));
+
+import * as fs from 'fs';
+import * as path from 'path';
 
 import { groupLedgerWords } from '../components/WordLedger';
 
@@ -107,5 +111,36 @@ describe('groupLedgerWords', () => {
     expect(groups).toHaveLength(Math.ceil(500 / 18));
     expect(groups.flatMap(g => g.words)).toHaveLength(500);
     expect(groups[groups.length - 1].words[groups[groups.length - 1].words.length - 1]).toBe('W499');
+  });
+});
+
+/**
+ * Source guard for the chip entrance cascade. The old design skipped the
+ * wrapper entirely past a global index cap and disarmed every remaining
+ * cascade on a 1.5s timer, so only the first 10 chips in the whole ledger ever
+ * animated. The replacement is a per-GROUP cascade with a per-group reveal
+ * latch: every windowed group animates its own chips on its first mount.
+ */
+describe('WordLedger chip cascade (source guard)', () => {
+  const src = fs.readFileSync(
+    path.join(__dirname, '..', 'components', 'WordLedger.tsx'),
+    'utf8',
+  );
+
+  test('the global index cap and the global settle timer are gone', () => {
+    expect(src).not.toMatch(/CHIP_CASCADE_CAP/);
+    expect(src).not.toMatch(/LEDGER_CASCADE_SETTLE_MS/);
+    expect(src).not.toMatch(/cascadeArmed/);
+  });
+
+  test('uses a per-group cascade delay and a per-group reveal latch', () => {
+    expect(src).toContain('getGroupedCascadeDelayMs');
+    expect(src).toContain('revealedGroupsRef');
+    expect(src).toContain('CHIP_CASCADE_STAGGER_MS');
+  });
+
+  test('reduced motion / low tier still short-circuits the wrappers', () => {
+    expect(src).toMatch(/getSettingsSync\(\)\.reducedMotion \|\| shouldSimplifyAnimations\(\)/);
+    expect(src).toContain('animate={!cascadeReducedMotion}');
   });
 });

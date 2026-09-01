@@ -57,50 +57,99 @@ const GALLERY_CASCADE_WINDOW = 8;
 // back into view never replays it.
 const GALLERY_CASCADE_SETTLE_MS = 1500;
 
+// --- Idle shimmer sweep -----------------------------------------------------
+// ONE looping driver for the whole screen (the WordLedger breathe pattern):
+// every collection bar reads its own windowed slice of it, so the sweeps are
+// staggered instead of synchronized and no card owns a timer of its own.
+/** Full driver period. Each bar sweeps exactly once per cycle. */
+const SHIMMER_CYCLE_MS = 20000;
+/** How long ONE bar's sweep takes (the old one-shot was 900ms). */
+const SHIMMER_SWEEP_MS = 2400;
+/** Fraction of the cycle a single bar is actually sweeping. */
+const SHIMMER_WINDOW = SHIMMER_SWEEP_MS / SHIMMER_CYCLE_MS;
+/** No bar sweeps before this point, so the first glint lands after the
+ *  entrance cascade has settled (120ms base + 8 x 50ms stagger + fade). */
+const SHIMMER_LEAD_IN = 0.08;
+/** Tail margin so `offset + SHIMMER_WINDOW` can never reach 1 (an
+ *  interpolation inputRange must stay monotonically increasing). */
+const SHIMMER_TAIL_MARGIN = 0.02;
+/** Band opacity at the middle of a sweep (unchanged from the one-shot). */
+const SHIMMER_PEAK_OPACITY = 0.5;
+/** Band travel, in dp, across a card. */
+const SHIMMER_START_X = -60;
+const SHIMMER_END_X = SCREEN_WIDTH;
+/** Golden-ratio conjugate: stepping by it per list index puts neighbouring
+ *  bars maximally far apart in the cycle, so the column never reads as a
+ *  top-to-bottom wave. */
+const SHIMMER_GOLDEN = 0.6180339887498949;
+/** How far the per-animal hash may nudge a bar off its golden-ratio slot. Kept
+ *  well under the golden step's guaranteed 0.382 separation so the scatter
+ *  stays irregular without ever letting two neighbouring bars sweep together. */
+const SHIMMER_JITTER = 0.08;
+
+/** Cheap stable FNV-1a string hash (mirrors the seeded-shuffle convention). */
+export function shimmerHash(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+/**
+ * Deterministic 0..1 start position in the shared shimmer cycle for one bar.
+ * A golden-ratio step by list index does the placing (consecutive indices land
+ * at least 0.382 of a cycle apart, so neighbouring bars can never sweep
+ * together and the column never reads as a top-to-bottom wave); the animal key
+ * adds a bounded jitter so the scatter looks irregular rather than patterned,
+ * the same way every run (no Math.random). Always returns a value in
+ * [SHIMMER_LEAD_IN, 1 - SHIMMER_WINDOW - SHIMMER_TAIL_MARGIN] so the sweep
+ * window always closes inside the cycle.
+ */
+export function getShimmerCycleOffset(key: string, index: number): number {
+  const span = 1 - SHIMMER_WINDOW - SHIMMER_TAIL_MARGIN - SHIMMER_LEAD_IN;
+  const jitter = (shimmerHash(key) / 4294967296) * SHIMMER_JITTER;
+  const raw = ((index * SHIMMER_GOLDEN) + jitter) % 1;
+  return SHIMMER_LEAD_IN + raw * span;
+}
+
 /** One collapsible animal group: a SectionList section (data = the entries
  *  shown while expanded; the header always shows the full count). */
 interface GallerySection {
   animalType: string;
   sectionIndex: number;
-  isNewest: boolean;
   entriesTotal: number;
   data: WhisperEntry[];
 }
 
 /**
- * A one-time light sweep across the newest (top) collection card, then it
- * rests (unmounts) so nothing keeps animating idle. Native-driven transform +
- * opacity only; reduced motion / low-tier devices skip it entirely.
+ * One bar's reflection sweep. Purely presentational: it owns NO timer and NO
+ * state, it reads a windowed slice of the screen's single looping `driver`, so
+ * N bars cost N interpolation nodes and zero extra animators. Outside its slice
+ * the band sits off-screen at opacity 0. Native-driver transform + opacity only.
  */
-const HeaderShimmer: React.FC<{ phase: number }> = ({ phase }) => {
-  const anim = useRef(new Animated.Value(0)).current;
-  const [done, setDone] = useState(false);
-
-  useEffect(() => {
-    if (getSettingsSync().reducedMotion || shouldSimplifyAnimations()) {
-      setDone(true);
-      return;
-    }
-    const animation = Animated.timing(anim, {
-      toValue: 1,
-      duration: 900,
-      delay: 260,
-      easing: Easing.inOut(Easing.quad),
-      useNativeDriver: true,
-    });
-    animation.start(({ finished }) => {
-      if (finished) setDone(true);
-    });
-    return () => animation.stop();
-  }, [anim]);
-
-  if (done) return null;
-
+const CardShimmer: React.FC<{
+  phase: number;
+  driver: Animated.Value;
+  offset: number;
+}> = ({ phase, driver, offset }) => {
   const t = getSurfaceTheme(phase);
-  const translateX = anim.interpolate({ inputRange: [0, 1], outputRange: [-60, SCREEN_WIDTH] });
-  const opacity = anim.interpolate({
-    inputRange: [0, 0.15, 0.85, 1],
-    outputRange: [0, 0.5, 0.5, 0],
+  const end = offset + SHIMMER_WINDOW;
+  const translateX = driver.interpolate({
+    inputRange: [0, offset, end, 1],
+    outputRange: [SHIMMER_START_X, SHIMMER_START_X, SHIMMER_END_X, SHIMMER_END_X],
+  });
+  const opacity = driver.interpolate({
+    inputRange: [
+      0,
+      offset,
+      offset + SHIMMER_WINDOW * 0.15,
+      offset + SHIMMER_WINDOW * 0.85,
+      end,
+      1,
+    ],
+    outputRange: [0, 0, SHIMMER_PEAK_OPACITY, SHIMMER_PEAK_OPACITY, 0, 0],
   });
 
   return (
@@ -201,6 +250,29 @@ export const WhisperGalleryScreen: React.FC<WhisperGalleryScreenProps> = ({
 
   const animalTypes = Object.keys(grouped);
 
+  // The one idle animator on this surface: a single linear loop every bar's
+  // shimmer reads a slice of. Skipped entirely under reduced motion / on
+  // low-tier devices (the bands are not even mounted then).
+  const shimmerAnim = useRef(new Animated.Value(0)).current;
+  const shimmerEnabled = !galleryReducedMotion && animalTypes.length > 0;
+  useEffect(() => {
+    if (!shimmerEnabled) return;
+    shimmerAnim.setValue(0);
+    const loop = Animated.loop(
+      Animated.timing(shimmerAnim, {
+        toValue: 1,
+        duration: SHIMMER_CYCLE_MS,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
+    loop.start();
+    return () => {
+      loop.stop();
+      shimmerAnim.stopAnimation();
+    };
+  }, [shimmerEnabled, shimmerAnim]);
+
   // One section per collapsible animal group. Collapsed sections carry no data
   // (only their header renders); the expanded one's entries virtualize.
   const sections: GallerySection[] = animalTypes.map((animalType, sectionIndex) => {
@@ -208,14 +280,13 @@ export const WhisperGalleryScreen: React.FC<WhisperGalleryScreenProps> = ({
     return {
       animalType,
       sectionIndex,
-      isNewest: sectionIndex === 0,
       entriesTotal: entries.length,
       data: expandedAnimal === animalType ? entries : [],
     };
   });
 
   const renderSectionHeader = ({ section }: { section: GallerySection }) => {
-    const { animalType, sectionIndex, isNewest, entriesTotal } = section;
+    const { animalType, sectionIndex, entriesTotal } = section;
     const typedAnimal = animalType as keyof typeof ANIMAL_INFO;
     const animalName = ANIMAL_INFO[typedAnimal]?.name || animalType;
     const animalEmoji = ANIMAL_INFO[typedAnimal]?.emoji || '🐾';
@@ -223,7 +294,7 @@ export const WhisperGalleryScreen: React.FC<WhisperGalleryScreenProps> = ({
     const isExpanded = expandedAnimal === animalType;
 
     const headerBody = (
-      <View style={isNewest ? styles.shimmerClip : undefined}>
+      <View style={styles.shimmerClip}>
         <TouchableOpacity
           onPress={() => {
             // The gallery's most-used gesture finally ticks (the quiet
@@ -267,7 +338,13 @@ export const WhisperGalleryScreen: React.FC<WhisperGalleryScreenProps> = ({
             <AnimatedChevron expanded={isExpanded} color={t.muted} />
           </PanelCard>
         </TouchableOpacity>
-        {isNewest && <HeaderShimmer phase={phase} />}
+        {shimmerEnabled && (
+          <CardShimmer
+            phase={phase}
+            driver={shimmerAnim}
+            offset={getShimmerCycleOffset(animalType, sectionIndex)}
+          />
+        )}
       </View>
     );
 
@@ -469,8 +546,9 @@ const styles = StyleSheet.create({
   sectionFooter: {
     height: 12,
   },
-  // Clips the one-time shimmer sweep to the newest card's bounds. Rectangular
-  // (no borderRadius) so it never rounds the card's baked pixel-frame corners.
+  // Clips each collection bar's shimmer sweep to that card's own bounds.
+  // Rectangular (no borderRadius) so it never rounds the card's baked
+  // pixel-frame corners.
   shimmerClip: {
     overflow: 'hidden',
   },
