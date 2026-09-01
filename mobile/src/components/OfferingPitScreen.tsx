@@ -88,6 +88,7 @@ import { playUiSound, stopCeremonyMusic } from '../services/uiSound';
 import { announceForA11y } from '../services/a11yAnnounce';
 import { getDeviceTier, shouldSimplifyAnimations } from '../services/deviceTier';
 import { getBulkOfferTiming } from '../services/pitOfferTiming';
+import { markScreenReady } from '../services/screenReady';
 
 // ---------------------------------------------------------------------------
 // Assets & Constants
@@ -1305,8 +1306,16 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
 
   // ---- Load harvest state ----
   const loadState = useCallback(async () => {
-    const state = await getHarvestState();
-    if (mountedRef.current) setHarvestState(state);
+    try {
+      const state = await getHarvestState();
+      if (mountedRef.current) setHarvestState(state);
+    } finally {
+      // The pit renders null until harvestState lands, so the navigation cover
+      // holds for exactly this read instead of lifting on an empty frame. In
+      // the finally: a failed read must still release the cover (it is capped
+      // anyway, but the player should never wait out the cap for nothing).
+      markScreenReady('pit');
+    }
   }, []);
 
   useEffect(() => { loadState(); }, [loadState]);

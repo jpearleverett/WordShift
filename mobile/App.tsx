@@ -195,7 +195,7 @@ import { StoreModal } from './src/components/monetization/StoreModal';
 import { recordInterstitialSeen, consumePatronNudge, armRemoveAdsNudgeIfEligible, consumePendingRemoveAdsNudge, canOfferRewardedDouble, recordRewardedDoubleOffered, canShowExitNudge, recordExitNudgeShown } from './src/services/monetizationPrompts';
 import { createRevenueCatBillingProvider } from './src/services/providers/revenueCatBilling';
 import { createAdMobAdProvider } from './src/services/providers/googleAdMobAds';
-import { installGlobalErrorHandler, setErrorForwarder } from './src/services/errorReporting';
+import { installGlobalErrorHandler, setErrorForwarder, reportError } from './src/services/errorReporting';
 import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST, STARTER_INTRO_MIN_PUZZLES, FINALE_DWELL_PUZZLES, FINALE_ARM_MIN_PUZZLES, INTERSTITIAL_MIN_PUZZLES, HOUSE_ASK_MIN_PUZZLES, HOUSE_ASK_CHANCE, HOUSE_ASK_REWARD_AMBER, REWARDED_HINT_GRANT, EXPERT_DIFFICULTY_UNLOCK_PUZZLES, LEXICON_UNLOCK_PUZZLES } from './src/constants/gameBalance';
 import { pickHouseAsk, evaluateHouseAsk, HouseAsk } from './src/services/houseAsks';
 import { getCumulativeStats } from './src/services/starRating';
@@ -266,7 +266,9 @@ import { markPendingChanges, uploadToCloud, installCloudProviderIfConfigured, ma
 import * as Sentry from '@sentry/react-native';
 import { getSentryDsn } from './src/services/supabaseClient';
 import { estimateSlotIndex, findClosestValidSlot, computeBoardScale } from './src/services/slotEstimation';
-import { DROP_SHAKE_KEYFRAME_MS, DROP_SHAKE_INTENSITY, SPEED_ESCALATION_STEP_SEC, SPEED_ESCALATION_MIN_SEC, SPEED_TICK_CRITICAL_SEC, SWIFT_HINT_TOAST_DELAY_MS, SCREEN_FADE_COVER_MS, SCREEN_FADE_REVEAL_MS, speedTickKind } from './src/constants/timing';
+import { DROP_SHAKE_KEYFRAME_MS, DROP_SHAKE_INTENSITY, SPEED_ESCALATION_STEP_SEC, SPEED_ESCALATION_MIN_SEC, SPEED_TICK_CRITICAL_SEC, SWIFT_HINT_TOAST_DELAY_MS, SCREEN_FADE_COVER_MS, SCREEN_FADE_REVEAL_MS, SCREEN_READY_TIMEOUT_MS, SCREEN_REVEAL_SETTLE_MS, speedTickKind } from './src/constants/timing';
+import { ScreenTransitionOverlay } from './src/components/ui/ScreenTransitionOverlay';
+import { armScreenReady, waitForScreenReady } from './src/services/screenReady';
 import { OfferingPitScreen } from './src/components/OfferingPitScreen';
 import { ShopScreen } from './src/components/shop/ShopScreen';
 import { loadPuzzleState, clearPuzzleState } from './src/services/puzzleSaveState';
@@ -316,6 +318,14 @@ interface PostVictoryIntro {
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // Speed rescue: seconds granted by the one-per-board rewarded continue.
+/**
+ * Stable no-op subscriber for the screen-reveal Animated.Value. See the comment
+ * at `revealListenerRef` in MainApp: subscribing is what keeps a natively-driven
+ * value's JS copy current, so a mid-animation re-render of the screen wrapper
+ * cannot rasterize the animation's stale START value back onto the view.
+ */
+const NOOP_ANIM_LISTENER = () => {};
+
 const SPEED_RESCUE_EXTRA_SEC = 30;
 const SPEED_RESCUE_PLACEMENT: RewardedPlacement = 'speed_rescue';
 
@@ -751,11 +761,38 @@ function MainApp() {
   const transitionOverlay = useRef(new Animated.Value(0)).current;
   // Per-destination screen reveal signature (F60): as the transition overlay
   // lifts, the arriving screen settles with a native-driver motion keyed to the
-  // destination — puzzle/home breathe in (scale 1.02->1.0), the pit sinks in
-  // (translateY -14->0, "underground"). 0 = at rest; 1 = the start-of-reveal
-  // extreme. Rests at 0 so the wrapper transform is neutral between transitions.
+  // destination — puzzle/home breathe in (scale 1.03->1.0), the pit sinks in
+  // (the same scale PLUS translateY -8->0, "underground"). 0 = at rest; 1 = the
+  // start-of-reveal extreme. Rests at 0 so the wrapper transform is neutral
+  // between transitions. The sink carries the scale on purpose: a bare
+  // translate lifted the screen off the root and left a band of flat root color
+  // along the bottom edge for the whole settle, while a 3% up-scale crops more
+  // than the 8dp shift on any phone, so the screen always covers the root.
   const screenRevealAnim = useRef(new Animated.Value(0)).current;
   const [screenRevealKind, setScreenRevealKind] = useState<'lift' | 'sink' | 'none'>('none');
+  // Memoized so the interpolations and the style object keep a stable identity
+  // across App's many re-renders. Re-creating them inline every render churned
+  // the underlying AnimatedProps node mid-settle, on top of the stale-value
+  // rasterization the reveal listener guards against. 'lift' and 'none' share
+  // the identity transform (the value rests at 0 -> scale 1).
+  const revealScale = useMemo(
+    () => screenRevealAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.03] }),
+    [screenRevealAnim]
+  );
+  const revealShift = useMemo(
+    () => screenRevealAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -8] }),
+    [screenRevealAnim]
+  );
+  const screenRevealStyle = useMemo(
+    () => ({
+      flex: 1,
+      // Scale FIRST so the shift happens inside the crop the scale opens up.
+      transform: screenRevealKind === 'sink'
+        ? [{ scale: revealScale }, { translateY: revealShift }]
+        : [{ scale: revealScale }],
+    }),
+    [screenRevealKind, revealScale, revealShift]
+  );
   // Opacity stutter for the prominent first-victory glitch (held at 1 under
   // reduced motion).
   const glitchStutter = useRef(new Animated.Value(1)).current;
@@ -777,72 +814,179 @@ function MainApp() {
   const [transitionOverlayColor, setTransitionOverlayColor] = useState('#1A1A2E');
   const [rootBgColor, setRootBgColor] = useState('#1A1A2E');
 
+  // Monotonic transition token: every navigation claims one, and every deferred
+  // step (the pre-cover frame, the cover's completion, the readiness race, the
+  // reveal) bails if a newer navigation has since claimed a higher one.
+  const transitionTokenRef = useRef(0);
+  // Current screen, readable synchronously inside transitionTo without making
+  // the callback depend on (and therefore be re-created by) every screen swap.
+  const currentScreenRef = useRef<AppScreen>(currentScreen);
+  useEffect(() => { currentScreenRef.current = currentScreen; }, [currentScreen]);
+
+  // Screen-reveal settle subscriber. React Native rasterizes an Animated.View's
+  // animated style on EVERY re-render (createAnimatedPropsHook ->
+  // reduceAnimatedProps -> AnimatedProps.__getValueWithStaticProps), and a
+  // NATIVELY-driven value only syncs its JS copy back when the animation ENDS
+  // (Animation.js __startAnimationIfNative). The screen wrapper below re-renders
+  // throughout a transition because its children are the entire app, so without
+  // keeping that JS copy current the first mid-settle re-render commits the
+  // animation's START extreme and the arriving screen visibly snaps back before
+  // native resumes. Memoizing the wrapper is not available (its children change
+  // by definition), so this is the one place a listener earns its keep: a single
+  // no-op subscriber, attached only while the settle is actually running and
+  // removed the moment it ends, so there is no native->JS traffic at rest. The
+  // cover needs none of it — ScreenTransitionOverlay is a memoized leaf that
+  // App's mid-transition re-renders never reach.
+  const revealListenerRef = useRef<string | null>(null);
+  const detachRevealListener = useCallback(() => {
+    if (revealListenerRef.current === null) return;
+    screenRevealAnim.removeListener(revealListenerRef.current);
+    revealListenerRef.current = null;
+  }, [screenRevealAnim]);
+  useEffect(() => detachRevealListener, [detachRevealListener]);
+
   // Animated screen transition (instant if reducedMotion)
   const transitionTo = useCallback((screen: AppScreen, callback?: () => void) => {
+    const token = ++transitionTokenRef.current;
+    const destColor = getScreenBackgroundColor(screen, persistence.currentPhase);
+
+    // Already on this screen with nothing to run under the cover: the dip would
+    // hide a swap that never happens, so it is pure flicker. Both callers of
+    // this shape pass NO callback — the daily replay guard (which re-checks the
+    // standing on its own following line, not in a callback) and the New Cycle
+    // rebuild (whose comment already assumed this no-ops) — so no callback
+    // timing changes. A same-screen call that DOES pass a callback keeps its
+    // cover, because that callback is exactly the work the cover exists to hide
+    // (re-serving a board under the current screen).
+    if (screen === currentScreenRef.current && !callback) return;
+
     const reducedMotion = getSettingsSync().reducedMotion;
     if (reducedMotion) {
-      const destColor = getScreenBackgroundColor(screen, persistence.currentPhase);
+      detachRevealListener();
+      screenRevealAnim.setValue(0);
+      setScreenRevealKind('none');
+      transitionOverlay.setValue(0);
       setTransitionOverlayColor(destColor);
       setRootBgColor(destColor);
       setCurrentScreen(screen);
       callback?.();
       return;
     }
-    // Fade overlay IN (covers old screen)
-    Animated.timing(transitionOverlay, {
-      toValue: 1,
-      duration: SCREEN_FADE_COVER_MS,
-      easing: Easing.out(Easing.quad),
-      useNativeDriver: true,
-    }).start(() => {
-      // While fully opaque: swap colors to match destination screen
-      const destColor = getScreenBackgroundColor(screen, persistence.currentPhase);
-      setTransitionOverlayColor(destColor);
-      setRootBgColor(destColor);
 
-      setCurrentScreen(screen);
-      callback?.();
-      // Arm the destination reveal signature: the pit sinks in, every other
-      // screen breathes in. Set the anim to its start extreme now (hidden under
-      // the opaque overlay), then settle it as the overlay lifts.
-      const kind: 'lift' | 'sink' = screen === 'pit' ? 'sink' : 'lift';
-      setScreenRevealKind(kind);
-      screenRevealAnim.setValue(1);
-      // Wait for the new screen to be COMMITTED AND PAINTED before revealing.
-      // A single rAF was not enough: the setState calls above are batched and
-      // processed asynchronously, so one frame callback can fire before React
-      // has committed the swap — the overlay then began lifting over the
-      // outgoing screen, or over a half-mounted destination, which is the
-      // flicker players see on every navigation. The double rAF puts the reveal
-      // strictly after the frame that paints the new screen, at a cost of ~16ms.
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          // Fade overlay OUT — now blends through destination-matching color
+    // Paint the cover in the DESTINATION color BEFORE it starts fading in,
+    // while it is still fully transparent. It used to fade in matching the
+    // OUTGOING screen and then hard-cut to the destination color at full
+    // opacity — an instant full-screen color change (bright home -> near-black
+    // stats), which is the "pop" players see mid-navigation. Fading in on the
+    // destination color makes the whole navigation two continuous fades with no
+    // cut anywhere. The single frame of delay lets React commit that color
+    // while opacity is still 0; started in the same tick, the cover is already
+    // ~25% opaque by the time the commit lands and the change is visible.
+    setTransitionOverlayColor(destColor);
+    requestAnimationFrame(() => {
+      if (token !== transitionTokenRef.current) return;
+      // Fade overlay IN (covers old screen)
+      Animated.timing(transitionOverlay, {
+        toValue: 1,
+        duration: SCREEN_FADE_COVER_MS,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        // An interrupted cover (a second navigation started over this one)
+        // reports finished:false. Swapping anyway left the OLDER transition
+        // driving the colors and scheduling a reveal that fought the newer
+        // cover — the strobe on double-tapped navigation.
+        if (!finished || token !== transitionTokenRef.current) return;
+        // Root swaps while fully covered.
+        setRootBgColor(destColor);
+        // Armed BEFORE the mount: a screen that reports readiness synchronously
+        // would otherwise report into the previous arm and this one would wait
+        // out the whole timeout.
+        armScreenReady(screen);
+        setCurrentScreen(screen);
+        // Guarded: everything that LIFTS the cover (the reveal signature, the
+        // readiness race, the fade-out) is scheduled below this line, so a
+        // callback that throws synchronously would strand a fully-opaque
+        // full-screen cover forever — the app would read as frozen on a solid
+        // color. Report and keep going; the navigation itself already
+        // committed on the line above.
+        try {
+          callback?.();
+        } catch (e) {
+          reportError(e instanceof Error ? e : String(e), { source: 'transition_callback', metadata: { screen } });
+        }
+
+        // Arm the destination reveal signature: the pit sinks in, every other
+        // screen breathes in. Set the anim to its start extreme now (hidden
+        // under the opaque overlay), then settle it as the overlay lifts. A
+        // full-screen transformed layer is a full-screen composite, so low-tier
+        // devices get the cover alone.
+        const kind: 'lift' | 'sink' | 'none' =
+          shouldSimplifyAnimations() ? 'none' : screen === 'pit' ? 'sink' : 'lift';
+        setScreenRevealKind(kind);
+        if (kind !== 'none') screenRevealAnim.setValue(1);
+
+        const reveal = () => {
+          if (token !== transitionTokenRef.current) return;
+          // Fade overlay OUT — it has been the destination color all along, so
+          // this simply dissolves onto the arrived screen.
           Animated.timing(transitionOverlay, {
             toValue: 0,
             duration: SCREEN_FADE_REVEAL_MS,
-            easing: Easing.in(Easing.quad),
+            // OUT, not IN: an ease-IN fade-out holds the cover near-opaque for
+            // most of its duration and then drops fast, which reads as a snap.
+            // Ease-out lets the destination emerge at once with a gentle tail.
+            easing: Easing.out(Easing.quad),
             useNativeDriver: true,
           }).start();
-          // Settle the reveal signature (springs the arriving screen into place).
-          Animated.spring(screenRevealAnim, {
+          if (kind === 'none') return;
+          // Settle the reveal signature (springs the arriving screen into
+          // place). A duration, not a spring: the old friction-8 spring took
+          // ~400ms and kept sliding the screen for a further ~200ms after the
+          // cover was fully gone.
+          detachRevealListener();
+          revealListenerRef.current = screenRevealAnim.addListener(NOOP_ANIM_LISTENER);
+          Animated.timing(screenRevealAnim, {
             toValue: 0,
-            friction: 8,
-            tension: 90,
+            duration: SCREEN_REVEAL_SETTLE_MS,
+            easing: Easing.out(Easing.cubic),
             useNativeDriver: true,
-          }).start();
-        });
+          }).start(() => detachRevealListener());
+        };
+
+        // Wait for the new screen to be COMMITTED AND PAINTED before revealing.
+        // A single rAF was not enough: the setState calls above are batched and
+        // processed asynchronously, so one frame callback can fire before React
+        // has committed the swap — the overlay then began lifting over the
+        // outgoing screen, or over a half-mounted destination, which is the
+        // flicker players see on every navigation. The double rAF puts the
+        // reveal strictly after the frame that paints the new screen, at a cost
+        // of ~16ms.
+        const paint = () => {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(reveal);
+          });
+        };
+        // Destinations that paint NOTHING on their first frame (the pit renders
+        // null until its harvest state lands; ledger / gallery / shop start
+        // behind a loading gate) hold the cover until their first content is in
+        // state, capped hard by SCREEN_READY_TIMEOUT_MS. Every other screen —
+        // home included, since it paints ahead from its own scene snapshot —
+        // gets null back here and reveals with no added delay whatsoever.
+        const ready = waitForScreenReady(screen, SCREEN_READY_TIMEOUT_MS);
+        if (ready) ready.then(paint, paint);
+        else paint();
       });
     });
-  }, [transitionOverlay, screenRevealAnim, persistence.currentPhase]);
+  }, [transitionOverlay, screenRevealAnim, persistence.currentPhase, detachRevealListener]);
 
   // Keep root background AND the transition-cover color in sync with the current
-  // screen + phase (handles phase changes without transitions). The cover color
-  // must track the screen at REST, or the next transition's fade-IN covers the
-  // OUTGOING screen with a stale color (its init '#1A1A2E', or the previous
-  // transition's destination) and briefly washes the screen dark before the
-  // swap. Syncing it here makes every fade-in an invisible same-color cover; the
-  // mid-transition swap to the destination color (in transitionTo) is unchanged.
+  // screen + phase (handles phase changes without transitions). The cover is
+  // painted in the DESTINATION color for the whole of a transition now, so at
+  // REST this only re-asserts the color the last transition already set (or
+  // repaints both after a phase change with no navigation). It can never
+  // re-introduce a mid-transition cut: it fires on currentScreen, which only
+  // moves while the cover is fully opaque and already the destination color.
   useEffect(() => {
     const c = getScreenBackgroundColor(currentScreen, persistence.currentPhase);
     setRootBgColor(c);
@@ -5088,8 +5232,12 @@ function MainApp() {
                     onPress={() => {
                       hapticLight();
                       resetSpeedRun();
-                      setCurrentScreen('home');
-                      puzzleActions.setGameState(GameState.IDLE);
+                      // Through the transition, not a raw setCurrentScreen: a
+                      // bare swap hard-cuts to home AND leaves one frame of the
+                      // old rootBgColor behind it.
+                      transitionTo('home', () => {
+                        puzzleActions.setGameState(GameState.IDLE);
+                      });
                     }}
                     accessibilityLabel="Return home"
                   />
@@ -5592,12 +5740,7 @@ function MainApp() {
           stats, ledger, gallery, pit) so a render error on any of them returns
           the player home instead of crashing the entire app. */}
       <Animated.View
-        style={{
-          flex: 1,
-          transform: screenRevealKind === 'sink'
-            ? [{ translateY: screenRevealAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -14] }) }]
-            : [{ scale: screenRevealAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.02] }) }],
-        }}
+        style={screenRevealStyle}
         accessibilityElementsHidden={blockingOverlayActive}
         importantForAccessibility={blockingOverlayActive ? 'no-hide-descendants' : 'auto'}
       >
@@ -5608,14 +5751,9 @@ function MainApp() {
         {renderScreen()}
       </ErrorBoundary>
       </Animated.View>
-      {/* Screen transition overlay — solid cover that fades in/out during navigation */}
-      <Animated.View
-        pointerEvents="none"
-        style={[StyleSheet.absoluteFill, {
-          backgroundColor: transitionOverlayColor,
-          opacity: transitionOverlay,
-        }]}
-      />
+      {/* Screen transition overlay — solid cover that fades in/out during
+          navigation. A memoized leaf on purpose: see ScreenTransitionOverlay. */}
+      <ScreenTransitionOverlay opacity={transitionOverlay} color={transitionOverlayColor} />
       {/* Phase transition overlay — renders above ALL screens */}
       <PhaseTransitionOverlay
         event={phaseTransitionEvent}

@@ -27,6 +27,7 @@ import {
   getPhaseEraName,
   WhisperEntry,
 } from '../services/whisperGallery';
+import { markScreenReady } from '../services/screenReady';
 import { ANIMAL_INFO } from '../services/animalDialogue';
 import { getWhisperGalleryEmptyText } from '../services/phaseNarrative';
 import { AnimalType, DialoguePhase } from '../types/homeWorld';
@@ -227,6 +228,8 @@ export const WhisperGalleryScreen: React.FC<WhisperGalleryScreenProps> = ({
         setTotalCollected(stats.totalCollected);
       } finally {
         setLoading(false);
+        // First real content is in state: release the navigation cover.
+        markScreenReady('gallery');
       }
     })();
   }, []);

@@ -30,6 +30,7 @@ import {
   CosmeticItem,
   CosmeticCategory,
 } from '../../services/cosmetics';
+import { markScreenReady } from '../../services/screenReady';
 import { spendAmber } from '../../services/amberCurrency';
 import { getRoomsWithStatus } from '../../services/homeWorldData';
 import { Room, DialoguePhase } from '../../types/homeWorld';
@@ -327,6 +328,8 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
         console.warn('[Shop] initial load failed:', e);
       } finally {
         if (!cancelled) setLoading(false);
+        // First real content is in state: release the navigation cover.
+        markScreenReady('shop');
       }
     })();
     return () => { cancelled = true; };

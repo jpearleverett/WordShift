@@ -20,6 +20,7 @@ import { EntranceCascadeItem, getGroupedCascadeDelayMs } from './ui/RewardReveal
 import { useScreenInsets } from '../hooks/useScreenInsets';
 import { DialoguePhase } from '../types/homeWorld';
 import { getFullProgress } from '../services/amberCurrency';
+import { markScreenReady } from '../services/screenReady';
 import { getWordPhaseTier } from '../services/localGenerator';
 import { getWordsOfferedText } from '../services/phaseNarrative';
 import { getSettingsSync } from '../services/settings';
@@ -204,6 +205,9 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
       setWords([]);
     } finally {
       setLoading(false);
+      // First real content is in state: release the navigation cover, which
+      // has been holding rather than lifting on the loading gate.
+      markScreenReady('ledger');
     }
   };
 
