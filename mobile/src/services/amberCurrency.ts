@@ -462,6 +462,24 @@ export async function markUnbrokenWeaveIntroSeen(): Promise<void> {
   await saveProgress();
 }
 
+/** Whether Ember's one-time Phase-5 Keeper's Record reading has been heard. */
+export async function hasSeenKeeperRecord(): Promise<boolean> {
+  return (await loadProgress()).keeperRecordSeen === true;
+}
+
+/**
+ * Persist the Keeper's Record reading inside the existing home progress.
+ * Forever-once, like the first-win glitch: it survives New Cycle on purpose
+ * (the record reads "finished"; a second arrival does not reopen it).
+ */
+export async function markKeeperRecordSeen(): Promise<void> {
+  const progress = await loadProgress();
+  if (progress.keeperRecordSeen === true) return;
+  progress.keeperRecordSeen = true;
+  progressCache = progress;
+  await saveProgress();
+}
+
 /**
  * Get current amber balance
  */

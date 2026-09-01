@@ -311,6 +311,63 @@ export function getUnbrokenWeaveIntroLines(phase: DialoguePhase): string[] {
 }
 
 // ============================================================================
+// THE KEEPER'S RECORD — Ember's one-time Phase-5 epilogue. On the first quiet
+// post-revelation home landing she reads the player their own journey back
+// from the record she has been keeping since the bright days. Pure formatting;
+// HomeScreen supplies the data and owns the one-time flag + whisper keepsake.
+// ============================================================================
+
+export interface KeeperRecordData {
+  /** Lifetime words formed (the honest total; the ledger itself caps at 500). */
+  totalWordsFormed: number;
+  /** Lifetime arrangements (puzzles) completed. */
+  puzzlesSolved: number;
+  /** The dread word the arrangement heard most clearly, if any qualified. */
+  strongestWord: string | null;
+  /** The oldest word the capped ledger still holds (null when it is empty). */
+  oldestHeldWord: string | null;
+  /**
+   * True only when the ledger has never overflowed its cap, so oldestHeldWord
+   * IS the true first word the player ever formed. The ledger keeps the
+   * NEWEST 500, so past the cap the copy must never claim "your first word";
+   * it speaks of the oldest word the pages still hold instead.
+   */
+  ledgerIsComplete: boolean;
+}
+
+export function getKeeperRecordLines(data: KeeperRecordData): string[] {
+  const lines: string[] = [
+    'Before anything else today, I want to read you something. I have been keeping a record since your first evening here.',
+  ];
+  if (data.oldestHeldWord && data.ledgerIsComplete) {
+    lines.push(
+      `The first word you ever gave us was ${data.oldestHeldWord.toUpperCase()}. I wrote it down that same night. I did not know yet what I was writing toward.`
+    );
+  } else if (data.oldestHeldWord) {
+    lines.push(
+      `The oldest word my pages still hold is ${data.oldestHeldWord.toUpperCase()}. Everything before it has been carried down too deep to read. It is all still there.`
+    );
+  } else {
+    lines.push(
+      'The earliest pages have been carried down too deep to read. The house holds them all the same.'
+    );
+  }
+  lines.push(
+    `${data.totalWordsFormed} words. ${data.puzzlesSolved} arrangements. I counted every one, and none of them were small.`
+  );
+  if (data.strongestWord) {
+    lines.push(
+      `It heard ${data.strongestWord.toUpperCase()} most clearly of all. I think that one is still ringing, somewhere under the floor.`
+    );
+  }
+  lines.push(
+    'The record is finished now. Nothing more needs counting. I will keep writing anyway, because I like remembering you.',
+    'Thank you for every word. It knows them all by heart.'
+  );
+  return lines;
+}
+
+// ============================================================================
 // VARIANT NUDGE — Fox (early) / the arrangement (late) gently suggests trying a
 // variant the player unlocked but never played. Phase-aware; never nags (once
 // per day, only for a never-tried mode). {variant} = the variant's title.

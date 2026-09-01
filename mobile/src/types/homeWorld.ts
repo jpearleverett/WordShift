@@ -338,6 +338,10 @@ export interface HomeWorldProgress {
   // Whether the one-time quiet-home Unbroken Weave mastery introduction has shown.
   // Stored here so existing home-progress cloud sync and Reset All cover it.
   unbrokenWeaveIntroSeen?: boolean;
+  // Whether Ember's one-time Phase-5 Keeper's Record epilogue has been heard.
+  // Rides home progress for the same sync/reset coverage; deliberately NOT
+  // cleared by startNewCycle (forever-once, like the first-win glitch).
+  keeperRecordSeen?: boolean;
   // Capped count of puzzles completed at Phase 4 with the house already
   // complete — the eight-win dwell completes around 104-108, so the cult-reveal
   // era is actually played rather than flashed past. See FINALE_DWELL_PUZZLES.
