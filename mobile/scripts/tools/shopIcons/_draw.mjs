@@ -241,3 +241,80 @@ export function sheen(cv, cx, cy, rx, ry, alpha = 0.55) {
 }
 
 export { C, hex, blend, ellipse, roundRect, flameLobe, capsule, arcStroke, tri, arrowHead, poly, starPts, hexPts, down2, savePNG };
+
+/**
+ * Draw a subject with a thick warm-dark contour behind it.
+ *
+ * A blind review of the first pass found this to be the single biggest gap
+ * between the shop art and the shipped icon set: every icon in assets/ui is
+ * "ONE centred silhouette, thick warm-dark outline, 2-3 big value steps", and
+ * art built purely from gradients has no contour to hold its shape once the row
+ * shrinks it to 56dp. Wrapping a subject in this restores the silhouette, and it
+ * is what lets a light subject survive a dark ash row and a dark subject survive
+ * a cream parchment one.
+ *
+ * `draw` is called with a scratch canvas. Its alpha is distance-transformed
+ * (two-pass chamfer, so the contour is round rather than boxy), the ring is laid
+ * down in `color`, and the subject is composited back on top.
+ */
+export function withOutline(cv, draw, opts = {}) {
+  const width = opts.width ?? 9;      // supersample px; 9 => ~4.5px at 192, ~1.3px at 56dp
+  const color = opts.color ?? INK;
+  const alpha = opts.alpha ?? 1;
+  const tmp = C(cv.w, cv.h);
+  draw(tmp);
+
+  const { w, h } = cv;
+  const BIG = 1e9;
+  const dist = new Float64Array(w * h);
+  // Seed: inside the subject is 0, outside starts at infinity.
+  for (let i = 0; i < w * h; i++) dist[i] = tmp.px[i * 4 + 3] > 0.5 ? 0 : BIG;
+  // Chamfer 3-4 distance transform, forward then backward.
+  const D1 = 1, D2 = 1.4142;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      let d = dist[i];
+      if (d === 0) continue;
+      if (x > 0) d = Math.min(d, dist[i - 1] + D1);
+      if (y > 0) d = Math.min(d, dist[i - w] + D1);
+      if (x > 0 && y > 0) d = Math.min(d, dist[i - w - 1] + D2);
+      if (x < w - 1 && y > 0) d = Math.min(d, dist[i - w + 1] + D2);
+      dist[i] = d;
+    }
+  }
+  for (let y = h - 1; y >= 0; y--) {
+    for (let x = w - 1; x >= 0; x--) {
+      const i = y * w + x;
+      let d = dist[i];
+      if (d === 0) continue;
+      if (x < w - 1) d = Math.min(d, dist[i + 1] + D1);
+      if (y < h - 1) d = Math.min(d, dist[i + w] + D1);
+      if (x < w - 1 && y < h - 1) d = Math.min(d, dist[i + w + 1] + D2);
+      if (x > 0 && y < h - 1) d = Math.min(d, dist[i + w - 1] + D2);
+      dist[i] = d;
+    }
+  }
+
+  const [r, g, b] = hex(color);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      const d = dist[i];
+      if (d > width + 1) continue;
+      // 1 inside the ring, feathering off over the final pixel so the contour is
+      // anti-aliased like everything else in the kit.
+      const a = Math.max(0, Math.min(1, width + 1 - d));
+      if (a > 0) blend(cv, x, y, r, g, b, a * alpha);
+    }
+  }
+  // Subject over its own contour.
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const o = (y * w + x) * 4;
+      const sa = tmp.px[o + 3];
+      if (sa <= 0) continue;
+      blend(cv, x, y, tmp.px[o] / (sa || 1), tmp.px[o + 1] / (sa || 1), tmp.px[o + 2] / (sa || 1), sa);
+    }
+  }
+}
