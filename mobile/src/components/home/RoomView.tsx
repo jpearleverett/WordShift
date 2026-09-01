@@ -102,11 +102,16 @@ const WINDOW_TINT: Record<number, { color: string; opacity: number }> = {
   5: { color: '#191330', opacity: 0.86 }, // terrible peace: mauve night
 };
 
-// Word echo configuration by phase (ritual words inscribed in rooms)
+// Word echo configuration by phase (ritual words inscribed in rooms).
+// Phase 5 has its OWN entry: without it the render fell back to the phase-2
+// styling, so at Terrible Peace the offered words REGRESSED from crimson 0.25
+// to near-invisible white 0.08. At rest now, in the serene mauve register —
+// settled into the walls, not reset.
 const WORD_ECHO_CONFIG: Record<number, { count: number; opacity: number; fontSize: number; color: string }> = {
   2: { count: 3, opacity: 0.08, fontSize: FONT_SIZE.micro, color: '#FFFFFF' },
   3: { count: 4, opacity: 0.15, fontSize: FONT_SIZE.micro, color: '#9B7FCF' },
   4: { count: 5, opacity: 0.25, fontSize: FONT_SIZE.caption, color: '#8B2252' },
+  5: { count: 4, opacity: 0.14, fontSize: FONT_SIZE.micro, color: '#9B8CB8' },
 };
 
 // Predefined scattered positions for word echoes within each room

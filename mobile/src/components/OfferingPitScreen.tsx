@@ -115,6 +115,18 @@ function getPitBackground(phase: number) {
   return PIT_DAY;
 }
 
+// Phase scrim over the shared night art: phases 3, 4, and 5 all serve
+// pitt_night, so without this the reveal was never felt at the ritual's own
+// site. A faint crimson-black deepen at phase 4 (the session the robes are
+// new), a mauve settle at phase 5. Capped low so the pit's own glow layers
+// survive — the same restraint as the pit-entrance tint on home. Pure static
+// View color; exported for the contract test.
+export function getPitPhaseScrim(phase: number): { color: string; opacity: number } | null {
+  if (phase >= 5) return { color: '#251b38', opacity: 0.12 };
+  if (phase >= 4) return { color: '#2a0510', opacity: 0.16 };
+  return null;
+}
+
 const PIT_CENTER = {
   x: SCREEN_WIDTH * 0.5,
   y: SCREEN_HEIGHT * 0.72,
@@ -2356,6 +2368,18 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   return (
     <View style={[styles.container, { backgroundColor: PIT_BG_COLORS[phase] ?? PIT_BG_COLORS[0] }]}>
       <Image source={getPitBackground(phase)} style={styles.backgroundImage} resizeMode="cover" />
+      {(() => {
+        const scrim = getPitPhaseScrim(phase);
+        return scrim ? (
+          <View
+            pointerEvents="none"
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: scrim.color, opacity: scrim.opacity },
+            ]}
+          />
+        ) : null;
+      })()}
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* F121: fence the occluded pit visuals behind the ward-ignition

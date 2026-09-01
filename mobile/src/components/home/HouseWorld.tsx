@@ -667,6 +667,82 @@ const shootingStarStyles = StyleSheet.create({
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// DISTANT HEAT LIGHTNING — Phase 3 ONLY. The storm sky finally stirs.
+// ═══════════════════════════════════════════════════════════════════════════
+// For the longest single-sky stretch of the descent (floor 62 to the reveal
+// at ~90) the "oppressive pre-storm night" was a static image. This is a
+// rare, silent, two-pulse flicker on the upper sky band: cold pale slate, so
+// faint it reads as weather at the horizon, never a render glitch. Phase 4+
+// deliberately excluded — that sky belongs to the entity, and the "honestly
+// empty" rule stays true there. No thunder: silent lightning is wronger.
+// Self-scheduling timer (the ShootingStar pattern, no perpetual loop);
+// callers gate on ambientMotionEnabled so reduced motion / low tier skip it.
+const LIGHTNING_MIN_GAP_MS = 60000;
+const LIGHTNING_GAP_RANGE_MS = 90000;
+const LIGHTNING_PEAK_OPACITY = 0.07;
+
+const DistantLightning: React.FC = () => {
+  const flash = useRef(new Animated.Value(0)).current;
+  const mountedRef = useRef(true);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const animationRef = useRef<Animated.CompositeAnimation | null>(null);
+
+  useEffect(() => {
+    mountedRef.current = true;
+
+    const strike = () => {
+      if (!mountedRef.current) return;
+      // Two-pulse flicker: a short lick, a breath, a longer one.
+      const anim = Animated.sequence([
+        Animated.timing(flash, { toValue: 1, duration: 60, useNativeDriver: true }),
+        Animated.timing(flash, { toValue: 0, duration: 120, useNativeDriver: true }),
+        Animated.delay(140),
+        Animated.timing(flash, { toValue: 0.8, duration: 80, useNativeDriver: true }),
+        Animated.timing(flash, { toValue: 0, duration: 260, useNativeDriver: true }),
+      ]);
+      animationRef.current = anim;
+      anim.start(() => {
+        if (!mountedRef.current) return;
+        timeoutRef.current = setTimeout(
+          strike,
+          LIGHTNING_MIN_GAP_MS + Math.random() * LIGHTNING_GAP_RANGE_MS
+        );
+      });
+    };
+
+    // First strike waits a full gap — the sky must not perform on arrival.
+    timeoutRef.current = setTimeout(
+      strike,
+      LIGHTNING_MIN_GAP_MS + Math.random() * LIGHTNING_GAP_RANGE_MS
+    );
+
+    return () => {
+      mountedRef.current = false;
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      if (animationRef.current) animationRef.current.stop();
+    };
+  }, []);
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: SCREEN_HEIGHT * 0.38,
+        backgroundColor: '#AEB8CC',
+        opacity: flash.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, LIGHTNING_PEAK_OPACITY],
+        }),
+      }}
+    />
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
 // NIGHT STAR GLINT - two-View sparkle (replaces the ✦ glyph, F13/F64)
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -1146,19 +1222,23 @@ const ShadowFigure: React.FC<{ phase: number }> = ({ phase }) => {
   const isStatic = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
   const visible = phase >= 3;
 
+  // The settled entity (phase 5) breathes SLOWER than the looming one —
+  // sleeping, not watching. Only the durations change; reduced motion stays
+  // fully static exactly as before.
+  const breathHalfMs = phase >= 5 ? 7000 : 4000;
   useEffect(() => {
     if (!visible || isStatic) return;
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(breatheAnim, {
           toValue: 1,
-          duration: 4000,
+          duration: breathHalfMs,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
         Animated.timing(breatheAnim, {
           toValue: 0,
-          duration: 4000,
+          duration: breathHalfMs,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
@@ -1166,7 +1246,7 @@ const ShadowFigure: React.FC<{ phase: number }> = ({ phase }) => {
     );
     loop.start();
     return () => loop.stop();
-  }, [visible, isStatic, breatheAnim]);
+  }, [visible, isStatic, breatheAnim, breathHalfMs]);
 
   if (!visible) return null;
 
@@ -2116,6 +2196,10 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                 {ambientMotionEnabled && currentPhase >= 2 && <ShootingStar />}
                 {ambientMotionEnabled && currentPhase >= 3 && <ShootingStar />}
                 {ambientMotionEnabled && currentPhase >= 4 && <ShootingStar />}
+                {/* The pre-storm sky stirs: rare silent heat lightning at the
+                    horizon, Phase 3 ONLY (the Phase 4+ sky belongs to the
+                    entity and stays honestly empty). */}
+                {ambientMotionEnabled && currentPhase === 3 && <DistantLightning />}
 
               {/* Songbirds cross only the bright phases (F16); from Phase 3 on
                   the sky stays honestly empty rather than an unnatural cross-

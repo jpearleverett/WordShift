@@ -90,3 +90,38 @@ describe('aberration frequency stays subtle', () => {
     expect(BREATH_ABERRATION_CHANCE).toBeLessThan(0.1);
   });
 });
+
+// ============================================================================
+// Phase-graded particle MOTION (the descent reaches behavior, not just color)
+// ============================================================================
+describe('getParticleMotion', () => {
+  const { getParticleMotion } = require('../components/AnimatedBackground');
+
+  test('bright phases rise and spin; Growing Shadows goes ponderous; the Horizon sinks', () => {
+    for (const p of [0, 1, 2]) {
+      expect(getParticleMotion(p)).toEqual({
+        register: 'rise', spin: true, durationMul: 1, countMul: 1,
+      });
+    }
+    expect(getParticleMotion(3)).toEqual({
+      register: 'heavy', spin: false, durationMul: 1.5, countMul: 0.7,
+    });
+    for (const p of [4, 5]) {
+      expect(getParticleMotion(p)).toEqual({
+        register: 'sink', spin: false, durationMul: 1.6, countMul: 0.5,
+      });
+    }
+  });
+
+  test('the descent only ever slows and thins, never brightens', () => {
+    let prevDur = 0;
+    let prevCount = 2;
+    for (const p of [0, 3, 4]) {
+      const m = getParticleMotion(p);
+      expect(m.durationMul).toBeGreaterThanOrEqual(prevDur);
+      expect(m.countMul).toBeLessThanOrEqual(prevCount);
+      prevDur = m.durationMul;
+      prevCount = m.countMul;
+    }
+  });
+});

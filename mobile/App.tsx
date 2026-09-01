@@ -287,6 +287,17 @@ import {
   BLIND_TOGGLE_UNLOCK_PUZZLES,
 } from './src/services/puzzleVariety';
 import { appStyles as styles, getScreenBackgroundColor, getActionButtonColors } from './src/styles/appStyles';
+
+// Chromatic-aberration ghost layer for the glitch text: an absolutely
+// positioned same-glyph copy behind the main text, tinted and offset 1-2dp.
+// The shadow is suppressed (the main text keeps its red glow; doubled shadows
+// smear). Shared by the victory glitch and the glitch_title micro-beats.
+const appGlitchGhostStyle = {
+  position: 'absolute' as const,
+  opacity: 0.45,
+  textShadowColor: 'transparent',
+  textShadowRadius: 0,
+};
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useScreenInsets } from './src/hooks/useScreenInsets';
 
@@ -745,6 +756,20 @@ function MainApp() {
   // Opacity stutter for the prominent first-victory glitch (held at 1 under
   // reduced motion).
   const glitchStutter = useRef(new Animated.Value(1)).current;
+  // Chromatic-aberration ghost copies under the glitch text (a cyan and a
+  // deep-red offset layer, so the tear reads as the SCREEN failing, not red
+  // handwriting). On the held prominent glitch the ghosts jitter off the
+  // existing stutter value — no new animation driver; reduced motion pins
+  // the stutter at 1, so the ghosts sit still there too (and low-tier /
+  // reduced-motion devices skip the ghost layers entirely at render).
+  const glitchGhostShiftL = useMemo(
+    () => glitchStutter.interpolate({ inputRange: [0, 1], outputRange: [-3, -1.5] }),
+    [glitchStutter]
+  );
+  const glitchGhostShiftR = useMemo(
+    () => glitchStutter.interpolate({ inputRange: [0, 1], outputRange: [3, 1.5] }),
+    [glitchStutter]
+  );
   // Dynamic background colors for smooth transitions — match overlay/root to destination screen
   const [transitionOverlayColor, setTransitionOverlayColor] = useState('#1A1A2E');
   const [rootBgColor, setRootBgColor] = useState('#1A1A2E');
@@ -5199,15 +5224,57 @@ function MainApp() {
             importantForAccessibility="no-hide-descendants"
             accessibilityElementsHidden
           >
-            <Animated.Text
-              style={[
-                styles.victoryGlitchText,
-                orchestration.victoryGlitchProminent && styles.victoryGlitchTextProminent,
-                orchestration.victoryGlitchProminent && { opacity: glitchStutter },
-              ]}
-            >
-              {orchestration.victoryGlitch}
-            </Animated.Text>
+            <View>
+              {/* Ghost copies behind the main text: classic RGB split. Skipped
+                  under reduced motion / low tier (the single static text is
+                  exactly today's rendering there). The announced string never
+                  changes — ghosts repeat the same glyphs. */}
+              {!getSettingsSync().reducedMotion && !shouldSimplifyAnimations() && (
+                <>
+                  <Animated.Text
+                    style={[
+                      styles.victoryGlitchText,
+                      orchestration.victoryGlitchProminent && styles.victoryGlitchTextProminent,
+                      appGlitchGhostStyle,
+                      { color: '#00E5FF' },
+                      {
+                        transform: [
+                          { translateX: orchestration.victoryGlitchProminent ? glitchGhostShiftL : -2 },
+                          { translateY: 1 },
+                        ],
+                      },
+                    ]}
+                  >
+                    {orchestration.victoryGlitch}
+                  </Animated.Text>
+                  <Animated.Text
+                    style={[
+                      styles.victoryGlitchText,
+                      orchestration.victoryGlitchProminent && styles.victoryGlitchTextProminent,
+                      appGlitchGhostStyle,
+                      { color: '#D40030' },
+                      {
+                        transform: [
+                          { translateX: orchestration.victoryGlitchProminent ? glitchGhostShiftR : 2 },
+                          { translateY: -1 },
+                        ],
+                      },
+                    ]}
+                  >
+                    {orchestration.victoryGlitch}
+                  </Animated.Text>
+                </>
+              )}
+              <Animated.Text
+                style={[
+                  styles.victoryGlitchText,
+                  orchestration.victoryGlitchProminent && styles.victoryGlitchTextProminent,
+                  orchestration.victoryGlitchProminent && { opacity: glitchStutter },
+                ]}
+              >
+                {orchestration.victoryGlitch}
+              </Animated.Text>
+            </View>
           </View>
         )}
 
@@ -5226,11 +5293,26 @@ function MainApp() {
             // the screen-reader swipe order.
             importantForAccessibility="no-hide-descendants"
             accessibilityElementsHidden>
-            <Text style={[
-              orchestration.microBeat.type === 'glitch_title' ? styles.victoryGlitchText : styles.microBeatWhisperText,
-            ]}>
-              {orchestration.microBeat.type === 'glitch_title' ? orchestration.microBeat.glitchTitle : orchestration.microBeat.text}
-            </Text>
+            <View>
+              {/* glitch_title beats get the same RGB-split ghosts as the
+                  victory glitch (static offsets — this overlay hard-cuts). */}
+              {orchestration.microBeat.type === 'glitch_title' &&
+                !getSettingsSync().reducedMotion && !shouldSimplifyAnimations() && (
+                <>
+                  <Text style={[styles.victoryGlitchText, appGlitchGhostStyle, { color: '#00E5FF', transform: [{ translateX: -2 }, { translateY: 1 }] }]}>
+                    {orchestration.microBeat.glitchTitle}
+                  </Text>
+                  <Text style={[styles.victoryGlitchText, appGlitchGhostStyle, { color: '#D40030', transform: [{ translateX: 2 }, { translateY: -1 }] }]}>
+                    {orchestration.microBeat.glitchTitle}
+                  </Text>
+                </>
+              )}
+              <Text style={[
+                orchestration.microBeat.type === 'glitch_title' ? styles.victoryGlitchText : styles.microBeatWhisperText,
+              ]}>
+                {orchestration.microBeat.type === 'glitch_title' ? orchestration.microBeat.glitchTitle : orchestration.microBeat.text}
+              </Text>
+            </View>
           </Animated.View>
         )}
 
