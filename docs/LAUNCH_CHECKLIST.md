@@ -80,17 +80,27 @@ the codebase and are the remaining gates to submission.
       `adsUseTestIds` flip + the `expo.version` bump — one atomic cut commit,
       gated by `WORDSHIFT_PRODUCTION_CUT=1 npm test -- --no-coverage
       --testPathPattern=productionConfig` going 5/5 green.
-- [ ] **Merge the working branch to `main` before the cut** (2026-08-31: 9
+- [ ] **Merge the working branch to `main` before the cut** (2026-09-01: **24**
       commits on `claude/game-completion-checklist-mybsmk` are not on `main`,
       including the EXPERT dread top-up, the flying-tile ghost, all 13
-      `robed_talk.png` sprites, the finale graduation-card guard, and the
-      late-game copy passes — a build cut from `main` today would silently
-      omit all of it).
-- [ ] **Run `npx expo install --fix` + full re-validation before the cut** —
-      as of 2026-08-31 eleven packages sit behind their SDK-56 patch ranges
-      (expo 56.0.15 → ~56.0.21, expo-updates, expo-notifications, ...). Patch
-      lines carry native crash fixes; re-run `npm ci`, the full suite,
-      typecheck, lint, and `npx expo-doctor` afterwards.
+      `robed_talk.png` sprites, the finale graduation-card guard, the late-game
+      copy passes, the SDK-56 patch sync, the bespoke Arrival cue + ceremony
+      swell banding, the Terrible Peace sky/pit/foundation art, the Keeper's
+      Record epilogue, the Phase-5 peace SFX tier, the NG+ home entry / HUD
+      aging / glitch-ghost pass, and the Jekyll exclude that stops serving
+      internal docs on the public Pages site — a build cut from `main` today
+      would silently omit all of it).
+      **The Pages exclude makes this time-sensitive:** until the merge lands,
+      `AAA_DESIGN_AUDIT`, `GROWTH_STRATEGY`, `PRESS_KIT` and the other internal
+      docs stay publicly readable at `jpearleverett.github.io/WordShift/<NAME>`,
+      spoilers included.
+- [x] **SDK-56 patch drift synced** — DONE (2026-08-31): `npx expo install --fix`
+      bumped 8 native modules (expo 56.0.15 → 56.0.21, expo-updates,
+      expo-notifications, expo-sharing, expo-splash-screen, expo-build-properties,
+      expo-audio, expo-store-review). `npx expo install --check` now reports
+      "Dependencies are up to date" and expo-doctor is 21/22 (only the Hermes V1
+      advisory below). **Still re-run `npm ci`, the full suite, typecheck, lint
+      and `npx expo-doctor` immediately before the cut.**
 - [ ] **Hermes V1 memory-regression check (expo-doctor, new since 07-24)** —
       SDK 56 bundles Hermes V1 250829098.0.10; doctor flags ≤ .0.15 for a
       known memory regression (fixed in .0.16, which needs SDK 57 / RN

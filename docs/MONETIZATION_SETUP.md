@@ -33,10 +33,14 @@
 > - **Interstitials are invoked** — `App.tsx` `maybeShowVictoryInterstitial()`
 >   fires on the normal victory exits: puzzle→next-level, puzzle→home, AND the
 >   puzzle→pit route (`handleNextLevel` / `handleReturnHome` / `handleGoToPit`).
->   All narrative-beat exemptions live there: onboarding, the daily challenge,
->   pending phase transitions, queued final/post-revelation cinematics, Phase 5,
->   and the early "pure delight" window (first `AUTO_COLLECT_PUZZLE_LIMIT`
->   puzzles). Cadence is driven by `VictoryData.puzzlesSolved` against
+>   All narrative-beat exemptions live there: onboarding, the mandatory
+>   first-harvest gate, pending phase transitions, queued final/post-revelation
+>   cinematics, Phase 5, and the early "pure delight" window (no interstitial
+>   until `INTERSTITIAL_MIN_PUZZLES` (16) puzzles are solved, so the first ad
+>   lands on the exit of win 17). The daily challenge is exempt only from
+>   Phase 3 on (`ads.isDailyInterstitialAllowed(phase)` allows phases 0-2,
+>   where the daily carries the normal cadence).
+>   Cadence is driven by `VictoryData.puzzlesSolved` against
 >   `INTERSTITIAL_FREQUENCY_*`. (Tuning lever: raise
 >   `INTERSTITIAL_FREQUENCY_EARLY` / the early-window guard for a gentler
 >   first few sessions.)
@@ -90,7 +94,7 @@ Products (`iap.ts` → `PRODUCT_IDS`) — 10 SKUs in three flavors (5 entitlemen
 - `com.wordshift.cosmetic_bundle` → `cosmetic_bundle` entitlement (The Keeper's
   Collection: Eclipse tile theme + confetti)
 - `com.wordshift.starter` → `starter_pack` entitlement (Keeper's Welcome — a
-  one-time bundle: 400 amber + 5 hints, `gameBalance.STARTER_PACK_GRANTS`;
+  one-time bundle: 1,200 amber + 5 hints, `gameBalance.STARTER_PACK_GRANTS`;
   `purchaseStarterPack()` refuses a repurchase before it ever hits billing, so
   the entitlement doubles as the one-per-account lock)
 
@@ -169,7 +173,8 @@ The ad **policy** (interstitial cadence, rewarded daily cap, Patron suppression,
 narrative-beat exemptions) already lives in `ads.ts`; the adapter only serves the
 ads.
 
-> **Compatibility:** `react-native-google-mobile-ads` is pinned at **v16.3.4**
+> **Compatibility:** `react-native-google-mobile-ads` is declared as **`^16.3.4`**
+> (a caret range, NOT a pin — a 16.x minor can drift in on a fresh install)
 > in `package.json` (Expo SDK 56). Earlier v16.x releases had reported
 > config-plugin breakage on Expo SDK 54 / RN 0.81 (invertase issue #835) — if
 > you ever change the pin, re-verify the config plugin runs in the build.

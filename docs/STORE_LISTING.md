@@ -103,8 +103,8 @@ Legal pages are **LIVE and publicly accessible** via GitHub Pages (deployed from
 ## Asset checklist
 
 - [x] App icon 1024×1024 — `mobile/assets/icon.png`
-- [x] Android phone screenshots ×8, re-rendered 2026-07-13 with the revised banner copy + review fixes applied and re-validated — `docs/play-store/final/`
-- [x] Feature graphic 1024×500 (Play), generated — `docs/play-store/final/feature-graphic.png`
+- [x] Android phone screenshots ×8, re-rendered 2026-07-13 with the revised banner copy + review fixes applied and re-validated, uploaded to Play Console 2026-07-13. The PNGs are deliberately NOT stored in this repo; the names below are the upload slugs.
+- [x] Feature graphic 1024×500 (Play), generated — `docs/feature-graphic.png`
 - [ ] iPhone 6.7" screenshots ×5 (needs device/simulator)
 - [ ] iPad 12.9" screenshots ×3 (supportsTablet is true)
 
@@ -112,8 +112,9 @@ Legal pages are **LIVE and publicly accessible** via GitHub Pages (deployed from
 
 Copy revised 2026-07-12 (second pass): every support line is a complete
 sentence whose horror hint is woven INTO an innocent reading — several quote
-the game itself ("They've been hoping for someone like you" is Ember's
-onboarding seed line; "warm, funny, thoughtful" quotes the full description) so
+the game itself ("They've been hoping for someone like you" reworks Ember's
+onboarding seed line, "I have been hoping for someone like you for the longest
+time"; "warm, funny, thoughtful" quotes the full description) so
 the store page reads warm now and chilling in hindsight, exactly like the game.
 The old set stamped a spooky fragment on every frame and read as mannered.
 Dread ramp: edge (1), clean (2), whisper (3), warm-ominous (4), whisper (5),
@@ -122,16 +123,16 @@ File names keep their original headline slugs (e.g. `02_every_word_stays_real`,
 `06_flawless_offering`) even where the banner headline has since changed — the
 paths are upload artifacts; do not rename them.
 
-| # | Final upload path | Headline | Support line | Unique alt text | Visible authentic state |
+| # | Upload slug (not stored in repo) | Headline | Support line | Unique alt text | Visible authentic state |
 |---:|---|---|---|---|---|
-| 1 | `docs/play-store/final/01_shift_one_letter.png` | SHIFT ONE LETTER | Tuck a letter into the word below. Both words must survive. | WordShift puzzle board with the letter L selected and valid and invalid destination word previews visible. | Phase 0 puzzle board with L selected from PLAY and destination previews shown over PANT. |
-| 2 | `docs/play-store/final/02_every_word_stays_real.png` | ONE MOVE, TWO WORDS | Each move rewrites two words. Easy to learn, tricky to master. | WordShift puzzle showing PAY, PLANT, and HEAR midway through a valid letter-shifting chain. | Phase 0 puzzle board midway through the PAY, PLANT, HEAR chain with PLANT active. |
-| 3 | `docs/play-store/final/03_build_a_home.png` | BUILD A HOME | Turn puzzles into amber. The house turns amber into rooms. | Sunny WordShift house with several furnished rooms and multiple animal companions. | Sunny house showing the Cozy Den, Rustic Kitchen, Scholar's Study, Aquarium Room, and their companions. |
-| 4 | `docs/play-store/final/04_meet_unlikely_friends.png` | MEET 13 UNLIKELY FRIENDS | Warm, funny, thoughtful. They've been hoping for someone like you. | Ember the fox speaking to the player in a warm dialogue scene over the animal house. | Ember's warm introductory dialogue open over the sunny animal house. |
-| 5 | `docs/play-store/final/05_master_every_mode.png` | MASTER EVERY MODE | Reverse the chain, race the clock, go in blind. It all counts. | WordShift setup lists Standard, Reverse Shift, Speed Shift, Double Shift, Challenge, and Blind Mode. | Puzzle setup menu with Standard selected and Reverse Shift, Speed Shift, Double Shift, Challenge, and Blind Mode visible. |
-| 6 | `docs/play-store/final/06_flawless_offering.png` | GO FLAWLESS | No hints, no mistakes, no undos. Perfection gets noticed. | WordShift victory screen showing a flawless three-star solve and amber rewards. | Phase 0 victory modal with three stars, a FLAWLESS ribbon, the PAY to PLAN to HEART chain, and amber rewards. |
-| 7 | `docs/play-store/final/07_theyve_been_waiting.png` | THEY'VE BEEN WAITING | The longer you stay, the more the house changes around you. | WordShift animal house at dusk beneath a purple-orange sky, with the Jungle Hammock locked above furnished rooms. | Phase 2 dusk house with the Jungle Hammock still locked and no late-story imagery. |
-| 8 | `docs/play-store/final/08_something_stirs.png` | SOMETHING STIRS IN THE AIR | Your friends know more than they are willing to say. | A glowing offering pit in a moonlit forest clearing on the WordShift offering screen, with the message: Nothing left to give. The dark is patient. | Phase 3 night Offering Pit in its empty state. No ward ceremony, no robed sprites, no late-story imagery. |
+| 1 | `01_shift_one_letter.png` | SHIFT ONE LETTER | Tuck a letter into the word below. Both words must survive. | WordShift puzzle board with the letter L selected and valid and invalid destination word previews visible. | Phase 0 puzzle board with L selected from PLAY and destination previews shown over PANT. |
+| 2 | `02_every_word_stays_real.png` | ONE MOVE, TWO WORDS | Each move rewrites two words. Easy to learn, tricky to master. | WordShift puzzle showing PAY, PLANT, and HEAR midway through a valid letter-shifting chain. | Phase 0 puzzle board midway through the PAY, PLANT, HEAR chain with PLANT active. |
+| 3 | `03_build_a_home.png` | BUILD A HOME | Turn puzzles into amber. The house turns amber into rooms. | Sunny WordShift house with several furnished rooms and multiple animal companions. | Sunny house showing the Cozy Den, Rustic Kitchen, Scholar's Study, Aquarium Room, and their companions. |
+| 4 | `04_meet_unlikely_friends.png` | MEET 13 UNLIKELY FRIENDS | Warm, funny, thoughtful. They've been hoping for someone like you. | Ember the fox speaking to the player in a warm dialogue scene over the animal house. | Ember's warm introductory dialogue open over the sunny animal house. |
+| 5 | `05_master_every_mode.png` | MASTER EVERY MODE | Reverse the chain, race the clock, go in blind. It all counts. | WordShift setup lists Standard, Reverse Shift, Speed Shift, Double Shift, Challenge, and Blind Mode. | Puzzle setup menu with Standard selected and Reverse Shift, Speed Shift, Double Shift, Challenge, and Blind Mode visible. |
+| 6 | `06_flawless_offering.png` | GO FLAWLESS | No hints, no mistakes, no undos. Perfection gets noticed. | WordShift victory screen showing a flawless three-star solve and amber rewards. | Phase 0 victory modal with three stars, a FLAWLESS ribbon, the PAY to PLAN to HEART chain, and amber rewards. |
+| 7 | `07_theyve_been_waiting.png` | THEY'VE BEEN WAITING | The longer you stay, the more the house changes around you. | WordShift animal house at dusk beneath a purple-orange sky, with the Jungle Hammock locked above furnished rooms. | Phase 2 dusk house with the Jungle Hammock still locked and no late-story imagery. |
+| 8 | `08_something_stirs.png` | SOMETHING STIRS IN THE AIR | Your friends know more than they are willing to say. | A glowing offering pit in a moonlit forest clearing on the WordShift offering screen, with the message: Nothing left to give. The dark is patient. | Phase 3 night Offering Pit in its empty state. No ward ceremony, no robed sprites, no late-story imagery. |
 
 ### Regen checklist (from the 2026-07-12 screenshot review — closed 2026-07-13)
 
@@ -148,11 +149,15 @@ the console.
 Optional follow-up (not misleading, safe to ship): screenshot #5's setup menu
 shows the pre-trial-ladder copy ("No previews or hints, limited undos, +50%
 amber" / "Hide previews for a truer test"). The same-day rebalance changed the
-in-game rows to "No hints, limited undos, +25% amber" and "Challenge limits,
-no previews, judged only at the end, 2x amber". Recapture #5 whenever the
-screenshots next get touched.
+in-game Challenge row to "No hints, limited undos. +25% amber.", and Challenge
+and Blind have since been decoupled so the Blind row now reads "No guidance,
+judged at the end. Undos stay free. +100% amber." ("...Undos capped by
+Challenge. +125% amber." when both are on). The menu has also changed shape
+since capture: Speed is now a stackable modifier rather than a style row, and a
+fourth modifier (Lexicon) was added. Recapture #5 whenever the screenshots next
+get touched.
 
-Final feature graphic: `docs/play-store/final/feature-graphic.png`
+Final feature graphic: `docs/feature-graphic.png`
 Feature graphic alt text: Ember the fox beside the exact WordShift logo, candy tiles, glowing amber, and a sunny-to-dusk forest with subtle distant eyes.
 
 Never show Phase 4+ content, robed sprites, or the revealed shadow figure in

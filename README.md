@@ -6,18 +6,18 @@ The tonal shift is a designed surprise. This README keeps it unspoiled; [CLAUDE.
 
 ## Play loop
 
-1. You see a chain of words (3–5 rows of 4–5 letter words, depending on difficulty; the Daily Challenge uses 6-letter words).
+1. You see a chain of words (3–5 rows of 4–6 letter words, depending on difficulty; the Daily Challenge board ramps across the week, peaking at 6 letters on Sunday).
 2. Pick a letter from the current word — the word shrinks and must remain a valid word.
 3. Drop it into the next word — that word grows and must also be valid.
 4. Reach the end of the chain to win. Earn amber, build the house, meet the animals, and watch the world change.
 
-Variants: **Reverse Shift** (down the chain, then back up, with cumulative letter locking), **Double Shift** (two letters per move, up to 6 rows), **Speed Shift** (timed runs with an escalating clock). Plus a deterministic **Daily Challenge** (unlocks after 8 puzzles) with streaks and streak freezes, weekly quests, 51 achievements, and a phase-aware theming system that re-skins every screen, message, and animation as the story unfolds.
+Variants: **Reverse Shift** (down the chain, then back up, with cumulative letter locking) and **Double Shift** (two letters per move, up to 7 rows at EXPERT). On top of any style you can stack four modifiers: **Challenge** (capped undos, no hints), **Speed Shift** (a clock with an escalating round timer), **Blind Offering** (previews hidden), and **Lexicon** (rare-word vocabulary). Plus a deterministic **Daily Challenge** (unlocks after 8 puzzles) with streaks and streak freezes, weekly quests, 56 achievements, and a phase-aware theming system that re-skins every screen, message, and animation as the story unfolds.
 
-Monetization is convenience/expression only, never progression: a cosmetic shop bought with in-game amber, optional consumable amber/hint packs, a one-time starter pack, a cosmetic bundle, an optional Patron / Remove-Ads purchase, and gently-paced ads (GDPR/UMP consent-gated).
+Monetization is convenience/expression only, never progression: a cosmetic shop bought with in-game amber, optional consumable amber/hint packs, a one-time starter pack, a cosmetic bundle, an optional Patron / Remove-Ads purchase, an optional monthly Supporter subscription (ad-free plus a monthly amber stipend), a cosmetic season pass, and gently-paced ads (GDPR/UMP consent-gated).
 
 ## Tech
 
-React Native + Expo SDK 56 (React Native 0.85), TypeScript (strict), Jest (~2,600 tests across ~105 suites — counts drift as features land). Local-first: the core puzzles play fully offline with all state in AsyncStorage, and there are no user accounts. Backend features (cloud save, daily leaderboard, anonymous analytics via **Supabase**; crash reporting via **Sentry**) and monetization (in-app purchases via **RevenueCat**, ads via **AdMob**) activate when their keys are present in `app.json` → `extra` and degrade to no-ops otherwise — so Expo Go still runs everything. Supabase/Sentry and the Android monetization keys are currently configured; the iOS monetization keys are still empty (iOS falls back to the no-op providers). See [CLAUDE.md](./CLAUDE.md) for the full architecture reference — it's the canonical codebase doc.
+React Native + Expo SDK 56 (React Native 0.85), TypeScript (strict), Jest (~3,250 tests across ~123 suites — counts drift as features land). Local-first: the core puzzles play fully offline with all state in AsyncStorage, and there are no user accounts. Backend features (cloud save, daily leaderboard, anonymous analytics via **Supabase**; crash reporting via **Sentry**) and monetization (in-app purchases via **RevenueCat**, ads via **AdMob**) activate when their keys are present in `app.json` → `extra` and degrade to no-ops otherwise — so Expo Go still runs everything. Supabase/Sentry and the Android monetization keys are currently configured; the iOS monetization keys are still empty (iOS falls back to the no-op providers). See [CLAUDE.md](./CLAUDE.md) for the full architecture reference — it's the canonical codebase doc.
 
 ## Development
 
@@ -41,8 +41,8 @@ Always use `npm test`, not `npx jest` — the latter misses the local install an
 
 ### Generated content
 
-- **Puzzle banks**: `npm run generate:puzzles`, then always run `node scripts/tools/purgeProfanity.mjs` (the generator does not filter offensive words).
-- **Art/SFX**: `npm run generate:assets` rebuilds the app icon, splash, notification icon, the 42-file WAV pack, the world/pixel art, and the UI icon sprites from pure-Node scripts in `mobile/scripts/tools/`.
+- **Puzzle banks**: regenerate with the **gated toolkit** — `bash scripts/runGatedRegen.sh <EASY|MEDIUM|MEDIUM_PLUS|HARD>` for the standard banks, `scripts/runGatedReverseRegen.sh` and `scripts/runGatedDoubleRegen.sh` for reverse and double-shift — then `node scripts/swapGatedBanks.mjs` to swap the finished sidecars over the live files, and always `node scripts/tools/purgeProfanity.mjs` afterwards (the generators do not filter offensive words). **Do NOT run `npm run generate:puzzles`**: it executes the legacy generators, which write straight over the live banks with the pre-gated shape and lose the multi-route guarantee.
+- **Art/SFX**: `npm run generate:assets` rebuilds the app icon, splash, notification icon, the 70-file WAV pack, the world/pixel art, and the UI icon sprites from pure-Node scripts in `mobile/scripts/tools/`.
 - **Builds**: `eas build` profiles live in `mobile/eas.json` (`appVersionSource: "local"` — bump `android.versionCode` manually for each release). Remaining human release tasks are tracked in [docs/LAUNCH_CHECKLIST.md](./docs/LAUNCH_CHECKLIST.md).
 
 ## Docs

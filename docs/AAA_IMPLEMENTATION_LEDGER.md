@@ -6,18 +6,22 @@
 
 | Status | Count | Share |
 |---|--:|--:|
-| ✅ done | 174 | 97% |
-| 🟡 partial | 3 | 2% |
+| ✅ done | 176 | 98% |
+| 🟡 partial | 1 | <1% |
 | ⏸️ deferred | 3 | 2% |
 | ❌ not addressed | 0 | 0% |
 | **Total** | **180** | |
 
-**Fully done: 174 of 180.** The remaining 6 are 3 partials + 3 deferrals; the honest split is below.
+**Fully done: 176 of 180.** The remaining 4 are 1 partial + 3 deferrals; the honest split is below.
+
+> **Update (2026-08-31/09-01).** Two of the three partials were closed on branch
+> `claude/game-completion-checklist-mybsmk`: **F1** (cross-row flying ghost) and **F37**
+> (robed talk frames). Net 174 -> 176 done, 3 -> 1 partial.
 
 > **Session 5b — "everything code-possible" pass (2026-07-22).** After the re-verify close-out, a probe of the environment (npm reachable; `sharp` installs; Chromium present) reclassified several "deferred" items as actually doable, and they were closed: **F131** WebP (verified — the 9 full-screen backgrounds went ~25MB -> ~3.1MB via a build-time sharp tool; dims preserved, skyGeometry tripwire now reads WebP headers), **F136** async-chunked cold branching (agent), **F141** boot-gate through launch routing (no home flash), and **F139/F140/F138-board** the board scale-to-fit + tablet + resize-reactive board (a single `computeBoardScale`, unit-tested through the drag math so drops stay aligned; exactly 1 on ordinary phones). Net 169 -> 174 done.
 >
-> **The honest remaining 6:**
-> - **🟡 F1** cross-row flying ghost — a real animation-architecture change (an overlay tile travelling source->target on commit) on the core board loop, whose VISUAL result cannot be verified without a device; the neighbour rank-shift half already shipped. Held rather than dumped blind into a build.
+> **The honest remaining 4:**
+> - **✅ F1 (closed 2026-08-31)** cross-row flying ghost — both halves now ship. `ArrivalMark` carries optional flight endpoints from the commit site (`usePuzzleGame`); App resolves them to window coordinates (X analytically via `standardLetterCenterOffset` x boardScale, Y measured from the registered row nodes) and flies a `FlyingTileGhost` overlay with real LetterTile chrome (native driver, `TILE_FLIGHT_MS` 260ms with an upward bow, fading into the settle as it lands). Tap commits only; drag / drop1 / undo / autosave-restore never fly, and reduced-motion + low-tier devices skip the flight and keep the settle.
 > - **✅ F37 (closed 2026-08-31)** robed Phase 4-5 talk frame — all 13 `robed_talk.png` frames generated procedurally: each animal's idle→talk mouth delta transplanted onto `robed.png` under a locally-fitted palette map (per-animal tuning; hand-drawn open mouths for tarsier/aye-aye/kakapo whose source talk frames barely open; owl/rabbit get CLOSED-mouth frames since their robed art is drawn open; axolotl stays mouth-static by design). Registered in `CHARACTER_SPRITES`; the intro/override modal now mouth-flaps the robed stack like the main card; pinned by `homeDialoguePortraits.test.ts`. Verified animating live (web build, Phase-5 profile).
 > - **🟡 F138** the FULL app-wide `useWindowDimensions` sweep (10 non-board components still capture SCREEN_WIDTH at module load) — deliberately low value: the app is `orientation: portrait`-locked, so only split-screen/fold benefit, and the churn touches module-level StyleSheets. The board (the surface that matters) is now reactive.
 > - **⏸️ F135** room-background pan-windowing/virtualization — the audit's OWN documented architectural deferral; culling rooms in the pannable HouseWorld risks visible pop-in and cannot be verified without a device.
@@ -56,7 +60,7 @@ Four correctly-based worktree agents on disjoint files (all forked from the pit.
 - **F121** (OfferingPitScreen) — the pit chrome behind the ward-ignition ceremony is now fenced with `importantForAccessibility="no-hide-descendants"` + `accessibilityElementsHidden`, driven by a ceremony-inclusive boolean, so Android/TalkBack no longer leaks focus into the occluded pit during the ceremony (the iOS `accessibilityViewIsModal` complement is kept).
 
 **The honest remainder (11).**
-- **🟡 partial (3 → 1 after 2026-08-31):** **F1** CLOSED (cross-row flight shipped via ArrivalMark flight endpoints + a window-coord ghost overlay); **F37** CLOSED 2026-08-31 (all 13 robed_talk frames generated + wired); **F141** cold-launch-into-puzzle still flashes `home` before the board — the near-black boot blink is fixed, but the `currentScreen` default + raw `setCurrentScreen('puzzle')` route is a structural change held back as too risky for a polish pass.
+- **🟡 partial (3 → 1 after 2026-08-31):** **F1** CLOSED (cross-row flight shipped via ArrivalMark flight endpoints + a window-coord ghost overlay); **F37** CLOSED 2026-08-31 (all 13 robed_talk frames generated + wired); **F141** CLOSED (Session 5b) — `launchColdOpenPuzzle` now sets `currentScreen` BEFORE lifting the boot gate (`App.tsx:988-991`, with that exact comment) and the onboarding resume effect routes `cold_open_puzzle` through it, so the cold open paints the board directly with no `home` frame in between. **The one remaining partial in the whole ledger is F138** (the app-wide `useWindowDimensions` sweep of the 10 non-board components; the board itself is already resize-reactive).
 - **⏸️ deferred (8):** **F131** WebP re-encode (no VP8L/WebP encoder installed in this environment — documented `cwebp` plan); **F132** Play screenshots need real on-device capture ≥1080px; **F148** store screenshot #5 advertises +50% Challenge amber vs the shipped +25% — the listing COPY is corrected and LAUNCH_CHECKLIST now flags the binary PNG as a required pre-submission re-capture (a device-asset task, same class as F132); **F135** room-bitmap pan-windowing + **F136** async-chunked cold branching analyses + **F139** board-arc scale-to-fit ≤360dp + **F140** tablet large-aspect layout (the audit's own four documented architectural deferrals); **F138** global `useWindowDimensions` migration so fold/split-screen/resize re-lays-out — a genuine open architectural gap (not one of the audit's blessed four), but a large every-surface refactor against module-load `Dimensions.get()` (tile geometry, Row arc, pit spawn math…) with real regression risk, so deferred rather than rushed.
 
 **Verification.** Typecheck 0 errors; ESLint 0 errors; full suite **119 suites / 2938 tests green**. Every agent forked from the fix-HEAD, reset-hard to it, reported its verified base, and touched a disjoint file set — all four merged with zero conflicts.
@@ -267,7 +271,13 @@ Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a p
 | ✅ | P3 | No squash-and-stretch anywhere: landings and catches are uniform scale | Both landings now split into scaleX/scaleY with phase-scaled amplitude via getSquashParams: the tile arrival (LetterTile.tsx:489-518,829-830) AND Row's drag slot-catch, which replaced the old uniform catchBounceAnim with a catchSquashXAnim/catchSquashYAnim pair (1+amount / 1-amount, Row.tsx:331-342,485-486) using squash.friction/tension (commit 16d2235). |
 | ✅ | P3 | Tile press-in/out springs are fixed bright-candy values while menu chrome speaks phase-weight | handlePressOut now uses getPressSpring(phase) so the release ages with the descent (LetterTile.tsx:609-613), fixing the cited defect (release snapping with Phase-0 bounce on a Phase-4 board). press-IN is deliberately left constant (friction 5/tension 300) with a documented rationale ('the hand does not age'), a defensible deviation from the target's press-in ask. |
 
-### House world  ·  ✅11 🟡0 ⏸️0 ❌0
+### House world  ·  ✅10 🟡0 ⏸️0 ❌0 (+1 shipped, then reverted by design)
+
+> Note (2026-07-23): the two-rate parallax (F12) was implemented and then deliberately REMOVED in
+> commit `ab9739a`. Moving the sky slower than the house slid the house off the meadow baked into
+> the sky art and shimmered along the seam, so the scene now pans 1:1 by design
+> (`HouseWorld.tsx:1804-1814`); depth comes from the independently drifting clouds and ambient
+> sprites instead. Do not re-open this as an unfinished item.
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | ❌ | P0 | Home ambient particle system is rendered BEHIND the opaque world and is invisible at rest | Commit c3dd498 reworked the particles (de-emoji'd tinted Views, phase-graded, tier-gated) but `particles.map` at HouseWorld.tsx:1265 is STILL a sibling rendered BEFORE the PanGestureHandler, and the particle wrapper (line 174) has no zIndex while gestureContainer keeps zIndex:10 (line 1643); the opaque bottom-anchored sky (SKY_BOX_HEIGHT >= SCREEN_HEIGHT) therefore still paints over them at translateY=0. The target re-placement (into transformContainer or an overlay after the pan handler) was not done. |
@@ -492,7 +502,13 @@ Legend: ✅ done · 🟡 partial · ⏸️ deferred (needs device QA / risks a p
 | 🟡 | P2 | Horror micro-beats have no coherent screen-reader treatment: prominent beats go unspoken while subliminal flickers litter the swipe order as raw strings | Commit f2877c7 (useVictoryOrchestration.ts:~298) announces only ambient_whisper/silent_victory beats; the target's glitch_title and the guaranteed first-win glitch are deliberately left unspoken, and the subliminal victory-glitch/microbeat/interjection Text nodes in App.tsx:4491-4545 still carry no importantForAccessibility='no'/accessibilityElementsHidden (only pointerEvents='none', which does not remove them from the SR swipe order). |
 | 🟡 | P3 | Live-region announcements are Android-only with no iOS fallback, so all move feedback, receipts, and whispers are silent under VoiceOver | Only Toast.tsx (147-152) gained the cross-platform iOS announceForA11y fallback on message change; the other three cited sites still use the Android-only accessibilityLiveRegion with no announce call (AchievementToast.tsx:106, HomeScreen.tsx:2066, StoreModal.tsx:647 — announceForA11y count is 0 in all three). |
 
-### Dynamic type & adaptive layout  ·  ✅1 🟡1 ⏸️2 ❌0
+### Dynamic type & adaptive layout  ·  ✅3 🟡1 ⏸️0 ❌0
+
+> Board arc scale-to-fit (<=360dp) and tablet large-aspect were both closed in Session 5b by a
+> single `computeBoardScale` (`slotEstimation.ts:66-79`), applied at `App.tsx:3138` and threaded
+> through the drag math so drops stay aligned; it returns exactly 1 on ordinary phones and is
+> unit-tested in `dragDrop.test.ts:104-126`. The remaining 🟡 is F138, the app-wide
+> `useWindowDimensions` sweep of the 10 non-board components.
 | | Sev | Finding | Evidence |
 |---|---|---|---|
 | ✅ | P1 | No app-wide font-scale policy: OS large-font scales all chrome text but cottage frames are fixed-height single-line strips, so labels clip and titles truncate | installGlobalFont's global <Text> wrapper (src/theme/fonts.ts:146-153) now injects `maxFontSizeMultiplier: GLOBAL_MAX_FONT_SCALE` (=1.35, line 111) as an overridable default on every Text, exactly the target stopgap policy; shipped in commit 9734d6b 'Add an app-wide OS font-scale ceiling so text can't clip the cottage frames (P1)'. |

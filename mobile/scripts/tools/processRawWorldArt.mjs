@@ -155,8 +155,11 @@ processSprite('roof_raw.png', 'roof.png', 792);
 // dirt path gap baked into each base. They're normalized to ONE box size so
 // the house never jumps vertically when the phase changes (only the look of
 // the strip differs); the slight per-phase aspect stretch is baked in here.
-// Mapping mirrors the skies (phase_5 art is reused for game phase 5, like
-// sky_shadow): foundation_<gamePhase>.png, phase_1..5 -> game phases 0..4.
+// Mapping mirrors the skies: foundation_<gamePhase>.png, raw phase_1..5 ->
+// game phases 0..4. Game phase 5 is NOT produced here — foundation_5.png is
+// derived from foundation_4.png by scripts/tools/settleSkies.mjs (the same
+// pass that derives sky_peace.webp and pitt_peace.webp), so re-running this
+// script never touches it.
 const FOUND_W = 792, FOUND_H = 120;
 ['phase_1', 'phase_2', 'phase_3', 'phase_4', 'phase_5'].forEach((raw, gamePhase) => {
   const png = load(path.join(RAW, `${raw}.png`));

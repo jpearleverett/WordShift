@@ -30,7 +30,7 @@ exactly why what follows lands.
 | **Developer** | Iridescent Games — a solo developer |
 | **Platform** | Android (Google Play) at launch; built cross-platform (iOS planned) |
 | **Engine / stack** | React Native + Expo, TypeScript |
-| **Price** | Free. Optional in-app purchases (currency/hint packs, cosmetics, one-time Remove Ads) and occasional ads with an opt-in rewarded tier |
+| **Price** | Free. Optional in-app purchases (currency/hint packs, a starter bundle, cosmetics, one-time Remove Ads, a one-time Patron key, and an optional Supporter monthly subscription) and occasional ads with an opt-in rewarded tier |
 | **Monetization stance** | Convenience and cosmetics only — the story unfolds at the same pace for everyone; nothing narrative is purchasable |
 | **Accounts** | None required; core puzzles play offline |
 | **Current version** | 1.2.2 |
@@ -44,7 +44,7 @@ exactly why what follows lands.
 Reverse, Double Shift) with 4 stackable modifiers (Challenge, timed Speed
 runs, the previews-off Blind Offering, and the rare-word Lexicon), a shared
 Daily Challenge with leaderboard, 56 achievements, a 22,749-word dictionary,
-and ~9,576 quality-gated pre-generated puzzles across 30 banks plus on-device
+and ~9,611 quality-gated pre-generated puzzles across 30 banks plus on-device
 generation.
 
 ## Why this clips well (creator notes, spoiler-safe)

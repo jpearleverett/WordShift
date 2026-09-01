@@ -13,7 +13,9 @@ Sources:
 - `phase_1.png` .. `phase_5.png` → `foundation_0.png` .. `foundation_4.png`
   (one hand-lit foundation per phase: day green → dusk dry → night blue;
   normalized to 792×120 so the house never jumps between phases; game phase 5
-  reuses the shadow foundation, like the sky)
+  uses foundation_5.png, derived from foundation_4.png by
+  scripts/tools/settleSkies.mjs — the same pass that derives sky_peace.webp
+  and pitt_peace.webp)
 - `pit_raw.png` → `pit_entrance.png` (drops the top 45% of the tapered path)
 - `wall_raw.png` → `wall.png` (seamless tile)
 

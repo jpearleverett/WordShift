@@ -1,3 +1,31 @@
 title: WordShift
 description: Legal pages for the WordShift mobile game — privacy policy, terms of service, and data deletion.
 theme: jekyll-theme-minimal
+
+# This directory is BOTH the GitHub Pages source and the repo's internal docs
+# folder, so anything left un-excluded is served publicly at
+# https://jpearleverett.github.io/WordShift/<NAME>. Only four pages are meant
+# to be public: index (/), privacy-policy/, terms/, data-deletion/ — the three
+# legal URLs are wired into the app (src/constants/links.ts) and the store
+# listing, so never exclude or rename them.
+#
+# Everything below is internal and was previously live to anyone who guessed or
+# search-indexed the URL. The design audit and its ledger describe the cult
+# reveal, the shadow figure, and the whole phase arc in detail — publishing
+# them next to the link players tap from Settings spoils the entire game. The
+# press kit carries the creator-kit fast-forward instructions (era=reveal), the
+# checklists list unfinished work, and renders/ holds dark-phase screenshots.
+exclude:
+  - AAA_DESIGN_AUDIT.md
+  - AAA_IMPLEMENTATION_LEDGER.md
+  - BACKEND_SETUP.md
+  - COMPLETION_CHECKLIST.md
+  - GROWTH_STRATEGY.md
+  - LAUNCH_CHECKLIST.md
+  - MONETIZATION_SETUP.md
+  - OTA_UPDATES.md
+  - PRESS_KIT.md
+  - PUZZLE_REGENERATION_PLAN.md
+  - STORE_LISTING.md
+  - renders/
+  - supabase/

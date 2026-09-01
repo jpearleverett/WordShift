@@ -144,9 +144,9 @@ After each regenerated bank: run `purgeProfanity.mjs`, then update the test floo
 
 ## 5. Test-recalibration checklist (after regeneration)
 - **`bankDiversity.test.ts`** — `cap` (= measured max), `minUnique`, `minPuzzles` (~10% under measured) for **every regenerated bank**. *Primary; fails loudly if skipped.*
-- **`unbrokenWeaveBankEligibility.test.ts`** — `minEligible` per standard bank (420/350/280/195). **Standard regen only.**
-- **`puzzleExtension.test.ts`** — extendable-pool floors (190/140/130/110) + the `.slice(0,30)` real-bank test. **Standard regen only.**
-- **`bankSolvability.test.ts`** — must-pass (0 unsolvable / 0 inconclusive under shipped rules) for **all 12 banks**. *Run after `purgeProfanity.mjs`.* The non-negotiable gate, especially for reverse.
+- **`unbrokenWeaveBankEligibility.test.ts`** — `minEligible` per standard bank (currently 407/289/425/363 for EASY/MEDIUM/MEDIUM_PLUS/HARD; 420/350/280/195 were the pre-regeneration values). **Standard regen only.**
+- **`puzzleExtension.test.ts`** — extendable-pool floors (currently 203/127/207/180; 190/140/130/110 were the pre-regeneration values) + the `.slice(0,30)` real-bank test. **Standard regen only.**
+- **`bankSolvability.test.ts`** — must-pass (0 unsolvable / 0 inconclusive under shipped rules) for **all 30 shipped banks** (12 core + 3 EXPERT + 15 Lexicon; this plan said 12 because the EXPERT and Lexicon banks did not exist yet). *Run after `purgeProfanity.mjs`.* The non-negotiable gate, especially for reverse.
 - **`puzzleBank.test.ts`** — existence checks; keep green.
 - **`vocabularyHygiene` / `noEmDashes`** — after the corpus purge.
 - Set every numeric floor **~10% under what the run measures**, never speculatively above it (over-eager floors starve the HARD/dread banks first).
@@ -167,12 +167,23 @@ After each regenerated bank: run `purgeProfanity.mjs`, then update the test floo
 
 ---
 
-## 8. Decisions for you
-1. **Scope of the first pass** — do all four defect fixes (A1–A4) + guards, then regenerate *standard only*? Or go straight through reverse too? (Reverse is the biggest quality win but the largest new build.)
-2. **The 6–7L windfall (15,627 words, currently unused)** — leave dormant, or invest in using it (richer Sunday dailies / a new longer "expert" tier / longer late-game extensions)? This is a product-scope call, not required for the core regeneration.
-3. **Playable-vocabulary policy** — should chain/formed words be gated to a curated *common* subset while the generator still *traverses* the full graph for connectivity? (Cleanest way to keep puzzles recognizable while using the density for branching.)
-4. **How aggressive on difficulty differentiation** — adopt the explicit per-difficulty branching/trap/rarity bands (§2.4, §3 Phase C), or keep difficulty as just word-length/row-count and let branching emerge?
-5. **Double-shift** — refresh its banks for vocabulary, or leave them (they're already healthy)?
+## 8. Decisions (all resolved and shipped)
+
+Every open question this plan posed has been answered by the work that followed, so the list is
+kept only as a record of what was decided:
+
+1. **Scope** — standard, reverse AND double-shift were all regenerated through the gated toolkit.
+2. **The 6-7L windfall** — invested: it became the **EXPERT** tier (`puzzleBankExpert.ts` 230
+   boards, `puzzleBankReverseExpert.ts` 200, `puzzleBankDoubleShiftExpert.ts` 263).
+3. **Playable-vocabulary policy** — adopted as the 3-tier policy (full-dict validity, full-dict
+   traversal, a per-difficulty featured-rank ceiling on displayed words) via `getFeaturedRank` in
+   `localGenerator`.
+4. **Difficulty differentiation** — adopted: per-difficulty gated bars (single-choice ceilings,
+   dead-end fractions, bank-level trap floors).
+5. **Double-shift** — refreshed via `scripts/generateGatedDoubleBank.test.ts` (banks 494/495/496/491).
+
+Do not re-litigate these; the current state is documented in CLAUDE.md's Pre-Generated Puzzle
+Banks section.
 
 ---
 
