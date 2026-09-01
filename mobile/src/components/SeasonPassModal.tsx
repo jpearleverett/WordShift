@@ -18,6 +18,7 @@ import {
   StyleSheet,
   Animated,
   Easing,
+  Image,
 } from 'react-native';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
 import { getSurfaceTheme, SURFACE, getModalInSpring } from '../theme/surfaces';
@@ -27,6 +28,7 @@ import { shouldSimplifyAnimations } from '../services/deviceTier';
 import { PanelCard } from './ui/PanelCard';
 import { CandyButton } from './ui/CandyButton';
 import { PixelPlaque } from './ui/PixelPlaque';
+import { getStoreArt, STORE_ART_KEYS } from './monetization/storeArt';
 import { AmberInline } from './AmberInline';
 import { AmberSparkle } from './home/AmberSparkle';
 import { Confetti } from './Confetti';
@@ -357,6 +359,16 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
 
               {!view.premiumUnlocked && (
                 <PanelCard phase={phase} kind="card" style={styles.premiumBox}>
+                  {/* The premium track's own mark. Decorative: the locked line
+                      and the unlock button already carry every word. Centred on
+                      the box's axis, so the copy keeps its full width. Never
+                      give it a borderRadius - the art is pixel work. */}
+                  <Image
+                    source={getStoreArt(STORE_ART_KEYS.seasonPremium)}
+                    style={styles.premiumArt}
+                    resizeMode="contain"
+                    accessible={false}
+                  />
                   <Text style={[styles.premiumLocked, { color: t.body }]}>{copy.lockedLine}</Text>
                   <CandyButton
                     label={`Unlock premium · ${cost} amber`}
@@ -520,6 +532,8 @@ const styles = StyleSheet.create({
   tagline: { fontFamily: BODY_FONT, fontSize: FONT_SIZE.bodyLg, textAlign: 'center', marginTop: 4, marginBottom: 10 },
   progress: { fontFamily: PIXEL_FONT_BOLD, fontSize: FONT_SIZE.body, textAlign: 'center', marginBottom: 10 },
   premiumBox: { paddingVertical: 14, paddingHorizontal: SURFACE.cardPadX, marginBottom: 10 },
+  // 56dp: the art is drawn at 192px, so this only ever scales DOWN.
+  premiumArt: { width: 56, height: 56, alignSelf: 'center', marginBottom: 8 },
   premiumLocked: { fontFamily: BODY_FONT, fontSize: FONT_SIZE.body, textAlign: 'center', marginBottom: 10 },
   premiumBtn: { alignSelf: 'center' },
   subscribeLink: { fontFamily: BODY_FONT, fontSize: FONT_SIZE.small, textAlign: 'center', marginTop: 10 },

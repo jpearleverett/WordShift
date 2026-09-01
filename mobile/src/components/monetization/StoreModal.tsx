@@ -48,6 +48,7 @@ import { RewardedAdButton } from './RewardedAdButton';
 import { RewardReveal } from '../ui/RewardReveal';
 import { GiftOverlay, GiftItem } from './GiftOverlay';
 import { isAdsReady } from '../../services/ads';
+import { getStoreArt, STORE_ART_KEYS } from './storeArt';
 import {
   getDailyAmberStatus,
   recordDailyAmberClaim,
@@ -59,6 +60,28 @@ import { FONT_SIZE } from '../../theme/typeScale';
 
 const HINT_ICON = require('../../../assets/ui/hint.png');
 const AMBER_ICON = require('../../../assets/ui/amber.png');
+
+/** Rendered size of a store thumbnail. The art is drawn at 192px, so this only
+ *  ever scales DOWN. */
+const STORE_ART_DP = 56;
+
+/**
+ * The generated cottage thumbnail for a purchasable, mirroring ShopScreen's
+ * ShopArtThumb. Decorative on purpose (`accessible={false}`): the row's name /
+ * description Text and the price button's label already carry the semantics, so
+ * the art adds no new strings for a screen reader to read out.
+ *
+ * Never give this a borderRadius or a border - the art is pixel work and
+ * CSS-rounding a baked corner is the documented cozy-pixel anti-pattern.
+ */
+const StoreArtThumb: React.FC<{ artKey: string }> = ({ artKey }) => (
+  <Image
+    source={getStoreArt(artKey)}
+    style={styles.storeArt}
+    resizeMode="contain"
+    accessible={false}
+  />
+);
 
 /**
  * Fallback price label for The Keeper's Collection when the store product isn't
@@ -533,23 +556,26 @@ export const StoreModal: React.FC<StoreModalProps> = ({
 
   const renderPackRow = (info: ConsumableProductInfo, suffix: React.ReactNode) => (
     <PanelCard key={info.productId} phase={phase} style={styles.row}>
-      <View style={styles.rowInfo}>
-        <View style={styles.rowTitleLine}>
-          <Text style={[styles.rowTitle, { color: t.title }]}>{info.name}</Text>
-          {info.bestValue && (
-            <Text style={[styles.ribbon, { color: t.pillText, backgroundColor: t.pillBg }]}>
-              BEST VALUE
-            </Text>
-          )}
-          {info.reward.kind === 'amber' && firstAmberDouble && (
-            <Text style={[styles.ribbon, { color: t.pillText, backgroundColor: t.pillBg }]}>
-              2× FIRST PURCHASE!
-            </Text>
-          )}
+      <View style={styles.rowTop}>
+        <StoreArtThumb artKey={info.productId} />
+        <View style={styles.rowInfo}>
+          <View style={styles.rowTitleLine}>
+            <Text style={[styles.rowTitle, { color: t.title }]}>{info.name}</Text>
+            {info.bestValue && (
+              <Text style={[styles.ribbon, { color: t.pillText, backgroundColor: t.pillBg }]}>
+                BEST VALUE
+              </Text>
+            )}
+            {info.reward.kind === 'amber' && firstAmberDouble && (
+              <Text style={[styles.ribbon, { color: t.pillText, backgroundColor: t.pillBg }]}>
+                2× FIRST PURCHASE!
+              </Text>
+            )}
+          </View>
+          <Text style={[styles.rowDesc, { color: t.body }]}>
+            {info.description} {suffix}
+          </Text>
         </View>
-        <Text style={[styles.rowDesc, { color: t.body }]}>
-          {info.description} {suffix}
-        </Text>
       </View>
       {renderPricePill(
         priceLabel(info),
@@ -611,10 +637,15 @@ export const StoreModal: React.FC<StoreModalProps> = ({
                     BEST VALUE · ONE TIME
                   </Text>
                 </View>
-                <Text style={[styles.heroTitle, { color: t.title }]}>{STARTER_PACK_INFO.name}</Text>
-                <Text style={[styles.rowDesc, { color: t.body }]}>
-                  {STARTER_PACK_INFO.description} <AmberInline size={11} />
-                </Text>
+                <View style={styles.rowTop}>
+                  <StoreArtThumb artKey={STARTER_PACK_INFO.productId} />
+                  <View style={styles.rowInfo}>
+                    <Text style={[styles.heroTitle, { color: t.title }]}>{STARTER_PACK_INFO.name}</Text>
+                    <Text style={[styles.rowDesc, { color: t.body }]}>
+                      {STARTER_PACK_INFO.description} <AmberInline size={11} />
+                    </Text>
+                  </View>
+                </View>
                 <CandyButton
                   label={heroPrice}
                   onPress={handleBuyStarter}
@@ -635,13 +666,16 @@ export const StoreModal: React.FC<StoreModalProps> = ({
               <>
                 <Text style={[styles.sectionLabel, { color: t.muted }]}>FREE AMBER</Text>
                 <PanelCard phase={phase} style={styles.row}>
-                  <View style={styles.rowInfo}>
-                    <Text style={[styles.rowTitle, { color: t.title }]}>Daily Amber</Text>
-                    <Text style={[styles.rowDesc, { color: t.body }]}>
-                      {amberFaucet.available
-                        ? `Watch a short clip for +${DAILY_AMBER_REWARD} amber. ${amberFaucet.remaining} left today.`
-                        : 'Collected for today. Come back tomorrow!'}
-                    </Text>
+                  <View style={styles.rowTop}>
+                    <StoreArtThumb artKey={STORE_ART_KEYS.dailyAmber} />
+                    <View style={styles.rowInfo}>
+                      <Text style={[styles.rowTitle, { color: t.title }]}>Daily Amber</Text>
+                      <Text style={[styles.rowDesc, { color: t.body }]}>
+                        {amberFaucet.available
+                          ? `Watch a short clip for +${DAILY_AMBER_REWARD} amber. ${amberFaucet.remaining} left today.`
+                          : 'Collected for today. Come back tomorrow!'}
+                      </Text>
+                    </View>
                   </View>
                   {amberFaucet.available && (isPatronSync()
                     ? renderPricePill('Claim', handleClaimDailyAmber, `Claim ${DAILY_AMBER_REWARD} free amber`)
@@ -656,6 +690,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
                         // 4 — 'auto' assumes a dark host from phase 3 and made
                         // the label near-invisible on the storm card.
                         surface={phase >= 4 ? 'dark' : 'light'}
+                        style={styles.rowAction}
                       />
                     ))}
                 </PanelCard>
@@ -674,11 +709,14 @@ export const StoreModal: React.FC<StoreModalProps> = ({
 
             <Text style={[styles.sectionLabel, { color: t.muted }]}>SUPPORTER</Text>
             <PanelCard phase={phase} style={styles.row}>
-              <View style={styles.rowInfo}>
-                <Text style={[styles.rowTitle, { color: t.title }]}>Supporter</Text>
-                <Text style={[styles.rowDesc, { color: t.body }]}>
-                  Ad-free, {SUPPORTER_MONTHLY_AMBER} amber every month, the season pass premium track, and an exclusive confetti. Cancel anytime.
-                </Text>
+              <View style={styles.rowTop}>
+                <StoreArtThumb artKey={PRODUCT_IDS.SUPPORTER_SUB} />
+                <View style={styles.rowInfo}>
+                  <Text style={[styles.rowTitle, { color: t.title }]}>Supporter</Text>
+                  <Text style={[styles.rowDesc, { color: t.body }]}>
+                    Ad-free, {SUPPORTER_MONTHLY_AMBER} amber every month, the season pass premium track, and an exclusive confetti. Cancel anytime.
+                  </Text>
+                </View>
               </View>
               {isSupporterActive ? (
                 <Text style={[styles.ownedText, { color: t.amberText }]}>Active ✦</Text>
@@ -693,11 +731,14 @@ export const StoreModal: React.FC<StoreModalProps> = ({
 
             <Text style={[styles.sectionLabel, { color: t.muted }]}>COSMETIC BUNDLE</Text>
             <PanelCard phase={phase} style={styles.row}>
-              <View style={styles.rowInfo}>
-                <Text style={[styles.rowTitle, { color: t.title }]}>The Keeper&apos;s Collection</Text>
-                <Text style={[styles.rowDesc, { color: t.body }]}>
-                  The exclusive Eclipse tile set + Eclipse confetti. Equip them in the Cosmetic Shop.
-                </Text>
+              <View style={styles.rowTop}>
+                <StoreArtThumb artKey={PRODUCT_IDS.COSMETIC_BUNDLE} />
+                <View style={styles.rowInfo}>
+                  <Text style={[styles.rowTitle, { color: t.title }]}>The Keeper&apos;s Collection</Text>
+                  <Text style={[styles.rowDesc, { color: t.body }]}>
+                    The exclusive Eclipse tile set + Eclipse confetti. Equip them in the Cosmetic Shop.
+                  </Text>
+                </View>
               </View>
               {ownsBundle ? (
                 <Text style={[styles.ownedText, { color: t.amberText }]}>Owned ✦</Text>
@@ -862,17 +903,33 @@ const styles = StyleSheet.create({
   heroTitle: { fontSize: FONT_SIZE.title, fontWeight: '900', marginBottom: 2, fontFamily: PIXEL_FONT_BOLD },
   heroCta: { marginTop: 12 },
 
-  // Section rows — layered PanelCard material; consistent heights.
+  // Section rows — layered PanelCard material.
+  //
+  // Two-tier anatomy (thumbnail + text on top, action beneath) rather than one
+  // horizontal line. The cottage frames nest, so a row's own content box is only
+  // ~224dp wide on a 360dp screen (320 card - 2x28 panel band - 2x20 card band);
+  // a 56dp thumbnail AND an ~84dp price button on the same line would leave the
+  // name/description column ~68dp, and the Supporter blurb alone would run to a
+  // dozen lines. Dropping the action to its own tier gives the text 158dp, which
+  // is WIDER than the 132dp it had before the art existed (and much wider than
+  // the ~90dp the Daily Amber row had, since "Watch · +60" is a broad button).
   row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: 'column',
+    alignItems: 'stretch',
     paddingVertical: 12,
     paddingHorizontal: SURFACE.cardPadX,
     marginBottom: 8,
     minHeight: 68,
   },
-  rowInfo: { flex: 1, paddingRight: 8 },
+  // The thumbnail + text tier. `gap` is the only separation between them, so the
+  // text column keeps every dp the frame clearance left it (this is the store's
+  // version of the shop's trimmed body gutter: rowInfo's old paddingRight is
+  // gone, the space it held now sits between the art and the words).
+  rowTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  // NO borderRadius, NO border, NO overflow clip: the art is pixel work and
+  // CSS-rounding a baked corner is the documented cozy-pixel anti-pattern.
+  storeArt: { width: STORE_ART_DP, height: STORE_ART_DP },
+  rowInfo: { flex: 1 },
   rowTitleLine: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   rowTitle: { fontSize: FONT_SIZE.callout, fontWeight: '800', fontFamily: PIXEL_FONT_BOLD },
   ribbon: {
@@ -887,9 +944,20 @@ const styles = StyleSheet.create({
   },
   rowDesc: { fontSize: FONT_SIZE.small, marginTop: 3, lineHeight: 17, fontFamily: BODY_FONT },
 
-  // Price pill — chunky amber CandyButton (the single warm accent).
-  pricePill: { minWidth: 84 },
-  ownedText: { fontSize: FONT_SIZE.body, fontWeight: '800', paddingHorizontal: 8, fontFamily: PIXEL_FONT_BOLD },
+  // Price pill — chunky amber CandyButton (the single warm accent). Trails the
+  // row's text tier, pinned to the right edge so the prices still stack into one
+  // scannable column down the store.
+  pricePill: { minWidth: 84, alignSelf: 'flex-end', marginTop: 10 },
+  // Same slot, for the rewarded-clip button on the Daily Amber row.
+  rowAction: { alignSelf: 'flex-end', marginTop: 10 },
+  ownedText: {
+    fontSize: FONT_SIZE.body,
+    fontWeight: '800',
+    paddingHorizontal: 8,
+    fontFamily: PIXEL_FONT_BOLD,
+    alignSelf: 'flex-end',
+    marginTop: 10,
+  },
 
   patronLink: {
     marginTop: 16,

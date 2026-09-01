@@ -6,6 +6,7 @@ import {
   Modal,
   Animated,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { CandyColors } from '../../theme/colors';
 import { SURFACE, getSurfaceTheme, getModalInSpring } from '../../theme/surfaces';
@@ -14,6 +15,7 @@ import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { NineSliceFrame } from '../ui/NineSlice';
 import { CandyButton } from '../ui/CandyButton';
 import { PanelCard } from '../ui/PanelCard';
+import { getStoreArt } from './storeArt';
 import { AmberInline } from '../AmberInline';
 import {
   PRODUCT_IDS,
@@ -61,6 +63,27 @@ type FlowState = 'idle' | 'working' | 'unavailable';
 // price tier, which MUST be updated to match.
 export const PATRON_FALLBACK_PRICE = '$8.99';
 export const REMOVE_ADS_FALLBACK_PRICE = '$5.99';
+
+/** Rendered size of a store thumbnail (art is drawn at 192px: scales DOWN only). */
+const STORE_ART_DP = 56;
+
+/**
+ * The generated cottage thumbnail for one of this modal's two products.
+ * Decorative on purpose (`accessible={false}`): the heading and the CTA label
+ * already carry the semantics. Centred rather than leading, because this modal
+ * is a centred column and a left-aligned thumbnail would break its axis (and
+ * cost the copy width it does not have to spare).
+ *
+ * Never give this a borderRadius or a border - the art is pixel work.
+ */
+const StoreArtThumb: React.FC<{ artKey: string }> = ({ artKey }) => (
+  <Image
+    source={getStoreArt(artKey)}
+    style={styles.storeArt}
+    resizeMode="contain"
+    accessible={false}
+  />
+);
 
 /**
  * "Become a Patron" modal — cosmetic & convenience only.
@@ -299,6 +322,7 @@ export const PatronModal: React.FC<PatronModalProps> = ({
           <View style={[styles.glow, { backgroundColor: t.glow }]} />
 
           <Text style={[styles.eyebrow, { color: t.muted }]}>WORDSHIFT</Text>
+          <StoreArtThumb artKey={PRODUCT_IDS.PATRON_KEY} />
           <Text style={[styles.title, { color: t.title }]}>Become a Patron</Text>
           <Text style={[styles.subtitle, { color: t.body }]}>
             A one-time thank-you that dresses up the table, never the path through it.
@@ -351,6 +375,7 @@ export const PatronModal: React.FC<PatronModalProps> = ({
           {/* Secondary, cheaper tier: Remove Ads — your 2x rewards instantly, no ad. */}
           {!isPatron && !adFree && (
             <View style={styles.removeAdsBlock}>
+              <StoreArtThumb artKey={PRODUCT_IDS.REMOVE_ADS} />
               <Text style={[styles.removeAdsHint, { color: t.body }]}>
                 Just want the convenience? Skip the ads and claim your doubled
                 reward after each puzzle with a single tap.
@@ -437,6 +462,10 @@ const styles = StyleSheet.create({
     opacity: 0.25,
     borderRadius: 100,
   },
+  // NO borderRadius, NO border, NO overflow clip: the art is pixel work and
+  // CSS-rounding a baked corner is the documented cozy-pixel anti-pattern.
+  // Centred on the modal's axis, so it costs the copy no width at all.
+  storeArt: { width: STORE_ART_DP, height: STORE_ART_DP, alignSelf: 'center', marginTop: 6 },
   eyebrow: {
     fontSize: FONT_SIZE.caption,
     fontWeight: '800',
