@@ -21,12 +21,17 @@ import { isSacrificeAvailable, getSacrificePrompt } from '../../services/sacrifi
 import { canStartNewCycle } from '../../services/amberCurrency';
 
 // Candy-style UI icon sprites (cross-platform consistent, replaces emoji)
-const STAR_ICON = require('../../../assets/ui/star_filled.png');
+// Statistics wears the painted-bars stats sprite generateUiIcons drew for it
+// (it was generated but never consumed; the row borrowed the 3-star rating
+// star, which means "perfect solve" everywhere else).
+const STATS_ICON = require('../../../assets/ui/stats.png');
 const AMBER_ICON = require('../../../assets/ui/amber.png');
 // The How-to-Play row wore the hint bulb (a sprite that means "spend a hint"
 // on the board); the signpost (generateGameIcons chrome) says what it is.
 const RULES_ICON = require('../../../assets/ui/rules.png');
-const FLAME_ICON = require('../../../assets/ui/flame.png');
+// The Offering row shares the altar's own lit taper with SacrificeModal (the
+// streak flame it used to borrow means "days in a row" on every other surface).
+const CANDLE_ICON = require('../../../assets/ui/candle.png');
 const VOID_ICON = require('../../../assets/ui/void.png');
 // The Cosmetic Shop row borrowed an emote sparkle; the hanging shop sign is
 // the shop's own mark.
@@ -126,7 +131,7 @@ export const UtilityMenu: React.FC<UtilityMenuProps> = ({
               <HubRow
                 phase={phase}
                 hostDark={dtHostDark}
-                icon={STAR_ICON}
+                icon={STATS_ICON}
                 label="Statistics"
                 onPress={() => {
                   onClose();
@@ -189,7 +194,7 @@ export const UtilityMenu: React.FC<UtilityMenuProps> = ({
               <HubRow
                 phase={phase}
                 hostDark={dtHostDark}
-                icon={FLAME_ICON}
+                icon={CANDLE_ICON}
                 label={getSacrificePrompt(phase).title}
                 onPress={() => {
                   onClose();

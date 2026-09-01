@@ -314,9 +314,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 3,
   },
+  // 12dp floor: at 9dp the flame's contour and value steps averaged to a dot.
   streakBadgeFlame: {
-    width: 9,
-    height: 9,
+    width: 12,
+    height: 12,
     marginRight: 1,
   },
   streakBadgeText: {

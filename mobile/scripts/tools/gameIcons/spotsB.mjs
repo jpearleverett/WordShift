@@ -28,18 +28,26 @@
  *                    open mouth, the lesson the kitchen pot taught: a spout with
  *                    no opening reads as a second broken handle.
  *   shrine.png       the only serene piece: a mauve stone alcove with a lit
- *                    sill, a terracotta boat lamp whose flame stands at its
- *                    spout, and beside it a small brass ring on a peg with a
- *                    cream thread looped up through it and trailing onto the
- *                    sill. The recess is lit from BELOW by the lamp (dark at the
- *                    crown, warm at the floor), so the niche reads as holding
- *                    light rather than as a hole punched in the wall.
+ *                    sill, a footed terracotta bowl lamp with ONE big flame
+ *                    standing up out of its well of oil, and beside it a small
+ *                    brass ring on a peg with a cream thread looped through it
+ *                    and hanging in a V to the sill. The lamp is the hero: a
+ *                    first pass drew a boat lamp with the flame at its spout,
+ *                    and at 48px that was a brown dish beside a candle-flicker,
+ *                    while the thread run up one side and over the ring read as
+ *                    a walking cane. The recess is lit from BELOW by the lamp
+ *                    (dark at the crown, warm at the floor), so the niche reads
+ *                    as holding light rather than as a hole punched in the wall.
  *   spilled_ink.png  a glass inkpot tipped on its side pouring into a pool,
  *                    with a candy letter tile standing in the ink, split by one
- *                    jagged crack, and one chipped fragment beside it. The ink
- *                    is a blue-VIOLET held at mid value: the ash paper the
- *                    crash card sits on is itself a dark plum, and a true
- *                    blue-black pool would have sunk straight into it.
+ *                    jagged crack, and one chipped fragment beside it. The pot
+ *                    is round-shouldered with a thick pale glass rim and a cream
+ *                    label (a chamfered block read as a second tile); the crack
+ *                    runs down the tile's right third so the letter stays
+ *                    legible beside it. The ink is a blue-VIOLET held at mid
+ *                    value: the ash paper the crash card sits on is itself a
+ *                    dark plum, and a true blue-black pool would have sunk
+ *                    straight into it.
  *   notice.png       a parchment sheet with a real crease across its middle,
  *                    the lower flap pivoted a few degrees so the silhouette
  *                    kinks and the fold is visible in outline alone, a curled
@@ -103,6 +111,20 @@ function rectPtsL(R, lcx, lcy, hw, hh, ch = 0) {
     [lcx + hw, lcy + hh - ch], [lcx + hw - ch, lcy + hh], [lcx - hw + ch, lcy + hh],
     [lcx - hw, lcy + hh - ch], [lcx - hw, lcy - hh + ch],
   ].map(([x, y]) => R(x, y));
+}
+
+/** A ROUND-cornered rectangle in a rotated local frame (chamfers read as a gem). */
+function roundPtsL(R, lcx, lcy, hw, hh, rad, n = 7) {
+  const pts = [];
+  const corners = [[1, -1, -Math.PI / 2], [1, 1, 0], [-1, 1, Math.PI / 2], [-1, -1, Math.PI]];
+  for (const [sx, sy, a0] of corners) {
+    const cx = lcx + sx * (hw - rad), cy = lcy + sy * (hh - rad);
+    for (let i = 0; i <= n; i++) {
+      const a = a0 + (i / n) * (Math.PI / 2);
+      pts.push(R(cx + Math.cos(a) * rad, cy + Math.sin(a) * rad));
+    }
+  }
+  return pts;
 }
 
 /** A rotated oval as points (an axis-aligned `ellipse` cannot sit across a diagonal). */
@@ -283,32 +305,44 @@ export function draw() {
     ellipse(cv, 200, 344, 124, 104, '#FFF6E6', 0.3, 60);              // lamp light, uncontoured
     withOutline(cv, t => {
       // the arch: outer stone, a stepped inner band, then the recess
-      poly(t, archPts(c, 60, 152, 440), MAUVE.hi, 1, MAUVE.lo);
-      poly(t, archPts(c, 82, 130, 440), MAUVE.up, 1, MAUVE.base);
-      poly(t, archPts(c, 116, 104, 404), RECESS.top, 1, RECESS.bot);
-      ellipse(t, 224, 376, 88, 34, RECESS.lit, 0.6, 22);              // lamp light on the back wall
+      poly(t, archPts(c, 56, 156, 440), MAUVE.hi, 1, MAUVE.lo);
+      poly(t, archPts(c, 78, 134, 440), MAUVE.up, 1, MAUVE.base);
+      poly(t, archPts(c, 108, 110, 404), RECESS.top, 1, RECESS.bot);
+      ellipse(t, 222, 370, 104, 46, RECESS.lit, 0.7, 24);             // lamp light on the back wall
       // the sill
       roundRect(t, c, 420, 172, 22, 5, MAUVE.up, 1, MAUVE.deep);
       capsule(t, c - 160, 402, c + 160, 402, 6, MAUVE.hi, 0.7);
-      // the ring on its peg, thread looped through it
-      capsule(t, 330, 282, 330, 306, 11, MAUVE.deep);
-      capsule(t, 327, 284, 327, 304, 4, MAUVE.up, 0.6);
-      arcStroke(t, 330, 332, 26, 12, 0, Math.PI * 2, BRASS.lo);
-      arcStroke(t, 330, 332, 26, 6, Math.PI * 1.05, Math.PI * 1.75, BRASS.hi, 0.9);
-      const thread = [[298, 406], [318, 358], [330, 330], [340, 308], [352, 324], [358, 364], [354, 406]];
-      polyline(t, thread, 10, THREAD.lo);
-      polyline(t, thread.map(([x, y]) => [x - 1, y - 1]), 6, THREAD.base);
-      polyline(t, thread.map(([x, y]) => [x - 2, y - 2]), 2.5, THREAD.hi, 0.8);
-      // the clay lamp: a boat body, a filling hole, a spout with the flame at its lip
-      poly(t, ovalPts(226, 376, 68, 26, 0), CLAY.hi, 1, CLAY.lo);
-      poly(t, [[170, 366], [128, 352], [122, 366], [166, 392]], CLAY.base, 1, CLAY.lo);
-      ellipse(t, 240, 360, 15, 7, INK, 0.9, 2);
-      ellipse(t, 240, 359, 11, 5, CLAY.lo);
-      ellipse(t, 128, 360, 8, 6, INK, 0.9, 2);
-      fire(t, 130, 288, 362, 22, PEACE_FIRE);
+      // the ring on its peg, a thread looped through it hanging in a V to the sill.
+      // The first pass ran the thread up one side and over the top, and at 48px
+      // that read as a walking cane; two strands falling from the ring's hole
+      // is a ring-with-a-string in one glance.
+      capsule(t, 336, 268, 336, 296, 11, MAUVE.deep);
+      capsule(t, 333, 270, 333, 294, 4, MAUVE.up, 0.6);
+      arcStroke(t, 336, 322, 27, 12, 0, Math.PI * 2, BRASS.lo);
+      arcStroke(t, 336, 322, 27, 6, Math.PI * 1.05, Math.PI * 1.75, BRASS.hi, 0.9);
+      for (const strand of [[[336, 332], [318, 372], [312, 408]], [[336, 332], [356, 372], [364, 408]]]) {
+        polyline(t, strand, 10, THREAD.lo);
+        polyline(t, strand.map(([x, y]) => [x - 1, y - 1]), 6, THREAD.base);
+        polyline(t, strand.map(([x, y]) => [x - 2, y - 2]), 2.5, THREAD.hi, 0.8);
+      }
+      ellipse(t, 336, 338, 9, 8, THREAD.lo);                            // the knot
+      ellipse(t, 334, 336, 5, 4, THREAD.base);
+      // the clay lamp: a footed bowl, its rim open on a dark well of oil, and
+      // ONE big flame standing up out of it. It is the hero of the niche: the
+      // first pass drew a boat lamp with the flame at its spout and at delivery
+      // size that was a brown dish beside a candle-flicker.
+      const lx = 216;
+      roundRect(t, lx, 396, 40, 10, 4, CLAY.base, 1, CLAY.lo);          // foot
+      const bowl = [];
+      for (let i = 0; i <= 26; i++) { const a = (i / 26) * Math.PI; bowl.push([lx + Math.cos(a) * 70, 350 + Math.sin(a) * 44]); }
+      poly(t, bowl, CLAY.hi, 1, CLAY.lo);
+      ellipse(t, lx, 350, 70, 16, CLAY.base);                           // the rim's top face
+      ellipse(t, lx, 350, 60, 10, '#4A2814');                           // the well of oil
+      ellipse(t, lx - 18, 348, 20, 4, '#7C4A2A', 0.8);
+      fire(t, lx, 232, 360, 34, PEACE_FIRE);
     }, { width: CONTOUR });
     sheen(cv, 172, 148, 22, 30, 0.42);
-    sheen(cv, 206, 364, 16, 6, 0.5);
+    sheen(cv, 172, 372, 14, 20, 0.45);
     save(cv, 'shrine.png');
   }
 
@@ -319,22 +353,27 @@ export function draw() {
     const R = rot(bx, by, ang);                                         // the bottle's frame
     const T = rot(352, 318, -0.14);                                     // the tile's frame
     withOutline(cv, t => {
-      // the bottle: glass body, ink showing through, neck and lip, open mouth
-      poly(t, rectPtsL(R, 0, 0, 62, 54, 16), GLASS.hi, 1, GLASS.lo);
-      poly(t, rectPtsL(R, 0, 0, 50, 42, 12), INKP.hi, 1, INKP.lo);
-      capsule(t, ...R(-44, -46), ...R(40, -46), 8, '#FFFFFF', 0.45);
-      poly(t, rectPtsL(R, 78, 0, 18, 22, 4), GLASS.base, 1, GLASS.lo);
-      poly(t, rectPtsL(R, 100, 0, 8, 28, 3), GLASS.hi, 1, GLASS.lo);
-      poly(t, ovalPts(...R(108, 0), 6, 22, ang), INKP.lo);
-      // the tile: candy bevel, lighter face, a cream A, one jagged crack
+      // the bottle: a squat ROUND-shouldered glass pot (the first pass was a
+      // chamfered block and read as a blue tile), a thick pale glass rim, the
+      // ink showing through, a cream label, a wide neck and lip, open mouth
+      poly(t, roundPtsL(R, 0, 0, 62, 56, 30), GLASS.hi, 1, GLASS.lo);
+      poly(t, roundPtsL(R, 0, 0, 47, 41, 20), INKP.hi, 1, INKP.lo);
+      capsule(t, ...R(-36, -44), ...R(30, -44), 9, '#FFFFFF', 0.5);
+      poly(t, rectPtsL(R, -6, 6, 24, 16, 3), PAPER.hi, 1, PAPER.base);     // the label
+      capsule(t, ...R(-22, 6), ...R(10, 6), 5, PAPER.script, 0.7);
+      poly(t, rectPtsL(R, 78, 0, 18, 24, 4), GLASS.base, 1, GLASS.lo);
+      poly(t, rectPtsL(R, 100, 0, 8, 30, 3), GLASS.hi, 1, GLASS.lo);
+      poly(t, ovalPts(...R(108, 0), 6, 24, ang), INKP.lo);
+      // the tile: candy bevel, lighter face, a bold cream A, one jagged crack
+      // running down its RIGHT third so the letter stays legible beside it
       poly(t, rectPtsL(T, 0, 0, 68, 68, 16), TILE.base, 1, TILE.lo);
       poly(t, rectPtsL(T, 0, -4, 54, 52, 10), TILE.hi, 1, TILE.base);
-      const A = [[[-24, 34], [0, -34]], [[24, 34], [0, -34]], [[-13, 8], [13, 8]]];
-      for (const [[x1, y1], [x2, y2]] of A) capsule(t, ...T(x1 + 2, y1 + 3), ...T(x2 + 2, y2 + 3), 15, TILE.lo, 0.5);
-      for (const [[x1, y1], [x2, y2]] of A) capsule(t, ...T(x1, y1), ...T(x2, y2), 15, TILE.ink);
-      const crack = [[-14, -72], [2, -34], [-16, -8], [10, 28], [-4, 74]].map(p => T(...p));
+      const A = [[[-36, 36], [-12, -34]], [[12, 36], [-12, -34]], [[-25, 10], [1, 10]]];
+      for (const [[x1, y1], [x2, y2]] of A) capsule(t, ...T(x1 + 2, y1 + 3), ...T(x2 + 2, y2 + 3), 17, TILE.lo, 0.5);
+      for (const [[x1, y1], [x2, y2]] of A) capsule(t, ...T(x1, y1), ...T(x2, y2), 17, TILE.ink);
+      const crack = [[26, -72], [44, -40], [24, -10], [48, 28], [34, 74]].map(p => T(...p));
       polyline(t, crack, 9, INK, 0.95);
-      polyline(t, [T(2, -34), T(26, -46)], 7, INK, 0.95);
+      polyline(t, [T(44, -40), T(70, -52)], 7, INK, 0.95);
       polyline(t, crack.map(([x, y]) => [x + 4, y]), 3, '#FFFFFF', 0.35);
       // the chip that broke off
       poly(t, rectPtsL(rot(430, 386, 0.5), 0, 0, 16, 13, 4), TILE.base, 1, TILE.lo);

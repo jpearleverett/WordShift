@@ -4924,12 +4924,16 @@ function MainApp() {
                 accessible
                 accessibilityLabel="Speed Shift is on: this board is timed"
               >
+                {/* The Speed sprite (variant_speed.png, already in the mode-icon map)
+                    beside the label, like the sibling Blind / Lexicon / house badges;
+                    it used to be a raw '\u26A1' text glyph. */}
+                <Image source={getModeIconSprite('⚡')!} style={styles.variantBadgeIconImage} />
                 <Text style={[
                   styles.variantBadgeText,
                   persistence.currentPhase === 2 && styles.variantBadgeTextDusk,
                   persistence.currentPhase >= 3 && styles.variantBadgeTextDark,
                 ]}>
-                  {`\u26A1 Speed`}
+                  {'Speed'}
                 </Text>
               </BadgeAppear>
             )}

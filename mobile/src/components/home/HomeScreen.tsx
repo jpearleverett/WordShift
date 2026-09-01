@@ -97,14 +97,18 @@ const VOID_ICON = require('../../../assets/ui/void.png');
 // emoji glyphs. Keyed on the step's stable id so the mapping never depends on
 // an emoji codepoint. JOURNAL_ICON (above) covers the cover + ledger steps.
 const SCROLL_ICON = require('../../../assets/ui/scroll.png');
-const CALENDAR_ICON = require('../../../assets/ui/calendar.png');
 const SPARKLE_ICON = require('../../../assets/ui/emote_sparkle.png');
+// The gallery's own mark (generateUiIcons drew whisper.png for exactly this);
+// the hub row used to borrow the streak flame.
+const WHISPER_ICON = require('../../../assets/ui/whisper.png');
 function getJournalSpotlightStepSprite(stepId: string) {
   switch (stepId) {
     case 'gallery':
       return SCROLL_ICON;
     case 'quests':
-      return CALENDAR_ICON;
+      // The bullseye the quest pill and hub row wear, so the walkthrough
+      // teaches the mark the player will actually tap (was the DAILY calendar).
+      return QUEST_ICON;
     case 'open':
       return SPARKLE_ICON;
     case 'cover':
@@ -2516,7 +2520,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <HubRow
                 phase={progress.currentPhase}
                 hostDark={dtHostDark}
-                icon={FLAME_ICON}
+                icon={WHISPER_ICON}
                 label={getGalleryTitle(progress.currentPhase)}
                 onPress={() => {
                   setShowJournalModal(false);
