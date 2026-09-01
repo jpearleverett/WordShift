@@ -19,9 +19,9 @@ WordShift stores progress locally on your device and, while online, syncs a back
 
 In-game currency ("amber") and hints have no real-world cash value. Amber packs, hint packs, and other optional items are offered as in-app purchases, but they cannot be sold, transferred, redeemed for money, or exchanged outside the app. Game balance, rewards, and prices may be adjusted in updates.
 
-All purchases are processed by the app store you bought them through (Google Play, or Apple's App Store on iOS); the app itself cannot issue refunds, and refunds are handled under that store's policies. Consumable items (amber and hint packs) are credited to your game immediately on purchase and are used up as you spend them. One-time purchases (such as Remove Ads or the starter bundle) can be restored on a new device via **Settings → Restore Purchases**.
+All purchases are processed by the app store you bought them through (Google Play, or Apple's App Store on iOS); the app itself cannot issue refunds, and refunds are handled under that store's policies. Consumable items (amber and hint packs) are credited to your game immediately on purchase and are used up as you spend them. One-time purchases (such as Remove Ads or the starter bundle) can be restored on a new device via **Settings → Restore Purchases**. The optional "Supporter" subscription is an auto-renewing monthly purchase billed by your app store; it renews until you cancel it in that store's subscription settings, and it is likewise restored via Settings → Restore Purchases.
 
-The app shows advertising (occasional interstitial ads and reward ads you choose to watch). An optional one-time purchase removes interstitial ads.
+The app shows advertising (occasional interstitial ads, a banner on some menu screens, and reward ads you choose to watch). An optional one-time purchase, or an active Supporter subscription, removes the automatically shown ads.
 
 ## 3. Content
 

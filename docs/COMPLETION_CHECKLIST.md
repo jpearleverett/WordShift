@@ -144,9 +144,6 @@ line** (proves the locked-down Supabase RPCs end-to-end).
 
 - [x] `docs/GROWTH_STRATEGY.md` — corrected 2026-08-31 (now states the flag is deliberately
       `true` until the production cut, with the gate-test procedure).
-- [x] `docs/LAUNCH_CHECKLIST.md` — re-synced 2026-08-31 (versionCode 88 / v1.2.2, the OTA
-      runtime-coupling warning added to the ads-flip item, closed-test status note, fifth starred
-      iOS value `admobBannerIdIos`). Open boxes left honest — confirm the device-pass items.
 - [x] `docs/PRESS_KIT.md` — facts refreshed 2026-08-31 (v1.2.2, 56 achievements, 22,749 words,
       ~9,611 puzzles across 30 banks, real era depths). STILL OPEN: the press-contact placeholder (only the owner
       knows the address). Previously stale:
