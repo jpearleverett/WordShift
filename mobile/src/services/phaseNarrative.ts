@@ -3907,6 +3907,11 @@ export function getShopConfettiSectionLabel(phase: number): string {
   return 'CONFETTI';
 }
 
+export function getShopSparkSectionLabel(phase: number): string {
+  if (phase >= 3) return 'THE SPARK';
+  return 'MOVE SPARKS';
+}
+
 /** Label for the "no theme / default" option. */
 export function getShopDefaultThemeName(phase: number): string {
   if (phase >= 3) return 'Unadorned';
@@ -3916,6 +3921,11 @@ export function getShopDefaultThemeName(phase: number): string {
 export function getShopDefaultConfettiName(phase: number): string {
   if (phase >= 3) return 'Unadorned';
   return 'Classic (default)';
+}
+
+export function getShopDefaultSparkName(phase: number): string {
+  if (phase >= 3) return 'Unadorned';
+  return 'Bright (default)';
 }
 
 /** Locked-because-Patron note for entitlement-only cosmetics. */

@@ -8,8 +8,17 @@ import {
   StatusBar,
   ActivityIndicator,
   Animated,
+  Image,
 } from 'react-native';
-import { CandyColors, TILE_THEMES, CONFETTI_THEMES } from '../../theme/colors';
+import {
+  CandyColors,
+  TILE_THEMES,
+  CONFETTI_THEMES,
+  SPARK_THEMES,
+  getTileFinishForTheme,
+  TileFinish,
+} from '../../theme/colors';
+import { getShopArt, hasShopArt } from './shopArt';
 import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { CandyButton } from '../ui/CandyButton';
@@ -58,6 +67,8 @@ import {
   getShopDefaultThemeName,
   getShopConfettiSectionLabel,
   getShopDefaultConfettiName,
+  getShopSparkSectionLabel,
+  getShopDefaultSparkName,
   getShopPatronLockedLabel,
   getShopStoreBridgeText,
 } from '../../services/phaseNarrative';
@@ -125,10 +136,91 @@ interface PreviewProps {
   pulseToken?: number;
 }
 
-/** A small row of tiles previewing a tile palette. Tappable to demo the pulse. */
+/** Rendered size of a shop thumbnail. The art is drawn at 192px, so this only
+ *  ever scales DOWN. */
+const SHOP_ART_DP = 56;
+
+/**
+ * The generated cottage thumbnail for a purchasable. Decorative on purpose
+ * (`accessible={false}`): the card's name/description Text and the action
+ * button's label already carry the semantics, so the art adds no new strings.
+ * Never give this a borderRadius or a border — the art is pixel work.
+ */
+const ShopArtThumb: React.FC<{ artKey: string; scale?: Animated.Value }> = ({ artKey, scale }) => (
+  <Animated.View style={[styles.shopArtWrap, scale ? { transform: [{ scale }] } : null]}>
+    <Image source={getShopArt(artKey)} style={styles.shopArt} resizeMode="contain" accessible={false} />
+  </Animated.View>
+);
+
+/** Speckle positions for a preview tile (three of LetterTile's five spots, so
+ *  the wing dust reads at thumbnail scale without turning to mud). */
+const PREVIEW_SPECKS = [
+  { top: '20%' as const, left: '26%' as const },
+  { top: '52%' as const, left: '66%' as const },
+  { top: '74%' as const, left: '34%' as const },
+];
+
+/**
+ * One preview tile, painted with the theme's real palette AND its real
+ * TileFinish. The finish-led themes (wax, leaded glass, wing dust, cut stone)
+ * sell their MATERIAL rather than their hue, so a hue-only swatch would
+ * misrepresent the product: this mirrors LetterTile's own bevel / gloss /
+ * sweep / specular / rim / speckle / ink layers at thumbnail scale.
+ */
+const FinishTile: React.FC<{
+  char: string;
+  bg: string;
+  border: string;
+  finish: TileFinish;
+  large: boolean;
+  scale: Animated.Value;
+}> = ({ char, bg, border, finish, large, scale }) => (
+  <Animated.View
+    style={[
+      large ? styles.previewTileLarge : styles.previewTile,
+      { backgroundColor: bg, borderColor: border, transform: [{ scale }] },
+    ]}
+  >
+    <View pointerEvents="none" style={[styles.previewBevel, { backgroundColor: finish.bevel }]} />
+    <View pointerEvents="none" style={[styles.previewGloss, { backgroundColor: finish.gloss }]} />
+    <View pointerEvents="none" style={[styles.previewSweep, { backgroundColor: finish.sweep }]} />
+    {!!finish.rim && (
+      <View pointerEvents="none" style={[styles.previewRim, { borderColor: finish.rim }]} />
+    )}
+    {finish.grain === 'speckle' &&
+      PREVIEW_SPECKS.map((spot, i) => (
+        <View
+          key={i}
+          pointerEvents="none"
+          style={[styles.previewSpeck, spot, { backgroundColor: finish.grainColor }]}
+        />
+      ))}
+    {finish.specular !== 'none' && (
+      <View
+        pointerEvents="none"
+        style={[
+          styles.previewSpecular,
+          finish.specular === 'star' && styles.previewSpecularStar,
+          { backgroundColor: finish.specularColor },
+        ]}
+      />
+    )}
+    <Text style={[styles.previewTileText, { color: finish.ink ?? CandyColors.white }]}>{char}</Text>
+  </Animated.View>
+);
+
+/** A small row of tiles previewing a tile palette AND its finish, under the
+ *  item's cottage thumbnail. Tappable to demo the pulse. */
 const ThemePreview: React.FC<PreviewProps> = ({ themeId, pulseToken = 0 }) => {
   const palette = themeId && TILE_THEMES[themeId] ? TILE_THEMES[themeId] : CandyColors.tileColors;
-  const scales = useRef(PREVIEW_LETTERS.map(() => new Animated.Value(1))).current;
+  const finish = getTileFinishForTheme(themeId);
+  const artKey = themeId ?? 'theme_default';
+  const showArt = hasShopArt(artKey);
+  // [thumbnail, ...tiles] so the art leads playPulse's 60ms stagger.
+  const scales = useRef([
+    new Animated.Value(1),
+    ...PREVIEW_LETTERS.map(() => new Animated.Value(1)),
+  ]).current;
 
   const pulse = useCallback(() => {
     if (!previewMotionAllowed()) return;
@@ -146,32 +238,42 @@ const ThemePreview: React.FC<PreviewProps> = ({ themeId, pulseToken = 0 }) => {
       onPress={pulse}
       accessibilityRole="button"
       accessibilityLabel="Preview this tile theme"
-      style={styles.previewRow}
+      style={styles.previewColumn}
     >
-      {PREVIEW_LETTERS.map((ch, i) => {
-        const c = palette[i % palette.length];
-        return (
-          <Animated.View
-            key={ch}
-            style={[
-              styles.previewTile,
-              { backgroundColor: c.bg, borderColor: c.border, transform: [{ scale: scales[i] }] },
-            ]}
-          >
-            <Text style={styles.previewTileText}>{ch}</Text>
-          </Animated.View>
-        );
-      })}
+      {showArt && <ShopArtThumb artKey={artKey} scale={scales[0]} />}
+      <View style={styles.previewRow}>
+        {PREVIEW_LETTERS.map((ch, i) => {
+          const c = palette[i % palette.length];
+          return (
+            <FinishTile
+              key={ch}
+              char={ch}
+              bg={c.bg}
+              border={c.border}
+              finish={finish}
+              large={!showArt}
+              scale={scales[i + 1]}
+            />
+          );
+        })}
+      </View>
     </TouchableOpacity>
   );
 };
 
 const DEFAULT_CONFETTI = ['#FF6B9D', '#C44DFF', '#4DAFFF', '#FFD84D', '#4DE8C2', '#FF8C4D'];
 
+// Core + accent of the bright-days star burst, for the "no spark equipped" row.
+// With nothing equipped the real burst stays phase-aware and darkens with the
+// story (StarBurst's own phase table), which the default row's copy says.
+const DEFAULT_SPARK_CORES = ['#FFD700', '#FFFFFF'];
+
 /** A small scatter of dots previewing a confetti palette. Tappable to demo a mini-burst. */
 const ConfettiPreview: React.FC<PreviewProps> = ({ themeId, pulseToken = 0 }) => {
   const palette = themeId && CONFETTI_THEMES[themeId] ? CONFETTI_THEMES[themeId] : DEFAULT_CONFETTI;
-  const scales = useRef([0, 1, 2, 3, 4, 5].map(() => new Animated.Value(1))).current;
+  const artKey = themeId ?? 'confetti_default';
+  const showArt = hasShopArt(artKey);
+  const scales = useRef([0, 1, 2, 3, 4, 5, 6].map(() => new Animated.Value(1))).current;
 
   const pulse = useCallback(() => {
     if (!previewMotionAllowed()) return;
@@ -189,14 +291,76 @@ const ConfettiPreview: React.FC<PreviewProps> = ({ themeId, pulseToken = 0 }) =>
       onPress={pulse}
       accessibilityRole="button"
       accessibilityLabel="Preview this confetti palette"
-      style={styles.previewConfetti}
+      style={styles.previewColumn}
     >
-      {[0, 1, 2, 3, 4, 5].map(i => (
-        <Animated.View
-          key={i}
-          style={[styles.previewDot, { backgroundColor: palette[i % palette.length], transform: [{ scale: scales[i] }] }]}
-        />
-      ))}
+      {showArt && <ShopArtThumb artKey={artKey} scale={scales[0]} />}
+      <View style={styles.previewConfetti}>
+        {[0, 1, 2, 3, 4, 5].map(i => (
+          <Animated.View
+            key={i}
+            style={[
+              showArt ? styles.previewDot : styles.previewDotLarge,
+              { backgroundColor: palette[i % palette.length], transform: [{ scale: scales[i + 1] }] },
+            ]}
+          />
+        ))}
+      </View>
+    </TouchableOpacity>
+  );
+};
+
+/** Star diamonds previewing a move-spark palette: the same halo-behind-core
+ *  build StarBurst throws on a committed move, held still. From combo tier 2 up
+ *  alternate stars carry the accent, so the strip alternates core and accent. */
+const SparkPreview: React.FC<PreviewProps> = ({ themeId, pulseToken = 0 }) => {
+  const palette = themeId ? SPARK_THEMES[themeId] : undefined;
+  const artKey = themeId ?? 'spark_default';
+  const showArt = hasShopArt(artKey);
+  const scales = useRef([0, 1, 2, 3, 4, 5].map(() => new Animated.Value(1))).current;
+
+  const pulse = useCallback(() => {
+    if (!previewMotionAllowed()) return;
+    const a = playPulse(scales);
+    a.start();
+  }, [scales]);
+
+  useEffect(() => {
+    if (pulseToken > 0) pulse();
+  }, [pulseToken, pulse]);
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={pulse}
+      accessibilityRole="button"
+      accessibilityLabel="Preview this move spark"
+      style={styles.previewColumn}
+    >
+      {showArt && <ShopArtThumb artKey={artKey} scale={scales[0]} />}
+      <View style={styles.previewSparkRow}>
+        {[0, 1, 2, 3, 4].map(i => {
+          const core = palette
+            ? i % 2 === 1
+              ? palette.accent
+              : palette.bg
+            : DEFAULT_SPARK_CORES[i % DEFAULT_SPARK_CORES.length];
+          const halo = palette?.halo ?? core;
+          return (
+            <Animated.View
+              key={i}
+              style={[styles.previewSpark, { transform: [{ scale: scales[i + 1] }] }]}
+            >
+              <View style={[styles.previewSparkHalo, { backgroundColor: halo }]} />
+              <View
+                style={[
+                  showArt ? styles.previewSparkCore : styles.previewSparkCoreLarge,
+                  { backgroundColor: core },
+                ]}
+              />
+            </Animated.View>
+          );
+        })}
+      </View>
     </TouchableOpacity>
   );
 };
@@ -272,18 +436,23 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
 
   const tileThemes = useMemo(() => getCosmeticsByCategory('tile_theme'), []);
   const confettiThemes = useMemo(() => getCosmeticsByCategory('confetti'), []);
-  const allItems = useMemo(() => [...tileThemes, ...confettiThemes], [tileThemes, confettiThemes]);
+  const sparkThemes = useMemo(() => getCosmeticsByCategory('spark'), []);
+  const allItems = useMemo(
+    () => [...tileThemes, ...confettiThemes, ...sparkThemes],
+    [tileThemes, confettiThemes, sparkThemes],
+  );
 
   const refresh = useCallback(async () => {
     const ownedEntries = await Promise.all(
       allItems.map(async t => [t.id, await ownsCosmetic(t.id)] as const)
     );
-    const [tile, confetti] = await Promise.all([
+    const [tile, confetti, spark] = await Promise.all([
       getEquipped('tile_theme'),
       getEquipped('confetti'),
+      getEquipped('spark'),
     ]);
     setOwned(Object.fromEntries(ownedEntries));
-    setEquipped({ tile_theme: tile, confetti });
+    setEquipped({ tile_theme: tile, confetti, spark });
   }, [allItems]);
 
   const refreshHouse = useCallback(async () => {
@@ -389,10 +558,13 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
       // preview pulse, and the Equipped chip spring. Confetti self-skips under
       // reduced motion; the palette drives the color either way.
       setPurchaseReveal({ amount: cost, line: getCosmeticEquippedLine(phase), nonce: Date.now() });
+      const spark = SPARK_THEMES[item.id];
       const palette =
         item.category === 'tile_theme'
           ? (TILE_THEMES[item.id]?.map(c => c.bg) ?? [])
-          : (CONFETTI_THEMES[item.id] ?? []);
+          : item.category === 'spark'
+            ? (spark ? [spark.bg, spark.accent, spark.halo ?? spark.bg] : [])
+            : (CONFETTI_THEMES[item.id] ?? []);
       setCelebration(prev => ({ id: item.id, palette, token: (prev?.token ?? 0) + 1 }));
       if (palette.length > 0) setConfettiActive(true);
       await refresh();
@@ -670,11 +842,14 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     onBuy: () => void,
     a11y: string,
     extraLine?: string,
+    /** Art key, when it differs from the card key (attunements are level-keyed). */
+    artKey?: string,
   ) => {
     const isResolving = resolving?.key === key;
     return (
       <Animated.View key={key} style={isResolving ? { opacity: houseFade } : undefined}>
         <PanelCard phase={phase} kind="card" style={styles.card}>
+          <ShopArtThumb artKey={artKey ?? key} />
           <View style={styles.houseCardBody}>
             <Text style={[styles.cardName, { color: t.title }]}>{title}</Text>
             {extraLine ? (
@@ -788,9 +963,19 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
               ConfettiPreview,
             )}
             </EntranceCascadeItem>
+            <EntranceCascadeItem phase={phase} delay={getCascadeDelayMs(3, { baseMs: HEADER_CASCADE_BASE_MS })}>
+            {renderSection(
+              'spark',
+              getShopSparkSectionLabel(phase),
+              getShopDefaultSparkName(phase),
+              'The usual phase-aware burst.',
+              sparkThemes,
+              SparkPreview,
+            )}
+            </EntranceCascadeItem>
 
             {showHouseUpgrades && (
-              <EntranceCascadeItem phase={phase} delay={getCascadeDelayMs(3, { baseMs: HEADER_CASCADE_BASE_MS })}>
+              <EntranceCascadeItem phase={phase} delay={getCascadeDelayMs(4, { baseMs: HEADER_CASCADE_BASE_MS })}>
               <View>
                 <Text style={[styles.sectionLabel, { color: t.headerMuted }]}>HOUSE UPGRADES</Text>
                 {houseFeedback != null && (
@@ -828,6 +1013,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                     () => handleBuyAttunement(room.id),
                     `Attune ${room.name}, level ${info.level} of ${MAX_ATTUNEMENT_LEVEL}, ${info.name}, for ${info.cost} amber`,
                     `Attunement ${info.level} of ${MAX_ATTUNEMENT_LEVEL}`,
+                    `attune_${info.level}`,
                   ),
                 )}
               </View>
@@ -835,7 +1021,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
             )}
 
             {onOpenStore && (
-              <EntranceCascadeItem phase={phase} delay={getCascadeDelayMs(4, { baseMs: HEADER_CASCADE_BASE_MS })}>
+              <EntranceCascadeItem phase={phase} delay={getCascadeDelayMs(5, { baseMs: HEADER_CASCADE_BASE_MS })}>
               <TouchableOpacity
                 onPress={() => { hapticLight(); onOpenStore(); }}
                 accessibilityRole="button"
@@ -860,7 +1046,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
               </EntranceCascadeItem>
             )}
 
-            <EntranceCascadeItem phase={phase} delay={getCascadeDelayMs(5, { baseMs: HEADER_CASCADE_BASE_MS })}>
+            <EntranceCascadeItem phase={phase} delay={getCascadeDelayMs(6, { baseMs: HEADER_CASCADE_BASE_MS })}>
             <Text style={[styles.footnote, { color: t.headerMuted }]}>
               Cosmetics are for expression only. They never change the puzzle, the
               story, or your progress.
@@ -978,28 +1164,83 @@ const styles = StyleSheet.create({
   cardBody: { flex: 1, paddingHorizontal: 12 },
   cardName: { fontSize: FONT_SIZE.large, fontWeight: '800', fontFamily: PIXEL_FONT_BOLD },
   cardDesc: { fontSize: FONT_SIZE.small, fontWeight: '500', marginTop: 3, lineHeight: 17, fontFamily: BODY_FONT },
-  previewRow: { flexDirection: 'row', width: 96, flexWrap: 'wrap', gap: 4 },
+  // The leading column of a cosmetic card: cottage thumbnail over the live
+  // palette/material read. 96dp is the only slot that fits beside the body and
+  // the 96dp action button on a 360dp screen.
+  previewColumn: { width: 96, alignItems: 'center' },
+  // NO borderRadius, NO border, NO overflow clip: the art is pixel work and
+  // CSS-rounding a baked corner is the documented cozy-pixel anti-pattern.
+  shopArtWrap: {
+    width: SHOP_ART_DP,
+    height: SHOP_ART_DP,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shopArt: { width: SHOP_ART_DP, height: SHOP_ART_DP },
+  previewRow: { flexDirection: 'row', width: 96, justifyContent: 'center', gap: 4, marginTop: 6 },
   previewTile: {
+    width: 18,
+    height: 22,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  // Used when the item has no thumbnail yet, so the live material still reads
+  // as the row's leading visual.
+  previewTileLarge: {
     width: 22,
-    height: 26,
+    height: 28,
     borderRadius: 6,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
-  previewTileText: { color: CandyColors.white, fontSize: FONT_SIZE.small, fontWeight: '900', fontFamily: PIXEL_FONT_BOLD },
+  previewTileText: { color: CandyColors.white, fontSize: FONT_SIZE.caption, fontWeight: '900', fontFamily: PIXEL_FONT_BOLD, zIndex: 2 },
+  // Finish layers, mirroring LetterTile's own overlay stack at thumb scale.
+  previewBevel: { position: 'absolute', top: 0, left: 0, right: 0, height: '50%' },
+  previewGloss: { position: 'absolute', top: 2, left: 3, right: 3, height: 4, borderRadius: 2 },
+  previewSweep: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: '22%',
+    width: 5,
+    transform: [{ skewX: '-20deg' }],
+  },
+  previewRim: { ...StyleSheet.absoluteFill, borderWidth: 1 },
+  previewSpecular: { position: 'absolute', top: 3, right: 4, width: 4, height: 4, borderRadius: 2 },
+  previewSpecularStar: { borderRadius: 1, transform: [{ rotate: '45deg' }] },
+  previewSpeck: { position: 'absolute', width: 2, height: 2, borderRadius: 1 },
   previewConfetti: {
     width: 96,
-    height: 52,
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignContent: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 5,
+    marginTop: 6,
   },
-  previewDot: { width: 12, height: 12, borderRadius: 3 },
+  previewDot: { width: 10, height: 10, borderRadius: 3 },
+  previewDotLarge: { width: 13, height: 13, borderRadius: 4 },
+  // Move sparks: the halo-behind-core diamond StarBurst throws, held still.
+  previewSparkRow: {
+    width: 96,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    // 5 x 16 + 4 x 3 = 92, so the strip always clears the 96dp column.
+    gap: 3,
+    marginTop: 6,
+  },
+  previewSpark: { width: 16, height: 16, alignItems: 'center', justifyContent: 'center' },
+  previewSparkHalo: { position: 'absolute', width: 16, height: 16, borderRadius: 8, opacity: 0.32 },
+  previewSparkCore: { width: 9, height: 9, borderRadius: 2, transform: [{ rotate: '45deg' }] },
+  previewSparkCoreLarge: { width: 12, height: 12, borderRadius: 2, transform: [{ rotate: '45deg' }] },
   actionSlot: { minWidth: 96 },
-  houseCardBody: { flex: 1, paddingRight: 12 },
+  houseCardBody: { flex: 1, paddingHorizontal: 12 },
   houseFeedback: {
     fontSize: FONT_SIZE.small,
     fontWeight: '600',

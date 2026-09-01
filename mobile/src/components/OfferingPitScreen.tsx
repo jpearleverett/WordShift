@@ -18,6 +18,8 @@ import {
   getOverlayBannerTheme,
   getPhaseTheme,
   getTileColor,
+  getTileFinish,
+  DEFAULT_TILE_FINISH,
   PIT_BACKGROUND_COLORS as PIT_BG_COLORS,
   PIT_DEVOUR_COLORS as DEVOUR_COLORS,
 } from '../theme/colors';
@@ -374,15 +376,28 @@ interface ShockwaveRing {
 
 const MiniCandyTile = React.memo(({ char }: { char: string }) => {
   const color = getTileColor(char);
+  // The equipped tile theme's MATERIAL, so a bought finish reads at the pit too
+  // (bevel, specular treatment and ink only — the speckle is deliberately not
+  // extended here, since the pit floats many words at once).
+  const finish = getTileFinish();
+  const finishActive = finish !== DEFAULT_TILE_FINISH;
   return (
     <View style={tileStyles.outer}>
       <View style={[tileStyles.body, { backgroundColor: color.bg }]}>
         {/* Top bevel highlight */}
-        <View style={tileStyles.bevel} />
-        {/* Specular dot */}
-        <View style={tileStyles.specular} />
+        <View style={[tileStyles.bevel, finishActive && { backgroundColor: finish.bevel }]} />
+        {/* Specular dot (a hard glint or nothing, per the finish) */}
+        {finish.specular !== 'none' && (
+          <View
+            style={[
+              tileStyles.specular,
+              finishActive && { backgroundColor: finish.specularColor },
+              finish.specular === 'star' && tileStyles.specularStar,
+            ]}
+          />
+        )}
         {/* Letter */}
-        <Text style={tileStyles.letter}>{char}</Text>
+        <Text style={[tileStyles.letter, !!finish.ink && { color: finish.ink }]}>{char}</Text>
       </View>
       {/* 3D bottom edge */}
       <View style={[tileStyles.edge, { backgroundColor: color.border }]} />
@@ -423,6 +438,10 @@ const tileStyles = StyleSheet.create({
     height: 4,
     borderRadius: 2,
     backgroundColor: 'rgba(255,255,255,0.65)',
+  },
+  specularStar: {
+    borderRadius: 0,
+    transform: [{ rotate: '45deg' }],
   },
   letter: {
     fontFamily: PIXEL_FONT_BOLD,

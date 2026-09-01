@@ -59,6 +59,7 @@ import {
   setEquippedTileTheme,
   TILE_THEMES,
   CONFETTI_THEMES,
+  SPARK_THEMES,
 } from '../theme/colors';
 import {
   REWARDED_DAILY_CAP,
@@ -605,5 +606,39 @@ describe('cosmetics', () => {
   it('every amber confetti theme has a matching palette in CONFETTI_THEMES', () => {
     COSMETICS.filter(c => c.category === 'confetti' && c.acquisition.kind === 'amber')
       .forEach(c => expect(CONFETTI_THEMES[c.id]).toBeDefined());
+  });
+
+  it('supports an independent spark category (buy/equip + sync)', async () => {
+    expect(getEquippedSync('spark')).toBeUndefined();
+    expect(await ownsCosmetic('spark_hearth')).toBe(false);
+    expect(await recordAmberCosmeticPurchase('spark_hearth')).toBe(true);
+    expect(await equipCosmetic('spark_hearth')).toBe(true);
+    expect(await getEquipped('spark')).toBe('spark_hearth');
+    expect(getEquippedSync('spark')).toBe('spark_hearth');
+    // The spark selection is independent of the other two categories.
+    expect(getEquippedSync('tile_theme')).toBeUndefined();
+    expect(getEquippedSync('confetti')).toBeUndefined();
+  });
+
+  it('every amber spark has a matching palette in SPARK_THEMES', () => {
+    COSMETICS.filter(c => c.category === 'spark' && c.acquisition.kind === 'amber')
+      .forEach(c => expect(SPARK_THEMES[c.id]).toBeDefined());
+  });
+
+  it('the spark selection survives alongside a tile theme and confetti', async () => {
+    await recordAmberCosmeticPurchase('theme_ember');
+    await equipCosmetic('theme_ember');
+    await recordAmberCosmeticPurchase('confetti_gold');
+    await equipCosmetic('confetti_gold');
+    await recordAmberCosmeticPurchase('spark_ash');
+    await equipCosmetic('spark_ash');
+    expect(getEquippedSync('tile_theme')).toBe('theme_ember');
+    expect(getEquippedSync('confetti')).toBe('confetti_gold');
+    expect(getEquippedSync('spark')).toBe('spark_ash');
+    // Unequipping one category leaves the others intact.
+    await unequipCosmetic('spark');
+    expect(getEquippedSync('spark')).toBeUndefined();
+    expect(getEquippedSync('tile_theme')).toBe('theme_ember');
+    expect(getEquippedSync('confetti')).toBe('confetti_gold');
   });
 });

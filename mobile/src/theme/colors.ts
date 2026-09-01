@@ -190,6 +190,57 @@ export const TILE_THEMES: Record<string, TilePalette> = {
     { bg: '#B08A2E', border: '#856822', glow: 'rgba(176, 138, 46, 0.55)' },
     { bg: '#63449A', border: '#483270', glow: 'rgba(99, 68, 154, 0.55)' },
   ],
+  // ---------------------------------------------------------------------------
+  // FINISH-LED tile themes. These are sold on their MATERIAL (see TILE_FINISHES
+  // below) rather than on hue alone: the finish repaints the bevel, gloss,
+  // specular, sweep, rim and speckle on EVERY tile of the board, so the purchase
+  // is visible on tiles the player is not currently touching. Hue stays
+  // phase-owned exactly as before.
+  // ---------------------------------------------------------------------------
+  // Beeswax and Honey: warm waxy creams. The candy gloss goes away entirely.
+  theme_beeswax: [
+    { bg: '#F0D9A8', border: '#BFA97C', glow: 'rgba(240, 217, 168, 0.45)' },
+    { bg: '#E8C27A', border: '#B99A5C', glow: 'rgba(232, 194, 122, 0.45)' },
+    { bg: '#D9AE63', border: '#AB8749', glow: 'rgba(217, 174, 99, 0.45)' },
+    { bg: '#F5E4C0', border: '#C4B394', glow: 'rgba(245, 228, 192, 0.45)' },
+    { bg: '#E2B876', border: '#B4915C', glow: 'rgba(226, 184, 118, 0.45)' },
+    { bg: '#CFA05A', border: '#A37E45', glow: 'rgba(207, 160, 90, 0.45)' },
+    { bg: '#EDD09A', border: '#BCA378', glow: 'rgba(237, 208, 154, 0.45)' },
+    { bg: '#DCC08C', border: '#AF976E', glow: 'rgba(220, 192, 140, 0.45)' },
+  ],
+  // Cathedral Glass: jewel panes held in dark leading (the finish adds the rim).
+  theme_glasswork: [
+    { bg: '#2F5FA8', border: '#16305C', glow: 'rgba(47, 95, 168, 0.5)' },
+    { bg: '#8B2942', border: '#4E1524', glow: 'rgba(139, 41, 66, 0.5)' },
+    { bg: '#1F7A5E', border: '#0F4234', glow: 'rgba(31, 122, 94, 0.5)' },
+    { bg: '#7E5C14', border: '#4A360C', glow: 'rgba(126, 92, 20, 0.5)' },
+    { bg: '#5B3E8E', border: '#33224F', glow: 'rgba(91, 62, 142, 0.5)' },
+    { bg: '#1F6E7A', border: '#0F3B42', glow: 'rgba(31, 110, 122, 0.5)' },
+    { bg: '#A8456B', border: '#5E2439', glow: 'rgba(168, 69, 107, 0.5)' },
+    { bg: '#8F5624', border: '#553215', glow: 'rgba(143, 86, 36, 0.5)' },
+  ],
+  // Moth-wing: pale dust with a faint iridescence (the finish adds the speckle).
+  theme_mothwing: [
+    { bg: '#C4BCAE', border: '#948D82', glow: 'rgba(196, 188, 174, 0.4)' },
+    { bg: '#B9B4AC', border: '#8B8781', glow: 'rgba(185, 180, 172, 0.4)' },
+    { bg: '#C9C4CE', border: '#979298', glow: 'rgba(201, 196, 206, 0.4)' },
+    { bg: '#CDBFA9', border: '#9A8F7F', glow: 'rgba(205, 191, 169, 0.4)' },
+    { bg: '#B6C2BC', border: '#88918C', glow: 'rgba(182, 194, 188, 0.4)' },
+    { bg: '#C0B8C8', border: '#908A96', glow: 'rgba(192, 184, 200, 0.4)' },
+    { bg: '#BDB3A6', border: '#8E867C', glow: 'rgba(189, 179, 166, 0.4)' },
+    { bg: '#CAC6D2', border: '#97949D', glow: 'rgba(202, 198, 210, 0.4)' },
+  ],
+  // Cut Obsidian: volcanic glass with a violet-green sheen and a star glint.
+  theme_obsidian: [
+    { bg: '#221E2E', border: '#12101A', glow: 'rgba(34, 30, 46, 0.5)' },
+    { bg: '#2A2340', border: '#161228', glow: 'rgba(42, 35, 64, 0.5)' },
+    { bg: '#1E2630', border: '#0F141C', glow: 'rgba(30, 38, 48, 0.5)' },
+    { bg: '#33284A', border: '#1C1530', glow: 'rgba(51, 40, 74, 0.5)' },
+    { bg: '#20302C', border: '#111A18', glow: 'rgba(32, 48, 44, 0.5)' },
+    { bg: '#2C2436', border: '#181322', glow: 'rgba(44, 36, 54, 0.5)' },
+    { bg: '#282038', border: '#151022', glow: 'rgba(40, 32, 56, 0.5)' },
+    { bg: '#1B1B26', border: '#0D0D14', glow: 'rgba(27, 27, 38, 0.5)' },
+  ],
   theme_patron: [
     { bg: '#FFD479', border: '#CCA85B', glow: 'rgba(255, 212, 121, 0.55)' },
     { bg: '#F5C04D', border: '#C4993D', glow: 'rgba(245, 192, 77, 0.55)' },
@@ -257,6 +308,156 @@ function getActiveTilePalette(): TilePalette {
   }
   return CandyColors.tileColors;
 }
+
+// ----------------------------------------------------------------------------
+// Tile FINISH (Cosmetic Shop)
+// ----------------------------------------------------------------------------
+// A palette only ever reaches the active source row's unlocked tiles (the one
+// `getStyles()` branch in LetterTile that reads `getTileColor`), so a bought
+// theme used to show on about eight tiles. A FINISH repaints the tile's
+// MATERIAL layers instead — bevel, gloss, specular, shine sweep, an optional
+// cut rim and an optional static speckle — and those render on EVERY tile at
+// every phase, so the whole board's surface changes.
+//
+// HUE stays phase-owned: a finish never recolors a locked, selected, completed
+// or future tile's body. It only touches white-alpha overlays (plus the source
+// tile's ink and the interactable halo), so the board still darkens with the
+// story exactly as before.
+
+export interface TileFinish {
+  /** `styles.bevelTop` backgroundColor (the top-half highlight). */
+  bevel: string;
+  /** `styles.glossyShine` backgroundColor (the candy shine bar). */
+  gloss: string;
+  /** Specular treatment: today's round dot, a 45deg square glint, or nothing. */
+  specular: 'dot' | 'star' | 'none';
+  /** Specular color (ignored when `specular` is 'none'). */
+  specularColor: string;
+  /** `styles.shineSweep` backgroundColor (the travelling glass sweep). */
+  sweep: string;
+  /** Optional 1px inner rim inside the tile body (lead came / a cut edge). */
+  rim?: string;
+  /** Static speckle overlay. Device-tier gated for node count, never motion. */
+  grain?: 'none' | 'speckle';
+  /** Speckle color; carry the alpha here. */
+  grainColor?: string;
+  /** Letter ink for SOURCE tiles only (phase branches keep their own ink). */
+  ink?: string;
+  /** Opaque halo color for the interactable/selected outer glow. */
+  aura?: string;
+}
+
+/**
+ * The shipped candy finish. These four values MUST stay byte-identical to the
+ * literals in LetterTile's `bevelTop` / `glossyShine` / `specularDot` /
+ * `shineSweep` styles: every theme without a TILE_FINISHES entry (and every
+ * player who has bought nothing) resolves to this, so the default board must
+ * render exactly as it did before finishes existed.
+ */
+export const DEFAULT_TILE_FINISH: TileFinish = {
+  bevel: 'rgba(255, 255, 255, 0.25)',
+  gloss: 'rgba(255, 255, 255, 0.4)',
+  specular: 'dot',
+  specularColor: 'rgba(255, 255, 255, 0.7)',
+  sweep: 'rgba(255, 255, 255, 0.45)',
+};
+
+/**
+ * Finishes by tile-theme id. Only the finish-led themes appear here; the
+ * palette-led ones (ember/tide/bone/verdant/static/sovereign/patron/eclipse)
+ * deliberately have no entry and keep the default candy material.
+ */
+export const TILE_FINISHES: Record<string, TileFinish> = {
+  // Pressed wax: the gloss and the specular go away entirely. The most
+  // dramatic change available, and it is pure alpha.
+  theme_beeswax: {
+    bevel: 'rgba(255, 252, 240, 0.10)',
+    gloss: 'rgba(255, 250, 235, 0.07)',
+    specular: 'none',
+    specularColor: 'rgba(255, 250, 235, 0.35)',
+    sweep: 'rgba(255, 248, 230, 0.12)',
+    ink: '#3E2C12',
+  },
+  // Leaded glass: dark rim, no specular, and one bright narrow sweep that
+  // reads as light coming THROUGH the pane rather than off it.
+  theme_glasswork: {
+    bevel: 'rgba(255, 255, 255, 0.06)',
+    gloss: 'rgba(255, 255, 255, 0.14)',
+    specular: 'none',
+    specularColor: 'rgba(255, 255, 255, 0.5)',
+    sweep: 'rgba(255, 255, 255, 0.55)',
+    rim: 'rgba(18, 14, 26, 0.65)',
+    ink: '#FFF6E0',
+    aura: '#3A2F5E',
+  },
+  // Wing dust: near-matte with a static speckle over every tile.
+  theme_mothwing: {
+    bevel: 'rgba(255, 255, 255, 0.14)',
+    gloss: 'rgba(245, 242, 235, 0.10)',
+    specular: 'none',
+    specularColor: 'rgba(255, 255, 255, 0.4)',
+    sweep: 'rgba(240, 236, 228, 0.16)',
+    grain: 'speckle',
+    grainColor: 'rgba(58, 52, 46, 0.42)',
+    ink: '#2E2A26',
+    aura: '#8E8878',
+  },
+  // Cut stone: a hard star glint instead of the soft candy dot, plus a pale
+  // cut rim and a cold violet halo.
+  theme_obsidian: {
+    bevel: 'rgba(200, 190, 255, 0.07)',
+    gloss: 'rgba(180, 200, 255, 0.16)',
+    specular: 'star',
+    specularColor: 'rgba(235, 240, 255, 0.9)',
+    sweep: 'rgba(210, 220, 255, 0.30)',
+    rim: 'rgba(180, 190, 230, 0.28)',
+    ink: '#DCD6EE',
+    aura: '#4A3A7A',
+  },
+};
+
+/**
+ * The finish for a specific theme id (or the default for null/unknown ids).
+ * Used by the shop to preview a theme the player has not equipped.
+ */
+export function getTileFinishForTheme(id: string | null | undefined): TileFinish {
+  return (id && TILE_FINISHES[id]) || DEFAULT_TILE_FINISH;
+}
+
+/**
+ * The finish of the currently equipped tile theme. Resolves off the same
+ * `activeTileThemeId` module variable the palette uses, so there is no extra
+ * plumbing and no import cycle. Returns the DEFAULT_TILE_FINISH object itself
+ * when nothing is equipped (callers may compare by reference to detect that).
+ */
+export function getTileFinish(): TileFinish {
+  return getTileFinishForTheme(activeTileThemeId);
+}
+
+// ----------------------------------------------------------------------------
+// Move sparks (Cosmetic Shop)
+// ----------------------------------------------------------------------------
+// The star burst fires on every committed move, which makes it the most-seen
+// visual in the game. An equipped spark replaces the phase-default burst colors
+// (pure expression); the burst's count, spread and physics still follow the
+// phase and the combo tier.
+
+export interface SparkPalette {
+  /** Core color of most stars. */
+  bg: string;
+  /** Alternate core carried by every other star from combo tier 2 up. */
+  accent: string;
+  /** Optional halo tint. Defaults to the star's own core color. */
+  halo?: string;
+}
+
+export const SPARK_THEMES: Record<string, SparkPalette> = {
+  spark_hearth: { bg: '#FFB347', accent: '#FFF0C8', halo: '#D4802A' },
+  spark_pollen: { bg: '#D9E08A', accent: '#FFFDE0', halo: '#A8B054' },
+  spark_saltgrain: { bg: '#DCEAF2', accent: '#FFFFFF', halo: '#8FA9B8' },
+  spark_thread: { bg: '#E0C46A', accent: '#C0A8D8', halo: '#9E863C' },
+  spark_ash: { bg: '#8C8790', accent: '#D9563F', halo: '#5A555E' },
+};
 
 // Sparkle/star colors for effects
 export const SparkleColors = [
