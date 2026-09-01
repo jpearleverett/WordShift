@@ -75,6 +75,22 @@ export function playUiSound(kind: UiSoundKind = 'tap', arg?: number): void {
  * phaseTransitionEvent clears. Guarded like playUiSound. Deliberately routed
  * here (not a direct audio import) so ceremony components stay expo-audio-free.
  */
+/**
+ * Guarded selection haptic for presentational components — the touch twin of
+ * playUiSound (never a static expo-haptics import in their graph, so Node-env
+ * component tests keep loading without native stubs). Settings gating happens
+ * inside the haptics service.
+ */
+export function uiHapticSelection(): void {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const haptics = require('./haptics');
+    haptics.hapticSelection?.();
+  } catch {
+    // No native haptics layer in this environment — silent by design.
+  }
+}
+
 export function stopCeremonyMusic(): void {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports

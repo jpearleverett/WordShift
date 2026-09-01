@@ -32,6 +32,7 @@ import { getWhisperGalleryEmptyText } from '../services/phaseNarrative';
 import { AnimalType, DialoguePhase } from '../types/homeWorld';
 import { CHARACTER_SPRITES } from './home/AnimalSprite';
 import { FONT_SIZE } from '../theme/typeScale';
+import { playUiSound, uiHapticSelection } from '../services/uiSound';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -224,7 +225,14 @@ export const WhisperGalleryScreen: React.FC<WhisperGalleryScreenProps> = ({
     const headerBody = (
       <View style={isNewest ? styles.shimmerClip : undefined}>
         <TouchableOpacity
-          onPress={() => setExpandedAnimal(isExpanded ? null : animalType)}
+          onPress={() => {
+            // The gallery's most-used gesture finally ticks (the quiet
+            // selection sound, so expanding a collection reads lighter than
+            // committing an action).
+            playUiSound('selection');
+            uiHapticSelection();
+            setExpandedAnimal(isExpanded ? null : animalType);
+          }}
           accessibilityLabel={`${animalName}: ${entriesTotal} entries`}
           accessibilityRole="button"
           activeOpacity={0.85}
@@ -324,7 +332,7 @@ export const WhisperGalleryScreen: React.FC<WhisperGalleryScreenProps> = ({
       <View style={[styles.header, { paddingTop: screenInsets.top + 16 }]}>
         <TouchableOpacity
           style={[styles.backChip, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}
-          onPress={onClose}
+          onPress={() => { playUiSound('selection'); uiHapticSelection(); onClose(); }}
           accessibilityLabel="Go back"
           accessibilityRole="button"
         >

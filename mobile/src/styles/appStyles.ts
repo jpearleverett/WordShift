@@ -143,6 +143,29 @@ export const appStyles = StyleSheet.create({
     fontSize: FONT_SIZE.headline,
     fontFamily: BODY_FONT,
   },
+  headerHomeIcon: {
+    width: 22,
+    height: 22,
+    resizeMode: 'contain',
+  },
+  // Phase aging for the two header circles (home + help) and the speed pill —
+  // the last bright HUD chrome. Same three-step register the difficulty chip
+  // and variant badges use: dusk cools, dark drops to the translucent dread
+  // fill, void adds the faint crimson border. The circles recede with the
+  // board; they never vanish (still clearly tappable at phase 4).
+  headerCircleDusk: {
+    backgroundColor: 'rgba(45, 25, 70, 0.5)',
+  },
+  headerCircleDark: {
+    backgroundColor: 'rgba(20, 10, 40, 0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(180, 150, 220, 0.25)',
+  },
+  headerCircleVoid: {
+    backgroundColor: 'rgba(20, 10, 30, 0.6)',
+    borderWidth: 1,
+    borderColor: 'rgba(120, 40, 80, 0.4)',
+  },
   // Invisible layout stand-in for the withheld home button during onboarding:
   // identical footprint (the wordmark stays centered), ZERO visible chrome —
   // no background, no border, nothing to read as an empty dead circle.
@@ -546,6 +569,15 @@ export const appStyles = StyleSheet.create({
     borderRadius: 16,
     marginBottom: 6,
     marginTop: 2,
+  },
+  // Phase aging for the speed pill's RESTING fill only — the urgent/critical
+  // red overrides come later in the style array and still cut through at
+  // every phase.
+  speedTimerDusk: {
+    backgroundColor: 'rgba(45, 25, 70, 0.45)',
+  },
+  speedTimerDark: {
+    backgroundColor: 'rgba(20, 10, 40, 0.5)',
   },
   speedTimerUrgent: {
     backgroundColor: 'rgba(210, 40, 70, 0.85)',

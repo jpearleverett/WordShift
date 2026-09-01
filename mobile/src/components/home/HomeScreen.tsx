@@ -62,6 +62,7 @@ import {
   markHarvestHomeIntroSeen,
   hasSeenUnbrokenWeaveIntro,
   markUnbrokenWeaveIntroSeen,
+  canStartNewCycle,
 } from '../../services/amberCurrency';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
 import { AUTO_COLLECT_PUZZLE_LIMIT, HARVEST_NUDGE_MIN_AMBER, JOURNAL_UNLOCK_PUZZLES } from '../../constants/gameBalance';
@@ -183,7 +184,7 @@ import { getSettingsSync } from '../../services/settings';
 import { getUnlockedVariants } from '../../services/puzzleVariety';
 import { getPendingHarvestSummary, HarvestSummary } from '../../services/wordHarvest';
 import { getLocalDateString, daysAgoLocal } from '../../services/dateUtils';
-import { getHomeAmbientLine, getFoxPitNudgeLines, getShopTitle, getGoalSuggestion, getEventAmbientLine, getNextFriendPrompt } from '../../services/phaseNarrative';
+import { getHomeAmbientLine, getFoxPitNudgeLines, getShopTitle, getGoalSuggestion, getEventAmbientLine, getNextFriendPrompt, getNewCycleTitle } from '../../services/phaseNarrative';
 import { getActiveEvent } from '../../services/liveEvents';
 import { DailyChallengeCard } from '../DailyChallengeCard';
 import { isDailyChallengeUnlocked, getDailyStatus } from '../../services/dailyChallenge';
@@ -211,6 +212,12 @@ interface HomeScreenProps {
   onOpenShop?: () => void;
   onOpenStore?: () => void;
   onOpenPit?: () => void;
+  /**
+   * Begin a New Cycle from home (the utility-menu row shows only when
+   * canStartNewCycle() resolves true). The host owns the confirm, the
+   * ceremony, and the session rebuild — this just opens the door.
+   */
+  onStartNewCycle?: () => void;
   /** Current onboarding step (undefined when onboarding is complete) */
   onboardingStep?: OnboardingStep;
   /** Advance onboarding to next step */
@@ -595,6 +602,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onOpenShop,
   onOpenStore,
   onOpenPit,
+  onStartNewCycle,
   pitPhaseReady,
   onboardingStep,
   onAdvanceOnboarding,
@@ -710,6 +718,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [showSeasonModal, setShowSeasonModal] = useState(false);
   const [seasonClaimable, setSeasonClaimable] = useState(0);
   const [showUtilityModal, setShowUtilityModal] = useState(false);
+  // Whether the New Cycle door shows in the utility menu (true endgame only).
+  const [canCycle, setCanCycle] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
 
   // Ambient home line (atmospheric text when idle)
@@ -778,6 +788,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       getRoomsWithStatus(),
       getAnimalsWithStatus(),
     ]);
+
+    // The New Cycle door in the utility menu (Phase-5 true endgame only —
+    // canStartNewCycle gates on post-revelation, so this stays false for the
+    // whole first descent).
+    canStartNewCycle().then(setCanCycle).catch(() => {});
 
     if (claimed) {
       // Distinct arrival for a reserved room that finished its own wait: a
@@ -2764,6 +2779,23 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   setShowSacrificeModal(true);
                 }}
                 accessibilityLabel="Open sacrifice"
+              />
+            )}
+            {/* The Pattern Continues — the New Cycle door, IN the world the
+                Phase-5 player actually lives on. Previously findable only in
+                Settings, which the in-world pointer lines are forbidden from
+                naming; this row IS the door those lines allude to. */}
+            {canCycle && onStartNewCycle && (
+              <HubRow
+                phase={progress.currentPhase}
+                hostDark={dtHostDark}
+                icon={VOID_ICON}
+                label={getNewCycleTitle()}
+                onPress={() => {
+                  setShowUtilityModal(false);
+                  onStartNewCycle();
+                }}
+                accessibilityLabel={getNewCycleTitle()}
               />
             )}
           </SpringIn>

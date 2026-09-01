@@ -63,6 +63,7 @@ import {
 import { hapticLight, hapticMedium, hapticSuccess } from '../../services/haptics';
 import { isPatronSync } from '../../services/entitlements';
 import { FONT_SIZE } from '../../theme/typeScale';
+import { playUiSound, uiHapticSelection } from '../../services/uiSound';
 
 interface ShopScreenProps {
   phase: number;
@@ -711,7 +712,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
       <View style={[styles.header, { paddingTop: screenInsets.top + 12 }]}>
         <TouchableOpacity
           style={[styles.backChip, { backgroundColor: chipBg, borderColor: t.headerChipBorder }]}
-          onPress={onClose}
+          onPress={() => { playUiSound('selection'); uiHapticSelection(); onClose(); }}
           accessibilityLabel="Go back"
           accessibilityRole="button"
         >

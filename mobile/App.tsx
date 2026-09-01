@@ -40,7 +40,7 @@ import { useVictoryOrchestration } from './src/hooks/useVictoryOrchestration';
 import { useOnboardingFlow } from './src/hooks/useOnboardingFlow';
 import { useAutosave } from './src/hooks/useAutosave';
 import { logEvent } from './src/services/eventLogger';
-import { SettingsScreen } from './src/components/SettingsScreen';
+import { SettingsScreen, performNewCycle } from './src/components/SettingsScreen';
 import { FoxGuide } from './src/components/FoxGuide';
 import {
   COLD_OPEN_INSTRUCTION,
@@ -106,7 +106,7 @@ import { announceForA11y } from './src/services/a11yAnnounce';
 import { initAudio, setAudioPhase, startMusicForScreen, type MusicScreen, soundVictory, soundPerfect, soundValidMove, soundMidpointTurn, soundInvalidMove, soundUndo, soundHint, soundTap, soundUiTap, soundSelection, soundLetterSelect, soundDailyReady } from './src/services/audio';
 import { stopCeremonyMusic } from './src/services/uiSound';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess, hapticWarning, hapticError, hapticSelection } from './src/services/haptics';
+import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess, hapticWarning, hapticError, hapticSelection, hapticMoveCommit } from './src/services/haptics';
 import { getVariantTutorialIntroLines } from './src/services/animalDialogue';
 import {
   getPhaseIndicator,
@@ -132,6 +132,9 @@ import {
   getVariantNudgeMessage,
   getDailyHostLine,
   getNewCycleOpeningLine,
+  getNewCycleTitle,
+  getNewCycleDescription,
+  getNewCycleCTA,
   getDailyLadderLine,
   getDailyLadderTrendLabel,
   getEventDailyBonusLine,
@@ -164,7 +167,7 @@ import {
   UnbrokenWeaveMastery,
 } from './src/services/masteryRecords';
 import { maybePromptReview } from './src/services/reviewPrompt';
-import { getPhaseTransitionEvent, PhaseTransitionEvent, HOUSE_COMPLETION_EVENT, FINAL_PUZZLE_EVENT, buildFinalPuzzleEvent, POST_REVELATION_EVENT } from './src/services/phaseEvents';
+import { getPhaseTransitionEvent, PhaseTransitionEvent, HOUSE_COMPLETION_EVENT, FINAL_PUZZLE_EVENT, buildFinalPuzzleEvent, POST_REVELATION_EVENT, NEW_CYCLE_EVENT } from './src/services/phaseEvents';
 import { generateDailyPuzzle, prewarmDailyPuzzle, isDailyChallengeUnlocked, recordDailyCompletion, getDailyStatus, checkDailyStreakMilestone, grantFirstDailyMercy, getDailyHostName, getDailyDifficulty } from './src/services/dailyChallenge';
 import { recordDailyLadderResult, getDailyLadderSummary, shouldShowTrend } from './src/services/dailyLadder';
 import { startFrameMonitoring, stopFrameMonitoring } from './src/services/performanceMonitor';
@@ -1799,6 +1802,36 @@ function MainApp() {
     rebuildSessionFromStorage({ restartOnboarding: true });
   }, [rebuildSessionFromStorage]);
 
+  // New Cycle from the HOME surface (the Phase-5 player's actual home). The
+  // Settings "The Pattern" section remains; this is the discoverable door —
+  // the in-world pointer lines allude to a way to begin again, and a player
+  // who never browses Settings previously had no path to it at all. Same
+  // confirm, same committed performNewCycle, same serene ceremony; the
+  // ceremony's completion rebuilds the running session in place (the exact
+  // flow Settings runs via onCloudRestored).
+  const pendingCycleRebuildRef = useRef(false);
+  const handleStartNewCycleFromHome = useCallback(() => {
+    showGameAlert(
+      getNewCycleTitle(),
+      getNewCycleDescription(),
+      [
+        { text: 'Not yet', style: 'cancel' },
+        {
+          text: getNewCycleCTA(),
+          onPress: async () => {
+            try {
+              await performNewCycle();
+            } catch {
+              return; // nothing committed — no ceremony, no rebuild
+            }
+            pendingCycleRebuildRef.current = true;
+            setPhaseTransitionEvent(NEW_CYCLE_EVENT);
+          },
+        },
+      ]
+    );
+  }, []);
+
   // Re-check today's daily leaderboard standing (tapping the completed daily
   // card). The standing used to be shown exactly once, on completion; this gives
   // it a re-check surface (assessment §7). Degrades gracefully when the backend
@@ -2905,12 +2938,11 @@ function MainApp() {
         return;
       }
 
-      // Escalated haptics for drag-drop: heavy thud vs medium tap
-      if (wasDragDrop) {
-        hapticHeavy();
-      } else {
-        hapticMedium();
-      }
+      // Escalated haptics for drag-drop (heavy thud vs medium tap), aged by
+      // phase: from Growing Shadows the commit gains a delayed soft
+      // after-strike (the ponderous settle the heavy tile springs show the
+      // eye), and at Terrible Peace it softens to a single medium.
+      hapticMoveCommit(persistence.currentPhase, wasDragDrop);
       // Audio combo ladder: the chime climbs with the clean-move streak
       // (tier 0 base → 1/2/3; dark variants resolve inside audio.ts).
       soundValidMove(result.comboTier ?? 0);
@@ -4455,6 +4487,7 @@ function MainApp() {
               onOpenShop={() => transitionTo('shop')}
               onOpenStore={() => setShowStoreModal(true)}
               onOpenPit={() => transitionTo('pit')}
+              onStartNewCycle={handleStartNewCycleFromHome}
               onboardingStep={onboardingFlow.onboardingStep}
               onAdvanceOnboarding={onboardingActions.advanceOnboarding}
               pitPhaseReady={persistence.pendingPhaseTransition != null}
@@ -4545,12 +4578,21 @@ function MainApp() {
           {/* Hide home button during onboarding tutorial */}
           {!onboardingFlow.isOnboarding ? (
             <TouchableOpacity
-              style={styles.headerHomeButton}
+              style={[
+                styles.headerHomeButton,
+                persistence.currentPhase === 2 && styles.headerCircleDusk,
+                persistence.currentPhase >= 3 && styles.headerCircleDark,
+                persistence.currentPhase >= 4 && styles.headerCircleVoid,
+              ]}
               onPress={handleGoHome}
               accessibilityLabel="Go home"
               accessibilityRole="button"
             >
-              <Text style={styles.headerHomeText}>{'\uD83C\uDFE0'}</Text>
+              {getModeIconSprite('house') ? (
+                <Image source={getModeIconSprite('house')!} style={styles.headerHomeIcon} />
+              ) : (
+                <Text style={styles.headerHomeText}>{'\uD83C\uDFE0'}</Text>
+              )}
             </TouchableOpacity>
           ) : (
             /* The home route is deliberately withheld during onboarding, but
@@ -4588,12 +4630,19 @@ function MainApp() {
           </View>
 
           <TouchableOpacity
-            style={styles.helpButton}
+            style={[
+              styles.helpButton,
+              persistence.currentPhase === 2 && styles.headerCircleDusk,
+              persistence.currentPhase >= 3 && styles.headerCircleDark,
+              persistence.currentPhase >= 4 && styles.headerCircleVoid,
+            ]}
             onPress={() => puzzleActions.setShowRules(true)}
             accessibilityLabel="How to play"
             accessibilityRole="button"
           >
-            <View style={styles.helpButtonShine} />
+            {/* The candy shine reads as a smudge on the dark tinted fills
+                (same rule the toast applies) — bright phases only. */}
+            {persistence.currentPhase < 3 && <View style={styles.helpButtonShine} />}
             <Text style={styles.helpButtonText}>?</Text>
           </TouchableOpacity>
         </View>
@@ -4911,6 +4960,8 @@ function MainApp() {
         {speedTimer.speedTimeRemaining !== null && (
           <View style={[
             styles.speedTimerContainer,
+            persistence.currentPhase === 2 && styles.speedTimerDusk,
+            persistence.currentPhase >= 3 && styles.speedTimerDark,
             speedTimer.speedTimeRemaining <= 10 && styles.speedTimerUrgent,
             speedTimer.speedTimeRemaining <= SPEED_TICK_CRITICAL_SEC && styles.speedTimerCritical,
           ]}>
@@ -5321,6 +5372,7 @@ function MainApp() {
           visible={orchestration.showWhisper}
           animalName={orchestration.whisper?.animalName || ''}
           whisperText={orchestration.whisper?.text || ''}
+          animalType={orchestration.whisper?.animalType}
           phase={persistence.currentPhase}
           onComplete={orchestrationActions.dismissWhisper}
           topInset={screenInsets.top}
@@ -5537,7 +5589,16 @@ function MainApp() {
       {/* Phase transition overlay — renders above ALL screens */}
       <PhaseTransitionOverlay
         event={phaseTransitionEvent}
-        onComplete={() => setPhaseTransitionEvent(null)}
+        onComplete={() => {
+          setPhaseTransitionEvent(null);
+          // A home-launched New Cycle ceremony hands off to the in-place
+          // session rebuild once its overlay clears (mirrors Settings'
+          // handleCycleCeremonyComplete -> onCloudRestored).
+          if (pendingCycleRebuildRef.current) {
+            pendingCycleRebuildRef.current = false;
+            rebuildSessionFromStorage({ restartOnboarding: false });
+          }
+        }}
       />
       {/* Shareable result card preview — overlays everything */}
       <ShareResultModal

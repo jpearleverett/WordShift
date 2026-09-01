@@ -1,8 +1,9 @@
 import React, { useEffect, useRef } from 'react';
-import { Text, StyleSheet, Animated } from 'react-native';
-import { DialoguePhase } from '../../types/homeWorld';
+import { Text, StyleSheet, Animated, Image, View } from 'react-native';
+import { AnimalType, DialoguePhase } from '../../types/homeWorld';
 import { getSettingsSync } from '../../services/settings';
 import { BODY_FONT_ITALIC, PIXEL_FONT_BOLD } from '../../theme/fonts';
+import { CHARACTER_SPRITES } from '../home/AnimalSprite';
 
 interface AnimalWhisperProps {
   visible: boolean;
@@ -12,6 +13,13 @@ interface AnimalWhisperProps {
   onComplete: () => void;
   /** Safe-area top inset so the banner clears the status bar / notch. */
   topInset?: number;
+  /**
+   * The whispering animal, for the small spectral portrait beside the text.
+   * Follows the house-wide robe rule (robed from Phase 4); when absent or
+   * unknown the banner keeps its portrait-less layout (e.g. some
+   * personalized Phase-5 templates).
+   */
+  animalType?: string;
 }
 
 const FADE_IN_DURATION = 400;
@@ -30,6 +38,7 @@ export const AnimalWhisper: React.FC<AnimalWhisperProps> = ({
   phase,
   onComplete,
   topInset = 0,
+  animalType,
 }) => {
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -114,6 +123,16 @@ export const AnimalWhisper: React.FC<AnimalWhisperProps> = ({
       ? styles.nameMuted
       : styles.nameLight;
 
+  // The speaker's face follows the whisper into the puzzle room: idle in the
+  // bright phases (attachment when it matters most), ROBED from Phase 4 — a
+  // robed figure silently whispering over the victory modal. Kept small and
+  // slightly translucent so the ghost-like register survives; nothing renders
+  // when the type is unknown, and the a11y label already speaks name + text.
+  const sprites = animalType
+    ? CHARACTER_SPRITES[animalType as AnimalType]
+    : undefined;
+  const portrait = sprites ? (phase >= 4 ? sprites.robed : sprites.idle) : undefined;
+
   return (
     <Animated.View
       style={[styles.container, containerStyle, { top: topInset + 12, opacity: opacityAnim, transform: [{ translateY: driftY }] }]}
@@ -121,8 +140,20 @@ export const AnimalWhisper: React.FC<AnimalWhisperProps> = ({
       accessibilityRole="text"
       accessibilityLabel={`${animalName} whispers: ${whisperText}`}
     >
-      <Text style={[styles.nameText, nameStyle]}>{animalName}</Text>
-      <Text style={[styles.whisperText, textStyle]}>{whisperText}</Text>
+      {portrait ? (
+        <View style={styles.row}>
+          <Image source={portrait} style={styles.portrait} resizeMode="contain" />
+          <View style={styles.textColumn}>
+            <Text style={[styles.nameText, styles.nameTextRow, nameStyle]}>{animalName}</Text>
+            <Text style={[styles.whisperText, styles.whisperTextRow, textStyle]}>{whisperText}</Text>
+          </View>
+        </View>
+      ) : (
+        <>
+          <Text style={[styles.nameText, nameStyle]}>{animalName}</Text>
+          <Text style={[styles.whisperText, textStyle]}>{whisperText}</Text>
+        </>
+      )}
     </Animated.View>
   );
 };
@@ -165,6 +196,21 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(18, 9, 14, 0.96)',
     borderColor: 'rgba(200, 70, 80, 0.30)',
   },
+  // Portrait row layout: face | name-over-text. The column keeps the text's
+  // max width in check so long whispers wrap beside the portrait.
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  portrait: {
+    width: 38,
+    height: 38,
+    marginRight: 10,
+    opacity: 0.9,
+  },
+  textColumn: {
+    flexShrink: 1,
+  },
   nameText: {
     fontFamily: PIXEL_FONT_BOLD,
     fontSize: 11,
@@ -172,6 +218,12 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     textTransform: 'uppercase',
     marginBottom: 4,
+  },
+  nameTextRow: {
+    textAlign: 'left',
+  },
+  whisperTextRow: {
+    textAlign: 'left',
   },
   // Light inks on the now-solid dark banners (were dark inks tuned for the old
   // translucent light pill, which vanished on the bright modal). All clear

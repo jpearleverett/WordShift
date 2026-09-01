@@ -98,6 +98,9 @@ const NARRATIVE_VOICE_MAX_ATTEMPTS = 20;
 export interface WhisperData {
   animalName: string;
   text: string;
+  /** The speaking animal, so the banner can show its (phase-appropriate)
+   *  portrait. Optional — some personalized templates carry no type. */
+  animalType?: string;
 }
 
 export interface InterjectionData {
@@ -517,7 +520,11 @@ export function useVictoryOrchestration(): [
             // is computed eagerly, but becoming VISIBLE waits its turn.
             revealWhenFree(() => {
               if (gen !== generationRef.current) return;
-              setWhisper({ animalName: whisperData.animalName, text: whisperData.text });
+              setWhisper({
+                animalName: whisperData.animalName,
+                text: whisperData.text,
+                animalType: whisperData.animalType,
+              });
               setShowWhisper(true);
               // A whisper surfaces — the sound of being noticed. Not on the finale.
               if (!suppressCeremonyCues) { playUiSound('whisper'); hapticLight(); }

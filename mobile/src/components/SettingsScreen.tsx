@@ -83,6 +83,7 @@ import { clearDailyLadder } from '../services/dailyLadder';
 import { clearOfferingRequests } from '../services/offeringRequests';
 import { clearReviewPrompt } from '../services/reviewPrompt';
 import { FONT_SIZE } from '../theme/typeScale';
+import { playUiSound, uiHapticSelection } from '../services/uiSound';
 
 const AMBER_ICON = require('../../assets/ui/amber.png');
 
@@ -749,7 +750,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
         <View style={[styles.header, { paddingTop: screenInsets.top + 16 }]}>
           <TouchableOpacity
             style={[styles.backChip, { backgroundColor: skeletonChipBg, borderColor: st.headerChipBorder }]}
-            onPress={onClose}
+            onPress={() => { playUiSound('selection'); uiHapticSelection(); onClose(); }}
             accessibilityRole="button"
             accessibilityLabel="Back to home"
           >
@@ -784,7 +785,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
       <View style={[styles.header, { paddingTop: screenInsets.top + 16 }]}>
         <TouchableOpacity
           style={[styles.backChip, { backgroundColor: chipBg, borderColor: t.headerChipBorder }]}
-          onPress={onClose}
+          onPress={() => { playUiSound('selection'); uiHapticSelection(); onClose(); }}
           accessibilityRole="button"
           accessibilityLabel="Back to home"
         >

@@ -9,6 +9,7 @@ import {
   Image,
   Dimensions,
   Animated,
+  ActivityIndicator,
   Easing,
 } from 'react-native';
 import { PIXEL_FONT_BOLD } from '../theme/fonts';
@@ -19,10 +20,12 @@ import { EntranceCascadeItem, getCascadeDelayMs } from './ui/RewardReveal';
 import { useScreenInsets } from '../hooks/useScreenInsets';
 import { DialoguePhase } from '../types/homeWorld';
 import { getFullProgress } from '../services/amberCurrency';
+import { getWordPhaseTier } from '../services/localGenerator';
 import { getWordsOfferedText } from '../services/phaseNarrative';
 import { getSettingsSync } from '../services/settings';
 import { shouldSimplifyAnimations } from '../services/deviceTier';
 import { FONT_SIZE } from '../theme/typeScale';
+import { playUiSound, uiHapticSelection } from '../services/uiSound';
 
 // Cap the staggered chips so a long ledger (up to 500 words) snaps the rest in.
 const CHIP_CASCADE_CAP = 10;
@@ -40,17 +43,14 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const JOURNAL_ICON = require('../../assets/ui/journal.png');
 
-// Dread words that glow differently at higher phases
-const DREAD_WORD_SET = new Set([
-  'VOID', 'EMPTY', 'HOLLOW', 'FADE', 'WANE', 'DECAY', 'ALONE', 'LOST',
-  'DRIFT', 'SINK', 'FALL', 'DOOM', 'DARK', 'COLD', 'NUMB', 'GRAVE',
-  'ECHO', 'ABYSS', 'RIFT', 'DREAD', 'FEAR', 'SHADOW', 'SHADE', 'GHOST',
-  'ASH', 'DUST', 'TOMB', 'CRYPT', 'RUIN', 'END', 'FINAL', 'LAST',
-  'GATE', 'PORTAL', 'RIFT', 'SUMMON', 'RITUAL', 'VOID', 'NOTHING',
-  'OBLIVION', 'DARKNESS', 'SILENCE', 'STILL', 'FROZEN', 'DEAD', 'BONE',
-]);
-
-const isDread = (word: string): boolean => DREAD_WORD_SET.has(word.toUpperCase());
+// Dread highlighting keys off the CANONICAL 615-word tier system (the same
+// map that scores boards, tile resonance, and move resonance) — the old local
+// ~46-word list here missed marquee vocabulary like OMEN and WRAITH, so the
+// words the descent worked hardest to serve rendered as plain chips in the
+// one screen whose premise is "the words remember". Tier >= 2 matches the old
+// set's emptiness register (tier 1 is the broad curiosity band — THINK,
+// DRIFT — and highlighting it would light half the ledger).
+const isDread = (word: string): boolean => getWordPhaseTier(word.toUpperCase()) >= 2;
 
 // The newest dread chips (post-reversal) that visibly breathe with a slow
 // opacity pulse once the dread arc has truly deepened (phase >= 3) -- the
@@ -117,6 +117,9 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
   const screenInsets = useScreenInsets();
   const [words, setWords] = useState<string[]>([]);
   const [totalFormed, setTotalFormed] = useState(0);
+  // Loading gate so a 500-word ledger never flashes the wrong empty card
+  // while the async read resolves (mirrors WhisperGalleryScreen).
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadWords();
@@ -129,6 +132,8 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
       setTotalFormed(progress.totalWordsFormed || 0);
     } catch {
       setWords([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -207,9 +212,15 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
   const breatheRank = useMemo(() => {
     const m = new Map<number, number>();
     if (phase < 3) return m;
-    for (let i = 0; i < displayWords.length && m.size < DREAD_BREATHE_CAP; i++) {
-      if (isDread(displayWords[i])) m.set(i, m.size);
+    // The DEEPEST chips breathe first (tier desc, then newest-first): the
+    // freshest tier-3/4 offerings are the ones that feel faintly alive.
+    const candidates: { index: number; tier: number }[] = [];
+    for (let i = 0; i < displayWords.length; i++) {
+      const tier = getWordPhaseTier(displayWords[i].toUpperCase());
+      if (tier >= 2) candidates.push({ index: i, tier });
     }
+    candidates.sort((a, b) => (b.tier - a.tier) || (a.index - b.index));
+    for (const c of candidates.slice(0, DREAD_BREATHE_CAP)) m.set(c.index, m.size);
     return m;
   }, [displayWords, phase]);
 
@@ -289,7 +300,7 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
       <View style={styles.header}>
         <TouchableOpacity
           style={[styles.backChip, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}
-          onPress={onClose}
+          onPress={() => { playUiSound('selection'); uiHapticSelection(); onClose(); }}
           accessibilityLabel="Close ledger"
           accessibilityRole="button"
         >
@@ -332,16 +343,22 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
         windowSize={5}
         removeClippedSubviews
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <PanelCard phase={phase} kind="card" style={styles.emptyCard}>
-              <Image source={JOURNAL_ICON} style={styles.emptyIcon} resizeMode="contain" />
-              <Text style={[styles.emptyText, { color: t.body }]}>
-                {phase <= 1
-                  ? 'Complete puzzles to start your word collection!'
-                  : 'The ledger awaits your first offering.'}
-              </Text>
-            </PanelCard>
-          </View>
+          loading ? (
+            <View style={styles.emptyState}>
+              <ActivityIndicator color={t.muted} />
+            </View>
+          ) : (
+            <View style={styles.emptyState}>
+              <PanelCard phase={phase} kind="card" style={styles.emptyCard}>
+                <Image source={JOURNAL_ICON} style={styles.emptyIcon} resizeMode="contain" />
+                <Text style={[styles.emptyText, { color: t.body }]}>
+                  {phase <= 1
+                    ? 'Complete puzzles to start your word collection!'
+                    : 'The ledger awaits your first offering.'}
+                </Text>
+              </PanelCard>
+            </View>
+          )
         }
       />
     </View>
