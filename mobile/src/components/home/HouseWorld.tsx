@@ -45,16 +45,22 @@ const SKY_AFTERNOON = require('../../../assets/environment/sky_afternoon.webp');
 const SKY_DUSK = require('../../../assets/environment/sky_dusk.webp');
 const SKY_STORM = require('../../../assets/environment/sky_storm.webp');
 const SKY_SHADOW = require('../../../assets/environment/sky_shadow.webp');
+// Terrible Peace sky: derived from sky_shadow by scripts/tools/settleSkies.mjs
+// (ember eyes extinguished, crimson drained, mauve settle) — the shadow has
+// settled, so Phase 5 no longer reuses the Phase-4 art.
+const SKY_PEACE = require('../../../assets/environment/sky_peace.webp');
 const ROOF_IMG = require('../../../assets/environment/roof.png');
 // Per-phase foundations (hand-lit per phase: day green -> dusk dry -> night
-// blue), indexed by game phase; phase 5 reuses the shadow foundation, like the
-// sky. All normalized to one box size so the house never jumps between phases.
+// blue -> settled mauve), indexed by game phase. foundation_5 is derived from
+// foundation_4 by settleSkies.mjs (alpha preserved). All normalized to one box
+// size so the house never jumps between phases.
 const FOUNDATION_IMGS = [
   require('../../../assets/environment/foundation_0.png'),
   require('../../../assets/environment/foundation_1.png'),
   require('../../../assets/environment/foundation_2.png'),
   require('../../../assets/environment/foundation_3.png'),
   require('../../../assets/environment/foundation_4.png'),
+  require('../../../assets/environment/foundation_5.png'),
 ];
 const WALL_IMG = require('../../../assets/environment/wall.png');
 const EDGE_SHADOW_IMG = require('../../../assets/environment/wall_edge_shadow.png');
@@ -667,6 +673,82 @@ const shootingStarStyles = StyleSheet.create({
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// DISTANT HEAT LIGHTNING — Phase 3 ONLY. The storm sky finally stirs.
+// ═══════════════════════════════════════════════════════════════════════════
+// For the longest single-sky stretch of the descent (floor 62 to the reveal
+// at ~90) the "oppressive pre-storm night" was a static image. This is a
+// rare, silent, two-pulse flicker on the upper sky band: cold pale slate, so
+// faint it reads as weather at the horizon, never a render glitch. Phase 4+
+// deliberately excluded — that sky belongs to the entity, and the "honestly
+// empty" rule stays true there. No thunder: silent lightning is wronger.
+// Self-scheduling timer (the ShootingStar pattern, no perpetual loop);
+// callers gate on ambientMotionEnabled so reduced motion / low tier skip it.
+const LIGHTNING_MIN_GAP_MS = 60000;
+const LIGHTNING_GAP_RANGE_MS = 90000;
+const LIGHTNING_PEAK_OPACITY = 0.07;
+
+const DistantLightning: React.FC = () => {
+  const flash = useRef(new Animated.Value(0)).current;
+  const mountedRef = useRef(true);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const animationRef = useRef<Animated.CompositeAnimation | null>(null);
+
+  useEffect(() => {
+    mountedRef.current = true;
+
+    const strike = () => {
+      if (!mountedRef.current) return;
+      // Two-pulse flicker: a short lick, a breath, a longer one.
+      const anim = Animated.sequence([
+        Animated.timing(flash, { toValue: 1, duration: 60, useNativeDriver: true }),
+        Animated.timing(flash, { toValue: 0, duration: 120, useNativeDriver: true }),
+        Animated.delay(140),
+        Animated.timing(flash, { toValue: 0.8, duration: 80, useNativeDriver: true }),
+        Animated.timing(flash, { toValue: 0, duration: 260, useNativeDriver: true }),
+      ]);
+      animationRef.current = anim;
+      anim.start(() => {
+        if (!mountedRef.current) return;
+        timeoutRef.current = setTimeout(
+          strike,
+          LIGHTNING_MIN_GAP_MS + Math.random() * LIGHTNING_GAP_RANGE_MS
+        );
+      });
+    };
+
+    // First strike waits a full gap — the sky must not perform on arrival.
+    timeoutRef.current = setTimeout(
+      strike,
+      LIGHTNING_MIN_GAP_MS + Math.random() * LIGHTNING_GAP_RANGE_MS
+    );
+
+    return () => {
+      mountedRef.current = false;
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      if (animationRef.current) animationRef.current.stop();
+    };
+  }, []);
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: SCREEN_HEIGHT * 0.38,
+        backgroundColor: '#AEB8CC',
+        opacity: flash.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, LIGHTNING_PEAK_OPACITY],
+        }),
+      }}
+    />
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
 // NIGHT STAR GLINT - two-View sparkle (replaces the ✦ glyph, F13/F64)
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -738,14 +820,15 @@ const nightStarStyles = StyleSheet.create({
 // Sampled from assets/environment/sky_*.png (scripts/tools/reworkSkies.mjs
 // prints the storm/shadow samples; re-sample if the sky assets regenerate).
 // Phase→sky mapping mirrors the <Image source> below: 0=day, 1=afternoon,
-// 2=dusk, 3=storm, 4+=shadow (Phase 5 reuses sky_shadow).
+// 2=dusk, 3=storm, 4=shadow, 5=peace (settleSkies.mjs prints the peace
+// samples).
 const PHASE_BG_COLORS: Record<number, string> = {
   0: '#439cf2', // sky_day.png top row
   1: '#1583f9', // sky_afternoon.png top row
   2: '#684381', // sky_dusk.png top row
   3: '#000000', // sky_storm.png top row (post-rework pre-storm night)
   4: '#050816', // sky_shadow.png top row
-  5: '#050816', // Phase 5 renders sky_shadow too — same top row
+  5: '#181328', // sky_peace.webp top row (settled mauve night)
 };
 
 // Ground seam guard below the sky image. The sky Image is bottom-anchored to
@@ -761,7 +844,7 @@ const PHASE_GROUND_COLORS: Record<number, string> = {
   2: '#6d4018', // sky_dusk.png bottom row
   3: '#192330', // sky_storm.png bottom row (post-rework drained meadow)
   4: '#182131', // sky_shadow.png bottom row
-  5: '#182131', // Phase 5 renders sky_shadow too
+  5: '#2d273d', // sky_peace.webp bottom row (mauve-settled meadow)
 };
 
 // Per-phase house lighting. The house art is drawn in daylight; these tints
@@ -1146,19 +1229,23 @@ const ShadowFigure: React.FC<{ phase: number }> = ({ phase }) => {
   const isStatic = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
   const visible = phase >= 3;
 
+  // The settled entity (phase 5) breathes SLOWER than the looming one —
+  // sleeping, not watching. Only the durations change; reduced motion stays
+  // fully static exactly as before.
+  const breathHalfMs = phase >= 5 ? 7000 : 4000;
   useEffect(() => {
     if (!visible || isStatic) return;
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(breatheAnim, {
           toValue: 1,
-          duration: 4000,
+          duration: breathHalfMs,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
         Animated.timing(breatheAnim, {
           toValue: 0,
-          duration: 4000,
+          duration: breathHalfMs,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
@@ -1166,7 +1253,7 @@ const ShadowFigure: React.FC<{ phase: number }> = ({ phase }) => {
     );
     loop.start();
     return () => loop.stop();
-  }, [visible, isStatic, breatheAnim]);
+  }, [visible, isStatic, breatheAnim, breathHalfMs]);
 
   if (!visible) return null;
 
@@ -2055,6 +2142,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                     whole pan range exactly as the seat geometry was tuned for. */}
                 <Image
                   source={
+                    currentPhase >= 5 ? SKY_PEACE :
                     currentPhase >= 4 ? SKY_SHADOW :
                     currentPhase >= 3 ? SKY_STORM :
                     currentPhase >= 2 ? SKY_DUSK :
@@ -2116,6 +2204,10 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                 {ambientMotionEnabled && currentPhase >= 2 && <ShootingStar />}
                 {ambientMotionEnabled && currentPhase >= 3 && <ShootingStar />}
                 {ambientMotionEnabled && currentPhase >= 4 && <ShootingStar />}
+                {/* The pre-storm sky stirs: rare silent heat lightning at the
+                    horizon, Phase 3 ONLY (the Phase 4+ sky belongs to the
+                    entity and stays honestly empty). */}
+                {ambientMotionEnabled && currentPhase === 3 && <DistantLightning />}
 
               {/* Songbirds cross only the bright phases (F16); from Phase 3 on
                   the sky stays honestly empty rather than an unnatural cross-

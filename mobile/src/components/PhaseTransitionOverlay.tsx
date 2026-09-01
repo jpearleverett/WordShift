@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { FONT_SIZE } from '../theme/typeScale';
-import { View, Text, StyleSheet, Animated, Dimensions, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, Animated, Easing, Dimensions, TouchableOpacity, Image } from 'react-native';
 import { PhaseTransitionEvent, PhaseScene, SceneImage, CinematicParticleConfig } from '../services/phaseEvents';
 import { getSettingsSync } from '../services/settings';
 import { hapticLight, hapticMedium, hapticHeavy, hapticWarning } from '../services/haptics';
@@ -36,8 +36,13 @@ const SCENE_IMAGE_SIZES: Record<SceneImage, { width: number; height: number }> =
 
 /** Default peak opacity for a scene image when the scene doesn't set one. */
 const SCENE_IMAGE_DEFAULT_OPACITY = 0.6;
-/** How far (px) the descend effect lowers the image into place. */
-const DESCEND_DISTANCE = 90;
+/** How far (px) the descend effect lowers the image into place. Sized so the
+ *  Arrival reads as travel, not drift (~40% of the figure's rendered height
+ *  on a typical device); paired with a slight scale settle below. */
+const DESCEND_DISTANCE = 170;
+/** The descend starts a touch larger and settles to 1.0 — coming DOWN and
+ *  closing in, not sliding on a rail. */
+const DESCEND_SCALE_FROM = 1.1;
 
 /** Fire a haptic scaled to the scene's visual effect and event intensity */
 function fireSceneHaptic(scene: PhaseScene, shakeIntensity?: number): void {
@@ -302,6 +307,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
   // Scene-image drivers (the in-engine arrival: shadow figure / house art)
   const imageOpacity = useRef(new Animated.Value(0)).current;
   const imageTranslateY = useRef(new Animated.Value(0)).current;
+  const imageScale = useRef(new Animated.Value(1)).current;
   const [activeImage, setActiveImage] = useState<SceneImage | null>(null);
   const effectAnimsRef = useRef<Animated.CompositeAnimation[]>([]);
   const [flashColor, setFlashColor] = useState('#FFFFFF');
@@ -326,6 +332,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     flashOpacity.stopAnimation();
     imageOpacity.stopAnimation();
     imageTranslateY.stopAnimation();
+    imageScale.stopAnimation();
   };
 
   /**
@@ -358,19 +365,30 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
 
     if (reducedMotion) {
       imageTranslateY.setValue(0);
+      imageScale.setValue(1);
       imageOpacity.setValue(target);
       return;
     }
 
     if (scene.effect === 'descend') {
-      // The descent: start above, unseen; settle slowly into place.
+      // The descent: start above, unseen; settle slowly into place with a
+      // decelerating ease and a slight scale-down, so it reads as something
+      // arriving from height rather than drifting on a rail.
       imageTranslateY.setValue(-DESCEND_DISTANCE);
+      imageScale.setValue(DESCEND_SCALE_FROM);
       imageOpacity.setValue(0);
       const descendMs = Math.min(scene.duration * 0.75, 3800) * timeScale;
       const anim = Animated.parallel([
         Animated.timing(imageTranslateY, {
           toValue: 0,
           duration: descendMs,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(imageScale, {
+          toValue: 1,
+          duration: descendMs,
+          easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }),
         Animated.timing(imageOpacity, {
@@ -387,6 +405,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     // Plain image scene: settle in place, fade from wherever opacity is now
     // (0 for a fresh image, the previous target for a persisting one).
     imageTranslateY.setValue(0);
+    imageScale.setValue(1);
     const fade = Animated.timing(imageOpacity, {
       toValue: target,
       duration: 450 * timeScale,
@@ -565,17 +584,19 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
       const showTimer = setTimeout(() => {
         setActiveSceneIndex(index);
         runSceneImage(scene, timeScale, reducedMotion);
-        // The Arrival's dark ritual swell (soundPhaseChange resolves its dark
-        // variant by audioPhase at phase 3+) rides the descent. Audio self-
-        // gates on soundEnabled and must play even under reducedMotion (which
-        // governs motion, not sound).
+        // Audio self-gates on soundEnabled and must play even under
+        // reducedMotion (which governs motion, not sound).
         if (scene.effect === 'descend') {
           // Duck the looping music bed so the dark ritual swell owns the Arrival
           // soundscape (App's music effect restarts the phase's bed once the
           // event clears on complete). Guarded bridge, so it is a no-op without
           // the native audio layer.
           stopCeremonyMusic();
-          playUiSound('phase_change');
+          // The Arrival's own cue, heard exactly once in the whole game: the
+          // pad dying downward into one enormous slow bell whose strike lands
+          // with the settle haptic below. Never the ceremony swell the player
+          // has already heard at every ward ignition.
+          playUiSound('arrival');
         }
         if (!reducedMotion) {
           fireSceneHaptic(scene, event.shakeIntensity);
@@ -710,7 +731,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
         <Animated.View
           style={[
             styles.imageLayer,
-            { opacity: imageOpacity, transform: [{ translateY: imageTranslateY }] },
+            { opacity: imageOpacity, transform: [{ translateY: imageTranslateY }, { scale: imageScale }] },
           ]}
           pointerEvents="none"
         >

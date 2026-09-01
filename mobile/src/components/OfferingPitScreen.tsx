@@ -100,6 +100,10 @@ const PIT_DAY = require('../../assets/environment/pitt_day.webp');
 const PIT_AFTERNOON = require('../../assets/environment/pitt_afternoon.webp');
 const PIT_DUSK = require('../../assets/environment/pitt_dusk.webp');
 const PIT_NIGHT = require('../../assets/environment/pitt_night.webp');
+// Terrible Peace variant derived from pitt_night by settleSkies.mjs (mauve
+// settle with the teal pit glow protected) — phase 5 no longer shares the
+// phase-3/4 night art.
+const PIT_PEACE = require('../../assets/environment/pitt_peace.webp');
 const TENDING_ICON = require('../../assets/ui/tending.png');
 const MENU_ICON = require('../../assets/ui/menu.png');
 const HOME_ICON = require('../../assets/ui/home.png');
@@ -109,10 +113,25 @@ const GEAR_ICON = require('../../assets/ui/gear.png');
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 function getPitBackground(phase: number) {
+  if (phase >= 5) return PIT_PEACE;
   if (phase >= 3) return PIT_NIGHT;
   if (phase >= 2) return PIT_DUSK;
   if (phase >= 1) return PIT_AFTERNOON;
   return PIT_DAY;
+}
+
+// Phase scrim over the shared night art: phases 3 and 4 both serve pitt_night,
+// so without this the reveal was never felt at the ritual's own site. A faint
+// crimson-black deepen at phase 4 (the session the robes are new), capped low
+// so the pit's own glow layers survive — the same restraint as the
+// pit-entrance tint on home. Phase 5 serves its own settled art (pitt_peace,
+// the mauve grade baked in by settleSkies.mjs), so it takes NO scrim — a
+// second wash over already-settled art would double-dip. Pure static View
+// color; exported for the contract test.
+export function getPitPhaseScrim(phase: number): { color: string; opacity: number } | null {
+  if (phase >= 5) return null;
+  if (phase >= 4) return { color: '#2a0510', opacity: 0.16 };
+  return null;
 }
 
 const PIT_CENTER = {
@@ -1641,9 +1660,11 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         if (!mountedRef.current) return;
         setCeremonyStatus('erupting');
         hapticHeavy();
-        // The bespoke 2.6s ritual swell (soundPhaseChange) resolves its dark
-        // mirror by phase; it lands with the eruption, over the silenced bed.
-        playUiSound('phase_change');
+        // The 2.6s ceremony swell lands with the eruption, over the silenced
+        // bed. It bands on the ceremony's TARGET phase (the transition has
+        // not confirmed yet, so audioPhase still holds the old phase): warm
+        // handbell rise into phases 0-2, the dark ritual swell from 3 up.
+        playUiSound('phase_change', pendingPhaseTransition ?? undefined);
         flashPitSurge();
         spawnShockwave();
         const sw1 = setTimeout(() => { if (mountedRef.current) spawnShockwave(); }, 150);
@@ -2354,6 +2375,18 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   return (
     <View style={[styles.container, { backgroundColor: PIT_BG_COLORS[phase] ?? PIT_BG_COLORS[0] }]}>
       <Image source={getPitBackground(phase)} style={styles.backgroundImage} resizeMode="cover" />
+      {(() => {
+        const scrim = getPitPhaseScrim(phase);
+        return scrim ? (
+          <View
+            pointerEvents="none"
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: scrim.color, opacity: scrim.opacity },
+            ]}
+          />
+        ) : null;
+      })()}
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* F121: fence the occluded pit visuals behind the ward-ignition

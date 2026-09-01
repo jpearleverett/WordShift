@@ -616,14 +616,56 @@ render('dialogue', 0.15, (s, rand) => {
   strike(s, { freq: N.D5, dur: 0.11, vol: 0.4, partials: CELESTA, decayShape: 7.5, unison: 2, detune: 0.003, rand });
 }, { reverb: { wet: 0.06, tail: 0.1 }, peak: 0.42 });
 
-// phase_change: low ritual swell — sub pad, tritone shading, distant dark bell.
+// phase_change: WARM ceremony swell — the C-add9 house chord rising into a
+// handbell hour-strike, for the BRIGHT ward ignitions (target phase 0-2). One
+// lowered-7th (Bb) shade drifts under the warmth: the seed of wrongness, the
+// same device the dusk music beds use. The Phase 3+ ceremonies play
+// phase_change_dark below (audio.soundPhaseChange keys on the ceremony's
+// TARGET phase), so the descent is earned by ear too — the ignition INTO
+// Growing Shadows is the first ceremony that sounds wrong.
 render('phase_change', 2.6, (s, rand) => {
+  swell(s, { freq: D.C3, dur: 2.4, vol: 0.26, partials: [{ r: 1, g: 1 }, { r: 2, g: 0.35 }, { r: 3, g: 0.1 }], attack: 0.6, release: 1.0, unison: 3, detune: 0.005, rand });
+  swell(s, { freq: D.G3, start: 0.15, dur: 2.2, vol: 0.16, partials: [{ r: 1, g: 1 }, { r: 2, g: 0.25 }], attack: 0.7, release: 1.0, unison: 3, detune: 0.006, rand });
+  swell(s, { freq: N.D4, start: 0.35, dur: 1.9, vol: 0.11, attack: 0.7, release: 0.9, unison: 3, detune: 0.006, rand });
+  swell(s, { freq: N.E4, start: 0.55, dur: 1.7, vol: 0.09, attack: 0.65, release: 0.9, unison: 2, detune: 0.005, rand });
+  // The wrong-note: a lowered seventh drifting under the add9.
+  swell(s, { freq: D.Bb3, start: 0.9, dur: 1.2, vol: 0.05, attack: 0.6, release: 0.7, unison: 2, detune: 0.007, rand });
+  strike(s, { freq: N.C5, start: 1.1, dur: 1.3, vol: 0.3, partials: HANDBELL, attack: 0.006, decayShape: 3.8, unison: 2, detune: 0.003, rand });
+  noiseBurst(s, { start: 0.3, dur: 1.6, vol: 0.05, lp: 0.7, hp: 0.6, attack: 0.5, decayShape: 3.5, rand });
+}, { reverb: { wet: 0.32, decay: 0.82, damp: 0.45, tail: 1.0 }, peak: 0.68 });
+
+// phase_change_dark: the original low ritual swell — sub pad, tritone shading,
+// distant dark bell. Now explicitly the Phase 3+ ceremony voice.
+render('phase_change_dark', 2.6, (s, rand) => {
   swell(s, { freq: D.C2, dur: 2.4, vol: 0.3, partials: [{ r: 1, g: 1 }, { r: 2, g: 0.4 }, { r: 3, g: 0.12 }], attack: 0.7, release: 1.1, unison: 3, detune: 0.006, rand });
   swell(s, { freq: D.C3, start: 0.2, dur: 2.1, vol: 0.16, partials: [{ r: 1, g: 1 }, { r: 2, g: 0.25 }], attack: 0.8, release: 1.0, unison: 3, detune: 0.007, rand });
   swell(s, { freq: D.Gb3, start: 0.7, dur: 1.6, vol: 0.09, attack: 0.7, release: 0.8, unison: 3, detune: 0.008, rand });
   strike(s, { freq: D.C4, start: 1.1, dur: 1.3, vol: 0.28, partials: DARK_BELL, attack: 0.01, decayShape: 4, unison: 2, detune: 0.003, rand });
   noiseBurst(s, { start: 0.2, dur: 2.0, vol: 0.1, lp: 0.03, attack: 0.5, decayShape: 3.5, rand });
 }, { reverb: { wet: 0.35, decay: 0.85, damp: 0.5, tail: 1.1 }, peak: 0.72 });
+
+// arrival: THE descent's own sound (finale cinematic only; no dark mirror —
+// it IS the wrongness at any phase). ~8s: the world's pad dying downward
+// through minor steps, then ONE enormous slow-attack bell whose strike lands
+// with the overlay's settle haptic (~4.7s wall-clock at the shipped 1.25x
+// time scale), and a sub breath receding into the tail. Deliberate
+// mid-frequency body (C3/C4 bell pair, HOLLOW steps) so phone speakers,
+// which lose the sub, still carry the moment.
+render('arrival', 8.0, (s, rand) => {
+  swell(s, { freq: D.C2, dur: 5.2, vol: 0.3, partials: [{ r: 1, g: 1 }, { r: 2, g: 0.45 }, { r: 3, g: 0.15 }], attack: 1.2, release: 2.4, unison: 3, detune: 0.007, rand });
+  swell(s, { freq: D.C3, start: 0.4, dur: 4.6, vol: 0.18, partials: [{ r: 1, g: 1 }, { r: 2, g: 0.3 }], attack: 1.1, release: 2.2, unison: 3, detune: 0.008, rand });
+  swell(s, { freq: D.Gb3, start: 1.2, dur: 3.4, vol: 0.08, attack: 1.0, release: 1.6, unison: 3, detune: 0.009, rand });
+  // Descending minor steps as it comes down: Eb3 -> C3 -> G2.
+  strike(s, { freq: D.Eb3, start: 1.6, dur: 1.4, vol: 0.14, partials: HOLLOW, attack: 0.05, decayShape: 3.2, unison: 2, detune: 0.005, rand });
+  strike(s, { freq: D.C3, start: 2.7, dur: 1.6, vol: 0.16, partials: HOLLOW, attack: 0.05, decayShape: 3.0, unison: 2, detune: 0.005, rand });
+  strike(s, { freq: D.G2, start: 3.6, dur: 1.8, vol: 0.16, partials: HOLLOW, attack: 0.06, decayShape: 2.8, unison: 2, detune: 0.006, rand });
+  // THE bell: one enormous slow-attack strike, landing with the settle.
+  strike(s, { freq: D.C4, start: 4.4, dur: 3.2, vol: 0.42, partials: DARK_BELL, attack: 0.28, decayShape: 2.6, unison: 2, detune: 0.004, rand });
+  strike(s, { freq: D.C3, start: 4.45, dur: 3.0, vol: 0.2, partials: DARK_BELL, attack: 0.3, decayShape: 2.6, rand });
+  // Sub breath: gathers under the descent, exhales with the bell.
+  noiseBurst(s, { start: 0.1, dur: 4.0, vol: 0.08, lp: 0.05, attack: 1.2, decayShape: 2.8, rand });
+  noiseBurst(s, { start: 4.4, dur: 2.6, vol: 0.1, lp: 0.08, attack: 0.25, decayShape: 3.0, rand });
+}, { reverb: { wet: 0.4, decay: 0.9, damp: 0.5, tail: 1.6 }, peak: 0.74 });
 
 // daily_ready: warm handbell pair, G5 then C6.
 render('daily_ready', 1.0, (s, rand) => {
@@ -781,9 +823,75 @@ render('whisper', 0.9, (s, rand) => {
 }, { reverb: { wet: 0.3, damp: 0.45, tail: 0.5 }, peak: 0.3 });
 
 // ===========================================================================
-// AMBIENT MUSIC BEDS: three seamless loops sharing one musical DNA.
-// Quiet by design — a bed, not a song. Loop-exact by construction: continuous
-// voices quantized to integer cycles, event tails wrapped, reverb double-pass.
+// TERRIBLE PEACE SFX (Phase 5): the most frequent sounds resolved into soft
+// settled bells. Picked by resolveSfxForPhase's peace tier — everything
+// without a _peace variant keeps its dark mirror (the settled-dark palette).
+// Design: NEITHER rising NOR sinking. The combo ladder holds one constant
+// low root (C4) and ASSEMBLES the house's C-add9 chord across the streak
+// (root -> +fifth -> +third -> +ninth); the victory pair is quiet resolved
+// bells with the add9 restored and no tritone anywhere.
+// ===========================================================================
+
+// Peace move ladder: constant C4 handbell root, one consonant color note added
+// per tier at constant loudness — the streak deepens the chord, not the pitch.
+function peaceMove(name, colorNote, opts = {}) {
+  const { colorVol = 0.16, wet = 0.24, peak = 0.5, extra } = opts;
+  render(name, 0.7, (s, rand) => {
+    noiseBurst(s, { start: 0, dur: 0.015, vol: 0.1, lp: 0.25, decayShape: 10, rand });
+    strike(s, { freq: N.C4, dur: 0.55, vol: 0.42, partials: HANDBELL, attack: 0.008, decayShape: 4.2, unison: 2, detune: 0.0025, rand });
+    if (colorNote) {
+      strike(s, { freq: colorNote, start: 0.05, dur: 0.5, vol: colorVol, partials: CELESTA, attack: 0.01, decayShape: 4.5, unison: 2, detune: 0.003, rand });
+    }
+    if (extra) extra(s, rand);
+  }, { reverb: { wet, decay: 0.8, damp: 0.55, tail: 0.5 }, peak });
+}
+peaceMove('valid_move_peace', null);
+peaceMove('valid_move_2_peace', N.G4);
+peaceMove('valid_move_3_peace', N.E5, { colorVol: 0.13 });
+peaceMove('valid_move_4_peace', N.D5, { colorVol: 0.14, wet: 0.28, extra: (s, rand) => {
+  // The ninth lands with the faintest settled air — the chord is whole.
+  strike(s, { freq: N.G4, start: 0.08, dur: 0.45, vol: 0.09, partials: CELESTA, attack: 0.012, decayShape: 4.5, rand });
+  noiseBurst(s, { start: 0.1, dur: 0.3, vol: 0.03, lp: 0.85, hp: 0.8, attack: 0.08, decayShape: 3.5, rand });
+} });
+
+// victory_peace: three soft resolved handbells (C4 -> G4 -> C5) with a faint
+// third above — a completed thing set gently down, not a celebration.
+render('victory_peace', 1.8, (s, rand) => {
+  strike(s, { freq: N.C4, dur: 1.0, vol: 0.34, partials: HANDBELL, attack: 0.01, decayShape: 3.4, unison: 2, detune: 0.003, rand });
+  strike(s, { freq: N.G4, start: 0.3, dur: 1.0, vol: 0.26, partials: HANDBELL, attack: 0.012, decayShape: 3.2, unison: 2, detune: 0.003, rand });
+  strike(s, { freq: N.C5, start: 0.62, dur: 1.1, vol: 0.22, partials: HANDBELL, attack: 0.012, decayShape: 3.0, unison: 2, detune: 0.003, rand });
+  strike(s, { freq: N.E5, start: 0.9, dur: 0.8, vol: 0.09, partials: CELESTA, attack: 0.015, decayShape: 3.6, rand });
+}, { reverb: { wet: 0.32, decay: 0.84, damp: 0.55, tail: 0.8 }, peak: 0.6 });
+
+// perfect_peace: the victory bells completed by the ninth — the full C-add9
+// laid down slowly with a distant high shimmer. Serene, whole, unhurried.
+render('perfect_peace', 2.2, (s, rand) => {
+  strike(s, { freq: N.C4, dur: 1.1, vol: 0.34, partials: HANDBELL, attack: 0.01, decayShape: 3.2, unison: 2, detune: 0.003, rand });
+  strike(s, { freq: N.G4, start: 0.28, dur: 1.1, vol: 0.26, partials: HANDBELL, attack: 0.012, decayShape: 3.0, unison: 2, detune: 0.003, rand });
+  strike(s, { freq: N.C5, start: 0.58, dur: 1.2, vol: 0.22, partials: HANDBELL, attack: 0.012, decayShape: 2.9, unison: 2, detune: 0.003, rand });
+  strike(s, { freq: N.E5, start: 0.86, dur: 1.0, vol: 0.12, partials: CELESTA, attack: 0.015, decayShape: 3.4, rand });
+  strike(s, { freq: N.D5, start: 1.08, dur: 1.0, vol: 0.11, partials: CELESTA, attack: 0.018, decayShape: 3.4, rand });
+  strike(s, { freq: N.C6, start: 1.3, dur: 0.8, vol: 0.06, partials: CELESTA, attack: 0.02, decayShape: 3.8, rand });
+  noiseBurst(s, { start: 0.8, dur: 0.7, vol: 0.03, lp: 0.85, hp: 0.8, attack: 0.25, decayShape: 3, rand });
+}, { reverb: { wet: 0.34, decay: 0.85, damp: 0.55, tail: 1.0 }, peak: 0.62 });
+
+// dialogue_peace: the tiny blip settled low and warm (fires on every line).
+render('dialogue_peace', 0.18, (s, rand) => {
+  noiseBurst(s, { start: 0, dur: 0.008, vol: 0.1, lp: 0.3, decayShape: 12, rand });
+  strike(s, { freq: N.D4, dur: 0.14, vol: 0.36, partials: CELESTA, attack: 0.004, decayShape: 7, unison: 2, detune: 0.003, rand });
+}, { reverb: { wet: 0.1, damp: 0.5, tail: 0.14 }, peak: 0.38 });
+
+// letter_select_peace: a soft settled pluck one octave under the bright E5.
+render('letter_select_peace', 0.3, (s, rand) => {
+  noiseBurst(s, { start: 0, dur: 0.01, vol: 0.16, lp: 0.3, decayShape: 11, rand });
+  strike(s, { freq: N.E4, dur: 0.26, vol: 0.5, partials: HANDBELL, attack: 0.006, decayShape: 5.5, unison: 2, detune: 0.003, rand });
+}, { reverb: { wet: 0.14, damp: 0.5, tail: 0.24 }, peak: 0.52 });
+
+// ===========================================================================
+// AMBIENT MUSIC BEDS: three screen families × bright/dusk/dark/peace loops
+// sharing one musical DNA. Quiet by design — a bed, not a song. Loop-exact by
+// construction: continuous voices quantized to integer cycles, event tails
+// wrapped, reverb double-pass.
 // ===========================================================================
 
 // music_bright (18s): warm slow-breathing C add9 pad with gentle celesta
@@ -975,5 +1083,70 @@ renderLoop('music_pit_dark', 24, (s, { rand, q }) => {
     noiseBurst(tmp, { start: 0, dur: 5.5, vol: 0.06, lp: 0.02, attack: 1.8, decayShape: 3, rand });
   });
 }, { reverb: { wet: 0.46, decay: 0.88, damp: 0.6 }, peak: 0.5 });
+
+// ===========================================================================
+// TERRIBLE PEACE MUSIC BEDS (Phase 5): the dark DNA resolved low and slow —
+// the C-add9 restored (no minor third, no tritone, no sour beating pair, no
+// dissonant shimmer), the sub settled from a pulse into a breath, and the
+// dark-bell tolls softened into distant handbells. The serene register after
+// the arrival. Selected by musicBandForPhase at MUSIC_PEACE_PHASE (5).
+// ===========================================================================
+
+// music_peace (24s): the home world settled — a low whole C-add9 breathing
+// slowly, two far-off soft handbell hours.
+renderLoop('music_peace', 24, (s, { rand, q }) => {
+  const padVoice = (f, vol, lfoCycles, lfoDepth, lfoPhase) => {
+    loopPad(s, { freq: q(f), vol, lfoCycles, lfoDepth, lfoPhase, phase: rand() * 2 * Math.PI });
+    // Gentle consonant twin (the dark beds' sour ~1.006 pair, resolved).
+    loopPad(s, { freq: q(f * 1.0035), vol: vol * 0.55, lfoCycles, lfoDepth, lfoPhase: lfoPhase + 1.3, phase: rand() * 2 * Math.PI });
+  };
+  padVoice(D.C2, 0.18, 2, 0.5, 0);      // sub settled into a slow breath
+  padVoice(D.C3, 0.11, 2, 0.45, 1.2);   // root, single and true
+  padVoice(D.G3, 0.11, 3, 0.5, 2.4);    // fifth restored
+  padVoice(N.E4, 0.055, 2, 0.6, 0.8);   // major third returns
+  padVoice(N.D4, 0.032, 1, 0.75, 3.9);  // the ninth, one slow breath per loop
+  loopEvent(s, 8.6, 3.4, (tmp) => {
+    strike(tmp, { freq: N.C5, dur: 3.2, vol: 0.045, partials: HANDBELL, attack: 0.012, decayShape: 2.8, unison: 2, detune: 0.003, rand });
+  });
+  loopEvent(s, 18.4, 3.4, (tmp) => {
+    strike(tmp, { freq: N.G4, dur: 3.2, vol: 0.04, partials: HANDBELL, attack: 0.012, decayShape: 2.8, unison: 2, detune: 0.003, rand });
+  });
+}, { reverb: { wet: 0.36, decay: 0.84, damp: 0.55 }, peak: 0.48 });
+
+// music_puzzle_peace (20s): the focused chord sunk an octave and stilled —
+// C3-centered, the third faint and warm, one distant soft note.
+renderLoop('music_puzzle_peace', 20, (s, { rand, q }) => {
+  const padVoice = (f, vol, lfoCycles, lfoDepth, lfoPhase) => {
+    loopPad(s, { freq: q(f), vol, lfoCycles, lfoDepth, lfoPhase, phase: rand() * 2 * Math.PI });
+    loopPad(s, { freq: q(f * 1.003), vol: vol * 0.5, lfoCycles, lfoDepth, lfoPhase: lfoPhase + 1.2, phase: rand() * 2 * Math.PI });
+  };
+  padVoice(D.C3, 0.13, 2, 0.4, 0);      // root center
+  padVoice(D.G3, 0.075, 2, 0.5, 1.4);   // fifth
+  padVoice(N.E4, 0.045, 1, 0.6, 2.6);   // third, faint and warm
+  loopPad(s, { freq: q(D.C2), vol: 0.08, lfoCycles: 2, lfoDepth: 0.55, phase: rand() * 2 * Math.PI }); // sub breath
+  loopEvent(s, 11.0, 2.6, (tmp) => {
+    strike(tmp, { freq: N.G5, dur: 2.4, vol: 0.026, partials: CELESTA, attack: 0.01, decayShape: 3.6, unison: 2, detune: 0.003, rand });
+  });
+}, { reverb: { wet: 0.3, decay: 0.8, damp: 0.55 }, peak: 0.46 });
+
+// music_pit_peace (24s): the deepest place at rest — the cavern keeps its
+// gravity and width but the pulse becomes a breath, the tolls turn to soft
+// handbells, and the wind exhales once, unhurried.
+renderLoop('music_pit_peace', 24, (s, { rand, q }) => {
+  loopPad(s, { freq: q(D.C2), vol: 0.2, lfoCycles: 2, lfoDepth: 0.55, phase: rand() * 2 * Math.PI }); // sub breath, no pulse
+  loopPad(s, { freq: q(D.C3), vol: 0.11, lfoCycles: 2, lfoDepth: 0.4, phase: rand() * 2 * Math.PI });
+  loopPad(s, { freq: q(D.C3 * 1.0035), vol: 0.06, lfoCycles: 2, lfoDepth: 0.4, lfoPhase: 0.9, phase: rand() * 2 * Math.PI }); // consonant twin
+  loopPad(s, { freq: q(D.G3), vol: 0.11, lfoCycles: 3, lfoDepth: 0.5, lfoPhase: 2.2, phase: rand() * 2 * Math.PI }); // fifth restored
+  loopPad(s, { freq: q(N.E4), vol: 0.05, lfoCycles: 2, lfoDepth: 0.65, lfoPhase: 4.0, phase: rand() * 2 * Math.PI }); // faint warmth returns
+  loopEvent(s, 6.0, 3.6, (tmp) => {
+    strike(tmp, { freq: N.C4, dur: 3.4, vol: 0.055, partials: HANDBELL, attack: 0.014, decayShape: 2.8, unison: 2, detune: 0.003, rand });
+  });
+  loopEvent(s, 15.5, 3.6, (tmp) => {
+    strike(tmp, { freq: N.C5, dur: 3.4, vol: 0.04, partials: HANDBELL, attack: 0.014, decayShape: 2.8, unison: 2, detune: 0.003, rand });
+  });
+  loopEvent(s, 11.0, 6.0, (tmp) => {
+    noiseBurst(tmp, { start: 0, dur: 5.5, vol: 0.04, lp: 0.02, attack: 2.2, decayShape: 2.6, rand });
+  });
+}, { reverb: { wet: 0.46, decay: 0.88, damp: 0.55 }, peak: 0.48 });
 
 console.log('done.');

@@ -98,6 +98,9 @@ const NARRATIVE_VOICE_MAX_ATTEMPTS = 20;
 export interface WhisperData {
   animalName: string;
   text: string;
+  /** The speaking animal, so the banner can show its (phase-appropriate)
+   *  portrait. Optional — some personalized templates carry no type. */
+  animalType?: string;
 }
 
 export interface InterjectionData {
@@ -487,8 +490,11 @@ export function useVictoryOrchestration(): [
     // ------ Animal whisper (skip during onboarding; frequency-gated) ------
     // The roll happens BEFORE generation: a win that loses the roll skips the
     // whisper entirely, INCLUDING the gallery recordWhisper — a line the
-    // player never saw must not fill the archive.
-    if (!onboarding && Math.random() < getWhisperChance(phase)) {
+    // player never saw must not fill the archive. The finale win carries
+    // exactly one narrative voice (the silence, then the Arrival), so the
+    // roll itself is suppressed there — never just its sound cue, or a
+    // chatty ghost overlay races the climax cinematic.
+    if (!onboarding && !suppressCeremonyCues && Math.random() < getWhisperChance(phase)) {
       addTimeout(async () => {
         try {
           if (gen !== generationRef.current) return;
@@ -514,7 +520,11 @@ export function useVictoryOrchestration(): [
             // is computed eagerly, but becoming VISIBLE waits its turn.
             revealWhenFree(() => {
               if (gen !== generationRef.current) return;
-              setWhisper({ animalName: whisperData.animalName, text: whisperData.text });
+              setWhisper({
+                animalName: whisperData.animalName,
+                text: whisperData.text,
+                animalType: whisperData.animalType,
+              });
               setShowWhisper(true);
               // A whisper surfaces — the sound of being noticed. Not on the finale.
               if (!suppressCeremonyCues) { playUiSound('whisper'); hapticLight(); }
@@ -534,8 +544,9 @@ export function useVictoryOrchestration(): [
       }, WHISPER_DELAY_MS);
     }
 
-    // ------ Animal interjection / home nudge (skip during onboarding) ------
-    if (!onboarding) {
+    // ------ Animal interjection / home nudge (skip during onboarding;
+    // suppressed entirely on the finale win — see the whisper gate above) ------
+    if (!onboarding && !suppressCeremonyCues) {
       addTimeout(async () => {
         try {
           if (gen !== generationRef.current) return;

@@ -83,12 +83,15 @@ export const CHARACTER_SPRITES: Partial<Record<AnimalType, {
   talk?: ImageSourcePropType;
   robed?: ImageSourcePropType;
   /**
-   * Optional Phase 4-5 robed TALK frame (F26) — the reveal counterpart of
-   * `talk`. When present, a dialogue portrait opacity-switches robed<->
-   * robedTalk exactly like idle<->talk at earlier phases, so the climax's
-   * biggest lines no longer play over a frozen robed still. No animal has
-   * this frame today (only idle/talk/robed exist on disk for all 13) — a
-   * portrait consumer must check for it and fall back to the static `robed`
+   * Phase 4-5 robed TALK frame (F26/F37) — the reveal counterpart of
+   * `talk`. A dialogue portrait opacity-switches robed<->robedTalk exactly
+   * like idle<->talk at earlier phases, so the climax's biggest lines no
+   * longer play over a frozen robed still. All 13 animals ship the frame
+   * (generated 2026-08-31 by transplanting each animal's idle->talk mouth
+   * delta onto robed.png with a locally-fitted palette map; the axolotl's is
+   * a copy of robed.png on purpose — his scuba mask means his mouth never
+   * moves, same as his talk.png). Portrait consumers still check for it and
+   * fall back to the static `robed`
    * frame rather than assuming it exists.
    */
   robedTalk?: ImageSourcePropType;
@@ -104,6 +107,7 @@ export const CHARACTER_SPRITES: Partial<Record<AnimalType, {
     idle: require('../../../assets/characters/fox/idle.png'),
     talk: require('../../../assets/characters/fox/talk.png'),
     robed: require('../../../assets/characters/fox/robed.png'),
+    robedTalk: require('../../../assets/characters/fox/robed_talk.png'),
     walk: [
       require('../../../assets/characters/fox/walk_0.png'),
       require('../../../assets/characters/fox/walk_1.png'),
@@ -121,61 +125,73 @@ export const CHARACTER_SPRITES: Partial<Record<AnimalType, {
     idle: require('../../../assets/characters/pangolin/idle.png'),
     talk: require('../../../assets/characters/pangolin/talk.png'),
     robed: require('../../../assets/characters/pangolin/robed.png'),
+    robedTalk: require('../../../assets/characters/pangolin/robed_talk.png'),
   },
   owl: {
     idle: require('../../../assets/characters/owl/idle.png'),
     talk: require('../../../assets/characters/owl/talk.png'),
     robed: require('../../../assets/characters/owl/robed.png'),
+    robedTalk: require('../../../assets/characters/owl/robed_talk.png'),
   },
   axolotl: {
     idle: require('../../../assets/characters/axolotl/idle.png'),
     talk: require('../../../assets/characters/axolotl/talk.png'),
     robed: require('../../../assets/characters/axolotl/robed.png'),
+    robedTalk: require('../../../assets/characters/axolotl/robed_talk.png'),
   },
   capybara: {
     idle: require('../../../assets/characters/capybara/idle.png'),
     talk: require('../../../assets/characters/capybara/talk.png'),
     robed: require('../../../assets/characters/capybara/robed.png'),
+    robedTalk: require('../../../assets/characters/capybara/robed_talk.png'),
   },
   fennec_fox: {
     idle: require('../../../assets/characters/fennec_fox/idle.png'),
     talk: require('../../../assets/characters/fennec_fox/talk.png'),
     robed: require('../../../assets/characters/fennec_fox/robed.png'),
+    robedTalk: require('../../../assets/characters/fennec_fox/robed_talk.png'),
   },
   red_panda: {
     idle: require('../../../assets/characters/red_panda/idle.png'),
     talk: require('../../../assets/characters/red_panda/talk.png'),
     robed: require('../../../assets/characters/red_panda/robed.png'),
+    robedTalk: require('../../../assets/characters/red_panda/robed_talk.png'),
   },
   sloth: {
     idle: require('../../../assets/characters/sloth/idle.png'),
     talk: require('../../../assets/characters/sloth/talk.png'),
     robed: require('../../../assets/characters/sloth/robed.png'),
+    robedTalk: require('../../../assets/characters/sloth/robed_talk.png'),
   },
   wombat: {
     idle: require('../../../assets/characters/wombat/idle.png'),
     talk: require('../../../assets/characters/wombat/talk.png'),
     robed: require('../../../assets/characters/wombat/robed.png'),
+    robedTalk: require('../../../assets/characters/wombat/robed_talk.png'),
   },
   rabbit: {
     idle: require('../../../assets/characters/rabbit/idle.png'),
     talk: require('../../../assets/characters/rabbit/talk.png'),
     robed: require('../../../assets/characters/rabbit/robed.png'),
+    robedTalk: require('../../../assets/characters/rabbit/robed_talk.png'),
   },
   tarsier: {
     idle: require('../../../assets/characters/tarsier/idle.png'),
     talk: require('../../../assets/characters/tarsier/talk.png'),
     robed: require('../../../assets/characters/tarsier/robed.png'),
+    robedTalk: require('../../../assets/characters/tarsier/robed_talk.png'),
   },
   aye_aye: {
     idle: require('../../../assets/characters/aye_aye/idle.png'),
     talk: require('../../../assets/characters/aye_aye/talk.png'),
     robed: require('../../../assets/characters/aye_aye/robed.png'),
+    robedTalk: require('../../../assets/characters/aye_aye/robed_talk.png'),
   },
   kakapo: {
     idle: require('../../../assets/characters/kakapo/idle.png'),
     talk: require('../../../assets/characters/kakapo/talk.png'),
     robed: require('../../../assets/characters/kakapo/robed.png'),
+    robedTalk: require('../../../assets/characters/kakapo/robed_talk.png'),
   },
 };
 

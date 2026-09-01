@@ -50,6 +50,7 @@ import {
 import { getSettingsSync } from '../services/settings';
 import { shouldSimplifyAnimations } from '../services/deviceTier';
 import { FONT_SIZE } from '../theme/typeScale';
+import { playUiSound, uiHapticSelection } from '../services/uiSound';
 
 const STAR_FILLED = require('../../assets/ui/star_filled.png');
 const STAR_EMPTY = require('../../assets/ui/star_empty.png');
@@ -276,7 +277,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
         <View style={[styles.header, { paddingTop: screenInsets.top + 16 }]}>
           <TouchableOpacity
             style={[styles.backChip, { backgroundColor: CHROME_CHIP_BG, borderColor: st.headerChipBorder }]}
-            onPress={onClose}
+            onPress={() => { playUiSound('selection'); uiHapticSelection(); onClose(); }}
             accessibilityRole="button"
             accessibilityLabel="Back to home"
           >
@@ -431,7 +432,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
       <View style={[styles.header, { paddingTop: screenInsets.top + 16 }]}>
         <TouchableOpacity
           style={[styles.backChip, { backgroundColor: CHROME_CHIP_BG, borderColor: t.headerChipBorder }]}
-          onPress={onClose}
+          onPress={() => { playUiSound('selection'); uiHapticSelection(); onClose(); }}
           accessibilityRole="button"
           accessibilityLabel="Back to home"
         >
@@ -576,7 +577,13 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
                     {getPaceTrendMessage(effectivePhase as DialoguePhase)}
                   </Text>
                 )}
-                {unbrokenWeaveMastery && (
+                {/* The weave ladder is a phase-5 (post-revelation) pursuit, and
+                    getUnbrokenWeaveMastery() always resolves a rank object — so
+                    without this gate, any mid-game player who opened the card via
+                    a speed round or resonant choice saw "Rank 0: Unbroken Weave"
+                    (naming a mode that must not exist for them yet). Match the
+                    DifficultyMenu: show it only once earned or at phase 5. */}
+                {unbrokenWeaveMastery && (unbrokenWeaveMastery.wins > 0 || effectivePhase === 5) && (
                   <>
                     <View style={styles.masteryRow}>
                       <Text style={[styles.masteryLabel, { color: t.body }]}>Unbroken Weave</Text>

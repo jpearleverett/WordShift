@@ -94,6 +94,7 @@ jest.mock('../services/phaseNarrative', () => ({
   getFinalBoardStartMessage: jest.fn((_p: number) => 'The last arrangement. Take your time.'),
   getFinalBoardUndoRefusal: jest.fn((_p: number) => 'What is given now is given for good.'),
   getResonantMoveMessage: jest.fn((_p: number) => 'Oh, lovely choice. That word sits deep in the house.'),
+  getFinalBoardMoveMessage: jest.fn((_p: number) => 'Placed. Kept.'),
   getUnbrokenWeaveSpentLetterMessage: jest.fn((letter: string, _p: number) => `${letter} has already crossed the chain.`),
   getUnbrokenWeaveUnavailableMessage: jest.fn((_p: number) => 'The thread breaks before it can begin. A plain offering remains.'),
   getUnbrokenWeaveUnavailableTitle: jest.fn((_p: number) => 'The Thread Rests'),

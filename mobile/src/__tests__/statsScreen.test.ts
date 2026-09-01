@@ -445,3 +445,60 @@ describe('personal-best helpers', () => {
     expect(formatPersonalBestSummary({ fewestHints: 2, fewestInvalidAttempts: 3 })).toBe('2 hints, 3 mistakes');
   });
 });
+
+// ---------------------------------------------------------------------------
+// MASTERY card — the Unbroken Weave row must not leak a phase-5 mode early
+// ---------------------------------------------------------------------------
+
+describe('MASTERY card Unbroken Weave gating', () => {
+  const masteryMock = jest.requireMock('../services/masteryRecords') as {
+    getBestSpeedRound: jest.Mock;
+    getUnbrokenWeaveMastery: jest.Mock;
+  };
+
+  const rankZero = {
+    wins: 0,
+    flawlessWins: 0,
+    difficultyClears: [],
+    hardFlawless: false,
+    rank: 0,
+    title: 'Unbroken Weave',
+    nextObjective: 'Win one Unbroken Weave board.',
+  };
+
+  afterEach(() => {
+    masteryMock.getBestSpeedRound.mockResolvedValue(0);
+    masteryMock.getUnbrokenWeaveMastery.mockResolvedValue(null);
+  });
+
+  test('a mid-game player who opens the card via a speed round never sees Rank 0 weave', async () => {
+    // getUnbrokenWeaveMastery always resolves a rank object, so before the
+    // gate any speed-round player at phase 0-4 read "Rank 0: Unbroken Weave"
+    // (naming a post-revelation mode that does not exist for them yet).
+    masteryMock.getBestSpeedRound.mockResolvedValue(2);
+    masteryMock.getUnbrokenWeaveMastery.mockResolvedValue(rankZero);
+    const tree = await renderWithEffects({ currentPhase: 2, phase: 2 });
+
+    expect(textOf(tree)).toContain('Best speed run');
+    expect(textOf(tree)).not.toContain('Unbroken Weave');
+  });
+
+  test('the weave row shows at phase 5 even with zero wins (the mode exists now)', async () => {
+    masteryMock.getUnbrokenWeaveMastery.mockResolvedValue(rankZero);
+    const tree = await renderWithEffects({ currentPhase: 5, phase: 5 });
+
+    expect(textOf(tree)).toContain('Unbroken Weave');
+  });
+
+  test('an earned weave rank shows regardless of phase', async () => {
+    masteryMock.getUnbrokenWeaveMastery.mockResolvedValue({
+      ...rankZero,
+      wins: 1,
+      rank: 1,
+      title: 'Thread Joined',
+    });
+    const tree = await renderWithEffects({ currentPhase: 4, phase: 4 });
+
+    expect(textOf(tree)).toContain('Thread Joined');
+  });
+});

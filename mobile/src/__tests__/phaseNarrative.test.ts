@@ -55,6 +55,10 @@ import {
   getDwellLine,
   getPostCapDwellLine,
   getStreakHeldMessage,
+  getResonantMoveMessage,
+  getHouseAskLine,
+  getHouseAskFulfilledMessage,
+  getHintGrantMessage,
   getPreviewGraduationMessage,
   getSwiftVictoryHintMessage,
   getFinalBoardStartMessage,
@@ -960,6 +964,47 @@ describe('checkNarrativeMicroBeat', () => {
     expect(await checkNarrativeMicroBeat(99)).toBeNull();
   });
 
+  test('the {word} beat at 72 names the strongest dread word, resolved before consumption', async () => {
+    const amber = require('../services/amberCurrency');
+    const spy = jest.spyOn(amber, 'getRitualWords').mockResolvedValue(['SUNNY', 'VOID']);
+    try {
+      const beat = await checkNarrativeMicroBeat(72);
+      expect(beat).not.toBeNull();
+      expect(beat!.text).toContain('VOID');
+      expect(beat!.text).not.toContain('{word}');
+      // Consumed exactly once (resolve-then-mark).
+      expect(await checkNarrativeMicroBeat(72)).toBeNull();
+      // The shared table entry is never mutated by the resolution.
+      expect(MICRO_BEATS[72].text).toContain('{word}');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test('the {word} beat falls back to the baked wordless variant when no dread word exists', async () => {
+    const amber = require('../services/amberCurrency');
+    const spy = jest.spyOn(amber, 'getRitualWords').mockResolvedValue(['SUNNY', 'HAPPY']);
+    try {
+      const beat = await checkNarrativeMicroBeat(72);
+      expect(beat).not.toBeNull();
+      expect(beat!.text).toBe(MICRO_BEATS[72].fallbackText);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test('the {word} beat still delivers (via fallback) when the ritual read throws', async () => {
+    const amber = require('../services/amberCurrency');
+    const spy = jest.spyOn(amber, 'getRitualWords').mockRejectedValue(new Error('storage down'));
+    try {
+      const beat = await checkNarrativeMicroBeat(72);
+      expect(beat).not.toBeNull();
+      expect(beat!.text).toBe(MICRO_BEATS[72].fallbackText);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   test('returns early micro-beats in puzzles 5-25', async () => {
     const beat5 = await checkNarrativeMicroBeat(5);
     expect(beat5).not.toBeNull();
@@ -1137,8 +1182,37 @@ describe('MICRO_BEATS geography', () => {
   test('keys match the new geography exactly', () => {
     expect(keys).toEqual([
       5, 8, 12, 16, 20, 25, 30, 31, 33, 35, 38, 42, 45, 50, 54, 58, 61, 64, 70,
-      75, 82, 88, 92, 104, 106, 109, 112, 115,
+      72, 75, 78, 82, 86, 88, 92, 104, 106, 109, 112, 115,
     ]);
+  });
+
+  test('the glitch channel escalates monotonically by hold length toward the reveal', () => {
+    // 16 -> 35 -> 31 is chronology, not escalation order; escalation is BY
+    // HOLD: 300 -> 400 -> 900 -> 1200 -> 1600ms across 16/35/31/78/86.
+    const glitchKeys = keys.filter(k => MICRO_BEATS[k].type === 'glitch_title');
+    expect(glitchKeys).toEqual([16, 31, 35, 58, 61, 78, 86]);
+    expect(MICRO_BEATS[78].durationMs).toBeGreaterThan(MICRO_BEATS[31].durationMs);
+    expect(MICRO_BEATS[86].durationMs).toBeGreaterThan(MICRO_BEATS[78].durationMs);
+    expect(MICRO_BEATS[78].glitchTitle).toBe('YOU HAVE BEEN SO PATIENT');
+    expect(MICRO_BEATS[86].glitchTitle).toBe('WE KEPT EVERY WORD');
+  });
+
+  test('the personalized beat at 72 carries the {word} token AND a baked fallback', () => {
+    expect(MICRO_BEATS[72].text).toContain('{word}');
+    expect(MICRO_BEATS[72].fallbackText).toBeTruthy();
+    expect(MICRO_BEATS[72].fallbackText).not.toContain('{word}');
+    // 72 is the ONLY templated beat; every other beat is fully baked.
+    for (const k of keys) {
+      if (k === 72) continue;
+      expect(MICRO_BEATS[k].text ?? '').not.toContain('{word}');
+    }
+  });
+
+  test('the tag-question tic lives at 12 and 82 only', () => {
+    const questioners = keys.filter(k =>
+      /have you noticed\?|can't you\?|don't you\?/i.test(MICRO_BEATS[k].text ?? '')
+    );
+    expect(questioners).toEqual([12, 82]);
   });
 
   test('the puzzle-31 held glitch is prominent and the 33 whisper half-normalizes it', () => {
@@ -1822,6 +1896,82 @@ describe('getStreakHeldMessage', () => {
   test('phase defaults to the bright voice when omitted', () => {
     expect(getStreakHeldMessage(5)).toBe(getStreakHeldMessage(5, 0));
   });
+
+  test('every phase band is distinct (0/2/3/4/5 each carry their own register)', () => {
+    const bands = [0, 2, 3, 4, 5].map(p => getStreakHeldMessage(9, p));
+    expect(new Set(bands).size).toBe(bands.length);
+  });
+});
+
+describe('getResonantMoveMessage', () => {
+  test('draws from a pool at every phase band, dash-free, no phase labels', () => {
+    const realRandom = Math.random;
+    try {
+      for (const p of [0, 1, 2, 3, 4, 5]) {
+        const seen = new Set<string>();
+        for (let k = 0; k < 8; k++) {
+          Math.random = () => (k + 0.5) / 8;
+          const msg = getResonantMoveMessage(p);
+          expect(msg.length).toBeGreaterThan(0);
+          expect(msg).not.toMatch(/[–—]/);
+          expect(msg).not.toMatch(/\bphase\b/i);
+          seen.add(msg);
+        }
+        // A real pool: repeated wins do not repeat one fixed line.
+        expect(seen.size).toBeGreaterThan(1);
+      }
+    } finally {
+      Math.random = realRandom;
+    }
+  });
+
+  test('bright pools never leak dread framing; dread pools never sound bright', () => {
+    const realRandom = Math.random;
+    try {
+      for (let k = 0; k < 8; k++) {
+        Math.random = () => (k + 0.5) / 8;
+        expect(getResonantMoveMessage(0).toLowerCase()).not.toMatch(/arrangement|wanted|dark/);
+        expect(getResonantMoveMessage(4)).not.toMatch(/!/);
+      }
+    } finally {
+      Math.random = realRandom;
+    }
+  });
+});
+
+describe('house ask copy bands', () => {
+  test('ask lines name the letter at every band and kind, deterministically', () => {
+    for (const p of [0, 2, 3, 4, 5]) {
+      for (const kind of ['move', 'keep'] as const) {
+        const line = getHouseAskLine(p, kind, 'r');
+        expect(line).toContain('R');
+        expect(line).not.toMatch(/[–—]/);
+        // Deterministic: the a11y label calls this again and must match.
+        expect(getHouseAskLine(p, kind, 'r')).toBe(line);
+      }
+      expect(getHouseAskLine(p, 'move', 'r')).not.toBe(getHouseAskLine(p, 'keep', 'r'));
+    }
+  });
+
+  test('bands 0/2/3/4/5 are distinct for both kinds, and fulfilled receipts split too', () => {
+    for (const kind of ['move', 'keep'] as const) {
+      const bands = [0, 2, 3, 4, 5].map(p => getHouseAskLine(p, kind, 'e'));
+      expect(new Set(bands).size).toBe(bands.length);
+    }
+    const receipts = [0, 2, 3, 4, 5].map(p => getHouseAskFulfilledMessage(p));
+    expect(new Set(receipts).size).toBe(receipts.length);
+  });
+});
+
+describe('getHintGrantMessage', () => {
+  test('five distinct bands, all hint-naming and dash-free', () => {
+    const bands = [0, 2, 3, 4, 5].map(p => getHintGrantMessage(p));
+    expect(new Set(bands).size).toBe(bands.length);
+    for (const msg of bands) {
+      expect(msg.toLowerCase()).toContain('hint');
+      expect(msg).not.toMatch(/[–—]/);
+    }
+  });
 });
 
 describe('getPreviewGraduationMessage', () => {
@@ -1860,9 +2010,9 @@ describe('getFinalBoardStartMessage', () => {
 });
 
 describe('getCycleMicroBeat', () => {
-  test('six half-memories at the cycle-relative keys, silence everywhere else', () => {
+  test('ten half-memories at the cycle-relative keys, silence everywhere else', () => {
     const keys = Object.keys(CYCLE_MICRO_BEATS).map(Number).sort((a, b) => a - b);
-    expect(keys).toEqual([3, 10, 20, 34, 52, 75]);
+    expect(keys).toEqual([3, 10, 20, 34, 52, 75, 88, 106, 112, 115]);
     for (const k of keys) {
       const beat = getCycleMicroBeat(k);
       expect(beat).not.toBeNull();
@@ -1962,5 +2112,44 @@ describe('checkCycleNarrativeMicroBeat + resolveVictoryMicroBeat', () => {
     expect(await checkCycleNarrativeMicroBeat(3, 1)).toBeNull();
     await resetMicroBeats();
     expect(await checkCycleNarrativeMicroBeat(3, 1)).not.toBeNull();
+  });
+});
+
+// ============================================================================
+// Review fix: the {word} template must resolve on the CYCLE track too — an
+// NG+ player's re-fired beat 72 previously showed the literal token.
+// ============================================================================
+describe('cycle path resolves the {word} template (never the raw token)', () => {
+  beforeEach(async () => {
+    (AsyncStorage.clear as jest.Mock)();
+    await resetMicroBeats();
+  });
+
+  test('a re-fired regular beat at cycle-relative 72 names the dread word', async () => {
+    const amber = require('../services/amberCurrency');
+    const spy = jest.spyOn(amber, 'getRitualWords').mockResolvedValue(['VOID']);
+    try {
+      const beat = await checkCycleNarrativeMicroBeat(72, 7);
+      expect(beat).not.toBeNull();
+      expect(beat!.text).toContain('VOID');
+      expect(beat!.text).not.toContain('{word}');
+      // Consumed for this cycle (resolve-then-mark on this track too).
+      expect(await checkCycleNarrativeMicroBeat(72, 7)).toBeNull();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test('falls back to the baked wordless variant on the cycle path as well', async () => {
+    const amber = require('../services/amberCurrency');
+    const spy = jest.spyOn(amber, 'getRitualWords').mockResolvedValue(['SUNNY']);
+    try {
+      const beat = await checkCycleNarrativeMicroBeat(72, 8);
+      expect(beat).not.toBeNull();
+      expect(beat!.text).toBe(MICRO_BEATS[72].fallbackText);
+      expect(beat!.text).not.toContain('{word}');
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

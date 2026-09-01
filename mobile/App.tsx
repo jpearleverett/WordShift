@@ -40,7 +40,7 @@ import { useVictoryOrchestration } from './src/hooks/useVictoryOrchestration';
 import { useOnboardingFlow } from './src/hooks/useOnboardingFlow';
 import { useAutosave } from './src/hooks/useAutosave';
 import { logEvent } from './src/services/eventLogger';
-import { SettingsScreen } from './src/components/SettingsScreen';
+import { SettingsScreen, performNewCycle } from './src/components/SettingsScreen';
 import { FoxGuide } from './src/components/FoxGuide';
 import {
   COLD_OPEN_INSTRUCTION,
@@ -78,6 +78,7 @@ import {
   isFinaleArmed,
   consumeVariantNudge,
   getFullProgress,
+  getRitualWords,
   consumeCycleOpening,
 } from './src/services/amberCurrency';
 import { claimDailyLoginReward, DailyLoginGrant } from './src/services/dailyLoginReward';
@@ -98,10 +99,14 @@ import { initShareImage } from './src/services/shareImage';
 import { ShareResultModal } from './src/components/share/ShareResultModal';
 import { getLocalDateString } from './src/services/dateUtils';
 import { getSettingsSync, getSettings } from './src/services/settings';
+import { FlyingTileGhost, TileFlight } from './src/components/puzzle/FlyingTileGhost';
+import { standardLetterCenterOffset } from './src/constants/tileLayout';
+import { shouldSimplifyAnimations } from './src/services/deviceTier';
 import { announceForA11y } from './src/services/a11yAnnounce';
 import { initAudio, setAudioPhase, startMusicForScreen, type MusicScreen, soundVictory, soundPerfect, soundValidMove, soundMidpointTurn, soundInvalidMove, soundUndo, soundHint, soundTap, soundUiTap, soundSelection, soundLetterSelect, soundDailyReady } from './src/services/audio';
+import { stopCeremonyMusic } from './src/services/uiSound';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess, hapticWarning, hapticError, hapticSelection } from './src/services/haptics';
+import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess, hapticWarning, hapticError, hapticSelection, hapticMoveCommit } from './src/services/haptics';
 import { getVariantTutorialIntroLines } from './src/services/animalDialogue';
 import {
   getPhaseIndicator,
@@ -127,6 +132,9 @@ import {
   getVariantNudgeMessage,
   getDailyHostLine,
   getNewCycleOpeningLine,
+  getNewCycleTitle,
+  getNewCycleDescription,
+  getNewCycleCTA,
   getDailyLadderLine,
   getDailyLadderTrendLabel,
   getEventDailyBonusLine,
@@ -159,7 +167,7 @@ import {
   UnbrokenWeaveMastery,
 } from './src/services/masteryRecords';
 import { maybePromptReview } from './src/services/reviewPrompt';
-import { getPhaseTransitionEvent, PhaseTransitionEvent, HOUSE_COMPLETION_EVENT, FINAL_PUZZLE_EVENT, POST_REVELATION_EVENT } from './src/services/phaseEvents';
+import { getPhaseTransitionEvent, PhaseTransitionEvent, HOUSE_COMPLETION_EVENT, FINAL_PUZZLE_EVENT, buildFinalPuzzleEvent, POST_REVELATION_EVENT, NEW_CYCLE_EVENT } from './src/services/phaseEvents';
 import { generateDailyPuzzle, prewarmDailyPuzzle, isDailyChallengeUnlocked, recordDailyCompletion, getDailyStatus, checkDailyStreakMilestone, grantFirstDailyMercy, getDailyHostName, getDailyDifficulty } from './src/services/dailyChallenge';
 import { recordDailyLadderResult, getDailyLadderSummary, shouldShowTrend } from './src/services/dailyLadder';
 import { startFrameMonitoring, stopFrameMonitoring } from './src/services/performanceMonitor';
@@ -282,6 +290,17 @@ import {
   BLIND_TOGGLE_UNLOCK_PUZZLES,
 } from './src/services/puzzleVariety';
 import { appStyles as styles, getScreenBackgroundColor, getActionButtonColors } from './src/styles/appStyles';
+
+// Chromatic-aberration ghost layer for the glitch text: an absolutely
+// positioned same-glyph copy behind the main text, tinted and offset 1-2dp.
+// The shadow is suppressed (the main text keeps its red glow; doubled shadows
+// smear). Shared by the victory glitch and the glitch_title micro-beats.
+const appGlitchGhostStyle = {
+  position: 'absolute' as const,
+  opacity: 0.45,
+  textShadowColor: 'transparent',
+  textShadowRadius: 0,
+};
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useScreenInsets } from './src/hooks/useScreenInsets';
 
@@ -432,6 +451,9 @@ function MainApp() {
   // StarBurst effect state for valid moves. comboTier drives the burst's
   // size/count escalation (Confetti.StarBurst) so a rising clean-move streak
   // visibly grows the celebration instead of firing an identical 8-square pop.
+  // Cross-row flying ghost (audit F1): resolved endpoints for the tap-commit
+  // tile flight. Set by the lastArrival effect below; cleared when it lands.
+  const [tileFlight, setTileFlight] = useState<TileFlight | null>(null);
   const [starBurst, setStarBurst] = useState<{ active: boolean; x: number; y: number; comboTier: number }>({
     active: false, x: 0, y: 0, comboTier: 0,
   });
@@ -737,6 +759,20 @@ function MainApp() {
   // Opacity stutter for the prominent first-victory glitch (held at 1 under
   // reduced motion).
   const glitchStutter = useRef(new Animated.Value(1)).current;
+  // Chromatic-aberration ghost copies under the glitch text (a cyan and a
+  // deep-red offset layer, so the tear reads as the SCREEN failing, not red
+  // handwriting). On the held prominent glitch the ghosts jitter off the
+  // existing stutter value — no new animation driver; reduced motion pins
+  // the stutter at 1, so the ghosts sit still there too (and low-tier /
+  // reduced-motion devices skip the ghost layers entirely at render).
+  const glitchGhostShiftL = useMemo(
+    () => glitchStutter.interpolate({ inputRange: [0, 1], outputRange: [-3, -1.5] }),
+    [glitchStutter]
+  );
+  const glitchGhostShiftR = useMemo(
+    () => glitchStutter.interpolate({ inputRange: [0, 1], outputRange: [3, 1.5] }),
+    [glitchStutter]
+  );
   // Dynamic background colors for smooth transitions — match overlay/root to destination screen
   const [transitionOverlayColor, setTransitionOverlayColor] = useState('#1A1A2E');
   const [rootBgColor, setRootBgColor] = useState('#1A1A2E');
@@ -1065,19 +1101,52 @@ function MainApp() {
   const musicScreenRef = useRef(musicScreen);
   musicScreenRef.current = musicScreen;
   const musicHydratedRef = useRef(false);
+  // Hushed-win silence: set at the victory commit for the scripted silent
+  // victory and the finale win, cleared on the victory-exit paths (see
+  // startVictoryExitFlow). A ref, not state — the music effect re-runs on the
+  // win's own cumulativeStats change and must read the CURRENT hush.
+  const victoryMusicHushRef = useRef(false);
+  const puzzleIsFinalRef = useRef(false);
+  puzzleIsFinalRef.current = puzzle.isFinalBoard;
   useEffect(() => {
     if (persistence.cumulativeStats === null) return;
     musicHydratedRef.current = true;
     if (phaseTransitionEvent !== null) return;
+    // The last arrangement is played in true silence: after 100+ solves of
+    // continuous beds, the one board with no music says "this is different"
+    // before a single tile moves. The hush ref extends the same silence
+    // through the scripted silent-victory beat ("No music this time. Only
+    // the quiet after." must not be a lie).
+    if (musicScreen === 'puzzle' && (puzzle.isFinalBoard || victoryMusicHushRef.current)) {
+      stopCeremonyMusic();
+      return;
+    }
     startMusicForScreen(musicScreen, persistence.currentPhase).catch(() => {});
-  }, [persistence.cumulativeStats, persistence.currentPhase, phaseTransitionEvent, musicScreen]);
+  }, [persistence.cumulativeStats, persistence.currentPhase, phaseTransitionEvent, musicScreen, puzzle.isFinalBoard]);
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state !== 'active') return;
       if (!musicHydratedRef.current) return;
+      // Never resume the bed over an authored silence (finale / hushed win).
+      if (victoryMusicHushRef.current) return;
+      if (musicScreenRef.current === 'puzzle' && puzzleIsFinalRef.current) return;
       startMusicForScreen(musicScreenRef.current, musicPhaseRef.current).catch(() => {});
     });
     return () => subscription.remove();
+  }, []);
+  // Clears a hushed win's authored silence and (optionally) resumes the bed.
+  // Called by the victory-exit flow AND by the board-start paths reachable
+  // while a hushed victory modal is still up — a deep link or notification tap
+  // routes straight to startDailyBoard / the shared-challenge start, bypassing
+  // startVictoryExitFlow, and would otherwise leave the whole next board in
+  // unintended silence (the music effect and the foreground-resume listener
+  // both honor the ref).
+  const clearVictoryMusicHush = useCallback((resume: boolean) => {
+    if (!victoryMusicHushRef.current) return;
+    victoryMusicHushRef.current = false;
+    if (resume && musicHydratedRef.current && !puzzleIsFinalRef.current) {
+      startMusicForScreen(musicScreenRef.current, musicPhaseRef.current).catch(() => {});
+    }
   }, []);
 
   // Glitch stutter for the prominent first-victory glitch: a short on/off
@@ -1576,6 +1645,15 @@ function MainApp() {
     puzzleActions.setShowConfetti(false);
     victoryActions.resetVictory();
     orchestrationActions.resetOrchestration();
+    // A hushed win's authored silence ends at the exit: clear the hush and
+    // resume the bed explicitly (Next Level changes no music-effect dep, so
+    // the effect alone would leave the world silent). Skip the resume when an
+    // endgame cinematic is about to play — the effect restarts the bed when
+    // the overlay clears.
+    // On the finale itself, or when a rescued cinematic is about to play,
+    // skip the resume (the music effect restarts the bed when isFinalBoard
+    // flips / the screen changes / the overlay clears).
+    clearVictoryMusicHush(!pendingEndgame);
 
     if (queuedPostVictoryIntrosRef.current.length > 0) {
       pendingPostVictoryActionRef.current = action;
@@ -1588,7 +1666,7 @@ function MainApp() {
     }
 
     action();
-  }, [clearVictoryTimeouts, clearVictoryToastQueue, puzzleActions, victoryActions, orchestrationActions, advanceQueuedPostVictoryIntro]);
+  }, [clearVictoryTimeouts, clearVictoryToastQueue, clearVictoryMusicHush, puzzleActions, victoryActions, orchestrationActions, advanceQueuedPostVictoryIntro]);
 
   // ========================================================================
   // Navigation & puzzle lifecycle handlers
@@ -1701,6 +1779,12 @@ function MainApp() {
     pendingPostVictoryActionRef.current = null;
     setHomePanY(null);
     puzzlesSinceHomeVisit.current = 0;
+    // A rebuild that lands while the HomeScreen is ALREADY mounted (the
+    // home-launched New Cycle: transitionTo('home') no-ops on the same
+    // screen) must still re-read the world, or the shadow sky and robed
+    // keepers linger over a bright-reset session. The refresh signal re-runs
+    // loadAllData on the mounted screen; a remounting home ignores it.
+    setHomeRefreshSignal(n => n + 1);
     // Re-read the rebuilt persistence (amber, phase, stats, pending transition).
     persistenceActions.refreshStats().catch(() => {});
     getUnbrokenWeaveMastery().then(setUnbrokenWeaveMastery).catch(() => {});
@@ -1734,6 +1818,41 @@ function MainApp() {
     rebuildSessionFromStorage({ restartOnboarding: true });
   }, [rebuildSessionFromStorage]);
 
+  // New Cycle from the HOME surface (the Phase-5 player's actual home). The
+  // Settings "The Pattern" section remains; this is the discoverable door —
+  // the in-world pointer lines allude to a way to begin again, and a player
+  // who never browses Settings previously had no path to it at all. Same
+  // confirm, same committed performNewCycle, same serene ceremony; the
+  // ceremony's completion rebuilds the running session in place (the exact
+  // flow Settings runs via onCloudRestored).
+  const pendingCycleRebuildRef = useRef(false);
+  const handleStartNewCycleFromHome = useCallback(() => {
+    showGameAlert(
+      getNewCycleTitle(),
+      getNewCycleDescription(),
+      [
+        { text: 'Not yet', style: 'cancel' },
+        {
+          text: getNewCycleCTA(),
+          onPress: async () => {
+            let cycle = 0;
+            try {
+              cycle = await performNewCycle();
+            } catch {
+              return; // nothing committed — no ceremony, no rebuild
+            }
+            // performNewCycle returns 0 when the eligibility re-check fails
+            // (e.g. a stale row after a cycle already started elsewhere) —
+            // no ceremony over a world that did not change.
+            if (!cycle) return;
+            pendingCycleRebuildRef.current = true;
+            setPhaseTransitionEvent(NEW_CYCLE_EVENT);
+          },
+        },
+      ]
+    );
+  }, []);
+
   // Re-check today's daily leaderboard standing (tapping the completed daily
   // card). The standing used to be shown exactly once, on completion; this gives
   // it a re-check surface (assessment §7). Degrades gracefully when the backend
@@ -1764,6 +1883,9 @@ function MainApp() {
   // The daily board start proper — reached only through handleStartDaily's
   // replay guard below.
   const startDailyBoard = useCallback(() => {
+    // A hushed win's silence must not leak onto a link/notification-routed
+    // daily start (this path bypasses startVictoryExitFlow's clear).
+    clearVictoryMusicHush(true);
     persistenceActions.refreshStats();
     orchestrationActions.setCompletionCoda(null);
     setIsPlayingDaily(true);
@@ -1809,7 +1931,7 @@ function MainApp() {
         await puzzleActions.startNewGame('HARD', 'standard', 'standard', false, false, undefined, false);
       }
     });
-  }, [puzzleActions, transitionTo, persistenceActions, orchestrationActions, persistence.currentPhase, maybeShowSetupSelectorIntro, clearVictoryToastQueue]);
+  }, [puzzleActions, transitionTo, persistenceActions, orchestrationActions, persistence.currentPhase, maybeShowSetupSelectorIntro, clearVictoryToastQueue, clearVictoryMusicHush]);
 
   // Start the Daily Challenge (seeded; difficulty follows the week ramp).
   const handleStartDaily = useCallback((_difficulty: Difficulty) => {
@@ -1847,13 +1969,16 @@ function MainApp() {
     }
     hapticLight();
     soundTap();
+    // Same hush-leak guard as startDailyBoard: a challenge link can arrive
+    // over a hushed victory modal.
+    clearVictoryMusicHush(true);
     setIsPlayingDaily(false);
     resetSpeedRun();
     orchestrationActions.setCompletionCoda(null);
     persistenceActions.refreshStats();
     logEvent({ type: 'puzzle_started', data: { shared: true, words: words.length } });
     transitionTo('puzzle');
-  }, [puzzleActions, transitionTo, persistenceActions, orchestrationActions, persistence.currentPhase]);
+  }, [puzzleActions, transitionTo, persistenceActions, orchestrationActions, persistence.currentPhase, clearVictoryMusicHush]);
 
   const handleIncomingLink = useCallback((url: string) => {
     // Scheme/host matching is case-insensitive on Android intents, so compare
@@ -2649,6 +2774,14 @@ function MainApp() {
       // beats (the final board and the scripted silent victory) are hushed so
       // the phone never celebrates while the screen performs silence.
       const victoryHushed = wasFinalBoard || isSilentVictoryBeat(completedTotal);
+      // The hushed wins are ACTUALLY silent: fade the ambient bed out too
+      // (the silent-victory line "No music this time" was a lie while the bed
+      // looped on). The hush holds until a victory-exit path clears it; the
+      // music effect and the foreground-resume listener both honor the ref.
+      if (victoryHushed) {
+        victoryMusicHushRef.current = true;
+        stopCeremonyMusic();
+      }
       victoryActions.playVictorySequence(victory.earnedStars, persistence.currentPhase, victoryHushed);
 
       // Phase transitions are now DEFERRED to the Offering Pit.
@@ -2705,7 +2838,16 @@ function MainApp() {
                         : 'You completed the house and reached the final path.')
                     : 'The rooms are not all standing, and it did not need them. It only ever needed the words.',
                 });
-                queueEndgameCinematic(FINAL_PUZZLE_EVENT);
+                // The Arrival names the player's own deepest words (the
+                // evidence was their hands). Falls back to the generic
+                // event when the ritual memory holds too few dread words.
+                let arrivalEvent = FINAL_PUZZLE_EVENT;
+                try {
+                  arrivalEvent = buildFinalPuzzleEvent(await getRitualWords());
+                } catch {
+                  arrivalEvent = FINAL_PUZZLE_EVENT;
+                }
+                queueEndgameCinematic(arrivalEvent);
               } else if (!(await isFinaleArmed())) {
                 // Dwell gate: the finale used to fire on the FIRST Phase-4
                 // victory, so the whole cult-reveal era flashed past in one
@@ -2764,7 +2906,9 @@ function MainApp() {
         }
       }
 
-      // Post-victory orchestration: glitch, micro-beat, whisper, interjection
+      // Post-victory orchestration: glitch, micro-beat, whisper, interjection.
+      // isFinalBoard suppresses the whisper/interjection rolls entirely so the
+      // finale win carries one voice: the silence, then the Arrival.
       orchestrationActions.processVictory({
         phase: persistence.currentPhase,
         totalPuzzlesCompleted: finalVictory.cumulativeStats?.totalPuzzlesCompleted ?? 1,
@@ -2773,6 +2917,7 @@ function MainApp() {
         puzzlesSinceHomeVisit: puzzlesSinceHomeVisit.current,
         firstFreeWin,
         dwellLine: dwellLineForWin,
+        isFinalBoard: wasFinalBoard,
       });
 
       // Re-schedule notifications after puzzle completion
@@ -2820,12 +2965,11 @@ function MainApp() {
         return;
       }
 
-      // Escalated haptics for drag-drop: heavy thud vs medium tap
-      if (wasDragDrop) {
-        hapticHeavy();
-      } else {
-        hapticMedium();
-      }
+      // Escalated haptics for drag-drop (heavy thud vs medium tap), aged by
+      // phase: from Growing Shadows the commit gains a delayed soft
+      // after-strike (the ponderous settle the heavy tile springs show the
+      // eye), and at Terrible Peace it softens to a single medium.
+      hapticMoveCommit(persistence.currentPhase, wasDragDrop);
       // Audio combo ladder: the chime climbs with the clean-move streak
       // (tier 0 base → 1/2/3; dark variants resolve inside audio.ts).
       soundValidMove(result.comboTier ?? 0);
@@ -3003,6 +3147,54 @@ function MainApp() {
     else rowNodeRefs.current.delete(rowIndex);
   }, []);
 
+  // Cross-row flying ghost (audit F1): when a tap-committed arrival carries
+  // flight endpoints, resolve them to window coordinates — X analytically
+  // (standardLetterCenterOffset in unscaled board units x boardScale around
+  // the window centerline, the estimateSlotIndex precedent), Y from the
+  // registered row nodes. Rows keep their positions across a commit (only
+  // their tiles change), so measuring after the commit is race-free. The
+  // ghost overlaps the arriving tile's settle (which starts at scale 0.65)
+  // and hands over as it lands. Reduced-motion / low-tier devices skip the
+  // flight entirely — the settle is already their feedback.
+  useEffect(() => {
+    const a = puzzle.lastArrival;
+    if (
+      !a || a.flightChar === undefined || a.sourceRowIndex === undefined ||
+      a.sourceLetterIndex === undefined || a.sourceWordLength === undefined ||
+      a.targetWordLength === undefined
+    ) return;
+    if (getSettingsSync().reducedMotion || shouldSimplifyAnimations()) return;
+    const srcNode = rowNodeRefs.current.get(a.sourceRowIndex);
+    const dstNode = rowNodeRefs.current.get(a.rowIndex);
+    if (!srcNode?.measureInWindow || !dstNode?.measureInWindow) return;
+    const scale = boardScaleRef.current || 1;
+    const centerX = boardWindowWidth / 2;
+    const fromX = centerX + standardLetterCenterOffset(a.sourceLetterIndex, a.sourceWordLength, a.sourceWordLength >= 6) * scale;
+    const toX = centerX + standardLetterCenterOffset(a.slotIndex, a.targetWordLength, a.targetWordLength >= 6) * scale;
+    const moveId = a.moveId;
+    const flightChar = a.flightChar;
+    const compact = a.targetWordLength >= 6;
+    srcNode.measureInWindow((_sx: number, sy: number, _sw: number, sh: number) => {
+      dstNode.measureInWindow((_dx: number, dy: number, _dw: number, dh: number) => {
+        if (!sh || !dh) return;
+        setTileFlight({
+          id: moveId,
+          char: flightChar,
+          fromX,
+          fromY: sy + sh / 2,
+          toX,
+          toY: dy + dh / 2,
+          compact,
+          phase: persistence.currentPhase,
+        });
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the arrival; scale/width/phase read at fire time
+  }, [puzzle.lastArrival]);
+  const handleFlightDone = useCallback((id: number) => {
+    setTileFlight(prev => (prev && prev.id === id ? null : prev));
+  }, []);
+
   // Disable puzzle ScrollView during drag to prevent scroll-vs-drag conflict.
   // Toggled by DraggableTile via onDragActiveChange callback. Drag start also
   // measures the target row's window bounds ONCE (cheap, async) so the
@@ -3106,6 +3298,12 @@ function MainApp() {
     if (puzzle.gameState !== GameState.PLAYING) return;
     if (puzzle.previewGradingMode !== 'neutral' || puzzle.blindMode) return;
     if (onboardingFlow.isOnboarding) return;
+    // Never on THE final board: a save where graduation hasn't fired before the
+    // finale arms (creator-kit era snapshots; any restore skipping 13-115) would
+    // otherwise pop this card over the last arrangement — the one board no
+    // teaching beat may touch. Returning BEFORE the session latch keeps the
+    // beat alive for the next ordinary neutral board.
+    if (puzzle.isFinalBoard) return;
     if (graduationCheckedRef.current) return;
     graduationCheckedRef.current = true;
     (async () => {
@@ -3129,7 +3327,7 @@ function MainApp() {
       );
     })().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fires per fresh board; actions/phase read at fire time
-  }, [boardIdentity, puzzle.gameState, puzzle.previewGradingMode, puzzle.blindMode, onboardingFlow.isOnboarding]);
+  }, [boardIdentity, puzzle.gameState, puzzle.previewGradingMode, puzzle.blindMode, puzzle.isFinalBoard, onboardingFlow.isOnboarding]);
 
   // First-stuck mercy — the ONLY consumer of puzzle.isStuck. Stuck detection
   // stays silent by product decision (discovering a dead end and choosing
@@ -4316,6 +4514,7 @@ function MainApp() {
               onOpenShop={() => transitionTo('shop')}
               onOpenStore={() => setShowStoreModal(true)}
               onOpenPit={() => transitionTo('pit')}
+              onStartNewCycle={handleStartNewCycleFromHome}
               onboardingStep={onboardingFlow.onboardingStep}
               onAdvanceOnboarding={onboardingActions.advanceOnboarding}
               pitPhaseReady={persistence.pendingPhaseTransition != null}
@@ -4386,6 +4585,7 @@ function MainApp() {
 
         {/* Star burst effect on valid moves */}
         <StarBurst active={starBurst.active} x={starBurst.x} y={starBurst.y} phase={persistence.currentPhase} comboTier={starBurst.comboTier} />
+        <FlyingTileGhost flight={tileFlight} onDone={handleFlightDone} />
 
         {/* Phase change dramatic flash overlay */}
         <Animated.View
@@ -4405,12 +4605,21 @@ function MainApp() {
           {/* Hide home button during onboarding tutorial */}
           {!onboardingFlow.isOnboarding ? (
             <TouchableOpacity
-              style={styles.headerHomeButton}
+              style={[
+                styles.headerHomeButton,
+                persistence.currentPhase === 2 && styles.headerCircleDusk,
+                persistence.currentPhase >= 3 && styles.headerCircleDark,
+                persistence.currentPhase >= 4 && styles.headerCircleVoid,
+              ]}
               onPress={handleGoHome}
               accessibilityLabel="Go home"
               accessibilityRole="button"
             >
-              <Text style={styles.headerHomeText}>{'\uD83C\uDFE0'}</Text>
+              {getModeIconSprite('house') ? (
+                <Image source={getModeIconSprite('house')!} style={styles.headerHomeIcon} />
+              ) : (
+                <Text style={styles.headerHomeText}>{'\uD83C\uDFE0'}</Text>
+              )}
             </TouchableOpacity>
           ) : (
             /* The home route is deliberately withheld during onboarding, but
@@ -4448,12 +4657,19 @@ function MainApp() {
           </View>
 
           <TouchableOpacity
-            style={styles.helpButton}
+            style={[
+              styles.helpButton,
+              persistence.currentPhase === 2 && styles.headerCircleDusk,
+              persistence.currentPhase >= 3 && styles.headerCircleDark,
+              persistence.currentPhase >= 4 && styles.headerCircleVoid,
+            ]}
             onPress={() => puzzleActions.setShowRules(true)}
             accessibilityLabel="How to play"
             accessibilityRole="button"
           >
-            <View style={styles.helpButtonShine} />
+            {/* The candy shine reads as a smudge on the dark tinted fills
+                (same rule the toast applies) — bright phases only. */}
+            {persistence.currentPhase < 3 && <View style={styles.helpButtonShine} />}
             <Text style={styles.helpButtonText}>?</Text>
           </TouchableOpacity>
         </View>
@@ -4771,6 +4987,8 @@ function MainApp() {
         {speedTimer.speedTimeRemaining !== null && (
           <View style={[
             styles.speedTimerContainer,
+            persistence.currentPhase === 2 && styles.speedTimerDusk,
+            persistence.currentPhase >= 3 && styles.speedTimerDark,
             speedTimer.speedTimeRemaining <= 10 && styles.speedTimerUrgent,
             speedTimer.speedTimeRemaining <= SPEED_TICK_CRITICAL_SEC && styles.speedTimerCritical,
           ]}>
@@ -5084,15 +5302,57 @@ function MainApp() {
             importantForAccessibility="no-hide-descendants"
             accessibilityElementsHidden
           >
-            <Animated.Text
-              style={[
-                styles.victoryGlitchText,
-                orchestration.victoryGlitchProminent && styles.victoryGlitchTextProminent,
-                orchestration.victoryGlitchProminent && { opacity: glitchStutter },
-              ]}
-            >
-              {orchestration.victoryGlitch}
-            </Animated.Text>
+            <View>
+              {/* Ghost copies behind the main text: classic RGB split. Skipped
+                  under reduced motion / low tier (the single static text is
+                  exactly today's rendering there). The announced string never
+                  changes — ghosts repeat the same glyphs. */}
+              {!getSettingsSync().reducedMotion && !shouldSimplifyAnimations() && (
+                <>
+                  <Animated.Text
+                    style={[
+                      styles.victoryGlitchText,
+                      orchestration.victoryGlitchProminent && styles.victoryGlitchTextProminent,
+                      appGlitchGhostStyle,
+                      { color: '#00E5FF' },
+                      {
+                        transform: [
+                          { translateX: orchestration.victoryGlitchProminent ? glitchGhostShiftL : -2 },
+                          { translateY: 1 },
+                        ],
+                      },
+                    ]}
+                  >
+                    {orchestration.victoryGlitch}
+                  </Animated.Text>
+                  <Animated.Text
+                    style={[
+                      styles.victoryGlitchText,
+                      orchestration.victoryGlitchProminent && styles.victoryGlitchTextProminent,
+                      appGlitchGhostStyle,
+                      { color: '#D40030' },
+                      {
+                        transform: [
+                          { translateX: orchestration.victoryGlitchProminent ? glitchGhostShiftR : 2 },
+                          { translateY: -1 },
+                        ],
+                      },
+                    ]}
+                  >
+                    {orchestration.victoryGlitch}
+                  </Animated.Text>
+                </>
+              )}
+              <Animated.Text
+                style={[
+                  styles.victoryGlitchText,
+                  orchestration.victoryGlitchProminent && styles.victoryGlitchTextProminent,
+                  orchestration.victoryGlitchProminent && { opacity: glitchStutter },
+                ]}
+              >
+                {orchestration.victoryGlitch}
+              </Animated.Text>
+            </View>
           </View>
         )}
 
@@ -5111,11 +5371,26 @@ function MainApp() {
             // the screen-reader swipe order.
             importantForAccessibility="no-hide-descendants"
             accessibilityElementsHidden>
-            <Text style={[
-              orchestration.microBeat.type === 'glitch_title' ? styles.victoryGlitchText : styles.microBeatWhisperText,
-            ]}>
-              {orchestration.microBeat.type === 'glitch_title' ? orchestration.microBeat.glitchTitle : orchestration.microBeat.text}
-            </Text>
+            <View>
+              {/* glitch_title beats get the same RGB-split ghosts as the
+                  victory glitch (static offsets — this overlay hard-cuts). */}
+              {orchestration.microBeat.type === 'glitch_title' &&
+                !getSettingsSync().reducedMotion && !shouldSimplifyAnimations() && (
+                <>
+                  <Text style={[styles.victoryGlitchText, appGlitchGhostStyle, { color: '#00E5FF', transform: [{ translateX: -2 }, { translateY: 1 }] }]}>
+                    {orchestration.microBeat.glitchTitle}
+                  </Text>
+                  <Text style={[styles.victoryGlitchText, appGlitchGhostStyle, { color: '#D40030', transform: [{ translateX: 2 }, { translateY: -1 }] }]}>
+                    {orchestration.microBeat.glitchTitle}
+                  </Text>
+                </>
+              )}
+              <Text style={[
+                orchestration.microBeat.type === 'glitch_title' ? styles.victoryGlitchText : styles.microBeatWhisperText,
+              ]}>
+                {orchestration.microBeat.type === 'glitch_title' ? orchestration.microBeat.glitchTitle : orchestration.microBeat.text}
+              </Text>
+            </View>
           </Animated.View>
         )}
 
@@ -5124,6 +5399,7 @@ function MainApp() {
           visible={orchestration.showWhisper}
           animalName={orchestration.whisper?.animalName || ''}
           whisperText={orchestration.whisper?.text || ''}
+          animalType={orchestration.whisper?.animalType}
           phase={persistence.currentPhase}
           onComplete={orchestrationActions.dismissWhisper}
           topInset={screenInsets.top}
@@ -5340,7 +5616,16 @@ function MainApp() {
       {/* Phase transition overlay — renders above ALL screens */}
       <PhaseTransitionOverlay
         event={phaseTransitionEvent}
-        onComplete={() => setPhaseTransitionEvent(null)}
+        onComplete={() => {
+          setPhaseTransitionEvent(null);
+          // A home-launched New Cycle ceremony hands off to the in-place
+          // session rebuild once its overlay clears (mirrors Settings'
+          // handleCycleCeremonyComplete -> onCloudRestored).
+          if (pendingCycleRebuildRef.current) {
+            pendingCycleRebuildRef.current = false;
+            rebuildSessionFromStorage({ restartOnboarding: false });
+          }
+        }}
       />
       {/* Shareable result card preview — overlays everything */}
       <ShareResultModal

@@ -110,6 +110,7 @@ import {
   createPitOnboardingStallRescue,
   PIT_ONBOARDING_STALL_RESCUE_MS,
   shouldShowHarvestPitIntro,
+  getPitPhaseScrim,
 } from '../components/OfferingPitScreen';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -324,5 +325,35 @@ describe('shouldShowHarvestPitIntro (first-manual-harvest Fox beat)', () => {
     // a pending batch; returning to the pit at 0 real puzzles must NOT trigger
     // "now harvest them yourself" while the house is still carrying words down.
     expect(shouldShowHarvestPitIntro(false, null, 3, false, false)).toBe(false);
+  });
+});
+
+// ============================================================================
+// Phase scrim over the shared night art (phases 3 and 4 both serve pitt_night).
+// The caps are the contract: strong enough to be FELT at the reveal's own
+// site, capped low so the pit's teal glow layers survive the night phases.
+// Phase 5 serves its own settled art (pitt_peace) and takes NO scrim — a
+// second wash over already-graded art would double-dip.
+// ============================================================================
+describe('getPitPhaseScrim', () => {
+  test('nothing through phase 3; a crimson-black deepen at 4; none at 5 (pitt_peace carries the settle)', () => {
+    for (const p of [0, 1, 2, 3]) expect(getPitPhaseScrim(p)).toBeNull();
+    const reveal = getPitPhaseScrim(4);
+    expect(reveal).not.toBeNull();
+    expect(getPitPhaseScrim(5)).toBeNull();
+  });
+
+  test('opacity stays capped so the glow layers survive', () => {
+    expect(getPitPhaseScrim(4)!.opacity).toBeLessThanOrEqual(0.2);
+    expect(getPitPhaseScrim(4)!.opacity).toBeGreaterThan(0);
+  });
+
+  test('phase 5 routes to its own art, not the shared night art', () => {
+    const src = fs.readFileSync(
+      path.join(__dirname, '..', 'components', 'OfferingPitScreen.tsx'),
+      'utf8'
+    );
+    expect(src).toMatch(/pitt_peace\.webp/);
+    expect(src).toMatch(/phase >= 5\) return PIT_PEACE/);
   });
 });

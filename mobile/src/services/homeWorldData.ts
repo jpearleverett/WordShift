@@ -1143,8 +1143,30 @@ export async function canSkipUnlockGate(unlockId: string): Promise<boolean> {
     if (!done) return false;
   }
 
+  // NARRATIVE GUARD: never offer a paid skip into a descent-trio room before
+  // global Phase 3. The trio's recruits (LATE_PHASE_RECRUITS) carry arcs that
+  // assume Phase 3+ — organically their 84/88/92 solve gates imply it (weighted
+  // phase progress can never trail raw solves) — but a skip bypasses the solve
+  // gate, and amber is purchasable, so without this check cash -> amber -> skip
+  // could summon the trio (and, transitively, fire the house-completion
+  // ceremony) in the bright phases: a "story is never for sale" leak. Reserve
+  // stays available — it waits for the gate, which waits for the phase.
+  if (isDescentTrioRoomUnlock(unlock) && progress.currentPhase < 3) return false;
+
   // Must be able to afford the premium skip cost.
   return progress.amber >= getUnlockSkipCost(unlock);
+}
+
+/**
+ * Whether this unlock is one of the descent-trio rooms — a gated room whose
+ * immediately-following unlock is a LATE_PHASE_RECRUITS animal. Derived from
+ * the progression data (no hardcoded room list) so a reordering can't silently
+ * strand the guard.
+ */
+export function isDescentTrioRoomUnlock(unlock: Unlockable): boolean {
+  if (unlock.type !== 'room') return false;
+  const follower = UNLOCK_PROGRESSION.find(u => u.order === unlock.order + 1);
+  return follower?.type === 'character' && LATE_PHASE_RECRUITS.has(follower.targetId as AnimalType);
 }
 
 /**
@@ -1208,6 +1230,10 @@ export async function canSpeedUpReservedUnlock(unlockId: string): Promise<boolea
   const progress = await loadProgress();
   if (progress.reservedUnlockId !== unlockId) return false;
   if (unlock.minPuzzles !== undefined && progress.puzzlesSolved >= unlock.minPuzzles) return false;
+  // Same narrative guard as canSkipUnlockGate: a reserved descent-trio room may
+  // not be sped past its gate before global Phase 3 (the reservation itself
+  // stays valid and auto-claims when the gate opens).
+  if (isDescentTrioRoomUnlock(unlock) && progress.currentPhase < 3) return false;
   return progress.amber >= getReservedSkipCost(unlock);
 }
 
@@ -1228,6 +1254,9 @@ export async function skipReservedUnlock(unlockId: string): Promise<{
   const progress = await loadProgress();
   if (progress.reservedUnlockId !== unlockId) {
     return { success: false, error: 'This unlock is not reserved' };
+  }
+  if (isDescentTrioRoomUnlock(unlock) && progress.currentPhase < 3) {
+    return { success: false, error: 'This room is not ready to be hurried' };
   }
   const premium = getReservedSkipCost(unlock);
   const spend = await spendAmber(premium, `skip_reserved_${unlock.targetId}`);

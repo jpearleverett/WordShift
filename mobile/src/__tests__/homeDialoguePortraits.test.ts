@@ -136,3 +136,46 @@ describe('main animal dialogue card (reference surface, unchanged)', () => {
     expect(src).toContain('dialogueFlow.isTalking && styles.dialogueSpriteTalking');
   });
 });
+
+describe('robed talk frames (F37: the climax mouth-flap)', () => {
+  const spriteSrc = fs.readFileSync(
+    path.join(__dirname, '../components/home/AnimalSprite.tsx'),
+    'utf8'
+  );
+
+  it('all 13 animals register a robedTalk frame', () => {
+    const count = (spriteSrc.match(/robedTalk: require\('\.\.\/\.\.\/\.\.\/assets\/characters\/[a-z_]+\/robed_talk\.png'\)/g) || []).length;
+    expect(count).toBe(13);
+  });
+
+  it('all 13 robed_talk.png files exist on disk', () => {
+    const animals = [...spriteSrc.matchAll(/robedTalk: require\('\.\.\/\.\.\/\.\.\/assets\/characters\/([a-z_]+)\/robed_talk\.png'\)/g)].map(m => m[1]);
+    for (const an of animals) {
+      expect(fs.existsSync(path.join(__dirname, `../../assets/characters/${an}/robed_talk.png`))).toBe(true);
+    }
+  });
+
+  it("the axolotl's robedTalk is pixel-identical to robed (his mouth never moves, by design)", () => {
+    // Pixel equality, not byte equality: sanitizePng re-encodes, so the two
+    // files legitimately differ as bytes while painting the same image.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { PNG } = require('pngjs');
+    const a = PNG.sync.read(fs.readFileSync(path.join(__dirname, '../../assets/characters/axolotl/robed_talk.png')));
+    const b = PNG.sync.read(fs.readFileSync(path.join(__dirname, '../../assets/characters/axolotl/robed.png')));
+    expect(a.width).toBe(b.width);
+    expect(a.height).toBe(b.height);
+    expect(Buffer.from(a.data).equals(Buffer.from(b.data))).toBe(true);
+  });
+
+  it('the intro/override modal mouth-flaps the robed stack like the main card', () => {
+    const win = windowFromSrc('Robed + robedTalk stack, mirroring the main dialogue', 1400);
+    expect(win).toContain('.robedTalk!');
+    expect(win).toMatch(/!introIsTalking && styles\.dialogueSpriteLayerHidden/);
+  });
+});
+
+function windowFromSrc(marker: string, length: number): string {
+  const start = src.indexOf(marker);
+  expect(start).toBeGreaterThanOrEqual(0);
+  return src.slice(start, start + length);
+}

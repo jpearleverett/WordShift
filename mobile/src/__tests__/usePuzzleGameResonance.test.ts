@@ -113,6 +113,7 @@ jest.mock('../services/phaseNarrative', () => ({
   getFinalBoardStartMessage: jest.fn(() => 'The last arrangement.'),
   getFinalBoardUndoRefusal: jest.fn(() => 'Given for good.'),
   getResonantMoveMessage: jest.fn((_p: number) => 'RESONANT_LINE'),
+  getFinalBoardMoveMessage: jest.fn((_p: number) => 'Placed. Kept.'),
   getUnbrokenWeaveSpentLetterMessage: jest.fn((l: string) => `${l} spent.`),
   getUnbrokenWeaveUnavailableMessage: jest.fn(() => 'Weave unavailable.'),
 }));

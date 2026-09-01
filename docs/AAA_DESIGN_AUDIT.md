@@ -8,22 +8,18 @@
 
 ## 0. Implementation status (verified line-by-line)
 
-> The audit was the first deliverable; the branch then implemented a large slice of it. This status was **re-verified adversarially** — one skeptical reviewer per system re-checked all 180 filed findings at their cited `file:line` against the shipped HEAD (default stance: *not done without proof*). It **supersedes an earlier cluster-level estimate that over-counted** (that estimate credited a whole system as "done" when only its headline finding shipped). The full per-finding table lives in **[`AAA_IMPLEMENTATION_LEDGER.md`](./AAA_IMPLEMENTATION_LEDGER.md)**.
+> The audit was the first deliverable; the branch then implemented it across the follow-up sessions (Sessions 2–5b), and the resulting status was **re-verified adversarially** — blind per-finding reviewers re-checking all 180 filed findings at their cited `file:line` against the shipped HEAD (default stance: *not done without proof*). The full per-finding table and the session-by-session reconciliation live in **[`AAA_IMPLEMENTATION_LEDGER.md`](./AAA_IMPLEMENTATION_LEDGER.md)**.
 
-**Verified totals (of 180 filed findings):**
+**Verified totals (of 180 filed findings), per the ledger's Totals after Sessions 2–5b:**
 
 | Status | Count | Share |
 |---|--:|--:|
-| ✅ done | 55 | 31% |
-| 🟡 partial | 38 | 21% |
-| ⏸️ deferred (device QA / pinned-system risk) | 4 | 2% |
-| ❌ not addressed | 83 | 46% |
+| ✅ done | 174 | 97% |
+| 🟡 partial | 3 | 2% |
+| ⏸️ deferred | 3 | 2% |
+| ❌ not addressed | 0 | 0% |
 
-By severity (raw filed labels): **P0** 5✅ 1🟡 1❌ · **P1** 32✅ 14🟡 13❌ · **P2** 12✅ 14🟡 2⏸️ 49❌ · **P3** 6✅ 9🟡 2⏸️ 20❌.
-
-**What that means honestly:** the highest-severity, highest-leverage work landed — 5 of 7 P0s and 32 of 59 P1s are fully done, and the systemic wins shipped (RewardReveal + GiftOverlay across the reward loops, list virtualization, the Blind judgment beat, both modal entrances, the animal-life system, board-feel + board-serve, audio identity, a11y focus/announce, the share loop, settings/New-Cycle, the emote/phase-mood de-emoji, font-scale, and the whole quick-win sprint). But **the long P2/P3 tail is mostly still open** (49 P2 + 20 P3 not addressed), and 38 findings are only partially done. The tree is **green throughout** (typecheck clean, lint 0 errors, full suite passing) for everything that did ship.
-
-**The 4 deliberate deferrals** (each needs on-device QA or risks a pinned core system, so not shipped blind): board arc-row fit on ≤360dp (drag-drop math + small-screen QA), tablet dead-margins (tablet QA), room-background virtualization in HouseWorld (pinned Fabric workarounds + new pan physics, benefit unmeasurable without profiling), and async-chunking the branching analyses (bank-selection determinism). Everything else marked ❌/🟡 is genuinely remaining work, not a deferral.
+The ledger's reconciliation is the authoritative status — the remaining 6 are its **"honest remaining"** set: 3 partials (**F1** cross-row flying ghost, **F37** robed Phase 4-5 talk frames, **F138** the full app-wide `useWindowDimensions` sweep) and 3 deferrals (**F135** room-background pan-windowing, **F132** real on-device Play screenshots, **F148** store screenshot #5 re-capture), each held with a concrete stated reason rather than shipped blind.
 
 ---
 

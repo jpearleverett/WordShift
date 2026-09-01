@@ -103,3 +103,27 @@ describe('maybePromptReview', () => {
     expect(StoreReview.requestReview).toHaveBeenCalledTimes(1);
   });
 });
+
+// ============================================================================
+// The Settings "Rate WordShift" row is the PASSIVE complement to this policy:
+// a player-initiated Play Store link only. It must never route through the
+// review-prompt machinery (which asks) — a passive link cannot review-bomb,
+// so it is allowed at every phase while maybePromptReview stays Phase 0-1.
+// ============================================================================
+describe('Settings Rate WordShift row (source pin)', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const SETTINGS_SRC = fs.readFileSync(
+    path.join(__dirname, '..', 'components', 'SettingsScreen.tsx'),
+    'utf8'
+  );
+
+  test('renders a passive Play Store link in ABOUT', () => {
+    expect(SETTINGS_SRC).toMatch(/accessibilityLabel="Rate WordShift"/);
+    expect(SETTINGS_SRC).toMatch(/openLink\(PLAY_STORE_URL\)/);
+  });
+
+  test('never invokes the prompting review sheet from Settings', () => {
+    expect(SETTINGS_SRC).not.toMatch(/maybePromptReview|requestReview|expo-store-review/);
+  });
+});

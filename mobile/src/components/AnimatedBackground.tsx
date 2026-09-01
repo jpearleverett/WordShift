@@ -39,6 +39,33 @@ export function isAberrationEnabled(
   return phase <= 1 && tier !== 'low' && !reducedMotion;
 }
 
+// ---------------------------------------------------------------------------
+// Phase-graded particle MOTION — the descent reaches the particles' BEHAVIOR,
+// not just their color (the visual sibling of the dark SFX mirror). Mirrors
+// the home screen's AMBIENT_PARTICLES_BY_PHASE grammar: bright phases rise
+// and spin like candy sparkles; Growing Shadows goes ponderous (no spin,
+// longer travel, thinner air); the Horizon and after SINK — dim embers
+// falling in slow motion, circles only (no star/diamond candy shapes at the
+// reveal). Pure + exported so the register map is pinnable by tests.
+// ---------------------------------------------------------------------------
+export type ParticleMotionRegister = 'rise' | 'heavy' | 'sink';
+
+export interface ParticleMotion {
+  register: ParticleMotionRegister;
+  /** Full 360deg spin (bright candy motion) vs none (ponderous / falling). */
+  spin: boolean;
+  /** Multiplier over the base float duration (longer = heavier). */
+  durationMul: number;
+  /** Multiplier over getMaxParticleCount() (the dread thins the air). */
+  countMul: number;
+}
+
+export function getParticleMotion(phase: number): ParticleMotion {
+  if (phase >= 4) return { register: 'sink', spin: false, durationMul: 1.6, countMul: 0.5 };
+  if (phase >= 3) return { register: 'heavy', spin: false, durationMul: 1.5, countMul: 0.7 };
+  return { register: 'rise', spin: true, durationMul: 1, countMul: 1 };
+}
+
 interface ParticleLayout {
   id: number;
   x: number;
@@ -54,19 +81,21 @@ interface FloatingParticle extends ParticleLayout {
   color: string;
 }
 
-// Generate the stable motion layout once; color is derived per-phase later so a
-// phase transition recolors the same particles instead of leaving them pinned to
-// the launch palette (the gradual candy→dread shift should reach the particles too).
-const generateParticleLayout = (count: number): ParticleLayout[] => {
+// Generate the stable motion layout once per MOTION REGISTER; color is derived
+// per-phase later so a bright-band phase transition (0-2) recolors the same
+// particles in place. Crossing into a new register (2->3, 3->4) regenerates
+// the layout, since travel/shape/pace all change there.
+const generateParticleLayout = (count: number, motion: ParticleMotion): ParticleLayout[] => {
   const layout: ParticleLayout[] = [];
-  const types: Array<'circle' | 'star' | 'diamond'> = ['circle', 'star', 'diamond'];
+  const types: Array<'circle' | 'star' | 'diamond'> =
+    motion.register === 'sink' ? ['circle'] : ['circle', 'star', 'diamond'];
 
   for (let i = 0; i < count; i++) {
     layout.push({
       id: i,
       x: Math.random() * SCREEN_WIDTH,
       size: 8 + Math.random() * 20,
-      duration: 8000 + Math.random() * 12000,
+      duration: (8000 + Math.random() * 12000) * motion.durationMul,
       delay: Math.random() * 5000,
       colorSeed: Math.floor(Math.random() * 997),
       type: types[Math.floor(Math.random() * types.length)],
@@ -124,9 +153,14 @@ const SoftWash: React.FC<{
   );
 };
 
-const Particle: React.FC<{ particle: FloatingParticle; aberrationEnabled: boolean }> = ({
+const Particle: React.FC<{
+  particle: FloatingParticle;
+  aberrationEnabled: boolean;
+  motion: ParticleMotion;
+}> = ({
   particle,
   aberrationEnabled,
+  motion,
 }) => {
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT + 50)).current;
   const opacity = useRef(new Animated.Value(0)).current;
@@ -142,10 +176,14 @@ const Particle: React.FC<{ particle: FloatingParticle; aberrationEnabled: boolea
   const aberrationRef = useRef(aberrationEnabled);
   aberrationRef.current = aberrationEnabled;
 
+  // The travel direction is fixed for the particle's lifetime (the layout
+  // regenerates when the register changes, remounting every particle).
+  const sinking = motion.register === 'sink';
+
   useEffect(() => {
     const animate = () => {
-      // Reset values
-      translateY.setValue(SCREEN_HEIGHT + 50);
+      // Reset values (sinking embers start ABOVE the screen and fall).
+      translateY.setValue(sinking ? -100 : SCREEN_HEIGHT + 50);
       opacity.setValue(0);
       rotate.setValue(0);
       scale.setValue(0.5);
@@ -177,21 +215,26 @@ const Particle: React.FC<{ particle: FloatingParticle; aberrationEnabled: boolea
           ]);
 
       const branches: Animated.CompositeAnimation[] = [
-        // Float upward
+        // Float (upward in the bright registers; sinking embers fall).
         Animated.timing(translateY, {
-          toValue: -100,
+          toValue: sinking ? SCREEN_HEIGHT + 50 : -100,
           duration: d,
           easing: Easing.linear,
           useNativeDriver: true,
         }),
         opacityBranch,
-        // Rotate
-        Animated.timing(rotate, {
-          toValue: 1,
-          duration: d,
-          easing: Easing.linear,
-          useNativeDriver: true,
-        }),
+        // Rotate — bright candy motion only; the heavy/sinking registers
+        // drop the spin entirely (ponderous, matching the tiles' springs).
+        ...(motion.spin
+          ? [
+              Animated.timing(rotate, {
+                toValue: 1,
+                duration: d,
+                easing: Easing.linear,
+                useNativeDriver: true,
+              }),
+            ]
+          : []),
         // Scale pulse
         Animated.sequence([
           Animated.timing(scale, {
@@ -311,6 +354,23 @@ const Particle: React.FC<{ particle: FloatingParticle; aberrationEnabled: boolea
         },
       ]}
     >
+      {/* Sinking embers carry a soft halo (a same-color circle behind at low
+          opacity — the cheap glow trick; all sink particles are circles). */}
+      {sinking && (
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            width: particle.size * 1.9,
+            height: particle.size * 1.9,
+            borderRadius: particle.size * 0.95,
+            top: -particle.size * 0.45,
+            left: -particle.size * 0.45,
+            backgroundColor: particle.color,
+            opacity: 0.25,
+          }}
+        />
+      )}
       {renderShape(particle.color)}
       {aberrationEnabled && (
         <Animated.View
@@ -331,12 +391,23 @@ interface AnimatedBackgroundProps {
 export const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ phase = 0 }) => {
   const reducedMotion = getSettingsSync().reducedMotion;
   const theme = useMemo(() => getPhaseTheme(phase), [phase]);
-  const particleCount = getMaxParticleCount();
-  // Layout (positions/timing) is generated once and kept stable; color is mapped
-  // from the current phase palette so transitions recolor in place.
-  const particleLayout = useRef(
-    reducedMotion ? [] : generateParticleLayout(particleCount)
-  ).current;
+  const motion = getParticleMotion(phase);
+  // Layout (positions/timing) is stable WITHIN a motion register; color is
+  // mapped from the current phase palette so bright-band transitions (0-2)
+  // recolor in place. Crossing a register boundary (2->3 ponderous, 3->4
+  // sinking) regenerates the layout — travel, shape, pace, and count all
+  // change there, and the remount is hidden inside a phase transition.
+  const particleLayout = useMemo(
+    () =>
+      reducedMotion
+        ? []
+        : generateParticleLayout(
+            Math.max(2, Math.round(getMaxParticleCount() * motion.countMul)),
+            motion
+          ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the register, not the motion object identity
+    [reducedMotion, motion.register]
+  );
   const particles = useMemo<FloatingParticle[]>(
     () =>
       particleLayout.map((p) => ({
@@ -353,6 +424,10 @@ export const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ phase = 
   // without restarting the loop.
   const breathAberrationRef = useRef(aberrationEnabled);
   breathAberrationRef.current = aberrationEnabled;
+  // The ambient breath slows with the descent (4s bright -> 6.5s from
+  // Growing Shadows). A ref so the loop picks it up on its next cycle.
+  const breathDurRef = useRef(4000);
+  breathDurRef.current = phase >= 3 ? 6500 : 4000;
 
   useEffect(() => {
     if (reducedMotion) return;
@@ -367,7 +442,7 @@ export const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ phase = 
       if (cancelled) return;
       const aberrant =
         breathAberrationRef.current && Math.random() < BREATH_ABERRATION_CHANCE;
-      const dur = aberrant ? 6800 : 4000;
+      const dur = aberrant ? 6800 : breathDurRef.current;
       const seq = Animated.sequence([
         Animated.timing(pulseOpacity, {
           toValue: 1,
@@ -437,12 +512,14 @@ export const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ phase = 
         </>
       )}
 
-      {/* Floating particles */}
+      {/* Floating particles (keyed on the register so a register crossing
+          remounts them into the new travel direction) */}
       {particles.map((particle) => (
         <Particle
-          key={particle.id}
+          key={`${motion.register}_${particle.id}`}
           particle={particle}
           aberrationEnabled={aberrationEnabled}
+          motion={motion}
         />
       ))}
 

@@ -22,7 +22,7 @@ import {
   RESONANT_BOARD_CAP_AMBER,
 } from '../constants/gameBalance';
 import { CHALLENGE_MODE_CONFIG, DialoguePhase } from '../types/homeWorld';
-import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getOutOfHintsMessage, getLoadingMessage, getStartMessage, getInvalidWordMessage, getBlockedWordMessage, getBlindFailMessage, getLockedLetterMessage, getEchoPuzzleMessage, getFinalBoardStartMessage, getFinalBoardUndoRefusal, getResonantMoveMessage, getUnbrokenWeaveSpentLetterMessage, getUnbrokenWeaveUnavailableMessage, getUnbrokenWeaveUnavailableTitle } from '../services/phaseNarrative';
+import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getOutOfHintsMessage, getLoadingMessage, getStartMessage, getInvalidWordMessage, getBlockedWordMessage, getBlindFailMessage, getLockedLetterMessage, getEchoPuzzleMessage, getFinalBoardStartMessage, getFinalBoardUndoRefusal, getFinalBoardMoveMessage, getResonantMoveMessage, getUnbrokenWeaveSpentLetterMessage, getUnbrokenWeaveUnavailableMessage, getUnbrokenWeaveUnavailableTitle } from '../services/phaseNarrative';
 import { showGameAlert } from '../services/gameAlert';
 import { getHintBalanceSync, hasHintSync, consumeHintSync } from '../services/hints';
 import { getPreferredPuzzleVariant, setPreferredPuzzleVariant, getFullProgress, getRitualWords } from '../services/amberCurrency';
@@ -471,6 +471,21 @@ export interface ArrivalMark {
   direction: 'down' | 'up';
   /** Monotonic per-board id so consumers can detect a fresh arrival. */
   moveId: number;
+  /**
+   * Cross-row flight endpoints (the "flying ghost", audit F1) — OPTIONAL and
+   * present only on full tap-committed moves. App combines these with the
+   * measured row nodes + the analytic letter-center offsets (tileLayout) to
+   * fly a ghost tile from the source tile's position into the landing slot.
+   * Absent on drag (its floating tile IS the travel), double-shift drop1
+   * half-moves, undo takebacks, and autosave restores — no flight there.
+   */
+  flightChar?: string;
+  sourceRowIndex?: number;
+  sourceLetterIndex?: number;
+  /** Source word length BEFORE the letter left it. */
+  sourceWordLength?: number;
+  /** Target word length AFTER the letter landed (the letter's index is slotIndex). */
+  targetWordLength?: number;
 }
 
 export interface PuzzleGameState {
@@ -2300,6 +2315,15 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         letterId: selectedLetter.id,
         direction: moveDirection,
         moveId: ++arrivalMoveIdRef.current,
+        // Flight endpoints for the cross-row ghost (audit F1): the source
+        // geometry is pre-commit (index in the word the letter LEFT), the
+        // target geometry post-commit (the letter's index in the grown word
+        // is the insert slot index). App resolves these to window coords.
+        flightChar: selectedLetter.char,
+        sourceRowIndex: activeRowIndex,
+        sourceLetterIndex,
+        sourceWordLength: sourceRow.words.length,
+        targetWordLength: newTargetLetters.length,
       });
     } else {
       setLastArrival(null);
@@ -2372,8 +2396,15 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     // A resonant choice REPLACES the normal move message for that commit only —
     // the line IS the acknowledgment (never stacked with the pool draw). The
     // streak/combo bookkeeping inside moveMessageFor still runs identically.
+    // The FINAL board overrides both: the last arrangement speaks in its own
+    // hushed voice, with no combo escalation and no resonance line (resonance
+    // never fires on the finale anyway, but the guard keeps the voice single).
     const applyMoveMessage = (stuck: boolean) => {
       const normal = moveMessageFor(stuck);
+      if (isFinalBoardRef.current) {
+        setMessage(getFinalBoardMoveMessage(currentPhase));
+        return;
+      }
       setMessage(resonantMove ? getResonantMoveMessage(currentPhase) : normal);
     };
 

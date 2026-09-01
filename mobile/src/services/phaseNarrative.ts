@@ -311,6 +311,63 @@ export function getUnbrokenWeaveIntroLines(phase: DialoguePhase): string[] {
 }
 
 // ============================================================================
+// THE KEEPER'S RECORD — Ember's one-time Phase-5 epilogue. On the first quiet
+// post-revelation home landing she reads the player their own journey back
+// from the record she has been keeping since the bright days. Pure formatting;
+// HomeScreen supplies the data and owns the one-time flag + whisper keepsake.
+// ============================================================================
+
+export interface KeeperRecordData {
+  /** Lifetime words formed (the honest total; the ledger itself caps at 500). */
+  totalWordsFormed: number;
+  /** Lifetime arrangements (puzzles) completed. */
+  puzzlesSolved: number;
+  /** The dread word the arrangement heard most clearly, if any qualified. */
+  strongestWord: string | null;
+  /** The oldest word the capped ledger still holds (null when it is empty). */
+  oldestHeldWord: string | null;
+  /**
+   * True only when the ledger has never overflowed its cap, so oldestHeldWord
+   * IS the true first word the player ever formed. The ledger keeps the
+   * NEWEST 500, so past the cap the copy must never claim "your first word";
+   * it speaks of the oldest word the pages still hold instead.
+   */
+  ledgerIsComplete: boolean;
+}
+
+export function getKeeperRecordLines(data: KeeperRecordData): string[] {
+  const lines: string[] = [
+    'Before anything else today, I want to read you something. I have been keeping a record since your first evening here.',
+  ];
+  if (data.oldestHeldWord && data.ledgerIsComplete) {
+    lines.push(
+      `The first word you ever gave us was ${data.oldestHeldWord.toUpperCase()}. I wrote it down that same night. I did not know yet what I was writing toward.`
+    );
+  } else if (data.oldestHeldWord) {
+    lines.push(
+      `The oldest word my pages still hold is ${data.oldestHeldWord.toUpperCase()}. Everything before it has been carried down too deep to read. It is all still there.`
+    );
+  } else {
+    lines.push(
+      'The earliest pages have been carried down too deep to read. The house holds them all the same.'
+    );
+  }
+  lines.push(
+    `${data.totalWordsFormed} words. ${data.puzzlesSolved} arrangements. I counted every one, and none of them were small.`
+  );
+  if (data.strongestWord) {
+    lines.push(
+      `It heard ${data.strongestWord.toUpperCase()} most clearly of all. I think that one is still ringing, somewhere under the floor.`
+    );
+  }
+  lines.push(
+    'The record is finished now. Nothing more needs counting. I will keep writing anyway, because I like remembering you.',
+    'Thank you for every word. It knows them all by heart.'
+  );
+  return lines;
+}
+
+// ============================================================================
 // VARIANT NUDGE — Fox (early) / the arrangement (late) gently suggests trying a
 // variant the player unlocked but never played. Phase-aware; never nags (once
 // per day, only for a never-tried mode). {variant} = the variant's title.
@@ -1979,8 +2036,14 @@ export function getAnimalInterjection(
 export interface NarrativeMicroBeat {
   /** Type of micro-beat effect. `silent_victory` also suppresses the fanfare. */
   type: 'glitch_title' | 'ambient_whisper' | 'color_shift' | 'silent_victory';
-  /** Text to display (if applicable) */
+  /** Text to display (if applicable). A `{word}` token is resolved at fire
+   *  time to the player's strongest dread word (uppercased); see
+   *  checkNarrativeMicroBeat — resolution happens BEFORE the beat is marked
+   *  seen, and a failed resolution delivers `fallbackText` instead (a keyed
+   *  beat can never be consumed invisibly). */
   text?: string;
+  /** Baked wordless variant for a `{word}` beat when no dread word exists. */
+  fallbackText?: string;
   /** Replacement title that briefly flashes then corrects (glitch_title only) */
   glitchTitle?: string;
   /** Duration of the effect in ms */
@@ -2037,7 +2100,7 @@ export const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
   },
   25: {
     type: 'ambient_whisper',
-    text: 'Each puzzle builds something. You can feel it, can\'t you?',
+    text: 'Each puzzle builds something. The house counts them like bricks.',
     durationMs: 3000,
   },
   30: {
@@ -2075,12 +2138,15 @@ export const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
   },
   42: {
     type: 'ambient_whisper',
-    text: 'The light is changing. Have you noticed?',
+    text: 'The light is changing. It leaves a little earlier each day, and the house does not mind.',
     durationMs: 3000,
   },
   45: {
+    // Declarative, not a question (the tag-question tic lives at 12 and 82
+    // only). This is the SEED for the personalized beat at 72: the marks are
+    // asserted here, named there.
     type: 'ambient_whisper',
-    text: 'Some words leave marks where others don\'t. Have you noticed which ones?',
+    text: 'Some words leave marks where others do not. The deep ones. You already know which they are.',
     durationMs: 3000,
   },
   50: {
@@ -2115,6 +2181,16 @@ export const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     text: 'Seventy arrangements. The house hums.',
     durationMs: 3500,
   },
+  72: {
+    // The being-watched beat: the seed at 45 asserted that some words leave
+    // marks; this one names the player's own. `{word}` resolves to their
+    // strongest dread word at fire time (see checkNarrativeMicroBeat); the
+    // fallback keeps the beat's shape when no dread word has been formed.
+    type: 'ambient_whisper',
+    text: 'You keep finding your way back to {word}. Or it keeps finding its way back to you.',
+    fallbackText: 'Some words come back to your hands on their own now. You have a favorite. So does the house.',
+    durationMs: 4000,
+  },
   // Valley beats (75-88): the deep-shadow stretch between the last quiet
   // milestones and the reveal at ~90. Escalating wrongness, no explanations.
   75: {
@@ -2122,10 +2198,27 @@ export const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     text: 'The walls have grown thicker. Not to keep anything out.',
     durationMs: 3500,
   },
+  78: {
+    // The glitch channel re-arms for the approach: escalation by HOLD LENGTH
+    // (300 -> 400 -> 900 -> 1200 -> 1600ms as the reveal nears), never by
+    // explicitness. The caretaker warmth of 31, now with direction.
+    type: 'glitch_title',
+    glitchTitle: 'YOU HAVE BEEN SO PATIENT',
+    text: 'PERFECT!',
+    durationMs: 1200,
+  },
   82: {
     type: 'ambient_whisper',
     text: 'You feel it too, don\'t you? The way the letters know where they belong before you place them.',
     durationMs: 4000,
+  },
+  86: {
+    // The 'WE' of beat 35 returns: gratitude as wrongness, quietly
+    // foreshadowing the ledger and the offerings without naming either.
+    type: 'glitch_title',
+    glitchTitle: 'WE KEPT EVERY WORD',
+    text: 'PERFECT!',
+    durationMs: 1600,
   },
   88: {
     // The house is still raising its last rooms here; this beat must NOT claim
@@ -2205,6 +2298,34 @@ async function markMicroBeatSeen(puzzleCount: number): Promise<void> {
  * Check if a narrative micro-beat should fire at this puzzle count.
  * Returns the beat config (and marks it as consumed) or null.
  */
+/**
+ * Resolve a beat's `{word}` token to the player's strongest dread word
+ * (uppercased), falling back to the baked wordless variant. Returns null ONLY
+ * when a templated beat has no fallback (the caller must then leave the beat
+ * unconsumed — never burn a beat invisibly); non-templated beats pass through
+ * untouched. Shared by BOTH delivery tracks (first descent and New Cycle), so
+ * the token can never reach the player raw. Guarded lazy requires keep it
+ * Jest-safe and cycle-free.
+ */
+async function resolveMicroBeatText(beat: NarrativeMicroBeat): Promise<NarrativeMicroBeat | null> {
+  if (!beat.text || !beat.text.includes('{word}')) return beat;
+  let resolvedText: string | null = null;
+  try {
+    const { getRitualWords } = require('./amberCurrency');
+    const { getStrongestDreadWord } = require('./localGenerator');
+    const words: string[] = await getRitualWords();
+    const strongest = getStrongestDreadWord(words || []);
+    if (strongest && strongest.word) {
+      resolvedText = beat.text.replace(/\{word\}/g, String(strongest.word).toUpperCase());
+    }
+  } catch {
+    resolvedText = null;
+  }
+  const finalText = resolvedText ?? beat.fallbackText;
+  if (!finalText) return null;
+  return { ...beat, text: finalText };
+}
+
 export async function checkNarrativeMicroBeat(
   puzzlesSolved: number,
 ): Promise<NarrativeMicroBeat | null> {
@@ -2214,8 +2335,16 @@ export async function checkNarrativeMicroBeat(
   const seen = await loadMicroBeatsSeen();
   if (seen.has(puzzlesSolved)) return null;
 
+  // Personalized beats: resolve the {word} token BEFORE consuming the beat
+  // (resolve-then-mark, never consume-then-fail — the preview-graduation _v2
+  // incident is the cautionary tale). Keys are exact-count so deferral is
+  // impossible; the baked fallback is the correct shape for a player with no
+  // dread word yet.
+  const resolved = await resolveMicroBeatText(beat);
+  if (!resolved) return null; // unconsumed: never burn a beat invisibly
+
   await markMicroBeatSeen(puzzlesSolved);
-  return beat;
+  return resolved;
 }
 
 /**
@@ -2307,7 +2436,9 @@ export function getPostCapDwellLine(completedTotal: number, phase: number): stri
 // ============================================================================
 
 export function getStreakHeldMessage(heldAt: number, phase: number = 0): string {
+  if (phase >= 5) return `A quiet day passed and nothing came undone. The chain rests at ${heldAt}, kept.`;
   if (phase >= 4) return `The chain bent, and did not break. It holds at ${heldAt}.`;
+  if (phase >= 3) return `A dark day went unmarked, yet the chain held at ${heldAt}. Something kept count for you.`;
   if (phase >= 2) return `A day slipped past, but the thread held. Your streak stands at ${heldAt}.`;
   return `A missed day, forgiven! Your streak held at ${heldAt}. The house kept the light on for you.`;
 }
@@ -2331,10 +2462,43 @@ export function getNextFriendPrompt(phase: number, name: string): string {
 // framing arrives only when the world has already turned.
 // ============================================================================
 
+const RESONANT_MOVE_MESSAGES: Record<number, string[]> = {
+  0: [
+    'Oh, lovely choice. That word sits deep in the house.',
+    'Of all the words you could have made, that one hums.',
+    'A rich word! The walls like the sound of it.',
+    'That one lands heavier than the others would have. In a good way.',
+  ],
+  2: [
+    'That word rings lower than the others would have. The house noticed.',
+    'You had gentler words to choose. You chose the one with weight.',
+    'The other words would have passed unnoticed. Not that one.',
+    'Something under the floor leaned toward that word.',
+  ],
+  3: [
+    'Of the words on offer, you reached for the darkest. It reached back.',
+    'That word sank further than the rest would have. The house counts these.',
+    'You could have chosen lighter. The choice was heard.',
+    'The other words were doors. That one was a stair, going down.',
+  ],
+  4: [
+    'Of the words you could have made, you made the one it wanted.',
+    'It offered you choices only to see which you would take. It is pleased.',
+    'The lighter words were left where they lay. The arrangement noticed.',
+    'That word was waiting to be chosen. You felt it too.',
+  ],
+  5: [
+    'Of the words you could have made, you made the deep one. Old habits, kindly kept.',
+    'The pattern no longer needs the deep words. It is glad of them anyway.',
+    'You still reach for the words with weight. It remembers that about you.',
+    'A deep word, freely given. Nothing asks for them now. That is what makes it lovely.',
+  ],
+};
+
 export function getResonantMoveMessage(phase: number): string {
-  if (phase >= 4) return 'Of the words you could have made, you made the one it wanted.';
-  if (phase >= 2) return 'That word rings lower than the others would have. The house noticed.';
-  return 'Oh, lovely choice. That word sits deep in the house.';
+  const band = phase >= 5 ? 5 : phase >= 4 ? 4 : phase >= 3 ? 3 : phase >= 2 ? 2 : 0;
+  const pool = RESONANT_MOVE_MESSAGES[band];
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
 /** Label for the resonance line in the victory amber breakdown. */
@@ -2353,17 +2517,23 @@ export function getResonanceBonusLabel(phase: number): string {
 export function getHouseAskLine(phase: number, kind: 'move' | 'keep', letter: string): string {
   const l = letter.toUpperCase();
   if (kind === 'move') {
+    if (phase >= 5) return `One small thing, if you would: let the ${l} travel. The pattern likes to watch it go.`;
     if (phase >= 4) return `It asks one thing of this arrangement: the ${l} must travel.`;
+    if (phase >= 3) return `The house asks, low and certain: the ${l} must not stay where it is.`;
     if (phase >= 2) return `The house asks quietly: let the ${l} move before the end.`;
     return `A little wish from the house: let the letter ${l} travel today.`;
   }
+  if (phase >= 5) return `One small thing, if you would: leave the ${l} be. Some letters have earned their rest.`;
   if (phase >= 4) return `It asks one thing of this arrangement: the ${l} does not move.`;
+  if (phase >= 3) return `The house asks, low and certain: the ${l} is to be left alone.`;
   if (phase >= 2) return `The house asks quietly: leave the ${l} where it sits.`;
   return `A little wish from the house: let the letter ${l} stay right where it is.`;
 }
 
 export function getHouseAskFulfilledMessage(phase: number): string {
+  if (phase >= 5) return 'The small thing was done. The pattern is quietly glad of you.';
   if (phase >= 4) return 'The ask was honored. It does not forget that.';
+  if (phase >= 3) return 'The small ask was kept. Something below the floor is satisfied.';
   if (phase >= 2) return 'The small ask was kept. Something in the walls settles, pleased.';
   return 'You remembered the little wish! The house is delighted.';
 }
@@ -2375,7 +2545,9 @@ export function getHouseAskFulfilledMessage(phase: number): string {
 // ============================================================================
 
 export function getHintGrantMessage(phase: number): string {
+  if (phase >= 5) return 'A hint is set aside for you, though little here still needs solving. Take it as fondness.';
   if (phase >= 4) return 'A small kindness is set aside for you. One hint, kept where the cold cannot reach it.';
+  if (phase >= 3) return 'The house slips a hint into your keeping. The doors ahead are heavier.';
   if (phase >= 2) return 'The house tucks a spare hint into your pocket. For the harder doors ahead.';
   return 'A little gift from the house! One extra hint, saved for a rainy puzzle.';
 }
@@ -2438,6 +2610,25 @@ export function getFinalBoardUndoRefusal(phase: number): string {
   return 'Not this one. What is given now is given for good.';
 }
 
+// The last arrangement speaks in its own hushed voice: no combo escalation,
+// no arcade energy — every committed word lands the same quiet way. Drawn
+// once per commit; replaces the normal move-message pools entirely on the
+// finale board (see usePuzzleGame applyMoveMessage).
+const FINAL_BOARD_MOVE_MESSAGES = [
+  'Placed. Kept.',
+  'It hears this one.',
+  'The word settles where it was always going.',
+  'One more, and the house leans closer.',
+  'Set down gently. Held completely.',
+  'The letters know their places now.',
+];
+
+export function getFinalBoardMoveMessage(_phase: number): string {
+  return FINAL_BOARD_MOVE_MESSAGES[
+    Math.floor(Math.random() * FINAL_BOARD_MOVE_MESSAGES.length)
+  ];
+}
+
 // ============================================================================
 // NEW CYCLE MICRO-BEATS — quiet half-memories for a second descent. Keyed by
 // CYCLE-RELATIVE puzzle count (puzzles solved since the cycle began). The
@@ -2477,6 +2668,32 @@ export const CYCLE_MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     type: 'ambient_whisper',
     text: "Sloane smiles before you say a word. 'You always tell me that one.' You have not told her anything yet.",
     durationMs: 4500,
+  },
+  // Late half-memories for the SECOND reveal: these keys are occupied by
+  // regular MICRO_BEATS, so on a new cycle they REPLACE (never add to) the
+  // first descent's verbatim rerun — the approach lands as almost-memory.
+  // Same rule as the six above: never explicit, never 'last time'.
+  88: {
+    // The cycle's house is already whole (house completion is a precondition
+    // of entering a cycle), so the construction is REMEMBERED, not occurring.
+    type: 'ambient_whisper',
+    text: 'The house has not needed to make room in a long while. It still remembers how smoothly these walls went up, smoother than a first attempt has any right to be. It does not ask itself how it knows that.',
+    durationMs: 4500,
+  },
+  106: {
+    type: 'ambient_whisper',
+    text: 'You could stop now. You know that. ...You did not stop. No. That is not right. There was no before.',
+    durationMs: 4500,
+  },
+  112: {
+    type: 'ambient_whisper',
+    text: 'The house is whole. It is not yet ready. The held breath feels rehearsed, like a song the walls already know the end of.',
+    durationMs: 4500,
+  },
+  115: {
+    type: 'ambient_whisper',
+    text: 'The space between the words is no longer empty. It arrives with the cadence of something recited, not spoken.',
+    durationMs: 4000,
   },
 };
 
@@ -2557,8 +2774,14 @@ export async function checkCycleNarrativeMicroBeat(
   const seen = await loadCycleBeatsSeen(cycleCount);
   if (seen.has(cycleRelativeCount)) return null;
 
+  // A re-fired regular beat may carry the {word} template (the beat at 72) —
+  // resolve it on THIS track too, or the raw token reaches the player.
+  // Resolve-then-mark, same as the first-descent path.
+  const resolved = await resolveMicroBeatText(beat);
+  if (!resolved) return null;
+
   await markCycleBeatSeen(cycleCount, cycleRelativeCount);
-  return beat;
+  return resolved;
 }
 
 /**

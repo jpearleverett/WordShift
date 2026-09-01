@@ -88,11 +88,18 @@ describe('audio', () => {
       expect(validMoveSoundName(NaN, 0)).toBe('valid_move');
     });
 
-    test('the dark ladder takes over at Phase 3+ (sinking, not celebrating)', () => {
+    test('the dark ladder takes over at Phase 3-4 (sinking, not celebrating)', () => {
       expect(validMoveSoundName(0, 3)).toBe('valid_move_dark');
       expect(validMoveSoundName(1, 3)).toBe('valid_move_2_dark');
       expect(validMoveSoundName(2, 4)).toBe('valid_move_3_dark');
-      expect(validMoveSoundName(3, 5)).toBe('valid_move_4_dark');
+      expect(validMoveSoundName(3, 4)).toBe('valid_move_4_dark');
+    });
+
+    test('the peace ladder takes over at Phase 5 (the chord assembles, nothing rises or sinks)', () => {
+      expect(validMoveSoundName(0, 5)).toBe('valid_move_peace');
+      expect(validMoveSoundName(1, 5)).toBe('valid_move_2_peace');
+      expect(validMoveSoundName(2, 5)).toBe('valid_move_3_peace');
+      expect(validMoveSoundName(3, 5)).toBe('valid_move_4_peace');
     });
 
     test('stays bright through Phase 2', () => {
@@ -101,36 +108,60 @@ describe('audio', () => {
   });
 
   describe('dark variant resolution (resolveSfxForPhase)', () => {
-    const withDark = [
+    // Names with a dark mirror but NO peace variant — dark from 3 all the way
+    // through 5 (the settled-dark palette carries the less frequent sounds).
+    const darkOnly = [
       'tap',
-      'letter_select',
       'invalid_move',
       'undo',
       'hint',
       'amber_earn',
-      'dialogue',
-      'victory',
-      'perfect',
       'pit_devour',
     ];
+    // The most frequent sounds carry a Phase-5 peace variant on top.
+    const withPeace = ['letter_select', 'dialogue', 'victory', 'perfect'];
 
-    test.each(withDark)('%s swaps to its dark variant at Phase 3+', (name) => {
+    test.each([...darkOnly, ...withPeace])('%s swaps to its dark variant at Phase 3-4', (name) => {
       expect(resolveSfxForPhase(name, 3)).toBe(`${name}_dark`);
+      expect(resolveSfxForPhase(name, 4)).toBe(`${name}_dark`);
+    });
+
+    test.each(darkOnly)('%s keeps its dark mirror at Phase 5 (no peace variant)', (name) => {
       expect(resolveSfxForPhase(name, 5)).toBe(`${name}_dark`);
     });
 
-    test.each(withDark)('%s stays bright below Phase 3', (name) => {
+    test.each(withPeace)('%s resolves to its PEACE variant at Phase 5 (serene tier wins over dark)', (name) => {
+      expect(resolveSfxForPhase(name, 5)).toBe(`${name}_peace`);
+      // The peace tier never leaks below Phase 5.
+      expect(resolveSfxForPhase(name, 4)).toBe(`${name}_dark`);
+    });
+
+    test.each([...darkOnly, ...withPeace])('%s stays bright below Phase 3', (name) => {
       expect(resolveSfxForPhase(name, 0)).toBe(name);
       expect(resolveSfxForPhase(name, 2)).toBe(name);
     });
 
     test('sounds without a registered dark variant keep their base name', () => {
-      // glitch/whisper are horror cues with no dark mirror — always their base
-      // name; phase_change/daily_ready are already the dark end of the palette.
+      // glitch/whisper/arrival are horror cues with no dark mirror — always
+      // their base name; daily_ready is already the dark end of the palette.
       // (achievement/unlock DO have dark mirrors now — covered above.)
-      for (const name of ['phase_change', 'daily_ready', 'glitch', 'whisper']) {
+      for (const name of ['daily_ready', 'glitch', 'whisper', 'arrival']) {
         expect(resolveSfxForPhase(name, 4)).toBe(name);
       }
+    });
+
+    test('the ceremony swell bands on its TARGET phase, never audioPhase', () => {
+      // phase_change now has a registered dark twin, but soundPhaseChange
+      // selects it explicitly by the ceremony's target phase — the swell
+      // fires BEFORE confirmPhaseTransition, so resolving by audioPhase
+      // would band the ignition INTO Growing Shadows bright.
+      expect(resolveSfxForPhase('phase_change', 4)).toBe('phase_change_dark');
+      expect(resolveSfxForPhase('phase_change', 2)).toBe('phase_change');
+      const src = require('fs').readFileSync(
+        require('path').resolve(__dirname, '../services/audio.ts'), 'utf8'
+      );
+      expect(src).toMatch(/soundPhaseChange\(targetPhase\?: number\)/);
+      expect(src).toMatch(/phase >= 3 \? 'phase_change_dark' : 'phase_change'/);
     });
 
     test('achievement and unlock swap to their dark variants at Phase 3+', () => {

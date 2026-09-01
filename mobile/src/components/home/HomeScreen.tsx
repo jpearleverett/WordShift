@@ -62,6 +62,11 @@ import {
   markHarvestHomeIntroSeen,
   hasSeenUnbrokenWeaveIntro,
   markUnbrokenWeaveIntroSeen,
+  hasSeenKeeperRecord,
+  markKeeperRecordSeen,
+  getRitualWords,
+  getTotalWordsFormed,
+  canStartNewCycle,
 } from '../../services/amberCurrency';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
 import { AUTO_COLLECT_PUZZLE_LIMIT, HARVEST_NUDGE_MIN_AMBER, JOURNAL_UNLOCK_PUZZLES } from '../../constants/gameBalance';
@@ -119,8 +124,10 @@ import {
   getHarvestHomeIntroLines,
   getHarvestNudgeLine,
   getUnbrokenWeaveIntroLines,
+  getKeeperRecordLines,
   getReservedBuiltItselfLine,
 } from '../../services/phaseNarrative';
+import { getStrongestDreadWord } from '../../services/localGenerator';
 import {
   ROOMS,
   ANIMALS,
@@ -183,7 +190,7 @@ import { getSettingsSync } from '../../services/settings';
 import { getUnlockedVariants } from '../../services/puzzleVariety';
 import { getPendingHarvestSummary, HarvestSummary } from '../../services/wordHarvest';
 import { getLocalDateString, daysAgoLocal } from '../../services/dateUtils';
-import { getHomeAmbientLine, getFoxPitNudgeLines, getShopTitle, getGoalSuggestion, getEventAmbientLine, getNextFriendPrompt } from '../../services/phaseNarrative';
+import { getHomeAmbientLine, getFoxPitNudgeLines, getShopTitle, getGoalSuggestion, getEventAmbientLine, getNextFriendPrompt, getNewCycleTitle } from '../../services/phaseNarrative';
 import { getActiveEvent } from '../../services/liveEvents';
 import { DailyChallengeCard } from '../DailyChallengeCard';
 import { isDailyChallengeUnlocked, getDailyStatus } from '../../services/dailyChallenge';
@@ -211,6 +218,12 @@ interface HomeScreenProps {
   onOpenShop?: () => void;
   onOpenStore?: () => void;
   onOpenPit?: () => void;
+  /**
+   * Begin a New Cycle from home (the utility-menu row shows only when
+   * canStartNewCycle() resolves true). The host owns the confirm, the
+   * ceremony, and the session rebuild — this just opens the door.
+   */
+  onStartNewCycle?: () => void;
   /** Current onboarding step (undefined when onboarding is complete) */
   onboardingStep?: OnboardingStep;
   /** Advance onboarding to next step */
@@ -531,7 +544,7 @@ const COMPACT_DIALOGUE_SPRITES = new Set<string>(['axolotl', 'fennec_fox', 'aye_
 // HouseWorld's PHASE_BG_COLORS and appStyles' getScreenBackgroundColor('home');
 // re-sample if the sky assets regenerate.
 const PHASE_SKY_FILL: Record<number, string> = {
-  0: '#439cf2', 1: '#1583f9', 2: '#684381', 3: '#000000', 4: '#050816', 5: '#050816',
+  0: '#439cf2', 1: '#1583f9', 2: '#684381', 3: '#000000', 4: '#050816', 5: '#181328',
 };
 
 // ─── Last-rendered home scene ────────────────────────────────────────────────
@@ -595,6 +608,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onOpenShop,
   onOpenStore,
   onOpenPit,
+  onStartNewCycle,
   pitPhaseReady,
   onboardingStep,
   onAdvanceOnboarding,
@@ -622,7 +636,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [introAnimal, setIntroAnimal] = useState<Animal | null>(null);
   const [introDialogueIndex, setIntroDialogueIndex] = useState(0);
   const [introOverrideLines, setIntroOverrideLines] = useState<string[] | null>(null);
-  const [introContext, setIntroContext] = useState<'animal_intro' | 'challenge_intro' | 'pit_nudge' | 'daily_challenge_intro' | 'gated_room_intro' | 'harvest_gate_intro' | 'harvest_heavy_nudge' | 'unbroken_weave_intro' | 'offering_intro'>('animal_intro');
+  const [introContext, setIntroContext] = useState<'animal_intro' | 'challenge_intro' | 'pit_nudge' | 'daily_challenge_intro' | 'gated_room_intro' | 'harvest_gate_intro' | 'harvest_heavy_nudge' | 'unbroken_weave_intro' | 'keeper_record_intro' | 'offering_intro'>('animal_intro');
+  // The landing that showed the Keeper's Record holds the Unbroken Weave intro
+  // back to the NEXT home visit (per-mount ref: HomeScreen unmounts on every
+  // navigation away, so this naturally means "not in the same landing").
+  const keeperRecordShownThisLandingRef = useRef(false);
   // Live mirror of "is any intro currently claiming the dialogue surface" — the
   // gated-room intro reads this AFTER a settle delay to yield to a just-unlocked
   // animal's own intro (which opens on a 300ms delay in useUnlockFlow), so the
@@ -710,6 +728,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [showSeasonModal, setShowSeasonModal] = useState(false);
   const [seasonClaimable, setSeasonClaimable] = useState(0);
   const [showUtilityModal, setShowUtilityModal] = useState(false);
+  // Whether the New Cycle door shows in the utility menu (true endgame only).
+  const [canCycle, setCanCycle] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
 
   // Ambient home line (atmospheric text when idle)
@@ -778,6 +798,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       getRoomsWithStatus(),
       getAnimalsWithStatus(),
     ]);
+
+    // The New Cycle door in the utility menu (Phase-5 true endgame only —
+    // canStartNewCycle gates on post-revelation, so this stays false for the
+    // whole first descent).
+    canStartNewCycle().then(setCanCycle).catch(() => {});
 
     if (claimed) {
       // Distinct arrival for a reserved room that finished its own wait: a
@@ -1279,8 +1304,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     animals,
   ]);
 
-  // Unbroken Weave intro: a single quiet post-revelation home landing, held
-  // until no ceremony, pit transition, or animal dialogue owns the moment.
+  // The Keeper's Record: Ember's one-time epilogue on the first quiet
+  // post-revelation home landing — she reads the whole journey back from the
+  // record she has kept since the bright days. Fires BEFORE the Unbroken
+  // Weave intro (shorter settle timer), and the landing that shows it holds
+  // the weave intro to the NEXT visit so the epilogue is not immediately
+  // chased by a mode pitch. Marked seen on CLOSE (not at fire) so an
+  // interrupted reading re-fires; the gallery keepsake is recorded in the
+  // close handlers alongside the flag, so a re-fire with a shifted ledger
+  // can never leave a near-duplicate entry. Forever-once across cycles.
   useEffect(() => {
     if (!progress || isOnboarding || showIntroDialogue || introOverrideLines) return;
     if (progress.currentPhase !== 5 || progress.postRevelation !== true) return;
@@ -1289,8 +1321,79 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     let cancelled = false;
     const timer = setTimeout(() => {
       (async () => {
-        const seen = await hasSeenUnbrokenWeaveIntro();
+        const seen = await hasSeenKeeperRecord();
         if (seen || cancelled) return;
+
+        const ember = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
+        if (!ember) return;
+
+        const [ledger, total] = await Promise.all([getRitualWords(), getTotalWordsFormed()]);
+        // Re-check the shared intro surface after the awaits: another one-time
+        // card could have claimed it in the interleave, and this reading must
+        // never clobber a card mid-display (it simply re-fires next landing,
+        // since seen is only marked on close).
+        if (cancelled || introSurfaceBusyRef.current) return;
+        const strongest = getStrongestDreadWord(ledger);
+        const lines = getKeeperRecordLines({
+          // Legacy saves may predate the lifetime counter; the ledger length
+          // is a floor on the truth either way.
+          totalWordsFormed: Math.max(total, ledger.length),
+          puzzlesSolved: progress.puzzlesSolved ?? 0,
+          strongestWord: strongest?.word ?? null,
+          // The ledger keeps the NEWEST 500, so [0] is the oldest RETAINED
+          // word — only the true first word when the cap never overflowed.
+          oldestHeldWord: ledger.length > 0 ? ledger[0] : null,
+          ledgerIsComplete: total > 0 && total <= ledger.length,
+        });
+
+        keeperRecordShownThisLandingRef.current = true;
+        setIntroAnimal(ember);
+        setIntroDialogueIndex(0);
+        setIntroOverrideLines(lines);
+        setIntroContext('keeper_record_intro');
+        setShowIntroDialogue(true);
+        // The gallery keepsake is recorded in the CLOSE handlers, alongside
+        // the seen flag — recording at fire time let an interrupted reading
+        // re-fire later with a shifted ledger and leave a second,
+        // near-duplicate "record's heart" entry.
+      })().catch(() => {});
+    }, 600);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [
+    progress?.currentPhase,
+    progress?.postRevelation,
+    isOnboarding,
+    showIntroDialogue,
+    introOverrideLines,
+    dialogueFlow.showDialogue,
+    pendingHouseCompletion,
+    pitPhaseReady,
+    animals,
+  ]);
+
+  // Unbroken Weave intro: a single quiet post-revelation home landing, held
+  // until no ceremony, pit transition, or animal dialogue owns the moment.
+  useEffect(() => {
+    if (!progress || isOnboarding || showIntroDialogue || introOverrideLines) return;
+    if (progress.currentPhase !== 5 || progress.postRevelation !== true) return;
+    if (dialogueFlow.showDialogue || pendingHouseCompletion || pitPhaseReady) return;
+    // The Keeper's Record owns the landing it fired on; pitch the weave next visit.
+    if (keeperRecordShownThisLandingRef.current) return;
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      (async () => {
+        const seen = await hasSeenUnbrokenWeaveIntro();
+        // Post-await re-check of the shared surface AND the keeper ref: a JS
+        // stall spanning both timers' due times runs both expired callbacks
+        // back-to-back, BEFORE React's cleanup can flip `cancelled` — without
+        // this the weave pitch could clobber the Keeper's Record on the very
+        // landing the ref was meant to protect.
+        if (seen || cancelled || introSurfaceBusyRef.current || keeperRecordShownThisLandingRef.current) return;
 
         const fox = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
         if (!fox) return;
@@ -1739,6 +1842,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         // App-session-scoped (heavyHarvestNudgeShownThisSession) — nothing to persist.
       } else if (introContext === 'unbroken_weave_intro') {
         // Marked at presentation so the quiet one-time landing cannot re-fire.
+      } else if (introContext === 'keeper_record_intro') {
+        await markKeeperRecordSeen();
+        // The word-memory line is the record's heart — kept in the gallery
+        // exactly once, at the moment the reading counts as heard (recording
+        // at fire time let an interrupted reading re-fire with a shifted
+        // ledger and leave a near-duplicate entry).
+        if (introOverrideLines && introOverrideLines[1]) {
+          recordWhisper({
+            animalType: 'fox',
+            animalName: introAnimal.name,
+            text: introOverrideLines[1],
+            phase: 5,
+            type: 'dialogue',
+          }).catch(() => {});
+        }
       } else {
         await markIntroSeen(introAnimal.id);
       }
@@ -1770,6 +1888,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         // App-session-scoped (heavyHarvestNudgeShownThisSession) — nothing to persist.
       } else if (introContext === 'unbroken_weave_intro') {
         // Marked at presentation so closing this optional introduction is enough.
+      } else if (introContext === 'keeper_record_intro') {
+        // An early close still counts as heard — never force a re-read.
+        await markKeeperRecordSeen();
+        // Keepsake recorded here too: heard is heard, however it ended.
+        if (introOverrideLines && introOverrideLines[1]) {
+          recordWhisper({
+            animalType: 'fox',
+            animalName: introAnimal.name,
+            text: introOverrideLines[1],
+            phase: 5,
+            type: 'dialogue',
+          }).catch(() => {});
+        }
       } else {
         await markIntroSeen(introAnimal.id);
       }
@@ -2766,6 +2897,23 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 accessibilityLabel="Open sacrifice"
               />
             )}
+            {/* The Pattern Continues — the New Cycle door, IN the world the
+                Phase-5 player actually lives on. Previously findable only in
+                Settings, which the in-world pointer lines are forbidden from
+                naming; this row IS the door those lines allude to. */}
+            {canCycle && onStartNewCycle && (
+              <HubRow
+                phase={progress.currentPhase}
+                hostDark={dtHostDark}
+                icon={VOID_ICON}
+                label={getNewCycleTitle()}
+                onPress={() => {
+                  setShowUtilityModal(false);
+                  onStartNewCycle();
+                }}
+                accessibilityLabel={getNewCycleTitle()}
+              />
+            )}
           </SpringIn>
         </TouchableOpacity>
       </Modal>
@@ -3435,11 +3583,31 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       accessibilityLabel={`${introAnimal.name} portrait`}
                     >
                       {progress && progress.currentPhase >= 4 && CHARACTER_SPRITES[introAnimal.type]?.robed ? (
-                        <Image
-                          source={CHARACTER_SPRITES[introAnimal.type]!.robed!}
-                          style={styles.dialogueSpriteLayer}
-                          resizeMode="cover"
-                        />
+                        /* Robed + robedTalk stack, mirroring the main dialogue
+                           card: late-recruit intros land AT Phase 4, so the
+                           reveal-era intro portrait mouth-flaps too. */
+                        <>
+                          <Image
+                            source={CHARACTER_SPRITES[introAnimal.type]!.robed!}
+                            style={[
+                              styles.dialogueSpriteLayer,
+                              introIsTalking &&
+                                Boolean(CHARACTER_SPRITES[introAnimal.type]?.robedTalk) &&
+                                styles.dialogueSpriteLayerHidden,
+                            ]}
+                            resizeMode="cover"
+                          />
+                          {Boolean(CHARACTER_SPRITES[introAnimal.type]?.robedTalk) && (
+                            <Image
+                              source={CHARACTER_SPRITES[introAnimal.type]!.robedTalk!}
+                              style={[
+                                styles.dialogueSpriteLayer,
+                                !introIsTalking && styles.dialogueSpriteLayerHidden,
+                              ]}
+                              resizeMode="cover"
+                            />
+                          )}
+                        </>
                       ) : (
                         <>
                           <Image

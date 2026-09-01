@@ -424,11 +424,11 @@ export function getPhaseTheme(phase: number): PhaseTheme {
         overlayBottom: 'rgba(60, 40, 80, 0.35)',
         centerGlow: 'rgba(120, 100, 180, 0.04)',
         particleColors: [
-          'rgba(120, 110, 160, 0.2)',
-          'rgba(100, 80, 130, 0.2)',
-          'rgba(90, 90, 140, 0.2)',
-          'rgba(80, 100, 140, 0.15)',
-          'rgba(110, 100, 150, 0.15)',
+          'rgba(120, 110, 160, 0.26)',
+          'rgba(100, 80, 130, 0.26)',
+          'rgba(90, 90, 140, 0.26)',
+          'rgba(80, 100, 140, 0.2)',
+          'rgba(110, 100, 150, 0.2)',
         ],
         confettiColors: [
           '#803860', '#602890', '#285890', '#287868',
@@ -453,12 +453,15 @@ export function getPhaseTheme(phase: number): PhaseTheme {
         overlayMid: 'rgba(20, 15, 45, 0.5)',
         overlayBottom: 'rgba(30, 15, 40, 0.45)',
         centerGlow: 'rgba(80, 40, 120, 0.03)',
+        // Dying embers, actually VISIBLE on the near-black board (the old
+        // 0.12-0.15 alphas made the promised crimson embers imperceptible).
+        // Kept under the home screen's 0.5 ember peak.
         particleColors: [
-          'rgba(80, 60, 100, 0.15)',
-          'rgba(120, 40, 60, 0.15)',
-          'rgba(60, 50, 90, 0.15)',
-          'rgba(50, 60, 90, 0.12)',
-          'rgba(100, 40, 80, 0.12)',
+          'rgba(140, 60, 60, 0.42)',
+          'rgba(160, 70, 50, 0.36)',
+          'rgba(110, 60, 100, 0.32)',
+          'rgba(90, 70, 110, 0.3)',
+          'rgba(130, 50, 70, 0.34)',
         ],
         confettiColors: [
           '#602040', '#401860', '#184060', '#185040',
@@ -487,11 +490,11 @@ export function getPhaseTheme(phase: number): PhaseTheme {
         overlayBottom: 'rgba(35, 25, 50, 0.35)',
         centerGlow: 'rgba(100, 80, 150, 0.05)', // Faint purple glow — something lingers
         particleColors: [
-          'rgba(100, 80, 140, 0.12)',   // Ghostly purple
-          'rgba(80, 80, 120, 0.12)',    // Pale slate
-          'rgba(120, 100, 160, 0.10)',  // Dim lavender
-          'rgba(90, 70, 110, 0.10)',    // Faded mauve
-          'rgba(70, 70, 100, 0.08)',    // Almost invisible
+          'rgba(100, 80, 140, 0.28)',   // Ghostly purple
+          'rgba(80, 80, 120, 0.26)',    // Pale slate
+          'rgba(120, 100, 160, 0.24)',  // Dim lavender
+          'rgba(90, 70, 110, 0.22)',    // Faded mauve
+          'rgba(70, 70, 100, 0.18)',    // Barely there, still there
         ],
         confettiColors: [
           '#504060', '#403060', '#304060', '#305040',
@@ -825,7 +828,7 @@ export const PIT_BACKGROUND_COLORS: Record<number, string> = {
   2: '#514378',
   3: '#060612',
   4: '#1a122a',
-  5: '#1d1830', // post-revelation: settled, muted purple
+  5: '#0e0f2e', // post-revelation: pitt_peace.webp top row (settled mauve)
 };
 
 /**
