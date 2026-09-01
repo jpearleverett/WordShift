@@ -1979,8 +1979,14 @@ export function getAnimalInterjection(
 export interface NarrativeMicroBeat {
   /** Type of micro-beat effect. `silent_victory` also suppresses the fanfare. */
   type: 'glitch_title' | 'ambient_whisper' | 'color_shift' | 'silent_victory';
-  /** Text to display (if applicable) */
+  /** Text to display (if applicable). A `{word}` token is resolved at fire
+   *  time to the player's strongest dread word (uppercased); see
+   *  checkNarrativeMicroBeat — resolution happens BEFORE the beat is marked
+   *  seen, and a failed resolution delivers `fallbackText` instead (a keyed
+   *  beat can never be consumed invisibly). */
   text?: string;
+  /** Baked wordless variant for a `{word}` beat when no dread word exists. */
+  fallbackText?: string;
   /** Replacement title that briefly flashes then corrects (glitch_title only) */
   glitchTitle?: string;
   /** Duration of the effect in ms */
@@ -2037,7 +2043,7 @@ export const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
   },
   25: {
     type: 'ambient_whisper',
-    text: 'Each puzzle builds something. You can feel it, can\'t you?',
+    text: 'Each puzzle builds something. The house counts them like bricks.',
     durationMs: 3000,
   },
   30: {
@@ -2075,12 +2081,15 @@ export const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
   },
   42: {
     type: 'ambient_whisper',
-    text: 'The light is changing. Have you noticed?',
+    text: 'The light is changing. It leaves a little earlier each day, and the house does not mind.',
     durationMs: 3000,
   },
   45: {
+    // Declarative, not a question (the tag-question tic lives at 12 and 82
+    // only). This is the SEED for the personalized beat at 72: the marks are
+    // asserted here, named there.
     type: 'ambient_whisper',
-    text: 'Some words leave marks where others don\'t. Have you noticed which ones?',
+    text: 'Some words leave marks where others do not. The deep ones. You already know which they are.',
     durationMs: 3000,
   },
   50: {
@@ -2115,6 +2124,16 @@ export const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     text: 'Seventy arrangements. The house hums.',
     durationMs: 3500,
   },
+  72: {
+    // The being-watched beat: the seed at 45 asserted that some words leave
+    // marks; this one names the player's own. `{word}` resolves to their
+    // strongest dread word at fire time (see checkNarrativeMicroBeat); the
+    // fallback keeps the beat's shape when no dread word has been formed.
+    type: 'ambient_whisper',
+    text: 'You keep finding your way back to {word}. Or it keeps finding its way back to you.',
+    fallbackText: 'Some words come back to your hands on their own now. You have a favorite. So does the house.',
+    durationMs: 4000,
+  },
   // Valley beats (75-88): the deep-shadow stretch between the last quiet
   // milestones and the reveal at ~90. Escalating wrongness, no explanations.
   75: {
@@ -2122,10 +2141,27 @@ export const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     text: 'The walls have grown thicker. Not to keep anything out.',
     durationMs: 3500,
   },
+  78: {
+    // The glitch channel re-arms for the approach: escalation by HOLD LENGTH
+    // (300 -> 400 -> 900 -> 1200 -> 1600ms as the reveal nears), never by
+    // explicitness. The caretaker warmth of 31, now with direction.
+    type: 'glitch_title',
+    glitchTitle: 'YOU HAVE BEEN SO PATIENT',
+    text: 'PERFECT!',
+    durationMs: 1200,
+  },
   82: {
     type: 'ambient_whisper',
     text: 'You feel it too, don\'t you? The way the letters know where they belong before you place them.',
     durationMs: 4000,
+  },
+  86: {
+    // The 'WE' of beat 35 returns: gratitude as wrongness, quietly
+    // foreshadowing the ledger and the offerings without naming either.
+    type: 'glitch_title',
+    glitchTitle: 'WE KEPT EVERY WORD',
+    text: 'PERFECT!',
+    durationMs: 1600,
   },
   88: {
     // The house is still raising its last rooms here; this beat must NOT claim
@@ -2213,6 +2249,30 @@ export async function checkNarrativeMicroBeat(
 
   const seen = await loadMicroBeatsSeen();
   if (seen.has(puzzlesSolved)) return null;
+
+  // Personalized beats: resolve the {word} token BEFORE consuming the beat
+  // (resolve-then-mark, never consume-then-fail — the preview-graduation _v2
+  // incident is the cautionary tale). Keys are exact-count so deferral is
+  // impossible; the baked fallback is the correct shape for a player with no
+  // dread word yet. Guarded lazy requires keep this Jest-safe and cycle-free.
+  if (beat.text && beat.text.includes('{word}')) {
+    let resolvedText: string | null = null;
+    try {
+      const { getRitualWords } = require('./amberCurrency');
+      const { getStrongestDreadWord } = require('./localGenerator');
+      const words: string[] = await getRitualWords();
+      const strongest = getStrongestDreadWord(words || []);
+      if (strongest && strongest.word) {
+        resolvedText = beat.text.replace(/\{word\}/g, String(strongest.word).toUpperCase());
+      }
+    } catch {
+      resolvedText = null;
+    }
+    const finalText = resolvedText ?? beat.fallbackText;
+    if (!finalText) return null; // unconsumed: never burn a beat invisibly
+    await markMicroBeatSeen(puzzlesSolved);
+    return { ...beat, text: finalText };
+  }
 
   await markMicroBeatSeen(puzzlesSolved);
   return beat;
@@ -2539,6 +2599,30 @@ export const CYCLE_MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     type: 'ambient_whisper',
     text: "Sloane smiles before you say a word. 'You always tell me that one.' You have not told her anything yet.",
     durationMs: 4500,
+  },
+  // Late half-memories for the SECOND reveal: these keys are occupied by
+  // regular MICRO_BEATS, so on a new cycle they REPLACE (never add to) the
+  // first descent's verbatim rerun — the approach lands as almost-memory.
+  // Same rule as the six above: never explicit, never 'last time'.
+  88: {
+    type: 'ambient_whisper',
+    text: 'The house keeps making room, and its hands do not hesitate anywhere. Walls only go up this smoothly the second time. It does not ask itself how it knows that.',
+    durationMs: 4500,
+  },
+  106: {
+    type: 'ambient_whisper',
+    text: 'You could stop now. You know that. ...You did not stop. No. That is not right. There was no before.',
+    durationMs: 4500,
+  },
+  112: {
+    type: 'ambient_whisper',
+    text: 'The house is whole. It is not yet ready. The held breath feels rehearsed, like a song the walls already know the end of.',
+    durationMs: 4500,
+  },
+  115: {
+    type: 'ambient_whisper',
+    text: 'The space between the words is no longer empty. It arrives with the cadence of something recited, not spoken.',
+    durationMs: 4000,
   },
 };
 

@@ -964,6 +964,47 @@ describe('checkNarrativeMicroBeat', () => {
     expect(await checkNarrativeMicroBeat(99)).toBeNull();
   });
 
+  test('the {word} beat at 72 names the strongest dread word, resolved before consumption', async () => {
+    const amber = require('../services/amberCurrency');
+    const spy = jest.spyOn(amber, 'getRitualWords').mockResolvedValue(['SUNNY', 'VOID']);
+    try {
+      const beat = await checkNarrativeMicroBeat(72);
+      expect(beat).not.toBeNull();
+      expect(beat!.text).toContain('VOID');
+      expect(beat!.text).not.toContain('{word}');
+      // Consumed exactly once (resolve-then-mark).
+      expect(await checkNarrativeMicroBeat(72)).toBeNull();
+      // The shared table entry is never mutated by the resolution.
+      expect(MICRO_BEATS[72].text).toContain('{word}');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test('the {word} beat falls back to the baked wordless variant when no dread word exists', async () => {
+    const amber = require('../services/amberCurrency');
+    const spy = jest.spyOn(amber, 'getRitualWords').mockResolvedValue(['SUNNY', 'HAPPY']);
+    try {
+      const beat = await checkNarrativeMicroBeat(72);
+      expect(beat).not.toBeNull();
+      expect(beat!.text).toBe(MICRO_BEATS[72].fallbackText);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test('the {word} beat still delivers (via fallback) when the ritual read throws', async () => {
+    const amber = require('../services/amberCurrency');
+    const spy = jest.spyOn(amber, 'getRitualWords').mockRejectedValue(new Error('storage down'));
+    try {
+      const beat = await checkNarrativeMicroBeat(72);
+      expect(beat).not.toBeNull();
+      expect(beat!.text).toBe(MICRO_BEATS[72].fallbackText);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   test('returns early micro-beats in puzzles 5-25', async () => {
     const beat5 = await checkNarrativeMicroBeat(5);
     expect(beat5).not.toBeNull();
@@ -1141,8 +1182,37 @@ describe('MICRO_BEATS geography', () => {
   test('keys match the new geography exactly', () => {
     expect(keys).toEqual([
       5, 8, 12, 16, 20, 25, 30, 31, 33, 35, 38, 42, 45, 50, 54, 58, 61, 64, 70,
-      75, 82, 88, 92, 104, 106, 109, 112, 115,
+      72, 75, 78, 82, 86, 88, 92, 104, 106, 109, 112, 115,
     ]);
+  });
+
+  test('the glitch channel escalates monotonically by hold length toward the reveal', () => {
+    // 16 -> 35 -> 31 is chronology, not escalation order; escalation is BY
+    // HOLD: 300 -> 400 -> 900 -> 1200 -> 1600ms across 16/35/31/78/86.
+    const glitchKeys = keys.filter(k => MICRO_BEATS[k].type === 'glitch_title');
+    expect(glitchKeys).toEqual([16, 31, 35, 58, 61, 78, 86]);
+    expect(MICRO_BEATS[78].durationMs).toBeGreaterThan(MICRO_BEATS[31].durationMs);
+    expect(MICRO_BEATS[86].durationMs).toBeGreaterThan(MICRO_BEATS[78].durationMs);
+    expect(MICRO_BEATS[78].glitchTitle).toBe('YOU HAVE BEEN SO PATIENT');
+    expect(MICRO_BEATS[86].glitchTitle).toBe('WE KEPT EVERY WORD');
+  });
+
+  test('the personalized beat at 72 carries the {word} token AND a baked fallback', () => {
+    expect(MICRO_BEATS[72].text).toContain('{word}');
+    expect(MICRO_BEATS[72].fallbackText).toBeTruthy();
+    expect(MICRO_BEATS[72].fallbackText).not.toContain('{word}');
+    // 72 is the ONLY templated beat; every other beat is fully baked.
+    for (const k of keys) {
+      if (k === 72) continue;
+      expect(MICRO_BEATS[k].text ?? '').not.toContain('{word}');
+    }
+  });
+
+  test('the tag-question tic lives at 12 and 82 only', () => {
+    const questioners = keys.filter(k =>
+      /have you noticed\?|can't you\?|don't you\?/i.test(MICRO_BEATS[k].text ?? '')
+    );
+    expect(questioners).toEqual([12, 82]);
   });
 
   test('the puzzle-31 held glitch is prominent and the 33 whisper half-normalizes it', () => {
@@ -1940,9 +2010,9 @@ describe('getFinalBoardStartMessage', () => {
 });
 
 describe('getCycleMicroBeat', () => {
-  test('six half-memories at the cycle-relative keys, silence everywhere else', () => {
+  test('ten half-memories at the cycle-relative keys, silence everywhere else', () => {
     const keys = Object.keys(CYCLE_MICRO_BEATS).map(Number).sort((a, b) => a - b);
-    expect(keys).toEqual([3, 10, 20, 34, 52, 75]);
+    expect(keys).toEqual([3, 10, 20, 34, 52, 75, 88, 106, 112, 115]);
     for (const k of keys) {
       const beat = getCycleMicroBeat(k);
       expect(beat).not.toBeNull();
