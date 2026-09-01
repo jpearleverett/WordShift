@@ -68,7 +68,7 @@ describe('shopArt registry', () => {
     expect(getShopArt('attune_2')).toBe(SHOP_ART.attune_2);
   });
 
-  it('ships one art file per registry entry (48 as generated)', () => {
-    expect(Object.keys(SHOP_ART).length).toBe(48);
+  it('ships one art file per registry entry (58 as generated)', () => {
+    expect(Object.keys(SHOP_ART).length).toBe(58);
   });
 });

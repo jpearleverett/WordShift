@@ -16,18 +16,39 @@
  *   Two or three BIG value steps. No satellite elements, no particle fields, no
  *   repeated micro-texture, no full-width hairline rails. Mass filling the frame.
  *
- * THIRD PASS (targeted). Two of these were still not NAMEABLE by a blind grader,
- * which is the disqualifying case, and two more still failed on mass:
- *   - upgrade_belfry read as "two white rings and a small pill on a wooden board",
- *     three disconnected elements floating in a frame — a DIAGRAM of the
- *     decoration, not an object. The board is gone and the chalk itself is the
- *     hero: one flat-ended prismatic stub standing in the ring it drew.
- *   - upgrade_garden and upgrade_jungle_room were both "thin parts separated by
- *     large voids, the opposite of the mass-fills-the-tile rule". The chime's
- *     tubes now OVERLAP into one column (each keeping an ink keyline so they do
- *     not fuse), and the vine is one thick trunk with every leaf anchored onto it.
- * The other nine tiles in this file were graded good at delivery size and are
- * untouched.
+ * FINAL PASS (targeted; the third pass's note is folded in below where it still
+ * holds). Five tiles were named on the closing defect list and only those five
+ * changed — upgrade_garden, upgrade_star_loft, upgrade_belfry, upgrade_office and
+ * upgrade_bamboo_attic. The other eight were graded good at delivery size across
+ * four blind rounds and are untouched, byte for byte.
+ *
+ *   - upgrade_belfry has now been four different subjects. Rings on a plaque read
+ *     as a DIAGRAM; a chalk pointing at a ring's centre read as a magnifying
+ *     glass; a chalk across it as a chord fragmented the ring; and the ring drawn
+ *     alone, however richly modelled, was still "a bare ring" to every grader.
+ *     A drawn LINE does not read as an object at 56dp, so the hero is now the one
+ *     thing here with real material presence — a fat cut stick of chalk, seated in
+ *     its own dust — lying diagonally THROUGH a closed chalk circle.
+ *   - upgrade_garden's tubes were made to OVERLAP by the third pass, which is
+ *     exactly what broke it: with no gap, the neighbour drawn last painted over
+ *     the previous tube's highlight and four tubes fused into one lobed gold mass
+ *     with no keylines. They are now SPACED so only their ink keylines meet, and
+ *     the tile draws the whole chime (cord, disc, open cord, tubes, striker,
+ *     wind sail) the way its legible tier-2 sibling does.
+ *   - upgrade_star_loft's moth was built from bare fills, so its body overran the
+ *     right forewing into an un-outlined cut and the rear wing's contour stopped
+ *     in mid-air. Every part now lays its own grown ink shape, back to front.
+ *   - upgrade_office and upgrade_bamboo_attic both carried a DARK halo: amber and
+ *     orange at low alpha are darker than the cream parchment in two channels of
+ *     three, so on a light shop row each "glow" laid a grey-brown smudge around
+ *     its own light source. Both are warm WHITE now, and both were also running
+ *     off the canvas edge, which cost those tiles their contour and contact gap.
+ *
+ * EVERY subject in this file clears the canvas edge by at least 4px on all four
+ * sides, measured, so no tile can lose its contour in a list row.
+ *
+ * Still true from the third pass: upgrade_jungle_room is one thick trunk with
+ * every leaf anchored onto it.
  *
  * Specifically undone from the first pass: the kitchen's second pot and its rail
  * (the pair read as buckets), the jungle/star-loft/garden rails (landscape
@@ -99,34 +120,56 @@ function bloom(cv, x, y, r, n, rot, top, bottom, coreHi, coreLo) {
 }
 
 /**
- * Half of a smooth elliptical stroke — a chalk ring drawn on the ground, seen at
- * the same shallow angle as the ground. arcStroke only does CIRCLES, so this is a
- * chain of overlapping capsules along the ellipse. Splitting it into a far half
- * and a near half lets a subject stand between them, which is the only cue that
- * makes a ring on the floor read as a ring on the floor rather than as a symbol
- * floating on the tile.
+ * A chime tube: a cut length of pipe with its own ink keyline and an open mouth
+ * at the bottom. Two things here are scar tissue from the previous draft, which
+ * packed its tubes so they OVERLAPPED into one column:
+ *   - roundRect, not capsule. A capsule's round caps put the tube's real top
+ *     th/2 above its stated top, which ate the run of open cord it was supposed
+ *     to hang from and welded the block to the disc above it.
+ *   - the tubes are now SPACED so their bodies never touch and only their ink
+ *     keylines meet. Overlapping bodies meant the neighbour drawn last painted
+ *     over the previous tube's highlight, so the right-hand tubes lost all
+ *     modelling and four tubes fused into a single lobed gold mass.
  */
-function groundRingArc(cv, cx, cy, rx, ry, front, th, color, alpha = 1, n = 40) {
-  for (let i = 0; i < n; i++) {
-    const a0 = (i / n) * Math.PI * 2, a1 = ((i + 1) / n) * Math.PI * 2;
-    if ((Math.sin((a0 + a1) / 2) >= 0) !== front) continue;
-    capsule(cv, cx + Math.cos(a0) * rx, cy + Math.sin(a0) * ry,
-      cx + Math.cos(a1) * rx, cy + Math.sin(a1) * ry, th, color, alpha);
-  }
+function brassTube(cv, x, yTop, yBot, th, pal) {
+  const cy = (yTop + yBot) / 2, hh = (yBot - yTop) / 2, hw = th / 2, rad = th * 0.22;
+  roundRect(cv, x, cy, hw + 6, hh + 6, rad + 6, INK, 0.92);
+  roundRect(cv, x, cy, hw, hh, rad, pal.base);
+  roundRect(cv, x - hw * 0.38, cy, hw * 0.28, hh - 7, hw * 0.26, pal.hi, 0.95);
+  roundRect(cv, x + hw * 0.54, cy, hw * 0.24, hh - 7, hw * 0.22, pal.lo, 0.7);
+  ellipse(cv, x, yBot - 6, hw * 0.8, 9, pal.lo, 0.9);            // the open mouth
+  ellipse(cv, x, yBot - 8, hw * 0.54, 5.5, '#5B3A11', 0.85);
 }
 
 /**
- * A FAT chime tube carrying its own ink keyline. The keyline is the whole point:
- * the chime tiles pack their tubes so they OVERLAP into one solid column (thin
- * tubes with voids between them were the set's worst thumbnail failure), and once
- * they overlap, only an internal dark edge can keep three tubes from fusing into
- * a single grey slab.
+ * A cut stick — a chamfered rectangle laid along an axis, as a point list for
+ * `poly`. Used for the chalk: a stick of chalk has FLAT ends, and both `capsule`
+ * and an axis-aligned `roundRect` refuse to give it one on a diagonal.
+ * `off` slides the whole outline sideways across the stick's own width, which is
+ * how the lit and shaded facets are cut without a second coordinate system.
  */
-function fatTube(cv, x, yTop, yBot, th, pal) {
-  capsule(cv, x, yTop, x, yBot, th + 13, INK, 0.92);
-  capsule(cv, x, yTop, x, yBot, th, pal.base);
-  capsule(cv, x - th * 0.25, yTop + 6, x - th * 0.25, yBot - 6, th * 0.34, pal.hi, 0.95);
-  capsule(cv, x + th * 0.3, yTop + 6, x + th * 0.3, yBot - 6, th * 0.22, pal.lo, 0.6);
+function stickPts(bx, by, tx, ty, hw, cut, off = 0, trimB = 0, trimT = 0) {
+  const L = Math.hypot(tx - bx, ty - by) || 1;
+  const dx = (tx - bx) / L, dy = (ty - by) / L, px = -dy, py = dx;
+  const P = (a, b) => [bx + dx * a + px * (b + off), by + dy * a + py * (b + off)];
+  const a0 = trimB, a1 = L - trimT;
+  return [P(a0, hw - cut), P(a0 + cut, hw), P(a1 - cut, hw), P(a1, hw - cut),
+    P(a1, -(hw - cut)), P(a1 - cut, -hw), P(a0 + cut, -hw), P(a0, -(hw - cut))];
+}
+
+/**
+ * A polygon pushed outward from its own centroid by `g`. This is how each moth
+ * wing gets a closed ink contour of its own: the previous moth drew its wings as
+ * bare fills, so the rear wing's outline simply stopped in mid-air and the body
+ * ran off the edge of the forewing into an un-outlined blunt cut.
+ */
+function grow(pts, g) {
+  const n = pts.length;
+  const cx = pts.reduce((s, p) => s + p[0], 0) / n, cy = pts.reduce((s, p) => s + p[1], 0) / n;
+  return pts.map(([x, y]) => {
+    const d = Math.hypot(x - cx, y - cy) || 1;
+    return [x + ((x - cx) / d) * g, y + ((y - cy) / d) * g];
+  });
 }
 
 /**
@@ -144,6 +187,17 @@ function lanternRib(cv, x, y, hw, hh, f, th, color, alpha) {
 }
 
 /** Upper half of an ellipse as a closed polygon — a dome, a lid, a shell. */
+/** A ROTATED oval as a point list, for `poly` — used for the spout's mouth,
+ *  which has to sit square across a diagonal axis (an axis-aligned `ellipse`
+ *  cannot, and a spout with no opening reads as a broken second handle). */
+function ovalPts(cx, cy, ra, rb, rot, n = 24) {
+  const ca = Math.cos(rot), sa = Math.sin(rot);
+  return Array.from({ length: n }, (_, i) => {
+    const a = (i / n) * Math.PI * 2, u = Math.cos(a) * ra, v = Math.sin(a) * rb;
+    return [cx + u * ca - v * sa, cy + u * sa + v * ca];
+  });
+}
+
 function domePts(cx, cy, rx, ry, n = 26) {
   const pts = [];
   for (let i = 0; i <= n; i++) {
@@ -206,8 +260,12 @@ export function drawLantern(cv, c, opts = {}) {
     flameLobe(cv, x, y - u(26), y + u(30), u(20), '#FF9A2E');
     flameLobe(cv, x, y - u(12), y + u(28), u(12), '#FFF0B4');
   } else {
-    capsule(cv, x, y - u(20), x, y + u(16), u(11), GLASS.lo, 0.7);  // dead wick
-    ellipse(cv, x, y + u(22), u(15), u(7), GLASS.lo, 0.5);
+    // The dead wick and its cold pan. The pan used to be a lone ellipse at alpha
+    // exactly 0.5, which is the one alpha withOutline's seed test rejects: it was
+    // composited but never contoured, so it read as a pale smudge floating loose
+    // in the glass. Both parts now sit well above that threshold and are shapes.
+    capsule(cv, x, y - u(20), x, y + u(14), u(11), GLASS.lo, 0.85);  // dead wick
+    roundRect(cv, x, y + u(24), u(22), u(8), u(4), GLASS.lo, 0.9);   // its cold pan
   }
   for (const dx of [-40, 40]) capsule(cv, x + u(dx), y - u(52), x + u(dx), y + u(52), u(12), INK, 0.95);
   capsule(cv, x - u(44), y - u(4), x + u(44), y - u(4), u(8), INK, 0.6);
@@ -249,10 +307,17 @@ export function draw() {
     const { cv, c } = canvas();
     contactShadow(cv, c + 6, 340, 132, 24, 0.3);
     withOutline(cv, t => {
-      // spout, left — two tapering segments
+      // Spout, left — two tapering segments ending in a FLARED, OPEN MOUTH.
+      // Without the mouth the spout was a featureless nub and graded as "a second
+      // broken handle"; the opening is what tells the eye which end pours. It is
+      // a rotated oval (see ovalPts) because the spout runs on a diagonal, so an
+      // axis-aligned ellipse would sit across it crooked.
       capsule(t, c - 88, 214, c - 124, 184, 48, COPPER.base);
       capsule(t, c - 122, 186, c - 146, 160, 30, COPPER.base);
       capsule(t, c - 128, 176, c - 146, 155, 12, COPPER.hi, 0.7);
+      const spoutAng = Math.atan2(160 - 186, -146 + 122);          // along the spout
+      poly(t, ovalPts(c - 151, 155, 13, 26, spoutAng), COPPER.hi, 1, COPPER.mid);
+      poly(t, ovalPts(c - 152, 154, 7, 18, spoutAng), COPPER.lo);   // the bore
       // loop handle, right
       arcStroke(t, c + 94, 226, 50, 30, -Math.PI * 0.52, Math.PI * 0.52, COPPER.mid);
       arcStroke(t, c + 94, 226, 50, 12, -Math.PI * 0.44, Math.PI * 0.1, COPPER.hi, 0.65);
@@ -263,10 +328,18 @@ export function draw() {
       // rim plate + domed lid + knob
       roundRect(t, c, 160, 116, 16, 7, COPPER.hi, 1, COPPER.mid);
       poly(t, domePts(c, 150, 96, 58), COPPER.hi, 1, COPPER.mid);
-      arcStroke(t, c, 150, 76, 13, Math.PI * 1.18, Math.PI * 1.66, '#FFE6C4', 0.6);
-      capsule(t, c, 74, c, 92, 18, COPPER.mid);
-      ellipse(t, c, 72, 26, 23, COPPER.hi);
-      ellipse(t, c + 6, 80, 15, 11, COPPER.mid, 0.65);
+      // The dome's highlight rides a radius of 46, INSIDE the dome. At 76 it swung
+      // wide of a form only 58 tall, so its upper-left half hung past the
+      // silhouette — a pale stroke arcing away into the background, contoured
+      // along with everything else because it sits above withOutline's 0.5 seed.
+      arcStroke(t, c, 150, 46, 15, Math.PI * 1.16, Math.PI * 1.70, '#FFE6C4', 0.6);
+      // Knob: a NECK that starts above the dome and ends well inside it, with the
+      // ball seated on the neck. The old ball floated with a 3px kiss against the
+      // dome, which withOutline drew as two contours meeting — a detached bead.
+      capsule(t, c, 76, c, 112, 30, COPPER.mid);
+      capsule(t, c - 9, 80, c - 9, 108, 10, COPPER.hi, 0.55);
+      ellipse(t, c, 66, 30, 26, COPPER.hi);
+      ellipse(t, c + 8, 74, 17, 12, COPPER.mid, 0.6);
     }, { width: 9 });
     sheen(cv, c - 52, 214, 20, 34, 0.5);
     sheen(cv, c - 40, 122, 22, 12, 0.45);
@@ -390,13 +463,21 @@ export function draw() {
 
   { // === upgrade_office.png — Standing Lamp, a warm brass floor lamp ===
     const { cv, c } = canvas();
-    ellipse(cv, c, 240, 176, 156, '#FFC65C', 0.2, 118);               // cast light, uncontoured
-    contactShadow(cv, c + 10, 356, 112, 22, 0.32);
+    // The cast light is WARM WHITE, not amber. A glow is a glow only if it
+    // lightens the surface it lands on, and #FFC65C at 0.2 is darker than the
+    // cream parchment in two channels of three: on a light shop row the old halo
+    // dropped a grey-brown smudge around the lamp, and it also ran 12px off the
+    // bottom of the canvas, which cost the tile its contour and its contact gap
+    // along that edge. These two stops sit above cream in every channel, so they
+    // can only lift it, and both are comfortably inside the frame.
+    ellipse(cv, c, 176, 150, 130, '#FFF3D2', 0.26, 100);              // cast light, uncontoured
+    ellipse(cv, c, 142, 100, 84, '#FFFCEE', 0.26, 64);
+    contactShadow(cv, c + 10, 350, 108, 18, 0.32);
     withOutline(cv, t => {
-      ellipse(t, c, 338, 96, 27, BRASS.hi);                           // base
-      ellipse(t, c, 346, 82, 17, BRASS.lo, 0.85);
-      capsule(t, c, 340, c, 168, 28, BRASS.lo);                       // pole
-      capsule(t, c - 7, 336, c - 7, 172, 9, BRASS.hi, 0.9);
+      ellipse(t, c, 332, 96, 27, BRASS.hi);                           // base
+      ellipse(t, c, 340, 82, 17, BRASS.lo, 0.85);
+      capsule(t, c, 334, c, 168, 28, BRASS.lo);                       // pole
+      capsule(t, c - 7, 330, c - 7, 172, 9, BRASS.hi, 0.9);
       ellipse(t, c, 262, 24, 13, BRASS.hi);
       poly(t, [[c - 130, 188], [c + 130, 188], [c + 78, 74], [c - 78, 74]], '#FFF3CC', 1, '#E89A2C');
       capsule(t, c - 128, 184, c + 128, 184, 18, '#E0801E', 0.55);    // lit lower rim
@@ -431,134 +512,242 @@ export function draw() {
     savePNG(path.join(OUT, 'upgrade_burrow.png'), W, W, down2(cv, W, W));
   }
 
-  { // === upgrade_garden.png — Wind Chimes: one hanging mass, not a rank of tubes ===
-    // REBUILT. Pass two already cut five thin tubes to three fat ones, and it still
-    // graded as "thin vertical capsules separated by large voids, the opposite of
-    // the mass-fills-the-tile rule" — and a fair reading of it was test tubes or a
-    // xylophone. Spacing the tubes apart is what did it: at 56dp the gaps are wider
-    // than the tubes, so the eye gets a picket fence rather than an object.
+  { // === upgrade_garden.png — Wind Chimes: the WHOLE chime, warm brass, ragged ===
+    // REBUILT, and this time against its own tier-2 sibling rather than against
+    // the abstract rule that mass must fill the tile. Pass three obeyed that rule
+    // by packing three fat tubes until they OVERLAPPED, and the result was worse
+    // than the voids it replaced: with no gap between them the neighbour drawn
+    // last painted over the previous tube's highlight, so the two right-hand
+    // tubes lost all modelling, every keyline disappeared, and the subject fused
+    // into one lobed gold mass terminating at four different heights with the
+    // contour broken open on the lower right. A blind grader could not name it.
     //
-    // The tubes now OVERLAP by ~26px into one solid tapered column, each holding
-    // its own ink keyline so the column still reads as three tubes rather than a
-    // slab. The silhouette is deliberately a pendant — wide cap, tapering column,
-    // one big round bob under it — because the tier-2 sibling is a flat-bottomed
-    // block with no bob, and a pair of chime tiles has to be told apart by outline
-    // before either is read in detail. Temperature separates them too: warm brass
-    // here, cold white there.
+    // deepen_garden solves this same subject legibly by drawing the COMPLETE
+    // object: hanging cord, suspension disc, a real run of open cord, the tube
+    // block, then a striker and a wind sail hanging below it. Those last parts
+    // are what nobody mistakes for test tubes or a xylophone, so this tile is
+    // staged the same way — and the two stay clearly apart where it matters.
+    // Tier-1 is warm brass, four tubes cut to RAGGED lengths, a round turned bob
+    // and a wide flat wind paddle: a chime in a breeze. Tier-2 is cold steel,
+    // every tube one measure, disc-topped and dead still.
+    //
+    // Three proportions are load-bearing and were all wrong in the first rebuild,
+    // which read as a pendant chandelier:
+    //   - the tubes are LONG (about 3x their width). Short tubes read as bulbs.
+    //   - the disc is FLAT and NARROWER than the tube block. A wide domed disc
+    //     over short tubes is a lampshade, whatever it is painted like.
+    //   - the striker is a ball sitting on a WIDE flat sail. A ball tapering into
+    //     something narrower below it is an acorn.
+    // And the tubes are SPACED so their bodies never touch and only their ink
+    // keylines meet, which leaves one continuous dark seam between neighbours —
+    // the only thing that keeps four bright tubes from reading as a slab at 56dp.
     const { cv, c } = canvas();
-    contactShadow(cv, c + 8, 358, 96, 14, 0.22);
+    const TX = [c - 96, c - 32, c + 32, c + 96];    // bodies 10 apart, keylines touching
+    const TB = [222, 280, 268, 214];                // ragged, but a deliberate arc
     withOutline(cv, t => {
-      roundRect(t, c, 74, 140, 25, 12, WOOD.light, 1, WOOD.dark);     // cap
-      capsule(t, c - 128, 58, c + 128, 58, 10, WOOD.rim, 0.7);
-      capsule(t, c - 126, 88, c + 126, 88, 8, WOOD.seam, 0.4);
-      for (const x of [c - 58, c + 58, c]) capsule(t, x, 94, x, 122, 14, WOOD.dark, 0.95);
-      fatTube(t, c - 58, 118, 222, 84, BRASSTUBE);                    // three lengths, well
-      fatTube(t, c + 58, 118, 198, 84, BRASSTUBE);                    // apart, so the bottom
-      fatTube(t, c, 118, 244, 92, BRASSTUBE);                         // edge is ragged
-      // The column is kept SHORT on purpose: the bob has to hang in clear air with
-      // a real run of cord above it, or it fuses to the centre tube's rounded end
-      // and the whole subject reads as a bunch of something. The bob is also the
-      // DARKEST wood in the palette, not the lightest — a pale disc against pale
-      // brass was a shape with no value behind it.
-      capsule(t, c, 236, c, 288, 13, WOOD.seam, 0.95);                // bob cord
-      ellipse(t, c, 320, 46, 46, WOOD.dark);                          // the wooden bob
-      ellipse(t, c - 6, 312, 34, 32, WOOD.mid);
-      ellipse(t, c - 15, 300, 15, 11, WOOD.base, 0.9);
+      capsule(t, c, 26, c, 52, 11, WOOD.dark);                       // it hangs
+      capsule(t, c - 4, 30, c - 4, 48, 4.5, WOOD.rim, 0.55);
+      ellipse(t, c, 66, 104, 14, WOOD.dark);                         // suspension disc
+      ellipse(t, c, 57, 104, 14, WOOD.base);
+      ellipse(t, c - 32, 52, 36, 5, WOOD.rim, 0.6);
+      // A REAL RUN of open cord between the disc and the tube tops. Without it the
+      // disc's contour and the tube block's contour merge and the whole object
+      // reads as a cabinet rather than as something hanging in the air.
+      for (const x of TX) capsule(t, x, 74, x, 130, 9, WOOD.seam, 0.95);
+      for (let i = 0; i < TX.length; i++) brassTube(t, TX[i], 124, TB[i], 54, BRASSTUBE);
+      capsule(t, c, 272, c, 296, 9, WOOD.seam);                      // striker cord
+      // The striker: one turned wooden bob, and deliberately the DARKEST value on
+      // the tile — a pale bob in front of pale brass is a shape with no value
+      // behind it, which is how the last draft lost it.
+      ellipse(t, c, 308, 26, 24, WOOD.seam);
+      ellipse(t, c - 3, 303, 21, 19, WOOD.dark);
+      ellipse(t, c - 9, 296, 9, 7, WOOD.mid, 0.9);
+      // The wind sail, wider than it is tall and overlapping the bob with its own
+      // grown keyline: an 8px cord between two masses is narrower than the
+      // contour that would be drawn on both sides of it, so the two would fuse.
+      const sail = [[c - 37, 328], [c + 37, 333], [c + 31, 357], [c - 31, 352]];
+      poly(t, grow(sail, 6), INK, 0.95);
+      poly(t, sail, WOOD.base, 1, WOOD.dark);
     }, { width: 9 });
-    sheen(cv, c - 90, 64, 28, 8, 0.45);
-    sheen(cv, c - 74, 178, 10, 44, 0.4);
+    sheen(cv, c - 40, 52, 24, 5, 0.45);
+    sheen(cv, c - 88, 160, 8, 40, 0.5);
     savePNG(path.join(OUT, 'upgrade_garden.png'), W, W, down2(cv, W, W));
   }
 
   { // === upgrade_bamboo_attic.png — ONE glowing paper lantern ===
     // Two lanterns drifting on a diagonal with a dust of sparks read as debris.
     // One big centred globe with a soft cast shadow reads as a lantern.
+    //
+    // The halo was rebuilt for the final pass. At s = 1.8 it ran 43px past the
+    // left edge, 43px past the right and 52px past the bottom, so the tile lost
+    // its contour and its contact gap on three sides at once and sat a step lower
+    // than its neighbours in a list. It was also drawn in ORANGE, which is darker
+    // than the cream parchment in two channels of three, so on a light shop row a
+    // "glow" laid a brown smudge around the lantern. Both stops are now warm
+    // WHITE — above cream in every channel, so they can only lighten — and both
+    // sit a clear 20px inside the frame while still reading past the paper body.
     const { cv, c } = canvas();
-    lanternHalo(cv, { x: c, y: 208, s: 1.8, paper: true });
-    contactShadow(cv, c + 6, 360, 104, 15, 0.24);
+    ellipse(cv, c, 206, 152, 148, '#FFF2CE', 0.26, 108);              // bloom, uncontoured
+    ellipse(cv, c, 206, 134, 130, '#FFFAE8', 0.24, 82);
+    contactShadow(cv, c + 6, 350, 100, 14, 0.24);
     withOutline(cv, t => {
-      drawLantern(t, c, { x: c, y: 208, s: 1.8, lit: true, paper: true, hanger: false });
+      drawLantern(t, c, { x: c, y: 206, s: 1.75, lit: true, paper: true, hanger: false });
     }, { width: 10 });
-    sheen(cv, c - 66, 158, 26, 20, 0.45);
+    sheen(cv, c - 64, 158, 26, 20, 0.45);
     savePNG(path.join(OUT, 'upgrade_bamboo_attic.png'), W, W, down2(cv, W, W));
   }
 
   { // === upgrade_star_loft.png — the Moth Lantern: ONE lantern, ONE moth on it ===
-    // Was a lantern plus two flanking moths on a full-width rail: three elements
-    // where the shipped set uses one. The moth now sits ON the glass, so the
-    // silhouette is single and the moth cannot vanish into empty space.
+    // The lantern was graded good. The MOTH was not, and it failed in exactly the
+    // way a shape built from bare fills fails: the body bar overran the right
+    // forewing and ended in a blunt un-outlined cut floating over the blue glass,
+    // the highlight laid along the body poked out past it as a stray brown stub,
+    // the rear wing's outline stopped in mid-air, and the wings carried no
+    // contour at all — the only subject on the sheet that did not.
+    //
+    // So the moth is rebuilt part by part, BACK TO FRONT, and every part lays its
+    // own grown ink shape (see `grow`) before its fill: hind wings, then fore
+    // wings over them, then the antennae, then the body over all four wing roots,
+    // then the head over the body and the antenna stubs. Nothing terminates in
+    // open air and nothing overruns anything, because the body is contained
+    // inside the wing span by construction rather than by luck.
+    //
+    // Two proportions decide whether it reads at 56dp. The moth is UPRIGHT — head
+    // up, wings spread, antennae in a V — since a horizontal body reads as a twig.
+    // And the WINGS carry the mass: the first rebuild gave the body and head so
+    // much ink that four small wings read as pale blobs around a dark cross, so
+    // the wings are now nearly twice the area and the body and head are thin.
     const { cv, c } = canvas();
     ellipse(cv, c - 8, 206, 132, 148, '#9FB6D8', 0.16, 110);          // cold moonlight
     contactShadow(cv, c + 8, 360, 96, 14, 0.22);
     withOutline(cv, t => {
       drawLantern(t, c, { x: c - 4, y: 218, s: 1.66, lit: false, paper: false, hanger: true });
-      // one oversized moth, perched across the glass
-      const mx = c + 4, my = 216, a = -0.2;
-      const ca = Math.cos(a), sa = Math.sin(a);
-      const off = (dx, dy) => [mx + dx * ca - dy * sa, my + dx * sa + dy * ca];
-      for (const sgn of [-1, 1]) {
-        const [hx, hy] = off(-32, sgn * 28);
-        petal(t, hx, hy, 35, 22, a + sgn * 1.98, '#E4D6B8', '#877A5F');
-        const [fx, fy] = off(3, sgn * 38);
-        petal(t, fx, fy, 48, 28, a + sgn * 1.3, '#FDF7E9', '#A2946F');
+
+      // --- ONE oversized moth, perched across the glass -----------------------
+      const MX = c - 4, MY = 222, MA = -0.1;
+      const ca = Math.cos(MA), sa = Math.sin(MA);
+      const P = ([lx, ly]) => [MX + lx * ca - ly * sa, MY + lx * sa + ly * ca];
+      const wing = (pts, sgn) => pts.map(([x, y]) => P([x * sgn, y]));
+      const FORE = [[8, -34], [42, -46], [70, -20], [48, 14], [14, 4]];
+      const HIND = [[10, 4], [46, 16], [50, 42], [24, 48], [8, 26]];
+
+      for (const sgn of [-1, 1]) {                                   // hind wings, behind
+        const w = wing(HIND, sgn);
+        poly(t, grow(w, 7), INK, 0.95);
+        poly(t, w, '#D9CAA7', 1, '#8B7E5E');
       }
-      const [bx1, by1] = off(-34, 0), [bx2, by2] = off(32, 0);
-      capsule(t, bx1, by1, bx2, by2, 23, '#3F3122');
-      capsule(t, bx1 - 3, by1 - 4, bx2 - 3, by2 - 4, 9, '#C0AD8A', 0.85);
-      for (const sgn of [-1, 1]) {
-        const [ax1, ay1] = off(29, sgn * 5), [ax2, ay2] = off(49, sgn * 19);
-        capsule(t, ax1, ay1, ax2, ay2, 8, '#3F3122');
+      for (const sgn of [-1, 1]) {                                   // fore wings, over them
+        const w = wing(FORE, sgn);
+        poly(t, grow(w, 7), INK, 0.95);
+        poly(t, w, '#FCF5E4', 1, '#AFA281');
+        // ONE band per forewing: a moth's single big value step, never a texture
+        poly(t, [P([20 * sgn, -32]), P([44 * sgn, -36]), P([58 * sgn, -12]), P([30 * sgn, -8])],
+          '#8B7952', 0.55);
       }
+      for (const sgn of [-1, 1]) {                                   // antennae, from the head
+        const a1 = P([6 * sgn, -42]), a2 = P([18 * sgn, -62]), a3 = P([30 * sgn, -80]);
+        capsule(t, a1[0], a1[1], a2[0], a2[1], 11, INK, 0.95);
+        capsule(t, a2[0], a2[1], a3[0], a3[1], 10, INK, 0.95);
+        capsule(t, a1[0], a1[1], a2[0], a2[1], 5.5, '#6F5A3C');
+        capsule(t, a2[0], a2[1], a3[0], a3[1], 5, '#6F5A3C');
+        ellipse(t, a3[0], a3[1], 7, 7, INK, 0.95);                   // a club, never a cut end
+        ellipse(t, a3[0], a3[1], 4.5, 4.5, '#A8946C');
+      }
+      const bT = P([0, -30]), bB = P([0, 32]);                       // body, inside the wings
+      capsule(t, bT[0], bT[1], bB[0], bB[1], 28, INK, 0.95);
+      capsule(t, bT[0], bT[1], bB[0], bB[1], 18, '#6F5A3C');
+      const sT = P([-3, -22]), sB = P([-3, 24]);
+      capsule(t, sT[0], sT[1], sB[0], sB[1], 6, '#A8946C', 0.85);    // dorsal stripe, inset
+      const hd = P([0, -40]);                                        // head, over both
+      ellipse(t, hd[0], hd[1], 16, 16, INK, 0.95);
+      ellipse(t, hd[0], hd[1], 11, 11, '#6F5A3C');
+      const he = P([-4, -44]);
+      ellipse(t, he[0], he[1], 5, 4.5, '#A8946C', 0.9);
     }, { width: 8 });
-    sheen(cv, c - 44, 168, 12, 26, 0.4);
+    sheen(cv, c - 52, 108, 18, 8, 0.42);
     savePNG(path.join(OUT, 'upgrade_star_loft.png'), W, W, down2(cv, W, W));
   }
 
-  { // === upgrade_belfry.png — Chalk Circles: the chalk itself, mid-stroke ===
-    // REDESIGNED. Pass one put white rings on a near-black plaque and dissolved on
-    // an ash row. Pass two warmed the plaque, and was read blind as "two white
-    // rings and a small pill on a wooden board" — three disconnected elements
-    // floating inside a frame with no relationship to each other. It was a DIAGRAM
-    // of the decoration, not an object, and a framed board is not a subject: it is
-    // a second frame drawn inside the row's own.
+  { // === upgrade_belfry.png — Chalk Circles: the chalk itself, the ring behind ==
+    // FOURTH SUBJECT, and the four failures behind it are the whole argument.
+    // Rings on a plaque read as a DIAGRAM of the decoration. A chalk pointing at a
+    // ring's centre rendered a magnifying glass. A chalk laid across the ring as a
+    // chord fragmented the ring. And the ring drawn alone as a fat tapering bead,
+    // shaded round and overrunning its own start, was still only "a bare ring" or
+    // "a pale hoop" to a blind grader.
     //
-    // So the board is gone and the chalk is the hero: one fat stick, and one bold
-    // ring it is in the middle of drawing. The two are a single connected mass
-    // (the stick crosses the ring's lower-left terminus, so withOutline contours
-    // them as one silhouette), the ring is deliberately LEFT OPEN at the lower
-    // right so the pair can never settle into a prohibition sign, and the stick is
-    // laid off-centre and off-diameter for the same reason.
+    // The lesson taken is that a DRAWN LINE will not read as an object at 56dp,
+    // however it is modelled. So the hero is the one thing on this tile with real
+    // material presence — a fat cut stick of chalk, seated on a bed of its own
+    // dust with a contact shadow under it — and the ring is demoted to CONTEXT.
     //
-    // An all-white subject on cream is the risk here, so the ring carries a real
-    // dark side (STONE.lo across its lower-right) rather than a soft shade: that
-    // plus the INK contour gives three big steps — white stick, chalk ring, stone
-    // shadow — none of which depend on the row's background colour.
+    // The staging took four tries of its own and every failure named a rule.
+    // A chalk leaning UP the ring's lower-left flank chained into the stroke: an
+    // open C beside a white stub at a tangent is a blade with a handle, and it
+    // graded as a sickle. A chalk lying FLAT under the ring, wholly inside its
+    // silhouette, stopped being a second object and read as a tag on a keyring.
+    // A chalk standing against the outside of the rim gave a lollipop, because
+    // ANY bar meeting a circle at its edge and stopping there is a handle. And a
+    // chalk laid radially is the magnifying glass from pass two.
+    //
+    // What is left, and what this draws: the ring is CLOSED (swept past 360 with
+    // its tail laid over its own start, which is both what a hand-drawn circle
+    // does and what stops it ever reading as a blade), and the chalk lies
+    // DIAGONALLY THROUGH it — butt outside the ring at the lower left, tip well
+    // inside the open middle — crossing the stroke exactly once at about fifty
+    // degrees to the tangent there. Passing through is what kills the handle: an
+    // object that continues past a rim is lying on the circle, not hanging off
+    // it. The axis still misses the centre by two thirds of a radius and the tip
+    // stops well short of it, so neither the magnifying glass nor the chord
+    // comes back, and the ring is occluded in ONE place and emerges on both
+    // sides of it.
     const { cv, c } = canvas();
-    // The stick: flat-ended, drawn along an axis with an explicit perpendicular so
-    // the three facets stay parallel. FLAT ends matter — every earlier attempt used
-    // a round-capped capsule, and a white lozenge is a pill, not a piece of chalk.
-    const AX = c - 86, AY = 326, BX = c + 106, BY = 126, HW = 56;
-    const al = Math.hypot(BX - AX, BY - AY);
-    const px = -(BY - AY) / al, py = (BX - AX) / al;   // perpendicular, down-right
-    const q = (x, y, d) => [x + px * d, y + py * d];
-    const face = (d0, d1) => [q(AX, AY, d0), q(BX, BY, d0), q(BX, BY, d1), q(AX, AY, d1)];
-    const RX = c - 64, RY = 330;
-    ellipse(cv, c - 40, 342, 78, 36, PARCH.shadow, 0.45, 44);         // chalk dust, uncontoured
-    contactShadow(cv, c - 34, 356, 142, 18, 0.3);
-    withOutline(cv, t => {
-      // the ring the chalk has been drawing, on the floor: far half, then the
-      // stick, then the near half, so the stick is physically INSIDE the ring
-      groundRingArc(t, RX, RY, 100, 32, false, 26, '#E2D9C2');
-      poly(t, face(-HW, HW), CHALK);                                  // the stick
-      poly(t, face(-HW, -HW * 0.32), '#FFFFFF', 0.85);                // lit top facet
-      poly(t, face(HW * 0.34, HW), '#C7BA9E', 0.8);                   // shaded under facet
-      poly(t, [q(BX, BY, -HW), q(BX, BY, HW),
-        q(BX - (BX - AX) * 0.055, BY - (BY - AY) * 0.055, HW),
-        q(BX - (BX - AX) * 0.055, BY - (BY - AY) * 0.055, -HW)], '#DED3B8', 0.9);  // worn end
-      groundRingArc(t, RX, RY, 100, 32, true, 26, '#F4EEDC');
-      groundRingArc(t, RX, RY + 11, 100, 32, true, 11, STONE.lo, 0.45);
+    const RCX = c + 30, RCY = 142, RRX = 104, RRY = 96;
+    const A0 = -2.4, A1 = A0 + Math.PI * 2 + 0.3;           // a closed ring, tail over start
+    const N = 112;
+    // Thin where the hand sets down and lifts, fat through the middle of the
+    // swing. It never goes below 12: under that the contour swallows the chalk
+    // core and a tapering end reads as a dark blob rather than a lift-off.
+    const beadAt = u => 16 + 13 * Math.pow(Math.max(0, Math.sin(Math.min(1, u * 1.02) * Math.PI * 0.99)), 0.4);
+    const ptAt = u => {
+      const a = A0 + (A1 - A0) * u;
+      const wob = 1 + 0.03 * Math.sin(a * 3 + 0.7);         // chalk is never machined
+      return [RCX + Math.cos(a) * RRX * wob, RCY + Math.sin(a) * RRY * wob];
+    };
+    const ring = (g, u0, u1, dx, dy, k, color, alpha = 1) => {
+      const steps = Math.max(2, Math.round(N * (u1 - u0)));
+      for (let i = 0; i < steps; i++) {
+        const a = u0 + ((u1 - u0) * i) / steps, b = u0 + ((u1 - u0) * (i + 1)) / steps;
+        const [x0, y0] = ptAt(a), [x1, y1] = ptAt(b);
+        capsule(g, x0 + dx, y0 + dy, x1 + dx, y1 + dy, beadAt(a) * k, color, alpha);
+      }
+    };
+    const bead = (g, u0, u1) => {
+      ring(g, u0, u1, 4, 6, 1.0, '#B0A489');                // shaded flank, lower-right
+      ring(g, u0, u1, 0, 0, 0.86, '#DCD4BA');               // the mark itself
+      ring(g, u0, u1, -5, -6, 0.34, '#F1EAD4', 0.9);        // lit crown, upper-left
+    };
+    const BX = c - 82, BY = 328, TPX = c + 30, TPY = 212;   // the chalk lies through it
+    ellipse(cv, c - 66, 348, 78, 16, '#F7F1E2', 0.4, 48);   // its dust, uncontoured
+    contactShadow(cv, c - 74, 352, 56, 11, 0.3);
+    withOutline(cv, g => {
+      bead(g, 0, 0.92);
+      ring(g, 0.9, 1, 0, 0, 1.26, INK, 0.92);               // the tail lies ACROSS the start
+      bead(g, 0.9, 1);
+      // The chalk over it, keylined, so the ring reads as passing BEHIND an object
+      // rather than as a hoop with a bite taken out of it.
+      poly(g, stickPts(BX, BY, TPX, TPY, 45, 13), INK, 0.95);
+      poly(g, stickPts(BX, BY, TPX, TPY, 38, 10), '#FCF7EA', 1, '#A79B80');
+      // THREE flat value steps across the width, not a gradient: a prism has
+      // facets, and a single smooth ramp on a pale slab read as a blank label.
+      poly(g, stickPts(BX, BY, TPX, TPY, 11, 4, -23, 15, 17), '#FFFFFF', 0.85);
+      poly(g, stickPts(BX, BY, TPX, TPY, 12, 4, 25, 15, 17), '#8E8268', 0.9);
+      // the flat cut end: chalk is a stick that was snapped, not a rod that was turned
+      const L = Math.hypot(TPX - BX, TPY - BY), px = -(TPY - BY) / L, py = (TPX - BX) / L;
+      capsule(g, TPX - px * 30, TPY - py * 30, TPX + px * 30, TPY + py * 30, 15, CHALK, 0.95);
     }, { width: 10 });
-    sheen(cv, c + 26, 190, 14, 44, 0.4);
+    sheen(cv, c - 64, 106, 14, 10, 0.35);
+    sheen(cv, c + 4, 216, 15, 12, 0.35);
     savePNG(path.join(OUT, 'upgrade_belfry.png'), W, W, down2(cv, W, W));
   }
 

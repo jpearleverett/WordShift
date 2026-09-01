@@ -51,6 +51,38 @@
  *     notch. Six flat facet planes now, seated on its plinth.
  *   - theme_default, three flat cards in the coolest palette on the sheet. The
  *     tiles are extruded objects now, drawn from the palette's warm members.
+ *
+ * FOURTH PASS closes a measured defect list; the subjects themselves are
+ * accepted and only the named faults were touched:
+ *
+ *   - EDGE COLLISIONS. Seven of these eighteen icons reached their canvas edge,
+ *     where a subject loses both its contour and its contact-shadow gap and the
+ *     row reads as sheared. Measured on the border rows/columns: confetti_gold
+ *     26px along the bottom, confetti_verdant 29, theme_bone 30 down the RIGHT,
+ *     theme_ember 40 across the top, theme_sovereign 46, theme_tide 68 and
+ *     theme_patron 112. Every one is now clear on all four sides — the guard in
+ *     src/__tests__/shopIconGeometry.test.ts holds the whole set to it. The fix
+ *     was per-icon and never a blanket shrink: a ground shadow pulled up under
+ *     its object (tide, verdant, sovereign, eclipse), a subject re-seated in the
+ *     frame (bone, sovereign), a bloom bounded (ember), a run shortened (the
+ *     bow's tails, the kite's tail) and, only where the subject genuinely stood
+ *     92% of the box tall, one honest rescale (patron, to 84% about its own
+ *     centre of span).
+ *   - theme_bone read visibly off-centre: the cup sat on the canvas centre with
+ *     its handle hung off the right, so the handle's outline occupied the last
+ *     pixel column while 32px of parchment sat empty on the left. It is composed
+ *     around `bx` now, so bowl-plus-handle is what sits centred.
+ *   - THE DARK HALO. Soft radial washes drawn in a subject's own mid palette
+ *     colour are DARKER than the parchment they land on, so three light-emitting
+ *     tiles were laying a grey smudge on their own rows: theme_ember (named in
+ *     review), theme_patron and theme_eclipse. A glow around a light source is a
+ *     LIGHT colour at low alpha or it does not exist — ember and patron now wash
+ *     warm white, eclipse has none at all (its corona is painted opaque, so it
+ *     never needed one). theme_static's dial wash is likewise a light one now,
+ *     though the cabinet covers it entirely, so that PNG is unchanged.
+ *   - theme_eclipse could not be named by two of three reviewers: "a hole, not a
+ *     sphere", and on ash its body sampled at background luminance so only the
+ *     ring survived. The disc has an interior now — see the tile.
  * ---------------------------------------------------------------------------
  *
  * House doctrine, three passes per subject: contact shadow (drawn BEFORE the
@@ -361,9 +393,14 @@ function drawPinwheel(t, c, p) {
 
 // --- gold: a ribbon bow ----------------------------------------------------
 function drawBow(t, c, p) {
-  const kx = c, ky = c - 16;
+  // The tails were 190px long from a knot near the centre, so they left the
+  // canvas: 26 lit pixels sat on the bottom row, uncontoured, and the bow read
+  // as cut off rather than as lying on the shelf. The knot is lifted and the
+  // tails shortened; the swallow notches are the same shape, just inside the
+  // frame, and the bow now sits centred in the box instead of low in it.
+  const kx = c, ky = c - 36;
   for (const [dx, ang, cc] of [[-26, RAD(104), p[3]], [26, RAD(76), p[1]]])
-    poly(t, tailPts(kx + dx, ky + 20, ang, 190, 46, 66), cc, 1, shade(cc, 0.55));
+    poly(t, tailPts(kx + dx, ky + 20, ang, 150, 46, 66), cc, 1, shade(cc, 0.55));
   for (const [ang, cc] of [[RAD(-146), p[1], p[3]], [RAD(-34), p[0], p[3]]]) {
     poly(t, petalPts(kx, ky, ang, 156, 138), shade(cc, 0.72));    // the loop's shaded under-plane
     poly(t, petalPts(kx, ky - 13, ang, 148, 120), cc);            // its lit face, one hard step up
@@ -413,8 +450,13 @@ function drawTassel(t, c, p) {
 
 // --- verdant: a kite with a waving tail -----------------------------------
 function drawKite(t, c, p) {
-  const kx = c - 24, ky = c - 38, up = 118, dn = 114, side = 112;
-  const tail = [], TL = s => [kx + 16 * Math.sin(s * 4.0) + s * 100, ky + dn + s * 92];
+  // The tail fell 92px past the sail's own base and took the last bow with it:
+  // 29 lit pixels on the bottom row, no contour, no contact gap. The fall is
+  // shortened (the tail still waves and still trails down-right, it just lands
+  // inside the frame) and the kite is nudged right, because the sail sat 6px
+  // left of centre while the tail hung out to the right of it.
+  const kx = c - 12, ky = c - 44, up = 118, dn = 114, side = 112;
+  const tail = [], TL = s => [kx + 16 * Math.sin(s * 4.0) + s * 100, ky + dn + s * 72];
   for (let i = 0; i <= 24; i++) tail.push(TL(i / 24));
   poly(t, ribbonPts(tail, () => 21), shade(p[1], 0.78));          // the tail string
   for (const [s, ang] of [[0.26, RAD(-26)], [0.6, RAD(16)], [0.95, RAD(-18)]]) {
@@ -446,8 +488,16 @@ function drawPouch(t, c, p) {
   roundRect(t, c, c + 44, 138, 116, 96, p[0], 1, shade(p[1], 0.62)); // body
   roundRect(t, c - 46, c + 26, 56, 78, 48, shade(p[0], 1.2), 0.6);  // one big lit plane
   roundRect(t, c, c - 58, 88, 32, 16, p[4], 1, shade(p[4], 0.58)); // cord band
-  capsule(t, c + 74, c - 58, c + 116, c - 20, 24, p[4]);           // cord end, absorbed
-  capsule(t, c + 74, c - 63, c + 108, c - 30, 10, shade(p[4], 1.32), 0.8);
+  // The cord end hangs DOWN THE BAG, not out into the air. The earlier draft ran
+  // it up-right from the band and it left the silhouette entirely: a blind review
+  // called it "a tapered rod that projects clear of the bag, unanchored and
+  // unexplained". Both segments now end well inside the body, so the cord reads
+  // as the loose end of the same tie that cinches the neck.
+  capsule(t, c + 62, c - 54, c + 92, c - 14, 26, shade(p[4], 0.72));
+  capsule(t, c + 92, c - 14, c + 86, c + 30, 26, shade(p[4], 0.72));
+  capsule(t, c + 62, c - 54, c + 90, c - 16, 12, p[4]);
+  capsule(t, c + 90, c - 16, c + 85, c + 26, 12, p[4]);
+  capsule(t, c + 60, c - 58, c + 84, c - 24, 6, shade(p[4], 1.32), 0.75);
   ellipse(t, c - 40, c - 54, 22, 9, '#FFFFFF', 0.45, 6);
 }
 
@@ -471,10 +521,16 @@ function drawBloom(t, c, p) {
 
 // --- supporter: a spool of ribbon ------------------------------------------
 function drawSpool(t, c, p) {
+  // THE TAIL IS BOUNDED AND ATTACHED. The earlier curve ran off the lower-right
+  // corner and was cut flat by the tile edge, and its upper end started in mid
+  // air on top of the flange; a blind review read it as an amputation with no
+  // join. It now starts ON the wound ribbon (so the eye sees where it comes off
+  // the roll), crosses the front of the lower flange, and its far corner lands
+  // ~30px clear of the frame with room for the contour.
   const spill = [];
   for (let i = 0; i <= 22; i++) {
     const s = i / 22;
-    spill.push([c + 40 + s * 104, c + 44 + 52 * Math.sin(s * 2.7) + s * 92]);
+    spill.push([c - 12 + s * 144, c + 24 + 54 * Math.sin(s * 2.4) + s * s * 60]);
   }
   roundRect(t, c, c, 78, 104, 16, shade(p[0], 1.12), 1, shade(p[1], 0.82)); // wound gold
   for (const [dy, cc] of [[-52, shade(p[3], 1.12)], [4, p[1]], [58, shade(p[0], 1.1)]])
@@ -491,8 +547,11 @@ function drawSpool(t, c, p) {
   ellipse(t, c, c - 112, 46, 14, WOOD.seam);
   // The tail spills IN FRONT of the lower flange, which is what stops the two
   // discs reading as the rollers of a scroll.
-  poly(t, ribbonPts(spill, () => 54), p[2], 1, shade(p[2], 0.6));
-  poly(t, ribbonPts(spill.map(([x, y]) => [x - 6, y - 12]), () => 18),
+  poly(t, ribbonPts(spill, s => 62 - s * 16), p[2], 1, shade(p[2], 0.6));
+  // The lit crease is INSET at both ends (slice 3..-3) so it can never poke out
+  // past the ribbon it is meant to be lying on — that stub was the pale scrap
+  // that made the tail's upper end look severed.
+  poly(t, ribbonPts(spill.slice(3, -3).map(([x, y]) => [x - 5, y - 12]), () => 16),
     shade(p[4], 1.16), 0.7);
   ellipse(t, c - 62, c - 118, 34, 11, '#FFFFFF', 0.4, 7);
 }
@@ -545,8 +604,15 @@ export function draw() {
   { // === theme_ember.png — an iron bowl of THREE oversized coals ===
     const { cv, c } = canvas();
     const pal = TILE_PAL.theme_ember;
-    ellipse(cv, c, c - 34, 160, 172, pal[0][0], 0.3, 78);           // heat bloom
-    contactShadow(cv, c + 4, c + 158, 140, 24, 0.32);
+    // THE BLOOM IS A LIGHT WASH, AND IT IS BOUNDED. A blind review measured the
+    // earlier one as a large soft DARKENING of the row — up to ~80,000px of
+    // background pulled down, "a grey smudge even at 70px". The cause was drawing
+    // a heat glow in the ember tile's own mid orange, which is darker than the
+    // cream parchment it lands on; a glow around a light source has to be a LIGHT
+    // colour at low alpha or it is not a glow. It also ran 7px off the top edge,
+    // which cost the flames their contour there, so it is inside the frame now.
+    ellipse(cv, c, c - 26, 132, 140, '#FFF2C8', 0.3, 70);           // heat bloom
+    contactShadow(cv, c + 4, c + 156, 140, 22, 0.32);
     withOutline(cv, t => {
       // Bowl first, coals over its rim, so the two read as one heap.
       poly(t, taperPts(c, c + 44, c + 146, 146, 92), '#5C5268', 1, '#251F2D');
@@ -577,7 +643,10 @@ export function draw() {
     const { cv, c } = canvas();
     const pal = TILE_PAL.theme_tide;
     const cy = c + 34, R = 126, waterY = cy - 22;
-    contactShadow(cv, c + 4, c + 176, 104, 20, 0.32);
+    // The shadow sat at the tangent point plus its own radius and ran off the
+    // bottom edge; it is pulled up under the float's base so the tile keeps a
+    // clear border on all four sides.
+    contactShadow(cv, c + 4, c + 156, 104, 18, 0.32);
     withOutline(cv, t => {
       roundRect(t, c, cy - R - 44, 44, 30, 12, WOOD.light, 1, WOOD.mid);   // cork
       capsule(t, c, cy - R - 22, c, cy - R + 8, 40, '#CFE6EE');            // neck
@@ -595,31 +664,41 @@ export function draw() {
   }
 
   { // === theme_bone.png — one pale ceramic cup, banded, filling the frame ===
+    // RE-CENTRED. The cup was built on the canvas centre and the handle was hung
+    // off its right side, so the SUBJECT was centred but the ICON was not: the
+    // handle's outer contour occupied the last pixel column (no contour, no
+    // contact gap) while 32px of empty parchment sat on the left, and in a list
+    // the tile read as sheared and shoved right. Everything now hangs off `bx`,
+    // the cup's axis, which is offset LEFT of centre by exactly half the handle's
+    // reach so the composed silhouette — bowl plus handle — is what sits centred.
+    // `by` lifts it a little at the same time, since the old bottom clearance was
+    // a third of the top's.
     const { cv, c } = canvas();
     const pal = TILE_PAL.theme_bone;
-    contactShadow(cv, c + 4, c + 156, 116, 22, 0.32);
+    const bx = c - 48, by = c - 12;
+    contactShadow(cv, bx + 18, by + 156, 116, 20, 0.32);
     withOutline(cv, t => {
-      arcStroke(t, c + 104, c - 4, 62, 40, -Math.PI * 0.46, Math.PI * 0.46, pal[1][1]);
-      arcStroke(t, c + 102, c - 8, 62, 20, -Math.PI * 0.44, Math.PI * 0.1,
+      arcStroke(t, bx + 118, by - 4, 62, 40, -Math.PI * 0.46, Math.PI * 0.46, pal[1][1]);
+      arcStroke(t, bx + 116, by - 8, 62, 20, -Math.PI * 0.44, Math.PI * 0.1,
         shade(pal[0][0], 1.1), 0.9);                                  // handle
-      poly(t, taperPts(c - 14, c - 72, c + 140, 104, 78), pal[0][0], 1, pal[0][1]);
+      poly(t, taperPts(bx, by - 72, by + 140, 104, 78), pal[0][0], 1, pal[0][1]);
       // Two oversized bands, not a texture: the palette's other two families,
       // shown at a size that survives 56dp.
-      poly(t, taperPts(c - 14, c + 4, c + 40, 96, 89), pal[4][1], 1, shade(pal[4][1], 0.78));
-      poly(t, taperPts(c - 14, c + 52, c + 74, 88, 84), pal[2][1], 1, shade(pal[2][1], 0.78));
-      ellipse(t, c - 14, c + 140, 76, 18, pal[1][1]);                 // foot
-      ellipse(t, c - 14, c - 72, 104, 30, '#F4EDE1');                 // rim
-      ellipse(t, c - 14, c - 68, 84, 21, pal[1][1]);                  // interior
-      ellipse(t, c - 14, c - 72, 84, 20, shade(pal[1][1], 0.5));
+      poly(t, taperPts(bx, by + 4, by + 40, 96, 89), pal[4][1], 1, shade(pal[4][1], 0.78));
+      poly(t, taperPts(bx, by + 52, by + 74, 88, 84), pal[2][1], 1, shade(pal[2][1], 0.78));
+      ellipse(t, bx, by + 140, 76, 18, pal[1][1]);                    // foot
+      ellipse(t, bx, by - 72, 104, 30, '#F4EDE1');                    // rim
+      ellipse(t, bx, by - 68, 84, 21, pal[1][1]);                     // interior
+      ellipse(t, bx, by - 72, 84, 20, shade(pal[1][1], 0.5));
     }, { width: 9 });
-    sheen(cv, c - 74, c - 16, 20, 46, 0.42);
+    sheen(cv, bx - 60, by - 16, 20, 46, 0.42);
     savePNG(path.join(OUT, 'theme_bone.png'), W, W, down2(cv, W, W));
   }
 
   { // === theme_verdant.png — a terracotta pot, three broad leaves ===
     const { cv, c } = canvas();
     const pal = TILE_PAL.theme_verdant;
-    contactShadow(cv, c + 4, c + 164, 122, 22, 0.32);
+    contactShadow(cv, c + 4, c + 150, 122, 20, 0.32);
     withOutline(cv, t => {
       const leaves = [
         [c - 16, c + 30, c - 126, c - 76, 74, -22, 1],
@@ -654,7 +733,10 @@ export function draw() {
     // quite arriving. Warm object, cold signal.
     const { cv, c } = canvas();
     const pal = TILE_PAL.theme_static;
-    ellipse(cv, c + 2, c - 52, 122, 62, pal[4][0], 0.24, 52);        // the dial's glow
+    // The dial's light is a LIGHT wash. Drawn in the tile set's cold blue it was
+    // darker than the parchment behind it, so the one thing on the cabinet that is
+    // supposed to be emitting was dimming its own row instead.
+    ellipse(cv, c + 2, c - 52, 122, 62, '#EDF8FF', 0.3, 52);         // the dial's glow
     contactShadow(cv, c + 4, c + 164, 132, 20, 0.32);
     withOutline(cv, t => {
       roundRect(t, c, c + 10, 138, 148, 30, WOOD.base, 1, WOOD.dark); // cabinet
@@ -691,13 +773,18 @@ export function draw() {
   { // === theme_sovereign.png — a gold circlet bedded into a violet cushion ===
     const { cv, c } = canvas();
     const pal = TILE_PAL.theme_sovereign;
-    contactShadow(cv, c + 4, c + 170, 148, 22, 0.32);
+    // The cushion and its shadow ran to the bottom edge (the shadow ended exactly
+    // ON row 191), so the tile lost its contour and its contact gap along the
+    // base and sat a step lower than its neighbours in a list. The whole
+    // circlet-and-cushion is lifted 12 supersample px and the ground shadow is
+    // tucked in behind it; nothing about the object itself changes.
+    contactShadow(cv, c + 4, c + 152, 148, 20, 0.32);
     withOutline(cv, t => {
-      roundRect(t, c, c + 122, 152, 50, 30, pal[4][0], 1, pal[3][0]);   // cushion
-      for (const dx of [-140, 140]) ellipse(t, c + dx, c + 146, 18, 18, pal[3][1]);
-      ellipse(t, c - 76, c + 100, 40, 12, shade(pal[4][0], 1.22), 0.6, 8);
-      ellipse(t, c, c + 96, 112, 20, shade(pal[3][0], 0.62), 0.85, 10); // crown's own shadow
-      const cy = c + 18;
+      roundRect(t, c, c + 110, 152, 50, 30, pal[4][0], 1, pal[3][0]);   // cushion
+      for (const dx of [-140, 140]) ellipse(t, c + dx, c + 134, 18, 18, pal[3][1]);
+      ellipse(t, c - 76, c + 88, 40, 12, shade(pal[4][0], 1.22), 0.6, 8);
+      ellipse(t, c, c + 84, 112, 20, shade(pal[3][0], 0.62), 0.85, 10); // crown's own shadow
+      const cy = c + 6;
       for (const [dx, ty, hw] of [[-74, -74, 36], [0, -116, 42], [74, -74, 36]]) {
         tri(t, [c + dx, cy + ty], [c + dx - hw, cy + 30], [c + dx + hw, cy + 30],
           shade(pal[2][0], 1.16));
@@ -727,25 +814,38 @@ export function draw() {
     // And it is SEATED: the culet runs down past the brass collar, the collar
     // closes around it, and the pedestal's top slab covers the tip, so the
     // stone rests IN the setting instead of hovering over a gap.
+    // FOURTH PASS, ONE FAULT: it did not fit. Measured, the pedestal's foot put
+    // 114 lit pixels ON the bottom row and the glow put 38 on the top one — the
+    // subject stood 92% of the box tall, so both ends lost their contour and
+    // their contact gap and the tile read as sheared top and bottom. The drawing
+    // is unchanged; it is scaled to 84% about its own centre of span and lifted
+    // so gem, collar, column and foot all sit inside the frame with ~20px clear.
+    // Everything downstream is expressed through X/Y/L, so the proportions and
+    // the hard facet steps survive the resize exactly.
     const { cv, c } = canvas();
     const pal = TILE_PAL.theme_patron;
-    ellipse(cv, c, c - 58, 150, 138, pal[0][0], 0.24, 74);           // gem glow
-    contactShadow(cv, c + 4, c + 186, 104, 14, 0.3);
+    const S = 0.84, LIFT = 18;
+    const X = d => c + d * S, Y = d => c + (d - LIFT) * S, L = d => d * S;
+    // A LIGHT glow. The old one was the gem's own mid gold, which is well below
+    // parchment in blue, so the stone's halo was quietly dimming its own row.
+    ellipse(cv, X(0), Y(-30), L(140), L(132), '#FFF3D2', 0.28, 70);   // gem glow
+    contactShadow(cv, X(4), Y(190), L(104), L(14), 0.3);
     withOutline(cv, t => {
       // The stone. A=left girdle, D=right girdle, B/C the crown corners,
       // M1/M2 the table's own corners, E the culet.
-      const gy = c - 74, E = [c, c + 96];
-      const A = [c - 136, gy], D = [c + 136, gy];
-      const B = [c - 80, gy - 76], C = [c + 80, gy - 76];
-      const M1 = [c - 48, gy], M2 = [c + 48, gy];
+      const gy = Y(-74), E = [X(0), Y(96)];
+      const A = [X(-136), gy], D = [X(136), gy];
+      const B = [X(-80), Y(-150)], C = [X(80), Y(-150)];
+      const M1 = [X(-48), gy], M2 = [X(48), gy];
       poly(t, [B, C, M2, M1], shade(pal[4][0], 1.14));               // table, lightest
       poly(t, [A, B, M1], pal[0][0]);                                // crown left
       poly(t, [C, D, M2], shade(pal[3][0], 0.9));                    // crown right
       poly(t, [A, M1, E], shade(pal[2][0], 0.88));                   // pavilion left
       poly(t, [M1, M2, E], shade(pal[5][0], 0.74));                  // pavilion centre
       poly(t, [M2, D, E], shade(pal[5][1], 0.6));                    // pavilion right, darkest
-      capsule(t, A[0] + 6, gy, D[0] - 6, gy, 9, shade(pal[3][1], 0.8), 0.7);  // girdle
-      poly(t, [[B[0] + 10, B[1] + 10], [C[0] - 46, C[1] + 10], [M1[0] + 16, M1[1] - 12]],
+      capsule(t, A[0] + L(6), gy, D[0] - L(6), gy, L(9), shade(pal[3][1], 0.8), 0.7); // girdle
+      poly(t, [[B[0] + L(10), B[1] + L(10)], [C[0] - L(46), C[1] + L(10)],
+        [M1[0] + L(16), M1[1] - L(12)]],
         '#FFF6DC', 0.5);                                             // one clean specular plane
       // The setting closes ON the stone: collar first, then the slab over the tip.
       // A solid brass CUP, not a ring: a ring left a dark hollow under the
@@ -755,29 +855,35 @@ export function draw() {
       // runs UNBROKEN down to the slab it stands on, and a single brass ferrule
       // wraps its narrow point. A cup and a collar ring were both tried and both
       // read as a hole with the gem hovering over it.
-      roundRect(t, c, c + 62, 40, 15, 7, BRASS.hi, 1, shade(BRASS.lo, 0.9));
-      roundRect(t, c, c + 57, 32, 5, 3, shade(BRASS.hi, 1.2), 0.85);
-      roundRect(t, c, c + 98, 64, 14, 6, shade(BRASS.lo, 0.95), 1, '#4A3110');
+      roundRect(t, X(0), Y(62), L(40), L(15), L(7), BRASS.hi, 1, shade(BRASS.lo, 0.9));
+      roundRect(t, X(0), Y(57), L(32), L(5), L(3), shade(BRASS.hi, 1.2), 0.85);
+      roundRect(t, X(0), Y(98), L(64), L(14), L(6), shade(BRASS.lo, 0.95), 1, '#4A3110');
       // ONE turned pedestal, cut in hard steps: slab, column, foot.
-      roundRect(t, c, c + 118, 94, 15, 7, WOOD.light);
-      roundRect(t, c, c + 131, 94, 7, 3, WOOD.mid);
-      poly(t, [[c - 38, c + 134], [c + 38, c + 134], [c + 56, c + 158], [c - 56, c + 158]],
+      roundRect(t, X(0), Y(118), L(94), L(15), L(7), WOOD.light);
+      roundRect(t, X(0), Y(131), L(94), L(7), L(3), WOOD.mid);
+      poly(t, [[X(-38), Y(134)], [X(38), Y(134)], [X(56), Y(158)], [X(-56), Y(158)]],
         WOOD.base);
-      poly(t, [[c + 10, c + 134], [c + 38, c + 134], [c + 56, c + 158], [c + 22, c + 158]],
+      poly(t, [[X(10), Y(134)], [X(38), Y(134)], [X(56), Y(158)], [X(22), Y(158)]],
         WOOD.dark, 0.55);                                            // its shaded plane
-      roundRect(t, c, c + 166, 106, 16, 7, WOOD.mid);
-      roundRect(t, c, c + 179, 106, 6, 3, WOOD.dark);
+      roundRect(t, X(0), Y(166), L(106), L(16), L(7), WOOD.mid);
+      roundRect(t, X(0), Y(179), L(106), L(6), L(3), WOOD.dark);
     }, { width: 9 });
-    sheen(cv, c - 54, c - 104, 30, 17, 0.7);
+    sheen(cv, X(-54), Y(-104), L(30), L(17), 0.7);
     savePNG(path.join(OUT, 'theme_patron.png'), W, W, down2(cv, W, W));
   }
 
   { // === theme_eclipse.png — a black disc inside a BRIGHT corona ===
     const { cv, c } = canvas();
     const pal = TILE_PAL.theme_eclipse;
-    const rose = shade(pal[5][0], 1.55), hot = '#FFD9C2';
-    ellipse(cv, c, c, 184, 184, rose, 0.26, 82);                      // corona bloom
-    contactShadow(cv, c + 4, c + 172, 92, 16, 0.24);
+    const hot = '#FFD9C2';
+    // NO OUTER BLOOM. There was a soft radial wash out at r=184 mixed from the
+    // tile's own violet, which is darker than parchment in every channel: the one
+    // subject in the set that is nothing but light was laying a grey ring on the
+    // row around it, and it reached three edges besides. A glow has to be lighter
+    // than every ground it can land on or it should not exist, and here it need
+    // not: the corona disc below IS the light, painted opaque, so it reads as
+    // emission on cream and on ash without spending a single dim pixel.
+    contactShadow(cv, c + 4, c + 154, 92, 14, 0.24);
     withOutline(cv, t => {
       // ONE thick corona, no spokes. The first pass hung six stubby rays off
       // the rim; they were sub-pixel at delivery and read as damage, and the
@@ -785,8 +891,24 @@ export function draw() {
       // is what the shipped void orb does, and it is what carries the tile.
       roundRect(t, c, c - 4, 164, 164, 164, hot, 1, pal[5][0]);        // corona disc
       roundRect(t, c, c - 4, 128, 128, 128, shade(pal[3][1], 0.7));    // inner ink ring
-      roundRect(t, c, c - 4, 118, 118, 118, pal[2][0], 1, '#13112A');  // eclipsing disc
-      ellipse(t, c - 52, c - 58, 34, 24, '#8E86C8', 0.35, 16);         // faint sphere turn
+      // THE DISC IS A SPHERE, NOT A HOLE. Two of three reviewers could not name
+      // this tile: the body had no internal value structure at all, so it read
+      // as "a dark disc in a rim", and on the ash row it sampled at background
+      // luminance and only the ring survived. It is modelled now — a violet body
+      // whose shadowed core is sunk toward the LOWER RIGHT, away from the set's
+      // upper-left light, so the near face turns; and a thin warm limb along the
+      // far side, where the corona it is standing in front of leaks around it.
+      // Three hard steps, no smooth-only modelling, and the eclipse is still an
+      // eclipse: the body stays the darkest mass in the tile.
+      // The limb is the disc's OWN edge, not a stroke laid on top of it: a warm
+      // ring at the body's full radius with the body itself set 5px up-left, so
+      // what survives is a crescent that hugs the lower-right rim and tapers to
+      // nothing at the top-left. An arc drawn inside the disc was tried first and
+      // read as a stray grey hair with two visible round caps.
+      roundRect(t, c, c - 4, 118, 118, 118, '#4A2733', 1, shade(hot, 0.95));
+      roundRect(t, c - 5, c - 9, 113, 113, 113, shade(pal[0][0], 1.06), 1, '#181336');
+      ellipse(t, c + 20, c + 22, 94, 94, '#140F2C', 0.96, 30);         // shadowed core
+      ellipse(t, c - 42, c - 50, 46, 35, shade(pal[0][0], 1.44), 0.5, 20); // the lit turn
       // The bright lip that holds the silhouette on a dark row.
       ellipseRing(t, c, c - 4, 146, 146, 20, '#FFF0DE', 0.92, 150);
       ellipseRing(t, c, c + 10, 148, 148, 13, pal[3][0], 0.75, 150);
@@ -806,17 +928,22 @@ export function draw() {
   confettiIcon('confetti_default', (t, c) => drawPinwheel(t, c, CP.confetti_default),
     [10, 158, 46, 13], [-64, -84, 26, 15, 0.5]);
   confettiIcon('confetti_gold', (t, c) => drawBow(t, c, CP.confetti_gold),
-    [4, 158, 92, 16], [-96, -34, 26, 17, 0.5]);
+    [4, 138, 92, 15], [-96, -54, 26, 17, 0.5]);
   confettiIcon('confetti_dusk', (t, c) => drawFan(t, c, CP.confetti_dusk),
     [4, 168, 78, 15], [-84, -54, 22, 34, 0.42]);
   confettiIcon('confetti_ember', (t, c) => drawTassel(t, c, CP.confetti_ember),
     [4, 160, 78, 15], [-38, -22, 20, 15, 0.4]);
   confettiIcon('confetti_verdant', (t, c) => drawKite(t, c, CP.confetti_verdant),
-    [16, 170, 76, 14], [-62, -94, 24, 18, 0.45]);
+    [22, 154, 76, 12], [-50, -100, 24, 18, 0.45]);
   confettiIcon('confetti_sovereign', (t, c) => drawPouch(t, c, CP.confetti_sovereign),
     [4, 164, 116, 18], [-74, -6, 26, 30, 0.35]);
+  // The bloom's sheen sits ON the upper-left long petal (the -150 degree lobe),
+  // not in the notch between two petals: at [-64, -76] it landed squarely on the
+  // INK contour, and 0.45 white over a warm near-black is a flat grey-olive
+  // plateau — the "4x3 patch that matches nothing in the palette" a blind review
+  // found inside the silhouette. A specular must fall on a lit FACE.
   confettiIcon('confetti_eclipse', (t, c) => drawBloom(t, c, CP.confetti_eclipse),
-    [4, 168, 84, 14], [-64, -76, 22, 15, 0.45]);
+    [4, 168, 84, 14], [-66, -40, 20, 13, 0.42]);
   confettiIcon('confetti_supporter', (t, c) => drawSpool(t, c, CP.confetti_supporter),
     [8, 156, 96, 16], [-70, -110, 24, 12, 0.45]);
   confettiIcon('confetti_season', (t, c) => drawBanner(t, c, CP.confetti_season),

@@ -54,6 +54,21 @@
  *     down the middle. Both are consolidated into one connected silhouette.
  * The other eight tiles in this file were graded good and are untouched.
  *
+ * FOURTH PASS (edge collisions + two contour leaks), against measured numbers
+ * rather than impressions. Every icon's border rows and columns were sampled for
+ * non-zero alpha, and three tiles in this file were running off the canvas:
+ * deepen_burrow (138px of the soil bed along the bottom row), deepen_aquarium
+ * (62px, the bowl's foot) and deepen_kitchen (33px, the salt berm's near arc). An
+ * icon whose art reaches its own edge loses BOTH its contour and its contact gap
+ * there, so in a shop row it reads as sheared, or as sitting one step lower than
+ * the tiles beside it. All three subjects were lifted and trimmed (never merely
+ * scaled down: each still fills 70-85% of the box) so at least 4px of clear alpha
+ * remains on all four sides. deepen_study's marginalia is now plotted in the
+ * PAGE's own sheared coordinates instead of a screen-space grid, so it cannot run
+ * off the cream onto the cover; deepen_office's lamp was redrawn against the
+ * correctly-built one in upgrades.mjs and its halo was recoloured to a stop that
+ * LIGHTENS cream; deepen_bamboo_attic was given the interior it lacked.
+ *
  * The tier-1 RHYMES are kept, but they are drawn to differ AT 56dp rather than at
  * illustration scale, because that is where a shop list actually stacks a pair:
  * cold blue flame vs warm (den), a cold white block of EQUAL-length tubes vs a warm
@@ -104,7 +119,7 @@ const SLATE = { hi: '#3D4C66', base: '#26314A', lo: '#101725' };
 const NIGHT = { hi: '#1A2242', base: '#111739', lo: '#070A1C' };
 const ICE = { hi: '#EAF7FF', base: '#A6CEE8', dark: '#5A7C9B', deep: '#2B4260' };
 const STEEL = { hi: '#9BA6B2', base: '#5C6672', lo: '#2C343E' };
-const BRIGHTSTEEL = { hi: '#FFFFFF', base: '#E4F2FF', lo: '#8FB3CE' };
+const BRIGHTSTEEL = { hi: '#FFFFFF', base: '#DCEAF6', lo: '#5E82A0' };
 const PEWTER = { hi: '#C6CFD8', base: '#8A94A0', lo: '#3E4753' };
 const BRZ = { hi: '#F6DB92', base: '#C99A44', lo: '#734F1C', sh: '#8D6A2A', verd: '#5E8C7A' };
 const BONE = { hi: '#F4EEDA', base: '#D6CCAE', lo: '#94896A' };
@@ -164,23 +179,52 @@ function bloomFan(cv, x, y, r, n, face, spread, top, bottom, coreHi, coreLo) {
  * is itself only 2px thick at delivery: it averaged out to the grey scalloped fuzz
  * a grader read as a doily.
  */
-function saltArc(cv, cx, cy, rx, ry, front, n = 14) {
-  for (let i = 0; i < n; i++) {
-    const a = (i / n) * Math.PI * 2;
-    if ((Math.sin(a) >= 0) !== front) continue;
-    const x = cx + Math.cos(a) * rx, y = cy + Math.sin(a) * ry;
-    ellipse(cv, x, y + 12, 36, 27, SALT.lo);
-    ellipse(cv, x, y, 34, 25, SALT.hi);
-  }
+function saltBerm(cv, cx, cy, rx, ry, front, n = 72) {
+  // Thickness breathes on a fixed 9-lobe sine, so the ridge heaps and thins the
+  // way a poured line does. The earlier draft roughened it with discrete grains
+  // instead, and discrete white circles are a string of pearls (or wool) long
+  // before they are salt.
+  const band = (dy, th, color, alpha = 1) => {
+    for (let i = 0; i < n; i++) {
+      const am = ((i + 0.5) / n) * Math.PI * 2;
+      if ((Math.sin(am) >= 0) !== front) continue;
+      const a0 = (i / n) * Math.PI * 2, a1 = ((i + 1) / n) * Math.PI * 2;
+      const k = 1 + 0.26 * Math.sin(am * 9 + 0.6);
+      capsule(cv, cx + Math.cos(a0) * rx, cy + Math.sin(a0) * ry + dy,
+        cx + Math.cos(a1) * rx, cy + Math.sin(a1) * ry + dy, th * k, color, alpha);
+    }
+  };
+  band(8, 36, SALT.lo);        // the berm's shaded foot
+  band(-1, 27, SALT.base);     // its body
+  band(-10, 14, SALT.hi);      // the lit crest
 }
 
-/** A FAT chime tube. Thickness is the whole point: the first pass hung five thin
- *  ones that merged into a single grey slab at 56dp. */
+/** A tapered lens, fat in the middle: a knife cut in a crust, not a laid twig. */
+function scorePts(x1, y1, x2, y2, w, n = 16) {
+  const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy) || 1;
+  const nx = -dy / L, ny = dx / L, up = [], dn = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n, hw = w * Math.sin(Math.PI * t);
+    const px = x1 + dx * t, py = y1 + dy * t;
+    up.push([px + nx * hw, py + ny * hw]);
+    dn.push([px - nx * hw, py - ny * hw]);
+  }
+  return up.concat(dn.reverse());
+}
+
+/** A FAT chime tube, FLAT-ENDED. Thickness is the whole point (the first pass
+ *  hung five thin ones that merged into a single grey slab at 56dp), and so are
+ *  the ends: built from round-capped capsules the same tube is a lozenge, and a
+ *  pale lozenge with a dark spot at the bottom is a test tube, which is exactly
+ *  what a blind review called the previous chime. A cylinder is shaded ACROSS,
+ *  not along, so the light and dark faces are vertical strips rather than the
+ *  kit's usual top-to-bottom gradient. */
 function tube(cv, x, y1, y2, th, pal) {
-  capsule(cv, x, y1, x, y2, th + 11, INK, 0.92);
-  capsule(cv, x, y1, x, y2, th, pal.base);
-  capsule(cv, x - th * 0.24, y1 + 5, x - th * 0.24, y2 - 5, th * 0.32, pal.hi, 0.92);
-  capsule(cv, x + th * 0.3, y1 + 5, x + th * 0.3, y2 - 5, th * 0.2, pal.lo, 0.55);
+  const cy = (y1 + y2) / 2, hh = (y2 - y1) / 2, hw = th / 2, rad = th * 0.2;
+  roundRect(cv, x, cy, hw + 6, hh + 6, rad + 6, INK, 0.92);
+  roundRect(cv, x, cy, hw, hh, rad, pal.base);
+  roundRect(cv, x - hw * 0.36, cy, hw * 0.3, hh - 6, hw * 0.28, pal.hi, 0.95);
+  roundRect(cv, x + hw * 0.52, cy, hw * 0.26, hh - 6, hw * 0.24, pal.lo, 0.7);
 }
 
 /** Half-ellipse dome (lamp shade, lid), traced left rim -> over the top -> right rim. */
@@ -227,42 +271,49 @@ export function draw() {
     savePNG(path.join(OUT, 'deepen_cozy_den.png'), W, W, down2(cv, W, W));
   }
 
-  { // === deepen_kitchen.png — Salt Circle: a poured white ring round one loaf ===
-    // REDESIGNED TWICE. Pass one was three nested ellipses on a void (graded 1.7,
-    // unidentifiable). Pass two set the loaf on a big elliptical table top and was
-    // read blind as "a doily under a bun / a straw hat / a shell", and correctly
-    // pinned as the only tile in the whole set drawn in flattened 3/4 perspective
-    // while every other subject is frontal.
+  { // === deepen_kitchen.png — Salt Circle: a poured ring round one loaf ===
+    // REDESIGNED THREE TIMES, and the third is a fix for two SEPARATE ambiguities
+    // a blind review found compounding each other: "a brown egg-shaped stone with
+    // a carved X resting on white wool". Both are addressed head on.
     //
-    // The table WAS the perspective, so the table is gone: the loaf is now the
-    // hero, a big frontal dome standing on its own contact shadow like every other
-    // subject in the set, and the ring is a bold rope of oversized salt beads
-    // poured around it. The one thing a ring around an object cannot avoid is
-    // being an ellipse, so it is drawn near edge-on (rx 154 / ry 42, ratio 0.27)
-    // and gets its depth purely from OCCLUSION — the far arc vanishes behind the
-    // loaf and reappears at the two sides, the near arc crosses in front of the
-    // loaf's foot. A near-edge-on ring reads as a ring lying on the ground; the
-    // fat ellipse of pass two could only ever read as the rim of a plate.
+    //   The loaf was an EGG. It is now a boule: 252 wide by 150 tall, so it is
+    //   plainly wider than it is high, and the two scores are tapered LENS cuts
+    //   (fat in the middle, closed at both ends) with their pale crumb lit on the
+    //   LOWER-RIGHT wall. The old scores were even-width capsules highlighted
+    //   along their top, which is how a raised twig is lit, not how an incision is.
+    //
+    //   The salt was WOOL. It was a chain of 34px beads, and big soft white
+    //   circles are wool or cloud before they are ever salt. It is now a poured
+    //   BERM: one continuous low ridge with a shaded foot, a body and a lit crest,
+    //   roughened by six grains a third of the old size. Poured salt is a line
+    //   with a ridge, not a necklace.
+    //
+    // The ring still gets its depth purely from OCCLUSION — the far arc passes
+    // behind the loaf, the near arc crosses in front of its foot — and it is drawn
+    // near edge-on (rx 146 / ry 48) so it reads as lying on the floor.
     const { cv, c } = canvas();
-    contactShadow(cv, c + 6, 344, 156, 28, 0.3);
+    // FOURTH PASS: the NEAR arc's shaded foot band sat 8px below the ellipse and
+    // carried an 18px half-thickness, which put it on the bottom row of the canvas
+    // (33px of it) with the contour clipped off. The whole ring is lifted 16px and
+    // laid flatter still (ry 48 -> 42), which also seats it more convincingly on
+    // the floor; the loaf moves with it so the occlusion reads exactly as before.
+    contactShadow(cv, c + 6, 334, 158, 24, 0.3);
     withOutline(cv, t => {
-      saltArc(t, c, 292, 138, 40, false);                             // the poured ring, far arc
-      ellipse(t, c + 8, 294, 100, 26, INK, 0.3);                      // the loaf's own footing
-      // The loaf: one dome in the dark crust value, then an inset dome in the lit
-      // one. Both share a base line, so the light dome leaves a hard crust rim
-      // around the top and sides — a real value step, not a soft airbrush.
-      poly(t, domePts(c, 300, 116, 196), CRUST.base, 1, CRUST.lo);
-      poly(t, domePts(c - 8, 300, 95, 166), CRUST.hi, 1, CRUST.base);
-      // Two bold crossed scores. A single diagonal left the dome readable as a
-      // stone; the cross is what names it as bread, and at 22px in the supersample
-      // it is still ~3px at 56dp rather than surface noise.
-      for (const [x1, y1, x2, y2] of [[c - 56, 218, c + 46, 174], [c - 40, 168, c + 44, 226]]) {
-        capsule(t, x1, y1, x2, y2, 22, CRUST.lo, 0.95);
-        capsule(t, x1 + 2, y1 - 8, x2 + 2, y2 - 8, 9, '#F7DEB0', 0.85);
+      saltBerm(t, c, 284, 146, 42, false);                            // far arc
+      ellipse(t, c + 8, 280, 104, 24, INK, 0.28);                     // the loaf's footing
+      // The loaf: the dark crust value first, then an inset dome in the lit one.
+      // Both share a base line, so the light dome leaves a hard crust rim around
+      // the top and sides — a real value step, not a soft airbrush.
+      poly(t, domePts(c, 284, 126, 150), CRUST.base, 1, CRUST.lo);
+      poly(t, domePts(c - 6, 284, 106, 126), CRUST.hi, 1, CRUST.base);
+      for (const [x1, y1, x2, y2] of [[c - 74, 230, c + 52, 184], [c - 46, 178, c + 60, 242]]) {
+        poly(t, scorePts(x1, y1, x2, y2, 17), CRUST.lo);              // the cut
+        poly(t, scorePts(x1 + 5, y1 + 8, x2 + 5, y2 + 8, 8), '#F7DFB2', 0.9); // lit crumb
       }
-      saltArc(t, c, 292, 138, 40, true);                              // ... and the near arc
+      ellipse(t, c - 34, 198, 46, 20, '#F3D9A6', 0.35, 22);           // a dusting of flour
+      saltBerm(t, c, 284, 146, 42, true);                             // ... and the near arc
     }, { width: 9 });
-    sheen(cv, c - 58, 176, 30, 15, 0.42);
+    sheen(cv, c - 62, 190, 28, 14, 0.4);
     savePNG(path.join(OUT, 'deepen_kitchen.png'), W, W, down2(cv, W, W));
   }
 
@@ -271,7 +322,7 @@ export function draw() {
     // greyed out completely. Four OVERSIZED scrawls carry the idea instead, and the
     // page block has real thickness so the book is a solid, not two flat quads.
     const { cv, c } = canvas();
-    contactShadow(cv, c + 8, 356, 142, 22, 0.32);
+    contactShadow(cv, c + 8, 352, 140, 20, 0.32);
     withOutline(cv, t => {
       poly(t, [[c - 160, 134], [c - 4, 196], [c + 160, 134], [c + 160, 292], [c - 4, 356], [c - 160, 292]], SLATE.lo);
       poly(t, [[c - 158, 130], [c - 6, 192], [c - 6, 340], [c - 158, 280]], SLATE.hi, 1, SLATE.base);
@@ -280,16 +331,29 @@ export function draw() {
       poly(t, [[c + 136, 152], [c + 12, 202], [c + 12, 328], [c + 136, 274]], PAPER.hi, 1, PAPER.base);
       capsule(t, c, 194, c, 344, 26, SLATE.lo);                       // spine valley
       capsule(t, c - 5, 200, c - 5, 338, 9, SLATE.hi, 0.55);
-      // the same spidery hand, identical on both sides: two oversized wavy lines
-      // per page. Four marks, each ~7px at 192, so they stay MARKS at 56dp rather
-      // than dissolving the way the first pass's hatching did.
+      // The same spidery hand on both pages, two oversized wavy lines each — but
+      // plotted in the PAGE's own coordinates rather than on a screen-space grid.
+      // The pages are sheared quads, and the old screen-space placement did not
+      // follow them: the lower-right scrawl ran off the cream, across the navy
+      // cover and into the book's outer contour (which is what read blind as a
+      // stray dark notch on the right cover's lower edge), and the left page's top
+      // scrawl overhung its fore-edge. `pagePt` maps u = 0 at the spine to u = 1 at
+      // the fore-edge and v = 0 at the head to v = 1 at the foot of whichever page,
+      // landing exactly on the PAPER quads drawn above, so every mark is CLIPPED TO
+      // ITS PAGE by construction. The u/v insets below leave a margin on all four
+      // sides wider than the stroke's own half-thickness.
+      const pagePt = (side, u, v) => {
+        const yTop = 202 - 50 * u, yBot = 328 - 54 * u;
+        return [c + side * (12 + 124 * u), yTop + v * (yBot - yTop)];
+      };
       for (const side of [-1, 1]) {
-        for (const [dy, lean] of [[0, 0.18], [58, 0.12]]) {
-          const x = c + side * 84, y = 216 + dy + side * 22;
-          const pts = [[-50, 9], [-16, -9], [16, 9], [50, -9]];
-          for (let i = 1; i < pts.length; i++) {
-            const [x1, y1] = pts[i - 1], [x2, y2] = pts[i];
-            capsule(t, x + x1, y + y1 + x1 * lean, x + x2, y + y2 + x2 * lean, 16, '#2A2438', 0.95);
+        for (const v0 of [0.31, 0.66]) {
+          const wave = [[0.17, -0.09], [0.40, 0.09], [0.63, -0.09], [0.85, 0.09]];
+          for (let i = 1; i < wave.length; i++) {
+            const [ua, va] = wave[i - 1], [ub, vb] = wave[i];
+            const [x1, y1] = pagePt(side, ua, v0 + va);
+            const [x2, y2] = pagePt(side, ub, v0 + vb);
+            capsule(t, x1, y1, x2, y2, 16, '#2A2438', 0.95);
           }
         }
       }
@@ -311,31 +375,39 @@ export function draw() {
     // line, with nothing alive in it. Every part is fully opaque and the value runs
     // in three hard steps (pale glass above the line, near-black water below it,
     // the one bright crescent inside the water), so nothing can ghost.
+    //
+    // FOURTH PASS: the foot ran 62px along the bottom ROW of the canvas — its
+    // roundRect ended at y 374 of 384 and the 9px contour pushed the rest past the
+    // edge, so the bowl had no contour and no contact gap underneath it and sat a
+    // step low against its neighbours. The bowl is lifted and taken in a little
+    // (radius 146 -> 138, centre 206 -> 194); every dependent coordinate below is
+    // derived from BY/BR or moved with them, so the mouth, the water line and the
+    // crescent cannot drift off the glass.
     const { cv, c } = canvas();
-    const BX = c, BY = 206, BR = 146;
+    const BX = c, BY = 194, BR = 138;
     // The mouth is the arc cut away above y = 92; the water line is the chord at
     // y = 170. Both angles are derived from the radius so the rim and the surface
     // can never drift off the glass.
     const thAt = y => Math.asin(Math.max(-1, Math.min(1, (y - BY) / BR)));
-    const mouth = thAt(92), surf = thAt(170);
+    const mouth = thAt(82), surf = thAt(158);
     const arcPts = (r, from, to, n = 44) => Array.from({ length: n + 1 }, (_, i) => {
       const a = from + ((to - from) * i) / n;
       return [BX + Math.cos(a) * r, BY + Math.sin(a) * r];
     });
-    contactShadow(cv, c + 8, 366, 108, 16, 0.3);
+    contactShadow(cv, c + 8, 346, 100, 13, 0.3);
     withOutline(cv, t => {
       // glass body: mouth angle round the bottom and back up to the mirrored mouth
       poly(t, arcPts(BR, mouth, Math.PI - mouth), GLASS.hi, 1, GLASS.base);
       // the water: the same arc, but started at the surface chord
       poly(t, arcPts(BR - 10, surf, Math.PI - surf), '#1D5578', 1, '#061620');
-      ellipse(t, c + 4, 268, 62, 62, PAPER.hi);                       // the reflected crescent
-      ellipse(t, c + 16, 244, 47, 47, '#123C58');                     // ... bitten from above
-      capsule(t, c - 138, 170, c + 138, 170, 18, '#4E85AB');          // the surface: dead flat
-      capsule(t, c - 136, 164, c + 136, 164, 8, '#F2FBFF');
-      roundRect(t, c, 88, 94, 19, 9, GLASS.hi, 1, GLASS.base);        // the mouth rim
-      roundRect(t, c, 356, 64, 18, 8, GLASS.base, 1, GLASS.dead);     // the foot
+      ellipse(t, c + 4, 254, 58, 58, PAPER.hi);                       // the reflected crescent
+      ellipse(t, c + 15, 232, 44, 44, '#123C58');                     // ... bitten from above
+      capsule(t, c - 130, 158, c + 130, 158, 17, '#4E85AB');          // the surface: dead flat
+      capsule(t, c - 128, 152, c + 128, 152, 8, '#F2FBFF');
+      roundRect(t, c, 80, 88, 18, 9, GLASS.hi, 1, GLASS.base);        // the mouth rim
+      roundRect(t, c, 334, 60, 16, 8, GLASS.base, 1, GLASS.dead);     // the foot
     }, { width: 9 });
-    sheen(cv, c - 92, 132, 26, 44, 0.42);
+    sheen(cv, c - 88, 124, 25, 42, 0.42);
     savePNG(path.join(OUT, 'deepen_aquarium.png'), W, W, down2(cv, W, W));
   }
 
@@ -398,28 +470,103 @@ export function draw() {
     savePNG(path.join(OUT, 'deepen_desert_room.png'), W, W, down2(cv, W, W));
   }
 
-  { // === deepen_office.png — Second Shadow: one lamp, two shadows ===
-    // Kept (3.3) but the craft error is fixed: the cast shadow was a HARD-edged
-    // parallelogram running off the tile to the lower LEFT, i.e. light from the
-    // upper right, contradicting every other icon in the game. Both shadows are now
-    // soft lobes, laid on the canvas before the contour so they never get outlined.
-    // The shade is a shallow cold dome rather than the tier-1 brass floor lamp's
-    // warm trapezoid, so the pair separates by both shape and temperature at 56dp.
+  { // === deepen_office.png — Second Shadow: the SHADOWS are the subject ===
+    // REDESIGNED. The previous draft made the lamp the mass and the shadows two
+    // soft uncontoured smudges under it; blind graders read the object as "a
+    // mushroom OR a glass cloche", and noted that the set already owns an
+    // unambiguous lamp one tier down, so as a lamp this tile was both unclear and
+    // redundant. The deepening is not a lamp. It is that there are TWO shadows.
+    //
+    // So the lamp is small, cold and plainly a lamp (a trapezoid shade on a post
+    // and a foot, the shape its tier-1 sibling made legible), and the pair of cast
+    // shadows carries the mass: two flattened, hard-edged repetitions of that same
+    // silhouette, splayed from the one foot at different angles and different
+    // lengths, so the eye recognises the shape twice and gets the discrepancy for
+    // free. They are drawn INSIDE the contour because they are the subject.
+    //
+    // They are also deliberately MID value, not near-black. A shadow drawn dark
+    // enough to be "correct" disappears on an ash row, and this tile has to work
+    // on both; these read as shadows through their SHAPE and their attachment to
+    // the foot, which no background can take away.
+    //
+    // FOURTH PASS — the base was broken and all three blind reviewers named it.
+    // The two fans were thrown from origins 18px apart and both were 40-52px WIDE
+    // at u = 0, so their blunt starting ends met the pole as two mismatched
+    // quadrilaterals in a bow-tie that never closed: the left one's contour ran
+    // straight through the foot, the right one's top edge crossed over it, and the
+    // separate dark overlap pool sat below the foot outside any silhouette as a
+    // free-floating wedge. A reviewer put it plainly — upgrades.mjs already draws
+    // a correct lamp (one clean elliptical foot) and the two could not ship side
+    // by side.
+    //
+    // So the lamp is now built to that same anatomy — trapezoid shade, straight
+    // post, ONE elliptical foot with its own shaded underside — and the foot is
+    // drawn LAST, over both fans. The fans are thrown from a single origin at the
+    // centre of that foot and start NARROW, so their blunt ends are hidden beneath
+    // it and each shadow simply emerges from under the lamp. There is no joint to
+    // get wrong, and no free element outside the silhouette.
+    //
+    // What makes the tile its own thing is unchanged: the two cast shadows are the
+    // subject, they disagree (different angle, different length, different spread),
+    // and they stay MID value so they survive an ash row — they read as shadows
+    // through their shape and their attachment to the foot, not through darkness.
     const { cv, c } = canvas();
-    ellipse(cv, c, 214, 152, 136, '#BBD6EE', 0.17, 112);              // cold cast light
-    ellipse(cv, c - 104, 344, 106, 25, INK, 0.3, 34);                 // the two shadows
-    ellipse(cv, c + 108, 340, 98, 23, INK, 0.26, 34);
-    contactShadow(cv, c + 4, 346, 80, 15, 0.26);
+    // ONE cast shadow: a long fan lying on the floor, widening away from the foot
+    // and rounded off at its far end. A projected lamp OUTLINE was tried first and
+    // read as an axe head; the fan is the shape every reader already knows as a
+    // cast shadow, and two of them from one foot is the whole beat. `v` is
+    // squashed to 0.55 because the floor recedes.
+    const fan = (ox, oy, deg, L, w0, w1) => {
+      const a = (deg * Math.PI) / 180;
+      const dx = Math.cos(a), dy = Math.sin(a) * 0.62;
+      const px = -Math.sin(a), py = Math.cos(a) * 0.55;
+      const P = (u, v) => [ox + dx * u + px * v, oy + dy * u + py * v];
+      const up = [], dn = [];
+      for (let i = 0; i <= 22; i++) {
+        const u = i / 22;
+        let hw = w0 + (w1 - w0) * Math.pow(u, 0.8);
+        if (u > 0.93) hw *= Math.sqrt(Math.max(0, 1 - ((u - 0.93) / 0.07) ** 2));
+        up.push(P(u * L, hw)); dn.push(P(u * L, -hw));
+      }
+      return dn.concat(up.reverse());
+    };
+    // The lamp stands a little left of centre so the longer right-hand shadow has
+    // room to run without touching the frame.
+    const LX = c - 8, FOOTY = 300;
+    // A glow LIGHTENS. The previous stop was #BBD6EE, which is darker than the
+    // cream parchment of a light shop row, so the widest element in the tile laid a
+    // grey haze around the lamp instead of cast light. This one sits above cream in
+    // every channel and still reads cold.
+    ellipse(cv, LX, 176, 146, 126, '#FAFCFF', 0.30, 104);            // cold cast light
+    ellipse(cv, LX, 140, 96, 80, '#FFFFFF', 0.26, 62);
+    contactShadow(cv, LX + 4, 316, 60, 12, 0.24);
     withOutline(cv, t => {
-      roundRect(t, c, 334, 118, 20, 12, STEEL.base, 1, STEEL.lo);     // base
-      capsule(t, c, 330, c, 238, 36, STEEL.lo);                       // neck
-      capsule(t, c - 11, 326, c - 11, 242, 13, STEEL.hi, 0.8);
-      poly(t, domePts(c, 238, 156, 128), '#F0F8FF', 1, '#6690B8');    // shallow shade
-      capsule(t, c - 152, 230, c + 152, 230, 26, '#5A83AC', 0.5);     // lit lower rim
-      roundRect(t, c, 242, 160, 16, 7, '#E4F1FC', 1, '#7FA6C6');
-      ellipse(t, c, 260, 66, 20, '#FFFFFF', 0.55, 16);                // the light itself
+      // Two shadows, and they do NOT agree: one short and narrow, one long and
+      // broad, at unrelated angles. Both are thrown from the SAME point — the
+      // centre of the foot — and both start narrow, so the foot drawn below covers
+      // their roots and each fan only appears once it is clear of the lamp. Flat
+      // fills, no lit rim: a lit edge would make them objects.
+      // Near-mirrored fans read as a stand rather than as two shadows, so these
+      // disagree on every axis at once: one short, steep and narrow at a lighter
+      // value, one long, shallow and broad at a darker one.
+      for (const [deg, L, w0, w1, fill] of [
+        [140, 126, 14, 36, '#787C90'],
+        [14, 165, 18, 58, '#565A6D'],
+      ]) {
+        poly(t, fan(LX, FOOTY, deg, L, w0, w1), fill);
+      }
+      // the lamp: cold, compact, and the same anatomy as its tier-1 sibling
+      poly(t, [[LX - 40, 84], [LX + 40, 84], [LX + 86, 158], [LX - 86, 158]],
+        '#F2F8FF', 1, '#7FA6C6');                                     // shade
+      capsule(t, LX - 82, 156, LX + 82, 156, 16, '#5A83AC', 0.55);    // lit lower rim
+      capsule(t, LX - 40, 88, LX + 40, 88, 12, '#FFFFFF', 0.6);       // lit top rim
+      capsule(t, LX, FOOTY, LX, 156, 22, STEEL.base);                 // post
+      capsule(t, LX - 7, 294, LX - 7, 162, 8, STEEL.hi, 0.7);
+      ellipse(t, LX, 250, 24, 12, STEEL.lo, 0.8);                     // collar
+      ellipse(t, LX, FOOTY, 76, 23, STEEL.hi);                        // ONE foot, drawn last
+      ellipse(t, LX, FOOTY + 7, 63, 15, STEEL.lo, 0.85);              // ... and its underside
     }, { width: 9 });
-    sheen(cv, c - 80, 166, 26, 30, 0.5);
+    sheen(cv, LX - 50, 104, 20, 12, 0.5);
     savePNG(path.join(OUT, 'deepen_office.png'), W, W, down2(cv, W, W));
   }
 
@@ -429,14 +576,19 @@ export function draw() {
     // against WARM earth for real hue separation (the fix the graders credited to
     // the tier-1 tile), and the invisible 1px hum rings are now a plain halo.
     const { cv, c } = canvas();
-    ellipse(cv, c, 194, 152, 148, COLDGLOW, 0.22, 118);
-    contactShadow(cv, c + 8, 350, 134, 22, 0.32);
+    // FOURTH PASS: the earth mound was the worst edge collision in the whole set —
+    // 138px of it lay on the canvas's bottom ROW, so the bed had no contour and no
+    // contact gap along its entire width and the tile read as cut off. The mound,
+    // its clods and the contact shadow are all lifted; the shards are untouched
+    // (they graded well) and simply stand a little deeper in the bed.
+    ellipse(cv, c, 188, 152, 144, COLDGLOW, 0.22, 118);
+    contactShadow(cv, c + 8, 340, 132, 20, 0.32);
     withOutline(cv, t => {
       shard(t, c - 114, 168, c - 168, c - 48, 306, c - 84, ICE);
       shard(t, c + 112, 142, c + 46, c + 166, 306, c + 138, ICE);
       shard(t, c - 2, 52, c - 78, c + 74, 312, c + 30, ICE);
-      roundRect(t, c, 336, 156, 38, 26, EARTH.hi, 1, EARTH.lo);       // earth mound
-      for (const [x, y, rx, ry] of [[c - 112, 316, 40, 21], [c + 6, 310, 46, 23], [c + 120, 318, 38, 20]]) {
+      roundRect(t, c, 320, 150, 34, 24, EARTH.hi, 1, EARTH.lo);       // earth mound
+      for (const [x, y, rx, ry] of [[c - 108, 300, 38, 20], [c + 6, 294, 44, 22], [c + 114, 302, 36, 19]]) {
         ellipse(t, x, y - 2, rx, ry, EARTH.base);
         ellipse(t, x - rx * 0.3, y - ry * 0.55, rx * 0.42, ry * 0.36, EARTH.hi, 0.75);
       }
@@ -445,30 +597,56 @@ export function draw() {
     savePNG(path.join(OUT, 'deepen_burrow.png'), W, W, down2(cv, W, W));
   }
 
-  { // === deepen_garden.png — Tuned Chimes: one note, and every tube agrees ===
-    // REBUILT alongside its tier-1 sibling. Three spaced tubes of three different
-    // lengths was a near-duplicate of the tier-1 composition AND carried the same
-    // picket-fence voids; both were read as test tubes.
+  { // === deepen_garden.png — Tuned Chimes: a whole chime, every tube one length ==
+    // REDESIGNED. The previous draft was a bar with three equal tubes hanging off
+    // it, cropped at the bottom edge, and blind graders could not name it: "three
+    // rounded white slats hanging from a dark rod — a scroll, a blind, a chime or
+    // ice". It also shared its entire construction with its tier-1 sibling, so it
+    // read as an unfinished copy of that tile rather than its own object.
     //
-    // The tubes are now packed into one overlapping block, and — the whole point of
-    // the deepening — they are all exactly the SAME LENGTH. A chime tuned to a
-    // single note is a chime whose tubes have all been cut to one measure, so the
-    // eerie regularity is the mechanism, not a decoration laid over it. That also
-    // hands the pair its silhouette split: this is a hard flat-bottomed block with
-    // no bob, against tier-1's tapering column under a big round wooden bob, and it
-    // is cold white against warm brass.
+    // The room rhymes in this set are deliberate, but a rhyme cannot cost a tile
+    // its name, so this one is drawn as a COMPLETE wind chime instead of a
+    // fragment of one: the hanging ring at the top, the suspension disc, the tube
+    // block, the striker and the wind sail below it. Those last three are what
+    // nobody mistakes for a blind, and the whole object now sits inside the frame
+    // with the sail clear of the bottom edge.
+    //
+    // The deepening itself is still the mechanism, not a decoration laid over it:
+    // every tube is cut to EXACTLY the same length, because a chime that has
+    // settled on one note is a chime whose tubes have all been cut to one measure.
+    // Against tier-1 (warm brass, ragged lengths, a bar and a ball) this is cold
+    // white, flat-bottomed and disc-topped.
     const { cv, c } = canvas();
-    ellipse(cv, c, 236, 128, 150, COLDGLOW, 0.2, 96);                 // the note, uncontoured
-    contactShadow(cv, c + 8, 360, 108, 14, 0.22);
+    ellipse(cv, c, 236, 128, 146, COLDGLOW, 0.2, 96);                 // the note, uncontoured
+    contactShadow(cv, c + 8, 366, 66, 10, 0.2);
     withOutline(cv, t => {
-      roundRect(t, c, 80, 146, 26, 13, DARKWOOD.hi, 1, DARKWOOD.lo);  // cap
-      capsule(t, c - 134, 62, c + 134, 62, 10, '#7E5F3F', 0.7);
-      capsule(t, c - 132, 94, c + 132, 94, 8, DARKWOOD.lo, 0.5);
-      for (const x of [c - 60, c + 60, c]) capsule(t, x, 100, x, 128, 14, DARKWOOD.lo, 0.95);
-      for (const x of [c - 60, c + 60, c]) tube(t, x, 124, 340, 88, BRIGHTSTEEL);
+      capsule(t, c, 26, c, 96, 13, DARKWOOD.base);                    // it hangs
+      capsule(t, c - 4, 32, c - 4, 88, 5, '#8A6742', 0.6);
+      ellipse(t, c, 106, 84, 20, DARKWOOD.lo);                        // suspension disc
+      ellipse(t, c, 97, 84, 20, DARKWOOD.hi);
+      ellipse(t, c - 28, 92, 27, 7, '#8A6742', 0.6);
+      // A REAL GAP of open cord between the disc and the tube tops. `tube` lays an
+      // ink keyline as a ROUND-CAPPED capsule, so a fat tube's contour reaches
+      // th/2 + 5 above its own top: the first version of this composition put the
+      // tube tops at the disc's rim, the two contours merged, and the whole thing
+      // read as a lantern or a birdcage rather than as something hanging.
+      for (const x of [c - 64, c, c + 64])
+        capsule(t, x, 114, x, 196, 11, DARKWOOD.lo, 0.95);
+      // The tube block: three tubes, just touching, all ending on the SAME line —
+      // a chime settled on one note is a chime cut to one measure.
+      for (const x of [c - 64, c + 64, c]) {
+        tube(t, x, 190, 300, 62, BRIGHTSTEEL);
+        ellipse(t, x, 297, 29, 10, STEEL.lo);                         // the open mouth
+        ellipse(t, x, 295, 21, 6, '#20262E');
+      }
+      // striker and wind sail, hanging in front of the tubes on the centre cord
+      ellipse(t, c, 302, 36, 31, DARKWOOD.lo);
+      ellipse(t, c - 2, 298, 31, 27, DARKWOOD.hi);
+      poly(t, [[c, 322], [c + 30, 338], [c, 370], [c - 30, 338]],
+        DARKWOOD.hi, 1, DARKWOOD.lo);
     }, { width: 9 });
-    sheen(cv, c - 96, 70, 28, 8, 0.45);
-    sheen(cv, c - 76, 200, 10, 52, 0.5);
+    sheen(cv, c - 50, 90, 22, 7, 0.42);
+    sheen(cv, c - 82, 224, 9, 40, 0.5);
     savePNG(path.join(OUT, 'deepen_garden.png'), W, W, down2(cv, W, W));
   }
 
@@ -477,20 +655,70 @@ export function draw() {
     // that all three graders read as a rendering artefact. One lantern now, held
     // high on a short cord to the top edge — and a RIBBED CYLINDER rather than a
     // globe, so it cannot be confused with the tier-1 paper globe at 56dp.
+    //
+    // FOURTH PASS. Two of three blind reviewers could still not name it: "a banded
+    // cream cylinder", "almost no interior information, 36 distinct colours against
+    // a 100-160 norm, reads as a blank form". Everything inside the silhouette was
+    // one flat BONE gradient, two straight rib capsules and a soft white blob, and
+    // a straight band across a cylinder is exactly what flattens it back into a
+    // rectangle. The subject is right — risen paper lanterns held steady against
+    // dark rafters — so this pass gives it the interior it never had:
+    //
+    //   ROUNDNESS. The paper turns under at both sides (two dark strips) and lifts
+    //   down the middle (one pale one), and every rib now SAGS across the belly
+    //   instead of running straight, which is the one cue that makes a rectangle a
+    //   cylinder seen side-on. Each rib is drawn twice, a shadow band with a lit
+    //   edge riding above it, so the ribs have depth of their own.
+    //   A CAP, top and bottom, each seated on a dark collar ring where the paper is
+    //   gathered onto the wood, so the paper is fixed to something.
+    //   A GLOW THROUGH THE PAPER. Not a highlight on it: a broad soft bleed with a
+    //   small hard-edged flame silhouette inside, which is what a lit paper lantern
+    //   actually looks like from outside. It stays COLD (the tier-1 sibling owns
+    //   the warm globe), so the pair still separates on temperature at 56dp.
     const { cv, c } = canvas();
-    ellipse(cv, c, 214, 124, 142, '#E8EFE9', 0.24, 104);
-    contactShadow(cv, c + 6, 360, 86, 13, 0.2);
-    withOutline(cv, t => {
-      capsule(t, c, 40, c, 84, 15, DARKWOOD.base);                    // held near the rafters
-      roundRect(t, c, 88, 76, 19, 8, DARKWOOD.hi, 1, DARKWOOD.lo);    // top cap
-      roundRect(t, c, 216, 118, 118, 46, BONE.hi, 1, BONE.base);      // paper cylinder
-      for (const y of [166, 264]) {
-        capsule(t, c - 112, y, c + 112, y, 22, BONE.lo, 0.5);         // two oversized ribs
+    // A bowed band across the belly of the cylinder. `bow` is what stops a rib
+    // reading as a strip of tape laid over a flat card.
+    const rib = (y, th, hw, bow) => {
+      const n = 14, up = [], dn = [];
+      for (let i = 0; i <= n; i++) {
+        const u = i / n, x = c - hw + 2 * hw * u, s = y + bow * Math.sin(Math.PI * u);
+        up.push([x, s - th / 2]); dn.push([x, s + th / 2]);
       }
-      ellipse(t, c, 214, 62, 82, '#FFFFFF', 0.34, 22);                // the light inside
-      roundRect(t, c, 338, 68, 17, 8, DARKWOOD.hi, 1, DARKWOOD.lo);   // bottom cap
+      return up.concat(dn.reverse());
+    };
+    ellipse(cv, c, 212, 132, 146, '#F2F7FF', 0.28, 106);              // cold paper glow
+    contactShadow(cv, c + 6, 358, 88, 12, 0.2);
+    withOutline(cv, t => {
+      // A THIN cord with a knot at the cap. The thick stub the previous draft hung
+      // it from read as a spout, and a squat body under a wide cap reads as a
+      // barrel, so the paper is taller than it is wide and both caps are visibly
+      // narrower than it.
+      capsule(t, c, 30, c, 80, 11, DARKWOOD.base);                    // held near the rafters
+      ellipse(t, c, 76, 16, 11, DARKWOOD.hi);                         // the knot
+      roundRect(t, c, 86, 70, 18, 8, DARKWOOD.hi, 1, DARKWOOD.lo);    // top cap
+      roundRect(t, c, 216, 124, 128, 46, BONE.hi, 1, BONE.base);      // paper cylinder
+      // the paper turns away at both edges and catches the light down the middle
+      roundRect(t, c - 101, 216, 23, 120, 23, '#9C9174', 0.6);
+      roundRect(t, c + 103, 216, 21, 120, 21, '#7C7255', 0.55);
+      roundRect(t, c - 8, 216, 46, 122, 24, '#FFFFFF', 0.26);
+      // The flame, seen THROUGH the paper. The bleed is kept under the core rather
+      // than over it: a broad wash at full strength swallows the silhouette, and
+      // the silhouette is the whole point — it is what says LANTERN rather than
+      // banded cylinder.
+      ellipse(t, c - 4, 230, 46, 84, '#E2F2FF', 0.7, 26);
+      flameLobe(t, c - 4, 162, 282, 30, '#FBFEFF', 1);
+      flameLobe(t, c - 5, 192, 276, 15, '#FFFFFF', 1);
+      // four sagging ribs, each a shadow band with a lit edge riding above it
+      for (const y of [150, 202, 254, 302]) {
+        poly(t, rib(y, 15, 116, 11), '#6E6551', 0.5);
+        poly(t, rib(y - 8, 6, 116, 11), '#FFFDF2', 0.55);
+      }
+      // the collars where the paper is gathered onto the wood
+      poly(t, rib(108, 13, 112, 9), DARKWOOD.lo, 0.55);
+      poly(t, rib(328, 13, 112, 9), DARKWOOD.lo, 0.6);
+      roundRect(t, c, 340, 66, 16, 8, DARKWOOD.hi, 1, DARKWOOD.lo);   // bottom cap
     }, { width: 10 });
-    sheen(cv, c - 66, 158, 26, 34, 0.45);
+    sheen(cv, c - 74, 152, 24, 36, 0.45);
     savePNG(path.join(OUT, 'deepen_bamboo_attic.png'), W, W, down2(cv, W, W));
   }
 

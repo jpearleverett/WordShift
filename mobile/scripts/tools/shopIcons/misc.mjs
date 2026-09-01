@@ -40,6 +40,25 @@
  * background, the recess inside it is genuinely dark, and the flame is the
  * largest element in the tile rather than the smallest.
  *
+ * FOURTH PASS, two targeted fixes:
+ *   - attune_3's widest element was a #FFC24A halo, and #FFC24A is DARKER than the
+ *     cream parchment of a light shop row in two channels of three. A glow that
+ *     darkens the surface it lands on is not a glow: on cream the sunburst wore a
+ *     grey-gold smudge the size of the tile. Both stops are now above cream in
+ *     every channel, so they can only lift it (the same fix upgrades.mjs made to
+ *     its lamp, and for the same reason).
+ *   - attune_2 was precisely describable and still not nameable: "concentric gold
+ *     and silver rings". The reason was structural, not decorative — the outer
+ *     hoop FLOATED, with a band of bare background between it and the stone, so
+ *     nothing in the tile held anything else and there was no object for the eye
+ *     to land on. It now has thickness (the hoop is drawn a second time offset
+ *     down, so its own edge shows beneath the band), seating (four stone brackets
+ *     clamp it onto the disc, drawn OVER the metal) and material (the inner band
+ *     casts onto the floor of the well; the middle is a domed rivet head, not a
+ *     bloom). The RING's geometry is untouched, so the three still read as one
+ *     escalating line, and the brackets stop well inside the hoop's outer edge so
+ *     the silhouette stays the smooth bullseye that separates it from level 3.
+ *
  * House doctrine (see _draw.mjs): contact shadow, top-lit bodies built with the
  * gradTo argument, one upper-left sheen, INK outlines and never #000. Every
  * subject is wrapped in `withOutline`, the thick warm-dark contour the shipped
@@ -65,8 +84,19 @@ const OUT = path.resolve(import.meta.dirname, '../../../assets/ui/shop');
  *  shipped set uses. `hi` is 0.85 luminance, `deep` is 0.24 — a dark ash row and
  *  a cream parchment row both have something to bite on. */
 const SLATE = { hi: '#EFE9D8', up: '#CFC5AE', mid: '#9E9480', lo: '#6C6455', deep: '#443E34' };
-/** The recess inside the ring: the dark step every bright core is read against. */
-const RECESS = '#2A2430';
+/** The recess inside the ring: the dark step every bright core is read against.
+ *  It is a per-level colour, not one constant, and that is a FIX rather than a
+ *  flourish. A single cold navy well (#2A2430) belonged to neither palette: at
+ *  Kindled it showed as two cold crescents either side of the flame and at
+ *  Attuned as cold wedges between the sigil bars, and a blind review named the
+ *  same artefact in both tiles — "a dark shape that has no read and does not
+ *  follow the disc's circular form ... an unremoved dark backing layer showing
+ *  through". The well is now cut from its own ring's material (warm stone-dark
+ *  under the flame, deep gold inside the gold ring), so whatever the subject
+ *  leaves uncovered reads as the shadowed interior of the ring it is cut into.
+ *  Humming keeps the original navy: its well is almost entirely covered by the
+ *  inner band and the core, it graded clean, and it is the family's cold note. */
+const RECESS = { stone: '#332618', hum: '#2A2430', gold: '#5E3305' };
 const GOLD = { hi: '#FFD469', up: '#FFE9A8', mid: '#F0A81E', lo: '#A96406', deep: '#6E3D06' };
 /** Kindled's flame is deliberately AMBER, not the red-orange a flame usually
  *  wants to be: it ties level 1's light to the gold of levels 2 and 3, and it
@@ -118,14 +148,15 @@ function metalBand(cv, r, th, pal) {
  * `pal` swaps the stone for gold at Attuned; the GEOMETRY never changes, which is
  * what holds the three tiles together as one family.
  */
-function baseRing(cv, pal) {
+function baseRing(cv, pal, recess) {
   roundRect(cv, RING.cx, RING.cy, RING.rOut, RING.rOut, RING.rOut, pal.hi, 1, pal.lo);
   // inner bevel keyline, a few px in from the rim — the shipped gem and trophy
   // both carry one, and it is what stops a flat disc reading as a sticker.
   ringStroke(cv, RING.cx, RING.cy, RING.rOut - 9, 9, pal.deep, 0.42);
-  // the recess: hard dark edge, then the well itself
+  // the recess: a hard rim shadow, then the well itself, both in the ring's own
+  // dark rather than a shared navy (see RECESS above)
   ellipse(cv, RING.cx, RING.cy, RING.rIn + 7, RING.rIn + 7, INK, 0.9, 3);
-  ellipse(cv, RING.cx, RING.cy, RING.rIn, RING.rIn, RECESS, 1, 3);
+  ellipse(cv, RING.cx, RING.cy, RING.rIn, RING.rIn, recess, 1, 3);
   // light from above falls on the FAR (lower) inner wall of a well
   arcStroke(cv, RING.cx, RING.cy, RING.rIn + 4, 10, 0.40, Math.PI - 0.40, pal.up, 0.5);
 }
@@ -141,7 +172,7 @@ export function draw() {
     contactShadow(cv, RING.cx + 5, RING.cy + 122, 108, 20, 0.32);
     ellipse(cv, RING.cx, RING.cy - 26, 118, 132, '#FF8A2A', 0.14, 30);   // heat spill
     withOutline(cv, t => {
-      baseRing(t, SLATE);
+      baseRing(t, SLATE, RECESS.stone);
       // ember bed at the bottom of the well: wide, so the well still reads as a
       // well on either side of the flame rather than being swallowed by it
       ellipse(t, RING.cx, RING.cy + 42, 60, 19, '#5E1E05', 1, 4);
@@ -165,14 +196,38 @@ export function draw() {
     // (290px across against 214) so the two differ in MASS as well as in shape.
     const { cv } = canvas();
     contactShadow(cv, RING.cx + 5, RING.cy + 150, 118, 20, 0.32);
-    ellipse(cv, RING.cx, RING.cy, 168, 168, '#FFA83A', 0.15, 34);
+    ellipse(cv, RING.cx, RING.cy, 168, 168, '#FFF3D2', 0.26, 34);
     withOutline(cv, t => {
-      baseRing(t, SLATE);
-      metalBand(t, 133, 24, GOLD);            // the outer band, clear of the stone
+      baseRing(t, SLATE, RECESS.hum);
+      // The hoop's own EDGE: the same ring laid down once more, offset, so the band
+      // has a thickness to stand on instead of being a circle painted on the tile.
+      ringStroke(t, RING.cx, RING.cy + 9, 133, 24, GOLD.deep, 1);
+      metalBand(t, 133, 24, GOLD);            // the outer hoop
+      // Four brackets clamp the hoop onto the stone, drawn OVER the metal so they
+      // read as holding it down. Without them the hoop floated clear of the disc
+      // with bare background between the two, and a floating ring is a diagram.
+      // They stop short of the hoop's outer edge, so the silhouette stays round,
+      // and they only span the GAP the hoop floats over — from the stone's rim to
+      // the middle of the band. A clip that ran all the way in toward the core
+      // would be a spoke, and a spoked wheel is the silhouette level 3 owns.
+      for (let k = 0; k < 4; k++) {
+        const a = Math.PI / 4 + (k * Math.PI) / 2;
+        const ux = Math.cos(a), uy = Math.sin(a);
+        const x1 = RING.cx + ux * 100, y1 = RING.cy + uy * 100;
+        const x2 = RING.cx + ux * 137, y2 = RING.cy + uy * 137;
+        capsule(t, x1, y1, x2, y2, 40, INK, 0.92);
+        capsule(t, x1, y1, x2, y2, 30, SLATE.up, 1);
+        capsule(t, x1 - 5, y1 - 5, x2 - 5, y2 - 5, 10, SLATE.hi, 0.8);
+      }
+      // the inner band casts onto the floor of the well, which is what puts it
+      // DOWN IN the ring rather than flat on top of it
+      ringStroke(t, RING.cx + 4, RING.cy + 10, 51, 19, INK, 0.42);
       metalBand(t, 51, 19, GOLD);             // the inner band, down in the well
-      ellipse(t, RING.cx, RING.cy, 30, 30, GOLD.lo, 1, 3);      // held core
-      ellipse(t, RING.cx, RING.cy - 1, 24, 24, GOLD.hi, 1, 3);
-      ellipse(t, RING.cx - 2, RING.cy - 3, 13, 13, '#FFF6DC', 1, 3);
+      // the middle is a domed rivet head: ringed, top-lit, hard-edged
+      ellipse(t, RING.cx, RING.cy + 3, 33, 33, INK, 0.92, 3);
+      ellipse(t, RING.cx, RING.cy, 30, 30, GOLD.lo, 1, 3);
+      ellipse(t, RING.cx, RING.cy - 2, 23, 23, GOLD.hi, 1, 3);
+      ellipse(t, RING.cx - 3, RING.cy - 5, 12, 12, '#FFF6DC', 1, 3);
     }, { width: 10 });
     sheen(cv, RING.cx - 92, RING.cy - 92, 26, 16, 0.5);
     sheen(cv, RING.cx - 60, RING.cy - 58, 22, 14, 0.4);
@@ -185,7 +240,10 @@ export function draw() {
     // even at 56dp it can never be confused with the smooth bullseye above it.
     const { cv } = canvas();
     contactShadow(cv, RING.cx + 5, RING.cy + 150, 118, 20, 0.32);
-    ellipse(cv, RING.cx, RING.cy, 176, 176, '#FFC24A', 0.17, 34);
+    // A glow LIGHTENS (see the header). Both stops sit above cream in every
+    // channel; the tighter one keeps the light gathered on the core.
+    ellipse(cv, RING.cx, RING.cy, 176, 176, '#FFF3D2', 0.30, 34);
+    ellipse(cv, RING.cx, RING.cy, 120, 120, '#FFFBEC', 0.30, 26);
     // the six bars, as tapered wedges from just outside the core to past the rim
     const BARS = 6;
     const bar = (k, rA, rB, wA, wB) => {
@@ -199,7 +257,7 @@ export function draw() {
       ];
     };
     withOutline(cv, t => {
-      baseRing(t, GOLD);
+      baseRing(t, GOLD, RECESS.gold);
       for (let k = 0; k < BARS; k++) {
         poly(t, bar(k, 46, 152, 24, 9), INK, 1);
         poly(t, bar(k, 48, 146, 18, 5), '#FFF3D2', 1, GOLD.hi);

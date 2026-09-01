@@ -23,6 +23,12 @@ export const SHOP_ART: { [key: string]: ImageSourcePropType } = {
   theme_sovereign: require('../../../assets/ui/shop/theme_sovereign.png'),
   theme_patron: require('../../../assets/ui/shop/theme_patron.png'),
   theme_eclipse: require('../../../assets/ui/shop/theme_eclipse.png'),
+  // The finish-led themes: these sell a MATERIAL, so each shows a letter tile
+  // rendered in that material rather than just its palette.
+  theme_beeswax: require('../../../assets/ui/shop/theme_beeswax.png'),
+  theme_glasswork: require('../../../assets/ui/shop/theme_glasswork.png'),
+  theme_mothwing: require('../../../assets/ui/shop/theme_mothwing.png'),
+  theme_obsidian: require('../../../assets/ui/shop/theme_obsidian.png'),
 
   // --- Confetti palettes -----------------------------------------------------
   confetti_default: require('../../../assets/ui/shop/confetti_default.png'),
@@ -34,6 +40,14 @@ export const SHOP_ART: { [key: string]: ImageSourcePropType } = {
   confetti_eclipse: require('../../../assets/ui/shop/confetti_eclipse.png'),
   confetti_supporter: require('../../../assets/ui/shop/confetti_supporter.png'),
   confetti_season: require('../../../assets/ui/shop/confetti_season.png'),
+
+  // --- Move sparks -----------------------------------------------------------
+  spark_default: require('../../../assets/ui/shop/spark_default.png'),
+  spark_hearth: require('../../../assets/ui/shop/spark_hearth.png'),
+  spark_pollen: require('../../../assets/ui/shop/spark_pollen.png'),
+  spark_saltgrain: require('../../../assets/ui/shop/spark_saltgrain.png'),
+  spark_thread: require('../../../assets/ui/shop/spark_thread.png'),
+  spark_ash: require('../../../assets/ui/shop/spark_ash.png'),
 
   // --- Room decorations (tier 1) ---------------------------------------------
   upgrade_cozy_den: require('../../../assets/ui/shop/upgrade_cozy_den.png'),
@@ -88,18 +102,9 @@ export const SHOP_ART_PLACEHOLDER_KEY = 'shop_placeholder';
  * its icon still breaks CI.
  */
 export const PENDING_SHOP_ART: readonly string[] = [
-  // The four finish-led tile themes and the whole move-spark category landed
-  // after the shop art run; their materials/bursts preview live meanwhile.
-  'theme_beeswax',
-  'theme_glasswork',
-  'theme_mothwing',
-  'theme_obsidian',
-  'spark_default',
-  'spark_hearth',
-  'spark_pollen',
-  'spark_saltgrain',
-  'spark_thread',
-  'spark_ash',
+  // Every purchasable currently has art. A cosmetic added without a PNG goes
+  // here so the shop keeps rendering its live preview, and shopArt.test.ts
+  // fails the moment that key gains a file, so the list cannot go stale.
 ];
 
 /**
