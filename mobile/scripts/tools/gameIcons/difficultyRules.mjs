@@ -30,22 +30,30 @@
  * brief's 1/12-of-frame floor is 16px at 192; the smallest symbol stroke here
  * is 18px in supersample = 9px at 192).
  *
- * Round two (blind review at 28px): two emblems failed nameability and were
- * redrawn; the vessel and the sprout / flame / crown are the same drawings.
- *   OAK LEAF  round one's eight fine lobes averaged to an egg, and its cream
- *             sat within ~0.13 luminance of the gold wax. Now a SIMPLE
- *             silhouette — three deep round lobes a side (notches >= 1/4 of the
- *             leaf's width) under a pointed tip, a straight stem out of the
- *             bottom — filled with its own two-step value (pale gold over deep
- *             amber, `gradTo`), and ONE dark midrib from stem to tip; a single
- *             vein is the one mark that says "leaf" at 28px.
- *   SWORD     round one's blade was a 2px hairline with a centred guard of the
- *             same stroke: a plus sign, and on red wax a medical / religious
- *             cross. Now the blade is >= 1/6 of the disc wide with a two-value
- *             fuller (lit left, shaded right), the crossguard is a short THICK
- *             bar well below the emblem's centre, under it a DARK wine-brown
- *             grip (two value steps under the blade) and a round pommel, and the
- *             whole sword is canted 8 degrees so it can never be a plus.
+ * Round two (blind review at 28px): the emblems were given their own contour and
+ * the vessel was scaled up. Round three: the same two emblems came back from the
+ * blind judge unnamed at delivery size and were redrawn AGAIN; the vessel, the
+ * ribbon, the palette, the shadow and the sprout / flame / crown are untouched,
+ * because the ladder has to stay one line.
+ *   OAK LEAF  a cream leaf on gold wax is light on light: the emblem sat ~0.06
+ *             luminance from the disc, so the lobes had no value to be cut out
+ *             of and the whole thing averaged to a pale egg at 28px. It is now
+ *             the ONE emblem drawn dark on its wax — burnished bronze, a 0.29
+ *             step at the lit top and 0.52 at the shaded base — with THREE deep
+ *             lobes a side (notch >= 23% of the leaf's width, lobe >= 1/6 of the
+ *             disc), a long thin stalk out past the pressed ring (the cue that
+ *             says "leaf" when the lobes are 2px), one quiet lit midrib rather
+ *             than the old cream bar that turned it into a coffee bean, and a
+ *             12-degree cant so it is never a symmetrical badge.
+ *   SWORD     the failure was proportion, not palette: a narrow blade crossed by
+ *             a long bar at the emblem's own centre is a PLUS by construction,
+ *             and the judge read a cross (and got the blade's direction wrong).
+ *             Rebuilt around three ratios — blade 21% of the disc wide with a
+ *             blunt point and ONE dark fuller, guard only 1.6x the blade wide
+ *             and 0.6x it thick sitting at ~64% of the emblem's HEIGHT, hilt
+ *             half the blade's length ending in a bright brass pommel knob 15%
+ *             of the disc across — so the silhouette is a long light blade over
+ *             a short dark bar, canted 13 degrees off both axes.
  *   VESSEL    the seal spanned 59% x 72% of the frame, under the brief's 65-80%
  *             and this is the smallest-delivered family (28dp), so the shared
  *             geometry is scaled up by `K` = 1.12 about the vessel's own bbox
@@ -334,24 +342,34 @@ function symSprout(t, pal, dx, dy, ink, al) {
   poly(t, leafPts(...P(6, 12), ...P(54, -30), L(42), L(-14)), col, al);
 }
 
-/** Oak leaf relief values: pale gold catching the light over deep amber. */
-const LEAF = { hi: '#FFF1B8', lo: '#D8951E' };
+/**
+ * Oak leaf relief values. This is the ONE emblem drawn dark-on-wax instead of
+ * cream-on-wax, and deliberately: the rule across the family is that the pressed
+ * symbol is the OPPOSITE value to its wax, and gold is the only light wax of the
+ * five. Cream on gold put the whole leaf within ~0.06 luminance of the disc, so
+ * at 28dp the lobes had nothing to be cut out of and it averaged to a pale egg.
+ * Burnished bronze over the gold is a 0.29 step at the leaf's lit top and 0.52
+ * at its shaded base, and the cream midrib gives the inside its own light.
+ */
+const LEAF = { hi: '#B9772F', lo: '#6E3C18', vein: '#DFA452' };
+const LEAF_CANT = (12 * Math.PI) / 180;
 
 function symOakLeaf(t, pal, dx, dy, ink, al) {
-  const P = mapper(dx, dy);
-  // pointed tip, three deep round lobes a side, base pinched to the stem. The
-  // right half is tabled tip-to-base and mirrored; notch x (18/24/16) against a
-  // 54 half-width keeps every notch >= 1/4 of the leaf's width deep.
+  const P = mapper(dx, dy, LEAF_CANT);
+  // A blunt tip and THREE deep round lobes a side, tabled tip-to-base on the
+  // right and mirrored. Against the 108-wide leaf every notch bites 25-32 units
+  // (>= 23% of the width) and every lobe spans 36-42 units of height (>= 1/6 of
+  // the disc), which is the coarsest an oak leaf can be and still be an oak
+  // leaf: any finer and the 6x downscale fills the notches back in.
   const half = [
-    [0, -70], [12, -60], [28, -54], [38, -42], [32, -32], [18, -28],             // lobe 1
-    [34, -20], [50, -12], [54, 2], [48, 14], [34, 20], [22, 18],                 // lobe 2 (widest)
-    [34, 28], [46, 38], [44, 50], [32, 58], [16, 60], [0, 58],                   // lobe 3 into the base
+    [0, -77], [20, -71], [40, -59], [42, -46], [11, -33],                        // lobe 1
+    [40, -26], [60, -11], [58, 7], [24, 13],                                     // lobe 2 (widest)
+    [46, 22], [55, 40], [44, 53], [22, 57], [0, 59],                             // lobe 3 into the base
   ];
   const pts = half.concat(half.slice(1, -1).reverse().map(([px, py]) => [-px, py]));
   poly(t, pts.map(([px, py]) => P(px, py)), ink ?? LEAF.hi, al, ink ? null : LEAF.lo);
-  poly(t, [P(-7, 54), P(7, 54), P(7, 76), P(-7, 76)], ink ?? LEAF.lo, al);       // straight stem
-  capsule(t, ...P(0, 76), ...P(0, 76), L(14), ink ?? LEAF.lo, al);              // stem's round foot
-  if (!ink) capsule(t, ...P(0, -54), ...P(0, 52), L(9), INK, 0.65);             // the one midrib
+  capsule(t, ...P(0, 54), ...P(0, 90), L(13), ink ?? LEAF.lo, al);              // stalk, out past the pressed ring
+  if (!ink) capsule(t, ...P(0, -56), ...P(0, 46), L(9), LEAF.vein, 0.85);       // the one midrib
 }
 
 function symFlame(t, pal, dx, dy, ink, al) {
@@ -365,29 +383,41 @@ function symFlame(t, pal, dx, dy, ink, al) {
   }
 }
 
-/** Sword relief values: blade lit / shaded halves, leather-wrapped grip. */
-const SWORD = { shade: '#C4B7A5', gripHi: '#A96B33', gripLo: '#6A3C1A' };
-const SWORD_CANT = (8 * Math.PI) / 180;
+/**
+ * Sword relief values. The whole failure of the last pass was proportion, not
+ * palette: a narrow blade crossed by a long bar at the emblem's own centre is a
+ * PLUS by construction, and on red wax a blind reviewer read a cross. So the
+ * silhouette is rebuilt around three ratios and nothing else can drift:
+ *   blade 42 wide (21% of the disc) with a blunt 8-unit point, 96 long;
+ *   guard 68 wide (1.6x the blade) and 26 thick (0.62x the blade), centred at
+ *     64% of the emblem's height, i.e. well BELOW centre, so the read is a long
+ *     light blade over a short dark bar rather than two crossed strokes;
+ *   hilt 54 long (blade / hilt = 1.8), ending in a brass pommel knob 30 across
+ *     (15% of the disc) so the bottom terminates in a knob, not a bare end.
+ * Cant 13 degrees so neither axis is ever square to the frame.
+ */
+const SWORD = {
+  shade: '#C4B7A5', fuller: '#8C7E6C',
+  guardHi: '#DDA33C', guardLo: '#8A5518',
+  gripHi: '#6B3E1C', gripLo: '#472612',
+  pommel: '#EFC169', pommelHi: '#FBE6AF',
+};
+const SWORD_CANT = (13 * Math.PI) / 180;
 
 function symSword(t, pal, dx, dy, ink, al) {
   const P = mapper(dx, dy, SWORD_CANT), cream = creamFor(pal);
   const pts = arr => arr.map(([px, py]) => P(px, py));
-  // blade 34 wide (>= 1/6 of the disc) and 90 long, so the point is the thing
-  // the eye lands on; the guard is a short bar THINNER than the blade (24
-  // against 34 — a bar as thick as the blade made the top half a T at 28px)
-  if (ink) {
-    poly(t, pts([[0, -76], [17, -52], [17, 14], [-17, 14], [-17, -52]]), ink, al);
-  } else {
-    // two-value fuller: the left face lit, the right face in shade, split on the
-    // blade's own centre line so the point still reads as a point
-    poly(t, pts([[0, -76], [0, 14], [-17, 14], [-17, -52]]), cream, al);
-    poly(t, pts([[0, -76], [17, -52], [17, 14], [0, 14]]), SWORD.shade, al);
-  }
-  poly(t, pts([[-42, 14], [42, 14], [42, 38], [-42, 38]]), ink ?? cream, al);    // short crossguard, low
-  capsule(t, ...P(-42, 26), ...P(-42, 26), L(24), ink ?? cream, al);              // rounded guard ends
-  capsule(t, ...P(42, 26), ...P(42, 26), L(24), ink ?? cream, al);
-  poly(t, pts([[-10, 37], [10, 37], [10, 53], [-10, 53]]), ink ?? SWORD.gripHi, al, ink ? null : SWORD.gripLo); // wrapped grip
-  capsule(t, ...P(0, 62), ...P(0, 62), L(22), ink ?? cream, al);                  // round pommel
+  const blade = [[-4, -80], [4, -80], [22, -38], [22, 20], [-22, 20], [-22, -38]];
+  const guard = [[-37, 7], [37, 7], [37, 33], [-37, 33]];
+  const grip = [[-11, 30], [11, 30], [11, 52], [-11, 52]];
+  poly(t, pts(blade), ink ?? cream, al, ink ? null : SWORD.shade);               // steel, lit top to shaded base
+  if (!ink) capsule(t, ...P(0, -50), ...P(0, 12), L(9), SWORD.fuller, 0.9);      // the one fuller
+  poly(t, pts(guard), ink ?? SWORD.guardHi, al, ink ? null : SWORD.guardLo);     // short heavy crossguard, low
+  capsule(t, ...P(-37, 20), ...P(-37, 20), L(26), ink ?? SWORD.guardHi, al);    // rounded guard ends
+  capsule(t, ...P(37, 20), ...P(37, 20), L(26), ink ?? SWORD.guardHi, al);
+  poly(t, pts(grip), ink ?? SWORD.gripHi, al, ink ? null : SWORD.gripLo);        // dark wrapped grip
+  ellipse(t, ...P(0, 58), L(15), L(15), ink ?? SWORD.pommel, al, 2);             // brass pommel knob
+  if (!ink) ellipse(t, ...P(-5, 53), L(6), L(6), SWORD.pommelHi, 0.85, 2);
 }
 
 function symCrown(t, pal, dx, dy, ink, al) {

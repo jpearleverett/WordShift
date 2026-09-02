@@ -16,9 +16,10 @@
  *                     -> a post with three stacked arrows, a mound at its foot
  *   earn_stars        three gold stars hung from a sagging string
  *                     -> three stars in a shallow V
- *   no_hints          a brass box lantern, three louvre boards shut, warm light
- *                     at the seams and spilling at its foot -> a peaked cap and
- *                     ring over a banded box on a foot bar
+ *   no_hints          a brass box lantern, three louvre boards shut a full
+ *                     value step darker than its cap, warm light in the seams
+ *                     between them and spilling at its foot -> a peaked cap and
+ *                     ring over a dark-and-bright banded box on a foot bar
  *   challenge_mode    a rolled letter, red ribbon, red wax seal, tails hanging
  *                     -> a diagonal tube with a disc on it
  *   speed_wins        a wooden hourglass grown two feathered wings
@@ -27,13 +28,15 @@
  *                     -> a sack with a spiky crown
  *   visit_animals     a sage stoneware teapot and two cream cups on one wooden
  *                     tray -> an oval board, a round pot, two cups on its foot
- *   streak_days       a thick hemp rope on a lazy S, tied in three round
- *                     overhand knots -> a fat horizontal cord with three lumps
+ *   streak_days       a thick hemp rope on a lazy S, cinched into three round
+ *                     overhand knots, each an X of crossed strands -> a fat
+ *                     cord pinched at three bulges twice its own girth
  *   sacrifice_amber   a stone altar bowl on a foot, gems inside, a low flame
  *                     -> a wide shallow dish over a stem, plume above
- *   tend_amber        a brass watering can tilted to pour, three ribbons of
- *                     water landing on a sprout, all on one mound -> a leaning
- *                     cylinder, a long spout, a pale fall onto two leaves
+ *   tend_amber        a brass watering can tilted to pour, a bail handle
+ *                     strapped to its back, three ribbons of water landing on a
+ *                     sprout, all on one mound -> a leaning cylinder, a long
+ *                     spout, a pale fall onto two sage leaves
  *   variant_wins      three playing cards fanned from one pivot, a glyph on each
  *                     -> a splayed fan of rounded rectangles
  *
@@ -81,7 +84,7 @@ const TILE = {
 };
 const GOLD = { hi: '#FFE07A', base: '#F2BE3A', lo: '#B77A12' };
 /** The lantern's ironwork and shut interior: warm dark browns, never grey. The seam is amber edged with a cream core (inside the silhouette); the escaping glow is lighter than cream in every channel. */
-const LANTERN = { mid: '#B98A3A', under: '#6E4715', inside: '#4A2C18', amber: '#FFC845', seam: '#FFF6C8', glow: '#FFF6C8' };
+const LANTERN = { under: '#6E4715', inside: '#4A2C18', amber: '#FFC845', seam: '#FFF6C8', glow: '#FFF6C8' };
 const LEAF = { hi: '#A6D46A', base: '#6FAF3F', lo: '#3D7A26' };
 const TWINE = { hi: '#F3E6C4', base: '#D8C296', lo: '#A98F5F' };
 const RIBBON = { hi: '#E2564F', lo: '#9A2A25' };
@@ -348,21 +351,24 @@ export function draw() {
   }
 
   { // === no_hints.png — a brass box lantern, three louvres shut, warm light at the seams and spilling at the foot ===
-    // Round 1 drew a tall narrow grey box with five thin bars and the blind
-    // reviewer saw a birdcage; round 2 went brass but squat, with hairline
-    // seams that vanished at 32dp, so it read as a brass box. This one is a
-    // proper box lantern, a little taller than wide: a peaked cap under a fat
-    // carry ring, a foot bar wider than the body, and THREE broad louvre
-    // boards (40px, ~1/10 frame) overlapping downward with a dark underside
-    // step on each. The LIGHT is the subject now: every seam between boards is
-    // a 16px amber band with a cream core (inside the silhouette, so it is
-    // never contoured), and one pale fan of light escapes the bottom seam
-    // onto the ground, drawn OUTSIDE withOutline in a value lighter than cream
-    // in every channel so it lifts either ground instead of smudging it.
+    // Round 1 drew a tall narrow GREY box with five thin bars and the blind
+    // reviewer saw a birdcage; round 2 went brass but let the louvre boards and
+    // the light between them sit at almost the same value, so at 32dp the whole
+    // thing averaged to one uniform gold box and the "shut, but lit inside"
+    // idea vanished. The subject here is the CONTRAST, not the box: the three
+    // louvre boards are now deep brass shading to dark brown (a full value step
+    // below the cap and the foot bar), and the seams between them are 22px
+    // bands — amber edged, cream cored, ~1/17 of the frame — so the silhouette
+    // is dark-bright-dark-bright striping that survives an 8x downscale. One
+    // warm amber wedge escapes the bottom seam onto the ground, drawn OUTSIDE
+    // withOutline (never contoured) in a value lighter than cream parchment in
+    // every channel, so it lifts either ground instead of smudging it, and kept
+    // narrow enough that it reads as spilled light and not as a plinth.
     const { cv } = canvas();
-    contactShadow(cv, c + 10, 342, 124, 14, 0.32);
-    // the escaping light: a fan on the ground under the foot seam, uncontoured
-    poly(cv, [[c - 62, 298], [c + 62, 298], [c + 132, 352], [c - 120, 352]], LANTERN.glow, 0.85);
+    contactShadow(cv, c + 10, 344, 116, 13, 0.32);
+    // the escaping light: a wedge on the ground under the foot seam, uncontoured
+    poly(cv, [[c - 52, 300], [c + 52, 300], [c + 108, 348], [c - 96, 348]], LANTERN.glow, 0.62);
+    poly(cv, [[c - 40, 302], [c + 40, 302], [c + 76, 342], [c - 66, 342]], LANTERN.amber, 0.5);
     withOutline(cv, t => {
       // the carry ring: a thick brass torus, and the collar it hangs from
       arcStroke(t, c, 62, 24, 20, 0, Math.PI * 2, BRASS.lo);
@@ -372,28 +378,28 @@ export function draw() {
       roundRect(t, c, 312, 104, 11, 5, BRASS.hi, 1, BRASS.lo);
       capsule(t, c - 98, 319, c + 98, 319, 7, LANTERN.under, 0.7);
       // the body: a brass box whose inside is shut dark, with two corner posts
-      roundRect(t, c, 222, 90, 82, 10, LANTERN.mid, 1, LANTERN.under);
+      roundRect(t, c, 222, 90, 82, 10, LANTERN.under, 1, LANTERN.inside);
       roundRect(t, c, 222, 82, 76, 6, LANTERN.inside);
       capsule(t, c - 92, 146, c - 92, 296, 10, LANTERN.under);
       capsule(t, c + 92, 146, c + 92, 296, 10, LANTERN.under);
-      // the seams: three warm bands of light, amber edged, cream cored,
-      // laid down BEFORE the boards so each board overlaps the one below
-      for (const y of [186, 242, 296]) {
-        capsule(t, c - 84, y, c + 84, y, 16, LANTERN.amber);
-        capsule(t, c - 82, y - 1, c + 82, y - 1, 8, LANTERN.seam);
+      // the seams: three broad bands of light, amber edged, cream cored, laid
+      // down BEFORE the boards so each board overlaps the one below
+      for (const y of [186, 242, 298]) {
+        capsule(t, c - 86, y, c + 86, y, 22, LANTERN.amber);
+        capsule(t, c - 84, y - 2, c + 84, y - 2, 13, LANTERN.seam);
       }
-      // three broad louvre boards, top-lit brass, a dark underside step each,
-      // overhanging the posts so they read as shutters and not as bands
-      for (const y of [158, 214, 270]) {
-        roundRect(t, c, y, 96, 20, 5, BRASS.hi, 1, LANTERN.mid);
-        capsule(t, c - 92, y + 16, c + 92, y + 16, 9, LANTERN.under, 0.85);
+      // three broad louvre boards, a full value step DARKER than the cap and
+      // the foot bar, each with a dark underside step, overhanging the posts so
+      // they read as shut shutters and not as bands
+      for (const y of [156, 212, 268]) {
+        roundRect(t, c, y, 96, 19, 5, '#C39140', 1, '#5E3B12');
+        capsule(t, c - 92, y + 15, c + 92, y + 15, 8, LANTERN.inside, 0.9);
       }
       // the peaked cap over the body, its eave shading the top board
       poly(t, [[c - 108, 138], [c + 108, 138], [c + 30, 96], [c - 30, 96]], BRASS.hi, 1, BRASS.lo);
       capsule(t, c - 100, 141, c + 100, 141, 10, LANTERN.under, 0.8);
     }, { width: 9 });
     sheen(cv, c - 58, 118, 18, 7, 0.5);
-    sheen(cv, c - 66, 148, 14, 5, 0.4);
     savePNG(path.join(OUT, 'no_hints.png'), W, W, down2(cv, W, W));
   }
   { // === challenge_mode.png — a rolled letter, red ribbon, red wax seal ===
@@ -546,59 +552,79 @@ export function draw() {
 
   { // === streak_days.png — a thick hemp rope on a lazy S, tied in three round overhand knots ===
     // Round 1 was a thin diagonal rod with three flat discs on it and read as
-    // beads on a skewer; round 2 fattened the rope but stretched each knot
-    // ALONG the cord with a strand running diagonally over it, and the three
-    // together read as one twisted cruller at 32dp. Now the rope (46px, ~1/8
-    // frame) lies on a gentle S that never rises past ~20deg, its cut ends
-    // frayed in a darker hemp, and each knot is a near-ROUND bulge (64px,
-    // ~1/6 frame) with its own keyline and ONE dark strand crossing it
-    // steeply, so it is a tied lump on the cord and not a bead or a twist.
+    // beads on a skewer. Round 2 fattened the rope to 46px and sized the knots
+    // at 64px, which is only 1.4x the cord: the free stretches between them
+    // were shorter than the knots themselves, so the three lumps fused into one
+    // sausage and the blind reviewer saw walnuts, not a rope.
+    //
+    // A knot reads as a knot at 32dp on three cues, and all three are drawn
+    // here: (a) PROPORTION — the cord is 30px and each bulge 66px, so a knot is
+    // 2.2x the rope it sits on, with ~28px of bare cord showing in every gap and
+    // a long free run out to each frayed end (the rope is the longest thing on
+    // the canvas, spanning ~78% of the frame); (b) the CINCH — the cord is
+    // pinched to 20px as it enters and leaves each bulge, which no bead
+    // threaded on a rod ever does; (c) the CROSS-OVER — a single strand of rope
+    // runs steeply over the face of each bulge with a dark groove either side
+    // of it, so the lump is visibly tied rather than moulded. The lazy S keeps
+    // the whole thing off the horizontal without ever exceeding ~20 degrees.
     const { cv } = canvas();
-    const N = 40, X0 = 58, X1 = 326;
+    const N = 48, X0 = 48, X1 = 336;
     const rope = [];
     for (let i = 0; i <= N; i++) {
       const x = X0 + ((X1 - X0) * i) / N;
-      rope.push([x, 206 + 16 * Math.sin(((x - X0) / (X1 - X0)) * Math.PI * 2)]);
+      rope.push([x, 200 + 21 * Math.sin(((x - X0) / (X1 - X0)) * Math.PI * 2)]);
     }
     const at = f => rope[Math.round(f * N)];
     const tangent = f => {
       const i = Math.round(f * N), a = rope[Math.max(0, i - 1)], b = rope[Math.min(N, i + 1)];
       return Math.atan2(b[1] - a[1], b[0] - a[0]);
     };
-    const KNOTS = [0.16, 0.5, 0.84];
-    contactShadow(cv, c + 8, 292, 150, 16, 0.28);
+    const KNOTS = [0.2, 0.5, 0.8];
+    // the cord cinches down as it runs into a knot and swells back out after it
+    const girth = f => {
+      let m = 1;
+      for (const k of KNOTS) m = Math.min(m, Math.max(0.68, Math.abs(f - k) / 0.1));
+      return 33 * m;
+    };
+    contactShadow(cv, c + 8, 286, 156, 15, 0.28);
     withOutline(cv, t => {
       // frayed cut ends first: three short darker strands splaying from each end
       for (const [f, dir] of [[0, -1], [1, 1]]) {
         const [x, y] = at(f), a = tangent(f);
-        for (const da of [-0.5, 0, 0.5]) {
-          capsule(t, x, y, x + Math.cos(a + da) * 30 * dir, y + Math.sin(a + da) * 30 * dir, 13, HEMP.fray);
+        for (const da of [-0.55, 0, 0.55]) {
+          capsule(t, x, y, x + Math.cos(a + da) * 26 * dir, y + Math.sin(a + da) * 26 * dir, 11, HEMP.fray);
         }
       }
-      // the rope: a fat tube, lit along its upper edge, shaded along its lower one
-      polyline(t, rope, 46, HEMP.base);
-      polyline(t, rope.map(([x, y]) => [x - 2, y - 11]), 12, HEMP.hi, 0.85);
-      polyline(t, rope.map(([x, y]) => [x + 2, y + 13]), 11, HEMP.lo, 0.7);
-      // the lay of the rope: two broad diagonal bands in each free stretch
-      // between knots, 16px wide (~1/24 frame, well clear of hatching)
-      for (const i of [12, 15, 25, 28]) {
+      // the rope: a pinched tube, lit along its upper edge, shaded along its lower one
+      polyline(t, rope, girth, HEMP.base);
+      polyline(t, rope.map(([x, y]) => [x - 2, y - 7]), f => girth(f) * 0.26, HEMP.hi, 0.85);
+      polyline(t, rope.map(([x, y]) => [x + 2, y + 8]), f => girth(f) * 0.24, HEMP.lo, 0.7);
+      // the lay of the rope: one broad diagonal band in each free stretch
+      for (const i of [17, 31]) {
         const [x, y] = rope[i], a = tangent(i / N), nx = -Math.sin(a), ny = Math.cos(a), tx = Math.cos(a), ty = Math.sin(a);
-        capsule(t, x - nx * 20 + tx * 8, y - ny * 20 + ty * 8, x + nx * 20 - tx * 8, y + ny * 20 - ty * 8, 16, HEMP.lo, 0.35);
+        capsule(t, x - nx * 14 + tx * 6, y - ny * 14 + ty * 6, x + nx * 14 - tx * 6, y + ny * 14 - ty * 6, 12, HEMP.lo, 0.4);
       }
-      // three knots: each a near-round overhand bulge with its own keyline,
-      // a shaded underside, and one strand of rope crossing it steeply
+      // three knots: each an overhand bulge, twice the cord it sits on, made of
+      // TWO strands crossing in an X — one passing under, one riding over — so
+      // the lump is visibly tied rather than moulded or threaded on
       for (const f of KNOTS) {
         const [kx, ky] = at(f), a = tangent(f);
-        poly(t, ovalPts(kx, ky, 40, 38, a), INK, 0.95);
-        poly(t, ovalPts(kx, ky, 32, 30, a), HEMP.hi, 1, HEMP.lo);
-        ellipse(t, kx + 2, ky + 12, 22, 10, HEMP.lo, 0.5, 4);
-        const b = a + 1.1, bx = Math.cos(b) * 30, by = Math.sin(b) * 30;
-        capsule(t, kx - bx, ky - by, kx + bx, ky + by, 20, INK, 0.92);
-        capsule(t, kx - bx, ky - by, kx + bx, ky + by, 11, HEMP.base);
-        capsule(t, kx - bx - 2, ky - by - 3, kx + bx - 2, ky + by - 3, 4, HEMP.hi, 0.8);
+        poly(t, ovalPts(kx, ky, 36, 34, a), INK, 0.9);
+        poly(t, ovalPts(kx, ky, 32, 30, a), HEMP.base, 1, HEMP.lo);
+        ellipse(t, kx + 2, ky + 12, 21, 8, HEMP.lo, 0.5, 4);
+        // the grooves are shallow, not black bars: the strands stay hemp so the
+        // knot reads as woven cord rather than a dark lump wearing a stripe
+        const strand = (da, th, top) => {
+          const b = a + da, ux = Math.cos(b) * 29, uy = Math.sin(b) * 29;
+          capsule(t, kx - ux, ky - uy, kx + ux, ky + uy, th + 7, HEMP.fray, 0.85);
+          capsule(t, kx - ux, ky - uy, kx + ux, ky + uy, th, top ? HEMP.hi : HEMP.base);
+          capsule(t, kx - ux - 2, ky - uy - 3, kx + ux - 2, ky + uy - 3, 4, top ? '#F0DCAE' : HEMP.hi, 0.7);
+        };
+        strand(-0.95, 12, false);   // the strand that passes under
+        strand(1.02, 14, true);     // the strand that rides over it
       }
     }, { width: 9 });
-    sheen(cv, at(0.16)[0] - 12, at(0.16)[1] - 13, 11, 7, 0.5);
+    sheen(cv, at(0.2)[0] - 12, at(0.2)[1] - 13, 10, 7, 0.5);
     savePNG(path.join(OUT, 'streak_days.png'), W, W, down2(cv, W, W));
   }
   { // === sacrifice_amber.png — a stone altar bowl, gems inside, a low flame (dread) ===
@@ -633,74 +659,88 @@ export function draw() {
   }
 
   { // === tend_amber.png — a brass can tilted to pour, three ribbons of water landing on a sprout, all on one mound (serene) ===
-    // Round 1 stood the can upright with an arch handle over the top (a
-    // padlock at 32dp) beside a sprout in its own dish; round 2 tilted it but
-    // kept a stub spout and three drops the size of pixels. Now the can LEANS
-    // 35deg clockwise, its spout runs ~40% of the frame down-right to a flared
-    // rose, the handle is an open loop from the top rim to the back, and the
-    // pour is three FAT ribbons of pale water (24px, ~1/16 frame) drawn inside
-    // the contour so can, water and sprout are ONE silhouette; the sprout's
-    // two fat sage leaves stand on the same mauve mound the can rests on,
-    // under one contact shadow. Palette serene: brass, mauve earth, sage.
+    // Round 1 stood the can upright under a closed arch handle, which is a
+    // padlock shackle at 32dp, and set the sprout in its own dish so there were
+    // two subjects and no anchor. Round 2 tilted the can but hung a near-closed
+    // brass RING off its top (a keyring at 32dp), pointed a stubby spout at a
+    // sprout that had been drawn BEFORE the water, so three fat white ribbons
+    // painted over the leaves and the only green left was a sliver.
+    //
+    // This cut fixes the reading order and the two silhouette traps:
+    //   - the handle is a BAIL, a thick brass strap arcing from the top rim
+    //     back down to the can's own back wall, hugging the body: two visible
+    //     attachment points, no free-standing loop, nothing a shackle would do;
+    //   - the spout is 1/3 of the frame long, angled down-right, and ends in a
+    //     flared ROSE whose disc face is turned toward the ground;
+    //   - the water is drawn UNDER the leaves (three pale-blue ribbons, 18px,
+    //     inside the contour) so the sprout sits in front of its own pour and
+    //     stays green, and the leaves are 1/5 of the frame each;
+    //   - can, pour and sprout all stand on one mauve mound under one contact
+    //     shadow, so the whole thing is a single connected silhouette.
+    // Palette serene: brass body, mauve earth, sage leaves, pale lilac water.
     const { cv } = canvas();
-    const ang = 0.61;                                              // the can's tilt, 35deg clockwise
-    const bx = c - 82, by = 208, hw = 54, hh = 70;                 // the can body
+    const ang = 0.62;                                              // the can's tilt, ~35deg clockwise
+    const bx = c - 100, by = 158, hw = 48, hh = 58;                // the can body
     const ca = Math.cos(ang), sa = Math.sin(ang);
     const P = (lx, ly) => [bx + lx * ca - ly * sa, by + lx * sa + ly * ca];
-    const sx = c + 112;                                            // the sprout's stem
-    const root = P(hw, -44), rose = [c + 104, 224];                // the spout's ends
+    const sx = c + 96;                                             // the sprout's stem
+    const root = P(hw - 4, -26), rose = [c + 56, 196];             // the spout's ends
     const dl = Math.hypot(rose[0] - root[0], rose[1] - root[1]);
     const dx = (rose[0] - root[0]) / dl, dy = (rose[1] - root[1]) / dl, nx = -dy, ny = dx;
-    ellipse(cv, sx, 278, 54, 44, '#FFF4D6', 0.6, 20);              // the sprout's warm halo, uncontoured
-    contactShadow(cv, c + 16, 336, 150, 14, 0.3);
+    const fc = [rose[0] + dx * 18, rose[1] + dy * 18], rot = Math.atan2(ny, nx);
+    ellipse(cv, sx, 276, 64, 48, '#FFF4D6', 0.5, 22);              // the sprout's warm halo, uncontoured
+    contactShadow(cv, c + 14, 350, 148, 13, 0.3);
     withOutline(cv, t => {
       // the mound of earth both pieces stand on
-      poly(t, domePts(c + 20, 324, 150, 36), SERENE.soil, 1, SERENE.soilLo);
-      capsule(t, c - 124, 322, c + 164, 322, 8, SERENE.soilLo, 0.7);
-      // the sprout: one stem, two fat leaves
-      capsule(t, sx, 302, sx, 264, 14, SERENE.stem);
-      leaf(t, sx - 26, 270, 34, 20, -2.55, SERENE.leafHi, SERENE.leafLo);
-      leaf(t, sx + 26, 266, 34, 20, -0.6, SERENE.leafHi, SERENE.leafLo);
-      // three ribbons of water from the rose down onto the leaves: pale, lit
-      // down their left edge, a lilac shade down their right
-      for (const [x0, y0, x1, y1] of [[c + 108, 236, c + 90, 288], [c + 122, 240, c + 112, 296], [c + 136, 234, c + 134, 286]]) {
-        capsule(t, x0, y0, x1, y1, 24, SERENE.water);
-        capsule(t, x0 + 5, y0 + 2, x1 + 5, y1 - 2, 6, SERENE.waterLo, 0.7);
-        capsule(t, x0 - 5, y0 + 4, x1 - 5, y1 - 4, 5, SERENE.waterHi, 0.8);
+      poly(t, domePts(c + 14, 336, 152, 44), SERENE.soil, 1, SERENE.soilLo);
+      capsule(t, c - 132, 334, c + 156, 334, 8, SERENE.soilLo, 0.7);
+      // the sprout's stem, then the pour, then the leaves ON TOP of the pour
+      capsule(t, sx, 320, sx, 278, 17, SERENE.stem);
+      // three separate ribbons: the gaps between them are narrower than the
+      // contour, so withOutline draws a dark seam down each one and the pour
+      // stays three strands instead of averaging into one white sheet
+      for (const [x0, y0, x1, y1] of [[fc[0] - 22, 210, sx - 34, 276], [fc[0] + 2, 214, sx - 2, 290], [fc[0] + 26, 210, sx + 28, 272]]) {
+        capsule(t, x0, y0, x1, y1, 15, '#CFDDF7');
+        capsule(t, x0 - 3, y0 + 4, x1 - 3, y1 - 4, 5, SERENE.waterHi, 0.9);
+        capsule(t, x0 + 4, y0 + 5, x1 + 4, y1 - 5, 4, SERENE.waterLo, 0.75);
       }
-      // the handle: an open loop from the top rim round to the back
-      arcStroke(t, c - 108, 118, 38, 22, 1.88, 0.09 + Math.PI * 2, BRASS.lo);
-      arcStroke(t, c - 110, 116, 38, 8, Math.PI * 1.05, Math.PI * 1.6, BRASS.hi, 0.8);
-      // the spout: a long tapered tube from the can's front to the rose
+      leaf(t, sx - 30, 278, 38, 24, -2.5, SERENE.leafHi, SERENE.leafLo);
+      leaf(t, sx + 30, 272, 38, 24, -0.62, SERENE.leafHi, SERENE.leafLo);
+      capsule(t, sx, 312, sx, 286, 6, SERENE.leafLo, 0.5);
+      // the spout: a long tapered tube from the can's front down to the rose
       poly(t, [
-        [root[0] + nx * 21, root[1] + ny * 21], [rose[0] + nx * 13, rose[1] + ny * 13],
-        [rose[0] - nx * 13, rose[1] - ny * 13], [root[0] - nx * 21, root[1] - ny * 21],
+        [root[0] + nx * 20, root[1] + ny * 20], [rose[0] + nx * 12, rose[1] + ny * 12],
+        [rose[0] - nx * 12, rose[1] - ny * 12], [root[0] - nx * 20, root[1] - ny * 20],
       ], BRASS.hi, 1, BRASS.lo);
-      capsule(t, root[0] + nx * 12, root[1] + ny * 12, rose[0] + nx * 7, rose[1] + ny * 7, 7, '#FFF0C4', 0.55);
-      capsule(t, root[0] - nx * 13, root[1] - ny * 13, rose[0] - nx * 8, rose[1] - ny * 8, 7, '#6E4715', 0.55);
-      // the body over the roots of handle and spout
+      capsule(t, root[0] - nx * 11, root[1] - ny * 11, rose[0] - nx * 6, rose[1] - ny * 6, 7, '#FFF0C4', 0.55);
+      capsule(t, root[0] + nx * 12, root[1] + ny * 12, rose[0] + nx * 7, rose[1] + ny * 7, 7, '#6E4715', 0.55);
+      // the rose: a flare at the spout's end and a wide disc face, dark centred
+      poly(t, [
+        [rose[0] + nx * 12, rose[1] + ny * 12], [fc[0] + nx * 28, fc[1] + ny * 28],
+        [fc[0] - nx * 28, fc[1] - ny * 28], [rose[0] - nx * 12, rose[1] - ny * 12],
+      ], BRASS.hi, 1, BRASS.lo);
+      poly(t, ovalPts(fc[0], fc[1], 32, 14, rot), INK, 0.95);
+      poly(t, ovalPts(fc[0], fc[1], 28, 11, rot), BRASS.hi, 1, BRASS.lo);
+      poly(t, ovalPts(fc[0] + 1, fc[1] + 2, 20, 6, rot), '#6E4715', 0.85);
+      // the bail handle: a thick brass strap from the top rim arcing back and
+      // down onto the can's own back wall — attached at both ends, never a ring
+      const hA = P(-hw + 8, -hh + 4), hB = P(-hw + 4, 22);
+      const bail = quadPts(hA, [hA[0] - 66, hA[1] + 6], hB, 20);
+      polyline(t, bail, 20, BRASS.lo);
+      polyline(t, bail.map(([x, y]) => [x + 3, y - 4]), 7, BRASS.hi, 0.8);
+      // the body over the roots of bail and spout
       poly(t, roundRectPts(bx, by, hw, hh, 14, ang), BRASS.hi, 1, BRASS.lo);
       const bl0 = P(-hw + 7, -hh + 12), bl1 = P(-hw + 7, hh - 12), fr0 = P(hw - 6, -hh + 12), fr1 = P(hw - 6, hh - 12);
       capsule(t, bl0[0], bl0[1], bl1[0], bl1[1], 10, '#FFF0C4', 0.5);       // lit back edge
       capsule(t, fr0[0], fr0[1], fr1[0], fr1[1], 9, '#6E4715', 0.5);        // shaded front edge
       // the rim: an oval opening on the tilted top, lilac water inside
       const [rx, ry] = P(0, -hh + 2);
-      poly(t, ovalPts(rx, ry, hw, 16, ang), INK, 0.6);
-      poly(t, ovalPts(rx, ry, hw - 4, 13, ang), '#6E4715');
-      poly(t, ovalPts(rx + 2, ry + 1, hw - 12, 9, ang), SERENE.water);
-      // the rose: a flare at the spout's end and a wide disc face, dark centred
-      const fc = [rose[0] + dx * 16, rose[1] + dy * 16], rot = Math.atan2(ny, nx);
-      poly(t, [
-        [rose[0] + nx * 13, rose[1] + ny * 13], [fc[0] + nx * 27, fc[1] + ny * 27],
-        [fc[0] - nx * 27, fc[1] - ny * 27], [rose[0] - nx * 13, rose[1] - ny * 13],
-      ], BRASS.hi, 1, BRASS.lo);
-      poly(t, ovalPts(fc[0], fc[1], 31, 14, rot), INK, 0.95);
-      poly(t, ovalPts(fc[0], fc[1], 27, 11, rot), BRASS.hi, 1, BRASS.lo);
-      poly(t, ovalPts(fc[0] + 1, fc[1] + 1, 19, 6, rot), '#6E4715', 0.85);
+      poly(t, ovalPts(rx, ry, hw, 15, ang), INK, 0.6);
+      poly(t, ovalPts(rx, ry, hw - 4, 12, ang), '#6E4715');
+      poly(t, ovalPts(rx + 2, ry + 1, hw - 12, 8, ang), SERENE.water);
     }, { width: 9 });
     const sh = P(-hw * 0.45, -hh * 0.5);
-    sheen(cv, sh[0], sh[1], 12, 20, 0.5);
-    sheen(cv, c - 122, 96, 6, 9, 0.4);
+    sheen(cv, sh[0], sh[1], 12, 18, 0.5);
     savePNG(path.join(OUT, 'tend_amber.png'), W, W, down2(cv, W, W));
   }
   { // === variant_wins.png — three playing cards fanned from one pivot, a glyph on each ===

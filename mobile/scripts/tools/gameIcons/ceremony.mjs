@@ -48,6 +48,51 @@
  *                         ground inside it, never contoured. Mauve and wine,
  *                         the faintest bloom.
  *
+ * EIGHTH PASS, after the arbiter's review of the seventh (row 2 passed again
+ * and is untouched to the byte; rows 1 and 3 failed on COMPOSITION and PALETTE,
+ * not on craft — the arbiter's note was "the correct move is subtraction"):
+ *   - Row 1's two moths were five smooth rounded lobes strung along a single
+ *     connecting axis THROUGH the lantern, so the blind reviewer named the pair
+ *     a leafy twig crossing the glass, and the cluster sat over the brightest
+ *     pane. Everything that made them a branch is deleted: there is no longer
+ *     any element between the two moths, and both are moved fully clear of the
+ *     lantern into the air — one upper-right past the cap's corner, one
+ *     lower-left — so the vessel's silhouette is unbroken and the flame is
+ *     unoccluded. The moth itself is redrawn on the SAME anatomy as the shipped
+ *     `spots/empty_gallery.png` moth (chromeSpots.mjs `pinnedMoth`): head up,
+ *     forewings swept up and out with one dark BAND across each, rounded
+ *     hindwings below, a fat dark body, a round head and two short antennae.
+ *     Borrowing the family's own moth was the fix — four fresh silhouettes were
+ *     tried first (rounded lobes, a delta, a butterfly, a long-abdomen insect)
+ *     and every one averaged into a blossom or a bow at 48px. It is scaled to
+ *     ~1/4 of the frame and repalletted from the gallery's ochre into pale
+ *     cream-to-ochre wings, clearly LIGHTER than the brass frame, as asked.
+ *     Crucially the moths take their OWN thinner contour pass (MOTH_RING_W 13,
+ *     not the emblem's 22): the family ring is ~2.3% of the frame, which is
+ *     right for a 700px vessel and nearly a tenth of a 260px moth, and at full
+ *     weight it swallowed the wings. Lantern, glass, flame, bars, foot and all
+ *     five halos are untouched to the pixel.
+ *   - Row 3 is REBUILT, not patched. It had three competing subjects and no
+ *     anchor: a tree, a solid contoured crimson slab that read as a bench, and
+ *     a house that collapsed to a speck at 32dp and duplicated the shipped
+ *     red-roof home mark. Both the house and the crimson slab are DELETED. What
+ *     is left is two elements and one anchor: a large bare TREE (~66% of the
+ *     frame tall, a long tapered trunk with six limbs leaving it at six
+ *     different heights — all six radiating from one fork was what made the
+ *     previous crown read as a splayed hand) standing on a low wide ellipse of
+ *     WARM dusk ground (the cool lavender/plum is gone; the ground is warm
+ *     brown grading to wine, the WOOD range the rest of the family lives in),
+ *     and ONE long cast SHADOW leaving the trunk's foot toward the lower right.
+ *     The shadow's lower edge is the ground's own front rim and its upper edge
+ *     is one straight diagonal, so it narrows as the ground recedes and takes
+ *     the whole lower-right of the mound instead of a stripe that vanished at
+ *     48px; three nested lengths give it a density falloff as well (~0.68
+ *     cumulative at the trunk, 0.44 at the tip). It is laid on the already
+ *     opaque ground inside the contour pass, so it is a tone ON the ground and
+ *     is never outlined. The crimson horizon survives only as LIGHT: a low rose
+ *     glow behind the trunk, drawn outside the contour in stops above cream, so
+ *     the dread note lands without a second nameable object.
+ *
  * SEVENTH PASS, after the arbiter's review of the sixth (row 2 passed again
  * and is untouched to the byte; rows 1 and 3 failed on SUBJECT legibility):
  *   - Row 1's dust-brown leaf-oval moths were read as a sprig of dead leaves
@@ -228,6 +273,8 @@ const c = 512;
 /** Contour width for the 1024 supersample: the same ~2.3% of frame the 192px
  *  set uses (9 in a 384 space), so the three read with the kit's line weight. */
 const RING_W = 22;
+/** The moths' own, thinner contour. See the note in ceremony_curious. */
+const MOTH_RING_W = 13;
 
 // --- local palettes ---------------------------------------------------------
 /** Warm-white blooms. Every stop sits above cream (#F3E2BF) in all three
@@ -243,34 +290,41 @@ const GLASS = { hi: '#FFE9A9', lo: '#EE8E24', heart: '#FFF3C8' };
 const FIRE = { out: '#FF8A1E', mid: '#FFD25A', core: '#FFF8E0' };
 const WAX = { hi: '#FCF2DC', lo: '#D8C199', drip: '#FFF8E8', shade: '#C9B08A' };
 const NIGHT = { hi: '#2B2752', lo: '#0F0D1C', warm: '#E88A2A', warmer: '#FFC060' };
-/** Moth wings: pale parchment at the top edge (~0.94 luminance) grading to
- *  tan (~0.65) at the bottom, so the lower half is a full step under cream
- *  and the top a full step over ash and the brass. The wing nearest the
- *  lantern uses the warm pair, a shade more amber, as if lit by the flame.
- *  The hindwing lobe is a step darker than the forewing it sits under. The
- *  body is a dark warm brown with a lighter belly, never black. */
+/** Moth wings: a pale warm cream at the top edge grading to ochre at the
+ *  bottom, with a darker ochre hindwing under each forewing and one dark BAND
+ *  laid across each forewing — the band is the structure that stops a pale wing
+ *  averaging into a petal at delivery size. Every stop sits in the AMB/PARCH
+ *  range and clearly ABOVE the brass frame in value, so the moths are never
+ *  mistaken for part of the lantern, and the ochre lower halves are a full step
+ *  under cream. The wing nearest the lantern takes the warm pair, a shade more
+ *  amber, as if lit by it. The body is a dark warm brown, never black. */
 const MOTH = {
-  wingHi: '#FBF0D9', wingLo: '#C9A06C', warmHi: '#FFE9B4', warmLo: '#D89C56',
-  hindHi: '#E8CFA2', hindLo: '#A8804E', hindWarmHi: '#F6D68F', hindWarmLo: '#BE8644',
-  body: '#4E3220', belly: '#8A6238', head: '#3E2818',
+  hi: '#FCF1D8', lo: '#D3AC70', warmHi: '#FFEDC4', warmLo: '#DFA85E',
+  hindHi: '#E9D0A2', hindLo: '#A98450', band: '#6E4E24', body: '#4A3320', belly: '#8A6238',
 };
 /** The amber ring of the halo, just outside the glass: an amber-white that
  *  sits above cream (#F3E2BF) in every channel, so on the near-black ceremony
  *  ground it is the lantern's light and on parchment it is nothing. */
 const AMBER_HALO = '#FFEEC6';
-/** The crimson horizon: a LINE along the ground's back rim, with a brighter
- *  core, and the catch of it on the far house's roof. */
-const DUSK = { line: '#C83E56', core: '#EA5E78', glow: '#FFE4DE' };
-/** Ground: a mid dusk mauve, top-lit (~0.56 down to ~0.38 luminance; ash is
- *  ~0.18), light enough that a hard INK shadow at 0.7 sits >= 0.2 under it. */
-const GROUND = { hi: '#A088B4', lo: '#6E5686' };
-const BARK = { crownHi: '#B08A6C', hi: '#9C7458', lo: '#4E3226', rim: '#C49E7E' };
-/** The far house: indigo walls (~0.34 at the eave to ~0.22 at the foot, a
- *  step under the mauve ground they stand on and inside the INK contour)
- *  under a darker roof, one warm window. */
-const HOUSE = { wallHi: '#6A5AA4', wallLo: '#46387A', roofHi: '#4E3E6E', roofLo: '#2E2248', winHi: '#FFD36A', winLo: '#FFA030', winGlow: '#FFF2CE' };
-/** The cast shadow's strength: INK at this alpha, hard-edged, on the ground. */
-const SHADOW_ALPHA = 0.7;
+/** The crimson horizon survives only as LIGHT: a low rose afterglow behind the
+ *  trunk. Both stops sit above cream (#F3E2BF) in every channel, so on the
+ *  parchment review ground they can only lighten and on the near-black
+ *  cinematic ground they are a red dusk sky. No slab, no contoured bar. */
+const DUSK = { glow: '#FFE4DE', warm: '#FFEEDF' };
+/** The dusk ground: WARM brown grading to wine (the WOOD/ACCENT range the rest
+ *  of the family lives in, never the cool lavender that broke the set). The top
+ *  is ~0.59 luminance and the foot ~0.39, both a clear step over ash (~0.18),
+ *  and light enough that a stacked INK shadow reads as a shadow on it. */
+const GROUND = { hi: '#C48E5E', lo: '#8C5A46' };
+/** The bare tree: a lit tan at the crown falling to a near-ink at the roots, so
+ *  the trunk is a full step off the ground it stands on (there is no contour
+ *  between them) and the crown is a full step off ash. */
+const BARK = { crownHi: '#C09A78', hi: '#AE8663', lo: '#43291E', rim: '#D6B08C' };
+/** The cast shadow: three nested INK polys, longest and faintest first, so the
+ *  shape thins in DENSITY as well as in width (~0.55 cumulative at the trunk's
+ *  foot falling to 0.30 at the tip). Laid on the already-opaque ground inside
+ *  the contour pass, so it is a tone on the ground and is never outlined. */
+const SHADOW_LAYERS = 0.44;
 
 // --- local helpers ----------------------------------------------------------
 /** Contact shadow, scaled for the 1024 space. */
@@ -395,81 +449,56 @@ function bentFlame(cv, bx, by, tx, ty, layers, n = 22) {
     poly(cv, L.concat(R.reverse()), color, 1);
   }
 }
-/** Closed Catmull-Rom spline through `pts`, `sub` samples per span: a hand-
- *  drawn rounded outline from a handful of control points. The moth's wings. */
-function smoothClosed(pts, sub = 6) {
-  const n = pts.length, out = [];
-  for (let i = 0; i < n; i++) {
-    const p0 = pts[(i - 1 + n) % n], p1 = pts[i], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
-    for (let k = 0; k < sub; k++) {
-      const t = k / sub, t2 = t * t, t3 = t2 * t;
-      out.push([
-        0.5 * (2 * p1[0] + (-p0[0] + p2[0]) * t + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2 + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3),
-        0.5 * (2 * p1[1] + (-p0[1] + p2[1]) * t + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3),
-      ]);
-    }
-  }
-  return out;
-}
 /**
- * ONE moth seen from ABOVE (head at local -y, wings spread to +-x), rotated by
- * `ang` and scaled by `s`. Built for an 8x downscale: per side a broad
- * rounded-triangle FOREWING (root at the body, apex ~104*s out and a little
- * forward, a scalloped trailing edge) laid over a small HINDWING lobe; a FAT
- * fuzzy body bar clearly visible between the wing roots (dark warm brown with
- * a lighter belly stripe), a round head, and two thin CURVED antennae (9*s
- * core on a 21*s ink underlay) sweeping out and away. Wingspan ~208*s, about
- * 1/5 of the frame. No eye-spots, no veins. Every part lays a grown INK
- * underlay first so the moth keeps its shape where it lies over brass or the
- * halo. `warmSide` (+1 or -1) names the wing nearest the lantern, which takes
- * the amber pair. `mothPoint` exposes the transform for the sheen.
+ * ONE moth, drawn on the SAME anatomy as the shipped `spots/empty_gallery.png`
+ * moth (chromeSpots.mjs `pinnedMoth`) so the two are one hand and this emblem
+ * borrows a silhouette that has already survived a blind review: head up, wings
+ * spread symmetrical like a specimen — two forewings swept up and out with one
+ * dark BAND across each, two rounded hindwings below, a fat dark body, a round
+ * head and two short antennae. Every part lays its own grown INK keyline (a
+ * moth built from bare fills loses its wing contours), which is also the "thin
+ * contour" the arbiter asked for on each wing. `s` scales it: at s = 1.6 the
+ * wingspan is ~237px on the 1024 supersample, about 1/4.3 of the frame. `ang`
+ * is a SMALL tilt only — a hard rotation is the first thing an 8x downscale
+ * destroys. `warmSide` (+1 or -1) names the wing nearest the lantern, which
+ * takes the amber pair; `mothPoint` exposes the transform for the sheen.
  */
-const FORE = [[12, -34], [46, -56], [82, -62], [106, -50], [100, -20], [86, 4], [66, 2], [48, 18], [26, 22], [12, 12]];
-const HIND = [[14, 22], [46, 20], [80, 34], [76, 62], [46, 74], [14, 58]];
-const wingPts = (pts, sgn) => smoothClosed(pts.map(([x, y]) => [x * sgn, y]), 6);
+const FORE = [[4, -12], [22, -40], [56, -50], [74, -34], [66, -6], [30, 4]];
+const HIND = [[6, 2], [32, 4], [60, 20], [52, 46], [24, 52], [6, 36]];
+const BAND = [[8, -18], [58, -46], [66, -32], [18, -4]];
 function mothPoint(mx, my, ang, s, [lx, ly]) {
   const ca = Math.cos(ang), sa = Math.sin(ang);
   return [mx + (lx * ca - ly * sa) * s, my + (lx * sa + ly * ca) * s];
 }
-/** Antenna: a quadratic from the head out to the tip, as 4 capsule segments. */
-function antennaPts(sgn) {
-  const a = [sgn * 5, -58], m = [sgn * 26, -96], b = [sgn * 50, -104], out = [];
-  for (let i = 0; i <= 4; i++) {
-    const u = i / 4;
-    out.push([(1 - u) * (1 - u) * a[0] + 2 * (1 - u) * u * m[0] + u * u * b[0], (1 - u) * (1 - u) * a[1] + 2 * (1 - u) * u * m[1] + u * u * b[1]]);
-  }
-  return out;
-}
 function moth(t, mx, my, ang, s, warmSide) {
   const P = p => mothPoint(mx, my, ang, s, p);
-  const G = 11 * s;
-  const fore = { [-1]: wingPts(FORE, -1).map(P), [1]: wingPts(FORE, 1).map(P) };
-  const hind = { [-1]: wingPts(HIND, -1).map(P), [1]: wingPts(HIND, 1).map(P) };
-  for (const sgn of [-1, 1]) {                            // ink underlays first
-    poly(t, grow(hind[sgn], G), INK, 0.95);
-    poly(t, grow(fore[sgn], G), INK, 0.95);
-    for (const [[x1, y1], [x2, y2]] of antennaPts(sgn).slice(1).map((p, i) => [antennaPts(sgn)[i], p]).map(([a, b]) => [P(a), P(b)]))
-      capsule(t, x1, y1, x2, y2, 21 * s, INK, 0.95);
+  const side = (pts, sgn) => pts.map(([x, y]) => P([x * sgn, y]));
+  const G = 8 * s;
+  for (const sgn of [-1, 1]) {                       // hindwings first
+    const w = side(HIND, sgn);
+    poly(t, grow(w, G), INK, 0.95);
+    poly(t, w, MOTH.hindHi, 1, MOTH.hindLo);
   }
-  const [b0x, b0y] = P([0, -40]), [b1x, b1y] = P([0, 56]);
-  capsule(t, b0x, b0y, b1x, b1y, 54 * s, INK, 0.95);
-  const [hx, hy] = P([0, -52]);
-  ellipse(t, hx, hy, 27 * s, 26 * s, INK, 0.95, 2);
-  for (const sgn of [-1, 1]) {                            // hindwing, then forewing over it
+  for (const sgn of [-1, 1]) {                       // forewings, each with its band
     const warm = sgn === warmSide;
-    poly(t, hind[sgn], warm ? MOTH.hindWarmHi : MOTH.hindHi, 1, warm ? MOTH.hindWarmLo : MOTH.hindLo);
-    poly(t, fore[sgn], warm ? MOTH.warmHi : MOTH.wingHi, 1, warm ? MOTH.warmLo : MOTH.wingLo);
+    const w = side(FORE, sgn);
+    poly(t, grow(w, G), INK, 0.95);
+    poly(t, w, warm ? MOTH.warmHi : MOTH.hi, 1, warm ? MOTH.warmLo : MOTH.lo);
+    poly(t, side(BAND, sgn), MOTH.band, 0.85);
   }
-  capsule(t, b0x, b0y, b1x, b1y, 38 * s, MOTH.body, 1);   // the fat fuzzy body between the wings
-  const [f0x, f0y] = P([-5, -30]), [f1x, f1y] = P([-5, 46]);
-  capsule(t, f0x, f0y, f1x, f1y, 11 * s, MOTH.belly, 0.85);
-  const [t0x, t0y] = P([0, -18]);
-  ellipse(t, t0x, t0y, 22 * s, 16 * s, MOTH.belly, 0.45, 8);   // thorax fuzz
-  ellipse(t, hx, hy, 18 * s, 17 * s, MOTH.head, 1, 2);
-  for (const sgn of [-1, 1]) {                            // the curved antennae
-    const pts = antennaPts(sgn).map(P);
-    for (let i = 1; i < pts.length; i++) capsule(t, pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1], 9 * s, MOTH.body, 1);
+  for (const sgn of [-1, 1]) {                       // two short antennae
+    const a0 = P([4 * sgn, -38]), a1 = P([24 * sgn, -68]);
+    capsule(t, a0[0], a0[1], a1[0], a1[1], 15 * s, INK, 0.95);
+    capsule(t, a0[0], a0[1], a1[0], a1[1], 8 * s, MOTH.body);
   }
+  const bT = P([0, -28]), bB = P([0, 42]);           // the fat dark body
+  capsule(t, bT[0], bT[1], bB[0], bB[1], 32 * s, INK, 0.95);
+  capsule(t, bT[0], bT[1], bB[0], bB[1], 22 * s, MOTH.body);
+  const sT = P([-4, -20]), sB = P([-4, 30]);
+  capsule(t, sT[0], sT[1], sB[0], sB[1], 7 * s, MOTH.belly, 0.8);
+  const hd = P([0, -38]);
+  ellipse(t, hd[0], hd[1], 18 * s, 18 * s, INK, 0.95, 2);
+  ellipse(t, hd[0], hd[1], 13 * s, 13 * s, MOTH.body, 1, 2);
 }
 
 export function draw() {
@@ -477,14 +506,13 @@ export function draw() {
 
   { // === ceremony_curious.png — the lit lantern and its two moths ===========
     // A standing hand lantern: ring, finial, peaked brass cap, amber glass with
-    // a candle flame, two dark corner bars, a brass foot. The two moths CIRCLE
-    // it: the upper one outside the lantern to the upper-right, heading left
-    // with its head at the cap's corner; the lower one outside the glass to
-    // the lower-left, heading up-right with one wingtip on the left rail. Both
-    // touch the lantern, so the outline pass draws one contour round all
-    // three; neither crosses the glass, so the flame is unoccluded. The halo
-    // is four stacked flat discs of warm white plus an amber-white ring just
-    // outside the glass, the lantern's light they have come to.
+    // a candle flame, two dark corner bars, a brass foot. The lantern is the
+    // anchor and nothing is drawn across it. Two moths circle it in the AIR —
+    // one upper-right, one lower-left, each a detached shape floating in the
+    // halo, drawn on the shipped gallery moth's anatomy and repalletted pale
+    // cream-to-ochre so they separate from the brass. The halo is four stacked
+    // flat discs of warm white plus an amber-white ring just outside the glass,
+    // the lantern's light they have come to.
     const cv = C(S, S);
     halo(cv, c, 545, 460, 460, HALO[0], 0.12);
     halo(cv, c, 548, 360, 360, HALO[1], 0.14);
@@ -520,20 +548,28 @@ export function draw() {
       roundRect(t, c, 776, 176, 16, 6, BRASS.hi, 1, BRASS.lo);
       roundRect(t, c, 812, 120, 22, 8, BRASS.lo, 1, '#6E4A1E');
       roundRect(t, c, 848, 170, 20, 8, BRASS.hi, 1, BRASS.lo);
-      // the two moths circling the light: upper-right, heading left so the
-      // head touches only the cap's corner (its lower wing is the lit one);
-      // lower-left, heading up-right, one wingtip on the left rail (its
-      // right wing is the lit one). Body axes ~90 degrees apart.
-      moth(t, 764, 300, -1.95, 1.05, -1);
-      moth(t, 262, 634, 0.6, 1.0, 1);
     }, { width: RING_W });
+    // The two moths CIRCLING the light, both in the AIR and both fully clear of
+    // the lantern: one upper-right past the cap's corner, one lower-left. They
+    // take their OWN contour pass at MOTH_RING_W rather than riding the
+    // lantern's: the emblem's 22px ring is ~2.3% of the frame, which is right
+    // for a 700px vessel and nearly a tenth of a 260px moth — at the family
+    // weight the ring plus each wing's keyline swallowed the pale wings and the
+    // pair averaged into two lumps. A thinner ring on a bigger moth is what
+    // lets the wing shape, the dark band and the antennae survive 48px. Each
+    // moth also stands more than both contour widths clear of the lantern, so
+    // nothing bridges a moth to the vessel and nothing crosses the bright pane.
+    withOutline(cv, t => {
+      moth(t, 840, 220, -0.30, 1.75, -1);
+      moth(t, 162, 706, 0.26, 1.75, 1);
+    }, { width: MOTH_RING_W });
     sheen(cv, c - 100, 268, 40, 12, 0.4);
     sheen(cv, c - 92, 380, 22, 60, 0.45);
-    { // one sheen on the canvas-upper-left wing of each moth
-      const [ax, ay] = mothPoint(764, 300, -1.95, 1.05, [-70, -34]);
-      sheen(cv, ax, ay, 16, 10, 0.45);
-      const [bx, by] = mothPoint(262, 634, 0.6, 1.0, [-70, -34]);
-      sheen(cv, bx, by, 16, 10, 0.45);
+    { // one sheen on the canvas-upper wing of each moth
+      const [ax, ay] = mothPoint(840, 220, -0.30, 1.75, [-40, -36]);
+      sheen(cv, ax, ay, 24, 13, 0.4);
+      const [bx, by] = mothPoint(162, 706, 0.26, 1.75, [-40, -36]);
+      sheen(cv, bx, by, 24, 13, 0.4);
     }
     savePNG(path.join(OUT, 'ceremony_curious.png'), 512, 512, down2Straight(cv, 512, 512));
   }
@@ -585,101 +621,88 @@ export function draw() {
     savePNG(path.join(OUT, 'ceremony_deeper.png'), 512, 512, down2(cv, 512, 512));
   }
 
-  { // === ceremony_shadows.png — a dead tree throwing a long shadow ==========
-    // ONE grounded silhouette, centred: a low wide ELLIPSE of mauve dusk
-    // ground (840 x 352: x 92..932, y 548..900, centre 724) with the tree
-    // standing forward on its left half and a SMALL house two-thirds of the
-    // way back on its right. A thin crimson LINE runs along the ground's back
-    // rim from the left shoulder to just behind the house, never a slab. The
-    // cast shadow is the subject's second element: ONE hard-edged INK wedge
-    // at 0.7 laid on the ground from the trunk's foot, at trunk width,
-    // fanning right across the ground to ~1/4 of the frame tall where its far
-    // edge meets the house's foundation. It is painted on the opaque ground
-    // before the tree and house, so the contour pass never sees it as an
-    // edge — a shadow is never outlined. The tree is a tapered trunk (144px
-    // at the base) with three limbs that each fork once and one low limb;
-    // every stick is >= 40px wide at its tip (>= 2px at 48px) and every tip
-    // gap >= 100px. The afterglow behind the crown and the rose glow above
-    // the horizon are drawn first, outside the contour, in stops above cream;
-    // the window's warm glow is laid over the contour last.
+  { // === ceremony_shadows.png — a bare tree throwing one long shadow =======
+    // TWO elements, ONE anchor. The anchor is a large centred bare TREE, ~66%
+    // of the frame tall, five chunky forks and one low limb, standing on a low
+    // wide ellipse of WARM dusk ground (brown grading to wine — the family's
+    // wood range, never the cool plum that broke the set). The second element
+    // is its cast SHADOW: one long tapered shape leaving the trunk's foot
+    // toward the lower-right and thinning in width and density as it goes, so
+    // it reaches toward something outside the frame. There is no house and no
+    // crimson bar; the dread note is carried purely as LIGHT, a low rose
+    // afterglow behind the trunk drawn outside the contour in stops above
+    // cream. The shadow is laid on the already-opaque ground inside the
+    // contour pass, so it is a tone on the ground and is never outlined.
     const cv = C(S, S);
-    const GX = 512, GY = 724, GRX = 420, GRY = 176;
-    const GROUND_HW = superHW(GX, GY, GRX, GRY, 2);       // a plain ellipse
-    const DY = 26;                                         // the tree's shift down onto the ground
-    /** The tree's sticks (x1, y1, x2, y2, rootWidth, tipWidth): three main
-     *  limbs that each fork once, one low limb that bends once. */
+    const GX = 512, GY = 792, GRX = 450, GRY = 128;
+    const groundHH = x => Math.max(0, GRY * Math.sqrt(Math.max(0, 1 - ((x - GX) / GRX) ** 2)));
+    const GROUND_HW = superHW(GX, GY, GRX, GRY, 2);       // a plain low ellipse
+    /** The tree: a LONG tapered trunk with six limbs leaving it at six
+     *  DIFFERENT heights and six different angles (all six radiating from one
+     *  fork made a splayed hand, which is what the previous pass drew), the
+     *  lowest pair long and drooping, the top pair a fork at the crown. Every
+     *  stick is >= 32px at its tip (>= 1.5px at the 48px review size) and no
+     *  two tips are closer than ~130px, so the crown stays open at delivery. */
     const LIMBS = [
-      [316, 512, 210, 350, 80, 52], [354, 482, 368, 270, 82, 54], [388, 516, 518, 350, 78, 52],
-      [402, 606, 542, 546, 66, 44],
-    ].map(([x1, y1, x2, y2, w1, w2]) => [x1, y1 + DY, x2, y2 + DY, w1, w2]);
-    const TWIGS = [
-      [210, 350, 144, 268, 52, 40], [210, 350, 226, 214, 52, 40],
-      [368, 270, 320, 168, 54, 40], [368, 270, 440, 174, 54, 40],
-      [518, 350, 582, 244, 52, 40], [518, 350, 626, 336, 52, 40],
-      [542, 546, 622, 500, 44, 40],
-    ].map(([x1, y1, x2, y2, w1, w2]) => [x1, y1 + DY, x2, y2 + DY, w1, w2]);
-    halo(cv, 370, 430 + DY, 380, 330, AFTERGLOW.high, 0.12);
-    halo(cv, 380, 490 + DY, 290, 250, AFTERGLOW.mid, 0.14);
-    halo(cv, 512, 556, 400, 96, DUSK.glow, 0.32);                       // the rose horizon glow
-    bloom(cv, 512, 470, 380, 150, AFTERGLOW.low, 0.16);
-    shadow(cv, c + 18, 908, 380, 26, 0.3);
+      [350, 608, 182, 448, 70, 40],
+      [430, 548, 604, 424, 66, 38],
+      [364, 438, 222, 296, 58, 36],
+      [424, 392, 570, 262, 56, 34],
+      [390, 322, 292, 152, 50, 32],
+      [408, 322, 478, 142, 50, 32],
+    ];
+    halo(cv, 430, 430, 400, 340, AFTERGLOW.high, 0.13);   // the pale evening sky
+    halo(cv, 470, 560, 330, 250, AFTERGLOW.mid, 0.13);
+    halo(cv, 512, 700, 470, 165, DUSK.glow, 0.30);        // the low crimson horizon, as light
+    bloom(cv, 512, 730, 330, 110, DUSK.warm, 0.20);
+    shadow(cv, c + 20, 906, 400, 26, 0.28);
     withOutline(cv, t => {
-      // -- the ground: one low wide ellipse, top-lit --
+      // -- the ground: one low wide ellipse, warm brown to wine, top-lit --
       poly(t, bandPoly(GY - GRY, GY + GRY, GROUND_HW, 60), GROUND.hi, 1, GROUND.lo);
-      // -- the crimson horizon LINE along the back rim (26px = 1/40 frame),
-      //    from the left shoulder to just behind the house, a brighter core --
-      const rim = th => [GX + (GRX - 16) * Math.cos(th), GY - (GRY - 16) * Math.sin(th)];
-      const HZ = [];
-      for (let i = 0; i <= 24; i++) HZ.push(rim((150 - (150 - 49) * (i / 24)) * Math.PI / 180));
-      for (let i = 1; i < HZ.length; i++) capsule(t, HZ[i - 1][0], HZ[i - 1][1], HZ[i][0], HZ[i][1], 26, DUSK.line, 1);
-      for (let i = 1; i < HZ.length; i++) capsule(t, HZ[i - 1][0], HZ[i - 1][1], HZ[i][0], HZ[i][1], 10, DUSK.core, 0.8);
-      // -- the trunk's own small contact ellipse at its foot --
-      ellipse(t, 342, 762 + DY, 92, 16, INK, 0.38, 30);
-      // -- the cast shadow: ONE hard INK wedge from the trunk's foot, fanning
-      //    right to the house's foundation, clamped to the ground's rim --
-      const WEDGE_X0 = 380, WEDGE_X1 = 790;
-      const wedgeTop = x => 746 + ((x - WEDGE_X0) / (WEDGE_X1 - WEDGE_X0)) * (598 - 746);
-      const wedgeBot = x => 830 + ((x - WEDGE_X0) / (WEDGE_X1 - WEDGE_X0)) * (850 - 830);
-      const top = [], bot = [];
-      for (let i = 0; i <= 20; i++) {
-        const x = WEDGE_X0 + ((WEDGE_X1 - WEDGE_X0) * i) / 20;
-        const hh = Math.max(0, GRY * Math.sqrt(Math.max(0, 1 - ((x - GX) / GRX) ** 2)) - 4);
-        top.push([x, Math.max(GY - hh, wedgeTop(x))]);
-        bot.push([x, Math.min(GY + hh, wedgeBot(x))]);
-      }
-      poly(t, top.concat(bot.reverse()), INK, SHADOW_ALPHA);
-      // -- the far house, ~1/6 of the frame, foot two-thirds of the way back --
-      const WALL = [[792, 622], [900, 622], [900, 690], [792, 690]];
-      const GABLE = [[778, 626], [914, 626], [846, 530]];
-      const CHIM = [[878, 560], [900, 560], [900, 606], [878, 606]];
-      poly(t, grow(CHIM, 10), INK, 0.95);
-      poly(t, grow(WALL, 12), INK, 0.95);
-      poly(t, grow(GABLE, 12), INK, 0.95);
-      poly(t, CHIM, HOUSE.roofHi, 1, HOUSE.roofLo);
-      poly(t, WALL, HOUSE.wallHi, 1, HOUSE.wallLo);
-      poly(t, GABLE, HOUSE.roofHi, 1, HOUSE.roofLo);
-      capsule(t, 784, 620, 846, 536, 12, DUSK.line, 0.9);                  // the horizon-side slope caught in crimson
-      roundRect(t, 846, 660, 26, 26, 5, INK, 0.95);
-      roundRect(t, 846, 660, 22, 22, 4, HOUSE.winHi, 1, HOUSE.winLo);      // the one lit window (44px)
-      // -- the bare tree: a tapered trunk, three forked limbs, one low limb --
-      const TRUNK = [[270, 762], [300, 620], [310, 470], [396, 470], [406, 620], [414, 762]].map(([x, y]) => [x, y + DY]);
-      const ROOT_L = [[246, 764], [300, 690], [322, 764]].map(([x, y]) => [x, y + DY]);
-      const ROOT_R = [[366, 764], [394, 690], [436, 764]].map(([x, y]) => [x, y + DY]);
+      // -- the cast shadow: ONE long tapered plane leaving the trunk's foot
+      //    toward the lower right. Its lower edge IS the ground's front rim and
+      //    its upper edge is one straight diagonal, so the shape narrows as the
+      //    ground recedes — the way a long shadow actually lies — and it takes
+      //    the whole lower-right of the mound rather than a stripe nobody sees
+      //    at 48px. Three nested lengths give it a density falloff too (~0.68
+      //    cumulative at the trunk, 0.44 at the tip). Laid on the already
+      //    opaque ground, so the contour pass never sees it as an edge. --
+      const SX0 = 398, SX1 = 944;
+      const shadowTop = x => 730 + ((x - SX0) / (SX1 - SX0)) * (800 - 730);
+      const wedge = (x1, alpha) => {
+        const top = [], bot = [];
+        for (let i = 0; i <= 26; i++) {
+          const x = SX0 + ((x1 - SX0) * i) / 26;
+          const hh = Math.max(0, groundHH(x) - 5);
+          top.push([x, Math.max(GY - hh, shadowTop(x))]);
+          bot.push([x, GY + hh]);
+        }
+        poly(t, top.concat(bot.reverse()), INK, alpha);
+      };
+      wedge(944, SHADOW_LAYERS);
+      wedge(736, 0.26);
+      wedge(584, 0.22);
+      // -- the trunk's own contact ellipse, so it grounds without merging --
+      ellipse(t, 396, 796, 100, 18, INK, 0.4, 30);
+      // -- the bare tree --
       const limb = (x1, y1, x2, y2, w1, w2, hi) => {
         capsule(t, x2, y2, x2, y2, w2, hi, 1);                             // rounded tip
         capsule(t, x1, y1, x1, y1, w1, BARK.lo, 1);                        // rounded root
         poly(t, stick(x1, y1, x2, y2, w1, w2), hi, 1, BARK.lo);
       };
-      for (const [x1, y1, x2, y2, w1, w2] of TWIGS) limb(x1, y1, x2, y2, w1, w2, BARK.crownHi);
-      for (const [x1, y1, x2, y2, w1, w2] of LIMBS) limb(x1, y1, x2, y2, w1, w2, BARK.hi);
+      for (const [x1, y1, x2, y2, w1, w2] of LIMBS) limb(x1, y1, x2, y2, w1, w2, BARK.crownHi);
+      const TRUNK = [[318, 808], [346, 650], [362, 470], [380, 300], [418, 298], [424, 470], [440, 650], [478, 808]];
+      const ROOT_L = [[288, 810], [344, 726], [364, 810]];
+      const ROOT_R = [[418, 810], [446, 726], [492, 810]];
       poly(t, TRUNK, BARK.hi, 1, BARK.lo);
       poly(t, ROOT_L, BARK.lo, 1);
       poly(t, ROOT_R, BARK.lo, 1);
-      capsule(t, 322, 486 + DY, 294, 750 + DY, 18, BARK.rim, 0.6);         // lit left flank
-      capsule(t, 386, 490 + DY, 398, 750 + DY, 16, INK, 0.45);              // shaded right flank
+      // the top-left lit face and the shaded right flank, so the trunk is a
+      // cylinder lit from the upper left rather than a flat plank
+      poly(t, [[328, 800], [352, 650], [368, 472], [386, 302], [404, 302], [390, 474], [376, 654], [358, 800]], BARK.rim, 0.6);
+      capsule(t, 414, 316, 462, 792, 20, INK, 0.38);
     }, { width: RING_W });
-    sheen(cv, 326, 520 + DY, 12, 40, 0.4);
-    bloom(cv, 846, 660, 56, 56, HOUSE.winGlow, 0.42);                     // the window's glow, over the contour
+    sheen(cv, 350, 560, 12, 56, 0.4);
     savePNG(path.join(OUT, 'ceremony_shadows.png'), 512, 512, down2Straight(cv, 512, 512));
   }
 }
