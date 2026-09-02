@@ -23,6 +23,7 @@ import { Animal, Room, HomeWorldProgress } from '../../types/homeWorld';
 import { HouseWorld } from './HouseWorld';
 import { CHARACTER_SPRITES } from './AnimalSprite';
 import { getQuestArt } from '../questArt';
+import { DialogueBody } from './DialogueBody';
 import { CHROME_ICONS, SPOT_ART } from '../ui/chromeIcons';
 import { CandyColors, getDialogueTheme, getPhaseTheme } from '../../theme/colors';
 import { SURFACE, getPressSpring, getSurfaceTheme, getModalInSpring } from '../../theme/surfaces';
@@ -2376,7 +2377,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       edgeDp={CARD_EDGE_DP}
                       fillColor={pixelSkin.fillCard}
                     />
-                    <Text style={[styles.dialogueText, { color: panelSt.body }]}>{dialogueFlow.revealedText}</Text>
+                    <DialogueBody text={dialogueFlow.revealedText} style={[styles.dialogueText, { color: panelSt.body }]} />
                   </TouchableOpacity>
 
                   {/* Dialogue choice buttons (Phase 3 choice points) */}
@@ -3329,7 +3330,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       edgeDp={CARD_EDGE_DP}
                       fillColor={pixelSkin.fillCard}
                     />
-                    <Text style={[styles.dialogueText, { color: panelSt.body }]}>{getCurrentIntroText()}</Text>
+                    <DialogueBody text={getCurrentIntroText()} style={[styles.dialogueText, { color: panelSt.body }]} />
                   </View>
 
                   <View style={styles.dialogueFooter}>
@@ -3585,9 +3586,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     edgeDp={CARD_EDGE_DP}
                     fillColor={pixelSkin.fillCard}
                   />
-                  <Text style={[styles.dialogueText, { color: panelSt.body }]}>
-                    {journalSpotlightLines[journalSpotlightIndex]}
-                  </Text>
+                  <DialogueBody
+                    text={journalSpotlightLines[journalSpotlightIndex]}
+                    style={[styles.dialogueText, { color: panelSt.body }]}
+                  />
                 </View>
 
                 <View style={styles.journalSpotlightFooter}>
@@ -4092,10 +4094,13 @@ const styles = StyleSheet.create({
     minHeight: 66,
     justifyContent: 'center',
   },
+  // 16/27 rather than the 15/25 body default: this is the one long-form
+  // reading surface in the game, set in a slab serif in a ~264dp column, so it
+  // earns a step up in size and leading over the chrome around it.
   dialogueText: {
     fontFamily: BODY_FONT,
-    fontSize: FONT_SIZE.callout,
-    lineHeight: 25,
+    fontSize: 16,
+    lineHeight: 27,
     letterSpacing: 0.2,
   },
   // The cottage bevel sits flush-right in the footer at its own strip height.
