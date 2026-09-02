@@ -95,6 +95,18 @@ A full pre-launch fun overhaul driven by an external-critic assessment (core ver
 - **Dialogue quality pass**: 48 in-place rewrites (no count/id changes) — Phase-4 liturgy individuated per animal, Phase-1/2 anomaly convergence diversified, register breaks fixed (BURN/FLOAT/threshold), kept-not-consumed theology aligned, Phase-5 retellings thinned, aye-aye monologue walls tightened, trio seeds/callbacks self-contained AND deliverable (callback gate widened for animals with no seed window). A further **register-repair pass** ships in v1.3.2 (see Fun-Findings Pass).
 - **Hero skies reworked** (`scripts/tools/reworkSkies.mjs`, idempotent from `assets/raw/*_original.png`): sky_storm is now an oppressive pre-storm night (was serene); sky_shadow's explicit demon face is dissolved into an ambiguous towering darkness with two faint ember points (the ShadowFigure overlay is the star again).
 
+## Dialogue Readability Pass (2026-09-02)
+
+A player report that lines needed re-reading turned out to be measurable, and the cause was register and delivery rather than vocabulary (the corpus scores Flesch 80.6 / grade 5.2 — the WORDS were never hard).
+
+**What was wrong.** The contraction rate was **14%** (1,139 expanded forms against 189 contractions: "I have" 248 times, "it is" 207, "I am" 101) where natural speech runs 65-80%, so every animal read like written prose. Comma density was **1.02 per sentence**, double conversational, giving clause chains the reader has to hold in memory. And the paginator's 420-character budget almost never fired against a corpus averaging 273 characters a line, so **92% of dialogue arrived as ONE ~8-line block** behind a six-second typewriter.
+
+**Register (phase-aware, and the gate is now a narrative device).** Contractions were applied to **phases 0-3 only**; the Phase 4-5 liturgy keeps its expanded forms. So the corpus went from a flat 14% to **93-96% at phases 0-3 and 19% at phase 4**: the animals audibly stop using contractions at the reveal, which makes the register itself part of the turn. Sentences over 28 words are split at a coordinating seam, never leaving a stub under 7 words. Every line, id, count, image and cross-animal echo is preserved — this was a rhythm pass, not a rewrite. Toolkit in the session scratchpad; the transform skipped any string whose phase it could not attribute (519 of 3,209).
+
+**One grammar rule worth keeping:** English forbids a contracted auxiliary in stranded position — "We are." is grammatical, "We're." is not, while NEGATIVE contractions are fine there ("I don't."). 35 stranded auxiliaries were expanded back after the pass. Any future contraction pass must re-apply that rule.
+
+**Delivery.** `DIALOGUE_PAGE_CHAR_BUDGET` 420 -> **200** (8.4 rendered lines per page -> 4.8; pages of 7+ lines 80% -> 13%; reveal 5.6s -> 3.0s). `components/home/DialogueBody` renders **one sentence per block** with a 7dp gap so the eye has a landing point per thought; the splitter (`services/dialogueText.splitIntoSentences`) is presentation-only and **lossless** — re-joining with one space reproduces the input, including on a growing typewriter PREFIX (pinned by `dialogueBody.test.ts`), which matters because the dialogue flow compares `dialogueText` against choice prompts by equality and the gallery records the unsplit line. The bubble also steps up from the 15/25 chrome body to **16/27**, being the one long-form reading surface in the game.
+
 ## Tech Stack
 
 - **Framework**: React Native with Expo SDK 56
