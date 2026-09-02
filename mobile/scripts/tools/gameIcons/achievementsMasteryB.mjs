@@ -24,12 +24,12 @@
  *            speed_15       a winged boot                     -> a boot with a wing
  *   EXPLORER variant_explorer  a brass compass rose           -> a disc with an 8-point star
  *   BLIND    blind_first    a dark blindfold, knotted         -> a curved band + tails
- *            blind_10       a hand reading a raised-dot letter tile by touch
- *                                                            -> a square with a dotted L + a pointing hand
+ *            blind_10       an open hand laid flat on a raised-dot letter tile,
+ *                           reading it by touch              -> a square with a bump cluster + a spread hand
  *   EXPERT   expert_first   a tall narrow bare pinnacle, a big flag planted
  *                                                            -> a spire + a pennant
- *            expert_25      a broad snowy summit, a rising sun behind it
- *                                                            -> a two-peak massif + a rayed disc
+ *            expert_25      a broad two-peak snowy range, the sun rising in the
+ *                           saddle between the peaks        -> a twin-peak massif + a rayed disc
  *   LEXICON  lexicon_first  an old page with a red wax seal   -> a leaf of paper + a red disc
  *            lexicon_25     a hoard: a level stack of three books, a scroll
  *                           along the top, a coin against the front
@@ -50,10 +50,13 @@
  * puzzle ladder uses, so a tile is a tile across the whole list, and every tile
  * keeps the game's NEAR-SQUARE bevel proportions (a first pass let the pair and
  * the touch tile drift to card shapes and they read as a gift box and a phone).
- * Iron is a cool light steel three value steps off the ash paper; leather and
- * wood are the shop's warm browns; brass is the kit's; both peaks are warm bare
- * rock (PEAK) so the summit pair no longer pulls cold against the family and the
- * shadow face holds a clear step above ash. The blindfold is a slate indigo (a
+ * Iron is a WARM forge grey (the kit's STONE pushed toward umber, three value
+ * steps off the ash paper): a blue-silver chrome horseshoe was the one cold
+ * object in a wood/brass/parchment family, and doctrine allows cool colour only
+ * as an accent. Leather and wood are the shop's warm browns; brass is the kit's;
+ * both peaks are warm bare rock (PEAK) with cream-white snow so the summit pair
+ * no longer pulls cold against the family and the shadow face holds a clear step
+ * above ash. The blindfold is a slate indigo (a
  * "dark cloth" drawn at true black would vanish on ash) with a big lit fold. The
  * apex crest leans dread on purpose: the hub is a near-black disc with a crimson
  * five-point sigil, the one crimson-on-black note in the family.
@@ -84,7 +87,9 @@ const TILE = {
   pink: ['#FF6B9D', '#D44D7A'], purple: ['#C44DFF', '#9933CC'], blue: ['#4DAFFF', '#2E8BC0'],
   teal: ['#4DE8C2', '#2EAF8E'], yellow: ['#FFD84D', '#CCB030'], orange: ['#FF8C4D', '#CC6633'],
 };
-const IRON = { hi: '#E3E5EC', base: '#B4B7C4', mid: '#7A7E90', lo: '#484B5A' };
+/** Warm forge iron: umber-grey, never blue. hole/pit are the nail holes' two
+ *  near-blacks, warm-shifted so no band in the horseshoe carries a cool tint. */
+const IRON = { hi: '#D2C0AB', base: '#8E7C6C', mid: '#7A6858', lo: '#5A4A3E', hole: '#33251C', pit: '#221710' };
 const LEATHER = { hi: '#E0AC6E', base: '#BD7F45', lo: '#7E4B22', cuff: '#5B361A' };
 const GOLD = { up: '#FFE9A8', hi: '#FFD469', mid: '#F0A81E', lo: '#A96406', deep: '#6E3D06' };
 const CRIMSON = { hi: '#F2685A', base: '#C4302B', lo: '#7C1518' };
@@ -94,7 +99,7 @@ const CLOTH = { hi: '#8C84B4', base: '#5C5580', lo: '#35304E', deep: '#221F34' }
 const SKIN = { hi: '#F8D4AC', base: '#E8AE7C', lo: '#BC7444' };
 const LEAF = { hi: '#A6D46A', base: '#6FAF3F', lo: '#3D7A26' };
 const ROAD = { hi: '#EFD9A8', base: '#D8B87C', lo: '#9C7A44' };
-const SNOW = { hi: '#FFFFFF', lo: '#D6E0EC' };
+const SNOW = { hi: '#FFFFFF', lo: '#E4D9C6' };   // cream-white, no blue in the shade
 /** Warm bare rock, both peaks: a lit tan/ochre face and a warm brown shadow face
  *  that stays a clear step above the ash paper (the first pass was slate grey,
  *  which sank into ash at 32px and pulled cold against the brass/wood family). */
@@ -278,7 +283,11 @@ export function draw() {
   { // === reverse_first.png — a horseshoe, open end up ===========================
     // One iron U. The band is a thick semicircle with two arms rising off it,
     // each arm bending slightly inward so the open end reads as a horseshoe and
-    // not a magnet. Four nail holes, two a side, big enough to survive 34dp.
+    // not a magnet. Six nail holes, three a side, big enough to survive 34dp.
+    // The metal is WARM forge iron (the blind judge named the first pass but
+    // flagged it as the family's one cold, blue-silver object): the silhouette,
+    // the up-left lit crest, the heel caps and the down-right shadow are the
+    // first pass's; only the bands' hue changed.
     const { cv, c } = canvas();
     const cx = c, cy = c + 16, R = 108, TH = 56;
     const armTop = cy - 116;
@@ -297,12 +306,13 @@ export function draw() {
         ellipse(t, cx + s * (R - 10), armTop, TH * 0.5, 13, IRON.mid, 1, 2);
         ellipse(t, cx + s * (R - 10) - 4, armTop - 3, TH * 0.32, 7, IRON.hi, 0.9, 2);
       }
-      // nail holes, two a side, ringed
+      // nail holes, three a side (two on the arm, one where the arm meets the
+      // bend), ringed with a lit rim so each reads as a punched hole
       for (const s of [-1, 1]) {
-        for (const [ax, ay] of [[R - 2, cy - 70], [R + 2, cy - 12]]) {
+        for (const [ax, ay] of [[R - 2, cy - 82], [R, cy - 30], [R - 3, cy + 24]]) {
           const hx = cx + s * ax, hy = ay;
-          ellipse(t, hx, hy, 15, 15, '#2E2A36', 1, 2);
-          ellipse(t, hx + 2, hy + 3, 10, 10, '#1E1B26', 1, 2);
+          ellipse(t, hx, hy, 15, 15, IRON.hole, 1, 2);
+          ellipse(t, hx + 2, hy + 3, 10, 10, IRON.pit, 1, 2);
           arcStroke(t, hx, hy, 14, 4, 0.3, Math.PI - 0.3, IRON.hi, 0.6);
         }
       }
@@ -594,52 +604,60 @@ export function draw() {
   }
 
   { // === blind_10.png — a hand reading a raised-dot tile by touch ===============
-    // The first pass was a tall hot-magenta slab with a 2x2 dot grid, which the
-    // blind judge called a phone or a die. Now ONE near-square candy tile in the
-    // game's own proportions, candy ORANGE (the warm side of the tile palette),
-    // whose face carries a big raised-dot letter L: six cream bumps, each on a
-    // darker lower rim, filling most of the face and never a grid. The hand is
-    // smaller (about a third of the frame), enters from the lower right, and its
-    // index fingertip rests on the L's last dot; its cuff is sage, not tile-hued.
+    // The first pass was a tall hot-magenta slab with a 2x2 dot grid and a
+    // pointing finger, which the blind judge called a phone or a die being
+    // tapped. Now ONE near-square candy tile in the game's own proportions,
+    // candy ORANGE (the warm side of the tile palette), whose face carries a
+    // 3-over-2 cluster of five big raised bumps (each a tenth of the frame, on a
+    // darker lower rim: braille-like, never a die face or an app grid). The
+    // hand is an OPEN hand seen from the back, laid FLAT on the face from the
+    // lower right with four spread fingers and the thumb out to the side, its
+    // index fingertip resting on the cluster's lower-right bump: a hand lying on
+    // a surface reads by touch, a pointing finger reads as tapping a screen.
+    // Its cuff is sage, not tile-hued.
     const { cv, c } = canvas();
     const tx = c - 30, ty = c - 16;
     contactShadow(cv, c + 10, c + 134, 142, 18, 0.32);
     withOutline(cv, t => {
       tile(t, tx, ty, 90, 98, -8, TILE.orange, null, 16);
-      // the raised-dot L: four bumps down, two more along the foot
+      // the raised-dot cluster: three bumps across the top, two below, offset
       const ang = (-8 * Math.PI) / 180, ca = Math.cos(ang), sa = Math.sin(ang);
       const P = (lx, ly) => [tx + lx * ca - ly * sa, ty + lx * sa + ly * ca];
       const rim = shade(TILE.orange[1], 0.62);
-      for (const [lx, ly] of [[-34, -66], [-34, -26], [-34, 14], [-34, 54], [6, 54], [46, 54]]) {
+      for (const [lx, ly] of [[-54, -46], [0, -46], [54, -46], [-27, 14], [27, 14]]) {
         const [dx, dy] = P(lx, ly);
-        ellipse(t, dx + 3, dy + 6, 18, 18, rim, 1, 2);
-        ellipse(t, dx, dy, 16, 16, '#FFF6E2', 1, 2);
-        ellipse(t, dx - 4, dy - 5, 7, 5, '#FFFFFF', 0.9, 2);
+        ellipse(t, dx + 3, dy + 6, 21, 21, rim, 1, 2);
+        ellipse(t, dx, dy, 19, 19, '#FFF6E2', 1, 2);
+        ellipse(t, dx - 5, dy - 6, 8, 6, '#FFFFFF', 0.9, 2);
       }
-      // the hand, in a local frame scaled by k, index finger pointing up-left
-      const k = 0.75;
-      const HX = c + 81, HY = c + 73, HA = (-38 * Math.PI) / 180;
+      // the hand, in a local frame scaled by k: local -y is the finger direction
+      // (up-left in the frame), local -x is the thumb side (down-left)
+      const k = 0.72;
+      const HX = c + 79, HY = c + 61, HA = (-37 * Math.PI) / 180;
       const hca = Math.cos(HA), hsa = Math.sin(HA);
       const H = (lx, ly) => [HX + lx * k * hca - ly * k * hsa, HY + lx * k * hsa + ly * k * hca];
       const fing = (x0, y0, x1, y1, th) => {
         capsule(t, ...H(x0, y0), ...H(x1, y1), th * k + 8, INK, 0.95);
         capsule(t, ...H(x0, y0), ...H(x1, y1), th * k, SKIN.base);
-        capsule(t, ...H(x0 - 4, y0), ...H(x1 - 4, y1 + 4), th * k * 0.32, SKIN.hi, 0.6);
+        capsule(t, ...H(x0 - 4, y0), ...H(x1 - 4, y1 + 6), th * k * 0.32, SKIN.hi, 0.6);
+        ellipse(t, ...H(x1, y1), th * k * 0.36, th * k * 0.3, SKIN.hi, 0.85, 2);   // fingertip pad
       };
       // sleeve cuff, behind everything
-      poly(t, roundRectPts(...H(4, 78), 42 * k, 20 * k, 8, HA), INK, 0.95);
-      poly(t, roundRectPts(...H(4, 78), 36 * k, 14 * k, 5, HA), SAGE.base, 1, SAGE.lo);
-      // curled fingers and thumb
-      fing(0, -6, 0, -44, 28);
-      fing(26, -2, 26, -36, 26);
-      fing(50, 6, 50, -24, 22);
-      fing(-40, 30, -86, 8, 30);
-      // palm over their roots
-      poly(t, roundRectPts(...H(4, 30), 58 * k, 54 * k, 24 * k, HA), INK, 0.95);
-      poly(t, roundRectPts(...H(4, 30), 51 * k, 47 * k, 20 * k, HA), SKIN.hi, 1, SKIN.lo);
-      // the index finger, long, over the palm, its tip on the L's last dot
-      fing(-26, 10, -26, -92, 28);
-      ellipse(t, ...H(-26, -92), 13 * k, 13 * k, SKIN.hi, 0.9, 2);
+      poly(t, roundRectPts(...H(0, 56), 46 * k, 20 * k, 8, HA), INK, 0.95);
+      poly(t, roundRectPts(...H(0, 56), 40 * k, 14 * k, 5, HA), SAGE.base, 1, SAGE.lo);
+      // four spread fingers, flat on the face, tips scalloped (middle longest);
+      // the index (nearest the thumb) lands on the lower-right bump
+      fing(-45, -30, -45, -140, 26);
+      fing(-15, -34, -15, -152, 25);
+      fing(15, -32, 15, -146, 24);
+      fing(45, -24, 45, -124, 22);
+      // the thumb, out to the side and a little forward
+      fing(-40, -4, -94, -46, 28);
+      // the palm over every root, top-lit
+      poly(t, roundRectPts(...H(0, -8), 60 * k, 50 * k, 24 * k, HA), INK, 0.95);
+      poly(t, roundRectPts(...H(0, -8), 53 * k, 43 * k, 20 * k, HA), SKIN.hi, 1, SKIN.lo);
+      // a soft knuckle line across the finger roots so the hand reads as laid flat
+      capsule(t, ...H(-52, -40), ...H(52, -34), 6, SKIN.lo, 0.35);
     }, { width: 10 });
     sheen(cv, tx - 54, ty - 62, 12, 20, 0.4);
     savePNG(path.join(OUT, 'blind_10.png'), W, W, down2(cv, W, W));
@@ -679,44 +697,65 @@ export function draw() {
   }
 
   { // === expert_25.png — a snowy summit with a rising sun behind it =============
-    // The same triangle family as expert_first but with a WHITE cap and a big
-    // gold sun with six rays rising off the right shoulder. Two crests, one
-    // with a pennant and one with a rayed disc, and nothing else in common.
+    // The other half of the expert pair, split from expert_first by SILHOUETTE:
+    // that one is a single narrow spire, this one is a BROAD TWO-PEAK RANGE (a
+    // taller peak left, a shorter one right, base three quarters of the frame)
+    // so the two differ even with the sun removed. Both peaks wear a cream snow
+    // cap; the gold sun, with seven fat rays, rises in the SADDLE between them
+    // so the disc is framed by rock on both sides and cannot read as a badge
+    // stuck on a shoulder. Warm rock (PEAK), the same as the spire.
     const { cv, c } = canvas();
-    const baseY = 334, ax = c - 30, ay = 132;
-    const sx = c + 34, sy = 184, sr = 82;
-    ellipse(cv, sx, sy, 152, 140, HALO, 0.3, 90);                 // sunlight, uncontoured
-    contactShadow(cv, c + 8, baseY + 18, 152, 16, 0.32);
+    const baseY = 334;
+    // the saddle sits low enough (y 250) that a real half-disc shows between the
+    // peaks at 32px, not just the rays
+    const sx = c + 18, sy = 190, sr = 76;
+    ellipse(cv, sx, sy, 150, 140, HALO, 0.3, 90);                 // sunlight, uncontoured
+    contactShadow(cv, c + 8, baseY + 18, 154, 16, 0.32);
     withOutline(cv, t => {
-      // the sun and its rays, behind the mountain
-      for (let k = 0; k < 6; k++) {
-        const a = -Math.PI * 0.95 + (k * Math.PI * 0.9) / 5;
+      // the sun and its rays, behind the range
+      for (let k = 0; k < 7; k++) {
+        const a = -Math.PI * 0.88 + (k * Math.PI * 0.76) / 6;
         const ux = Math.cos(a), uy = Math.sin(a), nx = -uy, ny = ux;
         poly(t, [
           [sx + ux * (sr - 10) - nx * 16, sy + uy * (sr - 10) - ny * 16],
           [sx + ux * (sr - 10) + nx * 16, sy + uy * (sr - 10) + ny * 16],
-          [sx + ux * (sr + 40) + nx * 5, sy + uy * (sr + 40) + ny * 5],
-          [sx + ux * (sr + 40) - nx * 5, sy + uy * (sr + 40) - ny * 5],
+          [sx + ux * (sr + 44) + nx * 5, sy + uy * (sr + 44) + ny * 5],
+          [sx + ux * (sr + 44) - nx * 5, sy + uy * (sr + 44) - ny * 5],
         ], GOLD.mid, 1, GOLD.lo);
       }
       ellipse(t, sx, sy, sr + 6, sr + 6, GOLD.lo, 1, 2);
       roundRect(t, sx, sy, sr, sr, sr, GOLD.up, 1, GOLD.mid);
-      // the mountain
-      const left = [[c - 160, baseY], [c - 104, 240], [c - 78, 256], [ax, ay], [ax + 6, baseY]];
-      const right = [[ax, ay], [c + 30, 226], [c + 62, 210], [c + 156, baseY], [ax + 6, baseY]];
-      poly(t, right, PEAK.shHi, 1, PEAK.shLo);
-      poly(t, left, PEAK.litHi, 1, PEAK.litLo);
-      // the snow cap, one jagged-bottomed cape over the apex
-      const cap = [
-        [ax, ay - 2], [c + 30, 226], [c + 14, 212], [c - 4, 234], [c - 24, 214],
-        [c - 46, 236], [c - 66, 220], [c - 78, 256],
+      // the range: two peaks, a saddle between, one lit face and one shadow
+      // face per peak (light from the upper-left)
+      const A1 = [c - 56, 118], A2 = [c + 78, 176], SAD = [c + 14, 250];
+      const leftLit = [[c - 144, baseY], [c - 120, 252], [c - 92, 192], A1, [c - 48, 244], [c - 44, baseY]];
+      const leftSh = [A1, [c - 20, 172], SAD, [c + 18, baseY], [c - 44, baseY], [c - 48, 244]];
+      const rightLit = [SAD, [c + 46, 202], A2, [c + 84, 262], [c + 86, baseY], [c + 18, baseY]];
+      const rightSh = [A2, [c + 106, 224], [c + 144, baseY], [c + 86, baseY], [c + 84, 262]];
+      poly(t, leftSh, PEAK.shHi, 1, PEAK.shLo);
+      poly(t, rightSh, PEAK.shHi, 1, PEAK.shLo);
+      poly(t, leftLit, PEAK.litHi, 1, PEAK.litLo);
+      poly(t, rightLit, PEAK.litHi, 1, PEAK.litLo);
+      // one crag line down each lit face
+      capsule(t, c - 62, 150, c - 100, 262, 8, PEAK.crag, 0.28);
+      capsule(t, c + 72, 206, c + 50, 282, 7, PEAK.crag, 0.25);
+      // the snow caps, one jagged-bottomed cape over each apex
+      const capL = [
+        [A1[0], A1[1] - 2], [c - 20, 172], [c - 34, 158], [c - 48, 178], [c - 62, 160],
+        [c - 78, 182], [c - 92, 192],
       ];
-      poly(t, grow(cap, 5), INK, 0.9);
-      poly(t, cap, SNOW.hi, 1, SNOW.lo);
-      capsule(t, ax + 2, ay + 24, c + 8, 214, 9, SNOW.lo, 0.6);
+      const capR = [
+        [A2[0], A2[1] - 2], [c + 106, 224], [c + 94, 210], [c + 80, 228], [c + 66, 210],
+        [c + 54, 222], [c + 46, 202],
+      ];
+      for (const cap of [capL, capR]) {
+        poly(t, grow(cap, 5), INK, 0.9);
+        poly(t, cap, SNOW.hi, 1, SNOW.lo);
+      }
+      capsule(t, A1[0] + 4, A1[1] + 22, c - 30, 172, 8, SNOW.lo, 0.6);
     }, { width: 10 });
-    sheen(cv, c - 84, 250, 12, 26, 0.3);
-    sheen(cv, sx - 36, sy - 34, 14, 10, 0.5);
+    sheen(cv, c - 74, 156, 10, 14, 0.4);
+    sheen(cv, sx - 30, sy - 30, 14, 10, 0.5);
     savePNG(path.join(OUT, 'expert_25.png'), W, W, down2(cv, W, W));
   }
 

@@ -17,8 +17,9 @@
  *   puzzle_10     THREE tiles in a neat column                   -> a squat tower
  *   puzzle_25     FIVE smaller tiles, the column leaning         -> a tall crooked tower
  *   puzzle_35     a brass magnifying glass held over one tile    -> circle + diagonal handle
- *   puzzle_50     ONE tile cut as a jigsaw piece: bulbs up and right, socket left
- *                                                                 -> a square with a bulb and a bite
+ *   puzzle_50     TWO tiles interlocked: a big blue tile, a smaller yellow one
+ *                 slotted onto its lower-right, a tab-and-socket edge between
+ *                                                                 -> a stepped pair with a zigzag seam
  *   puzzle_100    a laurel wreath ringing one tile               -> a leafy ring
  *   puzzle_250    a tile resting on a blacksmith's anvil         -> the horned anvil
  *   puzzle_500    a tile standing on a stone plinth, star on top -> a stepped pedestal
@@ -59,7 +60,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {
-  canvas, savePNG, down2, W, contactShadow, sheen, withOutline,
+  canvas, savePNG, down2, W, C, blend, contactShadow, sheen, withOutline,
   INK, WOOD, BRASS, STONE,
   ellipse, roundRect, poly, capsule, arcStroke, flameLobe, starPts,
 } from '../shopIcons/_draw.mjs';
@@ -214,7 +215,7 @@ function tile(t, cx, cy, hw, hh, angDeg, pal, letter = null, e = Math.round(hh *
  * The letter on a tile face: a dark drop pass, then the light glyph, both as
  * capsule strokes (or arcs for O/C) through the tile's own local->canvas map
  * `P`. `s` is the glyph half-size, `ang` the tile's rotation (the C's mouth
- * turns with it). Shared by `tile()` and `jigsawPiece()`.
+ * turns with it). Shared by `tile()` and `jigsawTile()`.
  */
 function drawGlyph(t, P, s, pal, letter, ang) {
   const th = s * 0.36;
@@ -255,37 +256,54 @@ function flame(t, cx, topY, botY, r, lean = -0.06, keyline = true) {
 }
 
 /**
- * ONE jigsaw piece in the tile's own chrome: a square body with a round knob
- * standing off its TOP edge and its RIGHT edge, and a round socket bitten clean
- * through its LEFT edge so the ground shows. Body, necks and knobs go down in
- * the same pass per plane (keyline, base, side, face), so the whole piece is
- * one alpha shape and withOutline contours it as one object; the socket is
- * punched last, through every plane. Round 1 drew two equal tiles joined by a
- * 14px dot, which had no anchor and collapsed to two blobs at 32px: a single
- * piece with a bulb the size of a sixth of the frame is the universal
- * puzzle-piece silhouette and survives an 8x downscale.
+ * Composite a scratch layer onto `t` (premultiplied over premultiplied). The
+ * interlocked pair needs it: each tile has a SOCKET punched out of its edge
+ * and a TAB poking into the other, and `punch` cuts through everything under
+ * it, so the second tile is drawn on its own layer (socket punched there) and
+ * stamped over the first, letting the first tile's tab show through the hole.
  */
-function jigsawPiece(t, cx, cy, hw, pal, letter = null, e = 12) {
-  const kr = 36, out = 30, neck = 20, rad = 22;           // bulb radius, bulb centre beyond the edge, neck half-width
+function stamp(t, layer) {
+  for (let i = 0; i < t.w * t.h; i++) {
+    const o = i * 4, sa = layer.px[o + 3];
+    if (sa <= 0) continue;
+    blend(t, i % t.w, ~~(i / t.w), layer.px[o] / sa, layer.px[o + 1] / sa, layer.px[o + 2] / sa, sa);
+  }
+}
+
+/**
+ * ONE jigsaw-edged tile in the tile's own chrome (keyline, base, side, face,
+ * bevel, gloss, specular, glyph), axis-aligned. `tabs` are round knobs standing
+ * off the LEFT or RIGHT edge on a short neck, drawn in the same pass per plane
+ * so the knob is part of the tile's alpha and withOutline / the keyline contour
+ * it as one object; `sockets` are round bites punched through every plane after
+ * the tile is drawn, so whatever lies beneath (the other tile's tab) shows.
+ * Round 1 drew two equal tiles side by side joined by a 14px dot with a stray
+ * knob off the far edge: no anchor, a ticket perforation, two blobs at 32px.
+ * A big tile with a small one stepped onto its lower-right corner is ONE
+ * compact silhouette, and the seam between the two colours is a real zigzag.
+ */
+function jigsawTile(t, cx, cy, hw, hh, pal, letter, e, tabs = [], sockets = [], glyphDx = 0) {
+  const rad = 22;
   const plane = (dy, color, grow = 0) => {
-    roundRect(t, cx, cy + dy, hw + grow, hw + grow, rad + grow * 0.5, color);
-    roundRect(t, cx, cy + dy - hw + 2, neck + grow, 34 + grow, 6, color);     // top neck
-    roundRect(t, cx + hw - 2, cy + dy, 34 + grow, neck + grow, 6, color);     // right neck
-    ellipse(t, cx, cy + dy - hw - out, kr + grow, kr + grow, color, 1, 3);   // top bulb
-    ellipse(t, cx + hw + out, cy + dy, kr + grow, kr + grow, color, 1, 3);   // right bulb
+    roundRect(t, cx, cy + dy, hw + grow, hh + grow, rad + grow * 0.5, color);
+    for (const { side, y, r, out } of tabs) {
+      const s = side === 'right' ? 1 : -1, neck = r * 0.6;
+      roundRect(t, cx + s * (hw + out / 2 - 2), cy + dy + y, out / 2 + 2 + grow, neck + grow, 4, color);
+      ellipse(t, cx + s * (hw + out), cy + dy + y, r + grow, r + grow, color, 1, 3);
+    }
   };
-  plane(e, INK, 8);                                                          // own keyline
-  plane(2 * e, shade(pal[1], 0.54));                                         // base plane
-  plane(e, pal[1]);                                                          // side plane
-  plane(0, pal[0]);                                                          // face
-  // bevel plane over the top half, the top bulb included, then the gloss bar
-  roundRect(t, cx, cy - hw * 0.46, hw - 6, hw * 0.54, rad * 0.9, shade(pal[0], 1.16));
-  ellipse(t, cx, cy - hw - out, kr - 5, kr - 5, shade(pal[0], 1.16), 1, 3);
-  roundRect(t, cx, cy - hw * 0.62, hw * 0.62, hw * 0.13, 13, '#FFFFFF', 0.4);
-  ellipse(t, cx + hw * 0.56, cy - hw * 0.54, hw * 0.14, hw * 0.14, '#FFFFFF', 0.75, 3);
-  // one glyph, seated right of the socket and below the specular dot
-  if (letter) drawGlyph(t, (lx, ly) => [cx + 16 + lx, cy + 8 + ly], hw * 0.4, pal, letter, 0);
-  punch(t, cx - hw + out, cy, kr);                                           // the socket
+  for (const dy of [0, e, 2 * e]) plane(dy, INK, 8);                        // own keyline, full depth
+  plane(2 * e, shade(pal[1], 0.54));                                        // base plane
+  plane(e, pal[1]);                                                         // side plane
+  plane(0, pal[0]);                                                         // face
+  roundRect(t, cx, cy - hh * 0.46, hw - 6, hh * 0.54, rad * 0.9, shade(pal[0], 1.16));   // bevel plane
+  for (const { side, y, r, out } of tabs) {
+    if (y < 0) ellipse(t, cx + (side === 'right' ? 1 : -1) * (hw + out), cy + y, r - 5, r - 5, shade(pal[0], 1.16), 1, 3);
+  }
+  roundRect(t, cx, cy - hh * 0.62, hw * 0.7, hh * 0.13, Math.min(13, hh * 0.12), '#FFFFFF', 0.4);  // gloss bar
+  ellipse(t, cx + hw * 0.56, cy - hh * 0.54, hw * 0.14, hw * 0.14, '#FFFFFF', 0.75, 3);        // specular dot
+  if (letter) drawGlyph(t, (lx, ly) => [cx + glyphDx + lx, cy + ly], Math.min(hw, hh) * 0.55, pal, letter, 0);
+  for (const { side, y, r, inset } of sockets) punch(t, cx + (side === 'right' ? 1 : -1) * (hw - inset), cy + y, r);
 }
 
 /**
@@ -398,16 +416,33 @@ export function draw() {
     savePNG(path.join(OUT, 'puzzle_35.png'), W, W, down2(cv, W, W));
   }
 
-  { // === puzzle_50.png — ONE candy jigsaw piece, tile-chromed ===================
-    // The piece is asymmetric (bulbs up and right, socket left), so it is
-    // centred by its bounding box, not its body: body 180 wide + a 66 bulb.
+  { // === puzzle_50.png — TWO tiles interlocked, a stepped pair ==============
+    // A big blue tile (180 wide) with a smaller yellow one (116 wide) slotted
+    // onto its lower-right corner, so the pair is one near-square silhouette
+    // (~77% of the frame) stepping diagonally, never a side-by-side band. The
+    // shared edge is a true jigsaw profile: the blue tile's TAB (r 24, a 27%
+    // knob of its width) fills a socket in the yellow, and the yellow's own tab
+    // fills a socket in the blue above it, so the seam between the two colours
+    // zigzags. The yellow tile is drawn on its own layer (see stamp) so its
+    // socket can be punched without cutting the blue tab beneath it. One glyph
+    // only, on the blue face at ~55%, seated left of the socket.
     const { cv, c } = canvas();
-    const px = c - 33, py = c + 16;
-    contactShadow(cv, px + 10, py + 128, 112, 16, 0.32);
+    const bx = c - 58, by = c - 32, bw = 90, bh = 88;      // blue: x 44..224, y 72..248
+    const yx = c + 90, yy = c + 14, yw = 58, yh = 76;      // yellow: x 224..340, y 130..282
+    const R = 24, KNOB = 22, E = 12;
+    const tabY = 216 - by, sockY = 162 - by;               // seam heights in blue-local y
+    contactShadow(cv, c + 8, 318, 132, 16, 0.32);
     withOutline(cv, t => {
-      jigsawPiece(t, px, py, 90, TILE.blue, 'P');
+      jigsawTile(t, bx, by, bw, bh, TILE.blue, 'P', E,
+        [{ side: 'right', y: tabY, r: R, out: KNOB }],
+        [{ side: 'right', y: sockY, r: R + 7, inset: KNOB }], -12);
+      const layer = C(t.w, t.h);
+      jigsawTile(layer, yx, yy, yw, yh, TILE.yellow, null, E,
+        [{ side: 'left', y: 162 - yy, r: R, out: KNOB }],
+        [{ side: 'left', y: 216 - yy, r: R + 7, inset: KNOB }]);
+      stamp(t, layer);
     }, { width: 10 });
-    sheen(cv, px - 52, py - 58, 20, 12, 0.5);
+    sheen(cv, bx - 50, by - 50, 20, 12, 0.5);
     savePNG(path.join(OUT, 'puzzle_50.png'), W, W, down2(cv, W, W));
   }
 

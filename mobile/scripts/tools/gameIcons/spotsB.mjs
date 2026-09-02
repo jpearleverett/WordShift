@@ -27,55 +27,66 @@
  *                    copper pot (side loop handle, no fire). The spout has an
  *                    open mouth, the lesson the kitchen pot taught: a spout with
  *                    no opening reads as a second broken handle.
- *   shrine.png       the only serene piece: a mauve stone alcove holding a lit
- *                    clay OIL LAMP: a teardrop body (light terracotta at the
- *                    rim to wine-brown at the foot, 144px wide at the
- *                    supersample, over half the recess) whose left tip pinches
- *                    into a spout, and the one flame stands DIRECTLY on that
- *                    spout tip, its base overlapping the clay by several px so
- *                    there is never a gap for it to float in (104px tall at
- *                    the supersample, over a sixth of the frame). Round 3 had
- *                    a dish with the flame off to one side on a hairline
- *                    spout and the reviewer saw 'a candle on a dish'. The
- *                    tending motif is now LEGIBLE at 48px instead of a key
- *                    squiggle: a brass ring 80px outer (over a seventh of the
- *                    frame) with an 18px band and its own INK keyline, hooked
- *                    on a wooden peg that sticks up out of the recess's right
- *                    wall, and ONE thick cream cord (22px, 11 at native) fed
- *                    through the ring and folded over its bottom band, both
- *                    ends draping straight down to rest on the sill; the near
- *                    end passes behind the lamp's shoulder. The recess itself
- *                    is lifted off the ash paper: a warm plum gradient (deep
- *                    at the crown, warming to the floor) with a lamp glow
- *                    around the flame, so on the dark ground it reads as a
- *                    lit hollow and never as an open archway, while the lilac
- *                    arch band stays a full step lighter than it.
- *   spilled_ink.png  ONE anchor, the inkpot: a squat round-bellied inkwell
- *                    wider than tall (156 x 128 at the supersample) in a wine
- *                    glaze, top-lit in canvas space with a dark foot band, a
- *                    real NECK (a short wine collar into a flared brass lip)
- *                    so the silhouette says inkpot and not mug, tipped so the
- *                    mouth faces lower right with indigo-black ink at the lip,
- *                    and its cork lying loose below the belly. Beside it, ONE
- *                    beveled candy letter tile drawn in theme_default.png's
- *                    grammar (rounded square, a darker rim band that is
- *                    thickest at the bottom, a top-lit pink face, a big cream
- *                    W), 144px square at the supersample (72 at native, over
- *                    a quarter of the frame), standing upright and leaning
- *                    its top corner behind the pot's lip, with one bold INK
- *                    crack (14px) zig-zagging from a chipped upper-right
- *                    corner down across the W. No fragments: round 3 split
- *                    the tile into slabs and the reviewer saw 'three pink
- *                    blocks'. The ink is a single low indigo pool spreading
- *                    from the mouth, under a third of the frame wide, darker
- *                    than the pot's lit body, with a light rim along its
- *                    upper contour and one gloss so it holds on the ash
- *                    paper; the tile stands in its near edge. The whole group
- *                    is recentred (painted bbox inside 48px margins on every
- *                    side at the supersample) after round 3 ran 6px from the
- *                    right edge. It stands apart from the ledger's upright
- *                    blue inkpot in empty_ledger by being knocked over,
- *                    glazed wine and corked.
+ *   shrine.png       the only serene piece: a mauve stone alcove holding
+ *                    exactly TWO things, and the lamp is the anchor. The lit
+ *                    clay OIL LAMP is a teardrop body 200px wide at the
+ *                    supersample (~40% of the frame, 10px inside each recess
+ *                    wall), centred on the sill, light terracotta at the rim
+ *                    to wine-brown at the foot, its left tip pinched into a
+ *                    spout; the one flame (136px tall, over a quarter of the
+ *                    frame) stands on the spout with its base sunk 14px into
+ *                    the clay so it can never float. Round 4 had a 144px
+ *                    dish barely taller than the cord runs beside it, and the
+ *                    reviewer saw a smear. The tending motif is ONE token
+ *                    mounted flat on the back wall above and to the right of
+ *                    the flame: a brass ring 112px outer with a 28px band,
+ *                    INK-keylined on both edges (the hole shows the recess,
+ *                    so withOutline cannot contour the inner edge), and a
+ *                    single short closed cream loop (36px thick, a teardrop
+ *                    hanging through the bottom band, its top standing in the
+ *                    hole). No peg, no draping cord: round 4 hung two long
+ *                    cord runs to the sill off a peg and they read as a
+ *                    'gold hook / cane' at 48px. The recess is lifted off
+ *                    the ash paper (a warm plum, deep at the crown, warming
+ *                    to the floor) with a warm-white lamp glow behind the
+ *                    lamp mass, so the hollow shows two big steps: dark plum
+ *                    / lit lamp. The lilac arch band stays a full step
+ *                    lighter than the recess; nothing else sits inside it.
+ *   spilled_ink.png  the cracked TILE is the anchor and the pot and ink are
+ *                    its supporting pieces, all on ONE baseline. Round 3 led
+ *                    with a tipped pot that overlapped a 15-degree tile sunk
+ *                    in a large indigo pool, and the blind reviewer saw a
+ *                    "dark round jar, a pink wedge and a puddle": three
+ *                    overlapping pieces with no anchor, the game's identity
+ *                    object unrecognisable, cool blue/magenta dominant, and
+ *                    a bbox only 53% of the frame tall. The tile is now drawn
+ *                    exactly to theme_default.png's grammar (its own INK
+ *                    keyline, a dark base plane and a mid side plane under a
+ *                    top-lit candy-pink face, the lighter bevel plane over
+ *                    the top half, gloss bar, specular dot, the cream W),
+ *                    UPRIGHT at 5 degrees, 294px tall at the supersample
+ *                    (~57% of the frame), centred a little right of c, and
+ *                    nothing is ever drawn over it. Its crack is ONE bold
+ *                    INK zig-zag, 10px wide, running from the top edge of the
+ *                    face down through the side and base planes to the
+ *                    bottom edge, with a thin cream highlight along its
+ *                    right side, kept to the right of the W so the letter
+ *                    stays whole. The INKPOT is a squat stoneware pot in a
+ *                    warm wine glaze (light at the top of the belly, near
+ *                    black at the foot, a lit flank and a shaded band) with
+ *                    a BRASS collar, lying on its side to the LEFT of the
+ *                    tile, tipped 26 degrees so its dark open mouth points
+ *                    at the tile's foot; its long axis is ~34% of the frame.
+ *                    The INK is one flat indigo puddle, the only cool colour
+ *                    in the picture and smaller than the tile: it starts at
+ *                    the mouth, runs under the tile's base and shows as a
+ *                    band in front of it, with one thin cream sheen. The
+ *                    three pieces touch, so a single withOutline pass
+ *                    contours the group, and one contact shadow sits under
+ *                    all of it. Painted bbox ~82% wide, ~69% tall. It stands
+ *                    apart from the ledger's upright blue inkpot in
+ *                    empty_ledger by being knocked over, glazed wine and
+ *                    brass-collared.
  *   notice.png       a parchment sheet with a real crease across its middle,
  *                    the lower flap pivoted a few degrees so the silhouette
  *                    kinks and the fold is visible in outline alone, a curled
@@ -87,7 +98,14 @@
  *                    (the alert card's own fill): round 1 painted it parchment
  *                    on parchment and it survived only as an outline. The one
  *                    light line is the crease highlight. It is also the family's
- *                    smallest silhouette, so it fills ~70% of the frame.
+ *                    smallest silhouette, so it fills ~70% of the frame. Its
+ *                    shadow is the cast of a pinned sheet on the wall behind
+ *                    it: an offset copy of the sheet's own shape pushed 26,30
+ *                    (13,15 at native) so it clears the 12px contour, laid
+ *                    down twice (a 5% enlarged copy at low alpha under the
+ *                    true copy) so the edge is soft like the siblings'
+ *                    contact ellipse. Round 4 offset it only 12,14 and the
+ *                    contour swallowed all of it.
  *
  * Palette: warm cottage throughout (parchment wall, red roof, copper, brass,
  * candy pink) except the shrine, which is the game's Terrible-Peace mauve. Every
@@ -126,22 +144,21 @@ const RECESS = { top: '#3E2F52', bot: '#6B5480', corner: '#2C2038' };
 const CLAY = { hi: '#EBB98D', base: '#C8865A', lo: '#7F4A2C' };
 /** The lamp body: light terracotta at the rim, deep wine-brown at the foot. */
 const LAMP = { hi: '#EDAE80', lo: '#7A3826', top: '#F2C9A2', well: '#4A2814' };
-const PEG = { hi: '#D9A870', base: '#B07A44', lo: '#6E4520' };
 /** Lamp glow: above cream (#F3E2BF) in every channel, so it can only lighten. */
 const GLOW = '#FFF4DC';
 const PEACE_FIRE = { out: '#E8944A', mid: '#FFBE5E', in: '#FFE1A0', core: '#FFF9E8' };
 const THREAD = { hi: '#FFF8EA', base: '#F0DDB0', lo: '#B89C6C' };
-const POT = { hi: '#D99C90', base: '#96474D', lo: '#4E2026', band: '#3E1A20' };
-const LIP = { hi: '#F2CE7A', lo: '#9A6A2E' };
-const CORK = { hi: '#E2C08C', base: '#C69A5E', lo: '#8C6432' };
+/** The inkpot: a warm wine stoneware glaze, near black at the foot. */
+const STONEWARE = { hi: '#E08C78', base: '#A84A4E', lo: '#5A2228', foot: '#33121A', flank: '#EBA48F' };
 /**
- * The spill: a top-lit violet-indigo pool whose DARKEST fill (#6B5FB4) still
- * sits at linear luminance ~0.145, a tenth above the ash paper (0.026), so the
- * INK keyline around it always has something lighter to sit against. The two
- * near-black inks are reserved for the pot's mouth and a thin inner lip.
+ * The spill: ONE indigo puddle, the only cool colour in the icon. Its upper
+ * fill (#4A3F8A) sits at perceived luminance ~0.27 against the ash paper's
+ * ~0.18, and a 12px INK contour always separates them, so it never vanishes
+ * on the dark ground; on cream it is the darkest mass after the outline.
  */
-const INKP = { rim: '#9C92E0', hi: '#5A4DAE', lo: '#3D3390', gloss: '#EDE9FF', mouth: '#1A1533', depth: '#0E0B1E', lipShine: '#7A6ED0' };
-const TILE = { hi: '#FF9EC2', base: '#F25E8E', lo: '#B02A5B', ink: '#FFF4F8' };
+const INKP = { hi: '#4F4392', lo: '#2E2A5A', mouth: '#1A1533', depth: '#0E0B1E', sheen: '#EFE6FF' };
+/** theme_default.png's own tile colours (TILE_PAL.theme_default[0]) and their shades. */
+const TILEC = { faceHi: '#FF7FAB', faceLo: '#EE4F86', bevel: '#FFA0C4', side: '#D44D7A', base: '#722A42', glyph: '#FFF6E2', glyphShade: '#83304B', crackLight: '#FFF3E6' };
 const PAPER = { hi: '#E6CB92', base: '#D6B47A', flapHi: '#D2AE72', flapLo: '#C79C60', backHi: '#B08A52', backLo: '#96703C', crease: '#A07E48', light: '#F6E6C4', script: '#5A3A22' };
 
 // --- local shape helpers (pure, table-driven) --------------------------------
@@ -395,139 +412,125 @@ export function draw() {
       glowInArch(t, 168, 150, 70, 70, RECESS.corner, 0.55, 40);               // the two dark crown corners
       glowInArch(t, 344, 150, 70, 70, RECESS.corner, 0.55, 40);
       // lamp light on the back wall: a warm plum bloom, then a warm white
-      // (above cream in every channel) tight around the flame, both clipped
-      // to the recess so they never bleed onto the stone band
-      glowInArch(t, 206, 318, 170, 150, '#8A6E9E', 0.5, 70);
-      glowInArch(t, 186, 300, 112, 112, GLOW, 0.36, 60);
-      glowInArch(t, 256, 372, 150, 70, GLOW, 0.16, 50);
+      // (above cream in every channel) behind the lamp mass and tight around
+      // the flame, all clipped to the recess so they never bleed onto the band
+      glowInArch(t, 200, 306, 180, 160, '#8A6E9E', 0.5, 72);
+      glowInArch(t, 184, 292, 118, 118, GLOW, 0.38, 62);
+      glowInArch(t, 256, 372, 160, 70, GLOW, 0.18, 52);
       // the sill
       roundRect(t, c, 420, 172, 22, 5, MAUVE.up, 1, MAUVE.deep);
       capsule(t, c - 160, 402, c + 160, 402, 6, MAUVE.hi, 0.7);
-      // THE PEG: a wooden dowel angled up out of the right wall, keylined
-      // because the recess behind it is opaque and would give it no contour
-      capsule(t, 328, 204, 346, 170, 32, INK, 0.95);
-      capsule(t, 328, 204, 346, 170, 20, PEG.base);
-      capsule(t, 326, 200, 341, 174, 7, PEG.hi, 0.6);
-      ellipse(t, 346, 170, 10, 10, PEG.lo);
-      ellipse(t, 344, 168, 6, 6, PEG.hi, 0.7);
-      // THE CORD, part one: the two runs visible INSIDE the ring's hole,
-      // drawn before the ring so the band covers them where they pass behind it
-      const rx = 318, ry = 226, RO = 40, RB = 18;
-      const cord = (run, th = 22) => { polyline(t, run, th + 12, INK, 0.95); polyline(t, run, th, THREAD.base); };
-      cord([[302, 232], [312, 262]], 20);
-      cord([[334, 232], [326, 262]], 20);
-      // THE RING: 80 outer, an 18 band, keylined on BOTH edges (the hole
-      // shows the recess, so withOutline cannot contour the inner edge)
-      arcStroke(t, rx, ry, RO - RB / 2, RB + 22, 0, Math.PI * 2, INK, 0.95);
+      // THE TOKEN: a brass ring mounted flat on the back wall above and to
+      // the right of the flame, one closed cream loop hanging through its
+      // bottom band. The loop goes down first (the ring's band covers it
+      // where it passes behind), its top standing in the hole so the hole
+      // shows cream, not recess. Both are keylined by hand: the recess
+      // behind them is opaque, so withOutline would give them no contour.
+      const rx = 294, ry = 200, RO = 56, RB = 28;
+      const loop = [[294, 182], [306, 192], [311, 222], [313, 254], [311, 282], [305, 300], [294, 308], [283, 300], [277, 282], [275, 254], [277, 222], [282, 192]];
+      // only the HANGING part is keylined: inside the hole the cream cord sits
+      // straight on the plum recess, so the hole reads as cord, not as INK
+      const loopK = [[323, 236], [323, 254], [321, 286], [313, 308], [294, 319], [275, 308], [267, 286], [265, 254], [265, 236]];
+      poly(t, loopK, INK, 0.95);
+      poly(t, loop, THREAD.hi, 1, THREAD.lo);
+      capsule(t, 286, 262, 289, 292, 7, '#FFFFFF', 0.45);                     // the loop's lit left strand
+      // the ring: 112 outer, a 28 band, INK on BOTH edges (10px outside, 6px
+      // inside so the hole stays open), brass lit from the upper-left
+      arcStroke(t, rx, ry, RO - RB / 2 + 2, RB + 16, 0, Math.PI * 2, INK, 0.95);
       arcStroke(t, rx, ry, RO - RB / 2, RB, 0, Math.PI * 2, BRASS.lo);
       arcStroke(t, rx, ry, RO - RB / 2, RB, Math.PI * 0.95, Math.PI * 2.05, '#C99A44');
-      arcStroke(t, rx, ry, RO - RB / 2, RB - 6, Math.PI * 1.08, Math.PI * 1.5, BRASS.hi);
-      // THE CORD, part two: folded over the bottom band and draping straight
-      // down to rest on the sill. The near end runs behind the lamp's
-      // shoulder (the lamp is drawn after it); the far end rests in the open
-      cord([[312, 250], [318, 268], [322, 330], [320, 398]]);
-      cord([[326, 250], [340, 270], [346, 330], [346, 398]]);
-      capsule(t, 342, 290, 344, 340, 6, THREAD.hi, 0.6);
-      capsule(t, 320, 290, 321, 330, 6, THREAD.hi, 0.6);
-      // THE LAMP, the anchor: a teardrop clay body on the sill, 144 wide,
-      // its left tip pinched into a spout. Foot first, then the body top-lit
-      // light terracotta to wine-brown, a lighter top face, the filler well.
-      const lx = 244;
-      roundRect(t, lx + 4, 400, 44, 8, 3, CLAY.base, 1, CLAY.lo);                // the foot
+      arcStroke(t, rx, ry, RO - RB / 2, RB - 8, Math.PI * 1.08, Math.PI * 1.5, BRASS.hi);
+      // THE LAMP, the anchor: a teardrop clay body 200 wide centred on the
+      // sill, its left tip pinched into a spout. Foot first, then the body
+      // top-lit light terracotta to wine-brown, a lighter top face, the
+      // filler well, the shaded belly.
+      roundRect(t, 262, 402, 48, 8, 3, CLAY.base, 1, CLAY.lo);                  // the foot
       const body = [
-        [164, 352], [178, 342], [200, 336], [232, 332], [268, 333], [296, 340],
-        [312, 352], [318, 368], [312, 386], [292, 398], [258, 404], [220, 404],
-        [190, 398], [172, 384], [162, 366],
+        [156, 348], [166, 338], [186, 328], [214, 320], [250, 316], [286, 318],
+        [316, 326], [340, 340], [354, 358], [356, 376], [348, 390], [326, 400],
+        [292, 405], [250, 406], [210, 403], [184, 396], [168, 382], [158, 364],
       ];
       poly(t, body, LAMP.hi, 1, LAMP.lo);
-      capsule(t, lx - 60, 386, lx + 56, 386, 14, LAMP.lo, 0.5);                // the shaded belly
-      poly(t, [[168, 352], [182, 344], [206, 339], [238, 336], [270, 337], [296, 344], [308, 354], [298, 360], [266, 356], [232, 355], [200, 357], [180, 358]], LAMP.top);
-      ellipse(t, lx + 6, 347, 20, 7, LAMP.well);                                // the filler well
-      ellipse(t, lx + 2, 346, 12, 3, '#8A5430', 0.8);
-      // the wick opening at the spout tip, and the ONE flame rising straight
-      // out of it: its base overlaps the clay by several px, no gap
-      ellipse(t, 176, 352, 9, 5, LAMP.well);
-      fire(t, 178, 258, 362, 26, PEACE_FIRE);
+      capsule(t, 196, 390, 330, 390, 16, LAMP.lo, 0.5);                       // the shaded belly
+      poly(t, [[160, 348], [170, 340], [190, 331], [216, 324], [250, 320], [286, 322], [314, 330], [336, 342], [346, 354], [334, 360], [300, 354], [254, 350], [214, 352], [190, 356], [172, 356]], LAMP.top);
+      ellipse(t, 270, 334, 24, 8, LAMP.well);                                  // the filler well
+      ellipse(t, 266, 333, 14, 4, '#8A5430', 0.8);
+      // the wick opening on the spout, and the ONE flame rising straight
+      // out of it: 136 tall, its base sunk 14px into the clay, no gap
+      ellipse(t, 178, 340, 11, 6, LAMP.well);
+      fire(t, 180, 214, 350, 28, PEACE_FIRE);
     }, { width: CONTOUR });
     sheen(cv, 170, 128, 20, 28, 0.5);                                         // the arch band's upper-left
-    sheen(cv, 214, 352, 14, 8, 0.5);                                          // the lamp's shoulder
+    sheen(cv, 206, 330, 16, 8, 0.5);                                          // the lamp's shoulder
     save(cv, 'shrine.png');
   }
 
-  { // === spilled_ink.png — a tipped inkpot, its cork, ONE cracked tile ======
+  { // === spilled_ink.png — a tipped inkpot beside ONE cracked letter tile ==
     const cv = fresh();
-    const ang = 0.55, px = 148, py = 222;                               // the pot's centre; local +x runs base -> mouth
+    // THE TILE'S frame: upright at 5 degrees, a little right of centre. Its
+    // size is theme_default's front tile scaled to the 512 supersample
+    // (hw 98, hh 114: the keyline stands 294 tall, ~57% of the frame).
+    const hw = 98, hh = 114, tilt = -0.087;
+    const T = rot(336, 244, tilt);
+    const RR = (lx, ly, w, h, rad) => roundPtsL(T, lx, ly, w, h, rad);
+    // THE POT'S frame: lying on its side to the left, tipped 26 degrees so
+    // local +x (foot -> mouth) runs down-right at the tile's foot
+    const ang = 0.45, px = 130, py = 347;
     const R = rot(px, py, ang);
-    const [mx, my] = R(112, 0);                                         // the mouth's centre
-    const T = rot(px + 224, py + 36, -0.1);                             // the tile, standing in the pool's near edge
-    const TH = 72;                                                      // tile half-size: 144 (72 at native)
-    // one shadow for the whole group, down-right
-    contactShadow(cv, px + 130, py + 146, 210, 22, 0.32);
+    const [mx, my] = R(98, 0);                                          // the mouth's centre (218, 390)
+    // one contact shadow under the whole group, down-right, never contoured
+    contactShadow(cv, c + 6, 452, 196, 22, 0.32);
     withOutline(cv, t => {
-      // THE CORK, loose on the ground below the belly: a tapered tan stopper
-      poly(t, [[px - 70, py + 78], [px - 26, py + 86], [px - 26, py + 116], [px - 70, py + 108]], CORK.hi, 1, CORK.lo);
-      ellipse(t, px - 70, py + 93, 9, 16, CORK.lo);
-      capsule(t, px - 62, py + 84, px - 32, py + 90, 6, '#F6E2BC', 0.6);
-      // THE POT: a squat round-bellied inkwell, wider than tall, top-lit in
-      // canvas space (whichever flank faces up is the lit one), a foot plate
-      // at the base, a dark band on the underside, and a real NECK: a short
-      // wine collar, then a flared brass lip, then the dark open mouth with
-      // ink glistening at its lower edge
-      poly(t, rectPtsL(R, -62, 0, 9, 48, 3), POT.base, 1, POT.band);      // the foot plate
-      poly(t, ovalPts(px, py, 62, 82, ang), POT.hi, 1, POT.lo);           // the belly
-      capsule(t, ...R(-30, -64), ...R(40, -64), 18, POT.hi, 0.6);         // the lit upper flank
-      capsule(t, ...R(-36, 62), ...R(44, 62), 22, POT.band, 0.5);         // the shaded underside
-      capsule(t, ...R(58, -50), ...R(58, 50), 10, POT.hi, 0.35);          // the shoulder ridge
-      poly(t, rectPtsL(R, 78, 0, 18, 32, 3), POT.base, 1, POT.lo);        // the neck: local 60..96
-      capsule(t, ...R(66, -30), ...R(92, -30), 8, POT.hi, 0.5);
-      poly(t, [R(90, -36), R(112, -54), R(112, 54), R(90, 36)], LIP.hi, 1, LIP.lo); // the flared brass lip, its end resting on the tile
-      capsule(t, ...R(96, -40), ...R(110, -46), 7, '#FFF4D0', 0.7);
-      poly(t, ovalPts(mx, my, 15, 52, ang), INKP.mouth);                  // the open mouth
-      poly(t, ovalPts(mx - 3, my - 3, 9, 37, ang), INKP.depth, 0.85);
-      capsule(t, ...R(115, 8), ...R(115, 40), 9, INKP.lipShine, 0.8);     // ink glistening at the lip
-      // THE SPILL: one tongue out of the mouth into one low pool. A closed
-      // INK keyline first (it separates the ink from the pot's dark
-      // underside), then the indigo fill, a light rim along the upper
-      // contour, one gloss
-      const cx0 = px + 150, cy0 = py + 108, rxp = 84, ryp = 30;
-      const bump = [1, 0.96, 1.04, 0.95, 1.03, 0.98, 1.05, 0.94, 1, 0.97, 1.04, 0.93, 1.02, 0.96, 1.05, 0.95, 1.01, 0.94, 1.03, 0.97, 1, 0.95, 1.02, 0.98, 1.03];
-      const pool = [];
-      for (let i = 0; i <= 24; i++) {
-        const a = 4.3 + (i / 24) * (9.9 - 4.3);                            // from the upper-right round the bottom to the upper-left
-        pool.push([cx0 + Math.cos(a) * rxp * bump[i], cy0 + Math.sin(a) * ryp * bump[i]]);
-      }
-      const tongue = [[mx - 26, my + 32], [mx - 16, my + 46], [mx - 2, my + 58], [mx + 20, my + 64]];
-      const spill = [...pool, ...tongue];
-      polyline(t, [...spill, spill[0]], 14, INK, 0.95);
-      poly(t, spill, INKP.hi, 1, INKP.lo);
-      polyline(t, [[cx0 - 70, cy0 - 8], [cx0 - 46, cy0 - 22], [cx0 - 12, cy0 - 28]], 9, INKP.rim, 0.9);
-      polyline(t, [[cx0 + 20, cy0 - 28], [cx0 + 50, cy0 - 22], [cx0 + 74, cy0 - 8]], 9, INKP.rim, 0.9);
-      capsule(t, mx - 14, my + 38, mx - 6, my + 54, 7, INKP.rim, 0.8);
-      capsule(t, cx0 - 44, cy0 + 4, cx0 - 14, cy0 + 8, 8, INKP.gloss, 0.5);
-      // THE TILE last, standing in the pool's near edge. The shop's grammar:
-      // a rounded square rim band (base to dark), a top-lit face set 4px
-      // high so the bottom band is the thickest bevel, a big cream W. The
-      // upper-right corner is CHIPPED (the notch is in both polygons, so the
-      // band follows it), and ONE bold INK crack zig-zags from the chip down
-      // across the W, with a lit edge beside it
-      const notched = (M, h, rad, n1, n2, n3) => {
-        const pts = [M(h - n1, -h), M(h - n2, -h + n3), M(h, -h + n1)];       // the chip
-        for (const [sx, sy, a0] of [[1, 1, 0], [-1, 1, Math.PI / 2], [-1, -1, Math.PI]]) {
-          const cx = sx * (h - rad), cy = sy * (h - rad);
-          for (let i = 0; i <= 7; i++) { const a = a0 + (i / 7) * (Math.PI / 2); pts.push(M(cx + Math.cos(a) * rad, cy + Math.sin(a) * rad)); }
-        }
-        return pts;
-      };
-      poly(t, notched(T, TH, 16, 40, 20, 26), TILE.base, 1, TILE.lo);
-      const F = rot(...T(0, -4), -0.1);
-      poly(t, notched(F, TH - 14, 10, 28, 10, 18), TILE.hi, 1, TILE.base);
-      polyline(t, [T(-34, -26), T(-18, 30), T(0, -8), T(18, 30), T(34, -26)], 15, TILE.ink);
-      const crack = [T(TH - 22, -TH + 26), T(28, -36), T(4, -4), T(20, 36), T(-2, TH + 2)];
-      polyline(t, crack.map(([x, y]) => [x + 6, y + 2]), 5, '#FFC9DC', 0.7);
-      polyline(t, crack, 14, INK, 0.95);
+      // THE INK: one flat puddle from the mouth, under the tile's base, showing
+      // as a band in front of it and a small lobe at its right. Drawn first so
+      // the pot's mouth and the tile both sit ON it.
+      const puddle = [
+        [mx - 14, my - 12], [mx + 8, my - 6], [300, 386], [380, 388], [436, 392],
+        [454, 410], [460, 436], [450, 456], [412, 464], [356, 460], [304, 465],
+        [250, 460], [206, 462], [176, 451], [164, 430], [170, 410], [186, 398],
+      ];
+      poly(t, puddle, INKP.lo, 1, INKP.hi);                                // dark at the far edge, lit toward the viewer
+      capsule(t, 240, 440, 292, 438, 5, INKP.sheen, 0.6);                  // the one thin sheen
+      // THE POT: its own INK keyline first (it lies on the puddle), then the
+      // foot plate, the belly (light at the top, wine below, near black at
+      // the foot band), a lit upper flank, a shaded lower band, the neck,
+      // the brass collar and the dark open mouth with ink at its lower lip
+      poly(t, ovalPts(px, py, 68, 54, ang), INK, 0.95);
+      poly(t, rectPtsL(R, 74, 0, 16, 28, 3), INK, 0.95);                          // the pinched neck's keyline
+      poly(t, rectPtsL(R, 96, 0, 14, 42, 3), INK, 0.95);                          // the flared lip's keyline
+      poly(t, rectPtsL(R, -72, 0, 8, 34, 2), STONEWARE.lo, 1, STONEWARE.foot);   // the foot plate
+      poly(t, ovalPts(px, py, 62, 48, ang), STONEWARE.hi, 1, STONEWARE.lo);      // the belly
+      capsule(t, ...R(-30, -34), ...R(28, -34), 16, STONEWARE.flank, 0.75);        // the lit upper flank
+      capsule(t, ...R(-36, 32), ...R(40, 32), 18, STONEWARE.foot, 0.5);           // the shaded underside
+      poly(t, rectPtsL(R, 74, 0, 12, 22, 3), STONEWARE.base, 1, STONEWARE.lo);   // the pinched neck
+      poly(t, rectPtsL(R, 94, 0, 10, 36, 2), BRASS.hi, 1, BRASS.lo);             // the flared brass lip
+      capsule(t, ...R(90, -30), ...R(96, -32), 6, '#FFF0C4', 0.75);
+      poly(t, ovalPts(mx + 4, my, 13, 33, ang), INKP.mouth);                      // the open mouth
+      poly(t, ovalPts(mx + 1, my - 2, 8, 24, ang), INKP.depth, 0.85);
+      capsule(t, ...R(104, 12), ...R(104, 28), 7, INKP.hi, 0.9);                 // ink at the lower lip
+      // THE TILE, theme_default's grammar: its own INK keyline, a dark base
+      // plane and a mid side plane under a top-lit candy-pink face, a lighter
+      // bevel plane over the top half, the gloss bar, the specular dot, the
+      // cream W with its shade. Nothing is drawn over it.
+      poly(t, RR(0, 24, hw + 12, hh + 33, 36), INK);
+      poly(t, RR(0, 45, hw, hh, 30), TILEC.base);                                // base plane, dark bottom rim
+      poly(t, RR(0, 23, hw, hh, 30), TILEC.side);                                // side plane
+      poly(t, RR(0, 0, hw, hh, 30), TILEC.faceHi, 1, TILEC.faceLo);              // the face, top-lit
+      poly(t, RR(0, -hh * 0.46, hw - 8, hh * 0.54, 26), TILEC.bevel);            // bevel plane
+      poly(t, RR(0, -hh * 0.62, hw * 0.76, hh * 0.13, 17), '#FFFFFF', 0.4);      // gloss bar
+      ellipse(t, ...T(hw * 0.56, -hh * 0.54), 15, 15, '#FFFFFF', 0.75, 4);      // specular dot
+      const seg = [[-41, -45, -22, 40], [-22, 40, 0, -13], [0, -13, 22, 40], [22, 40, 41, -45]];
+      for (const [x0, y0, x1, y1] of seg) capsule(t, ...T(x0, y0 + 10), ...T(x1, y1 + 10), 20, TILEC.glyphShade, 0.55);
+      for (const [x0, y0, x1, y1] of seg) capsule(t, ...T(x0, y0 + 3), ...T(x1, y1 + 3), 17, TILEC.glyph);
+      // THE CRACK: one bold INK zig-zag from the face's top edge down through
+      // the side and base planes to the bottom edge, 10px wide, kept right of
+      // the W, with a thin cream highlight along its right side
+      const crack = [[52, -116], [78, -62], [50, -6], [76, 52], [58, 116], [63, 140], [60, 161]];
+      polyline(t, crack.map(([x, y]) => T(x, y)), 10, INK);
+      polyline(t, crack.map(([x, y]) => T(x + 6, y)), 4, TILEC.crackLight, 0.85);
     }, { width: CONTOUR });
-    sheen(cv, ...R(-34, -34), 14, 24, 0.5);                             // the pot's upper-left shoulder
-    sheen(cv, ...T(-40, -44), 12, 8, 0.5);                              // the tile's face
+    sheen(cv, ...T(-58, -82), 22, 11, 0.45);                            // the tile's upper-left
+    sheen(cv, ...R(-22, -28), 14, 9, 0.5);                              // the pot's belly
     save(cv, 'spilled_ink.png');
   }
 
@@ -538,8 +541,12 @@ export function draw() {
     const [kx, ky] = P(0, 0);
     const B = rot(kx, ky, ang + 0.09);                                  // the lower flap, pivoted at the crease
     const sheet = [P(-hw, -hh), P(hw, -hh), P(hw, 0), B(hw, hh), B(-hw, hh), P(-hw, 0)];
-    // a pinned sheet casts onto the wall behind it: an offset copy of its own shape
-    poly(cv, sheet.map(([x, y]) => [x + 12, y + 14]), INK, 0.28);
+    // a pinned sheet casts onto the wall behind it: an offset copy of its own
+    // shape, pushed far enough (26,30) to clear the 12px contour, with a 5%
+    // enlarged copy at low alpha beneath it so the edge falls off softly
+    const cast = (dx, dy, s, a) => poly(cv, sheet.map(([x, y]) => [kx + dx + (x - kx) * s, ky + dy + (y - ky) * s]), INK, a);
+    cast(26, 30, 1.05, 0.12);
+    cast(26, 30, 1, 0.2);
     withOutline(cv, t => {
       // the sheet sits a full value step BELOW the cream ground it lands on
       poly(t, [P(-hw, -hh), P(hw, -hh), P(hw, 0), P(-hw, 0)], PAPER.hi, 1, PAPER.base);

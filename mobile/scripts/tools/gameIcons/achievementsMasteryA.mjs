@@ -11,19 +11,23 @@
  *
  *   STARS ladder (perfect-solve counts), vessel = the GOLD STAR, escalating by
  *   COUNT and then by the thing that HOLDS the stars:
- *     first_perfect  ONE star rising out of a low green horizon, six short gold
- *                    dawn rays fanning up from behind it (First Light)
- *                    -> a spiky star sunk into a hill. Asymmetric top, flat base.
+ *     first_perfect  ONE star half-risen behind a FLAT-TOPPED sage horizon band,
+ *                    six brass ray rods radiating from it (First Light)
+ *                    -> a sunburst over a straight edge. The horizon is a band
+ *                    with a straight top, not a mound: the first blind round
+ *                    read a domed hill as something the star stood ON.
  *     perfect_10     a FAN of three stars, the big one centre and high
  *                    -> a three-lobed arc. Wider than tall.
  *     perfect_25     a corked GLASS JAR filled with stars
  *                    -> a bottle. Taller than wide, a lid on top.
  *     perfect_50     a brass-rimmed night MEDAL hung from a wine ribbon and a
- *                    brass bar, five stars joined into a constellation on its face
+ *                    brass bar, five stars joined into a constellation on its
+ *                    face, ONE anchor star clearly larger than the other four
  *                    -> a disc with a ribbon V and a bar above it. The only round
  *                    thing in the ladder, and its ribbon keeps it off the
  *                    challenge buckler's plain-circle silhouette (row 10 of the
- *                    same list): the first blind round confused the two.
+ *                    same list): the first blind round confused the two, so the
+ *                    straps and bar are fat enough to survive 32px.
  *   Every star is drawn by the one `goldStar` below, so the four read as one line.
  *   The medal is a deliberate addition to the brief's bare "five stars and
  *   lines": five loose stars are a particle field at 26dp, and the house rule is
@@ -32,8 +36,19 @@
  *   STANDALONE crests (difficulty / self-reliance / flawless play):
  *     all_difficulties  a five-petal pinwheel rosette, one petal per tier colour
  *                       (green, gold, orange, red, purple) on a brass hub
- *     hard_10           a crimson great helm with a brass comb and a T-slot
- *     no_hints_10       a lit brass oil lamp, spout left, loop handle right
+ *     hard_10           a crimson knight's helm: a domed skull cap over a face
+ *                       plate with two eye slits and breath slits, a brass visor
+ *                       hinge between them, a flared steel gorget below (wider
+ *                       than the crown) and a tall cream plume curling to the
+ *                       upper-right. The plume, the paired eye slits and the
+ *                       flare are the cues only a helmet owns: the earlier
+ *                       dome + top knob + flat base band + T-slot read as a
+ *                       paper lantern or a bell to a blind reviewer.
+ *     no_hints_10       a lit brass oil lamp, spout left, loop handle right,
+ *                       the BODY on the canvas centre so the flame stays well
+ *                       inside the left edge; no aura behind the flame (see the
+ *                       kit fact below: a translucent halo on the bare canvas
+ *                       ships as a grey smudge)
  *     flawless_first    a cut clear gem, side view, on a wine cushion
  *     flawless_25       an arrow dead-centre in a wooden target
  *   The five share nothing but the house voice, on purpose: each is a different
@@ -69,8 +84,9 @@
  * #FFF3D2 disc at 0.34 ships as rgb 87,83,71 @ 34%). Composited over parchment
  * that can only DARKEN it, however light the source colour was. A glow that must
  * read light therefore has to be OPAQUE paint inside the contour: first_perfect's
- * rays are solid gold wedges, not a halo. No Math.random: every coordinate is a
- * literal, so the generator is byte-reproducible.
+ * rays are solid brass rods and no_hints_10's flame carries no aura at all. No
+ * Math.random: every coordinate is a literal, so the generator is
+ * byte-reproducible.
  *
  * All coordinates are in the 384x384 supersample space (c = 192 is the centre);
  * each file is downsampled 2x to a 192px PNG.
@@ -214,36 +230,35 @@ function crown(cv, cx, baseY) {
 export function draw() {
   fs.mkdirSync(OUT, { recursive: true });
 
-  { // === first_perfect.png — First Light: one star rising out of a green horizon ===
+  { // === first_perfect.png — First Light: one star rising over a flat horizon ===
     const { cv, c } = canvas();
-    const sy = 190;
-    contactShadow(cv, c + 8, 344, 148, 18, 0.32);                          // the ONLY thing outside the contour
+    const sy = 204, R = 100, hz = 254;                                     // star centre / radius, horizon top edge
+    contactShadow(cv, c + 10, 342, 136, 14, 0.32);                         // under the band, down-right: the ONLY thing outside the contour
     withOutline(cv, t => {
-      // dawn rays: six solid gold rods fanning UP from a point low in the
-      // star's body, so they say "first light" behind a rising star. Each is
-      // ~20-30px at 192 past the star's silhouette and ~9px wide, over the
-      // 1/12-frame floor; opaque, so they are contoured with the star and can
-      // never darken the ground the way a translucent halo does (see header).
-      // They are a step DARKER than the star (GOLD.mid, no lit core) and the
-      // star wears an extra-heavy keyline over them, so at 32px the star stays
-      // the bright form and the fan stays behind it.
-      // Each ray is a tapered wedge (wide at the star, narrowing outward): the
-      // sunburst shape. Parallel round-capped rods read as crown prongs at 32px.
-      const ox = c, oy = sy + 44;
-      for (const deg of [-152, -130, -108, -72, -50, -28]) {
+      // six brass ray RODS radiating from the star's centre: two horizontal
+      // along the horizon and four fanned over the top, each 18 degrees OFF a
+      // star point so no rod extends a point (a fan hugging the points read as
+      // crown prongs in the first blind round). Each rod is 26px wide at 384
+      // (13 at 192, over the 1/16-frame floor) and shows ~40-70px at 192 past
+      // the star's silhouette. Brass, a full step darker than the gold star and
+      // separated from it by an extra-heavy keyline, so at 32px the star stays
+      // the bright form and the rays stay behind it. Opaque paint, contoured
+      // with the star: it can never darken the ground the way a halo does.
+      for (const deg of [-180, -144, -108, -72, -36, 0]) {
         const a = (deg * Math.PI) / 180, ca = Math.cos(a), sa = Math.sin(a);
-        const R = (s, o) => [ox + ca * s - sa * o, oy + sa * s + ca * o];
-        poly(t, [R(56, -14), R(160, -6), R(164, 0), R(160, 6), R(56, 14)], GOLD.mid, 1, GOLD.lo);
+        capsule(t, c + ca * 40, sy + sa * 40, c + ca * (R + 46), sy + sa * (R + 46), 26, BRASS.lo);
+        capsule(t, c + ca * 44, sy + sa * 44 - 4, c + ca * (R + 40), sy + sa * (R + 40) - 4, 12, BRASS.hi, 0.85);
       }
-      poly(t, starPts(c, sy, 104 + 16, 104 * 0.5 + 10), INK, 0.95);        // heavy keyline vs the rays
-      goldStar(t, c, sy, 104);
-      // the horizon: a low green hill drawn OVER the star's lower points (they
-      // sink ~10px at 192 into it), so the star is rising out of the hill rather
-      // than standing on it
-      poly(t, [...domePts(c, 316, 156, 60), [c + 156, 340], [c - 156, 340]], ACCENT.main, 1, ACCENT.lo);
-      poly(t, [...domePts(c, 320, 140, 46), [c + 140, 332], [c - 140, 332]], '#9BC46E', 0.55); // lit crest, inside the hill
+      poly(t, starPts(c, sy, R + 16, R * 0.5 + 10), INK, 0.95);           // heavy keyline vs the rays
+      goldStar(t, c, sy, R);
+      // the horizon: a flat-topped sage band ~70% of the frame wide, drawn OVER
+      // the star so its two lower points sink behind the straight top edge
+      // (the edge runs through the star's bottom inner vertex): half risen is
+      // rising. A lit crest strip just under the edge, a darker foot.
+      poly(t, [[c - 134, hz], [c + 134, hz], [c + 124, 334], [c - 124, 334]], ACCENT.main, 1, ACCENT.lo);
+      capsule(t, c - 118, hz + 12, c + 118, hz + 12, 12, '#9BC46E', 0.6);
     }, { width: 10 });
-    sheen(cv, c - 34, sy - 30, 17, 11, 0.5);
+    sheen(cv, c - 34, sy - 34, 17, 11, 0.5);
     savePNG(path.join(OUT, 'first_perfect.png'), W, W, down2(cv, W, W));
   }
 
@@ -291,13 +306,16 @@ export function draw() {
       // the ribbon: a brass pin bar at the top, two wine straps falling in a V
       // to a brass suspension ring at the disc's crown. The bar + V is what
       // breaks the plain-circle silhouette the challenge buckler owns.
-      const barY = 42;
-      poly(t, [[c - 64, barY + 8], [c - 30, barY + 8], [c + 4, 146], [c - 20, 146]], WINE.base, 1, WINE.lo);   // left strap
-      poly(t, [[c + 30, barY + 8], [c + 64, barY + 8], [c + 20, 146], [c - 4, 146]], WINE.hi, 1, WINE.base);   // right strap (lit)
-      capsule(t, c - 47, barY + 18, c - 12, 138, 8, WINE.hi, 0.55);        // lit stripe, left strap
-      capsule(t, c + 47, barY + 18, c + 12, 138, 8, '#D66A93', 0.5);       // lit stripe, right strap
-      roundRect(t, c, barY, 70, 11, 5, BRASS.hi, 1, BRASS.lo);            // pin bar
-      capsule(t, c - 60, barY - 3, c + 60, barY - 3, 5, '#FFF3D2', 0.55);  // bar highlight
+      // Straps 44px wide at the bar and a 168px bar (at 384): fat enough that
+      // the V + bar still reads at 32px, where the first round's thinner
+      // ribbon let the disc read as a bare circle.
+      const barY = 40;
+      poly(t, [[c - 74, barY + 9], [c - 30, barY + 9], [c + 6, 148], [c - 24, 148]], WINE.base, 1, WINE.lo);   // left strap
+      poly(t, [[c + 30, barY + 9], [c + 74, barY + 9], [c + 24, 148], [c - 6, 148]], WINE.hi, 1, WINE.base);   // right strap (lit)
+      capsule(t, c - 54, barY + 20, c - 14, 140, 9, WINE.hi, 0.55);        // lit stripe, left strap
+      capsule(t, c + 54, barY + 20, c + 14, 140, 9, '#D66A93', 0.5);       // lit stripe, right strap
+      roundRect(t, c, barY, 84, 13, 6, BRASS.hi, 1, BRASS.lo);            // pin bar
+      capsule(t, c - 70, barY - 4, c + 70, barY - 4, 5, '#FFF3D2', 0.55);  // bar highlight
       ringStroke(t, c, 128, 15, 11, BRASS.lo);                             // suspension ring
       arcStroke(t, c, 128, 15, 5, Math.PI * 1.05, Math.PI * 1.7, BRASS.hi, 0.9);
       // the medal disc
@@ -305,16 +323,19 @@ export function draw() {
       ringStroke(t, c, cy, R - 11, 7, GOLD.deep, 0.6);
       roundRect(t, c, cy, R - 20, R - 20, R - 20, NIGHT.hi, 1, NIGHT.lo);   // night field
       ringStroke(t, c, cy, R - 24, 7, NIGHT.lo, 0.7);
-      // the constellation: five big stars (>= 20px at 192 each) on five fat gold
-      // cords (18px at 384 = 9px at 192) laid out as a DIPPER, a four-star bowl
-      // to the lower right and one handle star up-left. A symmetric W read as
-      // the letter M at 32px; the dipper is the one constellation everyone names.
-      const S = [[c - 16, cy + 16], [c + 44, cy + 44], [c + 64, cy - 16], [c + 4, cy - 40], [c - 48, cy - 50]];
+      // the constellation: five stars on five fat gold cords (20px at 384 =
+      // 10px at 192, over the 1/24-frame floor) laid out as a DIPPER, a
+      // four-star bowl to the lower right and one handle star up-left. A
+      // symmetric W read as the letter M at 32px; the dipper is the one
+      // constellation everyone names. The bowl's inner corner star, nearest the
+      // disc centre, is the ANCHOR: 34px against 20px for the other four, so
+      // one star clearly leads the group.
+      const S = [[c - 16, cy + 18], [c + 46, cy + 42], [c + 58, cy - 16], [c + 6, cy - 46], [c - 40, cy - 44]];
       const links = [[0, 1], [1, 2], [2, 3], [3, 0], [3, 4]];
-      for (const [a, b] of links) capsule(t, S[a][0], S[a][1], S[b][0], S[b][1], 18, GOLD.lo);
-      for (const [a, b] of links) capsule(t, S[a][0], S[a][1], S[b][0], S[b][1], 9, GOLD.hi, 0.9);
-      const RS = [22, 25, 25, 23, 20];
-      S.forEach(([x, y], i) => goldStar(t, x, y, RS[i], -Math.PI / 2 + (i - 2) * 0.12));
+      for (const [a, b] of links) capsule(t, S[a][0], S[a][1], S[b][0], S[b][1], 20, GOLD.lo);
+      for (const [a, b] of links) capsule(t, S[a][0], S[a][1], S[b][0], S[b][1], 10, GOLD.hi, 0.9);
+      const RS = [34, 20, 20, 20, 20];
+      [1, 2, 3, 4, 0].forEach(i => goldStar(t, S[i][0], S[i][1], RS[i], -Math.PI / 2 + (i - 2) * 0.12));
     }, { width: 10 });
     sheen(cv, c - 70, cy - 70, 22, 14, 0.45);
     savePNG(path.join(OUT, 'perfect_50.png'), W, W, down2(cv, W, W));
@@ -343,57 +364,82 @@ export function draw() {
     savePNG(path.join(OUT, 'all_difficulties.png'), W, W, down2(cv, W, W));
   }
 
-  { // === hard_10.png — Fearless: a crimson great helm =========================
+  { // === hard_10.png — Fearless: a crimson knight's helm, plumed ==============
     const { cv, c } = canvas();
-    contactShadow(cv, c + 8, 336, 118, 18, 0.32);
+    contactShadow(cv, c + 8, 344, 130, 16, 0.32);
     withOutline(cv, t => {
-      // the comb along the crown, brass
-      poly(t, [[c - 84, 116], [c - 30, 26], [c + 30, 26], [c + 84, 116]], BRASS.hi, 1, BRASS.lo);
-      // the helm: a dome on a bucket with rounded bottom corners
-      const body = [...domePts(c, 154, 108, 100), [c + 108, 290], [c + 92, 312], [c - 92, 312], [c - 108, 290]];
-      poly(t, body, CRIMSON.hi, 1, CRIMSON.lo);
-      // lit left cheek, shaded right cheek
-      poly(t, [[c - 96, 150], [c - 50, 78], [c - 34, 96], [c - 60, 300], [c - 90, 290]], '#FF8C7A', 0.45);
-      poly(t, [[c + 40, 120], [c + 100, 160], [c + 100, 290], [c + 50, 306]], CRIMSON.lo, 0.4);
-      // brow band + T-slot: the eye slit and the breathing slot
-      capsule(t, c - 106, 156, c + 106, 156, 10, CRIMSON.lo, 0.7);
-      roundRect(t, c, 190, 84, 13, 6, INK, 1);
-      roundRect(t, c, 254, 11, 52, 5, INK, 1);
-      // brass rim at the chin
-      roundRect(t, c, 306, 98, 12, 6, BRASS.hi, 1, BRASS.lo);
+      // the PLUME first (the skull cap covers its root): a cream feather rising
+      // from the crown and curling to the upper-right, fat through the middle,
+      // ~54px tall at 192. Drawn as a bead of discs along a quadratic curve
+      // with a parchment-shadow twin offset down-right for its underside.
+      const P0 = [c - 2, 136], P1 = [c + 4, 12], P2 = [c + 122, 52];
+      const bz = s => [
+        (1 - s) * (1 - s) * P0[0] + 2 * (1 - s) * s * P1[0] + s * s * P2[0],
+        (1 - s) * (1 - s) * P0[1] + 2 * (1 - s) * s * P1[1] + s * s * P2[1],
+      ];
+      const thick = s => 26 + 32 * Math.sin(s * Math.PI) - 6 * s;
+      for (let i = 0; i <= 24; i++) { const s = i / 24, [x, y] = bz(s); capsule(t, x + 6, y + 11, x + 6, y + 11, thick(s), PARCH.shadow); }
+      for (let i = 0; i <= 24; i++) { const s = i / 24, [x, y] = bz(s); capsule(t, x, y, x, y, thick(s) - 4, PARCH.hi); }
+      // the GORGET: a flared steel neck guard, wider than the crown (a lantern
+      // tapers the other way), with a dark lip along its bottom
+      poly(t, [[c - 100, 284], [c + 100, 284], [c + 122, 330], [c - 122, 330]], IRON.hi, 1, IRON.mid);
+      capsule(t, c - 110, 318, c + 110, 318, 8, IRON.lo, 0.5);
+      // the FACE PLATE: a crimson box a step darker than the skull, cheeks
+      // tucked in toward the chin, a lit nasal ridge down the middle
+      poly(t, [[c - 96, 206], [c + 96, 206], [c + 98, 258], [c + 86, 300], [c - 86, 300], [c - 98, 258]], CRIMSON.base, 1, CRIMSON.lo);
+      capsule(t, c, 214, c, 296, 14, CRIMSON.hi, 0.35);
+      // two eye slits (26px wide, 13 tall at 192 each: ~2px tall at 32px, the
+      // thinnest dark mark that still shows) either side of the nasal bar,
+      // three short breath slits below them
+      roundRect(t, c - 44, 234, 26, 13, 6, INK, 1);
+      roundRect(t, c + 44, 234, 26, 13, 6, INK, 1);
+      for (const x of [c - 26, c, c + 26]) roundRect(t, x, 274, 5, 16, 3, INK, 1);
+      // the SKULL CAP: a crimson dome, lit left cheek, shaded right
+      poly(t, domePts(c, 210, 102, 86), CRIMSON.hi, 1, CRIMSON.base);
+      poly(t, [[c - 92, 206], [c - 58, 140], [c - 30, 130], [c - 46, 206]], '#FF8C7A', 0.45);
+      poly(t, [[c + 40, 136], [c + 92, 176], [c + 100, 206], [c + 60, 206]], CRIMSON.lo, 0.35);
+      // brass plume socket on the crown
+      roundRect(t, c, 122, 18, 12, 6, BRASS.hi, 1, BRASS.lo);
+      // the VISOR HINGE: a brass band between skull and face, a rivet at each end
+      roundRect(t, c, 208, 110, 9, 4, BRASS.hi, 1, BRASS.lo);
+      for (const x of [c - 100, c + 100]) { ellipse(t, x, 208, 9, 9, INK, 0.9, 2); ellipse(t, x, 207, 6, 6, BRASS.hi, 1, 2); }
     }, { width: 10 });
-    sheen(cv, c - 58, 108, 20, 13, 0.5);
+    sheen(cv, c - 52, 160, 20, 13, 0.5);
     savePNG(path.join(OUT, 'hard_10.png'), W, W, down2(cv, W, W));
   }
 
   { // === no_hints_10.png — Independent Thinker: a lit brass oil lamp =========
     const { cv, c } = canvas();
-    const bx = c - 4, by = 244;
-    contactShadow(cv, bx + 6, 336, 132, 18, 0.32);
-    ellipse(cv, bx - 92, 136, 66, 72, HALO, 0.36, 24);                      // lamp light (stays inside the frame)
+    // The BODY sits on the canvas centre (bx = c + 10 puts the whole lamp's
+    // bounding box there once the spout and the big ring handle are counted),
+    // so the flame tip stays ~26px at 192 inside the left edge. No aura behind
+    // the flame: on the bare canvas a translucent halo ships as a grey smudge
+    // (see the kit fact in the header).
+    const bx = c + 10, by = 246;
+    contactShadow(cv, bx + 6, 336, 134, 18, 0.32);
     withOutline(cv, t => {
       // foot
       roundRect(t, bx, 312, 66, 12, 6, BRASS.hi, 1, BRASS.lo);
       capsule(t, bx, 300, bx, 286, 30, BRASS.lo);
-      // loop handle, right
-      arcStroke(t, bx + 114, 232, 42, 22, -Math.PI * 0.55, Math.PI * 0.55, BRASS.lo);
-      arcStroke(t, bx + 114, 232, 42, 10, -Math.PI * 0.5, Math.PI * 0.05, BRASS.hi, 0.8);
-      // spout, left, rising to the flame
-      capsule(t, bx - 80, 236, bx - 138, 176, 40, BRASS.lo);
-      capsule(t, bx - 84, 234, bx - 136, 178, 24, BRASS.hi, 0.9);
+      // loop handle, right: big enough to be carried by
+      arcStroke(t, bx + 100, 232, 48, 24, -Math.PI * 0.6, Math.PI * 0.6, BRASS.lo);
+      arcStroke(t, bx + 100, 232, 48, 11, -Math.PI * 0.55, Math.PI * 0.05, BRASS.hi, 0.8);
+      // spout, left, a little shorter, rising to the flame
+      capsule(t, bx - 78, 238, bx - 118, 184, 40, BRASS.lo);
+      capsule(t, bx - 82, 236, bx - 116, 186, 24, BRASS.hi, 0.9);
       // body: a squat teardrop belly
       roundRect(t, bx, by, 104, 52, 46, BRASS.hi, 1, BRASS.lo);
-      capsule(t, bx - 90, 262, bx + 90, 262, 20, '#7E5320', 0.4);           // belly shade
+      capsule(t, bx - 90, 264, bx + 90, 264, 20, '#7E5320', 0.4);           // belly shade
       // lid + knob
-      roundRect(t, bx - 4, 190, 44, 11, 5, BRASS.hi, 1, BRASS.lo);
-      capsule(t, bx - 4, 184, bx - 4, 170, 12, BRASS.lo);
-      ellipse(t, bx - 4, 164, 13, 12, BRASS.hi);
+      roundRect(t, bx - 4, 192, 44, 11, 5, BRASS.hi, 1, BRASS.lo);
+      capsule(t, bx - 4, 186, bx - 4, 172, 12, BRASS.lo);
+      ellipse(t, bx - 4, 166, 13, 12, BRASS.hi);
       // the flame at the spout's mouth
-      flameLobe(t, bx - 132, 62, 176, 34, '#D8461B');
-      flameLobe(t, bx - 134, 84, 174, 25, '#FF9A2E');
-      flameLobe(t, bx - 136, 116, 172, 13, '#FFF0B4');
+      flameLobe(t, bx - 116, 66, 184, 34, '#D8461B');
+      flameLobe(t, bx - 118, 88, 182, 25, '#FF9A2E');
+      flameLobe(t, bx - 120, 120, 180, 13, '#FFF0B4');
     }, { width: 10 });
-    sheen(cv, bx - 50, 214, 26, 13, 0.5);
+    sheen(cv, bx - 44, 216, 26, 13, 0.5);
     savePNG(path.join(OUT, 'no_hints_10.png'), W, W, down2(cv, W, W));
   }
 
