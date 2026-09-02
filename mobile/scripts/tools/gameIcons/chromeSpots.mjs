@@ -156,8 +156,8 @@ const LEDGER = { hi: '#B0584F', base: '#8C3C36', lo: '#5C2320', deep: '#3B1513' 
 /** Quill: cream (PAGE.hi at most, never #FFFFFF) down to tan, on a warm shaft. */
 const QUILL = { hi: '#FBF2DC', lo: '#B39C72', shaft: '#7A5A3A' };
 const GILT = { lite: '#FBE6A8', hi: '#E6BC62', base: '#C48F3C', lo: '#8E5E22', deep: '#5B3A12' };
-/** A cream-to-ochre moth: its lit half clears cream, its body clears ash. */
-const MOTH = { base: '#C89E4E', band: '#4E3618', body: '#4A3320' };
+/** An ochre moth: lit tan over shade tan, a dark band and a near-ink body. */
+const MOTH = { hi: '#EBD29A', base: '#C89E4E', lo: '#96702F', band: '#6B4A1E', body: '#453020' };
 /** The ledger's inkpot: warm clay, never the cobalt glass of round 1. */
 const CLAY = { hi: '#D9A468', base: '#B87C46', lo: '#7E4C22' };
 /** The gallery's empty wall: a faded plaster two steps under cream, never grey. */
@@ -252,28 +252,43 @@ function leaf(t, hx, hy, a, k, top, bottom) {
  * (> 1/6 of the frame) and no antenna is thinner than 12px (> 1/48).
  */
 function simpleMoth(t, mx, my, s) {
-  const P = ([x, y]) => [mx + x * s, my + y * s];
-  const side = (pts, sgn) => pts.map(([x, y]) => P([x * sgn, y]));
-  const WING = [[6, -34], [-28, -62], [-74, -52], [-92, -8], [-70, 40], [-24, 48], [4, 26]];
+  const ca = Math.cos(-0.3), sa = Math.sin(-0.3);   // tilted, as if clinging
+  const A = ([x, y], k) => [mx + (x * ca - y * sa) * k, my + (x * sa + y * ca) * k];
+  // A wing SWEPT out to a point, not a round lobe: a lobe with a dot in it
+  // averaged to a coin at 64px, and a pair of them to a padlock.
+  const WING = [[4, -26], [-28, -54], [-72, -60], [-108, -42], [-118, -12],
+    [-96, 12], [-58, 30], [-22, 34], [2, 14]];
+  const BAND = [[-110, -6], [-92, 10], [-56, 27], [-22, 30], [-20, 16], [-56, 13], [-90, -2]];
+  const wing = (sgn, k) => WING.map(([x, y]) => A([x * sgn, y], k));
+  const parts = (k, col, al) => {                 // wings + body + antennae at k
+    for (const sgn of [-1, 1]) poly(t, wing(sgn, k), col, al);
+    const bT = A([0, -34], k), bB = A([0, 46], k);
+    capsule(t, bT[0], bT[1], bB[0], bB[1], 34 * k, col, al);
+    for (const sgn of [-1, 1]) {
+      const a0 = A([8 * sgn, -42], k), a1 = A([48 * sgn, -84], k);
+      capsule(t, a0[0], a0[1], a1[0], a1[1], 18 * k, col, al);
+    }
+    const hd = A([0, -42], k);
+    ellipse(t, hd[0], hd[1], 17 * k, 17 * k, col, al, 3);
+  };
+  // ONE ink halo around the whole insect: per-part keylines cut the moth into
+  // separate stones, which is what a mid-round draft looked like at 64px.
+  parts(s * 1.10, INK, 0.95);
   for (const sgn of [-1, 1]) {
-    const w = side(WING, sgn);
-    poly(t, grow(w, 10 * s), INK, 0.95);
-    poly(t, w, CREAM.hi, 1, MOTH.base);
-    const [dx, dy] = P([-50 * sgn, -4]);
-    ellipse(t, dx, dy, 17 * s, 17 * s, INK, 0.9, 3);
-    ellipse(t, dx, dy, 12 * s, 12 * s, MOTH.band, 1, 3);
+    poly(t, wing(sgn, s), MOTH.hi, 1, MOTH.lo);
+    poly(t, BAND.map(([x, y]) => A([x * sgn, y], s)), MOTH.band, 0.8);
+    const v0 = A([6 * sgn, -20], s), v1 = A([-98 * sgn, -32], s);
+    capsule(t, v0[0], v0[1], v1[0], v1[1], 9 * s, MOTH.lo, 0.55);
   }
-  for (const sgn of [-1, 1]) {                                   // antennae
-    const a0 = P([6 * sgn, -54]), a1 = P([34 * sgn, -88]);
-    capsule(t, a0[0], a0[1], a1[0], a1[1], 30 * s, INK, 0.95);
-    capsule(t, a0[0], a0[1], a1[0], a1[1], 20 * s, MOTH.body);
+  const bT = A([0, -34], s), bB = A([0, 46], s);
+  capsule(t, bT[0], bT[1], bB[0], bB[1], 34 * s, MOTH.body);
+  capsule(t, bT[0] - 5 * s, bT[1] + 6 * s, bB[0] - 5 * s, bB[1] - 10 * s, 10 * s, MOTH.lo, 0.5);
+  for (const sgn of [-1, 1]) {
+    const a0 = A([8 * sgn, -42], s), a1 = A([48 * sgn, -84], s);
+    capsule(t, a0[0], a0[1], a1[0], a1[1], 18 * s, MOTH.body);
   }
-  const bT = P([0, -40]), bB = P([0, 46]);
-  capsule(t, bT[0], bT[1], bB[0], bB[1], 44 * s, INK, 0.95);
-  capsule(t, bT[0], bT[1], bB[0], bB[1], 32 * s, MOTH.body);
-  const hd = P([0, -50]);
-  ellipse(t, hd[0], hd[1], 22 * s, 22 * s, INK, 0.95, 3);
-  ellipse(t, hd[0], hd[1], 16 * s, 16 * s, MOTH.body, 1, 3);
+  const hd = A([0, -42], s);
+  ellipse(t, hd[0], hd[1], 17 * s, 17 * s, MOTH.body, 1, 3);
 }
 
 /**
@@ -414,46 +429,38 @@ export function draw() {
   }
 
   { // === season_pass.png — ribboned pass card with a wax seal ================
-    // The first draft hung two notched tails straight down from a lumpy,
-    // star-stamped seal, which was the rosette of ribbon.png in miniature: at
-    // 24dp rows 5 and 9 were twins. The ribbon is now a SASH laid diagonally
-    // across the card's lower-right corner, both ends dovetailed just past the
-    // card's edges, and the seal is a smooth wax disc with a plain pressed ring
-    // sitting where the sash crosses the corner. Card + sash + seal is the
-    // silhouette; nothing here has pleats or a star.
+    // Round 1 laid the ribbon across the card as a diagonal SASH: its upper end
+    // crossed the top-right corner and was read as a TORN corner (damage, not a
+    // pass), while its lower end and the lumpy seal averaged into one red blot
+    // beside ribbon.png's rosette. Now the card has four square corners and
+    // nothing crosses its face; one big PLAIN round wax disc sits astride the
+    // lower-right corner (r 56 = 54% of the card's height, so it breaks the
+    // silhouette by itself) with two dovetailed tails hanging out from under it
+    // past the card's bottom edge. Two thick title bars, no third thin line.
     const cv = fresh();
-    const kx = c, ky = c - 10, HW = 190, HH = 122;
-    contactShadow(cv, kx + 12, ky + HH + 30, 170, 22, 0.3);
-    const wx = kx + 118, wy = ky + 58, wr = 54;                     // the seal
-    const ux = 0.62, uy = -0.785;                                    // sash direction
+    const kx = c - 20, ky = c - 42, HW = 168, HH = 104;
+    const wx = kx + HW - 26, wy = ky + HH - 12, wr = 56;             // the seal
+    contactShadow(cv, c + 14, 452, 172, 19, 0.3);
     withOutline(cv, t => {
-      // the card: plum border, parchment face
-      roundRect(t, kx, ky, HW, HH, 18, PLUM.hi, 1, PLUM.lo);
-      roundRect(t, kx, ky, HW - 18, HH - 18, 10, PARCH.hi, 1, PARCH.dim);
-      capsule(t, kx - HW + 26, ky - HH + 10, kx + HW - 26, ky - HH + 10, 8, '#B4729F', 0.7);
-      // two plum title bars on the left half
-      roundRect(t, kx - 66, ky - 56, 92, 15, 7, PLUM.base, 1, PLUM.lo);
-      roundRect(t, kx - 86, ky - 14, 72, 11, 5, PLUM.base, 0.85, PLUM.lo);
-      roundRect(t, kx - 86, ky + 24, 72, 11, 5, PLUM.base, 0.85, PLUM.lo);
-      // the sash: two dovetailed halves running out from the seal's centre so
-      // each end past the card is a notched ribbon tail
-      poly(t, tailPts(wx, wy, wx + ux * 150, wy + uy * 150, 46, 18), RED.hi, 1, RED.base);
-      poly(t, tailPts(wx, wy, wx - ux * 156, wy - uy * 156, 46, 18), RED.base, 1, RED.lo);
-      capsule(t, wx - ux * 120 - 6, wy - uy * 120 - 8, wx + ux * 120 - 6, wy + uy * 120 - 8, 8, RED.lite, 0.45);
-      // the wax seal: a gently lumpy blob, a lit crescent, a plain pressed ring
-      for (let i = 0; i < 7; i++) {
-        const a = (i / 7) * Math.PI * 2 + 0.4;
-        ellipse(t, wx + Math.cos(a) * (wr - 8), wy + Math.sin(a) * (wr - 8), 13, 13, WAX.base, 1, 3);
-      }
-      ellipse(t, wx, wy, wr - 5, wr - 5, WAX.base, 1, 3);
-      arcStroke(t, wx, wy, wr - 17, 12, 0.5, Math.PI - 0.5, WAX.lo, 0.65);
-      arcStroke(t, wx, wy, wr - 17, 11, -Math.PI + 0.6, -0.6, WAX.hi, 0.7);
-      arcStroke(t, wx, wy, 24, 12, -Math.PI, Math.PI, WAX.lo, 0.95);
-      arcStroke(t, wx - 1, wy - 2, 24, 6, -Math.PI + 0.4, -0.4, WAX.hi, 0.6);
-      ellipse(t, wx, wy, 9, 9, WAX.lo, 1, 3);
+      // the two tails first: their heads run under the card and the seal
+      poly(t, tailPts(wx - 4, wy - 14, wx - 42, wy + 100, 58, 24), RED.base, 1, RED.lo);
+      poly(t, tailPts(wx + 8, wy - 14, wx + 44, wy + 94, 58, 24), RED.hi, 1, RED.base);
+      // the card: plum border, parchment face, square-shouldered corners
+      roundRect(t, kx, ky, HW, HH, 14, PLUM.hi, 1, PLUM.lo);
+      roundRect(t, kx, ky, HW - 16, HH - 16, 8, PARCH.hi, 1, PARCH.dim);
+      capsule(t, kx - HW + 24, ky - HH + 9, kx + HW - 24, ky - HH + 9, 8, '#B4729F', 0.7);
+      // two thick plum title bars at the upper left (each > 1/16 of the frame)
+      roundRect(t, kx - 58, ky - 50, 98, 18, 8, PLUM.base, 1, PLUM.lo);
+      roundRect(t, kx - 74, ky - 2, 82, 17, 8, PLUM.base, 1, PLUM.lo);
+      // the seal: a smooth disc, two value steps, a pressed ring, a small star
+      roundRect(t, wx, wy, wr, wr, wr, WAX.hi, 1, WAX.lo);
+      arcStroke(t, wx, wy, wr - 17, 13, -Math.PI, Math.PI, WAX.lo, 0.7);
+      arcStroke(t, wx, wy, wr - 8, 10, -Math.PI + 0.5, -0.5, WAX.hi, 0.55);
+      poly(t, starPts(wx, wy + 2, 29, 12), WAX.deep, 0.85);
+      poly(t, starPts(wx - 2, wy - 1, 26, 11), WAX.hi, 0.5);
     }, CHROME);
-    sheen(cv, kx - 140, ky - 86, 30, 12, 0.4);
-    sheen(cv, wx - 20, wy - 22, 9, 6, 0.5);
+    sheen(cv, kx - 132, ky - 80, 30, 12, 0.4);
+    sheen(cv, wx - 25, wy - 27, 13, 9, 0.5);
     save(cv, path.join(OUT, 'season_pass.png'));
   }
 
@@ -484,55 +491,63 @@ export function draw() {
   }
 
   { // === shop_sign.png — hanging wooden shop sign with a paintbrush ===========
-    // Two lessons from the first draft at 24dp. A short rod with two links
-    // over a wide plank is the outline of a BRIEFCASE and its handle, so the
-    // bracket rod now runs well past the plank on both sides with a ball
-    // finial at each end (a rod, not a handle). And a thin tapering stick with
-    // a pink tip is a PENCIL, so the brush is now a flat house-painter's brush:
-    // a short wine handle, a brass ferrule, and a bristle head WIDER than the
-    // handle with a square-cut end dipped in candy-pink paint, hanging off the
-    // plank's lower-right corner.
+    // Round 1 hung the plank from a near-black IRON rod on two thin links: on
+    // ash that hardware vanished and the board floated, and the rod + board +
+    // an overhanging brush were three masses fighting for the eye. The hardware
+    // is WARM now (a wood bracket beam inside the board's own width, joined by
+    // two chunky brass links that overlap both, so it is one connected shape),
+    // and the brush is the ONLY emblem: near-horizontal, centred on the board,
+    // fat enough that its bristle head is still a shape at 24dp.
     const cv = fresh();
-    const py = c + 34;
-    contactShadow(cv, c + 10, py + 132, 160, 18, 0.32);
-    // the brush lies along d = (0.80, 0.60) from its butt at (x0, y0)
-    const x0 = c - 152, y0 = py - 74, dx = 0.8, dy = 0.6, nx = -0.6, ny = 0.8;
-    const P = (tt, s) => [x0 + dx * tt + nx * s, y0 + dy * tt + ny * s];
+    const py = c + 42, BW = 162, BH = 110;
+    contactShadow(cv, c + 12, py + BH + 26, 152, 18, 0.32);
+    // the brush axis: a gentle 8 degrees down to the right, centred on t = 132
+    const ux = Math.cos(0.14), uy = Math.sin(0.14), nx = -uy, ny = ux;
+    const x0 = c - 132 * ux, y0 = py - 132 * uy;
+    const P = (tt, s) => [x0 + ux * tt + nx * s, y0 + uy * tt + ny * s];
     withOutline(cv, t => {
-      capsule(t, c - 196, c - 166, c + 196, c - 166, 20, IRON.base);     // bracket rod
-      capsule(t, c - 190, c - 172, c + 190, c - 172, 6, IRON.hi, 0.7);
-      for (const x of [c - 200, c + 200]) {                              // ball finials
-        ellipse(t, x, c - 166, 17, 17, IRON.base, 1, 3);
-        ellipse(t, x - 4, c - 171, 7, 6, IRON.hi, 0.8, 2);
+      // The rail OVERHANGS the board and the links hang at the board's outer
+      // corners: a beam tucked inside the board's width with links near its
+      // centre is the outline of a briefcase handle and its clasps, which is
+      // exactly what a mid-round draft produced.
+      capsule(t, c - 186, 132, c + 186, 132, 54, INK, 0.92);            // bracket rail
+      capsule(t, c - 186, 132, c + 186, 132, 42, WOOD.base);
+      capsule(t, c - 172, 121, c + 172, 121, 11, WOOD.rim, 0.75);
+      capsule(t, c - 172, 146, c + 172, 146, 9, WOOD.seam, 0.45);
+      for (const x of [c - 192, c + 192]) {                             // brass finials
+        ellipse(t, x, 132, 30, 30, INK, 0.92, 3);
+        ellipse(t, x, 132, 23, 23, BR.mid, 1, 3);
+        ellipse(t, x - 6, 126, 11, 9, BR.lite, 0.85, 2);
       }
-      for (const x of [c - 134, c + 134]) {                              // two links
-        capsule(t, x, c - 160, x, py - 100, 16, IRON.lo);
-        capsule(t, x - 4, c - 154, x - 4, py - 104, 5, IRON.hi, 0.6);
+      for (const x of [c - 122, c + 122]) {                             // two brass links
+        capsule(t, x, 142, x, 200, 46, INK, 0.92);
+        capsule(t, x, 142, x, 200, 34, BR.hi);
+        capsule(t, x, 152, x, 190, 13, BR.deep, 0.6);
+        capsule(t, x - 10, 150, x - 10, 192, 7, BR.lite, 0.7);
       }
-      roundRect(t, c, py, 178, 112, 14, WOOD.light, 1, WOOD.dark);       // plank
-      roundRect(t, c, py, 160, 94, 10, WOOD.seam, 0.5);                  // border groove
-      roundRect(t, c, py, 150, 84, 8, WOOD.light, 1, WOOD.base);
-      capsule(t, c - 156, py - 104, c + 156, py - 104, 9, '#F7D8A8', 0.7);
-      // the brush: handle, ferrule, bristles, paint
-      const hA = P(0, 0), hB = P(150, 0);
-      capsule(t, hA[0], hA[1], hB[0], hB[1], 42, INK, 0.92);
-      capsule(t, hA[0], hA[1], hB[0], hB[1], 36, RED.base);
-      const cA = P(8, -9), cB = P(146, -9);
-      capsule(t, cA[0], cA[1], cB[0], cB[1], 10, RED.lite, 0.6);
-      const ferrule = [P(146, -30), P(198, -32), P(198, 32), P(146, 30)];
-      poly(t, grow(ferrule, 6), INK, 0.92);
+      roundRect(t, c, py, BW, BH, 14, WOOD.light, 1, WOOD.dark);        // the plank
+      roundRect(t, c, py, BW - 16, BH - 16, 10, WOOD.seam, 0.45);       // border groove
+      roundRect(t, c, py, BW - 24, BH - 24, 8, WOOD.light, 1, WOOD.base);
+      capsule(t, c - BW + 24, py - BH + 14, c + BW - 24, py - BH + 14, 9, '#F7D8A8', 0.7);
+      // the brush: a fat wood handle, a stepped brass ferrule, a broad wedge
+      const hA = P(0, 0), hB = P(138, 0);
+      capsule(t, hA[0], hA[1], hB[0], hB[1], 60, INK, 0.92);
+      capsule(t, hA[0], hA[1], hB[0], hB[1], 48, WOOD.dark);
+      const cA = P(12, -14), cB = P(130, -14);
+      capsule(t, cA[0], cA[1], cB[0], cB[1], 12, WOOD.mid, 0.8);
+      const ferrule = [P(132, -42), P(184, -44), P(184, 44), P(132, 42)];
+      poly(t, grow(ferrule, 7), INK, 0.92);
       poly(t, ferrule, BR.hi, 1, BR.lo);
-      const rA = P(150, -18), rB = P(194, -19);
-      capsule(t, rA[0], rA[1], rB[0], rB[1], 9, BR.lite, 0.8);
-      const bristle = [P(196, -34), P(292, -38), P(300, -30), P(300, 30), P(292, 38), P(196, 34)];
-      poly(t, grow(bristle, 6), INK, 0.92);
+      const rA = P(140, -24), rB = P(178, -25);
+      capsule(t, rA[0], rA[1], rB[0], rB[1], 11, BR.lite, 0.8);
+      const bristle = [P(182, -44), P(252, -56), P(264, -46), P(264, 46), P(252, 56), P(182, 44)];
+      poly(t, grow(bristle, 7), INK, 0.92);
       poly(t, bristle, CREAM.hi, 1, CREAM.lo);
-      const tip = [P(250, -37), P(292, -38), P(300, -30), P(300, 30), P(292, 38), P(250, 37)];
-      poly(t, tip, PINK.hi, 1, PINK.lo);
-      const dA = P(300, 12), dB = P(322, 14);                             // a paint drip
-      capsule(t, dA[0], dA[1], dB[0], dB[1], 16, PINK.base);
+      const dip = [P(224, -54), P(252, -56), P(264, -46), P(264, 46), P(252, 56), P(224, 54)];
+      poly(t, dip, PINK.hi, 1, PINK.lo);
+      capsule(t, P(232, -40)[0], P(232, -40)[1], P(258, -41)[0], P(258, -41)[1], 11, '#FFD3E4', 0.55);
     }, CHROME);
-    sheen(cv, c - 132, py - 74, 30, 10, 0.45);
+    sheen(cv, c - 122, py - 70, 28, 10, 0.45);
     save(cv, path.join(OUT, 'shop_sign.png'));
   }
 
@@ -590,69 +605,111 @@ export function draw() {
     save(cv, path.join(OUT, 'ribbon.png'));
   }
 
-  { // === spots/empty_ledger.png — open blank ledger, quill, inkpot ============
+  { // === spots/empty_ledger.png — a blank ledger, a quill and an inkpot ======
+    // Round 1 drew the ledger as a flat landscape spread, which at 96dp was
+    // book_open's silhouette again, then hung a white plume and a detached
+    // cobalt pot off it and ruled the pages with hatching finer than 1/12 of
+    // the frame. This is ONE still life instead: the ledger is a wine trapezoid
+    // in slight top-down perspective (far edge narrower than near, portrait
+    // pages, a thick stacked page block along the near edge, a brass cap on the
+    // near-right corner), a big cream quill lies across it, and a warm CLAY pot
+    // overlaps its front-left corner so the two share a contour and a shadow.
     const cv = fresh();
-    const by = c + 8;
-    contactShadow(cv, c + 12, by + 150, 210, 20, 0.32);
-    contactShadow(cv, c - 138, c + 176, 56, 12, 0.3);
+    const bx = c - 4, bT = 96, bB = 352, HW = 146, DIP = 30;
+    contactShadow(cv, c + 16, 412, 198, 22, 0.32);
     withOutline(cv, t => {
-      openBook(t, c, by, 214, 124, 24, 16, LEDGER, PAGE, { rules: true });
-      // the quill across the right page: shaft from nib (near the gutter) up
-      // and right to the tip; the vane hangs off the upper-left side of it
-      const nx0 = c + 34, ny0 = by + 92, tx1 = c + 200, ty1 = by - 160;
-      const L = Math.hypot(tx1 - nx0, ty1 - ny0), ux = (tx1 - nx0) / L, uy = (ty1 - ny0) / L;
-      const px = -uy, py = ux;                                          // left-hand normal
-      const Q = (tt, s) => [nx0 + ux * tt + px * s, ny0 + uy * tt + py * s];
-      const vane = [Q(58, 0), Q(90, -30), Q(150, -46), Q(215, -40), Q(L, -4), Q(L, 4), Q(228, 10), Q(150, 20), Q(100, 14), Q(70, 4)];
-      poly(t, grow(vane, 7), INK, 0.92);
-      poly(t, vane, FEATHER.hi, 1, FEATHER.lo);
-      const s0 = Q(0, 0), s1 = Q(L - 8, 0);
-      capsule(t, s0[0], s0[1], s1[0], s1[1], 9, FEATHER.shaft, 0.9);    // the rachis
-      const nA = Q(-2, 0), nB = Q(46, 0);
-      capsule(t, nA[0], nA[1], nB[0], nB[1], 20, INK, 0.92);
-      capsule(t, nA[0], nA[1], nB[0], nB[1], 14, BR.hi);               // brass nib
-      capsule(t, nA[0], nA[1], nA[0], nA[1], 15, INK, 0.95);
-      capsule(t, nA[0], nA[1], nA[0], nA[1], 9, BR.deep);              // its tip
-      // the inkpot in front of the lower-left corner
-      const ix = c - 150, iy = c + 112;
-      roundRect(t, ix, iy + 8, 46, 38, 16, INKP.hi, 1, INKP.lo);       // glass body
-      roundRect(t, ix, iy - 34, 30, 12, 5, BR.hi, 1, BR.lo);           // brass collar
-      roundRect(t, ix, iy - 50, 24, 10, 5, INKP.rim, 1, INKP.lo);      // cap
-      roundRect(t, ix - 22, iy + 6, 8, 24, 4, INKP.gloss, 0.55);       // glass gloss
-      capsule(t, ix - 34, iy + 34, ix + 34, iy + 34, 8, INKP.lo, 0.8);
+      // the stacked page block, drawn first so the covers overlap its head
+      poly(t, [[bx - HW + 4, bB - 30], [bx + HW - 4, bB - 30], [bx + HW - 20, bB + 34], [bx, bB + 46], [bx - HW + 20, bB + 34]], PAGE.base, 1, PAGE.lo);
+      poly(t, [[bx - HW + 14, bB + 2], [bx + HW - 14, bB + 2], [bx + HW - 24, bB + 24], [bx, bB + 33], [bx - HW + 24, bB + 24]], PAGE.lo, 0.6);
+      // the wine covers, spread in a shallow V, PORTRAIT pages (1.1:1 overall,
+      // where book_open's spread is 1.6:1)
+      const cover = [[bx - HW, bT], [bx - 10, bT + DIP], [bx + 10, bT + DIP], [bx + HW, bT],
+        [bx + HW, bB - 6], [bx + 10, bB - DIP * 0.6], [bx - 10, bB - DIP * 0.6], [bx - HW, bB - 6]];
+      poly(t, cover, LEDGER.hi, 1, LEDGER.lo);
+      capsule(t, bx - HW + 14, bT + 8, bx - 14, bT + DIP + 6, 11, LEDGER.hi, 0.75);
+      capsule(t, bx + 14, bT + DIP + 6, bx + HW - 14, bT + 8, 11, LEDGER.hi, 0.75);
+      const pageL = [[bx - HW + 17, bT + 22], [bx - 13, bT + DIP + 14], [bx - 13, bB - DIP * 0.6 - 14], [bx - HW + 17, bB - 24]];
+      const pageR = pageL.map(([x, y]) => [2 * bx - x, y]);
+      poly(t, pageL, PAGE.hi, 1, PAGE.base);
+      poly(t, pageR, PAGE.hi, 1, PAGE.base);
+      for (const sgn of [-1, 1]) {                     // three fat rules a page
+        const outer = bx + sgn * (HW - 30), inner = bx + sgn * 28;
+        for (const [fy, lift] of [[0.30, 12], [0.52, 6], [0.74, 2]]) {
+          const y = bT + (bB - bT) * fy;
+          capsule(t, outer, y + lift, inner, y + lift * 0.3, 14, PAGE.line, 0.8);
+        }
+        capsule(t, bx + sgn * (HW - 46), bT + 54, bx + sgn * (HW - 46), bB - 44, 10, PAGE.margin, 0.85);
+      }
+      capsule(t, bx, bT + DIP + 4, bx, bB - DIP * 0.6 - 4, 22, LEDGER.deep);   // gutter
+      const cap = [[bx + HW - 54, bT + 6], [bx + HW + 2, bT - 4], [bx + HW + 2, bT + 50], [bx + HW - 40, bT + 54]];
+      poly(t, grow(cap, 6), INK, 0.92);                                 // brass corner cap
+      poly(t, cap, BR.hi, 1, BR.lo);
+      // the quill lies ACROSS THE RIGHT PAGE ONLY (the gutter and left page stay
+      // clear, so the open-book read survives) and out past the cover's edge
+      const nX = bx + 26, nY = bB - 44, tX = bx + 178, tY = 108;
+      const L = Math.hypot(tX - nX, tY - nY), qx = (tX - nX) / L, qy = (tY - nY) / L;
+      const vx = -qy, vy = qx;                                          // left-hand normal
+      const Q = (tt, s) => [nX + qx * tt + vx * s, nY + qy * tt + vy * s];
+      const sA = Q(-6, 0), sB = Q(L - 6, 0);
+      capsule(t, sA[0], sA[1], sB[0], sB[1], 26, INK, 0.92);
+      capsule(t, sA[0], sA[1], sB[0], sB[1], 17, QUILL.shaft);          // the shaft
+      const vane = [Q(92, 2), Q(112, -46), Q(160, -80), Q(212, -74), Q(250, -34), Q(L - 2, -6),
+        Q(L - 4, 6), Q(226, 12), Q(170, 14), Q(124, 12)];
+      poly(t, grow(vane, 9), INK, 0.95);
+      poly(t, vane, QUILL.hi, 1, QUILL.lo);
+      capsule(t, Q(114, -8)[0], Q(114, -8)[1], Q(250, -12)[0], Q(250, -12)[1], 11, QUILL.lo, 0.55);
+      const nA = Q(-4, 0), nB = Q(52, 0);
+      capsule(t, nA[0], nA[1], nB[0], nB[1], 30, INK, 0.92);
+      capsule(t, nA[0], nA[1], nB[0], nB[1], 22, BR.hi);                // brass nib
+      ellipse(t, nA[0], nA[1], 11, 11, INK, 0.95, 3);
+      // the clay inkpot, overlapping the ledger's front-left corner
+      const ix = c - 158, iy = 326;
+      roundRect(t, ix, iy + 10, 50, 46, 19, CLAY.hi, 1, CLAY.lo);       // body
+      roundRect(t, ix, iy - 30, 33, 17, 8, CLAY.hi, 1, CLAY.base);      // shoulder
+      roundRect(t, ix, iy - 52, 28, 16, 6, BR.hi, 1, BR.lo);            // brass cap
+      ellipse(t, ix, iy - 63, 18, 7, INK, 0.85, 2);                     // ink meniscus
+      capsule(t, ix - 33, iy + 44, ix + 33, iy + 44, 9, CLAY.lo, 0.7);
     }, SPOT);
-    sheen(cv, c - 172, by - 94, 36, 12, 0.4);
-    sheen(cv, c - 162, c + 96, 8, 12, 0.5);
+    sheen(cv, bx - 108, bT + 52, 30, 14, 0.35);
+    sheen(cv, c - 178, 302, 9, 13, 0.5);
     save(cv, path.join(SPOTS, 'empty_ledger.png'));
   }
 
-  { // === spots/empty_gallery.png — empty frame on a nail, one small moth ======
+  { // === spots/empty_gallery.png — empty frame on a nail, one moth ============
+    // Round 1's hardware was a near-black cord that vanished on ash and tangled
+    // with a tiny four-winged moth on the top rail into a squiggle read as a
+    // cobweb or dried flowers, and the mount was flat cool grey: the family's
+    // only cold fill. The wire is warm twine on ONE big brass nail head, the
+    // mount is a top-lit faded plaster, and the moth is one big two-lobed shape
+    // sitting astride the frame's lower-right corner, where it breaks the
+    // rectangle instead of decorating it.
     const cv = fresh();
-    const fy = c + 26, HW = 176, HH = 148;
-    contactShadow(cv, c + 14, fy + HH + 18, 160, 18, 0.32);
+    const fx = c - 18, fy = c + 32, HW = 150, HH = 128;
+    contactShadow(cv, fx + 16, fy + HH + 18, 146, 18, 0.32);
     withOutline(cv, t => {
-      // the nail and the picture wire
-      ellipse(t, c, c - 196, 17, 13, IRON.hi, 1, 3);
-      ellipse(t, c + 3, c - 193, 9, 6, IRON.lo, 0.8, 2);
+      // the hanging wire: a shallow warm-twine V into one big brass nail head
       for (const sgn of [-1, 1]) {
-        capsule(t, c + sgn * 140, fy - HH + 6, c, c - 192, 13, INK, 0.92);
-        capsule(t, c + sgn * 140, fy - HH + 6, c, c - 192, 7, IRON.base);
+        capsule(t, fx + sgn * 106, fy - HH + 12, fx, 98, 32, INK, 0.92);
+        capsule(t, fx + sgn * 106, fy - HH + 12, fx, 98, 22, TWINE.base);
+        capsule(t, fx + sgn * 102 - 4, fy - HH + 6, fx - 4, 92, 8, TWINE.hi, 0.65);
       }
-      // the frame: gilt outer, a carved inner step, the wall showing through
-      roundRect(t, c, fy, HW, HH, 12, GILT.hi, 1, GILT.lo);
-      capsule(t, c - HW + 18, fy - HH + 9, c + HW - 18, fy - HH + 9, 10, GILT.lite, 0.8);
-      capsule(t, c - HW + 18, fy + HH - 9, c + HW - 18, fy + HH - 9, 10, GILT.deep, 0.6);
-      roundRect(t, c, fy, HW - 22, HH - 22, 6, GILT.deep, 0.75);
-      roundRect(t, c, fy, HW - 30, HH - 30, 4, GILT.base, 1, GILT.lo);
-      roundRect(t, c, fy, HW - 44, HH - 44, 3, WALLP.hi, 1, WALLP.lo);
-      for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {   // corner rosettes
-        ellipse(t, c + sx * (HW - 20), fy + sy * (HH - 20), 17, 17, GILT.lite, 1, 3);
-        ellipse(t, c + sx * (HW - 20) + 3, fy + sy * (HH - 20) + 3, 9, 9, GILT.lo, 0.8, 2);
+      ellipse(t, fx, 82, 26, 26, INK, 0.95, 3);
+      ellipse(t, fx, 82, 22, 22, BR.mid, 1, 3);
+      ellipse(t, fx - 6, 76, 12, 11, BR.lite, 0.9, 3);
+      // the frame: gilt outer, a carved inner step, the empty wall inside
+      roundRect(t, fx, fy, HW, HH, 12, GILT.hi, 1, GILT.lo);
+      capsule(t, fx - HW + 18, fy - HH + 9, fx + HW - 18, fy - HH + 9, 10, GILT.lite, 0.8);
+      capsule(t, fx - HW + 18, fy + HH - 9, fx + HW - 18, fy + HH - 9, 10, GILT.deep, 0.6);
+      roundRect(t, fx, fy, HW - 22, HH - 22, 6, GILT.deep, 0.75);
+      roundRect(t, fx, fy, HW - 30, HH - 30, 4, GILT.base, 1, GILT.lo);
+      roundRect(t, fx, fy, HW - 44, HH - 44, 3, PLASTER.hi, 1, PLASTER.lo);
+      for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {   // corner studs
+        ellipse(t, fx + sx * (HW - 20), fy + sy * (HH - 20), 17, 17, GILT.lite, 1, 3);
+        ellipse(t, fx + sx * (HW - 20) + 3, fy + sy * (HH - 20) + 3, 9, 9, GILT.lo, 0.8, 2);
       }
-      // one small moth perched on the top rail, right of centre
-      moth(t, c + 92, fy - HH + 2, -0.18, 0.72);
+      simpleMoth(t, fx + HW - 42, fy + HH - 40, 0.82);   // astride the near corner
     }, SPOT);
-    sheen(cv, c - 132, fy - 118, 30, 10, 0.4);
+    sheen(cv, fx - 118, fy - 108, 30, 10, 0.4);
     save(cv, path.join(SPOTS, 'empty_gallery.png'));
   }
 }
