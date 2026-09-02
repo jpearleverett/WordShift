@@ -17,7 +17,8 @@
  *   puzzle_10     THREE tiles in a neat column                   -> a squat tower
  *   puzzle_25     FIVE smaller tiles, the column leaning         -> a tall crooked tower
  *   puzzle_35     a brass magnifying glass held over one tile    -> circle + diagonal handle
- *   puzzle_50     two tiles locked knob-into-socket, jigsaw-wise -> a wide two-tone bar
+ *   puzzle_50     ONE tile cut as a jigsaw piece: bulbs up and right, socket left
+ *                                                                 -> a square with a bulb and a bite
  *   puzzle_100    a laurel wreath ringing one tile               -> a leafy ring
  *   puzzle_250    a tile resting on a blacksmith's anvil         -> the horned anvil
  *   puzzle_500    a tile standing on a stone plinth, star on top -> a stepped pedestal
@@ -32,7 +33,7 @@
  *   streak_14     a campfire: three crossed logs, one flame      -> flame over a log pile
  *   streak_30     a stone hearth with fire in its arched mouth   -> a wide block with a dark arch
  *   streak_60     an unbroken iron chain ring, flame at centre   -> a knobbly ring
- *   streak_100    a phoenix: the flame grown two wings           -> a winged V
+ *   streak_100    a phoenix: the flame grown two feathered wings -> a winged V
  *
  * Luminous escalation is invisible at 32dp (every glow averages to the same warm
  * blur), so nothing here escalates by glow; the halo is the same light cream
@@ -206,7 +207,17 @@ function tile(t, cx, cy, hw, hh, angDeg, pal, letter = null, e = Math.round(hh *
   ellipse(t, sx, sy, hw * 0.14, hw * 0.14, '#FFFFFF', 0.75, 3);            // specular dot
 
   if (!letter) return;
-  const s = Math.min(hw, hh) * 0.52, th = s * 0.36;
+  drawGlyph(t, P, Math.min(hw, hh) * 0.52, pal, letter, ang);
+}
+
+/**
+ * The letter on a tile face: a dark drop pass, then the light glyph, both as
+ * capsule strokes (or arcs for O/C) through the tile's own local->canvas map
+ * `P`. `s` is the glyph half-size, `ang` the tile's rotation (the C's mouth
+ * turns with it). Shared by `tile()` and `jigsawPiece()`.
+ */
+function drawGlyph(t, P, s, pal, letter, ang) {
+  const th = s * 0.36;
   const dark = shade(pal[1], 0.62), light = '#FFF6E2';
   if (letter === 'O' || letter === 'C') {
     // round letters are arcs, not segment chains; C leaves its mouth on the right
@@ -241,6 +252,52 @@ function flame(t, cx, topY, botY, r, lean = -0.06, keyline = true) {
   flameLobe(t, cx + r * lean, topY + H * 0.2, botY - 2, r * 0.74, FIRE.mid);
   flameLobe(t, cx + r * lean * 1.6, topY + H * 0.45, botY - 4, r * 0.48, FIRE.in);
   flameLobe(t, cx + r * lean * 2, topY + H * 0.68, botY - 6, r * 0.24, FIRE.core);
+}
+
+/**
+ * ONE jigsaw piece in the tile's own chrome: a square body with a round knob
+ * standing off its TOP edge and its RIGHT edge, and a round socket bitten clean
+ * through its LEFT edge so the ground shows. Body, necks and knobs go down in
+ * the same pass per plane (keyline, base, side, face), so the whole piece is
+ * one alpha shape and withOutline contours it as one object; the socket is
+ * punched last, through every plane. Round 1 drew two equal tiles joined by a
+ * 14px dot, which had no anchor and collapsed to two blobs at 32px: a single
+ * piece with a bulb the size of a sixth of the frame is the universal
+ * puzzle-piece silhouette and survives an 8x downscale.
+ */
+function jigsawPiece(t, cx, cy, hw, pal, letter = null, e = 12) {
+  const kr = 36, out = 30, neck = 20, rad = 22;           // bulb radius, bulb centre beyond the edge, neck half-width
+  const plane = (dy, color, grow = 0) => {
+    roundRect(t, cx, cy + dy, hw + grow, hw + grow, rad + grow * 0.5, color);
+    roundRect(t, cx, cy + dy - hw + 2, neck + grow, 34 + grow, 6, color);     // top neck
+    roundRect(t, cx + hw - 2, cy + dy, 34 + grow, neck + grow, 6, color);     // right neck
+    ellipse(t, cx, cy + dy - hw - out, kr + grow, kr + grow, color, 1, 3);   // top bulb
+    ellipse(t, cx + hw + out, cy + dy, kr + grow, kr + grow, color, 1, 3);   // right bulb
+  };
+  plane(e, INK, 8);                                                          // own keyline
+  plane(2 * e, shade(pal[1], 0.54));                                         // base plane
+  plane(e, pal[1]);                                                          // side plane
+  plane(0, pal[0]);                                                          // face
+  // bevel plane over the top half, the top bulb included, then the gloss bar
+  roundRect(t, cx, cy - hw * 0.46, hw - 6, hw * 0.54, rad * 0.9, shade(pal[0], 1.16));
+  ellipse(t, cx, cy - hw - out, kr - 5, kr - 5, shade(pal[0], 1.16), 1, 3);
+  roundRect(t, cx, cy - hw * 0.62, hw * 0.62, hw * 0.13, 13, '#FFFFFF', 0.4);
+  ellipse(t, cx + hw * 0.56, cy - hw * 0.54, hw * 0.14, hw * 0.14, '#FFFFFF', 0.75, 3);
+  // one glyph, seated right of the socket and below the specular dot
+  if (letter) drawGlyph(t, (lx, ly) => [cx + 16 + lx, cy + 8 + ly], hw * 0.4, pal, letter, 0);
+  punch(t, cx - hw + out, cy, kr);                                           // the socket
+}
+
+/**
+ * ONE feather lobe: a rounded oval from root (x1, y1) to tip (x2, y2), `th`
+ * wide, with an ink under-oval so stacked lobes keep a value step between
+ * them, and a top-lit gradient (light at the top of its box, deep at the base).
+ */
+function featherLobe(t, x1, y1, x2, y2, th, hi, lo) {
+  const cx = (x1 + x2) / 2, cy = (y1 + y2) / 2;
+  const ra = Math.hypot(x2 - x1, y2 - y1) / 2, rot = Math.atan2(y2 - y1, x2 - x1);
+  poly(t, ovalPts(cx, cy, ra + 6, th / 2 + 6, rot), INK, 0.92);
+  poly(t, ovalPts(cx, cy, ra, th / 2, rot), hi, 1, lo);
 }
 
 /** The lit-crest halo: LIGHTER than cream in every channel, laid before the outline. */
@@ -341,31 +398,16 @@ export function draw() {
     savePNG(path.join(OUT, 'puzzle_35.png'), W, W, down2(cv, W, W));
   }
 
-  { // === puzzle_50.png — two tiles locked knob-into-socket ======================
+  { // === puzzle_50.png — ONE candy jigsaw piece, tile-chromed ===================
+    // The piece is asymmetric (bulbs up and right, socket left), so it is
+    // centred by its bounding box, not its body: body 180 wide + a 66 bulb.
     const { cv, c } = canvas();
-    const ang = -5, ar = (ang * Math.PI) / 180, ca = Math.cos(ar), sa = Math.sin(ar);
-    const P = (lx, ly) => [c + lx * ca - ly * sa, c + 8 + lx * sa + ly * ca];
-    contactShadow(cv, c + 10, c + 118, 150, 18, 0.32);
-    // An extruded round tab in a tile's own colours, pushed out of its edge.
-    const knob = (t, kx, ky, pal) => {
-      ellipse(t, kx, ky + 8, 32, 32, INK, 1, 3);                  // socket keyline
-      ellipse(t, kx, ky + 16, 25, 25, shade(pal[1], 0.54), 1, 3);
-      ellipse(t, kx, ky + 8, 25, 25, pal[1], 1, 3);
-      ellipse(t, kx, ky, 25, 25, pal[0], 1, 3);
-      ellipse(t, kx - 2, ky - 8, 18, 14, shade(pal[0], 1.16), 1, 3);
-    };
+    const px = c - 33, py = c + 16;
+    contactShadow(cv, px + 10, py + 128, 112, 16, 0.32);
     withOutline(cv, t => {
-      tile(t, ...P(58, 0), 56, 66, ang, TILE.yellow, 'E');
-      tile(t, ...P(-58, 0), 56, 66, ang, TILE.blue, 'W');
-      // The jigsaw read lives in the OUTER edges: a socket bitten out of the
-      // blue tile's left edge, a knob standing off the yellow tile's right edge.
-      // Between them the blue knob is pushed into the yellow tile.
-      const [nx, ny] = P(-114, 6);
-      punch(t, nx, ny + 6, 24);
-      knob(t, ...P(8, 2), TILE.blue);
-      knob(t, ...P(122, 2), TILE.yellow);
+      jigsawPiece(t, px, py, 90, TILE.blue, 'P');
     }, { width: 10 });
-    sheen(cv, c - 104, c - 44, 18, 10, 0.5);
+    sheen(cv, px - 52, py - 58, 20, 12, 0.5);
     savePNG(path.join(OUT, 'puzzle_50.png'), W, W, down2(cv, W, W));
   }
 
@@ -591,22 +633,19 @@ export function draw() {
     const { cv, c } = canvas();
     warmGlow(cv, c, 190, 150, 130, 0.3);
     contactShadow(cv, c + 8, 326, 100, 14, 0.32);
-    // Each wing is one feathered poly: a swept upper edge out to the tip, then
-    // four big feather scallops back to the body. No tail — a pair of tongues
-    // under the body read as feet at 32px and turned the phoenix into a hen.
-    const wing = s => [
-      [c + s * 22, 214], [c + s * 70, 162], [c + s * 120, 114], [c + s * 160, 78],
-      [c + s * 142, 122], [c + s * 156, 154], [c + s * 124, 164], [c + s * 132, 206],
-      [c + s * 96, 204], [c + s * 94, 246], [c + s * 56, 236], [c + s * 32, 272],
-    ];
-    const inner = s => [
-      [c + s * 24, 220], [c + s * 62, 176], [c + s * 104, 134], [c + s * 132, 108],
-      [c + s * 118, 148], [c + s * 98, 174], [c + s * 90, 212], [c + s * 60, 226], [c + s * 36, 258],
-    ];
+    // Each wing is three rounded feather lobes fanned from a root hidden inside
+    // the flame body, stacked bottom-up so the top lobe overlaps the next and
+    // the outer edge is a scalloped curve. Round 1's wings were sawtooth polys
+    // with stripe bands inside: aliased steps at 64px, the one off-voice row in
+    // the set. Lobes are >= 48px wide here (24 at 192) and each carries its own
+    // top-lit ramp, lighter toward the top of the wing, deeper toward the base.
+    // No tail — a pair of tongues under the body read as feet at 32px and
+    // turned the phoenix into a hen. Wingspan stays inside 78% of the frame.
     withOutline(cv, t => {
       for (const s of [-1, 1]) {
-        poly(t, wing(s), FIRE.in, 1, FIRE.out);
-        poly(t, inner(s), FIRE.core, 0.85, FIRE.in);
+        featherLobe(t, c + s * 30, 258, c + s * 112, 232, 54, '#FF8A30', FIRE.out);
+        featherLobe(t, c + s * 36, 236, c + s * 128, 168, 50, FIRE.in, '#F06A22');
+        featherLobe(t, c + s * 40, 214, c + s * 134, 102, 48, '#FFD778', '#FF9A3A');
       }
       flame(t, c, 54, 302, 56, -0.05);
     }, { width: 10 });

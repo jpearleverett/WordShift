@@ -40,14 +40,21 @@
  *                    in the top bulb, a thin stream, a heap in the bottom bulb.
  *   rules.png        a wooden signpost: one post seated in an earth mound, ONE
  *                    arrow board pointing right, two nail heads.
- *   shop_sign.png    a plank sign hanging by two iron links from an iron
- *                    bracket rod that runs well past the plank with a ball
- *                    finial at each end (a short rod over a wide plank read as
- *                    a briefcase handle at 24dp), with a flat house-painter's
- *                    brush lying diagonally across its face (wine handle,
- *                    brass ferrule, a bristle head WIDER than the handle,
- *                    square-cut and dipped in candy-pink paint; a thin
- *                    tapered head read as a pencil).
+ *   shop_sign.png    ONE silhouette: a big plank board (~58% of the frame
+ *                    tall) is the anchor, a short WOOD bracket beam sits
+ *                    across its top, and two thick leather STRAPS run from
+ *                    the beam down onto the board's face with no gap, each
+ *                    riveted in brass. The house-painter's brush is painted
+ *                    as an emblem FULLY INSIDE the board's contour, lower-
+ *                    left to upper-right: a fat dark-wood handle, a brass
+ *                    ferrule band, a WIDE flared cream bristle tuft with
+ *                    three grooves, its end dipped candy-pink, and one fat
+ *                    pink paint dab (with a drip) on the board past the tip.
+ *                    Round 1 hung the board from a cool IRON rod on two thin
+ *                    links, which went dark-on-dark on ash so the board
+ *                    floated unsupported, and let the brush overhang the
+ *                    board at both ends, which collapsed to a pink smear at
+ *                    32px; nothing here is grey and nothing leaves the board.
  *   clover.png       a four-leaf clover: four heart-shaped leaves on the
  *                    diagonals around a dark hub, the two upper leaves lit and
  *                    the lower two shaded, one short stem down-right.
@@ -55,20 +62,38 @@
  *                    inner ring, a brass button centre with a small star, two
  *                    notched tails below.
  * The spots:
- *   spots/empty_ledger.png   an open BLANK ledger (wine leather, so it is not the
- *                    green book above) with faint rules and a red margin line
- *                    per page, a big white quill lying across the right page
- *                    with its brass nib toward the gutter, and a squat indigo
- *                    inkpot with a brass collar standing in front of the lower
- *                    left corner.
- *   spots/empty_gallery.png  an EMPTY gilt picture frame hanging by a wire from
- *                    a nail, the dusty mauve wall showing through the mount,
- *                    and one small cream moth perched on the top rail.
+ *   spots/empty_ledger.png   an open BLANK ledger in wine leather, the ONE
+ *                    anchor, tilted ~8 degrees so its outline is no longer
+ *                    book_open's: a heavy stacked page block (two cream/tan
+ *                    edge bands) shows under both pages, a wide dark-red
+ *                    spine band runs top to bottom, and brass caps sit on all
+ *                    four cover corners. The pages are blank (no ruled
+ *                    hatching) with one red margin line each. A big cream-to-
+ *                    tan quill lies across the right page, plume AND brass
+ *                    nib inside the book's bounding box, on a thick warm-
+ *                    brown shaft; a squat wine-glass inkpot with a brass cap
+ *                    stands ON the left page so it shares the book's contour.
+ *                    Round 1 parked an indigo pot outside the book (dark-on-
+ *                    dark on ash, a detached second object), let a #FFFFFF
+ *                    plume break above the silhouette, and ruled the pages
+ *                    with sub-1/12 hatching that averaged to mush.
+ *   spots/empty_gallery.png  an EMPTY gilt picture frame (unchanged from
+ *                    round 1: it was the best-drawn element) hung by a short
+ *                    thick BRASS wire triangle from ONE big round brass nail
+ *                    head, a warm empty-wall parchment showing through the
+ *                    mount, and one large ochre MOTH pinned flat inside the
+ *                    frame at lower-right, wings spread symmetrical, one dark
+ *                    band per wing. Round 1's thin grey cord tangled with a
+ *                    tiny tan moth on the top rail into a squiggle that was
+ *                    never named, and its mauve interior was the family's one
+ *                    cool fill.
  *
  * Palette: the kit's WOOD/PARCH/BRASS/AMB/ACCENT plus local sets (sun gold,
- * pale glass, forest leather, plum, wax, candy red, iron, earth, clover green,
- * wine leather, indigo ink, gilt, dusty wall). Every "glow" stop is above cream
- * in all three channels (the only one here is the sun's disc crest).
+ * pale glass, forest leather, plum, wax, candy red, iron for the signpost's
+ * nail heads only, earth, clover green, wine leather, gilt, ochre moth, quill
+ * tan). No cool fill or grey hardware survives except those two nail heads.
+ * Every "glow" stop is above cream in all three channels (the only one here
+ * is the sun's disc crest).
  *
  * House doctrine (see _draw.mjs): contact shadow BEFORE withOutline, subject
  * inside it, sheen AFTER it. INK for contours, never #000. No Math.random or
@@ -115,11 +140,11 @@ const CREAM = { hi: '#FFF9EA', base: '#F6E8C6', lo: '#D6BC8A' };
 const BR = { lite: '#F8E2A6', hi: BRASS.hi, mid: '#C48F3C', lo: BRASS.lo, deep: '#63401A' };
 const PINK = { hi: '#FF9EC2', base: '#F25E8E', lo: '#B02A5B' };
 const LEDGER = { hi: '#B0584F', base: '#8C3C36', lo: '#5C2320', deep: '#3B1513' };
-const INKP = { rim: '#5E56A0', hi: '#3A3268', base: '#2B2550', lo: '#1A1533', gloss: '#8C84C8' };
-const FEATHER = { hi: '#FFFFFF', base: '#F1E7D2', lo: '#BFAF90', shaft: '#7A5A3A' };
+/** Quill: cream (PAGE.hi at most, never #FFFFFF) down to tan, on a warm shaft. */
+const QUILL = { hi: '#FBF2DC', lo: '#B39C72', shaft: '#7A5A3A' };
 const GILT = { lite: '#FBE6A8', hi: '#E6BC62', base: '#C48F3C', lo: '#8E5E22', deep: '#5B3A12' };
-const WALLP = { hi: '#D6C9C4', base: '#C3B3AF', lo: '#A89795' };
-const MOTH = { hi: '#F7EEDA', base: '#E3D3AE', lo: '#A89570', band: '#8B7952', body: '#6F5A3C', head: '#A8946C' };
+/** An ochre moth: every stop sits well below the parchment wall it is pinned on. */
+const MOTH = { hi: '#E4C47E', base: '#C89E4E', lo: '#9A7332', deep: '#6B4E22', band: '#4E3618', body: '#4A3320' };
 
 // --- local shape helpers (pure, table-driven) --------------------------------
 
@@ -197,52 +222,66 @@ function leaf(t, hx, hy, a, k, top, bottom) {
 }
 
 /**
- * A small moth, wings spread, head up, drawn part by part BACK TO FRONT with
- * each part laying its own grown ink keyline (the upgrades set's lesson: a
- * moth built from bare fills loses its wing contours). `s` scales it.
+ * A rounded rectangle as a closed polygon (clockwise, y-down), so it can be
+ * grown for a keyline, rotated through a mapper, or gradient-filled by poly.
  */
-function moth(t, MX, MY, MA, s) {
-  const ca = Math.cos(MA), sa = Math.sin(MA);
-  const P = ([lx, ly]) => [MX + lx * s * ca - ly * s * sa, MY + lx * s * sa + ly * s * ca];
-  const wing = (pts, sgn) => pts.map(([x, y]) => P([x * sgn, y]));
-  const FORE = [[8, -34], [42, -46], [70, -20], [48, 14], [14, 4]];
-  const HIND = [[10, 4], [46, 16], [50, 42], [24, 48], [8, 26]];
+function roundPts(cx, cy, hw, hh, rad, n = 6) {
+  const pts = [];
+  for (const [sx, sy, a0] of [[1, -1, -Math.PI / 2], [1, 1, 0], [-1, 1, Math.PI / 2], [-1, -1, Math.PI]]) {
+    const ox = cx + sx * (hw - rad), oy = cy + sy * (hh - rad);
+    for (let i = 0; i <= n; i++) {
+      const a = a0 + (i / n) * (Math.PI / 2);
+      pts.push([ox + Math.cos(a) * rad, oy + Math.sin(a) * rad]);
+    }
+  }
+  return pts;
+}
+
+/**
+ * A moth PINNED FLAT, head up, wings spread symmetrical like a specimen in a
+ * case: two forewings swept up and out, two hindwings rounded below, one dark
+ * band across each forewing, a fat dark body, a round head and two short
+ * antennae. Every part lays its own grown ink keyline (the upgrades set's
+ * lesson: a moth built from bare fills loses its wing contours). `s` scales it;
+ * at s = 0.78 the wingspan is ~115px on the 512 supersample.
+ */
+function pinnedMoth(t, mx, my, s) {
+  const P = ([x, y]) => [mx + x * s, my + y * s];
+  const side = (pts, sgn) => pts.map(([x, y]) => P([x * sgn, y]));
+  const FORE = [[4, -12], [22, -40], [56, -50], [74, -34], [66, -6], [30, 4]];
+  const HIND = [[6, 2], [32, 4], [60, 20], [52, 46], [24, 52], [6, 36]];
+  const BAND = [[8, -18], [58, -46], [66, -32], [18, -4]];
   for (const sgn of [-1, 1]) {
-    const w = wing(HIND, sgn);
-    poly(t, grow(w, 7 * s), INK, 0.95);
-    poly(t, w, MOTH.base, 1, MOTH.lo);
+    const w = side(HIND, sgn);
+    poly(t, grow(w, 8 * s), INK, 0.95);
+    poly(t, w, MOTH.base, 1, MOTH.deep);
   }
   for (const sgn of [-1, 1]) {
-    const w = wing(FORE, sgn);
-    poly(t, grow(w, 7 * s), INK, 0.95);
+    const w = side(FORE, sgn);
+    poly(t, grow(w, 8 * s), INK, 0.95);
     poly(t, w, MOTH.hi, 1, MOTH.lo);
-    poly(t, [P([20 * sgn, -32]), P([44 * sgn, -36]), P([58 * sgn, -12]), P([30 * sgn, -8])], MOTH.band, 0.55);
+    poly(t, side(BAND, sgn), MOTH.band, 0.9);
   }
   for (const sgn of [-1, 1]) {
-    const a1 = P([6 * sgn, -42]), a2 = P([18 * sgn, -62]), a3 = P([30 * sgn, -80]);
-    capsule(t, a1[0], a1[1], a2[0], a2[1], 11 * s, INK, 0.95);
-    capsule(t, a2[0], a2[1], a3[0], a3[1], 10 * s, INK, 0.95);
-    capsule(t, a1[0], a1[1], a2[0], a2[1], 5.5 * s, MOTH.body);
-    capsule(t, a2[0], a2[1], a3[0], a3[1], 5 * s, MOTH.body);
-    ellipse(t, a3[0], a3[1], 7 * s, 7 * s, INK, 0.95);
-    ellipse(t, a3[0], a3[1], 4.5 * s, 4.5 * s, MOTH.head);
+    const a0 = P([4 * sgn, -38]), a1 = P([24 * sgn, -68]);
+    capsule(t, a0[0], a0[1], a1[0], a1[1], 15 * s, INK, 0.95);
+    capsule(t, a0[0], a0[1], a1[0], a1[1], 8 * s, MOTH.body);
   }
-  const bT = P([0, -30]), bB = P([0, 32]);
-  capsule(t, bT[0], bT[1], bB[0], bB[1], 28 * s, INK, 0.95);
-  capsule(t, bT[0], bT[1], bB[0], bB[1], 18 * s, MOTH.body);
-  const sT = P([-3, -22]), sB = P([-3, 24]);
-  capsule(t, sT[0], sT[1], sB[0], sB[1], 6 * s, MOTH.head, 0.85);
-  const hd = P([0, -40]);
-  ellipse(t, hd[0], hd[1], 16 * s, 16 * s, INK, 0.95);
-  ellipse(t, hd[0], hd[1], 11 * s, 11 * s, MOTH.body);
+  const bT = P([0, -28]), bB = P([0, 42]);
+  capsule(t, bT[0], bT[1], bB[0], bB[1], 32 * s, INK, 0.95);
+  capsule(t, bT[0], bT[1], bB[0], bB[1], 22 * s, MOTH.body);
+  const sT = P([-4, -20]), sB = P([-4, 30]);
+  capsule(t, sT[0], sT[1], sB[0], sB[1], 7 * s, MOTH.lo, 0.8);
+  const hd = P([0, -38]);
+  ellipse(t, hd[0], hd[1], 18 * s, 18 * s, INK, 0.95);
+  ellipse(t, hd[0], hd[1], 13 * s, 13 * s, MOTH.body);
 }
 
 /**
  * The Lexicon book's OPEN pages: leather covers spread in a shallow V with the
  * spine dipped, cream pages inset on each side, a dark gutter down the middle.
- * Shared by book_open.png (the green book) and the ledger spot (wine leather,
- * wider) so the two open books have one anatomy. `lines` draws two fat rule
- * strokes per page, `rules` draws the ledger's faint rules + red margins.
+ * Used by book_open.png (the green book); the ledger spot draws its own tilted
+ * anatomy below. `lines` draws two fat rule strokes per page.
  */
 function openBook(t, cx, cy, hw, hh, dip, inset, pal, page, opts = {}) {
   const cover = [
@@ -270,17 +309,6 @@ function openBook(t, cx, cy, hw, hh, dip, inset, pal, page, opts = {}) {
         const y0 = cy + fy * hh, y1 = y0 + (dip * 0.7) * (1 - Math.abs(0) );
         capsule(t, x0, y0 - (dip * 0.45), x0 + (x1 - x0) * len, y0 - (dip * 0.45) + (dip * 0.45) * len, 15, page.line, 0.9);
       }
-    }
-  }
-  if (opts.rules) {
-    for (const sgn of [-1, 1]) {
-      const x0 = cx + sgn * (hw - inset - 18), x1 = cx + sgn * 40;
-      for (const fy of [-0.42, -0.14, 0.14, 0.42]) {
-        const y0 = cy + fy * hh;
-        capsule(t, x0, y0 - dip * 0.42, x1, y0, 7, page.line, 0.5);
-      }
-      const mx = cx + sgn * (hw - inset - 62);
-      capsule(t, mx, cy - hh + inset + 14 + (1 - Math.abs(mx - cx) / hw) * dip, mx, cy + hh - inset - 14, 9, page.margin, 0.75);
     }
   }
 }

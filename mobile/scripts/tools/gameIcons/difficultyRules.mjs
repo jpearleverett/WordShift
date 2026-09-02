@@ -20,13 +20,37 @@
  *               palette and the pressed symbol change.
  *
  * The relief is drawn as a RAISED stamp, not a same-colour dent: a cream body
- * over an INK drop shadow offset down-right. Real wax embosses in its own hue,
- * but a same-hue dent averages to nothing at 28dp — the symbol is the whole
- * point of the icon, so it gets the value step it needs. The cream is tinted a
- * little toward the tier's own light, so it still reads as the wax catching the
- * light rather than a white sticker. Every symbol is >= 1/3 of the seal across
- * (the brief's 1/12-of-frame floor is 16px at 192; the smallest symbol stroke
- * here is 18px in supersample = 9px at 192).
+ * over an INK drop shadow offset down-right, and (round two) inside its OWN
+ * withOutline pass, so every emblem is separated from the wax by real ink, the
+ * same contour weight the vessel has. Real wax embosses in its own hue, but a
+ * same-hue dent averages to nothing at 28dp — the symbol is the whole point of
+ * the icon, so it gets the value step it needs. The cream is tinted a little
+ * toward the tier's own light, so it still reads as the wax catching the light
+ * rather than a white sticker. Every symbol is >= 1/3 of the seal across (the
+ * brief's 1/12-of-frame floor is 16px at 192; the smallest symbol stroke here
+ * is 18px in supersample = 9px at 192).
+ *
+ * Round two (blind review at 28px): two emblems failed nameability and were
+ * redrawn; the vessel and the sprout / flame / crown are the same drawings.
+ *   OAK LEAF  round one's eight fine lobes averaged to an egg, and its cream
+ *             sat within ~0.13 luminance of the gold wax. Now a SIMPLE
+ *             silhouette — three deep round lobes a side (notches >= 1/4 of the
+ *             leaf's width) under a pointed tip, a straight stem out of the
+ *             bottom — filled with its own two-step value (pale gold over deep
+ *             amber, `gradTo`), and ONE dark midrib from stem to tip; a single
+ *             vein is the one mark that says "leaf" at 28px.
+ *   SWORD     round one's blade was a 2px hairline with a centred guard of the
+ *             same stroke: a plus sign, and on red wax a medical / religious
+ *             cross. Now the blade is >= 1/6 of the disc wide with a two-value
+ *             fuller (lit left, shaded right), the crossguard is a short THICK
+ *             bar well below the emblem's centre, under it a DARK wine-brown
+ *             grip (two value steps under the blade) and a round pommel, and the
+ *             whole sword is canted 8 degrees so it can never be a plus.
+ *   VESSEL    the seal spanned 59% x 72% of the frame, under the brief's 65-80%
+ *             and this is the smallest-delivered family (28dp), so the shared
+ *             geometry is scaled up by `K` = 1.12 about the vessel's own bbox
+ *             centre (`PIVOT_Y`). One table, one scale: all five tiers move
+ *             together and stay identical, and the outer pixel ring stays clear.
  *
  * The wax itself carries the house's value steps: a scalloped rim graded
  * light-to-dark top-down (the scallops are 14 wide lobes, big enough to survive
@@ -206,8 +230,23 @@ function socket(t, cx, cy, hw, hh) {
 // ---------------------------------------------------------------------------
 // THE SEAL — fixed geometry, shared by all five tiers
 // ---------------------------------------------------------------------------
-const SEAL = { cx: 192, cy: 176, r: 98, amp: 7, lobes: 14, press: 74 };
-const RIBBON = { top: 120, bottom: 336, notch: 314, inner: 8, outer: 62, spread: 30 };
+
+/**
+ * Round-two vessel scale. Every seal length below is written in round one's
+ * 384-space units and mapped through these: `L` scales a length, `SX`/`SY`
+ * scale a coordinate about the vessel's bbox centre (192, 203), so the seal
+ * grows in place — the outer pixel ring stays clear (the ribbon's contact
+ * shadow now bottoms out at supersample ~376 of 384) and the five tiers keep
+ * one geometry.
+ */
+const K = 1.12;
+const PIVOT_Y = 203;
+const L = v => v * K;
+const SX = v => 192 + (v - 192) * K;
+const SY = v => PIVOT_Y + (v - PIVOT_Y) * K;
+
+const SEAL = { cx: 192, cy: SY(176), r: L(98), amp: L(7), lobes: 14, press: L(74) };
+const RIBBON = { top: SY(120), bottom: SY(336), notch: SY(314), inner: L(8), outer: L(62), spread: L(30) };
 
 /** The two ribbon tails, hung behind the seal, notched swallow-tail ends. */
 function ribbon(t, pal) {
@@ -217,12 +256,12 @@ function ribbon(t, pal) {
     const pts = [
       [x(RIBBON.inner), RIBBON.top], [x(RIBBON.outer), RIBBON.top],
       [x(RIBBON.outer + RIBBON.spread), RIBBON.bottom],
-      [x((RIBBON.outer + RIBBON.inner) / 2 + RIBBON.spread / 2 - 2), RIBBON.notch],
-      [x(RIBBON.inner + RIBBON.spread - 6), RIBBON.bottom],
+      [x((RIBBON.outer + RIBBON.inner) / 2 + RIBBON.spread / 2 - L(2)), RIBBON.notch],
+      [x(RIBBON.inner + RIBBON.spread - L(6)), RIBBON.bottom],
     ];
     poly(t, pts, pal.dark, 1, pal.shadow);
     // a lit fold line down the tail's inner edge
-    capsule(t, x(RIBBON.inner + 8), SEAL.cy + 60, x(RIBBON.inner + RIBBON.spread + 2), RIBBON.bottom - 22, 7, pal.light, 0.45);
+    capsule(t, x(RIBBON.inner + L(8)), SEAL.cy + L(60), x(RIBBON.inner + RIBBON.spread + L(2)), RIBBON.bottom - L(22), L(7), pal.light, 0.45);
   }
 }
 
@@ -230,25 +269,39 @@ function ribbon(t, pal) {
 function wax(t, pal) {
   const { cx, cy, r, amp, lobes, press } = SEAL;
   poly(t, wavyPts(cx, cy, r, amp, lobes), pal.light, 1, pal.dark);
-  poly(t, wavyPts(cx, cy, r - 14, amp * 0.55, lobes), pal.main, 1, pal.dark);   // rim bevel step
-  ellipse(t, cx, cy, press + 5, press + 5, INK, 0.55, 3);                        // the die's bite
-  roundRect(t, cx, cy, press, press, press, pal.main, 1, pal.dark);              // pressed floor
-  arcStroke(t, cx, cy, press - 5, 9, 0.5, Math.PI - 0.5, pal.light, 0.55);      // light on the far wall
+  poly(t, wavyPts(cx, cy, r - L(14), amp * 0.55, lobes), pal.main, 1, pal.dark);   // rim bevel step
+  ellipse(t, cx, cy, press + L(5), press + L(5), INK, 0.55, 3);                     // the die's bite
+  roundRect(t, cx, cy, press, press, press, pal.main, 1, pal.dark);                 // pressed floor
+  arcStroke(t, cx, cy, press - L(5), L(9), 0.5, Math.PI - 0.5, pal.light, 0.55);   // light on the far wall
 }
 
 /**
- * Draw `sym` as a raised relief: an INK keyline all round (eight offset copies
- * of the symbol, which is a poor man's dilation but it is exact and cheap), an
- * ink shadow down-right, then the cream body, then any `detail` the symbol
- * wants drawn INSIDE its body (the flame's inner tongue). The keyline is what
- * keeps the cream relief legible on the YELLOW wax, where cream-on-gold has
- * almost no value step of its own — round one lost the oak leaf there.
+ * Draw `sym` as a raised relief: an INK drop shadow down-right (the symbol
+ * drawn solid in ink, offset), then the coloured body inside its OWN
+ * withOutline pass, so the emblem carries the same warm-dark contour the
+ * vessel does and is separated from the wax by ink whatever the wax's value.
+ * Round one used a 5px eight-copy keyline here and lost the oak leaf on the
+ * yellow wax at 28px (cream on gold with a hairline between them); a full
+ * contour is what lets the crown and flame be read by their edge, so every
+ * emblem gets it. Symbols take (t, pal, dx, dy, ink, alpha): with `ink` set
+ * they draw their whole silhouette in that one colour (the shadow pass), with
+ * `ink` null they draw in their real colours plus any inside detail.
  */
-function relief(t, pal, sym, detail = null) {
-  for (const [ox, oy] of [[-5, 0], [5, 0], [0, -5], [0, 5], [-4, -4], [4, -4], [-4, 4], [4, 4]]) sym(t, INK, 1, ox, oy);
-  sym(t, INK, 0.7, 6, 7);
-  sym(t, mix(CREAM, pal.light, 0.22), 1, 0, 0);
-  if (detail) detail(t, pal);
+function relief(t, pal, sym) {
+  sym(t, pal, 6, 7, INK, 0.7);
+  withOutline(t, tt => sym(tt, pal, 0, 0, null, 1), { width: 9 });
+}
+
+/** The relief cream, tinted a little toward the tier's own light. */
+const creamFor = pal => mix(CREAM, pal.light, 0.22);
+
+/**
+ * Point mapper for a symbol: offsets in round-one units, scaled by K, optionally
+ * rotated by `ang` (radians, clockwise on screen) about the seal centre.
+ */
+function mapper(dx, dy, ang = 0) {
+  const ox = SEAL.cx + dx, oy = SEAL.cy + dy, ca = Math.cos(ang), sa = Math.sin(ang);
+  return (px, py) => [ox + (px * ca - py * sa) * K, oy + (px * sa + py * ca) * K];
 }
 
 /** A curved leaf blade from (bx,by) to (tx,ty), bowed by `bend`, widest at mid. */
@@ -268,69 +321,96 @@ function leafPts(bx, by, tx, ty, width, bend, steps = 16) {
   return up.concat(dn.reverse());
 }
 
-// --- the five pressed symbols, each (t, color, alpha, dx, dy) ---------------
-const S = { x: SEAL.cx, y: SEAL.cy };
+// --- the five pressed symbols, each (t, pal, dx, dy, ink, alpha) ------------
 
-function symSprout(t, col, al, dx, dy) {
-  const x = S.x + dx, y = S.y + dy;
-  capsule(t, x, y + 58, x, y - 8, 17, col, al);                                 // stem
+function symSprout(t, pal, dx, dy, ink, al) {
+  const P = mapper(dx, dy), col = ink ?? creamFor(pal);
+  capsule(t, ...P(0, 58), ...P(0, -8), L(17), col, al);                          // stem
   // two fat leaf blades leaving the stem at ~50 degrees, bowed outward, with the
   // stem running up between them so there is a real notch: a seedling with two
   // wings. (Straight thin blades read as a T-bar, then a letter Y; two lobes
   // meeting over a bud read as a heart on a stick. Wings it is.)
-  poly(t, leafPts(x - 6, y + 12, x - 54, y - 30, 42, 14), col, al);
-  poly(t, leafPts(x + 6, y + 12, x + 54, y - 30, 42, -14), col, al);
+  poly(t, leafPts(...P(-6, 12), ...P(-54, -30), L(42), L(14)), col, al);
+  poly(t, leafPts(...P(6, 12), ...P(54, -30), L(42), L(-14)), col, al);
 }
 
-function symOakLeaf(t, col, al, dx, dy) {
-  const x = S.x + dx, y = S.y + dy;
-  // three pairs of deep round lobes either side of a spine; wide, so the leaf
-  // is a MASS at 28dp and not a stalk with a fringe
-  const half = [[0, -66], [16, -56], [18, -42], [40, -42], [46, -24], [26, -14], [48, 0], [46, 16], [26, 22], [42, 36], [34, 48], [14, 48], [10, 54]];
-  const pts = half.concat(half.slice(0, -1).reverse().map(([px, py]) => [-px, py]));
-  poly(t, pts.map(([px, py]) => [x + px, y + py - 6]), col, al);
-  capsule(t, x, y + 42, x, y + 64, 13, col, al);                                // stalk
+/** Oak leaf relief values: pale gold catching the light over deep amber. */
+const LEAF = { hi: '#FFF1B8', lo: '#D8951E' };
+
+function symOakLeaf(t, pal, dx, dy, ink, al) {
+  const P = mapper(dx, dy);
+  // pointed tip, three deep round lobes a side, base pinched to the stem. The
+  // right half is tabled tip-to-base and mirrored; notch x (18/24/16) against a
+  // 54 half-width keeps every notch >= 1/4 of the leaf's width deep.
+  const half = [
+    [0, -70], [12, -60], [28, -54], [38, -42], [32, -32], [18, -28],             // lobe 1
+    [34, -20], [50, -12], [54, 2], [48, 14], [34, 20], [22, 18],                 // lobe 2 (widest)
+    [34, 28], [46, 38], [44, 50], [32, 58], [16, 60], [0, 58],                   // lobe 3 into the base
+  ];
+  const pts = half.concat(half.slice(1, -1).reverse().map(([px, py]) => [-px, py]));
+  poly(t, pts.map(([px, py]) => P(px, py)), ink ?? LEAF.hi, al, ink ? null : LEAF.lo);
+  poly(t, [P(-7, 54), P(7, 54), P(7, 76), P(-7, 76)], ink ?? LEAF.lo, al);       // straight stem
+  capsule(t, ...P(0, 76), ...P(0, 76), L(14), ink ?? LEAF.lo, al);              // stem's round foot
+  if (!ink) capsule(t, ...P(0, -54), ...P(0, 52), L(9), INK, 0.65);             // the one midrib
 }
 
-function symFlame(t, col, al, dx, dy) {
-  const x = S.x + dx, y = S.y + dy;
-  flameLobe(t, x, y - 64, y + 58, 42, col, al);
-}
-/** The flame's inner tongue, in the wax's own hue: what turns a teardrop into fire. */
-function flameTongue(t, pal) {
-  flameLobe(t, S.x, S.y - 18, S.y + 50, 21, pal.dark, 1);
-  flameLobe(t, S.x, S.y + 4, S.y + 48, 12, pal.main, 1);
-}
-
-function symSword(t, col, al, dx, dy) {
-  const x = S.x + dx, y = S.y + dy;
-  poly(t, [[x, y - 68], [x + 13, y - 44], [x + 13, y + 14], [x - 13, y + 14], [x - 13, y - 44]], col, al);  // blade
-  capsule(t, x - 38, y + 22, x + 38, y + 22, 16, col, al);                      // crossguard
-  capsule(t, x, y + 28, x, y + 50, 13, col, al);                                // grip
-  ellipse(t, x, y + 60, 11, 11, col, al, 2);                                    // pommel
+function symFlame(t, pal, dx, dy, ink, al) {
+  const P = mapper(dx, dy), col = ink ?? creamFor(pal);
+  const [x, top] = P(0, -64), [, bot] = P(0, 58);
+  flameLobe(t, x, top, bot, L(42), col, al);
+  if (!ink) {
+    // the flame's inner tongue, in the wax's own hue: what turns a teardrop into fire
+    flameLobe(t, x, P(0, -18)[1], P(0, 50)[1], L(21), pal.dark, 1);
+    flameLobe(t, x, P(0, 4)[1], P(0, 48)[1], L(12), pal.main, 1);
+  }
 }
 
-function symCrown(t, col, al, dx, dy) {
-  const x = S.x + dx, y = S.y + dy;
-  poly(t, [[x - 46, y + 30], [x - 46, y - 18], [x - 22, y + 4], [x, y - 40], [x + 22, y + 4], [x + 46, y - 18], [x + 46, y + 30]], col, al);
-  poly(t, roundRectPts(x, y + 36, 48, 12, 6), col, al);                          // band
-  for (const [px, py] of [[-46, -20], [0, -42], [46, -20]]) ellipse(t, x + px, y + py, 9, 9, col, al, 2);
+/** Sword relief values: blade lit / shaded halves, leather-wrapped grip. */
+const SWORD = { shade: '#C4B7A5', gripHi: '#A96B33', gripLo: '#6A3C1A' };
+const SWORD_CANT = (8 * Math.PI) / 180;
+
+function symSword(t, pal, dx, dy, ink, al) {
+  const P = mapper(dx, dy, SWORD_CANT), cream = creamFor(pal);
+  const pts = arr => arr.map(([px, py]) => P(px, py));
+  // blade 34 wide (>= 1/6 of the disc) and 90 long, so the point is the thing
+  // the eye lands on; the guard is a short bar THINNER than the blade (24
+  // against 34 — a bar as thick as the blade made the top half a T at 28px)
+  if (ink) {
+    poly(t, pts([[0, -76], [17, -52], [17, 14], [-17, 14], [-17, -52]]), ink, al);
+  } else {
+    // two-value fuller: the left face lit, the right face in shade, split on the
+    // blade's own centre line so the point still reads as a point
+    poly(t, pts([[0, -76], [0, 14], [-17, 14], [-17, -52]]), cream, al);
+    poly(t, pts([[0, -76], [17, -52], [17, 14], [0, 14]]), SWORD.shade, al);
+  }
+  poly(t, pts([[-42, 14], [42, 14], [42, 38], [-42, 38]]), ink ?? cream, al);    // short crossguard, low
+  capsule(t, ...P(-42, 26), ...P(-42, 26), L(24), ink ?? cream, al);              // rounded guard ends
+  capsule(t, ...P(42, 26), ...P(42, 26), L(24), ink ?? cream, al);
+  poly(t, pts([[-10, 37], [10, 37], [10, 53], [-10, 53]]), ink ?? SWORD.gripHi, al, ink ? null : SWORD.gripLo); // wrapped grip
+  capsule(t, ...P(0, 62), ...P(0, 62), L(22), ink ?? cream, al);                  // round pommel
+}
+
+function symCrown(t, pal, dx, dy, ink, al) {
+  const P = mapper(dx, dy), col = ink ?? creamFor(pal);
+  poly(t, [[-46, 30], [-46, -18], [-22, 4], [0, -40], [22, 4], [46, -18], [46, 30]].map(([px, py]) => P(px, py)), col, al);
+  const [bx, by] = P(0, 36);
+  poly(t, roundRectPts(bx, by, L(48), L(12), L(6)), col, al);                     // band
+  for (const [px, py] of [[-46, -20], [0, -42], [46, -20]]) ellipse(t, ...P(px, py), L(9), L(9), col, al, 2);
 }
 
 const SYMBOL = { easy: symSprout, medium: symOakLeaf, medium_plus: symFlame, hard: symSword, expert: symCrown };
-const DETAIL = { medium_plus: flameTongue };
 
 function drawSeal(tier) {
   const pal = TIER[tier];
   const { cv } = canvas();
-  contactShadow(cv, SEAL.cx + 8, RIBBON.bottom + 6, 88, 16, 0.3);
-  ellipse(cv, SEAL.cx + 10, SEAL.cy + 12, SEAL.r + 8, SEAL.r + 8, INK, 0.26, 14);   // drop shadow behind the disc
+  contactShadow(cv, SEAL.cx + L(8), RIBBON.bottom + L(6), L(88), L(16), 0.3);
+  ellipse(cv, SEAL.cx + L(10), SEAL.cy + L(12), SEAL.r + L(8), SEAL.r + L(8), INK, 0.26, 14);   // drop shadow behind the disc
   withOutline(cv, t => {
     ribbon(t, pal);
     wax(t, pal);
-    relief(t, pal, SYMBOL[tier], DETAIL[tier] ?? null);
+    relief(t, pal, SYMBOL[tier]);
   }, { width: 9 });
-  sheen(cv, SEAL.cx - 54, SEAL.cy - 58, 24, 14, 0.45);
+  sheen(cv, SEAL.cx - L(54), SEAL.cy - L(58), L(24), L(14), 0.45);
   savePNG(path.join(OUT_DIFF, `${tier}.png`), W, W, down2(cv, W, W));
 }
 

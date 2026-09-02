@@ -12,40 +12,51 @@
  *   first_animal  a paw print pressed into a round clay disc   -> a disc
  *   animals_5     a wooden birdhouse, heart door, sage roof     -> a peaked house on a ring
  *   all_animals   a five-point gold crown                       -> a jagged crown
- *   all_rooms     a carpenter's mallet crossed over a try-square-> an L with a bar across it
+ *   all_rooms     a carpenter's mallet, a small brass try-square
+ *                 tucked behind its handle                      -> a banded barrel on a diagonal
  *   amber_1000    a clay pot, gems heaped above its rim         -> a tall urn with a lumpy top
- *   amber_5000    an iron strongbox, lid up, gems spilling      -> a squat box with a raised slab
+ *   amber_5000    a walnut strongbox, lid low, gems heaped in
+ *                 its mouth, a brass padlock on the front       -> a wide box under a low slab
  *
- * The amber pair shares the one `gem()` primitive so the two read as one line:
- * the pot is the SMALLER hoard (terracotta, open, gems just clearing the rim),
- * the strongbox the LARGER (iron-banded, locked, gems overrunning the front).
- * The clay of the pot is the same TERRA as the paw-print disc, which ties the
- * category together as one material family without repeating a silhouette.
+ * The amber pair shares the one `gem()` primitive so the two read as one line,
+ * but they escalate by STRUCTURE (pot to strongbox) and never by motif: the
+ * pot is the SMALLER hoard (terracotta, open, one gem tipping off the rim, one
+ * caught on the belly), the strongbox the LARGER (walnut, iron-strapped,
+ * locked, the heap climbing over the lid line, ONE gem over the front lip and
+ * nothing on the ground, which the pot owns). The clay of the pot is the same
+ * TERRA as the paw-print disc, which ties the category together as one
+ * material family without repeating a silhouette.
  *
  * JOURNEY: the four phase crests follow the game's descent, each in the palette
  * of the phase it marks, and the three daily/sharing crests are plain objects:
  *
- *   phase_1       a steaming teacup, ONE curl of steam bent into a question hook
- *                 (Curious Thoughts: sage glaze, warm)          -> cup + a hook above it
+ *   phase_1       a steaming teacup, ONE tapered curl of steam hooked like a
+ *                 question (Curious Thoughts: sage glaze, warm) -> cup + a curl above it
  *   phase_2       a stone well, a crescent moon lying in its water
  *                 (Deeper Questions: night stone, navy water)   -> a cylinder under a frame
  *   phase_3       a bare tree, its shadow lying long across the ground
  *                 (Growing Shadows: dusk mauve, wine bark)      -> a forked tree on a slab
- *   phase_4       a black sun on the horizon, rimmed in crimson
- *                 (The Horizon: the dread palette)              -> a rayed disc on a bar
+ *   phase_4       a black sun SETTING behind a straight horizon, rimmed in
+ *                 crimson (The Horizon: the dread palette)      -> a rimmed disc cut by a band
  *   daily_first   a kraft envelope under a red wax seal stamped with an X
  *   daily_7       a brass bell hanging from a cord, a red bow at its crown
  *   daily_30      a garden gate standing OPEN between two posts under a lintel
- *   shared_first  a paper airplane climbing to the upper right
+ *   shared_first  a parchment paper airplane climbing to the upper right
  *
- * PALETTE. Terracotta (TERRA), the kit's WOOD/BRASS/STONE/AMB, a warm IRON grey
- * (never cool vector steel next to the wood), sage for the glaze and the roof,
- * KRAFT for the envelope — kraft rather than cream paper because a cream letter
- * on the cream parchment row is invisible (rule 6: no large area within ~0.13
- * luminance of a ground). The four phase crests darken in order: sage, night
- * navy, dusk mauve, then ash/indigo with a crimson rim — the only crimson in the
- * family, so the dread crest is the one that glows red. No glow is drawn on
- * cream-adjacent surfaces at all: every soft wash here is a contact shadow.
+ * PALETTE. Terracotta (TERRA), the kit's WOOD/BRASS/STONE/AMB, WALNUT for the
+ * strongbox (darker and redder than the blond WOOD, mid-tone still clear of ash
+ * paper), a warm IRON grey and a warmer WIRON for straps and hoops (never cool
+ * vector steel next to the wood), sage for the glaze and the roof, KRAFT for
+ * the envelope and PLANE parchment for the airplane — kraft rather than cream
+ * paper because a cream letter on the cream parchment row is invisible (rule 6:
+ * no large area within ~0.13 luminance of a ground), and parchment rather than
+ * white because a white dart was the only cool-neutral object on a warm sheet.
+ * The four phase crests darken in order: sage, night navy, dusk mauve, then
+ * indigo on a wine ground with a crimson rim — the only crimson in the family,
+ * so the dread crest is the one that glows red; the tree keeps its mauve pill
+ * and the sun gets its own flat horizon band so the two are not a series. No
+ * glow is drawn on cream-adjacent surfaces at all: every soft wash here is a
+ * contact shadow.
  *
  * House doctrine (see _draw.mjs): contact shadow goes down on the real canvas
  * FIRST (never contoured), the subject is drawn inside withOutline (INK contour,
@@ -74,16 +85,29 @@ const RUBY = { hi: '#FF8A86', base: '#D8383E', lo: '#8A1A24' };
 const TEALGEM = { hi: '#8DEBD4', base: '#3FBFA6', lo: '#1E6E63' };
 const WAX = { hi: '#F06A66', base: '#C4272E', lo: '#7E141B', groove: '#4E0A10' };
 const KRAFT = { hi: '#E6BC86', base: '#C4914F', lo: '#8A6030', crease: '#5E3F1C' };
-const PAPER = { hi: '#FFFFFF', base: '#F2F1EC', lo: '#C6BFB0', deep: '#8E8474' };
 const SAGE = { hi: '#CFE3B4', base: '#8DB86A', lo: '#527A36', deep: '#345224' };
 const TEA = { hi: '#C9822F', lo: '#7A4412' };
-const STEAM = { hi: '#FBF8F0', lo: '#CFC6C4' };
+// Steam is parchment-warm, a step DARKER than cream at its base, so the curl is a
+// form the contour can hold on the cream row rather than a white glyph on white.
+const STEAM = { tip: '#EBDCC4', base: '#D6C0A0' };
 const NIGHT = { hi: '#4A5896', base: '#2A325E', lo: '#151A38' };
 const MOON = '#F6EEC8';
 const DUSK = { gHi: '#C29ABC', gLo: '#6E4A72', shadow: '#2E1A33' };
 const BARK = { hi: '#9E6650', base: '#6A3F33', lo: '#3E241E' };
-const DREAD = { gHi: '#8C7692', gLo: '#4E3E5A', sun: '#130D16', sunHi: '#2C1F31', rim: '#C8283A', rimHi: '#FF6A62' };
+// The dread crest: a top-lit indigo disc (never flat black), a crimson rim, and
+// a wine ground whose lit top edge clears the ash row by > 0.13 luminance.
+const DREAD = { gHi: '#7A4C64', gLo: '#46293E', sun: '#16101F', sunHi: '#2E2440', rim: '#C8283A', rimHi: '#E8505A', line: '#C0303A' };
 const TWINE = { hi: '#F3E6C4', base: '#D8C296', lo: '#A98F5F' };
+// Walnut for the strongbox: darker and redder than the kit's WOOD so the box is
+// not the puzzle ladder's blond chest, but its mid-tone stays >= 0.32 luminance
+// so the body clears ash paper (the round-1 iron box sat AT ash luminance).
+const WALNUT = { hi: '#A6734E', base: '#7A5036', lo: '#6A4630', deep: '#3E2416', lidHi: '#C49468', lidLo: '#8E6242', edge: '#5A3824', mouth: '#2A1810' };
+// Warm iron (R > B on every step) for straps and mallet hoops; IRON above stays
+// as it is for the passing crests, which must not change by a byte.
+const WIRON = { hi: '#8E7A6C', base: '#6B5548', lo: '#4A3A32' };
+// Parchment for the paper plane: the one white object in round 1 was the only
+// cool-neutral thing on a warm sheet, so it now folds from the kit's paper.
+const PLANE = { hi: '#F6E9CF', base: '#E4CFA8', lo: '#C9AF88', deep: '#A88C66' };
 
 // --- local helpers -------------------------------------------------------------
 
@@ -145,6 +169,38 @@ function gem(t, x, y, r, rot = 0) {
 
 /** A picket-gate plank as a poly between two rails (see daily_30). */
 function lerp(a, b, u) { return a + (b - a) * u; }
+
+/** Mix two hex colours (u = 0 -> a, u = 1 -> b) back to a hex string. */
+function mix(a, b, u) {
+  const pa = [1, 3, 5].map(i => parseInt(a.slice(i, i + 2), 16));
+  const pb = [1, 3, 5].map(i => parseInt(b.slice(i, i + 2), 16));
+  return '#' + pa.map((v, i) => Math.round(lerp(v, pb[i], u)).toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * A tapered ribbon along a Catmull-Rom spline through `pts`: thickness runs
+ * th0 -> th1 and the colour col0 -> col1 from the first point to the last. It is
+ * a chain of solid capsules, so withOutline contours it as one form (steam).
+ */
+function ribbon(t, pts, th0, th1, col0, col1, steps = 12) {
+  const P = i => pts[Math.max(0, Math.min(pts.length - 1, i))];
+  const samples = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [p0, p1, p2, p3] = [P(i - 1), P(i), P(i + 1), P(i + 2)];
+    for (let s = 0; s < steps; s++) {
+      const u = s / steps, u2 = u * u, u3 = u2 * u;
+      const x = 0.5 * (2 * p1[0] + (-p0[0] + p2[0]) * u + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * u2 + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * u3);
+      const y = 0.5 * (2 * p1[1] + (-p0[1] + p2[1]) * u + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * u2 + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * u3);
+      samples.push([x, y]);
+    }
+  }
+  samples.push(pts[pts.length - 1]);
+  const n = samples.length - 1;
+  for (let i = 0; i < n; i++) {
+    const u = i / n;
+    capsule(t, samples[i][0], samples[i][1], samples[i + 1][0], samples[i + 1][1], lerp(th0, th1, u), mix(col0, col1, u));
+  }
+}
 
 export function draw() {
   fs.mkdirSync(OUT, { recursive: true });
@@ -242,37 +298,48 @@ export function draw() {
     savePNG(path.join(OUT, 'all_animals.png'), W, W, down2(cv, W, W));
   }
 
-  { // === all_rooms.png — a carpenter's mallet crossed over a try-square ========
-    // The square is an L (thick wooden stock along the bottom, brass blade up the
-    // left) and the mallet lies diagonally across its inside, head at the upper
-    // left so the blade passes BEHIND the head and shows again above it: the two
-    // tools genuinely cross rather than sit side by side.
+  { // === all_rooms.png — a carpenter's mallet, a small brass try-square behind ==
+    // The MALLET is the sole anchor: a banded barrel head at the upper left
+    // (~42% of the frame long) with the handle running down-right at ~42 degrees,
+    // the whole tool spanning ~75% of the frame. Round 1 drew the try-square at
+    // the mallet's own scale and material, and the two wooden pieces closed into
+    // a triangle that read as a hammer on a rack. The square is now an ACCESSORY:
+    // a small brass L (arms 30% of the frame, stroke 1/10) tilted 15 degrees so
+    // neither arm runs parallel to a canvas edge, tucked behind the lower half of
+    // the handle at the lower left. It is drawn first, so the handle covers it.
     const { cv, c } = canvas();
-    contactShadow(cv, c + 6, 344, 150, 18, 0.3);
-    const ang = Math.atan2(150 - 322, -40 - 120);                    // handle, lower-right to upper-left
-    const HX = c + 120, HY = 322, TX = c - 40, TY = 150;
+    contactShadow(cv, c + 10, 330, 150, 18, 0.3);
+    const ang = 0.733;                                               // handle: down-right, ~42 degrees
+    const ca = Math.cos(ang), sa = Math.sin(ang);
+    const HX = c - 74, HY = 118;                                     // head centre
+    const along = (d) => [HX + ca * d, HY + sa * d];                 // a point d px down the handle
     withOutline(cv, t => {
-      // try-square: brass blade (vertical) + wooden stock (horizontal)
-      roundRect(t, c - 132, 190, 16, 130, 5, BRASS.hi, 1, BRASS.lo);
-      capsule(t, c - 138, 64, c - 138, 300, 5, '#FFF0C4', 0.55);
-      roundRect(t, c - 30, 302, 132, 22, 7, WOOD.light, 1, WOOD.dark);
-      capsule(t, c - 150, 290, c + 92, 290, 7, WOOD.rim, 0.55);
-      for (const x of [c - 66, c + 4, c + 74]) ellipse(t, x, 302, 7, 7, BRASS.lo, 0.9, 2);  // rivets
-      // mallet handle, thick enough to stay a handle at 32dp
-      poly(t, roundRectPts((HX + TX) / 2, (HY + TY) / 2, Math.hypot(HX - TX, HY - TY) / 2 + 4, 18, 9, ang), WOOD.base, 1, WOOD.dark);
-      poly(t, roundRectPts((HX + TX) / 2 - 7, (HY + TY) / 2 - 7, Math.hypot(HX - TX, HY - TY) / 2 - 12, 6, 4, ang), WOOD.rim, 0.55);
-      // mallet head: a BIG barrel across the handle's top end. The first pass drew
-      // it at 68x42 and the square's L swallowed it at 32dp; the head is the
-      // thing that says "mallet", so it is now the largest mass on the tile.
-      const hx = c - 70, hy = 118;
-      poly(t, roundRectPts(hx, hy, 84, 52, 20, ang + Math.PI / 2), WOOD.light, 1, WOOD.dark);
-      poly(t, roundRectPts(hx - 10, hy - 14, 62, 14, 9, ang + Math.PI / 2), WOOD.rim, 0.6);
-      for (const s of [-1, 1]) {                                     // iron hoops on the barrel ends
-        const ex = hx + Math.cos(ang + Math.PI / 2) * 64 * s, ey = hy + Math.sin(ang + Math.PI / 2) * 64 * s;
-        poly(t, roundRectPts(ex, ey, 11, 50, 4, ang + Math.PI / 2), IRON.base, 1, IRON.deep);
+      // the try-square: outer corner K, arm A along u, arm B up along v
+      const th = -0.26, cu = Math.cos(th), su = Math.sin(th);        // -15 degrees
+      const K = [c - 25, 312];
+      const L = (a, b) => [K[0] + cu * a + su * b, K[1] + su * a - cu * b];   // local (a right, b up)
+      const armA = L(57.5, 20), armB = L(20, 57.5);
+      poly(t, roundRectPts(armA[0], armA[1], 57.5, 20, 4, th), BRASS.hi, 1, BRASS.lo);
+      poly(t, roundRectPts(armB[0], armB[1], 20, 57.5, 4, th), BRASS.hi, 1, BRASS.lo);
+      const e0 = L(6, 34), e1 = L(108, 34);                          // lit inner edges
+      capsule(t, e0[0], e0[1], e1[0], e1[1], 5, '#FFF0C4', 0.5);
+      const f0 = L(6, 34), f1 = L(6, 108);
+      capsule(t, f0[0], f0[1], f1[0], f1[1], 5, '#FFF0C4', 0.5);
+      // the handle: from inside the head to the lower right
+      const [h0x, h0y] = along(20), [h1x, h1y] = along(262);
+      poly(t, roundRectPts((h0x + h1x) / 2, (h0y + h1y) / 2, 121, 18, 9, ang), WOOD.base, 1, WOOD.dark);
+      const [g0x, g0y] = along(60), [g1x, g1y] = along(250);
+      capsule(t, g0x + sa * 6, g0y - ca * 6, g1x + sa * 6, g1y - ca * 6, 6, WOOD.rim, 0.5);
+      // the head: a barrel across the handle's top, two dark bands at its ends
+      poly(t, roundRectPts(HX, HY, 80, 38, 16, ang + Math.PI / 2), WOOD.light, 1, WOOD.dark);
+      poly(t, roundRectPts(HX - 8, HY - 12, 58, 10, 6, ang + Math.PI / 2), WOOD.rim, 0.6);
+      for (const s of [-1, 1]) {
+        const ex = HX + Math.cos(ang + Math.PI / 2) * 62 * s, ey = HY + Math.sin(ang + Math.PI / 2) * 62 * s;
+        poly(t, roundRectPts(ex, ey, 11, 37, 4, ang + Math.PI / 2), WIRON.base, 1, WIRON.lo);
+        poly(t, roundRectPts(ex - 3, ey - 3, 4, 30, 2, ang + Math.PI / 2), WIRON.hi, 0.6);
       }
     }, { width: 10 });
-    sheen(cv, c - 112, 96, 14, 22, 0.42);
+    sheen(cv, c - 108, 92, 14, 22, 0.42);
     savePNG(path.join(OUT, 'all_rooms.png'), W, W, down2(cv, W, W));
   }
 
@@ -302,48 +369,65 @@ export function draw() {
     savePNG(path.join(OUT, 'amber_1000.png'), W, W, down2(cv, W, W));
   }
 
-  { // === amber_5000.png — an iron strongbox, lid up, gems spilling from it =====
-    // Iron and squat where the puzzle ladder's chest (puzzle_750) is wood and
-    // domed: a flat slab lid standing open on its back hinge, two vertical bands,
-    // a brass padlock hanging open at the front, and the gems overrun the lip.
+  { // === amber_5000.png — a walnut strongbox, lid low, gems heaped in its mouth =
+    // Round 1 was a cool iron box whose body sat AT ash luminance, so on the dark
+    // row only the bands and gems survived, and it borrowed the pot's spill
+    // (one loose gem on the ground), so rows 5 and 6 read as twins. Now: a squat
+    // WIDE walnut box (planks top-lit, mid-tone > 0.32 luminance), dark warm
+    // iron straps, a big brass padlock on the front, and the lid raised only
+    // ~35 degrees on its back hinge so its lighter underside shows as a LOW
+    // slab (puzzle_750's chest, in the same list, stands its lid tall). The
+    // gems are a low heap INSIDE the mouth that breaks the lid line, with ONE
+    // gem hanging over the front lip and nothing on the ground.
     const { cv, c } = canvas();
-    contactShadow(cv, c + 8, 344, 148, 18, 0.32);
+    contactShadow(cv, c + 8, 346, 154, 16, 0.32);
     withOutline(cv, t => {
-      // lid: its underside faces us
-      poly(t, [[c - 134, 196], [c + 134, 196], [c + 122, 96], [c - 122, 96]], IRON.lo, 1, IRON.base);
-      roundRect(t, c, 96, 124, 9, 4, IRON.hi, 1, IRON.base);           // lid's lit top edge
-      for (const x of [c - 74, c + 74]) poly(t, [[x - 14, 196], [x + 14, 196], [x + 13, 100], [x - 13, 100]], IRON.deep, 0.8);
-      // body
-      roundRect(t, c, 262, 134, 66, 8, IRON.hi, 1, IRON.lo);
-      for (const x of [c - 74, c + 74]) {
-        roundRect(t, x, 262, 15, 66, 3, IRON.deep, 0.95);
-        capsule(t, x - 5, 200, x - 5, 324, 4, IRON.hi, 0.45);
+      // the lid: underside facing us, foreshortened, hinged along the back
+      poly(t, [[c - 138, 200], [c + 138, 200], [c + 128, 140], [c - 128, 140]], WALNUT.lidHi, 1, WALNUT.lidLo);
+      roundRect(t, c, 138, 130, 7, 3, WALNUT.edge, 1, WALNUT.deep);    // the lid's free edge
+      for (const x of [c - 90, c + 90]) poly(t, [[x - 14, 200], [x + 14, 200], [x + 13, 134], [x - 13, 134]], WIRON.base, 1, WIRON.lo);
+      // the mouth: a dark band between hinge and lip
+      roundRect(t, c, 204, 138, 12, 3, WALNUT.mouth);
+      // the body: wide walnut planks, two seams, a lit lip
+      roundRect(t, c, 270, 144, 58, 10, WALNUT.hi, 1, WALNUT.lo);
+      for (const y of [252, 292]) capsule(t, c - 136, y, c + 136, y, 6, WALNUT.deep, 0.35);
+      capsule(t, c - 138, 215, c + 138, 215, 9, '#BE8A60', 0.85);       // the front lip, lit
+      for (const x of [c - 90, c + 90]) {                              // straps
+        roundRect(t, x, 270, 15, 58, 3, WIRON.base, 1, WIRON.lo);
+        capsule(t, x - 6, 216, x - 6, 324, 4, WIRON.hi, 0.6);
       }
-      capsule(t, c - 130, 198, c + 130, 198, 12, IRON.deep, 0.9);      // the open mouth's lip
-      for (const x of [c - 108, c + 108]) roundRect(t, x, 334, 20, 8, 3, IRON.deep);  // feet
-      // padlock, open
-      arcStroke(t, c, 276, 18, 10, Math.PI, Math.PI * 2, BRASS.lo);
-      roundRect(t, c, 300, 24, 22, 6, BRASS.hi, 1, BRASS.lo);
-      ellipse(t, c, 302, 6, 6, INK, 0.8, 2);
-      // the hoard
-      gem(t, c - 84, 184, 30, 0.2);
-      gem(t, c - 28, 176, 31, -0.3);
-      gem(t, c + 30, 180, 31, 0.35);
-      gem(t, c + 86, 186, 29, -0.1);
-      gem(t, c + 2, 130, 30, 0.15);
-      gem(t, c - 102, 232, 27, 0.4);                                   // over the lip
-      gem(t, c + 54, 236, 27, -0.35);
-      gem(t, c + 140, 318, 25, 0.2);                                   // one on the ground
+      for (const x of [c - 112, c + 112]) roundRect(t, x, 334, 22, 8, 3, WALNUT.deep);  // feet
+      // the padlock: brass, big enough to stay a padlock at 32dp
+      arcStroke(t, c, 254, 22, 13, Math.PI, Math.PI * 2, BRASS.lo);
+      arcStroke(t, c - 2, 252, 22, 5, Math.PI * 1.1, Math.PI * 1.55, '#FFF0C4', 0.6);
+      roundRect(t, c, 286, 32, 26, 8, BRASS.hi, 1, BRASS.lo);
+      ellipse(t, c, 286, 8, 8, INK, 0.85, 2);
+      capsule(t, c, 288, c, 302, 8, INK, 0.85);
+      // the hoard: a low heap in the mouth, climbing over the lid line
+      gem(t, c - 84, 192, 29, 0.2);
+      gem(t, c - 28, 190, 30, -0.3);
+      gem(t, c + 28, 192, 30, 0.35);
+      gem(t, c + 84, 194, 28, -0.1);
+      gem(t, c - 56, 154, 30, 0.1);
+      gem(t, c + 2, 148, 31, -0.2);
+      gem(t, c + 58, 156, 29, 0.3);
+      gem(t, c - 24, 114, 29, 0.25);
+      gem(t, c + 30, 116, 28, -0.15);
+      gem(t, c + 108, 222, 27, 0.4);                                   // ONE gem over the front lip
     }, { width: 10 });
-    sheen(cv, c - 106, 220, 12, 30, 0.4);
+    sheen(cv, c - 120, 236, 12, 26, 0.4);
     savePNG(path.join(OUT, 'amber_5000.png'), W, W, down2(cv, W, W));
   }
 
-  { // === phase_1.png — a steaming teacup, the steam bent into a question hook ==
+  { // === phase_1.png — a steaming teacup, ONE curl of steam hooked like a question
     // Sage glaze, not creamware: cream china on the cream parchment row is a
-    // contour with nothing inside it. The steam is ONE thick pale ribbon (solid,
-    // so withOutline contours it) drawn as the hook of a '?' with its stem
-    // dropping into the tea. No dot: a lone dot at 32dp is a stray fleck.
+    // contour with nothing inside it. Round 1 typeset the steam as a literal '?'
+    // (dot and all), which the doctrine forbids and which vanished as a white
+    // hook on cream. The steam is now ONE tapered ribbon (1/8 of the frame thick
+    // at the tea, 1/14 at the tip) that rises, bows left, and curls over to the
+    // upper right like a hook, warm parchment a step darker than cream so the
+    // INK contour holds it, plus a second much smaller wisp so it reads as steam
+    // rather than a symbol. The cup stays the dominant mass.
     const { cv, c } = canvas();
     contactShadow(cv, c + 8, 332, 150, 18, 0.32);
     withOutline(cv, t => {
@@ -361,14 +445,13 @@ export function draw() {
       ellipse(t, c, 200, 106, 24, SAGE.hi, 1, 3);
       ellipse(t, c, 202, 96, 18, TEA.lo, 1, 3);
       ellipse(t, c - 4, 200, 88, 14, TEA.hi, 1, 3);
-      // the steam: hook + stem
-      capsule(t, c - 2, 148, c - 2, 194, 24, STEAM.hi);
-      arcStroke(t, c - 2, 100, 46, 26, Math.PI * 0.98, Math.PI * 2.5, STEAM.hi);
-      arcStroke(t, c + 2, 104, 46, 9, Math.PI * 1.1, Math.PI * 2.4, STEAM.lo, 0.7);
-      capsule(t, c + 6, 152, c + 6, 190, 8, STEAM.lo, 0.6);
+      // the steam: one hooked curl, and a small wisp to its left
+      ribbon(t, [[c + 14, 198], [c + 30, 166], [c + 12, 126], [c + 30, 84], [c + 72, 62], [c + 100, 80], [c + 96, 108]],
+        48, 27, STEAM.base, STEAM.tip);
+      ribbon(t, [[c - 44, 198], [c - 56, 176], [c - 46, 152], [c - 58, 130]], 26, 16, STEAM.base, STEAM.tip);
     }, { width: 10 });
     sheen(cv, c - 70, 216, 16, 30, 0.42);
-    sheen(cv, c - 36, 70, 14, 10, 0.45);
+    sheen(cv, c + 40, 78, 12, 9, 0.4);
     savePNG(path.join(OUT, 'phase_1.png'), W, W, down2(cv, W, W));
   }
 
@@ -442,36 +525,36 @@ export function draw() {
     savePNG(path.join(OUT, 'phase_3.png'), W, W, down2(cv, W, W));
   }
 
-  { // === phase_4.png — a black sun on the horizon, rimmed in crimson ===========
-    // The dread crest, and the family's only crimson. A crimson sun-with-rays is
-    // laid first and the black sun-with-rays over it a step smaller, so a rim of
-    // crimson shows all the way round disc and rays alike; the ground slab then
-    // covers the lower third so the sun SITS on the horizon rather than floating.
+  { // === phase_4.png — a black sun SETTING behind a horizon, rimmed in crimson ==
+    // The dread crest, and the family's only crimson. Round 1 gave the disc a
+    // ring of crimson-edged spikes and a flat-black core at ash luminance, so on
+    // the dark row only the spikes survived and it read as an urchin, and its
+    // purple pill mound twinned it with the tree. Now: a PLAIN disc (~55% of
+    // the frame) top-lit in two steps of indigo, never flat black, with a wide
+    // continuous crimson rim, its lower third cut off by a straight horizon; the
+    // ground is a flat wine band across the bottom ~30% of the frame whose top
+    // edge carries a thin crimson line. Three SHORT stubby rays above the
+    // horizon only (a sun, not a star). No glow: a crimson wash darkens cream.
     const { cv, c } = canvas();
-    contactShadow(cv, c + 6, 342, 160, 16, 0.3);
-    const SX = c, SY = 196;
-    const rays = (rIn, rOut, halfAng, color, alpha = 1) => {
-      for (let k = 0; k < 8; k++) {
-        const a = -Math.PI / 2 + (k * Math.PI) / 4;
-        tri(t0, [SX + Math.cos(a - halfAng) * rIn, SY + Math.sin(a - halfAng) * rIn],
-          [SX + Math.cos(a + halfAng) * rIn, SY + Math.sin(a + halfAng) * rIn],
-          [SX + Math.cos(a) * rOut, SY + Math.sin(a) * rOut], color, alpha);
-      }
-    };
-    let t0 = null;
+    contactShadow(cv, c + 6, 350, 160, 14, 0.3);
+    const SX = c, SY = 188, R = 104;
     withOutline(cv, t => {
-      t0 = t;
-      rays(84, 158, 0.30, DREAD.rim);
-      ellipse(t, SX, SY, 106, 106, DREAD.rim, 1, 3);
-      arcStroke(t, SX, SY, 98, 12, Math.PI * 0.95, Math.PI * 1.7, DREAD.rimHi, 0.9);
-      rays(84, 140, 0.19, DREAD.sun);
-      ellipse(t, SX, SY, 92, 92, DREAD.sun, 1, 3);
-      ellipse(t, SX - 12, SY - 22, 62, 52, DREAD.sunHi, 0.8, 34);
-      // the ground, over the sun's lower third, and the crimson horizon line
-      roundRect(t, c, 312, 162, 40, 24, DREAD.gHi, 1, DREAD.gLo);
-      capsule(t, c - 156, 274, c + 156, 274, 9, DREAD.rim, 0.95);
+      for (const a of [-Math.PI / 2, -Math.PI / 2 - 0.85, -Math.PI / 2 + 0.85]) {   // three short rays
+        const rIn = R - 6, rOut = R + 44, hw = 17;
+        const nx = -Math.sin(a), ny = Math.cos(a);
+        tri(t, [SX + Math.cos(a) * rIn - nx * hw, SY + Math.sin(a) * rIn - ny * hw],
+          [SX + Math.cos(a) * rIn + nx * hw, SY + Math.sin(a) * rIn + ny * hw],
+          [SX + Math.cos(a) * rOut, SY + Math.sin(a) * rOut], DREAD.rim);
+      }
+      ellipse(t, SX, SY, R, R, DREAD.rim, 1, 3);                       // the rim, seen as a disc
+      arcStroke(t, SX, SY, R - 8, 10, Math.PI * 0.95, Math.PI * 1.65, DREAD.rimHi, 0.9);  // lit upper-left rim
+      ellipse(t, SX, SY, R - 18, R - 18, DREAD.sun, 1, 3);             // the dark body, 18px inside
+      ellipse(t, SX - 26, SY - 28, 62, 56, DREAD.sunHi, 1, 30);        // its top-lit step
+      // the ground: a flat wine band, and the crimson horizon along its top edge
+      roundRect(t, c, 288, 160, 58, 14, DREAD.gHi, 1, DREAD.gLo);
+      capsule(t, c - 158, 230, c + 158, 230, 22, DREAD.line);
     }, { width: 10 });
-    sheen(cv, c - 130, 288, 22, 8, 0.32);
+    sheen(cv, c - 130, 250, 22, 8, 0.3);
     savePNG(path.join(OUT, 'phase_4.png'), W, W, down2(cv, W, W));
   }
 
@@ -584,17 +667,20 @@ export function draw() {
     // A dart seen from three-quarters: the far wing lit white, the near wing a
     // step down, the keel below darkest — three flat value steps and one crease,
     // which is all a folded sheet has and all a 32dp cell can carry.
+    // Round 1 folded it from white paper and it was the one cool-neutral object
+    // on the warm sheet; it is parchment now (R > B on every fill), the crease
+    // is INK, and the dart is 12% larger so the wing still reads at 26dp.
     const { cv, c } = canvas();
-    const ang = -0.5, ca = Math.cos(ang), sa = Math.sin(ang);
-    const OX = c + 130, OY = 132;                                     // the nose
-    const P = (u, v) => [OX + u * ca - v * sa, OY + u * sa + v * ca];
-    contactShadow(cv, c + 14, 320, 132, 16, 0.3);
+    const ang = -0.5, ca = Math.cos(ang), sa = Math.sin(ang), S = 1.12;
+    const OX = c + 146, OY = 122;                                     // the nose
+    const P = (u, v) => [OX + (u * ca - v * sa) * S, OY + (u * sa + v * ca) * S];
+    contactShadow(cv, c + 14, 328, 148, 16, 0.3);
     withOutline(cv, t => {
-      poly(t, [P(0, 0), P(-262, 44), P(-206, 6)], PAPER.base, 1, PAPER.lo);      // near wing
-      poly(t, [P(0, 0), P(-206, 6), P(-196, 72)], PAPER.lo, 1, PAPER.deep);      // keel
-      poly(t, [P(0, 0), P(-256, -78), P(-206, 6)], PAPER.hi, 1, PAPER.base);     // far wing
+      poly(t, [P(0, 0), P(-262, 44), P(-206, 6)], PLANE.base, 1, PLANE.lo);      // near wing
+      poly(t, [P(0, 0), P(-206, 6), P(-196, 72)], PLANE.lo, 1, PLANE.deep);      // keel
+      poly(t, [P(0, 0), P(-256, -78), P(-206, 6)], PLANE.hi, 1, PLANE.base);     // far wing
       const [x1, y1] = P(-6, 0), [x2, y2] = P(-204, 6);
-      capsule(t, x1, y1, x2, y2, 6, PAPER.deep, 0.5);                            // the spine crease
+      capsule(t, x1, y1, x2, y2, 6, INK, 0.45);                                  // the spine crease
     }, { width: 10 });
     const [sx, sy] = P(-150, -34);
     sheen(cv, sx, sy, 34, 12, 0.45);

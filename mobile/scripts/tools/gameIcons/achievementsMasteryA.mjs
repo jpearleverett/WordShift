@@ -11,16 +11,21 @@
  *
  *   STARS ladder (perfect-solve counts), vessel = the GOLD STAR, escalating by
  *   COUNT and then by the thing that HOLDS the stars:
- *     first_perfect  ONE star rising over a low green horizon (First Light)
- *                    -> a single star on a hill. Asymmetric top, flat base.
+ *     first_perfect  ONE star rising out of a low green horizon, six short gold
+ *                    dawn rays fanning up from behind it (First Light)
+ *                    -> a spiky star sunk into a hill. Asymmetric top, flat base.
  *     perfect_10     a FAN of three stars, the big one centre and high
  *                    -> a three-lobed arc. Wider than tall.
  *     perfect_25     a corked GLASS JAR filled with stars
  *                    -> a bottle. Taller than wide, a lid on top.
- *     perfect_50     a brass-rimmed night MEDALLION with five stars joined into a
- *                    constellation -> a round disc. The only circle in the ladder.
+ *     perfect_50     a brass-rimmed night MEDAL hung from a wine ribbon and a
+ *                    brass bar, five stars joined into a constellation on its face
+ *                    -> a disc with a ribbon V and a bar above it. The only round
+ *                    thing in the ladder, and its ribbon keeps it off the
+ *                    challenge buckler's plain-circle silhouette (row 10 of the
+ *                    same list): the first blind round confused the two.
  *   Every star is drawn by the one `goldStar` below, so the four read as one line.
- *   The medallion is a deliberate addition to the brief's bare "five stars and
+ *   The medal is a deliberate addition to the brief's bare "five stars and
  *   lines": five loose stars are a particle field at 26dp, and the house rule is
  *   ONE centred silhouette. Set into a disc they are a constellation on a coin.
  *
@@ -56,10 +61,16 @@
  *
  * House doctrine (see _draw.mjs): contact shadow and any halo go down on the real
  * canvas FIRST (never contoured), the subject is drawn inside withOutline, the
- * upper-left sheen lands on top of the contour. INK outlines, never #000. Every
- * halo is lighter than cream parchment in all three channels so it can only lift
- * the surface it lands on. No Math.random: every coordinate is a literal, so the
- * generator is byte-reproducible.
+ * upper-left sheen lands on top of the contour. INK outlines, never #000.
+ *
+ * A kit fact that decided first_perfect's dawn light: the canvas starts as
+ * transparent BLACK and the PNG is saved straight-alpha, so a translucent layer
+ * laid on the bare canvas exports as its colour scaled by its alpha (a cream
+ * #FFF3D2 disc at 0.34 ships as rgb 87,83,71 @ 34%). Composited over parchment
+ * that can only DARKEN it, however light the source colour was. A glow that must
+ * read light therefore has to be OPAQUE paint inside the contour: first_perfect's
+ * rays are solid gold wedges, not a halo. No Math.random: every coordinate is a
+ * literal, so the generator is byte-reproducible.
  *
  * All coordinates are in the 384x384 supersample space (c = 192 is the centre);
  * each file is downsampled 2x to a 192px PNG.
@@ -203,17 +214,34 @@ function crown(cv, cx, baseY) {
 export function draw() {
   fs.mkdirSync(OUT, { recursive: true });
 
-  { // === first_perfect.png — First Light: one star rising over a green horizon ===
+  { // === first_perfect.png — First Light: one star rising out of a green horizon ===
     const { cv, c } = canvas();
-    const sy = 178;
-    contactShadow(cv, c + 8, 344, 148, 18, 0.32);
-    ellipse(cv, c, sy, 150, 140, HALO, 0.34, 40);                          // dawn halo
+    const sy = 190;
+    contactShadow(cv, c + 8, 344, 148, 18, 0.32);                          // the ONLY thing outside the contour
     withOutline(cv, t => {
+      // dawn rays: six solid gold rods fanning UP from a point low in the
+      // star's body, so they say "first light" behind a rising star. Each is
+      // ~20-30px at 192 past the star's silhouette and ~9px wide, over the
+      // 1/12-frame floor; opaque, so they are contoured with the star and can
+      // never darken the ground the way a translucent halo does (see header).
+      // They are a step DARKER than the star (GOLD.mid, no lit core) and the
+      // star wears an extra-heavy keyline over them, so at 32px the star stays
+      // the bright form and the fan stays behind it.
+      // Each ray is a tapered wedge (wide at the star, narrowing outward): the
+      // sunburst shape. Parallel round-capped rods read as crown prongs at 32px.
+      const ox = c, oy = sy + 44;
+      for (const deg of [-152, -130, -108, -72, -50, -28]) {
+        const a = (deg * Math.PI) / 180, ca = Math.cos(a), sa = Math.sin(a);
+        const R = (s, o) => [ox + ca * s - sa * o, oy + sa * s + ca * o];
+        poly(t, [R(56, -14), R(160, -6), R(164, 0), R(160, 6), R(56, 14)], GOLD.mid, 1, GOLD.lo);
+      }
+      poly(t, starPts(c, sy, 104 + 16, 104 * 0.5 + 10), INK, 0.95);        // heavy keyline vs the rays
       goldStar(t, c, sy, 104);
-      // the horizon: a low green hill drawn OVER the star's lower points, so the
-      // star is rising out of it rather than sitting on it
-      poly(t, [...domePts(c, 326, 156, 52), [c + 156, 340], [c - 156, 340]], ACCENT.main, 1, ACCENT.lo);
-      poly(t, [...domePts(c, 330, 140, 40), [c + 140, 332], [c - 140, 332]], '#9BC46E', 0.55); // lit crest, inside the hill
+      // the horizon: a low green hill drawn OVER the star's lower points (they
+      // sink ~10px at 192 into it), so the star is rising out of the hill rather
+      // than standing on it
+      poly(t, [...domePts(c, 316, 156, 60), [c + 156, 340], [c - 156, 340]], ACCENT.main, 1, ACCENT.lo);
+      poly(t, [...domePts(c, 320, 140, 46), [c + 140, 332], [c - 140, 332]], '#9BC46E', 0.55); // lit crest, inside the hill
     }, { width: 10 });
     sheen(cv, c - 34, sy - 30, 17, 11, 0.5);
     savePNG(path.join(OUT, 'first_perfect.png'), W, W, down2(cv, W, W));
@@ -255,24 +283,40 @@ export function draw() {
     savePNG(path.join(OUT, 'perfect_25.png'), W, W, down2(cv, W, W));
   }
 
-  { // === perfect_50.png — a night medallion with a five-star constellation ===
+  { // === perfect_50.png — a night medal on a ribbon, a five-star constellation ===
     const { cv, c } = canvas();
-    const cy = c + 4, R = 152;
-    contactShadow(cv, c + 8, cy + R + 4, 130, 18, 0.32);
+    const cy = 244, R = 112;                                               // disc ~58% of the frame
+    contactShadow(cv, c + 8, cy + R + 4, 100, 16, 0.32);
     withOutline(cv, t => {
+      // the ribbon: a brass pin bar at the top, two wine straps falling in a V
+      // to a brass suspension ring at the disc's crown. The bar + V is what
+      // breaks the plain-circle silhouette the challenge buckler owns.
+      const barY = 42;
+      poly(t, [[c - 64, barY + 8], [c - 30, barY + 8], [c + 4, 146], [c - 20, 146]], WINE.base, 1, WINE.lo);   // left strap
+      poly(t, [[c + 30, barY + 8], [c + 64, barY + 8], [c + 20, 146], [c - 4, 146]], WINE.hi, 1, WINE.base);   // right strap (lit)
+      capsule(t, c - 47, barY + 18, c - 12, 138, 8, WINE.hi, 0.55);        // lit stripe, left strap
+      capsule(t, c + 47, barY + 18, c + 12, 138, 8, '#D66A93', 0.5);       // lit stripe, right strap
+      roundRect(t, c, barY, 70, 11, 5, BRASS.hi, 1, BRASS.lo);            // pin bar
+      capsule(t, c - 60, barY - 3, c + 60, barY - 3, 5, '#FFF3D2', 0.55);  // bar highlight
+      ringStroke(t, c, 128, 15, 11, BRASS.lo);                             // suspension ring
+      arcStroke(t, c, 128, 15, 5, Math.PI * 1.05, Math.PI * 1.7, BRASS.hi, 0.9);
+      // the medal disc
       roundRect(t, c, cy, R, R, R, BRASS.hi, 1, BRASS.lo);                 // brass rim
-      ringStroke(t, c, cy, R - 12, 8, GOLD.deep, 0.6);
-      roundRect(t, c, cy, R - 22, R - 22, R - 22, NIGHT.hi, 1, NIGHT.lo);   // night field
-      ringStroke(t, c, cy, R - 26, 8, NIGHT.lo, 0.7);
-      // the constellation: five stars, four gold cords
-      const S = [[c - 90, 250], [c - 44, 128], [c + 28, 198], [c + 82, 104], [c + 100, 258]];
-      const links = [[0, 1], [1, 2], [2, 3], [3, 4], [4, 2]];
-      for (const [a, b] of links) capsule(t, S[a][0], S[a][1], S[b][0], S[b][1], 15, GOLD.lo);
-      for (const [a, b] of links) capsule(t, S[a][0], S[a][1], S[b][0], S[b][1], 8, GOLD.hi, 0.9);
-      const RS = [30, 34, 26, 38, 32];
+      ringStroke(t, c, cy, R - 11, 7, GOLD.deep, 0.6);
+      roundRect(t, c, cy, R - 20, R - 20, R - 20, NIGHT.hi, 1, NIGHT.lo);   // night field
+      ringStroke(t, c, cy, R - 24, 7, NIGHT.lo, 0.7);
+      // the constellation: five big stars (>= 20px at 192 each) on five fat gold
+      // cords (18px at 384 = 9px at 192) laid out as a DIPPER, a four-star bowl
+      // to the lower right and one handle star up-left. A symmetric W read as
+      // the letter M at 32px; the dipper is the one constellation everyone names.
+      const S = [[c - 16, cy + 16], [c + 44, cy + 44], [c + 64, cy - 16], [c + 4, cy - 40], [c - 48, cy - 50]];
+      const links = [[0, 1], [1, 2], [2, 3], [3, 0], [3, 4]];
+      for (const [a, b] of links) capsule(t, S[a][0], S[a][1], S[b][0], S[b][1], 18, GOLD.lo);
+      for (const [a, b] of links) capsule(t, S[a][0], S[a][1], S[b][0], S[b][1], 9, GOLD.hi, 0.9);
+      const RS = [22, 25, 25, 23, 20];
       S.forEach(([x, y], i) => goldStar(t, x, y, RS[i], -Math.PI / 2 + (i - 2) * 0.12));
     }, { width: 10 });
-    sheen(cv, c - 96, cy - 96, 26, 16, 0.45);
+    sheen(cv, c - 70, cy - 70, 22, 14, 0.45);
     savePNG(path.join(OUT, 'perfect_50.png'), W, W, down2(cv, W, W));
   }
 
