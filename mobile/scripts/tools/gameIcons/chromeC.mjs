@@ -100,7 +100,7 @@
  * the ouroboros (five steps, warmed a touch toward rose/wine in round 4 so it
  * sits beside the shrine's serene mauve rather than cool violet; `mid` at
  * ~0.45 linear luminance so the tube sits a full step above ash and the head,
- * in `lite`/`hi`, a step above the tube on both grounds); a local SCROLL
+ * in `hi` over `mid`, a step above the tube on both grounds); a local SCROLL
  * ladder (four tan-creams, the crown at cream and the seat two steps below,
  * so the roll clears the cream ground by contour and the ash ground by value);
  * one cool BLUEPRINT ink for the roofline. No glows anywhere in this family.
@@ -134,7 +134,7 @@ const save = (cv, file) => savePNG(file, OW, OW, down2(cv, OW, OW));
 // --- local palettes ---------------------------------------------------------
 /** Serene mauve, the Phase-5 material, warmed toward rose/wine. Five steps so
  *  a ring 66px thick still has a lit crest and a shaded seat once it is 3px thick. */
-const MAUVE = { lite: '#F6E6EF', hi: '#E5CAE0', mid: '#CBA5CD', lo: '#805684', deep: '#553559' };
+const MAUVE = { lite: '#F7E7EE', hi: '#E9C9DB', mid: '#CFA3C4', lo: '#86567C', deep: '#593553' };
 const EYE = { pupil: '#2A1B30' };
 /** The ledger spot's glass and feather, verbatim, so the two ledger marks are one pot. */
 const INKP = { rim: '#5E56A0', lit: '#6A61B4', hi: '#3A3268', base: '#2B2550', lo: '#1A1533', gloss: '#9E96D6' };
@@ -292,15 +292,21 @@ export function draw() {
       // inner edge stays inside the tube (the keyline never opens the ring)
       const P = rot(cx + Math.cos(aH) * R, cy + Math.sin(aH) * R, aH + Math.PI / 2);
       const H = (u, v) => P(u, -v);
-      const head = [H(-66, 0), H(-60, 30), H(-40, 54), H(-10, 67), H(26, 65), H(52, 50),
-        H(68, 24), H(72, 4), H(66, -16), H(48, -28), H(0, -30), H(-46, -27), H(-62, -14)];
+      // a teardrop lying ALONG the ring, blunt crown behind, nose pointing
+      // clockwise at the tail; filled in the creature's own mauve a step above
+      // the tube (a near-white head read as a pearl on a ring), lit toward the
+      // crown so the value ladder matches the tube's
+      const head = [H(-74, 4), H(-70, 30), H(-52, 52), H(-22, 64), H(14, 62), H(48, 50),
+        H(76, 34), H(92, 18), H(86, 4), H(66, -14), H(36, -26), H(-4, -30), H(-46, -28), H(-68, -14)];
       poly(t, grow(head, 6), INK, 0.9);
-      poly(t, head, MAUVE.lite, 1, MAUVE.hi);
-      // the mouth: a short ink wedge notched into the outer edge at the nose
-      poly(t, [H(36, 22), H(44, 64), H(78, 22)], INK, 0.95);
+      poly(t, head, MAUVE.hi, 1, MAUVE.mid);
+      arcStroke(t, cx, cy, R + 40, 14, aH - 0.26, aH + 0.02, MAUVE.lite, 0.9); // the lit crown
+      // the mouth: the jaw opens at the nose, an ink wedge cut back from the
+      // tip along the outer half of the head, so the tail runs INTO it
+      poly(t, [H(30, 22), H(94, 40), H(94, 6)], INK, 0.95);
       // one solid dark eye, high on the crown
-      const [ex, ey] = H(-16, 26);
-      ellipse(t, ex, ey, 23, 23, EYE.pupil, 1, 2);
+      const [ex, ey] = H(-22, 26);
+      ellipse(t, ex, ey, 24, 24, EYE.pupil, 1, 2);
     }, CHROME);
     sheen(cv, cx - 100, cy - 100, 30, 16, 0.5);
     save(cv, path.join(OUT, 'cycle_loop.png'));
@@ -401,71 +407,74 @@ export function draw() {
     save(cv, path.join(OUT, 'paper_plane.png'));
   }
 
-  { // === spots/empty_house.png — rolled parchment scroll, twine, a pencil ====
-    // ROUND 4. ONE anchored object in the parchment palette. The roll is a
-    // horizontal tan-cream tube 280px long (the group spans ~73% of the frame
-    // with the flap and the end cap), top-lit with a cream crown and a two-step
-    // darker seat; its RIGHT end shows the rolled sheet's cross-section as a
-    // lit disc 92px wide carrying a bold 11px wood-brown SPIRAL of 1.6 turns
-    // round a dark hollow: the spiral is what says "scroll". ONE ochre twine
-    // band near the centre under a simple knot with two short stubs (no bow,
-    // no second band). At the LEFT end a short flat flap of the sheet peels
-    // open on the ground under the roll and carries ONE bold blue-ink roofline
-    // chevron 66px wide, the only blueprint cue (round 3's house glyph on a
-    // steel-blue roll made a drum with a sticker). The carpenter's pencil lies
-    // ON THE GROUND in front of the roll, rising slightly to the right, a
-    // 54px warm-wood body with a lit top face, a dark cut end at the left, a
-    // flat cream sharpened tip and a graphite point at the right, its point
-    // overlapping the roll's lower-left; the flap, roll and pencil all touch
-    // under one contour and share one contact shadow.
+  { // === spots/empty_house.png — a rolled BLUEPRINT with a house-plan flap ====
+    // ROUND 5 (hand pass after the fourth blind review). Rounds 1-4 tried a
+    // parchment scroll, a cinnamon-roll spiral, a gift-bow and a pencil in
+    // front, and a stranger never once saw a plan: "a beige tube with a bow
+    // and a tag". So the roll now IS the blueprint. ONE anchor: a diagonal
+    // tube (lower-left to upper-right, ~70% of the frame) in dusty blueprint
+    // BLUE, top-lit via gradTo so the MATERIAL says "plan"; its upper-right
+    // end shows the rolled sheet's cross-section as two thick cream rings
+    // round a dark hollow (no spiral, no brown). At the lower-left the sheet
+    // unrolls into a short flat flap CONTINUOUS with the tube (same blue, one
+    // contour) carrying a tiny cream house outline: a gable over a rectangle
+    // in four strokes, each >= 1/12 of the frame, so the "house" survives the
+    // 8x downscale. A thin tan cord wraps the middle twice under a small
+    // square knot (no bow loops: they read as gift wrap). The carpenter's
+    // pencil is tucked BEHIND the roll so only its sharpened tip shows at the
+    // lower-right and it never crosses the anchor.
     const cv = fresh();
-    const rx = c, ry = c - 22, RL = 140, RR = 78;
-    contactShadow(cv, c + 4, 392, 196, 24, 0.32);
+    const BLUE = { hi: '#5E80B6', lo: '#34507C', edge: '#2A4066', cream: '#F6EAD0' };
+    const ang = -0.52;                                   // radians, y-down: rises to the right
+    const PT = rot(c + 6, c - 4, ang);                   // tube frame (centre, rotated)
+    contactShadow(cv, c + 10, 392, 200, 24, 0.32);
     withOutline(cv, t => {
-      // the flap: a flat piece of the sheet peeled open at the left, lying
-      // under the roll's left end, with the blue roofline on it
-      const fl = rx - RL;
-      poly(t, [[fl + 30, ry - 30], [fl - 84, ry - 30], [fl - 84, ry + 70], [fl + 30, ry + 70]], PARCH.hi, 1, PARCH.dim);
-      capsule(t, fl - 75, ry + 44, fl - 42, ry - 6, 14, BLUEPRINT);
-      capsule(t, fl - 42, ry - 6, fl - 9, ry + 44, 14, BLUEPRINT);
-      // the roll: a horizontal tube, top-lit, a cream crown, a shaded seat
-      poly(t, roundRectPts(rx, ry, RL, RR, 20, 0), SCROLL.hi, 1, SCROLL.lo);
-      roundRect(t, rx, ry + RR - 12, RL - 6, 10, 5, SCROLL.seat, 0.7);
-      roundRect(t, rx, ry - RR + 16, RL - 10, 9, 4, SCROLL.crown, 0.9);
-      ellipse(t, rx - RL + 6, ry, 28, RR - 2, SCROLL.lo, 1, 2);                // the shaded far end
-      // the near end: the rolled sheet's cross-section, a lit disc with a spiral
-      const ex = rx + RL, ey = ry;
-      ellipse(t, ex, ey, 46, RR + 2, INK, 0.9, 2);
-      ellipse(t, ex, ey, 42, RR - 2, SCROLL.crown, 1, 2);
-      spiral(t, ex, ey, 42 / 76, 7, 62, 1.6, 11, SCROLL.coil);
-      ellipse(t, ex, ey, 7, 12, INK, 0.9, 2);                                    // the hollow
-      // one twine band round the tube, a simple knot with two short stubs
-      const bx = rx + 24;
-      roundRect(t, bx, ry, 20, RR + 8, 8, INK, 0.9);
-      roundRect(t, bx, ry, 14, RR + 5, 6, WOOD.light, 1, WOOD.dark);
-      const ky = ry - RR - 8;
-      for (const [dx, dy] of [[-40, -34], [38, -38]]) {
-        capsule(t, bx, ky, bx + dx, ky + dy, 28, INK, 0.9);
-        capsule(t, bx, ky, bx + dx, ky + dy, 18, WOOD.light);
-      }
-      roundRect(t, bx, ky, 26, 20, 9, INK, 0.9);
-      roundRect(t, bx, ky - 2, 20, 15, 7, WOOD.light, 1, WOOD.base);
-      // the pencil on the ground in front: a fat flat body rising to the
-      // right, a lit top face, a dark cut end, a cream tip and a graphite point
-      const pa = -0.16, PX = rot(c - 80, ry + 96, pa);
-      const body = roundRectPts(...PX(0, 0), 100, 27, 6, pa);
-      poly(t, grow(body, 6), INK, 0.92);
+      // the pencil behind the roll: only its tip clears the tube's lower edge
+      const PX = rot(c + 86, c + 110, -0.12);
+      const body = roundRectPts(...PX(0, 0), 96, 18, 5, -0.12);
+      poly(t, grow(body, 5), INK, 0.92);
       poly(t, body, PENCIL.hi, 1, PENCIL.lo);
-      poly(t, roundRectPts(...PX(0, -14), 96, 7, 3, pa), PENCIL.top, 0.85);    // the lit top face
-      poly(t, [PX(-100, -27), PX(-100, 27), PX(-92, 27), PX(-92, -27)], PENCIL.end);   // the cut end
-      const tip = [PX(98, -27), PX(98, 27), PX(142, 9), PX(142, -9)];
+      const tip = [PX(96, -18), PX(96, 18), PX(132, 6), PX(132, -6)];
       poly(t, grow(tip, 5), INK, 0.92);
       poly(t, tip, PARCH.hi, 1, PARCH.shadow);
-      const lead = [PX(140, -9), PX(140, 9), PX(164, 0)];
-      poly(t, grow(lead, 5), INK, 0.92);
+      const lead = [PX(131, -6), PX(131, 6), PX(150, 0)];
+      poly(t, grow(lead, 4), INK, 0.92);
       poly(t, lead, PENCIL.lead);
+      // the unrolled flap at the lower-left, continuous with the tube
+      const flap = roundRectPts(...PT(-150, 26), 82, 62, 10, ang);
+      poly(t, flap, BLUE.hi, 1, BLUE.lo);
+      // the tube: a rotated rounded bar, top-lit, with a lit crown line
+      const tube = roundRectPts(...PT(0, 0), 158, 46, 26, ang);
+      poly(t, tube, BLUE.hi, 1, BLUE.lo);
+      const crown = roundRectPts(...PT(-6, -30), 140, 6, 3, ang);
+      poly(t, crown, '#8FA9D2', 0.85);
+      const seat = roundRectPts(...PT(0, 34), 146, 6, 3, ang);
+      poly(t, seat, BLUE.edge, 0.8);
+      // the house plan on the flap: a gable over a rectangle, four cream strokes
+      const H = rot(...PT(-150, 30), ang);
+      const w = 12;
+      capsule(t, ...H(-34, 26), ...H(34, 26), w, BLUE.cream);
+      capsule(t, ...H(-34, 26), ...H(-34, -4), w, BLUE.cream);
+      capsule(t, ...H(34, 26), ...H(34, -4), w, BLUE.cream);
+      capsule(t, ...H(-40, -2), ...H(0, -36), w, BLUE.cream);
+      capsule(t, ...H(0, -36), ...H(40, -2), w, BLUE.cream);
+      // the twine: two thin cords round the middle and a small square knot
+      for (const dx of [-16, 14]) {
+        poly(t, roundRectPts(...PT(dx, 0), 9, 52, 4, ang), INK, 0.9);
+        poly(t, roundRectPts(...PT(dx, 0), 6, 50, 3, ang), WOOD.light, 1, WOOD.dark);
+      }
+      poly(t, roundRectPts(...PT(-1, -50), 20, 14, 6, ang), INK, 0.9);
+      poly(t, roundRectPts(...PT(-1, -50), 16, 11, 5, ang), WOOD.light, 1, WOOD.base);
+      // the near end at the upper-right: the rolled sheet's cross-section
+      const [ex, ey] = PT(158, 0);
+      ellipse(t, ex, ey, 48, 48, BLUE.edge, 1, 2);
+      ellipse(t, ex, ey, 42, 42, BLUE.cream, 1, 2);
+      ellipse(t, ex, ey, 30, 30, BLUE.lo, 1, 2);
+      ellipse(t, ex, ey, 20, 20, BLUE.cream, 1, 2);
+      ellipse(t, ex, ey, 9, 9, INK, 0.9, 2);
     }, SPOT);
-    sheen(cv, rx - 80, ry - 52, 46, 11, 0.45);
+    const [sx, sy] = PT(-70, -32);
+    sheen(cv, sx, sy, 40, 10, 0.5);
     save(cv, path.join(SPOTS, 'empty_house.png'));
   }
 }
