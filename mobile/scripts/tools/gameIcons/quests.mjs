@@ -160,9 +160,21 @@ function leaf(t, x, y, len, wid, ang, hi, lo) {
   poly(t, leafPts(x, y, len, wid, ang), hi, 1, lo);
 }
 
-/** A thick stroke along a sampled path (a string, a stream). */
+/** A thick stroke along a sampled path (a string, a stream). `th` may be a
+ *  function of the segment's 0..1 position, so a cord can be pinched. */
 function polyline(t, pts, th, color, alpha = 1) {
-  for (let i = 1; i < pts.length; i++) capsule(t, pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1], th, color, alpha);
+  const w = typeof th === 'function' ? th : () => th;
+  for (let i = 1; i < pts.length; i++) {
+    capsule(t, pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1], w((i - 0.5) / (pts.length - 1)), color, alpha);
+  }
+}
+
+/** A quadratic bezier sampled to a point list (handles, bails, pour arcs). */
+function quadPts(p0, cp, p1, n = 18) {
+  return Array.from({ length: n + 1 }, (_, i) => {
+    const u = i / n, v = 1 - u;
+    return [v * v * p0[0] + 2 * v * u * cp[0] + u * u * p1[0], v * v * p0[1] + 2 * v * u * cp[1] + u * u * p1[1]];
+  });
 }
 
 /** Letter glyphs as stroke segments in a unit box (y down). */

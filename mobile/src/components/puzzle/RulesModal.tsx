@@ -13,6 +13,7 @@ import { CandyColors } from '../../theme/colors';
 import { SURFACE, getSurfaceTheme, getModalInSpring } from '../../theme/surfaces';
 import { PanelCard } from '../ui/PanelCard';
 import { getRulesStepArt } from './difficultyArt';
+import { CHROME_ICONS } from '../ui/chromeIcons';
 import { CandyButton } from '../ui/CandyButton';
 import { getSettingsSync } from '../../services/settings';
 import { getRulesText } from '../../services/phaseNarrative';
@@ -145,8 +146,11 @@ export const RulesModal: React.FC<RulesModalProps> = ({
             onStartShouldSetResponder={() => true}
           >
             <PanelCard phase={phase} kind="panel" style={styles.rulesModal}>
+              {/* The carved close mark (generateGameIcons chrome) instead of a
+                  typographic '✕' set as a button label. */}
               <CandyButton
-                label={'✕'}
+                label={''}
+                icon={CHROME_ICONS.close}
                 onPress={handleClose}
                 phase={phase}
                 variant="quiet"
