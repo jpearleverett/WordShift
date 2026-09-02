@@ -23,6 +23,7 @@ import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { CandyButton } from '../ui/CandyButton';
 import { PanelCard } from '../ui/PanelCard';
+import { CHROME_ICONS } from '../ui/chromeIcons';
 import { AmberInline } from '../AmberInline';
 import { Confetti } from '../Confetti';
 import { RewardReveal, EntranceCascadeItem, getCascadeDelayMs } from '../ui/RewardReveal';
@@ -382,7 +383,7 @@ const AnimatedEquippedChip: React.FC<{ spring: boolean; borderColor: string; tex
   }, [animate, scale]);
   return (
     <Animated.View style={[styles.statusChip, styles.equippedChip, { borderColor, transform: [{ scale }] }]}>
-      <Text style={[styles.equippedChipText, { color: textColor }]}>Equipped ✓</Text>
+      <Text style={[styles.equippedChipText, { color: textColor }]}>Equipped <Image source={CHROME_ICONS.check} style={styles.inlineMark} /></Text>
     </Animated.View>
   );
 };
@@ -799,7 +800,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
           </View>
           {defaultEquipped ? (
             <View style={[styles.statusChip, styles.equippedChip, { borderColor: t.sectionBorder }]}>
-              <Text style={[styles.equippedChipText, { color: t.body }]}>Equipped ✓</Text>
+              <Text style={[styles.equippedChipText, { color: t.body }]}>Equipped <Image source={CHROME_ICONS.check} style={styles.inlineMark} /></Text>
             </View>
           ) : (
             <CandyButton
@@ -862,7 +863,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
           </View>
           {isResolving ? (
             <View style={[styles.resolveChip, { backgroundColor: t.amberTint, borderColor: t.amberTintBorder }]}>
-              <Text style={[styles.resolveCheck, { color: t.amberText }]}>✓</Text>
+              <Image source={CHROME_ICONS.check} style={styles.resolveCheckIcon} resizeMode="contain" accessible={false} />
               <Text style={[styles.resolveMsg, { color: t.amberText }]} numberOfLines={2}>
                 {resolving?.message}
               </Text>
@@ -937,7 +938,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                   style={{ ...styles.patronBanner, borderColor: t.amberTintBorder }}
                 >
                   <View pointerEvents="none" style={[styles.tintInset, { backgroundColor: t.amberTint }]} />
-                  <Text style={[styles.patronBannerTitle, { color: t.amberText }]}>{'✦'} Become a Patron</Text>
+                  <Text style={[styles.patronBannerTitle, { color: t.amberText }]}><Image source={CHROME_ICONS.starBullet} style={styles.inlineMark} /> Become a Patron</Text>
                   <Text style={[styles.patronBannerSub, { color: t.body }]}>Support WordShift. A small amber bonus + an exclusive gold tile set</Text>
                 </PanelCard>
               </TouchableOpacity>
@@ -1040,7 +1041,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                       {getShopStoreBridgeText(phase).subtitle}
                     </Text>
                   </View>
-                  <Text style={[styles.storeBridgeChevron, { color: t.amberText }]}>{'>'}</Text>
+                  <Image source={CHROME_ICONS.chevron} style={styles.storeBridgeChevronIcon} resizeMode="contain" accessible={false} />
                 </PanelCard>
               </TouchableOpacity>
               </EntranceCascadeItem>
@@ -1287,7 +1288,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  resolveCheck: { fontSize: FONT_SIZE.title, fontWeight: '900', fontFamily: PIXEL_FONT_BOLD },
+  resolveCheckIcon: { width: 18, height: 18 },
+  // Inline check / star marks (generateGameIcons chrome), x-height sized.
+  inlineMark: { width: 12, height: 12 },
   resolveMsg: { fontSize: FONT_SIZE.micro, fontWeight: '700', textAlign: 'center', fontFamily: PIXEL_FONT_BOLD, marginTop: 2 },
   storeBridge: {
     flexDirection: 'row',
@@ -1300,7 +1303,7 @@ const styles = StyleSheet.create({
   storeBridgeBody: { flex: 1 },
   storeBridgeTitle: { fontSize: FONT_SIZE.bodyLg, fontWeight: '800', marginBottom: 2, fontFamily: PIXEL_FONT_BOLD },
   storeBridgeSub: { fontSize: FONT_SIZE.small, fontWeight: '600', fontFamily: PIXEL_FONT_BOLD },
-  storeBridgeChevron: { fontSize: FONT_SIZE.title, fontWeight: '900', marginLeft: 10, fontFamily: PIXEL_FONT_BOLD },
+  storeBridgeChevronIcon: { width: 18, height: 18, marginLeft: 10 },
   footnote: {
     fontSize: FONT_SIZE.caption,
     fontWeight: '500',

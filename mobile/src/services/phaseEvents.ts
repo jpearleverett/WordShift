@@ -36,9 +36,13 @@ export interface PhaseTransitionEvent {
 /**
  * In-engine art for a cinematic scene — the real game assets, never an emoji.
  * 'shadow_figure' is the entity (environment/shadow_figure.png); 'house' is
- * the roof silhouette the player built (environment/roof.png).
+ * the roof silhouette the player built (environment/roof.png); the three
+ * 'ceremony_*' emblems (assets/ui/spots, generateGameIcons) give the phase 1-3
+ * ceremonies an image of their own (a lantern with moths, a guttering candle
+ * in a dark window, a bare tree's long shadow) where they used to be text on
+ * a dark ground.
  */
-export type SceneImage = 'shadow_figure' | 'house';
+export type SceneImage = 'shadow_figure' | 'house' | 'ceremony_curious' | 'ceremony_deeper' | 'ceremony_shadows';
 
 export interface PhaseScene {
   text: string;
@@ -97,6 +101,8 @@ const PHASE_EVENTS: Record<number, PhaseTransitionEvent> = {
       },
       {
         text: 'The words seem to lean in. As if they are listening.',
+        image: 'ceremony_curious',
+        imageOpacity: 0.5,
         delay: 6400,
         duration: 3000,
         effect: 'pulse',
@@ -128,6 +134,8 @@ const PHASE_EVENTS: Record<number, PhaseTransitionEvent> = {
       },
       {
         text: 'Or perhaps it is you that has changed,\nand the words were always like this.',
+        image: 'ceremony_deeper',
+        imageOpacity: 0.5,
         delay: 3200,
         duration: 3000,
         effect: 'pulse',
@@ -175,6 +183,8 @@ const PHASE_EVENTS: Record<number, PhaseTransitionEvent> = {
       },
       {
         text: 'Your friends speak of endings. Of purpose.\nOf something that is almost here.',
+        image: 'ceremony_shadows',
+        imageOpacity: 0.5,
         delay: 6400,
         duration: 4000,
         effect: 'particles_rise',

@@ -53,6 +53,8 @@ import { countUpDisplayValue, getCountUpDurationMs } from '../ui/RewardReveal';
 import { BODY_FONT, BODY_FONT_ITALIC, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { NineSliceFrame } from '../ui/NineSlice';
 import { CandyButton } from '../ui/CandyButton';
+import { getModeIconSprite, getPhaseIndicatorSprite } from './modeIcons';
+import { CHROME_ICONS } from '../ui/chromeIcons';
 import { getPixelSkin, PANEL_CORNER_DP, PANEL_EDGE_DP } from '../../theme/pixelSkin.generated';
 import { SURFACE } from '../../theme/surfaces';
 
@@ -593,7 +595,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             {rewardedDoubleEnabled && !isOnboarding && onRewardedDouble && (
               rewardedDoubleClaimed ? (
                 <Text style={[styles.rewardedDoubleConfirm, { color: phaseTheme.modalSecondaryTextColor }]}>
-                  {'✓ '}{getRewardedDoubleConfirm(phase as DialoguePhase)}
+                  <Image source={CHROME_ICONS.check} style={styles.bonusGlyph} /> {getRewardedDoubleConfirm(phase as DialoguePhase)}
                 </Text>
               ) : isAdFreeSync() ? (
                 <TouchableOpacity
@@ -603,7 +605,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                   accessibilityLabel={getRewardedDoubleLabel(phase as DialoguePhase)}
                 >
                   <Text style={[styles.freeDoubleText, phase >= 3 ? styles.freeDoubleTextDark : styles.freeDoubleTextLight]}>
-                    {'✦ '}{getRewardedDoubleLabel(phase as DialoguePhase)}
+                    <Image source={CHROME_ICONS.starBullet} style={styles.bonusGlyph} /> {getRewardedDoubleLabel(phase as DialoguePhase)}
                   </Text>
                 </TouchableOpacity>
               ) : (
@@ -636,8 +638,9 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                     accessibilityElementsHidden
                   />
                   <Text style={[styles.collectNowText, { color: btn.harvestPill.text }]}>
-                    {'Collect Now  ›'}
+                    {'Collect Now'}
                   </Text>
+                  <Image source={CHROME_ICONS.chevron} style={styles.collectNowChevron} resizeMode="contain" accessible={false} />
                 </View>
               </TouchableOpacity>
             )}
@@ -970,19 +973,16 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                   accessible
                   accessibilityLabel={`${phaseNarrative.title}. ${phaseNarrative.body}`}
                 >
-                  {/* No sprite maps to the phase-change glyphs, and a raw OS
-                      color emoji would break the cottage skin — a small
-                      monochrome diamond stands in, tinted mauve once the card
-                      goes dark so it ages with the descent (spoiler-safe: the
-                      glyph reveals nothing the card does not already say). */}
-                  <Text
-                    style={[styles.phaseChangeGlyph, {
-                      color: victoryData!.newPhase >= 3 ? '#C9A9FF' : CandyColors.white,
-                    }]}
+                  {/* The phase-mood sprite for the phase being entered, the same
+                      family the puzzle header badge wears, so the card carries
+                      the moment's own image instead of a typographic stand-in
+                      (spoiler-safe: it reveals nothing the copy does not). */}
+                  <Image
+                    source={getPhaseIndicatorSprite(victoryData!.newPhase)}
+                    style={styles.phaseChangeGlyphImage}
+                    resizeMode="contain"
                     importantForAccessibility="no"
-                  >
-                    {'◈'}
-                  </Text>
+                  />
                   <Text style={styles.phaseChangeTitle}>{phaseNarrative.title}</Text>
                   <Text style={styles.phaseChangeText}>{phaseNarrative.body}</Text>
                 </View>
@@ -1229,7 +1229,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                         {surpriseBonusAmber > 0 && (
                           <View style={styles.bonusRow}>
                             <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
-                              {'◈'} Lucky Find
+                              <Image source={getModeIconSprite('clover')!} style={styles.bonusGlyph} /> Lucky Find
                             </Text>
                             <Text style={[styles.bonusValue, { color: accent.gold }]}>+{surpriseBonusAmber}</Text>
                           </View>
@@ -1245,7 +1245,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                         {patronBonusAmber > 0 && (
                           <View style={styles.bonusRow}>
                             <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
-                              {'✦'} Patron
+                              <Image source={CHROME_ICONS.starBullet} style={styles.bonusGlyph} /> Patron
                             </Text>
                             <Text style={[styles.bonusValue, { color: accent.gold }]}>+{patronBonusAmber}</Text>
                           </View>
@@ -1261,7 +1261,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                         {(victoryData.freshVariantBonus ?? 0) > 0 && (
                           <View style={styles.bonusRow}>
                             <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
-                              {'◈'} Fresh variant
+                              <Image source={getModeIconSprite('ribbon')!} style={styles.bonusGlyph} /> Fresh variant
                             </Text>
                             <Text style={[styles.bonusValue, { color: accent.variant }]}>+{victoryData.freshVariantBonus}</Text>
                           </View>
@@ -1305,7 +1305,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                     {rewardDoubleBonus > 0 && (
                       <View style={styles.bonusRow}>
                         <Text style={[styles.bonusLabel, { color: phaseTheme.modalTextColor, fontWeight: '800' }]}>
-                          {'✦'} Doubled
+                          <Image source={CHROME_ICONS.starBullet} style={styles.bonusGlyph} /> Doubled
                         </Text>
                         <View style={styles.amberValueRow}>
                           <Image source={AMBER_ICON} style={styles.amberIcon} />
@@ -1343,7 +1343,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                     {rewardedDoubleEnabled && !isOnboarding && onRewardedDouble && (
                       rewardedDoubleClaimed ? (
                         <Text style={[styles.rewardedDoubleConfirm, { color: phaseTheme.modalSecondaryTextColor }]}>
-                          {'✓ '}{getRewardedDoubleConfirm(phase as DialoguePhase)}
+                          <Image source={CHROME_ICONS.check} style={styles.bonusGlyph} /> {getRewardedDoubleConfirm(phase as DialoguePhase)}
                         </Text>
                       ) : isAdFreeSync() ? (
                         <TouchableOpacity
@@ -1353,7 +1353,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                           accessibilityLabel={getRewardedDoubleLabel(phase as DialoguePhase)}
                         >
                           <Text style={[styles.freeDoubleText, phase >= 3 ? styles.freeDoubleTextDark : styles.freeDoubleTextLight]}>
-                            {'✦ '}{getRewardedDoubleLabel(phase as DialoguePhase)}
+                            <Image source={CHROME_ICONS.starBullet} style={styles.bonusGlyph} /> {getRewardedDoubleLabel(phase as DialoguePhase)}
                           </Text>
                         </TouchableOpacity>
                       ) : (
@@ -1860,6 +1860,18 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: CandyColors.gray[500],
   },
+  // Inline receipt bullet (clover for a lucky find, rosette for a fresh
+  // variant) sized to the label's x-height, like AmberInline in a Text run.
+  bonusGlyph: {
+    width: 14,
+    height: 14,
+  },
+  collectNowChevron: {
+    width: 10,
+    height: 10,
+    marginLeft: 6,
+    opacity: 0.9,
+  },
   bonusValue: {
     fontFamily: PIXEL_FONT_BOLD,
     fontSize: FONT_SIZE.body,
@@ -2259,9 +2271,9 @@ const styles = StyleSheet.create({
     borderColor: CandyColors.purple.main,
   },
   // Monochrome diamond glyph that replaces the phase-change color emoji.
-  phaseChangeGlyph: {
-    fontFamily: BODY_FONT,
-    fontSize: FONT_SIZE.headline,
+  phaseChangeGlyphImage: {
+    width: 32,
+    height: 32,
     marginBottom: 8,
   },
   phaseChangeTitle: {

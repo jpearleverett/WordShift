@@ -15,6 +15,7 @@ import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { NineSliceFrame } from '../ui/NineSlice';
 import { CandyButton } from '../ui/CandyButton';
 import { PanelCard } from '../ui/PanelCard';
+import { CHROME_ICONS } from '../ui/chromeIcons';
 import { getStoreArt } from './storeArt';
 import { AmberInline } from '../AmberInline';
 import {
@@ -331,7 +332,7 @@ export const PatronModal: React.FC<PatronModalProps> = ({
           {isPatron ? (
             <PanelCard phase={phase} style={styles.patronActiveBox}>
               <Text style={[styles.patronActiveTitle, { color: t.amberText }]}>
-                You are a Patron ✦
+                You are a Patron <Image source={CHROME_ICONS.starBullet} style={styles.inlineMark} />
               </Text>
               <Text style={[styles.patronActiveBody, { color: t.body }]}>
                 The warmth is already yours. {'+'}{PATRON_AMBER_BONUS} amber a puzzle and the
@@ -342,7 +343,7 @@ export const PatronModal: React.FC<PatronModalProps> = ({
             <PanelCard phase={phase} style={styles.benefits}>
               {benefits.map(b => (
                 <View key={b.key} style={styles.benefitRow}>
-                  <Text style={[styles.benefitBullet, { color: t.amberText }]}>✦</Text>
+                  <Image source={CHROME_ICONS.starBullet} style={styles.benefitBulletIcon} resizeMode="contain" accessible={false} />
                   {b.render}
                 </View>
               ))}
@@ -393,7 +394,7 @@ export const PatronModal: React.FC<PatronModalProps> = ({
 
           {!isPatron && adFree && (
             <Text style={[styles.adFreeNote, { color: t.body }]}>
-              Ads removed ✓. Your doubled reward is granted with a single tap.
+              Ads removed <Image source={CHROME_ICONS.check} style={styles.inlineMark} />. Your doubled reward is granted with a single tap.
             </Text>
           )}
 
@@ -500,12 +501,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
   },
-  benefitBullet: {
-    fontSize: FONT_SIZE.bodyLg,
-    fontWeight: '900',
-    fontFamily: PIXEL_FONT_BOLD,
+  // Brass star bullet / inline check (generateGameIcons chrome) in place of
+  // the '✦' and '✓' glyphs.
+  inlineMark: {
+    width: 13,
+    height: 13,
+  },
+  benefitBulletIcon: {
+    width: 14,
+    height: 14,
     marginRight: 10,
-    marginTop: 1,
+    marginTop: 2,
   },
   benefitText: {
     flex: 1,

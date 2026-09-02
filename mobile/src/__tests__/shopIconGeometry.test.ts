@@ -1,7 +1,10 @@
 /**
  * Geometry guards for the generated cottage icon sets: the shop's purchasables
- * (assets/ui/shop, scripts/tools/generateShopIcons.mjs) and the store's
- * purchasables (assets/ui/store, scripts/tools/generateStoreIcons.mjs).
+ * (assets/ui/shop, scripts/tools/generateShopIcons.mjs), the store's
+ * purchasables (assets/ui/store, scripts/tools/generateStoreIcons.mjs), and the
+ * game-surface families drawn by scripts/tools/generateGameIcons.mjs
+ * (achievement crests, quest icons, difficulty seals, rules diagrams, the two
+ * empty-state spots, and the flat chrome glyphs it added to assets/ui).
  *
  * These exist because a blind art review caught a defect class that is invisible
  * in a diff and easy to reintroduce: a subject drawn slightly too large reaches
@@ -23,28 +26,65 @@ import sharp from 'sharp';
  * the same defect class (and the same guard) rather than being trusted because
  * its generator is newer.
  */
-const ICON_DIRS: ReadonlyArray<[string, string]> = [
-  ['shop', path.resolve(__dirname, '../../assets/ui/shop')],
-  ['store', path.resolve(__dirname, '../../assets/ui/store')],
+type IconSet = {
+  set: string;
+  dir: string;
+  /** Every icon in the set is drawn at this size so its row never upscales. */
+  size: number;
+  /** Painted-alpha coverage floor (a blank icon passes the edge check trivially). */
+  minCoverage: number;
+  /** Restrict to these basenames (for a set that shares its folder with older art). */
+  only?: string[];
+  /** Skip these basenames (a folder that also holds a differently-sized set). */
+  exclude?: string[];
+};
+const CEREMONY_FILES = ['ceremony_curious.png', 'ceremony_deeper.png', 'ceremony_shadows.png'];
+const ui = (rel: string) => path.resolve(__dirname, '../../assets/ui', rel);
+const ICON_SETS: ReadonlyArray<IconSet> = [
+  { set: 'shop', dir: ui('shop'), size: 192, minCoverage: 0.12 },
+  { set: 'store', dir: ui('store'), size: 192, minCoverage: 0.12 },
+  // generateGameIcons.mjs families (see gameArt.test.ts for the registries).
+  { set: 'achievements', dir: ui('achievements'), size: 192, minCoverage: 0.12 },
+  { set: 'quests', dir: ui('quests'), size: 192, minCoverage: 0.12 },
+  { set: 'difficulty', dir: ui('difficulty'), size: 192, minCoverage: 0.12 },
+  { set: 'rules', dir: ui('rules'), size: 192, minCoverage: 0.12 },
+  { set: 'spots', dir: ui('spots'), size: 256, minCoverage: 0.12, exclude: CEREMONY_FILES },
+  // The phase 1-3 ceremony emblems share the spots folder at 512px.
+  { set: 'ceremony', dir: ui('spots'), size: 512, minCoverage: 0.1, only: CEREMONY_FILES },
+  // The chrome glyphs live flat beside the older 256px candy set, whose files
+  // predate these rules, so only the generateGameIcons ones are checked.
+  {
+    set: 'chrome',
+    dir: ui('.'),
+    size: 256,
+    minCoverage: 0.1,
+    only: ['sun.png', 'hourglass.png', 'book_closed.png', 'book_open.png', 'season_pass.png', 'rules.png', 'shop_sign.png', 'clover.png', 'ribbon.png'],
+  },
+  // The smallest marks (12-24dp) are mostly air by design: a chevron or a
+  // tick cannot fill 10% of its frame without turning into a blob.
+  {
+    set: 'chrome-marks',
+    dir: ui('.'),
+    size: 256,
+    minCoverage: 0.06,
+    only: ['check.png', 'check_badge.png', 'chevron.png', 'alert_pip.png', 'play.png', 'star_bullet.png', 'close.png', 'cycle_loop.png', 'ledger_quill.png', 'word_echo.png', 'paper_plane.png'],
+  },
 ];
-
-/** Every icon is drawn at this size so a ~56dp row thumbnail never upscales. */
-const EXPECTED_SIZE = 192;
 /** Alpha above this counts as painted; below it is anti-aliasing tail. */
 const ALPHA_FLOOR = 8;
 
 /** [label, absolute path] for every PNG in both sets, so a failure names the set. */
-const files: Array<[string, string]> = ICON_DIRS.flatMap(([set, dir]) =>
+const files: Array<[string, string, number, number]> = ICON_SETS.flatMap(({ set, dir, size, minCoverage, only, exclude }) =>
   fs
     .readdirSync(dir)
-    .filter((f) => f.endsWith('.png'))
+    .filter((f) => f.endsWith('.png') && (!only || only.includes(f)) && !(exclude && exclude.includes(f)))
     .sort()
-    .map((f) => [`${set}/${f}`, path.join(dir, f)] as [string, string]),
+    .map((f) => [`${set}/${f}`, path.join(dir, f), size, minCoverage] as [string, string, number, number]),
 );
 
 describe('generated icon geometry', () => {
-  it('has icons from both sets to check', () => {
-    for (const [set] of ICON_DIRS) {
+  it('has icons from every set to check', () => {
+    for (const { set } of ICON_SETS) {
       expect({ set, found: files.some(([label]) => label.startsWith(`${set}/`)) }).toEqual({
         set,
         found: true,
@@ -52,14 +92,14 @@ describe('generated icon geometry', () => {
     }
   });
 
-  it.each(files)('%s is 192x192 with transparent edges and real content', async (file, filePath) => {
+  it.each(files)('%s is drawn at its set size with transparent edges and real content', async (file, filePath, size, minCoverage) => {
     const { data, info } = await sharp(filePath)
       .ensureAlpha()
       .raw()
       .toBuffer({ resolveWithObject: true });
     const { width: w, height: h, channels: c } = info;
 
-    expect(`${file}:${w}x${h}`).toBe(`${file}:${EXPECTED_SIZE}x${EXPECTED_SIZE}`);
+    expect(`${file}:${w}x${h}`).toBe(`${file}:${size}x${size}`);
 
     const alphaAt = (x: number, y: number) => data[(y * w + x) * c + 3];
     let top = 0;
@@ -83,6 +123,6 @@ describe('generated icon geometry', () => {
     let painted = 0;
     for (let i = 3; i < data.length; i += c) if (data[i] > 128) painted++;
     const coverage = painted / (w * h);
-    expect({ file, tooSparse: coverage < 0.12 }).toEqual({ file, tooSparse: false });
+    expect({ file, tooSparse: coverage < minCoverage }).toEqual({ file, tooSparse: false });
   });
 });

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { Modal, View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { Modal, View, Text, StyleSheet, TouchableOpacity, Animated, Image } from 'react-native';
+import { SPOT_ART } from './chromeIcons';
 import { SURFACE, getSurfaceTheme, getPressSpring } from '../../theme/surfaces';
 import { PanelCard } from './PanelCard';
 import { CandyButton, CandyButtonVariant } from './CandyButton';
@@ -183,6 +184,11 @@ export const GameAlertModal: React.FC<GameAlertModalProps> = ({ phase }) => {
           {/* claim touches so taps inside the card never hit the scrim */}
           <TouchableOpacity activeOpacity={1} style={styles.cardTouch}>
             <PanelCard phase={phase} kind="panel" style={styles.card}>
+              {/* Authored 'beat' cards (the rules-just-changed moments) carry the
+                  pinned-notice spot; utility confirms stay plain. */}
+              {isBeat && (
+                <Image source={SPOT_ART.notice} style={styles.spot} resizeMode="contain" accessible={false} />
+              )}
               {current.title !== '' && (
                 <Text style={[styles.title, { color: t.title }]}>{current.title}</Text>
               )}
@@ -240,6 +246,12 @@ const styles = StyleSheet.create({
   card: {
     paddingVertical: 26,
     paddingHorizontal: SURFACE.panelPadX,
+  },
+  spot: {
+    width: 64,
+    height: 64,
+    alignSelf: 'center',
+    marginBottom: 8,
   },
   title: {
     fontFamily: PIXEL_FONT_BOLD,

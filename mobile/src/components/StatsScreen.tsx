@@ -25,10 +25,12 @@ import {
   Achievement,
   getTotalCount,
   buildAchievementCheckState,
-  ACHIEVEMENT_CATEGORY_ICONS,
   ACHIEVEMENT_LOCK_ICON,
   AchievementCheckState,
 } from '../services/achievements';
+import { getAchievementArt } from './achievementArt';
+import { DIFFICULTY_ART } from './puzzle/difficultyArt';
+import { CHROME_ICONS } from './ui/chromeIcons';
 import { getDailyStatus } from '../services/dailyChallenge';
 import { getStreakInfo, getAmberBalance } from '../services/amberCurrency';
 import { Difficulty } from '../types';
@@ -93,14 +95,6 @@ const ACHIEVEMENT_CATEGORY_NAMES: Record<(typeof ACHIEVEMENT_CATEGORIES)[number]
 
 /** Semantic per-tier colors for the BY DIFFICULTY rows — the same identity the
  *  setup menu's difficulty rings and the share card's dot use. */
-const DIFFICULTY_STAT_COLORS: Record<Difficulty, string> = {
-  EASY: CandyColors.green.main,
-  MEDIUM: CandyColors.yellow.main,
-  MEDIUM_PLUS: CandyColors.orange.main,
-  HARD: CandyColors.red.main,
-  EXPERT: CandyColors.purple.main,
-};
-
 interface HeroStatSpec {
   value: number;
   label: string;
@@ -357,9 +351,12 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
                 i % 2 === 1 && { backgroundColor: rowAltTint },
               ]}
             >
-              {/* Category sprite (unlocked) / lock sprite (locked) — the chrome
-                  renders one shared generated sprite per category, matching the
-                  AchievementToast; the per-achievement emoji stays a data key. */}
+              {/* The achievement's own generated crest (assets/ui/achievements,
+                  one painted subject per achievement, the same art the
+                  AchievementToast shows). A locked row shows the crest it would
+                  earn, dimmed, with a small lock sprite pinned to the alcove's
+                  corner so the locked state never rides on opacity alone; the
+                  per-achievement emoji in achievements.ts stays a data key. */}
               <View
                 style={[
                   styles.achievementIconBadge,
@@ -368,10 +365,13 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
                 ]}
               >
                 <Image
-                  source={achievement.isUnlocked ? ACHIEVEMENT_CATEGORY_ICONS[achievement.category] : ACHIEVEMENT_LOCK_ICON}
-                  style={styles.achievementIconImage}
+                  source={getAchievementArt(achievement.id, achievement.category)}
+                  style={[styles.achievementIconImage, !achievement.isUnlocked && styles.achievementIconImageLocked]}
                   resizeMode="contain"
                 />
+                {!achievement.isUnlocked && (
+                  <Image source={ACHIEVEMENT_LOCK_ICON} style={styles.achievementLockOverlay} resizeMode="contain" />
+                )}
               </View>
               <View style={styles.achievementInfo}>
                 <Text style={[
@@ -406,7 +406,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
                 </Text>
               </View>
               {achievement.isUnlocked && (
-                <Text style={styles.achievementCheck}>✓</Text>
+                <Image source={CHROME_ICONS.check} style={styles.achievementCheckIcon} resizeMode="contain" accessibilityLabel="unlocked" />
               )}
             </View>
           );
@@ -619,7 +619,6 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
                     difficulty={diff}
                     completed={bucket.completed}
                     stars={bucket.stars}
-                    color={DIFFICULTY_STAT_COLORS[diff]}
                     labelColor={t.body}
                     countColor={t.muted}
                     avgColor={t.title}
@@ -848,7 +847,6 @@ function DifficultyRow({
   difficulty,
   completed,
   stars,
-  color,
   labelColor,
   countColor,
   avgColor,
@@ -857,7 +855,6 @@ function DifficultyRow({
   difficulty: Difficulty;
   completed: number;
   stars: number;
-  color: string;
   labelColor: string;
   countColor: string;
   avgColor: string;
@@ -866,7 +863,7 @@ function DifficultyRow({
   const avg = completed > 0 ? (stars / completed).toFixed(1) : '0.0';
   return (
     <View style={[styles.difficultyRow, altBg ? { backgroundColor: altBg } : null]}>
-      <View style={[styles.difficultyDot, { backgroundColor: color }]} />
+      <Image source={DIFFICULTY_ART[difficulty]} style={styles.difficultySeal} resizeMode="contain" />
       <Text style={[styles.difficultyLabel, { color: labelColor }]}>{difficulty}</Text>
       <Text style={[styles.difficultyCount, { color: countColor }]}>{completed} puzzles</Text>
       <Text style={[styles.difficultyAvg, { color: avgColor }]}>{avg} avg</Text>
@@ -1093,10 +1090,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: SURFACE.cardPadX,
     paddingVertical: 14,
   },
-  difficultyDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+  // The tier's wax-seal emblem (assets/ui/difficulty) in place of a 10dp
+  // coloured dot: the tiers now differ by silhouette as well as hue.
+  difficultySeal: {
+    width: 26,
+    height: 26,
     marginRight: 10,
   },
   difficultyLabel: {
@@ -1158,12 +1156,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: SURFACE.cardPadX,
     paddingVertical: 12,
   },
-  // Generated candy sprite alcove (one per category / a lock when unearned),
-  // replacing the raw color emoji + 🔒 that fought the cottage chrome.
+  // Generated crest alcove (the achievement's own painted crest, dimmed with a
+  // corner lock while unearned), replacing the raw color emoji + 🔒 that fought
+  // the cottage chrome. 48dp so a 36dp crest keeps its silhouette.
   achievementIconBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1172,8 +1171,18 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   achievementIconImage: {
-    width: 24,
-    height: 24,
+    width: 36,
+    height: 36,
+  },
+  achievementIconImageLocked: {
+    opacity: 0.38,
+  },
+  achievementLockOverlay: {
+    position: 'absolute',
+    right: -4,
+    bottom: -4,
+    width: 18,
+    height: 18,
   },
   achievementInfo: {
     flex: 1,
@@ -1227,11 +1236,9 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.small,
     fontWeight: '800',
   },
-  achievementCheck: {
-    fontFamily: PIXEL_FONT_BOLD,
-    fontSize: FONT_SIZE.title,
-    color: CandyColors.green.main,
-    fontWeight: '900',
+  achievementCheckIcon: {
+    width: 18,
+    height: 18,
     marginLeft: 8,
   },
 

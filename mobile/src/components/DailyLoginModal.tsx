@@ -23,6 +23,7 @@ import { getSettingsSync } from '../services/settings';
 import { getDailyLoginFirstClaimCopy, getDailyLoginModalCopy } from '../services/phaseNarrative';
 import { FONT_SIZE } from '../theme/typeScale';
 
+import { CHROME_ICONS } from './ui/chromeIcons';
 const AMBER_ICON = require('../../assets/ui/amber.png');
 
 interface DailyLoginModalProps {
@@ -250,7 +251,7 @@ export const DailyLoginModal: React.FC<DailyLoginModalProps> = ({ grant, phase, 
                       {isJackpot ? 'Day 7' : `Day ${dayNum}`}
                     </Text>
                     {isPast ? (
-                      <Text style={[styles.checkMark, { color: t.amberText }]} accessibilityLabel="claimed">✓</Text>
+                      <Image source={CHROME_ICONS.check} style={styles.checkMarkIcon} resizeMode="contain" accessibilityLabel="claimed" />
                     ) : (
                       <View style={styles.dayAmount}>
                         <Image source={AMBER_ICON} style={styles.dayAmberIcon} accessibilityLabel="amber" />
@@ -422,10 +423,10 @@ const styles = StyleSheet.create({
     fontFamily: PIXEL_FONT_BOLD,
     marginBottom: 3,
   },
-  checkMark: {
-    fontSize: FONT_SIZE.large,
-    fontWeight: '800',
-    fontFamily: PIXEL_FONT_BOLD,
+  // The carved check (generateGameIcons chrome) marks a claimed day.
+  checkMarkIcon: {
+    width: 18,
+    height: 18,
   },
   dayAmount: {
     flexDirection: 'row',

@@ -10,6 +10,7 @@ import {
   ImageSourcePropType,
   Dimensions,
 } from 'react-native';
+import { DialogueBody } from './home/DialogueBody';
 import { getDialogueTheme } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
 import { hapticLight } from '../services/haptics';
@@ -350,11 +351,16 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
                   fillColor={FOX_SKIN.fillCard}
                 />
               )}
-              <Animated.Text
-                style={[isCompact ? styles.compactText : styles.dialogueText, { color: FOX_SURFACE.body, opacity: textFadeAnim }]}
-              >
-                {displayText}
-              </Animated.Text>
+              {/* One sentence per block (see DialogueBody) so a multi-sentence
+                  card is not a single slab; the fade stays on the wrapper so
+                  the whole body still cross-fades as one. */}
+              <Animated.View style={{ opacity: textFadeAnim }}>
+                <DialogueBody
+                  text={displayText}
+                  style={[isCompact ? styles.compactText : styles.dialogueText, { color: FOX_SURFACE.body }]}
+                  gap={isCompact ? 5 : 7}
+                />
+              </Animated.View>
             </View>
 
             {/* Footer: quiet Skip + solid purple pill. The footer keeps a
@@ -508,10 +514,12 @@ const styles = StyleSheet.create({
     minHeight: 44,
     justifyContent: 'center',
   },
+  // Matches HomeScreen's speech bubble: 16/27 for the one long-form reading
+  // surface in the game, a step up from the 15/25 chrome body.
   dialogueText: {
     fontFamily: BODY_FONT,
-    fontSize: FONT_SIZE.callout,
-    lineHeight: 25,
+    fontSize: 16,
+    lineHeight: 27,
     letterSpacing: 0.2,
   },
   dialogueFooter: {

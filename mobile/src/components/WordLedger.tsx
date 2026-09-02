@@ -47,7 +47,11 @@ const GROUP_CASCADE_CAP = 2;
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-const JOURNAL_ICON = require('../../assets/ui/journal.png');
+// Empty-state spot illustration (assets/ui/spots, generateGameIcons): an open
+// blank ledger at 96dp where the 52dp journal chrome icon used to stand in.
+const EMPTY_LEDGER_SPOT = require('../../assets/ui/spots/empty_ledger.png');
+// The carved-wood chevron, mirrored, leads the back chip (was a '←' glyph).
+const CHEVRON_ICON = require('../../assets/ui/chevron.png');
 
 // Dread highlighting keys off the CANONICAL 615-word tier system (the same
 // map that scores boards, tile resonance, and move resonance) — the old local
@@ -366,7 +370,8 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
           accessibilityLabel="Close ledger"
           accessibilityRole="button"
         >
-          <Text style={[styles.backChipText, { color: t.title }]}>← Back</Text>
+          <Image source={CHEVRON_ICON} style={styles.backChevron} resizeMode="contain" accessible={false} />
+          <Text style={[styles.backChipText, { color: t.title }]}>Back</Text>
         </TouchableOpacity>
         <EntranceCascadeItem phase={phase}>
         <PanelCard phase={phase} kind="card" style={styles.titlePlaque}>
@@ -412,7 +417,7 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
           ) : (
             <View style={styles.emptyState}>
               <PanelCard phase={phase} kind="card" style={styles.emptyCard}>
-                <Image source={JOURNAL_ICON} style={styles.emptyIcon} resizeMode="contain" />
+                <Image source={EMPTY_LEDGER_SPOT} style={styles.emptyIcon} resizeMode="contain" accessible={false} />
                 <Text style={[styles.emptyText, { color: t.body }]}>
                   {phase <= 1
                     ? 'Complete puzzles to start your word collection!'
@@ -452,6 +457,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   backChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
     alignSelf: 'flex-start',
     minHeight: 44,
     justifyContent: 'center',
@@ -459,6 +466,12 @@ const styles = StyleSheet.create({
     borderRadius: SURFACE.buttonRadius,
     borderWidth: 1.5,
     marginBottom: 12,
+  },
+  backChevron: {
+    width: 12,
+    height: 12,
+    marginRight: 6,
+    transform: [{ scaleX: -1 }],
   },
   backChipText: {
     fontFamily: PIXEL_FONT_BOLD,
@@ -567,9 +580,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   emptyIcon: {
-    width: 52,
-    height: 52,
-    marginBottom: 14,
+    width: 96,
+    height: 96,
+    marginBottom: 16,
   },
   emptyText: {
     fontFamily: PIXEL_FONT_BOLD,

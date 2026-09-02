@@ -209,11 +209,10 @@ export const appStyles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
   },
-  helpButtonText: {
-    fontSize: FONT_SIZE.headline,
-    fontFamily: BODY_FONT_BOLD,
-    fontWeight: '900',
-    color: CandyColors.white,
+  // The signpost sprite inside the round help button.
+  helpButtonIcon: {
+    width: 24,
+    height: 24,
   },
 
   // Stats Row
@@ -280,29 +279,12 @@ export const appStyles = StyleSheet.create({
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
   },
-  difficultyDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginRight: 8,
-  },
-  difficultyDotEasy: {
-    backgroundColor: CandyColors.green.main,
-  },
-  difficultyDotMedium: {
-    backgroundColor: CandyColors.yellow.main,
-  },
-  difficultyDotMediumPlus: {
-    backgroundColor: CandyColors.orange.main,
-  },
-  difficultyDotHard: {
-    backgroundColor: CandyColors.red.main,
-  },
-  // EXPERT must match DIFFICULTY_RING_COLORS.EXPERT in DifficultyMenu — without
-  // it the header chip's dot matched no case and rendered uncolored on the apex
-  // tier (the exact failure the chip-label helper was written to prevent).
-  difficultyDotExpert: {
-    backgroundColor: CandyColors.purple.main,
+  // The tier's wax-seal emblem in the setup chip (assets/ui/difficulty),
+  // replacing the flat coloured dot family: the seal carries the hue itself.
+  difficultySealChip: {
+    width: 16,
+    height: 16,
+    marginRight: 6,
   },
   difficultyText: {
     fontSize: FONT_SIZE.small,
@@ -311,10 +293,13 @@ export const appStyles = StyleSheet.create({
     color: CandyColors.white,
     marginRight: 6,
   },
-  difficultyArrow: {
-    fontSize: FONT_SIZE.micro,
-    fontFamily: BODY_FONT,
-    color: 'rgba(255, 255, 255, 0.7)',
+  // The carved chevron, turned to point down, as the setup chip's caret.
+  difficultyArrowIcon: {
+    width: 10,
+    height: 10,
+    marginLeft: 4,
+    opacity: 0.85,
+    transform: [{ rotate: '90deg' }],
   },
 
   // Toast
@@ -362,12 +347,18 @@ export const appStyles = StyleSheet.create({
     fontWeight: '700',
     color: CandyColors.purple.main,
   },
-  loadingGlyph: {
+  // The loading card's kettle spot (assets/ui/spots/gathering.png).
+  loadingSpot: {
     marginTop: 8,
-    fontSize: FONT_SIZE.title,
-    fontFamily: BODY_FONT,
-    color: CandyColors.purple.main,
-    opacity: 0.8,
+    width: 56,
+    height: 56,
+  },
+  // The Time's Up card's hourglass sprite.
+
+  loadingGlyphImage: {
+    marginTop: 8,
+    width: 40,
+    height: 40,
   },
   loadingHint: {
     marginTop: 6,
@@ -714,6 +705,12 @@ export const appStyles = StyleSheet.create({
   phaseBadgeIcon: {
     fontSize: FONT_SIZE.small,
     fontFamily: BODY_FONT,
+  },
+  // The phase-mood sprite in the atmosphere badge (16dp: the badge is a
+  // small chip under the wordmark, so the glyph stays subordinate to it).
+  phaseBadgeIconImage: {
+    width: 16,
+    height: 16,
   },
   phaseBadgeText: {
     fontSize: FONT_SIZE.micro,

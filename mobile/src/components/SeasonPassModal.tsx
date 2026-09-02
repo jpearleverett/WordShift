@@ -26,6 +26,7 @@ import { CONFETTI_THEMES } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
 import { shouldSimplifyAnimations } from '../services/deviceTier';
 import { PanelCard } from './ui/PanelCard';
+import { CHROME_ICONS } from './ui/chromeIcons';
 import { CandyButton } from './ui/CandyButton';
 import { PixelPlaque } from './ui/PixelPlaque';
 import { getStoreArt, STORE_ART_KEYS } from './monetization/storeArt';
@@ -394,7 +395,7 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
               )}
               {view.premiumUnlocked && (
                 <Text style={[styles.premiumActive, { color: t.amberText }]}>
-                  Premium unlocked{view.premiumViaSupporter ? ' (Supporter)' : ''} ✦
+                  Premium unlocked{view.premiumViaSupporter ? ' (Supporter)' : ''} <Image source={CHROME_ICONS.starBullet} style={styles.inlineMark} />
                 </Text>
               )}
 
@@ -441,11 +442,11 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
                     <View style={styles.tierRewards}>
                       <Text style={[styles.tierReward, { color: t.body }]}>
                         Free: +{tr.freeAmber} amber
-                        {tr.freeClaimed ? ' ✓' : ''}
+                        {tr.freeClaimed ? ' ' : ''}{tr.freeClaimed ? <Image source={CHROME_ICONS.check} style={styles.inlineMark} /> : null}
                       </Text>
                       <Text style={[styles.tierReward, { color: view.premiumUnlocked ? t.title : t.muted }]}>
                         Premium: +{tr.premiumAmber} amber{tr.premiumCosmetic ? ' + confetti' : ''}
-                        {tr.premiumClaimed ? ' ✓' : ''}
+                        {tr.premiumClaimed ? ' ' : ''}{tr.premiumClaimed ? <Image source={CHROME_ICONS.check} style={styles.inlineMark} /> : null}
                       </Text>
                     </View>
                     <View style={styles.tierActions}>
@@ -519,6 +520,8 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
 };
 
 const styles = StyleSheet.create({
+  // Inline check / star marks (generateGameIcons chrome), x-height sized.
+  inlineMark: { width: 12, height: 12 },
   overlay: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 18 },
   // The entrance wrapper is the direct flex child of the definite-height overlay
   // (like StoreModal's animated card), so its maxHeight resolves; the PanelCard

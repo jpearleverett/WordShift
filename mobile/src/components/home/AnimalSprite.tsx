@@ -13,6 +13,7 @@ import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Animal, AnimalType, DialoguePhase } from '../../types/homeWorld';
 import { ANIMAL_EMOJIS } from '../../services/homeWorldData';
 import { CandyColors } from '../../theme/colors';
+import { CHROME_ICONS } from '../ui/chromeIcons';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { getSettingsSync } from '../../services/settings';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
@@ -1447,7 +1448,9 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
                 { transform: [{ scale: notificationPulse }] },
               ]}
             >
-              <Text style={styles.notificationText}>!</Text>
+              {/* The candy alert pip (generateGameIcons chrome) fills the badge
+                  where a flat circle + '!' Text used to sit. */}
+              <Image source={CHROME_ICONS.alertPip} style={styles.notificationBadgeIcon} resizeMode="contain" accessible={false} />
             </Animated.View>
           )}
 
@@ -1538,26 +1541,17 @@ const styles = StyleSheet.create({
     right: 15,
     width: 20,
     height: 20,
-    borderRadius: 10,
-    backgroundColor: CandyColors.red.main,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: CandyColors.white,
-    shadowColor: CandyColors.red.dark,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5,
-    shadowRadius: 2,
     // Android z-order among siblings is elevation-driven: the badge now sits ON
     // the animal, and the emoji fallback body carries elevation 5, so 3 would
     // let that body paint over the badge.
+    zIndex: 6,
     elevation: 6,
   },
-  notificationText: {
-    fontFamily: PIXEL_FONT_BOLD,
-    color: CandyColors.white,
-    fontSize: FONT_SIZE.bodyLg,
-    fontWeight: '900',
+  notificationBadgeIcon: {
+    width: 22,
+    height: 22,
   },
   emotionBubble: {
     position: 'absolute',

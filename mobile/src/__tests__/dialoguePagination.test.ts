@@ -55,8 +55,11 @@ const BUDGET = DIALOGUE_PAGE_CHAR_BUDGET;
 const norm = (s: string) => s.replace(/\s+/g, ' ').trim();
 
 describe('splitDialogueIntoPages', () => {
-  it('exports a ~420 character budget', () => {
-    expect(BUDGET).toBe(420);
+  it('exports a ~200 character budget', () => {
+    // Lowered from 420: at 420 only 8% of the shipped corpus ever paginated,
+    // so nearly every line arrived as one ~8-line block. See the constant's
+    // comment in useDialogueFlow for the measurements.
+    expect(BUDGET).toBe(200);
   });
 
   it('returns short text unchanged as a single page (same string identity)', () => {

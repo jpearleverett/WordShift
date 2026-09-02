@@ -37,14 +37,18 @@ import { playUiSound, uiHapticSelection } from '../services/uiSound';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-const FLAME_ICON = require('../../assets/ui/flame.png');
+// Empty-state spot illustration (assets/ui/spots, generateGameIcons): an empty
+// picture frame at 96dp where the 52dp streak flame used to stand in.
+const EMPTY_GALLERY_SPOT = require('../../assets/ui/spots/empty_gallery.png');
 
 // Generated candy sprites replacing the bare entry-type emoji (💭/💬/🔗/⚡/📜).
 const ENTRY_TYPE_ICONS: Record<string, ReturnType<typeof require>> = {
   whisper: require('../../assets/ui/whisper.png'),
   dialogue: require('../../assets/ui/speech.png'),
   cross_reference: require('../../assets/ui/link.png'),
-  trigger_reaction: require('../../assets/ui/variant_speed.png'),
+  // A candy tile with a speech ripple (generateGameIcons chrome): a puzzle word
+  // an animal reacted to, where the Speed Shift bolt used to stand in.
+  trigger_reaction: require('../../assets/ui/word_echo.png'),
 };
 const SCROLL_ICON = require('../../assets/ui/scroll.png');
 const getEntryTypeIcon = (type: string) => ENTRY_TYPE_ICONS[type] || SCROLL_ICON;
@@ -449,7 +453,7 @@ export const WhisperGalleryScreen: React.FC<WhisperGalleryScreenProps> = ({
           ) : (
             <View style={styles.emptyState}>
               <PanelCard phase={phase} kind="card" style={styles.emptyCard}>
-                <Image source={FLAME_ICON} style={styles.emptyIcon} resizeMode="contain" />
+                <Image source={EMPTY_GALLERY_SPOT} style={styles.emptyIcon} resizeMode="contain" accessible={false} />
                 <Text style={[styles.emptyText, { color: t.body }]}>
                   {getWhisperGalleryEmptyText(phase as DialoguePhase)}
                 </Text>
@@ -535,9 +539,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   emptyIcon: {
-    width: 52,
-    height: 52,
-    marginBottom: 14,
+    width: 96,
+    height: 96,
+    marginBottom: 16,
   },
   emptyText: {
     fontFamily: PIXEL_FONT_BOLD,

@@ -76,12 +76,19 @@ import { getModalInSpring } from '../theme/surfaces';
 
 /**
  * Maximum characters shown per dialogue page. Lines longer than this are split
- * at sentence boundaries so the speech bubble never grows past a readable size
- * (the newest animals carry lines of several hundred words). Pagination is
- * purely presentational: it never touches dialogue indices, session counts,
- * or any persistence.
+ * at sentence boundaries so the speech bubble never grows past a readable size.
+ * Pagination is purely presentational: it never touches dialogue indices,
+ * session counts, or any persistence.
+ *
+ * WHY 200 AND NOT 420. At 420 the paginator almost never fired: the corpus
+ * averages ~273 characters a line, so 92% of dialogue arrived as ONE page of
+ * roughly eight rendered lines in a ~264dp bubble, with a six-second
+ * typewriter in front of it. That is a wall of text at conversation cadence,
+ * and it is the main reason lines needed re-reading. At 200 a typical line
+ * becomes two pages of two or three sentences: one tap, one thought, and a
+ * reveal short enough that a reader waits it out instead of skipping it.
  */
-export const DIALOGUE_PAGE_CHAR_BUDGET = 420;
+export const DIALOGUE_PAGE_CHAR_BUDGET = 200;
 
 /**
  * Per-character dialogue reveal (F25): the visible page materializes one

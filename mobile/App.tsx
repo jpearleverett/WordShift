@@ -109,7 +109,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess, hapticWarning, hapticError, hapticSelection, hapticMoveCommit } from './src/services/haptics';
 import { getVariantTutorialIntroLines } from './src/services/animalDialogue';
 import {
-  getPhaseIndicator,
   getLoadingMessage,
   getRitualMicroEvent,
   isSilentVictoryBeat,
@@ -172,7 +171,9 @@ import { generateDailyPuzzle, prewarmDailyPuzzle, isDailyChallengeUnlocked, reco
 import { recordDailyLadderResult, getDailyLadderSummary, shouldShowTrend } from './src/services/dailyLadder';
 import { startFrameMonitoring, stopFrameMonitoring } from './src/services/performanceMonitor';
 import { AnimalWhisper } from './src/components/puzzle/AnimalWhisper';
-import { getModeIconSprite } from './src/components/puzzle/modeIcons';
+import { getModeIconSprite, getPhaseIndicatorSprite } from './src/components/puzzle/modeIcons';
+import { DIFFICULTY_ART } from './src/components/puzzle/difficultyArt';
+import { CHROME_ICONS, SPOT_ART } from './src/components/ui/chromeIcons';
 import { WordLedger } from './src/components/WordLedger';
 import { WhisperGalleryScreen } from './src/components/WhisperGalleryScreen';
 import { isDreadWord, validateWord } from './src/services/localGenerator';
@@ -4796,9 +4797,14 @@ function MainApp() {
               accessibilityLabel="Atmosphere shifted"
               accessibilityRole="text"
               >
-                <Text style={styles.phaseBadgeIcon}>
-                  {getPhaseIndicator(persistence.currentPhase).icon}
-                </Text>
+                {/* The phase-mood sprite (sun/thought/moon/eye/void/dove), the
+                    same family the victory phase-change card wears, in place of
+                    the raw OS emoji getPhaseIndicator still carries as a key. */}
+                <Image
+                  source={getPhaseIndicatorSprite(persistence.currentPhase)}
+                  style={styles.phaseBadgeIconImage}
+                  resizeMode="contain"
+                />
               </View>
             )}
           </View>
@@ -4817,7 +4823,10 @@ function MainApp() {
             {/* The candy shine reads as a smudge on the dark tinted fills
                 (same rule the toast applies) — bright phases only. */}
             {persistence.currentPhase < 3 && <View style={styles.helpButtonShine} />}
-            <Text style={styles.helpButtonText}>?</Text>
+            {/* The How-to-Play signpost (generateGameIcons chrome), the same
+                mark the utility menu's How to Play row wears, instead of a
+                bare '?' glyph beside the hand-painted wordmark. */}
+            <Image source={getModeIconSprite('rules')!} style={styles.helpButtonIcon} resizeMode="contain" />
           </TouchableOpacity>
         </View>
 
@@ -4915,12 +4924,16 @@ function MainApp() {
                 accessible
                 accessibilityLabel="Speed Shift is on: this board is timed"
               >
+                {/* The Speed sprite (variant_speed.png, already in the mode-icon map)
+                    beside the label, like the sibling Blind / Lexicon / house badges;
+                    it used to be a raw '\u26A1' text glyph. */}
+                <Image source={getModeIconSprite('⚡')!} style={styles.variantBadgeIconImage} />
                 <Text style={[
                   styles.variantBadgeText,
                   persistence.currentPhase === 2 && styles.variantBadgeTextDusk,
                   persistence.currentPhase >= 3 && styles.variantBadgeTextDark,
                 ]}>
-                  {`\u26A1 Speed`}
+                  {'Speed'}
                 </Text>
               </BadgeAppear>
             )}
@@ -5054,16 +5067,11 @@ function MainApp() {
             accessibilityRole="button"
           >
             {persistence.currentPhase < 3 && <View style={styles.difficultyButtonShine} />}
-            <View style={[
-              styles.difficultyDot,
-              chipDifficulty === 'EASY' && styles.difficultyDotEasy,
-              chipDifficulty === 'MEDIUM' && styles.difficultyDotMedium,
-              chipDifficulty === 'MEDIUM_PLUS' && styles.difficultyDotMediumPlus,
-              chipDifficulty === 'HARD' && styles.difficultyDotHard,
-              chipDifficulty === 'EXPERT' && styles.difficultyDotExpert,
-            ]} />
+            {/* The tier's wax-seal emblem (the same art the setup menu rows
+                and Stats wear) in place of a flat coloured dot. */}
+            <Image source={DIFFICULTY_ART[chipDifficulty]} style={styles.difficultySealChip} resizeMode="contain" />
             <Text style={styles.difficultyText}>{getDifficultyChipLabel(puzzle.difficulty)}</Text>
-            <Text style={styles.difficultyArrow}>{'\u25BC'}</Text>
+            <Image source={CHROME_ICONS.chevron} style={styles.difficultyArrowIcon} resizeMode="contain" accessible={false} />
           </TouchableOpacity>
 
           <DifficultyMenu
@@ -5172,7 +5180,9 @@ function MainApp() {
             <View style={styles.loadingOverlay}>
               <View style={[styles.loadingBox, { backgroundColor: pauseSurface.cardBg, borderWidth: 1, borderColor: pauseSurface.cardBorder }]}>
                 <BrandedLoader size={44} />
-                <Text style={[styles.loadingGlyph, { color: pauseSurface.title }]}>{persistence.currentPhase >= 3 ? '◈' : '✦'}</Text>
+                {/* The gathering kettle (assets/ui/spots): the board is being
+                    brewed. Replaces the '✦'/'◈' text glyph. */}
+                <Image source={SPOT_ART.gathering} style={styles.loadingSpot} resizeMode="contain" accessible={false} />
                 <Text style={[styles.loadingText, { color: pauseSurface.title }]}>
                   {getLoadingMessage(persistence.currentPhase)}
                 </Text>
@@ -5189,7 +5199,9 @@ function MainApp() {
           {puzzle.gameState === GameState.GAME_OVER && (
             <View style={styles.loadingOverlay} accessibilityRole="alert">
               <View style={[styles.loadingBox, { backgroundColor: pauseSurface.cardBg, borderWidth: 1, borderColor: pauseSurface.cardBorder }]}>
-                <Text style={[styles.loadingGlyph, { color: pauseSurface.title }]}>{'◈'}</Text>
+                {/* A spent hourglass (generateGameIcons chrome) heads the card
+                    instead of a typographic diamond: the overlay is about time. */}
+                <Image source={getModeIconSprite('hourglass')!} style={styles.loadingGlyphImage} resizeMode="contain" />
                 <Text style={[styles.timeUpText, { color: pauseSurface.title }]}>
                   {puzzle.message || getSpeedTimeUpMessage(persistence.currentPhase)}
                 </Text>

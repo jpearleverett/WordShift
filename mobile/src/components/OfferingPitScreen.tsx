@@ -110,6 +110,9 @@ const PIT_PEACE = require('../../assets/environment/pitt_peace.webp');
 const TENDING_ICON = require('../../assets/ui/tending.png');
 const MENU_ICON = require('../../assets/ui/menu.png');
 const HOME_ICON = require('../../assets/ui/home.png');
+// The Tending Shrine's own spot (assets/ui/spots/shrine.png): a stone alcove
+// with a lit clay lamp, heading the Phase-5 modal that had no image at all.
+const SHRINE_SPOT = require('../../assets/ui/spots/shrine.png');
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -2873,6 +2876,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
                 fillColor={pitSkin.fill}
                 openBottom
               />
+              <Image source={SHRINE_SPOT} style={styles.tendingSpot} resizeMode="contain" accessible={false} />
               <Text style={[styles.tendingTitle, { color: pitSurface.title }]}>{getTendingTitle()}</Text>
               <Animated.Text style={[styles.tendingDepth, { color: pitSurface.amberText, transform: [{ scale: tendPulseScale }] }]}>
                 {getTendingLevelLabel(tendingLevel)}
@@ -3131,6 +3135,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 30,
     paddingTop: 36,
     paddingBottom: 36,
+  },
+  tendingSpot: {
+    width: 84,
+    height: 84,
+    alignSelf: 'center',
+    marginBottom: 6,
   },
   tendingTitle: {
     fontFamily: PIXEL_FONT_BOLD,

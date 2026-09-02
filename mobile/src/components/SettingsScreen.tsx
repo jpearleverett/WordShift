@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
+  Image,
 } from 'react-native';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
 import Constants from 'expo-constants';
@@ -86,6 +87,9 @@ import { FONT_SIZE } from '../theme/typeScale';
 import { playUiSound, uiHapticSelection } from '../services/uiSound';
 
 const AMBER_ICON = require('../../assets/ui/amber.png');
+// The carved-wood chevron (generateGameIcons chrome) that trails every link
+// row, where an ASCII '>' used to sit beside the cottage plaques.
+const CHEVRON_ICON = require('../../assets/ui/chevron.png');
 
 interface SettingsScreenProps {
   /** Current narrative phase (0-5) — drives the phase-aware surface theme. */
@@ -964,7 +968,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
               accessibilityLabel={getNewCycleTitle()}
             >
               <Text style={[styles.linkText, { color: t.title }]}>{getNewCycleTitle()}</Text>
-              <Text style={[styles.linkChevron, { color: t.muted }]}>{'>'}</Text>
+              <Image source={CHEVRON_ICON} style={styles.linkChevronIcon} resizeMode="contain" accessible={false} />
             </TouchableOpacity>
             <Text style={[styles.dangerDescription, { color: t.muted, paddingHorizontal: 4 }]}>
               Begin the descent again. The house stays as you built it.
@@ -995,7 +999,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
             <Text style={[styles.linkText, { color: t.secondaryText }]}>Restore Purchases</Text>
             {purchaseRestoreBusy
               ? <ActivityIndicator color={t.secondaryText} />
-              : <Text style={[styles.linkChevron, { color: t.muted }]}>{'>'}</Text>}
+              : <Image source={CHEVRON_ICON} style={styles.linkChevronIcon} resizeMode="contain" accessible={false} />}
           </TouchableOpacity>
         </PanelCard>
 
@@ -1012,7 +1016,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
             accessibilityLabel="Rate WordShift"
           >
             <Text style={[styles.linkText, { color: t.secondaryText }]}>Rate WordShift</Text>
-            <Text style={[styles.linkChevron, { color: t.muted }]}>{'>'}</Text>
+            <Image source={CHEVRON_ICON} style={styles.linkChevronIcon} resizeMode="contain" accessible={false} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.aboutRow}
@@ -1021,7 +1025,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
             accessibilityLabel="Privacy Policy"
           >
             <Text style={[styles.linkText, { color: t.secondaryText }]}>Privacy Policy</Text>
-            <Text style={[styles.linkChevron, { color: t.muted }]}>{'>'}</Text>
+            <Image source={CHEVRON_ICON} style={styles.linkChevronIcon} resizeMode="contain" accessible={false} />
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.aboutRow, rowTint]}
@@ -1030,7 +1034,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
             accessibilityLabel="Terms of Service"
           >
             <Text style={[styles.linkText, { color: t.secondaryText }]}>Terms of Service</Text>
-            <Text style={[styles.linkChevron, { color: t.muted }]}>{'>'}</Text>
+            <Image source={CHEVRON_ICON} style={styles.linkChevronIcon} resizeMode="contain" accessible={false} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.aboutRow}
@@ -1039,7 +1043,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
             accessibilityLabel="Data Deletion"
           >
             <Text style={[styles.linkText, { color: t.secondaryText }]}>Data Deletion</Text>
-            <Text style={[styles.linkChevron, { color: t.muted }]}>{'>'}</Text>
+            <Image source={CHEVRON_ICON} style={styles.linkChevronIcon} resizeMode="contain" accessible={false} />
           </TouchableOpacity>
           {privacyOptionsAvailable && (
             <TouchableOpacity
@@ -1052,7 +1056,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
               accessibilityLabel="Privacy Options"
             >
               <Text style={[styles.linkText, { color: t.secondaryText }]}>Privacy Options</Text>
-              <Text style={[styles.linkChevron, { color: t.muted }]}>{'>'}</Text>
+              <Image source={CHEVRON_ICON} style={styles.linkChevronIcon} resizeMode="contain" accessible={false} />
             </TouchableOpacity>
           )}
           <TouchableOpacity
@@ -1062,7 +1066,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
             accessibilityLabel="Contact Support"
           >
             <Text style={[styles.linkText, { color: t.secondaryText }]}>Contact Support</Text>
-            <Text style={[styles.linkChevron, { color: t.muted }]}>{'>'}</Text>
+            <Image source={CHEVRON_ICON} style={styles.linkChevronIcon} resizeMode="contain" accessible={false} />
           </TouchableOpacity>
           <View style={styles.aboutRow}>
             <Text style={[styles.aboutLabel, { color: t.body }]}>WordShift</Text>
@@ -1301,10 +1305,10 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.callout,
     fontWeight: '600',
   },
-  linkChevron: {
-    fontFamily: PIXEL_FONT_BOLD,
-    fontSize: FONT_SIZE.bodyLg,
-    fontWeight: '700',
+  linkChevronIcon: {
+    width: 14,
+    height: 14,
+    opacity: 0.85,
   },
   bottomSpacer: {
     height: 60,

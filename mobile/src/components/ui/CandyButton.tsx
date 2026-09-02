@@ -147,7 +147,9 @@ export const CandyButton: React.FC<CandyButtonProps> = ({
           { paddingBottom: BTN_SHADOW_DP, transform: [{ translateY }] },
         ]}
       >
-        {icon ? <Image source={icon} style={styles.icon} resizeMode="contain" /> : null}
+        {/* Icon-only buttons (a close mark, say) drop the label gap so the
+            sprite sits on the button's own centre line. */}
+        {icon ? <Image source={icon} style={[styles.icon, !label && styles.iconOnly]} resizeMode="contain" /> : null}
         <Text
           numberOfLines={1}
           style={[
@@ -179,6 +181,9 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     marginRight: 8,
+  },
+  iconOnly: {
+    marginRight: 0,
   },
   label: {
     fontFamily: PIXEL_FONT_BOLD,
