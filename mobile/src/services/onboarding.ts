@@ -37,6 +37,23 @@ export type OnboardingStep =
 
 let cachedStep: OnboardingStep | null = null;
 
+/**
+ * Drop the cached onboarding step after an external storage write (cloud
+ * restore).
+ *
+ * `wordshift_onboarding_step` is cloud-synced, but module state survives the
+ * appEpoch remount (that remounts MainApp, not the module graph). On the
+ * boot-restore-times-out path a fresh install had already written
+ * 'cold_open_puzzle' into this cache; when the slow restore landed with
+ * 'complete', the stale cache won, the restored player was dropped back into
+ * the first-run beat on top of their finished house, and the resume effect
+ * then PERSISTED 'home_empty' over the restored step, so relaunching could
+ * not save them.
+ */
+export function invalidateOnboardingCache(): void {
+  cachedStep = null;
+}
+
 const VALID_STEPS: Set<string> = new Set([
   'not_started', 'cold_open_puzzle', 'home_empty', 'fox_invited', 'going_to_puzzle',
   'puzzle_tutorial', 'puzzle_complete', 'going_to_pit', 'pit_intro',

@@ -97,7 +97,7 @@ import { ShareableResult, decodeChallengeLink, buildChallengeShareText } from '.
 import { consumeSharePrompt, getSharePromptInvite } from './src/services/sharePrompts';
 import { initShareImage } from './src/services/shareImage';
 import { ShareResultModal } from './src/components/share/ShareResultModal';
-import { getLocalDateString } from './src/services/dateUtils';
+import { getLocalDateString, daysAgoLocal } from './src/services/dateUtils';
 import { getSettingsSync, getSettings } from './src/services/settings';
 import { FlyingTileGhost, TileFlight } from './src/components/puzzle/FlyingTileGhost';
 import { standardLetterCenterOffset } from './src/constants/tileLayout';
@@ -634,6 +634,15 @@ function MainApp() {
   // True while the current daily board was eased (first-ever daily) — its
   // result skips the shared leaderboard submit (the board isn't the shared one).
   const dailyEasedRef = useRef<boolean>(false);
+  // The daily board's OWN local day, captured when the board is served. Every
+  // consumer used to recompute "today" from the wall clock at victory time, so
+  // a solve that landed after local midnight was filed under D+1 while the
+  // board played was D's: the leaderboard row and the ladder entry carried a
+  // time from a different board, the streak measured its gap from the wrong
+  // day (burning a banked freeze or decaying a streak the player had kept),
+  // and the next morning's daily card already showed a checkmark for a board
+  // they had never seen — the replay guard then refused to serve it at all.
+  const dailyBoardDateRef = useRef<string | null>(null);
   // handleShare is defined far below; the share-prompt (declared above it) calls
   // it through this ref, kept current each render, to avoid a TDZ cycle.
   const handleShareRef = useRef<() => void>(() => {});
@@ -665,6 +674,10 @@ function MainApp() {
   const socialProofCacheRef = useRef<{ date: string; count: number } | null>(null);
   // Optional rewarded "double the reward" — one claim per victory
   const [victoryDoubleClaimed, setVictoryDoubleClaimed] = useState(false);
+  // Synchronous companion to victoryDoubleClaimed: the state only lands after
+  // the credit's storage round-trips, so a double-tap on the ad-free instant
+  // claim slipped through. MUST be reset wherever victoryDoubleClaimed is.
+  const rewardedDoubleInFlightRef = useRef(false);
   // The setup menu keeps this private ladder snapshot current without making
   // the puzzle hook own persistence for a Phase-5-only modifier.
   const [unbrokenWeaveMastery, setUnbrokenWeaveMastery] = useState<UnbrokenWeaveMastery | null>(null);
@@ -1020,6 +1033,13 @@ function MainApp() {
     // already processing, or the board is no longer PLAYING, swallow the timeout.
     if (isProcessingVictoryRef.current || gameStateRef.current !== GameState.PLAYING) return;
     setPuzzleGameState(GameState.GAME_OVER);
+    // A timed-out board is finished, so it must not be resumable. Nothing else
+    // clears the save on a loss, and the last write before the expiry is a full
+    // PLAYING snapshot with 1s left (useAutosave fires on every
+    // speedTimeRemaining tick, and the flip to GAME_OVER blocks every later
+    // write). The next PLAY restored that board and it timed out again within a
+    // second, which read as the game refusing to serve a new puzzle.
+    clearPuzzleState().catch(() => {});
     hapticWarning();
     soundInvalidMove();
     setPuzzleMessage(getSpeedTimeUpMessage(persistence.currentPhase));
@@ -1068,7 +1088,12 @@ function MainApp() {
     // than by the style being played. This is the load-bearing predicate: if it
     // ever silently reads false, speed becomes a badge and an amber bonus with
     // no clock behind it.
-    if (!puzzle.speedMode || puzzle.gameState !== GameState.PLAYING) {
+    // The victory lock is part of the predicate: the winning commit calls
+    // stopSpeedTimer() and then setSpeedRound(n+1) in the same batch, and
+    // gameState only flips to WON after the awaited recordVictory. speedRound
+    // is a dep, so that render re-armed the clock at the full NEXT-round limit
+    // and ticked it over the finished board for the whole record window.
+    if (!puzzle.speedMode || puzzle.gameState !== GameState.PLAYING || victoryFlow.isProcessingVictory) {
       stopSpeedTimer();
       return;
     }
@@ -1090,6 +1115,7 @@ function MainApp() {
     puzzle.gameState,
     puzzle.difficulty,
     speedRound,
+    victoryFlow.isProcessingVictory,
     startSpeedTimer,
     stopSpeedTimer,
   ]);
@@ -1812,6 +1838,29 @@ function MainApp() {
     // flips / the screen changes / the overlay clears).
     clearVictoryMusicHush(!pendingEndgame);
 
+    // An intro is ALREADY presenting and owns a parked exit action. Reached
+    // because the Fox card has no backdrop (zIndex 9000, anchored ~38% down),
+    // so the victory modal underneath stays live and its NEXT LEVEL / Home
+    // buttons — and Android back — can fire a second exit. By then the queue is
+    // empty (advanceQueuedPostVictoryIntro shift()ed the live intro out of it),
+    // so that second exit used to fall straight through to action() and leave
+    // postVictoryIntro set forever: the stale card then reappeared over the
+    // player's NEXT board and, on Continue, ran the FIRST exit's parked action
+    // and threw that board away — while every guard keyed on postVictoryIntro
+    // (notification ask, share invite, remove-ads offer, daily-login modal)
+    // stayed dead for the rest of the session.
+    //
+    // The ref is the right key, not the state: it is set only in the deferral
+    // branch below and cleared only when the parked action finally runs, so it
+    // is an exact synchronous mirror of "an intro owns the screen" with no
+    // render lag. Replace the parked action and return — do NOT call
+    // advanceQueuedPostVictoryIntro() here: with an empty queue it would null
+    // the live intro and fire the action under the player's finger.
+    if (pendingPostVictoryActionRef.current) {
+      pendingPostVictoryActionRef.current = action;
+      return;
+    }
+
     if (queuedPostVictoryIntrosRef.current.length > 0) {
       pendingPostVictoryActionRef.current = action;
       advanceQueuedPostVictoryIntro().catch(() => {
@@ -1822,6 +1871,12 @@ function MainApp() {
       return;
     }
 
+    // No intro owns the screen, so nothing may be left presenting either.
+    // Belt-and-braces against a card unmounted by some path that never enters
+    // this flow (the advance rejection above, say): a stranded postVictoryIntro
+    // renders over the next board. Cleared WITHOUT marking it seen, so the
+    // one-time beat re-fires on a later victory — the dismissal contract.
+    setPostVictoryIntro(null);
     action();
   }, [clearVictoryTimeouts, clearVictoryToastQueue, clearVictoryMusicHush, puzzleActions, victoryActions, orchestrationActions, advanceQueuedPostVictoryIntro]);
 
@@ -1852,7 +1907,16 @@ function MainApp() {
       // live state and the retained preference, so restoring it would blank
       // the setup chip and seed every following board from an unset value.
       const saved = await loadPuzzleState();
-      if (saved && saved.gameState === 'PLAYING' && !saved.isPlayingDaily && isValidDifficulty(saved.difficulty)) {
+      // A speed save with a second or less on the clock is not a board, it is a
+      // loss about to happen: restoring it hands the player a puzzle that times
+      // out before they can move. onSpeedTimeUp now clears the save at the
+      // buzzer, so this only catches a snapshot written by an older build (or a
+      // process killed between the last tick and the expiry).
+      const expiringSpeedSave =
+        saved?.speedMode === true &&
+        saved.speedTimeRemainingSec != null &&
+        saved.speedTimeRemainingSec <= 1;
+      if (saved && saved.gameState === 'PLAYING' && !saved.isPlayingDaily && !expiringSpeedSave && isValidDifficulty(saved.difficulty)) {
         // Restored boards never carry (or roll) a house ask — the ask does
         // not survive autosave (dropped silently; deliberate simplification).
         houseAskRestoreSuppressRef.current = true;
@@ -1920,6 +1984,7 @@ function MainApp() {
     setIsPlayingDaily(false);
     resetSpeedRun();
     setVictoryDoubleClaimed(false);
+    rewardedDoubleInFlightRef.current = false;
     setVictoryDoubleOffer(false);
     setDailyRank(null);
     setDailyLadderLine(null);
@@ -2038,6 +2103,19 @@ function MainApp() {
     })();
   }, [persistence.currentPhase]);
 
+  // The day THIS daily board belongs to. Only today or yesterday is credible:
+  // a board left open while the app sat backgrounded for days must never
+  // credit an arbitrary past day, so anything older falls back to the wall
+  // clock (the pre-fix behaviour, which is correct for a stale board).
+  const resolveDailyBoardDate = useCallback((): string => {
+    const captured = dailyBoardDateRef.current;
+    if (captured) {
+      const age = daysAgoLocal(captured);
+      if (age === 0 || age === 1) return captured;
+    }
+    return getLocalDateString();
+  }, []);
+
   // The daily board start proper — reached only through handleStartDaily's
   // replay guard below.
   const startDailyBoard = useCallback(() => {
@@ -2061,6 +2139,9 @@ function MainApp() {
         // shared one, so its result must NOT hit the leaderboard (still pays
         // full HARD reward + records to the local ladder).
         dailyEasedRef.current = daily.eased === true;
+        // Capture the board's own day here, at serve time — the win may commit
+        // on the other side of local midnight.
+        dailyBoardDateRef.current = daily.date;
         logEvent({ type: 'puzzle_started', data: { difficulty: 'HARD', daily: true, eased: dailyEasedRef.current } });
         // First-daily mercy: a one-time hint cushion so the first HARD daily
         // (6-letter, 5-row) isn't a wall. Only fires after the board actually
@@ -2208,6 +2289,14 @@ function MainApp() {
     if (puzzle.gameState === GameState.WON && victoryFlow.victoryData?.mandatoryHarvest) {
       return;
     }
+    // Same rule for a live post-victory intro, and for the same reason: routing
+    // away unmounts the card (it only renders on the puzzle screen) while its
+    // state and its parked exit action stay set, so the stale card would
+    // reappear over the next board and discard it on Continue. The link is
+    // re-tappable; the beat is one-time.
+    if (postVictoryIntro) {
+      return;
+    }
 
     if (lowerUrl.startsWith('wordshift://challenge/daily')) {
       // The optional ?date= param is ignored — the daily is always today's.
@@ -2252,6 +2341,7 @@ function MainApp() {
     handleStartSharedChallenge,
     puzzle.gameState,
     victoryFlow.victoryData,
+    postVictoryIntro,
   ]);
 
   // The handler lives in a ref so the Linking subscription is created exactly
@@ -2298,6 +2388,12 @@ function MainApp() {
     }
     // Never route over the first-harvest gate (same rule as deep links).
     if (puzzle.gameState === GameState.WON && victoryFlow.victoryData?.mandatoryHarvest) {
+      return;
+    }
+    // Nor over a live post-victory intro — routing away strands the card and
+    // its parked exit action over the player's next board (see the deep-link
+    // guard above). The notification is re-tappable; the beat is one-time.
+    if (postVictoryIntro) {
       return;
     }
     if (target === 'daily') {
@@ -2356,6 +2452,16 @@ function MainApp() {
       subscription?.remove?.();
     };
   }, []);
+
+  // The difficulty this board is PAID at — the one the victory receipt must
+  // name. Daily always rewards HARD; a shared link prices as EASY because its
+  // chain is attacker-craftable. The modal used to read puzzle.difficulty
+  // instead, which a shared link never touches, so a MEDIUM/HARD-preference
+  // player saw their preference beside EASY's base amber and could be told
+  // "First HARD Clear" for a bonus that was in fact EASY's (and had just
+  // consumed their real first-EASY windfall). One value, both consumers.
+  const rewardDifficulty: Difficulty =
+    isPlayingDaily ? 'HARD' : puzzle.isSharedChallenge ? 'EASY' : puzzle.difficulty;
 
   const handleSlotPress = useCallback(async (
     targetIndex: number,
@@ -2428,9 +2534,14 @@ function MainApp() {
       // most once per session, surface the "getting faster" beat when the recent
       // median is meaningfully quicker than before. Skipped for restored boards
       // (result.solveTimeMs is undefined) and timed/speed boards.
+      // Speed is a MODIFIER, not a variant, so a timed board still reports
+      // variant 'standard' — the variant check alone let countdown-pressured
+      // times (a 30-65s clock) into the untimed pace record and flipped the
+      // "getting faster" trend on solves that were never faster.
       if (
         result.solveTimeMs != null &&
         result.variant === 'standard' &&
+        result.speed !== true &&
         !isPlayingDaily
       ) {
         const solveDifficulty = puzzle.difficulty;
@@ -2475,7 +2586,9 @@ function MainApp() {
         // chosen difficulty preference (which is left untouched during a daily).
         // Shared-link boards price as EASY: the chain is attacker-craftable
         // (a trivial 3-word link must not pay the crafter's HARD base).
-        isPlayingDaily ? 'HARD' : puzzle.isSharedChallenge ? 'EASY' : puzzle.difficulty,
+        // The victory modal is handed this SAME value, so the receipt can never
+        // name a difficulty the board was not paid at.
+        rewardDifficulty,
         result.hintsUsed,
         result.invalidAttempts,
         result.gameMode,
@@ -2523,6 +2636,9 @@ function MainApp() {
       // daily's +50% line can never linger onto later normal-board victories.
       setEventBonusLine(null);
       setVictoryDoubleClaimed(false);
+      // The in-flight latch is released with the claim flag, or the 2x would be
+      // claimable exactly once per app session.
+      rewardedDoubleInFlightRef.current = false;
       // Rewarded-double cadence gate: the 2x slot presents up to
       // REWARDED_DOUBLE_DAILY_CAP times per local day and never at phase 4+
       // (the dread arc is protected like interstitials) — on every win it made
@@ -2581,7 +2697,9 @@ function MainApp() {
         setDailyLadderTrend(null);
         setEventBonusLine(null);
         (async () => {
-          const date = getLocalDateString();
+          // The board's day, not the wall clock's: a solve that straddles local
+          // midnight belongs to the board it was played on.
+          const date = resolveDailyBoardDate();
           const elapsedMs = puzzleStartTimeRef.current > 0
             ? Date.now() - puzzleStartTimeRef.current
             : 0;
@@ -2632,6 +2750,11 @@ function MainApp() {
         })();
         try {
           const before = await getDailyStatus();
+          // The streak record still buckets by the wall-clock day inside
+          // dailyChallenge.ts (its grace-period gap is measured against the
+          // real today), so a midnight-straddling solve can still misfile the
+          // streak. Closing that needs a boardDate parameter down there; the
+          // board's own day is available here as resolveDailyBoardDate().
           const dailyProgress = await recordDailyCompletion(
             victory.earnedStars,
             result.hintsUsed,
@@ -3200,6 +3323,7 @@ function MainApp() {
   }, [
     puzzleActions,
     puzzle.difficulty,
+    rewardDifficulty,
     puzzle.selectedLetter,
     puzzle.gameState,
     persistenceActions,
@@ -4163,6 +4287,16 @@ function MainApp() {
         }
         return true;
       }
+      // A post-victory Fox intro owns the puzzle screen: swallow back. The card
+      // is backdrop-less, so back used to reach the WON branch below and run a
+      // SECOND exit, stranding the intro (see startVictoryExitFlow). Routing
+      // back into dismissPostVictoryIntro() instead is deliberately NOT done:
+      // dismissal marks the one-time beat seen and fires the parked action, so
+      // an interruption would consume a beat unseen and could serve a brand-new
+      // board instead of going home. The card carries its own Skip and Continue.
+      if (currentScreen === 'puzzle' && postVictoryIntro) {
+        return true;
+      }
       // A pit-mandatory victory (first-harvest gate or pending ward ceremony)
       // must not be escapable via hardware back — back does what the only
       // visible CTA does and routes to the pit instead of stranding the beat.
@@ -4202,20 +4336,37 @@ function MainApp() {
       return false;
     });
     return () => subscription.remove();
-  }, [currentScreen, transitionTo, onboardingFlow.isOnboarding, onboardingFlow.onboardingStep, puzzleActions, puzzle.gameState, puzzle.history.length, puzzle.unbrokenWeaveMode, victoryFlow.victoryData, persistence.pendingPhaseTransition, handleGoToPit, handleReturnHome]);
+  }, [currentScreen, transitionTo, onboardingFlow.isOnboarding, onboardingFlow.onboardingStep, puzzleActions, puzzle.gameState, puzzle.history.length, puzzle.unbrokenWeaveMode, victoryFlow.victoryData, persistence.pendingPhaseTransition, postVictoryIntro, handleGoToPit, handleReturnHome]);
 
   // Optional rewarded "double the reward": credits a bonus equal to this
   // puzzle's amber (a true 2x), reward-only — never phase progress. One claim
   // per victory. Inert until a real ad provider is connected.
   const handleRewardedDouble = useCallback(async () => {
     const earned = victoryFlow.victoryData?.amberEarned ?? 0;
-    if (earned <= 0 || victoryDoubleClaimed) return;
+    // victoryDoubleClaimed is STATE, and it is only set after two awaited
+    // storage round-trips inside awardBonusAmber — so on the ad-free branch
+    // (a plain instant-claim button with no busy flag of its own) a second tap
+    // inside that window re-entered with the flag still false and credited the
+    // bonus twice: 3x the puzzle's amber. awardBonusAmber has no concurrency
+    // guard of its own, so the guard has to be synchronous and it has to be
+    // here. Not an optimistic setState + rollback: awardBonusAmber swallows its
+    // own write failures and mutates the cache first, so a "failed" rollback
+    // would show 1x over an in-memory 2x, and the modal's count-up would
+    // animate to 2x and snap back.
+    if (earned <= 0 || victoryDoubleClaimed || rewardedDoubleInFlightRef.current) return;
+    rewardedDoubleInFlightRef.current = true;
     try {
       const newBalance = await awardBonusAmber(earned, 'rewarded_victory_double');
       persistenceActions.setAmberBalance(newBalance);
       setVictoryDoubleClaimed(true);
+      // The ref stays latched on success: it covers the render gap before the
+      // state lands. It is released with victoryDoubleClaimed on every victory
+      // reset — without those resets the 2x would be claimable once per app
+      // session and silently dead on every later win.
     } catch {
-      // Non-critical — never block the victory flow.
+      // Non-critical — never block the victory flow. Released only on failure,
+      // so the player can retry.
+      rewardedDoubleInFlightRef.current = false;
     }
   }, [victoryFlow.victoryData, victoryDoubleClaimed, persistenceActions]);
 
@@ -4255,7 +4406,9 @@ function MainApp() {
       // shareResults falls back to the legacy distribution grid.
       moveOutcomes: puzzle.moveOutcomes.length > 0 ? puzzle.moveOutcomes : undefined,
       isDaily: isPlayingDaily,
-      dailyDate: isPlayingDaily ? getLocalDateString() : undefined,
+      // The board's day, not the wall clock's — a win that lands after local
+      // midnight must not label the share card with a day it wasn't played on.
+      dailyDate: isPlayingDaily ? resolveDailyBoardDate() : undefined,
       moveCount,
       wordChain: puzzle.lastCompletedWords.length > 0 ? puzzle.lastCompletedWords : undefined,
       animalWhisper: orchestration.whisper?.text,
@@ -4279,7 +4432,7 @@ function MainApp() {
       }
     }
     return { result, challengeText };
-  }, [victoryFlow.victoryData, puzzle, orchestration.whisper, persistence.currentPhase, isPlayingDaily]);
+  }, [victoryFlow.victoryData, puzzle, orchestration.whisper, persistence.currentPhase, isPlayingDaily, resolveDailyBoardDate]);
 
   const openShareModal = useCallback((data: { result: ShareableResult; challengeText: string | null }) => {
     setShareResultData(data.result);
@@ -5454,7 +5607,7 @@ function MainApp() {
         <VictoryModal
           visible={puzzle.gameState === GameState.WON && !(onboardingFlow.isOnboarding && (onboardingFlow.onboardingStep === 'puzzle_complete' || onboardingFlow.onboardingStep === 'going_to_pit'))}
           earnedStars={puzzle.earnedStars}
-          difficulty={isPlayingDaily ? 'HARD' : puzzle.difficulty}
+          difficulty={rewardDifficulty}
           phase={persistence.currentPhase}
           phaseTransitionPending={persistence.pendingPhaseTransition != null}
           isPlayingDaily={isPlayingDaily}

@@ -57,7 +57,18 @@ async function load(): Promise<HintState> {
   return cache;
 }
 
-/** Drop the in-memory hint cache after external storage writes (cloud restore). */
+/**
+ * Drop the in-memory hint cache after external storage writes (cloud restore).
+ *
+ * The mirror is ZEROED, not left stale, deliberately: a stale mirror would let
+ * the player spend against a balance the restore may have lowered. That makes
+ * the re-warm mandatory rather than optional, and it lives at the restore
+ * boundary (cloudSave.restoreFromCloudData awaits initHints right after this)
+ * because nothing on any live path calls back into `load()` — initHints is
+ * bootstrap-only and refreshHintBalance only re-reads this mirror. Without
+ * that re-warm the HINT button read 0 for the rest of the session and the app
+ * offered to sell the player hints they had just restored.
+ */
 export function invalidateHintsCache(): void {
   cache = null;
   syncBalance = 0;

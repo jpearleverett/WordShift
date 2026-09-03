@@ -688,6 +688,24 @@ for (const a of ACHIEVEMENTS) {
 // In-memory cache
 let progressCache: AchievementProgress | null = null;
 
+/**
+ * Drop the in-memory achievement cache after an external storage write (cloud
+ * restore) so the next read reflects the restored save.
+ *
+ * `wordshift_achievements` has always been cloud-synced, but this invalidator
+ * did not exist, so a mid-session restore left the pre-restore set warm. The
+ * next checkAchievements then read the STALE unlocked list against the
+ * RESTORED stats, re-unlocked everything the other device had already earned,
+ * re-credited their one-time amber, and wrote `stale + re-earned` back over
+ * the restored list. The permanent casualties were the six streak
+ * achievements, whose check() is a CURRENT-state predicate: once the streak
+ * has lapsed they are neither in the stale set nor re-earnable, so that write
+ * silently deleted them.
+ */
+export function invalidateAchievementsCache(): void {
+  progressCache = null;
+}
+
 function getDefaultProgress(): AchievementProgress {
   return {
     unlockedIds: [],

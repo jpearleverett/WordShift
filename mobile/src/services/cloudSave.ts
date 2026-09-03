@@ -24,6 +24,12 @@ import { invalidateNarrativeDeliveryCache } from './dialogue/animalDialogueNarra
 import { invalidateMicroBeatCaches } from './phaseNarrative';
 import { invalidateSupporterCache } from './supporterStipend';
 import { invalidateSeasonPassCache } from './seasonPass';
+import { invalidateAchievementsCache } from './achievements';
+import { invalidateOnboardingCache } from './onboarding';
+import { invalidateNotificationCaches } from './notifications';
+import { invalidatePlayedPuzzleCaches } from './puzzleBank';
+import { initHints } from './hints';
+import { initCosmetics } from './cosmetics';
 
 /**
  * Cloud save infrastructure for WordShift.
@@ -511,6 +517,18 @@ function invalidateRestoredServiceCaches(): void {
   invalidateMicroBeatCaches();
   invalidateSupporterCache();
   invalidateSeasonPassCache();
+  // These four owned a synced key with a module cache and no invalidator at
+  // all, each with its own way of eating a restore: achievements re-unlocked
+  // and re-paid everything the other device had earned (and dropped the
+  // streak achievements, whose check() is a current-state predicate), the
+  // onboarding step put a restored player back into the first-run tutorial,
+  // the notification prefs wrote this device's switches back over the
+  // restored ones, and the per-bank played lists re-served boards the player
+  // had already solved.
+  invalidateAchievementsCache();
+  invalidateOnboardingCache();
+  invalidateNotificationCaches();
+  invalidatePlayedPuzzleCaches();
 }
 
 /**
@@ -584,19 +602,82 @@ export async function collectLocalSaveData(): Promise<CloudSaveData> {
 }
 
 /**
+ * Keys held back from the restore sweep below, each for its own reason.
+ *
+ * - `wordshift_schema_version`: also in SYNC_KEYS, but deleting it when an old
+ *   payload lacks it drops getSchemaVersion() to 0 and re-runs every migration
+ *   over the just-restored data. Survivable today, pointless risk always.
+ * - `wordshift_hints`: seed-on-init AND bought with real money. Removing it
+ *   would either leave the balance at zero or let initHints re-grant the free
+ *   starting stash (the `seededFree` flag lives in the very value being
+ *   removed). Keeping this device's hints through a restore is the kinder
+ *   failure by a wide margin.
+ */
+const RESTORE_SWEEP_EXEMPT = new Set(['wordshift_schema_version', 'wordshift_hints']);
+
+/**
  * Restore save data from a CloudSaveData object.
- * Overwrites all local data with cloud data. Writes every key present in the
- * payload, so prefix-synced keys (SYNC_KEY_PREFIXES) restore with no extra
- * handling.
+ *
+ * This is an OVERWRITE, and it now behaves like one. It used to only write the
+ * keys the payload happened to carry — and `collectLocalSaveData` skips any
+ * key the source device never wrote — so every synced key the restored save
+ * had no opinion about kept this device's value, and the player ended up
+ * running a hybrid of two saves. The visible costs were one-time narrative
+ * flags (a player restoring an EARLIER save kept micro_beats_seen from the
+ * discarded one and never saw those beats again) and, worst, the discarded
+ * device's abandoned mid-puzzle board surviving as the restored save's
+ * resumable autosave. So: sweep the synced keys the payload omits, then write.
+ *
+ * `invalidateRestoredServiceCaches()` runs AFTER both, which is what makes the
+ * sweep safe — puzzleSaveState's own cache is dropped there, so the discarded
+ * board cannot be re-persisted by the next autosave write.
  */
 export async function restoreFromCloudData(cloudData: CloudSaveData): Promise<boolean> {
   try {
     const entries = Object.entries(cloudData.data);
+    const incoming = new Set(Object.keys(cloudData.data));
+
+    // Sweep: every locally-present synced key the payload does not carry.
+    // The prefix families are enumerated off the real stored keys (they have
+    // no fixed list), and the excluded device/store keys are never touched
+    // because they are not in SYNC_KEYS or the prefixes to begin with.
+    try {
+      const localKeys = await AsyncStorage.getAllKeys();
+      const stale = localKeys.filter(
+        key =>
+          !incoming.has(key) &&
+          !RESTORE_SWEEP_EXEMPT.has(key) &&
+          (SYNC_KEYS.includes(key) || SYNC_KEY_PREFIXES.some(prefix => key.startsWith(prefix))),
+      );
+      if (stale.length > 0) {
+        await AsyncStorage.multiRemove(stale);
+      }
+    } catch {
+      // A failed sweep must not abort the restore — a hybrid save is still
+      // better than no restore.
+    }
+
     // Write all keys from cloud data
     for (const [key, value] of entries) {
       await AsyncStorage.setItem(key, value);
     }
     invalidateRestoredServiceCaches();
+
+    // Re-warm the two services whose caches are RENDER-PATH MIRRORS rather
+    // than lazily-reloaded values. Every other invalidator above nulls a cache
+    // that the next async read refills; these two do not have such a read on
+    // any live path. hints' mirror is zeroed on invalidation (the safe side —
+    // a stale mirror would let a player overspend), so without this the HINT
+    // button read 0 and offered to sell hints the player had just restored;
+    // cosmetics' mirror feeds colors.ts and Confetti synchronously, so without
+    // this every purchased tile theme, finish, confetti palette and move spark
+    // reverted to defaults for the rest of the session while the Shop still
+    // said "Equipped". Awaited here, at the one boundary that knows a restore
+    // landed, because the recovery-code path never calls back into App at all.
+    await Promise.all([
+      initHints().catch(() => {}),
+      initCosmetics().catch(() => {}),
+    ]);
     return true;
   } catch {
     return false;

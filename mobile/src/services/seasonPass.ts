@@ -138,7 +138,17 @@ async function loadState(puzzlesSolved: number): Promise<SeasonPassState> {
     } catch {
       /* fall through */
     }
-    if (!cache) cache = getDefault(seasonId, puzzlesSolved);
+    if (!cache) {
+      // PERSIST the anchor the moment it is created. `startPuzzles` is what
+      // makes in-season progress mean anything, and nothing on the read path
+      // (getSeasonPassView / getSeasonClaimableCount) writes — so every launch
+      // re-anchored to the player's CURRENT total and progress restarted at
+      // zero. At 6 puzzles per tier that made tier 1 reachable only by solving
+      // six boards inside one process lifetime: the whole 10-tier ladder was
+      // unreachable for the 2/day casual the game is balanced around.
+      cache = getDefault(seasonId, puzzlesSolved);
+      await persist(cache);
+    }
   }
   // Roll over on a new local month.
   if (cache.seasonId !== seasonId) {

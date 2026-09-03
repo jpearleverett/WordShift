@@ -21,8 +21,8 @@ import {
   getDailyHostName,
 } from '../services/dailyChallenge';
 import { getHintBalance, clearHints } from '../services/hints';
+import { selectDailyBankPuzzle } from '../services/puzzleBank';
 import { FIRST_DAILY_BONUS_HINTS } from '../constants/gameBalance';
-import { generateLocalPuzzle } from '../services/localGenerator';
 import { getLocalDateStringDaysAgo } from '../services/dateUtils';
 
 // Mock AsyncStorage
@@ -48,19 +48,16 @@ jest.mock('@react-native-async-storage/async-storage', () => {
   };
 });
 
-// Mock localGenerator to avoid actual puzzle generation
-jest.mock('../services/localGenerator', () => ({
-  generateLocalPuzzle: jest.fn(() =>
-    Promise.resolve({
-      words: ['FARM', 'ARM', 'WARM', 'WAR'],
-      hint: 'Think about letters...',
-      solution: [
-        { stepIndex: 0, sourceWord: 'FARM', targetWord: 'ARM', letterToMove: 'F', explanation: '' },
-      ],
-      difficulty: 'MEDIUM',
-    })
-  ),
-}));
+// The daily is served from the REAL shipped banks — that is the whole point of
+// the fix, so the bank is deliberately not stubbed. It is only wrapped so the
+// caching/prewarm tests can count resolutions.
+jest.mock('../services/puzzleBank', () => {
+  const actual = jest.requireActual('../services/puzzleBank');
+  return {
+    ...actual,
+    selectDailyBankPuzzle: jest.fn(actual.selectDailyBankPuzzle),
+  };
+});
 
 // Mock amberCurrency
 jest.mock('../services/amberCurrency', () => ({
@@ -389,39 +386,102 @@ describe('first-daily hint mercy', () => {
 });
 
 describe('generateDailyPuzzle caching / prewarm', () => {
+  const bankPick = selectDailyBankPuzzle as jest.Mock;
+
   beforeEach(async () => {
     (AsyncStorage.clear as jest.Mock)();
     await clearDailyProgress();
-    (generateLocalPuzzle as jest.Mock).mockClear();
+    bankPick.mockClear();
   });
 
-  test('memoizes today\'s puzzle — a repeat call does not regenerate', async () => {
+  test('memoizes today\'s puzzle — a repeat call does not re-resolve', async () => {
     const first = await generateDailyPuzzle();
     const second = await generateDailyPuzzle();
     expect(second).toEqual(first);
-    expect((generateLocalPuzzle as jest.Mock)).toHaveBeenCalledTimes(1);
+    expect(bankPick).toHaveBeenCalledTimes(1);
   });
 
-  test('threads the generator solution through DailyPuzzleData (stored-step daily hints)', async () => {
+  test('threads the stored bank solution through DailyPuzzleData (stored-step daily hints)', async () => {
     const daily = await generateDailyPuzzle();
-    expect(daily.solution).toEqual([
-      { stepIndex: 0, sourceWord: 'FARM', targetWord: 'ARM', letterToMove: 'F', explanation: '' },
-    ]);
+    expect(Array.isArray(daily.solution)).toBe(true);
+    expect(daily.solution!.length).toBe(daily.words.length - 1);
+    expect(daily.solution![0].sourceWord).toBe(daily.words[0]);
   });
 
-  test('prewarm generates the puzzle ahead of time so the next call is cached', async () => {
+  test('prewarm resolves the puzzle ahead of time so the next call is cached', async () => {
     prewarmDailyPuzzle();
-    // Let the fire-and-forget generation settle.
+    // Let the fire-and-forget resolution settle.
     await Promise.resolve();
     await generateDailyPuzzle();
-    expect((generateLocalPuzzle as jest.Mock)).toHaveBeenCalledTimes(1);
+    expect(bankPick).toHaveBeenCalledTimes(1);
   });
 
   test('clearDailyProgress drops the cached puzzle', async () => {
     await generateDailyPuzzle();
     await clearDailyProgress();
     await generateDailyPuzzle();
-    expect((generateLocalPuzzle as jest.Mock)).toHaveBeenCalledTimes(2);
+    expect(bankPick).toHaveBeenCalledTimes(2);
+  });
+});
+
+// The daily's one promise is that everyone is solving the same board. It used
+// to be resolved by a global-Math.random-override generation that yielded to
+// the event loop for up to 2.5s, read the player's own word history and dread
+// phase, and gave up on a wall clock — three independent ways for two devices
+// to land on different chains while the share grid and the leaderboard both
+// insisted otherwise. These are the locks on the fix.
+describe('daily board determinism', () => {
+  beforeEach(async () => {
+    (AsyncStorage.clear as jest.Mock)();
+    await clearDailyProgress();
+  });
+
+  test('same date resolves to the same chain even with a concurrent Math.random consumer', async () => {
+    const first = await generateDailyPuzzle();
+
+    await clearDailyProgress();
+    // The exact interleaving that used to steal the seeded stream: animals
+    // wandering, particles, confetti — all burning Math.random values during
+    // the resolution window.
+    const thief = setInterval(() => { Math.random(); Math.random(); Math.random(); }, 1);
+    let second;
+    try {
+      second = await generateDailyPuzzle();
+    } finally {
+      clearInterval(thief);
+    }
+
+    expect(second.words).toEqual(first.words);
+    expect(second.solution).toEqual(first.solution);
+  });
+
+  test('never replaces the global Math.random', async () => {
+    const original = Math.random;
+    const pending = generateDailyPuzzle();
+    expect(Math.random).toBe(original);
+    await pending;
+    expect(Math.random).toBe(original);
+  });
+
+  test('selectDailyBankPuzzle is a pure function of (difficulty, roll)', () => {
+    const actual = jest.requireActual('../services/puzzleBank');
+    const a = actual.selectDailyBankPuzzle('MEDIUM', 0.42);
+    const b = actual.selectDailyBankPuzzle('MEDIUM', 0.42);
+    expect(a).not.toBeNull();
+    expect(b!.words).toEqual(a!.words);
+    // A different draw must be able to land elsewhere in the bank.
+    const c = actual.selectDailyBankPuzzle('MEDIUM', 0.91);
+    expect(c!.words).not.toEqual(a!.words);
+    // Out-of-range / non-finite rolls still land on a real board.
+    expect(actual.selectDailyBankPuzzle('MEDIUM', 1)).not.toBeNull();
+    expect(actual.selectDailyBankPuzzle('MEDIUM', NaN)).not.toBeNull();
+  });
+
+  test('the served board matches the day\'s ramp SHAPE', async () => {
+    const daily = await generateDailyPuzzle();
+    const ramp = getDailyRamp(getTodayString(), daily.eased === true);
+    expect(daily.wordLength).toBe(ramp.wordLength);
+    expect(daily.words.length).toBe(ramp.targetRows);
   });
 });
 
