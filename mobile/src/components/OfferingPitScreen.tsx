@@ -24,7 +24,7 @@ import {
   PIT_DEVOUR_COLORS as DEVOUR_COLORS,
 } from '../theme/colors';
 import { useScreenInsets } from '../hooks/useScreenInsets';
-import { AmberInline } from './AmberInline';
+import { AmberInline, AmberValue } from './AmberInline';
 import { DialoguePhase } from '../types/homeWorld';
 import { AUTO_COLLECT_PUZZLE_LIMIT } from '../constants/gameBalance';
 import {
@@ -916,13 +916,19 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const [resultMessage, setResultMessage] = useState<string | null>(null);
   const [isOffering, setIsOffering] = useState(false);
   const [displayBalance, setDisplayBalance] = useState(amberBalance);
-  // Adopt EXTERNAL amber increases (a Store purchase made while the pit is
-  // open). Upward-only: pit-local spends/credits update displayBalance first
-  // and echo back through onAmberChange, so a lagging equal-or-smaller prop
-  // must never clobber the optimistic local value mid-cascade.
-  useEffect(() => {
-    setDisplayBalance(prev => (amberBalance > prev ? amberBalance : prev));
-  }, [amberBalance]);
+  // There is exactly ONE amberBalance prop-sync effect, and it lives below
+  // (search isOfferingRef). A second upward-only adoption effect used to sit
+  // here, and because both keyed on [amberBalance] and effects run in
+  // declaration order, it ran FIRST and won: during Offer All the parent echoes
+  // the already-credited FINAL balance back in the same batched render the
+  // cascade resets the display to the pre-offer value, so this effect raised
+  // the total straight to the end number and the guarded effect below then
+  // bailed on isOfferingRef with nothing left to undo. The per-word increments
+  // clamp at that same final value, so the count-up never played at all — the
+  // header sat at the post-harvest total while the pending badge counted down
+  // beside it. It was redundant too: the effect below assigns the prop
+  // unconditionally whenever the cascade is not running, which is the whole of
+  // its stated purpose (adopting an external increase, e.g. a Store purchase).
   const [overflowCount, setOverflowCount] = useState(0);
   // Tracks amber visually consumed during harvest-all cascade (for decrementing pending display)
   const [pendingAmberOffset, setPendingAmberOffset] = useState(0);
@@ -2886,9 +2892,12 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
               {tendingNext && (
                 <>
                   <View style={styles.tendingCostRow}>
-                    <Text style={[styles.tendingCostText, { color: pitSurface.amberText }]}>
-                      <AmberInline size={20} /> {tendingNext.cost}
-                    </Text>
+                    <AmberValue
+                      amount={tendingNext.cost}
+                      size={20}
+                      color={pitSurface.amberText}
+                      textStyle={styles.tendingCostText}
+                    />
                     {tendingNext.dailyBonusApplied && (
                       <Text style={[styles.tendingCostStrike, { color: pitSurface.muted }]}>{tendingNext.baseCost}</Text>
                     )}
@@ -2971,9 +2980,12 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
                 fillColor={pitSkin.fillCard}
               />
               <View style={styles.summaryItem}>
-                <Text style={[styles.summaryValue, { color: pitSurface.title }]}>
-                  <AmberInline size={16} /> {Math.max(0, pendingAmber - pendingAmberOffset)}
-                </Text>
+                <AmberValue
+                  amount={Math.max(0, pendingAmber - pendingAmberOffset)}
+                  size={16}
+                  color={pitSurface.title}
+                  textStyle={styles.summaryValue}
+                />
                 <Text style={[styles.summaryLabel, { color: pitSurface.muted }]}>
                   {getPitPendingAmberLabel(phase)}
                 </Text>

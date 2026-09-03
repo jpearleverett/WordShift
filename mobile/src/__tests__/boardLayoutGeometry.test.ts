@@ -8,11 +8,15 @@
  * flexbox actually produces, so the invariants are pinned here (the repo has no
  * renderer in test env, and this is pure math).
  */
+import fs from 'fs';
+import path from 'path';
 import {
   arcLetterCenterOffset,
   standardLetterCenterOffset,
   ARC_SLOT_RENDERED_WIDTH,
   ARC_SLOT_MARGIN_H,
+  ARC_SLOT_OUTER_MARGIN_H,
+  ARC_SLOT_CELL_W,
   ARC_LETTER_MARGIN_H,
   STANDARD_TILE_W,
   STANDARD_TILE_MARGIN_H,
@@ -45,7 +49,12 @@ describe('letter centre offsets', () => {
       const tileW = compact
         ? COMPACT_TILE_W + COMPACT_TILE_MARGIN_H * 2
         : STANDARD_TILE_W + STANDARD_TILE_MARGIN_H * 2;
-      const arcStep = tileW + ARC_LETTER_MARGIN_H * 2 + ARC_SLOT_RENDERED_WIDTH + ARC_SLOT_MARGIN_H * 2;
+      // The slot cell is ARC_SLOT_CELL_W, not the bare rendered width plus the
+      // wrapper margin: Row nests a `slotOuter` View with its own margin inside
+      // the arcSlotWrapper, and this test used to recompute the step WITHOUT it
+      // (16dp against a rendered 20dp), so it pinned the drift rather than
+      // catching it.
+      const arcStep = tileW + ARC_LETTER_MARGIN_H * 2 + ARC_SLOT_CELL_W;
       for (const n of COUNTS) {
         for (let i = 1; i < n; i++) {
           // Consecutive arc letters are one letter cell + one slot cell apart.
@@ -86,5 +95,54 @@ describe('letter centre offsets', () => {
       expect(Number.isFinite(seed)).toBe(true);
       expect(Math.abs(seed)).toBeLessThan(STANDARD_TILE_W * 3);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The arc slot cell must equal what Row.tsx actually renders.
+//
+// The drift this guards was invisible for exactly one reason: every consumer
+// reconstructed the cell from the same two constants and nobody checked them
+// against the tree. `slotOuter`'s own margin is a third term, and it is the one
+// that went missing. Read it back out of the stylesheet source so a future edit
+// to Row's slot chrome fails here instead of silently moving every slot centre.
+// ---------------------------------------------------------------------------
+describe('arc slot cell matches Row.tsx', () => {
+  const ROW_SRC = fs.readFileSync(
+    path.resolve(__dirname, '../components/Row.tsx'),
+    'utf8',
+  );
+
+  /** Pull `marginHorizontal` out of a named StyleSheet entry (literal or the constant). */
+  function styleMarginH(styleName: string, constantName: string): number | string {
+    const block = new RegExp(`${styleName}:\\s*\\{([^}]*)\\}`).exec(ROW_SRC);
+    expect(block).not.toBeNull();
+    const margin = /marginHorizontal:\s*([A-Za-z_0-9-]+)/.exec(block![1]);
+    expect(margin).not.toBeNull();
+    const raw = margin![1];
+    if (raw === constantName) return constantName;
+    return Number(raw);
+  }
+
+  it('slotOuter carries the margin ARC_SLOT_OUTER_MARGIN_H names', () => {
+    const rendered = styleMarginH('slotOuter', 'ARC_SLOT_OUTER_MARGIN_H');
+    if (typeof rendered === 'number') {
+      expect(rendered).toBe(ARC_SLOT_OUTER_MARGIN_H);
+    } else {
+      expect(rendered).toBe('ARC_SLOT_OUTER_MARGIN_H');
+    }
+  });
+
+  it('slotCompact renders ARC_SLOT_RENDERED_WIDTH', () => {
+    expect(ROW_SRC).toMatch(/slotCompact:\s*\{[^}]*width:\s*ARC_SLOT_RENDERED_WIDTH/);
+  });
+
+  it('the cell constant sums all THREE terms (18 + 2*2 - 1*2 = 20)', () => {
+    expect(ARC_SLOT_CELL_W).toBe(
+      ARC_SLOT_RENDERED_WIDTH + ARC_SLOT_OUTER_MARGIN_H * 2 + ARC_SLOT_MARGIN_H * 2,
+    );
+    expect(ARC_SLOT_CELL_W).toBe(20);
+    // The value the consumers used to compute, which is what regressed.
+    expect(ARC_SLOT_CELL_W).not.toBe(ARC_SLOT_RENDERED_WIDTH + ARC_SLOT_MARGIN_H * 2);
   });
 });

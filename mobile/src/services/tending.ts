@@ -166,21 +166,57 @@ export function selectPhase5Dialogue(
   pool: string[],
   caughtUp: number,
   deliveredIndex: number,
-  seed: number
+  seed: number,
+  isEligible: (index: number) => boolean = () => true
 ): { text: string; isNew: boolean; nextCaughtUp: number } {
   if (pool.length === 0) {
     return { text: 'The pattern holds.', isNew: false, nextCaughtUp: caughtUp };
   }
-  if (caughtUp < pool.length) {
-    return { text: pool[caughtUp], isNew: true, nextCaughtUp: caughtUp + 1 };
+  // New-line branch: the first ELIGIBLE index at or after the pointer.
+  //
+  // A line that names an animal the player has not met is stepped OVER, not
+  // removed — the pool keeps its coordinate space, so `caughtUp` (a persisted
+  // count) keeps meaning what it always meant. A stepped-over line is not lost
+  // either: it stays in the re-read permutation below and becomes deliverable
+  // the moment its room is built.
+  for (let i = caughtUp; i < pool.length; i++) {
+    if (isEligible(i)) {
+      return { text: pool[i], isNew: true, nextCaughtUp: i + 1 };
+    }
   }
   // Caught up — serve re-reads in a deterministic shuffled order. The permutation
   // is re-seeded per full cycle (seed + cycle index), so a deep re-reader doesn't
   // settle into one repeating sequence: each pass through the pool is reshuffled.
+  //
+  // Filtered to the eligible indices AFTER shuffling, so the order a given seed
+  // produces for the lines a player can hear does not change when an unrelated
+  // room is built; unlocking simply lets more of that same order through.
   const cycle = Math.floor(deliveredIndex / pool.length);
   const perm = seededPermutation(pool.length, (seed + cycle) >>> 0);
-  const idx = perm[((deliveredIndex % pool.length) + pool.length) % pool.length];
+  const readable = perm.filter(isEligible);
+  // Nothing eligible at all is pathological (every line names someone unmet);
+  // fall back to the unfiltered order rather than leaving the animal mute.
+  const order = readable.length > 0 ? readable : perm;
+  const idx = order[((deliveredIndex % order.length) + order.length) % order.length];
   return { text: pool[idx], isNew: false, nextCaughtUp: caughtUp };
+}
+
+/**
+ * Whether an animal still has an UNREAD Phase-5 line the player may hear.
+ *
+ * The badge used to be `caughtUp < pool.length`, which lights for a pool whose
+ * only remaining lines name an animal the player has not met — the badge would
+ * promise news and the session would open on a re-read.
+ */
+export function hasNewPhase5Line(
+  pool: string[],
+  caughtUp: number,
+  isEligible: (index: number) => boolean = () => true
+): boolean {
+  for (let i = caughtUp; i < pool.length; i++) {
+    if (isEligible(i)) return true;
+  }
+  return false;
 }
 
 /** Deterministic Fisher–Yates permutation of [0..n) from a 32-bit seed. */

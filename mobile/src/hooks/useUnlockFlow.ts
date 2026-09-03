@@ -11,7 +11,8 @@ import {
   canSkipUnlockGate,
   skipUnlockGate,
   getUnlockSkipCost,
-  canSpeedUpReservedUnlock,
+  getReservedSpeedUpState,
+  ReservedSpeedUpState,
   skipReservedUnlock,
   getReservedSkipCost,
 } from '../services/homeWorldData';
@@ -36,6 +37,17 @@ interface UseUnlockFlowParams {
    * portrait would deliver the OTHER intro's script.
    */
   resetIntroOverrides?: () => void;
+  /**
+   * Run the victory-free achievement check after anything that changes the
+   * unlocked room/animal COUNTS. Four achievements (first_animal, animals_5,
+   * all_animals, all_rooms — 185 amber) key on nothing else, and the counts
+   * only ever move here, on a screen that ran no check at all: completing the
+   * house left 'Full House' and 'Master Builder' locked, with their amber
+   * uncredited, until the player happened to win another puzzle. Wired to
+   * useAchievementQueue's checkAchievementsNow, which shares presentUnlocks
+   * with the victory-side check so the two cannot drift.
+   */
+  onUnlockCompleted?: () => void;
 }
 
 interface UseUnlockFlowReturn {
@@ -56,6 +68,12 @@ interface UseUnlockFlowReturn {
   skipCost: number;
   /** Whether the RESERVED unlock can be sped up now (reserved + premium affordable). */
   canSpeedUpReserved: boolean;
+  /**
+   * WHY the speed-up is unavailable, so the copy beside the missing button can
+   * be true. 'not_yet' is the descent-trio phase guard — no amount of amber
+   * changes it, and it must never be priced.
+   */
+  reservedSpeedUpState: ReservedSpeedUpState;
   /** Remaining premium amber to speed up the reserved unlock (0 when N/A). */
   reservedSkipCost: number;
   handlePurchase: (unlock: Unlockable, options?: { suppressIntro?: boolean }) => Promise<void>;
@@ -94,6 +112,7 @@ export function useUnlockFlow({
   setIntroDialogueIndex,
   setShowIntroDialogue,
   resetIntroOverrides,
+  onUnlockCompleted,
 }: UseUnlockFlowParams): UseUnlockFlowReturn {
   const [showShop, setShowShop] = useState(false);
   const [showRoomUnlock, setShowRoomUnlock] = useState<Room | null>(null);
@@ -105,6 +124,7 @@ export function useUnlockFlow({
   const [canSkip, setCanSkip] = useState(false);
   const [skipCost, setSkipCost] = useState(0);
   const [canSpeedUpReserved, setCanSpeedUpReserved] = useState(false);
+  const [reservedSpeedUpState, setReservedSpeedUpState] = useState<ReservedSpeedUpState>('none');
   const [reservedSkipCost, setReservedSkipCost] = useState(0);
   const [unlockAvailability, setUnlockAvailability] = useState<{
     available: boolean;
@@ -134,17 +154,18 @@ export function useUnlockFlow({
     setReservedUnlockId(reserved);
 
     if (unlock) {
-      const [availability, reservable, skippable, speedable] = await Promise.all([
+      const [availability, reservable, skippable, speedState] = await Promise.all([
         isUnlockAvailable(unlock.id),
         canReserveUnlock(unlock.id),
         canSkipUnlockGate(unlock.id),
-        canSpeedUpReservedUnlock(unlock.id),
+        getReservedSpeedUpState(unlock.id),
       ]);
       setUnlockAvailability(availability);
       setCanReserve(reservable);
       setCanSkip(skippable);
       setSkipCost(skippable ? getUnlockSkipCost(unlock) : 0);
-      setCanSpeedUpReserved(speedable);
+      setCanSpeedUpReserved(speedState === 'ready');
+      setReservedSpeedUpState(speedState);
       // Expose the speed-up premium whenever this unlock is the reservation
       // (even when it's not yet affordable), so the UI can show the option and
       // its cost instead of hiding it — the premium equals the base cost again,
@@ -156,6 +177,7 @@ export function useUnlockFlow({
       setCanSkip(false);
       setSkipCost(0);
       setCanSpeedUpReserved(false);
+      setReservedSpeedUpState('none');
       setReservedSkipCost(0);
     }
 
@@ -184,18 +206,19 @@ export function useUnlockFlow({
   const recheckAffordability = useCallback(async () => {
     const unlock = nextUnlock;
     if (!unlock) return;
-    const [availability, reservable, skippable, speedable, reserved] = await Promise.all([
+    const [availability, reservable, skippable, speedState, reserved] = await Promise.all([
       isUnlockAvailable(unlock.id),
       canReserveUnlock(unlock.id),
       canSkipUnlockGate(unlock.id),
-      canSpeedUpReservedUnlock(unlock.id),
+      getReservedSpeedUpState(unlock.id),
       getReservedUnlockId(),
     ]);
     setUnlockAvailability(availability);
     setCanReserve(reservable);
     setCanSkip(skippable);
     setSkipCost(skippable ? getUnlockSkipCost(unlock) : 0);
-    setCanSpeedUpReserved(speedable);
+    setCanSpeedUpReserved(speedState === 'ready');
+    setReservedSpeedUpState(speedState);
     setReservedSkipCost(reserved === unlock.id ? getReservedSkipCost(unlock) : 0);
   }, [nextUnlock]);
 
@@ -250,6 +273,7 @@ export function useUnlockFlow({
       await loadAllData();
       setShowRoomUnlock(null);
       setShowInvitePrompt(false);
+      onUnlockCompleted?.();
       if (unlock.type === 'character') {
         const animal = ANIMALS.find(a => a.id === unlock.targetId);
         if (animal) {
@@ -266,7 +290,7 @@ export function useUnlockFlow({
       hapticError();
       setPurchaseError(result.error || 'Unable to skip the wait right now.');
     }
-  }, [loadAllData, onAmberChange, setShowCelebration, setIntroAnimal, setIntroDialogueIndex, setShowIntroDialogue]);
+  }, [loadAllData, onAmberChange, onUnlockCompleted, setShowCelebration, setIntroAnimal, setIntroDialogueIndex, setShowIntroDialogue]);
 
   // Speed up an already-reserved unlock: pay the remaining premium, unlock now.
   const handleSpeedUpReserved = useCallback(async (unlock: Unlockable) => {
@@ -280,6 +304,7 @@ export function useUnlockFlow({
       await loadAllData();
       setShowRoomUnlock(null);
       setShowInvitePrompt(false);
+      onUnlockCompleted?.();
       if (unlock.type === 'character') {
         const animal = ANIMALS.find(a => a.id === unlock.targetId);
         if (animal) {
@@ -296,7 +321,7 @@ export function useUnlockFlow({
       hapticError();
       setPurchaseError(result.error || 'Unable to speed this up right now.');
     }
-  }, [loadAllData, onAmberChange, setShowCelebration, setIntroAnimal, setIntroDialogueIndex, setShowIntroDialogue]);
+  }, [loadAllData, onAmberChange, onUnlockCompleted, setShowCelebration, setIntroAnimal, setIntroDialogueIndex, setShowIntroDialogue]);
 
   // Handle unlock purchase
   const handlePurchase = useCallback(async (unlock: Unlockable, options?: { suppressIntro?: boolean }) => {
@@ -317,6 +342,9 @@ export function useUnlockFlow({
       // could go negative and poison the app-level amber mirror.
       const balance = await getAmberBalance();
       onAmberChange?.(balance);
+      // The unlocked counts just moved: check the collection achievements now,
+      // not whenever the player next happens to finish a puzzle.
+      onUnlockCompleted?.();
 
       // If we just unlocked a character, show their intro dialogue
       if (unlock.type === 'character' && !options?.suppressIntro) {
@@ -339,7 +367,7 @@ export function useUnlockFlow({
       hapticError();
       setPurchaseError(result.error || 'Unable to unlock. Try again later.');
     }
-  }, [loadAllData, onAmberChange, setShowCelebration, setIntroAnimal, setIntroDialogueIndex, setShowIntroDialogue]);
+  }, [loadAllData, onAmberChange, onUnlockCompleted, setShowCelebration, setIntroAnimal, setIntroDialogueIndex, setShowIntroDialogue]);
 
   return {
     showShop,
@@ -354,6 +382,7 @@ export function useUnlockFlow({
     canSkip,
     skipCost,
     canSpeedUpReserved,
+    reservedSpeedUpState,
     reservedSkipCost,
     handlePurchase,
     handleReserve,

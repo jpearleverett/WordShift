@@ -146,9 +146,12 @@ export const AchievementToast: React.FC<AchievementToastProps> = ({
           <Text style={[styles.title, { color: t.title }]}>{achievement.title}</Text>
         </View>
         {achievement.rewardAmber > 0 && (
-          <Text style={[styles.reward, { color: t.amberText }]}>
-            +{achievement.rewardAmber} <AmberInline size={14} />
-          </Text>
+          <>
+            <Text style={[styles.reward, { color: t.amberText }]} numberOfLines={1}>
+              +{achievement.rewardAmber}
+            </Text>
+            <AmberInline size={14} style={styles.rewardGem} />
+          </>
         )}
       </View>
     </Animated.View>
@@ -166,7 +169,7 @@ const styles = StyleSheet.create({
   inner: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: SURFACE.cardPadY,
     paddingHorizontal: SURFACE.cardPadX,
     overflow: 'hidden',
     shadowColor: 'rgba(10, 6, 24, 1)',
@@ -209,5 +212,18 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     fontFamily: PIXEL_FONT_BOLD,
     marginLeft: 8,
+  },
+  // The gem is a real flex-row sibling, NEVER an inline <Image> inside the
+  // reward Text run. This Text is the one row child sized by its own paragraph
+  // measurement (textContainer's flex:1 absorbs the remainder), and the run
+  // "+20 <space><attachment>" has exactly one line-break opportunity: the space
+  // before the gem. An inline image is measured as a separate shadow node and
+  // the paragraph is then re-laid-out inside the frame that measurement
+  // produced, so any sub-point disagreement drops the gem onto a second line —
+  // which is what the player saw. A nowrap flex row has no break opportunity at
+  // all, so the failure is removed structurally rather than tuned around. Same
+  // reason as HomeScreen's AmberCostLabel and the pit's Offer All row.
+  rewardGem: {
+    marginLeft: 4,
   },
 });

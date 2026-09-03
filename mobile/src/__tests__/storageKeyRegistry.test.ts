@@ -43,6 +43,7 @@ const DOCUMENTED_EXCLUSIONS: Record<string, string> = {
   wordshift_swift_hint_seen: 'One-time UI pointer toast; device-local UX, not progress.',
   wordshift_first_stuck_seen: 'One-time mercy notice; a returning player may deserve it once more.',
   wordshift_preview_graduation_seen_v2: 'One-time teaching card, device-local by design.',
+  wordshift_local_reset_at: 'Stamps when THIS device was reset; syncing it would round-trip through a restore and defeat its own purpose. Deliberately survives Reset All (like wordshift_pending_iap_grants), so a post-reset relaunch whose upload failed cannot auto-restore the pre-reset save.',
 };
 
 /** Source files to scan for key literals. */
@@ -64,6 +65,17 @@ function discoverKeys(): Map<string, string> {
   for (const file of files) {
     const src = fs.readFileSync(file, 'utf8');
     for (const m of src.matchAll(/['"`](wordshift_[a-z0-9_]+)['"`]/g)) {
+      if (!found.has(m[1])) found.set(m[1], path.relative(root, file));
+    }
+    // Second pass for INTERPOLATED key families. The literal scan above needs
+    // a closing quote right after the key, so a template literal like
+    // `wordshift_guaranteed_crossref_phase_${i}` never matched and a whole
+    // four-key family was invisible to this guard — neither synced, nor
+    // prefix-matched, nor excluded, and every assertion below passed anyway.
+    // (The size canary could not catch it either: losing one family does not
+    // drop the count below 50.) Records the stem, including its trailing
+    // underscore, which is exactly the shape SYNC_KEY_PREFIXES matches.
+    for (const m of src.matchAll(/['"`](wordshift_[a-z0-9_]+)\$\{/g)) {
       if (!found.has(m[1])) found.set(m[1], path.relative(root, file));
     }
   }

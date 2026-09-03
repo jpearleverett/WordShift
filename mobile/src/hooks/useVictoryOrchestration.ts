@@ -4,6 +4,7 @@ import {
   getVictoryGlitch,
   getFirstWinGlitchText,
   resolveVictoryMicroBeat,
+  ackVictoryMicroBeat,
   NarrativeMicroBeat,
   getAnimalWhisper,
   getPersonalizedPhase5Whisper,
@@ -412,14 +413,23 @@ export function useVictoryOrchestration(): [
     // only when no keyed beat claims this win — one narrative voice at a time.
     (async () => {
       let beat: NarrativeMicroBeat | null = null;
+      // Which delivery track this save is on, so the beat is acked through
+      // the record it was reserved in (absolute vs per-cycle).
+      let beatCycleCount = 0;
+      // Only a KEYED beat is acked. The dwell line below is fabricated here
+      // and owns no pending record; acking it would drop somebody else's
+      // held beat.
+      let beatIsKeyed = false;
       try {
         const fullProgress = await getFullProgress();
         if (gen !== generationRef.current) return;
+        beatCycleCount = fullProgress?.cycleCount ?? 0;
         beat = await resolveVictoryMicroBeat(
           totalPuzzlesCompleted,
-          fullProgress?.cycleCount ?? 0,
+          beatCycleCount,
           fullProgress?.cycleStartPuzzles ?? 0,
         );
+        beatIsKeyed = !!beat;
       } catch {
         beat = null;
       }
@@ -439,6 +449,11 @@ export function useVictoryOrchestration(): [
         addTimeout(() => {
           revealWhenFree(() => {
             if (gen !== generationRef.current) return;
+            // Commit at the moment it becomes visible, never at resolve time:
+            // the reveal is scheduled 0.6-1.8s out and EVERY victory exit
+            // (NEXT LEVEL, Home, Collect Now, back) clears it. Until this
+            // runs the beat stays queued and the next win delivers it.
+            if (beatIsKeyed) ackVictoryMicroBeat(beatCycleCount).catch(() => {});
             setMicroBeat(finalBeat);
             setShowMicroBeat(true);
             microBeatAnimRef.current?.stop();

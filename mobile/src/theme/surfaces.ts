@@ -57,6 +57,33 @@ export const SURFACE = {
    * __tests__/surfaceClearance.test.ts.
    */
   cardPadX: 20,
+  /**
+   * VERTICAL content inset for a cottage PANEL frame — the same number as
+   * panelPadX, and that is not a coincidence: the frame master is drawn by BFS
+   * ring depth from the shape boundary (generateUiPanels.mjs drawFrameMaster)
+   * and each ring's ROLE is chosen by that depth alone, with only the SHADE
+   * varying by side. The strip budget is therefore isotropic, so the top and
+   * bottom carry exactly the band the sides do.
+   *
+   * It exists as its own token so a style can state its vertical inset without
+   * re-deriving the geometry. That derivation is what went wrong: with only
+   * panelPadX/cardPadX to reach for, every surface picked its own vertical
+   * number by eye, and they all picked one UNDER the band. Pinned by
+   * __tests__/surfaceClearance.test.ts.
+   */
+  panelPadY: 28,
+  /**
+   * Vertical content inset for a cottage CARD frame. Same derivation as
+   * cardPadX: the 18dp strip is 12dp wood + a 3dp transition ring + a 3dp
+   * vignette ring, and 20 clears the whole strip with 2dp to spare.
+   *
+   * The card's bottom transition/vignette rings are fill-toned where the top
+   * ones are shaded, so a tight bottom is less visible than a tight top — but
+   * the inset stays SYMMETRIC on purpose. A box whose bottom gap is smaller
+   * than its top reads wrong, and the bottom is where the chunky button bevels
+   * sit, whose baked cast-shadow row would otherwise land on the wood seam.
+   */
+  cardPadY: 20,
   /** Stagger interval for content cascade inside freshly opened panels. */
   staggerMs: 50,
   /** Modal entrance: springy (one soft overshoot). */

@@ -182,6 +182,22 @@ let prefsCache: NotificationPreferences | null = null;
 let promptedCache: boolean | null = null;
 let notificationsModule: any = undefined;
 
+/**
+ * Drop both notification caches after an external storage write (cloud
+ * restore).
+ *
+ * Both keys are cloud-synced, and SettingsScreen warms `prefsCache` on mount —
+ * the very screen the restore is performed from. Without this, the Daily
+ * Reminders switch kept showing the pre-restore value and the next toggle
+ * merged the caller's change over that stale object and wrote the whole thing
+ * back over the restored save; a stale `promptedCache === false` also re-fired
+ * the one-time permission prompt on a player who had already been asked.
+ */
+export function invalidateNotificationCaches(): void {
+  prefsCache = null;
+  promptedCache = null;
+}
+
 function getDefaultPrefs(): NotificationPreferences {
   return {
     dailyReminderEnabled: true,
@@ -330,6 +346,18 @@ export async function scheduleAllNotifications(currentPhase: number): Promise<vo
   // so a daily player never gets a redundant "your puzzle is ready" ping.
   const playedToday = await hasPlayedTodaySafe();
 
+  // Whether the Daily Challenge is reachable yet. Read ONCE here, above the
+  // re-engagement block, because two ladders need it: the streak-risk ping
+  // routes by it, and so does the morning reminder. It used to be computed
+  // inside `if (prefs.dailyReminderEnabled)` further down, so a player with
+  // the morning reminder switched off never computed it at all — and the
+  // streak-risk ping (which fires from a 2-day PLAY streak, reachable in as
+  // few as 2-4 solves) hardcoded the daily as its target and landed the
+  // player on a "locked" popup instead of a board. isDailyChallengeUnlockedSafe
+  // is try/catch-guarded with a phase fallback, so the unconditional read is
+  // safe; it costs one extra progress read on the reminder-disabled path.
+  const dailyUnlocked = await isDailyChallengeUnlockedSafe(currentPhase);
+
   // Same-local-day dedupe: the whole set is scheduled in this one pass, so we
   // track which local days already carry a ping and cap delivery at ONE
   // notification per local day. Without this a lapsed player's first missed
@@ -353,7 +381,7 @@ export async function scheduleAllNotifications(currentPhase: number): Promise<vo
     // is safe, so the warning would contradict reality — suppress it.
     const hasStreakRisk = streak >= 2 && !playedToday;
     if (hasStreakRisk) {
-      await scheduleStreakRisk(mod, currentPhase, streak, occupiedDays);
+      await scheduleStreakRisk(mod, currentPhase, streak, dailyUnlocked, occupiedDays);
     }
     // A finished-story player gets the special tail copy on the +14/+30 rungs.
     let finishedStory = false;
@@ -384,7 +412,6 @@ export async function scheduleAllNotifications(currentPhase: number): Promise<vo
   // routed home — never "your daily puzzle is ready" for content the player
   // can't reach yet.
   if (prefs.dailyReminderEnabled) {
-    const dailyUnlocked = await isDailyChallengeUnlockedSafe(currentPhase);
     await scheduleDailyReminder(mod, prefs.dailyReminderHour, currentPhase, playedToday, dailyUnlocked, occupiedDays);
   }
 }
@@ -712,6 +739,7 @@ async function scheduleStreakRisk(
   mod: any,
   phase: number,
   streak: number,
+  dailyUnlocked: boolean,
   occupiedDays: Set<string>
 ): Promise<void> {
   const message = getStreakRiskMessage(phase, streak);
@@ -734,7 +762,12 @@ async function scheduleStreakRisk(
         title: getNotificationTitle(phase, 'streakRisk'),
         body: message,
         sound: true,
-        data: { target: 'daily' },
+        // The PLAY streak this ping guards can exist long before the Daily
+        // Challenge unlocks, and the tap handler re-checks: pointing at a
+        // locked daily met the player with a "locked" alert on the one
+        // evening the app most wanted them back. Copy is already generic, so
+        // only the route changes.
+        data: { target: dailyUnlocked ? 'daily' : 'home' },
       },
       trigger: {
         date: triggerDate,
@@ -750,8 +783,7 @@ async function scheduleStreakRisk(
  * Reset notification preferences (for Settings > Reset All).
  */
 export async function resetNotificationPrefs(): Promise<void> {
-  prefsCache = null;
-  promptedCache = null;
+  invalidateNotificationCaches();
   try {
     await AsyncStorage.removeItem(STORAGE_KEY);
     await AsyncStorage.removeItem(PROMPTED_KEY);

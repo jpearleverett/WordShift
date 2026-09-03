@@ -172,6 +172,8 @@ jest.mock('../services/amberCurrency', () => ({
   recordVariantEncounter: (...args: any[]) => mockRecordVariantEncounter(args[0]),
   applyVariantAmberBonus: (...args: any[]) => mockApplyVariantAmberBonus(args[0], args[1], args[2], args[3]),
   recordVariantWin: (...args: any[]) => mockRecordVariantWin(args[0], args[1]),
+  // recordVictory reads this to build the quest generation context.
+  getFullProgress: jest.fn(async () => ({ unlockedAnimals: ['fox', 'pangolin'] })),
 }));
 
 // --- Mock dialogueSession ---
@@ -207,9 +209,11 @@ jest.mock('../services/masteryRecords', () => ({
 }));
 
 // --- Mock weekly quests ---
-const mockUpdateQuestProgress = jest.fn(async (_event?: any, _phase?: any) => []);
+// Forwards the third arg too: recordVictory now supplies the quest generation
+// context, and the mock has to see it for the guards below to mean anything.
+const mockUpdateQuestProgress = jest.fn(async (_event?: any, _phase?: any, _ctx?: any) => []);
 jest.mock('../services/weeklyQuests', () => ({
-  updateQuestProgress: (...args: any[]) => mockUpdateQuestProgress(args[0], args[1]),
+  updateQuestProgress: (...args: any[]) => mockUpdateQuestProgress(args[0], args[1], args[2]),
 }));
 
 // --- Mock wordHarvest ---
@@ -465,8 +469,41 @@ describe('useGamePersistence', () => {
 
       expect(mockUpdateQuestProgress).toHaveBeenCalledWith(
         expect.objectContaining({ isDaily: true }),
-        expect.any(Number)
+        expect.any(Number),
+        expect.any(Object)
       );
+    });
+
+    test('marks the event as a real solve, so the altar cannot advance solve_count', async () => {
+      const [, actions] = callHook();
+      await actions.recordVictory('MEDIUM', 0, 0, 'standard', ['LIME', 'TIME'], 'standard');
+      expect(mockUpdateQuestProgress).toHaveBeenCalledWith(
+        expect.objectContaining({ isSolve: true }),
+        expect.any(Number),
+        expect.any(Object)
+      );
+    });
+
+    test('supplies a COMPLETE generation context, not a partial one', async () => {
+      // A fresh install's first victory is the first thing to touch the quest
+      // service (the cold open means HomeScreen never mounted), and
+      // rememberGenerationContext persists whatever it is handed — so a partial
+      // context would re-introduce the `?? 10` unlocked-animal default on the
+      // next context-less load and put "talk to 9 animals" in a new player's
+      // first week.
+      const [, actions] = callHook();
+      await actions.recordVictory('MEDIUM', 0, 0, 'standard', ['LIME', 'TIME'], 'standard');
+      const ctx = mockUpdateQuestProgress.mock.calls[0][2] as Record<string, unknown>;
+      expect(ctx).toBeDefined();
+      for (const field of [
+        'puzzlesSolved',
+        'unlockedAnimalCount',
+        'dailyUnlocked',
+        'challengeUnlocked',
+        'unlockedVariants',
+      ]) {
+        expect(ctx[field]).toBeDefined();
+      }
     });
 
     test('records variant encounter for non-standard variant', async () => {

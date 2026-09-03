@@ -20,14 +20,15 @@ import {
   getPhaseProgressFraction,
   getPendingPhaseTransition,
   isPostRevelation,
+  getFullProgress,
 } from '../services/amberCurrency';
 import { updatePuzzleCount, updateSessionPhase } from '../services/dialogueSession';
 import { recordFormedWords } from '../services/wordHistory';
 import { calculateRitualEnergy, extractTriggerWords } from '../services/localGenerator';
 import { GameEvent, logEvent } from '../services/eventLogger';
-import { updateQuestProgress } from '../services/weeklyQuests';
+import { updateQuestProgress, WeeklyQuestGenerationContext } from '../services/weeklyQuests';
 import { recordOfferingFulfillment } from '../services/offeringRequests';
-import { PuzzleVariant, getVariantAmberMultiplier, getNewlyUnlockedVariants } from '../services/puzzleVariety';
+import { PuzzleVariant, getVariantAmberMultiplier, getNewlyUnlockedVariants, getUnlockedVariants } from '../services/puzzleVariety';
 import { enqueueHarvestBatch, generateBatchId, getPendingHarvestSummary, HarvestSummary } from '../services/wordHarvest';
 import { recordResonantChoices } from '../services/masteryRecords';
 import { RESONANT_MOVE_AMBER, RESONANT_BOARD_CAP_AMBER } from '../constants/gameBalance';
@@ -528,7 +529,44 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
       // Update daily + weekly quest progress and capture newly completed quests
       let questsCompleted: string[] = [];
       try {
+        // A COMPLETE generation context, not just the event.
+        //
+        // A fresh install goes straight to the cold-open board, so HomeScreen —
+        // previously the only caller that supplied a context — never mounts,
+        // and this victory was the first thing to touch the quest service. With
+        // no context, `isBelowJournalGate(undefined)` is false by design, so
+        // the pre-journal dormancy gate never fired for ANY fresh install and a
+        // full set was minted at puzzles-solved 1; and `unlockedAnimalCount`
+        // fell back to 10, which kept both "talk to 6/9 animals" weeklies in
+        // the pool for a player who had met nobody. That set then survived the
+        // week, because a later context-full load sees a current periodId and
+        // leaves it alone. Roughly 87% of weeks minted an unreachable one.
+        //
+        // It must be COMPLETE: rememberGenerationContext persists whatever it
+        // is handed, so a partial context would re-introduce the ?? 10 animal
+        // default on the next context-less load.
+        // Read defensively: quest progress must not depend on this succeeding.
+        // It sits inside the same try as updateQuestProgress, so a throw here
+        // would silently skip the whole quest update for that victory. Falling
+        // back to a context-less call restores the old (imperfect but working)
+        // behaviour instead of losing progress outright.
+        let questContext: WeeklyQuestGenerationContext | undefined;
+        try {
+          const questProgress = await getFullProgress();
+          questContext = {
+            puzzlesSolved: amberResult.puzzlesSolved,
+            unlockedAnimalCount: (questProgress.unlockedAnimals ?? []).length,
+            dailyUnlocked: false,
+            challengeUnlocked: amberResult.puzzlesSolved >= 15,
+            unlockedVariants: getUnlockedVariants(amberResult.puzzlesSolved, effectivePhase),
+          };
+        } catch {
+          questContext = undefined;
+        }
         const completedQuests = await updateQuestProgress({
+          // The one caller that represents a completed board. The altar and the
+          // Tending Shrine share this handler and must not advance solve_count.
+          isSolve: true,
           difficulty,
           stars,
           hintsUsed,
@@ -538,7 +576,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
           currentStreak: amberResult.currentStreak,
           variant,
           isSpeed: speed,
-        }, effectivePhase);
+        }, effectivePhase, questContext);
         questsCompleted = completedQuests.map(q => q.title);
       } catch (_) {
         // Quest progress update is non-critical

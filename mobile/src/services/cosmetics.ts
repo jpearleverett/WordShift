@@ -294,7 +294,19 @@ async function load(): Promise<CosmeticState> {
   return cache;
 }
 
-/** Drop the in-memory cosmetic cache after external storage writes (cloud restore). */
+/**
+ * Drop the in-memory cosmetic cache after external storage writes (cloud
+ * restore).
+ *
+ * Unlike its ~25 siblings this clears RENDER-PATH MIRRORS — colors.ts's
+ * activeTileThemeId (tile palette AND finish) and the getEquippedSync map
+ * Confetti reads for the confetti palette and move sparks. Nothing lazily
+ * refills them: the only async cosmetic reads in the app are ShopScreen's and
+ * initCosmetics. So the clear is only half the fix; the other half is
+ * cloudSave.restoreFromCloudData awaiting initCosmetics immediately after
+ * this. Without it, restoring a save stripped every purchased cosmetic off the
+ * board for the rest of the session while the Shop still read "Equipped".
+ */
 export function invalidateCosmeticsCache(): void {
   cache = null;
   syncEquipped = {};

@@ -275,8 +275,21 @@ export function getWeekId(date: Date = new Date()): string {
   const d = parseLocalDate(getLocalDateString(date));
   const dayNum = d.getDay() || 7; // Make Sunday = 7
   d.setDate(d.getDate() + 4 - dayNum); // Thursday of the week
-  const yearStart = parseLocalDate(`${d.getFullYear()}-01-01`);
-  const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  // The span is measured on DST-FREE integers. Subtracting two local midnights
+  // and dividing by 86400000 is off by an hour whenever a DST transition falls
+  // between Jan 1 and the week's Thursday, and `ceil` turns that fractional day
+  // into a whole week whenever the Thursday sits an exact multiple of 7 days
+  // out — which is every Thursday of a year whose Jan 1 is a Friday. In the
+  // north the span only ever LOSES an hour, which ceil absorbs; in the south
+  // DST ends in autumn, so the extra hour persists from April to October and
+  // every week id in between is one too high. At the October snap-back the week
+  // then repeated the previous week's id, `parsed.periodId === currentPeriod`
+  // held, and Sydney/Auckland/Santiago players got no new weekly quests for a
+  // second week running (2027, 2038, 2044; historically 2010, 2016, 2021).
+  // Lifting the already-local calendar components to UTC removes the offset.
+  const thursdayUtc = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+  const yearStartUtc = Date.UTC(d.getFullYear(), 0, 1);
+  const weekNo = Math.ceil((((thursdayUtc - yearStartUtc) / 86400000) + 1) / 7);
   return `${d.getFullYear()}-W${weekNo.toString().padStart(2, '0')}`;
 }
 
@@ -666,8 +679,27 @@ export async function updateQuestProgress(event: {
   amberTended?: number;
   /** Variant key of the completed puzzle (for variant_wins quests). */
   variant?: string;
-}, currentPhase: number = 0): Promise<Quest[]> {
-  const combined = await loadWeeklyQuests(currentPhase);
+  /**
+   * A puzzle was actually completed. Required for `solve_count`.
+   *
+   * This handler is shared by three callers: the victory path, the Phase-4
+   * altar (`{ amberSacrificed }`) and the Phase-5 Tending Shrine
+   * (`{ amberTended }`). Every other case is conditional on a field only a
+   * real solve supplies, but `solve_count` used to increment unconditionally,
+   * so every amber offering and every Tending purchase counted as a completed
+   * puzzle. That let the biggest weekly quest and the full-moon event quest be
+   * finished without playing a board, and it inverted the altar's economics:
+   * at the Phase-4 2.0x multiplier, 30 taps of the 5-amber chip destroyed 150
+   * amber to claim 280, turning a rite whose contract is "you get nothing
+   * mechanical in return" into a net gain.
+   */
+  isSolve?: boolean;
+}, currentPhase: number = 0, context?: WeeklyQuestGenerationContext): Promise<Quest[]> {
+  // The victory path passes a full context so a fresh install's FIRST touch of
+  // this service already knows the player state (see the caller's comment in
+  // useGamePersistence). Every other caller stays context-less and keeps its
+  // existing semantics.
+  const combined = await loadWeeklyQuests(currentPhase, context);
 
   // Pre-journal gate: both tiers dormant — nothing to progress, nothing to save.
   if (combined.daily.gatedInactive && combined.weekly.gatedInactive) {
@@ -688,7 +720,9 @@ export async function updateQuestProgress(event: {
 
       switch (quest.type) {
         case 'solve_count':
-          progressDelta = 1;
+          // Gated like every sibling case: only a real solve counts. See the
+          // `isSolve` doc on the event type for what this was costing.
+          if (event.isSolve) progressDelta = 1;
           break;
         case 'solve_difficulty':
           if (quest.difficulty === 'MEDIUM_PLUS') {

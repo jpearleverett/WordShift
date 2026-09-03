@@ -7,10 +7,20 @@
  *  - naming an animal that unlocks AFTER the speaker requires gating
  *    (a `requiresAnimals` tag, the cross-ref `mentions` filter, or the
  *    coordinated-event unlockedAnimals check).
- *  - Phase 5 / post-revelation content is exempt: it requires house
- *    completion, so every animal is unlocked by then.
+ *  - Phase 5 / post-revelation content is NOT exempt. It used to be, on the
+ *    premise that reaching the reveal required a finished house; the
+ *    endgame-lockout fix ended that by also arming on a bare solve floor, so a
+ *    player who spent amber on the cosmetic catalogue instead of the last
+ *    rooms arrives at Phase 5 with keepers unbuilt. The 36 authored lines that
+ *    name a later-unlocking animal STAY in the corpus (they are good writing,
+ *    and engineered cross-animal texture is the point) — they are gated at
+ *    RUNTIME by buildPhase5Eligibility instead, so the static scan below
+ *    deliberately exempts them while the runtime tests at the bottom of this
+ *    file prove the filter actually withholds them.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { buildPhase5Pool, buildPhase5Eligibility } from '../services/dialogue/phase5Pool';
+import { selectPhase5Dialogue, hasNewPhase5Line, hashSeed } from '../services/tending';
 import { AnimalType } from '../types/homeWorld';
 import {
   getDialoguesForAnimal,
@@ -201,5 +211,77 @@ describe('dialogue unlock gating', () => {
       }
     }
     expect(violations).toEqual([]);
+  });
+
+  /**
+   * Post-revelation lines are the one family gated at RUNTIME rather than in
+   * the corpus, so the static scan above cannot cover them. These stand in for
+   * it: the pool keeps every line at a stable index, and the predicate decides
+   * which of those indices may be delivered right now.
+   */
+  describe('post-revelation lines are gated at runtime, not rewritten', () => {
+    const WITHOUT_TRIO: string[] = ALL_ANIMALS.filter(
+      a => a !== 'tarsier' && a !== 'aye_aye' && a !== 'kakapo'
+    );
+
+    it('the corpus really does contain later-unlocking mentions (guards the guard)', () => {
+      // If this ever reaches zero the tests below are vacuous — either the
+      // lines were rewritten (losing the texture) or the pool stopped
+      // including them.
+      let mentions = 0;
+      for (const speaker of ALL_ANIMALS) {
+        const pool = buildPhase5Pool(speaker, 0, null);
+        const eligible = buildPhase5Eligibility(speaker, pool, WITHOUT_TRIO);
+        mentions += pool.filter((_, i) => !eligible(i)).length;
+      }
+      expect(mentions).toBeGreaterThan(0);
+    });
+
+    it('never delivers a line naming an animal the player has not met', () => {
+      for (const speaker of ALL_ANIMALS) {
+        const pool = buildPhase5Pool(speaker, 0, null);
+        if (pool.length === 0) continue;
+        const eligible = buildPhase5Eligibility(speaker, pool, WITHOUT_TRIO);
+        const seed = hashSeed(speaker);
+
+        // Walk the entire new-line run...
+        let caughtUp = 0;
+        const served: string[] = [];
+        let guard = 0;
+        while (hasNewPhase5Line(pool, caughtUp, eligible) && guard++ < 200) {
+          const r = selectPhase5Dialogue(pool, caughtUp, 0, seed, eligible);
+          served.push(r.text);
+          caughtUp = r.nextCaughtUp;
+        }
+        // ...then well into the shuffled re-read cycle, which is the other
+        // path a withheld line could escape through.
+        for (let d = 0; d < pool.length * 3; d++) {
+          served.push(selectPhase5Dialogue(pool, caughtUp, d, seed, eligible).text);
+        }
+
+        for (const text of served) {
+          expect(namedAnimals(text, speaker).filter(m => !WITHOUT_TRIO.includes(m))).toEqual([]);
+        }
+      }
+    });
+
+    it('releases the withheld lines once the animal is unlocked', () => {
+      for (const speaker of ALL_ANIMALS) {
+        const pool = buildPhase5Pool(speaker, 0, null);
+        const open = buildPhase5Eligibility(speaker, pool, ALL_ANIMALS);
+        expect(pool.every((_, i) => open(i))).toBe(true);
+      }
+    });
+
+    it('the badge does not light for a pool whose remaining lines are all withheld', () => {
+      // The whole point of routing the badge through the same predicate: it
+      // used to be `caughtUp < pool.length`, which promised news the session
+      // could not deliver and opened on a re-read instead.
+      const pool = ['A quiet line.', 'Vesper comes down at dawn.'];
+      const eligible = buildPhase5Eligibility('fox', pool, WITHOUT_TRIO);
+      expect(hasNewPhase5Line(pool, 0, eligible)).toBe(true);
+      expect(hasNewPhase5Line(pool, 1, eligible)).toBe(false);
+      expect(hasNewPhase5Line(pool, 1, buildPhase5Eligibility('fox', pool, ALL_ANIMALS))).toBe(true);
+    });
   });
 });

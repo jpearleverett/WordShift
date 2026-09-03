@@ -11,7 +11,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const SCHEMA_VERSION_KEY = 'wordshift_schema_version';
 
 /** Current schema version — increment when adding new migrations */
-export const CURRENT_SCHEMA_VERSION = 5;
+export const CURRENT_SCHEMA_VERSION = 6;
 
 // ---------------------------------------------------------------------------
 // v4: dialogue-corpus doubling (67 -> 134 base lines per animal).
@@ -217,6 +217,30 @@ const MIGRATIONS: Migration[] = [
         await AsyncStorage.setItem(progressKey, JSON.stringify(progress));
       } catch (error) {
         console.warn('Migration v5: Failed to migrate the speed variant:', error);
+      }
+    },
+  },
+  {
+    version: 6,
+    description: 'Backfill houseCompletionCelebrated from houseCompleted (the cinematic delivery flag split off the world-state flag)',
+    migrate: async () => {
+      const progressKey = 'wordshift_home_progress';
+      try {
+        const stored = await AsyncStorage.getItem(progressKey);
+        if (!stored) return;
+        const progress = JSON.parse(stored);
+        // `houseCompleted` used to mean both "the house is whole" and "the
+        // cutscene has played". Splitting them re-arms an interrupted delivery,
+        // but without this backfill it would ALSO re-arm for everyone who
+        // already watched it: on their next home landing the game would replay
+        // the house-completion cinematic. Anyone with houseCompleted has, by
+        // definition, already been through that beat.
+        if (progress.houseCompleted === true && progress.houseCompletionCelebrated === undefined) {
+          progress.houseCompletionCelebrated = true;
+          await AsyncStorage.setItem(progressKey, JSON.stringify(progress));
+        }
+      } catch (error) {
+        console.warn('Migration v6: Failed to backfill houseCompletionCelebrated:', error);
       }
     },
   },

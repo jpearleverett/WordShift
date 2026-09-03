@@ -30,6 +30,16 @@ interface DraggableTileProps {
   phase?: number;
   /** Called when drag activation state changes — used to disable parent ScrollView during drag */
   onDragActiveChange?: (active: boolean) => void;
+  /**
+   * The uniform board scale (computeBoardScale) applied by an ANCESTOR of this
+   * tile. The drag ghost is a child of that transform, so a raw page-space
+   * delta renders at `dx * scale` — the ghost travelled at a fraction of the
+   * finger's speed while the drop still committed at the finger (10% of the
+   * drag distance on a 360dp phone, 22% on a 6-letter EXPERT board, which is
+   * below 1 on every phone). The ghost's translate and lift are divided by it
+   * so the rendered motion is page-space again.
+   */
+  boardScale?: number;
 }
 
 const DRAG_THRESHOLD = 10;
@@ -63,6 +73,7 @@ export function DraggableTile({
   letterChar,
   phase = 0,
   onDragActiveChange,
+  boardScale = 1,
 }: DraggableTileProps) {
   const translateX = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(0)).current;
@@ -84,12 +95,18 @@ export function DraggableTile({
   const onTapRef = useRef(onTap);
   const enabledRef = useRef(enabled);
   const onDragActiveChangeRef = useRef(onDragActiveChange);
+  // The board scale needs the same ref mirror as the callbacks, and for the
+  // same reason: PanResponder is created ONCE and captures its closure
+  // permanently, so a plain prop read inside onPanResponderMove would freeze at
+  // the mount-time value (1) forever and counter-scale nothing.
+  const scaleRef = useRef(boardScale);
   onDragStartRef.current = onDragStart;
   onDragEndRef.current = onDragEnd;
   onMoveRef.current = onMove;
   onTapRef.current = onTap;
   enabledRef.current = enabled;
   onDragActiveChangeRef.current = onDragActiveChange;
+  scaleRef.current = boardScale;
 
   const panResponder = useRef(
     PanResponder.create({
@@ -135,6 +152,10 @@ export function DraggableTile({
           floatingOpacity.setValue(1);
           sourceOpacity.setValue(0.3);
           const settings = getSettingsSync();
+          // Counter-scale the lift too, or the ghost rides only 44*s dp above
+          // the finger while lines 164/177 subtract the full 44 — the aim point
+          // and the visible centre would disagree by ~10dp on EXPERT.
+          const liftScale = scaleRef.current || 1;
           if (!settings.reducedMotion) {
             Animated.spring(floatingScale, {
               toValue: 1.1,
@@ -143,19 +164,24 @@ export function DraggableTile({
               useNativeDriver: true,
             }).start();
             Animated.spring(liftAnim, {
-              toValue: -DRAG_LIFT_DP,
+              toValue: -DRAG_LIFT_DP / liftScale,
               friction: 7,
               tension: 120,
               useNativeDriver: true,
             }).start();
           } else {
-            liftAnim.setValue(-DRAG_LIFT_DP);
+            liftAnim.setValue(-DRAG_LIFT_DP / liftScale);
           }
         }
 
         if (dragActivated.current) {
-          translateX.setValue(dx);
-          translateY.setValue(dy);
+          // Divide by the live board scale so the ghost's RENDERED travel
+          // equals the finger's page-space travel. The positions reported to
+          // onMove/onDragEnd stay raw page space — estimateSlotIndex hit-tests
+          // there and applies the scale itself.
+          const s = scaleRef.current || 1;
+          translateX.setValue(dx / s);
+          translateY.setValue(dy / s);
           // Live hover feedback: report the finger's page position, lifted by
           // the same DRAG_LIFT_DP the ghost visually rides at (F7) — the aim
           // point stays the ghost's visible center, not the covered fingertip.

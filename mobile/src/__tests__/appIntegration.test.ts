@@ -800,3 +800,147 @@ describe('house asks (optional per-board constraint)', () => {
     expect(APP_TSX).toMatch(/if \(currentScreen !== 'puzzle'\) clearHouseAsk\(\);/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// App-shell bug sweep (post-victory intro stranding, speed run teardown, daily
+// midnight straddle, shared-link receipt, double-tap on the instant 2x).
+// ---------------------------------------------------------------------------
+
+const sliceBetween = (start: string, end: string): string => {
+  const a = APP_TSX.indexOf(start);
+  const b = APP_TSX.indexOf(end, a + 1);
+  expect(a).toBeGreaterThan(-1);
+  expect(b).toBeGreaterThan(a);
+  return APP_TSX.slice(a, b);
+};
+
+describe('a post-victory Fox intro can never be stranded', () => {
+  const exitFlow = () =>
+    sliceBetween('const startVictoryExitFlow = useCallback', '// Start puzzle when navigating to puzzle screen');
+
+  test('a second exit while an intro presents replaces the parked action instead of falling through', () => {
+    const flow = exitFlow();
+    // The guard keys on the REF (an exact synchronous mirror of "an intro owns
+    // the screen"), never on the one-render-stale state.
+    expect(flow).toMatch(/if \(pendingPostVictoryActionRef\.current\) \{\s*pendingPostVictoryActionRef\.current = action;\s*return;/);
+    // It must sit ABOVE the queue branch, or the empty queue falls through again.
+    expect(flow.indexOf('if (pendingPostVictoryActionRef.current)')).toBeLessThan(
+      flow.indexOf('if (queuedPostVictoryIntrosRef.current.length > 0)')
+    );
+    // And it must NOT advance the queue (that would null the live intro and
+    // fire the action under the player's finger).
+    const guard = flow.slice(
+      flow.indexOf('if (pendingPostVictoryActionRef.current)'),
+      flow.indexOf('if (queuedPostVictoryIntrosRef.current.length > 0)')
+    );
+    expect(guard).not.toContain('advanceQueuedPostVictoryIntro');
+  });
+
+  test('the plain exit clears any presenting intro WITHOUT marking the one-time beat seen', () => {
+    const flow = exitFlow();
+    const tail = flow.slice(flow.lastIndexOf('setPostVictoryIntro(null);'));
+    expect(tail).toContain('action();');
+    // Marking lives only in dismissPostVictoryIntro — an interruption must
+    // never consume a beat unseen.
+    expect(flow).not.toContain('markStarterIntroSeen');
+    expect(flow).not.toContain('markModifierStackingIntroSeen');
+    expect(flow).not.toContain('markLexiconIntroSeen');
+  });
+
+  test('hardware back is swallowed while an intro owns the puzzle screen, above the WON branch', () => {
+    const back = sliceBetween("BackHandler.addEventListener('hardwareBackPress'", 'return () => subscription.remove();');
+    expect(back).toMatch(/if \(currentScreen === 'puzzle' && postVictoryIntro\) \{\s*return true;/);
+    expect(back.indexOf("currentScreen === 'puzzle' && postVictoryIntro")).toBeLessThan(
+      back.indexOf('puzzle.gameState === GameState.WON')
+    );
+    // Back must not dismiss: dismissal marks the beat seen and fires the
+    // parked action.
+    expect(back).not.toMatch(/dismissPostVictoryIntro\(\);/);
+  });
+
+  test('deep links and notification taps refuse to route over a live intro', () => {
+    const link = sliceBetween('const handleIncomingLink = useCallback', 'const handleIncomingLinkRef');
+    expect(link).toMatch(/if \(postVictoryIntro\) \{\s*return;/);
+    const notif = sliceBetween('routeNotificationTargetRef.current = (target: unknown)', "} else if (target === 'home')");
+    expect(notif).toMatch(/if \(postVictoryIntro\) \{\s*return;/);
+  });
+});
+
+describe('a timed-out speed run is finished, not resumable', () => {
+  test('the buzzer clears the mid-puzzle autosave', () => {
+    const timeUp = sliceBetween('const onSpeedTimeUp = useCallback', 'const [speedTimer, speedTimerActions]');
+    expect(timeUp).toContain('setPuzzleGameState(GameState.GAME_OVER);');
+    expect(timeUp).toContain('clearPuzzleState().catch(() => {});');
+  });
+
+  test('a restore refuses a speed save with a second or less left', () => {
+    expect(APP_TSX).toMatch(/const expiringSpeedSave =\s*saved\?\.speedMode === true &&/);
+    expect(APP_TSX).toMatch(/saved\.speedTimeRemainingSec <= 1;/);
+    expect(APP_TSX).toContain('!saved.isPlayingDaily && !expiringSpeedSave');
+  });
+
+  test('the clock never re-arms over a completed board during the victory record', () => {
+    // stopSpeedTimer + setSpeedRound land in the same batch as a still-PLAYING
+    // gameState, and speedRound is a dep — the victory lock is what holds it.
+    expect(APP_TSX).toMatch(
+      /if \(!puzzle\.speedMode \|\| puzzle\.gameState !== GameState\.PLAYING \|\| victoryFlow\.isProcessingVictory\)/
+    );
+  });
+});
+
+describe('the private pace record stays untimed', () => {
+  test('speed boards are excluded (they report variant standard)', () => {
+    expect(APP_TSX).toMatch(
+      /result\.solveTimeMs != null &&\s*result\.variant === 'standard' &&\s*result\.speed !== true &&\s*!isPlayingDaily/
+    );
+  });
+});
+
+describe('the victory receipt names the difficulty the board was PAID at', () => {
+  test('one value feeds both recordVictory and the modal', () => {
+    expect(APP_TSX).toMatch(
+      /const rewardDifficulty: Difficulty =\s*isPlayingDaily \? 'HARD' : puzzle\.isSharedChallenge \? 'EASY' : puzzle\.difficulty;/
+    );
+    expect(APP_TSX).toContain('difficulty={rewardDifficulty}');
+    // The old split (a shared link priced EASY but labelled with the player's
+    // preference) must not come back.
+    expect(APP_TSX).not.toContain("difficulty={isPlayingDaily ? 'HARD' : puzzle.difficulty}");
+  });
+});
+
+describe('the instant 2x claim cannot be double-tapped', () => {
+  test('a synchronous in-flight latch guards the awaited credit', () => {
+    const handler = sliceBetween('const handleRewardedDouble = useCallback', 'const handleSpeedRescue');
+    expect(handler).toContain('|| rewardedDoubleInFlightRef.current) return;');
+    expect(handler.indexOf('rewardedDoubleInFlightRef.current = true;')).toBeLessThan(
+      handler.indexOf('await awardBonusAmber')
+    );
+    // Released only on failure — the latch covers the render gap on success.
+    expect(handler.match(/rewardedDoubleInFlightRef\.current = false;/g) || []).toHaveLength(1);
+  });
+
+  test('the latch is released wherever the claim flag is reset (or the 2x dies for the session)', () => {
+    const resets = APP_TSX.match(/setVictoryDoubleClaimed\(false\);/g) || [];
+    const releases = APP_TSX.match(/rewardedDoubleInFlightRef\.current = false;/g) || [];
+    // One release per reset, plus the one inside the failure path.
+    expect(releases.length).toBe(resets.length + 1);
+  });
+});
+
+describe('a daily solve belongs to the board it was played on', () => {
+  test('the board day is captured at serve time and only trusted for today/yesterday', () => {
+    expect(APP_TSX).toContain('dailyBoardDateRef.current = daily.date;');
+    const resolver = sliceBetween('const resolveDailyBoardDate = useCallback', 'const startDailyBoard');
+    expect(resolver).toContain('daysAgoLocal(captured)');
+    expect(resolver).toMatch(/if \(age === 0 \|\| age === 1\) return captured;/);
+    expect(resolver).toContain('return getLocalDateString();');
+  });
+
+  test('the leaderboard, the local ladder and the share card all use it', () => {
+    expect(APP_TSX).toMatch(/const date = resolveDailyBoardDate\(\);/);
+    expect(APP_TSX).toContain('dailyDate: isPlayingDaily ? resolveDailyBoardDate() : undefined');
+    // The wall-clock forms must not creep back in.
+    expect(APP_TSX).not.toContain('const date = getLocalDateString();');
+    expect(APP_TSX).not.toContain('dailyDate: isPlayingDaily ? getLocalDateString() : undefined');
+  });
+});

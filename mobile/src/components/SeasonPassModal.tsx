@@ -30,7 +30,7 @@ import { CHROME_ICONS } from './ui/chromeIcons';
 import { CandyButton } from './ui/CandyButton';
 import { PixelPlaque } from './ui/PixelPlaque';
 import { getStoreArt, STORE_ART_KEYS } from './monetization/storeArt';
-import { AmberInline } from './AmberInline';
+import { AmberValue } from './AmberInline';
 import { AmberSparkle } from './home/AmberSparkle';
 import { Confetti } from './Confetti';
 import { hapticLight, hapticMedium } from '../services/haptics';
@@ -342,9 +342,13 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
           />
           <PixelPlaque phase={phase} label={'SEASON PASS'} style={styles.plaque} />
           <View style={styles.headerBalanceRow}>
-            <Text style={[styles.headerBalance, { color: t.amberText }]} accessibilityLabel={`${displayedAmber} amber`}>
-              <AmberInline size={13} /> {displayedAmber}
-            </Text>
+            <AmberValue
+              amount={displayedAmber}
+              size={13}
+              color={t.amberText}
+              textStyle={styles.headerBalance}
+              accessibilityLabel={`${displayedAmber} amber`}
+            />
           </View>
           <Text style={[styles.title, { color: t.title }]}>{copy.title}</Text>
           <Text style={[styles.tagline, { color: t.body }]}>{copy.tagline}</Text>
@@ -534,7 +538,7 @@ const styles = StyleSheet.create({
   title: { fontFamily: PIXEL_FONT_BOLD, fontSize: FONT_SIZE.headline, textAlign: 'center' },
   tagline: { fontFamily: BODY_FONT, fontSize: FONT_SIZE.bodyLg, textAlign: 'center', marginTop: 4, marginBottom: 10 },
   progress: { fontFamily: PIXEL_FONT_BOLD, fontSize: FONT_SIZE.body, textAlign: 'center', marginBottom: 10 },
-  premiumBox: { paddingVertical: 14, paddingHorizontal: SURFACE.cardPadX, marginBottom: 10 },
+  premiumBox: { paddingVertical: SURFACE.cardPadY, paddingHorizontal: SURFACE.cardPadX, marginBottom: 10 },
   // 56dp: the art is drawn at 192px, so this only ever scales DOWN.
   premiumArt: { width: 56, height: 56, alignSelf: 'center', marginBottom: 8 },
   premiumLocked: { fontFamily: BODY_FONT, fontSize: FONT_SIZE.body, textAlign: 'center', marginBottom: 10 },

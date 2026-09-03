@@ -332,8 +332,8 @@ const styles = StyleSheet.create({
   actionPanel: {
     width: 320,
     marginTop: 14,
-    paddingTop: 14,
-    paddingBottom: 16,
+    paddingTop: SURFACE.cardPadY,
+    paddingBottom: SURFACE.cardPadY,
     paddingHorizontal: SURFACE.cardPadX,
     alignItems: 'center',
   },

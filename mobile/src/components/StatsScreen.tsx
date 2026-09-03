@@ -18,7 +18,7 @@ import { BannerAd } from './monetization/BannerAd';
 import { shouldShowBanner } from '../services/ads';
 import { isAdFreeSync } from '../services/entitlements';
 import { useScreenInsets } from '../hooks/useScreenInsets';
-import { AmberInline } from './AmberInline';
+import { AmberValue } from './AmberInline';
 import { CumulativeStats, PersonalBest, getCumulativeStats, getAverageStars, getThreeStarRate } from '../services/starRating';
 import {
   getAchievementsWithStatus,
@@ -401,9 +401,13 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
                 )}
               </View>
               <View style={[styles.achievementReward, { backgroundColor: t.amberTint, borderColor: t.amberTintBorder }]}>
-                <Text style={[styles.achievementRewardText, { color: t.amberText }]}>
-                  <AmberInline size={12} /> +{achievement.rewardAmber}
-                </Text>
+                <AmberValue
+                  amount={`+${achievement.rewardAmber}`}
+                  size={12}
+                  color={t.amberText}
+                  textStyle={styles.achievementRewardText}
+                  accessibilityLabel={`${achievement.rewardAmber} amber`}
+                />
               </View>
               {achievement.isUnlocked && (
                 <Image source={CHROME_ICONS.check} style={styles.achievementCheckIcon} resizeMode="contain" accessibilityLabel="unlocked" />
@@ -687,12 +691,12 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
               </View>
               <View style={[styles.journeyRow, { backgroundColor: rowAltTint }]}>
                 <Text style={[styles.journeyLabel, { color: t.body }]}>Amber Balance</Text>
-                <Text
-                  style={[styles.journeyValue, { color: t.amberText }]}
+                <AmberValue
+                  amount={displayedAmberBalance}
+                  color={t.amberText}
+                  textStyle={styles.journeyValue}
                   accessibilityLabel={`${displayedAmberBalance} amber`}
-                >
-                  <AmberInline /> {displayedAmberBalance}
-                </Text>
+                />
               </View>
               <View style={styles.journeyRow}>
                 <Text style={[styles.journeyLabel, { color: t.body }]}>Daily Challenges</Text>
@@ -942,7 +946,7 @@ const styles = StyleSheet.create({
   // Hero stats
   heroCard: {
     marginBottom: 18,
-    paddingVertical: 24,
+    paddingVertical: SURFACE.panelPadY,
     paddingHorizontal: SURFACE.panelPadX,
   },
   heroGlow: {

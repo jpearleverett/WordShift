@@ -18,7 +18,7 @@ import { NineSliceFrame } from '../ui/NineSlice';
 import { CandyButton } from '../ui/CandyButton';
 import { PanelCard } from '../ui/PanelCard';
 import { CHROME_ICONS } from '../ui/chromeIcons';
-import { AmberInline } from '../AmberInline';
+import { AmberValue } from '../AmberInline';
 import { AmberSparkle } from '../home/AmberSparkle';
 import {
   PRODUCT_IDS,
@@ -48,7 +48,7 @@ import { logEvent } from '../../services/eventLogger';
 import { RewardedAdButton } from './RewardedAdButton';
 import { RewardReveal } from '../ui/RewardReveal';
 import { GiftOverlay, GiftItem } from './GiftOverlay';
-import { isAdsReady } from '../../services/ads';
+import { isAdsReady, isRewardedCapReached } from '../../services/ads';
 import { getStoreArt, STORE_ART_KEYS } from './storeArt';
 import {
   getDailyAmberStatus,
@@ -166,6 +166,15 @@ export const StoreModal: React.FC<StoreModalProps> = ({
   );
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [amberFaucet, setAmberFaucet] = useState<DailyAmberStatus | null>(null);
+  // The faucet's own 2/day counter and the SHARED rewarded-view cap (8/day
+  // across victory doubles, hint recovery, quest bonuses, speed rescues and
+  // this faucet) are independent. RewardedAdButton hides itself entirely once
+  // the shared cap is spent, so a player with a faucet claim still owed but
+  // eight views already watched was told to "Watch a short clip. N left today."
+  // beside nothing tappable — a cap reading as a broken button. Held as state
+  // and read fresh on every modal open (isRewardedCapReached is async, so it
+  // can never be called during render).
+  const [rewardedCapReached, setRewardedCapReached] = useState(false);
   // The daily faucet claim resolves into a magnitude-aware RewardReveal count-up
   // (nonce forces a fresh reveal each claim, since the faucet allows 2/day).
   const [faucetReveal, setFaucetReveal] = useState<{ amount: number; nonce: number } | null>(null);
@@ -191,6 +200,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
       setFaucetReveal(null);
       setGift(null);
       getDailyAmberStatus().then(setAmberFaucet).catch(() => {});
+      isRewardedCapReached().then(setRewardedCapReached).catch(() => {});
       logEvent({ type: 'store_opened', data: { surface: 'store_modal' } });
     }
   }, [visible]);
@@ -345,6 +355,10 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     hapticMedium();
     const result = await recordDailyAmberClaim();
     setAmberFaucet(result);
+    // A faucet claim SPENDS a rewarded view, so re-read the shared cap here or
+    // a player at 7 views who claims once lands right back in the contradiction
+    // ("1 left today", no button) on the second claim.
+    isRewardedCapReached().then(setRewardedCapReached).catch(() => {});
     const grant = dailyAmberGrantFor(result);
     if (grant <= 0) {
       // Already collected today (stale card or rapid re-tap): the card flips to
@@ -577,13 +591,13 @@ export const StoreModal: React.FC<StoreModalProps> = ({
   /** Quantity as its own fact — the one number a buyer actually compares. */
   const renderRewardValue = (reward: ConsumableProductInfo['reward']) =>
     reward.kind === 'amber' ? (
-      <Text
-        style={[styles.valueAmber, { color: t.amberText }]}
-        numberOfLines={1}
+      <AmberValue
+        amount={reward.amount}
+        size={14}
+        color={t.amberText}
+        textStyle={styles.valueAmber}
         accessibilityLabel={`${reward.amount} amber`}
-      >
-        <AmberInline size={14} /> {reward.amount}
-      </Text>
+      />
     ) : (
       <Text style={[styles.valueWord, { color: t.amberText }]} numberOfLines={1}>
         {reward.amount} hints
@@ -654,9 +668,13 @@ export const StoreModal: React.FC<StoreModalProps> = ({
             <Text style={[styles.title, { color: t.title }]}>Store</Text>
             <View style={[styles.balances, { backgroundColor: t.rowBg, borderColor: t.rowBorder }]}>
               <View style={styles.amberBalanceWrap}>
-                <Text style={[styles.balanceText, { color: t.amberText }]} accessibilityLabel={`${displayedAmber} amber`}>
-                  <AmberInline size={13} /> {displayedAmber}
-                </Text>
+                <AmberValue
+                  amount={displayedAmber}
+                  size={13}
+                  color={t.amberText}
+                  textStyle={styles.balanceText}
+                  accessibilityLabel={`${displayedAmber} amber`}
+                />
                 {amberBurst && <AmberSparkle phase={phase} />}
               </View>
               <Text style={[styles.balanceText, { color: t.body }]}>
@@ -708,8 +726,24 @@ export const StoreModal: React.FC<StoreModalProps> = ({
                     <View style={styles.rowInfo}>
                       <Text style={[styles.rowTitle, { color: t.title }]}>Daily Amber</Text>
                       <Text style={[styles.rowDesc, { color: t.body }]}>
+                        {/* Patrons never touch ads (handleClaimDailyAmber grants
+                            directly and RewardedAdButton returns null for them),
+                            so the shared cap is irrelevant to them — gating this
+                            copy unconditionally would tell a Patron their free
+                            amber was gone and hide a claim they can still make.
+
+                            OWED: the cap-reached line below is inline only
+                            because this batch could not edit phaseNarrative.ts.
+                            It belongs in a phase-aware getter there
+                            (getDailyAmberCapReachedLine(phase, amount)) like
+                            every other player-facing string; the rest of this
+                            card's copy predates the convention and should ride
+                            the same move. Keep it free of em dashes either way,
+                            noEmDashes.test.ts sweeps this file's literals. */}
                         {amberFaucet.available
-                          ? `Watch a short clip. ${amberFaucet.remaining} left today.`
+                          ? (!isPatronSync() && rewardedCapReached
+                              ? `Waiting for you. You have watched every clip today, so come back tomorrow for these ${DAILY_AMBER_REWARD} amber.`
+                              : `Watch a short clip. ${amberFaucet.remaining} left today.`)
                           : 'Collected for today. Come back tomorrow!'}
                       </Text>
                       {amberFaucet.available && renderRowFooter(
@@ -720,13 +754,13 @@ export const StoreModal: React.FC<StoreModalProps> = ({
                         // it anywhere. Stating it here covers both branches and
                         // lets the rewarded button shed its "· +60" suffix, which
                         // also buys back the width its busy copy needs.
-                        <Text
-                          style={[styles.valueAmber, { color: t.amberText }]}
-                          numberOfLines={1}
+                        <AmberValue
+                          amount={DAILY_AMBER_REWARD}
+                          size={14}
+                          color={t.amberText}
+                          textStyle={styles.valueAmber}
                           accessibilityLabel={`${DAILY_AMBER_REWARD} amber`}
-                        >
-                          <AmberInline size={14} /> {DAILY_AMBER_REWARD}
-                        </Text>,
+                        />,
                         isPatronSync() ? (
                           renderPricePill('Claim', handleClaimDailyAmber, `Claim ${DAILY_AMBER_REWARD} free amber`)
                         ) : (
@@ -901,7 +935,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 420,
     maxHeight: '86%',
-    paddingVertical: 24,
+    paddingVertical: SURFACE.panelPadY,
     paddingHorizontal: SURFACE.panelPadX,
     shadowColor: CandyColors.purple.dark,
     shadowOffset: { width: 0, height: 16 },
@@ -953,7 +987,7 @@ const styles = StyleSheet.create({
 
   // Starter pack hero — first card, framed by the amber accent border.
   heroCard: {
-    paddingVertical: 14,
+    paddingVertical: SURFACE.cardPadY,
     paddingHorizontal: SURFACE.cardPadX,
     marginTop: 12,
   },
@@ -978,7 +1012,7 @@ const styles = StyleSheet.create({
   // same baseline closes the void without inlining the price beside the art —
   // which genuinely does not fit (art + price on one line leaves the words 68dp).
   row: {
-    paddingVertical: 12,
+    paddingVertical: SURFACE.cardPadY,
     paddingHorizontal: SURFACE.cardPadX,
     marginBottom: 8,
     minHeight: 68,
@@ -1063,7 +1097,7 @@ const styles = StyleSheet.create({
 
   patronLink: {
     marginTop: 16,
-    paddingVertical: 12,
+    paddingVertical: SURFACE.cardPadY,
     paddingHorizontal: SURFACE.cardPadX,
   },
   patronLinkText: { fontSize: FONT_SIZE.body, lineHeight: 18, textAlign: 'center', fontFamily: BODY_FONT },

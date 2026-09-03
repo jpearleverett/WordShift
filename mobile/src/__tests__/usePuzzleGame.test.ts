@@ -1103,6 +1103,125 @@ describe('usePuzzleGame', () => {
       expect(state.rows[0].words.map(l => l.char).join('')).toBe('ABCDE');
       expect(state.rows[1].words.map(l => l.char).join('')).toBe('FGHIJ');
     });
+
+    // A REFUSED undo must change nothing. The streak reset and the undosUsed
+    // tick used to sit ABOVE the Challenge budget check, so pressing UNDO with
+    // the budget spent produced the "no undos remaining" shake AND silently
+    // destroyed the clean-move combo run: the next valid move dropped from its
+    // escalated line and chime back to the base tier with no visible cause.
+    // The finale's refusal already got this right (it returns above the
+    // mutations); the budget refusal now matches it.
+    describe('a refused undo charges nothing', () => {
+      async function playMove(char: string, slot: number) {
+        let [state, actions] = callHook();
+        const letter = state.rows[state.activeRowIndex].words.find(
+          l => l.char === char && !l.isLocked
+        )!;
+        actions.handleLetterPress(letter, state.activeRowIndex);
+        [, actions] = callHook();
+        return actions.handleSlotPress(slot);
+      }
+
+      /** Challenge board with its whole undo budget already spent. */
+      async function boardWithSpentBudget() {
+        resetHookState();
+        let [, actions] = callHook();
+        actions.setGameMode('challenge');
+        actions.setUndoLimited(true);
+        [, actions] = callHook();
+        // 4 rows = 3 moves, so a move remains after the budget is gone.
+        actions.initGame(['ABCD', 'EFGH', 'IJKL', 'WXYZ']);
+
+        let [state] = callHook();
+        const budget = state.undosRemaining;
+        expect(budget).toBeGreaterThan(0);
+        expect(budget).toBeLessThan(Infinity);
+
+        for (let i = 0; i < budget; i++) {
+          await playMove('A', 0);
+          [, actions] = callHook();
+          actions.handleUndo();
+        }
+        [state] = callHook();
+        expect(state.undosRemaining).toBe(0);
+        expect(state.history).toHaveLength(0);
+      }
+
+      test('the combo streak survives the refusal (the reported symptom)', async () => {
+        await boardWithSpentBudget();
+
+        const first = await playMove('A', 0);
+        expect(first?.comboTier).toBe(0); // streak 1
+
+        let [, actions] = callHook();
+        actions.handleUndo(); // refused: budget spent
+
+        let [state] = callHook();
+        expect(state.error).toBe('No undos remaining in Challenge Mode!');
+        expect(state.history).toHaveLength(1); // nothing reverted
+        expect(state.undosRemaining).toBe(0);
+
+        // Streak 2, not streak 1 — the refusal did not break the run.
+        const second = await playMove('E', 0);
+        expect(second?.completed).toBe(false);
+        expect(second?.comboTier).toBe(1);
+      });
+
+      test('the refusal does not tick undosUsed (only the real undos count)', async () => {
+        await boardWithSpentBudget();
+        const budgetSpent = 2; // the two real undos above
+
+        await playMove('A', 0);
+        let [, actions] = callHook();
+        actions.handleUndo(); // refused
+        [, actions] = callHook();
+        actions.handleUndo(); // refused again for good measure
+
+        await playMove('E', 0);
+        const done = await playMove('I', 0);
+        expect(done?.completed).toBe(true);
+        expect(done?.undosUsed).toBe(budgetSpent);
+      });
+
+      test('a double-shift MID-STEP undo still works at undosRemaining 0', async () => {
+        // Mid-step undos are budget-EXEMPT by design (they take back half a
+        // move, not a committed one). Moving the budget check above that branch
+        // would strand a Challenge double-shift player in pick2/drop2 forever.
+        resetHookState();
+        let [, actions] = callHook();
+        actions.setGameMode('challenge');
+        actions.setUndoLimited(true);
+        [, actions] = callHook();
+        actions.initGame(['ABCDE', 'FGHIJ'], undefined, undefined, 5, 'double_shift');
+
+        let [state] = callHook();
+        const budget = state.undosRemaining;
+        expect(budget).toBeLessThan(Infinity);
+
+        // Burn the whole budget on completed steps (each = 2 drops, 1 charge).
+        for (let i = 0; i < budget; i++) {
+          await playMove('A', 0);
+          await playMove('B', 1);
+          [, actions] = callHook();
+          actions.handleUndo();
+        }
+        [state] = callHook();
+        expect(state.undosRemaining).toBe(0);
+
+        // Now take HALF a step and undo it: still allowed, still free.
+        await playMove('A', 0);
+        [state] = callHook();
+        expect(state.doubleShiftPhase).toBe('pick2');
+
+        [, actions] = callHook();
+        actions.handleUndo();
+        [state] = callHook();
+        expect(state.doubleShiftPhase).toBe('pick1');
+        expect(state.history).toHaveLength(0);
+        expect(state.undosRemaining).toBe(0);
+        expect(state.rows[0].words.map(l => l.char).join('')).toBe('ABCDE');
+      });
+    });
   });
 
   describe('setCurrentPhase', () => {
@@ -3006,6 +3125,78 @@ describe('usePuzzleGame', () => {
       actions2.restorePuzzleState(saved as unknown as import('../services/puzzleSaveState').SavedPuzzleState);
       [state] = callHook();
       expect(state.isSharedChallenge).toBe(false);
+    });
+  });
+
+  // undosUsed is the third input to the Flawless tier, and it was the only one
+  // of the three that did not survive a process kill: hintsUsed and
+  // invalidAttempts were faithfully restored while this one silently restarted
+  // at 0, so undo + force-quit + resume finished credited as a Flawless
+  // Offering (ribbon, lifetime flawlessCount, the flawless achievements).
+  describe('undosUsed survives autosave restore', () => {
+    function savedBoard(rows: unknown, extra: Record<string, unknown> = {}) {
+      return {
+        rows,
+        activeRowIndex: 0,
+        selectedLetter: null,
+        gameState: GameState.PLAYING,
+        message: '',
+        history: [],
+        invalidAttempts: 0,
+        hintsUsed: 0,
+        undosRemaining: Infinity,
+        difficulty: 'MEDIUM',
+        currentWordLength: 4,
+        hint: '',
+        solution: undefined,
+        reverseSolution: undefined,
+        gameMode: 'standard',
+        currentVariant: 'standard',
+        selectedVariant: 'standard',
+        moveDirection: 'down',
+        currentPhase: 0,
+        lastFormedWord: null,
+        isPlayingDaily: false,
+        savedAt: Date.now(),
+        ...extra,
+      } as unknown as import('../services/puzzleSaveState').SavedPuzzleState;
+    }
+
+    test('the hook exposes the live count so the autosave can persist it', async () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['ABCD', 'EFGH', 'IJKL', 'WXYZ']);
+
+      let [state, live] = callHook();
+      expect(state.undosUsed).toBe(0);
+
+      const letter = state.rows[0].words.find(l => l.char === 'A')!;
+      live.handleLetterPress(letter, 0);
+      [, actions] = callHook();
+      await actions.handleSlotPress(0);
+      [, actions] = callHook();
+      actions.handleUndo();
+
+      [state] = callHook();
+      expect(state.undosUsed).toBe(1);
+    });
+
+    test('a saved count comes back, and a legacy row with no field lands on 0', () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['ABCD', 'EFGH', 'IJKL', 'WXYZ']);
+      let [state, actions2] = callHook();
+
+      actions2.restorePuzzleState(savedBoard(state.rows, { undosUsed: 3 }));
+      [state] = callHook();
+      expect(state.undosUsed).toBe(3);
+
+      // The assignment is unconditional: a pre-fix save (no field at all) must
+      // clear the ref, not inherit the 3 above.
+      [, actions2] = callHook();
+      actions2.restorePuzzleState(savedBoard(state.rows));
+      [state] = callHook();
+      expect(state.undosUsed).toBe(0);
     });
   });
 

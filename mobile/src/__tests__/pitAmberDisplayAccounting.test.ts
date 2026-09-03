@@ -228,6 +228,21 @@ describe('accounting regression tripwires', () => {
     expect(src).toMatch(/if \(isOfferingRef\.current\) return;\s*\n\s*setDisplayBalance\(amberBalance\);/);
   });
 
+  test('there is exactly ONE amberBalance prop-sync effect, and it is the guarded one', () => {
+    // Bug A came back by a side door: a SECOND [amberBalance] effect that
+    // adopted the prop upward-only with no cascade guard. Effects run in
+    // declaration order, so the unguarded one ran first and raised the display
+    // straight to the final balance; the guarded one then bailed with nothing
+    // left to undo, and the clamped per-word increments had nowhere to count
+    // to. Any effect keyed on the prop must carry the isOfferingRef guard.
+    // Exactly one writer copies the prop into the display, and it is the
+    // guarded one asserted above. (The other [amberBalance] effect is the
+    // amberBalanceRef mirror, which touches no display state.)
+    const writers = src.match(/setDisplayBalance\(amberBalance\)/g) ?? [];
+    expect(writers).toHaveLength(1);
+    expect(src).not.toMatch(/amberBalance > prev \? amberBalance : prev/);
+  });
+
   test('Offer All alone uses the bulk timing resolver and keeps the ceremony visually primary', () => {
     const harvestAll = src.slice(
       src.indexOf('const handleHarvestAll = useCallback'),

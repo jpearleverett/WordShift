@@ -10,13 +10,20 @@ import {
   Easing,
 } from 'react-native';
 import { Room, Animal, RoomTheme, DialoguePhase } from '../../types/homeWorld';
-import { ROOM_THEME_COLORS } from '../../services/homeWorldData';
+import {
+  ROOM_THEME_COLORS,
+  getLockedRoomCardSub,
+  getReservedArrivalText,
+  getReserveGateText,
+  getDescentTrioNotReadyText,
+} from '../../services/homeWorldData';
 import { AnimalSprite } from './AnimalSprite';
 import { CandyColors } from '../../theme/colors';
 import { FONT_SIZE } from '../../theme/typeScale';
 import { getPixelSkin, CARD_CORNER_DP, CARD_EDGE_DP } from '../../theme/pixelSkin.generated';
 import { NineSliceFrame } from '../ui/NineSlice';
 import { PixelPlaque } from '../ui/PixelPlaque';
+import { CHROME_ICONS } from '../ui/chromeIcons';
 import { BODY_FONT_BOLD } from '../../theme/fonts';
 import { getSettingsSync } from '../../services/settings';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
@@ -443,6 +450,26 @@ interface RoomViewProps {
   ritualWords?: string[];
   unlockCost?: number | null;
   amberBalance?: number;
+  /**
+   * This room is the RESERVED unlock: its cost has already been spent and it
+   * builds itself when its level gate opens. Without it the in-world card kept
+   * advertising the price the player just paid, beside their now-depleted
+   * balance — the reservation read as a failure or a double charge.
+   */
+  isReserved?: boolean;
+  /**
+   * This room cannot be built at ANY balance right now — its level gate is shut,
+   * or (descent trio) the house's own weighted Phase-3 floor is. Resolved by
+   * homeWorldData's `isUnlockGateBlocked`, the same predicate isUnlockAvailable
+   * uses, so the card and the refusal can never disagree. The card used to say
+   * "Tap to build" the moment the player could afford it, and tapping only
+   * opened a modal explaining the wait.
+   */
+  gateBlocked?: boolean;
+  /** The level this room's gate opens at (for the short card line + a11y). */
+  gateMinPuzzles?: number;
+  /** Solves so far: picks the BINDING wait (level board vs house) and speaks it. */
+  puzzlesSolved?: number;
   inviteCost?: number | null;
   // Hide the in-room "Invite" chip while the invite prompt modal is open
   // (the modal already offers the invite action; the chip would otherwise
@@ -467,6 +494,10 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
   ritualWords = [],
   unlockCost = null,
   amberBalance = 0,
+  isReserved = false,
+  gateBlocked = false,
+  gateMinPuzzles,
+  puzzlesSolved = 0,
   inviteCost = null,
   suppressInviteChip = false,
 }) => {
@@ -491,6 +522,32 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
     // scrim (bodyRoomScrim in HouseWorld) darkens it for free.
     const lockedSkin = getPixelSkin(currentPhase);
     const affordable = unlockCost !== null && amberBalance >= unlockCost;
+    // Which of the two waits is this? A level gate the player can watch tick
+    // down, or the house's own Phase-3 floor on the descent trio (which no
+    // level number describes — see getLockedRoomCardSub).
+    const levelGateOpen = gateMinPuzzles === undefined || puzzlesSolved >= gateMinPuzzles;
+    // A reserved room is PAID: neither the price nor the balance means anything
+    // about it any more, so both rows go. A gated-but-unreserved room KEEPS
+    // both (they are still true) and gains the wait line beneath them — the
+    // price and the balance are exactly what that player is still working on.
+    const cardSub = getLockedRoomCardSub({
+      reserved: isReserved,
+      gateBlocked,
+      minPuzzles: gateMinPuzzles,
+      puzzlesSolved,
+      affordable,
+    });
+    // Spoken, not laid out, so the a11y label uses the long-form modal copy —
+    // the card's own line has to survive a 108x58dp chip.
+    const lockedA11yLabel = isReserved
+      ? `${room.name}. ${getReservedArrivalText(gateMinPuzzles, puzzlesSolved)}`
+      : gateBlocked
+        ? levelGateOpen
+          ? `${room.name}. ${getDescentTrioNotReadyText()}`
+          : `${room.name}. ${getReserveGateText(gateMinPuzzles, puzzlesSolved)}`
+        : unlockCost !== null
+          ? `Build ${room.name} for ${unlockCost} amber`
+          : `Unlock ${room.name}`;
     return (
       <Pressable
         style={({ pressed }) => [
@@ -501,11 +558,7 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
         ]}
         onPress={() => onRoomPress(room)}
         accessibilityRole="button"
-        accessibilityLabel={
-          unlockCost !== null
-            ? `Build ${room.name} for ${unlockCost} amber`
-            : `Unlock ${room.name}`
-        }
+        accessibilityLabel={lockedA11yLabel}
       >
         {/* Unbuilt interior: framing studs + cross-beam, a shuttered window,
             and a draped dust sheet — a room mid-construction, not cardboard. */}
@@ -543,21 +596,43 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
             <Text style={[styles.lockedCardName, { color: lockedSkin.ink.primary }]} numberOfLines={1}>
               {room.name}
             </Text>
-            {unlockCost !== null ? (
+            {isReserved ? (
+              // Paid and waiting on its own gate: the carved chrome tick,
+              // never a typed check glyph (the art pass retired those).
+              <View style={styles.lockedReservedRow}>
+                <Image source={CHROME_ICONS.check} style={styles.lockedReservedMark} accessible={false} />
+                <Text style={[styles.lockedCardSub, { color: lockedSkin.ink.secondary, marginTop: 0 }]}>{cardSub}</Text>
+              </View>
+            ) : unlockCost !== null ? (
               <>
                 <View style={styles.lockedCostRow}>
                   <Text style={[styles.lockedCostLabel, { color: lockedSkin.ink.secondary }]}>Build</Text>
                   <Image source={AMBER_ICON} style={styles.lockedCostGem} />
                   <Text style={[styles.lockedCostAmount, { color: lockedSkin.ink.primary }]}>{unlockCost}</Text>
                 </View>
-                {affordable ? (
-                  <Text style={[styles.lockedCardSub, styles.lockedCardSubAffordable]}>Tap to build</Text>
-                ) : (
+                {/* The balance row is about the PURSE and the wait line is
+                    about the LEVEL BOARD: two independent constraints, so a
+                    gated room the player also cannot yet afford has to show
+                    both. Branching gate-first hid the balance — the number
+                    that player is actually working on for most of the wait. */}
+                {!affordable && (
                   <View style={styles.lockedBalanceRow}>
                     <Text style={[styles.lockedCardSub, { color: lockedSkin.ink.quiet }]}>You:</Text>
                     <Image source={AMBER_ICON} style={styles.lockedBalanceGem} />
                     <Text style={[styles.lockedCardSub, { color: lockedSkin.ink.quiet }]}>{amberBalance}</Text>
                   </View>
+                )}
+                {cardSub !== '' && (
+                  <Text
+                    style={[
+                      styles.lockedCardSub,
+                      gateBlocked
+                        ? { color: lockedSkin.ink.secondary }
+                        : styles.lockedCardSubAffordable,
+                    ]}
+                  >
+                    {cardSub}
+                  </Text>
                 )}
               </>
             ) : (
@@ -1129,6 +1204,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 2,
+  },
+  lockedReservedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  lockedReservedMark: {
+    width: 14,
+    height: 14,
+    marginRight: 5,
   },
   lockedCostLabel: {
     fontFamily: BODY_FONT_BOLD,

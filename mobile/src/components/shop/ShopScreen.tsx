@@ -24,7 +24,7 @@ import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { CandyButton } from '../ui/CandyButton';
 import { PanelCard } from '../ui/PanelCard';
 import { CHROME_ICONS } from '../ui/chromeIcons';
-import { AmberInline } from '../AmberInline';
+import { AmberInline, AmberValue } from '../AmberInline';
 import { Confetti } from '../Confetti';
 import { RewardReveal, EntranceCascadeItem, getCascadeDelayMs } from '../ui/RewardReveal';
 import { getSettingsSync } from '../../services/settings';
@@ -904,12 +904,13 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
           </Text>
         </View>
         <View style={[styles.amberPill, { backgroundColor: t.sectionBg, borderColor: t.amberTintBorder }]}>
-          <Text
-            style={[styles.amberPillText, { color: t.amberText }]}
+          <AmberValue
+            amount={Math.max(0, displayedBalance)}
+            size={14}
+            color={t.amberText}
+            textStyle={styles.amberPillText}
             accessibilityLabel={`${Math.max(0, balance)} amber`}
-          >
-            <AmberInline size={14} /> {Math.max(0, displayedBalance)}
-          </Text>
+          />
         </View>
       </View>
 

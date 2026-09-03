@@ -132,6 +132,16 @@ function getBundleSource(): string {
 const BUNDLE_SOURCE = getBundleSource();
 
 /**
+ * Device-local "this device was deliberately reset at T" stamp, read by
+ * cloudSave.maybeAutoRestoreOnFreshInstall so a post-reset relaunch cannot
+ * silently download the pre-reset save when the reset's own upload failed
+ * (offline). Only the FRESH-INSTALL auto-restore consults it: the deliberate
+ * paths — Backup & Restore, a recovery code, the sync-conflict banner's "use
+ * the newer save" — must all stay unblocked.
+ */
+export const LOCAL_RESET_MARKER_KEY = 'wordshift_local_reset_at';
+
+/**
  * Reset All Progress — the full local wipe, exported for regression testing.
  *
  * Root-cause notes for the "Reset All doesn't reset" player report:
@@ -210,14 +220,41 @@ export async function performFullReset(): Promise<string[]> {
     }
   });
 
+  // Stamp the reset locally BEFORE the upload, and after the clears batch
+  // (clearSyncStatus deletes the device/owner keys in that same batch, so a
+  // marker written inside it could be clobbered by an unrelated ordering
+  // change). The upload below is the only thing standing between a reset and
+  // the bootstrap's fresh-install auto-restore, and it is exactly the call most
+  // likely to fail: one 8s RPC fired at the moment the player deliberately
+  // wipes their save, with no retry and no visible failure. Offline, it failed
+  // silently, Updates.reloadAsync restarted the app, clearProgress had made
+  // wordshift_home_progress empty, the install id was unchanged, and the whole
+  // pre-reset save came straight back down. The marker is a timestamp so
+  // maybeAutoRestoreOnFreshInstall can refuse a cloud row that predates the
+  // reset while still accepting a genuinely newer save from another device.
+  //
+  // Deliberately device-local: NOT in cloudSave.SYNC_KEYS (it would round-trip
+  // through a restore and defeat itself) and NOT cleared by Reset All — same
+  // category as wordshift_pending_iap_grants.
+  try {
+    await AsyncStorage.setItem(LOCAL_RESET_MARKER_KEY, String(Date.now()));
+  } catch {
+    // Best effort: a marker we cannot write just leaves the old behaviour.
+  }
+
   // Overwrite the cloud row with the now-empty local state so the bootstrap's
   // fresh-install auto-restore can't resurrect the pre-reset save after the
   // reload. NoOp provider (cloud unconfigured) makes this a harmless no-op;
   // an offline failure must never block the reset itself.
   try {
-    await uploadToCloud();
+    const uploaded = await uploadToCloud();
+    if (uploaded) {
+      // The cloud row now matches the reset state, so there is nothing left to
+      // guard against and the marker must not outlive its reason.
+      await AsyncStorage.removeItem(LOCAL_RESET_MARKER_KEY);
+    }
   } catch {
-    // Non-fatal: the local wipe already succeeded.
+    // Non-fatal: the local wipe already succeeded, and the marker stands.
   }
 
   return failures;
@@ -465,6 +502,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
       setShowRestore(false);
       setRestoreInput('');
       if (restored) {
+        // Same reason runCloudRestore does it: the restore invalidated the
+        // service caches but NOT React state, so without this the session keeps
+        // rendering the pre-restore phase (bright candy chrome, bright victory
+        // copy) over a Phase 4/5 save until the next victory or relaunch —
+        // while this very alert promises the app will use it from now on.
+        onCloudRestored?.();
         showGameAlert('Restored', 'Your progress was restored. The app will use it from now on.');
       } else {
         showGameAlert('Restore', 'No saved progress was found for that code yet.');
@@ -978,7 +1021,18 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
 
         <PanelCard phase={phase} kind="panel" style={styles.section}>
           <PixelPlaque phase={phase} label={'DATA'} style={styles.sectionPlaque} />
-          <TouchableOpacity style={styles.dangerRow} onPress={handleResetData}>
+          {/* The app's only irreversible control, and the one row in this file
+              that announced as two static Texts with no button role: a screen
+              reader read the warning as advice, and a stray double-tap fired
+              the wipe. The explicit label also stops the reader welding the
+              title and the whole warning paragraph into one announcement. */}
+          <TouchableOpacity
+            style={styles.dangerRow}
+            onPress={handleResetData}
+            accessibilityRole="button"
+            accessibilityLabel="Reset All Progress"
+            accessibilityHint="Erases your house, animals, amber, statistics, achievements, and daily challenge history. Cannot be undone."
+          >
             <Text style={[styles.dangerText, { color: t.dangerText }]}>Reset All Progress</Text>
             <Text style={[styles.dangerDescription, { color: t.muted }]}>
               Erases your house, animals, and amber, plus statistics, achievements, and daily challenge history. Cannot be undone.
@@ -1347,7 +1401,7 @@ const styles = StyleSheet.create({
     bottom: 0,
   },
   restoreCard: {
-    paddingVertical: 22,
+    paddingVertical: SURFACE.panelPadY,
     paddingHorizontal: SURFACE.panelPadX,
   },
   restoreTitle: {

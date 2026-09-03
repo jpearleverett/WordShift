@@ -127,6 +127,16 @@ export const ANIMAL_AWARENESS_TIERS: Record<AnimalType, AnimalAwarenessTier> = {
  * because the phase-5 handoff skips unread earlier lines by design. And at
  * global phase 5 every animal clamps to 5 so no tier sits at Phase 4 forever
  * and misses its post-revelation dialogue.
+ *
+ * CONSEQUENCE WORTH KNOWING: the lagging tier therefore never resolves to 3
+ * (global 3 -> 2, global 4 -> 4). Anything keyed on `animalPhase === 3` is
+ * unreachable for those five animals, which is why the phase-3 choice point,
+ * cross-references and trigger reactions are selected from the animal's
+ * READING position (see getFlavorPhase in useDialogueFlow and the index band
+ * in getChoiceForAnimal) rather than from this number alone. Do not "fix" that
+ * by routing the lagging tier through a transitional 3 here: it would re-open
+ * the Phase-4 orphan and desync getCatchUpSessionBonus, whose lagging claimant
+ * is keyed on global phase 4 with animalPhase already 4.
  */
 export function getAnimalPhase(globalPhase: DialoguePhase, animalType: AnimalType): DialoguePhase {
   if (globalPhase === 5) return 5;
@@ -331,6 +341,16 @@ export interface HomeWorldProgress {
   triggerWordQueue?: string[];
   // Whether the house completion ceremony has been triggered
   houseCompleted?: boolean;
+  /**
+   * Whether the house-completion CINEMATIC was actually delivered.
+   *
+   * Deliberately separate from `houseCompleted`, which is the world-state fact
+   * (written the moment the last room lands, and read by the endgame chain).
+   * The two were the same flag, so the beat was marked spent at DETECTION: a
+   * player who left home inside the delivery window lost the cutscene forever.
+   * Split, the beat stays armed until it has actually played.
+   */
+  houseCompletionCelebrated?: boolean;
   // Whether the final puzzle has been completed
   finalPuzzleCompleted?: boolean;
   // Whether post-revelation (Phase 5) content has been reached
@@ -559,11 +579,28 @@ export function getMilestoneMessage(milestone: typeof MILESTONE_BONUSES[0], phas
  */
 export function checkMilestone(
   puzzleCount: number,
-  lastClaimedMilestone?: number
+  lastClaimedMilestone?: number,
+  phase?: DialoguePhase
 ): { amber: number; message: string; puzzles: number } | null {
   const claimed = lastClaimedMilestone ?? 0;
   const milestone = MILESTONE_BONUSES.find(m => m.puzzles <= puzzleCount && m.puzzles > claimed);
-  return milestone ? { amber: milestone.amber, message: milestone.message, puzzles: milestone.puzzles } : null;
+  if (!milestone) return null;
+  return {
+    amber: milestone.amber,
+    // Resolved HERE, not by the caller. This used to return a bare object
+    // literal carrying only {amber, message, puzzles}, so `darkMessage` and
+    // `dreadMessage` were dropped before the one caller could reach them —
+    // and since both are optional on the source type, the stripped object
+    // still satisfied getMilestoneMessage's parameter and TypeScript said
+    // nothing. Every guard inside it read undefined and fell through to the
+    // bright copy at every phase, which made ~two dozen authored dread lines
+    // dead content and put "Century milestone!" in the middle of the cult
+    // reveal, in dark styling (VictoryModal applies that from phase >= 3, so
+    // the mismatch was conspicuous rather than subtle). Mirrors the shape
+    // checkStreakMilestone already uses.
+    message: phase === undefined ? milestone.message : getMilestoneMessage(milestone, phase),
+    puzzles: milestone.puzzles,
+  };
 }
 
 /**

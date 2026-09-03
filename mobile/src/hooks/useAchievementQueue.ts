@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   checkAchievements,
+  buildAchievementCheckState,
   Achievement,
   AchievementCheckState,
   getShareCount,
@@ -17,6 +18,15 @@ export interface AchievementQueueState {
 
 export interface AchievementQueueActions {
   checkForAchievements: (victory: VictoryData) => Promise<void>;
+  /**
+   * Run a check against live stored state, with no victory in hand — for the
+   * moments that change an achievement's inputs OUTSIDE the victory chain.
+   * The journey achievements are the whole reason it exists: they key on
+   * `currentPhase`, which only ever advances at the pit's ward-ignition
+   * ceremony, so with the victory chain as the only trigger they sat locked
+   * until the player happened to finish another puzzle.
+   */
+  checkAchievementsNow: () => Promise<void>;
   dismissAchievement: () => void;
 }
 
@@ -32,6 +42,21 @@ export function useAchievementQueue(): [AchievementQueueState, AchievementQueueA
       setQueue(rest);
     }
   }, [currentAchievement, queue]);
+
+  /** The one presentation path, shared by both entry points so neither drifts. */
+  const presentUnlocks = useCallback(async (state: AchievementCheckState) => {
+    const newAchievements = await checkAchievements(state);
+    if (newAchievements.length === 0) return;
+    hapticHeavy();
+    // achievement.wav (a composed 1.3s fanfare) shipped in the pack but was
+    // never played; it resolves its dark mirror by phase automatically.
+    playUiSound('achievement');
+    setQueue(prev => {
+      const existingIds = new Set(prev.map(a => a.id));
+      const uniqueNew = newAchievements.filter(a => !existingIds.has(a.id));
+      return uniqueNew.length > 0 ? [...prev, ...uniqueNew] : prev;
+    });
+  }, []);
 
   const checkForAchievements = useCallback(async (victory: VictoryData) => {
     try {
@@ -74,23 +99,22 @@ export function useAchievementQueue(): [AchievementQueueState, AchievementQueueA
         maxStackWins: variantStats.maxStackWins,
       };
 
-      const newAchievements = await checkAchievements(state);
-      if (newAchievements.length > 0) {
-        hapticHeavy();
-        // achievement.wav (a composed 1.3s fanfare) shipped in the pack but was
-        // never played; it resolves its dark mirror by phase automatically.
-        playUiSound('achievement');
-        setQueue(prev => {
-          const existingIds = new Set(prev.map(a => a.id));
-          const uniqueNew = newAchievements.filter(a => !existingIds.has(a.id));
-          return uniqueNew.length > 0 ? [...prev, ...uniqueNew] : prev;
-        });
-      }
-
+      await presentUnlocks(state);
     } catch (err) {
       console.warn('Achievement check failed:', err);
     }
-  }, []);
+  }, [presentUnlocks]);
+
+  // `buildAchievementCheckState` assembles the same shape from live storage
+  // (and lazily require()s the economy graph to stay import-cycle-safe), so a
+  // check outside the victory chain needs no extra plumbing.
+  const checkAchievementsNow = useCallback(async () => {
+    try {
+      await presentUnlocks(await buildAchievementCheckState());
+    } catch (err) {
+      console.warn('Achievement check failed:', err);
+    }
+  }, [presentUnlocks]);
 
   const dismissAchievement = useCallback(() => {
     setCurrentAchievement(null);
@@ -98,6 +122,6 @@ export function useAchievementQueue(): [AchievementQueueState, AchievementQueueA
 
   return [
     { currentAchievement },
-    { checkForAchievements, dismissAchievement },
+    { checkForAchievements, checkAchievementsNow, dismissAchievement },
   ];
 }

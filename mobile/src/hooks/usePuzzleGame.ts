@@ -507,6 +507,14 @@ export interface PuzzleGameState {
   showConfetti: boolean;
   invalidAttempts: number;
   hintsUsed: number;
+  /**
+   * Undos spent on the current board — the third input to the Flawless tier,
+   * exposed so the autosave can persist it alongside hintsUsed/invalidAttempts.
+   * Read off a ref rather than state on purpose (undo must not re-render the
+   * board); safe because this object is rebuilt on every render and a render
+   * always follows an undo (setHistory fires on every undo branch).
+   */
+  undosUsed: number;
   earnedStars: number;
   gameMode: GameMode;
   /** Blind Offering modifier active (ghost previews hidden). */
@@ -1370,8 +1378,20 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       ) {
         try {
           const ritualWords = await getRitualWords();
-          // Pick words matching the target word length for this difficulty
-          const targetLen = requestedDifficulty === 'EASY' || requestedDifficulty === 'MEDIUM' ? 4 : 5;
+          // Pick words matching the target word length for this difficulty.
+          // EXPERT was missing from this ternary, which predates the tier: it
+          // resolved to 5 while generateLocalPuzzle builds EXPERT boards from
+          // the 6-letter word set, so the forced-start guard threw
+          // "not valid for word length 6" on EVERY attempt and the catch below
+          // swallowed it. An EXPERT player never once received an echo board,
+          // one of the signature Phase-3+ beats, and paid a wasted async
+          // generator call on every 5th standard board for it.
+          const targetLen =
+            requestedDifficulty === 'EASY' || requestedDifficulty === 'MEDIUM'
+              ? 4
+              : requestedDifficulty === 'EXPERT'
+                ? 6
+                : 5;
           const candidates = ritualWords.filter(w => w.length === targetLen);
           if (candidates.length > 0) {
             const echoWord = candidates[Math.floor(Math.random() * candidates.length)];
@@ -2570,14 +2590,17 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       return;
     }
 
-    // Taking back a move breaks the clean-move streak AND the flawless run.
-    cleanMoveStreakRef.current = 0;
-    undosUsedRef.current += 1;
-
     const isDoubleShift = hasVariantModifier(currentVariant, 'double_shift');
 
-    // Double shift mid-step undo: always allowed even in challenge mode (not a committed move)
+    // Double shift mid-step undo: always allowed even in challenge mode (not a
+    // committed move). It keeps the streak/flawless charge it has always had —
+    // the mutations live INSIDE this branch rather than above the budget check
+    // so a REFUSED undo cannot charge anything (see below), while this
+    // budget-exempt path is unchanged.
     if (isDoubleShift && (doubleShiftPhase === 'pick2' || doubleShiftPhase === 'drop2')) {
+      // Taking back a move breaks the clean-move streak AND the flawless run.
+      cleanMoveStreakRef.current = 0;
+      undosUsedRef.current += 1;
       const delta = history[history.length - 1];
       setRows(prevRows => {
         const newRows = [...prevRows];
@@ -2610,9 +2633,20 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     // limit; whenever undoLimited is on, the finite budget is read and charged.
     const freeUndos = blindMode && !undoLimited;
     if (gameMode === 'challenge' && !freeUndos && undosRemaining <= 0) {
+      // Charge-free, exactly like the finale's refusal above. The streak reset
+      // and undosUsed tick used to sit ABOVE this check, so a refused undo
+      // silently destroyed the player's clean-move combo run: the shake said
+      // nothing happened while the next valid move dropped from the tier-3
+      // combo line and chime back to the base one, with no visible cause. A
+      // refused action must change nothing.
       shakeError("No undos remaining in Challenge Mode!");
       return;
     }
+
+    // Past the refusal: a real committed undo. Taking back a move breaks the
+    // clean-move streak AND the flawless run.
+    cleanMoveStreakRef.current = 0;
+    undosUsedRef.current += 1;
 
     // Challenge + double shift: a completed step is TWO committed deltas (both
     // drops). Revert the WHOLE step atomically for ONE undo charge — otherwise
@@ -2884,6 +2918,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setHistory(saved.history);
     setInvalidAttempts(saved.invalidAttempts);
     setHintsUsed(saved.hintsUsed);
+    // Assigned UNCONDITIONALLY, never behind an `if (saved.undosUsed != null)`:
+    // a legacy row with no field must land on 0 rather than inherit whatever
+    // the previous board left in the ref. Its two siblings above were always
+    // restored; this one silently restarted at 0, which laundered a used undo
+    // into a false Flawless across a kill.
+    undosUsedRef.current = saved.undosUsed ?? 0;
     setUndosRemaining(saved.undosRemaining);
     difficultyRef.current = saved.difficulty;
     preferredDifficultyRef.current = saved.difficulty;
@@ -2946,12 +2986,28 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     // board that was served as final, even across a relaunch.
     isFinalBoardRef.current = saved.isFinalBoard === true;
     setIsFinalBoard(saved.isFinalBoard === true);
-    // A legacy 'speed' variant is coerced to 'standard' (see the speedMode
-    // restore above) so it lands on a real config instead of an unknown key.
-    setCurrentVariant(
-      restoreUnbrokenWeave || legacySpeedVariant ? 'standard' : saved.currentVariant
-    );
-    setSelectedVariantState(restoreUnbrokenWeave ? 'standard' : saved.selectedVariant);
+    // Any variant key that is not a live union member is coerced to 'standard',
+    // not just the one legacy string we know about. puzzleSaveState carries no
+    // schema version, so a save written by ANY older build can hand us a key
+    // that matches no config; `isPuzzleVariant` also rejects undefined, which
+    // covers saves predating the field.
+    //
+    // BOTH setters need this. `selectedVariant` used to restore raw, and a
+    // legacy 'speed' value reached App's clamp effect -> `isVariantUnlocked`,
+    // which read `VARIANT_UNLOCK_REQUIREMENTS['speed'].puzzlesSolved` on an
+    // undefined entry and threw. That effect lives in MainApp, which has no
+    // ErrorBoundary above it, so the whole tree unmounted — and since this path
+    // never clears the save, every relaunch reproduced it.
+    const restoredCurrent =
+      restoreUnbrokenWeave || !isPuzzleVariant(saved.currentVariant as string)
+        ? 'standard'
+        : saved.currentVariant;
+    const restoredSelected =
+      restoreUnbrokenWeave || !isPuzzleVariant(saved.selectedVariant as string)
+        ? 'standard'
+        : saved.selectedVariant;
+    setCurrentVariant(restoredCurrent);
+    setSelectedVariantState(restoredSelected);
     setMoveDirection(saved.moveDirection);
     setCurrentPhase(saved.currentPhase);
     setLastFormedWord(saved.lastFormedWord);
@@ -3120,6 +3176,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     outOfHintsSignal,
     hintHighlight,
     moveOutcomes,
+    undosUsed: undosUsedRef.current,
     resonantChoiceCount,
     resonanceAmber: resonanceAmberForCount(resonantChoiceCount),
     moveHistorySummary,

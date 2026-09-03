@@ -121,6 +121,13 @@ export interface PuzzleBankSelectionOptions {
   unbrokenWeaveOnly?: boolean;
   /** Lexicon (rare-word) mode: draw from the rare-vocabulary bank for this variant+difficulty. */
   lexicon?: boolean;
+  /**
+   * Speed modifier armed for this board. Speed is no longer a variant — a
+   * speed board arrives here as `variant === 'standard'` — so the caller must
+   * say so, or the +1 row extension below silently lengthens a board that is
+   * being played against a clock calibrated to the BASE chain.
+   */
+  speed?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -447,15 +454,19 @@ async function markPuzzlePlayed(puzzleId: string, bankKey: string = 'standard'):
  */
 function getBankForSelection(difficulty: Difficulty, variant: PuzzleVariant, lexicon = false): PreGeneratedPuzzle[] | null {
   // standard / reverse / double_shift each have their own bank family. SPEED
-  // reuses the STANDARD family: getBankKey maps speed -> std_<diff> (or
-  // lex_std_<diff>), so a Speed board is a standard board played against the
-  // clock, served from the pre-generated bank instead of generating on-device
-  // (zero-wait). The +1 extension stays gated to variant === 'standard', so a
-  // speed board keeps its base size. Any future variant without a bank family
-  // returns null here and falls back to on-device generation.
+  // is a MODIFIER, not a variant: a speed board arrives with its underlying
+  // style, so a standard-style speed board is served from std_<diff> (or
+  // lex_std_<diff>) and needs no family of its own — hence no 'speed' arm
+  // here. Its base size is protected by the `options.speed` gate on the
+  // extension below, NOT by the variant check: that comment used to claim
+  // "variant === 'standard' keeps a speed board at base size", which stopped
+  // being true the moment speed stopped being a variant, and every speed run
+  // past 70 solves quietly grew a row on an unchanged clock. Any future
+  // variant without a bank family returns null here and falls back to
+  // on-device generation.
   const hasBankFamily =
     variant === 'standard' || variant === 'reverse' ||
-    variant === 'double_shift' || variant === 'speed';
+    variant === 'double_shift';
   if (!hasBankFamily) return null;
 
   const bankKey = getBankKey(difficulty, variant, lexicon);
@@ -571,6 +582,46 @@ function scorePuzzleForContext(
 }
 
 /**
+ * Pick the Daily Challenge board by DATE-SEEDED INDEX out of a shipped bank.
+ *
+ * The daily's whole promise is that everyone is solving the SAME board, and
+ * the old route could not keep it. It got determinism by swapping the global
+ * Math.random for a date-seeded PRNG across an `await`-heavy generation that
+ * yields to the event loop every 15ms for up to 2.5 seconds — so every wander
+ * leg, particle and confetti burst that happened to tick during that window
+ * consumed values meant for the board, and the chain came out different on
+ * every device. Three quieter inputs made it worse: the search read the
+ * player's own word-recency map and dread phase, and its budget was
+ * wall-clock, so a slower phone diverged even from an identical stream.
+ *
+ * This path has none of that. It is synchronous, touches no player state, and
+ * cannot time out: given the date it is a pure function, which is the only
+ * thing that makes the shared grid, the streak copy and the leaderboard's
+ * "you beat N% of seekers" honest.
+ *
+ * `roll` is a 0..1 draw from the caller's date-seeded PRNG. The one remaining
+ * cross-device input is the shipped bank itself, so two players on different
+ * app versions can differ — unavoidable, and no worse than the dictionary
+ * drift the generator already carried.
+ *
+ * Deliberately does NOT consult or write played-puzzle storage: the daily is
+ * the same board for everyone, so "have I seen it" must not steer it, and
+ * marking it would spend it out of the ordinary rotation.
+ */
+export function selectDailyBankPuzzle(
+  difficulty: Difficulty,
+  roll: number,
+): PuzzleConfig | null {
+  const bankKey = getBankKey(difficulty, 'standard');
+  if (!BANK_REGISTRY[bankKey]) return null;
+  const bank = getBank(bankKey);
+  if (bank.length === 0) return null;
+  const clamped = Number.isFinite(roll) ? Math.min(0.9999999, Math.max(0, roll)) : 0;
+  const index = Math.min(bank.length - 1, Math.floor(clamped * bank.length));
+  return toPuzzleConfig(bank[index]);
+}
+
+/**
  * Select a puzzle from the pre-generated bank.
  *
  * Returns a PuzzleConfig ready for initGame(), or null if no bank exists
@@ -596,6 +647,7 @@ export async function selectPreGeneratedPuzzle(
     variant === 'standard' &&
     puzzlesSolved >= PUZZLE_EXTENSION_UNLOCK_PUZZLES &&
     !options.unbrokenWeaveOnly &&
+    options.speed !== true && // Never lengthen a board played against a clock (see PuzzleBankSelectionOptions.speed)
     !lexicon; // Lexicon boards are curated rare — never extend (keeps the vocabulary intact)
   const selectableBank = options.unbrokenWeaveOnly
     ? bank.filter(puzzle => isUnbrokenWeaveEligible(puzzle.solution))
@@ -775,15 +827,29 @@ export async function selectPreGeneratedPuzzle(
 }
 
 /**
- * Clear played puzzle tracking (for Reset All Data).
+ * Drop the per-bank played-puzzle-id caches after an external storage write
+ * (cloud restore) WITHOUT deleting the keys.
+ *
+ * The `wordshift_played_*` family is prefix-synced, so a restore rewrites it
+ * on disk — but every bank the player touched this session still held a warm
+ * pre-restore list, and the next markPuzzlePlayed mutated that list and wrote
+ * it back, replacing the restored history with this device's shorter one. The
+ * player was then re-served boards they had already solved on the other
+ * device: exactly what prefix-syncing these keys was added to prevent.
  */
-export async function clearPlayedPuzzles(): Promise<void> {
-  const keys: string[] = [];
+export function invalidatePlayedPuzzleCaches(): void {
   for (const entry of Object.values(BANK_REGISTRY)) {
     entry.cache = null;
     entry.idToWords = null;
-    keys.push(entry.storageKey);
   }
+}
+
+/**
+ * Clear played puzzle tracking (for Reset All Data).
+ */
+export async function clearPlayedPuzzles(): Promise<void> {
+  const keys = Object.values(BANK_REGISTRY).map(entry => entry.storageKey);
+  invalidatePlayedPuzzleCaches();
   try {
     await AsyncStorage.multiRemove(keys);
   } catch {

@@ -68,7 +68,15 @@ export function getSession(animalId: string): DialogueSession | null {
   return sessionsCache.get(animalId) || null;
 }
 
-// Current phase for phase-aware session limits
+// Current phase for phase-aware session limits.
+//
+// This module is a pure counter: it cannot read progress itself, so the value
+// is a MIRROR the app has to keep current. It used to be written only by
+// recordVictory, which meant every app launch ran the session rules at phase 0
+// until the player finished a puzzle — 3 lines per session instead of 6 at the
+// reveal, and a session left warm above the phase-0 cap was refused on the
+// first tap and put straight on cooldown. Anything that knows the phase should
+// push it here (useDialogueFlow mirrors it on load and again at tap time).
 let currentPhase: DialoguePhase = 0;
 
 /**

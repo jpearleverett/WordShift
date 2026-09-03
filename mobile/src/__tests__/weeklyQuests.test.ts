@@ -161,10 +161,10 @@ describe('weeklyQuests', () => {
       }
       if (variantQuest) {
         const other = variantQuest.variant === 'speed' ? 'reverse' : 'speed';
-        await updateQuestProgress({ difficulty: 'MEDIUM', stars: 1, variant: other }, 0);
+        await updateQuestProgress({ isSolve: true, difficulty: 'MEDIUM', stars: 1, variant: other }, 0);
         let s = await loadWeeklyQuests(0);
         expect([...s.daily.quests, ...s.weekly.quests].find(q => q.id === variantQuest!.id)?.progress).toBe(0);
-        await updateQuestProgress({ difficulty: 'MEDIUM', stars: 1, variant: variantQuest.variant }, 0);
+        await updateQuestProgress({ isSolve: true, difficulty: 'MEDIUM', stars: 1, variant: variantQuest.variant }, 0);
         s = await loadWeeklyQuests(0);
         expect([...s.daily.quests, ...s.weekly.quests].find(q => q.id === variantQuest!.id)?.progress).toBe(1);
       }
@@ -278,7 +278,7 @@ describe('weeklyQuests', () => {
   describe('updateQuestProgress', () => {
     it('increments solve_count quest on any puzzle completion', async () => {
       await loadWeeklyQuests(0, unlockedQuestContext);
-      await updateQuestProgress({
+      await updateQuestProgress({ isSolve: true,
         difficulty: 'MEDIUM',
         stars: 2,
         hintsUsed: 1,
@@ -302,7 +302,7 @@ describe('weeklyQuests', () => {
       const starQuest = allQuests.find(q => q.type === 'earn_stars');
 
       if (starQuest) {
-        await updateQuestProgress({
+        await updateQuestProgress({ isSolve: true,
           difficulty: 'MEDIUM',
           stars: 2,
           hintsUsed: 0,
@@ -312,7 +312,7 @@ describe('weeklyQuests', () => {
         const allQ1 = [...s1.daily.quests, ...s1.weekly.quests];
         expect(allQ1.find(q => q.id === starQuest.id)?.progress).toBe(0);
 
-        await updateQuestProgress({
+        await updateQuestProgress({ isSolve: true,
           difficulty: 'MEDIUM',
           stars: 3,
           hintsUsed: 0,
@@ -331,7 +331,7 @@ describe('weeklyQuests', () => {
       const noHintQuest = allQuests.find(q => q.type === 'no_hints');
 
       if (noHintQuest) {
-        await updateQuestProgress({
+        await updateQuestProgress({ isSolve: true,
           difficulty: 'MEDIUM',
           stars: 2,
           hintsUsed: 2,
@@ -341,7 +341,7 @@ describe('weeklyQuests', () => {
         const allQ1 = [...s1.daily.quests, ...s1.weekly.quests];
         expect(allQ1.find(q => q.id === noHintQuest.id)?.progress).toBe(0);
 
-        await updateQuestProgress({
+        await updateQuestProgress({ isSolve: true,
           difficulty: 'MEDIUM',
           stars: 3,
           hintsUsed: 0,
@@ -360,7 +360,7 @@ describe('weeklyQuests', () => {
       const challengeQuest = allQuests.find(q => q.type === 'challenge_mode');
 
       if (challengeQuest) {
-        await updateQuestProgress({
+        await updateQuestProgress({ isSolve: true,
           difficulty: 'HARD',
           stars: 3,
           hintsUsed: 0,
@@ -371,7 +371,7 @@ describe('weeklyQuests', () => {
         const allQ1 = [...s1.daily.quests, ...s1.weekly.quests];
         expect(allQ1.find(q => q.id === challengeQuest.id)?.progress).toBe(0);
 
-        await updateQuestProgress({
+        await updateQuestProgress({ isSolve: true,
           difficulty: 'HARD',
           stars: 3,
           hintsUsed: 0,
@@ -391,7 +391,7 @@ describe('weeklyQuests', () => {
       const amberQuest = allQuests.find(q => q.type === 'earn_amber');
 
       if (amberQuest) {
-        await updateQuestProgress({
+        await updateQuestProgress({ isSolve: true,
           difficulty: 'MEDIUM',
           stars: 2,
           hintsUsed: 0,
@@ -408,7 +408,7 @@ describe('weeklyQuests', () => {
 
       // Complete many puzzles to trigger solve_count completion
       for (let i = 0; i < 5; i++) {
-        await updateQuestProgress({
+        await updateQuestProgress({ isSolve: true,
           difficulty: 'HARD',
           stars: 3,
           hintsUsed: 0,
@@ -430,7 +430,7 @@ describe('weeklyQuests', () => {
       const amberQuest = allQuests.find(q => q.type === 'earn_amber');
 
       if (amberQuest) {
-        await updateQuestProgress({
+        await updateQuestProgress({ isSolve: true,
           difficulty: 'MEDIUM',
           stars: 2,
           hintsUsed: 0,
@@ -443,7 +443,7 @@ describe('weeklyQuests', () => {
     });
 
     it('returns newly completed quests array', async () => {
-      const completed = await updateQuestProgress({
+      const completed = await updateQuestProgress({ isSolve: true,
         difficulty: 'HARD',
         stars: 3,
         hintsUsed: 0,
@@ -460,7 +460,7 @@ describe('weeklyQuests', () => {
     it('updates both daily and weekly quests simultaneously', async () => {
       await loadWeeklyQuests(0);
 
-      await updateQuestProgress({
+      await updateQuestProgress({ isSolve: true,
         difficulty: 'MEDIUM',
         stars: 3,
         hintsUsed: 0,
@@ -485,7 +485,7 @@ describe('weeklyQuests', () => {
       await loadWeeklyQuests(0);
 
       // Complete a bunch to trigger a daily solve_count
-      await updateQuestProgress({
+      await updateQuestProgress({ isSolve: true,
         difficulty: 'HARD',
         stars: 3,
         hintsUsed: 0,
@@ -511,7 +511,7 @@ describe('weeklyQuests', () => {
 
     it('returns null for already claimed quest', async () => {
       await loadWeeklyQuests(0);
-      await updateQuestProgress({
+      await updateQuestProgress({ isSolve: true,
         difficulty: 'HARD',
         stars: 3,
         hintsUsed: 0,
@@ -586,7 +586,7 @@ describe('weeklyQuests', () => {
 
     it('returns amber sum for completed unclaimed quests across both tiers', async () => {
       await loadWeeklyQuests(0, unlockedQuestContext);
-      await updateQuestProgress({
+      await updateQuestProgress({ isSolve: true,
         difficulty: 'HARD',
         stars: 3,
         hintsUsed: 0,
@@ -682,7 +682,7 @@ describe('weeklyQuests', () => {
       const visitQuest = allQuests.find(q => q.type === 'visit_animals');
 
       if (visitQuest) {
-        await updateQuestProgress({
+        await updateQuestProgress({ isSolve: true,
           difficulty: 'MEDIUM',
           stars: 2,
           hintsUsed: 0,
@@ -703,7 +703,7 @@ describe('weeklyQuests', () => {
       const streakQuest = allQuests.find(q => q.type === 'streak_days');
 
       if (streakQuest) {
-        await updateQuestProgress({
+        await updateQuestProgress({ isSolve: true,
           difficulty: 'MEDIUM',
           stars: 2,
           hintsUsed: 0,
@@ -759,7 +759,7 @@ describe('weeklyQuests', () => {
       const sacrificeQuest = allQuests.find(q => q.type === 'sacrifice_amber');
       if (!sacrificeQuest) return; // Skip if not randomly generated
 
-      await updateQuestProgress({
+      await updateQuestProgress({ isSolve: true,
         difficulty: 'MEDIUM' as any,
         stars: 3,
         hintsUsed: 0,
@@ -929,7 +929,7 @@ describe('weeklyQuests', () => {
       await loadWeeklyQuests(0);
 
       // Complete a quest
-      await updateQuestProgress({
+      await updateQuestProgress({ isSolve: true,
         difficulty: 'HARD',
         stars: 3,
         hintsUsed: 0,
@@ -994,7 +994,7 @@ describe('weeklyQuests', () => {
       // Day rolls over mid-session; the first quest-touching action is a
       // context-LESS puzzle completion.
       jest.setSystemTime(new Date(2026, 5, 11, 0, 5, 0));
-      await updateQuestProgress({ difficulty: 'EASY', stars: 3, hintsUsed: 0, amberEarned: 8 }, 0);
+      await updateQuestProgress({ isSolve: true, difficulty: 'EASY', stars: 3, hintsUsed: 0, amberEarned: 8 }, 0);
 
       const state = await loadWeeklyQuests(0);
       expect(state.daily.periodId).toBe('2026-06-11');
@@ -1013,7 +1013,7 @@ describe('weeklyQuests', () => {
       invalidateQuestCache();
 
       jest.setSystemTime(new Date(2026, 5, 11, 0, 5, 0));
-      await updateQuestProgress({ difficulty: 'EASY', stars: 3, hintsUsed: 0, amberEarned: 8 }, 0);
+      await updateQuestProgress({ isSolve: true, difficulty: 'EASY', stars: 3, hintsUsed: 0, amberEarned: 8 }, 0);
 
       const state = await loadWeeklyQuests(0);
       expect(state.daily.periodId).toBe('2026-06-11');
@@ -1031,7 +1031,7 @@ describe('weeklyQuests', () => {
       // tier also regenerates context-less at least once.
       for (let day = 11; day <= 24; day++) {
         jest.setSystemTime(new Date(2026, 5, day, 9, 0, 0));
-        await updateQuestProgress({ difficulty: 'EASY', stars: 3, hintsUsed: 0, amberEarned: 8 }, 0);
+        await updateQuestProgress({ isSolve: true, difficulty: 'EASY', stars: 3, hintsUsed: 0, amberEarned: 8 }, 0);
         const state = await loadWeeklyQuests(0);
         expectNoImpossibleQuests([...state.daily.quests, ...state.weekly.quests]);
       }
@@ -1085,7 +1085,7 @@ describe('weeklyQuests', () => {
 
     it('updateQuestProgress no-ops while gated', async () => {
       await loadWeeklyQuests(0, preJournalContext);
-      const completed = await updateQuestProgress({
+      const completed = await updateQuestProgress({ isSolve: true,
         difficulty: 'HARD', stars: 3, hintsUsed: 0, isChallenge: true, amberEarned: 500,
       }, 0);
       expect(completed).toEqual([]);
@@ -1147,7 +1147,7 @@ describe('weeklyQuests', () => {
 
       if (mpQuest) {
         // HARD should count
-        await updateQuestProgress({
+        await updateQuestProgress({ isSolve: true,
           difficulty: 'HARD',
           stars: 3,
           hintsUsed: 0,
@@ -1233,7 +1233,7 @@ describe('weeklyQuests', () => {
       expect(eq).toBeDefined();
 
       for (let i = 0; i < EVENT_QUEST_TARGET; i++) {
-        await updateQuestProgress({
+        await updateQuestProgress({ isSolve: true,
           difficulty: 'MEDIUM', stars: 2, hintsUsed: 1, amberEarned: 10,
         }, 0);
       }
@@ -1271,5 +1271,114 @@ describe('weeklyQuests', () => {
       // Same period — activation replaces the placeholder in place.
       expect(activated.daily.periodId).toBe(gated.daily.periodId);
     });
+  });
+});
+
+/**
+ * Two defects that lived in updateQuestProgress's shared shape.
+ */
+describe('updateQuestProgress only counts what its event actually evidences', () => {
+  const ctx = {
+    puzzlesSolved: 25,
+    unlockedAnimalCount: 4,
+    dailyUnlocked: false,
+    challengeUnlocked: true,
+    unlockedVariants: ['standard', 'reverse', 'double_shift'],
+  };
+
+  beforeEach(async () => {
+    await AsyncStorage.clear();
+    invalidateQuestCache();
+  });
+
+  // Seeded directly rather than drawn from the pool: whether a generated set
+  // contains a solve_count quest depends on the period seed, so a pool draw
+  // makes this assertion pass or fail by calendar date.
+  async function seedSolveCountQuest(): Promise<void> {
+    const quest = {
+      id: 'probe_solve_count',
+      type: 'solve_count' as const,
+      tier: 'weekly' as const,
+      title: 'Complete 30 puzzles this week',
+      description: 'Complete 30 puzzles this week',
+      target: 30,
+      progress: 0,
+      completed: false,
+      claimed: false,
+      rewardAmber: 140,
+    };
+    await AsyncStorage.setItem(
+      'wordshift_weekly_quests',
+      JSON.stringify({ periodId: getWeekId(), tier: 'weekly', quests: [quest], animalsVisitedThisPeriod: [] }),
+    );
+    await AsyncStorage.setItem(
+      'wordshift_daily_quests',
+      JSON.stringify({ periodId: getDayId(), tier: 'daily', quests: [], animalsVisitedThisPeriod: [] }),
+    );
+    invalidateQuestCache();
+  }
+
+  it('an amber offering does not advance a "complete N puzzles" quest', async () => {
+    // The altar and the Tending Shrine share this handler. solve_count used to
+    // increment unconditionally, so 30 taps of the 5-amber chip could claim the
+    // biggest weekly quest with no board played — and at the Phase-4 2.0x
+    // multiplier that turned a rite contractually worth nothing into +130 amber.
+    await seedSolveCountQuest();
+
+    await updateQuestProgress({ amberSacrificed: 5 }, 4);
+    await updateQuestProgress({ amberTended: 120 }, 4);
+
+    const after = await loadWeeklyQuests(4);
+    expect(after.weekly.quests.find(q => q.id === 'probe_solve_count')!.progress).toBe(0);
+  });
+
+  it('a real solve still advances it', async () => {
+    await seedSolveCountQuest();
+    await updateQuestProgress({ isSolve: true, difficulty: 'MEDIUM', stars: 2, hintsUsed: 1 }, 0);
+    const after = await loadWeeklyQuests(0);
+    expect(after.weekly.quests.find(q => q.id === 'probe_solve_count')!.progress).toBe(1);
+  });
+
+  it('the first victory of a fresh install mints the DORMANT set, not an impossible one', async () => {
+    // The cold open means HomeScreen never mounts before the first win, so this
+    // victory was the first thing to touch the service — with no context, the
+    // dormancy gate could not fire and unlockedAnimalCount defaulted to 10,
+    // putting "talk to 6/9 animals" in a set for a player who had met nobody.
+    await updateQuestProgress(
+      { isSolve: true, difficulty: 'EASY', stars: 3, hintsUsed: 0 },
+      0,
+      { puzzlesSolved: 1, unlockedAnimalCount: 0, dailyUnlocked: false, challengeUnlocked: false, unlockedVariants: [] },
+    );
+    const state = await loadWeeklyQuests(0);
+    expect(state.daily.gatedInactive).toBe(true);
+    expect(state.weekly.gatedInactive).toBe(true);
+    expect([...state.daily.quests, ...state.weekly.quests]
+      .some(q => q.type === 'visit_animals')).toBe(false);
+  });
+});
+
+/**
+ * getWeekId measured its ISO-week span by subtracting two local midnights, so a
+ * DST transition between Jan 1 and the week's Thursday shifted it by an hour
+ * and `ceil` promoted that to a whole week. Southern-hemisphere only, and only
+ * in years whose Jan 1 is a Friday: from the April fall-back to the October
+ * spring-forward every id ran one high, then snapped back — so the snap week
+ * repeated the previous week's id and the weekly tier never reset.
+ */
+describe('getWeekId is DST-proof', () => {
+  it('does not repeat an id across the southern spring-forward (Sydney, 2027)', () => {
+    const sep27 = getWeekId(new Date(2027, 8, 27, 12));
+    const oct04 = getWeekId(new Date(2027, 9, 4, 12));
+    expect(sep27).not.toBe(oct04);
+    // ...and the week that follows still holds together end to end.
+    expect(getWeekId(new Date(2027, 9, 10, 12))).toBe(oct04);
+  });
+
+  it('assigns consecutive Mondays consecutive ids across a whole Jan-1-Friday year', () => {
+    const seen: string[] = [];
+    for (let d = new Date(2027, 0, 4); d.getFullYear() === 2027; d.setDate(d.getDate() + 7)) {
+      seen.push(getWeekId(new Date(d)));
+    }
+    expect(new Set(seen).size).toBe(seen.length);
   });
 });

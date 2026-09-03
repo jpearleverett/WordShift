@@ -24,6 +24,12 @@ import { invalidateNarrativeDeliveryCache } from './dialogue/animalDialogueNarra
 import { invalidateMicroBeatCaches } from './phaseNarrative';
 import { invalidateSupporterCache } from './supporterStipend';
 import { invalidateSeasonPassCache } from './seasonPass';
+import { invalidateAchievementsCache } from './achievements';
+import { invalidateOnboardingCache } from './onboarding';
+import { invalidateNotificationCaches } from './notifications';
+import { invalidatePlayedPuzzleCaches } from './puzzleBank';
+import { initHints } from './hints';
+import { initCosmetics } from './cosmetics';
 
 /**
  * Cloud save infrastructure for WordShift.
@@ -168,7 +174,25 @@ export const SYNC_KEYS = [
  * one `wordshift_played_*` key per bank; without them a restore on a new
  * device forgets which bank puzzles were played and repeats them).
  */
-export const SYNC_KEY_PREFIXES = ['wordshift_played_'];
+export const SYNC_KEY_PREFIXES = [
+  'wordshift_played_',
+  // The four `wordshift_guaranteed_crossref_phase_N` flags (amberCurrency)
+  // mark the once-per-phase forced cross-animal reference as delivered. They
+  // are built as template literals, so the storage-key guard's literal scan
+  // could not see them and they were never registered anywhere: after a
+  // restore, a mid-game player was served that once-per-phase beat again for
+  // every phase already passed. Same class as wordshift_first_win_glitch
+  // below, which is exactly what that guard was added to prevent.
+  'wordshift_guaranteed_crossref_phase_',
+];
+
+/**
+ * Mirrored from SettingsScreen rather than imported: a service must not import
+ * from a component (import cycle). SettingsScreen owns the write; this file
+ * only reads it. Deliberately unsynced and deliberately survives Reset All —
+ * see its entry in storageKeyRegistry.test.ts.
+ */
+const LOCAL_RESET_MARKER_KEY = 'wordshift_local_reset_at';
 
 const SYNC_STATUS_KEY = 'wordshift_cloud_sync_status';
 const CURRENT_SAVE_VERSION = 1;
@@ -384,16 +408,64 @@ export async function getOrCreateRecoveryCode(): Promise<string> {
 }
 
 /**
+ * The owner id a DISPLAYED recovery code refers to.
+ *
+ * `formatRecoveryCode` prepends a literal "WS" for readability, and the code we
+ * hand the player is what they type back. Normalizing alone kept that prefix,
+ * so a typed "WS-3F2A-1B4C" resolved to owner "WS3F2A1B4C" while the device
+ * that showed it had uploaded under "3F2A1B4C" — the code could never address
+ * its own save, and re-showing it on the linked device drifted again to
+ * "WS-WSIN-ST9F". Strip the prefix here and run the remainder through the same
+ * `deriveRecoveryBody` the display side uses, so both ends land on the
+ * identical canonical body.
+ *
+ * Deliberately NOT folded into `normalizeRecoveryCode`: that helper also runs
+ * inside `deriveRecoveryBody` over arbitrary owner ids, and stripping there
+ * would change the body of any owner that merely happens to start with "WS".
+ */
+function ownerFromRecoveryCode(raw: string): string {
+  const cleaned = normalizeRecoveryCode(raw);
+  const body = cleaned.startsWith('WS') && cleaned.length >= 10 ? cleaned.slice(2) : cleaned;
+  return deriveRecoveryBody(body);
+}
+
+/** The owner a PRE-FIX build would have stored for this code (see below). */
+function legacyOwnerFromRecoveryCode(raw: string): string {
+  return normalizeRecoveryCode(raw);
+}
+
+/**
  * Link a recovery code entered by the player: validate/normalize and store it
  * as the cloud owner override, so subsequent owner resolution uses it. After
  * linking, call downloadFromCloud() (or maybeAutoRestoreOnFreshInstall) to pull
  * the linked save. Returns false for clearly-invalid input.
+ *
+ * Compatibility: a device that linked on a pre-fix build uploaded under the
+ * un-stripped owner, so those rows would be unreachable from the corrected id.
+ * When the canonical owner holds no row, fall back once to the legacy id and
+ * adopt whichever one actually has a save.
  */
 export async function linkRecoveryCode(code: string): Promise<boolean> {
   const canonical = normalizeRecoveryCode(code);
   if (canonical.length < 8) return false;
+  const owner = ownerFromRecoveryCode(code);
   try {
-    await AsyncStorage.setItem(CLOUD_OWNER_KEY, canonical);
+    await AsyncStorage.setItem(CLOUD_OWNER_KEY, owner);
+    const legacy = legacyOwnerFromRecoveryCode(code);
+    if (legacy !== owner) {
+      try {
+        if (!(await provider.download())) {
+          await AsyncStorage.setItem(CLOUD_OWNER_KEY, legacy);
+          if (!(await provider.download())) {
+            // Neither holds a row; keep the canonical id so this device's own
+            // future uploads land where the code says they should.
+            await AsyncStorage.setItem(CLOUD_OWNER_KEY, owner);
+          }
+        }
+      } catch {
+        await AsyncStorage.setItem(CLOUD_OWNER_KEY, owner);
+      }
+    }
     return true;
   } catch {
     return false;
@@ -415,6 +487,21 @@ export async function maybeAutoRestoreOnFreshInstall(): Promise<boolean> {
 
     const cloudData = await provider.download();
     if (!cloudData) return false;
+
+    // A deliberate Reset All must not be undone by the next launch. Reset
+    // overwrites the cloud row with the cleared state, but when that upload
+    // fails (offline is the ordinary case — the player resets, closes the app,
+    // and relaunches on a plane) the stale pre-reset row is still up there, the
+    // local sentinel is gone, and this path restores everything they just
+    // erased. Refuse any row written at or before the reset stamp; a genuinely
+    // NEWER save from another device has timestamp > marker and still restores.
+    //
+    // Only here. downloadFromCloud, linkRecoveryCode and the conflict banner's
+    // "use the newer save" are explicit player choices and stay unblocked.
+    try {
+      const resetAt = Number((await AsyncStorage.getItem(LOCAL_RESET_MARKER_KEY)) ?? 0);
+      if (resetAt > 0 && (cloudData.timestamp ?? 0) <= resetAt) return false;
+    } catch {}
 
     const restored = await restoreFromCloudData(cloudData);
     if (restored) {
@@ -463,6 +550,18 @@ function invalidateRestoredServiceCaches(): void {
   invalidateMicroBeatCaches();
   invalidateSupporterCache();
   invalidateSeasonPassCache();
+  // These four owned a synced key with a module cache and no invalidator at
+  // all, each with its own way of eating a restore: achievements re-unlocked
+  // and re-paid everything the other device had earned (and dropped the
+  // streak achievements, whose check() is a current-state predicate), the
+  // onboarding step put a restored player back into the first-run tutorial,
+  // the notification prefs wrote this device's switches back over the
+  // restored ones, and the per-bank played lists re-served boards the player
+  // had already solved.
+  invalidateAchievementsCache();
+  invalidateOnboardingCache();
+  invalidateNotificationCaches();
+  invalidatePlayedPuzzleCaches();
 }
 
 /**
@@ -536,19 +635,82 @@ export async function collectLocalSaveData(): Promise<CloudSaveData> {
 }
 
 /**
+ * Keys held back from the restore sweep below, each for its own reason.
+ *
+ * - `wordshift_schema_version`: also in SYNC_KEYS, but deleting it when an old
+ *   payload lacks it drops getSchemaVersion() to 0 and re-runs every migration
+ *   over the just-restored data. Survivable today, pointless risk always.
+ * - `wordshift_hints`: seed-on-init AND bought with real money. Removing it
+ *   would either leave the balance at zero or let initHints re-grant the free
+ *   starting stash (the `seededFree` flag lives in the very value being
+ *   removed). Keeping this device's hints through a restore is the kinder
+ *   failure by a wide margin.
+ */
+const RESTORE_SWEEP_EXEMPT = new Set(['wordshift_schema_version', 'wordshift_hints']);
+
+/**
  * Restore save data from a CloudSaveData object.
- * Overwrites all local data with cloud data. Writes every key present in the
- * payload, so prefix-synced keys (SYNC_KEY_PREFIXES) restore with no extra
- * handling.
+ *
+ * This is an OVERWRITE, and it now behaves like one. It used to only write the
+ * keys the payload happened to carry — and `collectLocalSaveData` skips any
+ * key the source device never wrote — so every synced key the restored save
+ * had no opinion about kept this device's value, and the player ended up
+ * running a hybrid of two saves. The visible costs were one-time narrative
+ * flags (a player restoring an EARLIER save kept micro_beats_seen from the
+ * discarded one and never saw those beats again) and, worst, the discarded
+ * device's abandoned mid-puzzle board surviving as the restored save's
+ * resumable autosave. So: sweep the synced keys the payload omits, then write.
+ *
+ * `invalidateRestoredServiceCaches()` runs AFTER both, which is what makes the
+ * sweep safe — puzzleSaveState's own cache is dropped there, so the discarded
+ * board cannot be re-persisted by the next autosave write.
  */
 export async function restoreFromCloudData(cloudData: CloudSaveData): Promise<boolean> {
   try {
     const entries = Object.entries(cloudData.data);
+    const incoming = new Set(Object.keys(cloudData.data));
+
+    // Sweep: every locally-present synced key the payload does not carry.
+    // The prefix families are enumerated off the real stored keys (they have
+    // no fixed list), and the excluded device/store keys are never touched
+    // because they are not in SYNC_KEYS or the prefixes to begin with.
+    try {
+      const localKeys = await AsyncStorage.getAllKeys();
+      const stale = localKeys.filter(
+        key =>
+          !incoming.has(key) &&
+          !RESTORE_SWEEP_EXEMPT.has(key) &&
+          (SYNC_KEYS.includes(key) || SYNC_KEY_PREFIXES.some(prefix => key.startsWith(prefix))),
+      );
+      if (stale.length > 0) {
+        await AsyncStorage.multiRemove(stale);
+      }
+    } catch {
+      // A failed sweep must not abort the restore — a hybrid save is still
+      // better than no restore.
+    }
+
     // Write all keys from cloud data
     for (const [key, value] of entries) {
       await AsyncStorage.setItem(key, value);
     }
     invalidateRestoredServiceCaches();
+
+    // Re-warm the two services whose caches are RENDER-PATH MIRRORS rather
+    // than lazily-reloaded values. Every other invalidator above nulls a cache
+    // that the next async read refills; these two do not have such a read on
+    // any live path. hints' mirror is zeroed on invalidation (the safe side —
+    // a stale mirror would let a player overspend), so without this the HINT
+    // button read 0 and offered to sell hints the player had just restored;
+    // cosmetics' mirror feeds colors.ts and Confetti synchronously, so without
+    // this every purchased tile theme, finish, confetti palette and move spark
+    // reverted to defaults for the rest of the session while the Shop still
+    // said "Equipped". Awaited here, at the one boundary that knows a restore
+    // landed, because the recovery-code path never calls back into App at all.
+    await Promise.all([
+      initHints().catch(() => {}),
+      initCosmetics().catch(() => {}),
+    ]);
     return true;
   } catch {
     return false;
@@ -609,6 +771,16 @@ export async function uploadToCloud(force: boolean = false): Promise<boolean> {
 
   const saveData = await collectLocalSaveData();
   const success = await provider.upload(saveData);
+
+  // Any successful upload retires the reset marker: the cloud row is now this
+  // device's own state, so there is nothing left for the auto-restore guard to
+  // protect against. Clearing it here (not only on the reset's own upload)
+  // covers the offline reset whose first successful sync comes later.
+  if (success) {
+    try {
+      await AsyncStorage.removeItem(LOCAL_RESET_MARKER_KEY);
+    } catch {}
+  }
 
   await updateSyncStatus(success);
   return success;

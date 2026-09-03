@@ -233,8 +233,11 @@ describe('difficulty chip fallback (blank-pill regression)', () => {
     expect(APP_TSX).toMatch(/const diff = normalizeDifficulty\(difficulty \|\| puzzle\.difficulty\)/);
     // ...and a saved board whose difficulty is outside the union is discarded
     // instead of restored (restore would poison state + retained preference).
+    // The chain also rejects an expiring speed save now (a board with a second
+    // left is a loss about to happen, not a board), so the difficulty check is
+    // pinned as the LAST clause rather than as an exact chain.
     expect(APP_TSX).toMatch(
-      /saved\.gameState === 'PLAYING' && !saved\.isPlayingDaily && isValidDifficulty\(saved\.difficulty\)/,
+      /saved\.gameState === 'PLAYING' && !saved\.isPlayingDaily && [^\n]*isValidDifficulty\(saved\.difficulty\)/,
     );
   });
 });

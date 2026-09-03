@@ -22,6 +22,16 @@ export interface SavedPuzzleState {
   history: MoveDelta[];
   invalidAttempts: number;
   hintsUsed: number;
+  /** Undos SPENT on this board so far. Optional because it is newer than the
+   *  save shape and puzzleSaveState carries no schema version, so a pre-fix row
+   *  legitimately has no value (restore falls through to 0 — identical to the
+   *  old behaviour, no migration needed). It rides here because it is the third
+   *  input to the Flawless tier alongside invalidAttempts and hintsUsed, and it
+   *  was the only one of the three that did NOT survive a kill: a player who
+   *  undid, force-quit and resumed finished credited with a Flawless Offering
+   *  (ribbon, lifetime flawlessCount, the flawless achievements) on a board
+   *  that was not flawless. */
+  undosUsed?: number;
   undosRemaining: number;
   difficulty: Difficulty;
   currentWordLength: number;

@@ -115,6 +115,7 @@ jest.mock('../services/dialogueSession', () => ({
   getSession: jest.fn(() => null),
   getSessionStatus: jest.fn(() => ({ status: 'in_session', dialoguesRemaining: 5 })),
   isOnCooldown: jest.fn(() => false),
+  updateSessionPhase: jest.fn(),
 }));
 
 jest.mock('../services/amberCurrency', () => ({
@@ -138,7 +139,8 @@ jest.mock('../services/dialogueChoices', () => ({
   getChoiceForAnimal: jest.fn(async () => null),
   recordChoice: jest.fn(async () => ({ response: 'response', convergence: 'convergence' })),
   loadChoiceState: jest.fn(async () => ({ choices: {} })),
-  getAndMarkPhase4CallbackPage: jest.fn(async () => null),
+  getPhase4CallbackPage: jest.fn(async () => null),
+  markPhase4CallbackShown: jest.fn(async () => {}),
 }));
 
 jest.mock('../services/whisperGallery', () => ({

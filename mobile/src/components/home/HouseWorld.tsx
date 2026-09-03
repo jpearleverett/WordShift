@@ -23,6 +23,7 @@ import { RoomView, computeEmbellishmentIntensity } from './RoomView';
 import { CandyColors } from '../../theme/colors';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { isOnCooldown, getSessionStatus } from '../../services/dialogueSession';
+import { isUnlockGateBlocked } from '../../services/homeWorldData';
 import {
   clampHomeScenePanY,
   resolveHomeScenePanRestore,
@@ -1628,6 +1629,14 @@ interface HouseWorldProps {
   deepenedRooms?: Record<string, number>;
   /** Tier-3 attunement roomId → level reached 1..3 (level-0 rooms omitted). */
   attunedRooms?: Record<string, number>;
+  /**
+   * The reservation and the level gate, so the in-world room card can stop
+   * inviting a tap it cannot honour. Without these it advertised a build price
+   * for rooms that were already paid for at reserve time, or still gate-locked.
+   */
+  reservedUnlockId?: string | null;
+  puzzlesSolved?: number;
+  phaseProgress?: number;
   savedPanY?: number | null;
   onPanYChange?: (panY: number) => void;
   /** Tapping the in-world pit entrance opens the Offering Pit. */
@@ -1658,6 +1667,9 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   purchasedUpgrades = {},
   deepenedRooms = {},
   attunedRooms = {},
+  reservedUnlockId = null,
+  puzzlesSolved = 0,
+  phaseProgress,
   savedPanY = null,
   onPanYChange,
   onPitPress,
@@ -2315,9 +2327,10 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                   {/* Render rooms from top to bottom (highest row number first) */}
                   {sortedRooms.map((room, index) => {
                     const roomAnimal = getAnimalForRoom(room.id);
-                    const roomUnlockCost = (!room.isUnlocked && nextUnlock?.type === 'room' && nextUnlock.targetId === room.id)
-                      ? nextUnlock.cost
-                      : null;
+                    const isNextRoom = !room.isUnlocked
+                      && nextUnlock?.type === 'room'
+                      && nextUnlock.targetId === room.id;
+                    const roomUnlockCost = isNextRoom ? nextUnlock!.cost : null;
                     const inviteCost = (room.isUnlocked
                       && roomAnimal
                       && !roomAnimal.isUnlocked
@@ -2348,6 +2361,16 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                             )}
                             ritualWords={ritualWords}
                             unlockCost={roomUnlockCost}
+                            isReserved={isNextRoom && reservedUnlockId === nextUnlock!.id}
+                            // The SHARED predicate, not a re-derived
+                            // `minPuzzles !== undefined && solved < minPuzzles`:
+                            // that inline form is exactly the disagreement that
+                            // let this card invite a tap on a room
+                            // isUnlockAvailable refuses (it also misses the
+                            // descent-trio phase hold).
+                            gateBlocked={isNextRoom && isUnlockGateBlocked(nextUnlock, { puzzlesSolved, phaseProgress })}
+                            gateMinPuzzles={isNextRoom ? nextUnlock!.minPuzzles : undefined}
+                            puzzlesSolved={puzzlesSolved}
                             amberBalance={amberBalance}
                             inviteCost={inviteCost}
                             suppressInviteChip={suppressInviteChips}

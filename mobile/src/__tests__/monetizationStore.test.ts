@@ -336,4 +336,29 @@ describe('daily free-amber grant honors the recorded claim (no Patron over-grant
     expect(card.indexOf('RewardedAdButton', gateIdx)).toBeGreaterThan(gateIdx);
     expect(card).toContain('Collected for today. Come back tomorrow!');
   });
+
+  it('the copy is cap-aware, and the cap branch never applies to Patrons', () => {
+    const src = readComponent('StoreModal.tsx');
+    // The faucet's 2/day counter and the SHARED 8/day rewarded cap are
+    // independent, and RewardedAdButton hides itself at the shared cap — so a
+    // faucet claim still owed past 8 views rendered "Watch a short clip. N left
+    // today." beside nothing tappable. The cap has to be read (async, so it is
+    // held as state, never called during render) and stated in the copy.
+    expect(src).toContain('isRewardedCapReached');
+    expect(src).not.toMatch(/\{\s*isRewardedCapReached\(\)/); // never inline in JSX
+
+    const start = src.indexOf('{amberFaucet && (isPatronSync() || isAdsReady())');
+    const end = src.indexOf(']}>AMBER</Text>', start);
+    const card = src.slice(start, end);
+    // Patrons never watch an ad for this (handleClaimDailyAmber grants direct),
+    // so an ungated cap branch would withhold a claim they can still make.
+    expect(card).toMatch(/!isPatronSync\(\) && rewardedCapReached/);
+
+    // The cap state is refreshed on modal open AND after a claim (a claim
+    // itself spends a rewarded view, so claim #2 at count 7 would otherwise
+    // land back in the same contradiction).
+    const claimStart = src.indexOf('const handleClaimDailyAmber');
+    const claimEnd = src.indexOf('const handleBuyConsumable');
+    expect(src.slice(claimStart, claimEnd)).toContain('isRewardedCapReached()');
+  });
 });

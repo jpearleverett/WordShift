@@ -166,6 +166,10 @@ export function isVariantUnlocked(
 ): boolean {
   if (variant === 'standard') return true;
   const req = VARIANT_UNLOCK_REQUIREMENTS[variant];
+  // A retired or corrupt key has no requirement. Report it LOCKED rather than
+  // throwing on `req.puzzlesSolved`: App's clamp effect then self-heals the
+  // value to 'standard' instead of taking the whole tree down with it.
+  if (!req) return false;
   return puzzlesSolved >= req.puzzlesSolved && currentPhase >= req.minDepthPhase;
 }
 
@@ -350,7 +354,11 @@ export function getVariantDescription(config: VariantConfig, phase: number): str
 /**
  * Get the first-instruction text for a variant.
  */
-export function getVariantInstruction(config: VariantConfig, phase: number): string {
+export function getVariantInstruction(config: VariantConfig | undefined, phase: number): string {
+  // Tolerates a missing config for the same reason isVariantUnlocked tolerates
+  // a missing requirement: a board served under a retired key must degrade to
+  // the standard rules, never throw on the board-start path.
+  if (!config) return VARIANT_CONFIGS.standard[phase >= 3 ? 'darkInstruction' : 'instruction'];
   return phase >= 3 ? config.darkInstruction : config.instruction;
 }
 

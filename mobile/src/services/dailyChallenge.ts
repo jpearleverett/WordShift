@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Difficulty, PuzzleSolutionStep } from '../types';
 import { DAILY_CHALLENGE_UNLOCK_PUZZLES, FIRST_DAILY_BONUS_HINTS } from '../constants/gameBalance';
-import { generateLocalPuzzle } from './localGenerator';
+import { selectDailyBankPuzzle } from './puzzleBank';
 import { getLocalDateString, getLocalDateStringDaysAgo, daysAgoLocal, parseLocalDate } from './dateUtils';
 import { addHints } from './hints';
 
@@ -61,6 +61,19 @@ let progressCache: DailyChallengeProgress | null = null;
  */
 export function invalidateDailyProgressCache(): void {
   progressCache = null;
+  // The RESOLVED board goes too. It embeds the `eased` decision, which is made
+  // from totalCompleted at generation time — so a device that had already
+  // pre-warmed today's board as a first-ever daily kept serving the gentle
+  // beginner shape to the veteran save that had just been restored over it,
+  // and App skips the leaderboard submission for any eased board, so that
+  // day's result was silently withheld from the standing.
+  //
+  // Only the resolved value. `dailyGenerationInProgress` is deliberately left
+  // alone: it is a single-flight guard, and tearing it down mid-flight lets a
+  // second generation start against the first's state. The epoch below is what
+  // stops an in-flight result from landing in the cache after this point.
+  dailyPuzzleCache = null;
+  dailyCacheEpoch++;
 }
 
 function getDefaultProgress(): DailyChallengeProgress {
@@ -332,34 +345,61 @@ export interface DailyPuzzleData {
   eased?: boolean;
 }
 
-// Guard against concurrent daily puzzle generation
+// Guard against concurrent daily puzzle resolution
 let dailyGenerationInProgress: Promise<DailyPuzzleData> | null = null;
 
-// Resolved-puzzle cache, keyed by local day. Lets a pre-warm at launch
-// make the daily appear instantly on tap (the seeded 6-letter / 5-row
-// generation can take a beat on low-end devices).
+// Resolved-puzzle cache, keyed by local day.
 let dailyPuzzleCache: DailyPuzzleData | null = null;
+// Bumped by invalidateDailyProgressCache: a resolution that started before an
+// invalidation must not write its (now stale-shaped) result into the cache.
+let dailyCacheEpoch = 0;
 
 /**
- * Generate the daily challenge puzzle
- * Uses the date as a seed so all players get the same puzzle.
- * Temporarily replaces Math.random with a seeded PRNG during generation.
- * Guarded against concurrent calls — subsequent callers await the first generation.
- * Memoized per local day — a same-day repeat call returns the cached result.
+ * The bank whose boards match a given day's SHAPE. The ramp asks for a
+ * word length and a row count; the shipped standard banks are exactly those
+ * shapes, so the map is a shape lookup, not a difficulty one — Wednesday's
+ * "MEDIUM_PLUS, 5 letters, 5 rows" is served from the 5-letter/5-row HARD
+ * bank because that is the board the ramp describes. The ramp's own
+ * `difficulty` label rides on unchanged for copy and telemetry (the daily
+ * always pays HARD regardless).
+ */
+function bankForDailyShape(wordLength: number, targetRows: number): Difficulty {
+  if (wordLength >= 6) return 'EXPERT';        // 6-letter / 5-row (Sunday peak)
+  if (wordLength <= 4) return 'MEDIUM';        // 4-letter / 4-row (Monday, and the eased first daily)
+  return targetRows >= 5 ? 'HARD' : 'MEDIUM_PLUS'; // 5-letter: 5 rows vs 4
+}
+
+/**
+ * Resolve the day's Daily Challenge board.
+ *
+ * Deterministic by DATE and nothing else: a date-seeded PRNG picks an index
+ * out of the shipped standard bank matching the day's shape
+ * (selectDailyBankPuzzle). It used to generate on device under a global
+ * Math.random override held across an await-heavy, wall-clock-bounded search
+ * that also read the player's own word history and dread phase — which meant
+ * the "shared" board was in truth a different board per device, while the
+ * share grid, the streak copy and the leaderboard all asserted otherwise. The
+ * bank was already sitting there, identical on every install; picking from it
+ * is the whole fix, and it costs no wait at all.
+ *
+ * Guarded against concurrent calls — subsequent callers await the first
+ * resolution. Memoized per local day; a same-day repeat call returns the
+ * cached result.
  */
 export async function generateDailyPuzzle(): Promise<DailyPuzzleData> {
   const today = getTodayString();
 
-  // Return today's already-generated puzzle instantly.
+  // Return today's already-resolved puzzle instantly.
   if (dailyPuzzleCache && dailyPuzzleCache.date === today) {
     return dailyPuzzleCache;
   }
 
-  // If generation is already in progress, await the existing result
+  // If resolution is already in progress, await the existing result
   if (dailyGenerationInProgress) {
     return dailyGenerationInProgress;
   }
 
+  const epochAtStart = dailyCacheEpoch;
   const generationPromise = (async () => {
     // A player's very first daily is eased to the gentle MEDIUM 4/4 board (see
     // getDailyRamp). The seed is unchanged, so the eased board is still
@@ -369,31 +409,38 @@ export async function generateDailyPuzzle(): Promise<DailyPuzzleData> {
     const eased = isFirstDailyEasing(progress);
     const ramp = getDailyRamp(today, eased);
     const difficulty = ramp.difficulty;
+    // One draw off the date-seeded stream. Math.random is never touched.
     const rng = seededRandom(`wordshift-daily-${today}`);
-
-    // Temporarily override Math.random for deterministic generation
-    const originalRandom = Math.random;
-    Math.random = rng;
+    const roll = rng();
 
     try {
-      // Board shape ramps across the week (see getDailyRamp).
-      const puzzle = await generateLocalPuzzle(difficulty, {
-        wordLength: ramp.wordLength,
-        targetRows: ramp.targetRows,
-      });
+      const board =
+        selectDailyBankPuzzle(bankForDailyShape(ramp.wordLength, ramp.targetRows), roll) ??
+        // Shipped banks are never empty, so this is belt and braces only: fall
+        // back to the gentlest shape rather than leaving the player with no
+        // daily at all.
+        selectDailyBankPuzzle('MEDIUM', roll);
+      if (!board) {
+        throw new Error('No daily board available');
+      }
       const result: DailyPuzzleData = {
-        words: puzzle.words,
-        hint: puzzle.hint,
-        solution: puzzle.solution,
+        words: board.words,
+        hint: board.hint,
+        solution: board.solution,
         difficulty,
         date: today,
-        wordLength: puzzle.wordLength ?? ramp.wordLength,
+        wordLength: board.wordLength ?? ramp.wordLength,
         eased,
       };
-      dailyPuzzleCache = result;
+      // A restore may have landed while this was resolving; that bumps the
+      // epoch, and the shape decision above is made from the pre-restore
+      // progress. Hand this caller its board, but do not let it become the
+      // day's cached answer.
+      if (epochAtStart === dailyCacheEpoch) {
+        dailyPuzzleCache = result;
+      }
       return result;
     } finally {
-      Math.random = originalRandom;
       dailyGenerationInProgress = null;
     }
   })();
@@ -403,10 +450,10 @@ export async function generateDailyPuzzle(): Promise<DailyPuzzleData> {
 }
 
 /**
- * Pre-generate today's daily puzzle in the background so it's ready instantly
- * when the player taps the Daily Challenge card. Safe to call repeatedly
- * (no-op once cached for the day) and fire-and-forget (errors are swallowed —
- * the on-tap path will retry and surface any real failure).
+ * Resolve today's daily board in the background so it's ready instantly when
+ * the player taps the Daily Challenge card. Safe to call repeatedly (no-op
+ * once cached for the day) and fire-and-forget (errors are swallowed — the
+ * on-tap path will retry and surface any real failure).
  */
 export function prewarmDailyPuzzle(): void {
   const today = getTodayString();
@@ -616,6 +663,7 @@ export async function clearDailyProgress(): Promise<void> {
   progressCache = getDefaultProgress();
   dailyPuzzleCache = null;
   dailyGenerationInProgress = null;
+  dailyCacheEpoch++;
   try {
     await AsyncStorage.removeItem(STORAGE_KEY);
   } catch {}

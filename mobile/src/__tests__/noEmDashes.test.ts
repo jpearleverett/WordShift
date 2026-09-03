@@ -50,6 +50,10 @@ import {
   UNLOCK_PROGRESSION,
   getReservedArrivalText,
   getReserveGateText,
+  getReservedSpeedUpNeedAmberText,
+  getReservedSpeedUpNotYetText,
+  getLockedRoomReasonText,
+  getNextUnlockMeterText,
 } from '../services/homeWorldData';
 import { ACHIEVEMENTS } from '../services/achievements';
 import { DAILY_QUEST_POOL, WEEKLY_QUEST_POOL } from '../services/weeklyQuests';
@@ -154,6 +158,13 @@ describe('no em/en dashes in player-facing text', () => {
     collectStrings(UNLOCK_PROGRESSION, strings);
     strings.push(getReservedArrivalText(42, 35), getReservedArrivalText(undefined, 35));
     strings.push(getReserveGateText(42, 35), getReserveGateText(undefined, 35));
+    strings.push(getReservedSpeedUpNeedAmberText(225), getReservedSpeedUpNotYetText());
+    strings.push(
+      getLockedRoomReasonText({ gated: true, canAfford: true }),
+      getLockedRoomReasonText({ gated: false, canAfford: false }),
+      getLockedRoomReasonText({ gated: false, canAfford: true }),
+    );
+    strings.push(getNextUnlockMeterText(84, 10));
     for (const a of ACHIEVEMENTS) strings.push(a.title, a.description);
     collectStrings(DAILY_QUEST_POOL, strings);
     collectStrings(WEEKLY_QUEST_POOL, strings);

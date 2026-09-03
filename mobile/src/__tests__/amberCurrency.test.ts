@@ -67,7 +67,7 @@ import {
   RESONANT_BOARD_CAP_AMBER,
   MILESTONE_BONUSES,
 } from '../constants/gameBalance';
-import { FIRST_COMPLETION_BONUS } from '../types/homeWorld';
+import { FIRST_COMPLETION_BONUS, checkMilestone, getMilestoneMessage } from '../types/homeWorld';
 import { getLocalDateStringDaysAgo } from '../services/dateUtils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -1501,5 +1501,46 @@ describe('journal intro tracking', () => {
     expect(await hasSeenJournalIntro()).toBe(true);
     await clearProgress();
     expect(await hasSeenJournalIntro()).toBe(false);
+  });
+});
+
+/**
+ * checkMilestone used to return a bare {amber, message, puzzles} literal, so
+ * the dark/dread variants were dropped before its only caller could reach
+ * them — and because both are OPTIONAL on the source type, the stripped object
+ * still satisfied getMilestoneMessage's parameter and TypeScript stayed quiet.
+ * Every milestone therefore spoke the bright copy at every phase, in dark
+ * styling, straight through the cult reveal.
+ */
+describe('milestone copy shifts with the phase (dead dread lines)', () => {
+  it('serves the dread line past the reveal', () => {
+    expect(checkMilestone(100, 96, 4 as never)?.message).toBe(
+      'The arrangement grows. One hundred offerings.'
+    );
+  });
+
+  it('serves the dark line in the deeper phases', () => {
+    // 50, not 25: milestone 25 fires below the Phase-2 floor of 28, so it can
+    // never actually show a divergence in play.
+    expect(checkMilestone(50, 25, 2 as never)?.message).toBe('The pattern takes shape.');
+  });
+
+  it('serves the bright line in the bright days, and when no phase is given', () => {
+    expect(checkMilestone(50, 25, 0 as never)?.message).toBe('Puzzle enthusiast!');
+    expect(checkMilestone(50, 25)?.message).toBe('Puzzle enthusiast!');
+  });
+
+  it('agrees with resolving the phase off the live table entry', () => {
+    // The regression in one line: if checkMilestone ever strips the variants
+    // again, its message stops matching what getMilestoneMessage would return
+    // for the same milestone and phase.
+    for (const phase of [0, 1, 2, 3, 4, 5] as const) {
+      const resolved = checkMilestone(100, 96, phase as never)!;
+      const fromTable = getMilestoneMessage(
+        MILESTONE_BONUSES.find(m => m.puzzles === 100)!,
+        phase as never
+      );
+      expect(resolved.message).toBe(fromTable);
+    }
   });
 });
