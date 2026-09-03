@@ -33,6 +33,13 @@ interface RewardedAdButtonProps {
   onReward: () => void;
   /** Button label, e.g. "Tend the offering for bonus amber". */
   label: string;
+  /**
+   * Screen-reader label, when the visible one is too terse to stand alone.
+   * Defaults to `label`. The Store's faucet row shows a bare "Watch" because
+   * the amount sits beside it on the row's value rail, but a reader hitting the
+   * button on its own still needs to be told what the tap earns.
+   */
+  accessibilityLabel?: string;
   /** Narrative phase, for tasteful phase-aware tinting. */
   phase: number;
   /**
@@ -75,6 +82,7 @@ export const RewardedAdButton: React.FC<RewardedAdButtonProps> = ({
   placement,
   onReward,
   label,
+  accessibilityLabel,
   phase,
   surface = 'auto',
   showWhenUnavailable = false,
@@ -182,7 +190,7 @@ export const RewardedAdButton: React.FC<RewardedAdButtonProps> = ({
       disabled={disabled}
       accessibilityRole="button"
       accessibilityState={{ disabled }}
-      accessibilityLabel={label}
+      accessibilityLabel={accessibilityLabel ?? label}
     >
       {busy ? (
         // Branded tap->ad handoff: keep the play glyph, name what's happening
@@ -191,7 +199,11 @@ export const RewardedAdButton: React.FC<RewardedAdButtonProps> = ({
         <Animated.View style={[styles.busyRow, { opacity: busyOpacity }]}>
           <Image source={CHROME_ICONS.play} style={styles.playIcon} resizeMode="contain" accessible={false} />
           <AmberInline size={13} style={styles.busyPip} />
-          <Text style={[styles.label, isDark ? styles.labelDark : styles.labelLight, styles.busyLabel]}>
+          {/* Single line by contract: this button is now a rail-width child in
+              the Store (154dp, not the old 224dp full-width tier), and the busy
+              copy is longer than the resting label — left to wrap it grew the
+              button a whole line taller the instant the player tapped it. */}
+          <Text numberOfLines={1} style={[styles.label, isDark ? styles.labelDark : styles.labelLight, styles.busyLabel]}>
             {getRewardedBusyLabel(phase)}
           </Text>
         </Animated.View>
@@ -200,7 +212,11 @@ export const RewardedAdButton: React.FC<RewardedAdButtonProps> = ({
            where a '▷' glyph used to. */
         <View style={styles.busyRow}>
           <Image source={CHROME_ICONS.play} style={styles.playIcon} resizeMode="contain" accessible={false} />
-          <Text style={[styles.label, isDark ? styles.labelDark : styles.labelLight]}>{label}</Text>
+          {/* Clamped for the same reason: at the OS max font scale the resting
+              label wraps too, which reintroduces the height jump from the other
+              side. accessibilityLabel is the prop, not this Text, so an ellipsis
+              never reaches a screen reader. */}
+          <Text numberOfLines={1} style={[styles.label, isDark ? styles.labelDark : styles.labelLight]}>{label}</Text>
         </View>
       )}
     </TouchableOpacity>
@@ -222,6 +238,8 @@ const styles = StyleSheet.create({
   },
   busyLabel: {
     marginLeft: 6,
+    // Shrink before the pill can overrun a narrow host rail.
+    flexShrink: 1,
   },
   button: {
     paddingHorizontal: 16,

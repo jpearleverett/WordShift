@@ -64,7 +64,7 @@ const AMBER_ICON = require('../../../assets/ui/amber.png');
 
 /** Rendered size of a store thumbnail. The art is drawn at 192px, so this only
  *  ever scales DOWN. */
-const STORE_ART_DP = 56;
+const STORE_ART_DP = 60;
 
 /**
  * The generated cottage thumbnail for a purchasable, mirroring ShopScreen's
@@ -93,7 +93,12 @@ const StoreArtThumb: React.FC<{ artKey: string }> = ({ artKey }) => (
  */
 export const COSMETIC_BUNDLE_FALLBACK_PRICE = '$4.99';
 /** Supporter subscription fallback label (monthly). Keep in sync with the store tier. */
-export const SUPPORTER_SUB_FALLBACK_PRICE = '$3.99/mo';
+// No '/mo' suffix: the row's value line carries the cadence ("Monthly"), and a
+// live RevenueCat priceString never includes a period either — so the suffix
+// made the fallback the ONLY price in the store wide enough to push its button
+// past the rail's budget and squeeze the value line into an ellipsis. Since
+// iOS billing is unconfigured, that fallback is what every iOS build renders.
+export const SUPPORTER_SUB_FALLBACK_PRICE = '$3.99';
 
 interface StoreModalProps {
   visible: boolean;
@@ -555,7 +560,37 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     />
   );
 
-  const renderPackRow = (info: ConsumableProductInfo, suffix: React.ReactNode) => (
+  /**
+   * The row's bottom rail: what you GET on the left, what it costs on the
+   * right, sharing one baseline. The value slot flexes (and its text is
+   * single-line) so a long value shrinks rather than shoving the action off
+   * the card, and a row with nothing to state leaves an empty spacer that
+   * still pins the action right.
+   */
+  const renderRowFooter = (value: React.ReactNode, action: React.ReactNode) => (
+    <View style={styles.rowFooter}>
+      <View style={styles.rowValue}>{value}</View>
+      {action}
+    </View>
+  );
+
+  /** Quantity as its own fact — the one number a buyer actually compares. */
+  const renderRewardValue = (reward: ConsumableProductInfo['reward']) =>
+    reward.kind === 'amber' ? (
+      <Text
+        style={[styles.valueAmber, { color: t.amberText }]}
+        numberOfLines={1}
+        accessibilityLabel={`${reward.amount} amber`}
+      >
+        <AmberInline size={14} /> {reward.amount}
+      </Text>
+    ) : (
+      <Text style={[styles.valueWord, { color: t.amberText }]} numberOfLines={1}>
+        {reward.amount} hints
+      </Text>
+    );
+
+  const renderPackRow = (info: ConsumableProductInfo) => (
     <PanelCard key={info.productId} phase={phase} style={styles.row}>
       <View style={styles.rowTop}>
         <StoreArtThumb artKey={info.productId} />
@@ -573,16 +608,17 @@ export const StoreModal: React.FC<StoreModalProps> = ({
               </Text>
             )}
           </View>
-          <Text style={[styles.rowDesc, { color: t.body }]}>
-            {info.description} {suffix}
-          </Text>
+          <Text style={[styles.rowDesc, { color: t.body }]}>{info.description}</Text>
+          {renderRowFooter(
+            renderRewardValue(info.reward),
+            renderPricePill(
+              priceLabel(info),
+              () => handleBuyConsumable(info),
+              `Buy ${info.name}, ${info.reward.amount} ${info.reward.kind}, for ${priceLabel(info)}`,
+            ),
+          )}
         </View>
       </View>
-      {renderPricePill(
-        priceLabel(info),
-        () => handleBuyConsumable(info),
-        `Buy ${info.name} for ${priceLabel(info)}`,
-      )}
     </PanelCard>
   );
 
@@ -643,7 +679,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
                   <View style={styles.rowInfo}>
                     <Text style={[styles.heroTitle, { color: t.title }]}>{STARTER_PACK_INFO.name}</Text>
                     <Text style={[styles.rowDesc, { color: t.body }]}>
-                      {STARTER_PACK_INFO.description} <AmberInline size={11} />
+                      {STARTER_PACK_INFO.description}
                     </Text>
                   </View>
                 </View>
@@ -673,40 +709,52 @@ export const StoreModal: React.FC<StoreModalProps> = ({
                       <Text style={[styles.rowTitle, { color: t.title }]}>Daily Amber</Text>
                       <Text style={[styles.rowDesc, { color: t.body }]}>
                         {amberFaucet.available
-                          ? `Watch a short clip for +${DAILY_AMBER_REWARD} amber. ${amberFaucet.remaining} left today.`
+                          ? `Watch a short clip. ${amberFaucet.remaining} left today.`
                           : 'Collected for today. Come back tomorrow!'}
                       </Text>
+                      {amberFaucet.available && renderRowFooter(
+                        // The reward rides the rail like every other row rather
+                        // than being spelled into one branch's button label: the
+                        // Patron action is just "Claim", so with the amount only
+                        // in the button a Patron saw the offer with no number on
+                        // it anywhere. Stating it here covers both branches and
+                        // lets the rewarded button shed its "· +60" suffix, which
+                        // also buys back the width its busy copy needs.
+                        <Text
+                          style={[styles.valueAmber, { color: t.amberText }]}
+                          numberOfLines={1}
+                          accessibilityLabel={`${DAILY_AMBER_REWARD} amber`}
+                        >
+                          <AmberInline size={14} /> {DAILY_AMBER_REWARD}
+                        </Text>,
+                        isPatronSync() ? (
+                          renderPricePill('Claim', handleClaimDailyAmber, `Claim ${DAILY_AMBER_REWARD} free amber`)
+                        ) : (
+                          <RewardedAdButton
+                            placement="daily_amber"
+                            onReward={handleClaimDailyAmber}
+                            label="Watch"
+                            accessibilityLabel={`Watch a clip for ${DAILY_AMBER_REWARD} free amber`}
+                            phase={phase}
+                            // Host is the cottage PanelCard, which stays light
+                            // parchment through phase 3 (storm) and flips dark at
+                            // 4 — 'auto' assumes a dark host from phase 3 and made
+                            // the label near-invisible on the storm card.
+                            surface={phase >= 4 ? 'dark' : 'light'}
+                          />
+                        ),
+                      )}
                     </View>
                   </View>
-                  {amberFaucet.available && (isPatronSync()
-                    ? renderPricePill('Claim', handleClaimDailyAmber, `Claim ${DAILY_AMBER_REWARD} free amber`)
-                    : (
-                      <RewardedAdButton
-                        placement="daily_amber"
-                        onReward={handleClaimDailyAmber}
-                        label={`Watch · +${DAILY_AMBER_REWARD}`}
-                        phase={phase}
-                        // Host is the cottage PanelCard, which stays light
-                        // parchment through phase 3 (storm) and flips dark at
-                        // 4 — 'auto' assumes a dark host from phase 3 and made
-                        // the label near-invisible on the storm card.
-                        surface={phase >= 4 ? 'dark' : 'light'}
-                        style={styles.rowAction}
-                      />
-                    ))}
                 </PanelCard>
               </>
             )}
 
             <Text style={[styles.sectionLabel, { color: t.muted }]}>AMBER</Text>
-            {CONSUMABLE_PRODUCTS.filter(p => p.reward.kind === 'amber').map(info =>
-              renderPackRow(info, <AmberInline size={11} />),
-            )}
+            {CONSUMABLE_PRODUCTS.filter(p => p.reward.kind === 'amber').map(renderPackRow)}
 
             <Text style={[styles.sectionLabel, { color: t.muted }]}>HINTS</Text>
-            {CONSUMABLE_PRODUCTS.filter(p => p.reward.kind === 'hints').map(info =>
-              renderPackRow(info, <Image source={HINT_ICON} style={styles.hintInlineSmall} accessibilityLabel="hints" />),
-            )}
+            {CONSUMABLE_PRODUCTS.filter(p => p.reward.kind === 'hints').map(renderPackRow)}
 
             <Text style={[styles.sectionLabel, { color: t.muted }]}>SUPPORTER</Text>
             <PanelCard phase={phase} style={styles.row}>
@@ -717,17 +765,22 @@ export const StoreModal: React.FC<StoreModalProps> = ({
                   <Text style={[styles.rowDesc, { color: t.body }]}>
                     Ad-free, {SUPPORTER_MONTHLY_AMBER} amber every month, the season pass premium track, and an exclusive confetti. Cancel anytime.
                   </Text>
+                  {renderRowFooter(
+                    // Cadence rather than a count: the left slot always answers
+                    // "what do I get", and for a subscription that is "monthly".
+                    <Text style={[styles.valueWord, { color: t.amberText }]} numberOfLines={1}>Monthly</Text>,
+                    isSupporterActive ? (
+                      <Text style={[styles.ownedText, { color: t.amberText }]}>Active <Image source={CHROME_ICONS.starBullet} style={styles.inlineMark} /></Text>
+                    ) : (
+                      renderPricePill(
+                        prices[PRODUCT_IDS.SUPPORTER_SUB] ?? SUPPORTER_SUB_FALLBACK_PRICE,
+                        handleBuySupporter,
+                        'Subscribe as a Supporter',
+                      )
+                    ),
+                  )}
                 </View>
               </View>
-              {isSupporterActive ? (
-                <Text style={[styles.ownedText, { color: t.amberText }]}>Active <Image source={CHROME_ICONS.starBullet} style={styles.inlineMark} /></Text>
-              ) : (
-                renderPricePill(
-                  prices[PRODUCT_IDS.SUPPORTER_SUB] ?? SUPPORTER_SUB_FALLBACK_PRICE,
-                  handleBuySupporter,
-                  'Subscribe as a Supporter',
-                )
-              )}
             </PanelCard>
 
             <Text style={[styles.sectionLabel, { color: t.muted }]}>COSMETIC BUNDLE</Text>
@@ -739,17 +792,22 @@ export const StoreModal: React.FC<StoreModalProps> = ({
                   <Text style={[styles.rowDesc, { color: t.body }]}>
                     The exclusive Eclipse tile set + Eclipse confetti. Equip them in the Cosmetic Shop.
                   </Text>
+                  {renderRowFooter(
+                    // Reads against Supporter's "Monthly" one row up: the two
+                    // cash tiers differ by cadence, and that is the comparison.
+                    <Text style={[styles.valueWord, { color: t.amberText }]} numberOfLines={1}>Forever</Text>,
+                    ownsBundle ? (
+                      <Text style={[styles.ownedText, { color: t.amberText }]}>Owned <Image source={CHROME_ICONS.starBullet} style={styles.inlineMark} /></Text>
+                    ) : (
+                      renderPricePill(
+                        prices[PRODUCT_IDS.COSMETIC_BUNDLE] ?? COSMETIC_BUNDLE_FALLBACK_PRICE,
+                        handleBuyBundle,
+                        "Buy The Keeper's Collection",
+                      )
+                    ),
+                  )}
                 </View>
               </View>
-              {ownsBundle ? (
-                <Text style={[styles.ownedText, { color: t.amberText }]}>Owned <Image source={CHROME_ICONS.starBullet} style={styles.inlineMark} /></Text>
-              ) : (
-                renderPricePill(
-                  prices[PRODUCT_IDS.COSMETIC_BUNDLE] ?? COSMETIC_BUNDLE_FALLBACK_PRICE,
-                  handleBuyBundle,
-                  "Buy The Keeper's Collection",
-                )
-              )}
             </PanelCard>
 
             {onOpenPatron && (
@@ -882,7 +940,6 @@ const styles = StyleSheet.create({
   // positioned anchor to overlay on credit.
   amberBalanceWrap: { position: 'relative' },
   hintInline: { width: 13, height: 13 },
-  hintInlineSmall: { width: 11, height: 11 },
   scroll: { flexGrow: 0 },
   scrollContent: { paddingBottom: 4 },
   sectionLabel: {
@@ -906,23 +963,27 @@ const styles = StyleSheet.create({
 
   // Section rows — layered PanelCard material.
   //
-  // Two-tier anatomy (thumbnail + text on top, action beneath) rather than one
-  // horizontal line. The cottage frames nest, so a row's own content box is only
-  // ~224dp wide on a 360dp screen (320 card - 2x28 panel band - 2x20 card band);
-  // a 56dp thumbnail AND an ~84dp price button on the same line would leave the
-  // name/description column ~68dp, and the Supporter blurb alone would run to a
-  // dozen lines. Dropping the action to its own tier gives the text 158dp, which
-  // is WIDER than the 132dp it had before the art existed (and much wider than
-  // the ~90dp the Daily Amber row had, since "Watch · +60" is a broad button).
+  // ART COLUMN + INFO COLUMN, and the info column carries its own bottom rail.
+  // The width budget is the hard constraint: the cottage frames nest, so a row's
+  // content box is only ~224dp on a 360dp screen (320 card - 2x28 panel band -
+  // 2x20 card band). Art (60) + gap (10) leaves 154dp of info column; the rail
+  // spends 80 of that on the action and ~66 on the value, and the description
+  // gets the full 154 above them.
+  //
+  // The earlier anatomy stacked [art | title+desc] and then dropped the action
+  // onto its own full-width tier below. That kept the text wide but left the art
+  // floating mid-card with nothing under it and an L-shaped void in the bottom
+  // left of every row, because the action only ever filled ~84dp of the right
+  // edge. Moving the action INTO the info column and giving it a partner on the
+  // same baseline closes the void without inlining the price beside the art —
+  // which genuinely does not fit (art + price on one line leaves the words 68dp).
   row: {
-    flexDirection: 'column',
-    alignItems: 'stretch',
     paddingVertical: 12,
     paddingHorizontal: SURFACE.cardPadX,
     marginBottom: 8,
     minHeight: 68,
   },
-  // The thumbnail + text tier. `gap` is the only separation between them, so the
+  // The art + info columns. `gap` is the only separation between them, so the
   // text column keeps every dp the frame clearance left it (this is the store's
   // version of the shop's trimmed body gutter: rowInfo's old paddingRight is
   // gone, the space it held now sits between the art and the words).
@@ -945,24 +1006,59 @@ const styles = StyleSheet.create({
   },
   rowDesc: { fontSize: FONT_SIZE.small, marginTop: 3, lineHeight: 17, fontFamily: BODY_FONT },
 
-  // Price pill — chunky amber CandyButton (the single warm accent). Trails the
-  // row's text tier, pinned to the right edge so the prices still stack into one
-  // scannable column down the store.
-  pricePill: { minWidth: 84, alignSelf: 'flex-end', marginTop: 10 },
-  // Same slot, for the rewarded-clip button on the Daily Amber row.
-  rowAction: { alignSelf: 'flex-end', marginTop: 10 },
+  // The bottom rail: what you get (left) against what it costs (right), sharing
+  // one baseline at the foot of the info column.
+  //
+  // It WRAPS rather than squeezes. The value is now the only place a row states
+  // its reward quantity, and a CandyButton has no flexShrink (Yoga defaults it
+  // to 0), so a plain `flex: 1` value slot is a pure subtraction remainder: the
+  // button takes what its label needs and the quantity ellipsizes away first.
+  // That fires on real devices — at the OS "Largest" font setting the 16pt price
+  // label grows past the ~66dp the value has, and 5500 renders as "55...". With
+  // flexBasis 'auto' the value contributes its REAL content width to the line,
+  // so once value + gap + action exceeds the column the action drops to its own
+  // line (flex-end keeps it right-aligned, and `gap` supplies the row gap) —
+  // i.e. it degrades back to the old two-tier stack, but only on the devices
+  // that need it. At default scale nothing moves: flexGrow still eats the slack
+  // and pins the action right.
+  rowFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  rowValue: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 'auto',
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  // The quantity, in the store's one warm accent — sized just under the row
+  // title so it reads as a fact about the row, never as a second title.
+  valueAmber: { fontSize: FONT_SIZE.bodyLg, fontWeight: '800', fontFamily: PIXEL_FONT_BOLD },
+  // Word-shaped values ("5 hints", "Monthly", "Forever") a step smaller again:
+  // they are longer, and the width budget above leaves them ~66dp.
+  valueWord: { fontSize: FONT_SIZE.body, fontWeight: '800', fontFamily: PIXEL_FONT_BOLD },
+
+  // Price pill — chunky amber CandyButton (the single warm accent). Sits at the
+  // right end of the rail, so the prices still stack into one scannable column
+  // down the store. Position comes from the rail, not from the pill.
+  pricePill: { minWidth: 80 },
   // Inline brass star / chevron marks (generateGameIcons chrome), x-height sized.
   inlineMark: {
     width: 12,
     height: 12,
   },
+  // Owned/Active stands in for the price pill on the same rail.
   ownedText: {
     fontSize: FONT_SIZE.body,
     fontWeight: '800',
     paddingHorizontal: 8,
     fontFamily: PIXEL_FONT_BOLD,
-    alignSelf: 'flex-end',
-    marginTop: 10,
   },
 
   patronLink: {

@@ -319,9 +319,21 @@ describe('daily free-amber grant honors the recorded claim (no Patron over-grant
 
   it('the Free Amber card gates Patron Claim and the rewarded button identically', () => {
     const src = readComponent('StoreModal.tsx');
-    // One shared availability gate: at cap the pill/button disappear for both
-    // Patrons and ad-watchers, and the copy flips to "Collected for today".
-    expect(src).toMatch(/amberFaucet\.available\s*&&\s*\(isPatronSync\(\)/);
-    expect(src).toContain('Collected for today. Come back tomorrow!');
+    const start = src.indexOf('{amberFaucet && (isPatronSync() || isAdsReady())');
+    const end = src.indexOf(']}>AMBER</Text>', start);
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    const card = src.slice(start, end);
+
+    // ONE shared availability gate covering both branches: at cap the Patron
+    // pill and the rewarded button disappear together, and the copy flips to
+    // "Collected for today". Asserted structurally (a single `available &&`
+    // gate that both branches sit inside) rather than by matching one exact
+    // JSX spelling, so a layout change cannot fail a policy test.
+    expect(card.match(/amberFaucet\.available\s*&&/g) ?? []).toHaveLength(1);
+    const gateIdx = card.search(/amberFaucet\.available\s*&&/);
+    expect(card.indexOf('isPatronSync()', gateIdx)).toBeGreaterThan(gateIdx);
+    expect(card.indexOf('RewardedAdButton', gateIdx)).toBeGreaterThan(gateIdx);
+    expect(card).toContain('Collected for today. Come back tomorrow!');
   });
 });
