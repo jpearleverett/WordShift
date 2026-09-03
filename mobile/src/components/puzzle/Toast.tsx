@@ -22,9 +22,20 @@ interface ToastProps {
  * Phase-aware toast colors. Reuses the phase theme's AA-audited modal
  * text/background pairs for the normal toast (the same pairs VictoryModal
  * renders on), plus contrast-checked error pairs per phase group:
- * - Phase 0-2 error: white on CandyColors.red.shadow #B91C1C — 6.5:1
- *   (the old red.main #EF4444 measured only 3.8:1 with white)
+ * - Phase 0-2 error: white on CandyColors.red.shadow #B91C1C — 6.5:1 raw,
+ *   5.95:1 once the pill's own top shine is composited in (the old red.main
+ *   #EF4444 measured only 3.8:1 with white)
  * - Phase 3+ error: #F6C8CE on deep crimson #4A1520 — 9.9:1
+ *
+ * The shine is part of the pair, not decoration on top of it: `toastShine`
+ * paints over the fill and UNDER the text, so the ratio the player actually
+ * reads is measured against the composite. The bright branch's candy 0.3 white
+ * wash lightened #B91C1C to #CE6060 and dropped white text to 3.84:1 — under
+ * the 4.5 bar for a 15px/800 label, on the highest-frequency negative-feedback
+ * surface in the first 40 puzzles. The error pill therefore carries its OWN
+ * faint shine; `shine` keeps the candy gloss for the normal/receipt pill (a
+ * white wash only IMPROVES its dark-on-light pair), which is by far the most
+ * common toast and reads correctly.
  * Exported for the contrast regression tests.
  */
 export function getToastTheme(phase: number) {
@@ -38,6 +49,7 @@ export function getToastTheme(phase: number) {
       // The candy shine reads as a smudge on the dark tinted fills — keep a
       // faint top light so the pill still has form without going bright.
       shine: 'rgba(255, 255, 255, 0.06)',
+      errorShine: 'rgba(255, 255, 255, 0.06)',
       shadow: theme.vignetteColor,
     };
   }
@@ -47,6 +59,9 @@ export function getToastTheme(phase: number) {
     errorBg: CandyColors.red.shadow,
     errorText: CandyColors.white,
     shine: 'rgba(255, 255, 255, 0.3)',
+    // Same faint wash the dark pills use: enough top light for form, little
+    // enough that white on the composite still holds 5.95:1.
+    errorShine: 'rgba(255, 255, 255, 0.06)',
     shadow: theme.vignetteColor,
   };
 }
@@ -184,7 +199,16 @@ export const Toast: React.FC<ToastProps> = ({ message, isError, phase = 0, isVoi
       accessibilityLiveRegion="polite"
       accessibilityRole="alert"
     >
-      <View style={[styles.toastShine, { backgroundColor: isVoice && !isError ? 'rgba(255,255,255,0.35)' : toastTheme.shine }]} />
+      <View
+        style={[
+          styles.toastShine,
+          {
+            backgroundColor: isVoice && !isError
+              ? 'rgba(255,255,255,0.35)'
+              : (isError ? toastTheme.errorShine : toastTheme.shine),
+          },
+        ]}
+      />
       <Text
         style={[
           isVoice && !isError ? styles.toastVoiceText : styles.toastText,

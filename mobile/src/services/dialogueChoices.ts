@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AnimalType, DialoguePhase } from '../types/homeWorld';
+import { AnimalType, ANIMAL_AWARENESS_TIERS } from '../types/homeWorld';
+import { getPhaseStartIndex } from './dialogue/animalDialogueBase';
 
 /**
  * Player choice point system for Phase 3 dialogue.
@@ -252,27 +253,64 @@ export async function loadChoiceState(): Promise<ChoiceState> {
 }
 
 /**
- * Check if an animal should offer a choice point during Phase 3 dialogue.
+ * How far into the animal's Phase-3 block the choice becomes due. Two lines,
+ * not the old absolute 4: `getDialoguesPerSession(3)` is 5 (7 with the
+ * catch-up boost), so the index only ever LANDS at session-start offsets 0, 5,
+ * 10... A narrow window would be stepped clean over by most animals.
+ */
+const CHOICE_MIN_PHASE3_OFFSET = 2;
+
+/**
+ * Check if an animal should offer its Phase-3 choice point.
  * Returns the choice content or null.
+ *
+ * WHY THE GATE IS SHAPED LIKE THIS. `dialogueIndex` is the ABSOLUTE index into
+ * the animal's phase-ordered line list, and the phase blocks run 24/28/22/30/30
+ * — so Phase 3 starts at index 74. The original window (`dialogueIndex >= 4 &&
+ * <= 6`) was written as if the index were a per-phase offset, which put it deep
+ * inside the animal's PHASE-0 block: any player who actually read dialogue was
+ * past it forever, and every late-unlocked animal is fast-forwarded to a
+ * phase-start index (24/52/74/104) on unlock, straight over it. The beat, its
+ * 13 prompts, 26 responses, and all 26 Phase-4 and 26 Phase-5 callbacks that
+ * hang off a recorded choice were effectively dead content.
+ *
+ * The band is now the animal's real Phase-3 block. There is no upper offset
+ * cap beyond the end of that block: `offeredBy` already enforces once per
+ * animal, and a tight cap only re-creates the stepping problem.
+ *
+ * The lagging tier needs the phase-4 door. getAnimalPhase staggers the descent
+ * but converges at the reveal (global 3 -> animalPhase 2, global 4 ->
+ * animalPhase 4), so sloth/wombat/rabbit/red_panda/kakapo NEVER resolve to
+ * animalPhase 3 in any state — they read their Phase-3 lines while already at
+ * animalPhase 4. Keying on the index band as well as the phase is what lets
+ * them be offered the choice over the phase-3 material it belongs to. Ordering
+ * takes care of itself: nothing is recorded on the visit that offers the
+ * choice, so getAndMarkPhase4CallbackPage returns null that visit and its
+ * callback lands on a later one.
  */
 export async function getChoiceForAnimal(
   animalType: string,
   animalPhase: number,
   dialogueIndex: number
 ): Promise<DialogueChoice | null> {
-  // Only trigger during Phase 3
-  if (animalPhase !== 3) return null;
+  const choice = ANIMAL_CHOICES[animalType];
+  if (!choice) return null;
 
-  // Only trigger mid-dialogue (around dialogue index 4-6)
-  if (dialogueIndex < 4 || dialogueIndex > 6) return null;
+  const type = animalType as AnimalType;
+  const laggingAtReveal =
+    animalPhase === 4 && ANIMAL_AWARENESS_TIERS[type] === 'lagging';
+  if (animalPhase !== 3 && !laggingAtReveal) return null;
+
+  // Inside the animal's own Phase-3 block, a couple of lines in.
+  const start = getPhaseStartIndex(type, 3);
+  const end = getPhaseStartIndex(type, 4);
+  if (dialogueIndex < start + CHOICE_MIN_PHASE3_OFFSET) return null;
+  if (dialogueIndex >= end) return null;
 
   const state = await loadChoiceState();
 
   // Only offer once per animal
   if (state.offeredBy.includes(animalType)) return null;
-
-  const choice = ANIMAL_CHOICES[animalType];
-  if (!choice) return null;
 
   return choice;
 }
@@ -407,10 +445,18 @@ async function saveChoiceState(state: ChoiceState): Promise<void> {
  */
 /**
  * One-time Phase 4 pre-dialogue page: the animal recontextualizes the
- * player's Phase 3 choice now that the cult is revealed. Marks itself
- * shown so it never repeats. Returns null when there's nothing to say.
+ * player's Phase 3 choice now that the cult is revealed. Returns null when
+ * there's nothing to say.
+ *
+ * PEEK ONLY — it records nothing. The page it produces can sit behind a
+ * coordinated event, a trigger reaction or a cross-reference, and the dialogue
+ * modal closes on a scrim tap or the Android back button, so marking it shown
+ * while BUILDING the page list destroyed one-time beats the player never saw.
+ * The caller commits with markPhase4CallbackShown at the moment the page
+ * actually becomes visible (the peek/commit shape this file already uses for
+ * getChoiceForAnimal/recordChoice).
  */
-export async function getAndMarkPhase4CallbackPage(
+export async function getPhase4CallbackPage(
   animalType: string
 ): Promise<string | null> {
   const state = await loadChoiceState();
@@ -418,11 +464,19 @@ export async function getAndMarkPhase4CallbackPage(
   if (!choice) return null;
   const shown = state.phase4CallbackShown ?? [];
   if (shown.includes(animalType)) return null;
-  const text = getPhase4ChoiceCallback(animalType, choice);
-  if (!text) return null;
+  return getPhase4ChoiceCallback(animalType, choice);
+}
+
+/**
+ * Commit the Phase-4 choice callback as shown, so it never repeats. Called
+ * when the page becomes visible, not when it is built. Idempotent.
+ */
+export async function markPhase4CallbackShown(animalType: string): Promise<void> {
+  const state = await loadChoiceState();
+  const shown = state.phase4CallbackShown ?? [];
+  if (shown.includes(animalType)) return;
   state.phase4CallbackShown = [...shown, animalType];
   await saveChoiceState(state);
-  return text;
 }
 
 /**

@@ -186,6 +186,14 @@ export const SYNC_KEY_PREFIXES = [
   'wordshift_guaranteed_crossref_phase_',
 ];
 
+/**
+ * Mirrored from SettingsScreen rather than imported: a service must not import
+ * from a component (import cycle). SettingsScreen owns the write; this file
+ * only reads it. Deliberately unsynced and deliberately survives Reset All —
+ * see its entry in storageKeyRegistry.test.ts.
+ */
+const LOCAL_RESET_MARKER_KEY = 'wordshift_local_reset_at';
+
 const SYNC_STATUS_KEY = 'wordshift_cloud_sync_status';
 const CURRENT_SAVE_VERSION = 1;
 
@@ -480,6 +488,21 @@ export async function maybeAutoRestoreOnFreshInstall(): Promise<boolean> {
     const cloudData = await provider.download();
     if (!cloudData) return false;
 
+    // A deliberate Reset All must not be undone by the next launch. Reset
+    // overwrites the cloud row with the cleared state, but when that upload
+    // fails (offline is the ordinary case — the player resets, closes the app,
+    // and relaunches on a plane) the stale pre-reset row is still up there, the
+    // local sentinel is gone, and this path restores everything they just
+    // erased. Refuse any row written at or before the reset stamp; a genuinely
+    // NEWER save from another device has timestamp > marker and still restores.
+    //
+    // Only here. downloadFromCloud, linkRecoveryCode and the conflict banner's
+    // "use the newer save" are explicit player choices and stay unblocked.
+    try {
+      const resetAt = Number((await AsyncStorage.getItem(LOCAL_RESET_MARKER_KEY)) ?? 0);
+      if (resetAt > 0 && (cloudData.timestamp ?? 0) <= resetAt) return false;
+    } catch {}
+
     const restored = await restoreFromCloudData(cloudData);
     if (restored) {
       await updateSyncStatus(true);
@@ -748,6 +771,16 @@ export async function uploadToCloud(force: boolean = false): Promise<boolean> {
 
   const saveData = await collectLocalSaveData();
   const success = await provider.upload(saveData);
+
+  // Any successful upload retires the reset marker: the cloud row is now this
+  // device's own state, so there is nothing left for the auto-restore guard to
+  // protect against. Clearing it here (not only on the reset's own upload)
+  // covers the offline reset whose first successful sync comes later.
+  if (success) {
+    try {
+      await AsyncStorage.removeItem(LOCAL_RESET_MARKER_KEY);
+    } catch {}
+  }
 
   await updateSyncStatus(success);
   return success;

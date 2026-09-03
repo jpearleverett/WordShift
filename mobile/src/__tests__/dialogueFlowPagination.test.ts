@@ -112,6 +112,7 @@ jest.mock('../services/dialogueSession', () => ({
   getSession: jest.fn(() => null),
   getSessionStatus: jest.fn(() => ({ status: 'in_session', dialoguesRemaining: 5 })),
   isOnCooldown: jest.fn(() => false),
+  updateSessionPhase: jest.fn(),
 }));
 
 jest.mock('../services/amberCurrency', () => ({
@@ -135,7 +136,8 @@ jest.mock('../services/dialogueChoices', () => ({
   getChoiceForAnimal: jest.fn(async () => null),
   recordChoice: jest.fn(async () => ({ response: 'response', convergence: 'convergence' })),
   loadChoiceState: jest.fn(async () => ({ choices: {} })),
-  getAndMarkPhase4CallbackPage: jest.fn(async () => null),
+  getPhase4CallbackPage: jest.fn(async () => null),
+  markPhase4CallbackShown: jest.fn(async () => {}),
 }));
 
 jest.mock('../services/whisperGallery', () => ({
@@ -438,6 +440,49 @@ describe('useDialogueFlow Fox Phase 4 tutorial callback gating', () => {
     expect(hook.dialogueText).toBe('tutorial callback line');
     expect(amberCurrency.markTutorialSeedsPlanted).toHaveBeenCalledTimes(1);
   });
+
+  // consumePendingVariantTutorial shifts its queue and files the variant under
+  // seen as it reads, so it has no peek half. On a visit that already spent
+  // page 0 on Fox's tutorial callback the variant line would sit at page 1,
+  // and a scrim tap or Android back on page 0 burned it forever with nothing
+  // having shown it. It must not even be consulted on such a visit.
+  it('does not consume the pending variant tutorial behind an earlier page', async () => {
+    const amberCurrency = jest.requireMock('../services/amberCurrency') as {
+      wereTutorialSeedsPlanted: jest.Mock;
+      consumePendingVariantTutorial: jest.Mock;
+    };
+    amberCurrency.wereTutorialSeedsPlanted.mockResolvedValueOnce(false);
+
+    let hook = render();
+    await hook.handleAnimalTap({ ...fox, currentDialogueIndex: 0 } as never);
+    hook = render();
+
+    expect(hook.dialogueText).toBe('tutorial callback line');
+    expect(amberCurrency.consumePendingVariantTutorial).not.toHaveBeenCalled();
+  });
+
+  // The other side of the gate: on a visit with nothing ahead of it the note
+  // is still consumed and served. Tapped on Panko rather than Ember because
+  // only the fox owns the Phase-4 tutorial callback, so this visit is quiet by
+  // construction and cannot depend on the seeds-planted mock.
+  it('consumes the pending variant tutorial on an otherwise quiet visit', async () => {
+    const variantLine = 'The chain runs backward now, and it still comes home.';
+    const amberCurrency = jest.requireMock('../services/amberCurrency') as {
+      consumePendingVariantTutorial: jest.Mock;
+    };
+    amberCurrency.consumePendingVariantTutorial.mockResolvedValueOnce('reverse');
+    const animalDialogue = jest.requireMock('../services/animalDialogue') as {
+      getVariantTutorialDialogue: jest.Mock;
+    };
+    animalDialogue.getVariantTutorialDialogue.mockReturnValueOnce(variantLine);
+
+    let hook = render();
+    await hook.handleAnimalTap({ ...pangolin, currentDialogueIndex: 0 } as never);
+    hook = render();
+
+    expect(amberCurrency.consumePendingVariantTutorial).toHaveBeenCalledTimes(1);
+    expect(hook.dialogueText).toBe(variantLine);
+  });
 });
 
 describe('useDialogueFlow Phase 5 pool-only delivery', () => {
@@ -483,9 +528,9 @@ describe('useDialogueFlow Phase 5 pool-only delivery', () => {
     };
     animalDialogue.getAndMarkNarrativeCallbackPage.mockResolvedValue(null);
     const dialogueChoices = jest.requireMock('../services/dialogueChoices') as {
-      getAndMarkPhase4CallbackPage: jest.Mock;
+      getPhase4CallbackPage: jest.Mock;
     };
-    dialogueChoices.getAndMarkPhase4CallbackPage.mockResolvedValue(null);
+    dialogueChoices.getPhase4CallbackPage.mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -523,9 +568,9 @@ describe('useDialogueFlow Phase 5 pool-only delivery', () => {
       'A Phase 4 seed callback.'
     );
     const dialogueChoices = jest.requireMock('../services/dialogueChoices') as {
-      getAndMarkPhase4CallbackPage: jest.Mock;
+      getPhase4CallbackPage: jest.Mock;
     };
-    dialogueChoices.getAndMarkPhase4CallbackPage.mockResolvedValue(
+    dialogueChoices.getPhase4CallbackPage.mockResolvedValue(
       'A Phase 4 choice callback.'
     );
 
@@ -535,7 +580,7 @@ describe('useDialogueFlow Phase 5 pool-only delivery', () => {
 
     expect(amberCurrency.wereTutorialSeedsPlanted).not.toHaveBeenCalled();
     expect(amberCurrency.markTutorialSeedsPlanted).not.toHaveBeenCalled();
-    expect(dialogueChoices.getAndMarkPhase4CallbackPage).not.toHaveBeenCalled();
+    expect(dialogueChoices.getPhase4CallbackPage).not.toHaveBeenCalled();
     expect(animalDialogue.getAndMarkNarrativeCallbackPage).not.toHaveBeenCalled();
     expect(hook.dialogueText).toBe(phase5Line);
   });
@@ -568,9 +613,14 @@ describe('useDialogueFlow Phase 5 pool-only delivery', () => {
     expect(hook.dialogueText).toBe(phase5Line);
   });
 
-  it('keeps Phase 5 trigger and fulfilled-offering reactions ahead of the pool', async () => {
+  // The trigger queue and the offering request BOTH consume as they read, and
+  // neither service has a peek half to defer to, so each may only run when its
+  // page would be page 0 (guaranteed visible the instant the modal opens). A
+  // visit that spends page 0 on a trigger reaction therefore leaves the
+  // offering untouched — deferred to the next quiet visit, never consumed
+  // behind a page the player might close on.
+  it('keeps a Phase 5 trigger reaction ahead of the pool and leaves the offering for later', async () => {
     const triggerLine = 'ASH. Even now, the fire remembers.';
-    const offeringLine = 'You brought the word I asked for. It rests with the pattern.';
     const amberCurrency = jest.requireMock('../services/amberCurrency') as {
       consumeTriggerWords: jest.Mock;
     };
@@ -579,6 +629,29 @@ describe('useDialogueFlow Phase 5 pool-only delivery', () => {
       getTriggerWordReaction: jest.Mock;
     };
     animalDialogue.getTriggerWordReaction.mockReturnValueOnce(triggerLine);
+    const offeringRequests = jest.requireMock('../services/offeringRequests') as {
+      takeOfferingDialogue: jest.Mock;
+    };
+
+    let hook = render();
+    await hook.handleAnimalTap({ ...pangolin, currentDialogueIndex: 0 } as never);
+    hook = render();
+
+    expect(animalDialogue.getTriggerWordReaction).toHaveBeenCalledWith(
+      'pangolin',
+      'ASH',
+      5
+    );
+    expect(offeringRequests.takeOfferingDialogue).not.toHaveBeenCalled();
+    expect(hook.dialogueText).toBe(triggerLine);
+
+    await hook.handleNextDialogue();
+    hook = render();
+    expect(hook.dialogueText).toBe(phase5Line);
+  });
+
+  it('serves a fulfilled Phase 5 offering reaction on an otherwise quiet visit', async () => {
+    const offeringLine = 'You brought the word I asked for. It rests with the pattern.';
     const offeringRequests = jest.requireMock('../services/offeringRequests') as {
       takeOfferingDialogue: jest.Mock;
     };
@@ -591,20 +664,11 @@ describe('useDialogueFlow Phase 5 pool-only delivery', () => {
     await hook.handleAnimalTap({ ...pangolin, currentDialogueIndex: 0 } as never);
     hook = render();
 
-    expect(animalDialogue.getTriggerWordReaction).toHaveBeenCalledWith(
-      'pangolin',
-      'ASH',
-      5
-    );
     expect(offeringRequests.takeOfferingDialogue).toHaveBeenCalledWith(
       'pangolin',
       5,
-      false
+      true
     );
-    expect(hook.dialogueText).toBe(triggerLine);
-
-    await hook.handleNextDialogue();
-    hook = render();
     expect(hook.dialogueText).toBe(offeringLine);
 
     await hook.handleNextDialogue();
@@ -652,5 +716,240 @@ describe('useDialogueFlow Phase 5 pool-only delivery', () => {
     await hook.handleAnimalTap({ ...tarsier, currentDialogueIndex: 0 } as never);
 
     expect(checkDialogueAvailabilityMock).toHaveBeenCalledWith('tarsier', 0);
+  });
+});
+
+// ===========================================================================
+// One-time pre-dialogue pages are committed WHEN THEY BECOME VISIBLE.
+//
+// handleAnimalTap used to consume every one-time source while assembling the
+// page list — the coordinated event (stored on GLOBAL progress, so one of the
+// eight house-wide crescendos was burned for every animal at once), the
+// tutorial-seed flag, the guaranteed cross-reference flag, the Phase-4 choice
+// callback. The modal closes on a scrim tap or the Android back button, so a
+// player who dismissed early lost beats nothing had shown them.
+// ===========================================================================
+describe('useDialogueFlow one-time page commits', () => {
+  const coordinatedLine = 'We all dreamed the same corridor last night.';
+  const choiceCallbackLine = 'You asked what the fire saw, and I can answer now.';
+
+  beforeEach(() => {
+    resetHookState();
+    jest.clearAllMocks();
+    progress.currentPhase = 4;
+    progress.puzzlesSolved = 95;
+    animals = [{ ...pangolin }];
+    getCurrentDialogueMock.mockReturnValue({ text: SHORT_LINE });
+  });
+
+  afterEach(() => {
+    progress.currentPhase = 0;
+    progress.puzzlesSolved = 10;
+  });
+
+  function mockTwoPageVisit() {
+    const animalDialogue = jest.requireMock('../services/animalDialogue') as {
+      getCoordinatedEventLine: jest.Mock;
+    };
+    animalDialogue.getCoordinatedEventLine.mockReturnValueOnce({
+      text: coordinatedLine,
+      theme: 'shared_dream',
+    });
+    const dialogueChoices = jest.requireMock('../services/dialogueChoices') as {
+      getPhase4CallbackPage: jest.Mock;
+    };
+    dialogueChoices.getPhase4CallbackPage.mockResolvedValue(choiceCallbackLine);
+  }
+
+  it('commits page 0 on open and the next page only once it is shown', async () => {
+    mockTwoPageVisit();
+    const amberCurrency = jest.requireMock('../services/amberCurrency') as {
+      recordConsumedCoordinatedEvent: jest.Mock;
+    };
+    const dialogueChoices = jest.requireMock('../services/dialogueChoices') as {
+      markPhase4CallbackShown: jest.Mock;
+    };
+
+    let hook = render();
+    await hook.handleAnimalTap({ ...pangolin, currentDialogueIndex: 0 } as never);
+    hook = render();
+
+    expect(hook.dialogueText).toBe(coordinatedLine);
+    expect(amberCurrency.recordConsumedCoordinatedEvent).toHaveBeenCalledWith('shared_dream');
+    // Page 1 is not on screen yet.
+    expect(dialogueChoices.markPhase4CallbackShown).not.toHaveBeenCalled();
+
+    await hook.handleNextDialogue();
+    hook = render();
+
+    expect(hook.dialogueText).toBe(choiceCallbackLine);
+    expect(dialogueChoices.markPhase4CallbackShown).toHaveBeenCalledWith('pangolin');
+  });
+
+  it('leaves an un-shown page uncommitted when the player closes early', async () => {
+    mockTwoPageVisit();
+    const dialogueChoices = jest.requireMock('../services/dialogueChoices') as {
+      markPhase4CallbackShown: jest.Mock;
+    };
+
+    let hook = render();
+    await hook.handleAnimalTap({ ...pangolin, currentDialogueIndex: 0 } as never);
+    hook = render();
+    await hook.handleCloseDialogue();
+
+    // The callback was never on screen, so it is still owed to the player.
+    expect(dialogueChoices.markPhase4CallbackShown).not.toHaveBeenCalled();
+  });
+
+  it('commits a page at most once even if Next is tapped again', async () => {
+    mockTwoPageVisit();
+    const amberCurrency = jest.requireMock('../services/amberCurrency') as {
+      recordConsumedCoordinatedEvent: jest.Mock;
+    };
+
+    let hook = render();
+    await hook.handleAnimalTap({ ...pangolin, currentDialogueIndex: 0 } as never);
+    hook = render();
+    await hook.handleNextDialogue();
+    hook = render();
+    await hook.handleNextDialogue();
+
+    expect(amberCurrency.recordConsumedCoordinatedEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it('spends the vanguard guaranteed cross-ref flag only on a reference that exists', async () => {
+    // Archimedes, not Ember: the fox also owns the Phase-4 tutorial callback,
+    // which would take page 0 here.
+    const owl = { ...pangolin, id: 'owl', type: 'owl', name: 'Archimedes', roomId: 'study' };
+    animals = [{ ...owl }];
+    const amberCurrency = jest.requireMock('../services/amberCurrency') as {
+      hasSeenGuaranteedCrossRef: jest.Mock;
+      markGuaranteedCrossRefSeen: jest.Mock;
+    };
+    amberCurrency.hasSeenGuaranteedCrossRef.mockResolvedValue(false);
+    const animalDialogue = jest.requireMock('../services/animalDialogue') as {
+      getCrossAnimalReference: jest.Mock;
+    };
+    animalDialogue.getCrossAnimalReference.mockReturnValue(null);
+
+    let hook = render();
+    await hook.handleAnimalTap({ ...owl, currentDialogueIndex: 0 } as never);
+    hook = render();
+
+    // Nothing was said, so the one guaranteed reference for this phase is
+    // still owed (it used to be marked before the lookup ran).
+    expect(amberCurrency.markGuaranteedCrossRefSeen).not.toHaveBeenCalled();
+
+    resetHookState();
+    jest.clearAllMocks();
+    animals = [{ ...owl }];
+    amberCurrency.hasSeenGuaranteedCrossRef.mockResolvedValue(false);
+    animalDialogue.getCrossAnimalReference.mockReturnValue('Vesper has not blinked all week.');
+    getCurrentDialogueMock.mockReturnValue({ text: SHORT_LINE });
+
+    hook = render();
+    await hook.handleAnimalTap({ ...owl, currentDialogueIndex: 0 } as never);
+    hook = render();
+
+    expect(hook.dialogueText).toBe('Vesper has not blinked all week.');
+    expect(amberCurrency.markGuaranteedCrossRefSeen).toHaveBeenCalledWith(4);
+  });
+});
+
+// ===========================================================================
+// The Phase-3 choice beat has to reach the lagging tier, which converges from
+// animal-phase 2 straight to 4 at the reveal and so never resolves to 3.
+// ===========================================================================
+describe('useDialogueFlow Phase-3 choice reachability', () => {
+  const sloth = { ...pangolin, id: 'sloth', type: 'sloth', name: 'Sloane', roomId: 'jungle' };
+
+  beforeEach(() => {
+    resetHookState();
+    jest.clearAllMocks();
+    animals = [{ ...sloth }];
+    getCurrentDialogueMock.mockReturnValue({ text: SHORT_LINE });
+    // Implementations survive clearAllMocks; make sure no earlier test's
+    // cross-reference line is still queued ahead of the choice prompt.
+    (jest.requireMock('../services/animalDialogue') as {
+      getCrossAnimalReference: jest.Mock;
+    }).getCrossAnimalReference.mockReturnValue(null);
+    (jest.requireMock('../services/dialogueChoices') as {
+      getPhase4CallbackPage: jest.Mock;
+    }).getPhase4CallbackPage.mockResolvedValue(null);
+  });
+
+  afterEach(() => {
+    progress.currentPhase = 0;
+    progress.puzzlesSolved = 10;
+  });
+
+  it('consults the choice for a lagging animal at global Phase 4 (animal-phase 4)', async () => {
+    progress.currentPhase = 4;
+    progress.puzzlesSolved = 95;
+    const dialogueChoices = jest.requireMock('../services/dialogueChoices') as {
+      getChoiceForAnimal: jest.Mock;
+    };
+    dialogueChoices.getChoiceForAnimal.mockResolvedValue({
+      prompt: 'Sloane blinks, very slowly.',
+      options: { ask: 'How long?', refuse: 'Sleep, friend.' },
+      responses: { ask: 'A while.', refuse: 'I will.' },
+      convergence: 'The branch bears it either way.',
+    });
+
+    let hook = render();
+    await hook.handleAnimalTap({ ...sloth, currentDialogueIndex: 76 } as never);
+    hook = render();
+
+    expect(dialogueChoices.getChoiceForAnimal).toHaveBeenCalledWith('sloth', 4, 76);
+    expect(hook.dialogueText).toBe('Sloane blinks, very slowly.');
+    expect(hook.activeChoice).not.toBeNull();
+  });
+
+  it('still consults the choice at animal-phase 3 for the middle tier', async () => {
+    progress.currentPhase = 3;
+    progress.puzzlesSolved = 70;
+    const dialogueChoices = jest.requireMock('../services/dialogueChoices') as {
+      getChoiceForAnimal: jest.Mock;
+    };
+    dialogueChoices.getChoiceForAnimal.mockResolvedValue(null);
+
+    const hook = render();
+    await hook.handleAnimalTap({ ...pangolin, currentDialogueIndex: 76 } as never);
+
+    expect(dialogueChoices.getChoiceForAnimal).toHaveBeenCalledWith('pangolin', 3, 76);
+  });
+});
+
+// ===========================================================================
+// The session layer keeps the narrative phase in a module variable that only
+// recordVictory used to write, so every launch ran phase-0 session rules
+// (3 lines instead of 6 at the reveal, and a warm session refused outright)
+// until the player finished a puzzle.
+// ===========================================================================
+describe('useDialogueFlow session phase mirror', () => {
+  afterEach(() => {
+    progress.currentPhase = 0;
+  });
+
+  it('pushes the current phase into the session layer before availability is checked', async () => {
+    resetHookState();
+    jest.clearAllMocks();
+    progress.currentPhase = 4;
+    animals = [{ ...pangolin }];
+    getCurrentDialogueMock.mockReturnValue({ text: SHORT_LINE });
+    (jest.requireMock('../services/animalDialogue') as {
+      getCrossAnimalReference: jest.Mock;
+    }).getCrossAnimalReference.mockReturnValue(null);
+    const dialogueSession = jest.requireMock('../services/dialogueSession') as {
+      updateSessionPhase: jest.Mock;
+    };
+
+    const hook = render();
+    await hook.handleAnimalTap({ ...pangolin, currentDialogueIndex: 0 } as never);
+
+    expect(dialogueSession.updateSessionPhase).toHaveBeenCalledWith(4);
+    const phaseCallOrder = dialogueSession.updateSessionPhase.mock.invocationCallOrder[0];
+    const availabilityCallOrder = checkDialogueAvailabilityMock.mock.invocationCallOrder[0];
+    expect(phaseCallOrder).toBeLessThan(availabilityCallOrder);
   });
 });

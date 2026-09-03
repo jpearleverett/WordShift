@@ -12,6 +12,21 @@ import { getPhaseTheme } from '../theme/colors';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // ---------------------------------------------------------------------------
+// The Skip control's ink. It used to paint the event's own accentColor at 50%
+// alpha, which composited to 1.26-2.47:1 against the eight event backgrounds —
+// black on black at the finale and post-revelation, i.e. the only escape from a
+// 10-20 second cinematic that cannot be dismissed any other way was invisible.
+// The event's textColor is no exception (4.22 at phase 4, 3.35 at The Arrival),
+// so the skip deliberately drops out of the event palette entirely: it is
+// chrome, not narrative colour, and one near-white ink clears 4.5:1 on every
+// bgColor (10.6:1 at the brightest). The border sits a shade back so the pill
+// still reads as secondary while clearing the 3:1 non-text bar everywhere.
+// Pinned by cinematicSkipContrast.test.ts.
+// ---------------------------------------------------------------------------
+export const SKIP_INK_COLOR = '#E8E4F0';
+export const SKIP_BORDER_COLOR = '#B9B0CC';
+
+// ---------------------------------------------------------------------------
 // In-engine cinematic art: the REAL game assets (never emoji). The entity is
 // the same soft shadow_figure.png HouseWorld renders behind the house; the
 // house is the roof art the player raised room by room.
@@ -815,12 +830,12 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
 
       {/* Skip button */}
       <TouchableOpacity
-        style={[styles.skipButton, { borderColor: event.accentColor + '80' }]}
+        style={[styles.skipButton, { borderColor: SKIP_BORDER_COLOR }]}
         onPress={handleSkip}
         accessibilityLabel="Skip transition"
         accessibilityRole="button"
       >
-        <Text style={[styles.skipText, { color: event.accentColor + '80' }]}>Skip</Text>
+        <Text style={[styles.skipText, { color: SKIP_INK_COLOR }]}>Skip</Text>
       </TouchableOpacity>
 
       {/* Progress dots */}
@@ -902,7 +917,13 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 16,
     borderWidth: 1,
-    zIndex: 2,
+    // ABOVE the vignette (zIndex 999), below the flash (1001, which must keep
+    // covering everything). The skip pill sits at top-right, which is exactly
+    // where the two vignette edges overlap and darken hardest (up to 0.9 on the
+    // vignette_close scenes) — at zIndex 2 the vignette painted straight over
+    // the only escape from a 10-20s cinematic, so new ink alone would not have
+    // been enough.
+    zIndex: 1000,
   },
   skipText: {
     fontFamily: BODY_FONT_BOLD,

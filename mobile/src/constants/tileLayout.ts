@@ -26,6 +26,19 @@ export const ARC_SLOT_RENDERED_WIDTH = SLOT_WIDTH + 4;
 export const ARC_LETTER_MARGIN_H = -3; // arcLetterWrapper marginHorizontal
 export const ARC_SLOT_MARGIN_H = -1; // arcSlotWrapper marginHorizontal
 
+// Row.tsx wraps every arc slot in a `slotOuter` View that carries its OWN
+// horizontal margin, INSIDE the arcSlotWrapper. That term was never accounted
+// for anywhere: the geometry consumers all reconstructed the cell as
+// ARC_SLOT_RENDERED_WIDTH + ARC_SLOT_MARGIN_H * 2 = 16dp while the tree
+// actually renders 18 + 2*2 - 1*2 = 20dp. The 4dp shortfall compounds slot by
+// slot outward from the row centre (+/-12dp at the ends of a 6-letter row), so
+// the swelling drop slot was not always the one under the finger and the fan
+// collapse ended on a visible snap. One constant now carries the whole cell so
+// there is nothing left to forget.
+export const ARC_SLOT_OUTER_MARGIN_H = 2; // Row.tsx `slotOuter` marginHorizontal
+export const ARC_SLOT_CELL_W =
+  ARC_SLOT_RENDERED_WIDTH + (ARC_SLOT_OUTER_MARGIN_H + ARC_SLOT_MARGIN_H) * 2;
+
 // Tile horizontal footprint (standard vs compact for 6+ letter words)
 export const STANDARD_TILE_W = 52;
 export const STANDARD_TILE_MARGIN_H = 3;
@@ -58,7 +71,7 @@ export function arcLetterCenterOffset(
   compact: boolean,
 ): number {
   const letterW = tileFootprint(compact) + ARC_LETTER_MARGIN_H * 2;
-  const slotW = ARC_SLOT_RENDERED_WIDTH + ARC_SLOT_MARGIN_H * 2;
+  const slotW = ARC_SLOT_CELL_W;
   const total = (letterCount + 1) * slotW + letterCount * letterW;
   const center = (index + 1) * slotW + index * letterW + letterW / 2;
   return center - total / 2;

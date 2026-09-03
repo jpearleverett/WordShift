@@ -38,7 +38,12 @@ import {
   getSession,
   getSessionStatus,
   isOnCooldown,
+  updateSessionPhase,
 } from '../services/dialogueSession';
+// Imported straight from the dialogue data module (as homeWorldData does):
+// phase-start indices are the only way to read an absolute dialogue index as
+// "which phase's material is this animal actually on".
+import { getPhaseStartIndex } from '../services/dialogue/animalDialogueBase';
 import {
   markDialogueRead,
   consumeTriggerWords,
@@ -59,11 +64,12 @@ import {
   PlayerChoice,
   DialogueChoice,
   loadChoiceState,
-  getAndMarkPhase4CallbackPage,
+  getPhase4CallbackPage,
+  markPhase4CallbackShown,
 } from '../services/dialogueChoices';
 import { recordWhisper } from '../services/whisperGallery';
 import { getFoxPostTutorialPlayPrompt } from '../services/phaseNarrative';
-import { recordAnimalVisit } from '../services/weeklyQuests';
+import { recordAnimalVisit, Quest } from '../services/weeklyQuests';
 import { hapticLight, hapticSelection } from '../services/haptics';
 import {
   loadTendingState,
@@ -309,6 +315,37 @@ interface UseDialogueFlowParams {
   progress: HomeWorldProgress | null;
   setAnimals: React.Dispatch<React.SetStateAction<Animal[]>>;
   onFoxPlayPrompt?: () => void;
+  /**
+   * Quests completed by THIS visit (talk-to-animals quests). recordAnimalVisit
+   * mutates the quest objects in the module-level cache in place, and the home
+   * screen holds those same references, so nothing re-derives on its own: the
+   * header quest pill and the journal badge kept showing the pre-completion
+   * count until the player opened the quest modal. The host uses this to
+   * re-wrap its quest state.
+   */
+  onQuestsCompleted?: (quests: Quest[]) => void;
+}
+
+/**
+ * A page shown before the animal's regular dialogue. `commit` is the one-time
+ * bookkeeping that must run when the page BECOMES VISIBLE — never when the
+ * page list is built.
+ *
+ * WHY. handleAnimalTap used to consume every one-time source while assembling
+ * the list: the coordinated event, the tutorial-seed flag, the guaranteed
+ * cross-reference flag, the Phase-4 choice callback. The modal closes on a
+ * scrim tap or the Android back button and closeDialogue drops the queue, so a
+ * player who dismissed early burned beats nothing had shown them. A
+ * coordinated event is the worst case: it is consumed on GLOBAL progress, so
+ * one of the eight house-wide crescendos was gone for every animal at once.
+ *
+ * Commit-on-visible, not commit-on-advance: a page the player saw and then
+ * closed on stays committed (at most once), and a page never shown is never
+ * burned.
+ */
+interface PreDialoguePage {
+  text: string;
+  commit?: () => Promise<void>;
 }
 
 interface UseDialogueFlowReturn {
@@ -374,6 +411,7 @@ export function useDialogueFlow({
   progress,
   setAnimals,
   onFoxPlayPrompt,
+  onQuestsCompleted,
 }: UseDialogueFlowParams): UseDialogueFlowReturn {
   const [selectedAnimal, setSelectedAnimal] = useState<Animal | null>(null);
   const [showDialogue, setShowDialogue] = useState(false);
@@ -390,7 +428,7 @@ export function useDialogueFlow({
 
   // Pre-dialogue pages: shown before regular dialogue, one at a time
   // These are trigger reactions, cross-animal refs, coordinated events, etc.
-  const [preDialoguePages, setPreDialoguePages] = useState<string[]>([]);
+  const [preDialoguePages, setPreDialoguePages] = useState<PreDialoguePage[]>([]);
 
   // Long-line pagination (purely presentational). `pageCursor` is which page
   // of the current line is visible; `pageSource` records the full text the
@@ -497,6 +535,77 @@ export function useDialogueFlow({
     );
   };
 
+  // Keep the session layer's phase mirror current.
+  //
+  // dialogueSession holds the narrative phase in a module variable that only
+  // recordVictory ever wrote, and it defaults to 0 — so a player who opened the
+  // app and visited their animals BEFORE solving a puzzle got phase-0 session
+  // rules for the whole launch: 3 lines per session instead of 6 at the reveal,
+  // and a session left warm at 4 lines was refused outright ("preparing, return
+  // after more offerings") because 4 >= getDialoguesPerSession(0). It is
+  // mirrored here, where the phase is known, and again at tap time below so no
+  // render ordering can leave it stale.
+  useEffect(() => {
+    if (progress) updateSessionPhase(progress.currentPhase);
+  }, [progress?.currentPhase]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /**
+   * The phase whose MATERIAL the animal is currently reading, derived from its
+   * resolved index against the phase-block boundaries, never above its
+   * awareness-tier phase.
+   *
+   * WHY: the lagging tier converges at the reveal (getAnimalPhase maps global
+   * 3 -> 2 and global 4 -> 4), so sloth/wombat/rabbit/red_panda/kakapo never
+   * resolve to animal-phase 3 in any state. Everything keyed on animalPhase
+   * alone — the phase-3 cross-references and trigger-word reactions — was
+   * therefore unreachable for five of thirteen animals for the whole dread
+   * arc. Reading the index instead gives them phase-3 flavor over their
+   * phase-3 lines, and rolls forward on its own when the index crosses into
+   * the phase-4 block. It also stops a vanguard animal with unread backlog
+   * from answering phase-2 lines with phase-3 flavor.
+   *
+   * getAnimalPhase itself stays untouched: its `4` for the lagging tier at the
+   * reveal is load-bearing (the robes are house-wide, and the Phase-4 blocks
+   * were orphaned before it).
+   */
+  const getFlavorPhase = (
+    animal: Animal,
+    animalPhase: DialoguePhase,
+    unlocked: Set<AnimalType>
+  ): DialoguePhase => {
+    // Phase 5 is pool-only; there is no indexed block to read a phase from.
+    if (animalPhase >= 5) return animalPhase;
+    const resolved = resolveDialogueIndex(
+      animal.type,
+      animal.currentDialogueIndex,
+      animalPhase,
+      unlocked
+    );
+    let reading = 0;
+    for (let p = 4; p >= 1; p--) {
+      if (resolved >= getPhaseStartIndex(animal.type, p as DialoguePhase)) {
+        reading = p;
+        break;
+      }
+    }
+    return Math.min(reading, animalPhase) as DialoguePhase;
+  };
+
+  /**
+   * Run a page's one-time bookkeeping now that the page is on screen. Clears
+   * the commit first, so a page can never be committed twice.
+   */
+  const commitPage = async (page: PreDialoguePage | undefined): Promise<void> => {
+    if (!page || !page.commit) return;
+    const commit = page.commit;
+    page.commit = undefined;
+    try {
+      await commit();
+    } catch {
+      // One-time bookkeeping is non-critical; never break the conversation.
+    }
+  };
+
   // Track last-seen sacrifice count per animal to detect new sacrifices
   const lastSeenSacrificeCount = useRef<Record<string, number>>({});
 
@@ -582,7 +691,7 @@ export function useDialogueFlow({
   const getFullDialogueText = (): string => {
     // If there are pre-dialogue pages remaining, show the first one
     if (preDialoguePages.length > 0) {
-      return preDialoguePages[0];
+      return preDialoguePages[0].text;
     }
     // Otherwise show regular dialogue
     if (!selectedAnimal || !progress) return '';
@@ -745,6 +854,10 @@ export function useDialogueFlow({
     // Pick up any Tending done since the hook mounted (e.g. the player just
     // deepened the pattern in the pit) so Phase-5 selection/badge are current.
     await refreshTendingState();
+    // Availability and the session cap are phase-aware; make sure the session
+    // layer is reading THIS phase and not its module default (see the mirror
+    // effect above) before either is consulted.
+    if (progress) updateSessionPhase(progress.currentPhase);
     const availability = await checkDialogueAvailability(animal.id, getSessionBonus(animal));
 
     if (!availability.available) {
@@ -769,7 +882,16 @@ export function useDialogueFlow({
     hapticSelection();
 
     if (progress) {
-      recordAnimalVisit(animal.id, progress.currentPhase, progress.currentStreak).catch(() => {});
+      // A talk-to-animals quest completed by this visit has to reach the host:
+      // recordAnimalVisit mutates the cached quest objects in place, so no
+      // state derived from them ever re-runs on its own. Optional-chained on
+      // purpose — the resolved value is undefined under the hook test mocks,
+      // and an unguarded read would throw into the .catch and go silent.
+      recordAnimalVisit(animal.id, progress.currentPhase, progress.currentStreak)
+        .then(completed => {
+          if (completed?.length) onQuestsCompleted?.(completed);
+        })
+        .catch(() => {});
 
       // Skip past any lines that reference still-locked animals so the
       // stored read position never points at a blocked line.
@@ -804,9 +926,14 @@ export function useDialogueFlow({
     // trigger, and fulfilled-offering pages before its post-revelation/Tending
     // pool. They are not retired Phase 3/4 regular backlog; only the callback
     // queues below are restricted to their exact era.
-    const pages: string[] = [];
+    const pages: PreDialoguePage[] = [];
 
     const animalPhase = progress ? getAnimalPhase(progress.currentPhase, animal.type) : 0;
+    // Which era's lines this animal is actually on (see getFlavorPhase): the
+    // pools that dress a line must match the line, not the sky.
+    const flavorPhase = progress
+      ? getFlavorPhase(animal, animalPhase as DialoguePhase, getUnlockedTypes())
+      : 0;
 
     // 1. Tutorial callback for Fox at exact global/effective Phase 4. Requiring
     // both excludes vanguard Phase 4 at global Phase 3 and every Phase 5 visit.
@@ -819,16 +946,22 @@ export function useDialogueFlow({
         const seedsPlanted = await wereTutorialSeedsPlanted();
         if (!seedsPlanted) {
           const callbackLine = TUTORIAL_CALLBACK_DIALOGUES[Math.floor(Math.random() * TUTORIAL_CALLBACK_DIALOGUES.length)];
-          pages.push(callbackLine);
-          await markTutorialSeedsPlanted();
+          pages.push({ text: callbackLine, commit: () => markTutorialSeedsPlanted() });
         }
       } catch {
         // Tutorial callback is non-critical
       }
     }
 
-    // 2. Variant tutorial note — one-time explanation for newly encountered modes
-    if (progress) {
+    // 2. Variant tutorial note — one-time explanation for newly encountered modes.
+    // Same rule as the trigger queue and the offering request below:
+    // consumePendingVariantTutorial shifts the pending queue and files the
+    // variant under seen as it reads, so it has no peek half to defer to and
+    // may only ever run when its page would be page 0 (guaranteed visible the
+    // instant the modal opens). Without the gate it could sit at page 1 behind
+    // Fox's Phase-4 tutorial callback, and a scrim tap or Android back on page
+    // 0 burned the line forever with nothing having shown it.
+    if (progress && pages.length === 0) {
       try {
         const pendingVariant = await consumePendingVariantTutorial();
         if (pendingVariant) {
@@ -838,7 +971,7 @@ export function useDialogueFlow({
             progress.currentPhase
           );
           if (variantLine) {
-            pages.push(variantLine);
+            pages.push({ text: variantLine });
           }
         }
       } catch {
@@ -862,26 +995,36 @@ export function useDialogueFlow({
           progress.unlockedAnimals ?? []
         );
         if (coordEvent) {
-          pages.push(coordEvent.text);
+          // Consumed when the page is SHOWN, not here: consumedCoordinatedEvents
+          // lives on global home progress, so burning it during construction
+          // took one of the eight house-wide crescendos away from every animal
+          // at once if the player dismissed the card.
+          const theme = coordEvent.theme;
+          pages.push({
+            text: coordEvent.text,
+            commit: () => recordConsumedCoordinatedEvent(theme),
+          });
           hasCoordinatedEvent = true;
-          await recordConsumedCoordinatedEvent(coordEvent.theme);
         }
       } catch {
         // Coordinated events are non-critical
       }
     }
 
-    // 4. Trigger word reaction — use the actual per-animal reactions
-    if (!hasCoordinatedEvent) {
+    // 4. Trigger word reaction — use the actual per-animal reactions.
+    // consumeTriggerWords empties a queue as it reads, so it cannot be deferred
+    // to a commit; instead it may only ever run when this page would be page 0,
+    // which is guaranteed visible the moment the modal opens.
+    if (!hasCoordinatedEvent && pages.length === 0) {
       try {
         const consumed = await consumeTriggerWords(animal.type);
         if (consumed.length > 0) {
           const word = consumed[0];
-          if (animalPhase >= 1) {
+          if (flavorPhase >= 1) {
             // Use the per-animal, per-phase, per-word reaction text
-            const reaction = getTriggerWordReaction(animal.type, word, animalPhase as DialoguePhase);
+            const reaction = getTriggerWordReaction(animal.type, word, flavorPhase);
             if (reaction) {
-              pages.push(reaction);
+              pages.push({ text: reaction });
             }
           }
         }
@@ -891,10 +1034,14 @@ export function useDialogueFlow({
     }
 
     // 4b. Offering request (Phase 2+) — the animal asks once for a themed word,
-    // and reacts by name when the ledger has since delivered one. A fulfillment
-    // reaction always lands (it's a response to the player); the initial request
-    // line only fills an otherwise-quiet visit so it never crowds the main arc.
-    if (!hasCoordinatedEvent && progress) {
+    // and reacts by name when the ledger has since delivered one.
+    // Same rule as the trigger queue: takeOfferingDialogue writes
+    // requested/acknowledged as it reads and has no peek half, so it only runs
+    // when its page would be page 0 (guaranteed visible on open). A visit
+    // already carrying a page simply does not consult it, and the reaction
+    // lands whole on the next quiet visit rather than being consumed behind a
+    // page the player may close on.
+    if (!hasCoordinatedEvent && pages.length === 0 && progress) {
       try {
         // Always allow a fulfillment reaction; only allow a fresh request line
         // (which the service consumes on read) when the visit is otherwise quiet.
@@ -904,7 +1051,7 @@ export function useDialogueFlow({
           pages.length === 0
         );
         if (offering) {
-          pages.push(offering.line);
+          pages.push({ text: offering.line });
         }
       } catch {
         // Offering-request dialogue is non-critical
@@ -922,7 +1069,7 @@ export function useDialogueFlow({
         } else if (currentCount > lastSeenSacrificeCount.current[animal.type]) {
           const reaction = getSacrificeReaction(animal.type, currentCount, progress.currentPhase);
           if (reaction) {
-            pages.push(reaction);
+            pages.push({ text: reaction });
           }
           lastSeenSacrificeCount.current[animal.type] = currentCount;
         }
@@ -941,7 +1088,7 @@ export function useDialogueFlow({
         progress.currentPhase
       );
       if (thresholdLine) {
-        pages.push(thresholdLine);
+        pages.push({ text: thresholdLine });
       }
     }
 
@@ -956,7 +1103,7 @@ export function useDialogueFlow({
         const sessionNumber = (getSession(animal.id)?.sessionsCompleted ?? 0) + 1;
         const seed = await getAndMarkNarrativeSeedPage(animal.type, sessionNumber);
         if (seed) {
-          pages.push(seed);
+          pages.push({ text: seed });
         }
       } catch {
         // Narrative seeds are non-critical
@@ -970,25 +1117,29 @@ export function useDialogueFlow({
 
       if (isVanguard && progress.currentPhase >= 1) {
         try {
-          const seen = await hasSeenGuaranteedCrossRef(progress.currentPhase);
-          if (!seen) {
-            forceRef = true;
-            await markGuaranteedCrossRefSeen(progress.currentPhase);
-          }
+          forceRef = !(await hasSeenGuaranteedCrossRef(progress.currentPhase));
         } catch {
           // Non-critical
         }
       }
 
-      const crossRefChance = animalPhase <= 1 ? 0.20
-        : animalPhase === 2 ? 0.25
-        : animalPhase === 3 ? 0.45
+      const crossRefChance = flavorPhase <= 1 ? 0.20
+        : flavorPhase === 2 ? 0.25
+        : flavorPhase === 3 ? 0.45
         : 0.60;
 
       if (forceRef || Math.random() < crossRefChance) {
-        const ref = getCrossAnimalReference(animal.type, animalPhase as DialoguePhase, progress.unlockedAnimals);
+        const ref = getCrossAnimalReference(animal.type, flavorPhase, progress.unlockedAnimals);
         if (ref) {
-          pages.push(ref);
+          // The guaranteed-per-phase flag is spent on the page, not on the
+          // attempt: it used to be marked before the lookup, so a phase whose
+          // pool resolved to null (every candidate mentioning a locked animal)
+          // burned the vanguard's one guaranteed reference showing nothing.
+          const refPhase = progress.currentPhase;
+          pages.push({
+            text: ref,
+            commit: forceRef ? () => markGuaranteedCrossRefSeen(refPhase) : undefined,
+          });
         }
       }
     }
@@ -997,9 +1148,13 @@ export function useDialogueFlow({
     // Phase 3 choice now that the cult is revealed.
     if (animalPhase === 4) {
       try {
-        const choiceCallback = await getAndMarkPhase4CallbackPage(animal.type);
+        const choiceCallback = await getPhase4CallbackPage(animal.type);
         if (choiceCallback) {
-          pages.push(choiceCallback);
+          const type = animal.type;
+          pages.push({
+            text: choiceCallback,
+            commit: () => markPhase4CallbackShown(type),
+          });
         }
       } catch {
         // Choice callbacks are non-critical
@@ -1018,15 +1173,22 @@ export function useDialogueFlow({
           allowUnheardSeeds: true,
         });
         if (seedCallback) {
-          pages.push(seedCallback);
+          // Still marked at build time: the mark lives inside the service and
+          // there is no peek half to defer to yet (see the note on
+          // getPhase4CallbackPage for the shape it wants).
+          pages.push({ text: seedCallback });
         }
       } catch {
         // Seed callbacks are non-critical
       }
     }
 
-    // 8. Dialogue choice point (Phase 3 only) — illusion of agency
-    if (animalPhase === 3) {
+    // 8. Dialogue choice point (the Phase-3 beat) — illusion of agency.
+    // Phase 4 is passed through too: the lagging tier reads its Phase-3 block
+    // at animal-phase 4 (getAnimalPhase converges at the reveal), and
+    // getChoiceForAnimal is the one place that decides, from the index band and
+    // the awareness tier, whether this animal is on its Phase-3 material.
+    if (animalPhase === 3 || animalPhase === 4) {
       try {
         const choice = await getChoiceForAnimal(
           animal.type,
@@ -1035,7 +1197,7 @@ export function useDialogueFlow({
         );
         if (choice) {
           // Show the choice prompt as a pre-dialogue page
-          pages.push(choice.prompt);
+          pages.push({ text: choice.prompt });
           setActiveChoice(choice);
         }
       } catch {
@@ -1044,6 +1206,10 @@ export function useDialogueFlow({
     }
 
     setPreDialoguePages(pages);
+    // The modal opens on page 0, so page 0 is visible from this moment: commit
+    // its bookkeeping here, and every later page as it becomes the head (see
+    // handleNextDialogue).
+    await commitPage(pages[0]);
 
     const status = getSessionStatus(animal.id, getSessionBonus(animal));
     setSessionInfo(status);
@@ -1062,7 +1228,7 @@ export function useDialogueFlow({
         useNativeDriver: true,
       }).start();
     }
-  }, [dialogueSlide, progress, refreshTendingState, resetPageQueue]);
+  }, [dialogueSlide, progress, refreshTendingState, resetPageQueue, onQuestsCompleted]);
 
   // Recompute hasNewDialogue for a specific animal after session changes
   const recomputeHasNewDialogue = useCallback((animal: Animal): boolean => {
@@ -1224,7 +1390,11 @@ export function useDialogueFlow({
     // Pre-dialogue pages don't count toward session dialogue limits
     if (preDialoguePages.length > 0) {
       resetPageQueue();
+      const nextHead = preDialoguePages[1];
       setPreDialoguePages(prev => prev.slice(1));
+      // The next page is now the visible one — commit its bookkeeping here
+      // (see PreDialoguePage): never at build time, never on advancing PAST it.
+      await commitPage(nextHead);
       return;
     }
 
@@ -1380,7 +1550,7 @@ export function useDialogueFlow({
         const seenNudge = await hasSeenFoxPlayNudge();
         if (!seenNudge) {
           resetPageQueue();
-          setPreDialoguePages([getFoxPostTutorialPlayPrompt(progress.currentPhase)]);
+          setPreDialoguePages([{ text: getFoxPostTutorialPlayPrompt(progress.currentPhase) }]);
           await markFoxPlayNudgeSeen();
           onFoxPlayPrompt?.();
           return;
@@ -1399,7 +1569,7 @@ export function useDialogueFlow({
       setPlayerChoices(prev => ({ ...prev, [selectedAnimal.type]: choice }));
       // Replace the current pre-dialogue page with the response, then convergence
       resetPageQueue();
-      setPreDialoguePages([result.response, result.convergence]);
+      setPreDialoguePages([{ text: result.response }, { text: result.convergence }]);
       setActiveChoice(null);
 
       // Record the choice response in whisper gallery

@@ -43,6 +43,7 @@ const DOCUMENTED_EXCLUSIONS: Record<string, string> = {
   wordshift_swift_hint_seen: 'One-time UI pointer toast; device-local UX, not progress.',
   wordshift_first_stuck_seen: 'One-time mercy notice; a returning player may deserve it once more.',
   wordshift_preview_graduation_seen_v2: 'One-time teaching card, device-local by design.',
+  wordshift_local_reset_at: 'Stamps when THIS device was reset; syncing it would round-trip through a restore and defeat its own purpose. Deliberately survives Reset All (like wordshift_pending_iap_grants), so a post-reset relaunch whose upload failed cannot auto-restore the pre-reset save.',
 };
 
 /** Source files to scan for key literals. */

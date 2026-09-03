@@ -12,6 +12,19 @@ import {
   ANIMAL_CHOICES,
   PlayerChoice,
 } from '../services/dialogueChoices';
+import { getPhaseStartIndex } from '../services/dialogue/animalDialogueBase';
+import { ANIMAL_AWARENESS_TIERS, AnimalType } from '../types/homeWorld';
+
+/**
+ * A dialogue index that sits inside an animal's real Phase-3 block. The old
+ * tests passed a literal 5, which reads as "the 6th line the animal ever
+ * says" — deep in its PHASE-0 block, because the index is absolute over the
+ * phase-ordered list (blocks of 24/28/22/30/30). The window was written as if
+ * the index were a per-phase offset, so the beat was unreachable for anyone
+ * who actually read dialogue. These tests measure from the real boundary.
+ */
+const inPhase3 = (animal: string, offset = 2): number =>
+  getPhaseStartIndex(animal as AnimalType, 3) + offset;
 
 // Mock AsyncStorage using shared factory
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -272,60 +285,110 @@ describe('dialogueChoices', () => {
     });
 
     it('returns choice content for phase 3', async () => {
-      const result = await getChoiceForAnimal('fox', 3, 5);
+      const result = await getChoiceForAnimal('fox', 3, inPhase3('fox'));
       expect(result).not.toBeNull();
       expect(result!.prompt).toBe(ANIMAL_CHOICES.fox.prompt);
     });
 
-    it('returns null for phase 4', async () => {
-      const result = await getChoiceForAnimal('fox', 4, 5);
+    it('returns null for phase 4 for a non-lagging animal', async () => {
+      // Fox has had its own animal-phase 3; at 4 the moment has passed.
+      const result = await getChoiceForAnimal('fox', 4, inPhase3('fox'));
       expect(result).toBeNull();
     });
 
-    it('returns null for dialogueIndex < 4', async () => {
-      for (let i = 0; i < 4; i++) {
+    it('returns null before the animal is a couple of lines into its Phase-3 block', async () => {
+      const start = getPhaseStartIndex('fox', 3);
+      for (let i = start - 3; i < start + 2; i++) {
         const result = await getChoiceForAnimal('fox', 3, i);
         expect(result).toBeNull();
       }
     });
 
-    it('returns choice for dialogueIndex 4-6', async () => {
-      for (let i = 4; i <= 6; i++) {
+    it('stays available across the whole Phase-3 block (a 5-line session steps in fives)', async () => {
+      // getDialoguesPerSession(3) is 5, so session-start indices land on
+      // start+0, +5, +10... A three-wide window is simply stepped over; the
+      // band is the block, and offeredBy is what makes it once-per-animal.
+      const start = getPhaseStartIndex('fox', 3);
+      const end = getPhaseStartIndex('fox', 4);
+      for (let i = start + 2; i < end; i += 5) {
         await clearChoiceState();
         const result = await getChoiceForAnimal('fox', 3, i);
         expect(result).not.toBeNull();
       }
     });
 
-    it('returns null for dialogueIndex > 6', async () => {
-      const result = await getChoiceForAnimal('fox', 3, 7);
+    it('returns null once the animal has read past its Phase-3 block', async () => {
+      const result = await getChoiceForAnimal('fox', 3, getPhaseStartIndex('fox', 4));
       expect(result).toBeNull();
     });
 
     it('returns null if animal already offered choice', async () => {
       await recordChoice('fox', 'ask');
-      const result = await getChoiceForAnimal('fox', 3, 5);
+      const result = await getChoiceForAnimal('fox', 3, inPhase3('fox'));
       expect(result).toBeNull();
     });
 
     it('returns choice for different animal after one has offered', async () => {
       await recordChoice('fox', 'ask');
-      const result = await getChoiceForAnimal('owl', 3, 5);
+      const result = await getChoiceForAnimal('owl', 3, inPhase3('owl'));
       expect(result).not.toBeNull();
     });
 
     it('returns choice content for every animal', async () => {
       for (const animal of ALL_ANIMALS) {
         await clearChoiceState();
-        const result = await getChoiceForAnimal(animal, 3, 5);
+        // Lagging animals never resolve to animal-phase 3 (see below); they
+        // read their Phase-3 block at animal-phase 4.
+        const phase = ANIMAL_AWARENESS_TIERS[animal as AnimalType] === 'lagging' ? 4 : 3;
+        const result = await getChoiceForAnimal(animal, phase, inPhase3(animal));
         expect(result).not.toBeNull();
         expect(result!.prompt).toBe(ANIMAL_CHOICES[animal].prompt);
       }
     });
 
     it('returns null for unknown animal', async () => {
-      const result = await getChoiceForAnimal('unicorn', 3, 5);
+      const result = await getChoiceForAnimal('unicorn', 3, 76);
       expect(result).toBeNull();
+    });
+
+    // =======================================================================
+    // Reachability against the indices the game actually stores. The old
+    // window ([4,6] absolute) could only be satisfied by an animal the player
+    // had all but ignored, and never at all by one fast-forwarded on unlock.
+    // =======================================================================
+    describe('reachability from real stored indices', () => {
+      it('offers the choice to a lagging animal, which never reaches animal-phase 3', async () => {
+        // getAnimalPhase maps lagging: global 3 -> 2, global 4 -> 4. Their
+        // Phase-3 lines are read at animal-phase 4.
+        for (const animal of ALL_ANIMALS.filter(
+          a => ANIMAL_AWARENESS_TIERS[a as AnimalType] === 'lagging'
+        )) {
+          await clearChoiceState();
+          const result = await getChoiceForAnimal(animal, 4, inPhase3(animal));
+          expect(result).not.toBeNull();
+        }
+      });
+
+      it('reaches a late recruit fast-forwarded onto its Phase-3 start index', async () => {
+        // fastForwardLateUnlockDialogue writes exactly getPhaseStartIndex(type, 3)
+        // for an animal unlocked at global Phase 3 (the aye-aye, belfry gate 88).
+        // Its first session (5 lines, or 7 with the catch-up boost) steps
+        // straight over any narrow window; the next session start is inside
+        // the band.
+        const start = getPhaseStartIndex('aye_aye', 3);
+        expect(await getChoiceForAnimal('aye_aye', 3, start)).toBeNull();
+        expect(await getChoiceForAnimal('aye_aye', 3, start + 5)).not.toBeNull();
+        await clearChoiceState();
+        expect(await getChoiceForAnimal('aye_aye', 3, start + 7)).not.toBeNull();
+      });
+
+      it('never fires over an animal\'s bright-days lines', async () => {
+        // The old window put the dread prompt on top of Phase-0 small talk.
+        for (const animal of ALL_ANIMALS) {
+          await clearChoiceState();
+          expect(await getChoiceForAnimal(animal, 3, 5)).toBeNull();
+        }
+      });
     });
   });
 
@@ -530,7 +593,7 @@ describe('dialogueChoices', () => {
       await recordChoice('fox', 'ask');
       await clearChoiceState();
 
-      const result = await getChoiceForAnimal('fox', 3, 5);
+      const result = await getChoiceForAnimal('fox', 3, inPhase3('fox'));
       expect(result).not.toBeNull();
     });
 

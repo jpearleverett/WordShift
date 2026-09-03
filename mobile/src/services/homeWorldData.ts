@@ -8,7 +8,7 @@ import { logEvent } from './eventLogger';
 import { loadTendingState } from './tending';
 import { loadChoiceState } from './dialogueChoices';
 import { getPhase5PoolLength } from './dialogue/phase5Pool';
-import { UNLOCK_SKIP_PREMIUM } from '../constants/gameBalance';
+import { UNLOCK_SKIP_PREMIUM, PHASE_THRESHOLDS } from '../constants/gameBalance';
 
 // ============================================================================
 // PHASE-AWARE ROOM DESCRIPTIONS
@@ -778,9 +778,11 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   // THE HIGH ROOMS (Puzzles ~84-92) - The house keeps growing above what was
   // once its top, through late Growing Shadows and past the reveal (~90). The
   // gates sit at/past the Phase 3 weighted threshold (PHASE_THRESHOLDS[3] =
-  // 84) — the derivation LATE_PHASE_RECRUITS (types/homeWorld.ts) relies on:
-  // weighted progress never trails raw puzzles, so the descent trio can only
-  // ever unlock at global Phase 3+. The Sky Garden gate at 92 completes the
+  // 84), which the LATE_PHASE_RECRUITS derivation (types/homeWorld.ts) leans
+  // on. The gates alone do NOT prove it though: a shared-challenge win pays +1
+  // solve and +0 weighted progress, so the Phase-3 floor for the trio is
+  // ENFORCED explicitly in isUnlockAvailable rather than implied by the
+  // gates. The Sky Garden gate at 92 completes the
   // house/recruits Moss around 96-100. The eight-win dwell completes around
   // 104-108, arming waits for 115, the final board is ~116, and
   // post-revelation is ~117-122.
@@ -956,6 +958,21 @@ export async function isUnlockAvailable(unlockId: string): Promise<{
       available: false,
       reason: `Complete ${unlock.minPuzzles} puzzles first (${progress.puzzlesSolved} so far)`,
     };
+  }
+
+  // NARRATIVE GUARD (descent trio): the LATE_PHASE_RECRUITS derivation rests on
+  // "the trio's 84/88/92 solve gates imply global Phase 3", which in turn rests
+  // on weighted phase progress never trailing raw solves. Shared-challenge
+  // boards break exactly that: they pay full amber but +0 phase progress
+  // (skipPhaseProgress), so ~25 friend-link wins inside the first 84 solves put
+  // a player at 84 solves with weighted progress still under the Phase-3
+  // threshold — the Star Loft opens, Vesper arrives under a dusk sky delivering
+  // Phase-3 dread, and her catch-up boost (which needs global Phase 3) never
+  // applies. Gate on the WEIGHTED number, which is what the derivation actually
+  // wants (see isDescentTrioHeld for why it is not `currentPhase`). A no-op for
+  // anyone who has never won a shared-challenge board.
+  if (isDescentTrioHeld(unlock, progress)) {
+    return { available: false, reason: getDescentTrioNotReadyText() };
   }
 
   // For character unlocks, check if the room exists
@@ -1250,6 +1267,84 @@ export function getLockedRoomReasonText(opts: { gated: boolean; canAfford: boole
 }
 
 /**
+ * Why one of the last three rooms is refusing, when the refusal is the HOUSE
+ * and not the purse or the level board. No numbers, no phase jargon (narrative
+ * rule 7) — the same register as getReservedSpeedUpNotYetText, because it is
+ * the same refusal seen from the other side.
+ */
+export function getDescentTrioNotReadyText(): string {
+  return 'The house is not ready for this one yet. It comes in its own time.';
+}
+
+/**
+ * The one short line under the in-world locked room card. It exists because the
+ * card cannot borrow the MODAL's sentences: getReserveGateText /
+ * getReservedArrivalText return full lines ("Still growing here. Opens at level
+ * 84 (you're at 12)"), and the card is a ~108x58dp chip inside a 250x123dp
+ * room — those wrap to four or five lines and burst the NineSlice frame. Same
+ * module as the modal copy so the two can never say different things about the
+ * same room; each sized for its own surface. The spoken accessibility label is
+ * free to use the long-form modal helpers.
+ */
+export function getLockedRoomCardSub(opts: {
+  reserved: boolean;
+  gateBlocked: boolean;
+  minPuzzles?: number;
+  puzzlesSolved?: number;
+  affordable: boolean;
+}): string {
+  if (opts.reserved) return 'Reserved';
+  if (opts.gateBlocked) {
+    // Name the BINDING constraint, the way getNextUnlockMeterText does. A
+    // descent-trio room whose level gate is already open is waiting on the
+    // house itself (the weighted Phase-3 floor), and no level number describes
+    // that wait — quoting one the player has already passed would read as the
+    // gate being broken.
+    const levelGateOpen =
+      opts.minPuzzles === undefined || (opts.puzzlesSolved ?? 0) >= opts.minPuzzles;
+    return levelGateOpen ? 'Still growing' : `Opens at level ${opts.minPuzzles}`;
+  }
+  return opts.affordable ? 'Tap to build' : '';
+}
+
+/**
+ * Is this unlock's ARRIVAL held back by something no amount of amber can move —
+ * its level gate, or (descent trio only) the house's own Phase-3 floor?
+ *
+ * One predicate because the in-world card and the availability check MUST agree
+ * on what "gated" means. They did not: the card read the level gate alone, so a
+ * shared-challenge player standing at 84 raw solves with weighted progress
+ * still under the Phase-3 threshold saw "Tap to build" on a Star Loft that
+ * isUnlockAvailable would then refuse.
+ */
+export function isUnlockGateBlocked(
+  unlock: Unlockable | null | undefined,
+  progress: { puzzlesSolved?: number; phaseProgress?: number } | null | undefined,
+): boolean {
+  if (!unlock || !progress) return false;
+  const solved = progress.puzzlesSolved ?? 0;
+  if (unlock.minPuzzles !== undefined && solved < unlock.minPuzzles) return true;
+  return isDescentTrioHeld(unlock, progress);
+}
+
+/**
+ * The descent trio's narrative floor, in one place: the last three rooms may
+ * never arrive before the house has actually descended to Phase 3.
+ *
+ * WEIGHTED progress, never `currentPhase`: transitions are deferred to the pit
+ * ward-ignition ceremony, so reading `currentPhase` would refuse the room to a
+ * perfectly normal player at the exact moment it was meant to open, until they
+ * walked to the pit and tapped through a ceremony nobody told them about.
+ */
+function isDescentTrioHeld(
+  unlock: Unlockable,
+  progress: { puzzlesSolved?: number; phaseProgress?: number },
+): boolean {
+  if (!isDescentTrioRoomUnlock(unlock)) return false;
+  return (progress.phaseProgress ?? progress.puzzlesSolved ?? 0) < PHASE_THRESHOLDS[3];
+}
+
+/**
  * Amber to speed up an ALREADY-RESERVED unlock: only the premium delta (the base
  * cost was already paid at reserve time), so the total paid equals a direct skip.
  */
@@ -1364,6 +1459,16 @@ export async function claimReservedUnlockIfReady(): Promise<Unlockable | null> {
 
   // Gate must now be met.
   if (unlock.minPuzzles !== undefined && progress.puzzlesSolved < unlock.minPuzzles) {
+    return null;
+  }
+
+  // ...and for the descent trio the gate really means "the house is ready":
+  // the same weighted floor isUnlockAvailable enforces. Without it a player
+  // whose raw solves outran their weighted descent (shared-challenge boards pay
+  // no phase progress) could reserve the Star Loft and have it delivered here,
+  // straight past the guard on the build path. The reservation is not lost or
+  // refunded, it simply keeps waiting — which is what a reservation is.
+  if (isDescentTrioHeld(unlock, progress)) {
     return null;
   }
 

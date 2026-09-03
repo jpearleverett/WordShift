@@ -50,6 +50,7 @@ import {
   getFullProgress,
   markIntroSeen,
   markHouseCompleted,
+  markHouseCompletionCelebrated,
   awardBonusAmber,
   hasSeenChallengeIntro,
   markChallengeIntroSeen,
@@ -245,6 +246,16 @@ interface HomeScreenProps {
    * of the inline fallback modal.
    */
   onHouseCompleted?: () => void;
+  /**
+   * Run the victory-free achievement check (App's useAchievementQueue
+   * `checkAchievementsNow`). Four achievements key ONLY on unlock counts
+   * (first_animal / animals_5 / all_animals / all_rooms, 185 amber between
+   * them) and those counts only ever move on this screen, which ran no check
+   * at all — so completing the house left 'Full House' and 'Master Builder'
+   * reading LOCKED, with the amber uncredited, until the player happened to
+   * finish another puzzle. Same delivery path as the victory-side check.
+   */
+  onUnlockCompleted?: () => void;
   /**
    * Bumped by App when an App-level modal that can change amber (the Store /
    * Patron modals) closes while home is visible. HomeScreen loads its data on
@@ -548,6 +559,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   initialHousePanY = null,
   onHousePanChange,
   onHouseCompleted,
+  onUnlockCompleted,
   refreshSignal = 0,
 }) => {
   const screenInsets = useScreenInsets();
@@ -687,6 +699,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setIntroAnimal,
     setIntroDialogueIndex,
     setShowIntroDialogue,
+    onUnlockCompleted,
     // A newly unlocked character's intro must open on a clean slate — if a
     // one-time HomeScreen intro (Reserve explainer etc.) raced into the shared
     // intro state during the unlock delay, its override script would otherwise
@@ -725,6 +738,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         }).start();
       }
       setShowCelebration(true);
+      // A reserved room that built itself changes the unlocked counts exactly
+      // like a purchase does, so the collection achievements must be checked
+      // here too (see onUnlockCompleted).
+      onUnlockCompleted?.();
     }
 
     // Update puzzle count for dialogue session system
@@ -740,13 +757,30 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     // breath as the final animal's purchase, and firing immediately ran the
     // temple cutscene on top of that animal's intro dialogue. Mark it pending
     // instead — the effect below plays it once no intro dialogue is up.
-    if (!progressData.houseCompleted) {
+    //
+    // The two facts are deliberately separate flags. `houseCompleted` is
+    // WORLD STATE (the endgame chain, the completion coda, canStartNewCycle and
+    // the creator kit all read it), so it is written the instant the house is
+    // whole and never waits on a cutscene. `houseCompletionCelebrated` is
+    // DELIVERY, and it is written only when the cinematic actually plays. They
+    // used to be one flag written at detection time, with delivery living in
+    // component state on a screen that unmounts on every navigation — so a
+    // player who tapped PLAY, or was killed by the task switcher, inside the
+    // 650ms window lost the payoff for the house's 4,615-amber arc forever, on
+    // every device, with nothing anywhere that could re-arm it.
+    let houseIsWhole = progressData.houseCompleted === true;
+    if (!houseIsWhole) {
       const allRoomsUnlocked = roomsData.filter(r => r.isUnlocked).length >= ROOMS.length;
       const allAnimalsUnlocked = animalsData.filter(a => a.isUnlocked).length >= ANIMALS.length;
       if (allRoomsUnlocked && allAnimalsUnlocked) {
         await markHouseCompleted();
-        setPendingHouseCompletion(true);
+        houseIsWhole = true;
       }
+    }
+    // Outside the completion guard on purpose: an interrupted delivery re-arms
+    // on the next home landing, and keeps re-arming until the beat is seen.
+    if (houseIsWhole && !progressData.houseCompletionCelebrated) {
+      setPendingHouseCompletion(true);
     }
 
     // Refresh unlock data with fresh arrays (avoids stale state)
@@ -792,7 +826,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       attuned,
       tendingLevel: tending,
     };
-  }, [unlockFlow.refreshUnlockData]);
+  }, [unlockFlow.refreshUnlockData, onUnlockCompleted]);
 
   // Keep the ref in sync
   loadAllDataRef.current = loadAllData;
@@ -808,6 +842,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     if (showIntroDialogue || introOverrideLines) return;
     const timer = setTimeout(() => {
       setPendingHouseCompletion(false);
+      // Written HERE, on delivery, mirroring markUnbrokenWeaveIntroSeen: until
+      // this lands the beat stays armed and the next home landing re-offers it.
+      markHouseCompletionCelebrated().catch(() => {});
       if (onHouseCompleted) {
         // App plays the full HOUSE_COMPLETION_EVENT cinematic over the home scene.
         onHouseCompleted();
@@ -1755,12 +1792,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setDoubleQuestOffer({ questId, amber: reward.amber });
     logEvent({ type: 'quest_reward_claimed', data: { questId, amber: reward.amber } });
 
-    const refreshed = await loadWeeklyQuests(progress.currentPhase, {
-      puzzlesSolved: progress.puzzlesSolved,
-      unlockedAnimalCount: animals.filter(a => a.isUnlocked).length,
-      dailyUnlocked: false,
-      challengeUnlocked: (progress.puzzlesSolved ?? 0) >= 15,
-    });
+    // NO context on purpose. loadWeeklyQuests STORES whatever context it is
+    // handed (module-level lastKnownContext + the persisted
+    // lastGenerationContext), and this call passed a partial one with no
+    // unlockedVariants — overwriting the full context handleOpenQuestModal had
+    // just written, since the modal must be open to claim. A later context-less
+    // regeneration (updateQuestProgress on any victory, after a period
+    // rollover) then read unlockedVariants: [] and filtered every variant_wins
+    // template out of the whole next day's board. This refresh is a re-read of
+    // the current period's just-mutated cache, never a generation, so it needs
+    // no context at all: the safest fix is to hand it none.
+    const refreshed = await loadWeeklyQuests(progress.currentPhase);
     // loadWeeklyQuests returns the module-level cache objects that
     // claimQuestReward mutated IN PLACE — the same references this component
     // already holds in state. Clone every level so the pill/journal counts
@@ -2088,6 +2130,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           ritualWords={progress.ritualWords}
           nextUnlock={unlockFlow.nextUnlock}
           amberBalance={progress.amber}
+          reservedUnlockId={unlockFlow.reservedUnlockId}
+          puzzlesSolved={progress.puzzlesSolved}
+          // Weighted progress rides along because "gated" is not only the level
+          // board: the descent trio also waits on the house's own Phase-3
+          // floor, and the in-world card has to refuse for exactly the reason
+          // isUnlockAvailable does (both go through isUnlockGateBlocked).
+          phaseProgress={progress.phaseProgress}
           purchasedUpgrades={purchasedUpgrades}
           deepenedRooms={deepenedRooms}
           attunedRooms={attunedRooms}

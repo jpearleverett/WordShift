@@ -37,6 +37,17 @@ interface UseUnlockFlowParams {
    * portrait would deliver the OTHER intro's script.
    */
   resetIntroOverrides?: () => void;
+  /**
+   * Run the victory-free achievement check after anything that changes the
+   * unlocked room/animal COUNTS. Four achievements (first_animal, animals_5,
+   * all_animals, all_rooms — 185 amber) key on nothing else, and the counts
+   * only ever move here, on a screen that ran no check at all: completing the
+   * house left 'Full House' and 'Master Builder' locked, with their amber
+   * uncredited, until the player happened to win another puzzle. Wired to
+   * useAchievementQueue's checkAchievementsNow, which shares presentUnlocks
+   * with the victory-side check so the two cannot drift.
+   */
+  onUnlockCompleted?: () => void;
 }
 
 interface UseUnlockFlowReturn {
@@ -101,6 +112,7 @@ export function useUnlockFlow({
   setIntroDialogueIndex,
   setShowIntroDialogue,
   resetIntroOverrides,
+  onUnlockCompleted,
 }: UseUnlockFlowParams): UseUnlockFlowReturn {
   const [showShop, setShowShop] = useState(false);
   const [showRoomUnlock, setShowRoomUnlock] = useState<Room | null>(null);
@@ -261,6 +273,7 @@ export function useUnlockFlow({
       await loadAllData();
       setShowRoomUnlock(null);
       setShowInvitePrompt(false);
+      onUnlockCompleted?.();
       if (unlock.type === 'character') {
         const animal = ANIMALS.find(a => a.id === unlock.targetId);
         if (animal) {
@@ -277,7 +290,7 @@ export function useUnlockFlow({
       hapticError();
       setPurchaseError(result.error || 'Unable to skip the wait right now.');
     }
-  }, [loadAllData, onAmberChange, setShowCelebration, setIntroAnimal, setIntroDialogueIndex, setShowIntroDialogue]);
+  }, [loadAllData, onAmberChange, onUnlockCompleted, setShowCelebration, setIntroAnimal, setIntroDialogueIndex, setShowIntroDialogue]);
 
   // Speed up an already-reserved unlock: pay the remaining premium, unlock now.
   const handleSpeedUpReserved = useCallback(async (unlock: Unlockable) => {
@@ -291,6 +304,7 @@ export function useUnlockFlow({
       await loadAllData();
       setShowRoomUnlock(null);
       setShowInvitePrompt(false);
+      onUnlockCompleted?.();
       if (unlock.type === 'character') {
         const animal = ANIMALS.find(a => a.id === unlock.targetId);
         if (animal) {
@@ -307,7 +321,7 @@ export function useUnlockFlow({
       hapticError();
       setPurchaseError(result.error || 'Unable to speed this up right now.');
     }
-  }, [loadAllData, onAmberChange, setShowCelebration, setIntroAnimal, setIntroDialogueIndex, setShowIntroDialogue]);
+  }, [loadAllData, onAmberChange, onUnlockCompleted, setShowCelebration, setIntroAnimal, setIntroDialogueIndex, setShowIntroDialogue]);
 
   // Handle unlock purchase
   const handlePurchase = useCallback(async (unlock: Unlockable, options?: { suppressIntro?: boolean }) => {
@@ -328,6 +342,9 @@ export function useUnlockFlow({
       // could go negative and poison the app-level amber mirror.
       const balance = await getAmberBalance();
       onAmberChange?.(balance);
+      // The unlocked counts just moved: check the collection achievements now,
+      // not whenever the player next happens to finish a puzzle.
+      onUnlockCompleted?.();
 
       // If we just unlocked a character, show their intro dialogue
       if (unlock.type === 'character' && !options?.suppressIntro) {
@@ -350,7 +367,7 @@ export function useUnlockFlow({
       hapticError();
       setPurchaseError(result.error || 'Unable to unlock. Try again later.');
     }
-  }, [loadAllData, onAmberChange, setShowCelebration, setIntroAnimal, setIntroDialogueIndex, setShowIntroDialogue]);
+  }, [loadAllData, onAmberChange, onUnlockCompleted, setShowCelebration, setIntroAnimal, setIntroDialogueIndex, setShowIntroDialogue]);
 
   return {
     showShop,

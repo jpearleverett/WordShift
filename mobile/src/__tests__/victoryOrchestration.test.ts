@@ -83,3 +83,41 @@ describe('whisper roll placement', () => {
     expect(HOOK_SRC).toContain('!onboarding && !suppressCeremonyCues && Math.random()');
   });
 });
+
+// ===========================================================================
+// Micro-beat delivery: the beat is resolved at victory time but revealed
+// 600-1800ms later (plus the narrative-slot wait), and EVERY victory exit
+// clears that pending reveal. Because the beat tables are exact-count keyed
+// against a monotonic counter, acking at resolve time meant a brisk NEXT
+// LEVEL tap burned a one-time beat forever — worst of all the scripted silent
+// victory, whose fanfare is suppressed by a separate pure lookup, leaving a
+// wordless, confetti-less win that reads as a bug.
+// ===========================================================================
+describe('micro-beat ack placement', () => {
+  test('the beat is acked inside the reveal, after the generation check', () => {
+    const revealIdx = HOOK_SRC.indexOf('setShowMicroBeat(true)');
+    const ackIdx = HOOK_SRC.indexOf('ackVictoryMicroBeat(beatCycleCount)');
+    expect(revealIdx).toBeGreaterThan(-1);
+    expect(ackIdx).toBeGreaterThan(-1);
+    // Acked as it becomes visible, not when it resolved.
+    expect(ackIdx).toBeLessThan(revealIdx);
+    const resolveIdx = HOOK_SRC.indexOf('await resolveVictoryMicroBeat(');
+    expect(resolveIdx).toBeLessThan(ackIdx);
+    // The generation guard still stands between them.
+    const guard = HOOK_SRC.lastIndexOf('if (gen !== generationRef.current) return;', ackIdx);
+    expect(guard).toBeGreaterThan(resolveIdx);
+  });
+
+  test('the fabricated dwell line is never acked (it owns no pending record)', () => {
+    expect(HOOK_SRC).toContain('if (beatIsKeyed) ackVictoryMicroBeat(beatCycleCount)');
+    const dwellIdx = HOOK_SRC.indexOf("beat = { type: 'ambient_whisper', text: dwellLine");
+    expect(dwellIdx).toBeGreaterThan(-1);
+    // beatIsKeyed is only set from the keyed resolve, never from the dwell line.
+    expect(HOOK_SRC.match(/beatIsKeyed = /g)).toHaveLength(2);
+  });
+
+  test('the ack is track-aware (a cycled save must not write the absolute set)', () => {
+    expect(HOOK_SRC).toContain('beatCycleCount = fullProgress?.cycleCount ?? 0;');
+    expect(HOOK_SRC).toContain('ackVictoryMicroBeat(beatCycleCount)');
+  });
+});

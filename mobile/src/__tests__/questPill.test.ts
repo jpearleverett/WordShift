@@ -343,7 +343,13 @@ describe('header wiring (source scan of the one-row header)', () => {
   test('claiming inside the quest modal replaces quest state so counts re-derive', () => {
     const claimStart = src.indexOf('const handleClaimQuest');
     expect(claimStart).toBeGreaterThan(-1);
-    const claimBlock = src.slice(claimStart, claimStart + 1600);
+    // Slice to the callback's real terminator, not a magic character count: a
+    // fixed window silently drops assertions off the end the moment someone
+    // adds a comment to the handler, which is exactly how this test started
+    // failing on code that was correct.
+    const claimEnd = src.indexOf('\n  }, [', claimStart);
+    expect(claimEnd).toBeGreaterThan(claimStart);
+    const claimBlock = src.slice(claimStart, claimEnd);
     expect(claimBlock).toContain('claimQuestReward');
     // Fresh references at every level — loadWeeklyQuests hands back the same
     // in-place-mutated cache objects the component already holds in state.

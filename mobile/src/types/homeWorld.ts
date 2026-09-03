@@ -127,6 +127,16 @@ export const ANIMAL_AWARENESS_TIERS: Record<AnimalType, AnimalAwarenessTier> = {
  * because the phase-5 handoff skips unread earlier lines by design. And at
  * global phase 5 every animal clamps to 5 so no tier sits at Phase 4 forever
  * and misses its post-revelation dialogue.
+ *
+ * CONSEQUENCE WORTH KNOWING: the lagging tier therefore never resolves to 3
+ * (global 3 -> 2, global 4 -> 4). Anything keyed on `animalPhase === 3` is
+ * unreachable for those five animals, which is why the phase-3 choice point,
+ * cross-references and trigger reactions are selected from the animal's
+ * READING position (see getFlavorPhase in useDialogueFlow and the index band
+ * in getChoiceForAnimal) rather than from this number alone. Do not "fix" that
+ * by routing the lagging tier through a transitional 3 here: it would re-open
+ * the Phase-4 orphan and desync getCatchUpSessionBonus, whose lagging claimant
+ * is keyed on global phase 4 with animalPhase already 4.
  */
 export function getAnimalPhase(globalPhase: DialoguePhase, animalType: AnimalType): DialoguePhase {
   if (globalPhase === 5) return 5;
@@ -331,6 +341,16 @@ export interface HomeWorldProgress {
   triggerWordQueue?: string[];
   // Whether the house completion ceremony has been triggered
   houseCompleted?: boolean;
+  /**
+   * Whether the house-completion CINEMATIC was actually delivered.
+   *
+   * Deliberately separate from `houseCompleted`, which is the world-state fact
+   * (written the moment the last room lands, and read by the endgame chain).
+   * The two were the same flag, so the beat was marked spent at DETECTION: a
+   * player who left home inside the delivery window lost the cutscene forever.
+   * Split, the beat stays armed until it has actually played.
+   */
+  houseCompletionCelebrated?: boolean;
   // Whether the final puzzle has been completed
   finalPuzzleCompleted?: boolean;
   // Whether post-revelation (Phase 5) content has been reached

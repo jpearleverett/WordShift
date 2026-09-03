@@ -4861,6 +4861,12 @@ function MainApp() {
               initialHousePanY={homePanY}
               onHousePanChange={setHomePanY}
               onHouseCompleted={() => setPhaseTransitionEvent(HOUSE_COMPLETION_EVENT)}
+              // The four COLLECTION achievements key on unlocked room/animal
+              // counts, which only ever change here — nothing checked them at
+              // the moment they became true, so they waited for the player's
+              // next victory. Same shape as the journey achievements at the
+              // pit ceremony.
+              onUnlockCompleted={() => { achievementActions.checkAchievementsNow().catch(() => {}); }}
               refreshSignal={homeRefreshSignal}
             />
             {/* Achievement toast overlay */}

@@ -184,8 +184,13 @@ interface VictoryModalProps {
 // Phase-aware 3D button colors — matches LetterTile's phase palette.
 // Text/background pairs are WCAG AA-checked (>=4.5:1) against the phase's
 // modal background (see getPhaseTheme) — ratios noted inline where a color
-// was tuned for contrast.
-function getButtonTheme(phase: DialoguePhase) {
+// was tuned for contrast. `secondary`/`share` are consumed ONLY by the compact
+// Swift-Victories strip (the full modal's buttons are cottage CandyButtons on
+// the pixel skin), and both are flat fills with no overlay, so the pair below
+// is the final rendered one. Exported so victoryModal.test.ts can re-measure
+// every phase instead of trusting these comments — the share pair shipped
+// carrying a hand-written ratio that was 0.5 off and under the bar.
+export function getButtonTheme(phase: DialoguePhase) {
   if (phase >= 4) return {
     primary:   { bg: '#7C3AED', edge: '#5B21B6', shadow: '#5B21B6' },
     harvest:   { bg: '#C2410C', edge: '#9A3412', shadow: '#9A3412' },
@@ -208,7 +213,7 @@ function getButtonTheme(phase: DialoguePhase) {
     primary:   { bg: CandyColors.pink.main, edge: CandyColors.pink.dark, shadow: CandyColors.pink.dark },
     harvest:   { bg: CandyColors.orange.main, edge: CandyColors.orange.dark, shadow: CandyColors.orange.dark },
     secondary: { bg: CandyColors.gray[300], edge: CandyColors.gray[400], text: CandyColors.gray[600] }, // 5.1:1
-    share:     { bg: CandyColors.blue.light, edge: CandyColors.blue.main, text: CandyColors.gray[700] }, // 4.6:1 (secondary.text was 3.0:1 on blue)
+    share:     { bg: CandyColors.blue.light, edge: CandyColors.blue.main, text: CandyColors.gray[800] }, // 5.75:1 (gray[700] was 4.07:1 — the '4.6' this line used to claim was never measured; gray[600] is 2.98:1)
     harvestPill: { bg: 'rgba(249, 115, 22, 0.10)', border: 'rgba(249, 115, 22, 0.2)', text: '#9A3412' }, // 5.2:1 (orange.dark was 3.2:1)
     streakChip: { bg: '#FFE0C2', border: 'rgba(234, 88, 12, 0.35)', text: '#9A3412' }, // 5.8:1 (was orange.dark on orange.light @ 1.6:1)
     modalBorder: 'rgba(255, 255, 255, 0.3)',
@@ -218,7 +223,7 @@ function getButtonTheme(phase: DialoguePhase) {
     primary:   { bg: CandyColors.pink.main, edge: CandyColors.pink.dark, shadow: CandyColors.pink.dark },
     harvest:   { bg: CandyColors.orange.main, edge: CandyColors.orange.dark, shadow: CandyColors.orange.dark },
     secondary: { bg: CandyColors.gray[200], edge: CandyColors.gray[300], text: CandyColors.gray[600] }, // 6.2:1
-    share:     { bg: CandyColors.blue.light, edge: CandyColors.blue.main, text: CandyColors.gray[700] }, // 4.6:1 (secondary.text was 3.0:1 on blue)
+    share:     { bg: CandyColors.blue.light, edge: CandyColors.blue.main, text: CandyColors.gray[800] }, // 5.75:1 (gray[700] was 4.07:1 — the '4.6' this line used to claim was never measured; gray[600] is 2.98:1)
     harvestPill: { bg: 'rgba(249, 115, 22, 0.10)', border: 'rgba(249, 115, 22, 0.2)', text: '#9A3412' }, // 6.6:1 (orange.dark was 3.2:1)
     streakChip: { bg: '#FFE0C2', border: 'rgba(234, 88, 12, 0.35)', text: '#9A3412' }, // 5.8:1 (was orange.dark on orange.light @ 1.6:1)
     modalBorder: 'rgba(255, 255, 255, 0.4)',

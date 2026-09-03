@@ -1008,7 +1008,19 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
                 UNBROKEN WEAVE
               </Text>
               <Text style={[styles.challengeMenuDesc, { color: t.muted }]}>
-                Each letter may cross the chain only once.
+                {/* The state has to be legible without colour. Every other row
+                    swaps its GLYPH; this one carried a constant thread, so an
+                    8%-alpha fill and the title's hue were the only on/off
+                    signal a sighted player had (at the serene skin, #D9C8D4 vs
+                    #C99E63 — a hue-only difference on a near-invisible tint).
+                    The 'On.' / 'Off.' lead-in follows the Speed and Lexicon
+                    rows and states it in words. The glyph swap wants an
+                    off-state mark drawn into MODE_ICON_SPRITES first: ModeIcon
+                    falls back to the RAW OS emoji for an unmapped key, which is
+                    exactly what the 📕/📖/⏱ sprites were added to stop. */}
+                {unbrokenWeaveActive
+                  ? 'On. Each letter may cross the chain only once.'
+                  : 'Off. Each letter may cross the chain only once.'}
               </Text>
               {unbrokenWeaveMastery && (
                 <>

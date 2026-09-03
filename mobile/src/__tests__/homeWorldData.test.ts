@@ -22,6 +22,9 @@ import {
   getReservedSpeedUpNotYetText,
   getReservedSpeedUpNeedAmberText,
   getLockedRoomReasonText,
+  getLockedRoomCardSub,
+  getDescentTrioNotReadyText,
+  isUnlockGateBlocked,
   skipReservedUnlock,
   isDescentTrioRoomUnlock,
   getReservedSkipCost,
@@ -142,10 +145,13 @@ describe('UNLOCK_PROGRESSION', () => {
     });
 
     // LATE_PHASE_RECRUITS derivation guard (types/homeWorld.ts): the trio's
-    // room gates must ALL sit at or past the Phase 3 weighted threshold —
-    // weighted progress never trails raw puzzles solved, so gate >= threshold
-    // proves the trio cannot exist before global Phase 3. Bamboo (the room
-    // below) is deliberately NOT part of the derivation.
+    // room gates must ALL sit at or past the Phase 3 weighted threshold. The
+    // gates alone do NOT prove the trio cannot exist before global Phase 3 —
+    // a shared-challenge win pays +1 solve and +0 weighted progress, so raw
+    // solves CAN outrun weighted progress — which is why isUnlockAvailable
+    // enforces the weighted floor explicitly (see the descent-trio guard
+    // below). Bamboo (the room below) is deliberately NOT part of the
+    // derivation.
     for (const id of ['unlock_star_loft', 'unlock_belfry', 'unlock_sky_garden']) {
       expect(gatesById[id]).toBeGreaterThanOrEqual(PHASE_THRESHOLDS[3]);
     }
@@ -176,10 +182,11 @@ describe('UNLOCK_PROGRESSION', () => {
   // THROUGH Growing Shadows and past the reveal (the original ten rooms top
   // out at the Bamboo Attic gate 74; the three high rooms gate at 84/88/92).
   // ALL THREE high-room gates must sit at or past the Phase 3 weighted
-  // threshold (PHASE_THRESHOLDS[3] = 84): the LATE_PHASE_RECRUITS derivation
-  // in types/homeWorld.ts relies on gate >= threshold plus
-  // weighted-never-trails-raw to prove the descent trio can only unlock at
-  // global Phase 3+. The last gate must stay clear of the Phase 4 weighted
+  // threshold (PHASE_THRESHOLDS[3] = 84), which the LATE_PHASE_RECRUITS
+  // derivation in types/homeWorld.ts leans on. Weighted progress can trail raw
+  // solves (shared-challenge boards pay no phase progress), so the Phase-3
+  // floor for the trio is ENFORCED in isUnlockAvailable, not merely implied by
+  // these gates. The last gate must stay clear of the Phase 4 weighted
   // threshold — house completion (~96-100) must land before finale arming
   // (115), never compete with it.
   test('the final house unlock lands in the descent, before finale territory', () => {
@@ -361,6 +368,10 @@ describe('late-unlock dialogue fast-forward', () => {
   test('Vesper starts at her current effective phase instead of replaying an earlier block', async () => {
     const p = await loadProgress();
     p.puzzlesSolved = 200;
+    // Weighted progress must be set alongside raw solves: the descent-trio
+    // Phase-3 floor in isUnlockAvailable reads the WEIGHTED number, and a save
+    // with 200 solves and 0 weighted progress cannot exist outside a test.
+    p.phaseProgress = 200;
     p.currentPhase = 4;
     await unlockThrough('unlock_tarsier');
 
@@ -373,6 +384,7 @@ describe('late-unlock dialogue fast-forward', () => {
   test('Moss starts at his current effective lagging phase', async () => {
     const p = await loadProgress();
     p.puzzlesSolved = 200;
+    p.phaseProgress = 200; // see Vesper above: the trio floor reads weighted progress
     p.currentPhase = 4;
     await unlockThrough('unlock_kakapo');
 
@@ -752,6 +764,72 @@ describe('skip the wait (pay premium, unlock now)', () => {
       }
     });
 
+    // Shared-challenge wins pay full amber and ZERO phase progress
+    // (skipPhaseProgress), so ~25 friend-link boards inside the first 84 solves
+    // land a player on puzzlesSolved 84 with weighted progress still under the
+    // Phase-3 threshold. The organic unlock path used to trust the solve gate
+    // alone, so the Star Loft opened and Vesper arrived under a dusk sky
+    // delivering Phase-3 dread, with her catch-up boost (global Phase 3+) never
+    // applying. The guard reads the WEIGHTED number, not currentPhase, because
+    // phase transitions are deferred to the pit ceremony.
+    test('a trio room stays shut when raw solves outran weighted progress', async () => {
+      (await loadProgress()).puzzlesSolved = 80;
+      await unlockUpTo('unlock_star_loft');
+      const p = await loadProgress();
+      p.puzzlesSolved = 84;          // the solve gate is met
+      p.phaseProgress = 83;          // ...but the weighted descent is not
+      p.currentPhase = 2;
+
+      const blocked = await isUnlockAvailable('unlock_star_loft');
+      expect(blocked.available).toBe(false);
+      expect(blocked.reason).toBe(getDescentTrioNotReadyText());
+
+      // One more weighted point and the house is ready, with no pit ceremony
+      // in between (currentPhase deliberately still 2 — transitions defer).
+      p.phaseProgress = 84;
+      expect((await isUnlockAvailable('unlock_star_loft')).available).toBe(true);
+    });
+
+    test('the trio guard is a no-op for a player whose progress never trailed', async () => {
+      (await loadProgress()).puzzlesSolved = 80;
+      await unlockUpTo('unlock_star_loft');
+      const p = await loadProgress();
+      p.puzzlesSolved = 84;
+      p.phaseProgress = 96; // accelerators: weighted runs AHEAD of raw solves
+      p.currentPhase = 2;
+      expect((await isUnlockAvailable('unlock_star_loft')).available).toBe(true);
+    });
+
+    test('the refusal is in-world: no numbers, no phase or level jargon', () => {
+      const line = getDescentTrioNotReadyText();
+      expect(line).not.toMatch(/\d/);
+      expect(line.toLowerCase()).not.toContain('phase');
+      expect(line.toLowerCase()).not.toContain('level');
+      expect(line).not.toMatch(/[—–]/); // house rule: no em dashes in player copy
+    });
+
+    // The reserve path must not be a way around the floor: reserving is legal
+    // (it waits), but DELIVERY has to respect the same weighted line, or a
+    // shared-challenge player reserves the Star Loft and simply receives it.
+    test('a reserved trio room is not delivered while weighted progress trails', async () => {
+      (await loadProgress()).puzzlesSolved = 80;
+      await unlockUpTo('unlock_star_loft');
+      const p = await loadProgress();
+      p.phaseProgress = 80;
+      expect(await canReserveUnlock('unlock_star_loft')).toBe(true);
+      await reserveNextUnlock('unlock_star_loft');
+
+      const held = await loadProgress();
+      held.puzzlesSolved = 84;  // solve gate met
+      held.phaseProgress = 83;  // the house is not ready
+      expect(await claimReservedUnlockIfReady()).toBeNull();
+      expect((await loadProgress()).unlockedRooms).not.toContain('star_loft');
+      expect(await getReservedUnlockId()).toBe('unlock_star_loft'); // nothing lost
+
+      (await loadProgress()).phaseProgress = 84;
+      expect((await claimReservedUnlockIfReady())?.id).toBe('unlock_star_loft');
+    });
+
     test('non-trio gated rooms are untouched by the guard (jungle skips at Phase 0)', async () => {
       await unlockUpTo('unlock_jungle');
       // jungle's own prerequisites are ungated, so no solves are needed here
@@ -830,5 +908,77 @@ describe('speed up a reserved room (pay only the remaining premium)', () => {
     const res = await skipReservedUnlock('unlock_jungle');
     expect(res.success).toBe(false);
     expect((await loadProgress()).unlockedRooms).not.toContain('jungle_room');
+  });
+});
+
+// The in-world locked room card is a ~108x58dp chip inside a 250x123dp room.
+// It cannot borrow the modal's sentences ("Still growing here. Opens at level
+// 84 (you're at 12)") — they wrap to four or five lines and burst the frame —
+// but it must never contradict them either, so both live in this module.
+// The in-world card and isUnlockAvailable have to agree on what "gated" means.
+// They did not: the card read the level gate alone, so a shared-challenge
+// player standing at 84 raw solves with weighted progress still under the
+// Phase-3 threshold saw "Tap to build" on a Star Loft the house would refuse.
+describe('isUnlockGateBlocked', () => {
+  const starLoft = UNLOCK_PROGRESSION.find(u => u.id === 'unlock_star_loft')!;
+  const jungle = UNLOCK_PROGRESSION.find(u => u.id === 'unlock_jungle')!;
+
+  test('a closed level gate blocks, an open one does not', () => {
+    expect(isUnlockGateBlocked(jungle, { puzzlesSolved: 12, phaseProgress: 12 })).toBe(true);
+    expect(isUnlockGateBlocked(jungle, { puzzlesSolved: 19, phaseProgress: 19 })).toBe(false);
+  });
+
+  test('a trio room stays blocked past its level gate while weighted progress trails', () => {
+    expect(isUnlockGateBlocked(starLoft, { puzzlesSolved: 84, phaseProgress: 83 })).toBe(true);
+    expect(isUnlockGateBlocked(starLoft, { puzzlesSolved: 84, phaseProgress: 84 })).toBe(false);
+  });
+
+  test('a non-trio gated room ignores the weighted floor entirely', () => {
+    expect(isUnlockGateBlocked(jungle, { puzzlesSolved: 19, phaseProgress: 3 })).toBe(false);
+  });
+
+  test('a missing weighted number falls back to raw solves (legacy saves)', () => {
+    expect(isUnlockGateBlocked(starLoft, { puzzlesSolved: 84 })).toBe(false);
+  });
+});
+
+describe('getLockedRoomCardSub', () => {
+  test('a reserved room says so, and never quotes a price it already took', () => {
+    const sub = getLockedRoomCardSub({ reserved: true, gateBlocked: true, minPuzzles: 84, affordable: false });
+    expect(sub).toBe('Reserved');
+  });
+
+  test('a gated room names the level it opens at instead of inviting a tap', () => {
+    expect(getLockedRoomCardSub({ reserved: false, gateBlocked: true, minPuzzles: 19, affordable: true }))
+      .toBe('Opens at level 19');
+    // ...and never claims it is buildable when tapping only opens a modal.
+    expect(getLockedRoomCardSub({ reserved: false, gateBlocked: true, minPuzzles: 19, affordable: true }))
+      .not.toContain('Tap to build');
+  });
+
+  // A descent-trio room whose LEVEL gate is already open is waiting on the
+  // house itself, and no level number describes that wait. Quoting one the
+  // player has already passed would read as the gate being broken.
+  test('a room held by the house, not the level board, names no level', () => {
+    expect(getLockedRoomCardSub({
+      reserved: false, gateBlocked: true, minPuzzles: 84, puzzlesSolved: 84, affordable: false,
+    })).toBe('Still growing');
+  });
+
+  test('an ungated affordable room keeps the build invitation', () => {
+    expect(getLockedRoomCardSub({ reserved: false, gateBlocked: false, affordable: true }))
+      .toBe('Tap to build');
+  });
+
+  test('every line stays short enough for the card', () => {
+    const lines = [
+      getLockedRoomCardSub({ reserved: true, gateBlocked: true, minPuzzles: 92, affordable: false }),
+      getLockedRoomCardSub({ reserved: false, gateBlocked: true, minPuzzles: 92, affordable: false }),
+      getLockedRoomCardSub({ reserved: false, gateBlocked: true, affordable: false }),
+      getLockedRoomCardSub({ reserved: false, gateBlocked: false, affordable: true }),
+    ];
+    for (const line of lines) {
+      expect(line.length).toBeLessThanOrEqual(20);
+    }
   });
 });

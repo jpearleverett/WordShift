@@ -1720,6 +1720,19 @@ export async function markHouseCompleted(): Promise<void> {
 }
 
 /**
+ * Mark the house-completion cinematic as DELIVERED. Separate from
+ * markHouseCompleted (see houseCompletionCelebrated on HomeWorldProgress):
+ * the fact and its delivery are different events, and conflating them lost the
+ * cutscene for anyone who left home while it was still being staged.
+ */
+export async function markHouseCompletionCelebrated(): Promise<void> {
+  const progress = await loadProgress();
+  progress.houseCompletionCelebrated = true;
+  progressCache = progress;
+  await saveProgress();
+}
+
+/**
  * Check if house is fully completed
  */
 export async function isHouseCompleted(): Promise<boolean> {

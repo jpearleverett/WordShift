@@ -916,13 +916,19 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const [resultMessage, setResultMessage] = useState<string | null>(null);
   const [isOffering, setIsOffering] = useState(false);
   const [displayBalance, setDisplayBalance] = useState(amberBalance);
-  // Adopt EXTERNAL amber increases (a Store purchase made while the pit is
-  // open). Upward-only: pit-local spends/credits update displayBalance first
-  // and echo back through onAmberChange, so a lagging equal-or-smaller prop
-  // must never clobber the optimistic local value mid-cascade.
-  useEffect(() => {
-    setDisplayBalance(prev => (amberBalance > prev ? amberBalance : prev));
-  }, [amberBalance]);
+  // There is exactly ONE amberBalance prop-sync effect, and it lives below
+  // (search isOfferingRef). A second upward-only adoption effect used to sit
+  // here, and because both keyed on [amberBalance] and effects run in
+  // declaration order, it ran FIRST and won: during Offer All the parent echoes
+  // the already-credited FINAL balance back in the same batched render the
+  // cascade resets the display to the pre-offer value, so this effect raised
+  // the total straight to the end number and the guarded effect below then
+  // bailed on isOfferingRef with nothing left to undo. The per-word increments
+  // clamp at that same final value, so the count-up never played at all — the
+  // header sat at the post-harvest total while the pending badge counted down
+  // beside it. It was redundant too: the effect below assigns the prop
+  // unconditionally whenever the cascade is not running, which is the whole of
+  // its stated purpose (adopting an external increase, e.g. a Store purchase).
   const [overflowCount, setOverflowCount] = useState(0);
   // Tracks amber visually consumed during harvest-all cascade (for decrementing pending display)
   const [pendingAmberOffset, setPendingAmberOffset] = useState(0);

@@ -48,7 +48,7 @@ import { logEvent } from '../../services/eventLogger';
 import { RewardedAdButton } from './RewardedAdButton';
 import { RewardReveal } from '../ui/RewardReveal';
 import { GiftOverlay, GiftItem } from './GiftOverlay';
-import { isAdsReady } from '../../services/ads';
+import { isAdsReady, isRewardedCapReached } from '../../services/ads';
 import { getStoreArt, STORE_ART_KEYS } from './storeArt';
 import {
   getDailyAmberStatus,
@@ -166,6 +166,15 @@ export const StoreModal: React.FC<StoreModalProps> = ({
   );
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [amberFaucet, setAmberFaucet] = useState<DailyAmberStatus | null>(null);
+  // The faucet's own 2/day counter and the SHARED rewarded-view cap (8/day
+  // across victory doubles, hint recovery, quest bonuses, speed rescues and
+  // this faucet) are independent. RewardedAdButton hides itself entirely once
+  // the shared cap is spent, so a player with a faucet claim still owed but
+  // eight views already watched was told to "Watch a short clip. N left today."
+  // beside nothing tappable — a cap reading as a broken button. Held as state
+  // and read fresh on every modal open (isRewardedCapReached is async, so it
+  // can never be called during render).
+  const [rewardedCapReached, setRewardedCapReached] = useState(false);
   // The daily faucet claim resolves into a magnitude-aware RewardReveal count-up
   // (nonce forces a fresh reveal each claim, since the faucet allows 2/day).
   const [faucetReveal, setFaucetReveal] = useState<{ amount: number; nonce: number } | null>(null);
@@ -191,6 +200,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
       setFaucetReveal(null);
       setGift(null);
       getDailyAmberStatus().then(setAmberFaucet).catch(() => {});
+      isRewardedCapReached().then(setRewardedCapReached).catch(() => {});
       logEvent({ type: 'store_opened', data: { surface: 'store_modal' } });
     }
   }, [visible]);
@@ -345,6 +355,10 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     hapticMedium();
     const result = await recordDailyAmberClaim();
     setAmberFaucet(result);
+    // A faucet claim SPENDS a rewarded view, so re-read the shared cap here or
+    // a player at 7 views who claims once lands right back in the contradiction
+    // ("1 left today", no button) on the second claim.
+    isRewardedCapReached().then(setRewardedCapReached).catch(() => {});
     const grant = dailyAmberGrantFor(result);
     if (grant <= 0) {
       // Already collected today (stale card or rapid re-tap): the card flips to
@@ -712,8 +726,24 @@ export const StoreModal: React.FC<StoreModalProps> = ({
                     <View style={styles.rowInfo}>
                       <Text style={[styles.rowTitle, { color: t.title }]}>Daily Amber</Text>
                       <Text style={[styles.rowDesc, { color: t.body }]}>
+                        {/* Patrons never touch ads (handleClaimDailyAmber grants
+                            directly and RewardedAdButton returns null for them),
+                            so the shared cap is irrelevant to them — gating this
+                            copy unconditionally would tell a Patron their free
+                            amber was gone and hide a claim they can still make.
+
+                            OWED: the cap-reached line below is inline only
+                            because this batch could not edit phaseNarrative.ts.
+                            It belongs in a phase-aware getter there
+                            (getDailyAmberCapReachedLine(phase, amount)) like
+                            every other player-facing string; the rest of this
+                            card's copy predates the convention and should ride
+                            the same move. Keep it free of em dashes either way,
+                            noEmDashes.test.ts sweeps this file's literals. */}
                         {amberFaucet.available
-                          ? `Watch a short clip. ${amberFaucet.remaining} left today.`
+                          ? (!isPatronSync() && rewardedCapReached
+                              ? `Waiting for you. You have watched every clip today, so come back tomorrow for these ${DAILY_AMBER_REWARD} amber.`
+                              : `Watch a short clip. ${amberFaucet.remaining} left today.`)
                           : 'Collected for today. Come back tomorrow!'}
                       </Text>
                       {amberFaucet.available && renderRowFooter(

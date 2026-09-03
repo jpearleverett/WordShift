@@ -66,6 +66,8 @@ import {
   CYCLE_MICRO_BEATS,
   checkCycleNarrativeMicroBeat,
   resolveVictoryMicroBeat,
+  ackVictoryMicroBeat,
+  invalidateMicroBeatCaches,
 } from '../services/phaseNarrative';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DialoguePhase } from '../types/homeWorld';
@@ -2099,12 +2101,77 @@ describe('checkCycleNarrativeMicroBeat + resolveVictoryMicroBeat', () => {
     // First playthrough: absolute count consumes the classic track.
     const first = await resolveVictoryMicroBeat(35, 0, 0);
     expect(first).toEqual(MICRO_BEATS[35]);
+    await ackVictoryMicroBeat(0);
     // Cycle 1 at total 203, started at 200 → cycle-relative 3 → Ember's half-memory.
     const cycled = await resolveVictoryMicroBeat(203, 1, 200);
     expect(cycled).toEqual(CYCLE_MICRO_BEATS[3]);
+    // Ack it: an un-acked beat is deliberately re-delivered on the next win
+    // (that is the deferral), so the silence below is only meaningful once
+    // the queue is empty.
+    await ackVictoryMicroBeat(1);
     // Legacy cycled save with no anchor (cycleStartPuzzles 0): relative count
     // equals the huge total → outruns every key → the old silence, no crash.
     expect(await resolveVictoryMicroBeat(203, 1, 0)).toBeNull();
+  });
+
+  // =========================================================================
+  // Deferred delivery: a beat resolves ~0.6-1.8s before it is shown, and every
+  // victory exit cancels that reveal. Because the tables are exact-count keyed
+  // against a monotonic counter, a beat that was resolved but never revealed
+  // used to be gone for good — the whole point of these one-time beats lost to
+  // a brisk NEXT LEVEL tap (and to Swift Victories, whose buttons are live
+  // instantly). The resolved beat is now held until the reveal acks it.
+  // =========================================================================
+  test('an un-acked beat is re-delivered on the next win, then stops', async () => {
+    const beat = await resolveVictoryMicroBeat(35, 0, 0);
+    expect(beat).toEqual(MICRO_BEATS[35]);
+
+    // The player exits before the reveal: no ack. The next win (not a beat
+    // key of its own) delivers the held beat instead of nothing.
+    const held = await resolveVictoryMicroBeat(36, 0, 0);
+    expect(held).toEqual(MICRO_BEATS[35]);
+
+    // Shown this time.
+    await ackVictoryMicroBeat(0);
+    expect(await resolveVictoryMicroBeat(37, 0, 0)).toBeNull();
+  });
+
+  test('a held beat never swallows the beat of the win that delivers it', async () => {
+    // 31 resolves and is never shown...
+    const first = await resolveVictoryMicroBeat(31, 0, 0);
+    expect(first).toEqual(MICRO_BEATS[31]);
+    // ...and win 33 is itself a beat key. The held one goes first, and 33 is
+    // queued behind it rather than being rolled and dropped.
+    const held = await resolveVictoryMicroBeat(33, 0, 0);
+    expect(held).toEqual(MICRO_BEATS[31]);
+    await ackVictoryMicroBeat(0);
+    const nextWin = await resolveVictoryMicroBeat(34, 0, 0);
+    expect(nextWin).toEqual(MICRO_BEATS[33]);
+  });
+
+  test('a cycled save acks through its own per-cycle record', async () => {
+    const cycled = await resolveVictoryMicroBeat(203, 1, 200);
+    expect(cycled).toEqual(CYCLE_MICRO_BEATS[3]);
+    // Acking the absolute track must not clear the cycle track's held beat.
+    await ackVictoryMicroBeat(0);
+    expect(await resolveVictoryMicroBeat(204, 1, 200)).toEqual(CYCLE_MICRO_BEATS[3]);
+    await ackVictoryMicroBeat(1);
+    // 206 → cycle-relative 6, which is not a key on either track.
+    expect(await resolveVictoryMicroBeat(206, 1, 200)).toBeNull();
+  });
+
+  test('a held beat survives a relaunch (it is persisted, not just in memory)', async () => {
+    const beat = await resolveVictoryMicroBeat(35, 0, 0);
+    expect(beat).toEqual(MICRO_BEATS[35]);
+    invalidateMicroBeatCaches();
+    expect(await resolveVictoryMicroBeat(36, 0, 0)).toEqual(MICRO_BEATS[35]);
+  });
+
+  test('a legacy seen-set (a bare array) still reads forward', async () => {
+    await AsyncStorage.setItem('wordshift_micro_beats_seen', JSON.stringify([35]));
+    invalidateMicroBeatCaches();
+    expect(await resolveVictoryMicroBeat(35, 0, 0)).toBeNull();
+    expect(await resolveVictoryMicroBeat(42, 0, 0)).toEqual(MICRO_BEATS[42]);
   });
 
   test('resetMicroBeats clears the cycle-scoped seen set too', async () => {

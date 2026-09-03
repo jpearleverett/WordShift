@@ -1062,7 +1062,13 @@ const RULES_TEXT: Record<DialoguePhase, RulesText> = {
     title: 'HOW TO PLAY',
     steps: [
       { heading: 'Pick a Letter', desc: 'Tap any colorful tile in the active row.' },
-      { heading: 'Drop it Down', desc: 'Tap a + slot to place your letter.' },
+      // Names what the board actually draws. There is no '+' anywhere on a
+      // slot: the drop indicator is a small round dot (Row's dropDot), and the
+      // only glyph a slot ever shows is the guided tutorial's down arrow. The
+      // first How-to-Play a new player reads must not send them hunting for a
+      // mark that does not exist. (The plus in the step diagram stays: with the
+      // copy no longer naming it, it reads as generic "insert here" art.)
+      { heading: 'Drop it Down', desc: 'Tap an empty slot below to place your letter.' },
       { heading: 'Make Real Words', desc: 'Both words must be valid English!' },
       { heading: 'Complete All Rows', desc: 'Work through every row to win!' },
     ],
@@ -2269,29 +2275,101 @@ export const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
 /** AsyncStorage key for tracking consumed micro-beats */
 const MICRO_BEATS_SEEN_KEY = 'wordshift_micro_beats_seen';
 
-let microBeatsSeen: Set<number> | null = null;
+// ---------------------------------------------------------------------------
+// DEFERRED DELIVERY — why a resolved beat is ALSO held in a pending queue.
+//
+// A beat is resolved on the victory that lands on its key, but it is not
+// SHOWN for another 600-1800ms (the reveal delay), plus up to ~4s while the
+// narrative-slot arbiter waits its turn. Every victory exit (NEXT LEVEL,
+// Home, Collect Now, hardware back) clears that pending reveal, and the keys
+// are exact-count against a monotonic counter, so a beat resolved on win N is
+// never looked up again. With Swift Victories on, the compact strip's buttons
+// are live immediately — a brisk player lost most of the game's one-time
+// horror beats and could never get them back.
+//
+// So the resolved beat (text already substituted, so the {word} guarantee
+// holds) is written into a small pending QUEUE in the SAME record as the seen
+// set — one write, and no new storage key to register with cloudSave. The
+// next victory delivers the head of that queue BEFORE rolling its own beat,
+// and the queue entry is dropped only when the reveal actually runs
+// (ackVictoryMicroBeat, called from the reveal callback). A beat whose reveal
+// is cancelled therefore lands one win later instead of vanishing.
+// ---------------------------------------------------------------------------
 
-async function loadMicroBeatsSeen(): Promise<Set<number>> {
-  if (microBeatsSeen) return microBeatsSeen;
+/** A beat that resolved but has not yet been seen by the player. */
+interface PendingMicroBeat {
+  /** The exact-count key it resolved for (absolute, or cycle-relative). */
+  key: number;
+  /** Fully resolved beat — `{word}` already substituted at resolve time. */
+  beat: NarrativeMicroBeat;
+}
+
+/**
+ * Cap on undelivered beats held at once. In practice the queue never exceeds
+ * one (the head is delivered on the very next win); the cap exists so a player
+ * who never lets a reveal finish cannot accumulate a backlog that surfaces an
+ * ancient beat twenty wins out of place. Oldest is dropped first.
+ */
+const MAX_PENDING_MICRO_BEATS = 3;
+
+function queuePendingBeat(
+  pending: PendingMicroBeat[],
+  key: number,
+  beat: NarrativeMicroBeat,
+): PendingMicroBeat[] {
+  const next = [...pending.filter(p => p.key !== key), { key, beat }];
+  return next.slice(Math.max(0, next.length - MAX_PENDING_MICRO_BEATS));
+}
+
+interface MicroBeatsRecord {
+  seen: number[];
+  pending: PendingMicroBeat[];
+}
+
+let microBeatsRecord: MicroBeatsRecord | null = null;
+
+async function loadMicroBeatsRecord(): Promise<MicroBeatsRecord> {
+  if (microBeatsRecord) return microBeatsRecord;
   try {
     const AsyncStorage = require('@react-native-async-storage/async-storage').default;
     const raw = await AsyncStorage.getItem(MICRO_BEATS_SEEN_KEY);
-    microBeatsSeen = raw ? new Set(JSON.parse(raw)) : new Set();
+    const parsed = raw ? JSON.parse(raw) : null;
+    // Legacy shape is a bare array of seen counts; it reads forward cleanly.
+    microBeatsRecord = Array.isArray(parsed)
+      ? { seen: parsed, pending: [] }
+      : { seen: parsed?.seen ?? [], pending: parsed?.pending ?? [] };
   } catch {
-    microBeatsSeen = new Set();
+    microBeatsRecord = { seen: [], pending: [] };
   }
-  return microBeatsSeen;
+  return microBeatsRecord;
 }
 
-async function markMicroBeatSeen(puzzleCount: number): Promise<void> {
-  const seen = await loadMicroBeatsSeen();
-  seen.add(puzzleCount);
+async function saveMicroBeatsRecord(record: MicroBeatsRecord): Promise<void> {
+  microBeatsRecord = record;
   try {
     const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-    await AsyncStorage.setItem(MICRO_BEATS_SEEN_KEY, JSON.stringify([...seen]));
+    await AsyncStorage.setItem(MICRO_BEATS_SEEN_KEY, JSON.stringify(record));
   } catch {
     // Silently fail — non-critical
   }
+}
+
+/**
+ * Mark a beat consumed for the first-descent track. `pendingBeat` also queues
+ * the resolved beat for delivery — seen and pending are written together, so a
+ * kill between the two is impossible.
+ */
+async function markMicroBeatSeen(
+  puzzleCount: number,
+  pendingBeat?: NarrativeMicroBeat,
+): Promise<void> {
+  const record = await loadMicroBeatsRecord();
+  await saveMicroBeatsRecord({
+    seen: record.seen.includes(puzzleCount) ? record.seen : [...record.seen, puzzleCount],
+    pending: pendingBeat
+      ? queuePendingBeat(record.pending, puzzleCount, pendingBeat)
+      : record.pending,
+  });
 }
 
 /**
@@ -2332,8 +2410,8 @@ export async function checkNarrativeMicroBeat(
   const beat = MICRO_BEATS[puzzlesSolved];
   if (!beat) return null;
 
-  const seen = await loadMicroBeatsSeen();
-  if (seen.has(puzzlesSolved)) return null;
+  const record = await loadMicroBeatsRecord();
+  if (record.seen.includes(puzzlesSolved)) return null;
 
   // Personalized beats: resolve the {word} token BEFORE consuming the beat
   // (resolve-then-mark, never consume-then-fail — the preview-graduation _v2
@@ -2343,7 +2421,10 @@ export async function checkNarrativeMicroBeat(
   const resolved = await resolveMicroBeatText(beat);
   if (!resolved) return null; // unconsumed: never burn a beat invisibly
 
-  await markMicroBeatSeen(puzzlesSolved);
+  // Consumed for the roll AND queued for delivery: the count can never fire
+  // again, but the resolved line survives a cancelled reveal (see the
+  // deferred-delivery note above) until it is actually shown.
+  await markMicroBeatSeen(puzzlesSolved, resolved);
   return resolved;
 }
 
@@ -2721,13 +2802,16 @@ const CYCLE_BEATS_SEEN_KEY = 'wordshift_cycle_beats_seen';
 interface CycleBeatsSeen {
   cycle: number;
   seen: number[];
+  /** Resolved-but-unshown beats for THIS cycle (see the deferred-delivery
+   *  note above). Dropped wholesale when a deeper cycle begins, like `seen`. */
+  pending?: PendingMicroBeat[];
 }
 
 let cycleBeatsSeenCache: CycleBeatsSeen | null = null;
 
-async function loadCycleBeatsSeen(cycleCount: number): Promise<Set<number>> {
+async function loadCycleBeatsRecord(cycleCount: number): Promise<CycleBeatsSeen> {
   if (cycleBeatsSeenCache && cycleBeatsSeenCache.cycle === cycleCount) {
-    return new Set(cycleBeatsSeenCache.seen);
+    return cycleBeatsSeenCache;
   }
   try {
     const AsyncStorage = require('@react-native-async-storage/async-storage').default;
@@ -2735,24 +2819,71 @@ async function loadCycleBeatsSeen(cycleCount: number): Promise<Set<number>> {
     const parsed: CycleBeatsSeen | null = raw ? JSON.parse(raw) : null;
     // A record from an older cycle self-resets: the new descent starts fresh.
     cycleBeatsSeenCache = parsed && parsed.cycle === cycleCount
-      ? parsed
-      : { cycle: cycleCount, seen: [] };
+      ? { ...parsed, pending: parsed.pending ?? [] }
+      : { cycle: cycleCount, seen: [], pending: [] };
   } catch {
-    cycleBeatsSeenCache = { cycle: cycleCount, seen: [] };
+    cycleBeatsSeenCache = { cycle: cycleCount, seen: [], pending: [] };
   }
-  return new Set(cycleBeatsSeenCache.seen);
+  return cycleBeatsSeenCache;
 }
 
-async function markCycleBeatSeen(cycleCount: number, cycleRelativeCount: number): Promise<void> {
-  const seen = await loadCycleBeatsSeen(cycleCount);
-  seen.add(cycleRelativeCount);
-  cycleBeatsSeenCache = { cycle: cycleCount, seen: [...seen] };
+async function saveCycleBeatsRecord(record: CycleBeatsSeen): Promise<void> {
+  cycleBeatsSeenCache = record;
   try {
     const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-    await AsyncStorage.setItem(CYCLE_BEATS_SEEN_KEY, JSON.stringify(cycleBeatsSeenCache));
+    await AsyncStorage.setItem(CYCLE_BEATS_SEEN_KEY, JSON.stringify(record));
   } catch {
     // Silently fail — non-critical
   }
+}
+
+async function markCycleBeatSeen(
+  cycleCount: number,
+  cycleRelativeCount: number,
+  pendingBeat?: NarrativeMicroBeat,
+): Promise<void> {
+  const record = await loadCycleBeatsRecord(cycleCount);
+  await saveCycleBeatsRecord({
+    cycle: cycleCount,
+    seen: record.seen.includes(cycleRelativeCount)
+      ? record.seen
+      : [...record.seen, cycleRelativeCount],
+    pending: pendingBeat
+      ? queuePendingBeat(record.pending ?? [], cycleRelativeCount, pendingBeat)
+      : record.pending ?? [],
+  });
+}
+
+/**
+ * The oldest resolved-but-unshown beat on the track this save is playing.
+ * Read-only: the entry is dropped by ackVictoryMicroBeat, at the moment the
+ * beat is actually revealed.
+ */
+async function peekPendingMicroBeat(cycleCount: number): Promise<NarrativeMicroBeat | null> {
+  const pending = cycleCount > 0
+    ? (await loadCycleBeatsRecord(cycleCount)).pending ?? []
+    : (await loadMicroBeatsRecord()).pending;
+  return pending.length > 0 ? pending[0].beat : null;
+}
+
+/**
+ * Drop the delivered beat from the pending queue. Track-aware: a cycled save
+ * acks through its own per-cycle record, so absolute counts can never be
+ * written into the first-descent set. Call this from the reveal callback,
+ * AFTER the generation check passes — never at resolve time, or a cancelled
+ * reveal silently eats the beat again. Idempotent and safe on an empty queue.
+ */
+export async function ackVictoryMicroBeat(cycleCount: number): Promise<void> {
+  if (cycleCount > 0) {
+    const record = await loadCycleBeatsRecord(cycleCount);
+    const pending = record.pending ?? [];
+    if (pending.length === 0) return;
+    await saveCycleBeatsRecord({ ...record, cycle: cycleCount, pending: pending.slice(1) });
+    return;
+  }
+  const record = await loadMicroBeatsRecord();
+  if (record.pending.length === 0) return;
+  await saveMicroBeatsRecord({ ...record, pending: record.pending.slice(1) });
 }
 
 /**
@@ -2771,8 +2902,8 @@ export async function checkCycleNarrativeMicroBeat(
     ?? (regular && regular.type !== 'silent_victory' ? regular : null);
   if (!beat) return null;
 
-  const seen = await loadCycleBeatsSeen(cycleCount);
-  if (seen.has(cycleRelativeCount)) return null;
+  const record = await loadCycleBeatsRecord(cycleCount);
+  if (record.seen.includes(cycleRelativeCount)) return null;
 
   // A re-fired regular beat may carry the {word} template (the beat at 72) —
   // resolve it on THIS track too, or the raw token reaches the player.
@@ -2780,7 +2911,7 @@ export async function checkCycleNarrativeMicroBeat(
   const resolved = await resolveMicroBeatText(beat);
   if (!resolved) return null;
 
-  await markCycleBeatSeen(cycleCount, cycleRelativeCount);
+  await markCycleBeatSeen(cycleCount, cycleRelativeCount, resolved);
   return resolved;
 }
 
@@ -2796,10 +2927,15 @@ export async function resolveVictoryMicroBeat(
   cycleCount: number,
   cycleStartPuzzles: number,
 ): Promise<NarrativeMicroBeat | null> {
-  if (cycleCount > 0) {
-    return checkCycleNarrativeMicroBeat(totalPuzzlesCompleted - cycleStartPuzzles, cycleCount);
-  }
-  return checkNarrativeMicroBeat(totalPuzzlesCompleted);
+  // A beat held from an earlier win (resolved, never actually shown) is
+  // delivered FIRST. This win's own beat is still rolled and reserved behind
+  // it in the queue rather than skipped — the keys are exact-count, so a beat
+  // we decline to roll here would be lost for good.
+  const held = await peekPendingMicroBeat(cycleCount);
+  const fresh = cycleCount > 0
+    ? await checkCycleNarrativeMicroBeat(totalPuzzlesCompleted - cycleStartPuzzles, cycleCount)
+    : await checkNarrativeMicroBeat(totalPuzzlesCompleted);
+  return held ?? fresh;
 }
 
 /**
@@ -2891,21 +3027,23 @@ export function getDreadOfferingLine(word: string, phase: DialoguePhase): string
 }
 
 /**
- * Drop the in-memory micro-beat seen caches (absolute + cycle-scoped) after an
+ * Drop the in-memory micro-beat records (absolute + cycle-scoped) after an
  * external storage write (cloud restore) — both keys are cloud-synced, and a
- * warm pre-restore cache would re-suppress/re-fire beats against stale state.
+ * warm pre-restore cache would re-suppress/re-fire beats against stale state
+ * (and would keep a pending beat the restored save has already delivered).
  */
 export function invalidateMicroBeatCaches(): void {
-  microBeatsSeen = null;
+  microBeatsRecord = null;
   cycleBeatsSeenCache = null;
 }
 
 /**
  * Reset micro-beats tracking (for Reset All Data). Clears BOTH the absolute
- * seen set and the cycle-scoped one — a full reset starts every track over.
+ * record and the cycle-scoped one (seen sets AND any pending deliveries) — a
+ * full reset starts every track over.
  */
 export async function resetMicroBeats(): Promise<void> {
-  microBeatsSeen = null;
+  microBeatsRecord = null;
   cycleBeatsSeenCache = null;
   try {
     const AsyncStorage = require('@react-native-async-storage/async-storage').default;

@@ -94,7 +94,7 @@ jest.mock('../services/eventLogger', () => ({
 }));
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { performFullReset } from '../components/SettingsScreen';
+import { performFullReset, LOCAL_RESET_MARKER_KEY } from '../components/SettingsScreen';
 import {
   awardBonusAmber,
   getAmberBalance,
@@ -167,6 +167,33 @@ describe('performFullReset', () => {
     // The home-progress key doubles as cloudSave's fresh-install sentinel;
     // it must actually be gone from storage after the wipe.
     expect(await AsyncStorage.getItem('wordshift_home_progress')).toBeNull();
+  });
+
+  // The post-reset upload is the ONLY thing keeping the bootstrap's
+  // fresh-install auto-restore from pulling the pre-reset save straight back
+  // down after Updates.reloadAsync — and it is a single 8s RPC fired at the
+  // exact moment a player deliberately wipes their save, with no retry. Under
+  // the NoOp provider used here (and offline in the wild) it does not succeed,
+  // so the reset must leave a local stamp behind for cloudSave to refuse a
+  // cloud row older than the reset.
+  test('stamps a local reset marker when the post-reset upload does not land', async () => {
+    await awardBonusAmber(120, 'test_seed');
+    const before = Date.now();
+    await performFullReset();
+
+    const marker = await AsyncStorage.getItem(LOCAL_RESET_MARKER_KEY);
+    expect(marker).not.toBeNull();
+    expect(Number(marker)).toBeGreaterThanOrEqual(before);
+  });
+
+  // Device-local by design: the marker must not ride cloud sync (it would
+  // round-trip through a restore and defeat itself) and must survive its own
+  // reset (same category as wordshift_pending_iap_grants).
+  test('the reset marker is not itself cleared by the reset', async () => {
+    await performFullReset();
+    expect(await AsyncStorage.getItem(LOCAL_RESET_MARKER_KEY)).not.toBeNull();
+    await performFullReset();
+    expect(await AsyncStorage.getItem(LOCAL_RESET_MARKER_KEY)).not.toBeNull();
   });
 
   test('is idempotent — running on an already-virgin save succeeds cleanly', async () => {

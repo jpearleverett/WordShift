@@ -154,6 +154,7 @@ jest.mock('../components/monetization/RewardedAdButton', () => ({
 
 import { VictoryModal, VictoryData } from '../components/puzzle/VictoryModal';
 import { getToastTheme } from '../components/puzzle/Toast';
+import { getButtonTheme } from '../components/puzzle/VictoryModal';
 import { SWIFT_VICTORY_MIN_PUZZLES } from '../hooks/useVictoryFlow';
 import {
   VICTORY_FEEDBACK_POOLS,
@@ -351,6 +352,24 @@ function luminance(hex: string): number {
     return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
   };
   return 0.2126 * chan(0) + 0.7152 * chan(2) + 0.0722 * chan(4);
+}
+
+/**
+ * Composite an `rgba(r, g, b, a)` wash over an opaque hex fill. The toast's
+ * shine is a real layer between the fill and the text, so the ratio the player
+ * reads is measured against this, not against the raw fill.
+ */
+function blendOver(rgbaWash: string, bgHex: string): string {
+  const m = /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)/.exec(rgbaWash);
+  if (!m) return bgHex;
+  const [wr, wg, wb] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const a = m[4] === undefined ? 1 : Number(m[4]);
+  const bg = bgHex.replace('#', '');
+  const chan = (i: number, w: number) =>
+    Math.round(w * a + parseInt(bg.substr(i * 2, 2), 16) * (1 - a));
+  return `#${[chan(0, wr), chan(1, wg), chan(2, wb)]
+    .map(v => v.toString(16).padStart(2, '0'))
+    .join('')}`;
 }
 
 function contrast(fgHex: string, bgHex: string): number {
@@ -884,6 +903,53 @@ describe('phase-aware toast colors', () => {
   it('the old error pair (white on red.main, 3.8:1) is gone at every phase', () => {
     for (const phase of [0, 1, 2, 3, 4, 5]) {
       expect(getToastTheme(phase).errorBg).not.toBe('#EF4444');
+    }
+  });
+
+  // The pill paints `toastShine` OVER the fill and UNDER the label, so the raw
+  // fill is not the background the player reads. The audit above measured the
+  // raw pair and recorded 6.5:1 for the bright error toast; the composite was
+  // 3.84:1 (white on #CE6060) because the candy 0.3 white wash lightens
+  // #B91C1C. Compositing here is what stops the next audit repeating that.
+  it('the SHINE-composited pairs hold WCAG AA (>=4.5:1) at every phase', () => {
+    for (const phase of [0, 1, 2, 3, 4, 5]) {
+      const t = getToastTheme(phase);
+      expect(contrast(t.errorText, blendOver(t.errorShine, t.errorBg))).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(t.normalText, blendOver(t.shine, t.normalBg))).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it('the error pill keeps its own shine, so the candy gloss survives on the normal pill', () => {
+    // Changing the single shared `shine` would have flattened the most common
+    // toast in the game to fix the rarest-styled one.
+    const bright = getToastTheme(0);
+    expect(bright.shine).toBe('rgba(255, 255, 255, 0.3)');
+    expect(bright.errorShine).not.toBe(bright.shine);
+  });
+});
+
+// ===========================================================================
+// 9. Swift-victory strip button theme (the compact result strip's own colors)
+// ===========================================================================
+
+describe('swift-victory button theme contrast', () => {
+  it('share and secondary labels hold >=4.5:1 on their own fills at every phase', () => {
+    for (const phase of [0, 1, 2, 3, 4, 5] as DialoguePhase[]) {
+      const btn = getButtonTheme(phase);
+      // 14px/700 is below WCAG's large-text threshold, so the 4.5 bar applies.
+      expect(contrast(btn.share.text, btn.share.bg)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(btn.secondary.text, btn.secondary.bg)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it('the bright Share pair is no longer the mis-recorded 4.07:1 grey', () => {
+    for (const phase of [0, 1, 2] as DialoguePhase[]) {
+      // gray[700] on blue.light measured 4.073 while the inline comment claimed
+      // 4.6 — the growth CTA carrying the first-share amber bonus was the
+      // weakest text on the strip.
+      expect(getButtonTheme(phase).share.text).not.toBe('#334155');
+      expect(contrast(getButtonTheme(phase).share.text, getButtonTheme(phase).share.bg))
+        .toBeGreaterThanOrEqual(4.5);
     }
   });
 });
