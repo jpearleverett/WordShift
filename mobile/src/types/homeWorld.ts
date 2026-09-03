@@ -559,11 +559,28 @@ export function getMilestoneMessage(milestone: typeof MILESTONE_BONUSES[0], phas
  */
 export function checkMilestone(
   puzzleCount: number,
-  lastClaimedMilestone?: number
+  lastClaimedMilestone?: number,
+  phase?: DialoguePhase
 ): { amber: number; message: string; puzzles: number } | null {
   const claimed = lastClaimedMilestone ?? 0;
   const milestone = MILESTONE_BONUSES.find(m => m.puzzles <= puzzleCount && m.puzzles > claimed);
-  return milestone ? { amber: milestone.amber, message: milestone.message, puzzles: milestone.puzzles } : null;
+  if (!milestone) return null;
+  return {
+    amber: milestone.amber,
+    // Resolved HERE, not by the caller. This used to return a bare object
+    // literal carrying only {amber, message, puzzles}, so `darkMessage` and
+    // `dreadMessage` were dropped before the one caller could reach them —
+    // and since both are optional on the source type, the stripped object
+    // still satisfied getMilestoneMessage's parameter and TypeScript said
+    // nothing. Every guard inside it read undefined and fell through to the
+    // bright copy at every phase, which made ~two dozen authored dread lines
+    // dead content and put "Century milestone!" in the middle of the cult
+    // reveal, in dark styling (VictoryModal applies that from phase >= 3, so
+    // the mismatch was conspicuous rather than subtle). Mirrors the shape
+    // checkStreakMilestone already uses.
+    message: phase === undefined ? milestone.message : getMilestoneMessage(milestone, phase),
+    puzzles: milestone.puzzles,
+  };
 }
 
 /**

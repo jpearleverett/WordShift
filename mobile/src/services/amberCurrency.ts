@@ -12,7 +12,6 @@ import {
   STREAK_BONUSES,
   calculateStreakMultiplier,
   checkMilestone,
-  getMilestoneMessage,
   NARRATIVE_ACCELERATION,
   CHALLENGE_MODE_CONFIG,
   AnimalType,
@@ -753,13 +752,18 @@ export async function awardPuzzleAmber(
   progress.phaseProgress += phaseProgressIncrement;
 
   // Check for milestone bonus (uses >= with last-claimed tracking to prevent skips/doubles)
-  const milestone = checkMilestone(progress.puzzlesSolved, progress.lastClaimedMilestone ?? 0);
+  const milestone = checkMilestone(
+    progress.puzzlesSolved,
+    progress.lastClaimedMilestone ?? 0,
+    progress.currentPhase
+  );
   let milestoneBonus = 0;
   let milestoneMessage: string | null = null;
   if (milestone) {
     milestoneBonus = milestone.amber;
-    // Use phase-aware milestone message
-    milestoneMessage = getMilestoneMessage(milestone, progress.currentPhase);
+    // Phase resolved inside checkMilestone, which is the only place that still
+    // holds the dark/dread variants (see its comment).
+    milestoneMessage = milestone.message;
     // Windfall: credits the spendable balance IMMEDIATELY (never deferred to
     // the harvest batch — see the function doc). Amber-only, never phase progress.
     progress.amber += milestoneBonus;

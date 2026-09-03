@@ -174,7 +174,17 @@ export const SYNC_KEYS = [
  * one `wordshift_played_*` key per bank; without them a restore on a new
  * device forgets which bank puzzles were played and repeats them).
  */
-export const SYNC_KEY_PREFIXES = ['wordshift_played_'];
+export const SYNC_KEY_PREFIXES = [
+  'wordshift_played_',
+  // The four `wordshift_guaranteed_crossref_phase_N` flags (amberCurrency)
+  // mark the once-per-phase forced cross-animal reference as delivered. They
+  // are built as template literals, so the storage-key guard's literal scan
+  // could not see them and they were never registered anywhere: after a
+  // restore, a mid-game player was served that once-per-phase beat again for
+  // every phase already passed. Same class as wordshift_first_win_glitch
+  // below, which is exactly what that guard was added to prevent.
+  'wordshift_guaranteed_crossref_phase_',
+];
 
 const SYNC_STATUS_KEY = 'wordshift_cloud_sync_status';
 const CURRENT_SAVE_VERSION = 1;

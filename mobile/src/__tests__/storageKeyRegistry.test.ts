@@ -66,6 +66,17 @@ function discoverKeys(): Map<string, string> {
     for (const m of src.matchAll(/['"`](wordshift_[a-z0-9_]+)['"`]/g)) {
       if (!found.has(m[1])) found.set(m[1], path.relative(root, file));
     }
+    // Second pass for INTERPOLATED key families. The literal scan above needs
+    // a closing quote right after the key, so a template literal like
+    // `wordshift_guaranteed_crossref_phase_${i}` never matched and a whole
+    // four-key family was invisible to this guard — neither synced, nor
+    // prefix-matched, nor excluded, and every assertion below passed anyway.
+    // (The size canary could not catch it either: losing one family does not
+    // drop the count below 50.) Records the stem, including its trailing
+    // underscore, which is exactly the shape SYNC_KEY_PREFIXES matches.
+    for (const m of src.matchAll(/['"`](wordshift_[a-z0-9_]+)\$\{/g)) {
+      if (!found.has(m[1])) found.set(m[1], path.relative(root, file));
+    }
   }
   return found;
 }
