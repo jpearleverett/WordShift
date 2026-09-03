@@ -77,7 +77,11 @@ export interface ConsumableProductInfo {
   reward: ConsumableReward;
   /** Display name shown in the store. */
   name: string;
-  /** Short blurb. */
+  /**
+   * Short blurb. Deliberately does NOT repeat the reward quantity: the store
+   * row renders `reward` as its own value line opposite the price, so the
+   * blurb carries the REASON to pick this tier, not the number.
+   */
   description: string;
   /** Marks the best-value tier in the UI. */
   bestValue?: boolean;
@@ -96,21 +100,21 @@ export const CONSUMABLE_PRODUCTS: ConsumableProductInfo[] = [
     productId: PRODUCT_IDS.AMBER_SMALL,
     reward: { kind: 'amber', amount: AMBER_PACK_GRANTS.small },
     name: 'Pouch of Amber',
-    description: `${AMBER_PACK_GRANTS.small} amber for the shop.`,
+    description: 'A little amber for the shop.',
     fallbackPrice: '$0.99',
   },
   {
     productId: PRODUCT_IDS.AMBER_MEDIUM,
     reward: { kind: 'amber', amount: AMBER_PACK_GRANTS.medium },
     name: 'Jar of Amber',
-    description: `${AMBER_PACK_GRANTS.medium} amber. More per coin.`,
+    description: 'More amber per coin.',
     fallbackPrice: '$2.99',
   },
   {
     productId: PRODUCT_IDS.AMBER_LARGE,
     reward: { kind: 'amber', amount: AMBER_PACK_GRANTS.large },
     name: 'Hoard of Amber',
-    description: `${AMBER_PACK_GRANTS.large} amber. Best value.`,
+    description: 'The most amber per coin.',
     bestValue: true,
     fallbackPrice: '$6.99',
   },
@@ -118,14 +122,14 @@ export const CONSUMABLE_PRODUCTS: ConsumableProductInfo[] = [
     productId: PRODUCT_IDS.HINTS_SMALL,
     reward: { kind: 'hints', amount: HINT_PACK_GRANTS.small },
     name: 'Handful of Hints',
-    description: `${HINT_PACK_GRANTS.small} hints when you're stuck.`,
+    description: "For when you're stuck.",
     fallbackPrice: '$0.99',
   },
   {
     productId: PRODUCT_IDS.HINTS_LARGE,
     reward: { kind: 'hints', amount: HINT_PACK_GRANTS.large },
     name: 'Satchel of Hints',
-    description: `${HINT_PACK_GRANTS.large} hints. Never caught short.`,
+    description: 'Never caught short.',
     bestValue: true,
     fallbackPrice: '$2.99',
   },

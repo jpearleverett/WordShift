@@ -1,5 +1,6 @@
-import { PIXEL_SKINS } from '../theme/pixelSkin.generated';
+import { PIXEL_SKINS, getPixelSkin } from '../theme/pixelSkin.generated';
 import { getPhaseTheme } from '../theme/colors';
+import { getSurfaceTheme } from '../theme/surfaces';
 
 /**
  * F99 regression guard: the cottage plaque label ink (`ink.plaque`) must clear
@@ -75,4 +76,35 @@ describe('bright-phase victory title contrast (F102)', () => {
     const t = getPhaseTheme(phase);
     expect(contrastRatio(t.victoryTitleColor, t.modalBgColor)).toBeGreaterThanOrEqual(4.5);
   });
+});
+
+/**
+ * Named surface inks must clear WCAG AA on the PARCHMENT they are actually
+ * painted on.
+ *
+ * `getSurfaceTheme`'s inks were audited against the flat `cardBg`/`sectionBg`
+ * tokens, but every skinned surface in the app renders through `PanelCard`,
+ * whose fill is the generated skin's `fill` (kind 'panel') or `fillCard`
+ * (kind 'card', the default) — NOT those tokens. Nothing pinned that pair, and
+ * the storm skin's `amberText` sat at 4.30:1 on `fillCard`. It went unnoticed
+ * while amber ink appeared there only on the store's "Owned"/"Active" states;
+ * the moment a row's reward value made it an always-rendered line it became
+ * seven sub-threshold strings on one screen.
+ *
+ * Loop the inks that carry meaning (never decoration) so the comment above
+ * getSurfaceTheme's palette is enforced rather than aspirational.
+ */
+describe('surface ink contrast on the cottage parchments', () => {
+  const PHASES = [0, 1, 2, 3, 4, 5];
+  const INKS = ['title', 'body', 'muted', 'amberText', 'dangerText'] as const;
+
+  it.each(PHASES.flatMap(phase => INKS.map(ink => [phase, ink] as const)))(
+    'phase %i %s clears WCAG AA on both skin parchments',
+    (phase, ink) => {
+      const t = getSurfaceTheme(phase);
+      const skin = getPixelSkin(phase);
+      expect(contrastRatio(t[ink], skin.fill)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(t[ink], skin.fillCard)).toBeGreaterThanOrEqual(4.5);
+    },
+  );
 });

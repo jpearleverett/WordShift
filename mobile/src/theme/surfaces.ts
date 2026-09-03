@@ -181,7 +181,11 @@ const COTTAGE: Record<'bright' | 'dusk' | 'storm' | 'dark' | 'serene', Omit<Surf
     primaryBg: '#E8A33D', primaryEdge: '#8A5414', primaryText: '#3B2416',
     pillBg: '#E8A33D', pillEdge: '#8A5414', pillText: '#3B2416',
     secondaryBg: 'rgba(201, 138, 75, 0.16)', secondaryBorder: '#A96B33', secondaryText: '#4A3222',
-    dangerText: '#A6402E',
+    // 4.42:1 on skin.fillCard at #A6402E — the flat cardBg token it was audited
+    // against is lighter than the parchment PanelCard actually paints, and
+    // dangerText does render on a kind='card' host (HomeScreen's room-unlock
+    // purchase error). Deepened to #9A3728: 5.08:1 on fillCard, 5.57:1 on fill.
+    dangerText: '#9A3728',
   },
   dusk: {
     screenBg: '#4A3524', headerTitle: '#F2E2C2', headerMuted: '#DCC49B', headerChipBorder: 'rgba(242, 226, 194, 0.35)', cardBg: '#E6D0A9', cardBorder: '#48301C',
@@ -191,13 +195,19 @@ const COTTAGE: Record<'bright' | 'dusk' | 'storm' | 'dark' | 'serene', Omit<Surf
     primaryBg: '#DC8026', primaryEdge: '#7E4A10', primaryText: '#33201E',
     pillBg: '#DC8026', pillEdge: '#7E4A10', pillText: '#33201E',
     secondaryBg: 'rgba(168, 116, 71, 0.16)', secondaryBorder: '#8A5A31', secondaryText: '#43301F',
-    dangerText: '#96382A',
+    // Same correction as bright: 4.29:1 -> 4.87:1 on skin.fillCard.
+    dangerText: '#8A3125',
   },
   storm: {
     screenBg: '#33241E', headerTitle: '#DEC49E', headerMuted: '#C8AE85', headerChipBorder: 'rgba(222, 196, 158, 0.35)', cardBg: '#CDB289', cardBorder: '#301B14',
     title: '#2A1A10', body: '#2F1F14', muted: '#4A3626',
     sectionBg: '#C2A67D', sectionBorder: '#A3875F', rowBg: '#C2A67D', rowBorder: '#A3875F',
-    amberText: '#5E3B00', amberTint: 'rgba(150, 98, 20, 0.14)', amberTintBorder: 'rgba(130, 82, 24, 0.5)',
+    // Deepened from #5E3B00 (4.30:1 on sectionBg/rowBg/skin.fillCard — below
+    // the >= 4.5:1 contract) to #4E3100 (5.13:1 on fillCard, 5.86:1 on cardBg).
+    // Storm was the only skin below the bar; bright/dusk/dark/serene already
+    // clear it on both parchments. amberText is never painted on storm's
+    // screenBg (1.25:1 there), so deepening it cannot regress any live pair.
+    amberText: '#4E3100', amberTint: 'rgba(150, 98, 20, 0.14)', amberTintBorder: 'rgba(130, 82, 24, 0.5)',
     primaryBg: '#D97F2E', primaryEdge: '#733D12', primaryText: '#2A1A10',
     pillBg: '#D97F2E', pillEdge: '#733D12', pillText: '#2A1A10',
     secondaryBg: 'rgba(122, 82, 56, 0.18)', secondaryBorder: '#613E2B', secondaryText: '#2F1F14',
