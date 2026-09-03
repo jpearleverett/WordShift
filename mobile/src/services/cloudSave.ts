@@ -384,16 +384,64 @@ export async function getOrCreateRecoveryCode(): Promise<string> {
 }
 
 /**
+ * The owner id a DISPLAYED recovery code refers to.
+ *
+ * `formatRecoveryCode` prepends a literal "WS" for readability, and the code we
+ * hand the player is what they type back. Normalizing alone kept that prefix,
+ * so a typed "WS-3F2A-1B4C" resolved to owner "WS3F2A1B4C" while the device
+ * that showed it had uploaded under "3F2A1B4C" — the code could never address
+ * its own save, and re-showing it on the linked device drifted again to
+ * "WS-WSIN-ST9F". Strip the prefix here and run the remainder through the same
+ * `deriveRecoveryBody` the display side uses, so both ends land on the
+ * identical canonical body.
+ *
+ * Deliberately NOT folded into `normalizeRecoveryCode`: that helper also runs
+ * inside `deriveRecoveryBody` over arbitrary owner ids, and stripping there
+ * would change the body of any owner that merely happens to start with "WS".
+ */
+function ownerFromRecoveryCode(raw: string): string {
+  const cleaned = normalizeRecoveryCode(raw);
+  const body = cleaned.startsWith('WS') && cleaned.length >= 10 ? cleaned.slice(2) : cleaned;
+  return deriveRecoveryBody(body);
+}
+
+/** The owner a PRE-FIX build would have stored for this code (see below). */
+function legacyOwnerFromRecoveryCode(raw: string): string {
+  return normalizeRecoveryCode(raw);
+}
+
+/**
  * Link a recovery code entered by the player: validate/normalize and store it
  * as the cloud owner override, so subsequent owner resolution uses it. After
  * linking, call downloadFromCloud() (or maybeAutoRestoreOnFreshInstall) to pull
  * the linked save. Returns false for clearly-invalid input.
+ *
+ * Compatibility: a device that linked on a pre-fix build uploaded under the
+ * un-stripped owner, so those rows would be unreachable from the corrected id.
+ * When the canonical owner holds no row, fall back once to the legacy id and
+ * adopt whichever one actually has a save.
  */
 export async function linkRecoveryCode(code: string): Promise<boolean> {
   const canonical = normalizeRecoveryCode(code);
   if (canonical.length < 8) return false;
+  const owner = ownerFromRecoveryCode(code);
   try {
-    await AsyncStorage.setItem(CLOUD_OWNER_KEY, canonical);
+    await AsyncStorage.setItem(CLOUD_OWNER_KEY, owner);
+    const legacy = legacyOwnerFromRecoveryCode(code);
+    if (legacy !== owner) {
+      try {
+        if (!(await provider.download())) {
+          await AsyncStorage.setItem(CLOUD_OWNER_KEY, legacy);
+          if (!(await provider.download())) {
+            // Neither holds a row; keep the canonical id so this device's own
+            // future uploads land where the code says they should.
+            await AsyncStorage.setItem(CLOUD_OWNER_KEY, owner);
+          }
+        }
+      } catch {
+        await AsyncStorage.setItem(CLOUD_OWNER_KEY, owner);
+      }
+    }
     return true;
   } catch {
     return false;

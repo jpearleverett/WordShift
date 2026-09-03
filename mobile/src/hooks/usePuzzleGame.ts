@@ -2946,12 +2946,28 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     // board that was served as final, even across a relaunch.
     isFinalBoardRef.current = saved.isFinalBoard === true;
     setIsFinalBoard(saved.isFinalBoard === true);
-    // A legacy 'speed' variant is coerced to 'standard' (see the speedMode
-    // restore above) so it lands on a real config instead of an unknown key.
-    setCurrentVariant(
-      restoreUnbrokenWeave || legacySpeedVariant ? 'standard' : saved.currentVariant
-    );
-    setSelectedVariantState(restoreUnbrokenWeave ? 'standard' : saved.selectedVariant);
+    // Any variant key that is not a live union member is coerced to 'standard',
+    // not just the one legacy string we know about. puzzleSaveState carries no
+    // schema version, so a save written by ANY older build can hand us a key
+    // that matches no config; `isPuzzleVariant` also rejects undefined, which
+    // covers saves predating the field.
+    //
+    // BOTH setters need this. `selectedVariant` used to restore raw, and a
+    // legacy 'speed' value reached App's clamp effect -> `isVariantUnlocked`,
+    // which read `VARIANT_UNLOCK_REQUIREMENTS['speed'].puzzlesSolved` on an
+    // undefined entry and threw. That effect lives in MainApp, which has no
+    // ErrorBoundary above it, so the whole tree unmounted — and since this path
+    // never clears the save, every relaunch reproduced it.
+    const restoredCurrent =
+      restoreUnbrokenWeave || !isPuzzleVariant(saved.currentVariant as string)
+        ? 'standard'
+        : saved.currentVariant;
+    const restoredSelected =
+      restoreUnbrokenWeave || !isPuzzleVariant(saved.selectedVariant as string)
+        ? 'standard'
+        : saved.selectedVariant;
+    setCurrentVariant(restoredCurrent);
+    setSelectedVariantState(restoredSelected);
     setMoveDirection(saved.moveDirection);
     setCurrentPhase(saved.currentPhase);
     setLastFormedWord(saved.lastFormedWord);

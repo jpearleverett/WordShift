@@ -4311,6 +4311,12 @@ function MainApp() {
     soundSelection();
     orchestrationActions.setCompletionCoda(null);
     resetSpeedRun();
+    // Every setup-menu change serves a NEW, ordinary board, so it ends the
+    // daily. Without this the flag stayed armed: switching difficulty on a
+    // hard daily made the next normal board pay full HARD amber AND HARD-tier
+    // phase progress, submit to the shared leaderboard, and stamp the daily
+    // complete, silently consuming that day's real challenge.
+    setIsPlayingDaily(false);
     puzzleActions.startNewGame(d, puzzle.gameMode, puzzle.selectedVariant);
   }, [puzzleActions, puzzle.gameMode, puzzle.selectedVariant, orchestrationActions]);
 
@@ -4322,6 +4328,7 @@ function MainApp() {
     soundSelection();
     orchestrationActions.setCompletionCoda(null);
     resetSpeedRun();
+    setIsPlayingDaily(false);
     puzzleActions.setSelectedVariant(variant);
     puzzleActions.startNewGame(
       puzzle.difficulty,
@@ -4366,6 +4373,7 @@ function MainApp() {
     soundSelection();
     orchestrationActions.setCompletionCoda(null);
     resetSpeedRun();
+    setIsPlayingDaily(false);
     const newUndoLimited = !puzzle.undoLimited;
     // gameMode is 'challenge' while EITHER constraint is on; Blind is preserved.
     const newMode = (newUndoLimited || puzzle.blindMode) ? 'challenge' : 'standard';
@@ -4396,6 +4404,7 @@ function MainApp() {
     soundSelection();
     orchestrationActions.setCompletionCoda(null);
     resetSpeedRun();
+    setIsPlayingDaily(false);
     const newBlind = !puzzle.blindMode;
     // gameMode stays 'challenge' if the undo-limit constraint is still on.
     const newMode = (newBlind || puzzle.undoLimited) ? 'challenge' : 'standard';
@@ -4424,6 +4433,7 @@ function MainApp() {
     soundSelection();
     orchestrationActions.setCompletionCoda(null);
     resetSpeedRun();
+    setIsPlayingDaily(false);
     puzzleActions.startNewGame(
       puzzle.difficulty,
       undefined,             // keep gameMode (composes with challenge/blind)
@@ -4449,6 +4459,7 @@ function MainApp() {
     orchestrationActions.setCompletionCoda(null);
     // The escalation ladder restarts whenever the modifier is re-armed.
     resetSpeedRun();
+    setIsPlayingDaily(false);
     puzzleActions.startNewGame(
       puzzle.difficulty,
       undefined,             // keep gameMode (composes with challenge/blind)
@@ -4468,6 +4479,7 @@ function MainApp() {
     soundSelection();
     orchestrationActions.setCompletionCoda(null);
     resetSpeedRun();
+    setIsPlayingDaily(false);
     puzzleActions.startNewGame(
       puzzle.difficulty,
       'standard',

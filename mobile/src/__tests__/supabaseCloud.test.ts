@@ -241,8 +241,28 @@ describe('SupabaseCloudProvider', () => {
 
       const ok = await linkRecoveryCode('ws-qrst-uvwx');
       expect(ok).toBe(true);
-      // Normalized: uppercased, separators stripped.
-      expect(await getCloudOwnerId()).toBe('WSQRSTUVWX');
+      // Uppercased, separators stripped, and the DISPLAY prefix removed: the
+      // owner is the canonical 8-char body, which is what the device that
+      // showed this code uploaded under. This used to assert 'WSQRSTUVWX' —
+      // the un-stripped form — which is precisely why a code could never
+      // address its own save.
+      expect(await getCloudOwnerId()).toBe('QRSTUVWX');
+    });
+
+    it('a displayed recovery code resolves back to the owner it was minted from', async () => {
+      // The round trip nothing pinned: show -> type -> same owner. Without it,
+      // display and link drifted apart silently and CI stayed green.
+      const shown = await getOrCreateRecoveryCode();
+      const mintedOwner = await AsyncStorage.getItem('wordshift_cloud_owner');
+      expect(mintedOwner).toBeTruthy();
+
+      await AsyncStorage.removeItem('wordshift_cloud_owner');
+      expect(await linkRecoveryCode(shown)).toBe(true);
+      expect(await getCloudOwnerId()).toBe(mintedOwner);
+
+      // ...and re-showing it on the linked device gives back the SAME code,
+      // rather than re-deriving a third one from the stored value.
+      expect(await getOrCreateRecoveryCode()).toBe(shown);
     });
 
     it('rejects too-short / invalid codes', async () => {
@@ -254,7 +274,7 @@ describe('SupabaseCloudProvider', () => {
 
     it('clearSyncStatus removes the owner override', async () => {
       await linkRecoveryCode('WSABCDEFGH');
-      expect(await getCloudOwnerId()).toBe('WSABCDEFGH');
+      expect(await getCloudOwnerId()).toBe('ABCDEFGH');
       await clearSyncStatus();
       expect(await getCloudOwnerId()).toBe('install-abc123');
     });
