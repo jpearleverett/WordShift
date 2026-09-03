@@ -11,7 +11,8 @@ import {
   canSkipUnlockGate,
   skipUnlockGate,
   getUnlockSkipCost,
-  canSpeedUpReservedUnlock,
+  getReservedSpeedUpState,
+  ReservedSpeedUpState,
   skipReservedUnlock,
   getReservedSkipCost,
 } from '../services/homeWorldData';
@@ -56,6 +57,12 @@ interface UseUnlockFlowReturn {
   skipCost: number;
   /** Whether the RESERVED unlock can be sped up now (reserved + premium affordable). */
   canSpeedUpReserved: boolean;
+  /**
+   * WHY the speed-up is unavailable, so the copy beside the missing button can
+   * be true. 'not_yet' is the descent-trio phase guard — no amount of amber
+   * changes it, and it must never be priced.
+   */
+  reservedSpeedUpState: ReservedSpeedUpState;
   /** Remaining premium amber to speed up the reserved unlock (0 when N/A). */
   reservedSkipCost: number;
   handlePurchase: (unlock: Unlockable, options?: { suppressIntro?: boolean }) => Promise<void>;
@@ -105,6 +112,7 @@ export function useUnlockFlow({
   const [canSkip, setCanSkip] = useState(false);
   const [skipCost, setSkipCost] = useState(0);
   const [canSpeedUpReserved, setCanSpeedUpReserved] = useState(false);
+  const [reservedSpeedUpState, setReservedSpeedUpState] = useState<ReservedSpeedUpState>('none');
   const [reservedSkipCost, setReservedSkipCost] = useState(0);
   const [unlockAvailability, setUnlockAvailability] = useState<{
     available: boolean;
@@ -134,17 +142,18 @@ export function useUnlockFlow({
     setReservedUnlockId(reserved);
 
     if (unlock) {
-      const [availability, reservable, skippable, speedable] = await Promise.all([
+      const [availability, reservable, skippable, speedState] = await Promise.all([
         isUnlockAvailable(unlock.id),
         canReserveUnlock(unlock.id),
         canSkipUnlockGate(unlock.id),
-        canSpeedUpReservedUnlock(unlock.id),
+        getReservedSpeedUpState(unlock.id),
       ]);
       setUnlockAvailability(availability);
       setCanReserve(reservable);
       setCanSkip(skippable);
       setSkipCost(skippable ? getUnlockSkipCost(unlock) : 0);
-      setCanSpeedUpReserved(speedable);
+      setCanSpeedUpReserved(speedState === 'ready');
+      setReservedSpeedUpState(speedState);
       // Expose the speed-up premium whenever this unlock is the reservation
       // (even when it's not yet affordable), so the UI can show the option and
       // its cost instead of hiding it — the premium equals the base cost again,
@@ -156,6 +165,7 @@ export function useUnlockFlow({
       setCanSkip(false);
       setSkipCost(0);
       setCanSpeedUpReserved(false);
+      setReservedSpeedUpState('none');
       setReservedSkipCost(0);
     }
 
@@ -184,18 +194,19 @@ export function useUnlockFlow({
   const recheckAffordability = useCallback(async () => {
     const unlock = nextUnlock;
     if (!unlock) return;
-    const [availability, reservable, skippable, speedable, reserved] = await Promise.all([
+    const [availability, reservable, skippable, speedState, reserved] = await Promise.all([
       isUnlockAvailable(unlock.id),
       canReserveUnlock(unlock.id),
       canSkipUnlockGate(unlock.id),
-      canSpeedUpReservedUnlock(unlock.id),
+      getReservedSpeedUpState(unlock.id),
       getReservedUnlockId(),
     ]);
     setUnlockAvailability(availability);
     setCanReserve(reservable);
     setCanSkip(skippable);
     setSkipCost(skippable ? getUnlockSkipCost(unlock) : 0);
-    setCanSpeedUpReserved(speedable);
+    setCanSpeedUpReserved(speedState === 'ready');
+    setReservedSpeedUpState(speedState);
     setReservedSkipCost(reserved === unlock.id ? getReservedSkipCost(unlock) : 0);
   }, [nextUnlock]);
 
@@ -354,6 +365,7 @@ export function useUnlockFlow({
     canSkip,
     skipCost,
     canSpeedUpReserved,
+    reservedSpeedUpState,
     reservedSkipCost,
     handlePurchase,
     handleReserve,

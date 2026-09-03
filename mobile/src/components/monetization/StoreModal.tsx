@@ -953,7 +953,7 @@ const styles = StyleSheet.create({
 
   // Starter pack hero — first card, framed by the amber accent border.
   heroCard: {
-    paddingVertical: 14,
+    paddingVertical: SURFACE.cardPadY,
     paddingHorizontal: SURFACE.cardPadX,
     marginTop: 12,
   },
@@ -978,7 +978,7 @@ const styles = StyleSheet.create({
   // same baseline closes the void without inlining the price beside the art —
   // which genuinely does not fit (art + price on one line leaves the words 68dp).
   row: {
-    paddingVertical: 12,
+    paddingVertical: SURFACE.cardPadY,
     paddingHorizontal: SURFACE.cardPadX,
     marginBottom: 8,
     minHeight: 68,
@@ -1063,7 +1063,7 @@ const styles = StyleSheet.create({
 
   patronLink: {
     marginTop: 16,
-    paddingVertical: 12,
+    paddingVertical: SURFACE.cardPadY,
     paddingHorizontal: SURFACE.cardPadX,
   },
   patronLinkText: { fontSize: FONT_SIZE.body, lineHeight: 18, textAlign: 'center', fontFamily: BODY_FONT },

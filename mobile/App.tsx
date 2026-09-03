@@ -499,6 +499,14 @@ function MainApp() {
     victoryTimeoutsRef.current = [];
   }, []);
 
+  // The achievement check is deliberately NOT on the cancellable victory list.
+  // Every exit path (Next Level / Home / Collect Now / back) runs
+  // startVictoryExitFlow -> clearVictoryTimeouts, so a player who tapped inside
+  // the 500ms window dropped the whole check with nothing left to re-run it,
+  // and an earned unlock silently waited for a later, slower win. Its own ref
+  // survives the exit and is cleared only on unmount.
+  const achievementCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Sequential victory toast queue. The post-victory receipts (streak
   // milestone amber, daily milestones, freeze saves, harvest overflow, pace
   // beats...) used to race into the single setMessage slot at fixed delays,
@@ -585,6 +593,10 @@ function MainApp() {
       if (houseAskLineTimerRef.current !== null) {
         clearTimeout(houseAskLineTimerRef.current);
         houseAskLineTimerRef.current = null;
+      }
+      if (achievementCheckTimerRef.current !== null) {
+        clearTimeout(achievementCheckTimerRef.current);
+        achievementCheckTimerRef.current = null;
       }
     };
   }, [clearVictoryTimeouts, clearVictoryToastQueue]);
@@ -3038,7 +3050,13 @@ function MainApp() {
       }
 
       // Check achievements after brief delay to not block victory display
-      addVictoryTimeout(() => achievementActions.checkForAchievements(finalVictory), 500);
+      if (achievementCheckTimerRef.current !== null) {
+        clearTimeout(achievementCheckTimerRef.current);
+      }
+      achievementCheckTimerRef.current = setTimeout(() => {
+        achievementCheckTimerRef.current = null;
+        achievementActions.checkForAchievements(finalVictory);
+      }, 500);
 
       // The guaranteed, prominent opening-promise glitch fires on the player's
       // FIRST free-play win (one-time), not the guided tutorial.
@@ -4594,6 +4612,15 @@ function MainApp() {
             onPhaseTransitionConfirmed={(newPhase) => {
               // Refresh all persistence state to pick up the new currentPhase
               persistenceActions.refreshStats();
+              // The journey achievements key on currentPhase, and this ceremony
+              // is the ONLY place it ever advances. Without a check here they
+              // waited for whenever the player next finished a puzzle, so the
+              // era they had just lit stayed locked in Statistics and its amber
+              // went uncredited. Persisting it now makes both honest at the
+              // moment that earned it; the toast is not mounted on the pit
+              // screen and the cinematic covers everything, so it presents on
+              // the next home or puzzle arrival rather than over the ceremony.
+              achievementActions.checkAchievementsNow().catch(() => {});
               // Play the full PhaseTransitionOverlay cinematic
               const event = getPhaseTransitionEvent(newPhase as any);
               if (event) {

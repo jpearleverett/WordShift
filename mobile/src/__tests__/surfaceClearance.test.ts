@@ -53,6 +53,24 @@ describe('cottage frame content clearance', () => {
     expect(SURFACE.cardPadX).toBeGreaterThanOrEqual(CARD_EDGE_DP);
     expect(SURFACE.cardPadX).toBeLessThan(SURFACE.panelPadX);
   });
+
+  // The VERTICAL insets take the same numbers, and that is a property of the
+  // generator rather than a convenience: drawFrameMaster assigns each ring's
+  // ROLE by BFS depth from the shape boundary and varies only the SHADE by
+  // side, so the strip budget is isotropic. Without their own tokens every
+  // surface picked a vertical by eye and every one of them picked it UNDER the
+  // band (Store rows and the achievement toast at 12, the hero card and the
+  // dialogue choice buttons at 14, HubRow at exactly 15).
+  it('panel content padding clears the wood band vertically', () => {
+    expect(SURFACE.panelPadY).toBeGreaterThan(PANEL_BAND_DP);
+    expect(SURFACE.panelPadY).toBeLessThanOrEqual(PANEL_EDGE_DP);
+  });
+
+  it('card content padding clears the card band vertically', () => {
+    expect(SURFACE.cardPadY).toBeGreaterThan(CARD_BAND_DP);
+    expect(SURFACE.cardPadY).toBeGreaterThanOrEqual(CARD_EDGE_DP);
+    expect(SURFACE.cardPadY).toBeLessThan(SURFACE.panelPadY);
+  });
 });
 
 /**
@@ -64,7 +82,11 @@ describe('cottage frame content clearance', () => {
 const SRC_ROOT = path.join(__dirname, '..');
 const read = (rel: string) => fs.readFileSync(path.join(SRC_ROOT, rel), 'utf8');
 
-const TOKEN_ADOPTERS: Array<{ file: string; style: string; token: 'panelPadX' | 'cardPadX' }> = [
+const TOKEN_ADOPTERS: Array<{
+  file: string;
+  style: string;
+  token: 'panelPadX' | 'cardPadX' | 'panelPadY' | 'cardPadY';
+}> = [
   // The three surfaces named in the report.
   { file: 'components/StatsScreen.tsx', style: 'difficultyRow', token: 'cardPadX' },
   { file: 'components/monetization/StoreModal.tsx', style: 'row', token: 'cardPadX' },
@@ -76,6 +98,11 @@ const TOKEN_ADOPTERS: Array<{ file: string; style: string; token: 'panelPadX' | 
   // Card-framed rows.
   { file: 'components/ui/HubRow.tsx', style: 'hubRow', token: 'cardPadX' },
   { file: 'components/AchievementToast.tsx', style: 'inner', token: 'cardPadX' },
+  // ...and the same three families vertically, which nothing pinned until a
+  // player reported Store rows whose text touched the top and bottom wood.
+  { file: 'components/monetization/StoreModal.tsx', style: 'row', token: 'cardPadY' },
+  { file: 'components/AchievementToast.tsx', style: 'inner', token: 'cardPadY' },
+  { file: 'components/ui/HubRow.tsx', style: 'hubRow', token: 'cardPadY' },
 ];
 
 describe('frame-hosted styles read their inset from the shared token', () => {

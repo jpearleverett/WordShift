@@ -18,6 +18,10 @@ import {
   getUnlockSkipCost,
   getSkipGateText,
   canSpeedUpReservedUnlock,
+  getReservedSpeedUpState,
+  getReservedSpeedUpNotYetText,
+  getReservedSpeedUpNeedAmberText,
+  getLockedRoomReasonText,
   skipReservedUnlock,
   isDescentTrioRoomUnlock,
   getReservedSkipCost,
@@ -696,6 +700,56 @@ describe('skip the wait (pay premium, unlock now)', () => {
       expect(p.unlockedRooms).not.toContain('star_loft');
       p.currentPhase = 3;
       expect(await canSpeedUpReservedUnlock('unlock_star_loft')).toBe(true);
+    });
+
+    test('the trio guard reports itself as not_yet, never as an empty purse', async () => {
+      // The bug: the phase guard sat one line above the affordability compare,
+      // so a player at Phase 0 holding 13,252 amber against a 225 premium had
+      // their balance never read, and the UI, seeing only `false`, told them to
+      // come back when they could afford it.
+      (await loadProgress()).puzzlesSolved = 80;
+      await unlockUpTo('unlock_star_loft');
+      const p = await loadProgress();
+      p.currentPhase = 0;
+      p.amber = 13252;
+      await reserveNextUnlock('unlock_star_loft');
+      (await loadProgress()).amber = 13252;
+
+      expect(await getReservedSpeedUpState('unlock_star_loft')).toBe('not_yet');
+      expect(await canSpeedUpReservedUnlock('unlock_star_loft')).toBe(false);
+
+      // ...and the not_yet copy must never carry a price, since no amount of
+      // amber can buy past this guard.
+      expect(getReservedSpeedUpNotYetText()).not.toMatch(/\d/);
+      expect(getReservedSpeedUpNotYetText().toLowerCase()).not.toContain('amber');
+    });
+
+    test('a genuinely short purse reports need_amber, and that copy names the price', async () => {
+      (await loadProgress()).puzzlesSolved = 80;
+      await unlockUpTo('unlock_star_loft');
+      const p = await loadProgress();
+      p.currentPhase = 3; // past the trio guard, so the purse is the only blocker
+      await reserveNextUnlock('unlock_star_loft');
+      (await loadProgress()).amber = 0;
+      expect(await getReservedSpeedUpState('unlock_star_loft')).toBe('need_amber');
+      expect(getReservedSpeedUpNeedAmberText(225)).toContain('225');
+    });
+
+    test('locked-room copy names the real blocker, never a guess at the purse', () => {
+      // At 13,252 amber for a room already paid for at reserve time, "play more
+      // puzzles to earn amber" was simply false.
+      expect(getLockedRoomReasonText({ gated: true, canAfford: true }).toLowerCase())
+        .not.toContain('amber');
+      expect(getLockedRoomReasonText({ gated: false, canAfford: false }).toLowerCase())
+        .toContain('amber');
+      // Never leaks the phase/level system into a locked-room line (rule 7).
+      for (const gated of [true, false]) {
+        for (const canAfford of [true, false]) {
+          const line = getLockedRoomReasonText({ gated, canAfford }).toLowerCase();
+          expect(line).not.toContain('phase');
+          expect(line).not.toContain('level');
+        }
+      }
     });
 
     test('non-trio gated rooms are untouched by the guard (jungle skips at Phase 0)', async () => {

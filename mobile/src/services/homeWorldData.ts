@@ -1212,6 +1212,44 @@ export function getSkipGateText(skipCost: number): string {
 }
 
 /**
+ * The Next Unlock meter's caption when the binding constraint is the LEVEL
+ * gate, not the purse. The meter always measured amber against cost, so a
+ * reserved room (whose cost was already spent) pinned it at "13252 / 450" and
+ * told the player nothing about the 84 solves they were actually waiting on.
+ */
+export function getNextUnlockMeterText(minPuzzles: number, puzzlesSolved: number): string {
+  return `Level ${puzzlesSolved} / ${minPuzzles}`;
+}
+
+/** Speed-up line when the purse really is short of the remaining premium. */
+export function getReservedSpeedUpNeedAmberText(premium: number): string {
+  return `Or speed it up for ${premium} amber once you can set that much aside.`;
+}
+
+/**
+ * Speed-up line when the HOUSE is refusing, not the purse: the descent-trio
+ * rooms cannot be bought forward before the shadows gather. Deliberately
+ * carries NO price. Naming a cost for something no amount of amber can buy is
+ * the exact lie this line was written to replace, and a player holding
+ * thousands read it as being told they were poor. In-world voice: no level,
+ * puzzle or phase jargon (narrative rule 7).
+ */
+export function getReservedSpeedUpNotYetText(): string {
+  return 'This one will not be hurried. It arrives when the house is ready for it.';
+}
+
+/**
+ * Why a locked room is locked, named honestly. The blanket "play more puzzles
+ * to earn amber" claim is only true when the purse is actually the blocker; it
+ * was printing for a room whose amber was already paid at reserve time.
+ */
+export function getLockedRoomReasonText(opts: { gated: boolean; canAfford: boolean }): string {
+  if (opts.gated) return 'This room is still taking shape. It opens when the house is ready.';
+  if (!opts.canAfford) return 'Offer more words to gather the amber this room needs.';
+  return 'Ready to build whenever you are.';
+}
+
+/**
  * Amber to speed up an ALREADY-RESERVED unlock: only the premium delta (the base
  * cost was already paid at reserve time), so the total paid equals a direct skip.
  */
@@ -1219,22 +1257,43 @@ export function getReservedSkipCost(unlock: Unlockable): number {
   return getUnlockSkipCost(unlock) - unlock.cost;
 }
 
+/** Why a reserved unlock can or cannot be sped up right now. */
+export type ReservedSpeedUpState = 'ready' | 'not_yet' | 'need_amber' | 'none';
+
 /**
- * Whether a reserved unlock can be sped up now: it is the reservation, its gate
- * hasn't opened yet (once it has, it auto-claims for free — no reason to pay),
- * and the player can afford the remaining premium.
+ * The REASON behind the speed-up decision, so the UI can say something true
+ * instead of assuming an empty purse.
+ *
+ * The distinction that matters is 'not_yet' vs 'need_amber'. The descent-trio
+ * phase guard below is deliberate — amber must never summon the last three
+ * rooms during the bright days — but it sat one line above the affordability
+ * comparison, so a player at phase 0 holding 13,252 amber against a 225 premium
+ * had their balance never read at all, and the UI, seeing only `false`, told
+ * them to come back when they could afford it.
  */
-export async function canSpeedUpReservedUnlock(unlockId: string): Promise<boolean> {
+export async function getReservedSpeedUpState(unlockId: string): Promise<ReservedSpeedUpState> {
   const unlock = UNLOCK_PROGRESSION.find(u => u.id === unlockId);
-  if (!unlock) return false;
+  if (!unlock) return 'none';
   const progress = await loadProgress();
-  if (progress.reservedUnlockId !== unlockId) return false;
-  if (unlock.minPuzzles !== undefined && progress.puzzlesSolved >= unlock.minPuzzles) return false;
+  if (progress.reservedUnlockId !== unlockId) return 'none';
+  // Gate already open: it auto-claims for free, so there is nothing to buy.
+  if (unlock.minPuzzles !== undefined && progress.puzzlesSolved >= unlock.minPuzzles) return 'none';
   // Same narrative guard as canSkipUnlockGate: a reserved descent-trio room may
   // not be sped past its gate before global Phase 3 (the reservation itself
   // stays valid and auto-claims when the gate opens).
-  if (isDescentTrioRoomUnlock(unlock) && progress.currentPhase < 3) return false;
-  return progress.amber >= getReservedSkipCost(unlock);
+  if (isDescentTrioRoomUnlock(unlock) && progress.currentPhase < 3) return 'not_yet';
+  return progress.amber >= getReservedSkipCost(unlock) ? 'ready' : 'need_amber';
+}
+
+/**
+ * Whether a reserved unlock can be sped up now: it is the reservation, its gate
+ * hasn't opened yet (once it has, it auto-claims for free — no reason to pay),
+ * and the player can afford the remaining premium. Delegates to
+ * `getReservedSpeedUpState` so the button gate and the explanation beside it
+ * can never drift apart.
+ */
+export async function canSpeedUpReservedUnlock(unlockId: string): Promise<boolean> {
+  return (await getReservedSpeedUpState(unlockId)) === 'ready';
 }
 
 /**

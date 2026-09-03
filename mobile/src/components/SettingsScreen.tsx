@@ -1347,7 +1347,7 @@ const styles = StyleSheet.create({
     bottom: 0,
   },
   restoreCard: {
-    paddingVertical: 22,
+    paddingVertical: SURFACE.panelPadY,
     paddingHorizontal: SURFACE.panelPadX,
   },
   restoreTitle: {

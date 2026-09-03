@@ -57,7 +57,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: SURFACE.cardPadX,
-    paddingVertical: 15,
+    paddingVertical: SURFACE.cardPadY,
     minHeight: 56,
     marginBottom: 10,
   },

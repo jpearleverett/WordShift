@@ -494,7 +494,7 @@ const styles = StyleSheet.create({
   benefits: {
     marginTop: 20,
     gap: 12,
-    paddingVertical: 14,
+    paddingVertical: SURFACE.cardPadY,
     paddingHorizontal: SURFACE.cardPadX,
   },
   benefitRow: {

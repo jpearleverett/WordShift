@@ -146,6 +146,10 @@ import {
   getRoomDescription,
   claimReservedUnlockIfReady,
   getReservedArrivalText,
+  getReservedSpeedUpNeedAmberText,
+  getReservedSpeedUpNotYetText,
+  getLockedRoomReasonText,
+  getNextUnlockMeterText,
   getReserveGateText,
 } from '../../services/homeWorldData';
 import { RewardedAdButton } from '../monetization/RewardedAdButton';
@@ -1882,6 +1886,42 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Cottage pixel skin for the home modal chrome (same hostDark mapping).
   const pixelSkin = getPixelSkin(progress.currentPhase, dtHostDark);
   const phaseTheme = getPhaseTheme(progress.currentPhase);
+
+  // The Next Unlock meter measures the BINDING constraint, not always amber.
+  // It used to be amber-against-cost unconditionally, so a room whose cost was
+  // already paid at reserve time pinned the bar full and read "13252 / 450"
+  // while the player was actually waiting on 84 solves. When a level gate (or a
+  // live reservation) is what stands in the way, the meter counts solves; when
+  // the purse is what stands in the way, it counts amber, exactly as before.
+  // A plain derivation, not a hook: this block sits after the loading-state
+  // early return, where the surrounding theme reads (st / panelSt / pixelSkin)
+  // are plain calls for the same reason.
+  const nextUnlockMeter = (() => {
+    const unlock = unlockFlow.nextUnlock;
+    if (!unlock) return { percent: 0, label: '', a11y: '', max: 1, now: 0 };
+    const gateBlocked = unlock.minPuzzles !== undefined && progress.puzzlesSolved < unlock.minPuzzles;
+    const isReserved = unlockFlow.reservedUnlockId === unlock.id;
+    if (unlock.minPuzzles !== undefined && (gateBlocked || isReserved)) {
+      const max = unlock.minPuzzles;
+      const now = Math.min(progress.puzzlesSolved, max);
+      return {
+        percent: Math.min(100, (progress.puzzlesSolved / max) * 100),
+        label: getNextUnlockMeterText(max, progress.puzzlesSolved),
+        a11y: `Level ${progress.puzzlesSolved} of ${max}`,
+        max,
+        now,
+      };
+    }
+    if (unlock.cost === 0) return { percent: 100, label: 'FREE', a11y: 'Free', max: 1, now: 1 };
+    return {
+      percent: Math.min(100, (progress.amber / unlock.cost) * 100),
+      label: `${progress.amber} / ${unlock.cost} amber`,
+      a11y: `${progress.amber} of ${unlock.cost} amber`,
+      max: unlock.cost,
+      now: Math.min(progress.amber, unlock.cost),
+    };
+  })();
+
   // Phase-aware material for the PLAY dock (candy green → ember → mauve).
   const playDockColors = getPlayDockColors(progress.currentPhase);
   // "Visit next friend" chain: offered only at the dialogue session's natural
@@ -2074,13 +2114,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 playUiSound('tap');
                 unlockFlow.setShowShop(true);
               }}
-              accessibilityLabel={`Next unlock. ${unlockFlow.nextUnlock.cost === 0 ? 'Free' : `${progress.amber} of ${unlockFlow.nextUnlock.cost} amber`}`}
+              accessibilityLabel={`Next unlock. ${nextUnlockMeter.a11y}`}
               accessibilityRole="button"
-              accessibilityValue={{
-                min: 0,
-                max: unlockFlow.nextUnlock.cost || 1,
-                now: Math.min(progress.amber, unlockFlow.nextUnlock.cost || 1),
-              }}
+              accessibilityValue={{ min: 0, max: nextUnlockMeter.max, now: nextUnlockMeter.now }}
             >
               {/* Wooden sign — cottage card frame over the outdoor world. */}
               <NineSliceFrame
@@ -2093,23 +2129,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <Text style={[styles.unlockProgressLabel, { color: st.title }]}>
                   Next Unlock
                 </Text>
-                <View style={[styles.unlockProgressBarBg, { backgroundColor: st.sectionBorder }]}>
+                <View style={[styles.unlockProgressBarBg, { backgroundColor: st.amberTint, borderColor: st.amberTintBorder }]}>
                   <View
                     style={[
                       styles.unlockProgressBarFill,
-                      { backgroundColor: st.pillBg },
-                      {
-                        width: `${Math.min(100, unlockFlow.nextUnlock.cost > 0
-                          ? (progress.amber / unlockFlow.nextUnlock.cost) * 100
-                          : 100)}%`,
-                      },
+                      { backgroundColor: st.amberText },
+                      { width: `${nextUnlockMeter.percent}%` },
                     ]}
                   />
                 </View>
                 <Text style={[styles.unlockProgressText, { color: st.body }]}>
-                  {unlockFlow.nextUnlock.cost === 0
-                    ? 'FREE'
-                    : <><AmberInline /> {progress.amber} / {unlockFlow.nextUnlock.cost}</>}
+                  {nextUnlockMeter.label}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -2667,7 +2697,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     ) : (
                       <View style={[styles.reservedChip, { backgroundColor: panelSt.secondaryBg, borderColor: panelSt.secondaryBorder }]}>
                         <Text style={[styles.reservedChipText, { color: panelSt.secondaryText }]}>Reserved <Image source={CHROME_ICONS.check} style={styles.inlineMark} /></Text>
-                        {unlockFlow.reservedSkipCost > 0 && (
+                        {/* Non-interactive by construction, so it can only ever
+                            be a price tag. Shown when the purse is genuinely
+                            short; when the HOUSE is refusing it advertised a
+                            purchase that does not exist, which is what read as
+                            a broken button. */}
+                        {unlockFlow.reservedSpeedUpState === 'need_amber' && (
                           <View style={styles.reservedChipSpeedRow}>
                             <AmberCostLabel
                               prefix="Speed up"
@@ -2677,6 +2712,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                               iconSize={13}
                             />
                           </View>
+                        )}
+                        {/* ...and when the house is refusing, say so here too,
+                            or this surface shows a bare "Reserved" with no
+                            reason and the player learns nothing. */}
+                        {unlockFlow.reservedSpeedUpState === 'not_yet' && (
+                          <Text style={[styles.reservedChipSubtext, { color: panelSt.muted }]}>
+                            {getReservedSpeedUpNotYetText()}
+                          </Text>
                         )}
                       </View>
                     )
@@ -2967,7 +3010,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 />
                 <Text style={[styles.lockedRoomName, { color: panelSt.body }]}>{unlockFlow.showRoomUnlock.name}</Text>
                 <Text style={[styles.shopSubtitle, { color: panelSt.muted }]}>
-                  Play more puzzles to earn amber and unlock this room!
+                  {getLockedRoomReasonText({
+                    gated: !!(unlockFlow.unlockAvailability && !unlockFlow.unlockAvailability.available
+                      && unlockFlow.unlockAvailability.reason
+                      && !unlockFlow.unlockAvailability.reason.startsWith('Already')),
+                    canAfford: !unlockFlow.nextUnlock || progress.amber >= unlockFlow.nextUnlock.cost,
+                  })}
                 </Text>
                 <Text style={[styles.amberBalance, { color: panelSt.amberText }]}>Your Amber: <AmberInline /> {progress.amber}</Text>
 
@@ -3002,9 +3050,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                           >
                             <AmberCostLabel prefix="Speed it up for" amount={unlockFlow.reservedSkipCost} color={pixelSkin.ink.primary} />
                           </BevelRowButton>
-                        ) : unlockFlow.reservedSkipCost > 0 ? (
+                        ) : unlockFlow.reservedSpeedUpState === 'need_amber' ? (
                           <Text style={[styles.shopSubtitle, { color: panelSt.muted, marginTop: 6, fontStyle: 'italic', fontFamily: BODY_FONT_ITALIC }]}>
-                            Or speed it up for <AmberInline /> {unlockFlow.reservedSkipCost} once you can afford it.
+                            {getReservedSpeedUpNeedAmberText(unlockFlow.reservedSkipCost)}
+                          </Text>
+                        ) : unlockFlow.reservedSpeedUpState === 'not_yet' ? (
+                          // The house is refusing, not the purse. Priced copy
+                          // here told a player holding 13,252 amber to come back
+                          // when they could afford 225.
+                          <Text style={[styles.shopSubtitle, { color: panelSt.muted, marginTop: 6, fontStyle: 'italic', fontFamily: BODY_FONT_ITALIC }]}>
+                            {getReservedSpeedUpNotYetText()}
                           </Text>
                         ) : null}
                       </>
@@ -3976,8 +4031,13 @@ const styles = StyleSheet.create({
   },
   // Recessed wood trough (square pixel ends), amber fill.
   unlockProgressBarBg: {
+    // The trough carries a real outline, like the quest bar's. Without one an
+    // unfilled meter is an unbounded tinted strip with no readable extent, and
+    // the old pillBg-on-sectionBorder pair sat at 1.14-1.27:1 through phase 3,
+    // so a full bar and an empty bar were the same picture.
     flex: 2,
     height: 10,
+    borderWidth: 1,
     overflow: 'hidden',
   },
   unlockProgressBarFill: {
@@ -4533,7 +4593,7 @@ const styles = StyleSheet.create({
   },
   dialogueChoiceBtn: {
     // Cottage card frame background; clear the 18dp card strip; ≥44dp caps.
-    paddingVertical: 14,
+    paddingVertical: SURFACE.cardPadY,
     paddingHorizontal: SURFACE.cardPadX,
     minHeight: 46,
     justifyContent: 'center',
@@ -4791,7 +4851,7 @@ const styles = StyleSheet.create({
     minHeight: 84,
     // Cottage card frame owns the edge; clear the 18dp card strip.
     paddingHorizontal: SURFACE.cardPadX,
-    paddingVertical: 14,
+    paddingVertical: SURFACE.cardPadY,
   },
   journalSpotlightCardActive: {
     transform: [{ translateY: -1 }],

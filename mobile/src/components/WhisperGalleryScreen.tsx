@@ -569,7 +569,7 @@ const styles = StyleSheet.create({
   animalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: SURFACE.cardPadY,
     paddingHorizontal: SURFACE.cardPadX,
     gap: 10,
   },

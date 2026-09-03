@@ -534,7 +534,7 @@ const styles = StyleSheet.create({
   title: { fontFamily: PIXEL_FONT_BOLD, fontSize: FONT_SIZE.headline, textAlign: 'center' },
   tagline: { fontFamily: BODY_FONT, fontSize: FONT_SIZE.bodyLg, textAlign: 'center', marginTop: 4, marginBottom: 10 },
   progress: { fontFamily: PIXEL_FONT_BOLD, fontSize: FONT_SIZE.body, textAlign: 'center', marginBottom: 10 },
-  premiumBox: { paddingVertical: 14, paddingHorizontal: SURFACE.cardPadX, marginBottom: 10 },
+  premiumBox: { paddingVertical: SURFACE.cardPadY, paddingHorizontal: SURFACE.cardPadX, marginBottom: 10 },
   // 56dp: the art is drawn at 192px, so this only ever scales DOWN.
   premiumArt: { width: 56, height: 56, alignSelf: 'center', marginBottom: 8 },
   premiumLocked: { fontFamily: BODY_FONT, fontSize: FONT_SIZE.body, textAlign: 'center', marginBottom: 10 },
