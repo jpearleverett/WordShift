@@ -5,9 +5,9 @@ import { getPhase2PoolCursors } from './dialogue/animalDialogueNarrative';
 import { getTotalDialogueCount } from './animalDialogue';
 import { isOnCooldown } from './dialogueSession';
 import { logEvent } from './eventLogger';
-import { loadTendingState } from './tending';
+import { loadTendingState, hasNewPhase5Line } from './tending';
 import { loadChoiceState } from './dialogueChoices';
-import { getPhase5PoolLength } from './dialogue/phase5Pool';
+import { buildPhase5Pool, buildPhase5Eligibility } from './dialogue/phase5Pool';
 import { UNLOCK_SKIP_PREMIUM, PHASE_THRESHOLDS } from '../constants/gameBalance';
 
 // ============================================================================
@@ -1557,13 +1557,20 @@ export async function getAnimalsWithStatus(): Promise<Animal[]> {
       if (animalPhase === 5 && tendingState) {
         // Post-revelation is pool-only. Regular Phase 3/4 backlog is retired
         // at the reveal and must never light the badge again.
-        const poolLen = getPhase5PoolLength(
+        const pool = buildPhase5Pool(
           animal.type,
           tendingState.level,
           choiceState?.choices?.[animal.type] ?? null
         );
         const caughtUp = tendingState.caughtUp[animal.type] ?? 0;
-        hasNewDialogue = caughtUp < poolLen;
+        // Mirrors useDialogueFlow.recomputeHasNewDialogue: a remaining line
+        // that names an animal the player has not met is not news, so the
+        // badge must not light for it. `caughtUp < pool.length` did.
+        hasNewDialogue = hasNewPhase5Line(
+          pool,
+          caughtUp,
+          buildPhase5Eligibility(animal.type, pool, progress.unlockedAnimals ?? [])
+        );
       } else if (animalPhase === 2) {
         const totalDialogues = getTotalDialogueCount(animal.type, 2);
         // Resolve the raw stored index past lines gated on still-locked

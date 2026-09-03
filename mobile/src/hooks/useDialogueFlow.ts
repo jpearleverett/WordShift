@@ -74,10 +74,11 @@ import { hapticLight, hapticSelection } from '../services/haptics';
 import {
   loadTendingState,
   selectPhase5Dialogue,
+  hasNewPhase5Line,
   setPhase5CaughtUp,
   hashSeed,
 } from '../services/tending';
-import { buildPhase5Pool } from '../services/dialogue/phase5Pool';
+import { buildPhase5Pool, buildPhase5Eligibility } from '../services/dialogue/phase5Pool';
 import { getModalInSpring } from '../theme/surfaces';
 
 /**
@@ -492,7 +493,11 @@ export function useDialogueFlow({
     const totalRegular = getTotalDialogueCount(animalType, 4);
     const caughtUp = tendingCaughtUp[animalType] ?? 0;
     const deliveredIndex = Math.max(0, currentDialogueIndex - totalRegular);
-    const result = selectPhase5Dialogue(pool, caughtUp, deliveredIndex, hashSeed(animalType));
+    // Post-revelation lines are gated on the unlocked animals like every other
+    // pool: the endgame arms on a bare solve floor, so reaching Phase 5 no
+    // longer implies a finished house.
+    const eligible = buildPhase5Eligibility(animalType, pool, progress?.unlockedAnimals ?? []);
+    const result = selectPhase5Dialogue(pool, caughtUp, deliveredIndex, hashSeed(animalType), eligible);
     return { pool, caughtUp, ...result };
   };
 
@@ -1240,7 +1245,14 @@ export function useDialogueFlow({
       // Pool-only badge: regular backlog is irrelevant after the reveal.
       const pool = buildPhase5Pool(animal.type, tendingLevel, playerChoices[animal.type] ?? null);
       const caughtUp = tendingCaughtUp[animal.type] ?? 0;
-      return caughtUp < pool.length;
+      // Not `caughtUp < pool.length`: that lights for a pool whose only
+      // remaining lines name an animal the player has not met, so the badge
+      // promised news and the session opened on a re-read.
+      return hasNewPhase5Line(
+        pool,
+        caughtUp,
+        buildPhase5Eligibility(animal.type, pool, progress.unlockedAnimals ?? [])
+      );
     }
     const resolved = resolveDialogueIndex(animal.type, animal.currentDialogueIndex, animalPhase, getUnlockedTypes());
     if (animalPhase === 2 && resolved >= totalDialogues) {

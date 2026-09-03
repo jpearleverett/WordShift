@@ -165,6 +165,10 @@ jest.mock('../services/tending', () => ({
 
 jest.mock('../services/dialogue/phase5Pool', () => ({
   buildPhase5Pool: jest.fn(() => []),
+  // Post-revelation lines are gated on the unlocked animals at runtime. These
+  // suites are about page ORDER, not gating, so the predicate lets everything
+  // through — dialogueGating.test.ts owns the withholding behaviour.
+  buildPhase5Eligibility: jest.fn(() => () => true),
 }));
 
 import { useDialogueFlow, splitDialogueIntoPages } from '../hooks/useDialogueFlow';

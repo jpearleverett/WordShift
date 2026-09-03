@@ -598,7 +598,15 @@ const ANIMAL_DISPLAY_NAMES: Record<string, AnimalType> = {
   Vesper: 'tarsier', Tock: 'aye_aye', Moss: 'kakapo',
 };
 
-function lineMentionsLockedAnimal(
+/**
+ * Whether a line names an animal the player has not met.
+ *
+ * Exported because the Phase-5 pool needs the same test: post-revelation lines
+ * were never gated, on the premise that Phase 5 implied a finished house. The
+ * endgame also arms on a bare solve floor now, so a player who spent amber on
+ * cosmetics instead of rooms can hear a keeper named who has no room.
+ */
+export function lineMentionsLockedAnimal(
   text: string,
   speaker: AnimalType,
   unlockedAnimals: string[]
