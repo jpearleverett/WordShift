@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   compactHubModal: {
-    paddingVertical: 24,
+    paddingVertical: SURFACE.panelPadY,
     paddingHorizontal: SURFACE.panelPadX,
     paddingBottom: 32,
   },

@@ -444,7 +444,7 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     maxWidth: 420,
-    paddingVertical: 24,
+    paddingVertical: SURFACE.panelPadY,
     paddingHorizontal: SURFACE.panelPadX,
     shadowColor: CandyColors.purple.dark,
     shadowOffset: { width: 0, height: 16 },

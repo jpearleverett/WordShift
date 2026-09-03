@@ -212,9 +212,9 @@ const styles = StyleSheet.create({
   },
   card: {
     width: '100%',
-    paddingTop: 26,
+    paddingTop: SURFACE.panelPadY,
     paddingHorizontal: SURFACE.panelPadX,
-    paddingBottom: 24,
+    paddingBottom: SURFACE.panelPadY,
     alignItems: 'center',
   },
   glow: {

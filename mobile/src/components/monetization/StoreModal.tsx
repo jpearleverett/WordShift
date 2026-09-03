@@ -18,7 +18,7 @@ import { NineSliceFrame } from '../ui/NineSlice';
 import { CandyButton } from '../ui/CandyButton';
 import { PanelCard } from '../ui/PanelCard';
 import { CHROME_ICONS } from '../ui/chromeIcons';
-import { AmberInline } from '../AmberInline';
+import { AmberValue } from '../AmberInline';
 import { AmberSparkle } from '../home/AmberSparkle';
 import {
   PRODUCT_IDS,
@@ -577,13 +577,13 @@ export const StoreModal: React.FC<StoreModalProps> = ({
   /** Quantity as its own fact — the one number a buyer actually compares. */
   const renderRewardValue = (reward: ConsumableProductInfo['reward']) =>
     reward.kind === 'amber' ? (
-      <Text
-        style={[styles.valueAmber, { color: t.amberText }]}
-        numberOfLines={1}
+      <AmberValue
+        amount={reward.amount}
+        size={14}
+        color={t.amberText}
+        textStyle={styles.valueAmber}
         accessibilityLabel={`${reward.amount} amber`}
-      >
-        <AmberInline size={14} /> {reward.amount}
-      </Text>
+      />
     ) : (
       <Text style={[styles.valueWord, { color: t.amberText }]} numberOfLines={1}>
         {reward.amount} hints
@@ -654,9 +654,13 @@ export const StoreModal: React.FC<StoreModalProps> = ({
             <Text style={[styles.title, { color: t.title }]}>Store</Text>
             <View style={[styles.balances, { backgroundColor: t.rowBg, borderColor: t.rowBorder }]}>
               <View style={styles.amberBalanceWrap}>
-                <Text style={[styles.balanceText, { color: t.amberText }]} accessibilityLabel={`${displayedAmber} amber`}>
-                  <AmberInline size={13} /> {displayedAmber}
-                </Text>
+                <AmberValue
+                  amount={displayedAmber}
+                  size={13}
+                  color={t.amberText}
+                  textStyle={styles.balanceText}
+                  accessibilityLabel={`${displayedAmber} amber`}
+                />
                 {amberBurst && <AmberSparkle phase={phase} />}
               </View>
               <Text style={[styles.balanceText, { color: t.body }]}>
@@ -720,13 +724,13 @@ export const StoreModal: React.FC<StoreModalProps> = ({
                         // it anywhere. Stating it here covers both branches and
                         // lets the rewarded button shed its "· +60" suffix, which
                         // also buys back the width its busy copy needs.
-                        <Text
-                          style={[styles.valueAmber, { color: t.amberText }]}
-                          numberOfLines={1}
+                        <AmberValue
+                          amount={DAILY_AMBER_REWARD}
+                          size={14}
+                          color={t.amberText}
+                          textStyle={styles.valueAmber}
                           accessibilityLabel={`${DAILY_AMBER_REWARD} amber`}
-                        >
-                          <AmberInline size={14} /> {DAILY_AMBER_REWARD}
-                        </Text>,
+                        />,
                         isPatronSync() ? (
                           renderPricePill('Claim', handleClaimDailyAmber, `Claim ${DAILY_AMBER_REWARD} free amber`)
                         ) : (
@@ -901,7 +905,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 420,
     maxHeight: '86%',
-    paddingVertical: 24,
+    paddingVertical: SURFACE.panelPadY,
     paddingHorizontal: SURFACE.panelPadX,
     shadowColor: CandyColors.purple.dark,
     shadowOffset: { width: 0, height: 16 },

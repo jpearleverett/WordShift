@@ -2,7 +2,7 @@ import React, { forwardRef } from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
 import { FONT_SIZE } from '../../theme/typeScale';
 import { getPhaseTheme } from '../../theme/colors';
-import { getSurfaceTheme } from '../../theme/surfaces';
+import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
 import { PIXEL_FONT_BOLD, BODY_FONT_BOLD, BODY_FONT_ITALIC } from '../../theme/fonts';
 import { PanelCard } from '../ui/PanelCard';
 import { getShareCardTagline } from '../../services/phaseNarrative';
@@ -332,9 +332,12 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   panel: { alignSelf: 'stretch' },
+  // Panel frame: the opaque wood alone is 21dp, so content at 20 was drawn ON
+  // it. This card is captured into the PNG people share, so it grows a touch —
+  // the alternative was shipping a share image with type on the frame.
   content: {
-    paddingVertical: 20,
-    paddingHorizontal: 24,
+    paddingVertical: SURFACE.panelPadY,
+    paddingHorizontal: SURFACE.panelPadX,
     alignItems: 'center',
   },
   scanline: { position: 'absolute', left: 0, right: 0, height: 1 },

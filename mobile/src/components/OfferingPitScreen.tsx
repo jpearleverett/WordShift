@@ -24,7 +24,7 @@ import {
   PIT_DEVOUR_COLORS as DEVOUR_COLORS,
 } from '../theme/colors';
 import { useScreenInsets } from '../hooks/useScreenInsets';
-import { AmberInline } from './AmberInline';
+import { AmberInline, AmberValue } from './AmberInline';
 import { DialoguePhase } from '../types/homeWorld';
 import { AUTO_COLLECT_PUZZLE_LIMIT } from '../constants/gameBalance';
 import {
@@ -2886,9 +2886,12 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
               {tendingNext && (
                 <>
                   <View style={styles.tendingCostRow}>
-                    <Text style={[styles.tendingCostText, { color: pitSurface.amberText }]}>
-                      <AmberInline size={20} /> {tendingNext.cost}
-                    </Text>
+                    <AmberValue
+                      amount={tendingNext.cost}
+                      size={20}
+                      color={pitSurface.amberText}
+                      textStyle={styles.tendingCostText}
+                    />
                     {tendingNext.dailyBonusApplied && (
                       <Text style={[styles.tendingCostStrike, { color: pitSurface.muted }]}>{tendingNext.baseCost}</Text>
                     )}
@@ -2971,9 +2974,12 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
                 fillColor={pitSkin.fillCard}
               />
               <View style={styles.summaryItem}>
-                <Text style={[styles.summaryValue, { color: pitSurface.title }]}>
-                  <AmberInline size={16} /> {Math.max(0, pendingAmber - pendingAmberOffset)}
-                </Text>
+                <AmberValue
+                  amount={Math.max(0, pendingAmber - pendingAmberOffset)}
+                  size={16}
+                  color={pitSurface.title}
+                  textStyle={styles.summaryValue}
+                />
                 <Text style={[styles.summaryLabel, { color: pitSurface.muted }]}>
                   {getPitPendingAmberLabel(phase)}
                 </Text>

@@ -4193,7 +4193,7 @@ const styles = StyleSheet.create({
   // keeps layout only (the 30dp panel strip's 24dp wood+transition band is
   // cleared by SURFACE.panelPadX).
   shopModal: {
-    paddingVertical: 24,
+    paddingVertical: SURFACE.panelPadY,
     paddingHorizontal: SURFACE.panelPadX,
     paddingBottom: 40,
   },
@@ -4208,7 +4208,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   compactHubModal: {
-    paddingVertical: 24,
+    paddingVertical: SURFACE.panelPadY,
     paddingHorizontal: SURFACE.panelPadX,
     paddingBottom: 32,
   },
@@ -4796,7 +4796,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     // Clear the panel band (the panel itself carries no padding of its own).
     paddingHorizontal: SURFACE.panelPadX,
-    paddingTop: 24,
+    paddingTop: SURFACE.panelPadY,
     paddingBottom: 14,
     gap: 12,
   },
