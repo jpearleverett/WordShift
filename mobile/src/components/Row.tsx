@@ -155,17 +155,10 @@ interface RowProps {
 function getPhaseRowColors(phase: number) {
   if (phase <= 1) {
     return {
-      glowColor: CandyColors.purple.main,
-      sourceBorderColor: CandyColors.purple.light,
-      sourceShadowColor: CandyColors.purple.main,
-      targetBorderColor: CandyColors.pink.light,
-      targetShadowColor: CandyColors.pink.main,
-      pickBadgeColor: CandyColors.purple.main,
-      dropBadgeColor: CandyColors.pink.main,
-      slotGlowColor: CandyColors.pink.main,
-      slotBorderColor: CandyColors.pink.light,
-      dropHintColor: CandyColors.pink.main,
-      cornerDotColor: CandyColors.pink.light,
+      glowColor: '#D9B477', sourceBorderColor: '#C5A56C', sourceShadowColor: '#201C15',
+      targetBorderColor: '#94B8AF', targetShadowColor: '#203E38', pickBadgeColor: '#705430',
+      dropBadgeColor: '#365E56', slotGlowColor: '#B9D2B3', slotBorderColor: '#638F80',
+      dropHintColor: '#365E56', cornerDotColor: '#A1BFA8',
     };
   }
 
@@ -1457,17 +1450,17 @@ const styles = StyleSheet.create({
 
   // Row variants
   rowSource: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backgroundColor: '#F0E4CB',
     borderWidth: 3,
     borderColor: CandyColors.purple.light,
     shadowColor: CandyColors.purple.main,
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
     elevation: 10,
   },
   rowTarget: {
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    backgroundColor: 'rgba(229, 222, 199, 0.84)',
     borderWidth: 3,
     borderColor: CandyColors.pink.light,
     borderStyle: 'dashed',

@@ -2,6 +2,8 @@
 
 Reviewed against the local `main` checkout on 5 September 2026. This is an assessment and proposed revision direction; it does not change the game or establish new canon. Full spoilers follow.
 
+The implemented revision, current canon and validation are documented in [Story and visual implementation](STORY_AND_VISUAL_IMPLEMENTATION.md).
+
 **My assessment: the game has a strong artistic identity, but needs substantial structural revision to deliver the emotional impact its premise promises.**
 
 The domestic vocabulary is its greatest asset: a kettle, a fish, a borrowed book, a wall someone repaired, a place kept warm. The shift from hospitality to ritual makes the familiar game loop disturbing. The animal companions have enough specificity to support real affection. The use of the player's actual words is especially valuable.

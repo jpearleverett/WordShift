@@ -1,3 +1,4 @@
+import { clearEvents } from '../services/eventLogger';
 /**
  * Monetization UI tests (PatronModal + RewardedAdButton).
  *
@@ -395,3 +396,7 @@ describe('RewardedAdButton', () => {
     expect(onReward).not.toHaveBeenCalled();
   });
 });
+
+// These service/UI tests enqueue telemetry events; cancel their debounce before
+// Jest disposes the module registry and its lazy telemetry import.
+afterEach(clearEvents);

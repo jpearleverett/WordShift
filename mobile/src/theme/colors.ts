@@ -1,5 +1,5 @@
-// WordShift Candy Theme - Inspired by Candy Crush's vibrant palette
-// Rich, saturated gradients that pop on screen
+// WordShift: painted tokens, warm timber and a sky that changes with the story.
+// Legacy CandyColors names remain stable for existing consumers and cosmetics.
 
 export const CandyColors = {
   // Primary candy palette
@@ -70,14 +70,14 @@ export const CandyColors = {
 
   // Tile colors for letter variety
   tileColors: [
-    { bg: '#FF6B9D', border: '#D44D7A', glow: 'rgba(255, 107, 157, 0.5)' }, // Hot pink
-    { bg: '#C44DFF', border: '#9933CC', glow: 'rgba(196, 77, 255, 0.5)' },  // Purple
-    { bg: '#4DAFFF', border: '#2E8BC0', glow: 'rgba(77, 175, 255, 0.5)' },  // Sky blue
-    { bg: '#4DE8C2', border: '#2EAF8E', glow: 'rgba(77, 232, 194, 0.5)' },  // Mint
-    { bg: '#FFD84D', border: '#CCB030', glow: 'rgba(255, 216, 77, 0.5)' },  // Gold
-    { bg: '#FF8C4D', border: '#CC6633', glow: 'rgba(255, 140, 77, 0.5)' },  // Orange
-    { bg: '#FF5A5A', border: '#CC3333', glow: 'rgba(255, 90, 90, 0.5)' },   // Coral red
-    { bg: '#5AC8FA', border: '#3AAFDD', glow: 'rgba(90, 200, 250, 0.5)' },  // Cyan
+    { bg: '#D9997B', border: '#945A43', glow: 'rgba(232, 200, 148, 0.24)' },
+    { bg: '#B8A2C7', border: '#756386', glow: 'rgba(232, 200, 148, 0.24)' },
+    { bg: '#8FB8CA', border: '#557F92', glow: 'rgba(232, 200, 148, 0.24)' },
+    { bg: '#A6BD8F', border: '#697F55', glow: 'rgba(232, 200, 148, 0.24)' },
+    { bg: '#DEC38A', border: '#A28650', glow: 'rgba(232, 200, 148, 0.24)' },
+    { bg: '#DDB095', border: '#966E51', glow: 'rgba(232, 200, 148, 0.24)' },
+    { bg: '#CD9390', border: '#925D60', glow: 'rgba(232, 200, 148, 0.24)' },
+    { bg: '#99BDB5', border: '#5D827A', glow: 'rgba(232, 200, 148, 0.24)' },
   ],
 
   // Status colors
@@ -347,20 +347,27 @@ export interface TileFinish {
   aura?: string;
 }
 
-/**
- * The shipped candy finish. These four values MUST stay byte-identical to the
- * literals in LetterTile's `bevelTop` / `glossyShine` / `specularDot` /
- * `shineSweep` styles: every theme without a TILE_FINISHES entry (and every
- * player who has bought nothing) resolves to this, so the default board must
- * render exactly as it did before finishes existed.
- */
+/** The default is a softly polished painted token; purchased finishes keep their own material. */
 export const DEFAULT_TILE_FINISH: TileFinish = {
-  bevel: 'rgba(255, 255, 255, 0.25)',
-  gloss: 'rgba(255, 255, 255, 0.4)',
-  specular: 'dot',
-  specularColor: 'rgba(255, 255, 255, 0.7)',
-  sweep: 'rgba(255, 255, 255, 0.45)',
+  bevel: 'rgba(255, 246, 219, 0.28)',
+  gloss: 'rgba(255, 246, 219, 0.08)',
+  specular: 'none',
+  specularColor: 'rgba(255, 246, 219, 0)',
+  sweep: 'rgba(255, 246, 219, 0.12)',
 };
+
+/** Choose readable source-letter ink even on an equipped cosmetic palette. */
+export function getTileInkColor(background: string): string {
+  const channels = [1, 3, 5].map(start => parseInt(background.slice(start, start + 2), 16) / 255)
+    .map(value => value <= 0.04045 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4));
+  const luminance = channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+  const darkContrast = (luminance + 0.05) / 0.06683879508032017;
+  const lightContrast = 0.9689252872760447 / (luminance + 0.05);
+  if (darkContrast >= 4.5) return '#28221D';
+  if (lightContrast >= 4.5) return '#FFF5DF';
+  // Mid-luminance cosmetics need the full ink range to meet the text bar.
+  return luminance > 0.179 ? '#000000' : '#FFFFFF';
+}
 
 /**
  * Finishes by tile-theme id. Only the finish-led themes appear here; the
@@ -504,7 +511,7 @@ export interface PhaseTheme {
 
 /**
  * Get the visual theme for the current narrative phase.
- * Phase 0: Bright candy colors (default)
+ * Phase 0: Moss, warm paper and painted tokens (default)
  * Phase 1: Slightly muted, amber tones creeping in
  * Phase 2: Cooler, more blue/purple, hints of isolation
  * Phase 3: Dark, cold, shadowy
@@ -514,13 +521,13 @@ export function getPhaseTheme(phase: number): PhaseTheme {
   switch (phase) {
     case 0:
       return {
-        bgPrimary: '#667EEA',
-        bgSecondary: '#764BA2',
-        bgTertiary: '#667EEA',
-        overlayTop: 'rgba(76, 29, 149, 0.25)',
-        overlayMid: 'rgba(102, 126, 234, 0.3)',
-        overlayBottom: 'rgba(240, 147, 251, 0.2)',
-        centerGlow: 'rgba(255, 255, 255, 0.1)',
+        bgPrimary: '#34483F',
+        bgSecondary: '#5D6350',
+        bgTertiary: '#34483F',
+        overlayTop: 'rgba(16, 35, 32, 0.16)',
+        overlayMid: 'rgba(92, 112, 90, 0.12)',
+        overlayBottom: 'rgba(185, 138, 75, 0.1)',
+        centerGlow: 'rgba(244, 217, 166, 0.025)',
         particleColors: [
           'rgba(255, 255, 255, 0.3)',
           'rgba(255, 182, 193, 0.4)',
@@ -532,29 +539,26 @@ export function getPhaseTheme(phase: number): PhaseTheme {
           '#FF6B9D', '#C44DFF', '#4DAFFF', '#4DE8C2',
           '#FFD84D', '#FF8C4D', '#FF4D6A', '#9D4DFF',
         ],
-        // pink.dark (#DB2777) reads 4.6:1 on the white modal (pink.main #EC4899
-        // was only 3.5:1 — passable at display size but under the 4.5:1 bar);
-        // still unmistakably candy pink.
-        victoryTitleColor: CandyColors.pink.dark,
+        // Warm ink keeps the victory title legible on the paper panel.
+        victoryTitleColor: '#725126',
         victoryGlowColor: CandyColors.yellow.light,
-        modalOverlayColor: 'rgba(76, 29, 149, 0.7)',
-        modalBgColor: CandyColors.white,
-        modalTextColor: CandyColors.purple.main,
-        // WCAG AA-checked: 4.8:1 on modalBg #FFFFFF, 4.6:1 on statBg #F8FAFC
-        // (gray[400] measured only 2.6:1 — unreadable secondary text)
-        modalSecondaryTextColor: CandyColors.gray[500],
-        modalStatBgColor: CandyColors.gray[50],
+        modalOverlayColor: 'rgba(19, 32, 28, 0.76)',
+        modalBgColor: '#F3E4C2',
+        modalTextColor: '#473322',
+        // Secondary ink is readable on both paper surfaces.
+        modalSecondaryTextColor: '#67533C',
+        modalStatBgColor: '#EAD8B0',
         modalDividerColor: CandyColors.gray[200],
-        vignetteColor: '#4C1D95',
+        vignetteColor: '#182A24',
       };
     case 1:
       return {
-        bgPrimary: '#5B6DB0',
-        bgSecondary: '#6B4592',
-        bgTertiary: '#5B6DB0',
-        overlayTop: 'rgba(60, 25, 120, 0.3)',
-        overlayMid: 'rgba(80, 100, 180, 0.3)',
-        overlayBottom: 'rgba(180, 120, 200, 0.2)',
+        bgPrimary: '#3E4848',
+        bgSecondary: '#625656',
+        bgTertiary: '#3E4848',
+        overlayTop: 'rgba(32, 35, 48, 0.18)',
+        overlayMid: 'rgba(91, 91, 107, 0.12)',
+        overlayBottom: 'rgba(192, 139, 105, 0.1)',
         centerGlow: 'rgba(255, 220, 150, 0.08)',
         particleColors: [
           'rgba(255, 240, 200, 0.3)',
@@ -579,7 +583,7 @@ export function getPhaseTheme(phase: number): PhaseTheme {
         modalSecondaryTextColor: '#665E7A',
         modalStatBgColor: '#F0ECF5',
         modalDividerColor: CandyColors.gray[200],
-        vignetteColor: '#3D1870',
+        vignetteColor: '#262D34',
       };
     case 2:
       return {

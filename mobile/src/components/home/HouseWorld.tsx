@@ -8,6 +8,8 @@ import {
   Text,
   Easing,
   Image,
+  Platform,
+  TouchableOpacity as WebTouchableOpacity,
 } from 'react-native';
 import {
   GestureHandlerRootView,
@@ -16,7 +18,7 @@ import {
   PanGestureHandlerGestureEvent,
   // Touchables inside the pannable house view must come from
   // react-native-gesture-handler to coexist with the pan gesture
-  TouchableOpacity,
+  TouchableOpacity as GestureTouchableOpacity,
 } from 'react-native-gesture-handler';
 import { Room, Animal, DialoguePhase, Unlockable } from '../../types/homeWorld';
 import { RoomView, computeEmbellishmentIntensity } from './RoomView';
@@ -41,6 +43,9 @@ import { getActiveEvent } from '../../services/liveEvents';
 // no visible loss on the painterly art. Dimensions are unchanged (941x1972);
 // the seat-geometry contract in skyGeometry.test.ts still holds. Re-encode via
 // scripts/tools/encodeBackgroundsWebp.mjs.
+// Native touchables arbitrate with the house pan; web exposes a single button.
+const TouchableOpacity = Platform.OS === 'web' ? WebTouchableOpacity : GestureTouchableOpacity;
+
 const SKY_DAY = require('../../../assets/environment/sky_day.webp');
 const SKY_AFTERNOON = require('../../../assets/environment/sky_afternoon.webp');
 const SKY_DUSK = require('../../../assets/environment/sky_dusk.webp');
@@ -119,14 +124,14 @@ interface AmbientParticleConfig {
 }
 
 // Phase register: warm gold motes rising (0-1) -> dimmer desaturated lavender
-// drift (2-3) -> sparse crimson embers sinking heavily (4-5).
+// drift (2-3) -> sinking crimson embers (4) -> slow warm motes (5).
 const AMBIENT_PARTICLES_BY_PHASE: Record<number, AmbientParticleConfig> = {
   0: { colors: ['#FFE9A8', '#FFD27A', '#FFF3C4', '#FBE7B0'], size: 6, maxCount: 8, spawnMs: 1900, durationMin: 8000, durationRange: 5000, direction: 'up', peakOpacity: 0.85, drift: 60, glow: true },
   1: { colors: ['#FCE0A0', '#EBD9B4', '#F0C98A'], size: 5, maxCount: 7, spawnMs: 2300, durationMin: 9000, durationRange: 5000, direction: 'up', peakOpacity: 0.7, drift: 52, glow: true },
   2: { colors: ['#C9B6D6', '#B7A6C4', '#A69AB8'], size: 5, maxCount: 5, spawnMs: 3200, durationMin: 11000, durationRange: 5000, direction: 'up', peakOpacity: 0.5, drift: 42, glow: false },
   3: { colors: ['#8E7EA0', '#7C6E8E', '#6E6480'], size: 4, maxCount: 4, spawnMs: 4200, durationMin: 13000, durationRange: 6000, direction: 'up', peakOpacity: 0.42, drift: 32, glow: false },
   4: { colors: ['#C25A3A', '#A83C2A', '#8B2E22'], size: 4, maxCount: 4, spawnMs: 4200, durationMin: 12000, durationRange: 5000, direction: 'down', peakOpacity: 0.5, drift: 28, glow: true },
-  5: { colors: ['#7A5C86', '#8B2E4A', '#6B5B8A'], size: 4, maxCount: 3, spawnMs: 5000, durationMin: 14000, durationRange: 6000, direction: 'down', peakOpacity: 0.45, drift: 24, glow: true },
+  5: { colors: ['#D5B888', '#B8A5C5', '#F1D7A8'], size: 4, maxCount: 3, spawnMs: 5000, durationMin: 14000, durationRange: 6000, direction: 'up', peakOpacity: 0.38, drift: 24, glow: true },
 };
 
 const FloatingParticle: React.FC<{ particle: Particle }> = ({ particle }) => {
@@ -867,7 +872,7 @@ const PHASE_HOUSE_TINT: Record<number, { color: string; ext: number; room: numbe
   2: { color: '#D66E46', ext: 0.14, room: 0.07 }, // dusk: warm sunset rose
   3: { color: '#0E1A36', ext: 0.45, room: 0.22 }, // storm night: deep blue
   4: { color: '#080818', ext: 0.55, room: 0.27 }, // shadow: near-black indigo
-  5: { color: '#140E28', ext: 0.48, room: 0.24 }, // terrible peace: softer mauve dark
+  5: { color: '#211B32', ext: 0.42, room: 0.16 }, // After: cool outside, lived warmth inside
 };
 
 // Contact-shadow appearance by phase: color follows the ground it falls on
@@ -1615,6 +1620,93 @@ const SKY_BOX_HEIGHT = Math.max(
 );
 
 
+/**
+ * The painted meadow must stay fixed to the foundation. Tall houses rise above
+ * that painting into additional air; decorate only that air, never stretch the
+ * river upward or place a second horizon behind the roof.
+ *
+ * Every primitive below is a direct child of the same pan plane as the sky.
+ * There is no overflowing raster wrapper, native raster cache, animation or
+ * scroll listener. The lowest primitive ends above the art's flat top seam.
+ */
+const UPPER_SKY_LIGHT: Record<number, {
+  cloud: string; haze: string; star: string; cloudOpacity: number; hazeOpacity: number;
+}> = {
+  0: { cloud: '#CCE9F7', haze: '#F6F4D5', star: '#FFFFFF', cloudOpacity: 0.13, hazeOpacity: 0.09 },
+  1: { cloud: '#D3D4EA', haze: '#FAD8B1', star: '#FFF5DA', cloudOpacity: 0.15, hazeOpacity: 0.1 },
+  2: { cloud: '#362D59', haze: '#E3AEC6', star: '#F8DAC2', cloudOpacity: 0.24, hazeOpacity: 0.14 },
+  3: { cloud: '#131D37', haze: '#59667F', star: '#C9D8E8', cloudOpacity: 0.42, hazeOpacity: 0.13 },
+  4: { cloud: '#211632', haze: '#6D4A68', star: '#ADACC5', cloudOpacity: 0.42, hazeOpacity: 0.12 },
+  5: { cloud: '#30283F', haze: '#BB9A98', star: '#F1D8A7', cloudOpacity: 0.32, hazeOpacity: 0.13 },
+};
+
+const UpperSkyAtmosphere: React.FC<{
+  phase: DialoguePhase; height: number;
+}> = React.memo(({ phase, height }) => {
+  if (height <= 0) return null;
+  const palette = UPPER_SKY_LIGHT[phase] ?? UPPER_SKY_LIGHT[0];
+  const simple = getDeviceTier() === 'low';
+  const bandCount = Math.max(1, Math.min(simple ? 3 : 7, Math.ceil(height / 240)));
+  const starCount = phase >= 2 ? Math.min(simple ? 8 : 34, Math.ceil(height / 42)) : 0;
+  return (
+    <>
+      {Array.from({ length: bandCount }, (_, i) => {
+        const bottom = SKY_BOX_HEIGHT + 42 + i * (height / bandCount);
+        const fromLeft = i % 2 === 0;
+        const cloudWidth = SCREEN_WIDTH * (1.05 + (i % 3) * 0.1);
+        return (
+          <React.Fragment key={'upper-air-' + i}>
+            {/* A far cloud bank and a closer, quieter lobe give the side air
+                depth without inventing hills at the height of the upper rooms. */}
+            <View pointerEvents="none" importantForAccessibility="no-hide-descendants"
+              style={{
+                position: 'absolute', zIndex: -1, bottom,
+                left: fromLeft ? -SCREEN_WIDTH * 0.43 : SCREEN_WIDTH * 0.38,
+                width: cloudWidth, height: 92 + (i % 3) * 26, borderRadius: 160,
+                backgroundColor: palette.cloud, opacity: palette.cloudOpacity,
+              }} />
+            {!simple && <View pointerEvents="none" importantForAccessibility="no-hide-descendants"
+              style={{
+                position: 'absolute', zIndex: -1, bottom: bottom + 34,
+                left: fromLeft ? SCREEN_WIDTH * 0.55 : -SCREEN_WIDTH * 0.58,
+                width: SCREEN_WIDTH * 1.2, height: 130, borderRadius: 180,
+                backgroundColor: palette.cloud, opacity: palette.cloudOpacity * 0.55,
+              }} />}
+            {/* Broad reflected haze; concentric low-alpha shapes feather its
+                edges using only cheap static native Views. */}
+            {(simple ? [1] : [1, 0.76, 0.5]).map((scale, layer) => (
+              <View key={'haze-' + layer} pointerEvents="none"
+                importantForAccessibility="no-hide-descendants"
+                style={{
+                  position: 'absolute', zIndex: -1,
+                  bottom: bottom + 20 + (1 - scale) * 44,
+                  left: (fromLeft ? -0.3 : 0.12) * SCREEN_WIDTH + (1 - scale) * SCREEN_WIDTH * 0.58,
+                  width: SCREEN_WIDTH * 1.3 * scale, height: 114 * scale,
+                  borderRadius: 180, backgroundColor: palette.haze,
+                  opacity: palette.hazeOpacity * (simple ? 0.5 : 0.36),
+                }} />
+            ))}
+          </React.Fragment>
+        );
+      })}
+      {Array.from({ length: starCount }, (_, i) => (
+        <View key={'upper-star-' + i} pointerEvents="none"
+          importantForAccessibility="no-hide-descendants"
+          style={{
+            position: 'absolute', zIndex: -1,
+            bottom: SKY_BOX_HEIGHT + 78 + ((i * 137 + 41) % Math.max(1, Math.floor(height))),
+            left: 14 + ((i * 73 + 19) % Math.max(1, Math.floor(SCREEN_WIDTH - 28))),
+            width: i % 7 === 0 ? 2 : 1.3, height: i % 7 === 0 ? 2 : 1.3,
+            borderRadius: 2, backgroundColor: palette.star,
+            opacity: (phase === 2 ? 0.2 : 0.3) + (i % 4) * 0.07,
+          }} />
+      ))}
+    </>
+  );
+});
+UpperSkyAtmosphere.displayName = 'UpperSkyAtmosphere';
+
+
 interface HouseWorldProps {
   rooms: Room[];
   animals: Animal[];
@@ -1825,6 +1917,12 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
       max: Math.max(0, overflow + 50),
     };
   }, [containerHeight, houseHeight, numRows, onPitPress, houseBottomMargin]);
+
+  // Reach above the roof end of the complete pan range, including a small
+  // overscroll allowance. Short houses still use only the painted sky.
+  const upperAtmosphereHeight = Math.max(
+    0, (containerHeight ?? SCREEN_HEIGHT) + panBounds.max + 180 - SKY_BOX_HEIGHT
+  );
 
   // ─── One cohesive scene (no vertical-pan parallax) ───────────────────────
   // The meadow the house stands on is BAKED INTO the sky artwork. A two-rate
@@ -2165,6 +2263,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                     Height is the fixed SKY_BOX_HEIGHT floor: with the scene now
                     panning as one 1:1 plane, the art covers the frame across the
                     whole pan range exactly as the seat geometry was tuned for. */}
+                <UpperSkyAtmosphere phase={currentPhase} height={upperAtmosphereHeight} />
                 <Image
                   source={
                     currentPhase >= 5 ? SKY_PEACE :

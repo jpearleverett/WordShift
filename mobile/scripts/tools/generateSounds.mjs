@@ -659,13 +659,26 @@ render('arrival', 8.0, (s, rand) => {
   strike(s, { freq: D.Eb3, start: 1.6, dur: 1.4, vol: 0.14, partials: HOLLOW, attack: 0.05, decayShape: 3.2, unison: 2, detune: 0.005, rand });
   strike(s, { freq: D.C3, start: 2.7, dur: 1.6, vol: 0.16, partials: HOLLOW, attack: 0.05, decayShape: 3.0, unison: 2, detune: 0.005, rand });
   strike(s, { freq: D.G2, start: 3.6, dur: 1.8, vol: 0.16, partials: HOLLOW, attack: 0.06, decayShape: 2.8, unison: 2, detune: 0.006, rand });
-  // THE bell: one enormous slow-attack strike, landing with the settle.
-  strike(s, { freq: D.C4, start: 4.4, dur: 3.2, vol: 0.42, partials: DARK_BELL, attack: 0.28, decayShape: 2.6, unison: 2, detune: 0.004, rand });
-  strike(s, { freq: D.C3, start: 4.45, dur: 3.0, vol: 0.2, partials: DARK_BELL, attack: 0.3, decayShape: 2.6, rand });
   // Sub breath: gathers under the descent, exhales with the bell.
   noiseBurst(s, { start: 0.1, dur: 4.0, vol: 0.08, lp: 0.05, attack: 1.2, decayShape: 2.8, rand });
   noiseBurst(s, { start: 4.4, dur: 2.6, vol: 0.1, lp: 0.08, attack: 0.25, decayShape: 3.0, rand });
 }, { reverb: { wet: 0.4, decay: 0.9, damp: 0.5, tail: 1.6 }, peak: 0.74 });
+
+
+// Tock's one answer: a clear bronze attack and a long, warm imperfect decay.
+// Harmonics sit in phone-speaker range; no reward ladder or success arpeggio.
+render('story_bell', 4.4, (s, rand) => {
+  strike(s, { freq: D.C4, dur: 4.0, vol: 0.38, partials: HANDBELL, attack: 0.012, decayShape: 2.5, unison: 2, detune: 0.0018, rand });
+  strike(s, { freq: D.C3, start: 0.015, dur: 3.4, vol: 0.13, partials: DARK_BELL, attack: 0.025, decayShape: 3.0, rand });
+  noiseBurst(s, { start: 0, dur: 0.09, vol: 0.045, lp: 0.35, decayShape: 7, rand });
+}, { reverb: { wet: 0.32, decay: 0.84, damp: 0.48, tail: 1.1 }, peak: 0.65 });
+
+// Moss's response: one breath gathering into a rounded low call, then release.
+render('story_answer', 3.6, (s, rand) => {
+  swell(s, { freq: D.C3, dur: 3.1, vol: 0.3, partials: [{ r: 1, g: 1 }, { r: 2, g: 0.42 }, { r: 3, g: 0.2 }], attack: 0.55, release: 1.3, unison: 2, detune: 0.002, rand });
+  swell(s, { freq: D.G3, start: 0.25, dur: 2.65, vol: 0.08, partials: [{ r: 1, g: 1 }, { r: 2, g: 0.2 }], attack: 0.65, release: 1.2, rand });
+  noiseBurst(s, { start: 0, dur: 2.9, vol: 0.035, lp: 0.13, attack: 0.5, decayShape: 3.5, rand });
+}, { reverb: { wet: 0.2, decay: 0.8, damp: 0.6, tail: 0.8 }, peak: 0.6 });
 
 // daily_ready: warm handbell pair, G5 then C6.
 render('daily_ready', 1.0, (s, rand) => {

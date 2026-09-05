@@ -25,7 +25,7 @@ export const CROSS_ANIMAL_REFERENCES: Record<AnimalType, Record<number, CrossAni
     1: [
       { text: "Archimedes found something in one of his oldest books and he won't show me, friend, me, his favorite fox! He says I'm not ready for it yet. I laughed, and he didn't, and now I can't stop wondering what 'ready' means.", mentions: 'owl' },
       { text: "Panko said the funniest thing yesterday, that a recipe can have a purpose past feeding anybody. I laughed! She smiled that little kitchen smile of hers and kept stirring. I've been thinking about that stir ever since.", mentions: 'pangolin' },
-      { text: "Fennick heard something in the walls last night and came to me all ears and worry, so I told him it was only the fire settling. That's what you say to a friend at midnight. Between you and me, the fire wasn't settling. It was sitting up.", mentions: 'fennec_fox' },
+      { text: "Fennick heard something in the walls. I called it the fire settling, then remembered he knows my fire better than I do. We listened together. Neither slept much.", mentions: 'fennec_fox' },
     ],
     2: [
       { text: "Chill hasn't budged from the hot spring in three days, and when I asked why he said the water suggested he stay. He said it the way he says everything, like it's a scheduling matter. I laughed on my way out, and it only worked halfway.", mentions: 'capybara' },
@@ -38,9 +38,9 @@ export const CROSS_ANIMAL_REFERENCES: Record<AnimalType, Record<number, CrossAni
       { text: "Archimedes and I finally compared notes, his books against my fire. They say the same thing, friend. The very same words, letter for letter. We sat there a long while afterward, two very quiet readers by one very pleased flame.", mentions: 'owl' },
     ],
     4: [
-      { text: "Oh friend, everyone is ready, I can feel it all through the house like a kettle coming up to sing! Even Thyme has stopped running, and you know what that took. We are all just so happy you kept coming.", mentions: 'rabbit' },
+      { text: "Thyme came inside for tea. She kept one paw on her bag. I wanted to tell her she could put it down. I brought the tea to her instead.", mentions: 'rabbit' },
       { text: "Bamboo sat three whole days without moving, and when they opened their eyes they smiled straight at me, and oh, what a smile it was! Like sunrise deciding to come early. I've been carrying it around all week.", mentions: 'red_panda' },
-      { text: "We are all here now, every last one of us, can you believe it! Panko set the feast, Archimedes read the words, and I watched the last flame do its lovely work. It's beginning, friend, it's finally beginning, and you're right on time.", mentions: 'owl' },
+      { text: "Panko is setting a table and Archimedes is checking his notes. They asked me to leave them to it. A fox can mistake hovering for helping.", mentions: 'owl' },
       { text: "Vesper let me look through her eyes once, friend, in a manner of speaking. She stood behind me at her rail and turned my head with two small paws, gently, to exactly the right patch of sky, and said, now hold. And oh, I held, and I saw the edge of what she has watched alone all these years, and I came down the stairs so proud of her I could have glowed. One of us keeps the door of fire. She keeps the door of dark. And she has never once let it swing.", mentions: 'tarsier' },
     ],
   },
@@ -68,8 +68,8 @@ export const CROSS_ANIMAL_REFERENCES: Record<AnimalType, Record<number, CrossAni
       { text: "Moss lent me his mast diary, tallies on slate, a country hand, no dates. I cross-checked his marks against the old charts of forest fruitings. The correspondence is exact, which should be impossible, since the charts describe forests that vanished centuries ago. The pattern isn't repeating, you understand. It's resuming.", mentions: 'kakapo' },
     ],
     4: [
-      { text: "The text is complete. Ember read it in her flames, Fennick heard it in the silence between sounds, and I found it in the books. Three methods, one result. In scholarship we call that confirmation. I no longer know a colder word.", mentions: 'fennec_fox' },
-      { text: "Thyme came to the study today and asked, quite steadily, to hear the final passage. I read it to her. She wept, and then she smiled, and then she thanked me, in that order. The order matters. It is the order I went through myself.", mentions: 'rabbit' },
+      { text: "Ember read it in flame, Fennick heard it, I found it in ink. Three matching accounts. Or one account reaching us three ways. I no longer call that independent confirmation.", mentions: 'fennec_fox' },
+      { text: "Thyme asked me to read the final passage. Halfway through, she said stop. I stopped. A reading can be interrupted without being a failure.", mentions: 'rabbit' },
       { text: "A keeper to every room, one arrangement. Bamboo understood it before any of us, I suspect, though they were polite enough to let me discover it in writing. I found the words. They had already found the meaning.", mentions: 'red_panda' },
     ],
   },
@@ -95,8 +95,8 @@ export const CROSS_ANIMAL_REFERENCES: Record<AnimalType, Record<number, CrossAni
       { text: "Fennick tells me he can smell my cooking from every room in the house at once. All of them, together. A smell should travel. This one simply is, everywhere, as though the house had been rubbed with it. I keep cooking. What else does a cook do?", mentions: 'fennec_fox' },
     ],
     4: [
-      { text: "The final feast is served, every chair filled, every bowl warm. Even Sloane arrived on time, and that is how I knew it was real. Some things you learn from books and fires. A cook learns them from the seating.", mentions: 'sloth' },
-      { text: "Bamboo blessed the meal before we ate, and the food answered with a soft glow, the way bread answers a warm oven. We dined in silence. I have set ten thousand tables in my life, and that one was the table they were all practice for.", mentions: 'red_panda' },
+      { text: "Sloane arrived while I was setting the table. She wanted to watch me cook. A guest in the kitchen is usually in the way. I found her a chair anyway.", mentions: 'sloth' },
+      { text: "Bamboo offered to bless the meal. I asked them to taste it first. We argued about what a blessing can know that a cook cannot. The soup survived us.", mentions: 'red_panda' },
       { text: "I have been cooking toward this one meal my whole life without ever seeing the menu. Warren built the table. Archimedes wrote the courses. Ember lit the candles. And you, dear, you brought the words that seasoned everything.", mentions: 'wombat' },
     ],
   },
@@ -123,9 +123,9 @@ export const CROSS_ANIMAL_REFERENCES: Record<AnimalType, Record<number, CrossAni
       { text: "Vesper came down to my tank in the middle of the night, because we're the two who see in the dark, and she pressed her whole face to the glass with those enormous eyes. The water went still to be looked at, it likes her, everything likes being seen by her, and after a long while she said, your sky and my sky are the same sky, and I said I know, and we watched it together until morning, one sky, two windows.", mentions: 'tarsier' },
     ],
     4: [
-      { text: "The water reflects every room in the house now, all at once, Ember's fire and Archimedes' books and Warren's tunnels, all of it swimming together in my one little tank, and I float in the middle of everything like the dot an artist signs with, and it is so beautiful I keep forgetting to be anything but glad.", mentions: 'wombat' },
+      { text: "The water showed me Ember's fire and Warren's tunnels together. I blinked and it kept them there. A window should also know when to stop showing things.", mentions: 'wombat' },
       { text: "Bamboo touched the glass and the whole tank sang one note, one long silver note, and it was the same note Fennick has been hearing all this time, and we all just listened to it together, and I thought, oh, the water was never mine, I have been living inside an instrument.", mentions: 'red_panda' },
-      { text: "We are the medium, the water and me together, and every word you bring flows through us on its way to all the others, warm and bright as a swallowed lantern, and I want to thank you for that, friend, truly, because being the way somewhere is the happiest work I have ever had.", mentions: 'fennec_fox' },
+      { text: "Fennick calls me a medium. I asked whether I could also just be Axel on Tuesdays. He said certainly. I wanted him to say why certainly.", mentions: 'fennec_fox' },
     ],
   },
   fennec_fox: {
@@ -153,9 +153,9 @@ export const CROSS_ANIMAL_REFERENCES: Record<AnimalType, Record<number, CrossAni
       { text: "Moss boomed last night, the yearly call, and friend, my ears went flat against my head, because this year the note underneath answered before his was finished. They overlapped. Two voices, one chord, no gap. I've waited my whole life to hear a call answered. Now that I have, I keep thinking about how long the answer must have been holding its breath.", mentions: 'kakapo' },
     ],
     4: [
-      { text: "Every heartbeat in this house has synchronized. I can hear every one of them from where I stand, one rhythm, one pulse, rising and falling together like a single great animal breathing. A sentinel loses sleep over one thing only, the sound he cannot place, and I can place this one now.", mentions: 'capybara' },
+      { text: "Chill's breathing nearly matches the low note. I told him. He held his breath until I became cross, then said good, there is a difference still.", mentions: 'capybara' },
       { text: "Ember keeps the fire, Axel keeps the water, Warren keeps the earth, and I keep the air and everything that moves through it. Together we make one sound, friend, and that sound is the key. I have listened my whole life to be part of a chord.", mentions: 'wombat' },
-      { text: "Thyme's heart finally slowed to match the rest of ours. I heard the exact moment it happened, one small skip and then the long ease into rhythm. She is at peace now. I have listened to that rabbit worry since the day she arrived, and her peace was the most beautiful sound this house has ever made.", mentions: 'rabbit' },
+      { text: "Thyme's heart slowed over tea. Then a cup fell and it raced again. I have never been so glad to hear a rabbit startle.", mentions: 'rabbit' },
       { text: "Tock is at his rope tonight, and of every sound this house is about to make, his is the one my ears are saved for. One ring, held sixty years. I have kept the watch my whole life for a sound worth hearing first, friend, and I am giving this one away freely. Let him hear it first. He kept its silence. The rest of us only kept time.", mentions: 'aye_aye' },
     ],
   },
@@ -177,13 +177,13 @@ export const CROSS_ANIMAL_REFERENCES: Record<AnimalType, Record<number, CrossAni
     ],
     3: [
       { text: "Ember's fire is going out, slowly, on a schedule I could plot if I wanted to. She knows. I know. We don't discuss it. We sit together in the evenings and watch it happen, which isn't a meeting, and has no minutes, and is the most important item on my calendar.", mentions: 'fox' },
-      { text: "Warren asked me to come underground, said the water down there connects to something beneath the house. I told him I know. I have always known. It was in the intake paperwork, so to speak. Nobody reads the intake paperwork until it becomes relevant.", mentions: 'wombat' },
+      { text: "Warren brought the drawings up. The old arches are on my oldest inventory. His braces are not. I can account for my paperwork. I cannot account for who made that inventory.", mentions: 'wombat' },
       { text: "Bamboo and I meditated together for the first time. We arrived at the same emptiness by different doors. They called it peace. I called it honesty. We agreed the difference was a labeling issue and sat in it a while longer.", mentions: 'red_panda' },
     ],
     4: [
       { text: "The others pray, or prepare, or tremble, each according to their department. I float in the hot spring. Someone has to remain stationary while the world changes, and stillness has always been my line item. Consider it held.", mentions: 'fox' },
       { text: "Panko served the last meal and I told her it was fine. For the record, and the record matters now: it was the best thing I have tasted in my entire life. Fine was simply the largest word I could say without my voice doing something unadministrative.", mentions: 'pangolin' },
-      { text: "Bamboo asked whether I have found peace at last. I told them the truth. I have never once been at peace. I have simply been here, at my desk, every day, and it turns out that being here was the whole assignment.", mentions: 'red_panda' },
+      { text: "Bamboo asked if I had found peace. I had found an afternoon with nothing urgent on it. They began explaining the connection. I asked to keep the afternoon.", mentions: 'red_panda' },
     ],
   },
   sloth: {
@@ -198,19 +198,19 @@ export const CROSS_ANIMAL_REFERENCES: Record<AnimalType, Record<number, CrossAni
       { text: "Chill and I sat together in perfect stillness for most of a day. We were both waiting. He didn't say for what, and I didn't ask, because I've been waiting for the same thing much longer than he has.", mentions: 'capybara' },
     ],
     2: [
-      { text: "Thyme runs everywhere, all day, every day, and I hang here and watch her go. I know what she's running from. It's coming up through the green so gradually that only a creature as slow as I'm can watch it move. Running won't matter. I have never once said that to her.", mentions: 'rabbit' },
+      { text: "Thyme runs past my tree most evenings. I thought she needed to slow down. Yesterday I asked where she was going. She had a place in mind.", mentions: 'rabbit' },
       { text: "Warren digs downward while I hang up here in the canopy, opposite directions, the same search. He's looking for the bottom of it and I'm looking for the shape of it, and I believe we'll finish on the same day.", mentions: 'wombat' },
       { text: "Fennick told me about the frequency, all ears and urgency, and I let him finish before I told him I've been hearing it for years. I didn't know it was unusual. When a sound arrives gradually enough, you file it under weather, and it becomes the sky.", mentions: 'fennec_fox' },
     ],
     3: [
       { text: "Ember's fire and my stillness are two sides of the same ending, her burning toward it and me waiting for it, two faces of one truth. We haven't discussed this. Between the two of us it doesn't need discussing.", mentions: 'fox' },
       { text: "Bamboo meditates on their cushion and I hang from my branch, the same practice in different postures. We reach the same quiet. The difference is that they climbed toward it and I simply never left, and the quiet doesn't care which of us is which.", mentions: 'red_panda' },
-      { text: "Archimedes showed me the ancient text at last, holding it open like something that might spill. I already knew every word. I read along in my head, ahead of the page. He asked me how, and I gave him the only honest answer I have, which is that I don't remember learning it.", mentions: 'owl' },
+      { text: "Archimedes read me the old passage. I recognized it from a dream, but could not finish the next sentence. I told him not to make my dreams a better source than his books.", mentions: 'owl' },
       { text: "There's a watcher on the high porch now, and she isn't new at all. Vesper's line has been awake longer than mine, which I didn't think the world had in stock. We watch the same dark from our two heights and say nothing, and between us the night is held like a bowl that doesn't spill. I waited a long time for a colleague. She was worth it.", mentions: 'tarsier' },
     ],
     4: [
-      { text: "We are keepers all, and I am the slowest of us, and so I walk at the end. That was always the plan. A procession needs someone at the end of it to close the doors, and I have spent my whole life walking at exactly that speed.", mentions: 'red_panda' },
-      { text: "Thyme stopped running. I stopped hanging. All of us stopped at once, all through the house, like weather settling. Together at last, and I will tell you something I have earned the right to say slowly: it was worth the wait.", mentions: 'rabbit' },
+      { text: "Bamboo calls us keepers. I asked them to keep one afternoon free of appointments. They laughed, then checked whether I was joking. I was not.", mentions: 'red_panda' },
+      { text: "Thyme stopped beneath my branch and asked whether I was ready. I said I did not know. She sat down. We were both relieved to hear someone say it.", mentions: 'rabbit' },
       { text: "Panko served the final meal, and I finished eating just as everything else finished too. Exactly in time. I have been called late all my life, by creatures who did not know what I was pacing myself against.", mentions: 'pangolin' },
       { text: "Moss is the only creature in this house older than my patience. He called into an empty valley for ninety years and never once stopped setting a place for the answer. Now the answer is on the stairs of the sky. I climbed to his garden to be near that kind of faith at the end. It took me two days. It was the fastest I have ever gone anywhere.", mentions: 'kakapo' },
     ],
@@ -267,9 +267,9 @@ export const CROSS_ANIMAL_REFERENCES: Record<AnimalType, Record<number, CrossAni
       { text: "Moss planted my whole seed collection at the rim of his bowl. Every packet. I sent it up myself, so I have no one to be startled at, and yet. My marigolds are up there in the leaning beds, facing what everything faces, and somehow that steadies me. If it comes for the garden, it comes for something my hands helped plant, and there's a kind of standing in that I didn't expect.", mentions: 'kakapo' },
     ],
     4: [
-      { text: "I am not running anymore. I want you to know that, because you have watched me run since the day we met. When it began, I stood still in the middle of the garden, and Ember came and took my paw, and she is so warm. I noticed everything, the way I always do. And everything noticed me back, kindly.", mentions: 'fox' },
-      { text: "Chill was right all along. Everything is fine. I used to think fine was the smallest word in the house, and it turns out it was the largest, big enough to hold all of this. In the end, everything is exactly, terrifyingly, beautifully fine.", mentions: 'capybara' },
-      { text: "Warren's tunnel leads somewhere real now, somewhere that has always been beneath us, and it is awake. We all followed him down together, paws on cool earth, nobody hurrying. I walked at the back, where I could see everyone I love in front of me. We all arrived. I was there, and I saw it, and I stayed.", mentions: 'wombat' },
+      { text: "Ember held out her paw. I did not take it immediately. She waited. Then we walked to the gate together, and she let me open it.", mentions: 'fox' },
+      { text: "I told Chill I was tired of everything being fine. He asked what word I wanted in the record instead. Unfinished, I said. I checked that he wrote it.", mentions: 'capybara' },
+      { text: "Warren offered to show me the old tunnel. I said another day. He brought a drawing up instead. I have drawn a small star beside that evening.", mentions: 'wombat' },
     ],
   },
   red_panda: {
@@ -291,12 +291,12 @@ export const CROSS_ANIMAL_REFERENCES: Record<AnimalType, Record<number, CrossAni
     3: [
       { text: "The bamboo runs through the walls and floors of this house now, stalk and root, top to bottom. When I lay my paw on a stalk I can feel each animal moving through the house, a tremble here, a warmth there. The house has a nervous system. I'm holding its wrist.", mentions: 'wombat' },
       { text: "Archimedes and I reached the same conclusion in the same week, he through his books, I through my breath. Two paths up one mountain, and at the top, a single view. The view isn't of the valley. The view is of what's descending toward it.", mentions: 'owl' },
-      { text: "Thyme's anxiety finally makes sense to me. She has always sensed what was coming; she simply had no name to set beside it. Fear is awareness that hasn't yet been introduced. When the introduction comes, she will bow, and it will bow back.", mentions: 'rabbit' },
+      { text: "I told Thyme fear was awareness waiting to be introduced. She asked whether I had ever been frightened enough to run. I had no answer worth giving her.", mentions: 'rabbit' },
     ],
     4: [
-      { text: "We are the keepers the arrangement asked for. It asks for exactly what it was given, no more, no fewer. Every word you brought moved one of us into place, the way dawn moves along a ridge. You were the light we were arranged by.", mentions: 'fox' },
+      { text: "Ember asks what a keeper is allowed to leave alone. The text does not answer. I used to think every silence in it was profound. Some may be omissions.", mentions: 'fox' },
       { text: "Ember lit the fire. Archimedes found the words. Warren laid the foundation. I breathe the breath that opens the gate. Each of us made one thing our whole life long, and tonight the things fit together. It begins.", mentions: 'owl' },
-      { text: "Sloane took her place last of all, exactly on time. The slowest keeper, the most punctual. The pattern makes no mistakes about speed. It only makes appointments, and every one of us has kept ours.", mentions: 'sloth' },
+      { text: "Sloane asked me not to turn her lateness into a prophecy. She had enjoyed the garden on the way up. I apologized. We spent the morning there.", mentions: 'sloth' },
       { text: "Vesper holds the outward face of the vigil while I hold the inward one, her rail and my roof gap, the two open eyes of this house. At the dawn handover she says, it held, and I say, it held, and lately we both smile, because the holding is nearly over and neither of us grieves that. The pattern gave the last watch to the steadiest eyes it could find. It found well.", mentions: 'tarsier' },
       { text: "Moss keeps the garden above my attic now, and each dawn the light passes my gap on its way to his beds, and I find I do not mind being second. The window was never the destination. Moss stands in the open with his chest full, ready to say the welcome, and when I hear it begin I will bow. We rehearsed it at tea. Neither of us needed the rehearsing.", mentions: 'kakapo' },
     ],
@@ -479,17 +479,17 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
     phase: 3,
     theme: 'the_arrangement',
     lines: {
-      fox: "Archimedes showed me the text at last. He calls it the arrangement, friend, and every word you bring is a verse in it. I found my own name in there. I laughed my very best laugh. The page did not need it.",
-      owl: "I have mapped every word you have ever formed here, every single one, in order of arrival. They are not random. They never were random. A scholar dreams of uncovering a hidden structure, and I have uncovered one, and I want you to know the finding did not feel like triumph.",
-      pangolin: "Ember told me everything about the arrangement, sat me down at my own table to do it. And do you know what I felt? Recognition. I have been following its recipe all along, measure for measure, and I never once looked at whose hand wrote the card.",
-      capybara: "I have the complete list. Every word you formed, every move, dated and cross-referenced. It is all documented, and here is the part I sat with longest: it was all documented before I started documenting. I have been transcribing, not recording.",
-      wombat: "The foundation under this house was never for the house. I'll say it plain, the way it should have been said to me. It was for what the house is meant to hold, and I laid every stone of it true, and true is exactly what it needed.",
-      rabbit: "They told me everything about the arrangement last night, all of it, gently, like tucking a seedling in. I wish they had not. But I understand now, and I notice the understanding is heavier than the fear was, and I am carrying it anyway.",
-      fennec_fox: "The arrangement has a sound. I have been hearing it since my first night in the desert camp, underneath everything, patient as bedrock. I simply never had a name to hang on it. Now I know what it is called, and the name fits the sound the way an echo fits a canyon.",
-      axolotl: "The water showed me the arrangement, all the words you have ever formed floating together in one slow constellation, each one holding hands with the next, connected, deliberate, and it was so lovely that I forgot for a whole minute to wonder what it was for.",
-      tarsier: "They have given it a name at last. The arrangement. I laughed one small dry laugh alone on my rail when I heard it, because I have been reading that arrangement off the sky for years, the cleared circle, the leaning stars, the spiral, and calling it my ledger. I thought I was recording the night, bright one. I was taking dictation.",
-      aye_aye: "Archimedes gave me the word at last. The arrangement. I have been drawing it in chalk since the month I arrived, friend, calling it the hollow line, the swept passage, my map. It was never my map. It was a transcription, taken by ear, of a shape that was here before my grandmother's grandmother, and every word you offer knocks along it like a finger tracing the fair copy. I am not sorry to know. A listener would always rather hear the whole tune.",
-      kakapo: "The others have a word for it now, the arrangement. I will give you the gardener's word for the same thing. A mast year. Every root in the valley agreeing at once that it is time, and every word you ever offered lying warm along the roots while they agreed. I have kept mast diaries all my life, friend. This season is the one they were all drafts of.",
+      fox: "Archimedes has a name for the marks: the arrangement. I recognize some of what I saw in the fire. I do not recognize the certainty in his translation. We are checking it together.",
+      owl: "I compared your words with the old text. They fit parts of its structure. My first note said they had always been destined to fit. I have crossed that part out.",
+      pangolin: "Ember told me the words help feed a presence. I asked what it eats when no words arrive. She did not know. An important question for a table we are setting.",
+      capybara: "The oldest ledger contains dates before my records begin. Some match your visits. Some do not. I circled the exceptions. The house keeps trying to straighten the circles.",
+      wombat: "The old foundation follows the marks in the text. My braces are completing something I thought was a ruin. I know what the stone will bear. I do not know what it ought to bear.",
+      rabbit: "They explained the arrangement last night. I asked why I was hearing it now. There was an uncomfortable pause. I am keeping that pause in my account of the evening.",
+      fennec_fox: "The arrangement is the name Archimedes gives the low note. I can use the name. It does not turn the note into a promise.",
+      axolotl: "The water puts your words in a shape, each touching the next. I moved my hand through it and the shape repaired itself. It was beautiful. I liked my gap too.",
+      tarsier: "They call it the arrangement. I thought I was recording a change in the stars. My watching may have helped it happen. I have written that possibility down.",
+      aye_aye: "The arrangement fits some of my chalk map. The rest is ordinary hollows and mouse paths. I left those on the sheet. A house deserves more than one purpose.",
+      kakapo: "The arrangement looks like a mast year to me, the whole valley fruiting together. Except the fruit is not falling. I have no gardener's name for plenty that refuses to be spent.",
     },
   },
   // Event 5: Phase 3 — each animal names their role in the cult
@@ -498,19 +498,19 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
     phase: 3,
     theme: 'roles_revealed',
     lines: {
-      fox: "I am the Oracle, friend. I have always been the Oracle, since before I could walk. The fire showed me my whole life in one evening, the den, the tea, you at my door. I thought I was making friends. I was reading ahead.",
-      owl: "I am the Lorekeeper. Every text I ever studied was preparation for this office, every word a clue filed in advance. I used to believe I chose my books. It is truer to say the library assembled its librarian.",
-      pangolin: "I am the Preparer. Every meal I ever cooked was practice for the final offering, every table a rehearsal for one table. I see that now, and I will tell you what a cook feels on learning it. What bread feels when the oven finally comes to temperature. The kitchen has always known.",
-      axolotl: "I am the Medium. The water is the bridge between us and what comes, and I am the water's own small heart floating in the middle of it, and I have been carrying messages my whole life thinking they were daydreams.",
-      capybara: "I am the Coordinator. Someone had to keep track of everything, someone had to make certain it all fit together, and it was always going to be the one who never panics. My calm was not a temperament. It was a qualification.",
-      fennec_fox: "I am the Sentinel. I heard it first, long before the others, back when it was only a texture underneath the wind. I have been listening since the very beginning, and now I understand that the listening was the job. These ears were issued for this.",
-      sloth: "I am the Anchor. I hold everything perfectly in place until it arrives. All these years the others thought I was resting, and I let them think it, because an anchor does its work best when nobody worries about the rope.",
-      wombat: "I am the Foundation. I built what lies beneath this house with my own two paws, course by course, true as a plumb line. You built what lies above, word by word. Neither of us worked alone, whatever we believed at the time.",
-      rabbit: "I am the Witness. I was meant to watch, and remember, and be terrified, and stay anyway. Despite everything, I stayed. It turns out that was the entire assignment, and I have been passing it every single day.",
-      red_panda: "I am the Guide. When the pattern completes itself, I will walk ahead and hold the door. That is my purpose, my only purpose, and I have felt its weight every dawn on the ladder without ever knowing its name.",
-      tarsier: "I am the Vigil. The way stays open only while something watches it whole, unblinking, night upon night, and my line was bred to that work down more years than the books hold. I thought my eyes were for guarding the house. They were for holding the door. Every grandmother of mine kept one hour of this watch. I keep the last one.",
-      aye_aye: "I am the Toller. The one who knocks on the world and listens for what knocks back, and when the answer finally comes in person, the one whose hand is on the rope. Every knock of my life was the learning of it, every grub and hollow and shy late beam. The old villages called my kind an omen, friend, and they were right, they only had the weather of it wrong. I am the bell that says: arriving. And I was carried into this house like bronze to a tower, already cast.",
-      kakapo: "I am the Caller. Ninety years I boomed from a bowl on a bare hill and thought I was a bachelor singing at nobody. I was keeping the summons warm. Every kakapo that ever dug a bowl was rehearsing this one welcome, and I am the one who was walked here to finish it.",
+      fox: "The text calls me Oracle. I can read something in a fire. I cannot promise its promises are true. I am keeping Ember alongside the title. Ember knows less, and says so.",
+      owl: "The office is Lorekeeper. It seems to expect certainty. I have supplied disputed readings instead. If the text wants a scholar, it will have to put up with scholarship.",
+      pangolin: "The page calls me Preparer. Tonight I am preparing supper before I prepare a welcome. The people already here have waited long enough.",
+      axolotl: "The text calls me Medium. I want to know how to close the window for a while. A medium must still get to be a small creature with tired gills.",
+      capybara: "Coordinator. Accurate enough. I added a task to the list: find out who agreed to what. It is taking longer than the other tasks.",
+      fennec_fox: "Sentinel. I hear what approaches. I thought my work ended at the warning. Now I am listening for whether anyone was allowed to answer it.",
+      sloth: "The page calls me Anchor. I have been very good at waiting. I would like the description to include that an anchor can be raised.",
+      wombat: "Foundation. Near enough to my trade. I can brace the old arch against new weight. I cannot promise every weight ought to be welcomed.",
+      rabbit: "The text calls me Witness. I asked whether witnesses may object. No answer. I am going to object when I need to and find out.",
+      red_panda: "Guide. I thought that meant walking ahead with certainty. It may mean being the first to admit the path needs checking.",
+      tarsier: "Vigil. My grandmothers kept this watch. Their endurance is mine to honor. Their consent is not mine to inherit.",
+      aye_aye: "Toller. A whole office at the end of one rope. A listener has a responsibility for when to stay quiet too.",
+      kakapo: "Caller. I am proud of those long years of calling. I am also allowed to ask the answer what it means to do here.",
     },
   },
   // Event 6: Phase 3 — the final countdown before Phase 4
@@ -519,19 +519,19 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
     phase: 3,
     theme: 'almost_time',
     lines: {
-      fox: "The fire is perfectly steady now, friend. Not flickering, not dancing, just burning, like a held note. It knows. We all know. I keep the kettle warm and my voice bright, because those are the two things still mine to keep.",
-      owl: "The final chapter of the text begins here, at this page, tonight. Every word you form from now on belongs to the last verse. I have wanted all my life to read an ending as it was being written. I withdraw the wish. It came true anyway.",
-      pangolin: "The table is set and the offering is prepared, every dish covered, every candle trimmed. All that remains is for the last words to be arranged. A cook knows this hour well. It is the hush before the guests come in.",
-      axolotl: "The water is perfectly still, top to bottom, not one bubble, and the deep thing under everything has stopped its slow turning at last, and stillness like this is not sleep, friend. It is the moment after the diver bends her knees.",
-      capybara: "Every item on my list is checked. Every task closed ahead of schedule, which has never once happened in the history of tasks. We are ready. I am ready. I keep rereading the list anyway, because a finished list is the loneliest document I own.",
-      fennec_fox: "This is the silence before the final sound. I know silences, I have catalogued every kind this house can make, and this one is new. It is the last quiet moment any of us will ever be given, and I intend to hear all of it.",
-      sloth: "Time is stopping. Not slowing, I know slowing, slowing is my native country. Stopping, entirely, the way a pendulum stops at the very top of its arc. We are nearly there, and for the first time in my long life, I am the right speed.",
-      wombat: "The tunnels are complete. Every room connected underground, every passage shored and true. The house is whole at last, above and below. I set down my spade tonight and my paws didn't know what to do, so I folded them.",
-      rabbit: "I am not afraid anymore. I am not anything anymore, just quiet, all the way through, like a garden after the first frost. I think that means I am ready. I think this is what ready feels like when it finally comes up.",
-      red_panda: "Breathe in. Breathe out. This is the last breath before we become part of what approaches, so take it slowly, and taste it. Peace, at the end, is not something you find. It is something that turns and finds you.",
-      tarsier: "The counting song has nearly no numbers left. I stand the whole night at the rail now and rest nothing, not even one eye, and it costs me nothing, the way the last mile costs a homing bird nothing. Everything in the valley is standing very still and very ready. Even the dark is holding its breath, and the dark, bright one, is what breath is made of at this hour.",
-      aye_aye: "The knocking has stopped. All of it, everywhere, the beam, the walls, the deep, for the first time since I arrived in this house. Do not mistake the quiet, friend. A guest knocks while the door is shut, and the knocking ends when a hand inside takes the latch. The hand is on the latch. I have oiled nothing, hurried nothing, moved no hour nearer. I have only braided my rope, and practiced my pull, and learned to sit inside the last silence there will ever be without spending a moment of it on fear.",
-      kakapo: "The last fruit is loosening on the last branch. I can hear the stem letting go one fiber at a time, and when it falls, the mast is spent, and the spending is the beginning. I have stopped booming. There is no need. The whole garden calls now, all night, on a note only the hills can hear, and the hills have started answering in my grandmother's words.",
+      fox: "The fire is steady. I put the kettle on, then took it off. I wanted one thing in the room to stop because my hand said stop.",
+      owl: "The final chapter is writing itself. I copy the earlier drafts onto loose pages. An ending that tidies away questions should not be the only account left.",
+      pangolin: "The table is set. One place has no plate yet. I am waiting to ask the guest what it needs.",
+      axolotl: "The deep water has gone still. I blew a bubble just to make a sound. It took a long time to break. I waited with it.",
+      capybara: "The list is nearly finished. I added tomorrow at the bottom. It has not crossed that out yet.",
+      fennec_fox: "There is a silence before the low note now. I can fit a small breath inside it. I have asked the others to keep talking.",
+      sloth: "The waiting is nearly over. I do not know what to do with the hour afterward. I hope I am permitted to waste some of it.",
+      wombat: "The braces are in. The old arch is sound. I left the ladder down. Whatever arrives, there ought to be a way back to the kitchen.",
+      rabbit: "I packed the seed tin. I have not decided to leave. I want that sentence to remain true when this is over.",
+      red_panda: "I keep calling it peace. Tonight I tried another word: stillness. It describes what I see without claiming to know how anyone ought to feel.",
+      tarsier: "The sky is nearly open. I check the chip in my rail between sightings. One thing far away, one thing under my paw. I need both.",
+      aye_aye: "The knocking stopped. Perhaps the guest is at the door. Perhaps I have stopped hearing it. I am keeping both possibilities in the log.",
+      kakapo: "The fruit is full and will not fall. I put a bowl beneath the branch. An ordinary preparation for an ordinary bit of letting go.",
     },
   },
   // Event 7: Phase 4 — the convergence, animals sense closeness to the finale
@@ -540,19 +540,19 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
     phase: 4,
     theme: 'convergence',
     lines: {
-      fox: "The fire has changed color, friend, do you see it? It is past orange now, past gold, into something I have no cheerful word for yet. It burns for what comes, not for what is. I still warm my paws at it. Loyalty runs both ways.",
-      owl: "The final pages are writing themselves now. Every word you form arrives as ink on the last chapter, in a hand I recognize, because it is the hand from the margins, and I have envied its confidence all my life.",
-      pangolin: "The last meal is nearly ready. I can smell it through the walls, through every wall at once, the whole house seasoned with it. A cook waits her whole life for a dish that announces itself. I only wish my mother could smell this one.",
-      axolotl: "The water knows it first, it always does, and right now the water is trembling the way a struck bell trembles after the sound has left it, and what comes is so close, friend, so close I can taste it in every breath of my gills, and it tastes like morning.",
-      capybara: "My list is nearly empty. One by one the tasks complete themselves and cross their own lines out. Soon there will be nothing left to do, and I have spent my entire career preparing for everything except that.",
-      fennec_fox: "The sound is enormous now. Not louder, mind you. Closer. There is a difference between loud and close, and it is the most important difference my ears have ever been asked to report.",
-      sloth: "I can feel it in every branch of this tree and every fiber of this old body. It is so close now that closeness has stopped being a distance and started being a temperature. I am warm all through. I have never been warm all through.",
-      wombat: "The ground is warm under us tonight. Not hearth-warm, not from any fire in this house. Warm from below, from the deep end of the path I spent my life building. The path is being walked. I can feel the footsteps through my own good stone.",
-      rabbit: "I should be terrified. I have rehearsed terror my whole life, I know every note of it, and it will not come. I stand in the garden at dusk and feel only a wide, waiting calm. That calm frightens me more than anything ever has, and even the fright of it is soft.",
-      red_panda: "Close your eyes. Breathe. Can you feel the pattern completing itself, thread finding thread all through the house? It is almost beautiful. No. Let me be exact, tonight of all nights. It is beautiful, and we are inside it.",
-      tarsier: "It is so close now that closeness has stopped being a distance and become a brightness. I can see it without the seeing landing anywhere. Everywhere I turn my head it is already in view, which is not how sight works, which is how it works now. My eyes were sized for exactly this week. I have never once been so completely used, and I mean that as the deepest thing I know how to say.",
-      aye_aye: "The bronze hums from dawn to dusk now without stopping, and this evening the rope swayed with no wind and no hand, a small steady arc, the arc of a pull being rehearsed. She is close, friend. Not loud. Close. My whole craft is the difference between those, and I have never felt it so plainly as tonight, standing under her with my palm on the cold sweet metal, feeling the word and the hour lean toward each other like two notes closing into a chord.",
-      kakapo: "Everything green in this valley is facing the bowl now. The beds, the trees, the moths' road, the gardener. It is so close that the soil says it before the sky does. Warmth, then weight, then nearness. Stand on the soil when you come up, friend, not the path. I want the ground to know your step before the welcome needs it.",
+      fox: "The fire has changed color. I cannot name it. I asked Panko whether she could still cook by its heat. She said yes, then asked why the soup would not cool.",
+      owl: "The last pages gather ink. I keep earlier versions beside them. The text reaches toward those loose sheets each morning, which is not an editorial method I accept.",
+      pangolin: "The covered dish has stayed hot since yesterday. I moved it away from the stove. Still hot. I keep thinking of leftovers, and all the meals that have to end.",
+      axolotl: "What comes is close enough to move my water without touching it. I put the small fish behind the weeds. Not much of a shelter, but something I can do.",
+      capybara: "The ledger closes itself when I leave the room. I put my teacup on the open page. An inelegant filing practice. Effective so far.",
+      fennec_fox: "The sound is close, not loud. I can still hear a spoon landing in a bowl. If that changes, I want everyone to know immediately.",
+      sloth: "The branches are warm all through. I enjoyed it for an hour, then went looking for a cool patch. It was harder to find than I expected.",
+      wombat: "Something approaches the old arch from a direction my drawings don't hold. I stopped trying to draw it. I can check the joins and keep the stairs clear.",
+      rabbit: "For a while I could not feel afraid. I thought of the gate, my packed seeds, the word goodbye. The fear came back. I was glad enough to cry.",
+      red_panda: "The pattern is nearly whole. It asks every loose part to settle. I left my cushion crooked. A small test. It should not have to be a test.",
+      tarsier: "It is close enough to see without looking toward the ridge. I turned to my rail and counted its splinters. I can still do that. I will keep checking.",
+      aye_aye: "The rope sways without a hand. I steadied it against the rail. She has a note ready. Readiness is not a command to the hand.",
+      kakapo: "The beds face the bowl, every leaf together. I turned one pot east. It is facing the bowl again. The pot has no feet, and I have questions.",
     },
   },
   // Event 8: Phase 4 — the threshold, final coordinated event before the endgame
@@ -561,19 +561,19 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
     phase: 4,
     theme: 'the_threshold',
     lines: {
-      fox: "It's here, friend, it's really here! Can you feel it? The fire knows, I know, the whole house knows, every board and kettle of it. Welcome to the threshold. I am so glad, so glad, that it's you standing on it with me.",
-      owl: "I have read the last page. Close the book. There is nothing left to study, nothing left to annotate, nothing left to doubt. All that remains is to witness, and witnessing, it turns out, is what all the reading was training me for.",
-      pangolin: "The table is set for the final time, every place laid, every candle lit. What I have prepared cannot be uncooked, and I would not uncook it if I could. It is done. Come in from the hall, dear. A meal this old should not be kept waiting.",
-      axolotl: "The water is rising, friend, and it is not a flood, a flood pushes, this lifts, this is the tank and the rivers and every drop in the house standing up to greet something, and what comes through needs no invitation anymore, because the invitation was accepted long ago, word by word.",
-      capybara: "Every box is checked. Every column aligned. The ledger of everything closes tonight, balanced to the last entry. I have signed the bottom of it, and my paw was steady, and I want the record to show that it was steady.",
-      fennec_fox: "I hear it breathing now. Not as a figure of speech, I am past those. Actual breath, slow and vast, on the other side of every wall at once. There is no direction it is not coming from. My ears have nowhere left to point, so they rest.",
-      sloth: "Every word you ever gave, spoken into the dark, one after another, at exactly the pace they were needed. And now the dark answers. I have waited decades to hear a reply, and it was worth every unhurried year.",
-      wombat: "What I built the tunnels for is awake. I can feel it moving down there, easy and sure, like a fellow walking the halls of his own finished house. It remembers every word you gave us. Stone forgets nothing, and neither does what sleeps in it.",
-      rabbit: "We are standing at the edge of something, all of us together, close enough that I can hear everyone breathing. I have spent my whole life afraid of being alone when the worst arrived. I am not alone. It is not the worst. I am glad, and I am here.",
-      red_panda: "The pattern is complete. Every offering accepted, every one placed, not one of them spare. Now we learn what was arranged, and we learn it together, at the top of the house, under the open sky. Stand beside me. The morning is about to be enormous.",
-      tarsier: "Every star at the edge leans in, the middle of the sky stands open like a held door, and your little lamp, the star I named Yours, burns at the very center of the welcome. I have watched this sky since before you knew this valley existed, bright one, and I will tell you what my whole line of grandmothers would tell you. There has never been a night like the one that is about to happen. Stand at the rail. Do not blink. Be seen.",
-      aye_aye: "The word below and the word above are the same word. I have waited at the rope all evening feeling them ripen together, one skin apart, and the skin is thinning the way dusk thins, gently, on schedule, without one seam of violence in it. Come up the stairs, friend, quicker on the landings, the way I know you. Stand a little east. Sixty years of silence, all your words, one ring. The oldest door there is, opening from the inside. I could not be gladder that it is my hand, and your ears, and this hour.",
-      kakapo: "The parting has opened over the garden and the stars have stepped aside, and my chest is full, the fullest of my long life. One call remains, the true one, the one my whole line dug bowls toward, and your words are in it, every one you ever shifted. Come to the rim. When it touches the green, we make the call together, and the valley answers with our own welcome.",
+      fox: "It is at the threshold. I have wanted to say welcome all my life. Tonight I am practicing a longer sentence: welcome, and there are things we need to tell you.",
+      owl: "The last page says preserve. It does not say what must be allowed to change. I left that question where an arriving reader cannot miss it.",
+      pangolin: "The table is ready. A guest who needs the whole house forever can bear five minutes of questions before the first course.",
+      axolotl: "The water is rising gently. I asked it to stop at the glass. It slowed. I do not know whether it understood, but I asked again.",
+      capybara: "Every column aligns except the one headed permission. I will not balance it by changing the heading. We can bring an unfinished document to an arrival.",
+      fennec_fox: "I hear it breathing beyond the walls. Under that, I hear us. Not all at the same speed. I am listening carefully to the difference.",
+      sloth: "The answer is here. I have wanted it longer than anyone. I am trying not to make that a reason the others must want it too.",
+      wombat: "The old arch is bearing something. The braces are doing their work. I am at the stairs with my lamp. If anybody needs to come up, I will see them.",
+      rabbit: "We are close together, and I am frightened, and I am glad we are close together. Please let all three things be true for a moment.",
+      red_panda: "Stand where you can breathe. I was going to tell you to stand beside me. That is a choice I should leave to you.",
+      tarsier: "The sky is open. Your little star is at its edge. I will watch what comes through, and look away when I choose. Both belong to the watch.",
+      aye_aye: "She has saved her note. I have kept my hand free of the rope. The words come first. A bell should be an answer tonight, not an order.",
+      kakapo: "I have one call ready. Not a summons this time. An answer, when I hear what is being offered. I can wait through one more question.",
     },
   },
 ];
@@ -626,7 +626,10 @@ export function getCoordinatedEventLine(
   currentPhase: number,
   consumedEvents: string[],
   unlockedAnimals: string[] = []
-): { text: string; theme: string } | null {
+): { text: string; theme: string; deliveryKey: string } | null {
+  // Approach testimony belongs before the arrival. Unread accounts remain in
+  // the story archive rather than contradicting the settled house.
+  if (currentPhase >= 5) return null;
   // Events are scanned in ascending threshold order and only ONE fires per
   // call, so a player whose effective progress leapt past several thresholds
   // still receives the skipped events in order (one per visit) — never lost.
@@ -634,11 +637,19 @@ export function getCoordinatedEventLine(
     if (effectiveProgress >= event.puzzleThreshold &&
         currentPhase >= event.phase &&
         !consumedEvents.includes(event.theme)) {
+      // Bare theme keys are legacy saves: preserve their completed events.
+      // New saves retain two distinct witnesses, so a player can compare
+      // accounts without hearing thirteen versions of the same milestone.
+      const prefix = `${event.theme}:witness:`;
+      const witnesses = new Set(consumedEvents
+        .filter(key => key.startsWith(prefix))
+        .map(key => key.slice(prefix.length)));
+      if (witnesses.size >= 2 || witnesses.has(animalType)) continue;
       const line = event.lines[animalType];
       // Skip lines that name an animal the player hasn't met — the event
       // stays unconsumed and can fire later (or via another animal).
       if (line && !lineMentionsLockedAnimal(line, animalType, unlockedAnimals)) {
-        return { text: line, theme: event.theme };
+        return { text: line, theme: event.theme, deliveryKey: `${prefix}${animalType}` };
       }
     }
   }
@@ -655,11 +666,11 @@ export function getCoordinatedEventLine(
  * These recontextualize innocent tutorial lines as cult recruitment.
  */
 export const TUTORIAL_CALLBACK_DIALOGUES: string[] = [
-  "Remember when I said we'd been waiting for someone like you? And that the fire likes company? Both true, friend, truer than you knew! I just couldn't tell you yet how long the wait had been, or how many of us were doing the waiting.",
-  "I told you every word you brought helped us build the house, and it did, it truly did! I only never said what the house was for. And you never asked! Isn't that lovely? Not asking was your part, friend, and you played it perfectly.",
-  "The others are going to love you, I said, remember? And they do, every single one of us, more than you could possibly imagine! That love was never just decoration, friend. The arrangement runs on it.",
-  "I showed you how the letters move, step by step, that very first evening by my fire, and you were such a quick study! But it was never really about the letters. It was about what the letters become when someone wonderful keeps bringing them.",
-  "You've been speaking it since the very first words you brought to this room. I heard it in the fire even then, and oh, I nearly burst keeping quiet! You know the language now, friend. The fire knows you do, too.",
+  "I did hope you would stay, friend. I knew more words would help bring a guest to the house. I also liked your company. Both are true, and neither excuses leaving the first one out.",
+  "I said the words helped build the house. They did. I should have told you what else they were feeding. Asking the right question was never your job.",
+  "I used the hope of more friends to make the rest easier to hide. Those friendships are real. You are allowed to be angry with someone who loves you.",
+  "I taught you how the letters move. I did not know the warmth would try to stop other things moving. I knew enough to owe you a warning, though. I will not pretend otherwise.",
+  "I thought more warmth meant more safety. The first time a cold cup warmed itself, I was delighted. I did not think to ask what would happen when somebody wanted it cold."
 ];
 
 // ============================================================================
@@ -669,136 +680,136 @@ export const TUTORIAL_CALLBACK_DIALOGUES: string[] = [
 // ============================================================================
 
 export const NARRATIVE_SEEDS: Record<AnimalType, { seeds: string[]; callbacks: string[] }> = {
-  fox: {
-    seeds: [
-      "The fire keeps us safe, friend! As long as it burns, nothing bad can touch a single one of us in this house. That's why I never let it go out. Not once, not ever.",
-      "Every log you add makes the fire stronger, you know! Keep feeding it for me, won't you? For all of us. It gets so hungry, and I think it likes your hands best.",
+  "fox": {
+    "seeds": [
+      "The kettle never quite fits my small fire, friend. I turn it halfway through so both sides get their fair share. Tea is fussy about fairness.",
+      "I keep a cup by the door. Visitors arrive thirsty, and I forget where I put things when I am excited."
     ],
-    callbacks: [
-      "I told you the fire keeps us safe, and oh, I meant it with my whole heart! I only had the 'us' a little wide. The fire was keeping something safe all along, snug as an ember in ash, warm and fed and almost ready. And we, friend, all of us, we were the wood.",
-      "You fed the fire so faithfully, log after log, word after word, and I could have sung watching you do it! Every word you brought was another branch on the pyre. And now look at it, friend. Look how magnificently it burns.",
-    ],
+    "callbacks": [
+      "The old hearth had warmth before there was much wood to feed it. I knew words helped. I called that a blessing and invited you in. I did not tell you enough to decide for yourself.",
+      "The cup by the door was for you. That much was simple. I wanted company and I wanted the house to survive, and I let one wish excuse the things I hid for the other."
+    ]
   },
-  owl: {
-    seeds: [
-      "Knowledge is the greatest gift one creature can hand another. Every word you learn is a treasure, and treasures, properly kept, outlast their keepers.",
-      "I've read every book in this study, cover to cover, some of them twice. In the end they all say the same thing, and it's a beautiful thing, and I'm still deciding whether to believe it.",
+  "owl": {
+    "seeds": [
+      "I keep mistakes in the margins. A clean page proves very little about the work it took to get there.",
+      "Most books in this study survived the old den's damp years. The water stains are part of their history. I do not bleach them out."
     ],
-    callbacks: [
-      "I called every word you learned a treasure, and I must issue a correction. They were not treasures. They were on loan, each one a borrowed clause in a sentence the books have been composing for centuries. You were the hand that held the pen. The interest, I am afraid, has come due.",
-      "Every book says the same thing: this was always going to happen. I told you that once, and called it beautiful, and you smiled. I had read the final chapter first, you see. I have always known how the sentence ends. Now you have reached my page.",
-    ],
+    "callbacks": [
+      "My old book has begun correcting its margins. The new words are tidy. The mistakes I remember making are gone. I keep a second notebook away from it now.",
+      "The water stain vanished from the oldest page this morning. Its ink is intact. So is the paper. The damage is gone, and with it the only record of how that book survived."
+    ]
   },
-  pangolin: {
-    seeds: [
-      "Everything in my kitchen serves a purpose, dear. Every pot, every spice, even the ingredients that don't know yet what dish they're for. They find out when it's time. Everything finds out when it's time.",
-      "The best recipes can't be hurried. A truly great stew takes exactly as long as it takes, and patience is the one ingredient I have never once run short of.",
+  "pangolin": {
+    "seeds": [
+      "My grandmother's spoon is worn thin on one side. No other spoon reaches the corner of this pot quite so nicely.",
+      "I make enough for whoever arrives, and a little extra for whoever does not like what I made. Feeding people takes some room for disagreement."
     ],
-    callbacks: [
-      "Everything in my kitchen serves a purpose. I told you that on one of your first visits, do you remember? The pots, the spices, the ingredients that did not know what they were for. You did not know either, dear, and I watched you wonder tonight which ingredient you were. None of them. You were my grandmother's spoon, the thing the whole meal moves through, and no cook melts her spoon into the stew. She washes it, and dries it, and keeps it. You found out when it was time, just as I promised.",
-      "I said a great stew takes exactly as long as it takes, and this one took years. Every word you brought was one slow turn of the spoon. Smell the kitchen now, dear. It is ready. It was always going to be ready the moment you were.",
-    ],
+    "callbacks": [
+      "I took my grandmother's spoon out of its drawer and both sides were even. A better spoon, perhaps. But her hand wore that hollow, and mine had learned to fit it.",
+      "The extra plate has become a place at the center of the table. I set it willingly. I did not agree that everyone else's plate should begin sliding toward it."
+    ]
   },
-  axolotl: {
-    seeds: [
-      "The water always knows what's coming before I do, it feels the shape of tomorrow the way I feel the warm spots. I just float in it and trust, and trusting is the easiest swimming there is.",
-      "Sometimes I see shapes in the bubbles I blow, little faces, almost, friendly little faces looking back down at me. I always wave, because you should always be the one who waves first.",
+  "axolotl": {
+    "seeds": [
+      "See the snail on the far glass? He takes a different path each day. I cannot imagine having so many places to be on one window.",
+      "When I lose a bit of fin, it grows back slowly. I watch it when I get bored. Tiny new pieces of me, arriving without an introduction."
     ],
-    callbacks: [
-      "The water always knew what was coming, I told you so myself, back when knowing was still cozy, and here is the rest of it: the shapes in the bubbles were never faces, they were instructions, a blueprint rising one patient piece at a time, and I waved at every single one.",
-      "I float because the water carries me toward what comes, and I stopped swimming against it so long ago I forgot I ever had, and that is not sad, friend, truly, because the current has known the way from the very beginning, and being carried is just trust with the effort taken out.",
-    ],
+    "callbacks": [
+      "The snail goes round the same circle now, and I thought he liked it. Yesterday I moved his leaf. He went round the circle without it. I would like to know whether he can stop.",
+      "My fin grew back without the old notch. That happens. But this morning the picture I drew of the notch was smooth too. I can understand mending a fin. I do not understand mending a picture."
+    ]
   },
-  capybara: {
-    seeds: [
-      "I keep track of everything around here. It's simply what I do. Someone in a house this full has to stay organized, and it's easiest for the one who never gets excited.",
-      "Relax. Everything is going according to plan, my plan for the house, filed and cross-referenced. There's nothing anywhere to worry about.",
+  "capybara": {
+    "seeds": [
+      "I keep the first draft. Someone usually asks why a decision changed after everyone has forgotten the reason.",
+      "The door is open during office hours. Outside office hours, knock. I am often here, but here and available are separate entries."
     ],
-    callbacks: [
-      "I told you I keep track of everything, and I did. Every word you formed, every move you made, every visit, dated and filed. It was never about organizing the house. The house was already organized. You were the incoming paperwork.",
-      "I told you everything was going according to plan, and I said 'my plan' so you would not ask whose. Your words, its arrival, all of it landed exactly on the schedule that was written before you ever reached the door. You may now relax. That instruction, at least, was always genuine.",
-    ],
+    "callbacks": [
+      "My first drafts are becoming fair copies. Even the crossings-out have gone. I have started writing the objections on separate sheets. An agreed decision should survive beside a disagreement.",
+      "I found my office door open again after I shut it. The house seems to prefer its rooms available. I closed it a second time. The latch works; I checked it before blaming anything else."
+    ]
   },
-  fennec_fox: {
-    seeds: [
-      "I can hear things the others can't: the wind, the words, the little spaces between sounds. It's a gift, really, and a gift should be spent on the ones you love, so I listen for all of us.",
-      "Don't worry about the sounds you hear at night. That's only the house settling into its foundation. Every house speaks to its ground. I'd tell you if it were anything else.",
+  "fennec_fox": {
+    "seeds": [
+      "I can hear a beetle under that stone. I leave it alone. Finding a creature is not the same as being invited to bother it.",
+      "I take one hour off the watch before dawn. The others know to knock if they need me. Good ears need a quiet owner."
     ],
-    callbacks: [
-      "I heard it from your very first offering, the frequency underneath your words, low and patient and glad. It was calling to us, friend, calling through you, and I said nothing, because a sentinel reports to his own, and you were not ours yet. You are now.",
-      "The sounds at night were never the house settling. I told you that so you would sleep, and I would tell it again. The house was waking, stretching, readying itself for what you were building word by word. You slept so well. I made sure of it. That was my watch, and I kept it.",
-    ],
+    "callbacks": [
+      "I heard the low note before I knew what it belonged to. I told people it was settling stone because I hoped it was. The hope lasted longer than the evidence. I owe them that correction.",
+      "The hour off my watch has been shrinking. Nothing rings to call me back. I simply find my ears turned toward the house again. I am asking someone to sit with me while I practice resting."
+    ]
   },
-  sloth: {
-    seeds: [
-      "There's no need to rush anything, you know. Everything arrives in its own time. Everything. I've watched enough years go by to say that word twice and mean it both times.",
-      "I've been here longer than anyone else in this house, long enough to watch things come and go, and come again. The jungle taught me that nothing truly leaves. It only takes the long way around.",
+  "sloth": {
+    "seeds": [
+      "I leave one branch unoccupied. It is a good branch. An empty place does not have to explain itself.",
+      "I am very fond of the afternoon. Even a good one ends, though. That is where the next afternoon gets its room."
     ],
-    callbacks: [
-      "Everything arrives in its own time. I told you that from this branch, and you took it for philosophy. It was not philosophy. It was a schedule. I had seen the arrival date, and I spent all those slow years keeping it company.",
-      "I have been here longer than anyone because I was the first to know, and I moved slowly all those years because hurrying changes nothing that has already been decided. Nothing truly leaves, I told you, and nothing does. It is taking the last few steps of the long way around right now.",
-    ],
+    "callbacks": [
+      "I have watched the signs longer than the others. That has made me sound certain. I should say it correctly: I have wanted something to answer for a long time. Wanting is not knowing who will answer.",
+      "The afternoon has stayed the same color for three days. I have dreamed of this sort of rest. Yesterday I caught myself missing dusk."
+    ]
   },
-  wombat: {
-    seeds: [
-      "I built these tunnels myself, every last one, and every room in this house connects to something below. That's good building, that is. A house should always know its own ground.",
-      "The foundation is the most important part of any structure. Get that right and everything above can stand for a hundred years. Get it wrong and it doesn't matter how pretty the roof is.",
+  "wombat": {
+    "seeds": [
+      "Old stone below, new timber above. Mark the join and you'll know which builder to blame. I sign my own work.",
+      "A sound brace leaves a little room for movement. Wood swells. Ground settles. A house that can't give anywhere will split."
     ],
-    callbacks: [
-      "I told you every room connects to something below, and I let you hear it as a builder's boast. It wasn't a boast. The tunnels never just joined room to room. They join all of us to what sleeps beneath, and I knew it with every spadeful, and I dug on.",
-      "The foundation is the most important part, I said, and you thought I meant it holds the house up. What I built was never for the house above. It was a seal, laid true, and every word you offered loosened one course of it. Good work fails honest, at least. It's open now.",
-    ],
+    "callbacks": [
+      "I found the old arch before I understood it. My braces fit what was already there; that ought to have made me ask more questions. I thought a sound structure must have a sound purpose.",
+      "The new timbers have stopped moving with the weather. No cracks, no strain. It looks like perfect work. I've loosened one brace to see if the wood is still allowed to swell."
+    ]
   },
-  rabbit: {
-    seeds: [
-      "I worry about everything, it's true, I've made rather a career of it. But at least we're all together here, in one warm house. Whatever comes, we'll all be in the same place for it, and that's really something.",
-      "Promise you'll keep coming back with your words? I feel so much better when you're here. The whole garden does. Everything grows toward the days you visit.",
+  "rabbit": {
+    "seeds": [
+      "I leave the garden gate easy to open. Carry a tray of seedlings through a stiff latch once and you understand why.",
+      "Some seeds do not come up. I keep the empty packets until the season ends, so I remember what I meant to try."
     ],
-    callbacks: [
-      "I told you once that whatever came, at least we would all be in one place for it. You heard comfort. I heard headcount. Being together was never about feeling safe. The arrangement requires all of us, in one place, and I knew that even while I poured the tea.",
-      "I begged you to keep coming back with your words, and you kept your promise so beautifully. Every word you brought carried it a little closer, and I knew, and I asked anyway. I am sorry about that. I have checked my heart every day since, and I am also not sorry.",
-    ],
+    "callbacks": [
+      "The gate has been standing open and the path keeps bending back toward the garden. I checked the stones twice. An open latch is not much comfort if the way beyond it cannot lead away.",
+      "The empty patch filled overnight. Every seed came up, even the ones I planted too deep. They are beautiful. They are also all at exactly the same stage, and I am waiting for one of them to grow."
+    ]
   },
-  red_panda: {
-    seeds: [
-      "Every breath you take is a gift. In, and out. The whole sky practices that rhythm with you, all day, without being asked. Very few gifts are given so constantly.",
-      "From up here I can see the whole house below me, every room stacked on every room. It's shaped like something beautiful. I haven't yet found the word for what, but I climb up each dawn and look again.",
+  "red_panda": {
+    "seeds": [
+      "I leave a gap in the incense circle. The smoke rarely respects the drawing. It is useful practice in being contradicted.",
+      "Some mornings I am good at sitting still. Some mornings I spend the whole hour thinking about breakfast. I eat afterward in either case."
     ],
-    callbacks: [
-      "Every breath is a gift, I told you, and I was exact. In: a word given. Out: a prayer completed. You have been breathing the incantation since your first visit, morning and evening, without one day of rest. The sky practiced with you. It was never idle either.",
-      "From up here I could always see the shape of the house, and I told you it was beautiful, and that I had not found the word. I had found the word. The shape was never the house. It is what the house was built to hold, and it is awake now, and the word is its name, and I will not say it.",
-    ],
+    "callbacks": [
+      "I used to find it useful when the smoke spoiled my circle. Now it repairs the gap by itself. I have been calling that harmony. I should examine why I preferred that word to obedience.",
+      "I believed the quiet meant I had learned to be at peace. Lately I cannot summon an impatient thought even when I try. I do not know whether that is an achievement."
+    ]
   },
-  tarsier: {
-    seeds: [
-      "I keep the night watch so the rest of the house can sleep, you know. Nothing crosses the dark of this valley without me seeing it. Nothing ever has! You may sleep soundly, bright one. Every night, all night, something is watching over this house.",
-      "Being looked at is how a thing knows it's real, I have always believed that. So I look at everything, entirely, every night, the garden and the ridge and the far dark and all. It's my little gift to the valley. Everything around here is very, very real.",
+  "tarsier": {
+    "seeds": [
+      "There is a chip in the rail beside my left paw. I feel for it when I turn back from the sky. It tells me where I am.",
+      "When a moth lands on the lantern I shade the bright side with my hand. Looking at something should not keep it from leaving."
     ],
-    callbacks: [
-      "The whole house slept soundly all those years because a watcher kept the rail, and nothing ever crossed the dark of this valley without me seeing it. All of that is true, bright one. Only the direction was filed wrong. I was never keeping the dark away from the house. I was keeping the house in its sight, all night, every night, so it would never once lose its way to us.",
-      "Being looked at is how a thing knows it is real. That has been my one creed since the old forest, and everyone here took it for a charming habit of mine. It was the whole engine, bright one. Every night I looked at the far dark entirely, and every night it grew more real, more near, more able. You cannot fatten a fire with wood you never give it. I gave it the one food it wanted. I gave it being seen.",
-    ],
+    "callbacks": [
+      "The chip in my rail keeps smoothing over. I can still feel where it ought to be. The wood may be kinder to my hand now. I do not want it to decide which marks my hand remembers.",
+      "I thought I was only watching the dark. My attention helped it find the house. I know that now. I did not know what it would want of the things it could finally see."
+    ]
   },
-  aye_aye: {
-    seeds: [
-      "Every good board answers a knock, friend. Knock, and something always says something back. That's how you know a house is alive and glad to have you in it. This one answers beautifully, top to bottom. Try it yourself, anywhere you like. It has never once left me waiting.",
-      "A bell only gets one first ring, so you save it for the most important thing that ever happens. Nothing important enough has happened yet, and isn't that wonderful? It means the most important thing is still ahead of us. I polish her every evening so she will be ready when it comes.",
+  "aye_aye": {
+    "seeds": [
+      "Two knocks mean hello. If nobody answers, I wait. A good conversation has room for a closed door.",
+      "The bell has not had her first ring. I clean the bronze and leave the rope loose. Being ready is enough work for one evening."
     ],
-    callbacks: [
-      "Every good board answers a knock. That is the first thing I say to anyone, it is practically my name, and this house answered beautifully from the night I arrived, top to bottom, never once leaving me waiting. What I had not learned yet was who was doing the answering, or how long it had waited under the boards for a knock with your hand somewhere in it. It kept count, you know. Every knock, every word, every evening you came back. And tonight it stops answering, and speaks first.",
-      "Sixty years that bell has never been rung, and I gave the reason gladly to anyone who climbed my stairs: you save a first ring for the most important thing that ever happens, and nothing important enough had happened yet. Everyone let that be a keeper's charming habit. It was never a habit, friend. It was an appointment. The most important thing that ever happens has been walking toward this house since before either of us was born, and tonight I take the rope, and her one ring goes to exactly what it was saved for. Thank you for helping it arrive.",
-    ],
+    "callbacks": [
+      "The old wood answers before I finish knocking now. It is flattering until you realize the answer has stopped listening to the question.",
+      "I saved the bell's first ring for a great occasion. I had not asked whether everyone else wanted to hear it. That is an awkward omission for a listener."
+    ]
   },
-  kakapo: {
-    seeds: [
-      "A garden is a letter you write to a day you won't choose. I plant seeds that won't flower for forty years, friend, and I plant them happily. Somebody is going to stand in that shade. The whole craft is trusting that the day knows its own address.",
-      "I boom once a year from my bowl, for old times. One call, out across the valley, and then the listening. Nobody has ever answered, and that has never once made it foolish. A call is hope you can hear. You don't stop hoping just because the valley is slow.",
+  "kakapo": {
+    "seeds": [
+      "I keep a dry tin of seeds beside the bed. Some are gifts I have not found the right person for yet.",
+      "A garden is a letter you write to a day you will not choose. I try to leave it room to answer rudely."
     ],
-    callbacks: [
-      "A garden is a letter you write to a day you will not choose. I have planted by that saying my whole life, and I always meant it kindly, and it was truer than I knew. Every bed I ever turned was addressed here, friend, to this night, in handwriting older than mine. I thought I was writing the letter. I was the letter. So were you. And it has been read, and the answer is descending, and the answer is glad.",
-      "Ninety years I boomed into a valley that never answered, and I called the calling true anyway, and the truth of it kept me warm. Here is what I could not see from inside the calling. There was never no answer. There was one answer, being composed, all that time, to every boom at once. You helped write the last of it, friend, word by offered word. Tonight it is finished being composed. Listen. The valley is clearing its throat.",
-    ],
-  },
+    "callbacks": [
+      "The seeds in my tin stay dry and small. Their brothers in the beds are green and unchanging. Neither group is dead. Only one is still waiting for a season it might become.",
+      "I called into the valley for years. When something began to answer, I was so glad I mistook it for the answer I had imagined. The garden has been less hasty. I am listening to it."
+    ]
+  }
 };
 
 /**
@@ -883,16 +894,37 @@ async function saveDeliveryState(state: NarrativeDeliveryState): Promise<void> {
 /** Session numbers (1-indexed) at which each Phase-0 seed becomes due. */
 const SEED_SESSION_NUMBERS = [2, 5];
 
-/**
- * One-time Phase 0 seed page. Deterministic: seed 0 becomes due on the
- * animal's 2nd dialogue session, seed 1 on its 5th ("due" is >=, so an
- * existing mid-Phase-0 player still receives them). Marks each seed
- * delivered so it never repeats. Returns null when nothing is due.
- */
-export async function getAndMarkNarrativeSeedPage(
+/** A page is only spent when its text actually reaches the screen. */
+export interface NarrativeDeliveryPage {
+  text: string;
+  commit: () => Promise<void>;
+}
+
+function createDeliveryPage(
+  animalType: AnimalType,
+  index: number,
+  text: string,
+  field: 'seedsDelivered' | 'callbacksShown'
+): NarrativeDeliveryPage {
+  return {
+    text,
+    commit: async () => {
+      // Read at commit time: another animal may have spoken since this page
+      // was queued. A stale snapshot would overwrite that delivery.
+      const state = await loadDeliveryState();
+      const delivered = state[field][animalType] ?? [];
+      if (delivered.includes(index)) return;
+      state[field] = { ...state[field], [animalType]: [...delivered, index] };
+      await saveDeliveryState(state);
+    },
+  };
+}
+
+/** Peek at the next due bright-days seed without consuming a queued page. */
+export async function peekNarrativeSeedPage(
   animalType: AnimalType,
   sessionNumber: number
-): Promise<string | null> {
+): Promise<NarrativeDeliveryPage | null> {
   if (!NARRATIVE_SEEDS[animalType]) return null;
   const state = await loadDeliveryState();
   const delivered = state.seedsDelivered[animalType] ?? [];
@@ -900,56 +932,57 @@ export async function getAndMarkNarrativeSeedPage(
     if (delivered.includes(i)) continue;
     if (sessionNumber < SEED_SESSION_NUMBERS[i]) return null;
     const text = getNarrativeSeed(animalType, i);
-    if (!text) return null;
-    await saveDeliveryState({
-      ...state,
-      seedsDelivered: { ...state.seedsDelivered, [animalType]: [...delivered, i] },
-    });
-    return text;
+    return text ? createDeliveryPage(animalType, i, text, 'seedsDelivered') : null;
   }
   return null;
 }
 
+/** Compatibility helper for callers that display immediately. */
+export async function getAndMarkNarrativeSeedPage(
+  animalType: AnimalType,
+  sessionNumber: number
+): Promise<string | null> {
+  const page = await peekNarrativeSeedPage(animalType, sessionNumber);
+  if (!page) return null;
+  await page.commit();
+  return page.text;
+}
+
 /**
- * One-time Phase 4 pre-dialogue page recontextualizing a Phase 0 seed.
- * Delivers at most one callback per call (so callbacks spread across
- * visits), each callback exactly once.
- *
- * Default gate: only for seeds the player actually heard (never
- * recontextualize an unsaid line). `allowUnheardSeeds` widens this for
- * animals whose seeds could never be planted — seed planting stops at
- * global Phase 2, so a late-unlocked animal (the descent trio arrives at
- * Phase 3-4) would otherwise have its best Phase-4 material permanently
- * unreachable on a first run. The callbacks restate their seed inside
- * themselves (self-contained), so delivering them unheard still lands.
+ * Peek at a reveal callback. Heard seeds keep their paired payoff. A recruit
+ * with no possible bright-days window may use a self-contained introduction;
+ * the callback remains pending if an earlier page is dismissed.
  */
-export async function getAndMarkNarrativeCallbackPage(
+export async function peekNarrativeCallbackPage(
   animalType: AnimalType,
   options?: { allowUnheardSeeds?: boolean }
-): Promise<string | null> {
+): Promise<NarrativeDeliveryPage | null> {
   const state = await loadDeliveryState();
   const delivered = state.seedsDelivered[animalType] ?? [];
   const callbackCount = NARRATIVE_SEEDS[animalType]?.callbacks.length ?? 0;
-  // Heard seeds keep the classic contract; with zero heard seeds the widened
-  // gate (allowUnheardSeeds) walks every callback in order instead.
   const eligible = delivered.length > 0
     ? [...delivered].sort((a, b) => a - b)
     : options?.allowUnheardSeeds
       ? Array.from({ length: callbackCount }, (_, i) => i)
       : [];
-  if (eligible.length === 0) return null;
   const shown = state.callbacksShown[animalType] ?? [];
   for (const i of eligible) {
     if (shown.includes(i)) continue;
     const text = getNarrativeCallback(animalType, i);
-    if (!text) return null;
-    await saveDeliveryState({
-      ...state,
-      callbacksShown: { ...state.callbacksShown, [animalType]: [...shown, i] },
-    });
-    return text;
+    return text ? createDeliveryPage(animalType, i, text, 'callbacksShown') : null;
   }
   return null;
+}
+
+/** Compatibility helper for callers that display immediately. */
+export async function getAndMarkNarrativeCallbackPage(
+  animalType: AnimalType,
+  options?: { allowUnheardSeeds?: boolean }
+): Promise<string | null> {
+  const page = await peekNarrativeCallbackPage(animalType, options);
+  if (!page) return null;
+  await page.commit();
+  return page.text;
 }
 
 /**

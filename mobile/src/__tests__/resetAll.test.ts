@@ -56,6 +56,8 @@ jest.mock('react-native', () => ({
   Easing: { inOut: jest.fn(() => jest.fn()), sin: jest.fn(), out: jest.fn(() => jest.fn()) },
 }));
 
+jest.mock('react-native-gesture-handler', () => ({ TouchableOpacity: 'TouchableOpacity' }));
+
 jest.mock('expo-constants', () => ({
   __esModule: true,
   default: { expoConfig: { version: '1.0.0', extra: {} } },
@@ -94,13 +96,14 @@ jest.mock('../services/eventLogger', () => ({
 }));
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { performFullReset, LOCAL_RESET_MARKER_KEY } from '../components/SettingsScreen';
+import { performFullReset, performNewCycle, LOCAL_RESET_MARKER_KEY } from '../components/SettingsScreen';
 import {
   awardBonusAmber,
   getAmberBalance,
   getCurrentPhase,
   getFullProgress,
   clearProgress,
+  invalidateProgressCache,
 } from '../services/amberCurrency';
 import {
   recordPuzzleCompletion,
@@ -114,6 +117,7 @@ import {
 } from '../services/onboarding';
 import { initHints, addHints, getHintBalance, clearHints } from '../services/hints';
 import { updateSetting, getSettings, resetSettings } from '../services/settings';
+import { clearStoryState, loadStoryState, recordStoryBoundary, STORY_STORAGE_KEY } from '../services/storySpine';
 import { STARTING_FREE_HINTS } from '../constants/gameBalance';
 
 describe('performFullReset', () => {
@@ -125,6 +129,7 @@ describe('performFullReset', () => {
     await clearHints();
     await resetOnboarding();
     await resetSettings();
+    await clearStoryState();
   });
 
   test('returns every key service to virgin state without a restart', async () => {
@@ -135,6 +140,7 @@ describe('performFullReset', () => {
     await initHints(); // seeds the free hint pack
     await addHints(3, 'test_seed');
     await updateSetting('soundEnabled', false);
+    await recordStoryBoundary({ phase: 4, puzzlesSolved: 116, cycleCount: 0, unlockedAnimals: ['fox'] }, 'CLOSED');
 
     // Sanity: the save is non-virgin before the reset
     expect(await getAmberBalance()).toBeGreaterThan(0);
@@ -167,6 +173,7 @@ describe('performFullReset', () => {
     // The home-progress key doubles as cloudSave's fresh-install sentinel;
     // it must actually be gone from storage after the wipe.
     expect(await AsyncStorage.getItem('wordshift_home_progress')).toBeNull();
+    expect(await AsyncStorage.getItem(STORY_STORAGE_KEY)).toBeNull();
   });
 
   // The post-reset upload is the ONLY thing keeping the bootstrap's
@@ -176,6 +183,22 @@ describe('performFullReset', () => {
   // the NoOp provider used here (and offline in the wild) it does not succeed,
   // so the reset must leave a local stamp behind for cloudSave to refuse a
   // cloud row older than the reset.
+  test('New Cycle preserves the chosen boundary while resetting the live story', async () => {
+    const progress = await getFullProgress();
+    await AsyncStorage.setItem('wordshift_home_progress', JSON.stringify({ ...progress,
+      currentPhase: 5, postRevelation: true, finalPuzzleCompleted: true, houseCompleted: true, puzzlesSolved: 120,
+    }));
+    invalidateProgressCache();
+    await recordStoryBoundary({ phase: 5, puzzlesSolved: 120, cycleCount: 0, unlockedAnimals: ['fox'] }, 'CLOSER');
+    expect(await performNewCycle()).toBe(1);
+    const next = await getFullProgress();
+    const state = await loadStoryState({ phase: next.currentPhase, puzzlesSolved: next.puzzlesSolved,
+      cycleCount: next.cycleCount ?? 0, cycleStartPuzzles: next.cycleStartPuzzles, unlockedAnimals: next.unlockedAnimals });
+    expect(state.boundary).toBeNull();
+    expect(state.carriedBoundary).toBe('release');
+    expect(state.memories).toEqual({});
+  });
+
   test('stamps a local reset marker when the post-reset upload does not land', async () => {
     await awardBonusAmber(120, 'test_seed');
     const before = Date.now();

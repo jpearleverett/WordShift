@@ -86,7 +86,7 @@ export const COLD_OPEN_INSTRUCTION = "Oh, you're here! Tap a letter in the top w
  * line because that one is already carrying the marks and undo, and because
  * "if you get stuck" reads better right after a success than before one.
  */
-export const COLD_OPEN_FIRST_MOVE = "There! Oh, lovely. Feel how the whole house settled around that word? If a board ever puzzles you, HINT will nudge you along. Keep going, you have the knack for this.";
+export const COLD_OPEN_FIRST_MOVE = "There! Oh, lovely. That little click means both words fit. If a board ever puzzles you, HINT will nudge you along. Keep going, you have the knack for this.";
 
 /**
  * Shown once, the first time the player picks a letter up on the cold-open
@@ -176,7 +176,7 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
   // Fox arrives after the player has already solved the cold-open puzzle.
   // The final sentence keeps the original faint wrong-note intact.
   fox_invited: [
-    "You let me in! Oh, I hoped you would. I'm Ember!\nYou already made this house a little more real with that puzzle. It is my favorite thing.",
+    "You let me in! Oh, I hoped you would. I'm Ember!\nYour words warmed the old stones under the den. I brought the kettle over while you were finishing.",
     "Those words are already waiting below us. Come on, I want to show you where they went. I have been hoping for someone like you for the longest time.",
   ],
 
@@ -216,7 +216,7 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
   // already had their first-win reward moment, so the whole explanation lands
   // in a single card and the corridor loses a tap).
   pit_intro: [
-    "Here we are, the pit! Every word you solve drifts down here afterwards.\nOffer your words and they turn to amber, the warm gold that builds our house. Go on, it loves being fed. Most things here do, funnily enough.",
+    "Here we are, the pit! Every word you solve drifts down here afterwards.\nOffer your words and they turn to amber, the warm gold that builds our house. We can use it for another room. Or save it until we know what we want.",
   ],
 
   // Step 6.5: On the pit screen, before the player has offered — a standing
@@ -241,6 +241,6 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
   // their hand.
   unlock_explained: [
     "That's the whole happy loop! Solve puzzles, offer your words, and the amber builds our rooms and invites more friends.\nWhen you have words to offer, the pit waits just below the house. Scroll down and give it a tap.",
-    "Come back each day, and we'll fill this house together. They need you.",
+    "Come back when you like. I will keep a place by the hearth.",
   ],
 };

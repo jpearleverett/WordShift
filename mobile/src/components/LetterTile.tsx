@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing } from 'react-native';
 import { Letter } from '../types';
-import { getTileColor, getTileFinish, CandyColors, getPhaseTheme, getResonanceConfig } from '../theme/colors';
+import { getTileColor, getTileFinish, getTileInkColor, CandyColors, getPhaseTheme, getResonanceConfig } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
 import { shouldSimplifyAnimations } from '../services/deviceTier';
 import { getPressSpring } from '../theme/surfaces';
@@ -742,7 +742,7 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
         borderColor: tileColor.border,
         // Ink is finish-owned ONLY here, where the tile body is theme-colored.
         // The locked/selected/default branches keep their phase inks.
-        textColor: finish.ink ?? CandyColors.white,
+        textColor: finish.ink ?? getTileInkColor(tileColor.bg),
         shadowColor: tileColor.bg,
       };
     }
@@ -780,10 +780,10 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
       };
     }
     return {
-      bgColor: CandyColors.white,
-      borderColor: CandyColors.gray[300],
-      textColor: CandyColors.gray[600],
-      shadowColor: CandyColors.gray[400],
+      bgColor: '#EDDFC3',
+      borderColor: '#B29B75',
+      textColor: '#4B4032',
+      shadowColor: '#59462F',
     };
   };
 

@@ -19,7 +19,9 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
-import * as ts from 'typescript';
+// Keep the compiler API typed without making ESLint expand its large export
+// namespace. Test scaffolds use require elsewhere for the same Node runtime.
+const ts: typeof import('typescript') = require('typescript');
 
 import { AnimalType, DialoguePhase } from '../types/homeWorld';
 import {
@@ -297,7 +299,7 @@ describe('no em/en dashes in player-facing text', () => {
         true,
         file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
       );
-      const visit = (node: ts.Node): void => {
+      const visit = (node: import('typescript').Node): void => {
         let literal: string | null = null;
         if (
           ts.isStringLiteral(node) ||

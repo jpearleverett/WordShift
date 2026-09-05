@@ -34,6 +34,8 @@ export type UiSoundKind =
   | 'glitch'
   | 'whisper'
   | 'arrival'
+  | 'story_bell'
+  | 'story_answer'
   | 'valid_move'
   | 'star_pop';
 
@@ -53,6 +55,8 @@ export function playUiSound(kind: UiSoundKind = 'tap', arg?: number): void {
       // passes pendingPhaseTransition) so the swell bands dark from target 3.
       case 'phase_change': audio.soundPhaseChange?.(arg); break;
       case 'arrival': audio.soundArrival?.(); break;
+      case 'story_bell': audio.soundStoryBell?.(); break;
+      case 'story_answer': audio.soundStoryAnswer?.(); break;
       case 'amber_earn': audio.soundAmberEarn?.(); break;
       case 'unlock': audio.soundUnlock?.(); break;
       case 'achievement': audio.soundAchievement?.(); break;

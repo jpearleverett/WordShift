@@ -7,7 +7,6 @@ jest.mock('react-native', () => ({
 }));
 
 import { getActionButtonColors } from '../styles/appStyles';
-import { CandyColors } from '../theme/colors';
 
 /**
  * The bottom action buttons (UNDO / HINT / RESTART) must track the descent:
@@ -27,24 +26,13 @@ const lum = (hex: string): number => {
 describe('getActionButtonColors — phase-aware bottom controls', () => {
   const KINDS = ['undo', 'hint', 'restart'] as const;
 
-  test('phases 0-1 are the original candy colors, pixel-identical', () => {
-    for (const phase of [0, 1]) {
-      expect(getActionButtonColors('undo', phase)).toEqual({
-        bg: CandyColors.yellow.main,
-        border: CandyColors.yellow.shadow,
-        glow: CandyColors.yellow.glow,
-      });
-      expect(getActionButtonColors('hint', phase)).toEqual({
-        bg: CandyColors.blue.main,
-        border: CandyColors.blue.shadow,
-        glow: CandyColors.blue.glow,
-      });
-      expect(getActionButtonColors('restart', phase)).toEqual({
-        bg: CandyColors.green.main,
-        border: CandyColors.green.shadow,
-        glow: CandyColors.green.glow,
-      });
-    }
+  test('bright controls retain distinct warm, cool and green identities', () => {
+    const [undo, hint, restart] = KINDS.map(kind => getActionButtonColors(kind, 0).bg);
+    const channel = (color: string, offset: number) => parseInt(color.slice(offset, offset + 2), 16);
+    expect(channel(undo, 1)).toBeGreaterThan(channel(undo, 5));
+    expect(channel(hint, 5)).toBeGreaterThan(channel(hint, 1));
+    expect(channel(restart, 3)).toBeGreaterThan(channel(restart, 1));
+    for (const kind of KINDS) expect(getActionButtonColors(kind, 1)).toEqual(getActionButtonColors(kind, 0));
   });
 
   test('Phase 2 is a cooled dusk step: not candy, and lighter than Phase 3 dread (F178)', () => {

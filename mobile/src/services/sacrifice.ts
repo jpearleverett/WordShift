@@ -1,21 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /**
- * The Offering (Phase 4+): a private altar to the thing the house is becoming.
- *
- * The player offers earned amber "to the arrangement." The amber is destroyed;
- * they get NOTHING tangible in return. No room, no cosmetic, no progress. The
- * entire point is complicity: they choose to feed a cosmic-horror ritual for no
- * mechanical benefit, and they will, because it is offered warmly.
- *
- * What the mechanic gives back is not a reward but *recognition*. The more you
- * give, the more the arrangement notices you: a visible monument to what you've
- * given, a private "devotion" standing that changes how it addresses you, and
- * an in-session rhythm that escalates from indifferent acceptance to direct,
- * unsettling attention. Satisfying, but wrong. Warm the way a held hand is warm
- * when you cannot see whose hand it is.
- *
- * "You didn't have to do that. But you did."
+ * The optional Offering spends amber for an authored response and a record of
+ * what the player gave. It buys no item or story outcome. Offering quests can
+ * return part of the amber; the service and altar must describe that honestly.
+ * Recognition is flavor, never proof that spending changed the player's
+ * allegiance, erased a boundary, or earned the animals' affection.
  */
 
 const STORAGE_KEY = 'wordshift_sacrifices';
@@ -67,8 +57,8 @@ const SACRIFICE_MILESTONES: Record<number, string> = {
   5: 'Five times now. The pattern thanks you. If patterns could thank.',
   10: 'Ten offerings. The house is warmer. Why is the house warmer?',
   25: 'Twenty-five voluntary offerings. The keepers speak of your devotion.',
-  50: 'Fifty. The arrangement has never been fed so willingly.',
-  100: 'One hundred offerings. You gave everything. You chose to.',
+  50: 'Fifty. A long row of small lights remains where the amber settled.',
+  100: 'One hundred offerings. The arrangement remembers each one. Your next decision is still yours.',
 };
 
 // Escalating in-session responses. The player can now offer repeatedly without
@@ -85,7 +75,7 @@ const OFFERING_RESPONSES: Record<'p4' | 'p5', { calm: string[]; leaning: string[
       'Accepted. Always accepted.',
     ],
     leaning: [
-      'The animals pause, wherever they are. They know what you did.',
+      'A note travels through the nearest beam. Something heard the amber settle.',
       'The pattern grows. You fed it again, and freely.',
       "Ember's fire leans toward you now, though you are not near it.",
       'The house holds its breath around your hands.',
@@ -94,24 +84,24 @@ const OFFERING_RESPONSES: Record<'p4' | 'p5', { calm: string[]; leaning: string[
       'You are still here. Still giving. The house has stopped pretending to be surprised.',
       'It knows the shape of your giving now. It waits for the next.',
       'Something behind the walls has turned to face you fully.',
-      'You did not have to. You never have to. That is what it loves.',
+      'The light waits after your hand withdraws. You can leave it waiting.',
     ],
   },
   p5: {
     calm: [
-      'The pattern accepts, gently. There is no hunger left in it, only welcome.',
-      'The amber settles into the quiet. Nothing stirs. Nothing needs to.',
-      'It is received. All of it is received now.',
+      'The pattern accepts. A little warmth gathers around the empty place.',
+      'The amber settles into the quiet. Somewhere nearby, a chair moves.',
+      'It is received. The mark of this offering stays.',
     ],
     leaning: [
       'The house is warm the way a held hand is warm. It remembers you giving.',
-      'The animals smile without turning. The offering was expected, and kind.',
+      'The light in the bowl fades before the light at the door.',
       'You give to something that has already arrived. It thanks you anyway.',
     ],
     fervent: [
-      'You are part of the pattern that gives to the pattern. It is very peaceful here.',
-      'There is nothing left to summon. You give for the closeness of it. So does it.',
-      'The arrangement holds you the way it holds the amber. Kept. Content.',
+      'The pattern knows the shape of this gesture. It waits while you decide whether to make another.',
+      'The arrival is over. This offering is a new decision, smaller than that night.',
+      'The arrangement keeps the amber. Your hand comes away empty and your own.',
     ],
   },
 };
@@ -119,14 +109,14 @@ const OFFERING_RESPONSES: Record<'p4' | 'p5', { calm: string[]; leaning: string[
 // The rare "offer everything" act: the fullest complicity, in one gesture.
 const EVERYTHING_RESPONSES: Record<'p4' | 'p5', string[]> = {
   p4: [
-    'Everything. You gave everything. The house floods with a light that has no source.',
+    'Everything. You gave all your amber. The house floods with a light that has no source.',
     'All of it, at once. The walls shudder like something waking. You feel seen to the bone.',
-    'You emptied your hands into the pattern. It closes around the gift, and around you.',
+    'You emptied your hands into the pattern. It closes around the gift. Your hands remain outside.',
   ],
   p5: [
-    'Everything, freely, at the end of things. The arrangement receives it like a last warm breath.',
-    'You keep nothing. The house keeps you. It has, for some time now.',
-    'All of it. The pattern does not thank you. It simply makes room, and you fit.',
+    'All the amber in your pouch. The arrangement receives it in a single warm pulse.',
+    'Your amber pouch is empty. The door remains where it was.',
+    'All of it. The light rises, settles, and leaves room for the next ordinary sound.',
   ],
 };
 
@@ -137,10 +127,10 @@ const EVERYTHING_RESPONSES: Record<'p4' | 'p5', string[]> = {
 export const DEVOTION_TIERS: DevotionTier[] = [
   { threshold: 1, title: 'Noticed', regard: 'The arrangement has turned its attention to you.' },
   { threshold: 3, title: 'Marked', regard: 'It knows your hands now.' },
-  { threshold: 8, title: 'Known', regard: 'It no longer waits to be asked.' },
-  { threshold: 20, title: 'Kept', regard: 'You belong to the pattern a little.' },
+  { threshold: 8, title: 'Known', regard: 'It recognizes the approach of your hands.' },
+  { threshold: 20, title: 'Kept', regard: 'A record of your offerings has been kept.' },
   { threshold: 50, title: 'Beloved of the Pattern', regard: 'The keepers speak of your devotion.' },
-  { threshold: 100, title: 'One of the Arrangement', regard: 'There is no longer a line between you and it.' },
+  { threshold: 100, title: 'One of the Arrangement', regard: 'It remembers a hundred visits. Each visit still had an ending.' },
 ];
 
 /** Index (0-based) of the highest devotion tier held at `count`, or -1 if none. */
@@ -352,13 +342,13 @@ export function getSacrificePrompt(phase: number): { title: string; subtitle: st
   if (phase >= 5) {
     return {
       title: 'Give to the Pattern',
-      subtitle: 'The amber returns to the quiet. You keep nothing. The house keeps you.',
+      subtitle: 'The amber returns to the quiet. This buys no item or ending. An active offering quest can return part of the amber.',
     };
   }
   if (phase >= 4) {
     return {
       title: 'Offer to the Arrangement',
-      subtitle: 'The amber returns to the pattern. You get nothing. The house remembers.',
+      subtitle: 'The amber returns to the pattern. This buys no item or ending. An active offering quest can return part of the amber.',
     };
   }
   // Should not be visible before Phase 4, but just in case

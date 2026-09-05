@@ -25,8 +25,8 @@ import {
   getPhase2ExtraDialogues,
   getPhase2PoolLine,
   phase2PoolHasNew,
-  getAndMarkNarrativeSeedPage,
-  getAndMarkNarrativeCallbackPage,
+  peekNarrativeSeedPage,
+  peekNarrativeCallbackPage,
   getPhase2PoolCursors,
   advancePhase2PoolCursor,
 } from '../services/animalDialogue';
@@ -927,10 +927,9 @@ export function useDialogueFlow({
 
     // Build pre-dialogue pages: these show as sequential conversation pages
     // before the regular dialogue, creating natural conversational flow.
-    // Phase 5 still permits live, phase-aware variant, coordinated-event,
-    // trigger, and fulfilled-offering pages before its post-revelation/Tending
-    // pool. They are not retired Phase 3/4 regular backlog; only the callback
-    // queues below are restricted to their exact era.
+    // Phase 5 permits live variant and fulfilled-offering pages before its
+    // post-revelation/Tending pool. Approach testimony and reveal callbacks
+    // retire at arrival; the archive preserves their earlier versions.
     const pages: PreDialoguePage[] = [];
 
     const animalPhase = progress ? getAnimalPhase(progress.currentPhase, animal.type) : 0;
@@ -986,7 +985,7 @@ export function useDialogueFlow({
 
     // 3. Coordinated event — milestone events take priority over trigger words
     let hasCoordinatedEvent = false;
-    if (progress && progress.puzzlesSolved > 0) {
+    if (progress && progress.currentPhase < 5 && progress.puzzlesSolved > 0) {
       try {
         const consumed = progress.consumedCoordinatedEvents || [];
         // Key events on the same weighted scale phase transitions use, so an
@@ -1000,14 +999,12 @@ export function useDialogueFlow({
           progress.unlockedAnimals ?? []
         );
         if (coordEvent) {
-          // Consumed when the page is SHOWN, not here: consumedCoordinatedEvents
-          // lives on global home progress, so burning it during construction
-          // took one of the eight house-wide crescendos away from every animal
-          // at once if the player dismissed the card.
-          const theme = coordEvent.theme;
+          // Commit this witness only when its page is shown. Another animal
+          // can then corroborate the event; an interrupted queue spends none.
+          const deliveryKey = coordEvent.deliveryKey;
           pages.push({
             text: coordEvent.text,
-            commit: () => recordConsumedCoordinatedEvent(theme),
+            commit: () => recordConsumedCoordinatedEvent(deliveryKey),
           });
           hasCoordinatedEvent = true;
         }
@@ -1106,9 +1103,9 @@ export function useDialogueFlow({
     if (progress && progress.currentPhase <= 1) {
       try {
         const sessionNumber = (getSession(animal.id)?.sessionsCompleted ?? 0) + 1;
-        const seed = await getAndMarkNarrativeSeedPage(animal.type, sessionNumber);
+        const seed = await peekNarrativeSeedPage(animal.type, sessionNumber);
         if (seed) {
-          pages.push({ text: seed });
+          pages.push(seed);
         }
       } catch {
         // Narrative seeds are non-critical
@@ -1174,25 +1171,20 @@ export function useDialogueFlow({
     // otherwise be permanently unreachable on a first run.
     if (animalPhase === 4) {
       try {
-        const seedCallback = await getAndMarkNarrativeCallbackPage(animal.type, {
+        const seedCallback = await peekNarrativeCallbackPage(animal.type, {
           allowUnheardSeeds: true,
         });
         if (seedCallback) {
-          // Still marked at build time: the mark lives inside the service and
-          // there is no peek half to defer to yet (see the note on
-          // getPhase4CallbackPage for the shape it wants).
-          pages.push({ text: seedCallback });
+          pages.push(seedCallback);
         }
       } catch {
         // Seed callbacks are non-critical
       }
     }
 
-    // 8. Dialogue choice point (the Phase-3 beat) — illusion of agency.
-    // Phase 4 is passed through too: the lagging tier reads its Phase-3 block
-    // at animal-phase 4 (getAnimalPhase converges at the reveal), and
-    // getChoiceForAnimal is the one place that decides, from the index band and
-    // the awareness tier, whether this animal is on its Phase-3 material.
+    // 8. A relationship choice follows the reader into the reveal, including
+    // late recruits whose introduction starts directly on Phase-4 material.
+    // Never offer it after arrival or recall a branch the player did not choose.
     if (animalPhase === 3 || animalPhase === 4) {
       try {
         const choice = await getChoiceForAnimal(

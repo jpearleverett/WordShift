@@ -25,6 +25,9 @@ import {
   getCoordinatedEventLine,
   getAndMarkNarrativeSeedPage,
   getAndMarkNarrativeCallbackPage,
+  peekNarrativeSeedPage,
+  peekNarrativeCallbackPage,
+  invalidateNarrativeDeliveryCache,
   getPhase2PoolCursors,
   advancePhase2PoolCursor,
   clearNarrativeDeliveryState,
@@ -37,6 +40,7 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 const ALL_ANIMALS: AnimalType[] = [
   'fox', 'pangolin', 'owl', 'axolotl', 'sloth',
   'fennec_fox', 'capybara', 'wombat', 'rabbit', 'red_panda',
+  'tarsier', 'aye_aye', 'kakapo',
 ];
 
 beforeEach(async () => {
@@ -199,7 +203,7 @@ describe('coordinated events keyed on weighted progress', () => {
       const r = getCoordinatedEventLine('fox', effectiveProgress, phase, consumed, ALL_ANIMALS);
       if (!r) break;
       delivered.push(r.theme);
-      consumed.push(r.theme);
+      consumed.push(r.deliveryKey);
     }
     return delivered;
   }
@@ -214,12 +218,12 @@ describe('coordinated events keyed on weighted progress', () => {
     const consumed: string[] = [];
     const first = getCoordinatedEventLine('fox', 230, 4, consumed, ALL_ANIMALS);
     expect(first?.theme).toBe(themesInOrder[0]);
-    consumed.push(first!.theme);
+    consumed.push(first!.deliveryKey);
     const second = getCoordinatedEventLine('fox', 230, 4, consumed, ALL_ANIMALS);
     expect(second?.theme).toBe(themesInOrder[1]);
   });
 
-  it('every event is reachable BEFORE the arrival, so no pre-arrival dread line lands after it', () => {
+  it('makes every event available before arrival without assuming the player heard it', () => {
     // These thresholds were authored against a ~300-puzzle arc and were left at
     // 140/161/168/175 after the arc was compressed twice. Post-revelation now
     // lands near raw 120, and Phase 5 still serves coordinated-event pages — so
@@ -238,7 +242,7 @@ describe('coordinated events keyed on weighted progress', () => {
       expect(event.puzzleThreshold).toBeLessThanOrEqual(arrivalBound);
     }
 
-    // A player standing at that bound has received all eight.
+    // At the bound a player can hear every theme; actual visits remain optional.
     expect(drain(arrivalBound, 4)).toEqual(themesInOrder);
   });
 
@@ -264,5 +268,68 @@ describe('coordinated events keyed on weighted progress', () => {
   it('already-consumed bookkeeping still suppresses delivered events', () => {
     const all = drain(230, 4);
     expect(getCoordinatedEventLine('fox', 230, 4, all, ALL_ANIMALS)).toBeNull();
+  });
+});
+
+
+describe('narrative pages survive an interrupted conversation', () => {
+  it('does not count a queued seed as heard, even after a reload', async () => {
+    const queued = await peekNarrativeSeedPage('fox', 2);
+    expect(queued?.text).toBe(NARRATIVE_SEEDS.fox.seeds[0]);
+    invalidateNarrativeDeliveryCache();
+    expect(await peekNarrativeCallbackPage('fox')).toBeNull();
+    expect((await peekNarrativeSeedPage('fox', 2))?.text).toBe(queued?.text);
+    await queued!.commit();
+    invalidateNarrativeDeliveryCache();
+    expect(await peekNarrativeSeedPage('fox', 2)).toBeNull();
+    expect((await peekNarrativeCallbackPage('fox'))?.text).toBe(NARRATIVE_SEEDS.fox.callbacks[0]);
+  });
+
+  it('keeps a callback owed until its page appears and commits it once', async () => {
+    await getAndMarkNarrativeSeedPage('owl', 2);
+    const queued = await peekNarrativeCallbackPage('owl');
+    invalidateNarrativeDeliveryCache();
+    expect((await peekNarrativeCallbackPage('owl'))?.text).toBe(queued?.text);
+    await queued!.commit();
+    await queued!.commit();
+    invalidateNarrativeDeliveryCache();
+    expect(await peekNarrativeCallbackPage('owl')).toBeNull();
+  });
+
+  it('merges queued commits without overwriting other animals or pool progress', async () => {
+    const fox = await peekNarrativeSeedPage('fox', 2);
+    const owl = await peekNarrativeSeedPage('owl', 2);
+    await fox!.commit();
+    await advancePhase2PoolCursor('rabbit');
+    await owl!.commit();
+    invalidateNarrativeDeliveryCache();
+    expect(await peekNarrativeSeedPage('fox', 2)).toBeNull();
+    expect(await peekNarrativeSeedPage('owl', 2)).toBeNull();
+    expect((await getPhase2PoolCursors()).rabbit).toBe(1);
+  });
+});
+
+describe('independent witnesses and arrival chronology', () => {
+  it('lets another animal corroborate a heard event, with at most two witnesses', () => {
+    const consumed: string[] = [];
+    const first = getCoordinatedEventLine('fox', 56, 2, consumed, ALL_ANIMALS)!;
+    consumed.push(first.deliveryKey);
+    expect(getCoordinatedEventLine('fox', 56, 2, consumed, ALL_ANIMALS)).toBeNull();
+    const second = getCoordinatedEventLine('owl', 56, 2, consumed, ALL_ANIMALS)!;
+    expect(second.theme).toBe(first.theme);
+    expect(second.text).not.toBe(first.text);
+    consumed.push(second.deliveryKey);
+    expect(getCoordinatedEventLine('pangolin', 56, 2, consumed, ALL_ANIMALS)).toBeNull();
+  });
+
+  it('preserves legacy completed themes without replaying a witness', () => {
+    expect(getCoordinatedEventLine('owl', 56, 2, ['words_changing'], ALL_ANIMALS)).toBeNull();
+  });
+
+  it('never delivers an unconsumed approach account after arrival, however far behind the reader is', () => {
+    for (const animal of ALL_ANIMALS) {
+      expect(getCoordinatedEventLine(animal, 1000, 5, [], ALL_ANIMALS)).toBeNull();
+      expect(getCoordinatedEventLine(animal, 1000, 5, ['words_changing:witness:fox'], ALL_ANIMALS)).toBeNull();
+    }
   });
 });

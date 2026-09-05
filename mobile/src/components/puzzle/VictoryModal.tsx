@@ -431,7 +431,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
     }
     if (!entranceComplete || announcedRef.current) return;
     announcedRef.current = true;
-    const title = getVictoryTitle(earnedStars, phase);
+    const title = (victoryData?.finalBoard ? 'The last word.' : getVictoryTitle(earnedStars, phase));
     const starsPhrase = `${earnedStars} of 3 stars`;
     const flawlessPhrase = victoryData?.flawless ? `${getFlawlessHonorific(phase)}. ` : '';
     const total = victoryData?.amberEarned ?? 0;
@@ -543,7 +543,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               ))}
             </View>
             <Text style={[styles.compactTitle, { color: phaseTheme.victoryTitleColor }]}>
-              {getVictoryTitle(earnedStars, phase)}
+              {(victoryData?.finalBoard ? 'The last word.' : getVictoryTitle(earnedStars, phase))}
             </Text>
             {victoryData?.flawless && (
               <Text
@@ -814,7 +814,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               color: phaseTheme.victoryTitleColor,
               textShadowColor: getVictoryTitleShadowColor(phase),
             }]}>
-              {getVictoryTitle(earnedStars, phase)}
+              {(victoryData?.finalBoard ? 'The last word.' : getVictoryTitle(earnedStars, phase))}
             </Text>
             {/* Flawless offering — the perfect-play tier above 3 stars. A small
                 phase-aware honorific ribbon; only shows on a truly clean solve. */}

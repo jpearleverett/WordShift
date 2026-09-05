@@ -1,3 +1,4 @@
+import { clearEvents } from '../services/eventLogger';
 /**
  * Integration tests for critical gameplay paths.
  *
@@ -402,3 +403,7 @@ describe('Economy Balance', () => {
     expect(progress.amber).toBe(12 + 10 + 10 + 8); // 40
   });
 });
+
+// These service/UI tests enqueue telemetry events; cancel their debounce before
+// Jest disposes the module registry and its lazy telemetry import.
+afterEach(clearEvents);

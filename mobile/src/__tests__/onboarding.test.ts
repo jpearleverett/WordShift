@@ -224,24 +224,24 @@ describe('onboarding', () => {
       const lines = ONBOARDING_FOX_LINES.fox_invited;
       expect(lines.length).toBe(2);
       expect(lines[0]).toContain("I'm Ember!");
-      expect(lines.join(' ').toLowerCase()).toContain('puzzle');
+      expect(lines.join(' ').toLowerCase()).toContain('words warmed the old stones');
       expect(lines.join(' ').toLowerCase()).toContain('already');
       expect(lines[lines.length - 1]).toContain(
         'I have been hoping for someone like you for the longest time.'
       );
     });
 
-    test('the pit-intro seed survives the merge verbatim', () => {
+    test('the first offering explains amber and leaves saving it available', () => {
       expect(ONBOARDING_FOX_LINES.pit_intro.join(' ')).toContain(
-        'it loves being fed. Most things here do, funnily enough.'
+        'Or save it until we know what we want.'
       );
     });
 
-    test('the closing seed "They need you." survives verbatim as the final line', () => {
+    test('the invitation to return leaves the timing with the player', () => {
       const lines = ONBOARDING_FOX_LINES.unlock_explained;
-      expect(lines[lines.length - 1]).toContain('They need you.');
-      // And the come-back-each-day retention hook rides the same closer.
-      expect(lines[lines.length - 1].toLowerCase()).toContain('come back each day');
+      expect(lines[lines.length - 1]).toContain('keep a place by the hearth');
+      // The invitation does not turn absence into failing the residents.
+      expect(lines[lines.length - 1].toLowerCase()).toContain('come back when you like');
     });
 
     test('the puzzle-tutorial intro teaches BOTH the tap and drag input paths', () => {

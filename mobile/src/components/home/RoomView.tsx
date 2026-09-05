@@ -106,7 +106,7 @@ const WINDOW_TINT: Record<number, { color: string; opacity: number }> = {
   2: { color: '#B5623C', opacity: 0.5 },  // dusk: warm rose
   3: { color: '#16233F', opacity: 0.82 }, // storm night: deep blue
   4: { color: '#0A0E22', opacity: 0.9 },  // shadow: near-black night
-  5: { color: '#191330', opacity: 0.86 }, // terrible peace: mauve night
+  5: { color: '#453F64', opacity: 0.78 }, // After: moonlit mauve, still a night outside
 };
 
 // Word echo configuration by phase (ritual words inscribed in rooms).
@@ -299,6 +299,56 @@ const ROOM_GLOW_VARIANTS: Record<RoomTheme, RoomGlowVariant> = {
 /** Room-appropriate tier-1 glow variant (warm fire ONLY in real hearth rooms). */
 export const getRoomGlowVariant = (theme: RoomTheme): RoomGlowVariant =>
   ROOM_GLOW_VARIANTS[theme] ?? GLOW_LAMP;
+
+
+/**
+ * The room painting supplies its objects and light sources. These shallow
+ * recesses and floor reflections make the cutaway read as a space inside the
+ * timber, with the animal standing in front of it. Investment glows above this
+ * layer keep their own brighter, animated treatment.
+ */
+const RoomDepthLighting: React.FC<{ theme: RoomTheme; phase: DialoguePhase }> = ({
+  theme, phase,
+}) => {
+  const variant = getRoomGlowVariant(theme);
+  const after = phase >= 5;
+  const night = phase >= 3;
+  const recess = night ? '#080B18' : '#392919';
+  const layers = shouldSimplifyAnimations() ? [1] : [1, 0.62, 0.3];
+  return (
+    <View pointerEvents="none" style={styles.depthLighting}
+      importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+      {layers.map((weight, i) => (
+        <React.Fragment key={'recess-' + i}>
+          <View style={{
+            position: 'absolute', top: 4 + i * 5, left: 4, right: 4,
+            height: 5, backgroundColor: recess,
+            opacity: (night ? 0.22 : 0.14) * weight,
+          }} />
+          <View style={{
+            position: 'absolute', top: 4, bottom: 4, left: 4 + i * 3,
+            width: 3, backgroundColor: recess, opacity: 0.16 * weight,
+          }} />
+          <View style={{
+            position: 'absolute', top: 4, bottom: 4, right: 4 + i * 3,
+            width: 3, backgroundColor: recess, opacity: 0.2 * weight,
+          }} />
+        </React.Fragment>
+      ))}
+      <View style={[styles.floorReflection, {
+        backgroundColor: variant.core,
+        opacity: after ? 0.11 : night ? 0.085 : 0.055,
+      }]} />
+      <View style={[styles.floorRecess, {
+        backgroundColor: recess, opacity: night ? 0.24 : 0.17,
+      }]} />
+      <View style={[styles.floorLip, {
+        backgroundColor: variant.core, opacity: after ? 0.3 : 0.2,
+      }]} />
+    </View>
+  );
+};
+
 
 /** Wall spots for up to 4 sigil marks (percent insets; mirrored pairs). */
 const SIGIL_SPOTS: { top: string; left?: string; right?: string }[] = [
@@ -681,6 +731,8 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
         );
       })()}
 
+      <RoomDepthLighting theme={room.theme} phase={currentPhase} />
+
       {/* In-world investment layers (tier-1 hearth glow / tier-2 sigils and
           wash / tier-3 scaling + motes). Behind the frame, animal, and
           nameplate; entirely decorative and non-interactive. */}
@@ -733,7 +785,12 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
       )}
 
       {/* Room frame */}
-      <View style={[styles.frame, { borderColor: themeColors.accent }]} />
+      <View pointerEvents="none" style={[styles.frame, {
+        borderColor: themeColors.accent,
+        borderTopColor: currentPhase >= 3 ? '#96856C' : '#D4B684',
+        borderBottomColor: currentPhase >= 3 ? '#302839' : '#5A4028',
+      }]} />
+      <View pointerEvents="none" style={styles.innerBevel} />
 
       {/* Room name plate — the wooden cottage PixelPlaque (matching the dialogue
           nameplates), compact-scaled to sit proportionately in the small room.
@@ -899,6 +956,20 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
 RoomView.displayName = 'RoomView';
 
 const styles = StyleSheet.create({
+
+  depthLighting: { ...StyleSheet.absoluteFill, overflow: 'hidden', borderRadius: 8 },
+  floorReflection: {
+    position: 'absolute', bottom: 8, left: '16%', width: '68%', height: '24%',
+    borderRadius: 90,
+  },
+  floorRecess: { position: 'absolute', left: 4, right: 4, bottom: 4, height: 7 },
+  floorLip: { position: 'absolute', left: 8, right: 8, bottom: 5, height: 1 },
+  innerBevel: {
+    position: 'absolute', top: 4, bottom: 4, left: 4, right: 4,
+    borderRadius: 4, borderWidth: 1,
+    borderTopColor: '#1B16284D', borderLeftColor: '#1B162830',
+    borderRightColor: '#F4D6A729', borderBottomColor: '#F4D6A740',
+  },
   container: {
     borderRadius: 8,
     overflow: 'hidden',
