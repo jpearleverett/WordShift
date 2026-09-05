@@ -1,3 +1,4 @@
+import { beginStoryCycle, clearStoryState } from '../services/storySpine';
 import React, { useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -37,6 +38,7 @@ import { clearAchievements } from '../services/achievements';
 import { clearDailyProgress } from '../services/dailyChallenge';
 import {
   clearProgress,
+  getFullProgress,
   getAmberBalance,
   getStreakFreezeCount,
   purchaseStreakFreeze,
@@ -179,6 +181,7 @@ export async function performFullReset(): Promise<string[]> {
     ['weeklyQuests', clearWeeklyQuests],
     ['whisperGallery', clearWhisperGallery],
     ['dialogueChoices', clearChoiceState],
+    ['story', clearStoryState],
     ['narrativeDelivery', clearNarrativeDeliveryState],
     ['microBeats', resetMicroBeats],
     ['notificationPrefs', resetNotificationPrefs],
@@ -276,6 +279,15 @@ export async function performNewCycle(): Promise<number> {
   const before = await canStartNewCycle();
   if (!before) return 0;
   const cycle = await startNewCycle();
+  const nextProgress = await getFullProgress();
+  await beginStoryCycle({
+    phase: nextProgress.currentPhase, puzzlesSolved: nextProgress.puzzlesSolved,
+    cycleCount: nextProgress.cycleCount ?? 0, cycleStartPuzzles: nextProgress.cycleStartPuzzles,
+    unlockedAnimals: nextProgress.unlockedAnimals,
+  }).catch(() => {
+    // The previous cycle's durable record can be adopted lazily on next read.
+    // A failed carryover write must not interrupt the other cycle resets.
+  });
   // Reset only the narrative-gating state so the descent replays; each is
   // independent, so one failure can't abort the rest.
   const clears: Array<() => Promise<unknown>> = [

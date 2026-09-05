@@ -102,8 +102,8 @@ jest.mock('../services/animalDialogue', () => ({
   getPhase2ExtraDialogues: jest.fn(() => []),
   getPhase2PoolLine: jest.fn(() => null),
   phase2PoolHasNew: jest.fn(() => false),
-  getAndMarkNarrativeSeedPage: jest.fn(async () => null),
-  getAndMarkNarrativeCallbackPage: jest.fn(async () => null),
+  peekNarrativeSeedPage: jest.fn(async () => null),
+  peekNarrativeCallbackPage: jest.fn(async () => null),
   getPhase2PoolCursors: jest.fn(async () => ({})),
   advancePhase2PoolCursor: jest.fn(async () => 0),
 }));

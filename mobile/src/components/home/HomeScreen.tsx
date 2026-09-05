@@ -1,3 +1,4 @@
+import { loadStoryState, STORY_COPY } from '../../services/storySpine';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { FONT_SIZE } from '../../theme/typeScale';
 import {
@@ -220,6 +221,9 @@ interface HomeScreenProps {
   onOpenSettings?: () => void;
   onOpenStats?: () => void;
   onOpenLedger?: () => void;
+  onOpenStory?: () => void;
+  storyOverlayActive?: boolean;
+  onOverlayActivityChange?: (active: boolean) => void;
   onOpenGallery?: () => void;
   onOpenShop?: () => void;
   onOpenStore?: () => void;
@@ -548,6 +552,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onOpenSettings,
   onOpenStats,
   onOpenLedger,
+  onOpenStory,
+  storyOverlayActive = false,
+  onOverlayActivityChange,
   onOpenGallery,
   onOpenShop,
   onOpenStore,
@@ -592,8 +599,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // two can never flicker over each other.
   const introSurfaceBusyRef = useRef(false);
   useEffect(() => {
-    introSurfaceBusyRef.current = showIntroDialogue || !!introOverrideLines;
-  }, [showIntroDialogue, introOverrideLines]);
+    introSurfaceBusyRef.current = showIntroDialogue || !!introOverrideLines || storyOverlayActive;
+  }, [showIntroDialogue, introOverrideLines, storyOverlayActive]);
   // Journal spotlight intro state
   const [journalSpotlightActive, setJournalSpotlightActive] = useState(false);
   const [journalSpotlightIndex, setJournalSpotlightIndex] = useState(0);
@@ -1266,7 +1273,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         const seen = await hasSeenKeeperRecord();
         if (seen || cancelled) return;
 
-        const ember = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
+        const story = await loadStoryState({ phase: progress.currentPhase,
+          puzzlesSolved: progress.puzzlesSolved, cycleCount: progress.cycleCount ?? 0,
+          cycleStartPuzzles: progress.cycleStartPuzzles, unlockedAnimals: progress.unlockedAnimals,
+          postRevelation: progress.postRevelation });
+        if (!story.memories.reply?.completed || storyOverlayActive || cancelled) return;
+        const ember = animals.find(a => a.id === 'fox');
         if (!ember) return;
 
         const [ledger, total] = await Promise.all([getRitualWords(), getTotalWordsFormed()]);
@@ -1308,6 +1320,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   }, [
     progress?.currentPhase,
     progress?.postRevelation,
+    storyOverlayActive,
     isOnboarding,
     showIntroDialogue,
     introOverrideLines,
@@ -1897,6 +1910,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     () => journalSpotlightStepMeta.filter(step => step.showInPreview),
     [journalSpotlightStepMeta]
   );
+
+  const localOverlayActive = showIntroDialogue || !!introOverrideLines || dialogueFlow.showDialogue ||
+    showJournalModal || showSeasonModal || showUtilityModal || showQuestModal ||
+    unlockFlow.showShop || unlockFlow.showRoomUnlock !== null || unlockFlow.showInvitePrompt ||
+    showHouseCompletion || journalSpotlightActive;
+  useEffect(() => {
+    onOverlayActivityChange?.(localOverlayActive);
+    return () => onOverlayActivityChange?.(false);
+  }, [localOverlayActive, onOverlayActivityChange]);
 
   if (!progress || rooms.length === 0) {
     // Only reachable on a genuinely cold read (first launch, or right after a
@@ -2586,6 +2608,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <Text style={[styles.shopSubtitle, { color: panelSt.muted }]}>
               Keep the house&apos;s records in one place.
             </Text>
+            {onOpenStory && (
+              <HubRow
+                phase={progress.currentPhase}
+                hostDark={dtHostDark}
+                icon={WHISPER_ICON}
+                label={STORY_COPY.journalTitle}
+                onPress={() => { setShowJournalModal(false); onOpenStory(); }}
+                accessibilityLabel={STORY_COPY.journalTitle}
+              />
+            )}
             {onOpenLedger && (
               <HubRow
                 phase={progress.currentPhase}
@@ -3448,7 +3480,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       style={styles.dialogueContinueBevel}
                     >
                       <Text style={[styles.continueButtonText, { color: pixelSkin.ink.primary }]}>
-                        {hasMoreIntroDialogues() ? 'Next' : 'Welcome!'}
+                        {hasMoreIntroDialogues() ? 'Next' : introContext === 'animal_intro' ? 'Welcome!' : 'Continue'}
                       </Text>
                     </BevelRowButton>
                   </View>

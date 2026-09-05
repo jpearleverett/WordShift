@@ -28,6 +28,8 @@ jest.mock('react-native', () => ({
   Text: 'Text',
   TouchableOpacity: 'TouchableOpacity',
   Image: 'Image',
+  ScrollView: 'ScrollView',
+  useWindowDimensions: () => ({ width: 400, height: 800 }),
   Dimensions: { get: () => ({ width: 400, height: 800 }) },
   StyleSheet: {
     absoluteFill: { position: 'absolute' },
@@ -57,7 +59,12 @@ jest.mock('../services/haptics', () => ({
   hapticHeavy: jest.fn(),
   hapticWarning: jest.fn(),
 }));
-jest.mock('../theme/fonts', () => ({ BODY_FONT_BOLD: 'BodyBold' }));
+jest.mock('../theme/fonts', () => ({ BODY_FONT: 'Body', BODY_FONT_BOLD: 'BodyBold', PIXEL_FONT_BOLD: 'PixelBold' }));
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 20, right: 0, bottom: 20, left: 0 }),
+}));
+jest.mock('../components/home/AnimalSprite', () => ({ CHARACTER_SPRITES: {} }));
+jest.mock('../services/storyArchive', () => ({ getStorySpeakerName: (speaker: string) => speaker }));
 jest.mock('../theme/colors', () => ({
   getPhaseTheme: () => ({ vignetteColor: '#000000' }),
 }));
@@ -68,6 +75,7 @@ import {
   HOUSE_COMPLETION_EVENT,
   FINAL_PUZZLE_EVENT,
   buildFinalPuzzleEvent,
+  buildPostRevelationEvent,
   POST_REVELATION_EVENT,
   NEW_CYCLE_EVENT,
   PhaseTransitionEvent,
@@ -121,7 +129,7 @@ describe('ordinary transition title subtlety', () => {
   test('accessibility announces visible content, never a suppressed title', () => {
     for (const event of ordinaryEvents) {
       const tree = PhaseTransitionOverlay({ event, onComplete: jest.fn() }) as ElementLike;
-      expect(tree.props?.accessibilityLabel).toBe(event.scenes[0].text);
+      expect(tree.props?.accessibilityLabel).toBe('A moment in the house');
       expect(tree.props?.accessibilityLabel).not.toContain(event.title);
     }
     for (const event of titledEvents) {
@@ -178,11 +186,13 @@ describe('FINAL_PUZZLE_EVENT — the in-engine arrival', () => {
     }
   });
 
-  test('total length stays in the ~30s band (Skip remains the fast exit)', () => {
-    // getEventDuration is the raw scene budget; the overlay applies 1.25x.
-    const shippedMs = getEventDuration(FINAL_PUZZLE_EVENT) * 1.25;
-    expect(shippedMs).toBeGreaterThanOrEqual(27000);
-    expect(shippedMs).toBeLessThanOrEqual(35000);
+  test('important endings are read at the player pace with a full authored timing budget', () => {
+    for (const event of [FINAL_PUZZLE_EVENT, POST_REVELATION_EVENT, NEW_CYCLE_EVENT]) {
+      expect(event.readAtOwnPace).toBe(true);
+      expect(getEventDuration(event)).toBeGreaterThan(0);
+    }
+    // Reduced motion removes effects; it must not shorten reading time.
+    expect(getEventDuration(FINAL_PUZZLE_EVENT) * 1.25).toBeGreaterThan(40000);
   });
 
   test('a held breath precedes the descent: the scene before it carries no image', () => {
@@ -265,5 +275,77 @@ describe('NEW_CYCLE_EVENT — the serene re-descent', () => {
       expect(scene.effect).not.toBe('descend');
     }
     expect(NEW_CYCLE_EVENT.scenes.length).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe('Arrival remembers the actual household and decisions', () => {
+  test('an unfinished house does not become complete and unseen animals do not speak', () => {
+    const event = buildFinalPuzzleEvent([], { houseComplete: false, unlockedAnimals: [] });
+    expect(event.scenes[2].text).toMatch(/remain unbuilt/);
+    expect(event.scenes.every(scene => !scene.speaker)).toBe(true);
+    expect(event.scenes.map(scene => scene.text).join(' ')).not.toMatch(/Ember|Warren|Tock|Moss|Thyme|Chill/);
+  });
+
+  test('a complete recruited household keeps the old foundation and new bracing distinct', () => {
+    const event = buildFinalPuzzleEvent([], { houseComplete: true, unlockedAnimals: ['fox', 'wombat'] });
+    expect(event.scenes[2].text).toMatch(/old foundation/);
+    expect(event.scenes[2].text).toMatch(/whole household/);
+    expect(event.scenes[2].speaker).toBe('wombat');
+    expect(event.scenes[2].text).toMatch(/braces the join/);
+  });
+
+  test('CLOSED and CLOSER show different enacted boundaries and illustrations', () => {
+    const closed = buildFinalPuzzleEvent([], { boundary: 'remember', unlockedAnimals: ['fox'] });
+    const closer = buildFinalPuzzleEvent([], { boundary: 'release', unlockedAnimals: ['fox'] });
+    expect(closed.scenes[6].text).toMatch(/CLOSED.*private room/s);
+    expect(closed.scenes[6].image).toBe('private_room');
+    expect(closer.scenes[6].text).toMatch(/CLOSER.*road beyond still leads away/s);
+    expect(closer.scenes[6].image).toBe('outward_road_night');
+    expect(closed.scenes.filter(scene => scene.effect === 'descend')).toHaveLength(1);
+    expect(closer.scenes.filter(scene => scene.effect === 'descend')).toHaveLength(1);
+  });
+
+  test('Tock answers once only if he has been recruited', () => {
+    const withTock = buildFinalPuzzleEvent([], { boundary: 'remember', unlockedAnimals: ['aye_aye', 'kakapo'] });
+    const withoutTock = buildFinalPuzzleEvent([], { boundary: 'remember', unlockedAnimals: ['kakapo'] });
+    const withoutEither = buildFinalPuzzleEvent([], { boundary: 'remember', unlockedAnimals: [] });
+    const bells = withTock.scenes.filter(scene => scene.cue === 'bell');
+    expect(bells).toHaveLength(1);
+    expect(bells[0].speaker).toBe('aye_aye');
+    expect(withTock.scenes.some(scene => scene.cue === 'answer')).toBe(false);
+    expect(withoutTock.scenes.filter(scene => scene.cue === 'answer')).toHaveLength(1);
+    expect(withoutTock.scenes.find(scene => scene.cue === 'answer')?.speaker).toBe('kakapo');
+    expect(withoutEither.scenes.some(scene => scene.cue)).toBe(false);
+  });
+
+  test('kept record and seed confidence refer to the actual chosen objects', () => {
+    const record = buildFinalPuzzleEvent([], { keptRecord: true, unlockedAnimals: ['capybara'] });
+    expect(record.scenes[4].speaker).toBe('capybara');
+    expect(record.scenes[4].text).toMatch(/original page/);
+    const seeds = buildFinalPuzzleEvent([], { keptPromise: true, unlockedAnimals: ['rabbit'] });
+    expect(seeds.scenes[4].speaker).toBe('rabbit');
+    expect(seeds.scenes[4].text).toMatch(/seed tin.*own pocket/s);
+  });
+
+  test('Ember keeps the distance the player asked for', () => {
+    const beside = buildFinalPuzzleEvent([], { standBeside: true, unlockedAnimals: ['fox'] });
+    const apart = buildFinalPuzzleEvent([], { standBeside: false, unlockedAnimals: ['fox'] });
+    expect(beside.scenes[7].text).toMatch(/stands beside you/);
+    expect(apart.scenes[7].text).toMatch(/stays by the hearth/);
+    expect(apart.scenes[7].text).not.toMatch(/stands beside/);
+  });
+
+  test('After carries each boundary without inventing an original page or a legacy choice', () => {
+    expect(buildPostRevelationEvent()).toBe(POST_REVELATION_EVENT);
+    expect(buildPostRevelationEvent({ boundary: null })).toBe(POST_REVELATION_EVENT);
+    const kept = buildPostRevelationEvent({ boundary: 'remember', keptRecord: true });
+    const rewritten = buildPostRevelationEvent({ boundary: 'remember', keptRecord: false });
+    const road = buildPostRevelationEvent({ boundary: 'release' });
+    expect(kept.scenes[3].text).toMatch(/old page and its correction/);
+    expect(rewritten.scenes[3].text).toMatch(/written again/);
+    expect(rewritten.scenes[3].text).not.toMatch(/old page/);
+    expect(kept.backdrop?.image).toBe('private_room');
+    expect(road.backdrop?.image).toBe('outward_road');
+    expect(road.scenes[1].text).toMatch(/road/);
   });
 });

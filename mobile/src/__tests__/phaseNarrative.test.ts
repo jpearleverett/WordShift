@@ -200,7 +200,7 @@ describe('getMoveMessage', () => {
 
   test('phase 0 messages come from the pool or the rare darkness seeds', () => {
     // getMoveMessage uses Math.random; Phase 0 includes ~7% rare "seed" messages.
-    const seedWords = ['remember', 'shifted', 'feel', 'wanted'];
+    const seedWords = ['lingered', 'shifted', 'warmth', 'room'];
     for (let i = 0; i < 60; i++) {
       const msg = getMoveMessage(0);
       const isPool = MOVE_MESSAGES[0].includes(msg);
@@ -1239,22 +1239,16 @@ describe('MICRO_BEATS geography', () => {
     expect(isSilentVictoryBeat(115)).toBe(false);
   });
 
-  test('the complicity beat lands at 106', () => {
-    expect(MICRO_BEATS[106].text).toBe(
-      'You could stop now. You know that. You won\'t. They know that too.'
-    );
+  test('the preservation cost becomes observable before the final choice', () => {
+    expect(MICRO_BEATS[106].text).toMatch(/flower.*morning.*turns it back/);
+    expect(MICRO_BEATS[106].text).not.toMatch(/you won't|you will|cannot stop/i);
   });
 
-  test('house-wholeness language only appears at or after completion (~96-100)', () => {
-    for (const k of keys) {
-      const text = (MICRO_BEATS[k].text ?? '').toLowerCase();
-      if (/is whole|every room is built|every keeper is home/.test(text)) {
-        expect(k).toBeGreaterThanOrEqual(96);
-      }
+  test('unconditional micro-beats do not claim optional rooms or recruits are complete', () => {
+    for (const beat of Object.values(MICRO_BEATS)) {
+      expect(beat.text ?? '').not.toMatch(/house is whole|every room is built|every keeper is home/i);
     }
-    // And the dwell-window beats DO speak of the whole house.
-    expect(MICRO_BEATS[109].text!.toLowerCase()).toContain('every room is built');
-    expect(MICRO_BEATS[112].text!.toLowerCase()).toContain('the house is whole');
+    expect(MICRO_BEATS[109].text).toContain('occupied room');
   });
 
   test('dwell beats never surface a counter or number', () => {
@@ -1700,7 +1694,7 @@ describe('victory glitch', () => {
   });
 
   test('getFirstWinGlitchText returns a stable non-empty glitch', () => {
-    expect(getFirstWinGlitchText()).toBe('WE SEE YOU');
+    expect(getFirstWinGlitchText()).toBe('A LITTLE WARMER');
   });
 });
 
@@ -2218,5 +2212,34 @@ describe('cycle path resolves the {word} template (never the raw token)', () => 
     } finally {
       spy.mockRestore();
     }
+  });
+});
+
+describe('Dwell on the unfinished-house finale route', () => {
+  test('waits without claiming the visible house is complete', () => {
+    for (const phase of [4, 5]) {
+      const lines = Array.from({ length: 8 }, (_, i) => getDwellLine(i + 1, phase, false));
+      expect(new Set(lines).size).toBe(8);
+      expect(lines.join(' ')).toMatch(/unbuilt|unfinished/);
+      expect(lines.join(' ')).not.toMatch(/house is whole|nothing is being built|nothing left to make ready|every room is ready/i);
+      for (let i = 0; i < lines.length; i++) {
+        expect(lines[i]).not.toBe(getDwellLine(i + 1, phase, true));
+      }
+    }
+  });
+
+  test('keeps the complete-house default and clamps incomplete reading positions', () => {
+    expect(getDwellLine(1, 4)).toBe(getDwellLine(1, 4, true));
+    expect(getDwellLine(0, 4, false)).toBe(getDwellLine(1, 4, false));
+    expect(getDwellLine(999, 4, false)).toBe(getDwellLine(8, 4, false));
+  });
+});
+
+describe('NewCycle retains a household without assuming its construction state', () => {
+  test('construction half-memories never claim all rooms were finished', () => {
+    const text = [getCycleMicroBeat(88)?.text, getCycleMicroBeat(112)?.text].join(' ');
+    expect(text).not.toMatch(/house is whole|house is complete|not needed to make room/i);
+    expect(text).toMatch(/timber/);
+    expect(text).toMatch(/rehearsed/);
   });
 });

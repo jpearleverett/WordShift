@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { invalidateStoryCache, STORY_STORAGE_KEY } from './storySpine';
 import { invalidateProgressCache } from './amberCurrency';
 import { invalidatePuzzleStateCache } from './puzzleSaveState';
 import { invalidateSettingsCache } from './settings';
@@ -132,6 +133,7 @@ export const SYNC_KEYS = [
   // Narrative state
   'wordshift_dialogue_sessions',
   'wordshift_dialogue_choices',
+  STORY_STORAGE_KEY,
   'wordshift_narrative_delivery',
   'wordshift_whisper_gallery',
   'wordshift_sacrifices',
@@ -521,6 +523,7 @@ let provider: CloudProvider = new NoOpProvider();
 let syncStatusCache: SyncStatus | null = null;
 
 function invalidateRestoredServiceCaches(): void {
+  invalidateStoryCache();
   invalidateProgressCache();
   invalidateStatsCache();
   invalidatePuzzleStateCache();

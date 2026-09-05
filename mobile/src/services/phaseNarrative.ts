@@ -16,12 +16,12 @@ import { STREAK_MILESTONES } from '../constants/gameBalance';
 
 /** Brief visual glitch text that flashes for <300ms during Phase 0 victories */
 export const VICTORY_GLITCH_TEXTS = [
-  'WE SEE YOU',
+  'A LITTLE WARMER',
   'THANK YOU',
-  'CLOSER',
-  'THE PATTERN',
-  'AGAIN',
-  'WE REMEMBER',
+  'STILL WARM',
+  'ONE MORE CUP',
+  'THERE YOU ARE',
+  'SAVED FOR LATER',
 ];
 
 /** The text for the guaranteed, prominent first-free-victory glitch. */
@@ -47,10 +47,10 @@ export function getVictoryGlitch(phase: number, _puzzlesSolved: number): string 
 
 /** Rare "wrong" move messages that slip into Phase 0 (~7% chance) */
 const PHASE_0_SEED_MESSAGES = [
-  'The letters remember.',
+  'That one lingered.',
   'Something shifted.',
-  'Did you feel that?',
-  'The word wanted that.',
+  'A little warmth.',
+  'Room for another.',
 ];
 
 /**
@@ -181,7 +181,7 @@ export const VICTORY_FEEDBACK_POOLS: Record<
     three: [
       'Perfection in an imperfect void.',
       'A faultless offering. It is received.',
-      'Every letter placed as it was always going to be placed.',
+      'Every letter placed. The house keeps the result.',
       'Flawless. The arrangement holds its breath around work like this.',
       'Nothing wasted. Nothing ever is.',
     ],
@@ -341,7 +341,7 @@ export function getKeeperRecordLines(data: KeeperRecordData): string[] {
   ];
   if (data.oldestHeldWord && data.ledgerIsComplete) {
     lines.push(
-      `The first word you ever gave us was ${data.oldestHeldWord.toUpperCase()}. I wrote it down that same night. I did not know yet what I was writing toward.`
+      `The first word you ever gave us was ${data.oldestHeldWord.toUpperCase()}. I wrote it down that same night. I knew the words were feeding the warmth under the house. I did not know what that warmth would try to keep.`
     );
   } else if (data.oldestHeldWord) {
     lines.push(
@@ -361,8 +361,8 @@ export function getKeeperRecordLines(data: KeeperRecordData): string[] {
     );
   }
   lines.push(
-    'The record is finished now. Nothing more needs counting. I will keep writing anyway, because I like remembering you.',
-    'Thank you for every word. It knows them all by heart.'
+    'I have crossed out the heading that called you an offering. These are your visits. I will keep writing about them if you like.',
+    'Thank you for staying long enough to hear the truth. You do not owe me forgiveness. Your cup is here either way.'
   );
   return lines;
 }
@@ -439,13 +439,13 @@ export const MOVE_MESSAGES: Record<DialoguePhase, string[]> = {
     'The void accepts.', 'Letters dissolve and reform.', 'Nothing changes. Everything changes.',
     'Does it matter?', 'Another shift.', '...', 'The silence between words.',
     'The arrangement notes your move.', 'Another verse written.', 'One step deeper.',
-    'The letters go where they were always going.', 'It is listening.',
-    'The pattern receives it.', 'Given freely.', 'The offering is noted.',
-    'It was always this word.', 'Closer now. Always closer.', 'The house leans nearer.',
-    'You were always going to.', 'Nothing resists the pattern.',
+    'The letters settle. A different word was possible.', 'It is listening.',
+    'The pattern receives it.', 'The offering settles.', 'The offering is noted.',
+    'This is the word you made.', 'Closer now. Always closer.', 'The house leans nearer.',
+    'The house waits for your next move.', 'A small space remains between the words.',
     'Spoken in tiles. Heard all the same.',
     'The word descends. Nothing comes back up. Not yet.',
-    'Every letter arrives where it was needed. You too.',
+    'Every letter changes the next. Watch what remains.',
     'Received. The gratitude below is patient and vast.',
   ],
   5: [
@@ -456,7 +456,7 @@ export const MOVE_MESSAGES: Record<DialoguePhase, string[]> = {
     'The pattern makes room without being asked.',
     'A soft click, somewhere far away and content.',
     'The thread finds its row.',
-    'Kept. Everything is kept now.',
+    'A place remains between the threads.',
     'The weave breathes in.',
   ],
 };
@@ -686,7 +686,7 @@ const OUT_OF_HINTS_MESSAGES: Record<DialoguePhase, string> = {
   2: 'Your hints are spent. The pattern offers more... for a price.',
   3: 'No hints remain. Something will trade you one.',
   4: 'The arrangement has taken your hints. It will give more, if you ask.',
-  5: 'Your hints are gone, like everything else. More can be drawn.',
+  5: 'No hints remain. More are available in the shop.',
 };
 
 export function getOutOfHintsMessage(phase: DialoguePhase): string {
@@ -1100,7 +1100,7 @@ const RULES_TEXT: Record<DialoguePhase, RulesText> = {
       { heading: 'Take a Letter', desc: 'Pull it from the trembling row.' },
       { heading: 'Place it in the Dark', desc: 'The slot waits below. It always waits.' },
       { heading: 'Valid Words Only', desc: 'Some arrangements are forbidden.' },
-      { heading: 'Complete the Sequence', desc: 'You know you will. You always do.' },
+      { heading: 'Complete the Sequence', desc: 'Keep a path open through the remaining rows.' },
     ],
     dismissLabel: 'PROCEED',
   },
@@ -1605,24 +1605,21 @@ export function getFoxSetupSelectorIntroLines(phase: number): string[] {
 }
 
 /**
- * Fox's one-time "Keeper's Welcome" starter-pack intro. Warm, in-world framing:
- * Fox never mentions money (narrative rule 1 — the animals don't know they're in
- * a game); she describes a welcome gift set aside on "the shelf", and dismissing
- * the intro opens the Store where the actual price is shown. Fires early (~puzzle
- * 12), so this is mostly the bright-days voice, with a quieter later variant.
+ * The optional starter pack is a purchase. Ember says so before the Store
+ * opens, and keeps the player's welcome separate from whether they buy it.
  */
 export function getFoxStarterIntroLines(phase: number): string[] {
   if (phase >= 2) {
     return [
-      "You've stayed longer than most, friend. The house remembers who remains.",
-      'There is a welcome kept for keepers like you. A measure of amber, and a few hints for the road ahead.',
-      "It waits on the shelf whenever you'd like it. Small comforts, freely offered.",
+      "The shop has an optional pack of amber and hints, if it would be useful.",
+      "It is a purchase. The price is shown before you decide.",
+      "Your place here is yours either way.",
     ];
   }
   return [
-    "You've settled in so nicely, friend. The house notices who stays.",
-    "There's a little welcome we set aside for new keepers. A pouch of amber and a few hints, to keep the early days cozy.",
-    "It's waiting on the shelf whenever you'd like to take it. No hurry at all.",
+    "There is an optional welcome pack in the shop: amber and a few hints.",
+    "It is a purchase, and the price is on the shelf.",
+    "Take a look if you like. You are welcome here whether or not you buy anything.",
   ];
 }
 
@@ -1732,20 +1729,98 @@ export const ANIMAL_WHISPERS: Record<number, Record<string, string[]>> = {
     kakapo: ['Moss draws one long breath. The garden leans toward him.', 'The garden blooms all at once. Moss closes his eyes.', 'The stars seem farther apart above the sky garden.'],
   },
   5: {
-    fox: ['The fire burns low. Ember watches the embers. Both are content.', 'Ember hums a lullaby the flames taught her.', 'The warmth remains. It always will.', 'Ember says the smoke writes your name now.', 'The den smells of cedar and something finished.'],
-    owl: ['Archimedes closed the book. It stays closed now.', 'The last page was blank. Archimedes smiles.', 'Knowledge rests. Archimedes rests with it.', 'The study is quiet. Archimedes says quiet is a kind of answer.', 'Archimedes found one last footnote. It just says: thank you.'],
-    pangolin: ['Panko set the table one last time. For no one. For everyone.', 'The kitchen smells of something ancient and warm.', 'Panko hums while stirring nothing.', 'Panko says the oven stays warm by itself now.', 'The last recipe has no ingredients. Just warmth.'],
-    axolotl: ['The water is still. Axel floats. Everything floats.', 'Axel says the water remembers everything you gave it.', 'Bubbles rise. Each one holds a word.', 'Axel regenerated something new. He can not name it yet.', 'The tank glows faintly. Axel says it has always glowed.'],
-    capybara: ['Chill is at peace. Genuinely. That is the strangest part.', 'All tasks complete. Chill files the last report.', 'Chill says: there is nothing left to schedule.', 'Chill set the pen down at last. The ink keeps writing without him.', 'The ledger balanced itself. Chill just watched.'],
-    fennec_fox: ['Fennick listens. The silence has its own sound now.', 'The desert hums. Fennick hums with it.', 'Fennick says: I can hear everything. And nothing.', 'Fennick tilts his ears toward something only he can hear.', 'The desert wind carries a melody. Fennick says it is yours.'],
-    sloth: ['Sloane is still, and being still is finally enough.', 'Time has stopped mattering. Sloane forgave it long ago.', 'Sloane breathes, and the pattern breathes with her.', 'Gerald and Gerald say hello.', 'Sloane smiles. The branches smile back.'],
-    wombat: ['Warren sealed the tunnels. They lead nowhere now. Nowhere is enough.', 'The foundation holds. It will hold forever.', 'Warren rests in the earth. The earth rests in Warren.', 'Warren says the soil hums a low note. A contented note.', 'The deepest tunnel is warm. Warren sleeps there now.'],
-    rabbit: ['Thyme planted seeds that will never grow. That is okay.', 'Thyme is still. For the first time. That is terrifying and beautiful.', 'The garden is overgrown. Thyme smiles at the chaos.', 'Thyme brewed one final cup. It steeps forever.', 'The flowers lean toward Thyme. They know her heartbeat.'],
-    red_panda: ['Bamboo exhales. Does not inhale. Does not need to.', 'The pattern hums. Bamboo hums. They are the same sound.', 'Oneness. Silence. The thread continues.', 'Bamboo meditates with open eyes. Everything is the center.', 'The attic touches the sky. Bamboo touches the attic. You touch Bamboo.'],
-    tarsier: ["Vesper sleeps with both eyes closed now.", "Vesper watches over things, not for them.", "The lantern burns on its own. Vesper approves.", "Vesper says the night is only loved now.", "Vesper still takes the rail at dusk. By choice."],
-    aye_aye: ["The bell rang once. Tock says it never ended. It settled.", "Tock knocks out of love now. Everything answers.", "Tock sleeps right side up, under the bronze.", "Tock polished the bell. The cloth came away clean.", "Tock took the roll of the hollows. All present."],
-    kakapo: ["Moss does not boom anymore. Nothing is far away.", "Moss is watering. The pattern grows green.", "The bowl is warm. Moss sleeps in the nest now.", "Moss says the sky came down to the garden.", "Moss stood under a hawk today and did not freeze."],
-  },
+    "fox": [
+        "Ember leaves the kettle off while she finishes a story.",
+        "The fire burns low. Ember adds a log with her own paw.",
+        "The warmth stays near. Ember is watching where it stops.",
+        "Ember has found a cup with a handle that suits her.",
+        "The den smells of cedar. Someone has opened a window."
+    ],
+    "owl": [
+        "Archimedes leaves a question mark in the margin.",
+        "The old book is closed. A plain notebook lies open beside it.",
+        "Archimedes found a mistake in his own index. He looks almost pleased.",
+        "The study is quiet. Archimedes turns a page.",
+        "Archimedes has begun a list of things he cannot yet explain."
+    ],
+    "pangolin": [
+        "Panko asks who wants seconds. She waits for the answers.",
+        "The soup tastes different today. Panko writes down what she changed.",
+        "Panko is teaching someone how to chop an onion.",
+        "A loaf has burned at one edge. Panko saves the middle.",
+        "Panko leaves the bruised pears for the compost."
+    ],
+    "axolotl": [
+        "Axel is trying to make a square bubble. The corners keep escaping.",
+        "The water moves when Axel moves.",
+        "Axel rubs a patch of algae off the glass, then leaves the next one.",
+        "Axel is quiet today. He waves when you pass.",
+        "The tank glows faintly. Axel checks an old drawing of it."
+    ],
+    "capybara": [
+        "Chill files an objection without softening its wording.",
+        "One clock in the office runs slow. Chill makes a note.",
+        "Chill has put lunch on the schedule. Twice, by accident.",
+        "Chill closes the folder before he joins the conversation.",
+        "The ledger has a blank column. Chill leaves it blank."
+    ],
+    "fennec_fox": [
+        "Fennick can hear a beetle under the great note.",
+        "The desert hums. Fennick is listening to the wind instead.",
+        "Fennick rests both ears against the cushion.",
+        "Fennick knows who is coming by the scrape of their shoes.",
+        "A spoon falls in the kitchen. Fennick laughs before it lands."
+    ],
+    "sloth": [
+        "Sloane changes her mind about which branch to sit on.",
+        "Sloane is watching the afternoon take its time.",
+        "Sloane breathes. After a moment, the leaves move.",
+        "Gerald and Gerald say hello.",
+        "Sloane hears a different word and lifts her head."
+    ],
+    "wombat": [
+        "Warren leaves enough room for the timber to swell.",
+        "The foundation holds. Warren checks it anyway.",
+        "Warren has drawn a new stair on the back of an old plan.",
+        "The soil hums. Warren taps twice and waits.",
+        "Warren clears the deepest stair before he rests."
+    ],
+    "rabbit": [
+        "Thyme checks the seeds in her dry tin.",
+        "Thyme sits still until the kettle calls.",
+        "The garden is overgrown. Thyme chooses a small corner to begin with.",
+        "Thyme pours yesterday's tea onto the mint and brews some more.",
+        "Thyme counts the seedlings. She has lost count twice."
+    ],
+    "red_panda": [
+        "Bamboo exhales, then takes another ordinary breath.",
+        "Bamboo loses the note and finds their own voice.",
+        "The incense curls into a shape Bamboo did not draw.",
+        "Bamboo opens their eyes when someone disagrees.",
+        "An attic window sticks. Bamboo fetches Warren."
+    ],
+    "tarsier": [
+        "Vesper has handed the watch over for an hour.",
+        "Vesper counts moths on the rail.",
+        "The lantern goes out. Vesper trims the wick.",
+        "Vesper looks from the ridge to the small mark beside her paw.",
+        "Vesper takes the rail at dusk. Tonight she brings a book."
+    ],
+    "aye_aye": [
+        "Tock waits through the silence after a knock.",
+        "Tock polishes one side of the bronze and forgets the other.",
+        "Tock sleeps right side up, under the bell.",
+        "A grub interrupts Tock's count. He starts again.",
+        "Tock lays the rope where any paw can leave it alone."
+    ],
+    "kakapo": [
+        "Moss clears a place in the garden for something he has never grown.",
+        "Moss measures a seedling against yesterday's mark.",
+        "The bowl is warm. Moss carries it into the shade.",
+        "Moss answers a distant bird with one low call.",
+        "Moss has put a date on a new packet of seeds."
+    ]
+},
 };
 
 /**
@@ -1832,11 +1907,11 @@ export function getPersonalizedPhase5Whisper(
       `${name} traces ${word} in the ashes. It glows briefly.`,
     ],
     owl: [
-      `${name} found ${word} written in the margins of every book.`,
-      `${name} says ${word} was the answer all along.`,
+      `${name} copies ${word} into a plain notebook and dates the page.`,
+      `${name} leaves a little room after ${word}. The sentence is not finished.`,
     ],
     pangolin: [
-      `${name} says ${word} was always part of the recipe.`,
+      `${name} writes ${word} on the back of a recipe. A note worth keeping.`,
       `${name} stirs the pot. ${word} rises in the steam.`,
     ],
     axolotl: [
@@ -1844,8 +1919,8 @@ export function getPersonalizedPhase5Whisper(
       `${name} says the bubbles still spell ${word}.`,
     ],
     capybara: [
-      `${name} filed ${word} under "things that matter." It is the only entry.`,
-      `${name} says ${word} balanced the final equation.`,
+      `${name} files ${word} under "things that matter." There are other entries.`,
+      `${name} leaves ${word} in the margin. It does not fit the columns.`,
     ],
     fennec_fox: [
       `${name} can still hear ${word} echoing across the sand.`,
@@ -1857,18 +1932,18 @@ export function getPersonalizedPhase5Whisper(
     ],
     wombat: [
       `${name} says ${word} is carved into the deepest tunnel wall.`,
-      `${name} found ${word} in the foundation. It was always there.`,
+      `${name} chalks ${word} beside the new brace. The old stone stays bare.`,
     ],
     rabbit: [
-      `${name} planted ${word} in the garden. Something grew.`,
-      `${name} says ${word} blooms every morning now.`,
+      `${name} labels an empty row ${word}. She has not chosen what to plant.`,
+      `${name} finds yesterday's label: ${word}. A new shoot leans across it.`,
     ],
     red_panda: [
       `${name} breathes in ${word}. Breathes out silence.`,
-      `${word} is the thread. ${name} is the loom. You are the weaver.`,
+      `${word} is written twice in the smoke. ${name} watches the second shape change.`,
     ],
     tarsier: [
-      `${name} saw ${word} between the stars long before you spelled it.`,
+      `${name} writes ${word} beside yesterday's star. The next line stays empty.`,
       `${name} does not blink. "${word}," she says. "It is still there."`,
     ],
     aye_aye: [
@@ -1877,7 +1952,7 @@ export function getPersonalizedPhase5Whisper(
     ],
     kakapo: [
       `${name} called ${word} into the dark once. The dark finally said it back.`,
-      `${name} says ${word} was the answer he waited a lifetime to hear.`,
+      `${name} says ${word} is an answer he had not expected. He will think about it.`,
     ],
   };
 
@@ -2193,8 +2268,8 @@ export const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     // strongest dread word at fire time (see checkNarrativeMicroBeat); the
     // fallback keeps the beat's shape when no dread word has been formed.
     type: 'ambient_whisper',
-    text: 'You keep finding your way back to {word}. Or it keeps finding its way back to you.',
-    fallbackText: 'Some words come back to your hands on their own now. You have a favorite. So does the house.',
+    text: '{word}. That word has reached the timber. The grain bends around it.',
+    fallbackText: 'A word in the timber has been sanded away. The grain still bends around the space.',
     durationMs: 4000,
   },
   // Valley beats (75-88): the deep-shadow stretch between the last quiet
@@ -2236,7 +2311,7 @@ export const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
   // Reveal-adjacent (92): lands just after the turn, when the robes are new.
   92: {
     type: 'ambient_whisper',
-    text: 'The animals have stopped pretending the puzzles are just puzzles. They watch you the way you\'d watch a door beginning to open.',
+    text: 'The words are part of an invitation. Your friends are still arguing about what a guest may ask of a home.',
     durationMs: 4500,
   },
   104: {
@@ -2249,19 +2324,19 @@ export const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
   },
   106: {
     type: 'ambient_whisper',
-    text: 'You could stop now. You know that. You won\'t. They know that too.',
+    text: 'A flower at the edge of the house keeps trying to turn toward the morning. Each night, the warmth turns it back.',
     durationMs: 4000,
   },
   // Dwell-window beats (109/112): the house is whole (~96-100) but not yet
   // ready to receive. Held breath, never a countdown.
   109: {
     type: 'ambient_whisper',
-    text: 'Every room is built. Every keeper is home. And still the house waits, the way a held breath waits.',
+    text: 'The warmth reaches every occupied room. At one doorway, a draft still gets through.',
     durationMs: 4500,
   },
   112: {
     type: 'ambient_whisper',
-    text: 'The house is whole. It is not yet ready. The difference between those two things is growing very thin.',
+    text: 'The house settles around the work you have done. Underneath, something waits for the next word.',
     durationMs: 4500,
   },
   // Final pre-finale beat (115, the arming floor): the last word before the last arrangement.
@@ -2471,7 +2546,7 @@ const DWELL_LINES_SERENE: string[] = [
   'Your words arrive like letters from an old friend. The house reads them slowly.',
   'The quiet is not waiting for anything. It is simply staying.',
   'The house holds its shape, contented. It kept still for this once.',
-  'Everything that was promised has been kept. The house breathes out, and out, and out.',
+  'The house breathes out. Somewhere a cup cools, and nobody rushes to warm it.',
 ];
 
 // Once the eighth dwell has been spoken, the house still has to wait for the
@@ -2499,8 +2574,34 @@ const POST_CAP_DWELL_LINES_SERENE: string[] = [
   'The breath leaves slowly, and the house lets it go.',
 ];
 
-export function getDwellLine(dwellCount: number, phase: number): string {
-  const lines = phase >= 5 ? DWELL_LINES_SERENE : DWELL_LINES;
+// The solve-floor route permits Arrival before every room is purchased.
+// Construction can remain unfinished while the words and decisions are ready.
+const DWELL_LINES_UNFINISHED = [
+  'Some rooms remain unbuilt. The warmth has found the old foundation anyway.',
+  'There is work left for another day. For a moment, the friends who are here put it down.',
+  'The rooms that stand are listening. Empty space remains beyond them.',
+  'A loose length of timber rests against the wall. The low note passes through it too.',
+  'Your words settle under the rooms you raised. The old stone carries them further.',
+  'Beyond the last wall, the warmth traces a shape through the air.',
+  'The unfinished house waits with the friends who are here.',
+  'The words have brought something close. There will still be building to do after tonight.',
+];
+
+const DWELL_LINES_UNFINISHED_SERENE = [
+  'Some rooms remain unbuilt. Warmth stays in the rooms that stand.',
+  'Someone has set the tools out for another day.',
+  'There is room left to make room. Nobody hurries to fill it.',
+  'The dust settles on a spare length of timber.',
+  'Your words arrive among the ordinary sounds of the work.',
+  'The unfinished wall lets a little wind through.',
+  'A place can be lived in before every part of it is ready.',
+  'The house grows at the pace of the people building it.',
+];
+
+export function getDwellLine(dwellCount: number, phase: number, houseComplete: boolean = true): string {
+  const lines = houseComplete
+    ? phase >= 5 ? DWELL_LINES_SERENE : DWELL_LINES
+    : phase >= 5 ? DWELL_LINES_UNFINISHED_SERENE : DWELL_LINES_UNFINISHED;
   const idx = Math.max(1, Math.min(dwellCount, lines.length)) - 1;
   return lines[idx];
 }
@@ -2675,7 +2776,7 @@ export function getSwiftVictoryHintMessage(phase: number): string {
 // ============================================================================
 
 export function getFinalBoardStartMessage(phase: number): string {
-  if (phase >= 5) return 'One more arrangement. The pattern already knows its shape.';
+  if (phase >= 5) return 'One more arrangement. A place for another decision.';
   return 'The last arrangement. Take your time. It has waited this long.';
 }
 
@@ -2687,8 +2788,8 @@ export function getFinalBoardStartMessage(phase: number): string {
  * arrangement again is permitted; taking a word back is not).
  */
 export function getFinalBoardUndoRefusal(phase: number): string {
-  if (phase >= 5) return 'It is already part of the pattern. It cannot come back.';
-  return 'Not this one. What is given now is given for good.';
+  if (phase >= 5) return 'The letters return together. Restart this arrangement to begin again.';
+  return 'This arrangement has no Undo. Restart returns all the letters.';
 }
 
 // The last arrangement speaks in its own hushed voice: no combo escalation,
@@ -2698,10 +2799,10 @@ export function getFinalBoardUndoRefusal(phase: number): string {
 const FINAL_BOARD_MOVE_MESSAGES = [
   'Placed. Kept.',
   'It hears this one.',
-  'The word settles where it was always going.',
+  'The word settles where you placed it.',
   'One more, and the house leans closer.',
   'Set down gently. Held completely.',
-  'The letters know their places now.',
+  'The letters hold the places you gave them.',
 ];
 
 export function getFinalBoardMoveMessage(_phase: number): string {
@@ -2755,20 +2856,20 @@ export const CYCLE_MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
   // first descent's verbatim rerun — the approach lands as almost-memory.
   // Same rule as the six above: never explicit, never 'last time'.
   88: {
-    // The cycle's house is already whole (house completion is a precondition
-    // of entering a cycle), so the construction is REMEMBERED, not occurring.
+    // Remembered wear belongs to whatever rooms were retained. This beat
+    // does not depend on construction being complete or having stopped.
     type: 'ambient_whisper',
-    text: 'The house has not needed to make room in a long while. It still remembers how smoothly these walls went up, smoother than a first attempt has any right to be. It does not ask itself how it knows that.',
+    text: 'A groove in the timber has been worn smooth. The wood around it looks newly cut.',
     durationMs: 4500,
   },
   106: {
     type: 'ambient_whisper',
-    text: 'You could stop now. You know that. ...You did not stop. No. That is not right. There was no before.',
+    text: 'One flower turns away from the center. The warmth starts to turn it back, then stops, as though it remembers a correction.',
     durationMs: 4500,
   },
   112: {
     type: 'ambient_whisper',
-    text: 'The house is whole. It is not yet ready. The held breath feels rehearsed, like a song the walls already know the end of.',
+    text: 'The house is quiet. It is not yet ready. The held breath feels rehearsed, like a song the walls already know the end of.',
     durationMs: 4500,
   },
   115: {
@@ -3021,7 +3122,7 @@ export function getNewCyclePointerLine(phase: DialoguePhase): string | null {
 export function getDreadOfferingLine(word: string, phase: DialoguePhase): string {
   const w = word.toUpperCase();
   if (phase >= 5) return `${w}. It is part of the weave now. Woven by your hand.`;
-  if (phase >= 4) return `You gave us ${w}. You didn't have to.`;
+  if (phase >= 4) return `You brought ${w}. The house is still learning what it means.`;
   if (phase >= 3) return `${w} slips into the dark. The pit remembers it.`;
   return `Something in ${w} sinks deeper than the rest.`;
 }
@@ -3118,7 +3219,7 @@ const HOME_AMBIENT_LINES: Record<DialoguePhase, string[]> = {
     'The weave continues. Thread by thread.',
     'Nothing moves. Nothing needs to.',
     'The light is neither bright nor dark. It simply is.',
-    'You belong here. You always did.',
+    'There is a place for you here. The door opens both ways.',
   ],
 };
 
@@ -3414,7 +3515,7 @@ const PIT_SCREEN_SUBTITLES: Record<DialoguePhase, string> = {
   0: 'Offer your harvested words to receive amber.',
   1: 'Your words are ready. Offer them and receive amber.',
   2: 'The words you\'ve gathered wait to be released.',
-  3: 'The words must be surrendered. They were never yours.',
+  3: 'The words go down. Keep a record of what you send.',
   4: 'Feed the arrangement. It is always hungry.',
   5: 'The words settle here. Gently, now.',
 };
@@ -3748,22 +3849,23 @@ export function getGatedRoomIntroLines(phase: number, roomName: string): string[
 /**
  * One-time Phase-4 invitation to the Offering, spoken by Ember (the flame-oracle
  * who reads the fire). Robed, reverent, certain, unsettling: it invites the
- * player into the ritual and names the wrongness of wanting to give for nothing.
+ * player to an optional offering, with the partial quest rebate stated plainly.
  * Phase-5 variant is serene (the entity has arrived). No em dashes.
  */
 export function getOfferingIntroLines(phase: number): string[] {
   if (phase >= 5) {
     return [
-      'You feel it too, I think. The stillness at the center of the house.',
-      'When you have amber to spare, you may give it to the pattern. Not to me... to what we have become.',
-      'It asks for nothing in return. That is how you know the giving is real.',
+      "The bowl is still there, if you want to leave amber.",
+      "The house remembers an offering. Your welcome at my hearth already belongs to you.",
+      "An offering task may return some amber. It says how much before you give.",
+      "You may also leave the bowl alone. I will put the kettle on either way.",
     ];
   }
   return [
-    'There is a hollow at the heart of the house now. You have felt it. I have felt it since the beginning.',
-    'When you have amber to spare, you can offer it. Not to me, friend... to what we are making together.',
-    'It gives you nothing back. No room, no reward, nothing you can hold in your hands.',
-    'And still you will want to. That is how I knew you were the one we had been waiting for.',
+    "There is a hollow at the heart of the house. A little amber disappears into it when I let go.",
+    "You can offer amber there. The house keeps a record of it, and sometimes answers.",
+    "An offering task may return some amber. It says how much before you give.",
+    "You may leave it alone. Being welcome here does not depend on what you give.",
   ];
 }
 
@@ -3961,7 +4063,7 @@ export function getTendingTitle(): string {
 /** Subtitle / current state of tending. */
 export function getTendingSubtitle(level: number): string {
   if (level <= 0) {
-    return 'The house is complete. But the pattern can always go deeper. Offer amber, and tend it.';
+    return 'The presence has settled. Offer amber to tend the pattern and change its light.';
   }
   return `Tended ${level} ${level === 1 ? 'time' : 'times'}. It keeps its shape because you keep it.`;
 }
@@ -4006,7 +4108,7 @@ export function getTendingMilestoneCeremonyText(level: number): string[] {
     case 15:
       return ['Fifteen.', 'The shape is yours now, as much as anyone\'s. The keepers know your devotion by heart.'];
     case 35:
-      return ['Thirty-five tendings offered.', 'There was never anything to summon. There was only this... the deepening, and the keeping. You understand that now.'];
+      return ['Thirty-five tendings offered.', 'Something arrived. Now the work is learning what to keep, what to mend, and what to let change.'];
     case 70:
       return ['Seventy.', 'The pattern and the keeper have become the same gesture. Breathe in. It deepens. Breathe out. So do you.'];
     default:

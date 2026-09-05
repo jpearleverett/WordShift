@@ -37,6 +37,10 @@ import { useAchievementQueue } from './src/hooks/useAchievementQueue';
 import { useSpeedTimer } from './src/hooks/useSpeedTimer';
 import { useDreadEffects } from './src/hooks/useDreadEffects';
 import { useVictoryOrchestration } from './src/hooks/useVictoryOrchestration';
+import { useStoryFlow } from './src/hooks/useStoryFlow';
+import { StorySceneModal } from './src/components/StorySceneModal';
+import { StoryJournalModal } from './src/components/StoryJournalModal';
+import { StoryContext, loadStoryState, recordStoryBoundary } from './src/services/storySpine';
 import { useOnboardingFlow } from './src/hooks/useOnboardingFlow';
 import { useAutosave } from './src/hooks/useAutosave';
 import { logEvent } from './src/services/eventLogger';
@@ -166,7 +170,7 @@ import {
   UnbrokenWeaveMastery,
 } from './src/services/masteryRecords';
 import { maybePromptReview } from './src/services/reviewPrompt';
-import { getPhaseTransitionEvent, PhaseTransitionEvent, HOUSE_COMPLETION_EVENT, FINAL_PUZZLE_EVENT, buildFinalPuzzleEvent, POST_REVELATION_EVENT, NEW_CYCLE_EVENT } from './src/services/phaseEvents';
+import { getPhaseTransitionEvent, PhaseTransitionEvent, HOUSE_COMPLETION_EVENT, FINAL_PUZZLE_EVENT, buildFinalPuzzleEvent, buildPostRevelationEvent, FinalArrivalContext, NEW_CYCLE_EVENT } from './src/services/phaseEvents';
 import { generateDailyPuzzle, prewarmDailyPuzzle, isDailyChallengeUnlocked, recordDailyCompletion, getDailyStatus, checkDailyStreakMilestone, grantFirstDailyMercy, getDailyHostName, getDailyDifficulty } from './src/services/dailyChallenge';
 import { recordDailyLadderResult, getDailyLadderSummary, shouldShowTrend } from './src/services/dailyLadder';
 import { startFrameMonitoring, stopFrameMonitoring } from './src/services/performanceMonitor';
@@ -629,6 +633,15 @@ function MainApp() {
   // mounted HomeScreen reloads its progress (purchased amber must register
   // against the next unlock immediately, not after the next screen change).
   const [homeRefreshSignal, setHomeRefreshSignal] = useState(0);
+  const [homeOverlayActive, setHomeOverlayActive] = useState(false);
+  const [homeQuietReady, setHomeQuietReady] = useState(false);
+  useEffect(() => {
+    setHomeQuietReady(false);
+    if (currentScreen !== 'home' || homeOverlayActive) return;
+    // Give resident conversations their settle window before a reward card.
+    const timer = setTimeout(() => setHomeQuietReady(true), 900);
+    return () => clearTimeout(timer);
+  }, [currentScreen, homeOverlayActive]);
   // Solve-time stopwatch for the Daily Challenge leaderboard (ms since board ready)
   const puzzleStartTimeRef = useRef<number>(0);
   // True while the current daily board was eased (first-ever daily) — its
@@ -1138,6 +1151,35 @@ function MainApp() {
   }), [transitionTo, puzzleActions.startNewGame, puzzleActions.setGameState, puzzleActions.clearBoard, puzzleActions.setShowConfetti, persistenceActions.refreshStats, victoryActions.resetVictory]);
 
   const [onboardingFlow, onboardingActions] = useOnboardingFlow(onboardingCallbacks);
+
+  const getStoryContext = useCallback(async (): Promise<StoryContext> => {
+    const progress = await getFullProgress();
+    const words = progress.ritualWords ?? [];
+    return {
+      phase: progress.currentPhase, puzzlesSolved: progress.puzzlesSolved,
+      cycleCount: progress.cycleCount ?? 0, cycleStartPuzzles: progress.cycleStartPuzzles,
+      unlockedAnimals: progress.unlockedAnimals, finaleArmed: progress.finaleArmed,
+      finalPuzzleCompleted: progress.finalPuzzleCompleted, postRevelation: progress.postRevelation,
+      ritualWord: words.length ? words[words.length - 1] : null,
+      houseComplete: progress.houseCompleted,
+    };
+  }, []);
+  const storyFlow = useStoryFlow(getStoryContext, !onboardingFlow.isOnboarding);
+  const { active: activeStory, prepare: prepareStory, run: runStory, reset: resetStory } = storyFlow;
+  const storyOverlayActive = !!activeStory || !!storyFlow.journalContext;
+  const storyExitPreparing = useRef(false);
+  const victoryContinuationRef = useRef<Promise<void>>(Promise.resolve());
+  const getArrivalContext = useCallback(async (): Promise<FinalArrivalContext> => {
+    const context = await getStoryContext();
+    const state = await loadStoryState(context);
+    return {
+      houseComplete: context.houseComplete, unlockedAnimals: [...context.unlockedAnimals],
+      boundary: state.boundary, keptPromise: state.memories.seeds?.choice === 'confidence',
+      keptRecord: state.memories.record?.choice === 'keep',
+      standBeside: state.memories.promise?.choice === undefined ? undefined : state.memories.promise.choice === 'beside',
+    };
+  }, [getStoryContext]);
+
 
   const launchColdOpenPuzzle = useCallback(async () => {
     const [saved, stats] = await Promise.all([
@@ -1813,7 +1855,8 @@ function MainApp() {
     }, 1500);
   }, [addVictoryTimeout]);
 
-  const startVictoryExitFlow = useCallback((action: () => void) => {
+  const startVictoryExitFlow = useCallback((nextAction: () => void) => {
+    const action = () => runStory(nextAction);
     // Rescue a queued endgame cinematic before clearVictoryTimeouts drops its
     // timer: play it now, over the navigation, instead of losing it forever.
     const pendingEndgame = pendingEndgameEventRef.current;
@@ -1878,14 +1921,14 @@ function MainApp() {
     // one-time beat re-fires on a later victory — the dismissal contract.
     setPostVictoryIntro(null);
     action();
-  }, [clearVictoryTimeouts, clearVictoryToastQueue, clearVictoryMusicHush, puzzleActions, victoryActions, orchestrationActions, advanceQueuedPostVictoryIntro]);
+  }, [clearVictoryTimeouts, clearVictoryToastQueue, clearVictoryMusicHush, puzzleActions, victoryActions, orchestrationActions, advanceQueuedPostVictoryIntro, runStory]);
 
   // ========================================================================
   // Navigation & puzzle lifecycle handlers
   // ========================================================================
 
   // Start puzzle when navigating to puzzle screen
-  const handlePlayPuzzle = useCallback((difficulty?: Difficulty) => {
+  const startPuzzleFromHome = useCallback((difficulty?: Difficulty) => {
     hapticLight();
     soundUiTap();
     setIsPlayingDaily(false);
@@ -1943,6 +1986,17 @@ function MainApp() {
     });
   }, [puzzle.difficulty, puzzleActions, transitionTo, persistenceActions, orchestrationActions, maybeShowSetupSelectorIntro, clearVictoryToastQueue]);
 
+  const handlePlayPuzzle = useCallback(async (difficulty?: Difficulty) => {
+    if (storyExitPreparing.current || activeStory) return;
+    storyExitPreparing.current = true;
+    try {
+      await prepareStory();
+      runStory(() => startPuzzleFromHome(difficulty));
+    } catch {
+      puzzleActions.setMessage('The conversation could not be opened. Try Play again.');
+    } finally { storyExitPreparing.current = false; }
+  }, [activeStory, prepareStory, runStory, startPuzzleFromHome, puzzleActions]);
+
   // Return to home screen
   const handleGoHome = useCallback(() => {
     hapticLight();
@@ -1974,6 +2028,9 @@ function MainApp() {
     // so drop it here or the rebuilt session's first home frame would show the
     // OLD house for a beat before loadAllData corrects it.
     resetHomeSceneSnapshot();
+    resetStory();
+    storyExitPreparing.current = false;
+    victoryContinuationRef.current = Promise.resolve();
     clearVictoryTimeouts();
     clearVictoryToastQueue();
     puzzleActions.clearBoard();
@@ -2032,6 +2089,7 @@ function MainApp() {
     persistenceActions,
     onboardingActions,
     launchColdOpenPuzzle,
+    resetStory,
     resetSpeedRun,
     transitionTo,
   ]);
@@ -3004,215 +3062,226 @@ function MainApp() {
         enqueueVictoryToast(getHarvestOverflowMessage(persistence.currentPhase));
       }
 
-      puzzleActions.setEarnedStars(victory.earnedStars);
-      victoryActions.setVictoryData(finalVictory);
+      // The receipt may appear while the narrative writes are still settling.
+      // An early Next/Home tap waits for this work before preparing a scene or
+      // starting another board, so an armed finale cannot be served twice.
+      let releaseVictoryContinuation!: () => void;
+      victoryContinuationRef.current = new Promise<void>(resolve => { releaseVictoryContinuation = resolve; });
+      try {
+        puzzleActions.setEarnedStars(victory.earnedStars);
+        victoryActions.setVictoryData(finalVictory);
 
-      // Scripted anticlimax: on the one silent-victory board the fanfare simply
-      // does not play (the micro-beat renders the stark line instead). The most
-      // complicit moment in the descent is a quiet one. The FINAL board gets
-      // the same silence — no chime, no confetti — before the arrival plays.
-      if (!isSilentVictoryBeat(completedTotal) && !wasFinalBoard) {
-        if (victory.earnedStars === 3) {
-          soundPerfect();
-        } else {
-          soundVictory();
+        // Scripted anticlimax: on the one silent-victory board the fanfare simply
+        // does not play (the micro-beat renders the stark line instead). The most
+        // complicit moment in the descent is a quiet one. The FINAL board gets
+        // the same silence — no chime, no confetti — before the arrival plays.
+        if (!isSilentVictoryBeat(completedTotal) && !wasFinalBoard) {
+          if (victory.earnedStars === 3) {
+            soundPerfect();
+          } else {
+            soundVictory();
+          }
         }
-      }
 
-      puzzleActions.setGameState(GameState.WON);
-      // Full sensory silence on BOTH quiet beats: the scripted silent victory
-      // (148) and the final board. Confetti raining over "No music this time.
-      // Only the quiet after." would undo the anticlimax the beat exists for.
-      puzzleActions.setShowConfetti(
-        !wasFinalBoard && !isSilentVictoryBeat(completedTotal)
-      );
-      victoryActions.setProcessingVictory(false);
-      puzzlesSinceHomeVisit.current += 1;
+        puzzleActions.setGameState(GameState.WON);
+        // Full sensory silence on BOTH quiet beats: the scripted silent victory
+        // (148) and the final board. Confetti raining over "No music this time.
+        // Only the quiet after." would undo the anticlimax the beat exists for.
+        puzzleActions.setShowConfetti(
+          !wasFinalBoard && !isSilentVictoryBeat(completedTotal)
+        );
+        victoryActions.setProcessingVictory(false);
+        puzzlesSinceHomeVisit.current += 1;
 
-      // Store-review prompt — ONLY on a Phase 0-1 delight peak (a perfect win),
-      // HARD-suppressed from Phase 2 on so the reveal's betrayal can't harvest
-      // one-star reviews (assessment §9). Policy-gated + once-ever; deferred so
-      // it lands after the victory choreography settles.
-      addVictoryTimeout(() => {
-        maybePromptReview({
-          phase: persistence.currentPhase,
-          stars: victory.earnedStars,
-          puzzlesSolved: completedTotal,
-          isOnboarding: !(onboardingFlow.onboardingStep === undefined || onboardingFlow.onboardingStep === 'complete'),
-          isDaily: isPlayingDaily,
-        }).then(prompted => {
-          // The OS review sheet fired mid-victory, outside the exit-nudge
-          // chain — flag it so THIS win's exit runs no nudges on top
-          // (runVictoryExitNudges checks + clears the flag, non-consuming
-          // for the deferred nudges themselves).
-          if (prompted) reviewPromptFiredRef.current = true;
-        }).catch(() => {});
-      }, 1800);
+        // Store-review prompt — ONLY on a Phase 0-1 delight peak (a perfect win),
+        // HARD-suppressed from Phase 2 on so the reveal's betrayal can't harvest
+        // one-star reviews (assessment §9). Policy-gated + once-ever; deferred so
+        // it lands after the victory choreography settles.
+        addVictoryTimeout(() => {
+          maybePromptReview({
+            phase: persistence.currentPhase,
+            stars: victory.earnedStars,
+            puzzlesSolved: completedTotal,
+            isOnboarding: !(onboardingFlow.onboardingStep === undefined || onboardingFlow.onboardingStep === 'complete'),
+            isDaily: isPlayingDaily,
+          }).then(prompted => {
+            // The OS review sheet fired mid-victory, outside the exit-nudge
+            // chain — flag it so THIS win's exit runs no nudges on top
+            // (runVictoryExitNudges checks + clears the flag, non-consuming
+            // for the deferred nudges themselves).
+            if (prompted) reviewPromptFiredRef.current = true;
+          }).catch(() => {});
+        }, 1800);
 
-      // Play choreographed victory sequence (the modal gates tap-to-skip to
-      // its own entrance window via onSkip). The ceremony ages with the phase
-      // (heavier springs / stone-like haptics at the reveal), and BOTH quiet
-      // beats (the final board and the scripted silent victory) are hushed so
-      // the phone never celebrates while the screen performs silence.
-      const victoryHushed = wasFinalBoard || isSilentVictoryBeat(completedTotal);
-      // The hushed wins are ACTUALLY silent: fade the ambient bed out too
-      // (the silent-victory line "No music this time" was a lie while the bed
-      // looped on). The hush holds until a victory-exit path clears it; the
-      // music effect and the foreground-resume listener both honor the ref.
-      if (victoryHushed) {
-        victoryMusicHushRef.current = true;
-        stopCeremonyMusic();
-      }
-      victoryActions.playVictorySequence(victory.earnedStars, persistence.currentPhase, victoryHushed);
+        // Play choreographed victory sequence (the modal gates tap-to-skip to
+        // its own entrance window via onSkip). The ceremony ages with the phase
+        // (heavier springs / stone-like haptics at the reveal), and BOTH quiet
+        // beats (the final board and the scripted silent victory) are hushed so
+        // the phone never celebrates while the screen performs silence.
+        const victoryHushed = wasFinalBoard || isSilentVictoryBeat(completedTotal);
+        // The hushed wins are ACTUALLY silent: fade the ambient bed out too
+        // (the silent-victory line "No music this time" was a lie while the bed
+        // looped on). The hush holds until a victory-exit path clears it; the
+        // music effect and the foreground-resume listener both honor the ref.
+        if (victoryHushed) {
+          victoryMusicHushRef.current = true;
+          stopCeremonyMusic();
+        }
+        victoryActions.playVictorySequence(victory.earnedStars, persistence.currentPhase, victoryHushed);
 
-      // Phase transitions are now DEFERRED to the Offering Pit.
-      // When phaseTransitionPending is true, the phase change will be confirmed
-      // in the pit screen with a ward mark ceremony. Don't play the overlay here.
+        // Phase transitions are now DEFERRED to the Offering Pit.
+        // When phaseTransitionPending is true, the phase change will be confirmed
+        // in the pit screen with a ward mark ceremony. Don't play the overlay here.
 
-      // Check for endgame triggers (dwell voice → finale arming → the marked
-      // final board's win → post-revelation).
-      //
-      // The finale is no longer declared retroactively on an ordinary win:
-      // only a capped eight-win dwell AND completedTotal >=
-      // FINALE_ARM_MIN_PUZZLES (115) arm finaleArmed. The NEXT standard board
-      // start then serves the marked FINAL BOARD (usePuzzleGame.startNewGame).
-      // Its victory — and only its victory — plays FINAL_PUZZLE_EVENT. The win
-      // after that triggers POST_REVELATION_EVENT + markPostRevelation,
-      // exactly as before.
-      let dwellLineForWin: string | null = null;
-      if (!victory.phaseChanged && persistence.currentPhase >= 4) {
-        try {
-          const houseComplete = await isHouseCompleted();
-          // ENDGAME ELIGIBILITY. This used to require houseComplete OUTRIGHT,
-          // which made a SOFT CURRENCY load-bearing for narrative completion:
-          // markPostRevelation() is the only route to Phase 5, and it sat
-          // inside this branch. Completing the house costs 4,615 amber on a
-          // specific ladder, while ~5,600 amber of cosmetics is ungated and
-          // visible from solve 0 — so a player who spent on cosmetics, or who
-          // simply earned slowly, was silently and permanently locked out of
-          // the revelation with no warning surface anywhere in the game.
-          //
-          // The design rule is that amber must never ACCELERATE the story, and
-          // that still holds exactly: the fallback below is a REAL-SOLVE floor
-          // (115), which no amount of amber or cash can buy. The rule simply
-          // needed its mirror — amber must not be able to BLOCK the story
-          // either. The house stays the intended route (it completes ~96-100,
-          // comfortably before the arming floor), so for virtually every player
-          // nothing changes; this only stops the ending being strandable.
-          const endgameEligible = houseComplete || completedTotal >= FINALE_ARM_MIN_PUZZLES;
-          if (endgameEligible) {
-            const finalDone = await isFinalPuzzleCompleted();
-            if (!finalDone) {
-              if (wasFinalBoard) {
-                // The last arrangement is complete. markFinalPuzzleCompleted
-                // also disarms the finale (single atomic write).
-                await markFinalPuzzleCompleted();
-                // The coda must not claim a finished house on the solve-floor
-                // fallback path (see endgameEligible above) — a player who
-                // reached the last arrangement with rooms still unbuilt would
-                // be told they completed something they can see they did not.
-                orchestrationActions.setCompletionCoda({
-                  title: houseComplete ? 'THE HOUSE STANDS COMPLETE' : 'THE ARRANGEMENT IS COMPLETE',
-                  text: houseComplete
-                    ? (persistence.currentPhase >= 3
-                        ? 'You finished what was being built. There is no pretending now.'
-                        : 'You completed the house and reached the final path.')
-                    : 'The rooms are not all standing, and it did not need them. It only ever needed the words.',
-                });
-                // The Arrival names the player's own deepest words (the
-                // evidence was their hands). Falls back to the generic
-                // event when the ritual memory holds too few dread words.
-                let arrivalEvent = FINAL_PUZZLE_EVENT;
-                try {
-                  arrivalEvent = buildFinalPuzzleEvent(await getRitualWords());
-                } catch {
-                  arrivalEvent = FINAL_PUZZLE_EVENT;
+        // Check for endgame triggers (dwell voice → finale arming → the marked
+        // final board's win → post-revelation).
+        //
+        // The finale is no longer declared retroactively on an ordinary win:
+        // only a capped eight-win dwell AND completedTotal >=
+        // FINALE_ARM_MIN_PUZZLES (115) arm finaleArmed. The NEXT standard board
+        // start then serves the marked FINAL BOARD (usePuzzleGame.startNewGame).
+        // Its victory — and only its victory — plays FINAL_PUZZLE_EVENT. The win
+        // after that triggers POST_REVELATION_EVENT + markPostRevelation,
+        // exactly as before.
+        let dwellLineForWin: string | null = null;
+        if (!victory.phaseChanged && persistence.currentPhase >= 4) {
+          try {
+            const houseComplete = await isHouseCompleted();
+            // ENDGAME ELIGIBILITY. This used to require houseComplete OUTRIGHT,
+            // which made a SOFT CURRENCY load-bearing for narrative completion:
+            // markPostRevelation() is the only route to Phase 5, and it sat
+            // inside this branch. Completing the house costs 4,615 amber on a
+            // specific ladder, while ~5,600 amber of cosmetics is ungated and
+            // visible from solve 0 — so a player who spent on cosmetics, or who
+            // simply earned slowly, was silently and permanently locked out of
+            // the revelation with no warning surface anywhere in the game.
+            //
+            // The design rule is that amber must never ACCELERATE the story, and
+            // that still holds exactly: the fallback below is a REAL-SOLVE floor
+            // (115), which no amount of amber or cash can buy. The rule simply
+            // needed its mirror — amber must not be able to BLOCK the story
+            // either. The house stays the intended route (it completes ~96-100,
+            // comfortably before the arming floor), so for virtually every player
+            // nothing changes; this only stops the ending being strandable.
+            const endgameEligible = houseComplete || completedTotal >= FINALE_ARM_MIN_PUZZLES;
+            if (endgameEligible) {
+              const finalDone = await isFinalPuzzleCompleted();
+              if (!finalDone) {
+                if (wasFinalBoard) {
+                  // The last arrangement is complete. markFinalPuzzleCompleted
+                  // also disarms the finale (single atomic write).
+                  const completedStoryContext = await getStoryContext();
+                  const lastWord = result.completedWords?.[result.completedWords.length - 1] ?? '';
+                  const authoredFinal = puzzle.rows.map(row => row.originalWord).join(',') === 'SPARK,CARED,SCARE,SHARE,CARVE,CARED,CLOSE';
+                  await recordStoryBoundary(completedStoryContext, authoredFinal ? lastWord : '');
+                  await markFinalPuzzleCompleted();
+                  // The coda must not claim a finished house on the solve-floor
+                  // fallback path (see endgameEligible above) — a player who
+                  // reached the last arrangement with rooms still unbuilt would
+                  // be told they completed something they can see they did not.
+                  orchestrationActions.setCompletionCoda({
+                    title: houseComplete ? 'THE HOUSE STANDS COMPLETE' : 'THE ARRANGEMENT IS COMPLETE',
+                    text: houseComplete
+                      ? (persistence.currentPhase >= 3
+                          ? 'The last word has settled. What happens next belongs to everyone who lives here.'
+                          : 'You completed the house and reached the final path.')
+                      : 'There is still room to build. Tonight, the words have opened something beneath the unfinished house.',
+                  });
+                  // The Arrival names the player's own deepest words (the
+                  // evidence was their hands). Falls back to the generic
+                  // event when the ritual memory holds too few dread words.
+                  let arrivalEvent = FINAL_PUZZLE_EVENT;
+                  try {
+                    arrivalEvent = buildFinalPuzzleEvent(await getRitualWords(), await getArrivalContext());
+                  } catch {
+                    arrivalEvent = FINAL_PUZZLE_EVENT;
+                  }
+                  queueEndgameCinematic(arrivalEvent);
+                } else if (!(await isFinaleArmed())) {
+                  // Dwell gate: the finale used to fire on the FIRST Phase-4
+                  // victory, so the whole cult-reveal era flashed past in one
+                  // puzzle. Require FINALE_DWELL_PUZZLES Phase-4 puzzles first
+                  // so the robed sprites, sacrifice mechanic, and 300 Phase-4
+                  // dialogue lines are actually played. Even after all eight
+                  // dwell wins land early (completion/recruit ~136, dwell ~143),
+                  // hold the marked board until arming at 160. The final board
+                  // is ~161 and post-revelation ~162, giving the descent trio
+                  // time to speak. Never shown as a counter (narrative rule 7)
+                  // — the house "is not yet ready."
+                  const dwellBefore = await getPhase4DwellCount();
+                  const dwell = await recordPhase4Dwell();
+                  if (canArmFinale(dwell, completedTotal)) {
+                    await armFinale();
+                  }
+                  // Dwell voice: the wait after "The arrangement is ready."
+                  // reads as held breath, not silence — one counter-free line
+                  // per dwell win, surfaced through the ambient overlay in the
+                  // victory cascade (skipped when a keyed micro-beat fires).
+                  dwellLineForWin = dwellBefore >= FINALE_DWELL_PUZZLES
+                    ? getPostCapDwellLine(completedTotal, persistence.currentPhase)
+                    : getDwellLine(Math.min(dwell, FINALE_DWELL_PUZZLES), persistence.currentPhase, houseComplete);
                 }
-                queueEndgameCinematic(arrivalEvent);
-              } else if (!(await isFinaleArmed())) {
-                // Dwell gate: the finale used to fire on the FIRST Phase-4
-                // victory, so the whole cult-reveal era flashed past in one
-                // puzzle. Require FINALE_DWELL_PUZZLES Phase-4 puzzles first
-                // so the robed sprites, sacrifice mechanic, and 300 Phase-4
-                // dialogue lines are actually played. Even after all eight
-                // dwell wins land early (completion/recruit ~136, dwell ~143),
-                // hold the marked board until arming at 160. The final board
-                // is ~161 and post-revelation ~162, giving the descent trio
-                // time to speak. Never shown as a counter (narrative rule 7)
-                // — the house "is not yet ready."
-                const dwellBefore = await getPhase4DwellCount();
-                const dwell = await recordPhase4Dwell();
-                if (canArmFinale(dwell, completedTotal)) {
-                  await armFinale();
+                // Armed but not the final board (a daily / restored board):
+                // hold still — the arrangement has already chosen its board.
+              } else {
+                const postRev = await isPostRevelation();
+                if (!postRev) {
+                  await markPostRevelation();
+                  orchestrationActions.setCompletionCoda({
+                    title: 'THE PATTERN REMEMBERS YOU',
+                    text: 'You saw it through to the end. The arrangement is complete, and your words remain in every wall.',
+                  });
+                  queueEndgameCinematic(buildPostRevelationEvent(await getArrivalContext()));
                 }
-                // Dwell voice: the wait after "The arrangement is ready."
-                // reads as held breath, not silence — one counter-free line
-                // per dwell win, surfaced through the ambient overlay in the
-                // victory cascade (skipped when a keyed micro-beat fires).
-                dwellLineForWin = dwellBefore >= FINALE_DWELL_PUZZLES
-                  ? getPostCapDwellLine(completedTotal, persistence.currentPhase)
-                  : getDwellLine(Math.min(dwell, FINALE_DWELL_PUZZLES), persistence.currentPhase);
-              }
-              // Armed but not the final board (a daily / restored board):
-              // hold still — the arrangement has already chosen its board.
-            } else {
-              const postRev = await isPostRevelation();
-              if (!postRev) {
-                await markPostRevelation();
-                orchestrationActions.setCompletionCoda({
-                  title: 'THE PATTERN REMEMBERS YOU',
-                  text: 'You saw it through to the end. The arrangement is complete, and your words remain in every wall.',
-                });
-                queueEndgameCinematic(POST_REVELATION_EVENT);
               }
             }
+          } catch {
+            // Endgame triggers are non-critical
           }
-        } catch {
-          // Endgame triggers are non-critical
         }
-      }
 
-      // Check achievements after brief delay to not block victory display
-      if (achievementCheckTimerRef.current !== null) {
-        clearTimeout(achievementCheckTimerRef.current);
-      }
-      achievementCheckTimerRef.current = setTimeout(() => {
-        achievementCheckTimerRef.current = null;
-        achievementActions.checkForAchievements(finalVictory);
-      }, 500);
-
-      // The guaranteed, prominent opening-promise glitch fires on the player's
-      // FIRST free-play win (one-time), not the guided tutorial.
-      let firstFreeWin = false;
-      if (!onboardingFlow.isOnboarding) {
-        try {
-          firstFreeWin = !(await hasSeenFirstWinGlitch());
-          if (firstFreeWin) markFirstWinGlitchSeen().catch(() => {});
-        } catch {
-          firstFreeWin = false;
+        // Check achievements after brief delay to not block victory display
+        if (achievementCheckTimerRef.current !== null) {
+          clearTimeout(achievementCheckTimerRef.current);
         }
-      }
+        achievementCheckTimerRef.current = setTimeout(() => {
+          achievementCheckTimerRef.current = null;
+          achievementActions.checkForAchievements(finalVictory);
+        }, 500);
 
-      // Post-victory orchestration: glitch, micro-beat, whisper, interjection.
-      // isFinalBoard suppresses the whisper/interjection rolls entirely so the
-      // finale win carries one voice: the silence, then the Arrival.
-      orchestrationActions.processVictory({
-        phase: persistence.currentPhase,
-        totalPuzzlesCompleted: finalVictory.cumulativeStats?.totalPuzzlesCompleted ?? 1,
-        completedWords: result.completedWords,
-        isOnboarding: onboardingFlow.isOnboarding,
-        puzzlesSinceHomeVisit: puzzlesSinceHomeVisit.current,
-        firstFreeWin,
-        dwellLine: dwellLineForWin,
-        isFinalBoard: wasFinalBoard,
-      });
+        // The guaranteed, prominent opening-promise glitch fires on the player's
+        // FIRST free-play win (one-time), not the guided tutorial.
+        let firstFreeWin = false;
+        if (!onboardingFlow.isOnboarding) {
+          try {
+            firstFreeWin = !(await hasSeenFirstWinGlitch());
+            if (firstFreeWin) markFirstWinGlitchSeen().catch(() => {});
+          } catch {
+            firstFreeWin = false;
+          }
+        }
 
-      // Re-schedule notifications after puzzle completion
-      scheduleAllNotifications(persistence.currentPhase).catch(() => {});
+        // Post-victory orchestration: glitch, micro-beat, whisper, interjection.
+        // isFinalBoard suppresses the whisper/interjection rolls entirely so the
+        // finale win carries one voice: the silence, then the Arrival.
+        orchestrationActions.processVictory({
+          phase: persistence.currentPhase,
+          totalPuzzlesCompleted: finalVictory.cumulativeStats?.totalPuzzlesCompleted ?? 1,
+          completedWords: result.completedWords,
+          isOnboarding: onboardingFlow.isOnboarding,
+          puzzlesSinceHomeVisit: puzzlesSinceHomeVisit.current,
+          firstFreeWin,
+          dwellLine: dwellLineForWin,
+          isFinalBoard: wasFinalBoard,
+        });
 
-      // Mark cloud save as having pending changes
-      markPendingChanges().catch(() => {});
-      uploadToCloud().catch(() => {});
+        // Re-schedule notifications after puzzle completion
+        scheduleAllNotifications(persistence.currentPhase).catch(() => {});
+
+        // Mark cloud save as having pending changes
+        markPendingChanges().catch(() => {});
+        uploadToCloud().catch(() => {});
+      } finally { releaseVictoryContinuation(); }
     } else if (result === null && puzzle.selectedLetter) {
       // Slot press happened but was invalid
       hapticError();
@@ -3339,6 +3408,8 @@ function MainApp() {
     tutorialGuidance,
     addVictoryTimeout,
     enqueueVictoryToast,
+    getStoryContext,
+    getArrivalContext,
   ]);
 
   const handleLetterPress = useCallback((letter: any, rowIndex: number) => {
@@ -4190,15 +4261,26 @@ function MainApp() {
     })().catch(() => {});
   }, [victoryFlow.victoryData, onboardingFlow.isOnboarding, persistence.currentPhase, puzzleActions]);
 
-  const handleNextLevel = useCallback(() => {
+  const handleNextLevel = useCallback(async () => {
+    if (storyExitPreparing.current || activeStory) return;
+    storyExitPreparing.current = true;
+    let storyWillPresent = false;
+    try {
+      await victoryContinuationRef.current;
+      storyWillPresent = await prepareStory();
+    }
+    catch {
+      puzzleActions.setMessage('The conversation could not be opened. Try again.');
+      return;
+    } finally { storyExitPreparing.current = false; }
     hapticLight();
     setIsPlayingDaily(false);
     setSpeedRescueUsed(false);
     // Reads victoryData — must run before the exit flow resets it.
-    maybeShowSwiftVictoryHint();
+    if (!storyWillPresent) maybeShowSwiftVictoryHint();
     // Snapshot the share payload BEFORE the exit flow resets victoryData.
     pendingShareSnapshotRef.current = buildShareDataRef.current();
-    const adShown = maybeShowVictoryInterstitial();
+    const adShown = storyWillPresent ? false : maybeShowVictoryInterstitial();
     // Capture BEFORE startVictoryExitFlow shift()s the intro queue.
     const introWillPresent =
       queuedPostVictoryIntrosRef.current.length > 0 || postVictoryIntro !== null;
@@ -4207,9 +4289,9 @@ function MainApp() {
       puzzleActions.handleNextLevel();
     });
     Promise.resolve(adShown)
-      .then((shown) => runVictoryExitNudges(shown === true, introWillPresent))
+      .then((shown) => runVictoryExitNudges(shown === true, introWillPresent || storyWillPresent))
       .catch(() => {});
-  }, [puzzleActions, startVictoryExitFlow, runVictoryExitNudges, maybeShowVictoryInterstitial, maybeShowSwiftVictoryHint, postVictoryIntro]);
+  }, [activeStory, prepareStory, puzzleActions, startVictoryExitFlow, runVictoryExitNudges, maybeShowVictoryInterstitial, maybeShowSwiftVictoryHint, postVictoryIntro]);
 
   // The cold-open Continue reveals the empty home and Fox invitation. Legacy
   // guided-puzzle resumes keep their old puzzle-screen completion beat.
@@ -4239,12 +4321,23 @@ function MainApp() {
     transitionTo,
   ]);
 
-  const handleReturnHome = useCallback(() => {
+  const handleReturnHome = useCallback(async () => {
+    if (storyExitPreparing.current || activeStory) return;
+    storyExitPreparing.current = true;
+    let storyWillPresent = false;
+    try {
+      await victoryContinuationRef.current;
+      storyWillPresent = await prepareStory();
+    }
+    catch {
+      puzzleActions.setMessage('The conversation could not be opened. Try again.');
+      return;
+    } finally { storyExitPreparing.current = false; }
     hapticLight();
     setIsPlayingDaily(false);
     // Snapshot the share payload BEFORE the exit flow resets victoryData.
     pendingShareSnapshotRef.current = buildShareDataRef.current();
-    const adShown = maybeShowVictoryInterstitial();
+    const adShown = storyWillPresent ? false : maybeShowVictoryInterstitial();
     // Capture BEFORE startVictoryExitFlow shift()s the intro queue.
     const introWillPresent =
       queuedPostVictoryIntrosRef.current.length > 0 || postVictoryIntro !== null;
@@ -4254,23 +4347,33 @@ function MainApp() {
       transitionTo('home');
     });
     Promise.resolve(adShown)
-      .then((shown) => runVictoryExitNudges(shown === true, introWillPresent))
+      .then((shown) => runVictoryExitNudges(shown === true, introWillPresent || storyWillPresent))
       .catch(() => {});
-  }, [puzzleActions, transitionTo, startVictoryExitFlow, runVictoryExitNudges, maybeShowVictoryInterstitial, postVictoryIntro]);
+  }, [activeStory, prepareStory, puzzleActions, transitionTo, startVictoryExitFlow, runVictoryExitNudges, maybeShowVictoryInterstitial, postVictoryIntro]);
 
   // The pit route (Collect Now) is deliberately EXEMPT from interstitials:
   // the player is on their way to collect amber they already earned, and an
   // ad tax on your own earnings poisons the harvest loop. The next-level and
   // home exits keep the normal cadence, so ad inventory shifts rather than
   // disappears.
-  const handleGoToPit = useCallback(() => {
+  const handleGoToPit = useCallback(async () => {
+    if (storyExitPreparing.current || activeStory) return;
+    storyExitPreparing.current = true;
+    try {
+      await victoryContinuationRef.current;
+      await prepareStory();
+    }
+    catch {
+      puzzleActions.setMessage('The conversation could not be opened. Try again.');
+      return;
+    } finally { storyExitPreparing.current = false; }
     hapticLight();
     startVictoryExitFlow(() => {
       puzzlesSinceHomeVisit.current = 0;
       puzzleActions.clearBoard();
       transitionTo('pit');
     });
-  }, [puzzleActions, transitionTo, startVictoryExitFlow]);
+  }, [activeStory, prepareStory, puzzleActions, transitionTo, startVictoryExitFlow]);
 
   // Android hardware back button: sub-screens navigate home; home exits the app.
   // Swallowed during onboarding so back can't break the guided flow.
@@ -4665,7 +4768,7 @@ function MainApp() {
     !victoryFlow.isProcessingVictory &&
     victoryFlow.victoryData === null &&
     postVictoryIntro === null &&
-    phaseTransitionEvent === null;
+    phaseTransitionEvent === null && !storyOverlayActive && !homeOverlayActive && homeQuietReady;
 
   // ========================================================================
   // Render
@@ -4843,6 +4946,9 @@ function MainApp() {
           <View style={{ flex: 1 }}>
             <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
             <HomeScreen
+              onOpenStory={() => { storyFlow.openJournal().catch(() => {}); }}
+              storyOverlayActive={storyOverlayActive || phaseTransitionEvent !== null}
+              onOverlayActivityChange={setHomeOverlayActive}
               onPlayPuzzle={handlePlayPuzzle}
               onStartDaily={handleStartDaily}
               onRecheckDailyStanding={handleRecheckDailyStanding}
@@ -5940,7 +6046,7 @@ function MainApp() {
   const blockingOverlayActive =
     victoryModalVisible ||
     puzzle.gameState === GameState.GAME_OVER ||
-    phaseTransitionEvent != null;
+    phaseTransitionEvent != null || storyOverlayActive;
 
   // Render screen with global overlays on top
   return (
@@ -5977,6 +6083,19 @@ function MainApp() {
             rebuildSessionFromStorage({ restartOnboarding: false });
           }
         }}
+      />
+      <StorySceneModal
+        memory={!phaseTransitionEvent && !postVictoryIntro ? activeStory?.memory ?? null : null}
+        phase={activeStory?.context.phase ?? persistence.currentPhase}
+        onAdvance={storyFlow.advance}
+        onChoose={storyFlow.choose}
+        onClose={storyFlow.close}
+      />
+      <StoryJournalModal
+        visible={storyFlow.journalContext !== null}
+        context={storyFlow.journalContext}
+        onClose={storyFlow.closeJournal}
+        onResume={() => { storyFlow.resume().catch(() => {}); }}
       />
       {/* Shareable result card preview — overlays everything */}
       <ShareResultModal

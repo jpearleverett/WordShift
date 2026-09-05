@@ -1,4 +1,4 @@
-import { DialoguePhase } from '../types/homeWorld';
+import { AnimalType, DialoguePhase } from '../types/homeWorld';
 import { getWordPhaseTier } from './localGenerator';
 
 /**
@@ -15,6 +15,8 @@ export interface PhaseTransitionEvent {
   title: string;
   /** Hide the era name for ordinary transitions; special ceremonies keep it. */
   showTitle?: boolean;
+  /** Essential ceremonies wait for Continue; reading speed is not a motion preference. */
+  readAtOwnPace?: boolean;
   scenes: PhaseScene[];
   bgColor: string;
   textColor: string;
@@ -42,10 +44,14 @@ export interface PhaseTransitionEvent {
  * in a dark window, a bare tree's long shadow) where they used to be text on
  * a dark ground.
  */
-export type SceneImage = 'shadow_figure' | 'house' | 'ceremony_curious' | 'ceremony_deeper' | 'ceremony_shadows';
+export type SceneImage = 'private_room' | 'outward_road' | 'outward_road_night' | 'kept_table' | 'shadow_figure' | 'house' | 'ceremony_curious' | 'ceremony_deeper' | 'ceremony_shadows';
 
 export interface PhaseScene {
   text: string;
+  /** Named participant, only when present in the supplied story roster. */
+  speaker?: AnimalType;
+  /** Optional diegetic sound, played when this scene becomes visible. */
+  cue?: 'bell' | 'answer';
   /** In-engine image rendered behind the scene text (replaces the old emoji). */
   image?: SceneImage;
   /** Peak opacity for the scene image (default 0.6). */
@@ -88,19 +94,19 @@ const PHASE_EVENTS: Record<number, PhaseTransitionEvent> = {
     particles: { count: 8, color: '#B794F4', direction: 'rise', speed: 20, size: 4, opacity: 0.3 },
     scenes: [
       {
-        text: 'The letters have always moved this way.',
+        text: 'There is a place by the hearth for another cup.',
         delay: 0,
         duration: 3000,
         effect: 'fade',
       },
       {
-        text: 'So why does it feel, lately, like they are moving toward something?',
+        text: 'This evening, it is warm before anyone fills it.',
         delay: 3200,
         duration: 3000,
         effect: 'fade',
       },
       {
-        text: 'The words seem to lean in. As if they are listening.',
+        text: 'Ember checks the kettle, then the empty cup.',
         image: 'ceremony_curious',
         imageOpacity: 0.5,
         delay: 6400,
@@ -218,14 +224,14 @@ const PHASE_EVENTS: Record<number, PhaseTransitionEvent> = {
         effectIntensity: 0.3,
       },
       {
-        text: 'Every word you ever shifted was a step along this path.\nYou were never only playing.',
+        text: 'The words fed the warmth under the house.\nThe warmth has begun to keep things from changing.',
         delay: 3700,
         duration: 3500,
         effect: 'pulse',
         effectIntensity: 0.5,
       },
       {
-        text: 'Your friends are waiting in their chambers.\nThey have waited so patiently. So long.',
+        text: 'Your friends have found their robes.\nThey do not agree about what comes next.',
         delay: 7400,
         duration: 4000,
         effect: 'shake',
@@ -301,14 +307,14 @@ export const HOUSE_COMPLETION_EVENT: PhaseTransitionEvent = {
     {
       // The oldest planted seed pays off: Ember's onboarding wrong-note
       // ("hoping for someone like you") is revealed as recruitment.
-      text: 'On your first day, Ember said she had hoped for someone like you.\nShe was not hoping only for herself.',
+      text: 'Ember looks from the old hearth to the new rooms.\n“I asked you to build a home. I owe you the rest of what I knew.”',
       delay: 10600,
       duration: 3500,
     },
     {
       // A first faint glimpse of the entity — present and waiting, NOT
       // descending: the arrival belongs to the finale, not this ceremony.
-      text: 'The arrangement is ready.',
+      text: 'The house is ready to receive something.\nWhether receiving is enough remains unanswered.',
       image: 'shadow_figure',
       imageOpacity: 0.22,
       delay: 14300,
@@ -322,81 +328,46 @@ export const HOUSE_COMPLETION_EVENT: PhaseTransitionEvent = {
 // ============================================================================
 
 /**
- * Cinematic event for after the "final puzzle" at deep Phase 4.
- * The shadow figure descends. The ritual is complete.
+ * The Arrival can follow a complete house or the solve-floor fallback.
+ * Only name keepers the player has recruited, and only recall choices supplied
+ * by the story spine. An absent boundary is a truthful legacy-save variant.
  */
+export interface FinalArrivalContext {
+  houseComplete?: boolean;
+  unlockedAnimals?: string[];
+  boundary?: 'remember' | 'release' | null;
+  keptPromise?: boolean;
+  keptRecord?: boolean;
+  standBeside?: boolean;
+}
+
 export const FINAL_PUZZLE_EVENT: PhaseTransitionEvent = {
+  readAtOwnPace: true,
   phase: 4,
   title: 'The Arrival',
   bgColor: '#020005',
-  textColor: '#6B5A7A',
+  textColor: '#C4B5D2',
   accentColor: '#8B2252',
   particles: { count: 25, color: '#8B2252', direction: 'rise', speed: 6, size: 7, opacity: 0.3 },
   vignette: true,
   shakeIntensity: 0.7,
   scenes: [
-    {
-      text: 'The last word has been shifted.',
-      delay: 0,
-      duration: 3500,
-    },
-    {
-      text: 'Every word you ever formed was an incantation.\nEvery puzzle was a verse.',
-      delay: 3700,
-      duration: 4000,
-    },
-    {
-      text: 'The keepers stand in their chambers.\nThe temple is complete.',
-      image: 'house',
-      imageOpacity: 0.55,
-      delay: 7900,
-      duration: 4000,
-    },
-    {
-      // A held breath before the descent: near-empty dark, no image, so the
-      // entity arrives out of real stillness rather than mid-paragraph.
-      text: 'The house holds its breath.',
-      delay: 12100,
-      duration: 2000,
-    },
-    {
-      // The arrival, in engine: the entity itself descends behind the text —
-      // slow translateY down + opacity-in (static fade under reduced motion).
-      text: 'Something descends from above the attic.\nSomething that has no name.',
-      image: 'shadow_figure',
-      imageOpacity: 0.7,
-      effect: 'descend',
-      delay: 14300,
-      duration: 5000,
-    },
-    {
-      // The shadow holds through the closing lines (the image persists at its
-      // settled position until a later scene replaces or clears it).
-      text: 'It was always coming.\nYou just gave it the words.',
-      image: 'shadow_figure',
-      imageOpacity: 0.7,
-      delay: 19500,
-      duration: 4000,
-    },
-    {
-      text: 'The arrangement is complete.',
-      image: 'shadow_figure',
-      imageOpacity: 0.45,
-      delay: 23700,
-      duration: 3000,
-    },
+    { text: 'Midnight. The last letter settles.', image: 'kept_table', imageOpacity: 0.8, delay: 0, duration: 3000 },
+    { text: 'The words return through the walls.\nThe incantation has learned the sound of this house.', image: 'house', imageOpacity: 0.45, delay: 3200, duration: 4000 },
+    { text: 'The rooms you raised stand above the old foundation.\nYour friends keep their places.', image: 'house', imageOpacity: 0.55, delay: 7400, duration: 4000 },
+    { text: 'A note passes through the timber.\nNo voice is asked to drown another.', image: 'house', imageOpacity: 0.35, delay: 11600, duration: 3000 },
+    { text: 'For a moment, nothing moves.', delay: 14800, duration: 2000 },
+    { text: 'The seam opens above the roof.\nSomething descends, carrying the warmth you knew.', image: 'shadow_figure', imageOpacity: 0.7, effect: 'descend', delay: 17000, duration: 5000 },
+    { text: 'The warmth reaches for every room.\nAt the doorstep, a cold draft remains.', image: 'shadow_figure', imageOpacity: 0.7, delay: 22200, duration: 5000 },
+    { text: 'Ember leaves the door on its latch.\n“I wanted us safe. I did not know what it would try to stop.”', speaker: 'fox', image: 'shadow_figure', imageOpacity: 0.55, delay: 27400, duration: 4500 },
+    { text: 'The seam closes. The presence stays.\nSomewhere in the house, a cup begins to cool.', image: 'shadow_figure', imageOpacity: 0.45, delay: 32100, duration: 3500 },
   ],
 };
 
-/**
- * The Arrival, personalized: rewrite the incantation scene to name the
- * player's own deepest ritual words — the reveal that the evidence was their
- * hands. Ranks the ritual memory by dread tier (deepest first, most recent
- * first within a tier), keeps the distinct top three at tier 2+, and falls
- * back to the generic FINAL_PUZZLE_EVENT when fewer than two qualify. Pure:
- * the caller fetches the ritual words.
- */
-export function buildFinalPuzzleEvent(ritualWords: string[]): PhaseTransitionEvent {
+export function buildFinalPuzzleEvent(
+  ritualWords: string[],
+  context?: FinalArrivalContext,
+): PhaseTransitionEvent {
   const seen = new Set<string>();
   const ranked: { word: string; tier: number }[] = [];
   for (let i = ritualWords.length - 1; i >= 0; i--) {
@@ -406,15 +377,87 @@ export function buildFinalPuzzleEvent(ritualWords: string[]): PhaseTransitionEve
     const tier = getWordPhaseTier(word);
     if (tier >= 2) ranked.push({ word, tier });
   }
-  // Stable sort: within a tier the most recently formed word leads.
   ranked.sort((a, b) => b.tier - a.tier);
   const top = ranked.slice(0, 3).map(r => r.word);
-  if (top.length < 2) return FINAL_PUZZLE_EVENT;
+  if (top.length < 2 && context === undefined) return FINAL_PUZZLE_EVENT;
+
   const scenes = FINAL_PUZZLE_EVENT.scenes.map(scene => ({ ...scene }));
-  scenes[1] = {
-    ...scenes[1],
-    text: `${top.join('. ')}.\nEvery one an incantation. Every puzzle a verse.`,
-  };
+  if (top.length >= 2) {
+    scenes[1].text = `${top.join('. ')}.\nThe incantation returns in the words you actually brought.`;
+  }
+  const met = new Set(context?.unlockedAnimals ?? ['fox']);
+  scenes[7].image = 'kept_table';
+  scenes[7].imageOpacity = 0.62;
+  if (met.has('fox') && context?.standBeside === true) {
+    scenes[7].text = 'Ember stands beside you, leaving a little space.\n“I will tell you when I do not know. That promise I can keep.”';
+  } else if (met.has('fox') && context?.standBeside === false) {
+    scenes[7].text = 'Ember stays by the hearth.\nYour place in the house does not depend on how close you stand to her.';
+  }
+  if (context?.boundary) {
+    const boundaryImage = context.boundary === 'remember' ? 'private_room' : 'outward_road_night';
+    scenes[6].image = boundaryImage;
+    scenes[6].imageOpacity = 0.88;
+    scenes[8].image = boundaryImage;
+    scenes[8].imageOpacity = 0.72;
+  }
+  // Ember is the first resident, but keep even the generic/legacy API honest
+  // when an explicit empty roster is provided by a test or restored snapshot.
+  if (!met.has('fox')) {
+    scenes[7].text = 'The doorway stays open a hand\'s width.\nWarmth and cold meet there without either disappearing.';
+    delete scenes[7].speaker;
+  }
+  if (context?.houseComplete === true) {
+    scenes[2].text = 'Every room you raised stands above the old foundation.\nThe whole household is here.';
+  } else if (context?.houseComplete === false) {
+    scenes[2].text = 'Some rooms remain unbuilt.\nThe warmth follows the words through the rooms you raised.';
+  }
+  if (met.has('wombat')) {
+    scenes[2].text += '\nWarren braces the join. “Room to move. It needs room to move.”';
+    scenes[2].speaker = 'wombat';
+  }
+
+  if (met.has('aye_aye')) {
+    scenes[3].text = 'Tock takes his paw off the rope.\n“Your words first. She can answer.”';
+    scenes[3].speaker = 'aye_aye';
+  } else if (met.has('fennec_fox')) {
+    scenes[3].text = 'Fennick lowers one ear to the floor.\n“The small sounds are still here. Keep them here.”';
+    scenes[3].speaker = 'fennec_fox';
+  }
+
+  if (context?.boundary === 'remember') {
+    scenes[6].text = context.keptRecord
+      ? 'CLOSED.\nThe warmth reaches the private room, then stops at its door.\nThe original words inside remain unchanged.'
+      : 'CLOSED.\nThe warmth reaches the private room, then stops at its door.\nA thought can stay there without being corrected.';
+  } else if (context?.boundary === 'release') {
+    scenes[6].text = 'CLOSER.\nThe warmth gathers at the doorstep, then makes room.\nThe road beyond still leads away.';
+  }
+  if (context?.boundary && met.has('aye_aye')) {
+    scenes[8].text = 'The bell answers once. The seam closes.\nA cup cools. Nobody warms it before asking.';
+    scenes[8].speaker = 'aye_aye';
+    scenes[8].cue = 'bell';
+  } else if (context?.boundary && met.has('kakapo')) {
+    scenes[8].text = 'Moss answers with one low call. The seam closes.\nA cup cools. Nobody warms it before asking.';
+    scenes[8].speaker = 'kakapo';
+    scenes[8].cue = 'answer';
+  }
+  if (context?.keptRecord && met.has('capybara')) {
+    scenes[4].text = 'Chill holds the original page flat.\n“The correction stays beside it. It does not replace it.”';
+    scenes[4].speaker = 'capybara';
+    scenes[4].duration = 3500;
+  } else if (context?.keptPromise && met.has('rabbit')) {
+    scenes[4].text = 'Thyme keeps the seed tin in her own pocket.\n“Still mine.”';
+    scenes[4].speaker = 'rabbit';
+    scenes[4].duration = 3000;
+  }
+
+  // Context can add a line to the house tableau or the held pause. Give each
+  // scene reading time and recompute timings without changing the choreography.
+  let nextDelay = 0;
+  for (const scene of scenes) {
+    scene.delay = nextDelay;
+    scene.duration = Math.max(scene.duration, Math.min(6500, scene.text.split(/\s+/).length * 135));
+    nextDelay += scene.duration + 200;
+  }
   return { ...FINAL_PUZZLE_EVENT, scenes };
 }
 
@@ -427,6 +470,7 @@ export function buildFinalPuzzleEvent(ritualWords: string[]): PhaseTransitionEve
  * Terrible peace. The shadow figure is here. The animals are serene.
  */
 export const POST_REVELATION_EVENT: PhaseTransitionEvent = {
+  readAtOwnPace: true,
   phase: 4,
   title: 'After',
   bgColor: '#0A0510',
@@ -444,7 +488,7 @@ export const POST_REVELATION_EVENT: PhaseTransitionEvent = {
       duration: 3000,
     },
     {
-      text: 'Your friends are at peace.\nA terrible, beautiful peace.',
+      text: 'Some of your friends sleep. Some keep watch.\nFor once, they do not all choose the same thing.',
       delay: 3200,
       duration: 3500,
     },
@@ -454,17 +498,36 @@ export const POST_REVELATION_EVENT: PhaseTransitionEvent = {
       duration: 3000,
     },
     {
-      text: 'But the meaning has changed.\nEverything has changed.',
+      text: 'A chipped cup stays chipped.\nTomorrow, someone may mend it.',
       delay: 10100,
       duration: 3000,
     },
     {
-      text: 'The pattern continues.\nIt always will.',
+      text: 'The pattern continues.\nSo does the work of living beside it.',
       delay: 13300,
       duration: 3000,
     },
   ],
 };
+
+
+/** After remembers the enacted boundary without inventing one for legacy saves. */
+export function buildPostRevelationEvent(context?: FinalArrivalContext): PhaseTransitionEvent {
+  if (!context?.boundary) return POST_REVELATION_EVENT;
+  const scenes = POST_REVELATION_EVENT.scenes.map(scene => ({ ...scene }));
+  scenes[1].text = context.boundary === 'remember'
+    ? 'The private room stays closed.\nNobody inside the house has to give every thought away.'
+    : 'The road beyond the house remains a road.\nA departure does not have to become a disappearance.';
+  scenes[3].text = context.boundary === 'remember'
+    ? context.keptRecord
+      ? 'The old page and its correction lie side by side.\nKeeping a memory does not make it the only truth.'
+      : 'A sentence is written again.\nThis time nobody turns it into a reassurance.'
+    : 'There is warmth at the door when someone returns.\nIt reaches no further than they ask.';
+  const image = context.boundary === 'remember' ? 'private_room' : 'outward_road';
+  scenes[1].image = image;
+  scenes[1].imageOpacity = 0.8;
+  return { ...POST_REVELATION_EVENT, scenes, backdrop: { image, opacity: 0.62 } };
+}
 
 // ============================================================================
 // NEW CYCLE (NG+) CEREMONY
@@ -482,6 +545,7 @@ export const POST_REVELATION_EVENT: PhaseTransitionEvent = {
  * the whole arc again lands as a moment rather than a hard restart.
  */
 export const NEW_CYCLE_EVENT: PhaseTransitionEvent = {
+  readAtOwnPace: true,
   phase: 5,
   title: 'Again',
   bgColor: '#0B0714',
@@ -501,7 +565,7 @@ export const NEW_CYCLE_EVENT: PhaseTransitionEvent = {
       effectIntensity: 0.25,
     },
     {
-      text: 'The house stays exactly as you built it.\nEvery room. Every keeper.',
+      text: 'The rooms you raised and the friends you invited remain.\nA bright morning is still possible here.',
       delay: 3700,
       duration: 3500,
     },
@@ -511,7 +575,7 @@ export const NEW_CYCLE_EVENT: PhaseTransitionEvent = {
       duration: 3500,
     },
     {
-      text: 'They will greet you as if for the first time.\nSome part of them will remember.',
+      text: 'They will greet you as if for the first time.\nOne small boundary may be older than the morning.',
       delay: 11100,
       duration: 3500,
     },

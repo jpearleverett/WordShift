@@ -8,8 +8,10 @@ import {
   Easing,
   Image,
   ImageSourcePropType,
+  Platform,
+  TouchableOpacity as WebTouchableOpacity,
 } from 'react-native';
-import { TouchableOpacity } from 'react-native-gesture-handler';
+import { TouchableOpacity as GestureTouchableOpacity } from 'react-native-gesture-handler';
 import { Animal, AnimalType, DialoguePhase } from '../../types/homeWorld';
 import { ANIMAL_EMOJIS } from '../../services/homeWorldData';
 import { CandyColors } from '../../theme/colors';
@@ -17,6 +19,10 @@ import { CHROME_ICONS } from '../ui/chromeIcons';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { getSettingsSync } from '../../services/settings';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
+
+// Gesture Handler retains native pan arbitration. Its web Touchable emits
+// nested buttons for this accessible sprite; the RN web control has one target.
+const TouchableOpacity = Platform.OS === 'web' ? WebTouchableOpacity : GestureTouchableOpacity;
 
 /** Milliseconds per walk-cycle frame (matches the source video's cadence:
  * a 30-frame gait at 24fps sampled every 3rd frame). */

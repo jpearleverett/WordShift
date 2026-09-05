@@ -235,8 +235,7 @@ export const WEEKLY_QUEST_POOL: QuestTemplate[] = [
   // Sacrifice (Phase 4+ only). Deliberately net-negative like tend_amber — the
   // quest can only appear at Phase 4+ where the reward multiplier is 2.0x, so
   // the base reward must stay below target/2 or the quest becomes an amber
-  // faucet and inverts the sacrifice mechanic's "you get nothing in return"
-  // design. Guarded by the economy test in weeklyQuests.test.ts.
+  // faucet instead of an optional offering with a partial quest rebate. Guarded by the economy test in weeklyQuests.test.ts.
   { type: 'sacrifice_amber', titleTemplate: 'Offering', descTemplate: 'Offer {target} amber to the arrangement', darkDescTemplate: 'Sacrifice {target} amber to the void', target: 100, rewardAmber: 30 },
   { type: 'sacrifice_amber', titleTemplate: 'Greater Offering', descTemplate: 'Offer {target} amber to the arrangement', darkDescTemplate: 'The arrangement hungers for {target} amber', target: 200, rewardAmber: 55 },
   // Tending (Phase 5+ only) — net-negative sink, weekly cadence for the Shrine.
@@ -690,8 +689,7 @@ export async function updateQuestProgress(event: {
    * puzzle. That let the biggest weekly quest and the full-moon event quest be
    * finished without playing a board, and it inverted the altar's economics:
    * at the Phase-4 2.0x multiplier, 30 taps of the 5-amber chip destroyed 150
-   * amber to claim 280, turning a rite whose contract is "you get nothing
-   * mechanical in return" into a net gain.
+   * amber to claim 280, turning an offering with a partial rebate into a net gain.
    */
   isSolve?: boolean;
 }, currentPhase: number = 0, context?: WeeklyQuestGenerationContext): Promise<Quest[]> {

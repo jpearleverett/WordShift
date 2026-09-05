@@ -63,6 +63,8 @@ const SOUND_SOURCES: Record<string, any> = {
   phase_change_dark: require('../../assets/sounds/phase_change_dark.wav'),
   // The Arrival (finale cinematic only) — no dark mirror, it IS the wrongness.
   arrival: require('../../assets/sounds/arrival.wav'),
+  story_bell: require('../../assets/sounds/story_bell.wav'),
+  story_answer: require('../../assets/sounds/story_answer.wav'),
   daily_ready: require('../../assets/sounds/daily_ready.wav'),
   // Offering Pit: a word landing in the pit (dark mirror hungrier at Phase 3+).
   pit_devour: require('../../assets/sounds/pit_devour.wav'),
@@ -436,6 +438,11 @@ export async function soundPhaseChange(targetPhase?: number): Promise<void> {
 export async function soundArrival(): Promise<void> {
   await playSound('arrival');
 }
+/** Tock's answer after the boundary holds; distinct from the approaching presence. */
+export async function soundStoryBell(): Promise<void> { await playSound('story_bell'); }
+/** Moss's low answer, voiced only when the caller is present. */
+export async function soundStoryAnswer(): Promise<void> { await playSound('story_answer'); }
+
 
 /** Daily challenge available */
 export async function soundDailyReady(): Promise<void> {

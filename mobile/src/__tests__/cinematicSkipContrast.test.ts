@@ -98,7 +98,7 @@ describe('the Skip control is visible on every cinematic', () => {
     // Ink is pointless under a 0.9-opacity darkening layer. Extract the three
     // zIndexes from their own style blocks so a reordering fails here.
     const zOf = (styleName: string): number => {
-      const block = new RegExp(`\\n  ${styleName}: \\{([\\s\\S]*?)\\n  \\},`).exec(OVERLAY_SRC);
+      const block = new RegExp(`\\n  ${styleName}: \\{([\\s\\S]*?)\\},`).exec(OVERLAY_SRC);
       expect(block).not.toBeNull();
       const z = /zIndex:\s*(\d+)/.exec(block![1]);
       expect(z).not.toBeNull();

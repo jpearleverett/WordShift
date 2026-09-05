@@ -1,0 +1,26 @@
+# Story illustrations
+
+Generated with the built-in image generation tool for WordShift, September 2026. Selected outputs were visually inspected and copied into the repository. These illustrations extend the existing cottage pixel art and represent ordinary hospitality, protected privacy, and freedom to leave. They are loaded locally; no image service runs in the app.
+
+- `kept-table.png`: journal and shared-scene header.
+- `private-room.png`: CLOSED boundary and its aftermath.
+- `outward-road-night.png`: CLOSER during the midnight arrival.
+- `outward-road.png`: the same road at dawn in the aftermath.
+
+## Final prompts
+
+### Table
+
+Use case: illustration-story. Asset type: landscape chapter illustration for WordShift, an intimate pixel-art mobile word puzzle mystery set in an animal cottage. Create a finished 1536x1024 pixel-art illustration of a small round wooden table beside a warm hearth at dusk. Two hand-made mugs sit on the table: one visibly chipped ceramic handle, the other a charming crooked painted flower. An open notebook with an unmarked loose page rests beside them. Two empty chairs at a gently different distance, lived-in moss green fabric, golden amber firelight on dark walnut wood, cool blue dusk through a small window, a peaceful but slightly questioning quiet. The visual story is that an imperfect thing holds a memory. Rich carefully placed pixel clusters, restrained 16-bit-style palette, dimensional light and tactile material shading, sophisticated indie game art. A clear readable silhouette at phone size, table occupying the central lower half, darker low-detail upper edges for an overlay title. No characters, no text, no letters, no watermark, no UI, no glowy particles, no horror eyes. Preserve a warm cottage atmosphere, understated depth, no glossy plastic 3D.
+
+### Private room
+
+Use case: illustration-story. Asset type: landscape ending illustration for a sophisticated pixel-art indie mobile game WordShift. Finished 1536x1024 pixel-art scene of a quiet private room in an animal-sized woodland cottage, seen just outside its wooden door which is nearly closed, a narrow warm crack of lamplight preserving a glimpse of a worn desk, one loose cream paper and a deliberately chipped teacup. The door has a simple wood latch on the inside visible in profile, natural imperfect wood grain and the mark of a small hand on its edge; a place belonging to its resident. Warm amber light inside, cool desaturated violet shadows in the surrounding hallway, earthy brown wooden beams, moss green details. Nothing threatening visible, privacy is the emotional climax. Deep dimensional lighting rendered in disciplined hand-placed pixel clusters, restrained 16-bit palette, polished storybook pixel art, rich material texture without photorealism. Strong clear doorway silhouette at phone size, room visible enough to feel welcoming, composition balanced with darker uncluttered edges for UI overlay. No characters, no readable words or letters on paper, no logos, no watermark, no horror eyes, no glowing magic, no glossy 3D.
+
+### Outward road
+
+Use case: illustration-story. Asset type: landscape ending illustration for pixel-art indie mobile game WordShift. Create a finished 1536x1024 pixel-art view looking outward from a cottage garden through an open little wooden gate onto a narrow EARTHEN FOOTPATH that continues beyond the last woodland trees into an open dawn meadow and toward a distant quiet hill. A small flat stone beside the gate points outward. The path clearly leads somewhere beyond the house, without looping back; freedom to leave is the emotional climax. Foreground dark walnut fence, ferns and moss with a few muted cream flowers, dawn amber along grass tops, cool lilac morning mist in the distant meadow, restrained warm-cool color harmony. Warm, calm and earned, not triumphant or saccharine. Sophisticated 16-bit storybook pixel art, dimensional light and carefully composed pixel clusters, detailed tactile vegetation with strong readable shapes at phone size. Broad luminous space past the gate, darker uncluttered outer edges for UI overlays, no characters, no cottage blocking the distant path, no readable text, no logo, no watermark, no eyes, no magic glow, no glossy 3D.
+
+### Outward road at midnight (edit)
+
+Edit reference: `outward-road.png`. Edit this exact WordShift pixel-art illustration into its MIDNIGHT counterpart. Preserve the identical garden gate, outward-pointing stone, footpath, trees, meadow, hills, camera, composition and sophisticated 16-bit storybook pixel clusters. Replace the dawn sky and golden sunlight with a deep desaturated indigo night sky, a sparse few small stars, and quiet silvery moonlight from offscreen. The distant path must remain readable and continue beyond the trees. Cool blue-violet moonlight edges the grass; only the smallest trace of warm reflected amber light touches the near gate from the unseen cottage behind the viewer. This is a peaceful but consequential midnight welcome with freedom to leave. No sunrise, no sunset, no warm horizon glow. Keep substantial tonal detail and readable silhouettes at phone size without brightening it into daytime. No people, animals, text, glyphs, logo or watermark. Produce the edited landscape bitmap at the same aspect ratio.

@@ -388,7 +388,7 @@ describe('finale orchestration wiring', () => {
   });
 
   test('the Arrival is personalized from the ritual memory with a generic fallback', () => {
-    expect(APP_TSX).toMatch(/buildFinalPuzzleEvent\(await getRitualWords\(\)\)/);
+    expect(APP_TSX).toMatch(/buildFinalPuzzleEvent\(await getRitualWords\(\), await getArrivalContext\(\)\)/);
     expect(APP_TSX).toMatch(/queueEndgameCinematic\(arrivalEvent\)/);
   });
 });
@@ -540,7 +540,7 @@ describe('finale staging (armed, not retroactive)', () => {
 
   test('the cinematic fires only on the marked final board', () => {
     // Firing path: only the marked final board's win completes the finale.
-    expect(APP_TSX).toMatch(/if \(wasFinalBoard\) \{[\s\S]{0,400}?markFinalPuzzleCompleted\(\)/);
+    expect(APP_TSX).toMatch(/if \(wasFinalBoard\) \{[\s\S]{0,900}?await recordStoryBoundary\([\s\S]{0,150}?await markFinalPuzzleCompleted\(\)/);
     // The finale event is queued via queueEndgameCinematic, which both schedules
     // the 1.5s beat AND records the event so a victory exit in the window can
     // rescue it instead of clearVictoryTimeouts dropping the climax forever.
@@ -571,7 +571,7 @@ describe('finale staging (armed, not retroactive)', () => {
     expect(APP_TSX).toMatch(/const dwellBefore = await getPhase4DwellCount\(\);/);
     expect(APP_TSX).toMatch(/dwellBefore >= FINALE_DWELL_PUZZLES/);
     expect(APP_TSX).toMatch(/getPostCapDwellLine\(completedTotal, persistence\.currentPhase\)/);
-    expect(APP_TSX).toMatch(/getDwellLine\(Math\.min\(dwell, FINALE_DWELL_PUZZLES\), persistence\.currentPhase\)/);
+    expect(APP_TSX).toMatch(/getDwellLine\(Math\.min\(dwell, FINALE_DWELL_PUZZLES\), persistence\.currentPhase, houseComplete\)/);
   });
 });
 
@@ -599,9 +599,8 @@ describe('victory flow', () => {
   });
 
   test('next/home victory exits run the interstitial gate; the pit exit (Collect Now) is exempt', () => {
-    // Next Level and Return Home keep the cadence (ad inventory shifts, it
-    // does not disappear).
-    const calls = APP_TSX.match(/const adShown = maybeShowVictoryInterstitial\(\);/g) || [];
+    // Routine exits keep their cadence; a queued core conversation suppresses the ad.
+    const calls = APP_TSX.match(/const adShown = storyWillPresent \? false : maybeShowVictoryInterstitial\(\);/g) || [];
     expect(calls.length).toBeGreaterThanOrEqual(2);
     // Collecting amber you already earned is never an ad moment: handleGoToPit
     // must not run the interstitial gate.

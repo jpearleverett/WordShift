@@ -1,3 +1,4 @@
+import { clearEvents } from '../services/eventLogger';
 import {
   ROOMS,
   ANIMALS,
@@ -982,3 +983,7 @@ describe('getLockedRoomCardSub', () => {
     }
   });
 });
+
+// These service/UI tests enqueue telemetry events; cancel their debounce before
+// Jest disposes the module registry and its lazy telemetry import.
+afterEach(clearEvents);

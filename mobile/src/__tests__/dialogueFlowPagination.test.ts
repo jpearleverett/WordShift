@@ -99,8 +99,8 @@ jest.mock('../services/animalDialogue', () => ({
   getPhase2ExtraDialogues: jest.fn(() => []),
   getPhase2PoolLine: jest.fn(() => null),
   phase2PoolHasNew: jest.fn(() => false),
-  getAndMarkNarrativeSeedPage: jest.fn(async () => null),
-  getAndMarkNarrativeCallbackPage: jest.fn(async () => null),
+  peekNarrativeSeedPage: jest.fn(async () => null),
+  peekNarrativeCallbackPage: jest.fn(async () => null),
   getPhase2PoolCursors: jest.fn(async () => ({})),
   advancePhase2PoolCursor: jest.fn(async () => 0),
 }));
@@ -361,6 +361,7 @@ describe('useDialogueFlow long-line pagination (drain behavior)', () => {
     animalDialogue.getCoordinatedEventLine.mockReturnValueOnce({
       text: LONG_LINE,
       theme: 'test_theme',
+      deliveryKey: 'test_theme:witness:pangolin',
     });
     getCurrentDialogueMock.mockImplementation(() => ({ text: SHORT_LINE }));
 
@@ -528,9 +529,9 @@ describe('useDialogueFlow Phase 5 pool-only delivery', () => {
       nextCaughtUp: 1,
     });
     const animalDialogue = jest.requireMock('../services/animalDialogue') as {
-      getAndMarkNarrativeCallbackPage: jest.Mock;
+      peekNarrativeCallbackPage: jest.Mock;
     };
-    animalDialogue.getAndMarkNarrativeCallbackPage.mockResolvedValue(null);
+    animalDialogue.peekNarrativeCallbackPage.mockResolvedValue(null);
     const dialogueChoices = jest.requireMock('../services/dialogueChoices') as {
       getPhase4CallbackPage: jest.Mock;
     };
@@ -566,10 +567,10 @@ describe('useDialogueFlow Phase 5 pool-only delivery', () => {
     };
     amberCurrency.wereTutorialSeedsPlanted.mockResolvedValueOnce(false);
     const animalDialogue = jest.requireMock('../services/animalDialogue') as {
-      getAndMarkNarrativeCallbackPage: jest.Mock;
+      peekNarrativeCallbackPage: jest.Mock;
     };
-    animalDialogue.getAndMarkNarrativeCallbackPage.mockResolvedValue(
-      'A Phase 4 seed callback.'
+    animalDialogue.peekNarrativeCallbackPage.mockResolvedValue(
+      { text: 'A Phase 4 seed callback.', commit: jest.fn(async () => {}) }
     );
     const dialogueChoices = jest.requireMock('../services/dialogueChoices') as {
       getPhase4CallbackPage: jest.Mock;
@@ -585,7 +586,7 @@ describe('useDialogueFlow Phase 5 pool-only delivery', () => {
     expect(amberCurrency.wereTutorialSeedsPlanted).not.toHaveBeenCalled();
     expect(amberCurrency.markTutorialSeedsPlanted).not.toHaveBeenCalled();
     expect(dialogueChoices.getPhase4CallbackPage).not.toHaveBeenCalled();
-    expect(animalDialogue.getAndMarkNarrativeCallbackPage).not.toHaveBeenCalled();
+    expect(animalDialogue.peekNarrativeCallbackPage).not.toHaveBeenCalled();
     expect(hook.dialogueText).toBe(phase5Line);
   });
 
@@ -680,7 +681,7 @@ describe('useDialogueFlow Phase 5 pool-only delivery', () => {
     expect(hook.dialogueText).toBe(phase5Line);
   });
 
-  it('keeps Phase 5 coordinated events ahead of the Tending-backed pool', async () => {
+  it('retires pre-arrival coordinated events while preserving the Tending-backed pool', async () => {
     const coordinatedLine = 'The whole house settles around the finished pattern.';
     const tendingLine = 'The shrine deepens, and I remember another quiet word.';
     const animalDialogue = jest.requireMock('../services/animalDialogue') as {
@@ -689,6 +690,7 @@ describe('useDialogueFlow Phase 5 pool-only delivery', () => {
     animalDialogue.getCoordinatedEventLine.mockReturnValueOnce({
       text: coordinatedLine,
       theme: 'terrible_peace',
+      deliveryKey: 'terrible_peace:witness:pangolin',
     });
     const phase5Pool = jest.requireMock('../services/dialogue/phase5Pool') as {
       buildPhase5Pool: jest.Mock;
@@ -706,11 +708,9 @@ describe('useDialogueFlow Phase 5 pool-only delivery', () => {
     let hook = render();
     await hook.handleAnimalTap({ ...pangolin, currentDialogueIndex: 0 } as never);
     hook = render();
-    expect(hook.dialogueText).toBe(coordinatedLine);
-
-    await hook.handleNextDialogue();
-    hook = render();
+    expect(animalDialogue.getCoordinatedEventLine).not.toHaveBeenCalled();
     expect(hook.dialogueText).toBe(tendingLine);
+    animalDialogue.getCoordinatedEventLine.mockReset().mockReturnValue(null);
   });
 
   it('does not grant late-recruit regular-backlog session bonus in Phase 5', async () => {
@@ -758,6 +758,7 @@ describe('useDialogueFlow one-time page commits', () => {
     animalDialogue.getCoordinatedEventLine.mockReturnValueOnce({
       text: coordinatedLine,
       theme: 'shared_dream',
+      deliveryKey: 'shared_dream:witness:pangolin',
     });
     const dialogueChoices = jest.requireMock('../services/dialogueChoices') as {
       getPhase4CallbackPage: jest.Mock;
@@ -779,7 +780,7 @@ describe('useDialogueFlow one-time page commits', () => {
     hook = render();
 
     expect(hook.dialogueText).toBe(coordinatedLine);
-    expect(amberCurrency.recordConsumedCoordinatedEvent).toHaveBeenCalledWith('shared_dream');
+    expect(amberCurrency.recordConsumedCoordinatedEvent).toHaveBeenCalledWith('shared_dream:witness:pangolin');
     // Page 1 is not on screen yet.
     expect(dialogueChoices.markPhase4CallbackShown).not.toHaveBeenCalled();
 

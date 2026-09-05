@@ -1,8 +1,6 @@
 /**
- * Fox's one-time "Keeper's Welcome" starter-pack intro: the narrative lines and
- * the one-time seen flag. The key narrative guardrail (rule 1: the animals don't
- * know they're in a game) is that Fox NEVER names money — she frames a gift, and
- * the Store card shows the actual price.
+ * The optional starter pack is described as a purchase before the Store opens.
+ * The animal's welcome does not depend on a purchase.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -30,13 +28,19 @@ describe("Keeper's Welcome starter intro", () => {
     }
   });
 
-  test('Fox never names money (the Store card shows the price)', () => {
-    for (const phase of [0, 2]) {
-      const text = getFoxStarterIntroLines(phase).join(' ').toLowerCase();
-      for (const forbidden of ['$', 'dollar', 'buy', 'purchase', 'price', ' pay', '1.99']) {
-        expect(text).not.toContain(forbidden);
-      }
+  test('the purchase and price are clear before the Store opens', () => {
+    for (const phase of [0, 1, 2, 3, 4, 5]) {
+      const text = getFoxStarterIntroLines(phase).join(' ');
+      expect(text).toMatch(/optional/i);
+      expect(text).toMatch(/purchase/i);
+      expect(text).toMatch(/price/i);
+      expect(text).not.toMatch(/freely offered|welcome gift|free gift/i);
     }
+  });
+
+  test('Ember separates welcome from spending', () => {
+    expect(getFoxStarterIntroLines(0).join(' ')).toMatch(/whether or not you buy/i);
+    expect(getFoxStarterIntroLines(4).join(' ')).toMatch(/yours either way/i);
   });
 
   test('the seen flag flips after markStarterIntroSeen', async () => {

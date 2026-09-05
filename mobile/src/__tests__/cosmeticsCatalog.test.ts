@@ -22,6 +22,7 @@ import {
 } from '../services/cosmetics';
 import {
   getTileColor,
+  getTileInkColor,
   getEquippedTileTheme,
   getTileFinish,
   getTileFinishForTheme,
@@ -292,30 +293,21 @@ describe('finish-led tile themes', () => {
     expect(getTileFinishForTheme('theme_does_not_exist')).toBe(DEFAULT_TILE_FINISH);
   });
 
-  /**
-   * Source pin: the promise that a player who bought nothing sees NO change
-   * rests entirely on DEFAULT_TILE_FINISH reproducing the four literals the
-   * LetterTile styles still declare. A typo in one alpha would silently
-   * restyle every tile for every player.
-   */
-  it('DEFAULT_TILE_FINISH still matches the literals in LetterTile styles', () => {
-    const src = fs.readFileSync(
-      path.join(__dirname, '..', 'components', 'LetterTile.tsx'),
-      'utf-8'
-    );
-    const colorAfter = (styleName: string): string => {
-      const block = src.split(`${styleName}: {`)[1];
-      expect(block).toBeDefined();
-      const match = /backgroundColor: '([^']+)'/.exec(block.split('},')[0]);
-      expect(match).not.toBeNull();
-      return match![1];
+  it('source-letter ink remains readable across default and cosmetic palettes', () => {
+    const luminance = (hex: string) => {
+      const values = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
+        .map(v => v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
+      return values[0] * 0.2126 + values[1] * 0.7152 + values[2] * 0.0722;
     };
-    expect(colorAfter('bevelTop')).toBe(DEFAULT_TILE_FINISH.bevel);
-    expect(colorAfter('glossyShine')).toBe(DEFAULT_TILE_FINISH.gloss);
-    expect(colorAfter('specularDot')).toBe(DEFAULT_TILE_FINISH.specularColor);
-    expect(colorAfter('shineSweep')).toBe(DEFAULT_TILE_FINISH.sweep);
-    expect(DEFAULT_TILE_FINISH.specular).toBe('dot');
+    for (const palette of [CandyColors.tileColors, ...Object.values(TILE_THEMES)]) {
+      for (const tile of palette) {
+        const bg = luminance(tile.bg);
+        const ink = luminance(getTileInkColor(tile.bg));
+        expect((Math.max(bg, ink) + 0.05) / (Math.min(bg, ink) + 0.05)).toBeGreaterThanOrEqual(4.5);
+      }
+    }
   });
+
 });
 
 // ===========================================================================

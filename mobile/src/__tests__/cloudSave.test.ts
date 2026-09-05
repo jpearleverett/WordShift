@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { clearStoryState, loadStoryState, recordStoryBoundary, STORY_STORAGE_KEY } from '../services/storySpine';
 import {
   collectLocalSaveData,
   restoreFromCloudData,
@@ -44,6 +45,7 @@ describe('cloudSave', () => {
   beforeEach(async () => {
     await AsyncStorage.clear();
     await clearSyncStatus();
+    await clearStoryState();
     await clearHints();
     await clearCosmetics();
     await clearWeeklyQuests();
@@ -305,6 +307,20 @@ describe('cloudSave', () => {
       await restoreFromCloudData(cloudData);
       const progress = await AsyncStorage.getItem('wordshift_home_progress');
       expect(JSON.parse(progress!).amber).toBe(999);
+    });
+
+    it('restores the chosen story boundary and invalidates its warm cache', async () => {
+      const context = { phase: 4 as const, puzzlesSolved: 116, cycleCount: 0, unlockedAnimals: ['fox'] };
+      await recordStoryBoundary(context, 'CLOSED');
+      const backup = await collectLocalSaveData();
+      expect(JSON.parse(backup.data[STORY_STORAGE_KEY]).boundary).toBe('remember');
+      await clearStoryState();
+      await recordStoryBoundary(context, 'CLOSER');
+      expect((await loadStoryState(context)).boundary).toBe('release');
+      expect(await restoreFromCloudData(backup)).toBe(true);
+      expect((await loadStoryState(context)).boundary).toBe('remember');
+      await restoreFromCloudData({ ...backup, data: {} });
+      expect((await loadStoryState(context)).boundary).toBeNull();
     });
 
     it('invalidates cached service state after overwriting local data', async () => {

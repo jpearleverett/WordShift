@@ -3,6 +3,7 @@ import { View, StyleSheet, Dimensions, Animated, Easing, Platform } from 'react-
 import { getPhaseTheme } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
 import { getMaxParticleCount, getDeviceTier } from '../services/deviceTier';
+import { PuzzleAtmosphere } from './PuzzleAtmosphere';
 import type { DeviceTier } from '../services/deviceTier';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -94,7 +95,7 @@ const generateParticleLayout = (count: number, motion: ParticleMotion): Particle
     layout.push({
       id: i,
       x: Math.random() * SCREEN_WIDTH,
-      size: 8 + Math.random() * 20,
+      size: 3 + Math.random() * 6,
       duration: (8000 + Math.random() * 12000) * motion.durationMul,
       delay: Math.random() * 5000,
       colorSeed: Math.floor(Math.random() * 997),
@@ -112,7 +113,7 @@ const generateParticleLayout = (count: number, motion: ParticleMotion): Particle
 // wash fades out gradually instead of stopping at a hard edge. Every band is
 // a plain static View: no animation, no JS work after mount, no new deps.
 // ---------------------------------------------------------------------------
-const WASH_FALLOFF_STEPS = 4;
+const WASH_FALLOFF_STEPS = 24;
 
 const SoftWash: React.FC<{
   color: string;
@@ -124,8 +125,11 @@ const SoftWash: React.FC<{
 }> = ({ color, core, tail, anchor }) => {
   const coreH = SCREEN_HEIGHT * core;
   const stepH = (SCREEN_HEIGHT * tail) / WASH_FALLOFF_STEPS;
-  const place = (offset: number, height: number) =>
-    anchor === 'top' ? { top: offset, height } : { bottom: offset, height };
+  const place = (offset: number, height: number) => {
+    const start = Math.round(offset);
+    const size = Math.round(offset + height) - start;
+    return anchor === 'top' ? { top: start, height: size } : { bottom: start, height: size };
+  };
   return (
     <>
       <View
@@ -138,8 +142,8 @@ const SoftWash: React.FC<{
           pointerEvents="none"
           style={[
             styles.washBand,
-            // +1px overlap between bands so rounding can't open seam gaps
-            place(coreH + i * stepH, stepH + 1),
+            // Shared rounded boundaries meet exactly, avoiding darker overlap lines.
+            place(coreH + i * stepH, stepH),
             {
               backgroundColor: color,
               // Steps down 0.8 / 0.6 / 0.4 / 0.2 — multiplies the color's own
@@ -489,6 +493,8 @@ export const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ phase = 
       <SoftWash color={theme.overlayMid} core={0.34} tail={0.28} anchor="top" />
       <SoftWash color={theme.overlayBottom} core={0.34} tail={0.28} anchor="bottom" />
 
+      <PuzzleAtmosphere phase={phase} />
+
       {/* Radial glow in center. iOS: soft shadow blur. Android ignores the
           shadow-* props (and elevation would cast a hard directional shadow,
           not a glow), so it gets concentric stepped-opacity circles instead,
@@ -523,29 +529,10 @@ export const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ phase = 
         />
       ))}
 
-      {/* Top vignette. iOS: shadow-based soft band. Android ignores those
-          shadow props entirely, so it gets three stepped translucent bands
-          fading downward instead (mirrors the bottom vignette's approach). */}
-      {Platform.OS === 'ios' ? (
-        <View style={[styles.vignetteTop, { shadowColor: theme.vignetteColor }]} />
-      ) : (
-        <>
-          <View
-            pointerEvents="none"
-            style={[styles.vignetteTopBand, { top: 0, backgroundColor: theme.vignetteColor + '4D' }]}
-          />
-          <View
-            pointerEvents="none"
-            style={[styles.vignetteTopBand, { top: 40, backgroundColor: theme.vignetteColor + '33' }]}
-          />
-          <View
-            pointerEvents="none"
-            style={[styles.vignetteTopBand, { top: 80, backgroundColor: theme.vignetteColor + '1A' }]}
-          />
-        </>
-      )}
-      {/* Bottom vignette */}
-      <View style={[styles.vignetteBottom, { backgroundColor: theme.vignetteColor + '4D' }]} />
+      {/* Feathered edge shade uses the same continuous stepped falloff. */}
+      <SoftWash color={theme.vignetteColor + '42'} core={0} tail={0.2} anchor="top" />
+      <SoftWash color={theme.vignetteColor + '42'} core={0} tail={0.18} anchor="bottom" />
+
     </View>
   );
 };

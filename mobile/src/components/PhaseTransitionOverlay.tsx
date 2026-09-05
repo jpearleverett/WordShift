@@ -1,13 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { FONT_SIZE } from '../theme/typeScale';
-import { View, Text, StyleSheet, Animated, Easing, Dimensions, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, Animated, Easing, Dimensions, TouchableOpacity, Image, ScrollView, useWindowDimensions } from 'react-native';
 import { PhaseTransitionEvent, PhaseScene, SceneImage, CinematicParticleConfig } from '../services/phaseEvents';
 import { getSettingsSync } from '../services/settings';
 import { hapticLight, hapticMedium, hapticHeavy, hapticWarning } from '../services/haptics';
 import { playUiSound, stopCeremonyMusic } from '../services/uiSound';
 import { announceForA11y } from '../services/a11yAnnounce';
-import { BODY_FONT_BOLD } from '../theme/fonts';
+import { BODY_FONT, BODY_FONT_BOLD, PIXEL_FONT_BOLD } from '../theme/fonts';
 import { getPhaseTheme } from '../theme/colors';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CHARACTER_SPRITES } from './home/AnimalSprite';
+import { getStorySpeakerName } from '../services/storyArchive';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -32,6 +35,10 @@ export const SKIP_BORDER_COLOR = '#B9B0CC';
 // house is the roof art the player raised room by room.
 // ---------------------------------------------------------------------------
 const SCENE_IMAGE_SOURCES: Record<SceneImage, ReturnType<typeof require>> = {
+  private_room: require('../../assets/story/private-room.png'),
+  outward_road_night: require('../../assets/story/outward-road-night.png'),
+  outward_road: require('../../assets/story/outward-road.png'),
+  kept_table: require('../../assets/story/kept-table.png'),
   shadow_figure: require('../../assets/environment/shadow_figure.png'),
   house: require('../../assets/environment/roof.png'),
   // Phase 1-3 ceremony emblems (512px, generateGameIcons): luminous painted
@@ -46,6 +53,10 @@ const CEREMONY_EMBLEM_SIZE = { width: Math.round(SCREEN_WIDTH * 0.6), height: Ma
 // Rendered sizes preserve each asset's aspect (shadow_figure 600x1200,
 // roof 792x283) and sit behind the centered scene text.
 const SCENE_IMAGE_SIZES: Record<SceneImage, { width: number; height: number }> = {
+  private_room: { width: SCREEN_WIDTH, height: SCREEN_WIDTH * 2 / 3 },
+  outward_road_night: { width: SCREEN_WIDTH, height: SCREEN_WIDTH * 2 / 3 },
+  outward_road: { width: SCREEN_WIDTH, height: SCREEN_WIDTH * 2 / 3 },
+  kept_table: { width: SCREEN_WIDTH, height: SCREEN_WIDTH * 2 / 3 },
   shadow_figure: {
     height: Math.round(SCREEN_HEIGHT * 0.52),
     width: Math.round(SCREEN_HEIGHT * 0.52 * (600 / 1200)),
@@ -320,34 +331,34 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
   event,
   onComplete,
 }) => {
-  const overlayOpacity = useRef(new Animated.Value(0)).current;
+  const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const [activeSceneIndex, setActiveSceneIndex] = useState(-1);
+  const [manualPlayback, setManualPlayback] = useState(false);
+  const overlayOpacity = useRef(new Animated.Value(0)).current;
   const sceneOpacity = useRef(new Animated.Value(0)).current;
   const sceneTranslateY = useRef(new Animated.Value(20)).current;
-  // Screen-effect drivers (native-driven, transform/opacity only)
   const shakeX = useRef(new Animated.Value(0)).current;
   const shakeY = useRef(new Animated.Value(0)).current;
   const flashOpacity = useRef(new Animated.Value(0)).current;
   const vignetteOpacity = useRef(new Animated.Value(0)).current;
-  // Scene-image drivers (the in-engine arrival: shadow figure / house art)
   const imageOpacity = useRef(new Animated.Value(0)).current;
   const imageTranslateY = useRef(new Animated.Value(0)).current;
   const imageScale = useRef(new Animated.Value(1)).current;
   const [activeImage, setActiveImage] = useState<SceneImage | null>(null);
   const effectAnimsRef = useRef<Animated.CompositeAnimation[]>([]);
   const [flashColor, setFlashColor] = useState('#FFFFFF');
-  // One-shot particle burst for particles_rise/fall scenes (keyed by nonce so a
-  // fresh burst remounts the layer). Null = no burst on screen.
   const [burst, setBurst] = useState<{
-    direction: 'rise' | 'fall';
-    color: string;
-    size: number;
-    durationMs: number;
-    nonce: number;
+    direction: 'rise' | 'fall'; color: string; size: number;
+    durationMs: number; nonce: number;
   } | null>(null);
   const burstNonceRef = useRef(0);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const hasSkipped = useRef(false);
+  const visibleEventRef = useRef<PhaseTransitionEvent | null>(null);
+  const onCompleteRef = useRef(onComplete);
+  const scrollRef = useRef<ScrollView>(null);
+  onCompleteRef.current = onComplete;
 
   const stopEffectAnims = () => {
     effectAnimsRef.current.forEach((a) => a.stop());
@@ -517,428 +528,297 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     }
   };
 
-  const handleSkip = () => {
+  const finish = () => {
     if (hasSkipped.current) return;
     hasSkipped.current = true;
     timersRef.current.forEach(clearTimeout);
     timersRef.current = [];
-    // Stop any in-flight animations from the current scene
     sceneOpacity.stopAnimation();
     sceneTranslateY.stopAnimation();
     stopEffectAnims();
     overlayOpacity.stopAnimation();
     overlayOpacity.setValue(0);
     setBurst(null);
-    onComplete();
+    onCompleteRef.current();
+  };
+  const finishRef = useRef(finish);
+  finishRef.current = finish;
+  const next = () => {
+    if (!event || activeSceneIndex < 0 || hasSkipped.current) return;
+    if (activeSceneIndex === event.scenes.length - 1) finishRef.current();
+    else setActiveSceneIndex(activeSceneIndex + 1);
   };
 
+  // A fresh event always opens on its own first scene. In particular, a
+  // previously skipped scene must not briefly appear under the next title.
   useEffect(() => {
-    if (!event) return;
+    visibleEventRef.current = null;
     hasSkipped.current = false;
-    // Reset screen-effect drivers for a fresh event
+    setManualPlayback(event?.readAtOwnPace === true);
+    setActiveSceneIndex(-1);
+    setActiveImage(null);
+    setBurst(null);
+    sceneOpacity.setValue(0);
+    sceneTranslateY.setValue(0);
+    shakeX.setValue(0);
+    shakeY.setValue(0);
+    flashOpacity.setValue(0);
+    imageOpacity.setValue(0);
+    imageTranslateY.setValue(0);
+    imageScale.setValue(1);
+    vignetteOpacity.setValue(event?.vignette ? 0.35 : 0);
+    if (!event) return;
+    const reducedMotion = getSettingsSync().reducedMotion;
+    if (reducedMotion) overlayOpacity.setValue(1);
+    else {
+      overlayOpacity.setValue(0);
+      Animated.timing(overlayOpacity, {
+        toValue: 1, duration: 650, useNativeDriver: true,
+      }).start();
+      hapticMedium();
+    }
+    announceForA11y(event.showTitle === false ? 'A moment in the house.' : event.title);
+    const timer = setTimeout(() => {
+      visibleEventRef.current = event;
+      setActiveSceneIndex(0);
+    }, reducedMotion ? 0 : 600);
+    timersRef.current.push(timer);
+    return () => {
+      visibleEventRef.current = null;
+      timersRef.current.forEach(clearTimeout);
+      timersRef.current = [];
+      stopEffectAnims();
+      overlayOpacity.stopAnimation();
+      sceneOpacity.stopAnimation();
+      sceneTranslateY.stopAnimation();
+    };
+    // Animation refs are stable; this effect owns one complete event.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [event]);
+
+  // Only a newly visible scene speaks or plays its cue. Changing playback
+  // mode cannot replay the bell, the descent, or the screen-reader announcement.
+  useEffect(() => {
+    const scene = event?.scenes[activeSceneIndex];
+    if (!event || visibleEventRef.current !== event || !scene || hasSkipped.current) return;
+    const reducedMotion = getSettingsSync().reducedMotion;
+    const timeScale = 1.25;
     stopEffectAnims();
     shakeX.setValue(0);
     shakeY.setValue(0);
     flashOpacity.setValue(0);
-    vignetteOpacity.setValue(0);
-    imageOpacity.setValue(0);
-    imageTranslateY.setValue(0);
-    setActiveImage(null);
-    // Reset the SCENE drivers too, so a fresh ceremony always opens dark. Without
-    // this, a skipped cinematic left activeSceneIndex/sceneOpacity from the prior
-    // event, and the next ceremony could flash the wrong scene line at full
-    // opacity before its own first scene timer fired.
-    setActiveSceneIndex(-1);
-    sceneOpacity.setValue(0);
-    sceneTranslateY.setValue(20);
     setBurst(null);
-
-    const reducedMotion = getSettingsSync().reducedMotion;
-    // Scale ALL timing: 0.4x in reduced motion (not just skip animations),
-    // 1.25x otherwise — playtest read the per-scene text as a touch too fast
-    // at 1.0, and uniform scaling stretches the dwell without disturbing the
-    // scene layout (delays and durations scale together; tap-to-skip remains).
-    const timeScale = reducedMotion ? 0.4 : 1.25;
-    const timers: ReturnType<typeof setTimeout>[] = [];
-
-    // Fade in overlay
-    if (reducedMotion) {
-      overlayOpacity.setValue(1);
-    } else {
-      Animated.timing(overlayOpacity, {
-        toValue: 1,
-        duration: 600 * timeScale,
-        useNativeDriver: true,
-      }).start();
-    }
-
-    // Honor the event-level vignette flag (previously dead code): a base
-    // atmospheric darkening at open, so the endgame ceremonies (house
-    // completion, the finale, post-revelation) that declare no 'vignette_close'
-    // scene still get their declared vignette. Scenes that DO close in compose
-    // a stronger frame on top (their 0.5-0.9 targets exceed this 0.35 base).
-    if (event.vignette) {
-      if (reducedMotion) {
-        vignetteOpacity.setValue(0.35);
-      } else {
-        Animated.timing(vignetteOpacity, {
-          toValue: 0.35,
-          duration: 700 * timeScale,
-          useNativeDriver: true,
-        }).start();
-      }
-    }
-
-    // Opening haptic beat
-    if (!reducedMotion) {
-      hapticMedium();
-    }
-
-    // Announce the ceremony to screen readers — a deferred cinematic reveal is
-    // otherwise silent (the accessibilityRole="alert" root doesn't reliably
-    // re-announce a mounted overlay). Speak the title, or the first scene line
-    // for title-less events (the finale / post-revelation).
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+    runSceneImage(scene, timeScale, reducedMotion);
     announceForA11y(
-      event.showTitle === false
-        ? (event.scenes[0]?.text ?? 'A moment passes.')
-        : event.title
+      scene.speaker ? getStorySpeakerName(scene.speaker) + '. ' + scene.text : scene.text
     );
-
-    // Schedule each scene
-    event.scenes.forEach((scene, index) => {
-      const showTimer = setTimeout(() => {
-        setActiveSceneIndex(index);
-        runSceneImage(scene, timeScale, reducedMotion);
-        // Audio self-gates on soundEnabled and must play even under
-        // reducedMotion (which governs motion, not sound).
-        if (scene.effect === 'descend') {
-          // Duck the looping music bed so the dark ritual swell owns the Arrival
-          // soundscape (App's music effect restarts the phase's bed once the
-          // event clears on complete). Guarded bridge, so it is a no-op without
-          // the native audio layer.
-          stopCeremonyMusic();
-          // The Arrival's own cue, heard exactly once in the whole game: the
-          // pad dying downward into one enormous slow bell whose strike lands
-          // with the settle haptic below. Never the ceremony swell the player
-          // has already heard at every ward ignition.
-          playUiSound('arrival');
-        }
-        if (!reducedMotion) {
-          fireSceneHaptic(scene, event.shakeIntensity);
-          runSceneEffect(scene, event.shakeIntensity ?? 0, event.phase);
-          if (scene.effect === 'particles_rise' || scene.effect === 'particles_fall') {
-            // One-shot burst for the scene's dwell; cleared shortly after.
-            burstNonceRef.current += 1;
-            const nonce = burstNonceRef.current;
-            const durationMs = scene.duration * timeScale;
-            setBurst({
-              direction: scene.effect === 'particles_rise' ? 'rise' : 'fall',
-              color: event.particles?.color ?? event.accentColor,
-              size: event.particles?.size ?? 8,
-              durationMs,
-              nonce,
-            });
-            timers.push(
-              setTimeout(() => {
-                setBurst((b) => (b && b.nonce === nonce ? null : b));
-              }, durationMs + 200)
-            );
-          }
-          if (scene.effect === 'descend') {
-            // A heavy settle lands with the figure at descendMs. Timer parked
-            // in timersRef so handleSkip/cleanup clear it.
-            const descendMs = Math.min(scene.duration * 0.75, 3800) * timeScale;
-            timersRef.current.push(setTimeout(() => hapticHeavy(), descendMs));
-          }
-        }
-        if (reducedMotion) {
-          sceneOpacity.setValue(1);
-          sceneTranslateY.setValue(0);
-        } else {
-          sceneOpacity.setValue(0);
-          sceneTranslateY.setValue(20);
-          Animated.parallel([
-            Animated.timing(sceneOpacity, {
-              toValue: 1,
-              duration: 400 * timeScale,
-              useNativeDriver: true,
-            }),
-            Animated.timing(sceneTranslateY, {
-              toValue: 0,
-              duration: 400 * timeScale,
-              useNativeDriver: true,
-            }),
-          ]).start();
-        }
-
-        // Fade out scene before next one
-        const fadeOutTimer = setTimeout(() => {
-          if (reducedMotion) {
-            sceneOpacity.setValue(0);
-          } else {
-            Animated.timing(sceneOpacity, {
-              toValue: 0,
-              duration: 300 * timeScale,
-              useNativeDriver: true,
-            }).start();
-          }
-        }, (scene.duration - 300) * timeScale);
-        timers.push(fadeOutTimer);
-      }, (scene.delay + 600) * timeScale); // +600 for initial overlay fade-in
-      timers.push(showTimer);
-    });
-
-    // Complete after all scenes finish
-    const lastScene = event.scenes[event.scenes.length - 1];
-    const totalDuration = (lastScene.delay + lastScene.duration + 600 + 500) * timeScale;
-    const completeTimer = setTimeout(() => {
-      if (reducedMotion) {
-        overlayOpacity.setValue(0);
-        onComplete();
-      } else {
-        Animated.timing(overlayOpacity, {
-          toValue: 0,
-          duration: 500 * timeScale,
-          useNativeDriver: true,
-        }).start(() => onComplete());
+    if (scene.effect === 'descend') {
+      stopCeremonyMusic();
+      playUiSound('arrival');
+    }
+    if (scene.cue === 'bell') playUiSound('story_bell');
+    if (scene.cue === 'answer') playUiSound('story_answer');
+    let settleTimer: ReturnType<typeof setTimeout> | undefined;
+    if (!reducedMotion) {
+      fireSceneHaptic(scene, event.shakeIntensity);
+      runSceneEffect(scene, event.shakeIntensity ?? 0, event.phase);
+      if (scene.effect === 'particles_rise' || scene.effect === 'particles_fall') {
+        burstNonceRef.current += 1;
+        setBurst({
+          direction: scene.effect === 'particles_rise' ? 'rise' : 'fall',
+          color: event.particles?.color ?? event.accentColor,
+          size: event.particles?.size ?? 8,
+          durationMs: scene.duration * timeScale,
+          nonce: burstNonceRef.current,
+        });
       }
-    }, totalDuration);
-    timers.push(completeTimer);
-
-    timersRef.current = timers;
+      if (scene.effect === 'descend') {
+        settleTimer = setTimeout(() => {
+          if (!hasSkipped.current) hapticHeavy();
+        }, Math.min(scene.duration * 0.75, 3800) * timeScale);
+        timersRef.current.push(settleTimer);
+      }
+      sceneOpacity.setValue(0);
+      sceneTranslateY.setValue(12);
+      Animated.parallel([
+        Animated.timing(sceneOpacity, { toValue: 1, duration: 360, useNativeDriver: true }),
+        Animated.timing(sceneTranslateY, { toValue: 0, duration: 360, useNativeDriver: true }),
+      ]).start();
+    } else {
+      sceneOpacity.setValue(1);
+      sceneTranslateY.setValue(0);
+    }
     return () => {
-      timers.forEach(clearTimeout);
+      if (settleTimer) clearTimeout(settleTimer);
       stopEffectAnims();
+      sceneOpacity.stopAnimation();
+      sceneTranslateY.stopAnimation();
     };
-  }, [event]);
+    // Playback mode is deliberately absent: it only controls the timer below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [event, activeSceneIndex]);
+
+  useEffect(() => {
+    const scene = event?.scenes[activeSceneIndex];
+    if (!event || visibleEventRef.current !== event || !scene ||
+        manualPlayback || hasSkipped.current) return;
+    // Reduced motion changes movement, never the time available to read.
+    const nextScene = event.scenes[activeSceneIndex + 1];
+    const authoredGap = nextScene ? Math.max(0, nextScene.delay - scene.delay - scene.duration) : 350;
+    const timer = setTimeout(() => {
+      if (hasSkipped.current) return;
+      if (activeSceneIndex >= event.scenes.length - 1) finishRef.current();
+      else setActiveSceneIndex(index => index + 1);
+    }, (scene.duration + authoredGap) * 1.25);
+    timersRef.current.push(timer);
+    return () => clearTimeout(timer);
+  }, [event, activeSceneIndex, manualPlayback]);
 
   if (!event) return null;
-
-  const activeScene: PhaseScene | undefined = event.scenes[activeSceneIndex];
+  const eventIsVisible = visibleEventRef.current === event;
+  const activeScene = eventIsVisible ? event.scenes[activeSceneIndex] : undefined;
+  const activeSprites = activeScene?.speaker ? CHARACTER_SPRITES[activeScene.speaker] : undefined;
+  const portrait = event.phase >= 4 ? activeSprites?.robed ?? activeSprites?.idle : activeSprites?.idle;
+  const isIllustration = (key: SceneImage) =>
+    key === 'private_room' || key === 'outward_road' || key === 'outward_road_night' || key === 'kept_table';
+  const lastScene = activeSceneIndex === event.scenes.length - 1;
+  const contentWidth = Math.min(width - 32, 720);
+  const heroHeight = Math.max(100, Math.min(height * 0.37, 400));
+  const readingHeight = Math.max(160, height - insets.top - insets.bottom - heroHeight - 115);
+  const imageSize = (key: SceneImage) => isIllustration(key)
+    ? { width: contentWidth, height: heroHeight }
+    : { width: Math.min(SCENE_IMAGE_SIZES[key].width, contentWidth * 0.84),
+        height: Math.min(SCENE_IMAGE_SIZES[key].height, heroHeight) };
 
   return (
     <Animated.View
-      style={[
-        styles.overlay,
-        {
-          opacity: overlayOpacity,
-          backgroundColor: event.bgColor,
-          transform: [{ translateX: shakeX }, { translateY: shakeY }],
-        },
-      ]}
-      accessibilityRole="alert"
-      // Fence the occluded screen behind this full-screen cinematic so a screen
-      // reader can only reach the ceremony while it plays (iOS honors
-      // accessibilityViewIsModal; the announce above speaks the reveal).
-      accessibilityViewIsModal={true}
-      accessibilityLabel={
-        event.showTitle === false
-          ? (event.scenes[0]?.text ?? 'Narrative transition')
-          : event.title
-      }
+      style={[styles.overlay, { opacity: overlayOpacity, backgroundColor: event.bgColor,
+        transform: [{ translateX: shakeX }, { translateY: shakeY }] }]}
+      accessibilityViewIsModal
+      accessibilityLabel={event.showTitle === false ? 'A moment in the house' : event.title}
     >
-      {/* Event-long backdrop: the settled entity behind every line (static, faint) */}
-      {event.backdrop && (
-        <View style={styles.imageLayer} pointerEvents="none">
-          <Image
-            source={SCENE_IMAGE_SOURCES[event.backdrop.image]}
-            resizeMode="contain"
-            style={{
-              ...SCENE_IMAGE_SIZES[event.backdrop.image],
-              opacity: event.backdrop.opacity,
-            }}
-          />
-        </View>
-      )}
-
-      {/* Per-scene in-engine image (the arrival descends behind the text) */}
-      {activeImage && (
-        <Animated.View
-          style={[
-            styles.imageLayer,
-            { opacity: imageOpacity, transform: [{ translateY: imageTranslateY }, { scale: imageScale }] },
-          ]}
-          pointerEvents="none"
-        >
-          <Image
-            source={SCENE_IMAGE_SOURCES[activeImage]}
-            resizeMode="contain"
-            style={SCENE_IMAGE_SIZES[activeImage]}
-          />
-        </Animated.View>
-      )}
-
-      {/* Soft atmospheric edge vignette (fades in on vignette_close scenes) */}
-      <SoftVignette opacity={vignetteOpacity} color={getPhaseTheme(event.phase).vignetteColor} />
-
-      {/* Full-screen flash overlay */}
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.flash,
-          { opacity: flashOpacity, backgroundColor: flashColor },
-        ]}
-      />
-
-      {/* Cinematic ambient particles */}
-      {event.particles && (
-        <View style={StyleSheet.absoluteFill} pointerEvents="none">
-          {Array.from({ length: event.particles.count }, (_, i) => (
-            <CinematicParticle key={i} config={event.particles!} index={i} />
-          ))}
-        </View>
-      )}
-
-      {/* One-shot burst for particles_rise/fall scenes (keyed so it remounts) */}
-      {burst && (
-        <View key={`burst-${burst.nonce}`} style={StyleSheet.absoluteFill} pointerEvents="none">
-          {Array.from({ length: BURST_PARTICLE_COUNT }, (_, i) => (
-            <BurstParticle
-              key={i}
-              direction={burst.direction}
-              color={burst.color}
-              size={burst.size}
-              durationMs={burst.durationMs}
-            />
-          ))}
-        </View>
-      )}
-
-      {/* Title */}
-      {event.showTitle !== false && (
-        <Text style={[styles.title, { color: event.accentColor }]}>
-          {event.title}
-        </Text>
-      )}
-
-      {/* Active scene */}
-      <Animated.View
-        style={[
-          styles.sceneContainer,
-          {
-            opacity: sceneOpacity,
-            transform: [{ translateY: sceneTranslateY }],
-          },
-        ]}
-      >
-        {activeScene && (
-          <Text style={[styles.sceneText, { color: event.textColor }]}>
-            {activeScene.text}
-          </Text>
-        )}
-      </Animated.View>
-
-      {/* Skip button */}
-      <TouchableOpacity
-        style={[styles.skipButton, { borderColor: SKIP_BORDER_COLOR }]}
-        onPress={handleSkip}
-        accessibilityLabel="Skip transition"
-        accessibilityRole="button"
-      >
-        <Text style={[styles.skipText, { color: SKIP_INK_COLOR }]}>Skip</Text>
-      </TouchableOpacity>
-
-      {/* Progress dots */}
-      <View style={styles.dotsContainer}>
-        {event.scenes.map((_, i) => (
-          <View
-            key={i}
-            style={[
-              styles.dot,
-              {
-                backgroundColor: i <= activeSceneIndex ? event.accentColor : event.accentColor + '40',
-              },
-            ]}
-          />
+      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+        <View style={[styles.topGlow, { backgroundColor: event.accentColor + '16' }]} />
+        {event.particles && Array.from({ length: event.particles.count }, (_, i) => (
+          <CinematicParticle key={i} config={event.particles!} index={i} />
         ))}
       </View>
+      <View style={[styles.shell, { width: contentWidth, paddingTop: insets.top + 14,
+        paddingBottom: insets.bottom + 14 }]}>
+        <View style={styles.header}>
+          <View style={styles.titleGroup}>
+            <Text style={styles.eyebrow}>WORDSHIFT</Text>
+            {event.showTitle !== false && <Text style={styles.title}>{event.title}</Text>}
+          </View>
+          <TouchableOpacity style={styles.skipButton} onPress={finish}
+            accessibilityLabel="Skip transition" accessibilityRole="button">
+            <Text style={styles.skipText}>Skip</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={[styles.artStage, { height: heroHeight }]} pointerEvents="none">
+          {event.backdrop && (
+            <View style={styles.imageLayer}>
+              <Image source={SCENE_IMAGE_SOURCES[event.backdrop.image]}
+                resizeMode={isIllustration(event.backdrop.image) ? 'cover' : 'contain'}
+                style={[imageSize(event.backdrop.image), { opacity: event.backdrop.opacity }]}
+                accessible={false} />
+            </View>
+          )}
+          {eventIsVisible && activeImage && (
+            <Animated.View style={[styles.imageLayer, { opacity: imageOpacity,
+              transform: [{ translateY: imageTranslateY }, { scale: imageScale }] }]}>
+              <Image source={SCENE_IMAGE_SOURCES[activeImage]}
+                resizeMode={isIllustration(activeImage) ? 'cover' : 'contain'}
+                style={imageSize(activeImage)} accessible={false} />
+            </Animated.View>
+          )}
+          <SoftVignette opacity={vignetteOpacity} color={getPhaseTheme(event.phase).vignetteColor} />
+          {burst && <View key={burst.nonce} style={StyleSheet.absoluteFill}>
+            {Array.from({ length: BURST_PARTICLE_COUNT }, (_, i) => (
+              <BurstParticle key={i} direction={burst.direction} color={burst.color}
+                size={burst.size} durationMs={burst.durationMs} />
+            ))}
+          </View>}
+          <View style={styles.artRule} />
+        </View>
+
+        <Animated.View style={[styles.sceneContainer, { maxHeight: readingHeight,
+          opacity: sceneOpacity, transform: [{ translateY: sceneTranslateY }] }]}>
+          {activeScene && <>
+            {activeScene.speaker && <View style={styles.speakerRow}>
+              {portrait && <Image source={portrait} resizeMode="contain"
+                style={styles.portrait} accessible={false} />}
+              <View style={styles.speakerCaption}>
+                <Text style={styles.speakerName}>{getStorySpeakerName(activeScene.speaker)}</Text>
+                <View style={[styles.speakerRule, { backgroundColor: event.accentColor }]} />
+              </View>
+            </View>}
+            <ScrollView ref={scrollRef} style={styles.readingScroll}
+              contentContainerStyle={styles.readingContent} bounces={false}
+              showsVerticalScrollIndicator keyboardShouldPersistTaps="handled">
+              <Text style={styles.sceneText}>{activeScene.text}</Text>
+            </ScrollView>
+            <View style={styles.footer}>
+              <View style={styles.progressGroup}>
+                <Text style={styles.progressText}>
+                  {activeSceneIndex + 1} / {event.scenes.length}
+                </Text>
+                <Text style={styles.modeText}>{manualPlayback ? 'At your pace' : 'A moment unfolds'}</Text>
+              </View>
+              {manualPlayback ? <TouchableOpacity onPress={next} style={styles.continueButton}
+                accessibilityRole="button" accessibilityLabel={lastScene ? 'Return to the house' : 'Continue the scene'}>
+                <Text style={styles.continueText}>{lastScene ? 'Return' : 'Continue'}</Text>
+              </TouchableOpacity> : <TouchableOpacity onPress={() => setManualPlayback(true)}
+                style={styles.readButton} accessibilityRole="button" accessibilityLabel="Pause and read at my pace">
+                <Text style={styles.readButtonText}>Read at my pace</Text>
+              </TouchableOpacity>}
+            </View>
+          </>}
+        </Animated.View>
+      </View>
+      <Animated.View pointerEvents="none" style={[styles.flash,
+        { opacity: flashOpacity, backgroundColor: flashColor }]} />
     </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: {
-    ...StyleSheet.absoluteFill,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-    padding: 40,
-  },
-  title: {
-    fontFamily: BODY_FONT_BOLD,
-    fontSize: FONT_SIZE.bodyLg,
-    fontWeight: '800',
-    letterSpacing: 3,
-    textTransform: 'uppercase',
-    marginBottom: 60,
-    opacity: 0.6,
-    zIndex: 2,
-  },
-  sceneContainer: {
-    alignItems: 'center',
-    minHeight: 120,
-    justifyContent: 'center',
-    zIndex: 2,
-  },
-  // Centered layer for the in-engine cinematic art (backdrop + scene image).
-  // Sits behind the text (zIndex under sceneContainer) and never intercepts
-  // touches — the imagery is presence, the words stay legible on top.
-  imageLayer: {
-    ...StyleSheet.absoluteFill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1,
-  },
-  sceneText: {
-    fontFamily: BODY_FONT_BOLD,
-    fontSize: FONT_SIZE.headline,
-    fontWeight: '600',
-    textAlign: 'center',
-    lineHeight: 30,
-    maxWidth: SCREEN_WIDTH * 0.8,
-  },
-  dotsContainer: {
-    flexDirection: 'row',
-    position: 'absolute',
-    bottom: 80,
-    gap: 8,
-    zIndex: 2,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  skipButton: {
-    position: 'absolute',
-    top: 50,
-    right: 24,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 16,
-    borderWidth: 1,
-    // ABOVE the vignette (zIndex 999), below the flash (1001, which must keep
-    // covering everything). The skip pill sits at top-right, which is exactly
-    // where the two vignette edges overlap and darken hardest (up to 0.9 on the
-    // vignette_close scenes) — at zIndex 2 the vignette painted straight over
-    // the only escape from a 10-20s cinematic, so new ink alone would not have
-    // been enough.
-    zIndex: 1000,
-  },
-  skipText: {
-    fontFamily: BODY_FONT_BOLD,
-    fontSize: FONT_SIZE.bodyLg,
-    fontWeight: '600',
-  },
-  flash: {
-    ...StyleSheet.absoluteFill,
-    zIndex: 1001,
-  },
-  // Soft edge vignette container. The darkening comes from stepped translucent
-  // bands (see SoftVignette) rather than a bordered rounded-rect, so there is no
-  // hard picture-frame edge — just an atmospheric darkening toward the corners.
-  vignette: {
-    ...StyleSheet.absoluteFill,
-    zIndex: 999,
-  },
+  overlay: { ...StyleSheet.absoluteFill, alignItems: 'center', zIndex: 1000 },
+  shell: { flex: 1, alignSelf: 'center' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    minHeight: 58, marginBottom: 12 },
+  titleGroup: { flex: 1, paddingRight: 16 },
+  eyebrow: { fontFamily: PIXEL_FONT_BOLD, fontSize: 10, letterSpacing: 3, color: '#CBB9A0', marginBottom: 8 },
+  title: { fontFamily: PIXEL_FONT_BOLD, fontSize: 22, lineHeight: 30, color: '#F3E8D7' },
+  topGlow: { position: 'absolute', top: 0, left: 0, right: 0, height: '48%' },
+  artStage: { width: '100%', overflow: 'hidden', marginBottom: 16, backgroundColor: '#100B15' },
+  imageLayer: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
+  artRule: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 1, backgroundColor: '#D7BE8B60' },
+  sceneContainer: { flex: 1, flexShrink: 1, backgroundColor: '#17121D',
+    borderWidth: 1, borderColor: '#8B755D60', paddingHorizontal: 20, paddingTop: 12 },
+  speakerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  portrait: { width: 56, height: 56, marginRight: 12 },
+  speakerCaption: { flex: 1 },
+  speakerName: { fontFamily: PIXEL_FONT_BOLD, fontSize: 16, lineHeight: 24, color: '#E9CCA2' },
+  speakerRule: { height: 2, width: 30, marginTop: 8 },
+  readingScroll: { flexShrink: 1 },
+  readingContent: { paddingVertical: 12 },
+  sceneText: { fontFamily: BODY_FONT, fontSize: 20, lineHeight: 31, color: '#F2E7D6' },
+  footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    gap: 12, borderTopWidth: 1, borderTopColor: '#806B5560', paddingVertical: 14, marginTop: 10 },
+  progressGroup: { flexShrink: 1 },
+  progressText: { fontFamily: PIXEL_FONT_BOLD, fontSize: 11, letterSpacing: 2, color: '#D5C3A9' },
+  modeText: { fontFamily: BODY_FONT, fontSize: 12, color: '#C3B5CC', marginTop: 5 },
+  continueButton: { minHeight: 48, minWidth: 110, alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 18, borderWidth: 1, borderColor: '#D8B680', backgroundColor: '#3A2D29' },
+  continueText: { fontFamily: PIXEL_FONT_BOLD, fontSize: 14, color: '#F4E8D1' },
+  readButton: { minHeight: 48, justifyContent: 'center', paddingHorizontal: 12 },
+  readButtonText: { fontFamily: BODY_FONT_BOLD, fontSize: 14, color: '#E2D2BD' },
+  skipButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 16,
+    borderWidth: 1, borderColor: SKIP_BORDER_COLOR, backgroundColor: '#100B15', zIndex: 1000 },
+  skipText: { fontFamily: BODY_FONT_BOLD, fontSize: FONT_SIZE.bodyLg, color: SKIP_INK_COLOR },
+  flash: { ...StyleSheet.absoluteFill, zIndex: 1001 },
+  vignette: { ...StyleSheet.absoluteFill, zIndex: 1 },
 });

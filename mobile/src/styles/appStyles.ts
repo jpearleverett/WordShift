@@ -40,20 +40,20 @@ export function getScreenBackgroundColor(screen: string, phase: number): string 
  * They keep their distinct HUE identity at every phase (warm=undo, cool=hint,
  * green=restart — muscle memory holds), but darken and desaturate into the
  * dread register from Phase 3 so three candy buttons don't glow against a
- * near-black board and break the descent. Phases 0-2 are the original candy
- * colors, pixel-identical to before.
+ * near-black board and break the descent. The bright controls use the same
+ * softly painted finish as the letter tokens.
  */
 export type ActionButtonKind = 'undo' | 'hint' | 'restart';
 export function getActionButtonColors(
   kind: ActionButtonKind,
   phase: number
 ): { bg: string; border: string; glow: string } {
-  const candy = {
-    undo: { bg: CandyColors.yellow.main, border: CandyColors.yellow.shadow, glow: CandyColors.yellow.glow },
-    hint: { bg: CandyColors.blue.main, border: CandyColors.blue.shadow, glow: CandyColors.blue.glow },
-    restart: { bg: CandyColors.green.main, border: CandyColors.green.shadow, glow: CandyColors.green.glow },
+  const painted = {
+    undo: { bg: '#DDB477', border: '#997542', glow: 'rgba(221, 180, 119, 0.22)' },
+    hint: { bg: '#88ADC5', border: '#536F89', glow: 'rgba(136, 173, 197, 0.22)' },
+    restart: { bg: '#9ABC8E', border: '#5D7955', glow: 'rgba(154, 188, 142, 0.22)' },
   } as const;
-  if (phase < 2) return candy[kind];
+  if (phase < 2) return painted[kind];
   if (phase < 3) {
     // Phase 2 (dusk): the candy COOLS one step — a desaturated, slightly
     // darker version of each hue — so the HUD ages gradually (bright -> cooled

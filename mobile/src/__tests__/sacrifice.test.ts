@@ -405,14 +405,14 @@ describe('sacrifice', () => {
       expect([...calm].some(m => m.includes('stopped pretending'))).toBe(false);
     });
 
-    it('serves serene (phase 5) copy distinct from the dread (phase 4) pool', () => {
+    it('keeps post-arrival offerings distinct without promising erased needs', () => {
       const p5 = new Set<string>();
       for (let i = 0; i < 40; i++) {
         p5.add(selectOfferingResponse({ count: 4, sessionStreak: 0, phase: 5 }).message);
       }
       expect([...p5].every(m => m.length > 0)).toBe(true);
-      // A serene line that never appears in the phase-4 calm pool.
-      expect([...p5].some(m => m.includes('no hunger'))).toBe(true);
+      expect([...p5].some(m => /mark|chair|empty place/.test(m))).toBe(true);
+      expect([...p5].every(m => !/no hunger|nothing is lost/.test(m))).toBe(true);
     });
 
     it('gives the "offer everything" gesture its own response', () => {
@@ -479,5 +479,16 @@ describe('sacrifice', () => {
       await clearSacrificeState();
       expect(await hasSeenOfferingIntro()).toBe(false);
     });
+  });
+});
+
+describe('Offering describes its actual incentives', () => {
+  test('offering copy allows the existing partial quest rebate and promises no item or ending', () => {
+    for (const phase of [4, 5]) {
+      const text = getSacrificePrompt(phase).subtitle;
+      expect(text).toMatch(/no item or ending/i);
+      expect(text).toMatch(/quest can return part/i);
+      expect(text).not.toMatch(/you get nothing|you keep nothing/i);
+    }
   });
 });

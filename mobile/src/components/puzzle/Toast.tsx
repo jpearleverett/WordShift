@@ -182,6 +182,7 @@ export const Toast: React.FC<ToastProps> = ({ message, isError, phase = 0, isVoi
 
   return (
     <Animated.View
+      pointerEvents="none"
       style={[
         styles.toast,
         {

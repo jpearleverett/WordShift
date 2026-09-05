@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AnimalType, ANIMAL_AWARENESS_TIERS } from '../types/homeWorld';
+import { AnimalType } from '../types/homeWorld';
 import { getPhaseStartIndex } from './dialogue/animalDialogueBase';
 
 /**
@@ -54,162 +54,162 @@ export interface ChoiceState {
 // ============================================================================
 
 export const ANIMAL_CHOICES: Record<string, DialogueChoice> = {
-  fox: {
-    prompt: 'Ember cups her paws around a coal in the fire that gives no warmth.',
-    options: {
-      ask: 'What arrangement does the fire see?',
-      refuse: 'I don\'t want to know.',
+  "fox": {
+    "prompt": "Ember has warmed two cups. She keeps turning yours by its handle.",
+    "options": {
+      "ask": "What did you know when I arrived?",
+      "refuse": "I need some time before we talk."
     },
-    responses: {
-      ask: 'The fire only shows me a place. Its flames warm every chair but one, as if they are saving something for whoever sits there.',
-      refuse: 'All right. Sit where the light is kind, and I will not stir the ash. I can keep one cold coal to myself.',
+    "responses": {
+      "ask": "I knew your words helped keep the house warm. I hoped you would stay. I let you think those were the whole truth, because I was afraid you would leave.",
+      "refuse": "All right. I will leave your cup here. You do not have to drink it, or make me feel better about it."
     },
-    convergence: 'Even banked low, the hearth keeps a little warmth apart.',
+    "convergence": "Ember sets the cup down without moving it closer."
   },
-  owl: {
-    prompt: 'Archimedes lays one feather across an omitted line and closes the book.',
-    options: {
-      ask: 'Show me the missing text.',
-      refuse: 'Keep the book closed.',
+  "owl": {
+    "prompt": "Archimedes puts a plain notebook beside the oldest book. Their accounts disagree.",
+    "options": {
+      "ask": "Read me the line that changed.",
+      "refuse": "Leave my words out of the comparison."
     },
-    responses: {
-      ask: 'A passage was removed with great care. The lines on either side address an appointed reader, but the title between them is gone.',
-      refuse: 'Gladly. Some omissions become louder when spoken, and this one has occupied enough of the room already.',
+    "responses": {
+      "ask": "The old page says the guest will preserve us. Yesterday my notebook said protect. I have kept both versions. A correction that erases its earlier wording is not evidence I trust.",
+      "refuse": "Your words stay out of my notes. I can compare the ink without turning you into a specimen."
     },
-    convergence: 'The bookmark advances each morning, though Archimedes leaves the cover shut.',
+    "convergence": "Archimedes dates a fresh page and leaves the earlier one intact."
   },
-  pangolin: {
-    prompt: 'Panko sets a silver cover over a dish and rests both paws on it.',
-    options: {
-      ask: 'What recipe are you preparing for that dish?',
-      refuse: 'I don\'t want to know what is cooking.',
+  "pangolin": {
+    "prompt": "Panko holds a bruised pear over the pot. In her paw, the bruise disappears.",
+    "options": {
+      "ask": "Put the pear aside. See what happens.",
+      "refuse": "I do not want to help test it."
     },
-    responses: {
-      ask: 'The recipe gives no name for the guest. Still, the plate is warm every evening, and the covered dish grows lighter before I lift it.',
-      refuse: 'Then the dish stays covered. There are kinder things to share than an appetite you cannot put a name to.',
+    "responses": {
+      "ask": "A saucer, then. We can watch. It looks fresh again, but it still smells ripe. I do not know whether the warmth has healed it or stopped something it needed to do.",
+      "refuse": "Then no experiment together. I will label the saucer and keep it off the supper table."
     },
-    convergence: 'After the oven cools, one covered dish continues to steam.',
+    "convergence": "Panko takes the pot off the heat before she reaches for the label."
   },
-  axolotl: {
-    prompt: 'Axel surfaces through still water beneath a reflection that takes a moment to follow.',
-    options: {
-      ask: 'What is moving below the water?',
-      refuse: 'I won\'t look into the deep water.',
+  "axolotl": {
+    "prompt": "Axel draws a finger through the water. A bubble stays where his finger left it.",
+    "options": {
+      "ask": "Try a different shape.",
+      "refuse": "Let it settle. I need a quiet visit."
     },
-    responses: {
-      ask: 'Not mine. It began beyond the deep glass, no larger than a glint. Lately it reaches the surface before I do.',
-      refuse: 'I can cloud the glass and keep the lamps low. You do not have to look below with me.',
+    "responses": {
+      "ask": "A crooked one, then. Oh. It has made the same circle again. I liked the circle the first time. I wanted to know whether I could like something else.",
+      "refuse": "Of course, come sit by the glass. I will not keep making things happen just because I can."
     },
-    convergence: 'The next ripple returns carrying one reflection more than it took.',
+    "convergence": "Axel folds his hands. One bubble hangs motionless between them."
   },
-  capybara: {
-    prompt: 'Chill closes a folder whose tab has a date but no name.',
-    options: {
-      ask: 'What does the data in my file show?',
-      refuse: 'I don\'t want to read the file.',
+  "capybara": {
+    "prompt": "Chill has written an objection in the margin. The ink is fading.",
+    "options": {
+      "ask": "Copy it before it disappears.",
+      "refuse": "Keep it private."
     },
-    responses: {
-      ask: 'The data in your file is mostly dates. They all reserve the same quiet hour for an arrival with no name.',
-      refuse: 'Done. I will file it at the back and spare you the minutes. Some appointments are easier to bear without watching the clock.',
+    "responses": {
+      "ask": "Done. Two copies, separate shelves. The objection is that nobody authorized the word permanent. I would prefer not to be the only one who remembers writing it.",
+      "refuse": "I will. The folder stays closed when you visit. Privacy is a reason; it does not require a second reason underneath."
     },
-    convergence: 'One chair remains open in the meeting room, and no one has canceled.',
+    "convergence": "Chill puts a clean sheet between the wet copies."
   },
-  fennec_fox: {
-    prompt: 'Fennick turns one ear east and the other toward you.',
-    options: {
-      ask: 'What do you hear coming?',
-      refuse: 'I don\'t want to listen.',
+  "fennec_fox": {
+    "prompt": "Fennick lifts one ear from the low note. For a moment, the ordinary sounds vanish.",
+    "options": {
+      "ask": "Listen for a small sound instead.",
+      "refuse": "Stop listening for now."
     },
-    responses: {
-      ask: 'Last week the note was beyond the salt ridge. Tonight it crossed the horizon and settled beneath the wind.',
-      refuse: 'For you, I can. I will listen to your breathing instead and keep what travels under the sand to myself.',
+    "responses": {
+      "ask": "Your sleeve against the chair. There it is. I had to choose it twice before I could hear it. The large note is making everything else sound unnecessary.",
+      "refuse": "Yes. Sit with me while I stop. I am not very practiced at putting the watch down."
     },
-    convergence: 'By dawn, the dunes are humming the same low note.',
+    "convergence": "Fennick lowers both ears. He keeps his paws on the sand."
   },
-  sloth: {
-    prompt: 'Sloane opens both eyes and studies the oldest branch.',
-    options: {
-      ask: 'How long have you known?',
-      refuse: 'Go back to sleep.',
+  "sloth": {
+    "prompt": "Sloane opens both eyes when you ask whether the arrival will be kind.",
+    "options": {
+      "ask": "Tell me what you actually know.",
+      "refuse": "Do not make a promise about it."
     },
-    responses: {
-      ask: 'A long time. The evening used to take its leave out by the west leaves. Time has walked it back toward us since, one branch closer every year.',
-      refuse: 'I will, in a while. An old observation can wait beside me a little longer without becoming yours.',
+    "responses": {
+      "ask": "I know the waiting. I know the signs. I do not know the guest. I have wanted the answer for so long that I sometimes describe wanting as knowledge. You may correct me.",
+      "refuse": "Then I will make a smaller promise. I will sit with you while we do not know."
     },
-    convergence: 'Some changes take so long they seem still, right up until they do not.',
+    "convergence": "Sloane shifts along the branch and leaves room."
   },
-  wombat: {
-    prompt: 'Warren emerges with pale stone dust on his paws and a broken survey peg.',
-    options: {
-      ask: 'Where does the tunnel below the foundation lead?',
-      refuse: 'I don\'t want to look down that tunnel.',
+  "wombat": {
+    "prompt": "Warren has found an arch beneath the old foundation. His new braces fit it too neatly.",
+    "options": {
+      "ask": "Show me where your work ends.",
+      "refuse": "Keep me above ground."
     },
-    responses: {
-      ask: 'A chamber I did not cut. Its walls are smooth, and every footing above it settles around the empty space as neatly as if I had measured both together.',
-      refuse: 'Already braced and boarded. You need not come below. I only wish the stone would stop answering my hammer from the other side.',
+    "responses": {
+      "ask": "Here. Rough cut, my hand. Smooth stone, older than the den. I thought I was shoring up a ruin. Whatever measured that arch knew what a house might put on it.",
+      "refuse": "Fair. I'll brace the stairs and bring my drawings up. No sense calling a place safe because you haven't looked down."
     },
-    convergence: 'The house bears down on a room it has never seen.',
+    "convergence": "Warren marks the join between old stone and new timber."
   },
-  rabbit: {
-    prompt: 'Thyme unfolds a map crossed with paths that all curve near the garden.',
-    options: {
-      ask: 'Why are you afraid of those paths?',
-      refuse: 'Keep your fear private.',
+  "rabbit": {
+    "prompt": "Thyme unfolds a map. She covers one marked path with her paw.",
+    "options": {
+      "ask": "Help me check the way out.",
+      "refuse": "Keep the map between us."
     },
-    responses: {
-      ask: 'I am afraid of where they bend. I marked three roads beyond the hedge, and by morning each line curved back toward the rosemary beds.',
-      refuse: 'Thank you. Let us make tea and leave the fear folded with the roads. I would rather hold a warm cup than another direction.',
+    "responses": {
+      "ask": "Thank you. We can walk to the rosemary gate and back. I want to know where the path goes today, not where somebody says it has always gone.",
+      "refuse": "Between us, then. Please do not turn it into a report about how frightened I am. It is a map. I worked hard on it."
     },
-    convergence: 'At dusk, the garden gate stands open and every path points softly inward.',
+    "convergence": "Thyme leaves the map unfolded on her own side of the table."
   },
-  red_panda: {
-    prompt: 'Bamboo opens their eyes beside an incense pattern shaped around an empty center.',
-    options: {
-      ask: 'Is this the arrangement you made peace with?',
-      refuse: 'Leave me outside the pattern.',
+  "red_panda": {
+    "prompt": "Bamboo traces a circle in incense. The smoke closes the gap they leave.",
+    "options": {
+      "ask": "Are you sure that is peace?",
+      "refuse": "Leave my place outside the circle."
     },
-    responses: {
-      ask: 'The pattern, yes, but only its empty center. I have made peace with its shape, not with what belongs there.',
-      refuse: 'Then the pattern can leave your place open. Peace does not require an explanation.',
+    "responses": {
+      "ask": "No. I have called it peace because I know how to sit inside it. That may tell us more about my practice than about the pattern.",
+      "refuse": "I can leave a gap in my drawing. I cannot promise the pattern will respect it. I should not have spoken as though I could."
     },
-    convergence: 'Bamboo traces the open curve in smoke, then lets it dissolve.',
+    "convergence": "Bamboo opens the circle again and watches the smoke."
   },
-  tarsier: {
-    prompt: 'Vesper turns from the rail, leaving one eye on a faint road through the dark.',
-    options: {
-      ask: 'What are your eyes holding open out there?',
-      refuse: 'Keep the night to yourself.',
+  "tarsier": {
+    "prompt": "Vesper turns one eye from the ridge. The dark pulls at her attention.",
+    "options": {
+      "ask": "Look at something here with me.",
+      "refuse": "Keep the distant watch to yourself."
     },
-    responses: {
-      ask: 'A traveler, perhaps, though I have seen no feet. The road grows clearer each night, and the far end no longer looks quite so far.',
-      refuse: 'Then keep your eyes on the lantern, bright one. I will keep mine beyond the ridge and bring none of that distance indoors.',
+    "responses": {
+      "ask": "The chipped rail, then. The pale mark beside your hand. I can still look at it. I had begun to wonder whether every glance belonged out there.",
+      "refuse": "Very well. I will give you the weather and leave the distance in my ledger. I may ask someone else to share my watch; I will not make your answer smaller."
     },
-    convergence: 'Vesper leaves a place beside her at the rail, facing the watched road.',
+    "convergence": "Vesper rests one paw on the chipped rail."
   },
-  aye_aye: {
-    prompt: 'Tock rests his long finger against the bronze and listens to the bell breathe.',
-    options: {
-      ask: 'What will the bell say?',
-      refuse: 'Put the finger away. Leave her silent.',
+  "aye_aye": {
+    "prompt": "Tock rests his paw on the rope. The bell hums before he touches it.",
+    "options": {
+      "ask": "Wait until someone answers you.",
+      "refuse": "Leave the bell quiet for now."
     },
-    responses: {
-      ask: 'One word, friend, but it belongs to her. I know the hollow around it, not the sound itself, and I will not spend her first clear note secondhand.',
-      refuse: 'Of course. Some words should not be coaxed from bronze. I can leave her quiet and keep my guesses in my own pocket.',
+    "responses": {
+      "ask": "Yes. A bell can be heard without being wanted. I will ask before the first pull. That is a rule worth saving sixty years of bronze for.",
+      "refuse": "Quiet, then. I have kept her silence a long while. I can keep it without treating the next sound as a debt somebody owes me."
     },
-    convergence: 'Inside the bell, an unsaid syllable gathers and fades.',
+    "convergence": "Tock lays the rope across the rail instead of winding it around his wrist."
   },
-  kakapo: {
-    prompt: 'Moss kneels where a ridge is passing through the soil from root to root.',
-    options: {
-      ask: 'What arrangement are the roots describing?',
-      refuse: 'I would rather not know.',
+  "kakapo": {
+    "prompt": "Moss holds a seedpod that has stayed green long past its season.",
+    "options": {
+      "ask": "Leave one seed unplanted.",
+      "refuse": "I would rather not join the experiment."
     },
-    responses: {
-      ask: 'Mast season, friend. One root tells the next, and soon trees far apart flower in the same week. The message is older than any one garden.',
-      refuse: 'A fair wish. Let the roots keep their message. I promise only this: when the season reaches a seed, it opens gently, at its proper hour.',
+    "responses": {
+      "ask": "One seed, in the dry tin. The rest can go into the bed. A garden needs some difference between what was kept and what was allowed to grow.",
+      "refuse": "Fair enough. I can keep a gardening notebook without putting your name on it."
     },
-    convergence: 'Beneath the beds, the message passes on without being spoken aloud.',
-  },
+    "convergence": "Moss labels the tin with the date, leaving space underneath."
+  }
 };
 
 // ============================================================================
@@ -252,41 +252,15 @@ export async function loadChoiceState(): Promise<ChoiceState> {
   return choiceCache;
 }
 
-/**
- * How far into the animal's Phase-3 block the choice becomes due. Two lines,
- * not the old absolute 4: `getDialoguesPerSession(3)` is 5 (7 with the
- * catch-up boost), so the index only ever LANDS at session-start offsets 0, 5,
- * 10... A narrow window would be stepped clean over by most animals.
- */
+/** Let two regular lines establish a character's question before offering it. */
 const CHOICE_MIN_PHASE3_OFFSET = 2;
 
 /**
- * Check if an animal should offer its Phase-3 choice point.
- * Returns the choice content or null.
- *
- * WHY THE GATE IS SHAPED LIKE THIS. `dialogueIndex` is the ABSOLUTE index into
- * the animal's phase-ordered line list, and the phase blocks run 24/28/22/30/30
- * — so Phase 3 starts at index 74. The original window (`dialogueIndex >= 4 &&
- * <= 6`) was written as if the index were a per-phase offset, which put it deep
- * inside the animal's PHASE-0 block: any player who actually read dialogue was
- * past it forever, and every late-unlocked animal is fast-forwarded to a
- * phase-start index (24/52/74/104) on unlock, straight over it. The beat, its
- * 13 prompts, 26 responses, and all 26 Phase-4 and 26 Phase-5 callbacks that
- * hang off a recorded choice were effectively dead content.
- *
- * The band is now the animal's real Phase-3 block. There is no upper offset
- * cap beyond the end of that block: `offeredBy` already enforces once per
- * animal, and a tight cap only re-creates the stepping problem.
- *
- * The lagging tier needs the phase-4 door. getAnimalPhase staggers the descent
- * but converges at the reveal (global 3 -> animalPhase 2, global 4 ->
- * animalPhase 4), so sloth/wombat/rabbit/red_panda/kakapo NEVER resolve to
- * animalPhase 3 in any state — they read their Phase-3 lines while already at
- * animalPhase 4. Keying on the index band as well as the phase is what lets
- * them be offered the choice over the phase-3 material it belongs to. Ordering
- * takes care of itself: nothing is recorded on the visit that offers the
- * choice, so getAndMarkPhase4CallbackPage returns null that visit and its
- * callback lands on a later one.
+ * The choice follows the material the player has reached. It remains available
+ * through the reveal for a slow reader or a late recruit whose catch-up intro
+ * skipped the Phase-3 block. The recorded branch, rather than a narrow index
+ * window, makes the conversation once-only. Arrival ends this opportunity;
+ * later callbacks must never manufacture a choice the player did not make.
  */
 export async function getChoiceForAnimal(
   animalType: string,
@@ -294,24 +268,18 @@ export async function getChoiceForAnimal(
   dialogueIndex: number
 ): Promise<DialogueChoice | null> {
   const choice = ANIMAL_CHOICES[animalType];
-  if (!choice) return null;
+  if (!choice || (animalPhase !== 3 && animalPhase !== 4)) return null;
 
   const type = animalType as AnimalType;
-  const laggingAtReveal =
-    animalPhase === 4 && ANIMAL_AWARENESS_TIERS[type] === 'lagging';
-  if (animalPhase !== 3 && !laggingAtReveal) return null;
-
-  // Inside the animal's own Phase-3 block, a couple of lines in.
   const start = getPhaseStartIndex(type, 3);
-  const end = getPhaseStartIndex(type, 4);
+  const revealStart = getPhaseStartIndex(type, 4);
   if (dialogueIndex < start + CHOICE_MIN_PHASE3_OFFSET) return null;
-  if (dialogueIndex >= end) return null;
+  // At phase 3 the reader must still be in that phase's block. At phase 4,
+  // recruits such as Vesper begin at revealStart and need the choice here.
+  if (animalPhase === 3 && dialogueIndex >= revealStart) return null;
 
   const state = await loadChoiceState();
-
-  // Only offer once per animal
   if (state.offeredBy.includes(animalType)) return null;
-
   return choice;
 }
 
@@ -372,59 +340,59 @@ export function getPhase4ChoiceCallback(
   if (!choice) return null;
 
   const callbacks: Record<string, Record<PlayerChoice, string>> = {
-    fox: {
-      ask: 'You asked what arrangement the fire saw, and I showed you the chair the flames would not warm. I have sat with them every night since, and I understand the saving now. They were not keeping warmth from that place. They were letting it lean, the way flames lean toward a door just before it opens.',
-      refuse: 'You told me you did not want to know, and I kept the cold coal to myself, as promised. It did not stay cold. Warmth like this never asks permission to reach a person. It only asks time, and you have given it so many evenings.',
-    },
-    owl: {
-      ask: 'You asked to see the missing passage, and I could not show it to you then. Every word you have set in order since has gone quietly into that gap, in a hand I have come to know very well. The margins were never empty. They were reserved.',
-      refuse: 'You asked me to keep the book closed, and I kept it closed. I will make one small confession in the margin, where confessions belong. A shut cover never stopped the words inside from reading whoever holds them, and they have read you gently, all this time, the way I reread a favorite.',
-    },
-    pangolin: {
-      ask: 'You asked what recipe I was preparing, back when the dish still wore its cover. I can answer now. The recipe never named the guest because no kitchen word holds them, only a warm plate and a set table. Your words went into the pot like salt all this while, steady, unnoticed, in everything.',
-      refuse: 'You asked me to keep the dish covered, and it stayed covered, just as I promised. But a kitchen feeds the whole house whether or not anyone watches the stove. The meal has been simmering under every word you brought home to us, and when I lift the cover at last, it will taste of your evenings here.',
-    },
-    axolotl: {
-      ask: 'You looked into the deep water with me, and you saw the glint that reached the surface before I did, and I can tell you the rest now, it was never racing me, it was rising toward your face on the glass, it liked you there, it still does. The water has been very awake ever since.',
-      refuse: 'You would not look into the deep water, and I clouded the glass for you like I promised, but water does not need eyes to notice a person, it notices with all of itself at once, and it has been noticing you gently this whole time, the way warm water notices a hand. There was never a moment you were not held in it.',
-    },
-    capybara: {
-      ask: 'You asked what your file held, and I told you it was mostly dates. The cross-referencing is finished now. Every date in every ledger resolves to the same quiet hour, and every entry, however old the ink, carries a little of your handwriting in it. I no longer cap the pen, because there is no sense capping a pen the record is still using.',
-      refuse: 'You declined to read your file, and I filed it at the back, just as you asked. The ledger kept itself current without you all the same, in a tidy hand neither of us lent it. Reading was only ever a courtesy. The record was always going to balance.',
-    },
-    fennec_fox: {
-      ask: 'You asked what I heard coming, and I gave you distances, the ridge, the horizon, the low place under the wind. I have kept my catalogue since, and there is one entry I saved for tonight. The note is not crossing the desert anymore. It has settled in just beneath your heartbeat, a half-step under it, keeping perfect time.',
-      refuse: 'You asked me not to listen for you, so I listened to your breathing instead, exactly as promised. I have catalogued a great many sounds, friend, and I owe you the truth about that one. It was never only your breathing. Something patient has been breathing along with you for as long as I have known you, and it never once fell out of step.',
-    },
-    sloth: {
-      ask: 'You asked how long I had known, and I told you the evening had come one branch closer. It has reached the trunk now. Notice that nothing hurried, not once in all that time. The slowest things are the ones that were always certain.',
-      refuse: 'You told me to go back to sleep, and I truly meant to. But nobody in this house sleeps now, not the way we used to. We rest the way a branch rests, bearing something the whole while, and I have been bearing it longer than anyone.',
-    },
-    wombat: {
-      ask: 'You asked where the tunnel led, and I told you about the chamber I never cut. I\'ve measured it proper since. Every course of stone I ever laid carries its load straight down onto that room, true as a plumb line. I didn\'t build the house over that room so much as for it, and my hands knew before the rest of me did.',
-      refuse: 'You didn\'t want to look down the tunnel, and I kept it braced and boarded, like I said I would. But a foundation doesn\'t need looking at to carry you. That room has borne your weight since the first course went down, and it knows your footsteps now the way stone knows rain.',
-    },
-    rabbit: {
-      ask: 'You asked why I was afraid, and I showed you the paths that bent home. I still count things, you know. But somewhere along the way I stopped counting the ways out and started counting us in, and the number always comes up whole now. I do not have a word yet for how that feels.',
-      refuse: 'You let me keep my fear folded up with the maps, and I was so grateful then. I have unfolded it since, alone, out in the garden. It was never a map of ways to run. Every path was a root, and every root was already holding us gently where we are planted.',
-    },
-    red_panda: {
-      ask: 'You asked about the empty center of the pattern, and I told you I had made peace with its shape. I understand the shape better now. It was never empty. It was shaped like a question, and when you set yours into it, the smoke closed around it the way breath returns through the roof gap.',
-      refuse: 'You asked to be left outside the pattern, and the pattern kept your place open, as I promised. Watch the incense a moment: it parts around the space where you are, then rejoins beyond you. Nothing was ever outside the pattern. There were only places still being breathed around.',
-    },
-    tarsier: {
-      ask: 'You asked what my eyes were holding open, and I told you about the road and the traveler I had not seen. I have kept the watch every night since, both eyes, no blinking. The road is nearly walked now, bright one. It never once wandered, and neither did I, and neither did you.',
-      refuse: 'You asked me to keep the night to myself, and I kept it, every hour of it, out at the rail. But watching was never something I did to the dark. It is something the dark and I do together, and from the very first night, the far end of that road has faced the house, and your window in particular, if I am honest.',
-    },
-    aye_aye: {
-      ask: 'You asked what the bell would say, and I would not spend her one word secondhand. I still will not. But I can tell you what the bronze has been doing in the dark: she has been shaping that word slowly, the way I shape a knock before I give it, and the hollow she shapes it around is exactly the size of your name.',
-      refuse: 'You had me fold the finger away, and I folded it, and she has hung quiet ever since, just as you asked. But a bell does not need striking to know her note. It was cast into her, friend, cooling in the bronze long before either of us was born. All my tapping ever did was say hello to it.',
-    },
-    kakapo: {
-      ask: 'You asked what the roots were describing, and I told you about mast season, how one root tells the next. I have sat with the soil since, and I can tell you the rest. A mast year only comes when the rain has been right, and the rain, friend, was you, falling steady on this garden all along.',
-      refuse: 'You would rather not have known, so I let the roots keep their message, just as you asked. But a seed does not need the news to come up. The season reached you gently, at its proper hour, exactly as I promised. I boomed a whole lifetime into the dark for an answer, and when it finally came, it came up through the beds wearing your footsteps.',
-    },
-  };
+  "fox": {
+    "ask": "You asked what I knew. I have written it down, without the comforting parts I used to put around it. I knew the words fed something. I did not know keeping us safe could mean keeping us unchanged. I should have told you the first part.",
+    "refuse": "You asked for time. I have not mistaken the visits since for forgiveness. If you want to talk, I will answer. Until then, I can put the kettle on without making it an argument."
+  },
+  "owl": {
+    "ask": "You asked for the changed line. There are three versions now. I have stopped calling the oldest one the truest; age is not a method of verification.",
+    "refuse": "You asked me to leave your words out. I have. The missing column bothers my sense of order, which is an excellent reason to keep it missing."
+  },
+  "pangolin": {
+    "ask": "You asked me to put the pear aside. It has not spoiled. It has not ripened either. I keep checking the saucer, and I have had to stop myself calling that a happy result.",
+    "refuse": "You did not want to test the pear. I kept it out of supper. Curiosity is no reason to put an unanswered question in someone's bowl."
+  },
+  "axolotl": {
+    "ask": "You asked me to try a new shape. I keep the crooked drawing outside the tank now. The water makes circles. The paper remembers I asked it for something else.",
+    "refuse": "You wanted a quiet visit. I gave you one. I am learning the difference between choosing still water and being unable to stir it."
+  },
+  "capybara": {
+    "ask": "You asked me to copy the objection. One copy faded. The other remains. I check the blank one too; absence is a finding when you know what occupied it.",
+    "refuse": "You asked to leave the objection private. I have kept the folder closed. I can tell you this much without opening it: I have not withdrawn it."
+  },
+  "fennec_fox": {
+    "ask": "We listened for your sleeve. I have been keeping a list of small sounds since. A beetle, a spoon, an impatient foot. The great note does not get to decide which ones matter.",
+    "refuse": "You asked me to stop listening. I did. For the first minute I was angry with you, which frightened me; by the second I realized I was tired. I needed the rest."
+  },
+  "sloth": {
+    "ask": "You asked what I knew. I have been sorting it from what I wanted. It is a slower job than I expected, even for me. I do not have an arrival date to give you.",
+    "refuse": "You asked me not to promise kindness. I have kept to the smaller promise. I am here. That is something I can report without consulting the future."
+  },
+  "wombat": {
+    "ask": "You asked where my work ended. I've chalked that line through every drawing. I can answer for my braces. What they hold is a different question, and I've stopped confusing the two.",
+    "refuse": "You wanted to stay above ground. The stairs are sound and the drawings are here. I won't turn a refusal to go underground into trust in what's down there."
+  },
+  "rabbit": {
+    "ask": "You offered to check the way out. The stones beyond the gate are where I marked them. I go that far each morning. Knowing I can return makes staying feel like a different action.",
+    "refuse": "You kept my map private. Nobody arrived to talk me out of it. I did not realize how badly I needed that until the whole evening passed quietly."
+  },
+  "red_panda": {
+    "ask": "You asked whether this was peace. The question has interrupted several very comfortable sittings. I am keeping it. Comfort is not an answer.",
+    "refuse": "You asked for a place outside. I cannot give you permission the pattern never asked me to administer. I can stand beside the gap and insist it remain a gap."
+  },
+  "tarsier": {
+    "ask": "You asked me to look nearby. I can still find the chip in the rail without the dark taking my eyes away. I check it every watch. Looking should include the right to look elsewhere.",
+    "refuse": "You left the far watch to me. I have kept it out of our visits. A watcher may ask for company. She may also receive an answer she did not hope for."
+  },
+  "aye_aye": {
+    "ask": "You asked me to wait for an answer. I am waiting. The bronze has a note ready; that is her business. Whether my hand lends it the house is still mine.",
+    "refuse": "You asked for quiet. The rope stays on the rail. She hums sometimes without me. I no longer tell myself that means my answer has already been given."
+  },
+  "kakapo": {
+    "ask": "You asked me to keep one seed. It is dry and small in its tin. The green ones in the bed have not opened. Keeping and growing looked alike for a while. They do not now.",
+    "refuse": "You left the experiment to me. I have kept the notes in my own name. A friend walking through a garden has not agreed to everything being grown in it."
+  }
+};
 
   return callbacks[animalType]?.[choice] || null;
 }
@@ -481,8 +449,8 @@ export async function markPhase4CallbackShown(animalType: string): Promise<void>
 
 /**
  * Phase 5 (post-revelation) choice callback — woven into each animal's
- * post-revelation dialogue cycle. Serene, settled; the choice no longer
- * matters and that is precisely the point.
+ * post-revelation dialogue cycle. The outcome remains shared, but the animal remembers the boundary or
+ * investigation the player actually chose.
  */
 export function getPhase5ChoiceCallback(
   animalType: string,
@@ -491,59 +459,59 @@ export function getPhase5ChoiceCallback(
   if (!choice) return null;
 
   const callbacks: Record<string, Record<PlayerChoice, string>> = {
-    fox: {
-      ask: 'You asked, once, when asking still felt dangerous. The fire remembers your courage fondly.',
-      refuse: 'You didn\'t want to know, once. I banked the fire that night and said nothing more, and I still think it was a good evening. Some things are better arrived at than told.',
-    },
-    pangolin: {
-      ask: 'You asked what was in the recipe. Now you\'ve tasted the finished dish. Was it everything I promised?',
-      refuse: 'You never asked what you were eating. Wise. Some meals are better met with trust.',
-    },
-    owl: {
-      ask: 'You asked about the text. Now you\'re written into it. The cleanest kind of answer.',
-      refuse: 'You closed the book when I offered it. It didn\'t matter. You were already the final chapter.',
-    },
-    axolotl: {
-      ask: 'You asked what swam below. It surfaced. You\'ve met. The water is calm now.',
-      refuse: 'You wouldn\'t look into the deep water, and the water kept your not-looking the way it keeps everything, folded small and safe on the silt. Your no is still down there, whole. Nothing ever needed it opened.',
-    },
-    capybara: {
-      ask: 'You requested your file, and I gave it to you complete... even the last page, which was blank then. It isn\'t now.',
-      refuse: 'You declined to read your file. Procedurally irrelevant. You wrote it either way.',
-    },
-    fennec_fox: {
-      ask: 'You asked what I heard coming. Now we both hear it everywhere. Like a heartbeat. Like home.',
-      refuse: 'You covered your ears, in your way. I understood. I spent years wishing mine folded flat. The sound is the floor under everything now, and I no longer sort the house into those who listened and those who would not. We all kept our watch.',
-    },
-    sloth: {
-      ask: 'You asked how long I\'d known. Forever, friend. The same answer the pattern gives.',
-      refuse: 'You didn\'t ask. You didn\'t need to. Some things arrive at their own speed. Like me.',
-    },
-    wombat: {
-      ask: 'You asked where the tunnels led. Now you stand at the end of them. Solid ground, like I promised.',
-      refuse: 'You never looked down the tunnel. Sensible. A floor is for standing on, not staring through. You trusted my bracing and walked where I said was sound, and there\'s no better compliment you can pay a builder.',
-    },
-    rabbit: {
-      ask: 'You asked me why I was afraid. Asking was kind. The fear is gone now. I almost miss it.',
-      refuse: 'You let me keep my fear private. Thank you. It\'s quiet now. Everything is.',
-    },
-    red_panda: {
-      ask: 'You asked what I had made peace with. Look up. You\'ve made peace with it too.',
-      refuse: 'You never asked about my peace. You have your own now. They are the same peace.',
-    },
-    tarsier: {
-      ask: "You asked what I saw out there. Now you have seen it too, with your own two moving eyes. It was worth the whole watch, was it not.",
-      refuse: "You never asked what I saw. I have thought about that at the rail, bright one, and I have decided it was its own kind of discipline. You kept your eyes on the work in front of you and let the night stay mine to carry. So I carried it. That was always what my post was for.",
-    },
-    aye_aye: {
-      ask: "You asked what the bell would say, once. Then you stood under the bronze and heard her say it. No answer of mine could have rung so true.",
-      refuse: "You told me to put the finger away, once. I did. She rang anyway, and it found you anyway, and look how gently. Nothing ever pointed at you that did not love you.",
-    },
-    kakapo: {
-      ask: "You asked what the arrangement was, there among the beds. It was a mast year. It fruited. You are standing in the orchard, and the orchard is glad of you.",
-      refuse: "You did not want to know, and I left the news in the ground where you set it down. The season never minded, friend. A season does not take a refusal personally. It simply goes on being the season, and you grew your own way up, and that is the growing I admire most.",
-    },
-  };
+  "fox": {
+    "ask": "You asked for the truth, and I owe you the parts I am still finding out. The fire tried to keep yesterday's warmth today. I let it go cold for an hour. I needed to know I could.",
+    "refuse": "You needed time. That still stands. I have learned to leave a cup empty without calling it a place you must come back to."
+  },
+  "owl": {
+    "ask": "You asked me to compare the accounts. I kept the crossings-out. A record that remembers its mistakes has something the great book lacked.",
+    "refuse": "You asked to stay outside my comparison. Your empty column is still empty. I have stopped trying to make that look like an omission."
+  },
+  "pangolin": {
+    "ask": "The pear on our saucer finally softened. I used the good half and composted the rest. It was an ordinary decision. I had missed those.",
+    "refuse": "You left the pear experiment to me. I still label what I cannot account for, and I tell people before I serve it. That should not have needed learning."
+  },
+  "axolotl": {
+    "ask": "You asked for a different shape. Yesterday I made a terrible square. It wobbled into nothing before I could show anyone. I was delighted.",
+    "refuse": "You asked me to let the water settle. I still can. I can also splash it now. A quiet visit feels different when there is a choice."
+  },
+  "capybara": {
+    "ask": "You asked for a copy. It still says nobody authorized permanent. I have filed the answer underneath: then we should ask. Very little ink, a substantial revision.",
+    "refuse": "You left the objection with me. I kept it. There are matters I can carry myself without asking a friend to become a witness."
+  },
+  "fennec_fox": {
+    "ask": "You helped me find a small sound inside the large one. I still practice. Today I heard two friends disagree over breakfast. Neither voice disappeared.",
+    "refuse": "You told me to stop for a while. I still take that rest. The watch is mine to pick up, which means it must be mine to put down."
+  },
+  "sloth": {
+    "ask": "You asked for what I knew. Here is a new item: a thing can arrive and still need to learn how to be here. I have started including myself in that.",
+    "refuse": "You would not take a promise about the future. Good. We had tea this afternoon. I can promise I enjoyed it, and leave tomorrow its own work."
+  },
+  "wombat": {
+    "ask": "You asked for the join. I still check it. The old arch bears the weight; my bracing leaves room for movement. Stone that cannot move at all cracks.",
+    "refuse": "You stayed above ground. I kept the stairs clear. They're for coming up as much as going down, and I'll keep them that way."
+  },
+  "rabbit": {
+    "ask": "You asked to check the path. I walked it yesterday, past the rosemary and a little further. Then I came back because I wanted my own bed.",
+    "refuse": "You kept the map between us. I have added a path to it, in ordinary pencil. You may look when I offer. I like being able to say that."
+  },
+  "red_panda": {
+    "ask": "You asked whether this was peace. I do not have a final word. This morning someone contradicted me and the room stayed warm. That is a better beginning.",
+    "refuse": "You asked to remain outside my circle. I leave the gap now. When the smoke closes it, I open it again. Practice ought to be useful to somebody besides the practitioner."
+  },
+  "tarsier": {
+    "ask": "You brought my eyes back to the rail. The chip is still there. I have stopped polishing that bit; I want one mark the house has not smoothed away.",
+    "refuse": "You asked me to keep the distance to myself. I did. There are things I can tell you now, if you want them. I will wait for that part."
+  },
+  "aye_aye": {
+    "ask": "You asked me to wait for an answer. I keep that rule for the little knocks too. A pause before the reply is space for another creature to decide.",
+    "refuse": "You asked me to leave her quiet. I remember. I will not call a sound you did not ask for a kindness merely because it was beautiful."
+  },
+  "kakapo": {
+    "ask": "You asked me to save a seed. It is still in the tin. I may plant it next season, or give it away. The important part is that it has a next season.",
+    "refuse": "You did not join the experiment. You can still come for tea. I have plenty to tell you about the beans, and none of it requires a theory of the sky."
+  }
+};
 
   return callbacks[animalType]?.[choice] ?? null;
 }

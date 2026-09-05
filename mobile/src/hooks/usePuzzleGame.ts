@@ -38,6 +38,7 @@ import {
   PuzzleVariant,
 } from '../services/puzzleVariety';
 import { MIN_CHALLENGE_WORDS, MAX_CHALLENGE_WORDS, type MoveOutcome } from '../services/shareResults';
+import { STORY_COPY } from '../services/storySpine';
 import { buildFinalBoard } from '../services/finalBoard';
 import {
   addSpentLetter,
@@ -1339,7 +1340,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
           finalPuzzle = CURATED_FINAL_PUZZLE;
         }
         if (isStale()) return;
-        const finalHint = 'hint' in finalPuzzle ? finalPuzzle.hint : undefined;
+        const finalHint = 'hint' in finalPuzzle && typeof finalPuzzle.hint === 'string' ? finalPuzzle.hint : undefined;
         initGame(
           finalPuzzle.words,
           finalHint,
@@ -1744,6 +1745,13 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
 
   const handleHint = useCallback(() => {
     if (gameState !== GameState.PLAYING || isProcessing) return;
+
+    // A story choice is never paid help or an automatic answer.
+    if (isFinalBoardRef.current && activeRowIndex === rows.length - 2 &&
+        rows[activeRowIndex + 1].words.map(letter => letter.char).join('') === 'CLOSE') {
+      setMessage(STORY_COPY.finalChoice + ' Move D or R to the end of CLOSE.');
+      return;
+    }
 
     // Challenge mode: no hints allowed
     if (gameMode === 'challenge') {
@@ -2422,7 +2430,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     const applyMoveMessage = (stuck: boolean) => {
       const normal = moveMessageFor(stuck);
       if (isFinalBoardRef.current) {
-        setMessage(getFinalBoardMoveMessage(currentPhase));
+        setMessage(activeRowIndex === rows.length - 3 &&
+          rows[rows.length - 1].words.map(letter => letter.char).join('') === 'CLOSE'
+          ? STORY_COPY.finalChoice : getFinalBoardMoveMessage(currentPhase));
         return;
       }
       setMessage(resonantMove ? getResonantMoveMessage(currentPhase) : normal);

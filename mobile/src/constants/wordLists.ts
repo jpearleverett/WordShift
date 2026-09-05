@@ -196,67 +196,19 @@ export const CURATED_EARLY_PUZZLES: CuratedPuzzle[] = [
 ];
 
 /**
- * The final arrangement is deliberately bespoke: seven common five-letter
- * words descend from warmth into the grave, with a complete shipped-rules
- * solution that never depends on a generated or banked fallback.
+ * A shared arrival with two playable boundaries. Every legal partial route
+ * completes; the last transfer freely spells CLOSED or CLOSER. The positioned
+ * sample below teaches the road, while D at the same target slot keeps a room.
  */
 export const CURATED_FINAL_PUZZLE: CuratedFinalPuzzle = {
-  words: ["SPARK", "LIGHT", "PAINS", "DWELL", "CURSE", "BLACK", "GRAVE"],
+  words: ["SPARK", "CARED", "SCARE", "SHARE", "CARVE", "CARED", "CLOSE"],
   solution: [
-    {
-      stepIndex: 0,
-      sourceWord: "SPARK",
-      targetWord: "LIGHT",
-      letterToMove: "S",
-      explanation: "Move 'S' from SPARK to form SLIGHT.",
-      insertionPosition: 0,
-      removalPosition: 0,
-    },
-    {
-      stepIndex: 1,
-      sourceWord: "SLIGHT",
-      targetWord: "PAINS",
-      letterToMove: "L",
-      explanation: "Move 'L' from SLIGHT to form PLAINS.",
-      insertionPosition: 1,
-      removalPosition: 1,
-    },
-    {
-      stepIndex: 2,
-      sourceWord: "PLAINS",
-      targetWord: "DWELL",
-      letterToMove: "S",
-      explanation: "Move 'S' from PLAINS to form DWELLS.",
-      insertionPosition: 5,
-      removalPosition: 5,
-    },
-    {
-      stepIndex: 3,
-      sourceWord: "DWELLS",
-      targetWord: "CURSE",
-      letterToMove: "D",
-      explanation: "Move 'D' from DWELLS to form CURSED.",
-      insertionPosition: 5,
-      removalPosition: 0,
-    },
-    {
-      stepIndex: 4,
-      sourceWord: "CURSED",
-      targetWord: "BLACK",
-      letterToMove: "S",
-      explanation: "Move 'S' from CURSED to form BLACKS.",
-      insertionPosition: 5,
-      removalPosition: 3,
-    },
-    {
-      stepIndex: 5,
-      sourceWord: "BLACKS",
-      targetWord: "GRAVE",
-      letterToMove: "L",
-      explanation: "Move 'L' from BLACKS to form GRAVEL.",
-      insertionPosition: 5,
-      removalPosition: 1,
-    },
+    { stepIndex: 0, sourceWord: "SPARK", targetWord: "CARED", letterToMove: "S", explanation: "Move S to the start of CARED to form SCARED.", insertionPosition: 0, removalPosition: 0 },
+    { stepIndex: 1, sourceWord: "SCARED", targetWord: "SCARE", letterToMove: "D", explanation: "Move D to the end of SCARE to form SCARED.", insertionPosition: 5, removalPosition: 5 },
+    { stepIndex: 2, sourceWord: "SCARED", targetWord: "SHARE", letterToMove: "S", explanation: "Move S to the end of SHARE to form SHARES.", insertionPosition: 5, removalPosition: 0 },
+    { stepIndex: 3, sourceWord: "SHARES", targetWord: "CARVE", letterToMove: "S", explanation: "Move the first S to the end of CARVE to form CARVES.", insertionPosition: 5, removalPosition: 0 },
+    { stepIndex: 4, sourceWord: "CARVES", targetWord: "CARED", letterToMove: "V", explanation: "Move V into CARED to form CARVED.", insertionPosition: 3, removalPosition: 3 },
+    { stepIndex: 5, sourceWord: "CARVED", targetWord: "CLOSE", letterToMove: "R", explanation: "Move R to make CLOSER and keep an outward road, or D to make CLOSED and keep a private room.", insertionPosition: 5, removalPosition: 2 },
   ],
   wordLength: 5,
 };
