@@ -2557,11 +2557,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         visible={showJournalModal}
         transparent
         statusBarTranslucent
-        animationType="fade"
+        animationType={getSettingsSync().reducedMotion ? 'none' : 'fade'}
         onRequestClose={() => { setJournalSpotlightActive(false); setShowJournalModal(false); }}
       >
         <TouchableOpacity
-          style={[styles.modalOverlay, { backgroundColor: journalSpotlightActive ? 'transparent' : st.overlay }]}
+          style={[styles.modalOverlay, {
+            backgroundColor: journalSpotlightActive ? 'transparent' : st.overlay,
+            pointerEvents: showJournalModal ? 'auto' : 'none',
+          }]}
+          aria-hidden={!showJournalModal}
+          accessibilityElementsHidden={!showJournalModal}
+          importantForAccessibility={showJournalModal ? 'auto' : 'no-hide-descendants'}
           activeOpacity={1}
           onPress={() => { if (!journalSpotlightActive) setShowJournalModal(false); }}
           accessibilityLabel="Close journal"
@@ -2882,10 +2888,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         visible={showQuestModal}
         transparent
         statusBarTranslucent
-        animationType="fade"
+        animationType={getSettingsSync().reducedMotion ? 'none' : 'fade'}
         onRequestClose={() => setShowQuestModal(false)}
       >
-        <View style={[styles.modalOverlay, { backgroundColor: st.overlay }]}>
+        <View
+          style={[styles.modalOverlay, { backgroundColor: st.overlay }]}
+          aria-hidden={!showQuestModal}
+          accessibilityElementsHidden={!showQuestModal}
+          importantForAccessibility={showQuestModal ? 'auto' : 'no-hide-descendants'}
+          pointerEvents={showQuestModal ? 'auto' : 'none'}
+        >
           <Pressable
             style={StyleSheet.absoluteFill}
             onPress={() => setShowQuestModal(false)}

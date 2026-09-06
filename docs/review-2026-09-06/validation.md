@@ -53,7 +53,7 @@ enlargement is a layout check; it is not Android system-font-scale evidence.
 ## Source and content
 
 Whole-project `npm run typecheck` passes with no diagnostics after the final
-Reverse correction and regression tests (81.29 seconds wall time). The normal `npm test --
+generator, modal accessibility and regression edits (76.92 seconds wall time). The normal `npm test --
 --no-coverage --runInBand` suite passes **160 suites / 3,981 tests** in 87.965
 seconds (89.43 seconds including npm startup), with no memory-override Jest
 configuration. Per-file transpilation is now the normal repository configuration;
@@ -96,8 +96,8 @@ changes and distinguishes them from the remaining reader pilot.
 
 
 The full strict lint run checks **433 files with zero errors and zero warnings**
-in 190.61 seconds. The subsequent Reverse source and regression edits also pass
-scoped lint with zero warnings. `npm run lint -- --max-warnings 0` is required in CI
+in 190.61 seconds. The subsequent generator and modal source/test edits also pass
+scoped lint with zero warnings (35.80 seconds for the final Home and browser files). `npm run lint -- --max-warnings 0` is required in CI
 and the internal-build workflow. [Lint summary](lint-summary.json).
 
 ## Rendered review notes
@@ -109,6 +109,17 @@ journey passes, and the updated fourth-page capture shows the full passage,
 Continue and Skip together. The offering introduction also waits until the
 ceremony releases the screen, including when its saved-flag read finishes late.
 Three focused lifecycle tests cover that ownership.
+
+GitHub's first complete browser run passed 13 journeys and exposed a faster
+Journal → Tasks transition than the local VM: the departing Journal's 250 ms
+fade still exposed its Season Pass button alongside the destination button.
+Journal and Tasks now hide departing content from accessibility and touch
+handling immediately, while allowing an enabled exit animation to finish. Both
+also honor reduced motion. The affected journeys retain strict button matching;
+the Journal journey explicitly enables motion and the season claim journey
+keeps reduced motion enabled. Both affected local journeys pass again (79.11
+and 69.53 seconds including startup), and the updated Tasks and Store comparison
+captures were reviewed. Their attempts are retained in the browser result log.
 
 
 All **15 unique rendered journeys pass**, with [per-attempt results and
@@ -134,8 +145,8 @@ the attempt history. These attempts are not added to the 15 unique-journey count
 
 ## Android export and delivery
 
-The Android export after the Reverse correction passes in **65.90 seconds**, with
-**700 asset records** and an **11,713,551-byte Hermes bundle**. Its manifest contains all seven runtime
+The Android export after the generator and modal corrections passes in **55.05 seconds**, with
+**700 asset records** and an **11,713,788-byte Hermes bundle**. Its manifest contains all seven runtime
 story WebPs and **zero story PNG masters**. The [export summary](android-export-summary.json)
 records the bundle path, SHA-256 and story paths. The previous September 5 export
 was 13,045,974 bytes; this comparison covers the combined code/content changes,

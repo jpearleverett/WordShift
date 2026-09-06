@@ -115,5 +115,17 @@
     "exitCode": 0,
     "elapsedSeconds": 61.09,
     "log": "browser-logs/15-attempt-1.log"
+  },
+  {
+    "journey": "journal rewards and support benefits are discoverable",
+    "exitCode": 0,
+    "elapsedSeconds": 79.11,
+    "log": "browser-logs/07-attempt-2.log"
+  },
+  {
+    "journey": "claiming a season reward updates amber once and stays claimed after relaunch",
+    "exitCode": 0,
+    "elapsedSeconds": 69.53,
+    "log": "browser-logs/15-attempt-2.log"
   }
 ]

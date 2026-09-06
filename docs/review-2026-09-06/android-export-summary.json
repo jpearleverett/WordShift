@@ -2,9 +2,9 @@
   "platform": "android",
   "exportExitCode": 0,
   "assetRecords": 700,
-  "hermesBundle": "_expo/static/js/android/AppEntry-6da7205cf42e1ac81d7ef3731791502c.hbc",
-  "hermesBytes": 11713551,
-  "hermesSha256": "c39d5486a28349de0cc7cf68994c0ae699760a1a5b85f10717695065f3907222",
+  "hermesBundle": "_expo/static/js/android/AppEntry-8511bd5a7bab84b803599b26ab20e7f0.hbc",
+  "hermesBytes": 11713788,
+  "hermesSha256": "256aa7db097a7be25fe37ce19d09426404d02e8b4fc207e9e8d947b6e3bdd2b9",
   "storyAssets": [
     "assets/story/optimized/kept-table-header.webp",
     "assets/story/optimized/private-room-header.webp",

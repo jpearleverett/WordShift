@@ -1,6 +1,6 @@
 Starting Metro Bundler
 
-Android Bundled 50000ms node_modules/expo/AppEntry.js (2288 modules)
+Android Bundled 60571ms node_modules/expo/AppEntry.js (2288 modules)
 Creating asset map
 
 › Assets (700):
@@ -706,7 +706,7 @@ assets/ui/word_echo.png (13KB)
 assets/ui/wordmark.png (302KB)
 
 › android bundles (1):
-_expo/static/js/android/AppEntry-8511bd5a7bab84b803599b26ab20e7f0.hbc (12MB)
+_expo/static/js/android/AppEntry-6da7205cf42e1ac81d7ef3731791502c.hbc (12MB)
 
 › Files (2):
 assetmap.json (309KB)

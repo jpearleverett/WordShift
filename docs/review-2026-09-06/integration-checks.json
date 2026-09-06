@@ -78,7 +78,7 @@
       "--output-dir",
       "/tmp/wordshift-android-export-completion"
     ],
-    "log": "android-export.log",
+    "log": "android-export-after-reverse.log",
     "stage": "After exact reverse removal-position correction"
   },
   {
@@ -90,7 +90,7 @@
       "run",
       "typecheck"
     ],
-    "log": "typecheck.log",
+    "log": "typecheck-after-reverse.log",
     "stage": "After exact reverse removal-position correction and deterministic regressions"
   },
   {
@@ -106,5 +106,65 @@
     ],
     "log": "jest.log",
     "stage": "After exact reverse removal-position correction and deterministic regressions"
+  },
+  {
+    "check": "typecheck",
+    "exitCode": 2,
+    "elapsedSeconds": 90.5,
+    "command": [
+      "npm",
+      "run",
+      "typecheck"
+    ],
+    "log": "typecheck-modal-prop-attempt.log",
+    "stage": "Intermediate unsupported TouchableOpacity pointerEvents prop; corrected to ViewStyle before rerun"
+  },
+  {
+    "check": "typecheck",
+    "exitCode": 0,
+    "elapsedSeconds": 76.92,
+    "command": [
+      "npm",
+      "run",
+      "typecheck"
+    ],
+    "log": "typecheck.log",
+    "stage": "After modal accessibility and native TouchableOpacity style correction"
+  },
+  {
+    "check": "home-lint",
+    "exitCode": 0,
+    "elapsedSeconds": 35.8,
+    "command": [
+      "npm",
+      "exec",
+      "--",
+      "eslint",
+      "src/components/home/HomeScreen.tsx",
+      "e2e/game.spec.ts",
+      "--max-warnings",
+      "0"
+    ],
+    "log": "home-lint.log",
+    "stage": "After modal accessibility and native TouchableOpacity style correction"
+  },
+  {
+    "check": "android-export",
+    "exitCode": 0,
+    "elapsedSeconds": 55.05,
+    "command": [
+      "npx",
+      "expo",
+      "export",
+      "--platform",
+      "android",
+      "--max-workers",
+      "1",
+      "--dump-assetmap",
+      "--output-dir",
+      "/tmp/wordshift-android-export-completion"
+    ],
+    "log": "android-export.log",
+    "stage": "After modal accessibility and native TouchableOpacity style correction"
   }
 ]

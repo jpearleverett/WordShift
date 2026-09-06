@@ -193,10 +193,18 @@ for (const boundary of ['remember', 'release'] as const) {
 test('journal rewards and support benefits are discoverable', async ({ page }) => {
   await openReturningBoard(page);
   await page.getByRole('button', { name: 'Go home', exact: true }).click();
+  // Exercise the actual exit fade as well as the reduced-motion season journey.
+  await page.evaluate(() => {
+    const settings = JSON.parse(localStorage.getItem('wordshift_settings')!);
+    localStorage.setItem('wordshift_settings', JSON.stringify({ ...settings, reducedMotion: false }));
+  });
+  await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: /^Open journal/ }).click();
   await expect(page.getByRole('heading', { name: 'STORIES AND DISCOVERIES', exact: true })).toBeVisible();
   await page.getByRole('button', { name: /^Open quests(?:,|$)/ }).click();
   await expect(page.getByRole('button', { name: /^Open season pass/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Close journal', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^Open season pass/ })).toHaveCount(1);
   await capture(page, 'updated-tasks-rewards');
   await page.getByRole('button', { name: 'Close quests', exact: true }).last().click();
   await page.getByRole('button', { name: /amber\. Opens the store\.$/ }).click();
@@ -426,6 +434,8 @@ test('claiming a season reward updates amber once and stays claimed after relaun
     await page.getByRole('button', { name: /^Open journal/ }).click();
     await page.getByRole('button', { name: /^Open quests(?:,|$)/ }).click();
     await page.getByRole('button', { name: /^Open season pass/ }).click();
+    await expect(page.getByRole('button', { name: 'Close journal', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Close quests', exact: true })).toHaveCount(0);
   };
   await openSeason();
   const before = await page.evaluate(() => JSON.parse(localStorage.getItem('wordshift_home_progress')!).amber);
