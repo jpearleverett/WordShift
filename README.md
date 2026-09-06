@@ -48,6 +48,7 @@ Always use `npm test`, not `npx jest` — the latter misses the local install an
 ## Docs
 
 - [CLAUDE.md](./CLAUDE.md) — architecture, systems, conventions (read this first; contains full narrative spoilers)
+- [docs/REMAINING_WORK.md](./docs/REMAINING_WORK.md) — what's left to ship a finished 1.0 and what would actually make the game great (audited 2026-08-29)
 - [docs/LAUNCH_CHECKLIST.md](./docs/LAUNCH_CHECKLIST.md) — remaining human release tasks (consoles, secrets, physical-device checks)
 - [docs/STORE_LISTING.md](./docs/STORE_LISTING.md) — store listing copy, keywords, age rating, screenshot shot list
 - [docs/BACKEND_SETUP.md](./docs/BACKEND_SETUP.md) — Supabase / Sentry provisioning (cloud save, leaderboard, analytics, crash reporting)
