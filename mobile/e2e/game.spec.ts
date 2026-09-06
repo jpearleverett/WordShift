@@ -50,6 +50,11 @@ async function openFreshGame(page: Page) {
 
 async function openReturningBoard(page: Page) {
   await openFreshGame(page);
+  // Establish the resumed-board fixture before changing its owner cohort.
+  // The help control appears before the debounced first autosave completes.
+  await expect.poll(() => page.evaluate(() =>
+    JSON.parse(localStorage.getItem('wordshift_in_progress_puzzle') || '{}').solution?.length ?? 0,
+  )).toBeGreaterThan(0);
   // Start from a real initialized save, modifying only cohort facts.
   await page.evaluate(() => {
     const progress = JSON.parse(localStorage.getItem('wordshift_home_progress') || '{}');

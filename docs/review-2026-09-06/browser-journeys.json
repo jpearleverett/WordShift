@@ -127,5 +127,11 @@
     "exitCode": 0,
     "elapsedSeconds": 69.53,
     "log": "browser-logs/15-attempt-2.log"
+  },
+  {
+    "journey": "solving a board exposes accessible results and durable progress",
+    "exitCode": 0,
+    "elapsedSeconds": 52.41,
+    "log": "browser-logs/04-attempt-2.log"
   }
 ]

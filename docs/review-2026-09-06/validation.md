@@ -121,6 +121,15 @@ keeps reduced motion enabled. Both affected local journeys pass again (79.11
 and 69.53 seconds including startup), and the updated Tasks and Store comparison
 captures were reviewed. Their attempts are retained in the browser result log.
 
+A subsequent CI run passed those transitions and 14 journeys overall, then
+identified a fixture timing assumption in ordinary victory. The returning-player
+helper reloaded before the initial board's debounced autosave completed, so the
+fast runner legitimately selected a new board instead of resuming the expected
+starter. The helper now waits for the durable board before modifying cohort
+facts. This makes the intended resumed-board scenario explicit without changing
+production selection or save timing. The corrected victory journey passes locally
+in 52.41 seconds including startup; its updated result capture was reviewed.
+
 
 All **15 unique rendered journeys pass**, with [per-attempt results and
 logs](browser-journeys.json). They cover fresh help/rules, repeat hint/reload,
