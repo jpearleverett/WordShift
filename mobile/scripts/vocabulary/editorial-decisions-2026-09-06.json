@@ -1,0 +1,1052 @@
+{
+  "reviewDate": "2026-09-06",
+  "sourceRevision": "1e5b7d3a72f47a71da5d28686c1dd4b397178485",
+  "query": "select distinct size, word, category, base_pos, variant_level, spelling from scowl_v0 where lower(word)=? order by word,size,variant_level",
+  "policy": "Final game vocabulary decisions, not claims that excluded strings are nonexistent English. Nine familiar attested variants return to fresh acceptance; 49 editorial exclusions remain excluded from fresh acceptance and required words. Historical saved-board dictionaries are unchanged. No entry awaits owner review.",
+  "previouslyReviewedAllow": [
+    "DIALOGS",
+    "DJINN",
+    "FLUKEY",
+    "FRIER",
+    "KIDDY",
+    "MOMMA",
+    "MOMMAS",
+    "PRICY",
+    "ROPEY",
+    "SAUTE",
+    "SAUTEED",
+    "SCHEMAS",
+    "SPACY",
+    "TSARIST",
+    "WHACKY"
+  ],
+  "entries": [
+    {
+      "word": "ALLS",
+      "decision": "exclude",
+      "reason": "Specialized plural noun rather than the ordinary pronoun; exclude from fresh play to avoid teaching arbitrary pluralization.",
+      "esdbRows": [],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485",
+        "https://scrabble.merriam.com/finder/alls"
+      ]
+    },
+    {
+      "word": "ALTHO",
+      "decision": "exclude",
+      "reason": "Nonpreferred shortened spelling of although; prefer the full word for ordinary play.",
+      "esdbRows": [
+        {
+          "size": 35,
+          "word": "altho",
+          "category": "",
+          "base_pos": "c",
+          "variant_level": 6,
+          "spelling": "A"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "AMEER",
+      "decision": "exclude",
+      "reason": "Nonpreferred transliteration of emir; prefer EMIR.",
+      "esdbRows": [
+        {
+          "size": 35,
+          "word": "ameer",
+          "category": "",
+          "base_pos": "n",
+          "variant_level": 6,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "AWAKED",
+      "decision": "exclude",
+      "reason": "Attested alternate inflection, but AWOKE/AWOKEN are the familiar modern forms.",
+      "esdbRows": [
+        {
+          "size": 35,
+          "word": "awaked",
+          "category": "",
+          "base_pos": "v",
+          "variant_level": 6,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485",
+        "https://www.merriam-webster.com/dictionary/awake"
+      ]
+    },
+    {
+      "word": "AWEING",
+      "decision": "exclude",
+      "reason": "Nonpreferred inflection; prefer AWING.",
+      "esdbRows": [
+        {
+          "size": 35,
+          "word": "aweing",
+          "category": "",
+          "base_pos": "v",
+          "variant_level": 8,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "BASSETT",
+      "decision": "exclude",
+      "reason": "No lowercase entry in the pinned ESDB; retain BASSET as the ordinary dog name.",
+      "esdbRows": [],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "BLOWED",
+      "decision": "exclude",
+      "reason": "Marked/nonpreferred inflection; prefer BLEW/BLOWN.",
+      "esdbRows": [
+        {
+          "size": 35,
+          "word": "blowed",
+          "category": "",
+          "base_pos": "n_v",
+          "variant_level": 8,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "BOGY",
+      "decision": "exclude",
+      "reason": "Nonpreferred spelling; prefer BOGEY.",
+      "esdbRows": [
+        {
+          "size": 50,
+          "word": "bogy",
+          "category": "",
+          "base_pos": "n",
+          "variant_level": 6,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "BONEY",
+      "decision": "exclude",
+      "reason": "Nonpreferred spelling; prefer BONY.",
+      "esdbRows": [
+        {
+          "size": 35,
+          "word": "boney",
+          "category": "",
+          "base_pos": "aj",
+          "variant_level": 6,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "BONNIE",
+      "decision": "allow",
+      "reason": "Recognizable British/Scottish adjective, not merely a personal name; restore the attested variant of BONNY.",
+      "esdbRows": [
+        {
+          "size": 50,
+          "word": "Bonnie",
+          "category": "",
+          "base_pos": "n",
+          "variant_level": 0,
+          "spelling": "_"
+        },
+        {
+          "size": 50,
+          "word": "bonnie",
+          "category": "",
+          "base_pos": "aj",
+          "variant_level": 6,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485",
+        "https://www.merriam-webster.com/dictionary/bonnie"
+      ]
+    },
+    {
+      "word": "BUILDED",
+      "decision": "exclude",
+      "reason": "Archaic/nonpreferred inflection; prefer BUILT.",
+      "esdbRows": [
+        {
+          "size": 35,
+          "word": "builded",
+          "category": "",
+          "base_pos": "n_v",
+          "variant_level": 7,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "CALIF",
+      "decision": "exclude",
+      "reason": "Nonpreferred transliteration; prefer CALIPH.",
+      "esdbRows": [
+        {
+          "size": 50,
+          "word": "calif",
+          "category": "",
+          "base_pos": "n",
+          "variant_level": 6,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "CAYMAN",
+      "decision": "allow",
+      "reason": "Attested animal noun, not merely the geographic name; restore this variant of CAIMAN.",
+      "esdbRows": [
+        {
+          "size": 50,
+          "word": "Cayman",
+          "category": "",
+          "base_pos": "n",
+          "variant_level": 0,
+          "spelling": "_"
+        },
+        {
+          "size": 70,
+          "word": "Cayman",
+          "category": "",
+          "base_pos": "n",
+          "variant_level": 0,
+          "spelling": "_"
+        },
+        {
+          "size": 60,
+          "word": "cayman",
+          "category": "",
+          "base_pos": "n",
+          "variant_level": 6,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485",
+        "https://www.merriam-webster.com/dictionary/cayman"
+      ]
+    },
+    {
+      "word": "CAYMANS",
+      "decision": "allow",
+      "reason": "Regular plural of the attested animal noun CAYMAN; restore with the singular.",
+      "esdbRows": [
+        {
+          "size": 60,
+          "word": "caymans",
+          "category": "",
+          "base_pos": "n",
+          "variant_level": 6,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485",
+        "https://www.merriam-webster.com/dictionary/cayman"
+      ]
+    },
+    {
+      "word": "CHID",
+      "decision": "exclude",
+      "reason": "Attested but less familiar inflection; prefer CHIDED.",
+      "esdbRows": [
+        {
+          "size": 35,
+          "word": "chid",
+          "category": "",
+          "base_pos": "v",
+          "variant_level": 6,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "CHOOSEY",
+      "decision": "allow",
+      "reason": "Recognizable alternate spelling of CHOOSY; restore.",
+      "esdbRows": [
+        {
+          "size": 35,
+          "word": "choosey",
+          "category": "",
+          "base_pos": "aj",
+          "variant_level": 6,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485",
+        "https://www.merriam-webster.com/dictionary/choosey"
+      ]
+    },
+    {
+      "word": "DEADS",
+      "decision": "exclude",
+      "reason": "Nonpreferred noun inflection; ordinary DEAD is sufficient.",
+      "esdbRows": [
+        {
+          "size": 35,
+          "word": "deads",
+          "category": "",
+          "base_pos": "n",
+          "variant_level": 8,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "DIGGED",
+      "decision": "exclude",
+      "reason": "Archaic/nonpreferred inflection; prefer DUG.",
+      "esdbRows": [
+        {
+          "size": 35,
+          "word": "digged",
+          "category": "",
+          "base_pos": "n_v",
+          "variant_level": 7,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "DOGY",
+      "decision": "exclude",
+      "reason": "Nonpreferred spelling of the specialized calf noun DOGIE; exclude.",
+      "esdbRows": [
+        {
+          "size": 50,
+          "word": "dogy",
+          "category": "",
+          "base_pos": "n",
+          "variant_level": 8,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "DOPY",
+      "decision": "exclude",
+      "reason": "Nonpreferred spelling; prefer DOPEY.",
+      "esdbRows": [
+        {
+          "size": 35,
+          "word": "dopy",
+          "category": "",
+          "base_pos": "aj",
+          "variant_level": 6,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "DRYEST",
+      "decision": "exclude",
+      "reason": "Nonpreferred superlative; prefer DRIEST.",
+      "esdbRows": [
+        {
+          "size": 35,
+          "word": "dryest",
+          "category": "",
+          "base_pos": "aj",
+          "variant_level": 6,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "ENOUGHS",
+      "decision": "exclude",
+      "reason": "No lowercase entry in the pinned ESDB; productive noun pluralization is too context-dependent for this puzzle dictionary.",
+      "esdbRows": [],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "FORMERS",
+      "decision": "exclude",
+      "reason": "No lowercase plural entry in the pinned ESDB; specialized noun usage is outside the intended vocabulary.",
+      "esdbRows": [],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "GASSES",
+      "decision": "allow",
+      "reason": "Attested plural and familiar verb inflection of GAS; restore.",
+      "esdbRows": [
+        {
+          "size": 35,
+          "word": "gasses",
+          "category": "",
+          "base_pos": "n_v",
+          "variant_level": 6,
+          "spelling": "A"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485",
+        "https://www.merriam-webster.com/dictionary/gasses"
+      ]
+    },
+    {
+      "word": "GAYLY",
+      "decision": "exclude",
+      "reason": "Nonpreferred spelling; prefer GAILY.",
+      "esdbRows": [
+        {
+          "size": 35,
+          "word": "gayly",
+          "category": "",
+          "base_pos": "av",
+          "variant_level": 6,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "GUMTREE",
+      "decision": "exclude",
+      "reason": "Nonpreferred closed compound; prefer the familiar GUM TREE phrase.",
+      "esdbRows": [
+        {
+          "size": 60,
+          "word": "gumtree",
+          "category": "",
+          "base_pos": "n",
+          "variant_level": 6,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "HALLO",
+      "decision": "allow",
+      "reason": "Attested call or greeting, recognizable regional spelling; restore.",
+      "esdbRows": [
+        {
+          "size": 60,
+          "word": "hallo",
+          "category": "",
+          "base_pos": "n",
+          "variant_level": 6,
+          "spelling": "_"
+        },
+        {
+          "size": 60,
+          "word": "hallo",
+          "category": "",
+          "base_pos": "v",
+          "variant_level": 6,
+          "spelling": "_"
+        },
+        {
+          "size": 60,
+          "word": "hallo",
+          "category": "",
+          "base_pos": "i",
+          "variant_level": 6,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485",
+        "https://www.merriam-webster.com/dictionary/hallo"
+      ]
+    },
+    {
+      "word": "HES",
+      "decision": "exclude",
+      "reason": "No lowercase entry in the pinned ESDB; do not admit ambiguous pronoun plurals or apostrophe-stripped contractions.",
+      "esdbRows": [],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "ILLER",
+      "decision": "exclude",
+      "reason": "Marked/nonpreferred comparative; prefer WORSE.",
+      "esdbRows": [
+        {
+          "size": 35,
+          "word": "iller",
+          "category": "",
+          "base_pos": "aj_av",
+          "variant_level": 8,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "ILLEST",
+      "decision": "exclude",
+      "reason": "Marked/nonpreferred superlative; prefer WORST.",
+      "esdbRows": [
+        {
+          "size": 35,
+          "word": "illest",
+          "category": "",
+          "base_pos": "aj_av",
+          "variant_level": 8,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "JUN",
+      "decision": "exclude",
+      "reason": "The pinned ESDB matches an abbreviation only; abbreviations are outside this game dictionary.",
+      "esdbRows": [
+        {
+          "size": 60,
+          "word": "jun",
+          "category": "",
+          "base_pos": "abbr",
+          "variant_level": 0,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "LEASTS",
+      "decision": "exclude",
+      "reason": "No lowercase entry in the pinned ESDB; context-dependent nominal plural is outside the intended vocabulary.",
+      "esdbRows": [],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "LIKEST",
+      "decision": "exclude",
+      "reason": "No lowercase entry in the pinned ESDB; archaic-looking inflection is outside the intended vocabulary.",
+      "esdbRows": [],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "LITTLES",
+      "decision": "exclude",
+      "reason": "Attested niche plural noun, but too context-dependent to require or validate in ordinary play.",
+      "esdbRows": [],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485",
+        "https://www.merriam-webster.com/dictionary/littles"
+      ]
+    },
+    {
+      "word": "LOCATER",
+      "decision": "exclude",
+      "reason": "Nonpreferred agent spelling; prefer LOCATOR.",
+      "esdbRows": [
+        {
+          "size": 60,
+          "word": "locater",
+          "category": "",
+          "base_pos": "n",
+          "variant_level": 6,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "LOONEY",
+      "decision": "exclude",
+      "reason": "Nonpreferred spelling; prefer LOONY.",
+      "esdbRows": [
+        {
+          "size": 35,
+          "word": "looney",
+          "category": "",
+          "base_pos": "n",
+          "variant_level": 6,
+          "spelling": "_"
+        },
+        {
+          "size": 35,
+          "word": "looney",
+          "category": "",
+          "base_pos": "aj",
+          "variant_level": 6,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "MADAMES",
+      "decision": "exclude",
+      "reason": "Nonpreferred plural inflection; keep the established MADAMS.",
+      "esdbRows": [
+        {
+          "size": 50,
+          "word": "madames",
+          "category": "",
+          "base_pos": "n",
+          "variant_level": 8,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "MAMBOES",
+      "decision": "exclude",
+      "reason": "Nonpreferred plural/verb spelling; prefer MAMBOS.",
+      "esdbRows": [
+        {
+          "size": 50,
+          "word": "mamboes",
+          "category": "",
+          "base_pos": "n_v",
+          "variant_level": 8,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "MASSE",
+      "decision": "exclude",
+      "reason": "No lowercase ASCII entry in the pinned ESDB; specialized accented billiards spelling is outside the intended vocabulary.",
+      "esdbRows": [],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "MOSTS",
+      "decision": "exclude",
+      "reason": "No lowercase entry in the pinned ESDB; context-dependent nominal plural is outside the intended vocabulary.",
+      "esdbRows": [],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "MUCHES",
+      "decision": "exclude",
+      "reason": "No lowercase entry in the pinned ESDB; context-dependent nominal plural is outside the intended vocabulary.",
+      "esdbRows": [],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "NONES",
+      "decision": "exclude",
+      "reason": "The pinned ESDB contains capitalized Nones only; historical/calendar terminology is outside the intended vocabulary.",
+      "esdbRows": [
+        {
+          "size": 80,
+          "word": "Nones",
+          "category": "",
+          "base_pos": "n",
+          "variant_level": 0,
+          "spelling": "_"
+        },
+        {
+          "size": 85,
+          "word": "Nones",
+          "category": "",
+          "base_pos": "n",
+          "variant_level": 0,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "NOS",
+      "decision": "exclude",
+      "reason": "The pinned ESDB matches an abbreviation only; avoid ambiguity with punctuation-dependent number abbreviations.",
+      "esdbRows": [
+        {
+          "size": 50,
+          "word": "nos",
+          "category": "",
+          "base_pos": "abbr",
+          "variant_level": 5,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "PRYER",
+      "decision": "exclude",
+      "reason": "Nonpreferred agent spelling; prefer PRIER.",
+      "esdbRows": [
+        {
+          "size": 60,
+          "word": "pryer",
+          "category": "",
+          "base_pos": "n",
+          "variant_level": 6,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "RENO",
+      "decision": "exclude",
+      "reason": "The pinned ESDB contains a proper name only; colloquial clipping is outside the intended vocabulary.",
+      "esdbRows": [
+        {
+          "size": 50,
+          "word": "Reno",
+          "category": "",
+          "base_pos": "n",
+          "variant_level": 0,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "REVERY",
+      "decision": "exclude",
+      "reason": "Nonpreferred spelling; prefer REVERIE.",
+      "esdbRows": [
+        {
+          "size": 35,
+          "word": "revery",
+          "category": "",
+          "base_pos": "n",
+          "variant_level": 6,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "SCAREY",
+      "decision": "exclude",
+      "reason": "Marked/nonpreferred spelling; prefer SCARY.",
+      "esdbRows": [
+        {
+          "size": 35,
+          "word": "scarey",
+          "category": "",
+          "base_pos": "aj",
+          "variant_level": 8,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "SHAMMY",
+      "decision": "exclude",
+      "reason": "Nonpreferred spelling of a specialized cloth/leather noun; prefer CHAMOIS.",
+      "esdbRows": [
+        {
+          "size": 50,
+          "word": "shammy",
+          "category": "",
+          "base_pos": "n",
+          "variant_level": 6,
+          "spelling": "_"
+        },
+        {
+          "size": 80,
+          "word": "shammy",
+          "category": "",
+          "base_pos": "v",
+          "variant_level": 6,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "SHES",
+      "decision": "exclude",
+      "reason": "No lowercase entry in the pinned ESDB; do not admit ambiguous pronoun plurals or apostrophe-stripped contractions.",
+      "esdbRows": [],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "SHOED",
+      "decision": "exclude",
+      "reason": "Nonpreferred inflection; prefer SHOD.",
+      "esdbRows": [
+        {
+          "size": 35,
+          "word": "shoed",
+          "category": "",
+          "base_pos": "v",
+          "variant_level": 6,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "STANDUP",
+      "decision": "allow",
+      "reason": "Attested closed compound for a comic/comedy style and adjective; restore.",
+      "esdbRows": [
+        {
+          "size": 50,
+          "word": "standup",
+          "category": "",
+          "base_pos": "aj",
+          "variant_level": 6,
+          "spelling": "_"
+        },
+        {
+          "size": 60,
+          "word": "standup",
+          "category": "",
+          "base_pos": "n",
+          "variant_level": 6,
+          "spelling": "_"
+        },
+        {
+          "size": 70,
+          "word": "standup",
+          "category": "",
+          "base_pos": "n",
+          "variant_level": 6,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485",
+        "https://www.merriam-webster.com/dictionary/standup"
+      ]
+    },
+    {
+      "word": "STONEY",
+      "decision": "exclude",
+      "reason": "Nonpreferred spelling; prefer STONY.",
+      "esdbRows": [
+        {
+          "size": 35,
+          "word": "stoney",
+          "category": "",
+          "base_pos": "aj",
+          "variant_level": 6,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "THATS",
+      "decision": "exclude",
+      "reason": "No lowercase entry in the pinned ESDB; ambiguous nominal plural/apostrophe-stripped contraction is outside the intended vocabulary.",
+      "esdbRows": [],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "TREADED",
+      "decision": "exclude",
+      "reason": "Attested less familiar inflection; prefer TROD/TRODDEN.",
+      "esdbRows": [],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485",
+        "https://scrabble.merriam.com/finder/treaded"
+      ]
+    },
+    {
+      "word": "WALLA",
+      "decision": "exclude",
+      "reason": "Marked/nonpreferred spelling and specialized usage; exclude from ordinary play.",
+      "esdbRows": [
+        {
+          "size": 60,
+          "word": "walla",
+          "category": "",
+          "base_pos": "n",
+          "variant_level": 8,
+          "spelling": "_"
+        },
+        {
+          "size": 70,
+          "word": "walla",
+          "category": "",
+          "base_pos": "n",
+          "variant_level": 8,
+          "spelling": "_"
+        },
+        {
+          "size": 80,
+          "word": "walla",
+          "category": "",
+          "base_pos": "n",
+          "variant_level": 8,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485"
+      ]
+    },
+    {
+      "word": "WHATS",
+      "decision": "exclude",
+      "reason": "Attested specialized plural noun; excludes an apparent apostrophe omission from ordinary play.",
+      "esdbRows": [],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485",
+        "https://scrabble.merriam.com/finder/whats"
+      ]
+    },
+    {
+      "word": "WINTERY",
+      "decision": "allow",
+      "reason": "Recognizable alternate spelling of WINTRY; restore.",
+      "esdbRows": [
+        {
+          "size": 35,
+          "word": "wintery",
+          "category": "",
+          "base_pos": "aj",
+          "variant_level": 6,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485",
+        "https://www.merriam-webster.com/dictionary/wintery"
+      ]
+    },
+    {
+      "word": "WOOLY",
+      "decision": "allow",
+      "reason": "Recognizable alternate spelling of WOOLLY; restore.",
+      "esdbRows": [
+        {
+          "size": 35,
+          "word": "wooly",
+          "category": "",
+          "base_pos": "n",
+          "variant_level": 6,
+          "spelling": "_"
+        },
+        {
+          "size": 35,
+          "word": "wooly",
+          "category": "",
+          "base_pos": "aj",
+          "variant_level": 6,
+          "spelling": "_"
+        }
+      ],
+      "sources": [
+        "https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485",
+        "https://www.merriam-webster.com/dictionary/woolly"
+      ]
+    }
+  ]
+}

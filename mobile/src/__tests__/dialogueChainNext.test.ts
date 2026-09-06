@@ -41,7 +41,7 @@ jest.mock('react', () => ({
   useState: (initial: unknown) => {
     const idx = stateIndex++;
     if (!stateStore.has(idx)) {
-      stateStore.set(idx, initial);
+      stateStore.set(idx, typeof initial === 'function' ? (initial as () => unknown)() : initial);
     }
     const value = stateStore.get(idx);
     const setter = (valOrFn: unknown) => {

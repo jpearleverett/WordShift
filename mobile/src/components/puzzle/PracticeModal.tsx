@@ -1,5 +1,7 @@
+import { TEXT_ROLE } from '../../theme/typography';
+import { AppText } from '../ui/AppText';
 import React, { useEffect, useState } from 'react';
-import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { DialoguePhase } from '../../types/homeWorld';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
@@ -21,7 +23,11 @@ export const PracticeModal: React.FC<PracticeModalProps> = ({ visible, lessonId,
   const insets = useScreenInsets();
   const { height } = useWindowDimensions();
   const theme = getSurfaceTheme(phase);
-  useEffect(() => { if (visible) setState(createPracticeState(lessonId)); }, [visible, lessonId]);
+  const [presentation, setPresentation] = useState({ visible, lessonId });
+  if (presentation.visible !== visible || presentation.lessonId !== lessonId) {
+    setPresentation({ visible, lessonId });
+    if (visible) setState(createPracticeState(lessonId));
+  }
   useEffect(() => { if (visible) announceForA11y(state.message); }, [visible, state.message]);
   useEffect(() => {
     if (!visible || Platform.OS !== 'web') return;
@@ -37,13 +43,13 @@ export const PracticeModal: React.FC<PracticeModalProps> = ({ visible, lessonId,
     <View accessibilityViewIsModal style={[styles.overlay, { backgroundColor: theme.overlay, paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 }]}>
       <PanelCard phase={phase} kind="panel" style={{ width: '100%', maxWidth: 540, maxHeight: height - insets.top - insets.bottom - 24 }}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <Text accessibilityRole="header" style={[styles.title, { color: theme.title }]}>{lesson.title}</Text>
-          <Text style={[styles.body, { color: theme.body }]}>A short example. Hints and progress stay as they are.</Text>
-          <Text accessibilityLiveRegion="polite" style={[styles.body, { color: theme.body }]}>{state.message}</Text>
+          <AppText textRole="title" accessibilityRole="header" style={[styles.title, { color: theme.title }]}>{lesson.title}</AppText>
+          <AppText textRole="reading" style={[styles.body, { color: theme.body }]}>A short example. Hints and progress stay as they are.</AppText>
+          <AppText textRole="reading" accessibilityLiveRegion="polite" style={[styles.body, { color: theme.body }]}>{state.message}</AppText>
           {state.rows.map((row, rowIndex) => <View key={rowIndex} style={styles.row}>
-            <Text style={[styles.caption, { color: theme.body }]}>
+            <AppText textRole="caption" style={[styles.caption, { color: theme.body }]}>
               {step?.sourceRow === rowIndex ? 'Pick from here' : step?.targetRow === rowIndex ? 'Place into here' : 'Finished word'}
-            </Text>
+            </AppText>
             {step?.sourceRow === rowIndex && !state.failed ? <ScrollView horizontal contentContainerStyle={styles.letters}>
               {row.map((cell, index) => <Pressable key={index}
                 accessibilityRole="button"
@@ -51,10 +57,10 @@ export const PracticeModal: React.FC<PracticeModalProps> = ({ visible, lessonId,
                 accessibilityState={{ selected: state.selected === index }}
                 onPress={() => setState(previous => selectPracticeLetter(previous, index))}
                 style={[styles.letter, { borderColor: theme.title, backgroundColor: state.selected === index ? theme.amberTint : 'transparent', opacity: cell.locked ? 0.6 : 1 }]}>
-                <Text style={[styles.letterText, { color: theme.title }]}>{cell.char}</Text>
-                {cell.locked && <Text style={[styles.locked, { color: theme.body }]}>lock</Text>}
+                <AppText textRole="label" style={[styles.letterText, { color: theme.title }]}>{cell.char}</AppText>
+                {cell.locked && <AppText style={[styles.locked, { color: theme.body }]}>lock</AppText>}
               </Pressable>)}
-            </ScrollView> : <Text style={[styles.word, { color: theme.title }]}>{row.map(cell => cell.char).join('')}</Text>}
+            </ScrollView> : <AppText textRole="label" style={[styles.word, { color: theme.title }]}>{row.map(cell => cell.char).join('')}</AppText>}
           </View>)}
           {selectedLetter && <View style={styles.slots}>
             {Array.from({ length: targetWord.length + 1 }, (_, slot) => {
@@ -63,7 +69,7 @@ export const PracticeModal: React.FC<PracticeModalProps> = ({ visible, lessonId,
                 accessibilityLabel={`Position ${slot + 1}${state.lessonId === 'blind' ? '' : `, ${preview}`}`}
                 onPress={() => setState(previous => placePracticeLetter(previous, slot))}
                 style={[styles.slot, { borderColor: theme.title }]}>
-                <Text style={[styles.body, { color: theme.title }]}>{state.lessonId === 'blind' ? `Position ${slot + 1}` : `${slot + 1}: ${preview}`}</Text>
+                <AppText textRole="reading" style={[styles.body, { color: theme.title }]}>{state.lessonId === 'blind' ? `Position ${slot + 1}` : `${slot + 1}: ${preview}`}</AppText>
               </Pressable>;
             })}
           </View>}
@@ -78,9 +84,9 @@ export const PracticeModal: React.FC<PracticeModalProps> = ({ visible, lessonId,
 const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 12 },
   content: { paddingHorizontal: SURFACE.panelPadX, paddingVertical: SURFACE.panelPadY, gap: 12 },
-  title: { fontFamily: PIXEL_FONT_BOLD, fontSize: 20, textAlign: 'center' },
-  body: { fontFamily: BODY_FONT, fontSize: 16, lineHeight: 23 },
-  caption: { fontFamily: BODY_FONT, fontSize: 14, marginBottom: 6 },
+  title: { ...TEXT_ROLE.title, textAlign: 'center' },
+  body: { ...TEXT_ROLE.body, lineHeight: 23 },
+  caption: { ...TEXT_ROLE.caption, marginBottom: 6 },
   row: { gap: 4 },
   letters: { gap: 4 },
   letter: { minWidth: 44, minHeight: 52, borderWidth: 1, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },

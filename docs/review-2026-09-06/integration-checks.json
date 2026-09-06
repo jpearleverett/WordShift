@@ -1,0 +1,62 @@
+[
+  {
+    "check": "typecheck",
+    "exitCode": 0,
+    "elapsedSeconds": 74.73,
+    "command": [
+      "npm",
+      "run",
+      "typecheck"
+    ],
+    "log": "typecheck.log"
+  },
+  {
+    "check": "jest",
+    "exitCode": 0,
+    "elapsedSeconds": 92.53,
+    "command": [
+      "npm",
+      "test",
+      "--",
+      "--no-coverage",
+      "--runInBand"
+    ],
+    "log": "jest.log"
+  },
+  {
+    "check": "lint",
+    "exitCode": 0,
+    "elapsedSeconds": 190.61,
+    "command": [
+      "npm",
+      "run",
+      "lint",
+      "--",
+      "--max-warnings",
+      "0",
+      "--format",
+      "json",
+      "--output-file",
+      "/tmp/wordshift-completion-strict-lint.json"
+    ],
+    "log": "lint.log"
+  },
+  {
+    "check": "android-export",
+    "exitCode": 0,
+    "elapsedSeconds": 100.71,
+    "command": [
+      "npx",
+      "expo",
+      "export",
+      "--platform",
+      "android",
+      "--max-workers",
+      "1",
+      "--dump-assetmap",
+      "--output-dir",
+      "/tmp/wordshift-android-export-completion"
+    ],
+    "log": "android-export.log"
+  }
+]

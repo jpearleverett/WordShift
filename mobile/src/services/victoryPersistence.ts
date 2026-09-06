@@ -5,31 +5,27 @@ import {
   isFlawless,
   recordPuzzleCompletion,
   getCumulativeStats,
-  CumulativeStats,
   getThreeStarRate,
 } from './starRating';
 import {
   awardPuzzleAmber,
-  getAmberBalance,
   getCurrentPhase,
   recordRitualWords,
   recordVariantEncounter,
   applyVariantAmberBonus,
   recordVariantWin,
-  getPhaseProgressFraction,
-  getPendingPhaseTransition,
   isPostRevelation,
   getFullProgress,
-} from './amberCurrency';
+ isHouseCompleted, isFinalPuzzleCompleted, isFinaleArmed, markFinalPuzzleCompleted,
+  markPostRevelation, getPhase4DwellCount, recordPhase4Dwell, armFinale , canArmFinale , awardBonusAmberInTransaction } from './amberCurrency';
 import { recordFormedWords } from './wordHistory';
 import { calculateRitualEnergy, extractTriggerWords } from './localGenerator';
-import { GameEvent, logEvent } from './eventLogger';
 import { updateQuestProgress, WeeklyQuestGenerationContext } from './weeklyQuests';
 import { recordOfferingFulfillment } from './offeringRequests';
 import { PuzzleVariant, getVariantAmberMultiplier, getNewlyUnlockedVariants, getUnlockedVariants } from './puzzleVariety';
-import { enqueueHarvestBatch, getPendingHarvestSummary, HarvestSummary, recoverPendingHarvestCredits } from './wordHarvest';
+import { enqueueHarvestBatch, getPendingHarvestSummary, recoverPendingHarvestCredits } from './wordHarvest';
 import { recordResonantChoices, recordUnbrokenWeaveVictory } from './masteryRecords';
-import { RESONANT_MOVE_AMBER, RESONANT_BOARD_CAP_AMBER } from '../constants/gameBalance';
+import { RESONANT_MOVE_AMBER, RESONANT_BOARD_CAP_AMBER , FINALE_ARM_MIN_PUZZLES } from '../constants/gameBalance';
 
 import type { VictoryData, AmberBreakdown } from '../hooks/useGamePersistence';
 import AsyncStorage, { runStorageTransaction } from './persistenceStorage';
@@ -37,12 +33,7 @@ import NativeStorage from '@react-native-async-storage/async-storage';
 import { invalidateRestoredServiceCaches } from './cloudSave';
 import { recordSeasonPuzzleCompletion } from './seasonPass';
 import { getLocalDateString, parseLocalDate } from './dateUtils';
-import { isHouseCompleted, isFinalPuzzleCompleted, isFinaleArmed, markFinalPuzzleCompleted,
-  markPostRevelation, getPhase4DwellCount, recordPhase4Dwell, armFinale } from './amberCurrency';
 import { recordStoryBoundary } from './storySpine';
-import { canArmFinale } from './amberCurrency';
-import { FINALE_ARM_MIN_PUZZLES } from '../constants/gameBalance';
-import { awardBonusAmberInTransaction } from './amberCurrency';
 import { loadDailyProgress, recordDailyCompletion, checkDailyStreakMilestone } from './dailyChallenge';
 import { isEventDay, getEventDailyBonusAmber } from './liveEvents';
 

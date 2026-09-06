@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Animated, Image, ImageStyle, StyleProp } from 'react-native';
 import { getSettingsSync } from '../../services/settings';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
@@ -16,7 +16,7 @@ export const BrandedLoader: React.FC<{ size?: number; style?: StyleProp<ImageSty
   size = 40,
   style,
 }) => {
-  const anim = useRef(new Animated.Value(0)).current;
+  const [anim] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     if (getSettingsSync().reducedMotion || shouldSimplifyAnimations()) {

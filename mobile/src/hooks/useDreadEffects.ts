@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Animated, Easing } from 'react-native';
 import { getSettingsSync } from '../services/settings';
 import { hapticLight, hapticMedium } from '../services/haptics';
@@ -60,8 +60,8 @@ export interface DreadEffectsActions {
  *   main container
  */
 export function useDreadEffects(): [DreadEffectsState, DreadEffectsActions] {
-  const dreadPulseOpacity = useRef(new Animated.Value(0)).current;
-  const screenShakeRef = useRef(new Animated.Value(0)).current;
+  const [dreadPulseOpacity] = useState(() => new Animated.Value(0));
+  const [screenShakeRef] = useState(() => new Animated.Value(0));
   const pulseAnimRef = useRef<Animated.CompositeAnimation | null>(null);
   const shakeAnimRef = useRef<Animated.CompositeAnimation | null>(null);
 

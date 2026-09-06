@@ -8,20 +8,21 @@ import { CHARACTER_SPRITES } from './home/AnimalSprite';
 export function StoryPortrait({ speaker, phase, passage, size = 116 }: {
   speaker: AnimalType; phase: DialoguePhase; passage: string; size?: number;
 }) {
-  const [talking, setTalking] = useState(false);
+  const passageKey = `${speaker}:${passage}`;
+  const [frame, setFrame] = useState<{ key: string; talking: boolean } | null>(null);
   const sprites = CHARACTER_SPRITES[speaker];
   const reducedMotion = useReducedMotion();
   useEffect(() => {
-    setTalking(false);
     if (reducedMotion) return;
     let ticks = 0;
     const timer = setInterval(() => {
       ticks += 1;
-      setTalking(ticks < 5 && ticks % 2 === 1);
+      setFrame({ key: passageKey, talking: ticks < 5 && ticks % 2 === 1 });
       if (ticks >= 5) clearInterval(timer);
     }, 220);
     return () => clearInterval(timer);
-  }, [speaker, passage, reducedMotion]);
+  }, [passageKey, reducedMotion]);
+  const talking = !reducedMotion && frame?.key === passageKey && frame.talking;
   if (!sprites) return null;
   const idle = phase >= 4 ? sprites.robed ?? sprites.idle : sprites.idle;
   const talk = phase >= 4 ? sprites.robedTalk ?? idle : sprites.talk ?? idle;

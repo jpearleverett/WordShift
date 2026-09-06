@@ -1,12 +1,26 @@
+import { COMMON_WORDS , CURATED_EARLY_PUZZLES, CURATED_FINAL_PUZZLE } from '../constants/wordLists';
+import decisions from '../../scripts/vocabulary/editorial-decisions-2026-09-06.json';
 import { DICTIONARY_WORDS } from '../dictionary';
 import { getRequiredPuzzleWords, isFairPuzzleWord, isPuzzleVocabularyFair } from '../services/puzzleVocabulary';
 import { PUZZLE_BANK_EASY } from '../data/puzzleBankEasy';
 import { PUZZLE_BANK_REVERSE_EASY } from '../data/puzzleBankReverseEasy';
 import { PUZZLE_BANK_DOUBLE_SHIFT_EASY } from '../data/puzzleBankDoubleShiftEasy';
 import { isChainSolvable } from '../services/puzzleSolvability';
-import { CURATED_EARLY_PUZZLES, CURATED_FINAL_PUZZLE } from '../constants/wordLists';
 
 describe('playable vocabulary policy', () => {
+  it('finishes every editorial decision and restores familiar variants without removing legacy save words', () => {
+    expect(decisions.entries).toHaveLength(58);
+    const restored = decisions.entries.filter(entry => entry.decision === 'allow');
+    expect(restored.map(entry => entry.word)).toEqual(['BONNIE', 'CAYMAN', 'CAYMANS', 'CHOOSEY', 'GASSES', 'HALLO', 'STANDUP', 'WINTERY', 'WOOLY']);
+    for (const entry of decisions.entries) {
+      expect(['allow', 'exclude']).toContain(entry.decision);
+      expect(entry.sources.length).toBeGreaterThan(0);
+      expect(DICTIONARY_WORDS).toContain(entry.word);
+      expect(COMMON_WORDS.has(entry.word)).toBe(entry.decision === 'allow');
+      expect(isFairPuzzleWord(entry.word)).toBe(entry.decision === 'allow');
+    }
+  });
+
   it('quarantines questionable required words without mislabeling rare valid discoveries', () => {
     for (const word of ['THATS', 'WHATS', 'SHES', 'NOS', 'BASSETT', 'ZZZZ']) {
       expect(isFairPuzzleWord(word)).toBe(false);

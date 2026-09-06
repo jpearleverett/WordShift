@@ -63,6 +63,7 @@ function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
 
 function readExtra(): Record<string, any> {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
     const Constants = require('expo-constants').default ?? require('expo-constants');
     return Constants?.expoConfig?.extra ?? Constants?.manifest?.extra ?? {};
   } catch {

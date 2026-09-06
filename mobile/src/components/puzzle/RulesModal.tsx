@@ -1,8 +1,9 @@
+import { TEXT_ROLE } from '../../theme/typography';
+import { AppText } from '../ui/AppText';
 import { PRACTICE_LESSONS, type PracticeLessonId } from '../../services/practiceLessons';
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
-  Text,
   TouchableOpacity,
   StyleSheet,
   Modal,
@@ -21,7 +22,7 @@ import { CandyButton } from '../ui/CandyButton';
 import { getSettingsSync } from '../../services/settings';
 import { getRulesText } from '../../services/phaseNarrative';
 import { DialoguePhase } from '../../types/homeWorld';
-import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
+import { PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { FONT_SIZE } from '../../theme/typeScale';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 
@@ -70,9 +71,9 @@ export const RulesModal: React.FC<RulesModalProps> = ({
   const t = getSurfaceTheme(phase);
   const reducedMotion = getSettingsSync().reducedMotion;
 
-  const backdropOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
-  const cardScale = useRef(new Animated.Value(reducedMotion ? 1 : 0.92)).current;
-  const cardOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const [backdropOpacity] = useState(() => new Animated.Value(reducedMotion ? 1 : 0));
+  const [cardScale] = useState(() => new Animated.Value(reducedMotion ? 1 : 0.92));
+  const [cardOpacity] = useState(() => new Animated.Value(reducedMotion ? 1 : 0));
   const closingRef = useRef(false);
 
   useEffect(() => {
@@ -106,7 +107,7 @@ export const RulesModal: React.FC<RulesModalProps> = ({
     ]);
     anim.start();
     return () => anim.stop();
-  }, [visible, reducedMotion, backdropOpacity, cardScale, cardOpacity]);
+  }, [visible, phase, reducedMotion, backdropOpacity, cardScale, cardOpacity]);
 
   const handleClose = useCallback(() => {
     if (closingRef.current) return;
@@ -168,7 +169,7 @@ export const RulesModal: React.FC<RulesModalProps> = ({
                 accessibilityLabel="Close"
               />
 
-              <Text style={[styles.rulesTitle, { color: t.title }]}>{rules.title}</Text>
+              <AppText textRole="title" style={[styles.rulesTitle, { color: t.title }]}>{rules.title}</AppText>
 
               {rules.steps.map((step, idx) => {
                 const chip = getStepChipColors(idx, phase);
@@ -189,7 +190,7 @@ export const RulesModal: React.FC<RulesModalProps> = ({
                             { backgroundColor: chip.bg, borderColor: chip.border },
                           ]}
                         >
-                          <Text style={[styles.ruleNumberText, styles.ruleNumberTextMini, { color: chip.text }]}>{idx + 1}</Text>
+                          <AppText textRole="label" style={[styles.ruleNumberText, styles.ruleNumberTextMini, { color: chip.text }]}>{idx + 1}</AppText>
                         </View>
                       </View>
                     ) : (
@@ -199,20 +200,20 @@ export const RulesModal: React.FC<RulesModalProps> = ({
                           { backgroundColor: chip.bg, borderColor: chip.border },
                         ]}
                       >
-                        <Text style={[styles.ruleNumberText, { color: chip.text }]}>{idx + 1}</Text>
+                        <AppText textRole="label" style={[styles.ruleNumberText, { color: chip.text }]}>{idx + 1}</AppText>
                       </View>
                     )}
                     <View style={styles.ruleContent}>
-                      <Text style={[styles.ruleHeading, { color: t.title }]}>{step.heading}</Text>
-                      <Text style={[styles.ruleDesc, { color: t.body }]}>{step.desc}</Text>
+                      <AppText style={[styles.ruleHeading, { color: t.title }]}>{step.heading}</AppText>
+                      <AppText style={[styles.ruleDesc, { color: t.body }]}>{step.desc}</AppText>
                     </View>
                   </View>
                 );
               })}
 
-              <Text style={{ color: t.body, fontSize: 15, lineHeight: 21, marginBottom: 12 }}>
+              <AppText style={{ color: t.body, fontSize: 15, lineHeight: 21, marginBottom: 12 }}>
                 Words use standard English spellings. Common regional spellings count. Rare valid discoveries can count too; new ordinary puzzles use a more familiar vocabulary.
-              </Text>
+              </AppText>
               {onPractice && (Object.keys(PRACTICE_LESSONS) as PracticeLessonId[]).map(lesson => (
                 <CandyButton key={lesson} label={PRACTICE_LESSONS[lesson].title} phase={phase} variant="quiet" onPress={() => onPractice(lesson)} />
               ))}
@@ -325,9 +326,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   ruleDesc: {
-    fontFamily: BODY_FONT,
-    fontSize: FONT_SIZE.bodyLg,
-    lineHeight: 19,
+    ...TEXT_ROLE.body,
   },
   gotItButton: {
     marginTop: 8,

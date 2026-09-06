@@ -16,7 +16,7 @@ const ownerOther = `ws2_${'b'.repeat(32)}`;
 const support = `wss_${'c'.repeat(32)}`;
 try {
   await db.exec('create role anon; create role authenticated; create role service_role bypassrls;');
-  for (const file of ['security_setup.sql', 'save_integrity_v2.sql', 'events_integrity_v2.sql', 'daily_board_versions.sql', 'support_operations.sql', 'analytics_funnels.sql']) {
+  for (const file of ['security_setup.sql', 'save_integrity_v2.sql', 'events_integrity_v2.sql', 'daily_board_versions.sql', 'support_operations.sql', 'analytics_funnels.sql', 'event_retention.sql']) {
     await db.exec(await readFile(new URL(file, import.meta.url), 'utf8'));
   }
   // Re-running upgrades must preserve rows and function signatures.
@@ -66,5 +66,28 @@ try {
     { saves: 1, installs: 2, events: 1, dailyScores: 0, versionedDailyScores: 0 });
   check((await db.query('select count(*)::int as n from public.saves')).rows[0].n, 1);
   check((await db.query('select count(*)::int as n from public.events')).rows[0].n, 1);
+  // Retention is bounded, preserves fresh/unrelated records and is operator-only.
+  // Rerunning the migration must keep legacy inserts usable without granting
+  // clients control of server receipt time, even when their clock is wrong.
+  await db.exec(await readFile(new URL('event_retention.sql', import.meta.url), 'utf8'));
+  check((await db.query("select has_table_privilege('anon','public.events','INSERT') as allowed")).rows[0].allowed, false);
+  check((await db.query("select has_column_privilege('anon','public.events','received_at','INSERT') as allowed")).rows[0].allowed, false);
+  await db.exec('set role anon');
+  await assert.rejects(db.query("insert into public.events(install_id,type,received_at) values('spoofed-receipt','app_open',now()+interval '100 years')"), error => error.code === '42501'); checks++;
+  await db.query("insert into public.events(install_id,event_id,platform,app_version,type,data,created_at) values('legacy-receipt','legacy-retry-id','android','1.2.0','app_open','{}',now()+interval '1 year')");
+  await db.exec('reset role');
+  check((await db.query("select received_at < created_at and received_at between now()-interval '1 minute' and now() as server_receipt from public.events where install_id='legacy-receipt' and event_id='legacy-retry-id'")).rows[0].server_receipt, true);
+  await db.query("insert into public.events(install_id,event_id,type,created_at,received_at) values ('retention-probe','old1','app_open',now()-interval '25 months',now()-interval '25 months'), ('retention-probe','old2','app_open',now()+interval '1 year',now()-interval '26 months'), ('retention-probe','fresh','app_open',now(),now())");
+  await db.exec('set role anon');
+  await assert.rejects(db.query('select public.prune_expired_events(1)')); checks++;
+  await db.exec('reset role');
+  await assert.rejects(db.query('select public.prune_expired_events(0)')); checks++;
+  await assert.rejects(db.query('select public.prune_expired_events(10001)')); checks++;
+  check((await db.query('select public.prune_expired_events(1) as n')).rows[0].n, 1);
+  check((await db.query("select count(*)::int as n from public.events where event_id='old1'")).rows[0].n, 1);
+  check((await db.query('select public.prune_expired_events(10000) as n')).rows[0].n, 1);
+  check((await db.query('select public.prune_expired_events(10000) as n')).rows[0].n, 0);
+  check((await db.query("select count(*)::int as n from public.events where event_id='fresh'")).rows[0].n, 1);
+  check((await db.query("select count(*)::int as n from public.events where event_id='other'")).rows[0].n, 1);
   console.log(JSON.stringify({ checks, result: 'passed', engine: 'PGlite PostgreSQL', remoteWrites: 0 }));
 } finally { await db.close(); }

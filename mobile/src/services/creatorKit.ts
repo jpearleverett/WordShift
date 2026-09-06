@@ -114,6 +114,7 @@ const ERA_SPECS: Record<CreatorEra, EraSpec> = {
  */
 function getConfigExtra(): Record<string, unknown> {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
     const Constants = require('expo-constants').default;
     return (Constants?.expoConfig?.extra as Record<string, unknown>) ?? {};
   } catch {

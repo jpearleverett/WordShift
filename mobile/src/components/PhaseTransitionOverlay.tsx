@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useLayoutEffect, useEffect, useRef, useState } from 'react';
 import { FONT_SIZE } from '../theme/typeScale';
-import { View, Text, StyleSheet, Animated, Easing, TouchableOpacity, Image, ScrollView, useWindowDimensions, AppState } from 'react-native';
+import { View, StyleSheet, Animated, Easing, TouchableOpacity, Image, ScrollView, useWindowDimensions, AppState } from 'react-native';
+import { AppText } from './ui/AppText';
 import { PhaseTransitionEvent, PhaseScene, SceneImage, CinematicParticleConfig } from '../services/phaseEvents';
 import { getSettingsSync } from '../services/settings';
 import { hapticLight, hapticMedium, hapticHeavy, hapticWarning } from '../services/haptics';
@@ -77,7 +78,8 @@ function fireSceneHaptic(scene: PhaseScene, shakeIntensity?: number): void {
       break;
     case 'flash':
     case 'shake':
-      isIntense ? hapticWarning() : hapticHeavy();
+      if (isIntense) hapticWarning();
+      else hapticHeavy();
       break;
     case 'pulse':
     case 'vignette_close':
@@ -108,6 +110,7 @@ function getFlashColor(phase: number): string {
 interface PhaseTransitionOverlayProps {
   event: PhaseTransitionEvent | null;
   onComplete: () => void;
+  suspended?: boolean;
 }
 
 const CinematicParticleBase: React.FC<{
@@ -115,17 +118,17 @@ const CinematicParticleBase: React.FC<{
   index: number;
 }> = ({ config, index }) => {
   const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
-  const translateMain = useRef(new Animated.Value(0)).current;
-  const wobble = useRef(new Animated.Value(0)).current;
+  const [translateMain] = useState(() => new Animated.Value(0));
+  const [wobble] = useState(() => new Animated.Value(0));
   const loopRef = useRef<Animated.CompositeAnimation | null>(null);
 
-  const startX = useRef(Math.random() * SCREEN_WIDTH).current;
+  const [startX] = useState(() => (Math.random() * SCREEN_WIDTH));
   // Horizontal-drift particles keep a STABLE top across scene changes (stored in
   // a ref, like startX). Previously it was an inline Math.random() at render, so
   // every setActiveSceneIndex re-render teleported all drift particles to a new
   // random Y, breaking the continuous ambient motion.
-  const startTop = useRef(Math.random() * SCREEN_HEIGHT).current;
-  const startDelay = useRef(index * 300 + Math.random() * 500).current;
+  const [startTop] = useState(() => (Math.random() * SCREEN_HEIGHT));
+  const [startDelay] = useState(() => (index * 300 + Math.random() * 500));
 
   useEffect(() => {
     if (getSettingsSync().reducedMotion) return;
@@ -163,9 +166,9 @@ const CinematicParticleBase: React.FC<{
       translateMain.stopAnimation();
       wobble.stopAnimation();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only: particles are
+
   // created fresh per transition event and destroyed when the overlay closes.
-  }, []);
+  }, [SCREEN_HEIGHT, SCREEN_WIDTH, config.direction, config.speed, startDelay, translateMain, wobble]);
 
   const isVertical = config.direction === 'rise' || config.direction === 'fall';
   const startY = config.direction === 'rise' ? SCREEN_HEIGHT : -50;
@@ -208,11 +211,11 @@ const BurstParticleBase: React.FC<{
   durationMs: number;
 }> = ({ direction, color, size, durationMs }) => {
   const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
-  const translateY = useRef(new Animated.Value(0)).current;
-  const opacity = useRef(new Animated.Value(0)).current;
-  const startX = useRef(Math.random() * SCREEN_WIDTH).current;
+  const [translateY] = useState(() => new Animated.Value(0));
+  const [opacity] = useState(() => new Animated.Value(0));
+  const [startX] = useState(() => (Math.random() * SCREEN_WIDTH));
   // Stagger the spray across the first third of the dwell.
-  const startDelay = useRef(Math.random() * (durationMs * 0.35)).current;
+  const [startDelay] = useState(() => (Math.random() * (durationMs * 0.35)));
   const startY = direction === 'rise' ? SCREEN_HEIGHT + size : -size;
   const travel = direction === 'rise'
     ? -(SCREEN_HEIGHT + size * 2)
@@ -234,7 +237,7 @@ const BurstParticleBase: React.FC<{
     anim.start();
     return () => anim.stop();
     // mount-only one-shot; the whole layer is remounted (nonce key) per burst.
-  }, []);
+  }, [durationMs, opacity, startDelay, translateY, travel]);
 
   return (
     <Animated.View
@@ -318,25 +321,26 @@ const SoftVignette: React.FC<{ opacity: Animated.Value; color: string }> = ({ op
 export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
   event,
   onComplete,
+  suspended = false,
 }) => {
-  const { width, height } = useWindowDimensions();
+  const { width, height, fontScale } = useWindowDimensions();
   const effectiveReducedMotion = useReducedMotion();
   const insets = useSafeAreaInsets();
   const [activeSceneIndex, setActiveSceneIndex] = useState(-1);
   const [manualPlayback, setManualPlayback] = useState(false);
-  const overlayOpacity = useRef(new Animated.Value(0)).current;
-  const sceneOpacity = useRef(new Animated.Value(0)).current;
-  const sceneTranslateY = useRef(new Animated.Value(20)).current;
-  const shakeX = useRef(new Animated.Value(0)).current;
-  const shakeY = useRef(new Animated.Value(0)).current;
-  const flashOpacity = useRef(new Animated.Value(0)).current;
-  const vignetteOpacity = useRef(new Animated.Value(0)).current;
-  const imageOpacity = useRef(new Animated.Value(0)).current;
-  const imageTranslateY = useRef(new Animated.Value(0)).current;
-  const imageScale = useRef(new Animated.Value(1)).current;
+  const [overlayOpacity] = useState(() => new Animated.Value(0));
+  const [sceneOpacity] = useState(() => new Animated.Value(0));
+  const [sceneTranslateY] = useState(() => new Animated.Value(20));
+  const [shakeX] = useState(() => new Animated.Value(0));
+  const [shakeY] = useState(() => new Animated.Value(0));
+  const [flashOpacity] = useState(() => new Animated.Value(0));
+  const [vignetteOpacity] = useState(() => new Animated.Value(0));
+  const [imageOpacity] = useState(() => new Animated.Value(0));
+  const [imageTranslateY] = useState(() => new Animated.Value(0));
+  const [imageScale] = useState(() => new Animated.Value(1));
   const [activeImage, setActiveImage] = useState<SceneImage | null>(null);
   const effectAnimsRef = useRef<Animated.CompositeAnimation[]>([]);
-  const [flashColor, setFlashColor] = useState('#FFFFFF');
+  const flashColor = getFlashColor(event?.phase ?? 0);
   const [burst, setBurst] = useState<{
     direction: 'rise' | 'fall'; color: string; size: number;
     durationMs: number; nonce: number;
@@ -345,16 +349,24 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const hasSkipped = useRef(false);
   const visibleEventRef = useRef<PhaseTransitionEvent | null>(null);
+  const [visibleEvent, setVisibleEvent] = useState<PhaseTransitionEvent | null>(null);
   const onCompleteRef = useRef(onComplete);
   const scrollRef = useRef<ScrollView>(null);
+  const scrollOffsetRef = useRef(0);
   const soundScope = useRef<ReturnType<typeof createCeremonySoundScope> | null>(null);
-  onCompleteRef.current = onComplete;
+  const suspendedRef = useRef(suspended);
+  const wasSuspendedRef = useRef(false);
+  const deliveredSceneRef = useRef<{ event: PhaseTransitionEvent; index: number } | null>(null);
+  useLayoutEffect(() => { onCompleteRef.current = onComplete; });
+  useLayoutEffect(() => { suspendedRef.current = suspended; });
   useEffect(() => {
     if (!effectiveReducedMotion) return;
     effectAnimsRef.current.forEach(animation => animation.stop());
     shakeX.setValue(0); shakeY.setValue(0); flashOpacity.setValue(0);
     imageTranslateY.setValue(0); imageScale.setValue(1); sceneTranslateY.setValue(0);
-    sceneOpacity.setValue(1); setBurst(null);
+    sceneOpacity.setValue(1);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Remove the burst layer when its native motion drivers are cancelled by the OS preference.
+    setBurst(null);
   }, [effectiveReducedMotion, shakeX, shakeY, flashOpacity, imageTranslateY, imageScale, sceneTranslateY, sceneOpacity]);
 
   const stopEffectAnims = () => {
@@ -452,7 +464,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
    * Render the scene's declared screen effect. Native driver only; fully
    * skipped in reduced motion (the static scene is already shown by the caller).
    */
-  const runSceneEffect = (scene: PhaseScene, eventShake: number, phase: number) => {
+  const runSceneEffect = (scene: PhaseScene, eventShake: number) => {
     if (getSettingsSync().reducedMotion) return;
     const intensity = scene.effectIntensity ?? eventShake ?? 0.5;
 
@@ -483,7 +495,6 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
         break;
       }
       case 'flash': {
-        setFlashColor(getFlashColor(phase));
         flashOpacity.setValue(0);
         const peak = 0.35 + 0.45 * intensity;
         const anim = Animated.sequence([
@@ -509,7 +520,6 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
       case 'pulse': {
         // A soft breathing swell (previously a no-op that still fired a haptic).
         // Reuses the flash layer at a gentle peak so the scene "breathes".
-        setFlashColor(getFlashColor(phase));
         flashOpacity.setValue(0);
         const peak = (0.2 + 0.25 * intensity);
         const anim = Animated.sequence([
@@ -543,9 +553,9 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     onCompleteRef.current();
   };
   const finishRef = useRef(finish);
-  finishRef.current = finish;
+  useLayoutEffect(() => { finishRef.current = finish; });
   const next = () => {
-    if (!event || activeSceneIndex < 0 || hasSkipped.current) return;
+    if (!event || suspended || activeSceneIndex < 0 || hasSkipped.current) return;
     if (activeSceneIndex === event.scenes.length - 1) finishRef.current();
     else setActiveSceneIndex(activeSceneIndex + 1);
   };
@@ -554,6 +564,9 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
   // previously skipped scene must not briefly appear under the next title.
   useEffect(() => {
     visibleEventRef.current = null;
+    deliveredSceneRef.current = null;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- A new external event owns a fresh native animation timeline and its render layers.
+    setVisibleEvent(null);
     hasSkipped.current = false;
     setManualPlayback(event?.readAtOwnPace === true);
     setActiveSceneIndex(-1);
@@ -573,7 +586,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     const appStateListener = AppState.addEventListener('change', state => {
       soundScope.current?.stop();
       // A return allows future passages to sound; it never replays an old tail.
-      if (state === 'active' && !hasSkipped.current) soundScope.current = createCeremonySoundScope();
+      if (state === 'active' && !hasSkipped.current && !suspendedRef.current) soundScope.current = createCeremonySoundScope();
     });
     const reducedMotion = getSettingsSync().reducedMotion;
     if (reducedMotion) overlayOpacity.setValue(1);
@@ -587,6 +600,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     announceForA11y(event.showTitle === false ? 'A moment in the house.' : event.title);
     const timer = setTimeout(() => {
       visibleEventRef.current = event;
+      setVisibleEvent(event);
       setActiveSceneIndex(0);
     }, reducedMotion ? 0 : 600);
     timersRef.current.push(timer);
@@ -605,11 +619,44 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [event]);
 
+  // Overlay arbitration can temporarily hide a ceremony while a save finishes.
+  // Keep the cursor and delivered-cue record; returning never replays a cue.
+  useEffect(() => {
+    const wasSuspended = wasSuspendedRef.current;
+    wasSuspendedRef.current = suspended;
+    if (!event) return;
+    if (suspended) {
+      soundScope.current?.stop();
+      overlayOpacity.stopAnimation();
+      effectAnimsRef.current.forEach(animation => animation.stop());
+      sceneOpacity.stopAnimation();
+      sceneTranslateY.stopAnimation();
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- A suspended native burst is finished; remounting it on resume would replay the one-shot effect.
+      setBurst(null);
+    } else if (wasSuspended) {
+      soundScope.current = createCeremonySoundScope();
+      overlayOpacity.setValue(1);
+    }
+  }, [event, suspended, overlayOpacity, sceneOpacity, sceneTranslateY]);
+
   // Only a newly visible scene speaks or plays its cue. Changing playback
   // mode cannot replay the bell, the descent, or the screen-reader announcement.
   useEffect(() => {
     const scene = event?.scenes[activeSceneIndex];
-    if (!event || visibleEventRef.current !== event || !scene || hasSkipped.current) return;
+    if (!event || suspended || visibleEventRef.current !== event || !scene || hasSkipped.current) return;
+    const delivered = deliveredSceneRef.current;
+    if (delivered?.event === event && delivered.index === activeSceneIndex) {
+      // A paused entrance may have stopped midway. Resume its settled pose,
+      // preserving the page and scroll position rather than repeating it.
+      sceneOpacity.setValue(1);
+      sceneTranslateY.setValue(0);
+      shakeX.setValue(0); shakeY.setValue(0); flashOpacity.setValue(0);
+      imageTranslateY.setValue(0); imageScale.setValue(1);
+      imageOpacity.setValue(scene.image ? scene.imageOpacity ?? SCENE_IMAGE_DEFAULT_OPACITY : 0);
+      scrollRef.current?.scrollTo({ y: scrollOffsetRef.current, animated: false });
+      return;
+    }
+    deliveredSceneRef.current = { event, index: activeSceneIndex };
     const reducedMotion = getSettingsSync().reducedMotion;
     const timeScale = 1.25;
     stopEffectAnims();
@@ -617,6 +664,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     shakeY.setValue(0);
     flashOpacity.setValue(0);
     setBurst(null);
+    scrollOffsetRef.current = 0;
     scrollRef.current?.scrollTo({ y: 0, animated: false });
     runSceneImage(scene, timeScale, reducedMotion);
     announceForA11y(
@@ -637,7 +685,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
       timersRef.current.push(settleTimer);
     }
     if (!reducedMotion) {
-      runSceneEffect(scene, event.shakeIntensity ?? 0, event.phase);
+      runSceneEffect(scene, event.shakeIntensity ?? 0);
       if (scene.effect === 'particles_rise' || scene.effect === 'particles_fall') {
         burstNonceRef.current += 1;
         setBurst({
@@ -666,12 +714,12 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     };
     // Playback mode is deliberately absent: it only controls the timer below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [event, activeSceneIndex]);
+  }, [event, activeSceneIndex, suspended]);
 
   useEffect(() => {
     const scene = event?.scenes[activeSceneIndex];
     if (!event || visibleEventRef.current !== event || !scene ||
-        manualPlayback || hasSkipped.current) return;
+        suspended || manualPlayback || hasSkipped.current) return;
     // Reduced motion changes movement, never the time available to read.
     const nextScene = event.scenes[activeSceneIndex + 1];
     const authoredGap = nextScene ? Math.max(0, nextScene.delay - scene.delay - scene.duration) : 350;
@@ -682,16 +730,21 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     }, (scene.duration + authoredGap) * 1.25);
     timersRef.current.push(timer);
     return () => clearTimeout(timer);
-  }, [event, activeSceneIndex, manualPlayback]);
+  }, [event, activeSceneIndex, manualPlayback, suspended]);
 
-  if (!event) return null;
-  const eventIsVisible = visibleEventRef.current === event;
+  if (!event || suspended) return null;
+  const eventIsVisible = visibleEvent === event;
   const activeScene = eventIsVisible ? event.scenes[activeSceneIndex] : undefined;
   const isIllustration = (key: SceneImage) =>
     key === 'private_room' || key === 'outward_road' || key === 'outward_road_night' || key === 'kept_table';
   const lastScene = activeSceneIndex === event.scenes.length - 1;
   const contentWidth = Math.min(width - 32, 720);
-  const heroHeight = Math.max(100, Math.min(height * 0.37, 400));
+  // Text-only passages should give their space to reading. Keep the stage
+  // when it owns artwork or a visible particle/vignette effect.
+  const hasStageContent = !!(activeScene?.image || event.backdrop)
+    || (!effectiveReducedMotion && ['particles_rise', 'particles_fall', 'vignette_close'].includes(activeScene?.effect ?? ''));
+  const heroHeight = hasStageContent
+    ? Math.max(72, Math.min(height * (fontScale > 1.2 ? 0.18 : 0.37), 400)) : 0;
   const readingHeight = Math.max(160, height - insets.top - insets.bottom - heroHeight - 115);
   const imageSize = (key: SceneImage) => isIllustration(key)
     ? { width: contentWidth, height: heroHeight }
@@ -715,16 +768,16 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
         paddingBottom: insets.bottom + 14 }]}>
         <View style={styles.header}>
           <View style={styles.titleGroup}>
-            <Text style={styles.eyebrow}>WORDSHIFT</Text>
-            {event.showTitle !== false && <Text style={styles.title}>{event.title}</Text>}
+            <AppText textRole="label" style={styles.eyebrow}>WORDSHIFT</AppText>
+            {event.showTitle !== false && <AppText textRole="title" style={styles.title}>{event.title}</AppText>}
           </View>
           <TouchableOpacity style={styles.skipButton} onPress={() => finish(true)}
             accessibilityLabel="Skip transition" accessibilityRole="button">
-            <Text style={styles.skipText}>Skip</Text>
+            <AppText textRole="label" style={styles.skipText}>Skip</AppText>
           </TouchableOpacity>
         </View>
 
-        <View style={[styles.artStage, { height: heroHeight }]} pointerEvents="none">
+        <View style={[styles.artStage, { height: heroHeight, marginBottom: hasStageContent ? 16 : 0 }]} pointerEvents="none">
           {event.backdrop && (
             <View style={styles.imageLayer}>
               <Image source={SCENE_IMAGE_SOURCES[event.backdrop.image]}
@@ -753,35 +806,37 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
 
         <Animated.View style={[styles.sceneContainer, { maxHeight: readingHeight,
           opacity: sceneOpacity, transform: [{ translateY: sceneTranslateY }] }]}>
-          {activeScene && <>
+          {activeScene && <ScrollView ref={scrollRef} style={styles.readingScroll}
+            contentContainerStyle={styles.sceneContent} bounces={false}
+            onScroll={scrollEvent => { scrollOffsetRef.current = scrollEvent.nativeEvent.contentOffset.y; }}
+            scrollEventThrottle={16}
+            showsVerticalScrollIndicator keyboardShouldPersistTaps="handled">
             {activeScene.speaker && <View style={styles.speakerRow}>
               <StoryPortrait speaker={activeScene.speaker} phase={event.phase} passage={`${event.title}:${activeSceneIndex}`} size={76} />
               <View style={styles.speakerCaption}>
-                <Text style={styles.speakerName}>{getStorySpeakerName(activeScene.speaker)}</Text>
+                <AppText textRole="label" style={styles.speakerName}>{getStorySpeakerName(activeScene.speaker)}</AppText>
                 <View style={[styles.speakerRule, { backgroundColor: event.accentColor }]} />
               </View>
             </View>}
-            <ScrollView ref={scrollRef} style={styles.readingScroll}
-              contentContainerStyle={styles.readingContent} bounces={false}
-              showsVerticalScrollIndicator keyboardShouldPersistTaps="handled">
-              <Text style={styles.sceneText}>{activeScene.text}</Text>
-            </ScrollView>
-            <View style={styles.footer}>
+            <View style={styles.readingContent}>
+              <AppText textRole="reading" style={styles.sceneText}>{activeScene.text}</AppText>
+            </View>
+            <View style={[styles.footer, fontScale > 1.2 && styles.footerStacked]}>
               <View style={styles.progressGroup}>
-                <Text style={styles.progressText}>
+                <AppText textRole="caption" style={styles.progressText}>
                   {activeSceneIndex + 1} / {event.scenes.length}
-                </Text>
-                <Text style={styles.modeText}>{manualPlayback ? 'At your pace' : 'A moment unfolds'}</Text>
+                </AppText>
+                <AppText textRole="caption" style={styles.modeText}>{manualPlayback ? 'At your pace' : 'A moment unfolds'}</AppText>
               </View>
               {manualPlayback ? <TouchableOpacity onPress={next} style={styles.continueButton}
                 accessibilityRole="button" accessibilityLabel={lastScene ? 'Return to the house' : 'Continue the scene'}>
-                <Text style={styles.continueText}>{lastScene ? 'Return' : 'Continue'}</Text>
+                <AppText textRole="label" style={styles.continueText}>{lastScene ? 'Return' : 'Continue'}</AppText>
               </TouchableOpacity> : <TouchableOpacity onPress={() => setManualPlayback(true)}
                 style={styles.readButton} accessibilityRole="button" accessibilityLabel="Pause and read at my pace">
-                <Text style={styles.readButtonText}>Read at my pace</Text>
+                <AppText textRole="label" style={styles.readButtonText}>Read at my pace</AppText>
               </TouchableOpacity>}
             </View>
-          </>}
+          </ScrollView>}
         </Animated.View>
       </View>
       <Animated.View pointerEvents="none" style={[styles.flash,
@@ -810,17 +865,19 @@ const styles = StyleSheet.create({
   speakerName: { fontFamily: PIXEL_FONT_BOLD, fontSize: 16, lineHeight: 24, color: '#E9CCA2' },
   speakerRule: { height: 2, width: 30, marginTop: 8 },
   readingScroll: { flexShrink: 1 },
-  readingContent: { paddingVertical: 12 },
+  sceneContent: { flexGrow: 1 },
+  readingContent: { flexGrow: 1, paddingVertical: 12 },
   sceneText: { fontFamily: BODY_FONT, fontSize: 20, lineHeight: 31, color: '#F2E7D6' },
   footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     gap: 12, borderTopWidth: 1, borderTopColor: '#806B5560', paddingVertical: 14, marginTop: 10 },
+  footerStacked: { flexDirection: 'column', alignItems: 'stretch' },
   progressGroup: { flexShrink: 1 },
   progressText: { fontFamily: PIXEL_FONT_BOLD, fontSize: 11, letterSpacing: 2, color: '#D5C3A9' },
   modeText: { fontFamily: BODY_FONT, fontSize: 12, color: '#C3B5CC', marginTop: 5 },
   continueButton: { minHeight: 48, minWidth: 110, alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 18, borderWidth: 1, borderColor: '#D8B680', backgroundColor: '#3A2D29' },
   continueText: { fontFamily: PIXEL_FONT_BOLD, fontSize: 14, color: '#F4E8D1' },
-  readButton: { minHeight: 48, justifyContent: 'center', paddingHorizontal: 12 },
+  readButton: { minHeight: 48, flexShrink: 1, justifyContent: 'center', paddingHorizontal: 12 },
   readButtonText: { fontFamily: BODY_FONT_BOLD, fontSize: 14, color: '#E2D2BD' },
   skipButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 16,
     borderWidth: 1, borderColor: SKIP_BORDER_COLOR, backgroundColor: '#100B15', zIndex: 1000 },

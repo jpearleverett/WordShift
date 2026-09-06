@@ -95,7 +95,7 @@ export const RewardedAdButton: React.FC<RewardedAdButtonProps> = ({
   const [capReached, setCapReached] = useState(false);
   const [busy, setBusy] = useState(false);
   const mounted = useRef(true);
-  const busyOpacity = useRef(new Animated.Value(1)).current;
+  const [busyOpacity] = useState(() => new Animated.Value(1));
   const busyLoopRef = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {

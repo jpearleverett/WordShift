@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useLayoutEffect, useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, Animated, Easing, useWindowDimensions } from 'react-native';
 import { getPhaseTheme } from '../../theme/colors';
 import { useReducedMotion } from '../../hooks/useReducedMotion';
@@ -27,12 +27,13 @@ export const CelebrationConfetti: React.FC<{ onComplete: () => void; phase?: num
   // and never completed for as long as the new friend's intro was open. Hold
   // the callback in a ref and key the effect on the phase alone.
   const onCompleteRef = useRef(onComplete);
-  onCompleteRef.current = onComplete;
+  useLayoutEffect(() => { onCompleteRef.current = onComplete; });
 
   useEffect(() => {
     // Reduced-motion / low-tier: no confetti storm, just resolve the callback so
     // the celebration flow continues (the unlock still lands, minus the shower).
     if (reducedMotion || shouldSimplifyAnimations()) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Unmount the native particle registry when the motion policy cancels the celebration drivers.
       setPieces([]);
       const t = setTimeout(() => onCompleteRef.current(), 400);
       return () => clearTimeout(t);
@@ -98,6 +99,7 @@ export const CelebrationConfetti: React.FC<{ onComplete: () => void; phase?: num
       anim.start();
     }
 
+    // Publish the drivers this effect owns and stops during cleanup.
     setPieces(newPieces);
 
     const timeout = setTimeout(() => onCompleteRef.current(), 2500);

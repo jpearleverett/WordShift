@@ -16,18 +16,20 @@ import fs from 'fs';
 import path from 'path';
 
 const APP_TSX = fs.readFileSync(path.resolve(__dirname, '../../App.tsx'), 'utf8');
+const BOOTSTRAP = fs.readFileSync(path.resolve(__dirname, '../services/appBootstrap.ts'), 'utf8');
+const LAUNCH_INTENTS = fs.readFileSync(path.resolve(__dirname, '../hooks/useLaunchIntents.ts'), 'utf8');
 const VICTORY_STORAGE = fs.readFileSync(path.resolve(__dirname, '../services/victoryPersistence.ts'), 'utf8');
 
 describe('bootstrap is non-blocking', () => {
   test('store/ad SDK init is fire-and-forget with error logging', () => {
-    expect(APP_TSX).toMatch(/void initIAP\(\)\.catch/);
-    expect(APP_TSX).toMatch(/void initAds\(\)\.catch/);
+    expect(BOOTSTRAP).toMatch(/void initIAP\(\)\.catch/);
+    expect(BOOTSTRAP).toMatch(/void initAds\(\)\.catch/);
   });
 
   test('settings + cosmetics + hints + entitlements + fonts stay awaited (sync caches / pixel font must be warm at first render)', () => {
-    expect(APP_TSX).toMatch(/await Promise\.all\(\[getSettings\(\), initCosmetics\(\), initHints\(\), loadEntitlements\(\), loadPixelFonts\(\)\]\)/);
+    expect(BOOTSTRAP).toMatch(/await Promise\.all\(\[getSettings\(\), initCosmetics\(\), initHints\(\), loadEntitlements\(\), loadPixelFonts\(\)\]\)/);
     // The old blocking form must not come back.
-    expect(APP_TSX).not.toMatch(/Promise\.all\(\[initIAP\(\)/);
+    expect(BOOTSTRAP).not.toMatch(/Promise\.all\(\[initIAP\(\)/);
   });
 });
 
@@ -54,8 +56,8 @@ describe('deep links and notification taps', () => {
   });
 
   test('notification response listener routes the data.target payload', () => {
-    expect(APP_TSX).toMatch(/addNotificationResponseReceivedListener/);
-    expect(APP_TSX).toMatch(/content\?\.data\?\.target/);
+    expect(LAUNCH_INTENTS).toMatch(/addNotificationResponseReceivedListener/);
+    expect(LAUNCH_INTENTS).toMatch(/content\?\.data\?\.target/);
     // Both payload values from services/notifications.ts are handled.
     expect(APP_TSX).toMatch(/target === 'daily'/);
     expect(APP_TSX).toMatch(/target === 'home'/);
@@ -702,7 +704,7 @@ describe('monetization + daily wiring', () => {
 describe('daily login modal deferral', () => {
   test('grant presentation is gated to a quiet home screen', () => {
     expect(APP_TSX).toMatch(/const dailyLoginGrantVisible =/);
-    expect(APP_TSX).toMatch(/grant=\{dailyLoginGrantVisible \? dailyLoginGrant : null\}/);
+    expect(APP_TSX).toMatch(/grant=\{overlayOwner === 'dailyLogin' \? dailyLoginGrant : null\}/);
     // The gate covers screen, victory flow, intros, and ceremonies.
     const gate = APP_TSX.slice(
       APP_TSX.indexOf('const dailyLoginGrantVisible ='),
@@ -855,9 +857,9 @@ describe('a post-victory Fox intro can never be stranded', () => {
   });
 
   test('deep links and notification taps refuse to route over a live intro', () => {
-    const link = sliceBetween('const handleIncomingLink = useCallback', 'const handleIncomingLinkRef');
+    const link = sliceBetween('const handleIncomingLink = useCallback', 'const routeNotificationTarget');
     expect(link).toMatch(/if \(postVictoryIntro\) \{\s*return;/);
-    const notif = sliceBetween('routeNotificationTargetRef.current = (target: unknown)', "} else if (target === 'home')");
+    const notif = sliceBetween('const routeNotificationTarget = (', "} else if (target === 'home')");
     expect(notif).toMatch(/if \(postVictoryIntro\) \{\s*return;/);
   });
 });

@@ -26,13 +26,13 @@ function rewindHookIndices() {
   refIndex = 0;
 }
 
-let effectCallbacks: Array<() => void> = [];
+let effectCallbacks: (() => void)[] = [];
 
 jest.mock('react', () => ({
   useState: (initial: unknown) => {
     const idx = stateIndex++;
     if (!stateStore.has(idx)) {
-      stateStore.set(idx, initial);
+      stateStore.set(idx, typeof initial === 'function' ? (initial as () => unknown)() : initial);
     }
     const value = stateStore.get(idx);
     const setter = (valOrFn: unknown) => {
@@ -216,11 +216,11 @@ jest.mock('../constants', () => ({
   },
 }));
 
-import { CHALLENGE_MODE_CONFIG } from '../constants/gameBalance';
 import { usePuzzleGame, hasAnyValidMove, canCompleteDoubleShift, hasAnyValidDoubleShiftMove, isBoardSolvableFromState, comboTierForStreak, shouldUseComboMessage, resolvePreviewGradingMode, PuzzleGameState, PuzzleGameActions } from '../hooks/usePuzzleGame';
 // Real values (the hook imports them from gameBalance directly, past the
 // '../constants' mock above) — the grading-window tests pin against them.
 import {
+  CHALLENGE_MODE_CONFIG,
   PREVIEW_GRADING_FULL_LIMIT,
 } from '../constants/gameBalance';
 

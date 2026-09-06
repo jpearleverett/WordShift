@@ -1,6 +1,8 @@
 # Fresh bank delivery validation — 2026-09-05
 
-All 30 generated banks were audited against the actual fresh-board dictionary and shared runtime qualification. The generated bank files were not edited. Out of 9,611 historical boards, 3,809 currently qualify for new play.
+The [6 September follow-up](../PUZZLE_BANK_TOP_UP_2026-09-06.md) completes the editorial decisions and gated bank replenishment. This document preserves the original September 5 findings; use the follow-up report for current bank counts and proofs.
+
+All 30 generated banks were audited against the actual fresh-board dictionary and shared runtime qualification. The generated bank files were not edited. Out of 9,611 historical boards, 3,809 qualified for new play at that audit checkpoint.
 
 | Family | Delivered boards | Required proof | Result |
 |---|---:|---|---|

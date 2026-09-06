@@ -11,6 +11,11 @@ module.exports = {
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
       tsconfig: {
+        // Type checking runs once through npm run typecheck. Per-file
+        // transpilation keeps the complete suite usable on 2 GB machines.
+        isolatedModules: true,
+        ignoreDeprecations: '6.0',
+        rootDir: '.',
         module: 'commonjs',
         esModuleInterop: true,
         jsx: 'react',

@@ -90,6 +90,15 @@ describe('supabaseClient', () => {
       expect(init.headers.Prefer).toBe('return=minimal');
     });
 
+    test('publishable keys use apikey without being presented as a JWT', async () => {
+      mockExtra.supabaseAnonKey = 'sb_publishable_example';
+      (global.fetch as jest.Mock).mockResolvedValue({ ok: true, status: 200, json: async () => [] });
+      await sbRpc('get_save_v2', { p_owner: 'invalid' });
+      const [, init] = (global.fetch as jest.Mock).mock.calls[0];
+      expect(init.headers.apikey).toBe('sb_publishable_example');
+      expect(init.headers).not.toHaveProperty('Authorization');
+    });
+
     test('sbInsert returns [] on a 204 success without representation', async () => {
       (global.fetch as jest.Mock).mockResolvedValue({ ok: true, status: 204 });
       const result = await sbInsert('events', { type: 'x' }, { returning: false });

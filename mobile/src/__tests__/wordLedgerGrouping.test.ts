@@ -135,7 +135,7 @@ describe('WordLedger chip cascade (source guard)', () => {
 
   test('uses a per-group cascade delay and a per-group reveal latch', () => {
     expect(src).toContain('getGroupedCascadeDelayMs');
-    expect(src).toContain('revealedGroupsRef');
+    expect(src).toContain('revealedGroups');
     expect(src).toContain('CHIP_CASCADE_STAGGER_MS');
   });
 

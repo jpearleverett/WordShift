@@ -1,0 +1,77 @@
+name: Android internal testing
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-internal-testing
+  cancel-in-progress: false
+
+jobs:
+  build-and-submit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Check release credentials
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          node - <<'NODE'
+          for (const name of ['EXPO_TOKEN', 'PLAY_SERVICE_ACCOUNT_JSON']) {
+            if (!process.env[name]) throw new Error(`Repository secret ${name} is required.`);
+          }
+          let key;
+          try { key = JSON.parse(process.env.PLAY_SERVICE_ACCOUNT_JSON); }
+          catch { throw new Error('PLAY_SERVICE_ACCOUNT_JSON must contain valid JSON.'); }
+          if (!key || key.type !== 'service_account' || !key.client_email || !key.private_key) {
+            throw new Error('PLAY_SERVICE_ACCOUNT_JSON must be a Google service-account JSON key.');
+          }
+          NODE
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify source
+        run: |
+          npm run typecheck
+          npm run lint -- --max-warnings 0
+          npm test -- --no-coverage --ci --runInBand
+      - name: Verify story and puzzle delivery
+        run: |
+          npm test -- --no-coverage --ci --runInBand --config scripts/jest.config.js --runTestsByPath scripts/reverseTopUpCandidates.test.ts
+          node scripts/tools/auditStoryCorpus.mjs
+          node --max-old-space-size=180 scripts/tools/auditVocabulary.mjs --branching --minimum-eligible=100
+          node --max-old-space-size=180 scripts/tools/auditBankRoutes.mjs
+          node scripts/tools/updateDailyBoardVersion.mjs --check
+      - name: Verify hosted backend migration
+        run: node scripts/tools/verifyHostedBackend.mjs
+      - name: Set up EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - name: Materialize submission credential
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs');
+          fs.mkdirSync('secrets', { recursive: true });
+          fs.writeFileSync('secrets/play-service-account.json', process.env.PLAY_SERVICE_ACCOUNT_JSON, { mode: 0o600 });
+          NODE
+      - name: Build and submit to Play internal testing
+        run: eas build --platform android --profile internal-testing --non-interactive --auto-submit-with-profile internal-testing
+      - name: Remove submission credential
+        if: always()
+        run: rm -f secrets/play-service-account.json

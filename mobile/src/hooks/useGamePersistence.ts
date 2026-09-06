@@ -5,7 +5,7 @@ import { getCumulativeStats, CumulativeStats } from '../services/starRating';
 import { getAmberBalance, getCurrentPhase, getPhaseProgressFraction,
   getPendingPhaseTransition, isPostRevelation } from '../services/amberCurrency';
 import { updatePuzzleCount, updateSessionPhase } from '../services/dialogueSession';
-import { GameEvent, logEvent } from '../services/eventLogger';
+import { logEvent } from '../services/eventLogger';
 import { PuzzleVariant } from '../services/puzzleVariety';
 import { generateBatchId, HarvestSummary } from '../services/wordHarvest';
 import { createVictoryInput, recordDurableVictory } from '../services/victoryPersistence';
@@ -312,7 +312,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
       return result;
     } finally { recordInProgress.current = false; }
 
-  }, [amberBalance, currentPhase, cumulativeStats]);
+  }, []);
 
   const state: PersistenceState = {
     cumulativeStats,

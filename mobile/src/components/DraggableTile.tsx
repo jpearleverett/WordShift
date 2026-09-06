@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import { Animated, PanResponder, Easing, StyleSheet, View } from 'react-native';
 import { getDragShadowColor } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
@@ -75,17 +75,17 @@ export function DraggableTile({
   onDragActiveChange,
   boardScale = 1,
 }: DraggableTileProps) {
-  const translateX = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(0)).current;
+  const [translateX] = useState(() => new Animated.Value(0));
+  const [translateY] = useState(() => new Animated.Value(0));
   // Lift (F7): 0 at rest, springs to -DRAG_LIFT_DP once the drag activates so
   // the ghost rides above the finger instead of directly under it.
-  const liftAnim = useRef(new Animated.Value(0)).current;
+  const [liftAnim] = useState(() => new Animated.Value(0));
   const isDragging = useRef(false);
   const startPos = useRef({ x: 0, y: 0 });
   const dragActivated = useRef(false);
-  const sourceOpacity = useRef(new Animated.Value(1)).current;
-  const floatingOpacity = useRef(new Animated.Value(0)).current;
-  const floatingScale = useRef(new Animated.Value(1)).current;
+  const [sourceOpacity] = useState(() => new Animated.Value(1));
+  const [floatingOpacity] = useState(() => new Animated.Value(0));
+  const [floatingScale] = useState(() => new Animated.Value(1));
 
   // Refs for callback props — PanResponder is created once and captures the
   // initial closure. Without refs, callbacks would be stale after re-renders.
@@ -100,16 +100,16 @@ export function DraggableTile({
   // permanently, so a plain prop read inside onPanResponderMove would freeze at
   // the mount-time value (1) forever and counter-scale nothing.
   const scaleRef = useRef(boardScale);
-  onDragStartRef.current = onDragStart;
-  onDragEndRef.current = onDragEnd;
-  onMoveRef.current = onMove;
-  onTapRef.current = onTap;
-  enabledRef.current = enabled;
-  onDragActiveChangeRef.current = onDragActiveChange;
-  scaleRef.current = boardScale;
+  useLayoutEffect(() => { onDragStartRef.current = onDragStart; });
+  useLayoutEffect(() => { onDragEndRef.current = onDragEnd; });
+  useLayoutEffect(() => { onMoveRef.current = onMove; });
+  useLayoutEffect(() => { onTapRef.current = onTap; });
+  useLayoutEffect(() => { enabledRef.current = enabled; });
+  useLayoutEffect(() => { onDragActiveChangeRef.current = onDragActiveChange; });
+  useLayoutEffect(() => { scaleRef.current = boardScale; });
 
-  const panResponder = useRef(
-    PanResponder.create({
+  // eslint-disable-next-line react-hooks/refs -- PanResponder registers callbacks; refs are read only when responder events fire.
+  const [panResponder] = useState(() => (PanResponder.create({
       // Capture phase: claim responder before ScrollView can intercept
       onStartShouldSetPanResponderCapture: () => enabledRef.current,
       onMoveShouldSetPanResponderCapture: (_, gestureState) => {
@@ -266,8 +266,7 @@ export function DraggableTile({
         floatingScale.setValue(1);
         sourceOpacity.setValue(1);
       },
-    })
-  ).current;
+    })));
 
   const shadowColor = getDragShadowColor(phase);
 

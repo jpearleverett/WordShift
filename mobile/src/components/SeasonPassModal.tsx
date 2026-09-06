@@ -23,7 +23,8 @@ import {
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
 import { getSurfaceTheme, SURFACE, getModalInSpring } from '../theme/surfaces';
 import { CONFETTI_THEMES } from '../theme/colors';
-import { getSettingsSync } from '../services/settings';
+import { useReducedMotion } from '../hooks/useReducedMotion';
+import { useCountUp } from '../hooks/useCountUp';
 import { shouldSimplifyAnimations } from '../services/deviceTier';
 import { PanelCard } from './ui/PanelCard';
 import { CHROME_ICONS } from './ui/chromeIcons';
@@ -71,26 +72,41 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
   const copy = getSeasonPassCopy(phase as DialoguePhase);
   const [view, setView] = useState<SeasonPassView | null>(null);
   const [busy, setBusy] = useState(false);
+  const openRef = useRef(false);
+  const refreshVersionRef = useRef(0);
 
   const refresh = useCallback(async () => {
+    const version = ++refreshVersionRef.current;
     try {
-      setView(await getSeasonPassView(puzzlesSolved));
+      const nextView = await getSeasonPassView(puzzlesSolved);
+      if (openRef.current && refreshVersionRef.current === version) setView(nextView);
     } catch {
       /* leave the last view up */
     }
   }, [puzzlesSolved]);
 
   useEffect(() => {
-    if (visible) refresh().catch(() => {});
-  }, [visible, refresh]);
+    openRef.current = visible;
+    if (!visible) return;
+    const version = ++refreshVersionRef.current;
+    getSeasonPassView(puzzlesSolved).then(nextView => {
+      if (openRef.current && refreshVersionRef.current === version) setView(nextView);
+    }).catch(() => {});
+    return () => {
+      // Closing invalidates publication immediately. The next opening (or
+      // puzzle-count change) increments the version before accepting a read,
+      // so an earlier request cannot publish into that later lifetime.
+      openRef.current = false;
+    };
+  }, [visible, puzzlesSolved]);
 
   // House entrance (was the OS animationType="fade" — a modal-choreography
   // violator): a backdrop fade + a SURFACE.modalIn spring on the card, with the
   // design system's asymmetric fast exit. Reduced motion pins everything shown.
-  const reducedMotion = getSettingsSync().reducedMotion;
-  const backdropOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
-  const cardScale = useRef(new Animated.Value(reducedMotion ? 1 : 0.92)).current;
-  const cardOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const reducedMotion = useReducedMotion();
+  const [backdropOpacity] = useState(() => new Animated.Value(reducedMotion ? 1 : 0));
+  const [cardScale] = useState(() => new Animated.Value(reducedMotion ? 1 : 0.92));
+  const [cardOpacity] = useState(() => new Animated.Value(reducedMotion ? 1 : 0));
   const closingRef = useRef(false);
 
   useEffect(() => {
@@ -112,7 +128,7 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
     ]);
     anim.start();
     return () => anim.stop();
-  }, [visible, reducedMotion, backdropOpacity, cardScale, cardOpacity]);
+  }, [visible, reducedMotion, backdropOpacity, cardScale, cardOpacity, phase]);
 
   const handleClose = useCallback(() => {
     if (closingRef.current) return;
@@ -134,7 +150,7 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
         easing: Easing.in(Easing.ease),
         useNativeDriver: true,
       }),
-    ]).start(() => onClose());
+    ]).start(({ finished }) => { if (finished) onClose(); });
   }, [reducedMotion, backdropOpacity, cardOpacity, onClose]);
 
   // The tier the player is presently working toward (the next unclaimed rung,
@@ -143,7 +159,7 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
   // surface: a slow 1.0 -> 1.06 native-driver scale loop, reduced-motion /
   // low-tier safe.
   const currentTier = view ? Math.min(view.tiersUnlocked + 1, view.totalTiers) : 0;
-  const currentTierPulse = useRef(new Animated.Value(1)).current;
+  const [currentTierPulse] = useState(() => new Animated.Value(1));
   useEffect(() => {
     if (!visible) return;
     if (reducedMotion || shouldSimplifyAnimations()) {
@@ -176,42 +192,17 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
 
   // Header amber balance: ticks from the old to the new value over ~400ms
   // (plain setState steps, text-only) instead of an instant number swap.
-  const [displayedAmber, setDisplayedAmber] = useState(currentAmber);
-  const prevAmberRef = useRef(currentAmber);
-  useEffect(() => {
-    if (!visible) {
-      prevAmberRef.current = currentAmber;
-      setDisplayedAmber(currentAmber);
-      return;
-    }
-    const prev = prevAmberRef.current;
-    if (prev === currentAmber) return;
-    if (reducedMotion) {
-      setDisplayedAmber(currentAmber);
-      prevAmberRef.current = currentAmber;
-      return;
-    }
-    const start = prev;
-    const end = currentAmber;
-    const steps = 13; // ~400ms at ~30ms/step
-    let i = 0;
-    const id = setInterval(() => {
-      i++;
-      const fraction = Math.min(1, i / steps);
-      setDisplayedAmber(Math.round(start + (end - start) * fraction));
-      if (i >= steps) {
-        clearInterval(id);
-        prevAmberRef.current = end;
-      }
-    }, 30);
-    return () => clearInterval(id);
-  }, [currentAmber, visible, reducedMotion]);
+  const { value: displayedAmber } = useCountUp(currentAmber, {
+    enabled: visible && !reducedMotion,
+    identity: visible,
+    durationMs: 400,
+  });
 
   // Claim feedback: the claimed row's amount springs up 12dp and fades while
   // AmberSparkle plays once over the claimed tier's badge.
   const [justClaimed, setJustClaimed] = useState<{ tier: number; track: 'free' | 'premium'; amount: number } | null>(null);
-  const claimPopY = useRef(new Animated.Value(0)).current;
-  const claimPopOpacity = useRef(new Animated.Value(0)).current;
+  const [claimPopY] = useState(() => new Animated.Value(0));
+  const [claimPopOpacity] = useState(() => new Animated.Value(0));
   const playClaimPop = useCallback(
     (tier: number, track: 'free' | 'premium', amount: number) => {
       setJustClaimed({ tier, track, amount });

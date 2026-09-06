@@ -367,7 +367,7 @@ export function useUnlockFlow({
       hapticError();
       setPurchaseError(result.error || 'Unable to unlock. Try again later.');
     }
-  }, [loadAllData, onAmberChange, onUnlockCompleted, setShowCelebration, setIntroAnimal, setIntroDialogueIndex, setShowIntroDialogue]);
+  }, [loadAllData, onAmberChange, onUnlockCompleted, setShowCelebration, setIntroAnimal, setIntroDialogueIndex, setShowIntroDialogue, resetIntroOverrides]);
 
   return {
     showShop,

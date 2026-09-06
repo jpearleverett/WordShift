@@ -255,18 +255,17 @@ const PHASE5_MOOD_COLOR = '#7B6B8A';
 
 // Z's animation component for sleeping animals
 const SleepingZs: React.FC = () => {
-  const z1Y = useRef(new Animated.Value(0)).current;
-  const z2Y = useRef(new Animated.Value(0)).current;
-  const z3Y = useRef(new Animated.Value(0)).current;
-  const z1Opacity = useRef(new Animated.Value(0)).current;
-  const z2Opacity = useRef(new Animated.Value(0)).current;
-  const z3Opacity = useRef(new Animated.Value(0)).current;
+  const [z1Y] = useState(() => new Animated.Value(0));
+  const [z2Y] = useState(() => new Animated.Value(0));
+  const [z3Y] = useState(() => new Animated.Value(0));
+  const [z1Opacity] = useState(() => new Animated.Value(0));
+  const [z2Opacity] = useState(() => new Animated.Value(0));
+  const [z3Opacity] = useState(() => new Animated.Value(0));
 
-  const animRef1 = useRef<Animated.CompositeAnimation | null>(null);
-  const animRef2 = useRef<Animated.CompositeAnimation | null>(null);
-  const animRef3 = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
+    let active = true;
+    const running: (Animated.CompositeAnimation | null)[] = [null, null, null];
     if (getSettingsSync().reducedMotion) {
       z1Opacity.setValue(1);
       z2Opacity.setValue(1);
@@ -278,9 +277,10 @@ const SleepingZs: React.FC = () => {
       y: Animated.Value,
       opacity: Animated.Value,
       delay: number,
-      animRef: React.MutableRefObject<Animated.CompositeAnimation | null>,
+      slot: number,
     ) => {
       const animate = () => {
+        if (!active) return;
         y.setValue(0);
         opacity.setValue(0);
         const anim = Animated.parallel([
@@ -305,22 +305,21 @@ const SleepingZs: React.FC = () => {
             }),
           ]),
         ]);
-        animRef.current = anim;
-        anim.start(() => animate());
+        running[slot] = anim;
+        anim.start(({ finished }) => { if (finished && active) animate(); });
       };
       animate();
     };
 
-    animateZ(z1Y, z1Opacity, 0, animRef1);
-    animateZ(z2Y, z2Opacity, 600, animRef2);
-    animateZ(z3Y, z3Opacity, 1200, animRef3);
+    animateZ(z1Y, z1Opacity, 0, 0);
+    animateZ(z2Y, z2Opacity, 600, 1);
+    animateZ(z3Y, z3Opacity, 1200, 2);
 
     return () => {
-      animRef1.current?.stop();
-      animRef2.current?.stop();
-      animRef3.current?.stop();
+      active = false;
+      running.forEach(animation => animation?.stop());
     };
-  }, []);
+  }, [z1Y, z1Opacity, z2Y, z2Opacity, z3Y, z3Opacity]);
 
   return (
     <View style={sleepStyles.container}>
@@ -543,28 +542,28 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
   quietNotifications = false,
   cooldownPuzzlesLeft,
 }) => {
-  const posX = useRef(new Animated.Value(animal.position.x)).current;
-  const posY = useRef(new Animated.Value(animal.position.y)).current;
-  const bounceY = useRef(new Animated.Value(0)).current;
-  const scaleX = useRef(new Animated.Value(1)).current;
-  const notificationPulse = useRef(new Animated.Value(1)).current;
+  const [posX] = useState(() => new Animated.Value(animal.position.x));
+  const [posY] = useState(() => new Animated.Value(animal.position.y));
+  const [bounceY] = useState(() => new Animated.Value(0));
+  const [scaleX] = useState(() => new Animated.Value(1));
+  const [notificationPulse] = useState(() => new Animated.Value(1));
 
   // New juice animations
-  const tapScale = useRef(new Animated.Value(1)).current;
-  const breatheScale = useRef(new Animated.Value(1)).current;
-  const emotionOpacity = useRef(new Animated.Value(0)).current;
-  const emotionY = useRef(new Animated.Value(0)).current;
-  const wiggleRotation = useRef(new Animated.Value(0)).current;
+  const [tapScale] = useState(() => new Animated.Value(1));
+  const [breatheScale] = useState(() => new Animated.Value(1));
+  const [emotionOpacity] = useState(() => new Animated.Value(0));
+  const [emotionY] = useState(() => new Animated.Value(0));
+  const [wiggleRotation] = useState(() => new Animated.Value(0));
 
   // Rare-idle beat transforms (native-driver only). Neutral at rest, animated
   // by the rare-idle scheduler one beat at a time. Live on the inner "body"
   // layer alongside the gait — never on the unflipped name/badge chrome.
-  const idleTalkOpacity = useRef(new Animated.Value(0)).current; // pre-mounted talk-layer crossfade (chirp/mutter)
-  const idlePerkScaleY = useRef(new Animated.Value(1)).current; // chirp scaleY perk
-  const idleHopY = useRef(new Animated.Value(0)).current; // rabbit hop-in-place
-  const idleShiftX = useRef(new Animated.Value(0)).current; // aye-aye tap-tap ticks
-  const idleRot = useRef(new Animated.Value(0)).current; // sloth lean / aye-aye / pangolin stir (fraction of ±10deg)
-  const idleScale = useRef(new Animated.Value(1)).current; // kakapo inflate
+  const [idleTalkOpacity] = useState(() => new Animated.Value(0)); // pre-mounted talk-layer crossfade (chirp/mutter)
+  const [idlePerkScaleY] = useState(() => new Animated.Value(1)); // chirp scaleY perk
+  const [idleHopY] = useState(() => new Animated.Value(0)); // rabbit hop-in-place
+  const [idleShiftX] = useState(() => new Animated.Value(0)); // aye-aye tap-tap ticks
+  const [idleRot] = useState(() => new Animated.Value(0)); // sloth lean / aye-aye / pangolin stir (fraction of ±10deg)
+  const [idleScale] = useState(() => new Animated.Value(1)); // kakapo inflate
 
   const currentXRef = useRef(animal.position.x);
   // Gait cadence multiplier for the leg currently underway (see
@@ -605,7 +604,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
   // Procedural gait for the animals WITHOUT real walk frames: bob + lean +
   // footfall squash-stretch while wandering. Same gates as the walk cycle —
   // robed figures glide, reduced motion / low tier stay static.
-  const gaitAnim = useRef(new Animated.Value(0)).current;
+  const [gaitAnim] = useState(() => new Animated.Value(0));
   const gaitActive = Boolean(
     isMoving &&
     !hasWalkFrames &&
@@ -683,12 +682,11 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
   // Cycle gait frames while walking; reset to the first frame on stop so the
   // next stroll always starts at the cycle's beginning.
   useEffect(() => {
-    if (!walkActive) {
-      setWalkFrame(0);
-      return;
-    }
+    if (!walkActive) return;
+    let nextFrame = 0;
     const interval = setInterval(() => {
-      setWalkFrame(prev => (prev + 1) % (walkFrames?.length ?? 1));
+      nextFrame = (nextFrame + 1) % (walkFrames?.length ?? 1);
+      setWalkFrame(nextFrame);
     }, WALK_FRAME_MS * gaitPaceRef.current);
     return () => clearInterval(interval);
   }, [walkActive, walkFrames?.length]);
@@ -723,7 +721,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
     );
     breatheAnimation.start();
     return () => breatheAnimation.stop();
-  }, [currentPhase]);
+  }, [breatheScale, currentPhase]);
 
   // Random emotion bubble popup
   useEffect(() => {
@@ -764,7 +762,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
     }, 8000 + Math.random() * 7000);
 
     return () => clearInterval(interval);
-  }, [currentPhase]);
+  }, [currentPhase, emotionOpacity, emotionY]);
 
   // Tap reaction animation
   const handlePress = useCallback(() => {
@@ -844,7 +842,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
     }
 
     onPress(animal);
-  }, [animal, onPress, currentPhase]);
+  }, [onPress, animal, tapScale, wiggleRotation, currentPhase, emotionY, emotionOpacity]);
 
   const wiggleRotate = wiggleRotation.interpolate({
     inputRange: [-1, 0, 1],
@@ -945,7 +943,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
       isMounted = false;
       clearTimeout(movementTimeout);
     };
-  }, [animal.type, currentPhase]);
+  }, [animal.position.x, animal.position.y, animal.type, currentPhase, posX, posY, scaleX]);
 
   // Bounce animation while moving. Suppressed when real walk frames play OR
   // the procedural gait runs — either already carries the vertical bob, and
@@ -1014,7 +1012,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
     return () => {
       bounceAnimation?.stop();
     };
-  }, [isMoving, animal.type, walkActive, gaitActive, currentPhase]);
+  }, [isMoving, animal.type, walkActive, gaitActive, currentPhase, bounceY]);
 
   // ---------------------------------------------------------------------------
   // Rare-idle scheduler (the "alive" system). ~1 beat every 20-45s, but only
@@ -1174,7 +1172,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
       releaseToken();
       resetIdleValues();
     };
-  }, [animal.type, currentPhase]);
+  }, [animal.type, currentPhase, idleHopY, idlePerkScaleY, idleRot, idleScale, idleShiftX, idleTalkOpacity]);
 
   // Notification pulse for new dialogue
   useEffect(() => {
@@ -1203,7 +1201,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
 
       return () => pulse.stop();
     }
-  }, [animal.hasNewDialogue]);
+  }, [animal.hasNewDialogue, notificationPulse]);
 
   // Get mood indicator color based on phase
   const getMoodColor = () => {

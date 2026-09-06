@@ -83,13 +83,19 @@ record the project, actual scheduled job/configuration, last successful run,
 oldest retained row and Sentry plan/project retention. Use read-only checks first:
 
 ```sql
-select min(created_at) as oldest_event,
-       count(*) filter(where created_at < now() - interval '24 months') as overdue
+select min(received_at) as oldest_event,
+       count(*) filter(where received_at < now() - interval '24 months') as overdue
 from public.events;
 ```
 
-Review deletion scope and schedule an operator-owned bounded cleanup if needed;
-record its observed execution. Do not add an unverified recurring destructive
+The upgrade now installs `prune_expired_events(batch_size)`, restricted to operators,
+with a fixed 24-month cutoff and a maximum 10,000 rows per call. Server receipt
+time owns retention, so a future device clock cannot keep an event indefinitely. The local SQL
+rehearsal checks its scope, bounds and anonymous-access denial. Enable Supabase
+Cron and run [`schedule_event_retention.sql`](supabase/schedule_event_retention.sql)
+to install the hourly named job, then record its observed execution. The file
+includes read-only job/run/oldest-row queries; a scheduled definition alone does
+not establish a successful cleanup. [Supabase Cron](https://supabase.com/docs/guides/cron/quickstart) Do not add an unverified recurring destructive
 job from the client. Check provider backups and incident/legal holds separately.
 No production retention job or provider deletion was verified by this change.
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useLayoutEffect, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -115,7 +115,7 @@ export const EntranceCascadeItem: React.FC<EntranceCascadeItemProps> = ({
   style,
   children,
 }) => {
-  const anim = useRef(new Animated.Value(0)).current;
+  const [anim] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     const reduced = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
@@ -183,16 +183,16 @@ export const RewardReveal: React.FC<RewardRevealProps> = ({
   const t = getSurfaceTheme(phase);
   const target = Math.round(amount);
 
-  const iconScale = useRef(new Animated.Value(0)).current;
-  const glowOpacity = useRef(new Animated.Value(0)).current;
-  const labelOpacity = useRef(new Animated.Value(0)).current;
+  const [iconScale] = useState(() => new Animated.Value(0));
+  const [glowOpacity] = useState(() => new Animated.Value(0));
+  const [labelOpacity] = useState(() => new Animated.Value(0));
 
   const reduced = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
-  const [display, setDisplay] = useState(reduced ? target : 0);
+  const [display, setDisplay] = useState(reduced || getCountUpDurationMs(target, phase) <= 0 ? target : 0);
 
   // Keep the latest onDone without re-running the mount effect.
   const onDoneRef = useRef(onDone);
-  onDoneRef.current = onDone;
+  useLayoutEffect(() => { onDoneRef.current = onDone; });
 
   useEffect(() => {
     let rafId = 0;
@@ -203,7 +203,6 @@ export const RewardReveal: React.FC<RewardRevealProps> = ({
       iconScale.setValue(1);
       glowOpacity.setValue(GLOW_REST);
       labelOpacity.setValue(1);
-      setDisplay(target);
       doneTimer = setTimeout(() => onDoneRef.current?.(), 0);
       return () => {
         if (doneTimer) clearTimeout(doneTimer);
@@ -213,7 +212,6 @@ export const RewardReveal: React.FC<RewardRevealProps> = ({
     iconScale.setValue(0);
     glowOpacity.setValue(0);
     labelOpacity.setValue(0);
-    setDisplay(0);
 
     const pop = getPressSpring(phase);
     const iconAnim = Animated.spring(iconScale, {
@@ -249,7 +247,6 @@ export const RewardReveal: React.FC<RewardRevealProps> = ({
 
     const duration = getCountUpDurationMs(target, phase);
     if (duration <= 0) {
-      setDisplay(target);
       doneTimer = setTimeout(() => onDoneRef.current?.(), 0);
     } else {
       const startedAt = Date.now();

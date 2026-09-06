@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -57,11 +57,11 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
   phase = 0,
   pulseSignal,
 }) => {
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-  const glowAnim = useRef(new Animated.Value(0)).current;
+  const [scaleAnim] = useState(() => new Animated.Value(1));
+  const [glowAnim] = useState(() => new Animated.Value(0));
   // Disabled-tap acknowledgment shake — parity with the locked tiles (a tap on
   // an inert control is felt, not silently swallowed).
-  const shakeAnim = useRef(new Animated.Value(0)).current;
+  const [shakeAnim] = useState(() => new Animated.Value(0));
 
   // One-shot acknowledgment pulse when pulseSignal changes (e.g. a milestone
   // hint gift raised the count while the button was off-screen — the pulse
@@ -104,7 +104,7 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
       }
     }
     return () => glowAnim.stopAnimation();
-  }, [disabled]);
+  }, [disabled, glowAnim]);
 
   const handlePressIn = () => {
     // Reduced motion: pin the pressed scale instantly (no spring travel).

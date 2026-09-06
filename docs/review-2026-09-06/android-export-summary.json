@@ -1,0 +1,19 @@
+{
+  "platform": "android",
+  "exportExitCode": 0,
+  "assetRecords": 700,
+  "hermesBundle": "_expo/static/js/android/AppEntry-1bcd0054c1bf1494636e2c3d2d287d71.hbc",
+  "hermesBytes": 11713518,
+  "hermesSha256": "6a573c78691877f496d936db82c84813e27feb74bd44e491de047db6ad8581f2",
+  "storyAssets": [
+    "assets/story/optimized/kept-table-header.webp",
+    "assets/story/optimized/private-room-header.webp",
+    "assets/story/optimized/outward-road-header.webp",
+    "assets/story/optimized/kept-table-hero.webp",
+    "assets/story/optimized/private-room-hero.webp",
+    "assets/story/optimized/outward-road-hero.webp",
+    "assets/story/optimized/outward-road-night-hero.webp"
+  ],
+  "storyPngMasters": 0,
+  "signedBinary": false
+}

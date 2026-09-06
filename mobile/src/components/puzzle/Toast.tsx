@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useLayoutEffect, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated, Platform } from 'react-native';
 import { CandyColors, getPhaseTheme } from '../../theme/colors';
 import { getModalInSpring } from '../../theme/surfaces';
@@ -67,9 +67,9 @@ export function getToastTheme(phase: number) {
 }
 
 export const Toast: React.FC<ToastProps> = ({ message, isError, phase = 0, isVoice = false }) => {
-  const slideAnim = useRef(new Animated.Value(-20)).current;
-  const opacityAnim = useRef(new Animated.Value(0)).current;
-  const shakeAnim = useRef(new Animated.Value(0)).current;
+  const [slideAnim] = useState(() => new Animated.Value(-20));
+  const [opacityAnim] = useState(() => new Animated.Value(0));
+  const [shakeAnim] = useState(() => new Animated.Value(0));
   const enterAnimRef = useRef<Animated.CompositeAnimation | null>(null);
   const shakeAnimRef = useRef<Animated.CompositeAnimation | null>(null);
   // Last message spoken via the iOS announce fallback (dedupe guard).
@@ -82,7 +82,7 @@ export const Toast: React.FC<ToastProps> = ({ message, isError, phase = 0, isVoi
   // without making phase an effect dependency (a phase shift shouldn't re-fly a
   // seated pill; the next message picks up the new weight).
   const phaseRef = useRef(phase);
-  phaseRef.current = phase;
+  useLayoutEffect(() => { phaseRef.current = phase; });
 
   const toastTheme = getToastTheme(phase);
 
@@ -165,7 +165,7 @@ export const Toast: React.FC<ToastProps> = ({ message, isError, phase = 0, isVoi
       enterAnimRef.current?.stop();
       shakeAnimRef.current?.stop();
     };
-  }, [message, isError]);
+  }, [message, isError, opacityAnim, shakeAnim, slideAnim]);
 
   // iOS live-region fallback: the visual accessibilityLiveRegion below is
   // Android-only, so move feedback and receipts would go unspoken on iOS. Speak

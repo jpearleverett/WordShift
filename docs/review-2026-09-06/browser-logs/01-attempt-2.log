@@ -1,0 +1,12 @@
+
+> wordshift-mobile@1.3.0 test:e2e
+> playwright test --grep fresh\ board\ has\ a\ visible\ help\ icon\ and\ scrollable\ rules\ at\ a\ small\ viewport$
+
+
+Running 1 test using 1 worker
+
+(node:172961) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 e2e/game.spec.ts:76:5 › fresh board has a visible help icon and scrollable rules at a small viewport (36.0s)
+
+  1 passed (38.3s)

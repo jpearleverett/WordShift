@@ -1,7 +1,7 @@
 import AsyncStorage, { runStorageTransaction } from './persistenceStorage';
 import { Difficulty, GameMode } from '../types';
 import { clearPlayedPuzzles } from './puzzleBank';
-import { getLocalDateString, getLocalDateStringDaysAgo, daysAgoLocal, parseLocalDate } from './dateUtils';
+import { getLocalDateString, daysAgoLocal, parseLocalDate } from './dateUtils';
 import {
   HomeWorldProgress,
   AmberTransaction,
@@ -9,7 +9,6 @@ import {
   FIRST_COMPLETION_BONUS,
   PHASE_THRESHOLDS,
   DialoguePhase,
-  STREAK_BONUSES,
   calculateStreakMultiplier,
   checkMilestone,
   NARRATIVE_ACCELERATION,
@@ -109,6 +108,7 @@ function retireUnlockedRegularDialogue(progress: HomeWorldProgress): boolean {
   if (unlocked.length === 0) return false;
   if (!progress.lastDialogueRead) progress.lastDialogueRead = {};
   const { getTotalDialogueCount } =
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
     require('./dialogue/animalDialogueBase') as typeof import('./dialogue/animalDialogueBase');
   let changed = false;
   for (const animalId of unlocked) {
@@ -141,6 +141,7 @@ function fastForwardExistingLateRecruitDialogue(progress: HomeWorldProgress): bo
   if (unlocked.length === 0) return false;
   if (!progress.lastDialogueRead) progress.lastDialogueRead = {};
   const { getPhaseStartIndex } =
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
     require('./dialogue/animalDialogueBase') as typeof import('./dialogue/animalDialogueBase');
   let changed = false;
 
@@ -167,13 +168,6 @@ function fastForwardExistingLateRecruitDialogue(progress: HomeWorldProgress): bo
  */
 function getTodayDateString(): string {
   return getLocalDateString();
-}
-
-/**
- * Check if a date string is yesterday (local calendar day)
- */
-function isYesterday(dateString: string): boolean {
-  return dateString === getLocalDateStringDaysAgo(1);
 }
 
 /**
@@ -1104,6 +1098,7 @@ export async function getCurrentPhase(): Promise<DialoguePhase> {
  */
 async function logPhaseReached(phase: DialoguePhase, puzzlesSolved: number): Promise<void> {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
     const eventLogger = require('./eventLogger') as typeof import('./eventLogger');
     const installAgeDays = (await eventLogger.getInstallAgeDays?.()) ?? -1;
     eventLogger.logEvent?.({
@@ -1417,6 +1412,7 @@ export async function consumeTriggerWords(animalType?: string): Promise<string[]
 
   // Import the animal's trigger words dynamically to avoid circular deps
   // We access ANIMAL_TRIGGER_WORDS from homeWorld types
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
   const { ANIMAL_TRIGGER_WORDS } = require('../types/homeWorld');
   const animalTriggers: string[] | undefined = ANIMAL_TRIGGER_WORDS[animalType];
   if (!animalTriggers || animalTriggers.length === 0) {

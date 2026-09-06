@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useLayoutEffect, useEffect, useRef, useMemo, useState } from 'react';
 import { View, StyleSheet, useWindowDimensions, Animated, Easing, Platform } from 'react-native';
 import { getPhaseTheme } from '../theme/colors';
 import { useReducedMotion } from '../hooks/useReducedMotion';
@@ -87,7 +87,7 @@ interface FloatingParticle extends ParticleLayout {
 // the layout, since travel/shape/pace all change there.
 const generateParticleLayout = (count: number, motion: ParticleMotion, SCREEN_WIDTH: number): ParticleLayout[] => {
   const layout: ParticleLayout[] = [];
-  const types: Array<'circle' | 'star' | 'diamond'> =
+  const types: ('circle' | 'star' | 'diamond')[] =
     motion.register === 'sink' ? ['circle'] : ['circle', 'star', 'diamond'];
 
   for (let i = 0; i < count; i++) {
@@ -167,25 +167,25 @@ const Particle: React.FC<{
   motion,
 }) => {
   const { height: SCREEN_HEIGHT } = useWindowDimensions();
-  const translateY = useRef(new Animated.Value(SCREEN_HEIGHT + 50)).current;
-  const opacity = useRef(new Animated.Value(0)).current;
-  const rotate = useRef(new Animated.Value(0)).current;
-  const scale = useRef(new Animated.Value(0.5)).current;
+  const [translateY] = useState(() => new Animated.Value(SCREEN_HEIGHT + 50));
+  const [opacity] = useState(() => new Animated.Value(0));
+  const [rotate] = useState(() => new Animated.Value(0));
+  const [scale] = useState(() => new Animated.Value(0.5));
   // Aberration drivers (Phase 0-1 only, idle at 0): an ember tone floods in and
   // the sparkle sinks a few px faster as it "dies wrong".
-  const emberOpacity = useRef(new Animated.Value(0)).current;
-  const sinkY = useRef(new Animated.Value(0)).current;
-  const mountedRef = useRef(true);
+  const [emberOpacity] = useState(() => new Animated.Value(0));
+  const [sinkY] = useState(() => new Animated.Value(0));
   const animRef = useRef<Animated.CompositeAnimation | null>(null);
   // Kept fresh so a phase change (0/1 -> 2+) stops future aberrations mid-loop.
   const aberrationRef = useRef(aberrationEnabled);
-  aberrationRef.current = aberrationEnabled;
+  useLayoutEffect(() => { aberrationRef.current = aberrationEnabled; });
 
   // The travel direction is fixed for the particle's lifetime (the layout
   // regenerates when the register changes, remounting every particle).
   const sinking = motion.register === 'sink';
 
   useEffect(() => {
+    let cancelled = false;
     const animate = () => {
       // Reset values (sinking embers start ABOVE the screen and fall).
       translateY.setValue(sinking ? -100 : SCREEN_HEIGHT + 50);
@@ -281,18 +281,18 @@ const Particle: React.FC<{
         Animated.delay(particle.delay),
         Animated.parallel(branches),
       ]);
-      animRef.current.start(() => {
-        if (mountedRef.current) animate();
+      animRef.current.start(({ finished }) => {
+        if (finished && !cancelled) animate();
       });
     };
 
     animate();
 
     return () => {
-      mountedRef.current = false;
+      cancelled = true;
       animRef.current?.stop();
     };
-  }, []);
+  }, [SCREEN_HEIGHT, emberOpacity, motion.spin, opacity, particle.delay, particle.duration, rotate, scale, sinkY, sinking, translateY]);
 
   const spin = rotate.interpolate({
     inputRange: [0, 1],
@@ -423,17 +423,17 @@ export const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ phase = 
     [particleLayout, theme]
   );
   // Use opacity-based pulse with native driver instead of JS-bridge backgroundColor
-  const pulseOpacity = useRef(new Animated.Value(0)).current;
+  const [pulseOpacity] = useState(() => new Animated.Value(0));
   // Phase 0-1 aberration gate (shared by particles + the ambient breath).
   const aberrationEnabled = isAberrationEnabled(phase, getDeviceTier(), reducedMotion);
   // Read inside the self-scheduling breath loop so a phase change flips it
   // without restarting the loop.
   const breathAberrationRef = useRef(aberrationEnabled);
-  breathAberrationRef.current = aberrationEnabled;
+  useLayoutEffect(() => { breathAberrationRef.current = aberrationEnabled; });
   // The ambient breath slows with the descent (4s bright -> 6.5s from
   // Growing Shadows). A ref so the loop picks it up on its next cycle.
   const breathDurRef = useRef(4000);
-  breathDurRef.current = phase >= 3 ? 6500 : 4000;
+  useLayoutEffect(() => { breathDurRef.current = phase >= 3 ? 6500 : 4000; });
 
   useEffect(() => {
     if (reducedMotion) return;
@@ -477,7 +477,7 @@ export const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ phase = 
       current?.stop();
       pulseOpacity.stopAnimation();
     };
-  }, [reducedMotion]);
+  }, [reducedMotion, pulseOpacity]);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.bgPrimary }]}>

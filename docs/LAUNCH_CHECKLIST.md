@@ -1,6 +1,6 @@
 # WordShift Launch Checklist (human tasks)
 
-Current release status is in [the September implementation ledger](IMPLEMENTATION_STATUS_2026-09-05.md) and [1.3.0 validation procedure](RELEASE_VALIDATION_1_3_0.md). The dated checks below record earlier builds; they do not validate the current changes.
+Current release status is in [the September implementation ledger](IMPLEMENTATION_STATUS_2026-09-05.md), [the account/device handoff](COMPLETION_HANDOFF_2026-09-06.md) and [1.3.0 validation procedure](RELEASE_VALIDATION_1_3_0.md). The dated checks below record earlier builds; they do not validate the current changes.
 
 ## Android (submission-blocking)
 

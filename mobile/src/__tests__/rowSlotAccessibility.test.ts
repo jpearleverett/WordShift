@@ -19,7 +19,6 @@ jest.mock('react-native', () => ({
   Animated: {
     View: 'Animated.View',
     Value: class {
-      constructor(_v: number) {}
       interpolate() { return 0; }
       setValue() {}
       stopAnimation() {}

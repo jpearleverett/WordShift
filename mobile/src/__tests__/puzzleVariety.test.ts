@@ -18,9 +18,11 @@ import {
   BLIND_TOGGLE_UNLOCK_PUZZLES,
   VARIANT_CONFIGS,
   PuzzleVariant,
-} from '../services/puzzleVariety';
-import { getSpeedTimeLimit, getSpeedUnlockHint, SPEED_TOGGLE_UNLOCK_PUZZLES } from '../services/puzzleVariety';
+ getSpeedTimeLimit, getSpeedUnlockHint, SPEED_TOGGLE_UNLOCK_PUZZLES } from '../services/puzzleVariety';
 import { DAILY_CHALLENGE_UNLOCK_PUZZLES, SPEED_TIME_LIMITS } from '../constants/gameBalance';
+import { COMMON_WORDS } from '../constants/wordLists';
+import { getGenerationWordSets, withGenerationVocabulary } from '../services/generatorVocabulary';
+import { PuzzleSolutionStep } from '../types';
 
 describe('puzzleVariety', () => {
   describe('VARIANT_CONFIGS', () => {
@@ -270,6 +272,21 @@ describe('puzzleVariety', () => {
       const mixedSolution = [{ letterToMove: 'A' }, { letterToMove: 'T' }] as any;
       expect(isVariantCompatibleWithSolution('reverse', mixedSolution)).toBe(true);
       expect(isVariantCompatibleWithSolution('reverse')).toBe(true);
+    });
+
+    it('keeps a valid advanced reverse board after its generation vocabulary is restored', async () => {
+      // The first shift leaves TOD, a reviewed advanced word. It is valid
+      // during play even when the next generator search uses common words.
+      const solution: PuzzleSolutionStep[] = [
+        { stepIndex: 0, sourceWord: 'TOED', targetWord: 'BRED', letterToMove: 'E', explanation: "Move 'E' from TOED to form BREED.", insertionPosition: 2, removalPosition: 2 },
+        { stepIndex: 1, sourceWord: 'BREED', targetWord: 'ILLS', letterToMove: 'B', explanation: "Move 'B' from BREED to form BILLS.", insertionPosition: 0, removalPosition: 0 },
+      ];
+      const words = await withGenerationVocabulary(true, async () => ['TOED', 'BRED', 'ILLS']);
+      expect(COMMON_WORDS.has('TOD')).toBe(true);
+      expect(getGenerationWordSets()[3].has('TOD')).toBe(false);
+      expect(isVariantCompatibleWithSolution('reverse', solution, words)).toBe(true);
+      // Switching validators must not turn an unplayable board into a pass.
+      expect(isVariantCompatibleWithSolution('reverse', solution, ['ZZZZ', 'BRED', 'ILLS'])).toBe(false);
     });
   });
 

@@ -1,0 +1,119 @@
+[
+  {
+    "journey": "fresh board has a visible help icon and scrollable rules at a small viewport",
+    "exitCode": -15,
+    "elapsedSeconds": 65.94,
+    "log": "browser-logs/01-attempt-1.log",
+    "reason": "Stopped duplicate Metro startup; no game assertion result."
+  },
+  {
+    "journey": "fresh board has a visible help icon and scrollable rules at a small viewport",
+    "exitCode": 0,
+    "elapsedSeconds": 40.04,
+    "log": "browser-logs/01-attempt-2.log"
+  },
+  {
+    "journey": "repeating disclosed advice spends one hint and survives reload",
+    "exitCode": 0,
+    "elapsedSeconds": 47.67,
+    "log": "browser-logs/02-attempt-1.log"
+  },
+  {
+    "journey": "optional practice can be played and closed without changing progress",
+    "exitCode": 0,
+    "elapsedSeconds": 20.07,
+    "log": "browser-logs/03-attempt-1.log"
+  },
+  {
+    "journey": "solving a board exposes accessible results and durable progress",
+    "exitCode": 0,
+    "elapsedSeconds": 37.47,
+    "log": "browser-logs/04-attempt-1.log"
+  },
+  {
+    "journey": "remember ending remains visible and inspectable in the house",
+    "exitCode": null,
+    "testResult": "passed",
+    "playwrightElapsedSeconds": 59.7,
+    "log": "browser-logs/05-attempt-1.log",
+    "runnerNote": "Outer driver ended with SIGTERM; its separate Playwright process completed with 1 passed (59.7s). Exit status was unavailable."
+  },
+  {
+    "journey": "release ending remains visible and inspectable in the house",
+    "exitCode": 0,
+    "elapsedSeconds": 64.15,
+    "log": "browser-logs/06-attempt-1.log"
+  },
+  {
+    "journey": "journal rewards and support benefits are discoverable",
+    "exitCode": 0,
+    "elapsedSeconds": 43.6,
+    "log": "browser-logs/07-attempt-1.log"
+  },
+  {
+    "journey": "resident dialogue keeps its reading and controls reachable at 320px with enlarged text",
+    "exitCode": 0,
+    "elapsedSeconds": 39.51,
+    "log": "browser-logs/08-attempt-1.log"
+  },
+  {
+    "journey": "a real house ceremony remains readable and can finish at 320px with enlarged text",
+    "exitCode": 0,
+    "elapsedSeconds": 55.27,
+    "log": "browser-logs/09-attempt-1.log"
+  },
+  {
+    "journey": "playing the final CLOSED choice persists its boundary through relaunch",
+    "exitCode": 1,
+    "elapsedSeconds": 188.54,
+    "log": "browser-logs/10-attempt-1.log"
+  },
+  {
+    "journey": "a real house ceremony remains readable and can finish at 320px with enlarged text",
+    "exitCode": 0,
+    "elapsedSeconds": 59.25,
+    "log": "browser-logs/09-attempt-2.log"
+  },
+  {
+    "journey": "playing the final CLOSED choice persists its boundary through relaunch",
+    "exitCode": 0,
+    "elapsedSeconds": 82.06,
+    "log": "browser-logs/10-attempt-2.log"
+  },
+  {
+    "journey": "playing the final CLOSER choice persists its boundary through relaunch",
+    "exitCode": 0,
+    "elapsedSeconds": 89.11,
+    "log": "browser-logs/11-attempt-1.log"
+  },
+  {
+    "journey": "an interrupted story resumes its saved page and commits the chosen memory once",
+    "exitCode": 0,
+    "elapsedSeconds": 78.78,
+    "log": "browser-logs/12-attempt-1.log"
+  },
+  {
+    "journey": "reset through Settings rebuilds a fresh playable session",
+    "exitCode": 1,
+    "elapsedSeconds": 49.85,
+    "log": "browser-logs/13-attempt-1.log"
+  },
+  {
+    "journey": "reset through Settings rebuilds a fresh playable session",
+    "exitCode": 0,
+    "elapsedSeconds": 55.2,
+    "log": "browser-logs/13-attempt-2.log"
+  },
+  {
+    "journey": "a daily resumed after midnight retains its original board identity and clock",
+    "exitCode": 0,
+    "elapsedSeconds": 53.13,
+    "log": "browser-logs/14-attempt-1.log"
+  },
+  {
+    "journey": "claiming a season reward updates amber once and stays claimed after relaunch",
+    "exitCode": 0,
+    "elapsedSeconds": 61.09,
+    "log": "browser-logs/15-attempt-1.log"
+  }
+]

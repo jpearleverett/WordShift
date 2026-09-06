@@ -170,6 +170,7 @@ async function flushEvents(): Promise<void> {
     return;
   }
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
     const { syncTelemetry } = require('./telemetry') as typeof import('./telemetry');
     void syncTelemetry().catch(() => {});
   } catch { /* Non-critical diagnostics transport. */ }

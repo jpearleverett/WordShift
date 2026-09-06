@@ -14,7 +14,7 @@
  * Uses the real LetterTile for pixel-faithful candy chrome; the ghost letter
  * is locked (the arriving tile lands locked) and never interactable.
  */
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 import { LetterTile } from '../LetterTile';
 import { STANDARD_TILE_W, COMPACT_TILE_W } from '../../constants/tileLayout';
@@ -43,7 +43,7 @@ interface Props {
 }
 
 export const FlyingTileGhost: React.FC<Props> = ({ flight, onDone }) => {
-  const progress = useRef(new Animated.Value(0)).current;
+  const [progress] = useState(() => new Animated.Value(0));
   const flightIdRef = useRef<number | null>(null);
 
   useEffect(() => {

@@ -12,14 +12,22 @@
  *    1.25x time scale).
  */
 
+type OverlayEffect = () => void | (() => void);
+let mockOverlayLifecycle: {
+  state: (initial: unknown) => unknown[];
+  ref: (initial: unknown) => { current: unknown };
+  effect: (effect: OverlayEffect, deps?: readonly unknown[], layout?: boolean) => void;
+} | null = null;
+
 jest.mock('react', () => {
   const actual = jest.requireActual('react');
   return {
     ...actual,
     default: actual,
-    useEffect: () => undefined,
-    useRef: (initial: unknown) => ({ current: initial }),
-    useState: (initial: unknown) => [initial, jest.fn()],
+    useEffect: (effect: OverlayEffect, deps?: readonly unknown[]) => mockOverlayLifecycle?.effect(effect, deps),
+    useLayoutEffect: (effect: OverlayEffect, deps?: readonly unknown[]) => mockOverlayLifecycle?.effect(effect, deps, true),
+    useRef: (initial: unknown) => mockOverlayLifecycle?.ref(initial) ?? { current: initial },
+    useState: (initial: unknown) => mockOverlayLifecycle?.state(initial) ?? [typeof initial === 'function' ? (initial as () => unknown)() : initial, jest.fn()],
   };
 });
 
@@ -29,6 +37,7 @@ jest.mock('react-native', () => ({
   TouchableOpacity: 'TouchableOpacity',
   Image: 'Image',
   ScrollView: 'ScrollView',
+  AppState: { addEventListener: jest.fn(() => ({ remove: jest.fn() })) },
   useWindowDimensions: () => ({ width: 400, height: 800 }),
   Dimensions: { get: () => ({ width: 400, height: 800 }) },
   StyleSheet: {
@@ -52,7 +61,14 @@ jest.mock('react-native', () => ({
 
 jest.mock('../services/settings', () => ({
   getSettingsSync: () => ({ reducedMotion: true }),
+  subscribeSettings: () => jest.fn(),
 }));
+jest.mock('../services/uiSound', () => ({
+  createCeremonySoundScope: jest.fn(() => ({ play: jest.fn(), stop: jest.fn() })),
+  stopCeremonyMusic: jest.fn(),
+}));
+jest.mock('../services/a11yAnnounce', () => ({ announceForA11y: jest.fn() }));
+jest.mock('../services/eventLogger', () => ({ logEvent: jest.fn() }));
 jest.mock('../services/haptics', () => ({
   hapticLight: jest.fn(),
   hapticMedium: jest.fn(),
@@ -83,6 +99,9 @@ import {
 import { getWordPhaseTier } from '../services/localGenerator';
 import { DialoguePhase } from '../types/homeWorld';
 import { PhaseTransitionOverlay } from '../components/PhaseTransitionOverlay';
+import { createCeremonySoundScope } from '../services/uiSound';
+import { announceForA11y } from '../services/a11yAnnounce';
+import { hapticLight } from '../services/haptics';
 
 const ALL_EVENTS: PhaseTransitionEvent[] = [
   ...([1, 2, 3, 4] as DialoguePhase[]).map(p => getPhaseTransitionEvent(p)!),
@@ -100,6 +119,101 @@ function collectText(node: unknown): string[] {
   if (Array.isArray(node)) return node.flatMap(collectText);
   return collectText((node as ElementLike).props?.children);
 }
+
+test('a suspended ceremony keeps its page and resumes without replaying delivered cues', () => {
+  jest.useFakeTimers();
+  jest.clearAllMocks();
+  const values = new Map<number, unknown>();
+  const previousEffects = new Map<number, { deps?: readonly unknown[]; cleanup?: () => void }>();
+  let pendingEffects: { index: number; effect: OverlayEffect; deps?: readonly unknown[]; layout: boolean }[] = [];
+  let cursor = 0;
+  let changed = false;
+  mockOverlayLifecycle = {
+    state(initial) {
+      const index = cursor++;
+      if (!values.has(index)) values.set(index, typeof initial === 'function' ? initial() : initial);
+      return [values.get(index), (update: unknown) => {
+        const previous = values.get(index);
+        const next = typeof update === 'function' ? update(previous) : update;
+        changed ||= !Object.is(previous, next);
+        values.set(index, next);
+      }];
+    },
+    ref(initial) {
+      const index = cursor++;
+      if (!values.has(index)) values.set(index, { current: initial });
+      return values.get(index) as { current: unknown };
+    },
+    effect(effect, deps, layout = false) {
+      const index = cursor++;
+      const previous = previousEffects.get(index);
+      if (!previous || !deps || deps.length !== previous.deps?.length || deps.some((value, i) => !Object.is(value, previous.deps?.[i]))) {
+        pendingEffects.push({ index, effect, deps, layout });
+      }
+    },
+  };
+  const event: PhaseTransitionEvent = {
+    ...HOUSE_COMPLETION_EVENT,
+    readAtOwnPace: false,
+    scenes: [
+      { text: 'The first page waits.', delay: 0, duration: 1000, effect: 'fade', cue: 'bell' },
+      { text: 'The next page answers.', delay: 1000, duration: 1000, effect: 'fade', cue: 'answer' },
+    ],
+  };
+  const onComplete = jest.fn();
+  const render = (suspended = false) => {
+    let tree: unknown;
+    let renders = 0;
+    do {
+      cursor = 0;
+      changed = false;
+      pendingEffects = [];
+      tree = PhaseTransitionOverlay({ event, suspended, onComplete });
+      // Commit layout effects before passive effects, keeping hook identities
+      // across renders and running cleanup before a changed effect starts.
+      for (const pending of pendingEffects.sort((a, b) => Number(b.layout) - Number(a.layout))) {
+        previousEffects.get(pending.index)?.cleanup?.();
+        previousEffects.set(pending.index, { deps: pending.deps, cleanup: pending.effect() || undefined });
+      }
+      if (++renders > 10) throw new Error('Ceremony did not settle its state');
+    } while (changed);
+    return tree;
+  };
+  try {
+    render();
+    jest.advanceTimersByTime(0);
+    expect(collectText(render())).toContain('The first page waits.');
+    const firstScope = jest.mocked(createCeremonySoundScope).mock.results[0].value;
+    expect(firstScope.play).toHaveBeenCalledTimes(1);
+    expect(firstScope.play).toHaveBeenCalledWith('story_bell');
+    expect(hapticLight).toHaveBeenCalledTimes(1);
+
+    jest.advanceTimersByTime(600);
+    expect(render(true)).toBeNull();
+    expect(firstScope.stop).toHaveBeenCalled();
+    jest.advanceTimersByTime(5000);
+    expect(render(true)).toBeNull();
+    expect(onComplete).not.toHaveBeenCalled();
+
+    expect(collectText(render())).toContain('The first page waits.');
+    expect(firstScope.play).toHaveBeenCalledTimes(1);
+    expect(hapticLight).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(announceForA11y).mock.calls.filter(([text]) => text === 'The first page waits.')).toHaveLength(1);
+    const resumedScope = jest.mocked(createCeremonySoundScope).mock.results[1].value;
+    expect(resumedScope.play).not.toHaveBeenCalled();
+
+    jest.advanceTimersByTime(1249);
+    expect(collectText(render())).toContain('The first page waits.');
+    jest.advanceTimersByTime(1);
+    expect(collectText(render())).toContain('The next page answers.');
+    expect(resumedScope.play).toHaveBeenCalledTimes(1);
+    expect(resumedScope.play).toHaveBeenCalledWith('story_answer');
+  } finally {
+    previousEffects.forEach(effect => effect.cleanup?.());
+    mockOverlayLifecycle = null;
+    jest.useRealTimers();
+  }
+});
 
 describe('ordinary transition title subtlety', () => {
   const ordinaryEvents = ([1, 2, 3, 4] as DialoguePhase[])

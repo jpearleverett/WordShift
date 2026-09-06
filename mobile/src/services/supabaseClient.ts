@@ -39,6 +39,7 @@ export interface SupabaseConfig {
  */
 function getConfigExtra(): Record<string, unknown> {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
     const Constants = require('expo-constants').default;
     return (Constants?.expoConfig?.extra as Record<string, unknown>) ?? {};
   } catch {
@@ -116,7 +117,8 @@ export async function sbFetch(
       ...rest,
       headers: {
         apikey: config.anonKey,
-        Authorization: `Bearer ${config.anonKey}`,
+        // Publishable keys identify the app through apikey; they are not JWTs.
+        ...(config.anonKey.startsWith('sb_publishable_') ? {} : { Authorization: `Bearer ${config.anonKey}` }),
         'Content-Type': 'application/json',
         ...(headers as Record<string, string> | undefined),
       },

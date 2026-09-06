@@ -1,13 +1,13 @@
-import { AUDITED_PUZZLE_WORDS, ADVANCED_PUZZLE_WORDS, OBSCURE_PUZZLE_WORDS, UNREVIEWED_PUZZLE_WORDS } from '../data/vocabulary/puzzleVocabulary';
+import { AUDITED_PUZZLE_WORDS, ADVANCED_PUZZLE_WORDS, OBSCURE_PUZZLE_WORDS, EXCLUDED_PUZZLE_WORDS } from '../data/vocabulary/puzzleVocabulary';
 import { DICTIONARY_WORDS } from '../dictionary';
-const DICTIONARY = new Set(DICTIONARY_WORDS);
 import type { PuzzleSolutionStep } from '../types';
+const DICTIONARY = new Set(DICTIONARY_WORDS);
 
 /** Familiarity is separate from validity. Rare valid player discoveries still count. */
 export function isFairPuzzleWord(word: string, advanced = false): boolean {
   const upper = word.toUpperCase();
   return DICTIONARY.has(upper) && AUDITED_PUZZLE_WORDS.has(upper)
-    && !UNREVIEWED_PUZZLE_WORDS.has(upper)
+    && !EXCLUDED_PUZZLE_WORDS.has(upper)
     && !OBSCURE_PUZZLE_WORDS.has(upper)
     && (advanced || !ADVANCED_PUZZLE_WORDS.has(upper));
 }

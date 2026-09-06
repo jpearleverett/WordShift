@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useLayoutEffect, useEffect, useRef, useState } from 'react';
 import { Text, StyleSheet, Animated, Image, View } from 'react-native';
 import { AnimalType, DialoguePhase } from '../../types/homeWorld';
 import { getSettingsSync } from '../../services/settings';
@@ -40,11 +40,11 @@ export const AnimalWhisper: React.FC<AnimalWhisperProps> = ({
   topInset = 0,
   animalType,
 }) => {
-  const opacityAnim = useRef(new Animated.Value(0)).current;
+  const [opacityAnim] = useState(() => new Animated.Value(0));
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Ref to always call the latest onComplete, avoiding stale closure capture
   const onCompleteRef = useRef(onComplete);
-  onCompleteRef.current = onComplete;
+  useLayoutEffect(() => { onCompleteRef.current = onComplete; });
 
   useEffect(() => {
     if (!visible) {
@@ -90,7 +90,7 @@ export const AnimalWhisper: React.FC<AnimalWhisperProps> = ({
         timerRef.current = null;
       }
     };
-  }, [visible]);
+  }, [visible, opacityAnim]);
 
   if (!visible) return null;
 

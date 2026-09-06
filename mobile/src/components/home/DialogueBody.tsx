@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { StyleProp, Text, TextStyle, View } from 'react-native';
+import { StyleProp, TextStyle, View } from 'react-native';
+import { AppText } from '../ui/AppText';
 import { splitIntoSentences } from '../../services/dialogueText';
 
 export { splitIntoSentences };
@@ -33,14 +34,14 @@ export const DialogueBody: React.FC<{
 }> = ({ text, style, gap = 7 }) => {
   const sentences = useMemo(() => splitIntoSentences(text), [text]);
   if (gap <= 0 || sentences.length <= 1) {
-    return <Text style={style}>{text}</Text>;
+    return <AppText textRole="reading" style={style}>{text}</AppText>;
   }
   return (
     <View>
       {sentences.map((s, i) => (
-        <Text key={i} style={[style, i > 0 && { marginTop: gap }]}>
+        <AppText textRole="reading" key={i} style={[style, i > 0 && { marginTop: gap }]}>
           {s}
-        </Text>
+        </AppText>
       ))}
     </View>
   );

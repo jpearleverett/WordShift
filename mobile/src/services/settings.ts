@@ -60,6 +60,7 @@ export function startSystemMotionPreference(onChange?: () => void): () => void {
   void getSettings().then(async () => {
     try {
       // Guarded so the settings service continues to work in Node and on web.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
       const { AccessibilityInfo } = require('react-native');
       if (!alive || !AccessibilityInfo) return;
       const listener = AccessibilityInfo.addEventListener?.('reduceMotionChanged', apply);

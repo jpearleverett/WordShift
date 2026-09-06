@@ -1,0 +1,102 @@
+{
+  "checkedAt": "2026-09-06T16:33:56.255Z",
+  "mode": "invalid-input and zero-row permission probes",
+  "playerDataRead": false,
+  "intendedWrites": 0,
+  "passed": false,
+  "results": [
+    {
+      "rpc": "get_save_v2",
+      "status": 404,
+      "expectedStatus": 200,
+      "code": "PGRST202",
+      "passed": false
+    },
+    {
+      "rpc": "upsert_save_v2",
+      "status": 404,
+      "expectedStatus": 200,
+      "code": "PGRST202",
+      "passed": false
+    },
+    {
+      "rpc": "ingest_events_v2",
+      "status": 404,
+      "expectedStatus": 200,
+      "code": "PGRST202",
+      "passed": false
+    },
+    {
+      "rpc": "submit_daily_score_v2",
+      "status": 404,
+      "expectedStatus": 200,
+      "code": "PGRST202",
+      "passed": false
+    },
+    {
+      "rpc": "daily_rank_v2",
+      "status": 404,
+      "expectedStatus": 200,
+      "code": "PGRST202",
+      "passed": false
+    },
+    {
+      "rpc": "get_save",
+      "status": 200,
+      "expectedStatus": [
+        401,
+        403,
+        404
+      ],
+      "code": null,
+      "passed": false
+    },
+    {
+      "rpc": "support_preview",
+      "status": 404,
+      "expectedStatus": [
+        401,
+        403,
+        404
+      ],
+      "code": "PGRST202",
+      "passed": true
+    },
+    {
+      "table": "saves",
+      "status": 401,
+      "expectedStatus": [
+        401,
+        403
+      ],
+      "passed": true
+    },
+    {
+      "table": "events",
+      "status": 401,
+      "expectedStatus": [
+        401,
+        403
+      ],
+      "passed": true
+    },
+    {
+      "table": "daily_scores_v2",
+      "status": 404,
+      "expectedStatus": [
+        401,
+        403
+      ],
+      "passed": false
+    },
+    {
+      "table": "support_install_links",
+      "status": 404,
+      "expectedStatus": [
+        401,
+        403
+      ],
+      "passed": false
+    }
+  ]
+}

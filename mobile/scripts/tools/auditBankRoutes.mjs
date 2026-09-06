@@ -7,12 +7,14 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 const require = createRequire(import.meta.url);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const bankDirectoryArg = process.argv.find(argument => argument.startsWith('--bank-directory='));
+const bankDirectory = bankDirectoryArg ? path.resolve(bankDirectoryArg.slice('--bank-directory='.length)) : path.join(root, 'src/data');
 const ts = require(root + '/node_modules/typescript');
 const dict = Function('return ' + fs.readFileSync(root + '/src/dictionary.ts', 'utf8').split('=')[1].trim().replace(/;$/, ''))();
 const vocabularySource = fs.readFileSync(root + '/src/data/vocabulary/puzzleVocabulary.ts', 'utf8');
-const vocabulary = Function(vocabularySource.replace(/export const /g, 'const ').replace(/new Set<string>/g, 'new Set') + '\nreturn {AUDITED_PUZZLE_WORDS,UNREVIEWED_PUZZLE_WORDS,ADVANCED_PUZZLE_WORDS,OBSCURE_PUZZLE_WORDS};')();
+const vocabulary = Function(vocabularySource.replace(/export const /g, 'const ').replace(/new Set<string>/g, 'new Set') + '\nreturn {AUDITED_PUZZLE_WORDS,EXCLUDED_PUZZLE_WORDS,ADVANCED_PUZZLE_WORDS,OBSCURE_PUZZLE_WORDS};')();
 const historical = new Set(dict);
-const fresh = new Set(dict.filter(word => !vocabulary.UNREVIEWED_PUZZLE_WORDS.has(word)));
+const fresh = new Set(dict.filter(word => !vocabulary.EXCLUDED_PUZZLE_WORDS.has(word)));
 const moduleCache = new Map();
 function compile(file) {
   if (moduleCache.has(file)) return moduleCache.get(file);
@@ -39,7 +41,7 @@ const solverDeclaration = hook.statements.find(node => ts.isFunctionDeclaration(
 const solverExports = {};
 Function('exports', ts.transpileModule(solverDeclaration.getText(hook), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText)(solverExports);
 const { isBoardSolvableFromState } = solverExports;
-const files = fs.readdirSync(root + '/src/data').filter(name => /^(puzzle|lexicon)Bank(?!Types).*\.ts$/.test(name)).sort();
+const files = fs.readdirSync(bankDirectory).filter(name => /^(puzzle|lexicon)Bank(?!Types).*\.ts$/.test(name)).sort();
 const results = [];
 const violations = [];
 const replayIssues = [];
@@ -123,7 +125,7 @@ function auditStoredReverseHints(puzzle) {
   return null;
 }
 for (const file of files) {
-  const source = fs.readFileSync(root + '/src/data/' + file, 'utf8');
+  const source = fs.readFileSync(path.join(bankDirectory, file), 'utf8');
   const body = source.slice(source.indexOf('= [') + 2).trim().replace(/;$/, '');
   const bank = Function('return (' + body + ')')();
   const advanced = file.startsWith('lexicon') || file.includes('Expert');
@@ -138,7 +140,7 @@ for (const file of files) {
       const repaired = variant === 'reverse' ? normalizeReverseBankSolution(puzzle, word => fresh.has(word)) : puzzle;
       withheldAfterVocabulary.push({ file, id: puzzle.id, words: puzzle.words,
         reason: !repaired ? 'reverse_replay_unproved' : !isPuzzleVocabularyFair(repaired, advanced) ? 'replayed_vocabulary' : 'audited_single_route',
-        invalidRequiredWords: repaired ? getRequiredPuzzleWords(repaired).filter(word => !vocabulary.AUDITED_PUZZLE_WORDS.has(word) || vocabulary.UNREVIEWED_PUZZLE_WORDS.has(word) || vocabulary.OBSCURE_PUZZLE_WORDS.has(word) || (!advanced && vocabulary.ADVANCED_PUZZLE_WORDS.has(word))) : [],
+        invalidRequiredWords: repaired ? getRequiredPuzzleWords(repaired).filter(word => !vocabulary.AUDITED_PUZZLE_WORDS.has(word) || vocabulary.EXCLUDED_PUZZLE_WORDS.has(word) || vocabulary.OBSCURE_PUZZLE_WORDS.has(word) || (!advanced && vocabulary.ADVANCED_PUZZLE_WORDS.has(word))) : [],
       });
       return [];
     }
@@ -175,8 +177,8 @@ for (const file of files) {
   results.push(row);
   console.log(JSON.stringify(row));
 }
-const report = { date: '2026-09-05', freshWords: fresh.size, historicalWords: historical.size, results, violations, replayIssues, hintIssues, historicalReplayIssues, withheldAfterVocabulary, memory: process.memoryUsage() };
-const outputPath = process.argv[2];
+const report = { date: '2026-09-06', freshWords: fresh.size, historicalWords: historical.size, results, violations, replayIssues, hintIssues, historicalReplayIssues, withheldAfterVocabulary, memory: process.memoryUsage() };
+const outputPath = process.argv.slice(2).find(argument => !argument.startsWith('--'));
 if (outputPath) fs.writeFileSync(outputPath, JSON.stringify(report, null, 2) + '\n');
 if (violations.length || replayIssues.length || hintIssues.length) process.exitCode = 1;
 console.log(JSON.stringify({ violations, replayIssues, hintIssues, rssMB: Math.round(process.memoryUsage().rss / 1048576) }));

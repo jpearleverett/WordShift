@@ -3,10 +3,15 @@ import fs from 'node:fs';
 const source = JSON.parse(fs.readFileSync(new URL('../vocabulary/esdb-2026-09-05.json', import.meta.url), 'utf8'));
 // Familiar variant spellings accepted after editorial review. These stay valid
 // player words regardless of a spell-checker's preference for another spelling.
-const reviewed = new Set(['MOMMA','MOMMAS','SAUTE','SAUTEED','DJINN','SCHEMAS','DIALOGS','TSARIST','FRIER','PRICY','SPACY','FLUKEY','WHACKY','ROPEY','KIDDY']);
+const editorial = JSON.parse(fs.readFileSync(new URL('../vocabulary/editorial-decisions-2026-09-06.json', import.meta.url), 'utf8'));
+const reviewed = new Set([...editorial.previouslyReviewedAllow, ...editorial.entries.filter(entry => entry.decision === 'allow').map(entry => entry.word)]);
+if (editorial.entries.length !== 58 || editorial.entries.some(entry => !['allow', 'exclude'].includes(entry.decision))) throw new Error('Incomplete vocabulary editorial decisions');
 const entries = Object.entries(source.levels);
+const adjudicated = new Set(editorial.entries.map(entry => entry.word));
+const expected = entries.filter(([word, level]) => level == null && !editorial.previouslyReviewedAllow.includes(word)).map(([word]) => word);
+if (adjudicated.size !== expected.length || expected.some(word => !adjudicated.has(word))) throw new Error('Editorial decisions must cover each unresolved source entry exactly once');
 const groups = {
-  UNREVIEWED_PUZZLE_WORDS: entries.filter(([w, n]) => n == null && !reviewed.has(w)),
+  EXCLUDED_PUZZLE_WORDS: entries.filter(([w, n]) => n == null && !reviewed.has(w)),
   ADVANCED_PUZZLE_WORDS: entries.filter(([w, n]) => n > 60 && n <= 70 && w !== 'META'),
   OBSCURE_PUZZLE_WORDS: entries.filter(([, n]) => n > 70),
 };

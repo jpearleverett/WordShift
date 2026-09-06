@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -173,7 +173,7 @@ const CardShimmer: React.FC<{
  * motion / low-tier devices snap to the target rotation instantly.
  */
 const AnimatedChevron: React.FC<{ expanded: boolean; color: string }> = ({ expanded, color }) => {
-  const anim = useRef(new Animated.Value(expanded ? 1 : 0)).current;
+  const [anim] = useState(() => new Animated.Value(expanded ? 1 : 0));
 
   useEffect(() => {
     const reduced = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
@@ -259,7 +259,7 @@ export const WhisperGalleryScreen: React.FC<WhisperGalleryScreenProps> = ({
   // The one idle animator on this surface: a single linear loop every bar's
   // shimmer reads a slice of. Skipped entirely under reduced motion / on
   // low-tier devices (the bands are not even mounted then).
-  const shimmerAnim = useRef(new Animated.Value(0)).current;
+  const [shimmerAnim] = useState(() => new Animated.Value(0));
   const shimmerEnabled = !galleryReducedMotion && animalTypes.length > 0;
   useEffect(() => {
     if (!shimmerEnabled) return;

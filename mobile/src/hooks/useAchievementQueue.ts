@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import {
   checkAchievements,
   buildAchievementCheckState,
@@ -32,16 +32,7 @@ export interface AchievementQueueActions {
 
 export function useAchievementQueue(): [AchievementQueueState, AchievementQueueActions] {
   const [queue, setQueue] = useState<Achievement[]>([]);
-  const [currentAchievement, setCurrentAchievement] = useState<Achievement | null>(null);
-
-  // Auto-process queue: show next achievement when current is dismissed
-  useEffect(() => {
-    if (!currentAchievement && queue.length > 0) {
-      const [next, ...rest] = queue;
-      setCurrentAchievement(next);
-      setQueue(rest);
-    }
-  }, [currentAchievement, queue]);
+  const currentAchievement = queue[0] ?? null;
 
   /** The one presentation path, shared by both entry points so neither drifts. */
   const presentUnlocks = useCallback(async (state: AchievementCheckState) => {
@@ -117,8 +108,12 @@ export function useAchievementQueue(): [AchievementQueueState, AchievementQueueA
   }, [presentUnlocks]);
 
   const dismissAchievement = useCallback(() => {
-    setCurrentAchievement(null);
-  }, []);
+    // A completion callback belongs to the toast that created it. Stopping an
+    // old animation or receiving the same dismissal twice cannot consume the
+    // next achievement before the player has seen it.
+    const id = currentAchievement?.id;
+    setQueue(pending => id && pending[0]?.id === id ? pending.slice(1) : pending);
+  }, [currentAchievement?.id]);
 
   return [
     { currentAchievement },

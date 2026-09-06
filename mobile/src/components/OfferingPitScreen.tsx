@@ -18,7 +18,6 @@ import {
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
 import {
   getOverlayBannerTheme,
-  getPhaseTheme,
   getTileColor,
   getTileFinish,
   DEFAULT_TILE_FINISH,
@@ -53,7 +52,7 @@ import {
   getNewCyclePointerLine,
 } from '../services/phaseNarrative';
 import { getStrongestDreadWord } from '../services/localGenerator';
-import { confirmPhaseTransition, spendAmber, awardBonusAmber, markMandatoryHarvestSeen, hasSeenMandatoryHarvest } from '../services/amberCurrency';
+import { confirmPhaseTransition, spendAmber, markMandatoryHarvestSeen, hasSeenMandatoryHarvest } from '../services/amberCurrency';
 import { FoxGuide } from './FoxGuide';
 import { NineSliceFrame, ThreeSliceStrip } from './ui/NineSlice';
 import {
@@ -862,7 +861,6 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
   const { PIT_CENTER, PIT_OVAL, WARD_RING_SIZE_Y, WARD_RING_SCALE_X, FLOAT_ZONE, GLOW_OUTER_SIZE, GLOW_OUTER_SCALE_X, GLOW_MIDDLE_SIZE, GLOW_MIDDLE_SCALE_X, GLOW_INNER_SIZE, GLOW_INNER_SCALE_X, GLOW_CORE_SIZE, GLOW_CORE_SCALE_X, GLOW_RIM_SIZE_Y, GLOW_RIM_SCALE_X } = useMemo(() => getPitGeometry(SCREEN_WIDTH, SCREEN_HEIGHT), [SCREEN_WIDTH, SCREEN_HEIGHT]);
   const styles = useMemo(() => createStyles(SCREEN_WIDTH, SCREEN_HEIGHT), [SCREEN_WIDTH, SCREEN_HEIGHT]);
-  const phaseTheme = getPhaseTheme(phase);
   // Cottage signage chrome for the pit banners: wooden card frames that age
   // with the world (bright parchment → ash paper), on-parchment inks that
   // flip to cream at phase 4+. The pit art stays untouched behind them.
@@ -916,7 +914,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const tendTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   // Felt response for "deepen the pattern": a native-driven bloom on the depth
   // reading when the level rises (reduced-motion pins to no motion).
-  const tendPulse = useRef(new Animated.Value(0)).current;
+  const [tendPulse] = useState(() => new Animated.Value(0));
   const tendPulseScale = tendPulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.16] });
 
   const devouredPerBatch = useRef<Map<string, Set<string>>>(new Map());
@@ -929,18 +927,18 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const stallRescueRef = useRef<{ arm: () => void; cancel: () => void } | null>(null);
 
   // Surge glow — flashes on devour impact / inhale
-  const pitSurgeOpacity = useRef(new Animated.Value(0)).current;
-  const pitSurgeScale = useRef(new Animated.Value(0.8)).current;
+  const [pitSurgeOpacity] = useState(() => new Animated.Value(0));
+  const [pitSurgeScale] = useState(() => new Animated.Value(0.8));
 
   // Breathing glow — continuous ambient pulse
-  const pitBreathProgress = useRef(new Animated.Value(0)).current;
+  const [pitBreathProgress] = useState(() => new Animated.Value(0));
   const breathLoopRef = useRef<Animated.CompositeAnimation | null>(null);
 
   // Glow intensity — dims when no words are floating (0.35 = quiet, 1.0 = full)
-  const glowIntensity = useRef(new Animated.Value(0.35)).current;
+  const [glowIntensity] = useState(() => new Animated.Value(0.35));
   const glowIntensityAnimRef = useRef<Animated.CompositeAnimation | null>(null);
 
-  const resultOpacity = useRef(new Animated.Value(0)).current;
+  const [resultOpacity] = useState(() => new Animated.Value(0));
   const mountedRef = useRef(true);
   const flyingWordsRef = useRef<FlyingWord[]>([]);
 
@@ -992,16 +990,14 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const trailTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   // Ward mark pulse animation (for pending state)
-  const wardPulseProgress = useRef(new Animated.Value(0)).current;
+  const [wardPulseProgress] = useState(() => new Animated.Value(0));
   const wardPulseLoop = useRef<Animated.CompositeAnimation | null>(null);
   // Ward ignition flash per mark
-  const wardFlashAnims = useRef<Animated.Value[]>(
-    Array.from({ length: PIT_WARD_COUNT }, () => new Animated.Value(0))
-  ).current;
+  const [wardFlashAnims] = useState<Animated.Value[]>(() => (Array.from({ length: PIT_WARD_COUNT }, () => new Animated.Value(0))));
 
   // Ceremony text fade
-  const ceremonyTextOpacity = useRef(new Animated.Value(0)).current;
-  const ceremonyOverlayOpacity = useRef(new Animated.Value(0)).current;
+  const [ceremonyTextOpacity] = useState(() => new Animated.Value(0));
+  const [ceremonyOverlayOpacity] = useState(() => new Animated.Value(0));
 
   // Ward mark positions: distributed along the upper arc of the pit opening.
   // The dots trace the opening's OWN ellipse plus a small uniform offset, so
@@ -1020,7 +1016,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       });
     }
     return positions;
-  }, [SCREEN_WIDTH, SCREEN_HEIGHT]);
+  }, [PIT_CENTER.x, PIT_CENTER.y, PIT_OVAL.radiusX, PIT_OVAL.radiusY]);
 
   const wardColors = getWardMarkColors(phase);
   const litCount = pendingPhaseTransition != null
@@ -1094,7 +1090,9 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       ceremonyTimers.current.forEach(clearTimeout);
       ceremonyAdvanceRef.current = null;
       popInTimeoutsRef.current.forEach(clearTimeout);
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- Teardown must cancel the latest timer registry, including timers added after mount.
       amberRiseTimeoutsRef.current.forEach(clearTimeout);
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- Teardown must cancel the latest timer registry, including timers added after mount.
       trailTimeoutsRef.current.forEach(clearTimeout);
     };
   }, []);
@@ -1295,7 +1293,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
 
     const interval = setInterval(spawnRimParticle, spawnInterval);
     return () => clearInterval(interval);
-  }, [phase, reducedMotion, simplify, tendingLevel, SCREEN_WIDTH, SCREEN_HEIGHT]);
+  }, [phase, reducedMotion, simplify, tendingLevel, SCREEN_WIDTH, SCREEN_HEIGHT, PIT_CENTER.x, PIT_CENTER.y, PIT_OVAL.radiusX, PIT_OVAL.radiusY]);
 
   // ---- Load harvest state ----
   const loadState = useCallback(async () => {
@@ -1361,9 +1359,40 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   }, [harvestState, isOnboarding, pendingPhaseTransition, phase, completedPuzzles]);
 
   // ---- Build flying words ----
+  // ---- Smooth float loop using single linear progress → interpolated sine ----
+  const startFloatLoop = useCallback((fw: FlyingWord) => {
+    if (reducedMotion || simplify || fw.isDevoured) return;
+
+    // X drift: single linear timing 0→1 looped, interpolated to sine in render
+    const loopX = Animated.loop(
+      Animated.timing(fw.driftProgress, {
+        toValue: 1,
+        duration: fw.driftPeriod,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+    fw.floatLoopX = loopX;
+    loopX.start();
+
+    // Y bob: same approach, different period
+    const loopY = Animated.loop(
+      Animated.timing(fw.bobProgress, {
+        toValue: 1,
+        duration: fw.bobPeriod,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+    fw.floatLoopY = loopY;
+    loopY.start();
+  }, [reducedMotion, simplify]);
+
   useEffect(() => {
     if (!harvestState) return;
 
+    let active = true;
+    const entrances: Animated.CompositeAnimation[] = [];
     const maxWords = getMaxFloatingWords();
     const allWords: FlyingWord[] = [];
     const batchCounts = new Map<string, number>();
@@ -1419,6 +1448,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     batchWordCounts.current = batchCounts;
     devouredPerBatch.current = new Map();
     finalizingBatches.current = new Set();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- This effect owns the native word drivers for one harvest snapshot and publishes their render registry.
     setOverflowCount(Math.max(0, totalWords - maxWords));
     setFlyingWords(allWords);
 
@@ -1434,17 +1464,21 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
           fw.scale.setValue(1);
           return;
         }
-        Animated.parallel([
+        const entrance = Animated.parallel([
           Animated.spring(fw.scale, { toValue: 1, friction: 5, tension: 120, useNativeDriver: true }),
           Animated.timing(fw.opacity, { toValue: 1, duration: 300, useNativeDriver: true }),
-        ]).start(() => {
-          if (mountedRef.current) startFloatLoop(fw);
+        ]);
+        entrances.push(entrance);
+        entrance.start(({ finished }) => {
+          if (finished && active && mountedRef.current) startFloatLoop(fw);
         });
       }, delay);
       popInTimeoutsRef.current.push(tid);
     });
 
     return () => {
+      active = false;
+      entrances.forEach(animation => animation.stop());
       popInTimeoutsRef.current.forEach(clearTimeout);
       popInTimeoutsRef.current = [];
       allWords.forEach(fw => {
@@ -1454,7 +1488,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         fw.floatLoopY = null;
       });
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Harvest identity owns batch delivery counters; viewport changes reposition these same drivers in the next effect.
   }, [harvestState]);
 
   // Resize the existing words without rebuilding batch delivery counters or
@@ -1475,35 +1509,6 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       };
     }));
   }, [SCREEN_WIDTH, SCREEN_HEIGHT, isOnboarding, FLOAT_ZONE.top]);
-
-  // ---- Smooth float loop using single linear progress → interpolated sine ----
-  const startFloatLoop = useCallback((fw: FlyingWord) => {
-    if (reducedMotion || simplify || fw.isDevoured) return;
-
-    // X drift: single linear timing 0→1 looped, interpolated to sine in render
-    const loopX = Animated.loop(
-      Animated.timing(fw.driftProgress, {
-        toValue: 1,
-        duration: fw.driftPeriod,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      })
-    );
-    fw.floatLoopX = loopX;
-    loopX.start();
-
-    // Y bob: same approach, different period
-    const loopY = Animated.loop(
-      Animated.timing(fw.bobProgress, {
-        toValue: 1,
-        duration: fw.bobPeriod,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      })
-    );
-    fw.floatLoopY = loopY;
-    loopY.start();
-  }, [reducedMotion, simplify]);
 
   // ---- Pit surge flash (on devour impact) ----
   const flashPitSurge = useCallback((intensity: number = 1) => {
@@ -1574,7 +1579,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       trailTimeoutsRef.current.push(tid);
     }
     setTrailParticles(prev => [...prev, ...newParticles]);
-  }, [phase, reducedMotion, SCREEN_WIDTH, SCREEN_HEIGHT]);
+  }, [reducedMotion, phase, PIT_CENTER.x, PIT_CENTER.y]);
 
   // ---- Spawn impact burst (radial ring at pit center) ----
   const spawnImpactBurst = useCallback(() => {
@@ -1608,7 +1613,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       ]).start(() => { if (mountedRef.current) setImpactParticles(prev => prev.filter(ip => ip.id !== p.id)); });
     }
     setImpactParticles(prev => [...prev, ...newParticles]);
-  }, [phase, reducedMotion, SCREEN_WIDTH, SCREEN_HEIGHT]);
+  }, [reducedMotion, phase, PIT_CENTER.x, PIT_CENTER.y]);
 
   // ---- Spawn shockwave ring (expanding ripple from pit center) ----
   const spawnShockwave = useCallback(() => {
@@ -1797,7 +1802,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       amberRiseTimeoutsRef.current.push(tid);
     }
     setAmberParticles(prev => [...prev, ...newParticles]);
-  }, [reducedMotion, SCREEN_WIDTH, SCREEN_HEIGHT]);
+  }, [reducedMotion, PIT_CENTER.x, PIT_CENTER.y]);
 
   // ---- Result toast ----
   const showResultToast = useCallback((message: string) => {
@@ -1821,7 +1826,10 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     } catch {}
   }, [tendingEnabled]);
 
-  useEffect(() => { refreshTending(); }, [refreshTending]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- refreshTending awaits storage before updating the shrine; this call does not synchronously derive state.
+    refreshTending();
+  }, [refreshTending]);
 
   const handleDeepenPattern = useCallback(async () => {
     if (tendingBusy || !tendingNext) return;
@@ -2109,7 +2117,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         ]),
       ]),
     ]).start(() => handleWordDevoured(fw));
-  }, [phase, isOffering, reducedMotion, spawnTrail, handleWordDevoured, getCurrentPos, triggerInhale, SCREEN_WIDTH, SCREEN_HEIGHT]);
+  }, [isOffering, getCurrentPos, spawnTrail, reducedMotion, phase, PIT_CENTER.x, PIT_CENTER.y, triggerInhale, handleWordDevoured]);
 
   // Keep devourWordRef in sync
   useEffect(() => { devourWordRef.current = devourWord; }, [devourWord]);
@@ -2121,7 +2129,6 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     setIsOffering(true);
     hapticHeavy();
 
-    const totalAmber = harvestState.pendingBatches.reduce((s, b) => s + b.amberValue, 0);
     const totalWordCount = harvestState.pendingBatches.reduce((s, b) => s + b.words.length, 0);
     // Strongest dread word across everything being offered — named back to the
     // player (Phase 2+) after the result toast, once for the whole harvest.
@@ -2298,7 +2305,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         }
       }
     }, cascadeDuration);
-  }, [isOffering, harvestState, phase, amberBalance, reducedMotion, onAmberChange, getCurrentPos, spawnTrail, spawnAmberRise, spawnImpactBurst, spawnShockwave, flashPitSurge, showResultToast, pendingPhaseTransition, ceremonyStatus, startCeremony, isOnboarding, SCREEN_WIDTH, SCREEN_HEIGHT]);
+  }, [isOffering, harvestState, phase, isOnboarding, reducedMotion, showResultToast, onAmberChange, spawnAmberRise, pendingPhaseTransition, ceremonyStatus, startCeremony, getCurrentPos, PIT_CENTER.x, PIT_CENTER.y, spawnTrail, flashPitSurge, spawnImpactBurst, spawnShockwave]);
 
   // ---- Onboarding: advance when the PLAYER has offered every word ----
   // The pit_offering step is completed by the player's own taps (each word
@@ -2363,12 +2370,12 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const pendingAmber = useMemo(() => {
     if (!harvestState) return 0;
     return harvestState.pendingBatches.reduce((s, b) => s + b.amberValue, 0);
-  }, [harvestState, SCREEN_WIDTH, SCREEN_HEIGHT]);
+  }, [harvestState]);
 
   const pendingWordCount = useMemo(() => {
     if (!harvestState) return 0;
     return harvestState.pendingBatches.reduce((s, b) => s + b.words.length, 0);
-  }, [harvestState, SCREEN_WIDTH, SCREEN_HEIGHT]);
+  }, [harvestState]);
 
   const phaseColors = DEVOUR_COLORS[phase] ?? DEVOUR_COLORS[0];
   const glowColor = phaseColors.glow;

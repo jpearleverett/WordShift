@@ -2,6 +2,7 @@ import { GameState } from '../types';
 
 jest.mock('react', () => ({
   useRef: (initial: unknown) => ({ current: initial }),
+  useLayoutEffect: (effect: () => void | (() => void)) => effect(),
   useEffect: (effect: () => void | (() => void)) => effect(),
 }));
 

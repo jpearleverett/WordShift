@@ -2,7 +2,10 @@ import { DAILY_BOARD_VERSION } from './src/services/dailyBoardVersion';
 import { PracticeModal } from './src/components/puzzle/PracticeModal';
 import type { PracticeLessonId } from './src/services/practiceLessons';
 import { saveWithPlayerRetry } from './src/services/saveRetry';
-import { recoverPendingVictory } from './src/services/victoryPersistence';
+import { useLaunchIntents } from './src/hooks/useLaunchIntents';
+import { useInitialGameRoute } from './src/hooks/useInitialGameRoute';
+import { useAppBoot } from './src/hooks/useAppBoot';
+import { useGlobalOverlays } from './src/hooks/useGlobalOverlays';
 import React, { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore } from 'react';
 import {
   View,
@@ -15,7 +18,6 @@ import {
   Animated,
   Easing,
   AppState,
-  Linking,
   BackHandler,
   Modal,
   Image,
@@ -74,10 +76,6 @@ import {
   markLexiconIntroSeen,
   consumePendingVariantTutorial,
   checkFreeStreakFreeze,
-
-
-
-
   consumeVariantNudge,
   getFullProgress,
   getRitualWords,
@@ -97,10 +95,9 @@ import { AchievementToast } from './src/components/AchievementToast';
 import { PhaseTransitionOverlay } from './src/components/PhaseTransitionOverlay';
 import { ShareableResult, decodeChallengeLink, buildChallengeShareText } from './src/services/shareResults';
 import { consumeSharePrompt, getSharePromptInvite } from './src/services/sharePrompts';
-import { initShareImage } from './src/services/shareImage';
 import { ShareResultModal } from './src/components/share/ShareResultModal';
 import { getLocalDateString, daysAgoLocal } from './src/services/dateUtils';
-import { getSettingsSync, getSettings, startSystemMotionPreference } from './src/services/settings';
+import { getSettingsSync } from './src/services/settings';
 import { FlyingTileGhost, TileFlight } from './src/components/puzzle/FlyingTileGhost';
 import { standardLetterCenterOffset } from './src/constants/tileLayout';
 import { shouldSimplifyAnimations } from './src/services/deviceTier';
@@ -108,7 +105,7 @@ import { announceForA11y } from './src/services/a11yAnnounce';
 import { initAudio, setAudioPhase, startMusicForScreen, type MusicScreen, soundVictory, soundPerfect, soundValidMove, soundMidpointTurn, soundInvalidMove, soundUndo, soundHint, soundTap, soundUiTap, soundSelection, soundLetterSelect, soundDailyReady } from './src/services/audio';
 import { stopCeremonyMusic } from './src/services/uiSound';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess, hapticWarning, hapticError, hapticSelection, hapticMoveCommit } from './src/services/haptics';
+import { hapticLight, hapticMedium, hapticSuccess, hapticWarning, hapticError, hapticSelection, hapticMoveCommit } from './src/services/haptics';
 import { getVariantTutorialIntroLines } from './src/services/animalDialogue';
 import {
   getLoadingMessage,
@@ -183,22 +180,49 @@ import {
   hasPromptedForNotifications,
   markPromptedForNotifications,
 } from './src/services/notifications';
-import { runMigrations } from './src/services/dataMigration';
-import { initIAP, setBillingProvider, reconcilePendingConsumableGrants, settleConsumableGrant } from './src/services/iap';
-import { initAds, setAdProvider, maybeShowInterstitial, showRewarded, isRewardedCapReached, isAdsReady, RewardedPlacement, isDailyInterstitialAllowed } from './src/services/ads';
+import { maybeShowInterstitial, showRewarded, isRewardedCapReached, isAdsReady, RewardedPlacement, isDailyInterstitialAllowed } from './src/services/ads';
 import { RewardedAdButton } from './src/components/monetization/RewardedAdButton';
-import { initCosmetics } from './src/services/cosmetics';
-import { loadPixelFonts, installGlobalFont } from './src/theme/fonts';
-import { initHints, addHints, grantBonusHint } from './src/services/hints';
-import { loadEntitlements, hasEntitlementSync, isAdFreeSync, ENTITLEMENTS } from './src/services/entitlements';
+import { installGlobalFont } from './src/theme/fonts';
+import { addHints, grantBonusHint } from './src/services/hints';
+import { hasEntitlementSync, isAdFreeSync, ENTITLEMENTS } from './src/services/entitlements';
 import { StoreModal } from './src/components/monetization/StoreModal';
 import { recordInterstitialSeen, consumePatronNudge, armRemoveAdsNudgeIfEligible, consumePendingRemoveAdsNudge, canOfferRewardedDouble, recordRewardedDoubleOffered, canShowExitNudge, recordExitNudgeShown } from './src/services/monetizationPrompts';
-import { createRevenueCatBillingProvider } from './src/services/providers/revenueCatBilling';
-import { createAdMobAdProvider } from './src/services/providers/googleAdMobAds';
 import { installGlobalErrorHandler, setErrorForwarder, reportError } from './src/services/errorReporting';
-import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST, STARTER_INTRO_MIN_PUZZLES, FINALE_DWELL_PUZZLES, FINALE_ARM_MIN_PUZZLES, INTERSTITIAL_MIN_PUZZLES, HOUSE_ASK_MIN_PUZZLES, HOUSE_ASK_CHANCE, HOUSE_ASK_REWARD_AMBER, REWARDED_HINT_GRANT, EXPERT_DIFFICULTY_UNLOCK_PUZZLES, LEXICON_UNLOCK_PUZZLES } from './src/constants/gameBalance';
+import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST, STARTER_INTRO_MIN_PUZZLES, FINALE_DWELL_PUZZLES, INTERSTITIAL_MIN_PUZZLES, HOUSE_ASK_MIN_PUZZLES, HOUSE_ASK_CHANCE, HOUSE_ASK_REWARD_AMBER, REWARDED_HINT_GRANT, EXPERT_DIFFICULTY_UNLOCK_PUZZLES, LEXICON_UNLOCK_PUZZLES } from './src/constants/gameBalance';
 import { pickHouseAsk, evaluateHouseAsk, HouseAsk } from './src/services/houseAsks';
 import { getCumulativeStats } from './src/services/starRating';
+import { isStorageTransactionActive, subscribeStorageTransaction } from './src/services/persistenceStorage';
+import { markPendingChanges, uploadToCloud } from './src/services/cloudSave';
+import * as Sentry from '@sentry/react-native';
+import { getSentryDsn } from './src/services/supabaseClient';
+import { estimateSlotIndex, findClosestValidSlot, computeBoardScale } from './src/services/slotEstimation';
+import { DROP_SHAKE_KEYFRAME_MS, DROP_SHAKE_INTENSITY, SPEED_ESCALATION_STEP_SEC, SPEED_ESCALATION_MIN_SEC, SPEED_TICK_CRITICAL_SEC, SWIFT_HINT_TOAST_DELAY_MS, SCREEN_FADE_COVER_MS, SCREEN_FADE_REVEAL_MS, SCREEN_READY_TIMEOUT_MS, SCREEN_REVEAL_SETTLE_MS, speedTickKind } from './src/constants/timing';
+import { ScreenTransitionOverlay } from './src/components/ui/ScreenTransitionOverlay';
+import { armScreenReady, waitForScreenReady } from './src/services/screenReady';
+import { OfferingPitScreen } from './src/components/OfferingPitScreen';
+import { ShopScreen } from './src/components/shop/ShopScreen';
+import { loadPuzzleState, clearPuzzleState } from './src/services/puzzleSaveState';
+import { offerBatch, settleBatchCredit } from './src/services/wordHarvest';
+import * as Updates from 'expo-updates';
+import { isCreatorKitEnabled, validateCreatorCode, applyCreatorSnapshot, isCreatorEra } from './src/services/creatorKit';
+import {
+  getNewlyUnlockedVariants,
+  getUnlockedVariants,
+  getSpeedTimeLimit,
+  getSpeedUnlockHint,
+  SPEED_TOGGLE_UNLOCK_PUZZLES,
+  getVariantSelectorOptions,
+  getBlindUnlockHint,
+  getLexiconUnlockHint,
+  isVariantUnlocked,
+  PuzzleVariant,
+  VARIANT_CONFIGS,
+  CHALLENGE_TOGGLE_UNLOCK_PUZZLES,
+  BLIND_TOGGLE_UNLOCK_PUZZLES,
+} from './src/services/puzzleVariety';
+import { appStyles as styles, getScreenBackgroundColor, getActionButtonColors } from './src/styles/appStyles';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useScreenInsets } from './src/hooks/useScreenInsets';
 
 // Defer the one-time difficulty-selector intro until a few boards are done —
 // firing on the very first post-onboarding Play hijacked the "just let me
@@ -252,46 +276,6 @@ async function markOneTimeFlagSeen(key: string): Promise<void> {
   }
 }
 
-// Module-scope launch-routing guards: an appEpoch remount (late cloud restore)
-// re-runs MainApp's mount effects, and both getInitialURL and
-// getLastNotificationResponseAsync keep returning the ORIGINAL launch payload —
-// these ensure each is routed at most once per process.
-let launchUrlProcessed = false;
-let coldStartNotificationProcessed = false;
-// Set when a slow fresh-install cloud restore lands after boot; the remounted
-// MainApp surfaces a one-time "progress restored" notice so the hard reset
-// mid-interaction doesn't read as the app glitching.
-let pendingRestoreNotice = false;
-import { recoverPendingStorageTransaction, isStorageTransactionActive, subscribeStorageTransaction } from './src/services/persistenceStorage';
-import { markPendingChanges, uploadToCloud, installCloudProviderIfConfigured, maybeAutoRestoreOnFreshInstall, holdUploadsUntil } from './src/services/cloudSave';
-import * as Sentry from '@sentry/react-native';
-import { getSentryDsn } from './src/services/supabaseClient';
-import { estimateSlotIndex, findClosestValidSlot, computeBoardScale } from './src/services/slotEstimation';
-import { DROP_SHAKE_KEYFRAME_MS, DROP_SHAKE_INTENSITY, SPEED_ESCALATION_STEP_SEC, SPEED_ESCALATION_MIN_SEC, SPEED_TICK_CRITICAL_SEC, SWIFT_HINT_TOAST_DELAY_MS, SCREEN_FADE_COVER_MS, SCREEN_FADE_REVEAL_MS, SCREEN_READY_TIMEOUT_MS, SCREEN_REVEAL_SETTLE_MS, speedTickKind } from './src/constants/timing';
-import { ScreenTransitionOverlay } from './src/components/ui/ScreenTransitionOverlay';
-import { armScreenReady, waitForScreenReady } from './src/services/screenReady';
-import { OfferingPitScreen } from './src/components/OfferingPitScreen';
-import { ShopScreen } from './src/components/shop/ShopScreen';
-import { loadPuzzleState, clearPuzzleState } from './src/services/puzzleSaveState';
-import { offerBatch, settleBatchCredit } from './src/services/wordHarvest';
-import * as Updates from 'expo-updates';
-import { isCreatorKitEnabled, validateCreatorCode, applyCreatorSnapshot, isCreatorEra } from './src/services/creatorKit';
-import {
-  getNewlyUnlockedVariants,
-  getUnlockedVariants,
-  getSpeedTimeLimit,
-  getSpeedUnlockHint,
-  SPEED_TOGGLE_UNLOCK_PUZZLES,
-  getVariantSelectorOptions,
-  getBlindUnlockHint,
-  getLexiconUnlockHint,
-  isVariantUnlocked,
-  PuzzleVariant,
-  VARIANT_CONFIGS,
-  CHALLENGE_TOGGLE_UNLOCK_PUZZLES,
-  BLIND_TOGGLE_UNLOCK_PUZZLES,
-} from './src/services/puzzleVariety';
-import { appStyles as styles, getScreenBackgroundColor, getActionButtonColors } from './src/styles/appStyles';
 
 // Chromatic-aberration ghost layer for the glitch text: an absolutely
 // positioned same-glyph copy behind the main text, tinted and offset 1-2dp.
@@ -303,8 +287,6 @@ const appGlitchGhostStyle = {
   textShadowColor: 'transparent',
   textShadowRadius: 0,
 };
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { useScreenInsets } from './src/hooks/useScreenInsets';
 
 // App screen type — expanded with settings, stats, and ledger
 type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery' | 'pit' | 'shop';
@@ -384,19 +366,12 @@ function MainApp() {
   }, [saveHoldActive]);
   const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT, fontScale } = useWindowDimensions();
   const compactPuzzleLayout = SCREEN_HEIGHT < 740 || fontScale > 1.15;
+  const [alertPending, setAlertPending] = useState(false);
   const [practiceLesson, setPracticeLesson] = useState<PracticeLessonId | null>(null);
   // Safe-area bases (notch / home indicator) — screens add breathing room on top
   const screenInsets = useScreenInsets();
   // Screen navigation
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('home');
-  // Launch-route gate: currentScreen defaults to 'home', but a cold launch may
-  // resolve into the puzzle or pit (an interrupted-onboarding resume). Until the
-  // resume effect decides, we keep showing the branded boot screen rather than
-  // painting 'home' for a frame and then swapping to the board (the F141 home
-  // flash). Cleared by the resume effect (every branch) and, as a brick-proof
-  // backstop, by a short timeout so a stalled decision can never trap the boot
-  // screen.
-  const [bootRouting, setBootRouting] = useState(true);
   const [homePanY, setHomePanY] = useState<number | null>(null);
 
   // Custom hooks - game logic & persistence separated from UI
@@ -407,6 +382,7 @@ function MainApp() {
   const setPuzzleGameState = puzzleActions.setGameState;
   const setPuzzleMessage = puzzleActions.setMessage;
   const setSelectedVariant = puzzleActions.setSelectedVariant;
+  const setPuzzlePhase = puzzleActions.setCurrentPhase;
 
   // Live mirrors of gameState + victory-lock for callbacks that must read the
   // CURRENT value without capturing it in a stale closure (e.g. the speed
@@ -435,14 +411,6 @@ function MainApp() {
     return () => clearTimeout(t);
   }, [puzzle.gameState, puzzle.isProcessing]);
 
-  // Brick-proof backstop for the launch-route gate: if the resume decision
-  // never lands (e.g. onboarding load stalls), lift the boot screen anyway so
-  // the app can never hang on it. Worst case this restores the pre-fix behavior
-  // (a possible home flash), never a stuck screen.
-  useEffect(() => {
-    const t = setTimeout(() => setBootRouting(false), 800);
-    return () => clearTimeout(t);
-  }, []);
   // Tracked timer for the one-time Swift-Victories hint (F110): cleared on
   // unmount so a raw setTimeout can't fire into a torn-down tree.
   const swiftHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -479,8 +447,8 @@ function MainApp() {
 
   // Sync narrative phase from persistence into puzzle hook
   useEffect(() => {
-    puzzleActions.setCurrentPhase(persistence.currentPhase);
-  }, [persistence.currentPhase, puzzleActions.setCurrentPhase]);
+    setPuzzlePhase(persistence.currentPhase);
+  }, [persistence.currentPhase, setPuzzlePhase]);
 
   // StarBurst effect state for valid moves. comboTier drives the burst's
   // size/count escalation (Confetti.StarBurst) so a rising clean-move streak
@@ -627,8 +595,6 @@ function MainApp() {
   // Home nudge — track consecutive puzzles without visiting home
   const puzzlesSinceHomeVisit = useRef(0);
 
-  // Guard: pit-resume useEffect should only fire on initial mount
-  const pitResumeCheckedRef = useRef(false);
   // Local day the daily launch tasks (freeze grant, login claim) last ran for.
   // Null until the first run; compared against getLocalDateString() so the
   // AppState listener can re-run them after an overnight foreground return
@@ -877,6 +843,7 @@ function MainApp() {
   // step (the pre-cover frame, the cover's completion, the readiness race, the
   // reveal) bails if a newer navigation has since claimed a higher one.
   const transitionTokenRef = useRef(0);
+  const [navigationBusy, setNavigationBusy] = useState(false);
   // Current screen, readable synchronously inside transitionTo without making
   // the callback depend on (and therefore be re-created by) every screen swap.
   const currentScreenRef = useRef<AppScreen>(currentScreen);
@@ -903,10 +870,16 @@ function MainApp() {
     revealListenerRef.current = null;
   }, [screenRevealAnim]);
   useEffect(() => detachRevealListener, [detachRevealListener]);
+  useEffect(() => () => {
+    // A readiness promise or animation callback from a disposed session must
+    // never swap screens or release the next session's cover.
+    transitionTokenRef.current += 1;
+    transitionOverlay.stopAnimation();
+    screenRevealAnim.stopAnimation();
+  }, [transitionOverlay, screenRevealAnim]);
 
   // Animated screen transition (instant if reducedMotion)
   const transitionTo = useCallback((screen: AppScreen, callback?: () => void) => {
-    const token = ++transitionTokenRef.current;
     const destColor = getScreenBackgroundColor(screen, persistence.currentPhase);
 
     // Already on this screen with nothing to run under the cover: the dip would
@@ -918,6 +891,9 @@ function MainApp() {
     // cover, because that callback is exactly the work the cover exists to hide
     // (re-serving a board under the current screen).
     if (screen === currentScreenRef.current && !callback) return;
+    // A no-op navigation must not invalidate an in-flight reveal and leave
+    // the screen permanently covered. Claim only after the no-op check.
+    const token = ++transitionTokenRef.current;
 
     const reducedMotion = getSettingsSync().reducedMotion;
     if (reducedMotion) {
@@ -927,7 +903,9 @@ function MainApp() {
       transitionOverlay.setValue(0);
       setTransitionOverlayColor(destColor);
       setRootBgColor(destColor);
+      currentScreenRef.current = screen;
       setCurrentScreen(screen);
+      setNavigationBusy(false);
       callback?.();
       return;
     }
@@ -941,6 +919,7 @@ function MainApp() {
     // cut anywhere. The single frame of delay lets React commit that color
     // while opacity is still 0; started in the same tick, the cover is already
     // ~25% opaque by the time the commit lands and the change is visible.
+    setNavigationBusy(true);
     setTransitionOverlayColor(destColor);
     requestAnimationFrame(() => {
       if (token !== transitionTokenRef.current) return;
@@ -962,6 +941,7 @@ function MainApp() {
         // would otherwise report into the previous arm and this one would wait
         // out the whole timeout.
         armScreenReady(screen);
+        currentScreenRef.current = screen;
         setCurrentScreen(screen);
         // Guarded: everything that LIFTS the cover (the reveal signature, the
         // readiness race, the fade-out) is scheduled below this line, so a
@@ -997,7 +977,9 @@ function MainApp() {
             // Ease-out lets the destination emerge at once with a gentle tail.
             easing: Easing.out(Easing.quad),
             useNativeDriver: true,
-          }).start();
+          }).start(({ finished }) => {
+            if (finished && token === transitionTokenRef.current) setNavigationBusy(false);
+          });
           if (kind === 'none') return;
           // Settle the reveal signature (springs the arriving screen into
           // place). A duration, not a spring: the old friction-8 spring took
@@ -1201,11 +1183,12 @@ function MainApp() {
   }, [getStoryContext]);
 
 
-  const launchColdOpenPuzzle = useCallback(async () => {
+  const launchColdOpenPuzzle = useCallback(async (isCurrent: () => boolean = () => true) => {
     const [saved, stats] = await Promise.all([
       loadPuzzleState(),
       getCumulativeStats(),
     ]);
+    if (!isCurrent()) return;
     const canRestoreColdOpen = (
       saved?.gameState === GameState.PLAYING &&
       !saved.isPlayingDaily &&
@@ -1222,30 +1205,32 @@ function MainApp() {
 
     if (route === 'home_empty') {
       if (saved) await clearPuzzleState();
+      if (!isCurrent()) return;
       await onboardingActions.advanceOnboarding('home_empty');
+      if (!isCurrent()) return;
       transitionTo('home', () => {
         puzzleActions.clearBoard();
       });
-      setBootRouting(false);
       return;
     }
 
     // Set the screen BEFORE lifting the boot gate so the board paints directly,
     // never a frame of 'home' in between.
     setCurrentScreen('puzzle');
-    setBootRouting(false);
     if (route === 'restore' && saved) {
       // Restored boards never carry (or roll) a house ask.
       houseAskRestoreSuppressRef.current = true;
       puzzleActions.restorePuzzleState(saved);
     } else {
       if (saved) await clearPuzzleState();
+      if (!isCurrent()) return;
       // undefined + undefined + false: clear the undo-limit too. These clean
       // standard starts used to leave a sticky Challenge on, which lit the
       // 'CHALLENGE n undos' chip over a board whose gameMode is 'standard' —
       // a budget nothing enforced (handleUndo gates on gameMode).
       await puzzleActions.startNewGame('EASY', 'standard', 'standard', false, false, undefined, false);
     }
+    if (!isCurrent()) return;
     puzzleActions.setMessage(COLD_OPEN_INSTRUCTION);
     logEvent({ type: 'puzzle_started', data: { difficulty: 'EASY', onboarding: true } });
   }, [onboardingActions, puzzleActions, transitionTo]);
@@ -1333,7 +1318,7 @@ function MainApp() {
   // (phaseTransitionEvent -> null), so the pit ignition / finale cinematics
   // keep their own soundscape and the new bed lands as the world settles.
   // startMusicForPhase is a no-op when the right bed is already playing, so
-  // re-runs (refreshStats, appEpoch remounts, a rebuildSessionFromStorage
+  // re-runs (refreshStats, session rebuilds, a rebuildSessionFromStorage
   // whose refresh changes currentPhase) are free.
   //
   // Backgrounding: audio.ts initializes expo-audio with
@@ -1458,16 +1443,6 @@ function MainApp() {
     };
   }, []);
 
-  // One-time notice after a late cloud restore remounted the app: without it,
-  // a fresh-install player a minute into onboarding sees the screen silently
-  // hard-reset to their restored save with zero explanation.
-  useEffect(() => {
-    if (pendingRestoreNotice) {
-      pendingRestoreNotice = false;
-      showGameAlert('Restored', 'Your saved progress was found in the cloud and restored.');
-    }
-  }, []);
-
   // Schedule notifications once persistence has hydrated, with the REAL phase.
   // The old mount-time scheduleAllNotifications(0) rewrote the entire reminder
   // ladder with bright Phase-0 copy on every browse-only launch — precisely for
@@ -1485,38 +1460,22 @@ function MainApp() {
   // (The Android hardware-back handler lives below handleGoToPit — its deps
   // array references that callback, which must be initialized first.)
 
-  // Resume the correct screen if onboarding was interrupted (initial mount only).
-  // The onboarding hook has already normalized transient steps to stable ones,
-  // so here we only need to map a stable step to its owning screen. Without this,
-  // a kill during the puzzle/pit/return beats would relaunch to a dead home
-  // screen (no Fox guide, no Play button) — an unrecoverable first-session brick.
-  useEffect(() => {
-    if (onboardingFlow.onboardingReady && !pitResumeCheckedRef.current) {
-      pitResumeCheckedRef.current = true;
-      const step = onboardingFlow.onboardingStep;
+  const initialRoute = useInitialGameRoute(
+    onboardingFlow.onboardingReady,
+    onboardingFlow.onboardingStep,
+    async (step, isCurrent) => {
       if (step === 'going_to_pit' || step === 'pit_intro' || step === 'pit_offering') {
-        setCurrentScreen('pit');
-        setBootRouting(false);
+        if (isCurrent()) setCurrentScreen('pit');
       } else if (step === 'cold_open_puzzle') {
-        // A kill during the self-directed opener resumes the exact autosaved
-        // board when possible; otherwise start curated EASY puzzle 0.
-        // launchColdOpenPuzzle lifts the boot gate itself once it has set the
-        // screen (so the board, not home, is what appears); clear on failure too.
-        launchColdOpenPuzzle().catch(() => setBootRouting(false));
+        await launchColdOpenPuzzle(isCurrent);
       } else if (step === 'puzzle_tutorial') {
-        // Re-init the guided tutorial puzzle so the player resumes a live,
-        // winnable board with the Fox overlay rather than a dead screen.
+        if (!isCurrent()) return;
         setCurrentScreen('puzzle');
-        puzzleActions.startNewGame('EASY', 'standard', 'standard', false, false, undefined, false);
-        setBootRouting(false);
-      } else {
-        // Normal launch (onboarding complete, or a non-puzzle step): home is the
-        // correct destination, so lift the boot gate and let it paint.
-        setBootRouting(false);
+        await puzzleActions.startNewGame('EASY', 'standard', 'standard', false, false, undefined, false);
       }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onboardingFlow.onboardingReady, onboardingFlow.onboardingStep, launchColdOpenPuzzle]);
+    },
+  );
+  const bootRouting = initialRoute.status !== 'ready';
 
   // Cold-open warmth: the opener's guiding voice (COLD_OPEN_INSTRUCTION, set at
   // launch) reacts with delight the instant the player lands their first valid
@@ -2013,7 +1972,7 @@ function MainApp() {
         maybeShowSetupSelectorIntro().catch(() => {});
       }
     });
-  }, [puzzle.difficulty, puzzleActions, transitionTo, persistenceActions, orchestrationActions, maybeShowSetupSelectorIntro, clearVictoryToastQueue]);
+  }, [puzzle.difficulty, puzzleActions, transitionTo, persistenceActions, orchestrationActions, maybeShowSetupSelectorIntro, clearVictoryToastQueue, resetSpeedRun]);
 
   const handlePlayPuzzle = useCallback(async (difficulty?: Difficulty) => {
     if (storyExitPreparing.current || activeStory) return;
@@ -2042,7 +2001,7 @@ function MainApp() {
       }
       puzzleActions.setShowConfetti(false);
     });
-  }, [puzzleActions, puzzle.unbrokenWeaveMode, transitionTo, clearVictoryToastQueue]);
+  }, [puzzleActions, puzzle.unbrokenWeaveMode, transitionTo, clearVictoryToastQueue, resetSpeedRun]);
 
   // Reset All completed but an in-place reload wasn't available (Expo Go /
   // dev client — Updates.reloadAsync throws there). Storage and service
@@ -2081,6 +2040,12 @@ function MainApp() {
     setShareResultData(null);
     setShareChallengeText(null);
     setDailyLoginGrant(null);
+    setNotificationPrompt(null);
+    setShowStoreModal(false);
+    setShowPatronModal(false);
+    setPracticeLesson(null);
+    setHomeOverlayActive(false);
+    setHomeQuietReady(false);
     setPhaseTransitionEvent(null);
     setShowSetupSelectorIntro(false);
     setPostVictoryIntro(null);
@@ -2220,7 +2185,8 @@ function MainApp() {
 
   // The daily board start proper — reached only through handleStartDaily's
   // replay guard below.
-  const startDailyBoard = useCallback(() => {
+  const startDailyBoard = useCallback((isCurrent: () => boolean = () => true) => {
+    if (!isCurrent()) return;
     // A hushed win's silence must not leak onto a link/notification-routed
     // daily start (this path bypasses startVictoryExitFlow's clear).
     clearVictoryMusicHush(true);
@@ -2230,10 +2196,12 @@ function MainApp() {
     resetSpeedRun();
     clearVictoryToastQueue();
     transitionTo('puzzle', async () => {
+      if (!isCurrent()) return;
       puzzleActions.setGameState(GameState.LOADING);
       puzzleActions.setMessage(getLoadingMessage(persistence.currentPhase));
       try {
         const saved = await loadPuzzleState();
+        if (!isCurrent()) return;
         if (saved?.isPlayingDaily && saved.gameState === 'PLAYING' && saved.dailyDate
           && [0, 1].includes(daysAgoLocal(saved.dailyDate))) {
           puzzleActions.restorePuzzleState(saved);
@@ -2246,6 +2214,7 @@ function MainApp() {
           return;
         }
         const daily = await generateDailyPuzzle();
+        if (!isCurrent()) return;
         puzzleActions.startDailyGame(daily.words, daily.hint, daily.wordLength, daily.solution);
         puzzleStartTimeRef.current = Date.now();
         // The first-ever daily gets an eased (MEDIUM) board so it isn't a
@@ -2263,6 +2232,7 @@ function MainApp() {
         // started; null on every call after the one-time grant.
         try {
           const mercyHints = await grantFirstDailyMercy();
+          if (!isCurrent()) return;
           if (mercyHints !== null) {
             puzzleActions.refreshHintBalance();
             puzzleActions.setMessage(getFirstDailyMercyMessage(persistence.currentPhase, mercyHints));
@@ -2271,6 +2241,7 @@ function MainApp() {
             // only ever one the player has met (assessment §7). Skipped on the
             // first daily so the mercy message isn't clobbered.
             const prog = await getFullProgress();
+            if (!isCurrent()) return;
             const hostName = getDailyHostName(prog?.unlockedAnimals ?? []);
             puzzleActions.setMessage(getDailyHostLine(hostName, persistence.currentPhase));
           }
@@ -2279,16 +2250,18 @@ function MainApp() {
         }
         maybeShowSetupSelectorIntro().catch(() => {});
       } catch {
+        if (!isCurrent()) return;
         // Daily generation failed — fall back to a standard HARD puzzle so the
         // player is never stranded on a loading screen.
         setIsPlayingDaily(false);
         await puzzleActions.startNewGame('HARD', 'standard', 'standard', false, false, undefined, false);
       }
     });
-  }, [puzzleActions, transitionTo, persistenceActions, orchestrationActions, persistence.currentPhase, maybeShowSetupSelectorIntro, clearVictoryToastQueue, clearVictoryMusicHush]);
+  }, [puzzleActions, transitionTo, persistenceActions, orchestrationActions, persistence.currentPhase, maybeShowSetupSelectorIntro, clearVictoryToastQueue, clearVictoryMusicHush, resetSpeedRun]);
 
   // Start the Daily Challenge (seeded; difficulty follows the week ramp).
-  const handleStartDaily = useCallback((_difficulty: Difficulty) => {
+  const handleStartDaily = useCallback((_difficulty: Difficulty, isCurrent: () => boolean = () => true) => {
+    if (!isCurrent()) return;
     hapticLight();
     soundUiTap();
     (async () => {
@@ -2299,6 +2272,7 @@ function MainApp() {
       // tapping the completed card.
       try {
         const status = await getDailyStatus();
+        if (!isCurrent()) return;
         if (status.isCompleted) {
           transitionTo('home');
           handleRecheckDailyStanding();
@@ -2307,7 +2281,7 @@ function MainApp() {
       } catch {
         // Status read failed — fall through and let the daily start.
       }
-      startDailyBoard();
+      if (isCurrent()) startDailyBoard(isCurrent);
     })();
   }, [transitionTo, handleRecheckDailyStanding, startDailyBoard]);
 
@@ -2332,9 +2306,9 @@ function MainApp() {
     persistenceActions.refreshStats();
     logEvent({ type: 'puzzle_started', data: { shared: true, words: words.length } });
     transitionTo('puzzle');
-  }, [puzzleActions, transitionTo, persistenceActions, orchestrationActions, persistence.currentPhase, clearVictoryMusicHush]);
+  }, [puzzleActions, transitionTo, persistenceActions, orchestrationActions, persistence.currentPhase, clearVictoryMusicHush, resetSpeedRun]);
 
-  const handleIncomingLink = useCallback((url: string) => {
+  const handleIncomingLink = useCallback((url: string, isCurrent: () => boolean = () => true) => {
     // Scheme/host matching is case-insensitive on Android intents, so compare
     // lowercased — a mixed-case link must neither bypass routing nor, worse,
     // bypass the creator-code telemetry redaction below.
@@ -2415,20 +2389,20 @@ function MainApp() {
 
     if (lowerUrl.startsWith('wordshift://challenge/daily')) {
       // The optional ?date= param is ignored — the daily is always today's.
-      // Unlock inputs read FRESH from storage: a cold-start link routes ~1.2s
-      // after launch, before React persistence state may have hydrated (a
-      // stale zero showed unlocked players a false "still locked" alert).
+      // Re-read unlock inputs after the queued intent has waited through any
+      // onboarding or modal. Progress can change during that wait.
       (async () => {
         try {
           const [stats, phaseNow] = await Promise.all([getCumulativeStats(), getCurrentPhase()]);
+          if (!isCurrent()) return;
           if (isDailyChallengeUnlocked(stats.totalPuzzlesCompleted, phaseNow)) {
-            handleStartDaily('HARD');
+            handleStartDaily('HARD', isCurrent);
           } else {
             transitionTo('home');
             showGameAlert('Daily Challenge', getDailyLockedMessage(phaseNow));
           }
         } catch {
-          handleStartDaily('HARD');
+          if (isCurrent()) handleStartDaily('HARD', isCurrent);
         }
       })();
       return;
@@ -2450,54 +2424,20 @@ function MainApp() {
   }, [
     onboardingFlow.onboardingStep,
     transitionTo,
-    puzzlesSolvedForVariantUnlocks,
     persistence.currentPhase,
     handleStartDaily,
     handleStartSharedChallenge,
     puzzle.gameState,
     victoryFlow.victoryData,
     postVictoryIntro,
+    rebuildSessionFromStorage,
   ]);
-
-  // The handler lives in a ref so the Linking subscription is created exactly
-  // once and the launch URL is processed exactly once. With the callback in the
-  // dep array the effect re-ran whenever its identity changed (every solve /
-  // phase change), re-invoking getInitialURL() — which keeps returning the
-  // app's original launch URL — and re-launching a shared-challenge link
-  // mid-session. The launch URL is routed after a short delay so persistence
-  // state has hydrated before any daily/challenge routing decision.
-  const handleIncomingLinkRef = useRef(handleIncomingLink);
-  handleIncomingLinkRef.current = handleIncomingLink;
-  useEffect(() => {
-    let launchTimer: ReturnType<typeof setTimeout> | null = null;
-    Linking.getInitialURL().then(url => {
-      // Module-scope guard: an appEpoch remount (late cloud restore) re-runs
-      // this effect, and getInitialURL keeps returning the original launch URL
-      // — without the guard the remount would re-route the player into the
-      // launch link's board a second time.
-      if (url && !launchUrlProcessed) {
-        launchUrlProcessed = true;
-        launchTimer = setTimeout(() => handleIncomingLinkRef.current(url), 1200);
-      }
-    }).catch(() => {});
-
-    const subscription = Linking.addEventListener('url', event => {
-      handleIncomingLinkRef.current(event.url);
-    });
-
-    return () => {
-      if (launchTimer) clearTimeout(launchTimer);
-      subscription.remove();
-    };
-  }, []);
 
   // Notification tap routing: scheduled notifications carry a data.target
   // payload ('daily' → the daily-challenge start path, 'home' → home screen).
-  // The handler lives in a ref so the subscription is created exactly once;
-  // expo-notifications is lazily required with the same guarded pattern as
-  // services/notifications.ts (absent module → taps just open the app).
-  const routeNotificationTargetRef = useRef<(target: unknown) => void>(() => {});
-  routeNotificationTargetRef.current = (target: unknown) => {
+  // useLaunchIntents owns subscription lifetime and defers this callback
+  // until the current session and overlay owner permit navigation.
+  const routeNotificationTarget = (target: unknown, isCurrent: () => boolean = () => true) => {
     if (onboardingFlow.onboardingStep && onboardingFlow.onboardingStep !== 'complete') {
       return;
     }
@@ -2512,15 +2452,13 @@ function MainApp() {
       return;
     }
     if (target === 'daily') {
-      // Read the unlock inputs FRESH from storage: a cold-start tap routes
-      // ~1.2s after launch, and the React persistence state can still be
-      // unhydrated then — a stale zero here showed fully-unlocked players a
-      // false "still locked" alert.
+      // Resolve against current progress after this intent's deferred wait.
       (async () => {
         try {
           const [stats, phaseNow] = await Promise.all([getCumulativeStats(), getCurrentPhase()]);
+          if (!isCurrent()) return;
           if (isDailyChallengeUnlocked(stats.totalPuzzlesCompleted, phaseNow)) {
-            handleStartDaily('HARD');
+            handleStartDaily('HARD', isCurrent);
           } else {
             // Same courtesy the deep-link path gives: say why the tap landed
             // on home instead of silently swallowing it.
@@ -2529,45 +2467,13 @@ function MainApp() {
           }
         } catch {
           // Storage read failed — let handleStartDaily's own guards decide.
-          handleStartDaily('HARD');
+          if (isCurrent()) handleStartDaily('HARD', isCurrent);
         }
       })();
     } else if (target === 'home') {
       transitionTo('home');
     }
   };
-  useEffect(() => {
-    let subscription: { remove?: () => void } | null = null;
-    let coldStartTimer: ReturnType<typeof setTimeout> | null = null;
-    try {
-      const Notifications = require('expo-notifications');
-      subscription = Notifications.addNotificationResponseReceivedListener((response: any) => {
-        routeNotificationTargetRef.current(
-          response?.notification?.request?.content?.data?.target
-        );
-      });
-      // Cold-start taps never reach the runtime listener — the notification
-      // that LAUNCHED the app is only available via getLastNotificationResponseAsync.
-      // Deferred briefly so persistence state hydrates before routing to the daily.
-      // Module-scope guard: an appEpoch remount must not re-route the tap.
-      Notifications.getLastNotificationResponseAsync?.()
-        .then((response: any) => {
-          const target = response?.notification?.request?.content?.data?.target;
-          if (target != null && !coldStartNotificationProcessed) {
-            coldStartNotificationProcessed = true;
-            coldStartTimer = setTimeout(() => routeNotificationTargetRef.current(target), 1200);
-          }
-        })
-        .catch(() => {});
-    } catch {
-      subscription = null;
-    }
-    return () => {
-      if (coldStartTimer) clearTimeout(coldStartTimer);
-      subscription?.remove?.();
-    };
-  }, []);
-
   // The difficulty this board is PAID at — the one the victory receipt must
   // name. Daily always rewards HARD; a shared link prices as EASY because its
   // chain is attacker-craftable. The modal used to read puzzle.difficulty
@@ -3351,8 +3257,11 @@ function MainApp() {
     tutorialGuidance,
     addVictoryTimeout,
     enqueueVictoryToast,
-    getStoryContext,
     getArrivalContext,
+    SCREEN_HEIGHT, SCREEN_WIDTH, fireBlindJudgment, isPlayingDaily,
+    puzzle.blindMode, puzzle.isFinalBoard, puzzle.isSharedChallenge, puzzle.rows,
+    puzzle.speedMode, puzzle.unbrokenWeaveMode, puzzlesSolvedForVariantUnlocks,
+    queueEndgameCinematic, resolveDailyBoardDate, speedRound, stopSpeedTimer,
   ]);
 
   const handleLetterPress = useCallback((letter: any, rowIndex: number) => {
@@ -3965,7 +3874,7 @@ function MainApp() {
     } finally {
       notificationPromptInFlightRef.current = false;
     }
-  }, [onboardingFlow.isOnboarding, persistence.cumulativeStats, persistence.currentPhase]);
+  }, [onboardingFlow.isOnboarding, persistence.cumulativeStats, persistence.currentPhase, postVictoryIntro]);
 
   const handleNotificationPromptDecline = useCallback(() => {
     setNotificationPrompt(null);
@@ -4325,7 +4234,7 @@ function MainApp() {
   // Swallowed during onboarding so back can't break the guided flow.
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (isStorageTransactionActive() || sessionTransitionRef.current) return true;
+      if (isStorageTransactionActive() || sessionTransitionRef.current || navigationBusy) return true;
       if (onboardingFlow.isOnboarding) {
         // On the very first interactive screen (the cold-open opener, nothing
         // committed yet), back should EXIT the app like any first screen — a
@@ -4386,7 +4295,7 @@ function MainApp() {
       return false;
     });
     return () => subscription.remove();
-  }, [currentScreen, transitionTo, onboardingFlow.isOnboarding, onboardingFlow.onboardingStep, puzzleActions, puzzle.gameState, puzzle.history.length, puzzle.unbrokenWeaveMode, victoryFlow.victoryData, persistence.pendingPhaseTransition, postVictoryIntro, handleGoToPit, handleReturnHome]);
+  }, [currentScreen, transitionTo, navigationBusy, onboardingFlow.isOnboarding, onboardingFlow.onboardingStep, puzzleActions, puzzle.gameState, puzzle.history.length, puzzle.unbrokenWeaveMode, victoryFlow.victoryData, persistence.pendingPhaseTransition, postVictoryIntro, handleGoToPit, handleReturnHome]);
 
   // Optional rewarded "double the reward": credits a bonus equal to this
   // puzzle's amber (a true 2x), reward-only — never phase progress. One claim
@@ -4521,7 +4430,7 @@ function MainApp() {
     // complete, silently consuming that day's real challenge.
     setIsPlayingDaily(false);
     puzzleActions.startNewGame(d, puzzle.gameMode, puzzle.selectedVariant);
-  }, [puzzleActions, puzzle.gameMode, puzzle.selectedVariant, orchestrationActions]);
+  }, [puzzleActions, puzzle.gameMode, puzzle.selectedVariant, orchestrationActions, resetSpeedRun]);
 
   const handleSelectVariant = useCallback((variant: PuzzleVariant) => {
     if (!isVariantUnlocked(variant, puzzlesSolvedForVariantUnlocks, persistence.currentPhase)) {
@@ -4547,6 +4456,7 @@ function MainApp() {
     puzzlesSolvedForVariantUnlocks,
     persistence.currentPhase,
     orchestrationActions,
+    resetSpeedRun,
   ]);
 
   // Every modifier toggle re-serves the board (blind in particular MUST apply to
@@ -4717,6 +4627,47 @@ function MainApp() {
     postVictoryIntro === null &&
     phaseTransitionEvent === null && !storyOverlayActive && !homeOverlayActive && homeQuietReady;
 
+  // Global requests retain their payloads in the owning flow. This scheduler
+  // grants one actionable layer, with FIFO dialogs and explicit save/story
+  // precedence, so a returning reward cannot open over Store or an alert.
+  const victoryModalVisible =
+    currentScreen === 'puzzle' &&
+    puzzle.gameState === GameState.WON &&
+    !(onboardingFlow.isOnboarding &&
+      (onboardingFlow.onboardingStep === 'puzzle_complete' ||
+        onboardingFlow.onboardingStep === 'going_to_pit'));
+  const overlayOwner = useGlobalOverlays({
+    saving: showStorageHold && saveHoldActive,
+    navigation: navigationBusy,
+    ceremony: phaseTransitionEvent !== null,
+    alert: alertPending,
+    story: activeStory !== null && postVictoryIntro === null,
+    journal: storyFlow.journalContext !== null,
+    share: shareResultData !== null,
+    practice: practiceLesson !== null,
+    store: showStoreModal,
+    patron: showPatronModal,
+    notification: notificationPrompt !== null,
+    dailyLogin: dailyLoginGrant !== null,
+    victory: victoryModalVisible,
+    timeUp: currentScreen === 'puzzle' && puzzle.gameState === GameState.GAME_OVER,
+  }, { dailyLogin: dailyLoginGrantVisible });
+  const [presentedPhaseEvent, setPresentedPhaseEvent] = useState<PhaseTransitionEvent | null>(null);
+  if (phaseTransitionEvent === null && presentedPhaseEvent !== null) setPresentedPhaseEvent(null);
+  else if (overlayOwner === 'ceremony' && presentedPhaseEvent !== phaseTransitionEvent) setPresentedPhaseEvent(phaseTransitionEvent);
+  const cinematicEvent = overlayOwner === 'ceremony' || presentedPhaseEvent === phaseTransitionEvent
+    ? phaseTransitionEvent : null;
+
+  useLaunchIntents(
+    onboardingFlow.onboardingReady && !bootRouting &&
+      persistence.cumulativeStats !== null && overlayOwner === null &&
+      sessionTransition === null && !storageBusy && postVictoryIntro === null &&
+      !homeOverlayActive && !puzzle.showRules && !puzzle.showDifficultyMenu,
+    handleIncomingLink,
+    routeNotificationTarget,
+    onboardingFlow.isOnboarding,
+  );
+
   // ========================================================================
   // Render
   // ========================================================================
@@ -4732,7 +4683,7 @@ function MainApp() {
     // native-splash -> bootstrap-gate -> MainApp-hydration holds read as ONE
     // continuous branded moment instead of blinking through the old near-black
     // (#1A1A2E, a Phase-4 color) card — or a differently-sized icon — on launch.
-    return <BootHold />;
+    return <BootHold failed={initialRoute.status === 'failed'} onRetry={initialRoute.retry} />;
   }
 
   // Helper: render the active screen content
@@ -5881,16 +5832,7 @@ function MainApp() {
   // overlay, or a phase-transition cinematic) is up: the screen underneath is
   // visually occluded, so it must be hidden from the screen reader too, or
   // VoiceOver/TalkBack focus leaks into the board/home behind the overlay.
-  const victoryModalVisible =
-    currentScreen === 'puzzle' &&
-    puzzle.gameState === GameState.WON &&
-    !(onboardingFlow.isOnboarding &&
-      (onboardingFlow.onboardingStep === 'puzzle_complete' ||
-        onboardingFlow.onboardingStep === 'going_to_pit'));
-  const blockingOverlayActive = sessionTransition !== null || showStorageHold || practiceLesson !== null ||
-    victoryModalVisible ||
-    (currentScreen === 'puzzle' && puzzle.gameState === GameState.GAME_OVER) ||
-    phaseTransitionEvent != null || storyOverlayActive;
+  const blockingOverlayActive = sessionTransition !== null || overlayOwner !== null;
 
   // Render screen with global overlays on top
   return (
@@ -5901,7 +5843,7 @@ function MainApp() {
           the player home instead of crashing the entire app. */}
       <Animated.View
         style={screenRevealStyle}
-        pointerEvents={storageBusy || sessionTransition !== null ? 'none' : 'auto'}
+        pointerEvents={storageBusy || sessionTransition !== null || navigationBusy ? 'none' : 'auto'}
         accessibilityElementsHidden={blockingOverlayActive}
         importantForAccessibility={blockingOverlayActive ? 'no-hide-descendants' : 'auto'}
       >
@@ -5914,7 +5856,7 @@ function MainApp() {
       </Animated.View>
       {/* Active result controls are siblings of the hidden background. */}
           {/* Time's Up overlay — speed variant only (GAME_OVER is set solely on time-up) */}
-          {currentScreen === 'puzzle' && puzzle.gameState === GameState.GAME_OVER && (
+          {overlayOwner === 'timeUp' && (
             <View style={styles.loadingOverlay} accessibilityRole="alert">
               <View style={[styles.loadingBox, { backgroundColor: pauseSurface.cardBg, borderWidth: 1, borderColor: pauseSurface.cardBorder }]}>
                 {/* A spent hourglass (generateGameIcons chrome) heads the card
@@ -5983,6 +5925,7 @@ function MainApp() {
             without the second exclusion the modal flashed back in.
             Tap-to-skip lives INSIDE the modal (onSkip): the old childless
             box-none Pressable here never received touches — dead code. */}
+        <View style={StyleSheet.absoluteFill} pointerEvents={overlayOwner === 'victory' ? 'box-none' : 'none'} accessibilityElementsHidden={overlayOwner !== 'victory'} importantForAccessibility={overlayOwner === 'victory' ? 'auto' : 'no-hide-descendants'}>
         <VictoryModal
           visible={victoryModalVisible}
           earnedStars={puzzle.earnedStars}
@@ -6020,13 +5963,15 @@ function MainApp() {
           variant={puzzle.currentVariant}
           gameMode={puzzle.gameMode}
         />
+        </View>
 
       {/* Screen transition overlay — solid cover that fades in/out during
           navigation. A memoized leaf on purpose: see ScreenTransitionOverlay. */}
       <ScreenTransitionOverlay opacity={transitionOverlay} color={transitionOverlayColor} />
       {/* Phase transition overlay — renders above ALL screens */}
       <PhaseTransitionOverlay
-        event={phaseTransitionEvent}
+        event={cinematicEvent}
+        suspended={overlayOwner !== 'ceremony'}
         onComplete={() => {
           setPhaseTransitionEvent(null);
           // A home-launched New Cycle ceremony hands off to the in-place
@@ -6039,21 +5984,21 @@ function MainApp() {
         }}
       />
       <StorySceneModal
-        memory={!phaseTransitionEvent && !postVictoryIntro ? activeStory?.memory ?? null : null}
+        memory={overlayOwner === 'story' ? activeStory?.memory ?? null : null}
         phase={activeStory?.context.phase ?? persistence.currentPhase}
         onAdvance={storyFlow.advance}
         onChoose={storyFlow.choose}
         onClose={storyFlow.close}
       />
       <StoryJournalModal
-        visible={storyFlow.journalContext !== null}
+        visible={overlayOwner === 'journal'}
         context={storyFlow.journalContext}
         onClose={storyFlow.closeJournal}
         onResume={() => { storyFlow.resume().catch(() => {}); }}
       />
       {/* Shareable result card preview — overlays everything */}
       <ShareResultModal
-        result={shareResultData}
+        result={overlayOwner === 'share' ? shareResultData : null}
         challengeText={shareChallengeText}
         onClose={() => setShareResultData(null)}
         onShared={() => {
@@ -6067,12 +6012,12 @@ function MainApp() {
           in the victory flow, a post-victory intro, or a ceremony, the claimed
           grant is held in state and surfaces on the next home arrival. */}
       <DailyLoginModal
-        grant={dailyLoginGrantVisible ? dailyLoginGrant : null}
+        grant={overlayOwner === 'dailyLogin' ? dailyLoginGrant : null}
         phase={persistence.currentPhase}
         onClose={() => setDailyLoginGrant(null)}
       />
       <NotificationPromptModal
-        visible={notificationPrompt !== null}
+        visible={overlayOwner === 'notification'}
         phase={persistence.currentPhase}
         title={notificationPrompt?.title ?? ''}
         body={notificationPrompt?.body ?? ''}
@@ -6082,7 +6027,7 @@ function MainApp() {
         onDecline={handleNotificationPromptDecline}
       />
       <PatronModal
-        visible={showPatronModal}
+        visible={overlayOwner === 'patron'}
         phase={persistence.currentPhase}
         onClose={() => {
           setShowPatronModal(false);
@@ -6091,7 +6036,7 @@ function MainApp() {
         onPatronChange={(isPatron) => { if (isPatron) persistenceActions.refreshStats(); }}
       />
       <StoreModal
-        visible={showStoreModal}
+        visible={overlayOwner === 'store'}
         phase={persistence.currentPhase}
         amberBalance={persistence.amberBalance}
         hintBalance={puzzle.hintBalance}
@@ -6101,13 +6046,13 @@ function MainApp() {
         }}
         onAmberChange={persistenceActions.setAmberBalance}
         onHintsChange={() => puzzleActions.refreshHintBalance()}
-        onOpenPatron={() => setShowPatronModal(true)}
+        onOpenPatron={() => { setShowStoreModal(false); setShowPatronModal(true); }}
       />
-      {practiceLesson && <PracticeModal visible lessonId={practiceLesson} phase={persistence.currentPhase} onClose={() => setPracticeLesson(null)} />}
+      {overlayOwner === 'practice' && practiceLesson && <PracticeModal visible lessonId={practiceLesson} phase={persistence.currentPhase} onClose={() => setPracticeLesson(null)} />}
       {/* Cottage-skinned Alert.alert replacement — mounted last so it layers
           over every screen and modal (see services/gameAlert). */}
-      <GameAlertModal phase={persistence.currentPhase} />
-      <Modal visible={showStorageHold && saveHoldActive} transparent animationType="none" onRequestClose={() => {}}>
+      <GameAlertModal phase={persistence.currentPhase} suspended={overlayOwner !== 'alert'} onPendingChange={setAlertPending} />
+      <Modal visible={overlayOwner === 'saving'} transparent animationType="none" onRequestClose={() => {}}>
         <View style={{ flex: 1, backgroundColor: 'rgba(30,20,26,0.18)', alignItems: 'center', justifyContent: 'center' }} accessibilityViewIsModal accessibilityLabel="Saving progress">
           <BrandedLoader size={30} />
         </View>
@@ -6162,87 +6107,7 @@ function BootHold({ failed = false, onRetry }: { failed?: boolean; onRetry?: () 
 }
 
 function App() {
-  const [bootReady, setBootReady] = useState(false);
-  const [bootFailed, setBootFailed] = useState(false);
-  const [bootAttempt, setBootAttempt] = useState(0);
-  const [, setMotionRevision] = useState(0);
-
-
-  useEffect(() => {
-    let cancelled = false;
-    let stopSystemMotion = () => {};
-    (async () => {
-      try {
-        // Recover an interrupted local commit before any service reads it.
-        await recoverPendingStorageTransaction();
-        if (cancelled) return;
-        installCloudProviderIfConfigured();
-        // The provider bounds its network request. Finish restore before play:
-        // a late restore must never replace progress made on the first screen.
-        const restorePromise = maybeAutoRestoreOnFreshInstall(() => !cancelled);
-        holdUploadsUntil(restorePromise);
-        await restorePromise;
-        if (cancelled) return;
-        await runMigrations();
-        if (cancelled) return;
-        await recoverPendingVictory();
-        if (cancelled) return;
-        await getSettings();
-        if (cancelled) return;
-        stopSystemMotion = startSystemMotionPreference(() => setMotionRevision(n => n + 1));
-        logEvent({ type: 'app_open' });
-        // Monetization scaffold: warm entitlement cache + init (NoOp) billing/ads
-        // providers so isPatronSync() and ad gating read correct values. Safe in
-        // Expo Go — no native modules until a real provider is wired.
-        initShareImage(); // registers the native image capturer if present (no-op in Expo Go)
-        // RevenueCat billing: inert until react-native-purchases is installed AND
-        // revenueCatIosKey/AndroidKey are set in app.json → extra. initIAP() configures it.
-        setBillingProvider(createRevenueCatBillingProvider());
-        // AdMob: inert until react-native-google-mobile-ads is installed AND the
-        // admob*Id* keys are set in app.json → extra. initAds() initializes it
-        // (and the adapter requests GDPR/UMP consent on init).
-        setAdProvider(createAdMobAdProvider());
-        // Store/ad SDK init is fire-and-forget: the first frame must never wait
-        // on billing config or the ads consent → SDK init → preload chain (the
-        // adapter runs that whole chain in the background internally). Worst
-        // case the first eligible ad/purchase surface is briefly unavailable.
-        void initIAP().catch((err) => console.warn('initIAP failed:', err));
-        void initAds().catch((err) => console.warn('initAds failed:', err));
-        // initHints seeds the one-time free hint stash; awaited before MainApp
-        // mounts, so usePuzzleGame reads the correct balance on its first render.
-        // loadEntitlements warms the sync cache (isPatronSync / ad suppression /
-        // Store first-purchase badge) — a cheap local read that must NOT ride on
-        // the fire-and-forget initIAP, or a cold cache briefly misreports
-        // Patron/ad-free status and the Store's 2x-first-purchase badge.
-        // loadPixelFonts registers the cottage dialogue/chrome font before the
-        // first frame (never throws — falls back to system font on failure).
-        // getSettings() warms the settings cache BEFORE the first frame. Every
-        // render-path consumer reads getSettingsSync() (settingsCache ||
-        // DEFAULT_SETTINGS); without this warm, a fresh launch returns DEFAULTS
-        // until some audio/haptic call happens to warm the cache first — so a
-        // persisted preference (Swift Victories, Reduced Motion, Sound/Haptics
-        // off) silently reads as its default on early renders. Warming it here
-        // makes getSettingsSync authoritative from frame one.
-        await Promise.all([getSettings(), initCosmetics(), initHints(), loadEntitlements(), loadPixelFonts()]);
-        if (cancelled) return;
-        // Paid intent, balance and applied-ID receipt settle together. A failed
-        // commit keeps bootstrap blocked for recovery rather than replaying a
-        // grant into a partially opened session.
-        const pendingGrants = await reconcilePendingConsumableGrants();
-        for (const grant of pendingGrants) {
-          if (cancelled) return;
-          await settleConsumableGrant(grant.grantId);
-        }
-
-      } catch (error) {
-        console.warn('Bootstrap init failed:', error);
-        if (!cancelled) setBootFailed(true);
-        return;
-      }
-      if (!cancelled) setBootReady(true);
-    })();
-    return () => { cancelled = true; stopSystemMotion(); };
-  }, [bootAttempt]);
+  const boot = useAppBoot();
 
   // Branded boot view while booting — the wordmark + a quiet spinner on the
   // root background, so a slow first launch reads as loading rather than a
@@ -6250,10 +6115,10 @@ function App() {
   // useSafeAreaInsets is available everywhere in MainApp.
   return (
     <SafeAreaProvider>
-      {bootReady ? (
+      {boot.status === 'ready' ? (
         <MainApp />
       ) : (
-        <BootHold failed={bootFailed} onRetry={() => { setBootFailed(false); setBootAttempt(n => n + 1); }} />
+        <BootHold failed={boot.status === 'failed'} onRetry={boot.retry} />
       )}
     </SafeAreaProvider>
   );

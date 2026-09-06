@@ -1,6 +1,6 @@
 
 import { DICTIONARY_WORDS } from '../dictionary';
-import { UNREVIEWED_PUZZLE_WORDS } from '../data/vocabulary/puzzleVocabulary';
+import { EXCLUDED_PUZZLE_WORDS } from '../data/vocabulary/puzzleVocabulary';
 import type { PuzzleSolutionStep, Difficulty } from '../types';
 import { isFairPuzzleWord } from '../services/puzzleVocabulary';
 import { isStandardChainSolvable } from '../services/puzzleSolvability';
@@ -17,7 +17,7 @@ export const WORDS_7 = ALL_UNIQUE_WORDS.filter(w => w.length === 7);
 // Combined for easy lookup
 // Fresh games use the reviewed dictionary. Historical saved boards keep their
 // original validation rules in usePuzzleGame until that board ends.
-export const COMMON_WORDS = new Set(ALL_UNIQUE_WORDS.filter(word => !UNREVIEWED_PUZZLE_WORDS.has(word)));
+export const COMMON_WORDS = new Set(ALL_UNIQUE_WORDS.filter(word => !EXCLUDED_PUZZLE_WORDS.has(word)));
 
 // Pre-validated fallback puzzle pools — used when generation times out
 // Each puzzle is a verified valid chain (every transition removes+inserts one letter, all words valid)

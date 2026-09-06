@@ -19,7 +19,7 @@ Monetization is convenience/expression only, never progression: a cosmetic shop 
 
 React Native + Expo SDK 57 (React Native 0.86), TypeScript (strict), Jest and rendered Playwright journeys (current results are in the implementation ledger). Local-first: the core puzzles play fully offline with all state in AsyncStorage, and there are no user accounts. Backend features (cloud save, daily leaderboard, anonymous analytics via **Supabase**; crash reporting via **Sentry**) and monetization (in-app purchases via **RevenueCat**, ads via **AdMob**) activate when their keys are present in `app.json` → `extra` and degrade to no-ops otherwise — so Expo Go still runs everything. Supabase/Sentry and the Android monetization keys are currently configured; the iOS monetization keys are still empty (iOS falls back to the no-op providers). See [CLAUDE.md](./CLAUDE.md) for the full architecture reference — it's the canonical codebase doc.
 
-Current engineering status: [September implementation ledger](docs/IMPLEMENTATION_STATUS_2026-09-05.md). Build/update procedure: [1.3.0 release validation](docs/RELEASE_VALIDATION_1_3_0.md).
+Current engineering status: [September implementation ledger](docs/IMPLEMENTATION_STATUS_2026-09-05.md). Account/device handoff: [completion record](docs/COMPLETION_HANDOFF_2026-09-06.md). The 1.3.0 Supabase integrity endpoints still require the prepared hosted migration; configured public keys alone do not install them. Build/update procedure: [1.3.0 release validation](docs/RELEASE_VALIDATION_1_3_0.md).
 
 ## Development
 
@@ -39,18 +39,19 @@ npm test -- --no-coverage                              # full suite
 npm test -- --no-coverage --testPathPattern=<filename> # one suite
 ```
 
-Always use `npm test`, not `npx jest` — the latter misses the local install and triggers a remote download. CI (`.github/workflows/ci.yml`) runs `npm ci` → typecheck → lint → test on every PR and on push to `main`.
+Always use `npm test` for repository checks. CI (`.github/workflows/ci.yml`) checks types, lint, tests, story and puzzle integrity, and rendered game journeys on pull requests and pushes to `main` or `feature/**`.
 
 ### Generated content
 
 - **Puzzle banks**: use `npm run generate:puzzles -- <standard|reverse|double> <difficulty>` from `mobile/`, with `EASY`, `MEDIUM`, `MEDIUM_PLUS`, `HARD` or `EXPERT`; prefix a difficulty with `LEX_` for Lexicon. This command dispatches to the **gated toolkit** and writes reviewable sidecars. Follow the printed targeted swap dry run before installing a reviewed sidecar, then always run `node scripts/tools/purgeProfanity.mjs` and the current vocabulary/complete-route checks. See [the regeneration instructions](CLAUDE.md#regenerating-puzzle-banks). Never run legacy generators or manually edit the banks: that can overwrite the gated shape and lose its multi-route guarantee.
 - **Art/SFX**: `npm run generate:assets` rebuilds the app icon, splash, notification icon, the 70-file WAV pack, the world/pixel art, and the UI icon sprites from pure-Node scripts in `mobile/scripts/tools/`.
-- **Builds**: `eas build` profiles live in `mobile/eas.json` (`appVersionSource: "local"` — bump `android.versionCode` manually for each release). Remaining human release tasks are tracked in [docs/LAUNCH_CHECKLIST.md](./docs/LAUNCH_CHECKLIST.md).
+- **Builds**: `eas build` profiles live in `mobile/eas.json` (`appVersionSource: "local"` — bump `android.versionCode` manually for each release). Current account/device requirements and prepared commands are in [the completion handoff](./docs/COMPLETION_HANDOFF_2026-09-06.md).
 
 ## Docs
 
 - [CLAUDE.md](./CLAUDE.md) — architecture, systems, conventions (read this first; contains full narrative spoilers)
-- [docs/LAUNCH_CHECKLIST.md](./docs/LAUNCH_CHECKLIST.md) — remaining human release tasks (consoles, secrets, physical-device checks)
+- [docs/COMPLETION_HANDOFF_2026-09-06.md](./docs/COMPLETION_HANDOFF_2026-09-06.md) — current account, physical-device and reader requirements
+- [docs/LAUNCH_CHECKLIST.md](./docs/LAUNCH_CHECKLIST.md) — historical launch checks
 - [docs/STORE_LISTING.md](./docs/STORE_LISTING.md) — store listing copy, keywords, age rating, screenshot shot list
 - [docs/BACKEND_SETUP.md](./docs/BACKEND_SETUP.md) — Supabase / Sentry provisioning (cloud save, leaderboard, analytics, crash reporting)
 - [docs/MONETIZATION_SETUP.md](./docs/MONETIZATION_SETUP.md) — RevenueCat (IAP) + AdMob (ads) store/product setup
@@ -59,4 +60,4 @@ Always use `npm test`, not `npx jest` — the latter misses the local install an
 
 ## Content rating
 
-The story carries mild horror / dark-fantasy themes as it unfolds. Target rating: ESRB Teen / PEGI 12. The puzzle dictionary is profanity-filtered.
+The story carries mild horror / dark-fantasy themes as it unfolds. The intended audience is 13+. Store-issued age ratings must follow the current questionnaires; see [the listing instructions](./docs/STORE_LISTING.md). The puzzle dictionary and required Double Shift intermediate strings are profanity-filtered.

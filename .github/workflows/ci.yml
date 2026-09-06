@@ -2,11 +2,13 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'feature/**']
   pull_request:
+  workflow_dispatch:
 
 jobs:
   build-and-test:
+    timeout-minutes: 30
     name: Typecheck, Lint & Test
     runs-on: ubuntu-latest
     defaults:
@@ -30,10 +32,22 @@ jobs:
         run: npm run typecheck
 
       - name: Lint
-        run: npm run lint
+        run: npm run lint -- --max-warnings 0
 
       - name: Test
-        run: npm test -- --no-coverage --ci
+        run: npm test -- --no-coverage --ci --runInBand
+
+      - name: Reverse top-up composition regressions
+        run: npm test -- --no-coverage --ci --runInBand --config scripts/jest.config.js --runTestsByPath scripts/reverseTopUpCandidates.test.ts
+
+      - name: Story corpus integrity
+        run: node scripts/tools/auditStoryCorpus.mjs
+
+      - name: Puzzle delivery policy and daily cohort
+        run: |
+          node --max-old-space-size=180 scripts/tools/auditVocabulary.mjs --branching --minimum-eligible=100
+          node --max-old-space-size=180 scripts/tools/auditBankRoutes.mjs
+          node scripts/tools/updateDailyBoardVersion.mjs --check
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
@@ -42,9 +56,11 @@ jobs:
         run: npm run test:e2e
 
       - name: Upload browser evidence
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: rendered-game-journeys
-          path: mobile/playwright-report/
+          path: |
+            mobile/playwright-report/
+            mobile/test-results/
           retention-days: 14

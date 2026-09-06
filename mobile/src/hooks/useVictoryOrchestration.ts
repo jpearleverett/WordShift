@@ -20,7 +20,6 @@ import { announceForA11y } from '../services/a11yAnnounce';
 import { hapticWarning, hapticLight } from '../services/haptics';
 import { getSettingsSync } from '../services/settings';
 import {
-  VICTORY_ANIMATION_LOCK_MS,
   WHISPER_DELAY_MS,
   INTERJECTION_DELAY_MS,
   INTERJECTION_AUTODISMISS_MS,
@@ -247,8 +246,8 @@ export function useVictoryOrchestration(): [
 
   const [interjection, setInterjection] = useState<InterjectionData | null>(null);
   const [showInterjection, setShowInterjection] = useState(false);
-  const interjectionOpacity = useRef(new Animated.Value(0)).current;
-  const interjectionTranslateY = useRef(new Animated.Value(OVERLAY_SETTLE_DP)).current;
+  const [interjectionOpacity] = useState(() => new Animated.Value(0));
+  const [interjectionTranslateY] = useState(() => new Animated.Value(OVERLAY_SETTLE_DP));
   const interjectionAnimRef = useRef<Animated.CompositeAnimation | null>(null);
 
   const [victoryGlitch, setVictoryGlitch] = useState<string | null>(null);
@@ -257,8 +256,8 @@ export function useVictoryOrchestration(): [
 
   const [microBeat, setMicroBeat] = useState<NarrativeMicroBeat | null>(null);
   const [showMicroBeat, setShowMicroBeat] = useState(false);
-  const microBeatOpacity = useRef(new Animated.Value(0)).current;
-  const microBeatTranslateY = useRef(new Animated.Value(OVERLAY_SETTLE_DP)).current;
+  const [microBeatOpacity] = useState(() => new Animated.Value(0));
+  const [microBeatTranslateY] = useState(() => new Animated.Value(OVERLAY_SETTLE_DP));
   const microBeatAnimRef = useRef<Animated.CompositeAnimation | null>(null);
 
   const [completionCoda, setCompletionCoda] = useState<CompletionCodaData | null>(null);

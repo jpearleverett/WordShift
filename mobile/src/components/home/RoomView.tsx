@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -371,7 +371,7 @@ const EmbellishmentGlow: React.FC<{
   scale: number;
   animate: boolean;
 }> = ({ variant, maxOpacity, scale, animate }) => {
-  const breathe = useRef(new Animated.Value(1)).current;
+  const [breathe] = useState(() => new Animated.Value(1));
 
   useEffect(() => {
     if (!animate) {
@@ -439,7 +439,7 @@ const DustMote: React.FC<{ left: string; delay: number; duration: number; color:
   duration,
   color,
 }) => {
-  const rise = useRef(new Animated.Value(0)).current;
+  const [rise] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     const loop = Animated.loop(

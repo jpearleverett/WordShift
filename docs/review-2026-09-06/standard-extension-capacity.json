@@ -1,0 +1,42 @@
+[
+  {
+    "tier": "Easy",
+    "stored": 453,
+    "freshBase": 323,
+    "appends": 167,
+    "deliverable": 145,
+    "floor": 130
+  },
+  {
+    "tier": "Medium",
+    "stored": 338,
+    "freshBase": 202,
+    "appends": 87,
+    "deliverable": 77,
+    "floor": 69
+  },
+  {
+    "tier": "MediumPlus",
+    "stored": 500,
+    "freshBase": 161,
+    "appends": 65,
+    "deliverable": 48,
+    "floor": 43
+  },
+  {
+    "tier": "Hard",
+    "stored": 100,
+    "freshBase": 100,
+    "appends": 37,
+    "deliverable": 31,
+    "floor": 27
+  },
+  {
+    "tier": "Expert",
+    "stored": 100,
+    "freshBase": 100,
+    "appends": 47,
+    "deliverable": 39,
+    "floor": 35
+  }
+]

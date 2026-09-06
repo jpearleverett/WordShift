@@ -57,7 +57,7 @@ type Variant = 'standard' | 'reverse' | 'double_shift';
 function auditBank(
   name: string,
   variant: Variant,
-  puzzles: Array<{ id: string; words: string[] }>,
+  puzzles: { id: string; words: string[] }[],
 ): { bad: string[]; inconclusive: string[] } {
   const bad: string[] = [];
   const inconclusive: string[] = [];
@@ -70,7 +70,7 @@ function auditBank(
 }
 
 describe('bank solvability (shipped rules)', () => {
-  const CASES: Array<[string, Variant, Array<{ id: string; words: string[] }>]> = [
+  const CASES: [string, Variant, { id: string; words: string[] }[]][] = [
     ['EASY', 'standard', PUZZLE_BANK_EASY],
     ['MEDIUM', 'standard', PUZZLE_BANK_MEDIUM],
     ['MEDIUM_PLUS', 'standard', PUZZLE_BANK_MEDIUM_PLUS],
@@ -126,7 +126,7 @@ describe('bank solvability (shipped rules)', () => {
     expect(isChainSolvable('standard', CURATED_FINAL_PUZZLE.words, isValid)).toBe('solvable');
 
     const rows = [...CURATED_FINAL_PUZZLE.words];
-    const lockedPositions: Array<number | null> = rows.map(() => null);
+    const lockedPositions: (number | null)[] = rows.map(() => null);
     const playedWords = new Set(rows);
     for (const step of CURATED_FINAL_PUZZLE.solution) {
       const sourceIndex = step.stepIndex;

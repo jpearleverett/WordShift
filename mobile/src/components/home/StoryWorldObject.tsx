@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Image, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { TouchableOpacity as GestureTouchableOpacity } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,17 +25,20 @@ export function StoryWorldObject({ keepsake, onPress }: { keepsake: StoryWorldKe
   </WorldButton>;
 }
 
-export function StoryWorldInspection({ keepsake, context, phase, onClose, onInspected }: {
+interface StoryWorldInspectionProps {
   keepsake: StoryWorldKeepsake | null; context: StoryContext | null; phase: DialoguePhase;
   onClose: () => void; onInspected: () => void;
-}) {
+}
+export function StoryWorldInspection(props: StoryWorldInspectionProps) {
+  return props.keepsake ? <StoryWorldInspectionContents key={`${props.context?.cycleCount}:${props.keepsake.boundary}`} {...props} /> : null;
+}
+function StoryWorldInspectionContents({ keepsake, context, phase, onClose, onInspected }: StoryWorldInspectionProps) {
   const theme = getSurfaceTheme(phase);
   const insets = useSafeAreaInsets();
   const reducedMotion = useReducedMotion();
   const [checked, setChecked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
-  useEffect(() => { setChecked(false); setError(false); }, [keepsake?.boundary, !!keepsake]);
   const inspect = async () => {
     if (!context || !keepsake || busy) return;
     setBusy(true); setError(false);

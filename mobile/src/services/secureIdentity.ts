@@ -1,5 +1,6 @@
 /** Bearer credentials must never fall back to a clock or Math.random. */
 export async function createSecureIdentity(): Promise<string> {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
   const { getRandomBytesAsync } = require('expo-crypto') as typeof import('expo-crypto');
   const bytes = await getRandomBytesAsync(16);
   if (bytes.length !== 16) throw new Error('Secure random generation is unavailable');

@@ -1,7 +1,7 @@
 import { getInstallId } from './installIdentity';
-export { getInstallId } from './installIdentity';
 import { getAllStoredEvents, acknowledgeEvents } from './eventLogger';
 import { isSupabaseConfigured, sbRpc } from './supabaseClient';
+export { getInstallId } from './installIdentity';
 
 /**
  * Optional remote telemetry transport.
@@ -25,6 +25,7 @@ import { isSupabaseConfigured, sbRpc } from './supabaseClient';
  */
 function getConfigExtra(): Record<string, unknown> {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
     const Constants = require('expo-constants').default;
     return (Constants?.expoConfig?.extra as Record<string, unknown>) ?? {};
   } catch {
@@ -40,6 +41,7 @@ function getTelemetryEndpoint(): string {
 
 function getAppVersion(): string {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
     const Constants = require('expo-constants').default;
     return (Constants?.expoConfig?.version as string) ?? '1.0.0';
   } catch {
@@ -66,6 +68,7 @@ export function isTelemetryEnabled(): boolean {
 function getPlatformOS(): string {
   try {
     // Lazy require so this module loads in Node test environments
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
     const { Platform } = require('react-native');
     return Platform?.OS ?? 'unknown';
   } catch {

@@ -44,10 +44,10 @@ export const DailyLoginModal: React.FC<DailyLoginModalProps> = ({ grant, phase, 
   const t = getSurfaceTheme(phase);
   const reducedMotion = getSettingsSync().reducedMotion;
 
-  const backdropOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
-  const cardScale = useRef(new Animated.Value(reducedMotion ? 1 : 0.92)).current;
-  const cardOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
-  const claimedPop = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const [backdropOpacity] = useState(() => new Animated.Value(reducedMotion ? 1 : 0));
+  const [cardScale] = useState(() => new Animated.Value(reducedMotion ? 1 : 0.92));
+  const [cardOpacity] = useState(() => new Animated.Value(reducedMotion ? 1 : 0));
+  const [claimedPop] = useState(() => new Animated.Value(reducedMotion ? 1 : 0));
   const closingRef = useRef(false);
 
   const visible = grant !== null;
@@ -97,7 +97,7 @@ export const DailyLoginModal: React.FC<DailyLoginModalProps> = ({ grant, phase, 
     ]);
     anim.start();
     return () => anim.stop();
-  }, [visible, reducedMotion, backdropOpacity, cardScale, cardOpacity, claimedPop]);
+  }, [visible, reducedMotion, backdropOpacity, cardScale, cardOpacity, claimedPop, phase]);
 
   // Amber-gem particle burst from the claimed day cell on Collect. The cell
   // reports its own layout (measured once it renders as the claimed cell);
@@ -105,20 +105,19 @@ export const DailyLoginModal: React.FC<DailyLoginModalProps> = ({ grant, phase, 
   const [claimedCellLayout, setClaimedCellLayout] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const [burstActive, setBurstActive] = useState(false);
   const BURST_PARTICLE_COUNT = 5;
-  const burstParticles = useRef(
-    Array.from({ length: BURST_PARTICLE_COUNT }, () => ({
+  const [burstParticles] = useState(() => (Array.from({ length: BURST_PARTICLE_COUNT }, () => ({
       tx: new Animated.Value(0),
       ty: new Animated.Value(0),
       opacity: new Animated.Value(0),
       scale: new Animated.Value(0.6),
-    })),
-  ).current;
+    }))));
 
-  useEffect(() => {
-    if (!visible) return;
+  const [previousGrant, setPreviousGrant] = useState(grant);
+  if (previousGrant !== grant) {
+    setPreviousGrant(grant);
     setBurstActive(false);
     setClaimedCellLayout(null);
-  }, [visible]);
+  }
 
   const handleClose = useCallback(() => {
     if (closingRef.current) return;

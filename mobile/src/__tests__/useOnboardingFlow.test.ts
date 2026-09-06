@@ -20,7 +20,7 @@
 // --- Mock React hooks to run synchronously in Node (no renderer) ---
 const stateStore: Map<number, unknown> = new Map();
 let stateIndex = 0;
-let effectCallbacks: Array<() => void> = [];
+let effectCallbacks: (() => void)[] = [];
 const refStore: Map<number, { current: unknown }> = new Map();
 let refIndex = 0;
 
@@ -47,7 +47,7 @@ jest.mock('react', () => ({
   useState: (initial: unknown) => {
     const idx = stateIndex++;
     if (!stateStore.has(idx)) {
-      stateStore.set(idx, initial);
+      stateStore.set(idx, typeof initial === 'function' ? (initial as () => unknown)() : initial);
     }
     const value = stateStore.get(idx);
     const setter = (valOrFn: unknown) => {

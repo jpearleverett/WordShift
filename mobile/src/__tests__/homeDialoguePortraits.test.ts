@@ -110,7 +110,7 @@ describe('intro/override dialogue portrait', () => {
 });
 
 describe('shared talking timer (intro modal + journal spotlight)', () => {
-  const effect = () => windowFrom('const [introIsTalking, setIntroIsTalking]', 900);
+  const effect = () => windowFrom('const [introTalkFrame, setIntroIsTalking]', 1100);
 
   it('one timer serves both surfaces', () => {
     const w = effect();
@@ -122,13 +122,15 @@ describe('shared talking timer (intro modal + journal spotlight)', () => {
 
   it('holds the flag true under reduced motion (static pose, no interval)', () => {
     const w = effect();
-    const reducedIdx = w.indexOf('reducedMotion');
-    const holdIdx = w.indexOf('setIntroIsTalking(true)');
+    // The pose is derived immediately, including on the first render after
+    // reduced motion changes. The timer only owns the alternating frame.
+    expect(w).toContain('(introMotionReduced || introTalkFrame)');
+    const guardIdx = w.indexOf('&& !introMotionReduced');
     const intervalIdx = w.indexOf('setInterval');
-    expect(reducedIdx).toBeGreaterThanOrEqual(0);
-    // The hold + early return come BEFORE the interval ever starts.
-    expect(holdIdx).toBeGreaterThan(reducedIdx);
-    expect(intervalIdx).toBeGreaterThan(holdIdx);
+    expect(guardIdx).toBeGreaterThanOrEqual(0);
+    expect(intervalIdx).toBeGreaterThan(guardIdx);
+    expect(w).toContain('clearInterval(interval)');
+    expect(w).toContain('[showIntroDialogue, journalSpotlightVisible, introMotionReduced]');
   });
 });
 
@@ -159,7 +161,7 @@ describe('robed talk frames (F37: the climax mouth-flap)', () => {
   it("the axolotl's robedTalk is pixel-identical to robed (his mouth never moves, by design)", () => {
     // Pixel equality, not byte equality: sanitizePng re-encodes, so the two
     // files legitimately differ as bytes while painting the same image.
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+
     const { PNG } = require('pngjs');
     const a = PNG.sync.read(fs.readFileSync(path.join(__dirname, '../../assets/characters/axolotl/robed_talk.png')));
     const b = PNG.sync.read(fs.readFileSync(path.join(__dirname, '../../assets/characters/axolotl/robed.png')));

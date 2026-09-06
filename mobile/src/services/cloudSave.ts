@@ -8,8 +8,8 @@ import { invalidateProgressCache } from './amberCurrency';
 import { invalidatePuzzleStateCache } from './puzzleSaveState';
 import { invalidateSettingsCache } from './settings';
 import { invalidateStatsCache } from './starRating';
-import { invalidateHintsCache } from './hints';
-import { invalidateCosmeticsCache } from './cosmetics';
+import { invalidateHintsCache , initHints } from './hints';
+import { invalidateCosmeticsCache , initCosmetics } from './cosmetics';
 import { invalidateQuestCache } from './weeklyQuests';
 import { invalidateHarvestCache } from './wordHarvest';
 import { invalidateDailyProgressCache } from './dailyChallenge';
@@ -33,8 +33,6 @@ import { invalidateAchievementsCache } from './achievements';
 import { invalidateOnboardingCache } from './onboarding';
 import { invalidateNotificationCaches } from './notifications';
 import { invalidatePlayedPuzzleCaches } from './puzzleBank';
-import { initHints } from './hints';
-import { initCosmetics } from './cosmetics';
 
 /**
  * Cloud save infrastructure for WordShift.
@@ -262,6 +260,7 @@ interface SaveRow {
  * client's transitive deps may not resolve at import time).
  */
 function sb(): typeof import('./supabaseClient') {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
   return require('./supabaseClient');
 }
 

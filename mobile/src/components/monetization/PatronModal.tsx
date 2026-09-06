@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -117,16 +117,17 @@ export const PatronModal: React.FC<PatronModalProps> = ({
   const [priceString, setPriceString] = useState<string | null>(null);
   const [adsPriceString, setAdsPriceString] = useState<string | null>(null);
 
-  const cardScale = useRef(new Animated.Value(reducedMotion ? 1 : 0.92)).current;
-  const cardOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const [cardScale] = useState(() => new Animated.Value(reducedMotion ? 1 : 0.92));
+  const [cardOpacity] = useState(() => new Animated.Value(reducedMotion ? 1 : 0));
 
-  // Sync entitlement flags whenever the modal opens (cache may have warmed since mount).
-  useEffect(() => {
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (wasVisible !== visible) {
+    setWasVisible(visible);
     if (visible) {
       setIsPatron(isPatronSync());
       setAdFree(isAdFreeSync());
     }
-  }, [visible]);
+  }
 
   // Fetch a localized price string from the store when available. The NoOp
   // provider returns [], so we simply fall back to a generic label.
@@ -178,7 +179,7 @@ export const PatronModal: React.FC<PatronModalProps> = ({
     ]);
     anim.start();
     return () => anim.stop();
-  }, [visible, reducedMotion, cardScale, cardOpacity]);
+  }, [visible, phase, reducedMotion, cardScale, cardOpacity]);
 
   const handlePurchase = useCallback(async () => {
     if (flow === 'working') return;

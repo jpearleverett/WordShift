@@ -122,7 +122,7 @@ function partition(batchValue: number, totalWords: number): number[] {
 describe('computeDevourAmberIncrement (exact partition invariants)', () => {
   // Awkward divisions on purpose — 10/4 is the classic naive-rounding
   // overshoot (round(2.5)=3 per word → 12 > 10).
-  const cases: Array<[value: number, words: number]> = [
+  const cases: [value: number, words: number][] = [
     [10, 4], [10, 3], [8, 10], [1, 7], [7, 1], [23, 5],
     [100, 7], [999, 13], [50, 6], [15, 2], [20, 20], [3, 9],
   ];

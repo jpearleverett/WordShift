@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { TouchableOpacity, Animated, Easing } from 'react-native';
 import { getSettingsSync } from '../../services/settings';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
@@ -26,8 +26,8 @@ export const JuicyButton: React.FC<JuicyButtonProps> = ({
   accessibilityLabel,
   accessibilityRole = 'button',
 }) => {
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const [scaleAnim] = useState(() => new Animated.Value(1));
+  const [pulseAnim] = useState(() => new Animated.Value(1));
 
   useEffect(() => {
     // The idle attract-pulse is a WORLD loop, so it must honor reducedMotion /

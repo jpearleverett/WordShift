@@ -18,6 +18,7 @@
  */
 
 import fs from 'fs';
+import crypto from 'node:crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getGatedBankTarget } from './tools/gatedBankTarget.mjs';
@@ -81,6 +82,15 @@ for (const { bank, key, liveFile, exportName, sidecar } of BANKS) {
   if (sidecarCount < THRESHOLD) {
     console.log(`${bank}: REFUSED — sidecar holds ${sidecarCount} puzzles, below threshold ${THRESHOLD} (live ${liveFile} keeps ${liveCount})`);
     refused++;
+    continue;
+  }
+
+  const policyHash = crypto.createHash('sha256')
+    .update(fs.readFileSync(path.join(DATA_DIR, 'vocabulary/puzzleVocabulary.ts')))
+    .update('fresh-routes-v1').digest('hex');
+  if (!sidecarContent.includes(`// Vocabulary policy: ${policyHash}\n`)) {
+    console.error(`${bank}: REFUSED — sidecar vocabulary policy is stale or missing; regenerate with the current gated toolkit`);
+    failed++;
     continue;
   }
 

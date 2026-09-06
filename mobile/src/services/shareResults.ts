@@ -417,6 +417,7 @@ export async function maybeAwardDailyShareBonus(): Promise<number> {
     if (last === dayKey) return 0;
     await AsyncStorage.setItem(SHARE_BONUS_KEY, dayKey);
     // Lazy require keeps this module free of an amberCurrency import cycle
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
     const { awardBonusAmber } = require('./amberCurrency');
     await awardBonusAmber(DAILY_SHARE_BONUS_AMBER, 'daily_share');
     return DAILY_SHARE_BONUS_AMBER;

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, memo } from 'react';
+import React, { useCallback, useEffect, useRef, useState, memo } from 'react';
 import {
   View,
   Text,
@@ -40,6 +40,7 @@ import {
 } from '../constants/timing';
 import { BODY_FONT_BOLD, PIXEL_FONT_BOLD } from '../theme/fonts';
 import { FONT_SIZE } from '../theme/typeScale';
+import { useRowArc } from '../hooks/useRowArc';
 
 // Arc layout configuration
 const ARC_ROTATION = 12; // Max rotation in degrees for edge elements (steeper fan)
@@ -234,18 +235,18 @@ const Slot: React.FC<{
   const settings = getSettingsSync();
   const phaseColors = getPhaseRowColors(phase);
   const guideGlow = getGuideGlowConfig(phase);
-  const scaleAnim = useRef(new Animated.Value(settings.reducedMotion ? 1 : 0)).current;
-  const pulseAnim = useRef(new Animated.Value(0)).current;
-  const glowAnim = useRef(new Animated.Value(0)).current;
+  const [scaleAnim] = useState(() => new Animated.Value(settings.reducedMotion ? 1 : 0));
+  const [pulseAnim] = useState(() => new Animated.Value(0));
+  const [glowAnim] = useState(() => new Animated.Value(0));
   // Catch-landing squash pair (F9/F76): replaces the old uniform catchBounceAnim
   // scale bump with a phase-weighted squash-and-stretch (getSquashParams),
   // matching LetterTile's own arrival landing instead of a fixed f5/t200 bounce.
-  const catchSquashXAnim = useRef(new Animated.Value(1)).current;
-  const catchSquashYAnim = useRef(new Animated.Value(1)).current;
-  const hoverScaleAnim = useRef(new Animated.Value(1)).current;
-  const adjacentPulseAnim = useRef(new Animated.Value(0)).current;
-  const previewOpacity = useRef(new Animated.Value(0)).current;
-  const previewScale = useRef(new Animated.Value(0.85)).current;
+  const [catchSquashXAnim] = useState(() => new Animated.Value(1));
+  const [catchSquashYAnim] = useState(() => new Animated.Value(1));
+  const [hoverScaleAnim] = useState(() => new Animated.Value(1));
+  const [adjacentPulseAnim] = useState(() => new Animated.Value(0));
+  const [previewOpacity] = useState(() => new Animated.Value(0));
+  const [previewScale] = useState(() => new Animated.Value(0.85));
 
   useEffect(() => {
     if (settings.reducedMotion) {
@@ -325,7 +326,7 @@ const Slot: React.FC<{
       pulseAnim.stopAnimation();
       glowAnim.stopAnimation();
     };
-  }, []);
+  }, [catchSquashXAnim, catchSquashYAnim, glowAnim, index, phase, pulseAnim, scaleAnim, settings.reducedMotion]);
 
   // Catch squash-and-stretch when a letter lands (F9: split from a uniform
   // scale bounce; F76: the spring itself now ages with phase via
@@ -348,7 +349,7 @@ const Slot: React.FC<{
         useNativeDriver: true,
       }).start();
     }
-  }, [triggerCatch, settings.reducedMotion, phase]);
+  }, [triggerCatch, settings.reducedMotion, phase, catchSquashXAnim, catchSquashYAnim]);
 
   // Live drag-hover swell: the slot under the finger scales up slightly while
   // hovered. Purely GEOMETRIC feedback (never validity-filtered) — it answers
@@ -368,7 +369,7 @@ const Slot: React.FC<{
     return () => {
       hoverScaleAnim.stopAnimation();
     };
-  }, [isHovered, settings.reducedMotion]);
+  }, [isHovered, settings.reducedMotion, hoverScaleAnim]);
 
   // Adjacent-slot guidance pulse: tapping the letter tile BETWEEN slots (a tap
   // that previously vanished silently) briefly swells this slot to draw the
@@ -395,11 +396,13 @@ const Slot: React.FC<{
       pulse.stop();
       adjacentPulseAnim.setValue(0);
     };
-  }, [pulseSignal, settings.reducedMotion]);
+  }, [pulseSignal, settings.reducedMotion, adjacentPulseAnim]);
 
   // Animate preview appearance
+  const previewWord = preview?.word;
+  const previewValid = preview?.isValid;
   useEffect(() => {
-    if (preview) {
+    if (previewWord !== undefined) {
       if (settings.reducedMotion) {
         previewOpacity.setValue(1);
         previewScale.setValue(1);
@@ -407,7 +410,7 @@ const Slot: React.FC<{
       }
       previewOpacity.setValue(0);
       previewScale.setValue(0.85);
-      Animated.parallel([
+      const animation = Animated.parallel([
         Animated.timing(previewOpacity, {
           toValue: 1,
           duration: 200,
@@ -419,12 +422,14 @@ const Slot: React.FC<{
           tension: 180,
           useNativeDriver: true,
         }),
-      ]).start();
+      ]);
+      animation.start();
+      return () => animation.stop();
     } else {
       previewOpacity.setValue(0);
       previewScale.setValue(0.85);
     }
-  }, [preview?.word, preview?.isValid]);
+  }, [previewWord, previewValid, previewOpacity, previewScale, settings.reducedMotion]);
 
   const pulseScale = pulseAnim.interpolate({
     inputRange: [0, 1],
@@ -651,25 +656,22 @@ export const Row: React.FC<RowProps> = memo(({
   const isRowResonant = phase >= 1 && wordTier > 0;
 
   // Animation values
-  const scaleAnim = useRef(new Animated.Value(isSource ? 1 : 0.9)).current;
-  const opacityAnim = useRef(new Animated.Value(isSource ? 1 : 0.3)).current;
-  const glowAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(0)).current;
-  const arcAnim = useRef(new Animated.Value(0)).current; // 0 = flat, 1 = full arc
+  const [scaleAnim] = useState(() => new Animated.Value(isSource ? 1 : 0.9));
+  const [opacityAnim] = useState(() => new Animated.Value(isSource ? 1 : 0.3));
+  const [glowAnim] = useState(() => new Animated.Value(0));
+  const [slideAnim] = useState(() => new Animated.Value(0));
+  const [arcAnim] = useState(() => new Animated.Value(0)); // 0 = flat, 1 = full arc
   // Slot-wrapper fade/scale that plays alongside the fan's flatten on collapse,
   // so the slots don't pop out of existence when the arc subtree unmounts.
-  const slotCollapseAnim = useRef(new Animated.Value(1)).current; // 1 = shown, 0 = collapsed
-  // Tracks whether the fan is currently open/opening, so a letter switch can
-  // update previews in place instead of hard-cutting the fan back to flat.
-  const arcOpenRef = useRef(false);
-  const invalidShakeX = useRef(new Animated.Value(0)).current;
-  const successBounceScale = useRef(new Animated.Value(1)).current;
+  const [slotCollapseAnim] = useState(() => new Animated.Value(1)); // 1 = shown, 0 = collapsed
+  const [invalidShakeX] = useState(() => new Animated.Value(0));
+  const [successBounceScale] = useState(() => new Animated.Value(1));
   const glowLoopRef = useRef<Animated.CompositeAnimation | null>(null);
   // F1 (neighbour rank-closing) — per-tile translateX cache + the last
   // rendered layout (id order + whether it was the arc), used by the
   // rank-shift effect below.
   const prevRenderRef = useRef<{ ids: string[]; arc: boolean } | null>(null);
-  const rankShiftAnims = useRef(new Map<string, Animated.Value>()).current;
+  const [rankShiftAnims] = useState(() => (new Map<string, Animated.Value>()));
   const getRankShiftAnim = (id: string): Animated.Value => {
     let anim = rankShiftAnims.get(id);
     if (!anim) {
@@ -679,11 +681,12 @@ export const Row: React.FC<RowProps> = memo(({
     return anim;
   };
 
-  // The arc fan stays MOUNTED through its close animation (see the arc effect):
-  // while collapsing, showSlots is already false but arcVisible keeps the
-  // subtree alive so the 300ms flatten plays against live views instead of an
-  // already-unmounted subtree.
-  const [arcVisible, setArcVisible] = useState(false);
+  // Keep the arc mounted through a deselection's 300ms flatten. A committed
+  // move changes the row's role and snaps directly to its normal layout.
+  const arcMounted = useRowArc(
+    !!showSlots, isTarget, getSettingsSync().reducedMotion || shouldSimplifyAnimations(),
+    arcAnim, slotCollapseAnim,
+  );
 
   // Inter-slot tap guidance: tapping a letter tile in the target row (between
   // drop slots) pulses its two ADJACENT slots. Letter i sits between slots i
@@ -700,20 +703,18 @@ export const Row: React.FC<RowProps> = memo(({
 
   // Stable ref callback so the parent can measure this row in-window for drop
   // Y-bounds checking. Kept stable across renders to avoid detach/attach churn.
-  const measureCbRef = useRef<(node: View | null) => void>(() => {});
-  measureCbRef.current = (node: View | null) => onMeasureRef?.(rowIndex, node);
-  const stableMeasureRef = useRef((node: View | null) => measureCbRef.current(node)).current;
+  const stableMeasureRef = useCallback((node: View | null) => {
+    onMeasureRef?.(rowIndex, node);
+  }, [onMeasureRef, rowIndex]);
 
   // Board-serve entrance (see BOARD_SERVE_* above). Decided once at mount so the
   // initial values don't flash: an animating serve starts hidden + risen and
   // settles; a reduced-motion / low-tier serve starts already in place. The
   // outer wrapper owns opacity/translateY so it never contends with the inner
   // row-transition opacity/scale/slide.
-  const serveAnimates = useRef(
-    !getSettingsSync().reducedMotion && !shouldSimplifyAnimations()
-  ).current;
-  const serveOpacity = useRef(new Animated.Value(serveAnimates ? 0 : 1)).current;
-  const serveTranslateY = useRef(new Animated.Value(serveAnimates ? BOARD_SERVE_RISE : 0)).current;
+  const [serveAnimates] = useState(() => (!getSettingsSync().reducedMotion && !shouldSimplifyAnimations()));
+  const [serveOpacity] = useState(() => new Animated.Value(serveAnimates ? 0 : 1));
+  const [serveTranslateY] = useState(() => new Animated.Value(serveAnimates ? BOARD_SERVE_RISE : 0));
 
   useEffect(() => {
     if (!serveAnimates) return;
@@ -837,83 +838,7 @@ export const Row: React.FC<RowProps> = memo(({
       glowLoopRef.current = null;
       glowAnim.stopAnimation();
     };
-  }, [isSource, isTarget, isCompleted, guidanceActive]);
-
-  // Animate the arc fan open/closed with real motion. The fan stays MOUNTED
-  // through its collapse (local arcVisible state) so the 300ms close plays
-  // against live views instead of an already-unmounted subtree; a letter switch
-  // while the fan is open updates previews in place without hard-cutting the fan
-  // flat; a committed move (the row's role changed, so isTarget is already
-  // false) accepts the snap, which the catch-bounce + arrival settle mask.
-  // Reduced motion / low-tier devices set everything instantly.
-  useEffect(() => {
-    const instant = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
-    if (showSlots) {
-      setArcVisible(true);
-      if (instant) {
-        arcAnim.setValue(1);
-        slotCollapseAnim.setValue(1);
-        arcOpenRef.current = true;
-        return;
-      }
-      if (arcOpenRef.current) {
-        // Fan already open (letter switch): keep it in place, let the Slot
-        // preview effects update the ghost words. No setValue(0) flash.
-        slotCollapseAnim.setValue(1);
-        return;
-      }
-      // Fresh open glide.
-      arcOpenRef.current = true;
-      slotCollapseAnim.setValue(1);
-      arcAnim.setValue(0);
-      Animated.timing(arcAnim, {
-        toValue: 1,
-        duration: 450, // Visible glide animation
-        easing: Easing.out(Easing.cubic), // Smooth deceleration
-        useNativeDriver: true,
-      }).start();
-      return;
-    }
-
-    // showSlots is false.
-    if (!arcOpenRef.current) return; // nothing open to collapse
-    arcOpenRef.current = false;
-    // A deselect leaves this the target row (isTarget stays true); a committed
-    // move flips the row's role so isTarget is already false -> snap instead.
-    const gracefulDeselect = isTarget;
-    if (instant || !gracefulDeselect) {
-      arcAnim.setValue(0);
-      slotCollapseAnim.setValue(1);
-      setArcVisible(false);
-      return;
-    }
-    // Deselect (board unchanged): flatten the fan and fade the slots, then
-    // unmount only once the collapse finishes.
-    Animated.parallel([
-      Animated.timing(arcAnim, {
-        toValue: 0,
-        duration: 300, // Faster collapse
-        easing: Easing.in(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(slotCollapseAnim, {
-        toValue: 0,
-        duration: 300,
-        easing: Easing.in(Easing.cubic),
-        useNativeDriver: true,
-      }),
-    ]).start(({ finished }) => {
-      if (finished) {
-        // NOT reset to 1 here: setArcVisible is async, so the animated node
-        // would jump back to the open pose for the frame before the unmount
-        // commits — and now that slotCollapseAnim also drives the letters'
-        // glide (collapseGlideX), that frame would visibly fling the ranks
-        // back apart. Every path that opens the fan re-arms it to 1 first.
-        setArcVisible(false);
-      }
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- isTarget rides with showSlots; anim values are stable refs
-  }, [showSlots, selectedLetter?.id]);
+  }, [isSource, isTarget, isCompleted, guidanceActive, glowAnim, opacityAnim, scaleAnim, slideAnim]);
 
   // Micro-shake the target row on invalid drop attempts. Visual-only: the
   // haptic + sound are owned by App.tsx's handleSlotPress so the rejection buzz
@@ -1176,12 +1101,6 @@ export const Row: React.FC<RowProps> = memo(({
     if (isCompleted) return styles.rowCompleted;
     return styles.rowFuture;
   };
-
-  // Render the arc while slots are shown AND through the collapse that follows a
-  // deselect (arcVisible). Gated on isTarget so a committed move (row role
-  // flipped) shows the standard layout immediately — no one-frame arc-on-source
-  // flash while the effect resets the collapse state.
-  const arcMounted = isTarget && (!!showSlots || arcVisible);
 
   // ─── F1 (neighbour rank-closing, achievable half) ──────────────────────────
   // When this row's rendered word length changes while it stays on the

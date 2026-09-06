@@ -1,6 +1,7 @@
+import { useCountUp } from '../../hooks/useCountUp';
 import { SupportComparison } from './SupportComparison';
 import { saveWithPlayerRetry } from '../../services/saveRetry';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -42,7 +43,7 @@ import {
   ENTITLEMENTS,
 } from '../../services/entitlements';
 import { awardBonusAmber } from '../../services/amberCurrency';
-import { addHints } from '../../services/hints';
+
 import { getSettingsSync } from '../../services/settings';
 import { hapticLight, hapticMedium } from '../../services/haptics';
 import { announceForA11y } from '../../services/a11yAnnounce';
@@ -189,10 +190,12 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     items: GiftItem[];
   } | null>(null);
 
-  const cardScale = useRef(new Animated.Value(reducedMotion ? 1 : 0.92)).current;
-  const cardOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const [cardScale] = useState(() => new Animated.Value(reducedMotion ? 1 : 0.92));
+  const [cardOpacity] = useState(() => new Animated.Value(reducedMotion ? 1 : 0));
 
-  useEffect(() => {
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (wasVisible !== visible) {
+    setWasVisible(visible);
     if (visible) {
       setOwnsBundle(hasEntitlementSync(ENTITLEMENTS.COSMETIC_BUNDLE));
       setOwnsStarter(hasEntitlementSync(ENTITLEMENTS.STARTER_PACK));
@@ -201,10 +204,15 @@ export const StoreModal: React.FC<StoreModalProps> = ({
       setSuccessMsg(null);
       setFaucetReveal(null);
       setGift(null);
-      getDailyAmberStatus().then(setAmberFaucet).catch(() => {});
-      isRewardedCapReached().then(setRewardedCapReached).catch(() => {});
-      logEvent({ type: 'store_opened', data: { surface: 'store_modal' } });
     }
+  }
+  useEffect(() => {
+    if (!visible) return;
+    let cancelled = false;
+    getDailyAmberStatus().then(value => { if (!cancelled) setAmberFaucet(value); }).catch(() => {});
+    isRewardedCapReached().then(value => { if (!cancelled) setRewardedCapReached(value); }).catch(() => {});
+    logEvent({ type: 'store_opened', data: { surface: 'store_modal' } });
+    return () => { cancelled = true; };
   }, [visible]);
 
   // Fetch localized price strings from the store; NoOp returns [] → fallbacks used.
@@ -264,49 +272,18 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     ]);
     anim.start();
     return () => anim.stop();
-  }, [visible, reducedMotion, cardScale, cardOpacity]);
+  }, [visible, phase, reducedMotion, cardScale, cardOpacity]);
 
   // Header amber balance: ticks from the old to the new value over ~400ms
   // (plain setState steps at ~30ms intervals, text-only) instead of an
   // instant number swap, with a one-cycle AmberSparkle burst on the pill.
-  const [displayedAmber, setDisplayedAmber] = useState(amberBalance);
-  const prevAmberRef = useRef(amberBalance);
-  const [amberBurst, setAmberBurst] = useState(false);
-  useEffect(() => {
-    if (!visible) {
-      prevAmberRef.current = amberBalance;
-      setDisplayedAmber(amberBalance);
-      setAmberBurst(false);
-      return;
-    }
-    const prev = prevAmberRef.current;
-    if (prev === amberBalance) return;
-    if (reducedMotion) {
-      setDisplayedAmber(amberBalance);
-      prevAmberRef.current = amberBalance;
-      return;
-    }
-    const start = prev;
-    const end = amberBalance;
-    const steps = 13; // ~400ms at ~30ms/step
-    let i = 0;
-    setAmberBurst(true);
-    const id = setInterval(() => {
-      i++;
-      const fraction = Math.min(1, i / steps);
-      setDisplayedAmber(Math.round(start + (end - start) * fraction));
-      if (i >= steps) {
-        clearInterval(id);
-        prevAmberRef.current = end;
-        setAmberBurst(false);
-      }
-    }, 30);
-    return () => clearInterval(id);
-  }, [amberBalance, visible, reducedMotion]);
+  const { value: displayedAmber, running: amberBurst } = useCountUp(amberBalance, {
+    enabled: visible && !reducedMotion, identity: visible,
+  });
 
   // successBox springs in (scale 0.9 -> 1 + fade) instead of popping.
-  const successBoxScale = useRef(new Animated.Value(reducedMotion ? 1 : 0.9)).current;
-  const successBoxOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const [successBoxScale] = useState(() => new Animated.Value(reducedMotion ? 1 : 0.9));
+  const [successBoxOpacity] = useState(() => new Animated.Value(reducedMotion ? 1 : 0));
   useEffect(() => {
     if (!successMsg) {
       successBoxOpacity.setValue(0);

@@ -3,7 +3,7 @@ import { DAILY_BOARD_VERSION } from './dailyBoardVersion';
 import { Difficulty, PuzzleSolutionStep } from '../types';
 import { DAILY_CHALLENGE_UNLOCK_PUZZLES, FIRST_DAILY_BONUS_HINTS } from '../constants/gameBalance';
 import { selectDailyBankPuzzle } from './puzzleBank';
-import { getLocalDateString, getLocalDateStringDaysAgo, daysAgoLocal, parseLocalDate } from './dateUtils';
+import { getLocalDateString, daysAgoLocal, parseLocalDate } from './dateUtils';
 import { addHints } from './hints';
 
 const STORAGE_KEY = 'wordshift_daily_challenge';
@@ -96,13 +96,6 @@ function getDefaultProgress(): DailyChallengeProgress {
  */
 export function getTodayString(): string {
   return getLocalDateString();
-}
-
-/**
- * Get yesterday's local-day date as YYYY-MM-DD string
- */
-function getYesterdayString(): string {
-  return getLocalDateStringDaysAgo(1);
 }
 
 /**

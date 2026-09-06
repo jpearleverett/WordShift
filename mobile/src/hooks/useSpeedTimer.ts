@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useLayoutEffect, useState, useEffect, useCallback, useRef } from 'react';
 import { AppState } from 'react-native';
 import { SPEED_TIMER_INTERVAL_MS } from '../constants/timing';
 
@@ -28,7 +28,7 @@ export function useSpeedTimer(
   // Stable ref for the time-up callback so the interval closure never
   // captures a stale version.
   const onTimeUpRef = useRef(onTimeUp);
-  onTimeUpRef.current = onTimeUp;
+  useLayoutEffect(() => { onTimeUpRef.current = onTimeUp; }, [onTimeUp]);
 
   // Active interval handle — stored in a ref so `stopSpeedTimer` can
   // clear it without depending on render state.

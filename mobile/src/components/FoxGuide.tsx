@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -136,11 +136,11 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
 }) => {
   const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
   const styles = useMemo(() => createStyles(SCREEN_WIDTH, SCREEN_HEIGHT), [SCREEN_WIDTH, SCREEN_HEIGHT]);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
-  const bounceAnim = useRef(new Animated.Value(0)).current;
-  const textFadeAnim = useRef(new Animated.Value(1)).current;
-  const [isTalking, setIsTalking] = useState(false);
+  const [fadeAnim] = useState(() => new Animated.Value(0));
+  const [slideAnim] = useState(() => new Animated.Value(30));
+  const [bounceAnim] = useState(() => new Animated.Value(0));
+  const [textFadeAnim] = useState(() => new Animated.Value(1));
+  const [talkingFrame, setIsTalking] = useState(false);
   // Two-step skip: the first Skip tap swaps the card to a confirmation (the
   // safe "keep going" gets the prominent pill; the skip is the quiet button),
   // so one stray touch can never silently abandon the guided intro.
@@ -181,7 +181,7 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
         useNativeDriver: true,
       }).start();
     }
-  }, [visible]);
+  }, [visible, fadeAnim, reducedMotion, slideAnim]);
 
   // Fox bounce when speaking
   useEffect(() => {
@@ -207,7 +207,7 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
     );
     loop.start();
     return () => loop.stop();
-  }, [speaking, visible]);
+  }, [speaking, visible, bounceAnim, reducedMotion]);
 
   // Talking animation - alternate between idle and talk sprites, mirroring the
   // HomeScreen dialogue portrait (useDialogueFlow): 300ms toggle while the card
@@ -216,16 +216,11 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
   // keep the toggle running uninterrupted, exactly like paging home dialogue.
   useEffect(() => {
     if (visible && hasText && speaking) {
-      if (reducedMotion) {
-        setIsTalking(true);
-        return;
-      }
+      if (reducedMotion) return;
       const interval = setInterval(() => {
         setIsTalking(prev => !prev);
       }, 300);
       return () => clearInterval(interval);
-    } else {
-      setIsTalking(false);
     }
   }, [visible, hasText, speaking, reducedMotion]);
 
@@ -241,13 +236,16 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
       duration: 250,
       useNativeDriver: true,
     }).start();
-  }, [text]);
+  }, [text, reducedMotion, textFadeAnim]);
 
   // A step advance or hide must never strand the skip confirmation — the
   // confirm applies to the moment it was asked in, not to a new line.
-  useEffect(() => {
+  const [skipContext, setSkipContext] = useState({ text, visible });
+  if (skipContext.text !== text || skipContext.visible !== visible) {
+    setSkipContext({ text, visible });
     setConfirmingSkip(false);
-  }, [text, visible]);
+  }
+  const isTalking = visible && hasText && speaking && (reducedMotion || talkingFrame);
 
   if (!visible) return null;
   // Never render an empty shell: with no text Fox has nothing to say, and a

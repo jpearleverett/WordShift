@@ -41,13 +41,21 @@ when no DSN is set.
 > integrity, daily-version and support migrations below have only been rehearsed
 > locally; their hosted deployment remains a release gate.
 
-Create a project at supabase.com and apply the following as `postgres`, in order:
+For a new project, apply the following as `postgres`, in order:
 
 1. [`security_setup.sql`](supabase/security_setup.sql) (base schema).
 2. [`save_integrity_v2.sql`](supabase/save_integrity_v2.sql).
 3. [`events_integrity_v2.sql`](supabase/events_integrity_v2.sql).
 4. [`daily_board_versions.sql`](supabase/daily_board_versions.sql).
 5. [`support_operations.sql`](supabase/support_operations.sql).
+6. [`analytics_funnels.sql`](supabase/analytics_funnels.sql).
+7. [`event_retention.sql`](supabase/event_retention.sql).
+
+For the existing WordShift project, skip the base schema and run
+`psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f docs/supabase/apply_upgrade.sql`,
+or run files 2–7 above in the dashboard SQL editor. Once Supabase Cron is enabled,
+apply [`schedule_event_retention.sql`](supabase/schedule_event_retention.sql) and
+record a successful scheduled run.
 
 Do not re-run the base script alone after upgrading: it would re-enable weak
 legacy save RPCs. Rehearse the sequence and permissions in a disposable project;

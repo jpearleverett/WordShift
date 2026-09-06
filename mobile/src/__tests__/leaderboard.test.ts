@@ -1,3 +1,4 @@
+import { DAILY_BOARD_VERSION } from '../services/dailyBoardVersion';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Mutable expo-config extra so we can toggle configured/unconfigured per test.
@@ -93,7 +94,7 @@ describe('leaderboard', () => {
       const sent = JSON.parse(init.body);
       expect(sent.p_owner).toBe(owner);
       expect(sent.p_date).toBe('2026-06-21');
-      expect(sent.p_board_version).toBe('vocabulary_2026_09_v1');
+      expect(sent.p_board_version).toBe(DAILY_BOARD_VERSION);
       expect(sent.p_time_ms).toBe(1001); // rounded
       expect(sent.p_stars).toBe(3);
       expect(sent.p_hints).toBe(1);

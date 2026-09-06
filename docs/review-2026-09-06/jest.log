@@ -1,0 +1,306 @@
+
+> wordshift-mobile@1.3.0 test
+> jest --no-coverage --runInBand
+
+PASS src/__tests__/noEmDashes.test.ts (11.046 s)
+PASS src/__tests__/gatedTooling.test.ts (12.141 s)
+PASS src/__tests__/dialoguePagination.test.ts
+PASS src/__tests__/doubleShift.test.ts (6.533 s)
+PASS src/__tests__/homeOfferingIntro.test.ts
+PASS src/__tests__/bankDiversity.test.ts
+PASS src/__tests__/puzzleFeelContracts.test.ts
+PASS src/__tests__/economyJourneySimulation.test.ts
+PASS src/__tests__/puzzleBank.test.ts
+PASS src/__tests__/questPill.test.ts
+PASS src/__tests__/localGenerator.test.ts
+PASS src/__tests__/vocabularyHygiene.test.ts
+PASS src/__tests__/puzzleExtension.test.ts
+PASS src/__tests__/bankSolvability.test.ts
+PASS src/__tests__/victoryModal.test.ts
+PASS src/__tests__/notifications.test.ts
+PASS src/__tests__/homeDialoguePortraits.test.ts
+PASS src/__tests__/puzzleBankDepth.test.ts
+PASS src/__tests__/shopIconGeometry.test.ts
+PASS src/__tests__/homeSurfaceFixes.test.ts
+PASS src/__tests__/pitOnboardingOffer.test.ts
+PASS src/__tests__/phaseNarrative.test.ts
+PASS src/__tests__/roomEmbellishments.test.ts
+PASS src/__tests__/usePuzzleGame.test.ts
+  ● Console
+
+    console.log
+      Local generation failed, using fallback: Error: timeout
+          at Object.<anonymous> (/home/coder/projects/WordShift/mobile/src/__tests__/usePuzzleGame.test.ts:1433:64)
+          at Promise.then.completed (/home/coder/projects/WordShift/mobile/node_modules/jest-circus/build/utils.js:298:28)
+          at new Promise (<anonymous>)
+          at callAsyncCircusFn (/home/coder/projects/WordShift/mobile/node_modules/jest-circus/build/utils.js:231:10)
+          at _callCircusTest (/home/coder/projects/WordShift/mobile/node_modules/jest-circus/build/run.js:316:40)
+          at _runTest (/home/coder/projects/WordShift/mobile/node_modules/jest-circus/build/run.js:252:3)
+          at _runTestsForDescribeBlock (/home/coder/projects/WordShift/mobile/node_modules/jest-circus/build/run.js:126:9)
+          at _runTestsForDescribeBlock (/home/coder/projects/WordShift/mobile/node_modules/jest-circus/build/run.js:121:9)
+          at _runTestsForDescribeBlock (/home/coder/projects/WordShift/mobile/node_modules/jest-circus/build/run.js:121:9)
+          at run (/home/coder/projects/WordShift/mobile/node_modules/jest-circus/build/run.js:71:3)
+          at runAndTransformResultsToJestFormat (/home/coder/projects/WordShift/mobile/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)
+          at jestAdapter (/home/coder/projects/WordShift/mobile/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)
+          at runTestInternal (/home/coder/projects/WordShift/mobile/node_modules/jest-runner/build/runTest.js:367:16)
+          at runTest (/home/coder/projects/WordShift/mobile/node_modules/jest-runner/build/runTest.js:444:34)
+
+      at Object.startNewGame (src/hooks/usePuzzleGame.ts:1603:15)
+
+    console.log
+      Local generation failed, using fallback: Error: timeout
+          at Object.<anonymous> (/home/coder/projects/WordShift/mobile/src/__tests__/usePuzzleGame.test.ts:1497:64)
+          at Promise.then.completed (/home/coder/projects/WordShift/mobile/node_modules/jest-circus/build/utils.js:298:28)
+          at new Promise (<anonymous>)
+          at callAsyncCircusFn (/home/coder/projects/WordShift/mobile/node_modules/jest-circus/build/utils.js:231:10)
+          at _callCircusTest (/home/coder/projects/WordShift/mobile/node_modules/jest-circus/build/run.js:316:40)
+          at _runTest (/home/coder/projects/WordShift/mobile/node_modules/jest-circus/build/run.js:252:3)
+          at _runTestsForDescribeBlock (/home/coder/projects/WordShift/mobile/node_modules/jest-circus/build/run.js:126:9)
+          at _runTestsForDescribeBlock (/home/coder/projects/WordShift/mobile/node_modules/jest-circus/build/run.js:121:9)
+          at _runTestsForDescribeBlock (/home/coder/projects/WordShift/mobile/node_modules/jest-circus/build/run.js:121:9)
+          at run (/home/coder/projects/WordShift/mobile/node_modules/jest-circus/build/run.js:71:3)
+          at runAndTransformResultsToJestFormat (/home/coder/projects/WordShift/mobile/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)
+          at jestAdapter (/home/coder/projects/WordShift/mobile/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)
+          at runTestInternal (/home/coder/projects/WordShift/mobile/node_modules/jest-runner/build/runTest.js:367:16)
+          at runTest (/home/coder/projects/WordShift/mobile/node_modules/jest-runner/build/runTest.js:444:34)
+
+      at Object.startNewGame (src/hooks/usePuzzleGame.ts:1603:15)
+
+    console.log
+      Local generation failed, using fallback: TypeError: (0 , localGenerator_1.generateDoubleShiftPuzzle) is not a function
+          at /home/coder/projects/WordShift/mobile/src/hooks/usePuzzleGame.ts:1146:34
+          at Object.startNewGame (/home/coder/projects/WordShift/mobile/src/hooks/usePuzzleGame.ts:1549:47)
+          at Object.<anonymous> (/home/coder/projects/WordShift/mobile/src/__tests__/usePuzzleGame.test.ts:1545:7)
+
+      at Object.startNewGame (src/hooks/usePuzzleGame.ts:1603:15)
+
+PASS src/__tests__/skyGeometry.test.ts
+PASS src/__tests__/generatorVocabulary.test.ts
+PASS src/__tests__/phaseEvents.test.ts
+PASS src/__tests__/resetAll.test.ts
+PASS src/__tests__/useOnboardingFlow.test.ts
+PASS src/__tests__/storyArchive.test.ts
+PASS src/__tests__/wordLedgerGrouping.test.ts
+PASS src/__tests__/whisperGalleryShimmer.test.ts
+PASS src/__tests__/dialogueChronology.test.ts
+PASS src/__tests__/tending.test.ts
+PASS src/__tests__/cinematicSkipContrast.test.ts
+PASS src/__tests__/puzzleVocabulary.test.ts
+PASS src/__tests__/audio.test.ts
+PASS src/__tests__/actionButtonIcons.test.ts
+PASS src/__tests__/appIntegration.test.ts
+PASS src/__tests__/unbrokenWeaveBankEligibility.test.ts
+PASS src/__tests__/saveIntegrity.test.ts
+  ● Console
+
+    console.warn
+      Failed to load harvest state: Error: read interrupted
+          at Object.<anonymous> (/home/coder/projects/WordShift/mobile/src/__tests__/saveIntegrity.test.ts:101:77)
+          at /home/coder/projects/WordShift/mobile/node_modules/jest-mock/build/index.js:397:39
+          at Object.<anonymous> (/home/coder/projects/WordShift/mobile/node_modules/jest-mock/build/index.js:404:13)
+          at Object.mockConstructor [as getItem] (/home/coder/projects/WordShift/mobile/node_modules/jest-mock/build/index.js:103:19)
+          at Object.getItem (/home/coder/projects/WordShift/mobile/src/services/persistenceStorage.ts:108:38)
+          at loadHarvestState (/home/coder/projects/WordShift/mobile/src/services/wordHarvest.ts:85:39)
+          at enqueueHarvestBatch (/home/coder/projects/WordShift/mobile/src/services/wordHarvest.ts:131:23)
+          at computeVictory (/home/coder/projects/WordShift/mobile/src/services/victoryPersistence.ts:181:54)
+          at /home/coder/projects/WordShift/mobile/src/services/victoryPersistence.ts:418:22
+          at /home/coder/projects/WordShift/mobile/src/services/persistenceStorage.ts:83:22
+          at persistVictory (/home/coder/projects/WordShift/mobile/src/services/victoryPersistence.ts:408:20)
+          at Object.<anonymous> (/home/coder/projects/WordShift/mobile/src/__tests__/saveIntegrity.test.ts:104:3)
+
+      94 |     }
+      95 |   } catch (error) {
+    > 96 |     console.warn('Failed to load harvest state:', error);
+         |             ^
+      97 |   }
+      98 |   harvestCache = getDefaultHarvestState();
+      99 |   return harvestCache;
+
+      at loadHarvestState (src/services/wordHarvest.ts:96:13)
+      at enqueueHarvestBatch (src/services/wordHarvest.ts:131:17)
+      at computeVictory (src/services/victoryPersistence.ts:181:29)
+      at src/services/victoryPersistence.ts:418:22
+      at src/services/persistenceStorage.ts:83:22
+      at persistVictory (src/services/victoryPersistence.ts:408:20)
+      at Object.<anonymous> (src/__tests__/saveIntegrity.test.ts:104:3)
+
+PASS src/__tests__/whisperGallery.test.ts
+PASS src/__tests__/dialogueGating.test.ts
+PASS src/__tests__/reverseGenerationGraph.test.ts
+PASS src/__tests__/cloudSave.test.ts
+PASS src/__tests__/amberCurrency.test.ts
+PASS src/__tests__/pitAmberDisplayAccounting.test.ts
+PASS src/__tests__/monetizationStore.test.ts
+PASS src/__tests__/finalBoard.test.ts
+PASS src/__tests__/creatorKit.test.ts
+PASS src/__tests__/cosmeticsCatalog.test.ts
+PASS src/__tests__/shareResults.test.ts
+PASS src/__tests__/homeWorldData.test.ts
+PASS src/__tests__/useGamePersistence.test.ts
+PASS src/__tests__/monetization.test.ts
+  ● Console
+
+    console.log
+      [IAP] NoOp purchase - no billing SDK configured: com.wordshift.patron_key
+
+      at NoOpBillingProvider.purchase (src/services/iap.ts:229:13)
+
+PASS src/__tests__/weeklyQuests.test.ts
+PASS src/__tests__/gameArt.test.ts
+PASS src/__tests__/storageKeyRegistry.test.ts
+PASS src/__tests__/providerAdapters.test.ts
+PASS src/__tests__/sharePrompts.test.ts
+PASS src/__tests__/puzzleChromeFixes.test.ts
+PASS src/__tests__/eventLogger.test.ts
+  ● Console
+
+    console.warn
+      Failed to flush events: Error: disk full
+          at Object.<anonymous> (/home/coder/projects/WordShift/mobile/src/__tests__/eventLogger.test.ts:198:14)
+
+      167 |   } catch (error) {
+      168 |     if (generation === bufferGeneration) eventBuffer = [...eventsToFlush, ...eventBuffer];
+    > 169 |     console.warn('Failed to flush events:', error);
+          |             ^
+      170 |     return;
+      171 |   }
+      172 |   try {
+
+      at flushEvents (src/services/eventLogger.ts:169:13)
+      at getEvents (src/services/eventLogger.ts:181:5)
+          at async Promise.all (index 0)
+      at Object.<anonymous> (src/__tests__/eventLogger.test.ts:199:7)
+
+PASS src/__tests__/keeperCountCanon.test.ts
+PASS src/__tests__/dailyChallenge.test.ts
+PASS src/__tests__/supabaseCloud.test.ts
+PASS src/__tests__/countUpLifecycle.test.ts
+PASS src/__tests__/victoryFlow.test.ts
+PASS src/__tests__/integration.test.ts
+PASS src/__tests__/statsScreen.test.ts
+PASS src/__tests__/dialogueChoices.test.ts
+PASS src/__tests__/houseAsks.test.ts
+PASS src/__tests__/wordHarvest.test.ts
+PASS src/__tests__/unbrokenWeavePresentation.test.ts
+PASS src/__tests__/dialogueFlowPagination.test.ts
+PASS src/__tests__/usePuzzleGameResonance.test.ts
+PASS src/__tests__/puzzleVariety.test.ts
+PASS src/__tests__/adsConsent.test.ts
+PASS src/__tests__/fallbackVocabulary.test.ts
+PASS src/__tests__/narrativeDelivery.test.ts
+PASS src/__tests__/sacrifice.test.ts
+PASS src/__tests__/componentsInviteChip.test.ts
+PASS src/__tests__/dailyAmberReward.test.ts
+PASS src/__tests__/storySpine.test.ts
+PASS src/__tests__/achievements.test.ts
+PASS src/__tests__/configValidation.test.ts
+PASS src/__tests__/screenTransition.test.ts
+PASS src/__tests__/mandatoryHarvestGate.test.ts
+PASS src/__tests__/victoryOrchestration.test.ts
+PASS src/__tests__/monetizationUI.test.ts
+PASS src/__tests__/sensoryPreferences.test.ts
+PASS src/__tests__/starterIntro.test.ts
+PASS src/__tests__/roomUpgrades.test.ts
+PASS src/__tests__/pitOfferTiming.test.ts
+PASS src/__tests__/gatedRoomIntro.test.ts
+PASS src/__tests__/socialProof.test.ts
+PASS src/__tests__/persistenceStorage.test.ts
+PASS src/__tests__/billingAdapterSdk.test.ts
+PASS src/__tests__/dragDrop.test.ts
+PASS src/__tests__/keeperRecord.test.ts
+PASS src/__tests__/rowSlotAccessibility.test.ts
+PASS src/__tests__/practiceLessons.test.ts
+PASS src/__tests__/pixelSkinContrast.test.ts
+PASS src/__tests__/supabaseClient.test.ts
+PASS src/__tests__/questClaims.test.ts
+PASS src/__tests__/liveEvents.test.ts
+PASS src/__tests__/dailyLoginReward.test.ts
+PASS src/__tests__/dailyLadder.test.ts
+PASS src/__tests__/puzzleBranching.test.ts
+PASS src/__tests__/dialogueChainNext.test.ts
+PASS src/__tests__/leaderboard.test.ts
+PASS src/__tests__/dialogueSession.test.ts
+PASS src/__tests__/secureIdentity.test.ts
+PASS src/__tests__/useStoryFlow.test.ts
+PASS src/__tests__/rewardReveal.test.ts
+PASS src/__tests__/components.test.ts
+PASS src/__tests__/surfaceClearance.test.ts
+PASS src/__tests__/masteryRecords.test.ts
+PASS src/__tests__/globalOverlays.test.ts
+PASS src/__tests__/telemetrySupabase.test.ts
+PASS src/__tests__/onboarding.test.ts
+PASS src/__tests__/monetizationPrompts.test.ts
+PASS src/__tests__/homeScenePan.test.ts
+PASS src/__tests__/boardLayoutGeometry.test.ts
+PASS src/__tests__/performanceMonitor.test.ts
+PASS src/__tests__/shopArt.test.ts
+PASS src/__tests__/storeArt.test.ts
+PASS src/__tests__/offeringRequests.test.ts
+PASS src/__tests__/backgroundAberration.test.ts
+PASS src/__tests__/animalDialogueVariants.test.ts
+PASS src/__tests__/seasonPass.test.ts
+PASS src/__tests__/dataMigration.test.ts
+PASS src/__tests__/wordHistory.test.ts
+PASS src/__tests__/supporterStipend.test.ts
+PASS src/__tests__/achievementDelivery.test.ts
+PASS src/__tests__/reviewPrompt.test.ts
+PASS src/__tests__/unbrokenWeaveIntegration.test.ts
+PASS src/__tests__/dialogueBody.test.ts
+PASS src/__tests__/utilityMenuParity.test.ts
+PASS src/__tests__/puzzleSaveState.test.ts
+PASS src/__tests__/worldGeometry.test.ts
+PASS src/__tests__/shareImage.test.ts
+  ● Console
+
+    console.warn
+      Image share failed, falling back to text: Error: no native module
+          at Object.<anonymous> (/home/coder/projects/WordShift/mobile/src/__tests__/shareImage.test.ts:72:44)
+          at Promise.then.completed (/home/coder/projects/WordShift/mobile/node_modules/jest-circus/build/utils.js:298:28)
+          at new Promise (<anonymous>)
+          at callAsyncCircusFn (/home/coder/projects/WordShift/mobile/node_modules/jest-circus/build/utils.js:231:10)
+          at _callCircusTest (/home/coder/projects/WordShift/mobile/node_modules/jest-circus/build/run.js:316:40)
+          at _runTest (/home/coder/projects/WordShift/mobile/node_modules/jest-circus/build/run.js:252:3)
+          at _runTestsForDescribeBlock (/home/coder/projects/WordShift/mobile/node_modules/jest-circus/build/run.js:126:9)
+          at _runTestsForDescribeBlock (/home/coder/projects/WordShift/mobile/node_modules/jest-circus/build/run.js:121:9)
+          at run (/home/coder/projects/WordShift/mobile/node_modules/jest-circus/build/run.js:71:3)
+          at runAndTransformResultsToJestFormat (/home/coder/projects/WordShift/mobile/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)
+          at jestAdapter (/home/coder/projects/WordShift/mobile/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)
+          at runTestInternal (/home/coder/projects/WordShift/mobile/node_modules/jest-runner/build/runTest.js:367:16)
+          at runTest (/home/coder/projects/WordShift/mobile/node_modules/jest-runner/build/runTest.js:444:34)
+
+       95 |       return shared;
+       96 |     } catch (err) {
+    >  97 |       console.warn('Image share failed, falling back to text:', err);
+          |               ^
+       98 |     }
+       99 |   }
+      100 |   // Text fallback (handles its own share-count + daily bonus).
+
+      at shareResultImage (src/services/shareImage.ts:97:15)
+      at Object.<anonymous> (src/__tests__/shareImage.test.ts:75:16)
+
+PASS src/__tests__/giftOverlay.test.ts
+PASS src/__tests__/useAutosave.test.ts
+PASS src/__tests__/hints.test.ts
+PASS src/__tests__/telemetry.test.ts
+PASS src/__tests__/speedTick.test.ts
+PASS src/__tests__/puzzleSolutionReplay.test.ts
+PASS src/__tests__/bootCoordinator.test.ts
+PASS src/__tests__/actionButtonPhase.test.ts
+PASS src/__tests__/unbrokenWeave.test.ts
+PASS src/__tests__/starRating.test.ts
+PASS src/__tests__/rowArcLifecycle.test.ts
+PASS src/__tests__/productionConfig.test.ts
+PASS src/__tests__/achievementQueueLifecycle.test.ts
+PASS src/__tests__/useScreenInsets.test.ts
+PASS src/__tests__/settings.test.ts
+PASS src/__tests__/dateUtils.test.ts
+PASS src/__tests__/a11yAnnounce.test.ts
+PASS src/__tests__/puzzleContentPolicy.test.ts
+PASS src/__tests__/saveRetry.test.ts
+
+Test Suites: 160 passed, 160 total
+Tests:       3979 passed, 3979 total
+Snapshots:   0 total
+Time:        90.52 s, estimated 114 s
+Ran all test suites.

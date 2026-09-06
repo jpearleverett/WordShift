@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -121,7 +121,7 @@ interface LedgerChipGroupRowProps {
   groupIndex: number;
   /** False under reduced motion / low tier: chips mount plain, no wrappers. */
   animate: boolean;
-  revealedRef: React.MutableRefObject<Set<string>>;
+  revealedGroups: Set<string>;
   renderChip: (word: string, globalIndex: number) => React.ReactNode;
   phase: DialoguePhase;
 }
@@ -136,24 +136,20 @@ const LedgerChipGroupRow: React.FC<LedgerChipGroupRowProps> = ({
   group,
   groupIndex,
   animate,
-  revealedRef,
+  revealedGroups,
   renderChip,
   phase,
 }) => {
   // Decided ONCE per mounted instance so an ordinary re-render (phase change,
   // data identity churn) can never swap a mid-flight EntranceCascadeItem for a
   // plain Fragment and snap the chip in.
-  const firstRevealRef = useRef<boolean | null>(null);
-  if (firstRevealRef.current === null) {
-    firstRevealRef.current = animate && !revealedRef.current.has(group.key);
-  }
-  const firstReveal = firstRevealRef.current;
+  const [firstReveal] = useState(() => animate && !revealedGroups.has(group.key));
 
   // Written in an effect, never during render: a double render would otherwise
   // mark the group revealed before its own chips had mounted.
   useEffect(() => {
-    revealedRef.current.add(group.key);
-  }, [group.key, revealedRef]);
+    revealedGroups.add(group.key);
+  }, [group.key, revealedGroups]);
 
   return (
     <View style={styles.wordChips}>
@@ -195,23 +191,18 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadWords();
-  }, []);
-
-  const loadWords = async () => {
-    try {
-      const progress = await getFullProgress();
+    let cancelled = false;
+    void getFullProgress().then(progress => {
+      if (cancelled) return;
       setWords(progress.ritualWords || []);
       setTotalFormed(progress.totalWordsFormed || 0);
-    } catch {
-      setWords([]);
-    } finally {
+    }).catch(() => {}).finally(() => {
+      if (cancelled) return;
       setLoading(false);
-      // First real content is in state: release the navigation cover, which
-      // has been holding rather than lifting on the loading gate.
       markScreenReady('ledger');
-    }
-  };
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   const t = getSurfaceTheme(phase);
 
@@ -242,7 +233,7 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
   // has truly deepened (phase >= 3); below that (or under reduced motion /
   // a low-tier device) it parks at a stable resting frame.
   const breatheEnabled = phase >= 3 && !getSettingsSync().reducedMotion && !shouldSimplifyAnimations();
-  const dreadAnim = useRef(new Animated.Value(0.25)).current;
+  const [dreadAnim] = useState(() => new Animated.Value(0.25));
   useEffect(() => {
     if (!breatheEnabled) {
       dreadAnim.setValue(phase < 2 ? 0 : 0.25);
@@ -270,7 +261,7 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
   // never again, so scrolling a long ledger away and back can't replay the
   // fade+rise (what the old global settle timer was for) while a group reached
   // for the first time, at any point however deep, still animates in.
-  const revealedGroupsRef = useRef<Set<string>>(new Set());
+  const [revealedGroups] = useState(() => new Set<string>());
 
   const resonance = getResonanceConfig(phase);
   // The shared dread-glow overlay (every dread chip, phase >= 2) reads offset
@@ -349,7 +340,7 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
       group={item}
       groupIndex={index}
       animate={!cascadeReducedMotion}
-      revealedRef={revealedGroupsRef}
+      revealedGroups={revealedGroups}
       renderChip={renderChip}
       phase={phase}
     />

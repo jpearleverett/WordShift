@@ -5,7 +5,7 @@ import { getSupportIdentifier } from '../services/supportIdentity';
 import { commitFullLocalReset, commitNewCycle } from '../services/resetStorage';
 import { clearPendingVictory } from '../services/victoryPersistence';
 import { clearStoryState } from '../services/storySpine';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View,
@@ -53,7 +53,7 @@ import {
 } from '../services/amberCurrency';
 import { restorePurchases } from '../services/iap';
 import { STREAK_FREEZE_CAP } from '../constants/gameBalance';
-import { isPatronSync, isAdFreeSync } from '../services/entitlements';
+import { isPatronSync, isAdFreeSync , clearEntitlements } from '../services/entitlements';
 import { clearWordHistory } from '../services/wordHistory';
 import { clearAllSessions } from '../services/dialogueSession';
 import { clearEvents } from '../services/eventLogger';
@@ -76,7 +76,6 @@ import {
   requestNotificationPermission,
 } from '../services/notifications';
 import { clearRoomUpgrades } from '../services/roomUpgrades';
-import { clearEntitlements } from '../services/entitlements';
 import { clearCosmetics } from '../services/cosmetics';
 import { clearAdPacing, privacyOptionsRequired, showPrivacyOptions } from '../services/ads';
 import { clearHints } from '../services/hints';
@@ -176,7 +175,7 @@ export async function performFullReset(): Promise<string[]> {
   // Commit all durable deletions and the anti-resurrection marker first.
   // Failure is retryable and must never proceed to a partially reset session.
   await commitFullLocalReset();
-  const clears: Array<[string, () => Promise<unknown>]> = [
+  const clears: [string, () => Promise<unknown>][] = [
     ['victoryIntent', clearPendingVictory],
     ['stats', clearStats],
     ['achievements', clearAchievements],
@@ -312,7 +311,7 @@ const CottageSwitch: React.FC<CottageSwitchProps> = ({
   reducedMotion,
   accessibilityLabel,
 }) => {
-  const anim = useRef(new Animated.Value(value ? 1 : 0)).current;
+  const [anim] = useState(() => new Animated.Value(value ? 1 : 0));
 
   useEffect(() => {
     if (reducedMotion || shouldSimplifyAnimations()) {
@@ -391,13 +390,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
   const [cycleCeremony, setCycleCeremony] = useState<PhaseTransitionEvent | null>(null);
   // `restoreVisible` keeps the Modal mounted while the exit animation plays.
   const [restoreVisible, setRestoreVisible] = useState(false);
-  const restoreBackdrop = useRef(new Animated.Value(0)).current;
-  const restoreScale = useRef(new Animated.Value(0.92)).current;
+  const [restoreBackdrop] = useState(() => new Animated.Value(0));
+  const [restoreScale] = useState(() => new Animated.Value(0.92));
   const reducedMotion = settings?.reducedMotion ?? false;
 
   useEffect(() => {
     if (showRestore) {
-      setRestoreVisible(true);
       if (reducedMotion) {
         restoreBackdrop.setValue(1);
         restoreScale.setValue(1);
@@ -414,6 +412,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
     if (reducedMotion) {
       restoreBackdrop.setValue(0);
       restoreScale.setValue(0.92);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Reduced motion completes the native exit immediately, releasing its otherwise delayed modal mount.
       setRestoreVisible(false);
       return;
     }
@@ -435,7 +434,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
       if (finished) setRestoreVisible(false);
     });
     return () => exit.stop();
-  }, [showRestore, restoreVisible, reducedMotion, restoreBackdrop, restoreScale]);
+  }, [showRestore, restoreVisible, reducedMotion, restoreBackdrop, restoreScale, phase]);
 
   // Restore previously-purchased IAP entitlements (Patron / ad-free). Store
   // policy requires an accessible restore path outside the purchase modal, so
@@ -512,6 +511,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
       setDailyRemindersOn(prefs.enabled && prefs.dailyReminderEnabled);
     });
     privacyOptionsRequired().then(setPrivacyOptionsAvailable);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- This refresh awaits both storage reads before publishing their balances.
     refreshStreakFreeze();
     canStartNewCycle().then(setCanCycle).catch(() => {});
     getSyncStatus().then((status) => setSyncConflict(!!status.conflictDetected)).catch(() => {});
@@ -704,7 +704,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
     // (resetAll.test.ts loads SettingsScreen in Node), and audio failures
     // must never break the settings screen.
     try {
-      const audio = require('../services/audio');
+      const audio = await import('../services/audio');
       if (value) {
         audio.startMusicForPhase(phase);
       } else {
@@ -1028,7 +1028,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
                 <Text style={[styles.recoveryCodeHint, { color: t.muted }]}>Backup saved. Keep this code private: anyone with it can restore your progress. Enter it on a new device to continue.</Text>
               </View>
             )}
-            <TouchableOpacity style={[styles.aboutRow, rowTint]} onPress={() => { hapticLight(); setShowRestore(true); }} accessibilityRole="button" accessibilityLabel="Restore from another device">
+            <TouchableOpacity style={[styles.aboutRow, rowTint]} onPress={() => { hapticLight(); setRestoreVisible(true); setShowRestore(true); }} accessibilityRole="button" accessibilityLabel="Restore from another device">
               <Text style={[styles.linkText, { color: t.secondaryText }]}>Restore from another device</Text>
             </TouchableOpacity>
             {syncConflict && (

@@ -26,3 +26,7 @@ dist-ssr
 
 # Claude Code harness infra (agent worktrees + transcripts) — never commit
 .claude/
+
+# Reviewed completion evidence is retained with its validation reports.
+!docs/review-2026-09-06/*.log
+!docs/review-2026-09-06/browser-logs/*.log

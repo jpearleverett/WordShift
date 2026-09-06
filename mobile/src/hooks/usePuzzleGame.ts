@@ -1,3 +1,4 @@
+import { logEvent } from '../services/eventLogger';
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { RowData, Letter, GameState, MoveDelta, PuzzleSolutionStep, Difficulty, GameMode } from '../types';
 import { SavedPuzzleState } from '../services/puzzleSaveState';
@@ -11,7 +12,7 @@ import {
   PUZZLE_EXTENSION_UNLOCK_PUZZLES,
 } from '../services/puzzleExtension';
 import { getWordHistoryWithRecency, recordPuzzleWords } from '../services/wordHistory';
-import { COMMON_WORDS, CURATED_EARLY_PUZZLES, CURATED_PUZZLE_COUNT, CuratedPuzzle, getRandomFallback } from '../constants';
+import { COMMON_WORDS, CURATED_EARLY_PUZZLES, CURATED_PUZZLE_COUNT, getRandomFallback } from '../constants';
 import { DICTIONARY_WORDS } from '../dictionary';
 import { CURATED_FINAL_PUZZLE } from '../constants/wordLists';
 import { isBlockedWord } from '../constants/blockedWords';
@@ -260,7 +261,7 @@ export function hasAnyValidDoubleShiftMove(
  * path offers free recovery rather than charging for unproved advice.
  */
 export function isBoardSolvableFromState(
-  rows: Array<Array<{ char: string; isLocked: boolean }>>,
+  rows: { char: string; isLocked: boolean }[][],
   activeRowIndex: number,
   moveDirection: 'down' | 'up',
   kind: 'standard' | 'reverse' | 'double_shift',
@@ -567,7 +568,7 @@ export interface PuzzleGameState {
   /** Current movement direction ("down" for standard flow, "up" during reverse return leg) */
   moveDirection: 'down' | 'up';
   /** Word previews for each slot position in the target row (when letter is selected) */
-  slotPreviews?: Array<{ word: string; isValid: boolean }>;
+  slotPreviews?: { word: string; isValid: boolean }[];
   /**
    * Whether the ✓/✗ validity grading on the ghost previews is PRESENTED.
    * The preview data always computes isValid internally (the double-shift
@@ -777,6 +778,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   // 0 invalids, 0 undos). A ref (not state) because nothing renders from it;
   // it's read once at completion. Reset with the other counters on a new board.
   const undosUsedRef = useRef(0);
+  const [undosUsed, setUndosUsed] = useState(0);
   // Solve-time telemetry for the private "getting faster" trend (mastery chase).
   // boardStartRef stamps when a FRESH board begins; boardTimedRef guards against
   // recording restored/retried boards (whose true elapsed we don't know), which
@@ -788,6 +790,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const [hintBalance, setHintBalance] = useState(() => getHintBalanceSync());
   const [outOfHintsSignal, setOutOfHintsSignal] = useState(0);
   const hintDisclosuresRef = useRef(new Map<string, HintDisclosure>());
+  const [hintDisclosures, setHintDisclosures] = useState<HintDisclosure[]>([]);
   const pendingAbandonmentRef = useRef<{
     difficulty: Difficulty; mode: GameMode; variant: PuzzleVariant; phase: DialoguePhase;
     blind: boolean; lexicon: boolean; speed: boolean; undoLimited: boolean; weave: boolean;
@@ -905,8 +908,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   // Speed-rescue handshake with App/useSpeedTimer.
   const [speedRescueSignal, setSpeedRescueSignal] = useState<{ extraSec: number; id: number } | null>(null);
 
-  const validWordsCache = useRef<Set<string>>(new Set(COMMON_WORDS));
+  const [validWords, setValidWords] = useState(() => new Set(COMMON_WORDS));
+  const validWordsCache = useRef(validWords);
   const vocabularyVersionRef = useRef<0 | 1>(1);
+  const [vocabularyVersion, setVocabularyVersion] = useState<0 | 1>(1);
   const shakeErrorTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Monotonic id for in-flight puzzle generations. `startNewGame` is a long
   // async (bank lookup + up to 30s reverse generation); two rapid invocations
@@ -1014,12 +1019,13 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     // Defensive validation: ensure all words are the same length
     const expectedLen = words[0]?.length ?? wordLength;
     const hasInconsistentLengths = words.some(w => w.length !== expectedLen);
-    if (hasInconsistentLengths) {
+    if (words.length === 0 || hasInconsistentLengths) {
       console.warn('Puzzle has inconsistent word lengths, falling back to safe puzzle');
       const safeFallback = getRandomFallback(difficulty);
-      const safeLen = safeFallback[0].length;
-      // Recursive call with validated fallback — won't loop because fallback pools are consistent
-      return applyBoard(safeFallback, undefined, undefined, safeLen, options);
+      words = safeFallback;
+      puzzleHint = undefined;
+      puzzleSolution = undefined;
+      wordLength = safeFallback[0].length;
     }
 
     const newRows: RowData[] = words.map(word => ({
@@ -1066,12 +1072,16 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     if (resetPerformance) {
       pendingAbandonmentRef.current = null;
       vocabularyVersionRef.current = 1;
+      setVocabularyVersion(1);
       validWordsCache.current = new Set(COMMON_WORDS);
+      setValidWords(validWordsCache.current);
       hintDisclosuresRef.current.clear();
+      setHintDisclosures([]);
       setInvalidAttempts(0);
       setHintsUsed(0);
       setEarnedStars(0);
       undosUsedRef.current = 0;
+      setUndosUsed(0);
       // A genuinely fresh board — start the solve-time clock for the trend.
       boardStartRef.current = Date.now();
       boardTimedRef.current = true;
@@ -1088,7 +1098,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         ? CHALLENGE_MODE_CONFIG.getMaxUndos(difficultyRef.current)
         : Infinity
     );
-  }, [currentPhase, currentVariant, gameMode, difficulty]);
+  }, [currentPhase, currentVariant, difficulty]);
 
   const initGame = useCallback((
     words: string[],
@@ -1220,7 +1230,6 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         previous.lexicon !== lexiconModeRef.current || previous.speed !== speedModeRef.current ||
         previous.undoLimited !== undoLimitedRef.current || previous.weave !== unbrokenWeaveModeRef.current;
       try {
-        const { logEvent } = require('../services/eventLogger') as typeof import('../services/eventLogger');
         logEvent({ type: 'puzzle_abandoned', data: {
           reason: setupChanged ? 'setup_change' : 'new_board', difficulty: previous.difficulty,
           mode: previous.variant === 'standard' ? previous.mode : previous.variant, phase: previous.phase,
@@ -2006,6 +2015,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     const deliverHint = (message: string, highlight: HintHighlight | null) => {
       if (!consumeHintSync()) return;
       hintDisclosuresRef.current.set(hintKey, { key: hintKey, message, highlight });
+      setHintDisclosures([...hintDisclosuresRef.current.values()]);
       setHintsUsed(prev => prev + 1);
       setHintBalance(getHintBalanceSync());
       pendingHintRef.current = true;
@@ -2196,7 +2206,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         setMessage(getHintFallback(currentPhase));
       }
     }
-  }, [gameState, isProcessing, rows, activeRowIndex, solution, reverseSolution, currentPhase, moveDirection, currentVariant, doubleShiftPhase, gameMode, checkValidation, unbrokenWeaveMode, spentLetterSet, lexiconMode, difficulty]);
+  }, [gameState, isProcessing, rows, activeRowIndex, solution, reverseSolution, currentPhase, moveDirection, currentVariant, doubleShiftPhase, gameMode, checkValidation, unbrokenWeaveMode, spentLetterSet, lexiconMode, difficulty, shakeError]);
 
   const handleSlotPress = useCallback(async (
     targetIndex: number,
@@ -2734,6 +2744,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       // Taking back a move breaks the clean-move streak AND the flawless run.
       cleanMoveStreakRef.current = 0;
       undosUsedRef.current += 1;
+      setUndosUsed(undosUsedRef.current);
       const delta = history[history.length - 1];
       setRows(prevRows => {
         const newRows = [...prevRows];
@@ -2780,6 +2791,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     // clean-move streak AND the flawless run.
     cleanMoveStreakRef.current = 0;
     undosUsedRef.current += 1;
+    setUndosUsed(undosUsedRef.current);
 
     // Challenge + double shift: a completed step is TWO committed deltas (both
     // drops). Revert the WHOLE step atomically for ONE undo charge — otherwise
@@ -2957,7 +2969,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     if (targetRowIndex < 0 || targetRowIndex >= rows.length) return undefined;
 
     const targetLetters = rows[targetRowIndex].words.map(l => l.char);
-    const previews: Array<{ word: string; isValid: boolean }> = [];
+    const previews: { word: string; isValid: boolean }[] = [];
 
     // Source-word validity after removing the selected letter. handleSlotPress
     // validates BOTH resulting words, so a preview that only checks the target
@@ -2972,7 +2984,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       .filter(l => l.id !== selectedLetter.id)
       .map(l => l.char)
       .join('');
-    const isSourceValidAfterRemoval = validWordsCache.current.has(sourceWordAfterRemoval);
+    const isSourceValidAfterRemoval = validWords.has(sourceWordAfterRemoval);
 
     // For each possible insertion position (0 through targetLetters.length)
     for (let i = 0; i <= targetLetters.length; i++) {
@@ -3001,7 +3013,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
           isValid: !blockedSource && !blockedTarget && canCompleteDoubleShift(
             reducedSource,
             intermediateChars,
-            (w) => validWordsCache.current.has(w)
+            (w) => validWords.has(w)
           ),
         });
       } else {
@@ -3010,12 +3022,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         // preview must AND both or it promises a move the game will reject.
         previews.push({
           word: newWord,
-          isValid: isSourceValidAfterRemoval && validWordsCache.current.has(newWord),
+          isValid: isSourceValidAfterRemoval && validWords.has(newWord),
         });
       }
     }
     return previews;
-  }, [selectedLetter, activeRowIndex, moveDirection, rows, gameState, currentVariant, doubleShiftPhase, blindMode, gameMode]);
+  }, [selectedLetter, activeRowIndex, moveDirection, rows, gameState, currentVariant, doubleShiftPhase, blindMode, validWords]);
 
   // The single presentation signal consumed by Row, drag snapping, and a11y.
   // Grading is shown only on 'graded' boards; a 'neutral' board never shows the
@@ -3026,6 +3038,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const restorePuzzleState = useCallback((saved: SavedPuzzleState) => {
     pendingAbandonmentRef.current = null;
     vocabularyVersionRef.current = saved.vocabularyVersion === 1 ? 1 : 0;
+    setVocabularyVersion(vocabularyVersionRef.current);
     validWordsCache.current = vocabularyVersionRef.current === 0
       ? new Set([...DICTIONARY_WORDS, ...COMMON_WORDS])
       : new Set(COMMON_WORDS);
@@ -3065,7 +3078,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     // the previous board left in the ref. Its two siblings above were always
     // restored; this one silently restarted at 0, which laundered a used undo
     // into a false Flawless across a kill.
+    setValidWords(validWordsCache.current);
+    setHintDisclosures([...hintDisclosuresRef.current.values()]);
     undosUsedRef.current = saved.undosUsed ?? 0;
+    setUndosUsed(undosUsedRef.current);
     setUndosRemaining(saved.undosRemaining);
     difficultyRef.current = saved.difficulty;
     preferredDifficultyRef.current = saved.difficulty;
@@ -3316,12 +3332,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     isFinalBoard,
     isStuck,
     hintBalance,
-    hintDisclosures: [...hintDisclosuresRef.current.values()],
-    vocabularyVersion: vocabularyVersionRef.current,
+    hintDisclosures,
+    vocabularyVersion,
     outOfHintsSignal,
     hintHighlight,
     moveOutcomes,
-    undosUsed: undosUsedRef.current,
+    undosUsed,
     resonantChoiceCount,
     resonanceAmber: resonanceAmberForCount(resonantChoiceCount),
     moveHistorySummary,

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useLayoutEffect, useEffect, useRef } from 'react';
 import { GameState } from '../types';
 import { savePuzzleState, SavedPuzzleState } from '../services/puzzleSaveState';
 import { AUTOSAVE_DEBOUNCE_MS } from '../constants/timing';
@@ -62,7 +62,7 @@ export function useAutosave(deps: AutosaveDeps): void {
   // progress when it fires — otherwise a save scheduled one render before a
   // victory could re-write the cleared save with a stale PLAYING board.
   const depsRef = useRef(deps);
-  depsRef.current = deps;
+  useLayoutEffect(() => { depsRef.current = deps; }, [deps]);
 
   useEffect(() => {
     if (timerRef.current) {

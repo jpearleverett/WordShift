@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const stateStore: Map<number, unknown> = new Map();
 let stateIndex = 0;
-let effectCallbacks: Array<() => void | (() => void)> = [];
+let effectCallbacks: (() => void | (() => void))[] = [];
 
 const resetRenderState = () => {
   stateStore.clear();

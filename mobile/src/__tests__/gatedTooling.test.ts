@@ -1,3 +1,5 @@
+import { passesBankMonotony } from '../../scripts/gatedMonotony';
+import { GATED_POLICY_HASH } from '../../scripts/gatedCheckpoint';
 import { spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -10,8 +12,9 @@ const node = (script: string, args: string[], env = process.env) => spawnSync(pr
 beforeEach(() => {
   fixture = mkdtempSync(join(tmpdir(), 'wordshift-gated-tools-'));
   mkdirSync(join(fixture, 'scripts/tools'), { recursive: true });
-  mkdirSync(join(fixture, 'src/data'), { recursive: true });
-  for (const script of ['swapGatedBanks.mjs', 'tools/gatedBankTarget.mjs', 'tools/generateGatedPuzzles.mjs']) {
+  mkdirSync(join(fixture, 'src/data/vocabulary'), { recursive: true });
+  copyFileSync(join(mobile, 'src/data/vocabulary/puzzleVocabulary.ts'), join(fixture, 'src/data/vocabulary/puzzleVocabulary.ts'));
+  for (const script of ['swapGatedBanks.mjs', 'tools/gatedBankTarget.mjs', 'tools/generateGatedPuzzles.mjs', 'tools/gatedCheckpointCount.mjs']) {
     copyFileSync(join(mobile, 'scripts', script), join(fixture, 'scripts', script));
   }
 });
@@ -41,7 +44,7 @@ test('all 30 wrapper selections forward the driver tier and optional LEXICON arg
   expect(node(join(fixture, 'scripts/tools/generateGatedPuzzles.mjs'), ['standard', 'LEX_FAKE'], env).status).toBe(1);
 }, 10000);
 
-const content = (exportName: string, id: string) => `export const ${exportName} = [{id:'${id}'}];\n`;
+const content = (exportName: string, id: string) => `// Vocabulary policy: ${GATED_POLICY_HASH}\nexport const ${exportName} = [{id:'${id}'}];\n`;
 test('targeted swaps cover all 30 banks, dry-run writes nothing, and real fixture swaps back up only the selected bank', () => {
   const data = join(fixture, 'src/data');
   for (const family of ['standard', 'reverse', 'double']) {
@@ -85,6 +88,8 @@ test('targeted selection refuses missing, undersized and structurally wrong side
   writeFileSync(live, original);
   writeFileSync(sidecar, content('LEXICON_BANK_REVERSE_EXPERT', 'new'));
   expect(node(script, ['2', 'reverse', 'LEX_EXPERT']).status).toBe(1);
+  writeFileSync(sidecar, content('LEXICON_BANK_REVERSE_EXPERT', 'new').replace(GATED_POLICY_HASH, 'old-policy'));
+  expect(node(script, ['1', 'reverse', 'LEX_EXPERT']).status).toBe(1);
   writeFileSync(sidecar, content('WRONG_EXPORT', 'new'));
   expect(node(script, ['1', 'reverse', 'LEX_EXPERT']).status).toBe(1);
   expect(readFileSync(live, 'utf8')).toBe(original);
@@ -93,4 +98,29 @@ test('targeted selection refuses missing, undersized and structurally wrong side
   expect(legacy.stdout).toContain('12 skipped');
   expect(legacy.stdout).not.toContain('LEXICON');
   for (const args of [['0'], ['1.5'], ['NaN'], ['1', 'standard'], ['1', 'reverse', 'LEX_EXPERT', 'extra']]) expect(node(script, args).status).toBe(1);
+});
+
+
+test('a full but stale checkpoint cannot bypass regeneration through the driver count shortcut', () => {
+  const script = join(fixture, 'scripts/tools/gatedCheckpointCount.mjs');
+  const checkpoint = join(fixture, 'src/data/checkpoint.json');
+  expect(node(script, [checkpoint]).stdout.trim()).toBe('0');
+  writeFileSync(checkpoint, JSON.stringify({ puzzles: Array.from({ length: 500 }, () => ({})), vocabularyPolicyHash: 'old' }));
+  const stale = node(script, [checkpoint]);
+  expect(stale.status).toBe(1);
+  expect(stale.stderr).toContain('Checkpoint vocabulary policy changed');
+  writeFileSync(checkpoint, JSON.stringify({ puzzles: [{ id: 'reviewed' }], vocabularyPolicyHash: GATED_POLICY_HASH }));
+  expect(node(script, [checkpoint]).stdout.trim()).toBe('1');
+});
+
+
+test('top-ups dilute inherited letter spikes and refuse additions that exceed the existing 30% guards', () => {
+  const puzzle = (start: string, moved: string) => ({ words: [start + 'EAR'], solution: [{ stepIndex: 0, sourceWord: start + 'EAR', targetWord: 'LAST', letterToMove: moved, explanation: '' }] });
+  const balanced = Array.from({ length: 20 }, (_, index) => puzzle(String.fromCharCode(65 + index % 10), String.fromCharCode(65 + index % 10)));
+  expect(passesBankMonotony(balanced, puzzle('A', 'A'))).toBe(true);
+  const spiked = balanced.map((entry, index) => index < 8 ? puzzle('A', 'S') : entry);
+  expect(passesBankMonotony(spiked, puzzle('A', 'B'))).toBe(false);
+  expect(passesBankMonotony(spiked, puzzle('B', 'S'))).toBe(false);
+  expect(passesBankMonotony(spiked, puzzle('B', 'B'))).toBe(true);
+  expect(passesBankMonotony([], puzzle('A', 'S'))).toBe(true);
 });

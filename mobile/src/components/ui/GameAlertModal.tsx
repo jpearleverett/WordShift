@@ -1,11 +1,14 @@
+import { AppText } from './AppText';
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { Modal, View, Text, StyleSheet, TouchableOpacity, Animated, Image } from 'react-native';
+import { Modal, View, StyleSheet, Pressable, ScrollView, Animated, Image, useWindowDimensions } from 'react-native';
 import { SPOT_ART } from './chromeIcons';
 import { SURFACE, getSurfaceTheme, getPressSpring } from '../../theme/surfaces';
 import { PanelCard } from './PanelCard';
 import { CandyButton, CandyButtonVariant } from './CandyButton';
-import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
+import { PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { FONT_SIZE } from '../../theme/typeScale';
+import { useScreenInsets } from '../../hooks/useScreenInsets';
+import { TEXT_ROLE } from '../../theme/typography';
 import { getSettingsSync } from '../../services/settings';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
 import {
@@ -16,6 +19,8 @@ import {
 
 interface GameAlertModalProps {
   phase: number;
+  suspended?: boolean;
+  onPendingChange?: (pending: boolean) => void;
 }
 
 /**
@@ -30,34 +35,40 @@ interface GameAlertModalProps {
  * the scrim, pops from further back, and wears a soft accent glow so it never
  * reads like a mundane OK confirm. reducedMotion / low-tier pin it instant.
  */
-export const GameAlertModal: React.FC<GameAlertModalProps> = ({ phase }) => {
+export const GameAlertModal: React.FC<GameAlertModalProps> = ({ phase, suspended = false, onPendingChange }) => {
+  const insets = useScreenInsets();
+  const { height } = useWindowDimensions();
   const [current, setCurrent] = useState<GameAlertRequest | null>(null);
+  const currentRef = useRef<GameAlertRequest | null>(null);
   const queueRef = useRef<GameAlertRequest[]>([]);
 
   const reduceMotion = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
 
   // Native-driven entrance values (opacity + transform only).
-  const backdropOpacity = useRef(new Animated.Value(0)).current;
-  const cardScale = useRef(new Animated.Value(1)).current;
-  const cardOpacity = useRef(new Animated.Value(0)).current;
+  const [backdropOpacity] = useState(() => new Animated.Value(0));
+  const [cardScale] = useState(() => new Animated.Value(1));
+  const [cardOpacity] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     const unsubscribe = setGameAlertListener((request) => {
-      setCurrent((showing) => {
-        if (showing) {
-          queueRef.current.push(request);
-          return showing;
-        }
-        return request;
-      });
+      // Claim ownership immediately: simultaneous requests queue once, even if
+      // React replays state updaters while checking Strict Mode purity.
+      if (currentRef.current) queueRef.current.push(request);
+      else {
+        currentRef.current = request;
+        setCurrent(request);
+      }
     });
     return unsubscribe;
   }, []);
 
+  useEffect(() => { onPendingChange?.(current !== null); }, [current, onPendingChange]);
+  useEffect(() => () => { onPendingChange?.(false); }, [onPendingChange]);
+
   // Spring entrance, re-run for each freshly shown alert (keyed on identity so
   // a queued alert taking the slot animates in fresh too).
   useEffect(() => {
-    if (!current) return;
+    if (!current || suspended) return;
     if (reduceMotion) {
       backdropOpacity.setValue(1);
       cardScale.setValue(1);
@@ -97,10 +108,12 @@ export const GameAlertModal: React.FC<GameAlertModalProps> = ({ phase }) => {
     ]);
     anim.start();
     return () => anim.stop();
-  }, [current, reduceMotion, phase, backdropOpacity, cardScale, cardOpacity]);
+  }, [current, suspended, reduceMotion, phase, backdropOpacity, cardScale, cardOpacity]);
 
   const dismiss = useCallback((button?: GameAlertButton) => {
-    setCurrent(queueRef.current.shift() ?? null);
+    const next = queueRef.current.shift() ?? null;
+    currentRef.current = next;
+    setCurrent(next);
     // Fire after the state update is queued so a button opening ANOTHER
     // alert (or modal) doesn't race the dismissal.
     button?.onPress?.();
@@ -119,7 +132,7 @@ export const GameAlertModal: React.FC<GameAlertModalProps> = ({ phase }) => {
     // Multi-button alerts with no explicit cancel require a choice.
   }, [current, dismiss]);
 
-  if (!current) return null;
+  if (!current || suspended) return null;
 
   const t = getSurfaceTheme(phase);
   const isBeat = current.tone === 'beat';
@@ -164,36 +177,39 @@ export const GameAlertModal: React.FC<GameAlertModalProps> = ({ phase }) => {
           style={[StyleSheet.absoluteFill, { backgroundColor: t.overlay, opacity: backdropOpacity }]}
         />
       )}
-      <TouchableOpacity
-        style={styles.overlay}
-        activeOpacity={1}
+      <View
+        style={[styles.overlay, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }]}
+        accessibilityViewIsModal
+      >
+      <Pressable
+        style={StyleSheet.absoluteFill}
         onPress={handleRequestClose}
         accessibilityRole="button"
         accessibilityLabel="Dismiss alert"
-      >
+      />
         <Animated.View
           style={[
             styles.cardWrap,
             isBeat && styles.cardWrapBeat,
+            { maxHeight: height - insets.top - insets.bottom - 32 },
             { transform: [{ scale: cardScale }], opacity: cardOpacity },
           ]}
         >
           {isBeat && (
             <View pointerEvents="none" style={[styles.glow, { backgroundColor: t.glow }]} />
           )}
-          {/* claim touches so taps inside the card never hit the scrim */}
-          <TouchableOpacity activeOpacity={1} style={styles.cardTouch}>
             <PanelCard phase={phase} kind="panel" style={styles.card}>
+              <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={styles.cardContent} bounces={false}>
               {/* Authored 'beat' cards (the rules-just-changed moments) carry the
                   pinned-notice spot; utility confirms stay plain. */}
               {isBeat && (
                 <Image source={SPOT_ART.notice} style={styles.spot} resizeMode="contain" accessible={false} />
               )}
               {current.title !== '' && (
-                <Text style={[styles.title, { color: t.title }]}>{current.title}</Text>
+                <AppText textRole="title" accessibilityRole="header" style={[styles.title, { color: t.title }]}>{current.title}</AppText>
               )}
               {Boolean(current.message) && (
-                <Text style={[styles.message, { color: t.body }]}>{current.message}</Text>
+                <AppText textRole="reading" style={[styles.message, { color: t.body }]}>{current.message}</AppText>
               )}
               <View style={styles.buttonColumn}>
                 {ordered.map((button, index) => (
@@ -208,10 +224,10 @@ export const GameAlertModal: React.FC<GameAlertModalProps> = ({ phase }) => {
                   />
                 ))}
               </View>
+              </ScrollView>
             </PanelCard>
-          </TouchableOpacity>
         </Animated.View>
-      </TouchableOpacity>
+      </View>
     </Modal>
   );
 };
@@ -244,6 +260,9 @@ const styles = StyleSheet.create({
     opacity: 0.28,
   },
   card: {
+    flexShrink: 1,
+  },
+  cardContent: {
     paddingVertical: 26,
     paddingHorizontal: SURFACE.panelPadX,
   },
@@ -261,9 +280,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   message: {
-    fontFamily: BODY_FONT,
-    fontSize: FONT_SIZE.bodyLg,
-    lineHeight: 20,
+    ...TEXT_ROLE.body,
     textAlign: 'center',
     marginBottom: 14,
   },

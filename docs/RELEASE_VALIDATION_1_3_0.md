@@ -18,8 +18,8 @@ npm run test:e2e
 node --max-old-space-size=180 scripts/tools/auditVocabulary.mjs ../docs/review-2026-09-05/vocabulary-bank-audit.json --branching
 node --max-old-space-size=180 scripts/tools/auditBankRoutes.mjs ../docs/review-2026-09-05/bank-route-audit.json
 npx expo install --check
-npx eas build --platform android --profile internal-testing
-npx eas submit --platform android --profile internal-testing
+npx eas-cli build --platform android --profile internal-testing
+npx eas-cli submit --platform android --profile internal-testing
 ```
 
 The two bank audits check current vocabulary, standard branching, full solution replay and preferred Reverse hint continuation. Their scope and artifact format are documented in [bank delivery validation](reports/BANK_DELIVERY_VALIDATION_2026-09-05.md#reproduce).
@@ -75,7 +75,7 @@ Profile a low-cost Android and a representative midrange Android. Measure cold/w
 node scripts/tools/profileAndroid.mjs ../docs/device-evidence/1.3.0-midrange-after-house
 ```
 
-The read-only helper captures package details, frame statistics and memory from one attached authorized device. It has not run against a device in this VM. Compare before/after samples and check sustained growth after repeated scene openings. Web bundle memory and source asset bytes are not measurements of native frame time, AAB size or a memory leak.
+The helper captures package/installer details, frame statistics, memory, battery/thermal counters and system text/motion settings from one attached authorized device. Pass `--launch-samples` to also collect three cold/warm native activity launches; this optional mode force-stops/relaunches the game, so finish the current move first. Native activity timing does not measure when the JavaScript board becomes playable. It has not run against a device in this VM. Compare before/after samples and check sustained growth after repeated scene openings. Web bundle memory and source asset bytes are not measurements of native frame time, AAB size or a memory leak.
 
 ## Current store capture brief
 

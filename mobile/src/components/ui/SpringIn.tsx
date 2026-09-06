@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Animated, StyleProp, ViewStyle } from 'react-native';
 import { getSettingsSync } from '../../services/settings';
 import { getModalInSpring } from '../../theme/surfaces';
@@ -17,7 +17,7 @@ export const SpringIn: React.FC<{
   children: React.ReactNode;
 }> = ({ style, claimTouches, phase = 0, children }) => {
   const reducedMotion = getSettingsSync().reducedMotion;
-  const scale = useRef(new Animated.Value(reducedMotion ? 1 : 0.92)).current;
+  const [scale] = useState(() => new Animated.Value(reducedMotion ? 1 : 0.92));
   useEffect(() => {
     if (reducedMotion) return;
     const anim = Animated.spring(scale, {
@@ -27,7 +27,7 @@ export const SpringIn: React.FC<{
     });
     anim.start();
     return () => anim.stop();
-  }, [scale, reducedMotion]);
+  }, [scale, reducedMotion, phase]);
   return (
     <Animated.View
       style={[style, { transform: [{ scale }] }]}

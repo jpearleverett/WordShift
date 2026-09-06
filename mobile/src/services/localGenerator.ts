@@ -1,19 +1,11 @@
-import { isFairPuzzleWord, isPuzzleVocabularyFair } from './puzzleVocabulary';
+import { isPuzzleVocabularyFair } from './puzzleVocabulary';
+import { getGenerationWordSets, getGenerationVocabularyKey, withGenerationVocabulary } from './generatorVocabulary';
 
 import { WORDS_3, WORDS_4, WORDS_5, WORDS_6, WORDS_7, COMMON_WORDS } from '../constants';
 import {
   analyzeStandardBranching,
   type PuzzleBranchingMetrics,
 } from './puzzleBranching';
-
-// Offline bank generation runs the search loops synchronously (no UI to keep
-// responsive) and sets GENERATOR_NO_YIELD=1: the periodic setTimeout yields
-// exist for the app's event loop, but under jest each yield allocates a
-// timer+promise pair that the environment retains, and a 25s search window
-// creates enough of them to exhaust the heap. In the app this is always false
-// and the yields behave exactly as before.
-const SKIP_EVENT_LOOP_YIELDS =
-  typeof process !== 'undefined' && !!process.env && process.env.GENERATOR_NO_YIELD === '1';
 
 import { PuzzleConfig, PuzzleSolutionStep, Difficulty } from '../types';
 import {
@@ -26,6 +18,15 @@ import { getCurrentPhase } from './amberCurrency';
 import { DialoguePhase } from '../types/homeWorld';
 import { isReverseChainSolvable } from './puzzleSolvability';
 
+// Offline bank generation runs the search loops synchronously (no UI to keep
+// responsive) and sets GENERATOR_NO_YIELD=1: the periodic setTimeout yields
+// exist for the app's event loop, but under jest each yield allocates a
+// timer+promise pair that the environment retains, and a 25s search window
+// creates enough of them to exhaust the heap. In the app this is always false
+// and the yields behave exactly as before.
+const SKIP_EVENT_LOOP_YIELDS =
+  typeof process !== 'undefined' && !!process.env && process.env.GENERATOR_NO_YIELD === '1';
+
 // Shipped-rules solvability check (COMMON_WORDS is the same dictionary the
 // board validates against). Used as the FINAL acceptance gate for reverse
 // chains so the generator can never again emit a chain that is unwinnable
@@ -34,15 +35,6 @@ import { isReverseChainSolvable } from './puzzleSolvability';
 // forward letters, while this explores the full move space exactly as the
 // player can.
 const isValidWordForRules = (w: string): boolean => COMMON_WORDS.has(w.toUpperCase());
-
-// Organize sets for dynamic access
-const WORD_SETS: Record<number, Set<string>> = {
-  3: new Set(WORDS_3.filter(word => isFairPuzzleWord(word))),
-  4: new Set(WORDS_4.filter(word => isFairPuzzleWord(word))),
-  5: new Set(WORDS_5.filter(word => isFairPuzzleWord(word))),
-  6: new Set(WORDS_6.filter(word => isFairPuzzleWord(word))),
-  7: new Set(WORDS_7.filter(word => isFairPuzzleWord(word))),
-};
 
 // Word arrays for frequency-based scoring (index = relative commonness)
 const WORD_ARRAYS: Record<number, string[]> = {
@@ -102,7 +94,7 @@ interface InsertionTarget {
  */
 type InsertionIndex = Map<string, InsertionTarget[]>;
 
-const insertionIndexCache = new Map<number, InsertionIndex>();
+const insertionIndexCache = new Map<string, InsertionIndex>();
 
 /**
  * Build (or retrieve cached) the insertion index for a given word length.
@@ -113,11 +105,12 @@ const insertionIndexCache = new Map<number, InsertionIndex>();
  * Memory: ~1-2 MB per word length.
  */
 export function getInsertionIndex(wordLength: number): InsertionIndex {
-  const cached = insertionIndexCache.get(wordLength);
+  const cacheKey = `${getGenerationVocabularyKey()}:${wordLength}`;
+  const cached = insertionIndexCache.get(cacheKey);
   if (cached) return cached;
 
-  const baseSet = WORD_SETS[wordLength];
-  const maxSet = WORD_SETS[wordLength + 1];
+  const baseSet = getGenerationWordSets()[wordLength];
+  const maxSet = getGenerationWordSets()[wordLength + 1];
   if (!baseSet || !maxSet) return new Map();
 
   const index: InsertionIndex = new Map();
@@ -139,7 +132,7 @@ export function getInsertionIndex(wordLength: number): InsertionIndex {
     }
   }
 
-  insertionIndexCache.set(wordLength, index);
+  insertionIndexCache.set(cacheKey, index);
   return index;
 }
 
@@ -176,8 +169,6 @@ const BORING_SUFFIX_LETTERS = new Set(['S', 'D', 'R', 'Y', 'E']);
 const BORING_PREFIX_LETTERS = new Set(['A', 'I', 'U', 'E', 'O']);
 
 // Common boring suffixes to detect (when removing creates these patterns)
-const BORING_ENDINGS = ['ED', 'ER', 'LY', 'ES', 'EN', 'AL'];
-const BORING_BEGINNINGS = ['RE', 'UN', 'IN', 'DE'];
 
 /**
  * Check if a move is a boring suffix/prefix transformation
@@ -567,6 +558,8 @@ let currentDreadPhase: DialoguePhase = 0;
 //     generator PRODUCES rare boards (instead of the harness rejecting the
 //     common boards the default scorer would otherwise favour). This keeps
 //     bank generation feasible AND drives on-device Lexicon play directly.
+// 3 = stronger search bias for offline Lexicon HARD/EXPERT top-ups. Their
+// rarity, vocabulary and complete-route acceptance gates stay unchanged.
 // Default 0 leaves every normal EASY-HARD board unchanged.
 let currentRarityLean = 0;
 
@@ -673,7 +666,7 @@ function scoreWordInterestingness(
       // says must never be featured, so the rare tail is AVOIDED, not chased.
       if (frac < 0.35) score -= 22;      // common: strongly avoid
       else if (frac < 0.60) score -= 4;  // lower-mid: mild avoid
-      else if (frac < 0.85) score += 14; // rare-but-fair: the Lexicon sweet spot
+      else if (frac < 0.85) score += currentRarityLean >= 3 ? 32 : 14; // apex banks need a stronger rare-word search bias
       else score -= 12;                  // obscure tail: avoid (reads as unfair)
     } else if (currentRarityLean === 1) {
       // MILD rarity lean (EXPERT, "uncommon-but-fair"): sweet spot in the
@@ -1059,79 +1052,41 @@ function weightedShuffle(
   const topWords = shuffle(scored.slice(0, topCount).map(s => s.word));
   const restWords = shuffle(scored.slice(topCount).map(s => s.word));
 
+  if (currentRarityLean >= 3) {
+    // Offline apex top-ups need a rare mean across the entire displayed chain.
+    // Randomizing the top 75% of scores erased the seed's rarity preference
+    // and made almost every otherwise valid board miss that unchanged gate.
+    // Try a shuffled rare seed band first, retaining all other words as backup.
+    const ordered = [...topWords, ...restWords];
+    const rareSeeds = ordered.filter(word => {
+      const rank = getFeaturedRank(word);
+      return rank >= 0.70 && rank <= 0.85;
+    });
+    const rareSet = new Set(rareSeeds);
+    return [...shuffle(rareSeeds), ...ordered.filter(word => !rareSet.has(word))];
+  }
   return [...topWords, ...restWords];
 }
 
 // ============================================================================
-// PRE-COMPUTED REMOVAL INDEX — for reverse-first chain generation
-// Maps (W+1)-letter words to their valid single-letter removals.
+// REVERSE-FIRST CHAIN GENERATOR
+// Builds forward candidates from legal adjacency, then proves both legs under
+// the shipped cumulative-lock rules.
 // ============================================================================
 
-interface RemovalTarget {
-  /** The (W+1)-letter source word */
-  sourceWord: string;
-  /** The W-letter word after removal */
-  remainder: string;
-  /** The letter that was removed */
-  letter: string;
-  /** Position from which the letter was removed */
-  position: number;
-}
-
-const removalIndexCache = new Map<number, Map<string, RemovalTarget[]>>();
-
-/**
- * Build (or retrieve cached) the removal index for a given base word length W.
- * For each (W+1)-letter word and each position, checks if removing the letter
- * at that position produces a valid W-letter word.
- *
- * Returns: Map<sourceWord(W+1), RemovalTarget[]>
- */
-function getRemovalIndex(wordLength: number): Map<string, RemovalTarget[]> {
-  const cached = removalIndexCache.get(wordLength);
-  if (cached) return cached;
-
-  const baseSet = WORD_SETS[wordLength];
-  const maxSet = WORD_SETS[wordLength + 1];
-  if (!baseSet || !maxSet) return new Map();
-
-  const index = new Map<string, RemovalTarget[]>();
-
-  for (const word of maxSet) {
-    const targets: RemovalTarget[] = [];
-    for (let j = 0; j < word.length; j++) {
-      const remainder = word.slice(0, j) + word.slice(j + 1);
-      if (baseSet.has(remainder)) {
-        targets.push({
-          sourceWord: word,
-          remainder,
-          letter: word[j],
-          position: j,
-        });
-      }
-    }
-    if (targets.length > 0) {
-      index.set(word, targets);
+/** Enumerate legal removals while locking only the received tile position. */
+export function getReverseRemovalCandidates(
+  word: string, receivedPosition: number | undefined, remainderWords: Set<string>, usedWords: Set<string>,
+): { charIndex: number; char: string; remainder: string }[] {
+  const removals: { charIndex: number; char: string; remainder: string }[] = [];
+  for (let position = 0; position < word.length; position++) {
+    if (position === receivedPosition) continue;
+    const remainder = word.slice(0, position) + word.slice(position + 1);
+    if (remainderWords.has(remainder) && !usedWords.has(remainder)) {
+      removals.push({ charIndex: position, char: word[position], remainder });
     }
   }
-
-  removalIndexCache.set(wordLength, index);
-  return index;
-}
-
-// ============================================================================
-// REVERSE-FIRST CHAIN GENERATOR
-// Builds chains bottom-to-top that are reverse-solvable by construction,
-// then validates the (much easier) forward path.
-// ============================================================================
-
-interface ReverseChainNode {
-  /** The original W-letter word for this row */
-  word: string;
-  /** Post-forward state of this row (may be W-1, W, or W+1 letters) */
-  postForwardState: string;
-  /** Locked positions in this row (from forward play) */
-  lockedPositions: Set<number>;
+  return removals;
 }
 
 /**
@@ -1163,7 +1118,13 @@ async function generateReverseChain(
   const targetsByLetter = new Map<string, InsertionTarget[]>();
   for (let c = 65; c <= 90; c++) {
     const letter = String.fromCharCode(c);
-    const targets = insertionIdx.get(letter);
+    const targets = insertionIdx.get(letter)?.filter(target =>
+      // Every receiving row must later give an unlocked letter, including the
+      // bottom row that begins the return. Reject impossible neighbors before
+      // spending a complete random walk on them.
+      getRemovalFlexibility(target.result, target.position, dicts.base) > 0 &&
+      (!recencyMap || (!isInHardCooldown(target.baseWord, recencyMap) && !isInHardCooldown(target.result, recencyMap))),
+    );
     if (targets && targets.length > 0) {
       targetsByLetter.set(letter, targets);
     }
@@ -1171,7 +1132,7 @@ async function generateReverseChain(
 
   let bestChain: PathNode[] | null = null;
   let bestScore = -1;
-  let checksCount = 0;
+  let firstValidAt: number | null = null;
 
   // Yield to the event loop once per frame so the UI stays responsive during
   // reverse generation (which can run up to ~25s). This used to be 200ms, ~13x
@@ -1199,10 +1160,19 @@ async function generateReverseChain(
   };
   // Seed pool computed once. Fall back to the full array if the rare band is
   // somehow empty for this length (never fail to generate for rarity).
-  const rareStartPool = rareLean ? dicts.baseArray.filter(inRareBand) : dicts.baseArray;
-  const startArray = rareStartPool.length > 0 ? rareStartPool : dicts.baseArray;
+  const removableStartPool = dicts.baseArray.filter(word =>
+    (!recencyMap || !isInHardCooldown(word, recencyMap)) &&
+    [...word].some((_, position) => dicts.min.has(word.slice(0, position) + word.slice(position + 1))),
+  );
+  const rareStartPool = rareLean ? removableStartPool.filter(inRareBand) : removableStartPool;
+  const startArray = rareStartPool.length > 0 ? rareStartPool : removableStartPool;
+  if (startArray.length === 0) return null;
 
   while (Date.now() - startTime < timeoutMs) {
+    // Freshness penalties can make every valid chain score below 30 once a
+    // bank is well used. Give a found chain two seconds for improvement;
+    // waiting until timeoutMs - 2000 spent ~23 seconds on every such search.
+    if (bestChain && firstValidAt !== null && Date.now() - firstValidAt >= 2000) return bestChain;
     // Yield periodically
     if (Date.now() - lastYield > YIELD_INTERVAL) {
       if (!SKIP_EVENT_LOOP_YIELDS) await new Promise(resolve => setTimeout(resolve, 0));
@@ -1220,22 +1190,13 @@ async function generateReverseChain(
     let valid = true;
 
     let currentTempWord = w0;
-    let letterReceived: string | undefined = undefined;
+    let receivedPosition: number | undefined;
 
     for (let step = 0; step < numSteps; step++) {
       // Find valid letter removals from currentTempWord
-      const removals: Array<{ charIndex: number; char: string; remainder: string }> = [];
-
-      for (let j = 0; j < currentTempWord.length; j++) {
-        const char = currentTempWord[j];
-        if (letterReceived && char === letterReceived) continue;
-
-        const remainder = currentTempWord.slice(0, j) + currentTempWord.slice(j + 1);
-        const isValid = step === 0 ? dicts.min.has(remainder) : dicts.base.has(remainder);
-        if (isValid && !usedWords.has(remainder)) {
-          removals.push({ charIndex: j, char, remainder });
-        }
-      }
+      const removals = getReverseRemovalCandidates(
+        currentTempWord, receivedPosition, step === 0 ? dicts.min : dicts.base, usedWords,
+      );
 
       if (removals.length === 0) { valid = false; break; }
 
@@ -1291,7 +1252,7 @@ async function generateReverseChain(
         usedWords.add(t.result);
 
         currentTempWord = t.result;
-        letterReceived = char;
+        receivedPosition = t.position;
         found = true;
         break;
       }
@@ -1303,13 +1264,13 @@ async function generateReverseChain(
 
     // Check reverse solvability (fast — ~0.1ms per check)
     const words = chain.map(n => n.word);
-    checksCount++;
 
     if (
-      isReverseSolvable(words, solution) &&
+      isAuthoredReverseSolvable(words, solution, dicts) &&
       // Final gate under the SHIPPED rules — no more unwinnable reverse boards.
       isReverseChainSolvable(words, isValidWordForRules) === 'solvable'
     ) {
+      firstValidAt ??= Date.now();
       const score = scorePuzzleChain(chain, recencyMap, true);
       if (score > bestScore) {
         bestChain = chain;
@@ -1317,7 +1278,7 @@ async function generateReverseChain(
 
         // If we found a decent puzzle, return it. If quality is low, keep looking
         // for a better one (up to 2 more seconds).
-        if (score >= 30 || Date.now() - startTime > timeoutMs - 2000) {
+        if (score >= 30) {
           return bestChain;
         }
       }
@@ -1395,7 +1356,7 @@ const generateLocalPuzzleCandidate = async (
   const forcedStartWord = overrides?.startWord?.toUpperCase();
   const requireReverse = overrides?.requireReverseSolvable ?? false;
   const relaxBoring = overrides?.relaxBoring ?? requireReverse;
-  // Rarity lean (0 off / 1 mild-EXPERT / 2 strong-Lexicon). Set per call; every
+  // Rarity lean (0 off / 1 mild / 2 Lexicon / 3 offline apex). Set per call; every
   // generation resets it so no lean leaks across calls (mirrors currentDreadPhase).
   currentRarityLean = overrides?.rarityLean ?? 0;
   currentReverseRareBandLo = overrides?.rareBandLo ?? 0.60;
@@ -1410,11 +1371,18 @@ const generateLocalPuzzleCandidate = async (
     currentDreadPhase = 0;
   }
 
+  // Reverse return routes must honor the same history/cap exclusions as the
+  // sampled descent. Otherwise search repeatedly proves paths through capped
+  // hidden remainders that the final bank gate then has to reject.
+  const searchWords = (length: number): Set<string> => requireReverse
+    ? new Set([...getGenerationWordSets()[length]].filter(word => !isInHardCooldown(word, recencyMap)))
+    : getGenerationWordSets()[length];
+  const baseWords = searchWords(wordLength);
   const dicts = {
-    min: WORD_SETS[wordLength - 1],
-    base: WORD_SETS[wordLength],
-    max: WORD_SETS[wordLength + 1],
-    baseArray: shuffle(Array.from(WORD_SETS[wordLength]))
+    min: searchWords(wordLength - 1),
+    base: baseWords,
+    max: searchWords(wordLength + 1),
+    baseArray: shuffle(Array.from(baseWords))
   };
 
   // --- Reverse-first generation path ---
@@ -1457,7 +1425,7 @@ const generateLocalPuzzleCandidate = async (
     // Solve the reverse path to capture reverse solution steps for hints.
     // This also updates the forward solution's insertionPositions to match
     // the specific forward placement that makes the reverse path work.
-    const reverseSolution = solveReverse(words, solution);
+    const reverseSolution = solveReverse(words, solution, dicts);
 
     return {
       words,
@@ -1615,6 +1583,46 @@ const generateLocalPuzzleCandidate = async (
 };
 
 /**
+ * Prove the exact sampled descent before searching its return. Generation
+ * already chose positions; re-enumerating every alternate descent for each
+ * random walk multiplies work on sparse six-letter graphs. This conservative
+ * probe keeps all cumulative locks and rejects incomplete/invalid metadata.
+ */
+interface ReverseSearchWords { min: Set<string>; base: Set<string>; max: Set<string> }
+
+export function isAuthoredReverseSolvable(
+  words: string[], solution: PuzzleSolutionStep[], searchWords?: ReverseSearchWords,
+): boolean {
+  if (words.length < 2 || solution.length !== words.length - 1) return false;
+  const wordLength = words[0].length;
+  const minDict = searchWords?.min ?? getGenerationWordSets()[wordLength - 1];
+  const baseDict = searchWords?.base ?? getGenerationWordSets()[wordLength];
+  const maxDict = searchWords?.max ?? getGenerationWordSets()[wordLength + 1];
+  if (!minDict || !baseDict || !maxDict) return false;
+  const rows = [...words];
+  const locks = words.map(() => new Set<number>());
+  for (let index = 0; index < solution.length; index++) {
+    const step = solution[index];
+    const remove = step.removalPosition;
+    const insert = step.insertionPosition;
+    const source = rows[index];
+    const target = rows[index + 1];
+    if (step.stepIndex !== index || remove == null || insert == null ||
+        !Number.isInteger(remove) || !Number.isInteger(insert) || remove < 0 || remove >= source.length || insert < 0 || insert > target.length ||
+        locks[index].has(remove) || source[remove] !== step.letterToMove) return false;
+    const remainder = source.slice(0, remove) + source.slice(remove + 1);
+    const formed = target.slice(0, insert) + step.letterToMove + target.slice(insert);
+    if (!(index === 0 ? minDict : baseDict).has(remainder) || !maxDict.has(formed)) return false;
+    rows[index] = remainder;
+    rows[index + 1] = formed;
+    locks[index] = new Set([...locks[index]].map(position => position > remove ? position - 1 : position));
+    locks[index + 1] = new Set([...locks[index + 1]].map(position => position >= insert ? position + 1 : position));
+    locks[index + 1].add(insert);
+  }
+  return canSolveReverseIterative(rows, minDict, baseDict, maxDict, wordLength, locks);
+}
+
+/**
  * Validate that a puzzle's reverse path is solvable.
  *
  * Simulates the forward pass using solution steps to compute the post-forward
@@ -1639,9 +1647,9 @@ export function isReverseSolvable(
   if (!solution || solution.length === 0 || words.length < 2) return false;
 
   const wordLength = words[0].length;
-  const minDict = WORD_SETS[wordLength - 1];
-  const baseDict = WORD_SETS[wordLength];
-  const maxDict = WORD_SETS[wordLength + 1];
+  const minDict = getGenerationWordSets()[wordLength - 1];
+  const baseDict = getGenerationWordSets()[wordLength];
+  const maxDict = getGenerationWordSets()[wordLength + 1];
 
   if (!minDict || !baseDict || !maxDict) return false;
 
@@ -1681,14 +1689,12 @@ export function isReverseSolvable(
     }
     if (unlockedPositions.length === 0) return false;
 
-    // Only validate remainder when there are duplicate occurrences (disambiguation needed).
-    // When unique, just use that position directly.
-    const validRemovePositions = unlockedPositions.length === 1
-      ? unlockedPositions
-      : unlockedPositions.filter(i => {
-          const remainder = srcRow.slice(0, i).join('') + srcRow.slice(i + 1).join('');
-          return baseDict.has(remainder);
-        });
+    // Alternate insertion positions can change the source word. Validate every
+    // remainder, even when the moved letter occurs only once in this branch.
+    const removalDict = srcRow.length > wordLength ? baseDict : minDict;
+    const validRemovePositions = unlockedPositions.filter(i =>
+      removalDict.has(srcRow.slice(0, i).join('') + srcRow.slice(i + 1).join('')),
+    );
     if (validRemovePositions.length === 0) return false;
 
     // Try each valid removal position × each valid insertion position
@@ -1736,136 +1742,6 @@ export function isReverseSolvable(
 }
 
 /**
- * Fast approximation of isReverseSolvable for use during chain generation.
- * Instead of exhaustively trying ALL forward insertion position combinations,
- * samples a limited number of random combinations. This is ~50-100x faster
- * than the full check with some false negatives (may miss valid chains).
- *
- * For each forward step, picks up to 2 random valid insertion positions,
- * giving at most 2^numSteps combinations (16 for HARD). Uses a reduced
- * MAX_ITERATIONS for the reverse DFS.
- */
-function isReverseSolvableFast(
-  words: string[],
-  solution: PuzzleSolutionStep[]
-): boolean {
-  if (!solution || solution.length === 0 || words.length < 2) return false;
-
-  const wordLength = words[0].length;
-  const minDict = WORD_SETS[wordLength - 1];
-  const baseDict = WORD_SETS[wordLength];
-  const maxDict = WORD_SETS[wordLength + 1];
-
-  if (!minDict || !baseDict || !maxDict) return false;
-
-  // Collect valid insertion positions per step
-  type StepPositions = Array<{
-    k: number; // insertion position
-    newRowLetters: string[][];
-    newLockedSets: Set<number>[];
-  }>;
-
-  // Build all valid forward states step by step, sampling at each level
-  function buildForwardStates(
-    stepIdx: number,
-    rowLetters: string[][],
-    lockedSets: Set<number>[],
-    maxPerStep: number
-  ): Array<{ rows: string[]; lockedSets: Set<number>[] }> {
-    if (stepIdx >= solution.length) {
-      return [{ rows: rowLetters.map(r => r.join('')), lockedSets }];
-    }
-
-    const step = solution[stepIdx];
-    const srcRow = rowLetters[step.stepIndex];
-    const srcLocked = lockedSets[step.stepIndex];
-
-    // Find ALL unlocked positions where the letter to move exists.
-    const unlockedPositions: number[] = [];
-    for (let i = 0; i < srcRow.length; i++) {
-      if (srcRow[i] === step.letterToMove && !srcLocked.has(i)) {
-        unlockedPositions.push(i);
-      }
-    }
-    if (unlockedPositions.length === 0) return [];
-
-    // Only validate remainder when there are duplicate occurrences (disambiguation needed).
-    const validRemovePositions = unlockedPositions.length === 1
-      ? unlockedPositions
-      : unlockedPositions.filter(i => {
-          const remainder = srcRow.slice(0, i).join('') + srcRow.slice(i + 1).join('');
-          return baseDict.has(remainder);
-        });
-    if (validRemovePositions.length === 0) return [];
-
-    const tgtRow = rowLetters[step.stepIndex + 1];
-    const tgtStr = tgtRow.join('');
-
-    const results: Array<{ rows: string[]; lockedSets: Set<number>[] }> = [];
-
-    for (const letterIdx of validRemovePositions) {
-      const shiftedSrcLocked = new Set<number>();
-      for (const pos of srcLocked) {
-        if (pos < letterIdx) shiftedSrcLocked.add(pos);
-        else if (pos > letterIdx) shiftedSrcLocked.add(pos - 1);
-      }
-
-      const newSrcRow = [...srcRow];
-      newSrcRow.splice(letterIdx, 1);
-
-      // Find all valid insertion positions
-      const validPositions: number[] = [];
-      for (let k = 0; k <= tgtRow.length; k++) {
-        const combined = tgtStr.slice(0, k) + step.letterToMove + tgtStr.slice(k);
-        if (maxDict.has(combined)) validPositions.push(k);
-      }
-
-      if (validPositions.length === 0) continue;
-
-      // Sample: shuffle and take up to maxPerStep
-      const sampled = shuffle(validPositions).slice(0, maxPerStep);
-
-      for (const k of sampled) {
-        const newRowLetters = rowLetters.map(r => [...r]);
-        newRowLetters[step.stepIndex] = newSrcRow;
-        const newTgtRow = [...tgtRow];
-        newTgtRow.splice(k, 0, step.letterToMove);
-        newRowLetters[step.stepIndex + 1] = newTgtRow;
-
-        const newLockedSets = lockedSets.map(s => new Set(s));
-        newLockedSets[step.stepIndex] = shiftedSrcLocked;
-        const shiftedTgtLocked = new Set<number>();
-        for (const pos of lockedSets[step.stepIndex + 1]) {
-          if (pos < k) shiftedTgtLocked.add(pos);
-          else shiftedTgtLocked.add(pos + 1);
-        }
-        shiftedTgtLocked.add(k);
-        newLockedSets[step.stepIndex + 1] = shiftedTgtLocked;
-
-        results.push(...buildForwardStates(stepIdx + 1, newRowLetters, newLockedSets, maxPerStep));
-      }
-    }
-
-    return results;
-  }
-
-  const initialRowLetters = words.map(w => w.split(''));
-  const initialLockedSets: Set<number>[] = words.map(() => new Set<number>());
-
-  // Sample up to 2 positions per step → max 16 combinations for 4-step HARD
-  const forwardStates = buildForwardStates(0, initialRowLetters, initialLockedSets, 2);
-
-  // Check each sampled forward state with a reduced iteration limit
-  for (const st of forwardStates) {
-    if (canSolveReverseIterative(st.rows, minDict, baseDict, maxDict, wordLength, st.lockedSets, 15000)) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-/**
  * Check if the reverse path from bottom to top is solvable.
  * Uses iterative depth-first search with backtracking.
  *
@@ -1899,9 +1775,9 @@ function canSolveReverseIterative(
     targetWord: string,
     step: number,
     sourceLockedSet: Set<number>
-  ): Array<{ newSource: string; newTarget: string; insertPos: number; removePos: number }> {
+  ): { newSource: string; newTarget: string; insertPos: number; removePos: number }[] {
     const isLastStep = step === numSteps - 1;
-    const moves: Array<{ newSource: string; newTarget: string; insertPos: number; removePos: number }> = [];
+    const moves: { newSource: string; newTarget: string; insertPos: number; removePos: number }[] = [];
 
     for (let i = 0; i < sourceWord.length; i++) {
       // Skip all locked positions — these letters cannot be picked
@@ -2014,14 +1890,15 @@ function canSolveReverseIterative(
  */
 export function solveReverse(
   words: string[],
-  solution: PuzzleSolutionStep[]
+  solution: PuzzleSolutionStep[],
+  searchWords?: ReverseSearchWords,
 ): PuzzleSolutionStep[] | null {
   if (!solution || solution.length === 0 || words.length < 2) return null;
 
   const wordLength = words[0].length;
-  const minDict = WORD_SETS[wordLength - 1];
-  const baseDict = WORD_SETS[wordLength];
-  const maxDict = WORD_SETS[wordLength + 1];
+  const minDict = searchWords?.min ?? getGenerationWordSets()[wordLength - 1];
+  const baseDict = searchWords?.base ?? getGenerationWordSets()[wordLength];
+  const maxDict = searchWords?.max ?? getGenerationWordSets()[wordLength + 1];
 
   if (!minDict || !baseDict || !maxDict) return null;
 
@@ -2040,7 +1917,7 @@ export function solveReverse(
     stepIdx: number,
     rowLetters: string[][],
     lockedSets: Set<number>[],
-    forwardPositions: Array<{ removePos: number; insertPos: number }>
+    forwardPositions: { removePos: number; insertPos: number }[]
   ): PuzzleSolutionStep[] | null {
     if (leafBudget <= 0) return null;
     if (stepIdx >= solution.length) {
@@ -2049,11 +1926,23 @@ export function solveReverse(
       const postForwardRows = rowLetters.map(r => r.join(''));
       const reverseResult = solveReverseIterative(postForwardRows, minDict, baseDict, maxDict, wordLength, lockedSets);
       if (reverseResult !== null) {
-        // Update the forward solution's positions to match the exact
-        // removal + insertion that makes the reverse path work
+        // Rebuild the hints from the chosen path. Updating positions alone
+        // leaves stale source words when an earlier insertion forms a different
+        // word, so later hints and vocabulary checks describe the wrong board.
+        const replayRows = [...words];
         for (let i = 0; i < forwardPositions.length; i++) {
-          solution[i].insertionPosition = forwardPositions[i].insertPos;
-          solution[i].removalPosition = forwardPositions[i].removePos;
+          const step = solution[i];
+          const { removePos, insertPos } = forwardPositions[i];
+          const source = replayRows[step.stepIndex];
+          const target = replayRows[step.stepIndex + 1];
+          const formed = target.slice(0, insertPos) + step.letterToMove + target.slice(insertPos);
+          step.sourceWord = source;
+          step.targetWord = target;
+          step.insertionPosition = insertPos;
+          step.removalPosition = removePos;
+          step.explanation = `Move '${step.letterToMove}' from ${source} to form ${formed}.`;
+          replayRows[step.stepIndex] = source.slice(0, removePos) + source.slice(removePos + 1);
+          replayRows[step.stepIndex + 1] = formed;
         }
       }
       return reverseResult;
@@ -2072,16 +1961,12 @@ export function solveReverse(
     }
     if (unlockedPositions.length === 0) return null;
 
-    // Only validate remainder when there are duplicate occurrences (disambiguation needed).
-    // For words like CHASES with two S's, removing position 3 vs 5 yields different
-    // remaining words (CHAES vs CHASE). We must try all to find the right one.
-    const validRemovePositions = unlockedPositions.length === 1
-      ? unlockedPositions
-      : unlockedPositions.filter(i => {
-          const remainder = srcRow.slice(0, i).join('') + srcRow.slice(i + 1).join('');
-          const removalDict = srcRow.length > wordLength ? baseDict : minDict;
-          return removalDict.has(remainder);
-        });
+    // A different earlier insertion can change this source even when its
+    // moved letter is unique. Every branch must leave a playable word.
+    const removalDict = srcRow.length > wordLength ? baseDict : minDict;
+    const validRemovePositions = unlockedPositions.filter(i =>
+      removalDict.has(srcRow.slice(0, i).join('') + srcRow.slice(i + 1).join('')),
+    );
     if (validRemovePositions.length === 0) return null;
 
     // Try each valid removal position × each valid insertion position
@@ -2170,9 +2055,9 @@ function solveReverseIterative(
     targetWord: string,
     step: number,
     sourceLockedSet: Set<number>
-  ): Array<{ newSource: string; newTarget: string; insertPos: number; removePos: number; letter: string }> {
+  ): { newSource: string; newTarget: string; insertPos: number; removePos: number; letter: string }[] {
     const isLastStep = step === numSteps - 1;
-    const moves: Array<{ newSource: string; newTarget: string; insertPos: number; removePos: number; letter: string }> = [];
+    const moves: { newSource: string; newTarget: string; insertPos: number; removePos: number; letter: string }[] = [];
 
     for (let i = 0; i < sourceWord.length; i++) {
       if (sourceLockedSet.has(i)) continue;
@@ -2365,13 +2250,13 @@ function canReverseLastStep(
 function simulateForwardStates(
   chain: PathNode[],
   wordLength: number
-): Array<{ rows: string[]; lockedSets: Set<number>[] }> | null {
-  const maxDict = WORD_SETS[wordLength + 1];
+): { rows: string[]; lockedSets: Set<number>[] }[] | null {
+  const maxDict = getGenerationWordSets()[wordLength + 1];
   if (!maxDict) return null;
 
   // Initial state: all original words, no locks
   const words = chain.map(n => n.word);
-  let states: Array<{ rows: string[]; lockedSets: Set<number>[] }> = [{
+  let states: { rows: string[]; lockedSets: Set<number>[] }[] = [{
     rows: [...words],
     lockedSets: words.map(() => new Set<number>()),
   }];
@@ -2380,7 +2265,7 @@ function simulateForwardStates(
     const node = chain[stepIdx];
     if (!node.letterToGive) break; // Incomplete chain (current node has no move yet)
 
-    const nextStates: Array<{ rows: string[]; lockedSets: Set<number>[] }> = [];
+    const nextStates: { rows: string[]; lockedSets: Set<number>[] }[] = [];
     for (const st of states) {
       const srcRow = st.rows[stepIdx].split('');
       const letterIdx = srcRow.indexOf(node.letterToGive);
@@ -2716,7 +2601,7 @@ interface DoubleInsertionTarget {
 
 type DoubleInsertionIndex = Map<string, DoubleInsertionTarget[]>;
 
-const doubleInsertionIndexCache = new Map<number, DoubleInsertionIndex>();
+const doubleInsertionIndexCache = new Map<string, DoubleInsertionIndex>();
 
 /** Normalize a letter pair to a canonical sorted key (e.g., "EL" not "LE"). */
 function letterPairKey(a: string, b: string): string {
@@ -2728,11 +2613,12 @@ function letterPairKey(a: string, b: string): string {
  * Iterates all (W+2)-letter words and finds valid 2-letter removals.
  */
 export function getDoubleInsertionIndex(wordLength: number): DoubleInsertionIndex {
-  const cached = doubleInsertionIndexCache.get(wordLength);
+  const cacheKey = `${getGenerationVocabularyKey()}:${wordLength}`;
+  const cached = doubleInsertionIndexCache.get(cacheKey);
   if (cached) return cached;
 
-  const baseSet = WORD_SETS[wordLength];
-  const maxSet = WORD_SETS[wordLength + 2];
+  const baseSet = getGenerationWordSets()[wordLength];
+  const maxSet = getGenerationWordSets()[wordLength + 2];
   if (!baseSet || !maxSet) return new Map();
 
   const index: DoubleInsertionIndex = new Map();
@@ -2761,7 +2647,7 @@ export function getDoubleInsertionIndex(wordLength: number): DoubleInsertionInde
     }
   }
 
-  doubleInsertionIndexCache.set(wordLength, index);
+  doubleInsertionIndexCache.set(cacheKey, index);
   return index;
 }
 
@@ -2773,16 +2659,16 @@ function findDoubleRemovals(
   word: string,
   validSet: Set<string>,
   lockedPositions?: Set<number>
-): Array<{
+): {
   letters: [string, string];
   positions: [number, number];
   remainder: string;
-}> {
-  const results: Array<{
+}[] {
+  const results: {
     letters: [string, string];
     positions: [number, number];
     remainder: string;
-  }> = [];
+  }[] = [];
 
   const len = word.length;
   for (let i = 0; i < len - 1; i++) {
@@ -2917,12 +2803,12 @@ async function findDoubleShiftPath(
     if (!targets) continue;
 
     // Score and filter insertion targets
-    const candidates: Array<{
+    const candidates: {
       baseWord: string;
       result: string;
       resultPositions: [number, number];
       score: number;
-    }> = [];
+    }[] = [];
 
     for (const t of targets) {
       if (usedWords.has(t.baseWord)) continue;
@@ -3079,7 +2965,7 @@ async function generateDoubleShiftPuzzleCandidate(
     difficulty === 'EXPERT' ? 7 : // apex: 6L double-shift is impossible (needs 8-letter
     6 // HARD                     // grow-targets), so differentiate by a longer 7-row chain
   );
-  // Rarity lean (0/1/2), reset per call (see generateLocalPuzzle).
+  // Rarity lean (0/1/2/3), reset per call (see generateLocalPuzzle).
   currentRarityLean = overrides?.rarityLean ?? 0;
 
   const recencyMap = await getWordHistoryWithRecency();
@@ -3091,9 +2977,9 @@ async function generateDoubleShiftPuzzleCandidate(
   }
 
   const dicts = {
-    min2: WORD_SETS[wordLength - 2],  // 3-letter words (remainder after removing 2 from row 0)
-    base: WORD_SETS[wordLength],       // 5-letter words (all displayed words)
-    max2: WORD_SETS[wordLength + 2],   // 7-letter words (tempState after inserting 2)
+    min2: getGenerationWordSets()[wordLength - 2],  // 3-letter words (remainder after removing 2 from row 0)
+    base: getGenerationWordSets()[wordLength],       // 5-letter words (all displayed words)
+    max2: getGenerationWordSets()[wordLength + 2],   // 7-letter words (tempState after inserting 2)
   };
 
   if (!dicts.min2 || !dicts.base || !dicts.max2) {
@@ -3114,7 +3000,7 @@ async function generateDoubleShiftPuzzleCandidate(
   const baseArray = shuffle(Array.from(dicts.base));
   const candidates = weightedShuffle(baseArray, wordLength, recencyMap);
 
-  const generatedPuzzles: Array<{ chain: DoubleShiftPathNode[]; score: number }> = [];
+  const generatedPuzzles: { chain: DoubleShiftPathNode[]; score: number }[] = [];
   let candidateIndex = 0;
 
   while (
@@ -3323,19 +3209,25 @@ export function getIncantationName(words: string[], phase: number): string | nul
   return templates[hash % templates.length];
 }
 
-/** Never deliver a generated board whose authored route requires unreviewed vocabulary. */
+/** Search and acceptance use the same vocabulary policy for every mode. */
 export async function generateLocalPuzzle(...args: Parameters<typeof generateLocalPuzzleCandidate>): Promise<PuzzleConfig> {
-  const puzzle = await generateLocalPuzzleCandidate(...args);
-  if (!isPuzzleVocabularyFair(puzzle, args[0] === 'EXPERT' || (args[1]?.rarityLean ?? 0) > 0)) {
-    throw new Error('Generated puzzle did not meet the playable vocabulary policy');
-  }
-  return puzzle;
+  const advanced = args[0] === 'EXPERT' || (args[1]?.rarityLean ?? 0) > 0;
+  return withGenerationVocabulary(advanced, async () => {
+    const puzzle = await generateLocalPuzzleCandidate(...args);
+    if (!isPuzzleVocabularyFair(puzzle, advanced)) {
+      throw new Error('Generated puzzle did not meet the playable vocabulary policy');
+    }
+    return puzzle;
+  });
 }
 
 export async function generateDoubleShiftPuzzle(...args: Parameters<typeof generateDoubleShiftPuzzleCandidate>): Promise<PuzzleConfig> {
-  const puzzle = await generateDoubleShiftPuzzleCandidate(...args);
-  if (!isPuzzleVocabularyFair(puzzle, args[0] === 'EXPERT' || (args[1]?.rarityLean ?? 0) > 0)) {
-    throw new Error('Generated puzzle did not meet the playable vocabulary policy');
-  }
-  return puzzle;
+  const advanced = args[0] === 'EXPERT' || (args[1]?.rarityLean ?? 0) > 0;
+  return withGenerationVocabulary(advanced, async () => {
+    const puzzle = await generateDoubleShiftPuzzleCandidate(...args);
+    if (!isPuzzleVocabularyFair(puzzle, advanced)) {
+      throw new Error('Generated puzzle did not meet the playable vocabulary policy');
+    }
+    return puzzle;
+  });
 }

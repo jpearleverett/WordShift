@@ -1,0 +1,34 @@
+dictionary.ts: removed 0 of 22749 words:
+
+dictionary.txt: removed 0 of 20724 lines
+lexiconBankDoubleShiftEasy.ts: kept 260, removed 0
+lexiconBankDoubleShiftExpert.ts: kept 100, removed 0
+lexiconBankDoubleShiftHard.ts: kept 100, removed 0
+lexiconBankDoubleShiftMedium.ts: kept 263, removed 0
+lexiconBankDoubleShiftMediumPlus.ts: kept 262, removed 0
+lexiconBankEasy.ts: kept 251, removed 0
+lexiconBankExpert.ts: kept 100, removed 0
+lexiconBankHard.ts: kept 100, removed 0
+lexiconBankMedium.ts: kept 247, removed 0
+lexiconBankMediumPlus.ts: kept 255, removed 0
+lexiconBankReverseEasy.ts: kept 240, removed 0
+lexiconBankReverseExpert.ts: kept 100, removed 0
+lexiconBankReverseHard.ts: kept 100, removed 0
+lexiconBankReverseMedium.ts: kept 240, removed 0
+lexiconBankReverseMediumPlus.ts: kept 100, removed 0
+puzzleBankDoubleShiftEasy.ts: kept 493, removed 0
+puzzleBankDoubleShiftExpert.ts: kept 263, removed 0
+puzzleBankDoubleShiftHard.ts: kept 100, removed 0
+puzzleBankDoubleShiftMedium.ts: kept 495, removed 0
+puzzleBankDoubleShiftMediumPlus.ts: kept 496, removed 0
+puzzleBankEasy.ts: kept 453, removed 0
+puzzleBankExpert.ts: kept 100, removed 0
+puzzleBankHard.ts: kept 100, removed 0
+puzzleBankMedium.ts: kept 338, removed 0
+puzzleBankMediumPlus.ts: kept 500, removed 0
+puzzleBankReverseEasy.ts: kept 500, removed 0
+puzzleBankReverseExpert.ts: kept 100, removed 0
+puzzleBankReverseHard.ts: kept 100, removed 0
+puzzleBankReverseMedium.ts: kept 500, removed 0
+puzzleBankReverseMediumPlus.ts: kept 100, removed 0
+src/constants/wordLists.ts: clean

@@ -135,7 +135,8 @@ describe('collection achievements are checked where the unlock counts actually m
     // purchase, skip-the-gate, speed-up-a-reservation.
     expect(UNLOCK_FLOW.match(/onUnlockCompleted\?\.\(\)/g)?.length).toBe(3);
     // ...and the reserved room that builds itself at its gate, in HomeScreen.
-    expect(HOME).toContain('onUnlockCompleted?.();');
+    expect(HOME).toContain('unlockCompletedRef.current?.();');
+    expect(HOME).toContain('useLayoutEffect(() => { unlockCompletedRef.current = onUnlockCompleted; });');
     expect(HOME).toContain('onUnlockCompleted?: () => void;');
   });
 });

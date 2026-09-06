@@ -22,7 +22,8 @@
  */
 
 import { Difficulty, PuzzleSolutionStep } from '../types';
-import { isReverseSolvable } from './localGenerator';
+import { COMMON_WORDS } from '../constants/wordLists';
+import { isReverseChainSolvable } from './puzzleSolvability';
 // Speed timers live in the central balance file (single source of truth).
 import {
   SPEED_TIME_LIMITS as SPEED_TIME_LIMIT_BY_DIFFICULTY,
@@ -462,7 +463,10 @@ export function isVariantCompatibleWithSolution(
 
   // Reverse variants: validate that the return path is solvable
   if (hasVariantModifier(variant, 'reverse') && words && words.length >= 2) {
-    if (!isReverseSolvable(words, solution)) {
+    // This proof runs after generator vocabulary context has been restored.
+    // Use the live move dictionary so a valid Expert/Lexicon return path is
+    // never rejected merely because the next search defaults to common words.
+    if (isReverseChainSolvable(words, word => COMMON_WORDS.has(word.toUpperCase())) !== 'solvable') {
       return false;
     }
   }

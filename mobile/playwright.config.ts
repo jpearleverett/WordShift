@@ -10,6 +10,7 @@ export default defineConfig({
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: 'http://localhost:8081',
+    actionTimeout: 30_000,
     viewport: { width: 390, height: 844 },
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
@@ -20,6 +21,7 @@ export default defineConfig({
   },
   webServer: {
     command: 'npx expo start --web --port 8081 --max-workers 1',
+    env: { NODE_OPTIONS: '--max-old-space-size=900', EXPO_NO_TELEMETRY: '1', SENTRY_DISABLE_AUTO_UPLOAD: 'true' },
     url: 'http://localhost:8081',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

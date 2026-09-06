@@ -1,12 +1,10 @@
-import React, { useRef, useCallback, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   Animated,
   Image,
   ImageSourcePropType,
   Pressable,
   StyleSheet,
-  Text,
-  View,
   ViewStyle,
 } from 'react-native';
 import { SURFACE, getPressSpring } from '../../theme/surfaces';
@@ -22,6 +20,8 @@ import { getSettingsSync } from '../../services/settings';
 import { playUiSound, type UiSoundKind } from '../../services/uiSound';
 import { playUiHaptic } from '../../services/uiHaptic';
 import { PIXEL_FONT_BOLD } from '../../theme/fonts';
+import { AppText } from './AppText';
+import { TEXT_ROLE } from '../../theme/typography';
 
 export type CandyButtonVariant = 'primary' | 'amber' | 'secondary' | 'quiet';
 
@@ -82,7 +82,7 @@ export const CandyButton: React.FC<CandyButtonProps> = ({
 }) => {
   const skin = getPixelSkin(phase, hostDark);
   const reducedMotion = getSettingsSync().reducedMotion;
-  const travel = useRef(new Animated.Value(0)).current;
+  const [travel] = useState(() => new Animated.Value(0));
   const [pressed, setPressed] = useState(false);
 
   const handlePress = useCallback(() => {
@@ -129,7 +129,7 @@ export const CandyButton: React.FC<CandyButtonProps> = ({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityState={{ disabled }}
-      style={[{ height: stripHeight, minWidth: BTN_CAP_DP * 2 + 24 }, disabled && styles.disabled, style]}
+      style={[{ minHeight: stripHeight, minWidth: BTN_CAP_DP * 2 + 24 }, disabled && styles.disabled, style]}
       // Disabled dims the whole button with opacity. Android applies group
       // opacity PER-VIEW, so the strip's deliberate 1dp cap/middle overlap
       // double-blends into a more-opaque vertical sliver at both cap joints
@@ -150,8 +150,8 @@ export const CandyButton: React.FC<CandyButtonProps> = ({
         {/* Icon-only buttons (a close mark, say) drop the label gap so the
             sprite sits on the button's own centre line. */}
         {icon ? <Image source={icon} style={[styles.icon, !label && styles.iconOnly]} resizeMode="contain" /> : null}
-        <Text
-          numberOfLines={1}
+        <AppText
+          textRole="label"
           style={[
             styles.label,
             size === 'lg' && styles.labelLg,
@@ -160,7 +160,7 @@ export const CandyButton: React.FC<CandyButtonProps> = ({
           ]}
         >
           {label}
-        </Text>
+        </AppText>
       </Animated.View>
     </Pressable>
   );
@@ -168,11 +168,12 @@ export const CandyButton: React.FC<CandyButtonProps> = ({
 
 const styles = StyleSheet.create({
   content: {
-    flex: 1,
+    flexGrow: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,
+    paddingTop: 10,
   },
   disabled: {
     opacity: 0.45,
@@ -186,8 +187,8 @@ const styles = StyleSheet.create({
     marginRight: 0,
   },
   label: {
-    fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 16,
+    ...TEXT_ROLE.label,
+    flexShrink: 1,
     fontWeight: '800',
     letterSpacing: 0.6,
     textAlign: 'center',
