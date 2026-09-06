@@ -17,7 +17,7 @@ module.exports = defineConfig([
     ],
   },
   {
-    // Expo SDK 56 enables additional React compiler diagnostics. The existing
+    // Expo SDK 57 enables additional React compiler diagnostics. The existing
     // React Native animation pattern (`useRef(new Animated.Value()).current`)
     // is widespread and already covered by runtime tests, so keep these as
     // upgrade warnings rather than blocking the SDK migration on a large

@@ -5,7 +5,7 @@ title: WordShift Privacy Policy
 
 # WordShift Privacy Policy
 
-**Effective date:** July 2, 2026
+**Effective date:** September 5, 2026
 
 WordShift ("the app") is a word puzzle game developed by Jonathan Pearl Everett ("we", "us"). This policy explains what information the app handles, what is sent off your device, and which third-party services are involved.
 
@@ -23,7 +23,7 @@ All gameplay data is stored locally on your device using your operating system's
 - A randomly generated install identifier (a random string, not tied to your real-world identity) used to operate the online features below
 - A local event log used for debugging
 
-Deleting the app, or using **Settings → Reset All Progress**, permanently deletes the local copy of this data.
+**Settings → Reset All Progress** clears gameplay progress and settings, while retaining install/save/support references and purchase retry protection. Store purchases can restore afterward. Reset also attempts to overwrite the cloud backup with the reset state; cloud deletion is a separate request.
 
 ## Information sent off your device
 
@@ -34,7 +34,7 @@ To understand how the game is played and improve it, the app sends anonymous eve
 To find and fix bugs, the app sends crash and error reports to Sentry. These may include your device model, operating-system version, app version, and a technical error trace.
 
 ### Cloud backup
-When you are online, the app automatically backs up your game save (progress, currency, settings) to our backend (Supabase) under your random install identifier — for example when you open the app and after you complete a puzzle — so your progress can be restored if you reinstall or switch devices. The backup contains only game data, never your name, email, or contacts. **Settings → Backup & Restore** shows a recovery code you can use to restore the save on another device, and you can ask us to delete your cloud save at any time (see below).
+When you are online, the app automatically backs up your game save (progress, currency, settings) to our backend (Supabase) under a separate random save credential — for example when you open the app and after you complete a puzzle — so your progress can be restored if you reinstall or switch devices. The backup contains game data, never your name, email, or contacts. Successful backups also privately link your support reference and install identifier to the save so support can locate records from linked devices. **Settings → Backup & Restore** shows a recovery code you can use to restore the save on another device, and you can ask us to delete your cloud save at any time (see below).
 
 ### Daily leaderboard
 If you play the Daily Challenge, your result (completion time, stars, and hints used) and your random install identifier are sent to our backend to compute an **anonymous** ranking. No name or profile is displayed.
@@ -64,7 +64,7 @@ WordShift is **not directed to children under 13**, and we do not knowingly coll
 ## Data retention and your choices
 
 - **Reset local data:** Settings → Reset All Progress (also clears local purchase/entitlement caches).
-- **Cloud backup:** managed via Settings → Backup & Restore; email us to delete a cloud save associated with your recovery code.
+- **Cloud backup:** managed via Settings → Backup & Restore; email us with the non-secret Support reference in Settings to request deletion of linked records. Do not email the recovery code; it authorizes backup access. We verify authority separately.
 - **Ads personalization:** use your device settings to reset or opt out of the advertising identifier, or use the **Privacy Options** entry in the app's Settings (shown where consent rules apply) to change your ad-consent choice.
 - **Notifications:** Settings → Daily Reminders, or your system notification settings.
 - **Other requests:** email us at the address below.

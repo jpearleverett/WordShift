@@ -1,4 +1,5 @@
-import { loadStoryState, STORY_COPY } from '../../services/storySpine';
+import { loadStoryState, getStoryWorldKeepsake, StoryContext, StoryState, STORY_COPY } from '../../services/storySpine';
+import { StoryWorldInspection } from './StoryWorldObject';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { FONT_SIZE } from '../../theme/typeScale';
 import {
@@ -8,7 +9,7 @@ import {
   Modal,
   TouchableOpacity,
   Animated,
-  Dimensions,
+  useWindowDimensions,
   Platform,
   Image,
   ScrollView,
@@ -185,7 +186,7 @@ import {
 import { getGalleryTitle, recordWhisper } from '../../services/whisperGallery';
 import {
   loadWeeklyQuests,
-  claimQuestReward,
+  claimAllReadyQuests,
   getQuestDescription,
   getTimeUntilReset,
   getTimeUntilDailyReset,
@@ -209,7 +210,6 @@ import { playUiHaptic } from '../../services/uiHaptic';
 import { announceForA11y } from '../../services/a11yAnnounce';
 import { logEvent } from '../../services/eventLogger';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface HomeScreenProps {
   onPlayPuzzle: (difficulty?: Difficulty) => void;
@@ -406,6 +406,7 @@ const BevelRowButton: React.FC<{
   /** UI sound on press (default 'tap'; dialogue-advance rows pass 'dialogue'). */
   soundKind?: UiSoundKind | 'none';
 }> = ({ phase, variant, onPress, disabled = false, accessibilityLabel, style, children, hostDark = false, soundKind = 'tap' }) => {
+  const styles = useHomeStyles();
   const skin = getPixelSkin(phase, hostDark);
   const reducedMotion = getSettingsSync().reducedMotion;
   const travel = useRef(new Animated.Value(0)).current;
@@ -471,13 +472,17 @@ const AmberCostLabel: React.FC<{
   color: string;
   textStyle?: StyleProp<TextStyle>;
   iconSize?: number;
-}> = ({ prefix, amount, color, textStyle = styles.bevelBtnText, iconSize = 16 }) => (
+}> = ({ prefix, amount, color, textStyle, iconSize = 16 }) => {
+  const styles = useHomeStyles();
+  textStyle ??= styles.bevelBtnText;
+  return (
   <>
     <Text style={[textStyle, { color }]}>{prefix}</Text>
     <AmberInline size={iconSize} style={styles.bevelAmberIcon} />
     <Text style={[textStyle, { color }]}>{amount}</Text>
   </>
-);
+  );
+};
 
 // The axolotl (scuba mask) and fennec (tall ears) are framed tighter in their
 // source sprites and read larger than the other animals in the dialogue alcove;
@@ -518,10 +523,12 @@ interface HomeSceneSnapshot {
   tendingLevel: number;
 }
 let homeSceneSnapshot: HomeSceneSnapshot | null = null;
+const quietLandingsShown = new Set<string>();
 
 /** Drop the paint-ahead scene (Reset All / cloud restore rebuilt the save). */
 export function resetHomeSceneSnapshot(): void {
   homeSceneSnapshot = null;
+  quietLandingsShown.clear();
 }
 
 // Once-per-APP-SESSION guard for the gentle "your pit is getting heavy" nudge.
@@ -577,7 +584,36 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // bright flash between the transition overlay and the real house, and the
   // "rooms visibly loading" the player sees. loadAllData still runs on mount
   // and overwrites this, so the snapshot is authoritative for at most one pass.
+  const styles = useHomeStyles();
   const [progress, setProgress] = useState<HomeWorldProgress | null>(homeSceneSnapshot?.progress ?? null);
+  const [worldStory, setWorldStory] = useState<StoryState | null>(null);
+  const [showStoryInspection, setShowStoryInspection] = useState(false);
+  const storyContext = useMemo<StoryContext | null>(() => progress ? ({
+    phase: progress.currentPhase, puzzlesSolved: progress.puzzlesSolved,
+    cycleCount: progress.cycleCount ?? 0, cycleStartPuzzles: progress.cycleStartPuzzles,
+    unlockedAnimals: progress.unlockedAnimals, postRevelation: progress.postRevelation,
+  }) : null, [progress]);
+  useEffect(() => {
+    let alive = true;
+    if (storyContext && !storyOverlayActive) {
+      loadStoryState(storyContext).then(state => { if (alive) setWorldStory(state); }).catch(() => {});
+    }
+    return () => { alive = false; };
+  }, [storyContext, storyOverlayActive]);
+  const storyKeepsake = useMemo(() => worldStory && storyContext ? getStoryWorldKeepsake(worldStory, storyContext) : null, [worldStory, storyContext]);
+  const [quietLanding, setQuietLanding] = useState(false);
+  const landingBoundary = storyKeepsake?.boundary;
+  const landingInherited = storyKeepsake?.inherited;
+  const landingCycle = storyContext?.cycleCount;
+  useEffect(() => {
+    if (!landingBoundary || landingInherited || landingCycle === undefined) return;
+    const key = `${landingCycle}:${landingBoundary}`;
+    if (quietLandingsShown.has(key)) return;
+    quietLandingsShown.add(key);
+    setQuietLanding(true);
+    const timer = setTimeout(() => setQuietLanding(false), 6500);
+    return () => clearTimeout(timer);
+  }, [landingBoundary, landingInherited, landingCycle]);
   const [rooms, setRooms] = useState<Room[]>(homeSceneSnapshot?.rooms ?? []);
   const [animals, setAnimals] = useState<Animal[]>(homeSceneSnapshot?.animals ?? []);
 
@@ -599,8 +635,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // two can never flicker over each other.
   const introSurfaceBusyRef = useRef(false);
   useEffect(() => {
-    introSurfaceBusyRef.current = showIntroDialogue || !!introOverrideLines || storyOverlayActive;
-  }, [showIntroDialogue, introOverrideLines, storyOverlayActive]);
+    introSurfaceBusyRef.current = showIntroDialogue || !!introOverrideLines || storyOverlayActive || showStoryInspection || quietLanding;
+  }, [showIntroDialogue, introOverrideLines, storyOverlayActive, showStoryInspection, quietLanding]);
   // Journal spotlight intro state
   const [journalSpotlightActive, setJournalSpotlightActive] = useState(false);
   const [journalSpotlightIndex, setJournalSpotlightIndex] = useState(0);
@@ -646,6 +682,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Weekly quest hub
   const [weeklyQuestState, setWeeklyQuestState] = useState<CombinedQuestState | null>(null);
   const [showQuestModal, setShowQuestModal] = useState(false);
+  const [questClaimBusy, setQuestClaimBusy] = useState(false);
+  const questClaimBusyRef = useRef(false);
+  const [questClaimError, setQuestClaimError] = useState<string | null>(null);
   // Quest reward reveal: the claim (and the opt-in watch-to-double) pays out as
   // a RewardReveal count-up + amber-icon pop instead of a static text line. The
   // id remounts the reveal so each payout re-animates (claim, then double).
@@ -659,6 +698,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [showJournalModal, setShowJournalModal] = useState(false);
   const [showSeasonModal, setShowSeasonModal] = useState(false);
   const [seasonClaimable, setSeasonClaimable] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    if (progress) getSeasonClaimableCount(progress.puzzlesSolved ?? 0)
+      .then(count => { if (alive) setSeasonClaimable(count); }).catch(() => {});
+    return () => { alive = false; };
+  }, [progress?.puzzlesSolved, showSeasonModal]);
   const [showUtilityModal, setShowUtilityModal] = useState(false);
 
   // Ambient home line (atmospheric text when idle)
@@ -1771,6 +1816,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       setWeeklyQuestState(refreshed);
     }
     setQuestReward(null);
+    setQuestClaimError(null);
     setDoubleQuestOffer(null);
     setShowQuestModal(true);
   }, [progress, animals]);
@@ -1792,44 +1838,44 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   }, [questCashOut]);
 
   const handleClaimQuest = useCallback(async (questId: string) => {
-    if (!progress) return;
-    const reward = await claimQuestReward(questId, progress.currentPhase);
-    if (!reward) return;
-
-    const newBalance = await awardBonusAmber(reward.amber, 'quest_reward');
-    onAmberChange?.(newBalance);
-    setProgress(prev => prev ? { ...prev, amber: newBalance } : prev);
-    questRewardIdRef.current += 1;
-    setQuestReward({ amount: reward.amber, label: 'Claimed', id: questRewardIdRef.current });
-    // Offer an opt-in "watch to double it" rewarded ad for this claim.
-    setDoubleQuestOffer({ questId, amber: reward.amber });
-    logEvent({ type: 'quest_reward_claimed', data: { questId, amber: reward.amber } });
-
-    // NO context on purpose. loadWeeklyQuests STORES whatever context it is
-    // handed (module-level lastKnownContext + the persisted
-    // lastGenerationContext), and this call passed a partial one with no
-    // unlockedVariants — overwriting the full context handleOpenQuestModal had
-    // just written, since the modal must be open to claim. A later context-less
-    // regeneration (updateQuestProgress on any victory, after a period
-    // rollover) then read unlockedVariants: [] and filtered every variant_wins
-    // template out of the whole next day's board. This refresh is a re-read of
-    // the current period's just-mutated cache, never a generation, so it needs
-    // no context at all: the safest fix is to hand it none.
-    const refreshed = await loadWeeklyQuests(progress.currentPhase);
-    // loadWeeklyQuests returns the module-level cache objects that
-    // claimQuestReward mutated IN PLACE — the same references this component
-    // already holds in state. Clone every level so the pill/journal counts
-    // (and anything memoized on tier or quest identity) re-derive from the
-    // post-claim state immediately, not from a stale snapshot.
-    setWeeklyQuestState({
-      daily: { ...refreshed.daily, quests: refreshed.daily.quests.map(q => ({ ...q })) },
-      weekly: { ...refreshed.weekly, quests: refreshed.weekly.quests.map(q => ({ ...q })) },
-    });
-    // A claim is a payoff: buzz it and cash the just-claimed card out (the
-    // header amber pill has already begun counting the reward up).
-    hapticSuccess();
-    runQuestCashOut(questId);
-  }, [progress, onAmberChange, animals, runQuestCashOut]);
+    if (!progress || questClaimBusyRef.current) return;
+    questClaimBusyRef.current = true;
+    setQuestClaimBusy(true);
+    setQuestClaimError(null);
+    try {
+      const reward = await claimAllReadyQuests(progress.currentPhase, questId === 'all' ? undefined : [questId]);
+      // Refresh without replacing the complete generation context supplied on
+      // open. Clone the service's mutable cache so every badge re-derives.
+      const refreshed = await loadWeeklyQuests(progress.currentPhase);
+      setWeeklyQuestState({
+        daily: { ...refreshed.daily, quests: refreshed.daily.quests.map(q => ({ ...q })) },
+        weekly: { ...refreshed.weekly, quests: refreshed.weekly.quests.map(q => ({ ...q })) },
+      });
+      // A retry may have recovered the prior durable commit and therefore find
+      // nothing new to claim. It still needs to refresh the visible balance.
+      const newBalance = reward?.balance ?? (await getFullProgress()).amber;
+      onAmberChange?.(newBalance);
+      setProgress(prev => prev ? { ...prev, amber: newBalance } : prev);
+      if (!reward) {
+        setQuestReward(null);
+        setDoubleQuestOffer(null);
+        return;
+      }
+      questRewardIdRef.current += 1;
+      setQuestReward({ amount: reward.amber, label: questId === 'all' ? `${reward.questIds.length} quests claimed` : 'Claimed', id: questRewardIdRef.current });
+      // Bulk collection takes base rewards; separate claims retain their
+      // optional single-quest double, never a new multiplied bulk offer.
+      setDoubleQuestOffer(questId === 'all' ? null : { questId, amber: reward.amber });
+      logEvent({ type: 'quest_reward_claimed', data: { questId, amber: reward.amber, questCount: reward.questIds.length } });
+      hapticSuccess();
+      if (questId !== 'all') runQuestCashOut(questId);
+    } catch {
+      setQuestClaimError('Could not finish the claim. Try again to refresh your rewards.');
+    } finally {
+      questClaimBusyRef.current = false;
+      setQuestClaimBusy(false);
+    }
+  }, [progress, onAmberChange, runQuestCashOut]);
 
   // Opt-in "double your quest reward" — fired only when the player watched the
   // full rewarded ad (RewardedAdButton onReward). Grants a second helping of the
@@ -1914,7 +1960,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const localOverlayActive = showIntroDialogue || !!introOverrideLines || dialogueFlow.showDialogue ||
     showJournalModal || showSeasonModal || showUtilityModal || showQuestModal ||
     unlockFlow.showShop || unlockFlow.showRoomUnlock !== null || unlockFlow.showInvitePrompt ||
-    showHouseCompletion || journalSpotlightActive;
+    showHouseCompletion || journalSpotlightActive || showStoryInspection;
   useEffect(() => {
     onOverlayActivityChange?.(localOverlayActive);
     return () => onOverlayActivityChange?.(false);
@@ -2049,7 +2095,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <Text style={styles.amberCount} numberOfLines={1}>
                   {amberInitedRef.current ? displayAmber : progress.amber}
                 </Text>
-                {!isOnboarding && <AmberSparkle phase={progress.currentPhase} />}
+                {!isOnboarding && !quietLanding && <AmberSparkle phase={progress.currentPhase} />}
               </View>
             </TouchableOpacity>
             {(progress.currentStreak > 1 || isStreakAtRisk) && (
@@ -2093,7 +2139,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       {getQuestPillCount(actionableQuestCount)}
                     </Text>
                   )}
-                  {claimableQuestAmber > 0 && (
+                  {claimableQuestAmber > 0 && !quietLanding && (
                     <Image source={CHROME_ICONS.alertPip} style={styles.headerBadgeIcon} resizeMode="contain" accessible={false} />
                   )}
                 </TouchableOpacity>
@@ -2122,7 +2168,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       deep (journal hub -> Season Pass row) with no home-screen
                       surface at all, so earned rewards sat unclaimed simply
                       because nothing ever said they existed. */}
-                  {!journalSpotlightActive && (claimableQuestAmber > 0 || seasonClaimable > 0) && (
+                  {!journalSpotlightActive && !quietLanding && (claimableQuestAmber > 0 || seasonClaimable > 0) && (
                     <Image source={CHROME_ICONS.alertPip} style={styles.headerBadgeIcon} resizeMode="contain" accessible={false} />
                   )}
                 </TouchableOpacity>
@@ -2144,6 +2190,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       <View style={styles.houseStage}>
         {/* House World */}
         <HouseWorld
+          storyKeepsake={storyKeepsake}
+          quietNotifications={quietLanding}
+          onInspectStory={() => setShowStoryInspection(true)}
           rooms={rooms}
           animals={animals}
           currentPhase={progress.currentPhase}
@@ -2223,7 +2272,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           {ambientLine && !isOnboarding && (
             <Animated.View style={[styles.ambientLineContainer, { opacity: ambientOpacity }]} pointerEvents="none">
               <Text style={styles.ambientLineText}>
-                {ambientLine}
+                {storyKeepsake && !storyKeepsake.inspected ? storyKeepsake.landingLine : ambientLine}
               </Text>
             </Animated.View>
           )}
@@ -2578,7 +2627,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         transparent
         statusBarTranslucent
         animationType="fade"
-        onRequestClose={() => { if (!journalSpotlightActive) setShowJournalModal(false); }}
+        onRequestClose={() => { setJournalSpotlightActive(false); setShowJournalModal(false); }}
       >
         <TouchableOpacity
           style={[styles.modalOverlay, { backgroundColor: journalSpotlightActive ? 'transparent' : st.overlay }]}
@@ -2590,7 +2639,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <SpringIn
             phase={progress?.currentPhase ?? 0}
             claimTouches
-            style={styles.compactHubModal}
+            style={[styles.compactHubModal, { maxHeight: '90%', width: '100%', maxWidth: 440 }]}
           >
             <NineSliceFrame
               skin={pixelSkin.panel}
@@ -2606,13 +2655,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               style={styles.modalPlaque}
             />
             <Text style={[styles.shopSubtitle, { color: panelSt.muted }]}>
-              Keep the house&apos;s records in one place.
+              Stories to return to. Rewards when you want them.
             </Text>
+            <ScrollView style={{ flexShrink: 1 }} showsVerticalScrollIndicator contentContainerStyle={{ paddingBottom: 4 }}>
+            <Text accessibilityRole="header" style={[styles.hubSectionLabel, { color: panelSt.muted }]}>STORIES AND DISCOVERIES</Text>
             {onOpenStory && (
               <HubRow
                 phase={progress.currentPhase}
                 hostDark={dtHostDark}
-                icon={WHISPER_ICON}
+                icon={JOURNAL_ICON}
                 label={STORY_COPY.journalTitle}
                 onPress={() => { setShowJournalModal(false); onOpenStory(); }}
                 accessibilityLabel={STORY_COPY.journalTitle}
@@ -2644,6 +2695,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 accessibilityLabel="Open Whisper Gallery"
               />
             )}
+            <Text accessibilityRole="header" style={[styles.hubSectionLabel, { color: panelSt.muted }]}>TASKS AND REWARDS</Text>
             {!!weeklyQuestState && (
               <HubRow
                 phase={progress.currentPhase}
@@ -2668,6 +2720,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               }}
               accessibilityLabel={`Open season pass${seasonClaimable > 0 ? `, ${seasonClaimable} rewards ready` : ''}`}
             />
+            </ScrollView>
+            <CandyButton label="Close" phase={progress.currentPhase} hostDark={dtHostDark} variant="quiet"
+              onPress={() => { setJournalSpotlightActive(false); setShowJournalModal(false); }} accessibilityLabel="Close journal" />
           </SpringIn>
         </TouchableOpacity>
       </Modal>
@@ -2681,8 +2736,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         onAmberChange={(bal) => {
           onAmberChange?.(bal);
           setProgress(prev => (prev ? { ...prev, amber: bal } : prev));
+          getSeasonClaimableCount(progress.puzzlesSolved ?? 0).then(setSeasonClaimable).catch(() => {});
         }}
         onSubscribe={onOpenStore ? () => { setShowSeasonModal(false); onOpenStore(); } : undefined}
+      />
+
+      <StoryWorldInspection
+        keepsake={showStoryInspection ? storyKeepsake : null}
+        context={storyContext} phase={progress.currentPhase}
+        onClose={() => setShowStoryInspection(false)}
+        onInspected={() => { if (storyContext) loadStoryState(storyContext).then(setWorldStory).catch(() => {}); }}
       />
 
       {/* Utility Hub Modal — the SHARED menu (same component the Offering
@@ -2912,7 +2975,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <PixelPlaque
               phase={progress.currentPhase}
               hostDark={dtHostDark}
-              label="Quests"
+              label="Tasks & rewards"
               style={styles.modalPlaque}
             />
             {questReward && (
@@ -2973,6 +3036,24 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={styles.questListContent}
             >
+              <HubRow phase={progress.currentPhase} hostDark={dtHostDark} icon={SEASON_PASS_ICON}
+                label={seasonClaimable > 0 ? `Season Pass · ${seasonClaimable} ready` : 'Season Pass'}
+                accessibilityLabel={`Open season pass${seasonClaimable > 0 ? `, ${seasonClaimable} rewards ready` : ''}`}
+                onPress={() => { setShowQuestModal(false); setShowSeasonModal(true); }} />
+              {!!pendingHarvest?.pendingAmber && onOpenPit && (
+                <HubRow phase={progress.currentPhase} hostDark={dtHostDark} icon={AMBER_ICON}
+                  label={`${pendingHarvest.pendingAmber} amber waiting at the pit`}
+                  accessibilityLabel={`Open the pit to collect ${pendingHarvest.pendingAmber} pending amber`}
+                  onPress={() => { setShowQuestModal(false); onOpenPit(); }} />
+              )}
+              {claimableQuestAmber > 0 && <View style={{ gap: 8, marginBottom: 16 }}>
+                <CandyButton label={questClaimBusy ? 'Saving…' : `Claim all ready · +${claimableQuestAmber}`}
+                  phase={progress.currentPhase} hostDark={dtHostDark} variant="amber" disabled={questClaimBusy}
+                  accessibilityLabel={`Claim all ready daily and weekly quests for ${claimableQuestAmber} amber`}
+                  onPress={() => { void handleClaimQuest('all'); }} />
+                <Text style={[styles.unlockDescription, { color: panelSt.muted }]}>Collect base rewards together. To double a reward with an optional clip, claim that quest separately.</Text>
+              </View>}
+              {questClaimError && <Text accessibilityLiveRegion="assertive" style={[styles.unlockDescription, { color: panelSt.dangerText, marginBottom: 12 }]}>{questClaimError}</Text>}
               {(questTab === 'daily' ? weeklyQuestState?.daily?.quests : weeklyQuestState?.weekly?.quests)?.map(quest => {
                 const questPct = quest.completed
                   ? 100
@@ -3024,7 +3105,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       onPress={() => {
                         handleClaimQuest(quest.id).catch(() => {});
                       }}
-                      disabled={!quest.completed || quest.claimed}
+                      disabled={questClaimBusy || !quest.completed || quest.claimed}
                       accessibilityLabel={
                         quest.claimed
                           ? `${quest.title} already claimed`
@@ -3583,6 +3664,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         transparent
         statusBarTranslucent
         animationType="none"
+        onRequestClose={() => { setJournalSpotlightActive(false); setShowJournalModal(false); }}
       >
         <View style={[styles.journalSpotlightBackdrop, { backgroundColor: dt.overlayBg }]}>
           <View style={[styles.journalSpotlightPanel, { shadowColor: dt.modalShadowColor }]}>
@@ -3779,7 +3861,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+function useHomeStyles() {
+  const { width, height } = useWindowDimensions();
+  return useMemo(() => createStyles(width, height), [width, height]);
+}
+const createStyles = (SCREEN_WIDTH: number, SCREEN_HEIGHT: number) => StyleSheet.create({
   container: {
     flex: 1,
     // Phase-0 sky top-row color, sampled from the sky assets (sampleSkyTops
@@ -4288,6 +4374,7 @@ const styles = StyleSheet.create({
   shopScrollContent: {
     paddingBottom: 8,
   },
+  hubSectionLabel: { fontFamily: BODY_FONT_BOLD, fontSize: 13, letterSpacing: 0.8, marginTop: 8, marginBottom: 12 },
   compactHubModal: {
     paddingVertical: SURFACE.panelPadY,
     paddingHorizontal: SURFACE.panelPadX,

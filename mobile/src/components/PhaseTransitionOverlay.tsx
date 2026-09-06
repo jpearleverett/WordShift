@@ -1,18 +1,20 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { FONT_SIZE } from '../theme/typeScale';
-import { View, Text, StyleSheet, Animated, Easing, Dimensions, TouchableOpacity, Image, ScrollView, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, Animated, Easing, TouchableOpacity, Image, ScrollView, useWindowDimensions, AppState } from 'react-native';
 import { PhaseTransitionEvent, PhaseScene, SceneImage, CinematicParticleConfig } from '../services/phaseEvents';
 import { getSettingsSync } from '../services/settings';
 import { hapticLight, hapticMedium, hapticHeavy, hapticWarning } from '../services/haptics';
-import { playUiSound, stopCeremonyMusic } from '../services/uiSound';
+import { createCeremonySoundScope, stopCeremonyMusic } from '../services/uiSound';
+import { logEvent } from '../services/eventLogger';
 import { announceForA11y } from '../services/a11yAnnounce';
 import { BODY_FONT, BODY_FONT_BOLD, PIXEL_FONT_BOLD } from '../theme/fonts';
 import { getPhaseTheme } from '../theme/colors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CHARACTER_SPRITES } from './home/AnimalSprite';
+import { StoryPortrait } from './StoryPortrait';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 import { getStorySpeakerName } from '../services/storyArchive';
+import { STORY_ART } from './storyArt';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // ---------------------------------------------------------------------------
 // The Skip control's ink. It used to paint the event's own accentColor at 50%
@@ -35,10 +37,10 @@ export const SKIP_BORDER_COLOR = '#B9B0CC';
 // house is the roof art the player raised room by room.
 // ---------------------------------------------------------------------------
 const SCENE_IMAGE_SOURCES: Record<SceneImage, ReturnType<typeof require>> = {
-  private_room: require('../../assets/story/private-room.png'),
-  outward_road_night: require('../../assets/story/outward-road-night.png'),
-  outward_road: require('../../assets/story/outward-road.png'),
-  kept_table: require('../../assets/story/kept-table.png'),
+  private_room: STORY_ART.private,
+  outward_road_night: STORY_ART.roadNight,
+  outward_road: STORY_ART.road,
+  kept_table: STORY_ART.table,
   shadow_figure: require('../../assets/environment/shadow_figure.png'),
   house: require('../../assets/environment/roof.png'),
   // Phase 1-3 ceremony emblems (512px, generateGameIcons): luminous painted
@@ -47,27 +49,10 @@ const SCENE_IMAGE_SOURCES: Record<SceneImage, ReturnType<typeof require>> = {
   ceremony_deeper: require('../../assets/ui/spots/ceremony_deeper.png'),
   ceremony_shadows: require('../../assets/ui/spots/ceremony_shadows.png'),
 };
-/** The square ceremony emblems share one size: ~60% of the screen width. */
-const CEREMONY_EMBLEM_SIZE = { width: Math.round(SCREEN_WIDTH * 0.6), height: Math.round(SCREEN_WIDTH * 0.6) };
-
-// Rendered sizes preserve each asset's aspect (shadow_figure 600x1200,
-// roof 792x283) and sit behind the centered scene text.
-const SCENE_IMAGE_SIZES: Record<SceneImage, { width: number; height: number }> = {
-  private_room: { width: SCREEN_WIDTH, height: SCREEN_WIDTH * 2 / 3 },
-  outward_road_night: { width: SCREEN_WIDTH, height: SCREEN_WIDTH * 2 / 3 },
-  outward_road: { width: SCREEN_WIDTH, height: SCREEN_WIDTH * 2 / 3 },
-  kept_table: { width: SCREEN_WIDTH, height: SCREEN_WIDTH * 2 / 3 },
-  shadow_figure: {
-    height: Math.round(SCREEN_HEIGHT * 0.52),
-    width: Math.round(SCREEN_HEIGHT * 0.52 * (600 / 1200)),
-  },
-  house: {
-    width: Math.round(SCREEN_WIDTH * 0.72),
-    height: Math.round(SCREEN_WIDTH * 0.72 * (283 / 792)),
-  },
-  ceremony_curious: CEREMONY_EMBLEM_SIZE,
-  ceremony_deeper: CEREMONY_EMBLEM_SIZE,
-  ceremony_shadows: CEREMONY_EMBLEM_SIZE,
+const SCENE_IMAGE_ASPECT: Record<SceneImage, number> = {
+  private_room: 1.5, outward_road_night: 1.5, outward_road: 1.5, kept_table: 1.5,
+  shadow_figure: 0.5, house: 792 / 283,
+  ceremony_curious: 1, ceremony_deeper: 1, ceremony_shadows: 1,
 };
 
 /** Default peak opacity for a scene image when the scene doesn't set one. */
@@ -129,6 +114,7 @@ const CinematicParticleBase: React.FC<{
   config: CinematicParticleConfig;
   index: number;
 }> = ({ config, index }) => {
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
   const translateMain = useRef(new Animated.Value(0)).current;
   const wobble = useRef(new Animated.Value(0)).current;
   const loopRef = useRef<Animated.CompositeAnimation | null>(null);
@@ -221,6 +207,7 @@ const BurstParticleBase: React.FC<{
   size: number;
   durationMs: number;
 }> = ({ direction, color, size, durationMs }) => {
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
   const translateY = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const startX = useRef(Math.random() * SCREEN_WIDTH).current;
@@ -290,6 +277,7 @@ function alphaHex(a: number): string {
  * the caller only animates it in when motion is on).
  */
 const SoftVignette: React.FC<{ opacity: Animated.Value; color: string }> = ({ opacity, color }) => {
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
   const depth = Math.min(SCREEN_WIDTH, SCREEN_HEIGHT) * 0.34;
   const band = depth / VIGNETTE_STEPS;
   const bands: React.ReactNode[] = [];
@@ -332,6 +320,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
   onComplete,
 }) => {
   const { width, height } = useWindowDimensions();
+  const effectiveReducedMotion = useReducedMotion();
   const insets = useSafeAreaInsets();
   const [activeSceneIndex, setActiveSceneIndex] = useState(-1);
   const [manualPlayback, setManualPlayback] = useState(false);
@@ -358,7 +347,15 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
   const visibleEventRef = useRef<PhaseTransitionEvent | null>(null);
   const onCompleteRef = useRef(onComplete);
   const scrollRef = useRef<ScrollView>(null);
+  const soundScope = useRef<ReturnType<typeof createCeremonySoundScope> | null>(null);
   onCompleteRef.current = onComplete;
+  useEffect(() => {
+    if (!effectiveReducedMotion) return;
+    effectAnimsRef.current.forEach(animation => animation.stop());
+    shakeX.setValue(0); shakeY.setValue(0); flashOpacity.setValue(0);
+    imageTranslateY.setValue(0); imageScale.setValue(1); sceneTranslateY.setValue(0);
+    sceneOpacity.setValue(1); setBurst(null);
+  }, [effectiveReducedMotion, shakeX, shakeY, flashOpacity, imageTranslateY, imageScale, sceneTranslateY, sceneOpacity]);
 
   const stopEffectAnims = () => {
     effectAnimsRef.current.forEach((a) => a.stop());
@@ -528,9 +525,13 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     }
   };
 
-  const finish = () => {
+  const finish = (skipped = false) => {
     if (hasSkipped.current) return;
     hasSkipped.current = true;
+    soundScope.current?.stop();
+    if (skipped && event) logEvent({ type: 'cinematic_skipped', data: {
+      phase: event.phase, ceremony: event.title, page: activeSceneIndex,
+    } });
     timersRef.current.forEach(clearTimeout);
     timersRef.current = [];
     sceneOpacity.stopAnimation();
@@ -568,6 +569,12 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     imageScale.setValue(1);
     vignetteOpacity.setValue(event?.vignette ? 0.35 : 0);
     if (!event) return;
+    soundScope.current = createCeremonySoundScope();
+    const appStateListener = AppState.addEventListener('change', state => {
+      soundScope.current?.stop();
+      // A return allows future passages to sound; it never replays an old tail.
+      if (state === 'active' && !hasSkipped.current) soundScope.current = createCeremonySoundScope();
+    });
     const reducedMotion = getSettingsSync().reducedMotion;
     if (reducedMotion) overlayOpacity.setValue(1);
     else {
@@ -575,8 +582,8 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
       Animated.timing(overlayOpacity, {
         toValue: 1, duration: 650, useNativeDriver: true,
       }).start();
-      hapticMedium();
     }
+    hapticMedium();
     announceForA11y(event.showTitle === false ? 'A moment in the house.' : event.title);
     const timer = setTimeout(() => {
       visibleEventRef.current = event;
@@ -584,6 +591,8 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     }, reducedMotion ? 0 : 600);
     timersRef.current.push(timer);
     return () => {
+      appStateListener.remove();
+      soundScope.current?.stop();
       visibleEventRef.current = null;
       timersRef.current.forEach(clearTimeout);
       timersRef.current = [];
@@ -615,13 +624,19 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     );
     if (scene.effect === 'descend') {
       stopCeremonyMusic();
-      playUiSound('arrival');
+      soundScope.current?.play('arrival');
     }
-    if (scene.cue === 'bell') playUiSound('story_bell');
-    if (scene.cue === 'answer') playUiSound('story_answer');
+    if (scene.cue === 'bell') soundScope.current?.play('story_bell');
+    if (scene.cue === 'answer') soundScope.current?.play('story_answer');
     let settleTimer: ReturnType<typeof setTimeout> | undefined;
+    fireSceneHaptic(scene, event.shakeIntensity);
+    if (scene.effect === 'descend') {
+      settleTimer = setTimeout(() => {
+        if (!hasSkipped.current) hapticHeavy();
+      }, Math.min(scene.duration * 0.75, 3800) * timeScale);
+      timersRef.current.push(settleTimer);
+    }
     if (!reducedMotion) {
-      fireSceneHaptic(scene, event.shakeIntensity);
       runSceneEffect(scene, event.shakeIntensity ?? 0, event.phase);
       if (scene.effect === 'particles_rise' || scene.effect === 'particles_fall') {
         burstNonceRef.current += 1;
@@ -632,12 +647,6 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
           durationMs: scene.duration * timeScale,
           nonce: burstNonceRef.current,
         });
-      }
-      if (scene.effect === 'descend') {
-        settleTimer = setTimeout(() => {
-          if (!hasSkipped.current) hapticHeavy();
-        }, Math.min(scene.duration * 0.75, 3800) * timeScale);
-        timersRef.current.push(settleTimer);
       }
       sceneOpacity.setValue(0);
       sceneTranslateY.setValue(12);
@@ -678,8 +687,6 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
   if (!event) return null;
   const eventIsVisible = visibleEventRef.current === event;
   const activeScene = eventIsVisible ? event.scenes[activeSceneIndex] : undefined;
-  const activeSprites = activeScene?.speaker ? CHARACTER_SPRITES[activeScene.speaker] : undefined;
-  const portrait = event.phase >= 4 ? activeSprites?.robed ?? activeSprites?.idle : activeSprites?.idle;
   const isIllustration = (key: SceneImage) =>
     key === 'private_room' || key === 'outward_road' || key === 'outward_road_night' || key === 'kept_table';
   const lastScene = activeSceneIndex === event.scenes.length - 1;
@@ -688,8 +695,8 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
   const readingHeight = Math.max(160, height - insets.top - insets.bottom - heroHeight - 115);
   const imageSize = (key: SceneImage) => isIllustration(key)
     ? { width: contentWidth, height: heroHeight }
-    : { width: Math.min(SCENE_IMAGE_SIZES[key].width, contentWidth * 0.84),
-        height: Math.min(SCENE_IMAGE_SIZES[key].height, heroHeight) };
+    : { width: Math.min(contentWidth * 0.84, heroHeight * SCENE_IMAGE_ASPECT[key]),
+        height: Math.min(contentWidth * 0.84 / SCENE_IMAGE_ASPECT[key], heroHeight) };
 
   return (
     <Animated.View
@@ -700,8 +707,8 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     >
       <View pointerEvents="none" style={StyleSheet.absoluteFill}>
         <View style={[styles.topGlow, { backgroundColor: event.accentColor + '16' }]} />
-        {event.particles && Array.from({ length: event.particles.count }, (_, i) => (
-          <CinematicParticle key={i} config={event.particles!} index={i} />
+        {event.particles && !effectiveReducedMotion && Array.from({ length: event.particles.count }, (_, i) => (
+          <CinematicParticle key={`${width}:${height}:${i}`} config={event.particles!} index={i} />
         ))}
       </View>
       <View style={[styles.shell, { width: contentWidth, paddingTop: insets.top + 14,
@@ -711,7 +718,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
             <Text style={styles.eyebrow}>WORDSHIFT</Text>
             {event.showTitle !== false && <Text style={styles.title}>{event.title}</Text>}
           </View>
-          <TouchableOpacity style={styles.skipButton} onPress={finish}
+          <TouchableOpacity style={styles.skipButton} onPress={() => finish(true)}
             accessibilityLabel="Skip transition" accessibilityRole="button">
             <Text style={styles.skipText}>Skip</Text>
           </TouchableOpacity>
@@ -735,7 +742,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
             </Animated.View>
           )}
           <SoftVignette opacity={vignetteOpacity} color={getPhaseTheme(event.phase).vignetteColor} />
-          {burst && <View key={burst.nonce} style={StyleSheet.absoluteFill}>
+          {burst && <View key={`${width}:${height}:${burst.nonce}`} style={StyleSheet.absoluteFill}>
             {Array.from({ length: BURST_PARTICLE_COUNT }, (_, i) => (
               <BurstParticle key={i} direction={burst.direction} color={burst.color}
                 size={burst.size} durationMs={burst.durationMs} />
@@ -748,8 +755,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
           opacity: sceneOpacity, transform: [{ translateY: sceneTranslateY }] }]}>
           {activeScene && <>
             {activeScene.speaker && <View style={styles.speakerRow}>
-              {portrait && <Image source={portrait} resizeMode="contain"
-                style={styles.portrait} accessible={false} />}
+              <StoryPortrait speaker={activeScene.speaker} phase={event.phase} passage={`${event.title}:${activeSceneIndex}`} size={76} />
               <View style={styles.speakerCaption}>
                 <Text style={styles.speakerName}>{getStorySpeakerName(activeScene.speaker)}</Text>
                 <View style={[styles.speakerRule, { backgroundColor: event.accentColor }]} />

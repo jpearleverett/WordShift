@@ -6,7 +6,14 @@ import {
   resetSettings,
   invalidateSettingsCache,
   GameSettings,
+  startSystemMotionPreference,
 } from '../services/settings';
+import { AccessibilityInfo } from 'react-native';
+
+jest.mock('react-native', () => ({ AccessibilityInfo: {
+  isReduceMotionEnabled: jest.fn(async () => true),
+  addEventListener: jest.fn(() => ({ remove: jest.fn() })),
+} }));
 
 // Mock AsyncStorage
 jest.mock('@react-native-async-storage/async-storage', () => {
@@ -137,5 +144,31 @@ describe('settings', () => {
       const settings = await resetSettings();
       expect(settings.swiftVictories).toBe(false);
     });
+  });
+});
+
+describe('OS motion preference', () => {
+  let stop: (() => void) | undefined;
+  afterEach(() => {
+    const listener = (AccessibilityInfo.addEventListener as jest.Mock).mock.calls.at(-1)?.[1];
+    listener?.(false); stop?.(); stop = undefined;
+  });
+  test('uses the OS default without persisting it as a manual choice', async () => {
+    await resetSettings();
+    const changed = jest.fn();
+    stop = startSystemMotionPreference(changed);
+    for (let n = 0; n < 6; n++) await Promise.resolve();
+    expect(getSettingsSync().reducedMotion).toBe(true);
+    expect(changed).toHaveBeenCalled();
+    await updateSetting('soundEnabled', false);
+    const stored = JSON.parse((await AsyncStorage.getItem('wordshift_settings'))!);
+    expect(stored.reducedMotion).toBeUndefined();
+  });
+  test('preserves an explicit saved motion choice while the OS changes', async () => {
+    await resetSettings(); await updateSetting('reducedMotion', false);
+    invalidateSettingsCache();
+    stop = startSystemMotionPreference();
+    for (let n = 0; n < 6; n++) await Promise.resolve();
+    expect(getSettingsSync().reducedMotion).toBe(false);
   });
 });

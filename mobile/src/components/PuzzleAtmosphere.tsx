@@ -1,5 +1,6 @@
 import React from 'react';
 import { Image, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { STORY_ART } from './storyArt';
 
 interface PuzzleAtmosphereProps {
   phase: number;
@@ -36,7 +37,7 @@ export const PuzzleAtmosphere: React.FC<PuzzleAtmosphereProps> = ({ phase }) => 
     >
       <View style={[styles.tableMemory, { height: Math.min(height * 0.38, 310), opacity: palette.texture }]}>
         <Image
-          source={require('../../assets/story/kept-table.png')}
+          source={STORY_ART.tableHeader}
           accessible={false}
           resizeMode="cover"
           style={styles.texture}

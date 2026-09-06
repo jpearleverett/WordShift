@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage, { isStorageTransactionActive, runStorageTransaction } from './persistenceStorage';
 import { Difficulty } from '../types';
 import { getLocalDateString, parseLocalDate } from './dateUtils';
 import { JOURNAL_UNLOCK_PUZZLES, SPEED_TOGGLE_UNLOCK_PUZZLES } from '../constants/gameBalance';
@@ -549,7 +549,8 @@ export async function peekWeeklyQuests(): Promise<{
       const parsed: QuestState = JSON.parse(stored);
       const currentPeriod = tier === 'daily' ? getDayId() : getWeekId();
       return parsed.periodId === currentPeriod ? parsed : null;
-    } catch {
+    } catch (error) {
+      if (isStorageTransactionActive()) throw error;
       return null;
     }
   };
@@ -612,7 +613,7 @@ async function loadQuestTier(
       }
       staleContext = parsed.lastGenerationContext ?? staleContext;
     }
-  } catch {}
+  } catch (error) { if (isStorageTransactionActive()) throw error; }
 
   // New period (or a dormant pre-journal placeholder whose gate just lifted) —
   // generate fresh quests. An explicit context wins; otherwise fall back to
@@ -888,6 +889,46 @@ export async function claimQuestReward(questId: string, currentPhase: number = 0
   return null;
 }
 
+export interface QuestClaimReceipt {
+  amber: number;
+  balance: number;
+  questIds: string[];
+}
+
+/** Claim every ready reward, or the requested subset, in one durable commit. */
+export async function claimAllReadyQuests(
+  currentPhase: number = 0,
+  questIds?: readonly string[],
+): Promise<QuestClaimReceipt | null> {
+  // Load only when claiming: the ordinary quest/progress dependency tree stays
+  // acyclic, and the public amber entry point must not nest this transaction.
+  const { awardBonusAmberInTransaction, invalidateProgressCache } = await import('./amberCurrency');
+  try {
+    return await runStorageTransaction('quest_claim', async () => {
+      const state = await loadWeeklyQuests(currentPhase);
+      const requested = questIds ? new Set(questIds) : null;
+      const ready = [...state.daily.quests, ...state.weekly.quests]
+        .filter(quest => quest.completed && !quest.claimed && (!requested || requested.has(quest.id)));
+      if (!ready.length) return null;
+      let amber = 0;
+      const claimed: string[] = [];
+      for (const quest of ready) {
+        const reward = await claimQuestReward(quest.id, currentPhase);
+        if (!reward) continue;
+        amber += reward.amber;
+        claimed.push(quest.id);
+      }
+      if (!claimed.length) return null;
+      const balance = await awardBonusAmberInTransaction(amber, 'quest_reward');
+      return { amber, balance, questIds: claimed };
+    });
+  } catch (error) {
+    invalidateQuestCache();
+    invalidateProgressCache();
+    throw error;
+  }
+}
+
 /**
  * Get quest description appropriate for the current phase.
  */
@@ -956,7 +997,7 @@ async function saveQuestTier(tier: QuestTier, state: QuestState): Promise<void> 
   else weeklyQuestCache = state;
   try {
     await AsyncStorage.setItem(storageKey, JSON.stringify(state));
-  } catch {}
+  } catch (error) { if (isStorageTransactionActive()) throw error; }
 }
 
 /**

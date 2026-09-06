@@ -74,15 +74,14 @@ export function useDreadEffects(): [DreadEffectsState, DreadEffectsActions] {
   }, []);
 
   const triggerDreadPulse = useCallback((phase: number) => {
-    // Reduced motion suppresses both the visual pulse/shake AND the haptics.
-    if (getSettingsSync().reducedMotion) return;
-
     // Haptic feedback scaled by phase intensity.
     if (phase >= 3) {
       hapticMedium();
     } else if (phase >= 2) {
       hapticLight();
     }
+    // Movement and touch have independent preferences.
+    if (getSettingsSync().reducedMotion) return;
 
     // Stop any in-flight animations before starting new ones.
     pulseAnimRef.current?.stop();

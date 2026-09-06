@@ -13,7 +13,7 @@
  * native module is loaded with a guarded dynamic `require` inside `initialize()`.
  *
  * NOTE: the AdMob *app* ids go in the `react-native-google-mobile-ads` config
- * plugin in app.json (Android id set; iOS pending); the *ad unit* ids are read
+ * plugin in app.json (Android configured; iOS sample ID until its release setup); the *ad unit* ids are read
  * here at runtime from `expo.extra`. The package is pinned in package.json —
  * check invertase release notes before bumping across Expo SDK majors.
  *
@@ -84,6 +84,11 @@ function shouldUseTestAds(): boolean {
 }
 
 function idsFromExtra(mod?: any): AdMobConfig {
+  const extra = readExtra();
+  // The iOS SDK has a sample app ID so an unfinished native configuration can
+  // launch safely. Ads remain off until the owner supplies iOS unit IDs.
+  if (Platform.OS === 'ios' && !extra.admobInterstitialIdIos && !extra.admobRewardedIdIos) return {};
+
   // Test mode: use the SDK's official TestIds (falling back to Google's public
   // sample unit ids if the SDK export is unavailable in this context).
   if (shouldUseTestAds()) {
@@ -93,7 +98,6 @@ function idsFromExtra(mod?: any): AdMobConfig {
       rewardedId: TestIds?.REWARDED ?? 'ca-app-pub-3940256099942544/5224354917',
     };
   }
-  const extra = readExtra();
   return Platform.OS === 'ios'
     ? { interstitialId: extra.admobInterstitialIdIos, rewardedId: extra.admobRewardedIdIos }
     : { interstitialId: extra.admobInterstitialIdAndroid, rewardedId: extra.admobRewardedIdAndroid };

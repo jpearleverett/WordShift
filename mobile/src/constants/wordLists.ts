@@ -1,6 +1,9 @@
 
 import { DICTIONARY_WORDS } from '../dictionary';
+import { UNREVIEWED_PUZZLE_WORDS } from '../data/vocabulary/puzzleVocabulary';
 import type { PuzzleSolutionStep, Difficulty } from '../types';
+import { isFairPuzzleWord } from '../services/puzzleVocabulary';
+import { isStandardChainSolvable } from '../services/puzzleSolvability';
 
 // All unique words from dictionary (filtered to 3-7 letters)
 const ALL_UNIQUE_WORDS = DICTIONARY_WORDS;
@@ -12,7 +15,9 @@ export const WORDS_6 = ALL_UNIQUE_WORDS.filter(w => w.length === 6);
 export const WORDS_7 = ALL_UNIQUE_WORDS.filter(w => w.length === 7);
 
 // Combined for easy lookup
-export const COMMON_WORDS = new Set(ALL_UNIQUE_WORDS);
+// Fresh games use the reviewed dictionary. Historical saved boards keep their
+// original validation rules in usePuzzleGame until that board ends.
+export const COMMON_WORDS = new Set(ALL_UNIQUE_WORDS.filter(word => !UNREVIEWED_PUZZLE_WORDS.has(word)));
 
 // Pre-validated fallback puzzle pools — used when generation times out
 // Each puzzle is a verified valid chain (every transition removes+inserts one letter, all words valid)
@@ -23,14 +28,14 @@ export const FALLBACK_PUZZLES_EASY: string[][] = [
   ["BELT", "OVER", "TIME"],
   ["CUPS", "WITH", "HERE"],
   ["FITS", "USED", "WITH"],
-  ["GONE", "SURE", "THAT"],
+  ["DUNE", "SHUT", "PALM"],
   ["POLL", "OVER", "TIME"],
   // Was MAIL-BEST-LAST: its only path used transient remainder MIL, which
   // hygiene pass 2 removed from the dictionary. BAIT-BEST-LAST solves via
   // BAIT(-A, leaves BIT) -> BEAST -> (-B, leaves EAST) -> BLAST.
   ["BAIT", "BEST", "LAST"],
   ["ARMY", "PART", "INTO"],
-  ["ARTS", "THAT", "WILL"],
+  ["MAPS", "SITS", "EXIT"],
   ["BEEN", "YEAR", "GOOD"],
   ["WERE", "HERE", "OVER"],
   ["FIND", "LIKE", "THAN"],
@@ -41,16 +46,16 @@ export const FALLBACK_PUZZLES_MEDIUM: string[][] = [
   ["SUIT", "SITE", "WHAT", "HERE"],
   ["LADS", "OVER", "TIME", "USED"],
   ["PLAY", "INTO", "BOTH", "WERE"],
-  ["GOLD", "SURE", "THAT", "WILL"],
+  ["HARM", "PAYS", "SILL", "WRIT"],
   ["BEAD", "WHAT", "HERE", "WERE"],
   ["RAIN", "MOST", "BOTH", "WERE"],
   ["SICK", "THAN", "WILL", "HERE"],
-  ["GRAY", "SURE", "THAT", "WILL"],
+  ["PUMP", "WARS", "NETS", "MEAL"],
   ["GANG", "YEAR", "PART", "INTO"],
   ["FORM", "OVER", "TIME", "USED"],
   ["LAND", "OVER", "TIME", "USED"],
-  ["LIPS", "THAT", "WILL", "HERE"],
-  ["CUTS", "THAT", "WILL", "HERE"],
+  ["ICON", "DIES", "CARS", "DOVE"],
+  ["VAMP", "DIES", "AIDE", "REDS"],
   ["SEEM", "OVER", "TIME", "USED"],
   ["IRON", "TIME", "OVER", "INTO"],
 ];
@@ -99,7 +104,9 @@ export const FALLBACK_PUZZLES_HARD: string[][] = [
   ["GOERS", "FAMED", "SACKS", "TRUCK", "DOVES"],
 ];
 
-/** Get a random fallback puzzle for the given difficulty */
+const fairFallbackCache = new Map<string[][], string[][]>();
+
+/** Get a fresh, fair and solvable fallback under today's gameplay dictionary. */
 export function getRandomFallback(difficulty: Difficulty): string[] {
   // EXPERT (6-letter) has no dedicated fallback pool; this is a rare emergency
   // net (banks + on-device generation are the real paths), so it degrades
@@ -108,7 +115,16 @@ export function getRandomFallback(difficulty: Difficulty): string[] {
     : difficulty === 'HARD' || difficulty === 'EXPERT' ? FALLBACK_PUZZLES_HARD
     : difficulty === 'MEDIUM_PLUS' ? FALLBACK_PUZZLES_MEDIUM_PLUS
     : FALLBACK_PUZZLES_MEDIUM;
-  return pool[Math.floor(Math.random() * pool.length)];
+  let eligible = fairFallbackCache.get(pool);
+  if (!eligible) {
+    const fairWord = (word: string) => COMMON_WORDS.has(word) && isFairPuzzleWord(word);
+    eligible = pool.filter(words => words.every(fairWord)
+      && isStandardChainSolvable(words, fairWord) === 'solvable');
+    fairFallbackCache.set(pool, eligible);
+  }
+  if (eligible.length === 0) throw new Error(`No fair fallback puzzle for ${difficulty}`);
+  // The cached pool is shared; callers receive their own board array.
+  return [...eligible[Math.floor(Math.random() * eligible.length)]];
 }
 
 /**

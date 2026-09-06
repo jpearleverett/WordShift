@@ -6,7 +6,7 @@ import {
   SectionList,
   TouchableOpacity,
   StatusBar,
-  Dimensions,
+  useWindowDimensions,
   ActivityIndicator,
   Image,
   Animated,
@@ -35,7 +35,6 @@ import { CHARACTER_SPRITES } from './home/AnimalSprite';
 import { FONT_SIZE } from '../theme/typeScale';
 import { playUiSound, uiHapticSelection } from '../services/uiSound';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // Empty-state spot illustration (assets/ui/spots, generateGameIcons): an empty
 // picture frame at 96dp where the 52dp streak flame used to stand in.
@@ -82,7 +81,6 @@ const SHIMMER_TAIL_MARGIN = 0.02;
 const SHIMMER_PEAK_OPACITY = 0.5;
 /** Band travel, in dp, across a card. */
 const SHIMMER_START_X = -60;
-const SHIMMER_END_X = SCREEN_WIDTH;
 /** Golden-ratio conjugate: stepping by it per list index puts neighbouring
  *  bars maximally far apart in the cycle, so the column never reads as a
  *  top-to-bottom wave. */
@@ -139,6 +137,7 @@ const CardShimmer: React.FC<{
   driver: Animated.Value;
   offset: number;
 }> = ({ phase, driver, offset }) => {
+  const { width: SHIMMER_END_X } = useWindowDimensions();
   const t = getSurfaceTheme(phase);
   const end = offset + SHIMMER_WINDOW;
   const translateX = driver.interpolate({
@@ -474,11 +473,11 @@ const styles = StyleSheet.create({
   // screen background a soft vignette depth without any animation cost.
   vignetteGlow: {
     position: 'absolute',
-    top: -SCREEN_WIDTH * 0.55,
-    left: -SCREEN_WIDTH * 0.3,
-    width: SCREEN_WIDTH * 1.6,
-    height: SCREEN_WIDTH * 1.1,
-    borderRadius: SCREEN_WIDTH * 0.8,
+    top: '-55%',
+    left: '-30%',
+    width: '160%',
+    aspectRatio: 1.6 / 1.1,
+    borderRadius: 10000,
     opacity: 0.22,
   },
   header: {

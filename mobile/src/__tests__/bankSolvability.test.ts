@@ -12,7 +12,7 @@
  */
 import { DICTIONARY_WORDS } from '../dictionary';
 import { isChainSolvable, SolvabilityResult } from '../services/puzzleSolvability';
-import { CURATED_EARLY_PUZZLES, CURATED_FINAL_PUZZLE, FALLBACK_PUZZLES_EASY, FALLBACK_PUZZLES_MEDIUM, FALLBACK_PUZZLES_MEDIUM_PLUS, FALLBACK_PUZZLES_HARD } from '../constants/wordLists';
+import { COMMON_WORDS, CURATED_EARLY_PUZZLES, CURATED_FINAL_PUZZLE, FALLBACK_PUZZLES_EASY, FALLBACK_PUZZLES_MEDIUM, FALLBACK_PUZZLES_MEDIUM_PLUS, FALLBACK_PUZZLES_HARD } from '../constants/wordLists';
 import { PUZZLE_BANK_EASY } from '../data/puzzleBankEasy';
 import { PUZZLE_BANK_MEDIUM } from '../data/puzzleBankMedium';
 import { PUZZLE_BANK_MEDIUM_PLUS } from '../data/puzzleBankMediumPlus';
@@ -173,7 +173,7 @@ describe('bank solvability (shipped rules)', () => {
       ['HARD', FALLBACK_PUZZLES_HARD],
     ] as const) {
       for (const words of pool) {
-        const r = isChainSolvable('standard', words, isValid);
+        const r = isChainSolvable('standard', words, word => COMMON_WORDS.has(word));
         if (r !== 'solvable') {
           throw new Error(`fallback ${name} ${words.join('-')} -> ${r}`);
         }

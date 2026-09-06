@@ -7,6 +7,7 @@
 
 import {
   deriveHouseAskCandidates,
+  deriveMeaningfulHouseAskCandidates,
   pickHouseAsk,
   evaluateHouseAsk,
   HouseAsk,
@@ -133,6 +134,9 @@ describe('deriveHouseAskCandidates', () => {
 });
 
 describe('pickHouseAsk', () => {
+  // Synthetic candidate-order fixtures intentionally accept every word; real
+  // dictionary witnesses are checked separately below.
+  const valid = () => true;
   test('returns null when no sound candidate exists', () => {
     expect(pickHouseAsk(undefined, START_WORDS)).toBeNull();
     expect(pickHouseAsk([], START_WORDS)).toBeNull();
@@ -141,23 +145,23 @@ describe('pickHouseAsk', () => {
 
   test('a single rng draw indexes the deterministic candidate order', () => {
     // Candidate order: move C, move G, keep A, keep T, keep D, keep O.
-    expect(pickHouseAsk(SOLUTION, START_WORDS, () => 0)).toEqual({ kind: 'move', letter: 'C' });
-    expect(pickHouseAsk(SOLUTION, START_WORDS, () => 0.5)).toEqual({ kind: 'keep', letter: 'T' });
-    expect(pickHouseAsk(SOLUTION, START_WORDS, () => 0.999)).toEqual({ kind: 'keep', letter: 'O' });
+    expect(pickHouseAsk(SOLUTION, START_WORDS, () => 0, valid)).toEqual({ kind: 'move', letter: 'C' });
+    expect(pickHouseAsk(SOLUTION, START_WORDS, () => 0.5, valid)).toEqual({ kind: 'keep', letter: 'T' });
+    expect(pickHouseAsk(SOLUTION, START_WORDS, () => 0.999, valid)).toEqual({ kind: 'keep', letter: 'O' });
   });
 
   test('an out-of-contract rng value clamps to a real candidate', () => {
-    expect(pickHouseAsk(SOLUTION, START_WORDS, () => 1)).toEqual({ kind: 'keep', letter: 'O' });
-    expect(pickHouseAsk(SOLUTION, START_WORDS, () => -0.2)).toEqual({ kind: 'move', letter: 'C' });
+    expect(pickHouseAsk(SOLUTION, START_WORDS, () => 1, valid)).toEqual({ kind: 'keep', letter: 'O' });
+    expect(pickHouseAsk(SOLUTION, START_WORDS, () => -0.2, valid)).toEqual({ kind: 'move', letter: 'C' });
   });
 
   test('deterministic given a seeded rng', () => {
-    const first = pickHouseAsk(SOLUTION, START_WORDS, mulberry32(1234));
-    const second = pickHouseAsk(SOLUTION, START_WORDS, mulberry32(1234));
+    const first = pickHouseAsk(SOLUTION, START_WORDS, mulberry32(1234), valid);
+    const second = pickHouseAsk(SOLUTION, START_WORDS, mulberry32(1234), valid);
     expect(first).not.toBeNull();
     expect(second).toEqual(first);
     // A different seed exercises the same contract (still a sound candidate).
-    const other = pickHouseAsk(SOLUTION, START_WORDS, mulberry32(99));
+    const other = pickHouseAsk(SOLUTION, START_WORDS, mulberry32(99), valid);
     expect(deriveHouseAskCandidates(SOLUTION, START_WORDS)).toContainEqual(other);
   });
 
@@ -166,10 +170,33 @@ describe('pickHouseAsk', () => {
     // 'move' pick is trivially kept and a 'keep' pick is trivially unbroken.
     const routeMoves = move(SOLUTION.map((s, i) => [s.letterToMove, i] as [string, number]));
     for (let roll = 0; roll < 1; roll += 0.05) {
-      const ask = pickHouseAsk(SOLUTION, START_WORDS, () => roll);
+      const ask = pickHouseAsk(SOLUTION, START_WORDS, () => roll, valid);
       expect(ask).not.toBeNull();
       expect(evaluateHouseAsk(ask as HouseAsk, routeMoves)).toBe(true);
     }
+  });
+});
+
+describe('meaningful route constraints', () => {
+  test('requires both a complying and a noncomplying completing route', () => {
+    const dictionary = new Set(['A', 'B', 'ACD', 'BCD']);
+    const asks = deriveMeaningfulHouseAskCandidates([step('A')], ['AB', 'CD'], word => dictionary.has(word));
+    expect(asks).toEqual([{ kind: 'move', letter: 'A' }, { kind: 'keep', letter: 'B' }]);
+    for (const ask of asks) {
+      expect(evaluateHouseAsk(ask, move([['A', 0]]))).toBe(true);
+      expect(evaluateHouseAsk(ask, move([['B', 0]]))).toBe(false);
+    }
+  });
+
+  test('filters an ask satisfied by every winning route, including the measured bank example', () => {
+    const asks = deriveMeaningfulHouseAskCandidates([step('H'), step('C', { stepIndex: 1 })], ['GOTH', 'COPS', 'DOLE']);
+    expect(asks).not.toContainEqual({ kind: 'move', letter: 'H' });
+  });
+
+  test('offers no ask when there is no route choice or no completing route', () => {
+    const dictionary = new Set(['B', 'ACD']);
+    expect(deriveMeaningfulHouseAskCandidates([step('A')], ['AB', 'CD'], word => dictionary.has(word))).toEqual([]);
+    expect(deriveMeaningfulHouseAskCandidates([step('A')], ['AB', 'CD'], () => false)).toEqual([]);
   });
 });
 

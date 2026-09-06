@@ -14,6 +14,8 @@ import { PuzzleVariant } from './puzzleVariety';
 const PUZZLE_SAVE_KEY = 'wordshift_in_progress_puzzle';
 
 export interface SavedPuzzleState {
+  /** Absent/0 = historical board dictionary; 1 = reviewed validity policy. */
+  vocabularyVersion?: 0 | 1;
   rows: RowData[];
   activeRowIndex: number;
   selectedLetter: Letter | null;
@@ -22,6 +24,8 @@ export interface SavedPuzzleState {
   history: MoveDelta[];
   invalidAttempts: number;
   hintsUsed: number;
+  /** Paid advice can be replayed after a relaunch without charging again. */
+  hintDisclosures?: import('../hooks/usePuzzleGame').HintDisclosure[];
   /** Undos SPENT on this board so far. Optional because it is newer than the
    *  save shape and puzzleSaveState carries no schema version, so a pre-fix row
    *  legitimately has no value (restore falls through to 0 — identical to the
@@ -69,6 +73,12 @@ export interface SavedPuzzleState {
   isPlayingDaily: boolean;
   /** Date for daily challenge saves (YYYY-MM-DD). Null for standard puzzles. */
   dailyDate?: string | null;
+  /** Keep the original board's competition pool across app updates. */
+  dailyBoardVersion?: string;
+  /** Preserve first-daily practice eligibility when the process is restarted. */
+  dailyEased?: boolean;
+  /** Original timing origin, so a resume cannot earn an artificially short rank. */
+  dailyStartedAt?: number;
   /** Board came from a friend-shared challenge link. Restored so a kill+relaunch
    *  can't convert a shared board (amber-only) into one that feeds phase progress. */
   isSharedChallenge?: boolean;

@@ -13,7 +13,7 @@
  * dailyLoginReward. Cloud-synced under `wordshift_daily_ladder`; cleared by
  * Settings -> Reset All. Local-day bucketing via services/dateUtils (never UTC).
  */
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage, { isStorageTransactionActive } from './persistenceStorage';
 import { Difficulty } from '../types';
 import { daysAgoLocal } from './dateUtils';
 
@@ -38,6 +38,8 @@ export interface DailyLadderEntry {
   stars: number;
   /** The day's board difficulty (the daily ramps Mon->Sun). */
   difficulty: Difficulty;
+  /** Eased first dailies and practice boards never acquire competitive ranks. */
+  rankEligible?: boolean;
   /**
    * Resonant deep-word choices made on that day's board. Optional and absent
    * by default (older entries / boards with none). Spoiler-safe: a count only,
@@ -49,6 +51,10 @@ export interface DailyLadderEntry {
 interface DailyLadderState {
   /** Chronological, newest LAST, deduped by date. */
   entries: DailyLadderEntry[];
+  /** Date-only archive keeps lifetime participation exact without retaining full results. */
+  archivedDates: string[];
+  archivedBestRank: number | null;
+  archivedBestPercentile: number | null;
 }
 
 export interface DailyLadderSummary {
@@ -79,7 +85,7 @@ export function invalidateDailyLadderCache(): void {
 }
 
 
-const getDefault = (): DailyLadderState => ({ entries: [] });
+const getDefault = (): DailyLadderState => ({ entries: [], archivedDates: [], archivedBestRank: null, archivedBestPercentile: null });
 
 async function load(): Promise<DailyLadderState> {
   if (cache) return cache;
@@ -87,10 +93,16 @@ async function load(): Promise<DailyLadderState> {
     const stored = await AsyncStorage.getItem(STORAGE_KEY);
     if (stored) {
       const parsed = JSON.parse(stored);
-      cache = { entries: Array.isArray(parsed?.entries) ? parsed.entries : [] };
+      cache = {
+        entries: Array.isArray(parsed?.entries) ? parsed.entries : [],
+        archivedDates: Array.isArray(parsed?.archivedDates) ? [...new Set<string>(parsed.archivedDates)] : [],
+        archivedBestRank: typeof parsed?.archivedBestRank === 'number' ? parsed.archivedBestRank : null,
+        archivedBestPercentile: typeof parsed?.archivedBestPercentile === 'number' ? parsed.archivedBestPercentile : null,
+      };
       return cache!;
     }
-  } catch {
+  } catch (error) {
+    if (isStorageTransactionActive()) throw error;
     // fall through to default
   }
   cache = getDefault();
@@ -101,7 +113,8 @@ async function save(state: DailyLadderState): Promise<void> {
   cache = state;
   try {
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch {
+  } catch (error) {
+    if (isStorageTransactionActive()) throw error;
     // Non-critical — the in-memory cache keeps the session consistent.
   }
 }
@@ -130,15 +143,19 @@ export async function recordDailyLadderResult(
   entry: DailyLadderEntry,
 ): Promise<DailyLadderState> {
   const state = await load();
+  // Full results are intentionally retained for 120 days. Do not count an
+  // old archived day twice when a delayed retry arrives.
+  if (state.archivedDates.includes(entry.date)) return state;
   const entries = state.entries.filter(e => e.date !== entry.date);
   const resonant = entry.resonantChoiceCount;
   entries.push({
     date: entry.date,
-    rank: entry.rank ?? null,
-    percentile: entry.percentile ?? null,
+    rank: entry.rankEligible === false ? null : entry.rank ?? null,
+    percentile: entry.rankEligible === false ? null : entry.percentile ?? null,
     timeMs: Math.max(0, Math.round(entry.timeMs)),
     stars: Math.max(0, Math.round(entry.stars)),
     difficulty: entry.difficulty,
+    ...(entry.rankEligible === false ? { rankEligible: false } : {}),
     // Optional field: stored only when a positive count exists (absent stays
     // the default so old entries and zero-resonance days look identical).
     ...(typeof resonant === 'number' && Number.isFinite(resonant) && resonant > 0
@@ -148,10 +165,32 @@ export async function recordDailyLadderResult(
   // Keep chronological by date so "latest"/trend are well-defined even if an
   // older day is backfilled.
   entries.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-  while (entries.length > MAX_ENTRIES) entries.shift();
-  const next = { entries };
+  const archivedDates = [...state.archivedDates];
+  let archivedBestRank = state.archivedBestRank;
+  let archivedBestPercentile = state.archivedBestPercentile;
+  while (entries.length > MAX_ENTRIES) {
+    const archived = entries.shift()!;
+    archivedDates.push(archived.date);
+    if (archived.rank != null) archivedBestRank = Math.min(archivedBestRank ?? Infinity, archived.rank);
+    if (archived.percentile != null) archivedBestPercentile = Math.max(archivedBestPercentile ?? -Infinity, archived.percentile);
+  }
+  const next = { entries, archivedDates, archivedBestRank, archivedBestPercentile };
   await save(next);
   return next;
+}
+
+/** Refresh a saved standing without replacing its solve data or creating a new result. */
+export async function refreshDailyLadderRank(
+  date: string,
+  rank: { rank: number; percentile: number },
+): Promise<boolean> {
+  if (!Number.isFinite(rank.rank) || rank.rank < 1 || !Number.isFinite(rank.percentile) ||
+      rank.percentile < 0 || rank.percentile > 100) return false;
+  const state = await load();
+  const existing = state.entries.find(entry => entry.date === date);
+  if (!existing || existing.rankEligible === false) return false;
+  await recordDailyLadderResult({ ...existing, rank: Math.round(rank.rank), percentile: rank.percentile });
+  return true;
 }
 
 /**
@@ -159,7 +198,7 @@ export async function recordDailyLadderResult(
  * state; date math is local-day via dateUtils.
  */
 export async function getDailyLadderSummary(): Promise<DailyLadderSummary> {
-  const { entries } = await load();
+  const { entries, archivedDates, archivedBestRank, archivedBestPercentile } = await load();
 
   const ranked = entries.filter(e => e.rank != null) as (DailyLadderEntry & {
     rank: number;
@@ -182,10 +221,10 @@ export async function getDailyLadderSummary(): Promise<DailyLadderSummary> {
   const bestPercentileThisWeek = weekPct.length
     ? Math.max(...weekPct.map(e => e.percentile))
     : null;
-  const bestRankEver = ranked.length ? Math.min(...ranked.map(e => e.rank)) : null;
-  const bestPercentileEver = withPct.length
-    ? Math.max(...withPct.map(e => e.percentile))
-    : null;
+  const allRanks = [...ranked.map(e => e.rank), ...(archivedBestRank == null ? [] : [archivedBestRank])];
+  const allPercentiles = [...withPct.map(e => e.percentile), ...(archivedBestPercentile == null ? [] : [archivedBestPercentile])];
+  const bestRankEver = allRanks.length ? Math.min(...allRanks) : null;
+  const bestPercentileEver = allPercentiles.length ? Math.max(...allPercentiles) : null;
 
   let trend: DailyLadderSummary['trend'] = null;
   if (withPct.length >= 2) {
@@ -195,7 +234,7 @@ export async function getDailyLadderSummary(): Promise<DailyLadderSummary> {
   }
 
   return {
-    participationCount: entries.length,
+    participationCount: archivedDates.length + entries.length,
     bestRankThisWeek,
     bestPercentileThisWeek,
     bestRankEver,

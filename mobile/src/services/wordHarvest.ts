@@ -1,4 +1,5 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage, { runStorageTransaction } from './persistenceStorage';
+import { awardBonusAmberInTransaction, getAmberBalance, invalidateProgressCache } from './amberCurrency';
 import { Difficulty, GameMode } from '../types';
 import { DialoguePhase } from '../types/homeWorld';
 import { PuzzleVariant } from './puzzleVariety';
@@ -22,12 +23,8 @@ export interface HarvestBatch {
 /**
  * Crash-safe credit ledger entry. When a batch is offered, its amber is moved
  * into this ledger in the SAME write that removes the batch, and stays there
- * until the caller confirms the amber actually landed in the spendable balance
- * (acknowledgeBatchCredit after awardBonusAmber succeeds). An app kill between
- * the offer and the credit can therefore never destroy the amber — the pit
- * screen re-credits un-acknowledged entries on next load via
- * reconcilePendingCredits, and the ledger entry is the dedupe that prevents
- * double-crediting.
+ * until settleBatchCredit commits the amber and removes the ledger entry in
+ * one journal. Bootstrap can retry an interrupted credit without paying twice.
  */
 export interface PendingCredit {
   /** Credit id: the offered batch's id, or a generated `hc_` id for offer-all sweeps. */
@@ -58,7 +55,7 @@ export interface OfferResult {
   /**
    * Ledger id for the crash-safe pending credit created by this offer (absent
    * when nothing was offered). Pass to acknowledgeBatchCredit AFTER the amber
-   * has been credited via awardBonusAmber.
+   * has been credited via awardBonusAmberInTransaction.
    */
   creditId?: string;
 }
@@ -117,6 +114,8 @@ async function saveHarvestState(): Promise<void> {
     await AsyncStorage.setItem(HARVEST_STORAGE_KEY, JSON.stringify(harvestCache));
   } catch (error) {
     console.warn('Failed to save harvest state:', error);
+    harvestCache = null;
+    throw error;
   }
 }
 
@@ -256,7 +255,8 @@ export async function offerAllBatches(): Promise<OfferResult> {
 
 /**
  * Acknowledge that a pending credit's amber has landed in the spendable
- * balance (call AFTER awardBonusAmber succeeds). Removes the ledger entry in a
+ * balance. Internal settlement helper; callers use settleBatchCredit so the
+ * award and acknowledgement share one commit. Removes the ledger entry in a
  * single write. Idempotent: acknowledging an unknown/already-cleared id is a
  * no-op.
  */
@@ -269,12 +269,43 @@ export async function acknowledgeBatchCredit(creditId: string): Promise<void> {
   await saveHarvestState();
 }
 
+/** Apply and acknowledge one offered credit in the same recoverable commit.
+ * Calling it again after a lost acknowledgement returns the current balance. */
+export async function settleBatchCredit(
+  creditId: string | undefined,
+  source: 'word_offering' | 'auto_word_offering' = 'word_offering',
+): Promise<number> {
+  if (!creditId) return getAmberBalance();
+  try {
+    return await runStorageTransaction('harvest_credit', async () => {
+      const state = await loadHarvestState();
+      const credit = state.pendingCredits.find(entry => entry.id === creditId);
+      if (!credit) return getAmberBalance();
+      if (!Number.isFinite(credit.amber) || credit.amber < 0) throw new Error('Invalid harvest credit');
+      const balance = await awardBonusAmberInTransaction(credit.amber, source);
+      await acknowledgeBatchCredit(creditId);
+      return balance;
+    });
+  } catch (error) {
+    invalidateHarvestCache();
+    invalidateProgressCache();
+    throw error;
+  }
+}
+
+/** Bootstrap/Retry: offered words keep their value even if the pit never reopened. */
+export async function recoverPendingHarvestCredits(): Promise<void> {
+  try {
+    const credits = await runStorageTransaction('harvest_recovery_snapshot', reconcilePendingCredits);
+    for (const credit of credits) await settleBatchCredit(credit.id);
+  } catch (error) { invalidateHarvestCache(); throw error; }
+}
+
 /**
  * Un-acknowledged pending credits: amber released from batches whose credit
- * never confirmed (app killed between the offer and awardBonusAmber). The pit
- * screen calls this on load, credits each entry, then acknowledges it. Entries
- * are KEPT until acknowledged — the ledger is the double-credit dedupe, so a
- * recovered entry can be credited exactly once.
+ * never confirmed (app killed between the offer and awardBonusAmberInTransaction). The pit
+ * screen/boot passes these IDs to settleBatchCredit. Entries are kept until
+ * their balance and removal commit together.
  */
 export async function reconcilePendingCredits(): Promise<PendingCredit[]> {
   const state = await loadHarvestState();

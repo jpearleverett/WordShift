@@ -4,6 +4,8 @@ Working copy for the App Store / Google Play listings. The hook of the game is
 the tonal bait-and-switch — the listing must *hint* at the darkness without
 spoiling the reveal, while the age rating must declare it honestly.
 
+> September 2026 update: the copy below includes the current game. Previous uploaded screenshots are historical; use the [1.3.0 capture brief](RELEASE_VALIDATION_1_3_0.md#current-store-capture-brief) before a new store submission. No listing upload is part of this code change.
+
 ## Identity
 
 - **App name:** WordShift
@@ -43,6 +45,7 @@ MASTER EVERY KIND OF SHIFT
 • Speed Shift tests how quickly you can see the pattern
 • Blind Offering hides previews for a true mastery challenge
 • Thousands of curated and generated word puzzles
+• Optional practice boards for Reverse, Double Shift and Blind Offering
 
 RETURN EACH DAY
 
@@ -52,6 +55,8 @@ A COZY GAME. MOSTLY.
 
 The longer you stay, the more the house changes. Familiar conversations take on new meanings. The animals remember the words you make.
 
+Revisit completed conversations in your journal. Recent journeys and the choices you made remain there when you begin a new cycle.
+
 Some mysteries unfold slowly.
 
 PLAY YOUR WAY
@@ -59,7 +64,7 @@ PLAY YOUR WAY
 • Core puzzles work offline
 • No account required
 • Optional hints and accessibility settings
-• Reduced-motion support
+• Reduced motion that follows your device preference, with a separate haptics setting
 • Free to play with occasional ads
 • Optional purchases for convenience and cosmetic expression
 • The main mystery unfolds through play, not purchases.

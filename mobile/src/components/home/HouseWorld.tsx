@@ -3,7 +3,7 @@ import { FONT_SIZE } from '../../theme/typeScale';
 import {
   View,
   StyleSheet,
-  Dimensions,
+  useWindowDimensions,
   Animated,
   Text,
   Easing,
@@ -33,10 +33,13 @@ import {
   computePanSettleTarget,
   rubberBandPanY,
 } from '../../services/homeScenePan';
+import { getSkyBoxHeight } from '../../services/worldGeometry';
 import { getSettingsSync } from '../../services/settings';
 import { shouldSimplifyAnimations, getDeviceTier } from '../../services/deviceTier';
 import { getTendingIntensity } from '../../services/tending';
 import { getActiveEvent } from '../../services/liveEvents';
+import { StoryWorldKeepsake } from '../../services/storySpine';
+import { StoryWorldObject } from './StoryWorldObject';
 
 // Environment assets
 // Full-screen sky backdrops ship as WebP (q90): ~15MB of PNG became ~1.5MB with
@@ -74,7 +77,6 @@ const PIT_ENTRANCE_IMG = require('../../../assets/environment/pit_entrance.png')
 const HOUSE_SHADOW_IMG = require('../../../assets/environment/house_shadow.png');
 const SHADOW_FIGURE_IMG = require('../../../assets/environment/shadow_figure.png');
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // AMBIENT PARTICLE SYSTEM — phase-graded living atmosphere
@@ -135,6 +137,7 @@ const AMBIENT_PARTICLES_BY_PHASE: Record<number, AmbientParticleConfig> = {
 };
 
 const FloatingParticle: React.FC<{ particle: Particle }> = ({ particle }) => {
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
   useEffect(() => {
     const startX = Math.random() * SCREEN_WIDTH;
     const endX = startX + (Math.random() - 0.5) * particle.drift * 2;
@@ -442,6 +445,7 @@ const smokeStyles = StyleSheet.create({
 // so it always faces its travel direction (F16). The caller only renders this
 // at the bright phases (F16) — songbirds don't cross the dread-phase skies.
 const FlyingBird: React.FC<{ startDelay: number; yPosition: number }> = ({ startDelay, yPosition }) => {
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
   const x = useRef(new Animated.Value(-50)).current;
   const y = useRef(new Animated.Value(yPosition)).current;
   const flapRotation = useRef(new Animated.Value(0)).current;
@@ -582,6 +586,7 @@ const birdStyles = StyleSheet.create({
 // ═══════════════════════════════════════════════════════════════════════════
 
 const ShootingStar: React.FC = () => {
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
   const x = useRef(new Animated.Value(0)).current;
   const y = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(0)).current;
@@ -694,6 +699,7 @@ const LIGHTNING_GAP_RANGE_MS = 90000;
 const LIGHTNING_PEAK_OPACITY = 0.07;
 
 const DistantLightning: React.FC = () => {
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
   const flash = useRef(new Animated.Value(0)).current;
   const mountedRef = useRef(true);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1333,6 +1339,7 @@ const DriftingCloud: React.FC<{
   /** Cloud body color (phase-dimmed by the caller). */
   tint: string;
 }> = ({ width, top, duration, initialProgress, opacity, tint }) => {
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
   const travel = SCREEN_WIDTH + width;
   const x = useRef(new Animated.Value(-width + travel * initialProgress)).current;
   const mountedRef = useRef(true);
@@ -1399,6 +1406,7 @@ const DriftingCloud: React.FC<{
  * Views + one opacity loop, no new art.
  */
 const MoonGlow: React.FC = () => {
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
   const breathe = useRef(new Animated.Value(0)).current;
   const isStatic = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
 
@@ -1605,19 +1613,6 @@ const PIT_DOCK_CLEARANCE = 80;
 // The house column is bottom-anchored too (margins below), so the foundation
 // top sits at (HOUSE_BOTTOM_MARGIN + PIT_DOCK_CLEARANCE + PIT_FLOW_HEIGHT 140
 // + foundation 43) = 293dp above the container bottom.
-const SKY_IMG_WIDTH = 941;
-const SKY_IMG_HEIGHT = 1972;
-// The 940 floor guarantees the seat even on very small / display-size-scaled
-// windows (e.g. 320x640dp): scale >= 940/1972 keeps the foundation top at
-// image row >= ~1366, below every river (lowest bank ~row 1335). The taller
-// pit (137dp flow) pushes the foundation higher up the art than the old one
-// did, so this floor is what keeps it out of the water — larger boxes only
-// push the house further down the meadow, never back up into the river.
-const SKY_BOX_HEIGHT = Math.max(
-  SCREEN_HEIGHT,
-  Math.ceil(SCREEN_WIDTH * (SKY_IMG_HEIGHT / SKY_IMG_WIDTH)) + 2,
-  940,
-);
 
 
 /**
@@ -1643,6 +1638,8 @@ const UPPER_SKY_LIGHT: Record<number, {
 const UpperSkyAtmosphere: React.FC<{
   phase: DialoguePhase; height: number;
 }> = React.memo(({ phase, height }) => {
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
+  const SKY_BOX_HEIGHT = getSkyBoxHeight(SCREEN_WIDTH, SCREEN_HEIGHT);
   if (height <= 0) return null;
   const palette = UPPER_SKY_LIGHT[phase] ?? UPPER_SKY_LIGHT[0];
   const simple = getDeviceTier() === 'low';
@@ -1708,6 +1705,8 @@ UpperSkyAtmosphere.displayName = 'UpperSkyAtmosphere';
 
 
 interface HouseWorldProps {
+  storyKeepsake?: StoryWorldKeepsake | null;
+  onInspectStory?: () => void;
   rooms: Room[];
   animals: Animal[];
   currentPhase: DialoguePhase;
@@ -1745,9 +1744,12 @@ interface HouseWorldProps {
    * the chip doesn't peek through the modal's translucent scrim.
    */
   suppressInviteChips?: boolean;
+  quietNotifications?: boolean;
 }
 
 export const HouseWorld: React.FC<HouseWorldProps> = ({
+  storyKeepsake,
+  onInspectStory,
   rooms,
   animals,
   currentPhase,
@@ -1768,7 +1770,10 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   pitNeedsAttention = false,
   tendingLevel = 0,
   suppressInviteChips = false,
+  quietNotifications = false,
 }) => {
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
+  const SKY_BOX_HEIGHT = getSkyBoxHeight(SCREEN_WIDTH, SCREEN_HEIGHT);
   const tendingIntensity = getTendingIntensity(tendingLevel);
   const ambientMotionEnabled = !getSettingsSync().reducedMotion && !shouldSimplifyAnimations();
   const houseTint = PHASE_HOUSE_TINT[currentPhase] ?? PHASE_HOUSE_TINT[0];
@@ -2273,7 +2278,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                     currentPhase >= 1 ? SKY_AFTERNOON :
                     SKY_DAY
                   }
-                  style={[styles.skyBackground, { height: SKY_BOX_HEIGHT }]}
+                  style={[styles.skyBackground, { width: SCREEN_WIDTH, height: SKY_BOX_HEIGHT }]}
                   resizeMode="cover"
                 />
 
@@ -2286,6 +2291,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                   pointerEvents="none"
                   style={[
                     styles.groundExtension,
+                    { bottom: -SCREEN_HEIGHT, height: SCREEN_HEIGHT + 1 },
                     { backgroundColor: PHASE_GROUND_COLORS[currentPhase] ?? PHASE_GROUND_COLORS[0] },
                   ]}
                 />
@@ -2295,9 +2301,9 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                     phase-dimmed. */}
                 {currentPhase <= 2 && (
                   <>
-                    <DriftingCloud width={170} top={26} duration={80000} initialProgress={0.15} opacity={currentPhase >= 2 ? 0.4 : 0.85} tint={currentPhase >= 2 ? '#CFC7DA' : '#FFFFFF'} />
-                    <DriftingCloud width={130} top={88} duration={105000} initialProgress={0.55} opacity={currentPhase >= 2 ? 0.4 : 0.85} tint={currentPhase >= 2 ? '#CFC7DA' : '#FFFFFF'} />
-                    <DriftingCloud width={120} top={58} duration={65000} initialProgress={0.8} opacity={currentPhase >= 2 ? 0.35 : 0.75} tint={currentPhase >= 2 ? '#C6BED2' : '#F4F2FA'} />
+                    <DriftingCloud key={`${SCREEN_WIDTH}:${SCREEN_HEIGHT}:170`} width={170} top={26} duration={80000} initialProgress={0.15} opacity={currentPhase >= 2 ? 0.4 : 0.85} tint={currentPhase >= 2 ? '#CFC7DA' : '#FFFFFF'} />
+                    <DriftingCloud key={`${SCREEN_WIDTH}:${SCREEN_HEIGHT}:130`} width={130} top={88} duration={105000} initialProgress={0.55} opacity={currentPhase >= 2 ? 0.4 : 0.85} tint={currentPhase >= 2 ? '#CFC7DA' : '#FFFFFF'} />
+                    <DriftingCloud key={`${SCREEN_WIDTH}:${SCREEN_HEIGHT}:120`} width={120} top={58} duration={65000} initialProgress={0.8} opacity={currentPhase >= 2 ? 0.35 : 0.75} tint={currentPhase >= 2 ? '#C6BED2' : '#F4F2FA'} />
                   </>
                 )}
 
@@ -2325,9 +2331,9 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                 )}
 
                 {/* Shooting stars (only at higher phases) */}
-                {ambientMotionEnabled && currentPhase >= 2 && <ShootingStar />}
-                {ambientMotionEnabled && currentPhase >= 3 && <ShootingStar />}
-                {ambientMotionEnabled && currentPhase >= 4 && <ShootingStar />}
+                {ambientMotionEnabled && currentPhase >= 2 && <ShootingStar key={`${SCREEN_WIDTH}:${SCREEN_HEIGHT}:first`} />}
+                {ambientMotionEnabled && currentPhase >= 3 && <ShootingStar key={`${SCREEN_WIDTH}:${SCREEN_HEIGHT}:second`} />}
+                {ambientMotionEnabled && currentPhase >= 4 && <ShootingStar key={`${SCREEN_WIDTH}:${SCREEN_HEIGHT}:third`} />}
                 {/* The pre-storm sky stirs: rare silent heat lightning at the
                     horizon, Phase 3 ONLY (the Phase 4+ sky belongs to the
                     entity and stays honestly empty). */}
@@ -2340,9 +2346,9 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                   not the distant sky backdrop). */}
               {ambientMotionEnabled && currentPhase <= 2 && (
                 <>
-                  <FlyingBird startDelay={0} yPosition={80} />
-                  <FlyingBird startDelay={3000} yPosition={50} />
-                  <FlyingBird startDelay={6000} yPosition={110} />
+                  <FlyingBird key={`${SCREEN_WIDTH}:${SCREEN_HEIGHT}:0`} startDelay={0} yPosition={80} />
+                  <FlyingBird key={`${SCREEN_WIDTH}:${SCREEN_HEIGHT}:3000`} startDelay={3000} yPosition={50} />
+                  <FlyingBird key={`${SCREEN_WIDTH}:${SCREEN_HEIGHT}:6000`} startDelay={6000} yPosition={110} />
                 </>
               )}
 
@@ -2448,6 +2454,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                             onAnimalPress={onAnimalPress}
                             onRoomPress={onRoomPress}
                             currentPhase={currentPhase}
+                            quietNotifications={quietNotifications}
                             isAnimalOnCooldown={roomAnimal ? isOnCooldown(roomAnimal.id) : false}
                             cooldownPuzzlesLeft={roomAnimal ? getSessionStatus(roomAnimal.id).puzzlesRemaining : undefined}
                             isRoomUpgraded={room.id in purchasedUpgrades}
@@ -2539,6 +2546,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                     style={styles.foundationImageInner}
                     resizeMode="stretch"
                   />
+                  {storyKeepsake && onInspectStory && <StoryWorldObject keepsake={storyKeepsake} onPress={onInspectStory} />}
                 </View>
 
                 {/* The Offering Pit's mouth in the front yard, a stone path
@@ -2582,6 +2590,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
           were invisible at translateY=0 in every phase. Memoized child: its
           spawn setState never re-renders the pan scene (flicker fix). */}
       <AmbientParticles
+        key={`${SCREEN_WIDTH}:${SCREEN_HEIGHT}`}
         phase={currentPhase}
         ambientMotionEnabled={ambientMotionEnabled}
         isFullMoon={isFullMoon}
@@ -2608,18 +2617,18 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 0,
     left: 0,
-    width: SCREEN_WIDTH,
-    height: SKY_BOX_HEIGHT,
+    width: '100%',
+    height: 940,
     zIndex: -1,
   },
   // Below the container bottom with a 1px overlap over the art's bottom row —
   // sub-pixel seam insurance only (see PHASE_GROUND_COLORS notes).
   groundExtension: {
     position: 'absolute',
-    bottom: -SCREEN_HEIGHT,
+    bottom: -1,
     left: 0,
     right: 0,
-    height: SCREEN_HEIGHT + 1,
+    height: 1,
     zIndex: -1,
   },
   // Screen-space ambient particle overlay: rendered after the pan handler,
@@ -2636,7 +2645,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: SCREEN_HEIGHT * 0.3,
+    height: '30%',
     zIndex: 150,
   },
 

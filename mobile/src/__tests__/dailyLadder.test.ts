@@ -11,6 +11,7 @@ import {
   shouldShowTrend,
   DailyLadderEntry,
   DailyLadderSummary,
+  refreshDailyLadderRank,
 } from '../services/dailyLadder';
 import { getLocalDateString, getLocalDateStringDaysAgo } from '../services/dateUtils';
 
@@ -35,6 +36,35 @@ beforeEach(async () => {
 });
 
 describe('recordDailyLadderResult', () => {
+  test('refreshes a provisional standing without losing solve fields or duplicating participation', async () => {
+    const date = getLocalDateString();
+    await recordDailyLadderResult(entry({ date, timeMs: 42000, resonantChoiceCount: 2 }));
+    expect(await refreshDailyLadderRank(date, { rank: 5, percentile: 80 })).toBe(true);
+    expect((await getDailyLadderHistory())[0]).toMatchObject({ date, timeMs: 42000, resonantChoiceCount: 2, rank: 5, percentile: 80 });
+    await refreshDailyLadderRank(date, { rank: 10, percentile: 70 });
+    expect((await getDailyLadderSummary()).participationCount).toBe(1);
+    expect((await getDailyLadderSummary()).bestRankEver).toBe(10);
+  });
+
+  test('never creates a result or ranks an eased practice board on refresh', async () => {
+    const date = getLocalDateString();
+    expect(await refreshDailyLadderRank(date, { rank: 1, percentile: 100 })).toBe(false);
+    await recordDailyLadderResult(entry({ date, rankEligible: false }));
+    expect(await refreshDailyLadderRank(date, { rank: 1, percentile: 100 })).toBe(false);
+  });
+
+  test('keeps lifetime count and archived best after 121 days and a reload', async () => {
+    const oldDate = getLocalDateStringDaysAgo(120);
+    await recordDailyLadderResult(entry({ date: oldDate, rank: 1, percentile: 99 }));
+    for (let ago = 119; ago >= 0; ago--) {
+      await recordDailyLadderResult(entry({ date: getLocalDateStringDaysAgo(ago), rank: 50, percentile: 60 }));
+    }
+    _clearDailyLadderCache();
+    expect((await getDailyLadderHistory())).toHaveLength(120);
+    expect(await getDailyLadderSummary()).toMatchObject({ participationCount: 121, bestRankEver: 1, bestPercentileEver: 99 });
+    await recordDailyLadderResult(entry({ date: oldDate }));
+    expect((await getDailyLadderSummary()).participationCount).toBe(121);
+  });
   test('records and persists an entry', async () => {
     await recordDailyLadderResult(entry({ date: getLocalDateString(), rank: 4, percentile: 88 }));
     const history = await getDailyLadderHistory();

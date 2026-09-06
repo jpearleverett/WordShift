@@ -1,7 +1,7 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage, { runStorageTransaction } from './persistenceStorage';
 import { Difficulty, GameMode } from '../types';
 import { clearPlayedPuzzles } from './puzzleBank';
-import { getLocalDateString, getLocalDateStringDaysAgo, daysAgoLocal } from './dateUtils';
+import { getLocalDateString, getLocalDateStringDaysAgo, daysAgoLocal, parseLocalDate } from './dateUtils';
 import {
   HomeWorldProgress,
   AmberTransaction,
@@ -177,23 +177,6 @@ function isYesterday(dateString: string): boolean {
 }
 
 /**
- * Check if a date string is exactly yesterday (local day).
- * Free streak continuation requires play *yesterday* — any longer gap must be
- * covered by a streak freeze (see updateStreak). This keeps daily habit
- * tension intact instead of letting an every-other-day cadence ride forever.
- */
-function playedYesterday(dateString: string): boolean {
-  return daysAgoLocal(dateString) === 1;
-}
-
-/**
- * Check if a date string is today
- */
-function isToday(dateString: string): boolean {
-  return dateString === getTodayDateString();
-}
-
-/**
  * Injectable RNG seam for the variable-ratio surprise bonus.
  * Production uses Math.random; tests swap a deterministic generator via
  * setSurpriseRng(). This is the ONLY test-only hook — production never depends
@@ -228,9 +211,11 @@ let streakFreezeJustConsumed = false;
  * Update streak based on play activity
  * Should be called when a puzzle is completed
  */
-async function updateStreak(): Promise<number> {
+async function updateStreak(completedDate?: string): Promise<number> {
   const progress = await loadProgress();
-  const today = getTodayDateString();
+  const today = completedDate ?? getTodayDateString();
+  const day = parseLocalDate(today);
+  const previousDay = getLocalDateString(new Date(day.getFullYear(), day.getMonth(), day.getDate() - 1));
 
   // Handle missing streak data (migration)
   if (progress.currentStreak === undefined) {
@@ -241,10 +226,10 @@ async function updateStreak(): Promise<number> {
     // First play ever - start streak at 1
     progress.currentStreak = 1;
     progress.lastPlayDate = today;
-  } else if (isToday(progress.lastPlayDate)) {
+  } else if (progress.lastPlayDate === today) {
     // Already played today - streak unchanged
     // Just return current streak
-  } else if (playedYesterday(progress.lastPlayDate)) {
+  } else if (progress.lastPlayDate === previousDay) {
     // Played yesterday — continue streak
     progress.currentStreak += 1;
     progress.lastPlayDate = today;
@@ -444,6 +429,8 @@ async function saveProgress(): Promise<void> {
     await AsyncStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify(progressCache));
   } catch (error) {
     console.warn('Failed to save home progress:', error);
+    progressCache = null;
+    throw error;
   }
 }
 
@@ -575,6 +562,8 @@ export async function awardPuzzleAmber(
   creditToBalance: boolean = false,
   options: {
     skipPhaseProgress?: boolean;
+    /** Original solve day, retained by a durable retry intent. */
+    completedDate?: string;
     /** Blind Offering win (challenge limits + end-judged blind play): pays the
      *  apex amber multiplier and the 2.0x phase-progress cap. */
     blind?: boolean;
@@ -633,7 +622,7 @@ export async function awardPuzzleAmber(
   const previousStreak = progress.currentStreak ?? 0;
 
   // Update streak first
-  const currentStreak = await updateStreak();
+  const currentStreak = await updateStreak(options.completedDate);
   // Capture (and clear) whether a streak freeze was just consumed to save the streak.
   const streakSaved = streakFreezeJustConsumed;
   streakFreezeJustConsumed = false;
@@ -1536,7 +1525,8 @@ export async function applyVariantAmberBonus(
   variant: string,
   baseAmberAward: number,
   configuredMultiplier: number,
-  creditToBalance: boolean = false
+  creditToBalance: boolean = false,
+  completedDate?: string
 ): Promise<{
   bonus: number;
   freshBonus: number;
@@ -1569,7 +1559,7 @@ export async function applyVariantAmberBonus(
   const bonus = Math.max(0, Math.round(baseAmberAward * (configuredMultiplier - 1)));
 
   // Once-per-day-per-variant fresh bonus.
-  const today = getLocalDateString();
+  const today = completedDate ?? getLocalDateString();
   if (!progress.variantFreshDates) progress.variantFreshDates = {};
   const isFresh = progress.variantFreshDates[variant] !== today;
   const freshBonus = isFresh ? FRESH_VARIANT_BONUS_AMBER : 0;
@@ -2288,6 +2278,13 @@ const DEFERRED_CREDIT_SOURCES = new Set(['word_offering', 'auto_word_offering'])
  * touching totalAmberEarned (already counted at victory time — see above).
  */
 export async function awardBonusAmber(amount: number, source: string): Promise<number> {
+  try {
+    return await runStorageTransaction('amber_bonus', () => awardBonusAmberInTransaction(amount, source));
+  } catch (error) { invalidateProgressCache(); throw error; }
+}
+
+/** Only for a caller already inside its explicitly owned storage transaction. */
+export async function awardBonusAmberInTransaction(amount: number, source: string): Promise<number> {
   const progress = await loadProgress();
   progress.amber += amount;
   if (!DEFERRED_CREDIT_SOURCES.has(source)) {

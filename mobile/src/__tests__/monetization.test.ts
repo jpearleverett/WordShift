@@ -1,3 +1,4 @@
+import { clearEvents } from '../services/eventLogger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ENTITLEMENTS,
@@ -642,3 +643,6 @@ describe('cosmetics', () => {
     expect(getEquippedSync('confetti')).toBe('confetti_gold');
   });
 });
+
+// The service owns a debounced telemetry timer; do not let it outlive its test environment.
+afterAll(() => clearEvents());

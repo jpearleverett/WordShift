@@ -12,8 +12,10 @@ import {
 } from '../services/puzzleExtension';
 import { getWordHistoryWithRecency, recordPuzzleWords } from '../services/wordHistory';
 import { COMMON_WORDS, CURATED_EARLY_PUZZLES, CURATED_PUZZLE_COUNT, CuratedPuzzle, getRandomFallback } from '../constants';
+import { DICTIONARY_WORDS } from '../dictionary';
 import { CURATED_FINAL_PUZZLE } from '../constants/wordLists';
 import { isBlockedWord } from '../constants/blockedWords';
+import { isFairPuzzleWord } from '../services/puzzleVocabulary';
 // Imported from gameBalance directly (not the constants barrel) so the hook's
 // test harness — which mocks '../constants' wholesale — still gets real values.
 import {
@@ -255,7 +257,7 @@ export function hasAnyValidDoubleShiftMove(
  * Pure and render-free (used by handleHint to avoid steering the player into
  * an unsolvable line). Bounded by a node budget: exhaustion returns false
  * ("not provably solvable"), which callers treat as a soft signal — the hint
- * path degrades to its legacy first-valid behavior rather than failing.
+ * path offers free recovery rather than charging for unproved advice.
  */
 export function isBoardSolvableFromState(
   rows: Array<Array<{ char: string; isLocked: boolean }>>,
@@ -458,6 +460,12 @@ export interface HintHighlight {
   targetSlotIndex?: number;
 }
 
+export interface HintDisclosure {
+  key: string;
+  message: string;
+  highlight: HintHighlight | null;
+}
+
 /**
  * Marks where the letter placed by the last committed tap move landed, so the
  * arriving LetterTile can play its arrival settle instead of teleporting.
@@ -593,6 +601,9 @@ export interface PuzzleGameState {
   isStuck: boolean;
   /** Player's spendable hint balance (consumable hint economy). */
   hintBalance: number;
+  hintDisclosures: HintDisclosure[];
+  /** 0 preserves historical validation for a resumed board; fresh boards use 1. */
+  vocabularyVersion: 0 | 1;
   /** Increments each time HINT is tapped with an empty balance (App offers ad/store). */
   outOfHintsSignal: number;
   /** Board glow for the last delivered hint (null when no hint is active). */
@@ -776,6 +787,11 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   // taps HINT with none left (App offers a rewarded clip / the store).
   const [hintBalance, setHintBalance] = useState(() => getHintBalanceSync());
   const [outOfHintsSignal, setOutOfHintsSignal] = useState(0);
+  const hintDisclosuresRef = useRef(new Map<string, HintDisclosure>());
+  const pendingAbandonmentRef = useRef<{
+    difficulty: Difficulty; mode: GameMode; variant: PuzzleVariant; phase: DialoguePhase;
+    blind: boolean; lexicon: boolean; speed: boolean; undoLimited: boolean; weave: boolean;
+  } | null>(null);
   // Consecutive clean moves this board (resets on invalid attempt / undo / new
   // board). Drives the escalating combo move-message. Kept in a ref so it never
   // triggers a re-render of its own.
@@ -890,6 +906,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const [speedRescueSignal, setSpeedRescueSignal] = useState<{ extraSec: number; id: number } | null>(null);
 
   const validWordsCache = useRef<Set<string>>(new Set(COMMON_WORDS));
+  const vocabularyVersionRef = useRef<0 | 1>(1);
   const shakeErrorTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Monotonic id for in-flight puzzle generations. `startNewGame` is a long
   // async (bank lookup + up to 30s reverse generation); two rapid invocations
@@ -1047,6 +1064,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     }
 
     if (resetPerformance) {
+      pendingAbandonmentRef.current = null;
+      vocabularyVersionRef.current = 1;
+      validWordsCache.current = new Set(COMMON_WORDS);
+      hintDisclosuresRef.current.clear();
       setInvalidAttempts(0);
       setHintsUsed(0);
       setEarnedStars(0);
@@ -1179,6 +1200,33 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     speedOverride?: boolean,
   ) => {
     const requestedDifficulty = selectedDifficulty ?? preferredDifficultyRef.current;
+    if (gameState === GameState.PLAYING && history.length > 0) {
+      pendingAbandonmentRef.current = {
+        difficulty, mode: gameMode, variant: currentVariant, phase: currentPhase,
+        blind: blindMode, lexicon: lexiconMode, speed: speedMode,
+        undoLimited, weave: unbrokenWeaveMode,
+      };
+    } else if (gameState !== GameState.LOADING) {
+      pendingAbandonmentRef.current = null;
+    }
+    // Only a committed replacement counts. A superseded/failed generation,
+    // opening Home, and restoring/restarting the same board never emit here.
+    const commitNewBoard = (...args: Parameters<typeof initGame>) => {
+      const previous = pendingAbandonmentRef.current;
+      initGame(...args);
+      if (!previous) return;
+      const setupChanged = previous.difficulty !== requestedDifficulty || previous.variant !== (args[4] ?? 'standard') ||
+        previous.mode !== gameModeRef.current || previous.blind !== (blindOverride ?? blindMode) ||
+        previous.lexicon !== lexiconModeRef.current || previous.speed !== speedModeRef.current ||
+        previous.undoLimited !== undoLimitedRef.current || previous.weave !== unbrokenWeaveModeRef.current;
+      try {
+        const { logEvent } = require('../services/eventLogger') as typeof import('../services/eventLogger');
+        logEvent({ type: 'puzzle_abandoned', data: {
+          reason: setupChanged ? 'setup_change' : 'new_board', difficulty: previous.difficulty,
+          mode: previous.variant === 'standard' ? previous.mode : previous.variant, phase: previous.phase,
+        } });
+      } catch { /* Telemetry must never block a served puzzle. */ }
+    };
     if (selectedDifficulty !== undefined) {
       preferredDifficultyRef.current = selectedDifficulty;
     }
@@ -1299,7 +1347,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       ) {
         const curated = CURATED_EARLY_PUZZLES[puzzlesSolved];
         if (isStale()) return;
-        initGame(curated.words, undefined, curated.solution, curated.words[0].length, 'standard');
+        commitNewBoard(curated.words, undefined, curated.solution, curated.words[0].length, 'standard');
         setMessage(getStartMessage(currentPhase));
         return;
       }
@@ -1341,7 +1389,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         }
         if (isStale()) return;
         const finalHint = 'hint' in finalPuzzle && typeof finalPuzzle.hint === 'string' ? finalPuzzle.hint : undefined;
-        initGame(
+        commitNewBoard(
           finalPuzzle.words,
           finalHint,
           finalPuzzle.solution,
@@ -1409,7 +1457,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
                 extendedEcho.words.length === echoPuzzle.words.length + 1
               ) {
                 if (isStale()) return;
-                initGame(
+                commitNewBoard(
                   extendedEcho.words,
                   extendedEcho.hint,
                   extendedEcho.solution,
@@ -1457,7 +1505,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
               );
           if (bankPuzzle) {
             if (isStale()) return;
-            initGame(bankPuzzle.words, bankPuzzle.hint, bankPuzzle.solution, bankPuzzle.wordLength, variant, bankPuzzle.reverseSolution);
+            commitNewBoard(bankPuzzle.words, bankPuzzle.hint, bankPuzzle.solution, bankPuzzle.wordLength, variant, bankPuzzle.reverseSolution);
             await recordPuzzleWords(bankPuzzle.words);
             if (variant !== 'standard') {
               const config = VARIANT_CONFIGS[variant];
@@ -1519,7 +1567,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
           ? extended
           : getGuaranteedExtendedStandardFallback(requestedDifficulty);
       }
-      initGame(
+      commitNewBoard(
         puzzleToServe.words,
         puzzleToServe.hint,
         puzzleToServe.solution,
@@ -1562,7 +1610,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         try {
           const matureFallback = getGuaranteedExtendedStandardFallback(requestedDifficulty);
           if (isStale()) return;
-          initGame(
+          commitNewBoard(
             matureFallback.words,
             matureFallback.hint,
             matureFallback.solution,
@@ -1577,7 +1625,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       const fallbackWords = getRandomFallback(requestedDifficulty);
       const fallbackWordLen = fallbackWords[0].length;
       if (isStale()) return;
-      initGame(
+      commitNewBoard(
         fallbackWords,
         undefined,
         undefined,
@@ -1596,7 +1644,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         announceWeaveUnavailable();
       }
     }
-  }, [difficulty, initGame, gameMode, currentPhase, generatePuzzleForVariant, selectedVariant, setSelectedVariant]);
+  }, [difficulty, initGame, gameMode, currentPhase, generatePuzzleForVariant, selectedVariant, setSelectedVariant,
+    gameState, history.length, currentVariant, blindMode, lexiconMode, speedMode, undoLimited, unbrokenWeaveMode]);
 
   // Daily Challenge bypasses the bank/generation path: words are supplied by
   // the seeded daily generator. Always standard mode (hints allowed) with
@@ -1756,6 +1805,27 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     // Challenge mode: no hints allowed
     if (gameMode === 'challenge') {
       shakeError("No hints in Challenge Mode!");
+      return;
+    }
+
+    // Selection is not a new board state: pick1/drop1 and pick2/drop2 each
+    // share the same paid disclosure. Tile ids are excluded so a restart of
+    // this same puzzle can reuse advice after its tiles have been recreated.
+    const hintKey = JSON.stringify([
+      currentVariant, activeRowIndex, moveDirection,
+      doubleShiftPhase === 'pick2' || doubleShiftPhase === 'drop2',
+      rows.map(row => row.words.map(letter => [letter.char, letter.isLocked])),
+      [...spentLetterSet].sort(),
+    ]);
+    const disclosed = hintDisclosuresRef.current.get(hintKey);
+    if (disclosed) {
+      const highlight = disclosed.highlight;
+      setMessage(disclosed.message);
+      setHintHighlight(highlight ? {
+        ...highlight,
+        letterId: rows[highlight.rowIndex]?.words[highlight.letterIndex]?.id ?? highlight.letterId,
+      } : null);
+      pendingHintRef.current = true;
       return;
     }
 
@@ -1933,36 +2003,92 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       };
     };
 
-    if (relevantStep) {
+    const deliverHint = (message: string, highlight: HintHighlight | null) => {
+      if (!consumeHintSync()) return;
+      hintDisclosuresRef.current.set(hintKey, { key: hintKey, message, highlight });
       setHintsUsed(prev => prev + 1);
-      consumeHintSync();
       setHintBalance(getHintBalanceSync());
       pendingHintRef.current = true;
+      setMessage(message);
+      setHintHighlight(highlight);
+    };
+
+    if (isDoubleShiftHint && !doubleShiftMidStep) {
+      // Validate the actual two-drop advice, including the remaining board.
+      // "Some pair exists" cannot validate a stale stored pair. Temporary
+      // first-drop nonwords are allowed; only the completed step is judged.
+      type PairHint = { first: string; second: string; letterIndex: number; slot: number; fair: boolean };
+      let pair: PairHint | null = null;
+      let continuationChecks = 0;
+      const source = rows[activeRowIndex].words;
+      const target = rows[hintTargetRowIndex].words;
+      pairs: for (let a = 0; a < source.length; a++) {
+        if (source[a].isLocked) continue;
+        const afterFirst = source.filter((_, index) => index !== a);
+        for (let b = 0; b < afterFirst.length; b++) {
+          if (afterFirst[b].isLocked) continue;
+          const remaining = afterFirst.filter((_, index) => index !== b);
+          const remainder = remaining.map(letter => letter.char).join('');
+          if (!checkValidation(remainder)) continue;
+          for (let firstSlot = 0; firstSlot <= target.length; firstSlot++) {
+            const intermediate = [...target.slice(0, firstSlot), { char: source[a].char, isLocked: true }, ...target.slice(firstSlot)];
+            for (let secondSlot = 0; secondSlot <= intermediate.length; secondSlot++) {
+              const completed = [...intermediate.slice(0, secondSlot), { char: afterFirst[b].char, isLocked: true }, ...intermediate.slice(secondSlot)];
+              const formed = completed.map(letter => letter.char).join('');
+              if (!checkValidation(formed)) continue;
+              const fair = isFairPuzzleWord(remainder, lexiconMode || difficulty === 'EXPERT') &&
+                isFairPuzzleWord(formed, lexiconMode || difficulty === 'EXPERT');
+              if (pair && !fair) continue;
+              const next = rows.map(row => row.words.map(letter => ({ char: letter.char, isLocked: letter.isLocked })));
+              next[activeRowIndex] = remaining;
+              next[hintTargetRowIndex] = completed;
+              // Bound total paid-advice work independently of word rarity.
+              if (++continuationChecks > 32) break pairs;
+              if (activeRowIndex !== rows.length - 2 &&
+                  !isBoardSolvableFromState(next, activeRowIndex + 1, 'down', 'double_shift', checkValidation, 3000)) continue;
+              pair = { first: source[a].char, second: afterFirst[b].char, letterIndex: a, slot: firstSlot, fair };
+              if (fair) break pairs;
+            }
+          }
+        }
+      }
+      if (pair) {
+        deliverHint(getHintMessage(`${pair.first}' and '${pair.second}`, currentTargetWord, currentPhase), {
+          rowIndex: activeRowIndex, letterIndex: pair.letterIndex, letterId: source[pair.letterIndex].id,
+          targetRowIndex: hintTargetRowIndex, targetSlotIndex: pair.slot,
+        });
+      } else {
+        setMessage('Try undoing a move to find another route. No hint was spent.');
+        setHintHighlight(null);
+      }
+      return;
+    }
+
+    // An alternate first drop changes the whole remaining pair. The live
+    // continuation search below proves the second drop against this board.
+    if (doubleShiftMidStep) relevantStep = undefined;
+
+    if (relevantStep) {
       if (relevantStep.lettersToMove && doubleShiftMidStep) {
         // Double shift mid-step: only show the second letter (first was already placed)
-        setMessage(
-          getHintMessage(relevantStep.lettersToMove[1], relevantStep.targetWord, currentPhase)
-        );
         // Positions in the step refer to the original words; the board has
         // shifted since drop1, so locate the second letter/slot by search.
-        setHintHighlight(buildHintHighlight(relevantStep.lettersToMove[1]));
+        deliverHint(getHintMessage(relevantStep.lettersToMove[1], relevantStep.targetWord, currentPhase),
+          buildHintHighlight(relevantStep.lettersToMove[1]));
       } else if (relevantStep.lettersToMove) {
         // Double shift hint: show both letters
-        setMessage(
+        deliverHint(
           getHintMessage(
             `${relevantStep.lettersToMove[0]}' and '${relevantStep.lettersToMove[1]}`,
             relevantStep.targetWord,
             currentPhase
-          )
+          ),
+          buildHintHighlight(relevantStep.lettersToMove[0]),
         );
         // Glow the first letter only — the intermediate drop slot isn't a
         // dictionary word, so a slot glow here would be a guess.
-        setHintHighlight(buildHintHighlight(relevantStep.lettersToMove[0]));
       } else {
-        setMessage(
-          getHintMessage(relevantStep.letterToMove, relevantStep.targetWord, currentPhase)
-        );
-        setHintHighlight(buildHintHighlight(
+        deliverHint(getHintMessage(relevantStep.letterToMove, relevantStep.targetWord, currentPhase), buildHintHighlight(
           relevantStep.letterToMove,
           relevantStep.removalPosition,
           relevantStep.insertionPosition
@@ -1975,9 +2101,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       // shared links) EVERY hint takes this path. Prefer the first candidate
       // whose post-move board is still solvable under the shipped rules
       // (isBoardSolvableFromState, the lock-aware from-state analogue of
-      // puzzleSolvability.isChainSolvable); fall back to the plain first-valid
-      // candidate only when no solvability-preserving move exists — a hint
-      // must never come up empty while a legal move does.
+      // puzzleSolvability.isChainSolvable). If no safe continuation is found,
+      // offer free recovery rather than sell a legal but doomed move.
       const sourceLetters = rows[activeRowIndex].words;
       const targetWord = currentTargetWord;
       const wordValid = (w: string) => validWordsCache.current.has(w);
@@ -1987,10 +2112,6 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         : isReverseVariantHint
           ? 'reverse'
           : 'standard';
-      // The one-pick-one-drop candidate model matches every path except a
-      // double-shift step still awaiting its FIRST drop, where a single move
-      // is only half a step — keep the legacy first-valid behavior there.
-      const canCheckSolvability = !isDoubleShiftHint || doubleShiftMidStep;
 
       const keepsBoardSolvable = (letterIndex: number, slotIndex: number): boolean => {
         const movedChar = sourceLetters[letterIndex].char;
@@ -2025,11 +2146,11 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         return isBoardSolvableFromState(nextBoard, activeRowIndex + 1, 'down', solverKind, wordValid);
       };
 
-      type FoundMove = { letter: string; resultWord: string; letterIndex: number; slotIndex: number };
+      type FoundMove = { letter: string; resultWord: string; letterIndex: number; slotIndex: number; fair?: boolean };
       let foundMove: FoundMove | null = null;
       let firstValidMove: FoundMove | null = null;
 
-      for (let i = 0; i < sourceLetters.length && !foundMove; i++) {
+      for (let i = 0; i < sourceLetters.length && !foundMove?.fair; i++) {
         if (sourceLetters[i].isLocked) continue;
         const letter = sourceLetters[i].char;
         if (unbrokenWeaveMode && isLetterSpent(spentLetterSet, letter)) continue;
@@ -2041,30 +2162,32 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         if (!validWordsCache.current.has(remaining)) continue;
 
         // Check if inserting this letter into any position in the target creates a valid word
-        for (let j = 0; j <= targetWord.length && !foundMove; j++) {
+        for (let j = 0; j <= targetWord.length && !foundMove?.fair; j++) {
           const candidate = targetWord.slice(0, j) + letter + targetWord.slice(j);
           if (!validWordsCache.current.has(candidate)) continue;
           if (!firstValidMove) {
             firstValidMove = { letter, resultWord: candidate, letterIndex: i, slotIndex: j };
           }
-          if (!canCheckSolvability || keepsBoardSolvable(i, j)) {
-            foundMove = { letter, resultWord: candidate, letterIndex: i, slotIndex: j };
+          const fair = isFairPuzzleWord(remaining, lexiconMode || difficulty === 'EXPERT') &&
+            isFairPuzzleWord(candidate, lexiconMode || difficulty === 'EXPERT');
+          if ((!foundMove || fair) && keepsBoardSolvable(i, j)) {
+            foundMove = { letter, resultWord: candidate, letterIndex: i, slotIndex: j, fair };
           }
         }
       }
 
-      // No solvability-preserving candidate exists (or the budget ran out) —
-      // degrade to the legacy first-valid behavior rather than refusing to
-      // help. The player can still undo out of the dead end.
-      if (!foundMove) foundMove = firstValidMove;
+      // No solvability-preserving candidate exists (or the budget ran out).
+      if (!foundMove && firstValidMove) {
+        // A legal next word is not useful paid guidance when its continuation
+        // could not be established. Recovery remains free, including when the
+        // bounded solver could not finish its search.
+        setMessage('Try undoing a move to find another route. No hint was spent.');
+        setHintHighlight(null);
+        return;
+      }
 
       if (foundMove) {
-        setHintsUsed(prev => prev + 1);
-        consumeHintSync();
-        setHintBalance(getHintBalanceSync());
-        pendingHintRef.current = true;
-        setMessage(getHintMessage(foundMove.letter, foundMove.resultWord, currentPhase));
-        setHintHighlight(buildHintHighlight(
+        deliverHint(getHintMessage(foundMove.letter, foundMove.resultWord, currentPhase), buildHintHighlight(
           foundMove.letter,
           foundMove.letterIndex,
           foundMove.slotIndex
@@ -2073,7 +2196,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         setMessage(getHintFallback(currentPhase));
       }
     }
-  }, [gameState, isProcessing, rows, activeRowIndex, solution, reverseSolution, currentPhase, moveDirection, currentVariant, doubleShiftPhase, gameMode, checkValidation, unbrokenWeaveMode, spentLetterSet]);
+  }, [gameState, isProcessing, rows, activeRowIndex, solution, reverseSolution, currentPhase, moveDirection, currentVariant, doubleShiftPhase, gameMode, checkValidation, unbrokenWeaveMode, spentLetterSet, lexiconMode, difficulty]);
 
   const handleSlotPress = useCallback(async (
     targetIndex: number,
@@ -2901,6 +3024,11 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const previewValidityVisible = previewGradingMode === 'graded';
 
   const restorePuzzleState = useCallback((saved: SavedPuzzleState) => {
+    pendingAbandonmentRef.current = null;
+    vocabularyVersionRef.current = saved.vocabularyVersion === 1 ? 1 : 0;
+    validWordsCache.current = vocabularyVersionRef.current === 0
+      ? new Set([...DICTIONARY_WORDS, ...COMMON_WORDS])
+      : new Set(COMMON_WORDS);
     const selectedExists = saved.selectedLetter
       ? saved.rows.some(row => row.words.some(letter => letter.id === saved.selectedLetter!.id))
       : false;
@@ -2928,6 +3056,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setHistory(saved.history);
     setInvalidAttempts(saved.invalidAttempts);
     setHintsUsed(saved.hintsUsed);
+    hintDisclosuresRef.current = new Map(
+      (saved.hintDisclosures ?? []).filter(item => typeof item?.key === 'string' && typeof item.message === 'string')
+        .map(item => [item.key, item]),
+    );
     // Assigned UNCONDITIONALLY, never behind an `if (saved.undosUsed != null)`:
     // a legacy row with no field must land on 0 rather than inherit whatever
     // the previous board left in the ref. Its two siblings above were always
@@ -3064,6 +3196,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   // repair path (including a failed blind-finale judgment), and the restarted
   // board must still BE the final board.
   const resetCurrentPuzzle = useCallback(() => {
+    pendingAbandonmentRef.current = null;
     if (rows.length === 0) return;
     const originalWords = rows.map(r => r.originalWord);
     const wordLen = originalWords[0]?.length ?? currentWordLength;
@@ -3183,6 +3316,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     isFinalBoard,
     isStuck,
     hintBalance,
+    hintDisclosures: [...hintDisclosuresRef.current.values()],
+    vocabularyVersion: vocabularyVersionRef.current,
     outOfHintsSignal,
     hintHighlight,
     moveOutcomes,

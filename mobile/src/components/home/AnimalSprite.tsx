@@ -352,6 +352,7 @@ interface AnimalSpriteProps {
   onPress: (animal: Animal) => void;
   currentPhase: DialoguePhase;
   isOnCooldown?: boolean;
+  quietNotifications?: boolean;
   cooldownPuzzlesLeft?: number;
 }
 
@@ -539,6 +540,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
   onPress,
   currentPhase,
   isOnCooldown = false,
+  quietNotifications = false,
   cooldownPuzzlesLeft,
 }) => {
   const posX = useRef(new Animated.Value(animal.position.x)).current;
@@ -1444,7 +1446,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
               its 90dp box, so a container-corner badge floated in dead space
               beside the head. It stays an UNFLIPPED sibling of `body`, so the
               "!" never mirrors with facing. */}
-          {animal.hasNewDialogue && !isOnCooldown && (
+          {animal.hasNewDialogue && !isOnCooldown && !quietNotifications && (
             <Animated.View
               style={[
                 styles.notificationBadge,

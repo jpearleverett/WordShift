@@ -1,6 +1,7 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getAllStoredEvents, removeOldestEvents } from './eventLogger';
-import { isSupabaseConfigured, sbInsert } from './supabaseClient';
+import { getInstallId } from './installIdentity';
+export { getInstallId } from './installIdentity';
+import { getAllStoredEvents, acknowledgeEvents } from './eventLogger';
+import { isSupabaseConfigured, sbRpc } from './supabaseClient';
 
 /**
  * Optional remote telemetry transport.
@@ -16,7 +17,6 @@ import { isSupabaseConfigured, sbInsert } from './supabaseClient';
  * unset = fully disabled (the default) — no network traffic occurs.
  * Remember to update the privacy policy before enabling.
  */
-const INSTALL_ID_KEY = 'wordshift_install_id';
 
 /**
  * Read Expo config `extra` lazily so this module still loads in Node test
@@ -50,9 +50,6 @@ function getAppVersion(): string {
 /** Minimum time between upload attempts (ms). */
 const SYNC_THROTTLE_MS = 60_000;
 
-// In-memory cache for the anonymous install id
-let installIdCache: string | null = null;
-
 // Last sync attempt timestamp (module memory — resets on app restart)
 let lastSyncAttempt = 0;
 
@@ -65,40 +62,6 @@ export function isTelemetryEnabled(): boolean {
   return getTelemetryEndpoint().length > 0 || isSupabaseConfigured();
 }
 
-function generateInstallId(): string {
-  try {
-    // uuid v4 requires crypto.getRandomValues — fall back below if unavailable
-    const { v4 } = require('uuid');
-    return v4();
-  } catch {
-    return `inst_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}${Math.random().toString(36).slice(2, 10)}`;
-  }
-}
-
-/**
- * Get the anonymous install id, lazily creating and persisting it
- * on first access.
- */
-export async function getInstallId(): Promise<string> {
-  if (installIdCache) return installIdCache;
-  try {
-    const stored = await AsyncStorage.getItem(INSTALL_ID_KEY);
-    if (stored) {
-      installIdCache = stored;
-      return stored;
-    }
-  } catch {
-    // Fall through to generate a fresh id
-  }
-  const id = generateInstallId();
-  installIdCache = id;
-  try {
-    await AsyncStorage.setItem(INSTALL_ID_KEY, id);
-  } catch {
-    // Non-critical — a fresh id will be generated next launch
-  }
-  return id;
-}
 
 function getPlatformOS(): string {
   try {
@@ -114,58 +77,43 @@ function getPlatformOS(): string {
  * Upload stored events to the configured collector. No-op when disabled.
  * Throttled to one attempt per SYNC_THROTTLE_MS. Never throws.
  */
-export async function syncTelemetry(): Promise<void> {
-  if (!isTelemetryEnabled()) return;
-
+let inFlight: Promise<void> | null = null;
+export function syncTelemetry(): Promise<void> {
+  if (!isTelemetryEnabled()) return Promise.resolve();
+  if (inFlight) return inFlight;
   const now = Date.now();
-  if (now - lastSyncAttempt < SYNC_THROTTLE_MS) return;
+  if (now - lastSyncAttempt < SYNC_THROTTLE_MS) return Promise.resolve();
   lastSyncAttempt = now;
+  inFlight = uploadEvents().finally(() => { inFlight = null; });
+  return inFlight;
+}
 
+async function uploadEvents(): Promise<void> {
   try {
     const events = await getAllStoredEvents();
-    if (events.length === 0) return;
-
+    if (!events.length) return;
     const installId = await getInstallId();
     const endpoint = getTelemetryEndpoint();
-
-    if (endpoint.length > 0) {
-      // Custom collector path (unchanged): one batched POST.
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          installId,
-          platform: getPlatformOS(),
-          appVersion: getAppVersion(),
-          events,
-        }),
-      });
-
-      if (response.ok) {
-        await removeOldestEvents(events.length);
-      }
+    if (endpoint) {
+      const controller = typeof AbortController !== 'undefined' ? new AbortController() : undefined;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        const response = await Promise.race([
+          fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            signal: controller?.signal,
+            body: JSON.stringify({ installId, platform: getPlatformOS(), appVersion: getAppVersion(), events }) }),
+          new Promise<null>(resolve => { timer = setTimeout(() => { controller?.abort(); resolve(null); }, 8000); }),
+        ]);
+        if (response?.ok) await acknowledgeEvents(events.map(event => event.id));
+      } finally { if (timer) clearTimeout(timer); }
       return;
     }
-
-    // Supabase analytics sink — no custom endpoint, but a backend is
-    // configured. Upload one row per event into the `events` table.
-    if (isSupabaseConfigured()) {
-      const platform = getPlatformOS();
-      const appVersion = getAppVersion();
-      const rows = events.map((event) => ({
-        install_id: installId,
-        platform,
-        app_version: appVersion,
-        type: event.type,
-        data: event.data ?? {},
-        created_at: new Date(event.timestamp).toISOString(),
-      }));
-      const result = await sbInsert('events', rows, { returning: false });
-      if (result !== null) {
-        await removeOldestEvents(events.length);
-      }
-    }
-  } catch {
-    // Network/storage failure — events stay queued for the next sync
-  }
+    // The events table stays unreadable to anon. PostgreSQL ON CONFLICT needs
+    // SELECT internally, so deduplication belongs in a bounded definer RPC.
+    const accepted = await sbRpc<boolean>('ingest_events_v2', {
+      p_install_id: installId, p_platform: getPlatformOS(),
+      p_app_version: getAppVersion(), p_events: events,
+    });
+    if (accepted === true) await acknowledgeEvents(events.map(event => event.id));
+  } catch { /* Retain unacknowledged records for a later attempt. */ }
 }

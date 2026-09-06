@@ -1,6 +1,10 @@
 -- ============================================================================
 -- WordShift Supabase security setup — capability-URL model.
 --
+-- BASE SCHEMA ONLY: apply save_integrity_v2.sql, events_integrity_v2.sql and
+-- daily_board_versions.sql immediately afterward for the current app. Re-running
+-- this base script alone would re-enable deprecated weak save RPCs.
+--
 -- IDEMPOTENT: safe to run repeatedly, on a fresh project or over the legacy
 -- schema from an earlier BACKEND_SETUP.md (it drops the old wide-open
 -- policies). Run the whole file in the Supabase SQL editor as `postgres`
@@ -197,7 +201,7 @@ begin
     p_owner, p_date, p_time_ms, p_stars::smallint, p_hints::smallint,
     left(p_handle, 24), now()
   )
-  on conflict (owner, date) do update
+  on conflict on constraint daily_scores_pkey do update
     set time_ms    = excluded.time_ms,
         stars      = excluded.stars,
         hints      = excluded.hints,

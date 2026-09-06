@@ -88,15 +88,25 @@ describe('leaderboard', () => {
         handle: 'anon',
       });
       const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
-      expect(url).toBe('https://x.supabase.co/rest/v1/rpc/submit_daily_score');
+      expect(url).toBe('https://x.supabase.co/rest/v1/rpc/submit_daily_score_v2');
       expect(init.method).toBe('POST');
       const sent = JSON.parse(init.body);
       expect(sent.p_owner).toBe(owner);
       expect(sent.p_date).toBe('2026-06-21');
+      expect(sent.p_board_version).toBe('vocabulary_2026_09_v1');
       expect(sent.p_time_ms).toBe(1001); // rounded
       expect(sent.p_stars).toBe(3);
       expect(sent.p_hints).toBe(1);
       expect(sent.p_handle).toBe('anon');
+    });
+
+    test('a resumed legacy board keeps its original ranking cohort', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue(okJson([]));
+      await submitDailyResult({date:'2026-06-21',timeMs:100,stars:3,hintsUsed:0,boardVersion:'legacy_v1'});
+      await getDailyRank('2026-06-21', 'legacy_v1');
+      for(const [,init] of (global.fetch as jest.Mock).mock.calls) {
+        expect(JSON.parse(init.body).p_board_version).toBe('legacy_v1');
+      }
     });
 
     test('submitDailyResult clamps negatives and defaults handle to null', async () => {
@@ -130,7 +140,7 @@ describe('leaderboard', () => {
       const r = await getDailyRank('2026-06-21');
       expect(r).toEqual({ rank: 3, total: 100, percentile: 97 });
       const [url] = (global.fetch as jest.Mock).mock.calls[0];
-      expect(url).toContain('/rest/v1/rpc/daily_rank');
+      expect(url).toContain('/rest/v1/rpc/daily_rank_v2');
       expect((global.fetch as jest.Mock).mock.calls.length).toBe(1);
     });
 
@@ -156,7 +166,7 @@ describe('leaderboard', () => {
       // Exactly one request, and it was the RPC — never a daily_scores select.
       const calls = (global.fetch as jest.Mock).mock.calls;
       expect(calls.length).toBe(1);
-      expect(calls[0][0]).toContain('/rest/v1/rpc/daily_rank');
+      expect(calls[0][0]).toContain('/rest/v1/rpc/daily_rank_v2');
       expect(calls[0][0]).not.toContain('/rest/v1/daily_scores');
     });
 

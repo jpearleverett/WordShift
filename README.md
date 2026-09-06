@@ -17,7 +17,9 @@ Monetization is convenience/expression only, never progression: a cosmetic shop 
 
 ## Tech
 
-React Native + Expo SDK 56 (React Native 0.85), TypeScript (strict), Jest (~3,250 tests across ~123 suites — counts drift as features land). Local-first: the core puzzles play fully offline with all state in AsyncStorage, and there are no user accounts. Backend features (cloud save, daily leaderboard, anonymous analytics via **Supabase**; crash reporting via **Sentry**) and monetization (in-app purchases via **RevenueCat**, ads via **AdMob**) activate when their keys are present in `app.json` → `extra` and degrade to no-ops otherwise — so Expo Go still runs everything. Supabase/Sentry and the Android monetization keys are currently configured; the iOS monetization keys are still empty (iOS falls back to the no-op providers). See [CLAUDE.md](./CLAUDE.md) for the full architecture reference — it's the canonical codebase doc.
+React Native + Expo SDK 57 (React Native 0.86), TypeScript (strict), Jest and rendered Playwright journeys (current results are in the implementation ledger). Local-first: the core puzzles play fully offline with all state in AsyncStorage, and there are no user accounts. Backend features (cloud save, daily leaderboard, anonymous analytics via **Supabase**; crash reporting via **Sentry**) and monetization (in-app purchases via **RevenueCat**, ads via **AdMob**) activate when their keys are present in `app.json` → `extra` and degrade to no-ops otherwise — so Expo Go still runs everything. Supabase/Sentry and the Android monetization keys are currently configured; the iOS monetization keys are still empty (iOS falls back to the no-op providers). See [CLAUDE.md](./CLAUDE.md) for the full architecture reference — it's the canonical codebase doc.
+
+Current engineering status: [September implementation ledger](docs/IMPLEMENTATION_STATUS_2026-09-05.md). Build/update procedure: [1.3.0 release validation](docs/RELEASE_VALIDATION_1_3_0.md).
 
 ## Development
 
@@ -41,7 +43,7 @@ Always use `npm test`, not `npx jest` — the latter misses the local install an
 
 ### Generated content
 
-- **Puzzle banks**: regenerate with the **gated toolkit** — `bash scripts/runGatedRegen.sh <EASY|MEDIUM|MEDIUM_PLUS|HARD>` for the standard banks, `scripts/runGatedReverseRegen.sh` and `scripts/runGatedDoubleRegen.sh` for reverse and double-shift — then `node scripts/swapGatedBanks.mjs` to swap the finished sidecars over the live files, and always `node scripts/tools/purgeProfanity.mjs` afterwards (the generators do not filter offensive words). **Do NOT run `npm run generate:puzzles`**: it executes the legacy generators, which write straight over the live banks with the pre-gated shape and lose the multi-route guarantee.
+- **Puzzle banks**: use `npm run generate:puzzles -- <standard|reverse|double> <difficulty>` from `mobile/`, with `EASY`, `MEDIUM`, `MEDIUM_PLUS`, `HARD` or `EXPERT`; prefix a difficulty with `LEX_` for Lexicon. This command dispatches to the **gated toolkit** and writes reviewable sidecars. Follow the printed targeted swap dry run before installing a reviewed sidecar, then always run `node scripts/tools/purgeProfanity.mjs` and the current vocabulary/complete-route checks. See [the regeneration instructions](CLAUDE.md#regenerating-puzzle-banks). Never run legacy generators or manually edit the banks: that can overwrite the gated shape and lose its multi-route guarantee.
 - **Art/SFX**: `npm run generate:assets` rebuilds the app icon, splash, notification icon, the 70-file WAV pack, the world/pixel art, and the UI icon sprites from pure-Node scripts in `mobile/scripts/tools/`.
 - **Builds**: `eas build` profiles live in `mobile/eas.json` (`appVersionSource: "local"` — bump `android.versionCode` manually for each release). Remaining human release tasks are tracked in [docs/LAUNCH_CHECKLIST.md](./docs/LAUNCH_CHECKLIST.md).
 

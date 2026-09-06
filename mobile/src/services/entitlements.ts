@@ -11,7 +11,7 @@
  * (roomUpgrades.ts, wordHarvest.ts). Safe to run in Expo Go — nothing native is imported.
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage, { isStorageTransactionActive } from './persistenceStorage';
 
 const STORAGE_KEY = 'wordshift_entitlements';
 
@@ -86,7 +86,8 @@ async function save(): Promise<void> {
   if (!cache) return;
   try {
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(cache));
-  } catch {
+  } catch (error) {
+    if (isStorageTransactionActive()) throw error;
     /* ignore */
   }
 }
@@ -233,3 +234,6 @@ export async function clearEntitlements(): Promise<void> {
     /* ignore */
   }
 }
+
+/** Drop local mirrors after an interrupted paid-reward transaction. */
+export function invalidateEntitlementsCache(): void { cache = null; }

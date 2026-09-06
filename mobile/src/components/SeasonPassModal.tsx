@@ -1,7 +1,7 @@
 /**
  * Season Pass modal — the monthly cosmetic reward track (seasonPass.ts). A free
  * track earned by playing and a premium track unlocked by an active Supporter
- * subscription OR by spending amber (the durable recurring sink). Rewards are
+ * subscription OR by spending amber for the unowned collection. Rewards are
  * amber (reward-only, never phase progress) + an exclusive premium cosmetic.
  *
  * Cottage-skin chrome (PanelCard / CandyButton / getSurfaceTheme), phase-aware,
@@ -35,13 +35,12 @@ import { AmberSparkle } from './home/AmberSparkle';
 import { Confetti } from './Confetti';
 import { hapticLight, hapticMedium } from '../services/haptics';
 import { showGameAlert } from '../services/gameAlert';
-import { spendAmber } from '../services/amberCurrency';
 import { getSeasonPassCopy } from '../services/phaseNarrative';
 import { DialoguePhase } from '../types/homeWorld';
 import {
   getSeasonPassView,
   claimSeasonTier,
-  markSeasonPremiumUnlocked,
+  purchaseSeasonPremiumWithAmber,
   getSeasonPremiumAmberCost,
   SeasonPassView,
 } from '../services/seasonPass';
@@ -261,6 +260,8 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
           logEvent({ type: 'season_reward_claimed', data: { tier, track, amber: r.amber, cosmetic: r.cosmeticGranted } });
           await refresh();
         }
+      } catch {
+        showGameAlert('Save interrupted', 'Please try claiming again. Any pending reward will be recovered before continuing.');
       } finally {
         setBusy(false);
       }
@@ -288,6 +289,9 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
         onAmberChange(last);
       }
       await refresh();
+    } catch {
+      await refresh().catch(() => {});
+      showGameAlert('Save interrupted', 'Some rewards may already be saved. Please try again to collect the remaining rewards.');
     } finally {
       setBusy(false);
     }
@@ -295,6 +299,13 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
 
   const unlockPremiumWithAmber = useCallback(async () => {
     if (busy) return;
+    // Re-read before spending: ownership may have arrived through a restore or
+    // subscription claim while this modal was open.
+    const currentView = await getSeasonPassView(puzzlesSolved);
+    if (!currentView.canUnlockPremiumWithAmber) {
+      await refresh();
+      return;
+    }
     const cost = getSeasonPremiumAmberCost();
     if (currentAmber < cost) {
       showGameAlert('Not enough amber', `The premium track opens for ${cost} amber. Keep offering, or become a Supporter to have it free every season.`);
@@ -302,16 +313,17 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
     }
     setBusy(true);
     try {
-      const spend = await spendAmber(cost, 'season_pass');
+      const spend = await purchaseSeasonPremiumWithAmber(puzzlesSolved);
       if (!spend.success) {
         showGameAlert('Not enough amber', spend.error ?? 'Try again in a moment.');
         return;
       }
-      await markSeasonPremiumUnlocked(puzzlesSolved);
       hapticMedium();
-      onAmberChange(spend.newBalance);
+      if (typeof spend.newBalance === 'number') onAmberChange(spend.newBalance);
       logEvent({ type: 'iap_purchase', data: { productId: 'season_premium_amber', kind: 'season', amber: cost } });
       await refresh();
+    } catch {
+      showGameAlert('Save interrupted', 'Please try again. Any pending unlock will be recovered before continuing.');
     } finally {
       setBusy(false);
     }
@@ -361,6 +373,9 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
                   ? ` · ${view.puzzlesToNextTier} more puzzle${view.puzzlesToNextTier === 1 ? '' : 's'} to the next`
                   : ' · complete'}
               </Text>
+              <Text style={[styles.tagline, { color: t.body }]}>
+                {view.seasonId} · Progress and unclaimed amber reset at the start of next month.
+              </Text>
 
               {!view.premiumUnlocked && (
                 <PanelCard phase={phase} kind="card" style={styles.premiumBox}>
@@ -374,8 +389,12 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
                     resizeMode="contain"
                     accessible={false}
                   />
-                  <Text style={[styles.premiumLocked, { color: t.body }]}>{copy.lockedLine}</Text>
-                  <CandyButton
+                  <Text style={[styles.premiumLocked, { color: t.body }]}>
+                    {view.premiumCosmeticOwned
+                      ? 'Season confetti is already in your collection. Your free amber track continues each month.'
+                      : `${copy.lockedLine} The complete premium track adds ${view.tiers.reduce((sum, tier) => sum + tier.premiumAmber, 0)} amber and one confetti palette.`}
+                  </Text>
+                  {view.canUnlockPremiumWithAmber && <CandyButton
                     label={`Unlock premium · ${cost} amber`}
                     variant="amber"
                     phase={phase}
@@ -383,7 +402,7 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
                     disabled={busy}
                     onPress={() => { hapticLight(); unlockPremiumWithAmber().catch(() => {}); }}
                     style={styles.premiumBtn}
-                  />
+                  />}
                   {onSubscribe && (
                     <TouchableOpacity
                       onPress={() => { hapticLight(); onSubscribe(); }}
@@ -391,7 +410,7 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
                       accessibilityLabel="Become a Supporter for the premium track"
                     >
                       <Text style={[styles.subscribeLink, { color: t.muted }]}>
-                        Supporters get it free every season. <Text style={{ color: t.title, fontWeight: '800' }}>Become a Supporter →</Text>
+                        Supporters receive the premium amber track every month. <Text style={{ color: t.title, fontWeight: '800' }}>Become a Supporter →</Text>
                       </Text>
                     </TouchableOpacity>
                   )}
@@ -449,7 +468,7 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
                         {tr.freeClaimed ? ' ' : ''}{tr.freeClaimed ? <Image source={CHROME_ICONS.check} style={styles.inlineMark} /> : null}
                       </Text>
                       <Text style={[styles.tierReward, { color: view.premiumUnlocked ? t.title : t.muted }]}>
-                        Premium: +{tr.premiumAmber} amber{tr.premiumCosmetic ? ' + confetti' : ''}
+                        Premium: +{tr.premiumAmber} amber{tr.premiumCosmetic ? (view.premiumCosmeticOwned ? ' · confetti owned' : ' + confetti') : ''}
                         {tr.premiumClaimed ? ' ' : ''}{tr.premiumClaimed ? <Image source={CHROME_ICONS.check} style={styles.inlineMark} /> : null}
                       </Text>
                     </View>

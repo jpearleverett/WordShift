@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from './persistenceStorage';
 import { Difficulty } from '../types';
 
 const STORAGE_KEY = 'wordshift_star_stats';
@@ -252,14 +252,8 @@ export async function recordPuzzleCompletion(
     };
   } catch (error) {
     console.warn('Failed to record puzzle completion:', error);
-    // Return the stats anyway even if persistence failed
-    return {
-      difficulty,
-      starsEarned: calculateStars(hintsUsed, invalidAttempts),
-      invalidAttempts,
-      hintsUsed,
-      timestamp: Date.now(),
-    };
+    statsCache = null;
+    throw error;
   }
 }
 

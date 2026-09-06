@@ -898,12 +898,12 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                   backgroundColor: btn.harvestPill.bg,
                   borderColor: btn.harvestPill.border,
                 }]}
-                // Group the row so the decorative sheaf glyph is not read as its
-                // own emoji; the label speaks the same count + verb shown.
+                // The label speaks the count and verb once; the pit sprite is
+                // decorative and matches the harvest destination elsewhere.
                 accessible
                 accessibilityLabel={`${victoryData.harvestedWords.length} ${victoryData.harvestedWords.length === 1 ? 'word' : 'words'} ${getPitHarvestLabel(phase).toLowerCase()}`}
               >
-                <Text style={styles.harvestWordIcon} importantForAccessibility="no">{'\uD83C\uDF3E'}</Text>
+                <Image source={PIT_ICON} style={styles.harvestWordIcon} resizeMode="contain" accessible={false} importantForAccessibility="no" accessibilityElementsHidden />
                 <Text style={[styles.harvestWordText, { color: btn.harvestPill.text }]}>
                   {victoryData.harvestedWords.length} {victoryData.harvestedWords.length === 1 ? 'word' : 'words'} {getPitHarvestLabel(phase).toLowerCase()}
                 </Text>
@@ -2126,8 +2126,8 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   harvestWordIcon: {
-    fontFamily: BODY_FONT,
-    fontSize: FONT_SIZE.headline,
+    width: 22,
+    height: 22,
     marginRight: 8,
   },
   harvestWordText: {

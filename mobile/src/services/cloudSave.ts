@@ -1,4 +1,8 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage, { runStorageTransaction, StorageRecoveryRequiredError } from './persistenceStorage';
+import { createSecureIdentity, isSecureIdentity, formatSecureRecoveryCode, parseSecureRecoveryCode } from './secureIdentity';
+import { CURRENT_SCHEMA_VERSION, runMigrations } from './dataMigration';
+import { getSupportMetadata } from './supportIdentity';
+import { logEvent } from './eventLogger';
 import { invalidateStoryCache, STORY_STORAGE_KEY } from './storySpine';
 import { invalidateProgressCache } from './amberCurrency';
 import { invalidatePuzzleStateCache } from './puzzleSaveState';
@@ -46,9 +50,9 @@ import { initCosmetics } from './cosmetics';
  * Save data includes: amber, stats, phase, unlocks, achievements,
  * dialogue progress, quest progress, cosmetics, and sacrifice state.
  *
- * Auth-free identity: the cloud "owner" is the anonymous install id by
- * default, overridable by a locally-stored recovery code so a player can
- * restore progress on a new device without an account.
+ * Account-free backups use a separate 128-bit bearer identity. The full WS2
+ * recovery code can restore that backup on a new device; anonymous analytics
+ * identity and non-secret support references do not authorize backup access.
  */
 
 // ============================================================================
@@ -58,6 +62,8 @@ import { initCosmetics } from './cosmetics';
 export interface CloudSaveData {
   version: number;
   timestamp: number;
+  /** Server revision, never a device clock. */
+  revision?: number;
   deviceId: string;
   /** All AsyncStorage keys and their values */
   data: Record<string, string>;
@@ -67,7 +73,8 @@ export interface CloudProvider {
   /** Upload local save data to cloud */
   upload(data: CloudSaveData): Promise<boolean>;
   /** Download the latest save from cloud */
-  download(): Promise<CloudSaveData | null>;
+  download(owner?: string): Promise<CloudSaveData | null>;
+  uploadConditional?(data: CloudSaveData, expectedRevision: number | null, force: boolean, owner?: string): Promise<{ status: 'saved' | 'conflict' | 'unavailable'; revision?: number }>;
   /** Check if a newer save exists on the server */
   hasNewerSave(localTimestamp: number): Promise<boolean>;
   /** Get the provider name for display */
@@ -88,6 +95,8 @@ export interface SyncStatus {
    * auto-merged or auto-downloaded mid-session.
    */
   conflictDetected?: boolean;
+  remoteRevision?: number;
+  owner?: string;
 }
 
 // ============================================================================
@@ -201,6 +210,8 @@ const CURRENT_SAVE_VERSION = 1;
 
 /** Local override for the cloud owner id (set when linking a recovery code). */
 const CLOUD_OWNER_KEY = 'wordshift_cloud_owner';
+export const LEGACY_CLOUD_OWNER_KEY = 'wordshift_cloud_legacy_owner';
+let ownerCreation: Promise<string> | null = null;
 /** A populated progress key signals this install is NOT a fresh reinstall. */
 const FRESH_INSTALL_SENTINEL_KEY = 'wordshift_home_progress';
 
@@ -233,11 +244,12 @@ class NoOpProvider implements CloudProvider {
 // ============================================================================
 
 /**
- * Row shape returned by the `get_save` RPC (docs/supabase/security_setup.sql).
+ * Row shape returned by the `get_save_v2` RPC (docs/supabase/security_setup.sql).
  * Direct `saves` table access is RLS-denied — the owner id is the capability
  * presented to the SECURITY DEFINER functions, never selected back.
  */
 interface SaveRow {
+  revision?: number;
   version: number;
   timestamp: number;
   device_id: string;
@@ -255,71 +267,61 @@ function sb(): typeof import('./supabaseClient') {
 
 /**
  * Resolve the stable cloud owner id for this install: a locally-stored
- * recovery-code override if present, else the anonymous install id.
+ * strong recovery capability. Preserve a legacy reference without importing
+ * ambiguous old short-code rows.
  */
 export async function getCloudOwnerId(): Promise<string> {
-  try {
-    const override = await AsyncStorage.getItem(CLOUD_OWNER_KEY);
-    if (override && override.trim()) return override.trim();
-  } catch {}
-  return sb().getBackendIdentity();
+  if (ownerCreation) return ownerCreation;
+  ownerCreation = (async () => {
+    const existing = await AsyncStorage.getItem(CLOUD_OWNER_KEY);
+    if (isSecureIdentity(existing)) return existing;
+    // Keep the legacy reference for support. Never read/merge a short code's
+    // cloud row automatically: unrelated installs may already share that row.
+    const legacy = existing || await sb().getBackendIdentity();
+    const owner = await createSecureIdentity();
+    if (legacy) await AsyncStorage.setItem(LEGACY_CLOUD_OWNER_KEY, legacy);
+    await AsyncStorage.setItem(CLOUD_OWNER_KEY, owner);
+    return owner;
+  })();
+  try { return await ownerCreation; } finally { ownerCreation = null; }
 }
 
 class SupabaseCloudProvider implements CloudProvider {
   async upload(data: CloudSaveData): Promise<boolean> {
-    const owner = await getCloudOwnerId();
-    // SECURITY DEFINER RPC — the only write path; returns true when stored.
-    const result = await sb().sbRpc<boolean>('upsert_save', {
-      p_owner: owner,
-      p_version: data.version,
-      p_timestamp: data.timestamp,
-      p_device_id: data.deviceId,
-      p_payload: JSON.stringify(data.data),
-    });
-    return result === true;
+    return (await this.uploadConditional(data, data.revision ?? null, false)).status === 'saved';
   }
 
-  async download(): Promise<CloudSaveData | null> {
-    const owner = await getCloudOwnerId();
-    const result = await sb().sbRpc<SaveRow | SaveRow[] | null>('get_save', {
-      p_owner: owner,
+  async uploadConditional(data: CloudSaveData, expectedRevision: number | null, force: boolean, owner?: string) {
+    const support = await getSupportMetadata();
+    const result = await sb().sbRpc<{ status: 'saved' | 'conflict'; revision: number }>('upsert_save_v2', {
+      p_owner: owner ?? await getCloudOwnerId(), p_version: data.version,
+      p_timestamp: data.timestamp, p_device_id: data.deviceId,
+      p_payload: JSON.stringify(data.data), p_expected_revision: expectedRevision,
+      p_force: force, p_support_id: support.supportId, p_install_id: support.installId,
     });
-    // PostgREST returns `returns table` results as an array; tolerate a bare
-    // object defensively.
-    const rows = Array.isArray(result) ? result : result ? [result] : [];
-    if (rows.length === 0) return null;
-    const newest = rows.reduce((a, b) => (b.timestamp > a.timestamp ? b : a));
-    if (typeof newest.payload !== 'string') return null;
-    let parsed: Record<string, string> = {};
-    try {
-      const obj = JSON.parse(newest.payload);
-      if (obj && typeof obj === 'object') parsed = obj as Record<string, string>;
-    } catch {
-      return null;
+    if (!result || !['saved', 'conflict'].includes(result.status) || !Number.isSafeInteger(result.revision)) {
+      return { status: 'unavailable' as const };
     }
-    return {
-      version: typeof newest.version === 'number' ? newest.version : CURRENT_SAVE_VERSION,
-      timestamp: typeof newest.timestamp === 'number' ? newest.timestamp : 0,
-      deviceId: typeof newest.device_id === 'string' ? newest.device_id : '',
-      data: parsed,
-    };
+    return result;
+  }
+
+  async download(owner?: string): Promise<CloudSaveData | null> {
+    const result = await sb().sbRpc<SaveRow[]>('get_save_v2', { p_owner: owner ?? await getCloudOwnerId() });
+    const row = Array.isArray(result) ? result[0] : null;
+    if (!row || typeof row.payload !== 'string' || !Number.isSafeInteger(row.revision)) return null;
+    try {
+      const save = { version: row.version, timestamp: row.timestamp, deviceId: row.device_id,
+        revision: row.revision, data: JSON.parse(row.payload) };
+      return validateCloudSaveData(save) ? save : null;
+    } catch { return null; }
   }
 
   async hasNewerSave(localTimestamp: number): Promise<boolean> {
-    const owner = await getCloudOwnerId();
-    const remote = await sb().sbRpc<number | null>('get_save_timestamp', {
-      p_owner: owner,
-    });
-    return typeof remote === 'number' && remote > localTimestamp;
+    const save = await this.download();
+    return !!save && save.timestamp > localTimestamp;
   }
-
-  getName(): string {
-    return 'Supabase';
-  }
-
-  async isReady(): Promise<boolean> {
-    return sb().isSupabaseConfigured();
-  }
+  getName(): string { return 'Supabase'; }
+  async isReady(): Promise<boolean> { return sb().isSupabaseConfigured(); }
 }
 
 /**
@@ -341,176 +343,93 @@ export function installCloudProviderIfConfigured(): void {
 // Recovery Code (auth-free cross-device restore)
 // ============================================================================
 
-// Crockford-style alphabet minus ambiguous chars (no 0/O, 1/I/L).
-const RECOVERY_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
-
-/** Normalize user-entered codes: uppercase, strip non-alphanumerics. */
-function normalizeRecoveryCode(raw: string): string {
-  return (raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+export type CloudRecoveryFailure = 'legacy_code' | 'invalid_code' | 'unavailable' | 'conflict';
+export class CloudRecoveryError extends Error {
+  constructor(public readonly reason: CloudRecoveryFailure, message: string) { super(message); }
 }
 
-/** Chunk an 8-char canonical body into the friendly WS-XXXX-XXXX form. */
-function formatRecoveryCode(body: string): string {
-  return `WS-${body.slice(0, 4)}-${body.slice(4, 8)}`;
-}
-
-/**
- * Deterministically derive the canonical 8-char recovery BODY from an owner
- * id. Idempotent: if `owner` is already a canonical 8-char body (e.g. it was
- * itself produced here on a prior call), it is returned unchanged — so the
- * displayed code never drifts across calls.
- */
-function deriveRecoveryBody(owner: string): string {
-  const cleaned = normalizeRecoveryCode(owner);
-  if (cleaned.length === 8) return cleaned;
-  let base = cleaned;
-  if (base.length < 8) {
-    // Pad deterministically from a simple rolling hash of the owner.
-    let h = 0;
-    for (let i = 0; i < owner.length; i++) {
-      h = (h * 31 + owner.charCodeAt(i)) >>> 0;
-    }
-    let pad = '';
-    while (base.length + pad.length < 8) {
-      pad += RECOVERY_ALPHABET[h % RECOVERY_ALPHABET.length];
-      h = Math.floor(h / RECOVERY_ALPHABET.length) || ((h * 31 + 7) >>> 0);
-    }
-    base = base + pad;
-  }
-  return base.slice(0, 8);
-}
-
-/**
- * Return a stable, human-friendly recovery code for this install, persisting
- * the canonical 8-char body as the cloud owner so the code — and the cloud
- * identity it represents — remain constant across calls and across reinstalls
- * that link the same code. Showing this code lets the player restore on another
- * device via linkRecoveryCode().
- *
- * Note: viewing the code locks in the canonical body as the owner. Because this
- * is intended to run in App bootstrap (before any cloud write), the cloud
- * identity stabilizes to the code body up front, so the code always addresses
- * the same `saves` row.
- */
+/** Reveal a credential only after its backup is durable on the server. */
 export async function getOrCreateRecoveryCode(): Promise<string> {
-  // If a canonical owner is already stored, the code is just its chunked form.
-  try {
-    const existing = await AsyncStorage.getItem(CLOUD_OWNER_KEY);
-    if (existing && existing.trim()) {
-      return formatRecoveryCode(deriveRecoveryBody(existing.trim()));
-    }
-  } catch {}
-
-  const owner = await getCloudOwnerId();
-  const body = deriveRecoveryBody(owner);
-  try {
-    await AsyncStorage.setItem(CLOUD_OWNER_KEY, body);
-  } catch {}
-  return formatRecoveryCode(body);
-}
-
-/**
- * The owner id a DISPLAYED recovery code refers to.
- *
- * `formatRecoveryCode` prepends a literal "WS" for readability, and the code we
- * hand the player is what they type back. Normalizing alone kept that prefix,
- * so a typed "WS-3F2A-1B4C" resolved to owner "WS3F2A1B4C" while the device
- * that showed it had uploaded under "3F2A1B4C" — the code could never address
- * its own save, and re-showing it on the linked device drifted again to
- * "WS-WSIN-ST9F". Strip the prefix here and run the remainder through the same
- * `deriveRecoveryBody` the display side uses, so both ends land on the
- * identical canonical body.
- *
- * Deliberately NOT folded into `normalizeRecoveryCode`: that helper also runs
- * inside `deriveRecoveryBody` over arbitrary owner ids, and stripping there
- * would change the body of any owner that merely happens to start with "WS".
- */
-function ownerFromRecoveryCode(raw: string): string {
-  const cleaned = normalizeRecoveryCode(raw);
-  const body = cleaned.startsWith('WS') && cleaned.length >= 10 ? cleaned.slice(2) : cleaned;
-  return deriveRecoveryBody(body);
-}
-
-/** The owner a PRE-FIX build would have stored for this code (see below). */
-function legacyOwnerFromRecoveryCode(raw: string): string {
-  return normalizeRecoveryCode(raw);
-}
-
-/**
- * Link a recovery code entered by the player: validate/normalize and store it
- * as the cloud owner override, so subsequent owner resolution uses it. After
- * linking, call downloadFromCloud() (or maybeAutoRestoreOnFreshInstall) to pull
- * the linked save. Returns false for clearly-invalid input.
- *
- * Compatibility: a device that linked on a pre-fix build uploaded under the
- * un-stripped owner, so those rows would be unreachable from the corrected id.
- * When the canonical owner holds no row, fall back once to the legacy id and
- * adopt whichever one actually has a save.
- */
-export async function linkRecoveryCode(code: string): Promise<boolean> {
-  const canonical = normalizeRecoveryCode(code);
-  if (canonical.length < 8) return false;
-  const owner = ownerFromRecoveryCode(code);
-  try {
-    await AsyncStorage.setItem(CLOUD_OWNER_KEY, owner);
-    const legacy = legacyOwnerFromRecoveryCode(code);
-    if (legacy !== owner) {
-      try {
-        if (!(await provider.download())) {
-          await AsyncStorage.setItem(CLOUD_OWNER_KEY, legacy);
-          if (!(await provider.download())) {
-            // Neither holds a row; keep the canonical id so this device's own
-            // future uploads land where the code says they should.
-            await AsyncStorage.setItem(CLOUD_OWNER_KEY, owner);
-          }
-        }
-      } catch {
-        await AsyncStorage.setItem(CLOUD_OWNER_KEY, owner);
-      }
-    }
-    return true;
-  } catch {
-    return false;
+  if (!(await uploadToCloud())) {
+    const status = await getSyncStatus();
+    throw new CloudRecoveryError(status.conflictDetected ? 'conflict' : 'unavailable',
+      status.conflictDetected ? 'Resolve the newer backup before sharing a recovery code.' :
+      'Connect to the internet and back up successfully before showing your recovery code.');
   }
+  return formatSecureRecoveryCode(await getCloudOwnerId());
+}
+
+function recoveryOwner(code: string): string {
+  const owner = parseSecureRecoveryCode(code);
+  if (owner) return owner;
+  if (/^(WS[-\s]?)?[a-z0-9]{4}[-\s]?[a-z0-9]{4}$/i.test(code.trim())) {
+    throw new CloudRecoveryError('legacy_code',
+      'This older short code needs an upgrade. Open the game on your original device and show a new recovery code. If that device is unavailable, contact support; your old backup has not been deleted.');
+  }
+  throw new CloudRecoveryError('invalid_code', 'Enter the complete WS2 recovery code from your other device.');
+}
+
+/** Kept for callers during upgrade; linking now includes the validated restore. */
+export async function linkRecoveryCode(code: string): Promise<boolean> {
+  return restoreFromRecoveryCode(code);
+}
+
+export async function restoreFromRecoveryCode(code: string): Promise<boolean> {
+  const owner = recoveryOwner(code);
+  return enqueueCloudOperation(async () => {
+    if (!(await provider.isReady())) return false;
+    const cloudData = await provider.download(owner);
+    if (!cloudData) return false;
+    const restored = await restoreFromCloudData(cloudData, owner);
+    if (restored) await updateSyncStatus(true, cloudData, owner);
+    return restored;
+  });
 }
 
 /**
  * On a fresh install (no local progress) with cloud configured, pull down a
  * cloud save for this owner if one exists. Returns whether a restore happened.
- * Call from App bootstrap before MainApp mounts. Never throws.
+ * Call from App bootstrap before MainApp mounts. A committed restore that
+ * needs journal recovery throws so bootstrap cannot open a partial save.
  */
-export async function maybeAutoRestoreOnFreshInstall(): Promise<boolean> {
+export async function maybeAutoRestoreOnFreshInstall(shouldContinue: () => boolean = () => true): Promise<boolean> {
   try {
+    if (!shouldContinue()) return false;
     if (!sb().isSupabaseConfigured()) return false;
 
     // Only auto-restore when local progress looks empty.
     const local = await AsyncStorage.getItem(FRESH_INSTALL_SENTINEL_KEY);
     if (local && local.trim()) return false;
 
-    const cloudData = await provider.download();
-    if (!cloudData) return false;
+    let cloudData = await provider.download();
+    if (!cloudData && provider instanceof SupabaseCloudProvider) {
+      const legacy = await AsyncStorage.getItem(LEGACY_CLOUD_OWNER_KEY);
+      if (legacy && /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(legacy)) {
+        const rows = await sb().sbRpc<SaveRow[]>('get_legacy_save_for_upgrade', { p_owner: legacy });
+        const row = rows?.[0];
+        if (row) {
+          try {
+            const save = { version: row.version, timestamp: row.timestamp, deviceId: row.device_id, data: JSON.parse(row.payload) };
+            if (validateCloudSaveData(save)) cloudData = save;
+          } catch { /* Keep original local state on invalid legacy data. */ }
+        }
+      }
+    }
+    if (!cloudData || !shouldContinue()) return false;
 
-    // A deliberate Reset All must not be undone by the next launch. Reset
-    // overwrites the cloud row with the cleared state, but when that upload
-    // fails (offline is the ordinary case — the player resets, closes the app,
-    // and relaunches on a plane) the stale pre-reset row is still up there, the
-    // local sentinel is gone, and this path restores everything they just
-    // erased. Refuse any row written at or before the reset stamp; a genuinely
-    // NEWER save from another device has timestamp > marker and still restores.
-    //
-    // Only here. downloadFromCloud, linkRecoveryCode and the conflict banner's
-    // "use the newer save" are explicit player choices and stay unblocked.
-    try {
-      const resetAt = Number((await AsyncStorage.getItem(LOCAL_RESET_MARKER_KEY)) ?? 0);
-      if (resetAt > 0 && (cloudData.timestamp ?? 0) <= resetAt) return false;
-    } catch {}
+    // A pending deliberate reset blocks automatic restore regardless of device
+    // clock skew. Only a successful reset upload or an explicit player restore
+    // may replace that choice; remote wall-clock timestamps cannot authorize it.
+    const resetMarker = await AsyncStorage.getItem(LOCAL_RESET_MARKER_KEY);
+    if (resetMarker) return false;
 
-    const restored = await restoreFromCloudData(cloudData);
+    const restored = await restoreFromCloudData(cloudData, undefined, shouldContinue);
     if (restored) {
-      await updateSyncStatus(true);
+      await updateSyncStatus(true, cloudData);
     }
     return restored;
-  } catch {
+  } catch (error) {
+    if (error instanceof StorageRecoveryRequiredError) throw error;
     return false;
   }
 }
@@ -522,7 +441,7 @@ export async function maybeAutoRestoreOnFreshInstall(): Promise<boolean> {
 let provider: CloudProvider = new NoOpProvider();
 let syncStatusCache: SyncStatus | null = null;
 
-function invalidateRestoredServiceCaches(): void {
+export function invalidateRestoredServiceCaches(): void {
   invalidateStoryCache();
   invalidateProgressCache();
   invalidateStatsCache();
@@ -602,39 +521,68 @@ async function getDeviceId(): Promise<string> {
  * Collect all local save data into a CloudSaveData object.
  */
 export async function collectLocalSaveData(): Promise<CloudSaveData> {
+  const keys = new Set([...SYNC_KEYS, ...(await AsyncStorage.getAllKeys()).filter(isSyncedKey)]);
   const data: Record<string, string> = {};
-  for (const key of SYNC_KEYS) {
-    try {
-      const value = await AsyncStorage.getItem(key);
-      if (value !== null) {
-        data[key] = value;
-      }
-    } catch {}
+  // A storage error is not an absent key. Propagate it rather than uploading a
+  // destructive partial snapshot. Explicit missing values are legitimate.
+  for (const key of keys) {
+    const value = await AsyncStorage.getItem(key);
+    if (value !== null) data[key] = value;
   }
+  return { version: CURRENT_SAVE_VERSION, timestamp: Date.now(), deviceId: await getDeviceId(), data };
+}
 
-  // Prefix-synced key families (e.g. the per-bank played-puzzle-id lists) —
-  // resolved dynamically from the actual stored keys, so new banks are picked
-  // up without touching SYNC_KEYS.
-  try {
-    const allKeys = await AsyncStorage.getAllKeys();
-    for (const key of allKeys) {
-      if (key in data) continue;
-      if (!SYNC_KEY_PREFIXES.some(prefix => key.startsWith(prefix))) continue;
-      try {
-        const value = await AsyncStorage.getItem(key);
-        if (value !== null) {
-          data[key] = value;
-        }
-      } catch {}
+function isSyncedKey(key: string): boolean {
+  return SYNC_KEYS.includes(key) || SYNC_KEY_PREFIXES.some(prefix => key.startsWith(prefix));
+}
+
+/** Structural validation at the trust boundary. Services may add stricter domain validation. */
+export function validateCloudSaveData(value: unknown): value is CloudSaveData {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const save = value as CloudSaveData;
+  if (save.version !== CURRENT_SAVE_VERSION || !Number.isFinite(save.timestamp) || save.timestamp < 0 ||
+      typeof save.deviceId !== 'string' || save.deviceId.length > 128 ||
+      !save.data || typeof save.data !== 'object' || Array.isArray(save.data) ||
+      (save.revision !== undefined && (!Number.isSafeInteger(save.revision) || save.revision < 1))) return false;
+  let bytes = 0;
+  for (const [key, raw] of Object.entries(save.data)) {
+    if (!isSyncedKey(key) || typeof raw !== 'string') return false;
+    bytes += key.length + raw.length;
+    if (bytes > 1048576) return false;
+    if (key === 'wordshift_schema_version') {
+      if (!/^\d+$/.test(raw) || Number(raw) > CURRENT_SCHEMA_VERSION) return false;
+      continue;
     }
-  } catch {}
-
-  return {
-    version: CURRENT_SAVE_VERSION,
-    timestamp: Date.now(),
-    deviceId: await getDeviceId(),
-    data,
-  };
+    // Primitive intro flags/date strings are stored directly. Structured keys
+    // are JSON; reject corrupt containers before any local state is removed.
+    if (STRUCTURED_SAVE_KEYS.has(key) || key.startsWith('wordshift_played_')) {
+      let parsed: unknown;
+      try { parsed = JSON.parse(raw); } catch { return false; }
+      if (!parsed || typeof parsed !== 'object') return false;
+      if (key.startsWith('wordshift_played_') && !Array.isArray(parsed)) return false;
+      if (key === 'wordshift_home_progress' && !validProgress(parsed)) return false;
+    }
+  }
+  return true;
+}
+const STRUCTURED_SAVE_KEYS = new Set(SYNC_KEYS.filter(key => ![
+  'wordshift_schema_version', 'wordshift_share_count', 'wordshift_share_bonus_date',
+  'wordshift_onboarding_step', 'wordshift_tutorial_completed', 'wordshift_notification_prompted',
+].includes(key) && !key.endsWith('_seen') && !key.endsWith('_seen_v2') && !key.endsWith('_glitch')));
+function validProgress(value: object): boolean {
+  if (Array.isArray(value)) return false;
+  const progress = value as Record<string, unknown>;
+  for (const key of ['amber', 'puzzlesSolved', 'phaseProgress', 'cycleCount']) {
+    if (progress[key] !== undefined && (typeof progress[key] !== 'number' ||
+        !Number.isFinite(progress[key]) || Number(progress[key]) < 0)) return false;
+  }
+  if (progress.currentPhase !== undefined && (!Number.isInteger(progress.currentPhase) ||
+      Number(progress.currentPhase) < 0 || Number(progress.currentPhase) > 5)) return false;
+  for (const key of ['unlockedAnimals', 'unlockedRooms']) {
+    if (progress[key] !== undefined && (!Array.isArray(progress[key]) ||
+        !(progress[key] as unknown[]).every(item => typeof item === 'string'))) return false;
+  }
+  return true;
 }
 
 /**
@@ -668,54 +616,40 @@ const RESTORE_SWEEP_EXEMPT = new Set(['wordshift_schema_version', 'wordshift_hin
  * sweep safe — puzzleSaveState's own cache is dropped there, so the discarded
  * board cannot be re-persisted by the next autosave write.
  */
-export async function restoreFromCloudData(cloudData: CloudSaveData): Promise<boolean> {
+export async function restoreFromCloudData(cloudData: CloudSaveData, owner?: string, shouldContinue: () => boolean = () => true): Promise<boolean> {
+  if (!shouldContinue()) return false;
+  if (!validateCloudSaveData(cloudData) || (owner !== undefined && !isSecureIdentity(owner))) {
+    logEvent({ type: 'cloud_sync_result', data: { operation: 'restore', result: 'invalid' } });
+    return false;
+  }
   try {
-    const entries = Object.entries(cloudData.data);
-    const incoming = new Set(Object.keys(cloudData.data));
-
-    // Sweep: every locally-present synced key the payload does not carry.
-    // The prefix families are enumerated off the real stored keys (they have
-    // no fixed list), and the excluded device/store keys are never touched
-    // because they are not in SYNC_KEYS or the prefixes to begin with.
-    try {
-      const localKeys = await AsyncStorage.getAllKeys();
-      const stale = localKeys.filter(
-        key =>
-          !incoming.has(key) &&
-          !RESTORE_SWEEP_EXEMPT.has(key) &&
-          (SYNC_KEYS.includes(key) || SYNC_KEY_PREFIXES.some(prefix => key.startsWith(prefix))),
-      );
-      if (stale.length > 0) {
-        await AsyncStorage.multiRemove(stale);
-      }
-    } catch {
-      // A failed sweep must not abort the restore — a hybrid save is still
-      // better than no restore.
-    }
-
-    // Write all keys from cloud data
-    for (const [key, value] of entries) {
-      await AsyncStorage.setItem(key, value);
-    }
+    await runStorageTransaction('cloud_restore', async () => {
+      if (!shouldContinue()) throw new Error('Restore cancelled');
+      await AsyncStorage.removeItem('wordshift_pending_victory');
+      await AsyncStorage.removeItem('wordshift_victory_receipt');
+      await AsyncStorage.removeItem(LOCAL_RESET_MARKER_KEY);
+      const incoming = new Set(Object.keys(cloudData.data));
+      const stale = (await AsyncStorage.getAllKeys()).filter(key =>
+        isSyncedKey(key) && !incoming.has(key) && !RESTORE_SWEEP_EXEMPT.has(key));
+      await AsyncStorage.multiRemove(stale);
+      for (const [key, value] of Object.entries(cloudData.data)) await AsyncStorage.setItem(key, value);
+      // Missing version means genuinely legacy data, not this device's version.
+      if (!incoming.has('wordshift_schema_version')) await AsyncStorage.setItem('wordshift_schema_version', '0');
+      await runMigrations();
+      if (owner) await AsyncStorage.setItem(CLOUD_OWNER_KEY, owner);
+      if (!shouldContinue()) throw new Error('Restore cancelled');
+    });
     invalidateRestoredServiceCaches();
-
-    // Re-warm the two services whose caches are RENDER-PATH MIRRORS rather
-    // than lazily-reloaded values. Every other invalidator above nulls a cache
-    // that the next async read refills; these two do not have such a read on
-    // any live path. hints' mirror is zeroed on invalidation (the safe side —
-    // a stale mirror would let a player overspend), so without this the HINT
-    // button read 0 and offered to sell hints the player had just restored;
-    // cosmetics' mirror feeds colors.ts and Confetti synchronously, so without
-    // this every purchased tile theme, finish, confetti palette and move spark
-    // reverted to defaults for the rest of the session while the Shop still
-    // said "Equipped". Awaited here, at the one boundary that knows a restore
-    // landed, because the recovery-code path never calls back into App at all.
-    await Promise.all([
-      initHints().catch(() => {}),
-      initCosmetics().catch(() => {}),
-    ]);
+    await Promise.all([initHints(), initCosmetics()]);
+    logEvent({ type: 'cloud_sync_result', data: { operation: 'restore', result: 'saved' } });
     return true;
-  } catch {
+  } catch (error) {
+    // Both a discarded stage and a journal awaiting replay require dropping
+    // every mirror. Bootstrap/retry rolls a committed journal forward first.
+    invalidateRestoredServiceCaches();
+    logEvent({ type: 'cloud_sync_result', data: { operation: 'restore',
+      result: error instanceof StorageRecoveryRequiredError ? 'recovery_required' : 'failed' } });
+    if (error instanceof StorageRecoveryRequiredError) throw error;
     return false;
   }
 }
@@ -729,10 +663,8 @@ export async function restoreFromCloudData(cloudData: CloudSaveData): Promise<bo
  * clobber it. The upload is skipped and `conflictDetected` is recorded in the
  * sync status instead (no auto-merge, no auto-download mid-session). A
  * successful download/restore clears the conflict; `force` bypasses the guard
- * for deliberate-overwrite flows. A device with NO baseline
- * (lastSyncTimestamp === 0 — e.g. right after Reset All clears the sync
- * status to deliberately overwrite the cloud row) uploads unguarded, since
- * there is nothing to compare against.
+ * for deliberate-overwrite flows. A missing revision on an existing row fails
+ * closed; server revisions, not device clocks, authorize normal overwrites.
  */
 // While the fresh-install boot restore is in flight, background uploads must
 // wait: MainApp mounts an upload on launch, and on a slow first launch it
@@ -751,42 +683,60 @@ export function holdUploadsUntil(promise: Promise<unknown>): void {
   });
 }
 
-export async function uploadToCloud(force: boolean = false): Promise<boolean> {
-  const isReady = await provider.isReady();
-  if (!isReady) return false;
-  if (uploadHold) await uploadHold;
-
-  if (!force) {
+let cloudOperationQueue: Promise<unknown> = Promise.resolve();
+/** Manual restore and upload share ordering; boot restore has its separate hold. */
+function enqueueCloudOperation<T>(work: () => Promise<T>): Promise<T> {
+  const run = cloudOperationQueue.catch(() => {}).then(work);
+  cloudOperationQueue = run;
+  return run;
+}
+export function uploadToCloud(force: boolean = false): Promise<boolean> {
+  return enqueueCloudOperation(async () => {
+    if (!(await provider.isReady())) return false;
+    if (uploadHold) await uploadHold;
     try {
-      const status = await getSyncStatus();
-      if (status.lastSyncTimestamp > 0) {
-        const serverIsNewer = await provider.hasNewerSave(status.lastSyncTimestamp);
-        if (serverIsNewer) {
-          await recordSyncConflict();
-          return false;
+      const snapshot = await runStorageTransaction('cloud_snapshot', async () => ({
+        owner: await getCloudOwnerId(), status: await getSyncStatus(),
+        resetMarker: await AsyncStorage.getItem(LOCAL_RESET_MARKER_KEY), data: await collectLocalSaveData(),
+      }));
+      const { owner, status, data: saveData } = snapshot;
+      if (!validateCloudSaveData(saveData)) throw new Error('Local save needs repair before backup');
+      const baseline = status.owner === owner ? status.remoteRevision ?? null : null;
+      let success: boolean;
+      let revision: number | undefined;
+      if (provider.uploadConditional) {
+        const result = await provider.uploadConditional(saveData, baseline, force, owner);
+        if (result.status === 'conflict') { await recordSyncConflict(); return false; }
+        success = result.status === 'saved';
+        revision = result.revision;
+      } else {
+        // Custom/offline providers retain their original seam. Production uses
+        // the mandatory v2 conditional RPC; it never falls back to legacy upsert.
+        if (!force && status.lastSyncTimestamp > 0 && await provider.hasNewerSave(status.lastSyncTimestamp)) {
+          await recordSyncConflict(); return false;
         }
+        success = await provider.upload(saveData);
       }
+      await runStorageTransaction('cloud_acknowledgement', async () => {
+        const markerNow = await AsyncStorage.getItem(LOCAL_RESET_MARKER_KEY);
+        // An acknowledgement of a PRE-reset snapshot cannot acknowledge a reset
+        // made while its network request was in flight. Compare and clear inside
+        // the same serialized operation as Reset's marker write.
+        if (success && snapshot.resetMarker && markerNow === snapshot.resetMarker) {
+          await AsyncStorage.removeItem(LOCAL_RESET_MARKER_KEY);
+        }
+        if (await getCloudOwnerId() === owner) {
+          await updateSyncStatus(success, { ...saveData, revision }, owner);
+          if (markerNow && markerNow !== snapshot.resetMarker) await markPendingChanges();
+        }
+      });
+      logEvent({ type: 'cloud_sync_result', data: { operation: 'upload', result: success ? 'saved' : 'unavailable' } });
+      return success;
     } catch {
-      // The conflict probe must never block an upload path that used to work;
-      // fall through to the plain upload.
+      await updateSyncStatus(false);
+      return false;
     }
-  }
-
-  const saveData = await collectLocalSaveData();
-  const success = await provider.upload(saveData);
-
-  // Any successful upload retires the reset marker: the cloud row is now this
-  // device's own state, so there is nothing left for the auto-restore guard to
-  // protect against. Clearing it here (not only on the reset's own upload)
-  // covers the offline reset whose first successful sync comes later.
-  if (success) {
-    try {
-      await AsyncStorage.removeItem(LOCAL_RESET_MARKER_KEY);
-    } catch {}
-  }
-
-  await updateSyncStatus(success);
-  return success;
+  });
 }
 
 /**
@@ -794,17 +744,15 @@ export async function uploadToCloud(force: boolean = false): Promise<boolean> {
  * Returns true if data was restored, false otherwise.
  */
 export async function downloadFromCloud(): Promise<boolean> {
-  const isReady = await provider.isReady();
-  if (!isReady) return false;
-
-  const cloudData = await provider.download();
-  if (!cloudData) return false;
-
-  const success = await restoreFromCloudData(cloudData);
-  if (success) {
-    await updateSyncStatus(true);
-  }
-  return success;
+  return enqueueCloudOperation(async () => {
+    const isReady = await provider.isReady();
+    if (!isReady) return false;
+    const cloudData = await provider.download();
+    if (!cloudData) return false;
+    const success = await restoreFromCloudData(cloudData);
+    if (success) await updateSyncStatus(true, cloudData);
+    return success;
+  });
 }
 
 /**
@@ -856,7 +804,7 @@ export async function markPendingChanges(): Promise<void> {
 // Internal
 // ============================================================================
 
-async function updateSyncStatus(success: boolean): Promise<void> {
+async function updateSyncStatus(success: boolean, save?: CloudSaveData, owner?: string): Promise<void> {
   // The baseline (lastSyncTimestamp) advances ONLY on success. A failed
   // upload/restore must keep the previous baseline: the newer-save conflict
   // guard compares the server's timestamp against this value, and stamping
@@ -865,7 +813,9 @@ async function updateSyncStatus(success: boolean): Promise<void> {
   // permanently blinding the guard to that conflict.
   const previous = syncStatusCache ?? (await getSyncStatus());
   const status: SyncStatus = {
-    lastSyncTimestamp: success ? Date.now() : previous.lastSyncTimestamp,
+    lastSyncTimestamp: success && save ? save.timestamp : previous.lastSyncTimestamp,
+    remoteRevision: success ? save?.revision : previous.remoteRevision,
+    owner: success ? owner ?? await getCloudOwnerId() : previous.owner,
     lastSyncSuccess: success,
     pendingChanges: !success,
     provider: provider.getName(),
@@ -884,6 +834,7 @@ async function updateSyncStatus(success: boolean): Promise<void> {
  * bumping lastSyncTimestamp here would mask the very conflict on retry.
  */
 async function recordSyncConflict(): Promise<void> {
+  logEvent({ type: 'cloud_sync_result', data: { operation: 'upload', result: 'conflict' } });
   const current = await getSyncStatus();
   const status: SyncStatus = {
     ...current,
@@ -905,6 +856,7 @@ export async function clearSyncStatus(): Promise<void> {
   try {
     await AsyncStorage.removeItem(SYNC_STATUS_KEY);
     await AsyncStorage.removeItem('wordshift_device_id');
-    await AsyncStorage.removeItem(CLOUD_OWNER_KEY);
+    // Reset progress preserves the cloud identity so its explicit overwrite
+    // addresses the same backup. Unlinking must be a separate player action.
   } catch {}
 }

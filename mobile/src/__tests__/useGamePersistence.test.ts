@@ -1,3 +1,6 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+jest.mock('../services/cloudSave', () => ({ invalidateRestoredServiceCaches: jest.fn() }));
+jest.mock('../services/seasonPass', () => ({ recordSeasonPuzzleCompletion: jest.fn(async () => {}) }));
 /**
  * Tests for useGamePersistence hook.
  *
@@ -162,6 +165,7 @@ const mockRecordRitualWords = jest.fn(async (_w?: any, _e?: any, _t?: any) => ({
 }));
 
 jest.mock('../services/amberCurrency', () => ({
+  awardBonusAmberInTransaction: jest.fn(async () => 100),
   awardPuzzleAmber: (...args: any[]) => mockAwardPuzzleAmber(args[0], args[1], args[2], args[3], args[4], args[5]),
   getAmberBalance: () => mockGetAmberBalance(),
   getCurrentPhase: () => mockGetCurrentPhase(),
@@ -218,7 +222,8 @@ jest.mock('../services/weeklyQuests', () => ({
 
 // --- Mock wordHarvest ---
 const mockEnqueueHarvestBatch = jest.fn(async (_batch?: any) => ({ overflow: false }));
-const mockGenerateBatchId = jest.fn(() => 'hb_test_123');
+let mockBatchSequence = 0;
+const mockGenerateBatchId = jest.fn(() => `hb_test_${++mockBatchSequence}`);
 const mockGetPendingHarvestSummary = jest.fn(async () => ({
   pendingAmber: 15,
   pendingWords: 3,
@@ -239,7 +244,8 @@ function callHook(): [PersistenceState, PersistenceActions] {
 }
 
 describe('useGamePersistence', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await AsyncStorage.clear();
     resetHookState();
     jest.clearAllMocks();
 
@@ -331,7 +337,7 @@ describe('useGamePersistence', () => {
       await actions.recordVictory('MEDIUM', 0, 0, 'standard');
 
       expect(mockAwardPuzzleAmber).toHaveBeenCalledWith(
-        'MEDIUM', 3, 'standard', expect.any(Number), false, { skipPhaseProgress: false, blind: false, lexicon: false, resonanceBonus: 0, undoLimited: false, speed: false }
+        'MEDIUM', 3, 'standard', expect.any(Number), false, { completedDate: expect.any(String), skipPhaseProgress: false, blind: false, lexicon: false, resonanceBonus: 0, undoLimited: false, speed: false }
       );
     });
 
@@ -459,7 +465,7 @@ describe('useGamePersistence', () => {
       await actions.recordVictory('MEDIUM', 0, 0);
 
       expect(mockAwardPuzzleAmber).toHaveBeenCalledWith(
-        'MEDIUM', 3, 'standard', expect.any(Number), false, { skipPhaseProgress: false, blind: false, lexicon: false, resonanceBonus: 0, undoLimited: false, speed: false }
+        'MEDIUM', 3, 'standard', expect.any(Number), false, { completedDate: expect.any(String), skipPhaseProgress: false, blind: false, lexicon: false, resonanceBonus: 0, undoLimited: false, speed: false }
       );
     });
 
@@ -532,34 +538,16 @@ describe('useGamePersistence', () => {
       expect(result.variantAppliedMultiplier).toBeCloseTo(1.2);
     });
 
-    test('handles service errors gracefully with default returns', async () => {
+    test('throws on service failure so the UI can retry the completed board', async () => {
       mockRecordPuzzleCompletion.mockRejectedValueOnce(new Error('Storage failed'));
-
       const [, actions] = callHook();
-      const result = await actions.recordVictory('MEDIUM', 0, 0);
-
-      // Should return defaults for error case
-      expect(result.earnedStars).toBe(3); // Stars are calculated before try block
-      expect(result.amberEarned).toBe(0);
-      expect(result.phaseChanged).toBe(false);
-      expect(result.streakBonus).toBe(0);
-      expect(result.challengeBonus).toBe(0);
-      expect(result.currentStreak).toBe(0);
-      expect(result.milestoneBonus).toBe(0);
-      expect(result.milestoneMessage).toBeNull();
-      expect(result.phaseAcceleration).toBe(1.0);
+      await expect(actions.recordVictory('MEDIUM', 0, 0)).rejects.toThrow('Storage failed');
     });
 
-    test('handles awardPuzzleAmber failure gracefully', async () => {
+    test('throws rather than fabricating a zero-reward victory on award failure', async () => {
       mockAwardPuzzleAmber.mockRejectedValueOnce(new Error('Award failed'));
-
       const [, actions] = callHook();
-      const result = await actions.recordVictory('EASY', 0, 1);
-
-      // Should return defaults
-      expect(result.earnedStars).toBe(3);
-      expect(result.amberEarned).toBe(0);
-      expect(result.phaseChanged).toBe(false);
+      await expect(actions.recordVictory('EASY', 0, 1)).rejects.toThrow('Award failed');
     });
 
     test('passes three-star rate ratio to awardPuzzleAmber', async () => {
@@ -570,7 +558,7 @@ describe('useGamePersistence', () => {
 
       // getThreeStarRate returns 50 (percentage), should be divided by 100 to get ratio 0.5
       expect(mockAwardPuzzleAmber).toHaveBeenCalledWith(
-        'MEDIUM', 3, 'standard', 0.5, false, { skipPhaseProgress: false, blind: false, lexicon: false, resonanceBonus: 0, undoLimited: false, speed: false }
+        'MEDIUM', 3, 'standard', 0.5, false, { completedDate: expect.any(String), skipPhaseProgress: false, blind: false, lexicon: false, resonanceBonus: 0, undoLimited: false, speed: false }
       );
     });
 
@@ -763,7 +751,7 @@ describe('useGamePersistence', () => {
       expect(result.amberEarned).toBe(15);
     });
 
-    test('the concurrent-guard fallback carries no breakdown (display falls back)', async () => {
+    test('concurrent completion rejects rather than displaying a fabricated victory)', async () => {
       // Make recordPuzzleCompletion hang so a second call hits the guard.
       let release: () => void = () => {};
       mockRecordPuzzleCompletion.mockImplementationOnce(
@@ -771,8 +759,8 @@ describe('useGamePersistence', () => {
       );
       const [, actions] = callHook();
       const first = actions.recordVictory('MEDIUM', 0, 0);
-      const second = await actions.recordVictory('MEDIUM', 0, 0);
-      expect(second.amberBreakdown).toBeUndefined();
+      await expect(actions.recordVictory('MEDIUM', 0, 0)).rejects.toThrow('already being saved');
+      for (let i = 0; i < 20; i++) await Promise.resolve();
       release();
       await first;
     });
@@ -790,7 +778,7 @@ describe('useGamePersistence', () => {
       );
       expect(mockAwardPuzzleAmber).toHaveBeenCalledWith(
         'MEDIUM', 3, 'standard', expect.any(Number), false,
-        { skipPhaseProgress: false, blind: false, lexicon: false, resonanceBonus: 4, undoLimited: false, speed: false }
+        { completedDate: expect.any(String), skipPhaseProgress: false, blind: false, lexicon: false, resonanceBonus: 4, undoLimited: false, speed: false }
       );
     });
 
@@ -802,7 +790,7 @@ describe('useGamePersistence', () => {
       );
       expect(mockAwardPuzzleAmber).toHaveBeenCalledWith(
         'MEDIUM', 3, 'standard', expect.any(Number), false,
-        { skipPhaseProgress: false, blind: false, lexicon: false, resonanceBonus: 6, undoLimited: false, speed: false }
+        { completedDate: expect.any(String), skipPhaseProgress: false, blind: false, lexicon: false, resonanceBonus: 6, undoLimited: false, speed: false }
       );
     });
 
@@ -869,7 +857,7 @@ describe('useGamePersistence', () => {
       );
       expect(mockAwardPuzzleAmber).toHaveBeenCalledWith(
         'MEDIUM', 3, 'standard', expect.any(Number), false,
-        { skipPhaseProgress: false, blind: false, lexicon: false, resonanceBonus: 0, undoLimited: false, speed: false }
+        { completedDate: expect.any(String), skipPhaseProgress: false, blind: false, lexicon: false, resonanceBonus: 0, undoLimited: false, speed: false }
       );
       expect(mockRecordResonantChoices).not.toHaveBeenCalled();
     });
@@ -884,7 +872,7 @@ describe('useGamePersistence', () => {
       );
 
       expect(mockAwardPuzzleAmber).toHaveBeenCalledWith(
-        'MEDIUM', 3, 'standard', expect.any(Number), false, { skipPhaseProgress: true, blind: false, lexicon: false, resonanceBonus: 0, undoLimited: false, speed: false }
+        'MEDIUM', 3, 'standard', expect.any(Number), false, { completedDate: expect.any(String), skipPhaseProgress: true, blind: false, lexicon: false, resonanceBonus: 0, undoLimited: false, speed: false }
       );
     });
 

@@ -1,3 +1,4 @@
+import { PRACTICE_LESSONS, type PracticeLessonId } from '../../services/practiceLessons';
 import React, { useCallback, useEffect, useRef } from 'react';
 import {
   View,
@@ -8,6 +9,8 @@ import {
   Animated,
   Easing,
   Image,
+  ScrollView,
+  useWindowDimensions,
 } from 'react-native';
 import { CandyColors } from '../../theme/colors';
 import { SURFACE, getSurfaceTheme, getModalInSpring } from '../../theme/surfaces';
@@ -20,6 +23,7 @@ import { getRulesText } from '../../services/phaseNarrative';
 import { DialoguePhase } from '../../types/homeWorld';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { FONT_SIZE } from '../../theme/typeScale';
+import { useScreenInsets } from '../../hooks/useScreenInsets';
 
 /**
  * Numbered step-chip hue rotation. The candy cycle survives every phase; only
@@ -51,14 +55,18 @@ interface RulesModalProps {
   visible: boolean;
   phase: DialoguePhase;
   onClose: () => void;
+  onPractice?: (lesson: PracticeLessonId) => void;
 }
 
 export const RulesModal: React.FC<RulesModalProps> = ({
   visible,
   phase,
   onClose,
+  onPractice,
 }) => {
   const rules = getRulesText(phase);
+  const insets = useScreenInsets();
+  const { height } = useWindowDimensions();
   const t = getSurfaceTheme(phase);
   const reducedMotion = getSettingsSync().reducedMotion;
 
@@ -124,7 +132,7 @@ export const RulesModal: React.FC<RulesModalProps> = ({
   }, [reducedMotion, backdropOpacity, cardOpacity, onClose]);
 
   return (
-    <Modal visible={visible} transparent animationType="none">
+    <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
       <View style={styles.overlayRoot}>
         <Animated.View
           pointerEvents="none"
@@ -134,18 +142,20 @@ export const RulesModal: React.FC<RulesModalProps> = ({
           ]}
         />
         <TouchableOpacity
-          style={styles.overlayTouch}
+          style={[styles.overlayTouch, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 }]}
           activeOpacity={1}
           onPress={handleClose}
         >
           <Animated.View
             style={[
               styles.cardWrap,
+              { maxHeight: height - insets.top - insets.bottom - 24 },
               { transform: [{ scale: cardScale }], opacity: cardOpacity },
             ]}
             onStartShouldSetResponder={() => true}
           >
             <PanelCard phase={phase} kind="panel" style={styles.rulesModal}>
+              <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={styles.rulesContent} bounces={false}>
               {/* The carved close mark (generateGameIcons chrome) instead of a
                   typographic '✕' set as a button label. */}
               <CandyButton
@@ -200,6 +210,12 @@ export const RulesModal: React.FC<RulesModalProps> = ({
                 );
               })}
 
+              <Text style={{ color: t.body, fontSize: 15, lineHeight: 21, marginBottom: 12 }}>
+                Words use standard English spellings. Common regional spellings count. Rare valid discoveries can count too; new ordinary puzzles use a more familiar vocabulary.
+              </Text>
+              {onPractice && (Object.keys(PRACTICE_LESSONS) as PracticeLessonId[]).map(lesson => (
+                <CandyButton key={lesson} label={PRACTICE_LESSONS[lesson].title} phase={phase} variant="quiet" onPress={() => onPractice(lesson)} />
+              ))}
               <CandyButton
                 label={rules.dismissLabel}
                 onPress={handleClose}
@@ -208,6 +224,7 @@ export const RulesModal: React.FC<RulesModalProps> = ({
                 size="lg"
                 style={styles.gotItButton}
               />
+              </ScrollView>
             </PanelCard>
           </Animated.View>
         </TouchableOpacity>
@@ -232,6 +249,9 @@ const styles = StyleSheet.create({
   },
   rulesModal: {
     width: '100%',
+    flexShrink: 1,
+  },
+  rulesContent: {
     paddingVertical: 28,
     paddingHorizontal: SURFACE.panelPadX,
   },

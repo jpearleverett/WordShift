@@ -1,3 +1,4 @@
+import { isFairPuzzleWord } from '../src/services/puzzleVocabulary';
 /**
  * GATED FULL-REGENERATION generator for WordShift's four REVERSE puzzle banks.
  *
@@ -232,6 +233,7 @@ function forwardSShare(solution: StepLike[] | undefined): number {
 // (incl. reverse-leg transients) within the loose backstop; dread exempt. EXPERT
 // adds an uncommon-but-fair MEAN rarity floor on the non-dread displayed words.
 function featuredBandOk(displayed: string[], allWords: string[]): boolean {
+  if (!allWords.every(word => isFairPuzzleWord(word, LEXICON || process.env.GATED_BANK === 'EXPERT'))) return false;
   for (const w of displayed) {
     if (getFeaturedRank(w) > CONFIG.featuredCeiling && !isDreadWord(w)) return false;
   }

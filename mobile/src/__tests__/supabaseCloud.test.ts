@@ -1,351 +1,155 @@
+import { clearEvents } from '../services/eventLogger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-// Mutable expo-config extra so we can toggle configured/unconfigured per test
-// (mirrors supabaseClient.test.ts).
-let mockExtra: Record<string, unknown> = {};
-jest.mock('expo-constants', () => ({
-  default: {
-    get expoConfig() {
-      return { extra: mockExtra, version: '1.0.0' };
-    },
-  },
-}));
-
-jest.mock('@react-native-async-storage/async-storage', () =>
-  require('./helpers/mockAsyncStorage').createMockAsyncStorage()
-);
-
-// Keep telemetry's install id deterministic and dependency-free.
-jest.mock('../services/telemetry', () => ({
-  getInstallId: async () => 'install-abc123',
-}));
-
 import {
-  installCloudProviderIfConfigured,
-  getCloudProvider,
-  getCloudOwnerId,
-  getOrCreateRecoveryCode,
-  linkRecoveryCode,
-  maybeAutoRestoreOnFreshInstall,
-  clearSyncStatus,
-  setCloudProvider,
-  CloudSaveData,
-  CloudProvider,
+  installCloudProviderIfConfigured, getCloudProvider, getCloudOwnerId,
+  getOrCreateRecoveryCode, restoreFromRecoveryCode, maybeAutoRestoreOnFreshInstall,
+  clearSyncStatus, setCloudProvider, uploadToCloud, downloadFromCloud, getSyncStatus,
+  CloudSaveData, CloudProvider, LEGACY_CLOUD_OWNER_KEY,
 } from '../services/cloudSave';
+import { formatSecureRecoveryCode } from '../services/secureIdentity';
 
-const CONFIGURED = { supabaseUrl: 'https://x.supabase.co', supabaseAnonKey: 'anon-key' };
-
-function mockFetchJson(body: unknown, status = 200, ok = true) {
-  (global.fetch as jest.Mock).mockResolvedValue({
-    ok,
-    status,
-    json: async () => body,
-  });
+let mockExtra: Record<string, unknown> = {};
+jest.mock('expo-constants', () => ({ default: { get expoConfig() { return { extra: mockExtra }; } } }));
+jest.mock('@react-native-async-storage/async-storage', () => require('./helpers/mockAsyncStorage').createMockAsyncStorage());
+jest.mock('../services/telemetry', () => ({ getInstallId: async () => 'install-abc123' }));
+const OWNER = 'ws2_' + 'a'.repeat(32);
+const OTHER = 'ws2_' + 'b'.repeat(32);
+const CONFIG = { supabaseUrl: 'https://x.supabase.co', supabaseAnonKey: 'public-key' };
+const save = (amount = 10, revision = 1): CloudSaveData => ({
+  version: 1, timestamp: 1000, revision, deviceId: 'remote', data: {
+    wordshift_home_progress: JSON.stringify({ amber: amount }), wordshift_schema_version: '6',
+  },
+});
+const row = (data = save()) => ({ version: data.version, timestamp: data.timestamp,
+  revision: data.revision, device_id: data.deviceId, payload: JSON.stringify(data.data) });
+function reply(body: unknown, ok = true) {
+  (global.fetch as jest.Mock).mockResolvedValue({ ok, status: ok ? 200 : 503, json: async () => body });
 }
-
-/** Reset the provider back to NoOp between tests so installs don't leak. */
-function resetToNoOp() {
-  setCloudProvider({
-    upload: async () => false,
-    download: async () => null,
+function install() { mockExtra = CONFIG; installCloudProviderIfConfigured(); }
+function memoryProvider(rows: Map<string, CloudSaveData>): CloudProvider {
+  return {
+    isReady: async () => true, getName: () => 'Memory', upload: async () => false,
     hasNewerSave: async () => false,
-    getName: () => 'Not Connected',
-    isReady: async () => false,
-  } as CloudProvider);
+    download: async owner => rows.get(owner ?? await getCloudOwnerId()) ?? null,
+    uploadConditional: async (data, expected, force, owner) => {
+      const key = owner ?? await getCloudOwnerId();
+      const previous = rows.get(key);
+      if (previous && !force && expected !== previous.revision) return { status: 'conflict', revision: previous.revision };
+      const revision = (previous?.revision ?? 0) + 1;
+      rows.set(key, { ...data, revision });
+      return { status: 'saved', revision };
+    },
+  };
 }
+beforeEach(async () => {
+  await AsyncStorage.clear(); await clearSyncStatus(); mockExtra = {};
+  global.fetch = jest.fn();
+  setCloudProvider({ isReady: async () => false, getName: () => 'Not Connected', upload: async () => false,
+    download: async () => null, hasNewerSave: async () => false });
+});
 
-describe('SupabaseCloudProvider', () => {
-  beforeEach(async () => {
-    (AsyncStorage.clear as jest.Mock)();
-    await clearSyncStatus();
-    mockExtra = {};
-    (global as Record<string, unknown>).fetch = jest.fn();
-    resetToNoOp();
+describe('secure cloud provider', () => {
+  test('unconfigured is a no-op; configured installs the provider', async () => {
+    installCloudProviderIfConfigured(); expect(await getCloudProvider().isReady()).toBe(false);
+    install(); expect(await getCloudProvider().isReady()).toBe(true);
+    expect(getCloudProvider().getName()).toBe('Supabase');
   });
-
-  afterEach(() => {
-    delete (global as Record<string, unknown>).fetch;
+  test('creates a stable full-random owner and preserves the legacy reference', async () => {
+    await AsyncStorage.setItem('wordshift_cloud_owner', 'INSTMTO7');
+    const [a, b] = await Promise.all([getCloudOwnerId(), getCloudOwnerId()]);
+    expect(a).toMatch(/^ws2_[a-f0-9]{32}$/); expect(a).toBe(b);
+    expect(await AsyncStorage.getItem(LEGACY_CLOUD_OWNER_KEY)).toBe('INSTMTO7');
+    expect(global.fetch).not.toHaveBeenCalled();
   });
-
-  describe('installCloudProviderIfConfigured', () => {
-    it('does NOT install when unconfigured (NoOp stays default)', () => {
-      mockExtra = {};
-      installCloudProviderIfConfigured();
-      expect(getCloudProvider().getName()).toBe('Not Connected');
-    });
-
-    it('installs the Supabase provider when configured', () => {
-      mockExtra = { ...CONFIGURED };
-      installCloudProviderIfConfigured();
-      expect(getCloudProvider().getName()).toBe('Supabase');
-    });
-
-    it('Supabase provider isReady reflects configuration', async () => {
-      mockExtra = { ...CONFIGURED };
-      installCloudProviderIfConfigured();
-      expect(await getCloudProvider().isReady()).toBe(true);
-    });
+  test('preserves an already secure owner', async () => {
+    await AsyncStorage.setItem('wordshift_cloud_owner', OWNER);
+    expect(await getCloudOwnerId()).toBe(OWNER);
+    await clearSyncStatus(); expect(await getCloudOwnerId()).toBe(OWNER);
   });
-
-  describe('getCloudOwnerId', () => {
-    it('defaults to the install id', async () => {
-      expect(await getCloudOwnerId()).toBe('install-abc123');
-    });
-
-    it('uses the stored recovery-code override when present', async () => {
-      await AsyncStorage.setItem('wordshift_cloud_owner', 'WSABCD1234');
-      expect(await getCloudOwnerId()).toBe('WSABCD1234');
-    });
+  test('uploads with a conditional v2 RPC and no direct table access', async () => {
+    install(); await AsyncStorage.setItem('wordshift_cloud_owner', OWNER);
+    reply({ status: 'saved', revision: 7 });
+    expect(await getCloudProvider().upload(save(12, 6))).toBe(true);
+    const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(url).toBe('https://x.supabase.co/rest/v1/rpc/upsert_save_v2');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body)).toMatchObject({ p_owner: OWNER, p_expected_revision: 6, p_force: false });
   });
-
-  describe('upload (upsert_save RPC — capability presented, no table write)', () => {
-    it('posts the save through /rest/v1/rpc/upsert_save', async () => {
-      mockExtra = { ...CONFIGURED };
-      installCloudProviderIfConfigured();
-      mockFetchJson(true);
-
-      const data: CloudSaveData = {
-        version: 1,
-        timestamp: 1000,
-        deviceId: 'dev-1',
-        data: { wordshift_home_progress: '{"amber":100}' },
-      };
-      const ok = await getCloudProvider().upload(data);
-      expect(ok).toBe(true);
-
-      const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
-      expect(url).toBe('https://x.supabase.co/rest/v1/rpc/upsert_save');
-      expect(init.method).toBe('POST');
-
-      const sent = JSON.parse(init.body);
-      expect(sent.p_owner).toBe('install-abc123');
-      expect(sent.p_version).toBe(1);
-      expect(sent.p_timestamp).toBe(1000);
-      expect(sent.p_device_id).toBe('dev-1');
-      expect(sent.p_payload).toBe(JSON.stringify(data.data));
-    });
-
-    it('returns false when the network call fails', async () => {
-      mockExtra = { ...CONFIGURED };
-      installCloudProviderIfConfigured();
-      (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 500 });
-
-      const ok = await getCloudProvider().upload({
-        version: 1,
-        timestamp: 1,
-        deviceId: 'd',
-        data: {},
-      });
-      expect(ok).toBe(false);
-    });
-
-    it('returns false when the server rejects the payload (RPC returns false)', async () => {
-      mockExtra = { ...CONFIGURED };
-      installCloudProviderIfConfigured();
-      mockFetchJson(false);
-
-      const ok = await getCloudProvider().upload({
-        version: 1,
-        timestamp: 1,
-        deviceId: 'd',
-        data: {},
-      });
-      expect(ok).toBe(false);
-    });
+  test.each([null, false, { status: 'conflict', revision: 4 }])('never falls back to unsafe legacy writes on %p', async response => {
+    install(); reply(response);
+    expect(await getCloudProvider().upload(save())).toBe(false);
+    expect((global.fetch as jest.Mock).mock.calls).toHaveLength(1);
   });
-
-  describe('download (get_save RPC)', () => {
-    it('reconstructs CloudSaveData from the RPC row', async () => {
-      mockExtra = { ...CONFIGURED };
-      installCloudProviderIfConfigured();
-
-      const payload = { wordshift_home_progress: '{"amber":777}' };
-      mockFetchJson([
-        {
-          version: 2,
-          timestamp: 99,
-          device_id: 'new',
-          payload: JSON.stringify(payload),
-        },
-      ]);
-
-      const result = await getCloudProvider().download();
-      expect(result).not.toBeNull();
-      expect(result!.version).toBe(2);
-      expect(result!.timestamp).toBe(99);
-      expect(result!.deviceId).toBe('new');
-      expect(result!.data).toEqual(payload);
-
-      const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
-      expect(url).toBe('https://x.supabase.co/rest/v1/rpc/get_save');
-      expect(init.method).toBe('POST');
-      expect(JSON.parse(init.body).p_owner).toBe('install-abc123');
-    });
-
-    it('tolerates a bare-object RPC result', async () => {
-      mockExtra = { ...CONFIGURED };
-      installCloudProviderIfConfigured();
-      mockFetchJson({ version: 1, timestamp: 7, device_id: 'd', payload: '{}' });
-      const result = await getCloudProvider().download();
-      expect(result).not.toBeNull();
-      expect(result!.timestamp).toBe(7);
-    });
-
-    it('returns null when no rows exist', async () => {
-      mockExtra = { ...CONFIGURED };
-      installCloudProviderIfConfigured();
-      mockFetchJson([]);
-      expect(await getCloudProvider().download()).toBeNull();
-    });
+  test('downloads a validated save and its server revision', async () => {
+    install(); reply([row()]);
+    expect(await getCloudProvider().download(OWNER)).toEqual(save());
+    expect(JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body)).toEqual({ p_owner: OWNER });
   });
-
-  describe('hasNewerSave (get_save_timestamp RPC)', () => {
-    it('true when remote timestamp exceeds local', async () => {
-      mockExtra = { ...CONFIGURED };
-      installCloudProviderIfConfigured();
-      mockFetchJson(500);
-      expect(await getCloudProvider().hasNewerSave(100)).toBe(true);
-      const [url] = (global.fetch as jest.Mock).mock.calls[0];
-      expect(url).toBe('https://x.supabase.co/rest/v1/rpc/get_save_timestamp');
-    });
-
-    it('false when remote timestamp is not newer', async () => {
-      mockExtra = { ...CONFIGURED };
-      installCloudProviderIfConfigured();
-      mockFetchJson(100);
-      expect(await getCloudProvider().hasNewerSave(100)).toBe(false);
-    });
-
-    it('false when no remote save (RPC returns null)', async () => {
-      mockExtra = { ...CONFIGURED };
-      installCloudProviderIfConfigured();
-      mockFetchJson(null);
-      expect(await getCloudProvider().hasNewerSave(0)).toBe(false);
-    });
+  test.each([[], {}, [{ ...row(), payload: 'bad json' }], [{ ...row(), revision: undefined }]])('rejects invalid/missing rows %p', async response => {
+    install(); reply(response); expect(await getCloudProvider().download()).toBeNull();
   });
-
-  describe('recovery code', () => {
-    it('generates a friendly, stable WS-XXXX-XXXX code', async () => {
-      const code1 = await getOrCreateRecoveryCode();
-      expect(code1).toMatch(/^WS-[A-Z0-9]{4}-[A-Z0-9]{4}$/);
-      const code2 = await getOrCreateRecoveryCode();
-      expect(code2).toBe(code1);
-      // Canonical owner was persisted.
-      const owner = await AsyncStorage.getItem('wordshift_cloud_owner');
-      expect(owner).toBeTruthy();
-    });
-
-    it('linking a code changes the resolved owner', async () => {
-      const before = await getCloudOwnerId();
-      expect(before).toBe('install-abc123');
-
-      const ok = await linkRecoveryCode('ws-qrst-uvwx');
-      expect(ok).toBe(true);
-      // Uppercased, separators stripped, and the DISPLAY prefix removed: the
-      // owner is the canonical 8-char body, which is what the device that
-      // showed this code uploaded under. This used to assert 'WSQRSTUVWX' —
-      // the un-stripped form — which is precisely why a code could never
-      // address its own save.
-      expect(await getCloudOwnerId()).toBe('QRSTUVWX');
-    });
-
-    it('a displayed recovery code resolves back to the owner it was minted from', async () => {
-      // The round trip nothing pinned: show -> type -> same owner. Without it,
-      // display and link drifted apart silently and CI stayed green.
-      const shown = await getOrCreateRecoveryCode();
-      const mintedOwner = await AsyncStorage.getItem('wordshift_cloud_owner');
-      expect(mintedOwner).toBeTruthy();
-
-      await AsyncStorage.removeItem('wordshift_cloud_owner');
-      expect(await linkRecoveryCode(shown)).toBe(true);
-      expect(await getCloudOwnerId()).toBe(mintedOwner);
-
-      // ...and re-showing it on the linked device gives back the SAME code,
-      // rather than re-deriving a third one from the stored value.
-      expect(await getOrCreateRecoveryCode()).toBe(shown);
-    });
-
-    it('rejects too-short / invalid codes', async () => {
-      expect(await linkRecoveryCode('WS-12')).toBe(false);
-      expect(await linkRecoveryCode('')).toBe(false);
-      // Owner unchanged.
-      expect(await getCloudOwnerId()).toBe('install-abc123');
-    });
-
-    it('clearSyncStatus removes the owner override', async () => {
-      await linkRecoveryCode('WSABCDEFGH');
-      expect(await getCloudOwnerId()).toBe('ABCDEFGH');
-      await clearSyncStatus();
-      expect(await getCloudOwnerId()).toBe('install-abc123');
-    });
+  test('fresh-install recovery preserves an intentional reset marker despite remote clock skew', async () => {
+    install(); reply([row()]);
+    await AsyncStorage.setItem('wordshift_local_reset_at', '1');
+    expect(await maybeAutoRestoreOnFreshInstall()).toBe(false);
+    expect(await AsyncStorage.getItem('wordshift_home_progress')).toBeNull();
   });
-
-  describe('maybeAutoRestoreOnFreshInstall', () => {
-    it('does nothing when unconfigured', async () => {
-      mockExtra = {};
-      expect(await maybeAutoRestoreOnFreshInstall()).toBe(false);
-      expect(global.fetch).not.toHaveBeenCalled();
-    });
-
-    it('restores when local is empty and cloud has a save', async () => {
-      mockExtra = { ...CONFIGURED };
-      installCloudProviderIfConfigured();
-
-      const payload = { wordshift_home_progress: '{"amber":321}' };
-      mockFetchJson([
-        {
-          version: 1,
-          timestamp: 10,
-          device_id: 'cloud',
-          payload: JSON.stringify(payload),
-        },
-      ]);
-
-      const restored = await maybeAutoRestoreOnFreshInstall();
-      expect(restored).toBe(true);
-      const progress = await AsyncStorage.getItem('wordshift_home_progress');
-      expect(JSON.parse(progress!).amber).toBe(321);
-    });
-
-    it('does NOT restore when local progress already exists', async () => {
-      mockExtra = { ...CONFIGURED };
-      installCloudProviderIfConfigured();
-      await AsyncStorage.setItem('wordshift_home_progress', '{"amber":1}');
-
-      const restored = await maybeAutoRestoreOnFreshInstall();
-      expect(restored).toBe(false);
-      // Existing local progress untouched.
-      const progress = await AsyncStorage.getItem('wordshift_home_progress');
-      expect(JSON.parse(progress!).amber).toBe(1);
-      // No download attempted.
-      expect(global.fetch).not.toHaveBeenCalled();
-    });
-
-    it('returns false when cloud has no save', async () => {
-      mockExtra = { ...CONFIGURED };
-      installCloudProviderIfConfigured();
-      mockFetchJson([]);
-      expect(await maybeAutoRestoreOnFreshInstall()).toBe(false);
-    });
-  });
-
-  describe('capability model: only rpc/ paths are ever requested', () => {
-    it('upload/download/hasNewerSave never issue a GET or touch a table path', async () => {
-      mockExtra = { ...CONFIGURED };
-      installCloudProviderIfConfigured();
-      mockFetchJson([]);
-
-      await getCloudProvider().upload({ version: 1, timestamp: 1, deviceId: 'd', data: {} });
-      await getCloudProvider().download();
-      await getCloudProvider().hasNewerSave(0);
-
-      const calls = (global.fetch as jest.Mock).mock.calls;
-      expect(calls.length).toBe(3);
-      for (const [url, init] of calls) {
-        expect(url).toContain('/rest/v1/rpc/');
-        expect(url).not.toContain('/rest/v1/saves');
-        expect(init.method).toBe('POST');
-      }
-    });
+  test('auto restore only runs without local progress', async () => {
+    install(); reply([row()]);
+    await AsyncStorage.setItem('wordshift_home_progress', '{"amber":1}');
+    expect(await maybeAutoRestoreOnFreshInstall()).toBe(false);
+    expect(global.fetch).not.toHaveBeenCalled();
+    await AsyncStorage.removeItem('wordshift_home_progress');
+    expect(await maybeAutoRestoreOnFreshInstall()).toBe(true);
+    expect(JSON.parse((await AsyncStorage.getItem('wordshift_home_progress'))!).amber).toBe(10);
   });
 });
+
+describe('recovery lifecycle and revisions', () => {
+  test('show code creates a durable backup that another device immediately restores', async () => {
+    const rows = new Map<string, CloudSaveData>(); setCloudProvider(memoryProvider(rows));
+    await AsyncStorage.setItem('wordshift_home_progress', '{"amber":123}');
+    const code = await getOrCreateRecoveryCode(); const owner = await getCloudOwnerId();
+    expect(rows.get(owner)).toBeDefined();
+    await AsyncStorage.clear(); await clearSyncStatus();
+    expect(await restoreFromRecoveryCode(code)).toBe(true);
+    expect(await getCloudOwnerId()).toBe(owner);
+    expect(JSON.parse((await AsyncStorage.getItem('wordshift_home_progress'))!).amber).toBe(123);
+  });
+  test('invalid, legacy, absent and offline restore do not change owner or progress', async () => {
+    await AsyncStorage.setItem('wordshift_cloud_owner', OWNER);
+    await AsyncStorage.setItem('wordshift_home_progress', '{"amber":12}');
+    setCloudProvider(memoryProvider(new Map()));
+    await expect(restoreFromRecoveryCode('bad')).rejects.toMatchObject({ reason: 'invalid_code' });
+    await expect(restoreFromRecoveryCode('WS-INST-MTO7')).rejects.toMatchObject({ reason: 'legacy_code' });
+    expect(await restoreFromRecoveryCode(formatSecureRecoveryCode(OTHER))).toBe(false);
+    expect(await getCloudOwnerId()).toBe(OWNER);
+    expect(await AsyncStorage.getItem('wordshift_home_progress')).toBe('{"amber":12}');
+  });
+  test('does not display a code for a failed backup', async () => {
+    await expect(getOrCreateRecoveryCode()).rejects.toMatchObject({ reason: 'unavailable' });
+  });
+  test('server revision detects newer writes even with an ahead local clock', async () => {
+    const rows = new Map([[OWNER, save(10, 1)]]); setCloudProvider(memoryProvider(rows));
+    await AsyncStorage.setItem('wordshift_cloud_owner', OWNER);
+    expect(await downloadFromCloud()).toBe(true);
+    expect((await getSyncStatus()).remoteRevision).toBe(1);
+    rows.set(OWNER, save(20, 2));
+    expect(await uploadToCloud()).toBe(false);
+    expect((await getSyncStatus()).conflictDetected).toBe(true);
+    expect(rows.get(OWNER)?.data.wordshift_home_progress).toBe('{"amber":20}');
+    expect(await uploadToCloud(true)).toBe(true);
+    expect((await getSyncStatus()).remoteRevision).toBe(3);
+  });
+  test('clearing sync metadata preserves linked reset target and requires explicit overwrite', async () => {
+    const rows = new Map([[OWNER, save(90, 1)]]); setCloudProvider(memoryProvider(rows));
+    await AsyncStorage.setItem('wordshift_cloud_owner', OWNER);
+    await clearSyncStatus();
+    expect(await uploadToCloud()).toBe(false);
+    expect(await uploadToCloud(true)).toBe(true);
+    expect(rows.size).toBe(1); expect(rows.get(OWNER)?.data.wordshift_home_progress).toBeUndefined();
+  });
+});
+
+// The service owns a debounced telemetry timer; do not let it outlive its test environment.
+afterAll(() => clearEvents());

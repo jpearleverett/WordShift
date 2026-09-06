@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { GameState } from '../types';
 import { savePuzzleState, SavedPuzzleState } from '../services/puzzleSaveState';
-import { getTodayString } from '../services/dailyChallenge';
 import { AUTOSAVE_DEBOUNCE_MS } from '../constants/timing';
 
 export interface AutosaveDeps {
@@ -20,7 +19,14 @@ export interface AutosaveDeps {
   history: any[];
   invalidAttempts: number;
   hintsUsed: number;
+  hintDisclosures?: SavedPuzzleState['hintDisclosures'];
+  dailyDate?: string | null;
+  dailyBoardVersion?: string;
+  dailyEased?: boolean;
+  dailyStartedAt?: number;
+  vocabularyVersion?: 0 | 1;
   undosRemaining: number;
+  undosUsed?: number;
   difficulty: string;
   currentWordLength: number;
   hint: any;
@@ -88,7 +94,9 @@ export function useAutosave(deps: AutosaveDeps): void {
           history: deps.history,
           invalidAttempts: deps.invalidAttempts,
           hintsUsed: deps.hintsUsed,
+          hintDisclosures: deps.hintDisclosures,
           undosRemaining: deps.undosRemaining,
+          undosUsed: deps.undosUsed,
           difficulty: deps.difficulty as any,
           currentWordLength: deps.currentWordLength,
           hint: deps.hint,
@@ -109,7 +117,11 @@ export function useAutosave(deps: AutosaveDeps): void {
           lastFormedWord: deps.lastFormedWord,
           doubleShiftPhase: deps.doubleShiftPhase as any,
           isPlayingDaily: deps.isPlayingDaily,
-          dailyDate: deps.isPlayingDaily ? getTodayString() : null,
+          dailyBoardVersion: deps.dailyBoardVersion,
+          dailyEased: deps.dailyEased,
+          dailyStartedAt: deps.dailyStartedAt,
+          vocabularyVersion: deps.vocabularyVersion,
+          dailyDate: deps.isPlayingDaily ? deps.dailyDate ?? null : null,
           isSharedChallenge: deps.isSharedChallenge,
           isFinalBoard: deps.isFinalBoard,
           speedTimerExpireAt: deps.speedTimeRemaining != null
@@ -140,7 +152,14 @@ export function useAutosave(deps: AutosaveDeps): void {
     deps.history,
     deps.invalidAttempts,
     deps.hintsUsed,
+    deps.hintDisclosures,
+    deps.dailyDate,
+    deps.dailyBoardVersion,
+    deps.dailyEased,
+    deps.dailyStartedAt,
+    deps.vocabularyVersion,
     deps.undosRemaining,
+    deps.undosUsed,
     deps.difficulty,
     deps.currentWordLength,
     deps.hint,

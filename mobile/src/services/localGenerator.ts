@@ -1,3 +1,4 @@
+import { isFairPuzzleWord, isPuzzleVocabularyFair } from './puzzleVocabulary';
 
 import { WORDS_3, WORDS_4, WORDS_5, WORDS_6, WORDS_7, COMMON_WORDS } from '../constants';
 import {
@@ -36,11 +37,11 @@ const isValidWordForRules = (w: string): boolean => COMMON_WORDS.has(w.toUpperCa
 
 // Organize sets for dynamic access
 const WORD_SETS: Record<number, Set<string>> = {
-  3: new Set(WORDS_3),
-  4: new Set(WORDS_4),
-  5: new Set(WORDS_5),
-  6: new Set(WORDS_6),
-  7: new Set(WORDS_7),
+  3: new Set(WORDS_3.filter(word => isFairPuzzleWord(word))),
+  4: new Set(WORDS_4.filter(word => isFairPuzzleWord(word))),
+  5: new Set(WORDS_5.filter(word => isFairPuzzleWord(word))),
+  6: new Set(WORDS_6.filter(word => isFairPuzzleWord(word))),
+  7: new Set(WORDS_7.filter(word => isFairPuzzleWord(word))),
 };
 
 // Word arrays for frequency-based scoring (index = relative commonness)
@@ -1373,7 +1374,7 @@ export function pickMultiRouteCandidate<T extends { score: number }>(
   return bestMultiRoute ?? bestOverall;
 }
 
-export const generateLocalPuzzle = async (
+const generateLocalPuzzleCandidate = async (
   difficulty: Difficulty = 'MEDIUM',
   overrides?: { wordLength?: number; targetRows?: number; startWord?: string; requireReverseSolvable?: boolean; relaxBoring?: boolean; rarityLean?: number; rareBandLo?: number }
 ): Promise<PuzzleConfig> => {
@@ -3066,7 +3067,7 @@ function scoreDoubleShiftChain(chain: DoubleShiftPathNode[], recencyMap?: Map<st
  * @param overrides Optional word length and row count overrides
  * @returns PuzzleConfig with isDoubleShift=true
  */
-export async function generateDoubleShiftPuzzle(
+async function generateDoubleShiftPuzzleCandidate(
   difficulty: Difficulty = 'MEDIUM',
   overrides?: { wordLength?: number; targetRows?: number; rarityLean?: number }
 ): Promise<PuzzleConfig> {
@@ -3320,4 +3321,21 @@ export function getIncantationName(words: string[], phase: number): string | nul
   // Deterministic pick based on word content
   const hash = words.join('').split('').reduce((a, c) => a + c.charCodeAt(0), 0);
   return templates[hash % templates.length];
+}
+
+/** Never deliver a generated board whose authored route requires unreviewed vocabulary. */
+export async function generateLocalPuzzle(...args: Parameters<typeof generateLocalPuzzleCandidate>): Promise<PuzzleConfig> {
+  const puzzle = await generateLocalPuzzleCandidate(...args);
+  if (!isPuzzleVocabularyFair(puzzle, args[0] === 'EXPERT' || (args[1]?.rarityLean ?? 0) > 0)) {
+    throw new Error('Generated puzzle did not meet the playable vocabulary policy');
+  }
+  return puzzle;
+}
+
+export async function generateDoubleShiftPuzzle(...args: Parameters<typeof generateDoubleShiftPuzzleCandidate>): Promise<PuzzleConfig> {
+  const puzzle = await generateDoubleShiftPuzzleCandidate(...args);
+  if (!isPuzzleVocabularyFair(puzzle, args[0] === 'EXPERT' || (args[1]?.rarityLean ?? 0) > 0)) {
+    throw new Error('Generated puzzle did not meet the playable vocabulary policy');
+  }
+  return puzzle;
 }

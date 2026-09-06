@@ -7,7 +7,6 @@ import {
   ListRenderItem,
   TouchableOpacity,
   Image,
-  Dimensions,
   Animated,
   ActivityIndicator,
   Easing,
@@ -45,7 +44,6 @@ const CHIP_CASCADE_STAGGER_MS = 28;
 const GROUP_CASCADE_STAGGER_MS = 70;
 const GROUP_CASCADE_CAP = 2;
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // Empty-state spot illustration (assets/ui/spots, generateGameIcons): an open
 // blank ledger at 96dp where the 52dp journal chrome icon used to stand in.
@@ -445,11 +443,11 @@ const styles = StyleSheet.create({
   // screen background a soft vignette depth without any animation cost.
   vignetteGlow: {
     position: 'absolute',
-    top: -SCREEN_WIDTH * 0.55,
-    left: -SCREEN_WIDTH * 0.3,
-    width: SCREEN_WIDTH * 1.6,
-    height: SCREEN_WIDTH * 1.1,
-    borderRadius: SCREEN_WIDTH * 0.8,
+    top: '-55%',
+    left: '-30%',
+    width: '160%',
+    aspectRatio: 1.6 / 1.1,
+    borderRadius: 10000,
     opacity: 0.22,
   },
   header: {

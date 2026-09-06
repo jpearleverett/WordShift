@@ -1,8 +1,6 @@
 # WordShift Launch Checklist (human tasks)
 
-Everything code-side has been implemented in the repo. The items below require
-accounts, consoles, secrets, or a physical device — they cannot be closed from
-the codebase and are the remaining gates to submission.
+Current release status is in [the September implementation ledger](IMPLEMENTATION_STATUS_2026-09-05.md) and [1.3.0 validation procedure](RELEASE_VALIDATION_1_3_0.md). The dated checks below record earlier builds; they do not validate the current changes.
 
 ## Android (submission-blocking)
 
@@ -35,7 +33,7 @@ the codebase and are the remaining gates to submission.
       - [ ] Sharing (PNG share card)
       - [ ] Re-check Challenge (previews on) + a deliberate Blind Offering
             failure on a current build (the trial ladder shipped after
-            build 44; versionCode is now 88)
+            build 44; that historical build used versionCode 88)
 - [x] **Closed test gate (12 testers / 14 days) — DONE.** Production access
       was GRANTED (confirmed 2026-08-31). The 12-tester/14-day requirement and
       Google's application review are behind us; the remaining gates are the
@@ -61,39 +59,32 @@ the codebase and are the remaining gates to submission.
       the live closed test from serving real ads — do NOT re-flip it until the
       production cut. Only `__DEV__` or this flag forces test ads, so a `false`
       value means EVERY release/testing build serves live ads.)*
-      *(EAS Updates warning: the flag is read at RUNTIME from the manifest and
-      rides EAS Updates. Closed-test and production builds are both built on
-      the shared `production` channel with `runtimeVersion` policy
-      `appVersion`, so the flip commit MUST also bump `expo.version` (creating
-      a distinct runtime) — otherwise an `eas update` published after the flip
-      serves LIVE ads to testers' existing builds, and an update published
-      from a pre-flip commit reverts the production build to test ads.)*
+      *(EAS Updates check: the flag is read at runtime and travels with updates.
+      New binaries use separate `internal-testing` and `production` channels
+      and runtimes resolved by `app.config.js`, such as
+      `1.3.0-internal-testing` and `1.3.0-production`. Set
+      `WORDSHIFT_RELEASE_CHANNEL` explicitly to match the update channel and
+      inspect the resolved runtime before publishing. Older binaries used a
+      shared production runtime; never target those with this native dependency
+      change or send the live-ad configuration to a testing runtime. Follow
+      [the current update procedure](OTA_UPDATES.md).)*
       *(CI warning, found 2026-08-31: `productionConfig.test.ts` asserts the
       flag is `true` when `WORDSHIFT_PRODUCTION_CUT` is unset, so the flip
       commit turns regular CI red. The same cut commit should add
       `WORDSHIFT_PRODUCTION_CUT: "1"` to the test step's `env` in
       `.github/workflows/ci.yml`, permanently inverting the guard to enforce
       the live config — otherwise someone "fixes" CI by reverting the flip.)*
-- [ ] **Bump `android.versionCode`** in `mobile/app.json` for the next release
-      (currently **88**, `version` **1.2.2**. autoIncrement is intentionally
-      off — bump manually every time). Do it in the SAME commit as the
-      `adsUseTestIds` flip + the `expo.version` bump — one atomic cut commit,
-      gated by `WORDSHIFT_PRODUCTION_CUT=1 npm test -- --no-coverage
-      --testPathPattern=productionConfig` going 5/5 green.
-- [ ] **Merge the working branch to `main` before the cut** (2026-09-01: **24**
-      commits on `claude/game-completion-checklist-mybsmk` are not on `main`,
-      including the EXPERT dread top-up, the flying-tile ghost, all 13
-      `robed_talk.png` sprites, the finale graduation-card guard, the late-game
-      copy passes, the SDK-56 patch sync, the bespoke Arrival cue + ceremony
-      swell banding, the Terrible Peace sky/pit/foundation art, the Keeper's
-      Record epilogue, the Phase-5 peace SFX tier, the NG+ home entry / HUD
-      aging / glitch-ghost pass, and the Jekyll exclude that stops serving
-      internal docs on the public Pages site — a build cut from `main` today
-      would silently omit all of it).
-      **The Pages exclude makes this time-sensitive:** until the merge lands,
-      `AAA_DESIGN_AUDIT`, `GROWTH_STRATEGY`, `PRESS_KIT` and the other internal
-      docs stay publicly readable at `jpearleverett.github.io/WordShift/<NAME>`,
-      spoilers included.
+- [ ] **Confirm the next artifact version.** This feature branch prepares Android
+      **94**, app **1.3.0**, and the `internal-testing` runtime. Auto-increment
+      remains off. Increase the code again if 94 has already been uploaded when
+      the build is cut. Internal testing keeps test ads enabled. Production
+      requires the separate reviewed runtime/ad-mode cut described in
+      [the release procedure](RELEASE_VALIDATION_1_3_0.md).
+- [ ] **Review and merge the intended release branch before the cut.** Confirm
+      its commit against the built artifact and current `origin/main`. Historical
+      branch names/commit counts are not evidence of today's release contents.
+      Verify the public Pages exclusion and spoiler-safe public documents as
+      part of that review; current hosted Pages contents were not checked here.
 - [x] **SDK-56 patch drift synced** — DONE (2026-08-31): `npx expo install --fix`
       bumped 8 native modules (expo 56.0.15 → 56.0.21, expo-updates,
       expo-notifications, expo-sharing, expo-splash-screen, expo-build-properties,
@@ -101,13 +92,12 @@ the codebase and are the remaining gates to submission.
       "Dependencies are up to date" and expo-doctor is 21/22 (only the Hermes V1
       advisory below). **Still re-run `npm ci`, the full suite, typecheck, lint
       and `npx expo-doctor` immediately before the cut.**
-- [ ] **Hermes V1 memory-regression check (expo-doctor, new since 07-24)** —
-      SDK 56 bundles Hermes V1 250829098.0.10; doctor flags ≤ .0.15 for a
-      known memory regression (fixed in .0.16, which needs SDK 57 / RN
-      0.86.2+). Before the cut, check Sentry/closed-test data for OOM or
-      memory-pressure crashes: if clean, ship on SDK 56 and schedule the SDK
-      57 upgrade as the first post-launch release; if not, take the upgrade
-      first.
+- [x] **Hermes engine dependency updated in source (2026-09-05).** Expo SDK
+      57 / React Native 0.86.3 includes the upstream fix. Expo Doctor passes
+      21/21 checks and npm reports zero known vulnerabilities. This verifies
+      dependency selection; signed-device memory and startup measurements
+      remain in [the release matrix](RELEASE_VALIDATION_1_3_0.md).
+
 - [ ] **Re-shoot the FULL screenshot set at ≥1080 px short side** — measured
       2026-08-31: the four titled uploads are 864×1536, below Play's 1080 px
       promotion-eligibility bar (a growth cost, not a rejection risk). Fold in
@@ -200,7 +190,7 @@ the codebase and are the remaining gates to submission.
 - [x] **Data safety + App content declarations** — DONE (2026-07-02): data
       safety, Advertising ID, privacy policy, ads declaration, content rating,
       target audience actioned in Play Console → App content.
-- [x] First manual Play upload already happened (v12 era; versionCode now 88);
+- [x] First manual Play upload already happened (historical v12-era record);
       `eas submit -p android` works from here (service account wired).
 
 ## iOS (separate track — blocked until the values below exist)

@@ -103,6 +103,7 @@ jest.mock('../services/phaseNarrative', () => ({
 jest.mock('../services/gameAlert', () => ({
   showGameAlert: jest.fn(),
 }));
+jest.mock('../services/eventLogger', () => ({ logEvent: jest.fn() }));
 
 jest.mock('../services/hints', () => ({
   getHintBalanceSync: jest.fn(() => 5),
@@ -312,6 +313,72 @@ describe('usePuzzleGame', () => {
   });
 
   describe('initGame', () => {
+    test('records abandonment only after replacing an unfinished board with committed moves', async () => {
+      const events = require('../services/eventLogger').logEvent as jest.Mock;
+      let [, actions] = callHook();
+      await actions.startNewGame('MEDIUM');
+      expect(events).not.toHaveBeenCalled();
+      actions.initGame(['ABCD', 'EFGH', 'IJKL']);
+      let [state, live] = callHook();
+      live.handleLetterPress(state.rows[0].words[0], 0);
+      [, actions] = callHook();
+      await actions.handleSlotPress(0);
+      [state, actions] = callHook();
+      expect(state.history).toHaveLength(1);
+      await actions.startNewGame('HARD');
+      expect(events).toHaveBeenCalledTimes(1);
+      expect(events).toHaveBeenLastCalledWith({ type: 'puzzle_abandoned', data: {
+        reason: 'setup_change', difficulty: 'MEDIUM', mode: 'standard', phase: 0,
+      } });
+      [, actions] = callHook();
+      actions.resetCurrentPuzzle();
+      [state, actions] = callHook();
+      actions.restorePuzzleState({ ...state, isPlayingDaily: false, savedAt: Date.now() } as unknown as import('../services/puzzleSaveState').SavedPuzzleState);
+      [, actions] = callHook();
+      actions.setGameState(GameState.WON);
+      [, actions] = callHook();
+      await actions.startNewGame('MEDIUM');
+      expect(events).toHaveBeenCalledTimes(1);
+    });
+
+    test('preserves historical words only on legacy resumed boards, including restart and resave', () => {
+      const words = require('../constants').COMMON_WORDS as Set<string>;
+      words.add('STARED');
+      try {
+        let [, actions] = callHook();
+        actions.initGame(['SHEDS', 'STARE'], undefined, undefined, 5);
+        let [state] = callHook();
+        const saved = { ...state, isPlayingDaily: false, savedAt: Date.now() };
+        delete (saved as { vocabularyVersion?: number }).vocabularyVersion;
+        actions.restorePuzzleState(saved as unknown as import('../services/puzzleSaveState').SavedPuzzleState);
+        [state, actions] = callHook();
+        expect(state.vocabularyVersion).toBe(0);
+        actions.handleLetterPress(state.rows[0].words[3], 0);
+        [state, actions] = callHook();
+        expect(state.slotPreviews?.[5]).toEqual({ word: 'STARED', isValid: true });
+        actions.resetCurrentPuzzle();
+        [state, actions] = callHook();
+        expect(state.vocabularyVersion).toBe(0);
+        const resaved = { ...state, isPlayingDaily: false, savedAt: Date.now() };
+        actions.restorePuzzleState(resaved as unknown as import('../services/puzzleSaveState').SavedPuzzleState);
+        [state, actions] = callHook();
+        expect(state.vocabularyVersion).toBe(0);
+        actions.handleLetterPress(state.rows[0].words[3], 0);
+        [state, actions] = callHook();
+        expect(state.slotPreviews?.[5]?.isValid).toBe(true);
+        // A new board clears compatibility, and that policy survives restore.
+        actions.initGame(['SHEDS', 'STARE'], undefined, undefined, 5);
+        [state, actions] = callHook();
+        expect(state.vocabularyVersion).toBe(1);
+        actions.restorePuzzleState({ ...state, isPlayingDaily: false, savedAt: Date.now() } as unknown as import('../services/puzzleSaveState').SavedPuzzleState);
+        [state, actions] = callHook();
+        actions.handleLetterPress(state.rows[0].words[3], 0);
+        [state] = callHook();
+        expect(state.vocabularyVersion).toBe(1);
+        expect(state.slotPreviews?.[5]?.isValid).toBe(false);
+      } finally { words.delete('STARED'); }
+    });
+
     test('sets rows from provided words', () => {
       let [, actions] = callHook();
       actions.initGame(['LIME', 'TIME', 'TIED']);
@@ -940,6 +1007,63 @@ describe('usePuzzleGame', () => {
   });
 
   describe('handleHint', () => {
+    test('replaces a stale stored Double Shift pair with a proved completing pair', () => {
+      let [, actions] = callHook();
+      actions.initGame(['ABCDE', 'FGHIJ'], undefined, [{
+        stepIndex: 0, sourceWord: 'ABCDE', targetWord: 'FGHIJ', letterToMove: 'C',
+        lettersToMove: ['C', 'D'], explanation: 'stale pair',
+      }], 5, 'double_shift');
+      [, actions] = callHook();
+      actions.handleHint();
+      const [state] = callHook();
+      expect(state.hintsUsed).toBe(1);
+      expect(state.hintHighlight?.letterIndex).toBe(0); // A, then B -> CDE / ABFGHIJ
+      expect(state.hintHighlight?.targetSlotIndex).toBe(0);
+    });
+
+    test('does not sell a Double Shift pair whose next row cannot finish', () => {
+      let [, actions] = callHook();
+      actions.initGame(['ABCDE', 'FGHIJ', 'KLMNO'], undefined, undefined, 5, 'double_shift');
+      [, actions] = callHook();
+      actions.handleHint();
+      const [state] = callHook();
+      expect(state.hintsUsed).toBe(0);
+      expect(require('../services/hints').consumeHintSync).not.toHaveBeenCalled();
+      expect(state.message).toContain('No hint was spent');
+    });
+
+    test('replays the same paid disclosure after repeated taps, restart, and relaunch', () => {
+      const hints = require('../services/hints');
+      let [, actions] = callHook();
+      actions.initGame(['ABCD', 'EFGH'], undefined, [
+        { stepIndex: 0, sourceWord: 'ABCD', targetWord: 'EFGH', letterToMove: 'A', explanation: 'test', removalPosition: 0, insertionPosition: 0 },
+      ]);
+      [, actions] = callHook();
+      actions.handleHint();
+      actions.handleHint();
+      let [state] = callHook();
+      expect(state.hintsUsed).toBe(1);
+      expect(hints.consumeHintSync).toHaveBeenCalledTimes(1);
+      expect(state.hintDisclosures).toHaveLength(1);
+      [, actions] = callHook();
+      actions.resetCurrentPuzzle();
+      [, actions] = callHook();
+      actions.handleHint();
+      [state] = callHook();
+      expect(state.hintsUsed).toBe(1);
+      expect(hints.consumeHintSync).toHaveBeenCalledTimes(1);
+      const saved = { ...state, isPlayingDaily: false, savedAt: Date.now() };
+      resetHookState();
+      [, actions] = callHook();
+      actions.restorePuzzleState(saved as unknown as import('../services/puzzleSaveState').SavedPuzzleState);
+      [, actions] = callHook();
+      actions.handleHint();
+      [state] = callHook();
+      expect(state.hintsUsed).toBe(1);
+      expect(hints.consumeHintSync).toHaveBeenCalledTimes(1);
+      expect(state.hintHighlight?.letterId).toBe(state.rows[0].words[0].id);
+    });
+
     test('increments hintsUsed when solution step matches', () => {
       resetHookState();
       let [, actions] = callHook();
@@ -2932,7 +3056,7 @@ describe('usePuzzleGame', () => {
       expect(state.hintHighlight!.targetSlotIndex).toBe(0);
     });
 
-    test('falls back to the first valid move when only dead ends exist (never refuses)', () => {
+    test('offers free recovery instead of charging for a known dead-end move', () => {
       const { consumeHintSync } = require('../services/hints');
       (consumeHintSync as jest.Mock).mockClear();
       const { getHintMessage } = require('../services/phaseNarrative');
@@ -2949,11 +3073,11 @@ describe('usePuzzleGame', () => {
       actions.handleHint();
 
       const [state] = callHook();
-      expect(state.hintsUsed).toBe(1);
-      expect(consumeHintSync).toHaveBeenCalledTimes(1);
-      expect(getHintMessage).toHaveBeenCalledWith('M', 'MJQXZ', expect.anything());
-      expect(state.hintHighlight!.letterIndex).toBe(0);
-      expect(state.hintHighlight!.targetSlotIndex).toBe(0);
+      expect(state.hintsUsed).toBe(0);
+      expect(consumeHintSync).not.toHaveBeenCalled();
+      expect(getHintMessage).not.toHaveBeenCalled();
+      expect(state.hintHighlight).toBeNull();
+      expect(state.message).toContain('No hint was spent');
     });
 
     test('a completing move is always acceptable (2-row board, no downstream check)', () => {

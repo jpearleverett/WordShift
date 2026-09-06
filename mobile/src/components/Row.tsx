@@ -1280,6 +1280,7 @@ export const Row: React.FC<RowProps> = memo(({
 
   return (
     <Animated.View
+      testID={`puzzle-row-${rowIndex}`}
       // Board-serve entrance wrapper: fades + rises the whole row in on a fresh
       // board serve (staggered by rowIndex). Kept OUTSIDE the row-transition
       // wrapper so its opacity/translateY compose cleanly with the inner

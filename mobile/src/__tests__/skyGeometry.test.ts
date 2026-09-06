@@ -18,12 +18,13 @@
  *
  * HouseWorld.tsx can't be imported in the Node test env (it pulls the full
  * native surface), so — following the appIntegration.test.ts precedent —
- * facts 2-3 are pinned by source scan + replicated math.
+ * anchoring is pinned by source scan and seat math invokes the shared production geometry.
  */
 
 import fs from 'fs';
 import path from 'path';
 import sharp from 'sharp';
+import { getSkyBoxHeight, SKY_IMG_WIDTH, SKY_IMG_HEIGHT } from '../services/worldGeometry';
 
 const ENV_DIR = path.resolve(__dirname, '../../assets/environment');
 const HOUSE_WORLD = fs.readFileSync(
@@ -79,22 +80,25 @@ describe('sky asset dimensions', () => {
 
 describe('HouseWorld sky anchoring', () => {
   test('sky image constants match the real assets', () => {
-    expect(HOUSE_WORLD).toMatch(/const SKY_IMG_WIDTH = 941;/);
-    expect(HOUSE_WORLD).toMatch(/const SKY_IMG_HEIGHT = 1972;/);
+    expect(SKY_IMG_WIDTH).toBe(941);
+    expect(SKY_IMG_HEIGHT).toBe(1972);
   });
 
   test('sky box is bottom-anchored with height-driven cover scaling', () => {
     // The box height must beat width-driven scaling so the art's full height
     // maps onto the box and its bottom row lands on the container bottom.
-    expect(HOUSE_WORLD).toMatch(
-      /const SKY_BOX_HEIGHT = Math\.max\(\s*SCREEN_HEIGHT,\s*Math\.ceil\(SCREEN_WIDTH \* \(SKY_IMG_HEIGHT \/ SKY_IMG_WIDTH\)\) \+ 2,\s*940,?\s*\);/
-    );
+    for (const [width, height] of [[320, 640], [393, 852], [852, 393], [1024, 1366]]) {
+      const boxHeight = getSkyBoxHeight(width, height);
+      expect(boxHeight).toBeGreaterThanOrEqual(height);
+      expect(boxHeight / SKY_IMG_HEIGHT).toBeGreaterThan(width / SKY_IMG_WIDTH);
+    }
+    expect(HOUSE_WORLD).toContain('getSkyBoxHeight(SCREEN_WIDTH, SCREEN_HEIGHT)');
+    expect(HOUSE_WORLD).toContain('width: SCREEN_WIDTH, height: SKY_BOX_HEIGHT');
     const skyStyle = HOUSE_WORLD.slice(
       HOUSE_WORLD.indexOf('skyBackground: {'),
       HOUSE_WORLD.indexOf('},', HOUSE_WORLD.indexOf('skyBackground: {'))
     );
     expect(skyStyle).toContain('bottom: 0');
-    expect(skyStyle).toContain('height: SKY_BOX_HEIGHT');
     expect(skyStyle).not.toContain('top:');
   });
 
@@ -244,11 +248,10 @@ describe('phase-appropriate room windows', () => {
 });
 
 describe('foundation seats below the river on real devices', () => {
-  // Replicates HouseWorld's bottom-anchored seat math. If any constant in
+  // Exercises HouseWorld's bottom-anchored seat math. If any constant in
   // HouseWorld changes (margins, pit size, foundation height, sky dims),
   // update BOTH places — this test failing means the house may be back in
   // the river on some device.
-  const IMG_W = 941;
   const IMG_H = 1972;
   const RIVER_BOTTOM_ROW = 1335; // lowest river/bank pixel across all 5 skies
   const HOUSE_BOTTOM_MARGIN = 30;
@@ -257,7 +260,7 @@ describe('foundation seats below the river on real devices', () => {
   const FOUNDATION_H = 43; // 282 * (120/792)
 
   const foundationTopArtRow = (sw: number, sh: number) => {
-    const boxH = Math.max(sh, Math.ceil(sw * (IMG_H / IMG_W)) + 2, 940);
+    const boxH = getSkyBoxHeight(sw, sh);
     const scale = boxH / IMG_H;
     const foundationTopDp =
       HOUSE_BOTTOM_MARGIN + PIT_DOCK_CLEARANCE + PIT_BLOCK + FOUNDATION_H; // above container bottom

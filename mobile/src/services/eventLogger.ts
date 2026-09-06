@@ -40,7 +40,13 @@ export type EventType =
   | 'daily_amber_claimed'
   | 'supporter_stipend_granted'
   | 'season_reward_claimed'
-  | 'app_error';
+  | 'app_error'
+  | 'cloud_sync_result'
+  | 'hint_requested'
+  | 'puzzle_abandoned'
+  | 'ad_availability'
+  | 'story_started' | 'story_deferred' | 'story_completed' | 'story_choice'
+  | 'story_resumed' | 'cinematic_skipped' | 'story_world_inspected';
 
 /**
  * A logged game event
@@ -52,12 +58,38 @@ export interface GameEvent {
 }
 
 export interface StoredEvent extends GameEvent {
+  id: string;
   timestamp: number;
 }
 
 // In-memory buffer — flushed to storage periodically
 let eventBuffer: StoredEvent[] = [];
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
+let storageQueue: Promise<unknown> = Promise.resolve();
+const eventSession = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`;
+let eventSequence = 0;
+let bufferGeneration = 0;
+function eventId(): string { return `${eventSession}_${++eventSequence}`; }
+function queued<T>(work: () => Promise<T>): Promise<T> {
+  const run = storageQueue.catch(() => {}).then(work);
+  storageQueue = run;
+  return run;
+}
+async function readEvents(): Promise<StoredEvent[]> {
+  const raw = await AsyncStorage.getItem(STORAGE_KEY);
+  const parsed: unknown = raw ? JSON.parse(raw) : [];
+  if (!Array.isArray(parsed)) return [];
+  let changed = false;
+  const events = parsed.filter(event => event && typeof event.type === 'string' && Number.isFinite(event.timestamp))
+    .map(event => {
+      if (typeof event.id === 'string' && event.id) return event as StoredEvent;
+      changed = true;
+      return { ...event, id: eventId() } as StoredEvent;
+    });
+  // Assign legacy records an ID once, before handing them to the uploader.
+  if (changed) await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+  return events;
+}
 
 // In-memory cache of the persisted install date (LOCAL calendar day).
 let installDateCache: string | null = null;
@@ -102,6 +134,7 @@ export async function getInstallAgeDays(): Promise<number> {
 export function logEvent(event: GameEvent): void {
   const storedEvent: StoredEvent = {
     ...event,
+    id: eventId(),
     timestamp: event.timestamp ?? Date.now(),
   };
 
@@ -122,82 +155,54 @@ export function logEvent(event: GameEvent): void {
  * Flush buffered events to AsyncStorage
  */
 async function flushEvents(): Promise<void> {
-  if (eventBuffer.length === 0) return;
-
-  const eventsToFlush = [...eventBuffer];
+  if (eventBuffer.length === 0) { await storageQueue.catch(() => {}); return; }
+  const eventsToFlush = eventBuffer;
+  const generation = bufferGeneration;
   eventBuffer = [];
-
   try {
-    const stored = await AsyncStorage.getItem(STORAGE_KEY);
-    const parsed = stored ? JSON.parse(stored) : [];
-    const existing: StoredEvent[] = Array.isArray(parsed) ? parsed : [];
-
-    const combined = [...existing, ...eventsToFlush];
-
-    // Keep only the most recent events
-    if (combined.length > MAX_EVENTS) {
-      combined.splice(0, combined.length - MAX_EVENTS);
-    }
-
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(combined));
+    await queued(async () => {
+      const combined = [...await readEvents(), ...eventsToFlush].slice(-MAX_EVENTS);
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(combined));
+    });
   } catch (error) {
+    if (generation === bufferGeneration) eventBuffer = [...eventsToFlush, ...eventBuffer];
     console.warn('Failed to flush events:', error);
-    // Put events back in buffer so they're not lost
-    eventBuffer = [...eventsToFlush, ...eventBuffer];
     return;
   }
-
-  // Fire-and-forget telemetry sync. Lazy require avoids a static
-  // import cycle (eventLogger ↔ telemetry). No-op when telemetry
-  // is disabled (the default).
   try {
     const { syncTelemetry } = require('./telemetry') as typeof import('./telemetry');
-    syncTelemetry().catch(() => {});
-  } catch {
-    // Telemetry unavailable — non-critical
-  }
+    void syncTelemetry().catch(() => {});
+  } catch { /* Non-critical diagnostics transport. */ }
 }
 
-/**
- * Get all stored events (for diagnostics/export)
- */
 export async function getEvents(): Promise<StoredEvent[]> {
   try {
-    // Flush any pending events first
     await flushEvents();
-
-    const stored = await AsyncStorage.getItem(STORAGE_KEY);
-    const parsed = stored ? JSON.parse(stored) : [];
-    return Array.isArray(parsed) ? parsed : [];
+    return await queued(readEvents);
   } catch (error) {
     console.warn('Failed to load events:', error);
     return [];
   }
 }
+export async function getAllStoredEvents(): Promise<StoredEvent[]> { return getEvents(); }
 
-/**
- * Get all stored events (for the telemetry uploader).
- * Flushes any pending buffered events first.
- */
-export async function getAllStoredEvents(): Promise<StoredEvent[]> {
-  return getEvents();
+/** Acknowledge precisely the uploaded records, never a shifting queue length. */
+export async function acknowledgeEvents(ids: readonly string[]): Promise<void> {
+  if (!ids.length) return;
+  const acknowledged = new Set(ids);
+  await queued(async () => {
+    const remaining = (await readEvents()).filter(event => !acknowledged.has(event.id));
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(remaining));
+  });
 }
 
-/**
- * Remove the oldest N stored events (called by the telemetry uploader
- * after a successful upload).
- */
+/** Legacy diagnostics helper. Transports must use acknowledgeEvents. */
 export async function removeOldestEvents(count: number): Promise<void> {
   if (count <= 0) return;
-  try {
-    const stored = await AsyncStorage.getItem(STORAGE_KEY);
-    const parsed = stored ? JSON.parse(stored) : [];
-    const existing: StoredEvent[] = Array.isArray(parsed) ? parsed : [];
-    const remaining = existing.slice(count);
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(remaining));
-  } catch (error) {
-    console.warn('Failed to remove oldest events:', error);
-  }
+  await queued(async () => {
+    const events = await readEvents();
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(events.slice(count)));
+  });
 }
 
 /**
@@ -229,6 +234,7 @@ export async function getRecentEvents(type: EventType, limit: number = 20): Prom
  */
 export async function clearEvents(): Promise<void> {
   try {
+    bufferGeneration++;
     eventBuffer = [];
     // Drop only the in-memory install-date copy (test isolation); the persisted
     // install date is device meta, deliberately not removed on reset.
@@ -237,7 +243,7 @@ export async function clearEvents(): Promise<void> {
       clearTimeout(flushTimer);
       flushTimer = null;
     }
-    await AsyncStorage.removeItem(STORAGE_KEY);
+    await queued(() => AsyncStorage.removeItem(STORAGE_KEY));
   } catch (error) {
     console.warn('Failed to clear events:', error);
   }

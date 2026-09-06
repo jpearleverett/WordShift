@@ -18,6 +18,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DialoguePhase } from '../types/homeWorld';
 import { getLocalDateString } from './dateUtils';
 import { isAdFreeSync } from './entitlements';
+import { logEvent } from './eventLogger';
 import {
   REWARDED_DAILY_CAP,
   INTERSTITIAL_FREQUENCY_EARLY,
@@ -306,11 +307,14 @@ export async function isRewardedCapReached(): Promise<boolean> {
  */
 export async function showRewarded(placement: RewardedPlacement): Promise<RewardedResult> {
   if (await isRewardedCapReached()) {
+    logEvent({ type: 'ad_availability', data: { format: 'rewarded', placement, result: 'daily_cap' } });
     return { completed: false, reason: 'daily_cap' };
   }
   // First ad exposure may be a rewarded clip — request consent/ATT before show.
   await ensureAdConsent();
   const result = await provider.showRewarded(placement);
+  logEvent({ type: 'ad_availability', data: { format: 'rewarded', placement,
+    result: result.completed ? 'completed' : result.reason ?? 'unavailable' } });
   if (result.completed) {
     const pacing = await loadPacing();
     const today = getLocalDateString();
@@ -343,11 +347,16 @@ export async function maybeShowInterstitial(params: {
     isAdFree: isAdFreeSync(),
     exempt: params.exempt ?? false,
   });
-  if (!allowed) return false;
+  if (!allowed) {
+    logEvent({ type: 'ad_availability', data: { format: 'interstitial', phase: params.phase, result: 'suppressed' } });
+    return false;
+  }
 
   // First ad exposure may be an interstitial — request consent/ATT before show.
   await ensureAdConsent();
   const shown = await provider.showInterstitial();
+  logEvent({ type: 'ad_availability', data: { format: 'interstitial', phase: params.phase,
+    result: shown ? 'shown' : 'unavailable' } });
   if (shown) {
     pacing.lastInterstitialPuzzle = params.puzzlesSolved;
     pacingCache = pacing;

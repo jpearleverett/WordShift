@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from './persistenceStorage';
 import { DialogueSession, DialoguePhase, DIALOGUE_SESSION_CONFIG, getDialoguesPerSession, getPuzzlesBetweenSessions } from '../types/homeWorld';
 
 const STORAGE_KEY = 'wordshift_dialogue_sessions';

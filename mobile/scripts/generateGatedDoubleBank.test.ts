@@ -1,3 +1,4 @@
+import { isFairPuzzleWord } from '../src/services/puzzleVocabulary';
 /**
  * GATED REGENERATION for WordShift's four DOUBLE-SHIFT puzzle banks.
  *
@@ -160,6 +161,7 @@ function computeDreadWordCount(words: string[]): number { return words.filter(w 
 function computeSemanticTags(words: string[]): string[] { const s = new Set<string>(); for (const w of words) { const c = getSemanticCluster(w); if (c) s.add(c); } return [...s]; }
 
 function featuredBandOk(displayed: string[], allWords: string[]): boolean {
+  if (!allWords.every(word => isFairPuzzleWord(word, LEXICON || process.env.GATED_BANK === 'EXPERT'))) return false;
   for (const w of displayed) if (getFeaturedRank(w) > CONFIG.featuredCeiling && !isDreadWord(w)) return false;
   for (const w of allWords) if (getFeaturedRank(w) > FEATURED_TRANSIENT_CEILING && !isDreadWord(w)) return false;
   if (CONFIG.featuredFloorMean > 0) {

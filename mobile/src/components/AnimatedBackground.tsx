@@ -1,12 +1,11 @@
 import React, { useEffect, useRef, useMemo } from 'react';
-import { View, StyleSheet, Dimensions, Animated, Easing, Platform } from 'react-native';
+import { View, StyleSheet, useWindowDimensions, Animated, Easing, Platform } from 'react-native';
 import { getPhaseTheme } from '../theme/colors';
-import { getSettingsSync } from '../services/settings';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 import { getMaxParticleCount, getDeviceTier } from '../services/deviceTier';
 import { PuzzleAtmosphere } from './PuzzleAtmosphere';
 import type { DeviceTier } from '../services/deviceTier';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // ---------------------------------------------------------------------------
 // Phase 0-1 "something is off" aberration
@@ -86,7 +85,7 @@ interface FloatingParticle extends ParticleLayout {
 // per-phase later so a bright-band phase transition (0-2) recolors the same
 // particles in place. Crossing into a new register (2->3, 3->4) regenerates
 // the layout, since travel/shape/pace all change there.
-const generateParticleLayout = (count: number, motion: ParticleMotion): ParticleLayout[] => {
+const generateParticleLayout = (count: number, motion: ParticleMotion, SCREEN_WIDTH: number): ParticleLayout[] => {
   const layout: ParticleLayout[] = [];
   const types: Array<'circle' | 'star' | 'diamond'> =
     motion.register === 'sink' ? ['circle'] : ['circle', 'star', 'diamond'];
@@ -123,6 +122,7 @@ const SoftWash: React.FC<{
   tail: number;
   anchor: 'top' | 'bottom';
 }> = ({ color, core, tail, anchor }) => {
+  const { height: SCREEN_HEIGHT } = useWindowDimensions();
   const coreH = SCREEN_HEIGHT * core;
   const stepH = (SCREEN_HEIGHT * tail) / WASH_FALLOFF_STEPS;
   const place = (offset: number, height: number) => {
@@ -166,6 +166,7 @@ const Particle: React.FC<{
   aberrationEnabled,
   motion,
 }) => {
+  const { height: SCREEN_HEIGHT } = useWindowDimensions();
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT + 50)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const rotate = useRef(new Animated.Value(0)).current;
@@ -393,7 +394,8 @@ interface AnimatedBackgroundProps {
 }
 
 export const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ phase = 0 }) => {
-  const reducedMotion = getSettingsSync().reducedMotion;
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
+  const reducedMotion = useReducedMotion();
   const theme = useMemo(() => getPhaseTheme(phase), [phase]);
   const motion = getParticleMotion(phase);
   // Layout (positions/timing) is stable WITHIN a motion register; color is
@@ -407,10 +409,10 @@ export const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ phase = 
         ? []
         : generateParticleLayout(
             Math.max(2, Math.round(getMaxParticleCount() * motion.countMul)),
-            motion
+            motion, SCREEN_WIDTH
           ),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the register, not the motion object identity
-    [reducedMotion, motion.register]
+    [reducedMotion, motion.register, SCREEN_WIDTH, SCREEN_HEIGHT]
   );
   const particles = useMemo<FloatingParticle[]>(
     () =>
@@ -505,7 +507,7 @@ export const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ phase = 
         <>
           <View
             pointerEvents="none"
-            style={[styles.centerGlowOuter, { backgroundColor: theme.centerGlow }]}
+            style={[styles.centerGlowOuter, { backgroundColor: theme.centerGlow, marginTop: -SCREEN_WIDTH * 0.1 }]}
           />
           <View
             pointerEvents="none"
@@ -513,7 +515,7 @@ export const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ phase = 
           />
           <View
             pointerEvents="none"
-            style={[styles.centerGlowInner, { backgroundColor: theme.centerGlow }]}
+            style={[styles.centerGlowInner, { backgroundColor: theme.centerGlow, marginTop: SCREEN_WIDTH * 0.1 }]}
           />
         </>
       )}
@@ -522,7 +524,7 @@ export const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ phase = 
           remounts them into the new travel direction) */}
       {particles.map((particle) => (
         <Particle
-          key={`${motion.register}_${particle.id}`}
+          key={`${SCREEN_WIDTH}:${SCREEN_HEIGHT}:${motion.register}_${particle.id}`}
           particle={particle}
           aberrationEnabled={aberrationEnabled}
           motion={motion}
@@ -552,11 +554,11 @@ const styles = StyleSheet.create({
   },
   centerGlow: {
     position: 'absolute',
-    top: SCREEN_HEIGHT * 0.3,
-    left: SCREEN_WIDTH * 0.2,
-    width: SCREEN_WIDTH * 0.6,
-    height: SCREEN_WIDTH * 0.6,
-    borderRadius: SCREEN_WIDTH * 0.3,
+    top: '30%',
+    left: '20%',
+    width: '60%',
+    aspectRatio: 1,
+    borderRadius: 999,
     shadowColor: '#FFFFFF',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.3,
@@ -567,29 +569,29 @@ const styles = StyleSheet.create({
   // core to read as a soft radial glow without shadow support.
   centerGlowOuter: {
     position: 'absolute',
-    top: SCREEN_HEIGHT * 0.3 - SCREEN_WIDTH * 0.1,
-    left: SCREEN_WIDTH * 0.1,
-    width: SCREEN_WIDTH * 0.8,
-    height: SCREEN_WIDTH * 0.8,
-    borderRadius: SCREEN_WIDTH * 0.4,
+    top: '30%',
+    left: '10%',
+    width: '80%',
+    aspectRatio: 1,
+    borderRadius: 999,
     opacity: 0.35,
   },
   centerGlowMid: {
     position: 'absolute',
-    top: SCREEN_HEIGHT * 0.3,
-    left: SCREEN_WIDTH * 0.2,
-    width: SCREEN_WIDTH * 0.6,
-    height: SCREEN_WIDTH * 0.6,
-    borderRadius: SCREEN_WIDTH * 0.3,
+    top: '30%',
+    left: '20%',
+    width: '60%',
+    aspectRatio: 1,
+    borderRadius: 999,
     opacity: 0.65,
   },
   centerGlowInner: {
     position: 'absolute',
-    top: SCREEN_HEIGHT * 0.3 + SCREEN_WIDTH * 0.1,
-    left: SCREEN_WIDTH * 0.3,
-    width: SCREEN_WIDTH * 0.4,
-    height: SCREEN_WIDTH * 0.4,
-    borderRadius: SCREEN_WIDTH * 0.2,
+    top: '30%',
+    left: '30%',
+    width: '40%',
+    aspectRatio: 1,
+    borderRadius: 999,
     opacity: 1,
   },
   vignetteTop: {

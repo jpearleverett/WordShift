@@ -1,3 +1,4 @@
+import { isFairPuzzleWord } from '../src/services/puzzleVocabulary';
 /**
  * GATED FULL-REGENERATION generator for WordShift's four standard puzzle banks.
  *
@@ -366,6 +367,7 @@ function maxSingleChoiceForPhase(phase: number): number {
 // dictionary for connectivity; this only bounds what is FEATURED.
 const FEATURED_TRANSIENT_CEILING = LEXICON ? 0.97 : 0.99;
 function featuredBandOk(displayed: string[], allWords: string[]): boolean {
+  if (!allWords.every(word => isFairPuzzleWord(word, LEXICON || process.env.GATED_BANK === 'EXPERT'))) return false;
   for (const w of displayed) {
     if (getFeaturedRank(w) > GATE.featuredCeiling && !isDreadWord(w)) return false;
   }

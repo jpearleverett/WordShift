@@ -1,4 +1,5 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage, { isStorageTransactionActive } from './persistenceStorage';
+import { DAILY_BOARD_VERSION } from './dailyBoardVersion';
 import { Difficulty, PuzzleSolutionStep } from '../types';
 import { DAILY_CHALLENGE_UNLOCK_PUZZLES, FIRST_DAILY_BONUS_HINTS } from '../constants/gameBalance';
 import { selectDailyBankPuzzle } from './puzzleBank';
@@ -159,8 +160,8 @@ export function getDailyChallengeUnlockProgress(
  * Check if a date string is within the daily streak grace period
  * Returns true if the date is 1 to DAILY_STREAK_GRACE_DAYS days ago
  */
-function isWithinDailyGracePeriod(dateString: string): boolean {
-  const diffDays = daysAgoLocal(dateString);
+function isWithinDailyGracePeriod(dateString: string, boardDate = getTodayString()): boolean {
+  const diffDays = Math.round((parseLocalDate(boardDate).getTime() - parseLocalDate(dateString).getTime()) / 86400000);
   return diffDays >= 1 && diffDays <= DAILY_STREAK_GRACE_DAYS;
 }
 
@@ -307,6 +308,7 @@ export async function loadDailyProgress(): Promise<DailyChallengeProgress> {
       return progressCache!;
     }
   } catch (err) {
+    if (isStorageTransactionActive()) throw err;
     console.warn('Failed to load daily challenge progress:', err);
   }
 
@@ -323,6 +325,8 @@ export async function isDailyCompleted(): Promise<boolean> {
 }
 
 export interface DailyPuzzleData {
+  /** Immutable leaderboard partition for this generation policy and bank set. */
+  boardVersion: string;
   words: string[];
   hint?: string;
   /**
@@ -424,6 +428,7 @@ export async function generateDailyPuzzle(): Promise<DailyPuzzleData> {
         throw new Error('No daily board available');
       }
       const result: DailyPuzzleData = {
+        boardVersion: DAILY_BOARD_VERSION,
         words: board.words,
         hint: board.hint,
         solution: board.solution,
@@ -486,6 +491,7 @@ export async function grantFirstDailyMercy(): Promise<number | null> {
   try {
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
   } catch (err) {
+    if (isStorageTransactionActive()) throw err;
     console.warn('Failed to save daily challenge progress:', err);
   }
 
@@ -498,13 +504,30 @@ export async function grantFirstDailyMercy(): Promise<number | null> {
 export async function recordDailyCompletion(
   stars: number,
   hintsUsed: number,
-  invalidAttempts: number
+  invalidAttempts: number,
+  boardDate: string = getTodayString(),
+  completionDate: string = getTodayString(),
 ): Promise<DailyChallengeProgress> {
   const progress = await loadDailyProgress();
-  const today = getTodayString();
+  const today = boardDate;
+  // Preserve the board's identity across midnight. An expired or malformed
+  // board is practice; it never consumes a different day's competition.
+  // A durable completion intent keeps its original eligibility on later replay.
+  const boardDay = parseLocalDate(boardDate);
+  const completedDay = parseLocalDate(completionDate);
+  const age = Math.round((Date.UTC(completedDay.getFullYear(), completedDay.getMonth(), completedDay.getDate())
+    - Date.UTC(boardDay.getFullYear(), boardDay.getMonth(), boardDay.getDate())) / 86_400_000);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(completionDate) ||
+      getLocalDateString(completedDay) !== completionDate ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(boardDate) ||
+      getLocalDateString(parseLocalDate(boardDate)) !== boardDate ||
+      age < 0 || age > 1) return progress;
 
-  // Don't record if already completed today
-  if (progress.lastCompletedDate === today) {
+  // A result may arrive after a newer day has already completed. Never count
+  // it twice or rewind the streak's most recent day.
+  if (progress.lastCompletedDate === today ||
+      progress.completedChallenges.some(result => result.date === today) ||
+      (progress.lastCompletedDate != null && progress.lastCompletedDate > today)) {
     return progress;
   }
 
@@ -521,7 +544,7 @@ export async function recordDailyCompletion(
   // Calculate streak. Yesterday → free continuation. A larger gap consumes a
   // banked freeze (if any) to keep the chain alive; otherwise the streak resets.
   progress.streakSavedByFreeze = false;
-  if (progress.lastCompletedDate && isWithinDailyGracePeriod(progress.lastCompletedDate)) {
+  if (progress.lastCompletedDate && isWithinDailyGracePeriod(progress.lastCompletedDate, today)) {
     progress.currentStreak += 1;
   } else if (
     progress.lastCompletedDate &&
@@ -548,7 +571,7 @@ export async function recordDailyCompletion(
   } else {
     progress.streakDecayedTo = undefined;
   }
-  if (progress.lastCompletedDate && (isWithinDailyGracePeriod(progress.lastCompletedDate) || progress.streakSavedByFreeze)) {
+  if (progress.lastCompletedDate && (isWithinDailyGracePeriod(progress.lastCompletedDate, today) || progress.streakSavedByFreeze)) {
     progress.streakDecayedTo = undefined;
   }
 
@@ -577,6 +600,7 @@ export async function recordDailyCompletion(
   try {
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
   } catch (err) {
+    if (isStorageTransactionActive()) throw err;
     console.warn('Failed to save daily challenge progress:', err);
   }
 

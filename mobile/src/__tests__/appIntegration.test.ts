@@ -16,6 +16,7 @@ import fs from 'fs';
 import path from 'path';
 
 const APP_TSX = fs.readFileSync(path.resolve(__dirname, '../../App.tsx'), 'utf8');
+const VICTORY_STORAGE = fs.readFileSync(path.resolve(__dirname, '../services/victoryPersistence.ts'), 'utf8');
 
 describe('bootstrap is non-blocking', () => {
   test('store/ad SDK init is fire-and-forget with error logging', () => {
@@ -411,8 +412,8 @@ describe('one-time swift-victory pointer', () => {
 
 describe('daily streak decay-to-milestone messaging', () => {
   test('the decayed checkpoint routes through getStreakHeldMessage', () => {
-    expect(APP_TSX).toMatch(/dailyProgress\.streakDecayedTo != null/);
-    expect(APP_TSX).toMatch(/getStreakHeldMessage\(heldAt, persistence\.currentPhase\)/);
+    expect(APP_TSX).toMatch(/daily\.progress\.streakDecayedTo != null/);
+    expect(APP_TSX).toMatch(/getStreakHeldMessage\(daily\.progress\.streakDecayedTo, persistence\.currentPhase\)/);
   });
 });
 
@@ -533,14 +534,14 @@ describe('finale staging (armed, not retroactive)', () => {
   test('the dwell gate waits for the arming floor before it arms the finale', () => {
     // Dwell remains recorded before the floor, then the direct service
     // predicate decides whether the first eligible win may arm.
-    expect(APP_TSX).toMatch(
-      /const dwell = await recordPhase4Dwell\(\);[\s\S]{0,150}if \(canArmFinale\(dwell, completedTotal\)\) \{\s*\n\s*await armFinale\(\);/
-    );
+    expect(VICTORY_STORAGE).toMatch(/const dwell = await recordPhase4Dwell\(\);[\s\S]{0,150}if \(canArmFinale\(dwell, amberResult.puzzlesSolved\)\) await armFinale\(\);/);
+    expect(APP_TSX).not.toContain('await recordPhase4Dwell()');
   });
 
   test('the cinematic fires only on the marked final board', () => {
     // Firing path: only the marked final board's win completes the finale.
-    expect(APP_TSX).toMatch(/if \(wasFinalBoard\) \{[\s\S]{0,900}?await recordStoryBoundary\([\s\S]{0,150}?await markFinalPuzzleCompleted\(\)/);
+    expect(VICTORY_STORAGE).toMatch(/if \(input.finalBoard\) \{[\s\S]{0,900}?await recordStoryBoundary\([\s\S]{0,900}?await markFinalPuzzleCompleted\(\)/);
+    expect(APP_TSX).toContain("endgame?.kind === 'arrival'");
     // The finale event is queued via queueEndgameCinematic, which both schedules
     // the 1.5s beat AND records the event so a victory exit in the window can
     // rescue it instead of clearVictoryTimeouts dropping the climax forever.
@@ -568,10 +569,10 @@ describe('finale staging (armed, not retroactive)', () => {
   });
 
   test('the dwell window keeps a post-cap held-breath voice without repeating the eighth line', () => {
-    expect(APP_TSX).toMatch(/const dwellBefore = await getPhase4DwellCount\(\);/);
-    expect(APP_TSX).toMatch(/dwellBefore >= FINALE_DWELL_PUZZLES/);
+    expect(VICTORY_STORAGE).toMatch(/const dwellBefore = await getPhase4DwellCount\(\);/);
+    expect(APP_TSX).toContain('(endgame.dwellBefore ?? 0) >= FINALE_DWELL_PUZZLES');
     expect(APP_TSX).toMatch(/getPostCapDwellLine\(completedTotal, persistence\.currentPhase\)/);
-    expect(APP_TSX).toMatch(/getDwellLine\(Math\.min\(dwell, FINALE_DWELL_PUZZLES\), persistence\.currentPhase, houseComplete\)/);
+    expect(APP_TSX).toContain('getDwellLine(Math.min(endgame.dwell ?? 0, FINALE_DWELL_PUZZLES), persistence.currentPhase, endgame.houseComplete)');
   });
 });
 
@@ -594,7 +595,7 @@ describe('victory flow', () => {
     // transition window; without the second exclusion the modal flashed
     // back in before the transition overlay covered it.
     expect(APP_TSX).toMatch(
-      /onboardingStep === 'puzzle_complete' \|\| onboardingFlow\.onboardingStep === 'going_to_pit'/
+      /onboardingStep === 'puzzle_complete' \|\|\s*onboardingFlow\.onboardingStep === 'going_to_pit'/
     );
   });
 
@@ -616,36 +617,32 @@ describe('victory flow', () => {
 });
 
 describe('Unbroken Weave mastery orchestration', () => {
-  test('records Weave mastery before choreography and merges every field into victory data', () => {
+  test('passes Weave completion to the durable owner before choreography', () => {
     const victoryFlow = APP_TSX.slice(
       APP_TSX.indexOf('if (result?.completed)'),
       APP_TSX.indexOf('// Check for endgame triggers', APP_TSX.indexOf('if (result?.completed)')),
     );
-    const recordIndex = victoryFlow.indexOf('recordUnbrokenWeaveVictory(');
-    const setVictoryIndex = victoryFlow.indexOf('setVictoryData(finalVictory)');
+    const recordIndex = victoryFlow.indexOf('persistenceActions.recordVictory(');
     const choreographyIndex = victoryFlow.indexOf('playVictorySequence(');
-
-    expect(victoryFlow).toContain('if (puzzle.unbrokenWeaveMode)');
-    expect(victoryFlow).toContain("recordUnbrokenWeaveVictory(puzzle.difficulty, victory.flawless === true)");
+    expect(victoryFlow).toContain('unbrokenWeave: puzzle.unbrokenWeaveMode');
     expect(recordIndex).toBeGreaterThan(-1);
-    expect(recordIndex).toBeLessThan(setVictoryIndex);
     expect(recordIndex).toBeLessThan(choreographyIndex);
-    expect(victoryFlow).toContain('unbrokenWeaveRank: mastery.rank');
-    expect(victoryFlow).toContain('unbrokenWeaveTitle: mastery.title');
-    expect(victoryFlow).toContain('unbrokenWeaveNextObjective: mastery.nextObjective');
-    expect(victoryFlow).toContain('unbrokenWeaveRankedUp: rankedUp');
+    // Mastery and reward writes belong to one durable receipt, tested behaviorally
+    // in saveIntegrity; App consumes the result and only refreshes its setup UI.
+    expect(victoryFlow).not.toContain('recordUnbrokenWeaveVictory(');
+    expect(victoryFlow).toContain('setUnbrokenWeaveMastery(await getUnbrokenWeaveMastery())');
   });
 
   test('keeps setup mastery state fresh after load, victory, reset, and cloud restore', () => {
     expect(APP_TSX).toMatch(/getUnbrokenWeaveMastery\(\)\.then\(setUnbrokenWeaveMastery\)/);
-    expect(APP_TSX).toMatch(/setUnbrokenWeaveMastery\(mastery\)/);
+    expect(APP_TSX).toMatch(/setUnbrokenWeaveMastery\(await getUnbrokenWeaveMastery\(\)\)/);
     expect(APP_TSX).toMatch(/unbrokenWeaveMastery=\{unbrokenWeaveMastery\}/);
 
     const rebuild = APP_TSX.slice(
       APP_TSX.indexOf('const rebuildSessionFromStorage'),
       APP_TSX.indexOf('const handleResetComplete'),
     );
-    expect(rebuild).toContain('getUnbrokenWeaveMastery().then(setUnbrokenWeaveMastery)');
+    expect(rebuild).toContain('setUnbrokenWeaveMastery(await getUnbrokenWeaveMastery())');
   });
 });
 
@@ -746,10 +743,10 @@ describe('house asks (optional per-board constraint)', () => {
   });
 
   test('a restored autosave board never rolls or carries an ask (dropped silently)', () => {
-    // Both restorePuzzleState call sites arm the suppress ref first, and the
+    // All three restore entry points (including resumed daily) arm the ref, and the
     // roll effect consumes it (plus a committed-move guard for mid-board saves).
     const arms = APP_TSX.match(/houseAskRestoreSuppressRef\.current = true;/g) || [];
-    expect(arms).toHaveLength(2);
+    expect(arms).toHaveLength(3);
     const effect = rollEffect();
     expect(effect).toContain('houseAskRestoreSuppressRef.current');
     expect(effect).toContain('if (puzzle.moveHistorySummary.length > 0) return;');
@@ -927,12 +924,11 @@ describe('the instant 2x claim cannot be double-tapped', () => {
 });
 
 describe('a daily solve belongs to the board it was played on', () => {
-  test('the board day is captured at serve time and only trusted for today/yesterday', () => {
+  test('the served date is retained and expired boards cannot rank', () => {
     expect(APP_TSX).toContain('dailyBoardDateRef.current = daily.date;');
     const resolver = sliceBetween('const resolveDailyBoardDate = useCallback', 'const startDailyBoard');
-    expect(resolver).toContain('daysAgoLocal(captured)');
-    expect(resolver).toMatch(/if \(age === 0 \|\| age === 1\) return captured;/);
-    expect(resolver).toContain('return getLocalDateString();');
+    expect(resolver).toContain('return dailyBoardDateRef.current ?? getLocalDateString();');
+    expect(APP_TSX).toContain('[0, 1].includes(daysAgoLocal(date))');
   });
 
   test('the leaderboard, the local ladder and the share card all use it', () => {

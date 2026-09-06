@@ -1,3 +1,5 @@
+import { saveWithPlayerRetry } from '../services/saveRetry';
+import { getPitGeometry as computePitGeometry } from '../services/worldGeometry';
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { FONT_SIZE } from '../theme/typeScale';
 import {
@@ -10,7 +12,7 @@ import {
   Platform,
   StatusBar,
   Image,
-  Dimensions,
+  useWindowDimensions,
   Modal,
 } from 'react-native';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
@@ -79,7 +81,7 @@ import {
   getHarvestState,
   offerBatch,
   offerAllBatches,
-  acknowledgeBatchCredit,
+  settleBatchCredit,
   reconcilePendingCredits,
   HarvestState,
 } from '../services/wordHarvest';
@@ -114,7 +116,6 @@ const HOME_ICON = require('../../assets/ui/home.png');
 // with a lit clay lamp, heading the Phase-5 modal that had no image at all.
 const SHRINE_SPOT = require('../../assets/ui/spots/shrine.png');
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 function getPitBackground(phase: number) {
   if (phase >= 5) return PIT_PEACE;
@@ -138,37 +139,8 @@ export function getPitPhaseScrim(phase: number): { color: string; opacity: numbe
   return null;
 }
 
-const PIT_CENTER = {
-  x: SCREEN_WIDTH * 0.5,
-  y: SCREEN_HEIGHT * 0.72,
-};
-
-// Pit opening oval dimensions — used to position overlays that align with
-// the pit opening in all three background images.
-const PIT_OVAL = {
-  radiusX: SCREEN_WIDTH * 0.29,
-  radiusY: SCREEN_HEIGHT * 0.06,
-};
-
-// How far outside the pit opening the ward marks (and the ring they are set
-// into) sit. Shared by the mark positions and the ring geometry so the marks
-// can never drift off their own circle.
 const PIT_WARD_RIM_OFFSET = 10;
-// The ward ring is drawn as a circle + scaleX (a real ellipse, no SVG).
-const WARD_RING_SIZE_Y = (PIT_OVAL.radiusY + PIT_WARD_RIM_OFFSET) * 2;
-const WARD_RING_SCALE_X = ((PIT_OVAL.radiusX + PIT_WARD_RIM_OFFSET) * 2) / WARD_RING_SIZE_Y;
-
-// Pre-inset header-height estimate — only positions the module-level FLOAT_ZONE
-// for spawning word chips. The rendered header uses useScreenInsets instead.
-const STATUS_BAR_HEIGHT =
-  Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 16 : 60;
-
-const FLOAT_ZONE = {
-  top: STATUS_BAR_HEIGHT + 60,
-  bottom: SCREEN_HEIGHT * 0.55,
-  left: 10,
-  right: SCREEN_WIDTH - 10,
-};
+const STATUS_BAR_HEIGHT = Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 16 : 60;
 
 // Mini candy tile size (per letter)
 const MINI_TILE_W = 22;
@@ -210,20 +182,8 @@ function getMaxRimParticles(): number {
 // Multi-layered concentric glow — creates depth and natural radial falloff
 // Each layer is rendered as a circle then stretched with scaleX for a true ellipse
 // (football/rugby ball shape with tapered pointed ends, not a flat-edged capsule)
-const PIT_GLOW_BASE_WIDTH = SCREEN_WIDTH * 0.7;
-const PIT_GLOW_BASE_HEIGHT = 90;
 
-// Pre-computed ellipse scaleX ratios (targetWidth / circleSize) for each layer
-const GLOW_OUTER_SIZE = PIT_GLOW_BASE_HEIGHT * 1.1;     // 99px circle
-const GLOW_OUTER_SCALE_X = (PIT_GLOW_BASE_WIDTH * 0.9) / GLOW_OUTER_SIZE;
-const GLOW_MIDDLE_SIZE = PIT_GLOW_BASE_HEIGHT * 0.9;    // 81px circle
-const GLOW_MIDDLE_SCALE_X = (PIT_GLOW_BASE_WIDTH * 0.64) / GLOW_MIDDLE_SIZE;
-const GLOW_INNER_SIZE = PIT_GLOW_BASE_HEIGHT * 0.7;     // 63px circle
-const GLOW_INNER_SCALE_X = (PIT_GLOW_BASE_WIDTH * 0.4) / GLOW_INNER_SIZE;
-const GLOW_CORE_SIZE = PIT_GLOW_BASE_HEIGHT * 0.5;      // 45px circle
-const GLOW_CORE_SCALE_X = (PIT_GLOW_BASE_WIDTH * 0.28) / GLOW_CORE_SIZE;
-const GLOW_RIM_SIZE_Y = PIT_OVAL.radiusY * 2;           // rim uses PIT_OVAL dims
-const GLOW_RIM_SCALE_X = (PIT_OVAL.radiusX * 2) / GLOW_RIM_SIZE_Y;
+const getPitGeometry = (width: number, height: number) => computePitGeometry(width, height, STATUS_BAR_HEIGHT);
 
 // Colors that match the pit rim glow baked into each background image
 const RIM_PARTICLE_COLORS: Record<number, string> = {
@@ -676,6 +636,8 @@ const RimParticleView = React.memo(({ p }: { p: RimParticle }) => (
 RimParticleView.displayName = 'RimParticleView';
 
 const ShockwaveRingView = React.memo(({ ring }: { ring: ShockwaveRing }) => {
+  const { width, height } = useWindowDimensions();
+  const { PIT_CENTER, PIT_OVAL } = getPitGeometry(width, height);
   const size = PIT_OVAL.radiusX * 2.6;
   const sizeY = PIT_OVAL.radiusY * 2.6;
   return (
@@ -897,6 +859,9 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   onOnboardingOfferComplete,
 }) => {
   const screenInsets = useScreenInsets();
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
+  const { PIT_CENTER, PIT_OVAL, WARD_RING_SIZE_Y, WARD_RING_SCALE_X, FLOAT_ZONE, GLOW_OUTER_SIZE, GLOW_OUTER_SCALE_X, GLOW_MIDDLE_SIZE, GLOW_MIDDLE_SCALE_X, GLOW_INNER_SIZE, GLOW_INNER_SCALE_X, GLOW_CORE_SIZE, GLOW_CORE_SCALE_X, GLOW_RIM_SIZE_Y, GLOW_RIM_SCALE_X } = useMemo(() => getPitGeometry(SCREEN_WIDTH, SCREEN_HEIGHT), [SCREEN_WIDTH, SCREEN_HEIGHT]);
+  const styles = useMemo(() => createStyles(SCREEN_WIDTH, SCREEN_HEIGHT), [SCREEN_WIDTH, SCREEN_HEIGHT]);
   const phaseTheme = getPhaseTheme(phase);
   // Cottage signage chrome for the pit banners: wooden card frames that age
   // with the world (bright parchment → ash paper), on-parchment inks that
@@ -1010,7 +975,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     setDisplayBalance(amberBalance);
   }, [amberBalance]);
   useEffect(() => { amberBalanceRef.current = amberBalance; }, [amberBalance]);
-  useEffect(() => { harvestStateRef.current = harvestState; }, [harvestState]);
+  useEffect(() => { harvestStateRef.current = harvestState; }, [harvestState, SCREEN_WIDTH, SCREEN_HEIGHT]);
 
   // ---- Ward mark ceremony state machine ----
   type CeremonyStatus = 'idle' | 'igniting' | 'erupting' | 'text' | 'complete';
@@ -1055,7 +1020,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       });
     }
     return positions;
-  }, []);
+  }, [SCREEN_WIDTH, SCREEN_HEIGHT]);
 
   const wardColors = getWardMarkColors(phase);
   const litCount = pendingPhaseTransition != null
@@ -1330,7 +1295,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
 
     const interval = setInterval(spawnRimParticle, spawnInterval);
     return () => clearInterval(interval);
-  }, [phase, reducedMotion, simplify, tendingLevel]);
+  }, [phase, reducedMotion, simplify, tendingLevel, SCREEN_WIDTH, SCREEN_HEIGHT]);
 
   // ---- Load harvest state ----
   const loadState = useCallback(async () => {
@@ -1349,8 +1314,8 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   useEffect(() => { loadState(); }, [loadState]);
 
   // Recover any offered batch whose amber credit never landed (app killed
-  // between the offer write and the award write). Apply-then-ack: at-least-once
-  // delivery, deduped by the ledger. Runs once per pit visit, before the player
+  // between the offer write and the credit commit). Award and acknowledgement
+  // share one journal so a retry cannot duplicate the credit. Runs once per pit visit, before the player
   // can interact with anything money-shaped.
   const creditRecoveryRanRef = useRef(false);
   useEffect(() => {
@@ -1361,8 +1326,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         const orphans = await reconcilePendingCredits();
         let recovered = 0;
         for (const credit of orphans) {
-          const balance = await awardBonusAmber(credit.amber, 'word_offering');
-          await acknowledgeBatchCredit(credit.id);
+          const balance = await saveWithPlayerRetry(() => settleBatchCredit(credit.id));
           recovered = balance;
         }
         if (orphans.length > 0 && mountedRef.current) {
@@ -1493,6 +1457,25 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [harvestState]);
 
+  // Resize the existing words without rebuilding batch delivery counters or
+  // restarting an offer. In-flight words retain their owned completion path.
+  const wordViewport = useRef({ width: SCREEN_WIDTH, height: SCREEN_HEIGHT });
+  useEffect(() => {
+    const previous = wordViewport.current;
+    wordViewport.current = { width: SCREEN_WIDTH, height: SCREEN_HEIGHT };
+    if (previous.width === SCREEN_WIDTH && previous.height === SCREEN_HEIGHT) return;
+    setFlyingWords(current => current.map(word => {
+      if (word.useDevourPos || word.isDevoured) return word;
+      const maxX = Math.max(10, SCREEN_WIDTH - word.word.length * (MINI_TILE_W + MINI_TILE_GAP) - 10);
+      const top = isOnboarding ? SCREEN_HEIGHT * 0.30 : FLOAT_ZONE.top;
+      const bottom = Math.max(top, SCREEN_HEIGHT * (isOnboarding ? 0.52 : 0.55));
+      return { ...word,
+        baseX: Math.max(10, Math.min(maxX, word.baseX * SCREEN_WIDTH / previous.width)),
+        baseY: Math.max(top, Math.min(bottom, word.baseY * SCREEN_HEIGHT / previous.height)),
+      };
+    }));
+  }, [SCREEN_WIDTH, SCREEN_HEIGHT, isOnboarding, FLOAT_ZONE.top]);
+
   // ---- Smooth float loop using single linear progress → interpolated sine ----
   const startFloatLoop = useCallback((fw: FlyingWord) => {
     if (reducedMotion || simplify || fw.isDevoured) return;
@@ -1591,7 +1574,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       trailTimeoutsRef.current.push(tid);
     }
     setTrailParticles(prev => [...prev, ...newParticles]);
-  }, [phase, reducedMotion]);
+  }, [phase, reducedMotion, SCREEN_WIDTH, SCREEN_HEIGHT]);
 
   // ---- Spawn impact burst (radial ring at pit center) ----
   const spawnImpactBurst = useCallback(() => {
@@ -1625,7 +1608,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       ]).start(() => { if (mountedRef.current) setImpactParticles(prev => prev.filter(ip => ip.id !== p.id)); });
     }
     setImpactParticles(prev => [...prev, ...newParticles]);
-  }, [phase, reducedMotion]);
+  }, [phase, reducedMotion, SCREEN_WIDTH, SCREEN_HEIGHT]);
 
   // ---- Spawn shockwave ring (expanding ripple from pit center) ----
   const spawnShockwave = useCallback(() => {
@@ -1814,7 +1797,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       amberRiseTimeoutsRef.current.push(tid);
     }
     setAmberParticles(prev => [...prev, ...newParticles]);
-  }, [reducedMotion]);
+  }, [reducedMotion, SCREEN_WIDTH, SCREEN_HEIGHT]);
 
   // ---- Result toast ----
   const showResultToast = useCallback((message: string) => {
@@ -1908,7 +1891,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         }
       } else {
         hapticMedium();
-        showResultToast(getTendingResultMessage(result.level));
+        showResultToast(tendingNext.contentComplete ? 'Your contribution keeps the finished shrine tended. Thank you.' : getTendingResultMessage(result.level));
         nextDelay = 2700;
       }
 
@@ -1932,7 +1915,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     // returns only counts) so a fed dread word can be named back to the player.
     const batchWords = harvestStateRef.current?.pendingBatches.find(b => b.id === batchId)?.words ?? [];
     try {
-      const result = await offerBatch(batchId);
+      const result = await saveWithPlayerRetry(() => offerBatch(batchId));
       if (!result) return;
       logEvent({ type: 'pit_offer', data: { amber: result.amberAwarded, words: result.wordsOffered } });
       // A completed manual offer is the moment the player has LEARNED the pit —
@@ -1950,13 +1933,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
           .catch(() => {});
         markMandatoryHarvestSeen().catch(() => {});
       }
-      const newBalance = await awardBonusAmber(result.amberAwarded, 'word_offering');
-      // Apply-then-ack: the pending-credit ledger entry is cleared only after
-      // the amber actually landed, so a kill between the two writes replays
-      // the credit instead of destroying it.
-      if (result.creditId) {
-        acknowledgeBatchCredit(result.creditId).catch(() => {});
-      }
+      const newBalance = await saveWithPlayerRetry(() => settleBatchCredit(result.creditId));
       if (mountedRef.current) {
         // Settle on the real credited balance. The per-word optimistic bumps
         // for this batch summed to exactly its amberValue, so this lands
@@ -2132,7 +2109,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         ]),
       ]),
     ]).start(() => handleWordDevoured(fw));
-  }, [phase, isOffering, reducedMotion, spawnTrail, handleWordDevoured, getCurrentPos, triggerInhale]);
+  }, [phase, isOffering, reducedMotion, spawnTrail, handleWordDevoured, getCurrentPos, triggerInhale, SCREEN_WIDTH, SCREEN_HEIGHT]);
 
   // Keep devourWordRef in sync
   useEffect(() => { devourWordRef.current = devourWord; }, [devourWord]);
@@ -2163,7 +2140,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     const baseBalance = amberBalanceRef.current;
 
     // Offer all batches atomically first
-    const result = await offerAllBatches();
+    const result = await saveWithPlayerRetry(offerAllBatches);
     logEvent({ type: 'pit_offer', data: { amber: result.amberAwarded, words: result.wordsOffered } });
     // Manual offer completed — the pit is learned (see tryFinalizeBatch).
     if (!isOnboarding) {
@@ -2178,12 +2155,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     }
     let finalBalance = baseBalance;
     if (result.amberAwarded > 0) {
-      finalBalance = await awardBonusAmber(result.amberAwarded, 'word_offering');
-      // Apply-then-ack (see tryFinalizeBatch): clear the pending-credit ledger
-      // entry only after the amber landed.
-      if (result.creditId) {
-        acknowledgeBatchCredit(result.creditId).catch(() => {});
-      }
+      finalBalance = await saveWithPlayerRetry(() => settleBatchCredit(result.creditId));
       if (mountedRef.current) onAmberChange?.(finalBalance);
     }
 
@@ -2326,7 +2298,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         }
       }
     }, cascadeDuration);
-  }, [isOffering, harvestState, phase, amberBalance, reducedMotion, onAmberChange, getCurrentPos, spawnTrail, spawnAmberRise, spawnImpactBurst, spawnShockwave, flashPitSurge, showResultToast, pendingPhaseTransition, ceremonyStatus, startCeremony, isOnboarding]);
+  }, [isOffering, harvestState, phase, amberBalance, reducedMotion, onAmberChange, getCurrentPos, spawnTrail, spawnAmberRise, spawnImpactBurst, spawnShockwave, flashPitSurge, showResultToast, pendingPhaseTransition, ceremonyStatus, startCeremony, isOnboarding, SCREEN_WIDTH, SCREEN_HEIGHT]);
 
   // ---- Onboarding: advance when the PLAYER has offered every word ----
   // The pit_offering step is completed by the player's own taps (each word
@@ -2391,12 +2363,12 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const pendingAmber = useMemo(() => {
     if (!harvestState) return 0;
     return harvestState.pendingBatches.reduce((s, b) => s + b.amberValue, 0);
-  }, [harvestState]);
+  }, [harvestState, SCREEN_WIDTH, SCREEN_HEIGHT]);
 
   const pendingWordCount = useMemo(() => {
     if (!harvestState) return 0;
     return harvestState.pendingBatches.reduce((s, b) => s + b.words.length, 0);
-  }, [harvestState]);
+  }, [harvestState, SCREEN_WIDTH, SCREEN_HEIGHT]);
 
   const phaseColors = DEVOUR_COLORS[phase] ?? DEVOUR_COLORS[0];
   const glowColor = phaseColors.glow;
@@ -2887,7 +2859,14 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
               <Animated.Text style={[styles.tendingDepth, { color: pitSurface.amberText, transform: [{ scale: tendPulseScale }] }]}>
                 {getTendingLevelLabel(tendingLevel)}
               </Animated.Text>
-              <Text style={[styles.tendingSubtitle, { color: pitSurface.body }]}>{getTendingSubtitle(tendingLevel)}</Text>
+              <Text style={[styles.tendingSubtitle, { color: pitSurface.body }]}>
+                {tendingNext?.contentComplete
+                  ? 'The shrine is complete. All its changes and keeper reflections are unlocked. Further amber is an optional contribution, with no new unlocks.'
+                  : getTendingSubtitle(tendingLevel)}
+              </Text>
+              {tendingNext?.nextMilestone != null && <Text style={[styles.tendingSubtitle, { color: pitSurface.body }]}>
+                Next keeper reflection: level {tendingNext.nextMilestone} · {tendingNext.levelsToNextMilestone} tending{tendingNext.levelsToNextMilestone === 1 ? '' : 's'} away.
+              </Text>}
 
               {tendingNext && (
                 <>
@@ -2912,16 +2891,16 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
                     ]}
                     disabled={tendingBusy || displayBalance < tendingNext.cost}
                     onPress={handleDeepenPattern}
-                    accessibilityLabel={`${getTendingButtonLabel()} for ${tendingNext.cost} amber`}
+                    accessibilityLabel={`${tendingNext.contentComplete ? 'Contribute amber' : getTendingButtonLabel()} for ${tendingNext.cost} amber`}
                     accessibilityRole="button"
                     accessibilityState={{ disabled: tendingBusy || displayBalance < tendingNext.cost }}
                   >
                     <ThreeSliceStrip skin={pitSkin.buttons.primary.lg.up} capDp={BTN_CAP_DP} />
-                    <Text style={[styles.tendingButtonText, { color: pitSkin.ink.primary }]}>{getTendingButtonLabel()}</Text>
+                    <Text style={[styles.tendingButtonText, { color: pitSkin.ink.primary }]}>{tendingNext.contentComplete ? 'Contribute amber' : getTendingButtonLabel()}</Text>
                   </TouchableOpacity>
                   {displayBalance < tendingNext.cost && (
                     <Text style={[styles.tendingInsufficient, { color: pitSurface.muted }]}>
-                      Earn more amber to deepen the pattern further.
+                      {tendingNext.contentComplete ? 'There is nothing more to unlock here. You can return to your puzzles whenever you like.' : 'Earn more amber to deepen the pattern further.'}
                     </Text>
                   )}
                   {/* No rewarded ad here by design: the shrine is serene
@@ -3062,7 +3041,9 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
 // Styles
 // ---------------------------------------------------------------------------
 
-const styles = StyleSheet.create({
+const createStyles = (SCREEN_WIDTH: number, SCREEN_HEIGHT: number) => {
+  const { PIT_CENTER, PIT_OVAL, FLOAT_ZONE } = getPitGeometry(SCREEN_WIDTH, SCREEN_HEIGHT);
+  return StyleSheet.create({
   container: { flex: 1, overflow: 'hidden' },
   backgroundImage: {
     position: 'absolute',
@@ -3371,4 +3352,5 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 6,
   },
-});
+  });
+};

@@ -113,7 +113,7 @@ export const VARIANT_CONFIGS: Record<PuzzleVariant, VariantConfig> = {
     title: 'Double Shift',
     description: 'Move two letters at once from each word to the next.',
     darkDescription: 'Two offerings per step. The pattern demands more.',
-    instruction: 'Pick two letters, then place each into the next word.',
+    instruction: 'Pick a letter and place it below, then pick and place the second. Both finished words must be valid.',
     darkInstruction: 'Two letters at a time. The arrangement grows hungrier.',
     icon: '⏫',
     amberMultiplier: 1.65,

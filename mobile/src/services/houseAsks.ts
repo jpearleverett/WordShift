@@ -16,6 +16,7 @@
  */
 
 import type { PuzzleSolutionStep } from '../types';
+import { COMMON_WORDS } from '../constants/wordLists';
 
 export type HouseAskKind = 'move' | 'keep';
 
@@ -102,14 +103,91 @@ export function pickHouseAsk(
   solutionSteps: readonly PuzzleSolutionStep[] | undefined,
   startWords: readonly string[],
   rng: () => number = Math.random,
+  isValidWord: (word: string) => boolean = isShippedWord,
 ): HouseAsk | null {
-  const candidates = deriveHouseAskCandidates(solutionSteps, startWords);
+  const candidates = deriveMeaningfulHouseAskCandidates(solutionSteps, startWords, isValidWord);
   if (candidates.length === 0) return null;
   const index = Math.min(
     candidates.length - 1,
     Math.max(0, Math.floor(rng() * candidates.length)),
   );
   return candidates[index];
+}
+
+const isShippedWord = (word: string): boolean => COMMON_WORDS.has(word);
+const meaningfulAskCache = new Map<string, HouseAsk[]>();
+const ASK_CACHE_LIMIT = 256;
+const ASK_STATE_LIMIT = 5000;
+
+/**
+ * A rewarded request must distinguish two winning routes. For each board,
+ * collect the union and intersection of characters moved by complete routes;
+ * a letter outside the intersection but inside the union has both witnesses.
+ * This runs once at board setup, never while picking or moving a tile. The
+ * bounded search fails closed: uncertain boards simply carry no request.
+ */
+export function deriveMeaningfulHouseAskCandidates(
+  solutionSteps: readonly PuzzleSolutionStep[] | undefined,
+  startWords: readonly string[],
+  isValidWord: (word: string) => boolean = isShippedWord,
+): HouseAsk[] {
+  const candidates = deriveHouseAskCandidates(solutionSteps, startWords);
+  if (candidates.length === 0) return [];
+  const cacheKey = JSON.stringify([startWords, candidates]);
+  if (isValidWord === isShippedWord) {
+    const cached = meaningfulAskCache.get(cacheKey);
+    if (cached) return cached.map(ask => ({ ...ask }));
+  }
+  type Paths = { union: Set<string>; intersection: Set<string> };
+  function mergePaths(left: Paths, right: Paths): Paths {
+    return {
+      union: new Set<string>([...left.union, ...right.union]),
+      intersection: new Set<string>([...left.intersection].filter(value => right.intersection.has(value))),
+    };
+  }
+  const memo = new Map<string, Paths | null>();
+  let states = 0;
+  let exhausted = false;
+  function visit(source: string, row: number, locked: number): Paths | null {
+    const key = `${row}:${locked}:${source}`;
+    if (memo.has(key)) return memo.get(key)!;
+    if (++states > ASK_STATE_LIMIT) {
+      exhausted = true;
+      return null;
+    }
+    const target = startWords[row + 1].toUpperCase();
+    let combined: Paths | null = null;
+    for (let i = 0; i < source.length; i++) {
+      if (i === locked) continue;
+      const letter = source[i];
+      if (!isValidWord(source.slice(0, i) + source.slice(i + 1))) continue;
+      for (let slot = 0; slot <= target.length; slot++) {
+        const formed = target.slice(0, slot) + letter + target.slice(slot);
+        if (!isValidWord(formed)) continue;
+        const child = row === startWords.length - 2
+          ? { union: new Set<string>(), intersection: new Set<string>() }
+          : visit(formed, row + 1, slot);
+        if (exhausted) return null;
+        if (!child) continue;
+        const union = new Set([...child.union, letter]);
+        const intersection = new Set([...child.intersection, letter]);
+        combined = combined ? mergePaths(combined, { union, intersection }) : { union, intersection };
+      }
+    }
+    memo.set(key, combined);
+    return combined;
+  }
+  const paths = visit(startWords[0].toUpperCase(), 0, -1);
+  const meaningful = !exhausted && paths
+    ? candidates.filter(ask => paths.union.has(ask.letter) && !paths.intersection.has(ask.letter))
+    : [];
+  if (isValidWord === isShippedWord) {
+    if (meaningfulAskCache.size >= ASK_CACHE_LIMIT) {
+      meaningfulAskCache.delete(meaningfulAskCache.keys().next().value!);
+    }
+    meaningfulAskCache.set(cacheKey, meaningful);
+  }
+  return meaningful.map(ask => ({ ...ask }));
 }
 
 /**

@@ -1,12 +1,10 @@
 # WordShift Backend Setup (optional, drop-in)
 
-> **Status:** ✅ Configured AND hardened. `supabaseUrl` + `supabaseAnonKey`
-> (cloud save, leaderboard, social proof, analytics) and `sentryDsn` (crash
-> reporting) are set in `app.json` → `expo.extra`, and
-> **`docs/supabase/security_setup.sql` has been applied and verified live**
-> (2026-07-02): RLS enabled on all four tables, anon's only direct table
-> privilege is `events` INSERT, and all seven RPCs are executable by anon. The
-> guide remains the reference for re-provisioning or pointing at a new project.
+> **Current migration status (2026-09-05):** credentials and the original July
+> setup were previously configured. This release adds save integrity, event
+> ingestion, daily board cohorts and private support operations. Their SQL has
+> been rehearsed locally; hosted deployment is a separate release gate. The July
+> verification does not establish that these new RPCs exist in production.
 
 Everything below is **disabled by default** (until credentials are filled in, as
 they now are). The app ships and runs in Expo Go with zero network calls until you
@@ -39,17 +37,24 @@ when no DSN is set.
 
 ## 1. Supabase project
 
-> ✅ Already done for the live project (applied + verified 2026-07-02). The
-> steps below are for re-provisioning or pointing at a new project.
+> The original base schema was applied and verified on 2026-07-02. The new
+> integrity, daily-version and support migrations below have only been rehearsed
+> locally; their hosted deployment remains a release gate.
 
-Create a free project at supabase.com, then run
-**[`docs/supabase/security_setup.sql`](supabase/security_setup.sql)** in the SQL
-editor (as `postgres`, the editor's default role). The script is **idempotent
-and self-contained**: it creates the four app tables (`saves`, `events`,
-`daily_scores`, `daily_counters`) if missing, locks them down, and installs the
-RPC surface the client uses. Re-run it any time — including over a project that
-was provisioned with the older (pre-hardening) SQL from this guide; it removes
-the legacy wide-open policies in place.
+Create a project at supabase.com and apply the following as `postgres`, in order:
+
+1. [`security_setup.sql`](supabase/security_setup.sql) (base schema).
+2. [`save_integrity_v2.sql`](supabase/save_integrity_v2.sql).
+3. [`events_integrity_v2.sql`](supabase/events_integrity_v2.sql).
+4. [`daily_board_versions.sql`](supabase/daily_board_versions.sql).
+5. [`support_operations.sql`](supabase/support_operations.sql).
+
+Do not re-run the base script alone after upgrading: it would re-enable weak
+legacy save RPCs. Rehearse the sequence and permissions in a disposable project;
+see [save upgrade](SAVE_INTEGRITY_UPGRADE.md) and
+[support operations](SUPPORT_AND_RETENTION_RUNBOOK.md). A missing new RPC leaves
+cloud/analytics/ranking unavailable; the client does not fall back to unsafe
+legacy writes.
 
 Then paste `supabaseUrl` + `supabaseAnonKey` (Project Settings → API) into
 `app.json`. Cloud save, leaderboard, social proof, and analytics go live.
@@ -66,7 +71,7 @@ the database can never trust "who" is calling, only "what they know". The
 model:
 
 - **A player's owner id is an unguessable bearer capability** — a random
-  UUIDv4 install id, or the 8-char recovery code derived from it. Presenting a
+  128-bit random save capability encoded as a complete WS2 recovery code. The old short code is deprecated and its save RPCs are revoked. Presenting a
   row's owner id is the only way to touch that row.
 - **Direct table access for `anon` is fully denied.** RLS is enabled on every
   app table with no anon read/write policies, *and* the default table grants
@@ -78,17 +83,17 @@ model:
   `postgres`, `EXECUTE` granted to `anon`) that gates each operation on the
   caller presenting the owner id, and returns only that owner's data or pure
   aggregates:
-  - `get_save(p_owner)` / `get_save_timestamp(p_owner)` / `upsert_save(...)`
+  - `get_save_v2(p_owner)` / `upsert_save_v2(...)`
     — cloud save, one row per capability, 1 MB payload cap.
-  - `submit_daily_score(...)` — upserts only the caller's `(owner, date)` row,
+  - `submit_daily_score_v2(...)` — upserts only the caller's `(owner, date, board_version)` row,
     with hard bounds (time ≤ 24 h, stars 0–3, hints 0–50, handle ≤ 24 chars)
     so a poisoned client can't submit absurd scores.
-  - `daily_rank(p_date, p_owner)` — aggregate-only standing
+  - `daily_rank_v2(p_date, p_owner, p_board_version)` — aggregate-only standing
     (rank/total/percentile); never other players' ids or scores.
   - `bump_words_offered(...)` (bounded per call) / `aggregate_proof(...)` —
     two anonymous global numbers, nothing per-player.
 - **The `events` telemetry table is INSERT-only** for `anon` (no select). The
-  client posts with `Prefer: return=minimal`.
+  current client calls `ingest_events_v2` to deduplicate stable event IDs without granting SELECT access.
 
 **Residual risks (accepted):**
 
@@ -107,11 +112,13 @@ model:
   enumeration infeasible regardless.
 
 ### Recovery code (cloud save is auth-free)
-A reinstall gets a new anonymous id, so to move progress across devices the
-player uses **Settings → Backup & Restore**: "Show recovery code" (a
-`WS-XXXX-XXXX` code) on the old device, "Restore from another device" on the
-new one. Auto-restore on a fresh install only happens when the same id already
-has a cloud save.
+To move progress across devices, the player uses **Settings → Backup & Restore**:
+"Show recovery code" on the original device, then "Restore from another device"
+on the new one. A new `WS2-` code contains all 32 hexadecimal characters of the
+128-bit save capability in four groups of eight; it is shown only after a durable
+backup succeeds. A fresh installation without retained identity does not discover
+an unrelated backup automatically. Short legacy codes are not silently imported;
+follow [the original-device upgrade and verified support procedure](SAVE_INTEGRITY_UPGRADE.md).
 
 ## 2. Sentry (crash reporting)
 

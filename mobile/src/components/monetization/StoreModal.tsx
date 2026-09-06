@@ -1,3 +1,5 @@
+import { SupportComparison } from './SupportComparison';
+import { saveWithPlayerRetry } from '../../services/saveRetry';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -30,7 +32,7 @@ import {
   purchaseConsumable,
   purchaseStarterPack,
   purchaseProduct,
-  acknowledgeConsumableGrant,
+  settleConsumableGrant,
   IapProduct,
 } from '../../services/iap';
 import {
@@ -384,8 +386,9 @@ export const StoreModal: React.FC<StoreModalProps> = ({
       try {
         const result = await purchaseConsumable(info.productId);
         if (result.success && result.reward) {
+          const credit = await saveWithPlayerRetry(() => settleConsumableGrant(result.grantId!));
           if (result.reward.kind === 'amber') {
-            const balance = await awardBonusAmber(result.reward.amount, `iap_${info.productId}`);
+            const balance = credit.amberBalance;
             onAmberChange?.(balance);
             setFirstAmberDouble(!hasMadeAmberPurchaseSync());
             if (result.firstPurchaseDoubled) {
@@ -401,15 +404,9 @@ export const StoreModal: React.FC<StoreModalProps> = ({
               setSuccessMsg(`+${result.reward.amount} amber added.`);
             }
           } else {
-            const balance = await addHints(result.reward.amount, `iap_${info.productId}`);
+            const balance = credit.hintBalance;
             onHintsChange?.(balance);
             setSuccessMsg(`+${result.reward.amount} hints added.`);
-          }
-          // Apply-then-ack: the grant is only cleared from the pending ledger
-          // once the reward has actually landed, so a kill mid-flow replays the
-          // grant (at-least-once) instead of losing a paid purchase.
-          if (result.grantId) {
-            acknowledgeConsumableGrant(result.grantId).catch(() => {});
           }
           logEvent({ type: 'iap_purchase', data: { productId: info.productId, kind: result.reward.kind } });
           hapticMedium();
@@ -441,18 +438,10 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     try {
       const result = await purchaseStarterPack();
       if (result.success && result.reward) {
-        // Apply-then-ack per grant (see handleBuyConsumable): a kill mid-flow
-        // replays the missing half rather than losing a paid bundle.
-        const balance = await awardBonusAmber(result.reward.amber, 'iap_starter');
-        onAmberChange?.(balance);
-        if (result.grantIds?.amber) {
-          acknowledgeConsumableGrant(result.grantIds.amber).catch(() => {});
-        }
-        const hints = await addHints(result.reward.hints, 'iap_starter');
-        onHintsChange?.(hints);
-        if (result.grantIds?.hints) {
-          acknowledgeConsumableGrant(result.grantIds.hints).catch(() => {});
-        }
+        const amberCredit = await saveWithPlayerRetry(() => settleConsumableGrant(result.grantIds!.amber!));
+        onAmberChange?.(amberCredit.amberBalance);
+        const hintCredit = await saveWithPlayerRetry(() => settleConsumableGrant(result.grantIds!.hints!));
+        onHintsChange?.(hintCredit.hintBalance);
         setOwnsStarter(true);
         // The Keeper's Welcome is a marquee moment: present the bundle as a
         // real gift (amber + hints each counting up), not an appended line.
@@ -685,6 +674,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
           </View>
 
           <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+            <SupportComparison phase={phase} />
             {!ownsStarter && (
               <PanelCard phase={phase} style={styles.heroCard}>
                 <View style={styles.heroRibbonRow}>

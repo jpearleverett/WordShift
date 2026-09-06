@@ -19,7 +19,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: mobile/package-lock.json
 
@@ -34,3 +34,17 @@ jobs:
 
       - name: Test
         run: npm test -- --no-coverage --ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Rendered game journeys
+        run: npm run test:e2e
+
+      - name: Upload browser evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rendered-game-journeys
+          path: mobile/playwright-report/
+          retention-days: 14

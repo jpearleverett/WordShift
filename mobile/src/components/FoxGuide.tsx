@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,11 +8,11 @@ import {
   Easing,
   Image,
   ImageSourcePropType,
-  Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 import { DialogueBody } from './home/DialogueBody';
 import { getDialogueTheme } from '../theme/colors';
-import { getSettingsSync } from '../services/settings';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 import { hapticLight } from '../services/haptics';
 import { playUiSound } from '../services/uiSound';
 import {
@@ -71,7 +71,6 @@ const foxBevelStyles = StyleSheet.create({
   label: { fontFamily: PIXEL_FONT_BOLD, fontSize: FONT_SIZE.callout, fontWeight: '800', letterSpacing: 0.4 },
 });
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // Fox sprites with fallback
 let foxTalkSprite: ImageSourcePropType | null = null;
@@ -135,6 +134,8 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
   speaking = true,
   variant = 'compact',
 }) => {
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
+  const styles = useMemo(() => createStyles(SCREEN_WIDTH, SCREEN_HEIGHT), [SCREEN_WIDTH, SCREEN_HEIGHT]);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
   const bounceAnim = useRef(new Animated.Value(0)).current;
@@ -144,7 +145,7 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
   // safe "keep going" gets the prominent pill; the skip is the quiet button),
   // so one stray touch can never silently abandon the guided intro.
   const [confirmingSkip, setConfirmingSkip] = useState(false);
-  const reducedMotion = getSettingsSync().reducedMotion;
+  const reducedMotion = useReducedMotion();
   const hasInteractiveControls = Boolean(onContinue || (showSkip && onSkip));
   // The card renders nothing without text (see the early returns below), so the
   // talk toggle must also key on this — otherwise a visible-but-textless guide
@@ -415,7 +416,7 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (SCREEN_WIDTH: number, SCREEN_HEIGHT: number) => StyleSheet.create({
   // ---- Shared container ----
   container: {
     position: 'absolute',

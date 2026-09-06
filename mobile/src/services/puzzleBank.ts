@@ -1,3 +1,4 @@
+import { isPuzzleVocabularyFair } from './puzzleVocabulary';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PuzzleConfig, Difficulty } from '../types';
 import type { PreGeneratedPuzzle } from '../data/puzzleBankTypes';
@@ -25,6 +26,7 @@ import {
   BANK_NOVEL_BONUS_SOME,
 } from '../constants/gameBalance';
 import { isUnbrokenWeaveEligible } from './unbrokenWeave';
+import { qualifyFreshBankPuzzle } from './bankDeliveryPolicy';
 
 // Delivered-experience branching steering. Measured over the shipped banks,
 // 62-71% of puzzles have exactly ONE complete solution path, so an unsteered
@@ -197,7 +199,15 @@ const BANK_REGISTRY: Record<string, BankRegistryEntry> = {
 function getBank(bankKey: string): PreGeneratedPuzzle[] {
   const entry = BANK_REGISTRY[bankKey] ?? BANK_REGISTRY['standard'];
   if (!entry.bankData) {
-    entry.bankData = entry.loadBank();
+    const advanced = bankKey.startsWith('lex_') || bankKey.includes('expert');
+    const variant = bankKey.startsWith('reverse') || bankKey.startsWith('lex_rev_') ? 'reverse'
+      : bankKey.startsWith('ds_') || bankKey.startsWith('lex_ds_') ? 'double_shift' : 'standard';
+    entry.bankData = entry.loadBank().flatMap(puzzle => {
+      // Repair only the returned copy, once at bank load. The full replay must
+      // obey fresh rules and its actual words must pass the vocabulary policy.
+      const delivered = qualifyFreshBankPuzzle(puzzle, advanced, variant, word => COMMON_WORDS.has(word));
+      return delivered ? [delivered] : [];
+    });
   }
   return entry.bankData;
 }
@@ -236,6 +246,7 @@ function getCachedStandardExtension(
     excludedWords: new Set(puzzle.allWords),
   });
   const result = extended.words.length === base.words.length + 1
+    && isPuzzleVocabularyFair(extended, bankKey.startsWith('lex_') || bankKey.includes('expert'))
     ? extended
     : null;
   standardExtensionCache.set(cacheKey, result);

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Swaps completed gated-regeneration sidecars over the live standard banks.
+ * Swaps reviewed gated sidecars over existing live banks with backups.
  *
  * For each bank whose sidecar (src/data/.gatedRegen_<bank>_output.ts) exists
  * and holds at least the threshold number of puzzles (arg 1, default 400):
@@ -11,20 +11,31 @@
  *   3. prints per-bank before/after puzzle counts.
  * A sidecar below the threshold is refused (the live bank is left untouched).
  *
- * Usage: cd mobile && node scripts/swapGatedBanks.mjs [threshold]
+ * Legacy usage: node scripts/swapGatedBanks.mjs [threshold] [--dry-run]
+ *   Scans the original 12 core banks only.
+ * Targeted usage: node scripts/swapGatedBanks.mjs <threshold> <standard|reverse|double> <EASY|...|LEX_EXPERT> [--dry-run]
+ *   Selects exactly one of all 30 banks, including Expert and Lexicon.
  */
 
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { getGatedBankTarget } from './tools/gatedBankTarget.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, '..', 'src', 'data');
 
-const rawThreshold = process.argv[2];
+const dryRun = process.argv.slice(2).includes('--dry-run');
+const args = process.argv.slice(2).filter(argument => argument !== '--dry-run');
+const [rawThreshold, family, selection] = args;
 const THRESHOLD = rawThreshold === undefined ? 400 : Number(rawThreshold);
-if (!Number.isFinite(THRESHOLD) || THRESHOLD < 0) {
-  console.error(`Invalid threshold '${rawThreshold}' (expected a non-negative number)`);
+if (!Number.isInteger(THRESHOLD) || THRESHOLD < 1) {
+  console.error(`Invalid threshold '${rawThreshold}' (expected a positive integer)`);
+  process.exit(1);
+}
+const selectedTarget = family === undefined ? null : getGatedBankTarget(family, selection);
+if (![0, 1, 3].includes(args.length) || (family !== undefined && !selectedTarget)) {
+  console.error('Usage: node scripts/swapGatedBanks.mjs [threshold] [standard|reverse|double EASY|...|LEX_EXPERT] [--dry-run]');
   process.exit(1);
 }
 
@@ -32,20 +43,8 @@ if (!Number.isFinite(THRESHOLD) || THRESHOLD < 0) {
 // banks use .gatedRegen_<key>_output.ts, reverse banks .gatedRegenReverse_<key>_output.ts.
 // A bank whose sidecar does not exist is simply skipped, so this one script
 // swaps whichever banks have a finished sidecar (standard and/or reverse).
-const BANKS = [
-  { bank: 'EASY', key: 'easy', liveFile: 'puzzleBankEasy.ts', exportName: 'PUZZLE_BANK_EASY', sidecar: '.gatedRegen_easy_output.ts' },
-  { bank: 'MEDIUM', key: 'medium', liveFile: 'puzzleBankMedium.ts', exportName: 'PUZZLE_BANK_MEDIUM', sidecar: '.gatedRegen_medium_output.ts' },
-  { bank: 'MEDIUM_PLUS', key: 'medium_plus', liveFile: 'puzzleBankMediumPlus.ts', exportName: 'PUZZLE_BANK_MEDIUM_PLUS', sidecar: '.gatedRegen_medium_plus_output.ts' },
-  { bank: 'HARD', key: 'hard', liveFile: 'puzzleBankHard.ts', exportName: 'PUZZLE_BANK_HARD', sidecar: '.gatedRegen_hard_output.ts' },
-  { bank: 'REVERSE_EASY', key: 'reverse_easy', liveFile: 'puzzleBankReverseEasy.ts', exportName: 'PUZZLE_BANK_REVERSE_EASY', sidecar: '.gatedRegenReverse_reverse_easy_output.ts' },
-  { bank: 'REVERSE_MEDIUM', key: 'reverse_medium', liveFile: 'puzzleBankReverseMedium.ts', exportName: 'PUZZLE_BANK_REVERSE_MEDIUM', sidecar: '.gatedRegenReverse_reverse_medium_output.ts' },
-  { bank: 'REVERSE_MEDIUM_PLUS', key: 'reverse_medium_plus', liveFile: 'puzzleBankReverseMediumPlus.ts', exportName: 'PUZZLE_BANK_REVERSE_MEDIUM_PLUS', sidecar: '.gatedRegenReverse_reverse_medium_plus_output.ts' },
-  { bank: 'REVERSE_HARD', key: 'reverse_hard', liveFile: 'puzzleBankReverseHard.ts', exportName: 'PUZZLE_BANK_REVERSE_HARD', sidecar: '.gatedRegenReverse_reverse_hard_output.ts' },
-  { bank: 'DOUBLE_EASY', key: 'double_easy', liveFile: 'puzzleBankDoubleShiftEasy.ts', exportName: 'PUZZLE_BANK_DOUBLE_SHIFT_EASY', sidecar: '.gatedRegenDouble_double_easy_output.ts' },
-  { bank: 'DOUBLE_MEDIUM', key: 'double_medium', liveFile: 'puzzleBankDoubleShiftMedium.ts', exportName: 'PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM', sidecar: '.gatedRegenDouble_double_medium_output.ts' },
-  { bank: 'DOUBLE_MEDIUM_PLUS', key: 'double_medium_plus', liveFile: 'puzzleBankDoubleShiftMediumPlus.ts', exportName: 'PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM_PLUS', sidecar: '.gatedRegenDouble_double_medium_plus_output.ts' },
-  { bank: 'DOUBLE_HARD', key: 'double_hard', liveFile: 'puzzleBankDoubleShiftHard.ts', exportName: 'PUZZLE_BANK_DOUBLE_SHIFT_HARD', sidecar: '.gatedRegenDouble_double_hard_output.ts' },
-];
+const BANKS = selectedTarget ? [selectedTarget] : ['standard', 'reverse', 'double'].flatMap(kind =>
+  ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'].map(difficulty => getGatedBankTarget(kind, difficulty)));
 
 /** Count serialized puzzles by their id fields (robust to header drift). */
 function countPuzzles(content) {
@@ -99,6 +98,11 @@ for (const { bank, key, liveFile, exportName, sidecar } of BANKS) {
     continue;
   }
 
+  if (dryRun) {
+    console.log(`${bank}: DRY RUN — would replace ${liveFile}, ${liveCount} → ${sidecarCount} puzzles; backup ${path.basename(backupPath)}`);
+    continue;
+  }
+
   // 1. Back up the live bank.
   fs.copyFileSync(livePath, backupPath);
   // 2. Atomic replace: write tmp in the same directory, then rename over live.
@@ -111,4 +115,4 @@ for (const { bank, key, liveFile, exportName, sidecar } of BANKS) {
 }
 
 console.log(`\nSwap complete: ${swapped} swapped, ${refused} refused (below threshold ${THRESHOLD}), ${skipped} skipped (no sidecar), ${failed} failed guards`);
-process.exit(failed > 0 ? 1 : 0);
+process.exit(failed > 0 || (selectedTarget && (refused > 0 || skipped > 0)) ? 1 : 0);

@@ -1,3 +1,4 @@
+import { isPuzzleVocabularyFair } from '../services/puzzleVocabulary';
 import { createMockAsyncStorage } from './helpers/mockAsyncStorage';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -17,6 +18,7 @@ import {
   clearPlayedPuzzles,
   getGuaranteedExtendedStandardFallback,
   selectPreGeneratedPuzzle,
+  selectDailyBankPuzzle,
 } from '../services/puzzleBank';
 import { PUZZLE_BANK_HARD } from '../data/puzzleBankHard';
 import { PUZZLE_BANK_REVERSE_HARD } from '../data/puzzleBankReverseHard';
@@ -40,6 +42,17 @@ beforeEach(async () => {
 });
 
 describe('puzzleBank', () => {
+  it('never delivers the formerly multi-route board whose alternative now requires WHATS', () => {
+    const lostRoute = PUZZLE_BANK_EASY.find(puzzle => puzzle.id === '33a2d13c19a0')!;
+    expect(isPuzzleVocabularyFair(lostRoute)).toBe(true);
+    const { analyzeStandardBranching } = require('../services/puzzleBranching');
+    expect(analyzeStandardBranching(lostRoute.words, (word: string) => COMMON_WORDS.has(word)).completePathCount).toBe(1);
+    // Traverse every position of the deterministic daily's eligible EASY pool.
+    for (let i = 0; i <= PUZZLE_BANK_EASY.length; i++) {
+      const delivered = selectDailyBankPuzzle('EASY', i / PUZZLE_BANK_EASY.length);
+      expect(delivered?.words).not.toEqual(lostRoute.words);
+    }
+  });
   describe('selectPreGeneratedPuzzle', () => {
     it('returns a valid PuzzleConfig for HARD difficulty', async () => {
       const result = await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap());
@@ -144,12 +157,14 @@ describe('puzzleBank', () => {
       // Not every board is +1-row-extendable, so pick the first that genuinely
       // is (the bank content changes across regenerations; the old [0]
       // assumption was brittle), then force selection to it.
-      const extendable = PUZZLE_BANK_EASY.find(p =>
-        extendStandardPuzzle(
+      const extendable = PUZZLE_BANK_EASY.find(p => {
+        const extended = extendStandardPuzzle(
           { words: p.words, solution: p.solution, wordLength: p.wordLength },
           { excludedWords: new Set(p.allWords) },
-        )?.words.length === p.words.length + 1,
-      )!;
+        );
+        return isPuzzleVocabularyFair(p) && extended.words.length === p.words.length + 1
+          && isPuzzleVocabularyFair(extended);
+      })!;
       await AsyncStorage.setItem(
         'wordshift_played_std_easy_puzzle_ids',
         JSON.stringify(

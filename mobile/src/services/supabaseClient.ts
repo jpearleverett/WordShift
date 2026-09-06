@@ -1,4 +1,4 @@
-import { getInstallId } from './telemetry';
+import { getInstallId } from './installIdentity';
 
 /**
  * Shared Supabase REST client for WordShift.
@@ -79,26 +79,20 @@ async function fetchWithTimeout(
   init: RequestInit,
   timeoutMs: number,
 ): Promise<Response | null> {
+  const controller = typeof globalThis.AbortController === 'function'
+    ? new globalThis.AbortController() : undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    const AbortController = (global as Record<string, unknown>).AbortController as
-      | (new () => { signal: unknown; abort(): void })
-      | undefined;
-    if (AbortController) {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
-      try {
-        return await fetch(url, { ...init, signal: controller.signal as never });
-      } finally {
-        clearTimeout(timer);
-      }
-    }
-    // No AbortController (older RN / Node test) — fall back to a plain race.
-    return (await Promise.race([
-      fetch(url, init),
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs)),
-    ])) as Response | null;
+    return await Promise.race([
+      fetch(url, { ...init, signal: controller?.signal }),
+      new Promise<null>(resolve => {
+        timer = setTimeout(() => { controller?.abort(); resolve(null); }, timeoutMs);
+      }),
+    ]);
   } catch {
     return null;
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 

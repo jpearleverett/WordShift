@@ -1,4 +1,10 @@
-import { beginStoryCycle, clearStoryState } from '../services/storySpine';
+import { saveWithPlayerRetry } from '../services/saveRetry';
+import { recoverPendingStorageTransaction, StorageRecoveryRequiredError } from '../services/persistenceStorage';
+import { runMigrations } from '../services/dataMigration';
+import { getSupportIdentifier } from '../services/supportIdentity';
+import { commitFullLocalReset, commitNewCycle } from '../services/resetStorage';
+import { clearPendingVictory } from '../services/victoryPersistence';
+import { clearStoryState } from '../services/storySpine';
 import React, { useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -21,7 +27,7 @@ import Constants from 'expo-constants';
 import * as Updates from 'expo-updates';
 import * as Application from 'expo-application';
 import { isSupabaseConfigured } from '../services/supabaseClient';
-import { getOrCreateRecoveryCode, linkRecoveryCode, downloadFromCloud, clearSyncStatus, uploadToCloud, getSyncStatus } from '../services/cloudSave';
+import { getOrCreateRecoveryCode, restoreFromRecoveryCode, CloudRecoveryError, downloadFromCloud, clearSyncStatus, uploadToCloud, getSyncStatus } from '../services/cloudSave';
 import { showGameAlert } from '../services/gameAlert';
 import { SURFACE, getSurfaceTheme, getModalInSpring, SurfaceTheme } from '../theme/surfaces';
 import { PanelCard } from './ui/PanelCard';
@@ -44,7 +50,6 @@ import {
   purchaseStreakFreeze,
   STREAK_FREEZE_AMBER_COST,
   canStartNewCycle,
-  startNewCycle,
 } from '../services/amberCurrency';
 import { restorePurchases } from '../services/iap';
 import { STREAK_FREEZE_CAP } from '../constants/gameBalance';
@@ -110,6 +115,10 @@ interface SettingsScreenProps {
    * restarting onboarding (App.tsx: rebuildSessionFromStorage({restartOnboarding:false})).
    */
   onCloudRestored?: () => void;
+  /** Keep the replaced session fenced through network work and its rebuild. */
+  onSessionTransitionChange?: (stage: 'saving' | 'waiting' | null) => void;
+  /** The host presents the ceremony outside its hidden background subtree. */
+  onNewCycleCommitted?: () => void;
 }
 
 // Native build identity. `expo-application` reads the installed APK/IPA's real
@@ -164,7 +173,11 @@ export const LOCAL_RESET_MARKER_KEY = 'wordshift_local_reset_at';
  * Returns the names of any clears that failed (empty array on full success).
  */
 export async function performFullReset(): Promise<string[]> {
+  // Commit all durable deletions and the anti-resurrection marker first.
+  // Failure is retryable and must never proceed to a partially reset session.
+  await commitFullLocalReset();
   const clears: Array<[string, () => Promise<unknown>]> = [
+    ['victoryIntent', clearPendingVictory],
     ['stats', clearStats],
     ['achievements', clearAchievements],
     ['dailyChallenge', clearDailyProgress],
@@ -223,39 +236,17 @@ export async function performFullReset(): Promise<string[]> {
     }
   });
 
-  // Stamp the reset locally BEFORE the upload, and after the clears batch
-  // (clearSyncStatus deletes the device/owner keys in that same batch, so a
-  // marker written inside it could be clobbered by an unrelated ordering
-  // change). The upload below is the only thing standing between a reset and
-  // the bootstrap's fresh-install auto-restore, and it is exactly the call most
-  // likely to fail: one 8s RPC fired at the moment the player deliberately
-  // wipes their save, with no retry and no visible failure. Offline, it failed
-  // silently, Updates.reloadAsync restarted the app, clearProgress had made
-  // wordshift_home_progress empty, the install id was unchanged, and the whole
-  // pre-reset save came straight back down. The marker is a timestamp so
-  // maybeAutoRestoreOnFreshInstall can refuse a cloud row that predates the
-  // reset while still accepting a genuinely newer save from another device.
-  //
-  // Deliberately device-local: NOT in cloudSave.SYNC_KEYS (it would round-trip
-  // through a restore and defeat itself) and NOT cleared by Reset All — same
-  // category as wordshift_pending_iap_grants.
-  try {
-    await AsyncStorage.setItem(LOCAL_RESET_MARKER_KEY, String(Date.now()));
-  } catch {
-    // Best effort: a marker we cannot write just leaves the old behaviour.
-  }
+  // The commit above already stamped the reset atomically with the wipe.
+  // Cache/system-notification cleanup failures do not undo that durable reset.
 
   // Overwrite the cloud row with the now-empty local state so the bootstrap's
   // fresh-install auto-restore can't resurrect the pre-reset save after the
   // reload. NoOp provider (cloud unconfigured) makes this a harmless no-op;
   // an offline failure must never block the reset itself.
   try {
-    const uploaded = await uploadToCloud();
-    if (uploaded) {
-      // The cloud row now matches the reset state, so there is nothing left to
-      // guard against and the marker must not outlive its reason.
-      await AsyncStorage.removeItem(LOCAL_RESET_MARKER_KEY);
-    }
+    // cloudSave acknowledges only the marker captured by this upload. An
+    // unconditional deletion here could erase a later reset's protection.
+    await uploadToCloud(true);
   } catch {
     // Non-fatal: the local wipe already succeeded, and the marker stands.
   }
@@ -276,34 +267,13 @@ export async function performFullReset(): Promise<string[]> {
  * Exported for regression testing.
  */
 export async function performNewCycle(): Promise<number> {
-  const before = await canStartNewCycle();
-  if (!before) return 0;
-  const cycle = await startNewCycle();
-  const nextProgress = await getFullProgress();
-  await beginStoryCycle({
-    phase: nextProgress.currentPhase, puzzlesSolved: nextProgress.puzzlesSolved,
-    cycleCount: nextProgress.cycleCount ?? 0, cycleStartPuzzles: nextProgress.cycleStartPuzzles,
-    unlockedAnimals: nextProgress.unlockedAnimals,
-  }).catch(() => {
-    // The previous cycle's durable record can be adopted lazily on next read.
-    // A failed carryover write must not interrupt the other cycle resets.
-  });
-  // Reset only the narrative-gating state so the descent replays; each is
-  // independent, so one failure can't abort the rest.
-  const clears: Array<() => Promise<unknown>> = [
-    clearAllSessions,
-    clearNarrativeDeliveryState,
-    clearChoiceState,
-    resetMicroBeats,
-    clearOfferingRequests,
-  ];
-  await Promise.allSettled(clears.map(async (fn) => fn()));
+  const cycle = await commitNewCycle();
   try {
-    // NG+ is a deliberate overwrite of narrative state — force past the
-    // newer-save conflict guard so the new cycle always becomes the cloud row.
-    await uploadToCloud(true);
+    // A local New Cycle does not authorize replacing a diverged remote save.
+    // A retry after journal recovery can return 0, but still needs to sync.
+    await uploadToCloud();
   } catch {
-    // Non-fatal.
+    // Non-fatal: local progress is durable, and a remote conflict stays visible.
   }
   return cycle;
 }
@@ -390,7 +360,7 @@ const CottageSwitch: React.FC<CottageSwitchProps> = ({
   );
 };
 
-export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, onReset, onCloudRestored }) => {
+export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, onReset, onCloudRestored, onSessionTransitionChange, onNewCycleCommitted }) => {
   const screenInsets = useScreenInsets();
   const [settings, setSettings] = useState<GameSettings | null>(null);
   const [dailyRemindersOn, setDailyRemindersOn] = useState(false);
@@ -402,9 +372,11 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
   const [showRestore, setShowRestore] = useState(false);
   const [restoreInput, setRestoreInput] = useState('');
   const [restoreBusy, setRestoreBusy] = useState(false);
+  const [restoreRecoveryRequired, setRestoreRecoveryRequired] = useState(false);
   // A newer cloud save exists on another device (upload conflict guard fired).
   const [syncConflict, setSyncConflict] = useState(false);
   const [purchaseRestoreBusy, setPurchaseRestoreBusy] = useState(false);
+  const [supportIdentifier, setSupportIdentifier] = useState<string | null>(null);
   // UMP privacy-options entry point (required to stay visible for EEA users
   // under the Google EU User Consent Policy; hidden everywhere else).
   const [privacyOptionsAvailable, setPrivacyOptionsAvailable] = useState(false);
@@ -495,8 +467,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
     try {
       const code = await getOrCreateRecoveryCode();
       setRecoveryCode(code);
-    } catch {
-      showGameAlert('Backup', 'Could not generate a recovery code right now.');
+    } catch (error) {
+      showGameAlert('Backup', error instanceof CloudRecoveryError ? error.message : 'Could not back up your progress right now. Please try again.');
     }
   };
 
@@ -505,12 +477,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
     if (!code) return;
     setRestoreBusy(true);
     try {
-      const linked = await linkRecoveryCode(code);
-      if (!linked) {
-        showGameAlert('Restore', "That code doesn't look right. Check it and try again.");
-        return;
-      }
-      const restored = await downloadFromCloud();
+      const restored = await restoreFromRecoveryCode(code);
       setShowRestore(false);
       setRestoreInput('');
       if (restored) {
@@ -524,8 +491,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
       } else {
         showGameAlert('Restore', 'No saved progress was found for that code yet.');
       }
-    } catch {
-      showGameAlert('Restore', 'Something went wrong restoring your progress.');
+    } catch (error) {
+      if (error instanceof StorageRecoveryRequiredError) { setRestoreRecoveryRequired(true); return; }
+      showGameAlert('Restore', error instanceof CloudRecoveryError ? error.message : 'Something went wrong restoring your progress. Your existing save is unchanged.');
     } finally {
       setRestoreBusy(false);
     }
@@ -539,6 +507,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
 
   useEffect(() => {
     getSettings().then(setSettings);
+    getSupportIdentifier().then(setSupportIdentifier).catch(() => {});
     getNotificationPrefs().then((prefs) => {
       setDailyRemindersOn(prefs.enabled && prefs.dailyReminderEnabled);
     });
@@ -554,6 +523,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
   // it is gated behind a confirm that spells out exactly what is kept vs lost
   // (the old one-tap "Use the newer save" wiped local progress with no warning).
   const runCloudRestore = () => {
+    if (restoreBusy) return;
+    setRestoreBusy(true);
     (async () => {
       try {
         const restored = await downloadFromCloud();
@@ -567,9 +538,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
         } else {
           showGameAlert('Restore', 'Could not fetch the newer save right now. Try again later.');
         }
-      } catch {
+      } catch (error) {
+        if (error instanceof StorageRecoveryRequiredError) { setRestoreRecoveryRequired(true); return; }
         showGameAlert('Restore', 'Something went wrong restoring your progress.');
-      }
+      } finally { setRestoreBusy(false); }
     })();
   };
 
@@ -656,11 +628,26 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
         {
           text: getNewCycleCTA(),
           onPress: async () => {
-            // Commit the new cycle to storage (force-uploads it as the cloud
-            // row inside performNewCycle), then play the serene re-descent
-            // ceremony; its onComplete performs the reload.
-            await performNewCycle();
-            setCycleCeremony(NEW_CYCLE_EVENT);
+            // Commit the cycle and its archive before the re-descent ceremony.
+            let previousCycle: number | undefined;
+            const cycle = await saveWithPlayerRetry(async () => {
+              onSessionTransitionChange?.('saving');
+              try {
+                previousCycle ??= (await getFullProgress()).cycleCount ?? 0;
+                await performNewCycle();
+                return (await getFullProgress()).cycleCount ?? 0;
+              } catch (error) {
+                onSessionTransitionChange?.('waiting');
+                throw error;
+              }
+            }, {
+              title: 'Your new cycle is waiting',
+              message: 'We could not finish saving the new cycle. Free device storage if it is full, then retry.',
+            });
+            if (cycle <= (previousCycle ?? cycle)) { onSessionTransitionChange?.(null); return; }
+            onSessionTransitionChange?.('waiting');
+            if (onNewCycleCommitted) onNewCycleCommitted();
+            else setCycleCeremony(NEW_CYCLE_EVENT);
           },
         },
       ]
@@ -758,12 +745,33 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
           text: 'Reset Everything',
           style: 'destructive',
           onPress: async () => {
-            await performFullReset();
-            const fresh = await getSettings();
-            setSettings(fresh);
-            const freshPrefs = await getNotificationPrefs();
-            setDailyRemindersOn(freshPrefs.enabled && freshPrefs.dailyReminderEnabled);
-            await refreshStreakFreeze();
+            await saveWithPlayerRetry(async () => {
+              onSessionTransitionChange?.('saving');
+              try { return await performFullReset(); }
+              catch (error) { onSessionTransitionChange?.('waiting'); throw error; }
+            }, {
+              title: 'Reset is waiting',
+              message: 'Your device could not finish saving the reset. Free some storage if it is full, then retry.',
+            });
+            // Refresh may fail after the reset already committed. Retry only
+            // the refresh so the player never repeats a completed reset.
+            await saveWithPlayerRetry(async () => {
+              onSessionTransitionChange?.('saving');
+              try {
+                const fresh = await getSettings();
+                setSettings(fresh);
+                const freshPrefs = await getNotificationPrefs();
+                setDailyRemindersOn(freshPrefs.enabled && freshPrefs.dailyReminderEnabled);
+                await refreshStreakFreeze();
+              } catch (error) {
+                onSessionTransitionChange?.('waiting');
+                throw error;
+              }
+            }, {
+              title: 'Your reset is saved',
+              message: 'We could not finish opening the fresh game. Free device storage if it is full, then retry.',
+            });
+            onSessionTransitionChange?.('waiting');
             // Reload the app so it re-enters the intro tutorial from a clean slate.
             // Onboarding only initializes at launch, so a live wipe alone would
             // leave the running session stuck on a stale "complete" state — the
@@ -796,6 +804,34 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
       ]
     );
   };
+
+  if (restoreRecoveryRequired) {
+    return <Modal visible animationType="none" onRequestClose={() => {}}>
+      <View style={{ flex: 1, padding: 24, justifyContent: 'center', backgroundColor: '#FFF0F5' }}>
+        <Text style={{ color: '#443126', fontSize: 20, marginBottom: 12 }}>Finishing your restored save</Text>
+        <Text style={{ color: '#443126', fontSize: 16, marginBottom: 20 }}>Your backup was received, but the device could not finish writing it. Free some device storage if it is full, then retry.</Text>
+        <CandyButton label={restoreBusy ? 'Finishing…' : 'Retry restore'} phase={phase} disabled={restoreBusy} onPress={async () => {
+          setRestoreBusy(true);
+          try {
+            await recoverPendingStorageTransaction();
+            await runMigrations();
+            onCloudRestored?.();
+            setRestoreRecoveryRequired(false);
+          } catch { /* Keep the protected recovery screen until commit succeeds. */ }
+          finally { setRestoreBusy(false); }
+        }} />
+      </View>
+    </Modal>;
+  }
+
+  if (restoreBusy) {
+    return <Modal visible animationType="none" onRequestClose={() => {}}>
+      <View style={{ flex: 1, padding: 24, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFF0F5' }} accessibilityViewIsModal>
+        <ActivityIndicator size="large" color="#76533A" />
+        <Text accessibilityLiveRegion="polite" style={{ color: '#443126', fontSize: 18, marginTop: 20 }}>Restoring your progress…</Text>
+      </View>
+    </Modal>;
+  }
 
   // Skeleton: render the header + a few empty PanelCards from static props
   // while the settings load lands, so the reveal never exposes a blank
@@ -989,7 +1025,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
             {recoveryCode && (
               <View style={[styles.recoveryCodeBox, { backgroundColor: t.rowBg, borderColor: t.rowBorder }]}>
                 <Text style={[styles.recoveryCodeText, { color: t.title }]} accessibilityLabel={`Recovery code ${recoveryCode}`}>{recoveryCode}</Text>
-                <Text style={[styles.recoveryCodeHint, { color: t.muted }]}>Write this down. Enter it on a new device to restore your progress.</Text>
+                <Text style={[styles.recoveryCodeHint, { color: t.muted }]}>Backup saved. Keep this code private: anyone with it can restore your progress. Enter it on a new device to continue.</Text>
               </View>
             )}
             <TouchableOpacity style={[styles.aboutRow, rowTint]} onPress={() => { hapticLight(); setShowRestore(true); }} accessibilityRole="button" accessibilityLabel="Restore from another device">
@@ -1127,13 +1163,16 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
           )}
           <TouchableOpacity
             style={[styles.aboutRow, rowTint]}
-            onPress={() => openLink(getSupportMailto(APP_VERSION))}
+            onPress={() => openLink(getSupportMailto(APP_VERSION, supportIdentifier ?? undefined))}
             accessibilityRole="button"
             accessibilityLabel="Contact Support"
           >
             <Text style={[styles.linkText, { color: t.secondaryText }]}>Contact Support</Text>
             <Image source={CHEVRON_ICON} style={styles.linkChevronIcon} resizeMode="contain" accessible={false} />
           </TouchableOpacity>
+          {supportIdentifier && <View style={styles.aboutRow}>
+            <Text selectable style={[styles.recoveryCodeHint, { color: t.muted }]}>Support ID: {supportIdentifier}</Text>
+          </View>}
           <View style={styles.aboutRow}>
             <Text style={[styles.aboutLabel, { color: t.body }]}>WordShift</Text>
             <Text style={[styles.aboutValue, { color: t.muted }]}>{`v${NATIVE_VERSION} (${NATIVE_BUILD})`}</Text>
@@ -1151,7 +1190,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
         <View style={styles.bottomSpacer} />
       </ScrollView>
 
-      <Modal visible={restoreVisible} transparent animationType="none" statusBarTranslucent onRequestClose={() => setShowRestore(false)}>
+      <Modal visible={restoreVisible} transparent animationType="none" statusBarTranslucent onRequestClose={() => { if (!restoreBusy) setShowRestore(false); }}>
         <View style={styles.restoreRoot}>
           <Animated.View
             style={[styles.restoreBackdrop, { backgroundColor: t.overlay, opacity: restoreBackdrop }]}
@@ -1164,7 +1203,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
                 style={[styles.restoreInput, { borderColor: t.sectionBorder, backgroundColor: t.sectionBg, color: t.title }]}
                 value={restoreInput}
                 onChangeText={setRestoreInput}
-                placeholder="WS-XXXX-XXXX"
+                placeholder="Paste your private recovery code"
                 placeholderTextColor={t.muted}
                 autoCapitalize="characters"
                 autoCorrect={false}

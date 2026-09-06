@@ -378,8 +378,8 @@ export const PatronModal: React.FC<PatronModalProps> = ({
             <View style={styles.removeAdsBlock}>
               <StoreArtThumb artKey={PRODUCT_IDS.REMOVE_ADS} />
               <Text style={[styles.removeAdsHint, { color: t.body }]}>
-                Just want the convenience? Skip the ads and claim your doubled
-                reward after each puzzle with a single tap.
+                Just want the convenience? Skip the ads and claim offered victory
+                doubles with a single tap. Daily and story limits still apply.
               </Text>
               <CandyButton
                 label={`Remove Ads · ${adsPriceString ?? REMOVE_ADS_FALLBACK_PRICE}`}

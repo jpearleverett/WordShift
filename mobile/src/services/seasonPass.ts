@@ -23,11 +23,11 @@
  * Persisted under `wordshift_season_pass`; cloud-synced (progress/claims follow
  * the player), cleared by Reset All, cache invalidated on cloud restore.
  */
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage, { isStorageTransactionActive, runStorageTransaction } from './persistenceStorage';
 import { getLocalDateString } from './dateUtils';
-import { awardBonusAmber } from './amberCurrency';
+import { awardBonusAmberInTransaction, spendAmber, invalidateProgressCache } from './amberCurrency';
 import { isSupporterSync } from './entitlements';
-import { grantCosmetic } from './cosmetics';
+import { grantCosmetic, ownsCosmetic, invalidateCosmeticsCache } from './cosmetics';
 import {
   SEASON_PASS_TIERS,
   SEASON_PASS_PUZZLES_PER_TIER,
@@ -87,6 +87,10 @@ export interface SeasonPassView {
   premiumViaSupporter: boolean;
   /** Amber cost to unlock premium as a non-subscriber. */
   premiumAmberCost: number;
+  /** The existing terminal cosmetic is a collection reward, not a new monthly item. */
+  premiumCosmeticOwned: boolean;
+  /** Existing unlocks and Supporter benefits remain valid; do not sell the same collection twice. */
+  canUnlockPremiumWithAmber: boolean;
   tiers: SeasonTierView[];
   /** Count of rewards claimable right now (free + premium). */
   claimableCount: number;
@@ -105,11 +109,25 @@ function getDefault(seasonId: string, startPuzzles: number): SeasonPassState {
 
 async function persist(state: SeasonPassState): Promise<void> {
   cache = state;
-  try {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch {
-    /* non-critical — the in-memory cache keeps the session consistent */
-  }
+  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+/**
+ * Record the calendar boundary at victory, before a UI read can consume it.
+ * The total is AFTER this completion, so a new season starts at total - 1.
+ * Progress derives from the total rather than incrementing a second counter:
+ * retrying the same completion is therefore idempotent. This call participates
+ * in the completion storage transaction. Old recovered completions must not
+ * open a season in a different month.
+ */
+export async function recordSeasonPuzzleCompletion(
+  puzzlesSolvedAfterWin: number,
+  _completionId?: string,
+  completedDate: string = getLocalDateString(),
+): Promise<void> {
+  if (!Number.isSafeInteger(puzzlesSolvedAfterWin) || puzzlesSolvedAfterWin < 1) return;
+  if (completedDate.slice(0, 7) !== getCurrentSeasonId()) return;
+  await loadState(puzzlesSolvedAfterWin - 1);
 }
 
 /**
@@ -135,7 +153,8 @@ async function loadState(puzzlesSolved: number): Promise<SeasonPassState> {
           };
         }
       }
-    } catch {
+    } catch (error) {
+      if (isStorageTransactionActive()) throw error;
       /* fall through */
     }
     if (!cache) {
@@ -192,6 +211,7 @@ export async function getSeasonPassView(puzzlesSolved: number): Promise<SeasonPa
   const tiersUnlocked = tiersUnlockedFor(state, puzzlesSolved);
   const inSeason = Math.max(0, puzzlesSolved - state.startPuzzles);
   const premiumUnlocked = premiumAvailable(state);
+  const premiumCosmeticOwned = await ownsCosmetic(SEASON_PREMIUM_COSMETIC_ID);
 
   const tiers: SeasonTierView[] = [];
   let claimableCount = 0;
@@ -228,6 +248,8 @@ export async function getSeasonPassView(puzzlesSolved: number): Promise<SeasonPa
     premiumUnlocked,
     premiumViaSupporter: isSupporterSync(),
     premiumAmberCost: SEASON_PASS_PREMIUM_AMBER_COST,
+    premiumCosmeticOwned,
+    canUnlockPremiumWithAmber: !premiumUnlocked && !premiumCosmeticOwned,
     tiers,
     claimableCount,
   };
@@ -256,7 +278,22 @@ export async function claimSeasonTier(
   track: 'free' | 'premium',
   puzzlesSolved: number,
 ): Promise<SeasonClaimResult> {
-  if (tier < 1 || tier > SEASON_PASS_TIERS) {
+  try {
+    return await runStorageTransaction(`season_claim_${track}_${tier}`, () => claimSeasonTierInTransaction(tier, track, puzzlesSolved));
+  } catch (error) {
+    invalidateSeasonPassCache();
+    invalidateProgressCache();
+    invalidateCosmeticsCache();
+    throw error;
+  }
+}
+
+async function claimSeasonTierInTransaction(
+  tier: number,
+  track: 'free' | 'premium',
+  puzzlesSolved: number,
+): Promise<SeasonClaimResult> {
+  if (!Number.isInteger(tier) || tier < 1 || tier > SEASON_PASS_TIERS) {
     return { granted: false, amber: 0, cosmeticGranted: false, reason: 'invalid_tier' };
   }
   const state = await loadState(puzzlesSolved);
@@ -273,7 +310,7 @@ export async function claimSeasonTier(
   }
 
   const amber = track === 'free' ? SEASON_PASS_FREE_AMBER_PER_TIER : SEASON_PASS_PREMIUM_AMBER_PER_TIER;
-  const newBalance = await awardBonusAmber(amber, `season_${track}`);
+  const newBalance = await awardBonusAmberInTransaction(amber, `season_${track}`);
 
   let cosmeticGranted = false;
   if (track === 'premium' && tier === SEASON_PASS_TIERS) {
@@ -300,8 +337,33 @@ export function getSeasonPremiumAmberCost(): number {
  */
 export async function markSeasonPremiumUnlocked(puzzlesSolved: number): Promise<boolean> {
   const state = await loadState(puzzlesSolved);
-  if (isSupporterSync() || state.premiumUnlockedByAmber) return false;
+  if (isSupporterSync() || state.premiumUnlockedByAmber || await ownsCosmetic(SEASON_PREMIUM_COSMETIC_ID)) return false;
   state.premiumUnlockedByAmber = true;
   await persist(state);
   return true;
+}
+
+/** Spend and unlock together, so an interrupted purchase cannot lose amber. */
+export async function purchaseSeasonPremiumWithAmber(puzzlesSolved: number): Promise<{
+  success: boolean;
+  newBalance?: number;
+  error?: string;
+}> {
+  try {
+    return await runStorageTransaction('season_premium_unlock', async () => {
+      const state = await loadState(puzzlesSolved);
+      if (premiumAvailable(state) || await ownsCosmetic(SEASON_PREMIUM_COSMETIC_ID)) {
+        return { success: false, error: 'This collection is already available to you.' };
+      }
+      const spend = await spendAmber(SEASON_PASS_PREMIUM_AMBER_COST, 'season_pass');
+      if (!spend.success) return spend;
+      state.premiumUnlockedByAmber = true;
+      await persist(state);
+      return { success: true, newBalance: spend.newBalance };
+    });
+  } catch (error) {
+    invalidateSeasonPassCache();
+    invalidateProgressCache();
+    throw error;
+  }
 }

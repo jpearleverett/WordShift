@@ -26,9 +26,12 @@ describe('CelebrationConfetti no longer restarts itself every render', () => {
   // is shorter than the 2500ms completion timer: the burst relaunched ~3x/sec
   // and never completed for as long as the new friend's intro was open, while
   // ~150 unstopped native drivers were spawned each time.
-  test('the effect is keyed on phase alone, never on the callback identity', () => {
-    expect(CONFETTI).toContain('}, [phase]);');
-    expect(CONFETTI).not.toContain('}, [phase, onComplete]);');
+  test('the effect responds to scene geometry and motion preferences, never callback identity', () => {
+    const dependencies = CONFETTI.match(/}, \[phase,([^\]]+)\]\);/)?.[1] ?? '';
+    expect(dependencies).toContain('SCREEN_WIDTH');
+    expect(dependencies).toContain('SCREEN_HEIGHT');
+    expect(dependencies).toContain('reducedMotion');
+    expect(dependencies).not.toContain('onComplete');
   });
 
   test('completion fires through a ref, so the callback stays current without re-arming', () => {
@@ -171,10 +174,12 @@ describe('SettingsScreen: the destructive control and the deliberate restores', 
 
   test('the reset marker is stamped before the upload and cleared only when it lands', () => {
     const reset = SETTINGS.slice(SETTINGS.indexOf('export async function performFullReset'), SETTINGS.indexOf('export async function performNewCycle'));
-    const stampAt = reset.indexOf(`setItem(LOCAL_RESET_MARKER_KEY`);
-    const uploadAt = reset.indexOf('await uploadToCloud()');
+    const stampAt = reset.indexOf('await commitFullLocalReset()');
+    const uploadAt = reset.indexOf('await uploadToCloud(true)');
     expect(stampAt).toBeGreaterThan(-1);
     expect(uploadAt).toBeGreaterThan(stampAt);
-    expect(reset).toContain('removeItem(LOCAL_RESET_MARKER_KEY)');
+    // Only the cloud owner can acknowledge the exact marker it uploaded.
+    // A second unconditional clear here could erase a newer reset.
+    expect(reset).not.toContain('removeItem(LOCAL_RESET_MARKER_KEY)');
   });
 });

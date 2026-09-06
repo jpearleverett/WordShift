@@ -67,6 +67,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   hubRowText: {
+    flex: 1,
     fontFamily: PIXEL_FONT_BOLD,
     fontSize: FONT_SIZE.callout,
     fontWeight: '800',

@@ -16,7 +16,7 @@
  * lightweight services. Cloud-synced under `wordshift_mastery`; cleared by
  * Settings → Reset All.
  */
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from './persistenceStorage';
 import { Difficulty } from '../types';
 
 const STORAGE_KEY = 'wordshift_mastery';

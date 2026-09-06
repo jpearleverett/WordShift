@@ -104,7 +104,7 @@ export async function hapticMoveCommit(phase: number, dragDrop: boolean): Promis
     );
     if (phase >= 3) {
       setTimeout(() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        void hapticLight();
       }, MOVE_AFTERSTRIKE_DELAY_MS);
     }
   } catch {}

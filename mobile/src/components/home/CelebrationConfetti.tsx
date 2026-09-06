@@ -1,10 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, StyleSheet, Animated, Easing, Dimensions } from 'react-native';
+import { View, StyleSheet, Animated, Easing, useWindowDimensions } from 'react-native';
 import { getPhaseTheme } from '../../theme/colors';
-import { getSettingsSync } from '../../services/settings';
+import { useReducedMotion } from '../../hooks/useReducedMotion';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface ConfettiPiece {
   id: number;
@@ -17,6 +16,8 @@ interface ConfettiPiece {
 }
 
 export const CelebrationConfetti: React.FC<{ onComplete: () => void; phase?: number }> = ({ onComplete, phase = 0 }) => {
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
+  const reducedMotion = useReducedMotion();
   const [pieces, setPieces] = useState<ConfettiPiece[]>([]);
 
   // The callers hand us an inline arrow, so listing onComplete in the deps made
@@ -31,7 +32,8 @@ export const CelebrationConfetti: React.FC<{ onComplete: () => void; phase?: num
   useEffect(() => {
     // Reduced-motion / low-tier: no confetti storm, just resolve the callback so
     // the celebration flow continues (the unlock still lands, minus the shower).
-    if (getSettingsSync().reducedMotion || shouldSimplifyAnimations()) {
+    if (reducedMotion || shouldSimplifyAnimations()) {
+      setPieces([]);
       const t = setTimeout(() => onCompleteRef.current(), 400);
       return () => clearTimeout(t);
     }
@@ -103,7 +105,7 @@ export const CelebrationConfetti: React.FC<{ onComplete: () => void; phase?: num
       clearTimeout(timeout);
       running.forEach(a => a.stop());
     };
-  }, [phase]);
+  }, [phase, SCREEN_WIDTH, SCREEN_HEIGHT, reducedMotion]);
 
   return (
     <View style={styles.container} pointerEvents="none">

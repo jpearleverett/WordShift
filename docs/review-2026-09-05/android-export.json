@@ -1,0 +1,57 @@
+{
+  "validatedOn": "2026-09-06",
+  "platform": "android",
+  "result": "pass",
+  "assetRecords": 700,
+  "hermesBundle": "_expo/static/js/android/AppEntry-33d9067591930314998b173d1681b10f.hbc",
+  "hermesBytes": 13045974,
+  "hermesSha256": "cbee4ee4718ab9ea862533b6c71648bbfda0e444f45c9a71ee342aa8a34c80dd",
+  "uncompressedExportDirectoryBytes": 57468594,
+  "storyAssets": [
+    {
+      "file": "assets/story/optimized/kept-table-header.webp",
+      "width": 780,
+      "height": 520,
+      "bytes": 58654
+    },
+    {
+      "file": "assets/story/optimized/private-room-header.webp",
+      "width": 780,
+      "height": 520,
+      "bytes": 72744
+    },
+    {
+      "file": "assets/story/optimized/outward-road-header.webp",
+      "width": 780,
+      "height": 520,
+      "bytes": 142838
+    },
+    {
+      "file": "assets/story/optimized/kept-table-hero.webp",
+      "width": 1290,
+      "height": 860,
+      "bytes": 132186
+    },
+    {
+      "file": "assets/story/optimized/private-room-hero.webp",
+      "width": 1290,
+      "height": 860,
+      "bytes": 153302
+    },
+    {
+      "file": "assets/story/optimized/outward-road-hero.webp",
+      "width": 1290,
+      "height": 860,
+      "bytes": 312076
+    },
+    {
+      "file": "assets/story/optimized/outward-road-night-hero.webp",
+      "width": 1290,
+      "height": 860,
+      "bytes": 230968
+    }
+  ],
+  "storyPngMastersInManifest": 0,
+  "signedBuild": false,
+  "sourceMapUpload": false
+}

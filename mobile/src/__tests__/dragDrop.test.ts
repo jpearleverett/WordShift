@@ -102,11 +102,19 @@ describe('estimateSlotIndex', () => {
 });
 
 describe('computeBoardScale', () => {
-  it('leaves ordinary phones at exactly 1 (no perturbation)', () => {
-    // A 4-letter board (widest row reaches 5 letters, ~356px) fits a 400dp
-    // inner width, and 400 is below the tablet threshold.
-    expect(computeBoardScale(400, 4)).toBe(1);
-    expect(computeBoardScale(411, 4)).toBe(1);
+  it('leaves phones at exactly 1 when the rendered widest row actually fits', () => {
+    // The 5-letter transient row occupies 380dp including slotOuter margins.
+    expect(computeBoardScale(430, 4)).toBe(1);
+    expect(computeBoardScale(441, 4)).toBe(1);
+  });
+
+  it.each([320, 360, 390, 400, 768])('fits independently measured row footprints at width %i', width => {
+    for (const base of [4, 5, 6]) {
+      const widest = base + 1;
+      // Rendered tree: 18dp slot + two 2dp outer margins - two 1dp arc margins.
+      const rendered = (widest + 1) * (18 + 4 - 2) + widest * (widest >= 6 ? 42 + 4 - 6 : 52 + 6 - 6);
+      expect(rendered * computeBoardScale(width, base)).toBeLessThanOrEqual(width - 40 + 0.00001);
+    }
   });
 
   it('scales DOWN below 1 when the widest row would overflow a narrow screen', () => {
@@ -124,6 +132,17 @@ describe('computeBoardScale', () => {
   it('never returns a non-positive or NaN scale for degenerate widths', () => {
     expect(computeBoardScale(0, 4)).toBe(1);
     expect(Number.isFinite(computeBoardScale(300, 5))).toBe(true);
+  });
+});
+
+describe('rendered slot boundary alignment', () => {
+  it.each([0.75, 1, 1.2])('uses the complete cell footprint at scale %s', scale => {
+    const centers = [20, 80, 140, 200, 260, 320, 380].map(center => 200 + (center - 200) * scale);
+    for (let index = 0; index < centers.length - 1; index++) {
+      const midpoint = (centers[index] + centers[index + 1]) / 2;
+      expect(estimateSlotIndex(midpoint - 0.1, 7, 6, undefined, scale)).toBe(index);
+      expect(estimateSlotIndex(midpoint + 0.1, 7, 6, undefined, scale)).toBe(index + 1);
+    }
   });
 });
 
