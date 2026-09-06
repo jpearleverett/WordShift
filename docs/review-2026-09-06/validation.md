@@ -52,17 +52,26 @@ enlargement is a layout check; it is not Android system-font-scale evidence.
 
 ## Source and content
 
-Whole-project `npm run typecheck` passes with no diagnostics after all final
-source and layout edits (74.73 seconds wall time). The normal `npm test --
---no-coverage --runInBand` suite passes **160 suites / 3,979 tests** in 90.52
-seconds (92.53 seconds including npm startup), with no memory-override Jest
+Whole-project `npm run typecheck` passes with no diagnostics after the final
+Reverse correction and regression tests (81.29 seconds wall time). The normal `npm test --
+--no-coverage --runInBand` suite passes **160 suites / 3,981 tests** in 87.965
+seconds (89.43 seconds including npm startup), with no memory-override Jest
 configuration. Per-file transpilation is now the normal repository configuration;
 whole-project type checking remains required separately.
+
+The first completed GitHub CI run then exposed an intermittent Reverse generator
+failure: serialized hints omitted the exact removal position, so repeated
+letters could make vocabulary validation check the wrong remainder. Both
+serialization paths now retain that position. Two deterministic regressions use
+`START` → `STAR` by removing the final `T`, replay the emitted moves with
+cumulative locks, and check vocabulary acceptance. Both fail when the correction
+is temporarily removed; the fixed focused suite passes all four tests. This
+corrects generated hints without changing the installed catalog or daily cohort.
 
 The separate gated Reverse mutation/composition suite passes **11 tests** in
 1.338 seconds. It replays generated positions through the independent shipped
 solver, including two composed row substitutions and cumulative locks. This
-script-only suite is separate from the 3,979 normal tests and is required in CI
+script-only suite is separate from the 3,981 normal tests and is required in CI
 and the internal-build workflow. [Integration commands and exit statuses](integration-checks.json)
 link their retained logs.
 
@@ -87,7 +96,8 @@ changes and distinguishes them from the remaining reader pilot.
 
 
 The full strict lint run checks **433 files with zero errors and zero warnings**
-in 190.61 seconds. `npm run lint -- --max-warnings 0` is now required in CI
+in 190.61 seconds. The subsequent Reverse source and regression edits also pass
+scoped lint with zero warnings. `npm run lint -- --max-warnings 0` is required in CI
 and the internal-build workflow. [Lint summary](lint-summary.json).
 
 ## Rendered review notes
@@ -124,8 +134,8 @@ the attempt history. These attempts are not added to the 15 unique-journey count
 
 ## Android export and delivery
 
-The final Android export passes in **100.71 seconds**, with **700 asset records**
-and an **11,713,518-byte Hermes bundle**. Its manifest contains all seven runtime
+The Android export after the Reverse correction passes in **65.90 seconds**, with
+**700 asset records** and an **11,713,551-byte Hermes bundle**. Its manifest contains all seven runtime
 story WebPs and **zero story PNG masters**. The [export summary](android-export-summary.json)
 records the bundle path, SHA-256 and story paths. The previous September 5 export
 was 13,045,974 bytes; this comparison covers the combined code/content changes,

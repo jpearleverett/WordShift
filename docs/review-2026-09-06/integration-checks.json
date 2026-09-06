@@ -8,7 +8,8 @@
       "run",
       "typecheck"
     ],
-    "log": "typecheck.log"
+    "log": "typecheck-before-ci.log",
+    "stage": "Before CI duplicate-letter regression"
   },
   {
     "check": "jest",
@@ -21,7 +22,8 @@
       "--no-coverage",
       "--runInBand"
     ],
-    "log": "jest.log"
+    "log": "jest-before-ci.log",
+    "stage": "Before CI duplicate-letter regression"
   },
   {
     "check": "lint",
@@ -57,6 +59,52 @@
       "--output-dir",
       "/tmp/wordshift-android-export-completion"
     ],
-    "log": "android-export.log"
+    "log": "android-export-before-ci.log",
+    "stage": "Before CI duplicate-letter regression"
+  },
+  {
+    "check": "android-export",
+    "exitCode": 0,
+    "elapsedSeconds": 65.9,
+    "command": [
+      "npx",
+      "expo",
+      "export",
+      "--platform",
+      "android",
+      "--max-workers",
+      "1",
+      "--dump-assetmap",
+      "--output-dir",
+      "/tmp/wordshift-android-export-completion"
+    ],
+    "log": "android-export.log",
+    "stage": "After exact reverse removal-position correction"
+  },
+  {
+    "check": "typecheck",
+    "exitCode": 0,
+    "elapsedSeconds": 81.29,
+    "command": [
+      "npm",
+      "run",
+      "typecheck"
+    ],
+    "log": "typecheck.log",
+    "stage": "After exact reverse removal-position correction and deterministic regressions"
+  },
+  {
+    "check": "jest",
+    "exitCode": 0,
+    "elapsedSeconds": 89.43,
+    "command": [
+      "npm",
+      "test",
+      "--",
+      "--no-coverage",
+      "--runInBand"
+    ],
+    "log": "jest.log",
+    "stage": "After exact reverse removal-position correction and deterministic regressions"
   }
 ]

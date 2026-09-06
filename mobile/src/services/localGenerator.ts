@@ -2135,7 +2135,9 @@ function solveReverseIterative(
     newRows[targetRowIdx] = move.newTarget;
 
     if (frame.step === numSteps - 1) {
-      // Solution found! Build the reverse solution steps from the stack.
+      // Preserve exact removal positions: the first occurrence of a repeated
+      // letter may be locked or leave a different, invalid remainder.
+      // Build the reverse solution steps from the stack.
       const reverseSteps: PuzzleSolutionStep[] = [];
 
       // Collect moves from stack frames (skip root which has no appliedMove)
@@ -2149,6 +2151,7 @@ function solveReverseIterative(
             letterToMove: f.appliedMove.letter,
             explanation: `Move '${f.appliedMove.letter}' from ${f.appliedMove.sourceWordBefore} to form ${f.appliedMove.newTarget}.`,
             insertionPosition: f.appliedMove.insertPos,
+            removalPosition: f.appliedMove.removePos,
           });
         }
       }
@@ -2161,6 +2164,7 @@ function solveReverseIterative(
         letterToMove: move.letter,
         explanation: `Move '${move.letter}' from ${sourceWord} to form ${move.newTarget}.`,
         insertionPosition: move.insertPos,
+        removalPosition: move.removePos,
       });
 
       return reverseSteps;
