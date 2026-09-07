@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, Image, StyleSheet, Animated } from 'react-native';
 import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
 import { PIXEL_FONT_BOLD } from '../theme/fonts';
@@ -40,8 +40,8 @@ export const AchievementToast: React.FC<AchievementToastProps> = ({
   onDismiss,
   phase = 0,
 }) => {
-  const slideAnim = useRef(new Animated.Value(-120)).current;
-  const opacityAnim = useRef(new Animated.Value(0)).current;
+  const [slideAnim] = useState(() => new Animated.Value(-120));
+  const [opacityAnim] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     if (achievement) {
@@ -97,7 +97,7 @@ export const AchievementToast: React.FC<AchievementToastProps> = ({
             useNativeDriver: true,
           }),
         ]);
-        exit.start(() => onDismiss());
+        exit.start(({ finished }) => { if (finished) onDismiss(); });
       }, 3000);
 
       return () => {
@@ -106,7 +106,7 @@ export const AchievementToast: React.FC<AchievementToastProps> = ({
         exit?.stop();
       };
     }
-  }, [achievement]);
+  }, [achievement, onDismiss, opacityAnim, phase, slideAnim]);
 
   if (!achievement) return null;
 

@@ -62,6 +62,10 @@ export interface NextTendingInfo {
   dailyBonusApplied: boolean;
   /** `nextLevel` if it is a milestone level, else null. */
   milestone: number | null;
+  /** All authored shrine changes are already collected; further tending is an optional contribution. */
+  contentComplete: boolean;
+  nextMilestone: number | null;
+  levelsToNextMilestone: number | null;
 }
 
 // ============================================================================
@@ -136,12 +140,16 @@ export function getNextTendingInfo(
   const cost = dailyBonusApplied
     ? Math.max(10, Math.round((baseCost * (1 - TENDING_DAILY_BONUS_DISCOUNT)) / 10) * 10)
     : baseCost;
+  const nextMilestone = TENDING_MILESTONES.find(level => level > state.level) ?? null;
   return {
     nextLevel,
     baseCost,
     cost,
     dailyBonusApplied,
     milestone: getTendingMilestoneAt(nextLevel),
+    contentComplete: nextMilestone === null,
+    nextMilestone,
+    levelsToNextMilestone: nextMilestone == null ? null : nextMilestone - state.level,
   };
 }
 

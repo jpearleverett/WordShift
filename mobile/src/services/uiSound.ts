@@ -104,3 +104,14 @@ export function stopCeremonyMusic(): void {
     // No native audio layer in this environment — silent by design.
   }
 }
+
+/** A harmless scope is still returned when the native audio module is absent. */
+export function createCeremonySoundScope(): {
+  play: (name: 'arrival' | 'story_bell' | 'story_answer') => void; stop: () => void;
+} {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
+    const audio = require('./audio');
+    return audio.createCinematicSoundScope();
+  } catch { return { play: () => {}, stop: () => {} }; }
+}

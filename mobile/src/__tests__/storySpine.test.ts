@@ -3,6 +3,7 @@ import {
   StoryContext, StorySceneId, advanceStoryPage, beginStoryCycle, buildStoryScene,
   chooseStoryOption, clearStoryState, getStoryPages, invalidateStoryCache,
   loadStoryState, openStoryScene, recordStoryBoundary, selectStoryScene, STORY_STORAGE_KEY,
+  getStoryWorldKeepsake, inspectStoryWorld, getStoryPresentationPhase,
 } from '../services/storySpine';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -104,4 +105,76 @@ test('a legacy post-arrival save in a later cycle enters After before a bright-d
   expect((await openStoryScene(ctx))?.memory.scene.id).toBe('reply');
   await finish(ctx, 'reply', 'uncertain');
   expect(await openStoryScene(ctx)).toBeNull();
+});
+
+test('recruiting Axel after the cup fallback still introduces PLUM before his payoff', async () => {
+  const early = context({ phase: 1, puzzlesSolved: 18 });
+  await openStoryScene(early); await finish(early, 'cup', 'chip');
+  await openStoryScene(early); await finish(early, 'plum');
+  const recruited = context({ phase: 2, puzzlesSolved: 48, unlockedAnimals: ['fox', 'axolotl'] });
+  const setup = await openStoryScene(recruited);
+  expect(setup?.memory.scene.id).toBe('plum_recruited');
+  expect(setup?.memory.scene.lines.some(line => line.text.includes('This is PLUM'))).toBe(true);
+  expect(getStoryPresentationPhase(setup!.memory)).toBe(2);
+  await finish(recruited, 'plum_recruited'); invalidateStoryCache();
+  const state = await loadStoryState(recruited);
+  expect(state.memories.plum?.scene.lines.some(line => line.speaker === 'axolotl')).toBe(false);
+  expect(buildStoryScene('returned', { ...recruited, phase: 4, puzzlesSolved: 103 }, state).lines.some(line => line.text.includes('PLUM died'))).toBe(true);
+});
+
+test('two earlier cycles keep their real answers while current choices remain independent', async () => {
+  const first = context();
+  await openStoryScene(first); await finish(first, 'cup', 'flower');
+  await recordStoryBoundary(first, 'CLOSER');
+  const second = context({ cycleCount: 1, puzzlesSolved: 126, cycleStartPuzzles: 120 });
+  await beginStoryCycle(second);
+  await openStoryScene(second); await finish(second, 'old_mark');
+  await openStoryScene(second); await finish(second, 'cup', 'chip');
+  await recordStoryBoundary(second, 'CLOSED');
+  const third = context({ cycleCount: 2, puzzlesSolved: 240, cycleStartPuzzles: 240 });
+  await beginStoryCycle(third); invalidateStoryCache();
+  const kept = await loadStoryState(third);
+  expect(kept.memories).toEqual({});
+  expect(kept.previousCycles?.map(cycle => [cycle.cycle, cycle.memories.cup?.choice, cycle.boundary]))
+    .toEqual([[0, 'flower', 'release'], [1, 'chip', 'remember']]);
+  await clearStoryState();
+  expect((await loadStoryState(third)).previousCycles).toEqual([]);
+});
+
+test('world consequences are hidden before arrival, inspectable afterward and inherited honestly', async () => {
+  const before = context({ phase: 4, puzzlesSolved: 116 });
+  await recordStoryBoundary(before, 'CLOSER');
+  expect(getStoryWorldKeepsake(await loadStoryState(before), before)).toBeNull();
+  const after = { ...before, phase: 5 as const, postRevelation: true };
+  const road = getStoryWorldKeepsake(await loadStoryState(after), after);
+  expect(road?.action).toBe('Walk beyond the trees');
+  await inspectStoryWorld(after); invalidateStoryCache();
+  expect(getStoryWorldKeepsake(await loadStoryState(after), after)?.inspected).toBe(true);
+  const next = context({ cycleCount: 1, cycleStartPuzzles: 120, puzzlesSolved: 120 });
+  await beginStoryCycle(next);
+  const inherited = getStoryWorldKeepsake(await loadStoryState(next), next);
+  expect(inherited?.inherited).toBe(true);
+  expect(inherited?.invitation).toContain('old marker');
+  expect(inherited?.inspected).toBe(false);
+});
+
+test.each(['flower', 'chip'])('the %s cup receives specific callbacks without changing the answer', async choice => {
+  const ctx = context();
+  await openStoryScene(ctx); await finish(ctx, 'cup', choice);
+  const state = await loadStoryState(ctx);
+  const text = buildStoryScene('supper', ctx, state).lines.map(line => line.text).join(' ');
+  expect(text).toContain(choice === 'flower' ? 'flower cup' : 'chipped cup');
+  expect(text).toContain(choice === 'flower' ? 'cocoa' : 'tea');
+});
+
+test('full readers get ordinary aftermath while skipped readers retain the small boundary test', async () => {
+  const ctx = context({ phase: 4, puzzlesSolved: 115, finaleArmed: true, unlockedAnimals: ['fox', 'pangolin'] });
+  await recordStoryBoundary(ctx, 'CLOSED');
+  let state = await loadStoryState(ctx);
+  expect(buildStoryScene('after', ctx, state).title).toBe('A small test');
+  await openStoryScene(ctx); await finish(ctx, 'council');
+  state = await loadStoryState(ctx);
+  const after = buildStoryScene('after', ctx, state);
+  expect(after.title).toBe('An ordinary morning');
+  expect(after.lines.some(line => line.speaker === 'pangolin' && line.text.includes('Breakfast'))).toBe(true);
 });

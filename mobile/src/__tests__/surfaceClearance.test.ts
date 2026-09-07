@@ -82,11 +82,11 @@ describe('cottage frame content clearance', () => {
 const SRC_ROOT = path.join(__dirname, '..');
 const read = (rel: string) => fs.readFileSync(path.join(SRC_ROOT, rel), 'utf8');
 
-const TOKEN_ADOPTERS: Array<{
+const TOKEN_ADOPTERS: {
   file: string;
   style: string;
   token: 'panelPadX' | 'cardPadX' | 'panelPadY' | 'cardPadY';
-}> = [
+}[] = [
   // The three surfaces named in the report.
   { file: 'components/StatsScreen.tsx', style: 'difficultyRow', token: 'cardPadX' },
   { file: 'components/monetization/StoreModal.tsx', style: 'row', token: 'cardPadX' },
@@ -94,7 +94,6 @@ const TOKEN_ADOPTERS: Array<{
   // Panel-framed hosts.
   { file: 'components/SettingsScreen.tsx', style: 'section', token: 'panelPadX' },
   { file: 'components/puzzle/VictoryModal.tsx', style: 'victoryModal', token: 'panelPadX' },
-  { file: 'components/ui/GameAlertModal.tsx', style: 'card', token: 'panelPadX' },
   // Card-framed rows.
   { file: 'components/ui/HubRow.tsx', style: 'hubRow', token: 'cardPadX' },
   { file: 'components/AchievementToast.tsx', style: 'inner', token: 'cardPadX' },
@@ -111,6 +110,21 @@ describe('frame-hosted styles read their inset from the shared token', () => {
     const block = new RegExp(`\\n  ${style}: \\{[\\s\\S]*?\\n  \\},`).exec(src);
     expect(block).not.toBeNull();
     expect(block![0]).toContain(`SURFACE.${token}`);
+  });
+
+  it('the alert reading content and actions clear their enclosing panel frame', () => {
+    const src = read('components/ui/GameAlertModal.tsx');
+    const panel = /<PanelCard\b[^>]*kind="panel"[^>]*>([\s\S]*?)<\/PanelCard>/.exec(src);
+    expect(panel).not.toBeNull();
+    // Resolve the style actually attached to the framed scroll contents. The
+    // frame itself can stay unpadded while long text and buttons scroll inside.
+    const contents = /<ScrollView\b[^>]*contentContainerStyle=\{styles\.(\w+)\}[^>]*>([\s\S]*?)<\/ScrollView>/.exec(panel![1]);
+    expect(contents).not.toBeNull();
+    const padding = new RegExp(`\\n  ${contents![1]}: \\{[\\s\\S]*?\\n  \\},`).exec(src);
+    expect(padding).not.toBeNull();
+    expect(padding![0]).toContain('paddingHorizontal: SURFACE.panelPadX');
+    expect(contents![2]).toContain('current.message');
+    expect(contents![2]).toContain('<CandyButton');
   });
 });
 

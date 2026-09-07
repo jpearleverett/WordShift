@@ -11,18 +11,25 @@ jest.mock('../services/dateUtils', () => ({
 }));
 
 let isSupporter = false;
+let cosmeticOwned = false;
 jest.mock('../services/entitlements', () => ({
   isSupporterSync: () => isSupporter,
 }));
 
 const awardBonusAmber = jest.fn(async (amount: number, _source?: string) => 5000 + amount);
+const spendAmber = jest.fn(async () => ({ success: true, newBalance: 2500 }));
 jest.mock('../services/amberCurrency', () => ({
   awardBonusAmber: (amount: number, source: string) => awardBonusAmber(amount, source),
+  awardBonusAmberInTransaction: (amount: number, source: string) => awardBonusAmber(amount, source),
+  spendAmber: () => spendAmber(),
+  invalidateProgressCache: jest.fn(),
 }));
 
 const grantCosmetic = jest.fn(async (_id?: string) => true);
 jest.mock('../services/cosmetics', () => ({
   grantCosmetic: (id: string) => grantCosmetic(id),
+  ownsCosmetic: async () => cosmeticOwned,
+  invalidateCosmeticsCache: jest.fn(),
 }));
 
 import {
@@ -34,6 +41,8 @@ import {
   clearSeasonPass,
   invalidateSeasonPassCache,
   SEASON_PREMIUM_COSMETIC_ID,
+  recordSeasonPuzzleCompletion,
+  purchaseSeasonPremiumWithAmber,
 } from '../services/seasonPass';
 import {
   SEASON_PASS_TIERS,
@@ -48,13 +57,65 @@ const START = 40;
 beforeEach(async () => {
   mockDay = '2026-07-04';
   isSupporter = false;
+  cosmeticOwned = false;
   awardBonusAmber.mockClear();
   grantCosmetic.mockClear();
+  spendAmber.mockClear();
   (AsyncStorage.clear as jest.Mock)();
   await clearSeasonPass();
 });
 
 describe('seasonPass', () => {
+  test('concurrent premium unlocks spend once and concurrent tier claims grant once', async () => {
+    await getSeasonPassView(START);
+    const purchases = await Promise.all([purchaseSeasonPremiumWithAmber(START), purchaseSeasonPremiumWithAmber(START)]);
+    expect(purchases.filter(result => result.success)).toHaveLength(1);
+    expect(spendAmber).toHaveBeenCalledTimes(1);
+    const claims = await Promise.all([
+      claimSeasonTier(1, 'premium', START + 6),
+      claimSeasonTier(1, 'premium', START + 6),
+    ]);
+    expect(claims.filter(result => result.granted)).toHaveLength(1);
+    expect(awardBonusAmber).toHaveBeenCalledTimes(1);
+  });
+  test('counts six wins across launches without opening Journal', async () => {
+    for (let count = 1; count <= 6; count++) {
+      await recordSeasonPuzzleCompletion(count, `win_${count}`);
+      invalidateSeasonPassCache();
+    }
+    const view = await getSeasonPassView(6);
+    expect(view.progressPuzzles).toBe(6);
+    expect(view.tiersUnlocked).toBe(1);
+  });
+
+  test('the first new-month win anchors before its increment, with replay idempotence', async () => {
+    await getSeasonPassView(40);
+    mockDay = '2026-08-01';
+    await recordSeasonPuzzleCompletion(51, 'first_august', '2026-08-01');
+    await recordSeasonPuzzleCompletion(51, 'first_august', '2026-08-01');
+    expect((await getSeasonPassView(51)).progressPuzzles).toBe(1);
+    await recordSeasonPuzzleCompletion(52, 'second_august', '2026-08-01');
+    expect((await getSeasonPassView(52)).progressPuzzles).toBe(2);
+  });
+
+  test('recovered old-month completions cannot count toward a new season', async () => {
+    await recordSeasonPuzzleCompletion(50, 'old', '2026-06-30');
+    expect(await AsyncStorage.getItem('wordshift_season_pass')).toBeNull();
+  });
+
+  test('does not sell already-owned confetti again, while honoring existing premium and supporters', async () => {
+    await getSeasonPassView(START);
+    await markSeasonPremiumUnlocked(START);
+    cosmeticOwned = true;
+    expect((await getSeasonPassView(START)).premiumUnlocked).toBe(true);
+    mockDay = '2026-08-01';
+    const view = await getSeasonPassView(START);
+    expect(view.premiumCosmeticOwned).toBe(true);
+    expect(view.canUnlockPremiumWithAmber).toBe(false);
+    expect(await markSeasonPremiumUnlocked(START)).toBe(false);
+    isSupporter = true;
+    expect((await getSeasonPassView(START)).premiumUnlocked).toBe(true);
+  });
   test('season id is the local YYYY-MM', () => {
     mockDay = '2026-03-09';
     expect(getCurrentSeasonId()).toBe('2026-03');

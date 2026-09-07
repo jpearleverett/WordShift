@@ -1,5 +1,7 @@
 import { useStoryFlow } from '../hooks/useStoryFlow';
 import { StoryContext, StoryMemory, advanceStoryPage, chooseStoryOption, openStoryScene } from '../services/storySpine';
+import { logStoryEvent } from '../services/storyTelemetry';
+jest.mock('../services/storyTelemetry', () => ({ logStoryEvent: jest.fn() }));
 
 const states = new Map<number, unknown>();
 const refs = new Map<number, { current: unknown }>();
@@ -95,7 +97,9 @@ describe('useStoryFlow delivery and cancellation', () => {
     opening.resolve({ memory, state: { memories: { cup: memory } } });
     await Promise.all([first, second]);
     expect(render().active).toBeNull();
+    expect(logStoryEvent).not.toHaveBeenCalled();
     hook.run(() => {});
+    expect(logStoryEvent).toHaveBeenCalledWith('story_started', context, memory);
     expect(render().active?.memory.page).toBe(0);
     expect(openMock).toHaveBeenCalledTimes(1);
   });
@@ -112,6 +116,7 @@ describe('useStoryFlow delivery and cancellation', () => {
     hook.close();
     hook.close();
     expect(action).toHaveBeenCalledTimes(1);
+    expect((logStoryEvent as jest.Mock).mock.calls.filter(call => call[0] === 'story_deferred')).toHaveLength(1);
     expect(render().active).toBeNull();
   });
 

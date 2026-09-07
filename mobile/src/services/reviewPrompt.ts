@@ -93,6 +93,7 @@ function getStoreReview(): { requestReview?: () => Promise<void>; isAvailableAsy
   try {
     // Literal require so Metro can see and bundle it when the dep is present
     // (same guarded-require pattern as the monetization adapters).
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
     return require('expo-store-review');
   } catch {
     return null;

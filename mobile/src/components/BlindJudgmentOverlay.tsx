@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet } from 'react-native';
 import { getSettingsSync } from '../services/settings';
 import { shouldSimplifyAnimations } from '../services/deviceTier';
@@ -39,16 +39,14 @@ const REJECT_CRIMSON = '#C0304A';
 export const BlindJudgmentOverlay: React.FC<BlindJudgmentOverlayProps> = ({ signal }) => {
   // Sweep band (accepted) travels top -> bottom; the flash layer (both kinds)
   // fades in and out. Two native-driven values, reused across fires.
-  const sweepProgress = useRef(new Animated.Value(0)).current;
-  const flashOpacity = useRef(new Animated.Value(0)).current;
-  const kindRef = useRef<'accepted' | 'rejected'>('accepted');
+  const [sweepProgress] = useState(() => new Animated.Value(0));
+  const [flashOpacity] = useState(() => new Animated.Value(0));
   const lastIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!signal) return;
     if (lastIdRef.current === signal.id) return;
     lastIdRef.current = signal.id;
-    kindRef.current = signal.kind;
 
     const reduced = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
     sweepProgress.stopAnimation();
@@ -98,7 +96,7 @@ export const BlindJudgmentOverlay: React.FC<BlindJudgmentOverlayProps> = ({ sign
   }, [signal, sweepProgress, flashOpacity]);
 
   if (!signal) return null;
-  const color = kindRef.current === 'accepted' ? ACCEPT_GREEN : REJECT_CRIMSON;
+  const color = signal.kind === 'accepted' ? ACCEPT_GREEN : REJECT_CRIMSON;
 
   // The sweep band is a soft horizontal light that translates down the board.
   const bandTranslateY = sweepProgress.interpolate({
@@ -117,7 +115,7 @@ export const BlindJudgmentOverlay: React.FC<BlindJudgmentOverlayProps> = ({ sign
         style={[StyleSheet.absoluteFill, { backgroundColor: color, opacity: flashOpacity }]}
       />
       {/* Sweep band — accepted only */}
-      {kindRef.current === 'accepted' && (
+      {signal.kind === 'accepted' && (
         <Animated.View
           style={[
             styles.sweepBand,

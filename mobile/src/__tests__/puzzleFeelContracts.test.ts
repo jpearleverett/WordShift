@@ -338,7 +338,7 @@ describe('Row board-serve entrance', () => {
     expect(rowSrc).toContain('serveAnimates');
     expect(rowSrc).toContain('BOARD_SERVE_STAGGER_MS');
     // Decided once at mount from the accessibility settings + device tier.
-    expect(rowSrc).toMatch(/serveAnimates = useRef\(\s*!getSettingsSync\(\)\.reducedMotion && !shouldSimplifyAnimations\(\)/);
+    expect(rowSrc).toMatch(/\[serveAnimates\] = useState\(\(\) => \(?!getSettingsSync\(\)\.reducedMotion && !shouldSimplifyAnimations\(\)/);
     // The entrance transforms are native-driver only (opacity + translateY).
     const serveBlock = rowSrc.slice(
       rowSrc.indexOf('if (!serveAnimates) return;'),
@@ -605,7 +605,7 @@ describe('modifier row order is unlock order', () => {
   it('keeps each mode live toggle directly under its own locked tease', () => {
     // A locked tease that drifts away from its live row means one of the two
     // got moved alone, which is how the order broke the first time.
-    const pairs: Array<[string, string]> = [
+    const pairs: [string, string][] = [
       ['{showSpeedToggle && !introMode && speedLocked', '{showSpeedToggle && !introMode && (!speedLocked'],
       ['{showBlindToggle && !introMode && blindLocked', '{showBlindToggle && !introMode && (!blindLocked'],
       ['{showLexiconToggle && !introMode && lexiconLocked', '{showLexiconToggle && !introMode && (!lexiconLocked'],

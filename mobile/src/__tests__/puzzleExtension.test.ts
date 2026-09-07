@@ -6,7 +6,10 @@ import { PUZZLE_BANK_EASY } from '../data/puzzleBankEasy';
 import { PUZZLE_BANK_MEDIUM } from '../data/puzzleBankMedium';
 import { PUZZLE_BANK_MEDIUM_PLUS } from '../data/puzzleBankMediumPlus';
 import { PUZZLE_BANK_HARD } from '../data/puzzleBankHard';
+import { PUZZLE_BANK_EXPERT } from '../data/puzzleBankExpert';
 import type { PreGeneratedPuzzle } from '../data/puzzleBankTypes';
+import { qualifyFreshBankPuzzle } from '../services/bankDeliveryPolicy';
+import { isPuzzleVocabularyFair } from '../services/puzzleVocabulary';
 
 const basePuzzle = (): PuzzleConfig => ({
   words: ['PLAY', 'PANT'],
@@ -193,16 +196,23 @@ describe('extendStandardPuzzle', () => {
   });
 
   it.each([
-    // Floors ~10% under measured +1-row-extendable pool (2026-07 depth-lever
-    // regen: EASY 226, MEDIUM 142, MEDIUM_PLUS 230, HARD 200).
-    ['EASY', PUZZLE_BANK_EASY, 203],
-    ['MEDIUM', PUZZLE_BANK_MEDIUM, 127],
-    ['MEDIUM_PLUS', PUZZLE_BANK_MEDIUM_PLUS, 207],
-    ['HARD', PUZZLE_BANK_HARD, 180],
+    // September 6 delivery audit: fresh base qualification AND the final
+    // extension vocabulary check, matching getCachedStandardExtension.
+    // Measured pools 145/77/48/31/39; floors retain roughly 90% of each.
+    // The former HARD floor of 180 described a historical 457-record raw bank.
+    ['EASY', PUZZLE_BANK_EASY, 130],
+    ['MEDIUM', PUZZLE_BANK_MEDIUM, 69],
+    ['MEDIUM_PLUS', PUZZLE_BANK_MEDIUM_PLUS, 43],
+    ['HARD', PUZZLE_BANK_HARD, 27],
+    ['EXPERT', PUZZLE_BANK_EXPERT, 35],
   ] as const)(
-    '%s bank keeps a large deterministic pool with a valid fallback candidate',
-    (_name, bank, floor) => {
-      const extendable = bank.flatMap((puzzle: PreGeneratedPuzzle) => {
+    '%s bank retains a deterministic, fair extension pool with executable routes',
+    (name, bank, floor) => {
+      const advanced = name === 'EXPERT';
+      const freshBank = bank.map(puzzle => qualifyFreshBankPuzzle(
+        puzzle, advanced, 'standard', word => COMMON_WORDS.has(word),
+      )).filter((puzzle): puzzle is PreGeneratedPuzzle => puzzle !== null);
+      const extendable = freshBank.flatMap(puzzle => {
         const config: PuzzleConfig = {
           words: puzzle.words,
           solution: puzzle.solution,
@@ -215,18 +225,15 @@ describe('extendStandardPuzzle', () => {
           excludedWords: new Set(puzzle.allWords),
         });
         expect(second).toEqual(first);
-        return first.words.length === puzzle.words.length + 1 ? [first] : [];
+        return first.words.length === puzzle.words.length + 1 && isPuzzleVocabularyFair(first, advanced)
+          ? [first] : [];
       });
 
       expect(extendable.length).toBeGreaterThanOrEqual(floor);
-      expect(canonicalPathIsValid(
-        extendable[0],
-        word => COMMON_WORDS.has(word),
-      )).toBe(true);
-      expect(isStandardChainSolvable(
-        extendable[0].words,
-        word => COMMON_WORDS.has(word),
-      )).toBe('solvable');
+      for (const candidate of extendable) {
+        expect(canonicalPathIsValid(candidate, word => COMMON_WORDS.has(word))).toBe(true);
+        expect(isStandardChainSolvable(candidate.words, word => COMMON_WORDS.has(word))).toBe('solvable');
+      }
     },
   );
 });

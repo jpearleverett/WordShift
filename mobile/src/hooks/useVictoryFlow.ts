@@ -155,12 +155,12 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
   const [victoryStage, setVictoryStage] = useState<VictoryStage>('idle');
   const [victorySpinnerVisible, setVictorySpinnerVisible] = useState(false);
 
-  const victoryStar1 = useRef(new Animated.Value(0)).current;
-  const victoryStar2 = useRef(new Animated.Value(0)).current;
-  const victoryStar3 = useRef(new Animated.Value(0)).current;
-  const victoryModalScale = useRef(new Animated.Value(0.8)).current;
-  const victoryModalOpacity = useRef(new Animated.Value(0)).current;
-  const phaseFlashOpacity = useRef(new Animated.Value(0)).current;
+  const [victoryStar1] = useState(() => new Animated.Value(0));
+  const [victoryStar2] = useState(() => new Animated.Value(0));
+  const [victoryStar3] = useState(() => new Animated.Value(0));
+  const [victoryModalScale] = useState(() => new Animated.Value(0.8));
+  const [victoryModalOpacity] = useState(() => new Animated.Value(0));
+  const [phaseFlashOpacity] = useState(() => new Animated.Value(0));
   const hapticTimeouts = useRef<ReturnType<typeof setTimeout>[]>([]);
   const spinnerTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Ref to the running victory sequence animation (so skipToEnd can stop it). */

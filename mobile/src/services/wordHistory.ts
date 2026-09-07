@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from './persistenceStorage';
 
 const STORAGE_KEY = 'wordshift_word_history';
 const MAX_HISTORY_SIZE = 150; // Track last 150 puzzles

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Animated } from 'react-native';
 import { getSettingsSync } from '../../services/settings';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
@@ -33,14 +33,12 @@ export const AmberSparkle: React.FC<AmberSparkleProps> = ({ phase = 0 }) => {
   const mountedRef = useRef(true);
   const animsRef = useRef<Animated.CompositeAnimation[]>([]);
 
-  const sparkles = useRef(
-    [...Array(5)].map(() => ({
+  const [sparkles] = useState(() => ([...Array(5)].map(() => ({
       x: new Animated.Value(0),
       y: new Animated.Value(0),
       opacity: new Animated.Value(0),
       scale: new Animated.Value(0),
-    }))
-  ).current;
+    }))));
 
   useEffect(() => {
     mountedRef.current = true;

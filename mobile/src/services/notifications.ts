@@ -1,5 +1,4 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { DialoguePhase } from '../types/homeWorld';
 import { getLocalDateString } from './dateUtils';
 import { getWinBackMessage, getNotificationTitle } from './phaseNarrative';
 
@@ -39,12 +38,6 @@ export interface NotificationPreferences {
   dailyReminderHour: number; // 0-23, default 9 (9am)
   reengagementEnabled: boolean;
   enabled: boolean; // Master toggle
-}
-
-interface ScheduledNotification {
-  id: string;
-  type: 'daily_reminder' | 'win_back' | 'streak_risk' | 'animal_message' | 'quest_expiry';
-  scheduledAt: number;
 }
 
 // ============================================================================
@@ -214,6 +207,7 @@ function getDefaultPrefs(): NotificationPreferences {
 async function getNotificationsModule(): Promise<any> {
   if (notificationsModule !== undefined) return notificationsModule;
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
     notificationsModule = require('expo-notifications');
     return notificationsModule;
   } catch {
@@ -386,6 +380,7 @@ export async function scheduleAllNotifications(currentPhase: number): Promise<vo
     // A finished-story player gets the special tail copy on the +14/+30 rungs.
     let finishedStory = false;
     try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
       const { isPostRevelation } = require('./amberCurrency');
       finishedStory = await isPostRevelation();
     } catch {}
@@ -612,6 +607,7 @@ async function scheduleWinBackLadder(
  */
 async function getCurrentStreakSafe(): Promise<number> {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
     const { getFullProgress } = require('./amberCurrency');
     const progress = await getFullProgress();
     return progress?.currentStreak ?? 0;
@@ -629,6 +625,7 @@ async function getCurrentStreakSafe(): Promise<number> {
  */
 async function hasPlayedTodaySafe(): Promise<boolean> {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
     const { getFullProgress } = require('./amberCurrency');
     const progress = await getFullProgress();
     const lastPlay: string | null = progress?.lastPlayDate ?? null;
@@ -650,7 +647,9 @@ async function hasPlayedTodaySafe(): Promise<boolean> {
  */
 async function isDailyChallengeUnlockedSafe(currentPhase: number): Promise<boolean> {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
     const { isDailyChallengeUnlocked } = require('./dailyChallenge');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
     const { getFullProgress } = require('./amberCurrency');
     const progress = await getFullProgress();
     return isDailyChallengeUnlocked(progress?.puzzlesSolved ?? 0, currentPhase);
@@ -671,6 +670,7 @@ async function shouldRemindQuestExpirySafe(phase: number): Promise<boolean> {
     // stored, and this check runs during hydration — on a fresh install it
     // could win the race against the first context-full load and mint quests
     // from legacy defaults (defeating the pre-journal dormant gate).
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
     const { peekWeeklyQuests, getUnclaimedAmber } = require('./weeklyQuests');
     const peeked = await peekWeeklyQuests();
     if (!peeked.daily && !peeked.weekly) return false;

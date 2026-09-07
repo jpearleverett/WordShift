@@ -905,14 +905,6 @@ export async function getUnlockStatus(): Promise<Unlockable[]> {
 }
 
 /**
- * Get the animal associated with a room
- */
-function getAnimalForRoom(roomId: string): string | null {
-  const room = ROOMS.find(r => r.id === roomId);
-  return room?.animalId || null;
-}
-
-/**
  * Check if an unlock is available
  * Flow: invite animal → build room → invite animal → build room
  * For the first animal, the room already exists

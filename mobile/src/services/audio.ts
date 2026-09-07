@@ -1,5 +1,5 @@
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
-import { getSettings } from './settings';
+import { getSettings, getSettingsSync, subscribeSettings } from './settings';
 
 /**
  * Sound effects + ambient music system for WordShift
@@ -219,6 +219,45 @@ const soundCache: Map<string, AudioPlayer> = new Map();
 
 // Guards against concurrent first-loads of the same sound
 const loadingSounds: Map<string, Promise<AudioPlayer | null>> = new Map();
+export type CinematicSoundName = 'arrival' | 'story_bell' | 'story_answer';
+export interface CinematicSoundScope { play: (name: CinematicSoundName) => void; stop: () => void }
+const cinematicScopes = new Set<CinematicSoundScope>();
+
+/** Long cues belong to an event, never to the shared tap/word player cache. */
+export function createCinematicSoundScope(): CinematicSoundScope {
+  const players = new Set<AudioPlayer>();
+  let stopped = false;
+  const scope: CinematicSoundScope = {
+    play(name) {
+      void (async () => {
+        if (!(await isEnabled()) || stopped) return;
+        try {
+          const player = createAudioPlayer(SOUND_SOURCES[name]);
+          player.volume = SOUND_VOLUME;
+          players.add(player);
+          player.play();
+        } catch { /* Sound is optional. */ }
+      })();
+    },
+    stop() {
+      stopped = true;
+      for (const player of players) {
+        try { player.pause(); } catch {}
+        try { player.remove(); } catch {}
+      }
+      players.clear();
+      cinematicScopes.delete(scope);
+    },
+  };
+  cinematicScopes.add(scope);
+  return scope;
+}
+
+subscribeSettings(() => {
+  if (getSettingsSync().soundEnabled) return;
+  for (const scope of cinematicScopes) scope.stop();
+  for (const player of soundCache.values()) { try { player.pause(); } catch {} }
+});
 
 /**
  * Get a player from the cache, lazily creating it on first access.
@@ -287,6 +326,7 @@ export async function preloadSound(name: string, source: any): Promise<void> {
  * Cleanup all preloaded players (and the music bed)
  */
 export async function unloadAllSounds(): Promise<void> {
+  for (const scope of cinematicScopes) scope.stop();
   for (const [, player] of soundCache) {
     try {
       player.remove();

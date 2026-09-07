@@ -1,11 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, StyleSheet, Animated, Dimensions, Easing } from 'react-native';
-import { getSettingsSync } from '../services/settings';
+import React, { useLayoutEffect, useRef, useEffect, useMemo, useState } from 'react';
+import { View, StyleSheet, Animated, useWindowDimensions, Easing } from 'react-native';
 import { getPhaseTheme, CONFETTI_THEMES, SPARK_THEMES, SparkPalette } from '../theme/colors';
 import { getMaxConfettiCount, shouldSimplifyAnimations } from '../services/deviceTier';
 import { getEquippedSync } from '../services/cosmetics';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 type ConfettiShape = 'rect' | 'square' | 'circle' | 'triangle' | 'spark';
 
@@ -91,7 +90,7 @@ interface ConfettiPiece {
   shape: ConfettiShape;
 }
 
-const generateConfetti = (count: number, colors: string[], sparkBias: boolean): ConfettiPiece[] => {
+const generateConfetti = (count: number, colors: string[], sparkBias: boolean, SCREEN_WIDTH: number): ConfettiPiece[] => {
   const confettiColors = colors.length > 0 ? colors : getPhaseTheme(0).confettiColors;
   const shapePool = sparkBias ? DARK_CONFETTI_SHAPES : CONFETTI_SHAPES;
   const pieces: ConfettiPiece[] = [];
@@ -112,11 +111,12 @@ const generateConfetti = (count: number, colors: string[], sparkBias: boolean): 
 };
 
 const ConfettiPieceComponent: React.FC<{ piece: ConfettiPiece; profile: FallProfile }> = ({ piece, profile }) => {
-  const translateY = useRef(new Animated.Value(-50)).current;
-  const translateX = useRef(new Animated.Value(0)).current;
-  const rotate = useRef(new Animated.Value(0)).current;
-  const opacity = useRef(new Animated.Value(1)).current;
-  const scale = useRef(new Animated.Value(0)).current;
+  const { height: SCREEN_HEIGHT } = useWindowDimensions();
+  const [translateY] = useState(() => new Animated.Value(-50));
+  const [translateX] = useState(() => new Animated.Value(0));
+  const [rotate] = useState(() => new Animated.Value(0));
+  const [opacity] = useState(() => new Animated.Value(1));
+  const [scale] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     // Dark phases wobble less, so the amplitude is softer too (ash doesn't dance).
@@ -181,7 +181,7 @@ const ConfettiPieceComponent: React.FC<{ piece: ConfettiPiece; profile: FallProf
     ]);
     anim.start();
     return () => anim.stop();
-  }, []);
+  }, [SCREEN_HEIGHT, opacity, piece.delay, profile.fallBase, profile.fallRand, profile.popSpring, profile.sparkBias, profile.spinBase, profile.spinRand, profile.strongEaseIn, profile.wobbleCycles, rotate, scale, translateX, translateY]);
 
   const spin = rotate.interpolate({
     inputRange: [0, 1],
@@ -274,17 +274,11 @@ interface ConfettiProps {
   colors?: string[];
 }
 
-export const Confetti: React.FC<ConfettiProps> = ({ active, onComplete, phase = 0, ritualEnergy = 0, colors }) => {
-  const [pieces, setPieces] = useState<ConfettiPiece[]>([]);
+const ConfettiBurst: React.FC<ConfettiProps> = ({ onComplete, phase = 0, ritualEnergy = 0, colors }) => {
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
   const profile = useMemo(() => getFallProfile(phase), [phase]);
-
-  useEffect(() => {
-    if (active) {
-      // Skip confetti animation if reduced motion is enabled
-      if (getSettingsSync().reducedMotion) {
-        onComplete?.();
-        return;
-      }
+  // One random layout per mounted burst; unrelated parent renders never restart it.
+  const [pieces] = useState(() => {
       const theme = getPhaseTheme(phase);
       const baseCount = getMaxConfettiCount();
       // Scale confetti density with ritual energy
@@ -300,25 +294,34 @@ export const Confetti: React.FC<ConfettiProps> = ({ active, onComplete, phase = 
         : equippedConfetti && CONFETTI_THEMES[equippedConfetti]
         ? CONFETTI_THEMES[equippedConfetti]
         : theme.confettiColors;
-      setPieces(generateConfetti(count, confettiColors, profile.sparkBias));
-      const timeout = setTimeout(() => {
-        onComplete?.();
-      }, profile.maxDurationMs);
-      return () => clearTimeout(timeout);
-    } else {
-      setPieces([]);
-    }
-  }, [active, onComplete, phase, ritualEnergy, colors, profile]);
-
-  if (!active || pieces.length === 0) return null;
+      return generateConfetti(count, confettiColors, profile.sparkBias, SCREEN_WIDTH);
+  });
+  const complete = useRef(onComplete);
+  useLayoutEffect(() => { complete.current = onComplete; }, [onComplete]);
+  useEffect(() => {
+    const timer = setTimeout(() => complete.current?.(), profile.maxDurationMs);
+    return () => clearTimeout(timer);
+  }, [profile.maxDurationMs]);
 
   return (
     <View style={styles.container} pointerEvents="none">
       {pieces.map((piece) => (
-        <ConfettiPieceComponent key={piece.id} piece={piece} profile={profile} />
+        <ConfettiPieceComponent key={`${SCREEN_WIDTH}:${SCREEN_HEIGHT}:${piece.id}`} piece={piece} profile={profile} />
       ))}
     </View>
   );
+};
+
+export const Confetti: React.FC<ConfettiProps> = props => {
+  const reducedMotion = useReducedMotion();
+  const { width, height } = useWindowDimensions();
+  const { active, onComplete } = props;
+  useEffect(() => {
+    if (active && reducedMotion) onComplete?.();
+  }, [active, reducedMotion, onComplete]);
+  return active && !reducedMotion
+    ? <ConfettiBurst key={`${width}:${height}:${props.phase ?? 0}`} {...props} />
+    : null;
 };
 
 // Star burst effect for successful moves — colors shift with narrative phase.
@@ -348,7 +351,7 @@ interface StarBurstProps {
 }
 
 export const StarBurst: React.FC<StarBurstProps> = ({ active, x, y, phase = 0, comboTier = 0 }) => {
-  const reducedMotion = getSettingsSync().reducedMotion;
+  const reducedMotion = useReducedMotion();
   // Low-tier devices skip the decorative burst entirely (the move still lands
   // its haptic + sound); treat it exactly like reduced motion.
   const simplify = shouldSimplifyAnimations();

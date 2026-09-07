@@ -24,6 +24,7 @@ import {
   stopMusic,
   getActiveMusicTrack,
   unloadAllSounds,
+  createCinematicSoundScope,
 } from '../services/audio';
 import { resetSettings, updateSetting } from '../services/settings';
 
@@ -68,6 +69,26 @@ describe('audio', () => {
   afterEach(() => {
     jest.runOnlyPendingTimers();
     jest.useRealTimers();
+  });
+
+  test('a cinematic scope releases its cue when skipped without removing a gameplay player', async () => {
+    await soundTap();
+    const tap = getPlayers()[0];
+    const scope = createCinematicSoundScope();
+    scope.play('arrival');
+    for (let n = 0; n < 4; n++) await Promise.resolve();
+    const arrival = getPlayers()[1];
+    expect(arrival.play).toHaveBeenCalledTimes(1);
+    scope.stop();
+    expect(arrival.remove).toHaveBeenCalledTimes(1);
+    expect(tap.remove).not.toHaveBeenCalled();
+  });
+
+  test('a stopped cinematic scope cannot start a delayed cue', async () => {
+    const scope = createCinematicSoundScope();
+    scope.play('arrival'); scope.stop();
+    for (let n = 0; n < 4; n++) await Promise.resolve();
+    expect(getPlayers()).toHaveLength(0);
   });
 
   describe('combo ladder (validMoveSoundName)', () => {

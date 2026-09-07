@@ -1,0 +1,734 @@
+{
+  "date": "2026-09-06",
+  "freshWords": 22700,
+  "historicalWords": 22749,
+  "results": [
+    {
+      "file": "lexiconBankDoubleShiftEasy.ts",
+      "variant": "double_shift",
+      "advanced": true,
+      "raw": 260,
+      "originalEligible": 175,
+      "eligible": 175,
+      "repaired": 0,
+      "singlePath": 0,
+      "unsolvable": 0,
+      "inconclusive": 0,
+      "canonicalInvalidWords": 0,
+      "storedReplayInvalid": 0,
+      "maxStates": 0,
+      "branchChanged": 0
+    },
+    {
+      "file": "lexiconBankDoubleShiftExpert.ts",
+      "variant": "double_shift",
+      "advanced": true,
+      "raw": 100,
+      "originalEligible": 100,
+      "eligible": 100,
+      "repaired": 0,
+      "singlePath": 0,
+      "unsolvable": 0,
+      "inconclusive": 0,
+      "canonicalInvalidWords": 0,
+      "storedReplayInvalid": 0,
+      "maxStates": 0,
+      "branchChanged": 0
+    },
+    {
+      "file": "lexiconBankDoubleShiftHard.ts",
+      "variant": "double_shift",
+      "advanced": true,
+      "raw": 100,
+      "originalEligible": 100,
+      "eligible": 100,
+      "repaired": 0,
+      "singlePath": 0,
+      "unsolvable": 0,
+      "inconclusive": 0,
+      "canonicalInvalidWords": 0,
+      "storedReplayInvalid": 0,
+      "maxStates": 0,
+      "branchChanged": 0
+    },
+    {
+      "file": "lexiconBankDoubleShiftMedium.ts",
+      "variant": "double_shift",
+      "advanced": true,
+      "raw": 263,
+      "originalEligible": 156,
+      "eligible": 156,
+      "repaired": 0,
+      "singlePath": 0,
+      "unsolvable": 0,
+      "inconclusive": 0,
+      "canonicalInvalidWords": 0,
+      "storedReplayInvalid": 0,
+      "maxStates": 0,
+      "branchChanged": 0
+    },
+    {
+      "file": "lexiconBankDoubleShiftMediumPlus.ts",
+      "variant": "double_shift",
+      "advanced": true,
+      "raw": 262,
+      "originalEligible": 118,
+      "eligible": 118,
+      "repaired": 0,
+      "singlePath": 0,
+      "unsolvable": 0,
+      "inconclusive": 0,
+      "canonicalInvalidWords": 0,
+      "storedReplayInvalid": 0,
+      "maxStates": 0,
+      "branchChanged": 0
+    },
+    {
+      "file": "lexiconBankEasy.ts",
+      "variant": "standard",
+      "advanced": true,
+      "raw": 251,
+      "originalEligible": 202,
+      "eligible": 202,
+      "repaired": 0,
+      "singlePath": 0,
+      "unsolvable": 0,
+      "inconclusive": 0,
+      "canonicalInvalidWords": 0,
+      "storedReplayInvalid": 0,
+      "maxStates": 5,
+      "branchChanged": 0
+    },
+    {
+      "file": "lexiconBankExpert.ts",
+      "variant": "standard",
+      "advanced": true,
+      "raw": 100,
+      "originalEligible": 100,
+      "eligible": 100,
+      "repaired": 0,
+      "singlePath": 0,
+      "unsolvable": 0,
+      "inconclusive": 0,
+      "canonicalInvalidWords": 0,
+      "storedReplayInvalid": 0,
+      "maxStates": 6,
+      "branchChanged": 0
+    },
+    {
+      "file": "lexiconBankHard.ts",
+      "variant": "standard",
+      "advanced": true,
+      "raw": 100,
+      "originalEligible": 100,
+      "eligible": 100,
+      "repaired": 0,
+      "singlePath": 0,
+      "unsolvable": 0,
+      "inconclusive": 0,
+      "canonicalInvalidWords": 0,
+      "storedReplayInvalid": 0,
+      "maxStates": 7,
+      "branchChanged": 0
+    },
+    {
+      "file": "lexiconBankMedium.ts",
+      "variant": "standard",
+      "advanced": true,
+      "raw": 247,
+      "originalEligible": 185,
+      "eligible": 185,
+      "repaired": 0,
+      "singlePath": 0,
+      "unsolvable": 0,
+      "inconclusive": 0,
+      "canonicalInvalidWords": 0,
+      "storedReplayInvalid": 0,
+      "maxStates": 6,
+      "branchChanged": 0
+    },
+    {
+      "file": "lexiconBankMediumPlus.ts",
+      "variant": "standard",
+      "advanced": true,
+      "raw": 255,
+      "originalEligible": 126,
+      "eligible": 126,
+      "repaired": 0,
+      "singlePath": 0,
+      "unsolvable": 0,
+      "inconclusive": 0,
+      "canonicalInvalidWords": 0,
+      "storedReplayInvalid": 0,
+      "maxStates": 6,
+      "branchChanged": 0
+    },
+    {
+      "file": "lexiconBankReverseEasy.ts",
+      "variant": "reverse",
+      "advanced": true,
+      "raw": 240,
+      "originalEligible": 158,
+      "eligible": 157,
+      "repaired": 157,
+      "singlePath": 0,
+      "unsolvable": 0,
+      "inconclusive": 0,
+      "canonicalInvalidWords": 0,
+      "storedReplayInvalid": 0,
+      "maxStates": 0,
+      "branchChanged": 0
+    },
+    {
+      "file": "lexiconBankReverseExpert.ts",
+      "variant": "reverse",
+      "advanced": true,
+      "raw": 100,
+      "originalEligible": 100,
+      "eligible": 100,
+      "repaired": 0,
+      "singlePath": 0,
+      "unsolvable": 0,
+      "inconclusive": 0,
+      "canonicalInvalidWords": 0,
+      "storedReplayInvalid": 0,
+      "maxStates": 0,
+      "branchChanged": 0
+    },
+    {
+      "file": "lexiconBankReverseHard.ts",
+      "variant": "reverse",
+      "advanced": true,
+      "raw": 100,
+      "originalEligible": 100,
+      "eligible": 100,
+      "repaired": 0,
+      "singlePath": 0,
+      "unsolvable": 0,
+      "inconclusive": 0,
+      "canonicalInvalidWords": 0,
+      "storedReplayInvalid": 0,
+      "maxStates": 0,
+      "branchChanged": 0
+    },
+    {
+      "file": "lexiconBankReverseMedium.ts",
+      "variant": "reverse",
+      "advanced": true,
+      "raw": 240,
+      "originalEligible": 135,
+      "eligible": 135,
+      "repaired": 135,
+      "singlePath": 0,
+      "unsolvable": 0,
+      "inconclusive": 0,
+      "canonicalInvalidWords": 0,
+      "storedReplayInvalid": 0,
+      "maxStates": 0,
+      "branchChanged": 0
+    },
+    {
+      "file": "lexiconBankReverseMediumPlus.ts",
+      "variant": "reverse",
+      "advanced": true,
+      "raw": 100,
+      "originalEligible": 100,
+      "eligible": 100,
+      "repaired": 0,
+      "singlePath": 0,
+      "unsolvable": 0,
+      "inconclusive": 0,
+      "canonicalInvalidWords": 0,
+      "storedReplayInvalid": 0,
+      "maxStates": 0,
+      "branchChanged": 0
+    },
+    {
+      "file": "puzzleBankDoubleShiftEasy.ts",
+      "variant": "double_shift",
+      "advanced": false,
+      "raw": 493,
+      "originalEligible": 252,
+      "eligible": 252,
+      "repaired": 0,
+      "singlePath": 0,
+      "unsolvable": 0,
+      "inconclusive": 0,
+      "canonicalInvalidWords": 0,
+      "storedReplayInvalid": 0,
+      "maxStates": 0,
+      "branchChanged": 0
+    },
+    {
+      "file": "puzzleBankDoubleShiftExpert.ts",
+      "variant": "double_shift",
+      "advanced": true,
+      "raw": 263,
+      "originalEligible": 101,
+      "eligible": 101,
+      "repaired": 0,
+      "singlePath": 0,
+      "unsolvable": 0,
+      "inconclusive": 0,
+      "canonicalInvalidWords": 0,
+      "storedReplayInvalid": 0,
+      "maxStates": 0,
+      "branchChanged": 0
+    },
+    {
+      "file": "puzzleBankDoubleShiftHard.ts",
+      "variant": "double_shift",
+      "advanced": false,
+      "raw": 100,
+      "originalEligible": 100,
+      "eligible": 100,
+      "repaired": 0,
+      "singlePath": 0,
+      "unsolvable": 0,
+      "inconclusive": 0,
+      "canonicalInvalidWords": 0,
+      "storedReplayInvalid": 0,
+      "maxStates": 0,
+      "branchChanged": 0
+    },
+    {
+      "file": "puzzleBankDoubleShiftMedium.ts",
+      "variant": "double_shift",
+      "advanced": false,
+      "raw": 495,
+      "originalEligible": 169,
+      "eligible": 169,
+      "repaired": 0,
+      "singlePath": 0,
+      "unsolvable": 0,
+      "inconclusive": 0,
+      "canonicalInvalidWords": 0,
+      "storedReplayInvalid": 0,
+      "maxStates": 0,
+      "branchChanged": 0
+    },
+    {
+      "file": "puzzleBankDoubleShiftMediumPlus.ts",
+      "variant": "double_shift",
+      "advanced": false,
+      "raw": 496,
+      "originalEligible": 123,
+      "eligible": 123,
+      "repaired": 0,
+      "singlePath": 0,
+      "unsolvable": 0,
+      "inconclusive": 0,
+      "canonicalInvalidWords": 0,
+      "storedReplayInvalid": 0,
+      "maxStates": 0,
+      "branchChanged": 0
+    },
+    {
+      "file": "puzzleBankEasy.ts",
+      "variant": "standard",
+      "advanced": false,
+      "raw": 453,
+      "originalEligible": 324,
+      "eligible": 323,
+      "repaired": 0,
+      "singlePath": 0,
+      "unsolvable": 0,
+      "inconclusive": 0,
+      "canonicalInvalidWords": 0,
+      "storedReplayInvalid": 0,
+      "maxStates": 4,
+      "branchChanged": 0
+    },
+    {
+      "file": "puzzleBankExpert.ts",
+      "variant": "standard",
+      "advanced": true,
+      "raw": 100,
+      "originalEligible": 100,
+      "eligible": 100,
+      "repaired": 0,
+      "singlePath": 0,
+      "unsolvable": 0,
+      "inconclusive": 0,
+      "canonicalInvalidWords": 0,
+      "storedReplayInvalid": 0,
+      "maxStates": 7,
+      "branchChanged": 0
+    },
+    {
+      "file": "puzzleBankHard.ts",
+      "variant": "standard",
+      "advanced": false,
+      "raw": 100,
+      "originalEligible": 100,
+      "eligible": 100,
+      "repaired": 0,
+      "singlePath": 0,
+      "unsolvable": 0,
+      "inconclusive": 0,
+      "canonicalInvalidWords": 0,
+      "storedReplayInvalid": 0,
+      "maxStates": 7,
+      "branchChanged": 0
+    },
+    {
+      "file": "puzzleBankMedium.ts",
+      "variant": "standard",
+      "advanced": false,
+      "raw": 338,
+      "originalEligible": 202,
+      "eligible": 202,
+      "repaired": 0,
+      "singlePath": 0,
+      "unsolvable": 0,
+      "inconclusive": 0,
+      "canonicalInvalidWords": 0,
+      "storedReplayInvalid": 0,
+      "maxStates": 7,
+      "branchChanged": 0
+    },
+    {
+      "file": "puzzleBankMediumPlus.ts",
+      "variant": "standard",
+      "advanced": false,
+      "raw": 500,
+      "originalEligible": 161,
+      "eligible": 161,
+      "repaired": 0,
+      "singlePath": 0,
+      "unsolvable": 0,
+      "inconclusive": 0,
+      "canonicalInvalidWords": 0,
+      "storedReplayInvalid": 0,
+      "maxStates": 5,
+      "branchChanged": 0
+    },
+    {
+      "file": "puzzleBankReverseEasy.ts",
+      "variant": "reverse",
+      "advanced": false,
+      "raw": 500,
+      "originalEligible": 284,
+      "eligible": 282,
+      "repaired": 282,
+      "singlePath": 0,
+      "unsolvable": 0,
+      "inconclusive": 0,
+      "canonicalInvalidWords": 0,
+      "storedReplayInvalid": 0,
+      "maxStates": 0,
+      "branchChanged": 0
+    },
+    {
+      "file": "puzzleBankReverseExpert.ts",
+      "variant": "reverse",
+      "advanced": true,
+      "raw": 100,
+      "originalEligible": 100,
+      "eligible": 100,
+      "repaired": 0,
+      "singlePath": 0,
+      "unsolvable": 0,
+      "inconclusive": 0,
+      "canonicalInvalidWords": 0,
+      "storedReplayInvalid": 0,
+      "maxStates": 0,
+      "branchChanged": 0
+    },
+    {
+      "file": "puzzleBankReverseHard.ts",
+      "variant": "reverse",
+      "advanced": false,
+      "raw": 100,
+      "originalEligible": 100,
+      "eligible": 100,
+      "repaired": 0,
+      "singlePath": 0,
+      "unsolvable": 0,
+      "inconclusive": 0,
+      "canonicalInvalidWords": 0,
+      "storedReplayInvalid": 0,
+      "maxStates": 0,
+      "branchChanged": 0
+    },
+    {
+      "file": "puzzleBankReverseMedium.ts",
+      "variant": "reverse",
+      "advanced": false,
+      "raw": 500,
+      "originalEligible": 206,
+      "eligible": 205,
+      "repaired": 205,
+      "singlePath": 0,
+      "unsolvable": 0,
+      "inconclusive": 0,
+      "canonicalInvalidWords": 0,
+      "storedReplayInvalid": 0,
+      "maxStates": 0,
+      "branchChanged": 0
+    },
+    {
+      "file": "puzzleBankReverseMediumPlus.ts",
+      "variant": "reverse",
+      "advanced": false,
+      "raw": 100,
+      "originalEligible": 100,
+      "eligible": 100,
+      "repaired": 0,
+      "singlePath": 0,
+      "unsolvable": 0,
+      "inconclusive": 0,
+      "canonicalInvalidWords": 0,
+      "storedReplayInvalid": 0,
+      "maxStates": 0,
+      "branchChanged": 0
+    }
+  ],
+  "violations": [],
+  "replayIssues": [],
+  "hintIssues": [],
+  "historicalReplayIssues": [
+    {
+      "file": "lexiconBankReverseEasy.ts",
+      "id": "3e4370d8ebf1",
+      "words": [
+        "MOOR",
+        "FOES",
+        "ACES"
+      ],
+      "issue": "source/target mismatch at step 1"
+    },
+    {
+      "file": "lexiconBankReverseEasy.ts",
+      "id": "cfbcc997df19",
+      "words": [
+        "ATOM",
+        "BETS",
+        "SLUG"
+      ],
+      "issue": "source/target mismatch at step 1"
+    },
+    {
+      "file": "lexiconBankReverseEasy.ts",
+      "id": "25d0810d6681",
+      "words": [
+        "ERGO",
+        "FOES",
+        "AIRS"
+      ],
+      "issue": "source/target mismatch at step 1"
+    },
+    {
+      "file": "lexiconBankReverseEasy.ts",
+      "id": "2c932911371d",
+      "words": [
+        "HILT",
+        "BOWS",
+        "RAGS"
+      ],
+      "issue": "source/target mismatch at step 1"
+    },
+    {
+      "file": "lexiconBankReverseMedium.ts",
+      "id": "103746f88bc3",
+      "words": [
+        "WINK",
+        "PARS",
+        "RAMS",
+        "HUTS"
+      ],
+      "issue": "source/target mismatch at step 2"
+    },
+    {
+      "file": "lexiconBankReverseMedium.ts",
+      "id": "c9cc26c4a921",
+      "words": [
+        "KEEL",
+        "PARS",
+        "RAMS",
+        "MART"
+      ],
+      "issue": "source/target mismatch at step 2"
+    },
+    {
+      "file": "lexiconBankReverseMedium.ts",
+      "id": "a22502ae7749",
+      "words": [
+        "DAMP",
+        "SILT",
+        "BOWS",
+        "ORES"
+      ],
+      "issue": "source/target mismatch at step 2"
+    },
+    {
+      "file": "lexiconBankReverseMedium.ts",
+      "id": "7b7f80c168de",
+      "words": [
+        "GAIT",
+        "GLEN",
+        "ORES",
+        "SCAR"
+      ],
+      "issue": "source/target mismatch at step 2"
+    },
+    {
+      "file": "lexiconBankReverseMedium.ts",
+      "id": "c2e9b47c4790",
+      "words": [
+        "WARE",
+        "MANS",
+        "LING",
+        "DUES"
+      ],
+      "issue": "source/target mismatch at step 1"
+    },
+    {
+      "file": "puzzleBankReverseEasy.ts",
+      "id": "7771d9d77a06",
+      "words": [
+        "STAR",
+        "PATS",
+        "CHAR"
+      ],
+      "issue": "source/target mismatch at step 1"
+    },
+    {
+      "file": "puzzleBankReverseEasy.ts",
+      "id": "65ef4a9330f6",
+      "words": [
+        "SHOP",
+        "PATS",
+        "RIPS"
+      ],
+      "issue": "source/target mismatch at step 1"
+    },
+    {
+      "file": "puzzleBankReverseEasy.ts",
+      "id": "d2feb3283a8e",
+      "words": [
+        "OUTS",
+        "PATS",
+        "PUNS"
+      ],
+      "issue": "source/target mismatch at step 1"
+    },
+    {
+      "file": "puzzleBankReverseMedium.ts",
+      "id": "ef4992df7316",
+      "words": [
+        "DISK",
+        "SINS",
+        "PATH",
+        "COPS"
+      ],
+      "issue": "source/target mismatch at step 1"
+    },
+    {
+      "file": "puzzleBankReverseMedium.ts",
+      "id": "2fa7c438a962",
+      "words": [
+        "WHIT",
+        "SUNS",
+        "BEAT",
+        "BRED"
+      ],
+      "issue": "source/target mismatch at step 2"
+    },
+    {
+      "file": "puzzleBankReverseMedium.ts",
+      "id": "cad1852958cf",
+      "words": [
+        "DEFT",
+        "BOAS",
+        "LUMP",
+        "REPS"
+      ],
+      "issue": "source/target mismatch at step 1"
+    },
+    {
+      "file": "puzzleBankReverseMedium.ts",
+      "id": "c60d39e62b8f",
+      "words": [
+        "HUMS",
+        "PINE",
+        "NODS",
+        "LINE"
+      ],
+      "issue": "source/target mismatch at step 1"
+    }
+  ],
+  "withheldAfterVocabulary": [
+    {
+      "file": "lexiconBankReverseEasy.ts",
+      "id": "e75b35ad9c08",
+      "words": [
+        "SILL",
+        "KITS",
+        "INKS"
+      ],
+      "reason": "replayed_vocabulary",
+      "invalidRequiredWords": [
+        "KINS"
+      ]
+    },
+    {
+      "file": "puzzleBankEasy.ts",
+      "id": "33a2d13c19a0",
+      "words": [
+        "ACME",
+        "TOES",
+        "WHAT"
+      ],
+      "reason": "audited_single_route",
+      "invalidRequiredWords": []
+    },
+    {
+      "file": "puzzleBankReverseEasy.ts",
+      "id": "0269811347dc",
+      "words": [
+        "GEEK",
+        "INKS",
+        "JEST"
+      ],
+      "reason": "replayed_vocabulary",
+      "invalidRequiredWords": [
+        "KINS"
+      ]
+    },
+    {
+      "file": "puzzleBankReverseEasy.ts",
+      "id": "3d911fecf847",
+      "words": [
+        "SICK",
+        "INKS",
+        "SHOW"
+      ],
+      "reason": "replayed_vocabulary",
+      "invalidRequiredWords": [
+        "KINS"
+      ]
+    },
+    {
+      "file": "puzzleBankReverseMedium.ts",
+      "id": "313978d57484",
+      "words": [
+        "WASH",
+        "SAYS",
+        "SKIT",
+        "INKS"
+      ],
+      "reason": "replayed_vocabulary",
+      "invalidRequiredWords": [
+        "KINS"
+      ]
+    }
+  ],
+  "memory": {
+    "rss": 162971648,
+    "heapTotal": 72278016,
+    "heapUsed": 55728768,
+    "external": 1938372,
+    "arrayBuffers": 24811
+  }
+}

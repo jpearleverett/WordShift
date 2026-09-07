@@ -1,0 +1,6 @@
+{
+  "checks": 39,
+  "result": "passed",
+  "engine": "PGlite PostgreSQL",
+  "remoteWrites": 0
+}

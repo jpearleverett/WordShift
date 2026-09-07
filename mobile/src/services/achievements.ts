@@ -1,6 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ImageSourcePropType } from 'react-native';
-import { Difficulty } from '../types';
 import { CumulativeStats } from './starRating';
 import { ANIMALS, ROOMS } from './homeWorldData';
 
@@ -37,14 +36,20 @@ export type AchievementCategory = 'puzzle' | 'mastery' | 'streak' | 'collection'
  * AchievementToast alcove. flame/star_filled ship two categories on day one.
  */
 export const ACHIEVEMENT_CATEGORY_ICONS: Record<AchievementCategory, ImageSourcePropType> = {
+
   puzzle: require('../../assets/ui/quest.png'),
+
   mastery: require('../../assets/ui/star_filled.png'),
+
   streak: require('../../assets/ui/flame.png'),
+
   collection: require('../../assets/ui/home.png'),
+
   journey: require('../../assets/ui/moon.png'),
 };
 
 /** Locked-row icon sprite (replaces the raw 🔒 emoji). */
+
 export const ACHIEVEMENT_LOCK_ICON: ImageSourcePropType = require('../../assets/ui/lock.png');
 
 /**
@@ -769,6 +774,7 @@ export async function checkAchievements(
     const totalReward = newlyUnlocked.reduce((sum, a) => sum + a.rewardAmber, 0);
     if (totalReward > 0) {
       try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
         const { awardBonusAmber } = require('./amberCurrency');
         await awardBonusAmber(totalReward, 'achievement');
       } catch (err) {

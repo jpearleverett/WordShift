@@ -355,7 +355,7 @@ export const FINAL_PUZZLE_EVENT: PhaseTransitionEvent = {
     { text: 'Midnight. The last letter settles.', image: 'kept_table', imageOpacity: 0.8, delay: 0, duration: 3000 },
     { text: 'The words return through the walls.\nThe incantation has learned the sound of this house.', image: 'house', imageOpacity: 0.45, delay: 3200, duration: 4000 },
     { text: 'The rooms you raised stand above the old foundation.\nYour friends keep their places.', image: 'house', imageOpacity: 0.55, delay: 7400, duration: 4000 },
-    { text: 'A note passes through the timber.\nNo voice is asked to drown another.', image: 'house', imageOpacity: 0.35, delay: 11600, duration: 3000 },
+    { text: 'A note passes through the timber.\nA spoon taps a cup. The small sound still carries.', image: 'house', imageOpacity: 0.35, delay: 11600, duration: 3000 },
     { text: 'For a moment, nothing moves.', delay: 14800, duration: 2000 },
     { text: 'The seam opens above the roof.\nSomething descends, carrying the warmth you knew.', image: 'shadow_figure', imageOpacity: 0.7, effect: 'descend', delay: 17000, duration: 5000 },
     { text: 'The warmth reaches for every room.\nAt the doorstep, a cold draft remains.', image: 'shadow_figure', imageOpacity: 0.7, delay: 22200, duration: 5000 },

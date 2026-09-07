@@ -1,5 +1,7 @@
 # What's Left: WordShift Completion Checklist
 
+> Historical record. Current work and remaining checks: [September 2026 implementation ledger](IMPLEMENTATION_STATUS_2026-09-05.md).
+
 *Compiled 2026-08-31 from a full repo audit (release config, docs, design-audit ledger, code markers,
 known gaps, store/backend readiness, content/assets, plus a clean-room CI run). Items were
 adversarially verified against the repo at HEAD (`claude/game-completion-checklist-mybsmk`,

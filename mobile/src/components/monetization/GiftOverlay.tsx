@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { FONT_SIZE } from '../../theme/typeScale';
 import {
   View,
@@ -70,10 +70,10 @@ export const GiftOverlay: React.FC<GiftOverlayProps> = ({
   const t = getSurfaceTheme(phase);
   const reducedMotion = getSettingsSync().reducedMotion;
 
-  const backdropOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
-  const cardScale = useRef(new Animated.Value(reducedMotion ? 1 : 0.92)).current;
-  const cardOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
-  const giftPop = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const [backdropOpacity] = useState(() => new Animated.Value(reducedMotion ? 1 : 0));
+  const [cardScale] = useState(() => new Animated.Value(reducedMotion ? 1 : 0.92));
+  const [cardOpacity] = useState(() => new Animated.Value(reducedMotion ? 1 : 0));
+  const [giftPop] = useState(() => new Animated.Value(reducedMotion ? 1 : 0));
   const closingRef = useRef(false);
 
   useEffect(() => {
@@ -120,7 +120,7 @@ export const GiftOverlay: React.FC<GiftOverlayProps> = ({
     ]);
     anim.start();
     return () => anim.stop();
-  }, [visible, reducedMotion, backdropOpacity, cardScale, cardOpacity, giftPop]);
+  }, [visible, phase, reducedMotion, backdropOpacity, cardScale, cardOpacity, giftPop]);
 
   const handleClose = useCallback(() => {
     if (closingRef.current) return;

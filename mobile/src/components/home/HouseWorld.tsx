@@ -1,9 +1,9 @@
-import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useLayoutEffect, useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import { FONT_SIZE } from '../../theme/typeScale';
 import {
   View,
   StyleSheet,
-  Dimensions,
+  useWindowDimensions,
   Animated,
   Text,
   Easing,
@@ -33,10 +33,13 @@ import {
   computePanSettleTarget,
   rubberBandPanY,
 } from '../../services/homeScenePan';
+import { getSkyBoxHeight } from '../../services/worldGeometry';
 import { getSettingsSync } from '../../services/settings';
 import { shouldSimplifyAnimations, getDeviceTier } from '../../services/deviceTier';
 import { getTendingIntensity } from '../../services/tending';
 import { getActiveEvent } from '../../services/liveEvents';
+import { StoryWorldKeepsake } from '../../services/storySpine';
+import { StoryWorldObject } from './StoryWorldObject';
 
 // Environment assets
 // Full-screen sky backdrops ship as WebP (q90): ~15MB of PNG became ~1.5MB with
@@ -74,7 +77,6 @@ const PIT_ENTRANCE_IMG = require('../../../assets/environment/pit_entrance.png')
 const HOUSE_SHADOW_IMG = require('../../../assets/environment/house_shadow.png');
 const SHADOW_FIGURE_IMG = require('../../../assets/environment/shadow_figure.png');
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // AMBIENT PARTICLE SYSTEM — phase-graded living atmosphere
@@ -135,6 +137,7 @@ const AMBIENT_PARTICLES_BY_PHASE: Record<number, AmbientParticleConfig> = {
 };
 
 const FloatingParticle: React.FC<{ particle: Particle }> = ({ particle }) => {
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
   useEffect(() => {
     const startX = Math.random() * SCREEN_WIDTH;
     const endX = startX + (Math.random() - 0.5) * particle.drift * 2;
@@ -184,7 +187,7 @@ const FloatingParticle: React.FC<{ particle: Particle }> = ({ particle }) => {
     ]);
     anim.start();
     return () => anim.stop();
-  }, []);
+  }, [SCREEN_HEIGHT, SCREEN_WIDTH, particle.direction, particle.drift, particle.duration, particle.opacity, particle.peakOpacity, particle.scale, particle.x, particle.y]);
 
   const halo = particle.size * 2;
   return (
@@ -246,10 +249,7 @@ const AmbientParticles: React.FC<{
   // false under reducedMotion / low-tier (zero particles there); the medium
   // tier gets a reduced ceiling on top.
   useEffect(() => {
-    if (!ambientMotionEnabled) {
-      setParticles([]);
-      return;
-    }
+    if (!ambientMotionEnabled) return;
 
     const config = AMBIENT_PARTICLES_BY_PHASE[phase] ?? AMBIENT_PARTICLES_BY_PHASE[0];
     // High tier keeps the full count; medium thins it (density scales DOWN).
@@ -281,14 +281,15 @@ const AmbientParticles: React.FC<{
     };
 
     const interval = setInterval(spawnParticle, spawnMs);
-    spawnParticle(); // Spawn one immediately
+    // Publish the first particle now; later ones come from this owned interval.
+    spawnParticle();
 
     return () => clearInterval(interval);
   }, [phase, ambientMotionEnabled, isFullMoon]);
 
   return (
     <View style={styles.particleOverlay} pointerEvents="none">
-      {particles.map(particle => (
+      {ambientMotionEnabled && particles.map(particle => (
         <FloatingParticle key={particle.id} particle={particle} />
       ))}
     </View>
@@ -301,10 +302,10 @@ AmbientParticles.displayName = 'AmbientParticles';
 // ═══════════════════════════════════════════════════════════════════════════
 
 const SmokePuff: React.FC<{ delay: number; isStatic?: boolean; tint?: string }> = ({ delay, isStatic = false, tint }) => {
-  const y = useRef(new Animated.Value(0)).current;
-  const x = useRef(new Animated.Value(0)).current;
-  const opacity = useRef(new Animated.Value(0)).current;
-  const scale = useRef(new Animated.Value(0.5)).current;
+  const [y] = useState(() => new Animated.Value(0));
+  const [x] = useState(() => new Animated.Value(0));
+  const [opacity] = useState(() => new Animated.Value(0));
+  const [scale] = useState(() => new Animated.Value(0.5));
   const mountedRef = useRef(true);
   const animationRef = useRef<Animated.CompositeAnimation | null>(null);
 
@@ -442,9 +443,10 @@ const smokeStyles = StyleSheet.create({
 // so it always faces its travel direction (F16). The caller only renders this
 // at the bright phases (F16) — songbirds don't cross the dread-phase skies.
 const FlyingBird: React.FC<{ startDelay: number; yPosition: number }> = ({ startDelay, yPosition }) => {
-  const x = useRef(new Animated.Value(-50)).current;
-  const y = useRef(new Animated.Value(yPosition)).current;
-  const flapRotation = useRef(new Animated.Value(0)).current;
+  const { width: SCREEN_WIDTH } = useWindowDimensions();
+  const [x] = useState(() => new Animated.Value(-50));
+  const [y] = useState(() => new Animated.Value(yPosition));
+  const [flapRotation] = useState(() => new Animated.Value(0));
   const [facingRight, setFacingRight] = useState(true);
   const mountedRef = useRef(true);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -487,9 +489,9 @@ const FlyingBird: React.FC<{ startDelay: number; yPosition: number }> = ({ start
         delay: startDelay,
       });
       moveAnimRef.current = moveAnimation;
-      moveAnimation.start(() => {
+      moveAnimation.start(({ finished }) => {
         flapAnimation.stop();
-        if (!mountedRef.current) return;
+        if (!finished || !mountedRef.current) return;
         timeoutRef.current = setTimeout(animate, 5000 + Math.random() * 10000);
       });
     };
@@ -502,7 +504,7 @@ const FlyingBird: React.FC<{ startDelay: number; yPosition: number }> = ({ start
       if (flapAnimRef.current) flapAnimRef.current.stop();
       if (moveAnimRef.current) moveAnimRef.current.stop();
     };
-  }, []);
+  }, [SCREEN_WIDTH, flapRotation, startDelay, x, y, yPosition]);
 
   const scaleY = flapRotation.interpolate({
     inputRange: [0, 1],
@@ -582,9 +584,10 @@ const birdStyles = StyleSheet.create({
 // ═══════════════════════════════════════════════════════════════════════════
 
 const ShootingStar: React.FC = () => {
-  const x = useRef(new Animated.Value(0)).current;
-  const y = useRef(new Animated.Value(0)).current;
-  const opacity = useRef(new Animated.Value(0)).current;
+  const { width: SCREEN_WIDTH } = useWindowDimensions();
+  const [x] = useState(() => new Animated.Value(0));
+  const [y] = useState(() => new Animated.Value(0));
+  const [opacity] = useState(() => new Animated.Value(0));
   const mountedRef = useRef(true);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const animationRef = useRef<Animated.CompositeAnimation | null>(null);
@@ -627,8 +630,8 @@ const ShootingStar: React.FC = () => {
         ]),
       ]);
       animationRef.current = anim;
-      anim.start(() => {
-        if (!mountedRef.current) return;
+      anim.start(({ finished }) => {
+        if (!finished || !mountedRef.current) return;
         timeoutRef.current = setTimeout(animate, 10000 + Math.random() * 20000);
       });
     };
@@ -640,7 +643,7 @@ const ShootingStar: React.FC = () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       if (animationRef.current) animationRef.current.stop();
     };
-  }, []);
+  }, [SCREEN_WIDTH, opacity, x, y]);
 
   return (
     <Animated.View
@@ -694,7 +697,8 @@ const LIGHTNING_GAP_RANGE_MS = 90000;
 const LIGHTNING_PEAK_OPACITY = 0.07;
 
 const DistantLightning: React.FC = () => {
-  const flash = useRef(new Animated.Value(0)).current;
+  const { height: SCREEN_HEIGHT } = useWindowDimensions();
+  const [flash] = useState(() => new Animated.Value(0));
   const mountedRef = useRef(true);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const animationRef = useRef<Animated.CompositeAnimation | null>(null);
@@ -713,8 +717,8 @@ const DistantLightning: React.FC = () => {
         Animated.timing(flash, { toValue: 0, duration: 260, useNativeDriver: true }),
       ]);
       animationRef.current = anim;
-      anim.start(() => {
-        if (!mountedRef.current) return;
+      anim.start(({ finished }) => {
+        if (!finished || !mountedRef.current) return;
         timeoutRef.current = setTimeout(
           strike,
           LIGHTNING_MIN_GAP_MS + Math.random() * LIGHTNING_GAP_RANGE_MS
@@ -733,7 +737,7 @@ const DistantLightning: React.FC = () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       if (animationRef.current) animationRef.current.stop();
     };
-  }, []);
+  }, [flash]);
 
   return (
     <Animated.View
@@ -768,7 +772,7 @@ const NightStarGlint: React.FC<{
   twinkle: boolean;
   delay: number;
 }> = ({ left, top, size, baseOpacity, twinkle, delay }) => {
-  const pulse = useRef(new Animated.Value(1)).current;
+  const [pulse] = useState(() => new Animated.Value(1));
 
   useEffect(() => {
     if (!twinkle) {
@@ -917,7 +921,7 @@ const ArrangementConnector: React.FC<{ phase: number; tendingIntensity?: number 
     showGlow = t > 0.4;
   }
 
-  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const [pulseAnim] = useState(() => new Animated.Value(1));
   const animatePulse =
     showGlow && !getSettingsSync().reducedMotion && !shouldSimplifyAnimations();
 
@@ -1090,7 +1094,7 @@ const HouseSigilOverlay: React.FC<{
     showGlow = t > 0.4;
   }
 
-  const pulse = useRef(new Animated.Value(1)).current;
+  const [pulse] = useState(() => new Animated.Value(1));
   const animatePulse = showGlow && !getSettingsSync().reducedMotion && !shouldSimplifyAnimations();
 
   useEffect(() => {
@@ -1236,7 +1240,7 @@ const sigilOverlayStyles = StyleSheet.create({
  * under reducedMotion / simplified animations.
  */
 const ShadowFigure: React.FC<{ phase: number }> = ({ phase }) => {
-  const breatheAnim = useRef(new Animated.Value(0)).current;
+  const [breatheAnim] = useState(() => new Animated.Value(0));
   const isStatic = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
   const visible = phase >= 3;
 
@@ -1333,8 +1337,9 @@ const DriftingCloud: React.FC<{
   /** Cloud body color (phase-dimmed by the caller). */
   tint: string;
 }> = ({ width, top, duration, initialProgress, opacity, tint }) => {
+  const { width: SCREEN_WIDTH } = useWindowDimensions();
   const travel = SCREEN_WIDTH + width;
-  const x = useRef(new Animated.Value(-width + travel * initialProgress)).current;
+  const [x] = useState(() => new Animated.Value(-width + travel * initialProgress));
   const mountedRef = useRef(true);
   const animRef = useRef<Animated.CompositeAnimation | null>(null);
   const isStatic = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
@@ -1365,7 +1370,7 @@ const DriftingCloud: React.FC<{
       mountedRef.current = false;
       animRef.current?.stop();
     };
-  }, []);
+  }, [SCREEN_WIDTH, duration, initialProgress, isStatic, travel, width, x]);
 
   return (
     <Animated.View
@@ -1399,7 +1404,8 @@ const DriftingCloud: React.FC<{
  * Views + one opacity loop, no new art.
  */
 const MoonGlow: React.FC = () => {
-  const breathe = useRef(new Animated.Value(0)).current;
+  const { width: SCREEN_WIDTH } = useWindowDimensions();
+  const [breathe] = useState(() => new Animated.Value(0));
   const isStatic = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
 
   useEffect(() => {
@@ -1493,7 +1499,7 @@ const getPitPulseMs = (phase: number): number => {
  * period lengthens with the phase (F78) so the cue smolders, not sparkles, late.
  */
 const PitAttentionGlow: React.FC<{ phase: number }> = ({ phase }) => {
-  const pulse = useRef(new Animated.Value(0)).current;
+  const [pulse] = useState(() => new Animated.Value(0));
   const isStatic = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
   const halfCycle = getPitPulseMs(phase);
 
@@ -1605,19 +1611,6 @@ const PIT_DOCK_CLEARANCE = 80;
 // The house column is bottom-anchored too (margins below), so the foundation
 // top sits at (HOUSE_BOTTOM_MARGIN + PIT_DOCK_CLEARANCE + PIT_FLOW_HEIGHT 140
 // + foundation 43) = 293dp above the container bottom.
-const SKY_IMG_WIDTH = 941;
-const SKY_IMG_HEIGHT = 1972;
-// The 940 floor guarantees the seat even on very small / display-size-scaled
-// windows (e.g. 320x640dp): scale >= 940/1972 keeps the foundation top at
-// image row >= ~1366, below every river (lowest bank ~row 1335). The taller
-// pit (137dp flow) pushes the foundation higher up the art than the old one
-// did, so this floor is what keeps it out of the water — larger boxes only
-// push the house further down the meadow, never back up into the river.
-const SKY_BOX_HEIGHT = Math.max(
-  SCREEN_HEIGHT,
-  Math.ceil(SCREEN_WIDTH * (SKY_IMG_HEIGHT / SKY_IMG_WIDTH)) + 2,
-  940,
-);
 
 
 /**
@@ -1643,6 +1636,8 @@ const UPPER_SKY_LIGHT: Record<number, {
 const UpperSkyAtmosphere: React.FC<{
   phase: DialoguePhase; height: number;
 }> = React.memo(({ phase, height }) => {
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
+  const SKY_BOX_HEIGHT = getSkyBoxHeight(SCREEN_WIDTH, SCREEN_HEIGHT);
   if (height <= 0) return null;
   const palette = UPPER_SKY_LIGHT[phase] ?? UPPER_SKY_LIGHT[0];
   const simple = getDeviceTier() === 'low';
@@ -1708,6 +1703,8 @@ UpperSkyAtmosphere.displayName = 'UpperSkyAtmosphere';
 
 
 interface HouseWorldProps {
+  storyKeepsake?: StoryWorldKeepsake | null;
+  onInspectStory?: () => void;
   rooms: Room[];
   animals: Animal[];
   currentPhase: DialoguePhase;
@@ -1745,9 +1742,12 @@ interface HouseWorldProps {
    * the chip doesn't peek through the modal's translucent scrim.
    */
   suppressInviteChips?: boolean;
+  quietNotifications?: boolean;
 }
 
 export const HouseWorld: React.FC<HouseWorldProps> = ({
+  storyKeepsake,
+  onInspectStory,
   rooms,
   animals,
   currentPhase,
@@ -1768,7 +1768,10 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   pitNeedsAttention = false,
   tendingLevel = 0,
   suppressInviteChips = false,
+  quietNotifications = false,
 }) => {
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
+  const SKY_BOX_HEIGHT = getSkyBoxHeight(SCREEN_WIDTH, SCREEN_HEIGHT);
   const tendingIntensity = getTendingIntensity(tendingLevel);
   const ambientMotionEnabled = !getSettingsSync().reducedMotion && !shouldSimplifyAnimations();
   const houseTint = PHASE_HOUSE_TINT[currentPhase] ?? PHASE_HOUSE_TINT[0];
@@ -1805,7 +1808,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   // The rubber band is no longer computed in JS either: it is baked into the
   // interpolation below (panRaw -> rendered translateY), so the whole drag,
   // including the overscroll give, runs on the native thread with ZERO JS work.
-  const panRaw = useRef(new Animated.Value(0)).current;
+  const [panRaw] = useState(() => new Animated.Value(0));
 
   // Refs for gesture tracking
   const panRef = useRef<PanGestureHandler>(null);
@@ -1916,7 +1919,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
       // Allow panning up to see the roof + small padding.
       max: Math.max(0, overflow + 50),
     };
-  }, [containerHeight, houseHeight, numRows, onPitPress, houseBottomMargin]);
+  }, [numRows, houseHeight, onPitPress, houseBottomMargin, containerHeight, SCREEN_HEIGHT]);
 
   // Reach above the roof end of the complete pan range, including a small
   // overscroll allowance. Short houses still use only the painted sky.
@@ -1972,7 +1975,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
       );
     }
     return { inputRange, outputRange };
-  }, [panBoundsMax, containerHeight, panPhysicsEnabled]);
+  }, [panBoundsMax, containerHeight, SCREEN_HEIGHT, panPhysicsEnabled]);
 
   const translateY = useMemo(
     () => panRaw.interpolate({ ...panTransform, extrapolate: 'clamp' as const }),
@@ -2192,7 +2195,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   // else ever changes savedPanY (App seeds it null and only this component
   // writes it), so geometry alone should re-run the restore.
   const savedPanYRef = useRef(savedPanY);
-  savedPanYRef.current = savedPanY;
+  useLayoutEffect(() => { savedPanYRef.current = savedPanY; });
   useEffect(() => {
     if (containerHeight === null) return;
     // Never reposition under a live finger. The house can genuinely grow
@@ -2273,7 +2276,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                     currentPhase >= 1 ? SKY_AFTERNOON :
                     SKY_DAY
                   }
-                  style={[styles.skyBackground, { height: SKY_BOX_HEIGHT }]}
+                  style={[styles.skyBackground, { width: SCREEN_WIDTH, height: SKY_BOX_HEIGHT }]}
                   resizeMode="cover"
                 />
 
@@ -2286,6 +2289,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                   pointerEvents="none"
                   style={[
                     styles.groundExtension,
+                    { bottom: -SCREEN_HEIGHT, height: SCREEN_HEIGHT + 1 },
                     { backgroundColor: PHASE_GROUND_COLORS[currentPhase] ?? PHASE_GROUND_COLORS[0] },
                   ]}
                 />
@@ -2295,9 +2299,9 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                     phase-dimmed. */}
                 {currentPhase <= 2 && (
                   <>
-                    <DriftingCloud width={170} top={26} duration={80000} initialProgress={0.15} opacity={currentPhase >= 2 ? 0.4 : 0.85} tint={currentPhase >= 2 ? '#CFC7DA' : '#FFFFFF'} />
-                    <DriftingCloud width={130} top={88} duration={105000} initialProgress={0.55} opacity={currentPhase >= 2 ? 0.4 : 0.85} tint={currentPhase >= 2 ? '#CFC7DA' : '#FFFFFF'} />
-                    <DriftingCloud width={120} top={58} duration={65000} initialProgress={0.8} opacity={currentPhase >= 2 ? 0.35 : 0.75} tint={currentPhase >= 2 ? '#C6BED2' : '#F4F2FA'} />
+                    <DriftingCloud key={`${SCREEN_WIDTH}:${SCREEN_HEIGHT}:170`} width={170} top={26} duration={80000} initialProgress={0.15} opacity={currentPhase >= 2 ? 0.4 : 0.85} tint={currentPhase >= 2 ? '#CFC7DA' : '#FFFFFF'} />
+                    <DriftingCloud key={`${SCREEN_WIDTH}:${SCREEN_HEIGHT}:130`} width={130} top={88} duration={105000} initialProgress={0.55} opacity={currentPhase >= 2 ? 0.4 : 0.85} tint={currentPhase >= 2 ? '#CFC7DA' : '#FFFFFF'} />
+                    <DriftingCloud key={`${SCREEN_WIDTH}:${SCREEN_HEIGHT}:120`} width={120} top={58} duration={65000} initialProgress={0.8} opacity={currentPhase >= 2 ? 0.35 : 0.75} tint={currentPhase >= 2 ? '#C6BED2' : '#F4F2FA'} />
                   </>
                 )}
 
@@ -2325,9 +2329,9 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                 )}
 
                 {/* Shooting stars (only at higher phases) */}
-                {ambientMotionEnabled && currentPhase >= 2 && <ShootingStar />}
-                {ambientMotionEnabled && currentPhase >= 3 && <ShootingStar />}
-                {ambientMotionEnabled && currentPhase >= 4 && <ShootingStar />}
+                {ambientMotionEnabled && currentPhase >= 2 && <ShootingStar key={`${SCREEN_WIDTH}:${SCREEN_HEIGHT}:first`} />}
+                {ambientMotionEnabled && currentPhase >= 3 && <ShootingStar key={`${SCREEN_WIDTH}:${SCREEN_HEIGHT}:second`} />}
+                {ambientMotionEnabled && currentPhase >= 4 && <ShootingStar key={`${SCREEN_WIDTH}:${SCREEN_HEIGHT}:third`} />}
                 {/* The pre-storm sky stirs: rare silent heat lightning at the
                     horizon, Phase 3 ONLY (the Phase 4+ sky belongs to the
                     entity and stays honestly empty). */}
@@ -2340,9 +2344,9 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                   not the distant sky backdrop). */}
               {ambientMotionEnabled && currentPhase <= 2 && (
                 <>
-                  <FlyingBird startDelay={0} yPosition={80} />
-                  <FlyingBird startDelay={3000} yPosition={50} />
-                  <FlyingBird startDelay={6000} yPosition={110} />
+                  <FlyingBird key={`${SCREEN_WIDTH}:${SCREEN_HEIGHT}:0`} startDelay={0} yPosition={80} />
+                  <FlyingBird key={`${SCREEN_WIDTH}:${SCREEN_HEIGHT}:3000`} startDelay={3000} yPosition={50} />
+                  <FlyingBird key={`${SCREEN_WIDTH}:${SCREEN_HEIGHT}:6000`} startDelay={6000} yPosition={110} />
                 </>
               )}
 
@@ -2448,6 +2452,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                             onAnimalPress={onAnimalPress}
                             onRoomPress={onRoomPress}
                             currentPhase={currentPhase}
+                            quietNotifications={quietNotifications}
                             isAnimalOnCooldown={roomAnimal ? isOnCooldown(roomAnimal.id) : false}
                             cooldownPuzzlesLeft={roomAnimal ? getSessionStatus(roomAnimal.id).puzzlesRemaining : undefined}
                             isRoomUpgraded={room.id in purchasedUpgrades}
@@ -2539,6 +2544,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                     style={styles.foundationImageInner}
                     resizeMode="stretch"
                   />
+                  {storyKeepsake && onInspectStory && <StoryWorldObject keepsake={storyKeepsake} onPress={onInspectStory} />}
                 </View>
 
                 {/* The Offering Pit's mouth in the front yard, a stone path
@@ -2582,6 +2588,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
           were invisible at translateY=0 in every phase. Memoized child: its
           spawn setState never re-renders the pan scene (flicker fix). */}
       <AmbientParticles
+        key={`${SCREEN_WIDTH}:${SCREEN_HEIGHT}:${ambientMotionEnabled}`}
         phase={currentPhase}
         ambientMotionEnabled={ambientMotionEnabled}
         isFullMoon={isFullMoon}
@@ -2608,18 +2615,18 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 0,
     left: 0,
-    width: SCREEN_WIDTH,
-    height: SKY_BOX_HEIGHT,
+    width: '100%',
+    height: 940,
     zIndex: -1,
   },
   // Below the container bottom with a 1px overlap over the art's bottom row —
   // sub-pixel seam insurance only (see PHASE_GROUND_COLORS notes).
   groundExtension: {
     position: 'absolute',
-    bottom: -SCREEN_HEIGHT,
+    bottom: -1,
     left: 0,
     right: 0,
-    height: SCREEN_HEIGHT + 1,
+    height: 1,
     zIndex: -1,
   },
   // Screen-space ambient particle overlay: rendered after the pan handler,
@@ -2636,7 +2643,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: SCREEN_HEIGHT * 0.3,
+    height: '30%',
     zIndex: 150,
   },
 

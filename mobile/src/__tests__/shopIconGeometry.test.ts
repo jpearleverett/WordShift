@@ -40,7 +40,7 @@ type IconSet = {
 };
 const CEREMONY_FILES = ['ceremony_curious.png', 'ceremony_deeper.png', 'ceremony_shadows.png'];
 const ui = (rel: string) => path.resolve(__dirname, '../../assets/ui', rel);
-const ICON_SETS: ReadonlyArray<IconSet> = [
+const ICON_SETS: readonly IconSet[] = [
   { set: 'shop', dir: ui('shop'), size: 192, minCoverage: 0.12 },
   { set: 'store', dir: ui('store'), size: 192, minCoverage: 0.12 },
   // generateGameIcons.mjs families (see gameArt.test.ts for the registries).
@@ -74,7 +74,7 @@ const ICON_SETS: ReadonlyArray<IconSet> = [
 const ALPHA_FLOOR = 8;
 
 /** [label, absolute path] for every PNG in both sets, so a failure names the set. */
-const files: Array<[string, string, number, number]> = ICON_SETS.flatMap(({ set, dir, size, minCoverage, only, exclude }) =>
+const files: [string, string, number, number][] = ICON_SETS.flatMap(({ set, dir, size, minCoverage, only, exclude }) =>
   fs
     .readdirSync(dir)
     .filter((f) => f.endsWith('.png') && (!only || only.includes(f)) && !(exclude && exclude.includes(f)))

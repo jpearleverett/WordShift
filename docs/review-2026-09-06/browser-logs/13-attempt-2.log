@@ -1,0 +1,12 @@
+
+> wordshift-mobile@1.3.0 test:e2e
+> playwright test --grep reset\ through\ Settings\ rebuilds\ a\ fresh\ playable\ session$
+
+
+Running 1 test using 1 worker
+
+(node:177517) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 e2e/game.spec.ts:355:5 › reset through Settings rebuilds a fresh playable session (50.8s)
+
+  1 passed (53.5s)

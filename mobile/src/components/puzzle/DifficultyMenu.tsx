@@ -72,8 +72,8 @@ const StackEmblem: React.FC<{
   t: ReturnType<typeof getSurfaceTheme>;
 }> = ({ glyphs, title, subtitle, count, layerNames, t }) => {
   const reduced = getSettingsSync().reducedMotion;
-  const scale = useRef(new Animated.Value(reduced ? 1 : 0.86)).current;
-  const opacity = useRef(new Animated.Value(reduced ? 1 : 0)).current;
+  const [scale] = useState(() => new Animated.Value(reduced ? 1 : 0.86));
+  const [opacity] = useState(() => new Animated.Value(reduced ? 1 : 0));
   useEffect(() => {
     if (reduced) return;
     const anim = Animated.parallel([
@@ -291,9 +291,9 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   // everything shown. Refs/effect live BEFORE the visibility early-return so the
   // hook order never changes.
   const reducedMotion = getSettingsSync().reducedMotion;
-  const backdropOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
-  const cardScale = useRef(new Animated.Value(reducedMotion ? 1 : 0.92)).current;
-  const cardOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const [backdropOpacity] = useState(() => new Animated.Value(reducedMotion ? 1 : 0));
+  const [cardScale] = useState(() => new Animated.Value(reducedMotion ? 1 : 0.92));
+  const [cardOpacity] = useState(() => new Animated.Value(reducedMotion ? 1 : 0));
   const closingRef = useRef(false);
 
   useEffect(() => {
@@ -315,7 +315,7 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
     ]);
     anim.start();
     return () => anim.stop();
-  }, [visible, reducedMotion, backdropOpacity, cardScale, cardOpacity]);
+  }, [visible, phase, reducedMotion, backdropOpacity, cardScale, cardOpacity]);
 
   // Fast, asymmetric exit: fade the panel + scrim, then hand back to the parent
   // (which owns `visible`). A guard stops a double-dismiss from racing.
@@ -352,7 +352,7 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   // overflowing menu (before any scroll), not only after the first drag.
   const [menuOverflowing, setMenuOverflowing] = useState(false);
   const [menuAtBottom, setMenuAtBottom] = useState(false);
-  const scrollCueOpacity = useRef(new Animated.Value(0)).current;
+  const [scrollCueOpacity] = useState(() => new Animated.Value(0));
   const contentHeightRef = useRef(0);
   const viewportHeightRef = useRef(0);
 

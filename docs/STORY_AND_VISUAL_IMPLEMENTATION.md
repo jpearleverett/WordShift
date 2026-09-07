@@ -1,5 +1,7 @@
 # WordShift: the house can change
 
+> Historical record. Current work and remaining checks: [September 2026 implementation ledger](IMPLEMENTATION_STATUS_2026-09-05.md).
+
 This implementation follows [the editorial review](STORY_EDITORIAL_REVIEW.md). It preserves the word puzzle, thirteen residents, growing pixel house and gradual tonal descent, while giving that descent an observable cost and the player an answer that survives the ending.
 
 ## Private canon

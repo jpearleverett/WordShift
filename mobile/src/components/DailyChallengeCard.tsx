@@ -62,15 +62,21 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
   const [difficulty, setDifficulty] = useState<Difficulty>('HARD');
   const [stars, setStars] = useState(0);
   const [streak, setStreak] = useState(0);
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const glowAnim = useRef(new Animated.Value(0.3)).current;
+  const [pulseAnim] = useState(() => new Animated.Value(1));
+  const [glowAnim] = useState(() => new Animated.Value(0.3));
   const pulseLoopRef = useRef<Animated.CompositeAnimation | null>(null);
   const glowLoopRef = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
-    loadStatus();
-    // Re-run on mount and whenever refreshSignal changes (e.g. after a daily
-    // completion when returning home) so the card never shows stale state.
+    let cancelled = false;
+    void getDailyStatus().then(status => {
+      if (cancelled) return;
+      setIsCompleted(status.isCompleted);
+      setDifficulty(status.difficulty);
+      setStreak(status.streak);
+      setStars(status.todayResult?.stars ?? 0);
+    }).catch(() => {});
+    return () => { cancelled = true; };
   }, [refreshSignal]);
 
   useEffect(() => {
@@ -140,17 +146,7 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
       pulseAnim.stopAnimation();
       glowAnim.stopAnimation();
     };
-  }, [isCompleted, phase]);
-
-  const loadStatus = async () => {
-    const status = await getDailyStatus();
-    setIsCompleted(status.isCompleted);
-    setDifficulty(status.difficulty);
-    setStreak(status.streak);
-    if (status.todayResult) {
-      setStars(status.todayResult.stars);
-    }
-  };
+  }, [isCompleted, phase, glowAnim, pulseAnim]);
 
   const handlePress = () => {
     if (!isCompleted) {

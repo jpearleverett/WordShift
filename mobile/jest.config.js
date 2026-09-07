@@ -11,6 +11,11 @@ module.exports = {
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
       tsconfig: {
+        // Type checking runs once through npm run typecheck. Per-file
+        // transpilation keeps the complete suite usable on 2 GB machines.
+        isolatedModules: true,
+        ignoreDeprecations: '6.0',
+        rootDir: '.',
         module: 'commonjs',
         esModuleInterop: true,
         jsx: 'react',
@@ -21,6 +26,7 @@ module.exports = {
   },
   // Mock react-native modules that aren't available in Node
   moduleNameMapper: {
+    '^expo-crypto$': '<rootDir>/src/__tests__/__mocks__/expoCrypto.ts',
     '^@react-native-async-storage/async-storage$': '<rootDir>/src/__tests__/__mocks__/asyncStorage.ts',
     // expo-font ships an untransformed ESM build; the app only calls loadAsync
     // at runtime (theme/fonts.ts), so stub it for the Node test env.

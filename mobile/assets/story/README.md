@@ -1,5 +1,10 @@
 # Story illustrations
 
+Production views use the generated WebP derivatives in `optimized/`. Rebuild with
+`node scripts/tools/optimizeStoryAssets.mjs` from `mobile/`. The 1290px heroes and
+780px headers preserve the source composition; the PNGs below remain unchanged
+source masters. The eight derivatives total 1.21 MB versus 8.56 MB of PNGs.
+
 Generated with the built-in image generation tool for WordShift, September 2026. Selected outputs were visually inspected and copied into the repository. These illustrations extend the existing cottage pixel art and represent ordinary hospitality, protected privacy, and freedom to leave. They are loaded locally; no image service runs in the app.
 
 - `kept-table.png`: journal and shared-scene header.

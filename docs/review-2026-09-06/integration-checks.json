@@ -1,0 +1,170 @@
+[
+  {
+    "check": "typecheck",
+    "exitCode": 0,
+    "elapsedSeconds": 74.73,
+    "command": [
+      "npm",
+      "run",
+      "typecheck"
+    ],
+    "log": "typecheck-before-ci.log",
+    "stage": "Before CI duplicate-letter regression"
+  },
+  {
+    "check": "jest",
+    "exitCode": 0,
+    "elapsedSeconds": 92.53,
+    "command": [
+      "npm",
+      "test",
+      "--",
+      "--no-coverage",
+      "--runInBand"
+    ],
+    "log": "jest-before-ci.log",
+    "stage": "Before CI duplicate-letter regression"
+  },
+  {
+    "check": "lint",
+    "exitCode": 0,
+    "elapsedSeconds": 190.61,
+    "command": [
+      "npm",
+      "run",
+      "lint",
+      "--",
+      "--max-warnings",
+      "0",
+      "--format",
+      "json",
+      "--output-file",
+      "/tmp/wordshift-completion-strict-lint.json"
+    ],
+    "log": "lint.log"
+  },
+  {
+    "check": "android-export",
+    "exitCode": 0,
+    "elapsedSeconds": 100.71,
+    "command": [
+      "npx",
+      "expo",
+      "export",
+      "--platform",
+      "android",
+      "--max-workers",
+      "1",
+      "--dump-assetmap",
+      "--output-dir",
+      "/tmp/wordshift-android-export-completion"
+    ],
+    "log": "android-export-before-ci.log",
+    "stage": "Before CI duplicate-letter regression"
+  },
+  {
+    "check": "android-export",
+    "exitCode": 0,
+    "elapsedSeconds": 65.9,
+    "command": [
+      "npx",
+      "expo",
+      "export",
+      "--platform",
+      "android",
+      "--max-workers",
+      "1",
+      "--dump-assetmap",
+      "--output-dir",
+      "/tmp/wordshift-android-export-completion"
+    ],
+    "log": "android-export-after-reverse.log",
+    "stage": "After exact reverse removal-position correction"
+  },
+  {
+    "check": "typecheck",
+    "exitCode": 0,
+    "elapsedSeconds": 81.29,
+    "command": [
+      "npm",
+      "run",
+      "typecheck"
+    ],
+    "log": "typecheck-after-reverse.log",
+    "stage": "After exact reverse removal-position correction and deterministic regressions"
+  },
+  {
+    "check": "jest",
+    "exitCode": 0,
+    "elapsedSeconds": 89.43,
+    "command": [
+      "npm",
+      "test",
+      "--",
+      "--no-coverage",
+      "--runInBand"
+    ],
+    "log": "jest.log",
+    "stage": "After exact reverse removal-position correction and deterministic regressions"
+  },
+  {
+    "check": "typecheck",
+    "exitCode": 2,
+    "elapsedSeconds": 90.5,
+    "command": [
+      "npm",
+      "run",
+      "typecheck"
+    ],
+    "log": "typecheck-modal-prop-attempt.log",
+    "stage": "Intermediate unsupported TouchableOpacity pointerEvents prop; corrected to ViewStyle before rerun"
+  },
+  {
+    "check": "typecheck",
+    "exitCode": 0,
+    "elapsedSeconds": 76.92,
+    "command": [
+      "npm",
+      "run",
+      "typecheck"
+    ],
+    "log": "typecheck.log",
+    "stage": "After modal accessibility and native TouchableOpacity style correction"
+  },
+  {
+    "check": "home-lint",
+    "exitCode": 0,
+    "elapsedSeconds": 35.8,
+    "command": [
+      "npm",
+      "exec",
+      "--",
+      "eslint",
+      "src/components/home/HomeScreen.tsx",
+      "e2e/game.spec.ts",
+      "--max-warnings",
+      "0"
+    ],
+    "log": "home-lint.log",
+    "stage": "After modal accessibility and native TouchableOpacity style correction"
+  },
+  {
+    "check": "android-export",
+    "exitCode": 0,
+    "elapsedSeconds": 55.05,
+    "command": [
+      "npx",
+      "expo",
+      "export",
+      "--platform",
+      "android",
+      "--max-workers",
+      "1",
+      "--dump-assetmap",
+      "--output-dir",
+      "/tmp/wordshift-android-export-completion"
+    ],
+    "log": "android-export.log",
+    "stage": "After modal accessibility and native TouchableOpacity style correction"
+  }
+]

@@ -1,0 +1,4300 @@
+{
+  "dictionaryAuditDate": "2026-09-06",
+  "banks": [
+    {
+      "file": "lexiconBankDoubleShiftEasy.ts",
+      "total": 260,
+      "eligible": 175,
+      "advanced": true,
+      "diversity": {
+        "uniqueAuthoredWords": 766,
+        "meanQualityScore": 61.82857142857143,
+        "dreadTierCounts": {
+          "0": 128,
+          "1": 8,
+          "2": 9,
+          "3": 14,
+          "4": 16
+        },
+        "maximumWordUses": 3,
+        "maximumStartingLetterShare": 0.14857142857142858,
+        "maximumFirstMovedLetterShare": 0.12,
+        "sMoveShare": 0.08571428571428572
+      },
+      "variant": "double_shift",
+      "maxExploredStates": 0,
+      "routeFailures": 0
+    },
+    {
+      "file": "lexiconBankDoubleShiftExpert.ts",
+      "total": 100,
+      "eligible": 100,
+      "advanced": true,
+      "diversity": {
+        "uniqueAuthoredWords": 698,
+        "meanQualityScore": 63.43,
+        "dreadTierCounts": {
+          "0": 47,
+          "1": 11,
+          "2": 8,
+          "3": 20,
+          "4": 14
+        },
+        "maximumWordUses": 12,
+        "maximumStartingLetterShare": 0.16,
+        "maximumFirstMovedLetterShare": 0.16,
+        "sMoveShare": 0.09333333333333334
+      },
+      "variant": "double_shift",
+      "maxExploredStates": 0,
+      "routeFailures": 0
+    },
+    {
+      "file": "lexiconBankDoubleShiftHard.ts",
+      "total": 100,
+      "eligible": 100,
+      "advanced": true,
+      "diversity": {
+        "uniqueAuthoredWords": 755,
+        "meanQualityScore": 60.35,
+        "dreadTierCounts": {
+          "0": 42,
+          "1": 9,
+          "2": 14,
+          "3": 18,
+          "4": 17
+        },
+        "maximumWordUses": 6,
+        "maximumStartingLetterShare": 0.13,
+        "maximumFirstMovedLetterShare": 0.15,
+        "sMoveShare": 0.098
+      },
+      "variant": "double_shift",
+      "maxExploredStates": 0,
+      "routeFailures": 0
+    },
+    {
+      "file": "lexiconBankDoubleShiftMedium.ts",
+      "total": 263,
+      "eligible": 156,
+      "advanced": true,
+      "diversity": {
+        "uniqueAuthoredWords": 886,
+        "meanQualityScore": 60.666666666666664,
+        "dreadTierCounts": {
+          "0": 111,
+          "1": 8,
+          "2": 10,
+          "3": 14,
+          "4": 13
+        },
+        "maximumWordUses": 5,
+        "maximumStartingLetterShare": 0.12179487179487179,
+        "maximumFirstMovedLetterShare": 0.10256410256410256,
+        "sMoveShare": 0.07264957264957266
+      },
+      "variant": "double_shift",
+      "maxExploredStates": 0,
+      "routeFailures": 0
+    },
+    {
+      "file": "lexiconBankDoubleShiftMediumPlus.ts",
+      "total": 262,
+      "eligible": 118,
+      "advanced": true,
+      "diversity": {
+        "uniqueAuthoredWords": 767,
+        "meanQualityScore": 60.78813559322034,
+        "dreadTierCounts": {
+          "0": 60,
+          "1": 9,
+          "2": 11,
+          "3": 17,
+          "4": 21
+        },
+        "maximumWordUses": 7,
+        "maximumStartingLetterShare": 0.15254237288135594,
+        "maximumFirstMovedLetterShare": 0.11016949152542373,
+        "sMoveShare": 0.07627118644067797
+      },
+      "variant": "double_shift",
+      "maxExploredStates": 0,
+      "routeFailures": 0
+    },
+    {
+      "file": "lexiconBankEasy.ts",
+      "total": 251,
+      "eligible": 202,
+      "advanced": true,
+      "diversity": {
+        "uniqueAuthoredWords": 817,
+        "meanQualityScore": 63.10891089108911,
+        "dreadTierCounts": {
+          "0": 120,
+          "1": 11,
+          "2": 23,
+          "3": 24,
+          "4": 24
+        },
+        "maximumWordUses": 3,
+        "maximumStartingLetterShare": 0.10891089108910891,
+        "maximumFirstMovedLetterShare": 0.10396039603960396,
+        "sMoveShare": 0.12871287128712872
+      },
+      "unbrokenWeaveEligible": 202,
+      "variant": "standard",
+      "maxExploredStates": 5,
+      "routeFailures": 0
+    },
+    {
+      "file": "lexiconBankExpert.ts",
+      "total": 100,
+      "eligible": 100,
+      "advanced": true,
+      "diversity": {
+        "uniqueAuthoredWords": 480,
+        "meanQualityScore": 60.97,
+        "dreadTierCounts": {
+          "0": 88,
+          "1": 7,
+          "3": 3,
+          "4": 2
+        },
+        "maximumWordUses": 8,
+        "maximumStartingLetterShare": 0.15,
+        "maximumFirstMovedLetterShare": 0.15,
+        "sMoveShare": 0.0925
+      },
+      "unbrokenWeaveEligible": 84,
+      "variant": "standard",
+      "maxExploredStates": 6,
+      "routeFailures": 0
+    },
+    {
+      "file": "lexiconBankHard.ts",
+      "total": 100,
+      "eligible": 100,
+      "advanced": true,
+      "diversity": {
+        "uniqueAuthoredWords": 532,
+        "meanQualityScore": 62.91,
+        "dreadTierCounts": {
+          "0": 73,
+          "1": 3,
+          "2": 5,
+          "3": 5,
+          "4": 14
+        },
+        "maximumWordUses": 6,
+        "maximumStartingLetterShare": 0.19,
+        "maximumFirstMovedLetterShare": 0.13,
+        "sMoveShare": 0.075
+      },
+      "unbrokenWeaveEligible": 92,
+      "variant": "standard",
+      "maxExploredStates": 7,
+      "routeFailures": 0
+    },
+    {
+      "file": "lexiconBankMedium.ts",
+      "total": 247,
+      "eligible": 185,
+      "advanced": true,
+      "diversity": {
+        "uniqueAuthoredWords": 823,
+        "meanQualityScore": 64.68108108108108,
+        "dreadTierCounts": {
+          "0": 88,
+          "1": 13,
+          "2": 21,
+          "3": 33,
+          "4": 30
+        },
+        "maximumWordUses": 6,
+        "maximumStartingLetterShare": 0.11891891891891893,
+        "maximumFirstMovedLetterShare": 0.11891891891891893,
+        "sMoveShare": 0.10270270270270271
+      },
+      "unbrokenWeaveEligible": 179,
+      "variant": "standard",
+      "maxExploredStates": 6,
+      "routeFailures": 0
+    },
+    {
+      "file": "lexiconBankMediumPlus.ts",
+      "total": 255,
+      "eligible": 126,
+      "advanced": true,
+      "diversity": {
+        "uniqueAuthoredWords": 573,
+        "meanQualityScore": 64.64285714285714,
+        "dreadTierCounts": {
+          "0": 98,
+          "1": 2,
+          "2": 6,
+          "3": 7,
+          "4": 13
+        },
+        "maximumWordUses": 7,
+        "maximumStartingLetterShare": 0.14285714285714285,
+        "maximumFirstMovedLetterShare": 0.09523809523809523,
+        "sMoveShare": 0.05555555555555555
+      },
+      "unbrokenWeaveEligible": 122,
+      "variant": "standard",
+      "maxExploredStates": 6,
+      "routeFailures": 0
+    },
+    {
+      "file": "lexiconBankReverseEasy.ts",
+      "total": 240,
+      "eligible": 157,
+      "advanced": true,
+      "diversity": {
+        "uniqueAuthoredWords": 826,
+        "meanQualityScore": 50,
+        "dreadTierCounts": {
+          "0": 96,
+          "1": 6,
+          "2": 14,
+          "3": 24,
+          "4": 17
+        },
+        "maximumWordUses": 6,
+        "maximumStartingLetterShare": 0.11464968152866242,
+        "maximumFirstMovedLetterShare": 0.1592356687898089,
+        "sMoveShare": 0.1178343949044586
+      },
+      "variant": "reverse",
+      "maxExploredStates": 0,
+      "routeFailures": 0
+    },
+    {
+      "file": "lexiconBankReverseExpert.ts",
+      "total": 100,
+      "eligible": 100,
+      "advanced": true,
+      "diversity": {
+        "uniqueAuthoredWords": 394,
+        "meanQualityScore": 50,
+        "dreadTierCounts": {
+          "0": 90,
+          "1": 2,
+          "2": 2,
+          "3": 4,
+          "4": 2
+        },
+        "maximumWordUses": 15,
+        "maximumStartingLetterShare": 0.16,
+        "maximumFirstMovedLetterShare": 0.29,
+        "sMoveShare": 0.2225
+      },
+      "variant": "reverse",
+      "maxExploredStates": 0,
+      "routeFailures": 0
+    },
+    {
+      "file": "lexiconBankReverseHard.ts",
+      "total": 100,
+      "eligible": 100,
+      "advanced": true,
+      "diversity": {
+        "uniqueAuthoredWords": 765,
+        "meanQualityScore": 50,
+        "dreadTierCounts": {
+          "0": 68,
+          "1": 8,
+          "2": 10,
+          "3": 8,
+          "4": 6
+        },
+        "maximumWordUses": 12,
+        "maximumStartingLetterShare": 0.17,
+        "maximumFirstMovedLetterShare": 0.24,
+        "sMoveShare": 0.19
+      },
+      "variant": "reverse",
+      "maxExploredStates": 0,
+      "routeFailures": 0
+    },
+    {
+      "file": "lexiconBankReverseMedium.ts",
+      "total": 240,
+      "eligible": 135,
+      "advanced": true,
+      "diversity": {
+        "uniqueAuthoredWords": 867,
+        "meanQualityScore": 50,
+        "dreadTierCounts": {
+          "0": 69,
+          "1": 3,
+          "2": 11,
+          "3": 32,
+          "4": 20
+        },
+        "maximumWordUses": 7,
+        "maximumStartingLetterShare": 0.1111111111111111,
+        "maximumFirstMovedLetterShare": 0.16296296296296298,
+        "sMoveShare": 0.1506172839506173
+      },
+      "variant": "reverse",
+      "maxExploredStates": 0,
+      "routeFailures": 0
+    },
+    {
+      "file": "lexiconBankReverseMediumPlus.ts",
+      "total": 100,
+      "eligible": 100,
+      "advanced": true,
+      "diversity": {
+        "uniqueAuthoredWords": 682,
+        "meanQualityScore": 50,
+        "dreadTierCounts": {
+          "0": 72,
+          "1": 5,
+          "2": 3,
+          "3": 15,
+          "4": 5
+        },
+        "maximumWordUses": 8,
+        "maximumStartingLetterShare": 0.18,
+        "maximumFirstMovedLetterShare": 0.2,
+        "sMoveShare": 0.18
+      },
+      "variant": "reverse",
+      "maxExploredStates": 0,
+      "routeFailures": 0
+    },
+    {
+      "file": "puzzleBankDoubleShiftEasy.ts",
+      "total": 493,
+      "eligible": 252,
+      "advanced": false,
+      "diversity": {
+        "uniqueAuthoredWords": 1131,
+        "meanQualityScore": 61.90873015873016,
+        "dreadTierCounts": {
+          "0": 173,
+          "1": 7,
+          "2": 7,
+          "3": 31,
+          "4": 34
+        },
+        "maximumWordUses": 3,
+        "maximumStartingLetterShare": 0.1388888888888889,
+        "maximumFirstMovedLetterShare": 0.12301587301587301,
+        "sMoveShare": 0.08333333333333333
+      },
+      "variant": "double_shift",
+      "maxExploredStates": 0,
+      "routeFailures": 0
+    },
+    {
+      "file": "puzzleBankDoubleShiftExpert.ts",
+      "total": 263,
+      "eligible": 101,
+      "advanced": true,
+      "diversity": {
+        "uniqueAuthoredWords": 956,
+        "meanQualityScore": 62.37623762376238,
+        "dreadTierCounts": {
+          "0": 35,
+          "1": 8,
+          "2": 11,
+          "3": 20,
+          "4": 27
+        },
+        "maximumWordUses": 7,
+        "maximumStartingLetterShare": 0.13861386138613863,
+        "maximumFirstMovedLetterShare": 0.09900990099009901,
+        "sMoveShare": 0.09075907590759076
+      },
+      "variant": "double_shift",
+      "maxExploredStates": 0,
+      "routeFailures": 0
+    },
+    {
+      "file": "puzzleBankDoubleShiftHard.ts",
+      "total": 100,
+      "eligible": 100,
+      "advanced": false,
+      "diversity": {
+        "uniqueAuthoredWords": 857,
+        "meanQualityScore": 60.23,
+        "dreadTierCounts": {
+          "0": 46,
+          "1": 4,
+          "2": 11,
+          "3": 10,
+          "4": 29
+        },
+        "maximumWordUses": 4,
+        "maximumStartingLetterShare": 0.16,
+        "maximumFirstMovedLetterShare": 0.12,
+        "sMoveShare": 0.074
+      },
+      "variant": "double_shift",
+      "maxExploredStates": 0,
+      "routeFailures": 0
+    },
+    {
+      "file": "puzzleBankDoubleShiftMedium.ts",
+      "total": 495,
+      "eligible": 169,
+      "advanced": false,
+      "diversity": {
+        "uniqueAuthoredWords": 982,
+        "meanQualityScore": 61.142011834319526,
+        "dreadTierCounts": {
+          "0": 98,
+          "1": 9,
+          "2": 9,
+          "3": 22,
+          "4": 31
+        },
+        "maximumWordUses": 5,
+        "maximumStartingLetterShare": 0.15976331360946747,
+        "maximumFirstMovedLetterShare": 0.09467455621301775,
+        "sMoveShare": 0.08086785009861933
+      },
+      "variant": "double_shift",
+      "maxExploredStates": 0,
+      "routeFailures": 0
+    },
+    {
+      "file": "puzzleBankDoubleShiftMediumPlus.ts",
+      "total": 496,
+      "eligible": 123,
+      "advanced": false,
+      "diversity": {
+        "uniqueAuthoredWords": 868,
+        "meanQualityScore": 61.113821138211385,
+        "dreadTierCounts": {
+          "0": 64,
+          "1": 12,
+          "2": 8,
+          "3": 12,
+          "4": 27
+        },
+        "maximumWordUses": 5,
+        "maximumStartingLetterShare": 0.18699186991869918,
+        "maximumFirstMovedLetterShare": 0.08943089430894309,
+        "sMoveShare": 0.08333333333333333
+      },
+      "variant": "double_shift",
+      "maxExploredStates": 0,
+      "routeFailures": 0
+    },
+    {
+      "file": "puzzleBankEasy.ts",
+      "total": 453,
+      "eligible": 323,
+      "advanced": false,
+      "diversity": {
+        "uniqueAuthoredWords": 1192,
+        "meanQualityScore": 62.582043343653254,
+        "dreadTierCounts": {
+          "0": 181,
+          "1": 16,
+          "2": 39,
+          "3": 38,
+          "4": 49
+        },
+        "maximumWordUses": 3,
+        "maximumStartingLetterShare": 0.14241486068111456,
+        "maximumFirstMovedLetterShare": 0.0804953560371517,
+        "sMoveShare": 0.14396284829721362
+      },
+      "unbrokenWeaveEligible": 323,
+      "variant": "standard",
+      "maxExploredStates": 4,
+      "routeFailures": 0
+    },
+    {
+      "file": "puzzleBankExpert.ts",
+      "total": 100,
+      "eligible": 100,
+      "advanced": true,
+      "diversity": {
+        "uniqueAuthoredWords": 620,
+        "meanQualityScore": 57.74,
+        "dreadTierCounts": {
+          "0": 76,
+          "1": 2,
+          "2": 1,
+          "3": 18,
+          "4": 3
+        },
+        "maximumWordUses": 6,
+        "maximumStartingLetterShare": 0.16,
+        "maximumFirstMovedLetterShare": 0.1,
+        "sMoveShare": 0.16
+      },
+      "unbrokenWeaveEligible": 84,
+      "variant": "standard",
+      "maxExploredStates": 7,
+      "routeFailures": 0
+    },
+    {
+      "file": "puzzleBankHard.ts",
+      "total": 100,
+      "eligible": 100,
+      "advanced": false,
+      "diversity": {
+        "uniqueAuthoredWords": 635,
+        "meanQualityScore": 61.53,
+        "dreadTierCounts": {
+          "0": 69,
+          "1": 6,
+          "2": 6,
+          "3": 6,
+          "4": 13
+        },
+        "maximumWordUses": 6,
+        "maximumStartingLetterShare": 0.11,
+        "maximumFirstMovedLetterShare": 0.1,
+        "sMoveShare": 0.1425
+      },
+      "unbrokenWeaveEligible": 87,
+      "variant": "standard",
+      "maxExploredStates": 7,
+      "routeFailures": 0
+    },
+    {
+      "file": "puzzleBankMedium.ts",
+      "total": 338,
+      "eligible": 202,
+      "advanced": false,
+      "diversity": {
+        "uniqueAuthoredWords": 942,
+        "meanQualityScore": 63.68811881188119,
+        "dreadTierCounts": {
+          "0": 92,
+          "1": 11,
+          "2": 27,
+          "3": 35,
+          "4": 37
+        },
+        "maximumWordUses": 5,
+        "maximumStartingLetterShare": 0.11386138613861387,
+        "maximumFirstMovedLetterShare": 0.07920792079207921,
+        "sMoveShare": 0.13696369636963696
+      },
+      "unbrokenWeaveEligible": 192,
+      "variant": "standard",
+      "maxExploredStates": 7,
+      "routeFailures": 0
+    },
+    {
+      "file": "puzzleBankMediumPlus.ts",
+      "total": 500,
+      "eligible": 161,
+      "advanced": false,
+      "diversity": {
+        "uniqueAuthoredWords": 801,
+        "meanQualityScore": 63.192546583850934,
+        "dreadTierCounts": {
+          "0": 118,
+          "1": 7,
+          "2": 8,
+          "3": 7,
+          "4": 21
+        },
+        "maximumWordUses": 7,
+        "maximumStartingLetterShare": 0.11801242236024845,
+        "maximumFirstMovedLetterShare": 0.11801242236024845,
+        "sMoveShare": 0.15113871635610765
+      },
+      "unbrokenWeaveEligible": 151,
+      "variant": "standard",
+      "maxExploredStates": 5,
+      "routeFailures": 0
+    },
+    {
+      "file": "puzzleBankReverseEasy.ts",
+      "total": 500,
+      "eligible": 282,
+      "advanced": false,
+      "diversity": {
+        "uniqueAuthoredWords": 1324,
+        "meanQualityScore": 50,
+        "dreadTierCounts": {
+          "0": 127,
+          "1": 14,
+          "2": 39,
+          "3": 47,
+          "4": 55
+        },
+        "maximumWordUses": 6,
+        "maximumStartingLetterShare": 0.12411347517730496,
+        "maximumFirstMovedLetterShare": 0.14184397163120568,
+        "sMoveShare": 0.1773049645390071
+      },
+      "variant": "reverse",
+      "maxExploredStates": 0,
+      "routeFailures": 0
+    },
+    {
+      "file": "puzzleBankReverseExpert.ts",
+      "total": 100,
+      "eligible": 100,
+      "advanced": true,
+      "diversity": {
+        "uniqueAuthoredWords": 710,
+        "meanQualityScore": 50,
+        "dreadTierCounts": {
+          "0": 76,
+          "1": 6,
+          "2": 4,
+          "3": 8,
+          "4": 6
+        },
+        "maximumWordUses": 10,
+        "maximumStartingLetterShare": 0.18,
+        "maximumFirstMovedLetterShare": 0.3,
+        "sMoveShare": 0.2425
+      },
+      "variant": "reverse",
+      "maxExploredStates": 0,
+      "routeFailures": 0
+    },
+    {
+      "file": "puzzleBankReverseHard.ts",
+      "total": 100,
+      "eligible": 100,
+      "advanced": false,
+      "diversity": {
+        "uniqueAuthoredWords": 860,
+        "meanQualityScore": 50,
+        "dreadTierCounts": {
+          "0": 57,
+          "1": 9,
+          "2": 8,
+          "3": 12,
+          "4": 14
+        },
+        "maximumWordUses": 12,
+        "maximumStartingLetterShare": 0.18,
+        "maximumFirstMovedLetterShare": 0.21,
+        "sMoveShare": 0.27
+      },
+      "variant": "reverse",
+      "maxExploredStates": 0,
+      "routeFailures": 0
+    },
+    {
+      "file": "puzzleBankReverseMedium.ts",
+      "total": 500,
+      "eligible": 205,
+      "advanced": false,
+      "diversity": {
+        "uniqueAuthoredWords": 1337,
+        "meanQualityScore": 50,
+        "dreadTierCounts": {
+          "0": 87,
+          "1": 12,
+          "2": 33,
+          "3": 39,
+          "4": 34
+        },
+        "maximumWordUses": 8,
+        "maximumStartingLetterShare": 0.11707317073170732,
+        "maximumFirstMovedLetterShare": 0.13658536585365855,
+        "sMoveShare": 0.14308943089430895
+      },
+      "variant": "reverse",
+      "maxExploredStates": 0,
+      "routeFailures": 0
+    },
+    {
+      "file": "puzzleBankReverseMediumPlus.ts",
+      "total": 100,
+      "eligible": 100,
+      "advanced": false,
+      "diversity": {
+        "uniqueAuthoredWords": 811,
+        "meanQualityScore": 50,
+        "dreadTierCounts": {
+          "0": 65,
+          "1": 7,
+          "2": 6,
+          "3": 11,
+          "4": 11
+        },
+        "maximumWordUses": 6,
+        "maximumStartingLetterShare": 0.12,
+        "maximumFirstMovedLetterShare": 0.16,
+        "sMoveShare": 0.24
+      },
+      "variant": "reverse",
+      "maxExploredStates": 0,
+      "routeFailures": 0
+    }
+  ],
+  "total": 7356,
+  "eligible": 4372,
+  "withheldRequiredWords": [
+    [
+      "LAS",
+      55
+    ],
+    [
+      "BADS",
+      47
+    ],
+    [
+      "ANDS",
+      46
+    ],
+    [
+      "LOWES",
+      45
+    ],
+    [
+      "MACHE",
+      43
+    ],
+    [
+      "MIDS",
+      38
+    ],
+    [
+      "ATES",
+      36
+    ],
+    [
+      "AVE",
+      36
+    ],
+    [
+      "KINS",
+      35
+    ],
+    [
+      "ONS",
+      33
+    ],
+    [
+      "PEATS",
+      33
+    ],
+    [
+      "SEELY",
+      30
+    ],
+    [
+      "TABER",
+      29
+    ],
+    [
+      "WAKER",
+      28
+    ],
+    [
+      "HES",
+      28
+    ],
+    [
+      "OLDS",
+      28
+    ],
+    [
+      "CUTES",
+      26
+    ],
+    [
+      "WANS",
+      26
+    ],
+    [
+      "HOWES",
+      25
+    ],
+    [
+      "SPAKE",
+      25
+    ],
+    [
+      "RES",
+      24
+    ],
+    [
+      "LAKED",
+      24
+    ],
+    [
+      "BILES",
+      23
+    ],
+    [
+      "MATTERY",
+      22
+    ],
+    [
+      "LADER",
+      22
+    ],
+    [
+      "COOER",
+      20
+    ],
+    [
+      "PANED",
+      20
+    ],
+    [
+      "ABLES",
+      20
+    ],
+    [
+      "IRES",
+      20
+    ],
+    [
+      "LITS",
+      20
+    ],
+    [
+      "LEGER",
+      19
+    ],
+    [
+      "HERES",
+      19
+    ],
+    [
+      "ALLS",
+      19
+    ],
+    [
+      "BING",
+      19
+    ],
+    [
+      "SHARKED",
+      19
+    ],
+    [
+      "BONEY",
+      18
+    ],
+    [
+      "TORES",
+      18
+    ],
+    [
+      "RUBBLES",
+      17
+    ],
+    [
+      "CHORDED",
+      17
+    ],
+    [
+      "ROTES",
+      17
+    ],
+    [
+      "TALER",
+      17
+    ],
+    [
+      "PATED",
+      16
+    ],
+    [
+      "CROWDER",
+      16
+    ],
+    [
+      "SHES",
+      16
+    ],
+    [
+      "LAKER",
+      16
+    ],
+    [
+      "LIKER",
+      16
+    ],
+    [
+      "CAMES",
+      15
+    ],
+    [
+      "CRISPEN",
+      15
+    ],
+    [
+      "EDS",
+      15
+    ],
+    [
+      "TAO",
+      15
+    ],
+    [
+      "COSES",
+      15
+    ],
+    [
+      "SANED",
+      14
+    ],
+    [
+      "PLAINED",
+      14
+    ],
+    [
+      "COLED",
+      14
+    ],
+    [
+      "EASTS",
+      14
+    ],
+    [
+      "CASKED",
+      14
+    ],
+    [
+      "NOS",
+      13
+    ],
+    [
+      "INKER",
+      13
+    ],
+    [
+      "INNED",
+      13
+    ],
+    [
+      "MILLE",
+      13
+    ],
+    [
+      "THATS",
+      13
+    ],
+    [
+      "AMIDS",
+      13
+    ],
+    [
+      "GLEES",
+      13
+    ],
+    [
+      "TACTS",
+      13
+    ],
+    [
+      "LAVER",
+      13
+    ],
+    [
+      "SWINGES",
+      13
+    ],
+    [
+      "INGLE",
+      13
+    ],
+    [
+      "SAYER",
+      13
+    ],
+    [
+      "STADE",
+      12
+    ],
+    [
+      "RAYED",
+      12
+    ],
+    [
+      "RIPED",
+      12
+    ],
+    [
+      "READD",
+      12
+    ],
+    [
+      "PATY",
+      12
+    ],
+    [
+      "HOYLE",
+      12
+    ],
+    [
+      "TORO",
+      12
+    ],
+    [
+      "SHOED",
+      12
+    ],
+    [
+      "LIER",
+      12
+    ],
+    [
+      "COPER",
+      12
+    ],
+    [
+      "SONES",
+      12
+    ],
+    [
+      "PATER",
+      12
+    ],
+    [
+      "BIBLESS",
+      11
+    ],
+    [
+      "HANTS",
+      11
+    ],
+    [
+      "ASHED",
+      11
+    ],
+    [
+      "FRONTES",
+      11
+    ],
+    [
+      "MARROWY",
+      11
+    ],
+    [
+      "ILLER",
+      11
+    ],
+    [
+      "WAVEY",
+      11
+    ],
+    [
+      "VOLTES",
+      11
+    ],
+    [
+      "PLIER",
+      11
+    ],
+    [
+      "HOPER",
+      11
+    ],
+    [
+      "LEGES",
+      11
+    ],
+    [
+      "BRANT",
+      11
+    ],
+    [
+      "JESS",
+      11
+    ],
+    [
+      "COLE",
+      11
+    ],
+    [
+      "ENDER",
+      10
+    ],
+    [
+      "GALLY",
+      10
+    ],
+    [
+      "TIS",
+      10
+    ],
+    [
+      "LAYED",
+      10
+    ],
+    [
+      "TABES",
+      10
+    ],
+    [
+      "DROWNER",
+      10
+    ],
+    [
+      "BASILS",
+      10
+    ],
+    [
+      "LAMBER",
+      10
+    ],
+    [
+      "TWILLS",
+      10
+    ],
+    [
+      "TAOS",
+      10
+    ],
+    [
+      "RAKER",
+      10
+    ],
+    [
+      "SCAPE",
+      10
+    ],
+    [
+      "HADES",
+      10
+    ],
+    [
+      "WINEY",
+      10
+    ],
+    [
+      "CATES",
+      10
+    ],
+    [
+      "TINED",
+      10
+    ],
+    [
+      "LATED",
+      10
+    ],
+    [
+      "CHAOSES",
+      10
+    ],
+    [
+      "CONTE",
+      10
+    ],
+    [
+      "SKIINGS",
+      10
+    ],
+    [
+      "HONGS",
+      10
+    ],
+    [
+      "COMBE",
+      10
+    ],
+    [
+      "AVES",
+      10
+    ],
+    [
+      "MANILAS",
+      9
+    ],
+    [
+      "CARLE",
+      9
+    ],
+    [
+      "HARDS",
+      9
+    ],
+    [
+      "BODYING",
+      9
+    ],
+    [
+      "CHOIRED",
+      9
+    ],
+    [
+      "RIMER",
+      9
+    ],
+    [
+      "CRANKER",
+      9
+    ],
+    [
+      "RAGGY",
+      9
+    ],
+    [
+      "ROSED",
+      9
+    ],
+    [
+      "GAGER",
+      9
+    ],
+    [
+      "THENS",
+      9
+    ],
+    [
+      "MADRE",
+      9
+    ],
+    [
+      "GOOSEY",
+      9
+    ],
+    [
+      "CHARDS",
+      9
+    ],
+    [
+      "MUSTED",
+      9
+    ],
+    [
+      "PROSS",
+      9
+    ],
+    [
+      "LIBS",
+      9
+    ],
+    [
+      "CAMPO",
+      9
+    ],
+    [
+      "SHAWLED",
+      9
+    ],
+    [
+      "LUGER",
+      9
+    ],
+    [
+      "GREAVES",
+      9
+    ],
+    [
+      "STALELY",
+      9
+    ],
+    [
+      "ALT",
+      9
+    ],
+    [
+      "TAKIN",
+      9
+    ],
+    [
+      "LASED",
+      9
+    ],
+    [
+      "ANGERLY",
+      9
+    ],
+    [
+      "REDED",
+      9
+    ],
+    [
+      "LIARD",
+      9
+    ],
+    [
+      "FROES",
+      9
+    ],
+    [
+      "WESTS",
+      9
+    ],
+    [
+      "POLOS",
+      8
+    ],
+    [
+      "RAZER",
+      8
+    ],
+    [
+      "HEALTHS",
+      8
+    ],
+    [
+      "BLOWSED",
+      8
+    ],
+    [
+      "BLUME",
+      8
+    ],
+    [
+      "WIRINGS",
+      8
+    ],
+    [
+      "SIPED",
+      8
+    ],
+    [
+      "TELS",
+      8
+    ],
+    [
+      "ALMA",
+      8
+    ],
+    [
+      "MEADS",
+      8
+    ],
+    [
+      "PROST",
+      8
+    ],
+    [
+      "SAIDS",
+      8
+    ],
+    [
+      "IRED",
+      8
+    ],
+    [
+      "AGER",
+      8
+    ],
+    [
+      "CADES",
+      8
+    ],
+    [
+      "MOTHERY",
+      8
+    ],
+    [
+      "MOTHY",
+      8
+    ],
+    [
+      "STEADED",
+      8
+    ],
+    [
+      "WITED",
+      8
+    ],
+    [
+      "SAKER",
+      8
+    ],
+    [
+      "CARTE",
+      8
+    ],
+    [
+      "TOPES",
+      8
+    ],
+    [
+      "WITHY",
+      8
+    ],
+    [
+      "SEPT",
+      8
+    ],
+    [
+      "ALTS",
+      8
+    ],
+    [
+      "COSS",
+      8
+    ],
+    [
+      "GRAPY",
+      8
+    ],
+    [
+      "MOLY",
+      8
+    ],
+    [
+      "PLOWER",
+      8
+    ],
+    [
+      "BOWYER",
+      8
+    ],
+    [
+      "WOOPS",
+      8
+    ],
+    [
+      "NOWS",
+      8
+    ],
+    [
+      "BORINGS",
+      7
+    ],
+    [
+      "VAR",
+      7
+    ],
+    [
+      "SAVIN",
+      7
+    ],
+    [
+      "ATOPY",
+      7
+    ],
+    [
+      "HIGHT",
+      7
+    ],
+    [
+      "ANGELED",
+      7
+    ],
+    [
+      "CROWNER",
+      7
+    ],
+    [
+      "PEARLER",
+      7
+    ],
+    [
+      "TREADED",
+      7
+    ],
+    [
+      "VOLTE",
+      7
+    ],
+    [
+      "SETON",
+      7
+    ],
+    [
+      "EMERIES",
+      7
+    ],
+    [
+      "INFOS",
+      7
+    ],
+    [
+      "FAKEY",
+      7
+    ],
+    [
+      "JAGER",
+      7
+    ],
+    [
+      "JAGGER",
+      7
+    ],
+    [
+      "RIPES",
+      7
+    ],
+    [
+      "BRANS",
+      7
+    ],
+    [
+      "AROT",
+      7
+    ],
+    [
+      "SWINGED",
+      7
+    ],
+    [
+      "HERBY",
+      7
+    ],
+    [
+      "COLES",
+      7
+    ],
+    [
+      "RANCE",
+      7
+    ],
+    [
+      "STIPE",
+      7
+    ],
+    [
+      "CANTY",
+      7
+    ],
+    [
+      "STARTSY",
+      7
+    ],
+    [
+      "MACER",
+      7
+    ],
+    [
+      "REFED",
+      7
+    ],
+    [
+      "REDD",
+      7
+    ],
+    [
+      "CHAINES",
+      6
+    ],
+    [
+      "HAUTE",
+      6
+    ],
+    [
+      "SLUDGES",
+      6
+    ],
+    [
+      "WILDERS",
+      6
+    ],
+    [
+      "YEASTED",
+      6
+    ],
+    [
+      "WARED",
+      6
+    ],
+    [
+      "PUNKY",
+      6
+    ],
+    [
+      "DERIVER",
+      6
+    ],
+    [
+      "GROOVER",
+      6
+    ],
+    [
+      "NEATS",
+      6
+    ],
+    [
+      "SAGY",
+      6
+    ],
+    [
+      "FONDS",
+      6
+    ],
+    [
+      "FARCED",
+      6
+    ],
+    [
+      "PASTER",
+      6
+    ],
+    [
+      "BOCKS",
+      6
+    ],
+    [
+      "MOSTS",
+      6
+    ],
+    [
+      "BANED",
+      6
+    ],
+    [
+      "SANES",
+      6
+    ],
+    [
+      "LORES",
+      6
+    ],
+    [
+      "SPRIGGY",
+      6
+    ],
+    [
+      "WITES",
+      6
+    ],
+    [
+      "OILER",
+      6
+    ],
+    [
+      "ROWINGS",
+      6
+    ],
+    [
+      "SNEERER",
+      6
+    ],
+    [
+      "REDES",
+      6
+    ],
+    [
+      "BOOMY",
+      6
+    ],
+    [
+      "SLATY",
+      6
+    ],
+    [
+      "PRIMMED",
+      6
+    ],
+    [
+      "SPIER",
+      6
+    ],
+    [
+      "TRICKER",
+      6
+    ],
+    [
+      "LACER",
+      6
+    ],
+    [
+      "HURST",
+      6
+    ],
+    [
+      "POWS",
+      6
+    ],
+    [
+      "WHINEY",
+      6
+    ],
+    [
+      "NILS",
+      6
+    ],
+    [
+      "JUN",
+      5
+    ],
+    [
+      "CLASPER",
+      5
+    ],
+    [
+      "COTED",
+      5
+    ],
+    [
+      "NIGHS",
+      5
+    ],
+    [
+      "LONGERS",
+      5
+    ],
+    [
+      "PROSING",
+      5
+    ],
+    [
+      "AIRER",
+      5
+    ],
+    [
+      "LINKY",
+      5
+    ],
+    [
+      "CHASMED",
+      5
+    ],
+    [
+      "BLEAKS",
+      5
+    ],
+    [
+      "CROWER",
+      5
+    ],
+    [
+      "MEATED",
+      5
+    ],
+    [
+      "BREADY",
+      5
+    ],
+    [
+      "CHOKEY",
+      5
+    ],
+    [
+      "IRING",
+      5
+    ],
+    [
+      "CLADS",
+      5
+    ],
+    [
+      "FUNS",
+      5
+    ],
+    [
+      "EPTS",
+      5
+    ],
+    [
+      "SKEINED",
+      5
+    ],
+    [
+      "EST",
+      5
+    ],
+    [
+      "SEEPY",
+      5
+    ],
+    [
+      "TINGLER",
+      5
+    ],
+    [
+      "TANGLER",
+      5
+    ],
+    [
+      "SCOWLER",
+      5
+    ],
+    [
+      "SILLILY",
+      5
+    ],
+    [
+      "POLER",
+      5
+    ],
+    [
+      "VIRALLY",
+      5
+    ],
+    [
+      "SEN",
+      5
+    ],
+    [
+      "MARLY",
+      5
+    ],
+    [
+      "PRYER",
+      5
+    ],
+    [
+      "AIDER",
+      5
+    ],
+    [
+      "GRANGER",
+      5
+    ],
+    [
+      "SHALY",
+      5
+    ],
+    [
+      "RIBES",
+      5
+    ],
+    [
+      "SAWER",
+      5
+    ],
+    [
+      "KARST",
+      5
+    ],
+    [
+      "MUSER",
+      5
+    ],
+    [
+      "FORME",
+      5
+    ],
+    [
+      "FOLKY",
+      5
+    ],
+    [
+      "SWAYER",
+      5
+    ],
+    [
+      "FLAKEY",
+      5
+    ],
+    [
+      "MINKES",
+      5
+    ],
+    [
+      "COPEN",
+      5
+    ],
+    [
+      "LACKER",
+      5
+    ],
+    [
+      "SEPTS",
+      5
+    ],
+    [
+      "MENSA",
+      4
+    ],
+    [
+      "ALWAY",
+      4
+    ],
+    [
+      "TATES",
+      4
+    ],
+    [
+      "PSALMED",
+      4
+    ],
+    [
+      "SPAES",
+      4
+    ],
+    [
+      "BLIGHTY",
+      4
+    ],
+    [
+      "CHILDLY",
+      4
+    ],
+    [
+      "SOC",
+      4
+    ],
+    [
+      "GLOOMED",
+      4
+    ],
+    [
+      "BRAVOED",
+      4
+    ],
+    [
+      "FEATEST",
+      4
+    ],
+    [
+      "BRAVOES",
+      4
+    ],
+    [
+      "OUGHTED",
+      4
+    ],
+    [
+      "ACNES",
+      4
+    ],
+    [
+      "TEL",
+      4
+    ],
+    [
+      "REGES",
+      4
+    ],
+    [
+      "LARKY",
+      4
+    ],
+    [
+      "CURVEY",
+      4
+    ],
+    [
+      "EGGY",
+      4
+    ],
+    [
+      "APER",
+      4
+    ],
+    [
+      "THICKS",
+      4
+    ],
+    [
+      "DYINGS",
+      4
+    ],
+    [
+      "SPIKEY",
+      4
+    ],
+    [
+      "DISCED",
+      4
+    ],
+    [
+      "PECS",
+      4
+    ],
+    [
+      "NIPS",
+      4
+    ],
+    [
+      "PRIMS",
+      4
+    ],
+    [
+      "GOOS",
+      4
+    ],
+    [
+      "LATS",
+      4
+    ],
+    [
+      "SART",
+      4
+    ],
+    [
+      "LGES",
+      4
+    ],
+    [
+      "SHALOMS",
+      4
+    ],
+    [
+      "STOOLED",
+      4
+    ],
+    [
+      "DEADS",
+      4
+    ],
+    [
+      "STARVER",
+      4
+    ],
+    [
+      "FLINTED",
+      4
+    ],
+    [
+      "SALUTER",
+      4
+    ],
+    [
+      "SEWINGS",
+      4
+    ],
+    [
+      "STREAMY",
+      4
+    ],
+    [
+      "BARGEES",
+      4
+    ],
+    [
+      "HAVER",
+      4
+    ],
+    [
+      "FACER",
+      4
+    ],
+    [
+      "LASES",
+      4
+    ],
+    [
+      "SPURRER",
+      4
+    ],
+    [
+      "SCOOPER",
+      4
+    ],
+    [
+      "SPANKER",
+      4
+    ],
+    [
+      "CLASHER",
+      4
+    ],
+    [
+      "DWARFER",
+      4
+    ],
+    [
+      "BREES",
+      4
+    ],
+    [
+      "SHOER",
+      4
+    ],
+    [
+      "LIBRA",
+      4
+    ],
+    [
+      "BOWINGS",
+      4
+    ],
+    [
+      "DEWAN",
+      4
+    ],
+    [
+      "BRIBEES",
+      4
+    ],
+    [
+      "DOLCE",
+      4
+    ],
+    [
+      "MASHY",
+      4
+    ],
+    [
+      "BOSON",
+      4
+    ],
+    [
+      "VEERY",
+      4
+    ],
+    [
+      "DOSER",
+      4
+    ],
+    [
+      "GAPY",
+      4
+    ],
+    [
+      "COMBES",
+      4
+    ],
+    [
+      "PITCHY",
+      4
+    ],
+    [
+      "MAILES",
+      4
+    ],
+    [
+      "SWAGER",
+      4
+    ],
+    [
+      "HONG",
+      4
+    ],
+    [
+      "PALY",
+      4
+    ],
+    [
+      "FLEER",
+      4
+    ],
+    [
+      "LEWS",
+      4
+    ],
+    [
+      "PAWER",
+      3
+    ],
+    [
+      "SHEERLY",
+      3
+    ],
+    [
+      "DOLLIED",
+      3
+    ],
+    [
+      "TURKS",
+      3
+    ],
+    [
+      "GLEAMER",
+      3
+    ],
+    [
+      "FAMES",
+      3
+    ],
+    [
+      "PLUMPEN",
+      3
+    ],
+    [
+      "BROOMED",
+      3
+    ],
+    [
+      "WIFES",
+      3
+    ],
+    [
+      "SADES",
+      3
+    ],
+    [
+      "KARATES",
+      3
+    ],
+    [
+      "WHIGS",
+      3
+    ],
+    [
+      "CASKY",
+      3
+    ],
+    [
+      "COBB",
+      3
+    ],
+    [
+      "TELES",
+      3
+    ],
+    [
+      "PINOT",
+      3
+    ],
+    [
+      "VINY",
+      3
+    ],
+    [
+      "AXLED",
+      3
+    ],
+    [
+      "CHORED",
+      3
+    ],
+    [
+      "CODDER",
+      3
+    ],
+    [
+      "PLYER",
+      3
+    ],
+    [
+      "STOLED",
+      3
+    ],
+    [
+      "BARBES",
+      3
+    ],
+    [
+      "CHOKY",
+      3
+    ],
+    [
+      "LAIRED",
+      3
+    ],
+    [
+      "GISTS",
+      3
+    ],
+    [
+      "BLENDES",
+      3
+    ],
+    [
+      "ESCAPER",
+      3
+    ],
+    [
+      "SHRINED",
+      3
+    ],
+    [
+      "PRANKED",
+      3
+    ],
+    [
+      "KINES",
+      3
+    ],
+    [
+      "ASPIRER",
+      3
+    ],
+    [
+      "ESTATED",
+      3
+    ],
+    [
+      "FLINGER",
+      3
+    ],
+    [
+      "JUTES",
+      3
+    ],
+    [
+      "FATLY",
+      3
+    ],
+    [
+      "CHANTRY",
+      3
+    ],
+    [
+      "COURTER",
+      3
+    ],
+    [
+      "BRASHES",
+      3
+    ],
+    [
+      "SHAWS",
+      3
+    ],
+    [
+      "EVERT",
+      3
+    ],
+    [
+      "SPARKER",
+      3
+    ],
+    [
+      "COVED",
+      3
+    ],
+    [
+      "THANKER",
+      3
+    ],
+    [
+      "BIDER",
+      3
+    ],
+    [
+      "NAVALLY",
+      3
+    ],
+    [
+      "OMBRE",
+      3
+    ],
+    [
+      "HAMES",
+      3
+    ],
+    [
+      "TRUNKED",
+      3
+    ],
+    [
+      "SPHERED",
+      3
+    ],
+    [
+      "FANES",
+      3
+    ],
+    [
+      "WAISTED",
+      3
+    ],
+    [
+      "AWARDER",
+      3
+    ],
+    [
+      "ORANG",
+      3
+    ],
+    [
+      "SWATHER",
+      3
+    ],
+    [
+      "REACHER",
+      3
+    ],
+    [
+      "KALES",
+      3
+    ],
+    [
+      "THORNED",
+      3
+    ],
+    [
+      "AMENS",
+      3
+    ],
+    [
+      "POPSY",
+      3
+    ],
+    [
+      "SHAW",
+      3
+    ],
+    [
+      "LINY",
+      3
+    ],
+    [
+      "DONNE",
+      3
+    ],
+    [
+      "LAGGER",
+      3
+    ],
+    [
+      "SNAKEY",
+      3
+    ],
+    [
+      "GOOSY",
+      3
+    ],
+    [
+      "LASTER",
+      3
+    ],
+    [
+      "SWAGES",
+      3
+    ],
+    [
+      "STAGGY",
+      3
+    ],
+    [
+      "CURBER",
+      3
+    ],
+    [
+      "COOLY",
+      3
+    ],
+    [
+      "COLY",
+      3
+    ],
+    [
+      "GRAMPS",
+      3
+    ],
+    [
+      "LYINGS",
+      3
+    ],
+    [
+      "POLIS",
+      3
+    ],
+    [
+      "WHATS",
+      3
+    ],
+    [
+      "SLIMLY",
+      3
+    ],
+    [
+      "CHANTY",
+      3
+    ],
+    [
+      "HADED",
+      3
+    ],
+    [
+      "RAWS",
+      3
+    ],
+    [
+      "ANES",
+      3
+    ],
+    [
+      "CLAYS",
+      3
+    ],
+    [
+      "INED",
+      3
+    ],
+    [
+      "ILLY",
+      3
+    ],
+    [
+      "BIGS",
+      3
+    ],
+    [
+      "BAES",
+      3
+    ],
+    [
+      "CAKS",
+      3
+    ],
+    [
+      "HOES",
+      3
+    ],
+    [
+      "PEACHER",
+      2
+    ],
+    [
+      "FAITHED",
+      2
+    ],
+    [
+      "GODLILY",
+      2
+    ],
+    [
+      "BITSY",
+      2
+    ],
+    [
+      "KALAM",
+      2
+    ],
+    [
+      "PROPERS",
+      2
+    ],
+    [
+      "MORTARY",
+      2
+    ],
+    [
+      "BRUTING",
+      2
+    ],
+    [
+      "SOOTS",
+      2
+    ],
+    [
+      "GLEED",
+      2
+    ],
+    [
+      "MADAMES",
+      2
+    ],
+    [
+      "TONEY",
+      2
+    ],
+    [
+      "PATCHER",
+      2
+    ],
+    [
+      "GLADDED",
+      2
+    ],
+    [
+      "MONDO",
+      2
+    ],
+    [
+      "BRAKY",
+      2
+    ],
+    [
+      "FLUS",
+      2
+    ],
+    [
+      "ALMAS",
+      2
+    ],
+    [
+      "COUPED",
+      2
+    ],
+    [
+      "DOPY",
+      2
+    ],
+    [
+      "CHINAS",
+      2
+    ],
+    [
+      "CREPY",
+      2
+    ],
+    [
+      "WRIES",
+      2
+    ],
+    [
+      "CHAMPY",
+      2
+    ],
+    [
+      "WALLA",
+      2
+    ],
+    [
+      "COCAS",
+      2
+    ],
+    [
+      "HOSTLY",
+      2
+    ],
+    [
+      "BLOWED",
+      2
+    ],
+    [
+      "SURGER",
+      2
+    ],
+    [
+      "SANGH",
+      2
+    ],
+    [
+      "OTES",
+      2
+    ],
+    [
+      "BSET",
+      2
+    ],
+    [
+      "IGNS",
+      2
+    ],
+    [
+      "MOTS",
+      2
+    ],
+    [
+      "GLAS",
+      2
+    ],
+    [
+      "ECTS",
+      2
+    ],
+    [
+      "KIMS",
+      2
+    ],
+    [
+      "BRON",
+      2
+    ],
+    [
+      "HEDS",
+      2
+    ],
+    [
+      "DUGS",
+      2
+    ],
+    [
+      "FLIRTER",
+      2
+    ],
+    [
+      "GLOSSER",
+      2
+    ],
+    [
+      "WHITTER",
+      2
+    ],
+    [
+      "SUPERED",
+      2
+    ],
+    [
+      "ARMER",
+      2
+    ],
+    [
+      "HOPPY",
+      2
+    ],
+    [
+      "PULIS",
+      2
+    ],
+    [
+      "BRASSED",
+      2
+    ],
+    [
+      "BAZAR",
+      2
+    ],
+    [
+      "BASSETT",
+      2
+    ],
+    [
+      "STRIVER",
+      2
+    ],
+    [
+      "GLADY",
+      2
+    ],
+    [
+      "PENALLY",
+      2
+    ],
+    [
+      "CAESARS",
+      2
+    ],
+    [
+      "FORAYER",
+      2
+    ],
+    [
+      "RACINGS",
+      2
+    ],
+    [
+      "ALIENED",
+      2
+    ],
+    [
+      "DIMER",
+      2
+    ],
+    [
+      "TOD",
+      2
+    ],
+    [
+      "FLAKILY",
+      2
+    ],
+    [
+      "BURLILY",
+      2
+    ],
+    [
+      "THUNK",
+      2
+    ],
+    [
+      "SAULT",
+      2
+    ],
+    [
+      "SALIVAS",
+      2
+    ],
+    [
+      "TOONS",
+      2
+    ],
+    [
+      "MOUTHER",
+      2
+    ],
+    [
+      "DECOS",
+      2
+    ],
+    [
+      "GUTTERY",
+      2
+    ],
+    [
+      "BLURBED",
+      2
+    ],
+    [
+      "ROACHED",
+      2
+    ],
+    [
+      "ADEPTER",
+      2
+    ],
+    [
+      "FRITZES",
+      2
+    ],
+    [
+      "PLAIDED",
+      2
+    ],
+    [
+      "FLAGGER",
+      2
+    ],
+    [
+      "HAZELLY",
+      2
+    ],
+    [
+      "STOCKER",
+      2
+    ],
+    [
+      "MATCHER",
+      2
+    ],
+    [
+      "GARTH",
+      2
+    ],
+    [
+      "STRIPER",
+      2
+    ],
+    [
+      "ARGENTS",
+      2
+    ],
+    [
+      "SEDER",
+      2
+    ],
+    [
+      "SURLILY",
+      2
+    ],
+    [
+      "PAPALLY",
+      2
+    ],
+    [
+      "CURRIER",
+      2
+    ],
+    [
+      "WIDES",
+      2
+    ],
+    [
+      "PASES",
+      2
+    ],
+    [
+      "HENRY",
+      2
+    ],
+    [
+      "PEACHED",
+      2
+    ],
+    [
+      "OFFERER",
+      2
+    ],
+    [
+      "RAJ",
+      2
+    ],
+    [
+      "TOPER",
+      2
+    ],
+    [
+      "NOVELLY",
+      2
+    ],
+    [
+      "SPAWNER",
+      2
+    ],
+    [
+      "FARER",
+      2
+    ],
+    [
+      "LABELER",
+      2
+    ],
+    [
+      "CAGER",
+      2
+    ],
+    [
+      "MONDE",
+      2
+    ],
+    [
+      "LAUGHER",
+      2
+    ],
+    [
+      "SHELLER",
+      2
+    ],
+    [
+      "LEY",
+      2
+    ],
+    [
+      "CARB",
+      2
+    ],
+    [
+      "BUND",
+      2
+    ],
+    [
+      "CRORE",
+      2
+    ],
+    [
+      "REDLY",
+      2
+    ],
+    [
+      "OLDY",
+      2
+    ],
+    [
+      "CALIF",
+      2
+    ],
+    [
+      "DUKED",
+      2
+    ],
+    [
+      "GAGES",
+      2
+    ],
+    [
+      "LEADY",
+      2
+    ],
+    [
+      "DEWAR",
+      2
+    ],
+    [
+      "LISTER",
+      2
+    ],
+    [
+      "FLAKER",
+      2
+    ],
+    [
+      "RODMAN",
+      2
+    ],
+    [
+      "FAIRED",
+      2
+    ],
+    [
+      "EASTER",
+      2
+    ],
+    [
+      "WHEATS",
+      2
+    ],
+    [
+      "BLOOMY",
+      2
+    ],
+    [
+      "LIBER",
+      2
+    ],
+    [
+      "SIPES",
+      2
+    ],
+    [
+      "CLOUGH",
+      2
+    ],
+    [
+      "RACKER",
+      2
+    ],
+    [
+      "DUALLY",
+      2
+    ],
+    [
+      "BARDES",
+      2
+    ],
+    [
+      "FARD",
+      2
+    ],
+    [
+      "LAPSER",
+      2
+    ],
+    [
+      "GAPER",
+      2
+    ],
+    [
+      "GASPER",
+      2
+    ],
+    [
+      "STALKY",
+      2
+    ],
+    [
+      "STILLY",
+      2
+    ],
+    [
+      "AUNTLY",
+      2
+    ],
+    [
+      "BOWSED",
+      2
+    ],
+    [
+      "BELOWS",
+      2
+    ],
+    [
+      "CREPED",
+      2
+    ],
+    [
+      "OAPS",
+      2
+    ],
+    [
+      "REDOS",
+      2
+    ],
+    [
+      "USRS",
+      2
+    ],
+    [
+      "NONES",
+      2
+    ],
+    [
+      "WAPS",
+      2
+    ],
+    [
+      "LASE",
+      2
+    ],
+    [
+      "TAYS",
+      2
+    ],
+    [
+      "OLES",
+      2
+    ],
+    [
+      "WONS",
+      2
+    ],
+    [
+      "HRES",
+      2
+    ],
+    [
+      "ACRED",
+      2
+    ],
+    [
+      "TASE",
+      2
+    ],
+    [
+      "LINTS",
+      2
+    ],
+    [
+      "EALS",
+      2
+    ],
+    [
+      "TROS",
+      2
+    ],
+    [
+      "IPED",
+      2
+    ],
+    [
+      "EEPS",
+      2
+    ],
+    [
+      "MAKS",
+      2
+    ],
+    [
+      "KIPS",
+      2
+    ],
+    [
+      "SICES",
+      2
+    ],
+    [
+      "IVED",
+      2
+    ],
+    [
+      "BOLDS",
+      2
+    ],
+    [
+      "MUES",
+      2
+    ],
+    [
+      "CELLING",
+      1
+    ],
+    [
+      "AMEER",
+      1
+    ],
+    [
+      "WHIZZER",
+      1
+    ],
+    [
+      "GLIAL",
+      1
+    ],
+    [
+      "MIDDLED",
+      1
+    ],
+    [
+      "GAULT",
+      1
+    ],
+    [
+      "PRIMA",
+      1
+    ],
+    [
+      "SNARK",
+      1
+    ],
+    [
+      "GROANER",
+      1
+    ],
+    [
+      "TRANCED",
+      1
+    ],
+    [
+      "PARKERS",
+      1
+    ],
+    [
+      "NOTER",
+      1
+    ],
+    [
+      "BANCO",
+      1
+    ],
+    [
+      "BURSTER",
+      1
+    ],
+    [
+      "VEALS",
+      1
+    ],
+    [
+      "DOZENED",
+      1
+    ],
+    [
+      "PASEO",
+      1
+    ],
+    [
+      "PLUGGER",
+      1
+    ],
+    [
+      "CLIFT",
+      1
+    ],
+    [
+      "BEHAVER",
+      1
+    ],
+    [
+      "WARNERS",
+      1
+    ],
+    [
+      "AFRO",
+      1
+    ],
+    [
+      "REDOX",
+      1
+    ],
+    [
+      "PECKY",
+      1
+    ],
+    [
+      "BLUELY",
+      1
+    ],
+    [
+      "GRIPEY",
+      1
+    ],
+    [
+      "FAKEER",
+      1
+    ],
+    [
+      "GRIPY",
+      1
+    ],
+    [
+      "SLIMES",
+      1
+    ],
+    [
+      "HOMY",
+      1
+    ],
+    [
+      "TIPPY",
+      1
+    ],
+    [
+      "FLAXES",
+      1
+    ],
+    [
+      "SAGGER",
+      1
+    ],
+    [
+      "BROWED",
+      1
+    ],
+    [
+      "FLIPPY",
+      1
+    ],
+    [
+      "EAMS",
+      1
+    ],
+    [
+      "ADOS",
+      1
+    ],
+    [
+      "PASE",
+      1
+    ],
+    [
+      "NOBS",
+      1
+    ],
+    [
+      "INES",
+      1
+    ],
+    [
+      "OTED",
+      1
+    ],
+    [
+      "CCOA",
+      1
+    ],
+    [
+      "TRINE",
+      1
+    ],
+    [
+      "SELFS",
+      1
+    ],
+    [
+      "LEBEN",
+      1
+    ],
+    [
+      "BRANNED",
+      1
+    ],
+    [
+      "HOOPERS",
+      1
+    ],
+    [
+      "BROKING",
+      1
+    ],
+    [
+      "PALMERS",
+      1
+    ],
+    [
+      "SHADERS",
+      1
+    ],
+    [
+      "SHAMMER",
+      1
+    ],
+    [
+      "BURGESS",
+      1
+    ],
+    [
+      "CAMPILY",
+      1
+    ],
+    [
+      "FADER",
+      1
+    ],
+    [
+      "LUSHING",
+      1
+    ],
+    [
+      "TOMMY",
+      1
+    ],
+    [
+      "BARLEYS",
+      1
+    ],
+    [
+      "HISSY",
+      1
+    ],
+    [
+      "THRONED",
+      1
+    ],
+    [
+      "MORRO",
+      1
+    ],
+    [
+      "STACKER",
+      1
+    ],
+    [
+      "COUPING",
+      1
+    ],
+    [
+      "JAZZILY",
+      1
+    ],
+    [
+      "APACHES",
+      1
+    ],
+    [
+      "HUMPY",
+      1
+    ],
+    [
+      "SLITTED",
+      1
+    ],
+    [
+      "CRASHER",
+      1
+    ],
+    [
+      "VARUS",
+      1
+    ],
+    [
+      "DEVEL",
+      1
+    ],
+    [
+      "BOXINGS",
+      1
+    ],
+    [
+      "ROGUING",
+      1
+    ],
+    [
+      "TIARAED",
+      1
+    ],
+    [
+      "FOSSE",
+      1
+    ],
+    [
+      "HEARSED",
+      1
+    ],
+    [
+      "HOUNDER",
+      1
+    ],
+    [
+      "MIDDLER",
+      1
+    ],
+    [
+      "PACHA",
+      1
+    ],
+    [
+      "FRUITER",
+      1
+    ],
+    [
+      "RUGBIES",
+      1
+    ],
+    [
+      "MOWINGS",
+      1
+    ],
+    [
+      "WRIED",
+      1
+    ],
+    [
+      "SPRANGS",
+      1
+    ],
+    [
+      "MASSE",
+      1
+    ],
+    [
+      "STAGGED",
+      1
+    ],
+    [
+      "ALTHO",
+      1
+    ],
+    [
+      "SKULLED",
+      1
+    ],
+    [
+      "NEVES",
+      1
+    ],
+    [
+      "ALIENER",
+      1
+    ],
+    [
+      "AWAITER",
+      1
+    ],
+    [
+      "SOUTHED",
+      1
+    ],
+    [
+      "SHILY",
+      1
+    ],
+    [
+      "CANNULA",
+      1
+    ],
+    [
+      "PHAGE",
+      1
+    ],
+    [
+      "TECHY",
+      1
+    ],
+    [
+      "STENCHY",
+      1
+    ],
+    [
+      "CLAYING",
+      1
+    ],
+    [
+      "RUBBLED",
+      1
+    ],
+    [
+      "DYEINGS",
+      1
+    ],
+    [
+      "NICHING",
+      1
+    ],
+    [
+      "HOCKEYS",
+      1
+    ],
+    [
+      "SAPPILY",
+      1
+    ],
+    [
+      "SPEARER",
+      1
+    ],
+    [
+      "WEBBY",
+      1
+    ],
+    [
+      "STURT",
+      1
+    ],
+    [
+      "LACINGS",
+      1
+    ],
+    [
+      "TORAH",
+      1
+    ],
+    [
+      "PSALTER",
+      1
+    ],
+    [
+      "PARTYER",
+      1
+    ],
+    [
+      "GOLDEST",
+      1
+    ],
+    [
+      "ITCHILY",
+      1
+    ],
+    [
+      "WAHOO",
+      1
+    ],
+    [
+      "COOPERY",
+      1
+    ],
+    [
+      "HERRY",
+      1
+    ],
+    [
+      "NOTCHER",
+      1
+    ],
+    [
+      "ERRANTS",
+      1
+    ],
+    [
+      "BANGERS",
+      1
+    ],
+    [
+      "ADVICES",
+      1
+    ],
+    [
+      "CITER",
+      1
+    ],
+    [
+      "BRAIDER",
+      1
+    ],
+    [
+      "PATEN",
+      1
+    ],
+    [
+      "PEERY",
+      1
+    ],
+    [
+      "SUPPLED",
+      1
+    ],
+    [
+      "DICER",
+      1
+    ],
+    [
+      "DITCHER",
+      1
+    ],
+    [
+      "ROQUE",
+      1
+    ],
+    [
+      "COBBY",
+      1
+    ],
+    [
+      "WAXER",
+      1
+    ],
+    [
+      "DROIT",
+      1
+    ],
+    [
+      "HOVERER",
+      1
+    ],
+    [
+      "NUTSY",
+      1
+    ],
+    [
+      "FAVORER",
+      1
+    ],
+    [
+      "THORP",
+      1
+    ],
+    [
+      "SWISS",
+      1
+    ],
+    [
+      "ABODING",
+      1
+    ],
+    [
+      "FETAS",
+      1
+    ],
+    [
+      "MINAS",
+      1
+    ],
+    [
+      "ALKYL",
+      1
+    ],
+    [
+      "ATOMY",
+      1
+    ],
+    [
+      "REFUSER",
+      1
+    ],
+    [
+      "DEMOSES",
+      1
+    ],
+    [
+      "JOINTER",
+      1
+    ],
+    [
+      "LAKHS",
+      1
+    ],
+    [
+      "SOUTHER",
+      1
+    ],
+    [
+      "MINCY",
+      1
+    ],
+    [
+      "ARROWED",
+      1
+    ],
+    [
+      "WIGGY",
+      1
+    ],
+    [
+      "FLAVORY",
+      1
+    ],
+    [
+      "SHRIVER",
+      1
+    ],
+    [
+      "BLATTER",
+      1
+    ],
+    [
+      "DIDST",
+      1
+    ],
+    [
+      "SWAGING",
+      1
+    ],
+    [
+      "ADULTLY",
+      1
+    ],
+    [
+      "STEERER",
+      1
+    ],
+    [
+      "PRAISER",
+      1
+    ],
+    [
+      "STEALER",
+      1
+    ],
+    [
+      "TERRIES",
+      1
+    ],
+    [
+      "ORTHO",
+      1
+    ],
+    [
+      "SLINGER",
+      1
+    ],
+    [
+      "COLONIC",
+      1
+    ],
+    [
+      "GRIDDER",
+      1
+    ],
+    [
+      "BOSOMED",
+      1
+    ],
+    [
+      "WEBER",
+      1
+    ],
+    [
+      "GERMY",
+      1
+    ],
+    [
+      "WIFED",
+      1
+    ],
+    [
+      "JUNKY",
+      1
+    ],
+    [
+      "HAYER",
+      1
+    ],
+    [
+      "CADDY",
+      1
+    ],
+    [
+      "SPORTER",
+      1
+    ],
+    [
+      "CRUMP",
+      1
+    ],
+    [
+      "SNIPPER",
+      1
+    ],
+    [
+      "GAPPING",
+      1
+    ],
+    [
+      "VASTY",
+      1
+    ],
+    [
+      "SPRAWLY",
+      1
+    ],
+    [
+      "BRITTLY",
+      1
+    ],
+    [
+      "CLINGED",
+      1
+    ],
+    [
+      "RURALLY",
+      1
+    ],
+    [
+      "COTTA",
+      1
+    ],
+    [
+      "MINGLER",
+      1
+    ],
+    [
+      "CHAMPER",
+      1
+    ],
+    [
+      "CANNA",
+      1
+    ],
+    [
+      "RANDOMS",
+      1
+    ],
+    [
+      "CHILDES",
+      1
+    ],
+    [
+      "JESUITS",
+      1
+    ],
+    [
+      "GASHEST",
+      1
+    ],
+    [
+      "SOFTS",
+      1
+    ],
+    [
+      "GEY",
+      1
+    ],
+    [
+      "DOOMY",
+      1
+    ],
+    [
+      "ZIG",
+      1
+    ],
+    [
+      "LEX",
+      1
+    ],
+    [
+      "VEINY",
+      1
+    ],
+    [
+      "LIMBY",
+      1
+    ],
+    [
+      "REGS",
+      1
+    ],
+    [
+      "GLEBE",
+      1
+    ],
+    [
+      "LIVRE",
+      1
+    ],
+    [
+      "RECS",
+      1
+    ],
+    [
+      "CORKY",
+      1
+    ],
+    [
+      "CLIFFY",
+      1
+    ],
+    [
+      "PEACED",
+      1
+    ],
+    [
+      "CHEAPS",
+      1
+    ],
+    [
+      "SCAREY",
+      1
+    ],
+    [
+      "PLOTTY",
+      1
+    ],
+    [
+      "TOWNY",
+      1
+    ],
+    [
+      "TOWY",
+      1
+    ],
+    [
+      "LONGES",
+      1
+    ],
+    [
+      "TRIPES",
+      1
+    ],
+    [
+      "SPICEY",
+      1
+    ],
+    [
+      "SOBBER",
+      1
+    ],
+    [
+      "CODDED",
+      1
+    ],
+    [
+      "DUSKED",
+      1
+    ],
+    [
+      "GLAZER",
+      1
+    ],
+    [
+      "CHICS",
+      1
+    ],
+    [
+      "LEXES",
+      1
+    ],
+    [
+      "BRAGGY",
+      1
+    ],
+    [
+      "PATLY",
+      1
+    ],
+    [
+      "BARNY",
+      1
+    ],
+    [
+      "CAPPER",
+      1
+    ],
+    [
+      "CHARRY",
+      1
+    ],
+    [
+      "MELTON",
+      1
+    ],
+    [
+      "CHAPES",
+      1
+    ],
+    [
+      "TELLYS",
+      1
+    ],
+    [
+      "STUDLY",
+      1
+    ],
+    [
+      "CORDER",
+      1
+    ],
+    [
+      "CHARED",
+      1
+    ],
+    [
+      "GLEY",
+      1
+    ],
+    [
+      "BREDES",
+      1
+    ],
+    [
+      "SUER",
+      1
+    ],
+    [
+      "DOGY",
+      1
+    ],
+    [
+      "BRASIL",
+      1
+    ],
+    [
+      "STRAWY",
+      1
+    ],
+    [
+      "LICKER",
+      1
+    ],
+    [
+      "AMBERY",
+      1
+    ],
+    [
+      "STONEY",
+      1
+    ],
+    [
+      "SKITES",
+      1
+    ],
+    [
+      "BEAKY",
+      1
+    ],
+    [
+      "SPIKER",
+      1
+    ],
+    [
+      "DEFIER",
+      1
+    ],
+    [
+      "MAYOS",
+      1
+    ],
+    [
+      "URGER",
+      1
+    ],
+    [
+      "MIDSTS",
+      1
+    ],
+    [
+      "CRACKY",
+      1
+    ],
+    [
+      "TOILES",
+      1
+    ],
+    [
+      "ARGUS",
+      1
+    ],
+    [
+      "MYTHOS",
+      1
+    ],
+    [
+      "MARSES",
+      1
+    ],
+    [
+      "FARCER",
+      1
+    ],
+    [
+      "DEEDY",
+      1
+    ],
+    [
+      "SWEEPY",
+      1
+    ],
+    [
+      "FRAILS",
+      1
+    ],
+    [
+      "HURLY",
+      1
+    ],
+    [
+      "HURLEY",
+      1
+    ],
+    [
+      "TWEENY",
+      1
+    ],
+    [
+      "GHOSTY",
+      1
+    ],
+    [
+      "HELLS",
+      1
+    ],
+    [
+      "GANGER",
+      1
+    ],
+    [
+      "LADENS",
+      1
+    ],
+    [
+      "ABIDER",
+      1
+    ],
+    [
+      "SHOVER",
+      1
+    ],
+    [
+      "PESTOS",
+      1
+    ],
+    [
+      "SLATEY",
+      1
+    ],
+    [
+      "BOTHY",
+      1
+    ],
+    [
+      "BROTHY",
+      1
+    ],
+    [
+      "SHALEY",
+      1
+    ],
+    [
+      "LAURA",
+      1
+    ],
+    [
+      "CHID",
+      1
+    ],
+    [
+      "ITES",
+      1
+    ],
+    [
+      "ISLED",
+      1
+    ],
+    [
+      "HEMPS",
+      1
+    ],
+    [
+      "FUES",
+      1
+    ],
+    [
+      "AMMA",
+      1
+    ],
+    [
+      "BAKS",
+      1
+    ],
+    [
+      "CUMS",
+      1
+    ],
+    [
+      "OPSY",
+      1
+    ],
+    [
+      "RDED",
+      1
+    ],
+    [
+      "DARKS",
+      1
+    ],
+    [
+      "COALY",
+      1
+    ],
+    [
+      "SOLON",
+      1
+    ],
+    [
+      "SLOS",
+      1
+    ],
+    [
+      "CAKY",
+      1
+    ],
+    [
+      "EEMS",
+      1
+    ],
+    [
+      "LAKY",
+      1
+    ],
+    [
+      "LUMS",
+      1
+    ],
+    [
+      "SPAK",
+      1
+    ],
+    [
+      "HARS",
+      1
+    ],
+    [
+      "ODAS",
+      1
+    ],
+    [
+      "OCOS",
+      1
+    ],
+    [
+      "GNES",
+      1
+    ],
+    [
+      "TORI",
+      1
+    ],
+    [
+      "DIDY",
+      1
+    ],
+    [
+      "RYES",
+      1
+    ]
+  ],
+  "duplicateChains": [],
+  "routeAudit": {
+    "standardMinimumCompletePaths": 2,
+    "reverseAndDoubleContract": "shipped-rule solvability",
+    "routeFailures": []
+  }
+}

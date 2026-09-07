@@ -1,4 +1,4 @@
-import { logEvent, getEvents, getEventSummary, getRecentEvents, clearEvents, getInstallAgeDays } from '../services/eventLogger';
+import { logEvent, getEvents, getEventSummary, getRecentEvents, clearEvents, getInstallAgeDays, acknowledgeEvents } from '../services/eventLogger';
 import { getLocalDateString, getLocalDateStringDaysAgo } from '../services/dateUtils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -160,5 +160,44 @@ describe('getInstallAgeDays', () => {
     expect(await AsyncStorage.getItem('wordshift_install_date')).toBe(stored);
     // And the age still resolves from the same persisted date after the reset.
     expect(await getInstallAgeDays()).toBe(0);
+  });
+});
+
+
+describe('identified queue acknowledgement', () => {
+  test('delayed upload plus retention trimming keeps every unuploaded event', async () => {
+    for (let n=0; n<500; n++) logEvent({type: 'puzzle_started', data: {n}});
+    const uploaded = await getEvents();
+    for (let n=500; n<600; n++) logEvent({type: 'puzzle_started', data: {n}});
+    expect(await getEvents()).toHaveLength(500);
+    await acknowledgeEvents(uploaded.map(event => event.id));
+    const unsent = await getEvents();
+    expect(unsent).toHaveLength(100);
+    expect(unsent.map(event => event.data?.n)).toEqual(Array.from({length:100}, (_,i)=>i+500));
+  });
+
+  test('legacy event IDs persist across queue reads and acknowledgements', async () => {
+    await AsyncStorage.setItem('wordshift_event_log', JSON.stringify([{type:'app_open',timestamp:100}]));
+    const [first] = await getEvents();
+    const [second] = await getEvents();
+    expect(first.id).toBe(second.id);
+    expect(first.id).toBeTruthy();
+    await acknowledgeEvents([first.id]);
+    expect(await getEvents()).toEqual([]);
+  });
+
+  test('Reset during a failed flush never resurrects old events', async () => {
+    const originalWrite = (AsyncStorage.setItem as jest.Mock).getMockImplementation()!;
+    let reject!: (error:Error)=>void;
+    (AsyncStorage.setItem as jest.Mock).mockImplementationOnce(() => new Promise((_, fail) => {reject=fail;}));
+    try {
+      logEvent({type:'app_open'});
+      const flushing = getEvents();
+      for(let n=0;n<10;n++) await Promise.resolve();
+      const clearing = clearEvents();
+      reject(new Error('disk full'));
+      await Promise.all([flushing, clearing]);
+      expect(await getEvents()).toEqual([]);
+    } finally { (AsyncStorage.setItem as jest.Mock).mockImplementation(originalWrite); }
   });
 });

@@ -41,28 +41,24 @@ elif [ "$BANK" = "EXPERT" ]; then
 else
   TARGET=500
 fi
+TARGET="${GATED_TARGET:-$TARGET}"
 CHECKPOINT="src/data/.gatedRegen_${KEY}_progress.json"
 LOG="src/data/.gatedRegen_${KEY}.log"
 MIN_RUN_ACCEPTS=3   # a run accepting fewer than this counts toward the plateau
 PLATEAU_RUNS=2      # consecutive sub-minimum runs that end the campaign
-MAX_RUNS=200        # hard safety valve; never expected to bind
+MAX_RUNS="${GATED_MAX_RUNS:-200}"        # hard safety valve; never expected to bind
 
 count_accepted() {
-  node -e "
-    try {
-      const c = JSON.parse(require('fs').readFileSync('$CHECKPOINT', 'utf-8'));
-      console.log(Array.isArray(c.puzzles) ? c.puzzles.length : 0);
-    } catch { console.log(0); }
-  "
+  node scripts/tools/gatedCheckpointCount.mjs "$CHECKPOINT"
 }
 
-start_count=$(count_accepted)
+start_count=$(count_accepted) || exit 1
 echo "=== gated regen driver: $BANK — starting at ${start_count}/${TARGET} ($(date -u +%FT%TZ)) ===" | tee -a "$LOG"
 
 plateau=0
 run=0
 while :; do
-  count=$(count_accepted)
+  count=$(count_accepted) || exit 1
   if [ "$count" -ge "$TARGET" ]; then
     echo "FINAL: $BANK reached ${count}/${TARGET} after ${run} run(s)" | tee -a "$LOG"
     exit 0
@@ -78,12 +74,13 @@ while :; do
   # Each run is bounded ~9.5 minutes wall clock: the generator's own internal
   # deadline (default GATED_RUN_MS=540000) finalizes the sidecar before jest's
   # 570s testTimeout can kill the process (finalize-before-jest-deadline).
-  GATED_BANK="$BANK" GATED_LEXICON="$LEXICON_ENV" NODE_OPTIONS="--max-old-space-size=4096" \
-    ./node_modules/.bin/jest --config scripts/jest.config.js --no-coverage --forceExit \
+  GATED_BANK="$BANK" GATED_LEXICON="$LEXICON_ENV" GENERATOR_NO_YIELD=1 NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=650}" \
+    npm test -- --runInBand --config scripts/jest.config.js --no-coverage --forceExit \
     --testTimeout 570000 scripts/generateGatedBank.test.ts >> "$LOG" 2>&1
   jest_status=$?
+  if [ "$jest_status" -ne 0 ]; then echo "Gated generation failed (exit $jest_status); see $LOG" >&2; exit "$jest_status"; fi
 
-  new_count=$(count_accepted)
+  new_count=$(count_accepted) || exit 1
   accepted=$((new_count - count))
   echo "--- run $run: accepted ${accepted} (now ${new_count}/${TARGET}, jest exit ${jest_status}) ---" | tee -a "$LOG"
 

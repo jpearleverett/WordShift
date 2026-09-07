@@ -13,7 +13,7 @@
  * `handleHint` callback can read and consume without awaiting storage.
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage, { runStorageTransaction, isStorageTransactionActive } from './persistenceStorage';
 import { STARTING_FREE_HINTS } from '../constants/gameBalance';
 
 const STORAGE_KEY = 'wordshift_hints';
@@ -49,7 +49,8 @@ async function load(): Promise<HintState> {
         return cache;
       }
     }
-  } catch {
+  } catch (error) {
+    if (isStorageTransactionActive()) throw error;
     /* ignore — fall through to default */
   }
   cache = getDefault();
@@ -78,8 +79,9 @@ async function save(): Promise<void> {
   if (!cache) return;
   try {
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(cache));
-  } catch {
-    /* ignore */
+  } catch (error) {
+    invalidateHintsCache();
+    throw error;
   }
 }
 
@@ -139,7 +141,14 @@ export function consumeHintSync(): boolean {
  * Grant hints (rewarded ad, IAP hint pack, etc.). Returns the new balance.
  * `source` is recorded only via the caller's own logging; this layer just credits.
  */
-export async function addHints(amount: number, _source?: string): Promise<number> {
+export async function addHints(amount: number, source?: string): Promise<number> {
+  try {
+    return await runStorageTransaction('hint_grant', () => addHintsInTransaction(amount, source));
+  } catch (error) { invalidateHintsCache(); throw error; }
+}
+
+/** Only for a caller already inside its explicitly owned storage transaction. */
+export async function addHintsInTransaction(amount: number, _source?: string): Promise<number> {
   if (amount <= 0) return getHintBalance();
   const state = await load();
   state.balance += amount;
@@ -178,7 +187,8 @@ export async function clearHints(): Promise<void> {
   mirror(cache);
   try {
     await AsyncStorage.removeItem(STORAGE_KEY);
-  } catch {
-    /* ignore */
+  } catch (error) {
+    invalidateHintsCache();
+    throw error;
   }
 }

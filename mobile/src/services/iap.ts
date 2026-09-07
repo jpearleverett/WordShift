@@ -13,7 +13,10 @@
  * keys and writes them to `entitlements.ts`, which is what the rest of the app reads.
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage, { runStorageTransaction, isStorageTransactionActive } from './persistenceStorage';
+import { saveWithPlayerRetry } from './saveRetry';
+import { awardBonusAmberInTransaction, getAmberBalance, invalidateProgressCache } from './amberCurrency';
+import { addHintsInTransaction, getHintBalance, invalidateHintsCache } from './hints';
 import {
   ENTITLEMENTS,
   EntitlementKey,
@@ -24,6 +27,7 @@ import {
   hasEntitlement,
   hasMadeAmberPurchase,
   markAmberPurchaseMade,
+  invalidateEntitlementsCache,
 } from './entitlements';
 import {
   AMBER_PACK_GRANTS,
@@ -363,6 +367,8 @@ export interface PendingConsumableGrant {
 }
 
 const PENDING_GRANTS_KEY = 'wordshift_pending_iap_grants';
+const APPLIED_GRANTS_KEY = 'wordshift_applied_iap_grants';
+const PAID_SAVE_COPY = { title: 'Your purchase is waiting', message: 'Your purchase succeeded. We need to save its reward before continuing. Free some device storage if it is full, then retry. You will not be charged again.' };
 
 /** Session-monotonic suffix so fallback grant ids can never collide in-session. */
 let grantIdSeq = 0;
@@ -378,7 +384,8 @@ async function loadPendingGrants(): Promise<PendingConsumableGrant[]> {
         );
       }
     }
-  } catch {
+  } catch (error) {
+    if (isStorageTransactionActive()) throw error;
     /* ignore — fall through to empty */
   }
   return [];
@@ -390,36 +397,60 @@ async function savePendingGrants(grants: PendingConsumableGrant[]): Promise<void
 
 /**
  * Persist a just-paid consumable grant. Returns the ledger id. A persist
- * failure must never fail the purchase (the caller still applies the returned
- * reward; only the crash-replay net is lost for that one grant), so this
- * swallows storage errors.
+ * failure keeps the paid result in memory and retries its storage operation.
+ * Retrying never invokes provider.purchase again.
  */
-async function persistPendingConsumableGrant(entry: {
+interface GrantIntent {
   productId: ProductId;
   reward: ConsumableReward;
   transactionId?: string;
   firstPurchaseDoubled: boolean;
-}): Promise<string> {
-  const grantId =
-    entry.transactionId ??
-    `${entry.productId}:${Date.now()}:${++grantIdSeq}:${Math.random().toString(36).slice(2, 8)}`;
-  try {
+}
+
+async function persistPendingConsumableGrants(entries: GrantIntent[]): Promise<string[]> {
+  const intents = entries.map(entry => ({
+    grantId: entry.transactionId ?? `${entry.productId}:${Date.now()}:${++grantIdSeq}:${Math.random().toString(36).slice(2,8)}`,
+    productId: entry.productId, reward: entry.reward, purchasedAt: Date.now(),
+    ...(entry.firstPurchaseDoubled ? {firstPurchaseDoubled:true} : {}),
+  }));
+  // Retry storage only; never call the store purchase API a second time.
+  await saveWithPlayerRetry(async () => { try { await runStorageTransaction('paid_grant_intent', async () => {
     const grants = await loadPendingGrants();
-    // The ledger is the dedupe: the same store transaction never gets two entries.
-    if (!grants.some((g) => g.grantId === grantId)) {
-      grants.push({
-        grantId,
-        productId: entry.productId,
-        reward: entry.reward,
-        purchasedAt: Date.now(),
-        ...(entry.firstPurchaseDoubled ? { firstPurchaseDoubled: true } : {}),
-      });
-      await savePendingGrants(grants);
+    const applied = new Set<string>(JSON.parse(await AsyncStorage.getItem(APPLIED_GRANTS_KEY) ?? '[]'));
+    for (const intent of intents) {
+      if (!applied.has(intent.grantId) && !grants.some(grant => grant.grantId===intent.grantId)) grants.push(intent);
     }
-  } catch (error) {
-    console.warn('[IAP] failed to persist pending consumable grant:', error);
-  }
-  return grantId;
+    await savePendingGrants(grants);
+    if (entries.some(entry=>entry.firstPurchaseDoubled)) await markAmberPurchaseMade();
+    if (entries.some(entry=>entry.productId===PRODUCT_IDS.STARTER_PACK)) await grantEntitlements([ENTITLEMENTS.STARTER_PACK]);
+  }); } catch(error) { invalidateEntitlementsCache(); throw error; } }, PAID_SAVE_COPY);
+  return intents.map(intent=>intent.grantId);
+}
+
+async function persistPendingConsumableGrant(entry: GrantIntent): Promise<string> {
+  return (await persistPendingConsumableGrants([entry]))[0];
+}
+
+/** Credit + ledger acknowledgement + applied-ID receipt share one commit. */
+export async function settleConsumableGrant(grantId: string): Promise<{ amberBalance: number; hintBalance: number; applied: boolean }> {
+  try {
+    return await runStorageTransaction('paid_grant_credit', async () => {
+      const applied = new Set<string>(JSON.parse(await AsyncStorage.getItem(APPLIED_GRANTS_KEY) ?? '[]'));
+      const grants = await loadPendingGrants();
+      const grant = grants.find(item => item.grantId===grantId);
+      if (!grant && !applied.has(grantId)) throw new Error('Paid reward intent needs recovery');
+      if (grant && !applied.has(grantId)) {
+        if (!Number.isFinite(grant.reward.amount) || grant.reward.amount<0) throw new Error('Invalid paid reward');
+        if (grant.reward.kind==='amber') await awardBonusAmberInTransaction(grant.reward.amount, `iap_${grant.productId}`);
+        else if (grant.reward.kind==='hints') await addHintsInTransaction(grant.reward.amount, `iap_${grant.productId}`);
+        else throw new Error('Invalid paid reward kind');
+        applied.add(grantId);
+        await AsyncStorage.setItem(APPLIED_GRANTS_KEY, JSON.stringify([...applied]));
+      }
+      await savePendingGrants(grants.filter(item=>item.grantId!==grantId));
+      return {amberBalance:await getAmberBalance(), hintBalance:await getHintBalance(), applied:!!grant};
+    });
+  } catch(error) { invalidateProgressCache(); invalidateHintsCache(); throw error; }
 }
 
 /**
@@ -429,7 +460,7 @@ async function persistPendingConsumableGrant(entry: {
  * apply each grant's reward, then acknowledge it.
  */
 export async function reconcilePendingConsumableGrants(): Promise<PendingConsumableGrant[]> {
-  return loadPendingGrants();
+  return runStorageTransaction('paid_grant_recovery_snapshot', loadPendingGrants);
 }
 
 /**
@@ -444,6 +475,7 @@ export async function acknowledgeConsumableGrant(grantId: string): Promise<void>
       await savePendingGrants(remaining);
     }
   } catch (error) {
+    if (isStorageTransactionActive()) throw error;
     console.warn('[IAP] failed to acknowledge consumable grant:', error);
   }
 }
@@ -488,14 +520,6 @@ export async function purchaseConsumable(productId: ProductId): Promise<Consumab
       transactionId: result.transactionId,
       firstPurchaseDoubled: doubled,
     });
-    // Mark the one-time 2x flag AFTER the grant is safely on the ledger. If a
-    // kill lands between the two, the grant still replays on reconcile (player
-    // keeps their money) and the worst case is the next amber pack also doubles
-    // — strictly player-favorable, versus the old ordering where a crash here
-    // burned the flag AND left no ledger entry (paid, got nothing).
-    if (doubled) {
-      await markAmberPurchaseMade();
-    }
     if (doubled) {
       return { success: true, productId, reward: grantedReward, grantId, firstPurchaseDoubled: true };
     }
@@ -535,24 +559,14 @@ export async function purchaseStarterPack(): Promise<StarterPackPurchaseResult> 
   }
   const result = await provider.purchase(productId);
   if (result.success) {
-    await grantEntitlements([ENTITLEMENTS.STARTER_PACK]);
-    // Same crash-replay net as purchaseConsumable: the entitlement persists
-    // instantly, but the amber+hints currency grant could be lost to a kill
-    // between this return and the caller's award. Two ledger entries (one per
-    // reward kind) ride the existing consumable reconcile path.
+    // Both currency intents become durable together before the entitlement.
     const txBase = result.transactionId;
-    const amberGrantId = await persistPendingConsumableGrant({
-      productId,
-      reward: { kind: 'amber', amount: STARTER_PACK_GRANTS.amber },
-      transactionId: txBase ? `${txBase}:amber` : undefined,
-      firstPurchaseDoubled: false,
-    });
-    const hintsGrantId = await persistPendingConsumableGrant({
-      productId,
-      reward: { kind: 'hints', amount: STARTER_PACK_GRANTS.hints },
-      transactionId: txBase ? `${txBase}:hints` : undefined,
-      firstPurchaseDoubled: false,
-    });
+    const [amberGrantId, hintsGrantId] = await persistPendingConsumableGrants([
+      {productId,reward:{kind:'amber',amount:STARTER_PACK_GRANTS.amber},
+        transactionId:txBase ? `${txBase}:amber` : undefined,firstPurchaseDoubled:false},
+      {productId,reward:{kind:'hints',amount:STARTER_PACK_GRANTS.hints},
+        transactionId:txBase ? `${txBase}:hints` : undefined,firstPurchaseDoubled:false},
+    ]);
     return {
       success: true,
       productId,

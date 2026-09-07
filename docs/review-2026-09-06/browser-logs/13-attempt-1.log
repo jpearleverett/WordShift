@@ -1,0 +1,39 @@
+
+> wordshift-mobile@1.3.0 test:e2e
+> playwright test --grep reset\ through\ Settings\ rebuilds\ a\ fresh\ playable\ session$
+
+
+Running 1 test using 1 worker
+
+(node:177181) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  1 e2e/game.spec.ts:355:5 › reset through Settings rebuilds a fresh playable session (44.2s)
+
+
+  1) e2e/game.spec.ts:355:5 › reset through Settings rebuilds a fresh playable session ─────────────
+
+    Error: page.evaluate: TypeError: Cannot read properties of null (reading 'puzzlesSolved')
+        at eval (eval at evaluate (:311:30), <anonymous>:1:66)
+        at UtilityScript.evaluate (<anonymous>:313:16)
+        at UtilityScript.<anonymous> (<anonymous>:1:44)
+        at eval (eval at evaluate (:311:30), <anonymous>:1:66)
+        at UtilityScript.evaluate (<anonymous>:313:16)
+        at UtilityScript.<anonymous> (<anonymous>:1:44)
+        at /home/coder/projects/WordShift/mobile/e2e/game.spec.ts:373:21
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/game-reset-through-Setting-aad6b-ds-a-fresh-playable-session/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/game-reset-through-Setting-aad6b-ds-a-fresh-playable-session/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/game-reset-through-Setting-aad6b-ds-a-fresh-playable-session/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/game-reset-through-Setting-aad6b-ds-a-fresh-playable-session/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    e2e/game.spec.ts:355:5 › reset through Settings rebuilds a fresh playable session ──────────────

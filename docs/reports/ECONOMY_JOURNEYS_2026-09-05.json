@@ -1,0 +1,2347 @@
+{
+  "modelVersion": 1,
+  "startDate": "2026-09-05",
+  "totalWins": 240,
+  "assumedSeconds": {
+    "EASY": 60,
+    "MEDIUM": 100,
+    "MEDIUM_PLUS": 150,
+    "HARD": 220,
+    "EXPERT": 300
+  },
+  "journeys": [
+    {
+      "id": "casual",
+      "label": "Free, 2/day",
+      "wins": 240,
+      "days": 120,
+      "recruitsAndRooms": [
+        {
+          "win": 1,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "fox",
+          "cost": 0
+        },
+        {
+          "win": 3,
+          "day": 2,
+          "date": "2026-09-06",
+          "id": "kitchen",
+          "cost": 50
+        },
+        {
+          "win": 6,
+          "day": 3,
+          "date": "2026-09-07",
+          "id": "pangolin",
+          "cost": 100
+        },
+        {
+          "win": 8,
+          "day": 4,
+          "date": "2026-09-08",
+          "id": "study",
+          "cost": 75
+        },
+        {
+          "win": 10,
+          "day": 5,
+          "date": "2026-09-09",
+          "id": "owl",
+          "cost": 100
+        },
+        {
+          "win": 12,
+          "day": 6,
+          "date": "2026-09-10",
+          "id": "aquarium",
+          "cost": 140
+        },
+        {
+          "win": 14,
+          "day": 7,
+          "date": "2026-09-11",
+          "id": "axolotl",
+          "cost": 100
+        },
+        {
+          "win": 20,
+          "day": 10,
+          "date": "2026-09-14",
+          "id": "jungle_room",
+          "cost": 200
+        },
+        {
+          "win": 20,
+          "day": 10,
+          "date": "2026-09-14",
+          "id": "sloth",
+          "cost": 100
+        },
+        {
+          "win": 30,
+          "day": 15,
+          "date": "2026-09-19",
+          "id": "desert_room",
+          "cost": 225
+        },
+        {
+          "win": 30,
+          "day": 15,
+          "date": "2026-09-19",
+          "id": "fennec_fox",
+          "cost": 100
+        },
+        {
+          "win": 42,
+          "day": 21,
+          "date": "2026-09-25",
+          "id": "office",
+          "cost": 275
+        },
+        {
+          "win": 42,
+          "day": 21,
+          "date": "2026-09-25",
+          "id": "capybara",
+          "cost": 100
+        },
+        {
+          "win": 54,
+          "day": 27,
+          "date": "2026-10-01",
+          "id": "burrow",
+          "cost": 250
+        },
+        {
+          "win": 54,
+          "day": 27,
+          "date": "2026-10-01",
+          "id": "wombat",
+          "cost": 100
+        },
+        {
+          "win": 66,
+          "day": 33,
+          "date": "2026-10-07",
+          "id": "garden",
+          "cost": 300
+        },
+        {
+          "win": 66,
+          "day": 33,
+          "date": "2026-10-07",
+          "id": "rabbit",
+          "cost": 100
+        },
+        {
+          "win": 74,
+          "day": 37,
+          "date": "2026-10-11",
+          "id": "bamboo_attic",
+          "cost": 400
+        },
+        {
+          "win": 74,
+          "day": 37,
+          "date": "2026-10-11",
+          "id": "red_panda",
+          "cost": 100
+        },
+        {
+          "win": 84,
+          "day": 42,
+          "date": "2026-10-16",
+          "id": "star_loft",
+          "cost": 450
+        },
+        {
+          "win": 84,
+          "day": 42,
+          "date": "2026-10-16",
+          "id": "tarsier",
+          "cost": 100
+        },
+        {
+          "win": 88,
+          "day": 44,
+          "date": "2026-10-18",
+          "id": "belfry",
+          "cost": 500
+        },
+        {
+          "win": 88,
+          "day": 44,
+          "date": "2026-10-18",
+          "id": "aye_aye",
+          "cost": 100
+        },
+        {
+          "win": 92,
+          "day": 46,
+          "date": "2026-10-20",
+          "id": "sky_garden",
+          "cost": 550
+        },
+        {
+          "win": 92,
+          "day": 46,
+          "date": "2026-10-20",
+          "id": "kakapo",
+          "cost": 100
+        }
+      ],
+      "phases": {
+        "0": {
+          "win": 1,
+          "day": 1,
+          "date": "2026-09-05"
+        },
+        "1": {
+          "win": 12,
+          "day": 6,
+          "date": "2026-09-10"
+        },
+        "2": {
+          "win": 28,
+          "day": 14,
+          "date": "2026-09-18"
+        },
+        "3": {
+          "win": 62,
+          "day": 31,
+          "date": "2026-10-05"
+        },
+        "4": {
+          "win": 90,
+          "day": 45,
+          "date": "2026-10-19"
+        },
+        "5": {
+          "win": 117,
+          "day": 59,
+          "date": "2026-11-02"
+        }
+      },
+      "availableAmber": 16909,
+      "pendingAmber": 0,
+      "peakPendingAmber": 60,
+      "hints": 0,
+      "hintsRequested": 48,
+      "hintsGranted": 20,
+      "unservedHintRequests": 28,
+      "amberBySource": {
+        "puzzle_including_milestones": 9080,
+        "login": 3655,
+        "quests": 8029,
+        "season_free": 760
+      },
+      "adViews": 0,
+      "assumedMinutes": 418.6666666666678,
+      "amberPerAssumedMinute": 51.41,
+      "modeValue": {
+        "EASY/standard": {
+          "wins": 8,
+          "amber": 106,
+          "assumedMinutes": 8.5,
+          "amberPerAssumedMinute": 12.47
+        },
+        "MEDIUM/standard": {
+          "wins": 232,
+          "amber": 6614,
+          "assumedMinutes": 410.16666666666777,
+          "amberPerAssumedMinute": 16.13
+        }
+      },
+      "optionalSpent": 0,
+      "houseCompleteAt": {
+        "win": 92,
+        "day": 46,
+        "date": "2026-10-20"
+      },
+      "endingAt": {
+        "win": 116,
+        "day": 58,
+        "date": "2026-11-01"
+      }
+    },
+    {
+      "id": "engaged",
+      "label": "Free, 8/day",
+      "wins": 240,
+      "days": 30,
+      "recruitsAndRooms": [
+        {
+          "win": 1,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "fox",
+          "cost": 0
+        },
+        {
+          "win": 4,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "kitchen",
+          "cost": 50
+        },
+        {
+          "win": 8,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "pangolin",
+          "cost": 100
+        },
+        {
+          "win": 16,
+          "day": 2,
+          "date": "2026-09-06",
+          "id": "study",
+          "cost": 75
+        },
+        {
+          "win": 16,
+          "day": 2,
+          "date": "2026-09-06",
+          "id": "owl",
+          "cost": 100
+        },
+        {
+          "win": 16,
+          "day": 2,
+          "date": "2026-09-06",
+          "id": "aquarium",
+          "cost": 140
+        },
+        {
+          "win": 24,
+          "day": 3,
+          "date": "2026-09-07",
+          "id": "axolotl",
+          "cost": 100
+        },
+        {
+          "win": 24,
+          "day": 3,
+          "date": "2026-09-07",
+          "id": "jungle_room",
+          "cost": 200
+        },
+        {
+          "win": 32,
+          "day": 4,
+          "date": "2026-09-08",
+          "id": "sloth",
+          "cost": 100
+        },
+        {
+          "win": 40,
+          "day": 5,
+          "date": "2026-09-09",
+          "id": "desert_room",
+          "cost": 225
+        },
+        {
+          "win": 40,
+          "day": 5,
+          "date": "2026-09-09",
+          "id": "fennec_fox",
+          "cost": 100
+        },
+        {
+          "win": 48,
+          "day": 6,
+          "date": "2026-09-10",
+          "id": "office",
+          "cost": 275
+        },
+        {
+          "win": 48,
+          "day": 6,
+          "date": "2026-09-10",
+          "id": "capybara",
+          "cost": 100
+        },
+        {
+          "win": 56,
+          "day": 7,
+          "date": "2026-09-11",
+          "id": "burrow",
+          "cost": 250
+        },
+        {
+          "win": 56,
+          "day": 7,
+          "date": "2026-09-11",
+          "id": "wombat",
+          "cost": 100
+        },
+        {
+          "win": 72,
+          "day": 9,
+          "date": "2026-09-13",
+          "id": "garden",
+          "cost": 300
+        },
+        {
+          "win": 72,
+          "day": 9,
+          "date": "2026-09-13",
+          "id": "rabbit",
+          "cost": 100
+        },
+        {
+          "win": 80,
+          "day": 10,
+          "date": "2026-09-14",
+          "id": "bamboo_attic",
+          "cost": 400
+        },
+        {
+          "win": 80,
+          "day": 10,
+          "date": "2026-09-14",
+          "id": "red_panda",
+          "cost": 100
+        },
+        {
+          "win": 88,
+          "day": 11,
+          "date": "2026-09-15",
+          "id": "star_loft",
+          "cost": 450
+        },
+        {
+          "win": 88,
+          "day": 11,
+          "date": "2026-09-15",
+          "id": "tarsier",
+          "cost": 100
+        },
+        {
+          "win": 88,
+          "day": 11,
+          "date": "2026-09-15",
+          "id": "belfry",
+          "cost": 500
+        },
+        {
+          "win": 88,
+          "day": 11,
+          "date": "2026-09-15",
+          "id": "aye_aye",
+          "cost": 100
+        },
+        {
+          "win": 96,
+          "day": 12,
+          "date": "2026-09-16",
+          "id": "sky_garden",
+          "cost": 550
+        },
+        {
+          "win": 96,
+          "day": 12,
+          "date": "2026-09-16",
+          "id": "kakapo",
+          "cost": 100
+        }
+      ],
+      "phases": {
+        "0": {
+          "win": 1,
+          "day": 1,
+          "date": "2026-09-05"
+        },
+        "1": {
+          "win": 16,
+          "day": 2,
+          "date": "2026-09-06"
+        },
+        "2": {
+          "win": 32,
+          "day": 4,
+          "date": "2026-09-08"
+        },
+        "3": {
+          "win": 64,
+          "day": 8,
+          "date": "2026-09-12"
+        },
+        "4": {
+          "win": 96,
+          "day": 12,
+          "date": "2026-09-16"
+        },
+        "5": {
+          "win": 117,
+          "day": 15,
+          "date": "2026-09-19"
+        }
+      },
+      "availableAmber": 9642,
+      "pendingAmber": 0,
+      "peakPendingAmber": 234,
+      "hints": 0,
+      "hintsRequested": 48,
+      "hintsGranted": 20,
+      "unservedHintRequests": 28,
+      "amberBySource": {
+        "puzzle_including_milestones": 8591,
+        "quests": 4496,
+        "season_free": 300,
+        "login": 870
+      },
+      "adViews": 0,
+      "assumedMinutes": 418.6666666666678,
+      "amberPerAssumedMinute": 34.05,
+      "modeValue": {
+        "EASY/standard": {
+          "wins": 8,
+          "amber": 94,
+          "assumedMinutes": 8.5,
+          "amberPerAssumedMinute": 11.06
+        },
+        "MEDIUM/standard": {
+          "wins": 232,
+          "amber": 6137,
+          "assumedMinutes": 410.16666666666777,
+          "amberPerAssumedMinute": 14.96
+        }
+      },
+      "optionalSpent": 0,
+      "houseCompleteAt": {
+        "win": 96,
+        "day": 12,
+        "date": "2026-09-16"
+      },
+      "endingAt": {
+        "win": 116,
+        "day": 15,
+        "date": "2026-09-19"
+      }
+    },
+    {
+      "id": "long_session",
+      "label": "Free, one long session",
+      "wins": 240,
+      "days": 1,
+      "recruitsAndRooms": [
+        {
+          "win": 1,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "fox",
+          "cost": 0
+        },
+        {
+          "win": 4,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "kitchen",
+          "cost": 50
+        },
+        {
+          "win": 16,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "pangolin",
+          "cost": 100
+        },
+        {
+          "win": 16,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "study",
+          "cost": 75
+        },
+        {
+          "win": 24,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "owl",
+          "cost": 100
+        },
+        {
+          "win": 32,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "aquarium",
+          "cost": 140
+        },
+        {
+          "win": 40,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "axolotl",
+          "cost": 100
+        },
+        {
+          "win": 48,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "jungle_room",
+          "cost": 200
+        },
+        {
+          "win": 56,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "sloth",
+          "cost": 100
+        },
+        {
+          "win": 64,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "desert_room",
+          "cost": 225
+        },
+        {
+          "win": 72,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "fennec_fox",
+          "cost": 100
+        },
+        {
+          "win": 88,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "office",
+          "cost": 275
+        },
+        {
+          "win": 96,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "capybara",
+          "cost": 100
+        },
+        {
+          "win": 104,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "burrow",
+          "cost": 250
+        },
+        {
+          "win": 104,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "wombat",
+          "cost": 100
+        },
+        {
+          "win": 112,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "garden",
+          "cost": 300
+        },
+        {
+          "win": 112,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "rabbit",
+          "cost": 100
+        },
+        {
+          "win": 120,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "bamboo_attic",
+          "cost": 400
+        },
+        {
+          "win": 128,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "red_panda",
+          "cost": 100
+        },
+        {
+          "win": 152,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "star_loft",
+          "cost": 450
+        },
+        {
+          "win": 152,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "tarsier",
+          "cost": 100
+        },
+        {
+          "win": 176,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "belfry",
+          "cost": 500
+        },
+        {
+          "win": 184,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "aye_aye",
+          "cost": 100
+        },
+        {
+          "win": 200,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "sky_garden",
+          "cost": 550
+        },
+        {
+          "win": 208,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "kakapo",
+          "cost": 100
+        }
+      ],
+      "phases": {
+        "0": {
+          "win": 1,
+          "day": 1,
+          "date": "2026-09-05"
+        },
+        "1": {
+          "win": 16,
+          "day": 1,
+          "date": "2026-09-05"
+        },
+        "2": {
+          "win": 32,
+          "day": 1,
+          "date": "2026-09-05"
+        },
+        "3": {
+          "win": 64,
+          "day": 1,
+          "date": "2026-09-05"
+        },
+        "4": {
+          "win": 96,
+          "day": 1,
+          "date": "2026-09-05"
+        },
+        "5": {
+          "win": 124,
+          "day": 1,
+          "date": "2026-09-05"
+        }
+      },
+      "availableAmber": 2224,
+      "pendingAmber": 0,
+      "peakPendingAmber": 117,
+      "hints": 0,
+      "hintsRequested": 48,
+      "hintsGranted": 20,
+      "unservedHintRequests": 28,
+      "amberBySource": {
+        "puzzle_including_milestones": 5533,
+        "quests": 1106,
+        "season_free": 200
+      },
+      "adViews": 0,
+      "assumedMinutes": 418.6666666666678,
+      "amberPerAssumedMinute": 16.34,
+      "modeValue": {
+        "EASY/standard": {
+          "wins": 8,
+          "amber": 94,
+          "assumedMinutes": 8.5,
+          "amberPerAssumedMinute": 11.06
+        },
+        "MEDIUM/standard": {
+          "wins": 232,
+          "amber": 3339,
+          "assumedMinutes": 410.16666666666777,
+          "amberPerAssumedMinute": 8.14
+        }
+      },
+      "optionalSpent": 0,
+      "houseCompleteAt": {
+        "win": 208,
+        "day": 1,
+        "date": "2026-09-05"
+      },
+      "endingAt": {
+        "win": 123,
+        "day": 1,
+        "date": "2026-09-05"
+      }
+    },
+    {
+      "id": "easy",
+      "label": "Free, Easy only, 2/day",
+      "wins": 240,
+      "days": 120,
+      "recruitsAndRooms": [
+        {
+          "win": 1,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "fox",
+          "cost": 0
+        },
+        {
+          "win": 3,
+          "day": 2,
+          "date": "2026-09-06",
+          "id": "kitchen",
+          "cost": 50
+        },
+        {
+          "win": 6,
+          "day": 3,
+          "date": "2026-09-07",
+          "id": "pangolin",
+          "cost": 100
+        },
+        {
+          "win": 8,
+          "day": 4,
+          "date": "2026-09-08",
+          "id": "study",
+          "cost": 75
+        },
+        {
+          "win": 10,
+          "day": 5,
+          "date": "2026-09-09",
+          "id": "owl",
+          "cost": 100
+        },
+        {
+          "win": 14,
+          "day": 7,
+          "date": "2026-09-11",
+          "id": "aquarium",
+          "cost": 140
+        },
+        {
+          "win": 16,
+          "day": 8,
+          "date": "2026-09-12",
+          "id": "axolotl",
+          "cost": 100
+        },
+        {
+          "win": 20,
+          "day": 10,
+          "date": "2026-09-14",
+          "id": "jungle_room",
+          "cost": 200
+        },
+        {
+          "win": 20,
+          "day": 10,
+          "date": "2026-09-14",
+          "id": "sloth",
+          "cost": 100
+        },
+        {
+          "win": 30,
+          "day": 15,
+          "date": "2026-09-19",
+          "id": "desert_room",
+          "cost": 225
+        },
+        {
+          "win": 30,
+          "day": 15,
+          "date": "2026-09-19",
+          "id": "fennec_fox",
+          "cost": 100
+        },
+        {
+          "win": 42,
+          "day": 21,
+          "date": "2026-09-25",
+          "id": "office",
+          "cost": 275
+        },
+        {
+          "win": 42,
+          "day": 21,
+          "date": "2026-09-25",
+          "id": "capybara",
+          "cost": 100
+        },
+        {
+          "win": 54,
+          "day": 27,
+          "date": "2026-10-01",
+          "id": "burrow",
+          "cost": 250
+        },
+        {
+          "win": 54,
+          "day": 27,
+          "date": "2026-10-01",
+          "id": "wombat",
+          "cost": 100
+        },
+        {
+          "win": 66,
+          "day": 33,
+          "date": "2026-10-07",
+          "id": "garden",
+          "cost": 300
+        },
+        {
+          "win": 66,
+          "day": 33,
+          "date": "2026-10-07",
+          "id": "rabbit",
+          "cost": 100
+        },
+        {
+          "win": 74,
+          "day": 37,
+          "date": "2026-10-11",
+          "id": "bamboo_attic",
+          "cost": 400
+        },
+        {
+          "win": 74,
+          "day": 37,
+          "date": "2026-10-11",
+          "id": "red_panda",
+          "cost": 100
+        },
+        {
+          "win": 84,
+          "day": 42,
+          "date": "2026-10-16",
+          "id": "star_loft",
+          "cost": 450
+        },
+        {
+          "win": 84,
+          "day": 42,
+          "date": "2026-10-16",
+          "id": "tarsier",
+          "cost": 100
+        },
+        {
+          "win": 88,
+          "day": 44,
+          "date": "2026-10-18",
+          "id": "belfry",
+          "cost": 500
+        },
+        {
+          "win": 88,
+          "day": 44,
+          "date": "2026-10-18",
+          "id": "aye_aye",
+          "cost": 100
+        },
+        {
+          "win": 92,
+          "day": 46,
+          "date": "2026-10-20",
+          "id": "sky_garden",
+          "cost": 550
+        },
+        {
+          "win": 92,
+          "day": 46,
+          "date": "2026-10-20",
+          "id": "kakapo",
+          "cost": 100
+        }
+      ],
+      "phases": {
+        "0": {
+          "win": 1,
+          "day": 1,
+          "date": "2026-09-05"
+        },
+        "1": {
+          "win": 12,
+          "day": 6,
+          "date": "2026-09-10"
+        },
+        "2": {
+          "win": 28,
+          "day": 14,
+          "date": "2026-09-18"
+        },
+        "3": {
+          "win": 62,
+          "day": 31,
+          "date": "2026-10-05"
+        },
+        "4": {
+          "win": 90,
+          "day": 45,
+          "date": "2026-10-19"
+        },
+        "5": {
+          "win": 117,
+          "day": 59,
+          "date": "2026-11-02"
+        }
+      },
+      "availableAmber": 15125,
+      "pendingAmber": 0,
+      "peakPendingAmber": 48,
+      "hints": 0,
+      "hintsRequested": 48,
+      "hintsGranted": 20,
+      "unservedHintRequests": 28,
+      "amberBySource": {
+        "puzzle_including_milestones": 7774,
+        "login": 3655,
+        "quests": 7551,
+        "season_free": 760
+      },
+      "adViews": 0,
+      "assumedMinutes": 264,
+      "amberPerAssumedMinute": 74.77,
+      "modeValue": {
+        "EASY/standard": {
+          "wins": 240,
+          "amber": 5434,
+          "assumedMinutes": 264,
+          "amberPerAssumedMinute": 20.58
+        }
+      },
+      "optionalSpent": 0,
+      "houseCompleteAt": {
+        "win": 92,
+        "day": 46,
+        "date": "2026-10-20"
+      },
+      "endingAt": {
+        "win": 116,
+        "day": 58,
+        "date": "2026-11-01"
+      }
+    },
+    {
+      "id": "core_only",
+      "label": "Free, no shop or side claims, 8/day",
+      "wins": 240,
+      "days": 30,
+      "recruitsAndRooms": [
+        {
+          "win": 1,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "fox",
+          "cost": 0
+        },
+        {
+          "win": 4,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "kitchen",
+          "cost": 50
+        },
+        {
+          "win": 16,
+          "day": 2,
+          "date": "2026-09-06",
+          "id": "pangolin",
+          "cost": 100
+        },
+        {
+          "win": 16,
+          "day": 2,
+          "date": "2026-09-06",
+          "id": "study",
+          "cost": 75
+        },
+        {
+          "win": 24,
+          "day": 3,
+          "date": "2026-09-07",
+          "id": "owl",
+          "cost": 100
+        },
+        {
+          "win": 32,
+          "day": 4,
+          "date": "2026-09-08",
+          "id": "aquarium",
+          "cost": 140
+        },
+        {
+          "win": 32,
+          "day": 4,
+          "date": "2026-09-08",
+          "id": "axolotl",
+          "cost": 100
+        },
+        {
+          "win": 40,
+          "day": 5,
+          "date": "2026-09-09",
+          "id": "jungle_room",
+          "cost": 200
+        },
+        {
+          "win": 48,
+          "day": 6,
+          "date": "2026-09-10",
+          "id": "sloth",
+          "cost": 100
+        },
+        {
+          "win": 56,
+          "day": 7,
+          "date": "2026-09-11",
+          "id": "desert_room",
+          "cost": 225
+        },
+        {
+          "win": 56,
+          "day": 7,
+          "date": "2026-09-11",
+          "id": "fennec_fox",
+          "cost": 100
+        },
+        {
+          "win": 72,
+          "day": 9,
+          "date": "2026-09-13",
+          "id": "office",
+          "cost": 275
+        },
+        {
+          "win": 72,
+          "day": 9,
+          "date": "2026-09-13",
+          "id": "capybara",
+          "cost": 100
+        },
+        {
+          "win": 80,
+          "day": 10,
+          "date": "2026-09-14",
+          "id": "burrow",
+          "cost": 250
+        },
+        {
+          "win": 80,
+          "day": 10,
+          "date": "2026-09-14",
+          "id": "wombat",
+          "cost": 100
+        },
+        {
+          "win": 96,
+          "day": 12,
+          "date": "2026-09-16",
+          "id": "garden",
+          "cost": 300
+        },
+        {
+          "win": 96,
+          "day": 12,
+          "date": "2026-09-16",
+          "id": "rabbit",
+          "cost": 100
+        },
+        {
+          "win": 104,
+          "day": 13,
+          "date": "2026-09-17",
+          "id": "bamboo_attic",
+          "cost": 400
+        },
+        {
+          "win": 104,
+          "day": 13,
+          "date": "2026-09-17",
+          "id": "red_panda",
+          "cost": 100
+        },
+        {
+          "win": 112,
+          "day": 14,
+          "date": "2026-09-18",
+          "id": "star_loft",
+          "cost": 450
+        },
+        {
+          "win": 112,
+          "day": 14,
+          "date": "2026-09-18",
+          "id": "tarsier",
+          "cost": 100
+        },
+        {
+          "win": 120,
+          "day": 15,
+          "date": "2026-09-19",
+          "id": "belfry",
+          "cost": 500
+        },
+        {
+          "win": 128,
+          "day": 16,
+          "date": "2026-09-20",
+          "id": "aye_aye",
+          "cost": 100
+        },
+        {
+          "win": 144,
+          "day": 18,
+          "date": "2026-09-22",
+          "id": "sky_garden",
+          "cost": 550
+        },
+        {
+          "win": 144,
+          "day": 18,
+          "date": "2026-09-22",
+          "id": "kakapo",
+          "cost": 100
+        }
+      ],
+      "phases": {
+        "0": {
+          "win": 1,
+          "day": 1,
+          "date": "2026-09-05"
+        },
+        "1": {
+          "win": 16,
+          "day": 2,
+          "date": "2026-09-06"
+        },
+        "2": {
+          "win": 32,
+          "day": 4,
+          "date": "2026-09-08"
+        },
+        "3": {
+          "win": 64,
+          "day": 8,
+          "date": "2026-09-12"
+        },
+        "4": {
+          "win": 96,
+          "day": 12,
+          "date": "2026-09-16"
+        },
+        "5": {
+          "win": 124,
+          "day": 16,
+          "date": "2026-09-20"
+        }
+      },
+      "availableAmber": 3976,
+      "pendingAmber": 0,
+      "peakPendingAmber": 234,
+      "hints": 0,
+      "hintsRequested": 48,
+      "hintsGranted": 20,
+      "unservedHintRequests": 28,
+      "amberBySource": {
+        "puzzle_including_milestones": 8591
+      },
+      "adViews": 0,
+      "assumedMinutes": 418.6666666666678,
+      "amberPerAssumedMinute": 20.52,
+      "modeValue": {
+        "EASY/standard": {
+          "wins": 8,
+          "amber": 94,
+          "assumedMinutes": 8.5,
+          "amberPerAssumedMinute": 11.06
+        },
+        "MEDIUM/standard": {
+          "wins": 232,
+          "amber": 6137,
+          "assumedMinutes": 410.16666666666777,
+          "amberPerAssumedMinute": 14.96
+        }
+      },
+      "optionalSpent": 0,
+      "houseCompleteAt": {
+        "win": 144,
+        "day": 18,
+        "date": "2026-09-22"
+      },
+      "endingAt": {
+        "win": 123,
+        "day": 16,
+        "date": "2026-09-20"
+      }
+    },
+    {
+      "id": "all_side_rewards",
+      "label": "Free, side claims + ads + styles, 8/day",
+      "wins": 240,
+      "days": 30,
+      "recruitsAndRooms": [
+        {
+          "win": 1,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "fox",
+          "cost": 0
+        },
+        {
+          "win": 4,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "kitchen",
+          "cost": 50
+        },
+        {
+          "win": 8,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "pangolin",
+          "cost": 100
+        },
+        {
+          "win": 9,
+          "day": 2,
+          "date": "2026-09-06",
+          "id": "study",
+          "cost": 75
+        },
+        {
+          "win": 9,
+          "day": 2,
+          "date": "2026-09-06",
+          "id": "owl",
+          "cost": 100
+        },
+        {
+          "win": 16,
+          "day": 2,
+          "date": "2026-09-06",
+          "id": "aquarium",
+          "cost": 140
+        },
+        {
+          "win": 16,
+          "day": 2,
+          "date": "2026-09-06",
+          "id": "axolotl",
+          "cost": 100
+        },
+        {
+          "win": 24,
+          "day": 3,
+          "date": "2026-09-07",
+          "id": "jungle_room",
+          "cost": 200
+        },
+        {
+          "win": 24,
+          "day": 3,
+          "date": "2026-09-07",
+          "id": "sloth",
+          "cost": 100
+        },
+        {
+          "win": 32,
+          "day": 4,
+          "date": "2026-09-08",
+          "id": "desert_room",
+          "cost": 225
+        },
+        {
+          "win": 32,
+          "day": 4,
+          "date": "2026-09-08",
+          "id": "fennec_fox",
+          "cost": 100
+        },
+        {
+          "win": 48,
+          "day": 6,
+          "date": "2026-09-10",
+          "id": "office",
+          "cost": 275
+        },
+        {
+          "win": 48,
+          "day": 6,
+          "date": "2026-09-10",
+          "id": "capybara",
+          "cost": 100
+        },
+        {
+          "win": 56,
+          "day": 7,
+          "date": "2026-09-11",
+          "id": "burrow",
+          "cost": 250
+        },
+        {
+          "win": 56,
+          "day": 7,
+          "date": "2026-09-11",
+          "id": "wombat",
+          "cost": 100
+        },
+        {
+          "win": 72,
+          "day": 9,
+          "date": "2026-09-13",
+          "id": "garden",
+          "cost": 300
+        },
+        {
+          "win": 72,
+          "day": 9,
+          "date": "2026-09-13",
+          "id": "rabbit",
+          "cost": 100
+        },
+        {
+          "win": 80,
+          "day": 10,
+          "date": "2026-09-14",
+          "id": "bamboo_attic",
+          "cost": 400
+        },
+        {
+          "win": 80,
+          "day": 10,
+          "date": "2026-09-14",
+          "id": "red_panda",
+          "cost": 100
+        },
+        {
+          "win": 88,
+          "day": 11,
+          "date": "2026-09-15",
+          "id": "star_loft",
+          "cost": 450
+        },
+        {
+          "win": 88,
+          "day": 11,
+          "date": "2026-09-15",
+          "id": "tarsier",
+          "cost": 100
+        },
+        {
+          "win": 88,
+          "day": 11,
+          "date": "2026-09-15",
+          "id": "belfry",
+          "cost": 500
+        },
+        {
+          "win": 88,
+          "day": 11,
+          "date": "2026-09-15",
+          "id": "aye_aye",
+          "cost": 100
+        },
+        {
+          "win": 96,
+          "day": 12,
+          "date": "2026-09-16",
+          "id": "sky_garden",
+          "cost": 550
+        },
+        {
+          "win": 96,
+          "day": 12,
+          "date": "2026-09-16",
+          "id": "kakapo",
+          "cost": 100
+        }
+      ],
+      "phases": {
+        "0": {
+          "win": 1,
+          "day": 1,
+          "date": "2026-09-05"
+        },
+        "1": {
+          "win": 16,
+          "day": 2,
+          "date": "2026-09-06"
+        },
+        "2": {
+          "win": 32,
+          "day": 4,
+          "date": "2026-09-08"
+        },
+        "3": {
+          "win": 64,
+          "day": 8,
+          "date": "2026-09-12"
+        },
+        "4": {
+          "win": 96,
+          "day": 12,
+          "date": "2026-09-16"
+        },
+        "5": {
+          "win": 117,
+          "day": 15,
+          "date": "2026-09-19"
+        }
+      },
+      "availableAmber": 20146,
+      "pendingAmber": 0,
+      "peakPendingAmber": 363,
+      "hints": 0,
+      "hintsRequested": 48,
+      "hintsGranted": 46,
+      "unservedHintRequests": 2,
+      "amberBySource": {
+        "puzzle_including_milestones": 11782,
+        "quests": 5640,
+        "season_free": 300,
+        "login": 870,
+        "daily_amber": 3480,
+        "victory_double": 2429,
+        "daily_streak": 170,
+        "daily_event": 90
+      },
+      "adViews": 137,
+      "assumedMinutes": 677.4999999999994,
+      "amberPerAssumedMinute": 36.55,
+      "modeValue": {
+        "EASY/standard": {
+          "wins": 8,
+          "amber": 94,
+          "assumedMinutes": 8.5,
+          "amberPerAssumedMinute": 11.06
+        },
+        "MEDIUM/daily": {
+          "wins": 5,
+          "amber": 236,
+          "assumedMinutes": 8.833333333333334,
+          "amberPerAssumedMinute": 26.72
+        },
+        "MEDIUM/standard": {
+          "wins": 70,
+          "amber": 1824,
+          "assumedMinutes": 124.16666666666679,
+          "amberPerAssumedMinute": 14.69
+        },
+        "MEDIUM/reverse": {
+          "wins": 70,
+          "amber": 2679,
+          "assumedMinutes": 216.5,
+          "amberPerAssumedMinute": 12.37
+        },
+        "MEDIUM_PLUS/daily": {
+          "wins": 12,
+          "amber": 642,
+          "assumedMinutes": 31.5,
+          "amberPerAssumedMinute": 20.38
+        },
+        "MEDIUM/double_shift": {
+          "wins": 63,
+          "amber": 3226,
+          "assumedMinutes": 174.49999999999994,
+          "amberPerAssumedMinute": 18.49
+        },
+        "HARD/daily": {
+          "wins": 12,
+          "amber": 671,
+          "assumedMinutes": 44.99999999999999,
+          "amberPerAssumedMinute": 14.91
+        }
+      },
+      "optionalSpent": 0,
+      "houseCompleteAt": {
+        "win": 96,
+        "day": 12,
+        "date": "2026-09-16"
+      },
+      "endingAt": {
+        "win": 116,
+        "day": 15,
+        "date": "2026-09-19"
+      }
+    },
+    {
+      "id": "patron",
+      "label": "Patron, 8/day",
+      "wins": 240,
+      "days": 30,
+      "recruitsAndRooms": [
+        {
+          "win": 1,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "fox",
+          "cost": 0
+        },
+        {
+          "win": 3,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "kitchen",
+          "cost": 50
+        },
+        {
+          "win": 8,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "pangolin",
+          "cost": 100
+        },
+        {
+          "win": 9,
+          "day": 2,
+          "date": "2026-09-06",
+          "id": "study",
+          "cost": 75
+        },
+        {
+          "win": 9,
+          "day": 2,
+          "date": "2026-09-06",
+          "id": "owl",
+          "cost": 100
+        },
+        {
+          "win": 16,
+          "day": 2,
+          "date": "2026-09-06",
+          "id": "aquarium",
+          "cost": 140
+        },
+        {
+          "win": 16,
+          "day": 2,
+          "date": "2026-09-06",
+          "id": "axolotl",
+          "cost": 100
+        },
+        {
+          "win": 24,
+          "day": 3,
+          "date": "2026-09-07",
+          "id": "jungle_room",
+          "cost": 200
+        },
+        {
+          "win": 24,
+          "day": 3,
+          "date": "2026-09-07",
+          "id": "sloth",
+          "cost": 100
+        },
+        {
+          "win": 32,
+          "day": 4,
+          "date": "2026-09-08",
+          "id": "desert_room",
+          "cost": 225
+        },
+        {
+          "win": 32,
+          "day": 4,
+          "date": "2026-09-08",
+          "id": "fennec_fox",
+          "cost": 100
+        },
+        {
+          "win": 48,
+          "day": 6,
+          "date": "2026-09-10",
+          "id": "office",
+          "cost": 275
+        },
+        {
+          "win": 48,
+          "day": 6,
+          "date": "2026-09-10",
+          "id": "capybara",
+          "cost": 100
+        },
+        {
+          "win": 56,
+          "day": 7,
+          "date": "2026-09-11",
+          "id": "burrow",
+          "cost": 250
+        },
+        {
+          "win": 56,
+          "day": 7,
+          "date": "2026-09-11",
+          "id": "wombat",
+          "cost": 100
+        },
+        {
+          "win": 72,
+          "day": 9,
+          "date": "2026-09-13",
+          "id": "garden",
+          "cost": 300
+        },
+        {
+          "win": 72,
+          "day": 9,
+          "date": "2026-09-13",
+          "id": "rabbit",
+          "cost": 100
+        },
+        {
+          "win": 80,
+          "day": 10,
+          "date": "2026-09-14",
+          "id": "bamboo_attic",
+          "cost": 400
+        },
+        {
+          "win": 80,
+          "day": 10,
+          "date": "2026-09-14",
+          "id": "red_panda",
+          "cost": 100
+        },
+        {
+          "win": 88,
+          "day": 11,
+          "date": "2026-09-15",
+          "id": "star_loft",
+          "cost": 450
+        },
+        {
+          "win": 88,
+          "day": 11,
+          "date": "2026-09-15",
+          "id": "tarsier",
+          "cost": 100
+        },
+        {
+          "win": 88,
+          "day": 11,
+          "date": "2026-09-15",
+          "id": "belfry",
+          "cost": 500
+        },
+        {
+          "win": 88,
+          "day": 11,
+          "date": "2026-09-15",
+          "id": "aye_aye",
+          "cost": 100
+        },
+        {
+          "win": 96,
+          "day": 12,
+          "date": "2026-09-16",
+          "id": "sky_garden",
+          "cost": 550
+        },
+        {
+          "win": 96,
+          "day": 12,
+          "date": "2026-09-16",
+          "id": "kakapo",
+          "cost": 100
+        }
+      ],
+      "phases": {
+        "0": {
+          "win": 1,
+          "day": 1,
+          "date": "2026-09-05"
+        },
+        "1": {
+          "win": 16,
+          "day": 2,
+          "date": "2026-09-06"
+        },
+        "2": {
+          "win": 32,
+          "day": 4,
+          "date": "2026-09-08"
+        },
+        "3": {
+          "win": 64,
+          "day": 8,
+          "date": "2026-09-12"
+        },
+        "4": {
+          "win": 96,
+          "day": 12,
+          "date": "2026-09-16"
+        },
+        "5": {
+          "win": 117,
+          "day": 15,
+          "date": "2026-09-19"
+        }
+      },
+      "availableAmber": 15273,
+      "pendingAmber": 0,
+      "peakPendingAmber": 250,
+      "hints": 0,
+      "hintsRequested": 48,
+      "hintsGranted": 20,
+      "unservedHintRequests": 28,
+      "amberBySource": {
+        "puzzle_including_milestones": 9071,
+        "quests": 4496,
+        "season_free": 300,
+        "login": 870,
+        "daily_amber": 3480,
+        "victory_double": 1671
+      },
+      "adViews": 0,
+      "assumedMinutes": 418.6666666666678,
+      "amberPerAssumedMinute": 47.5,
+      "modeValue": {
+        "EASY/standard": {
+          "wins": 8,
+          "amber": 110,
+          "assumedMinutes": 8.5,
+          "amberPerAssumedMinute": 12.94
+        },
+        "MEDIUM/standard": {
+          "wins": 232,
+          "amber": 6601,
+          "assumedMinutes": 410.16666666666777,
+          "amberPerAssumedMinute": 16.09
+        }
+      },
+      "optionalSpent": 0,
+      "houseCompleteAt": {
+        "win": 96,
+        "day": 12,
+        "date": "2026-09-16"
+      },
+      "endingAt": {
+        "win": 116,
+        "day": 15,
+        "date": "2026-09-19"
+      }
+    },
+    {
+      "id": "supporter",
+      "label": "Supporter, 8/day",
+      "wins": 240,
+      "days": 30,
+      "recruitsAndRooms": [
+        {
+          "win": 1,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "fox",
+          "cost": 0
+        },
+        {
+          "win": 1,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "kitchen",
+          "cost": 50
+        },
+        {
+          "win": 1,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "pangolin",
+          "cost": 100
+        },
+        {
+          "win": 1,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "study",
+          "cost": 75
+        },
+        {
+          "win": 2,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "owl",
+          "cost": 100
+        },
+        {
+          "win": 8,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "aquarium",
+          "cost": 140
+        },
+        {
+          "win": 9,
+          "day": 2,
+          "date": "2026-09-06",
+          "id": "axolotl",
+          "cost": 100
+        },
+        {
+          "win": 24,
+          "day": 3,
+          "date": "2026-09-07",
+          "id": "jungle_room",
+          "cost": 200
+        },
+        {
+          "win": 24,
+          "day": 3,
+          "date": "2026-09-07",
+          "id": "sloth",
+          "cost": 100
+        },
+        {
+          "win": 32,
+          "day": 4,
+          "date": "2026-09-08",
+          "id": "desert_room",
+          "cost": 225
+        },
+        {
+          "win": 32,
+          "day": 4,
+          "date": "2026-09-08",
+          "id": "fennec_fox",
+          "cost": 100
+        },
+        {
+          "win": 48,
+          "day": 6,
+          "date": "2026-09-10",
+          "id": "office",
+          "cost": 275
+        },
+        {
+          "win": 48,
+          "day": 6,
+          "date": "2026-09-10",
+          "id": "capybara",
+          "cost": 100
+        },
+        {
+          "win": 56,
+          "day": 7,
+          "date": "2026-09-11",
+          "id": "burrow",
+          "cost": 250
+        },
+        {
+          "win": 56,
+          "day": 7,
+          "date": "2026-09-11",
+          "id": "wombat",
+          "cost": 100
+        },
+        {
+          "win": 72,
+          "day": 9,
+          "date": "2026-09-13",
+          "id": "garden",
+          "cost": 300
+        },
+        {
+          "win": 72,
+          "day": 9,
+          "date": "2026-09-13",
+          "id": "rabbit",
+          "cost": 100
+        },
+        {
+          "win": 80,
+          "day": 10,
+          "date": "2026-09-14",
+          "id": "bamboo_attic",
+          "cost": 400
+        },
+        {
+          "win": 80,
+          "day": 10,
+          "date": "2026-09-14",
+          "id": "red_panda",
+          "cost": 100
+        },
+        {
+          "win": 88,
+          "day": 11,
+          "date": "2026-09-15",
+          "id": "star_loft",
+          "cost": 450
+        },
+        {
+          "win": 88,
+          "day": 11,
+          "date": "2026-09-15",
+          "id": "tarsier",
+          "cost": 100
+        },
+        {
+          "win": 88,
+          "day": 11,
+          "date": "2026-09-15",
+          "id": "belfry",
+          "cost": 500
+        },
+        {
+          "win": 88,
+          "day": 11,
+          "date": "2026-09-15",
+          "id": "aye_aye",
+          "cost": 100
+        },
+        {
+          "win": 96,
+          "day": 12,
+          "date": "2026-09-16",
+          "id": "sky_garden",
+          "cost": 550
+        },
+        {
+          "win": 96,
+          "day": 12,
+          "date": "2026-09-16",
+          "id": "kakapo",
+          "cost": 100
+        }
+      ],
+      "phases": {
+        "0": {
+          "win": 1,
+          "day": 1,
+          "date": "2026-09-05"
+        },
+        "1": {
+          "win": 16,
+          "day": 2,
+          "date": "2026-09-06"
+        },
+        "2": {
+          "win": 32,
+          "day": 4,
+          "date": "2026-09-08"
+        },
+        "3": {
+          "win": 64,
+          "day": 8,
+          "date": "2026-09-12"
+        },
+        "4": {
+          "win": 96,
+          "day": 12,
+          "date": "2026-09-16"
+        },
+        "5": {
+          "win": 117,
+          "day": 15,
+          "date": "2026-09-19"
+        }
+      },
+      "availableAmber": 12548,
+      "pendingAmber": 0,
+      "peakPendingAmber": 234,
+      "hints": 0,
+      "hintsRequested": 48,
+      "hintsGranted": 20,
+      "unservedHintRequests": 28,
+      "amberBySource": {
+        "supporter_stipend": 600,
+        "puzzle_including_milestones": 8591,
+        "quests": 4491,
+        "season_free": 300,
+        "season_premium": 750,
+        "login": 870,
+        "victory_double": 1561
+      },
+      "adViews": 0,
+      "assumedMinutes": 418.6666666666678,
+      "amberPerAssumedMinute": 40.99,
+      "modeValue": {
+        "EASY/standard": {
+          "wins": 8,
+          "amber": 94,
+          "assumedMinutes": 8.5,
+          "amberPerAssumedMinute": 11.06
+        },
+        "MEDIUM/standard": {
+          "wins": 232,
+          "amber": 6137,
+          "assumedMinutes": 410.16666666666777,
+          "amberPerAssumedMinute": 14.96
+        }
+      },
+      "optionalSpent": 0,
+      "houseCompleteAt": {
+        "win": 96,
+        "day": 12,
+        "date": "2026-09-16"
+      },
+      "endingAt": {
+        "win": 116,
+        "day": 15,
+        "date": "2026-09-19"
+      }
+    },
+    {
+      "id": "decorator",
+      "label": "Free, spends 250 after win 28, 8/day",
+      "wins": 240,
+      "days": 30,
+      "recruitsAndRooms": [
+        {
+          "win": 1,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "fox",
+          "cost": 0
+        },
+        {
+          "win": 4,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "kitchen",
+          "cost": 50
+        },
+        {
+          "win": 8,
+          "day": 1,
+          "date": "2026-09-05",
+          "id": "pangolin",
+          "cost": 100
+        },
+        {
+          "win": 16,
+          "day": 2,
+          "date": "2026-09-06",
+          "id": "study",
+          "cost": 75
+        },
+        {
+          "win": 16,
+          "day": 2,
+          "date": "2026-09-06",
+          "id": "owl",
+          "cost": 100
+        },
+        {
+          "win": 16,
+          "day": 2,
+          "date": "2026-09-06",
+          "id": "aquarium",
+          "cost": 140
+        },
+        {
+          "win": 24,
+          "day": 3,
+          "date": "2026-09-07",
+          "id": "axolotl",
+          "cost": 100
+        },
+        {
+          "win": 24,
+          "day": 3,
+          "date": "2026-09-07",
+          "id": "jungle_room",
+          "cost": 200
+        },
+        {
+          "win": 32,
+          "day": 4,
+          "date": "2026-09-08",
+          "id": "sloth",
+          "cost": 100
+        },
+        {
+          "win": 40,
+          "day": 5,
+          "date": "2026-09-09",
+          "id": "desert_room",
+          "cost": 225
+        },
+        {
+          "win": 40,
+          "day": 5,
+          "date": "2026-09-09",
+          "id": "fennec_fox",
+          "cost": 100
+        },
+        {
+          "win": 48,
+          "day": 6,
+          "date": "2026-09-10",
+          "id": "office",
+          "cost": 275
+        },
+        {
+          "win": 48,
+          "day": 6,
+          "date": "2026-09-10",
+          "id": "capybara",
+          "cost": 100
+        },
+        {
+          "win": 56,
+          "day": 7,
+          "date": "2026-09-11",
+          "id": "burrow",
+          "cost": 250
+        },
+        {
+          "win": 56,
+          "day": 7,
+          "date": "2026-09-11",
+          "id": "wombat",
+          "cost": 100
+        },
+        {
+          "win": 72,
+          "day": 9,
+          "date": "2026-09-13",
+          "id": "garden",
+          "cost": 300
+        },
+        {
+          "win": 72,
+          "day": 9,
+          "date": "2026-09-13",
+          "id": "rabbit",
+          "cost": 100
+        },
+        {
+          "win": 80,
+          "day": 10,
+          "date": "2026-09-14",
+          "id": "bamboo_attic",
+          "cost": 400
+        },
+        {
+          "win": 80,
+          "day": 10,
+          "date": "2026-09-14",
+          "id": "red_panda",
+          "cost": 100
+        },
+        {
+          "win": 88,
+          "day": 11,
+          "date": "2026-09-15",
+          "id": "star_loft",
+          "cost": 450
+        },
+        {
+          "win": 88,
+          "day": 11,
+          "date": "2026-09-15",
+          "id": "tarsier",
+          "cost": 100
+        },
+        {
+          "win": 88,
+          "day": 11,
+          "date": "2026-09-15",
+          "id": "belfry",
+          "cost": 500
+        },
+        {
+          "win": 88,
+          "day": 11,
+          "date": "2026-09-15",
+          "id": "aye_aye",
+          "cost": 100
+        },
+        {
+          "win": 96,
+          "day": 12,
+          "date": "2026-09-16",
+          "id": "sky_garden",
+          "cost": 550
+        },
+        {
+          "win": 96,
+          "day": 12,
+          "date": "2026-09-16",
+          "id": "kakapo",
+          "cost": 100
+        }
+      ],
+      "phases": {
+        "0": {
+          "win": 1,
+          "day": 1,
+          "date": "2026-09-05"
+        },
+        "1": {
+          "win": 16,
+          "day": 2,
+          "date": "2026-09-06"
+        },
+        "2": {
+          "win": 32,
+          "day": 4,
+          "date": "2026-09-08"
+        },
+        "3": {
+          "win": 64,
+          "day": 8,
+          "date": "2026-09-12"
+        },
+        "4": {
+          "win": 96,
+          "day": 12,
+          "date": "2026-09-16"
+        },
+        "5": {
+          "win": 117,
+          "day": 15,
+          "date": "2026-09-19"
+        }
+      },
+      "availableAmber": 9392,
+      "pendingAmber": 0,
+      "peakPendingAmber": 234,
+      "hints": 0,
+      "hintsRequested": 48,
+      "hintsGranted": 20,
+      "unservedHintRequests": 28,
+      "amberBySource": {
+        "puzzle_including_milestones": 8591,
+        "quests": 4496,
+        "season_free": 300,
+        "login": 870
+      },
+      "adViews": 0,
+      "assumedMinutes": 418.6666666666678,
+      "amberPerAssumedMinute": 34.05,
+      "modeValue": {
+        "EASY/standard": {
+          "wins": 8,
+          "amber": 94,
+          "assumedMinutes": 8.5,
+          "amberPerAssumedMinute": 11.06
+        },
+        "MEDIUM/standard": {
+          "wins": 232,
+          "amber": 6137,
+          "assumedMinutes": 410.16666666666777,
+          "amberPerAssumedMinute": 14.96
+        }
+      },
+      "optionalSpent": 250,
+      "houseCompleteAt": {
+        "win": 96,
+        "day": 12,
+        "date": "2026-09-16"
+      },
+      "endingAt": {
+        "win": 116,
+        "day": 15,
+        "date": "2026-09-19"
+      }
+    }
+  ]
+}

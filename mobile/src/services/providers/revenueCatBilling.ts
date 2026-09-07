@@ -62,6 +62,7 @@ export interface RevenueCatConfig {
 function keyFromExtra(): string | undefined {
   try {
     // Lazy require so the file stays importable if expo-constants is absent.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
     const Constants = require('expo-constants').default ?? require('expo-constants');
     const extra = Constants?.expoConfig?.extra ?? Constants?.manifest?.extra ?? {};
     return Platform.OS === 'ios' ? extra.revenueCatIosKey : extra.revenueCatAndroidKey;

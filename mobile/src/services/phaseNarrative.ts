@@ -1849,6 +1849,7 @@ export function getAnimalWhisper(
   // If we have trigger words, prefer animals that care about those words
   let selectedType: string | null = null;
   if (triggerWords && triggerWords.length > 0 && phase >= 2) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
     const { ANIMAL_TRIGGER_WORDS } = require('../types/homeWorld');
     for (const animalId of unlockedAnimals) {
       const triggers: string[] = ANIMAL_TRIGGER_WORDS[animalId] || [];
@@ -2090,6 +2091,7 @@ export function getAnimalInterjection(
   if (Math.random() > 0.30) return null;
   if (unlockedAnimals.length === 0) return null;
 
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
   const { ANIMAL_INFO } = require('./animalDialogue');
 
   const clampedPhase = Math.min(5, Math.max(0, phase));
@@ -2406,6 +2408,7 @@ let microBeatsRecord: MicroBeatsRecord | null = null;
 async function loadMicroBeatsRecord(): Promise<MicroBeatsRecord> {
   if (microBeatsRecord) return microBeatsRecord;
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
     const AsyncStorage = require('@react-native-async-storage/async-storage').default;
     const raw = await AsyncStorage.getItem(MICRO_BEATS_SEEN_KEY);
     const parsed = raw ? JSON.parse(raw) : null;
@@ -2422,6 +2425,7 @@ async function loadMicroBeatsRecord(): Promise<MicroBeatsRecord> {
 async function saveMicroBeatsRecord(record: MicroBeatsRecord): Promise<void> {
   microBeatsRecord = record;
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
     const AsyncStorage = require('@react-native-async-storage/async-storage').default;
     await AsyncStorage.setItem(MICRO_BEATS_SEEN_KEY, JSON.stringify(record));
   } catch {
@@ -2464,7 +2468,9 @@ async function resolveMicroBeatText(beat: NarrativeMicroBeat): Promise<Narrative
   if (!beat.text || !beat.text.includes('{word}')) return beat;
   let resolvedText: string | null = null;
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
     const { getRitualWords } = require('./amberCurrency');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
     const { getStrongestDreadWord } = require('./localGenerator');
     const words: string[] = await getRitualWords();
     const strongest = getStrongestDreadWord(words || []);
@@ -2915,6 +2921,7 @@ async function loadCycleBeatsRecord(cycleCount: number): Promise<CycleBeatsSeen>
     return cycleBeatsSeenCache;
   }
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
     const AsyncStorage = require('@react-native-async-storage/async-storage').default;
     const raw = await AsyncStorage.getItem(CYCLE_BEATS_SEEN_KEY);
     const parsed: CycleBeatsSeen | null = raw ? JSON.parse(raw) : null;
@@ -2931,6 +2938,7 @@ async function loadCycleBeatsRecord(cycleCount: number): Promise<CycleBeatsSeen>
 async function saveCycleBeatsRecord(record: CycleBeatsSeen): Promise<void> {
   cycleBeatsSeenCache = record;
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
     const AsyncStorage = require('@react-native-async-storage/async-storage').default;
     await AsyncStorage.setItem(CYCLE_BEATS_SEEN_KEY, JSON.stringify(record));
   } catch {
@@ -3147,6 +3155,7 @@ export async function resetMicroBeats(): Promise<void> {
   microBeatsRecord = null;
   cycleBeatsSeenCache = null;
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
     const AsyncStorage = require('@react-native-async-storage/async-storage').default;
     await AsyncStorage.removeItem(MICRO_BEATS_SEEN_KEY);
     await AsyncStorage.removeItem(CYCLE_BEATS_SEEN_KEY);

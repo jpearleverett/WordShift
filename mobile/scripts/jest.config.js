@@ -15,9 +15,9 @@ module.exports = {
       // multi-MB bank data files) for the process lifetime — observed as
       // heap-limit OOM aborts mid-generation. `npm run typecheck` covers the
       // type safety of everything these scripts import.
-      isolatedModules: true,
       diagnostics: false,
       tsconfig: {
+        isolatedModules: true,
         module: 'commonjs',
         esModuleInterop: true,
         strict: true,

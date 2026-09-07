@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useCountUp } from '../../hooks/useCountUp';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -218,10 +219,10 @@ const ThemePreview: React.FC<PreviewProps> = ({ themeId, pulseToken = 0 }) => {
   const artKey = themeId ?? 'theme_default';
   const showArt = hasShopArt(artKey);
   // [thumbnail, ...tiles] so the art leads playPulse's 60ms stagger.
-  const scales = useRef([
+  const [scales] = useState(() => ([
     new Animated.Value(1),
     ...PREVIEW_LETTERS.map(() => new Animated.Value(1)),
-  ]).current;
+  ]));
 
   const pulse = useCallback(() => {
     if (!previewMotionAllowed()) return;
@@ -274,7 +275,7 @@ const ConfettiPreview: React.FC<PreviewProps> = ({ themeId, pulseToken = 0 }) =>
   const palette = themeId && CONFETTI_THEMES[themeId] ? CONFETTI_THEMES[themeId] : DEFAULT_CONFETTI;
   const artKey = themeId ?? 'confetti_default';
   const showArt = hasShopArt(artKey);
-  const scales = useRef([0, 1, 2, 3, 4, 5, 6].map(() => new Animated.Value(1))).current;
+  const [scales] = useState(() => ([0, 1, 2, 3, 4, 5, 6].map(() => new Animated.Value(1))));
 
   const pulse = useCallback(() => {
     if (!previewMotionAllowed()) return;
@@ -317,7 +318,7 @@ const SparkPreview: React.FC<PreviewProps> = ({ themeId, pulseToken = 0 }) => {
   const palette = themeId ? SPARK_THEMES[themeId] : undefined;
   const artKey = themeId ?? 'spark_default';
   const showArt = hasShopArt(artKey);
-  const scales = useRef([0, 1, 2, 3, 4, 5].map(() => new Animated.Value(1))).current;
+  const [scales] = useState(() => ([0, 1, 2, 3, 4, 5].map(() => new Animated.Value(1))));
 
   const pulse = useCallback(() => {
     if (!previewMotionAllowed()) return;
@@ -373,7 +374,7 @@ const AnimatedEquippedChip: React.FC<{ spring: boolean; borderColor: string; tex
   textColor,
 }) => {
   const animate = spring && previewMotionAllowed();
-  const scale = useRef(new Animated.Value(animate ? 0.8 : 1)).current;
+  const [scale] = useState(() => new Animated.Value(animate ? 0.8 : 1));
   useEffect(() => {
     if (!animate) return;
     scale.setValue(0.8);
@@ -406,8 +407,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   // The header amber pill ticks from the old value to the new one on any change
   // (a spend, or a prop refresh) instead of an instant swap, so a purchase reads
   // as amber leaving the pouch.
-  const [displayedBalance, setDisplayedBalance] = useState(amberBalance);
-  const prevBalanceRef = useRef(amberBalance);
+
   // Cosmetic-purchase reward moment (F43): a magnitude-aware count-up of the
   // spend + a phase-aware in-world line, auto-clearing after a read beat.
   const [purchaseReveal, setPurchaseReveal] = useState<{ amount: number; line: string; nonce: number } | null>(null);
@@ -433,7 +433,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   // House-upgrade in-card resolution (F50): the bought card holds its feedback in
   // place, fades, THEN the list reflows.
   const [resolving, setResolving] = useState<{ key: string; message: string } | null>(null);
-  const houseFade = useRef(new Animated.Value(1)).current;
+  const [houseFade] = useState(() => new Animated.Value(1));
 
   const tileThemes = useMemo(() => getCosmeticsByCategory('tile_theme'), []);
   const confettiThemes = useMemo(() => getCosmeticsByCategory('confetti'), []);
@@ -505,33 +505,12 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     return () => { cancelled = true; };
   }, [refresh, refreshHouse]);
 
-  useEffect(() => { setBalance(amberBalance); }, [amberBalance]);
-
-  // Tick the displayed pill value toward the real balance (~400ms). Reduced
-  // motion snaps to the final value.
-  useEffect(() => {
-    const prev = prevBalanceRef.current;
-    if (prev === balance) return;
-    if (reducedMotion) {
-      setDisplayedBalance(balance);
-      prevBalanceRef.current = balance;
-      return;
-    }
-    const start = prev;
-    const end = balance;
-    const steps = 13; // ~400ms at ~30ms/step
-    let i = 0;
-    const id = setInterval(() => {
-      i++;
-      const fraction = Math.min(1, i / steps);
-      setDisplayedBalance(Math.round(start + (end - start) * fraction));
-      if (i >= steps) {
-        clearInterval(id);
-        prevBalanceRef.current = end;
-      }
-    }, 30);
-    return () => clearInterval(id);
-  }, [balance, reducedMotion]);
+  const [lastAmberProp, setLastAmberProp] = useState(amberBalance);
+  if (lastAmberProp !== amberBalance) {
+    setLastAmberProp(amberBalance);
+    setBalance(amberBalance);
+  }
+  const { value: displayedBalance } = useCountUp(balance, { enabled: !reducedMotion });
 
   // The purchase reveal auto-clears after a read beat (the confetti + preview
   // pulse + chip spring carry the rest of the celebration).

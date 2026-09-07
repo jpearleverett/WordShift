@@ -367,7 +367,7 @@ export const POST_REVELATION_DIALOGUES: Record<AnimalType, string[]> = {
     "The seam closed. I keep looking where it was, then turn to write what is here now.",
     "The watch log has a page marked off duty. I've begun using it.",
     "Fennick suggested a song I don't know. I objected. Then asked him to sing the first part again.",
-    "The lantern remains unlit. I still like the valley better than the porch.",
+    "I shade the lantern when I want the valley. The porch can wait.",
     "A moth landed on my notebook. I ate it before recording the species. Scholarly loss.",
     "There are things I don't see from here. That was true before the sky opened too.",
     "The presence remains. It isn't the only thing in the dark worth watching.",

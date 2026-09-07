@@ -37,36 +37,43 @@ export const ShareResultModal: React.FC<ShareResultModalProps> = ({ result, onCl
   const bonusAvailableRef = useRef(false);
 
   const reducedMotion = getSettingsSync().reducedMotion;
-  const backdropOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
-  const contentScale = useRef(new Animated.Value(reducedMotion ? 1 : 0.92)).current;
-  const contentOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const [backdropOpacity] = useState(() => new Animated.Value(reducedMotion ? 1 : 0));
+  const [contentScale] = useState(() => new Animated.Value(reducedMotion ? 1 : 0.92));
+  const [contentOpacity] = useState(() => new Animated.Value(reducedMotion ? 1 : 0));
   // The card gets its own small "here is your card" reveal a beat after the panel.
-  const cardScale = useRef(new Animated.Value(reducedMotion ? 1 : 0.95)).current;
-  const cardOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const [cardScale] = useState(() => new Animated.Value(reducedMotion ? 1 : 0.95));
+  const [cardOpacity] = useState(() => new Animated.Value(reducedMotion ? 1 : 0));
   // Breathing opacity for the on-brand "capturing..." label (native driver).
-  const capturePulse = useRef(new Animated.Value(1)).current;
+  const [capturePulse] = useState(() => new Animated.Value(1));
   // Earned-reward pop for the "+5 amber" confirmation.
-  const earnedScale = useRef(new Animated.Value(reducedMotion ? 1 : 0.8)).current;
-  const earnedOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const [earnedScale] = useState(() => new Animated.Value(reducedMotion ? 1 : 0.8));
+  const [earnedOpacity] = useState(() => new Animated.Value(reducedMotion ? 1 : 0));
   const closingRef = useRef(false);
 
   const visible = result != null;
+  const [lastResult, setLastResult] = useState(result);
+  if (lastResult !== result) {
+    setLastResult(result);
+    setBonusEarned(false);
+  }
 
   useEffect(() => {
+    let cancelled = false;
     if (result) {
       isDailyShareBonusAvailable()
         .then((v) => {
+          if (cancelled) return;
           setBonusAvailable(v);
           bonusAvailableRef.current = v;
         })
         .catch(() => {});
     }
+    return () => { cancelled = true; };
   }, [result]);
 
   useEffect(() => {
     if (!visible) return;
     closingRef.current = false;
-    setBonusEarned(false);
     if (reducedMotion) {
       backdropOpacity.setValue(1);
       contentScale.setValue(1);
@@ -115,7 +122,7 @@ export const ShareResultModal: React.FC<ShareResultModalProps> = ({ result, onCl
     ]);
     anim.start();
     return () => anim.stop();
-  }, [visible, reducedMotion, backdropOpacity, contentScale, contentOpacity, cardScale, cardOpacity]);
+  }, [visible, result?.phase, reducedMotion, backdropOpacity, contentScale, contentOpacity, cardScale, cardOpacity]);
 
   // On-brand "capturing..." breathe while a share is in flight (native driver,
   // reduced-motion pins to steady).

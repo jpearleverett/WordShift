@@ -18,7 +18,7 @@
  * In-memory cache pattern; persisted under `wordshift_offering_requests`
  * (cloud-synced, cleared by Reset All).
  */
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from './persistenceStorage';
 import { AnimalType, DialoguePhase } from '../types/homeWorld';
 
 const STORAGE_KEY = 'wordshift_offering_requests';

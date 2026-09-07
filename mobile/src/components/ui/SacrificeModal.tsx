@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useCountUp } from '../../hooks/useCountUp';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -65,16 +66,13 @@ export const SacrificeModal: React.FC<SacrificeModalProps> = ({
   // The monument line's number CLIMBS when an offering raises it (was a snap).
   // Snaps on the first read after the altar opens (never counts the lifetime
   // total up from 0) and under reduced motion.
-  const [displayedOfferingTotal, setDisplayedOfferingTotal] = useState(0);
-  const displayedTotalRef = useRef(0);
-  const monumentInitedRef = useRef(false);
-  const monumentRafRef = useRef(0);
+  const [monumentRead, setMonumentRead] = useState(0);
   const [offeringCount, setOfferingCount] = useState(0);
   const [offerStreak, setOfferStreak] = useState(0);
   const [offeringTierUp, setOfferingTierUp] = useState<string | null>(null);
   const [confirmEverything, setConfirmEverything] = useState(false);
   // Candle flare on each offering (native driver, reduced-motion aware).
-  const sacrificePulse = useRef(new Animated.Value(0)).current;
+  const [sacrificePulse] = useState(() => new Animated.Value(0));
 
   // The host panel is dt.modalBg, which darkens at phase 2 — one phase BEFORE
   // the surface theme. panelSt mirrors getPixelSkin's hostDark ladder so the
@@ -84,60 +82,34 @@ export const SacrificeModal: React.FC<SacrificeModalProps> = ({
   const panelSt = getSurfaceTheme(phase === 2 ? 3 : phase === 3 ? 4 : phase);
   const pixelSkin = getPixelSkin(phase, dtHostDark);
 
-  // When the altar opens, load the running monument (total + count) and reset
-  // the session: no lingering response, streak from zero, no half-armed confirm.
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (wasVisible !== visible) {
+    setWasVisible(visible);
+    if (visible) {
+      setSacrificeMessage(null);
+      setOfferStreak(0);
+      setOfferingTierUp(null);
+      setConfirmEverything(false);
+    }
+  }
   useEffect(() => {
     if (!visible) return;
     let cancelled = false;
-    setSacrificeMessage(null);
-    setOfferStreak(0);
-    setOfferingTierUp(null);
-    setConfirmEverything(false);
-    (async () => {
-      const stats = await getSacrificeStats();
+    getSacrificeStats().then(stats => {
       if (cancelled) return;
       setOfferingTotal(stats.totalSacrificed);
       setOfferingCount(stats.count);
-    })();
+      setMonumentRead(read => read + 1);
+    }).catch(() => {});
     return () => { cancelled = true; };
   }, [visible]);
-
-  // Reset the monument climb latch when the altar closes so the next open snaps
-  // to the loaded total instead of counting the whole lifetime up from zero.
-  useEffect(() => {
-    if (!visible) monumentInitedRef.current = false;
-  }, [visible]);
-
-  // Climb the monument total when an offering raises it (snap on first read /
-  // reduced motion / a non-increase). JS-thread rAF tick, cancelled on change.
-  useEffect(() => {
-    const from = displayedTotalRef.current;
-    const to = offeringTotal;
-    const reduced = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
-    if (!monumentInitedRef.current || reduced || to <= from) {
-      monumentInitedRef.current = true;
-      displayedTotalRef.current = to;
-      setDisplayedOfferingTotal(to);
-      return;
-    }
-    const duration = getCountUpDurationMs(to - from, phase);
-    if (duration <= 0) {
-      displayedTotalRef.current = to;
-      setDisplayedOfferingTotal(to);
-      return;
-    }
-    const startedAt = Date.now();
-    const tick = () => {
-      const f = Math.min(1, (Date.now() - startedAt) / duration);
-      const v = countUpDisplayValue(f, to, from);
-      displayedTotalRef.current = v;
-      setDisplayedOfferingTotal(v);
-      if (f < 1) monumentRafRef.current = requestAnimationFrame(tick);
-    };
-    monumentRafRef.current = requestAnimationFrame(tick);
-    return () => { if (monumentRafRef.current) cancelAnimationFrame(monumentRafRef.current); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- climb keyed on the total; phase read at fire time
-  }, [offeringTotal]);
+  const { value: displayedOfferingTotal } = useCountUp(offeringTotal, {
+    enabled: visible && !getSettingsSync().reducedMotion && !shouldSimplifyAnimations(),
+    identity: `${visible}:${monumentRead}`,
+    increasesOnly: true,
+    durationMs: getCountUpDurationMs(offeringTotal, phase),
+    interpolate: countUpDisplayValue,
+  });
 
   // Shared offering action for both the amount chips and "Offer everything".
   // The altar stays OPEN: it updates the running monument + the in-session

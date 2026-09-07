@@ -1,15 +1,15 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
-
-// The crash card's spot (assets/ui/spots): an overturned inkpot beside a
-// cracked tile. A static require resolves at bundle time, so it cannot itself
-// throw inside the boundary that is rendering the fallback.
-const SPILLED_INK = require('../../assets/ui/spots/spilled_ink.png');
 import { getSurfaceTheme, SurfaceTheme } from '../theme/surfaces';
 import { getCurrentPhaseSync } from '../services/amberCurrency';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
 import { reportError } from '../services/errorReporting';
 import { FONT_SIZE } from '../theme/typeScale';
+
+// The crash card's spot (assets/ui/spots): an overturned inkpot beside a
+// cracked tile. A static require resolves at bundle time, so it cannot itself
+// throw inside the boundary that is rendering the fallback.
+const SPILLED_INK = require('../../assets/ui/spots/spilled_ink.png');
 
 interface ErrorBoundaryProps {
   children: ReactNode;

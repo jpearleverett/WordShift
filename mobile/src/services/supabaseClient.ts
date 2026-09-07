@@ -1,4 +1,4 @@
-import { getInstallId } from './telemetry';
+import { getInstallId } from './installIdentity';
 
 /**
  * Shared Supabase REST client for WordShift.
@@ -39,6 +39,7 @@ export interface SupabaseConfig {
  */
 function getConfigExtra(): Record<string, unknown> {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
     const Constants = require('expo-constants').default;
     return (Constants?.expoConfig?.extra as Record<string, unknown>) ?? {};
   } catch {
@@ -79,26 +80,20 @@ async function fetchWithTimeout(
   init: RequestInit,
   timeoutMs: number,
 ): Promise<Response | null> {
+  const controller = typeof globalThis.AbortController === 'function'
+    ? new globalThis.AbortController() : undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    const AbortController = (global as Record<string, unknown>).AbortController as
-      | (new () => { signal: unknown; abort(): void })
-      | undefined;
-    if (AbortController) {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
-      try {
-        return await fetch(url, { ...init, signal: controller.signal as never });
-      } finally {
-        clearTimeout(timer);
-      }
-    }
-    // No AbortController (older RN / Node test) — fall back to a plain race.
-    return (await Promise.race([
-      fetch(url, init),
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs)),
-    ])) as Response | null;
+    return await Promise.race([
+      fetch(url, { ...init, signal: controller?.signal }),
+      new Promise<null>(resolve => {
+        timer = setTimeout(() => { controller?.abort(); resolve(null); }, timeoutMs);
+      }),
+    ]);
   } catch {
     return null;
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 
@@ -122,7 +117,8 @@ export async function sbFetch(
       ...rest,
       headers: {
         apikey: config.anonKey,
-        Authorization: `Bearer ${config.anonKey}`,
+        // Publishable keys identify the app through apikey; they are not JWTs.
+        ...(config.anonKey.startsWith('sb_publishable_') ? {} : { Authorization: `Bearer ${config.anonKey}` }),
         'Content-Type': 'application/json',
         ...(headers as Record<string, string> | undefined),
       },

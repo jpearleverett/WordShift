@@ -1,0 +1,12 @@
+
+> wordshift-mobile@1.3.0 test:e2e
+> playwright test --grep an\ interrupted\ story\ resumes\ its\ saved\ page\ and\ commits\ the\ chosen\ memory\ once$
+
+
+Running 1 test using 1 worker
+
+(node:176965) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 e2e/game.spec.ts:317:5 › an interrupted story resumes its saved page and commits the chosen memory once (1.2m)
+
+  1 passed (1.3m)

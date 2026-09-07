@@ -4,6 +4,8 @@ Working copy for the App Store / Google Play listings. The hook of the game is
 the tonal bait-and-switch — the listing must *hint* at the darkness without
 spoiling the reveal, while the age rating must declare it honestly.
 
+> September 2026 update: the copy below includes the current game. Previous uploaded screenshots are historical; use the [1.3.0 capture brief](RELEASE_VALIDATION_1_3_0.md#current-store-capture-brief) before a new store submission. No listing upload is part of this code change.
+
 ## Identity
 
 - **App name:** WordShift
@@ -43,6 +45,7 @@ MASTER EVERY KIND OF SHIFT
 • Speed Shift tests how quickly you can see the pattern
 • Blind Offering hides previews for a true mastery challenge
 • Thousands of curated and generated word puzzles
+• Optional practice boards for Reverse, Double Shift and Blind Offering
 
 RETURN EACH DAY
 
@@ -52,6 +55,8 @@ A COZY GAME. MOSTLY.
 
 The longer you stay, the more the house changes. Familiar conversations take on new meanings. The animals remember the words you make.
 
+Revisit completed conversations in your journal. Recent journeys and the choices you made remain there when you begin a new cycle.
+
 Some mysteries unfold slowly.
 
 PLAY YOUR WAY
@@ -59,7 +64,7 @@ PLAY YOUR WAY
 • Core puzzles work offline
 • No account required
 • Optional hints and accessibility settings
-• Reduced-motion support
+• Reduced motion that follows your device preference, with a separate haptics setting
 • Free to play with occasional ads
 • Optional purchases for convenience and cosmetic expression
 • The main mystery unfolds through play, not purchases.
@@ -76,9 +81,8 @@ They've been waiting.
 
 ## Age rating guidance
 
-- **ESRB:** Teen (fantasy themes, mild horror) — answer "infrequent/mild horror/fear themes" honestly in the questionnaire.
-- **PEGI:** 12 (moderate horror themes, no violence, no profanity — dictionary is filtered).
-- **Apple:** 12+ — "Infrequent/Mild Horror/Fear Themes."
+- **Content-rating questionnaires:** disclose the actual horror/fear themes and app capabilities in each store's current questionnaire. Google uses IARC to assign regional ratings; a draft ESRB/PEGI label is not an issued rating. [Google content ratings](https://support.google.com/googleplay/android-developer/answer/9898843?hl=en)
+- **Apple:** the current system includes 13+, 16+ and 18+; the old 12+ label below the July artwork is historical. Complete the current App Store Connect questions and inspect the calculated regional rating. The game's intended 13+ audience is a separate product choice. [Apple's current rating definitions](https://developer.apple.com/help/app-store-connect/reference/app-information/age-ratings-values-and-definitions)
 - **Contains ads:** Yes (Google AdMob — interstitial, opt-in rewarded, and menu banners). Declare it in the Play "Ads" question. `app-ads.txt` is live at the domain root (`https://jpearleverett.github.io/app-ads.txt`, pub-6575205005908086).
 - **Contains in-app purchases:** Yes — 10 products: amber packs, hint packs, one-time starter bundle, Remove Ads, Patron's Key, cosmetic bundle (the original 9, created + activated in Play Console 2026-07-02), plus the **Supporter auto-renewing subscription** (revenue pass — create it in Play Console; see `docs/MONETIZATION_SETUP.md`). Play derives the displayed price range from the active products automatically.
 - **Target audience:** 13+ (do not target children — ads + dark themes). Avoids the Families policy.
@@ -103,12 +107,12 @@ Legal pages are **LIVE and publicly accessible** via GitHub Pages (deployed from
 ## Asset checklist
 
 - [x] App icon 1024×1024 — `mobile/assets/icon.png`
-- [x] Android phone screenshots ×8, re-rendered 2026-07-13 with the revised banner copy + review fixes applied and re-validated, uploaded to Play Console 2026-07-13. The PNGs are deliberately NOT stored in this repo; the names below are the upload slugs.
+- [ ] Android 1.3.0 screenshots ×8 from the signed build, following the current capture brief. The July 13 uploads are historical; the names below identify that older campaign. Public listing inspection returned 404 on September 6, so the current internal-track asset set requires Play Console access.
 - [x] Feature graphic 1024×500 (Play), generated — `docs/feature-graphic.png`
 - [ ] iPhone 6.7" screenshots ×5 (needs device/simulator)
 - [ ] iPad 12.9" screenshots ×3 (supportsTablet is true)
 
-### Android screenshot campaign (final upload order)
+### Historical July Android screenshot campaign
 
 Copy revised 2026-07-12 (second pass): every support line is a complete
 sentence whose horror hint is woven INTO an innocent reading — several quote

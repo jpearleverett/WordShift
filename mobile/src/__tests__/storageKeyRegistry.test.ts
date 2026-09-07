@@ -28,6 +28,12 @@ import { SYNC_KEYS, SYNC_KEY_PREFIXES } from '../services/cloudSave';
  * the test.
  */
 const DOCUMENTED_EXCLUSIONS: Record<string, string> = {
+  wordshift_storage_commit: 'Local write-ahead transaction journal; replay before any gameplay reads.',
+  wordshift_pending_victory: 'Local unfinished completion intent; restored saves discard it, Reset clears it.',
+  wordshift_victory_receipt: 'Local idempotency receipt for the most recent completion, not transferable progress.',
+  wordshift_cloud_legacy_owner: 'Private legacy recovery reference retained for reviewed support; never synced or merged.',
+  wordshift_support_id: 'Non-secret per-install support lookup, not a recovery credential; survives Reset.',
+
   wordshift_device_id: 'Identifies THIS device; syncing it would collide installs.',
   wordshift_install_id: 'Anonymous analytics install id, per-install by definition.',
   wordshift_ad_pacing: 'Ad frequency pacing is device-local UX, not progress.',
@@ -35,6 +41,7 @@ const DOCUMENTED_EXCLUSIONS: Record<string, string> = {
   wordshift_share_prompts: 'One-time share nudge pacing; a fresh device may re-earn it.',
   wordshift_event_log: 'Local analytics ring buffer, uploaded separately.',
   wordshift_entitlements: 'Store-authoritative: restored from the billing provider, never from a save.',
+  wordshift_applied_iap_grants: 'Device-local paid transaction receipts; retained through reset to prevent duplicate grants.',
   wordshift_pending_iap_grants: 'Money owed to THIS device; syncing could double-grant.',
   wordshift_cloud_sync_status: 'Metadata about syncing itself; syncing it is circular.',
   wordshift_cloud_owner: 'Identifies which account owns the cloud row; not player progress.',

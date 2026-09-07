@@ -1,4 +1,7 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useCountUp } from '../../hooks/useCountUp';
+import { SupportComparison } from './SupportComparison';
+import { saveWithPlayerRetry } from '../../services/saveRetry';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -30,7 +33,7 @@ import {
   purchaseConsumable,
   purchaseStarterPack,
   purchaseProduct,
-  acknowledgeConsumableGrant,
+  settleConsumableGrant,
   IapProduct,
 } from '../../services/iap';
 import {
@@ -40,7 +43,7 @@ import {
   ENTITLEMENTS,
 } from '../../services/entitlements';
 import { awardBonusAmber } from '../../services/amberCurrency';
-import { addHints } from '../../services/hints';
+
 import { getSettingsSync } from '../../services/settings';
 import { hapticLight, hapticMedium } from '../../services/haptics';
 import { announceForA11y } from '../../services/a11yAnnounce';
@@ -187,10 +190,12 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     items: GiftItem[];
   } | null>(null);
 
-  const cardScale = useRef(new Animated.Value(reducedMotion ? 1 : 0.92)).current;
-  const cardOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const [cardScale] = useState(() => new Animated.Value(reducedMotion ? 1 : 0.92));
+  const [cardOpacity] = useState(() => new Animated.Value(reducedMotion ? 1 : 0));
 
-  useEffect(() => {
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (wasVisible !== visible) {
+    setWasVisible(visible);
     if (visible) {
       setOwnsBundle(hasEntitlementSync(ENTITLEMENTS.COSMETIC_BUNDLE));
       setOwnsStarter(hasEntitlementSync(ENTITLEMENTS.STARTER_PACK));
@@ -199,10 +204,15 @@ export const StoreModal: React.FC<StoreModalProps> = ({
       setSuccessMsg(null);
       setFaucetReveal(null);
       setGift(null);
-      getDailyAmberStatus().then(setAmberFaucet).catch(() => {});
-      isRewardedCapReached().then(setRewardedCapReached).catch(() => {});
-      logEvent({ type: 'store_opened', data: { surface: 'store_modal' } });
     }
+  }
+  useEffect(() => {
+    if (!visible) return;
+    let cancelled = false;
+    getDailyAmberStatus().then(value => { if (!cancelled) setAmberFaucet(value); }).catch(() => {});
+    isRewardedCapReached().then(value => { if (!cancelled) setRewardedCapReached(value); }).catch(() => {});
+    logEvent({ type: 'store_opened', data: { surface: 'store_modal' } });
+    return () => { cancelled = true; };
   }, [visible]);
 
   // Fetch localized price strings from the store; NoOp returns [] → fallbacks used.
@@ -262,49 +272,18 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     ]);
     anim.start();
     return () => anim.stop();
-  }, [visible, reducedMotion, cardScale, cardOpacity]);
+  }, [visible, phase, reducedMotion, cardScale, cardOpacity]);
 
   // Header amber balance: ticks from the old to the new value over ~400ms
   // (plain setState steps at ~30ms intervals, text-only) instead of an
   // instant number swap, with a one-cycle AmberSparkle burst on the pill.
-  const [displayedAmber, setDisplayedAmber] = useState(amberBalance);
-  const prevAmberRef = useRef(amberBalance);
-  const [amberBurst, setAmberBurst] = useState(false);
-  useEffect(() => {
-    if (!visible) {
-      prevAmberRef.current = amberBalance;
-      setDisplayedAmber(amberBalance);
-      setAmberBurst(false);
-      return;
-    }
-    const prev = prevAmberRef.current;
-    if (prev === amberBalance) return;
-    if (reducedMotion) {
-      setDisplayedAmber(amberBalance);
-      prevAmberRef.current = amberBalance;
-      return;
-    }
-    const start = prev;
-    const end = amberBalance;
-    const steps = 13; // ~400ms at ~30ms/step
-    let i = 0;
-    setAmberBurst(true);
-    const id = setInterval(() => {
-      i++;
-      const fraction = Math.min(1, i / steps);
-      setDisplayedAmber(Math.round(start + (end - start) * fraction));
-      if (i >= steps) {
-        clearInterval(id);
-        prevAmberRef.current = end;
-        setAmberBurst(false);
-      }
-    }, 30);
-    return () => clearInterval(id);
-  }, [amberBalance, visible, reducedMotion]);
+  const { value: displayedAmber, running: amberBurst } = useCountUp(amberBalance, {
+    enabled: visible && !reducedMotion, identity: visible,
+  });
 
   // successBox springs in (scale 0.9 -> 1 + fade) instead of popping.
-  const successBoxScale = useRef(new Animated.Value(reducedMotion ? 1 : 0.9)).current;
-  const successBoxOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const [successBoxScale] = useState(() => new Animated.Value(reducedMotion ? 1 : 0.9));
+  const [successBoxOpacity] = useState(() => new Animated.Value(reducedMotion ? 1 : 0));
   useEffect(() => {
     if (!successMsg) {
       successBoxOpacity.setValue(0);
@@ -384,8 +363,9 @@ export const StoreModal: React.FC<StoreModalProps> = ({
       try {
         const result = await purchaseConsumable(info.productId);
         if (result.success && result.reward) {
+          const credit = await saveWithPlayerRetry(() => settleConsumableGrant(result.grantId!));
           if (result.reward.kind === 'amber') {
-            const balance = await awardBonusAmber(result.reward.amount, `iap_${info.productId}`);
+            const balance = credit.amberBalance;
             onAmberChange?.(balance);
             setFirstAmberDouble(!hasMadeAmberPurchaseSync());
             if (result.firstPurchaseDoubled) {
@@ -401,15 +381,9 @@ export const StoreModal: React.FC<StoreModalProps> = ({
               setSuccessMsg(`+${result.reward.amount} amber added.`);
             }
           } else {
-            const balance = await addHints(result.reward.amount, `iap_${info.productId}`);
+            const balance = credit.hintBalance;
             onHintsChange?.(balance);
             setSuccessMsg(`+${result.reward.amount} hints added.`);
-          }
-          // Apply-then-ack: the grant is only cleared from the pending ledger
-          // once the reward has actually landed, so a kill mid-flow replays the
-          // grant (at-least-once) instead of losing a paid purchase.
-          if (result.grantId) {
-            acknowledgeConsumableGrant(result.grantId).catch(() => {});
           }
           logEvent({ type: 'iap_purchase', data: { productId: info.productId, kind: result.reward.kind } });
           hapticMedium();
@@ -441,18 +415,10 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     try {
       const result = await purchaseStarterPack();
       if (result.success && result.reward) {
-        // Apply-then-ack per grant (see handleBuyConsumable): a kill mid-flow
-        // replays the missing half rather than losing a paid bundle.
-        const balance = await awardBonusAmber(result.reward.amber, 'iap_starter');
-        onAmberChange?.(balance);
-        if (result.grantIds?.amber) {
-          acknowledgeConsumableGrant(result.grantIds.amber).catch(() => {});
-        }
-        const hints = await addHints(result.reward.hints, 'iap_starter');
-        onHintsChange?.(hints);
-        if (result.grantIds?.hints) {
-          acknowledgeConsumableGrant(result.grantIds.hints).catch(() => {});
-        }
+        const amberCredit = await saveWithPlayerRetry(() => settleConsumableGrant(result.grantIds!.amber!));
+        onAmberChange?.(amberCredit.amberBalance);
+        const hintCredit = await saveWithPlayerRetry(() => settleConsumableGrant(result.grantIds!.hints!));
+        onHintsChange?.(hintCredit.hintBalance);
         setOwnsStarter(true);
         // The Keeper's Welcome is a marquee moment: present the bundle as a
         // real gift (amber + hints each counting up), not an appended line.
@@ -685,6 +651,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
           </View>
 
           <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+            <SupportComparison phase={phase} />
             {!ownsStarter && (
               <PanelCard phase={phase} style={styles.heroCard}>
                 <View style={styles.heroRibbonRow}>

@@ -3,6 +3,7 @@ import {
   advanceStoryPage, chooseStoryOption, openStoryScene,
   StoryContext, StoryMemory,
 } from '../services/storySpine';
+import { logStoryEvent } from '../services/storyTelemetry';
 
 /** A saved conversation owns one exit action, including through cinematic transitions. */
 export function useStoryFlow(getContext: () => Promise<StoryContext>, enabled: boolean) {
@@ -14,6 +15,7 @@ export function useStoryFlow(getContext: () => Promise<StoryContext>, enabled: b
   const operation = useRef(false);
   const epoch = useRef(0);
   const journalRequest = useRef(0);
+  const readingStarted = useRef<number | null>(null);
 
   const prepare = useCallback(async (): Promise<boolean> => {
     if (!enabled) return false;
@@ -36,12 +38,19 @@ export function useStoryFlow(getContext: () => Promise<StoryContext>, enabled: b
     const pending = prepared.current;
     if (!pending) { action(); return; }
     exitAction.current = action;
+    readingStarted.current = Date.now();
+    logStoryEvent('story_started', pending.context, pending.memory);
     setActive(pending);
   }, []);
 
   const close = useCallback(() => {
     if (operation.current) return;
     const action = exitAction.current;
+    if (readingStarted.current !== null && prepared.current) {
+      logStoryEvent('story_deferred', prepared.current.context, prepared.current.memory,
+        { elapsedMs: Math.max(0, Date.now() - readingStarted.current) });
+    }
+    readingStarted.current = null;
     exitAction.current = null;
     prepared.current = null;
     setActive(null);
@@ -58,7 +67,13 @@ export function useStoryFlow(getContext: () => Promise<StoryContext>, enabled: b
         : await chooseStoryOption(active.context, active.memory.scene.id, choice);
       if (started !== epoch.current) return;
       const memory = state.memories[active.memory.scene.id];
+      if (choice !== undefined && memory?.choice === choice && !active.memory.choice) {
+        logStoryEvent('story_choice', active.context, memory, { choiceId: choice });
+      }
       if (memory?.completed) {
+        logStoryEvent('story_completed', active.context, memory,
+          { elapsedMs: Math.max(0, Date.now() - (readingStarted.current ?? Date.now())) });
+        readingStarted.current = null;
         operation.current = false;
         close();
       } else if (memory) {
@@ -81,12 +96,16 @@ export function useStoryFlow(getContext: () => Promise<StoryContext>, enabled: b
   }, []);
   const resume = useCallback(async () => {
     setJournalContext(null);
-    if (await prepare()) run(() => {});
+    if (await prepare()) {
+      if (prepared.current) logStoryEvent('story_resumed', prepared.current.context, prepared.current.memory);
+      run(() => {});
+    }
   }, [prepare, run]);
   const reset = useCallback(() => {
     epoch.current += 1;
     journalRequest.current += 1;
     operation.current = false;
+    readingStarted.current = null;
     prepared.current = null;
     preparing.current = null;
     exitAction.current = null;

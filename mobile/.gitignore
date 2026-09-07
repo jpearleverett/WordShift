@@ -50,3 +50,7 @@ src/data/.gatedRegenDouble_*_progress.json*
 src/data/.gatedRegenDouble_*_output.ts*
 src/data/.gatedRegenDouble_*.log
 src/data/.pre_gated_*.ts.bak
+
+# Rendered journey evidence (CI artifacts)
+playwright-report/
+test-results/

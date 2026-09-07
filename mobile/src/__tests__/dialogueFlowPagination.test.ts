@@ -17,7 +17,7 @@
 // --- Mock React hooks to run synchronously in Node ---
 const stateStore: Map<number, unknown> = new Map();
 let stateIndex = 0;
-let effectCallbacks: Array<() => void> = [];
+let effectCallbacks: (() => void)[] = [];
 const refStore: Map<number, { current: unknown }> = new Map();
 let refIndex = 0;
 
@@ -38,7 +38,7 @@ jest.mock('react', () => ({
   useState: (initial: unknown) => {
     const idx = stateIndex++;
     if (!stateStore.has(idx)) {
-      stateStore.set(idx, initial);
+      stateStore.set(idx, typeof initial === 'function' ? (initial as () => unknown)() : initial);
     }
     const value = stateStore.get(idx);
     const setter = (valOrFn: unknown) => {
@@ -956,5 +956,38 @@ describe('useDialogueFlow session phase mirror', () => {
     const phaseCallOrder = dialogueSession.updateSessionPhase.mock.invocationCallOrder[0];
     const availabilityCallOrder = checkDialogueAvailabilityMock.mock.invocationCallOrder[0];
     expect(phaseCallOrder).toBeLessThan(availabilityCallOrder);
+  });
+});
+
+
+describe('dialogue reveal visit ownership', () => {
+  it('reopening the same line starts a fresh reveal instead of reusing the old completed count', async () => {
+    resetHookState();
+    jest.clearAllMocks();
+    progress.currentPhase = 0;
+    animals = [{ ...pangolin }];
+    const settings = jest.requireMock('../services/settings') as { getSettingsSync: jest.Mock };
+    settings.getSettingsSync.mockReturnValue({ reducedMotion: false });
+    getCurrentDialogueMock.mockReturnValue({ text: SHORT_LINE });
+    const animalDialogue = jest.requireMock('../services/animalDialogue') as { getCrossAnimalReference: jest.Mock };
+    animalDialogue.getCrossAnimalReference.mockReturnValue(null);
+    try {
+      let hook = render();
+      await hook.handleAnimalTap({ ...pangolin, currentDialogueIndex: 0 } as never);
+      hook = render();
+      expect(hook.revealedText).toBe('');
+      hook.completeReveal();
+      hook = render();
+      expect(hook.revealedText).toBe(hook.dialogueText);
+      await hook.handleCloseDialogue();
+      hook = render();
+      await hook.handleAnimalTap({ ...pangolin, currentDialogueIndex: 0 } as never);
+      hook = render();
+      expect(hook.dialogueText).toBe(SHORT_LINE);
+      expect(hook.revealedText).toBe('');
+      expect(hook.isTalking).toBe(false);
+    } finally {
+      settings.getSettingsSync.mockReturnValue({ reducedMotion: true });
+    }
   });
 });

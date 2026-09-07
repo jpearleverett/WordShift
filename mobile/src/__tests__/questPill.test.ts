@@ -86,6 +86,7 @@ jest.mock('react-native-safe-area-context', () => ({
 
 // Heavy child components (gesture-handler, seeded daily generator) — never
 // rendered here; stub to string tags so module load stays Node-safe.
+jest.mock('../components/home/StoryWorldObject', () => ({ StoryWorldObject: 'StoryWorldObject', StoryWorldInspection: 'StoryWorldInspection' }));
 jest.mock('../components/home/HouseWorld', () => ({ HouseWorld: 'HouseWorld' }));
 jest.mock('../components/home/AnimalSprite', () => ({ CHARACTER_SPRITES: {} }));
 jest.mock('../components/DailyChallengeCard', () => ({ DailyChallengeCard: 'DailyChallengeCard' }));
@@ -350,7 +351,7 @@ describe('header wiring (source scan of the one-row header)', () => {
     const claimEnd = src.indexOf('\n  }, [', claimStart);
     expect(claimEnd).toBeGreaterThan(claimStart);
     const claimBlock = src.slice(claimStart, claimEnd);
-    expect(claimBlock).toContain('claimQuestReward');
+    expect(claimBlock).toContain('claimAllReadyQuests');
     // Fresh references at every level — loadWeeklyQuests hands back the same
     // in-place-mutated cache objects the component already holds in state.
     expect(claimBlock).toContain('setWeeklyQuestState({');

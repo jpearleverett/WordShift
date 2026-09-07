@@ -85,7 +85,7 @@ describe('achievement toast reward pill cannot wrap', () => {
  * a real nowrap row with no break opportunity at all.
  */
 describe('intrinsically-sized amber values use the nowrap row', () => {
-  const SWEPT: Array<[string, string]> = [
+  const SWEPT: [string, string][] = [
     ['components/StatsScreen.tsx', 'achievementRewardText'],
     ['components/StatsScreen.tsx', 'journeyValue'],
     ['components/OfferingPitScreen.tsx', 'tendingCostText'],

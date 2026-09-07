@@ -1,7 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing } from 'react-native';
 import { Letter } from '../types';
-import { getTileColor, getTileFinish, getTileInkColor, CandyColors, getPhaseTheme, getResonanceConfig } from '../theme/colors';
+import { getTileColor, getTileFinish, getTileInkColor, CandyColors, getResonanceConfig } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
 import { shouldSimplifyAnimations } from '../services/deviceTier';
 import { getPressSpring } from '../theme/surfaces';
@@ -56,7 +56,6 @@ interface LetterTileProps {
 }
 
 // Compact tile dimensions for 6+ letter words
-const COMPACT_OUTER_W = COMPACT_TILE_W; // 42
 const COMPACT_OUTER_H = 52;
 const COMPACT_BODY_W = 42;
 const COMPACT_BODY_H = 46;
@@ -135,19 +134,19 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
   const settings = getSettingsSync();
 
   // Animation values
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-  const glowAnim = useRef(new Animated.Value(0)).current;
-  const bounceAnim = useRef(new Animated.Value(0)).current;
-  const shineAnim = useRef(new Animated.Value(0)).current;
-  const wobbleAnim = useRef(new Animated.Value(0)).current;
-  const trailGlowAnim = useRef(new Animated.Value(0)).current;
-  const resonanceAnim = useRef(new Animated.Value(0)).current;
-  const guidePulseAnim = useRef(new Animated.Value(0)).current;
-  const arrivalScaleAnim = useRef(new Animated.Value(1)).current;
-  const arrivalTranslateYAnim = useRef(new Animated.Value(0)).current;
+  const [scaleAnim] = useState(() => new Animated.Value(1));
+  const [glowAnim] = useState(() => new Animated.Value(0));
+  const [bounceAnim] = useState(() => new Animated.Value(0));
+  const [shineAnim] = useState(() => new Animated.Value(0));
+  const [wobbleAnim] = useState(() => new Animated.Value(0));
+  const [trailGlowAnim] = useState(() => new Animated.Value(0));
+  const [resonanceAnim] = useState(() => new Animated.Value(0));
+  const [guidePulseAnim] = useState(() => new Animated.Value(0));
+  const [arrivalScaleAnim] = useState(() => new Animated.Value(1));
+  const [arrivalTranslateYAnim] = useState(() => new Animated.Value(0));
   // Squash-and-stretch on the arrival landing (rest at 1 outside the settle).
-  const arrivalSquashXAnim = useRef(new Animated.Value(1)).current;
-  const arrivalSquashYAnim = useRef(new Animated.Value(1)).current;
+  const [arrivalSquashXAnim] = useState(() => new Animated.Value(1));
+  const [arrivalSquashYAnim] = useState(() => new Animated.Value(1));
 
   // Loop refs for proper cleanup (prevents memory leaks)
   const glowLoopRef = useRef<Animated.CompositeAnimation | null>(null);
@@ -158,50 +157,48 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
   const resonanceLoopRef = useRef<Animated.CompositeAnimation | null>(null);
   const guideLoopRef = useRef<Animated.CompositeAnimation | null>(null);
   const arrivalAnimRef = useRef<Animated.CompositeAnimation | null>(null);
-  const trailParticleAnims = useRef(
-    Array.from({ length: 4 }, () => ({
+  const [trailParticleAnims] = useState(() => (Array.from({ length: 4 }, () => ({
       opacity: new Animated.Value(0),
       scale: new Animated.Value(0.5),
       translateY: new Animated.Value(0),
-    }))
-  ).current;
+    }))));
   const trailParticleLoopRef = useRef<Animated.CompositeAnimation | null>(null);
 
   // Phase-aware animation parameters for selected tiles
-  const getSelectedSpringParams = () => {
+  const getSelectedSpringParams = useCallback(() => {
     if (phase >= 4) return { friction: 9, tension: 80 };
     if (phase >= 3) return { friction: 7, tension: 100 };
     if (phase >= 2) return { friction: 5, tension: 150 };
     // Phase 1: a barely-perceptible settling — the first hint the candy is cooling.
     if (phase >= 1) return { friction: 4, tension: 175 };
     return { friction: 3, tension: 200 };
-  };
+  }, [phase]);
 
-  const getWobbleDurations = () => {
+  const getWobbleDurations = useCallback(() => {
     if (phase >= 4) return { quarter: 400, half: 800 };
     if (phase >= 3) return { quarter: 300, half: 600 };
     if (phase >= 2) return { quarter: 200, half: 400 };
     if (phase >= 1) return { quarter: 175, half: 350 };
     return { quarter: 150, half: 300 };
-  };
+  }, [phase]);
 
-  const getBounceHeight = () => {
+  const getBounceHeight = useCallback(() => {
     if (phase >= 4) return -1.5;
     if (phase >= 3) return -2;
     if (phase >= 2) return -3;
     if (phase >= 1) return -3.5;
     return -4;
-  };
+  }, [phase]);
 
   // The selected-tile float bob slows as it shrinks: a small SLOW bob reads as
   // weight, a small fast bob just reads as jitter.
-  const getBounceDuration = () => {
+  const getBounceDuration = useCallback(() => {
     if (phase >= 4) return 850;
     if (phase >= 3) return 700;
     if (phase >= 2) return 550;
     if (phase >= 1) return 450;
     return 400;
-  };
+  }, [phase]);
 
   // Idle timings (every tile, all the time — this is where the board's weight
   // actually reads, since only one tile is ever selected). The candy glow
@@ -431,7 +428,7 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
       wobbleAnim.stopAnimation();
       trailGlowAnim.stopAnimation();
     };
-  }, [isSelected, phase]);
+  }, [isSelected, phase, bounceAnim, getBounceDuration, getBounceHeight, getSelectedSpringParams, getWobbleDurations, scaleAnim, trailGlowAnim, wobbleAnim]);
 
   // Resonance glow — phase-aware inner light for dread/ritual words.
   // Phase 1: subliminal shimmer. Phase 2: faint pulse. Phase 3: visible aura.
@@ -479,7 +476,7 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
       }
       resonanceAnim.stopAnimation();
     };
-  }, [isResonant, phase, settings.reducedMotion]);
+  }, [isResonant, phase, settings.reducedMotion, resonanceAnim]);
 
   // Tutorial guidance pulse for the exact recommended tile.
   useEffect(() => {
@@ -631,7 +628,7 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
         p.translateY.stopAnimation();
       });
     };
-  }, [isSelected]);
+  }, [isSelected, settings.reducedMotion, trailParticleAnims]);
 
   // Resonance visual config — color and opacity range per phase (from theme)
   const resonanceConfig = isResonant && phase >= 1 ? getResonanceConfig(phase) : null;

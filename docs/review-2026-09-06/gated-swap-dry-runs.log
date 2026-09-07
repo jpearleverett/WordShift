@@ -1,0 +1,65 @@
+
+$ node scripts/swapGatedBanks.mjs 100 double HARD --dry-run
+DOUBLE_HARD: DRY RUN — would replace puzzleBankDoubleShiftHard.ts, 490 → 100 puzzles; backup .pre_gated_double_hard.ts.bak
+
+Swap complete: 0 swapped, 0 refused (below threshold 100), 0 skipped (no sidecar), 0 failed guards
+
+$ node scripts/swapGatedBanks.mjs 100 standard HARD --dry-run
+HARD: DRY RUN — would replace puzzleBankHard.ts, 457 → 100 puzzles; backup .pre_gated_hard.ts.bak
+
+Swap complete: 0 swapped, 0 refused (below threshold 100), 0 skipped (no sidecar), 0 failed guards
+
+$ node scripts/swapGatedBanks.mjs 100 standard EXPERT --dry-run
+EXPERT: DRY RUN — would replace puzzleBankExpert.ts, 230 → 100 puzzles; backup .pre_gated_expert.ts.bak
+
+Swap complete: 0 swapped, 0 refused (below threshold 100), 0 skipped (no sidecar), 0 failed guards
+
+$ node scripts/swapGatedBanks.mjs 100 reverse MEDIUM_PLUS --dry-run
+REVERSE_MEDIUM_PLUS: DRY RUN — would replace puzzleBankReverseMediumPlus.ts, 500 → 100 puzzles; backup .pre_gated_reverse_medium_plus.ts.bak
+
+Swap complete: 0 swapped, 0 refused (below threshold 100), 0 skipped (no sidecar), 0 failed guards
+
+$ node scripts/swapGatedBanks.mjs 100 double LEX_HARD --dry-run
+LEXICON_DOUBLE_HARD: DRY RUN — would replace lexiconBankDoubleShiftHard.ts, 190 → 100 puzzles; backup .pre_gated_lexicon_double_hard.ts.bak
+
+Swap complete: 0 swapped, 0 refused (below threshold 100), 0 skipped (no sidecar), 0 failed guards
+
+$ node scripts/swapGatedBanks.mjs 100 standard LEX_HARD --dry-run
+LEXICON_HARD: DRY RUN — would replace lexiconBankHard.ts, 191 → 100 puzzles; backup .pre_gated_lexicon_hard.ts.bak
+
+Swap complete: 0 swapped, 0 refused (below threshold 100), 0 skipped (no sidecar), 0 failed guards
+
+$ node scripts/swapGatedBanks.mjs 100 reverse LEX_MEDIUM_PLUS --dry-run
+LEXICON_REVERSE_MEDIUM_PLUS: DRY RUN — would replace lexiconBankReverseMediumPlus.ts, 240 → 100 puzzles; backup .pre_gated_lexicon_reverse_medium_plus.ts.bak
+
+Swap complete: 0 swapped, 0 refused (below threshold 100), 0 skipped (no sidecar), 0 failed guards
+
+$ node scripts/swapGatedBanks.mjs 100 reverse LEX_HARD --dry-run
+LEXICON_REVERSE_HARD: DRY RUN — would replace lexiconBankReverseHard.ts, 240 → 100 puzzles; backup .pre_gated_lexicon_reverse_hard.ts.bak
+
+Swap complete: 0 swapped, 0 refused (below threshold 100), 0 skipped (no sidecar), 0 failed guards
+
+$ node scripts/swapGatedBanks.mjs 100 standard LEX_EXPERT --dry-run
+LEXICON_EXPERT: DRY RUN — would replace lexiconBankExpert.ts, 101 → 100 puzzles; backup .pre_gated_lexicon_expert.ts.bak
+
+Swap complete: 0 swapped, 0 refused (below threshold 100), 0 skipped (no sidecar), 0 failed guards
+
+$ node scripts/swapGatedBanks.mjs 100 double LEX_EXPERT --dry-run
+LEXICON_DOUBLE_EXPERT: DRY RUN — would replace lexiconBankDoubleShiftExpert.ts, 99 → 100 puzzles; backup .pre_gated_lexicon_double_expert.ts.bak
+
+Swap complete: 0 swapped, 0 refused (below threshold 100), 0 skipped (no sidecar), 0 failed guards
+
+$ node scripts/swapGatedBanks.mjs 100 reverse HARD --dry-run
+REVERSE_HARD: DRY RUN — would replace puzzleBankReverseHard.ts, 500 → 100 puzzles; backup .pre_gated_reverse_hard.ts.bak
+
+Swap complete: 0 swapped, 0 refused (below threshold 100), 0 skipped (no sidecar), 0 failed guards
+
+$ node scripts/swapGatedBanks.mjs 100 reverse EXPERT --dry-run
+REVERSE_EXPERT: DRY RUN — would replace puzzleBankReverseExpert.ts, 200 → 100 puzzles; backup .pre_gated_reverse_expert.ts.bak
+
+Swap complete: 0 swapped, 0 refused (below threshold 100), 0 skipped (no sidecar), 0 failed guards
+
+$ node scripts/swapGatedBanks.mjs 100 reverse LEX_EXPERT --dry-run
+LEXICON_REVERSE_EXPERT: DRY RUN — would replace lexiconBankReverseExpert.ts, 114 → 100 puzzles; backup .pre_gated_lexicon_reverse_expert.ts.bak
+
+Swap complete: 0 swapped, 0 refused (below threshold 100), 0 skipped (no sidecar), 0 failed guards

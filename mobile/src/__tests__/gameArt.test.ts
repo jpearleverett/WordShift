@@ -23,9 +23,8 @@ import { MODE_ICON_SPRITES, getModeIconSprite, getPhaseIndicatorSprite } from '.
 import { getRulesText } from '../services/phaseNarrative';
 import { CHROME_ICONS, SPOT_ART } from '../components/ui/chromeIcons';
 import { getPhaseTransitionEvent } from '../services/phaseEvents';
-import type { DialoguePhase as Phase } from '../types/homeWorld';
+import type { DialoguePhase as Phase , DialoguePhase } from '../types/homeWorld';
 import type { Difficulty } from '../types';
-import type { DialoguePhase } from '../types/homeWorld';
 
 const UI_DIR = path.resolve(__dirname, '../../assets/ui');
 

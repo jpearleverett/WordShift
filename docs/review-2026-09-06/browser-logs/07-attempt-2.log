@@ -1,0 +1,12 @@
+
+> wordshift-mobile@1.3.0 test:e2e
+> playwright test --grep journal\ rewards\ and\ support\ benefits\ are\ discoverable$
+
+
+Running 1 test using 1 worker
+
+(node:184316) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 e2e/game.spec.ts:193:5 › journal rewards and support benefits are discoverable (1.2m)
+
+  1 passed (1.3m)

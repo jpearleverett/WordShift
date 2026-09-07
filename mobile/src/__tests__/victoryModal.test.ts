@@ -152,9 +152,8 @@ jest.mock('../components/monetization/RewardedAdButton', () => ({
 // Imports (after mocks)
 // ---------------------------------------------------------------------------
 
-import { VictoryModal, VictoryData } from '../components/puzzle/VictoryModal';
+import { VictoryModal, VictoryData , getButtonTheme } from '../components/puzzle/VictoryModal';
 import { getToastTheme } from '../components/puzzle/Toast';
-import { getButtonTheme } from '../components/puzzle/VictoryModal';
 import { SWIFT_VICTORY_MIN_PUZZLES } from '../hooks/useVictoryFlow';
 import {
   VICTORY_FEEDBACK_POOLS,
@@ -833,7 +832,7 @@ describe('swift victories compact strip', () => {
 
   it('special beats keep the full modal even with the setting ON', () => {
     mockSwiftVictories = true;
-    const specials: Array<Partial<VictoryData>> = [
+    const specials: Partial<VictoryData>[] = [
       { milestoneBonus: 50, milestoneMessage: 'Milestone!' },
       { firstCompletionBonus: 20 },
       { streakMilestoneBonus: 30 },

@@ -27,7 +27,8 @@ export const PLAY_STORE_URL =
 /** Public web landing page (GitHub Pages root, same host as the legal docs). */
 export const WEB_LANDING_URL = 'https://jpearleverett.github.io/WordShift/';
 
-export function getSupportMailto(appVersion: string): string {
+export function getSupportMailto(appVersion: string, supportId?: string): string {
   const subject = encodeURIComponent(`WordShift Support (v${appVersion})`);
-  return `mailto:${EXTERNAL_LINKS.supportEmail}?subject=${subject}`;
+  const body = supportId ? `&body=${encodeURIComponent(`Support ID: ${supportId}\n\nDescribe what happened:\n`)}` : '';
+  return `mailto:${EXTERNAL_LINKS.supportEmail}?subject=${subject}${body}`;
 }

@@ -1,4 +1,12 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { DAILY_BOARD_VERSION } from './src/services/dailyBoardVersion';
+import { PracticeModal } from './src/components/puzzle/PracticeModal';
+import type { PracticeLessonId } from './src/services/practiceLessons';
+import { saveWithPlayerRetry } from './src/services/saveRetry';
+import { useLaunchIntents } from './src/hooks/useLaunchIntents';
+import { useInitialGameRoute } from './src/hooks/useInitialGameRoute';
+import { useAppBoot } from './src/hooks/useAppBoot';
+import { useGlobalOverlays } from './src/hooks/useGlobalOverlays';
+import React, { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore } from 'react';
 import {
   View,
   Text,
@@ -6,13 +14,12 @@ import {
   StyleSheet,
   ScrollView,
   StatusBar,
-  Dimensions,
   useWindowDimensions,
   Animated,
   Easing,
   AppState,
-  Linking,
   BackHandler,
+  Modal,
   Image,
 } from 'react-native';
 import { GameState, Difficulty } from './src/types';
@@ -27,7 +34,6 @@ import { isValidDifficulty, normalizeDifficulty, getDifficultyChipLabel } from '
 import { HomeScreen, resetHomeSceneSnapshot } from './src/components/home';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { AmberInline } from './src/components/AmberInline';
-import { CandyColors } from './src/theme/colors';
 import { getSurfaceTheme } from './src/theme/surfaces';
 import { CandyButton } from './src/components/ui/CandyButton';
 import { usePuzzleGame } from './src/hooks/usePuzzleGame';
@@ -40,7 +46,7 @@ import { useVictoryOrchestration } from './src/hooks/useVictoryOrchestration';
 import { useStoryFlow } from './src/hooks/useStoryFlow';
 import { StorySceneModal } from './src/components/StorySceneModal';
 import { StoryJournalModal } from './src/components/StoryJournalModal';
-import { StoryContext, loadStoryState, recordStoryBoundary } from './src/services/storySpine';
+import { StoryContext, loadStoryState } from './src/services/storySpine';
 import { useOnboardingFlow } from './src/hooks/useOnboardingFlow';
 import { useAutosave } from './src/hooks/useAutosave';
 import { logEvent } from './src/services/eventLogger';
@@ -70,16 +76,6 @@ import {
   markLexiconIntroSeen,
   consumePendingVariantTutorial,
   checkFreeStreakFreeze,
-  isHouseCompleted,
-  isFinalPuzzleCompleted,
-  markFinalPuzzleCompleted,
-  isPostRevelation,
-  markPostRevelation,
-  recordPhase4Dwell,
-  getPhase4DwellCount,
-  canArmFinale,
-  armFinale,
-  isFinaleArmed,
   consumeVariantNudge,
   getFullProgress,
   getRitualWords,
@@ -99,10 +95,9 @@ import { AchievementToast } from './src/components/AchievementToast';
 import { PhaseTransitionOverlay } from './src/components/PhaseTransitionOverlay';
 import { ShareableResult, decodeChallengeLink, buildChallengeShareText } from './src/services/shareResults';
 import { consumeSharePrompt, getSharePromptInvite } from './src/services/sharePrompts';
-import { initShareImage } from './src/services/shareImage';
 import { ShareResultModal } from './src/components/share/ShareResultModal';
 import { getLocalDateString, daysAgoLocal } from './src/services/dateUtils';
-import { getSettingsSync, getSettings } from './src/services/settings';
+import { getSettingsSync } from './src/services/settings';
 import { FlyingTileGhost, TileFlight } from './src/components/puzzle/FlyingTileGhost';
 import { standardLetterCenterOffset } from './src/constants/tileLayout';
 import { shouldSimplifyAnimations } from './src/services/deviceTier';
@@ -110,7 +105,7 @@ import { announceForA11y } from './src/services/a11yAnnounce';
 import { initAudio, setAudioPhase, startMusicForScreen, type MusicScreen, soundVictory, soundPerfect, soundValidMove, soundMidpointTurn, soundInvalidMove, soundUndo, soundHint, soundTap, soundUiTap, soundSelection, soundLetterSelect, soundDailyReady } from './src/services/audio';
 import { stopCeremonyMusic } from './src/services/uiSound';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess, hapticWarning, hapticError, hapticSelection, hapticMoveCommit } from './src/services/haptics';
+import { hapticLight, hapticMedium, hapticSuccess, hapticWarning, hapticError, hapticSelection, hapticMoveCommit } from './src/services/haptics';
 import { getVariantTutorialIntroLines } from './src/services/animalDialogue';
 import {
   getLoadingMessage,
@@ -139,7 +134,6 @@ import {
   getNewCycleDescription,
   getNewCycleCTA,
   getDailyLadderLine,
-  getDailyLadderTrendLabel,
   getEventDailyBonusLine,
   getPreviewGraduationMessage,
   getPreviewGraduationTitle,
@@ -160,19 +154,17 @@ import {
   getHouseAskLine,
   getHouseAskFulfilledMessage,
 } from './src/services/phaseNarrative';
-import { getActiveEvent, getEventDailyBonusAmber } from './src/services/liveEvents';
 import {
   getUnbrokenWeaveMastery,
   recordSolveTime,
   getSolveTrend,
   recordSpeedRound,
-  recordUnbrokenWeaveVictory,
   UnbrokenWeaveMastery,
 } from './src/services/masteryRecords';
 import { maybePromptReview } from './src/services/reviewPrompt';
 import { getPhaseTransitionEvent, PhaseTransitionEvent, HOUSE_COMPLETION_EVENT, FINAL_PUZZLE_EVENT, buildFinalPuzzleEvent, buildPostRevelationEvent, FinalArrivalContext, NEW_CYCLE_EVENT } from './src/services/phaseEvents';
-import { generateDailyPuzzle, prewarmDailyPuzzle, isDailyChallengeUnlocked, recordDailyCompletion, getDailyStatus, checkDailyStreakMilestone, grantFirstDailyMercy, getDailyHostName, getDailyDifficulty } from './src/services/dailyChallenge';
-import { recordDailyLadderResult, getDailyLadderSummary, shouldShowTrend } from './src/services/dailyLadder';
+import { generateDailyPuzzle, prewarmDailyPuzzle, isDailyChallengeUnlocked, getDailyStatus, grantFirstDailyMercy, getDailyHostName, getDailyDifficulty } from './src/services/dailyChallenge';
+import { recordDailyLadderResult, refreshDailyLadderRank, getDailyLadderSummary, shouldShowTrend } from './src/services/dailyLadder';
 import { startFrameMonitoring, stopFrameMonitoring } from './src/services/performanceMonitor';
 import { AnimalWhisper } from './src/components/puzzle/AnimalWhisper';
 import { getModeIconSprite, getPhaseIndicatorSprite } from './src/components/puzzle/modeIcons';
@@ -188,22 +180,49 @@ import {
   hasPromptedForNotifications,
   markPromptedForNotifications,
 } from './src/services/notifications';
-import { runMigrations } from './src/services/dataMigration';
-import { initIAP, setBillingProvider, reconcilePendingConsumableGrants, acknowledgeConsumableGrant } from './src/services/iap';
-import { initAds, setAdProvider, maybeShowInterstitial, showRewarded, isRewardedCapReached, isAdsReady, RewardedPlacement, isDailyInterstitialAllowed } from './src/services/ads';
+import { maybeShowInterstitial, showRewarded, isRewardedCapReached, isAdsReady, RewardedPlacement, isDailyInterstitialAllowed } from './src/services/ads';
 import { RewardedAdButton } from './src/components/monetization/RewardedAdButton';
-import { initCosmetics } from './src/services/cosmetics';
-import { loadPixelFonts, installGlobalFont } from './src/theme/fonts';
-import { initHints, addHints, grantBonusHint } from './src/services/hints';
-import { loadEntitlements, hasEntitlementSync, isAdFreeSync, ENTITLEMENTS } from './src/services/entitlements';
+import { installGlobalFont } from './src/theme/fonts';
+import { addHints, grantBonusHint } from './src/services/hints';
+import { hasEntitlementSync, isAdFreeSync, ENTITLEMENTS } from './src/services/entitlements';
 import { StoreModal } from './src/components/monetization/StoreModal';
 import { recordInterstitialSeen, consumePatronNudge, armRemoveAdsNudgeIfEligible, consumePendingRemoveAdsNudge, canOfferRewardedDouble, recordRewardedDoubleOffered, canShowExitNudge, recordExitNudgeShown } from './src/services/monetizationPrompts';
-import { createRevenueCatBillingProvider } from './src/services/providers/revenueCatBilling';
-import { createAdMobAdProvider } from './src/services/providers/googleAdMobAds';
 import { installGlobalErrorHandler, setErrorForwarder, reportError } from './src/services/errorReporting';
-import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST, STARTER_INTRO_MIN_PUZZLES, FINALE_DWELL_PUZZLES, FINALE_ARM_MIN_PUZZLES, INTERSTITIAL_MIN_PUZZLES, HOUSE_ASK_MIN_PUZZLES, HOUSE_ASK_CHANCE, HOUSE_ASK_REWARD_AMBER, REWARDED_HINT_GRANT, EXPERT_DIFFICULTY_UNLOCK_PUZZLES, LEXICON_UNLOCK_PUZZLES } from './src/constants/gameBalance';
+import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST, STARTER_INTRO_MIN_PUZZLES, FINALE_DWELL_PUZZLES, INTERSTITIAL_MIN_PUZZLES, HOUSE_ASK_MIN_PUZZLES, HOUSE_ASK_CHANCE, HOUSE_ASK_REWARD_AMBER, REWARDED_HINT_GRANT, EXPERT_DIFFICULTY_UNLOCK_PUZZLES, LEXICON_UNLOCK_PUZZLES } from './src/constants/gameBalance';
 import { pickHouseAsk, evaluateHouseAsk, HouseAsk } from './src/services/houseAsks';
 import { getCumulativeStats } from './src/services/starRating';
+import { isStorageTransactionActive, subscribeStorageTransaction } from './src/services/persistenceStorage';
+import { markPendingChanges, uploadToCloud } from './src/services/cloudSave';
+import * as Sentry from '@sentry/react-native';
+import { getSentryDsn } from './src/services/supabaseClient';
+import { estimateSlotIndex, findClosestValidSlot, computeBoardScale } from './src/services/slotEstimation';
+import { DROP_SHAKE_KEYFRAME_MS, DROP_SHAKE_INTENSITY, SPEED_ESCALATION_STEP_SEC, SPEED_ESCALATION_MIN_SEC, SPEED_TICK_CRITICAL_SEC, SWIFT_HINT_TOAST_DELAY_MS, SCREEN_FADE_COVER_MS, SCREEN_FADE_REVEAL_MS, SCREEN_READY_TIMEOUT_MS, SCREEN_REVEAL_SETTLE_MS, speedTickKind } from './src/constants/timing';
+import { ScreenTransitionOverlay } from './src/components/ui/ScreenTransitionOverlay';
+import { armScreenReady, waitForScreenReady } from './src/services/screenReady';
+import { OfferingPitScreen } from './src/components/OfferingPitScreen';
+import { ShopScreen } from './src/components/shop/ShopScreen';
+import { loadPuzzleState, clearPuzzleState } from './src/services/puzzleSaveState';
+import { offerBatch, settleBatchCredit } from './src/services/wordHarvest';
+import * as Updates from 'expo-updates';
+import { isCreatorKitEnabled, validateCreatorCode, applyCreatorSnapshot, isCreatorEra } from './src/services/creatorKit';
+import {
+  getNewlyUnlockedVariants,
+  getUnlockedVariants,
+  getSpeedTimeLimit,
+  getSpeedUnlockHint,
+  SPEED_TOGGLE_UNLOCK_PUZZLES,
+  getVariantSelectorOptions,
+  getBlindUnlockHint,
+  getLexiconUnlockHint,
+  isVariantUnlocked,
+  PuzzleVariant,
+  VARIANT_CONFIGS,
+  CHALLENGE_TOGGLE_UNLOCK_PUZZLES,
+  BLIND_TOGGLE_UNLOCK_PUZZLES,
+} from './src/services/puzzleVariety';
+import { appStyles as styles, getScreenBackgroundColor, getActionButtonColors } from './src/styles/appStyles';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useScreenInsets } from './src/hooks/useScreenInsets';
 
 // Defer the one-time difficulty-selector intro until a few boards are done —
 // firing on the very first post-onboarding Play hijacked the "just let me
@@ -257,46 +276,6 @@ async function markOneTimeFlagSeen(key: string): Promise<void> {
   }
 }
 
-// Module-scope launch-routing guards: an appEpoch remount (late cloud restore)
-// re-runs MainApp's mount effects, and both getInitialURL and
-// getLastNotificationResponseAsync keep returning the ORIGINAL launch payload —
-// these ensure each is routed at most once per process.
-let launchUrlProcessed = false;
-let coldStartNotificationProcessed = false;
-// Set when a slow fresh-install cloud restore lands after boot; the remounted
-// MainApp surfaces a one-time "progress restored" notice so the hard reset
-// mid-interaction doesn't read as the app glitching.
-let pendingRestoreNotice = false;
-import { markPendingChanges, uploadToCloud, installCloudProviderIfConfigured, maybeAutoRestoreOnFreshInstall, holdUploadsUntil } from './src/services/cloudSave';
-import * as Sentry from '@sentry/react-native';
-import { getSentryDsn } from './src/services/supabaseClient';
-import { estimateSlotIndex, findClosestValidSlot, computeBoardScale } from './src/services/slotEstimation';
-import { DROP_SHAKE_KEYFRAME_MS, DROP_SHAKE_INTENSITY, SPEED_ESCALATION_STEP_SEC, SPEED_ESCALATION_MIN_SEC, SPEED_TICK_CRITICAL_SEC, SWIFT_HINT_TOAST_DELAY_MS, SCREEN_FADE_COVER_MS, SCREEN_FADE_REVEAL_MS, SCREEN_READY_TIMEOUT_MS, SCREEN_REVEAL_SETTLE_MS, speedTickKind } from './src/constants/timing';
-import { ScreenTransitionOverlay } from './src/components/ui/ScreenTransitionOverlay';
-import { armScreenReady, waitForScreenReady } from './src/services/screenReady';
-import { OfferingPitScreen } from './src/components/OfferingPitScreen';
-import { ShopScreen } from './src/components/shop/ShopScreen';
-import { loadPuzzleState, clearPuzzleState } from './src/services/puzzleSaveState';
-import { offerBatch, acknowledgeBatchCredit } from './src/services/wordHarvest';
-import * as Updates from 'expo-updates';
-import { isCreatorKitEnabled, validateCreatorCode, applyCreatorSnapshot, isCreatorEra } from './src/services/creatorKit';
-import {
-  hasVariantModifier,
-  getNewlyUnlockedVariants,
-  getUnlockedVariants,
-  getSpeedTimeLimit,
-  getSpeedUnlockHint,
-  SPEED_TOGGLE_UNLOCK_PUZZLES,
-  getVariantSelectorOptions,
-  getBlindUnlockHint,
-  getLexiconUnlockHint,
-  isVariantUnlocked,
-  PuzzleVariant,
-  VARIANT_CONFIGS,
-  CHALLENGE_TOGGLE_UNLOCK_PUZZLES,
-  BLIND_TOGGLE_UNLOCK_PUZZLES,
-} from './src/services/puzzleVariety';
-import { appStyles as styles, getScreenBackgroundColor, getActionButtonColors } from './src/styles/appStyles';
 
 // Chromatic-aberration ghost layer for the glitch text: an absolutely
 // positioned same-glyph copy behind the main text, tinted and offset 1-2dp.
@@ -308,8 +287,6 @@ const appGlitchGhostStyle = {
   textShadowColor: 'transparent',
   textShadowRadius: 0,
 };
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { useScreenInsets } from './src/hooks/useScreenInsets';
 
 // App screen type — expanded with settings, stats, and ledger
 type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery' | 'pit' | 'shop';
@@ -320,7 +297,6 @@ interface PostVictoryIntro {
   lines: string[];
 }
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // Speed rescue: seconds granted by the one-per-board rewarded continue.
 /**
@@ -365,19 +341,37 @@ if (sentryDsn) {
   });
 }
 
+// React compiler analysis of this imperative coordinator did not finish in a
+// ten-hour lint run. Keep it out of compiler optimization until the lifecycle
+// split is complete; normal Hooks and dependency lint checks remain enabled.
 function MainApp() {
+  'use no memo';
+  const storageBusy = useSyncExternalStore(subscribeStorageTransaction, isStorageTransactionActive, () => false);
+  // A replaced save must remain fenced while network work, ceremony and the
+  // React session rebuild finish, including gaps between storage commits.
+  const [sessionTransition, setSessionTransitionState] = useState<'saving' | 'waiting' | null>(null);
+  const sessionTransitionRef = useRef<'saving' | 'waiting' | null>(null);
+  const setSessionTransition = useCallback((stage: 'saving' | 'waiting' | null) => {
+    sessionTransitionRef.current = stage;
+    setSessionTransitionState(stage);
+  }, []);
+  const saveHoldActive = storageBusy || sessionTransition === 'saving';
+  const [showStorageHold, setShowStorageHold] = useState(false);
+  useEffect(() => {
+    if (!saveHoldActive) { setShowStorageHold(false); return; }
+    // Fast local commits should not flash a modal or disrupt reader focus.
+    // Longer writes retain the blocking recovery presentation.
+    const timer = setTimeout(() => setShowStorageHold(true), 180);
+    return () => clearTimeout(timer);
+  }, [saveHoldActive]);
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT, fontScale } = useWindowDimensions();
+  const compactPuzzleLayout = SCREEN_HEIGHT < 740 || fontScale > 1.15;
+  const [alertPending, setAlertPending] = useState(false);
+  const [practiceLesson, setPracticeLesson] = useState<PracticeLessonId | null>(null);
   // Safe-area bases (notch / home indicator) — screens add breathing room on top
   const screenInsets = useScreenInsets();
   // Screen navigation
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('home');
-  // Launch-route gate: currentScreen defaults to 'home', but a cold launch may
-  // resolve into the puzzle or pit (an interrupted-onboarding resume). Until the
-  // resume effect decides, we keep showing the branded boot screen rather than
-  // painting 'home' for a frame and then swapping to the board (the F141 home
-  // flash). Cleared by the resume effect (every branch) and, as a brick-proof
-  // backstop, by a short timeout so a stalled decision can never trap the boot
-  // screen.
-  const [bootRouting, setBootRouting] = useState(true);
   const [homePanY, setHomePanY] = useState<number | null>(null);
 
   // Custom hooks - game logic & persistence separated from UI
@@ -388,6 +382,7 @@ function MainApp() {
   const setPuzzleGameState = puzzleActions.setGameState;
   const setPuzzleMessage = puzzleActions.setMessage;
   const setSelectedVariant = puzzleActions.setSelectedVariant;
+  const setPuzzlePhase = puzzleActions.setCurrentPhase;
 
   // Live mirrors of gameState + victory-lock for callbacks that must read the
   // CURRENT value without capturing it in a stale closure (e.g. the speed
@@ -416,14 +411,6 @@ function MainApp() {
     return () => clearTimeout(t);
   }, [puzzle.gameState, puzzle.isProcessing]);
 
-  // Brick-proof backstop for the launch-route gate: if the resume decision
-  // never lands (e.g. onboarding load stalls), lift the boot screen anyway so
-  // the app can never hang on it. Worst case this restores the pre-fix behavior
-  // (a possible home flash), never a stuck screen.
-  useEffect(() => {
-    const t = setTimeout(() => setBootRouting(false), 800);
-    return () => clearTimeout(t);
-  }, []);
   // Tracked timer for the one-time Swift-Victories hint (F110): cleared on
   // unmount so a raw setTimeout can't fire into a torn-down tree.
   const swiftHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -460,8 +447,8 @@ function MainApp() {
 
   // Sync narrative phase from persistence into puzzle hook
   useEffect(() => {
-    puzzleActions.setCurrentPhase(persistence.currentPhase);
-  }, [persistence.currentPhase, puzzleActions.setCurrentPhase]);
+    setPuzzlePhase(persistence.currentPhase);
+  }, [persistence.currentPhase, setPuzzlePhase]);
 
   // StarBurst effect state for valid moves. comboTier drives the burst's
   // size/count escalation (Confetti.StarBurst) so a rising clean-move streak
@@ -608,8 +595,6 @@ function MainApp() {
   // Home nudge — track consecutive puzzles without visiting home
   const puzzlesSinceHomeVisit = useRef(0);
 
-  // Guard: pit-resume useEffect should only fire on initial mount
-  const pitResumeCheckedRef = useRef(false);
   // Local day the daily launch tasks (freeze grant, login claim) last ran for.
   // Null until the first run; compared against getLocalDateString() so the
   // AppState listener can re-run them after an overnight foreground return
@@ -656,6 +641,7 @@ function MainApp() {
   // and the next morning's daily card already showed a checkmark for a board
   // they had never seen — the replay guard then refused to serve it at all.
   const dailyBoardDateRef = useRef<string | null>(null);
+  const dailyBoardVersionRef = useRef<string>(DAILY_BOARD_VERSION);
   // handleShare is defined far below; the share-prompt (declared above it) calls
   // it through this ref, kept current each render, to avoid a TDZ cycle.
   const handleShareRef = useRef<() => void>(() => {});
@@ -857,6 +843,7 @@ function MainApp() {
   // step (the pre-cover frame, the cover's completion, the readiness race, the
   // reveal) bails if a newer navigation has since claimed a higher one.
   const transitionTokenRef = useRef(0);
+  const [navigationBusy, setNavigationBusy] = useState(false);
   // Current screen, readable synchronously inside transitionTo without making
   // the callback depend on (and therefore be re-created by) every screen swap.
   const currentScreenRef = useRef<AppScreen>(currentScreen);
@@ -883,10 +870,16 @@ function MainApp() {
     revealListenerRef.current = null;
   }, [screenRevealAnim]);
   useEffect(() => detachRevealListener, [detachRevealListener]);
+  useEffect(() => () => {
+    // A readiness promise or animation callback from a disposed session must
+    // never swap screens or release the next session's cover.
+    transitionTokenRef.current += 1;
+    transitionOverlay.stopAnimation();
+    screenRevealAnim.stopAnimation();
+  }, [transitionOverlay, screenRevealAnim]);
 
   // Animated screen transition (instant if reducedMotion)
   const transitionTo = useCallback((screen: AppScreen, callback?: () => void) => {
-    const token = ++transitionTokenRef.current;
     const destColor = getScreenBackgroundColor(screen, persistence.currentPhase);
 
     // Already on this screen with nothing to run under the cover: the dip would
@@ -898,6 +891,9 @@ function MainApp() {
     // cover, because that callback is exactly the work the cover exists to hide
     // (re-serving a board under the current screen).
     if (screen === currentScreenRef.current && !callback) return;
+    // A no-op navigation must not invalidate an in-flight reveal and leave
+    // the screen permanently covered. Claim only after the no-op check.
+    const token = ++transitionTokenRef.current;
 
     const reducedMotion = getSettingsSync().reducedMotion;
     if (reducedMotion) {
@@ -907,7 +903,9 @@ function MainApp() {
       transitionOverlay.setValue(0);
       setTransitionOverlayColor(destColor);
       setRootBgColor(destColor);
+      currentScreenRef.current = screen;
       setCurrentScreen(screen);
+      setNavigationBusy(false);
       callback?.();
       return;
     }
@@ -921,6 +919,7 @@ function MainApp() {
     // cut anywhere. The single frame of delay lets React commit that color
     // while opacity is still 0; started in the same tick, the cover is already
     // ~25% opaque by the time the commit lands and the change is visible.
+    setNavigationBusy(true);
     setTransitionOverlayColor(destColor);
     requestAnimationFrame(() => {
       if (token !== transitionTokenRef.current) return;
@@ -942,6 +941,7 @@ function MainApp() {
         // would otherwise report into the previous arm and this one would wait
         // out the whole timeout.
         armScreenReady(screen);
+        currentScreenRef.current = screen;
         setCurrentScreen(screen);
         // Guarded: everything that LIFTS the cover (the reveal signature, the
         // readiness race, the fade-out) is scheduled below this line, so a
@@ -977,7 +977,9 @@ function MainApp() {
             // Ease-out lets the destination emerge at once with a gentle tail.
             easing: Easing.out(Easing.quad),
             useNativeDriver: true,
-          }).start();
+          }).start(({ finished }) => {
+            if (finished && token === transitionTokenRef.current) setNavigationBusy(false);
+          });
           if (kind === 'none') return;
           // Settle the reveal signature (springs the arriving screen into
           // place). A duration, not a spring: the old friction-8 spring took
@@ -1181,11 +1183,12 @@ function MainApp() {
   }, [getStoryContext]);
 
 
-  const launchColdOpenPuzzle = useCallback(async () => {
+  const launchColdOpenPuzzle = useCallback(async (isCurrent: () => boolean = () => true) => {
     const [saved, stats] = await Promise.all([
       loadPuzzleState(),
       getCumulativeStats(),
     ]);
+    if (!isCurrent()) return;
     const canRestoreColdOpen = (
       saved?.gameState === GameState.PLAYING &&
       !saved.isPlayingDaily &&
@@ -1202,30 +1205,32 @@ function MainApp() {
 
     if (route === 'home_empty') {
       if (saved) await clearPuzzleState();
+      if (!isCurrent()) return;
       await onboardingActions.advanceOnboarding('home_empty');
+      if (!isCurrent()) return;
       transitionTo('home', () => {
         puzzleActions.clearBoard();
       });
-      setBootRouting(false);
       return;
     }
 
     // Set the screen BEFORE lifting the boot gate so the board paints directly,
     // never a frame of 'home' in between.
     setCurrentScreen('puzzle');
-    setBootRouting(false);
     if (route === 'restore' && saved) {
       // Restored boards never carry (or roll) a house ask.
       houseAskRestoreSuppressRef.current = true;
       puzzleActions.restorePuzzleState(saved);
     } else {
       if (saved) await clearPuzzleState();
+      if (!isCurrent()) return;
       // undefined + undefined + false: clear the undo-limit too. These clean
       // standard starts used to leave a sticky Challenge on, which lit the
       // 'CHALLENGE n undos' chip over a board whose gameMode is 'standard' —
       // a budget nothing enforced (handleUndo gates on gameMode).
       await puzzleActions.startNewGame('EASY', 'standard', 'standard', false, false, undefined, false);
     }
+    if (!isCurrent()) return;
     puzzleActions.setMessage(COLD_OPEN_INSTRUCTION);
     logEvent({ type: 'puzzle_started', data: { difficulty: 'EASY', onboarding: true } });
   }, [onboardingActions, puzzleActions, transitionTo]);
@@ -1261,6 +1266,13 @@ function MainApp() {
     history: puzzle.history,
     invalidAttempts: puzzle.invalidAttempts,
     hintsUsed: puzzle.hintsUsed,
+    hintDisclosures: puzzle.hintDisclosures,
+    undosUsed: puzzle.undosUsed,
+    dailyDate: dailyBoardDateRef.current,
+    dailyBoardVersion: dailyBoardVersionRef.current,
+    dailyEased: dailyEasedRef.current,
+    dailyStartedAt: puzzleStartTimeRef.current,
+    vocabularyVersion: puzzle.vocabularyVersion,
     undosRemaining: puzzle.undosRemaining,
     difficulty: puzzle.difficulty,
     currentWordLength: puzzle.currentWordLength,
@@ -1306,7 +1318,7 @@ function MainApp() {
   // (phaseTransitionEvent -> null), so the pit ignition / finale cinematics
   // keep their own soundscape and the new bed lands as the world settles.
   // startMusicForPhase is a no-op when the right bed is already playing, so
-  // re-runs (refreshStats, appEpoch remounts, a rebuildSessionFromStorage
+  // re-runs (refreshStats, session rebuilds, a rebuildSessionFromStorage
   // whose refresh changes currentPhase) are free.
   //
   // Backgrounding: audio.ts initializes expo-audio with
@@ -1315,6 +1327,8 @@ function MainApp() {
   // release the player and force a re-decode + fade-up from silence on every
   // app switch). The foreground listener resumes the paused bed: a same-track
   // startMusicForPhase calls play() when the player isn't playing.
+  const activeCinematicRef = useRef(phaseTransitionEvent);
+  activeCinematicRef.current = phaseTransitionEvent;
   const musicPhaseRef = useRef(persistence.currentPhase);
   musicPhaseRef.current = persistence.currentPhase;
   // The music FAMILY follows the screen: the puzzle screen gets a focused bed,
@@ -1351,7 +1365,7 @@ function MainApp() {
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state !== 'active') return;
-      if (!musicHydratedRef.current) return;
+      if (!musicHydratedRef.current || activeCinematicRef.current) return;
       // Never resume the bed over an authored silence (finale / hushed win).
       if (victoryMusicHushRef.current) return;
       if (musicScreenRef.current === 'puzzle' && puzzleIsFinalRef.current) return;
@@ -1369,7 +1383,7 @@ function MainApp() {
   const clearVictoryMusicHush = useCallback((resume: boolean) => {
     if (!victoryMusicHushRef.current) return;
     victoryMusicHushRef.current = false;
-    if (resume && musicHydratedRef.current && !puzzleIsFinalRef.current) {
+    if (resume && musicHydratedRef.current && !puzzleIsFinalRef.current && !activeCinematicRef.current) {
       startMusicForScreen(musicScreenRef.current, musicPhaseRef.current).catch(() => {});
     }
   }, []);
@@ -1429,16 +1443,6 @@ function MainApp() {
     };
   }, []);
 
-  // One-time notice after a late cloud restore remounted the app: without it,
-  // a fresh-install player a minute into onboarding sees the screen silently
-  // hard-reset to their restored save with zero explanation.
-  useEffect(() => {
-    if (pendingRestoreNotice) {
-      pendingRestoreNotice = false;
-      showGameAlert('Restored', 'Your saved progress was found in the cloud and restored.');
-    }
-  }, []);
-
   // Schedule notifications once persistence has hydrated, with the REAL phase.
   // The old mount-time scheduleAllNotifications(0) rewrote the entire reminder
   // ladder with bright Phase-0 copy on every browse-only launch — precisely for
@@ -1456,38 +1460,22 @@ function MainApp() {
   // (The Android hardware-back handler lives below handleGoToPit — its deps
   // array references that callback, which must be initialized first.)
 
-  // Resume the correct screen if onboarding was interrupted (initial mount only).
-  // The onboarding hook has already normalized transient steps to stable ones,
-  // so here we only need to map a stable step to its owning screen. Without this,
-  // a kill during the puzzle/pit/return beats would relaunch to a dead home
-  // screen (no Fox guide, no Play button) — an unrecoverable first-session brick.
-  useEffect(() => {
-    if (onboardingFlow.onboardingReady && !pitResumeCheckedRef.current) {
-      pitResumeCheckedRef.current = true;
-      const step = onboardingFlow.onboardingStep;
+  const initialRoute = useInitialGameRoute(
+    onboardingFlow.onboardingReady,
+    onboardingFlow.onboardingStep,
+    async (step, isCurrent) => {
       if (step === 'going_to_pit' || step === 'pit_intro' || step === 'pit_offering') {
-        setCurrentScreen('pit');
-        setBootRouting(false);
+        if (isCurrent()) setCurrentScreen('pit');
       } else if (step === 'cold_open_puzzle') {
-        // A kill during the self-directed opener resumes the exact autosaved
-        // board when possible; otherwise start curated EASY puzzle 0.
-        // launchColdOpenPuzzle lifts the boot gate itself once it has set the
-        // screen (so the board, not home, is what appears); clear on failure too.
-        launchColdOpenPuzzle().catch(() => setBootRouting(false));
+        await launchColdOpenPuzzle(isCurrent);
       } else if (step === 'puzzle_tutorial') {
-        // Re-init the guided tutorial puzzle so the player resumes a live,
-        // winnable board with the Fox overlay rather than a dead screen.
+        if (!isCurrent()) return;
         setCurrentScreen('puzzle');
-        puzzleActions.startNewGame('EASY', 'standard', 'standard', false, false, undefined, false);
-        setBootRouting(false);
-      } else {
-        // Normal launch (onboarding complete, or a non-puzzle step): home is the
-        // correct destination, so lift the boot gate and let it paint.
-        setBootRouting(false);
+        await puzzleActions.startNewGame('EASY', 'standard', 'standard', false, false, undefined, false);
       }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onboardingFlow.onboardingReady, onboardingFlow.onboardingStep, launchColdOpenPuzzle]);
+    },
+  );
+  const bootRouting = initialRoute.status !== 'ready';
 
   // Cold-open warmth: the opener's guiding voice (COLD_OPEN_INSTRUCTION, set at
   // launch) reacts with delight the instant the player lands their first valid
@@ -1984,7 +1972,7 @@ function MainApp() {
         maybeShowSetupSelectorIntro().catch(() => {});
       }
     });
-  }, [puzzle.difficulty, puzzleActions, transitionTo, persistenceActions, orchestrationActions, maybeShowSetupSelectorIntro, clearVictoryToastQueue]);
+  }, [puzzle.difficulty, puzzleActions, transitionTo, persistenceActions, orchestrationActions, maybeShowSetupSelectorIntro, clearVictoryToastQueue, resetSpeedRun]);
 
   const handlePlayPuzzle = useCallback(async (difficulty?: Difficulty) => {
     if (storyExitPreparing.current || activeStory) return;
@@ -2013,7 +2001,7 @@ function MainApp() {
       }
       puzzleActions.setShowConfetti(false);
     });
-  }, [puzzleActions, puzzle.unbrokenWeaveMode, transitionTo, clearVictoryToastQueue]);
+  }, [puzzleActions, puzzle.unbrokenWeaveMode, transitionTo, clearVictoryToastQueue, resetSpeedRun]);
 
   // Reset All completed but an in-place reload wasn't available (Expo Go /
   // dev client — Updates.reloadAsync throws there). Storage and service
@@ -2023,7 +2011,8 @@ function MainApp() {
   // no stats), an empty board, no victory/ceremony remnants, and onboarding
   // restarted from the cold open instead of dumping the player back onto
   // a home screen still rendering their old save.
-  const rebuildSessionFromStorage = useCallback((opts: { restartOnboarding: boolean }) => {
+  const rebuildSessionFromStorage = useCallback(async (opts: { restartOnboarding: boolean }) => {
+    setSessionTransition('saving');
     // The home screen's paint-ahead scene describes the save we are replacing,
     // so drop it here or the rebuilt session's first home frame would show the
     // OLD house for a beat before loadAllData corrects it.
@@ -2051,6 +2040,12 @@ function MainApp() {
     setShareResultData(null);
     setShareChallengeText(null);
     setDailyLoginGrant(null);
+    setNotificationPrompt(null);
+    setShowStoreModal(false);
+    setShowPatronModal(false);
+    setPracticeLesson(null);
+    setHomeOverlayActive(false);
+    setHomeQuietReady(false);
     setPhaseTransitionEvent(null);
     setShowSetupSelectorIntro(false);
     setPostVictoryIntro(null);
@@ -2064,22 +2059,28 @@ function MainApp() {
     // keepers linger over a bright-reset session. The refresh signal re-runs
     // loadAllData on the mounted screen; a remounting home ignores it.
     setHomeRefreshSignal(n => n + 1);
-    // Re-read the rebuilt persistence (amber, phase, stats, pending transition).
-    persistenceActions.refreshStats().catch(() => {});
-    getUnbrokenWeaveMastery().then(setUnbrokenWeaveMastery).catch(() => {});
-    // Reset All: onboarding storage is back to 'not_started'; mirror the
-    // fresh-launch init so the intro replays this session. Creator snapshot:
-    // storage says 'complete' and must stay complete.
-    onboardingActions
-      .advanceOnboarding(opts.restartOnboarding ? 'cold_open_puzzle' : 'complete')
-      .then(() => {
+    // Do not release the old session while these mirrors still describe the
+    // replaced save. Retry refresh without re-running the destructive action.
+    await saveWithPlayerRetry(async () => {
+      setSessionTransition('saving');
+      try {
+        await persistenceActions.refreshStats();
+        setUnbrokenWeaveMastery(await getUnbrokenWeaveMastery());
+        await onboardingActions.advanceOnboarding(opts.restartOnboarding ? 'cold_open_puzzle' : 'complete');
         if (opts.restartOnboarding) {
-          launchColdOpenPuzzle().catch(() => {});
-        } else {
-          transitionTo('home');
+          await launchColdOpenPuzzle();
+        } else if (currentScreenRef.current !== 'home') {
+          await new Promise<void>(resolve => transitionTo('home', resolve));
         }
-      })
-      .catch(() => {});
+      } catch (error) {
+        setSessionTransition('waiting');
+        throw error;
+      }
+    }, {
+      title: 'Your progress is saved',
+      message: 'We could not finish opening the updated game. Free device storage if it is full, then retry.',
+    });
+    setSessionTransition(null);
   }, [
     clearVictoryTimeouts,
     clearVictoryToastQueue,
@@ -2089,6 +2090,7 @@ function MainApp() {
     persistenceActions,
     onboardingActions,
     launchColdOpenPuzzle,
+    setSessionTransition,
     resetStory,
     resetSpeedRun,
     transitionTo,
@@ -2107,6 +2109,11 @@ function MainApp() {
   // ceremony's completion rebuilds the running session in place (the exact
   // flow Settings runs via onCloudRestored).
   const pendingCycleRebuildRef = useRef(false);
+  const showNewCycleCeremony = useCallback(() => {
+    pendingCycleRebuildRef.current = true;
+    setSessionTransition('waiting');
+    setPhaseTransitionEvent(NEW_CYCLE_EVENT);
+  }, [setSessionTransition]);
   const handleStartNewCycleFromHome = useCallback(() => {
     showGameAlert(
       getNewCycleTitle(),
@@ -2116,23 +2123,31 @@ function MainApp() {
         {
           text: getNewCycleCTA(),
           onPress: async () => {
-            let cycle = 0;
-            try {
-              cycle = await performNewCycle();
-            } catch {
-              return; // nothing committed — no ceremony, no rebuild
-            }
-            // performNewCycle returns 0 when the eligibility re-check fails
-            // (e.g. a stale row after a cycle already started elsewhere) —
-            // no ceremony over a world that did not change.
-            if (!cycle) return;
-            pendingCycleRebuildRef.current = true;
-            setPhaseTransitionEvent(NEW_CYCLE_EVENT);
+            if (sessionTransitionRef.current) return;
+            let previousCycle: number | undefined;
+            const cycle = await saveWithPlayerRetry(async () => {
+              setSessionTransition('saving');
+              try {
+                previousCycle ??= (await getFullProgress()).cycleCount ?? 0;
+                await performNewCycle();
+                return (await getFullProgress()).cycleCount ?? 0;
+              } catch (error) {
+                setSessionTransition('waiting');
+                throw error;
+              }
+            }, {
+              title: 'Your new cycle is waiting',
+              message: 'We could not finish saving the new cycle. Free device storage if it is full, then retry.',
+            });
+            // Recovery may have committed this request before Retry. Show its
+            // ceremony once the stored cycle advanced, including that replay.
+            if (cycle <= (previousCycle ?? cycle)) { setSessionTransition(null); return; }
+            showNewCycleCeremony();
           },
         },
       ]
     );
-  }, []);
+  }, [setSessionTransition, showNewCycleCeremony]);
 
   // Re-check today's daily leaderboard standing (tapping the completed daily
   // card). The standing used to be shown exactly once, on completion; this gives
@@ -2148,6 +2163,7 @@ function MainApp() {
         const streakLine = daily.streak > 1 ? `\nDaily streak: ${daily.streak} days.` : '';
         const rank = await getDailyRank(getLocalDateString());
         if (rank) {
+          await refreshDailyLadderRank(getLocalDateString(), rank);
           showGameAlert(
             'Today’s Standing',
             `${getBeatPercentText(rank.percentile, persistence.currentPhase)}\nRank ${rank.rank} of ${rank.total} today.${streakLine}`
@@ -2161,22 +2177,16 @@ function MainApp() {
     })();
   }, [persistence.currentPhase]);
 
-  // The day THIS daily board belongs to. Only today or yesterday is credible:
-  // a board left open while the app sat backgrounded for days must never
-  // credit an arbitrary past day, so anything older falls back to the wall
-  // clock (the pre-fix behaviour, which is correct for a stale board).
+  // Preserve the served board's date across midnight, suspension and reload.
+  // Expired boards remain practice; they cannot claim another day's result.
   const resolveDailyBoardDate = useCallback((): string => {
-    const captured = dailyBoardDateRef.current;
-    if (captured) {
-      const age = daysAgoLocal(captured);
-      if (age === 0 || age === 1) return captured;
-    }
-    return getLocalDateString();
+    return dailyBoardDateRef.current ?? getLocalDateString();
   }, []);
 
   // The daily board start proper — reached only through handleStartDaily's
   // replay guard below.
-  const startDailyBoard = useCallback(() => {
+  const startDailyBoard = useCallback((isCurrent: () => boolean = () => true) => {
+    if (!isCurrent()) return;
     // A hushed win's silence must not leak onto a link/notification-routed
     // daily start (this path bypasses startVictoryExitFlow's clear).
     clearVictoryMusicHush(true);
@@ -2186,10 +2196,25 @@ function MainApp() {
     resetSpeedRun();
     clearVictoryToastQueue();
     transitionTo('puzzle', async () => {
+      if (!isCurrent()) return;
       puzzleActions.setGameState(GameState.LOADING);
       puzzleActions.setMessage(getLoadingMessage(persistence.currentPhase));
       try {
+        const saved = await loadPuzzleState();
+        if (!isCurrent()) return;
+        if (saved?.isPlayingDaily && saved.gameState === 'PLAYING' && saved.dailyDate
+          && [0, 1].includes(daysAgoLocal(saved.dailyDate))) {
+          puzzleActions.restorePuzzleState(saved);
+          dailyBoardDateRef.current = saved.dailyDate;
+          dailyBoardVersionRef.current = saved.dailyBoardVersion ?? 'legacy_v1';
+          // Unknown old easing/timing metadata cannot become a ranked shared board.
+          dailyEasedRef.current = saved.dailyEased ?? true;
+          puzzleStartTimeRef.current = saved.dailyStartedAt ?? 0;
+          houseAskRestoreSuppressRef.current = true;
+          return;
+        }
         const daily = await generateDailyPuzzle();
+        if (!isCurrent()) return;
         puzzleActions.startDailyGame(daily.words, daily.hint, daily.wordLength, daily.solution);
         puzzleStartTimeRef.current = Date.now();
         // The first-ever daily gets an eased (MEDIUM) board so it isn't a
@@ -2200,12 +2225,14 @@ function MainApp() {
         // Capture the board's own day here, at serve time — the win may commit
         // on the other side of local midnight.
         dailyBoardDateRef.current = daily.date;
+        dailyBoardVersionRef.current = daily.boardVersion;
         logEvent({ type: 'puzzle_started', data: { difficulty: 'HARD', daily: true, eased: dailyEasedRef.current } });
         // First-daily mercy: a one-time hint cushion so the first HARD daily
         // (6-letter, 5-row) isn't a wall. Only fires after the board actually
         // started; null on every call after the one-time grant.
         try {
           const mercyHints = await grantFirstDailyMercy();
+          if (!isCurrent()) return;
           if (mercyHints !== null) {
             puzzleActions.refreshHintBalance();
             puzzleActions.setMessage(getFirstDailyMercyMessage(persistence.currentPhase, mercyHints));
@@ -2214,6 +2241,7 @@ function MainApp() {
             // only ever one the player has met (assessment §7). Skipped on the
             // first daily so the mercy message isn't clobbered.
             const prog = await getFullProgress();
+            if (!isCurrent()) return;
             const hostName = getDailyHostName(prog?.unlockedAnimals ?? []);
             puzzleActions.setMessage(getDailyHostLine(hostName, persistence.currentPhase));
           }
@@ -2222,16 +2250,18 @@ function MainApp() {
         }
         maybeShowSetupSelectorIntro().catch(() => {});
       } catch {
+        if (!isCurrent()) return;
         // Daily generation failed — fall back to a standard HARD puzzle so the
         // player is never stranded on a loading screen.
         setIsPlayingDaily(false);
         await puzzleActions.startNewGame('HARD', 'standard', 'standard', false, false, undefined, false);
       }
     });
-  }, [puzzleActions, transitionTo, persistenceActions, orchestrationActions, persistence.currentPhase, maybeShowSetupSelectorIntro, clearVictoryToastQueue, clearVictoryMusicHush]);
+  }, [puzzleActions, transitionTo, persistenceActions, orchestrationActions, persistence.currentPhase, maybeShowSetupSelectorIntro, clearVictoryToastQueue, clearVictoryMusicHush, resetSpeedRun]);
 
   // Start the Daily Challenge (seeded; difficulty follows the week ramp).
-  const handleStartDaily = useCallback((_difficulty: Difficulty) => {
+  const handleStartDaily = useCallback((_difficulty: Difficulty, isCurrent: () => boolean = () => true) => {
+    if (!isCurrent()) return;
     hapticLight();
     soundUiTap();
     (async () => {
@@ -2242,6 +2272,7 @@ function MainApp() {
       // tapping the completed card.
       try {
         const status = await getDailyStatus();
+        if (!isCurrent()) return;
         if (status.isCompleted) {
           transitionTo('home');
           handleRecheckDailyStanding();
@@ -2250,7 +2281,7 @@ function MainApp() {
       } catch {
         // Status read failed — fall through and let the daily start.
       }
-      startDailyBoard();
+      if (isCurrent()) startDailyBoard(isCurrent);
     })();
   }, [transitionTo, handleRecheckDailyStanding, startDailyBoard]);
 
@@ -2275,9 +2306,9 @@ function MainApp() {
     persistenceActions.refreshStats();
     logEvent({ type: 'puzzle_started', data: { shared: true, words: words.length } });
     transitionTo('puzzle');
-  }, [puzzleActions, transitionTo, persistenceActions, orchestrationActions, persistence.currentPhase, clearVictoryMusicHush]);
+  }, [puzzleActions, transitionTo, persistenceActions, orchestrationActions, persistence.currentPhase, clearVictoryMusicHush, resetSpeedRun]);
 
-  const handleIncomingLink = useCallback((url: string) => {
+  const handleIncomingLink = useCallback((url: string, isCurrent: () => boolean = () => true) => {
     // Scheme/host matching is case-insensitive on Android intents, so compare
     // lowercased — a mixed-case link must neither bypass routing nor, worse,
     // bypass the creator-code telemetry redaction below.
@@ -2358,20 +2389,20 @@ function MainApp() {
 
     if (lowerUrl.startsWith('wordshift://challenge/daily')) {
       // The optional ?date= param is ignored — the daily is always today's.
-      // Unlock inputs read FRESH from storage: a cold-start link routes ~1.2s
-      // after launch, before React persistence state may have hydrated (a
-      // stale zero showed unlocked players a false "still locked" alert).
+      // Re-read unlock inputs after the queued intent has waited through any
+      // onboarding or modal. Progress can change during that wait.
       (async () => {
         try {
           const [stats, phaseNow] = await Promise.all([getCumulativeStats(), getCurrentPhase()]);
+          if (!isCurrent()) return;
           if (isDailyChallengeUnlocked(stats.totalPuzzlesCompleted, phaseNow)) {
-            handleStartDaily('HARD');
+            handleStartDaily('HARD', isCurrent);
           } else {
             transitionTo('home');
             showGameAlert('Daily Challenge', getDailyLockedMessage(phaseNow));
           }
         } catch {
-          handleStartDaily('HARD');
+          if (isCurrent()) handleStartDaily('HARD', isCurrent);
         }
       })();
       return;
@@ -2393,54 +2424,20 @@ function MainApp() {
   }, [
     onboardingFlow.onboardingStep,
     transitionTo,
-    puzzlesSolvedForVariantUnlocks,
     persistence.currentPhase,
     handleStartDaily,
     handleStartSharedChallenge,
     puzzle.gameState,
     victoryFlow.victoryData,
     postVictoryIntro,
+    rebuildSessionFromStorage,
   ]);
-
-  // The handler lives in a ref so the Linking subscription is created exactly
-  // once and the launch URL is processed exactly once. With the callback in the
-  // dep array the effect re-ran whenever its identity changed (every solve /
-  // phase change), re-invoking getInitialURL() — which keeps returning the
-  // app's original launch URL — and re-launching a shared-challenge link
-  // mid-session. The launch URL is routed after a short delay so persistence
-  // state has hydrated before any daily/challenge routing decision.
-  const handleIncomingLinkRef = useRef(handleIncomingLink);
-  handleIncomingLinkRef.current = handleIncomingLink;
-  useEffect(() => {
-    let launchTimer: ReturnType<typeof setTimeout> | null = null;
-    Linking.getInitialURL().then(url => {
-      // Module-scope guard: an appEpoch remount (late cloud restore) re-runs
-      // this effect, and getInitialURL keeps returning the original launch URL
-      // — without the guard the remount would re-route the player into the
-      // launch link's board a second time.
-      if (url && !launchUrlProcessed) {
-        launchUrlProcessed = true;
-        launchTimer = setTimeout(() => handleIncomingLinkRef.current(url), 1200);
-      }
-    }).catch(() => {});
-
-    const subscription = Linking.addEventListener('url', event => {
-      handleIncomingLinkRef.current(event.url);
-    });
-
-    return () => {
-      if (launchTimer) clearTimeout(launchTimer);
-      subscription.remove();
-    };
-  }, []);
 
   // Notification tap routing: scheduled notifications carry a data.target
   // payload ('daily' → the daily-challenge start path, 'home' → home screen).
-  // The handler lives in a ref so the subscription is created exactly once;
-  // expo-notifications is lazily required with the same guarded pattern as
-  // services/notifications.ts (absent module → taps just open the app).
-  const routeNotificationTargetRef = useRef<(target: unknown) => void>(() => {});
-  routeNotificationTargetRef.current = (target: unknown) => {
+  // useLaunchIntents owns subscription lifetime and defers this callback
+  // until the current session and overlay owner permit navigation.
+  const routeNotificationTarget = (target: unknown, isCurrent: () => boolean = () => true) => {
     if (onboardingFlow.onboardingStep && onboardingFlow.onboardingStep !== 'complete') {
       return;
     }
@@ -2455,15 +2452,13 @@ function MainApp() {
       return;
     }
     if (target === 'daily') {
-      // Read the unlock inputs FRESH from storage: a cold-start tap routes
-      // ~1.2s after launch, and the React persistence state can still be
-      // unhydrated then — a stale zero here showed fully-unlocked players a
-      // false "still locked" alert.
+      // Resolve against current progress after this intent's deferred wait.
       (async () => {
         try {
           const [stats, phaseNow] = await Promise.all([getCumulativeStats(), getCurrentPhase()]);
+          if (!isCurrent()) return;
           if (isDailyChallengeUnlocked(stats.totalPuzzlesCompleted, phaseNow)) {
-            handleStartDaily('HARD');
+            handleStartDaily('HARD', isCurrent);
           } else {
             // Same courtesy the deep-link path gives: say why the tap landed
             // on home instead of silently swallowing it.
@@ -2472,45 +2467,13 @@ function MainApp() {
           }
         } catch {
           // Storage read failed — let handleStartDaily's own guards decide.
-          handleStartDaily('HARD');
+          if (isCurrent()) handleStartDaily('HARD', isCurrent);
         }
       })();
     } else if (target === 'home') {
       transitionTo('home');
     }
   };
-  useEffect(() => {
-    let subscription: { remove?: () => void } | null = null;
-    let coldStartTimer: ReturnType<typeof setTimeout> | null = null;
-    try {
-      const Notifications = require('expo-notifications');
-      subscription = Notifications.addNotificationResponseReceivedListener((response: any) => {
-        routeNotificationTargetRef.current(
-          response?.notification?.request?.content?.data?.target
-        );
-      });
-      // Cold-start taps never reach the runtime listener — the notification
-      // that LAUNCHED the app is only available via getLastNotificationResponseAsync.
-      // Deferred briefly so persistence state hydrates before routing to the daily.
-      // Module-scope guard: an appEpoch remount must not re-route the tap.
-      Notifications.getLastNotificationResponseAsync?.()
-        .then((response: any) => {
-          const target = response?.notification?.request?.content?.data?.target;
-          if (target != null && !coldStartNotificationProcessed) {
-            coldStartNotificationProcessed = true;
-            coldStartTimer = setTimeout(() => routeNotificationTargetRef.current(target), 1200);
-          }
-        })
-        .catch(() => {});
-    } catch {
-      subscription = null;
-    }
-    return () => {
-      if (coldStartTimer) clearTimeout(coldStartTimer);
-      subscription?.remove?.();
-    };
-  }, []);
-
   // The difficulty this board is PAID at — the one the victory receipt must
   // name. Daily always rewards HARD; a shared link prices as EASY because its
   // chain is attacker-craftable. The modal used to read puzzle.difficulty
@@ -2629,8 +2592,8 @@ function MainApp() {
           }
         }).catch(() => {});
       }
-      // Clear mid-puzzle save on completion
-      clearPuzzleState().catch(() => {});
+      // The durable completion transaction removes the resumable board only
+      // after its reward and progress have committed.
 
       // Lock interaction during async victory chain. Deliberately NO haptic
       // here: the victory's success haptic belongs to the modal becoming
@@ -2639,7 +2602,7 @@ function MainApp() {
       // the star rhythm (tap-tap-tap-THUD) that follows.
       victoryActions.setProcessingVictory(true);
 
-      const victory = await persistenceActions.recordVictory(
+      const victory = await saveWithPlayerRetry(() => persistenceActions.recordVictory(
         // Daily Challenge always rewards as HARD regardless of the player's
         // chosen difficulty preference (which is left untouched during a daily).
         // Shared-link boards price as EASY: the chain is attacker-craftable
@@ -2679,8 +2642,19 @@ function MainApp() {
         result.undoLimited ?? false,
         // Speed Shift modifier: amber-only bonus + the lifetime speed-win
         // counter behind the Speed achievements.
-        result.speed ?? false
-      );
+        result.speed ?? false,
+        undefined,
+        {
+          finalBoard: wasFinalBoard,
+          ritualWord: puzzle.rows.map(row => row.originalWord).join(',') === 'SPARK,CARED,SCARE,SHARE,CARVE,CARED,CLOSE'
+            ? result.completedWords?.[result.completedWords.length - 1] ?? '' : '',
+          phaseBefore: persistence.currentPhase,
+          dailyDate: isPlayingDaily ? resolveDailyBoardDate() : undefined,
+          unbrokenWeave: puzzle.unbrokenWeaveMode,
+        },
+      ));
+      // Clear the in-memory autosave cache after the transaction removed its key.
+      await clearPuzzleState();
 
       // Aggregate social proof: contribute this puzzle's words to the global
       // daily count (spoiler-safe, anonymous). No-op until the backend is on.
@@ -2766,14 +2740,15 @@ function MainApp() {
             // Skip the shared leaderboard for an eased first-daily board — it
             // isn't the same board everyone else played, so its time/stars
             // aren't comparable. Full reward + local ladder still apply.
-            if (!dailyEasedRef.current) {
+            if (!dailyEasedRef.current && [0, 1].includes(daysAgoLocal(date))) {
               await submitDailyResult({
                 date,
+                boardVersion: dailyBoardVersionRef.current,
                 timeMs: elapsedMs,
                 stars: victory.earnedStars,
                 hintsUsed: result.hintsUsed,
               });
-              rank = await getDailyRank(date);
+              rank = await getDailyRank(date, dailyBoardVersionRef.current);
               if (rank) setDailyRank(rank);
             }
           } catch {
@@ -2786,6 +2761,7 @@ function MainApp() {
           try {
             await recordDailyLadderResult({
               date,
+              rankEligible: !dailyEasedRef.current && [0, 1].includes(daysAgoLocal(date)),
               rank: rank?.rank ?? null,
               percentile: rank?.percentile ?? null,
               timeMs: elapsedMs,
@@ -2806,82 +2782,29 @@ function MainApp() {
             // Ladder is decorative — never block the victory flow.
           }
         })();
-        try {
-          const before = await getDailyStatus();
-          // The streak record still buckets by the wall-clock day inside
-          // dailyChallenge.ts (its grace-period gap is measured against the
-          // real today), so a midnight-straddling solve can still misfile the
-          // streak. Closing that needs a boardDate parameter down there; the
-          // board's own day is available here as resolveDailyBoardDate().
-          const dailyProgress = await recordDailyCompletion(
-            victory.earnedStars,
-            result.hintsUsed,
-            result.invalidAttempts
-          );
-          logEvent({
-            type: 'daily_completed',
-            data: { stars: victory.earnedStars, streak: dailyProgress.currentStreak },
-          });
-          const milestone = checkDailyStreakMilestone(
-            dailyProgress.currentStreak,
-            before.streak,
-            persistence.currentPhase
-          );
-          if (milestone) {
-            const newBalance = await awardBonusAmber(milestone.amber, 'daily_streak_milestone');
-            persistenceActions.setAmberBalance(newBalance);
-            // A daily-streak milestone is a distinct celebration, not a plain
-            // receipt: fire the (previously-unwired) daily_ready chime + a
-            // success haptic so it doesn't land silently like a trivial line.
+        const daily = victory.dailyOutcome;
+        if (daily?.credited) {
+          logEvent({ type: 'daily_completed', data: {
+            stars: victory.earnedStars, streak: daily.progress.currentStreak,
+          } });
+          if (daily.milestone) {
             hapticSuccess();
             soundDailyReady();
-            enqueueVictoryToast(`${milestone.message} (+${milestone.amber} amber)`, 'receipt');
-          } else if (dailyProgress.streakSavedByFreeze) {
-            // A banked freeze forgave a missed day — let the player know the
-            // chain survived so the protection feels real, not silent. Phase-
-            // aware copy (the house protects warmly at every register).
+            enqueueVictoryToast(`${daily.milestone.message} (+${daily.milestone.amber} amber)`, 'receipt');
+          } else if (daily.progress.streakSavedByFreeze) {
             enqueueVictoryToast(getStreakFreezeReliefMessage(persistence.currentPhase, true));
-          } else if (dailyProgress.streakDecayedTo != null) {
-            // Decay-to-milestone: the lapse cost the climb, not the streak —
-            // name the checkpoint it held at (phase-aware copy).
-            const heldAt = dailyProgress.streakDecayedTo;
-            enqueueVictoryToast(getStreakHeldMessage(heldAt, persistence.currentPhase));
+          } else if (daily.progress.streakDecayedTo != null) {
+            enqueueVictoryToast(getStreakHeldMessage(daily.progress.streakDecayedTo, persistence.currentPhase));
           }
-          // Full-moon event: +50% bonus on the daily's amber, credited as
-          // BONUS amber only. Never feeds phase progress (same rule as every
-          // bonus/purchased amber source). Basis: the solve's earned parts
-          // (base + stars + streak + challenge), NOT one-time milestone /
-          // first-completion windfalls — those can be huge in the endgame tail
-          // and aren't "today's daily". Surfaced inside the VictoryModal
-          // (a toast would render underneath the modal overlay and never show).
-          if (getActiveEvent()) {
-            const b = victory.amberBreakdown;
-            const bonusBasis = b
-              ? b.base + b.starBonus + b.streakBonus + b.challengeBonus
-              : victory.amberEarned;
-            const eventBonus = getEventDailyBonusAmber(bonusBasis);
-            if (eventBonus > 0) {
-              const newBalance = await awardBonusAmber(eventBonus, 'event_daily_bonus');
-              persistenceActions.setAmberBalance(newBalance);
-              setEventBonusLine(getEventDailyBonusLine(persistence.currentPhase, eventBonus));
-            }
+          if (daily.eventBonus > 0) {
+            setEventBonusLine(getEventDailyBonusLine(persistence.currentPhase, daily.eventBonus));
           }
-        } catch {
-          // Daily recording is non-critical — never block the victory flow.
         }
       }
 
       let finalVictory = victory;
       if (puzzle.unbrokenWeaveMode) {
-        const { mastery, rankedUp } = await recordUnbrokenWeaveVictory(puzzle.difficulty, victory.flawless === true);
-        setUnbrokenWeaveMastery(mastery);
-        finalVictory = {
-          ...finalVictory,
-          unbrokenWeaveRank: mastery.rank,
-          unbrokenWeaveTitle: mastery.title,
-          unbrokenWeaveNextObjective: mastery.nextObjective,
-          unbrokenWeaveRankedUp: rankedUp,
-        };
+        setUnbrokenWeaveMastery(await getUnbrokenWeaveMastery());
       }
       const shouldAutoCollectVictory = (
         (onboardingFlow.onboardingStep === undefined || onboardingFlow.onboardingStep === 'complete') &&
@@ -2891,14 +2814,11 @@ function MainApp() {
       );
 
       if (shouldAutoCollectVictory && victory.harvestBatchId) {
-        const autoCollected = await offerBatch(victory.harvestBatchId);
+        const autoCollected = await saveWithPlayerRetry(() => offerBatch(victory.harvestBatchId!));
         if (autoCollected && autoCollected.amberAwarded > 0) {
-          const newBalance = await awardBonusAmber(autoCollected.amberAwarded, 'auto_word_offering');
-          // Apply-then-ack: clear the pending-credit ledger entry only after
-          // the amber landed (kill between the writes replays, never loses).
-          if (autoCollected.creditId) {
-            acknowledgeBatchCredit(autoCollected.creditId).catch(() => {});
-          }
+          const newBalance = await saveWithPlayerRetry(() => settleBatchCredit(
+            autoCollected.creditId, 'auto_word_offering'
+          ));
           persistenceActions.setAmberBalance(newBalance);
           logEvent({
             type: 'harvest_auto_collected',
@@ -3144,100 +3064,29 @@ function MainApp() {
         // after that triggers POST_REVELATION_EVENT + markPostRevelation,
         // exactly as before.
         let dwellLineForWin: string | null = null;
-        if (!victory.phaseChanged && persistence.currentPhase >= 4) {
-          try {
-            const houseComplete = await isHouseCompleted();
-            // ENDGAME ELIGIBILITY. This used to require houseComplete OUTRIGHT,
-            // which made a SOFT CURRENCY load-bearing for narrative completion:
-            // markPostRevelation() is the only route to Phase 5, and it sat
-            // inside this branch. Completing the house costs 4,615 amber on a
-            // specific ladder, while ~5,600 amber of cosmetics is ungated and
-            // visible from solve 0 — so a player who spent on cosmetics, or who
-            // simply earned slowly, was silently and permanently locked out of
-            // the revelation with no warning surface anywhere in the game.
-            //
-            // The design rule is that amber must never ACCELERATE the story, and
-            // that still holds exactly: the fallback below is a REAL-SOLVE floor
-            // (115), which no amount of amber or cash can buy. The rule simply
-            // needed its mirror — amber must not be able to BLOCK the story
-            // either. The house stays the intended route (it completes ~96-100,
-            // comfortably before the arming floor), so for virtually every player
-            // nothing changes; this only stops the ending being strandable.
-            const endgameEligible = houseComplete || completedTotal >= FINALE_ARM_MIN_PUZZLES;
-            if (endgameEligible) {
-              const finalDone = await isFinalPuzzleCompleted();
-              if (!finalDone) {
-                if (wasFinalBoard) {
-                  // The last arrangement is complete. markFinalPuzzleCompleted
-                  // also disarms the finale (single atomic write).
-                  const completedStoryContext = await getStoryContext();
-                  const lastWord = result.completedWords?.[result.completedWords.length - 1] ?? '';
-                  const authoredFinal = puzzle.rows.map(row => row.originalWord).join(',') === 'SPARK,CARED,SCARE,SHARE,CARVE,CARED,CLOSE';
-                  await recordStoryBoundary(completedStoryContext, authoredFinal ? lastWord : '');
-                  await markFinalPuzzleCompleted();
-                  // The coda must not claim a finished house on the solve-floor
-                  // fallback path (see endgameEligible above) — a player who
-                  // reached the last arrangement with rooms still unbuilt would
-                  // be told they completed something they can see they did not.
-                  orchestrationActions.setCompletionCoda({
-                    title: houseComplete ? 'THE HOUSE STANDS COMPLETE' : 'THE ARRANGEMENT IS COMPLETE',
-                    text: houseComplete
-                      ? (persistence.currentPhase >= 3
-                          ? 'The last word has settled. What happens next belongs to everyone who lives here.'
-                          : 'You completed the house and reached the final path.')
-                      : 'There is still room to build. Tonight, the words have opened something beneath the unfinished house.',
-                  });
-                  // The Arrival names the player's own deepest words (the
-                  // evidence was their hands). Falls back to the generic
-                  // event when the ritual memory holds too few dread words.
-                  let arrivalEvent = FINAL_PUZZLE_EVENT;
-                  try {
-                    arrivalEvent = buildFinalPuzzleEvent(await getRitualWords(), await getArrivalContext());
-                  } catch {
-                    arrivalEvent = FINAL_PUZZLE_EVENT;
-                  }
-                  queueEndgameCinematic(arrivalEvent);
-                } else if (!(await isFinaleArmed())) {
-                  // Dwell gate: the finale used to fire on the FIRST Phase-4
-                  // victory, so the whole cult-reveal era flashed past in one
-                  // puzzle. Require FINALE_DWELL_PUZZLES Phase-4 puzzles first
-                  // so the robed sprites, sacrifice mechanic, and 300 Phase-4
-                  // dialogue lines are actually played. Even after all eight
-                  // dwell wins land early (completion/recruit ~136, dwell ~143),
-                  // hold the marked board until arming at 160. The final board
-                  // is ~161 and post-revelation ~162, giving the descent trio
-                  // time to speak. Never shown as a counter (narrative rule 7)
-                  // — the house "is not yet ready."
-                  const dwellBefore = await getPhase4DwellCount();
-                  const dwell = await recordPhase4Dwell();
-                  if (canArmFinale(dwell, completedTotal)) {
-                    await armFinale();
-                  }
-                  // Dwell voice: the wait after "The arrangement is ready."
-                  // reads as held breath, not silence — one counter-free line
-                  // per dwell win, surfaced through the ambient overlay in the
-                  // victory cascade (skipped when a keyed micro-beat fires).
-                  dwellLineForWin = dwellBefore >= FINALE_DWELL_PUZZLES
-                    ? getPostCapDwellLine(completedTotal, persistence.currentPhase)
-                    : getDwellLine(Math.min(dwell, FINALE_DWELL_PUZZLES), persistence.currentPhase, houseComplete);
-                }
-                // Armed but not the final board (a daily / restored board):
-                // hold still — the arrangement has already chosen its board.
-              } else {
-                const postRev = await isPostRevelation();
-                if (!postRev) {
-                  await markPostRevelation();
-                  orchestrationActions.setCompletionCoda({
-                    title: 'THE PATTERN REMEMBERS YOU',
-                    text: 'You saw it through to the end. The arrangement is complete, and your words remain in every wall.',
-                  });
-                  queueEndgameCinematic(buildPostRevelationEvent(await getArrivalContext()));
-                }
-              }
-            }
-          } catch {
-            // Endgame triggers are non-critical
-          }
+        // The completion receipt owns ending state. This block only presents
+        // the committed consequence, so retry/recovery cannot advance dwell twice.
+        const endgame = victory.endgame;
+        if (endgame?.kind === 'arrival') {
+          orchestrationActions.setCompletionCoda({
+            title: endgame.houseComplete ? 'THE HOUSE STANDS COMPLETE' : 'THE ARRANGEMENT IS COMPLETE',
+            text: endgame.houseComplete
+              ? 'The last word has settled. What happens next belongs to everyone who lives here.'
+              : 'There is still room to build. Tonight, the words have opened something beneath the unfinished house.',
+          });
+          let arrivalEvent = FINAL_PUZZLE_EVENT;
+          try { arrivalEvent = buildFinalPuzzleEvent(await getRitualWords(), await getArrivalContext()); } catch { /* authored fallback */ }
+          queueEndgameCinematic(arrivalEvent);
+        } else if (endgame?.kind === 'dwell') {
+          dwellLineForWin = (endgame.dwellBefore ?? 0) >= FINALE_DWELL_PUZZLES
+            ? getPostCapDwellLine(completedTotal, persistence.currentPhase)
+            : getDwellLine(Math.min(endgame.dwell ?? 0, FINALE_DWELL_PUZZLES), persistence.currentPhase, endgame.houseComplete);
+        } else if (endgame?.kind === 'post_arrival') {
+          orchestrationActions.setCompletionCoda({
+            title: 'THE PATTERN REMEMBERS YOU',
+            text: 'You saw it through to the end. The arrangement is complete, and your words remain in every wall.',
+          });
+          queueEndgameCinematic(buildPostRevelationEvent(await getArrivalContext()));
         }
 
         // Check achievements after brief delay to not block victory display
@@ -3408,8 +3257,11 @@ function MainApp() {
     tutorialGuidance,
     addVictoryTimeout,
     enqueueVictoryToast,
-    getStoryContext,
     getArrivalContext,
+    SCREEN_HEIGHT, SCREEN_WIDTH, fireBlindJudgment, isPlayingDaily,
+    puzzle.blindMode, puzzle.isFinalBoard, puzzle.isSharedChallenge, puzzle.rows,
+    puzzle.speedMode, puzzle.unbrokenWeaveMode, puzzlesSolvedForVariantUnlocks,
+    queueEndgameCinematic, resolveDailyBoardDate, speedRound, stopSpeedTimer,
   ]);
 
   const handleLetterPress = useCallback((letter: any, rowIndex: number) => {
@@ -3935,10 +3787,13 @@ function MainApp() {
   }, [puzzle.undoLimited, persistence.amberBalance, puzzleActions, persistenceActions]);
 
   const handleHintPress = useCallback(() => {
+    logEvent({ type: 'hint_requested', data: {
+      phase: persistence.currentPhase, difficulty: puzzle.difficulty, variant: puzzle.currentVariant,
+    } });
     hapticSelection();
     soundHint();
     puzzleActions.handleHint();
-  }, [puzzleActions]);
+  }, [puzzleActions, persistence.currentPhase, puzzle.difficulty, puzzle.currentVariant]);
 
   // Out-of-hints recovery: a completed `hint_recovery` clip grants one hint.
   // Declining/closing the clip (or an ad failure) is a quiet toast, never a
@@ -4019,7 +3874,7 @@ function MainApp() {
     } finally {
       notificationPromptInFlightRef.current = false;
     }
-  }, [onboardingFlow.isOnboarding, persistence.cumulativeStats, persistence.currentPhase]);
+  }, [onboardingFlow.isOnboarding, persistence.cumulativeStats, persistence.currentPhase, postVictoryIntro]);
 
   const handleNotificationPromptDecline = useCallback(() => {
     setNotificationPrompt(null);
@@ -4379,6 +4234,7 @@ function MainApp() {
   // Swallowed during onboarding so back can't break the guided flow.
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (isStorageTransactionActive() || sessionTransitionRef.current || navigationBusy) return true;
       if (onboardingFlow.isOnboarding) {
         // On the very first interactive screen (the cold-open opener, nothing
         // committed yet), back should EXIT the app like any first screen — a
@@ -4439,7 +4295,7 @@ function MainApp() {
       return false;
     });
     return () => subscription.remove();
-  }, [currentScreen, transitionTo, onboardingFlow.isOnboarding, onboardingFlow.onboardingStep, puzzleActions, puzzle.gameState, puzzle.history.length, puzzle.unbrokenWeaveMode, victoryFlow.victoryData, persistence.pendingPhaseTransition, postVictoryIntro, handleGoToPit, handleReturnHome]);
+  }, [currentScreen, transitionTo, navigationBusy, onboardingFlow.isOnboarding, onboardingFlow.onboardingStep, puzzleActions, puzzle.gameState, puzzle.history.length, puzzle.unbrokenWeaveMode, victoryFlow.victoryData, persistence.pendingPhaseTransition, postVictoryIntro, handleGoToPit, handleReturnHome]);
 
   // Optional rewarded "double the reward": credits a bonus equal to this
   // puzzle's amber (a true 2x), reward-only — never phase progress. One claim
@@ -4574,7 +4430,7 @@ function MainApp() {
     // complete, silently consuming that day's real challenge.
     setIsPlayingDaily(false);
     puzzleActions.startNewGame(d, puzzle.gameMode, puzzle.selectedVariant);
-  }, [puzzleActions, puzzle.gameMode, puzzle.selectedVariant, orchestrationActions]);
+  }, [puzzleActions, puzzle.gameMode, puzzle.selectedVariant, orchestrationActions, resetSpeedRun]);
 
   const handleSelectVariant = useCallback((variant: PuzzleVariant) => {
     if (!isVariantUnlocked(variant, puzzlesSolvedForVariantUnlocks, persistence.currentPhase)) {
@@ -4600,6 +4456,7 @@ function MainApp() {
     puzzlesSolvedForVariantUnlocks,
     persistence.currentPhase,
     orchestrationActions,
+    resetSpeedRun,
   ]);
 
   // Every modifier toggle re-serves the board (blind in particular MUST apply to
@@ -4770,6 +4627,47 @@ function MainApp() {
     postVictoryIntro === null &&
     phaseTransitionEvent === null && !storyOverlayActive && !homeOverlayActive && homeQuietReady;
 
+  // Global requests retain their payloads in the owning flow. This scheduler
+  // grants one actionable layer, with FIFO dialogs and explicit save/story
+  // precedence, so a returning reward cannot open over Store or an alert.
+  const victoryModalVisible =
+    currentScreen === 'puzzle' &&
+    puzzle.gameState === GameState.WON &&
+    !(onboardingFlow.isOnboarding &&
+      (onboardingFlow.onboardingStep === 'puzzle_complete' ||
+        onboardingFlow.onboardingStep === 'going_to_pit'));
+  const overlayOwner = useGlobalOverlays({
+    saving: showStorageHold && saveHoldActive,
+    navigation: navigationBusy,
+    ceremony: phaseTransitionEvent !== null,
+    alert: alertPending,
+    story: activeStory !== null && postVictoryIntro === null,
+    journal: storyFlow.journalContext !== null,
+    share: shareResultData !== null,
+    practice: practiceLesson !== null,
+    store: showStoreModal,
+    patron: showPatronModal,
+    notification: notificationPrompt !== null,
+    dailyLogin: dailyLoginGrant !== null,
+    victory: victoryModalVisible,
+    timeUp: currentScreen === 'puzzle' && puzzle.gameState === GameState.GAME_OVER,
+  }, { dailyLogin: dailyLoginGrantVisible });
+  const [presentedPhaseEvent, setPresentedPhaseEvent] = useState<PhaseTransitionEvent | null>(null);
+  if (phaseTransitionEvent === null && presentedPhaseEvent !== null) setPresentedPhaseEvent(null);
+  else if (overlayOwner === 'ceremony' && presentedPhaseEvent !== phaseTransitionEvent) setPresentedPhaseEvent(phaseTransitionEvent);
+  const cinematicEvent = overlayOwner === 'ceremony' || presentedPhaseEvent === phaseTransitionEvent
+    ? phaseTransitionEvent : null;
+
+  useLaunchIntents(
+    onboardingFlow.onboardingReady && !bootRouting &&
+      persistence.cumulativeStats !== null && overlayOwner === null &&
+      sessionTransition === null && !storageBusy && postVictoryIntro === null &&
+      !homeOverlayActive && !puzzle.showRules && !puzzle.showDifficultyMenu,
+    handleIncomingLink,
+    routeNotificationTarget,
+    onboardingFlow.isOnboarding,
+  );
+
   // ========================================================================
   // Render
   // ========================================================================
@@ -4785,10 +4683,12 @@ function MainApp() {
     // native-splash -> bootstrap-gate -> MainApp-hydration holds read as ONE
     // continuous branded moment instead of blinking through the old near-black
     // (#1A1A2E, a Phase-4 color) card — or a differently-sized icon — on launch.
-    return <BootHold />;
+    return <BootHold failed={initialRoute.status === 'failed'} onRetry={initialRoute.retry} />;
   }
 
   // Helper: render the active screen content
+  const pauseSurface = getSurfaceTheme(persistence.currentPhase);
+
   const renderScreen = () => {
     if (currentScreen === 'settings') {
       return (
@@ -4799,6 +4699,8 @@ function MainApp() {
             onClose={() => transitionTo('home')}
             onReset={handleResetComplete}
             onCloudRestored={() => rebuildSessionFromStorage({ restartOnboarding: false })}
+            onSessionTransitionChange={setSessionTransition}
+            onNewCycleCommitted={showNewCycleCeremony}
           />
         </View>
       );
@@ -5020,7 +4922,6 @@ function MainApp() {
     // Phase-aware surface for the pause-state cards (board-gen / victory-record
     // spinner + the speed Time's-Up overlay) so they track the descent instead
     // of flashing Phase-0 white candy whenever the game pauses.
-    const pauseSurface = getSurfaceTheme(persistence.currentPhase);
     return (
       <ErrorBoundary
         fallbackMessage="Something went wrong with the puzzle. Tap to return home."
@@ -5053,7 +4954,7 @@ function MainApp() {
         />
 
         {/* Header — safe-area top inset applied inline (StyleSheet is static) */}
-        <View style={[styles.header, { paddingTop: screenInsets.top + 16 }]}>
+        <View style={[styles.header, { paddingTop: screenInsets.top + (compactPuzzleLayout ? 6 : 16) }]}>
           {/* Hide home button during onboarding tutorial */}
           {!onboardingFlow.isOnboarding ? (
             <TouchableOpacity
@@ -5130,7 +5031,7 @@ function MainApp() {
             {/* The How-to-Play signpost (generateGameIcons chrome), the same
                 mark the utility menu's How to Play row wears, instead of a
                 bare '?' glyph beside the hand-painted wordmark. */}
-            <Image source={getModeIconSprite('rules')!} style={styles.helpButtonIcon} resizeMode="contain" />
+            <Image source={CHROME_ICONS.rules} style={styles.helpButtonIcon} resizeMode="contain" />
           </TouchableOpacity>
         </View>
 
@@ -5499,72 +5400,9 @@ function MainApp() {
             </View>
           )}
 
-          {/* Time's Up overlay — speed variant only (GAME_OVER is set solely on time-up) */}
-          {puzzle.gameState === GameState.GAME_OVER && (
-            <View style={styles.loadingOverlay} accessibilityRole="alert">
-              <View style={[styles.loadingBox, { backgroundColor: pauseSurface.cardBg, borderWidth: 1, borderColor: pauseSurface.cardBorder }]}>
-                {/* A spent hourglass (generateGameIcons chrome) heads the card
-                    instead of a typographic diamond: the overlay is about time. */}
-                <Image source={getModeIconSprite('hourglass')!} style={styles.loadingGlyphImage} resizeMode="contain" />
-                <Text style={[styles.timeUpText, { color: pauseSurface.title }]}>
-                  {puzzle.message || getSpeedTimeUpMessage(persistence.currentPhase)}
-                </Text>
-                {/* Opt-in rewarded rescue — once per board. RewardedAdButton
-                    self-gates on provider readiness, the daily rewarded cap,
-                    and Patron status (it isn't rendered when unavailable). */}
-                {!speedRescueUsed && (
-                  <RewardedAdButton
-                    placement={SPEED_RESCUE_PLACEMENT}
-                    phase={persistence.currentPhase}
-                    surface="dark"
-                    label={getSpeedRescueLabel(persistence.currentPhase, SPEED_RESCUE_EXTRA_SEC)}
-                    onReward={handleSpeedRescue}
-                    style={styles.speedRescueButton}
-                  />
-                )}
-                <View style={styles.timeUpButtonRow}>
-                  <CandyButton
-                    label="Try Again"
-                    phase={persistence.currentPhase}
-                    variant="primary"
-                    style={styles.timeUpButtonFlex}
-                    soundKind="none"
-                    onPress={() => {
-                      hapticLight();
-                      // Abandoning the timed-out run resets the escalation
-                      // ladder (time-up no longer resets it — a rescue may
-                      // continue the run).
-                      resetSpeedRun();
-                      puzzleActions.startNewGame();
-                    }}
-                    accessibilityLabel="Try again with a new puzzle"
-                  />
-                  <CandyButton
-                    label="Home"
-                    phase={persistence.currentPhase}
-                    variant="secondary"
-                    style={styles.timeUpButtonFlex}
-                    soundKind="none"
-                    onPress={() => {
-                      hapticLight();
-                      resetSpeedRun();
-                      // Through the transition, not a raw setCurrentScreen: a
-                      // bare swap hard-cuts to home AND leaves one frame of the
-                      // old rootBgColor behind it.
-                      transitionTo('home', () => {
-                        puzzleActions.setGameState(GameState.IDLE);
-                      });
-                    }}
-                    accessibilityLabel="Return home"
-                  />
-                </View>
-              </View>
-            </View>
-          )}
-
           <ScrollView
             ref={puzzleScrollRef}
-            contentContainerStyle={styles.rowsContainer}
+            contentContainerStyle={[styles.rowsContainer, compactPuzzleLayout && { paddingTop: 6, paddingBottom: 18 }]}
             showsVerticalScrollIndicator={false}
             scrollEnabled={puzzleScrollEnabled}
             accessibilityRole="list"
@@ -5644,7 +5482,7 @@ function MainApp() {
         {/* Bottom Controls — simplified during onboarding (no NEW button).
             Bottom padding grows past the legacy 30 to clear the home
             indicator / gesture nav bar on tall devices. */}
-        <View style={[styles.controls, { paddingBottom: Math.max(30, screenInsets.bottom) }]}>
+        <View style={[styles.controls, { paddingBottom: Math.max(compactPuzzleLayout ? 12 : 30, screenInsets.bottom) }]}>
           <ActionButton
             icon="↩"
             label="UNDO"
@@ -5707,51 +5545,7 @@ function MainApp() {
           visible={puzzle.showRules}
           phase={persistence.currentPhase}
           onClose={() => puzzleActions.setShowRules(false)}
-        />
-
-        {/* Victory Modal — shown during onboarding puzzle_tutorial. Hidden while
-            the FoxGuide completion beat runs (puzzle_complete) AND through the
-            going_to_pit transition window: gameState is still WON during the
-            ~300ms before the pit transition overlay covers the screen, so
-            without the second exclusion the modal flashed back in.
-            Tap-to-skip lives INSIDE the modal (onSkip): the old childless
-            box-none Pressable here never received touches — dead code. */}
-        <VictoryModal
-          visible={puzzle.gameState === GameState.WON && !(onboardingFlow.isOnboarding && (onboardingFlow.onboardingStep === 'puzzle_complete' || onboardingFlow.onboardingStep === 'going_to_pit'))}
-          earnedStars={puzzle.earnedStars}
-          difficulty={rewardDifficulty}
-          phase={persistence.currentPhase}
-          phaseTransitionPending={persistence.pendingPhaseTransition != null}
-          isPlayingDaily={isPlayingDaily}
-          dailyRank={dailyRank}
-          dailyHistoryLine={dailyLadderLine}
-          dailyTrend={dailyLadderTrend}
-          socialProofLine={socialProofLine}
-          eventBonusLine={eventBonusLine}
-          receiptLine={victoryReceipt}
-          forceFullCeremony={phaseTransitionEvent != null}
-          rewardedDoubleEnabled={victoryDoubleOffer}
-          rewardedDoubleClaimed={victoryDoubleClaimed}
-          onRewardedDouble={handleRewardedDouble}
-          victoryData={victoryFlow.victoryData}
-          completionCoda={orchestration.completionCoda}
-          cumulativeStats={persistence.cumulativeStats}
-          completedWords={puzzle.lastCompletedWords}
-          incantationName={puzzle.lastIncantationName}
-          modalScale={victoryFlow.victoryModalScale}
-          modalOpacity={victoryFlow.victoryModalOpacity}
-          star1Scale={victoryFlow.victoryStar1}
-          star2Scale={victoryFlow.victoryStar2}
-          star3Scale={victoryFlow.victoryStar3}
-          onNextLevel={handleNextLevel}
-          onReturnHome={handleReturnHome}
-          onGoToPit={handleGoToPit}
-          onShare={handleShare}
-          onSkip={handleVictoryTapAccelerate}
-          isOnboarding={onboardingFlow.isOnboarding && (onboardingFlow.onboardingStep === 'cold_open_puzzle' || onboardingFlow.onboardingStep === 'puzzle_tutorial')}
-          onOnboardingContinue={handleOnboardingVictoryContinue}
-          variant={puzzle.currentVariant}
-          gameMode={puzzle.gameMode}
+          onPractice={lesson => { puzzleActions.setShowRules(false); setPracticeLesson(lesson); }}
         />
 
         {/* Victory Glitch — brief flash text during Phase 0 victories */}
@@ -6038,15 +5832,7 @@ function MainApp() {
   // overlay, or a phase-transition cinematic) is up: the screen underneath is
   // visually occluded, so it must be hidden from the screen reader too, or
   // VoiceOver/TalkBack focus leaks into the board/home behind the overlay.
-  const victoryModalVisible =
-    puzzle.gameState === GameState.WON &&
-    !(onboardingFlow.isOnboarding &&
-      (onboardingFlow.onboardingStep === 'puzzle_complete' ||
-        onboardingFlow.onboardingStep === 'going_to_pit'));
-  const blockingOverlayActive =
-    victoryModalVisible ||
-    puzzle.gameState === GameState.GAME_OVER ||
-    phaseTransitionEvent != null || storyOverlayActive;
+  const blockingOverlayActive = sessionTransition !== null || overlayOwner !== null;
 
   // Render screen with global overlays on top
   return (
@@ -6057,6 +5843,7 @@ function MainApp() {
           the player home instead of crashing the entire app. */}
       <Animated.View
         style={screenRevealStyle}
+        pointerEvents={storageBusy || sessionTransition !== null || navigationBusy ? 'none' : 'auto'}
         accessibilityElementsHidden={blockingOverlayActive}
         importantForAccessibility={blockingOverlayActive ? 'no-hide-descendants' : 'auto'}
       >
@@ -6067,12 +5854,124 @@ function MainApp() {
         {renderScreen()}
       </ErrorBoundary>
       </Animated.View>
+      {/* Active result controls are siblings of the hidden background. */}
+          {/* Time's Up overlay — speed variant only (GAME_OVER is set solely on time-up) */}
+          {overlayOwner === 'timeUp' && (
+            <View style={styles.loadingOverlay} accessibilityRole="alert">
+              <View style={[styles.loadingBox, { backgroundColor: pauseSurface.cardBg, borderWidth: 1, borderColor: pauseSurface.cardBorder }]}>
+                {/* A spent hourglass (generateGameIcons chrome) heads the card
+                    instead of a typographic diamond: the overlay is about time. */}
+                <Image source={getModeIconSprite('hourglass')!} style={styles.loadingGlyphImage} resizeMode="contain" />
+                <Text style={[styles.timeUpText, { color: pauseSurface.title }]}>
+                  {puzzle.message || getSpeedTimeUpMessage(persistence.currentPhase)}
+                </Text>
+                {/* Opt-in rewarded rescue — once per board. RewardedAdButton
+                    self-gates on provider readiness, the daily rewarded cap,
+                    and Patron status (it isn't rendered when unavailable). */}
+                {!speedRescueUsed && (
+                  <RewardedAdButton
+                    placement={SPEED_RESCUE_PLACEMENT}
+                    phase={persistence.currentPhase}
+                    surface="dark"
+                    label={getSpeedRescueLabel(persistence.currentPhase, SPEED_RESCUE_EXTRA_SEC)}
+                    onReward={handleSpeedRescue}
+                    style={styles.speedRescueButton}
+                  />
+                )}
+                <View style={styles.timeUpButtonRow}>
+                  <CandyButton
+                    label="Try Again"
+                    phase={persistence.currentPhase}
+                    variant="primary"
+                    style={styles.timeUpButtonFlex}
+                    soundKind="none"
+                    onPress={() => {
+                      hapticLight();
+                      // Abandoning the timed-out run resets the escalation
+                      // ladder (time-up no longer resets it — a rescue may
+                      // continue the run).
+                      resetSpeedRun();
+                      puzzleActions.startNewGame();
+                    }}
+                    accessibilityLabel="Try again with a new puzzle"
+                  />
+                  <CandyButton
+                    label="Home"
+                    phase={persistence.currentPhase}
+                    variant="secondary"
+                    style={styles.timeUpButtonFlex}
+                    soundKind="none"
+                    onPress={() => {
+                      hapticLight();
+                      resetSpeedRun();
+                      // Through the transition, not a raw setCurrentScreen: a
+                      // bare swap hard-cuts to home AND leaves one frame of the
+                      // old rootBgColor behind it.
+                      transitionTo('home', () => {
+                        puzzleActions.setGameState(GameState.IDLE);
+                      });
+                    }}
+                    accessibilityLabel="Return home"
+                  />
+                </View>
+              </View>
+            </View>
+          )}
+
+        {/* Victory Modal — shown during onboarding puzzle_tutorial. Hidden while
+            the FoxGuide completion beat runs (puzzle_complete) AND through the
+            going_to_pit transition window: gameState is still WON during the
+            ~300ms before the pit transition overlay covers the screen, so
+            without the second exclusion the modal flashed back in.
+            Tap-to-skip lives INSIDE the modal (onSkip): the old childless
+            box-none Pressable here never received touches — dead code. */}
+        <View style={StyleSheet.absoluteFill} pointerEvents={overlayOwner === 'victory' ? 'box-none' : 'none'} accessibilityElementsHidden={overlayOwner !== 'victory'} importantForAccessibility={overlayOwner === 'victory' ? 'auto' : 'no-hide-descendants'}>
+        <VictoryModal
+          visible={victoryModalVisible}
+          earnedStars={puzzle.earnedStars}
+          difficulty={rewardDifficulty}
+          phase={persistence.currentPhase}
+          phaseTransitionPending={persistence.pendingPhaseTransition != null}
+          isPlayingDaily={isPlayingDaily}
+          dailyRank={dailyRank}
+          dailyHistoryLine={dailyLadderLine}
+          dailyTrend={dailyLadderTrend}
+          socialProofLine={socialProofLine}
+          eventBonusLine={eventBonusLine}
+          receiptLine={victoryReceipt}
+          forceFullCeremony={phaseTransitionEvent != null}
+          rewardedDoubleEnabled={victoryDoubleOffer}
+          rewardedDoubleClaimed={victoryDoubleClaimed}
+          onRewardedDouble={handleRewardedDouble}
+          victoryData={victoryFlow.victoryData}
+          completionCoda={orchestration.completionCoda}
+          cumulativeStats={persistence.cumulativeStats}
+          completedWords={puzzle.lastCompletedWords}
+          incantationName={puzzle.lastIncantationName}
+          modalScale={victoryFlow.victoryModalScale}
+          modalOpacity={victoryFlow.victoryModalOpacity}
+          star1Scale={victoryFlow.victoryStar1}
+          star2Scale={victoryFlow.victoryStar2}
+          star3Scale={victoryFlow.victoryStar3}
+          onNextLevel={handleNextLevel}
+          onReturnHome={handleReturnHome}
+          onGoToPit={handleGoToPit}
+          onShare={handleShare}
+          onSkip={handleVictoryTapAccelerate}
+          isOnboarding={onboardingFlow.isOnboarding && (onboardingFlow.onboardingStep === 'cold_open_puzzle' || onboardingFlow.onboardingStep === 'puzzle_tutorial')}
+          onOnboardingContinue={handleOnboardingVictoryContinue}
+          variant={puzzle.currentVariant}
+          gameMode={puzzle.gameMode}
+        />
+        </View>
+
       {/* Screen transition overlay — solid cover that fades in/out during
           navigation. A memoized leaf on purpose: see ScreenTransitionOverlay. */}
       <ScreenTransitionOverlay opacity={transitionOverlay} color={transitionOverlayColor} />
       {/* Phase transition overlay — renders above ALL screens */}
       <PhaseTransitionOverlay
-        event={phaseTransitionEvent}
+        event={cinematicEvent}
+        suspended={overlayOwner !== 'ceremony'}
         onComplete={() => {
           setPhaseTransitionEvent(null);
           // A home-launched New Cycle ceremony hands off to the in-place
@@ -6085,21 +5984,21 @@ function MainApp() {
         }}
       />
       <StorySceneModal
-        memory={!phaseTransitionEvent && !postVictoryIntro ? activeStory?.memory ?? null : null}
+        memory={overlayOwner === 'story' ? activeStory?.memory ?? null : null}
         phase={activeStory?.context.phase ?? persistence.currentPhase}
         onAdvance={storyFlow.advance}
         onChoose={storyFlow.choose}
         onClose={storyFlow.close}
       />
       <StoryJournalModal
-        visible={storyFlow.journalContext !== null}
+        visible={overlayOwner === 'journal'}
         context={storyFlow.journalContext}
         onClose={storyFlow.closeJournal}
         onResume={() => { storyFlow.resume().catch(() => {}); }}
       />
       {/* Shareable result card preview — overlays everything */}
       <ShareResultModal
-        result={shareResultData}
+        result={overlayOwner === 'share' ? shareResultData : null}
         challengeText={shareChallengeText}
         onClose={() => setShareResultData(null)}
         onShared={() => {
@@ -6113,12 +6012,12 @@ function MainApp() {
           in the victory flow, a post-victory intro, or a ceremony, the claimed
           grant is held in state and surfaces on the next home arrival. */}
       <DailyLoginModal
-        grant={dailyLoginGrantVisible ? dailyLoginGrant : null}
+        grant={overlayOwner === 'dailyLogin' ? dailyLoginGrant : null}
         phase={persistence.currentPhase}
         onClose={() => setDailyLoginGrant(null)}
       />
       <NotificationPromptModal
-        visible={notificationPrompt !== null}
+        visible={overlayOwner === 'notification'}
         phase={persistence.currentPhase}
         title={notificationPrompt?.title ?? ''}
         body={notificationPrompt?.body ?? ''}
@@ -6128,7 +6027,7 @@ function MainApp() {
         onDecline={handleNotificationPromptDecline}
       />
       <PatronModal
-        visible={showPatronModal}
+        visible={overlayOwner === 'patron'}
         phase={persistence.currentPhase}
         onClose={() => {
           setShowPatronModal(false);
@@ -6137,7 +6036,7 @@ function MainApp() {
         onPatronChange={(isPatron) => { if (isPatron) persistenceActions.refreshStats(); }}
       />
       <StoreModal
-        visible={showStoreModal}
+        visible={overlayOwner === 'store'}
         phase={persistence.currentPhase}
         amberBalance={persistence.amberBalance}
         hintBalance={puzzle.hintBalance}
@@ -6147,29 +6046,22 @@ function MainApp() {
         }}
         onAmberChange={persistenceActions.setAmberBalance}
         onHintsChange={() => puzzleActions.refreshHintBalance()}
-        onOpenPatron={() => setShowPatronModal(true)}
+        onOpenPatron={() => { setShowStoreModal(false); setShowPatronModal(true); }}
       />
+      {overlayOwner === 'practice' && practiceLesson && <PracticeModal visible lessonId={practiceLesson} phase={persistence.currentPhase} onClose={() => setPracticeLesson(null)} />}
       {/* Cottage-skinned Alert.alert replacement — mounted last so it layers
           over every screen and modal (see services/gameAlert). */}
-      <GameAlertModal phase={persistence.currentPhase} />
+      <GameAlertModal phase={persistence.currentPhase} suspended={overlayOwner !== 'alert'} onPendingChange={setAlertPending} />
+      <Modal visible={overlayOwner === 'saving'} transparent animationType="none" onRequestClose={() => {}}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(30,20,26,0.18)', alignItems: 'center', justifyContent: 'center' }} accessibilityViewIsModal accessibilityLabel="Saving progress">
+          <BrandedLoader size={30} />
+        </View>
+      </Modal>
     </View>
   );
 }
 
-/**
- * Bootstrap gate: runs data migrations BEFORE MainApp mounts so that all
- * service caches read migrated data. Never blocks forever — the app renders
- * even if migrations fail (failures are logged, not fatal).
- */
-// How long the first frame may wait on the fresh-install cloud restore. The
-// restore is a single RPC that normally resolves well under a second; on a
-// slow/flaky network its 8s client timeout would otherwise hold the very first
-// launch hostage behind a boot screen. If the race times out we boot as a
-// fresh install and, should the slow restore eventually succeed, re-run
-// migrations and remount MainApp (restoreFromCloudData already invalidates
-// the service caches, so the remount re-reads the restored save).
-const BOOT_RESTORE_RACE_MS = 2500;
-
+/** Bootstrap owns restore/migration ordering; local recovery failures are retryable. */
 /**
  * The branded boot hold (F97/F119/F127): the fox icon card + wooden wordmark +
  * quiet spinner on the splash cream, sized RELATIVE TO THE WINDOW so it mirrors
@@ -6178,7 +6070,7 @@ const BOOT_RESTORE_RACE_MS = 2500;
  * the App bootstrap gate and MainApp's onboarding-hydration gate so all three
  * holds (native splash, bootstrap, hydration) read as ONE continuous frame.
  */
-function BootHold() {
+function BootHold({ failed = false, onRetry }: { failed?: boolean; onRetry?: () => void }) {
   const { width, height } = useWindowDimensions();
   const m = Math.min(width, height);
   const iconSize = Math.round(m * (740 / 1600));
@@ -6200,115 +6092,22 @@ function BootHold() {
         style={{ width: wordmarkWidth, height: Math.round(wordmarkWidth * 0.25) }}
         resizeMode="contain"
       />
-      <BrandedLoader size={30} style={{ marginTop: Math.round(gap * 1.4) }} />
+      {failed ? (
+        <View style={{ padding: 24, alignItems: 'center', maxWidth: 420 }}>
+          <Text style={{ textAlign: 'center', color: '#443126', fontSize: 16, marginBottom: 16 }}>
+            Your save could not be opened safely. Free some device storage if it is full, then try again.
+          </Text>
+          <TouchableOpacity onPress={onRetry} accessibilityRole="button" accessibilityLabel="Retry opening save" style={{ padding: 16, backgroundColor: '#DFC8AA', borderRadius: 12 }}>
+            <Text style={{ color: '#443126', fontSize: 16 }}>Try again</Text>
+          </TouchableOpacity>
+        </View>
+      ) : <BrandedLoader size={30} style={{ marginTop: Math.round(gap * 1.4) }} />}
     </View>
   );
 }
 
 function App() {
-  const [bootReady, setBootReady] = useState(false);
-  // Bumped when a slow cloud restore lands after boot — remounts MainApp so
-  // every hook re-reads the restored storage.
-  const [appEpoch, setAppEpoch] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-    logEvent({ type: 'app_open' });
-    (async () => {
-      try {
-        // Install the cloud provider (no-op unless Supabase is configured), then
-        // pull a cloud save BEFORE migrations/services read storage — so a fresh
-        // install (or a device switch via recovery code) restores prior progress.
-        // The wait is capped: D1 is decided on this exact launch, and a network
-        // stall must not read as a hung app.
-        installCloudProviderIfConfigured();
-        const restorePromise = maybeAutoRestoreOnFreshInstall();
-        // Background uploads (MainApp fires one on mount) wait for the restore
-        // to settle so a slow first launch can't push near-empty fresh-install
-        // state over the cloud row the restore is still downloading.
-        holdUploadsUntil(restorePromise);
-        const raced = await Promise.race([
-          restorePromise.then((restored) => ({ restored, timedOut: false })),
-          new Promise<{ restored: boolean; timedOut: boolean }>((resolve) =>
-            setTimeout(() => resolve({ restored: false, timedOut: true }), BOOT_RESTORE_RACE_MS)
-          ),
-        ]);
-        if (raced.timedOut) {
-          // Boot proceeds as a fresh install. If the restore later succeeds,
-          // apply it: re-run migrations over the restored data, then remount.
-          void restorePromise
-            .then(async (restored) => {
-              if (restored && !cancelled) {
-                await runMigrations();
-                // The remount hard-resets whatever the player was doing; the
-                // notice tells them why (their cloud progress arrived).
-                pendingRestoreNotice = true;
-                setAppEpoch((epoch) => epoch + 1);
-              }
-            })
-            .catch(() => {});
-        }
-        await runMigrations();
-        // Monetization scaffold: warm entitlement cache + init (NoOp) billing/ads
-        // providers so isPatronSync() and ad gating read correct values. Safe in
-        // Expo Go — no native modules until a real provider is wired.
-        initShareImage(); // registers the native image capturer if present (no-op in Expo Go)
-        // RevenueCat billing: inert until react-native-purchases is installed AND
-        // revenueCatIosKey/AndroidKey are set in app.json → extra. initIAP() configures it.
-        setBillingProvider(createRevenueCatBillingProvider());
-        // AdMob: inert until react-native-google-mobile-ads is installed AND the
-        // admob*Id* keys are set in app.json → extra. initAds() initializes it
-        // (and the adapter requests GDPR/UMP consent on init).
-        setAdProvider(createAdMobAdProvider());
-        // Store/ad SDK init is fire-and-forget: the first frame must never wait
-        // on billing config or the ads consent → SDK init → preload chain (the
-        // adapter runs that whole chain in the background internally). Worst
-        // case the first eligible ad/purchase surface is briefly unavailable.
-        void initIAP().catch((err) => console.warn('initIAP failed:', err));
-        void initAds().catch((err) => console.warn('initAds failed:', err));
-        // initHints seeds the one-time free hint stash; awaited before MainApp
-        // mounts, so usePuzzleGame reads the correct balance on its first render.
-        // loadEntitlements warms the sync cache (isPatronSync / ad suppression /
-        // Store first-purchase badge) — a cheap local read that must NOT ride on
-        // the fire-and-forget initIAP, or a cold cache briefly misreports
-        // Patron/ad-free status and the Store's 2x-first-purchase badge.
-        // loadPixelFonts registers the cottage dialogue/chrome font before the
-        // first frame (never throws — falls back to system font on failure).
-        // getSettings() warms the settings cache BEFORE the first frame. Every
-        // render-path consumer reads getSettingsSync() (settingsCache ||
-        // DEFAULT_SETTINGS); without this warm, a fresh launch returns DEFAULTS
-        // until some audio/haptic call happens to warm the cache first — so a
-        // persisted preference (Swift Victories, Reduced Motion, Sound/Haptics
-        // off) silently reads as its default on early renders. Warming it here
-        // makes getSettingsSync authoritative from frame one.
-        await Promise.all([getSettings(), initCosmetics(), initHints(), loadEntitlements(), loadPixelFonts()]);
-        // Recover any consumable purchase whose reward never landed (app killed
-        // between the store success and the grant). Apply-then-ack gives
-        // at-least-once delivery: a crash mid-recovery replays rather than
-        // loses a paid purchase. Local-only reads/writes — cheap to await, and
-        // doing it before MainApp mounts means the first frame shows the
-        // recovered balance.
-        try {
-          const pendingGrants = await reconcilePendingConsumableGrants();
-          for (const grant of pendingGrants) {
-            if (grant.reward.kind === 'amber') {
-              await awardBonusAmber(grant.reward.amount, `iap_recovered_${grant.productId}`);
-            } else {
-              await addHints(grant.reward.amount, `iap_recovered_${grant.productId}`);
-            }
-            await acknowledgeConsumableGrant(grant.grantId);
-          }
-        } catch (error) {
-          console.warn('Pending IAP grant recovery failed:', error);
-        }
-      } catch (error) {
-        console.warn('Bootstrap init failed:', error);
-      } finally {
-        if (!cancelled) setBootReady(true);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+  const boot = useAppBoot();
 
   // Branded boot view while booting — the wordmark + a quiet spinner on the
   // root background, so a slow first launch reads as loading rather than a
@@ -6316,10 +6115,10 @@ function App() {
   // useSafeAreaInsets is available everywhere in MainApp.
   return (
     <SafeAreaProvider>
-      {bootReady ? (
-        <MainApp key={appEpoch} />
+      {boot.status === 'ready' ? (
+        <MainApp />
       ) : (
-        <BootHold />
+        <BootHold failed={boot.status === 'failed'} onRetry={boot.retry} />
       )}
     </SafeAreaProvider>
   );

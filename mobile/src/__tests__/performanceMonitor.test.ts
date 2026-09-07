@@ -9,7 +9,7 @@ import {
 } from '../services/performanceMonitor';
 
 // Mock requestAnimationFrame / cancelAnimationFrame for Node
-let rafCallbacks: Array<(time: number) => void> = [];
+let rafCallbacks: ((time: number) => void)[] = [];
 let rafId = 0;
 
 beforeAll(() => {

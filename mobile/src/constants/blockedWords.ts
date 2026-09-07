@@ -9,6 +9,9 @@ export const BLOCKED_WORDS = [
   'CHINK', 'CHINKS', 'COCK', 'COCKS', 'COON', 'COONS', 'CRAP', 'CRAPS', 'CUM', 'CUMS',
   'DAGO', 'DAMN', 'DAMNS', 'DICK', 'DICKS', 'DILDO', 'DYKE', 'DYKES', 'FAG', 'FAGS', 'FAGGOT',
   'FART', 'FARTS',
+  // These never appeared in the dictionary, but partial Double Shift strings
+  // can still spell them before the final paired-move word check.
+  'FUCK', 'FUCKS', 'FUCKED', 'FUCKER', 'FUCKING', 'SHIT', 'SHITS', 'SHITTY',
   'GOOK', 'GOOKS', 'HOMO', 'HOMOS', 'HONKY', 'KIKE', 'KIKES', 'MILF', 'MORON', 'MORONS',
   'NEGRO', 'NEGROS',
   'PECKER', 'PISS', 'PISSED', 'POOF', 'POOFS', 'PORN', 'PORNO', 'PRICK', 'PRICKS', 'PUBE', 'PUBES',

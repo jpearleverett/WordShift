@@ -1,3 +1,4 @@
+import { clearEvents } from '../services/eventLogger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { clearStoryState, loadStoryState, recordStoryBoundary, STORY_STORAGE_KEY } from '../services/storySpine';
 import {
@@ -403,14 +404,14 @@ describe('cloudSave', () => {
         timestamp: Date.now(),
         deviceId: 'remote',
         data: {
-          wordshift_home_progress: '"progress_data"',
-          wordshift_achievements: '"achievement_data"',
+          wordshift_home_progress: '{"amber":12,"dialogueIndicesV4":true}',
+          wordshift_achievements: '{"unlocked":[]}',
         },
       };
 
       await restoreFromCloudData(cloudData);
-      expect(await AsyncStorage.getItem('wordshift_home_progress')).toBe('"progress_data"');
-      expect(await AsyncStorage.getItem('wordshift_achievements')).toBe('"achievement_data"');
+      expect(JSON.parse((await AsyncStorage.getItem('wordshift_home_progress'))!).amber).toBe(12);
+      expect(await AsyncStorage.getItem('wordshift_achievements')).toBe('{"unlocked":[]}');
     });
   });
 
@@ -601,7 +602,7 @@ describe('cloudSave', () => {
       expect((await getSyncStatus()).conflictDetected).toBe(false);
     });
 
-    it('a failing conflict probe falls back to the plain upload path', async () => {
+    it('a failing conflict probe refuses to overwrite an unknown remote state', async () => {
       await establishSyncBaseline();
 
       const mockUpload = jest.fn(async () => true);
@@ -610,8 +611,8 @@ describe('cloudSave', () => {
         hasNewerSave: async () => { throw new Error('network down'); },
       }));
 
-      expect(await uploadToCloud()).toBe(true);
-      expect(mockUpload).toHaveBeenCalledTimes(1);
+      expect(await uploadToCloud()).toBe(false);
+      expect(mockUpload).not.toHaveBeenCalled();
     });
   });
 
@@ -813,3 +814,6 @@ describe('cloudSave', () => {
     });
   });
 });
+
+// The service owns a debounced telemetry timer; do not let it outlive its test environment.
+afterAll(() => clearEvents());

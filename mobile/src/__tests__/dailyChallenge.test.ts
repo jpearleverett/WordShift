@@ -227,6 +227,26 @@ describe('dailyChallenge', () => {
     expect(status.totalCompleted).toBe(1);
   });
 
+  test('a midnight-crossing board belongs to yesterday and leaves today available', async () => {
+    const yesterday = getLocalDateStringDaysAgo(1);
+    const result = await recordDailyCompletion(3, 0, 0, yesterday);
+    expect(result.lastCompletedDate).toBe(yesterday);
+    expect((await getDailyStatus()).isCompleted).toBe(false);
+    await recordDailyCompletion(3, 0, 0);
+    expect(await getDailyStatus()).toMatchObject({ isCompleted: true, totalCompleted: 2, streak: 2 });
+    await recordDailyCompletion(3, 0, 0, yesterday);
+    expect((await getDailyStatus()).totalCompleted).toBe(2);
+  });
+
+  test('expired or future boards cannot consume today or rewind its streak', async () => {
+    await recordDailyCompletion(3, 0, 0, getLocalDateStringDaysAgo(2));
+    await recordDailyCompletion(3, 0, 0, getLocalDateStringDaysAgo(-1));
+    expect((await getDailyStatus()).totalCompleted).toBe(0);
+    await recordDailyCompletion(3, 0, 0);
+    await recordDailyCompletion(3, 0, 0, getLocalDateStringDaysAgo(1));
+    expect(await getDailyStatus()).toMatchObject({ totalCompleted: 1, streak: 1 });
+  });
+
   test('getDailyStatus returns correct structure', async () => {
     const status = await getDailyStatus();
     expect(status).toHaveProperty('isCompleted');
@@ -329,6 +349,9 @@ describe('dailyChallenge streak freeze mercy', () => {
     // Next day: an ordinary yesterday-continuation must not re-report a decay.
     const p2 = await loadDailyProgress();
     p2.lastCompletedDate = getLocalDateStringDaysAgo(1);
+    // Move the prior result too: a fixture changing only lastCompletedDate
+    // still represents today already completed under the date identity guard.
+    p2.completedChallenges[p2.completedChallenges.length - 1].date = getLocalDateStringDaysAgo(1);
     const next = await recordDailyCompletion(3, 0, 0);
     expect(next.currentStreak).toBe(8);
     expect(next.streakDecayedTo).toBeUndefined();

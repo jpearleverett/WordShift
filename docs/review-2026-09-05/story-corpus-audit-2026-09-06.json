@@ -1,0 +1,164 @@
+{
+  "baseDialogues": 1742,
+  "uniqueIds": 1742,
+  "residentCount": 13,
+  "animals": {
+    "red_panda": {
+      "lines": 134,
+      "words": 3637,
+      "longestSpeech": 58,
+      "phases": {
+        "0": 24,
+        "1": 28,
+        "2": 22,
+        "3": 30,
+        "4": 30
+      }
+    },
+    "axolotl": {
+      "lines": 134,
+      "words": 3796,
+      "longestSpeech": 58,
+      "phases": {
+        "0": 24,
+        "1": 28,
+        "2": 22,
+        "3": 30,
+        "4": 30
+      }
+    },
+    "pangolin": {
+      "lines": 134,
+      "words": 3359,
+      "longestSpeech": 44,
+      "phases": {
+        "0": 24,
+        "1": 28,
+        "2": 22,
+        "3": 30,
+        "4": 30
+      }
+    },
+    "sloth": {
+      "lines": 134,
+      "words": 3589,
+      "longestSpeech": 59,
+      "phases": {
+        "0": 24,
+        "1": 28,
+        "2": 22,
+        "3": 30,
+        "4": 30
+      }
+    },
+    "fennec_fox": {
+      "lines": 134,
+      "words": 3769,
+      "longestSpeech": 59,
+      "phases": {
+        "0": 24,
+        "1": 28,
+        "2": 22,
+        "3": 30,
+        "4": 30
+      }
+    },
+    "fox": {
+      "lines": 134,
+      "words": 3220,
+      "longestSpeech": 50,
+      "phases": {
+        "0": 24,
+        "1": 28,
+        "2": 22,
+        "3": 30,
+        "4": 30
+      }
+    },
+    "owl": {
+      "lines": 134,
+      "words": 3867,
+      "longestSpeech": 53,
+      "phases": {
+        "0": 24,
+        "1": 28,
+        "2": 22,
+        "3": 30,
+        "4": 30
+      }
+    },
+    "capybara": {
+      "lines": 134,
+      "words": 3646,
+      "longestSpeech": 59,
+      "phases": {
+        "0": 24,
+        "1": 28,
+        "2": 22,
+        "3": 30,
+        "4": 30
+      }
+    },
+    "wombat": {
+      "lines": 134,
+      "words": 3771,
+      "longestSpeech": 55,
+      "phases": {
+        "0": 24,
+        "1": 28,
+        "2": 22,
+        "3": 30,
+        "4": 30
+      }
+    },
+    "rabbit": {
+      "lines": 134,
+      "words": 3598,
+      "longestSpeech": 54,
+      "phases": {
+        "0": 24,
+        "1": 28,
+        "2": 22,
+        "3": 30,
+        "4": 30
+      }
+    },
+    "tarsier": {
+      "lines": 134,
+      "words": 3236,
+      "longestSpeech": 60,
+      "phases": {
+        "0": 24,
+        "1": 28,
+        "2": 22,
+        "3": 30,
+        "4": 30
+      }
+    },
+    "aye_aye": {
+      "lines": 134,
+      "words": 3127,
+      "longestSpeech": 37,
+      "phases": {
+        "0": 24,
+        "1": 28,
+        "2": 22,
+        "3": 30,
+        "4": 30
+      }
+    },
+    "kakapo": {
+      "lines": 134,
+      "words": 3343,
+      "longestSpeech": 60,
+      "phases": {
+        "0": 24,
+        "1": 28,
+        "2": 22,
+        "3": 30,
+        "4": 30
+      }
+    }
+  },
+  "problems": []
+}

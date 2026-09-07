@@ -1,5 +1,7 @@
 # WordShift — AAA Design Audit: Implementation Ledger
 
+> Historical record. Current work and remaining checks: [September 2026 implementation ledger](IMPLEMENTATION_STATUS_2026-09-05.md).
+
 **Verified line-by-line against the shipped code on branch `claude/wordshift-design-audit-fg52kd`.** Each of the 180 filed findings was re-checked at its cited `file:line` by an independent adversarial reviewer (one per system, 25 total, default stance *not done without proof*), corroborated with git history. This ledger supersedes the cluster-level estimate: it is the honest per-finding status.
 
 ## Totals

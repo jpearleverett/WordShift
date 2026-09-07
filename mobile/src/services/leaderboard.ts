@@ -20,11 +20,13 @@
  */
 
 import { isSupabaseConfigured, getBackendIdentity, sbRpc } from './supabaseClient';
+import { DAILY_BOARD_VERSION } from './dailyBoardVersion';
 
 /** A single submitted daily result (mirrors the `daily_scores` row shape). */
 export interface DailyScoreRow {
   owner: string;
   date: string;
+  board_version?: string;
   time_ms: number;
   stars: number;
   hints: number;
@@ -36,6 +38,8 @@ export interface DailyScoreRow {
 export interface SubmitDailyArgs {
   /** Local-day string (YYYY-MM-DD) — must match the daily challenge's date. */
   date: string;
+  /** Preserve the version captured when the board was served/restored. */
+  boardVersion?: string;
   timeMs: number;
   stars: number;
   hintsUsed: number;
@@ -68,10 +72,11 @@ export async function submitDailyResult(
   if (!owner) return null;
 
   const result = await sbRpc<DailyScoreRow | DailyScoreRow[] | null>(
-    'submit_daily_score',
+    'submit_daily_score_v2',
     {
       p_owner: owner,
       p_date: args.date,
+      p_board_version: args.boardVersion ?? DAILY_BOARD_VERSION,
       p_time_ms: Math.max(0, Math.round(args.timeMs)),
       p_stars: Math.max(0, Math.round(args.stars)),
       p_hints: Math.max(0, Math.round(args.hintsUsed)),
@@ -91,7 +96,7 @@ export async function submitDailyResult(
  *
  * Returns null when unconfigured or when there's no data for the player.
  */
-export async function getDailyRank(date: string): Promise<DailyRank | null> {
+export async function getDailyRank(date: string, boardVersion = DAILY_BOARD_VERSION): Promise<DailyRank | null> {
   if (!isSupabaseConfigured()) return null;
 
   const owner = await getBackendIdentity();
@@ -99,7 +104,7 @@ export async function getDailyRank(date: string): Promise<DailyRank | null> {
 
   const rpc = await sbRpc<
     DailyRank | DailyRank[] | null
-  >('daily_rank', { p_date: date, p_owner: owner });
+  >('daily_rank_v2', { p_date: date, p_owner: owner, p_board_version: boardVersion });
   const rpcRow = Array.isArray(rpc) ? rpc[0] : rpc;
   if (
     rpcRow &&

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Animated, Easing, Image } from 'react-native';
 import { getSettingsSync } from '../../services/settings';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
@@ -15,8 +15,8 @@ interface AnimatedLogoProps {
 }
 
 export const AnimatedLogo: React.FC<AnimatedLogoProps> = ({ phase = 0 }) => {
-  const bounceAnim = useRef(new Animated.Value(0)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
+  const [bounceAnim] = useState(() => new Animated.Value(0));
+  const [rotateAnim] = useState(() => new Animated.Value(0));
   const bounceLoopRef = useRef<Animated.CompositeAnimation | null>(null);
   const rotateLoopRef = useRef<Animated.CompositeAnimation | null>(null);
 
@@ -81,7 +81,7 @@ export const AnimatedLogo: React.FC<AnimatedLogoProps> = ({ phase = 0 }) => {
       rotateLoopRef.current?.stop();
       rotateLoopRef.current = null;
     };
-  }, [phase]);
+  }, [phase, bounceAnim, rotateAnim]);
 
   const rotate = rotateAnim.interpolate({
     inputRange: [-1, 1],

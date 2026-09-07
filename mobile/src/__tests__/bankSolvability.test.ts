@@ -12,7 +12,7 @@
  */
 import { DICTIONARY_WORDS } from '../dictionary';
 import { isChainSolvable, SolvabilityResult } from '../services/puzzleSolvability';
-import { CURATED_EARLY_PUZZLES, CURATED_FINAL_PUZZLE, FALLBACK_PUZZLES_EASY, FALLBACK_PUZZLES_MEDIUM, FALLBACK_PUZZLES_MEDIUM_PLUS, FALLBACK_PUZZLES_HARD } from '../constants/wordLists';
+import { COMMON_WORDS, CURATED_EARLY_PUZZLES, CURATED_FINAL_PUZZLE, FALLBACK_PUZZLES_EASY, FALLBACK_PUZZLES_MEDIUM, FALLBACK_PUZZLES_MEDIUM_PLUS, FALLBACK_PUZZLES_HARD } from '../constants/wordLists';
 import { PUZZLE_BANK_EASY } from '../data/puzzleBankEasy';
 import { PUZZLE_BANK_MEDIUM } from '../data/puzzleBankMedium';
 import { PUZZLE_BANK_MEDIUM_PLUS } from '../data/puzzleBankMediumPlus';
@@ -57,7 +57,7 @@ type Variant = 'standard' | 'reverse' | 'double_shift';
 function auditBank(
   name: string,
   variant: Variant,
-  puzzles: Array<{ id: string; words: string[] }>,
+  puzzles: { id: string; words: string[] }[],
 ): { bad: string[]; inconclusive: string[] } {
   const bad: string[] = [];
   const inconclusive: string[] = [];
@@ -70,7 +70,7 @@ function auditBank(
 }
 
 describe('bank solvability (shipped rules)', () => {
-  const CASES: Array<[string, Variant, Array<{ id: string; words: string[] }>]> = [
+  const CASES: [string, Variant, { id: string; words: string[] }[]][] = [
     ['EASY', 'standard', PUZZLE_BANK_EASY],
     ['MEDIUM', 'standard', PUZZLE_BANK_MEDIUM],
     ['MEDIUM_PLUS', 'standard', PUZZLE_BANK_MEDIUM_PLUS],
@@ -126,7 +126,7 @@ describe('bank solvability (shipped rules)', () => {
     expect(isChainSolvable('standard', CURATED_FINAL_PUZZLE.words, isValid)).toBe('solvable');
 
     const rows = [...CURATED_FINAL_PUZZLE.words];
-    const lockedPositions: Array<number | null> = rows.map(() => null);
+    const lockedPositions: (number | null)[] = rows.map(() => null);
     const playedWords = new Set(rows);
     for (const step of CURATED_FINAL_PUZZLE.solution) {
       const sourceIndex = step.stepIndex;
@@ -173,7 +173,7 @@ describe('bank solvability (shipped rules)', () => {
       ['HARD', FALLBACK_PUZZLES_HARD],
     ] as const) {
       for (const words of pool) {
-        const r = isChainSolvable('standard', words, isValid);
+        const r = isChainSolvable('standard', words, word => COMMON_WORDS.has(word));
         if (r !== 'solvable') {
           throw new Error(`fallback ${name} ${words.join('-')} -> ${r}`);
         }

@@ -1,3 +1,4 @@
+import { useCountUp } from '../../hooks/useCountUp';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FONT_SIZE } from '../../theme/typeScale';
 import {
@@ -12,29 +13,7 @@ import {
 } from 'react-native';
 import { CandyColors, getPhaseTheme } from '../../theme/colors';
 import { CumulativeStats } from '../../services/starRating';
-import {
-  getVictoryTitle,
-  getVictoryFeedback,
-  getPhaseChangeNarrative,
-  getRitualEchoHeader,
-  getRitualEchoFooter,
-  getWordsOfferedText,
-  getPitHarvestLabel,
-  getVictoryPitHint,
-  getPitMandatoryText,
-  getPitMandatoryCTA,
-  getAutoCollectCaption,
-  getMandatoryHarvestText,
-  getMandatoryHarvestCTA,
-  getNextStreakMilestoneText,
-  getFlawlessHonorific,
-  getUnbrokenWeaveRankUpLine,
-  getRewardedDoubleLabel,
-  getRewardedDoubleConfirm,
-  getDailyLadderTrendLabel,
-  getResonanceBonusLabel,
-  isSilentVictoryBeat,
-} from '../../services/phaseNarrative';
+import { getVictoryTitle, getVictoryFeedback, getPhaseChangeNarrative, getRitualEchoHeader, getRitualEchoFooter, getWordsOfferedText, getPitHarvestLabel, getPitMandatoryText, getPitMandatoryCTA, getAutoCollectCaption, getMandatoryHarvestText, getMandatoryHarvestCTA, getNextStreakMilestoneText, getFlawlessHonorific, getUnbrokenWeaveRankUpLine, getRewardedDoubleLabel, getRewardedDoubleConfirm, getDailyLadderTrendLabel, getResonanceBonusLabel, isSilentVictoryBeat } from '../../services/phaseNarrative';
 import { DialoguePhase } from '../../types/homeWorld';
 import { VARIANT_CONFIGS } from '../../services/puzzleVariety';
 import { AMBER_REWARDS, AUTO_COLLECT_PUZZLE_LIMIT } from '../../constants/gameBalance';
@@ -289,7 +268,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   // the line never visibly re-rolls as async lines (rank/social proof) land
   // and re-render the open modal.
   const victoryFeedbackLine = useMemo(
-    () => getVictoryFeedback(earnedStars, phase),
+    () => visible ? getVictoryFeedback(earnedStars, phase) : '',
     [earnedStars, phase, visible]
   );
   const totalPuzzlesCompleted = cumulativeStats?.totalPuzzlesCompleted ?? 0;
@@ -353,16 +332,16 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   // in useVictoryFlow's getStarStaggerMs).
   const cascadeStaggerMs = phase >= 3 ? 280 : 200;
   const cascadeSettleDp = phase >= 3 ? 12 : 8;
-  const contentOpacity1 = useRef(new Animated.Value(0)).current;
-  const contentOpacity2 = useRef(new Animated.Value(0)).current;
-  const contentOpacity3 = useRef(new Animated.Value(0)).current;
-  const contentOpacity4 = useRef(new Animated.Value(0)).current;
+  const [contentOpacity1] = useState(() => new Animated.Value(0));
+  const [contentOpacity2] = useState(() => new Animated.Value(0));
+  const [contentOpacity3] = useState(() => new Animated.Value(0));
+  const [contentOpacity4] = useState(() => new Animated.Value(0));
   const contentTranslateY1 = contentOpacity1.interpolate({ inputRange: [0, 1], outputRange: [cascadeSettleDp, 0] });
   const contentTranslateY2 = contentOpacity2.interpolate({ inputRange: [0, 1], outputRange: [cascadeSettleDp, 0] });
   const contentTranslateY3 = contentOpacity3.interpolate({ inputRange: [0, 1], outputRange: [cascadeSettleDp, 0] });
   const contentTranslateY4 = contentOpacity4.interpolate({ inputRange: [0, 1], outputRange: [cascadeSettleDp, 0] });
   // In-modal victory receipt slot: fades each queued line in fresh as it cycles.
-  const receiptOpacity = useRef(new Animated.Value(0)).current;
+  const [receiptOpacity] = useState(() => new Animated.Value(0));
   useEffect(() => {
     if (!receiptLine) {
       if (getSettingsSync().reducedMotion) { receiptOpacity.setValue(0); return; }
@@ -376,7 +355,17 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   // While the entrance choreography (stars + content cascade) runs, a
   // tap-anywhere layer skips it; once complete the layer unmounts so the
   // action buttons receive touches normally.
-  const [entranceComplete, setEntranceComplete] = useState(false);
+  const [entranceState, setEntranceState] = useState({ visible, version: 0, complete: false });
+  let currentEntrance = entranceState;
+  if (entranceState.visible !== visible) {
+    currentEntrance = { visible, version: entranceState.version + 1, complete: false };
+    setEntranceState(currentEntrance);
+  }
+  const entranceVersion = currentEntrance.version;
+  const entranceComplete = visible && (compactMode || getSettingsSync().reducedMotion || currentEntrance.complete);
+  const setEntranceComplete = useCallback((complete: boolean) => {
+    setEntranceState(previous => previous.version === entranceVersion ? { ...previous, complete } : previous);
+  }, [entranceVersion]);
   const cascadeAnimRef = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
@@ -390,10 +379,8 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
         contentOpacity2.setValue(1);
         contentOpacity3.setValue(1);
         contentOpacity4.setValue(1);
-        setEntranceComplete(true);
         return;
       }
-      setEntranceComplete(false);
       contentOpacity1.setValue(0);
       contentOpacity2.setValue(0);
       contentOpacity3.setValue(0);
@@ -415,8 +402,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
         cascadeAnimRef.current = null;
       };
     }
-    setEntranceComplete(false);
-  }, [visible, compactMode, hushedBeat]);
+  }, [visible, compactMode, hushedBeat, cascadeStaggerMs, contentOpacity1, contentOpacity2, contentOpacity3, contentOpacity4, setEntranceComplete]);
 
   // Assistive-access announce: once the modal has settled, speak the victory
   // payoff (the SAME title + amber the player sees, so it stays spoiler and
@@ -451,7 +437,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
     setEntranceComplete(true);
     // Let the orchestrator snap the star/modal animation to its final state
     onSkip?.();
-  }, [contentOpacity1, contentOpacity2, contentOpacity3, contentOpacity4, onSkip]);
+  }, [contentOpacity1, contentOpacity2, contentOpacity3, contentOpacity4, onSkip, setEntranceComplete]);
 
   // Watched-ad reward count-up. The rewarded "double" grants a bonus equal to
   // the earned amber, so the DISPLAYED total goes from `victoryTotalAmber` to
@@ -464,42 +450,12 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
     victoryTotalAmber + (rewardedDoubleClaimed ? victoryTotalAmber : 0);
   // Initialize at the target so the FIRST render (modal open) shows the settled
   // number with no count-up — only a fresh double claim animates.
-  const [animatedTotal, setAnimatedTotal] = useState(rewardedDoubleTarget);
-  const totalCountUpRafRef = useRef(0);
-  const prevRewardedDoubleClaimedRef = useRef<boolean | undefined>(rewardedDoubleClaimed);
-  useEffect(() => {
-    const wasClaimed = prevRewardedDoubleClaimedRef.current;
-    prevRewardedDoubleClaimedRef.current = rewardedDoubleClaimed;
-    // Only count up on a fresh false -> true double claim. Every other reason
-    // this effect runs (modal open, a new board, target recompute) snaps.
-    const justClaimed = !!rewardedDoubleClaimed && !wasClaimed;
-    if (!justClaimed) {
-      setAnimatedTotal(rewardedDoubleTarget);
-      return;
-    }
-    if (getSettingsSync().reducedMotion || shouldSimplifyAnimations()) {
-      setAnimatedTotal(rewardedDoubleTarget);
-      return;
-    }
-    const start = victoryTotalAmber;
-    const duration = getCountUpDurationMs(rewardedDoubleTarget, phase);
-    if (duration <= 0) {
-      setAnimatedTotal(rewardedDoubleTarget);
-      return;
-    }
-    const startedAt = Date.now();
-    const tick = () => {
-      const fraction = Math.min(1, (Date.now() - startedAt) / duration);
-      setAnimatedTotal(countUpDisplayValue(fraction, rewardedDoubleTarget, start));
-      if (fraction < 1) {
-        totalCountUpRafRef.current = requestAnimationFrame(tick);
-      }
-    };
-    totalCountUpRafRef.current = requestAnimationFrame(tick);
-    return () => {
-      if (totalCountUpRafRef.current) cancelAnimationFrame(totalCountUpRafRef.current);
-    };
-  }, [rewardedDoubleClaimed, rewardedDoubleTarget, victoryTotalAmber, phase]);
+  const { value: animatedTotal } = useCountUp(rewardedDoubleTarget, {
+    enabled: visible && !!rewardedDoubleClaimed && !getSettingsSync().reducedMotion && !shouldSimplifyAnimations(),
+    durationMs: getCountUpDurationMs(rewardedDoubleTarget, phase),
+    identity: visible,
+    interpolate: countUpDisplayValue,
+  });
 
   if (!visible) return null;
 
@@ -898,12 +854,12 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                   backgroundColor: btn.harvestPill.bg,
                   borderColor: btn.harvestPill.border,
                 }]}
-                // Group the row so the decorative sheaf glyph is not read as its
-                // own emoji; the label speaks the same count + verb shown.
+                // The label speaks the count and verb once; the pit sprite is
+                // decorative and matches the harvest destination elsewhere.
                 accessible
                 accessibilityLabel={`${victoryData.harvestedWords.length} ${victoryData.harvestedWords.length === 1 ? 'word' : 'words'} ${getPitHarvestLabel(phase).toLowerCase()}`}
               >
-                <Text style={styles.harvestWordIcon} importantForAccessibility="no">{'\uD83C\uDF3E'}</Text>
+                <Image source={PIT_ICON} style={styles.harvestWordIcon} resizeMode="contain" accessible={false} importantForAccessibility="no" accessibilityElementsHidden />
                 <Text style={[styles.harvestWordText, { color: btn.harvestPill.text }]}>
                   {victoryData.harvestedWords.length} {victoryData.harvestedWords.length === 1 ? 'word' : 'words'} {getPitHarvestLabel(phase).toLowerCase()}
                 </Text>
@@ -2126,8 +2082,8 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   harvestWordIcon: {
-    fontFamily: BODY_FONT,
-    fontSize: FONT_SIZE.headline,
+    width: 22,
+    height: 22,
     marginRight: 8,
   },
   harvestWordText: {

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -49,9 +49,9 @@ export const NotificationPromptModal: React.FC<NotificationPromptModalProps> = (
   const t = getSurfaceTheme(phase);
   const reducedMotion = getSettingsSync().reducedMotion;
 
-  const backdropOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
-  const cardScale = useRef(new Animated.Value(reducedMotion ? 1 : 0.92)).current;
-  const cardOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const [backdropOpacity] = useState(() => new Animated.Value(reducedMotion ? 1 : 0));
+  const [cardScale] = useState(() => new Animated.Value(reducedMotion ? 1 : 0.92));
+  const [cardOpacity] = useState(() => new Animated.Value(reducedMotion ? 1 : 0));
   const closingRef = useRef(false);
 
   useEffect(() => {
@@ -85,7 +85,7 @@ export const NotificationPromptModal: React.FC<NotificationPromptModalProps> = (
     ]);
     anim.start();
     return () => anim.stop();
-  }, [visible, reducedMotion, backdropOpacity, cardScale, cardOpacity]);
+  }, [visible, reducedMotion, backdropOpacity, cardScale, cardOpacity, phase]);
 
   const animateOut = useCallback((done: () => void) => {
     if (closingRef.current) return;

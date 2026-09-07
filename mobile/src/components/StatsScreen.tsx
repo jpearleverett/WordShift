@@ -111,6 +111,7 @@ function HeroStatsRow({
   stats,
   phase,
   animate,
+  onStarted,
   sectionBg,
   sectionBorder,
   valueColor,
@@ -119,26 +120,23 @@ function HeroStatsRow({
   stats: HeroStatSpec[];
   phase: number;
   animate: boolean;
+  onStarted: () => void;
   sectionBg: string;
   sectionBorder: string;
   valueColor: string;
   labelColor: string;
 }) {
-  const [fraction, setFraction] = useState(animate ? 0 : 1);
+  const [duration] = useState(() => {
+    const reduced = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
+    const maxTarget = stats.reduce((m, stat) => Math.max(m, Math.abs(stat.value)), 0);
+    return !animate || reduced ? 0 : getCountUpDurationMs(maxTarget, phase);
+  });
+  const [fraction, setFraction] = useState(duration > 0 ? 0 : 1);
   const rafRef = useRef(0);
 
   useEffect(() => {
-    if (!animate) {
-      setFraction(1);
-      return;
-    }
-    const reduced = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
-    const maxTarget = stats.reduce((m, s) => Math.max(m, Math.abs(s.value)), 0);
-    const duration = reduced ? 0 : getCountUpDurationMs(maxTarget, phase);
-    if (duration <= 0) {
-      setFraction(1);
-      return;
-    }
+    onStarted();
+    if (duration <= 0) return;
     const startedAt = Date.now();
     const tick = () => {
       const f = Math.min(1, (Date.now() - startedAt) / duration);
@@ -213,11 +211,11 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
   const [liveAmberBalance, setLiveAmberBalance] = useState<number | null>(null);
   // Latch so the hero count-up runs only the first time the overview appears
   // (persists across tab switches; a re-shown hero snaps to its final values).
-  const heroCountedRef = useRef(false);
+  const [heroCounted, setHeroCounted] = useState(false);
 
   // Cross-fade the tab content on swap: a 120ms dip-to-0.4-and-back instead of
   // the previous single-frame content swap. Reduced motion keeps it instant.
-  const tabFade = useRef(new Animated.Value(1)).current;
+  const [tabFade] = useState(() => new Animated.Value(1));
   useEffect(() => {
     if (getSettingsSync().reducedMotion) return;
     tabFade.setValue(0.4);
@@ -296,8 +294,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
   }
 
   // First appearance of the overview animates the hero; later shows are static.
-  const animateHero = !heroCountedRef.current;
-  heroCountedRef.current = true;
+  const animateHero = !heroCounted;
 
   const t = getSurfaceTheme(effectivePhase);
   const isDarkPhase = effectivePhase >= 3;
@@ -516,6 +513,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
                 <HeroStatsRow
                   phase={effectivePhase}
                   animate={animateHero}
+                  onStarted={() => setHeroCounted(true)}
                   sectionBg={t.sectionBg}
                   sectionBorder={t.sectionBorder}
                   valueColor={t.title}
@@ -786,7 +784,7 @@ function StarBar({
   const fillFraction = Math.max(0.02, pct / 100);
   const reducedMotion = getSettingsSync().reducedMotion;
   const [trackWidth, setTrackWidth] = useState(0);
-  const anim = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const [anim] = useState(() => new Animated.Value(reducedMotion ? 1 : 0));
 
   useEffect(() => {
     if (reducedMotion || trackWidth === 0) {

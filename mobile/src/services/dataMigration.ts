@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage, { isStorageTransactionActive, runStorageTransaction } from './persistenceStorage';
 
 /**
  * Data Migration System
@@ -105,6 +105,7 @@ const MIGRATIONS: Migration[] = [
         }
       } catch (error) {
         console.warn('Migration v2: Failed to migrate home progress:', error);
+        throw error;
       }
 
       // Migrate word history — convert flat array to grouped format
@@ -130,6 +131,7 @@ const MIGRATIONS: Migration[] = [
         }
       } catch (error) {
         console.warn('Migration v2: Failed to migrate word history:', error);
+        throw error;
       }
     },
   },
@@ -157,6 +159,7 @@ const MIGRATIONS: Migration[] = [
         }
       } catch (error) {
         console.warn('Migration v3: Failed to migrate home progress:', error);
+        throw error;
       }
     },
   },
@@ -184,6 +187,7 @@ const MIGRATIONS: Migration[] = [
         }
       } catch (error) {
         console.warn('Migration v4: Failed to migrate dialogue indices:', error);
+        throw error;
       }
     },
   },
@@ -217,6 +221,7 @@ const MIGRATIONS: Migration[] = [
         await AsyncStorage.setItem(progressKey, JSON.stringify(progress));
       } catch (error) {
         console.warn('Migration v5: Failed to migrate the speed variant:', error);
+        throw error;
       }
     },
   },
@@ -241,6 +246,7 @@ const MIGRATIONS: Migration[] = [
         }
       } catch (error) {
         console.warn('Migration v6: Failed to backfill houseCompletionCelebrated:', error);
+        throw error;
       }
     },
   },
@@ -269,7 +275,17 @@ export async function getSchemaVersion(): Promise<number> {
  * Should be called once on app startup before any data access.
  * Safe to call multiple times — only runs migrations that haven't been applied.
  */
-export async function runMigrations(): Promise<{
+export function runMigrations(): Promise<{
+  migrationsRun: number;
+  fromVersion: number;
+  toVersion: number;
+}> {
+  // Restore already owns a transaction. Standalone bootstrap migrations need
+  // the same journal, including the version marker, to avoid remapping twice.
+  return isStorageTransactionActive() ? migrate() : runStorageTransaction('migrations', migrate);
+}
+
+async function migrate(): Promise<{
   migrationsRun: number;
   fromVersion: number;
   toVersion: number;
@@ -291,8 +307,8 @@ export async function runMigrations(): Promise<{
       migrationsRun++;
     } catch (error) {
       console.warn(`Migration v${migration.version} failed:`, error);
-      // Stop on failure — don't skip migrations
-      break;
+      // Never mount gameplay or mark a failed migration complete.
+      throw error;
     }
   }
 

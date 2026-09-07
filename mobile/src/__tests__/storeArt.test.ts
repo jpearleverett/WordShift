@@ -27,7 +27,7 @@ import { PRODUCT_IDS, CONSUMABLE_PRODUCTS, STARTER_PACK_INFO } from '../services
 const STORE_DIR = path.resolve(__dirname, '../../assets/ui/store');
 
 /** Every key a paying surface asks `getStoreArt` for, with where it asks from. */
-const REQUESTED_KEYS: ReadonlyArray<[string, string]> = [
+const REQUESTED_KEYS: readonly [string, string][] = [
   // StoreModal
   ['StoreModal hero (Keeper’s Welcome)', STARTER_PACK_INFO.productId],
   ...CONSUMABLE_PRODUCTS.map(

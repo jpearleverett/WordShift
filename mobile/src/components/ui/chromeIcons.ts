@@ -10,6 +10,8 @@ import { ImageSourcePropType } from 'react-native';
 // `require()` literals only (Metro bundles what it can SEE; the documented
 // dynamic-require failure mode). `gameArt.test.ts` cross-checks every file.
 export const CHROME_ICONS = {
+  /** An open rules card, visible even before the first move. */
+  rules: require('../../../assets/ui/rules.png') as ImageSourcePropType,
   /** A carved green tick on a brass seat: "done / claimed / equipped". */
   check: require('../../../assets/ui/check.png') as ImageSourcePropType,
   /** A round green candy button carrying a tick: the completed-row badge. */

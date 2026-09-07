@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Animated, StyleProp, ViewStyle } from 'react-native';
 import { getSettingsSync } from '../../services/settings';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
@@ -26,8 +26,8 @@ export const BadgeAppear: React.FC<BadgeAppearProps> = ({
   accessibilityLabel,
   accessibilityRole,
 }) => {
-  const opacity = useRef(new Animated.Value(0)).current;
-  const scale = useRef(new Animated.Value(0.85)).current;
+  const [opacity] = useState(() => new Animated.Value(0));
+  const [scale] = useState(() => new Animated.Value(0.85));
 
   useEffect(() => {
     if (getSettingsSync().reducedMotion || shouldSimplifyAnimations()) {

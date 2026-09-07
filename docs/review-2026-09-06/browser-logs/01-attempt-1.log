@@ -1,0 +1,27 @@
+
+> wordshift-mobile@1.3.0 test:e2e
+> playwright test --grep fresh\ board\ has\ a\ visible\ help\ icon\ and\ scrollable\ rules\ at\ a\ small\ viewport$
+
+[WebServer] (node:167988) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:168054) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 1 test using 1 worker
+
+(node:168111) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] Error: listen EADDRINUSE: address already in use :::8081
+[WebServer] Error: listen EADDRINUSE: address already in use :::8081
+[WebServer]     at Server.setupListenHandle [as _listen2] (node:net:1941:16)
+[WebServer]     at listenInCluster (node:net:1998:12)
+[WebServer]     at Server.listen (node:net:2103:7)
+[WebServer]     at /home/coder/projects/WordShift/mobile/node_modules/@expo/cli/build/src/start/server/metro/runServer-fork.js:144:20
+[WebServer]     at new Promise (<anonymous>)
+[WebServer]     at runServer (/home/coder/projects/WordShift/mobile/node_modules/@expo/cli/build/src/start/server/metro/runServer-fork.js:140:12)
+[WebServer]     at async replaceMetroFileMap (/home/coder/projects/WordShift/mobile/node_modules/@expo/cli/build/src/start/server/metro/createFileMap-fork.js:191:20)
+[WebServer]     at async instantiateMetroAsync (/home/coder/projects/WordShift/mobile/node_modules/@expo/cli/build/src/start/server/metro/instantiateMetro.js:401:51)
+[WebServer]     at async MetroBundlerDevServer.startImplementationAsync (/home/coder/projects/WordShift/mobile/node_modules/@expo/cli/build/src/start/server/metro/MetroBundlerDevServer.js:930:82)
+[WebServer]     at async MetroBundlerDevServer.startAsync (/home/coder/projects/WordShift/mobile/node_modules/@expo/cli/build/src/start/server/BundlerDevServer.js:124:24)
+[WebServer]     at async DevServerManager.startAsync (/home/coder/projects/WordShift/mobile/node_modules/@expo/cli/build/src/start/server/DevServerManager.js:213:13)
+[WebServer]     at async startAsync (/home/coder/projects/WordShift/mobile/node_modules/@expo/cli/build/src/start/startAsync.js:163:5)

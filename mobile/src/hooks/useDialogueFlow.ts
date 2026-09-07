@@ -418,13 +418,14 @@ export function useDialogueFlow({
   const [showDialogue, setShowDialogue] = useState(false);
   const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null);
   const [cooldownMessage, setCooldownMessage] = useState<string | null>(null);
-  const [isTalking, setIsTalking] = useState(false);
+  const [talkingFrame, setIsTalking] = useState(false);
 
   // Per-character dialogue reveal (F25): revealedChars is how much of the
   // CURRENT visible page has materialized. The reveal effect further down
   // (declared after getDialogueText, which it depends on) resets this to 0
   // whenever the visible text changes and ticks it up to full length.
-  const [revealedChars, setRevealedChars] = useState(0);
+  const [reveal, setReveal] = useState({ source: '', count: 0 });
+  const [dialogueVisit, setDialogueVisit] = useState(0);
   const revealTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Pre-dialogue pages: shown before regular dialogue, one at a time
@@ -472,23 +473,26 @@ export function useDialogueFlow({
   }, []);
 
   useEffect(() => {
-    loadChoiceState()
-      .then(state => setPlayerChoices(state.choices ?? {}))
-      .catch(() => {});
-    refreshTendingState();
-    getPhase2PoolCursors()
-      .then(cursors => setPhase2Cursors(cursors))
-      .catch(() => {});
-  }, [refreshTendingState]);
+    let cancelled = false;
+    void Promise.all([loadChoiceState(), loadTendingState(), getPhase2PoolCursors()])
+      .then(([choices, tending, cursors]) => {
+        if (cancelled) return;
+        setPlayerChoices(choices.choices ?? {});
+        setTendingLevel(tending.level);
+        setTendingCaughtUp({ ...tending.caughtUp });
+        setPhase2Cursors(cursors);
+      }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   // Build an animal's current Phase-5 line pool from loaded hook state.
-  const getPhase5Pool = (animalType: AnimalType): string[] =>
-    buildPhase5Pool(animalType, tendingLevel, playerChoices[animalType] ?? null);
+  const getPhase5Pool = useCallback((animalType: AnimalType): string[] =>
+    buildPhase5Pool(animalType, tendingLevel, playerChoices[animalType] ?? null), [tendingLevel, playerChoices]);
 
   // Select the Phase-5 line for an animal at a given dialogue index, using the
   // recency-aware selector (new lines in order, then deterministic shuffled
   // re-reads). Returns the pool so callers can reason about its length.
-  const selectPhase5 = (animalType: AnimalType, currentDialogueIndex: number) => {
+  const selectPhase5 = useCallback((animalType: AnimalType, currentDialogueIndex: number) => {
     const pool = getPhase5Pool(animalType);
     const totalRegular = getTotalDialogueCount(animalType, 4);
     const caughtUp = tendingCaughtUp[animalType] ?? 0;
@@ -499,12 +503,12 @@ export function useDialogueFlow({
     const eligible = buildPhase5Eligibility(animalType, pool, progress?.unlockedAnimals ?? []);
     const result = selectPhase5Dialogue(pool, caughtUp, deliveredIndex, hashSeed(animalType), eligible);
     return { pool, caughtUp, ...result };
-  };
+  }, [getPhase5Pool, tendingCaughtUp, progress?.unlockedAnimals]);
 
   // Animal types currently unlocked — lines tagged with `requiresAnimals`
   // are skipped while any of their referenced animals is still locked.
-  const getUnlockedTypes = (): Set<AnimalType> =>
-    new Set((progress?.unlockedAnimals ?? []) as AnimalType[]);
+  const getUnlockedTypes = useCallback((): Set<AnimalType> =>
+    new Set((progress?.unlockedAnimals ?? []) as AnimalType[]), [progress?.unlockedAnimals]);
 
   // Catch-up session boost: extra lines per session for an animal with unread
   // REGULAR (indexed, non-pool) backlog inside a compressed window — a late
@@ -518,7 +522,7 @@ export function useDialogueFlow({
   // 136/143/160/161/162 figures predate two arc compressions. Computed per call from
   // current state and passed into the session layer, which stays a pure
   // counter. The newly-unlocked grace period is untouched (that's cooldowns).
-  const getSessionBonus = (animal: Animal): number => {
+  const getSessionBonus = useCallback((animal: Animal): number => {
     if (!progress) return 0;
     const animalPhase = getAnimalPhase(progress.currentPhase, animal.type);
     // Phase 5 is pool-only: all regular backlog is retired at the reveal, and
@@ -538,7 +542,7 @@ export function useDialogueFlow({
       hasUnreadRegular,
       ANIMAL_AWARENESS_TIERS[animal.type] === 'lagging'
     );
-  };
+  }, [progress, getUnlockedTypes]);
 
   // Keep the session layer's phase mirror current.
   //
@@ -615,18 +619,12 @@ export function useDialogueFlow({
   const lastSeenSacrificeCount = useRef<Record<string, number>>({});
 
   // Animations
-  const dialogueSlide = useRef(new Animated.Value(0)).current;
-  const cooldownOpacity = useRef(new Animated.Value(0)).current;
-  const cooldownSlide = useRef(new Animated.Value(20)).current;
+  const [dialogueSlide] = useState(() => new Animated.Value(0));
+  const [cooldownOpacity] = useState(() => new Animated.Value(0));
+  const [cooldownSlide] = useState(() => new Animated.Value(20));
 
-  // Update session status when selected animal changes
-  useEffect(() => {
-    if (selectedAnimal) {
-      const status = getSessionStatus(selectedAnimal.id, getSessionBonus(selectedAnimal));
-      setSessionInfo(status);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAnimal]);
+  // Session state changes in the open, advance and close handlers.
+
 
   // Timer for dismissing cooldown message with animation
   useEffect(() => {
@@ -681,7 +679,7 @@ export function useDialogueFlow({
       }, 2500);
       return () => clearTimeout(timeout);
     }
-  }, [cooldownMessage]);
+  }, [cooldownMessage, cooldownOpacity, cooldownSlide]);
 
   // Talking animation (F25): isTalking now flaps only while the current
   // line's per-character reveal is still in progress, at a per-species
@@ -693,7 +691,7 @@ export function useDialogueFlow({
   // regular dialogue. This is the single source of the visible line; the
   // paginated view (getDialogueText) and the whisper-gallery recording both
   // derive from it.
-  const getFullDialogueText = (): string => {
+  const getFullDialogueText = useCallback((): string => {
     // If there are pre-dialogue pages remaining, show the first one
     if (preDialoguePages.length > 0) {
       return preDialoguePages[0].text;
@@ -725,7 +723,7 @@ export function useDialogueFlow({
       animalPhase
     );
     return dialogue?.text || 'Hello, friend!';
-  };
+  }, [preDialoguePages, selectedAnimal, progress, selectPhase5, getUnlockedTypes, phase2Cursors]);
 
   // The VISIBLE dialogue text: the current page of the current line. Lines at
   // or under the budget pass through unchanged (same string identity, so the
@@ -775,7 +773,9 @@ export function useDialogueFlow({
   // every pagination test key off this exact field; the reveal is a purely
   // presentational layer on top via `revealedText`).
   const visibleDialogueText = getDialogueText();
+  const revealSource = `${dialogueVisit}:${visibleDialogueText}`;
   const reducedMotionNow = getSettingsSync().reducedMotion;
+  const revealedChars = reveal.source === revealSource ? reveal.count : 0;
   // A reveal is "in progress" only while the modal is up, motion isn't
   // reduced, and the typewriter hasn't caught up to the full page yet.
   const revealInProgress =
@@ -801,19 +801,17 @@ export function useDialogueFlow({
       revealTimerRef.current = null;
     }
     if (!showDialogue || !visibleDialogueText || getSettingsSync().reducedMotion) {
-      setRevealedChars(visibleDialogueText.length);
       return;
     }
-    setRevealedChars(0);
     const total = visibleDialogueText.length;
     revealTimerRef.current = setInterval(() => {
-      setRevealedChars(prev => {
-        const next = prev + 1;
+      setReveal(prev => {
+        const next = prev.source === revealSource ? prev.count + 1 : 1;
         if (next >= total && revealTimerRef.current) {
           clearInterval(revealTimerRef.current);
           revealTimerRef.current = null;
         }
-        return Math.min(next, total);
+        return { source: revealSource, count: Math.min(next, total) };
       });
     }, DIALOGUE_REVEAL_CHAR_MS);
     return () => {
@@ -822,7 +820,7 @@ export function useDialogueFlow({
         revealTimerRef.current = null;
       }
     };
-  }, [visibleDialogueText, showDialogue]);
+  }, [visibleDialogueText, revealSource, showDialogue, reducedMotionNow]);
 
   // Mouth-flap effect (F25): the talk/idle sprite layers alternate at a
   // per-species cadence ONLY while a reveal is in progress, and settle to a
@@ -831,10 +829,7 @@ export function useDialogueFlow({
   // here with revealInProgress true (the reveal effect above completes
   // instantly), so this alone is enough to keep the pose static.
   useEffect(() => {
-    if (!revealInProgress) {
-      setIsTalking(false);
-      return;
-    }
+    if (!revealInProgress) return;
     const cadence = selectedAnimal
       ? FLAP_CADENCE_MS[selectedAnimal.type] ?? DEFAULT_FLAP_CADENCE_MS
       : DEFAULT_FLAP_CADENCE_MS;
@@ -851,8 +846,8 @@ export function useDialogueFlow({
       clearInterval(revealTimerRef.current);
       revealTimerRef.current = null;
     }
-    setRevealedChars(visibleDialogueText.length);
-  }, [visibleDialogueText]);
+    setReveal({ source: revealSource, count: visibleDialogueText.length });
+  }, [visibleDialogueText, revealSource]);
 
   // Handle animal tap
   const handleAnimalTap = useCallback(async (animal: Animal) => {
@@ -920,6 +915,8 @@ export function useDialogueFlow({
     }
 
     setSelectedAnimal(animal);
+    setDialogueVisit(visit => visit + 1);
+    setIsTalking(false);
     setShowDialogue(true);
     // Fresh session: a stale page cursor from the previous session must never
     // leak into this one — the first line always opens on its first page.
@@ -1225,7 +1222,7 @@ export function useDialogueFlow({
         useNativeDriver: true,
       }).start();
     }
-  }, [dialogueSlide, progress, refreshTendingState, resetPageQueue, onQuestsCompleted]);
+  }, [dialogueSlide, progress, refreshTendingState, resetPageQueue, onQuestsCompleted, getSessionBonus, getUnlockedTypes, setAnimals]);
 
   // Recompute hasNewDialogue for a specific animal after session changes
   const recomputeHasNewDialogue = useCallback((animal: Animal): boolean => {
@@ -1253,7 +1250,7 @@ export function useDialogueFlow({
       return phase2PoolHasNew(animal.type, phase2Cursors[animal.type] ?? 0);
     }
     return resolved < totalDialogues;
-  }, [progress, tendingLevel, tendingCaughtUp, playerChoices, phase2Cursors]);
+  }, [progress, tendingLevel, tendingCaughtUp, playerChoices, phase2Cursors, getUnlockedTypes]);
 
   // Handle closing dialogue. Manual closes keep the session warm so
   // checking in with an animal never feels punitive.
@@ -1319,7 +1316,7 @@ export function useDialogueFlow({
     // Closing mid-pages behaves exactly like closing mid-line: nothing extra
     // beyond clearing the page queue so it can't leak into the next session.
     resetPageQueue();
-  }, [selectedAnimal, progress, preDialoguePages, recomputeHasNewDialogue, setAnimals, resetPageQueue]);
+  }, [selectedAnimal, progress, preDialoguePages, recomputeHasNewDialogue, setAnimals, resetPageQueue, getUnlockedTypes]);
 
   const handleCloseDialogue = useCallback(async () => {
     await closeDialogue(false);
@@ -1562,7 +1559,7 @@ export function useDialogueFlow({
       }
       closeDialogue(true);
     }
-  }, [selectedAnimal, progress, closeDialogue, setAnimals, preDialoguePages, onFoxPlayPrompt, tendingLevel, tendingCaughtUp, playerChoices, phase2Cursors, activeChoice, pageCursor, pageSource, resetPageQueue]);
+  }, [selectedAnimal, progress, closeDialogue, setAnimals, preDialoguePages, onFoxPlayPrompt, tendingCaughtUp, phase2Cursors, activeChoice, pageCursor, pageSource, resetPageQueue, getFullDialogueText, getPhase5Pool, getSessionBonus, getUnlockedTypes, selectPhase5]);
 
   // Handle player choosing a dialogue option (Phase 3 choice points)
   const handleDialogueChoice = useCallback(async (choice: PlayerChoice) => {
@@ -1602,7 +1599,7 @@ export function useDialogueFlow({
     cooldownOpacity,
     cooldownSlide,
     dialogueSlide,
-    isTalking,
+    isTalking: revealInProgress && talkingFrame,
     hasMoreToShow: computeHasMore(),
     activeChoice,
     handleAnimalTap,

@@ -38,6 +38,12 @@ describe('tending', () => {
   });
 
   describe('availability', () => {
+    it('names the next actual reward and acknowledges the final authored milestone', async () => {
+      const state = await loadTendingState();
+      expect(getNextTendingInfo({ ...state, level: 69 })).toMatchObject({ contentComplete: false, nextMilestone: 70, levelsToNextMilestone: 1 });
+      expect(getNextTendingInfo({ ...state, level: 70 })).toMatchObject({ contentComplete: true, nextMilestone: null, levelsToNextMilestone: null });
+      expect(getNextTendingInfo({ ...state, level: 71 }).cost).toBeGreaterThan(0);
+    });
     it('is a Phase-5-only loop', () => {
       expect(isTendingAvailable(4)).toBe(false);
       expect(isTendingAvailable(5)).toBe(true);

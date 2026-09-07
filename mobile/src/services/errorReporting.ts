@@ -24,11 +24,11 @@ interface ErrorContext {
 }
 
 // In-memory error log for current session (not persisted across restarts)
-const sessionErrors: Array<{
+const sessionErrors: {
   error: Error | string;
   context: ErrorContext;
   timestamp: number;
-}> = [];
+}[] = [];
 
 const MAX_SESSION_ERRORS = 50;
 
