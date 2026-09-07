@@ -1,10 +1,12 @@
 # WordShift — Store Listing Kit
 
+> **Android copy superseded September 7, 2026:** use the [current Google Play launch pack](../mobile/docs/store-launch/README.md) and [finished artwork upload guide](../mobile/assets/Play_store/launch-2026-09/README.md). The material below is retained for historical context and iOS reference; do not paste its older Android campaign into Play Console.
+
 Working copy for the App Store / Google Play listings. The hook of the game is
 the tonal bait-and-switch — the listing must *hint* at the darkness without
 spoiling the reveal, while the age rating must declare it honestly.
 
-> September 2026 update: the copy below includes the current game. Previous uploaded screenshots are historical; use the [1.3.0 capture brief](RELEASE_VALIDATION_1_3_0.md#current-store-capture-brief) before a new store submission. No listing upload is part of this code change.
+> Earlier September update: previous uploaded screenshots are historical. The [signed-build validation brief](RELEASE_VALIDATION_1_3_0.md#current-store-capture-brief) remains useful for device checks. The current Android campaign is linked above. No listing upload is part of this code change.
 
 ## Identity
 
