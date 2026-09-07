@@ -4415,13 +4415,15 @@ const createStyles = (SCREEN_WIDTH: number, SCREEN_HEIGHT: number, fontScale: nu
   },
   bevelContent: {
     flexGrow: 1,
-    paddingTop: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,
     // The baked shadow row sits below the button body — keep the label
-    // centered in the body, not the full strip.
+    // centered in the body, not the full strip. This must stay the ONLY
+    // vertical inset (mirrors CandyButton.content): a paddingTop without a
+    // matching extra paddingBottom drops the label below the body centre.
+    // Pinned by bevelLabelCentering.test.ts.
     paddingBottom: BTN_SHADOW_DP,
   },
   bevelBtnText: {

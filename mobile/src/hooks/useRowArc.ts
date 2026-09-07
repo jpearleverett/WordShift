@@ -1,22 +1,46 @@
 import { useEffect, useState } from 'react';
 import { Animated, Easing } from 'react-native';
 
-/** Keep the target fan mounted only for its own close animation. A committed
- * move or a motion preference change snaps it away and cannot revive on undo. */
+/**
+ * Keep the target fan mounted only for its own close animation.
+ *
+ * A graceful 300ms collapse is reserved for a pure DESELECT: the board is
+ * unchanged and the row stays the target, so the letters can glide back to
+ * their standard positions. Anything that changes the board under the fan
+ * snaps it away instead: a committed move (the row stops being the target), a
+ * motion preference change, or a letter arriving in / leaving this row while
+ * it stays the target (a double-shift first drop, the winning move, an undo).
+ * `wordCount` is that last signal. The snap matters because Row mounts the arc
+ * and standard subtrees under distinct keys, so the collapse's end REMOUNTS
+ * the row's tiles: an arriving tile that had started its arrival settle inside
+ * the arc would otherwise be cut off and replay it on the fresh mount. Snapping
+ * hands the arriving tile straight to the standard layout, where it settles
+ * once, and the surviving letters rank-close via Row's F1 spring exactly as
+ * they do on every other committed move.
+ *
+ * A snap or a finished collapse cannot revive on undo.
+ */
 export function useRowArc(
   showSlots: boolean,
   isTarget: boolean,
   instant: boolean,
   arc: Animated.Value,
   slots: Animated.Value,
+  wordCount: number,
 ): boolean {
   const [visible, setVisible] = useState(showSlots);
   const [previousShowSlots, setPreviousShowSlots] = useState(showSlots);
+  const [previousWordCount, setPreviousWordCount] = useState(wordCount);
   if (previousShowSlots !== showSlots) {
     setPreviousShowSlots(showSlots);
     if (showSlots) setVisible(true);
   }
-  if (visible && !showSlots && (!isTarget || instant)) setVisible(false);
+  let boardChanged = false;
+  if (previousWordCount !== wordCount) {
+    setPreviousWordCount(wordCount);
+    boardChanged = true;
+  }
+  if (visible && !showSlots && (!isTarget || instant || boardChanged)) setVisible(false);
 
   useEffect(() => {
     if (instant || !isTarget) {
@@ -36,7 +60,16 @@ export function useRowArc(
       opening.start();
       return () => opening.stop();
     }
-    if (!visible) return;
+    if (!visible) {
+      // Nothing is mounted (a snap, or a collapse that finished): rest the fan
+      // flat so the next open glides from the closed pose. Safe to re-arm the
+      // slot fade here because the arc subtree is already unmounted; while it
+      // was still live this reset would have flung the letters back apart for
+      // a frame, which is why the close animation itself never does it.
+      arc.setValue(0);
+      slots.setValue(1);
+      return;
+    }
     let cancelled = false;
     const closing = Animated.parallel([
       Animated.timing(arc, {

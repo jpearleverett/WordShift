@@ -878,3 +878,45 @@ describe('new-dialogue badge anchor contract', () => {
     expect(badge).toBeGreaterThan(bodyClose);
   });
 });
+
+describe('arc and standard layouts never share host views (source pin)', () => {
+  // Both layouts key their letter wrappers by letter.id, so with un-keyed
+  // containers React reused ONE Fabric view per letter across the arc ->
+  // standard switch. On iOS Fabric a prop NativeAnimated has driven (the
+  // collapse glide translateX) is recorded in the view's
+  // propKeysManagedByAnimated set for the rest of the view's life: React's
+  // committed transform is ignored by RCTViewComponentView.updateProps and
+  // RCTPropsAnimatedNode.restoreDefaultValues is a no-op under Fabric. The
+  // glide offset survived the flip and the DROP row rendered compacted after a
+  // deselect. Distinct container keys unmount the arc wrappers instead.
+  const rowSrc = fs.readFileSync(
+    path.join(__dirname, '../components/Row.tsx'),
+    'utf8',
+  );
+
+  it('keys the arc and standard containers differently', () => {
+    expect(rowSrc).toMatch(/<View key="arc" style=\{styles\.arcRow\}/);
+    expect(rowSrc).toMatch(/<View key="standard" style=\{styles\.lettersContainer\}/);
+  });
+
+  it('still keys letters by id in both layouts (reopen-while-collapsing stability)', () => {
+    const arcBlock = rowSrc.slice(
+      rowSrc.indexOf('const renderArcContent = () => {'),
+      rowSrc.indexOf('const renderContent = () => {'),
+    );
+    const standardBlock = rowSrc.slice(
+      rowSrc.indexOf('const renderContent = () => {'),
+      rowSrc.indexOf('const getRowStyle = () => {'),
+    );
+    expect(arcBlock).toContain('key={letter.id}');
+    expect(standardBlock).toContain('key={letter.id}');
+  });
+
+  it('feeds the word count into useRowArc so an arriving letter snaps the fan', () => {
+    // The keyed containers remount the row's tiles at the end of a collapse; a
+    // tile that arrived while the row stayed the target (double-shift first
+    // drop, the winning move) would replay its arrival settle on that mount.
+    // useRowArc snaps the fan on the word-count change instead.
+    expect(rowSrc).toMatch(/useRowArc\(\s*!!showSlots, isTarget, [\s\S]*?arcAnim, slotCollapseAnim, rowData\.words\.length,?\s*\);/);
+  });
+});

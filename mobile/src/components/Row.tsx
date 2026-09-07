@@ -682,10 +682,12 @@ export const Row: React.FC<RowProps> = memo(({
   };
 
   // Keep the arc mounted through a deselection's 300ms flatten. A committed
-  // move changes the row's role and snaps directly to its normal layout.
+  // move changes the row's role and snaps directly to its normal layout, and
+  // so does a letter arriving in (or leaving) this row while it stays the
+  // target: the word count is the hook's board-changed signal.
   const arcMounted = useRowArc(
     !!showSlots, isTarget, getSettingsSync().reducedMotion || shouldSimplifyAnimations(),
-    arcAnim, slotCollapseAnim,
+    arcAnim, slotCollapseAnim, rowData.words.length,
   );
 
   // Inter-slot tap guidance: tapping a letter tile in the target row (between
@@ -1118,6 +1120,10 @@ export const Row: React.FC<RowProps> = memo(({
   // Now each one starts at the exact arc x it was last seen at and springs to
   // its new standard x, so the row visibly makes room for the arriving letter.
   // The arriving letter itself is skipped — it owns its own arrival settle.
+  // The same snap-and-spring path serves a letter that arrives while this row
+  // STAYS the target (a double-shift first drop, the winning move): useRowArc
+  // snaps the fan on the word-count change, so the arriving tile mounts
+  // straight into the standard layout and settles exactly once.
   //
   // A graceful DESELECT is deliberately excluded here: the letters already
   // glided to their standard positions during the collapse (see
@@ -1277,12 +1283,27 @@ export const Row: React.FC<RowProps> = memo(({
           {arcMounted ? (
             // Arc layout for DROP row - letters overflow container. While the
             // fan is collapsing (showSlots already false) the slots are inert.
-            <View style={styles.arcRow} pointerEvents={showSlots ? 'auto' : 'none'}>
+            //
+            // `key`: the arc and standard subtrees must NEVER share host views.
+            // Both render `<Animated.View key={letter.id}>` per letter, so with
+            // un-keyed containers React reused one Fabric view per letter
+            // across the switch, only swapping its style. On iOS Fabric a prop
+            // NativeAnimated has driven (the collapseGlideX translateX) is
+            // recorded in the view's propKeysManagedByAnimated set for the rest
+            // of the view's life: RCTViewComponentView.updateProps then ignores
+            // React's committed transform, and RCTPropsAnimatedNode's
+            // restoreDefaultValues is a no-op under Fabric. So the glide offset
+            // survived the flip and the DROP row rendered compacted after every
+            // deselect (each letter sat at its standard x PLUS the glide
+            // delta). Distinct keys unmount the arc wrappers instead, and the
+            // standard wrappers mount as fresh, never-managed views at the same
+            // x the glide ended on. Pinned by puzzleFeelContracts.test.ts.
+            <View key="arc" style={styles.arcRow} pointerEvents={showSlots ? 'auto' : 'none'}>
               {renderArcContent()}
             </View>
           ) : (
             // Standard centered layout for other rows
-            <View style={styles.lettersContainer}>
+            <View key="standard" style={styles.lettersContainer}>
               {renderContent()}
             </View>
           )}

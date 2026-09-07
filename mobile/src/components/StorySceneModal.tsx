@@ -15,6 +15,14 @@ import { STORY_ART } from './storyArt';
 import { PanelCard } from './ui/PanelCard';
 import { CandyButton } from './ui/CandyButton';
 
+/**
+ * A page save normally lands within a few frames. Showing the "saving" state
+ * for that window (dimmed buttons, a caption mounting under them) read as the
+ * card flickering on EVERY Continue tap, so the affordance reveals only once a
+ * write has been slow for this long. Fast writes never show it at all.
+ */
+const SAVING_REVEAL_MS = 350;
+
 export interface StorySceneModalProps {
   memory: StoryMemory | null; phase: DialoguePhase;
   onAdvance: () => Promise<void>; onChoose: (choice: string) => Promise<void>; onClose: () => void;
@@ -26,7 +34,10 @@ export const StorySceneModal: React.FC<StorySceneModalProps> = ({ memory, phase,
   const scroll = useRef<ScrollView>(null);
   const busy = useRef(false);
   const retry = useRef<(() => Promise<void>) | null>(null);
-  const [saving, setSaving] = useState(false);
+  const revealTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Visible only for a SLOW write (see SAVING_REVEAL_MS). Double-tap protection
+  // does not depend on it: `busy` swallows re-entry for the whole write.
+  const [showSaving, setShowSaving] = useState(false);
   const pageKey = `${memory?.scene.id ?? ''}:${memory?.page ?? 0}`;
   const [errorPage, setErrorPage] = useState<string | null>(null);
   const setError = (value: boolean) => setErrorPage(value ? pageKey : null);
@@ -47,11 +58,21 @@ export const StorySceneModal: React.FC<StorySceneModalProps> = ({ memory, phase,
     scroll.current?.scrollTo({ y: 0, animated: false });
     if (line) announceForA11y(`${speakerName}. ${line.text}`);
   }, [memory?.scene.id, memory?.page, speakerName, line?.text]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => {
+    if (revealTimer.current) clearTimeout(revealTimer.current);
+  }, []);
   const run = async (action: () => Promise<void>) => {
     if (busy.current) return;
-    busy.current = true; retry.current = action; setSaving(true); setError(false);
+    busy.current = true; retry.current = action; setError(false);
+    if (revealTimer.current) clearTimeout(revealTimer.current);
+    revealTimer.current = setTimeout(() => setShowSaving(true), SAVING_REVEAL_MS);
     try { await action(); retry.current = null; } catch { setError(true); }
-    finally { busy.current = false; setSaving(false); }
+    finally {
+      if (revealTimer.current) clearTimeout(revealTimer.current);
+      revealTimer.current = null;
+      busy.current = false;
+      setShowSaving(false);
+    }
   };
   const close = () => { if (!busy.current) onClose(); };
   return <Modal visible={!!memory && !!line} transparent animationType={getSettingsSync().reducedMotion ? 'none' : 'fade'} onRequestClose={close}>
@@ -64,14 +85,18 @@ export const StorySceneModal: React.FC<StorySceneModalProps> = ({ memory, phase,
           <AppText textRole="label"  style={[styles.speaker, { color: theme.title }]}>{speakerName}</AppText>
           <AppText textRole="reading"  style={[styles.body, line?.speaker === 'narrator' && styles.narration, { color: theme.body }]}>{line?.text}</AppText>
           <View style={styles.actions}>
-            <AppText textRole="caption" accessibilityLabel={`Page ${visiblePage + 1} of ${pages.length}`} style={[styles.status, { color: theme.muted }]}>{visiblePage + 1} / {pages.length}</AppText>
-            {options?.length ? options.map(option => <Pressable key={option.id} accessibilityRole="button" accessibilityLabel={option.label} accessibilityState={{ disabled: saving }} disabled={saving} onPress={() => { void run(() => onChoose(option.id)); }} style={({ pressed }) => [styles.option, { backgroundColor: theme.sectionBg, borderColor: theme.sectionBorder, opacity: saving ? 0.6 : pressed ? 0.8 : 1 }]}>
+            {/* The counter and the slow-save caption share one line, so a
+                reveal never moves a button or re-sizes the card. */}
+            <View style={styles.statusRow}>
+              <AppText textRole="caption" accessibilityLabel={`Page ${visiblePage + 1} of ${pages.length}`} style={[styles.status, { color: theme.muted }]}>{visiblePage + 1} / {pages.length}</AppText>
+              {showSaving && <AppText textRole="caption" accessibilityLiveRegion="polite" numberOfLines={1} style={[styles.status, styles.statusSaving, { color: theme.muted }]}>{STORY_COPY.saving}</AppText>}
+            </View>
+            {options?.length ? options.map(option => <Pressable key={option.id} accessibilityRole="button" accessibilityLabel={option.label} accessibilityState={{ disabled: showSaving }} disabled={showSaving} onPress={() => { void run(() => onChoose(option.id)); }} style={({ pressed }) => [styles.option, { backgroundColor: theme.sectionBg, borderColor: theme.sectionBorder, opacity: showSaving ? 0.6 : pressed ? 0.8 : 1 }]}>
               <AppText textRole="label"  style={[styles.optionText, { color: theme.title }]}>{option.label}</AppText>
-            </Pressable>) : <CandyButton phase={phase} label={memory && visiblePage >= pages.length - 1 ? STORY_COPY.finish : STORY_COPY.continue} disabled={saving} onPress={() => { if (memory && visiblePage < memory.page) setReadingPage(visiblePage + 1); else void run(onAdvance); }} soundKind="none" />}
-            {visiblePage > 0 && <CandyButton phase={phase} label={STORY_COPY.previousPage} disabled={saving} onPress={() => setReadingPage(visiblePage - 1)} variant="quiet" soundKind="none" />}
-            {saving && <AppText textRole="caption" accessibilityLiveRegion="polite" style={[styles.status, { color: theme.muted }]}>{STORY_COPY.saving}</AppText>}
+            </Pressable>) : <CandyButton phase={phase} label={memory && visiblePage >= pages.length - 1 ? STORY_COPY.finish : STORY_COPY.continue} disabled={showSaving} onPress={() => { if (memory && visiblePage < memory.page) setReadingPage(visiblePage + 1); else void run(onAdvance); }} soundKind="none" />}
+            {visiblePage > 0 && <CandyButton phase={phase} label={STORY_COPY.previousPage} disabled={showSaving} onPress={() => { if (!busy.current) setReadingPage(visiblePage - 1); }} variant="quiet" soundKind="none" />}
             {error && <View accessibilityLiveRegion="assertive"><AppText textRole="caption" style={[styles.status, { color: theme.body }]}>{STORY_COPY.saveError}</AppText><CandyButton phase={phase} label={STORY_COPY.retry} onPress={() => { if (retry.current) void run(retry.current); }} variant="secondary" /></View>}
-            <CandyButton phase={phase} label={STORY_COPY.later} onPress={close} disabled={saving} variant="quiet" soundKind="none" />
+            <CandyButton phase={phase} label={STORY_COPY.later} onPress={close} disabled={showSaving} variant="quiet" soundKind="none" />
           </View>
         </ScrollView>
       </PanelCard>
@@ -91,5 +116,9 @@ const styles = StyleSheet.create({
   option: { minHeight: 56, padding: 16, borderWidth: 1 },
   optionText: { ...TEXT_ROLE.label, lineHeight: 24 },
   status: { fontFamily: BODY_FONT, fontSize: 14, lineHeight: 22, marginBottom: 10 },
+  // One line for the page counter and the slow-save caption: the row's resting
+  // height is the counter's own, so the caption can appear without a reflow.
+  statusRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
+  statusSaving: { flexShrink: 1, marginLeft: 12, textAlign: 'right' },
 });
 export default StorySceneModal;
