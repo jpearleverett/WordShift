@@ -20,8 +20,17 @@ import { CandyButton } from './ui/CandyButton';
  * for that window (dimmed buttons, a caption mounting under them) read as the
  * card flickering on EVERY Continue tap, so the affordance reveals only once a
  * write has been slow for this long. Fast writes never show it at all.
+ *
+ * On the slow path the un-dim and the page swap land in ONE commit because
+ * useStoryFlow.save calls setActive before its promise resolves and run()'s
+ * finally runs in the very next continuation; keep `advance` / `choose` direct
+ * pass-throughs to save() so no extra await tick can split them.
  */
 const SAVING_REVEAL_MS = 350;
+
+/** StoryPortrait frame height plus its bottom margin. */
+const PORTRAIT_SLOT_DP = 116 + 8;
+const SCENES_WITH_HEADER_ART = ['cup', 'supper', 'plum'];
 
 export interface StorySceneModalProps {
   memory: StoryMemory | null; phase: DialoguePhase;
@@ -51,6 +60,15 @@ export const StorySceneModal: React.FC<StorySceneModalProps> = ({ memory, phase,
   const speakerName = line ? getStorySpeakerName(line.speaker) : '';
   const options = memory && visiblePage === memory.page && !memory.choice && memory.page === memory.scene.lines.length - 1 ? memory.scene.options : undefined;
   const presentationPhase = memory ? getStoryPresentationPhase(memory) : phase;
+  // Frame stability: the card is content-sized and centred, so anything that
+  // mounts or unmounts between pages moves BOTH of its edges. The header art
+  // stays for every page of its scene, the portrait slot is reserved on
+  // narrator / player pages of any scene where an animal speaks, and the
+  // previous-page bevel occupies its slot from page one (invisible, inert), so
+  // page to page only the words change.
+  const showHeaderArt = !!memory && presentationPhase < 3 && SCENES_WITH_HEADER_ART.includes(memory.scene.id);
+  const portraitSpeaker = line && line.speaker !== 'narrator' && line.speaker !== 'player' ? line.speaker : null;
+  const reservePortrait = !portraitSpeaker && pages.some(page => page.speaker !== 'narrator' && page.speaker !== 'player');
   useEffect(() => {
     retry.current = null;
   }, [pageKey]);
@@ -66,7 +84,11 @@ export const StorySceneModal: React.FC<StorySceneModalProps> = ({ memory, phase,
     busy.current = true; retry.current = action; setError(false);
     if (revealTimer.current) clearTimeout(revealTimer.current);
     revealTimer.current = setTimeout(() => setShowSaving(true), SAVING_REVEAL_MS);
-    try { await action(); retry.current = null; } catch { setError(true); }
+    try { await action(); retry.current = null; } catch {
+      setError(true);
+      // iOS has no live regions, so the failure is spoken explicitly.
+      announceForA11y(STORY_COPY.saveError);
+    }
     finally {
       if (revealTimer.current) clearTimeout(revealTimer.current);
       revealTimer.current = null;
@@ -79,9 +101,10 @@ export const StorySceneModal: React.FC<StorySceneModalProps> = ({ memory, phase,
     <View style={[styles.overlay, { backgroundColor: theme.overlay, paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }]} accessibilityViewIsModal>
       <PanelCard phase={phase} kind="panel" style={{ width: '100%', maxWidth: 560, maxHeight: height - insets.top - insets.bottom - 32 }}>
         <ScrollView ref={scroll} contentContainerStyle={styles.content} bounces={false} keyboardShouldPersistTaps="handled">
-          {visiblePage === 0 && presentationPhase < 3 && memory && ['cup', 'supper', 'plum'].includes(memory.scene.id) && <Image source={STORY_ART.tableHeader} resizeMode="cover" style={styles.sceneArt} accessible={false} />}
+          {showHeaderArt && <Image source={STORY_ART.tableHeader} resizeMode="cover" style={styles.sceneArt} accessible={false} />}
           <AppText textRole="title" accessibilityRole="header"  style={[styles.title, { color: theme.title }]}>{memory?.scene.title}</AppText>
-          {line && line.speaker !== 'narrator' && line.speaker !== 'player' && <StoryPortrait speaker={line.speaker} phase={presentationPhase} passage={`${memory?.scene.id}:${visiblePage}`} />}
+          {portraitSpeaker && <StoryPortrait speaker={portraitSpeaker} phase={presentationPhase} passage={`${memory?.scene.id}:${visiblePage}`} />}
+          {reservePortrait && <View style={styles.portraitSlot} accessible={false} pointerEvents="none" />}
           <AppText textRole="label"  style={[styles.speaker, { color: theme.title }]}>{speakerName}</AppText>
           <AppText textRole="reading"  style={[styles.body, line?.speaker === 'narrator' && styles.narration, { color: theme.body }]}>{line?.text}</AppText>
           <View style={styles.actions}>
@@ -94,7 +117,14 @@ export const StorySceneModal: React.FC<StorySceneModalProps> = ({ memory, phase,
             {options?.length ? options.map(option => <Pressable key={option.id} accessibilityRole="button" accessibilityLabel={option.label} accessibilityState={{ disabled: showSaving }} disabled={showSaving} onPress={() => { void run(() => onChoose(option.id)); }} style={({ pressed }) => [styles.option, { backgroundColor: theme.sectionBg, borderColor: theme.sectionBorder, opacity: showSaving ? 0.6 : pressed ? 0.8 : 1 }]}>
               <AppText textRole="label"  style={[styles.optionText, { color: theme.title }]}>{option.label}</AppText>
             </Pressable>) : <CandyButton phase={phase} label={memory && visiblePage >= pages.length - 1 ? STORY_COPY.finish : STORY_COPY.continue} disabled={showSaving} onPress={() => { if (memory && visiblePage < memory.page) setReadingPage(visiblePage + 1); else void run(onAdvance); }} soundKind="none" />}
-            {visiblePage > 0 && <CandyButton phase={phase} label={STORY_COPY.previousPage} disabled={showSaving} onPress={() => { if (!busy.current) setReadingPage(visiblePage - 1); }} variant="quiet" soundKind="none" />}
+            {pages.length > 1 && <View
+              style={visiblePage === 0 ? styles.hiddenAction : undefined}
+              pointerEvents={visiblePage === 0 ? 'none' : 'auto'}
+              accessibilityElementsHidden={visiblePage === 0}
+              importantForAccessibility={visiblePage === 0 ? 'no-hide-descendants' : 'auto'}
+            >
+              <CandyButton phase={phase} label={STORY_COPY.previousPage} disabled={showSaving || visiblePage === 0} onPress={() => { if (!busy.current && visiblePage > 0) setReadingPage(visiblePage - 1); }} variant="quiet" soundKind="none" />
+            </View>}
             {error && <View accessibilityLiveRegion="assertive"><AppText textRole="caption" style={[styles.status, { color: theme.body }]}>{STORY_COPY.saveError}</AppText><CandyButton phase={phase} label={STORY_COPY.retry} onPress={() => { if (retry.current) void run(retry.current); }} variant="secondary" /></View>}
             <CandyButton phase={phase} label={STORY_COPY.later} onPress={close} disabled={showSaving} variant="quiet" soundKind="none" />
           </View>
@@ -109,6 +139,7 @@ const styles = StyleSheet.create({
   sceneArt: { width: '100%', height: 132, marginBottom: 20 },
   title: { ...TEXT_ROLE.title, textAlign: 'center', marginBottom: 18 },
   portrait: { width: 96, height: 96, alignSelf: 'center', marginBottom: 8 },
+  portraitSlot: { height: PORTRAIT_SLOT_DP },
   speaker: { ...TEXT_ROLE.label, marginBottom: 10 },
   body: { ...TEXT_ROLE.reading, marginBottom: 24 },
   narration: { fontFamily: BODY_FONT_ITALIC },
@@ -120,5 +151,8 @@ const styles = StyleSheet.create({
   // height is the counter's own, so the caption can appear without a reflow.
   statusRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
   statusSaving: { flexShrink: 1, marginLeft: 12, textAlign: 'right' },
+  // The previous-page bevel keeps its slot on page one so the action column
+  // never grows under the thumb when page two arrives.
+  hiddenAction: { opacity: 0 },
 });
 export default StorySceneModal;

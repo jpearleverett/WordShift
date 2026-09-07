@@ -670,7 +670,7 @@ export const Row: React.FC<RowProps> = memo(({
   // F1 (neighbour rank-closing) — per-tile translateX cache + the last
   // rendered layout (id order + whether it was the arc), used by the
   // rank-shift effect below.
-  const prevRenderRef = useRef<{ ids: string[]; arc: boolean } | null>(null);
+  const prevRenderRef = useRef<{ ids: string[]; arc: boolean; compact: boolean } | null>(null);
   const [rankShiftAnims] = useState(() => (new Map<string, Animated.Value>()));
   const getRankShiftAnim = (id: string): Animated.Value => {
     let anim = rankShiftAnims.get(id);
@@ -689,6 +689,32 @@ export const Row: React.FC<RowProps> = memo(({
     !!showSlots, isTarget, getSettingsSync().reducedMotion || shouldSimplifyAnimations(),
     arcAnim, slotCollapseAnim, rowData.words.length,
   );
+
+  // Layout generation: bumps on every arc <-> standard flip. Because the two
+  // layouts mount under distinct keys (see the render below), a flip REMOUNTS
+  // this row's tiles, and LetterTile plays its arrival settle from its mount
+  // effect. An arrival mark outlives the flips around it (a double-shift first
+  // drop's mark stays on this row until the second drop lands), so a tile that
+  // had already settled would replay its landing every time the fan opened or
+  // closed. An arrival is therefore handed to the tiles ONLY in the generation
+  // it first rendered in: same generation, keep passing it (a re-render must
+  // not change the prop on a mounted tile, or its effect cleanup cuts the
+  // spring); any later generation, the fresh tile mounts at rest. Render-phase
+  // state (the same pattern useRowArc uses), never a ref read during render.
+  const [layoutGen, setLayoutGen] = useState(0);
+  const [prevArcMounted, setPrevArcMounted] = useState(arcMounted);
+  if (prevArcMounted !== arcMounted) {
+    setPrevArcMounted(arcMounted);
+    setLayoutGen((g) => g + 1);
+  }
+  const [arrivalDelivery, setArrivalDelivery] = useState<{ moveId: number; gen: number } | null>(null);
+  if (arrival && arrivalDelivery?.moveId !== arrival.moveId) {
+    setArrivalDelivery({ moveId: arrival.moveId, gen: layoutGen });
+  }
+  const tileArrival =
+    arrival && arrivalDelivery?.moveId === arrival.moveId && arrivalDelivery.gen === layoutGen
+      ? arrival
+      : null;
 
   // Inter-slot tap guidance: tapping a letter tile in the target row (between
   // drop slots) pulses its two ADJACENT slots. Letter i sits between slots i
@@ -1003,8 +1029,8 @@ export const Row: React.FC<RowProps> = memo(({
               // eye to where drops go without committing anything (and without
               // leaking validity).
               onLockedPress={() => handleInterSlotTap(letterIndex)}
-              arrivalMoveId={arrival && arrival.letterId === letter.id ? arrival.moveId : undefined}
-              arrivalDirection={arrival && arrival.letterId === letter.id ? arrival.direction : undefined}
+              arrivalMoveId={tileArrival && tileArrival.letterId === letter.id ? tileArrival.moveId : undefined}
+              arrivalDirection={tileArrival && tileArrival.letterId === letter.id ? tileArrival.direction : undefined}
             />
           </Animated.View>
         );
@@ -1054,8 +1080,8 @@ export const Row: React.FC<RowProps> = memo(({
             (guidanceActive && isSource && guidedLetterId === letter.id) ||
             (hintLetterId != null && hintLetterId === letter.id)
           }
-          arrivalMoveId={arrival && arrival.letterId === letter.id ? arrival.moveId : undefined}
-          arrivalDirection={arrival && arrival.letterId === letter.id ? arrival.direction : undefined}
+          arrivalMoveId={tileArrival && tileArrival.letterId === letter.id ? tileArrival.moveId : undefined}
+          arrivalDirection={tileArrival && tileArrival.letterId === letter.id ? tileArrival.direction : undefined}
         />
       );
 
@@ -1136,9 +1162,19 @@ export const Row: React.FC<RowProps> = memo(({
   useEffect(() => {
     const currentIds = rowData.words.map((l) => l.id);
     const prev = prevRenderRef.current;
-    prevRenderRef.current = { ids: currentIds, arc: arcMounted };
+    prevRenderRef.current = { ids: currentIds, arc: arcMounted, compact: compactTiles };
 
-    if (arcMounted) return; // the arc render owns its own motion
+    if (arcMounted) {
+      // The arc render owns its own motion. The standard wrappers have just
+      // unmounted (the two layouts mount under distinct keys), so this is the
+      // one moment a rank-shift reset is invisible: a spring this effect's
+      // cleanup stopped mid-flight (a fast pick right after a snap) would
+      // otherwise leave its value at a partial offset, and the NEXT standard
+      // mount (after a plain deselect, where the length is unchanged and no
+      // seed runs) would come up with that stale nudge baked in.
+      rankShiftAnims.forEach((anim) => anim.setValue(0));
+      return;
+    }
     const instant = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
 
     if (instant) {
@@ -1167,20 +1203,25 @@ export const Row: React.FC<RowProps> = memo(({
     };
 
     if (prev.arc) {
-      // Arc -> standard with a letter added: the real geometric delta.
+      // Arc -> standard with a letter added: the real geometric delta. The OLD
+      // pose is measured with the compact flag the arc was rendered with:
+      // compactTiles flips at 6 letters, i.e. exactly when a 5-letter row
+      // receives one, and measuring the arc with the new flag started every
+      // survivor ~24dp from where it actually sat.
       currentIds.forEach((id, newIdx) => {
         const oldIdx = prev.ids.indexOf(id);
         if (oldIdx === -1) return; // the arriving letter owns its arrival settle
         seed(
           id,
-          arcLetterCenterOffset(oldIdx, prev.ids.length, compactTiles) -
+          arcLetterCenterOffset(oldIdx, prev.ids.length, prev.compact) -
             standardLetterCenterOffset(newIdx, currentIds.length, compactTiles),
         );
       });
     } else {
       // Standard -> standard (the old source row shrinking as its picked letter
-      // departs): a half-footprint nudge in the direction the gap closed.
-      const footprint = compactTiles
+      // departs): a half-footprint nudge in the direction the gap closed,
+      // measured in the OLD layout's tile footprint.
+      const footprint = prev.compact
         ? COMPACT_TILE_W + COMPACT_TILE_MARGIN_H * 2
         : STANDARD_TILE_W + STANDARD_TILE_MARGIN_H * 2;
       const half = footprint / 2;

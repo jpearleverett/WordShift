@@ -44,10 +44,13 @@ function styleBlock(src: string, key: string): string {
   expect(start).toBeGreaterThan(-1);
   const end = src.indexOf('\n  }', start + 1);
   expect(end).toBeGreaterThan(start);
-  return src.slice(start, end).replace(/\/\/.*$/gm, '');
+  return src.slice(start, end).replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
 }
 
-const VERTICAL_PADDING = /padding(Top|Vertical)\s*:|\bpadding\s*:/;
+// Any vertical padding, including the logical (Block) forms.
+const VERTICAL_PADDING = /padding(Top|Vertical|Block|BlockStart|BlockEnd)\s*:|\bpadding\s*:/;
+// A label TEXT style must not nudge itself off the centre line either.
+const TEXT_NUDGE = /(margin|padding)(Top|Bottom|Vertical|Block)\s*:|translateY/;
 
 describe('bevel label containers keep the shadow row as their only vertical inset', () => {
   const candy = read('../components/ui/CandyButton.tsx');
@@ -60,9 +63,15 @@ describe('bevel label containers keep the shadow row as their only vertical inse
     expect(content).not.toMatch(VERTICAL_PADDING);
     expect(content).not.toMatch(/margin(Top|Bottom|Vertical)\s*:/);
     // The one asymmetry rides the Animated.View so it stays next to the
-    // press-travel transform it composes with.
-    expect(candy).toMatch(/paddingBottom: BTN_SHADOW_DP, transform: \[\{ translateY \}\]/);
+    // press-travel transform it composes with, and nothing else vertical
+    // may share that inline object.
+    const inline = candy.match(/\{[^{}]*paddingBottom: BTN_SHADOW_DP[^{}]*transform: \[\{ translateY \}\][^{}]*\}/);
+    expect(inline).not.toBeNull();
+    expect(inline![0]).not.toMatch(VERTICAL_PADDING);
     expect(candy).toContain('textRole="label"');
+    for (const key of ['label', 'labelLg', 'quietLabel']) {
+      expect(styleBlock(candy, key)).not.toMatch(TEXT_NUDGE);
+    }
   });
 
   it('HomeScreen BevelRowButton mirrors CandyButton exactly', () => {
@@ -70,6 +79,9 @@ describe('bevel label containers keep the shadow row as their only vertical inse
     expect(content).toContain('paddingBottom: BTN_SHADOW_DP');
     expect(content).not.toMatch(VERTICAL_PADDING);
     expect(content).not.toMatch(/margin(Top|Bottom|Vertical)\s*:/);
+    for (const key of ['bevelBtnText', 'continueButtonText']) {
+      expect(styleBlock(home, key)).not.toMatch(TEXT_NUDGE);
+    }
   });
 
   it('FoxGuide bevel keeps the reference anatomy', () => {
@@ -80,6 +92,10 @@ describe('bevel label containers keep the shadow row as their only vertical inse
   });
 
   it('Offering Pit bevels keep the reference anatomy', () => {
+    // Two anatomies: harvestAllContent is a content WRAPPER inside the strip;
+    // tendingButton is the strip ITSELF acting as the label's flex parent (the
+    // ThreeSliceStrip is absolutely positioned off the padding box, so it still
+    // covers the whole strip). The inset rule is the same for both.
     for (const key of ['harvestAllContent', 'tendingButton']) {
       const block = styleBlock(pit, key);
       expect(block).toContain('paddingBottom: BTN_SHADOW_DP');

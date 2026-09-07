@@ -11,14 +11,18 @@ import { Animated, Easing } from 'react-native';
  * motion preference change, or a letter arriving in / leaving this row while
  * it stays the target (a double-shift first drop, the winning move, an undo).
  * `wordCount` is that last signal. The snap matters because Row mounts the arc
- * and standard subtrees under distinct keys, so the collapse's end REMOUNTS
- * the row's tiles: an arriving tile that had started its arrival settle inside
- * the arc would otherwise be cut off and replay it on the fresh mount. Snapping
+ * and standard subtrees under distinct keys, so every flip REMOUNTS the row's
+ * tiles: an arriving tile that had started its arrival settle inside a
+ * gracefully collapsing arc would be cut off at the collapse's end. Snapping
  * hands the arriving tile straight to the standard layout, where it settles
  * once, and the surviving letters rank-close via Row's F1 spring exactly as
- * they do on every other committed move.
+ * they do on every other committed move. (Row separately gates each arrival
+ * to the layout generation it first rendered in, so later flips, such as the
+ * fan reopening for a double-shift second pick, never replay it either.)
  *
- * A snap or a finished collapse cannot revive on undo.
+ * A snap or a finished collapse cannot revive on undo. This relies on a row
+ * never being both the source and the target of one move, so a move that
+ * clears the selection always changes the target row's length or its role.
  */
 export function useRowArc(
   showSlots: boolean,

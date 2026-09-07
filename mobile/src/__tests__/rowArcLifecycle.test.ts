@@ -33,6 +33,13 @@ jest.mock('react-native', () => ({
 import { Animated } from 'react-native';
 import { useRowArc } from '../hooks/useRowArc';
 
+// Harness model: React re-renders until a render-phase setState stops changing
+// state, then runs the effect's cleanup + setup only when its deps changed
+// (the final pass's effect wins). Not modelled: React also re-renders on a
+// same-value render-phase set (the hook only sets on change, so harmless),
+// prop transitions split across renders (isProcessing), and the ORDER between
+// the arc subtree's unmount and the `!visible` reset, which rests on React /
+// RN commit ordering rather than on this test.
 let previousDeps: readonly unknown[] | undefined;
 let cleanup: (() => void) | undefined;
 let arc: Animated.Value;
