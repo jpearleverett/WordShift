@@ -10,7 +10,7 @@ import { getStorySpeakerName } from '../services/storyArchive';
 import { announceForA11y } from '../services/a11yAnnounce';
 import { BODY_FONT, BODY_FONT_ITALIC } from '../theme/fonts';
 import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
-import { StoryPortrait } from './StoryPortrait';
+import { StoryPortrait, STORY_PORTRAIT_MARGIN_BOTTOM, STORY_PORTRAIT_SIZE } from './StoryPortrait';
 import { STORY_ART } from './storyArt';
 import { PanelCard } from './ui/PanelCard';
 import { CandyButton } from './ui/CandyButton';
@@ -28,9 +28,17 @@ import { CandyButton } from './ui/CandyButton';
  */
 const SAVING_REVEAL_MS = 350;
 
-/** StoryPortrait frame height plus its bottom margin. */
-const PORTRAIT_SLOT_DP = 116 + 8;
+/** StoryPortrait's frame height plus its bottom margin: the slot a narrator or player page reserves in its place. */
+const PORTRAIT_SLOT_DP = STORY_PORTRAIT_SIZE + STORY_PORTRAIT_MARGIN_BOTTOM;
 const SCENES_WITH_HEADER_ART = ['cup', 'supper', 'plum'];
+/**
+ * The header art stays for every page of its scene (a page-0-only image moved
+ * both card edges by 76dp on the first Continue). On the smallest phones that
+ * makes a three-line page overflow the card and pushes the quiet actions
+ * behind a scroll, so the art is shown only when the card has room for it,
+ * decided once per scene from the same available height the card is capped at.
+ */
+const HEADER_ART_MIN_CARD_DP = 720;
 
 export interface StorySceneModalProps {
   memory: StoryMemory | null; phase: DialoguePhase;
@@ -66,7 +74,9 @@ export const StorySceneModal: React.FC<StorySceneModalProps> = ({ memory, phase,
   // narrator / player pages of any scene where an animal speaks, and the
   // previous-page bevel occupies its slot from page one (invisible, inert), so
   // page to page only the words change.
-  const showHeaderArt = !!memory && presentationPhase < 3 && SCENES_WITH_HEADER_ART.includes(memory.scene.id);
+  const availableHeight = height - insets.top - insets.bottom - 32;
+  const showHeaderArt = !!memory && presentationPhase < 3 && SCENES_WITH_HEADER_ART.includes(memory.scene.id)
+    && availableHeight >= HEADER_ART_MIN_CARD_DP;
   const portraitSpeaker = line && line.speaker !== 'narrator' && line.speaker !== 'player' ? line.speaker : null;
   const reservePortrait = !portraitSpeaker && pages.some(page => page.speaker !== 'narrator' && page.speaker !== 'player');
   useEffect(() => {
@@ -99,7 +109,7 @@ export const StorySceneModal: React.FC<StorySceneModalProps> = ({ memory, phase,
   const close = () => { if (!busy.current) onClose(); };
   return <Modal visible={!!memory && !!line} transparent animationType={getSettingsSync().reducedMotion ? 'none' : 'fade'} onRequestClose={close}>
     <View style={[styles.overlay, { backgroundColor: theme.overlay, paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }]} accessibilityViewIsModal>
-      <PanelCard phase={phase} kind="panel" style={{ width: '100%', maxWidth: 560, maxHeight: height - insets.top - insets.bottom - 32 }}>
+      <PanelCard phase={phase} kind="panel" style={{ width: '100%', maxWidth: 560, maxHeight: availableHeight }}>
         <ScrollView ref={scroll} contentContainerStyle={styles.content} bounces={false} keyboardShouldPersistTaps="handled">
           {showHeaderArt && <Image source={STORY_ART.tableHeader} resizeMode="cover" style={styles.sceneArt} accessible={false} />}
           <AppText textRole="title" accessibilityRole="header"  style={[styles.title, { color: theme.title }]}>{memory?.scene.title}</AppText>

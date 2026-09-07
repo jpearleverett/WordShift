@@ -41,6 +41,7 @@ import {
 import { BODY_FONT_BOLD, PIXEL_FONT_BOLD } from '../theme/fonts';
 import { FONT_SIZE } from '../theme/typeScale';
 import { useRowArc } from '../hooks/useRowArc';
+import { useArrivalGate } from '../hooks/useArrivalGate';
 
 // Arc layout configuration
 const ARC_ROTATION = 12; // Max rotation in degrees for edge elements (steeper fan)
@@ -690,31 +691,13 @@ export const Row: React.FC<RowProps> = memo(({
     arcAnim, slotCollapseAnim, rowData.words.length,
   );
 
-  // Layout generation: bumps on every arc <-> standard flip. Because the two
-  // layouts mount under distinct keys (see the render below), a flip REMOUNTS
-  // this row's tiles, and LetterTile plays its arrival settle from its mount
-  // effect. An arrival mark outlives the flips around it (a double-shift first
-  // drop's mark stays on this row until the second drop lands), so a tile that
-  // had already settled would replay its landing every time the fan opened or
-  // closed. An arrival is therefore handed to the tiles ONLY in the generation
-  // it first rendered in: same generation, keep passing it (a re-render must
-  // not change the prop on a mounted tile, or its effect cleanup cuts the
-  // spring); any later generation, the fresh tile mounts at rest. Render-phase
-  // state (the same pattern useRowArc uses), never a ref read during render.
-  const [layoutGen, setLayoutGen] = useState(0);
-  const [prevArcMounted, setPrevArcMounted] = useState(arcMounted);
-  if (prevArcMounted !== arcMounted) {
-    setPrevArcMounted(arcMounted);
-    setLayoutGen((g) => g + 1);
-  }
-  const [arrivalDelivery, setArrivalDelivery] = useState<{ moveId: number; gen: number } | null>(null);
-  if (arrival && arrivalDelivery?.moveId !== arrival.moveId) {
-    setArrivalDelivery({ moveId: arrival.moveId, gen: layoutGen });
-  }
-  const tileArrival =
-    arrival && arrivalDelivery?.moveId === arrival.moveId && arrivalDelivery.gen === layoutGen
-      ? arrival
-      : null;
+  // Because the two layouts mount under distinct keys (see the render below),
+  // a flip REMOUNTS this row's tiles, and LetterTile plays its arrival settle
+  // from its mount effect. An arrival mark outlives the flips around it (a
+  // double-shift first drop's mark stays on this row until the second drop
+  // lands), so the tiles receive a mark ONLY in the layout generation it first
+  // rendered in; see hooks/useArrivalGate.ts.
+  const tileArrival = useArrivalGate(arrival, arcMounted);
 
   // Inter-slot tap guidance: tapping a letter tile in the target row (between
   // drop slots) pulses its two ADJACENT slots. Letter i sits between slots i
@@ -1171,8 +1154,10 @@ export const Row: React.FC<RowProps> = memo(({
       // cleanup stopped mid-flight (a fast pick right after a snap) would
       // otherwise leave its value at a partial offset, and the NEXT standard
       // mount (after a plain deselect, where the length is unchanged and no
-      // seed runs) would come up with that stale nudge baked in.
-      rankShiftAnims.forEach((anim) => anim.setValue(0));
+      // seed runs) would come up with that stale nudge baked in. Only the
+      // letters still on the row: a departed id's value is detached, and
+      // touching it would only mint an orphan native node.
+      currentIds.forEach((id) => rankShiftAnims.get(id)?.setValue(0));
       return;
     }
     const instant = getSettingsSync().reducedMotion || shouldSimplifyAnimations();

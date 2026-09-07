@@ -35,16 +35,28 @@ export function useRowArc(
   const [visible, setVisible] = useState(showSlots);
   const [previousShowSlots, setPreviousShowSlots] = useState(showSlots);
   const [previousWordCount, setPreviousWordCount] = useState(wordCount);
+  // Track the value THIS pass renders into, not the stale state. React re-runs
+  // the component for render-phase updates, but a consumer that also keeps
+  // render-phase state (Row's arrival gate) records what it saw on the first
+  // pass, so returning the stale `visible` made a snap look like "still
+  // mounted" for one pass and the gate recorded the wrong layout generation.
+  let nextVisible = visible;
   if (previousShowSlots !== showSlots) {
     setPreviousShowSlots(showSlots);
-    if (showSlots) setVisible(true);
+    if (showSlots) {
+      setVisible(true);
+      nextVisible = true;
+    }
   }
   let boardChanged = false;
   if (previousWordCount !== wordCount) {
     setPreviousWordCount(wordCount);
     boardChanged = true;
   }
-  if (visible && !showSlots && (!isTarget || instant || boardChanged)) setVisible(false);
+  if (nextVisible && !showSlots && (!isTarget || instant || boardChanged)) {
+    setVisible(false);
+    nextVisible = false;
+  }
 
   useEffect(() => {
     if (instant || !isTarget) {
@@ -91,5 +103,5 @@ export function useRowArc(
     return () => { cancelled = true; closing.stop(); };
   }, [showSlots, isTarget, instant, visible, arc, slots]);
 
-  return isTarget && (showSlots || (visible && !instant));
+  return isTarget && (showSlots || (nextVisible && !instant));
 }

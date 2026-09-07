@@ -940,8 +940,10 @@ describe('arc and standard layouts never share host views (source pin)', () => {
       expect(block).not.toMatch(/arrivalMoveId=\{arrival\b/);
       expect(block).not.toMatch(/arrivalDirection=\{arrival\b/);
     }
-    expect(flat).toContain('arrivalDelivery?.moveId === arrival.moveId && arrivalDelivery.gen === layoutGen');
-    expect(flat).toMatch(/if \(prevArcMounted !== arcMounted\) \{ setPrevArcMounted\(arcMounted\); setLayoutGen\(\(g\) => g \+ 1\); \}/);
+    // The gate itself lives in hooks/useArrivalGate.ts and is exercised at
+    // runtime by arrivalGate.test.ts (a source pin cannot see a withheld
+    // delivery); Row must feed it the fan state it actually renders with.
+    expect(flat).toContain('const tileArrival = useArrivalGate(arrival, arcMounted);');
   });
 
   it('resets the rank-shift cache while the arc owns the row', () => {
@@ -949,7 +951,7 @@ describe('arc and standard layouts never share host views (source pin)', () => {
     // after a snap) would otherwise resurface as a stale nudge on the next
     // standard mount; the reset runs when the standard wrappers have just
     // unmounted, the one moment it is invisible.
-    expect(flat).toMatch(/if \(arcMounted\) \{[\s\S]*?rankShiftAnims\.forEach\(\(anim\) => anim\.setValue\(0\)\); return; \}/);
+    expect(flat).toMatch(/if \(arcMounted\) \{[\s\S]*?currentIds\.forEach\(\(id\) => rankShiftAnims\.get\(id\)\?\.setValue\(0\)\); return; \}/);
     expect(flat).toContain('prevRenderRef.current = { ids: currentIds, arc: arcMounted, compact: compactTiles }');
     expect(flat).toContain('arcLetterCenterOffset(oldIdx, prev.ids.length, prev.compact)');
   });

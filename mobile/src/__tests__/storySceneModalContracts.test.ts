@@ -56,6 +56,7 @@ describe('StorySceneModal saving affordance is delayed, never per-page', () => {
     expect(src).not.toMatch(/opacity: saving \?/);
     // Every interactive control in the actions column takes the delayed flag.
     expect((src.match(/disabled=\{showSaving\}/g) ?? []).length).toBeGreaterThanOrEqual(3);
+    expect(flat).toContain('disabled={showSaving || visiblePage === 0}');
     expect(flat).toMatch(/accessibilityState=\{ ?\{ disabled: showSaving \} ?\}/);
   });
 
@@ -88,10 +89,16 @@ describe('StorySceneModal saving affordance is delayed, never per-page', () => {
     expect(flat).toMatch(/style=\{visiblePage === 0 \? styles\.hiddenAction : undefined\}/);
     expect(flat).toMatch(/importantForAccessibility=\{visiblePage === 0 \? 'no-hide-descendants' : 'auto'\}/);
     expect(flat).toMatch(/hiddenAction: \{ opacity: 0 \}/);
+    // The slot is the portrait's own footprint, by construction not by copy.
+    expect(flat).toContain('const PORTRAIT_SLOT_DP = STORY_PORTRAIT_SIZE + STORY_PORTRAIT_MARGIN_BOTTOM;');
+    // Art is decided per scene from the card's available height, never per page.
+    expect(flat).toMatch(/const showHeaderArt = [^;]*availableHeight >= HEADER_ART_MIN_CARD_DP;/);
+    expect(flat).not.toMatch(/showHeaderArt = [^;]*visiblePage/);
   });
 
   it('keeps the error, retry and accessibility paths intact', () => {
-    expect(flat).toMatch(/catch \{ setError\(true\); [\s\S]*?announceForA11y\(STORY_COPY\.saveError\); \}/);
+    const flatRun = runBlock.replace(/\s+/g, ' ');
+    expect(flatRun).toMatch(/catch \{ setError\(true\); [\s\S]*?announceForA11y\(STORY_COPY\.saveError\); \}/);
     expect(src).toContain('retry.current = action');
     expect(src).toMatch(/\{error && <View accessibilityLiveRegion="assertive">/);
     expect(src).toContain('label={STORY_COPY.retry}');
