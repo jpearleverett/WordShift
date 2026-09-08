@@ -24,7 +24,7 @@
  */
 
 import { Platform } from 'react-native';
-import { AdProvider, RewardedPlacement, RewardedResult } from '../ads';
+import type { AdProvider, RewardedPlacement, RewardedResult } from '../ads';
 
 export interface AdMobConfig {
   /** Interstitial ad unit id for this platform (ca-app-pub-…/…). */
@@ -33,33 +33,8 @@ export interface AdMobConfig {
   rewardedId?: string;
 }
 
-/** A guard so a load/show can never hang the caller forever. */
+/** Bound network loads and presentation startup, never time an ad already on screen. */
 const OP_TIMEOUT_MS = 12000;
-
-function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
-  return new Promise((resolve) => {
-    let settled = false;
-    const t = setTimeout(() => {
-      if (!settled) {
-        settled = true;
-        resolve(fallback);
-      }
-    }, ms);
-    p.then((v) => {
-      if (!settled) {
-        settled = true;
-        clearTimeout(t);
-        resolve(v);
-      }
-    }).catch(() => {
-      if (!settled) {
-        settled = true;
-        clearTimeout(t);
-        resolve(fallback);
-      }
-    });
-  });
-}
 
 function readExtra(): Record<string, any> {
   try {
@@ -134,27 +109,165 @@ export function createAdMobAdProvider(config: AdMobConfig = {}): AdProvider {
   let interstitialId: string | undefined;
   let rewardedId: string | undefined;
 
-  let loadedInterstitial: any | null = null;
-  let loadedRewarded: any | null = null;
-
-  /** Single-flight UMP consent gate; fulfills once consent is resolved. */
+  type AdKind = 'interstitial' | 'rewarded';
+  const slots: Record<AdKind, { loaded: any | null; loading: Promise<void> | null }> = {
+    interstitial: { loaded: null, loading: null },
+    rewarded: { loaded: null, loading: null },
+  };
+  const readinessListeners = new Set<() => void>();
+  const cancelLoads = new Set<() => void>();
+  let consentAllowsAds = false;
+  let consentGeneration = 0;
+  let initialized = false;
+  let sdkInitialized = false;
+  let sdkInitialization: Promise<boolean> | null = null;
   let consentPromise: Promise<void> | null = null;
+  let privacyOptionsPromise: Promise<void> | null = null;
+
+  function setReady(value: boolean): void {
+    if (ready === value) return;
+    ready = value;
+    readinessListeners.forEach((listener) => listener());
+  }
+
+  /** Invalidate ads created under the previous choices, including late loads. */
+  function suspendAds(): void {
+    consentGeneration += 1;
+    consentAllowsAds = false;
+    setReady(false);
+    cancelLoads.forEach((cancel) => cancel());
+    slots.interstitial.loaded = null;
+    slots.rewarded.loaded = null;
+    slots.interstitial.loading = null;
+    slots.rewarded.loading = null;
+  }
+
+  /** Build and preload one ad; cancel cleanly if the consent choices change. */
+  function preload(kind: AdKind): Promise<void> {
+    const slot = slots[kind];
+    const unitId = kind === 'interstitial' ? interstitialId : rewardedId;
+    if (!ready || !consentAllowsAds || !mod || !unitId || slot.loaded) return Promise.resolve();
+    if (slot.loading) return slot.loading;
+    const generation = consentGeneration;
+    const load = new Promise<void>((resolve) => {
+      let settled = false;
+      const unsubscribers: (() => void)[] = [];
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        cancelLoads.delete(finish);
+        unsubscribers.forEach((unsubscribe) => unsubscribe());
+        resolve();
+      };
+      const timer = setTimeout(finish, OP_TIMEOUT_MS);
+      cancelLoads.add(finish);
+      try {
+        const factory = kind === 'interstitial' ? mod.InterstitialAd : mod.RewardedAd;
+        const loadedEvent = kind === 'interstitial' ? mod.AdEventType.LOADED : mod.RewardedAdEventType.LOADED;
+        const ad = factory.createForAdRequest(unitId);
+        unsubscribers.push(ad.addAdEventListener(loadedEvent, () => {
+          if (!settled && ready && consentAllowsAds && generation === consentGeneration) slot.loaded = ad;
+          finish();
+        }));
+        unsubscribers.push(ad.addAdEventListener(mod.AdEventType.ERROR, finish));
+        ad.load();
+      } catch {
+        finish();
+      }
+    });
+    const pending = load.finally(() => {
+      if (slot.loading === pending) slot.loading = null;
+    });
+    slot.loading = pending;
+    return pending;
+  }
 
   /**
-   * Gather UMP consent (Google EU User Consent Policy). Resolves once consent
-   * is obtained / not required / errored ("error-continue" — ads then serve
-   * non-personalized). MUST complete before any ad request is made; single-
-   * flight so init + ensureAdConsent() share one flow and the form never
-   * double-presents.
+   * show() only starts native presentation; its promise is not the ad's lifetime.
+   * Once OPENED arrives, the player may watch for any length of time. Finish on
+   * CLOSED/ERROR and always detach listeners, including on startup timeout.
    */
+  function present(ad: any, kind: AdKind): Promise<{ closed: boolean; earned: boolean }> {
+    return new Promise((resolve) => {
+      let settled = false;
+      let earned = false;
+      const unsubscribers: (() => void)[] = [];
+      const finish = (closed: boolean) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(startupTimer);
+        unsubscribers.forEach((unsubscribe) => unsubscribe());
+        resolve({ closed, earned: closed && earned });
+      };
+      const startupTimer = setTimeout(() => finish(false), OP_TIMEOUT_MS);
+      try {
+        unsubscribers.push(ad.addAdEventListener(mod.AdEventType.OPENED, () => {
+          if (!settled) clearTimeout(startupTimer);
+        }));
+        if (kind === 'rewarded') {
+          unsubscribers.push(ad.addAdEventListener(mod.RewardedAdEventType.EARNED_REWARD, () => {
+            if (!settled) earned = true;
+          }));
+        }
+        unsubscribers.push(ad.addAdEventListener(mod.AdEventType.CLOSED, () => finish(true)));
+        unsubscribers.push(ad.addAdEventListener(mod.AdEventType.ERROR, () => finish(false)));
+        // Native show() can reject asynchronously as well as throw immediately.
+        void Promise.resolve(ad.show()).catch(() => finish(false));
+      } catch {
+        finish(false);
+      }
+    });
+  }
+
+  /** SDK initialization is shared, but only the current consent generation may serve ads. */
+  async function startAds(generation: number): Promise<void> {
+    if (!consentAllowsAds || generation !== consentGeneration || !mod) return;
+    if (!sdkInitialization) {
+      sdkInitialization = (async () => {
+        try {
+          const mobileAds = mod.default ?? mod;
+          await mobileAds().initialize();
+          sdkInitialized = true;
+          return true;
+        } catch (error) {
+          console.warn('[Ads] AdMob initialize failed:', error);
+          return false;
+        }
+      })();
+    }
+    const success = sdkInitialized || await sdkInitialization;
+    if (!success) sdkInitialization = null; // A later privacy-options retry can recover.
+    if (!success || !consentAllowsAds || generation !== consentGeneration) return;
+    setReady(true);
+    void preload('interstitial');
+    void preload('rewarded');
+  }
+
+  /** UMP's explicit signal is authoritative, including after a consent-form error. */
+  async function refreshConsentPermission(generation: number): Promise<void> {
+    let permitted = false;
+    try {
+      const info = await mod?.AdsConsent?.getConsentInfo?.();
+      permitted = info?.canRequestAds === true;
+    } catch {
+      // Unknown consent is not permission to initialize the SDK or request ads.
+    }
+    if (generation !== consentGeneration) return;
+    consentAllowsAds = permitted;
+    if (permitted) void startAds(generation);
+    else setReady(false);
+  }
+
+  /** Single-flight UMP update; never infer non-personalized permission from an error. */
   function resolveConsent(): Promise<void> {
     if (!consentPromise) {
       consentPromise = (async () => {
         const AdsConsent = mod?.AdsConsent;
+        const generation = consentGeneration;
         if (!AdsConsent) return;
         try {
           if (typeof AdsConsent.gatherConsent === 'function') {
-            // One-shot helper: requestInfoUpdate + load/show form if required.
             await AdsConsent.gatherConsent();
           } else {
             await AdsConsent.requestInfoUpdate();
@@ -163,57 +276,13 @@ export function createAdMobAdProvider(config: AdMobConfig = {}): AdProvider {
             }
           }
         } catch {
-          /* error-continue — ads still serve non-personalized */
+          // UMP may still permit requests using a previous session's consent.
+          // Read that permission explicitly; an error alone never authorizes ads.
         }
+        await refreshConsentPermission(generation);
       })();
     }
     return consentPromise;
-  }
-
-  /** Build + preload an interstitial; resolves when ready (or times out). */
-  function preloadInterstitial(): Promise<void> {
-    if (!mod || !interstitialId) return Promise.resolve();
-    return withTimeout(
-      new Promise<void>((resolve) => {
-        try {
-          const ad = mod.InterstitialAd.createForAdRequest(interstitialId);
-          const unsub = ad.addAdEventListener(mod.AdEventType.LOADED, () => {
-            loadedInterstitial = ad;
-            unsub?.();
-            resolve();
-          });
-          ad.addAdEventListener(mod.AdEventType.ERROR, () => resolve());
-          ad.load();
-        } catch {
-          resolve();
-        }
-      }),
-      OP_TIMEOUT_MS,
-      undefined as unknown as void
-    );
-  }
-
-  /** Build + preload a rewarded ad; resolves when ready (or times out). */
-  function preloadRewarded(): Promise<void> {
-    if (!mod || !rewardedId) return Promise.resolve();
-    return withTimeout(
-      new Promise<void>((resolve) => {
-        try {
-          const ad = mod.RewardedAd.createForAdRequest(rewardedId);
-          const unsub = ad.addAdEventListener(mod.RewardedAdEventType.LOADED, () => {
-            loadedRewarded = ad;
-            unsub?.();
-            resolve();
-          });
-          ad.addAdEventListener(mod.AdEventType.ERROR, () => resolve());
-          ad.load();
-        } catch {
-          resolve();
-        }
-      }),
-      OP_TIMEOUT_MS,
-      undefined as unknown as void
-    );
   }
 
   return {
@@ -225,44 +294,26 @@ export function createAdMobAdProvider(config: AdMobConfig = {}): AdProvider {
       return ready;
     },
 
-    async initialize(): Promise<void> {
-      // Load the SDK first so idsFromExtra can read its official TestIds when
-      // test mode is active (dev build or extra.adsUseTestIds).
-      const loaded = loadAdsModule();
-      if (!loaded) return; // SDK not installed → inert (Expo Go / Jest)
+    subscribeReady(listener: () => void): () => void {
+      readinessListeners.add(listener);
+      return () => { readinessListeners.delete(listener); };
+    },
 
+    async initialize(): Promise<void> {
+      if (initialized) return;
+      initialized = true;
+      const loaded = loadAdsModule();
+      if (!loaded) return; // SDK unavailable in Expo Go / web / Jest → inert.
       const ids = idsFromExtra(loaded);
-      // Explicit config wins over extra/test resolution.
       interstitialId = config.interstitialId ?? ids.interstitialId;
       rewardedId = config.rewardedId ?? ids.rewardedId;
-      if (!interstitialId && !rewardedId) return; // nothing configured → inert
-      // Keep the FULL module namespace: InterstitialAd / RewardedAd / AdEventType /
-      // RewardedAdEventType / AdsConsent are NAMED exports, while the default export
-      // is the mobileAds() initializer. Conflating them makes every ad request throw
-      // silently (ads never load, 0 requests reach AdMob).
+      if (!interstitialId && !rewardedId) return;
+      // Keep the full namespace: consent/ad classes are named exports, while
+      // mobileAds() is the default export.
       mod = loaded;
-      // EU User Consent Policy: UMP consent must be RESOLVED (obtained /
-      // not-required / error-continue) before ANY ad request leaves the device,
-      // so the consent gate runs strictly before SDK init + preloads. The whole
-      // chain is fired in the background — never awaited — because this runs in
-      // the cold-start boot gate: initialize() resolves immediately instead of
-      // blocking the app on a consent form or ad-network round-trips. `ready`
-      // flips once the SDK is up; the show paths already treat !ready as
-      // "no ad this time".
-      void resolveConsent()
-        .then(async () => {
-          const mobileAds = loaded.default ?? loaded;
-          await mobileAds().initialize();
-          ready = true;
-          // Warm one of each so the first show is instant — fired, not awaited
-          // (each preload keeps its own retry/timeout guard).
-          preloadInterstitial();
-          preloadRewarded();
-        })
-        .catch((error) => {
-          console.warn('[Ads] AdMob initialize failed:', error);
-          ready = false;
-        });
+      // The game boot never waits on the consent form or ad network. Every ad
+      // format stays disabled until UMP permits requests and SDK init finishes.
+      void resolveConsent();
     },
 
     async requestATTIfNeeded(): Promise<void> {
@@ -299,79 +350,58 @@ export function createAdMobAdProvider(config: AdMobConfig = {}): AdProvider {
       }
     },
 
-    async showPrivacyOptions(): Promise<void> {
-      if (!mod?.AdsConsent || typeof mod.AdsConsent.showPrivacyOptionsForm !== 'function') return;
-      try {
-        // The form needs up-to-date consent info; the init-time gate provides it.
-        await resolveConsent();
-        await mod.AdsConsent.showPrivacyOptionsForm();
-      } catch {
-        /* non-fatal */
+    showPrivacyOptions(): Promise<void> {
+      if (!mod?.AdsConsent || typeof mod.AdsConsent.showPrivacyOptionsForm !== 'function') return Promise.resolve();
+      if (!privacyOptionsPromise) {
+        privacyOptionsPromise = (async () => {
+          await resolveConsent();
+          // Unmount banners immediately and discard every preloaded ad. A form
+          // error may retain previous permission, but that must be checked again.
+          suspendAds();
+          const generation = consentGeneration;
+          try {
+            await mod.AdsConsent.showPrivacyOptionsForm();
+          } catch {
+            /* Keep gameplay usable if the CMP cannot present its form. */
+          }
+          await refreshConsentPermission(generation);
+        })().finally(() => { privacyOptionsPromise = null; });
       }
+      return privacyOptionsPromise;
     },
 
     async loadRewarded(_placement: RewardedPlacement): Promise<void> {
-      if (!ready || loadedRewarded) return;
-      await preloadRewarded();
+      if (!ready || slots.rewarded.loaded) return;
+      await preload('rewarded');
     },
 
     async showRewarded(_placement: RewardedPlacement): Promise<RewardedResult> {
       if (!ready || !mod) return { completed: false, reason: 'no_provider' };
-      if (!loadedRewarded) {
-        await preloadRewarded();
-        if (!loadedRewarded) return { completed: false, reason: 'not_ready' };
+      if (!slots.rewarded.loaded) {
+        await preload('rewarded');
+        if (!ready || !slots.rewarded.loaded) return { completed: false, reason: 'not_ready' };
       }
-      const ad = loadedRewarded;
-      loadedRewarded = null;
-      const result = await withTimeout(
-        new Promise<RewardedResult>((resolve) => {
-          let earned = false;
-          try {
-            ad.addAdEventListener(mod.RewardedAdEventType.EARNED_REWARD, () => {
-              earned = true;
-            });
-            ad.addAdEventListener(mod.AdEventType.CLOSED, () => {
-              resolve({ completed: earned, reason: earned ? undefined : 'dismissed' });
-            });
-            ad.addAdEventListener(mod.AdEventType.ERROR, () => {
-              resolve({ completed: false, reason: 'error' });
-            });
-            ad.show();
-          } catch {
-            resolve({ completed: false, reason: 'error' });
-          }
-        }),
-        OP_TIMEOUT_MS,
-        { completed: false, reason: 'error' }
-      );
-      // Preload the next one for a snappy subsequent tap.
-      preloadRewarded();
-      return result;
+      const ad = slots.rewarded.loaded;
+      slots.rewarded.loaded = null;
+      const result = await present(ad, 'rewarded');
+      // Preload only if the current consent choices still permit requests.
+      void preload('rewarded');
+      return result.closed
+        ? { completed: result.earned, reason: result.earned ? undefined : 'dismissed' }
+        : { completed: false, reason: 'error' };
     },
 
     async showInterstitial(): Promise<boolean> {
       if (!ready || !mod) return false;
-      if (!loadedInterstitial) {
-        await preloadInterstitial();
-        if (!loadedInterstitial) return false;
+      if (!slots.interstitial.loaded) {
+        await preload('interstitial');
+        if (!ready || !slots.interstitial.loaded) return false;
       }
-      const ad = loadedInterstitial;
-      loadedInterstitial = null;
-      const shown = await withTimeout(
-        new Promise<boolean>((resolve) => {
-          try {
-            ad.addAdEventListener(mod.AdEventType.CLOSED, () => resolve(true));
-            ad.addAdEventListener(mod.AdEventType.ERROR, () => resolve(false));
-            ad.show();
-          } catch {
-            resolve(false);
-          }
-        }),
-        OP_TIMEOUT_MS,
-        false
-      );
-      preloadInterstitial();
-      return shown;
+      const ad = slots.interstitial.loaded;
+      slots.interstitial.loaded = null;
+      const result = await present(ad, 'interstitial');
+      void preload('interstitial');
+      return result.closed;
     },
   };
 }

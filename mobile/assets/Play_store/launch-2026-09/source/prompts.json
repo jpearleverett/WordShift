@@ -1,0 +1,22 @@
+{
+  "mode": "Built-in image_gen tool",
+  "assets": [
+    {
+      "file": "../art/den-key-art.png",
+      "intent": "New promotional illustration using the current fox and cozy den as references; not a gameplay screenshot.",
+      "prompt": "Use case: ads-marketing. Asset: polished landscape key art for the Google Play feature graphic of WordShift, a cozy letter-shifting puzzle game with a gradually unsettling woodland home.\nInput 1 is the established fox resident character design (orange fox, cream muzzle, green cable-knit turtleneck, brown trousers). Input 2 is the actual cozy den game environment: timber walls, fireplace, brown chair, warm amber light. Use these as identity and medium references, not a screenshot to reproduce.\nCreate a beautiful premium indie-game illustration, finely crafted pixel art with dimensional painterly light and deliberately clean pixel edges. A warm timber den at dusk. On the right side, the friendly fox in the exact reference clothing is seated beside a small wooden table with two ceramic mugs and a few softly colored clay square puzzle tiles. Blank tiles only, no invented letters. A fireplace casts amber light; a blue-green twilight window and an ordinary partly open dark doorway add a very subtle note of curiosity, no sinister figure. The fox face feels expressive and inviting, not babyish. A little green plant. Deep forest teal, ochre, warm parchment, rust orange.\nWide 2.048:1 composition, ideally 2048x1000. Left 48 percent is an uncluttered softly lit deep-teal timber wall and gentle firelight gradient, providing room for the actual game logo and a short tagline added later. All key character features inside x=52%-84%, y=18%-85%, generous edge margins. The whole image should read warmly at thumbnail scale, with one clear fox focal point, not a busy forest panorama.\nNo text, no logos, no watermark, no phone frame, no UI, no rankings, no human hands. Do not depict endings, monsters, robes, occult symbols, a castle or gameplay not in the game. This is promotional key art; stay faithful to the reference pixel-art world.",
+      "references": [
+        "mobile/assets/characters/fox/talk.png",
+        "mobile/assets/rooms/cozy_den.png"
+      ]
+    },
+    {
+      "file": "../art/store-icon-master.png",
+      "intent": "Store icon artwork using the current fox identity.",
+      "prompt": "Use case: ads-marketing. Asset type: Google Play store icon for WordShift.\nCreate one exceptionally readable square 1024x1024 icon, full bleed corner-to-corner opaque image, no rounded corners or exterior shadow. Use the reference fox's exact orange fur, cream cheeks, dark brown nose and friendly face, green cable-knit turtleneck sweater. Premium finely crafted pixel art matching this woodland word puzzle game's actual resident sprite, with dimensional light and visibly intentional pixel edges. Close portrait: large friendly orange fox face at upper center, both ears fully visible with 10% edge breathing room; eyes open, inviting knowing smile. One large warm golden-ochre clay letter tile in foreground lower right, held naturally by one brown paw. On the tile exactly one uppercase dark forest-green serif letter: \"W\". The tile has softly rounded corners, a tactile chunky thickness and simple highlight, matching painted wooden/clay puzzle tokens, not shiny plastic. Green sweater visible at bottom left. Background is simple saturated forest teal with a very subtle warm light halo behind the face. Strong clean silhouette and high contrast at 48px. Limited warm orange, cream, green and ochre palette. Face and W tile both immediately readable. No other letters, no logo, no decorations, no amber currency, no trees, no tiny scenery, no badge, no phone, no watermark. Preserve actual character clothing and identity. Do not make it 3D-rendered or vector art.",
+      "references": [
+        "mobile/assets/characters/fox/talk.png"
+      ]
+    }
+  ]
+}

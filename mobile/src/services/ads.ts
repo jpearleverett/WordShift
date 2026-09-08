@@ -64,6 +64,8 @@ export interface AdProvider {
   privacyOptionsRequired?(): Promise<boolean>;
   /** Present the CMP privacy-options form so the user can revisit ad consent. */
   showPrivacyOptions?(): Promise<void>;
+  /** Observe consent/SDK readiness changes, including privacy-option revocation. */
+  subscribeReady?(listener: () => void): () => void;
   isReady(): boolean;
   getName(): string;
 }
@@ -113,10 +115,26 @@ class NoOpAdProvider implements AdProvider {
 let provider: AdProvider = new NoOpAdProvider();
 let pacingCache: AdPacingState | null = null;
 let consentAndAttRequested = false;
+const readinessListeners = new Set<() => void>();
+let unsubscribeProviderReadiness: (() => void) | undefined;
+
+function notifyReadiness(): void {
+  readinessListeners.forEach((listener) => listener());
+}
+
+/** Reactive counterpart to isAdsReady(), used to gate native banner mounting. */
+export function subscribeAdsReady(listener: () => void): () => void {
+  readinessListeners.add(listener);
+  return () => { readinessListeners.delete(listener); };
+}
 
 /** Swap in a real ad provider during app initialization. */
 export function setAdProvider(newProvider: AdProvider): void {
+  unsubscribeProviderReadiness?.();
   provider = newProvider;
+  consentAndAttRequested = false;
+  unsubscribeProviderReadiness = provider.subscribeReady?.(notifyReadiness);
+  notifyReadiness();
 }
 
 /**
@@ -135,8 +153,8 @@ export function setAdProvider(newProvider: AdProvider): void {
 export async function ensureAdConsent(): Promise<void> {
   if (consentAndAttRequested) return;
   consentAndAttRequested = true;
-  // Consent (UMP) first, then iOS ATT — both non-fatal; ads serve
-  // non-personalized if either is declined or unavailable.
+  // Consent (UMP) first, then iOS ATT. Errors must not block gameplay; the
+  // provider independently keeps ads disabled until UMP permits requests.
   try {
     await provider.requestConsentIfNeeded();
   } catch {
@@ -288,6 +306,8 @@ export async function initAds(): Promise<void> {
     await provider.initialize();
   } catch (error) {
     console.warn('[Ads] provider initialize failed:', error);
+  } finally {
+    notifyReadiness();
   }
 }
 

@@ -2,20 +2,20 @@
  * Banner ad — a low-friction anchored banner for MENU / utility surfaces only
  * (never over gameplay, the home art, or a ceremony). Follows the same seam
  * philosophy as the rest of the ad layer: INERT unless the AdMob SDK is present
- * AND a banner ad unit id is configured, so it is always safe to mount and a
- * no-op in Expo Go / Jest.
+ * AND a banner ad unit id is configured AND the provider has permission to
+ * request ads, so it is always safe to mount and a no-op in Expo Go / Jest.
  *
  * Suppression is centralized in ads.shouldShowBanner (ad-free holders,
- * onboarding, Phase 4+). When suppressed / unavailable it renders nothing — the
- * honest, non-nagging default (never a blank grey placeholder).
+ * onboarding, Phase 4+). Policy suppression renders nothing; unavailability
+ * keeps a reserved tray so a later ad does not shift the surrounding layout.
  *
  * Ad unit id resolution mirrors providers/googleAdMobAds.ts: test units in dev
  * or when extra.adsUseTestIds is set; otherwise the platform banner id from
  * app.json → extra (admobBannerIdIos / admobBannerIdAndroid). Empty id → nothing.
  */
-import React from 'react';
+import React, { useSyncExternalStore } from 'react';
 import { View, Text, Platform, StyleSheet } from 'react-native';
-import { shouldShowBanner } from '../../services/ads';
+import { isAdsReady, shouldShowBanner, subscribeAdsReady } from '../../services/ads';
 import { isAdFreeSync } from '../../services/entitlements';
 import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
 import { PIXEL_FONT_BOLD } from '../../theme/fonts';
@@ -72,12 +72,13 @@ function resolveBannerUnitId(mod: any): string | undefined {
  *   - POLICY (ad-free / onboarding / Phase 4+ via shouldShowBanner): render
  *     nothing at all, the honest non-nagging default (no empty shelf for a
  *     paying ad-free player; the menu consumers also policy-gate this View).
- *   - AVAILABILITY (SDK / unit id absent, e.g. Expo Go): the policy still wants
+ *   - AVAILABILITY (consent pending/denied or SDK / unit id absent): the policy still wants
  *     a banner here, so keep the labeled tray at its RESERVED height with an
  *     empty reserved slot instead of collapsing, so shown vs. not-yet-loaded
  *     occupy the same space and nothing below shifts.
  */
 export const BannerAd: React.FC<BannerAdProps> = ({ phase, onboarding = false }) => {
+  const adsReady = useSyncExternalStore(subscribeAdsReady, isAdsReady, () => false);
   if (!shouldShowBanner({ phase: phase as any, isAdFree: isAdFreeSync(), onboarding })) {
     return null;
   }
@@ -85,7 +86,9 @@ export const BannerAd: React.FC<BannerAdProps> = ({ phase, onboarding = false })
   const NativeBanner = mod?.BannerAd;
   const unitId = NativeBanner ? resolveBannerUnitId(mod) : undefined;
   const size = mod?.BannerAdSize?.ANCHORED_ADAPTIVE_BANNER ?? 'ANCHORED_ADAPTIVE_BANNER';
-  const canRenderNative = !!(NativeBanner && unitId);
+  // Mounting the SDK's banner view makes an ad request. The same consent and
+  // initialized-SDK gate as interstitial/rewarded ads must therefore precede it.
+  const canRenderNative = adsReady && !!(NativeBanner && unitId);
 
   // A subtle phase-aware "shelf" so the raw Google rectangle sits on the cottage
   // surface instead of floating bare (no overflow:hidden — a native ad view must

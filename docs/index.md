@@ -22,16 +22,15 @@ coming back. And pay attention to your animal friends. They notice things.
 
 ## Features
 
-- Thousands of hand-tuned word chains across five difficulties (4–6 letters),
-  topped by the EXPERT apex
+- Thousands of word puzzles across five difficulty levels
 - Two twist styles — Reverse Shift and Double Shift — plus four stackable
   trials: Challenge, timed Speed, the previews-hidden Blind Offering, and the
   rare-word Lexicon
-- A daily challenge shared by every player, with streaks and a leaderboard
+- Daily word challenges, with streaks and an online leaderboard
 - Build a house, room by room, for thirteen animal companions — each with their
   own voice, moods, and an unfolding story
 - Challenge friends with a link to the exact puzzle you just solved
-- No account required; progress backs up automatically
+- No account required; cloud backups sync when online
 
 ## Support & legal
 

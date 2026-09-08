@@ -1,0 +1,122 @@
+{
+  "generated_by": "node mobile/scripts/store/buildLaunch.mjs",
+  "locale": "en-US",
+  "gameplay_provenance": "Actual React Native web rendering at 390x700, deviceScaleFactor 3, staged attainable local save states. Gameplay pixels are unchanged; full captures are scaled uniformly inside editorial layouts. Not an Android device capture.",
+  "generated_art": "Built-in image_gen; prompts and references in source/prompts.json. Promotional art is used only in the feature graphic and store icon.",
+  "assets": [
+    {
+      "file": "upload/feature-graphic-1024x500.png",
+      "width": 1024,
+      "height": 500,
+      "channels": 3,
+      "bytes": 871725,
+      "sha256": "8d4b1f6e13f2a245bffee4c1b8b58d8c1fc060e7e596e376a3ce25757a501217",
+      "source": "source/layouts/feature.html"
+    },
+    {
+      "file": "upload/store-icon-512.png",
+      "width": 512,
+      "height": 512,
+      "channels": 4,
+      "bytes": 409337,
+      "sha256": "7192d085bc2fc3e94d9ac907d5b1cede02d4dd6eaf6283ff2433c611daa1b78d",
+      "source": "source/layouts/icon.html"
+    },
+    {
+      "file": "upload/phone/01-move-one-letter.png",
+      "width": 1080,
+      "height": 1920,
+      "channels": 3,
+      "bytes": 516028,
+      "sha256": "adcd6b986c3bb5f1447b5735219c0703503a2e4d32a31b33c75932f278e61991",
+      "source": "source/layouts/01-move-one-letter.html",
+      "capture": "raw/02-move-one-letter.png",
+      "alt_text": "The WordShift board with L selected in PLAY, ready to move into PANT and form PLANT.",
+      "caption_region_fraction": 0.140625
+    },
+    {
+      "file": "upload/phone/02-two-new-words.png",
+      "width": 1080,
+      "height": 1920,
+      "channels": 3,
+      "bytes": 455172,
+      "sha256": "351ec9f9b2bcca5b49077427fb75d3d43cc7a51deb89cb5234db2fb234407499",
+      "source": "source/layouts/02-two-new-words.html",
+      "capture": "raw/03-make-two-words.png",
+      "alt_text": "After shifting L, the WordShift board reads PAY, PLANT, and HEAR, with PLANT active for the next move.",
+      "caption_region_fraction": 0.140625
+    },
+    {
+      "file": "upload/phone/03-build-a-home.png",
+      "width": 1080,
+      "height": 1920,
+      "channels": 3,
+      "bytes": 2317413,
+      "sha256": "fa59fd1858c51c763f042f9cafbfeb7edebbe4d16b25e39ef4cad86c4286d5d9",
+      "source": "source/layouts/03-build-a-home.html",
+      "capture": "raw/05-build-a-home.png",
+      "alt_text": "A growing woodland house with warm furnished rooms and animal residents in WordShift.",
+      "caption_region_fraction": 0.140625
+    },
+    {
+      "file": "upload/phone/04-unlikely-friends.png",
+      "width": 1080,
+      "height": 1920,
+      "channels": 3,
+      "bytes": 654481,
+      "sha256": "07279f29079ed258502ab82dfd51ee64283e065c46133d16e401af1eca3dd0c6",
+      "source": "source/layouts/04-unlikely-friends.html",
+      "capture": "raw/06-meet-ember.png",
+      "alt_text": "Ember the fox talks about Panko’s mushroom soup, with furnished rooms visible behind her.",
+      "caption_region_fraction": 0.140625
+    },
+    {
+      "file": "upload/phone/05-make-it-yours.png",
+      "width": 1080,
+      "height": 1920,
+      "channels": 3,
+      "bytes": 312635,
+      "sha256": "4471371c7047686cc311fcf80ca5a2c6f42bab0de80bb48fdfe25d80dfa3e3af",
+      "source": "source/layouts/05-make-it-yours.html",
+      "capture": "raw/12-make-it-yours.png",
+      "alt_text": "WordShift’s Tile Shop shows color previews and amber costs for unlockable tile styles.",
+      "caption_region_fraction": 0.140625
+    },
+    {
+      "file": "upload/phone/06-daily-ritual.png",
+      "width": 1080,
+      "height": 1920,
+      "channels": 3,
+      "bytes": 457442,
+      "sha256": "cec6043a1021588c8597dbf90766782579815c8836b77192a811f9c00dbeff31",
+      "source": "source/layouts/06-daily-ritual.html",
+      "capture": "raw/09-daily-challenge.png",
+      "alt_text": "WordShift’s Daily Challenge offers a word puzzle to return to each day.",
+      "caption_region_fraction": 0.140625
+    },
+    {
+      "file": "upload/phone/07-change-the-rules.png",
+      "width": 1080,
+      "height": 1920,
+      "channels": 3,
+      "bytes": 479092,
+      "sha256": "a8b2cc7b37721a9f80a6c5e62ea6ac2d2929f7d19060a41c3bb1fe020a0c597e",
+      "source": "source/layouts/07-change-the-rules.html",
+      "capture": "raw/10-puzzle-styles.png",
+      "alt_text": "A Double Shift puzzle with DUSKY and MOLES on the board and instructions to move two letters.",
+      "caption_region_fraction": 0.140625
+    },
+    {
+      "file": "upload/phone/08-cozy-mostly.png",
+      "width": 1080,
+      "height": 1920,
+      "channels": 3,
+      "bytes": 409383,
+      "sha256": "36a775c6359b5e6830c4ef22dfa8b617a7271ce1c045d5b952208c76e71c5fec",
+      "source": "source/layouts/08-cozy-mostly.html",
+      "capture": "raw/08-your-choice.png",
+      "alt_text": "Ember offers a choice of cups and drinks in a story conversation, with two player responses shown.",
+      "caption_region_fraction": 0.140625
+    }
+  ]
+}
