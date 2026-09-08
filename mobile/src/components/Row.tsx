@@ -41,6 +41,7 @@ import {
 import { BODY_FONT_BOLD, PIXEL_FONT_BOLD } from '../theme/fonts';
 import { FONT_SIZE } from '../theme/typeScale';
 import { useRowArc } from '../hooks/useRowArc';
+import { useArrivalGate } from '../hooks/useArrivalGate';
 
 // Arc layout configuration
 const ARC_ROTATION = 12; // Max rotation in degrees for edge elements (steeper fan)
@@ -670,7 +671,7 @@ export const Row: React.FC<RowProps> = memo(({
   // F1 (neighbour rank-closing) — per-tile translateX cache + the last
   // rendered layout (id order + whether it was the arc), used by the
   // rank-shift effect below.
-  const prevRenderRef = useRef<{ ids: string[]; arc: boolean } | null>(null);
+  const prevRenderRef = useRef<{ ids: string[]; arc: boolean; compact: boolean } | null>(null);
   const [rankShiftAnims] = useState(() => (new Map<string, Animated.Value>()));
   const getRankShiftAnim = (id: string): Animated.Value => {
     let anim = rankShiftAnims.get(id);
@@ -682,11 +683,21 @@ export const Row: React.FC<RowProps> = memo(({
   };
 
   // Keep the arc mounted through a deselection's 300ms flatten. A committed
-  // move changes the row's role and snaps directly to its normal layout.
+  // move changes the row's role and snaps directly to its normal layout, and
+  // so does a letter arriving in (or leaving) this row while it stays the
+  // target: the word count is the hook's board-changed signal.
   const arcMounted = useRowArc(
     !!showSlots, isTarget, getSettingsSync().reducedMotion || shouldSimplifyAnimations(),
-    arcAnim, slotCollapseAnim,
+    arcAnim, slotCollapseAnim, rowData.words.length,
   );
+
+  // Because the two layouts mount under distinct keys (see the render below),
+  // a flip REMOUNTS this row's tiles, and LetterTile plays its arrival settle
+  // from its mount effect. An arrival mark outlives the flips around it (a
+  // double-shift first drop's mark stays on this row until the second drop
+  // lands), so the tiles receive a mark ONLY in the layout generation it first
+  // rendered in; see hooks/useArrivalGate.ts.
+  const tileArrival = useArrivalGate(arrival, arcMounted);
 
   // Inter-slot tap guidance: tapping a letter tile in the target row (between
   // drop slots) pulses its two ADJACENT slots. Letter i sits between slots i
@@ -1001,8 +1012,8 @@ export const Row: React.FC<RowProps> = memo(({
               // eye to where drops go without committing anything (and without
               // leaking validity).
               onLockedPress={() => handleInterSlotTap(letterIndex)}
-              arrivalMoveId={arrival && arrival.letterId === letter.id ? arrival.moveId : undefined}
-              arrivalDirection={arrival && arrival.letterId === letter.id ? arrival.direction : undefined}
+              arrivalMoveId={tileArrival && tileArrival.letterId === letter.id ? tileArrival.moveId : undefined}
+              arrivalDirection={tileArrival && tileArrival.letterId === letter.id ? tileArrival.direction : undefined}
             />
           </Animated.View>
         );
@@ -1052,8 +1063,8 @@ export const Row: React.FC<RowProps> = memo(({
             (guidanceActive && isSource && guidedLetterId === letter.id) ||
             (hintLetterId != null && hintLetterId === letter.id)
           }
-          arrivalMoveId={arrival && arrival.letterId === letter.id ? arrival.moveId : undefined}
-          arrivalDirection={arrival && arrival.letterId === letter.id ? arrival.direction : undefined}
+          arrivalMoveId={tileArrival && tileArrival.letterId === letter.id ? tileArrival.moveId : undefined}
+          arrivalDirection={tileArrival && tileArrival.letterId === letter.id ? tileArrival.direction : undefined}
         />
       );
 
@@ -1118,6 +1129,10 @@ export const Row: React.FC<RowProps> = memo(({
   // Now each one starts at the exact arc x it was last seen at and springs to
   // its new standard x, so the row visibly makes room for the arriving letter.
   // The arriving letter itself is skipped — it owns its own arrival settle.
+  // The same snap-and-spring path serves a letter that arrives while this row
+  // STAYS the target (a double-shift first drop, the winning move): useRowArc
+  // snaps the fan on the word-count change, so the arriving tile mounts
+  // straight into the standard layout and settles exactly once.
   //
   // A graceful DESELECT is deliberately excluded here: the letters already
   // glided to their standard positions during the collapse (see
@@ -1130,9 +1145,21 @@ export const Row: React.FC<RowProps> = memo(({
   useEffect(() => {
     const currentIds = rowData.words.map((l) => l.id);
     const prev = prevRenderRef.current;
-    prevRenderRef.current = { ids: currentIds, arc: arcMounted };
+    prevRenderRef.current = { ids: currentIds, arc: arcMounted, compact: compactTiles };
 
-    if (arcMounted) return; // the arc render owns its own motion
+    if (arcMounted) {
+      // The arc render owns its own motion. The standard wrappers have just
+      // unmounted (the two layouts mount under distinct keys), so this is the
+      // one moment a rank-shift reset is invisible: a spring this effect's
+      // cleanup stopped mid-flight (a fast pick right after a snap) would
+      // otherwise leave its value at a partial offset, and the NEXT standard
+      // mount (after a plain deselect, where the length is unchanged and no
+      // seed runs) would come up with that stale nudge baked in. Only the
+      // letters still on the row: a departed id's value is detached, and
+      // touching it would only mint an orphan native node.
+      currentIds.forEach((id) => rankShiftAnims.get(id)?.setValue(0));
+      return;
+    }
     const instant = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
 
     if (instant) {
@@ -1161,20 +1188,25 @@ export const Row: React.FC<RowProps> = memo(({
     };
 
     if (prev.arc) {
-      // Arc -> standard with a letter added: the real geometric delta.
+      // Arc -> standard with a letter added: the real geometric delta. The OLD
+      // pose is measured with the compact flag the arc was rendered with:
+      // compactTiles flips at 6 letters, i.e. exactly when a 5-letter row
+      // receives one, and measuring the arc with the new flag started every
+      // survivor ~24dp from where it actually sat.
       currentIds.forEach((id, newIdx) => {
         const oldIdx = prev.ids.indexOf(id);
         if (oldIdx === -1) return; // the arriving letter owns its arrival settle
         seed(
           id,
-          arcLetterCenterOffset(oldIdx, prev.ids.length, compactTiles) -
+          arcLetterCenterOffset(oldIdx, prev.ids.length, prev.compact) -
             standardLetterCenterOffset(newIdx, currentIds.length, compactTiles),
         );
       });
     } else {
       // Standard -> standard (the old source row shrinking as its picked letter
-      // departs): a half-footprint nudge in the direction the gap closed.
-      const footprint = compactTiles
+      // departs): a half-footprint nudge in the direction the gap closed,
+      // measured in the OLD layout's tile footprint.
+      const footprint = prev.compact
         ? COMPACT_TILE_W + COMPACT_TILE_MARGIN_H * 2
         : STANDARD_TILE_W + STANDARD_TILE_MARGIN_H * 2;
       const half = footprint / 2;
@@ -1277,12 +1309,27 @@ export const Row: React.FC<RowProps> = memo(({
           {arcMounted ? (
             // Arc layout for DROP row - letters overflow container. While the
             // fan is collapsing (showSlots already false) the slots are inert.
-            <View style={styles.arcRow} pointerEvents={showSlots ? 'auto' : 'none'}>
+            //
+            // `key`: the arc and standard subtrees must NEVER share host views.
+            // Both render `<Animated.View key={letter.id}>` per letter, so with
+            // un-keyed containers React reused one Fabric view per letter
+            // across the switch, only swapping its style. On iOS Fabric a prop
+            // NativeAnimated has driven (the collapseGlideX translateX) is
+            // recorded in the view's propKeysManagedByAnimated set for the rest
+            // of the view's life: RCTViewComponentView.updateProps then ignores
+            // React's committed transform, and RCTPropsAnimatedNode's
+            // restoreDefaultValues is a no-op under Fabric. So the glide offset
+            // survived the flip and the DROP row rendered compacted after every
+            // deselect (each letter sat at its standard x PLUS the glide
+            // delta). Distinct keys unmount the arc wrappers instead, and the
+            // standard wrappers mount as fresh, never-managed views at the same
+            // x the glide ended on. Pinned by puzzleFeelContracts.test.ts.
+            <View key="arc" style={styles.arcRow} pointerEvents={showSlots ? 'auto' : 'none'}>
               {renderArcContent()}
             </View>
           ) : (
             // Standard centered layout for other rows
-            <View style={styles.lettersContainer}>
+            <View key="standard" style={styles.lettersContainer}>
               {renderContent()}
             </View>
           )}

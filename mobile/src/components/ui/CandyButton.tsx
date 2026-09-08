@@ -168,12 +168,21 @@ export const CandyButton: React.FC<CandyButtonProps> = ({
 
 const styles = StyleSheet.create({
   content: {
+    // flexGrow (basis auto), NOT flex: 1: the Pressable is minHeight-sized so
+    // a wrapped large-text label can grow the button; basis 0 would hide that
+    // height from the parent.
+    //
+    // NO vertical padding here. The label is centred in the button BODY by the
+    // single asymmetry `paddingBottom: BTN_SHADOW_DP` (inline on the content
+    // view), which subtracts the baked cast-shadow row below the body. Any top
+    // inset that is not mirrored below the shadow row drops the label: a
+    // `paddingTop: 10` here once sat every bevel label ~5dp below the body
+    // centre. Pinned by bevelLabelCentering.test.ts.
     flexGrow: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,
-    paddingTop: 10,
   },
   disabled: {
     opacity: 0.45,

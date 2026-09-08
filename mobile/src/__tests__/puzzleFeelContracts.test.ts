@@ -878,3 +878,81 @@ describe('new-dialogue badge anchor contract', () => {
     expect(badge).toBeGreaterThan(bodyClose);
   });
 });
+
+describe('arc and standard layouts never share host views (source pin)', () => {
+  // Both layouts key their letter wrappers by letter.id, so with un-keyed
+  // containers React reused ONE Fabric view per letter across the arc ->
+  // standard switch. On iOS Fabric a prop NativeAnimated has driven (the
+  // collapse glide translateX) is recorded in the view's
+  // propKeysManagedByAnimated set until the view is recycled: React's
+  // committed transform is ignored by RCTViewComponentView.updateProps and
+  // RCTPropsAnimatedNode.restoreDefaultValues is a no-op under Fabric. The
+  // glide offset survived the flip and the DROP row rendered compacted after a
+  // deselect. Distinct container keys unmount the arc wrappers instead.
+  const rowSrc = fs.readFileSync(
+    path.join(__dirname, '../components/Row.tsx'),
+    'utf8',
+  );
+  // Whitespace-normalised so a wrap or re-indent cannot fail a contract pin.
+  const flat = rowSrc.replace(/\s+/g, ' ');
+
+  it('keys the arc and standard containers differently', () => {
+    expect(flat).toMatch(/<View key="arc" style=\{styles\.arcRow\}/);
+    expect(flat).toMatch(/<View key="standard" style=\{styles\.lettersContainer\}/);
+  });
+
+  it('still keys letters by id in both layouts (reopen-while-collapsing stability)', () => {
+    const arcBlock = rowSrc.slice(
+      rowSrc.indexOf('const renderArcContent = () => {'),
+      rowSrc.indexOf('const renderContent = () => {'),
+    );
+    const standardBlock = rowSrc.slice(
+      rowSrc.indexOf('const renderContent = () => {'),
+      rowSrc.indexOf('const getRowStyle = () => {'),
+    );
+    expect(arcBlock).toContain('key={letter.id}');
+    expect(standardBlock).toContain('key={letter.id}');
+  });
+
+  it('feeds the word count into useRowArc so an arriving letter snaps the fan', () => {
+    // The keyed containers remount the row's tiles on every flip; a tile that
+    // arrived while the row stayed the target (double-shift first drop, the
+    // winning move) must never be cut off inside a graceful collapse, so
+    // useRowArc snaps the fan on the word-count change instead.
+    expect(flat).toMatch(/useRowArc\( !!showSlots, isTarget, [\s\S]*?arcAnim, slotCollapseAnim, rowData\.words\.length,? \)/);
+  });
+
+  it('hands an arrival to the tiles only in the layout generation it first rendered in', () => {
+    // A double-shift first drop leaves its arrival mark on the row until the
+    // second drop; with the containers keyed, reopening the fan for the second
+    // pick remounts that tile, and LetterTile settles from its mount effect.
+    // Both renders take the gated `tileArrival`, never the raw prop.
+    const arcBlock = rowSrc.slice(
+      rowSrc.indexOf('const renderArcContent = () => {'),
+      rowSrc.indexOf('const renderContent = () => {'),
+    );
+    const standardBlock = rowSrc.slice(
+      rowSrc.indexOf('const renderContent = () => {'),
+      rowSrc.indexOf('const getRowStyle = () => {'),
+    );
+    for (const block of [arcBlock, standardBlock]) {
+      expect(block).toContain('arrivalMoveId={tileArrival && tileArrival.letterId === letter.id ? tileArrival.moveId : undefined}');
+      expect(block).not.toMatch(/arrivalMoveId=\{arrival\b/);
+      expect(block).not.toMatch(/arrivalDirection=\{arrival\b/);
+    }
+    // The gate itself lives in hooks/useArrivalGate.ts and is exercised at
+    // runtime by arrivalGate.test.ts (a source pin cannot see a withheld
+    // delivery); Row must feed it the fan state it actually renders with.
+    expect(flat).toContain('const tileArrival = useArrivalGate(arrival, arcMounted);');
+  });
+
+  it('resets the rank-shift cache while the arc owns the row', () => {
+    // A spring stopped mid-flight by the F1 effect's cleanup (a fast pick right
+    // after a snap) would otherwise resurface as a stale nudge on the next
+    // standard mount; the reset runs when the standard wrappers have just
+    // unmounted, the one moment it is invisible.
+    expect(flat).toMatch(/if \(arcMounted\) \{[\s\S]*?currentIds\.forEach\(\(id\) => rankShiftAnims\.get\(id\)\?\.setValue\(0\)\); return; \}/);
+    expect(flat).toContain('prevRenderRef.current = { ids: currentIds, arc: arcMounted, compact: compactTiles }');
+    expect(flat).toContain('arcLetterCenterOffset(oldIdx, prev.ids.length, prev.compact)');
+  });
+});

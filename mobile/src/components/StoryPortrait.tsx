@@ -4,8 +4,12 @@ import { AnimalType, DialoguePhase } from '../types/homeWorld';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { CHARACTER_SPRITES } from './home/AnimalSprite';
 
+/** Default frame size and bottom margin; StorySceneModal reserves this exact footprint on narrator / player pages. */
+export const STORY_PORTRAIT_SIZE = 116;
+export const STORY_PORTRAIT_MARGIN_BOTTOM = 8;
+
 /** A short speaking gesture, using the existing cast frames; never a looping distraction. */
-export function StoryPortrait({ speaker, phase, passage, size = 116 }: {
+export function StoryPortrait({ speaker, phase, passage, size = STORY_PORTRAIT_SIZE }: {
   speaker: AnimalType; phase: DialoguePhase; passage: string; size?: number;
 }) {
   const passageKey = `${speaker}:${passage}`;
@@ -31,6 +35,6 @@ export function StoryPortrait({ speaker, phase, passage, size = 116 }: {
   </View>;
 }
 const styles = StyleSheet.create({
-  frame: { width: 116, height: 116, alignSelf: 'center', overflow: 'hidden', marginBottom: 8 },
+  frame: { width: STORY_PORTRAIT_SIZE, height: STORY_PORTRAIT_SIZE, alignSelf: 'center', overflow: 'hidden', marginBottom: STORY_PORTRAIT_MARGIN_BOTTOM },
   sprite: { width: 158, height: 158, position: 'absolute', left: -21, top: -20 },
 });
