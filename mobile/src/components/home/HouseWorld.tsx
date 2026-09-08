@@ -29,6 +29,7 @@ import { isUnlockGateBlocked } from '../../services/homeWorldData';
 import {
   clampHomeScenePanY,
   resolveHomeScenePanRestore,
+  resolveRoomFocusPanY,
   resolveGestureBasePanY,
   computePanSettleTarget,
   rubberBandPanY,
@@ -1544,6 +1545,9 @@ const PitAttentionGlow: React.FC<{ phase: number }> = ({ phase }) => {
 const ROOM_WIDTH = 250;
 const ROOM_HEIGHT = ROOM_WIDTH * 0.493865; // Maintains ~2:1 aspect ratio of room PNGs (1456x720)
 const ROOM_GAP = 6;
+// The ArrangementConnector between rooms (arrangementStyles.connector: its
+// literal 10 is pinned by roomEmbellishments.test.ts for the seat math).
+const ROOM_CONNECTOR_HEIGHT = 10;
 const HOUSE_PADDING = 16;
 const HOUSE_WIDTH = ROOM_WIDTH + (HOUSE_PADDING * 2);
 // The house BODY is a touch narrower than the foundation/roof so the timber
@@ -1591,6 +1595,29 @@ const HOUSE_BOTTOM_MARGIN = 30;
 // extra in-flow bottom margin (only when the pit renders) keeps the pit
 // entrance fully above the dock at rest.
 const PIT_DOCK_CLEARANCE = 80;
+
+// How long a Shop focus visit holds before it is consumed: the pan spring
+// (~0.6s) plus the room's FocusFlare (rise, hold, fade) with a beat to spare.
+const FOCUS_HOLD_MS = 1800;
+
+/**
+ * Distance (dp) from the scene's bottom edge to the vertical centre of the
+ * room that has `roomsBelow` rooms beneath it in the column. Walks the flow
+ * layout from the bottom up: the house margin, the pit, the foundation (its
+ * -2 marginTop tucks it under the body), the body's bottom padding + the last
+ * row's gap, then one (room + gap + connector) pitch per room below. Pure and
+ * exported for the focus-pan test.
+ */
+export const getRoomCenterFromBottom = (
+  roomsBelow: number,
+  hasPit: boolean,
+  houseBottomMargin: number,
+): number => {
+  const bodyBottom = houseBottomMargin + (hasPit ? PIT_FLOW_HEIGHT : 0) + FOUNDATION_RENDER_HEIGHT - 2;
+  const rowBottom = HOUSE_PADDING / 2 + ROOM_GAP
+    + Math.max(0, roomsBelow) * (ROOM_HEIGHT + ROOM_GAP + ROOM_CONNECTOR_HEIGHT);
+  return bodyBottom + rowBottom + ROOM_HEIGHT / 2;
+};
 
 // ─── Sky geometry: the house sits BELOW the river, on every device ─────────
 // All five sky assets are 941x1972 (skyGeometry.test.ts pins this). The river
@@ -1738,6 +1765,17 @@ interface HouseWorldProps {
   /** Phase-5 Tending Level — drives the "deepening" of the arrangement sigils. */
   tendingLevel?: number;
   /**
+   * The Shop's "see it in the room" handoff: on mount (or when this changes)
+   * to a non-null room id, the scene springs its pan so that room is centred
+   * and the room flares its glow once, then `onFocusRoomConsumed` fires so the
+   * owner can clear it. The focus pan is a VISIT: it is never written to the
+   * saved pan position (that belongs to real releases only), so the next trip
+   * home restores wherever the player last left the scene, unless they pan
+   * after the focus, in which case their release commits as usual.
+   */
+  focusRoomId?: string | null;
+  onFocusRoomConsumed?: () => void;
+  /**
    * Hide the in-room "Invite" chips while the invite prompt modal is open, so
    * the chip doesn't peek through the modal's translucent scrim.
    */
@@ -1767,6 +1805,8 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   onPitPress,
   pitNeedsAttention = false,
   tendingLevel = 0,
+  focusRoomId = null,
+  onFocusRoomConsumed,
   suppressInviteChips = false,
   quietNotifications = false,
 }) => {
@@ -1787,6 +1827,10 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   // The pit shares the exterior tint, but capped so the well's teal glow
   // survives the night phases instead of washing to flat black.
   const pitTintOpacity = Math.min(houseTint.ext, 0.4);
+  // The room scrim (bodyRoomScrim) is painted OVER the rooms, so a purchased
+  // glow underneath it lost 22-27% of itself at night. RoomView multiplies its
+  // glow ceiling by this so the investment reads about the same in every sky.
+  const glowScrimBoost = houseTint.room >= 1 ? 1 : 1 / (1 - houseTint.room);
   const contactShadow = CONTACT_SHADOW[currentPhase] ?? CONTACT_SHADOW[0];
   // Chimney smoke color: warm pale grey while the days are bright, cooling to
   // ash as the descent deepens (F13/F64).
@@ -2064,6 +2108,9 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
       // clamped position authoritative.
       hasUserPannedRef.current = true;
       isPanningRef.current = true;
+      // The player is taking the scene back from a focus visit; their release
+      // will commit the new position of record.
+      focusHoldRef.current = null;
       return;
     }
     // Every terminal state releases the scene back to the restore effect.
@@ -2162,6 +2209,95 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     };
   }, [panRaw]);
 
+  // ─── Focus-room handoff (Shop -> home) ───────────────────────────────────
+  // Which room the Shop asked us to show, as its distance from the BOTTOM of
+  // the room column. The scene is bottom-anchored and rooms are added at the
+  // TOP, so that distance (and therefore the pan that centres the room) is
+  // invariant across the ghost room landing; only the CLAMP moves with the
+  // bound, which is exactly the shape the restore decision already handles.
+  const focusRoomIndex = focusRoomId ? sortedRooms.findIndex(r => r.id === focusRoomId) : -1;
+  const focusRoomsBelow = focusRoomIndex >= 0 ? sortedRooms.length - 1 - focusRoomIndex : -1;
+  const hasPit = onPitPress !== undefined;
+  // Held while a focus is the position of record for this mount. The restore
+  // effect re-asserts it on every geometry change instead of the saved pan,
+  // until the player pans (ACTIVE clears it), and it is never notified up.
+  const focusHoldRef = useRef<{ roomsBelow: number } | null>(null);
+  // The clamped target the running focus spring is heading to, so a geometry
+  // change that does not move the target leaves the spring alone.
+  const focusSpringTargetRef = useRef<number | null>(null);
+  const focusStartedForRef = useRef<string | null>(null);
+  const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onFocusRoomConsumedRef = useRef(onFocusRoomConsumed);
+  useLayoutEffect(() => { onFocusRoomConsumedRef.current = onFocusRoomConsumed; });
+
+  useEffect(() => {
+    if (!focusRoomId) {
+      focusStartedForRef.current = null;
+      return;
+    }
+    if (containerHeight === null) return;
+    // Started already; a geometry change re-ran this effect. The restore
+    // effect below carries the hold, so there is nothing to restart here.
+    if (focusStartedForRef.current === focusRoomId) return;
+    focusStartedForRef.current = focusRoomId;
+    if (focusRoomsBelow < 0) {
+      // Not a room this house shows (locked and not next, or unknown): a no-op
+      // visit, consumed at once so the owner can clear it.
+      onFocusRoomConsumedRef.current?.();
+      return;
+    }
+    focusHoldRef.current = { roomsBelow: focusRoomsBelow };
+    const { panY } = resolveRoomFocusPanY({
+      roomCenterFromBottom: getRoomCenterFromBottom(focusRoomsBelow, hasPit, houseBottomMargin),
+      viewportHeight: containerHeight,
+      maxPanY: panBoundsMax,
+    });
+    // Never under a live finger (the restore effect's rule); the release
+    // re-resolves and the player's own gesture wins.
+    if (!isPanningRef.current) {
+      if (!panPhysicsEnabled) {
+        // Reduced motion / low tier: land instantly, no spring. Never notify.
+        syncPanPosition(panY, false);
+      } else {
+        // One native spring from wherever the scene is, exactly like a release
+        // settle (same physics, same slot in settleAnimRef so a fresh gesture
+        // stops it and resolveGestureBasePanY trusts the live mirror while it
+        // flies). The rest point is settled now, not at spring end, for the
+        // same reason the release path does it.
+        settleAnimRef.current?.stop();
+        settleAnimRef.current = null;
+        panRaw.stopAnimation();
+        panRaw.flattenOffset();
+        baseTranslateY.current = panY;
+        focusSpringTargetRef.current = panY;
+        const spring = Animated.spring(panRaw, {
+          toValue: panY,
+          friction: 9,
+          tension: 45,
+          useNativeDriver: true,
+        });
+        settleAnimRef.current = spring;
+        spring.start(({ finished }) => {
+          focusSpringTargetRef.current = null;
+          if (!finished) return;
+          settleAnimRef.current = null;
+        });
+      }
+    }
+    if (focusTimerRef.current) clearTimeout(focusTimerRef.current);
+    focusTimerRef.current = setTimeout(() => {
+      focusTimerRef.current = null;
+      onFocusRoomConsumedRef.current?.();
+    }, FOCUS_HOLD_MS);
+  }, [focusRoomId, focusRoomsBelow, containerHeight, panBoundsMax, hasPit, houseBottomMargin, panPhysicsEnabled, syncPanPosition, panRaw]);
+
+  useEffect(() => {
+    return () => {
+      if (focusTimerRef.current) clearTimeout(focusTimerRef.current);
+      focusTimerRef.current = null;
+    };
+  }, []);
+
   // Preserve the current viewport when the house grows or helper UI changes the
   // available height, and restore the last viewport when the home screen remounts.
   //
@@ -2203,6 +2339,19 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     // the gesture offset, so acting here would yank the scene and leave the
     // rest of the drag running against a stale base. The release re-resolves.
     if (isPanningRef.current) return;
+    // A focus visit is the position of record until the player pans: re-clamp
+    // its (invariant) target against the new bound and re-assert it, leaving
+    // a focus spring that is already heading to that exact target alone.
+    if (focusHoldRef.current) {
+      const { panY: focusPanY } = resolveRoomFocusPanY({
+        roomCenterFromBottom: getRoomCenterFromBottom(focusHoldRef.current.roomsBelow, hasPit, houseBottomMargin),
+        viewportHeight: containerHeight,
+        maxPanY: panBoundsMax,
+      });
+      if (settleAnimRef.current !== null && focusSpringTargetRef.current === focusPanY) return;
+      syncPanPosition(focusPanY, false);
+      return;
+    }
     // Resolve from the UNCLAMPED intent, never from the live ref. The live ref
     // was re-clamped against the live bound on every listener tick, so any
     // window where the bound is short (see above, plus the beat where the
@@ -2223,7 +2372,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     // Never notify from a restore: the remembered position is written by real
     // releases only, so no clamp can ever be recorded as a choice.
     syncPanPosition(panY, false);
-  }, [containerHeight, panBoundsMax, syncPanPosition]);
+  }, [containerHeight, panBoundsMax, syncPanPosition, hasPit, houseBottomMargin]);
 
   return (
     <GestureHandlerRootView style={[styles.container, { backgroundColor: PHASE_BG_COLORS[currentPhase] || PHASE_BG_COLORS[0] }]}>
@@ -2463,6 +2612,8 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                               room.id in deepenedRooms,
                               attunedRooms[room.id] ?? 0
                             )}
+                            glowScrimBoost={glowScrimBoost}
+                            isFocusTarget={focusRoomId === room.id}
                             ritualWords={ritualWords}
                             unlockCost={roomUnlockCost}
                             isReserved={isNextRoom && reservedUnlockId === nextUnlock!.id}

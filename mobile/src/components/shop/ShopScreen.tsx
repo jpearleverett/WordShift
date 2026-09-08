@@ -1,5 +1,5 @@
 import { useCountUp } from '../../hooks/useCountUp';
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,7 @@ import {
   SPARK_THEMES,
   getTileFinishForTheme,
   TileFinish,
+  SparkPalette,
 } from '../../theme/colors';
 import { getShopArt, hasShopArt } from './shopArt';
 import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
@@ -26,7 +27,8 @@ import { CandyButton } from '../ui/CandyButton';
 import { PanelCard } from '../ui/PanelCard';
 import { CHROME_ICONS } from '../ui/chromeIcons';
 import { AmberInline, AmberValue } from '../AmberInline';
-import { Confetti } from '../Confetti';
+import { Confetti, StarBurst, getPhaseSparkPalette } from '../Confetti';
+import { STARBURST_DURATION_MS } from '../../constants/timing';
 import { RewardReveal, EntranceCascadeItem, getCascadeDelayMs } from '../ui/RewardReveal';
 import { getSettingsSync } from '../../services/settings';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
@@ -53,6 +55,8 @@ import {
   getRoomDeepening,
   getAttunementForLevel,
   getUpgradeDescription,
+  getHouseUpgradeSurfaceLine,
+  HouseUpgradeTier,
   getPurchasedUpgrades,
   getDeepenedRooms,
   getAttunedRooms,
@@ -73,6 +77,12 @@ import {
   getShopDefaultSparkName,
   getShopPatronLockedLabel,
   getShopStoreBridgeText,
+  getShopSectionHint,
+  getShopEquippedLine,
+  getShopDefaultDescription,
+  getShopUseDefaultLabel,
+  getShopMotionNoticeText,
+  getShopSeeItInRoomLabel,
 } from '../../services/phaseNarrative';
 import { hapticLight, hapticMedium, hapticSuccess } from '../../services/haptics';
 import { isPatronSync } from '../../services/entitlements';
@@ -88,6 +98,18 @@ interface ShopScreenProps {
   onOpenPatron?: () => void;
   /** Open the Store (amber packs). Renders a "Need more amber?" row when provided. */
   onOpenStore?: () => void;
+  /**
+   * Open Settings. Renders the motion-notice card's button (the confetti and
+   * spark sections are motion effects; Reduced Motion is seeded from the OS,
+   * so the player may never have chosen it) when provided.
+   */
+  onOpenSettings?: () => void;
+  /**
+   * Hand the player to the home screen with one room in focus ("See it in the
+   * room" on a bought house upgrade). App consumes it: sets a one-shot
+   * focusRoomId on HomeScreen and transitions home.
+   */
+  onFocusRoom?: (roomId: string) => void;
 }
 
 const AMBER_ICON = require('../../../assets/ui/amber.png');
@@ -98,20 +120,6 @@ const PREVIEW_LETTERS = ['A', 'B', 'C', 'D'];
  *  (matches StatsScreen / WhisperGallery so every secondary screen cascades in
  *  the same way). EntranceCascadeItem pins instantly under reduced motion. */
 const HEADER_CASCADE_BASE_MS = 120;
-
-/**
- * Short, phase-aware acknowledgment shown beneath the spend count-up when a
- * cosmetic is equipped, so the game's biggest expression purchase lands as a
- * moment rather than a silent chip swap. Kept local (there is no phaseNarrative
- * helper for the shop celebration and this file cannot add one); the copy stays
- * phase-aware and em-dash-free like every other player-facing string.
- */
-function getCosmeticEquippedLine(phase: number): string {
-  if (phase >= 4) return 'It settles into the arrangement.';
-  if (phase >= 2) return 'Equipped. The pattern shifts.';
-  if (phase >= 1) return 'Equipped. It suits you.';
-  return 'Equipped. Wear it proudly.';
-}
 
 const previewMotionAllowed = () => !getSettingsSync().reducedMotion && !shouldSimplifyAnimations();
 
@@ -134,8 +142,15 @@ function playPulse(values: Animated.Value[]): Animated.CompositeAnimation {
 
 interface PreviewProps {
   themeId: string | null;
-  /** Bumped by the parent on purchase to celebrate this item; also self-plays on tap. */
+  /** Bumped by the parent on purchase/equip to celebrate this item; also self-plays on tap. */
   pulseToken?: number;
+  /**
+   * Demo hook: called with the WINDOW centre of the live preview strip on tap
+   * and on every pulseToken bump, so the parent can fire the real effect there
+   * (the spark rows fire a real StarBurst). Fires regardless of the motion
+   * policy: the effect itself renders a still frame under reduced motion.
+   */
+  onDemo?: (x: number, y: number) => void;
 }
 
 /** Rendered size of a shop thumbnail. The art is drawn at 192px, so this only
@@ -314,11 +329,16 @@ const ConfettiPreview: React.FC<PreviewProps> = ({ themeId, pulseToken = 0 }) =>
 /** Star diamonds previewing a move-spark palette: the same halo-behind-core
  *  build StarBurst throws on a committed move, held still. From combo tier 2 up
  *  alternate stars carry the accent, so the strip alternates core and accent. */
-const SparkPreview: React.FC<PreviewProps> = ({ themeId, pulseToken = 0 }) => {
+const SparkPreview: React.FC<PreviewProps> = ({ themeId, pulseToken = 0, onDemo }) => {
   const palette = themeId ? SPARK_THEMES[themeId] : undefined;
   const artKey = themeId ?? 'spark_default';
   const showArt = hasShopArt(artKey);
   const [scales] = useState(() => ([0, 1, 2, 3, 4, 5].map(() => new Animated.Value(1))));
+  // The live strip, measured on demand (never at mount: the entrance cascade
+  // is still settling then) so the real burst fires at its window centre.
+  const stripRef = useRef<View>(null);
+  const onDemoRef = useRef(onDemo);
+  useEffect(() => { onDemoRef.current = onDemo; }, [onDemo]);
 
   const pulse = useCallback(() => {
     if (!previewMotionAllowed()) return;
@@ -326,20 +346,39 @@ const SparkPreview: React.FC<PreviewProps> = ({ themeId, pulseToken = 0 }) => {
     a.start();
   }, [scales]);
 
+  const demo = useCallback(() => {
+    const node = stripRef.current;
+    const fire = onDemoRef.current;
+    if (!fire) return;
+    if (node && typeof node.measureInWindow === 'function') {
+      node.measureInWindow((x: number, y: number, w: number, h: number) => {
+        fire(x + w / 2, y + h / 2);
+      });
+    }
+  }, []);
+
+  const press = useCallback(() => {
+    pulse();
+    demo();
+  }, [pulse, demo]);
+
   useEffect(() => {
-    if (pulseToken > 0) pulse();
-  }, [pulseToken, pulse]);
+    if (pulseToken > 0) {
+      pulse();
+      demo();
+    }
+  }, [pulseToken, pulse, demo]);
 
   return (
     <TouchableOpacity
       activeOpacity={0.85}
-      onPress={pulse}
+      onPress={press}
       accessibilityRole="button"
       accessibilityLabel="Preview this move spark"
       style={styles.previewColumn}
     >
       {showArt && <ShopArtThumb artKey={artKey} scale={scales[0]} />}
-      <View style={styles.previewSparkRow}>
+      <View ref={stripRef} collapsable={false} style={styles.previewSparkRow}>
         {[0, 1, 2, 3, 4].map(i => {
           const core = palette
             ? i % 2 === 1
@@ -396,6 +435,8 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   onAmberChange,
   onOpenPatron,
   onOpenStore,
+  onOpenSettings,
+  onFocusRoom,
 }) => {
   const screenInsets = useScreenInsets();
   const t = getSurfaceTheme(phase);
@@ -430,6 +471,30 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   // pulses its preview, and springs its Equipped chip.
   const [celebration, setCelebration] = useState<{ id: string; palette: string[]; token: number } | null>(null);
   const [confettiActive, setConfettiActive] = useState(false);
+  // The REAL move burst, fired at a spark row's preview centre on purchase,
+  // equip and preview tap (the old demo was a confetti fall in spark colours,
+  // which taught the wrong surface). `palette` is the row's OWN palette, so a
+  // not-yet-owned row previews itself, not whatever is equipped; the nonce
+  // remounts StarBurst so a second tap re-fires. Holds the same window App
+  // holds a move's burst for.
+  const [sparkDemo, setSparkDemo] = useState<{ x: number; y: number; palette: SparkPalette; nonce: number } | null>(null);
+  const fireSparkDemo = useCallback((x: number, y: number, sparkId: string | null) => {
+    const palette = (sparkId && SPARK_THEMES[sparkId]) || getPhaseSparkPalette(phase);
+    setSparkDemo({ x, y, palette, nonce: Date.now() });
+  }, [phase]);
+  useEffect(() => {
+    if (!sparkDemo) return;
+    const id = setTimeout(() => setSparkDemo(null), STARBURST_DURATION_MS);
+    return () => clearTimeout(id);
+  }, [sparkDemo]);
+  // Motion policy: when Reduced Motion (seeded from the OS) or the low device
+  // tier stills the two event cosmetics, say so at the head of their sections
+  // instead of selling a burst the player will watch for and never see.
+  const motionNoticeReason: 'reduced_motion' | 'low_tier' | null = reducedMotion
+    ? 'reduced_motion'
+    : shouldSimplifyAnimations()
+      ? 'low_tier'
+      : null;
   // House-upgrade in-card resolution (F50): the bought card holds its feedback in
   // place, fades, THEN the list reflows.
   const [resolving, setResolving] = useState<{ key: string; message: string } | null>(null);
@@ -537,14 +602,16 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
       // phase-aware in-world line, plus a burst of the purchased palette, a
       // preview pulse, and the Equipped chip spring. Confetti self-skips under
       // reduced motion; the palette drives the color either way.
-      setPurchaseReveal({ amount: cost, line: getCosmeticEquippedLine(phase), nonce: Date.now() });
-      const spark = SPARK_THEMES[item.id];
+      setPurchaseReveal({ amount: cost, line: getShopEquippedLine(phase, item.category), nonce: Date.now() });
+      // A confetti purchase falls in the purchased palette ONLY; a spark
+      // purchase fires the real StarBurst at its row (via the preview's
+      // pulseToken -> onDemo) and never a spark-coloured confetti fall.
       const palette =
         item.category === 'tile_theme'
           ? (TILE_THEMES[item.id]?.map(c => c.bg) ?? [])
-          : item.category === 'spark'
-            ? (spark ? [spark.bg, spark.accent, spark.halo ?? spark.bg] : [])
-            : (CONFETTI_THEMES[item.id] ?? []);
+          : item.category === 'confetti'
+            ? (CONFETTI_THEMES[item.id] ?? [])
+            : [];
       setCelebration(prev => ({ id: item.id, palette, token: (prev?.token ?? 0) + 1 }));
       if (palette.length > 0) setConfettiActive(true);
       await refresh();
@@ -559,6 +626,9 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     try {
       await equipCosmetic(item.id);
       hapticLight();
+      // Equip is a moment too: the chip springs, the preview pulses, and a
+      // spark row fires its real burst. No confetti (nothing was bought).
+      setCelebration(prev => ({ id: item.id, palette: [], token: (prev?.token ?? 0) + 1 }));
       await refresh();
     } finally {
       setBusy(null);
@@ -702,10 +772,37 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     }
   }, [busy, attunedRooms, onAmberChange, resolveHousePurchase]);
 
+  // Bought tier-1 decorations and tier-2 deepenings stay LISTED, as "in place"
+  // cards after the still-buyable rows: a purchased room used to vanish from
+  // the shop entirely, so the player got no confirmation of the spend and no
+  // way back to the room to look at what they had paid for.
+  const inPlaceUpgrades = useMemo(() => {
+    return rooms
+      .filter(room => room.isUnlocked)
+      .map(room => {
+        const upgrade = getRoomUpgrade(room.id);
+        if (!upgrade || !purchasedUpgrades[room.id]) return null;
+        return { room, upgrade };
+      })
+      .filter((entry): entry is { room: Room; upgrade: NonNullable<ReturnType<typeof getRoomUpgrade>> } => entry !== null);
+  }, [rooms, purchasedUpgrades]);
+
+  const inPlaceDeepenings = useMemo(() => {
+    return rooms
+      .filter(room => room.isUnlocked)
+      .map(room => {
+        const deepening = getRoomDeepening(room.id);
+        if (!deepening || !purchasedDeepenings[room.id]) return null;
+        return { room, deepening };
+      })
+      .filter((entry): entry is { room: Room; deepening: NonNullable<ReturnType<typeof getRoomDeepening>> } => entry !== null);
+  }, [rooms, purchasedDeepenings]);
+
   const showHouseUpgrades =
     areUpgradesAvailable(housePhase) &&
     availableUpgrades.length +
-      (areDeepeningsAvailable(housePhase) ? availableDeepenings.length : 0) +
+      inPlaceUpgrades.length +
+      (areDeepeningsAvailable(housePhase) ? availableDeepenings.length + inPlaceDeepenings.length : 0) +
       (areAttunementsAvailable(housePhase) ? availableAttunements.length : 0) > 0;
 
   const renderActionButton = (item: CosmeticItem) => {
@@ -761,21 +858,48 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     category: CosmeticCategory,
     sectionLabel: string,
     defaultName: string,
-    defaultDesc: string,
     items: CosmeticItem[],
     Preview: React.FC<PreviewProps>,
   ) => {
     const defaultEquipped = equipped[category] === undefined;
+    const isEvent = category === 'confetti' || category === 'spark';
+    const notice = isEvent && motionNoticeReason ? getShopMotionNoticeText(phase, motionNoticeReason) : null;
+    const useDefault = getShopUseDefaultLabel(phase, category);
+    // Spark rows demo the REAL burst at their preview; the other categories
+    // keep their pulse only.
+    const demoFor = (id: string | null) =>
+      category === 'spark' ? (x: number, y: number) => fireSparkDemo(x, y, id) : undefined;
     return (
       <View key={category}>
         <Text style={[styles.sectionLabel, { color: t.headerMuted }]}>{sectionLabel}</Text>
+        {/* WHERE and WHEN this cosmetic shows: confetti and sparks are events,
+            and nothing used to tell the player when to look. */}
+        <Text style={[styles.sectionHint, { color: t.headerMuted }]}>{getShopSectionHint(phase, category)}</Text>
+
+        {notice && (
+          <PanelCard phase={phase} kind="card" style={styles.noticeCard}>
+            <View style={styles.noticeBody}>
+              <Text style={[styles.noticeText, { color: t.body }]}>{notice.body}</Text>
+            </View>
+            {notice.button && onOpenSettings && (
+              <CandyButton
+                label={notice.button}
+                onPress={onOpenSettings}
+                phase={phase}
+                variant="quiet"
+                style={styles.actionSlot}
+                accessibilityLabel={notice.button}
+              />
+            )}
+          </PanelCard>
+        )}
 
         {/* Default (free) option */}
         <PanelCard phase={phase} kind="card" style={styles.card}>
-          <Preview themeId={null} />
+          <Preview themeId={null} onDemo={demoFor(null)} />
           <View style={styles.cardBody}>
             <Text style={[styles.cardName, { color: t.title }]}>{defaultName}</Text>
-            <Text style={[styles.cardDesc, { color: t.body }]}>{defaultDesc}</Text>
+            <Text style={[styles.cardDesc, { color: t.body }]}>{getShopDefaultDescription(phase, category)}</Text>
           </View>
           {defaultEquipped ? (
             <View style={[styles.statusChip, styles.equippedChip, { borderColor: t.sectionBorder }]}>
@@ -783,20 +907,24 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
             </View>
           ) : (
             <CandyButton
-              label="Equip"
+              label={useDefault.label}
               onPress={() => handleEquipDefault(category)}
               phase={phase}
               variant="secondary"
               disabled={busy != null}
               style={styles.actionSlot}
-              accessibilityLabel={`Equip ${defaultName}`}
+              accessibilityLabel={useDefault.accessibilityLabel}
             />
           )}
         </PanelCard>
 
         {items.map(item => (
           <PanelCard key={item.id} phase={phase} kind="card" style={styles.card}>
-            <Preview themeId={item.id} pulseToken={celebration?.id === item.id ? celebration.token : 0} />
+            <Preview
+              themeId={item.id}
+              pulseToken={celebration?.id === item.id ? celebration.token : 0}
+              onDemo={demoFor(item.id)}
+            />
             <View style={styles.cardBody}>
               <Text style={[styles.cardName, { color: t.title }]}>{item.name}</Text>
               <Text style={[styles.cardDesc, { color: t.body }]} numberOfLines={2}>
@@ -821,6 +949,8 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     buyLabel: string,
     onBuy: () => void,
     a11y: string,
+    /** Which tier this row sells, for the surface line under the flavour copy. */
+    tier: HouseUpgradeTier,
     extraLine?: string,
     /** Art key, when it differs from the card key (attunements are level-keyed). */
     artKey?: string,
@@ -836,6 +966,12 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
               <Text style={[styles.attuneLevel, { color: t.muted }]}>{extraLine}</Text>
             ) : null}
             <Text style={[styles.cardDesc, { color: t.body }]}>{description}</Text>
+            {/* The tier descriptions are fiction (copper pots, a spinning
+                globe); this names the pixels the purchase actually adds, so a
+                player knows what to look for once they walk back in. */}
+            <Text style={[styles.houseSurfaceLine, { color: t.muted }]}>
+              {getHouseUpgradeSurfaceLine(tier, housePhase)}
+            </Text>
             <Text style={[styles.houseCost, { color: t.amberText }]}>
               <AmberInline size={12} /> {cost}
             </Text>
@@ -860,6 +996,51 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
           )}
         </PanelCard>
       </Animated.View>
+    );
+  };
+
+  /**
+   * A house upgrade the player already owns. It keeps its place in the list
+   * (below everything still buyable, so the shop still reads as a shop) with a
+   * settled chip in the Equipped chip's own material, and hands the player back
+   * to the room to look at what they bought.
+   */
+  const renderInPlaceHouseCard = (
+    key: string,
+    title: string,
+    tier: HouseUpgradeTier,
+    room: Room,
+    artKey?: string,
+  ) => {
+    const see = getShopSeeItInRoomLabel(phase, room.name);
+    return (
+      <PanelCard key={key} phase={phase} kind="card" style={styles.inPlaceCard}>
+        <View style={styles.inPlaceRow}>
+          <ShopArtThumb artKey={artKey ?? key} />
+          <View style={styles.houseCardBody}>
+            <Text style={[styles.cardName, { color: t.title }]}>{title}</Text>
+            <Text style={[styles.houseSurfaceLine, { color: t.muted }]}>
+              {getHouseUpgradeSurfaceLine(tier, housePhase)}
+            </Text>
+          </View>
+          <View style={[styles.statusChip, styles.equippedChip, { borderColor: t.sectionBorder }]}>
+            <Text style={[styles.equippedChipText, { color: t.body }]}>
+              In place <Image source={CHROME_ICONS.check} style={styles.inlineMark} />
+            </Text>
+          </View>
+        </View>
+        {onFocusRoom && (
+          <CandyButton
+            label={see.label}
+            onPress={() => onFocusRoom(room.id)}
+            phase={phase}
+            variant="secondary"
+            disabled={busy != null}
+            style={styles.inPlaceAction}
+            accessibilityLabel={see.accessibilityLabel}
+          />
+        )}
+      </PanelCard>
     );
   };
 
@@ -929,7 +1110,6 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
               'tile_theme',
               getShopThemeSectionLabel(phase),
               getShopDefaultThemeName(phase),
-              'The original candy tiles.',
               tileThemes,
               ThemePreview,
             )}
@@ -939,7 +1119,6 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
               'confetti',
               getShopConfettiSectionLabel(phase),
               getShopDefaultConfettiName(phase),
-              'The usual phase-aware celebration.',
               confettiThemes,
               ConfettiPreview,
             )}
@@ -949,7 +1128,6 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
               'spark',
               getShopSparkSectionLabel(phase),
               getShopDefaultSparkName(phase),
-              'The usual phase-aware burst.',
               sparkThemes,
               SparkPreview,
             )}
@@ -971,6 +1149,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                     'Decorate',
                     () => handleBuyUpgrade(room.id),
                     `Decorate ${room.name} with ${upgrade.name} for ${upgrade.cost} amber`,
+                    1,
                   ),
                 )}
                 {areDeepeningsAvailable(housePhase) && availableDeepenings.map(({ room, deepening }) =>
@@ -982,6 +1161,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                     'Deepen',
                     () => handleBuyDeepening(room.id),
                     `Deepen ${room.name} with ${deepening.name} for ${deepening.cost} amber`,
+                    2,
                   ),
                 )}
                 {areAttunementsAvailable(housePhase) && availableAttunements.map(({ room, info }) =>
@@ -993,8 +1173,28 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                     'Attune',
                     () => handleBuyAttunement(room.id),
                     `Attune ${room.name}, level ${info.level} of ${MAX_ATTUNEMENT_LEVEL}, ${info.name}, for ${info.cost} amber`,
+                    3,
                     `Attunement ${info.level} of ${MAX_ATTUNEMENT_LEVEL}`,
                     `attune_${info.level}`,
+                  ),
+                )}
+                {/* Bought rows keep their place below everything still for
+                    sale, so the spend leaves a mark in the shop and the player
+                    has a way back to the room to look at it. */}
+                {inPlaceUpgrades.map(({ room, upgrade }) =>
+                  renderInPlaceHouseCard(
+                    `upgrade_${room.id}`,
+                    `${room.name}: ${upgrade.name}`,
+                    1,
+                    room,
+                  ),
+                )}
+                {areDeepeningsAvailable(housePhase) && inPlaceDeepenings.map(({ room, deepening }) =>
+                  renderInPlaceHouseCard(
+                    `deepen_${room.id}`,
+                    `${room.name}: ${deepening.name}`,
+                    2,
+                    room,
                   ),
                 )}
               </View>
@@ -1062,6 +1262,22 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
         phase={phase}
         onComplete={() => setConfettiActive(false)}
       />
+
+      {/* The real move burst, at the spark row that was bought / equipped /
+          tapped, in that row's own palette. Combo tier 2 so the accent shows.
+          Renders a still frame under reduced motion, a reduced burst on low
+          tier: never nothing. */}
+      {sparkDemo && (
+        <StarBurst
+          key={sparkDemo.nonce}
+          active
+          x={sparkDemo.x}
+          y={sparkDemo.y}
+          phase={phase}
+          comboTier={2}
+          paletteOverride={sparkDemo.palette}
+        />
+      )}
     </View>
   );
 };
@@ -1135,6 +1351,18 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     opacity: 0.8,
   },
+  // The one-line "where and when" under each section label. Pulls up toward
+  // the label (which carries its own 12dp bottom margin) so the pair reads as
+  // one heading.
+  sectionHint: {
+    fontSize: FONT_SIZE.small,
+    fontWeight: '500',
+    fontFamily: BODY_FONT,
+    lineHeight: 17,
+    marginTop: -6,
+    marginBottom: 12,
+    opacity: 0.85,
+  },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1142,6 +1370,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: SURFACE.cardPadX,
     marginBottom: 14,
   },
+  // Motion-policy notice at the head of the confetti / spark sections.
+  noticeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: SURFACE.cardPadY,
+    paddingHorizontal: SURFACE.cardPadX,
+    marginBottom: 14,
+  },
+  noticeBody: { flex: 1, paddingRight: 8 },
+  noticeText: { fontSize: FONT_SIZE.small, fontWeight: '500', lineHeight: 17, fontFamily: BODY_FONT },
   // The name/desc column is the tightest budget on the screen (a 96dp preview
   // and a 96dp action slot flank it), so its own gutter shrinks by exactly what
   // the card frame clearance took: text width is net-unchanged at 360dp.
@@ -1225,6 +1463,22 @@ const styles = StyleSheet.create({
   previewSparkCoreLarge: { width: 12, height: 12, borderRadius: 2, transform: [{ rotate: '45deg' }] },
   actionSlot: { minWidth: 96 },
   houseCardBody: { flex: 1, paddingHorizontal: 8 },
+  // Names the pixels a house upgrade actually adds, under the flavour copy.
+  houseSurfaceLine: {
+    fontSize: FONT_SIZE.caption,
+    fontWeight: '500',
+    fontFamily: BODY_FONT,
+    lineHeight: 15,
+    marginTop: 4,
+  },
+  // An owned upgrade: the row on top, its walk-back button beneath it.
+  inPlaceCard: {
+    paddingVertical: 14,
+    paddingHorizontal: SURFACE.cardPadX,
+    marginBottom: 14,
+  },
+  inPlaceRow: { flexDirection: 'row', alignItems: 'center' },
+  inPlaceAction: { marginTop: 12, alignSelf: 'flex-start', minWidth: 96 },
   houseFeedback: {
     fontSize: FONT_SIZE.small,
     fontWeight: '600',

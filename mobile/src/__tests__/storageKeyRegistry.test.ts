@@ -39,6 +39,7 @@ const DOCUMENTED_EXCLUSIONS: Record<string, string> = {
   wordshift_ad_pacing: 'Ad frequency pacing is device-local UX, not progress.',
   wordshift_monet_prompts: 'Monetization soft-prompt pacing — device UX, like ad pacing.',
   wordshift_share_prompts: 'One-time share nudge pacing; a fresh device may re-earn it.',
+  wordshift_cosmetic_receipt_: 'Key family (one per cosmetic id): the one-time first-showing receipt for a newly equipped confetti palette / move spark. Device-local UX pacing like share_prompts; a fresh device may deserve the receipt once more.',
   wordshift_event_log: 'Local analytics ring buffer, uploaded separately.',
   wordshift_entitlements: 'Store-authoritative: restored from the billing provider, never from a save.',
   wordshift_applied_iap_grants: 'Device-local paid transaction receipts; retained through reset to prevent duplicate grants.',

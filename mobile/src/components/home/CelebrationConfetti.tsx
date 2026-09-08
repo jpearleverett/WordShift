@@ -1,6 +1,7 @@
 import React, { useLayoutEffect, useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, Animated, Easing, useWindowDimensions } from 'react-native';
-import { getPhaseTheme } from '../../theme/colors';
+import { getPhaseTheme, CONFETTI_THEMES } from '../../theme/colors';
+import { getEquippedSync } from '../../services/cosmetics';
 import { useReducedMotion } from '../../hooks/useReducedMotion';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
 
@@ -38,10 +39,18 @@ export const CelebrationConfetti: React.FC<{ onComplete: () => void; phase?: num
       const t = setTimeout(() => onCompleteRef.current(), 400);
       return () => clearTimeout(t);
     }
-    // Phase-source the palette so late-game unlocks (the descent trio at 84/88/
-    // 92, house completion ~96-100) rain the muted crimson/ash of the reveal,
-    // not bright candy over the near-black world.
-    const colors = getPhaseTheme(phase).confettiColors;
+    // An equipped confetti cosmetic wins (pure expression, mirroring the
+    // puzzle-screen Confetti): this is the one UNSCRIMMED, centred confetti
+    // surface in the game, so a bought palette must show here or the purchase
+    // reads as broken. With none equipped, phase-source the palette so
+    // late-game unlocks (the descent trio at 84/88/92, house completion
+    // ~96-100) rain the muted crimson/ash of the reveal, not bright candy over
+    // the near-black world. Shape mix and physics stay phase-owned either way.
+    const equippedConfetti = getEquippedSync('confetti');
+    const colors =
+      equippedConfetti && CONFETTI_THEMES[equippedConfetti]
+        ? CONFETTI_THEMES[equippedConfetti]
+        : getPhaseTheme(phase).confettiColors;
     const newPieces: ConfettiPiece[] = [];
     // Keep every driver we start so a legitimate re-run (a phase change mid
     // celebration) or an unmount stops them instead of orphaning ~150 natives.

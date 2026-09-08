@@ -213,6 +213,13 @@ interface HomeScreenProps {
   onOpenGallery?: () => void;
   onOpenShop?: () => void;
   onOpenStore?: () => void;
+  /**
+   * The Shop's "see it in the room" handoff: the room to spring the house to
+   * and flare once on arrival (threaded straight into HouseWorld), and the
+   * callback the world fires once that visit has played so App can clear it.
+   */
+  focusRoomId?: string | null;
+  onFocusRoomConsumed?: () => void;
   onOpenPit?: () => void;
   /**
    * Begin a New Cycle from home (the utility-menu row shows only when
@@ -550,6 +557,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onOverlayActivityChange,
   onOpenGallery,
   onOpenShop,
+  focusRoomId = null,
+  onFocusRoomConsumed,
   onOpenStore,
   onOpenPit,
   onStartNewCycle,
@@ -2147,6 +2156,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           deepenedRooms={deepenedRooms}
           attunedRooms={attunedRooms}
           tendingLevel={tendingLevel}
+          focusRoomId={focusRoomId}
+          onFocusRoomConsumed={onFocusRoomConsumed}
           suppressInviteChips={unlockFlow.showInvitePrompt}
           savedPanY={initialHousePanY}
           onPanYChange={onHousePanChange}

@@ -27,6 +27,7 @@ import { CHROME_ICONS } from '../ui/chromeIcons';
 import { BODY_FONT_BOLD } from '../../theme/fonts';
 import { getSettingsSync } from '../../services/settings';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
+import { getRoomUpgradeArt } from '../shop/shopArt';
 
 // Room name plate scale: the full 42dp PixelPlaque would swamp a ~123dp room,
 // so the wooden nameplate is uniformly scaled to ~29dp tall / ~9.5dp font — big
@@ -170,11 +171,27 @@ export const getInviteAccessibilityLabel = (
 // In-world investment rendering (room upgrades).
 // A purchased upgrade used to render as a single 10px sparkle glyph; deepenings
 // and attunements rendered nothing. These layers make each amber sink visible
-// inside its room: a breathing hearth glow (tier 1), phase-aware wall sigils +
-// a richer interior wash (tier 2), and scaling glow / extra sigils / dust
-// motes as the attunement level climbs (tier 3). All layers are decorative,
-// non-interactive, and opacity-capped so the room art stays readable.
+// inside its room: the promised OBJECT (the decoration's own shop art, placed
+// on a per-room anchor) over a breathing hearth glow (tier 1), a second piece +
+// phase-aware wall sigils + a richer interior wash (tier 2), and scaling glow /
+// extra sigils / dust motes as the attunement level climbs (tier 3). All
+// layers are decorative and non-interactive.
+//
+// The floors were raised after a player reported "I don't see them show up in
+// the game": a single tier-1 purchase was a 48x26dp oval at ~0.195 opacity
+// (breathing down to ~0.10) under HouseWorld's 7-27% night scrim, plus one 4dp
+// pip, on a 250x123dp room whose free floor reflection already sat at 0.055 to
+// 0.11 in the same colour. The purchase delta was below notice. The ceilings
+// below keep the dark phases moody (embers, not a party) while a first
+// purchase is unmistakable at a glance.
 // ---------------------------------------------------------------------------
+
+/** Glow ceiling at full investment before any scrim compensation. */
+export const GLOW_OPACITY_CAP = 0.6;
+/** Hard ceiling on the compensated glow, so a night room never blows out. */
+export const GLOW_OPACITY_BOOST_CAP = 0.85;
+/** Largest scrim compensation accepted (1 / (1 - 0.27) is ~1.37 at phase 4). */
+export const GLOW_SCRIM_BOOST_MAX = 1.6;
 
 /**
  * Mirrors roomUpgrades.getRoomEmbellishmentIntensity math for prop-fed
@@ -202,8 +219,16 @@ export interface EmbellishmentVisuals {
    * light everywhere else — so this flag is the on/off, not the fire itself.
    */
   showHearthGlow: boolean;
-  /** Peak opacity of the glow stack — capped so rooms stay readable. */
+  /**
+   * Peak opacity of the glow stack: 0.42 for a lone tier-1 purchase, 0.6 at
+   * full investment (GLOW_OPACITY_CAP), then multiplied by the host's scrim
+   * compensation and hard-capped at GLOW_OPACITY_BOOST_CAP.
+   */
   glowMaxOpacity: number;
+  /** The decoration's own object, drawn in the room (tier 1). */
+  showDecorationProp: boolean;
+  /** The deepening's second piece, beside the first (tier 2). */
+  showDeepeningProp: boolean;
   /** Glow stack scale — steps up with each attunement level. */
   glowScale: number;
   /** Warm pips on the nameplate: 1 for tier-1 + 1 per attunement level. */
@@ -212,7 +237,7 @@ export interface EmbellishmentVisuals {
   sigilCount: number;
   /** Richer interior wash once deepened (phase-colored, very low opacity). */
   deepTintOpacity: number;
-  /** Faint floating dust motes at full attunement (max 4, motion-gated). */
+  /** Floating dust motes at full attunement ONLY (six, motion-gated). */
   showMotes: boolean;
 }
 
@@ -222,19 +247,30 @@ export const getEmbellishmentVisuals = (
   attunementLevel: number,
   /** 0..1 intensity; defaults to the local mirror of the service math. */
   intensityIn?: number,
+  /**
+   * HouseWorld paints a phase scrim OVER every room (7% dusk, 22% storm,
+   * 27% shadow) and the warm glow sits under it. Multiplying by
+   * 1 / (1 - scrim) makes the perceived glow roughly phase-invariant; the
+   * host passes it in so this file never mirrors the tint table.
+   */
+  scrimBoost = 1,
 ): EmbellishmentVisuals => {
   const level = Math.min(Math.max(attunementLevel, 0), 3);
   const intensity = Math.min(
     1,
     Math.max(0, intensityIn ?? computeEmbellishmentIntensity(isUpgraded, isDeepened, level))
   );
+  const boost = Math.min(GLOW_SCRIM_BOOST_MAX, Math.max(1, Number.isFinite(scrimBoost) ? scrimBoost : 1));
+  const baseGlow = Math.min(GLOW_OPACITY_CAP, 0.36 + intensity * 0.24);
   return {
     showHearthGlow: isUpgraded,
-    glowMaxOpacity: Math.min(0.3, 0.16 + intensity * 0.14),
+    glowMaxOpacity: Math.min(GLOW_OPACITY_BOOST_CAP, baseGlow * boost),
+    showDecorationProp: isUpgraded,
+    showDeepeningProp: isUpgraded && isDeepened,
     glowScale: 1 + level * 0.12,
     namePips: isUpgraded ? Math.min(4, 1 + level) : 0,
     sigilCount: Math.min(4, (isDeepened ? 1 : 0) + level),
-    deepTintOpacity: isDeepened ? 0.08 : 0,
+    deepTintOpacity: isDeepened ? 0.18 : 0,
     showMotes: level >= 3,
   };
 };
@@ -350,20 +386,171 @@ const RoomDepthLighting: React.FC<{ theme: RoomTheme; phase: DialoguePhase }> = 
 };
 
 
-/** Wall spots for up to 4 sigil marks (percent insets; mirrored pairs). */
+/**
+ * Wall spots for up to 4 sigil marks (percent insets). They cluster on the
+ * LEFT wall, spreading across it as the count grows: the decoration props
+ * own the right side of the room (ROOM_PROP_ANCHORS), the occupant's tag the
+ * bottom-left corner, the room sign the top centre, so this band is the one
+ * stretch of wall nothing else claims.
+ */
 const SIGIL_SPOTS: { top: string; left?: string; right?: string }[] = [
-  { top: '26%', left: '9%' },
-  { top: '24%', right: '9%' },
-  { top: '58%', right: '5%' },
-  { top: '60%', left: '5%' },
+  { top: '18%', left: '6%' },
+  { top: '46%', left: '5%' },
+  { top: '18%', left: '18%' },
+  { top: '46%', left: '17%' },
 ];
+
+// ---------------------------------------------------------------------------
+// The promised object. The shop sells "Copper Pots" and "a Gilded Globe" and
+// the room used to answer with a glow; now the decoration's own shop art is
+// drawn INSIDE the room at a per-room anchor (right half of the room, clear of
+// the occupant's bottom-left tag and the centred room sign; the animal
+// wanders in FRONT of it since the whole embellishment overlay sits behind the
+// sprite, which reads as depth rather than occlusion). Hung things sit high,
+// floor things sit on the floor band. The deepening adds a second piece just
+// inboard of the first, so the pair composes instead of scattering.
+// ---------------------------------------------------------------------------
+export const ROOM_PROP_SIZE = 32;
+
+export interface RoomPropAnchor {
+  right: number;
+  top?: number;
+  bottom?: number;
+}
+
+export const ROOM_PROP_ANCHORS: Record<string, { primary: RoomPropAnchor; secondary: RoomPropAnchor }> = {
+  cozy_den: { primary: { right: 14, bottom: 10 }, secondary: { right: 54, bottom: 14 } },     // hearthstone / ashen mantel on the floor
+  kitchen: { primary: { right: 14, top: 30 }, secondary: { right: 18, bottom: 10 } },         // pots hung high / salt ring on the floor
+  study: { primary: { right: 14, bottom: 12 }, secondary: { right: 54, bottom: 12 } },       // globe on the desk / the marked book
+  aquarium: { primary: { right: 40, bottom: 12 }, secondary: { right: 10, bottom: 44 } },    // coral low in the tank / still water above
+  jungle_room: { primary: { right: 14, top: 28 }, secondary: { right: 16, bottom: 10 } },    // vines from the ceiling / the inward bloom
+  desert_room: { primary: { right: 16, top: 26 }, secondary: { right: 56, top: 26 } },       // star map on the tent ceiling / new constellation
+  office: { primary: { right: 14, bottom: 10 }, secondary: { right: 54, bottom: 12 } },      // standing lamp / its second shadow
+  burrow: { primary: { right: 12, bottom: 36 }, secondary: { right: 50, bottom: 10 } },      // crystals in the wall / listening crystals
+  garden: { primary: { right: 14, top: 28 }, secondary: { right: 52, top: 30 } },            // chimes hung high / tuned chimes
+  bamboo_attic: { primary: { right: 14, top: 26 }, secondary: { right: 54, top: 22 } },      // lanterns floating / risen lanterns
+  star_loft: { primary: { right: 14, bottom: 38 }, secondary: { right: 52, bottom: 42 } },   // moth lantern at the rail / the lit hour
+  belfry: { primary: { right: 14, bottom: 8 }, secondary: { right: 54, bottom: 30 } },       // chalk circles on the skirting / waking bronze
+  sky_garden: { primary: { right: 14, bottom: 10 }, secondary: { right: 54, bottom: 10 } },  // moonflower bed / upturned blooms
+};
+
+const DEFAULT_PROP_ANCHORS = { primary: { right: 14, bottom: 10 }, secondary: { right: 54, bottom: 10 } };
+
+/** Where a room's tier-1 (primary) / tier-2 (secondary) object sits. */
+export const getRoomPropAnchor = (roomId: string, tier: 1 | 2): RoomPropAnchor => {
+  const anchors = ROOM_PROP_ANCHORS[roomId] ?? DEFAULT_PROP_ANCHORS;
+  return tier === 1 ? anchors.primary : anchors.secondary;
+};
+
+/**
+ * Objects that have already settled into place THIS SESSION. RoomView
+ * remounts on every trip home (HomeScreen unmounts on navigation), so the
+ * settle-in spring keys on a module-scope set instead of mount state: the
+ * piece lands once, the first time the player sees it, and is simply there on
+ * every later visit. Cleared only by a cold start, on purpose.
+ */
+const settledRoomProps = new Set<string>();
+
+/**
+ * One drawn object: the shop art at ROOM_PROP_SIZE over a soft contact-shadow
+ * oval (a dark low-opacity View, never shadowRadius, which Android does not
+ * blur), with a one-time settle-in scale spring on its first appearance in
+ * the session. Native driver; pinned to rest under reduced motion / low tier.
+ */
+const RoomProp: React.FC<{
+  source: ImageSourcePropType;
+  anchor: RoomPropAnchor;
+  settleKey: string;
+  animate: boolean;
+}> = ({ source, anchor, settleKey, animate }) => {
+  const [firstAppearance] = useState(() => animate && !settledRoomProps.has(settleKey));
+  const [settle] = useState(() => new Animated.Value(firstAppearance ? 0 : 1));
+
+  useEffect(() => {
+    settledRoomProps.add(settleKey);
+    if (!firstAppearance) {
+      settle.setValue(1);
+      return;
+    }
+    const spring = Animated.spring(settle, {
+      toValue: 1,
+      friction: 5,
+      tension: 90,
+      useNativeDriver: true,
+    });
+    spring.start();
+    return () => spring.stop();
+  }, [firstAppearance, settle, settleKey]);
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        styles.roomProp,
+        {
+          right: anchor.right,
+          ...(anchor.top !== undefined ? { top: anchor.top } : null),
+          ...(anchor.bottom !== undefined ? { bottom: anchor.bottom } : null),
+          opacity: settle.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0, 1, 1] }),
+          transform: [{ scale: settle.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] }) }],
+        },
+      ]}
+    >
+      <View style={styles.roomPropShadow} />
+      <Image source={source} style={styles.roomPropImage} resizeMode="contain" />
+    </Animated.View>
+  );
+};
+
+/**
+ * The Shop's "see it in the room" handoff lands here: a one-shot flare of the
+ * room's own glow register that rises to full, holds, and fades, so the eye
+ * lands on the room HouseWorld just panned to. Native driver. Under reduced
+ * motion it is simply lit at full and stays until the host consumes the focus
+ * (an opacity that never moves is not motion).
+ */
+export const FOCUS_FLARE_MS = 1660;
+const FocusFlare: React.FC<{ variant: RoomGlowVariant; animate: boolean }> = ({ variant, animate }) => {
+  const [flare] = useState(() => new Animated.Value(animate ? 0 : 1));
+
+  useEffect(() => {
+    if (!animate) {
+      flare.setValue(1);
+      return;
+    }
+    flare.setValue(0);
+    const seq = Animated.sequence([
+      Animated.timing(flare, { toValue: 1, duration: 260, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.delay(500),
+      Animated.timing(flare, { toValue: 0, duration: 900, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+    ]);
+    seq.start();
+    return () => seq.stop();
+  }, [animate, flare]);
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      importantForAccessibility="no-hide-descendants"
+      style={[styles.focusFlare, { opacity: flare }]}
+    >
+      <View style={[styles.embellishFill, { backgroundColor: variant.core, opacity: 0.22 }]} />
+      <View style={[styles.glowWrap, variant.anchor === 'center' ? styles.glowWrapCenter : styles.glowWrapBottom]}>
+        <View style={[styles.glowOuter, { backgroundColor: variant.outer, opacity: 0.45 }]} />
+        <View style={[styles.glowMid, { backgroundColor: variant.mid, opacity: 0.7 }]} />
+        <View style={[styles.glowCore, { backgroundColor: variant.core, opacity: 1 }]} />
+      </View>
+    </Animated.View>
+  );
+};
 
 /**
  * Tier-1 embellishment glow: 2-3 stacked feathered ovals with a slow
  * native-driven opacity breathing, recolored + anchored per ROOM (variant).
  * Hearth rooms get the warm fire palette anchored at the floor; other rooms
  * get their own register (lamp / water / foliage / night). Static (steady
- * glow) under reduced motion / low tier.
+ * glow) under reduced motion / low tier. The breath dips only to 0.75 of the
+ * peak: the old 0.55 floor spent half of every cycle below notice.
  */
 const EmbellishmentGlow: React.FC<{
   variant: RoomGlowVariant;
@@ -405,7 +592,7 @@ const EmbellishmentGlow: React.FC<{
         styles.glowWrap,
         variant.anchor === 'center' ? styles.glowWrapCenter : styles.glowWrapBottom,
         {
-          opacity: animate ? breathe.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] }) : 1,
+          opacity: animate ? breathe.interpolate({ inputRange: [0, 1], outputRange: [0.75, 1] }) : 1,
           transform: [{ scale }],
         },
       ]}
@@ -432,7 +619,7 @@ const SigilMark: React.FC<{ line: string; glow: string }> = ({ line, glow }) => 
   </View>
 );
 
-/** One slow-rising dust mote (full-attunement rooms only; motion-gated). */
+/** One slow-rising 5dp dust mote (full-attunement rooms ONLY; motion-gated). */
 const DustMote: React.FC<{ left: string; delay: number; duration: number; color: string }> = ({
   left,
   delay,
@@ -470,7 +657,7 @@ const DustMote: React.FC<{ left: string; delay: number; duration: number; color:
         {
           left: left as `${number}%`,
           backgroundColor: color,
-          opacity: rise.interpolate({ inputRange: [0, 0.2, 0.75, 1], outputRange: [0, 0.35, 0.25, 0] }),
+          opacity: rise.interpolate({ inputRange: [0, 0.2, 0.75, 1], outputRange: [0, 0.6, 0.45, 0] }),
           transform: [
             { translateY: rise.interpolate({ inputRange: [0, 1], outputRange: [0, -34] }) },
           ],
@@ -498,6 +685,18 @@ interface RoomViewProps {
   attunementLevel?: number;
   /** Total investment 0..1 (see computeEmbellishmentIntensity). */
   embellishmentIntensity?: number;
+  /**
+   * 1 / (1 - the host's room scrim opacity), so the purchased glow reads at
+   * roughly the same strength under the night scrim as in daylight. 1 = no
+   * scrim. Clamped inside getEmbellishmentVisuals.
+   */
+  glowScrimBoost?: number;
+  /**
+   * This room is the target of the Shop's "see it in the room" handoff:
+   * HouseWorld pans to it and this flares its glow once (FocusFlare). The
+   * host clears it when the focus is consumed.
+   */
+  isFocusTarget?: boolean;
   ritualWords?: string[];
   unlockCost?: number | null;
   amberBalance?: number;
@@ -543,6 +742,8 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
   isDeepened = false,
   attunementLevel = 0,
   embellishmentIntensity = 0,
+  glowScrimBoost = 1,
+  isFocusTarget = false,
   ritualWords = [],
   unlockCost = null,
   amberBalance = 0,
@@ -558,8 +759,14 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
     isRoomUpgraded,
     isDeepened,
     attunementLevel,
-    embellishmentIntensity > 0 ? embellishmentIntensity : undefined
+    embellishmentIntensity > 0 ? embellishmentIntensity : undefined,
+    glowScrimBoost
   );
+  // The promised objects: the decoration's shop art (tier 1) and the
+  // deepening's (tier 2). Null when a room has no dedicated piece, in which
+  // case only the light marks the purchase (never the parcel placeholder).
+  const decorationArt = embellish.showDecorationProp ? getRoomUpgradeArt(room.id, 1) : null;
+  const deepeningArt = embellish.showDeepeningProp ? getRoomUpgradeArt(room.id, 2) : null;
   const sigilColors = getSigilColors(currentPhase);
   // Room-appropriate tier-1 glow (fire only in real hearth rooms).
   const glowVariant = getRoomGlowVariant(room.theme);
@@ -735,9 +942,10 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
 
       <RoomDepthLighting theme={room.theme} phase={currentPhase} />
 
-      {/* In-world investment layers (tier-1 hearth glow / tier-2 sigils and
-          wash / tier-3 scaling + motes). Behind the frame, animal, and
-          nameplate; entirely decorative and non-interactive. */}
+      {/* In-world investment layers (tier-1 object + hearth glow / tier-2
+          second piece, sigils and wash / tier-3 scaling + motes). Behind the
+          frame, animal, and nameplate; entirely decorative and
+          non-interactive. One or two Images per decorated room. */}
       {(embellish.showHearthGlow || embellish.sigilCount > 0 || embellish.deepTintOpacity > 0) && (
         <View
           style={styles.embellishOverlay}
@@ -775,16 +983,39 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
               <SigilMark line={sigilColors.line} glow={sigilColors.glow} />
             </View>
           ))}
+          {decorationArt && (
+            <RoomProp
+              source={decorationArt}
+              anchor={getRoomPropAnchor(room.id, 1)}
+              settleKey={`${room.id}:1`}
+              animate={embellishMotion}
+            />
+          )}
+          {deepeningArt && (
+            <RoomProp
+              source={deepeningArt}
+              anchor={getRoomPropAnchor(room.id, 2)}
+              settleKey={`${room.id}:2`}
+              animate={embellishMotion}
+            />
+          )}
           {embellish.showMotes && embellishMotion && (
             <>
-              <DustMote left="22%" delay={0} duration={5200} color="#FFE9C4" />
-              <DustMote left="44%" delay={1700} duration={6400} color="#FFE9C4" />
-              <DustMote left="63%" delay={800} duration={5800} color="#F5D9EE" />
-              <DustMote left="80%" delay={2600} duration={7000} color="#FFE9C4" />
+              <DustMote left="20%" delay={0} duration={5200} color="#FFE9C4" />
+              <DustMote left="33%" delay={3100} duration={6800} color="#F5D9EE" />
+              <DustMote left="46%" delay={1700} duration={6400} color="#FFE9C4" />
+              <DustMote left="58%" delay={800} duration={5800} color="#F5D9EE" />
+              <DustMote left="70%" delay={3900} duration={6100} color="#FFE9C4" />
+              <DustMote left="82%" delay={2600} duration={7000} color="#FFE9C4" />
             </>
           )}
         </View>
       )}
+
+      {/* Shop handoff: flare this room's own light once so the eye lands
+          here after the pan. Above the investment layers, still behind the
+          frame and the animal. */}
+      {isFocusTarget && <FocusFlare variant={glowVariant} animate={embellishMotion} />}
 
       {/* Room frame */}
       <View pointerEvents="none" style={[styles.frame, {
@@ -1033,11 +1264,14 @@ const styles = StyleSheet.create({
     marginTop: 3,
     gap: 4,
   },
+  // 6dp with a warm-dark rim: a 4dp bare dot read as UI lint, not a lantern.
   pip: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: '#FFD27A',
+    borderWidth: 1,
+    borderColor: '#5A3A1A',
   },
   // ---- In-world investment layers ----
   embellishOverlay: {
@@ -1087,67 +1321,99 @@ const styles = StyleSheet.create({
   glowMid: {
     position: 'absolute',
     bottom: 6,
-    width: 82,
-    height: 44,
+    width: 100,
+    height: 52,
     borderRadius: 999,
   },
   glowCore: {
     position: 'absolute',
     bottom: 12,
-    width: 48,
-    height: 26,
+    width: 64,
+    height: 34,
     borderRadius: 999,
+  },
+  // The drawn object (the shop's own art for the piece) and its contact
+  // shadow: a dark low-opacity oval under the feet, never shadowRadius.
+  roomProp: {
+    position: 'absolute',
+    width: ROOM_PROP_SIZE,
+    height: ROOM_PROP_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  roomPropImage: {
+    width: ROOM_PROP_SIZE,
+    height: ROOM_PROP_SIZE,
+  },
+  roomPropShadow: {
+    position: 'absolute',
+    bottom: -2,
+    width: ROOM_PROP_SIZE - 4,
+    height: 9,
+    borderRadius: 999,
+    backgroundColor: '#140A04',
+    opacity: 0.32,
+  },
+  // Focus flare: the room's glow register at full, over a light wash.
+  focusFlare: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    overflow: 'hidden',
   },
   // Deepening sigils: thin angled line pair + a fatter low-opacity underlay
   // pair standing in for blur (Android-safe: no shadowRadius glow).
   sigilSpot: {
     position: 'absolute',
   },
-  // The line pair is anchored with explicit `left` values (box is 22 wide:
-  // crisp 2px lines centered at 7/15, their 7px glow underlays center-aligned
+  // The line pair is anchored with explicit `left` values (box is 30 wide:
+  // crisp 3px lines centered at 10/20, their 9px glow underlays center-aligned
   // beneath them) — no translate offsets (the invite-chip centering pin bans
-  // hardcoded translates in this file).
+  // hardcoded translates in this file). 30dp at 0.85: the old 22dp half-alpha
+  // mark was the size of a wood-grain dash.
   sigilBox: {
-    width: 22,
-    height: 22,
-    opacity: 0.5,
+    width: 30,
+    height: 30,
+    opacity: 0.85,
   },
   sigilLine: {
     position: 'absolute',
     top: 1,
-    height: 20,
-    borderRadius: 1,
+    height: 28,
+    borderRadius: 1.5,
   },
   sigilCrispLeft: {
-    left: 6,
-    width: 2,
+    left: 8.5,
+    width: 3,
     transform: [{ rotate: '24deg' }],
   },
   sigilCrispRight: {
-    left: 14,
-    width: 2,
+    left: 18.5,
+    width: 3,
     transform: [{ rotate: '-24deg' }],
   },
   sigilGlowLeft: {
-    left: 3.5,
-    width: 7,
-    borderRadius: 3,
+    left: 5.5,
+    width: 9,
+    borderRadius: 4,
     opacity: 0.22,
     transform: [{ rotate: '24deg' }],
   },
   sigilGlowRight: {
-    left: 11.5,
-    width: 7,
-    borderRadius: 3,
+    left: 15.5,
+    width: 9,
+    borderRadius: 4,
     opacity: 0.22,
     transform: [{ rotate: '-24deg' }],
   },
   dustMote: {
     position: 'absolute',
     bottom: '24%',
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
   },
   // Warm dark timber base for the unbuilt room (never flat gray cardboard).
   lockedRoom: {

@@ -452,18 +452,26 @@ export function getTileFinish(): TileFinish {
 export interface SparkPalette {
   /** Core color of most stars. */
   bg: string;
-  /** Alternate core carried by every other star from combo tier 2 up. */
+  /** Alternate core carried by every other star from combo tier 1 up. */
   accent: string;
   /** Optional halo tint. Defaults to the star's own core color. */
   halo?: string;
 }
 
+// Every halo is a LIGHTER tint of its core, never a darker shade. The halo is
+// the one layer bigger than the core diamond, drawn at partial opacity over
+// the board: a halo darker than its core simply vanished into the dusk/night
+// boards (#4A5580 / #2E3355 / #1A1A2E), so the paid burst read SMALLER than
+// the free one, whose halo is its own core color. cosmeticVisibility.test.ts
+// pins halo luminance > core luminance for every entry.
+// spark_ash's core clears the dusk board at >= 3.3:1 (the old #8C8790 sat at
+// ~2.1:1, less visible than the free lavender it replaced).
 export const SPARK_THEMES: Record<string, SparkPalette> = {
-  spark_hearth: { bg: '#FFB347', accent: '#FFF0C8', halo: '#D4802A' },
-  spark_pollen: { bg: '#D9E08A', accent: '#FFFDE0', halo: '#A8B054' },
-  spark_saltgrain: { bg: '#DCEAF2', accent: '#FFFFFF', halo: '#8FA9B8' },
-  spark_thread: { bg: '#E0C46A', accent: '#C0A8D8', halo: '#9E863C' },
-  spark_ash: { bg: '#8C8790', accent: '#D9563F', halo: '#5A555E' },
+  spark_hearth: { bg: '#FFB347', accent: '#FFF0C8', halo: '#FFD9A0' },
+  spark_pollen: { bg: '#D9E08A', accent: '#FFFDE0', halo: '#F0F4C0' },
+  spark_saltgrain: { bg: '#DCEAF2', accent: '#FFFFFF', halo: '#F4F9FC' },
+  spark_thread: { bg: '#E0C46A', accent: '#C0A8D8', halo: '#F2E2A8' },
+  spark_ash: { bg: '#B3AEB8', accent: '#D9563F', halo: '#D6D2DA' },
 };
 
 // Sparkle/star colors for effects

@@ -362,6 +362,50 @@ export const ROOM_ATTUNEMENTS: RoomAttunement[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Surface copy: what a tier actually CHANGES on screen.
+// The tier descriptions above are fiction (copper pots, a spinning globe); a
+// player who bought one looked for the pots and found a faint glow, and the
+// report was "I don't see them show up in the game". RoomView now draws the
+// promised object from its shop art, so each tier also gets one plain line
+// naming the pixels it adds, for the shop card to render under the flavour.
+// Phase-aware register, never the word for the stage itself, no dashes.
+// ---------------------------------------------------------------------------
+
+export type HouseUpgradeTier = 1 | 2 | 3;
+
+const HOUSE_UPGRADE_SURFACE_LINES: Record<HouseUpgradeTier, { bright: string; dark: string; serene: string }> = {
+  1: {
+    bright: 'The object appears in the room and its light grows. The plaque gains a lantern pip.',
+    dark: 'The object takes its place in the room and the light leans toward it. The plaque keeps a lit pip.',
+    serene: 'The object rests in the room and its light stays. The plaque keeps a lantern pip.',
+  },
+  2: {
+    bright: 'A second piece joins the first. Faint marks appear on the walls and the room deepens.',
+    dark: 'A second piece joins the first. Marks surface on the walls and the room goes deeper.',
+    serene: 'A second piece keeps the first company. The marks on the walls settle and the room stays deep.',
+  },
+  3: {
+    bright: 'The glow widens with each level and the plaque gains a pip. At the last level, dust drifts.',
+    dark: 'The glow widens with each level and the plaque gains a pip. At the last level, something drifts in the air.',
+    serene: 'The glow widens with each level and the plaque gains a pip. At the last level, dust drifts, unhurried.',
+  },
+};
+
+/**
+ * One line naming what a house-upgrade tier visibly changes in its room
+ * (tier 1 decoration, tier 2 deepening, tier 3 attunement). Phase-aware:
+ * bright through the dusk, the house register once the shadows grow (3-4),
+ * serene after the arrival (5). For the shop card, under the flavour copy.
+ */
+export function getHouseUpgradeSurfaceLine(tier: HouseUpgradeTier, phase: DialoguePhase): string {
+  const lines = HOUSE_UPGRADE_SURFACE_LINES[tier] ?? HOUSE_UPGRADE_SURFACE_LINES[1];
+  const p = phase as number;
+  if (p >= 5) return lines.serene;
+  if (p >= 3) return lines.dark;
+  return lines.bright;
+}
+
+// ---------------------------------------------------------------------------
 // In-memory cache
 // ---------------------------------------------------------------------------
 

@@ -22,7 +22,20 @@ export const VICTORY_GLITCH_DURATION_MS = 500;
 export const VICTORY_GLITCH_FIRST_DURATION_MS = 1400;
 
 // === STARBURST ===
-export const STARBURST_DURATION_MS = 600;
+// The move spark's visible life. App deactivates the burst after this window
+// (the shop's demo burst holds the same window). Raised 600 -> 750 with the
+// opacity fade delay 300 -> 450 so a paid palette can actually be read: the
+// old burst was 12dp cores for ~0.5s, directly under the thumb.
+export const STARBURST_DURATION_MS = 750;
+/** Stars hold full opacity this long before the 200ms fade. */
+export const STARBURST_FADE_DELAY_MS = 450;
+/**
+ * A touch-origin burst is lifted this far ABOVE the touch point so the ring
+ * clears the thumb that just tapped or dropped the tile. Applied where App
+ * resolves the feedback origin; bursts with a synthetic origin (the reverse
+ * midpoint at board centre, the shop's demo at a preview centre) are not lifted.
+ */
+export const STARBURST_ORIGIN_LIFT_DP = 36;
 
 // === DREAD PULSE ===
 export const DREAD_PULSE_FADE_IN_MS = 150;

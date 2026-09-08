@@ -4801,3 +4801,144 @@ export function getLexiconIntroLines(phase: DialoguePhase): string[] {
     'It layers onto anything else you have switched on, and it pays a bit more besides.',
   ];
 }
+
+// ============================================================================
+// COSMETIC SHOP — naming the SURFACE. Tile themes explain themselves (the row
+// shows tiles, the board is made of tiles). Confetti and sparks are EVENTS:
+// without "falls when you win" / "bursts from the letter you place" the player
+// has no idea when to look, and by the time the effect fires they are watching
+// the star pop-in or the next word. Every line below says where and when.
+// Never the word "phase" (narrative rule 7), never a dash.
+// ============================================================================
+
+type ShopCosmeticCategory = 'tile_theme' | 'confetti' | 'spark';
+
+function shopCategoryOf(category: unknown): ShopCosmeticCategory {
+  if (category === 'confetti' || category === 'spark') return category;
+  return 'tile_theme';
+}
+
+/** One small line under each section label: WHERE and WHEN this cosmetic shows. */
+export function getShopSectionHint(phase: number, category: unknown): string {
+  const cat = shopCategoryOf(category);
+  if (phase >= 4) {
+    if (cat === 'confetti') return 'It falls when the arrangement closes.';
+    if (cat === 'spark') return 'It rises from each letter you place.';
+    return 'On every letter, on every arrangement.';
+  }
+  if (phase >= 2) {
+    if (cat === 'confetti') return 'Falls across the board when a chain is finished.';
+    if (cat === 'spark') return 'Rises from each letter you set down.';
+    return 'On every letter tile, on every board.';
+  }
+  if (cat === 'confetti') return 'Falls across the board each time you win.';
+  if (cat === 'spark') return 'Bursts from every letter you set down.';
+  return 'On every letter tile, on every board.';
+}
+
+/** The line under the spend count-up when a cosmetic is equipped: names the surface. */
+export function getShopEquippedLine(phase: number, category: unknown): string {
+  const cat = shopCategoryOf(category);
+  if (phase >= 4) {
+    if (cat === 'confetti') return 'It settles into the arrangement. It falls at the next closing.';
+    if (cat === 'spark') return 'It settles into the arrangement. The next letter you place will wear it.';
+    return 'It settles into the arrangement. The letters wear it now.';
+  }
+  if (phase >= 2) {
+    if (cat === 'confetti') return 'Equipped. Watch your next finished chain.';
+    if (cat === 'spark') return 'Equipped. Watch the next letter you place.';
+    return 'Equipped. Your tiles are wearing it now.';
+  }
+  if (cat === 'confetti') return 'Equipped. Watch your next win.';
+  if (cat === 'spark') return 'Equipped. Watch the next letter you place.';
+  return 'Equipped. Your tiles are wearing it now.';
+}
+
+/** Description of the free default row for a category. Never names the system that ages it. */
+export function getShopDefaultDescription(phase: number, category: unknown): string {
+  const cat = shopCategoryOf(category);
+  if (phase >= 4) {
+    if (cat === 'confetti') return 'What falls when nothing is chosen. It has grown quiet.';
+    if (cat === 'spark') return 'The bare spark. It has grown dim.';
+    return 'The bare letters, as the house keeps them.';
+  }
+  if (phase >= 2) {
+    if (cat === 'confetti') return "The house's own celebration. It changes with the days.";
+    if (cat === 'spark') return "The house's own spark. It changes with the days.";
+    return 'The original candy tiles.';
+  }
+  if (cat === 'confetti') return 'The classic rainbow fall. It changes with the days.';
+  if (cat === 'spark') return 'The bright gold burst. It changes with the days.';
+  return 'The original candy tiles.';
+}
+
+/** Label + accessibility label for the default row's button: says WHICH category it resets. */
+export function getShopUseDefaultLabel(phase: number, category: unknown): { label: string; accessibilityLabel: string } {
+  const cat = shopCategoryOf(category);
+  const noun = cat === 'confetti' ? 'confetti' : cat === 'spark' ? 'move spark' : 'tile theme';
+  if (phase >= 4) return { label: 'Unadorn', accessibilityLabel: `Return to the bare ${noun}` };
+  return { label: 'Use default', accessibilityLabel: `Use the default ${noun}` };
+}
+
+/**
+ * The notice card at the head of the CONFETTI / MOVE SPARKS sections when the
+ * motion policy stills them. Reduced Motion is seeded from the OS, so a player
+ * may never have chosen it; the card says what changes and where to change it.
+ * Low-tier devices keep a reduced burst and cannot fix it in Settings, so
+ * that variant carries no button.
+ */
+export function getShopMotionNoticeText(
+  phase: number,
+  reason: unknown = 'reduced_motion',
+): { body: string; button?: string } {
+  if (reason === 'low_tier') {
+    if (phase >= 4) return { body: 'These move. On this device they keep to a smaller burst, so the colours you choose are what you will see.' };
+    return { body: 'These are motion effects. On this device they play as a smaller burst, so the colours you choose are what you will notice.' };
+  }
+  if (phase >= 4) {
+    return {
+      body: 'These move. With motion stilled, each holds one frame and lets it go. The colours you choose are still worn.',
+      button: 'Motion settings',
+    };
+  }
+  return {
+    body: 'These are motion effects. Reduced Motion is on, so they show as a still moment instead of a burst. The colours you choose still show.',
+    button: 'Motion settings',
+  };
+}
+
+/**
+ * One-time receipt the FIRST time a newly equipped confetti palette or move
+ * spark actually shows: replaces that move's message (sparks) or rides the
+ * victory toast queue (confetti). The tile theme needs none: the board is the
+ * receipt. Takes the cosmetic's display name.
+ */
+export function getCosmeticFirstShowingLine(phase: number, name: unknown): string {
+  const shown = typeof name === 'string' && name.trim().length > 0 ? name.trim() : 'Your choice';
+  if (phase >= 5) return `${shown}. The house keeps what you gave it.`;
+  if (phase >= 4) return `${shown}. It wears what you gave it.`;
+  if (phase >= 2) return `${shown}, as you chose.`;
+  return `${shown}, as promised.`;
+}
+
+/**
+ * The button on a house upgrade the player has already bought. The shop keeps
+ * a bought room listed (it used to vanish, which read as the purchase being
+ * taken away) and hands the player back to the room to look at it. The room is
+ * named outright while the days are bright; once the shadows grow the house
+ * asks for the walk itself and keeps the name for the screen reader.
+ */
+export function getShopSeeItInRoomLabel(
+  phase: number,
+  roomName: unknown,
+): { label: string; accessibilityLabel: string } {
+  const named = typeof roomName === 'string' && roomName.trim().length > 0;
+  const where = named ? `the ${(roomName as string).trim()}` : 'the room';
+  if (phase >= 5) {
+    return { label: 'Go and sit with it', accessibilityLabel: `Go and sit with what you kept in ${where}` };
+  }
+  if (phase >= 3) {
+    return { label: 'Go and look', accessibilityLabel: `Go and look at what stands in ${where}` };
+  }
+  return { label: `See it in ${where}`, accessibilityLabel: `See it in ${where}` };
+}

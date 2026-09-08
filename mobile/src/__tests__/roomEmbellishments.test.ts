@@ -75,7 +75,14 @@ import {
   computeEmbellishmentIntensity,
   getEmbellishmentVisuals,
   getSigilColors,
+  getRoomPropAnchor,
+  ROOM_PROP_ANCHORS,
+  ROOM_PROP_SIZE,
+  GLOW_OPACITY_CAP,
+  GLOW_OPACITY_BOOST_CAP,
 } from '../components/home/RoomView';
+import { getRoomUpgradeArt } from '../components/shop/shopArt';
+import { ROOMS } from '../services/homeWorldData';
 import {
   getGaitPeriodMs,
   getGaitBobPx,
@@ -133,19 +140,37 @@ describe('getEmbellishmentVisuals', () => {
     expect(v.showMotes).toBe(false);
   });
 
-  test('tier-1 decoration: hearth glow + one nameplate pip, no sigils', () => {
+  test('tier-1 decoration: the object + hearth glow + one nameplate pip, no sigils', () => {
     const v = getEmbellishmentVisuals(true, false, 0);
     expect(v.showHearthGlow).toBe(true);
+    expect(v.showDecorationProp).toBe(true);
+    expect(v.showDeepeningProp).toBe(false);
     expect(v.namePips).toBe(1);
     expect(v.sigilCount).toBe(0);
     expect(v.deepTintOpacity).toBe(0);
   });
 
-  test('deepening: first wall sigil + richer interior wash', () => {
+  test('a lone tier-1 purchase is unmistakable: 0.42 peak glow (was 0.195)', () => {
+    // The old floor (0.16 + 0.25 * 0.14 = 0.195, breathing down to ~0.10)
+    // sat under a 7-27% night scrim over a free 0.055-0.11 floor reflection in
+    // the same colour: the purchase delta was below notice, and the player
+    // report was "I don't see them show up in the game".
+    expect(getEmbellishmentVisuals(true, false, 0).glowMaxOpacity).toBeCloseTo(0.42);
+    expect(getEmbellishmentVisuals(true, true, 0).glowMaxOpacity).toBeCloseTo(0.48);
+    expect(getEmbellishmentVisuals(true, true, 3).glowMaxOpacity).toBeCloseTo(0.6);
+  });
+
+  test('deepening: the second piece, first wall sigil + a richer interior wash', () => {
     const v = getEmbellishmentVisuals(true, true, 0);
+    expect(v.showDeepeningProp).toBe(true);
     expect(v.sigilCount).toBe(1);
-    expect(v.deepTintOpacity).toBeGreaterThan(0);
-    expect(v.deepTintOpacity).toBeLessThanOrEqual(0.1); // readability cap
+    expect(v.deepTintOpacity).toBeCloseTo(0.18); // was an 8% wash, below the perceptual threshold
+    expect(v.deepTintOpacity).toBeLessThanOrEqual(0.25); // still a wash, never a repaint
+  });
+
+  test('the deepening piece never appears without the decoration it builds on', () => {
+    expect(getEmbellishmentVisuals(false, true, 0).showDeepeningProp).toBe(false);
+    expect(getEmbellishmentVisuals(false, true, 0).showDecorationProp).toBe(false);
   });
 
   test('each attunement level visibly deepens: +1 pip, +1 sigil, bigger glow', () => {
@@ -165,17 +190,88 @@ describe('getEmbellishmentVisuals', () => {
     expect(getEmbellishmentVisuals(true, true, 3).showMotes).toBe(true);
   });
 
-  test('layers stay capped so rooms remain readable', () => {
+  test('layers stay capped so rooms remain readable (raised ceilings, still moody)', () => {
+    // The caps were 0.3 / 4 / 4. The glow ceiling is now 0.6: the old cap kept
+    // the layer "subtle" to the point that players could not see the purchase
+    // they had just made. 0.6 at FULL investment is still a lit hearth in a
+    // painted room, not a spotlight, and the dark phases keep their scrim.
     const v = getEmbellishmentVisuals(true, true, 3);
-    expect(v.glowMaxOpacity).toBeLessThanOrEqual(0.3);
+    expect(v.glowMaxOpacity).toBeLessThanOrEqual(GLOW_OPACITY_CAP);
+    expect(GLOW_OPACITY_CAP).toBe(0.6);
     expect(v.sigilCount).toBeLessThanOrEqual(4);
     expect(v.namePips).toBeLessThanOrEqual(4);
+  });
+
+  test('the night-scrim compensation lifts the glow but never past the hard ceiling', () => {
+    // HouseWorld passes 1 / (1 - room scrim): ~1.075 at dusk, ~1.28 at storm,
+    // ~1.37 at shadow. The perceived glow stays roughly phase-invariant.
+    const day = getEmbellishmentVisuals(true, false, 0, undefined, 1);
+    const shadow = getEmbellishmentVisuals(true, false, 0, undefined, 1 / (1 - 0.27));
+    expect(shadow.glowMaxOpacity).toBeGreaterThan(day.glowMaxOpacity);
+    expect(shadow.glowMaxOpacity * (1 - 0.27)).toBeCloseTo(day.glowMaxOpacity, 2);
+    // Full investment under the deepest scrim stays under the hard cap...
+    const full = getEmbellishmentVisuals(true, true, 3, undefined, 1 / (1 - 0.27));
+    expect(full.glowMaxOpacity).toBeLessThanOrEqual(GLOW_OPACITY_BOOST_CAP);
+    expect(GLOW_OPACITY_BOOST_CAP).toBe(0.85);
+    // ...and a nonsense boost (0, negative, NaN, huge) can neither dim nor blow out.
+    expect(getEmbellishmentVisuals(true, false, 0, undefined, 0).glowMaxOpacity).toBeCloseTo(0.42);
+    expect(getEmbellishmentVisuals(true, false, 0, undefined, Number.NaN).glowMaxOpacity).toBeCloseTo(0.42);
+    expect(getEmbellishmentVisuals(true, true, 3, undefined, 99).glowMaxOpacity).toBeLessThanOrEqual(GLOW_OPACITY_BOOST_CAP);
   });
 
   test('an explicitly passed intensity drives the glow (prop parity)', () => {
     const low = getEmbellishmentVisuals(true, false, 0, 0.25);
     const high = getEmbellishmentVisuals(true, false, 0, 1);
     expect(high.glowMaxOpacity).toBeGreaterThan(low.glowMaxOpacity);
+  });
+});
+
+describe('the promised object (decoration props)', () => {
+  test('every room has its own tier-1 and tier-2 art, so the shop copy is honest', () => {
+    for (const room of ROOMS) {
+      expect(getRoomUpgradeArt(room.id, 1)).not.toBeNull();
+      expect(getRoomUpgradeArt(room.id, 2)).not.toBeNull();
+    }
+  });
+
+  test('an unknown room gets no art, never the parcel placeholder', () => {
+    expect(getRoomUpgradeArt('not_a_room', 1)).toBeNull();
+    expect(getRoomUpgradeArt('not_a_room', 2)).toBeNull();
+  });
+
+  test('every room has a primary and a secondary anchor on the right half of the room', () => {
+    // The occupant's tag hangs bottom-LEFT (animalPlate: left 6, maxWidth
+    // 62%) and the sigils cluster on the left wall, so the objects live on
+    // the right: `right` insets keep every 32dp piece inside x >= 250 * 0.5.
+    const ROOM_W = 250;
+    for (const room of ROOMS) {
+      expect(ROOM_PROP_ANCHORS[room.id]).toBeDefined();
+      for (const tier of [1, 2] as const) {
+        const a = getRoomPropAnchor(room.id, tier);
+        expect(a.right).toBeGreaterThanOrEqual(8);
+        expect(ROOM_W - a.right - ROOM_PROP_SIZE).toBeGreaterThanOrEqual(ROOM_W / 2);
+        // Exactly one vertical anchor, and it keeps the piece inside a 123dp room.
+        expect((a.top !== undefined ? 1 : 0) + (a.bottom !== undefined ? 1 : 0)).toBe(1);
+        const edge = a.top ?? a.bottom ?? 0;
+        expect(edge + ROOM_PROP_SIZE).toBeLessThanOrEqual(123);
+        // A hung piece clears the centred room sign (top 4, ~29dp tall).
+        if (a.top !== undefined) expect(a.top).toBeGreaterThanOrEqual(22);
+      }
+      // The pair composes: the second piece sits inboard, never on the first.
+      const p = getRoomPropAnchor(room.id, 1);
+      const q = getRoomPropAnchor(room.id, 2);
+      const overlapX = Math.abs(p.right - q.right) < ROOM_PROP_SIZE;
+      const pTop = p.top ?? 123 - (p.bottom ?? 0) - ROOM_PROP_SIZE;
+      const qTop = q.top ?? 123 - (q.bottom ?? 0) - ROOM_PROP_SIZE;
+      const overlapY = Math.abs(pTop - qTop) < ROOM_PROP_SIZE;
+      expect(overlapX && overlapY).toBe(false);
+    }
+  });
+
+  test('a room without an anchor entry falls back to the floor band', () => {
+    const a = getRoomPropAnchor('not_a_room', 1);
+    expect(a.bottom).toBeDefined();
+    expect(a.right).toBeGreaterThan(0);
   });
 });
 
@@ -215,6 +311,93 @@ describe('RoomView source pins', () => {
     // and the motion gate reads both reduced motion and device tier.
     expect(ROOM_VIEW_SRC).toMatch(/getSettingsSync\(\)\.reducedMotion && !shouldSimplifyAnimations\(\)/);
     expect(ROOM_VIEW_SRC).not.toMatch(/useNativeDriver: false/);
+  });
+
+  test('the visible-investment floors: bigger ovals, a 0.75 breath, 6dp rimmed pips, 30dp sigils, 5dp motes', () => {
+    const style = (name: string) => {
+      const at = ROOM_VIEW_SRC.indexOf(`  ${name}: {`);
+      expect(at).toBeGreaterThan(-1);
+      return ROOM_VIEW_SRC.slice(at, ROOM_VIEW_SRC.indexOf('},', at));
+    };
+    expect(style('glowCore')).toMatch(/width: 64,\s*height: 34/);
+    expect(style('glowMid')).toMatch(/width: 100,\s*height: 52/);
+    expect(ROOM_VIEW_SRC).toMatch(/outputRange: \[0\.75, 1\]/);
+    expect(style('pip')).toMatch(/width: 6,\s*height: 6/);
+    expect(style('pip')).toMatch(/borderWidth: 1/);
+    expect(style('sigilBox')).toMatch(/width: 30,\s*height: 30,\s*opacity: 0\.85/);
+    expect(style('sigilCrispLeft')).toMatch(/width: 3/);
+    expect(style('dustMote')).toMatch(/width: 5,\s*height: 5/);
+    expect(ROOM_VIEW_SRC).toMatch(/outputRange: \[0, 0\.6, 0\.45, 0\]/);
+  });
+
+  test('six motes, mounted ONLY at full attunement and only with motion on', () => {
+    const block = ROOM_VIEW_SRC.slice(
+      ROOM_VIEW_SRC.indexOf('{embellish.showMotes && embellishMotion && ('),
+      ROOM_VIEW_SRC.indexOf('Shop handoff: flare'),
+    );
+    expect((block.match(/<DustMote /g) ?? []).length).toBe(6);
+  });
+
+  test('the drawn object: shop art, a View contact shadow (no shadowRadius), a settle spring', () => {
+    const prop = ROOM_VIEW_SRC.slice(
+      ROOM_VIEW_SRC.indexOf('const RoomProp: React.FC'),
+      ROOM_VIEW_SRC.indexOf('export const FOCUS_FLARE_MS'),
+    );
+    expect(prop).toMatch(/Animated\.spring\(settle/);
+    expect(prop).toMatch(/useNativeDriver: true/);
+    expect(prop).not.toMatch(/shadowRadius/);
+    expect(prop).toMatch(/styles\.roomPropShadow/);
+    // Once per session: keyed on a module-scope set, pinned to rest otherwise.
+    expect(prop).toMatch(/settledRoomProps\.has\(settleKey\)/);
+    expect(prop).toMatch(/settledRoomProps\.add\(settleKey\)/);
+    // Both pieces render inside the non-interactive overlay from the shop art.
+    expect(ROOM_VIEW_SRC).toMatch(/getRoomUpgradeArt\(room\.id, 1\)/);
+    expect(ROOM_VIEW_SRC).toMatch(/getRoomUpgradeArt\(room\.id, 2\)/);
+  });
+
+  test('the focus flare is native-driven and instant under reduced motion', () => {
+    const flare = ROOM_VIEW_SRC.slice(
+      ROOM_VIEW_SRC.indexOf('const FocusFlare: React.FC'),
+      ROOM_VIEW_SRC.indexOf('interface RoomViewProps'),
+    );
+    expect(flare).toMatch(/if \(!animate\) \{\s*flare\.setValue\(1\);/);
+    expect(flare).toMatch(/useNativeDriver: true/);
+    expect(flare).not.toMatch(/useNativeDriver: false/);
+    expect(ROOM_VIEW_SRC).toMatch(/\{isFocusTarget && <FocusFlare/);
+  });
+});
+
+describe('HouseWorld focus-room handoff (source pins)', () => {
+  test('the focus pan is a visit: springs natively, never notifies the saved pan', () => {
+    const block = HOUSE_WORLD_SRC.slice(
+      HOUSE_WORLD_SRC.indexOf('// ─── Focus-room handoff'),
+      HOUSE_WORLD_SRC.indexOf('// Preserve the current viewport'),
+    );
+    expect(block.length).toBeGreaterThan(200);
+    expect(block).toMatch(/Animated\.spring\(panRaw/);
+    expect(block).toMatch(/useNativeDriver: true/);
+    expect(block).not.toMatch(/onPanYChange/);
+    expect(block).toMatch(/syncPanPosition\(panY, false\)/);
+    // Reduced motion / low tier lands instantly.
+    expect(block).toMatch(/if \(!panPhysicsEnabled\)/);
+    // Never under a live finger.
+    expect(block).toMatch(/if \(!isPanningRef\.current\)/);
+    // Consumed on a timer the owner can rely on.
+    expect(block).toMatch(/onFocusRoomConsumedRef\.current\?\.\(\)/);
+  });
+
+  test('a real pan takes the scene back from the focus hold', () => {
+    const active = HOUSE_WORLD_SRC.slice(
+      HOUSE_WORLD_SRC.indexOf('if (state === State.ACTIVE) {'),
+      HOUSE_WORLD_SRC.indexOf('// Every terminal state releases'),
+    );
+    expect(active).toMatch(/focusHoldRef\.current = null/);
+  });
+
+  test('the night scrim compensation is derived from the SAME tint table the scrim uses', () => {
+    expect(HOUSE_WORLD_SRC).toMatch(/const glowScrimBoost = houseTint\.room >= 1 \? 1 : 1 \/ \(1 - houseTint\.room\)/);
+    expect(HOUSE_WORLD_SRC).toMatch(/glowScrimBoost=\{glowScrimBoost\}/);
+    expect(HOUSE_WORLD_SRC).toMatch(/isFocusTarget=\{focusRoomId === room\.id\}/);
   });
 });
 

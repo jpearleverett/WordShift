@@ -675,6 +675,11 @@ export interface PuzzleGameActions {
      * intermediate moves so App can play soundValidMove(comboTier).
      */
     comboTier?: number;
+    /**
+     * True when this intermediate move was a resonant choice (its message is
+     * already the resonance acknowledgment, which App must never overwrite).
+     */
+    resonant?: boolean;
     /** Solve duration (ms) for a freshly-started board; absent for restored/retried boards. */
     solveTimeMs?: number;
     /** Whether this board was played with the Blind Offering modifier on. */
@@ -2224,6 +2229,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     moveOutcomes?: MoveOutcome[];
     /** Audio combo-ladder tier for the streak after this move (see interface doc). */
     comboTier?: number;
+    /** This intermediate move was a resonant choice (its message must not be overwritten). */
+    resonant?: boolean;
     /**
      * Blind Offering only: the final letter just landed but the finished
      * chain contains at least one non-word, so the board did NOT complete.
@@ -2626,7 +2633,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       setIsProcessing(false);
       // comboTier reads the ref AFTER moveMessageFor updated the streak, so the
       // chime ladder and the message escalate off the same count.
-      return { completed: false, hintsUsed, invalidAttempts, gameMode, completedWords: [], formedWord: targetWordStr, comboTier: comboTierForStreak(cleanMoveStreakRef.current) };
+      return { completed: false, hintsUsed, invalidAttempts, gameMode, completedWords: [], formedWord: targetWordStr, comboTier: comboTierForStreak(cleanMoveStreakRef.current), resonant: resonantMove };
     }
 
     // Reverse Shift: descend to bottom, then return to row 0.
@@ -2660,7 +2667,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       setLastFormedWord(targetWordStr);
       setIsProcessing(false);
       // At the midpoint the streak was just reset for the return leg → tier 0.
-      return { completed: false, hintsUsed, invalidAttempts, gameMode, completedWords: [], formedWord: targetWordStr, reverseMidpoint: reachedMidpoint, comboTier: comboTierForStreak(cleanMoveStreakRef.current) };
+      return { completed: false, hintsUsed, invalidAttempts, gameMode, completedWords: [], formedWord: targetWordStr, reverseMidpoint: reachedMidpoint, comboTier: comboTierForStreak(cleanMoveStreakRef.current), resonant: resonantMove };
     }
 
     // Returning upward in reverse mode.
@@ -2681,7 +2688,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setIsStuck(stuckUp);
     setLastFormedWord(targetWordStr);
     setIsProcessing(false);
-    return { completed: false, hintsUsed, invalidAttempts, gameMode, completedWords: [], formedWord: targetWordStr, comboTier: comboTierForStreak(cleanMoveStreakRef.current) };
+    return { completed: false, hintsUsed, invalidAttempts, gameMode, completedWords: [], formedWord: targetWordStr, comboTier: comboTierForStreak(cleanMoveStreakRef.current), resonant: resonantMove };
   }, [
     selectedLetter,
     gameState,

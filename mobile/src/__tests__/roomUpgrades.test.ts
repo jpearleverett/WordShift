@@ -288,3 +288,32 @@ describe('embellishment intensity (wave-2 renderer input)', () => {
     expect(await getRoomEmbellishmentIntensity('office')).toBeCloseTo(0.75, 5);
   });
 });
+
+describe('house-upgrade surface lines (what the room actually shows)', () => {
+  // The getter lives in roomUpgrades.ts so the shop card can name the pixels a
+  // tier adds under the flavour copy. Phase-aware, no dashes, and it never
+  // names the stage system.
+  const { getHouseUpgradeSurfaceLine } = require('../services/roomUpgrades');
+
+  it('names what each tier changes, per register', () => {
+    for (const tier of [1, 2, 3] as const) {
+      for (const phase of [0, 1, 2, 3, 4, 5] as const) {
+        const line: string = getHouseUpgradeSurfaceLine(tier, phase);
+        expect(line.length).toBeGreaterThan(20);
+        expect(line).not.toMatch(/[\u2014\u2013]/);
+        expect(line.toLowerCase()).not.toContain('phase');
+      }
+    }
+    expect(getHouseUpgradeSurfaceLine(1, 0)).toMatch(/object appears/i);
+    expect(getHouseUpgradeSurfaceLine(1, 0)).toMatch(/lantern pip/i);
+    expect(getHouseUpgradeSurfaceLine(2, 0)).toMatch(/marks/i);
+    expect(getHouseUpgradeSurfaceLine(3, 0)).toMatch(/dust drifts/i);
+  });
+
+  it('shifts register with the descent and settles after the arrival', () => {
+    expect(getHouseUpgradeSurfaceLine(1, 2)).toBe(getHouseUpgradeSurfaceLine(1, 0));
+    expect(getHouseUpgradeSurfaceLine(1, 3)).not.toBe(getHouseUpgradeSurfaceLine(1, 2));
+    expect(getHouseUpgradeSurfaceLine(1, 4)).toBe(getHouseUpgradeSurfaceLine(1, 3));
+    expect(getHouseUpgradeSurfaceLine(1, 5)).not.toBe(getHouseUpgradeSurfaceLine(1, 4));
+  });
+});
