@@ -90,7 +90,7 @@ export const TENDING_DIALOGUES: Record<AnimalType, string[]> = {
   tarsier: [
     "The far ridge looks clearer since the tending. I wrote that down before I decided I understood why.",
     "There is always more to see. I took my break anyway. The sky managed without a witness for ten minutes.",
-    "Fennick heard a note I could not place. So I asked him to lead the song. An educational evening at the rail.",
+    "Fennick heard a note I could not place. So I asked him to lead our duet at the rail, and I followed. His ears taught me more than my eyes did.",
     "I keep one page for what I notice while I am looking away from the presence. It is filling up with perfectly ordinary stars.",
     "The watch continues because I choose it today. Ask me again tomorrow. I would like the question to stay possible.",
   ],

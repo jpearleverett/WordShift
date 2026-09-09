@@ -3845,7 +3845,7 @@ export function getGatedRoomIntroLines(phase: number, roomName: string): string[
     return [
       `The house has grown quickly with you, friend. But the ${roomName} is not ready to rise yet.`,
       "Some rooms ask for more than amber. They ask for time, and for words. More of your words must be offered to the pit before the ground will hold the walls.",
-      "If you have the amber, you do not have to wait. Set it aside now, and the room will rise on its own when the time comes. Or press it to completion now, for a little more amber.",
+      "If you have the amber, you do not have to wait. There are two ways. Set the amber aside now, and the room will rise on its own when the time comes. Or spend a little more and bring the room to completion now.",
     ];
   }
   return [
@@ -3866,14 +3866,14 @@ export function getOfferingIntroLines(phase: number): string[] {
     return [
       "The offering bowl is still there, if you ever want to leave amber in it.",
       "The house remembers an offering. But your welcome at my hearth does not depend on one. It already belongs to you.",
-      "Sometimes an offering task gives a little amber back. It tells you how much before you give.",
+      "Sometimes the house asks for an offering and gives a little amber back. It says how much before you give.",
       "You may also leave the bowl alone. I will put the kettle on either way.",
     ];
   }
   return [
-    "There is a hollow at the heart of this house. When I let a little amber go over it, the amber disappears.",
+    "There is a hollow at the heart of this house. When I let a little amber fall in, it does not come back.",
     "You can offer amber there too. The house keeps a record of what is given, and sometimes it answers.",
-    "Sometimes an offering task gives a little amber back. It tells you how much before you give.",
+    "Sometimes the house asks for an offering and gives a little amber back. It says how much before you give.",
     "You may leave the hollow alone. Being welcome here does not depend on what you give.",
   ];
 }

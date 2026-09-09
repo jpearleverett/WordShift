@@ -197,7 +197,7 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
   // words must stay valid, and the green check / red cross ghost previews show
   // which drops keep them that way.
   puzzle_tutorial_valid_move: [
-    "There's that little click, it landed! A green check means both words stay real. A red cross means one of them falls apart.\nTap undo if you want a move back, or hint if you get stuck.",
+    "Did you hear that little click? It landed! A green check means both words stay real. A red cross means one of them breaks.\nUndo takes a move back, and hint is there if you're stuck.",
   ],
   puzzle_tutorial_invalid: [
     "Hmm, that one didn't land quite right.\nTap undo and try a different spot.",

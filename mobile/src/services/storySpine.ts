@@ -264,8 +264,8 @@ export function buildStoryScene(id: StorySceneId, context: StoryContext, state: 
       ...(has('wombat') ? [say('wombat', "I always read this line on the old plan as a brace. Look which way it points."), narrator("Warren turns a drawing of the foundations so the doorway faces you.")] : [narrator("A loose plan lies under the oldest hearthstone. Its arrows point in toward the house, not away from it.")]),
       ...(has('tarsier') ? [say('tarsier', "My watch keeps the house in sight all night. Nobody ever told me who I am watching for.")] : [ember("All that work to keep something out. Or maybe, friend, that is only what we wanted the drawing to mean.")]),
       ...(has('owl') ? [say('owl', "I wrote \"defense\" beside this mark in the old book. The book never used that word. I did.")] : [narrator("Someone has written SAFE in the margin. The handwriting is much newer than the plan.")]),
-      narrator("For the first time, someone crosses out an answer instead of writing down another question."),
-    ], "The marks on the old plan point inward, at the house. The comforting reading of them was ours.");
+      narrator("A line goes through the reassuring word. Nobody writes a new one under it. It is the first answer anyone has crossed out."),
+    ], "Every mark on the old plan points inward, at the house. We were the ones who called that safe.");
     case 'plum_recruited':
     case 'plum': return scene(has('axolotl') ? 'A little worried face' : "What the warmth keeps", has('axolotl') ? [
       say('axolotl', "This is PLUM! He is on his first lap of the tank, worried face and all. He usually stops swimming when I laugh."),
@@ -332,7 +332,7 @@ export function buildStoryScene(id: StorySceneId, context: StoryContext, state: 
       // door/gate can now be tested directly in the world whenever they choose.
       if (state.boundary && state.memories.council?.completed && !state.arrivedBeforeRevision) {
         return scene('An ordinary morning', [
-          narrator(state.boundary === 'remember' ? "The private door is still closed. In the kitchen, a pan has started smoking." : "A little mud comes back in through the gate that leads away. Someone fetches a cloth."),
+          narrator(state.boundary === 'remember' ? "The private door is still closed. In the kitchen, a pan has started smoking." : "Someone walked out through the gate and came back with mud on their feet. Someone else fetches a cloth."),
           has('pangolin') ? say('pangolin', "Breakfast. I burned one side and saved the other. You may call it a disaster or a rescue, whichever you prefer.") : ember(`I made ${drink}. There is also toast, if you are willing to scrape it.`),
           ...(has('wombat') ? [say('wombat', "A hinge is squeaking. Ordinary squeak, nothing stranger. I've got the right oil for this one.")] : []),
           ...(has('axolotl') && state.memories.returned?.scene.lines.some(line => line.speaker === 'axolotl')
@@ -346,12 +346,12 @@ export function buildStoryScene(id: StorySceneId, context: StoryContext, state: 
         narrator("One door stays closed. Behind it, the words I AM AFRAID are exactly as their author left them."),
         has('capybara') ? say('capybara', kept ? "I filed the original page in that room. Not one letter has been corrected since." : "I wrote those words again, inside that room. This time the ink stayed.") : ember("The warmth stopped at that door. I waited a long time to be certain."),
       ] : state.boundary === 'release' ? [
-        narrator("The small stone at the gate still points outward. The path runs past the last tree and does not turn back."),
+        narrator("A small stone still sits at the gate, marking the way out. The path runs past the last tree and does not turn back."),
         has('rabbit') ? say('rabbit', "I walked out until I could not see the house. Then I came back. Coming back was my own decision.") : ember("I followed the path past the trees. Coming back felt different, knowing I could have kept walking."),
-      ] : [narrator("A cup is set down outside the lines of the pattern. For a long moment, nothing moves it back."), ember("One small thing left exactly where we put it. I am watching to see whether it stays there.")]),
+      ] : [narrator("A cup is set down outside the pattern's lines. Anything left there used to be put back. Nothing moves it for a long time."), ember("One small thing left exactly where we put it. I am watching to see whether it stays there.")]),
       ...(has('axolotl') && state.memories.returned?.scene.lines.some(line => line.speaker === 'axolotl') ? [say('axolotl', "I am still not ready to say what I think about the fish. Thank you for not finishing that thought for me.")] : []),
       ember("You do not owe this morning any particular feeling, friend."),
-    ], state.boundary === 'remember' ? "Behind a private door, one thought stays uncorrected." : state.boundary === 'release' ? "The road out works. Coming back is a choice." : "A first small boundary is being tested.");
+    ], state.boundary === 'remember' ? "Behind a private door, one thought stays uncorrected." : state.boundary === 'release' ? "The road out works. Coming back is a choice." : "A cup left out of place is the first small test.");
     case 'reply': return scene('Your answer', [
       ...(cup ? [narrator(`${cupName[0].toUpperCase() + cupName.slice(1)} waits beside the chair you chose. Nobody has moved it.`)] : []),
       ember("We have talked a great deal, friend. I would like to listen now."),
@@ -363,7 +363,7 @@ export function buildStoryScene(id: StorySceneId, context: StoryContext, state: 
     ]);
     case 'old_mark': return scene('Something remained', [
       narrator("The bright mornings are back. One old mark has survived them."),
-      ...(state.carriedBoundary === 'remember' ? [narrator("One door does not quite match the new walls. Behind it, an old sentence still stands, and nothing has corrected it."), ember("I don't remember writing that, friend. But I know what it took to leave it there and not fix it.")] : state.carriedBoundary === 'release' ? [narrator("A small stone at the garden gate points outward. The path past it runs straight away from the house."), ember("I meant to turn that stone back toward the house. When I got there, I didn't want to.")] : [narrator("Someone has left a gap between two chairs. Ember measures it with her paw, then leaves it exactly as it is.")]),
+      ...(state.carriedBoundary === 'remember' ? [narrator("One door does not quite match the new walls. Behind it, an old sentence still stands, and nothing has corrected it."), ember("I don't remember writing that, friend. But I know what it took to leave it there and not fix it.")] : state.carriedBoundary === 'release' ? [narrator("A small stone at the garden gate points outward. The path past it runs straight away from the house."), ember("I meant to turn that stone back toward the house. When I got there, I didn't want to.")] : [narrator("Two chairs sit apart, with room between them for a third that nobody has added. Ember measures the gap with her paw and leaves it alone.")]),
       ...(state.carriedRecord && has('capybara') ? [say('capybara', "This page is old. The correction over it is newer. Then the original was written back in on top, newer still. Someone kept arguing.")] : []),
       ember("We chose something once. It has lasted longer than our memory of choosing it."),
     ], "A boundary survived into the bright days. The pattern can carry a change.");

@@ -451,7 +451,7 @@ const TRIGGER_WORD_REACTIONS: Record<AnimalType, Record<number, Record<string, s
       SEED: "SEED. There is still room here for something we have not planted.",
       NEST: "NEST. I line mine and keep it ready. Whoever comes to it owes me nothing.",
       BLOOM: "BLOOM. The flower I never planted may keep the nick in its petal. I prefer it that way.",
-      BOOM: "BOOM. My call takes one great breath, and I am saving it for when we meet. Your word does not have to use that breath now.",
+      BOOM: "BOOM. My call takes one great breath, and I am saving it for when we meet. You do not have to ask me for it now.",
       _default: "I have wanted an answer for ninety years. That does not mean I will know it when it arrives.",
     },
   },
@@ -508,7 +508,7 @@ export const WORD_THRESHOLD_DIALOGUES: { threshold: number; phase: number; lines
     lines: {
       fox: "Two hundred and fifty words. I do like knowing how much you've made. But a number isn't the same as asking how you are. So how are you?",
       owl: "Two hundred and fifty entries. I'm comparing what actually happened with what the old book predicted. They don't always match.",
-      pangolin: "Two hundred and fifty words in the record. That is enough for a recipe to be hard to check line by line. I am checking it anyway.",
+      pangolin: "Two hundred and fifty words now. That's a recipe too long to check line by line. I'm checking it line by line anyway.",
       capybara: "Two hundred and fifty entries. I've checked the count twice. What they mean is still an open question.",
       tarsier: "Two hundred and fifty words. My family's old log keeps a count too. I'm writing yours beside it so I can see where the two differ.",
       aye_aye: "Two hundred and fifty words. The beams still carry some of them. I won't pretend I was here for the beginning of it.",
@@ -525,7 +525,7 @@ export const WORD_THRESHOLD_DIALOGUES: { threshold: number; phase: number; lines
       capybara: "Five hundred entries. There's still room for a correction, an objection, or an answer nobody has given yet.",
       tarsier: "Five hundred words. I used to think every mark in a ledger meant the same thing to whoever wrote it. I've stopped assuming that.",
       aye_aye: "Five hundred words. I can hear a pattern in the beams now. I want to hear the parts that don't fit it too.",
-      kakapo: "Five hundred words. Even a full branch came one fruit at a time. Tell me which word you remember.",
+      kakapo: "Five hundred words. A heavy branch fills one fruit at a time, so that is how I count them. Which word do you still remember?",
     },
   },
   {
@@ -586,7 +586,7 @@ const SACRIFICE_REACTIONS: Record<string, { first: string; subsequent: string[] 
     subsequent: [
       "Your portion at supper is not measured against what you give away.",
       "A gift is yours to give. The part you keep is yours as well.",
-      "The pot stirred. I am leaving the rest of your amber exactly where it is. The part you did not offer stays yours.",
+      "The pot stirred when you gave that. I did not reach for the rest of your amber. The pot does not get to reach for it either.",
     ],
   },
   owl: {
