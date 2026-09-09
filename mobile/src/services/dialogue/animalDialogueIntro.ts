@@ -91,7 +91,7 @@ export const INTRO_DIALOGUES: Record<AnimalType, string[]> = {
     "My family kept a night watch. I brought their log up here. It's full of careful entries, and not one of them says why the watch began.",
     "That lantern is unlit on purpose. Lit, I can see the porch. Dark, I can see the whole valley.",
     "There's a patch of sky above the ridge that I can't account for. I won't try to explain it until I've watched it long enough to have something worth showing you.",
-    "Come at dusk if you can. I'll show you my favorite star first. The watch was handed down to me, so I'd like it to include one thing I picked myself.",
+    "Come at dusk if you can. I'll show you my favorite star first. The watch was handed down to me. I'd like it to include one thing I picked.",
   ],
   aye_aye: [
     "Tock, that's my name. Mind the last stair, it creaks. It announces visitors far more enthusiastically than I do.",
@@ -218,7 +218,7 @@ export const POST_REVELATION_DIALOGUES: Record<AnimalType, string[]> = {
     "My bubble game has no way to win. You would be good at it. Or terrible. There is no way to tell.",
     "I laughed today and somebody looked worried. Something was funny, that is all. Laughing can happen after things hurt.",
     "I want to be comforted. I am also trying to notice when wanting that makes me stop looking closely.",
-    "My pink toe is not new anymore. It is lovely to be bored by a toe.",
+    "My new toe is not new anymore. It is lovely to be bored by a toe.",
     "Some days I can talk about the fish. Some days I would rather hear about your day instead.",
     "We kept something that night. I do not want that to mean nothing is allowed to be different by your next visit.",
     "I put a rock somewhere inconvenient. Then I moved it, because it annoyed me. An excellent afternoon.",

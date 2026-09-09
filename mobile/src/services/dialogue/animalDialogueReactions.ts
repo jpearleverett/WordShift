@@ -371,7 +371,7 @@ const TRIGGER_WORD_REACTIONS: Record<AnimalType, Record<number, Record<string, s
       _default: "I can see the edge of that patch. I can't tell you one thing about what's behind it.",
     },
     3: {
-      NIGHT: "NIGHT. Something up there keeps my eyes longer than I mean to give it.",
+      NIGHT: "NIGHT. Something up there holds my attention longer than I intend.",
       MOON: "MOON. It moves the way it always has. I measure the strange movements against it.",
       STAR: "STAR. I named one of them once. That name is missing from my new chart. I still remember it.",
       WATCH: "WATCH. I want to see how this ends. That's my own wish, though. I shouldn't make it your duty.",

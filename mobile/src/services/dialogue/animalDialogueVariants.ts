@@ -20,7 +20,7 @@ const VARIANT_DIALOGUE_LEADS: Record<AnimalType, { light: string; dark: string }
   fox: { light: "Oh! There's a new way to move the words. Let me put the kettle down and show you.", dark: "The fire answered differently when you took that route. Here is what has changed." },
   owl: { light: "A variation. An excellent reason to read the instructions before I invent a theory.", dark: "I checked the new rules against what actually happened. That is a useful place to begin." },
   pangolin: { light: "A different recipe, same letters. Read it through before you put anything in the pot.", dark: "The method has changed. We should understand it before we decide anything is settled." },
-  axolotl: { light: "Oh, that went differently! I watched the whole thing. GLOW was mostly watching the feeding spoon.", dark: "The water took a different route this time. I want to understand this part while I can still see it." },
+  axolotl: { light: "Oh, that went differently! I was watching. GLOW was mostly watching the spoon.", dark: "The water took a different route this time. I want to understand this part while I can still see it." },
   fennec_fox: { light: "That had a rhythm I hadn't heard before. Let's find out what made it.", dark: "Those moves made a different sound. The rules explain part of what I heard." },
   capybara: { light: "New procedure. Here's the short version.", dark: "A revised procedure. The instructions are still here whenever you want them." },
   sloth: { light: "A different pace. I noticed, even from the hammock.", dark: "The route has changed. You are still allowed to take your time with it." },

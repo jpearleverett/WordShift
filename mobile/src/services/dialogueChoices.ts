@@ -73,7 +73,7 @@ export const ANIMAL_CHOICES: Record<string, DialogueChoice> = {
       "refuse": "Leave my words out of the comparison."
     },
     "responses": {
-      "ask": "Here is the line. The old page says the guest will preserve us. Yesterday my notebook said protect. I have kept both versions. A correction that hides its earlier wording is not evidence I trust.",
+      "ask": "Here is the line. The old page says the guest will preserve us. Yesterday my notebook said protect. I have kept both versions. A correction that erases its earlier wording is not evidence I trust.",
       "refuse": "Your words stay out of my notes, then. I can compare the two inks without turning you into a specimen."
     },
     "convergence": "Archimedes dates a fresh page and leaves the earlier one untouched."

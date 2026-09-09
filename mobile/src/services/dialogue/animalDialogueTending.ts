@@ -34,7 +34,7 @@ export const TENDING_DIALOGUES: Record<AnimalType, string[]> = {
   owl: [
     "I wrote the tending down, then crossed out the conclusion I was about to add. The crossing out stays legible. I had observed rather less than I thought.",
     "Another page in the plain notebook. Today it holds an argument about soup. Whoever reads this later deserves something other than prophecy.",
-    "I read my old account beside today's. My memory of that day has changed. A memory that changes is not automatically a memory that has been corrected.",
+    "I checked the old account against today's. A changed memory is not automatically a corrected one.",
     "The boundary we drew at the end is an entry in the index now. I check that entry as carefully as I check the new pages.",
     "There is still room in the oldest book for a question. So I have stopped calling it the last book.",
   ],
