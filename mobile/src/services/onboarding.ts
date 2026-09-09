@@ -74,7 +74,7 @@ const VALID_STEPS: Set<string> = new Set([
 // ACTIONS in order (tap a letter up top, then tap a spot below). The earlier
 // "move a letter down into the word below" read as abstract and first-timers
 // tapped around lost. Charm never at the cost of the first 30 seconds.
-export const COLD_OPEN_INSTRUCTION = "Oh, you're here! Tap a letter in the top word to pick it up. Then tap a spot in the word below to drop it in. The green checks mark the spots that make real words.";
+export const COLD_OPEN_INSTRUCTION = "Oh, you're here! Tap a letter in the top word to pick it up, then tap a spot in the word below to drop it in. Green checks will appear to show you the spots that make real words.";
 
 /** Shown once, the instant the player lands their first valid move on the cold-open board.
  *
@@ -86,7 +86,7 @@ export const COLD_OPEN_INSTRUCTION = "Oh, you're here! Tap a letter in the top w
  * line because that one is already carrying the marks and undo, and because
  * "if you get stuck" reads better right after a success than before one.
  */
-export const COLD_OPEN_FIRST_MOVE = "There! Oh, lovely. That little click means both words fit. If you ever get stuck, HINT will nudge you along. Keep going, you have the knack for this.";
+export const COLD_OPEN_FIRST_MOVE = "There! Oh, lovely. That little click means both words fit. Keep going, you have the knack for this. And if a board ever stumps you, HINT will nudge you along.";
 
 /**
  * Shown once, the first time the player picks a letter up on the cold-open
@@ -95,7 +95,7 @@ export const COLD_OPEN_FIRST_MOVE = "There! Oh, lovely. That little click means 
  * (green check / red cross) and names undo, so the tools are taught at the
  * exact moment they first matter.
  */
-export const COLD_OPEN_PREVIEW_TEACH = "Those little words show what each spot would spell. Tap a spot with a green check, and both words stay real. A red cross means one would break. UNDO takes any move back, so try freely.";
+export const COLD_OPEN_PREVIEW_TEACH = "Those faint words show what each spot would spell. A green check means both words hold. A red cross means one of them falls apart. And UNDO takes any move back, so poke about freely!";
 
 export type ColdOpenLaunchRoute = 'restore' | 'home_empty' | 'new_board';
 
@@ -170,14 +170,14 @@ export async function resetOnboarding(): Promise<void> {
 export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
   // Step 1: Empty home — guide to invite Fox
   home_empty: [
-    "Oh! Hello up there! I'm down here by the little den.\nTap the invite and I'll come say hello properly!",
+    "Oh! Hello up there! I'm down here, by the little den.\nTap it to invite me in, and I'll come say hello properly!",
   ],
 
   // Fox arrives after the player has already solved the cold-open puzzle.
   // The final sentence keeps the original faint wrong-note intact.
   fox_invited: [
     "You let me in! Oh, I hoped you would. I'm Ember!\nYour words warmed the old stones under the den. I brought the kettle over while you were finishing.",
-    "Your words are already waiting below us. Come on, I'll show you where they went. I have been hoping for someone like you for the longest time.",
+    "Your words have already gone somewhere below us. Come on, I'll show you where. I have been hoping for someone like you for the longest time.",
   ],
 
   // Step 3: On puzzle screen — guide through the puzzle. This intro beat is the
@@ -197,26 +197,26 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
   // words must stay valid, and the green check / red cross ghost previews show
   // which drops keep them that way.
   puzzle_tutorial_valid_move: [
-    "There's that little click! It landed. A green check means both words stay real. A red cross means one would break.\nWrong move? Tap undo. Stuck? Tap hint.",
+    "There's that little click, it landed! A green check means both words stay real. A red cross means one of them falls apart.\nTap undo if you want a move back, or hint if you get stuck.",
   ],
   puzzle_tutorial_invalid: [
     "Hmm, that one didn't land quite right.\nTap undo and try a different spot.",
   ],
   puzzle_tutorial_complete: [
     "Perfect. Feel how the house settled just a little? That's what your words do.",
-    "And the words you just made? They don't simply vanish, you know. They're worth something!\nCome with me, I want to show you my favorite spot.",
+    "And the words you just made? They don't simply vanish, you know. Every one of them leaves something behind.\nOh, wait until you see where.",
   ],
 
   // Step 5.5: Transition to pit — Fox introduces word harvesting
   going_to_pit: [
-    "And the words you just made? They don't simply vanish, you know. They're worth something!\nCome with me, I want to show you my favorite spot.",
+    "Come with me, I want to show you my favorite spot!\nIt's just below the house, and it's where all your words end up.",
   ],
 
   // Step 6: On pit screen — Fox explains the Offering Pit (ONE beat: the player
   // already had their first-win reward moment, so the whole explanation lands
   // in a single card and the corridor loses a tap).
   pit_intro: [
-    "Here we are, the pit! Every word you solve drifts down here afterwards.\nOffer your words and they turn to amber, the warm gold that builds our house. We can spend it on another room. Or save it until we know what we want.",
+    "Here we are, the pit! Every word you make drifts down here afterwards.\nOffer them and they turn to amber, the warm gold that builds our house. We can spend it on a new room. Or save it until we know what we want.",
   ],
 
   // Step 6.5: On the pit screen, before the player has offered — a standing
@@ -230,7 +230,7 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
 
   // Step 7: After the player has offered every word on the pit screen
   pit_offering_complete: [
-    "See? Real amber, out of words you made up in your own head!\nThe pit takes what we offer and gives back what the house needs. It has never once missed a trade.",
+    "See? Real amber, out of words you found yourself!\nThe pit takes what we offer and gives back what the house needs. It has never once missed a trade.",
   ],
 
   // Step 8: Back on home screen — explain unlocks and keep playing (kept to
@@ -240,7 +240,7 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
   // pit, so the player must hear where it lives before onboarding lets go of
   // their hand.
   unlock_explained: [
-    "That's the whole happy loop! Solve puzzles, offer your words, and the amber builds our rooms and brings more friends.\nWhen you have words waiting, the pit sits just below the house. Scroll down and give it a tap.",
+    "That's the whole of it! Solve puzzles, offer your words, and the amber builds our rooms and brings more friends.\nThe pit sits just below the house. Scroll down whenever you have words waiting, and give it a tap.",
     "Come back when you like. I will keep a place by the hearth.",
   ],
 };

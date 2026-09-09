@@ -88,7 +88,13 @@ export async function consumeCosmeticFirstShowing(category: ReceiptCategory): Pr
   return item.name;
 }
 
-/** Forget every receipt on this device (tests / a future Reset All hook). */
+/**
+ * Forget receipts. With ids, forgets exactly those; with none, drops the
+ * in-memory mirror (the Reset All shape — the durable per-id flags are wiped
+ * by commitFullLocalReset's journaled transaction, which sweeps the whole
+ * `wordshift_cosmetic_receipt_` family, so this cannot miss the ids that were
+ * never read this session).
+ */
 export async function clearCosmeticReceipts(ids?: string[]): Promise<void> {
   const targets = ids ?? Array.from(seenCache.keys());
   seenCache = new Map();

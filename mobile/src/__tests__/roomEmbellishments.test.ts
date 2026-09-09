@@ -80,6 +80,7 @@ import {
   ROOM_PROP_SIZE,
   GLOW_OPACITY_CAP,
   GLOW_OPACITY_BOOST_CAP,
+  ROOM_SIGN_BOTTOM_DP,
 } from '../components/home/RoomView';
 import { getRoomUpgradeArt } from '../components/shop/shopArt';
 import { ROOMS } from '../services/homeWorldData';
@@ -254,8 +255,14 @@ describe('the promised object (decoration props)', () => {
         expect((a.top !== undefined ? 1 : 0) + (a.bottom !== undefined ? 1 : 0)).toBe(1);
         const edge = a.top ?? a.bottom ?? 0;
         expect(edge + ROOM_PROP_SIZE).toBeLessThanOrEqual(123);
-        // A hung piece clears the centred room sign (top 4, ~29dp tall).
-        if (a.top !== undefined) expect(a.top).toBeGreaterThanOrEqual(22);
+        // A hung piece clears the centred room sign, whose bottom edge is
+        // derived (top + the plaque's scaled height), never eyeballed: the
+        // old hand-written 22 sat ABOVE the real 32.56, so three tier-2
+        // pieces (the risen lanterns, the new constellation, the tuned
+        // chimes) were partly behind opaque wood while this passed. The sign
+        // is centred and painted after the embellishment overlay, so the
+        // only fix is to hang the piece below it.
+        if (a.top !== undefined) expect(a.top).toBeGreaterThanOrEqual(Math.ceil(ROOM_SIGN_BOTTOM_DP));
       }
       // The pair composes: the second piece sits inboard, never on the first.
       const p = getRoomPropAnchor(room.id, 1);
@@ -330,12 +337,24 @@ describe('RoomView source pins', () => {
     expect(ROOM_VIEW_SRC).toMatch(/outputRange: \[0, 0\.6, 0\.45, 0\]/);
   });
 
-  test('six motes, mounted ONLY at full attunement and only with motion on', () => {
+  test('six motes, mounted at full attunement, stilled but never withheld', () => {
     const block = ROOM_VIEW_SRC.slice(
-      ROOM_VIEW_SRC.indexOf('{embellish.showMotes && embellishMotion && ('),
+      ROOM_VIEW_SRC.indexOf('{embellish.showMotes && ('),
       ROOM_VIEW_SRC.indexOf('Shop handoff: flare'),
     );
     expect((block.match(/<DustMote /g) ?? []).length).toBe(6);
+    // The attunement card promises drifting dust at the last level, so the
+    // motion gate stills the drift instead of nulling a paid effect (the rule
+    // every sibling layer here already follows).
+    expect(block).not.toMatch(/embellishMotion && \(/);
+    expect((block.match(/animate=\{embellishMotion\}/g) ?? []).length).toBe(6);
+    const mote = ROOM_VIEW_SRC.slice(
+      ROOM_VIEW_SRC.indexOf('const DustMote: React.FC'),
+      ROOM_VIEW_SRC.indexOf('interface RoomViewProps'),
+    );
+    expect(mote).toMatch(/if \(!animate\) \{\s*rise\.setValue\(MOTE_REST_RISE\);/);
+    expect(mote).toMatch(/useNativeDriver: true/);
+    expect(mote).not.toMatch(/useNativeDriver: false/);
   });
 
   test('the drawn object: shop art, a View contact shadow (no shadowRadius), a settle spring', () => {
@@ -384,6 +403,42 @@ describe('HouseWorld focus-room handoff (source pins)', () => {
     expect(block).toMatch(/if \(!isPanningRef\.current\)/);
     // Consumed on a timer the owner can rely on.
     expect(block).toMatch(/onFocusRoomConsumedRef\.current\?\.\(\)/);
+  });
+
+  test('the handoff is consumed on unmount, so a stale focus cannot outlive the visit', () => {
+    // Leaving home inside the 1.8s hold used to clear the timer without
+    // consuming, leaving the owner's focusRoomId set: the next trip home
+    // remounted, found it, and replayed the pan over the saved viewport.
+    const cleanup = HOUSE_WORLD_SRC.slice(
+      HOUSE_WORLD_SRC.indexOf('  useEffect(() => {\n    return () => {\n      if (!focusTimerRef.current) return;'),
+      HOUSE_WORLD_SRC.indexOf('// Preserve the current viewport'),
+    );
+    expect(cleanup.length).toBeGreaterThan(80);
+    expect(cleanup).toMatch(/clearTimeout\(focusTimerRef\.current\)/);
+    expect(cleanup).toMatch(/onFocusRoomConsumedRef\.current\?\.\(\)/);
+  });
+
+  test('a moved clamp re-aims the focus spring instead of hard-setting through it', () => {
+    // The ghost room lands moments after mount and grows panBoundsMax, which
+    // moves the CLAMPED focus target. syncPanPosition stops the running spring
+    // and hard-sets, so the glide used to jump the rest of its travel.
+    const hold = HOUSE_WORLD_SRC.slice(
+      HOUSE_WORLD_SRC.indexOf('if (focusHoldRef.current) {'),
+      HOUSE_WORLD_SRC.indexOf('// Resolve from the UNCLAMPED intent'),
+    );
+    expect(hold).toMatch(/if \(focusSpringTargetRef\.current === focusPanY\) return;/);
+    expect(hold).toMatch(/settleAnimRef\.current !== null && panPhysicsEnabled/);
+    expect(hold).toMatch(/Animated\.spring\(panRaw/);
+    expect(hold).toMatch(/useNativeDriver: true/);
+    // stop() fires the old end callback synchronously and nulls the target,
+    // so the new target must be claimed after it.
+    const stopAt = hold.indexOf('settleAnimRef.current.stop();');
+    const claimAt = hold.indexOf('focusSpringTargetRef.current = focusPanY;');
+    expect(stopAt).toBeGreaterThan(-1);
+    expect(claimAt).toBeGreaterThan(stopAt);
+    // Reduced motion / low tier still lands instantly.
+    expect(hold).toMatch(/syncPanPosition\(focusPanY, false\)/);
+    expect(hold).not.toMatch(/onPanYChange/);
   });
 
   test('a real pan takes the scene back from the focus hold', () => {

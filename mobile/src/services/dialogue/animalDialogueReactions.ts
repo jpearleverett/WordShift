@@ -423,36 +423,36 @@ const TRIGGER_WORD_REACTIONS: Record<AnimalType, Record<number, Record<string, s
   },
   kakapo: {
     1: {
-      GREEN: "GREEN. That's a fine first word for a garden report.",
+      GREEN: "GREEN. That's a fine first word for the slate where I keep my garden notes.",
       SEED: "SEED. Light enough to carry up the stairs. One day it will be taller than this roof.",
       NEST: "NEST. Mine is empty, and I still line it every week.",
       BLOOM: "BLOOM. Come and see the small flower by my bucket.",
-      BOOM: "BOOM. My voice has a much louder setting. I'm saving that one.",
+      BOOM: "BOOM. My voice can go much lower and louder than that. I'm saving it.",
       _default: "Your word stirred one leaf. It might have been the breeze. I left a marker by it.",
     },
     2: {
-      GREEN: "GREEN. The warmth under that bed reached a little farther today.",
+      GREEN: "GREEN. The warm patch under my far bed spread a little farther today.",
       SEED: "SEED. That one sprouted early. Decades to make a tree, only days to make a shoot.",
       NEST: "NEST. The lining is pressed down. Nobody has been sitting in it.",
       BLOOM: "BLOOM. There's a flower in the bed where I planted nothing.",
       BOOM: "BOOM. I hummed over my calling bowl, then stopped. A low note answered.",
-      _default: "Something low answers me up here. I would like it to be an answer. That's why I'm checking twice.",
+      _default: "Something low sounds back at me up here. I want it to be a reply, not an echo. That's why I'm checking twice.",
     },
     3: {
-      GREEN: "GREEN. Every new leaf faces my calling bowl. I turned one pot away, to see.",
+      GREEN: "GREEN. Every new leaf faces my calling bowl. I turned one pot away to see if it turns back.",
       SEED: "SEED. I kept some back in the tin. One season doesn't need every seed I own.",
       NEST: "NEST. I want a chick in mine. An empty nest isn't a promise of one.",
       BLOOM: "BLOOM. The same flower has come up again, down to the same nick in one petal.",
       BOOM: "BOOM. Humming isn't my real call. I'm still saving the breath for that.",
-      _default: "Something answers from under the roots. Whether it's answering me, I can't say yet.",
+      _default: "Something answers from under the roots. I can't tell yet whether it's answering me.",
     },
     4: {
-      GREEN: "GREEN. I would like the garden to keep surprising me.",
+      GREEN: "GREEN. I would like this garden to keep growing in ways I did not plan.",
       SEED: "SEED. There is still room here for something we have not planted.",
-      NEST: "NEST. I line mine and keep it ready. It asks nothing of a visitor.",
-      BLOOM: "BLOOM. The odd flower may keep the nick in its petal. I prefer it that way.",
-      BOOM: "BOOM. I will use my call when we meet. One word does not have to spend it early.",
-      _default: "I have wanted an answer for ninety years. That does not mean I can recognize every kindness when it comes.",
+      NEST: "NEST. I line mine and keep it ready. Whoever comes to it owes me nothing.",
+      BLOOM: "BLOOM. The flower I never planted may keep the nick in its petal. I prefer it that way.",
+      BOOM: "BOOM. My call takes one great breath, and I am saving it for when we meet. Your word does not have to use that breath now.",
+      _default: "I have wanted an answer for ninety years. That does not mean I will know it when it arrives.",
     },
   },
 };
@@ -499,7 +499,7 @@ export const WORD_THRESHOLD_DIALOGUES: { threshold: number; phase: number; lines
       fennec_fox: "One hundred words in the count. I've put a mark in my own chart for that. I'll keep listening for what makes each new word sound different.",
       tarsier: "A hundred words in the record. I wasn't watching every single one. Tell me your favorite and I'll give it a page of its own.",
       aye_aye: "The record says a hundred words. I can hear the recent ones in the beams. For the earlier ones I will need your account.",
-      kakapo: "A hundred words. A garden grows out of small things, counted patiently. It still needs somebody to look at each leaf.",
+      kakapo: "A hundred words. A garden grows out of small things, one at a time. Somebody still has to look at every leaf.",
     },
   },
   {
@@ -512,7 +512,7 @@ export const WORD_THRESHOLD_DIALOGUES: { threshold: number; phase: number; lines
       capybara: "Two hundred and fifty entries. I've checked the count twice. What they mean is still an open question.",
       tarsier: "Two hundred and fifty words. My family's old log keeps a count too. I'm writing yours beside it so I can see where the two differ.",
       aye_aye: "Two hundred and fifty words. The beams still carry some of them. I won't pretend I was here for the beginning of it.",
-      kakapo: "Two hundred and fifty words. This garden was growing long before I began tending it. I'd like to hear what you remember of it.",
+      kakapo: "Two hundred and fifty words. This garden was growing long before I started tending it. Your words have a history too. I'd like to hear where you began.",
     },
   },
   {
@@ -525,7 +525,7 @@ export const WORD_THRESHOLD_DIALOGUES: { threshold: number; phase: number; lines
       capybara: "Five hundred entries. There's still room for a correction, an objection, or an answer nobody has given yet.",
       tarsier: "Five hundred words. I used to think every mark in a ledger meant the same thing to whoever wrote it. I've stopped assuming that.",
       aye_aye: "Five hundred words. I can hear a pattern in the beams now. I want to hear the parts that don't fit it too.",
-      kakapo: "Five hundred words. Even a full branch is made of single fruit. Tell me which word you remember.",
+      kakapo: "Five hundred words. Even a full branch came one fruit at a time. Tell me which word you remember.",
     },
   },
   {
@@ -538,7 +538,7 @@ export const WORD_THRESHOLD_DIALOGUES: { threshold: number; phase: number; lines
       rabbit: "Seven hundred and fifty words. I can write a number down without deciding it is a distance I have to travel.",
       tarsier: "Seven hundred and fifty words. There is room in the ledger for another page. And my watch can hold something besides counting.",
       aye_aye: "Seven hundred and fifty. The bronze is holding a note under all those words. Counting them isn't a reason to spend it.",
-      kakapo: "Seven hundred and fifty words. The small empty pot by the gate is still empty. There's still room for something unplanned.",
+      kakapo: "Seven hundred and fifty words. The small pot by the gate is still empty. There's room in it for something unplanned.",
     },
   },
 ];
@@ -670,11 +670,11 @@ const SACRIFICE_REACTIONS: Record<string, { first: string; subsequent: string[] 
     ],
   },
   kakapo: {
-    first: "A little warmth reached the bed. I checked the seedlings before I came to thank you.",
+    first: "Some of what you gave reached my seed bed as warmth. I checked the seedlings before I came to thank you.",
     subsequent: [
       "Save some for a pot you have not chosen yet.",
       "The garden felt what you gave. It also welcomes a visitor who only wants to sit down.",
-      "A seed kept back for another season is not a failed gift. Amber can be kept the same way.",
+      "A seed kept back for another season is not a failed gift. You may keep some back too.",
     ],
   },
 };

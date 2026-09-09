@@ -20,7 +20,7 @@ import {
 import { AnimalSprite } from './AnimalSprite';
 import { CandyColors } from '../../theme/colors';
 import { FONT_SIZE } from '../../theme/typeScale';
-import { getPixelSkin, CARD_CORNER_DP, CARD_EDGE_DP } from '../../theme/pixelSkin.generated';
+import { getPixelSkin, CARD_CORNER_DP, CARD_EDGE_DP, PLAQUE_H_DP } from '../../theme/pixelSkin.generated';
 import { NineSliceFrame } from '../ui/NineSlice';
 import { PixelPlaque } from '../ui/PixelPlaque';
 import { CHROME_ICONS } from '../ui/chromeIcons';
@@ -32,7 +32,15 @@ import { getRoomUpgradeArt } from '../shop/shopArt';
 // Room name plate scale: the full 42dp PixelPlaque would swamp a ~123dp room,
 // so the wooden nameplate is uniformly scaled to ~29dp tall / ~9.5dp font — big
 // enough to read the room name, small enough to sit as a tidy label at the top.
-const ROOM_PLAQUE_SCALE = 0.68;
+export const ROOM_PLAQUE_SCALE = 0.68;
+
+// Where the room's own sign hangs. Exported with the scale above because the
+// two together give the sign's bottom edge (4 + 42 * 0.68 = 32.56dp), which is
+// the floor every HUNG prop anchor has to clear: the sign is centred, opaque
+// and painted after the embellishment overlay, so a piece anchored above that
+// line is partly behind the wood.
+const NAME_PLATE_TOP_DP = 4;
+export const ROOM_SIGN_BOTTOM_DP = NAME_PLATE_TOP_DP + PLAQUE_H_DP * ROOM_PLAQUE_SCALE;
 
 // The occupant's plate was 0.62 against the room sign's 0.68, which is only
 // 8.8% smaller in EVERY dimension — two near-identical wooden cards at opposite
@@ -420,15 +428,15 @@ export interface RoomPropAnchor {
 
 export const ROOM_PROP_ANCHORS: Record<string, { primary: RoomPropAnchor; secondary: RoomPropAnchor }> = {
   cozy_den: { primary: { right: 14, bottom: 10 }, secondary: { right: 54, bottom: 14 } },     // hearthstone / ashen mantel on the floor
-  kitchen: { primary: { right: 14, top: 30 }, secondary: { right: 18, bottom: 10 } },         // pots hung high / salt ring on the floor
+  kitchen: { primary: { right: 14, top: 34 }, secondary: { right: 18, bottom: 10 } },         // pots hung high / salt ring on the floor
   study: { primary: { right: 14, bottom: 12 }, secondary: { right: 54, bottom: 12 } },       // globe on the desk / the marked book
   aquarium: { primary: { right: 40, bottom: 12 }, secondary: { right: 10, bottom: 44 } },    // coral low in the tank / still water above
-  jungle_room: { primary: { right: 14, top: 28 }, secondary: { right: 16, bottom: 10 } },    // vines from the ceiling / the inward bloom
-  desert_room: { primary: { right: 16, top: 26 }, secondary: { right: 56, top: 26 } },       // star map on the tent ceiling / new constellation
+  jungle_room: { primary: { right: 14, top: 34 }, secondary: { right: 16, bottom: 10 } },    // vines from the ceiling / the inward bloom
+  desert_room: { primary: { right: 16, top: 34 }, secondary: { right: 56, top: 34 } },       // star map on the tent ceiling / new constellation
   office: { primary: { right: 14, bottom: 10 }, secondary: { right: 54, bottom: 12 } },      // standing lamp / its second shadow
   burrow: { primary: { right: 12, bottom: 36 }, secondary: { right: 50, bottom: 10 } },      // crystals in the wall / listening crystals
-  garden: { primary: { right: 14, top: 28 }, secondary: { right: 52, top: 30 } },            // chimes hung high / tuned chimes
-  bamboo_attic: { primary: { right: 14, top: 26 }, secondary: { right: 54, top: 22 } },      // lanterns floating / risen lanterns
+  garden: { primary: { right: 14, top: 34 }, secondary: { right: 52, top: 34 } },            // chimes hung high / tuned chimes
+  bamboo_attic: { primary: { right: 14, top: 34 }, secondary: { right: 54, top: 34 } },      // lanterns floating / risen lanterns
   star_loft: { primary: { right: 14, bottom: 38 }, secondary: { right: 52, bottom: 42 } },   // moth lantern at the rail / the lit hour
   belfry: { primary: { right: 14, bottom: 8 }, secondary: { right: 54, bottom: 30 } },       // chalk circles on the skirting / waking bronze
   sky_garden: { primary: { right: 14, bottom: 10 }, secondary: { right: 54, bottom: 10 } },  // moonflower bed / upturned blooms
@@ -619,16 +627,36 @@ const SigilMark: React.FC<{ line: string; glow: string }> = ({ line, glow }) => 
   </View>
 );
 
-/** One slow-rising 5dp dust mote (full-attunement rooms ONLY; motion-gated). */
-const DustMote: React.FC<{ left: string; delay: number; duration: number; color: string }> = ({
+// Where a stilled mote hangs: mid-rise, on the bright plateau of the opacity
+// curve below, so a motion-free room shows the dust rather than nothing.
+const MOTE_REST_RISE = 0.45;
+
+/**
+ * One slow-rising 5dp dust mote (full-attunement rooms ONLY). Like every other
+ * layer here it RENDERS without motion: the shop card promises drifting dust at
+ * the last level, so reduced motion / a low tier stills the drift and shows the
+ * mote hanging mid-rise rather than paying out nothing.
+ */
+const DustMote: React.FC<{
+  left: string;
+  delay: number;
+  duration: number;
+  color: string;
+  animate: boolean;
+}> = ({
   left,
   delay,
   duration,
   color,
+  animate,
 }) => {
-  const [rise] = useState(() => new Animated.Value(0));
+  const [rise] = useState(() => new Animated.Value(animate ? 0 : MOTE_REST_RISE));
 
   useEffect(() => {
+    if (!animate) {
+      rise.setValue(MOTE_REST_RISE);
+      return;
+    }
     const loop = Animated.loop(
       Animated.sequence([
         Animated.delay(delay),
@@ -647,7 +675,7 @@ const DustMote: React.FC<{ left: string; delay: number; duration: number; color:
     );
     loop.start();
     return () => loop.stop();
-  }, [delay, duration, rise]);
+  }, [animate, delay, duration, rise]);
 
   return (
     <Animated.View
@@ -999,14 +1027,14 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
               animate={embellishMotion}
             />
           )}
-          {embellish.showMotes && embellishMotion && (
+          {embellish.showMotes && (
             <>
-              <DustMote left="20%" delay={0} duration={5200} color="#FFE9C4" />
-              <DustMote left="33%" delay={3100} duration={6800} color="#F5D9EE" />
-              <DustMote left="46%" delay={1700} duration={6400} color="#FFE9C4" />
-              <DustMote left="58%" delay={800} duration={5800} color="#F5D9EE" />
-              <DustMote left="70%" delay={3900} duration={6100} color="#FFE9C4" />
-              <DustMote left="82%" delay={2600} duration={7000} color="#FFE9C4" />
+              <DustMote left="20%" delay={0} duration={5200} color="#FFE9C4" animate={embellishMotion} />
+              <DustMote left="33%" delay={3100} duration={6800} color="#F5D9EE" animate={embellishMotion} />
+              <DustMote left="46%" delay={1700} duration={6400} color="#FFE9C4" animate={embellishMotion} />
+              <DustMote left="58%" delay={800} duration={5800} color="#F5D9EE" animate={embellishMotion} />
+              <DustMote left="70%" delay={3900} duration={6100} color="#FFE9C4" animate={embellishMotion} />
+              <DustMote left="82%" delay={2600} duration={7000} color="#FFE9C4" animate={embellishMotion} />
             </>
           )}
         </View>
@@ -1237,7 +1265,7 @@ const styles = StyleSheet.create({
   // room and centers the plaque + its pip ornament row.
   namePlate: {
     position: 'absolute',
-    top: 4,
+    top: NAME_PLATE_TOP_DP,
     alignSelf: 'center',
     alignItems: 'center',
     maxWidth: '96%',

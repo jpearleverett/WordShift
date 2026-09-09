@@ -2293,8 +2293,15 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
 
   useEffect(() => {
     return () => {
-      if (focusTimerRef.current) clearTimeout(focusTimerRef.current);
+      if (!focusTimerRef.current) return;
+      clearTimeout(focusTimerRef.current);
       focusTimerRef.current = null;
+      // The visit is over either way. HomeScreen unmounts on every navigation,
+      // so leaving home inside the hold used to drop the consume on the floor
+      // and leave the owner's focusRoomId set: the NEXT trip home remounted,
+      // found the stale prop, and hijacked the saved viewport to replay a pan
+      // the player never asked for.
+      onFocusRoomConsumedRef.current?.();
     };
   }, []);
 
@@ -2348,7 +2355,31 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
         viewportHeight: containerHeight,
         maxPanY: panBoundsMax,
       });
-      if (settleAnimRef.current !== null && focusSpringTargetRef.current === focusPanY) return;
+      if (focusSpringTargetRef.current === focusPanY) return;
+      if (settleAnimRef.current !== null && panPhysicsEnabled) {
+        // Only the clamp moved (the ghost room landed and grew the bound):
+        // keep the glide and re-aim it. syncPanPosition would STOP the spring
+        // and hard-set, so the scene skipped the rest of its travel in one
+        // frame. stop() fires the old end callback synchronously, which nulls
+        // focusSpringTargetRef — hence the new target is claimed after it.
+        settleAnimRef.current.stop();
+        settleAnimRef.current = null;
+        baseTranslateY.current = focusPanY;
+        focusSpringTargetRef.current = focusPanY;
+        const spring = Animated.spring(panRaw, {
+          toValue: focusPanY,
+          friction: 9,
+          tension: 45,
+          useNativeDriver: true,
+        });
+        settleAnimRef.current = spring;
+        spring.start(({ finished }) => {
+          focusSpringTargetRef.current = null;
+          if (!finished) return;
+          settleAnimRef.current = null;
+        });
+        return;
+      }
       syncPanPosition(focusPanY, false);
       return;
     }
@@ -2372,7 +2403,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     // Never notify from a restore: the remembered position is written by real
     // releases only, so no clamp can ever be recorded as a choice.
     syncPanPosition(panY, false);
-  }, [containerHeight, panBoundsMax, syncPanPosition, hasPit, houseBottomMargin]);
+  }, [containerHeight, panBoundsMax, syncPanPosition, hasPit, houseBottomMargin, panPhysicsEnabled, panRaw]);
 
   return (
     <GestureHandlerRootView style={[styles.container, { backgroundColor: PHASE_BG_COLORS[currentPhase] || PHASE_BG_COLORS[0] }]}>

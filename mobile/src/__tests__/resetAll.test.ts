@@ -97,6 +97,7 @@ jest.mock('../services/eventLogger', () => ({
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { performFullReset, performNewCycle, LOCAL_RESET_MARKER_KEY } from '../components/SettingsScreen';
+import { receiptKeyFor } from '../services/cosmeticReceipts';
 import {
   awardBonusAmber,
   getAmberBalance,
@@ -217,6 +218,21 @@ describe('performFullReset', () => {
     expect(await AsyncStorage.getItem(LOCAL_RESET_MARKER_KEY)).not.toBeNull();
     await performFullReset();
     expect(await AsyncStorage.getItem(LOCAL_RESET_MARKER_KEY)).not.toBeNull();
+  });
+
+  // One flag per cosmetic id, so RESET_DEVICE_KEYS (an exact-match set) can
+  // never reach it. The clears table only knows the ids whose receipt path ran
+  // this session, so an earlier session's flag used to survive the wipe and the
+  // one-time first-showing beat never fired again for that cosmetic.
+  test('clears cosmetic first-showing receipts written in an earlier session', async () => {
+    await AsyncStorage.setItem(receiptKeyFor('confetti_gold'), '1');
+    await AsyncStorage.setItem(receiptKeyFor('spark_hearth'), '1');
+
+    const failures = await performFullReset();
+
+    expect(failures).toEqual([]);
+    expect(await AsyncStorage.getItem(receiptKeyFor('confetti_gold'))).toBeNull();
+    expect(await AsyncStorage.getItem(receiptKeyFor('spark_hearth'))).toBeNull();
   });
 
   test('is idempotent — running on an already-virgin save succeeds cleanly', async () => {
