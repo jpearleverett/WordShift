@@ -21,6 +21,7 @@
 
 import { isSupabaseConfigured, getBackendIdentity, sbRpc } from './supabaseClient';
 import { DAILY_BOARD_VERSION } from './dailyBoardVersion';
+import { DAILY_PERCENTILE_MIN_ENTRANTS } from '../constants/gameBalance';
 
 /** A single submitted daily result (mirrors the `daily_scores` row shape). */
 export interface DailyScoreRow {
@@ -141,10 +142,33 @@ function clampPercentile(value: number): number {
 }
 
 /**
+ * Whether a day's board carries enough entrants for its percentile to mean
+ * anything. Pure and exported so every surface (victory card, its accessibility
+ * label, the re-check alert, the local ladder's derived stats) asks one question.
+ * An unknown total is NOT meaningful: a legacy ladder entry stored before the
+ * count was persisted could have been a solo day, and guessing in its favour is
+ * how the hollow 0% got into the week statistics in the first place.
+ */
+export function hasMeaningfulPercentile(total?: number | null): boolean {
+  return typeof total === 'number' && Number.isFinite(total) && total >= DAILY_PERCENTILE_MIN_ENTRANTS;
+}
+
+/**
  * Spoiler-safe, phase-aware-toned standing copy. The "seekers" framing reads
  * fine in every phase (it never names the cult or the phase). Kept subtle.
+ *
+ * Returns NULL when `total` is supplied and the board is too thin for the
+ * percentile to carry information (see DAILY_PERCENTILE_MIN_ENTRANTS): a lone
+ * entrant "beats" nobody, so the honest formula returns 0% and a 0 printed under
+ * a win reads as a failure. Callers substitute getStandingsGatheringText.
+ * `total` is optional so a caller that genuinely has no count is unchanged.
  */
-export function getBeatPercentText(percentile: number, phase = 0): string {
+export function getBeatPercentText(
+  percentile: number,
+  phase = 0,
+  total?: number | null,
+): string | null {
+  if (total != null && !hasMeaningfulPercentile(total)) return null;
   const pct = clampPercentile(percentile);
   if (phase >= 4) {
     return `You stand ahead of ${pct}% of those gathered today`;
@@ -153,4 +177,25 @@ export function getBeatPercentText(percentile: number, phase = 0): string {
     return `You outpaced ${pct}% of seekers today`;
   }
   return `You beat ${pct}% of seekers today`;
+}
+
+/**
+ * The honest substitute shown in place of a suppressed percentile: it names the
+ * one thing that IS true of a thin board (hardly anyone has finished yet), never
+ * invents a number, never congratulates the player for beating nobody, and never
+ * reads as an error. The real rank line sits directly above it, so this only has
+ * to explain why no percentage follows it.
+ *
+ * Copy lives HERE beside getBeatPercentText, not in phaseNarrative.ts, for the
+ * same reason socialProof.ts keeps getWordsOfferedText: this is social-layer
+ * text whose whole meaning is the suppression rule next to it.
+ */
+export function getStandingsGatheringText(phase = 0): string {
+  if (phase >= 4) {
+    return 'Few have gathered today. The standings are still forming.';
+  }
+  if (phase >= 2) {
+    return 'Few seekers have finished today. The standings are still gathering.';
+  }
+  return 'Only a few players have finished today. The standings are still filling in.';
 }

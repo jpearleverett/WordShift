@@ -1044,6 +1044,28 @@ export function getPhaseChangeNarrative(newPhase: DialoguePhase): PhaseChangeNar
 }
 
 // ============================================================================
+// CEREMONY PLAYBACK CHROME
+// The ceremony plays itself: its pace is part of the drama. The pacing line
+// under the page count therefore does one job, teaching the hold gesture
+// BEFORE the reader needs it (the old borderless "Read at my pace" label was
+// a button nobody could see, sitting next to a status caption). Once the
+// player has tapped the words, the same line simply says the house is waiting.
+// ============================================================================
+
+/** The pacing line beneath the ceremony page count. */
+export function getCeremonyPaceCaption(held: boolean): string {
+  return held ? 'Waiting for you' : 'Tap the words to hold them here';
+}
+
+/**
+ * Screen-reader hint on the passage itself. The passage text stays the
+ * accessible label, so the words are never traded away for the gesture.
+ */
+export function getCeremonyHoldHint(): string {
+  return 'Holds this passage until you continue';
+}
+
+// ============================================================================
 // PHASE INDICATOR — What shows in the puzzle header
 // ============================================================================
 

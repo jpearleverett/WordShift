@@ -88,7 +88,7 @@ import { NotificationPromptModal } from './src/components/NotificationPromptModa
 import { GameAlertModal } from './src/components/ui/GameAlertModal';
 import { showGameAlert } from './src/services/gameAlert';
 import { PatronModal } from './src/components/monetization/PatronModal';
-import { submitDailyResult, getDailyRank, getBeatPercentText, DailyRank } from './src/services/leaderboard';
+import { submitDailyResult, getDailyRank, getBeatPercentText, getStandingsGatheringText, DailyRank } from './src/services/leaderboard';
 import { recordPuzzleContribution, getAggregateProof, getWordsOfferedText } from './src/services/socialProof';
 import { StatsScreen } from './src/components/StatsScreen';
 import { AchievementToast } from './src/components/AchievementToast';
@@ -2169,9 +2169,15 @@ function MainApp() {
         const rank = await getDailyRank(getLocalDateString());
         if (rank) {
           await refreshDailyLadderRank(getLocalDateString(), rank);
+          // The rank is true at any board size; the percentile is only
+          // meaningful once enough others have finished, so on a thin board
+          // getBeatPercentText returns null and the honest substitute stands in.
+          const standingLine =
+            getBeatPercentText(rank.percentile, persistence.currentPhase, rank.total) ??
+            getStandingsGatheringText(persistence.currentPhase);
           showGameAlert(
             'Today’s Standing',
-            `${getBeatPercentText(rank.percentile, persistence.currentPhase)}\nRank ${rank.rank} of ${rank.total} today.${streakLine}`
+            `${standingLine}\nRank ${rank.rank} of ${rank.total} today.${streakLine}`
           );
         } else {
           showGameAlert('Today’s Standing', `The standings are still gathering. Check back a little later.${streakLine}`);
@@ -2769,6 +2775,10 @@ function MainApp() {
               rankEligible: !dailyEasedRef.current && [0, 1].includes(daysAgoLocal(date)),
               rank: rank?.rank ?? null,
               percentile: rank?.percentile ?? null,
+              // Persist the entrant count beside the percentile so the ladder
+              // can tell a real standing from a solo day later. Without it a
+              // lone entrant's hard 0% became bestPercentileThisWeek forever.
+              total: rank?.total ?? null,
               timeMs: elapsedMs,
               stars: victory.earnedStars,
               // Record the ACTUAL board difficulty — an eased first daily is a

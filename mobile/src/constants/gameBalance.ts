@@ -717,6 +717,24 @@ export const LEXICON_AMBER_MULTIPLIER = 1.4;
  */
 export const FIRST_DAILY_BONUS_HINTS = 2;
 
+/**
+ * Minimum entrants on a day's daily board before the "percent of other players
+ * beaten" standing is meaningful enough to show the player.
+ *
+ * The percentile is defined as the percent of OTHER entrants beaten, so its
+ * denominator is (total - 1): a lone entrant beats nobody and scores a hard 0%,
+ * and at 2 entrants the only two possible values are 0% and 100%. Below this
+ * threshold the number carries no information and a 0% next to a win reads as a
+ * failure, so the standing sentence is suppressed the way socialProof hides a
+ * weak "words offered today" count (SOCIAL_PROOF_MIN_WORDS). 5 is the smallest
+ * board where one place is worth less than a quarter of the scale
+ * (100 / (N - 1) = 25 points per place).
+ *
+ * The RANK line ("#3 of 12") is factually true at any size and is NOT gated by
+ * this; only percentile-derived copy and statistics are.
+ */
+export const DAILY_PERCENTILE_MIN_ENTRANTS = 5;
+
 // ============================================================================
 // WEEKLY QUESTS
 // ============================================================================

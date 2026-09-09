@@ -1,6 +1,6 @@
 import React, { useLayoutEffect, useEffect, useRef, useState } from 'react';
 import { FONT_SIZE } from '../theme/typeScale';
-import { View, StyleSheet, Animated, Easing, TouchableOpacity, Image, ScrollView, useWindowDimensions, AppState } from 'react-native';
+import { View, StyleSheet, Animated, Easing, Pressable, TouchableOpacity, Image, ScrollView, useWindowDimensions, AppState } from 'react-native';
 import { AppText } from './ui/AppText';
 import { PhaseTransitionEvent, PhaseScene, SceneImage, CinematicParticleConfig } from '../services/phaseEvents';
 import { getSettingsSync } from '../services/settings';
@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StoryPortrait } from './StoryPortrait';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { getStorySpeakerName } from '../services/storyArchive';
+import { getCeremonyPaceCaption, getCeremonyHoldHint } from '../services/phaseNarrative';
 import { STORY_ART } from './storyArt';
 
 
@@ -559,6 +560,13 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     if (activeSceneIndex === event.scenes.length - 1) finishRef.current();
     else setActiveSceneIndex(activeSceneIndex + 1);
   };
+  // The passage itself is the hold control: a tap on the words the reader is
+  // already looking at cancels the pending advance (the timer effect below
+  // clears it) and hands over the Continue bevel. Idempotent, so a tap in a
+  // ceremony that already waits for the reader does nothing at all.
+  const holdForReading = () => {
+    if (!manualPlayback) setManualPlayback(true);
+  };
 
   // A fresh event always opens on its own first scene. In particular, a
   // previously skipped scene must not briefly appear under the next title.
@@ -720,7 +728,9 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     const scene = event?.scenes[activeSceneIndex];
     if (!event || visibleEventRef.current !== event || !scene ||
         suspended || manualPlayback || hasSkipped.current) return;
-    // Reduced motion changes movement, never the time available to read.
+    // Reduced motion changes movement, never the time available to read: the
+    // reading budget is not a motion preference, and holding a passage is now
+    // one tap on the words for every reader, whatever their motion setting.
     const nextScene = event.scenes[activeSceneIndex + 1];
     const authoredGap = nextScene ? Math.max(0, nextScene.delay - scene.delay - scene.duration) : 350;
     const timer = setTimeout(() => {
@@ -818,22 +828,26 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
                 <View style={[styles.speakerRule, { backgroundColor: event.accentColor }]} />
               </View>
             </View>}
-            <View style={styles.readingContent}>
+            <Pressable
+              style={styles.readingContent}
+              onPress={manualPlayback ? undefined : holdForReading}
+              accessible={!manualPlayback}
+              accessibilityRole={manualPlayback ? undefined : 'button'}
+              accessibilityLabel={manualPlayback ? undefined : activeScene.text}
+              accessibilityHint={manualPlayback ? undefined : getCeremonyHoldHint()}
+            >
               <AppText textRole="reading" style={styles.sceneText}>{activeScene.text}</AppText>
-            </View>
+            </Pressable>
             <View style={[styles.footer, fontScale > 1.2 && styles.footerStacked]}>
               <View style={styles.progressGroup}>
                 <AppText textRole="caption" style={styles.progressText}>
                   {activeSceneIndex + 1} / {event.scenes.length}
                 </AppText>
-                <AppText textRole="caption" style={styles.modeText}>{manualPlayback ? 'At your pace' : 'A moment unfolds'}</AppText>
+                <AppText textRole="caption" style={styles.modeText}>{getCeremonyPaceCaption(manualPlayback)}</AppText>
               </View>
-              {manualPlayback ? <TouchableOpacity onPress={next} style={styles.continueButton}
+              {manualPlayback && <TouchableOpacity onPress={next} style={styles.continueButton}
                 accessibilityRole="button" accessibilityLabel={lastScene ? 'Return to the house' : 'Continue the scene'}>
                 <AppText textRole="label" style={styles.continueText}>{lastScene ? 'Return' : 'Continue'}</AppText>
-              </TouchableOpacity> : <TouchableOpacity onPress={() => setManualPlayback(true)}
-                style={styles.readButton} accessibilityRole="button" accessibilityLabel="Pause and read at my pace">
-                <AppText textRole="label" style={styles.readButtonText}>Read at my pace</AppText>
               </TouchableOpacity>}
             </View>
           </ScrollView>}
@@ -877,8 +891,6 @@ const styles = StyleSheet.create({
   continueButton: { minHeight: 48, minWidth: 110, alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 18, borderWidth: 1, borderColor: '#D8B680', backgroundColor: '#3A2D29' },
   continueText: { fontFamily: PIXEL_FONT_BOLD, fontSize: 14, color: '#F4E8D1' },
-  readButton: { minHeight: 48, flexShrink: 1, justifyContent: 'center', paddingHorizontal: 12 },
-  readButtonText: { fontFamily: BODY_FONT_BOLD, fontSize: 14, color: '#E2D2BD' },
   skipButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 16,
     borderWidth: 1, borderColor: SKIP_BORDER_COLOR, backgroundColor: '#100B15', zIndex: 1000 },
   skipText: { fontFamily: BODY_FONT_BOLD, fontSize: FONT_SIZE.bodyLg, color: SKIP_INK_COLOR },
