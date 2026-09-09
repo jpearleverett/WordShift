@@ -348,10 +348,10 @@ export function buildStoryScene(id: StorySceneId, context: StoryContext, state: 
       ] : state.boundary === 'release' ? [
         narrator("A small stone still sits at the gate, marking the way out. The path runs past the last tree and does not turn back."),
         has('rabbit') ? say('rabbit', "I walked out until I could not see the house. Then I came back. Coming back was my own decision.") : ember("I followed the path past the trees. Coming back felt different, knowing I could have kept walking."),
-      ] : [narrator("A cup is set down outside the pattern's lines. Anything left there used to be put back. Nothing moves it for a long time."), ember("One small thing left exactly where we put it. I am watching to see whether it stays there.")]),
+      ] : [narrator("Someone sets a cup down where the pattern's lines do not run. The house used to put a stray cup back. This one has not moved for a long time."), ember("One small thing left exactly where we put it. I am watching to see whether it stays there.")]),
       ...(has('axolotl') && state.memories.returned?.scene.lines.some(line => line.speaker === 'axolotl') ? [say('axolotl', "I am still not ready to say what I think about the fish. Thank you for not finishing that thought for me.")] : []),
       ember("You do not owe this morning any particular feeling, friend."),
-    ], state.boundary === 'remember' ? "Behind a private door, one thought stays uncorrected." : state.boundary === 'release' ? "The road out works. Coming back is a choice." : "A cup left out of place is the first small test.");
+    ], state.boundary === 'remember' ? "Behind a private door, one thought stays uncorrected." : state.boundary === 'release' ? "The road out works. Coming back is a choice." : "A cup was left out of place on purpose, to see whether the house would put it back.");
     case 'reply': return scene('Your answer', [
       ...(cup ? [narrator(`${cupName[0].toUpperCase() + cupName.slice(1)} waits beside the chair you chose. Nobody has moved it.`)] : []),
       ember("We have talked a great deal, friend. I would like to listen now."),

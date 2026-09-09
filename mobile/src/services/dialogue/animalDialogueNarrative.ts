@@ -297,7 +297,7 @@ export const CROSS_ANIMAL_REFERENCES: Record<AnimalType, Record<number, CrossAni
       { text: "Ember asks what a keeper is allowed to leave alone. The old text we follow does not answer that. I used to think every silence in it was profound. Some of them may just be gaps.", mentions: 'fox' },
       { text: "Ember lit the fire. Archimedes found the words. Warren laid the foundation. I breathe the breath that opens the gate. Each of us spent a whole life making one thing, and tonight the four things fit together. It begins.", mentions: 'owl' },
       { text: "Sloane was late, and I had made her lateness mean something. She asked me to stop. She had simply enjoyed the garden on the way up. I apologized, and we spent the morning there.", mentions: 'sloth' },
-      { text: "Vesper watches outward from her rail. I watch upward through my roof gap. We are the two open eyes of this house. At dawn she tells me the night held. I tell her the same. We smile now. The watching is nearly over. The pattern chose steady eyes.", mentions: 'tarsier' },
+      { text: "Vesper watches outward from her loft rail while I watch upward through my roof gap. We are the two open eyes of this house. At dawn we each report that nothing came through. We smile at that now, the watching nearly over. What approaches wanted steady eyes.", mentions: 'tarsier' },
       { text: "Moss keeps the garden above my attic. Every dawn the light passes my gap on its way to his beds, and I do not mind being second. When he stands in the open and begins the welcome, I will bow. We practiced it over tea. Neither of us needed the practice.", mentions: 'kakapo' },
     ],
   },
@@ -318,7 +318,7 @@ export const CROSS_ANIMAL_REFERENCES: Record<AnimalType, Record<number, CrossAni
       { text: "Thyme asked if the night is safe. I told her the truth: it has never harmed me, and I no longer believe it's safe. She hugged her watering can and said the same is true of everything. The frightened one understands my ledgers best. I think about that a lot.", mentions: 'rabbit' },
     ],
     3: [
-      { text: "Ember and I compared doorways, her hearth and my sky. Her fire's stopped flickering, she said. It just burns now. My watch is the same, one steady look. Something's about to come through. Until then, every keeper here holds their post steady.", mentions: 'fox' },
+      { text: "Ember and I both keep a door for what's coming. Hers is the hearth, mine is the sky above the ridge. Her fire's stopped flickering, she said. It just burns now. Mine's the same. I don't look away. Everyone here is holding their post.", mentions: 'fox' },
       { text: "Chill sat the middle watch with me, tea and no questions. Near dawn he wrote one line and turned it so I could read: Vigil, ongoing, in order. It warmed me more than the tea. I copied it into my book. Some paperwork is poetry with its collar buttoned.", mentions: 'capybara' },
       { text: "Sloane came to the green at moonset and looked up. I turned my whole head down to her. Then she slowly pointed at the bare sky where the stars moved aside, in case I'd missed it. I hadn't. Kind of her to check. Thoroughness, at our age, is how we say love.", mentions: 'sloth' },
     ],

@@ -525,7 +525,7 @@ export const WORD_THRESHOLD_DIALOGUES: { threshold: number; phase: number; lines
       capybara: "Five hundred entries. There's still room for a correction, an objection, or an answer nobody has given yet.",
       tarsier: "Five hundred words. I used to think every mark in a ledger meant the same thing to whoever wrote it. I've stopped assuming that.",
       aye_aye: "Five hundred words. I can hear a pattern in the beams now. I want to hear the parts that don't fit it too.",
-      kakapo: "Five hundred words. A heavy branch fills one fruit at a time, so that is how I count them. Which word do you still remember?",
+      kakapo: "Five hundred words. I pick fruit one at a time, even off a heavy branch. That's how I've counted your words. Which one do you still remember?",
     },
   },
   {
@@ -586,7 +586,7 @@ const SACRIFICE_REACTIONS: Record<string, { first: string; subsequent: string[] 
     subsequent: [
       "Your portion at supper is not measured against what you give away.",
       "A gift is yours to give. The part you keep is yours as well.",
-      "The pot stirred when you gave that. I did not reach for the rest of your amber. The pot does not get to reach for it either.",
+      "You gave amber, and my pot stirred itself with nobody near it. It wants more. I am not reaching for the rest of your amber, and neither is the pot.",
     ],
   },
   owl: {
