@@ -119,3 +119,15 @@ export function getShopArt(key: string): ImageSourcePropType {
 export function hasShopArt(key: string): boolean {
   return key in SHOP_ART && key !== SHOP_ART_PLACEHOLDER_KEY;
 }
+
+/**
+ * The art for a room's tier-1 decoration or tier-2 deepening, for RoomView to
+ * draw the promised object INSIDE the room (the shop copy names copper pots
+ * and a spinning globe; the room used to show only a glow). Returns null when
+ * the room has no dedicated piece: the parcel placeholder must never stand in
+ * a room, where it would read as an unexplained crate.
+ */
+export function getRoomUpgradeArt(roomId: string, tier: 1 | 2): ImageSourcePropType | null {
+  const key = tier === 1 ? `upgrade_${roomId}` : `deepen_${roomId}`;
+  return hasShopArt(key) ? SHOP_ART[key] : null;
+}

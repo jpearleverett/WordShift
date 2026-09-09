@@ -153,7 +153,9 @@ import {
   getSkipConfirmLeaveLabel,
   getHouseAskLine,
   getHouseAskFulfilledMessage,
+  getCosmeticFirstShowingLine,
 } from './src/services/phaseNarrative';
+import { consumeCosmeticFirstShowing } from './src/services/cosmeticReceipts';
 import {
   getUnbrokenWeaveMastery,
   recordSolveTime,
@@ -196,7 +198,7 @@ import { markPendingChanges, uploadToCloud } from './src/services/cloudSave';
 import * as Sentry from '@sentry/react-native';
 import { getSentryDsn } from './src/services/supabaseClient';
 import { estimateSlotIndex, findClosestValidSlot, computeBoardScale } from './src/services/slotEstimation';
-import { DROP_SHAKE_KEYFRAME_MS, DROP_SHAKE_INTENSITY, SPEED_ESCALATION_STEP_SEC, SPEED_ESCALATION_MIN_SEC, SPEED_TICK_CRITICAL_SEC, SWIFT_HINT_TOAST_DELAY_MS, SCREEN_FADE_COVER_MS, SCREEN_FADE_REVEAL_MS, SCREEN_READY_TIMEOUT_MS, SCREEN_REVEAL_SETTLE_MS, speedTickKind } from './src/constants/timing';
+import { DROP_SHAKE_KEYFRAME_MS, DROP_SHAKE_INTENSITY, STARBURST_DURATION_MS, STARBURST_ORIGIN_LIFT_DP, SPEED_ESCALATION_STEP_SEC, SPEED_ESCALATION_MIN_SEC, SPEED_TICK_CRITICAL_SEC, SWIFT_HINT_TOAST_DELAY_MS, SCREEN_FADE_COVER_MS, SCREEN_FADE_REVEAL_MS, SCREEN_READY_TIMEOUT_MS, SCREEN_REVEAL_SETTLE_MS, speedTickKind } from './src/constants/timing';
 import { ScreenTransitionOverlay } from './src/components/ui/ScreenTransitionOverlay';
 import { armScreenReady, waitForScreenReady } from './src/services/screenReady';
 import { OfferingPitScreen } from './src/components/OfferingPitScreen';
@@ -618,6 +620,9 @@ function MainApp() {
   // mounted HomeScreen reloads its progress (purchased amber must register
   // against the next unlock immediately, not after the next screen change).
   const [homeRefreshSignal, setHomeRefreshSignal] = useState(0);
+  // Shop -> home "see it in the room" hand-off: a one-shot room id the home
+  // screen consumes (pans to the room, pulses it) and then clears.
+  const [homeFocusRoomId, setHomeFocusRoomId] = useState<string | null>(null);
   const [homeOverlayActive, setHomeOverlayActive] = useState(false);
   const [homeQuietReady, setHomeQuietReady] = useState(false);
   useEffect(() => {
@@ -2982,6 +2987,17 @@ function MainApp() {
         enqueueVictoryToast(getHarvestOverflowMessage(persistence.currentPhase));
       }
 
+      // First-showing receipt for a newly equipped confetti palette: the first
+      // win on which it actually falls carries a receipt-priority toast, once
+      // ever per cosmetic on this device. Gated on the same condition that
+      // fires the confetti below (never the silent beat, never the finale).
+      if (!wasFinalBoard && !isSilentVictoryBeat(completedTotal)) {
+        const receiptPhase = persistence.currentPhase;
+        consumeCosmeticFirstShowing('confetti').then(name => {
+          if (name) enqueueVictoryToast(getCosmeticFirstShowingLine(receiptPhase, name), 'receipt');
+        }).catch(() => {});
+      }
+
       // The receipt may appear while the narrative writes are still settling.
       // An early Next/Home tap waits for this work before preparing a scene or
       // starting another board, so an armed finale cannot be served twice.
@@ -3179,13 +3195,31 @@ function MainApp() {
       // (tier 0 base → 1/2/3; dark variants resolve inside audio.ts).
       soundValidMove(result.comboTier ?? 0);
 
+      // A touch-origin burst is lifted STARBURST_ORIGIN_LIFT_DP above the touch
+      // point so the ring clears the thumb that just tapped or dropped the
+      // tile (the old burst spawned directly under it, and roughly the first
+      // half of its life was hidden). The synthetic board-centre origin is
+      // not lifted. It stays live for STARBURST_DURATION_MS (750, was 600).
       setStarBurst({
         active: true,
         x: feedbackOrigin?.x ?? SCREEN_WIDTH / 2,
-        y: feedbackOrigin?.y ?? SCREEN_HEIGHT * 0.4,
+        y: feedbackOrigin ? feedbackOrigin.y - STARBURST_ORIGIN_LIFT_DP : SCREEN_HEIGHT * 0.4,
         comboTier: result.comboTier ?? 0,
       });
-      addVictoryTimeout(() => setStarBurst({ active: false, x: 0, y: 0, comboTier: 0 }), 600);
+      addVictoryTimeout(() => setStarBurst({ active: false, x: 0, y: 0, comboTier: 0 }), STARBURST_DURATION_MS);
+
+      // First-showing receipt for a newly equipped move spark: the first
+      // spark-bearing commit after equipping replaces its move message with the
+      // cosmetic's name, once ever per cosmetic on this device. Never on a
+      // resonant commit (that line IS its own acknowledgment), never on the
+      // final board (its hushed voice is single), and only on a formed-word
+      // commit (the half-move already returned above).
+      if (result.formedWord && !result.resonant && !puzzle.isFinalBoard) {
+        const receiptPhase = persistence.currentPhase;
+        consumeCosmeticFirstShowing('spark').then(name => {
+          if (name) puzzleActions.setMessage(getCosmeticFirstShowingLine(receiptPhase, name));
+        }).catch(() => {});
+      }
 
       // Target-row catch bounce on BOTH inputs so the placed tile always
       // "lands" — the default/accessible tap path used to skip this and feel
@@ -4756,6 +4790,11 @@ function MainApp() {
             onAmberChange={(newBalance) => persistenceActions.setAmberBalance(newBalance)}
             onOpenPatron={() => setShowPatronModal(true)}
             onOpenStore={() => setShowStoreModal(true)}
+            onOpenSettings={() => transitionTo('settings')}
+            onFocusRoom={(roomId) => {
+              setHomeFocusRoomId(roomId);
+              transitionTo('home');
+            }}
           />
         </View>
       );
@@ -4876,6 +4915,8 @@ function MainApp() {
               // pit ceremony.
               onUnlockCompleted={() => { achievementActions.checkAchievementsNow().catch(() => {}); }}
               refreshSignal={homeRefreshSignal}
+              focusRoomId={homeFocusRoomId}
+              onFocusRoomConsumed={() => setHomeFocusRoomId(null)}
             />
             {/* Achievement toast overlay */}
             <AchievementToast
@@ -4933,8 +4974,12 @@ function MainApp() {
         {/* Animated Background — darkens with narrative phase */}
         <AnimatedBackground phase={persistence.currentPhase} />
 
-        {/* Confetti celebration — colors shift with phase */}
-        <Confetti active={puzzle.showConfetti} phase={persistence.currentPhase} ritualEnergy={victoryFlow.victoryData?.ritualEnergy ?? 0} />
+        {/* The victory Confetti is NOT mounted here: the VictoryModal is a later
+            root-level sibling with a 70-85% scrim, so a burst inside the puzzle
+            screen was viewed through the scrim from its first frame and the
+            equipped palette was never seen. It mounts at the root, after the
+            modal wrapper (see below). StarBurst stays here on purpose: it must
+            sit above the board and UNDER the modals. */}
 
         {/* Star burst effect on valid moves */}
         <StarBurst active={starBurst.active} x={starBurst.x} y={starBurst.y} phase={persistence.currentPhase} comboTier={starBurst.comboTier} />
@@ -5963,6 +6008,21 @@ function MainApp() {
           variant={puzzle.currentVariant}
           gameMode={puzzle.gameMode}
         />
+        </View>
+
+        {/* Victory confetti — mounted ABOVE the results scrim (a root sibling
+            after the VictoryModal wrapper) so the equipped palette is actually
+            seen; the dark-phase fall profiles (thinner ember counts, ash
+            physics) live inside Confetti, so phases 3-5 stay embers. Pointer-
+            transparent, so tap-to-skip and every modal button still receive
+            touches, and it mounts BEFORE the game-alert host so it can never
+            cover a card. Same showConfetti trigger as before. */}
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          <Confetti
+            active={puzzle.showConfetti && currentScreen === 'puzzle'}
+            phase={persistence.currentPhase}
+            ritualEnergy={victoryFlow.victoryData?.ritualEnergy ?? 0}
+          />
         </View>
 
       {/* Screen transition overlay — solid cover that fades in/out during

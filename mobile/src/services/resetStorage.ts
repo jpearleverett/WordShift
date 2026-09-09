@@ -10,6 +10,13 @@ const RESET_DEVICE_KEYS = new Set([
   'wordshift_preview_graduation_seen_v2', 'wordshift_pending_victory', 'wordshift_victory_receipt',
 ]);
 
+/** Device-local key FAMILIES cleared by Reset All. RESET_DEVICE_KEYS is an
+ * exact-match set, so a per-id flag family needs its own prefix here: the
+ * cosmetic first-showing receipts are one key per cosmetic id, and without
+ * this the reset only ever reached the ids whose receipt path happened to run
+ * in the current session (its in-memory mirror), leaving the rest behind. */
+const RESET_DEVICE_KEY_PREFIXES = ['wordshift_cosmetic_receipt_'];
+
 /** Commit the entire local wipe + reset marker together before clearing live
  * service mirrors. Install/cloud identity, paid-grant intents and sticky mercy
  * flags deliberately survive. A failed commit keeps a journal for Retry/boot. */
@@ -17,7 +24,8 @@ export async function commitFullLocalReset(): Promise<void> {
   await recoverPendingStorageTransaction();
   await runStorageTransaction('full_reset', async () => {
     const keys = (await storage.getAllKeys()).filter(key => SYNC_KEYS.includes(key) ||
-      SYNC_KEY_PREFIXES.some(prefix => key.startsWith(prefix)) || RESET_DEVICE_KEYS.has(key));
+      SYNC_KEY_PREFIXES.some(prefix => key.startsWith(prefix)) || RESET_DEVICE_KEYS.has(key) ||
+      RESET_DEVICE_KEY_PREFIXES.some(prefix => key.startsWith(prefix)));
     await storage.multiRemove(keys);
     await storage.setItem('wordshift_local_reset_at', String(Date.now()));
   });

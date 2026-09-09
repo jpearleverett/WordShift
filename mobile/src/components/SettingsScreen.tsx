@@ -81,6 +81,7 @@ import { clearAdPacing, privacyOptionsRequired, showPrivacyOptions } from '../se
 import { clearHints } from '../services/hints';
 import { clearMonetPrompts } from '../services/monetizationPrompts';
 import { clearSharePrompts } from '../services/sharePrompts';
+import { clearCosmeticReceipts } from '../services/cosmeticReceipts';
 import { clearDailyLoginReward } from '../services/dailyLoginReward';
 import { clearSupporterState } from '../services/supporterStipend';
 import { clearSeasonPass } from '../services/seasonPass';
@@ -205,6 +206,7 @@ export async function performFullReset(): Promise<string[]> {
     ['hints', clearHints],
     ['monetPrompts', clearMonetPrompts],
     ['sharePrompts', clearSharePrompts],
+    ['cosmeticReceipts', clearCosmeticReceipts],
     ['dailyLogin', clearDailyLoginReward],
     ['dailyAmber', clearDailyAmberReward],
     ['supporterStipend', clearSupporterState],

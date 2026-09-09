@@ -198,3 +198,32 @@ export const rubberBandPanY = (
   if (rawPanY > max) return max + band(rawPanY - max);
   return rawPanY;
 };
+
+// ─── Focus-room handoff (Shop -> home) ───────────────────────────────────────
+
+interface RoomFocusPanInput {
+  /** Distance from the scene's bottom edge to the room's vertical centre (dp). */
+  roomCenterFromBottom: number;
+  /** The visible viewport height (the pan container's layout height). */
+  viewportHeight: number;
+  maxPanY: number;
+}
+
+/**
+ * The pan that centres a room in the viewport, for the "see it in the room"
+ * handoff from the Shop. The scene is bottom-anchored and pans DOWN by panY,
+ * so a point `d` above the scene bottom sits `d - panY` above the viewport
+ * bottom; centring it means `d - panY = viewport / 2`. Returned both ways for
+ * the same reason the restore decision is: the UNCLAMPED intent survives a
+ * bound that is momentarily one room short (the ghost room has not landed),
+ * and only the drawn position is clamped. Never written to the saved pan:
+ * a focus is a visit, and the remembered position belongs to real releases.
+ */
+export const resolveRoomFocusPanY = ({
+  roomCenterFromBottom,
+  viewportHeight,
+  maxPanY,
+}: RoomFocusPanInput): HomeScenePanRestore => {
+  const intendedPanY = roomCenterFromBottom - viewportHeight / 2;
+  return { panY: clampHomeScenePanY(intendedPanY, maxPanY), intendedPanY };
+};

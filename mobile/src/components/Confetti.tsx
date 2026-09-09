@@ -4,6 +4,7 @@ import { getPhaseTheme, CONFETTI_THEMES, SPARK_THEMES, SparkPalette } from '../t
 import { getMaxConfettiCount, shouldSimplifyAnimations } from '../services/deviceTier';
 import { getEquippedSync } from '../services/cosmetics';
 import { useReducedMotion } from '../hooks/useReducedMotion';
+import { STARBURST_FADE_DELAY_MS } from '../constants/timing';
 
 
 type ConfettiShape = 'rect' | 'square' | 'circle' | 'triangle' | 'spark';
@@ -110,6 +111,60 @@ const generateConfetti = (count: number, colors: string[], sparkBias: boolean, S
   return pieces;
 };
 
+/**
+ * The painted shape of one confetti piece. Shared by the falling piece (which
+ * wraps it in a native-driven transform) and the reduced-motion still scatter
+ * (which lays it out statically), so both draw the same palette the same way.
+ */
+const ConfettiShapeView: React.FC<{ piece: ConfettiPiece }> = ({ piece }) => {
+  // Shape variety: rectangles, squares, circles, triangles, and star-ish sparks.
+  const s = piece.size;
+  switch (piece.shape) {
+    case 'rect':
+      return (
+        <View
+          style={{ width: s * 0.5, height: s * 1.4, backgroundColor: piece.color, borderRadius: 2 }}
+        />
+      );
+    case 'circle':
+      return (
+        <View
+          style={{ width: s, height: s, backgroundColor: piece.color, borderRadius: s / 2 }}
+        />
+      );
+    case 'triangle':
+      return (
+        <View
+          style={{
+            width: 0,
+            height: 0,
+            backgroundColor: 'transparent',
+            borderStyle: 'solid',
+            borderLeftWidth: s * 0.55,
+            borderRightWidth: s * 0.55,
+            borderBottomWidth: s,
+            borderLeftColor: 'transparent',
+            borderRightColor: 'transparent',
+            borderBottomColor: piece.color,
+          }}
+        />
+      );
+    case 'spark': {
+      const ss = s * 0.9;
+      return (
+        <View style={{ width: ss, height: ss }}>
+          <View style={[styles.sparkSquare, { backgroundColor: piece.color }]} />
+          <View style={[styles.sparkDiamond, { backgroundColor: piece.color }]} />
+        </View>
+      );
+    }
+    default: // 'square'
+      return (
+        <View style={{ width: s, height: s, backgroundColor: piece.color, borderRadius: 2 }} />
+      );
+  }
+};
+
 const ConfettiPieceComponent: React.FC<{ piece: ConfettiPiece; profile: FallProfile }> = ({ piece, profile }) => {
   const { height: SCREEN_HEIGHT } = useWindowDimensions();
   const [translateY] = useState(() => new Animated.Value(-50));
@@ -188,57 +243,6 @@ const ConfettiPieceComponent: React.FC<{ piece: ConfettiPiece; profile: FallProf
     outputRange: ['0deg', '360deg'],
   });
 
-  // Shape variety: rectangles, squares, circles, triangles, and star-ish sparks.
-  // The Animated.View is now a motion/position wrapper; the shape renders inside
-  // so the native-driven transform stays exactly as before.
-  const s = piece.size;
-  const renderShape = () => {
-    switch (piece.shape) {
-      case 'rect':
-        return (
-          <View
-            style={{ width: s * 0.5, height: s * 1.4, backgroundColor: piece.color, borderRadius: 2 }}
-          />
-        );
-      case 'circle':
-        return (
-          <View
-            style={{ width: s, height: s, backgroundColor: piece.color, borderRadius: s / 2 }}
-          />
-        );
-      case 'triangle':
-        return (
-          <View
-            style={{
-              width: 0,
-              height: 0,
-              backgroundColor: 'transparent',
-              borderStyle: 'solid',
-              borderLeftWidth: s * 0.55,
-              borderRightWidth: s * 0.55,
-              borderBottomWidth: s,
-              borderLeftColor: 'transparent',
-              borderRightColor: 'transparent',
-              borderBottomColor: piece.color,
-            }}
-          />
-        );
-      case 'spark': {
-        const ss = s * 0.9;
-        return (
-          <View style={{ width: ss, height: ss }}>
-            <View style={[styles.sparkSquare, { backgroundColor: piece.color }]} />
-            <View style={[styles.sparkDiamond, { backgroundColor: piece.color }]} />
-          </View>
-        );
-      }
-      default: // 'square'
-        return (
-          <View style={{ width: s, height: s, backgroundColor: piece.color, borderRadius: 2 }} />
-        );
-    }
-  };
-
   return (
     <Animated.View
       style={[
@@ -255,7 +259,7 @@ const ConfettiPieceComponent: React.FC<{ piece: ConfettiPiece; profile: FallProf
         },
       ]}
     >
-      {renderShape()}
+      <ConfettiShapeView piece={piece} />
     </Animated.View>
   );
 };
@@ -274,12 +278,22 @@ interface ConfettiProps {
   colors?: string[];
 }
 
+/**
+ * The palette a burst paints with: an explicit override (shop purchase) wins,
+ * else the equipped confetti cosmetic (pure expression), else the phase default.
+ */
+const resolveConfettiPalette = (phase: number, colors?: string[]): string[] => {
+  if (colors && colors.length > 0) return colors;
+  const equippedConfetti = getEquippedSync('confetti');
+  if (equippedConfetti && CONFETTI_THEMES[equippedConfetti]) return CONFETTI_THEMES[equippedConfetti];
+  return getPhaseTheme(phase).confettiColors;
+};
+
 const ConfettiBurst: React.FC<ConfettiProps> = ({ onComplete, phase = 0, ritualEnergy = 0, colors }) => {
   const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
   const profile = useMemo(() => getFallProfile(phase), [phase]);
   // One random layout per mounted burst; unrelated parent renders never restart it.
   const [pieces] = useState(() => {
-      const theme = getPhaseTheme(phase);
       const baseCount = getMaxConfettiCount();
       // Scale confetti density with ritual energy
       const energyBonus = ritualEnergy >= 7 ? Math.floor(baseCount * 0.4) : ritualEnergy >= 4 ? Math.floor(baseCount * 0.2) : 0;
@@ -288,13 +302,7 @@ const ConfettiBurst: React.FC<ConfettiProps> = ({ onComplete, phase = 0, ritualE
       // An explicit palette wins (shop purchase burst); else an equipped cosmetic
       // confetti palette overrides the phase default (pure expression); with none
       // equipped the confetti stays phase-aware.
-      const equippedConfetti = getEquippedSync('confetti');
-      const confettiColors = colors
-        ? colors
-        : equippedConfetti && CONFETTI_THEMES[equippedConfetti]
-        ? CONFETTI_THEMES[equippedConfetti]
-        : theme.confettiColors;
-      return generateConfetti(count, confettiColors, profile.sparkBias, SCREEN_WIDTH);
+      return generateConfetti(count, resolveConfettiPalette(phase, colors), profile.sparkBias, SCREEN_WIDTH);
   });
   const complete = useRef(onComplete);
   useLayoutEffect(() => { complete.current = onComplete; }, [onComplete]);
@@ -312,16 +320,74 @@ const ConfettiBurst: React.FC<ConfettiProps> = ({ onComplete, phase = 0, ritualE
   );
 };
 
+// Reduced motion: the celebration is a single STILL scatter of palette pieces
+// that fades out on the opacity channel only. Nothing translates, spins or
+// scales. A purchased confetti palette is sold for amber and must show on
+// every device, so "no motion" must not mean "no confetti".
+const STILL_CONFETTI_COUNT = 24;
+const STILL_CONFETTI_HOLD_MS = 700;
+const STILL_CONFETTI_FADE_MS = 1100;
+
+interface StillConfettiPiece extends ConfettiPiece {
+  y: number;
+}
+
+const StillConfettiScatter: React.FC<ConfettiProps> = ({ onComplete, phase = 0, colors }) => {
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
+  const [pieces] = useState<StillConfettiPiece[]>(() => {
+    const profile = getFallProfile(phase);
+    // The dark phases keep their thinner ember profile here too.
+    const count = Math.max(6, Math.round(STILL_CONFETTI_COUNT * profile.countScale));
+    return generateConfetti(count, resolveConfettiPalette(phase, colors), profile.sparkBias, SCREEN_WIDTH).map(piece => ({
+      ...piece,
+      // Scattered over the upper part of the screen, where a fall would be seen.
+      y: SCREEN_HEIGHT * (0.08 + Math.random() * 0.54),
+    }));
+  });
+  const [opacity] = useState(() => new Animated.Value(1));
+  const complete = useRef(onComplete);
+  useLayoutEffect(() => { complete.current = onComplete; }, [onComplete]);
+  useEffect(() => {
+    opacity.setValue(1);
+    const anim = Animated.sequence([
+      Animated.delay(STILL_CONFETTI_HOLD_MS),
+      Animated.timing(opacity, { toValue: 0, duration: STILL_CONFETTI_FADE_MS, useNativeDriver: true }),
+    ]);
+    anim.start();
+    const timer = setTimeout(() => complete.current?.(), STILL_CONFETTI_HOLD_MS + STILL_CONFETTI_FADE_MS + 50);
+    return () => {
+      anim.stop();
+      clearTimeout(timer);
+    };
+  }, [opacity]);
+
+  return (
+    <Animated.View style={[styles.container, { opacity }]} pointerEvents="none">
+      {pieces.map(piece => (
+        <View
+          key={piece.id}
+          style={[
+            styles.stillPiece,
+            { left: piece.x, top: piece.y, transform: [{ rotate: `${piece.rotation}deg` }] },
+          ]}
+        >
+          <ConfettiShapeView piece={piece} />
+        </View>
+      ))}
+    </Animated.View>
+  );
+};
+
 export const Confetti: React.FC<ConfettiProps> = props => {
   const reducedMotion = useReducedMotion();
   const { width, height } = useWindowDimensions();
-  const { active, onComplete } = props;
-  useEffect(() => {
-    if (active && reducedMotion) onComplete?.();
-  }, [active, reducedMotion, onComplete]);
-  return active && !reducedMotion
-    ? <ConfettiBurst key={`${width}:${height}:${props.phase ?? 0}`} {...props} />
-    : null;
+  if (!props.active) return null;
+  const key = `${width}:${height}:${props.phase ?? 0}`;
+  // Reduced motion never nulls the effect: it renders the still scatter, which
+  // completes itself on the same onComplete contract as the fall.
+  return reducedMotion
+    ? <StillConfettiScatter key={key} {...props} />
+    : <ConfettiBurst key={key} {...props} />;
 };
 
 // Star burst effect for successful moves — colors shift with narrative phase.
@@ -338,8 +404,25 @@ const STAR_BURST_COLORS: Record<number, { bg: string; shadow: string; accent: st
   5: { bg: '#7B6B8A', shadow: '#5A4B6A', accent: '#B7A8C4' },  // Ghostly mauve (Phase 5: terrible peace)
 };
 
+/**
+ * The phase-default spark palette (no cosmetic equipped). Exported so the shop
+ * can demo the DEFAULT row's burst even while a paid spark is equipped.
+ */
+export function getPhaseSparkPalette(phase: number): SparkPalette {
+  return STAR_BURST_COLORS[phase] || STAR_BURST_COLORS[0];
+}
+
 // Combo escalation: a deeper clean-move streak throws a bigger, further burst.
 const STAR_COUNT_BY_TIER = [8, 10, 12, 14];
+// Low-tier devices throw a reduced burst (six stars, no halo Views) on the
+// same timeline: the spark is sold for amber and must still render there.
+const REDUCED_STAR_COUNT = 6;
+// Reduced motion: one still frame of palette diamonds at this radius, fading
+// out on opacity only. Nothing moves or scales.
+const STILL_STAR_COUNT = 8;
+const STILL_STAR_RADIUS_DP = 30;
+const STAR_BOX_DP = 28;
+const STAR_BURST_BOX_DP = 100;
 
 interface StarBurstProps {
   active: boolean;
@@ -348,18 +431,24 @@ interface StarBurstProps {
   phase?: number;
   /** Clean-move combo tier (0-3) — scales the burst count, spread, and richness. */
   comboTier?: number;
+  /**
+   * Explicit palette (mirrors Confetti's `colors`): the shop uses it so a row
+   * previews its OWN palette, owned or not. When omitted, an equipped move
+   * spark wins, else the phase default.
+   */
+  paletteOverride?: SparkPalette;
 }
 
-export const StarBurst: React.FC<StarBurstProps> = ({ active, x, y, phase = 0, comboTier = 0 }) => {
+export const StarBurst: React.FC<StarBurstProps> = ({ active, x, y, phase = 0, comboTier = 0, paletteOverride }) => {
   const reducedMotion = useReducedMotion();
-  // Low-tier devices skip the decorative burst entirely (the move still lands
-  // its haptic + sound); treat it exactly like reduced motion.
+  // Low-tier devices get a reduced burst (fewer stars, no halos), never none:
+  // the move still lands its haptic + sound, and its paid palette still shows.
   const simplify = shouldSimplifyAnimations();
   const tier = Math.max(0, Math.min(3, Math.floor(comboTier)));
-  const count = STAR_COUNT_BY_TIER[tier];
+  const count = reducedMotion ? STILL_STAR_COUNT : simplify ? REDUCED_STAR_COUNT : STAR_COUNT_BY_TIER[tier];
 
-  // Rebuild the animated set when the tier (and thus count) changes. The values
-  // only run while `active`, so recreating them on a rare tier change is cheap.
+  // Rebuild the animated set when the count changes. The values only run
+  // while `active`, so recreating them on a rare tier change is cheap.
   const stars = useMemo(
     () =>
       Array(count).fill(0).map((_, i) => ({
@@ -371,81 +460,121 @@ export const StarBurst: React.FC<StarBurstProps> = ({ active, x, y, phase = 0, c
       })),
     [count],
   );
+  // The reduced-motion still frame fades as one on a single opacity value.
+  const [stillOpacity] = useState(() => new Animated.Value(1));
 
   useEffect(() => {
-    if (active && !reducedMotion && !simplify) {
-      const runningAnims: Animated.CompositeAnimation[] = [];
-      // A deep tier at a dark phase damps one step (a heavier settle).
-      const popFriction = phase >= 3 ? 6 : 4;
-      const popTension = phase >= 3 ? 150 : 200;
-      // Each tier pops a little larger too, so a streak reads as richer, not just
-      // wider. Tier 0 stays exactly 1.0 so the default burst is unchanged.
-      const peakScale = 1 + tier * 0.12;
-      stars.forEach((star, i) => {
-        star.scale.setValue(0);
-        star.translateX.setValue(0);
-        star.translateY.setValue(0);
-        star.opacity.setValue(1);
-
-        // Base distance grows with the combo tier so a streak flings further.
-        const distance = 40 + tier * 12 + Math.random() * 30;
-
-        const anim = Animated.parallel([
-          Animated.sequence([
-            Animated.spring(star.scale, {
-              toValue: peakScale,
-              friction: popFriction,
-              tension: popTension,
-              useNativeDriver: true,
-            }),
-            Animated.timing(star.scale, {
-              toValue: 0,
-              duration: 300,
-              useNativeDriver: true,
-            }),
-          ]),
-          Animated.timing(star.translateX, {
-            toValue: Math.cos(star.angle) * distance,
-            duration: 500,
-            easing: Easing.out(Easing.quad),
-            useNativeDriver: true,
-          }),
-          Animated.timing(star.translateY, {
-            toValue: Math.sin(star.angle) * distance,
-            duration: 500,
-            easing: Easing.out(Easing.quad),
-            useNativeDriver: true,
-          }),
-          Animated.sequence([
-            Animated.delay(300),
-            Animated.timing(star.opacity, {
-              toValue: 0,
-              duration: 200,
-              useNativeDriver: true,
-            }),
-          ]),
-        ]);
-        anim.start();
-        runningAnims.push(anim);
-      });
-      return () => runningAnims.forEach(a => a.stop());
+    if (!active) return;
+    if (reducedMotion) {
+      stillOpacity.setValue(1);
+      const anim = Animated.sequence([
+        Animated.delay(STARBURST_FADE_DELAY_MS),
+        Animated.timing(stillOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
+      ]);
+      anim.start();
+      return () => anim.stop();
     }
-  }, [active, reducedMotion, simplify, stars, tier, phase]);
+    const runningAnims: Animated.CompositeAnimation[] = [];
+    // A deep tier at a dark phase damps one step (a heavier settle).
+    const popFriction = phase >= 3 ? 6 : 4;
+    const popTension = phase >= 3 ? 150 : 200;
+    // Each tier pops a little larger too, so a streak reads as richer, not just
+    // wider. Tier 0 stays exactly 1.0 so the default burst is unchanged.
+    const peakScale = 1 + tier * 0.12;
+    stars.forEach((star) => {
+      star.scale.setValue(0);
+      star.translateX.setValue(0);
+      star.translateY.setValue(0);
+      star.opacity.setValue(1);
 
-  if (!active || reducedMotion || simplify) return null;
+      // Base distance grows with the combo tier so a streak flings further.
+      const distance = 40 + tier * 12 + Math.random() * 30;
 
-  // An equipped move spark wins; with none equipped the burst stays phase-aware.
-  // The phase entries carry no `halo`, so the halo falls back to the core color
-  // exactly as it always has.
+      const anim = Animated.parallel([
+        Animated.sequence([
+          Animated.spring(star.scale, {
+            toValue: peakScale,
+            friction: popFriction,
+            tension: popTension,
+            useNativeDriver: true,
+          }),
+          Animated.timing(star.scale, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.timing(star.translateX, {
+          toValue: Math.cos(star.angle) * distance,
+          duration: 500,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(star.translateY, {
+          toValue: Math.sin(star.angle) * distance,
+          duration: 500,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.sequence([
+          // Held longer (450ms, was 300) so the palette can be read before it goes.
+          Animated.delay(STARBURST_FADE_DELAY_MS),
+          Animated.timing(star.opacity, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]);
+      anim.start();
+      runningAnims.push(anim);
+    });
+    return () => runningAnims.forEach(a => a.stop());
+  }, [active, reducedMotion, stars, tier, phase, stillOpacity]);
+
+  // The paid effect is NEVER nulled: reduced motion renders a still frame,
+  // low tier a reduced burst. Only an inactive burst renders nothing.
+  if (!active) return null;
+
+  // An explicit palette wins (shop preview); else an equipped move spark; with
+  // none equipped the burst stays phase-aware. The phase entries carry no
+  // `halo`, so the halo falls back to the core color exactly as it always has.
   const equippedSpark = getEquippedSync('spark');
   const themedSpark = equippedSpark ? SPARK_THEMES[equippedSpark] : undefined;
-  const palette: SparkPalette = themedSpark ?? (STAR_BURST_COLORS[phase] || STAR_BURST_COLORS[0]);
+  const palette: SparkPalette = paletteOverride ?? themedSpark ?? getPhaseSparkPalette(phase);
+  // From tier 1 up, alternate stars carry the accent, so a paid palette's
+  // second colour shows on the first clean pair, not only on a 4-move streak.
+  const coreFor = (i: number) => (tier >= 1 && i % 2 === 1 ? palette.accent : palette.bg);
+  const containerStyle = [styles.starBurstContainer, { left: x - STAR_BURST_BOX_DP / 2, top: y - STAR_BURST_BOX_DP / 2 }];
+
+  if (reducedMotion) {
+    // One static frame of palette diamonds around the origin. Positions are
+    // plain layout offsets (no transforms); only the opacity animates.
+    const centre = STAR_BURST_BOX_DP / 2 - STAR_BOX_DP / 2;
+    return (
+      <Animated.View style={[...containerStyle, { opacity: stillOpacity }]} pointerEvents="none">
+        {stars.map((star, i) => (
+          <View
+            key={i}
+            style={[
+              styles.star,
+              {
+                left: centre + Math.cos(star.angle) * STILL_STAR_RADIUS_DP,
+                top: centre + Math.sin(star.angle) * STILL_STAR_RADIUS_DP,
+              },
+            ]}
+          >
+            <View style={[styles.starCore, { backgroundColor: coreFor(i) }]} />
+          </View>
+        ))}
+      </Animated.View>
+    );
+  }
 
   return (
-    <View style={[styles.starBurstContainer, { left: x - 50, top: y - 50 }]} pointerEvents="none">
+    <View style={containerStyle} pointerEvents="none">
       {stars.map((star, i) => {
-        // From tier 2 up, alternate stars carry the phase accent for extra life.
-        const coreColor = tier >= 2 && i % 2 === 1 ? palette.accent : palette.bg;
+        const coreColor = coreFor(i);
         return (
           <Animated.View
             key={i}
@@ -462,8 +591,10 @@ export const StarBurst: React.FC<StarBurstProps> = ({ active, x, y, phase = 0, c
             ]}
           >
             {/* Two-layer glow (Android-safe): a soft halo View behind a bright
-                core diamond, so the sparkle exists without an iOS-only shadow. */}
-            <View style={[styles.starHalo, { backgroundColor: palette.halo ?? coreColor }]} />
+                core diamond, so the sparkle exists without an iOS-only shadow.
+                The low-tier reduced burst drops the halo Views (six stars, one
+                View each) to stay inside that tier's animation budget. */}
+            {!simplify && <View style={[styles.starHalo, { backgroundColor: palette.halo ?? coreColor }]} />}
             <View style={[styles.starCore, { backgroundColor: coreColor }]} />
           </Animated.View>
         );
@@ -482,6 +613,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
   },
+  // Reduced-motion still scatter: a piece laid out where it would have fallen.
+  stillPiece: {
+    position: 'absolute',
+  },
   // Star-ish spark confetti: square + 45deg diamond overlaid (compact sparkle).
   sparkSquare: {
     ...StyleSheet.absoluteFill,
@@ -494,32 +629,33 @@ const styles = StyleSheet.create({
   },
   starBurstContainer: {
     position: 'absolute',
-    width: 100,
-    height: 100,
+    width: STAR_BURST_BOX_DP,
+    height: STAR_BURST_BOX_DP,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
   },
   star: {
     position: 'absolute',
-    width: 20,
-    height: 20,
+    width: STAR_BOX_DP,
+    height: STAR_BOX_DP,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  // Soft 20px halo (low opacity) so the sparkle reads on Android, where the old
-  // iOS-only shadowRadius glow drew nothing.
+  // Soft 28dp halo so the sparkle reads on Android, where the old iOS-only
+  // shadowRadius glow drew nothing. Sized up from 20dp @ 0.32 (which vanished
+  // on the dusk/night boards) so the burst is readable, not subliminal.
   starHalo: {
     position: 'absolute',
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    opacity: 0.32,
+    width: STAR_BOX_DP,
+    height: STAR_BOX_DP,
+    borderRadius: STAR_BOX_DP / 2,
+    opacity: 0.45,
   },
-  // Bright 12px core diamond.
+  // Bright 16dp core diamond (was 12: too small to read under a thumb).
   starCore: {
-    width: 12,
-    height: 12,
+    width: 16,
+    height: 16,
     borderRadius: 2,
     transform: [{ rotate: '45deg' }],
   },

@@ -6,8 +6,34 @@ import {
   rubberBandPanY,
   resolveHomeScenePanRestore,
   resolveGestureBasePanY,
+  resolveRoomFocusPanY,
   HOME_PAN_PROJECTION_FACTOR,
 } from '../services/homeScenePan';
+
+describe('resolveRoomFocusPanY (Shop -> home "see it in the room")', () => {
+  test('centres the room: a point d above the scene bottom lands at viewport / 2', () => {
+    const { panY, intendedPanY } = resolveRoomFocusPanY({
+      roomCenterFromBottom: 700, viewportHeight: 800, maxPanY: 900,
+    });
+    expect(intendedPanY).toBe(300);
+    expect(panY).toBe(300);
+  });
+
+  test('a room already below the centre at rest never pans the scene off its floor', () => {
+    const r = resolveRoomFocusPanY({ roomCenterFromBottom: 250, viewportHeight: 800, maxPanY: 900 });
+    expect(r.intendedPanY).toBe(-150);
+    expect(r.panY).toBe(0);
+  });
+
+  test('clamps the DRAWN pan to the bound but keeps the intent unclamped', () => {
+    // The bound is one room short until the ghost room lands; the intent must
+    // survive so the restore effect can re-clamp it against the real bound.
+    const r = resolveRoomFocusPanY({ roomCenterFromBottom: 1500, viewportHeight: 800, maxPanY: 600 });
+    expect(r.intendedPanY).toBe(1100);
+    expect(r.panY).toBe(600);
+    expect(resolveRoomFocusPanY({ roomCenterFromBottom: 1500, viewportHeight: 800, maxPanY: 1200 }).panY).toBe(1100);
+  });
+});
 
 describe('clampHomeScenePanY', () => {
   test('clamps negative pan values to zero', () => {
