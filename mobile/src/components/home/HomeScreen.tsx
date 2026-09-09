@@ -31,6 +31,10 @@ import { CHROME_ICONS, SPOT_ART } from '../ui/chromeIcons';
 import { CandyColors, getDialogueTheme } from '../../theme/colors';
 import { SURFACE, getPressSpring, getSurfaceTheme, getModalInSpring } from '../../theme/surfaces';
 import {
+  DIALOGUE_SPRITE_COL_FRACTION,
+  getDialoguePortraitFrame,
+} from '../../theme/dialoguePortrait';
+import {
   getPixelSkin,
   PANEL_CORNER_DP,
   PANEL_EDGE_DP,
@@ -477,13 +481,54 @@ const AmberCostLabel: React.FC<{
   );
 };
 
-// The axolotl (scuba mask) and fennec (tall ears) are framed tighter in their
-// source sprites and read larger than the other animals in the dialogue alcove;
-// render those two a touch smaller so they don't clip the card.
+// Subject-HEIGHT ceiling: the axolotl (scuba mask), fennec (tall ears), aye-aye
+// and kakapo are framed tighter in their source sprites and read larger than the
+// rest of the cast, so their alcove box is capped a touch shorter.
 // (Measured subject-height fractions: axolotl 74%, fennec 70%, aye_aye 76%,
-// kakapo 77% — all noticeably above fox's 61% baseline, so all four render
-// compact; tarsier at 65% stays standard.)
+// kakapo 77%, all noticeably above fox's 61% baseline; tarsier at 65% stays
+// standard.) The horizontal crop is a separate, measured concern: see
+// getDialoguePortraitBox below.
 const COMPACT_DIALOGUE_SPRITES = new Set<string>(['axolotl', 'fennec_fox', 'aye_aye', 'kakapo']);
+
+// Portrait alcove geometry for the dialogue sheet (main card AND the
+// intro/override card, which share these styles).
+//
+// The alcove is the SPRITE COLUMN, not the box: the box used to be declared
+// wider than the column, so the column's overflow:hidden did the real cropping
+// and the declared width was dead. The box is now the alcove's own width, and
+// its HEIGHT is what sets the zoom, because cover renders the square art
+// `height` wide. getDialoguePortraitFrame lowers that height per character
+// until the visible band clears the measured subject, never above the height
+// the surface already uses, so only the characters that lose art today change
+// size; the rest are fixed by recentring alone, which is free.
+const STACKED_DIALOGUE_ALCOVE = 72;
+const getDialoguePortraitBox = (
+  animalType: string,
+  screenWidth: number,
+  fontScale: number
+) => {
+  const stacked = screenWidth < 380 || fontScale > 1.2;
+  const compact = COMPACT_DIALOGUE_SPRITES.has(animalType);
+  const alcoveWidth = stacked
+    ? STACKED_DIALOGUE_ALCOVE
+    : DIALOGUE_SPRITE_COL_FRACTION * (screenWidth - 2 * SURFACE.panelPadX);
+  const maxHeight = stacked
+    ? (compact ? 80 : 88)
+    : screenWidth * (compact ? 0.41 : 0.48);
+  return getDialoguePortraitFrame(animalType, alcoveWidth, maxHeight);
+};
+
+// The journal spotlight's alcove is a fixed well rather than a share of the
+// sheet, but it shows the same cover-scaled portrait, so it runs through the
+// same measured framing. Ember already fits its band, so this only recentres
+// her on the subject; a non-fox sprite routed here later cannot crop.
+const JOURNAL_SPOTLIGHT_ALCOVE = { width: 92, height: 140 };
+const getJournalSpotlightPortrait = (animalType: string) =>
+  getDialoguePortraitFrame(
+    animalType,
+    JOURNAL_SPOTLIGHT_ALCOVE.width,
+    JOURNAL_SPOTLIGHT_ALCOVE.height
+  );
 
 // Sampled from the sky assets' top rows (sampleSkyTops scratch script) so the
 // screen background meets the sky PNG without a seam — keep in sync with
@@ -572,7 +617,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   refreshSignal = 0,
 }) => {
   const screenInsets = useScreenInsets();
-  const { height: readingHeight } = useWindowDimensions();
+  const { width: screenWidth, height: readingHeight, fontScale } = useWindowDimensions();
   const isOnboarding = onboardingStep !== undefined && onboardingStep !== 'complete';
   // Seeded from the last-rendered scene (see homeSceneSnapshot): HomeScreen
   // unmounts on every navigation away, so starting from null meant EVERY return
@@ -741,6 +786,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setAnimals,
     onFoxPlayPrompt: () => setHighlightPlayButton(true),
   });
+
+  // Measured portrait framing for whichever character is on screen (see
+  // getDialoguePortraitBox). Both dialogue surfaces share the alcove styles, so
+  // they share the maths too.
+  const dialoguePortrait = useMemo(
+    () => getDialoguePortraitBox(dialogueFlow.selectedAnimal?.type ?? 'fox', screenWidth, fontScale),
+    [dialogueFlow.selectedAnimal?.type, screenWidth, fontScale]
+  );
+  const introPortrait = useMemo(
+    () => getDialoguePortraitBox(introAnimal?.type ?? 'fox', screenWidth, fontScale),
+    [introAnimal?.type, screenWidth, fontScale]
+  );
+  const journalSpotlightPortrait = useMemo(() => getJournalSpotlightPortrait('fox'), []);
 
   // loadAllData reference for unlock hook (defined below, stable via useCallback)
   const loadAllDataRef = useRef<() => Promise<void>>(() => Promise.resolve());
@@ -1690,7 +1748,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             animalName: introAnimal.name,
             text: introOverrideLines[1],
             phase: 5,
-            type: 'dialogue',
+            type: 'keepsake',
           }).catch(() => {});
         }
       } else {
@@ -1734,7 +1792,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             animalName: introAnimal.name,
             text: introOverrideLines[1],
             phase: 5,
-            type: 'dialogue',
+            type: 'keepsake',
           }).catch(() => {});
         }
       } else {
@@ -2369,8 +2427,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     <View
                       style={[
                         styles.dialogueSpriteImage,
-                        COMPACT_DIALOGUE_SPRITES.has(dialogueFlow.selectedAnimal.type) &&
-                          styles.dialogueSpriteImageSmall,
+                        dialoguePortrait.box,
                         dialogueFlow.isTalking && styles.dialogueSpriteTalking,
                       ]}
                       accessibilityRole="image"
@@ -2390,6 +2447,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             source={CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]!.robed!}
                             style={[
                               styles.dialogueSpriteLayer,
+                              dialoguePortrait.layer,
                               dialogueFlow.isTalking &&
                                 Boolean(CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]?.robedTalk) &&
                                 styles.dialogueSpriteLayerHidden,
@@ -2401,6 +2459,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                               source={CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]!.robedTalk!}
                               style={[
                                 styles.dialogueSpriteLayer,
+                                dialoguePortrait.layer,
                                 !dialogueFlow.isTalking && styles.dialogueSpriteLayerHidden,
                               ]}
                               resizeMode="cover"
@@ -2413,6 +2472,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             source={CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]!.idle}
                             style={[
                               styles.dialogueSpriteLayer,
+                              dialoguePortrait.layer,
                               dialogueFlow.isTalking &&
                                 Boolean(CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]?.talk) &&
                                 styles.dialogueSpriteLayerHidden,
@@ -2424,6 +2484,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                               source={CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]!.talk!}
                               style={[
                                 styles.dialogueSpriteLayer,
+                                dialoguePortrait.layer,
                                 !dialogueFlow.isTalking && styles.dialogueSpriteLayerHidden,
                               ]}
                               resizeMode="cover"
@@ -3414,8 +3475,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     <View
                       style={[
                         styles.dialogueSpriteImage,
-                        COMPACT_DIALOGUE_SPRITES.has(introAnimal.type) &&
-                          styles.dialogueSpriteImageSmall,
+                        introPortrait.box,
                         introIsTalking && styles.dialogueSpriteTalking,
                       ]}
                       accessibilityRole="image"
@@ -3430,6 +3490,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             source={CHARACTER_SPRITES[introAnimal.type]!.robed!}
                             style={[
                               styles.dialogueSpriteLayer,
+                              introPortrait.layer,
                               introIsTalking &&
                                 Boolean(CHARACTER_SPRITES[introAnimal.type]?.robedTalk) &&
                                 styles.dialogueSpriteLayerHidden,
@@ -3441,6 +3502,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                               source={CHARACTER_SPRITES[introAnimal.type]!.robedTalk!}
                               style={[
                                 styles.dialogueSpriteLayer,
+                                introPortrait.layer,
                                 !introIsTalking && styles.dialogueSpriteLayerHidden,
                               ]}
                               resizeMode="cover"
@@ -3453,6 +3515,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             source={CHARACTER_SPRITES[introAnimal.type]!.idle}
                             style={[
                               styles.dialogueSpriteLayer,
+                              introPortrait.layer,
                               introIsTalking &&
                                 Boolean(CHARACTER_SPRITES[introAnimal.type]?.talk) &&
                                 styles.dialogueSpriteLayerHidden,
@@ -3464,6 +3527,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                               source={CHARACTER_SPRITES[introAnimal.type]!.talk!}
                               style={[
                                 styles.dialogueSpriteLayer,
+                                introPortrait.layer,
                                 !introIsTalking && styles.dialogueSpriteLayerHidden,
                               ]}
                               resizeMode="cover"
@@ -3710,6 +3774,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   <View
                     style={[
                       styles.journalSpotlightSpriteCol,
+                      journalSpotlightPortrait.box,
                       introIsTalking && styles.dialogueSpriteTalking,
                     ]}
                     accessibilityRole="image"
@@ -3719,6 +3784,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       source={CHARACTER_SPRITES.fox.idle}
                       style={[
                         styles.dialogueSpriteLayer,
+                        journalSpotlightPortrait.layer,
                         introIsTalking &&
                           Boolean(CHARACTER_SPRITES.fox.talk) &&
                           styles.dialogueSpriteLayerHidden,
@@ -3730,6 +3796,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         source={CHARACTER_SPRITES.fox.talk!}
                         style={[
                           styles.dialogueSpriteLayer,
+                          journalSpotlightPortrait.layer,
                           !introIsTalking && styles.dialogueSpriteLayerHidden,
                         ]}
                         resizeMode="cover"
@@ -4194,20 +4261,20 @@ const createStyles = (SCREEN_WIDTH: number, SCREEN_HEIGHT: number, fontScale: nu
     flexDirection: SCREEN_WIDTH < 380 || fontScale > 1.2 ? 'column' : 'row',
   },
   dialogueSpriteCol: {
-    width: SCREEN_WIDTH < 380 || fontScale > 1.2 ? '100%' : '30%',
+    width: SCREEN_WIDTH < 380 || fontScale > 1.2
+      ? '100%'
+      : `${DIALOGUE_SPRITE_COL_FRACTION * 100}%`,
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
   },
+  // The crop box owns the crop: it carries overflow:hidden itself and its
+  // width/height arrive per character from getDialoguePortraitBox, so the
+  // visible band is the same on both platforms instead of depending on whether
+  // an over-wide box is clipped by the column. Anything sized here would be a
+  // second, contradictory source of truth, so nothing is.
   dialogueSpriteImage: {
-    width: SCREEN_WIDTH < 380 || fontScale > 1.2 ? 72 : SCREEN_WIDTH * 0.36,
-    height: SCREEN_WIDTH < 380 || fontScale > 1.2 ? 88 : SCREEN_WIDTH * 0.48,
-  },
-  // Axolotl/fennec render a touch smaller (see COMPACT_DIALOGUE_SPRITES) so
-  // their tighter source framing doesn't clip the dialogue card.
-  dialogueSpriteImageSmall: {
-    width: SCREEN_WIDTH < 380 || fontScale > 1.2 ? 64 : SCREEN_WIDTH * 0.31,
-    height: SCREEN_WIDTH < 380 || fontScale > 1.2 ? 80 : SCREEN_WIDTH * 0.41,
+    overflow: 'hidden',
   },
   // One layer of the pre-mounted idle/talk portrait stack. Explicit 100%
   // dims — an inset-only absolute Image collapses to intrinsic size on Fabric
@@ -5013,10 +5080,9 @@ const createStyles = (SCREEN_WIDTH: number, SCREEN_HEIGHT: number, fontScale: nu
   },
   // Transparent portrait crop box (NO fill, NO border/borderRadius): the
   // sprite sits directly on the card parchment like the main dialogue card's
-  // sprite column; fixed dims crop the cover-scaled idle/talk layers.
+  // sprite column. Its dims arrive from getJournalSpotlightPortrait, which is
+  // what crops the cover-scaled idle/talk layers.
   journalSpotlightSpriteCol: {
-    width: 92,
-    height: 140,
     overflow: 'hidden',
   },
   journalSpotlightDialogueCol: {

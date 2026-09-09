@@ -24,7 +24,6 @@ import {
   getGalleryStats,
   getGalleryTitle,
   getGallerySubtitle,
-  getPhaseEraName,
   WhisperEntry,
 } from '../services/whisperGallery';
 import { markScreenReady } from '../services/screenReady';
@@ -41,8 +40,20 @@ import { playUiSound, uiHapticSelection } from '../services/uiSound';
 const EMPTY_GALLERY_SPOT = require('../../assets/ui/spots/empty_gallery.png');
 
 // Generated candy sprites replacing the bare entry-type emoji (💭/💬/🔗/⚡/📜).
+// The mark is the only thing that tells one kind of kept line from another now
+// that no card is stamped with a name for the stretch it came from.
 const ENTRY_TYPE_ICONS: Record<string, ReturnType<typeof require>> = {
   whisper: require('../../assets/ui/whisper.png'),
+  // An answer an animal gave back to one of the player's own.
+  choice: require('../../assets/ui/speech.png'),
+  // A line kept on purpose (the keeper's record).
+  keepsake: require('../../assets/ui/ribbon.png'),
+  // A line from one of the late pools (post-revelation, Tending, the Phase-2
+  // exhaustion pool): real conversation the journal's corpus reader cannot
+  // reach, so a scroll rather than a murmur.
+  passage: require('../../assets/ui/scroll.png'),
+  // Legacy base conversation lines: hidden by whisperGallery's HIDDEN_TYPES,
+  // mapped only so a stored entry can never reach the screen iconless.
   dialogue: require('../../assets/ui/speech.png'),
   cross_reference: require('../../assets/ui/link.png'),
   // A candy tile with a speech ripple (generateGameIcons chrome): a puzzle word
@@ -378,15 +389,11 @@ export const WhisperGalleryScreen: React.FC<WhisperGalleryScreenProps> = ({
   const renderEntry = ({ item, index }: { item: WhisperEntry; index: number }) => {
     const card = (
       <View style={[styles.entryCard, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}>
-        <View
-          style={styles.entryTypeRow}
-          accessible
-          accessibilityLabel={getPhaseEraName(item.phase)}
-        >
-          <Image source={getEntryTypeIcon(item.type)} style={styles.entryTypeIcon} />
-          <Text style={[styles.entryType, { color: t.muted }]}>
-            {getPhaseEraName(item.phase)}
-          </Text>
+        {/* The mark alone. The card used to carry a name for the stretch of the
+            story the line came from, which is the phase system in costume; the
+            quote below is read out on its own, so nothing is lost here. */}
+        <View style={styles.entryTypeRow}>
+          <Image source={getEntryTypeIcon(item.type)} style={styles.entryTypeIcon} accessible={false} />
         </View>
         <Text style={[styles.entryText, { color: t.body }]}>
           &ldquo;{item.text}&rdquo;
@@ -639,12 +646,6 @@ const styles = StyleSheet.create({
   entryTypeIcon: {
     width: 17,
     height: 17,
-  },
-  entryType: {
-    fontFamily: PIXEL_FONT_BOLD,
-    fontSize: FONT_SIZE.caption,
-    fontWeight: '700',
-    letterSpacing: 0.8,
   },
   entryText: {
     fontFamily: BODY_FONT_ITALIC,

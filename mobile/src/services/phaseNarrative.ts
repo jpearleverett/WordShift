@@ -943,9 +943,12 @@ export function getRewardedDoubleConfirm(phase: DialoguePhase): string {
 // WHISPER GALLERY EMPTY STATE — Shown when no whispers are collected yet
 // ============================================================================
 
+// The gallery keeps only what is said in passing: the line after a win, an
+// answer given back, a keepsake. Full conversations are kept in the journal, so
+// this copy points at playing rather than at visiting.
 const WHISPER_GALLERY_EMPTY_TEXT: Record<DialoguePhase, string> = {
-  0: 'No whispers collected yet. Play puzzles and talk to your animal friends!',
-  1: 'No whispers collected yet. Play puzzles and visit your friends. They have things to say.',
+  0: 'No whispers collected yet. Solve a puzzle and listen for what your friends say after!',
+  1: 'No whispers collected yet. Keep solving. Your friends murmur things when a puzzle ends.',
   2: 'Nothing collected yet. The house is listening for your words.',
   3: 'The walls are quiet... for now.',
   4: 'The walls are quiet... for now.',

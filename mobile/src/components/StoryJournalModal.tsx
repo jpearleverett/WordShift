@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StoryContext, StoryMemory, StoryState, STORY_COPY, loadStoryState, selectStoryScene } from '../services/storySpine';
-import { StoryArchiveChapter, getStoryArchiveChapters, getStoryArchiveDialogues, getStorySpeakerName, getVisibleStoryMemoryLines } from '../services/storyArchive';
+import { StoryArchiveChapter, getStoryArchiveChapterLines, getStoryArchiveChapterSummary, getStoryArchiveChapters, getStorySpeakerName, getVisibleStoryMemoryLines } from '../services/storyArchive';
 import { getSettingsSync } from '../services/settings';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
 import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
@@ -38,12 +38,14 @@ const StoryJournalContents: React.FC<StoryJournalModalProps> = ({ visible, conte
   const chapters = useMemo(() => context ? getStoryArchiveChapters(context) : [], [contextKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const memories = state ? Object.values(state.memories).filter((value): value is StoryMemory => !!value) : [];
   const resumable = state && context ? selectStoryScene(context, state) : null;
-  const earlierLines = context && chapter ? getStoryArchiveDialogues(context, chapter.animal, chapter.phase) : [];
+  const earlierLines = context && chapter ? getStoryArchiveChapterLines(context, chapter.animal) : [];
   const memoryLines = context && selected ? getVisibleStoryMemoryLines(selected, context) : [];
   const answer = selected?.scene.options?.find(option => option.id === selected.choice)?.label;
   const back = () => { setSelected(null); setSelectedCycle(null); setChapter(null); };
   const resume = () => { onClose(); onResume(); };
-  const chapterTitle = (item: StoryArchiveChapter) => `${getStorySpeakerName(item.animal)} · ${STORY_COPY.archiveChapterTitles[item.phase]}`;
+  // A chapter is one animal, so its title is that animal. No mood word, no name
+  // for the stretch of the story the lines came from.
+  const chapterTitle = (item: StoryArchiveChapter) => getStorySpeakerName(item.animal);
   return <Modal visible={visible} transparent animationType={getSettingsSync().reducedMotion ? 'none' : 'fade'} onRequestClose={onClose}>
     <View style={[styles.overlay, { backgroundColor: theme.overlay, paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 }]} accessibilityViewIsModal>
       <PanelCard phase={phase} kind="panel" style={{ width: '100%', maxWidth: 660, height: height - insets.top - insets.bottom - 24 }}>
@@ -76,7 +78,7 @@ const StoryJournalContents: React.FC<StoryJournalModalProps> = ({ visible, conte
                 </Pressable>)}
               </View>)}
             </>}
-          </ScrollView> : <FlatList style={styles.scroll} key="chapters" data={chapters} keyExtractor={item => item.id} initialNumToRender={12} windowSize={5} contentContainerStyle={styles.reading} ListHeaderComponent={<AppText textRole="caption" style={[styles.summary, { color: theme.muted }]}>{STORY_COPY.archiveHint}</AppText>} ListEmptyComponent={<AppText textRole="reading" style={[styles.body, { color: theme.body }]}>{STORY_COPY.archiveEmpty}</AppText>} renderItem={({ item }) => <Pressable accessibilityRole="button" onPress={() => setChapter(item)} style={[styles.row, { backgroundColor: theme.sectionBg, borderColor: theme.sectionBorder }]}><AppText textRole="label" style={[styles.rowTitle, { color: theme.title }]}>{getStorySpeakerName(item.animal)}</AppText><AppText textRole="caption" style={[styles.rowBody, { color: theme.body }]}>{STORY_COPY.archiveChapterTitles[item.phase]}</AppText></Pressable>} />}
+          </ScrollView> : <FlatList style={styles.scroll} key="chapters" data={chapters} keyExtractor={item => item.id} initialNumToRender={12} windowSize={5} contentContainerStyle={styles.reading} ListHeaderComponent={<AppText textRole="caption" style={[styles.summary, { color: theme.muted }]}>{STORY_COPY.archiveHint}</AppText>} ListEmptyComponent={<AppText textRole="reading" style={[styles.body, { color: theme.body }]}>{STORY_COPY.archiveEmpty}</AppText>} renderItem={({ item }) => <Pressable accessibilityRole="button" onPress={() => setChapter(item)} style={[styles.row, { backgroundColor: theme.sectionBg, borderColor: theme.sectionBorder }]}><AppText textRole="label" style={[styles.rowTitle, { color: theme.title }]}>{getStorySpeakerName(item.animal)}</AppText><AppText textRole="caption" style={[styles.rowBody, { color: theme.body }]}>{getStoryArchiveChapterSummary(item.count)}</AppText></Pressable>} />}
         </>}
         <View style={styles.footer}><CandyButton phase={phase} label={STORY_COPY.close} onPress={onClose} variant="quiet" /></View>
       </PanelCard>

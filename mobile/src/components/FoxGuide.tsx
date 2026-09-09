@@ -22,6 +22,10 @@ import {
 } from '../services/phaseNarrative';
 import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
 import {
+  DIALOGUE_SPRITE_COL_FRACTION,
+  getDialoguePortraitFrame,
+} from '../theme/dialoguePortrait';
+import {
   getPixelSkin,
   CARD_CORNER_DP,
   CARD_EDGE_DP,
@@ -38,6 +42,25 @@ import { FONT_SIZE } from '../theme/typeScale';
 // FoxGuide is always a Phase-0 tutorial moment → bright cottage skin.
 const FOX_SKIN = getPixelSkin(0);
 const FOX_SURFACE = getSurfaceTheme(0);
+
+// FoxGuide's card is inset 16dp each side inside the screen, then the panel
+// frame's own wood band, so its sprite alcove is narrower than the home
+// dialogue sheet's. Ember's subject is 45% of her canvas wide and the full
+// card's band left her only ~2 canvas pixels of air on the left, so the same
+// measured framing runs here: the alcove owns the crop, the box height is
+// lowered only as far as Ember needs, and the layer is centred on her rather
+// than on the canvas. Shared with the home dialogue portrait so a non-fox
+// sprite routed through this card can never reproduce the alcove crop.
+const FOX_GUIDE_CARD_INSET = 16;
+const FOX_GUIDE_COMPACT_ALCOVE = 72;
+const getFoxGuidePortrait = (screenWidth: number, isCompact: boolean) => {
+  const alcoveWidth = isCompact
+    ? FOX_GUIDE_COMPACT_ALCOVE
+    : DIALOGUE_SPRITE_COL_FRACTION *
+      (screenWidth - 2 * FOX_GUIDE_CARD_INSET - 2 * SURFACE.panelPadX);
+  const maxHeight = isCompact ? 114 : screenWidth * 0.48;
+  return getDialoguePortraitFrame('fox', alcoveWidth, maxHeight);
+};
 
 /** Cottage pixel-bevel button for the FoxGuide footer (accepts a string label). */
 const FoxBevelButton: React.FC<{
@@ -246,6 +269,11 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
     setConfirmingSkip(false);
   }
   const isTalking = visible && hasText && speaking && (reducedMotion || talkingFrame);
+  // Measured portrait framing (above the early returns: hooks are unconditional).
+  const foxPortrait = useMemo(
+    () => getFoxGuidePortrait(SCREEN_WIDTH, variant === 'compact'),
+    [SCREEN_WIDTH, variant]
+  );
 
   if (!visible) return null;
   // Never render an empty shell: with no text Fox has nothing to say, and a
@@ -306,20 +334,20 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
             <Animated.View style={{ transform: [{ translateY: bounceAnim }] }}>
               {hasFoxSprite ? (
                 <View
-                  style={isCompact ? styles.compactSpriteImage : styles.dialogueSpriteImage}
+                  style={[styles.spriteCropBox, foxPortrait.box]}
                   accessibilityLabel="Ember portrait"
                 >
                   {foxIdleSprite && (
                     <Image
                       source={foxIdleSprite}
-                      style={[styles.foxSpriteLayer, showTalkFox && styles.foxSpriteLayerHidden]}
+                      style={[styles.foxSpriteLayer, foxPortrait.layer, showTalkFox && styles.foxSpriteLayerHidden]}
                       resizeMode="cover"
                     />
                   )}
                   {foxTalkSprite && (
                     <Image
                       source={foxTalkSprite}
-                      style={[styles.foxSpriteLayer, !showTalkFox && Boolean(foxIdleSprite) && styles.foxSpriteLayerHidden]}
+                      style={[styles.foxSpriteLayer, foxPortrait.layer, !showTalkFox && Boolean(foxIdleSprite) && styles.foxSpriteLayerHidden]}
                       resizeMode="cover"
                     />
                   )}
@@ -421,7 +449,7 @@ const createStyles = (SCREEN_WIDTH: number, SCREEN_HEIGHT: number) => StyleSheet
     left: 0,
     right: 0,
     zIndex: 9000,
-    paddingHorizontal: 16,
+    paddingHorizontal: FOX_GUIDE_CARD_INSET,
   },
   // Shared card anatomy (values copied from HomeScreen's dialogue modal)
   accentLine: {
@@ -449,16 +477,17 @@ const createStyles = (SCREEN_WIDTH: number, SCREEN_HEIGHT: number) => StyleSheet
     paddingRight: SURFACE.panelPadX,
     paddingBottom: PANEL_EDGE_DP - 12,
   },
-  // Sprite column - 30% width, zoomed in to fill (transparent — parchment shows)
+  // Sprite column - 30% width, zoomed in to fill (transparent, parchment shows)
   dialogueSpriteCol: {
-    width: '30%',
+    width: `${DIALOGUE_SPRITE_COL_FRACTION * 100}%`,
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
   },
-  dialogueSpriteImage: {
-    width: SCREEN_WIDTH * 0.36,
-    height: SCREEN_WIDTH * 0.48,
+  // The crop box owns the crop (see getFoxGuidePortrait); its dims arrive from
+  // the measured frame, so nothing is sized here.
+  spriteCropBox: {
+    overflow: 'hidden',
   },
   // Pre-mounted idle/talk stack (F29): absolute layers with EXPLICIT 100% size
   // (an inset-only Image collapses to intrinsic size on Fabric).
@@ -548,15 +577,10 @@ const createStyles = (SCREEN_WIDTH: number, SCREEN_HEIGHT: number) => StyleSheet
     paddingHorizontal: SURFACE.cardPadX,
   },
   compactSpriteCol: {
-    width: 72,
+    width: FOX_GUIDE_COMPACT_ALCOVE,
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
-  },
-  // Same 3:4 crop-to-fill treatment as the dialogue sprite, smaller.
-  compactSpriteImage: {
-    width: 86,
-    height: 114,
   },
   compactSpriteEmoji: {
     fontFamily: BODY_FONT,

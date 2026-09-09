@@ -263,6 +263,10 @@ test('a suspended ceremony keeps its page and resumes without replaying delivere
  * inside the scrolling reading pane. The passage itself is the control now: a
  * tap on the words the player is already reading holds the page and hands over
  * the Continue bevel, and the pacing line says so before it is needed.
+ *
+ * The settings mock above reports reducedMotion: true, so this also pins that
+ * the hold is not gated on a motion preference: a reader who has asked for
+ * less movement gets the same escape from the authored pace as everyone else.
  */
 test('the passage is the hold control: pressing the words cancels the pending advance', () => {
   jest.useFakeTimers();
@@ -298,7 +302,7 @@ test('the passage is the hold control: pressing the words cancels the pending ad
 
     // Partway through this page's 1250ms budget, the player taps the words.
     jest.advanceTimersByTime(1000);
-    void passage;
+    (passage!.props!.onPress as () => void)();
     render();
     jest.advanceTimersByTime(60000);
     const held = render();

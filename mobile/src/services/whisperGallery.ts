@@ -1,11 +1,20 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { PHASE_DESCRIPTIONS, DialoguePhase } from '../types/homeWorld';
 
 /**
- * Whisper Gallery — Collectible dialogue and whisper archive.
+ * Whisper Gallery — the archive of lines that exist nowhere else.
  *
- * Records every animal whisper, dialogue snippet, and notable narrative moment
- * the player has seen. Organized by animal and phase.
+ * Records the runtime-generated moments: the whisper after a win, the response
+ * an offering drew, the answer to a choice, the words the keeper kept. Base
+ * conversation lines are NOT recorded here — they live complete in the
+ * journal's earlier conversations (services/storyArchive), which reads the
+ * corpus directly and can neither desync nor be evicted. Organized by animal.
+ *
+ * The dividing line is what the JOURNAL CAN SHOW, not where a line was born.
+ * storyArchive reads phases 0-4 of ALL_DIALOGUES and nothing else, so the LATE
+ * POOLS — the Phase-2 exhaustion pool, the post-revelation pool and the Tending
+ * milestone lines, each served from its own module — can never appear there.
+ * Those are recorded here as 'passage'. Dropping them along with the base lines
+ * would silently retire the entire Tending reward from both archives.
  *
  * Players who care about the narrative will obsessively collect these.
  * Players who don't will ignore this screen entirely (zero cost).
@@ -23,7 +32,16 @@ export interface WhisperEntry {
   animalName: string;
   text: string;
   phase: number;
-  type: 'whisper' | 'dialogue' | 'cross_reference' | 'interjection' | 'trigger_reaction';
+  /**
+   * 'whisper' post-victory line or milestone offering response; 'choice' the
+   * answer a dialogue choice drew; 'keepsake' a one-time kept line; 'passage'
+   * a line from one of the LATE POOLS (see below).
+   * 'dialogue' is LEGACY only: base conversation lines recorded by builds
+   * before the journal took sole custody of them. Nothing writes it any more
+   * and HIDDEN_TYPES keeps it off the screen, but stored saves still carry it,
+   * so the member stays.
+   */
+  type: 'whisper' | 'choice' | 'keepsake' | 'passage' | 'dialogue' | 'cross_reference' | 'interjection' | 'trigger_reaction';
   timestamp: number;
 }
 
@@ -72,6 +90,21 @@ function generateEntryId(animalType: string, text: string, type: string): string
     hash = hash & hash; // Convert to 32-bit integer
   }
   return `wg_${Math.abs(hash).toString(36)}`;
+}
+
+/**
+ * Kinds the gallery stores but never shows. Base conversation lines recorded by
+ * older builds are duplicates of the journal's earlier conversations, so they
+ * are filtered out of every reader the screen uses. They are deliberately NOT
+ * deleted: the filter is reversible, and purging would also destroy the legacy
+ * choice answers and keepsakes that older builds happened to store under the
+ * same kind. The cap and dedupe arithmetic in recordWhisper still sees every
+ * stored entry, so an unfiltered read is the source of truth on disk.
+ */
+const HIDDEN_TYPES: ReadonlySet<string> = new Set(['dialogue']);
+
+function visibleEntries(state: WhisperGalleryState): WhisperEntry[] {
+  return state.entries.filter(entry => !HIDDEN_TYPES.has(entry.type));
 }
 
 // ============================================================================
@@ -135,7 +168,7 @@ export async function recordWhisper(entry: {
  */
 export async function getEntriesForAnimal(animalType: string): Promise<WhisperEntry[]> {
   const state = await loadWhisperGallery();
-  return state.entries
+  return visibleEntries(state)
     .filter(e => e.animalType === animalType)
     .sort((a, b) => a.phase - b.phase || a.timestamp - b.timestamp);
 }
@@ -147,7 +180,7 @@ export async function getGroupedEntries(): Promise<Record<string, WhisperEntry[]
   const state = await loadWhisperGallery();
   const grouped: Record<string, WhisperEntry[]> = {};
 
-  for (const entry of state.entries) {
+  for (const entry of visibleEntries(state)) {
     if (!grouped[entry.animalType]) grouped[entry.animalType] = [];
     grouped[entry.animalType].push(entry);
   }
@@ -174,14 +207,17 @@ export async function getGalleryStats(): Promise<{
   const byPhase: Record<number, number> = {};
   const byType: Record<string, number> = {};
 
-  for (const entry of state.entries) {
+  const visible = visibleEntries(state);
+  for (const entry of visible) {
     byAnimal[entry.animalType] = (byAnimal[entry.animalType] || 0) + 1;
     byPhase[entry.phase] = (byPhase[entry.phase] || 0) + 1;
     byType[entry.type] = (byType[entry.type] || 0) + 1;
   }
 
   return {
-    totalCollected: state.totalCollected,
+    // The count the header prints must match the list the screen shows, so it
+    // counts visible entries rather than echoing the stored total.
+    totalCollected: visible.length,
     byAnimal,
     byPhase,
     byType,
@@ -189,21 +225,14 @@ export async function getGalleryStats(): Promise<{
 }
 
 // ============================================================================
-// Era Names (display-only)
+// Display strings
 // ============================================================================
 
-/**
- * Get the poetic era name for a phase (clamped to the known 0-5 range).
- * Delegates to the canonical PHASE_DESCRIPTIONS titles in types/homeWorld so
- * the gallery never drifts from the rest of the game. Display-only: internal
- * phase numbers in data/storage stay numeric. The player must never see a
- * literal "Phase N" label (narrative rule: the phase system is invisible to
- * the player).
- */
-export function getPhaseEraName(phase: number): string {
-  const clamped = Math.max(0, Math.min(5, Math.floor(phase))) as DialoguePhase;
-  return PHASE_DESCRIPTIONS[clamped].title;
-}
+// No entry carries a name for the stretch of the story it came from. The
+// gallery used to stamp every card with one; a stamp like that is the phase
+// system wearing a costume, and the player asked for none of it here. Entries
+// are grouped by who spoke and ordered by when, which is all the shape they
+// need.
 
 /**
  * Get phase-aware gallery title.

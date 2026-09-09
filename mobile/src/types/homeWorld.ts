@@ -545,20 +545,11 @@ export function getPuzzlesBetweenSessions(phase: DialoguePhase): number {
   }
 }
 
-/**
- * Phase descriptions for UI
- * Phases are spread across ~120 puzzles (see PHASE_THRESHOLDS and
- * MIN_PUZZLES_FOR_PHASE in constants/gameBalance.ts; the arc was compressed
- * twice from its original ~300-puzzle geography)
- */
-export const PHASE_DESCRIPTIONS: Record<DialoguePhase, { title: string; mood: string }> = {
-  0: { title: 'Bright Days', mood: 'Everything seems wonderful!' },
-  1: { title: 'Curious Thoughts', mood: 'Beginning to wonder...' },
-  2: { title: 'Deeper Questions', mood: 'What does it all mean?' },
-  3: { title: 'Growing Shadows', mood: 'Something feels different...' },
-  4: { title: 'The Horizon', mood: 'Change is coming...' },
-  5: { title: 'Terrible Peace', mood: 'The pattern holds. Everything is quiet.' },
-};
+// PHASE_DESCRIPTIONS (the 'Bright Days' / 'Curious Thoughts' / ... era table)
+// was deleted with the whisper gallery's era stamp, its only consumer. Do not
+// reintroduce a table of names for the stretches of the story: the archives
+// group by who spoke, never by which stretch, and a mood label on a saved line
+// is the phase system wearing a costume.
 
 // PHASE_THRESHOLDS, AMBER_REWARDS, FIRST_COMPLETION_BONUS, MILESTONE_BONUSES
 // are now imported from constants/gameBalance.ts and re-exported at the top of this file.

@@ -277,14 +277,13 @@ describe('useDialogueFlow long-line pagination (drain behavior)', () => {
       expect(hook.hasMoreToShow).toBe(true);
     }
 
-    // No page advance recorded the line, advanced the read index, or
-    // re-fired the once-per-line whisper recording.
+    // No page advance recorded the line or advanced the read index.
     expect(recordDialogueMock).not.toHaveBeenCalled();
     expect(markDialogueReadMock).not.toHaveBeenCalled();
     expect(recordWhisperMock).not.toHaveBeenCalled();
   });
 
-  it('after the last page, Next advances the line exactly once (full-line whisper)', async () => {
+  it('after the last page, Next advances the line exactly once and keeps it out of the gallery', async () => {
     let hook = render();
     await hook.handleAnimalTap(pangolin as never);
     hook = render();
@@ -303,9 +302,11 @@ describe('useDialogueFlow long-line pagination (drain behavior)', () => {
     expect(recordDialogueMock).toHaveBeenCalledTimes(1);
     expect(markDialogueReadMock).toHaveBeenCalledTimes(1);
     expect(markDialogueReadMock).toHaveBeenCalledWith('pangolin', 1);
-    // The whisper gallery got the FULL line, not the last visible page
-    expect(recordWhisperMock).toHaveBeenCalledTimes(1);
-    expect(recordWhisperMock.mock.calls[0][0].text).toBe(LONG_LINE);
+    // A base conversation line is NEVER copied into the whisper gallery: it is
+    // already kept, complete, in the journal's earlier conversations. This
+    // used to record the full unpaginated line here, which made the gallery a
+    // lossy second copy of the archive.
+    expect(recordWhisperMock).not.toHaveBeenCalled();
 
     // The next line opens on its own first (and only) page
     expect(hook.dialogueText).toBe(SHORT_LINE);
@@ -324,8 +325,8 @@ describe('useDialogueFlow long-line pagination (drain behavior)', () => {
 
     expect(recordDialogueMock).toHaveBeenCalledTimes(1);
     expect(markDialogueReadMock).toHaveBeenCalledTimes(1);
-    expect(recordWhisperMock).toHaveBeenCalledTimes(1);
-    expect(recordWhisperMock.mock.calls[0][0].text).toBe(SHORT_LINE);
+    // Short or paginated, a base line still never reaches the gallery.
+    expect(recordWhisperMock).not.toHaveBeenCalled();
   });
 
   it('closing mid-pages clears the page queue for the next session', async () => {
@@ -989,5 +990,72 @@ describe('dialogue reveal visit ownership', () => {
     } finally {
       settings.getSettingsSync.mockReturnValue({ reducedMotion: true });
     }
+  });
+});
+
+/**
+ * The gallery keeps what the journal cannot show.
+ *
+ * A base conversation line is not recorded (the tests above pin that): the
+ * journal's earlier conversations read the same corpus, complete and
+ * un-evictable. But storyArchive reads phases 0-4 of ALL_DIALOGUES and nothing
+ * else, while the very same dialogue-advance branch also serves three corpora
+ * that live outside it: the Phase-2 exhaustion pool, the post-revelation pool
+ * and the Tending milestone lines. Those exist in NO other surface, so they are
+ * recorded as 'passage'.
+ *
+ * These two tests are the behavioural half of archiveSeparation.test.ts, which
+ * can only read the source. Deleting the recorder outright (which is what
+ * retired the Tending Shrine's whole reward from both archives) fails the
+ * first; dropping the `fromLatePool` guard fails the second.
+ */
+describe('useDialogueFlow keeps the late-pool lines the journal cannot show', () => {
+  const tending = jest.requireMock('../services/tending') as { selectPhase5Dialogue: jest.Mock };
+  const POOL_LINE = 'The pattern holds, and the kettle is still warm.';
+
+  beforeEach(() => {
+    resetHookState();
+    animals = [{ ...pangolin }];
+    jest.clearAllMocks();
+    getCurrentDialogueMock.mockReturnValue({ text: SHORT_LINE });
+  });
+
+  afterEach(() => {
+    progress.currentPhase = 0;
+    tending.selectPhase5Dialogue.mockReturnValue({ text: '', isNew: false, nextCaughtUp: 0 });
+  });
+
+  it('records a post-revelation / Tending pool line as a passage', async () => {
+    progress.currentPhase = 5;
+    tending.selectPhase5Dialogue.mockReturnValue({ text: POOL_LINE, isNew: true, nextCaughtUp: 1 });
+
+    let hook = render();
+    await hook.handleAnimalTap(pangolin as never);
+    hook = render();
+    expect(hook.dialogueText).toBe(POOL_LINE);
+
+    await hook.handleNextDialogue();
+
+    expect(recordWhisperMock).toHaveBeenCalledTimes(1);
+    const entry = recordWhisperMock.mock.calls[0][0];
+    expect(entry.text).toBe(POOL_LINE);
+    expect(entry.type).toBe('passage');
+    expect(entry.animalType).toBe('pangolin');
+    // Kept for the same reason it is shown: nothing else holds it.
+    expect(setPhase5CaughtUpMock).toHaveBeenCalled();
+  });
+
+  it('still keeps a base line out of the gallery at the same call site', async () => {
+    // Same branch, same recorder, phase 0: the journal owns this one.
+    progress.currentPhase = 0;
+
+    let hook = render();
+    await hook.handleAnimalTap(pangolin as never);
+    hook = render();
+    expect(hook.dialogueText).toBe(SHORT_LINE);
+
+    await hook.handleNextDialogue();
+
+    expect(recordWhisperMock).not.toHaveBeenCalled();
   });
 });

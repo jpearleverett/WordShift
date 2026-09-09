@@ -55,7 +55,6 @@ jest.mock('../services/whisperGallery', () => ({
   getGalleryStats: jest.fn(),
   getGalleryTitle: () => '',
   getGallerySubtitle: () => '',
-  getPhaseEraName: () => '',
 }));
 jest.mock('../services/animalDialogue', () => ({ ANIMAL_INFO: {} }));
 jest.mock('../services/phaseNarrative', () => ({ getWhisperGalleryEmptyText: () => '' }));

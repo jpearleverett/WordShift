@@ -1426,18 +1426,20 @@ export function useDialogueFlow({
     if (hasMore) {
       await recordDialogue(selectedAnimal.id);
 
-      // Record dialogue text in whisper gallery — the FULL line, not just the
-      // last visible page of a paginated one.
-      const currentText = getFullDialogueText();
-      if (currentText) {
-        recordWhisper({
-          animalType: selectedAnimal.type,
-          animalName: selectedAnimal.name,
-          text: currentText,
-          phase: animalPhase,
-          type: 'dialogue',
-        }).catch(() => {});
-      }
+      // Base conversation lines are NOT recorded to the gallery. They already
+      // live, complete and un-evictable, in the journal's earlier conversations
+      // (services/storyArchive reads the same corpus), so copying each read
+      // line here produced a second, lossier archive of the same text and let
+      // the gallery's 500-entry cap evict the runtime lines that exist nowhere
+      // else. The gallery keeps only what the journal cannot show.
+      //
+      // The LATE POOLS are the other half of that same rule, and they are still
+      // recorded (as 'passage', below). storyArchive reads phases 0-4 of
+      // ALL_DIALOGUES and nothing else, while the Phase-2 exhaustion pool
+      // (PHASE2_EXTRA_DIALOGUES), the post-revelation pool and the Tending
+      // milestone lines are each served from their own module, so the journal
+      // can never show one of them. `fromLatePool` below is set from the very
+      // branches that already detect a pool line, so the two cannot disagree.
 
       // Phase 5: if the line just shown was a genuinely-new pool line (not a
       // shuffled re-read), advance the animal's caught-up pointer and persist it,
@@ -1461,6 +1463,10 @@ export function useDialogueFlow({
       const total2 = getTotalDialogueCount(selectedAnimal.type, 2);
       let newIndex: number;
       let nextPhase2Cursor = phase2Cursors[selectedAnimal.type] ?? 0;
+      // Was the line the player just finished reading one the journal cannot
+      // show? Phase 5 is always a pool line (post-revelation / choice callback
+      // / Tending milestone); Phase 2 is one only past the base block.
+      let fromLatePool = animalPhase === 5;
       if (animalPhase === 5) {
         // Keep the regular index at/after the pool boundary and advance it only
         // as the deterministic re-read cursor. It never traverses old content.
@@ -1476,6 +1482,7 @@ export function useDialogueFlow({
           // A pool line was just shown: pin the stored index at the base-block
           // end (never inflate it — Phase 3 reads it as a phase-start position)
           // and advance the persisted pool cursor instead.
+          fromLatePool = true;
           newIndex = total2;
           const animalType = selectedAnimal.type;
           nextPhase2Cursor = await advancePhase2PoolCursor(animalType);
@@ -1485,6 +1492,19 @@ export function useDialogueFlow({
         }
       }
       await markDialogueRead(selectedAnimal.id, newIndex);
+      // Keep the line that no other surface holds. currentFullText is the FULL
+      // line (never the last visible page): reaching this branch means the page
+      // queue had already drained, so it is the line just finished, taken
+      // before the index above moved on.
+      if (fromLatePool && currentFullText) {
+        recordWhisper({
+          animalType: selectedAnimal.type,
+          animalName: selectedAnimal.name,
+          text: currentFullText,
+          phase: animalPhase,
+          type: 'passage',
+        }).catch(() => {});
+      }
       // A new line is about to show — it must open on its first page.
       resetPageQueue();
 
@@ -1573,13 +1593,15 @@ export function useDialogueFlow({
       setPreDialoguePages([{ text: result.response }, { text: result.convergence }]);
       setActiveChoice(null);
 
-      // Record the choice response in whisper gallery
+      // Record the choice response in the whisper gallery. Kept (as its own
+      // 'choice' kind) because it is generated at answer time and appears in
+      // no corpus the journal archive can walk.
       recordWhisper({
         animalType: selectedAnimal.type,
         animalName: selectedAnimal.name,
         text: result.response,
         phase: 3,
-        type: 'dialogue',
+        type: 'choice',
       }).catch(() => {});
     } catch {
       // Choice handling is non-critical, just close the choice

@@ -12,7 +12,7 @@ const RED_PANDA_DIALOGUES: Dialogue[] = [
   // Phase 0 (24)
   { id: 'rp_0_1', text: "Come up. Catch your breath first, those stairs are steep.", phase: 0, animalType: 'red_panda' },
   { id: 'rp_0_2', text: "I picked this room for the morning light. By afternoon the sun has moved off the mat, and I'm still deciding whether to move with it.", phase: 0, animalType: 'red_panda' },
-  { id: 'rp_0_3', text: "My name is Bamboo. The plant beside me is also bamboo. Only one of us needs watering.", phase: 0, animalType: 'red_panda' },
+  { id: 'rp_0_3', text: "Visitors keep watering the plant and calling it Bamboo. The plant is thriving on the attention, and I've decided not to interfere with a working arrangement.", phase: 0, animalType: 'red_panda' },
   { id: 'rp_0_4', text: "Sit wherever you fit. If the cushions are in your way, I'll move them.", phase: 0, animalType: 'red_panda' },
   { id: 'rp_0_5', text: "The incense was a gift out of Archimedes' crate. I should have asked him how slowly I was meant to burn it.", phase: 0, animalType: 'red_panda' },
   { id: 'rp_0_6', text: "I sat down to count my breaths. Then I got interested in the counting and forgot the breathing.", phase: 0, animalType: 'red_panda' },
@@ -156,7 +156,7 @@ const AXOLOTL_DIALOGUES: Dialogue[] = [
   { id: 'ax_0_2', text: "I can make a perfect ring in the water. Ask me to show you and it comes out a blob.", phase: 0, animalType: 'axolotl' },
   { id: 'ax_0_3', text: "That's my favorite pebble. It wasn't yesterday's favorite. Pebbles are a competitive field.", phase: 0, animalType: 'axolotl' },
   { id: 'ax_0_4', text: "New leg! I grew it myself. It's still figuring out how to take corners.", phase: 0, animalType: 'axolotl' },
-  { id: 'ax_0_5', text: "This pink toe is the newest part of me. I introduce it separately, so it feels important.", phase: 0, animalType: 'axolotl' },
+  { id: 'ax_0_5', text: "The toe has stopped being exciting to everybody except me. That's all right. Somebody in this tank has to keep track of the small news.", phase: 0, animalType: 'axolotl' },
   { id: 'ax_0_6', text: "I stayed up watching the moon's reflection in the glass. I fell asleep before I found the real one.", phase: 0, animalType: 'axolotl' },
   { id: 'ax_0_7', text: "Want to race bubbles? Choose yours carefully. Mine has been training.", phase: 0, animalType: 'axolotl' },
   { id: 'ax_0_8', text: "I bumped my head on a rock. I'm the one who put the rock there. Owning a thing should come with remembering where it is.", phase: 0, animalType: 'axolotl' },
@@ -168,7 +168,7 @@ const AXOLOTL_DIALOGUES: Dialogue[] = [
   { id: 'ax_0_14', text: "I sleep wherever I stop swimming. Some mornings I wake up impressed by the spot I picked.", phase: 0, animalType: 'axolotl' },
   { id: 'ax_0_15', text: "The snail has reached the far side of the glass. It was a long journey, and you're the first one to watch it.", phase: 0, animalType: 'axolotl' },
   { id: 'ax_0_16', text: "I sent a leaf up to the surface on a bubble. It came straight back down. So now I know how leaf transport works.", phase: 0, animalType: 'axolotl' },
-  { id: 'ax_0_17', text: "GLOW follows the feeding spoon. PLUM bites it. Picking their names was quick. Getting the two of them to agree took much longer.", phase: 0, animalType: 'axolotl' },
+  { id: 'ax_0_17', text: "GLOW and PLUM have never agreed about anything, including me. I think that's why the tank works. Two opinions, and somebody in the middle to hold the spoon.", phase: 0, animalType: 'axolotl' },
   { id: 'ax_0_18', text: "PLUM spends his days investigating the deep corner. I do wish he'd submit a report.", phase: 0, animalType: 'axolotl' },
   { id: 'ax_0_19', text: "I built a little cave out of rocks. The fish call it a spoon obstruction, because it sits between them and dinner.", phase: 0, animalType: 'axolotl' },
   { id: 'ax_0_20', text: "Tell me something small from outside. I can trade you plenty of water news.", phase: 0, animalType: 'axolotl' },
@@ -295,13 +295,13 @@ const AXOLOTL_DIALOGUES: Dialogue[] = [
 const PANGOLIN_DIALOGUES: Dialogue[] = [
   // Phase 0 (24)
   { id: 'pg_0_1', text: "Anyone who helps in my kitchen eats first. It's a simple rule, and it gets me a great many helpers.", phase: 0, animalType: 'pangolin' },
-  { id: 'pg_0_2', text: "Ant soufflé. I saw that face. There's bread too, don't worry.", phase: 0, animalType: 'pangolin' },
+  { id: 'pg_0_2', text: "You didn't have to say no thank you out loud. Your face managed it beautifully. There's bread instead, and I'm not offended in the slightest.", phase: 0, animalType: 'pangolin' },
   { id: 'pg_0_3', text: "I oversalted the soup. More vegetables are going in, to spread the mistake out thinner.", phase: 0, animalType: 'pangolin' },
   { id: 'pg_0_4', text: "Ember came by while I was unpacking. Frost on her tail, and questions about lunch. I decided to like her.", phase: 0, animalType: 'pangolin' },
   { id: 'pg_0_5', text: "None of my stools match. Neither do the people who sit on them.", phase: 0, animalType: 'pangolin' },
   { id: 'pg_0_6', text: "I sharpen the knives before I cook. It's quiet work, and it stops me starting seven dishes at once.", phase: 0, animalType: 'pangolin' },
-  { id: 'pg_0_7', text: "My grandmother's spoon has a split in the handle. It catches my thumb in the same place it caught hers.", phase: 0, animalType: 'pangolin' },
-  { id: 'pg_0_8', text: "My apron closes sideways, so I can still curl up inside it. I'm quite proud of the tailoring.", phase: 0, animalType: 'pangolin' },
+  { id: 'pg_0_7', text: "There's a newer spoon in the drawer, better balanced in every way. My hand still goes straight past it to my grandmother's. Habit is stubborn, and I let it be.", phase: 0, animalType: 'pangolin' },
+  { id: 'pg_0_8', text: "I curled up in the pantry this morning for a slow count of twenty. Nobody needs to know that, and the soup didn't suffer for it.", phase: 0, animalType: 'pangolin' },
   { id: 'pg_0_9', text: "Taste this, and be honest. You're allowed to dislike it. I can fix the soup, but I can't fix a polite face.", phase: 0, animalType: 'pangolin' },
   { id: 'pg_0_10', text: "I keep an empty chair where I can see the pot. Even the cook needs to sit down sometimes.", phase: 0, animalType: 'pangolin' },
   { id: 'pg_0_11', text: "My grandmother told me to feed hungry guests, and feed them well. I was too young to ask how she knew when they'd had enough.", phase: 0, animalType: 'pangolin' },
@@ -310,7 +310,7 @@ const PANGOLIN_DIALOGUES: Dialogue[] = [
   { id: 'pg_0_14', text: "There's one dish I make only for myself. No, that isn't an invitation to guess.", phase: 0, animalType: 'pangolin' },
   { id: 'pg_0_15', text: "I can feed you and complain about the washing-up at the same time. Both are sincere.", phase: 0, animalType: 'pangolin' },
   { id: 'pg_0_16', text: "If a pan sticks, leave it to soak. Certain arguments want the same treatment, in my experience.", phase: 0, animalType: 'pangolin' },
-  { id: 'pg_0_17', text: "This kitchen is mine now, and I still open the wrong drawer looking for spoons.", phase: 0, animalType: 'pangolin' },
+  { id: 'pg_0_17', text: "I've stopped putting things where they belong and started putting them where I reach for them. The kitchen and I are meeting in the middle.", phase: 0, animalType: 'pangolin' },
   { id: 'pg_0_18', text: "Bread needs waiting. So I need a timer, and somebody to stop me lifting the cloth to check.", phase: 0, animalType: 'pangolin' },
   { id: 'pg_0_19', text: "I made far too much soup. A tragedy, though the remedy is very straightforward. Sit down.", phase: 0, animalType: 'pangolin' },
   { id: 'pg_0_20', text: "Don't balance that bowl on your knee. I embroidered that cushion myself, and I'm unreasonable about it.", phase: 0, animalType: 'pangolin' },
@@ -437,12 +437,12 @@ const PANGOLIN_DIALOGUES: Dialogue[] = [
 const SLOTH_DIALOGUES: Dialogue[] = [
   // Phase 0 (24)
   { id: 'sl_0_1', text: "Hello down there. I'd wave, but I have a leaf balanced just right.", phase: 0, animalType: 'sloth' },
-  { id: 'sl_0_2', text: "I'm Sloane. That's the hammock. Please don't mix the two of us up.", phase: 0, animalType: 'sloth' },
+  { id: 'sl_0_2', text: "The hammock and I have the same outline by now. If you ever call it Sloane by mistake, neither of us will correct you quickly.", phase: 0, animalType: 'sloth' },
   { id: 'sl_0_3', text: "I set out to do one thing today. I haven't done it yet, but the plan is holding up.", phase: 0, animalType: 'sloth' },
-  { id: 'sl_0_4', text: "I knew this clearing before anyone added rooms to it. The old den had fewer cups in it then.", phase: 0, animalType: 'sloth' },
+  { id: 'sl_0_4', text: "The old den had two cups in it when I first looked inside. There's a whole shelf of them now. Things arrive here and then they stay.", phase: 0, animalType: 'sloth' },
   { id: 'sl_0_5', text: "That branch has held me through several disagreements with the weather.", phase: 0, animalType: 'sloth' },
   { id: 'sl_0_6', text: "I tried a different sleeping position last night. A courageous error.", phase: 0, animalType: 'sloth' },
-  { id: 'sl_0_7', text: "Every moth in my fur is named Gerald. It's a naming system with no paperwork.", phase: 0, animalType: 'sloth' },
+  { id: 'sl_0_7', text: "A fourth one moved into my fur last week. He's called Gerald as well. I did consider a number, and then I considered how long saying it would take.", phase: 0, animalType: 'sloth' },
   { id: 'sl_0_8', text: "Panko rigged a pulley to send dumplings up to me. Civilization has reached a new height.", phase: 0, animalType: 'sloth' },
   { id: 'sl_0_9', text: "Time passes differently when nobody asks what you've done with it.", phase: 0, animalType: 'sloth' },
   { id: 'sl_0_10', text: "I have opinions, and they take a while to finish. You needn't wait for the end of one before forming your own.", phase: 0, animalType: 'sloth' },
@@ -579,16 +579,16 @@ const SLOTH_DIALOGUES: Dialogue[] = [
 const FENNEC_FOX_DIALOGUES: Dialogue[] = [
   // Phase 0 (24)
   { id: 'ff_0_1', text: "I heard you coming up from the gate. Soft step, loose gravel. Hello!", phase: 0, animalType: 'fennec_fox' },
-  { id: 'ff_0_2', text: "Yes, these ears are real. And yes, I'm allowed to complain about carrying them.", phase: 0, animalType: 'fennec_fox' },
+  { id: 'ff_0_2', text: "I'm allowed to complain about carrying these, by the way. They collect sand, they catch the wind, and they turn a light breeze into an event.", phase: 0, animalType: 'fennec_fox' },
   { id: 'ff_0_3', text: "A kettle sounds different just before it boils. That's when I get the cups.", phase: 0, animalType: 'fennec_fox' },
   { id: 'ff_0_4', text: "The canvas flaps a lot. Listen past it, though, and camp is very quiet.", phase: 0, animalType: 'fennec_fox' },
   { id: 'ff_0_5', text: "There's one beetle under that stone. He's working harder than I intend to today.", phase: 0, animalType: 'fennec_fox' },
   { id: 'ff_0_6', text: "I can hear a little rain out beyond the ridge. We've got time to move the blankets in.", phase: 0, animalType: 'fennec_fox' },
   { id: 'ff_0_7', text: "Wind chimes are lovely until you're trying to sleep.", phase: 0, animalType: 'fennec_fox' },
   { id: 'ff_0_8', text: "Don't creep around for my sake. I hear you anyway, and then I worry about why you're creeping.", phase: 0, animalType: 'fennec_fox' },
-  { id: 'ff_0_9', text: "The sand cools after sunset and makes little clicking sounds. Sit with me a while and I'll show you.", phase: 0, animalType: 'fennec_fox' },
+  { id: 'ff_0_9', text: "The clicking started about ten minutes ago, if you were wondering. It runs from the ridge inward, so the far sand always finishes first.", phase: 0, animalType: 'fennec_fox' },
   { id: 'ff_0_10', text: "Once I heard rain three days before it arrived. Nobody believed me until everyone's washing was wet.", phase: 0, animalType: 'fennec_fox' },
-  { id: 'ff_0_11', text: "The desert is easier on my ears than a crowded room. In a room, all the little noises blur into one.", phase: 0, animalType: 'fennec_fox' },
+  { id: 'ff_0_11', text: "I tried a crowded room once, at the market. Forty conversations arrived at the same moment and not one of them finished. I bought nothing and came home early.", phase: 0, animalType: 'fennec_fox' },
   { id: 'ff_0_12', text: "My tea went cold while I listened to the kettle lid. Occupational hazard.", phase: 0, animalType: 'fennec_fox' },
   { id: 'ff_0_13', text: "A moth just landed on the canvas. It sounded like one soft stitch going through cloth.", phase: 0, animalType: 'fennec_fox' },
   { id: 'ff_0_14', text: "You can talk normally. I like hearing someone who means to be heard.", phase: 0, animalType: 'fennec_fox' },
@@ -601,7 +601,7 @@ const FENNEC_FOX_DIALOGUES: Dialogue[] = [
   { id: 'ff_0_21', text: "That wasn't thunder. It's the empty bowl knocking against the post. I check the ordinary answers first.", phase: 0, animalType: 'fennec_fox' },
   { id: 'ff_0_22', text: "I tried humming along with the kettle. We had different plans.", phase: 0, animalType: 'fennec_fox' },
   { id: 'ff_0_23', text: "A visitor makes the camp sound lived in. That's a nice change from just occupied.", phase: 0, animalType: 'fennec_fox' },
-  { id: 'ff_0_24', text: "Come back whenever you like. A gentle knock on the canvas is quite enough knock.", phase: 0, animalType: 'fennec_fox' },
+  { id: 'ff_0_24', text: "Come back whenever you like. I'll know it's you before you reach the post. Your step has a little hitch in it on the loose gravel, and I've grown fond of that.", phase: 0, animalType: 'fennec_fox' },
   // Phase 1 (28)
   { id: 'ff_1_1', text: "That low note I couldn't place? I said I'd hear it again the next day. I didn't. That stings a little. I'm wrong about plenty of things, but never about a noise.", phase: 1, animalType: 'fennec_fox' },
   { id: 'ff_1_2', text: "It did come back, though. Only at night. It sits low and steady under the wind, like someone humming who'd rather nobody noticed the humming.", phase: 1, animalType: 'fennec_fox' },
@@ -862,8 +862,8 @@ const FOX_DIALOGUES: Dialogue[] = [
 
 const OWL_DIALOGUES: Dialogue[] = [
   // Phase 0 (24)
-  { id: 'ow_0_1', text: "I file by affection. You're welcome to disagree once you've found something.", phase: 0, animalType: 'owl' },
-  { id: 'ow_0_2', text: "Bring me a word and I'll tell you where it came from. Some words have deeply embarrassing ancestors.", phase: 0, animalType: 'owl' },
+  { id: 'ow_0_1', text: "The stack nearest the window is the one I'm fondest of, which is exactly why it's nearest the window. You're welcome to disagree once you've found something.", phase: 0, animalType: 'owl' },
+  { id: 'ow_0_2', text: "Half the dignified words in this room have deeply embarrassing ancestors. I find that steadies me on the mornings when I'm feeling grand.", phase: 0, animalType: 'owl' },
   { id: 'ow_0_3', text: "I ordered eleven books. The crate came in heavier than I expected, and at first I took that as good value.", phase: 0, animalType: 'owl' },
   { id: 'ow_0_4', text: "There are twelve books in that crate. I've counted twice, and I've started to suspect the arithmetic.", phase: 0, animalType: 'owl' },
   { id: 'ow_0_5', text: "The extra book has no title anywhere on it. That's a serious inconvenience for my filing.", phase: 0, animalType: 'owl' },
@@ -877,7 +877,7 @@ const OWL_DIALOGUES: Dialogue[] = [
   { id: 'ow_0_13', text: "I spilled tea on the dictionary. It's a fragrant edition now.", phase: 0, animalType: 'owl' },
   { id: 'ow_0_14', text: "I reread books mostly for the passages I remembered badly.", phase: 0, animalType: 'owl' },
   { id: 'ow_0_15', text: "That's my thinking feather. It looks exactly like an ordinary feather, but it cost a great deal more.", phase: 0, animalType: 'owl' },
-  { id: 'ow_0_16', text: "Please bring a borrowed book back when you've finished it, not when you've worked out a good enough apology.", phase: 0, animalType: 'owl' },
+  { id: 'ow_0_16', text: "I keep a list of who has which book. Not out of suspicion. It's simply restful to know where everything is, including the things that have walked off.", phase: 0, animalType: 'owl' },
   { id: 'ow_0_17', text: "Someone pressed a fern in this book long ago. I know the fern far better than I know the argument.", phase: 0, animalType: 'owl' },
   { id: 'ow_0_18', text: "This window is at exactly the wrong height for the afternoon sun. So I moved the chair. The sun would not cooperate.", phase: 0, animalType: 'owl' },
   { id: 'ow_0_19', text: "Axel described a dream about water to me. If he were a book, he'd be an unstable edition. A lively one, though.", phase: 0, animalType: 'owl', requiresAnimals: ['axolotl'] },
@@ -1004,7 +1004,7 @@ const OWL_DIALOGUES: Dialogue[] = [
 
 const CAPYBARA_DIALOGUES: Dialogue[] = [
   // Phase 0 (24)
-  { id: 'cp_0_1', text: "The good chair's free. I tested it most of the morning, so I can confirm it works.", phase: 0, animalType: 'capybara' },
+  { id: 'cp_0_1', text: "The good chair's free, and it stays free. I've filed it under visitor, which is the only category in this office I take seriously.", phase: 0, animalType: 'capybara' },
   { id: 'cp_0_2', text: "I'm just finishing a thought. Nothing's due, so it can take as long as it likes.", phase: 0, animalType: 'capybara' },
   { id: 'cp_0_3', text: "The coffee's warm. That's about half of what this office achieves in a day.", phase: 0, animalType: 'capybara' },
   { id: 'cp_0_4', text: "I made a list this morning, then crossed off everything unnecessary. It's a very short list now.", phase: 0, animalType: 'capybara' },
@@ -1012,11 +1012,11 @@ const CAPYBARA_DIALOGUES: Dialogue[] = [
   { id: 'cp_0_6', text: "The desk drawer sticks, so open it slowly. That's my policy for most things, actually.", phase: 0, animalType: 'capybara' },
   { id: 'cp_0_7', text: "I put a plant by the window. It has declined every meeting I've invited it to.", phase: 0, animalType: 'capybara' },
   { id: 'cp_0_8', text: "My mug says \"productive.\" It was a gift from somebody with a very generous definition of that word.", phase: 0, animalType: 'capybara' },
-  { id: 'cp_0_9', text: "The hot spring is my break room. The ledger stays here on the desk while I'm in the water.", phase: 0, animalType: 'capybara' },
+  { id: 'cp_0_9', text: "I got as far as the door with the ledger under my arm last week. Then I put it back. You'd have had to stop me, and I'd rather save you the job.", phase: 0, animalType: 'capybara' },
   { id: 'cp_0_10', text: "There are spare pencils. Borrow one, return one. Return two if you're feeling unusually civic.", phase: 0, animalType: 'capybara' },
   { id: 'cp_0_11', text: "A quiet visitor improves the office. So does a noisy one, on the right sort of day.", phase: 0, animalType: 'capybara' },
   { id: 'cp_0_12', text: "I've scheduled nothing after lunch. Nothing is the hardest appointment to keep free.", phase: 0, animalType: 'capybara' },
-  { id: 'cp_0_13', text: "My face is doing pleased right now. It's the small print version, but it's there.", phase: 0, animalType: 'capybara' },
+  { id: 'cp_0_13', text: "Somewhere under all this, I'm pleased you came. You'll have to take that on the paperwork, because my face has no plans to confirm it.", phase: 0, animalType: 'capybara' },
   { id: 'cp_0_14', text: "The good chair squeaks. I've decided to take that as feedback.", phase: 0, animalType: 'capybara' },
   { id: 'cp_0_15', text: "No agenda today. You can still have a coffee.", phase: 0, animalType: 'capybara' },
   { id: 'cp_0_16', text: "I found a receipt for something I actually enjoyed. It's nice when the accounts explain themselves.", phase: 0, animalType: 'capybara' },
@@ -1147,7 +1147,7 @@ const CAPYBARA_DIALOGUES: Dialogue[] = [
 const WOMBAT_DIALOGUES: Dialogue[] = [
   // Phase 0 (24)
   { id: 'wb_0_1', text: "Mind the lintel. I measured it for myself, and I'm the short one here.", phase: 0, animalType: 'wombat' },
-  { id: 'wb_0_2', text: "I'm Warren. I dig, I brace, and I make tea when the kettle cooperates.", phase: 0, animalType: 'wombat' },
+  { id: 'wb_0_2', text: "There's a mug on the crate with Warren scratched into the base. My mother did that, so I'd stop losing them down other people's tunnels.", phase: 0, animalType: 'wombat' },
   { id: 'wb_0_3', text: "I make square corners. The earth supplies more than enough curves.", phase: 0, animalType: 'wombat' },
   { id: 'wb_0_4', text: "There's old stone under my new timber. I check both before I trust either.", phase: 0, animalType: 'wombat' },
   { id: 'wb_0_5', text: "Thirty years of digging, and I'm still pleased when a shelf comes out level.", phase: 0, animalType: 'wombat' },
@@ -1288,7 +1288,7 @@ const WOMBAT_DIALOGUES: Dialogue[] = [
 
 const RABBIT_DIALOGUES: Dialogue[] = [
   // Phase 0 (24)
-  { id: 'rb_0_1', text: "The thyme grows in this bed, and I'm the other Thyme. You can see why I label everything.", phase: 0, animalType: 'rabbit' },
+  { id: 'rb_0_1', text: "The label on that bed says Thyme, and so does the one on the gate. A visitor read the first one last week and said good morning to the herbs. I've stopped explaining it.", phase: 0, animalType: 'rabbit' },
   { id: 'rb_0_2', text: "Mind the gate. It bangs, and then I drop whatever I'm carrying.", phase: 0, animalType: 'rabbit' },
   { id: 'rb_0_3', text: "I grew all those flowers from seed. I keep wanting to introduce you to them one at a time.", phase: 0, animalType: 'rabbit' },
   { id: 'rb_0_4', text: "The path bends there because a flower came up where I'd planned to go straight. I let the flower win.", phase: 0, animalType: 'rabbit' },
@@ -1431,13 +1431,13 @@ const RABBIT_DIALOGUES: Dialogue[] = [
 // TARSIER (Vesper) - The unblinking night watcher whose vigil holds the way open
 const TARSIER_DIALOGUES: Dialogue[] = [
   // Phase 0 (24)
-  { id: 'tr_0_1', text: "Up here, on the rail. I keep forgetting that most people don't start by looking up.", phase: 0, animalType: 'tarsier' },
-  { id: 'tr_0_2', text: "I'm Vesper. I keep the night watch, and I eat breakfast at unreasonable hours.", phase: 0, animalType: 'tarsier' },
+  { id: 'tr_0_1', text: "You looked up before I said anything. Most people search the floor first, then the chairs, and only then the rail. I've decided to be pleased about that.", phase: 0, animalType: 'tarsier' },
+  { id: 'tr_0_2', text: "The chalk marks out there are signed Vesper, so nobody sweeps them off by accident. I keep the night watch, and I eat breakfast at hours the rest of the house won't admit to.", phase: 0, animalType: 'tarsier' },
   { id: 'tr_0_3', text: "I keep the lantern unlit so my eyes can have the whole valley.", phase: 0, animalType: 'tarsier' },
-  { id: 'tr_0_4', text: "My eyes can't move in my head, so I turn the whole head instead. I'll demonstrate if you like.", phase: 0, animalType: 'tarsier' },
+  { id: 'tr_0_4', text: "You can always tell what I'm watching, since the whole head goes with it. It makes me a poor liar and a very reliable lookout.", phase: 0, animalType: 'tarsier' },
   { id: 'tr_0_5', text: "A moth is a lovely thing. A moth is also supper. I manage to hold both opinions at once.", phase: 0, animalType: 'tarsier' },
   { id: 'tr_0_6', text: "I chalk the star positions onto the porch. Rain edits my work without asking.", phase: 0, animalType: 'tarsier' },
-  { id: 'tr_0_7', text: "When I look at you, you get all of my attention at once. Tell me if that's too much.", phase: 0, animalType: 'tarsier' },
+  { id: 'tr_0_7', text: "You haven't asked me to look away yet. Most people do, around now, and I never mind it. I only mind not being told.", phase: 0, animalType: 'tarsier' },
   { id: 'tr_0_8', text: "The porch is warmest just before dawn. It's an excellent place to finish a night.", phase: 0, animalType: 'tarsier' },
   { id: 'tr_0_9', text: "I inherited this watch log from my family. Plenty of diligent entries, very little explanation.", phase: 0, animalType: 'tarsier' },
   { id: 'tr_0_10', text: "That moth has circled me twice now. I admire persistence, but I won't admire it forever.", phase: 0, animalType: 'tarsier' },
@@ -1575,7 +1575,7 @@ const TARSIER_DIALOGUES: Dialogue[] = [
 const AYE_AYE_DIALOGUES: Dialogue[] = [
   // Phase 0 (24)
   { id: 'ay_0_1', text: "Tok, tok. That's hello. I try not to use it on a door with somebody asleep behind it.", phase: 0, animalType: 'aye_aye' },
-  { id: 'ay_0_2', text: "I'm Tock, an aye-aye. The long finger gets introduced last, after the rest of me. That order works better for everyone.", phase: 0, animalType: 'aye_aye' },
+  { id: 'ay_0_2', text: "The long finger gets introduced last, after the rest of me. Tock first, then the hand. That order has spared a few people a moment they'd rather not have had.", phase: 0, animalType: 'aye_aye' },
   { id: 'ay_0_3', text: "The bell up here has never rung. Not once. I'm her new keeper, so keeping that silence going is my job now.", phase: 0, animalType: 'aye_aye' },
   { id: 'ay_0_4', text: "Tap a board and you hear whether it's hollow. That's a good way to start getting to know a room.", phase: 0, animalType: 'aye_aye' },
   { id: 'ay_0_5', text: "Some hollows contain grubs. I eat grubs. The work has refreshments.", phase: 0, animalType: 'aye_aye' },
@@ -1717,10 +1717,10 @@ const AYE_AYE_DIALOGUES: Dialogue[] = [
 // KAKAPO (Moss) - The patient caller whose lifelong booming is finally answered
 const KAKAPO_DIALOGUES: Dialogue[] = [
   // Phase 0 (24)
-  { id: 'kk_0_1', text: "Moss. Mind the seedlings there. They're tiny, and they've claimed that whole bed like they own it.", phase: 0, animalType: 'kakapo' },
+  { id: 'kk_0_1', text: "Mind the seedlings there. They're tiny, and they've taken that whole bed. Somebody asked me last week which of the green things was Moss, and she wasn't joking.", phase: 0, animalType: 'kakapo' },
   { id: 'kk_0_2', text: "I walked here. It was all hills, and I now have strong opinions about walking.", phase: 0, animalType: 'kakapo' },
   { id: 'kk_0_3', text: "A kakapo can't fly. So I get my excellent views by standing on perfectly ordinary rocks.", phase: 0, animalType: 'kakapo' },
-  { id: 'kk_0_4', text: "That honey smell is me, I'm afraid. The bees consider it false advertising.", phase: 0, animalType: 'kakapo' },
+  { id: 'kk_0_4', text: "A bee followed me down two flights of stairs this morning, entirely convinced. I felt dreadful about it. There's no honey anywhere on me, only the promise of it.", phase: 0, animalType: 'kakapo' },
   { id: 'kk_0_5', text: "I keep a dish of sugar water by the gate. It's a peace offering to the bees who come for honey and find only me.", phase: 0, animalType: 'kakapo' },
   { id: 'kk_0_6', text: "The roof needed soil, so I carried soil up. Several trips, and one shortcut I regret.", phase: 0, animalType: 'kakapo' },
   { id: 'kk_0_7', text: "That shallow bowl in the dirt is where I do my calling. It took longer to dig than it looks.", phase: 0, animalType: 'kakapo' },

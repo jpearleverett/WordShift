@@ -17,8 +17,8 @@ interface DailyLeaderboardCardProps {
    * by the caller: getBeatPercentText when the day has enough entrants for a
    * percentile to mean anything, its getStandingsGatheringText substitute when
    * it does not. This component deliberately holds no percentile of its own and
-   * no fallback copy: it used to carry a hardcoded "You beat N% of players
-   * today", which is exactly how a suppressed 0% would come back.
+   * no fallback copy of its own: it used to hardcode its own percentage
+   * sentence, which is exactly how a suppressed standing would come back.
    */
   beatText?: string | null;
   /** Persistent local history line (best this week / participation); spoiler-safe. */

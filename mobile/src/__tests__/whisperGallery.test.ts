@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as gallery from '../services/whisperGallery';
 import {
   loadWhisperGallery,
   recordWhisper,
@@ -7,10 +8,16 @@ import {
   getGalleryStats,
   getGalleryTitle,
   getGallerySubtitle,
-  getPhaseEraName,
   clearWhisperGallery,
   WhisperEntry,
 } from '../services/whisperGallery';
+
+/** The era names the gallery used to stamp on every card. None of them, and no
+ *  label of that family, may reach a player-facing string from this module. */
+const ERA_NAMES = [
+  'Bright Days', 'Curious Thoughts', 'Deeper Questions',
+  'Growing Shadows', 'The Horizon', 'Terrible Peace',
+];
 
 // Mock AsyncStorage using shared factory
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -158,7 +165,7 @@ describe('whisperGallery', () => {
         animalName: 'Ember',
         text: 'Same text.',
         phase: 0,
-        type: 'dialogue',
+        type: 'choice',
       });
 
       const state = await loadWhisperGallery();
@@ -241,7 +248,7 @@ describe('whisperGallery', () => {
     });
 
     it('supports all entry types', async () => {
-      const types: WhisperEntry['type'][] = ['whisper', 'dialogue', 'cross_reference', 'interjection', 'trigger_reaction'];
+      const types: WhisperEntry['type'][] = ['whisper', 'choice', 'keepsake', 'dialogue', 'cross_reference', 'interjection', 'trigger_reaction'];
       for (const type of types) {
         const result = await recordWhisper({
           animalType: 'fox',
@@ -254,7 +261,7 @@ describe('whisperGallery', () => {
       }
 
       const state = await loadWhisperGallery();
-      expect(state.entries.length).toBe(5);
+      expect(state.entries.length).toBe(types.length);
     });
   });
 
@@ -266,7 +273,7 @@ describe('whisperGallery', () => {
     it('returns only entries for specified animal', async () => {
       await recordWhisper({ animalType: 'fox', animalName: 'Ember', text: 'Fox line.', phase: 0, type: 'whisper' });
       await recordWhisper({ animalType: 'owl', animalName: 'Archimedes', text: 'Owl line.', phase: 0, type: 'whisper' });
-      await recordWhisper({ animalType: 'fox', animalName: 'Ember', text: 'Fox line 2.', phase: 1, type: 'dialogue' });
+      await recordWhisper({ animalType: 'fox', animalName: 'Ember', text: 'Fox line 2.', phase: 1, type: 'choice' });
 
       const foxEntries = await getEntriesForAnimal('fox');
       expect(foxEntries.length).toBe(2);
@@ -360,14 +367,14 @@ describe('whisperGallery', () => {
 
     it('counts by type correctly', async () => {
       await recordWhisper({ animalType: 'fox', animalName: 'Ember', text: 'A.', phase: 0, type: 'whisper' });
-      await recordWhisper({ animalType: 'fox', animalName: 'Ember', text: 'B.', phase: 0, type: 'dialogue' });
-      await recordWhisper({ animalType: 'fox', animalName: 'Ember', text: 'C.', phase: 0, type: 'dialogue' });
-      await recordWhisper({ animalType: 'fox', animalName: 'Ember', text: 'D.', phase: 0, type: 'interjection' });
+      await recordWhisper({ animalType: 'fox', animalName: 'Ember', text: 'B.', phase: 0, type: 'choice' });
+      await recordWhisper({ animalType: 'fox', animalName: 'Ember', text: 'C.', phase: 0, type: 'choice' });
+      await recordWhisper({ animalType: 'fox', animalName: 'Ember', text: 'D.', phase: 0, type: 'keepsake' });
 
       const stats = await getGalleryStats();
       expect(stats.byType.whisper).toBe(1);
-      expect(stats.byType.dialogue).toBe(2);
-      expect(stats.byType.interjection).toBe(1);
+      expect(stats.byType.choice).toBe(2);
+      expect(stats.byType.keepsake).toBe(1);
     });
 
     it('totalCollected matches entry count', async () => {
@@ -442,39 +449,64 @@ describe('whisperGallery', () => {
   });
 
   // ===========================================================================
-  // getPhaseEraName
+  // Display strings (no era stamp survives here)
   // ===========================================================================
 
-  describe('getPhaseEraName', () => {
-    it('returns the canonical PHASE_DESCRIPTIONS title for each phase', () => {
-      // Delegates to types/homeWorld PHASE_DESCRIPTIONS — the single source of
-      // truth for era names (the gallery must never drift from it).
-      expect(getPhaseEraName(0)).toBe('Bright Days');
-      expect(getPhaseEraName(1)).toBe('Curious Thoughts');
-      expect(getPhaseEraName(2)).toBe('Deeper Questions');
-      expect(getPhaseEraName(3)).toBe('Growing Shadows');
-      expect(getPhaseEraName(4)).toBe('The Horizon');
-      expect(getPhaseEraName(5)).toBe('Terrible Peace');
+  describe('display strings', () => {
+    it('no longer exposes an era-name builder', () => {
+      // getPhaseEraName stamped every entry card with the name of the stretch
+      // of the story it came from. It is deleted, along with the
+      // PHASE_DESCRIPTIONS table it read: nothing in the gallery may name a
+      // stretch of the story again.
+      expect(Object.keys(gallery)).not.toContain('getPhaseEraName');
     });
 
-    it('clamps out-of-range phases to the known era range', () => {
-      expect(getPhaseEraName(-1)).toBe('Bright Days');
-      expect(getPhaseEraName(6)).toBe('Terrible Peace');
-      expect(getPhaseEraName(99)).toBe('Terrible Peace');
-    });
-
-    it('never leaks a literal phase number in any display-string builder', () => {
-      // Narrative rule 7: the phase system must never be revealed to the player.
+    it('never leaks a phase number or a name for a stretch of the story', () => {
       for (let phase = 0; phase <= 5; phase++) {
         const rendered = [
-          getPhaseEraName(phase),
           getGalleryTitle(phase),
           getGallerySubtitle(phase, 42),
         ];
         for (const text of rendered) {
           expect(text).not.toMatch(/Phase \d/i);
+          for (const era of ERA_NAMES) expect(text).not.toContain(era);
         }
       }
+    });
+  });
+
+  // ===========================================================================
+  // Legacy conversation lines (recorded by older builds, never shown again)
+  // ===========================================================================
+
+  describe('legacy base conversation entries', () => {
+    const legacy = { animalType: 'fox', animalName: 'Ember', text: 'A read line.', phase: 1, type: 'dialogue' as const };
+
+    it('stays on disk so nothing a save already holds is destroyed', async () => {
+      expect(await recordWhisper(legacy)).toBe(true);
+      const state = await loadWhisperGallery();
+      expect(state.entries.map(e => e.type)).toEqual(['dialogue']);
+    });
+
+    it('is hidden from every reader the screen uses', async () => {
+      await recordWhisper(legacy);
+      await recordWhisper({ animalType: 'fox', animalName: 'Ember', text: 'A whisper.', phase: 1, type: 'whisper' });
+
+      expect((await getEntriesForAnimal('fox')).map(e => e.text)).toEqual(['A whisper.']);
+      expect((await getGroupedEntries()).fox.map(e => e.text)).toEqual(['A whisper.']);
+
+      const stats = await getGalleryStats();
+      // The header count must match the list, or the screen advertises entries
+      // it does not list.
+      expect(stats.totalCollected).toBe(1);
+      expect(stats.byAnimal.fox).toBe(1);
+      expect(stats.byType.dialogue).toBeUndefined();
+    });
+
+    it('leaves an animal with only legacy entries out of the grouping entirely', async () => {
+      await recordWhisper(legacy);
+      expect(await getGroupedEntries()).toEqual({});
+      expect((await getGalleryStats()).totalCollected).toBe(0);
     });
   });
 
