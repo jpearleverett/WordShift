@@ -146,6 +146,7 @@ jest.mock('../services/whisperGallery', () => ({
 
 jest.mock('../services/phaseNarrative', () => ({
   getFoxPostTutorialPlayPrompt: jest.fn(() => 'Go solve a puzzle, friend.'),
+  getDialogueCaughtUpLine: jest.fn((phase: number) => `caught up (phase ${phase})`),
 }));
 
 jest.mock('../services/weeklyQuests', () => ({
@@ -172,7 +173,7 @@ jest.mock('../services/dialogue/phase5Pool', () => ({
 }));
 
 import { useDialogueFlow, splitDialogueIntoPages } from '../hooks/useDialogueFlow';
-import { getCurrentDialogue } from '../services/animalDialogue';
+import { getCurrentDialogue, getCoordinatedEventLine } from '../services/animalDialogue';
 import { checkDialogueAvailability, recordDialogue } from '../services/dialogueSession';
 import { markDialogueRead } from '../services/amberCurrency';
 import { recordWhisper } from '../services/whisperGallery';
@@ -1057,5 +1058,70 @@ describe('useDialogueFlow keeps the late-pool lines the journal cannot show', ()
     await hook.handleNextDialogue();
 
     expect(recordWhisperMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('useDialogueFlow exhausted regular block (no last-line replay)', () => {
+  // The mocked total is 24 and resolveDialogueIndex is the identity, so an
+  // index of 24 is exactly where closeDialogue's terminal read parks an animal
+  // whose block is read out: badge dark, still tappable.
+  const exhausted = { ...pangolin, currentDialogueIndex: 24, hasNewDialogue: false };
+
+  beforeEach(() => {
+    resetHookState();
+    animals = [{ ...exhausted }];
+    jest.clearAllMocks();
+    getCurrentDialogueMock.mockImplementation(() => ({ text: 'The last line of the block.' }));
+  });
+
+  it('speaks the caught-up line instead of replaying the last line, and offers Close', async () => {
+    let hook = render();
+    await hook.handleAnimalTap(exhausted as never);
+    hook = render();
+
+    expect(hook.dialogueText).toBe('caught up (phase 0)');
+    expect(hook.hasMoreToShow).toBe(false);
+    // The clamp in getCurrentDialogue is never consulted for a read-out block.
+    expect(getCurrentDialogueMock).not.toHaveBeenCalled();
+    // Nothing was advanced or budgeted just by looking in.
+    expect(markDialogueReadMock).not.toHaveBeenCalled();
+    expect(recordDialogueMock).not.toHaveBeenCalled();
+
+    await hook.handleCloseDialogue();
+    hook = render();
+    expect(hook.showDialogue).toBe(false);
+    expect(markDialogueReadMock).not.toHaveBeenCalled();
+    expect(recordDialogueMock).not.toHaveBeenCalled();
+    expect(recordWhisperMock).not.toHaveBeenCalled();
+  });
+
+  it('still delivers pre-dialogue pages ahead of the caught-up line', async () => {
+    (getCoordinatedEventLine as jest.Mock).mockReturnValueOnce({
+      text: 'Every room heard it at once.',
+      deliveryKey: 'coord:test',
+    });
+
+    let hook = render();
+    await hook.handleAnimalTap(exhausted as never);
+    hook = render();
+
+    // The event page opens the visit and promises more (the caught-up line).
+    expect(hook.dialogueText).toBe('Every room heard it at once.');
+    expect(hook.hasMoreToShow).toBe(true);
+
+    await hook.handleNextDialogue();
+    hook = render();
+    expect(hook.dialogueText).toBe('caught up (phase 0)');
+    expect(hook.hasMoreToShow).toBe(false);
+    expect(getCurrentDialogueMock).not.toHaveBeenCalled();
+    expect(recordDialogueMock).not.toHaveBeenCalled();
+  });
+
+  it('an unread block is untouched: the indexed line still serves', async () => {
+    let hook = render();
+    await hook.handleAnimalTap({ ...exhausted, currentDialogueIndex: 23 } as never);
+    hook = render();
+    expect(hook.dialogueText).toBe('The last line of the block.');
+    expect(getCurrentDialogueMock).toHaveBeenCalledWith('pangolin', 23, 0);
   });
 });

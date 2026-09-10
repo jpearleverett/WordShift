@@ -2669,6 +2669,25 @@ export function getNextFriendPrompt(phase: number, name: string): string {
 }
 
 // ============================================================================
+// DIALOGUE CAUGHT UP — what an animal says when its finite block for the
+// current stretch of the story is read out and the player taps it anyway.
+// Spoken inside the card in the animal's own first person, so it stays
+// voice-neutral across the cast; the reveal register drops its contractions
+// like every other Phase 4+ line. It replaces replaying the animal's LAST line
+// verbatim on every tap (getCurrentDialogue clamps an over-range index to the
+// tail). Phase 2 hands off to its exhaustion pool and Phase 5 cycles forever,
+// so neither normally reaches this; the lines exist so no phase can fall back
+// to a repeat. Never recorded, never counted against the session budget.
+// ============================================================================
+
+export function getDialogueCaughtUpLine(phase: number): string {
+  if (phase >= 5) return 'There is nothing new to tell tonight. Sit with me a while, or go on. Both are fine.';
+  if (phase >= 4) return 'I have said what I am able to say, for now. The arrangement will give me more when it is ready.';
+  if (phase >= 2) return "I've said what I can for now. Bring a few more words to the house and I'll have more for you.";
+  return "That's everything I've got for now. Go find a few more words and come back. I'll have more to say by then.";
+}
+
+// ============================================================================
 // MOVE RESONANCE — acknowledgment when the player, given a real choice of
 // valid words, chose the deepest one (see usePuzzleGame resonance tracking).
 // Bright phases stay innocent (a lovely word, nothing more); the dread

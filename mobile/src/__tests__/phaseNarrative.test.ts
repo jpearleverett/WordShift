@@ -68,6 +68,7 @@ import {
   resolveVictoryMicroBeat,
   ackVictoryMicroBeat,
   invalidateMicroBeatCaches,
+  getDialogueCaughtUpLine,
 } from '../services/phaseNarrative';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DialoguePhase } from '../types/homeWorld';
@@ -2241,5 +2242,31 @@ describe('NewCycle retains a household without assuming its construction state',
     expect(text).not.toMatch(/house is whole|house is complete|not needed to make room/i);
     expect(text).toMatch(/timber/);
     expect(text).toMatch(/rehearsed/);
+  });
+});
+
+describe('getDialogueCaughtUpLine (an exhausted animal never replays its last line)', () => {
+  const CONTRACTION = /\b\w+'(?:s|re|ve|ll|d|m|t)\b/i;
+  const FOURTH_WALL = /\b(?:game|player|screen|app|level|tap|button|menu|puzzle|phase)\b/i;
+
+  test('every phase has a line, in the house register, with no dashes or fourth-wall words', () => {
+    for (let phase = 0; phase <= 5; phase++) {
+      const line = getDialogueCaughtUpLine(phase);
+      expect(line.length).toBeGreaterThan(20);
+      expect(line).not.toMatch(/[\u2014\u2013]/);
+      expect(line).not.toMatch(FOURTH_WALL);
+      expect(line).not.toMatch(/bright days|curious thoughts|deeper questions|growing shadows/i);
+    }
+  });
+
+  test('contractions belong to phases 0-3 only; the reveal register drops them', () => {
+    for (const phase of [0, 1, 2, 3]) expect(getDialogueCaughtUpLine(phase)).toMatch(CONTRACTION);
+    for (const phase of [4, 5]) expect(getDialogueCaughtUpLine(phase)).not.toMatch(CONTRACTION);
+  });
+
+  test('the line darkens with the descent', () => {
+    const distinct = new Set([0, 2, 4, 5].map(getDialogueCaughtUpLine));
+    expect(distinct.size).toBe(4);
+    expect(getDialogueCaughtUpLine(4)).toMatch(/arrangement/);
   });
 });

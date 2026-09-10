@@ -68,7 +68,7 @@ import {
   markPhase4CallbackShown,
 } from '../services/dialogueChoices';
 import { recordWhisper } from '../services/whisperGallery';
-import { getFoxPostTutorialPlayPrompt } from '../services/phaseNarrative';
+import { getFoxPostTutorialPlayPrompt, getDialogueCaughtUpLine } from '../services/phaseNarrative';
 import { recordAnimalVisit, Quest } from '../services/weeklyQuests';
 import { hapticLight, hapticSelection } from '../services/haptics';
 import {
@@ -717,11 +717,26 @@ export function useDialogueFlow({
       }
     }
 
-    const dialogue = getCurrentDialogue(
+    const resolvedIndex = resolveDialogueIndex(
       selectedAnimal.type,
-      resolveDialogueIndex(selectedAnimal.type, selectedAnimal.currentDialogueIndex, animalPhase, getUnlockedTypes()),
-      animalPhase
+      selectedAnimal.currentDialogueIndex,
+      animalPhase,
+      getUnlockedTypes()
     );
+    // A finite block that is read out must not replay its last line. The
+    // terminal read in closeDialogue parks the index AT total so the badge goes
+    // honest-dark, but the animal stays tappable, and getCurrentDialogue clamps
+    // an over-range index to the tail: every visit re-served the same closing
+    // line verbatim (Ember repeating her goodbye until the next phase opened).
+    // Speak an honest "that is all for now" instead. hasMoreToShow already
+    // reads false at this index, so the button offers Close, nothing is
+    // recorded and no session budget is spent; any pre-dialogue pages (a
+    // coordinated event, a trigger reaction) still deliver ahead of it.
+    if (resolvedIndex >= getTotalDialogueCount(selectedAnimal.type, animalPhase)) {
+      return getDialogueCaughtUpLine(animalPhase);
+    }
+
+    const dialogue = getCurrentDialogue(selectedAnimal.type, resolvedIndex, animalPhase);
     return dialogue?.text || 'Hello, friend!';
   }, [preDialoguePages, selectedAnimal, progress, selectPhase5, getUnlockedTypes, phase2Cursors]);
 
