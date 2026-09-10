@@ -178,3 +178,17 @@ describe('neither archive names a stretch of the story', () => {
     expect(modal).toMatch(/const chapterTitle = \(item: StoryArchiveChapter\) => getStorySpeakerName\(item\.animal\);/);
   });
 });
+
+describe('the journey achievements do not name the stretches of the story either', () => {
+  it('no achievement title or description carries an era name', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { ACHIEVEMENTS } = require('../services/achievements') as { ACHIEVEMENTS: { title: string; description: string }[] };
+    const eras = ['Bright Days', 'Curious Thoughts', 'Deeper Questions', 'Growing Shadows', 'The Horizon', 'Terrible Peace'];
+    for (const achievement of ACHIEVEMENTS) {
+      for (const era of eras) {
+        expect(achievement.title).not.toContain(era);
+        expect(achievement.description).not.toContain(era);
+      }
+    }
+  });
+});

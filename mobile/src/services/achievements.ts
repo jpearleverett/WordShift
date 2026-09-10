@@ -458,11 +458,15 @@ export const ACHIEVEMENTS: Achievement[] = [
     check: (s) => s.amberEarned >= 1000,
   },
 
-  // Journey achievements
+  // Journey achievements. Titled by what the house LOOKS like at each turn
+  // (the sky over it), never by the story's own names for its stretches: a
+  // locked row shows its title, and a list that reads "Curious Thoughts,
+  // Deeper Questions, Growing Shadows, The Horizon" enumerates the descent
+  // for a player who has not taken it (narrative rule 7).
   {
     id: 'phase_1',
     rewardAmber: 20,
-    title: 'Curious Thoughts',
+    title: 'The Afternoon Turns',
     description: 'Feel the journey begin to change',
     icon: '💭',
     category: 'journey',
@@ -471,7 +475,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   {
     id: 'phase_2',
     rewardAmber: 25,
-    title: 'Deeper Questions',
+    title: 'Dusk at the Windows',
     description: 'Follow the journey into deeper questions',
     icon: '🌙',
     category: 'journey',
@@ -480,7 +484,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   {
     id: 'phase_3',
     rewardAmber: 30,
-    title: 'Growing Shadows',
+    title: 'Storm Over the Roof',
     description: 'Continue until the shadows gather',
     icon: '👁️',
     category: 'journey',
@@ -489,7 +493,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   {
     id: 'phase_4',
     rewardAmber: 50,
-    title: 'The Horizon',
+    title: 'Under the Thin Sky',
     description: 'Stand at the horizon of the journey',
     icon: '🌑',
     category: 'journey',
