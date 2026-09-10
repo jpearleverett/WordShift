@@ -178,6 +178,8 @@ import { checkDialogueAvailability, recordDialogue } from '../services/dialogueS
 import { markDialogueRead } from '../services/amberCurrency';
 import { recordWhisper } from '../services/whisperGallery';
 import { setPhase5CaughtUp } from '../services/tending';
+import { getChoiceForAnimal, recordChoice } from '../services/dialogueChoices';
+import { endSession } from '../services/dialogueSession';
 
 const getCurrentDialogueMock = getCurrentDialogue as jest.Mock;
 const recordDialogueMock = recordDialogue as jest.Mock;
@@ -1123,5 +1125,120 @@ describe('useDialogueFlow exhausted regular block (no last-line replay)', () => 
     hook = render();
     expect(hook.dialogueText).toBe('The last line of the block.');
     expect(getCurrentDialogueMock).toHaveBeenCalledWith('pangolin', 23, 0);
+  });
+});
+
+describe('useDialogueFlow choice page (the card turns over, must answer, echoed pick)', () => {
+  const CHOICE = {
+    prompt: 'Ember has warmed two cups. She keeps turning yours by the handle.',
+    options: { ask: 'What did you know when I arrived?', refuse: 'I need some time before we talk.' },
+    responses: { ask: 'ask response', refuse: 'refuse response' },
+    convergence: 'convergence',
+  };
+  // Pangolin is a middle-tier animal, so global phase 3 is animal phase 3:
+  // the one window where the choice page is queued (no other page builder
+  // fires under these mocks).
+  const progress3 = { ...progress, currentPhase: 3, phaseProgress: 70, puzzlesSolved: 70 };
+
+  function renderAt3() {
+    rewindHookIndices();
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    return useDialogueFlow({ progress: progress3 as never, setAnimals: setAnimals as never });
+  }
+
+  beforeEach(() => {
+    resetHookState();
+    animals = [{ ...pangolin }];
+    jest.clearAllMocks();
+    getCurrentDialogueMock.mockImplementation(() => ({ text: 'A regular line after the choice.' }));
+    (getChoiceForAnimal as jest.Mock).mockResolvedValueOnce(CHOICE);
+    (recordChoice as jest.Mock).mockImplementation(async (_type: string, pick: 'ask' | 'refuse') => ({
+      response: CHOICE.responses[pick],
+      convergence: CHOICE.convergence,
+    }));
+  });
+
+  it('the prompt is an ordinary line with Next; Next turns the card over instead of advancing', async () => {
+    let hook = renderAt3();
+    await hook.handleAnimalTap(pangolin as never);
+    hook = renderAt3();
+
+    expect(hook.dialogueText).toBe(CHOICE.prompt);
+    expect(hook.activeChoice).toEqual(CHOICE);
+    expect(hook.choiceOpen).toBe(false);
+    expect(hook.hasMoreToShow).toBe(true);
+
+    await hook.handleNextDialogue();
+    hook = renderAt3();
+    // The prompt stays the head (the page's caption reads it); the answers
+    // are now the only way forward.
+    expect(hook.choiceOpen).toBe(true);
+    expect(hook.dialogueText).toBe(CHOICE.prompt);
+    expect(hook.activeChoice).toEqual(CHOICE);
+    expect(recordDialogueMock).not.toHaveBeenCalled();
+    expect(markDialogueReadMock).not.toHaveBeenCalled();
+  });
+
+  it('must answer: close paths are refused while the card is turned over', async () => {
+    let hook = renderAt3();
+    await hook.handleAnimalTap(pangolin as never);
+    hook = renderAt3();
+    await hook.handleNextDialogue();
+    hook = renderAt3();
+    expect(hook.choiceOpen).toBe(true);
+
+    await hook.handleCloseDialogue();
+    hook = renderAt3();
+    expect(hook.showDialogue).toBe(true);
+    expect(hook.choiceOpen).toBe(true);
+    expect(endSession).not.toHaveBeenCalled();
+    expect(recordChoice).not.toHaveBeenCalled();
+  });
+
+  it('picking an answer turns the card back with the pick echoed above the reply, then clears it', async () => {
+    let hook = renderAt3();
+    await hook.handleAnimalTap(pangolin as never);
+    hook = renderAt3();
+    await hook.handleNextDialogue();
+    hook = renderAt3();
+
+    await hook.handleDialogueChoice('refuse');
+    hook = renderAt3();
+    expect(recordChoice).toHaveBeenCalledWith('pangolin', 'refuse');
+    expect(hook.choiceOpen).toBe(false);
+    expect(hook.activeChoice).toBeNull();
+    expect(hook.choiceEcho).toBe(CHOICE.options.refuse);
+    expect(hook.dialogueText).toBe('refuse response');
+    expect(hook.hasMoreToShow).toBe(true);
+    // The answer a choice draws lives nowhere else: it is kept as a 'choice'.
+    expect(recordWhisperMock).toHaveBeenCalledWith(expect.objectContaining({ text: 'refuse response', type: 'choice' }));
+
+    // Leaving the reply for the convergence line drops the echo.
+    await hook.handleNextDialogue();
+    hook = renderAt3();
+    expect(hook.dialogueText).toBe('convergence');
+    expect(hook.choiceEcho).toBeNull();
+
+    // And closing is allowed again.
+    await hook.handleCloseDialogue();
+    hook = renderAt3();
+    expect(hook.showDialogue).toBe(false);
+  });
+
+  it('closing after the pick resets the page state for the next session', async () => {
+    let hook = renderAt3();
+    await hook.handleAnimalTap(pangolin as never);
+    hook = renderAt3();
+    await hook.handleNextDialogue();
+    hook = renderAt3();
+    await hook.handleDialogueChoice('ask');
+    hook = renderAt3();
+    expect(hook.choiceEcho).toBe(CHOICE.options.ask);
+
+    await hook.handleCloseDialogue();
+    hook = renderAt3();
+    expect(hook.showDialogue).toBe(false);
+    expect(hook.choiceOpen).toBe(false);
+    expect(hook.choiceEcho).toBeNull();
   });
 });

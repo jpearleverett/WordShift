@@ -375,6 +375,16 @@ interface UseDialogueFlowReturn {
   hasMoreToShow: boolean;
   /** Active dialogue choice for Phase 3 choice points */
   activeChoice: DialogueChoice | null;
+  /**
+   * The card has turned over to the two answers (see DialogueChoicePage).
+   * Closing is refused until one is picked: the choice is the visit.
+   */
+  choiceOpen: boolean;
+  /**
+   * The answer the player just gave, echoed above the animal's reply; null
+   * again once the reply is left.
+   */
+  choiceEcho: string | null;
   handleAnimalTap: (animal: Animal) => Promise<void>;
   handleNextDialogue: () => Promise<void>;
   handleCloseDialogue: () => Promise<void>;
@@ -446,6 +456,9 @@ export function useDialogueFlow({
   }, []);
   // Active dialogue choice (Phase 3 choice points)
   const [activeChoice, setActiveChoice] = useState<DialogueChoice | null>(null);
+  // The choice page (card turned over to the answers) and the echoed pick.
+  const [choiceOpen, setChoiceOpen] = useState(false);
+  const [choiceEcho, setChoiceEcho] = useState<string | null>(null);
   // Recorded Phase 3 choices (loaded once; refreshed when a choice is made) —
   // used synchronously by the Phase 5 post-revelation dialogue cycle.
   const [playerChoices, setPlayerChoices] = useState<Record<string, PlayerChoice>>({});
@@ -936,6 +949,8 @@ export function useDialogueFlow({
     // Fresh session: a stale page cursor from the previous session must never
     // leak into this one — the first line always opens on its first page.
     resetPageQueue();
+    setChoiceOpen(false);
+    setChoiceEcho(null);
 
     // Build pre-dialogue pages: these show as sequential conversation pages
     // before the regular dialogue, creating natural conversational flow.
@@ -1328,14 +1343,21 @@ export function useDialogueFlow({
     setSelectedAnimal(null);
     setSessionInfo(null);
     setPreDialoguePages([]);
+    setChoiceOpen(false);
+    setChoiceEcho(null);
     // Closing mid-pages behaves exactly like closing mid-line: nothing extra
     // beyond clearing the page queue so it can't leak into the next session.
     resetPageQueue();
   }, [selectedAnimal, progress, preDialoguePages, recomputeHasNewDialogue, setAnimals, resetPageQueue, getUnlockedTypes]);
 
+  // The must-answer lock: while the card is turned over to the answers, the
+  // scrim, the hardware back and any other close path are refused. An
+  // unanswered choice used to be silently discarded and re-offered next
+  // visit, which made the beat feel skippable by accident.
   const handleCloseDialogue = useCallback(async () => {
+    if (choiceOpen) return;
     await closeDialogue(false);
-  }, [closeDialogue]);
+  }, [closeDialogue, choiceOpen]);
 
   // Availability signal for the "visit next friend" chain — the SAME news
   // signal the home "!" badge uses (recomputeHasNewDialogue already folds in
@@ -1402,10 +1424,21 @@ export function useDialogueFlow({
       }
     }
 
+    // The choice prompt reads as an ordinary line with an ordinary Next, and
+    // that Next turns the card over to the answers instead of advancing past
+    // the prompt: the page stays the head (HomeScreen's caption reads it) and
+    // the answers, not this button, are what move the conversation on.
+    if (activeChoice && currentFullText === activeChoice.prompt && !choiceOpen) {
+      setChoiceOpen(true);
+      return;
+    }
+
     // If still showing pre-dialogue pages, advance through them
     // Pre-dialogue pages don't count toward session dialogue limits
     if (preDialoguePages.length > 0) {
       resetPageQueue();
+      // The echoed pick belongs to the reply page only.
+      setChoiceEcho(null);
       const nextHead = preDialoguePages[1];
       setPreDialoguePages(prev => prev.slice(1));
       // The next page is now the visible one — commit its bookkeeping here
@@ -1594,7 +1627,7 @@ export function useDialogueFlow({
       }
       closeDialogue(true);
     }
-  }, [selectedAnimal, progress, closeDialogue, setAnimals, preDialoguePages, onFoxPlayPrompt, tendingCaughtUp, phase2Cursors, activeChoice, pageCursor, pageSource, resetPageQueue, getFullDialogueText, getPhase5Pool, getSessionBonus, getUnlockedTypes, selectPhase5]);
+  }, [selectedAnimal, progress, closeDialogue, setAnimals, preDialoguePages, onFoxPlayPrompt, tendingCaughtUp, phase2Cursors, activeChoice, choiceOpen, pageCursor, pageSource, resetPageQueue, getFullDialogueText, getPhase5Pool, getSessionBonus, getUnlockedTypes, selectPhase5]);
 
   // Handle player choosing a dialogue option (Phase 3 choice points)
   const handleDialogueChoice = useCallback(async (choice: PlayerChoice) => {
@@ -1606,6 +1639,9 @@ export function useDialogueFlow({
       // Replace the current pre-dialogue page with the response, then convergence
       resetPageQueue();
       setPreDialoguePages([{ text: result.response }, { text: result.convergence }]);
+      // The card turns back: the pick stays on it, dimmed, above the reply.
+      setChoiceOpen(false);
+      setChoiceEcho(activeChoice.options[choice]);
       setActiveChoice(null);
 
       // Record the choice response in the whisper gallery. Kept (as its own
@@ -1620,6 +1656,7 @@ export function useDialogueFlow({
       }).catch(() => {});
     } catch {
       // Choice handling is non-critical, just close the choice
+      setChoiceOpen(false);
       setActiveChoice(null);
     }
   }, [selectedAnimal, activeChoice, resetPageQueue]);
@@ -1639,6 +1676,8 @@ export function useDialogueFlow({
     isTalking: revealInProgress && talkingFrame,
     hasMoreToShow: computeHasMore(),
     activeChoice,
+    choiceOpen,
+    choiceEcho,
     handleAnimalTap,
     handleNextDialogue,
     handleCloseDialogue,

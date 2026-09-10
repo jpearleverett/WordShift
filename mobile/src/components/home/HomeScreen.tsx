@@ -25,6 +25,7 @@ import {
 import { Animal, Room, HomeWorldProgress } from '../../types/homeWorld';
 import { HouseWorld } from './HouseWorld';
 import { CHARACTER_SPRITES } from './AnimalSprite';
+import { DialogueChoicePage, DialogueChoiceEcho } from './DialogueChoicePage';
 import { getQuestArt } from '../questArt';
 import { DialogueBody } from './DialogueBody';
 import { CHROME_ICONS, SPOT_ART } from '../ui/chromeIcons';
@@ -2386,8 +2387,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         onRequestClose={dialogueFlow.handleCloseDialogue}
       >
         <View style={[styles.modalOverlay, { backgroundColor: dt.overlayBg }]} accessibilityViewIsModal>
-          <Pressable style={StyleSheet.absoluteFill} onPress={dialogueFlow.handleCloseDialogue}
-            accessibilityLabel="Close dialogue" accessibilityRole="button" />
+          {/* The scrim is a close control only while closing is allowed. On
+              the choice page the card holds until an answer is picked, so the
+              control is not rendered rather than rendered inert: a screen
+              reader must never be offered a "Close" that does nothing. */}
+          {!dialogueFlow.choiceOpen && (
+            <Pressable style={StyleSheet.absoluteFill} onPress={dialogueFlow.handleCloseDialogue}
+              accessibilityLabel="Close dialogue" accessibilityRole="button" />
+          )}
           <Animated.View
             style={[
               styles.dialogueModal,
@@ -2418,6 +2425,28 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
             {dialogueFlow.selectedAnimal && (
               <ScrollView style={{ maxHeight: readingHeight - screenInsets.top - screenInsets.bottom - 24 }} contentContainerStyle={styles.dialogueRow} bounces={false}>
+                {dialogueFlow.choiceOpen && dialogueFlow.activeChoice ? (
+                  /* The card turned over: the relationship choice takes the
+                     whole sheet (see DialogueChoicePage). Neither column
+                     renders, so there is no Next, no Close and no portrait
+                     alcove competing with the two answers. */
+                  <DialogueChoicePage
+                    animalType={dialogueFlow.selectedAnimal.type}
+                    name={dialogueFlow.selectedAnimal.name}
+                    nameColor={dt.nameColor}
+                    portrait={
+                      progress.currentPhase >= 4 && CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]?.robed
+                        ? CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]!.robed!
+                        : CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]?.idle ?? null
+                    }
+                    choice={dialogueFlow.activeChoice}
+                    skin={pixelSkin}
+                    inkBody={panelSt.body}
+                    inkMuted={panelSt.muted}
+                    onChoose={dialogueFlow.handleDialogueChoice}
+                  />
+                ) : (
+                <>
                 {/* Sprite column — the zoomed portrait sits on the parchment. */}
                 <View style={styles.dialogueSpriteCol}>
                   {CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type] ? (
@@ -2511,6 +2540,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
                 {/* Text column - 70% width */}
                 <View style={styles.dialogueTextCol}>
+                  {/* The answer the player just gave stays on the card, dimmed,
+                      above the reply it drew (cleared when the reply is left). */}
+                  {dialogueFlow.choiceEcho ? (
+                    <DialogueChoiceEcho text={dialogueFlow.choiceEcho} inkMuted={panelSt.muted} />
+                  ) : null}
                   {/* The bubble renders the progressively-revealed text (F25);
                       tapping it while the reveal is still in progress jumps
                       straight to the full line instead of waiting it out.
@@ -2533,43 +2567,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     <DialogueBody text={dialogueFlow.revealedText} style={[styles.dialogueText, { color: panelSt.body }]} />
                   </TouchableOpacity>
 
-                  {/* Dialogue choice buttons (Phase 3 choice points) */}
-                  {dialogueFlow.activeChoice && dialogueFlow.dialogueText === dialogueFlow.activeChoice.prompt ? (
-                    <View style={styles.dialogueChoiceRow}>
-                      <TouchableOpacity
-                        style={styles.dialogueChoiceBtn}
-                        onPress={() => dialogueFlow.handleDialogueChoice('ask')}
-                        accessibilityLabel={dialogueFlow.activeChoice.options.ask}
-                        accessibilityRole="button"
-                      >
-                        <NineSliceFrame
-                          skin={pixelSkin.card}
-                          cornerDp={CARD_CORNER_DP}
-                          edgeDp={CARD_EDGE_DP}
-                          fillColor={pixelSkin.fillCard}
-                        />
-                        <AppText textRole="label" style={[styles.dialogueChoiceBtnText, { color: panelSt.body }]}>
-                          {dialogueFlow.activeChoice.options.ask}
-                        </AppText>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.dialogueChoiceBtn}
-                        onPress={() => dialogueFlow.handleDialogueChoice('refuse')}
-                        accessibilityLabel={dialogueFlow.activeChoice.options.refuse}
-                        accessibilityRole="button"
-                      >
-                        <NineSliceFrame
-                          skin={pixelSkin.card}
-                          cornerDp={CARD_CORNER_DP}
-                          edgeDp={CARD_EDGE_DP}
-                          fillColor={pixelSkin.fillCard}
-                        />
-                        <AppText textRole="label" style={[styles.dialogueChoiceBtnText, { color: panelSt.body }]}>
-                          {dialogueFlow.activeChoice.options.refuse}
-                        </AppText>
-                      </TouchableOpacity>
-                    </View>
-                  ) : (
                   <View>
                   {nextFriendWithNews ? (
                     <BevelRowButton
@@ -2616,8 +2613,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     </BevelRowButton>
                   </View>
                   </View>
-                  )}
                 </View>
+                </>
+                )}
               </ScrollView>
             )}
           </Animated.View>
@@ -4774,28 +4772,6 @@ const createStyles = (SCREEN_WIDTH: number, SCREEN_HEIGHT: number, fontScale: nu
     fontSize: FONT_SIZE.body,
     fontWeight: '600',
   },
-  // Dialogue choice buttons (Phase 3)
-  dialogueChoiceRow: {
-    flexDirection: 'column',
-    gap: 8,
-    marginTop: 10,
-    paddingHorizontal: 4,
-  },
-  dialogueChoiceBtn: {
-    // Cottage card frame background; clear the 18dp card strip; ≥44dp caps.
-    paddingVertical: SURFACE.cardPadY,
-    paddingHorizontal: SURFACE.cardPadX,
-    minHeight: 46,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dialogueChoiceBtnText: {
-    fontFamily: BODY_FONT,
-    fontSize: FONT_SIZE.bodyLg,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-
   // Action row (Gallery + Pit + Sacrifice)
   actionRow: {
     flexDirection: 'row',
