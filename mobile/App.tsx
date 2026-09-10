@@ -1336,10 +1336,11 @@ function MainApp() {
   activeCinematicRef.current = phaseTransitionEvent;
   const musicPhaseRef = useRef(persistence.currentPhase);
   musicPhaseRef.current = persistence.currentPhase;
-  // The music FAMILY follows the screen: the puzzle screen gets a focused bed,
-  // the Offering Pit a ritual one, and every other screen (home + all the menus)
-  // keeps the world bed. It's tracked in a ref too so the foreground-resume
-  // restarts the bed for the screen the player is actually on.
+  // The music FAMILY follows the screen: the puzzle screen gets the puzzle bed,
+  // and every other screen (home, all the menus, AND the Offering Pit, which
+  // audio.ts resolves to the home family since the pit is part of the house
+  // world) keeps the world bed. It's tracked in a ref too so the
+  // foreground-resume restarts the bed for the screen the player is actually on.
   const musicScreen: MusicScreen =
     currentScreen === 'puzzle' ? 'puzzle' : currentScreen === 'pit' ? 'pit' : 'home';
   const musicScreenRef = useRef(musicScreen);
