@@ -103,6 +103,9 @@ async function openVictoryIntroCohort(page: Page, phaseThree = false) {
     }));
     localStorage.setItem('wordshift_mandatory_harvest_seen', 'true');
     localStorage.setItem('wordshift_first_win_glitch', 'true');
+    // This returning cohort already passed the 12-solve preview lesson. A
+    // relaunch may serve MEDIUM, where that unrelated lesson would block play.
+    localStorage.setItem('wordshift_preview_graduation_seen_v2', 'true');
     localStorage.removeItem('wordshift_modifier_stacking_intro_seen');
     const board = JSON.parse(localStorage.getItem('wordshift_in_progress_puzzle')!);
     board.currentPhase = lateGame ? 3 : 1;
@@ -436,7 +439,9 @@ test('a real house ceremony remains readable and can finish at 320px with enlarg
   });
   await page.setViewportSize({ width: 320, height: 568 });
   await page.reload({ waitUntil: 'domcontentloaded' });
-  const pause = page.getByRole('button', { name: 'Pause and read at my pace', exact: true });
+  // The scene text is the accessible pause button; its explanation is a hint.
+  // HOUSE_COMPLETION_EVENT's first scene (phaseEvents has native dependencies).
+  const pause = page.getByRole('button', { name: 'The house is complete.', exact: true });
   await expect(pause).toBeVisible({ timeout: 30_000 });
   await pause.click();
   for (let scene = 0; scene < 5; scene++) {
