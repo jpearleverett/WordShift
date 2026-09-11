@@ -55,6 +55,10 @@ import {
   confirmPhaseTransition,
   recordRitualWords,
   calculatePhaseAcceleration,
+  recordVariantEncounter,
+  getPendingVariantTutorials,
+  acknowledgeVariantTutorial,
+  consumePendingVariantTutorial,
 } from '../services/amberCurrency';
 import {
   SURPRISE_BONUS_AMOUNTS,
@@ -174,6 +178,56 @@ describe('loadProgress', () => {
       tarsier: 9999,
       kakapo: 9999,
     });
+  });
+});
+
+describe('variant introduction acknowledgement', () => {
+  test('an interrupted introduction stays unread after a fresh progress load', async () => {
+    await recordVariantEncounter('reverse');
+
+    const pending = await getPendingVariantTutorials();
+    expect(pending).toEqual(['reverse']);
+    // Presentation may shift its own copy without consuming the durable queue.
+    pending.shift();
+    expect(await getPendingVariantTutorials()).toEqual(['reverse']);
+
+    invalidateProgressCache();
+    expect(await getPendingVariantTutorials()).toEqual(['reverse']);
+    expect((await loadProgress()).seenVariantTutorials).toEqual([]);
+  });
+
+  test('dismissing a new unlock preserves a different older introduction', async () => {
+    await recordVariantEncounter('reverse');
+    await recordVariantEncounter('double_shift');
+    await acknowledgeVariantTutorial('double_shift');
+
+    invalidateProgressCache();
+    expect(await getPendingVariantTutorials()).toEqual(['reverse']);
+    expect((await loadProgress()).seenVariantTutorials).toEqual(['double_shift']);
+    // A later victory cannot requeue an introduction that was acknowledged.
+    await recordVariantEncounter('double_shift');
+    await acknowledgeVariantTutorial('double_shift');
+    expect(await getPendingVariantTutorials()).toEqual(['reverse']);
+    expect((await loadProgress()).seenVariantTutorials).toEqual(['double_shift']);
+  });
+
+  test('acknowledging the remaining introduction completes the queue durably', async () => {
+    await recordVariantEncounter('reverse');
+    await acknowledgeVariantTutorial('reverse');
+
+    invalidateProgressCache();
+    expect(await getPendingVariantTutorials()).toEqual([]);
+    expect((await loadProgress()).seenVariantTutorials).toEqual(['reverse']);
+  });
+
+  test('legacy consumers can still consume the next pending introduction', async () => {
+    await recordVariantEncounter('reverse');
+    await recordVariantEncounter('double_shift');
+    expect(await consumePendingVariantTutorial()).toBe('reverse');
+
+    invalidateProgressCache();
+    expect(await getPendingVariantTutorials()).toEqual(['double_shift']);
+    expect((await loadProgress()).seenVariantTutorials).toEqual(['reverse']);
   });
 });
 
