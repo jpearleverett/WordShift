@@ -439,22 +439,35 @@ test('a real house ceremony remains readable and can finish at 320px with enlarg
   });
   await page.setViewportSize({ width: 320, height: 568 });
   await page.reload({ waitUntil: 'domcontentloaded' });
-  // The scene text is the accessible pause button; its explanation is a hint.
-  // HOUSE_COMPLETION_EVENT's first scene (phaseEvents has native dependencies).
-  const pause = page.getByRole('button', { name: 'The house is complete.', exact: true });
-  await expect(pause).toBeVisible({ timeout: 30_000 });
-  await pause.click();
+  // Continue must be available before the player discovers the optional
+  // tap-to-hold gesture. Advancing once takes over the authored pacing.
+  await expect(page.getByTestId('phase-transition-next')).toBeVisible({ timeout: 30_000 });
   for (let scene = 0; scene < 5; scene++) {
     const advance = page.getByRole('button', { name: scene === 4 ? 'Return to the house' : 'Continue the scene', exact: true });
     await expect(advance).toBeVisible();
     await enlargeBrowserText(page);
-    await advance.scrollIntoViewIfNeeded();
+    const art = page.getByTestId('phase-transition-art');
+    const footer = page.getByTestId('phase-transition-footer');
+    const reading = page.getByTestId('phase-transition-reading');
+    const skip = page.getByRole('button', { name: 'Skip transition', exact: true });
+    // Do not scroll the controls into view: they must already fit, including
+    // the complete button hit areas, on every page at the enlarged text size.
+    for (const element of [art, footer, advance, skip]) {
+      await expect(element).toBeInViewport();
+      const bounds = await element.boundingBox();
+      expect(bounds).not.toBeNull();
+      expect(bounds!.x).toBeGreaterThanOrEqual(0);
+      expect(bounds!.y).toBeGreaterThanOrEqual(0);
+      expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(321);
+      expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(569);
+    }
+    expect((await art.boundingBox())!.height).toBeGreaterThanOrEqual(72);
+    await expect(art.locator('img').first()).toBeAttached();
+    await expect(reading.getByTestId('phase-transition-footer')).toHaveCount(0);
+    const footerBeforeScroll = await footer.boundingBox();
+    await reading.evaluate(element => { element.scrollTop = element.scrollHeight; });
+    expect((await footer.boundingBox())!.y).toBeCloseTo(footerBeforeScroll!.y, 0);
     await expect(advance).toBeInViewport();
-    const bounds = await advance.boundingBox();
-    expect(bounds).not.toBeNull();
-    expect(bounds!.x).toBeGreaterThanOrEqual(0);
-    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(321);
-    await expect(page.getByRole('button', { name: 'Skip transition', exact: true })).toBeInViewport();
     if (scene === 3) await capture(page, 'updated-ceremony-small-large-text');
     await advance.click();
   }

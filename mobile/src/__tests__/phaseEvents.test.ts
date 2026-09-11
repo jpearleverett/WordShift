@@ -6,8 +6,8 @@
  *    (effect 'descend'), with the house silhouette earlier in the sequence.
  *  - HOUSE_COMPLETION_EVENT shows the house + a faint waiting glimpse of the
  *    entity — present, NOT descending (the arrival belongs to the finale).
- *  - POST_REVELATION_EVENT keeps text-only scenes over a settled low-opacity
- *    shadow backdrop.
+ *  - POST_REVELATION_EVENT returns to illustrated rooms and roads while its
+ *    settled low-opacity shadow backdrop remains present.
  *  - Total finale length stays in the ~30s band (at the overlay's shipped
  *    1.25x time scale).
  */
@@ -103,7 +103,7 @@ import { PhaseTransitionOverlay } from '../components/PhaseTransitionOverlay';
 import { createCeremonySoundScope } from '../services/uiSound';
 import { announceForA11y } from '../services/a11yAnnounce';
 import { hapticLight } from '../services/haptics';
-import { getCeremonyPaceCaption, getCeremonyHoldHint } from '../services/phaseNarrative';
+import { getCeremonyHoldHint } from '../services/phaseNarrative';
 
 const ALL_EVENTS: PhaseTransitionEvent[] = [
   ...([1, 2, 3, 4] as DialoguePhase[]).map(p => getPhaseTransitionEvent(p)!),
@@ -112,6 +112,54 @@ const ALL_EVENTS: PhaseTransitionEvent[] = [
   POST_REVELATION_EVENT,
   NEW_CYCLE_EVENT,
 ];
+
+describe('illustrated phase transitions', () => {
+  const phaseBoundaries = [
+    ...([1, 2, 3, 4] as DialoguePhase[]).map(phase => getPhaseTransitionEvent(phase)!),
+    POST_REVELATION_EVENT,
+  ];
+
+  test.each(phaseBoundaries.map(event => [event.title, event] as const))(
+    '%s has visible artwork on every page',
+    (_title, event) => {
+      for (const scene of event.scenes) {
+        // The former blank pages had neither image nor meaningful backdrop.
+        // Require an explicit illustrated subject for every authored passage.
+        expect(scene.image).toBeDefined();
+        expect(scene.imageOpacity).toBeGreaterThanOrEqual(0.6);
+      }
+      // A transition should move between places, not repeat a single icon.
+      expect(new Set(event.scenes.map(scene => scene.image)).size).toBeGreaterThan(1);
+    },
+  );
+
+  test('ordinary transitions never reveal the entity before the finale', () => {
+    for (const event of phaseBoundaries.slice(0, 4)) {
+      expect(event.backdrop?.image).not.toBe('shadow_figure');
+      for (const scene of event.scenes) {
+        expect(scene.image).not.toBe('shadow_figure');
+        expect(scene.effect).not.toBe('descend');
+      }
+    }
+  });
+
+  test('special ceremonies and personalized endings also have art on every page', () => {
+    const variants = [
+      ...ALL_EVENTS,
+      buildFinalPuzzleEvent([], { houseComplete: false, unlockedAnimals: [] }),
+      buildFinalPuzzleEvent([], { boundary: 'remember', keptRecord: true, unlockedAnimals: ['fox', 'capybara'] }),
+      buildFinalPuzzleEvent([], { boundary: 'release', keptPromise: true, unlockedAnimals: ['rabbit'] }),
+      buildPostRevelationEvent({ boundary: 'remember', keptRecord: true }),
+      buildPostRevelationEvent({ boundary: 'release' }),
+    ];
+    for (const event of variants) {
+      for (const scene of event.scenes) {
+        expect(scene.image).toBeDefined();
+        expect(scene.imageOpacity).toBeGreaterThan(0);
+      }
+    }
+  });
+});
 
 type ElementLike = { props?: { children?: unknown; accessibilityLabel?: string } };
 
@@ -259,10 +307,9 @@ test('a suspended ceremony keeps its page and resumes without replaying delivere
 
 /**
  * The ceremony keeps its own pace on purpose, but the way out of that pace used
- * to be a borderless "Read at my pace" label sitting beside a status caption,
- * inside the scrolling reading pane. The passage itself is the control now: a
- * tap on the words the player is already reading holds the page and hands over
- * the Continue bevel, and the pacing line says so before it is needed.
+ * to be a borderless "Read at my pace" label inside the scrolling reading pane.
+ * Continue is always visible now. Tapping the words remains a second way to
+ * hold the current page without advancing it.
  *
  * The settings mock above reports reducedMotion: true, so this also pins that
  * the hold is not gated on a motion preference: a reader who has asked for
@@ -286,10 +333,8 @@ test('the passage is the hold control: pressing the words cancels the pending ad
     jest.advanceTimersByTime(0);
     const playing = render();
     expect(collectText(playing)).toContain('The first page waits.');
-    // The hint is present from the first page, and nothing else in the footer
-    // pretends to be a second button.
-    expect(collectText(playing)).toContain(getCeremonyPaceCaption(false));
-    expect(collectText(playing)).not.toContain('Continue');
+    // Players can advance immediately, without first discovering tap-to-hold.
+    expect(collectText(playing)).toContain('Continue');
 
     const passage = findByType(playing, 'Pressable');
     expect(passage).not.toBeNull();
@@ -310,8 +355,7 @@ test('the passage is the hold control: pressing the words cancels the pending ad
     expect(collectText(held)).toContain('The first page waits.');
     expect(collectText(held)).not.toContain('The next page answers.');
     expect(onComplete).not.toHaveBeenCalled();
-    // The page now says it is waiting, and the real bevel is the way on.
-    expect(collectText(held)).toContain(getCeremonyPaceCaption(true));
+    // Holding leaves the same visible Continue control as the way on.
     expect(collectText(held)).toContain('Continue');
 
     // Held is held: a second tap on the words is inert, not a second control.
@@ -418,10 +462,14 @@ describe('FINAL_PUZZLE_EVENT — the in-engine arrival', () => {
     expect(getEventDuration(FINAL_PUZZLE_EVENT) * 1.25).toBeGreaterThan(40000);
   });
 
-  test('a held breath precedes the descent: the scene before it carries no image', () => {
+  test('a held breath stays on the house before the entity first descends', () => {
     const idx = FINAL_PUZZLE_EVENT.scenes.findIndex(s => s.effect === 'descend');
     expect(idx).toBeGreaterThan(0);
-    expect(FINAL_PUZZLE_EVENT.scenes[idx - 1].image).toBeUndefined();
+    expect(FINAL_PUZZLE_EVENT.scenes[idx - 1].image).toBe('house');
+    expect(FINAL_PUZZLE_EVENT.scenes[idx - 1].effect).toBeUndefined();
+    for (const scene of FINAL_PUZZLE_EVENT.scenes.slice(0, idx)) {
+      expect(scene.image).not.toBe('shadow_figure');
+    }
   });
 });
 
@@ -473,28 +521,29 @@ describe('HOUSE_COMPLETION_EVENT — the temple ceremony', () => {
 });
 
 describe('POST_REVELATION_EVENT — terrible peace', () => {
-  test('text-only scenes over the settled shadow backdrop', () => {
+  test('illustrated scenes retain the settled shadow backdrop without another arrival', () => {
     expect(POST_REVELATION_EVENT.backdrop).toBeDefined();
     expect(POST_REVELATION_EVENT.backdrop!.image).toBe('shadow_figure');
     // Settled presence: low, static, constant.
     expect(POST_REVELATION_EVENT.backdrop!.opacity).toBeLessThanOrEqual(0.2);
     for (const scene of POST_REVELATION_EVENT.scenes) {
-      expect(scene.image).toBeUndefined();
+      expect(scene.image).toBeDefined();
       expect(scene.effect).not.toBe('descend');
     }
   });
 });
 
 describe('NEW_CYCLE_EVENT — the serene re-descent', () => {
-  test('stays in the terrible-peace register: text-only over the settled backdrop, no arrival', () => {
+  test('returns to familiar rooms and morning over the settled backdrop, without another arrival', () => {
     // A Phase-5 milestone ceremony, mirroring POST_REVELATION_EVENT's shape.
     expect(NEW_CYCLE_EVENT.phase).toBe(5);
     expect(NEW_CYCLE_EVENT.backdrop).toBeDefined();
     expect(NEW_CYCLE_EVENT.backdrop!.image).toBe('shadow_figure');
     expect(NEW_CYCLE_EVENT.backdrop!.opacity).toBeLessThanOrEqual(0.2);
     for (const scene of NEW_CYCLE_EVENT.scenes) {
-      // Nothing descends, nothing named — the pattern only turns.
-      expect(scene.image).toBeUndefined();
+      // Nothing descends; the settled presence accompanies ordinary life.
+      expect(scene.image).toBeDefined();
+      expect(scene.image).not.toBe('shadow_figure');
       expect(scene.effect).not.toBe('descend');
     }
     expect(NEW_CYCLE_EVENT.scenes.length).toBeGreaterThanOrEqual(3);

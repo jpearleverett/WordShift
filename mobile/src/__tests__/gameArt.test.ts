@@ -161,16 +161,34 @@ describe('chrome marks, scene spots and ceremony emblems (round 2)', () => {
     expect(missingOnDisk(refs)).toEqual([]);
   });
 
-  it('gives the phase 1-3 ceremonies an image that exists', () => {
+  it('keeps every registered ceremony emblem backed by a real file', () => {
     const refs = referencedPngs('../components/PhaseTransitionOverlay.tsx');
     for (const name of ['ceremony_curious', 'ceremony_deeper', 'ceremony_shadows']) {
       expect(refs).toContain(`assets/ui/spots/${name}.png`);
     }
     expect(missingOnDisk(refs)).toEqual([]);
-    // Every SceneImage a scene names must be one the overlay can render.
-    const scenes = ([1, 2, 3] as Phase[]).flatMap((p) => getPhaseTransitionEvent(p)?.scenes ?? []);
-    const used = scenes.map((s) => s.image).filter((i): i is NonNullable<typeof i> => Boolean(i));
-    expect(used).toEqual(expect.arrayContaining(['ceremony_curious', 'ceremony_deeper', 'ceremony_shadows']));
+  });
+
+  it('illustrates every phase 1-4 passage with a shipped story painting', () => {
+    const overlaySource = fs.readFileSync(path.resolve(__dirname, '../components/PhaseTransitionOverlay.tsx'), 'utf8');
+    const storySource = fs.readFileSync(path.resolve(__dirname, '../components/storyArt.ts'), 'utf8');
+    const sceneRegistry = new Map(Array.from(overlaySource.matchAll(/(\w+): STORY_ART\.(\w+)/g),
+      match => [match[1], match[2]]));
+    const storyRegistry = new Map(Array.from(storySource.matchAll(/(\w+): require\('([^']+\.webp)'\)/g),
+      match => [match[1], match[2]]));
+    for (const phase of [1, 2, 3, 4] as Phase[]) {
+      const event = getPhaseTransitionEvent(phase)!;
+      expect(event.scenes.length).toBeGreaterThan(0);
+      for (const scene of event.scenes) {
+        // Follow the actual overlay -> STORY_ART -> file mapping, so a renamed
+        // or missing asset cannot silently leave a passage without its art.
+        const storyKey = sceneRegistry.get(scene.image ?? '');
+        expect(storyKey).toBeDefined();
+        const asset = storyRegistry.get(storyKey!);
+        expect(asset).toBeDefined();
+        expect(fs.existsSync(path.resolve(__dirname, '../components', asset!))).toBe(true);
+      }
+    }
   });
 
   it.each([
