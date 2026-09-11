@@ -12,9 +12,14 @@ interface DailyLeaderboardCardProps {
   rank?: number | null;
   /** Total players on the board for the day. */
   total?: number | null;
-  /** Percent of other players beaten, 0-100. */
-  percentile?: number | null;
-  /** Pre-formatted, phase-aware standing copy (from getBeatPercentText). */
+  /**
+   * The standing sentence under the rank, ALREADY formatted and already judged
+   * by the caller: getBeatPercentText when the day has enough entrants for a
+   * percentile to mean anything, its getStandingsGatheringText substitute when
+   * it does not. This component deliberately holds no percentile of its own and
+   * no fallback copy of its own: it used to hardcode its own percentage
+   * sentence, which is exactly how a suppressed standing would come back.
+   */
   beatText?: string | null;
   /** Persistent local history line (best this week / participation); spoiler-safe. */
   historyLine?: string | null;
@@ -32,14 +37,13 @@ interface DailyLeaderboardCardProps {
  * backend services. Renders when there's a live standing OR a persistent local
  * history line (the offline returning-player hook), nothing otherwise.
  *
- * Spoiler-safe: only rank/percentile/history text — never phase or cult content.
+ * Spoiler-safe: only rank/standing/history text — never phase or cult content.
  * Accessibility: a single summarizing label; rank and trend are conveyed by
  * text + icon, never by color alone.
  */
 export const DailyLeaderboardCard: React.FC<DailyLeaderboardCardProps> = ({
   rank,
   total,
-  percentile,
   beatText,
   historyLine,
   trendLabel,
@@ -70,14 +74,18 @@ export const DailyLeaderboardCard: React.FC<DailyLeaderboardCardProps> = ({
   }
 
   const hasStanding = rank != null && total != null && total > 0;
-  // Nothing at all to show (no live rank AND no local history) → render nothing.
-  if (!hasStanding && !historyLine) {
+  // Nothing at all to show (no live rank, no standing line AND no local
+  // history) → render nothing.
+  if (!hasStanding && !beatText && !historyLine) {
     return null;
   }
 
+  // The a11y label says exactly what the card says: when the caller suppressed
+  // the percentile sentence, the screen reader hears the substitute too, never
+  // a number the sighted player was spared.
   const a11yParts = [
     hasStanding ? `Daily standing: rank ${rank} of ${total}.` : '',
-    hasStanding ? (beatText ?? (percentile != null ? `You beat ${percentile}% of players today.` : '')) : '',
+    beatText ?? '',
     historyLine ?? '',
     trendLabel ? `Placement trend: ${trendLabel}.` : '',
   ].filter(Boolean);
@@ -104,15 +112,11 @@ export const DailyLeaderboardCard: React.FC<DailyLeaderboardCardProps> = ({
         </Text>
       )}
 
-      {hasStanding && (beatText ? (
+      {beatText ? (
         <Text style={[styles.beatText, { color: secondaryColor }]}>
           {beatText}
         </Text>
-      ) : percentile != null ? (
-        <Text style={[styles.beatText, { color: secondaryColor }]}>
-          You beat {percentile}% of players today
-        </Text>
-      ) : null)}
+      ) : null}
 
       {historyLine ? (
         <View

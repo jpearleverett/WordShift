@@ -24,7 +24,7 @@ import { isDailyShareBonusAvailable, DAILY_SHARE_BONUS_AMBER } from '../../servi
 import { getSettingsSync } from '../../services/settings';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
 import { DailyLeaderboardCard } from '../social/DailyLeaderboardCard';
-import { getBeatPercentText, DailyRank } from '../../services/leaderboard';
+import { getBeatPercentText, getStandingsGatheringText, DailyRank } from '../../services/leaderboard';
 import { RewardedAdButton } from '../monetization/RewardedAdButton';
 import { isAdFreeSync } from '../../services/entitlements';
 import { announceForA11y } from '../../services/a11yAnnounce';
@@ -831,8 +831,16 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               <DailyLeaderboardCard
                 rank={dailyRank?.rank ?? null}
                 total={dailyRank?.total ?? null}
-                percentile={dailyRank?.percentile ?? null}
-                beatText={dailyRank ? getBeatPercentText(dailyRank.percentile, phase) : null}
+                /* The rank ("#1 of 1") is true at any board size, so it stays.
+                   The percentile is not: on a thin board getBeatPercentText
+                   returns null and the honest "still gathering" line takes its
+                   place, so the player is never told they beat 0% of anyone. */
+                beatText={
+                  dailyRank
+                    ? getBeatPercentText(dailyRank.percentile, phase, dailyRank.total) ??
+                      getStandingsGatheringText(phase)
+                    : null
+                }
                 historyLine={dailyHistoryLine}
                 trendLabel={getDailyLadderTrendLabel(dailyTrend, phase)}
                 phase={phase}

@@ -21,10 +21,12 @@ import { getSettings, getSettingsSync, subscribeSettings } from './settings';
  * Combo ladder: soundValidMove(comboTier) escalates the move chime across
  * clean-move streaks (bright = rising pentatonic steps; dark = sinking lower).
  *
- * Music: three seamless ambient loop beds (bright / dusk / dark) played on a
- * dedicated looping player. startMusicForPhase(phase) picks the bed for the
- * current phase and crossfades on changes; gated by the separate musicEnabled
- * setting (NOT soundEnabled — music has its own toggle).
+ * Music: twelve authored MP3 beds from assets/music/, two families (home and
+ * puzzle) with one bed per narrative phase 0-5, played on a dedicated looping
+ * player. startMusicForScreen(screen, phase) picks the family by screen (the
+ * Offering Pit is part of the house world, so it plays the home bed) and the
+ * bed by phase, crossfading on every change; gated by the separate musicEnabled
+ * setting (NOT soundEnabled, music has its own toggle).
  */
 
 // Sound name → bundled asset source
@@ -114,27 +116,39 @@ const SOUND_SOURCES: Record<string, any> = {
   letter_select_peace: require('../../assets/sounds/letter_select_peace.wav'),
 };
 
-// Ambient music beds (looping) — kept out of SOUND_SOURCES so a stray
-// playSound() can never fire a 20-second bed as a one-shot.
+// Ambient music beds (looping), kept out of SOUND_SOURCES so a stray
+// playSound() can never fire a two-to-four-minute bed as a one-shot.
+// Authored MP3s: the player's originals live in assets/raw/music (tracked, not
+// bundled) and `npm run encode:music` (scripts/tools/encodeMusic.mjs) writes
+// these shipped files. Two families with one bed per narrative phase 0-5:
+// `home` is the house world, which also covers every menu screen AND the
+// Offering Pit; `puzzle` is the board. The synthesized per-band WAV beds that
+// generateSounds.mjs used to render are retired.
 const MUSIC_SOURCES: Record<string, any> = {
-  // Home / world beds (also the default for menu/secondary screens).
-  music_bright: require('../../assets/sounds/music_bright.wav'),
-  music_dusk: require('../../assets/sounds/music_dusk.wav'),
-  music_dark: require('../../assets/sounds/music_dark.wav'),
-  // Puzzle-screen beds — the same DNA, focused/minimal so it never distracts.
-  music_puzzle_bright: require('../../assets/sounds/music_puzzle_bright.wav'),
-  music_puzzle_dusk: require('../../assets/sounds/music_puzzle_dusk.wav'),
-  music_puzzle_dark: require('../../assets/sounds/music_puzzle_dark.wav'),
-  // Offering-Pit beds — sunk underground: low drone, wide reverb, ritual tolls.
-  music_pit_bright: require('../../assets/sounds/music_pit_bright.wav'),
-  music_pit_dusk: require('../../assets/sounds/music_pit_dusk.wav'),
-  music_pit_dark: require('../../assets/sounds/music_pit_dark.wav'),
-  // Phase-5 "terrible peace" beds — the dark DNA resolved low and slow (the
-  // C-add9 restored, tolls softened), the serene register after the arrival.
-  music_peace: require('../../assets/sounds/music_peace.wav'),
-  music_puzzle_peace: require('../../assets/sounds/music_puzzle_peace.wav'),
-  music_pit_peace: require('../../assets/sounds/music_pit_peace.wav'),
+  music_home_0: require('../../assets/music/home_phase0.mp3'),
+  music_home_1: require('../../assets/music/home_phase1.mp3'),
+  music_home_2: require('../../assets/music/home_phase2.mp3'),
+  music_home_3: require('../../assets/music/home_phase3.mp3'),
+  music_home_4: require('../../assets/music/home_phase4.mp3'),
+  music_home_5: require('../../assets/music/home_phase5.mp3'),
+  music_puzzle_0: require('../../assets/music/puzzle_phase0.mp3'),
+  music_puzzle_1: require('../../assets/music/puzzle_phase1.mp3'),
+  music_puzzle_2: require('../../assets/music/puzzle_phase2.mp3'),
+  music_puzzle_3: require('../../assets/music/puzzle_phase3.mp3'),
+  music_puzzle_4: require('../../assets/music/puzzle_phase4.mp3'),
+  music_puzzle_5: require('../../assets/music/puzzle_phase5.mp3'),
 };
+
+/**
+ * Whether a bed name is registered. Null/undefined check, NOT truthiness:
+ * Metro asset ids are numbers (0 is valid) and Jest's file mock resolves every
+ * asset to 0. Exported so tests can prove every (screen, phase) resolves to a
+ * real bed without the require map itself being exported.
+ */
+export function hasMusicTrack(name: string): boolean {
+  const source = MUSIC_SOURCES[name];
+  return source !== undefined && source !== null;
+}
 
 // Hot-path sounds preloaded at init for latency-free first playback
 const PRELOAD_SOUND_NAMES = [
@@ -490,49 +504,46 @@ export async function soundDailyReady(): Promise<void> {
 }
 
 // ===== Ambient Music =====
-// A single looping bed per phase band. QUIET by design — it sits far under
-// the SFX. Gated by the dedicated musicEnabled setting (its own toggle,
-// independent of soundEnabled). All failures are swallowed.
+// One authored looping bed per (family, phase): six home beds, six puzzle
+// beds. QUIET by design: it sits far under the SFX. Gated by the dedicated
+// musicEnabled setting (its own toggle, independent of soundEnabled). All
+// failures are swallowed.
 
 const MUSIC_VOLUME = 0.4;
 const MUSIC_FADE_MS = 1200;
 const MUSIC_FADE_STEPS = 16;
-/** Phase at/above which the bed cools to dusk. */
-const MUSIC_DUSK_PHASE = 2;
-/** Phase at/above which the bed corrupts to dark. */
-const MUSIC_DARK_PHASE = 3;
-/** Phase at/above which the bed resolves to the post-revelation "peace" band. */
-const MUSIC_PEACE_PHASE = 5;
+/** Highest narrative phase with its own bed; phases clamp into 0..MUSIC_MAX_PHASE. */
+const MUSIC_MAX_PHASE = 5;
 
 /**
  * The screen context a music bed belongs to. 'home' is also the bed for every
  * menu / secondary screen (settings, stats, shop, ledger, gallery) — the world
- * music simply continues there.
+ * music simply continues there. 'pit' stays a distinct screen for callers but
+ * resolves to the HOME family: the Offering Pit is part of the house world,
+ * and the player authored two families (home and puzzle), not three. Walking
+ * home <-> pit therefore never restarts the bed; puzzle <-> pit still
+ * crossfades.
  */
 export type MusicScreen = 'home' | 'puzzle' | 'pit';
 
-/** Bed-name prefix per screen family. `home` uses the bare `music_*` beds. */
+/** Bed-name prefix per screen family (`music_home_<p>` / `music_puzzle_<p>`). */
 const MUSIC_FAMILY: Record<MusicScreen, string> = {
-  home: 'music',
+  home: 'music_home',
   puzzle: 'music_puzzle',
-  pit: 'music_pit',
+  pit: 'music_home',
 };
 
-/** Pure phase → corruption band (bright / dusk / dark / peace) — the descent
- *  then the terrible peace of post-revelation. */
-function musicBandForPhase(phase: number): 'bright' | 'dusk' | 'dark' | 'peace' {
-  if (phase >= MUSIC_PEACE_PHASE) return 'peace';
-  if (phase >= MUSIC_DARK_PHASE) return 'dark';
-  if (phase >= MUSIC_DUSK_PHASE) return 'dusk';
-  return 'bright';
-}
-
 /**
- * Pure (screen, phase) → bed mapping. Each screen family darkens with the phase
- * band, so the descent is preserved on every screen. Exported for tests.
+ * Pure (screen, phase) → bed mapping. Every family has six beds, one per
+ * narrative phase, so the descent is per phase on every screen (no bands).
+ * The phase is rounded and clamped into 0..MUSIC_MAX_PHASE; NaN falls back
+ * to 0 (the old band mapping also resolved NaN to the bright bed, and a key
+ * like `music_home_NaN` would silently no-op the switch). Exported for tests.
  */
 export function musicTrackForContext(screen: MusicScreen, phase: number): string {
-  return `${MUSIC_FAMILY[screen]}_${musicBandForPhase(phase)}`;
+  const rounded = Math.round(phase);
+  const p = Number.isNaN(rounded) ? 0 : Math.max(0, Math.min(MUSIC_MAX_PHASE, rounded));
+  return `${MUSIC_FAMILY[screen]}_${p}`;
 }
 
 /** Back-compat: the home/world bed for a phase. */
@@ -613,10 +624,10 @@ export async function startMusicForPhase(phase: number): Promise<void> {
 
 /**
  * Start (or crossfade to) the ambient bed for the given SCREEN + narrative
- * phase. The screen picks the bed family (home / puzzle / pit) and the phase
- * picks the corruption band, so the pit sounds like a ritual space and the
- * puzzle screen stays focused while both still darken with the descent.
- * Same crossfade / no-op / musicEnabled semantics as before.
+ * phase. The screen picks the family (the puzzle bed on the board, the home
+ * bed everywhere else in the house world, the Offering Pit included) and the
+ * phase picks one of that family's six beds, so every screen descends with
+ * the story. Same crossfade / no-op / musicEnabled semantics as before.
  */
 export async function startMusicForScreen(screen: MusicScreen, phase: number): Promise<void> {
   try {
@@ -628,8 +639,8 @@ export async function startMusicForScreen(screen: MusicScreen, phase: number): P
       } catch {}
       return;
     }
+    if (!hasMusicTrack(track)) return;
     const source = MUSIC_SOURCES[track];
-    if (source === undefined || source === null) return;
 
     // A rapid double-switch: snap off any player still fading out.
     if (retiringMusicPlayer) {
@@ -640,6 +651,11 @@ export async function startMusicForScreen(screen: MusicScreen, phase: number): P
     }
 
     const next = createAudioPlayer(source);
+    // Loop seam: `loop` on an MP3 relies on the LAME/Xing header in the first
+    // frame (encoder delay + padding) for a gapless wrap. ExoPlayer honours
+    // it; AVPlayer may leave a few ms at the seam. On beds 2-4 minutes long
+    // that is acceptable (the retired WAV beds were sample-exact by
+    // construction; that is the trade for authored music).
     next.loop = true;
     next.volume = 0;
     next.play();

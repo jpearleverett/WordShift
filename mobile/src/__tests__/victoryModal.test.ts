@@ -136,8 +136,16 @@ jest.mock('../services/entitlements', () => ({
   isAdFreeSync: () => false,
 }));
 
+// Hand-written stand-ins mirroring the real contract: getBeatPercentText
+// returns NULL below the entrant threshold (a percentile over a near-empty
+// board carries no information), and the caller substitutes the gathering line.
+const MOCK_MIN_ENTRANTS = 5;
 jest.mock('../services/leaderboard', () => ({
-  getBeatPercentText: jest.fn().mockReturnValue(''),
+  getBeatPercentText: jest.fn(
+    (percentile: number, phase: number, total?: number | null) =>
+      total != null && total < 5 ? null : `BEAT ${percentile}%`,
+  ),
+  getStandingsGatheringText: jest.fn(() => 'STILL GATHERING'),
 }));
 
 jest.mock('../components/social/DailyLeaderboardCard', () => ({
@@ -950,5 +958,45 @@ describe('swift-victory button theme contrast', () => {
       expect(contrast(getButtonTheme(phase).share.text, getButtonTheme(phase).share.bg))
         .toBeGreaterThanOrEqual(4.5);
     }
+  });
+});
+
+// ===========================================================================
+// Daily standing card — thin-board percentile suppression
+// ===========================================================================
+
+describe('daily standing card wiring', () => {
+  /** The Node harness never invokes child components, so read the element's props. */
+  function standingCardProps(tree: unknown): Record<string, unknown> | null {
+    const el = findAll(tree, e => typeof e.type === 'function' && 'beatText' in (e.props ?? {}))[0];
+    return (el?.props as Record<string, unknown>) ?? null;
+  }
+
+  it('substitutes the gathering line instead of a percentile on a thin board', () => {
+    const props = standingCardProps(render(baseProps({
+      isPlayingDaily: true,
+      dailyRank: { rank: 1, total: 1, percentile: 0 },
+    })));
+    // The rank is factually true and still passed through...
+    expect(props).toMatchObject({ rank: 1, total: 1 });
+    // ...but no "you beat 0%" reaches the card, in any form.
+    expect(props!.beatText).toBe('STILL GATHERING');
+  });
+
+  it('passes the real sentence once the board has enough entrants', () => {
+    const props = standingCardProps(render(baseProps({
+      isPlayingDaily: true,
+      dailyRank: { rank: 4, total: MOCK_MIN_ENTRANTS + 20, percentile: 78 },
+    })));
+    expect(props!.beatText).toBe('BEAT 78%');
+  });
+
+  it('passes no standing line at all when there is no live rank', () => {
+    const props = standingCardProps(render(baseProps({
+      isPlayingDaily: true,
+      dailyRank: null,
+      dailyHistoryLine: '3 dailies completed',
+    })));
+    expect(props!.beatText).toBeNull();
   });
 });

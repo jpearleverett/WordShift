@@ -184,6 +184,14 @@ describe('HomeScreen wiring', () => {
       /markKeeperRecordSeen\(\);[\s\S]{0,600}?recordWhisper\(\{/g
     ) ?? [];
     expect(keepsakeSites.length).toBe(2);
+    // Under its OWN kind: the gallery hides the legacy 'dialogue' kind, which
+    // is what base conversation lines were recorded as before the journal took
+    // sole custody of them, so a keepsake filed that way would vanish.
+    const keepsakeKinds = HOME_SCREEN.match(
+      /markKeeperRecordSeen\(\);[\s\S]{0,700}?type: '(\w+)'/g
+    ) ?? [];
+    expect(keepsakeKinds.length).toBe(2);
+    for (const site of keepsakeKinds) expect(site).toContain("type: 'keepsake'");
   });
 
   test('defers the weave intro one landing, guarded past the awaits', () => {

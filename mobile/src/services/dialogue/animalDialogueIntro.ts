@@ -7,9 +7,9 @@ import { AnimalType } from '../../types/homeWorld';
 export const INTRO_DIALOGUES: Record<AnimalType, string[]> = {
   fox: [
     "Oh! Come in, come in. Mind the step. I keep meaning to fix that step, and then I make tea instead.",
-    "I'm Ember. I found this old den empty, with the fire already burning. Someone had left a perfectly good kettle behind.",
-    "I inherited the cups along with the den. The chipped one is mine. You get the one whose handle stays attached.",
-    "You're the one bringing the words. I've seen the amber they leave behind. We could build a lot with a little of it.",
+    "I'm Ember. I found this old den standing empty and moved in the same afternoon, with a kettle under one arm and no plan at all.",
+    "There are two cups on the shelf, and I've been keeping the second one ready. The chipped one is mine. You get the one whose handle stays attached.",
+    "You're the one bringing the words. I felt it from in here, like a door opening somewhere under the floor, and I've been hoping you'd knock.",
     "My plan is rooms, one at a time. A kitchen first, in case somebody sensible wants to cook in it. Then more friends.",
     "Nothing grand today. Sit down. Tell me if this cushion needs more stuffing. I'm too attached to it to judge.",
   ],

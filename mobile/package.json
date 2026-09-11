@@ -12,6 +12,7 @@
     "lint": "eslint .",
     "generate:puzzles": "node scripts/tools/generateGatedPuzzles.mjs",
     "generate:assets": "node scripts/tools/processAppIcon.mjs && node scripts/tools/generateSplash.mjs && node scripts/tools/generateNotificationIcon.mjs && node scripts/tools/generateSounds.mjs && node scripts/tools/generateWorldArt.mjs && node scripts/tools/generatePixelWorld.mjs && node scripts/tools/generateUiIcons.mjs && node scripts/tools/generateShopIcons.mjs && node scripts/tools/generateStoreIcons.mjs && node scripts/tools/generateGameIcons.mjs && node scripts/tools/optimizeStoryAssets.mjs",
+    "encode:music": "node scripts/tools/encodeMusic.mjs",
     "audit:profanity": "node scripts/tools/purgeProfanity.mjs",
     "generate:vocabulary-policy": "node scripts/tools/buildVocabularyPolicy.mjs",
     "test:e2e": "playwright test",

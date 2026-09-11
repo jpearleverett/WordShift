@@ -943,9 +943,12 @@ export function getRewardedDoubleConfirm(phase: DialoguePhase): string {
 // WHISPER GALLERY EMPTY STATE — Shown when no whispers are collected yet
 // ============================================================================
 
+// The gallery keeps only what is said in passing: the line after a win, an
+// answer given back, a keepsake. Full conversations are kept in the journal, so
+// this copy points at playing rather than at visiting.
 const WHISPER_GALLERY_EMPTY_TEXT: Record<DialoguePhase, string> = {
-  0: 'No whispers collected yet. Play puzzles and talk to your animal friends!',
-  1: 'No whispers collected yet. Play puzzles and visit your friends. They have things to say.',
+  0: 'No whispers collected yet. Solve a puzzle and listen for what your friends say after!',
+  1: 'No whispers collected yet. Keep solving. Your friends murmur things when a puzzle ends.',
   2: 'Nothing collected yet. The house is listening for your words.',
   3: 'The walls are quiet... for now.',
   4: 'The walls are quiet... for now.',
@@ -1041,6 +1044,28 @@ export function getPhaseChangeNarrative(newPhase: DialoguePhase): PhaseChangeNar
         body: 'The journey continues.',
       };
   }
+}
+
+// ============================================================================
+// CEREMONY PLAYBACK CHROME
+// The ceremony plays itself: its pace is part of the drama. The pacing line
+// under the page count therefore does one job, teaching the hold gesture
+// BEFORE the reader needs it (the old borderless "Read at my pace" label was
+// a button nobody could see, sitting next to a status caption). Once the
+// player has tapped the words, the same line simply says the house is waiting.
+// ============================================================================
+
+/** The pacing line beneath the ceremony page count. */
+export function getCeremonyPaceCaption(held: boolean): string {
+  return held ? 'Waiting for you' : 'Tap the words to hold them here';
+}
+
+/**
+ * Screen-reader hint on the passage itself. The passage text stays the
+ * accessible label, so the words are never traded away for the gesture.
+ */
+export function getCeremonyHoldHint(): string {
+  return 'Holds this passage until you continue';
 }
 
 // ============================================================================
@@ -2641,6 +2666,25 @@ export function getNextFriendPrompt(phase: number, name: string): string {
   if (phase >= 4) return `${name} is waiting to speak.`;
   if (phase >= 2) return `${name} has something to tell you.`;
   return `${name} has news for you!`;
+}
+
+// ============================================================================
+// DIALOGUE CAUGHT UP — what an animal says when its finite block for the
+// current stretch of the story is read out and the player taps it anyway.
+// Spoken inside the card in the animal's own first person, so it stays
+// voice-neutral across the cast; the reveal register drops its contractions
+// like every other Phase 4+ line. It replaces replaying the animal's LAST line
+// verbatim on every tap (getCurrentDialogue clamps an over-range index to the
+// tail). Phase 2 hands off to its exhaustion pool and Phase 5 cycles forever,
+// so neither normally reaches this; the lines exist so no phase can fall back
+// to a repeat. Never recorded, never counted against the session budget.
+// ============================================================================
+
+export function getDialogueCaughtUpLine(phase: number): string {
+  if (phase >= 5) return 'There is nothing new to tell tonight. Sit with me a while, or go on. Both are fine.';
+  if (phase >= 4) return 'I have said what I am able to say, for now. The arrangement will give me more when it is ready.';
+  if (phase >= 2) return "I've said what I can for now. Bring a few more words to the house and I'll have more for you.";
+  return "That's everything I've got for now. Go find a few more words and come back. I'll have more to say by then.";
 }
 
 // ============================================================================

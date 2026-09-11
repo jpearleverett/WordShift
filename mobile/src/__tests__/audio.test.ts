@@ -4,9 +4,10 @@
  *     1-3 escalate, clamped; bright names below Phase 3, dark names at 3+.
  *   - resolveSfxForPhase: every registered `<name>_dark` swaps in at Phase 3+;
  *     sounds without a dark variant keep their base name at every phase.
- *   - Ambient music: startMusicForPhase picks bright/dusk/dark by phase,
- *     loops, crossfades on switch, is gated by musicEnabled (NOT soundEnabled),
- *     and stopMusic releases the player.
+ *   - Ambient music: startMusicForPhase / startMusicForScreen pick the
+ *     authored per-phase bed (the home family for home AND the pit, the
+ *     puzzle family on the board), loop it, crossfade on switch, gate on
+ *     musicEnabled (NOT soundEnabled), and stopMusic releases the player.
  *
  * All sound assets resolve to the same fileMock in Jest, so playback routing
  *  is asserted through the exported pure resolvers + player lifecycle.
@@ -19,6 +20,7 @@ import {
   soundTap,
   musicTrackForPhase,
   musicTrackForContext,
+  hasMusicTrack,
   startMusicForPhase,
   startMusicForScreen,
   stopMusic,
@@ -216,45 +218,92 @@ describe('audio', () => {
   });
 
   describe('ambient music', () => {
-    test('musicTrackForPhase maps the descent: bright 0-1, dusk 2, dark 3-4, peace 5', () => {
-      expect(musicTrackForPhase(0)).toBe('music_bright');
-      expect(musicTrackForPhase(1)).toBe('music_bright');
-      expect(musicTrackForPhase(2)).toBe('music_dusk');
-      expect(musicTrackForPhase(3)).toBe('music_dark');
-      expect(musicTrackForPhase(4)).toBe('music_dark');
-      // Post-revelation resolves to the "terrible peace" bed.
-      expect(musicTrackForPhase(5)).toBe('music_peace');
+    const SCREENS = ['home', 'puzzle', 'pit'] as const;
+    const PHASES = [0, 1, 2, 3, 4, 5];
+
+    test('musicTrackForPhase maps every phase to its own home bed (six steps, no bands)', () => {
+      expect(musicTrackForPhase(0)).toBe('music_home_0');
+      expect(musicTrackForPhase(1)).toBe('music_home_1');
+      expect(musicTrackForPhase(2)).toBe('music_home_2');
+      expect(musicTrackForPhase(3)).toBe('music_home_3');
+      expect(musicTrackForPhase(4)).toBe('music_home_4');
+      expect(musicTrackForPhase(5)).toBe('music_home_5');
     });
 
-    test('musicTrackForContext picks the screen family and keeps the phase band', () => {
-      // Home = the bare world beds (also the default for menu screens).
-      expect(musicTrackForContext('home', 0)).toBe('music_bright');
-      expect(musicTrackForContext('home', 2)).toBe('music_dusk');
-      expect(musicTrackForContext('home', 4)).toBe('music_dark');
-      // Puzzle family darkens with the same descent.
-      expect(musicTrackForContext('puzzle', 1)).toBe('music_puzzle_bright');
-      expect(musicTrackForContext('puzzle', 2)).toBe('music_puzzle_dusk');
-      expect(musicTrackForContext('puzzle', 3)).toBe('music_puzzle_dark');
-      // Pit family too.
-      expect(musicTrackForContext('pit', 0)).toBe('music_pit_bright');
-      expect(musicTrackForContext('pit', 2)).toBe('music_pit_dusk');
-      expect(musicTrackForContext('pit', 4)).toBe('music_pit_dark');
-      // Phase 5 resolves to the peace band on every screen family.
-      expect(musicTrackForContext('pit', 5)).toBe('music_pit_peace');
+    test('musicTrackForPhase rounds and clamps into 0..5 and treats NaN as phase 0', () => {
+      expect(musicTrackForPhase(-1)).toBe('music_home_0');
+      expect(musicTrackForPhase(9)).toBe('music_home_5');
+      expect(musicTrackForPhase(2.4)).toBe('music_home_2');
+      expect(musicTrackForPhase(2.6)).toBe('music_home_3');
+      // The retired band mapping resolved NaN to the bright bed; a key like
+      // music_home_NaN would instead make the switch a silent no-op.
+      expect(musicTrackForPhase(NaN)).toBe('music_home_0');
+    });
+
+    test('musicTrackForContext picks the screen family and keeps the per-phase step', () => {
+      // Home = the house-world beds (also the default for menu screens).
+      expect(musicTrackForContext('home', 0)).toBe('music_home_0');
+      expect(musicTrackForContext('home', 2)).toBe('music_home_2');
+      expect(musicTrackForContext('home', 4)).toBe('music_home_4');
+      // Puzzle family descends with the same per-phase steps.
+      expect(musicTrackForContext('puzzle', 1)).toBe('music_puzzle_1');
+      expect(musicTrackForContext('puzzle', 2)).toBe('music_puzzle_2');
+      expect(musicTrackForContext('puzzle', 3)).toBe('music_puzzle_3');
+      expect(musicTrackForContext('puzzle', 5)).toBe('music_puzzle_5');
+    });
+
+    test('the Offering Pit plays the HOME family at every phase (the pit is part of the house world)', () => {
+      expect(musicTrackForContext('pit', 0)).toBe('music_home_0');
+      expect(musicTrackForContext('pit', 2)).toBe('music_home_2');
+      expect(musicTrackForContext('pit', 4)).toBe('music_home_4');
+      expect(musicTrackForContext('pit', 5)).toBe('music_home_5');
+      for (const p of PHASES) {
+        expect(musicTrackForContext('pit', p)).toBe(musicTrackForContext('home', p));
+      }
+    });
+
+    test('every (screen, phase) resolves to a bed that is actually registered', () => {
+      for (const screen of SCREENS) {
+        for (const p of PHASES) {
+          expect(hasMusicTrack(musicTrackForContext(screen, p))).toBe(true);
+        }
+      }
+    });
+
+    test('the retired band beds are gone from the registry and nothing past phase 5 exists', () => {
+      for (const name of [
+        'music_bright', 'music_dusk', 'music_dark', 'music_peace',
+        'music_puzzle_bright', 'music_pit_dark', 'music_pit_peace',
+      ]) {
+        expect(hasMusicTrack(name)).toBe(false);
+      }
+      expect(hasMusicTrack('music_home_6')).toBe(false);
+      expect(hasMusicTrack('music_home_NaN')).toBe(false);
+      expect(hasMusicTrack('')).toBe(false);
     });
 
     test('startMusicForScreen plays the screen-specific bed and crossfades on a screen change', async () => {
       await startMusicForScreen('home', 0);
-      expect(getActiveMusicTrack()).toBe('music_bright');
+      expect(getActiveMusicTrack()).toBe('music_home_0');
       await startMusicForScreen('puzzle', 0);
-      expect(getActiveMusicTrack()).toBe('music_puzzle_bright');
+      expect(getActiveMusicTrack()).toBe('music_puzzle_0');
+      // puzzle -> pit is still a real switch (back to the home family).
       await startMusicForScreen('pit', 0);
-      expect(getActiveMusicTrack()).toBe('music_pit_bright');
+      expect(getActiveMusicTrack()).toBe('music_home_0');
+      expect(expoAudio.createAudioPlayer).toHaveBeenCalledTimes(3);
+    });
+
+    test('walking home <-> pit never restarts the bed (same family, resume no-op)', async () => {
+      await startMusicForScreen('home', 0);
+      await startMusicForScreen('pit', 0);
+      await startMusicForScreen('home', 0);
+      expect(expoAudio.createAudioPlayer).toHaveBeenCalledTimes(1);
+      expect(getActiveMusicTrack()).toBe('music_home_0');
     });
 
     test('startMusicForPhase starts a looping player and fades it in', async () => {
       await startMusicForPhase(0);
-      expect(getActiveMusicTrack()).toBe('music_bright');
+      expect(getActiveMusicTrack()).toBe('music_home_0');
       const player = getPlayers()[0];
       expect(player.loop).toBe(true);
       expect(player.play).toHaveBeenCalled();
@@ -263,25 +312,32 @@ describe('audio', () => {
       expect(player.volume).toBeGreaterThan(0.3); // faded up to bed volume
     });
 
-    test('same phase band twice does not restart or duplicate the bed', async () => {
+    test('the same phase twice does not restart or duplicate the bed', async () => {
       await startMusicForPhase(0);
-      await startMusicForPhase(1); // still bright
+      await startMusicForPhase(0);
       expect(expoAudio.createAudioPlayer).toHaveBeenCalledTimes(1);
-      expect(getActiveMusicTrack()).toBe('music_bright');
+      expect(getActiveMusicTrack()).toBe('music_home_0');
+    });
+
+    test('every phase owns its own bed: 0 -> 1 is a real switch (no bright band spans it any more)', async () => {
+      await startMusicForPhase(0);
+      await startMusicForPhase(1);
+      expect(expoAudio.createAudioPlayer).toHaveBeenCalledTimes(2);
+      expect(getActiveMusicTrack()).toBe('music_home_1');
     });
 
     test('phase change crossfades to the new bed and releases the old player', async () => {
       await startMusicForPhase(0);
-      const bright = getPlayers()[0];
+      const first = getPlayers()[0];
       jest.advanceTimersByTime(5000);
 
       await startMusicForPhase(4);
-      expect(getActiveMusicTrack()).toBe('music_dark');
-      const dark = getPlayers()[1];
-      expect(dark.loop).toBe(true);
+      expect(getActiveMusicTrack()).toBe('music_home_4');
+      const fourth = getPlayers()[1];
+      expect(fourth.loop).toBe(true);
       jest.advanceTimersByTime(5000);
-      expect(bright.remove).toHaveBeenCalled(); // old bed released after fade
-      expect(dark.volume).toBeGreaterThan(0.3);
+      expect(first.remove).toHaveBeenCalled(); // old bed released after fade
+      expect(fourth.volume).toBeGreaterThan(0.3);
     });
 
     test('stopMusic fades out and releases the player', async () => {
@@ -303,7 +359,7 @@ describe('audio', () => {
     test('music has its own toggle: plays even when soundEnabled is off', async () => {
       await updateSetting('soundEnabled', false);
       await startMusicForPhase(0);
-      expect(getActiveMusicTrack()).toBe('music_bright');
+      expect(getActiveMusicTrack()).toBe('music_home_0');
       expect(expoAudio.createAudioPlayer).toHaveBeenCalledTimes(1);
     });
   });

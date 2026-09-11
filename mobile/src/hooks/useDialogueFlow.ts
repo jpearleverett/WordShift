@@ -68,7 +68,7 @@ import {
   markPhase4CallbackShown,
 } from '../services/dialogueChoices';
 import { recordWhisper } from '../services/whisperGallery';
-import { getFoxPostTutorialPlayPrompt } from '../services/phaseNarrative';
+import { getFoxPostTutorialPlayPrompt, getDialogueCaughtUpLine } from '../services/phaseNarrative';
 import { recordAnimalVisit, Quest } from '../services/weeklyQuests';
 import { hapticLight, hapticSelection } from '../services/haptics';
 import {
@@ -375,6 +375,16 @@ interface UseDialogueFlowReturn {
   hasMoreToShow: boolean;
   /** Active dialogue choice for Phase 3 choice points */
   activeChoice: DialogueChoice | null;
+  /**
+   * The card has turned over to the two answers (see DialogueChoicePage).
+   * Closing is refused until one is picked: the choice is the visit.
+   */
+  choiceOpen: boolean;
+  /**
+   * The answer the player just gave, echoed above the animal's reply; null
+   * again once the reply is left.
+   */
+  choiceEcho: string | null;
   handleAnimalTap: (animal: Animal) => Promise<void>;
   handleNextDialogue: () => Promise<void>;
   handleCloseDialogue: () => Promise<void>;
@@ -446,6 +456,9 @@ export function useDialogueFlow({
   }, []);
   // Active dialogue choice (Phase 3 choice points)
   const [activeChoice, setActiveChoice] = useState<DialogueChoice | null>(null);
+  // The choice page (card turned over to the answers) and the echoed pick.
+  const [choiceOpen, setChoiceOpen] = useState(false);
+  const [choiceEcho, setChoiceEcho] = useState<string | null>(null);
   // Recorded Phase 3 choices (loaded once; refreshed when a choice is made) —
   // used synchronously by the Phase 5 post-revelation dialogue cycle.
   const [playerChoices, setPlayerChoices] = useState<Record<string, PlayerChoice>>({});
@@ -717,11 +730,26 @@ export function useDialogueFlow({
       }
     }
 
-    const dialogue = getCurrentDialogue(
+    const resolvedIndex = resolveDialogueIndex(
       selectedAnimal.type,
-      resolveDialogueIndex(selectedAnimal.type, selectedAnimal.currentDialogueIndex, animalPhase, getUnlockedTypes()),
-      animalPhase
+      selectedAnimal.currentDialogueIndex,
+      animalPhase,
+      getUnlockedTypes()
     );
+    // A finite block that is read out must not replay its last line. The
+    // terminal read in closeDialogue parks the index AT total so the badge goes
+    // honest-dark, but the animal stays tappable, and getCurrentDialogue clamps
+    // an over-range index to the tail: every visit re-served the same closing
+    // line verbatim (Ember repeating her goodbye until the next phase opened).
+    // Speak an honest "that is all for now" instead. hasMoreToShow already
+    // reads false at this index, so the button offers Close, nothing is
+    // recorded and no session budget is spent; any pre-dialogue pages (a
+    // coordinated event, a trigger reaction) still deliver ahead of it.
+    if (resolvedIndex >= getTotalDialogueCount(selectedAnimal.type, animalPhase)) {
+      return getDialogueCaughtUpLine(animalPhase);
+    }
+
+    const dialogue = getCurrentDialogue(selectedAnimal.type, resolvedIndex, animalPhase);
     return dialogue?.text || 'Hello, friend!';
   }, [preDialoguePages, selectedAnimal, progress, selectPhase5, getUnlockedTypes, phase2Cursors]);
 
@@ -921,6 +949,8 @@ export function useDialogueFlow({
     // Fresh session: a stale page cursor from the previous session must never
     // leak into this one — the first line always opens on its first page.
     resetPageQueue();
+    setChoiceOpen(false);
+    setChoiceEcho(null);
 
     // Build pre-dialogue pages: these show as sequential conversation pages
     // before the regular dialogue, creating natural conversational flow.
@@ -1313,14 +1343,21 @@ export function useDialogueFlow({
     setSelectedAnimal(null);
     setSessionInfo(null);
     setPreDialoguePages([]);
+    setChoiceOpen(false);
+    setChoiceEcho(null);
     // Closing mid-pages behaves exactly like closing mid-line: nothing extra
     // beyond clearing the page queue so it can't leak into the next session.
     resetPageQueue();
   }, [selectedAnimal, progress, preDialoguePages, recomputeHasNewDialogue, setAnimals, resetPageQueue, getUnlockedTypes]);
 
+  // The must-answer lock: while the card is turned over to the answers, the
+  // scrim, the hardware back and any other close path are refused. An
+  // unanswered choice used to be silently discarded and re-offered next
+  // visit, which made the beat feel skippable by accident.
   const handleCloseDialogue = useCallback(async () => {
+    if (choiceOpen) return;
     await closeDialogue(false);
-  }, [closeDialogue]);
+  }, [closeDialogue, choiceOpen]);
 
   // Availability signal for the "visit next friend" chain — the SAME news
   // signal the home "!" badge uses (recomputeHasNewDialogue already folds in
@@ -1387,10 +1424,21 @@ export function useDialogueFlow({
       }
     }
 
+    // The choice prompt reads as an ordinary line with an ordinary Next, and
+    // that Next turns the card over to the answers instead of advancing past
+    // the prompt: the page stays the head (HomeScreen's caption reads it) and
+    // the answers, not this button, are what move the conversation on.
+    if (activeChoice && currentFullText === activeChoice.prompt && !choiceOpen) {
+      setChoiceOpen(true);
+      return;
+    }
+
     // If still showing pre-dialogue pages, advance through them
     // Pre-dialogue pages don't count toward session dialogue limits
     if (preDialoguePages.length > 0) {
       resetPageQueue();
+      // The echoed pick belongs to the reply page only.
+      setChoiceEcho(null);
       const nextHead = preDialoguePages[1];
       setPreDialoguePages(prev => prev.slice(1));
       // The next page is now the visible one — commit its bookkeeping here
@@ -1426,18 +1474,20 @@ export function useDialogueFlow({
     if (hasMore) {
       await recordDialogue(selectedAnimal.id);
 
-      // Record dialogue text in whisper gallery — the FULL line, not just the
-      // last visible page of a paginated one.
-      const currentText = getFullDialogueText();
-      if (currentText) {
-        recordWhisper({
-          animalType: selectedAnimal.type,
-          animalName: selectedAnimal.name,
-          text: currentText,
-          phase: animalPhase,
-          type: 'dialogue',
-        }).catch(() => {});
-      }
+      // Base conversation lines are NOT recorded to the gallery. They already
+      // live, complete and un-evictable, in the journal's earlier conversations
+      // (services/storyArchive reads the same corpus), so copying each read
+      // line here produced a second, lossier archive of the same text and let
+      // the gallery's 500-entry cap evict the runtime lines that exist nowhere
+      // else. The gallery keeps only what the journal cannot show.
+      //
+      // The LATE POOLS are the other half of that same rule, and they are still
+      // recorded (as 'passage', below). storyArchive reads phases 0-4 of
+      // ALL_DIALOGUES and nothing else, while the Phase-2 exhaustion pool
+      // (PHASE2_EXTRA_DIALOGUES), the post-revelation pool and the Tending
+      // milestone lines are each served from their own module, so the journal
+      // can never show one of them. `fromLatePool` below is set from the very
+      // branches that already detect a pool line, so the two cannot disagree.
 
       // Phase 5: if the line just shown was a genuinely-new pool line (not a
       // shuffled re-read), advance the animal's caught-up pointer and persist it,
@@ -1461,6 +1511,10 @@ export function useDialogueFlow({
       const total2 = getTotalDialogueCount(selectedAnimal.type, 2);
       let newIndex: number;
       let nextPhase2Cursor = phase2Cursors[selectedAnimal.type] ?? 0;
+      // Was the line the player just finished reading one the journal cannot
+      // show? Phase 5 is always a pool line (post-revelation / choice callback
+      // / Tending milestone); Phase 2 is one only past the base block.
+      let fromLatePool = animalPhase === 5;
       if (animalPhase === 5) {
         // Keep the regular index at/after the pool boundary and advance it only
         // as the deterministic re-read cursor. It never traverses old content.
@@ -1476,6 +1530,7 @@ export function useDialogueFlow({
           // A pool line was just shown: pin the stored index at the base-block
           // end (never inflate it — Phase 3 reads it as a phase-start position)
           // and advance the persisted pool cursor instead.
+          fromLatePool = true;
           newIndex = total2;
           const animalType = selectedAnimal.type;
           nextPhase2Cursor = await advancePhase2PoolCursor(animalType);
@@ -1485,6 +1540,19 @@ export function useDialogueFlow({
         }
       }
       await markDialogueRead(selectedAnimal.id, newIndex);
+      // Keep the line that no other surface holds. currentFullText is the FULL
+      // line (never the last visible page): reaching this branch means the page
+      // queue had already drained, so it is the line just finished, taken
+      // before the index above moved on.
+      if (fromLatePool && currentFullText) {
+        recordWhisper({
+          animalType: selectedAnimal.type,
+          animalName: selectedAnimal.name,
+          text: currentFullText,
+          phase: animalPhase,
+          type: 'passage',
+        }).catch(() => {});
+      }
       // A new line is about to show — it must open on its first page.
       resetPageQueue();
 
@@ -1559,7 +1627,7 @@ export function useDialogueFlow({
       }
       closeDialogue(true);
     }
-  }, [selectedAnimal, progress, closeDialogue, setAnimals, preDialoguePages, onFoxPlayPrompt, tendingCaughtUp, phase2Cursors, activeChoice, pageCursor, pageSource, resetPageQueue, getFullDialogueText, getPhase5Pool, getSessionBonus, getUnlockedTypes, selectPhase5]);
+  }, [selectedAnimal, progress, closeDialogue, setAnimals, preDialoguePages, onFoxPlayPrompt, tendingCaughtUp, phase2Cursors, activeChoice, choiceOpen, pageCursor, pageSource, resetPageQueue, getFullDialogueText, getPhase5Pool, getSessionBonus, getUnlockedTypes, selectPhase5]);
 
   // Handle player choosing a dialogue option (Phase 3 choice points)
   const handleDialogueChoice = useCallback(async (choice: PlayerChoice) => {
@@ -1571,18 +1639,24 @@ export function useDialogueFlow({
       // Replace the current pre-dialogue page with the response, then convergence
       resetPageQueue();
       setPreDialoguePages([{ text: result.response }, { text: result.convergence }]);
+      // The card turns back: the pick stays on it, dimmed, above the reply.
+      setChoiceOpen(false);
+      setChoiceEcho(activeChoice.options[choice]);
       setActiveChoice(null);
 
-      // Record the choice response in whisper gallery
+      // Record the choice response in the whisper gallery. Kept (as its own
+      // 'choice' kind) because it is generated at answer time and appears in
+      // no corpus the journal archive can walk.
       recordWhisper({
         animalType: selectedAnimal.type,
         animalName: selectedAnimal.name,
         text: result.response,
         phase: 3,
-        type: 'dialogue',
+        type: 'choice',
       }).catch(() => {});
     } catch {
       // Choice handling is non-critical, just close the choice
+      setChoiceOpen(false);
       setActiveChoice(null);
     }
   }, [selectedAnimal, activeChoice, resetPageQueue]);
@@ -1602,6 +1676,8 @@ export function useDialogueFlow({
     isTalking: revealInProgress && talkingFrame,
     hasMoreToShow: computeHasMore(),
     activeChoice,
+    choiceOpen,
+    choiceEcho,
     handleAnimalTap,
     handleNextDialogue,
     handleCloseDialogue,

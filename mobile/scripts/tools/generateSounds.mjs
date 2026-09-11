@@ -1,4 +1,6 @@
-// Pure-Node WAV generator for WordShift's sound effects and ambient music beds.
+// Pure-Node WAV generator for WordShift's sound effects.
+// The ambient music beds are NOT rendered here: they are authored MP3s in
+// assets/raw/music, shipped by scripts/tools/encodeMusic.mjs (see that file).
 // No external dependencies. Run: node scripts/tools/generateSounds.mjs
 //
 // Synthesis engine (v2 — the audio overhaul):
@@ -11,10 +13,6 @@
 //   - Soft-knee tanh saturation on the master for glue and gentle harmonics.
 //   - Lightweight Schroeder reverb (3 lowpassed feedback combs + 2 allpasses)
 //     for space; dark sounds get damper, longer rooms.
-//   - Ambient music loops that are sample-exact seamless BY CONSTRUCTION:
-//     every continuous component completes an integer number of cycles over
-//     the loop, event tails wrap circularly, and reverb is applied via a
-//     double-pass (periodic steady state) so the tail wraps too.
 //
 // Musical direction: bright = warm C-major-pentatonic toy-piano/celesta
 // (cozy, candy). Dark (Phase 3+ variants) = hollow bells with minor-third and
@@ -308,24 +306,8 @@ function reverb(input, opts = {}) {
 }
 
 /**
- * Seamless reverb for loops: process two copies back-to-back and keep the
- * second half. The input is periodic and the reverb is LTI, so the second
- * pass is the periodic steady state — its tail wraps to its own start
- * (initial-transient error decays below one int16 LSB long before 16s).
- */
-function reverbLoop(input, opts = {}) {
-  const doubled = new Float64Array(input.length * 2);
-  doubled.set(input, 0);
-  doubled.set(input, input.length);
-  const processed = reverb(doubled, { ...opts, tail: 0 });
-  return processed.slice(input.length);
-}
-
-/**
  * Master finish: soft-knee tanh saturation (drive 0 = bypass), normalize to a
  * designed peak, then a short end fade so no file ends on a click.
- * Loops use drive 0 + fadeMs 0 (a fade would break the seam; saturation is
- * memoryless so it would be seam-safe, but the beds stay clean).
  */
 function finalize(samples, opts = {}) {
   const { peak = 0.72, drive = 1.25, fadeMs = 6 } = opts;
@@ -361,42 +343,6 @@ function render(name, seconds, build, opts = {}) {
   const out = rv ? reverb(s, rv) : s;
   finalize(out, { peak, drive, fadeMs });
   writeWav(path.join(OUT_DIR, `${name}.wav`), out);
-}
-
-/**
- * Seamless loop driver. Every continuous voice must use q(freq) (quantized to
- * an integer number of cycles over the loop) and integer LFO cycle counts;
- * finite events are added with circular wrap via loopEvent.
- */
-function renderLoop(name, L, build, opts = {}) {
-  const { reverb: rv, peak = 0.5 } = opts;
-  const n = Math.round(L * SAMPLE_RATE);
-  const s = new Float64Array(n);
-  const rand = mulberry32(hashSeed(name));
-  const q = (f) => Math.max(1, Math.round(f * L)) / L;
-  build(s, { rand, q, L });
-  const out = rv ? reverbLoop(s, rv) : s;
-  finalize(out, { peak, drive: 0, fadeMs: 0 });
-  writeWav(path.join(OUT_DIR, `${name}.wav`), out);
-}
-
-/** Continuous loop voice: quantized sine + amplitude LFO at integer cycles. */
-function loopPad(s, { freq, vol, lfoCycles = 0, lfoDepth = 0, lfoPhase = 0, phase = 0 }) {
-  const n = s.length;
-  const w = (2 * Math.PI * freq) / SAMPLE_RATE;
-  const wl = (2 * Math.PI * lfoCycles) / n;
-  for (let i = 0; i < n; i++) {
-    const lfo = lfoDepth ? 1 - lfoDepth * (0.5 + 0.5 * Math.sin(wl * i + lfoPhase)) : 1;
-    s[i] += Math.sin(w * i + phase) * vol * lfo;
-  }
-}
-
-/** Finite event added to a loop with circular wrap (tails cross the seam). */
-function loopEvent(s, startSec, dur, renderInto) {
-  const tmp = new Float64Array(Math.min(s.length, Math.ceil(dur * SAMPLE_RATE)));
-  renderInto(tmp);
-  const off = Math.floor(startSec * SAMPLE_RATE) % s.length;
-  for (let i = 0; i < tmp.length; i++) s[(off + i) % s.length] += tmp[i];
 }
 
 // ---------------------------------------------------------------------------
@@ -618,8 +564,8 @@ render('dialogue', 0.15, (s, rand) => {
 
 // phase_change: WARM ceremony swell — the C-add9 house chord rising into a
 // handbell hour-strike, for the BRIGHT ward ignitions (target phase 0-2). One
-// lowered-7th (Bb) shade drifts under the warmth: the seed of wrongness, the
-// same device the dusk music beds use. The Phase 3+ ceremonies play
+// lowered-7th (Bb) shade drifts under the warmth: the seed of wrongness,
+// planted by ear before the story admits it. The Phase 3+ ceremonies play
 // phase_change_dark below (audio.soundPhaseChange keys on the ceremony's
 // TARGET phase), so the descent is earned by ear too — the ignition INTO
 // Growing Shadows is the first ceremony that sounds wrong.
@@ -899,267 +845,5 @@ render('letter_select_peace', 0.3, (s, rand) => {
   noiseBurst(s, { start: 0, dur: 0.01, vol: 0.16, lp: 0.3, decayShape: 11, rand });
   strike(s, { freq: N.E4, dur: 0.26, vol: 0.5, partials: HANDBELL, attack: 0.006, decayShape: 5.5, unison: 2, detune: 0.003, rand });
 }, { reverb: { wet: 0.14, damp: 0.5, tail: 0.24 }, peak: 0.52 });
-
-// ===========================================================================
-// AMBIENT MUSIC BEDS: three screen families × bright/dusk/dark/peace loops
-// sharing one musical DNA. Quiet by design — a bed, not a song. Loop-exact by
-// construction: continuous voices quantized to integer cycles, event tails
-// wrapped, reverb double-pass.
-// ===========================================================================
-
-// music_bright (18s): warm slow-breathing C add9 pad with gentle celesta
-// sparkle on the pentatonic — the cozy candy meadow.
-renderLoop('music_bright', 18, (s, { rand, q }) => {
-  const padVoice = (f, vol, lfoCycles, lfoDepth, lfoPhase) => {
-    loopPad(s, { freq: q(f), vol, lfoCycles, lfoDepth, lfoPhase, phase: rand() * 2 * Math.PI });
-    // Detuned twin for chorus warmth (also quantized → still periodic).
-    loopPad(s, { freq: q(f * 1.0035), vol: vol * 0.6, lfoCycles, lfoDepth, lfoPhase: lfoPhase + 1.3, phase: rand() * 2 * Math.PI });
-  };
-  padVoice(N.C4 / 2, 0.16, 2, 0.35, 0);      // C3 root
-  padVoice(N.G4 / 2, 0.11, 3, 0.4, 1.1);     // G3 fifth
-  padVoice(N.C4, 0.09, 2, 0.45, 2.4);        // C4
-  padVoice(N.E4, 0.07, 4, 0.5, 0.7);         // E4 third
-  padVoice(N.D4, 0.045, 1, 0.7, 3.6);        // D4 ninth, breathes once per loop
-  loopPad(s, { freq: q(N.C4 / 4), vol: 0.05, lfoCycles: 2, lfoDepth: 0.3, phase: rand() });
-  // Sparkle: seven soft celesta notes scattered across the loop.
-  const sparkleNotes = [N.C6, N.D6, N.E6, N.G6, N.A6, N.E6, N.G6];
-  for (let k = 0; k < sparkleNotes.length; k++) {
-    const t = (k + 0.15 + rand() * 0.7) * (18 / sparkleNotes.length);
-    loopEvent(s, t, 1.6, (tmp) => {
-      strike(tmp, { freq: sparkleNotes[k], dur: 1.4, vol: 0.045 + rand() * 0.02, partials: CELESTA, attack: 0.003, decayShape: 4.5, unison: 2, detune: 0.003, rand });
-    });
-  }
-}, { reverb: { wet: 0.3, decay: 0.8, damp: 0.45 }, peak: 0.5 });
-
-// music_dusk (20s): the same chord cooled and slowed — dimmer third, wider
-// detune, an occasional lowered 7th (Bb) drifting through, rarer duller
-// sparkle. Familiar, but the light is going.
-renderLoop('music_dusk', 20, (s, { rand, q }) => {
-  const padVoice = (f, vol, lfoCycles, lfoDepth, lfoPhase, det = 1.005) => {
-    loopPad(s, { freq: q(f), vol, lfoCycles, lfoDepth, lfoPhase, phase: rand() * 2 * Math.PI });
-    loopPad(s, { freq: q(f * det), vol: vol * 0.6, lfoCycles, lfoDepth, lfoPhase: lfoPhase + 1.3, phase: rand() * 2 * Math.PI });
-  };
-  padVoice(N.C4 / 2, 0.16, 1, 0.4, 0);       // C3 root, one slow breath
-  padVoice(N.G4 / 2, 0.1, 2, 0.45, 1.1);     // G3
-  padVoice(N.C4, 0.08, 1, 0.5, 2.4);         // C4
-  padVoice(N.E4, 0.05, 2, 0.6, 0.7);         // E4 dimmed
-  padVoice(N.A4 / 2 * 1.0594631, 0.05, 1, 0.85, 4.4);  // Bb3 lowered 7th, comes and goes
-  loopPad(s, { freq: q(N.C4 / 4), vol: 0.06, lfoCycles: 1, lfoDepth: 0.35, phase: rand() });
-  // Sparse, lower, duller sparkle.
-  const sparkleNotes = [N.G5, N.A5, N.C6, N.E6];
-  for (let k = 0; k < sparkleNotes.length; k++) {
-    const t = (k + 0.2 + rand() * 0.6) * (20 / sparkleNotes.length);
-    loopEvent(s, t, 2.0, (tmp) => {
-      strike(tmp, { freq: sparkleNotes[k], dur: 1.8, vol: 0.035 + rand() * 0.015, partials: CELESTA, attack: 0.006, decayShape: 4, unison: 2, detune: 0.004, rand });
-    });
-  }
-  // One quiet handbell C5 mid-loop — a far-off hour striking.
-  loopEvent(s, 11.3, 2.4, (tmp) => {
-    strike(tmp, { freq: N.C5, dur: 2.2, vol: 0.05, partials: HANDBELL, attack: 0.006, decayShape: 3.2, unison: 2, detune: 0.003, rand });
-  });
-}, { reverb: { wet: 0.34, decay: 0.82, damp: 0.55 }, peak: 0.48 });
-
-// music_dark (24s): the same DNA corrupted — low, detuned, sparse. A slow sub
-// pulse, a sour beating pair on the root, minor third and tritone shading, a
-// faint semitone shimmer far above, and two distant dark-bell tolls.
-renderLoop('music_dark', 24, (s, { rand, q }) => {
-  // Sub pulse: C2 swelling every 3 seconds.
-  loopPad(s, { freq: q(D.C2), vol: 0.2, lfoCycles: 8, lfoDepth: 0.85, phase: rand() * 2 * Math.PI });
-  // Sour root pair: C3 against a copy ~10 cents off — slow, wrong beating.
-  loopPad(s, { freq: q(D.C3), vol: 0.12, lfoCycles: 2, lfoDepth: 0.4, phase: rand() * 2 * Math.PI });
-  loopPad(s, { freq: q(D.C3 * 1.006), vol: 0.1, lfoCycles: 2, lfoDepth: 0.4, lfoPhase: 0.9, phase: rand() * 2 * Math.PI });
-  // Minor third and tritone, drifting in and out.
-  loopPad(s, { freq: q(D.Eb3), vol: 0.07, lfoCycles: 2, lfoDepth: 0.6, lfoPhase: 2.2, phase: rand() * 2 * Math.PI });
-  loopPad(s, { freq: q(D.Gb3), vol: 0.045, lfoCycles: 3, lfoDepth: 0.8, lfoPhase: 4.1, phase: rand() * 2 * Math.PI });
-  // Faint dissonant shimmer: B5/C6 semitone pair beating far above.
-  loopPad(s, { freq: q(D.B5), vol: 0.018, lfoCycles: 5, lfoDepth: 0.9, lfoPhase: 1.5, phase: rand() * 2 * Math.PI });
-  loopPad(s, { freq: q(D.C6), vol: 0.018, lfoCycles: 5, lfoDepth: 0.9, lfoPhase: 3.8, phase: rand() * 2 * Math.PI });
-  // Two distant dark-bell tolls and one slow breath of wind.
-  loopEvent(s, 6.2, 3.2, (tmp) => {
-    strike(tmp, { freq: D.C4, dur: 3.0, vol: 0.08, partials: DARK_BELL, attack: 0.015, decayShape: 3.2, unison: 2, detune: 0.004, rand });
-  });
-  loopEvent(s, 17.5, 3.2, (tmp) => {
-    strike(tmp, { freq: D.G3, dur: 3.0, vol: 0.07, partials: DARK_BELL, attack: 0.015, decayShape: 3.2, unison: 2, detune: 0.004, rand });
-  });
-  loopEvent(s, 12.0, 5.0, (tmp) => {
-    noiseBurst(tmp, { start: 0, dur: 4.5, vol: 0.05, lp: 0.02, attack: 1.5, decayShape: 3, rand });
-  });
-}, { reverb: { wet: 0.38, decay: 0.85, damp: 0.6 }, peak: 0.5 });
-
-// ===========================================================================
-// PUZZLE MUSIC BEDS (played on the puzzle screen). Same C add9 DNA as the home
-// beds, but FOCUSED: fewer pad voices, centered mid-register, a soft breathing
-// root and only one or two quiet high notes — cleaner so it never distracts
-// from solving. Darkens with the descent like the world beds.
-// ===========================================================================
-
-// music_puzzle_bright (16s): warm but minimal — a small focused chord.
-renderLoop('music_puzzle_bright', 16, (s, { rand, q }) => {
-  const padVoice = (f, vol, lfoCycles, lfoDepth, lfoPhase) => {
-    loopPad(s, { freq: q(f), vol, lfoCycles, lfoDepth, lfoPhase, phase: rand() * 2 * Math.PI });
-    loopPad(s, { freq: q(f * 1.003), vol: vol * 0.55, lfoCycles, lfoDepth, lfoPhase: lfoPhase + 1.2, phase: rand() * 2 * Math.PI });
-  };
-  padVoice(N.C4, 0.12, 2, 0.32, 0);     // C4
-  padVoice(N.G4, 0.075, 3, 0.4, 1.4);   // G4 fifth
-  padVoice(N.E4, 0.05, 2, 0.5, 2.6);    // E4 third
-  loopPad(s, { freq: q(N.C4 / 2), vol: 0.1, lfoCycles: 3, lfoDepth: 0.5, phase: rand() * 2 * Math.PI }); // C3 soft breath
-  const notes = [N.G5, N.C6];
-  for (let k = 0; k < notes.length; k++) {
-    const t = (k + 0.3 + rand() * 0.5) * (16 / notes.length);
-    loopEvent(s, t, 1.4, (tmp) => {
-      strike(tmp, { freq: notes[k], dur: 1.2, vol: 0.028 + rand() * 0.01, partials: CELESTA, attack: 0.004, decayShape: 4.5, unison: 2, detune: 0.003, rand });
-    });
-  }
-}, { reverb: { wet: 0.24, decay: 0.75, damp: 0.5 }, peak: 0.46 });
-
-// music_puzzle_dusk (18s): the focused chord cooled — dimmer third, a lowered
-// 7th drifting through, one duller note.
-renderLoop('music_puzzle_dusk', 18, (s, { rand, q }) => {
-  const padVoice = (f, vol, lfoCycles, lfoDepth, lfoPhase, det = 1.004) => {
-    loopPad(s, { freq: q(f), vol, lfoCycles, lfoDepth, lfoPhase, phase: rand() * 2 * Math.PI });
-    loopPad(s, { freq: q(f * det), vol: vol * 0.55, lfoCycles, lfoDepth, lfoPhase: lfoPhase + 1.3, phase: rand() * 2 * Math.PI });
-  };
-  padVoice(N.C4, 0.12, 1, 0.4, 0);      // C4
-  padVoice(N.G4, 0.07, 2, 0.45, 1.4);   // G4
-  padVoice(N.E4, 0.042, 1, 0.55, 2.6);  // E4 dimmed
-  padVoice(D.Bb3, 0.04, 1, 0.85, 4.2);  // Bb3 lowered 7th, comes and goes
-  loopPad(s, { freq: q(N.C4 / 2), vol: 0.1, lfoCycles: 2, lfoDepth: 0.5, phase: rand() * 2 * Math.PI }); // C3 breath
-  loopEvent(s, 9.5, 2.2, (tmp) => {
-    strike(tmp, { freq: N.G5, dur: 2.0, vol: 0.03, partials: CELESTA, attack: 0.007, decayShape: 4, unison: 2, detune: 0.004, rand });
-  });
-}, { reverb: { wet: 0.3, decay: 0.8, damp: 0.55 }, peak: 0.46 });
-
-// music_puzzle_dark (22s): focused DREAD — a hollow mid drone, sour root pair,
-// minor third + tritone shading, one distant dark bell. Sparser and less
-// sub-heavy than the world's music_dark (the mind, not the whole world).
-renderLoop('music_puzzle_dark', 22, (s, { rand, q }) => {
-  loopPad(s, { freq: q(D.C3), vol: 0.13, lfoCycles: 2, lfoDepth: 0.42, phase: rand() * 2 * Math.PI });
-  loopPad(s, { freq: q(D.C3 * 1.006), vol: 0.1, lfoCycles: 2, lfoDepth: 0.42, lfoPhase: 0.9, phase: rand() * 2 * Math.PI });
-  loopPad(s, { freq: q(D.Eb3), vol: 0.07, lfoCycles: 2, lfoDepth: 0.6, lfoPhase: 2.2, phase: rand() * 2 * Math.PI });
-  loopPad(s, { freq: q(D.Gb3), vol: 0.04, lfoCycles: 3, lfoDepth: 0.8, lfoPhase: 4.1, phase: rand() * 2 * Math.PI });
-  loopPad(s, { freq: q(D.C2), vol: 0.09, lfoCycles: 4, lfoDepth: 0.7, phase: rand() * 2 * Math.PI }); // slow sub breath
-  loopEvent(s, 10.5, 3.2, (tmp) => {
-    strike(tmp, { freq: D.C4, dur: 3.0, vol: 0.07, partials: DARK_BELL, attack: 0.015, decayShape: 3.2, unison: 2, detune: 0.004, rand });
-  });
-}, { reverb: { wet: 0.34, decay: 0.83, damp: 0.58 }, peak: 0.48 });
-
-// ===========================================================================
-// PIT MUSIC BEDS (played on the Offering Pit screen). The same DNA, but sunk
-// underground: a low drone with GRAVITY even in the bright days, wide reverb,
-// and distant bell tolls — a ritual space. Darkens into full cavernous dread.
-// ===========================================================================
-
-// music_pit_bright (18s): spacious and hollow — the pit already has weight.
-renderLoop('music_pit_bright', 18, (s, { rand, q }) => {
-  loopPad(s, { freq: q(N.C4 / 4), vol: 0.17, lfoCycles: 2, lfoDepth: 0.45, phase: rand() * 2 * Math.PI }); // C2 sub
-  loopPad(s, { freq: q(N.C4 / 2), vol: 0.1, lfoCycles: 2, lfoDepth: 0.4, lfoPhase: 1.2, phase: rand() * 2 * Math.PI }); // C3
-  loopPad(s, { freq: q(N.G4 / 2), vol: 0.07, lfoCycles: 3, lfoDepth: 0.5, lfoPhase: 2.5, phase: rand() * 2 * Math.PI }); // G3
-  loopPad(s, { freq: q(N.E4), vol: 0.032, lfoCycles: 1, lfoDepth: 0.7, lfoPhase: 4.0, phase: rand() * 2 * Math.PI }); // E4 faint warmth
-  loopEvent(s, 5.0, 3.2, (tmp) => {
-    strike(tmp, { freq: N.C5, dur: 3.0, vol: 0.05, partials: HANDBELL, attack: 0.006, decayShape: 3.0, unison: 2, detune: 0.003, rand });
-  });
-  loopEvent(s, 13.0, 3.2, (tmp) => {
-    strike(tmp, { freq: N.G4, dur: 3.0, vol: 0.042, partials: HANDBELL, attack: 0.006, decayShape: 3.0, unison: 2, detune: 0.003, rand });
-  });
-}, { reverb: { wet: 0.42, decay: 0.86, damp: 0.42 }, peak: 0.48 });
-
-// music_pit_dusk (20s): the drone cools and lowers — a lowered 7th, duller bell.
-renderLoop('music_pit_dusk', 20, (s, { rand, q }) => {
-  loopPad(s, { freq: q(N.C4 / 4), vol: 0.17, lfoCycles: 1, lfoDepth: 0.5, phase: rand() * 2 * Math.PI }); // C2 sub
-  loopPad(s, { freq: q(N.C4 / 2), vol: 0.1, lfoCycles: 2, lfoDepth: 0.45, lfoPhase: 1.2, phase: rand() * 2 * Math.PI }); // C3
-  loopPad(s, { freq: q(N.G4 / 2), vol: 0.06, lfoCycles: 2, lfoDepth: 0.55, lfoPhase: 2.5, phase: rand() * 2 * Math.PI }); // G3
-  loopPad(s, { freq: q(D.Bb3), vol: 0.045, lfoCycles: 1, lfoDepth: 0.85, lfoPhase: 4.2, phase: rand() * 2 * Math.PI }); // Bb3 lowered 7th
-  loopEvent(s, 6.5, 3.4, (tmp) => {
-    strike(tmp, { freq: N.C5, dur: 3.1, vol: 0.045, partials: HANDBELL, attack: 0.008, decayShape: 2.8, unison: 2, detune: 0.004, rand });
-  });
-  loopEvent(s, 15.0, 3.4, (tmp) => {
-    strike(tmp, { freq: D.Eb4, dur: 3.1, vol: 0.04, partials: DARK_BELL, attack: 0.01, decayShape: 3.0, unison: 2, detune: 0.004, rand });
-  });
-}, { reverb: { wet: 0.44, decay: 0.87, damp: 0.52 }, peak: 0.47 });
-
-// music_pit_dark (24s): the bottom — cavernous ritual dread. A deep pulsing
-// sub, sour root pair, minor third + tritone, dark-bell tolls, and a long
-// breath of wind. The most reverberant bed of all (the deepest place).
-renderLoop('music_pit_dark', 24, (s, { rand, q }) => {
-  loopPad(s, { freq: q(D.C2), vol: 0.22, lfoCycles: 6, lfoDepth: 0.85, phase: rand() * 2 * Math.PI }); // sub pulse
-  loopPad(s, { freq: q(D.C3), vol: 0.12, lfoCycles: 2, lfoDepth: 0.4, phase: rand() * 2 * Math.PI });
-  loopPad(s, { freq: q(D.C3 * 1.006), vol: 0.1, lfoCycles: 2, lfoDepth: 0.4, lfoPhase: 0.9, phase: rand() * 2 * Math.PI }); // sour pair
-  loopPad(s, { freq: q(D.Eb3), vol: 0.075, lfoCycles: 2, lfoDepth: 0.6, lfoPhase: 2.2, phase: rand() * 2 * Math.PI }); // minor third
-  loopPad(s, { freq: q(D.Gb3), vol: 0.05, lfoCycles: 3, lfoDepth: 0.8, lfoPhase: 4.1, phase: rand() * 2 * Math.PI }); // tritone
-  loopEvent(s, 5.5, 3.6, (tmp) => {
-    strike(tmp, { freq: D.C4, dur: 3.4, vol: 0.085, partials: DARK_BELL, attack: 0.015, decayShape: 3.0, unison: 2, detune: 0.004, rand });
-  });
-  loopEvent(s, 16.0, 3.6, (tmp) => {
-    strike(tmp, { freq: D.G3, dur: 3.4, vol: 0.075, partials: DARK_BELL, attack: 0.015, decayShape: 3.0, unison: 2, detune: 0.004, rand });
-  });
-  loopEvent(s, 11.0, 6.0, (tmp) => {
-    noiseBurst(tmp, { start: 0, dur: 5.5, vol: 0.06, lp: 0.02, attack: 1.8, decayShape: 3, rand });
-  });
-}, { reverb: { wet: 0.46, decay: 0.88, damp: 0.6 }, peak: 0.5 });
-
-// ===========================================================================
-// TERRIBLE PEACE MUSIC BEDS (Phase 5): the dark DNA resolved low and slow —
-// the C-add9 restored (no minor third, no tritone, no sour beating pair, no
-// dissonant shimmer), the sub settled from a pulse into a breath, and the
-// dark-bell tolls softened into distant handbells. The serene register after
-// the arrival. Selected by musicBandForPhase at MUSIC_PEACE_PHASE (5).
-// ===========================================================================
-
-// music_peace (24s): the home world settled — a low whole C-add9 breathing
-// slowly, two far-off soft handbell hours.
-renderLoop('music_peace', 24, (s, { rand, q }) => {
-  const padVoice = (f, vol, lfoCycles, lfoDepth, lfoPhase) => {
-    loopPad(s, { freq: q(f), vol, lfoCycles, lfoDepth, lfoPhase, phase: rand() * 2 * Math.PI });
-    // Gentle consonant twin (the dark beds' sour ~1.006 pair, resolved).
-    loopPad(s, { freq: q(f * 1.0035), vol: vol * 0.55, lfoCycles, lfoDepth, lfoPhase: lfoPhase + 1.3, phase: rand() * 2 * Math.PI });
-  };
-  padVoice(D.C2, 0.18, 2, 0.5, 0);      // sub settled into a slow breath
-  padVoice(D.C3, 0.11, 2, 0.45, 1.2);   // root, single and true
-  padVoice(D.G3, 0.11, 3, 0.5, 2.4);    // fifth restored
-  padVoice(N.E4, 0.055, 2, 0.6, 0.8);   // major third returns
-  padVoice(N.D4, 0.032, 1, 0.75, 3.9);  // the ninth, one slow breath per loop
-  loopEvent(s, 8.6, 3.4, (tmp) => {
-    strike(tmp, { freq: N.C5, dur: 3.2, vol: 0.045, partials: HANDBELL, attack: 0.012, decayShape: 2.8, unison: 2, detune: 0.003, rand });
-  });
-  loopEvent(s, 18.4, 3.4, (tmp) => {
-    strike(tmp, { freq: N.G4, dur: 3.2, vol: 0.04, partials: HANDBELL, attack: 0.012, decayShape: 2.8, unison: 2, detune: 0.003, rand });
-  });
-}, { reverb: { wet: 0.36, decay: 0.84, damp: 0.55 }, peak: 0.48 });
-
-// music_puzzle_peace (20s): the focused chord sunk an octave and stilled —
-// C3-centered, the third faint and warm, one distant soft note.
-renderLoop('music_puzzle_peace', 20, (s, { rand, q }) => {
-  const padVoice = (f, vol, lfoCycles, lfoDepth, lfoPhase) => {
-    loopPad(s, { freq: q(f), vol, lfoCycles, lfoDepth, lfoPhase, phase: rand() * 2 * Math.PI });
-    loopPad(s, { freq: q(f * 1.003), vol: vol * 0.5, lfoCycles, lfoDepth, lfoPhase: lfoPhase + 1.2, phase: rand() * 2 * Math.PI });
-  };
-  padVoice(D.C3, 0.13, 2, 0.4, 0);      // root center
-  padVoice(D.G3, 0.075, 2, 0.5, 1.4);   // fifth
-  padVoice(N.E4, 0.045, 1, 0.6, 2.6);   // third, faint and warm
-  loopPad(s, { freq: q(D.C2), vol: 0.08, lfoCycles: 2, lfoDepth: 0.55, phase: rand() * 2 * Math.PI }); // sub breath
-  loopEvent(s, 11.0, 2.6, (tmp) => {
-    strike(tmp, { freq: N.G5, dur: 2.4, vol: 0.026, partials: CELESTA, attack: 0.01, decayShape: 3.6, unison: 2, detune: 0.003, rand });
-  });
-}, { reverb: { wet: 0.3, decay: 0.8, damp: 0.55 }, peak: 0.46 });
-
-// music_pit_peace (24s): the deepest place at rest — the cavern keeps its
-// gravity and width but the pulse becomes a breath, the tolls turn to soft
-// handbells, and the wind exhales once, unhurried.
-renderLoop('music_pit_peace', 24, (s, { rand, q }) => {
-  loopPad(s, { freq: q(D.C2), vol: 0.2, lfoCycles: 2, lfoDepth: 0.55, phase: rand() * 2 * Math.PI }); // sub breath, no pulse
-  loopPad(s, { freq: q(D.C3), vol: 0.11, lfoCycles: 2, lfoDepth: 0.4, phase: rand() * 2 * Math.PI });
-  loopPad(s, { freq: q(D.C3 * 1.0035), vol: 0.06, lfoCycles: 2, lfoDepth: 0.4, lfoPhase: 0.9, phase: rand() * 2 * Math.PI }); // consonant twin
-  loopPad(s, { freq: q(D.G3), vol: 0.11, lfoCycles: 3, lfoDepth: 0.5, lfoPhase: 2.2, phase: rand() * 2 * Math.PI }); // fifth restored
-  loopPad(s, { freq: q(N.E4), vol: 0.05, lfoCycles: 2, lfoDepth: 0.65, lfoPhase: 4.0, phase: rand() * 2 * Math.PI }); // faint warmth returns
-  loopEvent(s, 6.0, 3.6, (tmp) => {
-    strike(tmp, { freq: N.C4, dur: 3.4, vol: 0.055, partials: HANDBELL, attack: 0.014, decayShape: 2.8, unison: 2, detune: 0.003, rand });
-  });
-  loopEvent(s, 15.5, 3.6, (tmp) => {
-    strike(tmp, { freq: N.C5, dur: 3.4, vol: 0.04, partials: HANDBELL, attack: 0.014, decayShape: 2.8, unison: 2, detune: 0.003, rand });
-  });
-  loopEvent(s, 11.0, 6.0, (tmp) => {
-    noiseBurst(tmp, { start: 0, dur: 5.5, vol: 0.04, lp: 0.02, attack: 2.2, decayShape: 2.6, rand });
-  });
-}, { reverb: { wet: 0.46, decay: 0.88, damp: 0.55 }, peak: 0.48 });
 
 console.log('done.');

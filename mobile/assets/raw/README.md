@@ -53,3 +53,20 @@ art as its source.
 Do not cross the suffixes: `_original` belongs to `reworkSkies.mjs` and
 `_preseam` to `retouchSkySeam.mjs`, and reading either from another tool would
 silently revert that tool's edits.
+
+## Music sources (`scripts/tools/encodeMusic.mjs` reads FROM these)
+
+`music/` holds the player's 12 authored ambient beds exactly as uploaded
+(48 kHz stereo VBR at roughly 180-195 kbps, with a cover picture and generator
+tags), renamed to `home_phase0..5.mp3` and `puzzle_phase0..5.mp3` because a
+space in an asset filename is a Metro/Android hazard. Nothing `require()`s
+them and `assets/raw` is not in `assetBundlePatterns`, so they never reach the
+binary. The shipped beds in `assets/music/` are re-encodes written by
+
+    npm run encode:music
+
+(ffmpeg + libmp3lame, 44.1 kHz joint stereo, `-q:a 6`, every tag and the cover
+stream stripped, a static per-track gain only if the set spans more than 3 LU
+of integrated loudness). Replace an original here under the same name, re-run
+the script, and commit both files; `src/__tests__/musicAssets.test.ts` checks
+the shipped side on every test run.

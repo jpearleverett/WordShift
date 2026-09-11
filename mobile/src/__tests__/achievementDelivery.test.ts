@@ -6,8 +6,9 @@ const read = (rel: string) => fs.readFileSync(path.join(SRC_ROOT, rel), 'utf8');
 const readApp = () => fs.readFileSync(path.join(SRC_ROOT, '..', 'App.tsx'), 'utf8');
 
 /**
- * The journey achievements (Curious Thoughts / Deeper Questions / Growing
- * Shadows / The Horizon) are the only ones keyed on `currentPhase`, and
+ * The journey achievements (The Afternoon Turns / Dusk at the Windows /
+ * Storm Over the Roof / Under the Thin Sky) are the only ones keyed on
+ * `currentPhase`, and
  * `currentPhase` only ever advances in one place: `confirmPhaseTransition`,
  * called from the Offering Pit's ward-ignition ceremony. The victory chain was
  * the sole achievement trigger, so lighting a new era left its own achievement

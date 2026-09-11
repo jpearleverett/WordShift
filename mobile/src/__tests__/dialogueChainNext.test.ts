@@ -149,6 +149,7 @@ jest.mock('../services/whisperGallery', () => ({
 
 jest.mock('../services/phaseNarrative', () => ({
   getFoxPostTutorialPlayPrompt: jest.fn(() => 'Go solve a puzzle, friend.'),
+  getDialogueCaughtUpLine: jest.fn((phase: number) => `caught up (phase ${phase})`),
 }));
 
 jest.mock('../services/weeklyQuests', () => ({

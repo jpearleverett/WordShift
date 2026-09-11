@@ -31,7 +31,7 @@ module.exports = {
     // expo-font ships an untransformed ESM build; the app only calls loadAsync
     // at runtime (theme/fonts.ts), so stub it for the Node test env.
     '^expo-font$': '<rootDir>/src/__tests__/__mocks__/expoFont.ts',
-    // Stub static assets (sound/image/font require()s) for Node test resolution
-    '\\.(wav|png|webp|ttf)$': '<rootDir>/src/__tests__/__mocks__/fileMock.js',
+    // Stub static assets (sound/music/image/font require()s) for Node test resolution
+    '\\.(wav|mp3|png|webp|ttf)$': '<rootDir>/src/__tests__/__mocks__/fileMock.js',
   },
 };

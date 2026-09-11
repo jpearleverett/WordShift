@@ -81,7 +81,11 @@ export const STORY_COPY = {
   narrator: 'The house',
   player: 'You',
   finalChoice: 'CLOSED keeps one room of your own. CLOSER keeps a road that leads away. Both are welcomes with a boundary.',
-  archiveChapterTitles: ['By the warm hearth', 'When questions began', 'The changing house', 'While the shadows gathered', 'Before the arrival'],
+  // archiveChapterTitles (one mood label per stretch of the story) was deleted
+  // with the per-stretch chapter rows: a chapter is a speaker now, so the row
+  // says who and how much, never what the days felt like.
+  archiveLineOne: 'One line kept',
+  archiveLineMany: 'lines kept',
   readMemory: 'Read this conversation',
   answerRecorded: 'Answer kept',
   noArchive: 'Their earlier words will be kept here.',

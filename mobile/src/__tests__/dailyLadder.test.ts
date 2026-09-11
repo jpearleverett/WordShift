@@ -18,10 +18,14 @@ import { getLocalDateString, getLocalDateStringDaysAgo } from '../services/dateU
 const AsyncStorage = require('@react-native-async-storage/async-storage').default;
 const STORAGE_KEY = 'wordshift_daily_ladder';
 
+// Default to a healthy board (well past DAILY_PERCENTILE_MIN_ENTRANTS) so the
+// percentile statistics are exercised; thin and unknown-size days pass `total`
+// explicitly.
 function entry(overrides: Partial<DailyLadderEntry> & { date: string }): DailyLadderEntry {
   return {
     rank: null,
     percentile: null,
+    total: 40,
     timeMs: 30000,
     stars: 3,
     difficulty: 'HARD',
@@ -150,6 +154,89 @@ describe('getDailyLadderSummary', () => {
     await recordDailyLadderResult(entry({ date: getLocalDateString(), rank: 3, percentile: 90 }));
     // Compares the two RANKED days (70 -> 90) = up, ignoring the null day.
     expect((await getDailyLadderSummary()).trend).toBe('up');
+  });
+});
+
+describe('thin-board days never poison the percentile statistics', () => {
+  test('a solo day contributes its rank but not its 0% to the week/ever bests or the trend', async () => {
+    // The demoralising case: the player is the only entrant, so the backend's
+    // "percent of OTHERS beaten" is a hard 0 by construction.
+    await recordDailyLadderResult(
+      entry({ date: getLocalDateString(), rank: 1, percentile: 0, total: 1 }),
+    );
+    const s = await getDailyLadderSummary();
+    // The rank is factually true and stays.
+    expect(s.bestRankThisWeek).toBe(1);
+    expect(s.bestRankEver).toBe(1);
+    // The percentile is meaningless at this board size and must not stick.
+    expect(s.bestPercentileThisWeek).toBeNull();
+    expect(s.bestPercentileEver).toBeNull();
+    expect(s.trend).toBeNull();
+    expect(s.participationCount).toBe(1);
+  });
+
+  test('a run of solo days cannot pin the trend at flat/Holding', async () => {
+    for (const ago of [2, 1, 0]) {
+      await recordDailyLadderResult(
+        entry({ date: getLocalDateStringDaysAgo(ago), rank: 1, percentile: 0, total: 1 }),
+      );
+    }
+    expect((await getDailyLadderSummary()).trend).toBeNull();
+  });
+
+  test('a real board still sets the week best beside solo days', async () => {
+    await recordDailyLadderResult(
+      entry({ date: getLocalDateStringDaysAgo(1), rank: 1, percentile: 0, total: 2 }),
+    );
+    await recordDailyLadderResult(
+      entry({ date: getLocalDateString(), rank: 9, percentile: 64, total: 25 }),
+    );
+    const s = await getDailyLadderSummary();
+    expect(s.bestRankThisWeek).toBe(1); // rank statistics unchanged
+    expect(s.bestPercentileThisWeek).toBe(64);
+    expect(s.bestPercentileEver).toBe(64);
+  });
+
+  test('an entry stored before entrant counts existed is treated as unknown, not as fine', async () => {
+    // A legacy save could have been a solo day; it is excluded from percentile
+    // statistics rather than assumed meaningful.
+    await recordDailyLadderResult(
+      entry({ date: getLocalDateString(), rank: 3, percentile: 88, total: null }),
+    );
+    const history = await getDailyLadderHistory();
+    expect('total' in history[0]).toBe(false);
+    const s = await getDailyLadderSummary();
+    expect(s.bestRankThisWeek).toBe(3);
+    expect(s.bestPercentileThisWeek).toBeNull();
+    expect(s.bestPercentileEver).toBeNull();
+  });
+
+  test('a re-check carries the fresh entrant count onto the stored entry', async () => {
+    const date = getLocalDateString();
+    await recordDailyLadderResult(entry({ date, rank: 1, percentile: 0, total: 1 }));
+    expect((await getDailyLadderSummary()).bestPercentileThisWeek).toBeNull();
+    // Later in the day the board filled up and the standing was re-checked.
+    expect(await refreshDailyLadderRank(date, { rank: 3, percentile: 75, total: 9 })).toBe(true);
+    const s = await getDailyLadderSummary();
+    expect(s.bestPercentileThisWeek).toBe(75);
+    expect((await getDailyLadderHistory())[0].total).toBe(9);
+  });
+
+  test('an archived solo day never becomes the lifetime percentile best', async () => {
+    // The oldest day falls out of the 120-entry window and is folded into the
+    // archived bests; a solo day must not travel there either.
+    await recordDailyLadderResult(
+      entry({ date: getLocalDateStringDaysAgo(120), rank: 1, percentile: 0, total: 1 }),
+    );
+    for (let ago = 119; ago >= 0; ago--) {
+      await recordDailyLadderResult(
+        entry({ date: getLocalDateStringDaysAgo(ago), rank: 50, percentile: 60, total: 30 }),
+      );
+    }
+    _clearDailyLadderCache();
+    const s = await getDailyLadderSummary();
+    expect(s.bestRankEver).toBe(1);
+    expect(s.bestPercentileEver).toBe(60);
   });
 });
 

@@ -16,6 +16,7 @@
 import AsyncStorage, { isStorageTransactionActive } from './persistenceStorage';
 import { Difficulty } from '../types';
 import { daysAgoLocal } from './dateUtils';
+import { hasMeaningfulPercentile } from './leaderboard';
 
 const STORAGE_KEY = 'wordshift_daily_ladder';
 
@@ -32,6 +33,14 @@ export interface DailyLadderEntry {
   rank: number | null;
   /** Percent of other players beaten, 0-100; null when rank is null. */
   percentile: number | null;
+  /**
+   * Entrants on that day's board. Absent on entries written before this was
+   * recorded, and treated as UNKNOWN rather than fine: the percentile of a
+   * solo day is a hard 0 by construction, so a day whose size we cannot vouch
+   * for is left out of every percentile-derived statistic (see
+   * hasMeaningfulPercentile). The RANK statistics still count it.
+   */
+  total?: number | null;
   /** Solve duration in ms. */
   timeMs: number;
   /** Stars earned (0-3). */
@@ -62,7 +71,10 @@ export interface DailyLadderSummary {
   participationCount: number;
   /** Best (lowest) rank in the last 7 local days; null if none ranked. */
   bestRankThisWeek: number | null;
-  /** Best (highest) percentile in the last 7 local days; null if none ranked. */
+  /**
+   * Best (highest) percentile in the last 7 local days; null when no day in the
+   * window had enough entrants for a percentile to mean anything.
+   */
   bestPercentileThisWeek: number | null;
   /** Best (lowest) rank ever; null if never ranked. */
   bestRankEver: number | null;
@@ -148,6 +160,7 @@ export async function recordDailyLadderResult(
   if (state.archivedDates.includes(entry.date)) return state;
   const entries = state.entries.filter(e => e.date !== entry.date);
   const resonant = entry.resonantChoiceCount;
+  const total = entry.rankEligible === false ? null : entry.total;
   entries.push({
     date: entry.date,
     rank: entry.rankEligible === false ? null : entry.rank ?? null,
@@ -156,6 +169,11 @@ export async function recordDailyLadderResult(
     stars: Math.max(0, Math.round(entry.stars)),
     difficulty: entry.difficulty,
     ...(entry.rankEligible === false ? { rankEligible: false } : {}),
+    // Optional field: written only when the backend actually reported a count,
+    // so an offline day stays "unknown" instead of claiming to be a thin one.
+    ...(typeof total === 'number' && Number.isFinite(total) && total > 0
+      ? { total: Math.round(total) }
+      : {}),
     // Optional field: stored only when a positive count exists (absent stays
     // the default so old entries and zero-resonance days look identical).
     ...(typeof resonant === 'number' && Number.isFinite(resonant) && resonant > 0
@@ -172,7 +190,11 @@ export async function recordDailyLadderResult(
     const archived = entries.shift()!;
     archivedDates.push(archived.date);
     if (archived.rank != null) archivedBestRank = Math.min(archivedBestRank ?? Infinity, archived.rank);
-    if (archived.percentile != null) archivedBestPercentile = Math.max(archivedBestPercentile ?? -Infinity, archived.percentile);
+    // Only a percentile from a board big enough to mean something may become
+    // the lifetime best; an archived solo day would pin it at 0 forever.
+    if (archived.percentile != null && hasMeaningfulPercentile(archived.total)) {
+      archivedBestPercentile = Math.max(archivedBestPercentile ?? -Infinity, archived.percentile);
+    }
   }
   const next = { entries, archivedDates, archivedBestRank, archivedBestPercentile };
   await save(next);
@@ -182,14 +204,21 @@ export async function recordDailyLadderResult(
 /** Refresh a saved standing without replacing its solve data or creating a new result. */
 export async function refreshDailyLadderRank(
   date: string,
-  rank: { rank: number; percentile: number },
+  rank: { rank: number; percentile: number; total?: number | null },
 ): Promise<boolean> {
   if (!Number.isFinite(rank.rank) || rank.rank < 1 || !Number.isFinite(rank.percentile) ||
       rank.percentile < 0 || rank.percentile > 100) return false;
   const state = await load();
   const existing = state.entries.find(entry => entry.date === date);
   if (!existing || existing.rankEligible === false) return false;
-  await recordDailyLadderResult({ ...existing, rank: Math.round(rank.rank), percentile: rank.percentile });
+  await recordDailyLadderResult({
+    ...existing,
+    rank: Math.round(rank.rank),
+    percentile: rank.percentile,
+    // A re-check is the moment a board's size is most likely to have grown, so
+    // carry the fresh count through; fall back to whatever the entry already had.
+    total: rank.total ?? existing.total ?? null,
+  });
   return true;
 }
 
@@ -203,7 +232,14 @@ export async function getDailyLadderSummary(): Promise<DailyLadderSummary> {
   const ranked = entries.filter(e => e.rank != null) as (DailyLadderEntry & {
     rank: number;
   })[];
-  const withPct = entries.filter(e => e.percentile != null) as (DailyLadderEntry & {
+  // Rank statistics count every ranked day: "#1 of 1" is factually true.
+  // Percentile statistics do not: below DAILY_PERCENTILE_MIN_ENTRANTS the value
+  // is degenerate (a lone entrant is a hard 0), and an entry with no recorded
+  // total cannot be vouched for, so both are excluded here rather than allowed
+  // to pin bestPercentileThisWeek / bestPercentileEver / trend.
+  const withPct = entries.filter(
+    e => e.percentile != null && hasMeaningfulPercentile(e.total),
+  ) as (DailyLadderEntry & {
     percentile: number;
   })[];
 

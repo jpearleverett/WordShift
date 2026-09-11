@@ -34,6 +34,7 @@ jest.mock('react', () => {
 jest.mock('react-native', () => ({
   View: 'View',
   Text: 'Text',
+  Pressable: 'Pressable',
   TouchableOpacity: 'TouchableOpacity',
   Image: 'Image',
   ScrollView: 'ScrollView',
@@ -102,6 +103,7 @@ import { PhaseTransitionOverlay } from '../components/PhaseTransitionOverlay';
 import { createCeremonySoundScope } from '../services/uiSound';
 import { announceForA11y } from '../services/a11yAnnounce';
 import { hapticLight } from '../services/haptics';
+import { getCeremonyPaceCaption, getCeremonyHoldHint } from '../services/phaseNarrative';
 
 const ALL_EVENTS: PhaseTransitionEvent[] = [
   ...([1, 2, 3, 4] as DialoguePhase[]).map(p => getPhaseTransitionEvent(p)!),
@@ -113,6 +115,32 @@ const ALL_EVENTS: PhaseTransitionEvent[] = [
 
 type ElementLike = { props?: { children?: unknown; accessibilityLabel?: string } };
 
+type NodeLike = {
+  type?: unknown;
+  props?: {
+    children?: unknown;
+    onPress?: unknown;
+    accessibilityRole?: unknown;
+    accessibilityLabel?: unknown;
+    accessibilityHint?: unknown;
+  };
+};
+
+/** First element of the given host type in a rendered tree, or null. */
+function findByType(node: unknown, type: string): NodeLike | null {
+  if (node == null || typeof node !== 'object') return null;
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const found = findByType(child, type);
+      if (found) return found;
+    }
+    return null;
+  }
+  const element = node as NodeLike;
+  if (element.type === type) return element;
+  return findByType(element.props?.children, type);
+}
+
 function collectText(node: unknown): string[] {
   if (typeof node === 'string') return [node];
   if (node == null || typeof node !== 'object') return [];
@@ -120,9 +148,13 @@ function collectText(node: unknown): string[] {
   return collectText((node as ElementLike).props?.children);
 }
 
-test('a suspended ceremony keeps its page and resumes without replaying delivered cues', () => {
-  jest.useFakeTimers();
-  jest.clearAllMocks();
+/**
+ * Drives PhaseTransitionOverlay through the hand-rolled hook lifecycle above:
+ * `render()` re-renders until the component's own state settles, committing
+ * layout effects before passive ones and running each effect's cleanup before
+ * a changed effect starts. `dispose()` releases the lifecycle mock.
+ */
+function createOverlayHarness(event: PhaseTransitionEvent, onComplete: () => void) {
   const values = new Map<number, unknown>();
   const previousEffects = new Map<number, { deps?: readonly unknown[]; cleanup?: () => void }>();
   let pendingEffects: { index: number; effect: OverlayEffect; deps?: readonly unknown[]; layout: boolean }[] = [];
@@ -152,15 +184,6 @@ test('a suspended ceremony keeps its page and resumes without replaying delivere
       }
     },
   };
-  const event: PhaseTransitionEvent = {
-    ...HOUSE_COMPLETION_EVENT,
-    readAtOwnPace: false,
-    scenes: [
-      { text: 'The first page waits.', delay: 0, duration: 1000, effect: 'fade', cue: 'bell' },
-      { text: 'The next page answers.', delay: 1000, duration: 1000, effect: 'fade', cue: 'answer' },
-    ],
-  };
-  const onComplete = jest.fn();
   const render = (suspended = false) => {
     let tree: unknown;
     let renders = 0;
@@ -179,6 +202,26 @@ test('a suspended ceremony keeps its page and resumes without replaying delivere
     } while (changed);
     return tree;
   };
+  const dispose = () => {
+    previousEffects.forEach(effect => effect.cleanup?.());
+    mockOverlayLifecycle = null;
+  };
+  return { render, dispose };
+}
+
+test('a suspended ceremony keeps its page and resumes without replaying delivered cues', () => {
+  jest.useFakeTimers();
+  jest.clearAllMocks();
+  const event: PhaseTransitionEvent = {
+    ...HOUSE_COMPLETION_EVENT,
+    readAtOwnPace: false,
+    scenes: [
+      { text: 'The first page waits.', delay: 0, duration: 1000, effect: 'fade', cue: 'bell' },
+      { text: 'The next page answers.', delay: 1000, duration: 1000, effect: 'fade', cue: 'answer' },
+    ],
+  };
+  const onComplete = jest.fn();
+  const { render, dispose } = createOverlayHarness(event, onComplete);
   try {
     render();
     jest.advanceTimersByTime(0);
@@ -209,8 +252,74 @@ test('a suspended ceremony keeps its page and resumes without replaying delivere
     expect(resumedScope.play).toHaveBeenCalledTimes(1);
     expect(resumedScope.play).toHaveBeenCalledWith('story_answer');
   } finally {
-    previousEffects.forEach(effect => effect.cleanup?.());
-    mockOverlayLifecycle = null;
+    dispose();
+    jest.useRealTimers();
+  }
+});
+
+/**
+ * The ceremony keeps its own pace on purpose, but the way out of that pace used
+ * to be a borderless "Read at my pace" label sitting beside a status caption,
+ * inside the scrolling reading pane. The passage itself is the control now: a
+ * tap on the words the player is already reading holds the page and hands over
+ * the Continue bevel, and the pacing line says so before it is needed.
+ *
+ * The settings mock above reports reducedMotion: true, so this also pins that
+ * the hold is not gated on a motion preference: a reader who has asked for
+ * less movement gets the same escape from the authored pace as everyone else.
+ */
+test('the passage is the hold control: pressing the words cancels the pending advance', () => {
+  jest.useFakeTimers();
+  jest.clearAllMocks();
+  const event: PhaseTransitionEvent = {
+    ...HOUSE_COMPLETION_EVENT,
+    readAtOwnPace: false,
+    scenes: [
+      { text: 'The first page waits.', delay: 0, duration: 1000, effect: 'fade' },
+      { text: 'The next page answers.', delay: 1000, duration: 1000, effect: 'fade' },
+    ],
+  };
+  const onComplete = jest.fn();
+  const { render, dispose } = createOverlayHarness(event, onComplete);
+  try {
+    render();
+    jest.advanceTimersByTime(0);
+    const playing = render();
+    expect(collectText(playing)).toContain('The first page waits.');
+    // The hint is present from the first page, and nothing else in the footer
+    // pretends to be a second button.
+    expect(collectText(playing)).toContain(getCeremonyPaceCaption(false));
+    expect(collectText(playing)).not.toContain('Continue');
+
+    const passage = findByType(playing, 'Pressable');
+    expect(passage).not.toBeNull();
+    expect(typeof passage!.props?.onPress).toBe('function');
+    expect(passage!.props?.accessibilityRole).toBe('button');
+    // The words stay the accessible label, with the gesture as a hint.
+    expect(passage!.props?.accessibilityLabel).toBe('The first page waits.');
+    expect(passage!.props?.accessibilityHint).toBe(getCeremonyHoldHint());
+    expect(collectText(passage)).toContain('The first page waits.');
+
+    // Partway through this page's 1250ms budget, the player taps the words.
+    jest.advanceTimersByTime(1000);
+    (passage!.props!.onPress as () => void)();
+    render();
+    jest.advanceTimersByTime(60000);
+    const held = render();
+
+    expect(collectText(held)).toContain('The first page waits.');
+    expect(collectText(held)).not.toContain('The next page answers.');
+    expect(onComplete).not.toHaveBeenCalled();
+    // The page now says it is waiting, and the real bevel is the way on.
+    expect(collectText(held)).toContain(getCeremonyPaceCaption(true));
+    expect(collectText(held)).toContain('Continue');
+
+    // Held is held: a second tap on the words is inert, not a second control.
+    const heldPassage = findByType(held, 'Pressable');
+    expect(heldPassage!.props?.onPress).toBeUndefined();
+    expect(heldPassage!.props?.accessibilityRole).toBeUndefined();
+  } finally {
+    dispose();
     jest.useRealTimers();
   }
 });

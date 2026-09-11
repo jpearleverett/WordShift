@@ -19,7 +19,10 @@ import {
   submitDailyResult,
   getDailyRank,
   getBeatPercentText,
+  getStandingsGatheringText,
+  hasMeaningfulPercentile,
 } from '../services/leaderboard';
+import { DAILY_PERCENTILE_MIN_ENTRANTS } from '../constants/gameBalance';
 import { getBackendIdentity } from '../services/supabaseClient';
 
 const CONFIGURED = {
@@ -208,6 +211,63 @@ describe('leaderboard', () => {
     test('clamps out-of-range percentiles', () => {
       expect(getBeatPercentText(150, 0)).toBe('You beat 100% of seekers today');
       expect(getBeatPercentText(-10, 0)).toBe('You beat 0% of seekers today');
+    });
+
+    test('an omitted entrant count leaves the sentence unchanged (callers without one)', () => {
+      expect(getBeatPercentText(72, 0, undefined)).toBe('You beat 72% of seekers today');
+      expect(getBeatPercentText(72, 0, null)).toBe('You beat 72% of seekers today');
+    });
+  });
+
+  describe('thin-board suppression (DAILY_PERCENTILE_MIN_ENTRANTS)', () => {
+    test('hasMeaningfulPercentile gates on the threshold and rejects an unknown count', () => {
+      expect(hasMeaningfulPercentile(DAILY_PERCENTILE_MIN_ENTRANTS)).toBe(true);
+      expect(hasMeaningfulPercentile(DAILY_PERCENTILE_MIN_ENTRANTS - 1)).toBe(false);
+      expect(hasMeaningfulPercentile(1)).toBe(false);
+      // At 2 entrants the percentile can only ever be 0 or 100.
+      expect(hasMeaningfulPercentile(2)).toBe(false);
+      expect(hasMeaningfulPercentile(null)).toBe(false);
+      expect(hasMeaningfulPercentile(undefined)).toBe(false);
+      expect(hasMeaningfulPercentile(NaN)).toBe(false);
+    });
+
+    test('returns null below the threshold, at every phase', () => {
+      // The reported bug: a lone entrant "beat 0% of seekers today".
+      for (const phase of [0, 1, 2, 3, 4, 5]) {
+        expect(getBeatPercentText(0, phase, 1)).toBeNull();
+        expect(getBeatPercentText(100, phase, 2)).toBeNull();
+        expect(getBeatPercentText(50, phase, DAILY_PERCENTILE_MIN_ENTRANTS - 1)).toBeNull();
+      }
+    });
+
+    test('returns the real sentence at or above the threshold', () => {
+      expect(getBeatPercentText(75, 0, DAILY_PERCENTILE_MIN_ENTRANTS)).toBe(
+        'You beat 75% of seekers today'
+      );
+      expect(getBeatPercentText(75, 2, 40)).toBe('You outpaced 75% of seekers today');
+      expect(getBeatPercentText(0, 0, 40)).toBe('You beat 0% of seekers today');
+    });
+
+    test('the substitute names the thin board without a number, a congratulation or an error', () => {
+      for (const phase of [0, 1, 2, 3, 4, 5]) {
+        const line = getStandingsGatheringText(phase);
+        expect(line.length).toBeGreaterThan(0);
+        expect(line).not.toMatch(/\d/); // invents no number
+        expect(line).not.toMatch(/%/);
+        expect(line).not.toMatch(/beat|outpaced|ahead of|congrat/i); // no hollow praise
+        expect(line).not.toMatch(/error|sorry|unavailable|failed|try again/i);
+        // Never leaks the phase system or an era name (narrative rule 7).
+        expect(line).not.toMatch(/phase|bright days|curious|deeper questions|shadows|horizon|terrible peace/i);
+        expect(line).not.toMatch(/[—–]/); // no em/en dashes in player-facing copy
+      }
+    });
+
+    test('the substitute changes register with the descent', () => {
+      expect(getStandingsGatheringText(0)).toBe(getStandingsGatheringText(1));
+      expect(getStandingsGatheringText(2)).toBe(getStandingsGatheringText(3));
+      expect(getStandingsGatheringText(4)).toBe(getStandingsGatheringText(5));
+      expect(getStandingsGatheringText(0)).not.toBe(getStandingsGatheringText(2));
+      expect(getStandingsGatheringText(2)).not.toBe(getStandingsGatheringText(4));
     });
   });
 });
