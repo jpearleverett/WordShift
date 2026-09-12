@@ -41,6 +41,57 @@ test('a share preview owns the victory controls until it closes', () => {
   expect(selectOverlayOwner(queue, overlayMask({ victory: true }))).toBe('victory');
 });
 
+test('victory yields to the unlock introduction before the requested exit continues', () => {
+  const victoryRequest = overlayMask({ victory: true });
+  const victory = scheduleGlobalOverlays([], victoryRequest, victoryRequest);
+  expect(victory.owner).toBe('victory');
+
+  // Even while the completed board is still WON, the introduction must own
+  // input. Its parked exit will eventually replace the board or navigate away.
+  const introRequest = overlayMask({ victory: true, postVictoryIntro: true });
+  const introduction = scheduleGlobalOverlays(victory.queue, introRequest, introRequest);
+  expect(introduction.owner).toBe('postVictoryIntro');
+
+  const introOnly = overlayMask({ postVictoryIntro: true });
+  const resultDismissed = scheduleGlobalOverlays(introduction.queue, introOnly, introOnly);
+  expect(resultDismissed.owner).toBe('postVictoryIntro');
+  expect(resultDismissed.queue).not.toContain('victory');
+  expect(scheduleGlobalOverlays(resultDismissed.queue, 0, 0)).toEqual({ owner: null, queue: [] });
+});
+
+test.each<GlobalOverlay>(['saving', 'navigation', 'ceremony', 'alert'])(
+  '%s suspends the unlock introduction and restores it before other dialogs',
+  blocker => {
+    const requests = overlayMask({ postVictoryIntro: true, story: true, store: true, dailyLogin: true });
+    const introduction = scheduleGlobalOverlays(['store', 'dailyLogin'], requests, requests);
+    expect(introduction.owner).toBe('postVictoryIntro');
+
+    const blocked = requests | overlayMask({ [blocker]: true });
+    const suspended = scheduleGlobalOverlays(introduction.queue, blocked, blocked);
+    expect(suspended.owner).toBe(blocker);
+    expect(suspended.queue).toContain('postVictoryIntro');
+
+    const resumed = scheduleGlobalOverlays(suspended.queue, requests, requests);
+    expect(resumed.owner).toBe('postVictoryIntro');
+    expect(resumed.queue).toContain('story');
+    expect(resumed.queue).toContain('store');
+  },
+);
+
+test('acknowledging an unlock hands off to the saved story before an older Store request', () => {
+  const requests = overlayMask({ postVictoryIntro: true, story: true, store: true });
+  const introduction = scheduleGlobalOverlays(['store'], requests, requests);
+  expect(introduction.owner).toBe('postVictoryIntro');
+
+  const afterIntro = overlayMask({ story: true, store: true });
+  const story = scheduleGlobalOverlays(introduction.queue, afterIntro, afterIntro);
+  expect(story.owner).toBe('story');
+  expect(story.queue).not.toContain('postVictoryIntro');
+
+  const afterStory = overlayMask({ store: true });
+  expect(scheduleGlobalOverlays(story.queue, afterStory, afterStory).owner).toBe('store');
+});
+
 test('navigation covers a pending ceremony and the ceremony starts after the screen is ready', () => {
   const queue = reconcileOverlayQueue([], overlayMask({ navigation: true, ceremony: true, alert: true }));
   expect(selectOverlayOwner(queue, overlayMask({ navigation: true, ceremony: true, alert: true }))).toBe('navigation');

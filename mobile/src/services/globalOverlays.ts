@@ -1,7 +1,7 @@
 /** One actionable global overlay at a time. Source state remains parked while
  * another owner is visible; a suspended reward, story or share is not consumed. */
 export const GLOBAL_OVERLAYS = [
-  'saving', 'navigation', 'ceremony', 'alert', 'story', 'journal', 'share', 'practice',
+  'saving', 'navigation', 'ceremony', 'alert', 'postVictoryIntro', 'story', 'journal', 'share', 'practice',
   'store', 'patron', 'notification', 'dailyLogin', 'victory', 'timeUp',
 ] as const;
 export type GlobalOverlay = typeof GLOBAL_OVERLAYS[number];
@@ -13,9 +13,10 @@ const priority = (owner: GlobalOverlay): number => {
     case 'navigation': return 1;
     case 'ceremony': return 2;
     case 'alert': return 3;
-    case 'story': return 4;
-    case 'victory': case 'timeUp': return 6;
-    default: return 5;
+    case 'postVictoryIntro': return 4;
+    case 'story': return 5;
+    case 'victory': case 'timeUp': return 7;
+    default: return 6;
   }
 };
 
