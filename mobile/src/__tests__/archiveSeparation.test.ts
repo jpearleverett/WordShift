@@ -181,7 +181,6 @@ describe('neither archive names a stretch of the story', () => {
 
 describe('the journey achievements do not name the stretches of the story either', () => {
   it('no achievement title or description carries an era name', () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { ACHIEVEMENTS } = require('../services/achievements') as { ACHIEVEMENTS: { title: string; description: string }[] };
     const eras = ['Bright Days', 'Curious Thoughts', 'Deeper Questions', 'Growing Shadows', 'The Horizon', 'Terrible Peace'];
     for (const achievement of ACHIEVEMENTS) {

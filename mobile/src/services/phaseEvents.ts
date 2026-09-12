@@ -37,12 +37,12 @@ export interface PhaseTransitionEvent {
 
 /**
  * In-engine art for a cinematic scene — the real game assets, never an emoji.
+ * The illustrated rooms and roads give each page a place in the same house;
+ * the entity stays reserved for its authored reveal and settled aftermath.
  * 'shadow_figure' is the entity (environment/shadow_figure.png); 'house' is
  * the roof silhouette the player built (environment/roof.png); the three
- * 'ceremony_*' emblems (assets/ui/spots, generateGameIcons) give the phase 1-3
- * ceremonies an image of their own (a lantern with moths, a guttering candle
- * in a dark window, a bare tree's long shadow) where they used to be text on
- * a dark ground.
+ * 'ceremony_*' emblems (assets/ui/spots, generateGameIcons) remain registered
+ * for authored special scenes. Ordinary passages use the room/road paintings.
  */
 export type SceneImage = 'private_room' | 'outward_road' | 'outward_road_night' | 'kept_table' | 'shadow_figure' | 'house' | 'ceremony_curious' | 'ceremony_deeper' | 'ceremony_shadows';
 
@@ -52,10 +52,12 @@ export interface PhaseScene {
   speaker?: AnimalType;
   /** Optional diegetic sound, played when this scene becomes visible. */
   cue?: 'bell' | 'answer';
-  /** In-engine image rendered behind the scene text (replaces the old emoji). */
+  /** Illustration displayed with the passage, separate from its reading surface. */
   image?: SceneImage;
   /** Peak opacity for the scene image (default 0.6). */
   imageOpacity?: number;
+  /** A modest close view gives consecutive passages distinct framing. */
+  imageFraming?: 'wide' | 'detail';
   delay: number; // ms before showing this scene
   duration: number; // ms to display this scene
   /**
@@ -95,20 +97,25 @@ const PHASE_EVENTS: Record<number, PhaseTransitionEvent> = {
     scenes: [
       {
         text: 'There is a place by the hearth for another cup.',
+        image: 'kept_table',
+        imageOpacity: 1,
         delay: 0,
         duration: 3000,
         effect: 'fade',
       },
       {
         text: 'This evening, it is warm before anyone fills it.',
+        image: 'kept_table',
+        imageOpacity: 1,
+        imageFraming: 'detail',
         delay: 3200,
         duration: 3000,
         effect: 'fade',
       },
       {
         text: 'Ember checks the kettle, then the empty cup.',
-        image: 'ceremony_curious',
-        imageOpacity: 0.5,
+        image: 'private_room',
+        imageOpacity: 1,
         delay: 6400,
         duration: 3000,
         effect: 'pulse',
@@ -116,6 +123,8 @@ const PHASE_EVENTS: Record<number, PhaseTransitionEvent> = {
       },
       {
         text: 'Your friends have been thinking, too.\nThey have new things to share.',
+        image: 'kept_table',
+        imageOpacity: 1,
         delay: 9600,
         duration: 2500,
         effect: 'fade',
@@ -134,14 +143,17 @@ const PHASE_EVENTS: Record<number, PhaseTransitionEvent> = {
     scenes: [
       {
         text: 'The words are changing. Emptier. Hungrier.',
+        image: 'kept_table',
+        imageOpacity: 1,
+        imageFraming: 'detail',
         delay: 0,
         duration: 3000,
         effect: 'fade',
       },
       {
         text: 'Or perhaps it is you that has changed,\nand the words were always like this.',
-        image: 'ceremony_deeper',
-        imageOpacity: 0.5,
+        image: 'outward_road_night',
+        imageOpacity: 1,
         delay: 3200,
         duration: 3000,
         effect: 'pulse',
@@ -149,12 +161,17 @@ const PHASE_EVENTS: Record<number, PhaseTransitionEvent> = {
       },
       {
         text: 'Your friends speak softly now...\nof stillness, of endings, of things that pass.',
+        image: 'private_room',
+        imageOpacity: 1,
         delay: 6400,
         duration: 3500,
         effect: 'fade',
       },
       {
         text: 'And the house has gone quiet.\nThe kind of quiet that is waiting for something.',
+        image: 'outward_road_night',
+        imageOpacity: 1,
+        imageFraming: 'detail',
         delay: 10100,
         duration: 2500,
         effect: 'vignette_close',
@@ -175,6 +192,8 @@ const PHASE_EVENTS: Record<number, PhaseTransitionEvent> = {
     scenes: [
       {
         text: 'You feel it before you can name it.\nA weight behind the warmth.',
+        image: 'private_room',
+        imageOpacity: 1,
         delay: 0,
         duration: 3000,
         effect: 'flash',
@@ -182,6 +201,9 @@ const PHASE_EVENTS: Record<number, PhaseTransitionEvent> = {
       },
       {
         text: 'The letters tremble now, before they settle.\nAs if reluctant.',
+        image: 'kept_table',
+        imageOpacity: 1,
+        imageFraming: 'detail',
         delay: 3200,
         duration: 3000,
         effect: 'shake',
@@ -189,8 +211,8 @@ const PHASE_EVENTS: Record<number, PhaseTransitionEvent> = {
       },
       {
         text: 'Your friends speak of endings. Of purpose.\nOf something that is almost here.',
-        image: 'ceremony_shadows',
-        imageOpacity: 0.5,
+        image: 'outward_road_night',
+        imageOpacity: 1,
         delay: 6400,
         duration: 4000,
         effect: 'particles_rise',
@@ -198,6 +220,9 @@ const PHASE_EVENTS: Record<number, PhaseTransitionEvent> = {
       },
       {
         text: 'Go to them.\nWhile they still sound like themselves.',
+        image: 'private_room',
+        imageOpacity: 1,
+        imageFraming: 'detail',
         delay: 10600,
         duration: 2500,
         effect: 'vignette_close',
@@ -218,6 +243,8 @@ const PHASE_EVENTS: Record<number, PhaseTransitionEvent> = {
     scenes: [
       {
         text: 'The arrangement is almost whole.\nYou can feel where the last pieces go.',
+        image: 'kept_table',
+        imageOpacity: 1,
         delay: 0,
         duration: 3500,
         effect: 'flash',
@@ -225,6 +252,9 @@ const PHASE_EVENTS: Record<number, PhaseTransitionEvent> = {
       },
       {
         text: 'The words fed the warmth under the house.\nThe warmth has begun to keep things from changing.',
+        image: 'private_room',
+        imageOpacity: 1,
+        imageFraming: 'detail',
         delay: 3700,
         duration: 3500,
         effect: 'pulse',
@@ -232,6 +262,8 @@ const PHASE_EVENTS: Record<number, PhaseTransitionEvent> = {
       },
       {
         text: 'Your friends have found their robes.\nThey do not agree about what comes next.',
+        image: 'private_room',
+        imageOpacity: 1,
         delay: 7400,
         duration: 4000,
         effect: 'shake',
@@ -239,6 +271,8 @@ const PHASE_EVENTS: Record<number, PhaseTransitionEvent> = {
       },
       {
         text: 'Go home.\nSee what your hands have built.',
+        image: 'outward_road_night',
+        imageOpacity: 1,
         delay: 11600,
         duration: 3000,
         effect: 'vignette_close',
@@ -287,7 +321,7 @@ export const HOUSE_COMPLETION_EVENT: PhaseTransitionEvent = {
       text: 'The house is complete.',
       // The roof the player raised, room by room — their own work, in engine.
       image: 'house',
-      imageOpacity: 0.55,
+      imageOpacity: 0.9,
       delay: 0,
       duration: 3000,
     },
@@ -296,11 +330,16 @@ export const HOUSE_COMPLETION_EVENT: PhaseTransitionEvent = {
       // guaranteed unlocked here (the ceremony requires the full house, and
       // unlock order is fixed: Ember first, Moss last).
       text: 'Ember lit the first hearth. Moss answered from the roof.\nEleven keepers found their rooms between them.',
+      image: 'private_room',
+      imageOpacity: 1,
       delay: 3200,
       duration: 3500,
     },
     {
       text: 'You built it.\nPuzzle by puzzle. Word by word.',
+      image: 'kept_table',
+      imageOpacity: 1,
+      imageFraming: 'detail',
       delay: 6900,
       duration: 3500,
     },
@@ -308,6 +347,8 @@ export const HOUSE_COMPLETION_EVENT: PhaseTransitionEvent = {
       // The oldest planted seed pays off: Ember's onboarding wrong-note
       // ("hoping for someone like you") is revealed as recruitment.
       text: 'Ember looks from the old hearth to the new rooms.\n“I asked you to build a home. I owe you the rest of what I knew.”',
+      image: 'kept_table',
+      imageOpacity: 1,
       delay: 10600,
       duration: 3500,
     },
@@ -352,11 +393,13 @@ export const FINAL_PUZZLE_EVENT: PhaseTransitionEvent = {
   vignette: true,
   shakeIntensity: 0.7,
   scenes: [
-    { text: 'Midnight. The last letter settles.', image: 'kept_table', imageOpacity: 0.8, delay: 0, duration: 3000 },
-    { text: 'The words return through the walls.\nThe incantation has learned the sound of this house.', image: 'house', imageOpacity: 0.45, delay: 3200, duration: 4000 },
-    { text: 'The rooms you raised stand above the old foundation.\nYour friends keep their places.', image: 'house', imageOpacity: 0.55, delay: 7400, duration: 4000 },
-    { text: 'A note passes through the timber.\nA spoon taps a cup. The small sound still carries.', image: 'house', imageOpacity: 0.35, delay: 11600, duration: 3000 },
-    { text: 'For a moment, nothing moves.', delay: 14800, duration: 2000 },
+    { text: 'Midnight. The last letter settles.', image: 'kept_table', imageOpacity: 1, imageFraming: 'detail', delay: 0, duration: 3000 },
+    { text: 'The words return through the walls.\nThe incantation has learned the sound of this house.', image: 'house', imageOpacity: 0.9, delay: 3200, duration: 4000 },
+    { text: 'The rooms you raised stand above the old foundation.\nYour friends keep their places.', image: 'house', imageOpacity: 0.9, imageFraming: 'detail', delay: 7400, duration: 4000 },
+    { text: 'A note passes through the timber.\nA spoon taps a cup. The small sound still carries.', image: 'kept_table', imageOpacity: 1, delay: 11600, duration: 3000 },
+    // Hold on the house before the entity appears: the pause stays still,
+    // while every page has an illustration in the shared reading layout.
+    { text: 'For a moment, nothing moves.', image: 'house', imageOpacity: 0.9, delay: 14800, duration: 2000 },
     { text: 'The seam opens above the roof.\nSomething descends, carrying the warmth you knew.', image: 'shadow_figure', imageOpacity: 0.7, effect: 'descend', delay: 17000, duration: 5000 },
     { text: 'The warmth reaches for every room.\nAt the doorstep, a cold draft remains.', image: 'shadow_figure', imageOpacity: 0.7, delay: 22200, duration: 5000 },
     { text: 'Ember leaves the door on its latch.\n“I wanted us safe. I did not know what it would try to stop.”', speaker: 'fox', image: 'shadow_figure', imageOpacity: 0.55, delay: 27400, duration: 4500 },
@@ -387,7 +430,7 @@ export function buildFinalPuzzleEvent(
   }
   const met = new Set(context?.unlockedAnimals ?? ['fox']);
   scenes[7].image = 'kept_table';
-  scenes[7].imageOpacity = 0.62;
+  scenes[7].imageOpacity = 1;
   if (met.has('fox') && context?.standBeside === true) {
     scenes[7].text = 'Ember stands beside you, leaving a little space.\n“I will tell you when I do not know. That promise I can keep.”';
   } else if (met.has('fox') && context?.standBeside === false) {
@@ -396,9 +439,10 @@ export function buildFinalPuzzleEvent(
   if (context?.boundary) {
     const boundaryImage = context.boundary === 'remember' ? 'private_room' : 'outward_road_night';
     scenes[6].image = boundaryImage;
-    scenes[6].imageOpacity = 0.88;
+    scenes[6].imageOpacity = 1;
     scenes[8].image = boundaryImage;
-    scenes[8].imageOpacity = 0.72;
+    scenes[8].imageOpacity = 1;
+    scenes[8].imageFraming = 'detail';
   }
   // Ember is the first resident, but keep even the generic/legacy API honest
   // when an explicit empty roster is provided by a test or restored snapshot.
@@ -442,10 +486,15 @@ export function buildFinalPuzzleEvent(
   }
   if (context?.keptRecord && met.has('capybara')) {
     scenes[4].text = 'Chill holds the original page flat.\n“The correction stays beside it. It does not replace it.”';
+    scenes[4].image = 'kept_table';
+    scenes[4].imageOpacity = 1;
+    scenes[4].imageFraming = 'detail';
     scenes[4].speaker = 'capybara';
     scenes[4].duration = 3500;
   } else if (context?.keptPromise && met.has('rabbit')) {
     scenes[4].text = 'Thyme keeps the seed tin in her own pocket.\n“Still mine.”';
+    scenes[4].image = 'private_room';
+    scenes[4].imageOpacity = 1;
     scenes[4].speaker = 'rabbit';
     scenes[4].duration = 3000;
   }
@@ -478,32 +527,43 @@ export const POST_REVELATION_EVENT: PhaseTransitionEvent = {
   accentColor: '#4A3060',
   particles: { count: 10, color: '#4A3060', direction: 'drift', speed: 5, size: 4, opacity: 0.15 },
   vignette: true,
-  // The settled entity, faint and constant behind every line — it is simply
-  // HERE now. Text-only scenes; the presence never moves again.
+  // The settled entity stays present as the camera returns to ordinary life.
+  // Environmental illustrations do not replay its arrival.
   backdrop: { image: 'shadow_figure', opacity: 0.14 },
   scenes: [
     {
       text: 'The shadow settles.',
+      image: 'shadow_figure',
+      imageOpacity: 0.65,
       delay: 0,
       duration: 3000,
     },
     {
       text: 'Some of your friends sleep. Some keep watch.\nFor once, they do not all choose the same thing.',
+      image: 'private_room',
+      imageOpacity: 1,
       delay: 3200,
       duration: 3500,
     },
     {
       text: 'The letters still move.\nThe words still shift.',
+      image: 'kept_table',
+      imageOpacity: 1,
+      imageFraming: 'detail',
       delay: 6900,
       duration: 3000,
     },
     {
       text: 'A chipped cup stays chipped.\nTomorrow, someone may mend it.',
+      image: 'kept_table',
+      imageOpacity: 1,
       delay: 10100,
       duration: 3000,
     },
     {
       text: 'The pattern continues.\nSo does the work of living beside it.',
+      image: 'outward_road',
+      imageOpacity: 1,
       delay: 13300,
       duration: 3000,
     },
@@ -525,7 +585,9 @@ export function buildPostRevelationEvent(context?: FinalArrivalContext): PhaseTr
     : 'There is warmth at the door when someone returns.\nIt reaches no further than they ask.';
   const image = context.boundary === 'remember' ? 'private_room' : 'outward_road';
   scenes[1].image = image;
-  scenes[1].imageOpacity = 0.8;
+  scenes[1].imageOpacity = 1;
+  scenes[3].image = context.boundary === 'remember' ? 'kept_table' : 'private_room';
+  scenes[3].imageOpacity = 1;
   return { ...POST_REVELATION_EVENT, scenes, backdrop: { image, opacity: 0.62 } };
 }
 
@@ -537,7 +599,7 @@ export function buildPostRevelationEvent(context?: FinalArrivalContext): PhaseTr
  * The re-descent ceremony played when the player chooses to begin a New Cycle
  * from the true endgame. It is a Phase-5 milestone, so it stays in the
  * terrible-peace register and mirrors POST_REVELATION_EVENT's structure:
- * text-only scenes over the settled, low-opacity presence. Nothing descends,
+ * familiar rooms and roads with the settled, low-opacity presence. Nothing descends,
  * nothing is named. The pattern does not end, it turns. The last line hands the
  * player back toward a bright morning that the reload will actually deliver.
  *
@@ -559,6 +621,9 @@ export const NEW_CYCLE_EVENT: PhaseTransitionEvent = {
   scenes: [
     {
       text: 'The pattern has run its whole length.\nIt does not end. It turns.',
+      image: 'kept_table',
+      imageOpacity: 1,
+      imageFraming: 'detail',
       delay: 0,
       duration: 3500,
       effect: 'pulse',
@@ -566,21 +631,31 @@ export const NEW_CYCLE_EVENT: PhaseTransitionEvent = {
     },
     {
       text: 'The rooms you raised and the friends you invited remain.\nA bright morning is still possible here.',
+      image: 'private_room',
+      imageOpacity: 1,
       delay: 3700,
       duration: 3500,
     },
     {
       text: 'Beneath the stillness, a bright morning is already waking.',
+      image: 'outward_road',
+      imageOpacity: 1,
       delay: 7400,
       duration: 3500,
     },
     {
       text: 'They will greet you as if for the first time.\nOne small boundary may be older than the morning.',
+      image: 'private_room',
+      imageOpacity: 1,
+      imageFraming: 'detail',
       delay: 11100,
       duration: 3500,
     },
     {
       text: 'Begin again.',
+      image: 'outward_road',
+      imageOpacity: 1,
+      imageFraming: 'detail',
       delay: 14800,
       duration: 3000,
     },

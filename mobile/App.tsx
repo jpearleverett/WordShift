@@ -11,6 +11,7 @@ import {
   View,
   Text,
   TouchableOpacity,
+  Pressable,
   StyleSheet,
   ScrollView,
   StatusBar,
@@ -74,7 +75,8 @@ import {
   markModifierStackingIntroSeen,
   hasSeenLexiconIntro,
   markLexiconIntroSeen,
-  consumePendingVariantTutorial,
+  getPendingVariantTutorials,
+  acknowledgeVariantTutorial,
   checkFreeStreakFreeze,
   consumeVariantNudge,
   getFullProgress,
@@ -293,11 +295,9 @@ const appGlitchGhostStyle = {
 // App screen type — expanded with settings, stats, and ledger
 type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery' | 'pit' | 'shop';
 
-type PostVictoryIntroKind = 'variant_unlock' | 'modifier_stacking' | 'lexicon_unlock' | 'starter_pack';
-interface PostVictoryIntro {
-  kind: PostVictoryIntroKind;
-  lines: string[];
-}
+type PostVictoryIntro =
+  | { kind: 'variant_unlock'; variant: PuzzleVariant; lines: string[] }
+  | { kind: 'modifier_stacking' | 'lexicon_unlock' | 'starter_pack'; lines: string[] };
 
 
 // Speed rescue: seconds granted by the one-per-board rewarded continue.
@@ -786,6 +786,7 @@ function MainApp() {
   const [postVictoryIntroIndex, setPostVictoryIntroIndex] = useState(0);
   const queuedPostVictoryIntrosRef = useRef<PostVictoryIntro[]>([]);
   const pendingPostVictoryActionRef = useRef<(() => void) | null>(null);
+  const dismissingPostVictoryIntroRef = useRef(false);
 
   // Screen transition overlay — fades in to cover old screen, swaps, fades out to reveal new screen
   const transitionOverlay = useRef(new Animated.Value(0)).current;
@@ -1797,34 +1798,44 @@ function MainApp() {
       return;
     }
 
-    if (nextIntro.kind === 'variant_unlock') {
-      await consumePendingVariantTutorial();
-    }
-
     setPostVictoryIntroIndex(0);
     setPostVictoryIntro(nextIntro);
   }, []);
 
   const dismissPostVictoryIntro = useCallback(async () => {
-    const dismissedKind = postVictoryIntro?.kind;
-    if (dismissedKind === 'starter_pack') {
-      await markStarterIntroSeen();
-    }
-    // Marked on DISMISSAL, never at decision time, so an interruption (a kill,
-    // a deep link) can never consume the beat unseen — the same contract the
-    // starter intro and the mandatory-harvest gate use.
-    if (dismissedKind === 'modifier_stacking') {
-      await markModifierStackingIntroSeen();
-    }
-    if (dismissedKind === 'lexicon_unlock') {
-      await markLexiconIntroSeen();
-    }
-    setPostVictoryIntro(null);
-    await advanceQueuedPostVictoryIntro();
-    // After the starter intro closes, open the Store so the "welcome" Fox
-    // described is right there (the Keeper's Welcome hero card).
-    if (dismissedKind === 'starter_pack') {
-      setShowStoreModal(true);
+    // A double tap during the durable acknowledgement must not advance the
+    // queue twice or run the parked destination under a second intro.
+    if (!postVictoryIntro || dismissingPostVictoryIntroRef.current) return;
+    dismissingPostVictoryIntroRef.current = true;
+    try {
+      const dismissedKind = postVictoryIntro.kind;
+      if (postVictoryIntro.kind === 'variant_unlock') {
+        await acknowledgeVariantTutorial(postVictoryIntro.variant);
+      }
+      if (dismissedKind === 'starter_pack') {
+        await markStarterIntroSeen();
+      }
+      // Marked on DISMISSAL, never at decision time, so an interruption (a kill,
+      // a deep link) can never consume the beat unseen — the same contract the
+      // starter intro and the mandatory-harvest gate use.
+      if (dismissedKind === 'modifier_stacking') {
+        await markModifierStackingIntroSeen();
+      }
+      if (dismissedKind === 'lexicon_unlock') {
+        await markLexiconIntroSeen();
+      }
+      setPostVictoryIntro(null);
+      await advanceQueuedPostVictoryIntro();
+      // After the starter intro closes, open the Store so the "welcome" Fox
+      // described is right there (the Keeper's Welcome hero card).
+      if (dismissedKind === 'starter_pack') {
+        setShowStoreModal(true);
+      }
+    } catch (error) {
+      reportError(error instanceof Error ? error : String(error), { source: 'post_victory_intro' });
+      showGameAlert('Could not save yet', 'Please try Continue or Skip again.');
+    } finally {
+      dismissingPostVictoryIntroRef.current = false;
     }
   }, [postVictoryIntro, advanceQueuedPostVictoryIntro]);
 
@@ -1875,24 +1886,9 @@ function MainApp() {
     // flips / the screen changes / the overlay clears).
     clearVictoryMusicHush(!pendingEndgame);
 
-    // An intro is ALREADY presenting and owns a parked exit action. Reached
-    // because the Fox card has no backdrop (zIndex 9000, anchored ~38% down),
-    // so the victory modal underneath stays live and its NEXT LEVEL / Home
-    // buttons — and Android back — can fire a second exit. By then the queue is
-    // empty (advanceQueuedPostVictoryIntro shift()ed the live intro out of it),
-    // so that second exit used to fall straight through to action() and leave
-    // postVictoryIntro set forever: the stale card then reappeared over the
-    // player's NEXT board and, on Continue, ran the FIRST exit's parked action
-    // and threw that board away — while every guard keyed on postVictoryIntro
-    // (notification ask, share invite, remove-ads offer, daily-login modal)
-    // stayed dead for the rest of the session.
-    //
-    // The ref is the right key, not the state: it is set only in the deferral
-    // branch below and cleared only when the parked action finally runs, so it
-    // is an exact synchronous mirror of "an intro owns the screen" with no
-    // render lag. Replace the parked action and return — do NOT call
-    // advanceQueuedPostVictoryIntro() here: with an empty queue it would null
-    // the live intro and fire the action under the player's finger.
+    // Guard synchronous duplicate exits while an intro owns the deferred
+    // destination. Its global overlay blocks background taps, but a queued
+    // event must still never advance the intro or run navigation twice.
     if (pendingPostVictoryActionRef.current) {
       pendingPostVictoryActionRef.current = action;
       return;
@@ -2856,11 +2852,17 @@ function MainApp() {
       const completedTotal = finalVictory.cumulativeStats?.totalPuzzlesCompleted ?? 0;
       const immediateIntros: PostVictoryIntro[] = [];
       const newlyUnlockedVariants = getNewlyUnlockedVariants(completedTotal, finalVictory.newPhase);
-      if (newlyUnlockedVariants.length > 0) {
-        const lines = getVariantTutorialIntroLines(newlyUnlockedVariants[0], finalVictory.newPhase);
+      // The durable queue survives a killed app. Prefer this win's unlock,
+      // then retry one unread, still-unlocked style on a later victory.
+      const pendingVariantTutorials = await getPendingVariantTutorials();
+      const introVariant = newlyUnlockedVariants[0] ?? getUnlockedVariants(completedTotal, finalVictory.newPhase)
+        .find(variant => pendingVariantTutorials.includes(variant));
+      if (introVariant) {
+        const lines = getVariantTutorialIntroLines(introVariant, finalVictory.newPhase);
         if (lines && lines.length > 0) {
           immediateIntros.push({
             kind: 'variant_unlock',
+            variant: introVariant,
             lines,
           });
         }
@@ -4291,9 +4293,8 @@ function MainApp() {
         }
         return true;
       }
-      // A post-victory Fox intro owns the puzzle screen: swallow back. The card
-      // is backdrop-less, so back used to reach the WON branch below and run a
-      // SECOND exit, stranding the intro (see startVictoryExitFlow). Routing
+      // A post-victory Fox intro owns the screen: swallow back so it cannot
+      // run a second victory exit while the destination is parked. Routing
       // back into dismissPostVictoryIntro() instead is deliberately NOT done:
       // dismissal marks the one-time beat seen and fires the parked action, so
       // an interruption would consume a beat unseen and could serve a brand-new
@@ -4675,9 +4676,14 @@ function MainApp() {
   // Global requests retain their payloads in the owning flow. This scheduler
   // grants one actionable layer, with FIFO dialogs and explicit save/story
   // precedence, so a returning reward cannot open over Store or an alert.
+  // WON describes the completed board, not an open receipt. Exit clears the
+  // receipt before deferring navigation for Fox; keeping a data-less victory
+  // here would cover the intro and deadlock every exit behind its own dialogue.
   const victoryModalVisible =
     currentScreen === 'puzzle' &&
     puzzle.gameState === GameState.WON &&
+    victoryFlow.victoryData !== null &&
+    postVictoryIntro === null &&
     !(onboardingFlow.isOnboarding &&
       (onboardingFlow.onboardingStep === 'puzzle_complete' ||
         onboardingFlow.onboardingStep === 'going_to_pit'));
@@ -4686,6 +4692,7 @@ function MainApp() {
     navigation: navigationBusy,
     ceremony: phaseTransitionEvent !== null,
     alert: alertPending,
+    postVictoryIntro: !onboardingFlow.isOnboarding && postVictoryIntro !== null,
     story: activeStory !== null && postVictoryIntro === null,
     journal: storyFlow.journalContext !== null,
     share: shareResultData !== null,
@@ -5862,23 +5869,6 @@ function MainApp() {
             }}
           />
         )}
-        {!onboardingFlow.isOnboarding && postVictoryIntro && (
-          <FoxGuide
-            visible={true}
-            variant="dialogue"
-            text={postVictoryIntro.lines[Math.min(postVictoryIntroIndex, postVictoryIntro.lines.length - 1)]}
-            buttonText={postVictoryIntroIndex < postVictoryIntro.lines.length - 1 ? 'Next' : 'Continue'}
-            onContinue={handleAdvancePostVictoryIntro}
-            showSkip={true}
-            onSkip={dismissPostVictoryIntro}
-            position="bottom"
-            anchorStyle={{
-              top: Math.min(Math.max(SCREEN_HEIGHT * 0.38, 300), 420),
-              left: 8,
-              right: 8,
-            }}
-          />
-        )}
       </Animated.View>
       </ErrorBoundary>
     );
@@ -5899,7 +5889,7 @@ function MainApp() {
           the player home instead of crashing the entire app. */}
       <Animated.View
         style={screenRevealStyle}
-        pointerEvents={storageBusy || sessionTransition !== null || navigationBusy ? 'none' : 'auto'}
+        pointerEvents={storageBusy || sessionTransition !== null || navigationBusy || postVictoryIntro !== null ? 'none' : 'auto'}
         accessibilityElementsHidden={blockingOverlayActive}
         importantForAccessibility={blockingOverlayActive ? 'no-hide-descendants' : 'auto'}
       >
@@ -6020,6 +6010,35 @@ function MainApp() {
           gameMode={puzzle.gameMode}
         />
         </View>
+
+        {/* The intro owns a global layer outside the hidden puzzle screen.
+            The receipt is already closed; the solved board stays WON until
+            Continue/Skip releases the requested destination. */}
+        {overlayOwner === 'postVictoryIntro' && postVictoryIntro && (
+          <View testID="post-victory-intro" style={StyleSheet.absoluteFill} accessibilityViewIsModal={true}>
+            <Pressable
+              style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0, 0, 0, 0.35)' }]}
+              accessible={false}
+              importantForAccessibility="no"
+              onPress={() => {}}
+            />
+            <FoxGuide
+              visible={true}
+              variant="dialogue"
+              text={postVictoryIntro.lines[Math.min(postVictoryIntroIndex, postVictoryIntro.lines.length - 1)]}
+              buttonText={postVictoryIntroIndex < postVictoryIntro.lines.length - 1 ? 'Next' : 'Continue'}
+              onContinue={handleAdvancePostVictoryIntro}
+              showSkip={true}
+              onSkip={dismissPostVictoryIntro}
+              position="bottom"
+              anchorStyle={{
+                top: Math.min(Math.max(SCREEN_HEIGHT * 0.38, 300), 420),
+                left: 8,
+                right: 8,
+              }}
+            />
+          </View>
+        )}
 
         {/* Victory confetti — mounted ABOVE the results scrim (a root sibling
             after the VictoryModal wrapper) so the equipped palette is actually

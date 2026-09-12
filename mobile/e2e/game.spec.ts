@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
+import type { SavedPuzzleState } from '../src/services/puzzleSaveState';
 
 async function capture(page: Page, name: string) {
   const directory = process.env.WORDSHIFT_CAPTURE_DIR;
@@ -77,6 +78,183 @@ async function openReturningBoard(page: Page) {
   await defer.click();
   await expect(page.getByRole('button', { name: /^Hint, \d+ remaining$/ })).toBeVisible();
 }
+
+async function openVictoryIntroCohort(page: Page, phaseThree = false) {
+  await openReturningBoard(page);
+  await page.evaluate(lateGame => {
+    const completed = lateGame ? 64 : 24;
+    const progress = JSON.parse(localStorage.getItem('wordshift_home_progress')!);
+    Object.assign(progress, {
+      puzzlesSolved: completed, currentPhase: lateGame ? 3 : 1,
+      phaseProgress: lateGame ? 88 : 30, pendingPhaseTransition: null,
+      pendingVariantTutorials: [],
+      seenVariantTutorials: lateGame ? ['reverse', 'double_shift'] : ['reverse'],
+    });
+    localStorage.setItem('wordshift_home_progress', JSON.stringify(progress));
+    // Both ledgers describe the same returning player: unlock receipts use
+    // the star total, while durable variant discovery uses home progression.
+    localStorage.setItem('wordshift_star_stats', JSON.stringify({
+      totalPuzzlesCompleted: completed, totalStars: completed * 3,
+      threeStarCount: completed, twoStarCount: 0, oneStarCount: 0,
+      totalInvalidAttempts: 0, totalHintsUsed: 0, noHintPuzzleCount: completed,
+      flawlessCount: completed,
+      byDifficulty: { EASY: { completed, stars: completed * 3 } },
+      lastUpdated: Date.now(),
+    }));
+    localStorage.setItem('wordshift_mandatory_harvest_seen', 'true');
+    localStorage.setItem('wordshift_first_win_glitch', 'true');
+    // This returning cohort already passed the 12-solve preview lesson. A
+    // relaunch may serve MEDIUM, where that unrelated lesson would block play.
+    localStorage.setItem('wordshift_preview_graduation_seen_v2', 'true');
+    localStorage.removeItem('wordshift_modifier_stacking_intro_seen');
+    const board = JSON.parse(localStorage.getItem('wordshift_in_progress_puzzle')!);
+    board.currentPhase = lateGame ? 3 : 1;
+    localStorage.setItem('wordshift_in_progress_puzzle', JSON.stringify(board));
+  }, phaseThree);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.getByRole('button', { name: 'Play puzzle', exact: true }).click();
+  await deferVictoryStory(page);
+}
+
+async function deferVictoryStory(page: Page) {
+  // The real cup conversation was deferred by openReturningBoard; it remains
+  // eligible at each deliberate Play/victory exit throughout these journeys.
+  await page.getByText('Come back to this', { exact: true }).click();
+  await expect(page.getByText('Come back to this', { exact: true })).toHaveCount(0);
+}
+
+async function solveSavedStandardBoard(page: Page) {
+  await expect(page.getByRole('button', { name: 'How to play', exact: true })).toBeVisible();
+  await expect.poll(() => page.evaluate(() =>
+    JSON.parse(localStorage.getItem('wordshift_in_progress_puzzle') || '{}').solution?.length ?? 0,
+  )).toBeGreaterThan(0);
+  const board: SavedPuzzleState = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('wordshift_in_progress_puzzle')!),
+  );
+  expect(board.currentVariant).toBe('standard');
+  expect(board.solution).toHaveLength(board.rows.length - 1);
+  // The original tutorial's older solution schema omits exact slot indices.
+  const openingBoard = board.rows.map(row => row.originalWord).join(',') === 'PLAY,PANT,HEAR';
+  for (const step of board.solution!) {
+    const sourceLetters = board.rows[step.stepIndex].words;
+    const removal = step.removalPosition ?? sourceLetters.findIndex(letter =>
+      letter.char === step.letterToMove && !letter.isLocked,
+    );
+    const duplicateIndex = sourceLetters.slice(0, removal).filter(letter =>
+      letter.char === step.letterToMove && !letter.isLocked,
+    ).length;
+    const letter = page.getByTestId(`puzzle-row-${step.stepIndex}`)
+      .getByRole('button', { name: `Letter ${step.letterToMove}`, exact: true }).nth(duplicateIndex);
+    await letter.scrollIntoViewIfNeeded();
+    await letter.click();
+    const insertion = step.insertionPosition ?? (openingBoard ? [1, 4][step.stepIndex] : undefined);
+    expect(insertion).toBeDefined();
+    const targetLetters = board.rows[step.stepIndex + 1].words;
+    const [moved] = sourceLetters.splice(removal, 1);
+    targetLetters.splice(insertion!, 0, { ...moved, isLocked: true });
+    const formed = targetLetters.map(value => value.char).join('');
+    const slot = page.getByTestId(`puzzle-row-${step.stepIndex + 1}`)
+      .getByRole('button', { name: new RegExp(`^(?:Guided drop zone|Drop zone) ${insertion! + 1} of \\d+, (?:forms ${formed}, valid word|would form ${formed})$`) });
+    await slot.scrollIntoViewIfNeeded();
+    await slot.click();
+  }
+  await expect(page.getByRole('button', { name: 'Next level', exact: true })).toBeVisible({ timeout: 30_000 });
+}
+
+async function acknowledgeVictoryIntro(page: Page, skip = false) {
+  const intro = page.getByTestId('post-victory-intro');
+  await expect(intro).toBeVisible();
+  if (skip) {
+    await intro.getByRole('button', { name: 'Skip intro', exact: true }).click();
+    await intro.getByRole('button', { name: 'Yes, skip the whole intro', exact: true }).click();
+  } else {
+    // Bounded pagination: a missing or non-working Continue must fail here,
+    // rather than silently accepting a visible but untouchable Fox card.
+    for (let pageIndex = 0; pageIndex < 12; pageIndex++) {
+      const next = intro.getByRole('button', { name: /^(Next|Continue)$/ });
+      const lastPage = await next.getAttribute('aria-label') === 'Continue';
+      await next.click();
+      if (lastPage) break;
+    }
+  }
+  await expect(intro).toHaveCount(0);
+}
+
+for (const exit of ['Next level', 'Return home', 'Collect amber in the pit'] as const) {
+  test(`Double Shift unlock hands ${exit} from results to actionable dialogue`, async ({ page }) => {
+    await openVictoryIntroCohort(page);
+    await solveSavedStandardBoard(page);
+    const results = page.getByLabel('Results', { exact: true });
+    await expect(results).toBeVisible();
+    await results.getByRole('button', { name: exit, exact: true }).click();
+    await expect(results).toHaveCount(0);
+    const intro = page.getByTestId('post-victory-intro');
+    await expect(intro).toBeVisible();
+    expect(await intro.evaluate(element => element.closest('[aria-hidden="true"]') === null)).toBe(true);
+    await expect.poll(() => page.evaluate(() =>
+      JSON.parse(localStorage.getItem('wordshift_home_progress')!).pendingVariantTutorials,
+    )).toContain('double_shift');
+    expect(await page.evaluate(() =>
+      JSON.parse(localStorage.getItem('wordshift_home_progress')!).seenVariantTutorials,
+    )).not.toContain('double_shift');
+    await acknowledgeVictoryIntro(page, exit === 'Collect amber in the pit');
+    await deferVictoryStory(page);
+    await expect.poll(() => page.evaluate(() =>
+      JSON.parse(localStorage.getItem('wordshift_home_progress')!).seenVariantTutorials,
+    )).toContain('double_shift');
+    if (exit === 'Next level') {
+      await expect(page.getByRole('button', { name: 'How to play', exact: true })).toBeVisible();
+    } else if (exit === 'Return home') {
+      await expect(page.getByRole('button', { name: 'Play puzzle', exact: true })).toBeVisible();
+    } else {
+      await expect(page.getByRole('button', { name: /amber from \d+ words$/ })).toBeVisible();
+    }
+    await expect(results).toHaveCount(0);
+  });
+}
+
+test('phase 3 stacking dialogue completes once and the following win can exit', async ({ page }) => {
+  test.setTimeout(180_000);
+  await openVictoryIntroCohort(page, true);
+  await solveSavedStandardBoard(page);
+  await page.getByRole('button', { name: 'Next level', exact: true }).click();
+  await expect(page.getByLabel('Results', { exact: true })).toHaveCount(0);
+  await acknowledgeVictoryIntro(page);
+  await expect.poll(() => page.evaluate(() =>
+    localStorage.getItem('wordshift_modifier_stacking_intro_seen'),
+  )).toBe('true');
+  await deferVictoryStory(page);
+  await solveSavedStandardBoard(page);
+  await page.getByRole('button', { name: 'Return home', exact: true }).click();
+  await deferVictoryStory(page);
+  await expect(page.getByRole('button', { name: 'Play puzzle', exact: true })).toBeVisible();
+  await expect(page.getByTestId('post-victory-intro')).toHaveCount(0);
+  await expect(page.getByLabel('Results', { exact: true })).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() =>
+    JSON.parse(localStorage.getItem('wordshift_home_progress')!).puzzlesSolved,
+  )).toBe(66);
+});
+
+test('an interrupted mode introduction is offered after the next win beyond its unlock threshold', async ({ page }) => {
+  test.setTimeout(180_000);
+  await openVictoryIntroCohort(page);
+  await solveSavedStandardBoard(page);
+  await page.getByRole('button', { name: 'Next level', exact: true }).click();
+  await expect(page.getByTestId('post-victory-intro')).toBeVisible();
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.getByRole('button', { name: 'Play puzzle', exact: true }).click();
+  await deferVictoryStory(page);
+  await solveSavedStandardBoard(page);
+  await page.getByRole('button', { name: 'Next level', exact: true }).click();
+  await expect(page.getByLabel('Results', { exact: true })).toHaveCount(0);
+  await acknowledgeVictoryIntro(page, true);
+  await deferVictoryStory(page);
+  await expect(page.getByRole('button', { name: 'How to play', exact: true })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => {
+    const progress = JSON.parse(localStorage.getItem('wordshift_home_progress')!);
+    return { solved: progress.puzzlesSolved, seen: progress.seenVariantTutorials, pending: progress.pendingVariantTutorials };
+  })).toEqual({ solved: 26, seen: ['reverse', 'double_shift'], pending: [] });
+});
 
 test('fresh board has a visible help icon and scrollable rules at a small viewport', async ({ page }) => {
   await openFreshGame(page);
@@ -261,20 +439,35 @@ test('a real house ceremony remains readable and can finish at 320px with enlarg
   });
   await page.setViewportSize({ width: 320, height: 568 });
   await page.reload({ waitUntil: 'domcontentloaded' });
-  const pause = page.getByRole('button', { name: 'Pause and read at my pace', exact: true });
-  await expect(pause).toBeVisible({ timeout: 30_000 });
-  await pause.click();
+  // Continue must be available before the player discovers the optional
+  // tap-to-hold gesture. Advancing once takes over the authored pacing.
+  await expect(page.getByTestId('phase-transition-next')).toBeVisible({ timeout: 30_000 });
   for (let scene = 0; scene < 5; scene++) {
     const advance = page.getByRole('button', { name: scene === 4 ? 'Return to the house' : 'Continue the scene', exact: true });
     await expect(advance).toBeVisible();
     await enlargeBrowserText(page);
-    await advance.scrollIntoViewIfNeeded();
+    const art = page.getByTestId('phase-transition-art');
+    const footer = page.getByTestId('phase-transition-footer');
+    const reading = page.getByTestId('phase-transition-reading');
+    const skip = page.getByRole('button', { name: 'Skip transition', exact: true });
+    // Do not scroll the controls into view: they must already fit, including
+    // the complete button hit areas, on every page at the enlarged text size.
+    for (const element of [art, footer, advance, skip]) {
+      await expect(element).toBeInViewport();
+      const bounds = await element.boundingBox();
+      expect(bounds).not.toBeNull();
+      expect(bounds!.x).toBeGreaterThanOrEqual(0);
+      expect(bounds!.y).toBeGreaterThanOrEqual(0);
+      expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(321);
+      expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(569);
+    }
+    expect((await art.boundingBox())!.height).toBeGreaterThanOrEqual(72);
+    await expect(art.locator('img').first()).toBeAttached();
+    await expect(reading.getByTestId('phase-transition-footer')).toHaveCount(0);
+    const footerBeforeScroll = await footer.boundingBox();
+    await reading.evaluate(element => { element.scrollTop = element.scrollHeight; });
+    expect((await footer.boundingBox())!.y).toBeCloseTo(footerBeforeScroll!.y, 0);
     await expect(advance).toBeInViewport();
-    const bounds = await advance.boundingBox();
-    expect(bounds).not.toBeNull();
-    expect(bounds!.x).toBeGreaterThanOrEqual(0);
-    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(321);
-    await expect(page.getByRole('button', { name: 'Skip transition', exact: true })).toBeInViewport();
     if (scene === 3) await capture(page, 'updated-ceremony-small-large-text');
     await advance.click();
   }

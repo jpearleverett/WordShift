@@ -1465,6 +1465,31 @@ export async function recordVariantEncounter(variant: string): Promise<void> {
   await saveProgress();
 }
 
+/** Read unread introductions without consuming them before the player responds. */
+export async function getPendingVariantTutorials(): Promise<string[]> {
+  const progress = await loadProgress();
+  return [...(progress.pendingVariantTutorials ?? [])];
+}
+
+/**
+ * Acknowledge the introduction the player actually dismissed. A new unlock can
+ * present ahead of an older queued variant, so consuming the queue head here
+ * would silently discard a different introduction. Until this save succeeds,
+ * the pending key remains recoverable after an interrupted victory exit.
+ */
+export async function acknowledgeVariantTutorial(variant: string): Promise<void> {
+  if (!variant || variant === 'standard') return;
+  const progress = await loadProgress();
+  const pending = progress.pendingVariantTutorials ?? [];
+  const seen = progress.seenVariantTutorials ?? [];
+  if (!pending.includes(variant) && seen.includes(variant)) return;
+
+  progress.pendingVariantTutorials = pending.filter(key => key !== variant);
+  progress.seenVariantTutorials = seen.includes(variant) ? seen : [...seen, variant];
+  progressCache = progress;
+  await saveProgress();
+}
+
 /**
  * Consume the next pending variant tutorial key.
  * Marks it as seen immediately to prevent repeats.

@@ -83,6 +83,18 @@ const WALK_MATCH_SCALE = 1.1;
 const WALK_FEET_FROM_CENTER = WALK_SPRITE_BOX * (0.81 - 0.5); // ~28px
 const WALK_FEET_CORRECTION = -WALK_FEET_FROM_CENTER * (WALK_MATCH_SCALE - 1);
 
+export type SpritePose = 'idle' | 'talk' | 'robed' | 'robedTalk' | 'walk';
+export type SpriteFacing = 'left' | 'right';
+
+export interface WalkAtlas {
+  source: ImageSourcePropType;
+  columns: number;
+  rows: number;
+  frameCount: number;
+  /** Base cadence before the current travel leg's pace adjustment. */
+  frameMs?: number;
+}
+
 // Character sprite assets - add more as they become available
 // Exported so dialogue modals can use talk sprites
 export const CHARACTER_SPRITES: Partial<Record<AnimalType, {
@@ -103,12 +115,13 @@ export const CHARACTER_SPRITES: Partial<Record<AnimalType, {
    */
   robedTalk?: ImageSourcePropType;
   /**
-   * Optional walk cycle, played while the animal wanders its room (frames
-   * face RIGHT like idle.png; the container's scaleX flip handles leftward
-   * walks). Frames were extracted from source video (assets/raw/*_walk_
-   * source.mp4) at WALK_FRAME_MS spacing — one full gait cycle.
+   * Original fox walk cycle, extracted from source video. New residents use
+   * a packed atlas so the house does not mount a separate Image per frame.
    */
   walk?: ImageSourcePropType[];
+  walkAtlas?: WalkAtlas;
+  /** Facing of the pixels in each source asset, independent of travel. */
+  nativeFacing?: Partial<Record<SpritePose, SpriteFacing>>;
 }>> = {
   fox: {
     idle: require('../../../assets/characters/fox/idle.png'),
@@ -133,12 +146,20 @@ export const CHARACTER_SPRITES: Partial<Record<AnimalType, {
     talk: require('../../../assets/characters/pangolin/talk.png'),
     robed: require('../../../assets/characters/pangolin/robed.png'),
     robedTalk: require('../../../assets/characters/pangolin/robed_talk.png'),
+    walkAtlas: {
+      source: require('../../../assets/characters/pangolin/walk.png'),
+      columns: 4, rows: 2, frameCount: 8,
+    },
   },
   owl: {
     idle: require('../../../assets/characters/owl/idle.png'),
     talk: require('../../../assets/characters/owl/talk.png'),
     robed: require('../../../assets/characters/owl/robed.png'),
     robedTalk: require('../../../assets/characters/owl/robed_talk.png'),
+    walkAtlas: {
+      source: require('../../../assets/characters/owl/walk.png'),
+      columns: 4, rows: 2, frameCount: 8,
+    },
   },
   axolotl: {
     idle: require('../../../assets/characters/axolotl/idle.png'),
@@ -151,56 +172,111 @@ export const CHARACTER_SPRITES: Partial<Record<AnimalType, {
     talk: require('../../../assets/characters/capybara/talk.png'),
     robed: require('../../../assets/characters/capybara/robed.png'),
     robedTalk: require('../../../assets/characters/capybara/robed_talk.png'),
+    walkAtlas: {
+      source: require('../../../assets/characters/capybara/walk.png'),
+      columns: 4, rows: 2, frameCount: 8,
+    },
   },
   fennec_fox: {
     idle: require('../../../assets/characters/fennec_fox/idle.png'),
     talk: require('../../../assets/characters/fennec_fox/talk.png'),
     robed: require('../../../assets/characters/fennec_fox/robed.png'),
     robedTalk: require('../../../assets/characters/fennec_fox/robed_talk.png'),
+    walkAtlas: {
+      source: require('../../../assets/characters/fennec_fox/walk.png'),
+      columns: 4, rows: 2, frameCount: 8,
+    },
+    // Existing portraits look left; the new walk atlas looks right. Correct
+    // each layer instead of reversing the entire character in every pose.
+    nativeFacing: { idle: 'left', talk: 'left', robed: 'left', robedTalk: 'left', walk: 'right' },
   },
   red_panda: {
     idle: require('../../../assets/characters/red_panda/idle.png'),
     talk: require('../../../assets/characters/red_panda/talk.png'),
     robed: require('../../../assets/characters/red_panda/robed.png'),
     robedTalk: require('../../../assets/characters/red_panda/robed_talk.png'),
+    walkAtlas: {
+      source: require('../../../assets/characters/red_panda/walk.png'),
+      columns: 4, rows: 2, frameCount: 8,
+    },
   },
   sloth: {
     idle: require('../../../assets/characters/sloth/idle.png'),
     talk: require('../../../assets/characters/sloth/talk.png'),
     robed: require('../../../assets/characters/sloth/robed.png'),
     robedTalk: require('../../../assets/characters/sloth/robed_talk.png'),
+    walkAtlas: {
+      source: require('../../../assets/characters/sloth/walk.png'),
+      columns: 4, rows: 2, frameCount: 8,
+    },
   },
   wombat: {
     idle: require('../../../assets/characters/wombat/idle.png'),
     talk: require('../../../assets/characters/wombat/talk.png'),
     robed: require('../../../assets/characters/wombat/robed.png'),
     robedTalk: require('../../../assets/characters/wombat/robed_talk.png'),
+    walkAtlas: {
+      source: require('../../../assets/characters/wombat/walk.png'),
+      columns: 4, rows: 2, frameCount: 8,
+    },
   },
   rabbit: {
     idle: require('../../../assets/characters/rabbit/idle.png'),
     talk: require('../../../assets/characters/rabbit/talk.png'),
     robed: require('../../../assets/characters/rabbit/robed.png'),
     robedTalk: require('../../../assets/characters/rabbit/robed_talk.png'),
+    walkAtlas: {
+      source: require('../../../assets/characters/rabbit/walk.png'),
+      columns: 4, rows: 2, frameCount: 8,
+    },
   },
   tarsier: {
     idle: require('../../../assets/characters/tarsier/idle.png'),
     talk: require('../../../assets/characters/tarsier/talk.png'),
     robed: require('../../../assets/characters/tarsier/robed.png'),
     robedTalk: require('../../../assets/characters/tarsier/robed_talk.png'),
+    walkAtlas: {
+      source: require('../../../assets/characters/tarsier/walk.png'),
+      columns: 4, rows: 2, frameCount: 8,
+    },
   },
   aye_aye: {
     idle: require('../../../assets/characters/aye_aye/idle.png'),
     talk: require('../../../assets/characters/aye_aye/talk.png'),
     robed: require('../../../assets/characters/aye_aye/robed.png'),
     robedTalk: require('../../../assets/characters/aye_aye/robed_talk.png'),
+    walkAtlas: {
+      source: require('../../../assets/characters/aye_aye/walk.png'),
+      columns: 4, rows: 2, frameCount: 8,
+    },
   },
   kakapo: {
     idle: require('../../../assets/characters/kakapo/idle.png'),
     talk: require('../../../assets/characters/kakapo/talk.png'),
     robed: require('../../../assets/characters/kakapo/robed.png'),
     robedTalk: require('../../../assets/characters/kakapo/robed_talk.png'),
+    walkAtlas: {
+      source: require('../../../assets/characters/kakapo/walk.png'),
+      columns: 4, rows: 2, frameCount: 8,
+    },
   },
 };
+
+/** Normalize a source layer to face right before the body's travel turn. */
+export function getSpriteFacingCorrection(type: AnimalType, pose: SpritePose): 1 | -1 {
+  return CHARACTER_SPRITES[type]?.nativeFacing?.[pose] === 'left' ? -1 : 1;
+}
+
+/** Coordinates in the 90dp viewport; the atlas Image keeps the same source. */
+export function getWalkAtlasFrame(atlas: WalkAtlas, frame: number) {
+  const index = ((frame % atlas.frameCount) + atlas.frameCount) % atlas.frameCount;
+  return {
+    width: WALK_SPRITE_BOX * atlas.columns,
+    height: WALK_SPRITE_BOX * atlas.rows,
+    left: -(index % atlas.columns) * WALK_SPRITE_BOX,
+    top: -Math.floor(index / atlas.columns) * WALK_SPRITE_BOX,
+  };
+}
 
 // Emote bubble sprites — hand-drawn candy-UI-family art (generateUiIcons.mjs),
 // replacing the old OS-emoji glyphs so the ambient emotes match the game's
@@ -426,7 +502,7 @@ let idleBeatTokenHolder: number | null = null;
 let idleInstanceSeq = 0;
 
 // ---------------------------------------------------------------------------
-// Procedural gait (the 12 animals without real walk frames).
+// Procedural gait fallback (axolotl retains its existing movement).
 // Without frames a wandering animal used to glide side-to-side as a static
 // sprite with a flat bounce ("fridge magnets"). While wandering, these animals
 // now play a transform-only gait bundle: a synced vertical bob, a slight
@@ -440,6 +516,13 @@ let idleInstanceSeq = 0;
  * quick species (rabbit, fennec) patter and slow ones (sloth, kakapo) trudge. */
 export const getGaitPeriodMs = (type: AnimalType): number =>
   Math.max(300, Math.min(1400, (MOVEMENT_SPEED[type] ?? 3000) * 0.22));
+
+/** Species cadence for the new eight-frame cycles; keep the fox unchanged. */
+export function getWalkFrameDurationMs(type: AnimalType): number {
+  const atlas = CHARACTER_SPRITES[type]?.walkAtlas;
+  if (!atlas) return WALK_FRAME_MS;
+  return atlas.frameMs ?? Math.max(100, Math.min(200, MOVEMENT_SPEED[type] * 0.032));
+}
 
 /** Vertical bob amplitude (px): subtle 2-3px, scaled off the species bounce. */
 export const getGaitBobPx = (type: AnimalType): number =>
@@ -545,7 +628,9 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
   const [posX] = useState(() => new Animated.Value(animal.position.x));
   const [posY] = useState(() => new Animated.Value(animal.position.y));
   const [bounceY] = useState(() => new Animated.Value(0));
-  const [scaleX] = useState(() => new Animated.Value(1));
+  // This value represents WORLD direction, not the asset's native facing.
+  // Starting in the idle asset's direction preserves its authored rest pose.
+  const [scaleX] = useState(() => new Animated.Value(getSpriteFacingCorrection(animal.type, 'idle')));
   const [notificationPulse] = useState(() => new Animated.Value(1));
 
   // New juice animations
@@ -582,16 +667,24 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
   const [currentEmotion, setCurrentEmotion] = useState<EmoteKey | null>(null);
   const [spriteLoadFailed, setSpriteLoadFailed] = useState(false);
   const [walkFrame, setWalkFrame] = useState(0);
+  // Packed atlases move through native animated props. Their frame clock
+  // does not rerender this component or its badge/shadow on every footfall.
+  const [atlasFrameX] = useState(() => new Animated.Value(0, { useNativeDriver: Platform.OS !== 'web' }));
+  const [atlasFrameY] = useState(() => new Animated.Value(0, { useNativeDriver: Platform.OS !== 'web' }));
+  const [walkAtlasLoadFailed, setWalkAtlasLoadFailed] = useState(false);
 
   useEffect(() => {
     isMovingRef.current = isMoving;
   }, [isMoving]);
 
-  // Real walk-cycle frames play while the animal wanders (currently the fox).
+  // Real walk-cycle frames play while the animal wanders. Axolotl keeps its
+  // existing transform-only movement.
   // Robed figures (Phase 4+) don't stroll — they keep the gliding reverence —
   // and reduced motion / low-tier devices keep the static sprite.
   const walkFrames = CHARACTER_SPRITES[animal.type]?.walk;
-  const hasWalkFrames = Boolean(walkFrames && walkFrames.length > 0);
+  const walkAtlas = CHARACTER_SPRITES[animal.type]?.walkAtlas;
+  const walkFrameCount = walkAtlas?.frameCount ?? walkFrames?.length ?? 0;
+  const hasWalkFrames = walkFrameCount > 0 && !walkAtlasLoadFailed;
   const walkActive = Boolean(
     isMoving &&
     hasWalkFrames &&
@@ -685,11 +778,17 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
     if (!walkActive) return;
     let nextFrame = 0;
     const interval = setInterval(() => {
-      nextFrame = (nextFrame + 1) % (walkFrames?.length ?? 1);
-      setWalkFrame(nextFrame);
-    }, WALK_FRAME_MS * gaitPaceRef.current);
+      nextFrame = (nextFrame + 1) % walkFrameCount;
+      if (walkAtlas) {
+        const frame = getWalkAtlasFrame(walkAtlas, nextFrame);
+        atlasFrameX.setValue(frame.left);
+        atlasFrameY.setValue(frame.top);
+      } else {
+        setWalkFrame(nextFrame);
+      }
+    }, getWalkFrameDurationMs(animal.type) * gaitPaceRef.current);
     return () => clearInterval(interval);
-  }, [walkActive, walkFrames?.length]);
+  }, [walkActive, walkFrameCount, walkAtlas, animal.type, atlasFrameX, atlasFrameY]);
 
   // Breathing animation (subtle scale pulse) — phase-scaled: it slows and
   // deepens as the house darkens. currentPhase is in the deps so the pace
@@ -911,6 +1010,9 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
         MOVEMENT_SPEED[animal.type],
       );
 
+      setWalkFrame(0);
+      atlasFrameX.setValue(0);
+      atlasFrameY.setValue(0);
       setIsMoving(true);
 
       Animated.parallel([
@@ -928,6 +1030,9 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
         }),
       ]).start(() => {
         if (isMounted) {
+          setWalkFrame(0);
+          atlasFrameX.setValue(0);
+          atlasFrameY.setValue(0);
           setIsMoving(false);
           // Wait before next movement (3-8 seconds base, longer as it darkens)
           const pauseMs = (3000 + Math.random() * 5000) * motion.pauseMul;
@@ -943,7 +1048,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
       isMounted = false;
       clearTimeout(movementTimeout);
     };
-  }, [animal.position.x, animal.position.y, animal.type, currentPhase, posX, posY, scaleX]);
+  }, [animal.position.x, animal.position.y, animal.type, currentPhase, posX, posY, scaleX, atlasFrameX, atlasFrameY]);
 
   // Bounce animation while moving. Suppressed when real walk frames play OR
   // the procedural gait runs — either already carries the vertical bob, and
@@ -1293,6 +1398,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
               mirrors its chrome and nothing squashes with a footfall or an
               idle beat. */}
           <Animated.View
+            testID="animal-sprite-body"
             style={[
               styles.body,
               {
@@ -1318,8 +1424,8 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
             {CHARACTER_SPRITES[animal.type] && !spriteLoadFailed ? (
               (() => {
                 const sprites = CHARACTER_SPRITES[animal.type]!;
-                const staticSource =
-                  currentPhase >= 4 && sprites.robed ? sprites.robed : sprites.idle;
+                const staticPose = currentPhase >= 4 && sprites.robed ? 'robed' : 'idle';
+                const staticSource = staticPose === 'robed' ? sprites.robed! : sprites.idle;
                 const dreadTint = getSpriteDreadTint(currentPhase);
                 // Walk frames stay MOUNTED (opacity-switched) whenever they
                 // could play — swapping one Image's `source` mid-gait forces an
@@ -1328,8 +1434,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
                 // Skipped when the walk can never run (robed phases, reduced
                 // motion, low-tier devices) so those paths pay no decode cost.
                 const mountWalkStack = Boolean(
-                  walkFrames &&
-                  walkFrames.length > 0 &&
+                  hasWalkFrames &&
                   currentPhase < 4 &&
                   !getSettingsSync().reducedMotion &&
                   !shouldSimplifyAnimations()
@@ -1362,7 +1467,16 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
                 return (
                   <View style={styles.spriteImage}>
                     {/* Idle/robed base — hidden (not unmounted) while walking */}
-                    <View style={[styles.spriteLayer, { opacity: walkActive ? 0 : 1 }]}>
+                    <View
+                      testID="animal-sprite-static"
+                      style={[
+                        styles.spriteLayer,
+                        {
+                          opacity: walkActive ? 0 : 1,
+                          transform: [{ scaleX: getSpriteFacingCorrection(animal.type, staticPose) }],
+                        },
+                      ]}
+                    >
                       <Image
                         source={staticSource}
                         style={styles.spriteFill}
@@ -1371,14 +1485,61 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
                       />
                       {renderTint(staticSource)}
                     </View>
-                    {mountWalkStack && walkFrames!.map((frameSource, idx) => (
+                    {mountWalkStack && walkAtlas && (
+                      <View
+                        testID="animal-sprite-walk-atlas"
+                        style={[
+                          styles.spriteLayer,
+                          styles.atlasViewport,
+                          {
+                            opacity: walkActive ? 1 : 0,
+                            transform: [{ scaleX: getSpriteFacingCorrection(animal.type, 'walk') }],
+                          },
+                        ]}
+                      >
+                        <Animated.Image
+                          source={walkAtlas.source}
+                          style={[
+                            styles.atlasImage,
+                            getWalkAtlasFrame(walkAtlas, 0),
+                            { transform: [{ translateX: atlasFrameX }, { translateY: atlasFrameY }] },
+                          ]}
+                          resizeMode="contain"
+                          onError={() => setWalkAtlasLoadFailed(true)}
+                          importantForAccessibility="no"
+                          accessibilityElementsHidden
+                        />
+                        {dreadTint && (
+                          <Animated.Image
+                            source={walkAtlas.source}
+                            style={[
+                              styles.atlasImage,
+                              getWalkAtlasFrame(walkAtlas, 0),
+                              {
+                                tintColor: dreadTint.color,
+                                opacity: dreadTint.opacity,
+                                transform: [{ translateX: atlasFrameX }, { translateY: atlasFrameY }],
+                              },
+                            ]}
+                            resizeMode="contain"
+                            importantForAccessibility="no"
+                            accessibilityElementsHidden
+                          />
+                        )}
+                      </View>
+                    )}
+                    {mountWalkStack && walkFrames?.map((frameSource, idx) => (
                       <View
                         key={idx}
                         style={[
                           styles.spriteLayer,
                           // Scale the walk art up a hair to match the idle
                           // silhouette, kept feet-planted (see WALK_MATCH_SCALE).
-                          { transform: [{ translateY: WALK_FEET_CORRECTION }, { scale: WALK_MATCH_SCALE }] },
+                          { transform: [
+                            { scaleX: getSpriteFacingCorrection(animal.type, 'walk') },
+                            { translateY: WALK_FEET_CORRECTION },
+                            { scale: WALK_MATCH_SCALE },
+                          ] },
                           { opacity: walkActive && idx === walkFrame % walkFrames!.length ? 1 : 0 },
                         ]}
                       >
@@ -1388,7 +1549,16 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
                     ))}
                     {/* Pre-mounted talk layer for the rare-idle chirp/mutter */}
                     {mountIdleTalkLayer && (
-                      <Animated.View style={[styles.spriteLayer, { opacity: idleTalkOpacity }]}>
+                      <Animated.View
+                        testID="animal-sprite-talk"
+                        style={[
+                          styles.spriteLayer,
+                          {
+                            opacity: idleTalkOpacity,
+                            transform: [{ scaleX: getSpriteFacingCorrection(animal.type, 'talk') }],
+                          },
+                        ]}
+                      >
                         <Image source={sprites.talk!} style={styles.spriteFill} resizeMode="contain" />
                         {renderTint(sprites.talk!)}
                       </Animated.View>
@@ -1533,6 +1703,12 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  atlasViewport: {
+    overflow: 'hidden',
+  },
+  atlasImage: {
+    position: 'absolute',
+  },
   spriteFill: {
     width: '100%',
     height: '100%',
@@ -1581,3 +1757,4 @@ const styles = StyleSheet.create({
 });
 
 export default AnimalSprite;
+

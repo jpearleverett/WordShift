@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StoryPortrait } from './StoryPortrait';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { getStorySpeakerName } from '../services/storyArchive';
-import { getCeremonyPaceCaption, getCeremonyHoldHint } from '../services/phaseNarrative';
+import { getCeremonyHoldHint } from '../services/phaseNarrative';
 import { STORY_ART } from './storyArt';
 
 
@@ -45,8 +45,7 @@ const SCENE_IMAGE_SOURCES: Record<SceneImage, ReturnType<typeof require>> = {
   kept_table: STORY_ART.table,
   shadow_figure: require('../../assets/environment/shadow_figure.png'),
   house: require('../../assets/environment/roof.png'),
-  // Phase 1-3 ceremony emblems (512px, generateGameIcons): luminous painted
-  // subjects for the three transitions that had no image of their own.
+  // Registered ceremony emblems remain available for authored special scenes.
   ceremony_curious: require('../../assets/ui/spots/ceremony_curious.png'),
   ceremony_deeper: require('../../assets/ui/spots/ceremony_deeper.png'),
   ceremony_shadows: require('../../assets/ui/spots/ceremony_shadows.png'),
@@ -329,6 +328,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
   const insets = useSafeAreaInsets();
   const [activeSceneIndex, setActiveSceneIndex] = useState(-1);
   const [manualPlayback, setManualPlayback] = useState(false);
+  const manualPlaybackRef = useRef(false);
   const [overlayOpacity] = useState(() => new Animated.Value(0));
   const [sceneOpacity] = useState(() => new Animated.Value(0));
   const [sceneTranslateY] = useState(() => new Animated.Value(20));
@@ -557,14 +557,18 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
   useLayoutEffect(() => { finishRef.current = finish; });
   const next = () => {
     if (!event || suspended || activeSceneIndex < 0 || hasSkipped.current) return;
+    // Once a reader takes the controls, subsequent pages wait for them too.
+    manualPlaybackRef.current = true;
+    setManualPlayback(true);
     if (activeSceneIndex === event.scenes.length - 1) finishRef.current();
     else setActiveSceneIndex(activeSceneIndex + 1);
   };
   // The passage itself is the hold control: a tap on the words the reader is
   // already looking at cancels the pending advance (the timer effect below
-  // clears it) and hands over the Continue bevel. Idempotent, so a tap in a
+  // clears it) and hands over playback. Idempotent, so a tap in a
   // ceremony that already waits for the reader does nothing at all.
   const holdForReading = () => {
+    manualPlaybackRef.current = true;
     if (!manualPlayback) setManualPlayback(true);
   };
 
@@ -576,6 +580,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- A new external event owns a fresh native animation timeline and its render layers.
     setVisibleEvent(null);
     hasSkipped.current = false;
+    manualPlaybackRef.current = event?.readAtOwnPace === true;
     setManualPlayback(event?.readAtOwnPace === true);
     setActiveSceneIndex(-1);
     setActiveImage(null);
@@ -734,7 +739,8 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     const nextScene = event.scenes[activeSceneIndex + 1];
     const authoredGap = nextScene ? Math.max(0, nextScene.delay - scene.delay - scene.duration) : 350;
     const timer = setTimeout(() => {
-      if (hasSkipped.current) return;
+      // A tap can land just before the state commit clears this timeout.
+      if (hasSkipped.current || manualPlaybackRef.current) return;
       if (activeSceneIndex >= event.scenes.length - 1) finishRef.current();
       else setActiveSceneIndex(index => index + 1);
     }, (scene.duration + authoredGap) * 1.25);
@@ -748,18 +754,31 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
   const isIllustration = (key: SceneImage) =>
     key === 'private_room' || key === 'outward_road' || key === 'outward_road_night' || key === 'kept_table';
   const lastScene = activeSceneIndex === event.scenes.length - 1;
-  const contentWidth = Math.min(width - 32, 720);
-  // Text-only passages should give their space to reading. Keep the stage
-  // when it owns artwork or a visible particle/vignette effect.
-  const hasStageContent = !!(activeScene?.image || event.backdrop)
-    || (!effectiveReducedMotion && ['particles_rise', 'particles_fall', 'vignette_close'].includes(activeScene?.effect ?? ''));
+  const contentWidth = Math.min(width - 32, 640);
+  const availableHeight = Math.max(0, height - insets.top - insets.bottom);
+  // The card sizes to its content. Only the passage yields space on a short
+  // screen; art and controls remain visible, even with larger system text.
+  const compact = availableHeight < 640 || fontScale > 1.2;
+  const hasStageContent = !!(activeScene?.image || event.backdrop);
   const heroHeight = hasStageContent
-    ? Math.max(72, Math.min(height * (fontScale > 1.2 ? 0.18 : 0.37), 400)) : 0;
-  const readingHeight = Math.max(160, height - insets.top - insets.bottom - heroHeight - 115);
+    ? Math.max(72, Math.min(contentWidth / 1.5, availableHeight * (compact ? 0.23 : 0.4), 340))
+    : 0;
   const imageSize = (key: SceneImage) => isIllustration(key)
     ? { width: contentWidth, height: heroHeight }
     : { width: Math.min(contentWidth * 0.84, heroHeight * SCENE_IMAGE_ASPECT[key]),
         height: Math.min(contentWidth * 0.84 / SCENE_IMAGE_ASPECT[key], heroHeight) };
+  // The settled presence must remain visible over opaque room paintings.
+  // Other backdrops still sit behind the scene, as originally authored.
+  const presenceAboveArt = event.backdrop?.image === 'shadow_figure'
+    && !!activeImage && isIllustration(activeImage);
+  const backdrop = event.backdrop && (
+    <View style={styles.imageLayer}>
+      <Image source={SCENE_IMAGE_SOURCES[event.backdrop.image]}
+        resizeMode={isIllustration(event.backdrop.image) ? 'cover' : 'contain'}
+        style={[imageSize(event.backdrop.image), { opacity: event.backdrop.opacity }]}
+        accessible={false} />
+    </View>
+  );
 
   return (
     <Animated.View
@@ -774,8 +793,8 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
           <CinematicParticle key={`${width}:${height}:${i}`} config={event.particles!} index={i} />
         ))}
       </View>
-      <View style={[styles.shell, { width: contentWidth, paddingTop: insets.top + 14,
-        paddingBottom: insets.bottom + 14 }]}>
+      <View style={[styles.shell, { width: contentWidth, paddingTop: insets.top + 12,
+        paddingBottom: insets.bottom + 16 }]}>
         <View style={styles.header}>
           <View style={styles.titleGroup}>
             <AppText textRole="label" style={styles.eyebrow}>WORDSHIFT</AppText>
@@ -787,71 +806,84 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
           </TouchableOpacity>
         </View>
 
-        <View style={[styles.artStage, { height: heroHeight, marginBottom: hasStageContent ? 16 : 0 }]} pointerEvents="none">
-          {event.backdrop && (
-            <View style={styles.imageLayer}>
-              <Image source={SCENE_IMAGE_SOURCES[event.backdrop.image]}
-                resizeMode={isIllustration(event.backdrop.image) ? 'cover' : 'contain'}
-                style={[imageSize(event.backdrop.image), { opacity: event.backdrop.opacity }]}
-                accessible={false} />
+        <View style={styles.cardPosition}>
+          <View style={styles.storyCard}>
+            <View testID="phase-transition-art" style={[styles.artStage, { height: heroHeight }]} pointerEvents="none">
+              {!presenceAboveArt && backdrop}
+              {eventIsVisible && activeImage && (
+                <Animated.View style={[styles.imageLayer, { opacity: imageOpacity,
+                  transform: [{ translateY: imageTranslateY }, { scale: imageScale }] }]}>
+                  <Image source={SCENE_IMAGE_SOURCES[activeImage]}
+                    resizeMode={isIllustration(activeImage) ? 'cover' : 'contain'}
+                    style={[imageSize(activeImage), {
+                      transform: [{ scale: activeScene?.imageFraming === 'detail' ? 1.18 : 1 }],
+                    }]} accessible={false} />
+                </Animated.View>
+              )}
+              {presenceAboveArt && backdrop}
+              <SoftVignette opacity={vignetteOpacity} color={getPhaseTheme(event.phase).vignetteColor} />
+              {burst && <View key={`${width}:${height}:${burst.nonce}`} style={StyleSheet.absoluteFill}>
+                {Array.from({ length: BURST_PARTICLE_COUNT }, (_, i) => (
+                  <BurstParticle key={i} direction={burst.direction} color={burst.color}
+                    size={burst.size} durationMs={burst.durationMs} />
+                ))}
+              </View>}
+              <View style={styles.artRule} />
             </View>
-          )}
-          {eventIsVisible && activeImage && (
-            <Animated.View style={[styles.imageLayer, { opacity: imageOpacity,
-              transform: [{ translateY: imageTranslateY }, { scale: imageScale }] }]}>
-              <Image source={SCENE_IMAGE_SOURCES[activeImage]}
-                resizeMode={isIllustration(activeImage) ? 'cover' : 'contain'}
-                style={imageSize(activeImage)} accessible={false} />
-            </Animated.View>
-          )}
-          <SoftVignette opacity={vignetteOpacity} color={getPhaseTheme(event.phase).vignetteColor} />
-          {burst && <View key={`${width}:${height}:${burst.nonce}`} style={StyleSheet.absoluteFill}>
-            {Array.from({ length: BURST_PARTICLE_COUNT }, (_, i) => (
-              <BurstParticle key={i} direction={burst.direction} color={burst.color}
-                size={burst.size} durationMs={burst.durationMs} />
-            ))}
-          </View>}
-          <View style={styles.artRule} />
-        </View>
 
-        <Animated.View style={[styles.sceneContainer, { maxHeight: readingHeight,
-          opacity: sceneOpacity, transform: [{ translateY: sceneTranslateY }] }]}>
-          {activeScene && <ScrollView ref={scrollRef} style={styles.readingScroll}
-            contentContainerStyle={styles.sceneContent} bounces={false}
-            onScroll={scrollEvent => { scrollOffsetRef.current = scrollEvent.nativeEvent.contentOffset.y; }}
-            scrollEventThrottle={16}
-            showsVerticalScrollIndicator keyboardShouldPersistTaps="handled">
-            {activeScene.speaker && <View style={styles.speakerRow}>
-              <StoryPortrait speaker={activeScene.speaker} phase={event.phase} passage={`${event.title}:${activeSceneIndex}`} size={76} />
-              <View style={styles.speakerCaption}>
-                <AppText textRole="label" style={styles.speakerName}>{getStorySpeakerName(activeScene.speaker)}</AppText>
-                <View style={[styles.speakerRule, { backgroundColor: event.accentColor }]} />
-              </View>
-            </View>}
-            <Pressable
-              style={styles.readingContent}
-              onPress={manualPlayback ? undefined : holdForReading}
-              accessible={!manualPlayback}
-              accessibilityRole={manualPlayback ? undefined : 'button'}
-              accessibilityLabel={manualPlayback ? undefined : activeScene.text}
-              accessibilityHint={manualPlayback ? undefined : getCeremonyHoldHint()}
-            >
-              <AppText textRole="reading" style={styles.sceneText}>{activeScene.text}</AppText>
-            </Pressable>
-            <View style={[styles.footer, fontScale > 1.2 && styles.footerStacked]}>
-              <View style={styles.progressGroup}>
-                <AppText textRole="caption" style={styles.progressText}>
+            <Animated.View style={[styles.sceneContainer, {
+              opacity: sceneOpacity, transform: [{ translateY: sceneTranslateY }] }]}>
+              {activeScene && <ScrollView ref={scrollRef} testID="phase-transition-reading"
+                style={styles.readingScroll}
+                contentContainerStyle={[styles.sceneContent, compact && styles.sceneContentCompact]} bounces={false}
+                onScroll={scrollEvent => { scrollOffsetRef.current = scrollEvent.nativeEvent.contentOffset.y; }}
+                scrollEventThrottle={16}
+                showsVerticalScrollIndicator keyboardShouldPersistTaps="handled">
+                {activeScene.speaker && <View style={styles.speakerRow}>
+                  <StoryPortrait speaker={activeScene.speaker} phase={event.phase}
+                    passage={`${event.title}:${activeSceneIndex}`} size={compact ? 48 : 60} />
+                  <View style={styles.speakerCaption}>
+                    <AppText textRole="label" style={styles.speakerName}>{getStorySpeakerName(activeScene.speaker)}</AppText>
+                    <View style={[styles.speakerRule, { backgroundColor: event.accentColor }]} />
+                  </View>
+                </View>}
+                <Pressable
+                  style={styles.readingContent}
+                  onPress={manualPlayback ? undefined : holdForReading}
+                  accessible={!manualPlayback}
+                  accessibilityRole={manualPlayback ? undefined : 'button'}
+                  accessibilityLabel={manualPlayback ? undefined : activeScene.text}
+                  accessibilityHint={manualPlayback ? undefined : getCeremonyHoldHint()}
+                >
+                  <AppText textRole="reading" style={styles.sceneText}>{activeScene.text}</AppText>
+                </Pressable>
+              </ScrollView>}
+            </Animated.View>
+
+            {activeScene && <View testID="phase-transition-footer"
+              style={[styles.footer, fontScale > 1.2 && styles.footerStacked]}>
+              <View style={[styles.progressGroup, fontScale > 1.2 && styles.progressGroupWide]} accessible
+                accessibilityLabel={`Passage ${activeSceneIndex + 1} of ${event.scenes.length}`}>
+                <View style={styles.progressMarks} accessible={false} accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants">
+                  {event.scenes.map((_, index) => <View key={index} style={[
+                    styles.progressMark,
+                    index <= activeSceneIndex && styles.progressMarkRead,
+                    index === activeSceneIndex && styles.progressMarkCurrent,
+                  ]} />)}
+                </View>
+                <AppText textRole="label" style={styles.progressText}
+                  accessible={false} importantForAccessibility="no">
                   {activeSceneIndex + 1} / {event.scenes.length}
                 </AppText>
-                <AppText textRole="caption" style={styles.modeText}>{getCeremonyPaceCaption(manualPlayback)}</AppText>
               </View>
-              {manualPlayback && <TouchableOpacity onPress={next} style={styles.continueButton}
+              <TouchableOpacity testID="phase-transition-next" onPress={next} style={styles.continueButton}
                 accessibilityRole="button" accessibilityLabel={lastScene ? 'Return to the house' : 'Continue the scene'}>
                 <AppText textRole="label" style={styles.continueText}>{lastScene ? 'Return' : 'Continue'}</AppText>
-              </TouchableOpacity>}
-            </View>
-          </ScrollView>}
-        </Animated.View>
+              </TouchableOpacity>
+            </View>}
+          </View>
+        </View>
       </View>
       <Animated.View pointerEvents="none" style={[styles.flash,
         { opacity: flashOpacity, backgroundColor: flashColor }]} />
@@ -861,37 +893,45 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
 
 const styles = StyleSheet.create({
   overlay: { ...StyleSheet.absoluteFill, alignItems: 'center', zIndex: 1000 },
-  shell: { flex: 1, alignSelf: 'center' },
+  shell: { flex: 1, minHeight: 0, alignSelf: 'center' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    minHeight: 58, marginBottom: 12 },
+    flexShrink: 0, minHeight: 52, marginBottom: 16 },
   titleGroup: { flex: 1, paddingRight: 16 },
-  eyebrow: { fontFamily: PIXEL_FONT_BOLD, fontSize: 10, letterSpacing: 3, color: '#CBB9A0', marginBottom: 8 },
-  title: { fontFamily: PIXEL_FONT_BOLD, fontSize: 22, lineHeight: 30, color: '#F3E8D7' },
-  topGlow: { position: 'absolute', top: 0, left: 0, right: 0, height: '48%' },
-  artStage: { width: '100%', overflow: 'hidden', marginBottom: 16, backgroundColor: '#100B15' },
+  eyebrow: { fontFamily: PIXEL_FONT_BOLD, fontSize: 10, letterSpacing: 3, color: '#CBB9A0', marginVertical: 6 },
+  title: { fontFamily: PIXEL_FONT_BOLD, fontSize: 20, lineHeight: 28, color: '#F3E8D7' },
+  topGlow: { position: 'absolute', top: 0, left: 0, right: 0, height: '60%' },
+  cardPosition: { flex: 1, minHeight: 0, justifyContent: 'center', paddingBottom: 12 },
+  storyCard: { flexShrink: 1, minHeight: 0, overflow: 'hidden', borderRadius: 6,
+    backgroundColor: '#19151F', borderWidth: 1, borderColor: '#7D6A5566' },
+  artStage: { width: '100%', flexShrink: 0, overflow: 'hidden', backgroundColor: '#100B15' },
   imageLayer: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
-  artRule: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 1, backgroundColor: '#D7BE8B60' },
-  sceneContainer: { flex: 1, flexShrink: 1, backgroundColor: '#17121D',
-    borderWidth: 1, borderColor: '#8B755D60', paddingHorizontal: 20, paddingTop: 12 },
-  speakerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
-  portrait: { width: 56, height: 56, marginRight: 12 },
+  artRule: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 1, backgroundColor: '#D7BE8B66' },
+  sceneContainer: { flexShrink: 1, minHeight: 0 },
+  speakerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 12 },
   speakerCaption: { flex: 1 },
-  speakerName: { fontFamily: PIXEL_FONT_BOLD, fontSize: 16, lineHeight: 24, color: '#E9CCA2' },
-  speakerRule: { height: 2, width: 30, marginTop: 8 },
-  readingScroll: { flexShrink: 1 },
-  sceneContent: { flexGrow: 1 },
-  readingContent: { flexGrow: 1, paddingVertical: 12 },
+  speakerName: { fontFamily: PIXEL_FONT_BOLD, fontSize: 14, lineHeight: 22, color: '#E9CCA2' },
+  speakerRule: { height: 2, width: 24, marginTop: 6 },
+  readingScroll: { flexGrow: 0, flexShrink: 1, minHeight: 0 },
+  sceneContent: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 28 },
+  sceneContentCompact: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 20 },
+  readingContent: { minHeight: 44 },
   sceneText: { fontFamily: BODY_FONT, fontSize: 20, lineHeight: 31, color: '#F2E7D6' },
-  footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    gap: 12, borderTopWidth: 1, borderTopColor: '#806B5560', paddingVertical: 14, marginTop: 10 },
-  footerStacked: { flexDirection: 'column', alignItems: 'stretch' },
-  progressGroup: { flexShrink: 1 },
-  progressText: { fontFamily: PIXEL_FONT_BOLD, fontSize: 11, letterSpacing: 2, color: '#D5C3A9' },
-  modeText: { fontFamily: BODY_FONT, fontSize: 12, color: '#C3B5CC', marginTop: 5 },
-  continueButton: { minHeight: 48, minWidth: 110, alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: 18, borderWidth: 1, borderColor: '#D8B680', backgroundColor: '#3A2D29' },
-  continueText: { fontFamily: PIXEL_FONT_BOLD, fontSize: 14, color: '#F4E8D1' },
-  skipButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 16,
+  footer: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    gap: 16, borderTopWidth: 1, borderTopColor: '#806B554D', paddingVertical: 16, paddingHorizontal: 20,
+    backgroundColor: '#211B26' },
+  footerStacked: { flexDirection: 'column', alignItems: 'stretch', gap: 12 },
+  progressGroup: { flexShrink: 1, gap: 8 },
+  progressGroupWide: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  progressMarks: { flexDirection: 'row', gap: 5 },
+  progressMark: { width: 9, height: 3, backgroundColor: '#685869' },
+  progressMarkRead: { backgroundColor: '#B99A71' },
+  progressMarkCurrent: { width: 20, backgroundColor: '#E7C796' },
+  progressText: { fontFamily: PIXEL_FONT_BOLD, fontSize: 10, letterSpacing: 2, color: '#D5C3A9' },
+  continueButton: { minHeight: 48, minWidth: 136, alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 20, paddingVertical: 12, borderRadius: 3, borderWidth: 1,
+    borderColor: '#F2D6A7', backgroundColor: '#E7C796' },
+  continueText: { fontFamily: PIXEL_FONT_BOLD, fontSize: 14, color: '#241C21' },
+  skipButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 16, borderRadius: 3,
     borderWidth: 1, borderColor: SKIP_BORDER_COLOR, backgroundColor: '#100B15', zIndex: 1000 },
   skipText: { fontFamily: BODY_FONT_BOLD, fontSize: FONT_SIZE.bodyLg, color: SKIP_INK_COLOR },
   flash: { ...StyleSheet.absoluteFill, zIndex: 1001 },

@@ -174,12 +174,11 @@ jest.mock('../services/dialogue/phase5Pool', () => ({
 
 import { useDialogueFlow, splitDialogueIntoPages } from '../hooks/useDialogueFlow';
 import { getCurrentDialogue, getCoordinatedEventLine } from '../services/animalDialogue';
-import { checkDialogueAvailability, recordDialogue } from '../services/dialogueSession';
+import { checkDialogueAvailability, recordDialogue, endSession } from '../services/dialogueSession';
 import { markDialogueRead } from '../services/amberCurrency';
 import { recordWhisper } from '../services/whisperGallery';
 import { setPhase5CaughtUp } from '../services/tending';
 import { getChoiceForAnimal, recordChoice } from '../services/dialogueChoices';
-import { endSession } from '../services/dialogueSession';
 
 const getCurrentDialogueMock = getCurrentDialogue as jest.Mock;
 const recordDialogueMock = recordDialogue as jest.Mock;
