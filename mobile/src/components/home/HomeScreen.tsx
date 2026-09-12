@@ -98,7 +98,8 @@ import {
   getReservedSpeedUpNeedAmberText,
   getReservedSpeedUpNotYetText,
   getLockedRoomReasonText,
-  getNextUnlockMeterText,
+  getDescentTrioNotReadyText,
+  isUnlockGateBlocked,
   getReserveGateText,
 } from '../../services/homeWorldData';
 import { RewardedAdButton } from '../monetization/RewardedAdButton';
@@ -2005,7 +2006,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // already paid at reserve time pinned the bar full and read "13252 / 450"
   // while the player was actually waiting on 84 solves. When a level gate (or a
   // live reservation) is what stands in the way, the meter counts solves; when
-  // the purse is what stands in the way, it counts amber, exactly as before.
+  // the purse is what stands in the way, it counts amber. The caption names
+  // what remains, and a story-held arrival never presents a misleading full bar.
   // A plain derivation, not a hook: this block sits after the loading-state
   // early return, where the surrounding theme reads (st / panelSt / pixelSkin)
   // are plain calls for the same reason.
@@ -2014,24 +2016,39 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     if (!unlock) return { percent: 0, label: '', a11y: '', max: 1, now: 0 };
     const gateBlocked = unlock.minPuzzles !== undefined && progress.puzzlesSolved < unlock.minPuzzles;
     const isReserved = unlockFlow.reservedUnlockId === unlock.id;
-    if (unlock.minPuzzles !== undefined && (gateBlocked || isReserved)) {
+    if (unlock.minPuzzles !== undefined && gateBlocked) {
       const max = unlock.minPuzzles;
       const now = Math.min(progress.puzzlesSolved, max);
+      const remaining = max - now;
+      const puzzlesLeft = `${remaining} ${remaining === 1 ? 'puzzle' : 'puzzles'} to go`;
       return {
         percent: Math.min(100, (progress.puzzlesSolved / max) * 100),
-        label: getNextUnlockMeterText(max, progress.puzzlesSolved),
-        a11y: `Level ${progress.puzzlesSolved} of ${max}`,
+        label: isReserved ? `Reserved · ${puzzlesLeft}` : `${puzzlesLeft} · ${unlock.cost} amber`,
+        a11y: `${puzzlesLeft}. ${isReserved ? 'Reserved and already paid for.' : `Costs ${unlock.cost} amber.`}`,
         max,
         now,
       };
     }
-    if (unlock.cost === 0) return { percent: 100, label: 'FREE', a11y: 'Free', max: 1, now: 1 };
+    if (isUnlockGateBlocked(unlock, progress)) {
+      return {
+        percent: null,
+        label: isReserved ? 'Reserved · Waiting for the house' : 'Waiting for the house',
+        a11y: `${isReserved ? 'Reserved and already paid for. ' : ''}${getDescentTrioNotReadyText()}`,
+        max: 1,
+        now: 0,
+      };
+    }
+    if (isReserved) return { percent: 100, label: 'Reserved · Arriving soon', a11y: 'Reserved and already paid for. Arriving soon.', max: 1, now: 1 };
+    const remainingAmber = Math.max(0, unlock.cost - progress.amber);
+    const readyAction = unlock.type === 'character' ? 'Ready to invite' : 'Ready to build';
+    const costLabel = unlock.cost === 0 ? 'Free' : `${unlock.cost} amber`;
+    const label = remainingAmber > 0 ? `${remainingAmber} more amber` : `${readyAction} · ${costLabel}`;
     return {
-      percent: Math.min(100, (progress.amber / unlock.cost) * 100),
-      label: `${progress.amber} / ${unlock.cost} amber`,
-      a11y: `${progress.amber} of ${unlock.cost} amber`,
-      max: unlock.cost,
-      now: Math.min(progress.amber, unlock.cost),
+      percent: unlock.cost === 0 ? 100 : Math.min(100, (progress.amber / unlock.cost) * 100),
+      label,
+      a11y: remainingAmber > 0 ? `${remainingAmber} more amber needed. ${progress.amber} of ${unlock.cost} amber saved.` : `${readyAction}. ${costLabel}.`,
+      max: unlock.cost || 1,
+      now: unlock.cost === 0 ? 1 : Math.min(progress.amber, unlock.cost),
     };
   })();
 
@@ -2232,6 +2249,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           {/* Next Unlock Progress Bar (hidden during early onboarding, shown during unlock_explained) */}
           {unlockFlow.nextUnlock && (!isOnboarding || onboardingStep === 'unlock_explained') && (
             <TouchableOpacity
+              testID="next-unlock-progress"
               style={styles.unlockProgressContainer}
               activeOpacity={0.85}
               onPress={() => {
@@ -2239,9 +2257,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 playUiSound('tap');
                 unlockFlow.setShowShop(true);
               }}
-              accessibilityLabel={`Next unlock. ${nextUnlockMeter.a11y}`}
+              accessibilityLabel={`Next: ${unlockFlow.nextUnlock.name}. ${nextUnlockMeter.a11y}`}
+              accessibilityHint="Opens unlock details and options"
               accessibilityRole="button"
-              accessibilityValue={{ min: 0, max: nextUnlockMeter.max, now: nextUnlockMeter.now }}
+              accessibilityValue={nextUnlockMeter.percent === null ? undefined : { min: 0, max: nextUnlockMeter.max, now: nextUnlockMeter.now }}
             >
               {/* Wooden sign — cottage card frame over the outdoor world. */}
               <NineSliceFrame
@@ -2252,9 +2271,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               />
               <View style={styles.unlockProgressInner}>
                 <Text style={[styles.unlockProgressLabel, { color: st.title }]}>
-                  Next Unlock
+                  Next: {unlockFlow.nextUnlock.name}
                 </Text>
-                <View style={[styles.unlockProgressBarBg, { backgroundColor: st.amberTint, borderColor: st.amberTintBorder }]}>
+                <Text style={[styles.unlockProgressText, { color: st.body }]}>
+                  {nextUnlockMeter.label}
+                </Text>
+                {nextUnlockMeter.percent !== null && <View style={[styles.unlockProgressBarBg, { backgroundColor: st.amberTint, borderColor: st.amberTintBorder }]}>
                   <View
                     style={[
                       styles.unlockProgressBarFill,
@@ -2262,10 +2284,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       { width: `${nextUnlockMeter.percent}%` },
                     ]}
                   />
-                </View>
-                <Text style={[styles.unlockProgressText, { color: st.body }]}>
-                  {nextUnlockMeter.label}
-                </Text>
+                </View>}
               </View>
             </TouchableOpacity>
           )}
@@ -4193,21 +4212,18 @@ const createStyles = (SCREEN_WIDTH: number, SCREEN_HEIGHT: number, fontScale: nu
     elevation: 4,
   },
   unlockProgressInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 8,
+    alignItems: 'stretch',
+    gap: 6,
   },
   unlockProgressLabel: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: FONT_SIZE.small,
+    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '800',
     letterSpacing: 0.5,
-    flex: 1,
   },
   unlockProgressText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: FONT_SIZE.caption,
+    fontSize: FONT_SIZE.small,
     fontWeight: '800',
     letterSpacing: 0.3,
   },
@@ -4217,7 +4233,6 @@ const createStyles = (SCREEN_WIDTH: number, SCREEN_HEIGHT: number, fontScale: nu
     // unfilled meter is an unbounded tinted strip with no readable extent, and
     // the old pillBg-on-sectionBorder pair sat at 1.14-1.27:1 through phase 3,
     // so a full bar and an empty bar were the same picture.
-    flex: 2,
     height: 10,
     borderWidth: 1,
     overflow: 'hidden',
