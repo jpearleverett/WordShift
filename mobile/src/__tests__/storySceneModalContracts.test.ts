@@ -62,7 +62,7 @@ describe('StorySceneModal saving affordance is delayed, never per-page', () => {
 
   it('keeps double-tap protection on the busy ref for every write path', () => {
     expect(runBlock).toContain('if (busy.current) return;');
-    expect(flat).toMatch(/const close = \(\) => \{ if \(!busy\.current\) onClose\(\); \};/);
+    expect(flat).toContain('const close = () => { void run(onClose); };');
     // Previous page is a pure local re-read; it used to be disabled during the
     // write and must stay inert during one, or a fast tap could flash the
     // previous page under a landing save.

@@ -1,5 +1,5 @@
 import { useStoryFlow } from '../hooks/useStoryFlow';
-import { StoryContext, StoryMemory, advanceStoryPage, chooseStoryOption, openStoryScene } from '../services/storySpine';
+import { StoryContext, StoryMemory, advanceStoryPage, chooseStoryOption, deferStoryScene, openStoryScene } from '../services/storySpine';
 import { logStoryEvent } from '../services/storyTelemetry';
 jest.mock('../services/storyTelemetry', () => ({ logStoryEvent: jest.fn() }));
 
@@ -33,12 +33,14 @@ jest.mock('react', () => ({
 jest.mock('../services/storySpine', () => ({
   advanceStoryPage: jest.fn(),
   chooseStoryOption: jest.fn(),
+  deferStoryScene: jest.fn(),
   openStoryScene: jest.fn(),
 }));
 
 const openMock = openStoryScene as jest.Mock;
 const advanceMock = advanceStoryPage as jest.Mock;
 const chooseMock = chooseStoryOption as jest.Mock;
+const deferMock = deferStoryScene as jest.Mock;
 const context: StoryContext = {
   phase: 0, puzzlesSolved: 6, cycleCount: 0, unlockedAnimals: ['fox'],
 };
@@ -83,6 +85,7 @@ beforeEach(() => {
   jest.resetAllMocks();
   getContext = jest.fn(async () => context);
   openMock.mockResolvedValue({ memory, state: { memories: { cup: memory } } });
+  deferMock.mockResolvedValue({ memories: { cup: memory } });
 });
 
 describe('useStoryFlow delivery and cancellation', () => {
@@ -113,8 +116,8 @@ describe('useStoryFlow delivery and cancellation', () => {
     hook = render();
     expect(hook.active?.memory.scene.id).toBe('cup');
     expect(action).not.toHaveBeenCalled();
-    hook.close();
-    hook.close();
+    await Promise.all([hook.close(), hook.close()]);
+    expect(deferMock).toHaveBeenCalledTimes(1);
     expect(action).toHaveBeenCalledTimes(1);
     expect((logStoryEvent as jest.Mock).mock.calls.filter(call => call[0] === 'story_deferred')).toHaveLength(1);
     expect(render().active).toBeNull();
@@ -125,7 +128,8 @@ describe('useStoryFlow delivery and cancellation', () => {
     await hook.prepare();
     hook.run(() => {});
     hook = render();
-    hook.close();
+    await hook.close();
+    expect(deferMock).toHaveBeenCalledWith(context, 'cup');
     expect(advanceMock).not.toHaveBeenCalled();
     expect(chooseMock).not.toHaveBeenCalled();
     expect(memory.page).toBe(0);
@@ -184,10 +188,59 @@ describe('useStoryFlow delivery and cancellation', () => {
     expect(hook.active).not.toBeNull();
     hook.reset();
     hook = render();
-    hook.close();
+    await hook.close();
     expect(action).not.toHaveBeenCalled();
     expect(render().active).toBeNull();
   });
+});
+
+it('a failed deferral keeps both the conversation and its destination available for retry', async () => {
+  const action = jest.fn();
+  let hook = render();
+  await hook.prepare();
+  hook.run(action);
+  hook = render();
+  deferMock.mockRejectedValueOnce(new Error('Storage unavailable'));
+  await expect(hook.close()).rejects.toThrow('Storage unavailable');
+  expect(render().active?.memory.page).toBe(0);
+  expect(action).not.toHaveBeenCalled();
+  await render().close();
+  expect(action).toHaveBeenCalledTimes(1);
+});
+
+it('finishing a memory runs its destination without treating completion as deferral', async () => {
+  const action = jest.fn();
+  let hook = render();
+  await hook.prepare();
+  hook.run(action);
+  hook = render();
+  advanceMock.mockResolvedValue({ memories: { cup: { ...memory, completed: true } } });
+  await hook.advance();
+  expect(action).toHaveBeenCalledTimes(1);
+  expect(deferMock).not.toHaveBeenCalled();
+  expect(render().active).toBeNull();
+});
+
+it('a selected journal memory is explicitly resumed instead of reopening a different due scene', async () => {
+  await render().resume('cup');
+  expect(openMock).toHaveBeenCalledWith(context, 'cup');
+  expect(render().active?.memory.scene.id).toBe('cup');
+});
+
+it('reset during a deferral write cannot run navigation from the previous cycle', async () => {
+  const saved = deferred<unknown>();
+  deferMock.mockReturnValue(saved.promise);
+  const action = jest.fn();
+  let hook = render();
+  await hook.prepare();
+  hook.run(action);
+  hook = render();
+  const closing = hook.close();
+  hook.reset();
+  saved.resolve({});
+  await closing;
+  expect(action).not.toHaveBeenCalled();
+  expect(render().active).toBeNull();
 });
 
 it('reset during context loading prevents an old conversation write', async () => {

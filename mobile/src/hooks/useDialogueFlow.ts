@@ -60,6 +60,7 @@ import { takeOfferingDialogue } from '../services/offeringRequests';
 import { getSettingsSync } from '../services/settings';
 import {
   getChoiceForAnimal,
+  hasPendingDialogueChoice,
   recordChoice,
   PlayerChoice,
   DialogueChoice,
@@ -462,6 +463,8 @@ export function useDialogueFlow({
   // Recorded Phase 3 choices (loaded once; refreshed when a choice is made) —
   // used synchronously by the Phase 5 post-revelation dialogue cycle.
   const [playerChoices, setPlayerChoices] = useState<Record<string, PlayerChoice>>({});
+  const [answeredAnimals, setAnsweredAnimals] = useState<string[]>([]);
+  const choiceSubmissionRef = useRef(false);
 
   // Tending Shrine (Phase 5 endgame) state, loaded synchronously into the hook so
   // the Phase-5 dialogue selection + honest "new dialogue" badge can read it
@@ -491,6 +494,7 @@ export function useDialogueFlow({
       .then(([choices, tending, cursors]) => {
         if (cancelled) return;
         setPlayerChoices(choices.choices ?? {});
+        setAnsweredAnimals(choices.offeredBy ?? Object.keys(choices.choices ?? {}));
         setTendingLevel(tending.level);
         setTendingCaughtUp({ ...tending.caughtUp });
         setPhase2Cursors(cursors);
@@ -951,6 +955,8 @@ export function useDialogueFlow({
     resetPageQueue();
     setChoiceOpen(false);
     setChoiceEcho(null);
+    setActiveChoice(null);
+    choiceSubmissionRef.current = false;
 
     // Build pre-dialogue pages: these show as sequential conversation pages
     // before the regular dialogue, creating natural conversational flow.
@@ -965,6 +971,28 @@ export function useDialogueFlow({
     const flavorPhase = progress
       ? getFlavorPhase(animal, animalPhase as DialoguePhase, getUnlockedTypes())
       : 0;
+
+    // A due relationship choice leads the visit, ahead of optional atmosphere.
+    // A relationship choice follows the reader into the reveal, including
+    // late recruits whose introduction starts directly on Phase-4 material.
+    // Never offer it after arrival or recall a branch the player did not choose.
+    if (animalPhase === 3 || animalPhase === 4) {
+      try {
+        const choice = await getChoiceForAnimal(
+          animal.type,
+          animalPhase,
+          animal.currentDialogueIndex
+        );
+        if (choice) {
+          // Show the choice prompt as a pre-dialogue page
+          pages.push({ text: choice.prompt });
+          setActiveChoice(choice);
+        }
+      } catch {
+        // Choice points are non-critical
+      }
+    }
+
 
     // 1. Tutorial callback for Fox at exact global/effective Phase 4. Requiring
     // both excludes vanguard Phase 4 at global Phase 3 and every Phase 5 visit.
@@ -1209,25 +1237,6 @@ export function useDialogueFlow({
       }
     }
 
-    // 8. A relationship choice follows the reader into the reveal, including
-    // late recruits whose introduction starts directly on Phase-4 material.
-    // Never offer it after arrival or recall a branch the player did not choose.
-    if (animalPhase === 3 || animalPhase === 4) {
-      try {
-        const choice = await getChoiceForAnimal(
-          animal.type,
-          animalPhase,
-          animal.currentDialogueIndex
-        );
-        if (choice) {
-          // Show the choice prompt as a pre-dialogue page
-          pages.push({ text: choice.prompt });
-          setActiveChoice(choice);
-        }
-      } catch {
-        // Choice points are non-critical
-      }
-    }
 
     setPreDialoguePages(pages);
     // The modal opens on page 0, so page 0 is visible from this moment: commit
@@ -1279,8 +1288,10 @@ export function useDialogueFlow({
       // pool still has undelivered (genuinely new) lines.
       return phase2PoolHasNew(animal.type, phase2Cursors[animal.type] ?? 0);
     }
-    return resolved < totalDialogues;
-  }, [progress, tendingLevel, tendingCaughtUp, playerChoices, phase2Cursors, getUnlockedTypes]);
+    return resolved < totalDialogues || hasPendingDialogueChoice(
+      animal.type, animalPhase, resolved, answeredAnimals
+    );
+  }, [progress, tendingLevel, tendingCaughtUp, playerChoices, answeredAnimals, phase2Cursors, getUnlockedTypes]);
 
   // Handle closing dialogue. Manual closes keep the session warm so
   // checking in with an animal never feels punitive.
@@ -1343,6 +1354,7 @@ export function useDialogueFlow({
     setSelectedAnimal(null);
     setSessionInfo(null);
     setPreDialoguePages([]);
+    setActiveChoice(null);
     setChoiceOpen(false);
     setChoiceEcho(null);
     // Closing mid-pages behaves exactly like closing mid-line: nothing extra
@@ -1440,6 +1452,13 @@ export function useDialogueFlow({
       // The echoed pick belongs to the reply page only.
       setChoiceEcho(null);
       const nextHead = preDialoguePages[1];
+      // A choice reached on the session's last regular line is still answered
+      // in this visit. Its reply/convergence finish before the session closes.
+      const remaining = getSessionStatus(selectedAnimal.id, getSessionBonus(selectedAnimal)).dialoguesRemaining;
+      if (!nextHead && remaining !== undefined && remaining <= 0) {
+        await closeDialogue(true);
+        return;
+      }
       setPreDialoguePages(prev => prev.slice(1));
       // The next page is now the visible one — commit its bookkeeping here
       // (see PreDialoguePage): never at build time, never on advancing PAST it.
@@ -1572,6 +1591,22 @@ export function useDialogueFlow({
       }
       // The "!" badge is lit only when undelivered lines remain AND the animal is
       // available to talk (not resting on cooldown) — mirrors getAnimalsWithStatus.
+      // Crossing the eligibility threshold is enough: do not require the
+      // player to close, solve another puzzle, and reopen the animal first.
+      let pendingChoice: DialogueChoice | null = null;
+      if (!activeChoice && (animalPhase === 3 || animalPhase === 4)) {
+        try {
+          pendingChoice = await getChoiceForAnimal(selectedAnimal.type, animalPhase, newIndex);
+        } catch {}
+      }
+      if (pendingChoice) {
+        setActiveChoice(pendingChoice);
+        setChoiceOpen(false);
+        setChoiceEcho(null);
+        choiceSubmissionRef.current = false;
+        setPreDialoguePages([{ text: pendingChoice.prompt }]);
+      }
+      hasUndeliveredLines = hasUndeliveredLines || Boolean(pendingChoice);
       const hasNewDialogue = !isOnCooldown(selectedAnimal.id) && hasUndeliveredLines;
 
       setAnimals(prev =>
@@ -1585,7 +1620,7 @@ export function useDialogueFlow({
         prev ? { ...prev, currentDialogueIndex: newIndex } : null
       );
 
-      if (status.dialoguesRemaining !== undefined && status.dialoguesRemaining <= 0) {
+      if (!pendingChoice && status.dialoguesRemaining !== undefined && status.dialoguesRemaining <= 0) {
         const animalId = selectedAnimal.id;
         const animalName = selectedAnimal.name;
         await closeDialogue(true);
@@ -1631,17 +1666,20 @@ export function useDialogueFlow({
 
   // Handle player choosing a dialogue option (Phase 3 choice points)
   const handleDialogueChoice = useCallback(async (choice: PlayerChoice) => {
-    if (!selectedAnimal || !activeChoice) return;
+    if (!selectedAnimal || !activeChoice || choiceSubmissionRef.current) return;
+    choiceSubmissionRef.current = true;
     hapticSelection();
     try {
       const result = await recordChoice(selectedAnimal.type, choice);
-      setPlayerChoices(prev => ({ ...prev, [selectedAnimal.type]: choice }));
+      const accepted = result.choice ?? choice;
+      setPlayerChoices(prev => ({ ...prev, [selectedAnimal.type]: accepted }));
+      setAnsweredAnimals(prev => prev.includes(selectedAnimal.type) ? prev : [...prev, selectedAnimal.type]);
       // Replace the current pre-dialogue page with the response, then convergence
       resetPageQueue();
-      setPreDialoguePages([{ text: result.response }, { text: result.convergence }]);
+      setPreDialoguePages(prev => [{ text: result.response }, { text: result.convergence }, ...prev.slice(1)]);
       // The card turns back: the pick stays on it, dimmed, above the reply.
       setChoiceOpen(false);
-      setChoiceEcho(activeChoice.options[choice]);
+      setChoiceEcho(activeChoice.options[accepted]);
       setActiveChoice(null);
 
       // Record the choice response in the whisper gallery. Kept (as its own
@@ -1655,9 +1693,8 @@ export function useDialogueFlow({
         type: 'choice',
       }).catch(() => {});
     } catch {
-      // Choice handling is non-critical, just close the choice
-      setChoiceOpen(false);
-      setActiveChoice(null);
+      // Keep the unanswered page available if persistence fails.
+      choiceSubmissionRef.current = false;
     }
   }, [selectedAnimal, activeChoice, resetPageQueue]);
 
@@ -1686,3 +1723,4 @@ export function useDialogueFlow({
     handleVisitNextAnimal,
   };
 }
+

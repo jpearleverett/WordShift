@@ -136,6 +136,7 @@ jest.mock('../services/offeringRequests', () => ({
 }));
 
 jest.mock('../services/dialogueChoices', () => ({
+  hasPendingDialogueChoice: jest.requireActual('../services/dialogueChoices').hasPendingDialogueChoice,
   getChoiceForAnimal: jest.fn(async () => null),
   recordChoice: jest.fn(async () => ({ response: 'response', convergence: 'convergence' })),
   loadChoiceState: jest.fn(async () => ({ choices: {} })),
@@ -419,5 +420,27 @@ describe('useDialogueFlow visit-next-friend chain', () => {
     expect(checkDialogueAvailabilityMock).not.toHaveBeenCalled();
     expect(hook.selectedAnimal?.id).toBe('pangolin');
     expect(hook.showDialogue).toBe(true);
+  });
+});
+
+
+
+describe('choice-only conversation news', () => {
+  it('offers a friend with an unanswered reveal choice after all regular lines are read', async () => {
+    resetHookState();
+    jest.clearAllMocks();
+    isOnCooldownMock.mockReturnValue(false);
+    getSessionStatusMock.mockReturnValue({ status: 'in_session', dialoguesRemaining: 5 });
+    const revealProgress = { ...progress, currentPhase: 4 };
+    const renderReveal = () => {
+      rewindHookIndices();
+      // eslint-disable-next-line react-hooks/rules-of-hooks
+      return useDialogueFlow({ progress: revealProgress as never, setAnimals: setAnimals as never });
+    };
+    animals = [{ ...pangolin }, { ...fox, currentDialogueIndex: 134 }];
+    let hook = renderReveal();
+    await hook.handleAnimalTap(pangolin as never);
+    hook = renderReveal();
+    expect(hook.getNextAnimalWithNews(animals as never)?.id).toBe('fox');
   });
 });

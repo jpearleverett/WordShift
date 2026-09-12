@@ -6,7 +6,7 @@ import { getTotalDialogueCount } from './animalDialogue';
 import { isOnCooldown } from './dialogueSession';
 import { logEvent } from './eventLogger';
 import { loadTendingState, hasNewPhase5Line } from './tending';
-import { loadChoiceState } from './dialogueChoices';
+import { loadChoiceState, hasPendingDialogueChoice } from './dialogueChoices';
 import { buildPhase5Pool, buildPhase5Eligibility } from './dialogue/phase5Pool';
 import { UNLOCK_SKIP_PREMIUM, PHASE_THRESHOLDS } from '../constants/gameBalance';
 
@@ -1521,13 +1521,15 @@ export async function getAnimalsWithStatus(): Promise<Animal[]> {
   const progress = await loadProgress();
 
   // Phase-5 endgame: the honest "new dialogue" badge needs the Tending Shrine
-  // state + recorded choices. Post-revelation only: getAnimalPhase hard-caps
+  // state + recorded choices. The tending state is post-revelation only:
+  // getAnimalPhase hard-caps
   // every animal at 4 until the global phase is 5 (the awareness tiers stagger
   // the descent, never the arrival), so no animal can resolve to phase 5 before
-  // then. Loaded once, not per animal.
+  // then. Choices also light unanswered conversation badges from global
+  // phase 2 (the first vanguard opportunity). Loaded once, not per animal.
   const nearEndgame = progress.currentPhase >= 5;
   const tendingState = nearEndgame ? await loadTendingState() : null;
-  const choiceState = nearEndgame ? await loadChoiceState() : null;
+  const choiceState = progress.currentPhase >= 2 ? await loadChoiceState() : null;
   // Phase-2 exhaustion pool: badge honesty for animals whose base block is
   // done but who still have undelivered pool lines. Loaded once, not per animal.
   const phase2Cursors = progress.currentPhase >= 1 && progress.currentPhase <= 3
@@ -1584,7 +1586,9 @@ export async function getAnimalsWithStatus(): Promise<Animal[]> {
         // lit for an animal whose only remaining lines are all blocked.
         const totalDialogues = getTotalDialogueCount(animal.type, animalPhase);
         const resolvedIndex = resolveDialogueIndex(animal.type, dialogueIndex, animalPhase, unlockedTypes);
-        hasNewDialogue = resolvedIndex < totalDialogues;
+        hasNewDialogue = resolvedIndex < totalDialogues || hasPendingDialogueChoice(
+          animal.type, animalPhase, resolvedIndex, choiceState?.offeredBy ?? []
+        );
       }
     }
 
@@ -1658,3 +1662,4 @@ export const ANIMAL_EMOJIS: Record<AnimalType, string> = {
   aye_aye: '🐒',
   kakapo: '🦜',
 };
+

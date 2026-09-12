@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  advanceStoryPage, chooseStoryOption, openStoryScene,
-  StoryContext, StoryMemory,
+  advanceStoryPage, chooseStoryOption, deferStoryScene, openStoryScene,
+  StoryContext, StoryMemory, StorySceneId,
 } from '../services/storySpine';
 import { logStoryEvent } from '../services/storyTelemetry';
 
@@ -17,15 +17,15 @@ export function useStoryFlow(getContext: () => Promise<StoryContext>, enabled: b
   const journalRequest = useRef(0);
   const readingStarted = useRef<number | null>(null);
 
-  const prepare = useCallback(async (): Promise<boolean> => {
+  const prepare = useCallback(async (requestedId?: StorySceneId): Promise<boolean> => {
     if (!enabled) return false;
     if (preparing.current) return preparing.current;
-    if (prepared.current) return true;
+    if (prepared.current && (requestedId === undefined || prepared.current.memory.scene.id === requestedId)) return true;
     const started = epoch.current;
     const request = (async () => {
       const context = await getContext();
       if (started !== epoch.current) return false;
-      const result = await openStoryScene(context);
+      const result = requestedId === undefined ? await openStoryScene(context) : await openStoryScene(context, requestedId);
       if (started !== epoch.current) return false;
       prepared.current = result ? { context, memory: result.memory } : null;
       return !!result;
@@ -43,7 +43,7 @@ export function useStoryFlow(getContext: () => Promise<StoryContext>, enabled: b
     setActive(pending);
   }, []);
 
-  const close = useCallback(() => {
+  const dismiss = useCallback(() => {
     if (operation.current) return;
     const action = exitAction.current;
     if (readingStarted.current !== null && prepared.current) {
@@ -56,6 +56,19 @@ export function useStoryFlow(getContext: () => Promise<StoryContext>, enabled: b
     setActive(null);
     action?.();
   }, []);
+
+  const close = useCallback(async () => {
+    const pending = prepared.current;
+    if (!pending || operation.current) return;
+    operation.current = true;
+    const started = epoch.current;
+    try {
+      await deferStoryScene(pending.context, pending.memory.scene.id);
+      if (started !== epoch.current) return;
+      operation.current = false;
+      dismiss();
+    } finally { if (started === epoch.current) operation.current = false; }
+  }, [dismiss]);
 
   const save = useCallback(async (choice?: string) => {
     if (!active || operation.current) return;
@@ -75,14 +88,14 @@ export function useStoryFlow(getContext: () => Promise<StoryContext>, enabled: b
           { elapsedMs: Math.max(0, Date.now() - (readingStarted.current ?? Date.now())) });
         readingStarted.current = null;
         operation.current = false;
-        close();
+        dismiss();
       } else if (memory) {
         const next = { context: active.context, memory };
         prepared.current = next;
         setActive(next);
       }
     } finally { if (started === epoch.current) operation.current = false; }
-  }, [active, close]);
+  }, [active, dismiss]);
 
   const openJournal = useCallback(async () => {
     const started = epoch.current;
@@ -94,9 +107,9 @@ export function useStoryFlow(getContext: () => Promise<StoryContext>, enabled: b
     journalRequest.current += 1;
     setJournalContext(null);
   }, []);
-  const resume = useCallback(async () => {
+  const resume = useCallback(async (id?: StorySceneId) => {
     setJournalContext(null);
-    if (await prepare()) {
+    if (await prepare(id)) {
       if (prepared.current) logStoryEvent('story_resumed', prepared.current.context, prepared.current.memory);
       run(() => {});
     }

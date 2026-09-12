@@ -217,9 +217,12 @@ export const ANIMAL_CHOICES: Record<string, DialogueChoice> = {
 // ============================================================================
 
 let choiceCache: ChoiceState | null = null;
+let choiceWriteQueue: Promise<unknown> = Promise.resolve();
+let choiceGeneration = 0;
 
 /** Drop the in-memory cache after an external storage write (cloud restore). */
 export function invalidateChoiceCache(): void {
+  choiceGeneration++;
   choiceCache = null;
 }
 
@@ -241,14 +244,17 @@ function getDefaultState(): ChoiceState {
  */
 export async function loadChoiceState(): Promise<ChoiceState> {
   if (choiceCache) return choiceCache;
+  const generation = choiceGeneration;
   try {
     const stored = await AsyncStorage.getItem(STORAGE_KEY);
+    if (generation !== choiceGeneration) return loadChoiceState();
     if (stored) {
-      choiceCache = JSON.parse(stored);
+      choiceCache = choiceCache ?? JSON.parse(stored);
       return choiceCache!;
     }
   } catch {}
-  choiceCache = getDefaultState();
+  if (generation !== choiceGeneration) return loadChoiceState();
+  choiceCache = choiceCache ?? getDefaultState();
   return choiceCache;
 }
 
@@ -262,25 +268,36 @@ const CHOICE_MIN_PHASE3_OFFSET = 2;
  * window, makes the conversation once-only. Arrival ends this opportunity;
  * later callbacks must never manufacture a choice the player did not make.
  */
+export function hasPendingDialogueChoice(
+  animalType: string,
+  animalPhase: number,
+  dialogueIndex: number,
+  answeredAnimals: readonly string[]
+): boolean {
+  const choice = ANIMAL_CHOICES[animalType];
+  if (!choice || (animalPhase !== 3 && animalPhase !== 4)) return false;
+
+  const type = animalType as AnimalType;
+  const start = getPhaseStartIndex(type, 3);
+  const revealStart = getPhaseStartIndex(type, 4);
+  if (dialogueIndex < start + CHOICE_MIN_PHASE3_OFFSET) return false;
+  // At phase 3 the reader must still be in that phase's block. At phase 4,
+  // recruits such as Vesper begin at revealStart and need the choice here.
+  if (animalPhase === 3 && dialogueIndex >= revealStart) return false;
+
+  return !answeredAnimals.includes(animalType);
+}
+
+/** Peek at the same pending choice that lights the home news badge. */
 export async function getChoiceForAnimal(
   animalType: string,
   animalPhase: number,
   dialogueIndex: number
 ): Promise<DialogueChoice | null> {
-  const choice = ANIMAL_CHOICES[animalType];
-  if (!choice || (animalPhase !== 3 && animalPhase !== 4)) return null;
-
-  const type = animalType as AnimalType;
-  const start = getPhaseStartIndex(type, 3);
-  const revealStart = getPhaseStartIndex(type, 4);
-  if (dialogueIndex < start + CHOICE_MIN_PHASE3_OFFSET) return null;
-  // At phase 3 the reader must still be in that phase's block. At phase 4,
-  // recruits such as Vesper begin at revealStart and need the choice here.
-  if (animalPhase === 3 && dialogueIndex >= revealStart) return null;
-
   const state = await loadChoiceState();
-  if (state.offeredBy.includes(animalType)) return null;
-  return choice;
+  return hasPendingDialogueChoice(animalType, animalPhase, dialogueIndex, state.offeredBy)
+    ? ANIMAL_CHOICES[animalType]
+    : null;
 }
 
 /**
@@ -289,19 +306,30 @@ export async function getChoiceForAnimal(
 export async function recordChoice(
   animalType: string,
   choice: PlayerChoice
-): Promise<{ response: string; convergence: string }> {
-  const state = await loadChoiceState();
-  state.offeredBy.push(animalType);
-  state.choices[animalType] = choice;
-  state.hasSeenChoice = true;
-
-  await saveChoiceState(state);
-
-  const content = ANIMAL_CHOICES[animalType];
-  return {
-    response: content.responses[choice],
-    convergence: content.convergence,
-  };
+): Promise<{ choice: PlayerChoice; response: string; convergence: string }> {
+  return queueChoiceWrite(async generation => {
+    const state = await loadChoiceState();
+    assertChoiceGeneration(generation);
+    const content = ANIMAL_CHOICES[animalType];
+    // A second answer tap must return the first branch, never rewrite it or
+    // count the same animal twice. The accepted branch becomes visible in
+    // memory only after its complete state has been durably written.
+    const recorded = state.choices[animalType];
+    if (!recorded) {
+      await saveChoiceState({
+        ...state,
+        offeredBy: state.offeredBy.includes(animalType) ? [...state.offeredBy] : [...state.offeredBy, animalType],
+        choices: { ...state.choices, [animalType]: choice },
+        hasSeenChoice: true,
+      }, generation);
+    }
+    const accepted = recorded ?? choice;
+    return {
+      choice: accepted,
+      response: content.responses[accepted],
+      convergence: content.convergence,
+    };
+  });
 }
 
 /**
@@ -401,11 +429,27 @@ export function getPhase4ChoiceCallback(
 // Internal
 // ============================================================================
 
-async function saveChoiceState(state: ChoiceState): Promise<void> {
+function assertChoiceGeneration(generation: number): void {
+  if (generation !== choiceGeneration) throw new Error('Choice state changed before the answer was saved.');
+}
+
+/** All writes to this one storage key share an order, including callbacks. */
+function queueChoiceWrite<T>(write: (generation: number) => Promise<T>): Promise<T> {
+  const generation = choiceGeneration;
+  const operation = choiceWriteQueue.then(() => {
+    assertChoiceGeneration(generation);
+    return write(generation);
+  });
+  choiceWriteQueue = operation.catch(() => undefined);
+  return operation;
+}
+
+async function saveChoiceState(state: ChoiceState, generation: number): Promise<void> {
+  assertChoiceGeneration(generation);
+  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  // A reset/restore must not publish this old state back into the cache.
+  assertChoiceGeneration(generation);
   choiceCache = state;
-  try {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch {}
 }
 
 /**
@@ -440,11 +484,13 @@ export async function getPhase4CallbackPage(
  * when the page becomes visible, not when it is built. Idempotent.
  */
 export async function markPhase4CallbackShown(animalType: string): Promise<void> {
-  const state = await loadChoiceState();
-  const shown = state.phase4CallbackShown ?? [];
-  if (shown.includes(animalType)) return;
-  state.phase4CallbackShown = [...shown, animalType];
-  await saveChoiceState(state);
+  return queueChoiceWrite(async generation => {
+    const state = await loadChoiceState();
+    assertChoiceGeneration(generation);
+    const shown = state.phase4CallbackShown ?? [];
+    if (shown.includes(animalType)) return;
+    await saveChoiceState({ ...state, phase4CallbackShown: [...shown, animalType] }, generation);
+  });
 }
 
 /**
@@ -517,8 +563,14 @@ export function getPhase5ChoiceCallback(
 }
 
 export async function clearChoiceState(): Promise<void> {
-  choiceCache = null;
-  try {
+  invalidateChoiceCache();
+  // Cancel queued old answers, finish any write already in flight, then
+  // remove the key. A later answer queues behind this removal.
+  const operation = choiceWriteQueue.then(async () => {
     await AsyncStorage.removeItem(STORAGE_KEY);
-  } catch {}
+    choiceCache = null;
+  });
+  choiceWriteQueue = operation.catch(() => undefined);
+  await operation;
 }
+
