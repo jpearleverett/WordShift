@@ -117,8 +117,8 @@ async function openVictoryIntroCohort(page: Page, phaseThree = false) {
 }
 
 async function deferVictoryStory(page: Page) {
-  // The real cup conversation was deferred by openReturningBoard; it remains
-  // eligible at each deliberate Play/victory exit throughout these journeys.
+  // Use only when this cohort has a newly due scene or a three-puzzle retry.
+  // Keep this mandatory: a lost story/victory handoff must fail the journey.
   await page.getByText('Come back to this', { exact: true }).click();
   await expect(page.getByText('Come back to this', { exact: true })).toHaveCount(0);
 }
@@ -248,12 +248,30 @@ test('an interrupted mode introduction is offered after the next win beyond its 
   await page.getByRole('button', { name: 'Next level', exact: true }).click();
   await expect(page.getByLabel('Results', { exact: true })).toHaveCount(0);
   await acknowledgeVictoryIntro(page, true);
-  await deferVictoryStory(page);
   await expect(page.getByRole('button', { name: 'How to play', exact: true })).toBeVisible();
+  // Plum was deferred at 24 and cup at 25. Neither is due again at 26;
+  // finishing the mode introduction must release the next board directly.
+  await expect(page.getByText('Come back to this', { exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => {
+    const memories = JSON.parse(localStorage.getItem('wordshift_story_spine')!).memories;
+    return { plum: memories.plum.deferredAtPuzzle, cup: memories.cup.deferredAtPuzzle };
+  })).toEqual({ plum: 24, cup: 25 });
   await expect.poll(() => page.evaluate(() => {
     const progress = JSON.parse(localStorage.getItem('wordshift_home_progress')!);
     return { solved: progress.puzzlesSolved, seen: progress.seenVariantTutorials, pending: progress.pendingVariantTutorials };
   })).toEqual({ solved: 26, seen: ['reverse', 'double_shift'], pending: [] });
+  // A third real win makes the older scene due. The acknowledged mode intro
+  // stays closed while the deferred story resumes at its saved page.
+  await solveSavedStandardBoard(page);
+  await page.getByRole('button', { name: 'Next level', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'What the warmth keeps', exact: true })).toBeVisible();
+  await expect(page.getByTestId('post-victory-intro')).toHaveCount(0);
+  expect(await page.evaluate(() => {
+    const memory = JSON.parse(localStorage.getItem('wordshift_story_spine')!).memories.plum;
+    return { deferred: memory.deferredAtPuzzle ?? null, page: memory.page, completed: memory.completed };
+  })).toEqual({ deferred: null, page: 0, completed: false });
+  await deferVictoryStory(page);
+  await expect(page.getByRole('button', { name: 'How to play', exact: true })).toBeVisible();
 });
 
 test('fresh board has a visible help icon and scrollable rules at a small viewport', async ({ page }) => {
@@ -283,11 +301,14 @@ test('repeating disclosed advice spends one hint and survives reload', async ({ 
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('wordshift_in_progress_puzzle') || '{}').hintDisclosures?.length ?? 0)).toBeGreaterThan(0);
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Play puzzle', exact: true }).click();
-  // The deferred scene may be offered again at this deliberate new Play tap.
-  const defer = page.getByText('Come back to this', { exact: true });
-  await expect(defer).toBeVisible();
-  await defer.click();
+  // A reload and Play tap do not count as solved puzzles. The persisted
+  // deferral keeps this hint journey on its board instead of reopening cup.
   await expect(hint).toBeVisible();
+  await expect(page.getByText('Come back to this', { exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => {
+    const memory = JSON.parse(localStorage.getItem('wordshift_story_spine')!).memories.cup;
+    return { deferred: memory.deferredAtPuzzle, page: memory.page, choice: memory.choice ?? null };
+  })).toEqual({ deferred: 6, page: 0, choice: null });
   await hint.click();
   await expect(hint).toHaveAttribute('aria-label', 'Hint, 4 remaining');
 });
@@ -523,7 +544,20 @@ for (const [letter, finalWord, boundary] of [['D', 'CLOSED', 'remember'], ['R', 
 test('an interrupted story resumes its saved page and commits the chosen memory once', async ({ page }) => {
   await openReturningBoard(page);
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.getByRole('button', { name: 'Play puzzle', exact: true }).click();
+  // Explicit deferral survives relaunch. The selected journal memory can
+  // still resume immediately, without waiting for three more puzzles.
+  await page.getByRole('button', { name: /^Open journal/ }).click();
+  await page.getByRole('button', { name: 'Things We Kept', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Things We Kept', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Continue the conversation', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: /^A place at the table/ }).click();
+  const resume = page.getByRole('button', { name: 'Continue the conversation', exact: true });
+  await resume.scrollIntoViewIfNeeded();
+  await expect(resume).toBeInViewport();
+  await resume.click();
+  await expect.poll(() => page.evaluate(() =>
+    JSON.parse(localStorage.getItem('wordshift_story_spine')!).memories.cup.deferredAtPuzzle ?? null,
+  )).toBeNull();
   await expect(page.getByRole('heading', { name: 'A place at the table', exact: true })).toBeVisible();
   await page.setViewportSize({ width: 320, height: 568 });
   await enlargeBrowserText(page);
