@@ -3,7 +3,7 @@ import { AppText } from './ui/AppText';
 import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { StoryContext, StoryMemory, StoryState, STORY_COPY, loadStoryState, selectStoryScene } from '../services/storySpine';
+import { StoryContext, StoryMemory, StorySceneId, StoryState, STORY_COPY, canResumeStoryScene, loadStoryState, selectStoryScene } from '../services/storySpine';
 import { StoryArchiveChapter, getStoryArchiveChapterLines, getStoryArchiveChapterSummary, getStoryArchiveChapters, getStorySpeakerName, getVisibleStoryMemoryLines } from '../services/storyArchive';
 import { getSettingsSync } from '../services/settings';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
@@ -12,7 +12,7 @@ import { PanelCard } from './ui/PanelCard';
 import { CandyButton } from './ui/CandyButton';
 import { STORY_ART } from './storyArt';
 
-export interface StoryJournalModalProps { visible: boolean; context: StoryContext | null; onClose: () => void; onResume: () => void }
+export interface StoryJournalModalProps { visible: boolean; context: StoryContext | null; onClose: () => void; onResume: (id?: StorySceneId) => void }
 export const StoryJournalModal: React.FC<StoryJournalModalProps> = props => props.visible
   ? <StoryJournalContents key={JSON.stringify(props.context)} {...props} />
   : null;
@@ -42,7 +42,7 @@ const StoryJournalContents: React.FC<StoryJournalModalProps> = ({ visible, conte
   const memoryLines = context && selected ? getVisibleStoryMemoryLines(selected, context) : [];
   const answer = selected?.scene.options?.find(option => option.id === selected.choice)?.label;
   const back = () => { setSelected(null); setSelectedCycle(null); setChapter(null); };
-  const resume = () => { onClose(); onResume(); };
+  const resume = (id?: StorySceneId) => { onClose(); onResume(id); };
   // A chapter is one animal, so its title is that animal. No mood word, no name
   // for the stretch of the story the lines came from.
   const chapterTitle = (item: StoryArchiveChapter) => getStorySpeakerName(item.animal);
@@ -59,14 +59,14 @@ const StoryJournalContents: React.FC<StoryJournalModalProps> = ({ visible, conte
           {selected.completed && <AppText textRole="caption" style={[styles.summary, { color: theme.muted }]}>{selected.scene.memory}</AppText>}
           {answer && <AppText textRole="label" style={[styles.answer, { color: theme.title }]}>{STORY_COPY.savedChoice}: {answer}</AppText>}
           {memoryLines.map((line, index) => <View key={`${index}:${line.speaker}`} style={styles.line}><AppText textRole="label" style={[styles.speaker, { color: theme.title }]}>{getStorySpeakerName(line.speaker)}</AppText><AppText textRole="reading"  style={[styles.body, { color: theme.body }]}>{line.text}</AppText></View>)}
-          {selectedCycle === null && !selected.completed && resumable === selected.scene.id && <CandyButton phase={phase} label={STORY_COPY.resume} onPress={resume} />}
+          {selectedCycle === null && context && state && canResumeStoryScene(context, state, selected.scene.id) && <CandyButton phase={phase} label={STORY_COPY.resume} onPress={() => resume(selected.scene.id)} />}
         </ScrollView> : chapter ? <FlatList style={styles.scroll} key={chapter.id} data={earlierLines} keyExtractor={item => item.id} initialNumToRender={6} windowSize={5} contentContainerStyle={styles.reading} ListHeaderComponent={<AppText textRole="caption" style={[styles.summary, { color: theme.muted }]}>{STORY_COPY.archiveHint}</AppText>} renderItem={({ item }) => <AppText  style={[styles.archiveLine, styles.body, { color: theme.body, borderColor: theme.sectionBorder }]}>{item.text}</AppText>} /> : <>
           <View style={styles.tabs}>{(['memories', 'archive'] as const).map(value => <Pressable key={value} accessibilityRole="tab" accessibilityState={{ selected: tab === value }} onPress={() => setTab(value)} style={[styles.tab, { borderColor: theme.sectionBorder, backgroundColor: tab === value ? theme.sectionBg : 'transparent' }]}><AppText textRole="label" style={[styles.tabText, { color: theme.title }]}>{STORY_COPY[value]}</AppText></Pressable>)}</View>
           {tab === 'memories' ? <ScrollView style={styles.scroll} contentContainerStyle={styles.reading}>
             <Image source={STORY_ART.tableHeader} resizeMode="cover" style={styles.art} accessible={false} />
             {memories.length === 0 && <AppText textRole="reading" style={[styles.body, { color: theme.body }]}>{STORY_COPY.empty}</AppText>}
             {memories.map(memory => <Pressable key={memory.scene.id} accessibilityRole="button" onPress={() => setSelected(memory)} style={[styles.row, { backgroundColor: theme.sectionBg, borderColor: theme.sectionBorder }]}><AppText textRole="label" style={[styles.rowTitle, { color: theme.title }]}>{memory.scene.title}</AppText><AppText textRole="caption" style={[styles.rowBody, { color: theme.body }]}>{memory.completed ? memory.scene.memory : STORY_COPY.unread}</AppText></Pressable>)}
-            {resumable && <CandyButton phase={phase} label={STORY_COPY.resume} onPress={resume} variant="secondary" />}
+            {resumable && <CandyButton phase={phase} label={STORY_COPY.resume} onPress={() => resume()} variant="secondary" />}
             {!!state.previousCycles?.length && <>
               <AppText textRole="label" accessibilityRole="header" style={[styles.rowTitle, { color: theme.title, marginTop: 28 }]}>{STORY_COPY.previousCycles}</AppText>
               <AppText textRole="caption" style={[styles.summary, { color: theme.muted }]}>{STORY_COPY.cycleHistoryHint}</AppText>

@@ -45,12 +45,14 @@ import {
   setPhase5CaughtUp,
 } from '../services/tending';
 import { buildPhase5Pool } from '../services/dialogue/phase5Pool';
+import { clearChoiceState, recordChoice } from '../services/dialogueChoices';
 
 // Reset state between tests
 beforeEach(async () => {
   (AsyncStorage.clear as jest.Mock)();
   await clearProgress();
   await clearTendingState();
+  await clearChoiceState();
 });
 
 describe('ROOMS data', () => {
@@ -404,6 +406,16 @@ describe('late-unlock dialogue fast-forward', () => {
 });
 
 describe('getAnimalsWithStatus new-dialogue badge honesty', () => {
+  test('an unanswered reveal choice is news after the regular dialogue is exhausted', async () => {
+    const p = await loadProgress();
+    p.currentPhase = 4;
+    p.unlockedAnimals = ['pangolin'];
+    p.lastDialogueRead = { pangolin: 134 };
+    expect((await getAnimalsWithStatus()).find(a => a.id === 'pangolin')!.hasNewDialogue).toBe(true);
+    await recordChoice('pangolin', 'refuse');
+    expect((await getAnimalsWithStatus()).find(a => a.id === 'pangolin')!.hasNewDialogue).toBe(false);
+  });
+
   const { getTotalDialogueCount } = require('../services/dialogue/animalDialogueBase');
 
   // Middle-tier animal (offset 0) → animalPhase == global phase, so the math is
@@ -987,3 +999,4 @@ describe('getLockedRoomCardSub', () => {
 // These service/UI tests enqueue telemetry events; cancel their debounce before
 // Jest disposes the module registry and its lazy telemetry import.
 afterEach(clearEvents);
+

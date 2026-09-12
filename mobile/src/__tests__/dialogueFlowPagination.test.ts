@@ -133,6 +133,7 @@ jest.mock('../services/offeringRequests', () => ({
 }));
 
 jest.mock('../services/dialogueChoices', () => ({
+  hasPendingDialogueChoice: jest.requireActual('../services/dialogueChoices').hasPendingDialogueChoice,
   getChoiceForAnimal: jest.fn(async () => null),
   recordChoice: jest.fn(async () => ({ response: 'response', convergence: 'convergence' })),
   loadChoiceState: jest.fn(async () => ({ choices: {} })),
@@ -1239,5 +1240,130 @@ describe('useDialogueFlow choice page (the card turns over, must answer, echoed 
     expect(hook.showDialogue).toBe(false);
     expect(hook.choiceOpen).toBe(false);
     expect(hook.choiceEcho).toBeNull();
+  });
+});
+
+
+describe('choice delivery during the current visit', () => {
+  const CHOICE = {
+    prompt: 'Panko sets the pear aside.',
+    options: { ask: 'Test it.', refuse: 'Leave it alone.' },
+    responses: { ask: 'We will watch it.', refuse: 'We will leave it.' },
+    convergence: 'She puts down the pot.',
+  };
+  const revealProgress = { ...progress, currentPhase: 4 };
+  const nearChoice = { ...pangolin, currentDialogueIndex: 75 };
+  const dialogue = require('../services/animalDialogue');
+  const sessions = require('../services/dialogueSession');
+  const currency = require('../services/amberCurrency');
+  function renderReveal() {
+    rewindHookIndices();
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    return useDialogueFlow({ progress: revealProgress as never, setAnimals: setAnimals as never });
+  }
+  beforeEach(() => {
+    resetHookState();
+    jest.clearAllMocks();
+    animals = [{ ...nearChoice }];
+    dialogue.getTotalDialogueCount.mockReturnValue(134);
+    dialogue.hasMoreDialogues.mockReturnValue(true);
+    dialogue.getCurrentDialogue.mockReturnValue({ text: 'The pear has stopped ripening.' });
+    dialogue.getCoordinatedEventLine.mockReturnValue(null);
+    dialogue.getCrossAnimalReference.mockReturnValue(null);
+    sessions.checkDialogueAvailability.mockResolvedValue({ available: true });
+    sessions.getSessionStatus.mockReturnValue({ status: 'in_session', dialoguesRemaining: 5 });
+    (getChoiceForAnimal as jest.Mock).mockReset().mockImplementation(async (_type, _phase, index) => index >= 76 ? CHOICE : null);
+    (recordChoice as jest.Mock).mockImplementation(async (_type, choice) => ({
+      choice, response: CHOICE.responses[choice as 'ask' | 'refuse'], convergence: CHOICE.convergence,
+    }));
+  });
+
+  it('offers the choice immediately after crossing index 76 without reopening', async () => {
+    let hook = renderReveal();
+    await hook.handleAnimalTap(nearChoice as never);
+    hook = renderReveal();
+    expect(hook.activeChoice).toBeNull();
+    await hook.handleNextDialogue();
+    hook = renderReveal();
+    expect(hook.selectedAnimal?.currentDialogueIndex).toBe(76);
+    expect(hook.dialogueText).toBe(CHOICE.prompt);
+    await hook.handleNextDialogue();
+    expect(renderReveal().choiceOpen).toBe(true);
+  });
+
+  it('lets the choice and response finish when the threshold is the session limit', async () => {
+    let hook = renderReveal();
+    await hook.handleAnimalTap(nearChoice as never);
+    hook = renderReveal();
+    sessions.getSessionStatus.mockReturnValue({ status: 'in_session', dialoguesRemaining: 0 });
+    await hook.handleNextDialogue();
+    hook = renderReveal();
+    expect(hook.showDialogue).toBe(true);
+    expect(hook.dialogueText).toBe(CHOICE.prompt);
+    await hook.handleNextDialogue();
+    hook = renderReveal();
+    await hook.handleDialogueChoice('ask');
+    hook = renderReveal();
+    expect(hook.dialogueText).toBe(CHOICE.responses.ask);
+    await hook.handleNextDialogue();
+    hook = renderReveal();
+    expect(hook.dialogueText).toBe(CHOICE.convergence);
+    await hook.handleNextDialogue();
+    expect(renderReveal().showDialogue).toBe(false);
+    expect(endSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('leads with a due choice and preserves the later event until it is visible', async () => {
+    dialogue.getCoordinatedEventLine.mockReturnValueOnce({ text: 'The house heard a knock.', deliveryKey: 'knock:pangolin' });
+    let hook = renderReveal();
+    await hook.handleAnimalTap({ ...nearChoice, currentDialogueIndex: 76 } as never);
+    hook = renderReveal();
+    expect(hook.dialogueText).toBe(CHOICE.prompt);
+    expect(currency.recordConsumedCoordinatedEvent).not.toHaveBeenCalled();
+    await hook.handleNextDialogue();
+    hook = renderReveal();
+    await hook.handleDialogueChoice('refuse');
+    hook = renderReveal();
+    await hook.handleNextDialogue();
+    hook = renderReveal();
+    await hook.handleNextDialogue();
+    hook = renderReveal();
+    expect(hook.dialogueText).toBe('The house heard a knock.');
+    expect(currency.recordConsumedCoordinatedEvent).toHaveBeenCalledWith('knock:pangolin');
+  });
+
+  it('keeps the options open after a failed save and allows an answer retry', async () => {
+    (recordChoice as jest.Mock).mockRejectedValueOnce(new Error('disk full'));
+    let hook = renderReveal();
+    await hook.handleAnimalTap({ ...nearChoice, currentDialogueIndex: 76 } as never);
+    hook = renderReveal();
+    await hook.handleNextDialogue();
+    hook = renderReveal();
+    await hook.handleDialogueChoice('ask');
+    hook = renderReveal();
+    expect(hook.choiceOpen).toBe(true);
+    expect(hook.activeChoice).toBe(CHOICE);
+    expect(hook.choiceEcho).toBeNull();
+    await hook.handleDialogueChoice('refuse');
+    hook = renderReveal();
+    expect(recordChoice).toHaveBeenCalledTimes(2);
+    expect(hook.choiceOpen).toBe(false);
+    expect(hook.dialogueText).toBe(CHOICE.responses.refuse);
+  });
+
+  it('accepts one answer while the first tap is still saving', async () => {
+    let finish!: (value: unknown) => void;
+    (recordChoice as jest.Mock).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    let hook = renderReveal();
+    await hook.handleAnimalTap({ ...nearChoice, currentDialogueIndex: 76 } as never);
+    hook = renderReveal();
+    await hook.handleNextDialogue();
+    hook = renderReveal();
+    const first = hook.handleDialogueChoice('ask');
+    await hook.handleDialogueChoice('refuse');
+    expect(recordChoice).toHaveBeenCalledTimes(1);
+    finish({ choice: 'ask', response: CHOICE.responses.ask, convergence: CHOICE.convergence });
+    await first;
+    expect(renderReveal().choiceEcho).toBe(CHOICE.options.ask);
   });
 });

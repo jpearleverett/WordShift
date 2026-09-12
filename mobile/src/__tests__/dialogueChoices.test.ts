@@ -9,6 +9,8 @@ import {
   getPhase4ChoiceCallback,
   getPhase5ChoiceCallback,
   clearChoiceState,
+  invalidateChoiceCache,
+  markPhase4CallbackShown,
   ANIMAL_CHOICES,
   PlayerChoice,
 } from '../services/dialogueChoices';
@@ -330,6 +332,81 @@ describe('dialogueChoices', () => {
   // ===========================================================================
 
   describe('recordChoice', () => {
+    it('keeps a failed answer pending and durably saves the retry without losing other state', async () => {
+      await recordChoice('owl', 'refuse');
+      await markPhase4CallbackShown('owl');
+      (AsyncStorage.setItem as jest.Mock).mockRejectedValueOnce(new Error('disk full'));
+      await expect(recordChoice('fox', 'ask')).rejects.toThrow('disk full');
+      const failed = await loadChoiceState();
+      expect(failed.choices).toEqual({ owl: 'refuse' });
+      expect(failed.offeredBy).toEqual(['owl']);
+      expect(await getChoiceForAnimal('fox', 3, inPhase3('fox'))).not.toBeNull();
+      await recordChoice('fox', 'refuse');
+      invalidateChoiceCache();
+      const restored = await loadChoiceState();
+      expect(restored.choices).toEqual({ owl: 'refuse', fox: 'refuse' });
+      expect(restored.phase4CallbackShown).toEqual(['owl']);
+      expect(restored.offeredBy).toEqual(['owl', 'fox']);
+    });
+
+    it('serializes callback writes with new answers so neither overwrites the other', async () => {
+      await recordChoice('owl', 'refuse');
+      await Promise.all([recordChoice('fox', 'ask'), markPhase4CallbackShown('owl')]);
+      invalidateChoiceCache();
+      const restored = await loadChoiceState();
+      expect(restored.choices).toEqual({ owl: 'refuse', fox: 'ask' });
+      expect(restored.phase4CallbackShown).toEqual(['owl']);
+    });
+
+    it('reset waits for an in-flight write and cancels queued old answers', async () => {
+      const write = (AsyncStorage.setItem as jest.Mock).getMockImplementation()!;
+      let finish!: () => void;
+      let entered!: () => void;
+      const started = new Promise<void>(resolve => { entered = resolve; });
+      const gate = new Promise<void>(resolve => { finish = resolve; });
+      (AsyncStorage.setItem as jest.Mock).mockImplementationOnce(async (key, value) => {
+        entered();
+        await gate;
+        return write(key, value);
+      });
+      const first = recordChoice('fox', 'ask').catch(error => error);
+      await started;
+      const queued = recordChoice('owl', 'refuse').catch(error => error);
+      const reset = clearChoiceState();
+      finish();
+      await reset;
+      expect(await first).toBeInstanceOf(Error);
+      expect(await queued).toBeInstanceOf(Error);
+      expect(await AsyncStorage.getItem('wordshift_dialogue_choices')).toBeNull();
+      expect((await loadChoiceState()).choices).toEqual({});
+    });
+
+    it('cache invalidation prevents queued answers from rewriting restored storage', async () => {
+      const queued = recordChoice('fox', 'ask').catch(error => error);
+      invalidateChoiceCache();
+      const restored = { offeredBy: ['owl'], choices: { owl: 'refuse' }, hasSeenChoice: true };
+      await AsyncStorage.setItem('wordshift_dialogue_choices', JSON.stringify(restored));
+      expect(await queued).toBeInstanceOf(Error);
+      expect((await loadChoiceState()).choices).toEqual({ owl: 'refuse' });
+    });
+
+    it('keeps the first branch when two different answers arrive together', async () => {
+      const [first, repeated] = await Promise.all([
+        recordChoice('fox', 'ask'),
+        recordChoice('fox', 'refuse'),
+      ]);
+      expect(first.choice).toBe('ask');
+      expect(repeated.choice).toBe('ask');
+      expect(repeated.response).toBe(ANIMAL_CHOICES.fox.responses.ask);
+      expect((await loadChoiceState()).offeredBy).toEqual(['fox']);
+      expect(await getPlayerChoice('fox')).toBe('ask');
+    });
+
+    it('keeps both animals when their first answers arrive together', async () => {
+      await Promise.all([recordChoice('fox', 'ask'), recordChoice('owl', 'refuse')]);
+      expect((await loadChoiceState()).choices).toEqual({ fox: 'ask', owl: 'refuse' });
+    });
+
     it('records an "ask" choice correctly', async () => {
       const result = await recordChoice('fox', 'ask');
       expect(result.response).toBe(ANIMAL_CHOICES.fox.responses.ask);
@@ -559,3 +636,4 @@ describe('getPhase5ChoiceCallback', () => {
     expect(getPhase5ChoiceCallback('owl', 'ask')).not.toBe(getPhase5ChoiceCallback('owl', 'refuse'));
   });
 });
+

@@ -6084,7 +6084,7 @@ function MainApp() {
         visible={overlayOwner === 'journal'}
         context={storyFlow.journalContext}
         onClose={storyFlow.closeJournal}
-        onResume={() => { storyFlow.resume().catch(() => {}); }}
+        onResume={(id) => { storyFlow.resume(id).catch(() => {}); }}
       />
       {/* Shareable result card preview — overlays everything */}
       <ShareResultModal

@@ -42,7 +42,7 @@ const HEADER_ART_MIN_CARD_DP = 720;
 
 export interface StorySceneModalProps {
   memory: StoryMemory | null; phase: DialoguePhase;
-  onAdvance: () => Promise<void>; onChoose: (choice: string) => Promise<void>; onClose: () => void;
+  onAdvance: () => Promise<void>; onChoose: (choice: string) => Promise<void>; onClose: () => Promise<void>;
 }
 export const StorySceneModal: React.FC<StorySceneModalProps> = ({ memory, phase, onAdvance, onChoose, onClose }) => {
   const insets = useSafeAreaInsets();
@@ -106,7 +106,7 @@ export const StorySceneModal: React.FC<StorySceneModalProps> = ({ memory, phase,
       setShowSaving(false);
     }
   };
-  const close = () => { if (!busy.current) onClose(); };
+  const close = () => { void run(onClose); };
   return <Modal visible={!!memory && !!line} transparent animationType={getSettingsSync().reducedMotion ? 'none' : 'fade'} onRequestClose={close}>
     <View style={[styles.overlay, { backgroundColor: theme.overlay, paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }]} accessibilityViewIsModal>
       <PanelCard phase={phase} kind="panel" style={{ width: '100%', maxWidth: 560, maxHeight: availableHeight }}>
