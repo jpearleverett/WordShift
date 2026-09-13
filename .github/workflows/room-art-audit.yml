@@ -1,0 +1,31 @@
+name: Room art reference audit
+
+on:
+  push:
+    branches: ['audit/room-art-references']
+
+jobs:
+  references:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install Pillow
+      - name: Export room references for visual review
+        run: |
+          python - <<'PY'
+          from PIL import Image
+          from pathlib import Path
+          from io import BytesIO
+          import base64
+          for name in ['jungle', 'observatory', 'workshop', 'rainforest']:
+              path = Path('mobile/assets/rooms') / (name + '.png')
+              image = Image.open(path).convert('RGBA')
+              image.thumbnail((750, 750), Image.Resampling.LANCZOS)
+              out = BytesIO()
+              image.save(out, format='PNG', optimize=True)
+              print('ROOM_REFERENCE:' + name + ':' + base64.b64encode(out.getvalue()).decode())
+          PY
