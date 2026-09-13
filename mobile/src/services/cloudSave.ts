@@ -4,6 +4,7 @@ import { CURRENT_SCHEMA_VERSION, runMigrations } from './dataMigration';
 import { getSupportMetadata } from './supportIdentity';
 import { logEvent } from './eventLogger';
 import { invalidateStoryCache, STORY_STORAGE_KEY } from './storySpine';
+import { ACQUAINTANCE_STORAGE_KEY, invalidateAnimalAcquaintanceCache } from './animalAcquaintance';
 import { invalidateProgressCache } from './amberCurrency';
 import { invalidatePuzzleStateCache } from './puzzleSaveState';
 import { invalidateSettingsCache } from './settings';
@@ -141,6 +142,7 @@ export const SYNC_KEYS = [
   'wordshift_dialogue_sessions',
   'wordshift_dialogue_choices',
   STORY_STORAGE_KEY,
+  ACQUAINTANCE_STORAGE_KEY,
   'wordshift_narrative_delivery',
   'wordshift_whisper_gallery',
   'wordshift_sacrifices',
@@ -442,6 +444,7 @@ let syncStatusCache: SyncStatus | null = null;
 
 export function invalidateRestoredServiceCaches(): void {
   invalidateStoryCache();
+  invalidateAnimalAcquaintanceCache();
   invalidateProgressCache();
   invalidateStatsCache();
   invalidatePuzzleStateCache();

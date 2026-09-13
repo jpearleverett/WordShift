@@ -1,25 +1,15 @@
 /**
- * The dialogue card's CHOICE PAGE: the surface a relationship choice turns
- * over to. The prompt arrives as an ordinary line with an ordinary Next; that
- * Next turns the card over (useDialogueFlow.choiceOpen): the portrait steps
- * aside into a small header, the animal's line shrinks to a caption, and the
- * two answers take the full column as left-aligned parchment trays under a
- * YOU mark, so every word of the writing keeps the width a sentence needs.
- * The answers press like everything else the player has learned to touch
- * (the fill darkens under the thumb, the tap sounds); nothing else on the
- * page is a control, and the card refuses to close until one is picked (the
- * hook's must-answer lock, which also keeps the scrim from being rendered).
- *
- * DialogueChoiceEcho is the second half: the answer just given stays on the
- * card, dimmed, above the animal's reply, so the reply reads as a reply.
+ * A relationship choice stays part of the conversation: the animal and their
+ * full-size question share the sheet, with two equally weighted replies below.
+ * The host scrolls the complete page so longer writing and larger text settings
+ * never trade away an answer. Leaving postpones the decision; it never picks one.
  */
-import React, { useEffect } from 'react';
-import { View, Text, Image, Pressable, StyleSheet, type ImageSourcePropType } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Image, Pressable, StyleSheet, type ImageSourcePropType } from 'react-native';
 import { AppText } from '../ui/AppText';
 import { NineSliceFrame } from '../ui/NineSlice';
 import { CARD_CORNER_DP, CARD_EDGE_DP, type PixelSkin } from '../../theme/pixelSkin.generated';
 import { SURFACE } from '../../theme/surfaces';
-import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { FONT_SIZE } from '../../theme/typeScale';
 import { getDialoguePortraitFrame } from '../../theme/dialoguePortrait';
 import { playUiSound } from '../../services/uiSound';
@@ -27,29 +17,31 @@ import { announceForA11y } from '../../services/a11yAnnounce';
 import type { AnimalType } from '../../types/homeWorld';
 import type { DialogueChoice, PlayerChoice } from '../../services/dialogueChoices';
 
-/** The header portrait is a keepsake of the speaker, not the reading alcove. */
-const CHOICE_PORTRAIT_WIDTH = 56;
-const CHOICE_PORTRAIT_MAX_HEIGHT = 64;
-/** The speaker mark over the player's answers (and over the echoed pick). */
-export const CHOICE_SPEAKER_MARK = 'YOU';
+const CHOICE_PORTRAIT_WIDTH = 84;
+const CHOICE_PORTRAIT_MAX_HEIGHT = 104;
+const SAVING_REVEAL_MS = 300;
 
 interface AnswerTrayProps {
   text: string;
   skin: PixelSkin;
   ink: string;
+  saving: boolean;
   onPress: () => void;
 }
 
-function AnswerTray({ text, skin, ink, onPress }: AnswerTrayProps) {
+function AnswerTray({ text, skin, ink, saving, onPress }: AnswerTrayProps) {
   return (
     <Pressable
       style={styles.answer}
+      disabled={saving}
       onPress={() => {
+        if (saving) return;
         playUiSound('dialogue');
         onPress();
       }}
       accessibilityRole="button"
       accessibilityLabel={text}
+      accessibilityState={{ disabled: saving }}
     >
       {({ pressed }) => (
         <>
@@ -59,11 +51,8 @@ function AnswerTray({ text, skin, ink, onPress }: AnswerTrayProps) {
             edgeDp={CARD_EDGE_DP}
             fillColor={skin.fillCard}
           />
-          {/* The parchment darkens under the thumb: an ink veil inset past the
-              wood band, so the frame itself stays lit and the tray reads as
-              pressed rather than dimmed. */}
           {pressed ? <View pointerEvents="none" style={[styles.pressedVeil, { backgroundColor: ink }]} /> : null}
-          <Text style={[styles.answerText, { color: ink }]}>{text}</Text>
+          <AppText textRole="body" style={[styles.answerText, { color: ink }]}>{text}</AppText>
         </>
       )}
     </Pressable>
@@ -74,15 +63,18 @@ export interface DialogueChoicePageProps {
   animalType: AnimalType;
   name: string;
   nameColor: string;
-  /** The speaker's current portrait (idle, or robed from the reveal); null renders no portrait. */
+  /** The speaker's current portrait; null renders no portrait. */
   portrait: ImageSourcePropType | null;
   choice: DialogueChoice;
   skin: PixelSkin;
-  /** The card's body ink (panelSt.body): caption and answers. */
   inkBody: string;
-  /** The card's muted ink (panelSt.muted): the YOU mark. */
   inkMuted: string;
   onChoose: (choice: PlayerChoice) => void;
+  onLater: () => void;
+  /** Lock immediately while persistence runs, without dimming the whole sheet. */
+  saving?: boolean;
+  /** The hook supplies a short, actionable retry message after a failed save. */
+  error?: string | null;
 }
 
 export function DialogueChoicePage({
@@ -95,14 +87,27 @@ export function DialogueChoicePage({
   inkBody,
   inkMuted,
   onChoose,
+  onLater,
+  saving = false,
+  error = null,
 }: DialogueChoicePageProps) {
   const frame = getDialoguePortraitFrame(animalType, CHOICE_PORTRAIT_WIDTH, CHOICE_PORTRAIT_MAX_HEIGHT);
+  const [showSaving, setShowSaving] = useState(false);
 
-  // The turn is the signal: say who asked and what, then hand over the answer.
-  // Only what the page already shows (spoiler discipline of a11yAnnounce).
   useEffect(() => {
-    announceForA11y(`${name}. ${choice.prompt} Your answer.`);
+    announceForA11y(`${name}. ${choice.prompt} Your response.`);
   }, [name, choice.prompt]);
+
+  // A fast local write should not make the page blink. The status has a
+  // permanent slot, and only slow saves reveal it; buttons lock immediately.
+  useEffect(() => {
+    if (!saving) return;
+    const timer = setTimeout(() => setShowSaving(true), SAVING_REVEAL_MS);
+    return () => {
+      clearTimeout(timer);
+      setShowSaving(false);
+    };
+  }, [saving]);
 
   return (
     <View style={styles.page}>
@@ -116,28 +121,45 @@ export function DialogueChoicePage({
             <Image source={portrait} style={[styles.portraitLayer, frame.layer]} resizeMode="cover" />
           </View>
         ) : null}
-        <Text numberOfLines={1} style={[styles.name, { color: nameColor }]}>
+        <AppText textRole="label" style={[styles.name, { color: nameColor }]}>
           {name}
-        </Text>
-      </View>
-
-      <View style={styles.caption}>
-        <NineSliceFrame
-          skin={skin.card}
-          cornerDp={CARD_CORNER_DP}
-          edgeDp={CARD_EDGE_DP}
-          fillColor={skin.fillCard}
-        />
-        <AppText textRole="caption" style={{ color: inkBody }}>
-          {choice.prompt}
         </AppText>
       </View>
 
-      <AppText textRole="label" style={[styles.speakerMark, { color: inkMuted }]}>
-        {CHOICE_SPEAKER_MARK}
+      <AppText textRole="reading" style={[styles.prompt, { color: inkBody }]}>
+        {choice.prompt}
       </AppText>
-      <AnswerTray text={choice.options.ask} skin={skin} ink={inkBody} onPress={() => onChoose('ask')} />
-      <AnswerTray text={choice.options.refuse} skin={skin} ink={inkBody} onPress={() => onChoose('refuse')} />
+
+      <AppText textRole="label" style={[styles.speakerMark, { color: inkMuted }]}>
+        Your response
+      </AppText>
+      <View style={styles.answers}>
+        <AnswerTray text={choice.options.ask} skin={skin} ink={inkBody} saving={saving} onPress={() => onChoose('ask')} />
+        <AnswerTray text={choice.options.refuse} skin={skin} ink={inkBody} saving={saving} onPress={() => onChoose('refuse')} />
+      </View>
+
+      <View style={styles.status} accessibilityLiveRegion="polite">
+        {error ? (
+          <AppText textRole="body" style={{ color: inkBody }} accessibilityRole="alert">{error}</AppText>
+        ) : saving && showSaving ? (
+          <AppText textRole="caption" style={{ color: inkMuted }}>Saving your answer...</AppText>
+        ) : null}
+      </View>
+      <Pressable
+        style={({ pressed }) => [styles.later, pressed && styles.laterPressed]}
+        disabled={saving}
+        accessibilityRole="button"
+        accessibilityLabel="Come back later"
+        accessibilityHint="Leave this question unanswered. It will be here when you return."
+        accessibilityState={{ disabled: saving }}
+        onPress={() => {
+          if (saving) return;
+          playUiSound('dialogue');
+          onLater();
+        }}
+      >
+        <AppText textRole="body" style={[styles.laterText, { color: inkMuted }]}>Come back later</AppText>
+      </Pressable>
     </View>
   );
 }
@@ -145,15 +167,16 @@ export function DialogueChoicePage({
 export interface DialogueChoiceEchoProps {
   text: string;
   inkMuted: string;
+  inkBody?: string;
 }
 
-export function DialogueChoiceEcho({ text, inkMuted }: DialogueChoiceEchoProps) {
+export function DialogueChoiceEcho({ text, inkMuted, inkBody = inkMuted }: DialogueChoiceEchoProps) {
   return (
-    <View style={styles.echo} accessible accessibilityLabel={`You said: ${text}`}>
+    <View style={[styles.echo, { borderColor: inkMuted }]} accessible accessibilityLabel={`You said: ${text}`}>
       <AppText textRole="label" style={[styles.echoMark, { color: inkMuted }]}>
-        {CHOICE_SPEAKER_MARK}
+        You said
       </AppText>
-      <AppText textRole="caption" style={[styles.echoText, { color: inkMuted }]}>
+      <AppText textRole="body" style={{ color: inkBody }}>
         {text}
       </AppText>
     </View>
@@ -161,24 +184,22 @@ export function DialogueChoiceEcho({ text, inkMuted }: DialogueChoiceEchoProps) 
 }
 
 const styles = StyleSheet.create({
-  // Mirrors dialogueTextCol's insets so the page sits exactly where the
-  // reading column did; the sheet's panel clearance is the host's.
+  // The host owns the outer wood frame and safe-area clearance. Keep the
+  // question on that parchment, giving the framed replies the full width.
   page: {
     width: '100%',
-    paddingTop: 6,
-    paddingBottom: 34,
-    paddingHorizontal: 10,
+    paddingTop: 10,
+    paddingBottom: 24,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 16,
   },
-  // The crop box owns the crop (see theme/dialoguePortrait); its dims arrive
-  // per character from getDialoguePortraitFrame.
   portrait: {
     overflow: 'hidden',
-    marginRight: 10,
+    marginRight: 16,
+    flexShrink: 0,
   },
   portraitLayer: {
     position: 'absolute',
@@ -188,41 +209,29 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   name: {
-    fontFamily: PIXEL_FONT_BOLD,
-    fontSize: FONT_SIZE.callout,
-    fontWeight: '900',
-    letterSpacing: 0.5,
+    fontSize: FONT_SIZE.headline,
+    lineHeight: 28,
     flexShrink: 1,
   },
-  // Card-framed caption: clear the 12dp card band with room to spare.
-  caption: {
-    paddingHorizontal: SURFACE.cardPadX,
-    paddingVertical: 14,
-    justifyContent: 'center',
+  prompt: {
+    marginBottom: 24,
   },
   speakerMark: {
-    fontSize: 11,
-    lineHeight: 14,
-    letterSpacing: 2,
-    marginTop: 14,
-    marginBottom: 6,
-    marginLeft: 4,
+    fontSize: FONT_SIZE.bodyLg,
+    lineHeight: 21,
+    marginBottom: 12,
   },
-  // Card-framed answer tray: the shared card clearance on both axes, and a
-  // 56dp minimum so a one-line answer is still a comfortable target.
+  answers: {
+    gap: 12,
+  },
   answer: {
     paddingHorizontal: SURFACE.cardPadX,
     paddingVertical: SURFACE.cardPadY,
-    minHeight: 56,
+    minHeight: 64,
     justifyContent: 'center',
-    marginBottom: 10,
+    width: '100%',
   },
-  // Left-aligned like speech, never centred like signage.
   answerText: {
-    fontFamily: BODY_FONT,
-    fontSize: 16,
-    lineHeight: 24,
-    letterSpacing: 0.2,
     textAlign: 'left',
   },
   pressedVeil: {
@@ -233,17 +242,32 @@ const styles = StyleSheet.create({
     bottom: 12,
     opacity: 0.14,
   },
+  status: {
+    minHeight: 29,
+    paddingTop: 8,
+  },
+  later: {
+    minHeight: 48,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    alignSelf: 'center',
+    justifyContent: 'center',
+  },
+  laterPressed: {
+    opacity: 0.7,
+  },
+  laterText: {
+    textAlign: 'center',
+    textDecorationLine: 'underline',
+  },
   echo: {
-    marginBottom: 8,
-    paddingHorizontal: 4,
+    marginBottom: 16,
+    paddingLeft: 12,
+    borderLeftWidth: 2,
   },
   echoMark: {
-    fontSize: 11,
-    lineHeight: 14,
-    letterSpacing: 2,
-    marginBottom: 2,
-  },
-  echoText: {
-    opacity: 0.8,
+    fontSize: FONT_SIZE.bodyLg,
+    lineHeight: 21,
+    marginBottom: 4,
   },
 });

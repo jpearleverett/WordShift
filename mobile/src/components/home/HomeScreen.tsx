@@ -1,3 +1,4 @@
+import { createIntroPresentationGuard } from '../../services/introPresentation';
 import { AppText } from '../ui/AppText';
 import { loadStoryState, getStoryWorldKeepsake, StoryContext, StoryState, STORY_COPY } from '../../services/storySpine';
 import { StoryWorldInspection } from './StoryWorldObject';
@@ -119,6 +120,13 @@ import {
 
 import { useDialogueFlow } from '../../hooks/useDialogueFlow';
 import { useUnlockFlow } from '../../hooks/useUnlockFlow';
+import {
+  advanceAnimalAcquaintance,
+  loadAnimalAcquaintanceState,
+  openAnimalAcquaintance,
+  type AnimalAcquaintanceMemory,
+} from '../../services/animalAcquaintance';
+import { ACQUAINTANCE_ANIMALS } from '../../services/dialogue/animalAcquaintanceContent';
 
 import { JuicyButton } from './JuicyButton';
 import { CelebrationConfetti } from './CelebrationConfetti';
@@ -675,7 +683,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [introAnimal, setIntroAnimal] = useState<Animal | null>(null);
   const [introDialogueIndex, setIntroDialogueIndex] = useState(0);
   const [introOverrideLines, setIntroOverrideLines] = useState<string[] | null>(null);
-  const [introContext, setIntroContext] = useState<'animal_intro' | 'challenge_intro' | 'pit_nudge' | 'daily_challenge_intro' | 'gated_room_intro' | 'harvest_gate_intro' | 'harvest_heavy_nudge' | 'unbroken_weave_intro' | 'keeper_record_intro' | 'offering_intro'>('animal_intro');
+  const [introContext, setIntroContext] = useState<'animal_intro' | 'acquaintance' | 'challenge_intro' | 'pit_nudge' | 'daily_challenge_intro' | 'gated_room_intro' | 'harvest_gate_intro' | 'harvest_heavy_nudge' | 'unbroken_weave_intro' | 'keeper_record_intro' | 'offering_intro'>('animal_intro');
+  const [acquaintanceMemory, setAcquaintanceMemory] = useState<AnimalAcquaintanceMemory | null>(null);
+  const [introSaving, setIntroSaving] = useState(false);
+  const [introSaveError, setIntroSaveError] = useState<string | null>(null);
+  const [introOpenError, setIntroOpenError] = useState<string | null>(null);
+  const introSavingRef = useRef(false);
+  const regularDialogueBusyRef = useRef(false);
+  const introPresentationRef = useRef(createIntroPresentationGuard<Animal>(animal => animal.id));
+  const [introOpening, setIntroOpening] = useState(false);
+  const [pendingAnimalIntroCount, setPendingAnimalIntroCount] = useState(0);
+  useEffect(() => () => { introPresentationRef.current.invalidate(); }, []);
+  useEffect(() => {
+    if (!introOpenError) return;
+    const timer = setTimeout(() => setIntroOpenError(null), 8000);
+    return () => clearTimeout(timer);
+  }, [introOpenError]);
   // The landing that showed the Keeper's Record holds the Unbroken Weave intro
   // back to the NEXT home visit (per-mount ref: HomeScreen unmounts on every
   // navigation away, so this naturally means "not in the same landing").
@@ -686,8 +709,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // two can never flicker over each other.
   const introSurfaceBusyRef = useRef(false);
   useLayoutEffect(() => {
-    introSurfaceBusyRef.current = showIntroDialogue || !!introOverrideLines || storyOverlayActive || showStoryInspection || quietLanding;
-  }, [showIntroDialogue, introOverrideLines, storyOverlayActive, showStoryInspection, quietLanding]);
+    introSurfaceBusyRef.current = showIntroDialogue || !!introOverrideLines || introOpening || pendingAnimalIntroCount > 0 || storyOverlayActive || showStoryInspection || quietLanding;
+  }, [showIntroDialogue, introOverrideLines, introOpening, pendingAnimalIntroCount, storyOverlayActive, showStoryInspection, quietLanding]);
   // Journal spotlight intro state
   const [journalSpotlightActive, setJournalSpotlightActive] = useState(false);
   const [journalSpotlightIndex, setJournalSpotlightIndex] = useState(0);
@@ -782,12 +805,104 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [attunedRooms, setAttunedRooms] = useState<Record<string, number>>(homeSceneSnapshot?.attuned ?? {});
   const [tendingLevel, setTendingLevel] = useState(homeSceneSnapshot?.tendingLevel ?? 0);
 
+  // Personal visits have their own saved position. They never rewind the
+  // world's dialogue cursor or change answers an established friend remembers.
+  const claimIntroOpening = useCallback((): number => {
+    const token = introPresentationRef.current.claim();
+    if (token === null) throw new Error('Another conversation is still open.');
+    // Claim synchronously, before storage, so the completion timer and other
+    // awaited introductions cannot take the surface in the same JS turn.
+    introSurfaceBusyRef.current = true;
+    setIntroOpening(true);
+    return token;
+  }, []);
+
+  const presentAnimalAcquaintance = useCallback(async (animal: Animal, optional = false, ownedToken?: number) => {
+    const token = ownedToken ?? claimIntroOpening();
+    const owner = introPresentationRef.current;
+    try {
+      const freshProgress = await getFullProgress();
+      const state = await loadAnimalAcquaintanceState();
+      if (!owner.owns(token)) return;
+      const memory = await openAnimalAcquaintance(
+        animal.type,
+        freshProgress.currentPhase,
+        optional ? 'optional' : state.animals[animal.type] ? 'continue' : 'introduction',
+      );
+      if (!owner.owns(token)) return;
+      if (!memory) throw new Error('This conversation is no longer available.');
+      setIntroOpenError(null);
+      setAcquaintanceMemory(memory);
+      setIntroSaveError(null);
+      setIntroAnimal(animal);
+      setIntroDialogueIndex(memory.page);
+      setIntroOverrideLines(memory.lines);
+      setIntroContext('acquaintance');
+      setShowIntroDialogue(true);
+    } catch (error) {
+      if (ownedToken === undefined && owner.release(token)) setIntroOpening(false);
+      throw error;
+    } finally {
+      if (owner.owns(token)) setIntroOpening(false);
+    }
+  }, [claimIntroOpening]);
+
+  const presentAnimalIntroduction = useCallback(async (animal: Animal) => {
+    const owner = introPresentationRef.current;
+    if (owner.busy() || introSurfaceBusyRef.current || regularDialogueBusyRef.current) {
+      setPendingAnimalIntroCount(owner.enqueue(animal));
+      introSurfaceBusyRef.current = true;
+      return;
+    }
+    const token = claimIntroOpening();
+    try {
+      const freshProgress = await getFullProgress();
+      if (!owner.owns(token)) return;
+      if (ACQUAINTANCE_ANIMALS.has(animal.type) && freshProgress.currentPhase >= 2) {
+        await presentAnimalAcquaintance(animal, false, token);
+        return;
+      }
+      setIntroOpenError(null);
+      setAcquaintanceMemory(null);
+      setIntroSaveError(null);
+      setIntroOverrideLines(null);
+      setIntroContext('animal_intro');
+      setIntroAnimal(animal);
+      setIntroDialogueIndex(0);
+      setShowIntroDialogue(true);
+    } catch (error) {
+      if (owner.owns(token)) {
+        setIntroOpenError(`${animal.name} has arrived, but their conversation couldn't open. Tap them to try again.`);
+        owner.release(token);
+        setIntroOpening(false);
+      }
+      throw error;
+    } finally {
+      if (owner.owns(token)) setIntroOpening(false);
+    }
+  }, [claimIntroOpening, presentAnimalAcquaintance]);
+
   // Dialogue flow hook
   const dialogueFlow = useDialogueFlow({
     progress,
     setAnimals,
     onFoxPlayPrompt: () => setHighlightPlayButton(true),
+    onAcquaintance: presentAnimalAcquaintance,
   });
+
+  useLayoutEffect(() => { regularDialogueBusyRef.current = dialogueFlow.showDialogue; }, [dialogueFlow.showDialogue]);
+
+  useEffect(() => {
+    if (!pendingAnimalIntroCount || introOpening || showIntroDialogue || introOverrideLines ||
+      dialogueFlow.showDialogue || storyOverlayActive || showStoryInspection || quietLanding) return;
+    const owner = introPresentationRef.current;
+    const animal = owner.take();
+    if (!animal) return;
+    setPendingAnimalIntroCount(owner.pendingCount());
+    introSurfaceBusyRef.current = false;
+    void presentAnimalIntroduction(animal).catch(() => {});
+  }, [pendingAnimalIntroCount, introOpening, showIntroDialogue, introOverrideLines,
+    dialogueFlow.showDialogue, storyOverlayActive, showStoryInspection, quietLanding, presentAnimalIntroduction]);
 
   // Measured portrait framing for whichever character is on screen (see
   // getDialoguePortraitBox). Both dialogue surfaces share the alcove styles, so
@@ -816,6 +931,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setIntroDialogueIndex,
     setShowIntroDialogue,
     onUnlockCompleted,
+    onAnimalIntroduction: presentAnimalIntroduction,
     // A newly unlocked character's intro must open on a clean slate — if a
     // one-time HomeScreen intro (Reserve explainer etc.) raced into the shared
     // intro state during the unlock delay, its override script would otherwise
@@ -823,6 +939,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     resetIntroOverrides: () => {
       setIntroOverrideLines(null);
       setIntroContext('animal_intro');
+      setAcquaintanceMemory(null);
+      setIntroSaveError(null);
     },
   });
 
@@ -959,8 +1077,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     if (!pendingHouseCompletion) return;
     // Held while any intro dialogue surface is up (same pair the other
     // one-time home intros gate on).
-    if (showIntroDialogue || introOverrideLines) return;
+    if (showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0) return;
     const timer = setTimeout(() => {
+      if (introPresentationRef.current.busy() || introPresentationRef.current.pendingCount() > 0 || introSurfaceBusyRef.current) return;
       setPendingHouseCompletion(false);
       // Written HERE, on delivery, mirroring markUnbrokenWeaveIntroSeen: until
       // this lands the beat stays armed and the next home landing re-offers it.
@@ -975,7 +1094,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       }
     }, 650);
     return () => clearTimeout(timer);
-  }, [pendingHouseCompletion, showIntroDialogue, introOverrideLines, onHouseCompleted]);
+  }, [pendingHouseCompletion, showIntroDialogue, introOverrideLines, introOpening, pendingAnimalIntroCount, storyOverlayActive, showStoryInspection, quietLanding, onHouseCompleted]);
 
   const claimableQuestAmber = useMemo(() => {
     if (!weeklyQuestState || !hasHomeProgress) return 0;
@@ -1111,13 +1230,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   // Challenge Mode intro (one-time, Fox-led, after 15 puzzles).
   useEffect(() => {
-    if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines) return;
+    if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0) return;
     if ((homePuzzleCount || 0) < 15) return;
 
     let cancelled = false;
     (async () => {
       const seen = await hasSeenChallengeIntro();
-      if (seen || cancelled) return;
+      if (seen || cancelled || introSurfaceBusyRef.current) return;
 
       const fox = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
       if (!fox) return;
@@ -1130,18 +1249,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     })();
 
     return () => { cancelled = true; };
-  }, [homePuzzleCount, homePhase, isOnboarding, showIntroDialogue, introOverrideLines, animals, hasHomeProgress]);
+  }, [homePuzzleCount, homePhase, isOnboarding, showIntroDialogue, introOverrideLines, introOpening, pendingAnimalIntroCount, animals, hasHomeProgress]);
 
   // Daily Challenge intro (one-time, Fox-led, when the daily card first unlocks).
   // Celebrates the unlock so the new card isn't discovered silently.
   useEffect(() => {
-    if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines) return;
+    if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0) return;
     if (!isDailyChallengeUnlocked(homePuzzleCount, homePhase)) return;
 
     let cancelled = false;
     (async () => {
       const seen = await hasSeenDailyChallengeIntro();
-      if (seen || cancelled) return;
+      if (seen || cancelled || introSurfaceBusyRef.current) return;
 
       const fox = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
       if (!fox) return;
@@ -1154,17 +1273,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     })();
 
     return () => { cancelled = true; };
-  }, [homePuzzleCount, homePhase, isOnboarding, showIntroDialogue, introOverrideLines, animals, hasHomeProgress]);
+  }, [homePuzzleCount, homePhase, isOnboarding, showIntroDialogue, introOverrideLines, introOpening, pendingAnimalIntroCount, animals, hasHomeProgress]);
 
   // Pit transition Fox nudge (one-time per pending transition)
   useEffect(() => {
-    if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines) return;
+    if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0) return;
     if (!pitPhaseReady) return;
 
     let cancelled = false;
     (async () => {
       const seen = await hasSeenPitNudge();
-      if (seen || cancelled) return;
+      if (seen || cancelled || introSurfaceBusyRef.current) return;
 
       const fox = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
       if (!fox) return;
@@ -1180,17 +1299,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     })();
 
     return () => { cancelled = true; };
-  }, [pitPhaseReady, homePhase, isOnboarding, showIntroDialogue, introOverrideLines, animals, hasHomeProgress]);
+  }, [pitPhaseReady, homePhase, isOnboarding, showIntroDialogue, introOverrideLines, introOpening, pendingAnimalIntroCount, animals, hasHomeProgress]);
 
   // Journal intro (one-time, Fox-led spotlight, when journal becomes available)
   useEffect(() => {
-    if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines) return;
+    if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0) return;
     if (!shouldShowJournalButton || journalSpotlightActive) return;
 
     let cancelled = false;
     (async () => {
       const seen = await hasSeenJournalIntro();
-      if (seen || cancelled) return;
+      if (seen || cancelled || introSurfaceBusyRef.current) return;
 
       const lines = getJournalIntroLines(homePhase);
       setShowJournalModal(true);
@@ -1200,7 +1319,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     })();
 
     return () => { cancelled = true; };
-  }, [shouldShowJournalButton, homePhase, isOnboarding, showIntroDialogue, introOverrideLines, journalSpotlightActive, hasHomeProgress]);
+  }, [shouldShowJournalButton, homePhase, isOnboarding, showIntroDialogue, introOverrideLines, introOpening, pendingAnimalIntroCount, journalSpotlightActive, hasHomeProgress]);
 
   // First-gate lore intro (one-time, Fox-led): the first time a level-gated
   // room blocks the player (the Jungle Hammock, by default), Fox explains the
@@ -1226,7 +1345,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // It fires whether the player is idling on home OR has opened the room's
   // unlock modal (the intro renders on top, so dismissing reveals Reserve/Skip).
   useEffect(() => {
-    if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines) return;
+    if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0) return;
     const nu = unlockFlow.nextUnlock;
     if (!nu || nu.type !== 'room' || nu.minPuzzles === undefined) return;
     if ((homePuzzleCount || 0) >= nu.minPuzzles) return; // gate already open — no wall
@@ -1250,7 +1369,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     }, GATED_ROOM_INTRO_SETTLE_MS);
 
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [unlockFlow.nextUnlock, unlockFlow.showRoomUnlock, homePuzzleCount, homePhase, isOnboarding, showIntroDialogue, introOverrideLines, animals, hasHomeProgress]);
+  }, [unlockFlow.nextUnlock, unlockFlow.showRoomUnlock, homePuzzleCount, homePhase, isOnboarding, showIntroDialogue, introOverrideLines, introOpening, pendingAnimalIntroCount, animals, hasHomeProgress]);
 
   // First-harvest home safety net (one-time): the victory-modal gate is the
   // primary teacher, but if the player reaches home past the auto-collect
@@ -1259,7 +1378,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // learned flag itself is only set by a real manual offer at the pit, so the
   // victory gate keeps re-arming either way.
   useEffect(() => {
-    if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines) return;
+    if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0) return;
     if ((homePuzzleCount || 0) <= AUTO_COLLECT_PUZZLE_LIMIT) return;
     if (!pendingHarvest || pendingHarvest.pendingBatches <= 0) return;
 
@@ -1268,7 +1387,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       const learned = await hasSeenMandatoryHarvest();
       if (learned || cancelled) return;
       const introSeen = await hasSeenHarvestHomeIntro();
-      if (introSeen || cancelled) return;
+      if (introSeen || cancelled || introSurfaceBusyRef.current) return;
 
       const fox = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
       if (!fox) return;
@@ -1281,7 +1400,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     })();
 
     return () => { cancelled = true; };
-  }, [homePuzzleCount, homePhase, pendingHarvest, isOnboarding, showIntroDialogue, introOverrideLines, animals, hasHomeProgress]);
+  }, [homePuzzleCount, homePhase, pendingHarvest, isOnboarding, showIntroDialogue, introOverrideLines, introOpening, pendingAnimalIntroCount, animals, hasHomeProgress]);
 
   // Gentle heavy-pit nudge (once per app session): when a big pile of amber
   // sits unoffered, Fox mentions it once. The pit-entrance glow remains the
@@ -1289,7 +1408,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // phase transition is pending (the pit_nudge intro owns that moment) and
   // until the pit has been learned (the safety net above owns teaching).
   useEffect(() => {
-    if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines) return;
+    if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0) return;
     if (heavyHarvestNudgeShownThisSession) return;
     if (pitPhaseReady) return;
     if ((homePuzzleCount || 0) <= AUTO_COLLECT_PUZZLE_LIMIT) return;
@@ -1298,7 +1417,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     let cancelled = false;
     (async () => {
       const learned = await hasSeenMandatoryHarvest();
-      if (!learned || cancelled) return;
+      if (!learned || cancelled || introSurfaceBusyRef.current) return;
 
       const fox = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
       if (!fox) return;
@@ -1312,7 +1431,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     })();
 
     return () => { cancelled = true; };
-  }, [homePuzzleCount, homePhase, pendingHarvest, pitPhaseReady, isOnboarding, showIntroDialogue, introOverrideLines, animals, hasHomeProgress]);
+  }, [homePuzzleCount, homePhase, pendingHarvest, pitPhaseReady, isOnboarding, showIntroDialogue, introOverrideLines, introOpening, pendingAnimalIntroCount, animals, hasHomeProgress]);
 
   // The Keeper's Record: Ember's one-time epilogue on the first quiet
   // post-revelation home landing — she reads the whole journey back from the
@@ -1324,7 +1443,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // close handlers alongside the flag, so a re-fire with a shifted ledger
   // can never leave a near-duplicate entry. Forever-once across cycles.
   useEffect(() => {
-    if (!progress || isOnboarding || showIntroDialogue || introOverrideLines) return;
+    if (!progress || isOnboarding || showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0) return;
     if (progress.currentPhase !== 5 || progress.postRevelation !== true) return;
     if (dialogueFlow.showDialogue || pendingHouseCompletion || pitPhaseReady) return;
 
@@ -1332,7 +1451,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const timer = setTimeout(() => {
       (async () => {
         const seen = await hasSeenKeeperRecord();
-        if (seen || cancelled) return;
+        if (seen || cancelled || introSurfaceBusyRef.current) return;
 
         const story = await loadStoryState({ phase: progress.currentPhase,
           puzzlesSolved: progress.puzzlesSolved, cycleCount: progress.cycleCount ?? 0,
@@ -1384,6 +1503,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     isOnboarding,
     showIntroDialogue,
     introOverrideLines,
+    introOpening,
+    pendingAnimalIntroCount,
     dialogueFlow.showDialogue,
     pendingHouseCompletion,
     pitPhaseReady,
@@ -1393,7 +1514,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Unbroken Weave intro: a single quiet post-revelation home landing, held
   // until no ceremony, pit transition, or animal dialogue owns the moment.
   useEffect(() => {
-    if (!progress || isOnboarding || showIntroDialogue || introOverrideLines) return;
+    if (!progress || isOnboarding || showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0) return;
     if (progress.currentPhase !== 5 || progress.postRevelation !== true) return;
     if (dialogueFlow.showDialogue || pendingHouseCompletion || pitPhaseReady) return;
     // The Keeper's Record owns the landing it fired on; pitch the weave next visit.
@@ -1431,6 +1552,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     isOnboarding,
     showIntroDialogue,
     introOverrideLines,
+    introOpening,
+    pendingAnimalIntroCount,
     dialogueFlow.showDialogue,
     pendingHouseCompletion,
     pitPhaseReady,
@@ -1441,7 +1564,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // player into the ritual. Held until no ceremony/dialogue owns the moment;
   // marked seen on close (handleAdvanceIntroDialogue) so it lands once.
   useEffect(() => {
-    if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines) return;
+    if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0) return;
     if (!isSacrificeAvailable(homePhase)) return;
     if (storyOverlayActive || dialogueFlow.showDialogue || pendingHouseCompletion || pitPhaseReady) return;
 
@@ -1466,7 +1589,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [homePhase, isOnboarding, showIntroDialogue, introOverrideLines, storyOverlayActive, dialogueFlow.showDialogue, pendingHouseCompletion, pitPhaseReady, animals, hasHomeProgress]);
+  }, [homePhase, isOnboarding, showIntroDialogue, introOverrideLines, introOpening, pendingAnimalIntroCount, storyOverlayActive, dialogueFlow.showDialogue, pendingHouseCompletion, pitPhaseReady, animals, hasHomeProgress]);
 
   // Ambient home line — atmospheric text when no dialogue is active
   // Fades in, holds for 5s, then fades out to avoid persistent visual clutter.
@@ -1710,102 +1833,192 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const handleAdvanceIntroDialogue = async () => {
     if (!introAnimal || !progress) return;
 
-    const totalIntro = introOverrideLines
-      ? introOverrideLines.length
-      : shouldUseCatchup()
-        ? getCatchupIntroDialogueCount(introAnimal.type, progress.currentPhase)
-        : getIntroDialogueCount(introAnimal.type);
-    const nextIndex = introDialogueIndex + 1;
-
-    if (nextIndex < totalIntro) {
-      // More intro lines to show
-      setIntroDialogueIndex(nextIndex);
-    } else {
-      // Intro complete - mark as seen and close
-      if (introContext === 'challenge_intro') {
-        await markChallengeIntroSeen();
-      } else if (introContext === 'pit_nudge') {
-        await markPitNudgeSeen();
-      } else if (introContext === 'daily_challenge_intro') {
-        await markDailyChallengeIntroSeen();
-      } else if (introContext === 'gated_room_intro') {
-        await markGatedUnlockIntroSeen();
-      } else if (introContext === 'harvest_gate_intro') {
-        await markHarvestHomeIntroSeen();
-      } else if (introContext === 'offering_intro') {
-        await markOfferingIntroSeen();
-      } else if (introContext === 'harvest_heavy_nudge') {
-        // App-session-scoped (heavyHarvestNudgeShownThisSession) — nothing to persist.
-      } else if (introContext === 'unbroken_weave_intro') {
-        // Marked at presentation so the quiet one-time landing cannot re-fire.
-      } else if (introContext === 'keeper_record_intro') {
-        await markKeeperRecordSeen();
-        // The word-memory line is the record's heart — kept in the gallery
-        // exactly once, at the moment the reading counts as heard (recording
-        // at fire time let an interrupted reading re-fire with a shifted
-        // ledger and leave a near-duplicate entry).
-        if (introOverrideLines && introOverrideLines[1]) {
-          recordWhisper({
-            animalType: 'fox',
-            animalName: introAnimal.name,
-            text: introOverrideLines[1],
-            phase: 5,
-            type: 'keepsake',
-          }).catch(() => {});
+    if (introContext === 'acquaintance' && acquaintanceMemory) {
+      if (introSavingRef.current) return;
+      const owner = introPresentationRef.current;
+      const token = owner.current();
+      if (!owner.owns(token)) return;
+      introSavingRef.current = true;
+      setIntroSaving(true);
+      setIntroSaveError(null);
+      try {
+        const next = await advanceAnimalAcquaintance(
+          introAnimal.type, acquaintanceMemory.visit, acquaintanceMemory.page,
+        );
+        if (!owner.owns(token)) return;
+        if (next) {
+          setAcquaintanceMemory(next);
+          setIntroDialogueIndex(next.page);
+          setIntroOverrideLines(next.lines);
+        } else {
+          // The service's expected-page guard also makes retrying this final
+          // receipt safe if marking the original introduction fails.
+          await markIntroSeen(introAnimal.id);
+          const [freshProgress, freshAnimals] = await Promise.all([getFullProgress(), getAnimalsWithStatus()]);
+          if (!owner.owns(token)) return;
+          setProgress(freshProgress);
+          setAnimals(freshAnimals);
+          await dialogueFlow.refreshAcquaintanceState();
+          if (!owner.owns(token)) return;
+          owner.release(token);
+          setShowIntroDialogue(false);
+          setIntroAnimal(null);
+          setIntroDialogueIndex(0);
+          setIntroOverrideLines(null);
+          setAcquaintanceMemory(null);
+          setIntroContext('animal_intro');
         }
-      } else {
-        await markIntroSeen(introAnimal.id);
+      } catch {
+        if (owner.owns(token)) setIntroSaveError("Couldn't save your place. Try again.");
+      } finally {
+        introSavingRef.current = false;
+        setIntroSaving(false);
       }
-      setShowIntroDialogue(false);
-      setIntroAnimal(null);
-      setIntroDialogueIndex(0);
-      setIntroOverrideLines(null);
-      setIntroContext('animal_intro');
+      return;
+    }
+
+    if (introSavingRef.current) return;
+    const owner = introPresentationRef.current;
+    const token = owner.current() ?? owner.claim();
+    if (!owner.owns(token)) return;
+    introSavingRef.current = true;
+    setIntroSaving(true);
+    setIntroSaveError(null);
+    try {
+      const totalIntro = introOverrideLines
+        ? introOverrideLines.length
+        : shouldUseCatchup()
+          ? getCatchupIntroDialogueCount(introAnimal.type, progress.currentPhase)
+          : getIntroDialogueCount(introAnimal.type);
+      const nextIndex = introDialogueIndex + 1;
+
+      if (nextIndex < totalIntro) {
+        // More intro lines to show
+        setIntroDialogueIndex(nextIndex);
+      } else {
+        // Intro complete - mark as seen and close
+        if (introContext === 'challenge_intro') {
+          await markChallengeIntroSeen();
+        } else if (introContext === 'pit_nudge') {
+          await markPitNudgeSeen();
+        } else if (introContext === 'daily_challenge_intro') {
+          await markDailyChallengeIntroSeen();
+        } else if (introContext === 'gated_room_intro') {
+          await markGatedUnlockIntroSeen();
+        } else if (introContext === 'harvest_gate_intro') {
+          await markHarvestHomeIntroSeen();
+        } else if (introContext === 'offering_intro') {
+          await markOfferingIntroSeen();
+        } else if (introContext === 'harvest_heavy_nudge') {
+          // App-session-scoped (heavyHarvestNudgeShownThisSession) — nothing to persist.
+        } else if (introContext === 'unbroken_weave_intro') {
+          // Marked at presentation so the quiet one-time landing cannot re-fire.
+        } else if (introContext === 'keeper_record_intro') {
+          await markKeeperRecordSeen();
+          // The word-memory line is the record's heart — kept in the gallery
+          // exactly once, at the moment the reading counts as heard (recording
+          // at fire time let an interrupted reading re-fire with a shifted
+          // ledger and leave a near-duplicate entry).
+          if (introOverrideLines && introOverrideLines[1]) {
+            recordWhisper({
+              animalType: 'fox',
+              animalName: introAnimal.name,
+              text: introOverrideLines[1],
+              phase: 5,
+              type: 'keepsake',
+            }).catch(() => {});
+          }
+        } else {
+          await markIntroSeen(introAnimal.id);
+        }
+        if (!owner.owns(token)) return;
+        owner.release(token);
+        setShowIntroDialogue(false);
+        setIntroAnimal(null);
+        setIntroDialogueIndex(0);
+        setIntroOverrideLines(null);
+        setIntroContext('animal_intro');
+      }
+    } catch {
+      if (owner.owns(token)) setIntroSaveError("Couldn't save your place. Try again.");
+    } finally {
+      introSavingRef.current = false;
+      setIntroSaving(false);
     }
   };
 
   // Handle closing intro dialogue
   const handleCloseIntroDialogue = async () => {
-    if (introAnimal) {
-      // Mark intros as seen even if closed early so the player isn't forced repeatedly.
-      if (introContext === 'challenge_intro') {
-        await markChallengeIntroSeen();
-      } else if (introContext === 'pit_nudge') {
-        await markPitNudgeSeen();
-      } else if (introContext === 'daily_challenge_intro') {
-        await markDailyChallengeIntroSeen();
-      } else if (introContext === 'gated_room_intro') {
-        await markGatedUnlockIntroSeen();
-      } else if (introContext === 'harvest_gate_intro') {
-        await markHarvestHomeIntroSeen();
-      } else if (introContext === 'offering_intro') {
-        await markOfferingIntroSeen();
-      } else if (introContext === 'harvest_heavy_nudge') {
-        // App-session-scoped (heavyHarvestNudgeShownThisSession) — nothing to persist.
-      } else if (introContext === 'unbroken_weave_intro') {
-        // Marked at presentation so closing this optional introduction is enough.
-      } else if (introContext === 'keeper_record_intro') {
-        // An early close still counts as heard — never force a re-read.
-        await markKeeperRecordSeen();
-        // Keepsake recorded here too: heard is heard, however it ended.
-        if (introOverrideLines && introOverrideLines[1]) {
-          recordWhisper({
-            animalType: 'fox',
-            animalName: introAnimal.name,
-            text: introOverrideLines[1],
-            phase: 5,
-            type: 'keepsake',
-          }).catch(() => {});
-        }
-      } else {
-        await markIntroSeen(introAnimal.id);
+    if (introSavingRef.current) return;
+    const owner = introPresentationRef.current;
+    const token = owner.current() ?? owner.claim();
+    if (!owner.owns(token)) return;
+    introSavingRef.current = true;
+    setIntroSaving(true);
+    setIntroSaveError(null);
+    try {
+      if (introContext === 'acquaintance') {
+        if (!owner.owns(token)) return;
+        owner.release(token);
+        // Opening and advancing already saved the page. Leaving is a pause,
+        // including on the last page; only Finish visit completes this visit.
+        setShowIntroDialogue(false);
+        setIntroAnimal(null);
+        setIntroDialogueIndex(0);
+        setIntroOverrideLines(null);
+        setAcquaintanceMemory(null);
+        setIntroSaveError(null);
+        setIntroContext('animal_intro');
+        return;
       }
+      if (introAnimal) {
+        // Mark intros as seen even if closed early so the player isn't forced repeatedly.
+        if (introContext === 'challenge_intro') {
+          await markChallengeIntroSeen();
+        } else if (introContext === 'pit_nudge') {
+          await markPitNudgeSeen();
+        } else if (introContext === 'daily_challenge_intro') {
+          await markDailyChallengeIntroSeen();
+        } else if (introContext === 'gated_room_intro') {
+          await markGatedUnlockIntroSeen();
+        } else if (introContext === 'harvest_gate_intro') {
+          await markHarvestHomeIntroSeen();
+        } else if (introContext === 'offering_intro') {
+          await markOfferingIntroSeen();
+        } else if (introContext === 'harvest_heavy_nudge') {
+          // App-session-scoped (heavyHarvestNudgeShownThisSession) — nothing to persist.
+        } else if (introContext === 'unbroken_weave_intro') {
+          // Marked at presentation so closing this optional introduction is enough.
+        } else if (introContext === 'keeper_record_intro') {
+          // An early close still counts as heard — never force a re-read.
+          await markKeeperRecordSeen();
+          // Keepsake recorded here too: heard is heard, however it ended.
+          if (introOverrideLines && introOverrideLines[1]) {
+            recordWhisper({
+              animalType: 'fox',
+              animalName: introAnimal.name,
+              text: introOverrideLines[1],
+              phase: 5,
+              type: 'keepsake',
+            }).catch(() => {});
+          }
+        } else {
+          await markIntroSeen(introAnimal.id);
+        }
+      }
+      if (!owner.owns(token)) return;
+      owner.release(token);
+      setShowIntroDialogue(false);
+      setIntroAnimal(null);
+      setIntroDialogueIndex(0);
+      setIntroOverrideLines(null);
+      setIntroContext('animal_intro');
+    } catch {
+      if (owner.owns(token)) setIntroSaveError("Couldn't save your place. Try again.");
+    } finally {
+      introSavingRef.current = false;
+      setIntroSaving(false);
     }
-    setShowIntroDialogue(false);
-    setIntroAnimal(null);
-    setIntroDialogueIndex(0);
-    setIntroOverrideLines(null);
-    setIntroContext('animal_intro');
   };
 
   const handleOpenQuestModal = useCallback(async () => {
@@ -1962,7 +2175,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     [journalSpotlightStepMeta]
   );
 
-  const localOverlayActive = showIntroDialogue || !!introOverrideLines || dialogueFlow.showDialogue ||
+  const localOverlayActive = showIntroDialogue || !!introOverrideLines || introOpening || pendingAnimalIntroCount > 0 || dialogueFlow.showDialogue ||
     showJournalModal || showSeasonModal || showUtilityModal || showQuestModal ||
     unlockFlow.showShop || unlockFlow.showRoomUnlock !== null || unlockFlow.showInvitePrompt ||
     showHouseCompletion || journalSpotlightActive || showStoryInspection;
@@ -2378,6 +2591,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       )}
 
       {/* Cooldown Message Toast */}
+      {introOpenError && !dialogueFlow.cooldownMessage ? (
+        <View
+          style={[styles.cooldownToast, { backgroundColor: dt.cooldownBg, borderColor: dt.cooldownBorder }]}
+          pointerEvents="none"
+          accessibilityLiveRegion="polite"
+        >
+          <AppText textRole="body" style={styles.cooldownToastText}>{introOpenError}</AppText>
+        </View>
+      ) : null}
       {Boolean(dialogueFlow.cooldownMessage) && (
         <Animated.View
           style={[
@@ -2406,11 +2628,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         onRequestClose={dialogueFlow.handleCloseDialogue}
       >
         <View style={[styles.modalOverlay, { backgroundColor: dt.overlayBg }]} accessibilityViewIsModal>
-          {/* The scrim is a close control only while closing is allowed. On
-              the choice page the card holds until an answer is picked, so the
-              control is not rendered rather than rendered inert: a screen
-              reader must never be offered a "Close" that does nothing. */}
-          {!dialogueFlow.choiceOpen && (
+          {/* An unanswered question can wait. Only an answer being saved
+              briefly holds the sheet open. */}
+          {!dialogueFlow.choiceSaving && (
             <Pressable style={StyleSheet.absoluteFill} onPress={dialogueFlow.handleCloseDialogue}
               accessibilityLabel="Close dialogue" accessibilityRole="button" />
           )}
@@ -2445,10 +2665,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             {dialogueFlow.selectedAnimal && (
               <ScrollView style={{ maxHeight: readingHeight - screenInsets.top - screenInsets.bottom - 24 }} contentContainerStyle={styles.dialogueRow} bounces={false}>
                 {dialogueFlow.choiceOpen && dialogueFlow.activeChoice ? (
-                  /* The card turned over: the relationship choice takes the
-                     whole sheet (see DialogueChoicePage). Neither column
-                     renders, so there is no Next, no Close and no portrait
-                     alcove competing with the two answers. */
+                  /* The question and replies share the full reading sheet. */
                   <DialogueChoicePage
                     animalType={dialogueFlow.selectedAnimal.type}
                     name={dialogueFlow.selectedAnimal.name}
@@ -2463,6 +2680,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     inkBody={panelSt.body}
                     inkMuted={panelSt.muted}
                     onChoose={dialogueFlow.handleDialogueChoice}
+                    onLater={dialogueFlow.handleCloseDialogue}
+                    saving={dialogueFlow.choiceSaving}
+                    error={dialogueFlow.choiceError}
                   />
                 ) : (
                 <>
@@ -2559,10 +2779,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
                 {/* Text column - 70% width */}
                 <View style={styles.dialogueTextCol}>
-                  {/* The answer the player just gave stays on the card, dimmed,
+                  {/* The answer the player just gave stays on the card,
                       above the reply it drew (cleared when the reply is left). */}
                   {dialogueFlow.choiceEcho ? (
-                    <DialogueChoiceEcho text={dialogueFlow.choiceEcho} inkMuted={panelSt.muted} />
+                    <DialogueChoiceEcho text={dialogueFlow.choiceEcho} inkMuted={panelSt.muted} inkBody={panelSt.body} />
                   ) : null}
                   {/* The bubble renders the progressively-revealed text (F25);
                       tapping it while the reveal is still in progress jumps
@@ -2587,6 +2807,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   </TouchableOpacity>
 
                   <View>
+                  {dialogueFlow.canOfferAcquaintance ? (
+                    <BevelRowButton
+                      phase={progress.currentPhase}
+                      variant="secondary"
+                      hostDark={dtHostDark}
+                      onPress={dialogueFlow.handleOpenAcquaintance}
+                      soundKind="dialogue"
+                      accessibilityLabel="Tell me about yourself"
+                      style={styles.dialogueNextFriendBevel}
+                    >
+                      <AppText textRole="label" style={[styles.nextFriendButtonText, { color: pixelSkin.ink.secondary }]}>
+                        Tell me about yourself
+                      </AppText>
+                    </BevelRowButton>
+                  ) : null}
                   {nextFriendWithNews ? (
                     <BevelRowButton
                       phase={progress.currentPhase}
@@ -2623,11 +2858,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         }
                       }}
                       soundKind="dialogue"
-                      accessibilityLabel="Continue dialogue"
+                      accessibilityLabel={dialogueFlow.activeChoice && dialogueFlow.dialogueText === dialogueFlow.activeChoice.prompt ? 'Choose a response' : 'Continue dialogue'}
                       style={styles.dialogueContinueBevel}
                     >
                       <AppText textRole="label" style={[styles.continueButtonText, { color: pixelSkin.ink.primary }]}>
-                        {dialogueFlow.hasMoreToShow ? 'Next' : 'Close'}
+                        {dialogueFlow.activeChoice && dialogueFlow.dialogueText === dialogueFlow.activeChoice.prompt ? 'Choose a response' : dialogueFlow.hasMoreToShow ? 'Next' : 'Close'}
                       </AppText>
                     </BevelRowButton>
                   </View>
@@ -3454,8 +3689,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         onRequestClose={handleCloseIntroDialogue}
       >
         <View style={[styles.modalOverlay, { backgroundColor: dt.overlayBg }]} accessibilityViewIsModal>
-          <Pressable style={StyleSheet.absoluteFill} onPress={handleCloseIntroDialogue}
-            accessibilityLabel="Close intro dialogue" accessibilityRole="button" />
+          {!introSaving && (
+            <Pressable style={StyleSheet.absoluteFill} onPress={handleCloseIntroDialogue}
+              accessibilityLabel="Close intro dialogue" accessibilityRole="button" />
+          )}
           <Animated.View
             style={[
               styles.dialogueModal,
@@ -3578,24 +3815,51 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       edgeDp={CARD_EDGE_DP}
                       fillColor={pixelSkin.fillCard}
                     />
+                    {acquaintanceMemory && introContext === 'acquaintance' ? (
+                      <AppText textRole="label" style={{ color: panelSt.muted, marginBottom: 10 }}>
+                        {acquaintanceMemory.title}
+                      </AppText>
+                    ) : null}
                     <DialogueBody text={getCurrentIntroText()} style={[styles.dialogueText, { color: panelSt.body }]} />
                   </View>
 
+                  {introSaveError ? (
+                    <AppText textRole="body" accessibilityLiveRegion="polite" style={{ color: panelSt.body, marginTop: 12 }}>
+                      {introSaveError}
+                    </AppText>
+                  ) : null}
                   <View style={styles.dialogueFooter}>
                     <BevelRowButton
                       phase={progress.currentPhase}
                       variant="primary"
                       hostDark={dtHostDark}
                       onPress={handleAdvanceIntroDialogue}
+                      disabled={introSaving}
                       soundKind="dialogue"
-                      accessibilityLabel={hasMoreIntroDialogues() ? 'Continue intro' : 'Welcome and close'}
+                      accessibilityLabel={introSaveError ? 'Retry saving conversation' : hasMoreIntroDialogues() ? 'Continue intro' : introContext === 'acquaintance' ? 'Finish visit' : 'Welcome and close'}
                       style={styles.dialogueContinueBevel}
                     >
                       <AppText textRole="label" style={[styles.continueButtonText, { color: pixelSkin.ink.primary }]}>
-                        {hasMoreIntroDialogues() ? 'Next' : introContext === 'animal_intro' ? 'Welcome!' : 'Continue'}
+                        {introSaveError ? 'Try again' : hasMoreIntroDialogues() ? 'Next' : introContext === 'acquaintance' ? 'Finish visit' : introContext === 'animal_intro' ? 'Welcome!' : 'Continue'}
                       </AppText>
                     </BevelRowButton>
                   </View>
+                  {introContext === 'acquaintance' ? (
+                    <BevelRowButton
+                      phase={progress.currentPhase}
+                      variant="secondary"
+                      hostDark={dtHostDark}
+                      onPress={handleCloseIntroDialogue}
+                      disabled={introSaving}
+                      soundKind="dialogue"
+                      accessibilityLabel="Come back later"
+                      style={styles.dialogueNextFriendBevel}
+                    >
+                      <AppText textRole="label" style={[styles.nextFriendButtonText, { color: pixelSkin.ink.secondary }]}>
+                        Come back later
+                      </AppText>
+                    </BevelRowButton>
+                  ) : null}
                 </View>
               </ScrollView>
             )}

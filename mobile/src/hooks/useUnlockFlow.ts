@@ -37,6 +37,8 @@ interface UseUnlockFlowParams {
    * portrait would deliver the OTHER intro's script.
    */
   resetIntroOverrides?: () => void;
+  /** Open the host's durable personal-introduction flow for a new resident. */
+  onAnimalIntroduction?: (animal: Animal) => Promise<void>;
   /**
    * Run the victory-free achievement check after anything that changes the
    * unlocked room/animal COUNTS. Four achievements (first_animal, animals_5,
@@ -113,6 +115,7 @@ export function useUnlockFlow({
   setShowIntroDialogue,
   resetIntroOverrides,
   onUnlockCompleted,
+  onAnimalIntroduction,
 }: UseUnlockFlowParams): UseUnlockFlowReturn {
   const [showShop, setShowShop] = useState(false);
   const [showRoomUnlock, setShowRoomUnlock] = useState<Room | null>(null);
@@ -132,6 +135,34 @@ export function useUnlockFlow({
   } | null>(null);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
   const introTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // loadAllData updates phase/intro state before the delay fires. Always call
+  // the latest host callback so a just-unlocked animal gets the current visit.
+  const introCallbacksRef = useRef({ onAnimalIntroduction, resetIntroOverrides,
+    setIntroAnimal, setIntroDialogueIndex, setShowIntroDialogue });
+  useEffect(() => {
+    introCallbacksRef.current = { onAnimalIntroduction, resetIntroOverrides,
+      setIntroAnimal, setIntroDialogueIndex, setShowIntroDialogue };
+  }, [onAnimalIntroduction, resetIntroOverrides, setIntroAnimal, setIntroDialogueIndex, setShowIntroDialogue]);
+
+  const scheduleAnimalIntroduction = useCallback((animal: Animal) => {
+    if (introTimeoutRef.current) clearTimeout(introTimeoutRef.current);
+    introTimeoutRef.current = setTimeout(() => {
+      introTimeoutRef.current = null;
+      const callbacks = introCallbacksRef.current;
+      if (callbacks.onAnimalIntroduction) {
+        void callbacks.onAnimalIntroduction(animal).catch(() => {
+          // The purchase already succeeded. Do not consume the unseen intro
+          // or retry the purchase; the resident remains tappable for a retry.
+          setPurchaseError("Your friend has arrived, but their conversation couldn't open. Tap them to try again.");
+        });
+        return;
+      }
+      callbacks.resetIntroOverrides?.();
+      callbacks.setIntroAnimal(animal);
+      callbacks.setIntroDialogueIndex(0);
+      callbacks.setShowIntroDialogue(true);
+    }, 300);
+  }, []);
 
   // Cleanup intro timeout on unmount
   useEffect(() => {
@@ -277,20 +308,14 @@ export function useUnlockFlow({
       if (unlock.type === 'character') {
         const animal = ANIMALS.find(a => a.id === unlock.targetId);
         if (animal) {
-          if (introTimeoutRef.current) clearTimeout(introTimeoutRef.current);
-          introTimeoutRef.current = setTimeout(() => {
-            introTimeoutRef.current = null;
-            setIntroAnimal(animal as unknown as Animal);
-            setIntroDialogueIndex(0);
-            setShowIntroDialogue(true);
-          }, 300);
+          scheduleAnimalIntroduction(animal as unknown as Animal);
         }
       }
     } else {
       hapticError();
       setPurchaseError(result.error || 'Unable to skip the wait right now.');
     }
-  }, [loadAllData, onAmberChange, onUnlockCompleted, setShowCelebration, setIntroAnimal, setIntroDialogueIndex, setShowIntroDialogue]);
+  }, [loadAllData, onAmberChange, onUnlockCompleted, setShowCelebration, scheduleAnimalIntroduction]);
 
   // Speed up an already-reserved unlock: pay the remaining premium, unlock now.
   const handleSpeedUpReserved = useCallback(async (unlock: Unlockable) => {
@@ -308,20 +333,14 @@ export function useUnlockFlow({
       if (unlock.type === 'character') {
         const animal = ANIMALS.find(a => a.id === unlock.targetId);
         if (animal) {
-          if (introTimeoutRef.current) clearTimeout(introTimeoutRef.current);
-          introTimeoutRef.current = setTimeout(() => {
-            introTimeoutRef.current = null;
-            setIntroAnimal(animal as unknown as Animal);
-            setIntroDialogueIndex(0);
-            setShowIntroDialogue(true);
-          }, 300);
+          scheduleAnimalIntroduction(animal as unknown as Animal);
         }
       }
     } else {
       hapticError();
       setPurchaseError(result.error || 'Unable to speed this up right now.');
     }
-  }, [loadAllData, onAmberChange, onUnlockCompleted, setShowCelebration, setIntroAnimal, setIntroDialogueIndex, setShowIntroDialogue]);
+  }, [loadAllData, onAmberChange, onUnlockCompleted, setShowCelebration, scheduleAnimalIntroduction]);
 
   // Handle unlock purchase
   const handlePurchase = useCallback(async (unlock: Unlockable, options?: { suppressIntro?: boolean }) => {
@@ -350,24 +369,14 @@ export function useUnlockFlow({
       if (unlock.type === 'character' && !options?.suppressIntro) {
         const animal = ANIMALS.find(a => a.id === unlock.targetId);
         if (animal) {
-          if (introTimeoutRef.current) clearTimeout(introTimeoutRef.current);
-          introTimeoutRef.current = setTimeout(() => {
-            introTimeoutRef.current = null;
-            // Clean slate: a HomeScreen one-time intro may have claimed the
-            // shared intro state during this delay — the new character's
-            // intro must never render with another intro's override script.
-            resetIntroOverrides?.();
-            setIntroAnimal(animal as unknown as Animal);
-            setIntroDialogueIndex(0);
-            setShowIntroDialogue(true);
-          }, 300);
+          scheduleAnimalIntroduction(animal as unknown as Animal);
         }
       }
     } else {
       hapticError();
       setPurchaseError(result.error || 'Unable to unlock. Try again later.');
     }
-  }, [loadAllData, onAmberChange, onUnlockCompleted, setShowCelebration, setIntroAnimal, setIntroDialogueIndex, setShowIntroDialogue, resetIntroOverrides]);
+  }, [loadAllData, onAmberChange, onUnlockCompleted, setShowCelebration, scheduleAnimalIntroduction]);
 
   return {
     showShop,
@@ -396,3 +405,4 @@ export function useUnlockFlow({
     recheckAffordability,
   };
 }
+

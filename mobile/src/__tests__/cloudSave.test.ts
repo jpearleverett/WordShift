@@ -2,6 +2,10 @@ import { clearEvents } from '../services/eventLogger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { clearStoryState, loadStoryState, recordStoryBoundary, STORY_STORAGE_KEY } from '../services/storySpine';
 import {
+  ACQUAINTANCE_STORAGE_KEY, advanceAnimalAcquaintance, invalidateAnimalAcquaintanceCache,
+  loadAnimalAcquaintanceState, openAnimalAcquaintance,
+} from '../services/animalAcquaintance';
+import {
   collectLocalSaveData,
   restoreFromCloudData,
   setCloudProvider,
@@ -47,6 +51,7 @@ describe('cloudSave', () => {
     await AsyncStorage.clear();
     await clearSyncStatus();
     await clearStoryState();
+    invalidateAnimalAcquaintanceCache();
     await clearHints();
     await clearCosmetics();
     await clearWeeklyQuests();
@@ -322,6 +327,18 @@ describe('cloudSave', () => {
       expect((await loadStoryState(context)).boundary).toBe('remember');
       await restoreFromCloudData({ ...backup, data: {} });
       expect((await loadStoryState(context)).boundary).toBeNull();
+    });
+
+    it('restores an interrupted personal visit over a warm cache and clears it for a legacy cloud save', async () => {
+      const original = await openAnimalAcquaintance('rabbit', 3, 'introduction');
+      const backup = await collectLocalSaveData();
+      expect(JSON.parse(backup.data[ACQUAINTANCE_STORAGE_KEY]).animals.rabbit.active).toEqual(original);
+      await advanceAnimalAcquaintance('rabbit', 0, 0);
+      expect((await loadAnimalAcquaintanceState()).animals.rabbit!.active!.page).toBe(1);
+      expect(await restoreFromCloudData(backup)).toBe(true);
+      expect((await openAnimalAcquaintance('rabbit', 4, 'continue'))).toEqual(original);
+      expect(await restoreFromCloudData({ ...backup, data: {} })).toBe(true);
+      expect((await loadAnimalAcquaintanceState()).animals).toEqual({});
     });
 
     it('invalidates cached service state after overwriting local data', async () => {

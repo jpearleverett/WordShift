@@ -46,6 +46,11 @@ import {
 } from '../services/tending';
 import { buildPhase5Pool } from '../services/dialogue/phase5Pool';
 import { clearChoiceState, recordChoice } from '../services/dialogueChoices';
+import {
+  advanceAnimalAcquaintance, invalidateAnimalAcquaintanceCache, openAnimalAcquaintance,
+} from '../services/animalAcquaintance';
+import { clearAllSessions, isOnCooldown, startCooldown, updatePuzzleCount } from '../services/dialogueSession';
+import { DIALOGUE_SESSION_CONFIG } from '../types/homeWorld';
 
 // Reset state between tests
 beforeEach(async () => {
@@ -53,6 +58,8 @@ beforeEach(async () => {
   await clearProgress();
   await clearTendingState();
   await clearChoiceState();
+  invalidateAnimalAcquaintanceCache();
+  await clearAllSessions();
 });
 
 describe('ROOMS data', () => {
@@ -406,6 +413,45 @@ describe('late-unlock dialogue fast-forward', () => {
 });
 
 describe('getAnimalsWithStatus new-dialogue badge honesty', () => {
+  test('new personal visits stay available through the normal conversation cooldown', async () => {
+    const progress = await loadProgress();
+    progress.currentPhase = 4;
+    progress.unlockedAnimals = ['wombat'];
+    progress.introsSeen = [];
+    progress.lastDialogueRead = { wombat: 9999 };
+    await recordChoice('wombat', 'refuse');
+    updatePuzzleCount(90);
+    for (let session = 0; session < DIALOGUE_SESSION_CONFIG.GRACE_PERIOD_SESSIONS; session += 1) {
+      await startCooldown('wombat');
+    }
+    expect(isOnCooldown('wombat')).toBe(true);
+    expect((await getAnimalsWithStatus()).find(animal => animal.id === 'wombat')!.hasNewDialogue).toBe(true);
+
+    await openAnimalAcquaintance('wombat', 4, 'introduction');
+    progress.introsSeen = ['wombat'];
+    for (let visit = 0; visit < 3; visit += 1) {
+      expect((await getAnimalsWithStatus()).find(animal => animal.id === 'wombat')!.hasNewDialogue).toBe(true);
+      let memory = await openAnimalAcquaintance('wombat', 4, 'continue');
+      while (memory) memory = await advanceAnimalAcquaintance('wombat', memory.visit, memory.page);
+    }
+    expect((await getAnimalsWithStatus()).find(animal => animal.id === 'wombat')!.hasNewDialogue).toBe(false);
+    expect(progress.lastDialogueRead.wombat).toBe(9999);
+  });
+
+  test('existing friends are not auto-enrolled and locked future residents never get a badge', async () => {
+    const progress = await loadProgress();
+    progress.currentPhase = 4;
+    progress.unlockedAnimals = ['wombat'];
+    progress.introsSeen = ['wombat'];
+    progress.lastDialogueRead = { wombat: 9999 };
+    await recordChoice('wombat', 'refuse');
+    const animals = await getAnimalsWithStatus();
+    expect(animals.find(animal => animal.id === 'wombat')!.hasNewDialogue).toBe(false);
+    expect(animals.find(animal => animal.id === 'kakapo')!.hasNewDialogue).toBe(false);
+    await openAnimalAcquaintance('wombat', 4, 'optional');
+    expect((await getAnimalsWithStatus()).find(animal => animal.id === 'wombat')!.hasNewDialogue).toBe(true);
+  });
+
   test('an unanswered reveal choice is news after the regular dialogue is exhausted', async () => {
     const p = await loadProgress();
     p.currentPhase = 4;
@@ -999,4 +1045,3 @@ describe('getLockedRoomCardSub', () => {
 // These service/UI tests enqueue telemetry events; cancel their debounce before
 // Jest disposes the module registry and its lazy telemetry import.
 afterEach(clearEvents);
-

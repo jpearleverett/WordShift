@@ -2,6 +2,7 @@ import storage, { recoverPendingStorageTransaction, runStorageTransaction } from
 import { SYNC_KEYS, SYNC_KEY_PREFIXES, invalidateRestoredServiceCaches } from './cloudSave';
 import { canStartNewCycle, getFullProgress, startNewCycle } from './amberCurrency';
 import { beginStoryCycle } from './storySpine';
+import { ACQUAINTANCE_STORAGE_KEY } from './animalAcquaintance';
 
 const RESET_DEVICE_KEYS = new Set([
   'wordshift_device_id', 'wordshift_event_log', 'wordshift_entitlements',
@@ -33,6 +34,7 @@ export async function commitFullLocalReset(): Promise<void> {
 }
 
 const NEW_CYCLE_NARRATIVE_KEYS = [
+  ACQUAINTANCE_STORAGE_KEY,
   'wordshift_dialogue_sessions', 'wordshift_narrative_delivery',
   'wordshift_dialogue_choices', 'wordshift_micro_beats_seen',
   'wordshift_cycle_beats_seen', 'wordshift_offering_requests',
