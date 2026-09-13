@@ -7,6 +7,7 @@ import { isOnCooldown } from './dialogueSession';
 import { logEvent } from './eventLogger';
 import { loadTendingState, hasNewPhase5Line } from './tending';
 import { loadChoiceState, hasPendingDialogueChoice } from './dialogueChoices';
+import { loadAnimalAcquaintanceState, hasPendingAnimalAcquaintance } from './animalAcquaintance';
 import { buildPhase5Pool, buildPhase5Eligibility } from './dialogue/phase5Pool';
 import { UNLOCK_SKIP_PREMIUM, PHASE_THRESHOLDS } from '../constants/gameBalance';
 
@@ -1530,6 +1531,7 @@ export async function getAnimalsWithStatus(): Promise<Animal[]> {
   const nearEndgame = progress.currentPhase >= 5;
   const tendingState = nearEndgame ? await loadTendingState() : null;
   const choiceState = progress.currentPhase >= 2 ? await loadChoiceState() : null;
+  const acquaintanceState = await loadAnimalAcquaintanceState();
   // Phase-2 exhaustion pool: badge honesty for animals whose base block is
   // done but who still have undelivered pool lines. Loaded once, not per animal.
   const phase2Cursors = progress.currentPhase >= 1 && progress.currentPhase <= 3
@@ -1544,9 +1546,13 @@ export async function getAnimalsWithStatus(): Promise<Animal[]> {
     const unlocked = progress.unlockedAnimals.includes(animal.id);
     const dialogueIndex = progress.lastDialogueRead[animal.id] ?? 0;
 
-    // Compute hasNewDialogue: true when animal has unread dialogue and is available
-    let hasNewDialogue = false;
-    if (unlocked && !isOnCooldown(animal.id)) {
+    // Getting to know a new friend never requires waiting for the normal
+    // conversation cooldown. Existing friends are enrolled only if they ask.
+    let hasNewDialogue = unlocked && hasPendingAnimalAcquaintance(
+      acquaintanceState, animal.type, progress.currentPhase,
+      (progress.introsSeen ?? []).includes(animal.id),
+    );
+    if (unlocked && !hasNewDialogue && !isOnCooldown(animal.id)) {
       const animalPhase = getAnimalPhase(progress.currentPhase, animal.type);
       if (animalPhase === 5 && tendingState) {
         // Post-revelation is pool-only. Regular Phase 3/4 backlog is retired
@@ -1662,4 +1668,3 @@ export const ANIMAL_EMOJIS: Record<AnimalType, string> = {
   aye_aye: '🐒',
   kakapo: '🦜',
 };
-

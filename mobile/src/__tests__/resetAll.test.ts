@@ -119,6 +119,10 @@ import {
 import { initHints, addHints, getHintBalance, clearHints } from '../services/hints';
 import { updateSetting, getSettings, resetSettings } from '../services/settings';
 import { clearStoryState, loadStoryState, recordStoryBoundary, STORY_STORAGE_KEY } from '../services/storySpine';
+import {
+  ACQUAINTANCE_STORAGE_KEY, invalidateAnimalAcquaintanceCache,
+  loadAnimalAcquaintanceState, openAnimalAcquaintance,
+} from '../services/animalAcquaintance';
 import { STARTING_FREE_HINTS } from '../constants/gameBalance';
 
 describe('performFullReset', () => {
@@ -131,6 +135,7 @@ describe('performFullReset', () => {
     await resetOnboarding();
     await resetSettings();
     await clearStoryState();
+    invalidateAnimalAcquaintanceCache();
   });
 
   test('returns every key service to virgin state without a restart', async () => {
@@ -142,6 +147,7 @@ describe('performFullReset', () => {
     await addHints(3, 'test_seed');
     await updateSetting('soundEnabled', false);
     await recordStoryBoundary({ phase: 4, puzzlesSolved: 116, cycleCount: 0, unlockedAnimals: ['fox'] }, 'CLOSED');
+    await openAnimalAcquaintance('rabbit', 4, 'optional');
 
     // Sanity: the save is non-virgin before the reset
     expect(await getAmberBalance()).toBeGreaterThan(0);
@@ -175,6 +181,8 @@ describe('performFullReset', () => {
     // it must actually be gone from storage after the wipe.
     expect(await AsyncStorage.getItem('wordshift_home_progress')).toBeNull();
     expect(await AsyncStorage.getItem(STORY_STORAGE_KEY)).toBeNull();
+    expect(await AsyncStorage.getItem(ACQUAINTANCE_STORAGE_KEY)).toBeNull();
+    expect((await loadAnimalAcquaintanceState()).animals).toEqual({});
   });
 
   // The post-reset upload is the ONLY thing keeping the bootstrap's
@@ -191,6 +199,7 @@ describe('performFullReset', () => {
     }));
     invalidateProgressCache();
     await recordStoryBoundary({ phase: 5, puzzlesSolved: 120, cycleCount: 0, unlockedAnimals: ['fox'] }, 'CLOSER');
+    await openAnimalAcquaintance('rabbit', 5, 'optional');
     expect(await performNewCycle()).toBe(1);
     const next = await getFullProgress();
     const state = await loadStoryState({ phase: next.currentPhase, puzzlesSolved: next.puzzlesSolved,
@@ -198,6 +207,8 @@ describe('performFullReset', () => {
     expect(state.boundary).toBeNull();
     expect(state.carriedBoundary).toBe('release');
     expect(state.memories).toEqual({});
+    expect(await AsyncStorage.getItem(ACQUAINTANCE_STORAGE_KEY)).toBeNull();
+    expect((await loadAnimalAcquaintanceState()).animals).toEqual({});
   });
 
   test('stamps a local reset marker when the post-reset upload does not land', async () => {

@@ -117,6 +117,7 @@ jest.mock('../services/dialogueSession', () => ({
 
 jest.mock('../services/amberCurrency', () => ({
   markDialogueRead: jest.fn(async () => {}),
+  markIntroSeen: jest.fn(async () => {}),
   consumeTriggerWords: jest.fn(async () => []),
   consumePendingVariantTutorial: jest.fn(async () => null),
   wereTutorialSeedsPlanted: jest.fn(async () => true),
@@ -139,6 +140,11 @@ jest.mock('../services/dialogueChoices', () => ({
   loadChoiceState: jest.fn(async () => ({ choices: {} })),
   getPhase4CallbackPage: jest.fn(async () => null),
   markPhase4CallbackShown: jest.fn(async () => {}),
+}));
+
+jest.mock('../services/animalAcquaintance', () => ({
+  ...jest.requireActual('../services/animalAcquaintance'),
+  loadAnimalAcquaintanceState: jest.fn(async () => ({ version: 1, animals: {} })),
 }));
 
 jest.mock('../services/whisperGallery', () => ({
@@ -176,7 +182,7 @@ jest.mock('../services/dialogue/phase5Pool', () => ({
 import { useDialogueFlow, splitDialogueIntoPages } from '../hooks/useDialogueFlow';
 import { getCurrentDialogue, getCoordinatedEventLine } from '../services/animalDialogue';
 import { checkDialogueAvailability, recordDialogue, endSession } from '../services/dialogueSession';
-import { markDialogueRead } from '../services/amberCurrency';
+import { markDialogueRead, markIntroSeen } from '../services/amberCurrency';
 import { recordWhisper } from '../services/whisperGallery';
 import { setPhase5CaughtUp } from '../services/tending';
 import { getChoiceForAnimal, recordChoice } from '../services/dialogueChoices';
@@ -1128,7 +1134,7 @@ describe('useDialogueFlow exhausted regular block (no last-line replay)', () => 
   });
 });
 
-describe('useDialogueFlow choice page (the card turns over, must answer, echoed pick)', () => {
+describe('useDialogueFlow choice page (replies, postponement, echoed pick)', () => {
   const CHOICE = {
     prompt: 'Ember has warmed two cups. She keeps turning yours by the handle.',
     options: { ask: 'What did you know when I arrived?', refuse: 'I need some time before we talk.' },
@@ -1179,7 +1185,7 @@ describe('useDialogueFlow choice page (the card turns over, must answer, echoed 
     expect(markDialogueReadMock).not.toHaveBeenCalled();
   });
 
-  it('must answer: close paths are refused while the card is turned over', async () => {
+  it('can postpone an unanswered question without consuming it or starting cooldown', async () => {
     let hook = renderAt3();
     await hook.handleAnimalTap(pangolin as never);
     hook = renderAt3();
@@ -1189,10 +1195,16 @@ describe('useDialogueFlow choice page (the card turns over, must answer, echoed 
 
     await hook.handleCloseDialogue();
     hook = renderAt3();
-    expect(hook.showDialogue).toBe(true);
-    expect(hook.choiceOpen).toBe(true);
+    expect(hook.showDialogue).toBe(false);
+    expect(hook.choiceOpen).toBe(false);
     expect(endSession).not.toHaveBeenCalled();
     expect(recordChoice).not.toHaveBeenCalled();
+    expect(markDialogueReadMock).not.toHaveBeenCalled();
+    (getChoiceForAnimal as jest.Mock).mockResolvedValueOnce(CHOICE);
+    await hook.handleAnimalTap(pangolin as never);
+    hook = renderAt3();
+    expect(hook.activeChoice).toEqual(CHOICE);
+    expect(hook.dialogueText).toBe(CHOICE.prompt);
   });
 
   it('picking an answer turns the card back with the pick echoed above the reply, then clears it', async () => {
@@ -1344,11 +1356,14 @@ describe('choice delivery during the current visit', () => {
     expect(hook.choiceOpen).toBe(true);
     expect(hook.activeChoice).toBe(CHOICE);
     expect(hook.choiceEcho).toBeNull();
+    expect(hook.choiceSaving).toBe(false);
+    expect(hook.choiceError).toMatch(/couldn't be saved/);
     await hook.handleDialogueChoice('refuse');
     hook = renderReveal();
     expect(recordChoice).toHaveBeenCalledTimes(2);
     expect(hook.choiceOpen).toBe(false);
     expect(hook.dialogueText).toBe(CHOICE.responses.refuse);
+    expect(hook.choiceError).toBeNull();
   });
 
   it('accepts one answer while the first tap is still saving', async () => {
@@ -1360,10 +1375,136 @@ describe('choice delivery during the current visit', () => {
     await hook.handleNextDialogue();
     hook = renderReveal();
     const first = hook.handleDialogueChoice('ask');
+    hook = renderReveal();
+    expect(hook.choiceSaving).toBe(true);
     await hook.handleDialogueChoice('refuse');
+    await hook.handleCloseDialogue();
+    await hook.handleNextDialogue();
+    expect(renderReveal().showDialogue).toBe(true);
     expect(recordChoice).toHaveBeenCalledTimes(1);
     finish({ choice: 'ask', response: CHOICE.responses.ask, convergence: CHOICE.convergence });
     await first;
-    expect(renderReveal().choiceEcho).toBe(CHOICE.options.ask);
+    hook = renderReveal();
+    expect(hook.choiceEcho).toBe(CHOICE.options.ask);
+    expect(hook.choiceSaving).toBe(false);
+    await hook.handleCloseDialogue();
+    expect(renderReveal().showDialogue).toBe(false);
+  });
+});
+
+
+describe('late-resident personal visits before regular dialogue', () => {
+  const acquaintance = require('../services/animalAcquaintance');
+  const sessions = require('../services/dialogueSession');
+  const thyme = { ...pangolin, id: 'rabbit', type: 'rabbit', name: 'Thyme', currentDialogueIndex: 76 };
+  let acquaintanceProgress: Omit<typeof progress, 'introsSeen'> & { introsSeen: string[] };
+  const presentAcquaintance = jest.fn(async () => {});
+  function renderPersonal() {
+    rewindHookIndices();
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    return useDialogueFlow({ progress: acquaintanceProgress as never, setAnimals: setAnimals as never,
+      onAcquaintance: presentAcquaintance });
+  }
+  beforeEach(() => {
+    resetHookState();
+    jest.clearAllMocks();
+    acquaintanceProgress = { ...progress, currentPhase: 3, unlockedAnimals: ['pangolin', 'rabbit'], introsSeen: ['pangolin'] };
+    animals = [pangolin, thyme];
+    acquaintance.loadAnimalAcquaintanceState.mockResolvedValue({ version: 1, animals: {} });
+    sessions.checkDialogueAvailability.mockResolvedValue({ available: true });
+    sessions.isOnCooldown.mockReturnValue(false);
+    sessions.getSessionStatus.mockReturnValue({ status: 'in_session', dialoguesRemaining: 5 });
+    (getChoiceForAnimal as jest.Mock).mockReset().mockResolvedValue(null);
+    getCurrentDialogueMock.mockReturnValue({ text: 'An ordinary conversation.' });
+    presentAcquaintance.mockResolvedValue(undefined);
+  });
+
+  it('opens a new late resident before cooldown, choices, or regular cursor writes', async () => {
+    sessions.checkDialogueAvailability.mockResolvedValue({ available: false });
+    let hook = renderPersonal();
+    await hook.handleAnimalTap(thyme as never);
+    hook = renderPersonal();
+    expect(presentAcquaintance).toHaveBeenCalledWith(thyme);
+    expect(checkDialogueAvailability).not.toHaveBeenCalled();
+    expect(getChoiceForAnimal).not.toHaveBeenCalled();
+    expect(markDialogueRead).not.toHaveBeenCalled();
+    expect(recordDialogue).not.toHaveBeenCalled();
+    expect(hook.showDialogue).toBe(false);
+  });
+
+  it('keeps an enrolled visit freely available after the first introduction', async () => {
+    acquaintanceProgress = { ...acquaintanceProgress, introsSeen: ['pangolin', 'rabbit'] };
+    acquaintance.loadAnimalAcquaintanceState.mockResolvedValue({ version: 1, animals: { rabbit: { nextVisit: 1 } } });
+    sessions.checkDialogueAvailability.mockResolvedValue({ available: false });
+    const hook = renderPersonal();
+    await hook.handleAnimalTap(thyme as never);
+    expect(presentAcquaintance).toHaveBeenCalledWith(thyme);
+    expect(checkDialogueAvailability).not.toHaveBeenCalled();
+    expect(markDialogueRead).not.toHaveBeenCalled();
+  });
+
+  it('does not automatically reintroduce an existing friend, but offers an optional visit', async () => {
+    acquaintanceProgress = { ...acquaintanceProgress, introsSeen: ['pangolin', 'rabbit'] };
+    let hook = renderPersonal();
+    await hook.handleAnimalTap(thyme as never);
+    hook = renderPersonal();
+    expect(presentAcquaintance).not.toHaveBeenCalled();
+    expect(hook.showDialogue).toBe(true);
+    expect(hook.canOfferAcquaintance).toBe(true);
+    await hook.handleOpenAcquaintance();
+    expect(presentAcquaintance).toHaveBeenCalledWith(thyme, true);
+    expect(renderPersonal().showDialogue).toBe(false);
+    expect(recordChoice).not.toHaveBeenCalled();
+  });
+
+  it('does not replace completed personal visits with a second introduction', async () => {
+    acquaintanceProgress = { ...acquaintanceProgress, introsSeen: ['pangolin', 'rabbit'] };
+    acquaintance.loadAnimalAcquaintanceState.mockResolvedValue({ version: 1, animals: { rabbit: { nextVisit: 3 } } });
+    let hook = renderPersonal();
+    await hook.handleAnimalTap(thyme as never);
+    hook = renderPersonal();
+    expect(presentAcquaintance).not.toHaveBeenCalled();
+    expect(hook.showDialogue).toBe(true);
+    expect(hook.canOfferAcquaintance).toBe(false);
+  });
+
+  it('offers an enrolled friend in the visit chain despite a spent session and cooldown', async () => {
+    acquaintanceProgress = { ...acquaintanceProgress, introsSeen: ['pangolin', 'rabbit'] };
+    acquaintance.loadAnimalAcquaintanceState.mockResolvedValue({ version: 1, animals: { rabbit: { nextVisit: 1 } } });
+    let hook = renderPersonal();
+    await hook.handleAnimalTap(pangolin as never);
+    hook = renderPersonal();
+    sessions.isOnCooldown.mockReturnValue(true);
+    sessions.getSessionStatus.mockReturnValue({ status: 'in_session', dialoguesRemaining: 0 });
+    expect(hook.getNextAnimalWithNews([pangolin, thyme] as never)).toEqual(thyme);
+  });
+
+
+  it.each([1, 3])('repairs an interrupted intro-flag write from durable visit %i without replaying it', async (nextVisit) => {
+    acquaintance.loadAnimalAcquaintanceState.mockResolvedValue({ version: 1, animals: { rabbit: { nextVisit } } });
+    const hook = renderPersonal();
+    await hook.handleAnimalTap(thyme as never);
+    expect(markIntroSeen).toHaveBeenCalledWith('rabbit');
+    if (nextVisit === 1) {
+      expect(presentAcquaintance).toHaveBeenCalledWith(thyme);
+      expect(checkDialogueAvailability).not.toHaveBeenCalled();
+    } else {
+      expect(presentAcquaintance).not.toHaveBeenCalled();
+      expect(renderPersonal().showDialogue).toBe(true);
+    }
+  });
+
+  it('keeps a failed personal visit retryable and never falls into skipped regular material', async () => {
+    presentAcquaintance.mockRejectedValueOnce(new Error('disk full'));
+    let hook = renderPersonal();
+    await hook.handleAnimalTap(thyme as never);
+    hook = renderPersonal();
+    expect(hook.cooldownMessage).toMatch(/try again/);
+    expect(hook.showDialogue).toBe(false);
+    expect(checkDialogueAvailability).not.toHaveBeenCalled();
+    expect(markDialogueRead).not.toHaveBeenCalled();
+    await hook.handleAnimalTap(thyme as never);
+    expect(presentAcquaintance).toHaveBeenCalledTimes(2);
+    expect(renderPersonal().cooldownMessage).toBeNull();
   });
 });

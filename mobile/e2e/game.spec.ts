@@ -79,6 +79,67 @@ async function openReturningBoard(page: Page) {
   await expect(page.getByRole('button', { name: /^Hint, \d+ remaining$/ })).toBeVisible();
 }
 
+async function openVesperHome(page: Page, introSeen: boolean, answered = false) {
+  await openReturningBoard(page);
+  await page.evaluate(({ seen, hasAnswer }) => {
+    const progress = JSON.parse(localStorage.getItem('wordshift_home_progress')!);
+    const residents = ['fox', 'pangolin', 'owl', 'axolotl', 'sloth', 'fennec_fox', 'capybara', 'wombat', 'rabbit', 'red_panda', 'tarsier'];
+    Object.assign(progress, {
+      puzzlesSolved: 84, currentPhase: 3, phaseProgress: 88,
+      pendingPhaseTransition: null, pendingVariantTutorials: [],
+      seenVariantTutorials: ['reverse', 'double_shift'],
+      unlockedAnimals: residents,
+      unlockedRooms: ['cozy_den', 'kitchen', 'study', 'aquarium', 'jungle_room', 'desert_room', 'office', 'burrow', 'garden', 'bamboo_attic', 'star_loft'],
+      introsSeen: seen ? residents : residents.filter(animal => animal !== 'tarsier'),
+      // Vesper's existing late-unlock cursor: effective phase 4 while the
+      // house is in phase 3. Personal visits must not rewind this ledger.
+      lastDialogueRead: { ...progress.lastDialogueRead, tarsier: 104 },
+    });
+    localStorage.setItem('wordshift_home_progress', JSON.stringify(progress));
+    localStorage.setItem('wordshift_dialogue_choices', JSON.stringify({
+      offeredBy: hasAnswer ? ['tarsier'] : [],
+      choices: hasAnswer ? { tarsier: 'ask' } : {},
+      hasSeenChoice: hasAnswer,
+      phase4CallbackShown: hasAnswer ? ['tarsier'] : [],
+    }));
+    localStorage.removeItem('wordshift_animal_acquaintance');
+    localStorage.removeItem('wordshift_dialogue_sessions');
+    localStorage.setItem('wordshift_sacrifices', JSON.stringify({
+      totalAmberSacrificed: 0, sacrificeCount: 0, sacrificeHistory: [],
+      lastSacrificeTimestamp: 0, introSeen: true,
+    }));
+    for (const key of ['mandatory_harvest', 'modifier_stacking_intro', 'keeper_record', 'unbroken_weave_intro']) {
+      localStorage.setItem(`wordshift_${key}_seen`, 'true');
+    }
+  }, { seen: introSeen, hasAnswer: answered });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('button', { name: 'Play puzzle', exact: true })).toBeVisible();
+}
+
+async function visitVesper(page: Page) {
+  const vesper = page.getByRole('button', { name: 'Vesper the tarsier', exact: true });
+  await vesper.scrollIntoViewIfNeeded();
+  await vesper.click();
+}
+
+async function finishVesperVisit(page: Page, visit: number, fromPage = 0) {
+  // All three selected Vesper visits have four authored pages. Wait for each
+  // durable page before pressing again, so this also catches a stuck modal.
+  for (let current = fromPage; current < 3; current++) {
+    const next = page.getByRole('button', { name: 'Continue intro', exact: true });
+    await next.scrollIntoViewIfNeeded();
+    await next.click();
+    await expect.poll(() => page.evaluate(() =>
+      JSON.parse(localStorage.getItem('wordshift_animal_acquaintance')!).animals.tarsier.active.page,
+    )).toBe(current + 1);
+  }
+  await page.getByRole('button', { name: 'Finish visit', exact: true }).click();
+  await expect.poll(() => page.evaluate(() =>
+    JSON.parse(localStorage.getItem('wordshift_animal_acquaintance')!).animals.tarsier.nextVisit,
+  )).toBe(visit + 1);
+  await expect(page.getByRole('button', { name: 'Finish visit', exact: true })).toHaveCount(0);
+}
+
 async function openVictoryIntroCohort(page: Page, phaseThree = false) {
   await openReturningBoard(page);
   await page.evaluate(lateGame => {
@@ -438,6 +499,113 @@ test('resident dialogue keeps its reading and controls reachable at 320px with e
   await capture(page, 'updated-resident-small-large-text');
   await page.getByRole('button', { name: 'Close dialogue', exact: true }).click({ position: { x: 4, y: 4 } });
   await expect(ember).toBeVisible();
+});
+
+test('a late recruit gets three personal visits and resumes an interrupted welcome without rewinding the story', async ({ page }) => {
+  await openVesperHome(page, false);
+  await visitVesper(page);
+  await expect(page.getByText(/^Up here, on the rail\. I'm Vesper,/)).toBeVisible();
+  await page.getByRole('button', { name: 'Continue intro', exact: true }).click();
+  await expect.poll(() => page.evaluate(() =>
+    JSON.parse(localStorage.getItem('wordshift_animal_acquaintance')!).animals.tarsier.active.page,
+  )).toBe(1);
+  await page.getByRole('button', { name: 'Come back later', exact: true }).click();
+  expect(await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('wordshift_home_progress')!).introsSeen,
+  )).not.toContain('tarsier');
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await visitVesper(page);
+  await expect(page.getByText(/^My eyes can't move in my head,/)).toBeVisible();
+  await finishVesperVisit(page, 0, 1);
+  await expect.poll(() => page.evaluate(() =>
+    JSON.parse(localStorage.getItem('wordshift_home_progress')!).introsSeen,
+  )).toContain('tarsier');
+
+  // The next visits are immediately available, without puzzle grinding or
+  // a lecture that skips over the character's ordinary interests.
+  await visitVesper(page);
+  await expect(page.getByText(/^The chalk box needs a lid\./)).toBeVisible();
+  await finishVesperVisit(page, 1);
+  await visitVesper(page);
+  await expect(page.getByText('I have a favorite star. It has never noticed me. That suits us both.', { exact: true })).toBeVisible();
+  await finishVesperVisit(page, 2);
+  expect(await page.evaluate(() => {
+    const progress = JSON.parse(localStorage.getItem('wordshift_home_progress')!);
+    return { phase: progress.currentPhase, cursor: progress.lastDialogueRead.tarsier, puzzles: progress.puzzlesSolved };
+  })).toEqual({ phase: 3, cursor: 104, puzzles: 84 });
+  expect(await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('wordshift_dialogue_choices')!).choices,
+  )).toEqual({});
+
+  // The original current-era choice is still waiting after acquaintance.
+  await visitVesper(page);
+  await expect(page.getByRole('button', { name: 'Choose a response', exact: true })).toBeVisible();
+});
+
+test('an existing friend offers personal visits on request and keeps the player\'s earlier answer', async ({ page }) => {
+  await openVesperHome(page, true, true);
+  const answerBefore = await page.evaluate(() => localStorage.getItem('wordshift_dialogue_choices'));
+  await visitVesper(page);
+  const invitation = page.getByRole('button', { name: 'Tell me about yourself', exact: true });
+  await expect(invitation).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('wordshift_animal_acquaintance'))).toBeNull();
+  await invitation.scrollIntoViewIfNeeded();
+  await invitation.click();
+  await expect(page.getByText(/^The chalk box needs a lid\./)).toBeVisible();
+  expect(await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('wordshift_animal_acquaintance')!).animals.tarsier.active.visit,
+  )).toBe(1);
+  await finishVesperVisit(page, 1);
+  await visitVesper(page);
+  await finishVesperVisit(page, 2);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  expect(await page.evaluate(() => localStorage.getItem('wordshift_dialogue_choices'))).toBe(answerBefore);
+  await visitVesper(page);
+  await expect(page.getByRole('button', { name: 'Tell me about yourself', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Finish visit', exact: true })).toHaveCount(0);
+});
+
+test('animal replies stay reachable at 320px with enlarged text and postponing does not answer the question', async ({ page }) => {
+  await openVesperHome(page, true);
+  await page.setViewportSize({ width: 320, height: 568 });
+  await visitVesper(page);
+  await page.getByRole('button', { name: 'Choose a response', exact: true }).click();
+  await expect(page.getByText('Your response', { exact: true })).toBeVisible();
+  await enlargeBrowserText(page);
+  for (const reply of ['Look at something here with me.', 'Keep the distant watch to yourself.']) {
+    const button = page.getByRole('button', { name: reply, exact: true });
+    await button.scrollIntoViewIfNeeded();
+    await expect(button).toBeInViewport();
+    const bounds = await button.boundingBox();
+    expect(bounds).not.toBeNull();
+    expect(bounds!.x).toBeGreaterThanOrEqual(0);
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(321);
+    expect(bounds!.height).toBeGreaterThanOrEqual(64);
+  }
+  await capture(page, 'updated-animal-choice-small-large-text');
+  const later = page.getByRole('button', { name: 'Come back later', exact: true });
+  await later.scrollIntoViewIfNeeded();
+  await expect(later).toBeInViewport();
+  await later.click();
+  expect(await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('wordshift_dialogue_choices')!).choices,
+  )).toEqual({});
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await visitVesper(page);
+  await page.getByRole('button', { name: 'Choose a response', exact: true }).click();
+  const reply = page.getByRole('button', { name: 'Look at something here with me.', exact: true });
+  await reply.scrollIntoViewIfNeeded();
+  await reply.click();
+  await expect(page.getByLabel('You said: Look at something here with me.', { exact: true })).toBeVisible();
+  await expect.poll(() => page.evaluate(() =>
+    JSON.parse(localStorage.getItem('wordshift_dialogue_choices')!).choices.tarsier,
+  )).toBe('ask');
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  expect(await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('wordshift_dialogue_choices')!).choices.tarsier,
+  )).toBe('ask');
 });
 
 test('a real house ceremony remains readable and can finish at 320px with enlarged text', async ({ page }) => {

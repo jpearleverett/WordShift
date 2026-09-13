@@ -46,6 +46,7 @@ import {
 import { getPhaseStartIndex } from '../services/dialogue/animalDialogueBase';
 import {
   markDialogueRead,
+  markIntroSeen,
   consumeTriggerWords,
   consumePendingVariantTutorial,
   wereTutorialSeedsPlanted,
@@ -81,6 +82,12 @@ import {
 } from '../services/tending';
 import { buildPhase5Pool, buildPhase5Eligibility } from '../services/dialogue/phase5Pool';
 import { getModalInSpring } from '../theme/surfaces';
+import {
+  AnimalAcquaintanceState,
+  loadAnimalAcquaintanceState,
+  hasPendingAnimalAcquaintance,
+  canOfferAnimalAcquaintance,
+} from '../services/animalAcquaintance';
 
 /**
  * Maximum characters shown per dialogue page. Lines longer than this are split
@@ -317,6 +324,8 @@ interface UseDialogueFlowParams {
   progress: HomeWorldProgress | null;
   setAnimals: React.Dispatch<React.SetStateAction<Animal[]>>;
   onFoxPlayPrompt?: () => void;
+  /** Present a personal visit before the phase-aware regular conversation. */
+  onAcquaintance?: (animal: Animal, optional?: boolean) => Promise<void>;
   /**
    * Quests completed by THIS visit (talk-to-animals quests). recordAnimalVisit
    * mutates the quest objects in the module-level cache in place, and the home
@@ -376,11 +385,14 @@ interface UseDialogueFlowReturn {
   hasMoreToShow: boolean;
   /** Active dialogue choice for Phase 3 choice points */
   activeChoice: DialogueChoice | null;
-  /**
-   * The card has turned over to the two answers (see DialogueChoicePage).
-   * Closing is refused until one is picked: the choice is the visit.
-   */
+  /** The question is showing its available replies. It may be postponed. */
   choiceOpen: boolean;
+  /** Only an in-flight durable answer blocks another tap or dismissal. */
+  choiceSaving: boolean;
+  choiceError: string | null;
+  canOfferAcquaintance: boolean;
+  handleOpenAcquaintance: () => Promise<void>;
+  refreshAcquaintanceState: () => Promise<void>;
   /**
    * The answer the player just gave, echoed above the animal's reply; null
    * again once the reply is left.
@@ -424,6 +436,7 @@ export function useDialogueFlow({
   setAnimals,
   onFoxPlayPrompt,
   onQuestsCompleted,
+  onAcquaintance,
 }: UseDialogueFlowParams): UseDialogueFlowReturn {
   const [selectedAnimal, setSelectedAnimal] = useState<Animal | null>(null);
   const [showDialogue, setShowDialogue] = useState(false);
@@ -459,12 +472,36 @@ export function useDialogueFlow({
   const [activeChoice, setActiveChoice] = useState<DialogueChoice | null>(null);
   // The choice page (card turned over to the answers) and the echoed pick.
   const [choiceOpen, setChoiceOpen] = useState(false);
+  const [choiceSaving, setChoiceSaving] = useState(false);
+  const [choiceError, setChoiceError] = useState<string | null>(null);
   const [choiceEcho, setChoiceEcho] = useState<string | null>(null);
   // Recorded Phase 3 choices (loaded once; refreshed when a choice is made) —
   // used synchronously by the Phase 5 post-revelation dialogue cycle.
   const [playerChoices, setPlayerChoices] = useState<Record<string, PlayerChoice>>({});
   const [answeredAnimals, setAnsweredAnimals] = useState<string[]>([]);
   const choiceSubmissionRef = useRef(false);
+  const choiceSavePendingRef = useRef(false);
+  const acquaintanceOpeningRef = useRef(false);
+  const [acquaintanceState, setAcquaintanceState] = useState<AnimalAcquaintanceState>({ version: 1, animals: {} });
+  const refreshAcquaintanceState = useCallback(async () => {
+    setAcquaintanceState(await loadAnimalAcquaintanceState());
+  }, []);
+
+  // Intro completion and cloud/reset reloads refresh progress in the host.
+  // The relationship visit has its own cursor and never edits regular dialogue.
+  useEffect(() => {
+    let cancelled = false;
+    void loadAnimalAcquaintanceState().then(state => {
+      if (!cancelled) setAcquaintanceState(state);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [progress]);
+
+  const hasPendingAcquaintance = useCallback((animal: Animal): boolean => Boolean(
+    onAcquaintance && progress && hasPendingAnimalAcquaintance(
+      acquaintanceState, animal.type, progress.currentPhase, progress.introsSeen.includes(animal.id)
+    )
+  ), [acquaintanceState, onAcquaintance, progress]);
 
   // Tending Shrine (Phase 5 endgame) state, loaded synchronously into the hook so
   // the Phase-5 dialogue selection + honest "new dialogue" badge can read it
@@ -883,6 +920,32 @@ export function useDialogueFlow({
 
   // Handle animal tap
   const handleAnimalTap = useCallback(async (animal: Animal) => {
+    if (choiceSavePendingRef.current || acquaintanceOpeningRef.current) return;
+    if (onAcquaintance && progress) {
+      acquaintanceOpeningRef.current = true;
+      try {
+        const state = await loadAnimalAcquaintanceState();
+        setAcquaintanceState(state);
+        let introSeen = progress.introsSeen.includes(animal.id);
+        // A visit is saved before the host updates the legacy intro flag. A
+        // cold restart between those writes must not replay a finished welcome.
+        if (!introSeen && (state.animals[animal.type]?.nextVisit ?? 0) > 0) {
+          await markIntroSeen(animal.id);
+          introSeen = true;
+        }
+        if (hasPendingAnimalAcquaintance(state, animal.type, progress.currentPhase, introSeen)) {
+          setCooldownMessage(null);
+          await onAcquaintance(animal);
+          await refreshAcquaintanceState();
+          return;
+        }
+      } catch {
+        setCooldownMessage("Couldn't open this conversation. Tap your friend to try again.");
+        return;
+      } finally {
+        acquaintanceOpeningRef.current = false;
+      }
+    }
     // Pick up any Tending done since the hook mounted (e.g. the player just
     // deepened the pattern in the pit) so Phase-5 selection/badge are current.
     await refreshTendingState();
@@ -955,6 +1018,8 @@ export function useDialogueFlow({
     resetPageQueue();
     setChoiceOpen(false);
     setChoiceEcho(null);
+    setChoiceSaving(false);
+    setChoiceError(null);
     setActiveChoice(null);
     choiceSubmissionRef.current = false;
 
@@ -1261,11 +1326,12 @@ export function useDialogueFlow({
         useNativeDriver: true,
       }).start();
     }
-  }, [dialogueSlide, progress, refreshTendingState, resetPageQueue, onQuestsCompleted, getSessionBonus, getUnlockedTypes, setAnimals]);
+  }, [dialogueSlide, progress, refreshTendingState, resetPageQueue, onQuestsCompleted, onAcquaintance, refreshAcquaintanceState, getSessionBonus, getUnlockedTypes, setAnimals]);
 
   // Recompute hasNewDialogue for a specific animal after session changes
   const recomputeHasNewDialogue = useCallback((animal: Animal): boolean => {
     if (!animal.isUnlocked || !progress) return false;
+    if (hasPendingAcquaintance(animal)) return true;
     if (isOnCooldown(animal.id)) return false;
     const animalPhase = getAnimalPhase(progress.currentPhase, animal.type);
     const totalDialogues = getTotalDialogueCount(animal.type, animalPhase);
@@ -1291,7 +1357,7 @@ export function useDialogueFlow({
     return resolved < totalDialogues || hasPendingDialogueChoice(
       animal.type, animalPhase, resolved, answeredAnimals
     );
-  }, [progress, tendingLevel, tendingCaughtUp, playerChoices, answeredAnimals, phase2Cursors, getUnlockedTypes]);
+  }, [progress, tendingLevel, tendingCaughtUp, playerChoices, answeredAnimals, phase2Cursors, getUnlockedTypes, hasPendingAcquaintance]);
 
   // Handle closing dialogue. Manual closes keep the session warm so
   // checking in with an animal never feels punitive.
@@ -1357,19 +1423,40 @@ export function useDialogueFlow({
     setActiveChoice(null);
     setChoiceOpen(false);
     setChoiceEcho(null);
+    setChoiceError(null);
     // Closing mid-pages behaves exactly like closing mid-line: nothing extra
     // beyond clearing the page queue so it can't leak into the next session.
     resetPageQueue();
   }, [selectedAnimal, progress, preDialoguePages, recomputeHasNewDialogue, setAnimals, resetPageQueue, getUnlockedTypes]);
 
-  // The must-answer lock: while the card is turned over to the answers, the
-  // scrim, the hardware back and any other close path are refused. An
-  // unanswered choice used to be silently discarded and re-offered next
-  // visit, which made the beat feel skippable by accident.
+  // Leaving an unanswered question records no answer. Its existing pending
+  // choice badge brings the player back; only an in-flight save must finish.
   const handleCloseDialogue = useCallback(async () => {
-    if (choiceOpen) return;
+    if (choiceSavePendingRef.current) return;
     await closeDialogue(false);
-  }, [closeDialogue, choiceOpen]);
+  }, [closeDialogue]);
+
+  const canOfferAcquaintance = Boolean(
+    onAcquaintance && selectedAnimal && progress &&
+    progress.introsSeen.includes(selectedAnimal.id) &&
+    canOfferAnimalAcquaintance(acquaintanceState, selectedAnimal.type)
+  );
+
+  const handleOpenAcquaintance = useCallback(async () => {
+    if (!selectedAnimal || !onAcquaintance || !canOfferAcquaintance ||
+      choiceSavePendingRef.current || acquaintanceOpeningRef.current) return;
+    const animal = selectedAnimal;
+    acquaintanceOpeningRef.current = true;
+    try {
+      await closeDialogue(false);
+      await onAcquaintance(animal, true);
+      await refreshAcquaintanceState();
+    } catch {
+      setCooldownMessage("Couldn't open this conversation. Tap your friend to try again.");
+    } finally {
+      acquaintanceOpeningRef.current = false;
+    }
+  }, [selectedAnimal, onAcquaintance, canOfferAcquaintance, closeDialogue, refreshAcquaintanceState]);
 
   // Availability signal for the "visit next friend" chain — the SAME news
   // signal the home "!" badge uses (recomputeHasNewDialogue already folds in
@@ -1379,6 +1466,7 @@ export function useDialogueFlow({
   const isChainCandidate = useCallback(
     (animal: Animal): boolean => {
       if (!animal.isUnlocked) return false;
+      if (hasPendingAcquaintance(animal)) return true;
       if (!recomputeHasNewDialogue(animal)) return false;
       const status = getSessionStatus(animal.id, getSessionBonus(animal));
       if (status.status === 'cooldown') return false;
@@ -1386,7 +1474,7 @@ export function useDialogueFlow({
       return true;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [recomputeHasNewDialogue, progress]
+    [recomputeHasNewDialogue, hasPendingAcquaintance, progress]
   );
 
   // Resolve the next unlocked animal with news, wrapping in display/unlock
@@ -1408,7 +1496,7 @@ export function useDialogueFlow({
   // render and tap the standard cooldown message shows — no special casing.
   const handleVisitNextAnimal = useCallback(
     async (next: Animal) => {
-      if (!next || !next.isUnlocked) return;
+      if (!next || !next.isUnlocked || choiceSavePendingRef.current) return;
       if (selectedAnimal && next.id === selectedAnimal.id) return;
       await closeDialogue(false);
       await handleAnimalTap(next);
@@ -1418,7 +1506,12 @@ export function useDialogueFlow({
 
   // Handle dialogue advance
   const handleNextDialogue = useCallback(async () => {
-    if (!selectedAnimal || !progress) return;
+    if (!selectedAnimal || !progress || choiceSavePendingRef.current) return;
+    if (hasPendingAcquaintance(selectedAnimal)) {
+      await closeDialogue(false);
+      await handleAnimalTap(selectedAnimal);
+      return;
+    }
     hapticSelection();
 
     // FIRST: drain any remaining pages of the current line (long lines are
@@ -1440,8 +1533,8 @@ export function useDialogueFlow({
     // that Next turns the card over to the answers instead of advancing past
     // the prompt: the page stays the head (HomeScreen's caption reads it) and
     // the answers, not this button, are what move the conversation on.
-    if (activeChoice && currentFullText === activeChoice.prompt && !choiceOpen) {
-      setChoiceOpen(true);
+    if (activeChoice && currentFullText === activeChoice.prompt) {
+      if (!choiceOpen) setChoiceOpen(true);
       return;
     }
 
@@ -1603,6 +1696,8 @@ export function useDialogueFlow({
         setActiveChoice(pendingChoice);
         setChoiceOpen(false);
         setChoiceEcho(null);
+        setChoiceSaving(false);
+        setChoiceError(null);
         choiceSubmissionRef.current = false;
         setPreDialoguePages([{ text: pendingChoice.prompt }]);
       }
@@ -1662,12 +1757,15 @@ export function useDialogueFlow({
       }
       closeDialogue(true);
     }
-  }, [selectedAnimal, progress, closeDialogue, setAnimals, preDialoguePages, onFoxPlayPrompt, tendingCaughtUp, phase2Cursors, activeChoice, choiceOpen, pageCursor, pageSource, resetPageQueue, getFullDialogueText, getPhase5Pool, getSessionBonus, getUnlockedTypes, selectPhase5]);
+  }, [selectedAnimal, progress, closeDialogue, setAnimals, preDialoguePages, onFoxPlayPrompt, tendingCaughtUp, phase2Cursors, activeChoice, choiceOpen, pageCursor, pageSource, resetPageQueue, getFullDialogueText, getPhase5Pool, getSessionBonus, getUnlockedTypes, selectPhase5, hasPendingAcquaintance, handleAnimalTap]);
 
   // Handle player choosing a dialogue option (Phase 3 choice points)
   const handleDialogueChoice = useCallback(async (choice: PlayerChoice) => {
     if (!selectedAnimal || !activeChoice || choiceSubmissionRef.current) return;
     choiceSubmissionRef.current = true;
+    choiceSavePendingRef.current = true;
+    setChoiceSaving(true);
+    setChoiceError(null);
     hapticSelection();
     try {
       const result = await recordChoice(selectedAnimal.type, choice);
@@ -1693,8 +1791,12 @@ export function useDialogueFlow({
         type: 'choice',
       }).catch(() => {});
     } catch {
-      // Keep the unanswered page available if persistence fails.
+      // Keep the question and both replies intact so retry is explicit.
+      setChoiceError("Your response couldn't be saved. Please choose again to retry.");
       choiceSubmissionRef.current = false;
+    } finally {
+      choiceSavePendingRef.current = false;
+      setChoiceSaving(false);
     }
   }, [selectedAnimal, activeChoice, resetPageQueue]);
 
@@ -1714,7 +1816,12 @@ export function useDialogueFlow({
     hasMoreToShow: computeHasMore(),
     activeChoice,
     choiceOpen,
+    choiceSaving,
+    choiceError,
     choiceEcho,
+    canOfferAcquaintance,
+    handleOpenAcquaintance,
+    refreshAcquaintanceState,
     handleAnimalTap,
     handleNextDialogue,
     handleCloseDialogue,

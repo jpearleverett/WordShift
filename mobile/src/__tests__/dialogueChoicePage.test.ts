@@ -1,9 +1,4 @@
-/**
- * The relationship choice's own page (components/home/DialogueChoicePage):
- * source pins for the host wiring and the page's contracts. The flow itself
- * (Next turns the card over, must answer, echoed pick) is driven through the
- * hook in dialogueFlowPagination.test.ts.
- */
+/** Contracts for the relationship choice's reading surface and host wiring. */
 import fs from 'fs';
 import path from 'path';
 
@@ -13,58 +8,78 @@ const read = (rel: string) => fs.readFileSync(path.join(SRC, rel), 'utf8');
 describe('HomeScreen hosts the choice page', () => {
   const home = read('components/home/HomeScreen.tsx');
 
-  it('turns the card over to DialogueChoicePage while the choice is open, in place of both columns', () => {
+  it('gives the question and answers the entire scrolling sheet', () => {
     expect(home).toContain('{dialogueFlow.choiceOpen && dialogueFlow.activeChoice ? (');
     expect(home).toContain('<DialogueChoicePage');
-    // The old inline option buttons under the bubble are gone for good.
+    const scroll = home.lastIndexOf('<ScrollView', home.indexOf('<DialogueChoicePage'));
+    expect(scroll).toBeGreaterThan(0);
     expect(home).not.toContain('dialogueChoiceBtn');
     expect(home).not.toContain('dialogueChoiceRow');
   });
 
-  it('does not render the scrim close control while the card is turned over', () => {
+  it('offers postponement while protecting an answer being saved', () => {
+    expect(home).toContain('onLater={dialogueFlow.handleCloseDialogue}');
+    expect(home).toContain('saving={dialogueFlow.choiceSaving}');
+    expect(home).toContain('error={dialogueFlow.choiceError}');
     const scrim = home.indexOf('accessibilityLabel="Close dialogue"');
     expect(scrim).toBeGreaterThan(0);
-    const gate = home.lastIndexOf('{!dialogueFlow.choiceOpen && (', scrim);
+    const gate = home.lastIndexOf('{!dialogueFlow.choiceSaving && (', scrim);
     expect(gate).toBeGreaterThan(0);
     expect(scrim - gate).toBeLessThan(400);
   });
 
-  it('echoes the pick above the bubble, in the reading column', () => {
+  it('echoes the pick above the reply, using readable body ink', () => {
     const echo = home.indexOf('<DialogueChoiceEcho');
     const bubble = home.indexOf('style={styles.dialogueBubble}', echo);
     expect(echo).toBeGreaterThan(0);
     expect(bubble).toBeGreaterThan(echo);
     expect(bubble - echo).toBeLessThan(1200);
+    expect(home.slice(echo, bubble)).toContain('inkBody={panelSt.body}');
   });
 });
 
-describe('DialogueChoicePage contracts', () => {
+describe('DialogueChoicePage reading contracts', () => {
   const page = read('components/home/DialogueChoicePage.tsx');
 
-  it('the answers are real controls: pressable, sounded, card-framed, speech-aligned', () => {
-    expect(page).toContain('accessibilityRole="button"');
-    expect(page).toContain("playUiSound('dialogue')");
-    expect(page).toContain('skin={skin.card}');
-    expect(page).toContain("textAlign: 'left'");
-    // The pressed state is a fill change, never an opacity dim of the frame.
-    expect(page).toContain('pressedVeil');
+  it('keeps the full question at reading size without a competing inner frame', () => {
+    const prompt = page.slice(page.indexOf('<AppText textRole="reading"'), page.indexOf('<View style={styles.answers}>'));
+    expect(prompt).toContain('{choice.prompt}');
+    expect(prompt).not.toContain('NineSliceFrame');
+    expect(page).not.toContain('numberOfLines');
+    expect(page).not.toContain('adjustsFontSizeToFit');
+    expect(page).toContain('CHOICE_PORTRAIT_WIDTH = 84');
   });
 
-  it('the answer tray clears the card band on both axes from the shared tokens', () => {
+  it('gives both answers full-width flexible touch targets with the shared frame clearance', () => {
     const block = /\n  answer: \{[\s\S]*?\n  \},/.exec(page);
     expect(block).not.toBeNull();
     expect(block![0]).toContain('SURFACE.cardPadX');
     expect(block![0]).toContain('SURFACE.cardPadY');
+    expect(block![0]).toContain('minHeight: 64');
+    expect(block![0]).toContain("width: '100%'");
+    expect(block![0]).not.toMatch(/\sheight:/);
+    expect(page).toContain('<AppText textRole="body" style={[styles.answerText');
+    expect(page).toContain("textAlign: 'left'");
   });
 
-  it('names the speaker of the answers, and of the echoed pick', () => {
-    expect(page).toContain("export const CHOICE_SPEAKER_MARK = 'YOU'");
-    const marks = page.split('{CHOICE_SPEAKER_MARK}').length - 1;
-    expect(marks).toBe(2);
+  it('uses conversational labels and keeps the selected answer at body size', () => {
+    expect(page).toContain('Your response');
+    expect(page).toContain('You said');
+    const echo = page.slice(page.indexOf('export function DialogueChoiceEcho'), page.indexOf('const styles'));
+    expect(echo).toContain('textRole="body"');
+    expect(echo).not.toContain('opacity');
   });
 
-  it('announces who asked and what when the page opens, and nothing the page does not show', () => {
-    expect(page).toContain('announceForA11y(`${name}. ${choice.prompt} Your answer.`)');
+  it('announces who asked and what, without revealing any response', () => {
+    expect(page).toContain('announceForA11y(`${name}. ${choice.prompt} Your response.`)');
+  });
+
+  it('reserves slow-save status space without dimming the answers or sheet', () => {
+    expect(page).toContain('const SAVING_REVEAL_MS = 300');
+    expect(page).toContain('setTimeout(() => setShowSaving(true), SAVING_REVEAL_MS)');
+    expect(page).toContain('clearTimeout(timer)');
+    expect(page).toContain('minHeight: 29');
+    expect(page).not.toMatch(/opacity: saving/);
   });
 
   it('player-facing strings carry no em or en dashes', () => {

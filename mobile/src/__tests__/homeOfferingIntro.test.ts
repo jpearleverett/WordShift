@@ -14,7 +14,8 @@ function createHarness(readSeen: () => Promise<boolean>) {
   const fox = { id: 'fox' };
   const scope = {
     hasHomeProgress: true, isOnboarding: false, showIntroDialogue: false,
-    introOverrideLines: null, homePhase: 4, storyOverlayActive: false,
+    introOverrideLines: null, introOpening: false, pendingAnimalIntroCount: 0,
+    homePhase: 4, storyOverlayActive: false,
     dialogueFlow: { showDialogue: false }, pendingHouseCompletion: false,
     pitPhaseReady: false, animals: [fox], ANIMALS: [fox],
     isSacrificeAvailable: () => true, hasSeenOfferingIntro: jest.fn(readSeen),
@@ -83,4 +84,21 @@ test('leaving home during the saved-flag read cannot open an orphaned modal', as
   resolveSeen(false);
   await jest.advanceTimersByTimeAsync(0);
   expect(harness.scope.setShowIntroDialogue).not.toHaveBeenCalled();
+});
+
+
+
+test.each(['opening', 'queued'])('an %s animal introduction holds ambient invitations until it finishes', async (kind) => {
+  const harness = createHarness(async () => false);
+  if (kind === 'opening') harness.scope.introOpening = true;
+  else harness.scope.pendingAnimalIntroCount = 1;
+  harness.render();
+  await jest.advanceTimersByTimeAsync(1000);
+  expect(harness.scope.hasSeenOfferingIntro).not.toHaveBeenCalled();
+  harness.scope.introOpening = false;
+  harness.scope.pendingAnimalIntroCount = 0;
+  harness.render();
+  await jest.advanceTimersByTimeAsync(700);
+  expect(harness.scope.setShowIntroDialogue).toHaveBeenCalledWith(true);
+  harness.unmount();
 });
