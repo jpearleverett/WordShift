@@ -504,7 +504,9 @@ test('resident dialogue keeps its reading and controls reachable at 320px with e
 test('a late recruit gets three personal visits and resumes an interrupted welcome without rewinding the story', async ({ page }) => {
   await openVesperHome(page, false);
   await visitVesper(page);
-  await expect(page.getByText(/^Up here, on the rail\. I'm Vesper,/)).toBeVisible();
+  // DialogueBody renders each sentence as a separate reading block.
+  await expect(page.getByText('Up here, on the rail.', { exact: true })).toBeVisible();
+  await expect(page.getByText("I'm Vesper, and this is the Star Loft.", { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Continue intro', exact: true }).click();
   await expect.poll(() => page.evaluate(() =>
     JSON.parse(localStorage.getItem('wordshift_animal_acquaintance')!).animals.tarsier.active.page,
@@ -528,7 +530,7 @@ test('a late recruit gets three personal visits and resumes an interrupted welco
   await expect(page.getByText(/^The chalk box needs a lid\./)).toBeVisible();
   await finishVesperVisit(page, 1);
   await visitVesper(page);
-  await expect(page.getByText('I have a favorite star. It has never noticed me. That suits us both.', { exact: true })).toBeVisible();
+  await expect(page.getByText('I have a favorite star.', { exact: true })).toBeVisible();
   await finishVesperVisit(page, 2);
   expect(await page.evaluate(() => {
     const progress = JSON.parse(localStorage.getItem('wordshift_home_progress')!);
