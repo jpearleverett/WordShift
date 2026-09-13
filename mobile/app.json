@@ -230,7 +230,9 @@
         "expo-build-properties",
         {
           "android": {
-            "enablePngCrunchInReleaseBuilds": false
+            "enablePngCrunchInReleaseBuilds": false,
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
           }
         }
       ],
@@ -249,7 +251,8 @@
         {
           "userTrackingPermission": "Word Shift uses your data to show ads that are more relevant to you. You can play fully without allowing tracking."
         }
-      ]
+      ],
+      "./plugins/withAndroidOptimization"
     ],
     "extra": {
       "telemetryEndpoint": "",
