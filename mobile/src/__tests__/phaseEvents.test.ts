@@ -38,7 +38,8 @@ jest.mock('react-native', () => ({
   TouchableOpacity: 'TouchableOpacity',
   Image: 'Image',
   ScrollView: 'ScrollView',
-  AppState: { addEventListener: jest.fn(() => ({ remove: jest.fn() })) },
+  AppState: { currentState: 'active', addEventListener: jest.fn(() => ({ remove: jest.fn() })) },
+  BackHandler: { addEventListener: jest.fn(() => ({ remove: jest.fn() })) },
   useWindowDimensions: () => ({ width: 400, height: 800 }),
   Dimensions: { get: () => ({ width: 400, height: 800 }) },
   StyleSheet: {

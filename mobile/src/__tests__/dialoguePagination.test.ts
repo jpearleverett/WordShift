@@ -27,7 +27,8 @@ jest.mock('../services/haptics', () => ({
 jest.mock('../services/amberCurrency', () => ({
   markDialogueRead: jest.fn(async () => {}),
   consumeTriggerWords: jest.fn(async () => []),
-  consumePendingVariantTutorial: jest.fn(async () => null),
+  getPendingVariantTutorials: jest.fn(async () => []),
+  acknowledgeVariantTutorial: jest.fn(async () => {}),
   wereTutorialSeedsPlanted: jest.fn(async () => true),
   markTutorialSeedsPlanted: jest.fn(async () => {}),
   recordConsumedCoordinatedEvent: jest.fn(async () => {}),
@@ -295,3 +296,4 @@ describe('resolveVisiblePage', () => {
     expect(seen).toEqual(pages);
   });
 });
+

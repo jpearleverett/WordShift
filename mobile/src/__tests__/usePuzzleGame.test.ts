@@ -312,6 +312,128 @@ describe('usePuzzleGame', () => {
     jest.useRealTimers();
   });
 
+  describe('interrupted board generation', () => {
+    function deferred<T>() {
+      let resolve!: (value: T) => void;
+      let reject!: (error: Error) => void;
+      const promise = new Promise<T>((ok, fail) => { resolve = ok; reject = fail; });
+      return { promise, resolve, reject };
+    }
+
+    const bankBoard = { words: ['SUIT', 'SITE', 'WHAT', 'HERE'], wordLength: 4 };
+
+    test.each(['daily', 'restore', 'restart', 'clear'] as const)(
+      'a delayed normal board cannot replace a %s operation',
+      async operation => {
+        const bank = require('../services/puzzleBank');
+        const result = deferred<typeof bankBoard>();
+        const reachedBank = deferred<void>();
+        (bank.selectPreGeneratedPuzzle as jest.Mock).mockImplementationOnce(() => {
+          reachedBank.resolve();
+          return result.promise;
+        });
+        let [, actions] = callHook();
+        actions.initGame(['LIME', 'TIME', 'TIED']);
+        const [original, live] = callHook();
+        const loading = live.startNewGame('MEDIUM');
+        await reachedBank.promise;
+        [, actions] = callHook();
+        if (operation === 'daily') {
+          actions.startDailyGame(['PLANET', 'PLATES', 'PLANES'], 'daily hint', 6);
+        } else if (operation === 'restore') {
+          actions.restorePuzzleState({
+            ...original, isPlayingDaily: false, savedAt: Date.now(), message: 'Resumed board',
+          } as unknown as import('../services/puzzleSaveState').SavedPuzzleState);
+        } else if (operation === 'restart') {
+          actions.resetCurrentPuzzle();
+        } else {
+          actions.clearBoard();
+        }
+        const [replacement] = callHook();
+        result.resolve(bankBoard);
+        await loading;
+        const [settled] = callHook();
+        expect(settled.rows).toEqual(replacement.rows);
+        expect(settled.gameState).toBe(replacement.gameState);
+        expect(settled.message).toBe(replacement.message);
+        expect(require('../services/wordHistory').recordPuzzleWords).not.toHaveBeenCalled();
+      },
+    );
+
+    test('an old progress read cannot turn the daily into a HARD finale board', async () => {
+      const progress = deferred<{ puzzlesSolved: number; finaleArmed: boolean }>();
+      (require('../services/amberCurrency').getFullProgress as jest.Mock)
+        .mockReturnValueOnce(progress.promise);
+      const [, actions] = callHook();
+      const loading = actions.startNewGame('EASY');
+      actions.startDailyGame(['PLANET', 'PLATES', 'PLANES'], undefined, 6);
+      progress.resolve({ puzzlesSolved: 200, finaleArmed: true });
+      await loading;
+      const [state] = callHook();
+      expect(state.difficulty).toBe('EASY');
+      expect(state.isFinalBoard).toBe(false);
+      expect(state.rows[0].originalWord).toBe('PLANET');
+      expect(require('../services/finalBoard').buildFinalBoard).not.toHaveBeenCalled();
+    });
+
+    test('a delayed history write cannot put an old bank instruction over a cleared board', async () => {
+      const history = require('../services/wordHistory');
+      const saved = deferred<void>();
+      const reachedSave = deferred<void>();
+      (require('../services/puzzleBank').selectPreGeneratedPuzzle as jest.Mock)
+        .mockResolvedValueOnce(bankBoard);
+      (history.recordPuzzleWords as jest.Mock).mockImplementationOnce(() => {
+        reachedSave.resolve();
+        return saved.promise;
+      });
+      const [, actions] = callHook();
+      const loading = actions.startNewGame('MEDIUM');
+      await reachedSave.promise;
+      actions.clearBoard();
+      saved.resolve();
+      await loading;
+      const [state] = callHook();
+      expect(state.rows).toEqual([]);
+      expect(state.gameState).toBe(GameState.IDLE);
+      expect(state.message).toBe('');
+    });
+
+    test('a rejected superseded bank request cannot start a fallback or alter the daily', async () => {
+      const bank = require('../services/puzzleBank');
+      const result = deferred<never>();
+      const reachedBank = deferred<void>();
+      (bank.selectPreGeneratedPuzzle as jest.Mock).mockImplementationOnce(() => {
+        reachedBank.resolve();
+        return result.promise;
+      });
+      const [, actions] = callHook();
+      const loading = actions.startNewGame('MEDIUM');
+      await reachedBank.promise;
+      actions.startDailyGame(['PLANET', 'PLATES', 'PLANES'], undefined, 6);
+      result.reject(new Error('Bank lookup interrupted'));
+      await loading;
+      expect(require('../services/localGenerator').generateLocalPuzzle).not.toHaveBeenCalled();
+      const [state] = callHook();
+      expect(state.rows[0].originalWord).toBe('PLANET');
+    });
+
+    test('unmounting retires a pending progress request before it can commit a board', async () => {
+      const progress = deferred<{ puzzlesSolved: number }>();
+      (require('../services/amberCurrency').getFullProgress as jest.Mock)
+        .mockReturnValueOnce(progress.promise);
+      const [, actions] = callHook();
+      // The first lifecycle effect owns timeout and generation cleanup.
+      const cleanup = effectCallbacks[0]() as unknown as () => void;
+      const loading = actions.startNewGame('MEDIUM');
+      const beforeUnmount = [...stateStore.entries()];
+      cleanup();
+      progress.resolve({ puzzlesSolved: 20 });
+      await loading;
+      expect([...stateStore.entries()]).toEqual(beforeUnmount);
+      expect(require('../services/puzzleBank').selectPreGeneratedPuzzle).not.toHaveBeenCalled();
+    });
+  });
+
   describe('initGame', () => {
     test('records abandonment only after replacing an unfinished board with committed moves', async () => {
       const events = require('../services/eventLogger').logEvent as jest.Mock;
@@ -3563,3 +3685,4 @@ describe('usePuzzleGame', () => {
     });
   });
 });
+

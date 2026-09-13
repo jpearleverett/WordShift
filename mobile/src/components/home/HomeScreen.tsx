@@ -256,7 +256,7 @@ interface HomeScreenProps {
    * When provided, App plays the full HOUSE_COMPLETION_EVENT cinematic instead
    * of the inline fallback modal.
    */
-  onHouseCompleted?: () => void;
+  onHouseCompleted?: () => void | Promise<void>;
   /**
    * Run the victory-free achievement check (App's useAchievementQueue
    * `checkAchievementsNow`). Four achievements key ONLY on unlock counts
@@ -1081,9 +1081,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const timer = setTimeout(() => {
       if (introPresentationRef.current.busy() || introPresentationRef.current.pendingCount() > 0 || introSurfaceBusyRef.current) return;
       setPendingHouseCompletion(false);
-      // Written HERE, on delivery, mirroring markUnbrokenWeaveIntroSeen: until
-      // this lands the beat stays armed and the next home landing re-offers it.
-      markHouseCompletionCelebrated().catch(() => {});
+      // App saves a pending scene before presenting it and acknowledges only
+      // completion. Leaving or restarting during the scene keeps it available.
       if (onHouseCompleted) {
         // App plays the full HOUSE_COMPLETION_EVENT cinematic over the home scene.
         onHouseCompleted();
@@ -3938,7 +3937,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         if (houseCompletionTextIndex + 1 < lines.length) {
                           setHouseCompletionTextIndex(houseCompletionTextIndex + 1);
                         } else {
-                          setShowHouseCompletion(false);
+                          markHouseCompletionCelebrated().then(() => setShowHouseCompletion(false)).catch(() => {});
                         }
                       }}
                       accessibilityLabel={

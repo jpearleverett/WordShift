@@ -2,6 +2,7 @@ import { DAILY_BOARD_VERSION } from './src/services/dailyBoardVersion';
 import { PracticeModal } from './src/components/puzzle/PracticeModal';
 import type { PracticeLessonId } from './src/services/practiceLessons';
 import { saveWithPlayerRetry } from './src/services/saveRetry';
+import { createCeremonyPlayback } from './src/services/ceremonyPlayback';
 import { subscribeBillingChanges } from './src/services/iap';
 import { useLaunchIntents } from './src/hooks/useLaunchIntents';
 import { useInitialGameRoute } from './src/hooks/useInitialGameRoute';
@@ -45,6 +46,7 @@ import { useAchievementQueue } from './src/hooks/useAchievementQueue';
 import { useSpeedTimer } from './src/hooks/useSpeedTimer';
 import { useDreadEffects } from './src/hooks/useDreadEffects';
 import { useVictoryOrchestration } from './src/hooks/useVictoryOrchestration';
+import { useVictoryDouble } from './src/hooks/useVictoryDouble';
 import { useStoryFlow } from './src/hooks/useStoryFlow';
 import { StorySceneModal } from './src/components/StorySceneModal';
 import { StoryJournalModal } from './src/components/StoryJournalModal';
@@ -81,6 +83,7 @@ import {
   checkFreeStreakFreeze,
   consumeVariantNudge,
   getFullProgress,
+  queueHouseCeremony,
   getRitualWords,
   consumeCycleOpening,
 } from './src/services/amberCurrency';
@@ -167,7 +170,7 @@ import {
   UnbrokenWeaveMastery,
 } from './src/services/masteryRecords';
 import { maybePromptReview } from './src/services/reviewPrompt';
-import { getPhaseTransitionEvent, PhaseTransitionEvent, HOUSE_COMPLETION_EVENT, FINAL_PUZZLE_EVENT, buildFinalPuzzleEvent, buildPostRevelationEvent, FinalArrivalContext, NEW_CYCLE_EVENT } from './src/services/phaseEvents';
+import { getPhaseTransitionEvent, PhaseTransitionEvent, HOUSE_COMPLETION_EVENT, buildFinalPuzzleEvent, buildPostRevelationEvent, FinalArrivalContext, NEW_CYCLE_EVENT } from './src/services/phaseEvents';
 import { generateDailyPuzzle, prewarmDailyPuzzle, isDailyChallengeUnlocked, getDailyStatus, grantFirstDailyMercy, getDailyHostName, getDailyDifficulty } from './src/services/dailyChallenge';
 import { recordDailyLadderResult, refreshDailyLadderRank, getDailyLadderSummary, shouldShowTrend } from './src/services/dailyLadder';
 import { startFrameMonitoring, stopFrameMonitoring } from './src/services/performanceMonitor';
@@ -556,7 +559,7 @@ function MainApp() {
   // FOREVER (the flag is set, so the next win never re-queues it). Hold the
   // queued event here so an exit in the window can play it instead of losing
   // it — the PhaseTransitionOverlay renders at App root above every screen.
-  const pendingEndgameEventRef = useRef<PhaseTransitionEvent | null>(null);
+  const pendingEndgameEventRef = useRef(false);
 
   // HOUSE ASKS — the small optional per-board constraint (services/houseAsks):
   // on some standard boards the house asks that one letter travel, or that it
@@ -686,12 +689,12 @@ function MainApp() {
   // Last-known global words-offered count for today; reused when a victory's
   // own fetch fails so the social-proof line doesn't blink out mid-session.
   const socialProofCacheRef = useRef<{ date: string; count: number } | null>(null);
-  // Optional rewarded "double the reward" — one claim per victory
-  const [victoryDoubleClaimed, setVictoryDoubleClaimed] = useState(false);
-  // Synchronous companion to victoryDoubleClaimed: the state only lands after
-  // the credit's storage round-trips, so a double-tap on the ad-free instant
-  // claim slipped through. MUST be reset wherever victoryDoubleClaimed is.
-  const rewardedDoubleInFlightRef = useRef(false);
+  const {
+    claimed: victoryDoubleClaimed,
+    claim: handleRewardedDouble,
+    awaitPending: awaitVictoryDouble,
+    reset: resetVictoryDouble,
+  } = useVictoryDouble(victoryFlow.victoryData, persistenceActions.setAmberBalance);
   // The setup menu keeps this private ladder snapshot current without making
   // the puzzle hook own persistence for a Phase-5-only modifier.
   const [unbrokenWeaveMastery, setUnbrokenWeaveMastery] = useState<UnbrokenWeaveMastery | null>(null);
@@ -702,6 +705,12 @@ function MainApp() {
 
   // Phase transition overlay state
   const [phaseTransitionEvent, setPhaseTransitionEvent] = useState<PhaseTransitionEvent | null>(null);
+  const [ceremonyWaiting, setCeremonyWaiting] = useState(false);
+  const [ceremonyReady, setCeremonyReady] = useState(false);
+  const pitNavigationGuardRef = useRef<(() => boolean) | null>(null);
+  const setPitNavigationGuard = useCallback((guard: (() => boolean) | null) => {
+    pitNavigationGuardRef.current = guard;
+  }, []);
 
   // True while the player is in a Daily Challenge run (drives autosave tagging,
   // victory recording, and the VictoryModal "Daily Challenge Complete" header).
@@ -1198,6 +1207,38 @@ function MainApp() {
     };
   }, [getStoryContext]);
 
+  const ceremonyPlayback = useMemo(() => createCeremonyPlayback({
+    onEvent: setPhaseTransitionEvent,
+    onWaiting: setCeremonyWaiting,
+    build: async record => {
+      switch (record.kind) {
+        case 'phase': {
+          const event = getPhaseTransitionEvent(record.phase);
+          if (!event) throw new Error('The saved phase scene is unavailable');
+          return event;
+        }
+        case 'house': return HOUSE_COMPLETION_EVENT;
+        case 'arrival': return buildFinalPuzzleEvent(await getRitualWords(), await getArrivalContext());
+        case 'post_arrival': return buildPostRevelationEvent(await getArrivalContext());
+        case 'new_cycle': return NEW_CYCLE_EVENT;
+      }
+    },
+  }), [getArrivalContext]);
+  useEffect(() => {
+    let current = true;
+    void ceremonyPlayback.refresh().then(() => { if (current) setCeremonyReady(true); });
+    return () => { current = false; ceremonyPlayback.reset(); };
+  }, [ceremonyPlayback]);
+  const showPendingCeremony = useCallback(() => {
+    void ceremonyPlayback.refresh();
+  }, [ceremonyPlayback]);
+  const showHouseCeremony = useCallback(async () => {
+    await saveWithPlayerRetry(queueHouseCeremony, {
+      title: 'Your house is complete',
+      message: 'We need to save this moment before the scene begins. Please retry.',
+    });
+    await ceremonyPlayback.refresh();
+  }, [ceremonyPlayback]);
 
   const launchColdOpenPuzzle = useCallback(async (isCurrent: () => boolean = () => true) => {
     const [saved, stats] = await Promise.all([
@@ -1434,13 +1475,13 @@ function MainApp() {
   // New Cycle (NG+) opening beat — once per new cycle, on the first quiet home
   // landing after it begins, the bright days announce themselves (wrongly).
   useEffect(() => {
-    if (onboardingFlow.isOnboarding) return;
+    if (onboardingFlow.isOnboarding || !ceremonyReady || ceremonyWaiting || phaseTransitionEvent) return;
     consumeCycleOpening().then(cycle => {
       if (cycle != null) {
         showGameAlert('', getNewCycleOpeningLine(cycle));
       }
     }).catch(() => {});
-  }, [onboardingFlow.isOnboarding]);
+  }, [onboardingFlow.isOnboarding, ceremonyReady, ceremonyWaiting, phaseTransitionEvent]);
 
   // App-level initialization (non-onboarding)
   useEffect(() => {
@@ -1870,13 +1911,13 @@ function MainApp() {
 
   // Queue an endgame cinematic on the usual 1.5s beat, but also record it so a
   // victory exit inside the window can rescue it (see pendingEndgameEventRef).
-  const queueEndgameCinematic = useCallback((event: PhaseTransitionEvent) => {
-    pendingEndgameEventRef.current = event;
+  const queueEndgameCinematic = useCallback(() => {
+    pendingEndgameEventRef.current = true;
     addVictoryTimeout(() => {
-      pendingEndgameEventRef.current = null;
-      setPhaseTransitionEvent(event);
+      pendingEndgameEventRef.current = false;
+      showPendingCeremony();
     }, 1500);
-  }, [addVictoryTimeout]);
+  }, [addVictoryTimeout, showPendingCeremony]);
 
   const startVictoryExitFlow = useCallback((nextAction: () => void) => {
     const action = () => runStory(nextAction);
@@ -1884,8 +1925,8 @@ function MainApp() {
     // timer: play it now, over the navigation, instead of losing it forever.
     const pendingEndgame = pendingEndgameEventRef.current;
     if (pendingEndgame) {
-      pendingEndgameEventRef.current = null;
-      setPhaseTransitionEvent(pendingEndgame);
+      pendingEndgameEventRef.current = false;
+      showPendingCeremony();
     }
     clearVictoryTimeouts();
     clearVictoryToastQueue();
@@ -1929,7 +1970,7 @@ function MainApp() {
     // one-time beat re-fires on a later victory — the dismissal contract.
     setPostVictoryIntro(null);
     action();
-  }, [clearVictoryTimeouts, clearVictoryToastQueue, clearVictoryMusicHush, puzzleActions, victoryActions, orchestrationActions, advanceQueuedPostVictoryIntro, runStory]);
+  }, [showPendingCeremony, clearVictoryTimeouts, clearVictoryToastQueue, clearVictoryMusicHush, puzzleActions, victoryActions, orchestrationActions, advanceQueuedPostVictoryIntro, runStory]);
 
   // ========================================================================
   // Navigation & puzzle lifecycle handlers
@@ -2049,8 +2090,7 @@ function MainApp() {
     orchestrationActions.resetOrchestration();
     setIsPlayingDaily(false);
     resetSpeedRun();
-    setVictoryDoubleClaimed(false);
-    rewardedDoubleInFlightRef.current = false;
+    resetVictoryDouble();
     setVictoryDoubleOffer(false);
     setDailyRank(null);
     setDailyLadderLine(null);
@@ -2066,7 +2106,8 @@ function MainApp() {
     setPracticeLesson(null);
     setHomeOverlayActive(false);
     setHomeQuietReady(false);
-    setPhaseTransitionEvent(null);
+    pendingEndgameEventRef.current = false;
+    ceremonyPlayback.reset();
     setShowSetupSelectorIntro(false);
     setPostVictoryIntro(null);
     queuedPostVictoryIntrosRef.current = [];
@@ -2100,8 +2141,11 @@ function MainApp() {
       title: 'Your progress is saved',
       message: 'We could not finish opening the updated game. Free device storage if it is full, then retry.',
     });
+    await ceremonyPlayback.refresh();
     setSessionTransition(null);
   }, [
+    resetVictoryDouble,
+    ceremonyPlayback,
     clearVictoryTimeouts,
     clearVictoryToastQueue,
     puzzleActions,
@@ -2132,8 +2176,8 @@ function MainApp() {
   const showNewCycleCeremony = useCallback(() => {
     pendingCycleRebuildRef.current = true;
     setSessionTransition('waiting');
-    setPhaseTransitionEvent(NEW_CYCLE_EVENT);
-  }, [setSessionTransition]);
+    showPendingCeremony();
+  }, [setSessionTransition, showPendingCeremony]);
   const handleStartNewCycleFromHome = useCallback(() => {
     showGameAlert(
       getNewCycleTitle(),
@@ -2693,10 +2737,7 @@ function MainApp() {
       // Event bonus is a DAILY-victory line; clear it here so a full-moon
       // daily's +50% line can never linger onto later normal-board victories.
       setEventBonusLine(null);
-      setVictoryDoubleClaimed(false);
-      // The in-flight latch is released with the claim flag, or the 2x would be
-      // claimable exactly once per app session.
-      rewardedDoubleInFlightRef.current = false;
+      resetVictoryDouble();
       // Rewarded-double cadence gate: the 2x slot presents up to
       // REWARDED_DOUBLE_DAILY_CAP times per local day and never at phase 4+
       // (the dread arc is protected like interstitials) — on every win it made
@@ -3121,9 +3162,7 @@ function MainApp() {
               ? 'The last word has settled. What happens next belongs to everyone who lives here.'
               : 'There is still room to build. Tonight, the words have opened something beneath the unfinished house.',
           });
-          let arrivalEvent = FINAL_PUZZLE_EVENT;
-          try { arrivalEvent = buildFinalPuzzleEvent(await getRitualWords(), await getArrivalContext()); } catch { /* authored fallback */ }
-          queueEndgameCinematic(arrivalEvent);
+          queueEndgameCinematic();
         } else if (endgame?.kind === 'dwell') {
           dwellLineForWin = (endgame.dwellBefore ?? 0) >= FINALE_DWELL_PUZZLES
             ? getPostCapDwellLine(completedTotal, persistence.currentPhase)
@@ -3133,7 +3172,7 @@ function MainApp() {
             title: 'THE PATTERN REMEMBERS YOU',
             text: 'You saw it through to the end. The arrangement is complete, and your words remain in every wall.',
           });
-          queueEndgameCinematic(buildPostRevelationEvent(await getArrivalContext()));
+          queueEndgameCinematic();
         }
 
         // Check achievements after brief delay to not block victory display
@@ -3304,6 +3343,7 @@ function MainApp() {
       }
     }
   }, [
+    resetVictoryDouble,
     puzzleActions,
     puzzle.difficulty,
     rewardDifficulty,
@@ -3322,7 +3362,6 @@ function MainApp() {
     tutorialGuidance,
     addVictoryTimeout,
     enqueueVictoryToast,
-    getArrivalContext,
     SCREEN_HEIGHT, SCREEN_WIDTH, fireBlindJudgment, isPlayingDaily,
     puzzle.blindMode, puzzle.isFinalBoard, puzzle.isSharedChallenge, puzzle.rows,
     puzzle.speedMode, puzzle.unbrokenWeaveMode, puzzlesSolvedForVariantUnlocks,
@@ -4187,6 +4226,7 @@ function MainApp() {
     let storyWillPresent = false;
     try {
       await victoryContinuationRef.current;
+      await awaitVictoryDouble();
       storyWillPresent = await prepareStory();
     }
     catch {
@@ -4211,7 +4251,7 @@ function MainApp() {
     Promise.resolve(adShown)
       .then((shown) => runVictoryExitNudges(shown === true, introWillPresent || storyWillPresent))
       .catch(() => {});
-  }, [activeStory, prepareStory, puzzleActions, startVictoryExitFlow, runVictoryExitNudges, maybeShowVictoryInterstitial, maybeShowSwiftVictoryHint, postVictoryIntro]);
+  }, [awaitVictoryDouble, activeStory, prepareStory, puzzleActions, startVictoryExitFlow, runVictoryExitNudges, maybeShowVictoryInterstitial, maybeShowSwiftVictoryHint, postVictoryIntro]);
 
   // The cold-open Continue reveals the empty home and Fox invitation. Legacy
   // guided-puzzle resumes keep their old puzzle-screen completion beat.
@@ -4247,6 +4287,7 @@ function MainApp() {
     let storyWillPresent = false;
     try {
       await victoryContinuationRef.current;
+      await awaitVictoryDouble();
       storyWillPresent = await prepareStory();
     }
     catch {
@@ -4269,7 +4310,7 @@ function MainApp() {
     Promise.resolve(adShown)
       .then((shown) => runVictoryExitNudges(shown === true, introWillPresent || storyWillPresent))
       .catch(() => {});
-  }, [activeStory, prepareStory, puzzleActions, transitionTo, startVictoryExitFlow, runVictoryExitNudges, maybeShowVictoryInterstitial, postVictoryIntro]);
+  }, [awaitVictoryDouble, activeStory, prepareStory, puzzleActions, transitionTo, startVictoryExitFlow, runVictoryExitNudges, maybeShowVictoryInterstitial, postVictoryIntro]);
 
   // The pit route (Collect Now) is deliberately EXEMPT from interstitials:
   // the player is on their way to collect amber they already earned, and an
@@ -4281,6 +4322,7 @@ function MainApp() {
     storyExitPreparing.current = true;
     try {
       await victoryContinuationRef.current;
+      await awaitVictoryDouble();
       await prepareStory();
     }
     catch {
@@ -4293,13 +4335,15 @@ function MainApp() {
       puzzleActions.clearBoard();
       transitionTo('pit');
     });
-  }, [activeStory, prepareStory, puzzleActions, transitionTo, startVictoryExitFlow]);
+  }, [awaitVictoryDouble, activeStory, prepareStory, puzzleActions, transitionTo, startVictoryExitFlow]);
 
   // Android hardware back button: sub-screens navigate home; home exits the app.
   // Swallowed during onboarding so back can't break the guided flow.
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (isStorageTransactionActive() || sessionTransitionRef.current || navigationBusy) return true;
+      if (isStorageTransactionActive() || sessionTransitionRef.current || navigationBusy ||
+          phaseTransitionEvent !== null || ceremonyWaiting || !ceremonyReady ||
+          (currentScreen === 'pit' && pitNavigationGuardRef.current?.())) return true;
       if (onboardingFlow.isOnboarding) {
         // On the very first interactive screen (the cold-open opener, nothing
         // committed yet), back should EXIT the app like any first screen — a
@@ -4359,39 +4403,7 @@ function MainApp() {
       return false;
     });
     return () => subscription.remove();
-  }, [currentScreen, transitionTo, navigationBusy, onboardingFlow.isOnboarding, onboardingFlow.onboardingStep, puzzleActions, puzzle.gameState, puzzle.history.length, puzzle.unbrokenWeaveMode, victoryFlow.victoryData, persistence.pendingPhaseTransition, postVictoryIntro, handleGoToPit, handleReturnHome]);
-
-  // Optional rewarded "double the reward": credits a bonus equal to this
-  // puzzle's amber (a true 2x), reward-only — never phase progress. One claim
-  // per victory. Inert until a real ad provider is connected.
-  const handleRewardedDouble = useCallback(async () => {
-    const earned = victoryFlow.victoryData?.amberEarned ?? 0;
-    // victoryDoubleClaimed is STATE, and it is only set after two awaited
-    // storage round-trips inside awardBonusAmber — so on the ad-free branch
-    // (a plain instant-claim button with no busy flag of its own) a second tap
-    // inside that window re-entered with the flag still false and credited the
-    // bonus twice: 3x the puzzle's amber. awardBonusAmber has no concurrency
-    // guard of its own, so the guard has to be synchronous and it has to be
-    // here. Not an optimistic setState + rollback: awardBonusAmber swallows its
-    // own write failures and mutates the cache first, so a "failed" rollback
-    // would show 1x over an in-memory 2x, and the modal's count-up would
-    // animate to 2x and snap back.
-    if (earned <= 0 || victoryDoubleClaimed || rewardedDoubleInFlightRef.current) return;
-    rewardedDoubleInFlightRef.current = true;
-    try {
-      const newBalance = await awardBonusAmber(earned, 'rewarded_victory_double');
-      persistenceActions.setAmberBalance(newBalance);
-      setVictoryDoubleClaimed(true);
-      // The ref stays latched on success: it covers the render gap before the
-      // state lands. It is released with victoryDoubleClaimed on every victory
-      // reset — without those resets the 2x would be claimable once per app
-      // session and silently dead on every later win.
-    } catch {
-      // Non-critical — never block the victory flow. Released only on failure,
-      // so the player can retry.
-      rewardedDoubleInFlightRef.current = false;
-    }
-  }, [victoryFlow.victoryData, victoryDoubleClaimed, persistenceActions]);
+  }, [currentScreen, transitionTo, navigationBusy, phaseTransitionEvent, ceremonyWaiting, ceremonyReady, onboardingFlow.isOnboarding, onboardingFlow.onboardingStep, puzzleActions, puzzle.gameState, puzzle.history.length, puzzle.unbrokenWeaveMode, victoryFlow.victoryData, persistence.pendingPhaseTransition, postVictoryIntro, handleGoToPit, handleReturnHome]);
 
   // Speed rescue: a completed rewarded view revives a timed-out speed run with
   // extra seconds. The hook flips GAME_OVER → PLAYING; the speed-timer effect
@@ -4721,7 +4733,7 @@ function MainApp() {
     dailyLogin: dailyLoginGrant !== null,
     victory: victoryModalVisible,
     timeUp: currentScreen === 'puzzle' && puzzle.gameState === GameState.GAME_OVER,
-  }, { dailyLogin: dailyLoginGrantVisible });
+  }, { dailyLogin: dailyLoginGrantVisible, ceremony: phaseTransitionEvent !== null && !ceremonyWaiting });
   const [presentedPhaseEvent, setPresentedPhaseEvent] = useState<PhaseTransitionEvent | null>(null);
   if (phaseTransitionEvent === null && presentedPhaseEvent !== null) setPresentedPhaseEvent(null);
   else if (overlayOwner === 'ceremony' && presentedPhaseEvent !== phaseTransitionEvent) setPresentedPhaseEvent(phaseTransitionEvent);
@@ -4748,7 +4760,7 @@ function MainApp() {
   // never paints 'home' for a frame first (the F141 home flash) — the same
   // branded card simply stays up one beat longer, then the real destination
   // appears directly.
-  if (!onboardingFlow.onboardingReady || bootRouting) {
+  if (!onboardingFlow.onboardingReady || bootRouting || (!ceremonyReady && !alertPending)) {
     // The SAME window-relative branded hold as the bootstrap gate, so the
     // native-splash -> bootstrap-gate -> MainApp-hydration holds read as ONE
     // continuous branded moment instead of blinking through the old near-black
@@ -4854,6 +4866,8 @@ function MainApp() {
             onStartNewCycle={handleStartNewCycleFromHome}
             phaseProgressFraction={persistence.phaseProgressFraction}
             pendingPhaseTransition={persistence.pendingPhaseTransition}
+            onNavigationGuardChange={setPitNavigationGuard}
+            onPhaseTransitionReady={showPendingCeremony}
             onPhaseTransitionConfirmed={(newPhase) => {
               // Refresh all persistence state to pick up the new currentPhase
               persistenceActions.refreshStats();
@@ -4866,11 +4880,8 @@ function MainApp() {
               // screen and the cinematic covers everything, so it presents on
               // the next home or puzzle arrival rather than over the ceremony.
               achievementActions.checkAchievementsNow().catch(() => {});
-              // Play the full PhaseTransitionOverlay cinematic
-              const event = getPhaseTransitionEvent(newPhase as any);
-              if (event) {
-                setPhaseTransitionEvent(event);
-              }
+              // The durable queue is drained by onPhaseTransitionReady after
+              // both an original save and a recovered confirmation.
               victoryActions.playPhaseChangeFlash();
               // Update notifications with new phase
               scheduleAllNotifications(newPhase).catch(() => {});
@@ -4943,7 +4954,7 @@ function MainApp() {
               pitPhaseReady={persistence.pendingPhaseTransition != null}
               initialHousePanY={homePanY}
               onHousePanChange={setHomePanY}
-              onHouseCompleted={() => setPhaseTransitionEvent(HOUSE_COMPLETION_EVENT)}
+              onHouseCompleted={showHouseCeremony}
               // The four COLLECTION achievements key on unlocked room/animal
               // counts, which only ever change here — nothing checked them at
               // the moment they became true, so they waited for the player's
@@ -6080,14 +6091,11 @@ function MainApp() {
       <PhaseTransitionOverlay
         event={cinematicEvent}
         suspended={overlayOwner !== 'ceremony'}
-        onComplete={() => {
-          setPhaseTransitionEvent(null);
-          // A home-launched New Cycle ceremony hands off to the in-place
-          // session rebuild once its overlay clears (mirrors Settings'
-          // handleCycleCeremonyComplete -> onCloudRestored).
-          if (pendingCycleRebuildRef.current) {
+        onComplete={async () => {
+          const completed = await ceremonyPlayback.complete(phaseTransitionEvent);
+          if (completed?.kind === 'new_cycle' && pendingCycleRebuildRef.current) {
             pendingCycleRebuildRef.current = false;
-            rebuildSessionFromStorage({ restartOnboarding: false });
+            await rebuildSessionFromStorage({ restartOnboarding: false });
           }
         }}
       />

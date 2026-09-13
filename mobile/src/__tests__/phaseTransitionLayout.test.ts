@@ -13,6 +13,8 @@ type HookDriver = {
 };
 let mockHooks: HookDriver | null = null;
 let mockDimensions = { width: 400, height: 800, fontScale: 1, scale: 1 };
+let mockAppStateListener: ((state: string) => void) | undefined;
+let mockBackListener: (() => boolean) | undefined;
 let mockInsets = { top: 20, right: 0, bottom: 20, left: 0 };
 
 jest.mock('react', () => ({
@@ -27,7 +29,14 @@ jest.mock('react-native', () => {
   return {
     View: 'View', Text: 'Text', Pressable: 'Pressable', TouchableOpacity: 'TouchableOpacity',
     Image: 'Image', ScrollView: 'ScrollView',
-    AppState: { addEventListener: () => ({ remove: jest.fn() }) },
+    AppState: { currentState: 'active', addEventListener: (_event: string, listener: (state: string) => void) => {
+      mockAppStateListener = listener;
+      return { remove: () => { mockAppStateListener = undefined; } };
+    } },
+    BackHandler: { addEventListener: (_event: string, listener: () => boolean) => {
+      mockBackListener = listener;
+      return { remove: () => { mockBackListener = undefined; } };
+    } },
     useWindowDimensions: () => mockDimensions,
     Dimensions: { get: () => mockDimensions },
     StyleSheet: { absoluteFill: { position: 'absolute' }, create: (styles: unknown) => styles },
@@ -122,14 +131,15 @@ function mount(event: PhaseTransitionEvent, onComplete = jest.fn()) {
       }
     },
   };
-  const render = () => {
+  const render = (suspended = false, replacementEvent = event) => {
+    event = replacementEvent;
     let tree: unknown;
     let count = 0;
     do {
       cursor = 0;
       changed = false;
       pending = [];
-      tree = PhaseTransitionOverlay({ event, onComplete });
+      tree = PhaseTransitionOverlay({ event, onComplete, suspended });
       for (const effect of pending.sort((a, b) => Number(b.layout) - Number(a.layout))) {
         effects.get(effect.index)?.cleanup?.();
         effects.set(effect.index, { deps: effect.deps, cleanup: effect.callback() || undefined });
@@ -195,6 +205,7 @@ test.each([
           ? 'Return to the house' : 'Continue the scene');
         expect(find(tree, node => node.props?.accessibilityLabel === 'Skip transition')).toBeDefined();
         press(next);
+        jest.advanceTimersByTime(350);
       }
       expect(harness.onComplete).toHaveBeenCalledTimes(1);
     } finally {
@@ -228,6 +239,7 @@ test('Continue is available during autoplay and takes over pacing without a dela
     tree = harness.render();
     expect(text(tree)).toContain('Last passage.');
     const finish = byId(tree, 'phase-transition-next');
+    jest.advanceTimersByTime(350);
     press(finish);
     press(finish);
     jest.advanceTimersByTime(60_000);
@@ -282,6 +294,7 @@ test.each([
         expect(presenceIndex).toBeGreaterThan(paintingIndex);
       }
       press(byId(tree, 'phase-transition-next'));
+      jest.advanceTimersByTime(350);
     }
   } finally {
     harness.dispose();
@@ -302,4 +315,154 @@ test('a personalized environmental backdrop remains behind the foreground scene'
   } finally {
     harness.dispose();
   }
+});
+
+
+function shortEvent(readAtOwnPace = false): PhaseTransitionEvent {
+  return {
+    ...getPhaseTransitionEvent(1)!, readAtOwnPace,
+    scenes: ['First passage.', 'Second passage.', 'Last passage.'].map((passage, index) => ({
+      text: passage, image: 'private_room', delay: index * 1000, duration: 1000,
+    })),
+  };
+}
+
+function skipButton(tree: unknown) {
+  return find(tree, node => node.props?.accessibilityLabel === 'Skip transition');
+}
+
+test('Skip requires a separate confirmation and cancelling keeps the same page at reader pace', () => {
+  const harness = mount(shortEvent());
+  try {
+    const original = harness.render();
+    jest.advanceTimersByTime(1249);
+    // Two callbacks from the original button cannot confirm the second action.
+    press(skipButton(original));
+    press(skipButton(original));
+    jest.advanceTimersByTime(1);
+    let tree = harness.render();
+    expect(byId(tree, 'phase-transition-skip-confirmation')).toBeDefined();
+    expect(text(byId(tree, 'phase-transition-reading'))).toContain('First passage.');
+    expect(harness.onComplete).not.toHaveBeenCalled();
+    const staleConfirm = byId(tree, 'phase-transition-confirm-skip');
+    press(byId(tree, 'phase-transition-keep-reading'));
+    press(staleConfirm);
+    tree = harness.render();
+    expect(byId(tree, 'phase-transition-skip-confirmation')).toBeUndefined();
+    jest.advanceTimersByTime(60_000);
+    expect(text(harness.render())).toContain('First passage.');
+    expect(harness.onComplete).not.toHaveBeenCalled();
+    press(skipButton(harness.render()));
+    tree = harness.render();
+    press(byId(tree, 'phase-transition-confirm-skip'));
+    press(byId(tree, 'phase-transition-confirm-skip'));
+    expect(harness.onComplete).toHaveBeenCalledTimes(1);
+  } finally { harness.dispose(); }
+});
+
+test('Android Back asks before skipping and Back from that prompt returns to the same page', () => {
+  const harness = mount(shortEvent());
+  try {
+    harness.render();
+    expect(mockBackListener?.()).toBe(true);
+    expect(byId(harness.render(), 'phase-transition-skip-confirmation')).toBeDefined();
+    expect(harness.onComplete).not.toHaveBeenCalled();
+    expect(mockBackListener?.()).toBe(true);
+    const tree = harness.render();
+    expect(byId(tree, 'phase-transition-skip-confirmation')).toBeUndefined();
+    expect(text(tree)).toContain('First passage.');
+    expect(harness.onComplete).not.toHaveBeenCalled();
+  } finally { harness.dispose(); }
+  expect(mockBackListener).toBeUndefined();
+});
+
+test('backgrounding at an autoplay deadline preserves the unread page until the app is active again', () => {
+  const harness = mount(shortEvent());
+  try {
+    const original = harness.render();
+    jest.advanceTimersByTime(1249);
+    mockAppStateListener?.('background');
+    // Native AppState can change before React commits the pause and its cleanup.
+    jest.advanceTimersByTime(60_000);
+    press(byId(original, 'phase-transition-next'));
+    press(skipButton(original));
+    expect(text(harness.render())).toContain('First passage.');
+    expect(harness.onComplete).not.toHaveBeenCalled();
+    mockAppStateListener?.('active');
+    expect(text(harness.render())).toContain('First passage.');
+    jest.advanceTimersByTime(1249);
+    expect(text(harness.render())).toContain('First passage.');
+    jest.advanceTimersByTime(1);
+    expect(text(harness.render())).toContain('Second passage.');
+  } finally { harness.dispose(); }
+  expect(mockAppStateListener).toBeUndefined();
+});
+
+test('scrolling a long passage takes over playback before the pending timer can advance', () => {
+  const harness = mount(shortEvent());
+  try {
+    const tree = harness.render();
+    jest.advanceTimersByTime(1249);
+    (byId(tree, 'phase-transition-reading')!.props!.onScrollBeginDrag as () => void)();
+    jest.advanceTimersByTime(60_000);
+    expect(text(harness.render())).toContain('First passage.');
+    expect(harness.onComplete).not.toHaveBeenCalled();
+  } finally { harness.dispose(); }
+});
+
+test('rapid Continue taps across renders and stale page callbacks cannot consume unseen pages', () => {
+  const harness = mount(shortEvent(true));
+  try {
+    const first = byId(harness.render(), 'phase-transition-next');
+    press(first);
+    press(first);
+    let tree = harness.render();
+    expect(text(tree)).toContain('Second passage.');
+    press(byId(tree, 'phase-transition-next'));
+    jest.advanceTimersByTime(349);
+    press(byId(tree, 'phase-transition-next'));
+    expect(text(harness.render())).toContain('Second passage.');
+    jest.advanceTimersByTime(1);
+    press(first);
+    expect(text(harness.render())).toContain('Second passage.');
+    press(byId(tree, 'phase-transition-next'));
+    tree = harness.render();
+    expect(text(tree)).toContain('Last passage.');
+    press(byId(tree, 'phase-transition-next'));
+    expect(harness.onComplete).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(350);
+    press(byId(tree, 'phase-transition-next'));
+    press(byId(tree, 'phase-transition-next'));
+    expect(harness.onComplete).toHaveBeenCalledTimes(1);
+  } finally { harness.dispose(); }
+});
+
+test('callbacks from an old event cannot finish its replacement or advance it', () => {
+  const onePage = { ...shortEvent(true), scenes: shortEvent(true).scenes.slice(0, 1) };
+  const harness = mount(onePage);
+  try {
+    const original = harness.render();
+    press(skipButton(original));
+    const confirmation = byId(harness.render(), 'phase-transition-confirm-skip');
+    harness.render(false, shortEvent(true));
+    jest.advanceTimersByTime(0);
+    press(confirmation);
+    press(byId(original, 'phase-transition-next'));
+    press(skipButton(original));
+    const tree = harness.render();
+    expect(text(tree)).toContain('First passage.');
+    expect(byId(tree, 'phase-transition-skip-confirmation')).toBeUndefined();
+    expect(harness.onComplete).not.toHaveBeenCalled();
+  } finally { harness.dispose(); }
+});
+
+test('unmount cancels timers and makes already queued input callbacks inert', () => {
+  const onePage = { ...shortEvent(), scenes: shortEvent().scenes.slice(0, 1) };
+  const harness = mount(onePage);
+  const original = harness.render();
+  harness.dispose();
+  jest.advanceTimersByTime(60_000);
+  press(byId(original, 'phase-transition-next'));
+  press(skipButton(original));
+  expect(harness.onComplete).not.toHaveBeenCalled();
 });
