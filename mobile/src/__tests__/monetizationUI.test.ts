@@ -129,11 +129,13 @@ jest.mock('../services/iap', () => ({
   getProducts: (...args: unknown[]) => mockGetProducts(...args),
   purchaseProduct: (...args: unknown[]) => mockPurchaseProduct(...args),
   restorePurchases: (...args: unknown[]) => mockRestorePurchases(...args),
+  subscribeBillingChanges: () => () => {},
 }));
 
 let mockIsPatron = false;
 let mockIsAdFree = false;
 jest.mock('../services/entitlements', () => ({
+  ENTITLEMENTS: { PATRON: 'patron', ADFREE: 'adfree' },
   isPatronSync: () => mockIsPatron,
   isAdFreeSync: () => mockIsPatron || mockIsAdFree,
 }));
@@ -295,7 +297,8 @@ describe('PatronModal', () => {
 
     // Re-render → calm copy, still a non-Patron, no crash.
     tree = await renderC(PatronModal as any, { visible: true, phase: 0, onClose: jest.fn() });
-    expect(textOf(tree)).toContain('available right now');
+    expect(textOf(tree)).toContain('Check your store purchase history');
+    expect(textOf(tree)).not.toContain('Nothing was charged');
     expect(mockIsPatron).toBe(false);
   });
 
@@ -400,3 +403,4 @@ describe('RewardedAdButton', () => {
 // These service/UI tests enqueue telemetry events; cancel their debounce before
 // Jest disposes the module registry and its lazy telemetry import.
 afterEach(clearEvents);
+

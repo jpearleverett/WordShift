@@ -1,7 +1,7 @@
 import { useCountUp } from '../../hooks/useCountUp';
 import { SupportComparison } from './SupportComparison';
 import { saveWithPlayerRetry } from '../../services/saveRetry';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -34,6 +34,7 @@ import {
   purchaseStarterPack,
   purchaseProduct,
   settleConsumableGrant,
+  subscribeBillingChanges,
   IapProduct,
 } from '../../services/iap';
 import {
@@ -42,7 +43,6 @@ import {
   isPatronSync,
   ENTITLEMENTS,
 } from '../../services/entitlements';
-import { awardBonusAmber } from '../../services/amberCurrency';
 
 import { getSettingsSync } from '../../services/settings';
 import { hapticLight, hapticMedium } from '../../services/haptics';
@@ -55,8 +55,8 @@ import { isAdsReady, isRewardedCapReached } from '../../services/ads';
 import { getStoreArt, STORE_ART_KEYS } from './storeArt';
 import {
   getDailyAmberStatus,
-  recordDailyAmberClaim,
-  dailyAmberGrantFor,
+  claimDailyAmberReward,
+  createDailyAmberClaimId,
   DailyAmberStatus,
 } from '../../services/dailyAmberReward';
 import { DAILY_AMBER_REWARD, SUPPORTER_MONTHLY_AMBER } from '../../constants/gameBalance';
@@ -86,6 +86,65 @@ const StoreArtThumb: React.FC<{ artKey: string }> = ({ artKey }) => (
     accessible={false}
   />
 );
+
+/** The price action is a component so its callback stays an event handler. */
+const StorePricePill: React.FC<{
+  label: string;
+  onPress: () => void;
+  phase: number;
+  disabled: boolean;
+  accessibilityLabel: string;
+}> = props => (
+  <CandyButton {...props} variant="amber" style={styles.pricePill} />
+);
+
+const StorePackRow: React.FC<{
+  info: ConsumableProductInfo;
+  phase: number;
+  price: string;
+  firstAmberDouble: boolean;
+  disabled: boolean;
+  onPurchase: (info: ConsumableProductInfo) => Promise<void>;
+}> = ({ info, phase, price, firstAmberDouble, disabled, onPurchase }) => {
+  const t = getSurfaceTheme(phase);
+  return (
+    <PanelCard key={info.productId} phase={phase} style={styles.row}>
+      <View style={styles.rowTop}>
+        <StoreArtThumb artKey={info.productId} />
+        <View style={styles.rowInfo}>
+          <View style={styles.rowTitleLine}>
+            <Text style={[styles.rowTitle, { color: t.title }]}>{info.name}</Text>
+            {info.bestValue && (
+              <Text style={[styles.ribbon, { color: t.pillText, backgroundColor: t.pillBg }]}>
+                BEST VALUE
+              </Text>
+            )}
+            {info.reward.kind === 'amber' && firstAmberDouble && (
+              <Text style={[styles.ribbon, { color: t.pillText, backgroundColor: t.pillBg }]}>
+                2× FIRST PURCHASE!
+              </Text>
+            )}
+          </View>
+          <Text style={[styles.rowDesc, { color: t.body }]}>{info.description}</Text>
+          <View style={styles.rowFooter}>
+            <View style={styles.rowValue}>
+              {info.reward.kind === 'amber' ? (
+                <AmberValue amount={info.reward.amount} size={14} color={t.amberText}
+                  textStyle={styles.valueAmber} accessibilityLabel={`${info.reward.amount} amber`} />
+              ) : (
+                <Text style={[styles.valueWord, { color: t.amberText }]} numberOfLines={1}>
+                  {info.reward.amount} hints
+                </Text>
+              )}
+            </View>
+            <StorePricePill label={price} onPress={() => onPurchase(info)} phase={phase} disabled={disabled}
+              accessibilityLabel={`Buy ${info.name}, ${info.reward.amount} ${info.reward.kind}, for ${price}`} />
+          </View>
+        </View>
+      </View>
+    </PanelCard>
+  );
+};
 
 /**
  * Fallback price label for The Keeper's Collection when the store product isn't
@@ -118,7 +177,14 @@ interface StoreModalProps {
   onOpenPatron?: () => void;
 }
 
-type FlowState = 'idle' | 'working' | 'unavailable';
+type FlowState = 'idle' | 'working' | 'unavailable' | 'pending';
+
+const PURCHASE_UNCONFIRMED = "We couldn't confirm this purchase. Check your store purchase history before trying again.";
+const PURCHASE_PENDING = 'The store is still confirming this purchase. Please wait for its confirmation before trying again.';
+const PURCHASE_SAVE_COPY = {
+  title: 'Your purchase is waiting',
+  message: 'Your purchase was confirmed, but we could not save its items yet. Free some device storage if needed, then retry the save. You will not be charged again.',
+};
 
 const AMBER_PACK_IDS = [PRODUCT_IDS.AMBER_SMALL, PRODUCT_IDS.AMBER_MEDIUM, PRODUCT_IDS.AMBER_LARGE];
 const HINT_PACK_IDS = [PRODUCT_IDS.HINTS_SMALL, PRODUCT_IDS.HINTS_LARGE];
@@ -126,9 +192,8 @@ const HINT_PACK_IDS = [PRODUCT_IDS.HINTS_SMALL, PRODUCT_IDS.HINTS_LARGE];
 /**
  * The Store — consumable amber & hint packs plus the one-time cosmetic bundle.
  *
- * Consumables credit the amber reward balance / hint balance directly (the caller
- * convention: `purchaseConsumable` reports success + a reward, this modal applies
- * it via `awardBonusAmber` / `addHints`). Amber buys *convenience for the shop +
+ * Confirmed consumables are settled against the durable grant receipt before
+ * this modal presents the updated amber or hint balance. Amber buys *convenience for the shop +
  * amber sinks* — it is the REWARD balance only and never feeds phase progress, so
  * the story keeps its own pace. The cosmetic bundle is a non-consumable that
  * grants an entitlement (Eclipse tile theme + confetti).
@@ -154,6 +219,13 @@ export const StoreModal: React.FC<StoreModalProps> = ({
   const reducedMotion = getSettingsSync().reducedMotion;
 
   const [flow, setFlow] = useState<FlowState>('idle');
+  // A state update alone cannot stop two presses delivered in the same frame.
+  // Keep ownership through the native sheet AND the durable item grant.
+  const operationBusy = useRef(false);
+  const pendingPurchase = useRef<string | null>(null);
+  const dailyClaimBusy = useRef(false);
+  const rewardedAdBusy = useRef(false);
+  const dailyClaimId = useRef<string | null>(null);
   const [prices, setPrices] = useState<Record<string, string>>({});
   const [ownsBundle, setOwnsBundle] = useState<boolean>(
     hasEntitlementSync(ENTITLEMENTS.COSMETIC_BUNDLE),
@@ -201,11 +273,31 @@ export const StoreModal: React.FC<StoreModalProps> = ({
       setOwnsStarter(hasEntitlementSync(ENTITLEMENTS.STARTER_PACK));
       setIsSupporterActive(hasEntitlementSync(ENTITLEMENTS.SUPPORTER));
       setFirstAmberDouble(!hasMadeAmberPurchaseSync());
-      setSuccessMsg(null);
-      setFaucetReveal(null);
-      setGift(null);
+      // The global save overlay can hide this still-mounted modal and reopen it
+      // after the grant has completed. Clear reveals only on explicit dismissal.
     }
   }
+  // Storage overlays can temporarily hide this modal, so keep the subscription
+  // until unmount. Notifications arrive only after grants are durably saved.
+  useEffect(() => subscribeBillingChanges(change => {
+    setOwnsBundle(hasEntitlementSync(ENTITLEMENTS.COSMETIC_BUNDLE));
+    setOwnsStarter(hasEntitlementSync(ENTITLEMENTS.STARTER_PACK));
+    setIsSupporterActive(hasEntitlementSync(ENTITLEMENTS.SUPPORTER));
+    setFirstAmberDouble(!hasMadeAmberPurchaseSync());
+    const pendingProduct = pendingPurchase.current;
+    const matchingEntitlement = pendingProduct === PRODUCT_IDS.COSMETIC_BUNDLE
+      ? ENTITLEMENTS.COSMETIC_BUNDLE
+      : pendingProduct === PRODUCT_IDS.STARTER_PACK
+        ? ENTITLEMENTS.STARTER_PACK
+        : pendingProduct === PRODUCT_IDS.SUPPORTER_SUB ? ENTITLEMENTS.SUPPORTER : undefined;
+    if (pendingProduct && (change.productId === pendingProduct
+      || (matchingEntitlement && change.entitlements?.includes(matchingEntitlement)))) {
+      pendingPurchase.current = null;
+      setFlow(current => current === 'pending' ? 'idle' : current);
+      setSuccessMsg('Your purchase is ready. Thank you.');
+    }
+  }), []);
+
   useEffect(() => {
     if (!visible) return;
     let cancelled = false;
@@ -316,7 +408,9 @@ export const StoreModal: React.FC<StoreModalProps> = ({
   }, [faucetReveal]);
   useEffect(() => {
     if (flow === 'unavailable') {
-      announceForA11y('The store is not available right now. Nothing was charged.');
+      announceForA11y(PURCHASE_UNCONFIRMED);
+    } else if (flow === 'pending') {
+      announceForA11y(PURCHASE_PENDING);
     }
   }, [flow]);
 
@@ -325,36 +419,50 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     [prices],
   );
 
-  // Grant the daily free-amber reward (called after a completed rewarded view, or
-  // directly for Patron holders who don't watch ads). recordDailyAmberClaim caps
-  // it per local day and reports whether THIS claim was recorded — amber is
-  // credited only when it was, so a repeat tap past the cap (cheap for Patrons,
-  // who skip the ad) can never over-grant while the tracker stays pinned.
+  // Keep the earned view and claim ID until the counter and amber are durable.
+  // Retrying a failed save must not ask for another ad or claim another reward.
   const handleClaimDailyAmber = useCallback(async () => {
-    hapticMedium();
-    const result = await recordDailyAmberClaim();
-    setAmberFaucet(result);
-    // A faucet claim SPENDS a rewarded view, so re-read the shared cap here or
-    // a player at 7 views who claims once lands right back in the contradiction
-    // ("1 left today", no button) on the second claim.
-    isRewardedCapReached().then(setRewardedCapReached).catch(() => {});
-    const grant = dailyAmberGrantFor(result);
-    if (grant <= 0) {
-      // Already collected today (stale card or rapid re-tap): the card flips to
-      // its "Collected for today" state above; nothing is credited.
-      return;
+    if (dailyClaimBusy.current || (operationBusy.current && !rewardedAdBusy.current)) return;
+    dailyClaimBusy.current = true;
+    operationBusy.current = true;
+    setFlow('working');
+    const claimId = dailyClaimId.current ?? createDailyAmberClaimId();
+    dailyClaimId.current = claimId;
+    try {
+      const result = await saveWithPlayerRetry(() => claimDailyAmberReward(claimId), {
+        title: 'Your daily amber is waiting',
+        message: 'We could not save your amber yet. Free some device storage if needed, then retry the save. You do not need to watch another clip.',
+      });
+      dailyClaimId.current = null;
+      setAmberFaucet(result);
+      isRewardedCapReached().then(setRewardedCapReached).catch(() => {});
+      onAmberChange?.(result.newBalance);
+      if (result.grantedAmount > 0) {
+        hapticMedium();
+        setSuccessMsg(null);
+        setFaucetReveal({ amount: result.grantedAmount, nonce: Date.now() });
+        logEvent({ type: 'daily_amber_claimed', data: { amount: result.grantedAmount, remaining: result.remaining } });
+      }
+    } finally {
+      dailyClaimBusy.current = false;
+      if (!rewardedAdBusy.current) {
+        operationBusy.current = false;
+        setFlow(pendingPurchase.current ? 'pending' : 'idle');
+      }
     }
-    const balance = await awardBonusAmber(grant, 'rewarded_daily_amber');
-    onAmberChange?.(balance);
-    // Present the claim as a magnitude-aware count-up, not a static line.
-    setSuccessMsg(null);
-    setFaucetReveal({ amount: grant, nonce: Date.now() });
-    logEvent({ type: 'daily_amber_claimed', data: { amount: grant, remaining: result.remaining } });
   }, [onAmberChange]);
+
+  const canStartRewardedAd = useCallback(() => !operationBusy.current, []);
+  const handleRewardedBusyChange = useCallback((busy: boolean) => {
+    rewardedAdBusy.current = busy;
+    operationBusy.current = busy;
+    setFlow(busy ? 'working' : pendingPurchase.current ? 'pending' : 'idle');
+  }, []);
 
   const handleBuyConsumable = useCallback(
     async (info: ConsumableProductInfo) => {
-      if (flow === 'working') return;
+      if (operationBusy.current || pendingPurchase.current) return;
+      operationBusy.current = true;
       setFlow('working');
       setSuccessMsg(null);
       setFaucetReveal(null);
@@ -363,7 +471,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
       try {
         const result = await purchaseConsumable(info.productId);
         if (result.success && result.reward) {
-          const credit = await saveWithPlayerRetry(() => settleConsumableGrant(result.grantId!));
+          const credit = await saveWithPlayerRetry(() => settleConsumableGrant(result.grantId!), PURCHASE_SAVE_COPY);
           if (result.reward.kind === 'amber') {
             const balance = credit.amberBalance;
             onAmberChange?.(balance);
@@ -390,6 +498,11 @@ export const StoreModal: React.FC<StoreModalProps> = ({
           setFlow('idle');
           return;
         }
+        if (result.pending) {
+          pendingPurchase.current = info.productId;
+          setFlow('pending');
+          return;
+        }
         if (result.cancelled) {
           logEvent({ type: 'purchase_cancelled', data: { productId: info.productId, kind: info.reward.kind } });
           setFlow('idle');
@@ -400,13 +513,16 @@ export const StoreModal: React.FC<StoreModalProps> = ({
       } catch {
         logEvent({ type: 'purchase_failed', data: { productId: info.productId, kind: info.reward.kind, reason: 'exception' } });
         setFlow('unavailable');
+      } finally {
+        operationBusy.current = false;
       }
     },
-    [flow, onAmberChange, onHintsChange],
+    [onAmberChange, onHintsChange],
   );
 
   const handleBuyStarter = useCallback(async () => {
-    if (flow === 'working' || ownsStarter) return;
+    if (operationBusy.current || pendingPurchase.current || hasEntitlementSync(ENTITLEMENTS.STARTER_PACK)) return;
+    operationBusy.current = true;
     setFlow('working');
     setSuccessMsg(null);
     setFaucetReveal(null);
@@ -415,9 +531,9 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     try {
       const result = await purchaseStarterPack();
       if (result.success && result.reward) {
-        const amberCredit = await saveWithPlayerRetry(() => settleConsumableGrant(result.grantIds!.amber!));
+        const amberCredit = await saveWithPlayerRetry(() => settleConsumableGrant(result.grantIds!.amber!), PURCHASE_SAVE_COPY);
         onAmberChange?.(amberCredit.amberBalance);
-        const hintCredit = await saveWithPlayerRetry(() => settleConsumableGrant(result.grantIds!.hints!));
+        const hintCredit = await saveWithPlayerRetry(() => settleConsumableGrant(result.grantIds!.hints!), PURCHASE_SAVE_COPY);
         onHintsChange?.(hintCredit.hintBalance);
         setOwnsStarter(true);
         // The Keeper's Welcome is a marquee moment: present the bundle as a
@@ -440,6 +556,11 @@ export const StoreModal: React.FC<StoreModalProps> = ({
         setFlow('idle');
         return;
       }
+      if (result.pending) {
+        pendingPurchase.current = STARTER_PACK_INFO.productId;
+        setFlow('pending');
+        return;
+      }
       if (result.cancelled) {
         logEvent({ type: 'purchase_cancelled', data: { productId: STARTER_PACK_INFO.productId, kind: 'starter' } });
         setFlow('idle');
@@ -450,11 +571,14 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     } catch {
       logEvent({ type: 'purchase_failed', data: { productId: STARTER_PACK_INFO.productId, kind: 'starter', reason: 'exception' } });
       setFlow('unavailable');
+    } finally {
+      operationBusy.current = false;
     }
-  }, [flow, ownsStarter, onAmberChange, onHintsChange]);
+  }, [onAmberChange, onHintsChange]);
 
   const handleBuyBundle = useCallback(async () => {
-    if (flow === 'working' || ownsBundle) return;
+    if (operationBusy.current || pendingPurchase.current || hasEntitlementSync(ENTITLEMENTS.COSMETIC_BUNDLE)) return;
+    operationBusy.current = true;
     setFlow('working');
     setSuccessMsg(null);
     setFaucetReveal(null);
@@ -469,6 +593,11 @@ export const StoreModal: React.FC<StoreModalProps> = ({
         setFlow('idle');
         return;
       }
+      if (result.pending) {
+        pendingPurchase.current = PRODUCT_IDS.COSMETIC_BUNDLE;
+        setFlow('pending');
+        return;
+      }
       if (result.cancelled) {
         logEvent({ type: 'purchase_cancelled', data: { productId: PRODUCT_IDS.COSMETIC_BUNDLE, kind: 'cosmetic' } });
         setFlow('idle');
@@ -479,11 +608,14 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     } catch {
       logEvent({ type: 'purchase_failed', data: { productId: PRODUCT_IDS.COSMETIC_BUNDLE, kind: 'cosmetic', reason: 'exception' } });
       setFlow('unavailable');
+    } finally {
+      operationBusy.current = false;
     }
-  }, [flow, ownsBundle]);
+  }, []);
 
   const handleBuySupporter = useCallback(async () => {
-    if (flow === 'working' || isSupporterActive) return;
+    if (operationBusy.current || pendingPurchase.current || hasEntitlementSync(ENTITLEMENTS.SUPPORTER)) return;
+    operationBusy.current = true;
     setFlow('working');
     setSuccessMsg(null);
     setFaucetReveal(null);
@@ -499,6 +631,11 @@ export const StoreModal: React.FC<StoreModalProps> = ({
         setFlow('idle');
         return;
       }
+      if (result.pending) {
+        pendingPurchase.current = PRODUCT_IDS.SUPPORTER_SUB;
+        setFlow('pending');
+        return;
+      }
       if (result.cancelled) {
         logEvent({ type: 'purchase_cancelled', data: { productId: PRODUCT_IDS.SUPPORTER_SUB, kind: 'supporter' } });
         setFlow('idle');
@@ -509,36 +646,25 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     } catch {
       logEvent({ type: 'purchase_failed', data: { productId: PRODUCT_IDS.SUPPORTER_SUB, kind: 'supporter', reason: 'exception' } });
       setFlow('unavailable');
+    } finally {
+      operationBusy.current = false;
     }
-  }, [flow, isSupporterActive]);
+  }, []);
 
   const handleClose = useCallback(() => {
+    if (operationBusy.current) return;
+    pendingPurchase.current = null;
     setFlow('idle');
     setSuccessMsg(null);
     setFaucetReveal(null);
+    setGift(null);
     onClose();
   }, [onClose]);
 
   const t = getSurfaceTheme(phase);
   const skin = getPixelSkin(phase);
   const working = flow === 'working';
-
-  /** Price pinned right in a chunky amber CandyButton — the store's single accent. */
-  const renderPricePill = (
-    label: string,
-    onPress: () => void,
-    accessibilityLabel: string,
-  ) => (
-    <CandyButton
-      label={label}
-      onPress={onPress}
-      phase={phase}
-      variant="amber"
-      disabled={working}
-      accessibilityLabel={accessibilityLabel}
-      style={styles.pricePill}
-    />
-  );
+  const purchaseDisabled = working || flow === 'pending';
 
   /**
    * The row's bottom rail: what you GET on the left, what it costs on the
@@ -552,54 +678,6 @@ export const StoreModal: React.FC<StoreModalProps> = ({
       <View style={styles.rowValue}>{value}</View>
       {action}
     </View>
-  );
-
-  /** Quantity as its own fact — the one number a buyer actually compares. */
-  const renderRewardValue = (reward: ConsumableProductInfo['reward']) =>
-    reward.kind === 'amber' ? (
-      <AmberValue
-        amount={reward.amount}
-        size={14}
-        color={t.amberText}
-        textStyle={styles.valueAmber}
-        accessibilityLabel={`${reward.amount} amber`}
-      />
-    ) : (
-      <Text style={[styles.valueWord, { color: t.amberText }]} numberOfLines={1}>
-        {reward.amount} hints
-      </Text>
-    );
-
-  const renderPackRow = (info: ConsumableProductInfo) => (
-    <PanelCard key={info.productId} phase={phase} style={styles.row}>
-      <View style={styles.rowTop}>
-        <StoreArtThumb artKey={info.productId} />
-        <View style={styles.rowInfo}>
-          <View style={styles.rowTitleLine}>
-            <Text style={[styles.rowTitle, { color: t.title }]}>{info.name}</Text>
-            {info.bestValue && (
-              <Text style={[styles.ribbon, { color: t.pillText, backgroundColor: t.pillBg }]}>
-                BEST VALUE
-              </Text>
-            )}
-            {info.reward.kind === 'amber' && firstAmberDouble && (
-              <Text style={[styles.ribbon, { color: t.pillText, backgroundColor: t.pillBg }]}>
-                2× FIRST PURCHASE!
-              </Text>
-            )}
-          </View>
-          <Text style={[styles.rowDesc, { color: t.body }]}>{info.description}</Text>
-          {renderRowFooter(
-            renderRewardValue(info.reward),
-            renderPricePill(
-              priceLabel(info),
-              () => handleBuyConsumable(info),
-              `Buy ${info.name}, ${info.reward.amount} ${info.reward.kind}, for ${priceLabel(info)}`,
-            ),
-          )}
-        </View>
-      </View>
-    </PanelCard>
   );
 
   const heroPrice = prices[STARTER_PACK_INFO.productId] ?? STARTER_PACK_INFO.fallbackPrice;
@@ -674,7 +752,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
                   phase={phase}
                   variant="primary"
                   size="lg"
-                  disabled={working}
+                  disabled={purchaseDisabled}
                   accessibilityLabel={`Buy ${STARTER_PACK_INFO.name} for ${heroPrice}`}
                   style={styles.heroCta}
                 />
@@ -710,7 +788,9 @@ export const StoreModal: React.FC<StoreModalProps> = ({
                         {amberFaucet.available
                           ? (!isPatronSync() && rewardedCapReached
                               ? `Waiting for you. You have watched every clip today, so come back tomorrow for these ${DAILY_AMBER_REWARD} amber.`
-                              : `Watch a short clip. ${amberFaucet.remaining} left today.`)
+                              : isPatronSync()
+                                ? `Your daily gift. ${amberFaucet.remaining} left today.`
+                                : `Watch a short clip. ${amberFaucet.remaining} left today.`)
                           : 'Collected for today. Come back tomorrow!'}
                       </Text>
                       {amberFaucet.available && renderRowFooter(
@@ -729,11 +809,16 @@ export const StoreModal: React.FC<StoreModalProps> = ({
                           accessibilityLabel={`${DAILY_AMBER_REWARD} amber`}
                         />,
                         isPatronSync() ? (
-                          renderPricePill('Claim', handleClaimDailyAmber, `Claim ${DAILY_AMBER_REWARD} free amber`)
+                          <StorePricePill label="Claim" onPress={handleClaimDailyAmber} phase={phase} disabled={purchaseDisabled}
+                            accessibilityLabel={`Claim ${DAILY_AMBER_REWARD} free amber`} />
                         ) : (
                           <RewardedAdButton
                             placement="daily_amber"
                             onReward={handleClaimDailyAmber}
+                            completeAfterUnmount
+                            disabled={working}
+                            canStart={canStartRewardedAd}
+                            onBusyChange={handleRewardedBusyChange}
                             label="Watch"
                             accessibilityLabel={`Watch a clip for ${DAILY_AMBER_REWARD} free amber`}
                             phase={phase}
@@ -752,10 +837,16 @@ export const StoreModal: React.FC<StoreModalProps> = ({
             )}
 
             <Text style={[styles.sectionLabel, { color: t.muted }]}>AMBER</Text>
-            {CONSUMABLE_PRODUCTS.filter(p => p.reward.kind === 'amber').map(renderPackRow)}
+            {CONSUMABLE_PRODUCTS.filter(p => p.reward.kind === 'amber').map(info => (
+              <StorePackRow key={info.productId} info={info} phase={phase} price={priceLabel(info)}
+                firstAmberDouble={firstAmberDouble} disabled={purchaseDisabled} onPurchase={handleBuyConsumable} />
+            ))}
 
             <Text style={[styles.sectionLabel, { color: t.muted }]}>HINTS</Text>
-            {CONSUMABLE_PRODUCTS.filter(p => p.reward.kind === 'hints').map(renderPackRow)}
+            {CONSUMABLE_PRODUCTS.filter(p => p.reward.kind === 'hints').map(info => (
+              <StorePackRow key={info.productId} info={info} phase={phase} price={priceLabel(info)}
+                firstAmberDouble={firstAmberDouble} disabled={purchaseDisabled} onPurchase={handleBuyConsumable} />
+            ))}
 
             <Text style={[styles.sectionLabel, { color: t.muted }]}>SUPPORTER</Text>
             <PanelCard phase={phase} style={styles.row}>
@@ -773,11 +864,9 @@ export const StoreModal: React.FC<StoreModalProps> = ({
                     isSupporterActive ? (
                       <Text style={[styles.ownedText, { color: t.amberText }]}>Active <Image source={CHROME_ICONS.starBullet} style={styles.inlineMark} /></Text>
                     ) : (
-                      renderPricePill(
-                        prices[PRODUCT_IDS.SUPPORTER_SUB] ?? SUPPORTER_SUB_FALLBACK_PRICE,
-                        handleBuySupporter,
-                        'Subscribe as a Supporter',
-                      )
+                      <StorePricePill label={prices[PRODUCT_IDS.SUPPORTER_SUB] ?? SUPPORTER_SUB_FALLBACK_PRICE}
+                        onPress={handleBuySupporter} phase={phase} disabled={purchaseDisabled}
+                        accessibilityLabel="Subscribe as a Supporter" />
                     ),
                   )}
                 </View>
@@ -800,11 +889,9 @@ export const StoreModal: React.FC<StoreModalProps> = ({
                     ownsBundle ? (
                       <Text style={[styles.ownedText, { color: t.amberText }]}>Owned <Image source={CHROME_ICONS.starBullet} style={styles.inlineMark} /></Text>
                     ) : (
-                      renderPricePill(
-                        prices[PRODUCT_IDS.COSMETIC_BUNDLE] ?? COSMETIC_BUNDLE_FALLBACK_PRICE,
-                        handleBuyBundle,
-                        "Buy The Keeper's Collection",
-                      )
+                      <StorePricePill label={prices[PRODUCT_IDS.COSMETIC_BUNDLE] ?? COSMETIC_BUNDLE_FALLBACK_PRICE}
+                        onPress={handleBuyBundle} phase={phase} disabled={purchaseDisabled}
+                        accessibilityLabel="Buy The Keeper's Collection" />
                     ),
                   )}
                 </View>
@@ -814,11 +901,14 @@ export const StoreModal: React.FC<StoreModalProps> = ({
             {onOpenPatron && (
               <TouchableOpacity
                 onPress={() => {
+                  if (operationBusy.current) return;
                   hapticLight();
-                  onClose();
+                  handleClose();
                   onOpenPatron();
                 }}
                 accessibilityRole="button"
+                disabled={working}
+                accessibilityState={{ disabled: working }}
                 accessibilityLabel="Learn about Patron"
               >
                 <PanelCard phase={phase} style={styles.patronLink}>
@@ -856,17 +946,17 @@ export const StoreModal: React.FC<StoreModalProps> = ({
             </Animated.View>
           )}
 
-          {flow === 'unavailable' && (
-            <View style={[styles.unavailableBox, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}>
+          {(flow === 'unavailable' || flow === 'pending') && (
+            <View accessibilityLiveRegion="polite" style={[styles.unavailableBox, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}>
               <Text style={[styles.unavailableText, { color: t.body }]}>
-                The store isn&apos;t available right now. Nothing was charged. Please try again later.
+                {flow === 'pending' ? PURCHASE_PENDING : PURCHASE_UNCONFIRMED}
               </Text>
             </View>
           )}
 
           {working && (
             <View style={styles.workingRow}>
-              <ActivityIndicator size="small" color={t.amberText} />
+              <ActivityIndicator size="small" color={t.amberText} accessibilityLabel="Finishing your store request" />
             </View>
           )}
 
@@ -875,6 +965,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
             onPress={handleClose}
             phase={phase}
             variant="quiet"
+            disabled={working}
             accessibilityLabel="Close store"
             style={styles.closeBtn}
           />
@@ -1092,3 +1183,4 @@ const styles = StyleSheet.create({
 });
 
 export default StoreModal;
+

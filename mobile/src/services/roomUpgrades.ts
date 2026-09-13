@@ -6,7 +6,8 @@
  * three tier-3 "attunement" levels (require tier-1, not the deepening).
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage, { runStorageTransaction } from './persistenceStorage';
+import { invalidateProgressCache, loadProgress, spendAmber } from './amberCurrency';
 import { DialoguePhase } from '../types/homeWorld';
 
 const STORAGE_KEY = 'wordshift_room_upgrades';
@@ -133,7 +134,7 @@ export const ROOM_UPGRADES: RoomUpgrade[] = [
   {
     roomId: 'belfry',
     name: "Chalk Circles",
-    description: "Small neat chalk rings mark the skirting boards. Tock says every good survey deserves a fair copy.",
+    description: "Small neat chalk rings mark the low woodwork. Tock says every good survey deserves a fair copy.",
     cost: 150,
     darkDescription: "The circles are rounder in the mornings than they were the night before.",
   },
@@ -266,7 +267,7 @@ export const ROOM_ATTUNEMENTS: RoomAttunement[] = [
   {
     roomId: 'kitchen',
     descriptions: [
-      'The bread rises fuller inside the salt ring. Panko takes it as a compliment.',
+      'The bread rises fuller beneath the copper pots. Panko takes it as a compliment.',
       'The copper pots ring together now, softly, all on one note. Panko stirs in time.',
       'Every dish comes out perfect, always, exactly. Panko has stopped tasting for salt.',
     ],
@@ -308,7 +309,7 @@ export const ROOM_ATTUNEMENTS: RoomAttunement[] = [
     descriptions: [
       'The lamp warms the corner it faces before anyone turns it on. Chill appreciates the initiative.',
       'The paperwork sorts itself overnight into an order Chill did not choose. He has adopted the new system.',
-      'Both shadows stand up a moment before Chill does. He finds it efficient.',
+      'His shadow stirs a moment before Chill does. He finds it efficient.',
     ],
   },
   {
@@ -339,7 +340,7 @@ export const ROOM_ATTUNEMENTS: RoomAttunement[] = [
     roomId: 'star_loft',
     descriptions: [
       'The moths fly in slow circles now, all in the same direction. Vesper counts their turns without blinking.',
-      'The lit hour comes earlier each week. Vesper adjusts her watching accordingly.',
+      'The moths gather earlier each week. Vesper adjusts her watching accordingly.',
       'Between the stars there is a place the lantern light bends toward. Vesper has seen it. She says the loft sees it too.',
     ],
   },
@@ -380,9 +381,9 @@ const HOUSE_UPGRADE_SURFACE_LINES: Record<HouseUpgradeTier, { bright: string; da
     serene: 'The object rests in the room and its light stays. The plaque keeps a lantern pip.',
   },
   2: {
-    bright: 'A second piece joins the first. Faint marks appear on the walls and the room deepens.',
-    dark: 'A second piece joins the first. Marks surface on the walls and the room goes deeper.',
-    serene: 'A second piece keeps the first company. The marks on the walls settle and the room stays deep.',
+    bright: 'The decoration changes with the room. Faint marks appear on the walls.',
+    dark: 'The decoration changes with the room. Unfamiliar marks surface on the walls.',
+    serene: 'The decoration has settled into its changed form. The wall marks remain.',
   },
   3: {
     bright: 'The glow widens with each level and the plaque gains a pip. At the last level, dust drifts.',
@@ -422,30 +423,32 @@ export function invalidateRoomUpgradeCache(): void {
 
 async function loadState(): Promise<RoomUpgradeState> {
   if (cache) return cache;
-  try {
-    const stored = await AsyncStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (parsed && typeof parsed.purchased === 'object') {
-        // Normalize: older saves predate the `deepened` / `attunements` maps.
-        cache = {
-          purchased: parsed.purchased ?? {},
-          deepened: parsed.deepened ?? {},
-          attunements: parsed.attunements ?? {},
-        };
-        return cache!;
-      }
-    }
-  } catch { /* ignore */ }
-  cache = { purchased: {}, deepened: {}, attunements: {} };
+  const stored = await AsyncStorage.getItem(STORAGE_KEY);
+  if (!stored) {
+    cache = { purchased: {}, deepened: {}, attunements: {} };
+    return cache;
+  }
+  const parsed = JSON.parse(stored);
+  const validMap = (value: unknown, levels = false): boolean => !!value && typeof value === 'object' &&
+    !Array.isArray(value) && Object.values(value).every(item => typeof item === 'number' &&
+      Number.isFinite(item) && item >= 0 && (!levels || (Number.isInteger(item) && item <= MAX_ATTUNEMENT_LEVEL)));
+  if (!parsed || !validMap(parsed.purchased) || !validMap(parsed.deepened ?? {}) ||
+      !validMap(parsed.attunements ?? {}, true)) {
+    throw new Error('Your room upgrades could not be read. Please try again.');
+  }
+  // Normalize legacy saves, but never mistake unreadable ownership for an
+  // empty house and charge again for furniture the player already bought.
+  cache = { purchased: parsed.purchased, deepened: parsed.deepened ?? {}, attunements: parsed.attunements ?? {} };
   return cache;
 }
 
-async function saveState(): Promise<void> {
-  if (!cache) return;
-  try {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(cache));
-  } catch { /* ignore */ }
+const copyState = (state: RoomUpgradeState): RoomUpgradeState => ({
+  purchased: { ...state.purchased }, deepened: { ...state.deepened }, attunements: { ...state.attunements },
+});
+
+async function saveState(next: RoomUpgradeState): Promise<void> {
+  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  cache = next;
 }
 
 // ---------------------------------------------------------------------------
@@ -475,9 +478,10 @@ export function areUpgradesAvailable(phase: DialoguePhase): boolean {
 }
 
 /**
- * Purchase a room upgrade.
+ * Grant a room upgrade without charging amber.
  * Returns true if successful, false if already purchased or upgrade doesn't exist.
- * Does NOT handle amber spending — caller must call spendAmber first.
+ * Writes ownership only. Paid purchases must use purchaseHouseUpgrade so the
+ * charge and ownership share one durable commit.
  */
 export async function purchaseRoomUpgrade(roomId: string): Promise<boolean> {
   const upgrade = getRoomUpgrade(roomId);
@@ -486,8 +490,9 @@ export async function purchaseRoomUpgrade(roomId: string): Promise<boolean> {
   const state = await loadState();
   if (roomId in state.purchased) return false;
 
-  state.purchased[roomId] = Date.now();
-  await saveState();
+  const next = copyState(state);
+  next.purchased[roomId] = Date.now();
+  await saveState(next);
   return true;
 }
 
@@ -539,10 +544,10 @@ export function areDeepeningsAvailable(phase: DialoguePhase): boolean {
 }
 
 /**
- * Purchase a room's deepening (tier-2). Requires the tier-1 decoration to be in
+ * Grant a room's deepening (tier-2) without charging amber. Requires the tier-1 decoration to be in
  * place first (you deepen a room you've already dressed). Returns false if no
  * deepening exists, the tier-1 upgrade isn't purchased, or it's already bought.
- * Does NOT spend amber — caller must call spendAmber first (mirrors tier-1).
+ * Writes ownership only. Use purchaseHouseUpgrade for an atomic paid purchase.
  */
 export async function purchaseRoomDeepening(roomId: string): Promise<boolean> {
   const deepening = getRoomDeepening(roomId);
@@ -552,8 +557,9 @@ export async function purchaseRoomDeepening(roomId: string): Promise<boolean> {
   if (!(roomId in state.purchased)) return false; // tier-1 required first
   if (roomId in state.deepened) return false;
 
-  state.deepened[roomId] = Date.now();
-  await saveState();
+  const next = copyState(state);
+  next.deepened[roomId] = Date.now();
+  await saveState(next);
   return true;
 }
 
@@ -618,12 +624,12 @@ export async function getNextAttunementInfo(roomId: string): Promise<RoomAttunem
 }
 
 /**
- * Purchase a room's next attunement level (levels are strictly in order — the
+ * Grant a room's next attunement level without charging amber (levels are strictly in order — the
  * stored level is a counter). Requires the tier-1 decoration first (like the
  * deepening; the deepening itself is NOT required). Returns false if no
  * attunement exists, the tier-1 upgrade isn't purchased, or the room is
  * already fully attuned.
- * Does NOT spend amber — caller must call spendAmber first (mirrors tier-1).
+ * Writes ownership only. Use purchaseHouseUpgrade for an atomic paid purchase.
  */
 export async function purchaseRoomAttunement(roomId: string): Promise<boolean> {
   const attunement = getRoomAttunement(roomId);
@@ -634,9 +640,75 @@ export async function purchaseRoomAttunement(roomId: string): Promise<boolean> {
   const current = state.attunements[roomId] ?? 0;
   if (current >= MAX_ATTUNEMENT_LEVEL) return false;
 
-  state.attunements[roomId] = current + 1;
-  await saveState();
+  const next = copyState(state);
+  next.attunements[roomId] = current + 1;
+  await saveState(next);
   return true;
+}
+
+export type HouseUpgradePurchase =
+  | { roomId: string; tier: 1 }
+  | { roomId: string; tier: 2 }
+  | { roomId: string; tier: 3; level: number };
+
+export interface HouseUpgradePurchaseResult {
+  success: boolean;
+  newBalance: number;
+  reason?: 'already_owned' | 'unavailable' | 'not_enough_amber' | 'stale_offer';
+}
+
+/**
+ * The paid shop path. Validate the exact offer before spending; the amber
+ * balance, transaction ledger and room ownership then share one durable
+ * commit. Retrying an interrupted commit cannot buy a second attunement.
+ * The three purchaseRoom* functions remain free-grant APIs for other callers.
+ */
+export async function purchaseHouseUpgrade(request: HouseUpgradePurchase): Promise<HouseUpgradePurchaseResult> {
+  try {
+    return await runStorageTransaction('house_upgrade_purchase', async () => {
+      // Recovery runs before this callback, and may have completed the very
+      // purchase being retried. Warm mirrors must not obscure that ownership.
+      invalidateRoomUpgradeCache();
+      invalidateProgressCache();
+      const progress = await loadProgress();
+      const state = await loadState();
+      const refuse = (reason: HouseUpgradePurchaseResult['reason']): HouseUpgradePurchaseResult =>
+        ({ success: false, newBalance: progress.amber, reason });
+      const { roomId, tier } = request;
+      if (!areUpgradesAvailable(progress.currentPhase) || !progress.unlockedRooms.includes(roomId)) {
+        return refuse('unavailable');
+      }
+      const item = tier === 1 ? getRoomUpgrade(roomId) : tier === 2 ? getRoomDeepening(roomId) :
+        Number.isInteger(request.level) ? getAttunementForLevel(roomId, request.level) : null;
+      if (!item) return refuse('unavailable');
+      if (tier === 1 && roomId in state.purchased) return refuse('already_owned');
+      if (tier > 1 && !(roomId in state.purchased)) return refuse('unavailable');
+      if (tier === 2 && roomId in state.deepened) return refuse('already_owned');
+      if (tier === 3) {
+        const current = state.attunements[roomId] ?? 0;
+        if (request.level <= current) return refuse('already_owned');
+        if (request.level !== current + 1) return refuse('stale_offer');
+      }
+      const source = tier === 1 ? `room_upgrade_${roomId}` : tier === 2 ? `room_deepening_${roomId}` : `attunement_${roomId}`;
+      const spent = await spendAmber(item.cost, source);
+      if (!spent.success) {
+        if (spent.error === 'Not enough amber') return refuse('not_enough_amber');
+        throw new Error('Another purchase is still saving. Please try again.');
+      }
+      const next = copyState(state);
+      if (tier === 1) next.purchased[roomId] = Date.now();
+      else if (tier === 2) next.deepened[roomId] = Date.now();
+      else next.attunements[roomId] = request.level;
+      // Do not publish staged ownership into the room cache before commit.
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      return { success: true, newBalance: spent.newBalance };
+    });
+  } finally {
+    // A rejected journal write leaves the old save; a rejected apply leaves
+    // recovery work. Neither may leak a warm, partially updated mirror.
+    invalidateRoomUpgradeCache();
+    invalidateProgressCache();
+  }
 }
 
 /**
@@ -656,8 +728,6 @@ export async function getRoomEmbellishmentIntensity(roomId: string): Promise<num
 
 /** Clear all room upgrade data (for Reset All Data). */
 export async function clearRoomUpgrades(): Promise<void> {
+  await AsyncStorage.removeItem(STORAGE_KEY);
   cache = { purchased: {}, deepened: {}, attunements: {} };
-  try {
-    await AsyncStorage.removeItem(STORAGE_KEY);
-  } catch { /* ignore */ }
 }

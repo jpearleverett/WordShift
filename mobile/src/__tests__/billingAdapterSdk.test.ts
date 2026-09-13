@@ -12,8 +12,8 @@
  *  - initialize() fire-and-forgets a getCustomerInfo restore + registers a
  *    customer-info update listener, granting active entitlements locally so a
  *    reinstall doesn't strip a paying user until they manually tap Restore;
- *  - that path is GRANT-ONLY (never revokes local entitlements) and never
- *    blocks or rejects initialize().
+ *  - that path preserves permanent entitlements and sparse responses, revokes
+ *    only an explicitly inactive subscription, and never blocks initialize().
  */
 
 jest.mock('react-native', () => ({
@@ -43,9 +43,11 @@ jest.mock('react-native-purchases', () => {
     listeners: [] as ((info: any) => void)[],
     /** Store transaction id returned by purchaseStoreProduct. */
     transactionId: 'txn_test_1',
+    transactions: [] as any[],
   };
   const customerInfo = () => ({
     entitlements: { active: { ...state.activeEntitlements } },
+    nonSubscriptionTransactions: state.transactions,
   });
   const Purchases = {
     PRODUCT_CATEGORY: {
@@ -108,6 +110,7 @@ import {
 import { PRODUCT_IDS, BillingProvider } from '../services/iap';
 
 const rc = jest.requireMock('react-native-purchases');
+const originalStorageWrite = (AsyncStorage.setItem as jest.Mock).getMockImplementation()!;
 
 /** Drain the microtask chain kicked off in the background by initialize(). */
 const flushBackgroundChain = () => new Promise((resolve) => setImmediate(resolve));
@@ -133,6 +136,7 @@ function callsOf(method: string): { method: string; args: any[] }[] {
 }
 
 beforeEach(async () => {
+  (AsyncStorage.setItem as jest.Mock).mockImplementation(originalStorageWrite);
   await AsyncStorage.clear();
   await clearEntitlements();
   await loadEntitlements();
@@ -144,6 +148,10 @@ beforeEach(async () => {
   rc.__state.hangCustomerInfo = false;
   rc.__state.throwOnGetCustomerInfo = false;
   rc.__state.transactionId = 'txn_test_1';
+  rc.__state.transactions = [];
+  const { invalidateProgressCache } = await import('../services/amberCurrency');
+  const { invalidateHintsCache } = await import('../services/hints');
+  invalidateProgressCache(); invalidateHintsCache();
   // The adapter warns on deliberate failures we simulate — keep output clean.
   jest.spyOn(console, 'warn').mockImplementation(() => {});
 });
@@ -376,5 +384,92 @@ describe('RevenueCat adapter — customer-info update listener', () => {
     expect(() => rc.__state.listeners[0]({ entitlements: { active: {} } })).not.toThrow();
     await flushBackgroundChain();
     expect(await hasEntitlement(ENTITLEMENTS.PATRON)).toBe(false);
+  });
+});
+
+
+
+describe('RevenueCat adapter — interrupted and pending purchase safety', () => {
+  it('maps Play pending approval separately from cancellation or failure', async () => {
+    rc.__state.products = [storeProduct(PRODUCT_IDS.AMBER_SMALL)];
+    const p = await initProvider();
+    const purchase = jest.spyOn(rc.default, 'purchaseStoreProduct').mockRejectedValue({ code: '20', message: 'Awaiting payment' });
+    try {
+      expect(await p.purchase(PRODUCT_IDS.AMBER_SMALL)).toMatchObject({ success: false, pending: true, error: 'payment_pending' });
+    } finally { purchase.mockRestore(); }
+  });
+
+  it('never opens checkout if its historical receipt boundary cannot be made durable', async () => {
+    rc.__state.products = [storeProduct(PRODUCT_IDS.AMBER_SMALL)];
+    const original = (AsyncStorage.setItem as jest.Mock).getMockImplementation()!;
+    const storage = jest.spyOn(AsyncStorage, 'setItem').mockImplementation(async (key, value) => {
+      if (key === 'wordshift_storage_commit') throw new Error('full disk');
+      await original(key, value);
+    });
+    try {
+      const p = await initProvider();
+      expect((await p.purchase(PRODUCT_IDS.AMBER_SMALL)).success).toBe(false);
+      expect(callsOf('purchaseStoreProduct')).toHaveLength(0);
+    } finally { storage.mockRestore(); }
+  });
+
+  it('credits delayed completed receipts through the SDK listener, once', async () => {
+    await initProvider();
+    await flushBackgroundChain();
+    rc.__state.transactions = [{ transactionIdentifier: 'approved-later', productIdentifier: PRODUCT_IDS.AMBER_SMALL, purchaseDate: '2026-09-13T01:00:00Z' }];
+    const info = { entitlements: { active: {} }, nonSubscriptionTransactions: rc.__state.transactions };
+    rc.__state.listeners[0](info);
+    await flushBackgroundChain();
+    rc.__state.listeners[0](info);
+    await flushBackgroundChain();
+    const { getAmberBalance } = await import('../services/amberCurrency');
+    const { AMBER_PACK_GRANTS, FIRST_PURCHASE_AMBER_MULTIPLIER } = await import('../constants/gameBalance');
+    expect(await getAmberBalance()).toBe(AMBER_PACK_GRANTS.small * FIRST_PURCHASE_AMBER_MULTIPLIER);
+    expect(callsOf('purchaseStoreProduct')).toHaveLength(0);
+  });
+
+  it('recovers a completed receipt on the next initialization after checkout was interrupted', async () => {
+    await initProvider();
+    await flushBackgroundChain();
+    rc.__state.transactions = [{ transactionIdentifier: 'paid-before-kill', productIdentifier: PRODUCT_IDS.HINTS_SMALL, purchaseDate: '2026-09-13T01:00:00Z' }];
+    const { getHintBalance } = await import('../services/hints');
+    const before = await getHintBalance();
+    await initProvider();
+    await flushBackgroundChain();
+    const { HINT_PACK_GRANTS } = await import('../constants/gameBalance');
+    expect(await getHintBalance()).toBe(before + HINT_PACK_GRANTS.small);
+    expect(callsOf('purchaseStoreProduct')).toHaveLength(0);
+  });
+});
+
+
+describe('RevenueCat adapter — explicit subscription expiry', () => {
+  it('removes an explicitly expired Supporter while preserving permanent purchases', async () => {
+    await grantEntitlements([ENTITLEMENTS.SUPPORTER, ENTITLEMENTS.PATRON, ENTITLEMENTS.COSMETIC_BUNDLE]);
+    await initProvider();
+    await flushBackgroundChain();
+    rc.__state.listeners[0]({ entitlements: { active: {}, all: { supporter: { isActive: false } } }, nonSubscriptionTransactions: [] });
+    await flushBackgroundChain();
+    expect(await hasEntitlement(ENTITLEMENTS.SUPPORTER)).toBe(false);
+    expect(await hasEntitlement(ENTITLEMENTS.PATRON)).toBe(true);
+    expect(await hasEntitlement(ENTITLEMENTS.COSMETIC_BUNDLE)).toBe(true);
+  });
+
+  it('does not infer subscription expiry from an empty or partial customer record', async () => {
+    await grantEntitlements([ENTITLEMENTS.SUPPORTER]);
+    await initProvider();
+    await flushBackgroundChain();
+    rc.__state.listeners[0]({ entitlements: { active: {}, all: {} }, nonSubscriptionTransactions: [] });
+    await flushBackgroundChain();
+    expect(await hasEntitlement(ENTITLEMENTS.SUPPORTER)).toBe(true);
+  });
+
+  it('keeps benefits after renewal cancellation until the paid subscription actually expires', async () => {
+    await initProvider();
+    await flushBackgroundChain();
+    const supporter = { isActive: true, willRenew: false };
+    rc.__state.listeners[0]({ entitlements: { active: { supporter }, all: { supporter } }, nonSubscriptionTransactions: [] });
+    await flushBackgroundChain();
+    expect(await hasEntitlement(ENTITLEMENTS.SUPPORTER)).toBe(true);
   });
 });

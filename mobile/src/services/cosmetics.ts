@@ -4,7 +4,7 @@
  * Pure data layer for the cosmetic shop (tile themes + finishes, confetti
  * palettes, move sparks).
  * Ownership comes from two sources:
- *   - amber purchases (spent via amberCurrency.spendAmber, recorded here locally), and
+ *   - atomic amber purchases (balance, ownership and equipped choice together), and
  *   - entitlement grants (recorded in entitlements.ts).
  * `ownsCosmetic()` checks both. Mirrors the roomUpgrades.ts cache pattern; native-free.
  *
@@ -15,7 +15,8 @@
  * story (the tone contract).
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage, { runStorageTransaction } from './persistenceStorage';
+import { getFullProgress, invalidateProgressCache, spendAmber } from './amberCurrency';
 import { hasEntitlementSync, ENTITLEMENTS } from './entitlements';
 import { setEquippedTileTheme } from '../theme/colors';
 
@@ -274,24 +275,33 @@ function syncEquippedFrom(state: CosmeticState): void {
   setEquippedTileTheme(state.equipped.tile_theme ?? null);
 }
 
+function isMap(value: unknown): value is Record<string, unknown> {
+  return value != null && typeof value === 'object' && !Array.isArray(value);
+}
+
 async function load(): Promise<CosmeticState> {
   if (cache) return cache;
-  try {
-    const stored = await AsyncStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (parsed && typeof parsed.owned === 'object') {
-        cache = { owned: parsed.owned ?? {}, equipped: parsed.equipped ?? {} };
-        syncEquippedFrom(cache);
-        return cache;
-      }
+  const stored = await AsyncStorage.getItem(STORAGE_KEY);
+  if (stored) {
+    const parsed: unknown = JSON.parse(stored);
+    if (!isMap(parsed) || !isMap(parsed.owned) ||
+        !Object.values(parsed.owned).every(value => typeof value === 'number' && Number.isFinite(value)) ||
+        (parsed.equipped !== undefined && (!isMap(parsed.equipped) ||
+          !Object.values(parsed.equipped).every(value => typeof value === 'string')))) {
+      // Treating unreadable ownership as empty could charge for an owned item
+      // and overwrite the only copy of the player's previous purchases.
+      throw new Error('Your saved cosmetics could not be read. Please try again.');
     }
-  } catch {
-    /* ignore */
+    cache = { owned: parsed.owned as Record<string, number>, equipped: parsed.equipped ?? {} };
+  } else {
+    cache = getDefault();
   }
-  cache = getDefault();
   syncEquippedFrom(cache);
   return cache;
+}
+
+function copyState(state: CosmeticState): CosmeticState {
+  return { owned: { ...state.owned }, equipped: { ...state.equipped } };
 }
 
 /**
@@ -329,13 +339,11 @@ export function getEquippedSync(category: CosmeticCategory): string | undefined 
   return syncEquipped[category];
 }
 
-async function save(): Promise<void> {
-  if (!cache) return;
-  try {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(cache));
-  } catch {
-    /* ignore */
-  }
+async function save(next: CosmeticState): Promise<void> {
+  // Never announce ownership/equipment that failed to reach storage.
+  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  cache = next;
+  syncEquippedFrom(next);
 }
 
 // ---------------------------------------------------------------------------
@@ -368,60 +376,118 @@ export async function ownsCosmetic(id: string): Promise<boolean> {
   return id in state.owned;
 }
 
+export interface CosmeticPurchaseResult {
+  success: boolean;
+  newBalance: number;
+  reason?: 'already_owned' | 'unavailable' | 'not_enough_amber';
+}
+
 /**
- * Record an amber-bought cosmetic as owned. Does NOT spend amber — the caller must
- * call amberCurrency.spendAmber() first (mirrors roomUpgrades.purchaseRoomUpgrade).
- * Returns false if the item doesn't exist or isn't an amber item or is already owned.
+ * Buy and auto-equip in one durable commit. A repeat tap/recovered request
+ * checks saved ownership before spending, even if the shop's offer is stale.
+ */
+export async function purchaseAmberCosmetic(id: string): Promise<CosmeticPurchaseResult> {
+  const previousEquipped = { ...syncEquipped };
+  try {
+    const committed = await runStorageTransaction('cosmetic_purchase', async () => {
+      cache = null;
+      invalidateProgressCache();
+      const progress = await getFullProgress();
+      const state = await load();
+      const item = getCosmetic(id);
+      const refuse = (reason: CosmeticPurchaseResult['reason']) => ({
+        result: { success: false, newBalance: progress.amber, reason }, state,
+      });
+      if (!item || item.acquisition.kind !== 'amber') return refuse('unavailable');
+      if (id in state.owned) return refuse('already_owned');
+      const spent = await spendAmber(item.acquisition.cost, `cosmetic_${id}`);
+      if (!spent.success) {
+        if (spent.error === 'Not enough amber') return refuse('not_enough_amber');
+        throw new Error('Another purchase is still saving. Please try again.');
+      }
+      const next = copyState(state);
+      next.owned[id] = Date.now();
+      next.equipped[item.category] = id;
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      return { result: { success: true, newBalance: spent.newBalance }, state: next };
+    });
+    cache = committed.state;
+    syncEquippedFrom(committed.state);
+    return committed.result;
+  } catch (error) {
+    cache = null;
+    syncEquippedFrom({ owned: {}, equipped: previousEquipped });
+    throw error;
+  } finally {
+    invalidateProgressCache();
+  }
+}
+
+/**
+ * Legacy free ownership grant for amber items. Paid callers must use
+ * purchaseAmberCosmetic so amber and ownership share a commit.
  */
 export async function recordAmberCosmeticPurchase(id: string): Promise<boolean> {
   const item = getCosmetic(id);
   if (!item || item.acquisition.kind !== 'amber') return false;
-  const state = await load();
-  if (id in state.owned) return false;
-  state.owned[id] = Date.now();
-  cache = state;
-  await save();
-  return true;
+  return grantCosmetic(id);
 }
 
 /**
- * Grant local ownership of a reward/amber cosmetic without spending anything —
- * for cosmetics EARNED via gameplay (e.g. a Season Pass premium tier). Idempotent;
- * returns true only on the first grant. Entitlement/IAP cosmetics are owned via
- * their entitlement, so this is a no-op (returns false) for those.
+ * Grant local reward/amber ownership without spending. Participates in the
+ * caller's transaction (season claims); do not open a nested transaction here.
  */
 export async function grantCosmetic(id: string): Promise<boolean> {
   const item = getCosmetic(id);
-  if (!item) return false;
-  if (item.acquisition.kind === 'entitlement' || item.acquisition.kind === 'iap') return false;
+  if (!item || item.acquisition.kind === 'entitlement' || item.acquisition.kind === 'iap') return false;
   const state = await load();
   if (id in state.owned) return false;
-  state.owned[id] = Date.now();
-  cache = state;
-  await save();
+  const next = copyState(state);
+  next.owned[id] = Date.now();
+  await save(next);
   return true;
 }
 
-/** Equip an owned cosmetic for its category. Returns false if not owned. */
+/** Serialize selections with purchases so a late equip cannot erase ownership. */
+async function changeEquipment(
+  change: (state: CosmeticState) => Promise<boolean>,
+): Promise<boolean> {
+  const previousEquipped = { ...syncEquipped };
+  try {
+    const committed = await runStorageTransaction('cosmetic_equipment', async () => {
+      cache = null;
+      const next = copyState(await load());
+      const changed = await change(next);
+      if (changed) await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      return { state: next, changed };
+    });
+    cache = committed.state;
+    syncEquippedFrom(committed.state);
+    return committed.changed;
+  } catch (error) {
+    cache = null;
+    syncEquippedFrom({ owned: {}, equipped: previousEquipped });
+    throw error;
+  }
+}
+
+/** Equip an owned cosmetic; the visible palette changes only after saving. */
 export async function equipCosmetic(id: string): Promise<boolean> {
   const item = getCosmetic(id);
   if (!item) return false;
-  if (!(await ownsCosmetic(id))) return false;
-  const state = await load();
-  state.equipped[item.category] = id;
-  cache = state;
-  syncEquippedFrom(state);
-  await save();
-  return true;
+  return changeEquipment(async state => {
+    if (!(await ownsCosmetic(id))) return false;
+    state.equipped[item.category] = id;
+    return true;
+  });
 }
 
-/** Unequip a category, returning to the phase default. */
+/** Unequip a category, returning to the phase default after saving. */
 export async function unequipCosmetic(category: CosmeticCategory): Promise<void> {
-  const state = await load();
-  delete state.equipped[category];
-  cache = state;
-  syncEquippedFrom(state);
-  await save();
+  await changeEquipment(async state => {
+    delete state.equipped[category];
+    return true;
+  });
 }
 
 /** The equipped cosmetic id for a category, or undefined (= phase default). */
@@ -432,11 +498,7 @@ export async function getEquipped(category: CosmeticCategory): Promise<string | 
 
 /** Clear all cosmetic state (for Settings → Reset All). */
 export async function clearCosmetics(): Promise<void> {
+  await AsyncStorage.removeItem(STORAGE_KEY);
   cache = getDefault();
   syncEquippedFrom(cache);
-  try {
-    await AsyncStorage.removeItem(STORAGE_KEY);
-  } catch {
-    /* ignore */
-  }
 }

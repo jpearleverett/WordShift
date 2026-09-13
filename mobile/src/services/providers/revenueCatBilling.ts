@@ -48,8 +48,15 @@ import {
   isSubscriptionProduct,
   ProductId,
   PurchaseResult,
+  initializeStorePurchaseHistory,
+  reconcileStorePurchaseHistory,
+  StorePurchaseTransaction,
+  notifyBillingChanges,
 } from '../iap';
-import { EntitlementKey, grantEntitlements } from '../entitlements';
+import { ENTITLEMENTS, EntitlementKey, grantEntitlements, getGrantedEntitlements, setEntitlements, invalidateEntitlementsCache } from '../entitlements';
+import { runStorageTransaction, StorageRecoveryRequiredError } from '../persistenceStorage';
+import { saveWithPlayerRetry } from '../saveRetry';
+import { claimSupporterStipendIfDue } from '../supporterStipend';
 
 export interface RevenueCatConfig {
   /** RevenueCat public SDK key for the Apple App Store. */
@@ -127,6 +134,20 @@ function bareProductId(identifier: string): string {
 export function createRevenueCatBillingProvider(config: RevenueCatConfig = {}): BillingProvider {
   let Purchases: any | null = null;
   let ready = false;
+  let historyReady: Promise<void> | null = null;
+
+  function transactionsFrom(customerInfo: any): StorePurchaseTransaction[] {
+    return (customerInfo?.nonSubscriptionTransactions ?? []).map((transaction: any) => ({
+      transactionId: transaction.transactionIdentifier,
+      productId: bareProductId(transaction.productIdentifier),
+      purchasedAt: Date.parse(transaction.purchaseDate),
+    }));
+  }
+
+  async function syncCompletedPurchases(customerInfo: any): Promise<void> {
+    await historyReady;
+    await reconcileStorePurchaseHistory(transactionsFrom(customerInfo));
+  }
 
   /** Translate a RevenueCat customerInfo into our entitlement key set. */
   function entitlementsFrom(customerInfo: any): EntitlementKey[] {
@@ -137,19 +158,37 @@ export function createRevenueCatBillingProvider(config: RevenueCatConfig = {}): 
   }
 
   /**
-   * Grant-only sync of the store's active entitlements into local state (the
-   * SAME customerInfo → entitlement mapping the purchase() success path uses).
-   * `grantEntitlements` only ADDS keys — this path never clears/revokes local
-   * entitlements, so a flaky network or a partial customerInfo can never strip
-   * a paying user. Revocation stays with the explicit Restore Purchases flow.
+   * Preserve permanent purchases and sparse/offline responses. A subscription
+   * is removed only when its explicit SDK record says it is inactive; merely
+   * cancelling renewal while the paid period remains active keeps its benefits.
    * Never throws (fire-and-forget callers must not be able to reject).
    */
   async function grantFromCustomerInfo(customerInfo: any): Promise<void> {
     try {
       const ents = entitlementsFrom(customerInfo);
-      if (ents.length > 0) {
-        await grantEntitlements(ents);
+      const supporterExpired = !ents.includes(ENTITLEMENTS.SUPPORTER) &&
+        customerInfo?.entitlements?.all?.[ENTITLEMENTS.SUPPORTER]?.isActive === false;
+      if (ents.length > 0 || supporterExpired) {
+        const save = async () => {
+          try {
+            await runStorageTransaction('billing_entitlement_sync', async () => {
+              invalidateEntitlementsCache();
+              if (supporterExpired) {
+                await setEntitlements((await getGrantedEntitlements()).filter(key => key !== ENTITLEMENTS.SUPPORTER));
+              }
+              await grantEntitlements(ents);
+            });
+          } catch (error) { invalidateEntitlementsCache(); throw error; }
+        };
+        try { await save(); } catch (error) {
+          if (!(error instanceof StorageRecoveryRequiredError)) throw error;
+          await saveWithPlayerRetry(save, { title: 'Your purchases are waiting', message: 'We need to finish saving your purchases before continuing. Free some device storage if it is full, then retry. You will not be charged again.' });
+        }
+        if (ents.includes(ENTITLEMENTS.SUPPORTER)) {
+          await saveWithPlayerRetry(claimSupporterStipendIfDue, { title: 'Your monthly amber is waiting', message: 'We need to finish saving your monthly amber. Free some device storage if it is full, then retry. Your payment will not be repeated.' });
+        }
       }
+      notifyBillingChanges({ entitlements: ents.filter(key => key !== ENTITLEMENTS.STARTER_PACK) });
     } catch (error) {
       console.warn('[IAP] RevenueCat entitlement sync failed:', error);
     }
@@ -192,24 +231,27 @@ export function createRevenueCatBillingProvider(config: RevenueCatConfig = {}): 
       // until they manually find Restore Purchases in Settings. Register the
       // customer-info listener FIRST (so no update between fetch and register
       // is missed), then fetch the current customerInfo. Both paths are
-      // grant-only via grantFromCustomerInfo — see its doc comment.
+      // preserve permanent ownership; explicit subscription expiry is handled
+      // by grantFromCustomerInfo — see its doc comment.
       try {
         mod.addCustomerInfoUpdateListener?.((customerInfo: any) => {
           void grantFromCustomerInfo(customerInfo);
+          void syncCompletedPurchases(customerInfo).catch(error => console.warn('[IAP] Receipt recovery failed:', error));
         });
       } catch (error) {
         console.warn('[IAP] RevenueCat listener registration failed:', error);
       }
-      void (async () => {
-        try {
-          const customerInfo = await mod.getCustomerInfo();
-          await grantFromCustomerInfo(customerInfo);
-        } catch (error) {
-          // Non-fatal: the update listener and the manual Restore Purchases
-          // flow still cover the player.
-          console.warn('[IAP] RevenueCat silent restore failed:', error);
-        }
+      // Checkout waits for this durable baseline; initialize itself stays
+      // non-blocking so an offline store never prevents ordinary play.
+      historyReady = (async () => {
+        await mod.invalidateCustomerInfoCache?.();
+        const customerInfo = await mod.getCustomerInfo();
+        await initializeStorePurchaseHistory(transactionsFrom(customerInfo));
+        void grantFromCustomerInfo(customerInfo);
+        void reconcileStorePurchaseHistory(transactionsFrom(customerInfo))
+          .catch(error => console.warn('[IAP] Receipt recovery failed:', error));
       })();
+      void historyReady.catch(error => console.warn('[IAP] RevenueCat silent restore failed:', error));
     },
 
     async getProducts(productIds: ProductId[]): Promise<IapProduct[]> {
@@ -250,6 +292,14 @@ export function createRevenueCatBillingProvider(config: RevenueCatConfig = {}): 
         return { success: false, productId, error: 'billing_unavailable' };
       }
       try {
+        // A failed first snapshot must be retried before checkout, otherwise
+        // a future restart cannot distinguish old spent packs from this one.
+        try { await historyReady; } catch {
+          await Purchases.invalidateCustomerInfoCache?.();
+          const customerInfo = await Purchases.getCustomerInfo();
+          await initializeStorePurchaseHistory(transactionsFrom(customerInfo));
+          historyReady = Promise.resolve();
+        }
         // Fetch the store product object RevenueCat needs to start a purchase.
         // Same category requirement as getProducts above: the fetch MUST use the
         // product's own category (SUBSCRIPTION for `supporter`, NON_SUBSCRIPTION
@@ -278,6 +328,9 @@ export function createRevenueCatBillingProvider(config: RevenueCatConfig = {}): 
           transactionId: transaction?.transactionIdentifier ?? undefined,
         };
       } catch (error: any) {
+        if (String(error?.code) === String(Purchases?.PURCHASES_ERROR_CODE?.PAYMENT_PENDING_ERROR ?? '20')) {
+          return { success: false, productId, pending: true, error: 'payment_pending' };
+        }
         if (error?.userCancelled) {
           return { success: false, productId, cancelled: true };
         }
@@ -290,6 +343,7 @@ export function createRevenueCatBillingProvider(config: RevenueCatConfig = {}): 
       if (!ready || !Purchases) return { entitlements: [] };
       try {
         const customerInfo = await Purchases.restorePurchases();
+        void syncCompletedPurchases(customerInfo).catch(error => console.warn('[IAP] Receipt recovery failed:', error));
         return { entitlements: entitlementsFrom(customerInfo) };
       } catch (error) {
         console.warn('[IAP] RevenueCat restore failed:', error);
@@ -298,3 +352,4 @@ export function createRevenueCatBillingProvider(config: RevenueCatConfig = {}): 
     },
   };
 }
+

@@ -11,9 +11,11 @@
  * (roomUpgrades.ts, wordHarvest.ts). Safe to run in Expo Go — nothing native is imported.
  */
 
-import AsyncStorage, { isStorageTransactionActive } from './persistenceStorage';
+import AsyncStorage from './persistenceStorage';
 
 const STORAGE_KEY = 'wordshift_entitlements';
+// Purchase history survives a story reset; the first-ever offer stays used.
+const AMBER_PURCHASE_HISTORY_KEY = 'wordshift_iap_amber_purchase_made';
 
 // ---------------------------------------------------------------------------
 // Entitlement keys
@@ -66,30 +68,28 @@ function getDefault(): EntitlementState {
 
 async function load(): Promise<EntitlementState> {
   if (cache) return cache;
-  try {
-    const stored = await AsyncStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (parsed && typeof parsed.granted === 'object' && parsed.granted !== null) {
-        cache = { granted: parsed.granted, amberPurchaseMade: parsed.amberPurchaseMade === true };
-        return cache;
-      }
+  const stored = await AsyncStorage.getItem(STORAGE_KEY);
+  const amberMade = await AsyncStorage.getItem(AMBER_PURCHASE_HISTORY_KEY) === 'true';
+  if (stored) {
+    const parsed = JSON.parse(stored);
+    if (!parsed || typeof parsed.granted !== 'object' || parsed.granted === null || Array.isArray(parsed.granted)) {
+      throw new Error('Saved purchases need recovery');
     }
-  } catch {
-    /* ignore — fall through to default */
+    // Preserve purchase history from versions predating the sticky receipt
+    // before Reset All is ever allowed to remove the old entitlement key.
+    if (parsed.amberPurchaseMade === true && !amberMade) await AsyncStorage.setItem(AMBER_PURCHASE_HISTORY_KEY, 'true');
+    cache = { granted: parsed.granted, amberPurchaseMade: parsed.amberPurchaseMade === true || amberMade };
+  } else {
+    cache = { ...getDefault(), amberPurchaseMade: amberMade };
   }
-  cache = getDefault();
   return cache;
 }
 
-async function save(): Promise<void> {
-  if (!cache) return;
-  try {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(cache));
-  } catch (error) {
-    if (isStorageTransactionActive()) throw error;
-    /* ignore */
-  }
+async function save(state: EntitlementState): Promise<void> {
+  // Publish ownership only after its write succeeds. Paid callers retry this
+  // storage operation without ever reopening the native purchase sheet.
+  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  cache = state;
 }
 
 // ---------------------------------------------------------------------------
@@ -147,8 +147,8 @@ export function isSupporterSync(): boolean {
 export async function isAdFree(): Promise<boolean> {
   return (
     (await isPatron()) ||
-    hasEntitlement(ENTITLEMENTS.ADFREE) ||
-    hasEntitlement(ENTITLEMENTS.SUPPORTER)
+    (await hasEntitlement(ENTITLEMENTS.ADFREE)) ||
+    (await hasEntitlement(ENTITLEMENTS.SUPPORTER))
   );
 }
 
@@ -166,13 +166,13 @@ export function isAdFreeSync(): boolean {
  * Idempotent — existing grants keep their original timestamp.
  */
 export async function grantEntitlements(keys: EntitlementKey[]): Promise<void> {
-  const state = await load();
+  const previous = await load();
+  const state = { ...previous, granted: { ...previous.granted } };
   const now = Date.now();
   for (const key of keys) {
     if (!(key in state.granted)) state.granted[key] = now;
   }
-  cache = state;
-  await save();
+  await save(state);
 }
 
 /**
@@ -188,8 +188,7 @@ export async function setEntitlements(keys: EntitlementKey[]): Promise<void> {
   for (const key of keys) granted[key] = prev.granted[key] ?? now;
   // The first-purchase flag is local purchase-history state, not an entitlement
   // the store reports — a restore must not resurrect the one-time 2x.
-  cache = { granted, amberPurchaseMade: prev.amberPurchaseMade };
-  await save();
+  await save({ granted, amberPurchaseMade: prev.amberPurchaseMade });
 }
 
 /** Get all currently-granted entitlement keys. */
@@ -215,10 +214,9 @@ export function hasMadeAmberPurchaseSync(): boolean {
  */
 export async function markAmberPurchaseMade(): Promise<void> {
   const state = await load();
+  await AsyncStorage.setItem(AMBER_PURCHASE_HISTORY_KEY, 'true');
   if (state.amberPurchaseMade) return;
-  state.amberPurchaseMade = true;
-  cache = state;
-  await save();
+  await save({ ...state, granted: { ...state.granted }, amberPurchaseMade: true });
 }
 
 /**
@@ -227,12 +225,9 @@ export async function markAmberPurchaseMade(): Promise<void> {
  * a paying Patron is not permanently stripped — this only clears the local cache.
  */
 export async function clearEntitlements(): Promise<void> {
-  cache = getDefault();
-  try {
-    await AsyncStorage.removeItem(STORAGE_KEY);
-  } catch {
-    /* ignore */
-  }
+  await AsyncStorage.removeItem(STORAGE_KEY);
+  cache = null;
+  await load();
 }
 
 /** Drop local mirrors after an interrupted paid-reward transaction. */

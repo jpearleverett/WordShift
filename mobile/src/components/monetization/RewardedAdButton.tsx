@@ -30,7 +30,15 @@ interface RewardedAdButtonProps {
    * Fired ONLY when the player watched the full ad and earned the reward.
    * The host grants the actual reward (amber, streak protection, etc.).
    */
-  onReward: () => void;
+  onReward: () => void | Promise<void>;
+  /** Persist an earned account reward even if its host has since closed. */
+  completeAfterUnmount?: boolean;
+  /** Parent operation lock; canStart also protects against same-frame taps. */
+  disabled?: boolean;
+  canStart?: () => boolean;
+  /** Covers the entire ad and awaited reward save, including a grant retry. */
+  onBusyChange?: (busy: boolean) => void;
+  onRewardError?: (error: unknown) => void;
   /** Button label, e.g. "Tend the offering for bonus amber". */
   label: string;
   /**
@@ -81,6 +89,11 @@ interface RewardedAdButtonProps {
 export const RewardedAdButton: React.FC<RewardedAdButtonProps> = ({
   placement,
   onReward,
+  completeAfterUnmount = false,
+  disabled: externallyDisabled = false,
+  canStart,
+  onBusyChange,
+  onRewardError,
   label,
   accessibilityLabel,
   phase,
@@ -94,6 +107,10 @@ export const RewardedAdButton: React.FC<RewardedAdButtonProps> = ({
 
   const [capReached, setCapReached] = useState(false);
   const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
+  const earnedReward = useRef<(() => void | Promise<void>) | null>(null);
+  const [retryReward, setRetryReward] = useState(false);
+  const [errorLabel, setErrorLabel] = useState<string | null>(null);
   const mounted = useRef(true);
   const [busyOpacity] = useState(() => new Animated.Value(1));
   const busyLoopRef = useRef<Animated.CompositeAnimation | null>(null);
@@ -148,37 +165,62 @@ export const RewardedAdButton: React.FC<RewardedAdButtonProps> = ({
     (async () => {
       const reached = await isRewardedCapReached();
       if (!cancelled && mounted.current) setCapReached(reached);
-    })();
+    })().catch(() => {});
     return () => {
       cancelled = true;
     };
   }, [patron, providerReady]);
 
   const handlePress = useCallback(async () => {
-    if (busy || patron || !providerReady) return;
+    const hasEarnedReward = earnedReward.current !== null;
+    if (busyRef.current || externallyDisabled || (!hasEarnedReward && (patron || !providerReady || capReached))) return;
+    if (canStart && !canStart()) return;
+    busyRef.current = true;
     setBusy(true);
+    setErrorLabel(null);
+    onBusyChange?.(true);
     hapticLight();
     try {
-      const result = await showRewarded(placement);
-      if (!mounted.current) return;
-      if (result.completed) {
-        hapticMedium();
-        onReward();
+      if (!earnedReward.current) {
+        const result = await showRewarded(placement);
+        if (!mounted.current && !completeAfterUnmount) return;
+        if (result.completed) {
+          // Capture this earned reward's callback. A rerender may supply a
+          // different board/claim callback; retries must finish the original.
+          earnedReward.current = onReward;
+        }
+        if (result.reason === 'daily_cap' && mounted.current) setCapReached(true);
       }
-      if (result.reason === 'daily_cap') {
-        setCapReached(true);
+      if (earnedReward.current) {
+        await earnedReward.current();
+        earnedReward.current = null;
+        if (mounted.current) {
+          hapticMedium();
+          setRetryReward(false);
+        }
       }
+    } catch (error) {
+      // A completed ad is already paid for with the player's time. Retain its
+      // grant on failure so Retry saves it without presenting another ad.
+      if (mounted.current) {
+        setRetryReward(earnedReward.current !== null);
+        setErrorLabel(earnedReward.current ? 'Retry reward' : 'Try again');
+      }
+      onRewardError?.(error);
     } finally {
+      busyRef.current = false;
+      onBusyChange?.(false);
       if (mounted.current) setBusy(false);
     }
-  }, [busy, patron, providerReady, placement, onReward]);
+  }, [externallyDisabled, patron, providerReady, capReached, canStart, onBusyChange,
+    placement, completeAfterUnmount, onReward, onRewardError]);
 
   // Suppression: Patron, no provider (unless showWhenUnavailable), or capped.
-  const unavailable = !providerReady || capReached;
-  if (patron) return null;
+  const unavailable = !retryReward && (!providerReady || capReached);
+  if (patron && !retryReward) return null;
   if (unavailable && !showWhenUnavailable) return null;
 
-  const disabled = unavailable || busy;
+  const disabled = unavailable || busy || externallyDisabled;
   const isDark = surface === 'auto' ? phase >= 3 : surface === 'dark';
 
   return (
@@ -190,7 +232,7 @@ export const RewardedAdButton: React.FC<RewardedAdButtonProps> = ({
       disabled={disabled}
       accessibilityRole="button"
       accessibilityState={{ disabled }}
-      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityLabel={retryReward ? 'Retry saving your earned reward. No additional ad.' : errorLabel ?? accessibilityLabel ?? label}
     >
       {busy ? (
         // Branded tap->ad handoff: keep the play glyph, name what's happening
@@ -216,7 +258,7 @@ export const RewardedAdButton: React.FC<RewardedAdButtonProps> = ({
               label wraps too, which reintroduces the height jump from the other
               side. accessibilityLabel is the prop, not this Text, so an ellipsis
               never reaches a screen reader. */}
-          <Text numberOfLines={1} style={[styles.label, isDark ? styles.labelDark : styles.labelLight]}>{label}</Text>
+          <Text numberOfLines={1} style={[styles.label, isDark ? styles.labelDark : styles.labelLight]}>{errorLabel ?? label}</Text>
         </View>
       )}
     </TouchableOpacity>

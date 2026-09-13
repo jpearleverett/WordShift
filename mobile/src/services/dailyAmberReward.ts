@@ -2,18 +2,17 @@
  * Daily Amber Faucet (watch → amber)
  *
  * A "watch a short clip for free amber" affordance, claimable up to
- * DAILY_AMBER_DAILY_CAP times per local day. This service ONLY tracks the daily
- * claim count — it does not grant amber or show the ad. The caller (the Store's
- * Free-Amber card) shows the rewarded ad via RewardedAdButton (or, for Patron
- * holders, grants for free) and then credits amber with awardBonusAmber, exactly
- * like the hint_recovery rewarded flow.
+ * DAILY_AMBER_DAILY_CAP times per local day. A completed rewarded view (or a
+ * Patron claim) uses claimDailyAmberReward to commit the counter, credit and
+ * receipt together. Replaying an interrupted save never consumes another claim.
  *
  * Local-day bucketing only (services/dateUtils) — never UTC/toISOString. The
  * count resets when the local calendar day rolls over.
  */
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage, { runStorageTransaction } from './persistenceStorage';
 import { getLocalDateString } from './dateUtils';
 import { DAILY_AMBER_DAILY_CAP, DAILY_AMBER_REWARD } from '../constants/gameBalance';
+import { awardBonusAmberInTransaction, getFullProgress, invalidateProgressCache } from './amberCurrency';
 
 const STORAGE_KEY = 'wordshift_daily_amber';
 
@@ -22,6 +21,8 @@ interface DailyAmberState {
   date: string | null;
   /** Claims made on `date` so far. */
   count: number;
+  /** Durable identities of completed rewards, including claims before midnight. */
+  claimReceipts?: string[];
 }
 
 export interface DailyAmberStatus {
@@ -39,11 +40,16 @@ export interface DailyAmberStatus {
 
 export interface DailyAmberClaimResult extends DailyAmberStatus {
   /**
-   * Whether THIS call actually recorded a claim. False at/past the daily cap
-   * (and while another claim is mid-flight) — callers must credit amber ONLY
-   * when this is true, so the tracker and the grant always move together.
+   * Whether this call recorded a new claim. claimDailyAmberReward has already
+   * credited that reward atomically; callers must not award it a second time.
    */
   recorded: boolean;
+}
+
+export interface DailyAmberGrantResult extends DailyAmberClaimResult {
+  /** Zero for an already saved reward or an exhausted daily allowance. */
+  grantedAmount: number;
+  newBalance: number;
 }
 
 let cache: DailyAmberState | null = null;
@@ -58,26 +64,25 @@ const getDefault = (): DailyAmberState => ({ date: null, count: 0 });
 
 async function load(): Promise<DailyAmberState> {
   if (cache) return cache;
-  try {
-    const stored = await AsyncStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      cache = JSON.parse(stored);
-      return cache!;
+  const stored = await AsyncStorage.getItem(STORAGE_KEY);
+  if (stored) {
+    const state: DailyAmberState = JSON.parse(stored);
+    if (!state || (state.date !== null && typeof state.date !== 'string') ||
+        !Number.isInteger(state.count) || state.count < 0 ||
+        (state.claimReceipts !== undefined && (!Array.isArray(state.claimReceipts) ||
+          !state.claimReceipts.every(id => typeof id === 'string')))) {
+      throw new Error('Your daily amber record could not be read. Please retry.');
     }
-  } catch {
-    // fall through to default
+    cache = state;
+    return cache;
   }
   cache = getDefault();
   return cache;
 }
 
 async function save(state: DailyAmberState): Promise<void> {
+  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   cache = state;
-  try {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch {
-    // Non-critical — the in-memory cache keeps the session consistent.
-  }
 }
 
 /** Roll the counter to today if the stored day is stale (returns count for today). */
@@ -104,6 +109,10 @@ export async function clearDailyAmberReward(): Promise<void> {
 /** Today's faucet status (how many claims are left, the per-claim amount). */
 export async function getDailyAmberStatus(): Promise<DailyAmberStatus> {
   const state = await load();
+  return statusFor(state);
+}
+
+function statusFor(state: DailyAmberState): DailyAmberStatus {
   const claimedToday = forToday(state, getLocalDateString());
   const remaining = Math.max(0, DAILY_AMBER_DAILY_CAP - claimedToday);
   return {
@@ -115,6 +124,48 @@ export async function getDailyAmberStatus(): Promise<DailyAmberStatus> {
   };
 }
 
+let claimSequence = 0;
+
+/** Create once per earned view or Patron tap; keep this same ID through retries. */
+export function createDailyAmberClaimId(): string {
+  claimSequence += 1;
+  return `${Date.now().toString(36)}-${claimSequence.toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
+/**
+ * Complete an earned reward durably. The receipt and credit share the journal,
+ * so a retry that first recovers that journal reports zero newly granted amber.
+ * Receipts remain across local-day rollover: a midnight retry is still the same
+ * reward. There are at most two new receipts per day.
+ */
+export async function claimDailyAmberReward(claimId: string): Promise<DailyAmberGrantResult> {
+  if (!claimId.trim()) throw new Error('A daily amber claim needs its original reward ID.');
+  try {
+    return await runStorageTransaction('daily_amber_claim', async () => {
+      // Recovery happens before this callback. Neither staged nor pre-recovery
+      // caches may decide whether this reward has already been fulfilled.
+      invalidateDailyAmberCache();
+      invalidateProgressCache();
+      const state = await load();
+      const progress = await getFullProgress();
+      const status = statusFor(state);
+      if (state.claimReceipts?.includes(claimId) || !status.available) {
+        return { ...status, recorded: false, grantedAmount: 0, newBalance: progress.amber };
+      }
+      const updated: DailyAmberState = {
+        date: getLocalDateString(), count: status.claimedToday + 1,
+        claimReceipts: [...(state.claimReceipts ?? []), claimId],
+      };
+      const newBalance = await awardBonusAmberInTransaction(DAILY_AMBER_REWARD, 'rewarded_daily_amber');
+      await save(updated);
+      return { ...statusFor(updated), recorded: true, grantedAmount: DAILY_AMBER_REWARD, newBalance };
+    });
+  } finally {
+    invalidateDailyAmberCache();
+    invalidateProgressCache();
+  }
+}
+
 /** Whether a free-amber claim is available today. */
 export async function isDailyAmberAvailable(): Promise<boolean> {
   return (await getDailyAmberStatus()).available;
@@ -124,6 +175,9 @@ export async function isDailyAmberAvailable(): Promise<boolean> {
 let claimInProgress = false;
 
 /**
+ * Legacy counter-only API for economy simulations. Player claims must use
+ * claimDailyAmberReward so their counter and amber cannot be separated.
+ *
  * Record one free-amber claim for today (call AFTER the ad completes / the Patron
  * grant lands). Increments the local-day counter and returns the updated status
  * plus `recorded` — whether THIS call actually counted. A no-op beyond the cap
@@ -142,7 +196,7 @@ export async function recordDailyAmberClaim(): Promise<DailyAmberClaimResult> {
     if (claimedToday >= DAILY_AMBER_DAILY_CAP) {
       return { ...(await getDailyAmberStatus()), recorded: false };
     }
-    await save({ date: today, count: claimedToday + 1 });
+    await save({ ...state, date: today, count: claimedToday + 1 });
     return { ...(await getDailyAmberStatus()), recorded: true };
   } finally {
     claimInProgress = false;

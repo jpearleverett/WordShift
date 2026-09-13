@@ -10,6 +10,8 @@ import {
   ActivityIndicator,
   Animated,
   Image,
+  Modal,
+  BackHandler,
 } from 'react-native';
 import {
   CandyColors,
@@ -36,7 +38,9 @@ import { useScreenInsets } from '../../hooks/useScreenInsets';
 import {
   getCosmeticsByCategory,
   ownsCosmetic,
-  recordAmberCosmeticPurchase,
+  purchaseAmberCosmetic,
+  invalidateCosmeticsCache,
+  initCosmetics,
   equipCosmetic,
   unequipCosmetic,
   getEquipped,
@@ -44,7 +48,8 @@ import {
   CosmeticCategory,
 } from '../../services/cosmetics';
 import { markScreenReady } from '../../services/screenReady';
-import { spendAmber } from '../../services/amberCurrency';
+import { getFullProgress, invalidateProgressCache } from '../../services/amberCurrency';
+import { runStorageTransaction, StorageRecoveryRequiredError } from '../../services/persistenceStorage';
 import { getRoomsWithStatus } from '../../services/homeWorldData';
 import { Room, DialoguePhase } from '../../types/homeWorld';
 import {
@@ -60,9 +65,9 @@ import {
   getPurchasedUpgrades,
   getDeepenedRooms,
   getAttunedRooms,
-  purchaseRoomUpgrade,
-  purchaseRoomDeepening,
-  purchaseRoomAttunement,
+  purchaseHouseUpgrade,
+  HouseUpgradePurchase,
+  invalidateRoomUpgradeCache,
   MAX_ATTUNEMENT_LEVEL,
 } from '../../services/roomUpgrades';
 import { logEvent } from '../../services/eventLogger';
@@ -456,6 +461,8 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   const [equipped, setEquipped] = useState<Partial<Record<CosmeticCategory, string>>>({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const shopActionBusy = useRef(false);
+  const recoveryPending = useRef(false);
 
   // House upgrades (tier-1 decorations + tier-2 deepenings + tier-3
   // attunements), sold here alongside the cosmetics — amber sinks,
@@ -465,6 +472,15 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   const [purchasedDeepenings, setPurchasedDeepenings] = useState<Record<string, number>>({});
   const [attunedRooms, setAttunedRooms] = useState<Record<string, number>>({});
   const [houseFeedback, setHouseFeedback] = useState<string | null>(null);
+  const [saveRecovery, setSaveRecovery] = useState<
+    | { kind: 'house'; request: HouseUpgradePurchase; cost: number; message: string }
+    | { kind: 'cosmetic'; message: string }
+    | { kind: 'equipment'; message: string }
+    | null
+  >(null);
+  const [cosmeticFeedback, setCosmeticFeedback] = useState<string | null>(null);
+  const [saveRecoverySaving, setSaveRecoverySaving] = useState(false);
+  const [saveRecoveryError, setSaveRecoveryError] = useState(false);
 
   const reducedMotion = getSettingsSync().reducedMotion;
   // Cosmetic-purchase celebration (F43): the just-bought palette bursts confetti,
@@ -585,18 +601,36 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     return () => clearTimeout(id);
   }, [purchaseReveal]);
 
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () =>
+      shopActionBusy.current || recoveryPending.current || saveRecovery != null);
+    return () => subscription.remove();
+  }, [saveRecovery]);
+
+  const navigateAway = useCallback((action?: () => void) => {
+    if (shopActionBusy.current || recoveryPending.current || saveRecovery) return;
+    action?.();
+  }, [saveRecovery]);
+
   const handleBuy = useCallback(async (item: CosmeticItem) => {
-    if (busy || item.acquisition.kind !== 'amber') return;
+    if (busy || shopActionBusy.current || recoveryPending.current || saveRecovery || item.acquisition.kind !== 'amber') return;
     const cost = item.acquisition.cost;
-    if (balance < cost) return;
+    shopActionBusy.current = true;
     setBusy(item.id);
+    setCosmeticFeedback(null);
     try {
-      const spend = await spendAmber(cost, `cosmetic_${item.id}`);
-      if (!spend.success) return;
-      setBalance(spend.newBalance);
-      onAmberChange?.(spend.newBalance);
-      await recordAmberCosmeticPurchase(item.id);
-      await equipCosmetic(item.id); // auto-equip on purchase
+      const result = await purchaseAmberCosmetic(item.id);
+      setBalance(result.newBalance);
+      onAmberChange?.(result.newBalance);
+      if (!result.success) {
+        await refresh();
+        setCosmeticFeedback(result.reason === 'already_owned'
+          ? 'You already own this. Choose Equip to use it.'
+          : result.reason === 'not_enough_amber'
+            ? 'Not enough amber for that yet.'
+            : 'This item is not available for amber.');
+        return;
+      }
       hapticSuccess();
       // Celebrate the biggest expression purchase: a count-up of the spend + a
       // phase-aware in-world line, plus a burst of the purchased palette, a
@@ -615,37 +649,72 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
       setCelebration(prev => ({ id: item.id, palette, token: (prev?.token ?? 0) + 1 }));
       if (palette.length > 0) setConfettiActive(true);
       await refresh();
+    } catch (error) {
+      if (error instanceof StorageRecoveryRequiredError) {
+        recoveryPending.current = true;
+        setSaveRecovery({ kind: 'cosmetic', message: `${item.name} purchased and equipped.` });
+        setSaveRecoveryError(false);
+      } else {
+        setCosmeticFeedback('Your purchase could not be confirmed. Tap it again to retry; a saved purchase will not be charged twice.');
+      }
     } finally {
+      shopActionBusy.current = false;
       setBusy(null);
     }
-  }, [busy, balance, onAmberChange, refresh, phase]);
+  }, [busy, saveRecovery, onAmberChange, refresh, phase]);
 
   const handleEquip = useCallback(async (item: CosmeticItem) => {
-    if (busy) return;
+    if (busy || shopActionBusy.current || recoveryPending.current || saveRecovery) return;
+    shopActionBusy.current = true;
     setBusy(item.id);
+    setCosmeticFeedback(null);
     try {
-      await equipCosmetic(item.id);
+      if (!(await equipCosmetic(item.id))) {
+        await refresh();
+        setCosmeticFeedback('This item is not currently owned.');
+        return;
+      }
       hapticLight();
       // Equip is a moment too: the chip springs, the preview pulses, and a
       // spark row fires its real burst. No confetti (nothing was bought).
       setCelebration(prev => ({ id: item.id, palette: [], token: (prev?.token ?? 0) + 1 }));
       await refresh();
+    } catch (error) {
+      if (error instanceof StorageRecoveryRequiredError) {
+        recoveryPending.current = true;
+        setSaveRecovery({ kind: 'equipment', message: 'Your equipped selection is saved.' });
+        setSaveRecoveryError(false);
+      } else {
+        setCosmeticFeedback('Your selection could not be saved. Please try again.');
+      }
     } finally {
+      shopActionBusy.current = false;
       setBusy(null);
     }
-  }, [busy, refresh]);
+  }, [busy, saveRecovery, refresh]);
 
   const handleEquipDefault = useCallback(async (category: CosmeticCategory) => {
-    if (busy) return;
+    if (busy || shopActionBusy.current || recoveryPending.current || saveRecovery) return;
+    shopActionBusy.current = true;
     setBusy(`__default_${category}__`);
+    setCosmeticFeedback(null);
     try {
       await unequipCosmetic(category);
       hapticLight();
       await refresh();
+    } catch (error) {
+      if (error instanceof StorageRecoveryRequiredError) {
+        recoveryPending.current = true;
+        setSaveRecovery({ kind: 'equipment', message: 'Your equipped selection is saved.' });
+        setSaveRecoveryError(false);
+      } else {
+        setCosmeticFeedback('Your selection could not be saved. Please try again.');
+      }
     } finally {
+      shopActionBusy.current = false;
       setBusy(null);
     }
-  }, [busy, refresh]);
+  }, [busy, saveRecovery, refresh]);
 
   // -------------------------------------------------------------------------
   // HOUSE UPGRADES — tier-1 room decorations + tier-2 "deepenings"
@@ -694,83 +763,119 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
       .filter((entry): entry is { room: Room; info: NonNullable<ReturnType<typeof getAttunementForLevel>> } => entry !== null);
   }, [rooms, purchasedUpgrades, attunedRooms]);
 
+  const handleHousePurchase = useCallback(async (
+    request: HouseUpgradePurchase, key: string, cost: number, message: string,
+  ) => {
+    // State disables the next render; the ref blocks a second tap arriving
+    // before that render, including taps on another room's purchase button.
+    if (busy || shopActionBusy.current || recoveryPending.current || saveRecovery) return;
+    shopActionBusy.current = true;
+    setBusy(key);
+    setHouseFeedback(null);
+    try {
+      const result = await purchaseHouseUpgrade(request);
+      onAmberChange?.(result.newBalance);
+      setBalance(result.newBalance);
+      if (!result.success) {
+        await refreshHouse();
+        setHouseFeedback(result.reason === 'not_enough_amber'
+          ? 'Not enough amber for that yet.'
+          : result.reason === 'already_owned'
+            ? 'That upgrade is already in place.'
+            : result.reason === 'stale_offer'
+              ? 'The room has changed. Its current upgrades are shown below.'
+              : 'That room is not ready for this upgrade yet.');
+        return;
+      }
+      logEvent({ type: 'room_upgrade_purchased', data: {
+        roomId: request.roomId, cost,
+        ...(request.tier > 1 ? { tier: request.tier } : {}),
+        ...(request.tier === 3 ? { level: request.level } : {}),
+      } });
+      hapticMedium();
+      await resolveHousePurchase(key, message);
+    } catch (error) {
+      setResolving(null);
+      houseFade.setValue(1);
+      if (error instanceof StorageRecoveryRequiredError) {
+        // A durable purchase journal now owns this balance. Do not let play
+        // continue against its partially written save before replay finishes.
+        recoveryPending.current = true;
+        setSaveRecovery({ kind: 'house', request, cost, message });
+        setSaveRecoveryError(false);
+        return;
+      }
+      setHouseFeedback('Your purchase could not be confirmed. Tap the upgrade again to retry; a saved purchase will not be charged twice.');
+    } finally {
+      shopActionBusy.current = false;
+      setBusy(null);
+    }
+  }, [busy, saveRecovery, houseFade, onAmberChange, refreshHouse, resolveHousePurchase]);
+
+  const handleRecoverPurchase = useCallback(async () => {
+    if (!saveRecovery || shopActionBusy.current) return;
+    shopActionBusy.current = true;
+    setSaveRecoverySaving(true);
+    setSaveRecoveryError(false);
+    try {
+      // Transaction entry replays the pending journal first. Its read guard
+      // also catches legacy getters that fall back to defaults on a read error,
+      // so a failed refresh cannot reopen play with a fabricated balance.
+      const progress = await runStorageTransaction('shop_purchase_recovery', async () => {
+        invalidateProgressCache();
+        invalidateRoomUpgradeCache();
+        invalidateCosmeticsCache();
+        const savedProgress = await getFullProgress();
+        await Promise.all([refreshHouse(), initCosmetics()]);
+        await refresh();
+        return savedProgress;
+      });
+      setBalance(progress.amber);
+      onAmberChange?.(progress.amber);
+      if (saveRecovery.kind === 'house') {
+        const { request, cost, message } = saveRecovery;
+        logEvent({ type: 'room_upgrade_purchased', data: {
+          roomId: request.roomId, cost,
+          ...(request.tier > 1 ? { tier: request.tier } : {}),
+          ...(request.tier === 3 ? { level: request.level } : {}),
+        } });
+        setHouseFeedback(message);
+      } else {
+        setCosmeticFeedback(saveRecovery.message);
+      }
+      recoveryPending.current = false;
+      setSaveRecovery(null);
+    } catch {
+      // Keep the protected surface visible until both durable state and its
+      // displayed balance/ownership are ready. Retry only replays the journal.
+      invalidateProgressCache();
+      invalidateRoomUpgradeCache();
+      invalidateCosmeticsCache();
+      setSaveRecoveryError(true);
+    } finally {
+      shopActionBusy.current = false;
+      setSaveRecoverySaving(false);
+    }
+  }, [saveRecovery, onAmberChange, refreshHouse, refresh]);
+
   const handleBuyUpgrade = useCallback(async (roomId: string) => {
-    if (busy) return;
     const upgrade = getRoomUpgrade(roomId);
     if (!upgrade) return;
-    setBusy(`upgrade_${roomId}`);
-    try {
-      const spendResult = await spendAmber(upgrade.cost, `room_upgrade_${roomId}`);
-      if (!spendResult.success) {
-        setHouseFeedback('Not enough amber for that yet.');
-        return;
-      }
-      const purchased = await purchaseRoomUpgrade(roomId);
-      if (!purchased) {
-        setHouseFeedback('That upgrade is already in place.');
-        return;
-      }
-      onAmberChange?.(spendResult.newBalance);
-      setBalance(spendResult.newBalance);
-      logEvent({ type: 'room_upgrade_purchased', data: { roomId, cost: upgrade.cost } });
-      hapticMedium();
-      await resolveHousePurchase(`upgrade_${roomId}`, `${upgrade.name} added.`);
-    } finally {
-      setBusy(null);
-    }
-  }, [busy, onAmberChange, resolveHousePurchase]);
+    await handleHousePurchase({ roomId, tier: 1 }, `upgrade_${roomId}`, upgrade.cost, `${upgrade.name} added.`);
+  }, [handleHousePurchase]);
 
   const handleBuyDeepening = useCallback(async (roomId: string) => {
-    if (busy) return;
     const deepening = getRoomDeepening(roomId);
     if (!deepening) return;
-    setBusy(`deepening_${roomId}`);
-    try {
-      const spendResult = await spendAmber(deepening.cost, `room_deepening_${roomId}`);
-      if (!spendResult.success) {
-        setHouseFeedback('Not enough amber for that yet.');
-        return;
-      }
-      const purchased = await purchaseRoomDeepening(roomId);
-      if (!purchased) {
-        setHouseFeedback('That upgrade is already in place.');
-        return;
-      }
-      onAmberChange?.(spendResult.newBalance);
-      setBalance(spendResult.newBalance);
-      logEvent({ type: 'room_upgrade_purchased', data: { roomId, cost: deepening.cost, tier: 2 } });
-      hapticMedium();
-      await resolveHousePurchase(`deepen_${roomId}`, `${deepening.name} settles in.`);
-    } finally {
-      setBusy(null);
-    }
-  }, [busy, onAmberChange, resolveHousePurchase]);
+    await handleHousePurchase({ roomId, tier: 2 }, `deepen_${roomId}`, deepening.cost, `${deepening.name} settles in.`);
+  }, [handleHousePurchase]);
 
   const handleBuyAttunement = useCallback(async (roomId: string) => {
-    if (busy) return;
     const info = getAttunementForLevel(roomId, (attunedRooms[roomId] ?? 0) + 1);
     if (!info) return;
-    setBusy(`attunement_${roomId}`);
-    try {
-      const spendResult = await spendAmber(info.cost, `attunement_${roomId}`);
-      if (!spendResult.success) {
-        setHouseFeedback('Not enough amber for that yet.');
-        return;
-      }
-      const purchased = await purchaseRoomAttunement(roomId);
-      if (!purchased) {
-        setHouseFeedback('That upgrade is already in place.');
-        return;
-      }
-      onAmberChange?.(spendResult.newBalance);
-      setBalance(spendResult.newBalance);
-      logEvent({ type: 'room_upgrade_purchased', data: { roomId, cost: info.cost, tier: 3, level: info.level } });
-      hapticMedium();
-      await resolveHousePurchase(`attune_${roomId}`, `The room is ${info.name.toLowerCase()} now.`);
-    } finally {
-      setBusy(null);
-    }
-  }, [busy, attunedRooms, onAmberChange, resolveHousePurchase]);
+    await handleHousePurchase({ roomId, tier: 3, level: info.level }, `attune_${roomId}`, info.cost,
+      `The room is ${info.name.toLowerCase()} now.`);
+  }, [attunedRooms, handleHousePurchase]);
 
   // Bought tier-1 decorations and tier-2 deepenings stay LISTED, as "in place"
   // cards after the still-buyable rows: a purchased room used to vanish from
@@ -884,7 +989,8 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
             {notice.button && onOpenSettings && (
               <CandyButton
                 label={notice.button}
-                onPress={onOpenSettings}
+                onPress={() => navigateAway(onOpenSettings)}
+                disabled={busy != null}
                 phase={phase}
                 variant="quiet"
                 style={styles.actionSlot}
@@ -1032,7 +1138,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
         {onFocusRoom && (
           <CandyButton
             label={see.label}
-            onPress={() => onFocusRoom(room.id)}
+            onPress={() => navigateAway(() => onFocusRoom(room.id))}
             phase={phase}
             variant="secondary"
             disabled={busy != null}
@@ -1044,6 +1150,41 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     );
   };
 
+  if (saveRecovery) {
+    return (
+      <Modal visible animationType="none" onRequestClose={() => {}}>
+        <ScrollView
+          style={{ backgroundColor: t.screenBg }}
+          contentContainerStyle={[
+            styles.saveRecoveryScreen,
+            { paddingTop: screenInsets.top + 24, paddingBottom: screenInsets.bottom + 24 },
+          ]}
+          accessibilityViewIsModal
+        >
+          <PanelCard phase={phase} kind="card" style={styles.saveRecoveryCard}>
+            <Text style={[styles.cardName, { color: t.title }]}>{saveRecovery.kind === 'equipment' ? 'Finishing your change' : 'Finishing your purchase'}</Text>
+            <Text style={[styles.saveRecoveryBody, { color: t.body }]}>
+              {saveRecovery.kind === 'equipment'
+                ? 'Your device could not finish saving your selection. Retry to finish the same change.'
+                : 'Your device could not finish saving this purchase. Retry to finish the same purchase without spending more amber.'}
+            </Text>
+            {saveRecoveryError && (
+              <Text accessibilityLiveRegion="polite" style={[styles.saveRecoveryBody, { color: t.body }]}>
+                Saving still needs a little help. If your device storage is full, free some space, then try again.
+              </Text>
+            )}
+            <CandyButton
+              label={saveRecoverySaving ? 'Finishing…' : 'Retry save'}
+              phase={phase}
+              disabled={saveRecoverySaving}
+              onPress={handleRecoverPurchase}
+            />
+          </PanelCard>
+        </ScrollView>
+      </Modal>
+    );
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: t.screenBg }]}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
@@ -1051,7 +1192,8 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
       <View style={[styles.header, { paddingTop: screenInsets.top + 12 }]}>
         <TouchableOpacity
           style={[styles.backChip, { backgroundColor: chipBg, borderColor: t.headerChipBorder }]}
-          onPress={() => { playUiSound('selection'); uiHapticSelection(); onClose(); }}
+          onPress={() => navigateAway(() => { playUiSound('selection'); uiHapticSelection(); onClose(); })}
+          disabled={busy != null}
           accessibilityLabel="Go back"
           accessibilityRole="button"
         >
@@ -1085,10 +1227,14 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
           </View>
         ) : (
           <>
+            {cosmeticFeedback != null && (
+              <Text accessibilityLiveRegion="polite" style={[styles.houseFeedback, { color: t.headerMuted }]}>{cosmeticFeedback}</Text>
+            )}
             {onOpenPatron && !isPatronSync() && (
               <EntranceCascadeItem phase={phase} delay={getCascadeDelayMs(0, { baseMs: HEADER_CASCADE_BASE_MS })}>
               <TouchableOpacity
-                onPress={() => { hapticLight(); onOpenPatron(); }}
+                onPress={() => navigateAway(() => { hapticLight(); onOpenPatron(); })}
+                disabled={busy != null}
                 accessibilityLabel="Become a Patron"
                 accessibilityRole="button"
                 activeOpacity={0.85}
@@ -1140,7 +1286,8 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                 {houseFeedback != null && (
                   <Text style={[styles.houseFeedback, { color: t.headerMuted }]}>{houseFeedback}</Text>
                 )}
-                {availableUpgrades.map(({ room, upgrade }) =>
+                {// eslint-disable-next-line react-hooks/refs -- renderHouseCard forwards onBuy to CandyButton; its purchase guard runs only on press.
+                  availableUpgrades.map(({ room, upgrade }) =>
                   renderHouseCard(
                     `upgrade_${room.id}`,
                     `${room.name}: ${upgrade.name}`,
@@ -1152,7 +1299,8 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                     1,
                   ),
                 )}
-                {areDeepeningsAvailable(housePhase) && availableDeepenings.map(({ room, deepening }) =>
+                {// eslint-disable-next-line react-hooks/refs -- The helper forwards this event callback without calling it during render.
+                  areDeepeningsAvailable(housePhase) && availableDeepenings.map(({ room, deepening }) =>
                   renderHouseCard(
                     `deepen_${room.id}`,
                     `${room.name}: ${deepening.name}`,
@@ -1164,7 +1312,8 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                     2,
                   ),
                 )}
-                {areAttunementsAvailable(housePhase) && availableAttunements.map(({ room, info }) =>
+                {// eslint-disable-next-line react-hooks/refs -- The immediate guard is accessed only after CandyButton dispatches a press.
+                  areAttunementsAvailable(housePhase) && availableAttunements.map(({ room, info }) =>
                   renderHouseCard(
                     `attune_${room.id}`,
                     `${room.name}: ${info.name}`,
@@ -1204,7 +1353,8 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
             {onOpenStore && (
               <EntranceCascadeItem phase={phase} delay={getCascadeDelayMs(5, { baseMs: HEADER_CASCADE_BASE_MS })}>
               <TouchableOpacity
-                onPress={() => { hapticLight(); onOpenStore(); }}
+                onPress={() => navigateAway(() => { hapticLight(); onOpenStore(); })}
+                disabled={busy != null}
                 accessibilityRole="button"
                 accessibilityLabel="Open the Store for amber packs"
                 activeOpacity={0.85}
@@ -1287,6 +1437,9 @@ const styles = StyleSheet.create({
     flex: 1,
     // backgroundColor applied inline (phase-aware screenBg)
   },
+  saveRecoveryScreen: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24 },
+  saveRecoveryCard: { padding: SURFACE.cardPadX },
+  saveRecoveryBody: { fontFamily: BODY_FONT, fontSize: FONT_SIZE.body, lineHeight: 23, marginVertical: 16 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
