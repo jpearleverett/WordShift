@@ -1,6 +1,6 @@
 import React, { useLayoutEffect, useEffect, useRef, useState } from 'react';
 import { FONT_SIZE } from '../theme/typeScale';
-import { View, StyleSheet, Animated, Easing, Pressable, TouchableOpacity, Image, ScrollView, useWindowDimensions, AppState } from 'react-native';
+import { View, StyleSheet, Animated, Easing, Pressable, TouchableOpacity, Image, ScrollView, useWindowDimensions, AppState, BackHandler } from 'react-native';
 import { AppText } from './ui/AppText';
 import { PhaseTransitionEvent, PhaseScene, SceneImage, CinematicParticleConfig } from '../services/phaseEvents';
 import { getSettingsSync } from '../services/settings';
@@ -329,6 +329,15 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
   const [activeSceneIndex, setActiveSceneIndex] = useState(-1);
   const [manualPlayback, setManualPlayback] = useState(false);
   const manualPlaybackRef = useRef(false);
+  const [skipConfirmation, setSkipConfirmation] = useState(false);
+  const skipConfirmationRef = useRef(false);
+  const [appActive, setAppActive] = useState(() => AppState.currentState !== 'background' && AppState.currentState !== 'inactive');
+  const appActiveRef = useRef(appActive);
+  const activeSceneRef = useRef(-1);
+  const advanceLockedRef = useRef(false);
+  const [advanceLocked, setAdvanceLocked] = useState(false);
+  const currentEventRef = useRef(event);
+  const playbackPaused = suspended || !appActive || skipConfirmation;
   const [overlayOpacity] = useState(() => new Animated.Value(0));
   const [sceneOpacity] = useState(() => new Animated.Value(0));
   const [sceneTranslateY] = useState(() => new Animated.Value(20));
@@ -356,9 +365,9 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
   const scrollOffsetRef = useRef(0);
   const soundScope = useRef<ReturnType<typeof createCeremonySoundScope> | null>(null);
   const suspendedRef = useRef(suspended);
-  const wasSuspendedRef = useRef(false);
+  const wasPausedRef = useRef(false);
   const deliveredSceneRef = useRef<{ event: PhaseTransitionEvent; index: number } | null>(null);
-  useLayoutEffect(() => { onCompleteRef.current = onComplete; });
+  useLayoutEffect(() => { onCompleteRef.current = onComplete; currentEventRef.current = event; });
   useLayoutEffect(() => { suspendedRef.current = suspended; });
   useEffect(() => {
     if (!effectiveReducedMotion) return;
@@ -537,7 +546,8 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
   };
 
   const finish = (skipped = false) => {
-    if (hasSkipped.current) return;
+    if (hasSkipped.current || !event || visibleEventRef.current !== event || currentEventRef.current !== event ||
+        suspendedRef.current || !appActiveRef.current || (skipConfirmationRef.current && !skipped)) return;
     hasSkipped.current = true;
     soundScope.current?.stop();
     if (skipped && event) logEvent({ type: 'cinematic_skipped', data: {
@@ -556,21 +566,62 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
   const finishRef = useRef(finish);
   useLayoutEffect(() => { finishRef.current = finish; });
   const next = () => {
-    if (!event || suspended || activeSceneIndex < 0 || hasSkipped.current) return;
+    if (!event || visibleEventRef.current !== event || currentEventRef.current !== event || suspendedRef.current || !appActiveRef.current ||
+        skipConfirmationRef.current || activeSceneIndex < 0 || activeSceneRef.current !== activeSceneIndex ||
+        hasSkipped.current || advanceLockedRef.current) return;
+    // A second tap from the same gesture must not consume the newly drawn page.
+    // This brief guard affects input only, including with reduced motion enabled.
+    advanceLockedRef.current = true;
+    setAdvanceLocked(true);
+    timersRef.current.push(setTimeout(() => {
+      advanceLockedRef.current = false;
+      setAdvanceLocked(false);
+    }, 350));
     // Once a reader takes the controls, subsequent pages wait for them too.
     manualPlaybackRef.current = true;
     setManualPlayback(true);
     if (activeSceneIndex === event.scenes.length - 1) finishRef.current();
-    else setActiveSceneIndex(activeSceneIndex + 1);
+    else {
+      activeSceneRef.current = activeSceneIndex + 1;
+      setActiveSceneIndex(activeSceneIndex + 1);
+    }
   };
   // The passage itself is the hold control: a tap on the words the reader is
   // already looking at cancels the pending advance (the timer effect below
   // clears it) and hands over playback. Idempotent, so a tap in a
   // ceremony that already waits for the reader does nothing at all.
   const holdForReading = () => {
+    if (!event || visibleEventRef.current !== event || currentEventRef.current !== event || suspendedRef.current || !appActiveRef.current || hasSkipped.current) return;
     manualPlaybackRef.current = true;
     if (!manualPlayback) setManualPlayback(true);
   };
+
+  const requestSkip = () => {
+    if (!event || visibleEventRef.current !== event || currentEventRef.current !== event || suspendedRef.current || !appActiveRef.current ||
+        skipConfirmationRef.current || hasSkipped.current) return;
+    // Stop the clock synchronously: it may expire before React opens the prompt.
+    holdForReading();
+    skipConfirmationRef.current = true;
+    setSkipConfirmation(true);
+    announceForA11y('Skip the rest of this scene? Keep reading, or skip scene.');
+  };
+  const cancelSkip = () => {
+    if (!event || visibleEventRef.current !== event || currentEventRef.current !== event || !skipConfirmationRef.current || hasSkipped.current) return;
+    skipConfirmationRef.current = false;
+    setSkipConfirmation(false);
+  };
+  const requestSkipRef = useRef(requestSkip);
+  const cancelSkipRef = useRef(cancelSkip);
+  useLayoutEffect(() => { requestSkipRef.current = requestSkip; cancelSkipRef.current = cancelSkip; });
+  useEffect(() => {
+    if (!event || suspended) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (skipConfirmationRef.current) cancelSkipRef.current();
+      else requestSkipRef.current();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [event, suspended]);
 
   // A fresh event always opens on its own first scene. In particular, a
   // previously skipped scene must not briefly appear under the next title.
@@ -580,6 +631,11 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- A new external event owns a fresh native animation timeline and its render layers.
     setVisibleEvent(null);
     hasSkipped.current = false;
+    skipConfirmationRef.current = false;
+    setSkipConfirmation(false);
+    activeSceneRef.current = -1;
+    advanceLockedRef.current = false;
+    setAdvanceLocked(false);
     manualPlaybackRef.current = event?.readAtOwnPace === true;
     setManualPlayback(event?.readAtOwnPace === true);
     setActiveSceneIndex(-1);
@@ -597,6 +653,10 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     if (!event) return;
     soundScope.current = createCeremonySoundScope();
     const appStateListener = AppState.addEventListener('change', state => {
+      const active = state === 'active';
+      // Native lifecycle callbacks fence the timer before the state render runs.
+      appActiveRef.current = active;
+      setAppActive(active);
       soundScope.current?.stop();
       // A return allows future passages to sound; it never replays an old tail.
       if (state === 'active' && !hasSkipped.current && !suspendedRef.current) soundScope.current = createCeremonySoundScope();
@@ -614,6 +674,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     const timer = setTimeout(() => {
       visibleEventRef.current = event;
       setVisibleEvent(event);
+      activeSceneRef.current = 0;
       setActiveSceneIndex(0);
     }, reducedMotion ? 0 : 600);
     timersRef.current.push(timer);
@@ -635,10 +696,10 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
   // Overlay arbitration can temporarily hide a ceremony while a save finishes.
   // Keep the cursor and delivered-cue record; returning never replays a cue.
   useEffect(() => {
-    const wasSuspended = wasSuspendedRef.current;
-    wasSuspendedRef.current = suspended;
+    const wasPaused = wasPausedRef.current;
+    wasPausedRef.current = playbackPaused;
     if (!event) return;
-    if (suspended) {
+    if (playbackPaused) {
       soundScope.current?.stop();
       overlayOpacity.stopAnimation();
       effectAnimsRef.current.forEach(animation => animation.stop());
@@ -646,17 +707,17 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
       sceneTranslateY.stopAnimation();
       // eslint-disable-next-line react-hooks/set-state-in-effect -- A suspended native burst is finished; remounting it on resume would replay the one-shot effect.
       setBurst(null);
-    } else if (wasSuspended) {
+    } else if (wasPaused) {
       soundScope.current = createCeremonySoundScope();
       overlayOpacity.setValue(1);
     }
-  }, [event, suspended, overlayOpacity, sceneOpacity, sceneTranslateY]);
+  }, [event, playbackPaused, overlayOpacity, sceneOpacity, sceneTranslateY]);
 
   // Only a newly visible scene speaks or plays its cue. Changing playback
   // mode cannot replay the bell, the descent, or the screen-reader announcement.
   useEffect(() => {
     const scene = event?.scenes[activeSceneIndex];
-    if (!event || suspended || visibleEventRef.current !== event || !scene || hasSkipped.current) return;
+    if (!event || playbackPaused || visibleEventRef.current !== event || currentEventRef.current !== event || !scene || hasSkipped.current) return;
     const delivered = deliveredSceneRef.current;
     if (delivered?.event === event && delivered.index === activeSceneIndex) {
       // A paused entrance may have stopped midway. Resume its settled pose,
@@ -693,7 +754,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     fireSceneHaptic(scene, event.shakeIntensity);
     if (scene.effect === 'descend') {
       settleTimer = setTimeout(() => {
-        if (!hasSkipped.current) hapticHeavy();
+        if (!hasSkipped.current && appActiveRef.current && !suspendedRef.current && !skipConfirmationRef.current) hapticHeavy();
       }, Math.min(scene.duration * 0.75, 3800) * timeScale);
       timersRef.current.push(settleTimer);
     }
@@ -727,12 +788,12 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     };
     // Playback mode is deliberately absent: it only controls the timer below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [event, activeSceneIndex, suspended]);
+  }, [event, activeSceneIndex, playbackPaused]);
 
   useEffect(() => {
     const scene = event?.scenes[activeSceneIndex];
-    if (!event || visibleEventRef.current !== event || !scene ||
-        suspended || manualPlayback || hasSkipped.current) return;
+    if (!event || visibleEventRef.current !== event || currentEventRef.current !== event || !scene ||
+        playbackPaused || manualPlayback || hasSkipped.current) return;
     // Reduced motion changes movement, never the time available to read: the
     // reading budget is not a motion preference, and holding a passage is now
     // one tap on the words for every reader, whatever their motion setting.
@@ -740,13 +801,17 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     const authoredGap = nextScene ? Math.max(0, nextScene.delay - scene.delay - scene.duration) : 350;
     const timer = setTimeout(() => {
       // A tap can land just before the state commit clears this timeout.
-      if (hasSkipped.current || manualPlaybackRef.current) return;
+      if (hasSkipped.current || manualPlaybackRef.current || suspendedRef.current || !appActiveRef.current ||
+          skipConfirmationRef.current || visibleEventRef.current !== event || currentEventRef.current !== event || activeSceneRef.current !== activeSceneIndex) return;
       if (activeSceneIndex >= event.scenes.length - 1) finishRef.current();
-      else setActiveSceneIndex(index => index + 1);
+      else {
+        activeSceneRef.current = activeSceneIndex + 1;
+        setActiveSceneIndex(activeSceneIndex + 1);
+      }
     }, (scene.duration + authoredGap) * 1.25);
     timersRef.current.push(timer);
     return () => clearTimeout(timer);
-  }, [event, activeSceneIndex, manualPlayback, suspended]);
+  }, [event, activeSceneIndex, manualPlayback, playbackPaused]);
 
   if (!event || suspended) return null;
   const eventIsVisible = visibleEvent === event;
@@ -793,15 +858,18 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
           <CinematicParticle key={`${width}:${height}:${i}`} config={event.particles!} index={i} />
         ))}
       </View>
-      <View style={[styles.shell, { width: contentWidth, paddingTop: insets.top + 12,
+      <View pointerEvents={skipConfirmation ? 'none' : 'auto'}
+        accessibilityElementsHidden={skipConfirmation}
+        importantForAccessibility={skipConfirmation ? 'no-hide-descendants' : 'auto'}
+        style={[styles.shell, { width: contentWidth, paddingTop: insets.top + 12,
         paddingBottom: insets.bottom + 16 }]}>
         <View style={styles.header}>
           <View style={styles.titleGroup}>
             <AppText textRole="label" style={styles.eyebrow}>WORDSHIFT</AppText>
             {event.showTitle !== false && <AppText textRole="title" style={styles.title}>{event.title}</AppText>}
           </View>
-          <TouchableOpacity style={styles.skipButton} onPress={() => finish(true)}
-            accessibilityLabel="Skip transition" accessibilityRole="button">
+          <TouchableOpacity style={styles.skipButton} onPress={requestSkip} disabled={!eventIsVisible || skipConfirmation}
+            accessibilityLabel="Skip transition" accessibilityHint="Asks before skipping the rest of this scene." accessibilityRole="button">
             <AppText textRole="label" style={styles.skipText}>Skip</AppText>
           </TouchableOpacity>
         </View>
@@ -836,6 +904,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
               {activeScene && <ScrollView ref={scrollRef} testID="phase-transition-reading"
                 style={styles.readingScroll}
                 contentContainerStyle={[styles.sceneContent, compact && styles.sceneContentCompact]} bounces={false}
+                onScrollBeginDrag={holdForReading}
                 onScroll={scrollEvent => { scrollOffsetRef.current = scrollEvent.nativeEvent.contentOffset.y; }}
                 scrollEventThrottle={16}
                 showsVerticalScrollIndicator keyboardShouldPersistTaps="handled">
@@ -877,7 +946,8 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
                   {activeSceneIndex + 1} / {event.scenes.length}
                 </AppText>
               </View>
-              <TouchableOpacity testID="phase-transition-next" onPress={next} style={styles.continueButton}
+              <TouchableOpacity testID="phase-transition-next" onPress={next} disabled={advanceLocked}
+                accessibilityState={{ disabled: advanceLocked }} style={[styles.continueButton, advanceLocked && styles.continueButtonSettling]}
                 accessibilityRole="button" accessibilityLabel={lastScene ? 'Return to the house' : 'Continue the scene'}>
                 <AppText textRole="label" style={styles.continueText}>{lastScene ? 'Return' : 'Continue'}</AppText>
               </TouchableOpacity>
@@ -885,6 +955,24 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
           </View>
         </View>
       </View>
+      {skipConfirmation && <View testID="phase-transition-skip-confirmation" style={styles.confirmationBackdrop}
+        accessibilityViewIsModal>
+        <View style={[styles.confirmationCard, { maxHeight: Math.max(180, availableHeight - 32), width: contentWidth }]}>
+          <ScrollView bounces={false} contentContainerStyle={styles.confirmationContent}>
+            <AppText textRole="title" accessibilityRole="header" style={styles.confirmationTitle}>Skip the rest of this scene?</AppText>
+            <AppText textRole="reading" style={styles.confirmationText}>You can stay here and read at your own pace.</AppText>
+            <TouchableOpacity testID="phase-transition-keep-reading" onPress={cancelSkip}
+              style={styles.continueButton} accessibilityRole="button" accessibilityLabel="Keep reading">
+              <AppText textRole="label" style={styles.continueText}>Keep reading</AppText>
+            </TouchableOpacity>
+            <TouchableOpacity testID="phase-transition-confirm-skip" onPress={() => {
+              if (skipConfirmationRef.current) finish(true);
+            }} style={[styles.skipButton, styles.confirmSkipButton]} accessibilityRole="button" accessibilityLabel="Skip scene">
+              <AppText textRole="label" style={styles.skipText}>Skip scene</AppText>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      </View>}
       <Animated.View pointerEvents="none" style={[styles.flash,
         { opacity: flashOpacity, backgroundColor: flashColor }]} />
     </Animated.View>
@@ -930,10 +1018,18 @@ const styles = StyleSheet.create({
   continueButton: { minHeight: 48, minWidth: 136, alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 20, paddingVertical: 12, borderRadius: 3, borderWidth: 1,
     borderColor: '#F2D6A7', backgroundColor: '#E7C796' },
+  continueButtonSettling: { opacity: 0.65 },
   continueText: { fontFamily: PIXEL_FONT_BOLD, fontSize: 14, color: '#241C21' },
   skipButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 16, borderRadius: 3,
     borderWidth: 1, borderColor: SKIP_BORDER_COLOR, backgroundColor: '#100B15', zIndex: 1000 },
   skipText: { fontFamily: BODY_FONT_BOLD, fontSize: FONT_SIZE.bodyLg, color: SKIP_INK_COLOR },
+  confirmationBackdrop: { ...StyleSheet.absoluteFill, zIndex: 1002, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#100B15EB' },
+  confirmationCard: { backgroundColor: '#211B26', borderWidth: 1, borderColor: '#7D6A55', borderRadius: 6, overflow: 'hidden' },
+  confirmationContent: { padding: 24, gap: 16 },
+  confirmationTitle: { fontFamily: PIXEL_FONT_BOLD, fontSize: 18, lineHeight: 28, color: '#F3E8D7' },
+  confirmationText: { fontFamily: BODY_FONT, fontSize: 18, lineHeight: 27, color: '#F2E7D6', marginBottom: 4 },
+  confirmSkipButton: { alignItems: 'center', minHeight: 48 },
   flash: { ...StyleSheet.absoluteFill, zIndex: 1001 },
   vignette: { ...StyleSheet.absoluteFill, zIndex: 1 },
 });

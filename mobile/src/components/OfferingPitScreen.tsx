@@ -1,6 +1,6 @@
 import { saveWithPlayerRetry } from '../services/saveRetry';
 import { getPitGeometry as computePitGeometry } from '../services/worldGeometry';
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
 import { FONT_SIZE } from '../theme/typeScale';
 import {
   View,
@@ -14,6 +14,8 @@ import {
   Image,
   useWindowDimensions,
   Modal,
+  AppState,
+  BackHandler,
 } from 'react-native';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
 import {
@@ -52,7 +54,7 @@ import {
   getNewCyclePointerLine,
 } from '../services/phaseNarrative';
 import { getStrongestDreadWord } from '../services/localGenerator';
-import { confirmPhaseTransition, spendAmber, markMandatoryHarvestSeen, hasSeenMandatoryHarvest } from '../services/amberCurrency';
+import { confirmPhaseTransition, markMandatoryHarvestSeen, hasSeenMandatoryHarvest } from '../services/amberCurrency';
 import { FoxGuide } from './FoxGuide';
 import { NineSliceFrame, ThreeSliceStrip } from './ui/NineSlice';
 import {
@@ -70,7 +72,7 @@ import { UtilityMenu } from './ui/UtilityMenu';
 import {
   loadTendingState,
   getNextTendingInfo,
-  applyTend,
+  commitTendPurchase,
   isTendingAvailable,
   getTendingIntensity,
   NextTendingInfo,
@@ -809,6 +811,49 @@ export function computeDevourAmberIncrement(
   return Math.max(0, cumulative - previous);
 }
 
+/** Timers count foreground viewing time, so backgrounding cannot finish a rite. */
+export function createPitCeremonyClock(initiallyActive = true) {
+  type Entry = { callback: () => void; remaining: number; started: number; timer: ReturnType<typeof setTimeout> | null };
+  const entries = new Set<Entry>();
+  let active = initiallyActive;
+  const arm = (entry: Entry) => {
+    entry.started = Date.now();
+    entry.timer = setTimeout(() => {
+      entry.timer = null;
+      entries.delete(entry);
+      entry.callback();
+    }, entry.remaining);
+  };
+  return {
+    isActive: () => active,
+    schedule(callback: () => void, delay: number) {
+      const entry: Entry = { callback, remaining: delay, started: Date.now(), timer: null };
+      entries.add(entry);
+      if (active) arm(entry);
+      return () => {
+        if (entry.timer != null) clearTimeout(entry.timer);
+        entries.delete(entry);
+      };
+    },
+    setActive(next: boolean) {
+      if (active === next) return;
+      active = next;
+      for (const entry of entries) {
+        if (active) arm(entry);
+        else {
+          if (entry.timer != null) clearTimeout(entry.timer);
+          entry.timer = null;
+          entry.remaining = Math.max(0, entry.remaining - (Date.now() - entry.started));
+        }
+      }
+    },
+    clear() {
+      for (const entry of entries) if (entry.timer != null) clearTimeout(entry.timer);
+      entries.clear();
+    },
+  };
+}
+
 interface OfferingPitScreenProps {
   phase: DialoguePhase;
   amberBalance: number;
@@ -828,6 +873,10 @@ interface OfferingPitScreenProps {
   pendingPhaseTransition: DialoguePhase | null;
   /** Called after the pit confirms the phase transition */
   onPhaseTransitionConfirmed?: (newPhase: DialoguePhase) => void;
+  /** Drain any already-committed ceremony after a recovered phase save. */
+  onPhaseTransitionReady?: () => void;
+  /** Let App's Android Back handler consult this screen's immediate lock. */
+  onNavigationGuardChange?: (guard: (() => boolean) | null) => void;
   /** Whether onboarding is active — suppresses normal interaction */
   isOnboarding?: boolean;
   /** Current onboarding step (gates the manual tap-to-offer flow) */
@@ -852,6 +901,8 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   phaseProgressFraction,
   pendingPhaseTransition,
   onPhaseTransitionConfirmed,
+  onPhaseTransitionReady,
+  onNavigationGuardChange,
   isOnboarding,
   onboardingStep,
   completedPuzzles,
@@ -910,6 +961,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const [tendingLevel, setTendingLevel] = useState(0);
   const [tendingNext, setTendingNext] = useState<NextTendingInfo | null>(null);
   const [tendingBusy, setTendingBusy] = useState(false);
+  const tendingBusyRef = useRef(false);
   // Pending ceremony/result toast timers, tracked so they're cleared on unmount.
   const tendTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   // Felt response for "deepen the pattern": a native-driven bloom on the depth
@@ -953,6 +1005,29 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   // and the amberBalance prop-sync effect can tell when the Offer All cascade
   // owns the displayed balance.
   const isOfferingRef = useRef(false);
+  const pendingPhaseRef = useRef(pendingPhaseTransition);
+  useLayoutEffect(() => { pendingPhaseRef.current = pendingPhaseTransition; }, [pendingPhaseTransition]);
+  const ceremonyBusyRef = useRef(false);
+  const [ceremonyClock] = useState(() => createPitCeremonyClock(AppState.currentState !== 'background' && AppState.currentState !== 'inactive'));
+  const navigationBlocked = useCallback(() => (
+    isOfferingRef.current || tendingBusyRef.current || ceremonyBusyRef.current || pendingPhaseRef.current != null || finalizingBatches.current.size > 0
+  ), []);
+  const navigate = useCallback((action?: () => void) => {
+    if (!mountedRef.current || navigationBlocked()) return;
+    hapticLight();
+    playUiSound('tap');
+    action?.();
+  }, [navigationBlocked]);
+  useLayoutEffect(() => {
+    onNavigationGuardChange?.(navigationBlocked);
+    return () => onNavigationGuardChange?.(null);
+  }, [navigationBlocked, onNavigationGuardChange]);
+
+  useEffect(() => {
+    const back = BackHandler.addEventListener('hardwareBackPress', () => navigationBlocked());
+    const appState = AppState.addEventListener('change', state => ceremonyClock.setActive(state === 'active'));
+    return () => { back.remove(); appState.remove(); ceremonyClock.clear(); };
+  }, [navigationBlocked, ceremonyClock]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -980,7 +1055,6 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const [ceremonyStatus, setCeremonyStatus] = useState<CeremonyStatus>('idle');
   const [ceremonyIgniteStep, setCeremonyIgniteStep] = useState(-1);
   const [ceremonyTextIndex, setCeremonyTextIndex] = useState(-1);
-  const ceremonyTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   // Tap-to-advance: the pending "advance to next line" action, so a tap can
   // pace the sequence (an NG+ player's fourth ignition need not sit through
   // the fixed 2.5s-per-line auto-advance).
@@ -1087,7 +1161,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   // Clean up all tracked timers on unmount
   useEffect(() => {
     return () => {
-      ceremonyTimers.current.forEach(clearTimeout);
+      ceremonyClock.clear();
       ceremonyAdvanceRef.current = null;
       popInTimeoutsRef.current.forEach(clearTimeout);
       // eslint-disable-next-line react-hooks/exhaustive-deps -- Teardown must cancel the latest timer registry, including timers added after mount.
@@ -1095,7 +1169,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       // eslint-disable-next-line react-hooks/exhaustive-deps -- Teardown must cancel the latest timer registry, including timers added after mount.
       trailTimeoutsRef.current.forEach(clearTimeout);
     };
-  }, []);
+  }, [ceremonyClock]);
 
   // Ward hint or ready text
   const wardHintText = useMemo(() => {
@@ -1109,23 +1183,19 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   }, [phase, phaseProgressFraction, pendingPhaseTransition, ceremonyStatus]);
 
   // ---- Auto-trigger ceremony when entering pit with pending transition and no harvest ----
-  const autoTriggeredRef = useRef(false);
   useEffect(() => {
     if (
       pendingPhaseTransition != null &&
       ceremonyStatus === 'idle' &&
       harvestState &&
       harvestState.pendingBatches.length === 0 &&
-      !autoTriggeredRef.current &&
       !isOnboarding
     ) {
-      autoTriggeredRef.current = true;
-      const timer = setTimeout(() => {
+      return ceremonyClock.schedule(() => {
         if (mountedRef.current) startCeremony();
       }, 1200); // Longer delay so player sees the pit before ceremony
-      return () => clearTimeout(timer);
     }
-  }, [pendingPhaseTransition, ceremonyStatus, harvestState, isOnboarding, startCeremony]);
+  }, [pendingPhaseTransition, ceremonyStatus, harvestState, isOnboarding, startCeremony, ceremonyClock]);
 
   // ---- Ambient breathing glow loop ----
   useEffect(() => {
@@ -1651,12 +1721,13 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   // ---- Ward ignition ceremony implementation (ref-based) ----
   useEffect(() => {
     startCeremonyRef.current = () => {
-      if (ceremonyStatus !== 'idle' || pendingPhaseTransition == null) return;
+      if (!mountedRef.current || ceremonyBusyRef.current || ceremonyStatus !== 'idle' || pendingPhaseTransition == null || !ceremonyClock.isActive()) return;
+      ceremonyBusyRef.current = true;
       setCeremonyStatus('igniting');
       setCeremonyIgniteStep(0);
+      setShowUtilityModal(false);
 
-      ceremonyTimers.current.forEach(clearTimeout);
-      ceremonyTimers.current = [];
+      ceremonyClock.clear();
       ceremonyAdvanceRef.current = null;
 
       wardPulseLoop.current?.stop();
@@ -1670,7 +1741,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
 
       // Sequential ward ignition
       for (let i = 0; i < PIT_WARD_COUNT; i++) {
-        const timer = setTimeout(() => {
+        ceremonyClock.schedule(() => {
           if (!mountedRef.current) return;
           setCeremonyIgniteStep(i);
           wardFlashAnims[i].setValue(1);
@@ -1681,11 +1752,10 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
           }).start();
           if (i < PIT_WARD_COUNT - 1) hapticLight();
         }, i * 200);
-        ceremonyTimers.current.push(timer);
       }
 
       // After all wards ignite -> eruption
-      const eruptTimer = setTimeout(() => {
+      ceremonyClock.schedule(() => {
         if (!mountedRef.current) return;
         setCeremonyStatus('erupting');
         hapticHeavy();
@@ -1696,12 +1766,11 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         playUiSound('phase_change', pendingPhaseTransition ?? undefined);
         flashPitSurge();
         spawnShockwave();
-        const sw1 = setTimeout(() => { if (mountedRef.current) spawnShockwave(); }, 150);
-        const sw2 = setTimeout(() => { if (mountedRef.current) spawnShockwave(); }, 300);
-        ceremonyTimers.current.push(sw1, sw2);
+        ceremonyClock.schedule(() => { if (mountedRef.current) spawnShockwave(); }, 150);
+        ceremonyClock.schedule(() => { if (mountedRef.current) spawnShockwave(); }, 300);
 
         // After eruption -> ceremony text
-        const textTimer = setTimeout(() => {
+        ceremonyClock.schedule(() => {
           if (!mountedRef.current) return;
           setCeremonyStatus('text');
           setCeremonyTextIndex(0);
@@ -1714,17 +1783,27 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
 
           const texts = getPitTransitionCeremonyText(pendingPhaseTransition!);
 
+          let confirming = false;
           const runComplete = async () => {
+            if (confirming) return;
             ceremonyAdvanceRef.current = null;
             if (!mountedRef.current) return;
-            const result = await confirmPhaseTransition();
-            if (result && mountedRef.current) {
-              Animated.timing(ceremonyOverlayOpacity, {
-                toValue: 0,
-                duration: 300,
-                useNativeDriver: true,
-              }).start();
-              setCeremonyStatus('complete');
+            confirming = true;
+            const result = await saveWithPlayerRetry(confirmPhaseTransition, {
+              title: 'The ceremony is waiting',
+              message: 'We could not save this change to your village. Free some device space if needed, then retry. Your offering is safe.',
+            });
+            // The parent owns the durable cinematic queue. A forced unmount
+            // during this save must still hand it the committed transition.
+            if (result) {
+              if (mountedRef.current) {
+                Animated.timing(ceremonyOverlayOpacity, {
+                  toValue: 0,
+                  duration: 300,
+                  useNativeDriver: true,
+                }).start();
+                setCeremonyStatus('complete');
+              }
               onPhaseTransitionConfirmed?.(result.newPhase);
             } else if (mountedRef.current) {
               // Recovery: fade out overlay and reset to idle so user can retry
@@ -1733,8 +1812,10 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
                 duration: 300,
                 useNativeDriver: true,
               }).start();
+              ceremonyBusyRef.current = false;
               setCeremonyStatus('idle');
             }
+            onPhaseTransitionReady?.();
           };
 
           // Self-rescheduling line runner: each line auto-advances after 2.5s,
@@ -1753,24 +1834,33 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
               useNativeDriver: true,
             }).start();
             const isLast = j >= texts.length - 1;
-            const step = () => (isLast ? runComplete() : showLine(j + 1));
+            let advanced = false;
+            let readable = false;
+            const cancelDwell = ceremonyClock.schedule(() => { readable = true; }, 400);
+            const step = () => {
+              if (advanced || !mountedRef.current || !ceremonyClock.isActive()) return;
+              advanced = true;
+              cancelDwell();
+              ceremonyAdvanceRef.current = null;
+              if (isLast) void runComplete(); else showLine(j + 1);
+            };
             // Tightened dwell (was 2500/1500): the ~11.5s ceremony dragged. The
             // lines are 3-5 words, so ~2s reads comfortably, and a tap still
             // advances immediately (ceremonyAdvanceRef).
-            const autoTimer = setTimeout(step, isLast ? 1300 : 2000);
-            ceremonyTimers.current.push(autoTimer);
+            const cancelAuto = ceremonyClock.schedule(step, isLast ? 1300 : 2000);
             ceremonyAdvanceRef.current = () => {
-              clearTimeout(autoTimer);
+              // Ignore the tap that revealed this line and queued double taps
+              // until its fade has made it readable.
+              if (!readable || !ceremonyClock.isActive()) return;
+              cancelAuto();
               step();
             };
           };
           showLine(0);
         }, 650);
-        ceremonyTimers.current.push(textTimer);
       }, PIT_WARD_COUNT * 200 + 200);
-      ceremonyTimers.current.push(eruptTimer);
     };
-  }, [ceremonyStatus, pendingPhaseTransition, wardFlashAnims, flashPitSurge, spawnShockwave, ceremonyOverlayOpacity, ceremonyTextOpacity, onPhaseTransitionConfirmed]);
+  }, [ceremonyStatus, pendingPhaseTransition, wardFlashAnims, flashPitSurge, spawnShockwave, ceremonyOverlayOpacity, ceremonyTextOpacity, onPhaseTransitionConfirmed, onPhaseTransitionReady, ceremonyClock]);
 
   // ---- Spawn amber rise ----
   const spawnAmberRise = useCallback((_amberAmount: number) => {
@@ -1832,31 +1922,39 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   }, [refreshTending]);
 
   const handleDeepenPattern = useCallback(async () => {
-    if (tendingBusy || !tendingNext) return;
+    if (tendingBusyRef.current || !tendingNext) return;
     const cost = tendingNext.cost;
     if (displayBalance < cost) {
       showResultToast('Not enough amber to deepen the pattern yet.');
       return;
     }
+    tendingBusyRef.current = true;
     setTendingBusy(true);
     try {
-      const spend = await spendAmber(cost, 'tending');
-      if (!spend.success) {
-        showResultToast('The pattern could not accept that offering right now.');
+      const result = await saveWithPlayerRetry(() => commitTendPurchase(tendingNext.nextLevel, cost), {
+        title: 'Your shrine is waiting',
+        message: 'We could not save your offering. Free some device space if needed, then retry. You will not be charged twice.',
+      });
+      if (!result.success) {
+        if (mountedRef.current) {
+          setDisplayBalance(result.newBalance);
+          onAmberChange?.(result.newBalance);
+          await refreshTending();
+          showResultToast(result.error === 'changed' ? 'The shrine has changed. Check the updated offering and try again.' : 'The pattern could not accept that offering right now.');
+        }
         return;
       }
       if (mountedRef.current) {
-        setDisplayBalance(spend.newBalance);
-        onAmberChange?.(spend.newBalance);
+        setDisplayBalance(result.newBalance);
+        onAmberChange?.(result.newBalance);
       }
-      const result = await applyTend(cost);
       // A tend quest is deliberately a sink disguised as a quest — record the
       // amount and surface any quest that completes (so it's not silent).
       let completedQuests: Quest[] = [];
       try {
-        completedQuests = await updateQuestProgress({ amberTended: cost }, phase);
+        if (!result.recovered) completedQuests = await updateQuestProgress({ amberTended: result.amountSpent }, phase);
       } catch { /* quest tracking is best-effort */ }
-      logEvent({ type: 'pit_offer', data: { tending: result.level, amber: cost } });
+      if (!result.recovered) logEvent({ type: 'pit_offer', data: { tending: result.level, amber: result.amountSpent } });
       await refreshTending();
       if (!mountedRef.current) return;
 
@@ -1908,9 +2006,10 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         schedule(`Quest complete: ${completedQuests[0].title}`, nextDelay);
       }
     } finally {
+      tendingBusyRef.current = false;
       if (mountedRef.current) setTendingBusy(false);
     }
-  }, [tendingBusy, tendingNext, displayBalance, onAmberChange, phase, refreshTending, showResultToast, reducedMotion, flashPitSurge, spawnShockwave, tendPulse]);
+  }, [tendingNext, displayBalance, onAmberChange, phase, refreshTending, showResultToast, reducedMotion, flashPitSurge, spawnShockwave, tendPulse]);
 
   // ---- Batch completion ----
   const tryFinalizeBatch = useCallback(async (batchId: string) => {
@@ -1977,12 +2076,13 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
           // Trigger phase transition ceremony if pending
           if (pendingPhaseTransition != null && ceremonyStatus === 'idle') {
             // Small delay so the batch completion message shows first
-            setTimeout(() => { if (mountedRef.current) startCeremony(); }, 600);
+            ceremonyClock.schedule(() => { if (mountedRef.current) startCeremony(); }, 600);
           }
         }
       }
     } catch { /* batch may already be offered */ }
-  }, [phase, onAmberChange, spawnAmberRise, showResultToast, pendingPhaseTransition, ceremonyStatus, startCeremony, isOnboarding]);
+    finally { finalizingBatches.current.delete(batchId); }
+  }, [phase, onAmberChange, spawnAmberRise, showResultToast, pendingPhaseTransition, ceremonyStatus, startCeremony, isOnboarding, ceremonyClock]);
 
   // ---- Handle word devoured ----
   const handleWordDevoured = useCallback((fw: FlyingWord) => {
@@ -2039,7 +2139,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
 
   // ---- Devour a single word (true spiral path) ----
   const devourWord = useCallback((fw: FlyingWord) => {
-    if (fw.isDevoured || isOffering) return;
+    if (fw.isDevoured || isOfferingRef.current || ceremonyBusyRef.current) return;
     fw.isDevoured = true;
     hapticLight();
 
@@ -2117,14 +2217,14 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         ]),
       ]),
     ]).start(() => handleWordDevoured(fw));
-  }, [isOffering, getCurrentPos, spawnTrail, reducedMotion, phase, PIT_CENTER.x, PIT_CENTER.y, triggerInhale, handleWordDevoured]);
+  }, [getCurrentPos, spawnTrail, reducedMotion, phase, PIT_CENTER.x, PIT_CENTER.y, triggerInhale, handleWordDevoured]);
 
   // Keep devourWordRef in sync
   useEffect(() => { devourWordRef.current = devourWord; }, [devourWord]);
 
   // ---- Harvest All (with spiral paths) ----
   const handleHarvestAll = useCallback(async () => {
-    if (isOffering || !harvestState || harvestState.pendingBatches.length === 0) return;
+    if (isOfferingRef.current || ceremonyBusyRef.current || finalizingBatches.current.size > 0 || !harvestState || harvestState.pendingBatches.length === 0) return;
     isOfferingRef.current = true;
     setIsOffering(true);
     hapticHeavy();
@@ -2165,6 +2265,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       finalBalance = await saveWithPlayerRetry(() => settleBatchCredit(result.creditId));
       if (mountedRef.current) onAmberChange?.(finalBalance);
     }
+    if (!mountedRef.current) return;
 
     // Reset display accounting for the cascade: pending counts down from the
     // full pending value while the total counts up from the pre-offer balance
@@ -2181,14 +2282,15 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         playUiSound('amber_earn');
         showResultToast(getPitOfferResultMessage(phase, totalWordCount, result.amberAwarded));
         nameDreadOffering();
-        const freshState = await getHarvestState();
+        const freshState = await saveWithPlayerRetry(getHarvestState);
+        if (!mountedRef.current) return;
         setHarvestState({ ...freshState, pendingBatches: [...freshState.pendingBatches] });
         setOverflowCount(0);
         isOfferingRef.current = false;
         setIsOffering(false);
         // Trigger ceremony if pending
         if (pendingPhaseTransition != null && ceremonyStatus === 'idle') {
-          setTimeout(() => { if (mountedRef.current) startCeremony(); }, 600);
+          ceremonyClock.schedule(() => { if (mountedRef.current) startCeremony(); }, 600);
         }
       }
       return;
@@ -2284,7 +2386,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     const cascadeDuration = timing.cascadeDurationMs;
     setTimeout(async () => {
       if (!mountedRef.current) return;
-      const freshState = await getHarvestState();
+      const freshState = await saveWithPlayerRetry(getHarvestState);
       if (mountedRef.current) {
         // Settle exactly on the credited balance (the increments already sum
         // to it; this also corrects any drift from a concurrent credit).
@@ -2301,11 +2403,11 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         setIsOffering(false);
         // Trigger ceremony if pending
         if (pendingPhaseTransition != null && ceremonyStatus === 'idle') {
-          setTimeout(() => { if (mountedRef.current) startCeremony(); }, 600);
+          ceremonyClock.schedule(() => { if (mountedRef.current) startCeremony(); }, 600);
         }
       }
     }, cascadeDuration);
-  }, [isOffering, harvestState, phase, isOnboarding, reducedMotion, showResultToast, onAmberChange, spawnAmberRise, pendingPhaseTransition, ceremonyStatus, startCeremony, getCurrentPos, PIT_CENTER.x, PIT_CENTER.y, spawnTrail, flashPitSurge, spawnImpactBurst, spawnShockwave]);
+  }, [harvestState, phase, isOnboarding, reducedMotion, showResultToast, onAmberChange, spawnAmberRise, pendingPhaseTransition, ceremonyStatus, startCeremony, getCurrentPos, PIT_CENTER.x, PIT_CENTER.y, spawnTrail, flashPitSurge, spawnImpactBurst, spawnShockwave, ceremonyClock]);
 
   // ---- Onboarding: advance when the PLAYER has offered every word ----
   // The pit_offering step is completed by the player's own taps (each word
@@ -2391,6 +2493,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   // PhaseTransitionOverlay takes over at 'complete'.
   const blockingOverlayActive =
     ceremonyStatus !== 'idle' && ceremonyStatus !== 'complete';
+  const navigationBusy = isOffering || tendingBusy || blockingOverlayActive || pendingPhaseTransition != null;
 
   return (
     <View style={[styles.container, { backgroundColor: PIT_BG_COLORS[phase] ?? PIT_BG_COLORS[0] }]}>
@@ -2769,8 +2872,8 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
             {/* Amber pill taps through to the Store, same as the home header. */}
             <TouchableOpacity
               style={styles.amberContainer}
-              onPress={() => { hapticLight(); playUiSound('tap'); onOpenStore?.(); }}
-              disabled={!onOpenStore || isOnboarding}
+              onPress={() => navigate(onOpenStore)}
+              disabled={!onOpenStore || isOnboarding || navigationBusy}
               accessibilityLabel={
                 onOpenStore && !isOnboarding
                   ? `${Math.max(0, displayBalance)} amber. Tap to open the store`
@@ -2794,7 +2897,8 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
               {tendingEnabled && !isOnboarding && (
                 <TouchableOpacity
                   style={styles.headerIconBtn}
-                  onPress={() => { hapticLight(); playUiSound('tap'); refreshTending(); setShowTendingModal(true); }}
+                  onPress={() => navigate(() => { void refreshTending(); setShowTendingModal(true); })}
+                  disabled={navigationBusy}
                   accessibilityLabel={`Tend the pattern, ${getTendingLevelLabel(tendingLevel)}`}
                   accessibilityRole="button"
                 >
@@ -2803,7 +2907,8 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
               )}
               <TouchableOpacity
                 style={styles.headerIconBtn}
-                onPress={() => { hapticLight(); playUiSound('tap'); setShowUtilityModal(true); }}
+                onPress={() => navigate(() => setShowUtilityModal(true))}
+                disabled={navigationBusy}
                 accessibilityLabel="Open utility menu"
                 accessibilityRole="button"
               >
@@ -2811,7 +2916,8 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.headerIconBtn}
-                onPress={() => { hapticLight(); playUiSound('tap'); onClose(); }}
+                onPress={() => navigate(onClose)}
+                disabled={navigationBusy}
                 accessibilityLabel="Return home"
                 accessibilityRole="button"
               >
@@ -2829,11 +2935,11 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
           onClose={() => setShowUtilityModal(false)}
           amber={amberBalance}
           onAmberChange={onAmberChange}
-          onOpenStats={onOpenStats}
-          onOpenShop={onOpenShop}
-          onOpenStore={onOpenStore}
-          onOpenSettings={onOpenSettings}
-          onStartNewCycle={onStartNewCycle}
+          onOpenStats={onOpenStats ? () => navigate(onOpenStats) : undefined}
+          onOpenShop={onOpenShop ? () => navigate(onOpenShop) : undefined}
+          onOpenStore={onOpenStore ? () => navigate(onOpenStore) : undefined}
+          onOpenSettings={onOpenSettings ? () => navigate(onOpenSettings) : undefined}
+          onStartNewCycle={onStartNewCycle ? () => navigate(onStartNewCycle) : undefined}
         />
 
         {/* Tending Shrine modal — Phase 5 cosmetic amber sink */}
@@ -2842,12 +2948,12 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
           transparent
           statusBarTranslucent
           animationType="fade"
-          onRequestClose={() => setShowTendingModal(false)}
+          onRequestClose={() => { if (!tendingBusyRef.current) setShowTendingModal(false); }}
         >
           <TouchableOpacity
             style={styles.utilityOverlay}
             activeOpacity={1}
-            onPress={() => setShowTendingModal(false)}
+            onPress={() => { if (!tendingBusyRef.current) setShowTendingModal(false); }}
             accessibilityLabel="Close tending"
             accessibilityRole="button"
           >

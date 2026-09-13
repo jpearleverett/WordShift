@@ -926,9 +926,11 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   // a fresh id and aborts before committing if a newer call has superseded it.
   const generationIdRef = useRef(0);
 
-  // Clean up shakeError timeout on unmount
+  // Abandon pending generation and transient feedback when the hook leaves.
   useEffect(() => {
+    const generation = generationIdRef;
     return () => {
+      generation.current++;
       if (shakeErrorTimeout.current) {
         clearTimeout(shakeErrorTimeout.current);
       }
@@ -1338,6 +1340,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       // Serve curated early-game puzzles for the first few solves
       // These are hand-picked to showcase interesting letter moves
       const progress = await getFullProgress();
+      if (isStale()) return;
       puzzlesSolved = progress?.puzzlesSolved ?? 0;
       let unbrokenWeaveActive =
         requestedUnbrokenWeave &&
@@ -1441,6 +1444,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       ) {
         try {
           const ritualWords = await getRitualWords();
+          if (isStale()) return;
           // Pick words matching the target word length for this difficulty.
           // EXPERT was missing from this ternary, which predates the tier: it
           // resolved to 5 while generateLocalPuzzle builds EXPERT boards from
@@ -1479,6 +1483,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
                   'standard',
                 );
                 await recordPuzzleWords(extendedEcho.words);
+                if (isStale()) return;
                 setIsEchoPuzzle(true);
                 setMessage(getEchoPuzzleMessage(currentPhase));
                 return;
@@ -1486,6 +1491,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
             }
           }
         } catch {
+          if (isStale()) return;
           // Echo puzzle generation failed — fall through to normal path
         }
       }
@@ -1500,6 +1506,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       if (shouldUseBank) {
         try {
           const recencyMap = await getWordHistoryWithRecency();
+          if (isStale()) return;
           const bankPuzzle = unbrokenWeaveActive
             ? await selectPreGeneratedPuzzle(
                 requestedDifficulty,
@@ -1517,10 +1524,11 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
                 puzzlesSolved,
                 { lexicon: requestedLexicon },
               );
+          if (isStale()) return;
           if (bankPuzzle) {
-            if (isStale()) return;
             commitNewBoard(bankPuzzle.words, bankPuzzle.hint, bankPuzzle.solution, bankPuzzle.wordLength, variant, bankPuzzle.reverseSolution);
             await recordPuzzleWords(bankPuzzle.words);
+            if (isStale()) return;
             if (variant !== 'standard') {
               const config = VARIANT_CONFIGS[variant];
               setMessage(getVariantInstruction(config, currentPhase));
@@ -1536,6 +1544,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
             unbrokenWeaveFallback = true;
           }
         } catch (bankErr) {
+          if (isStale()) return;
           if (unbrokenWeaveActive) {
             disableUnbrokenWeave();
             unbrokenWeaveActive = false;
@@ -1605,6 +1614,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         announceWeaveUnavailable();
       }
     } catch (localErr) {
+      if (isStale()) return;
       console.log("Local generation failed, using fallback:", localErr);
       // Fallback puzzles don't include solver metadata, so restrictions may be
       // impossible to satisfy. Revert restriction variants to standard fallback.
@@ -1671,6 +1681,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     wordLength: number,
     puzzleSolution?: PuzzleSolutionStep[]
   ) => {
+    // This board now owns the session, even if a normal board is still loading.
+    generationIdRef.current++;
     gameModeRef.current = 'standard';
     setGameMode('standard');
     setBlindMode(false); // the daily is a shared board — never blind
@@ -3043,6 +3055,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const previewValidityVisible = previewGradingMode === 'graded';
 
   const restorePuzzleState = useCallback((saved: SavedPuzzleState) => {
+    generationIdRef.current++;
     pendingAbandonmentRef.current = null;
     vocabularyVersionRef.current = saved.vocabularyVersion === 1 ? 1 : 0;
     setVocabularyVersion(vocabularyVersionRef.current);
@@ -3221,6 +3234,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const resetCurrentPuzzle = useCallback(() => {
     pendingAbandonmentRef.current = null;
     if (rows.length === 0) return;
+    generationIdRef.current++;
     const originalWords = rows.map(r => r.originalWord);
     const wordLen = originalWords[0]?.length ?? currentWordLength;
     applyBoard(originalWords, hint || undefined, solution, wordLen, {
@@ -3255,6 +3269,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   }, [gameState, currentPhase]);
 
   const clearBoard = useCallback(() => {
+    generationIdRef.current++;
+    pendingAbandonmentRef.current = null;
     setRows([]);
     setActiveRowIndex(0);
     setSelectedLetter(null);
@@ -3394,3 +3410,4 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
 
   return [state, actions];
 }
+

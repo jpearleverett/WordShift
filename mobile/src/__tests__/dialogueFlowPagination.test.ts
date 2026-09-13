@@ -119,7 +119,8 @@ jest.mock('../services/amberCurrency', () => ({
   markDialogueRead: jest.fn(async () => {}),
   markIntroSeen: jest.fn(async () => {}),
   consumeTriggerWords: jest.fn(async () => []),
-  consumePendingVariantTutorial: jest.fn(async () => null),
+  getPendingVariantTutorials: jest.fn(async () => []),
+  acknowledgeVariantTutorial: jest.fn(async () => {}),
   wereTutorialSeedsPlanted: jest.fn(async () => true),
   markTutorialSeedsPlanted: jest.fn(async () => {}),
   recordConsumedCoordinatedEvent: jest.fn(async () => {}),
@@ -456,15 +457,12 @@ describe('useDialogueFlow Fox Phase 4 tutorial callback gating', () => {
     expect(amberCurrency.markTutorialSeedsPlanted).toHaveBeenCalledTimes(1);
   });
 
-  // consumePendingVariantTutorial shifts its queue and files the variant under
-  // seen as it reads, so it has no peek half. On a visit that already spent
-  // page 0 on Fox's tutorial callback the variant line would sit at page 1,
-  // and a scrim tap or Android back on page 0 burned it forever with nothing
-  // having shown it. It must not even be consulted on such a visit.
+  // An earlier tutorial page keeps the mode note queued for another visit.
   it('does not consume the pending variant tutorial behind an earlier page', async () => {
     const amberCurrency = jest.requireMock('../services/amberCurrency') as {
       wereTutorialSeedsPlanted: jest.Mock;
-      consumePendingVariantTutorial: jest.Mock;
+      getPendingVariantTutorials: jest.Mock;
+      acknowledgeVariantTutorial: jest.Mock;
     };
     amberCurrency.wereTutorialSeedsPlanted.mockResolvedValueOnce(false);
 
@@ -473,19 +471,16 @@ describe('useDialogueFlow Fox Phase 4 tutorial callback gating', () => {
     hook = render();
 
     expect(hook.dialogueText).toBe('tutorial callback line');
-    expect(amberCurrency.consumePendingVariantTutorial).not.toHaveBeenCalled();
+    expect(amberCurrency.getPendingVariantTutorials).not.toHaveBeenCalled();
   });
 
-  // The other side of the gate: on a visit with nothing ahead of it the note
-  // is still consumed and served. Tapped on Panko rather than Ember because
-  // only the fox owns the Phase-4 tutorial callback, so this visit is quiet by
-  // construction and cannot depend on the seeds-planted mock.
-  it('consumes the pending variant tutorial on an otherwise quiet visit', async () => {
+  it('acknowledges the pending variant only after the reader finishes its note', async () => {
     const variantLine = 'The chain runs backward now, and it still comes home.';
     const amberCurrency = jest.requireMock('../services/amberCurrency') as {
-      consumePendingVariantTutorial: jest.Mock;
+      getPendingVariantTutorials: jest.Mock;
+      acknowledgeVariantTutorial: jest.Mock;
     };
-    amberCurrency.consumePendingVariantTutorial.mockResolvedValueOnce('reverse');
+    amberCurrency.getPendingVariantTutorials.mockResolvedValueOnce(['reverse']);
     const animalDialogue = jest.requireMock('../services/animalDialogue') as {
       getVariantTutorialDialogue: jest.Mock;
     };
@@ -495,8 +490,11 @@ describe('useDialogueFlow Fox Phase 4 tutorial callback gating', () => {
     await hook.handleAnimalTap({ ...pangolin, currentDialogueIndex: 0 } as never);
     hook = render();
 
-    expect(amberCurrency.consumePendingVariantTutorial).toHaveBeenCalledTimes(1);
+    expect(amberCurrency.getPendingVariantTutorials).toHaveBeenCalledTimes(1);
     expect(hook.dialogueText).toBe(variantLine);
+    expect(amberCurrency.acknowledgeVariantTutorial).not.toHaveBeenCalled();
+    await hook.handleNextDialogue();
+    expect(amberCurrency.acknowledgeVariantTutorial).toHaveBeenCalledWith('reverse');
   });
 });
 
@@ -604,9 +602,10 @@ describe('useDialogueFlow Phase 5 pool-only delivery', () => {
     const variantLine =
       'The arrangement wanted a full circuit, with the chain unbroken the whole way home.';
     const amberCurrency = jest.requireMock('../services/amberCurrency') as {
-      consumePendingVariantTutorial: jest.Mock;
+      getPendingVariantTutorials: jest.Mock;
+      acknowledgeVariantTutorial: jest.Mock;
     };
-    amberCurrency.consumePendingVariantTutorial.mockResolvedValueOnce('reverse');
+    amberCurrency.getPendingVariantTutorials.mockResolvedValueOnce(['reverse']);
     const animalDialogue = jest.requireMock('../services/animalDialogue') as {
       getVariantTutorialDialogue: jest.Mock;
     };

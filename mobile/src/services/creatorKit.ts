@@ -6,6 +6,9 @@ import {
   awardPuzzleAmber,
   clearProgress,
   confirmPhaseTransition,
+  getPendingCeremonies,
+  acknowledgeCeremony,
+  queueHouseCeremony,
   getAmberBalance,
   getFullProgress,
   markChallengeIntroSeen,
@@ -358,6 +361,13 @@ export async function applyCreatorSnapshot(target: 'dusk' | 'shadows' | 'reveal'
       speedWins: 0,
       maxStackWins: 0,
     });
+
+    // These are deliberately pre-played screenshot/reviewer snapshots. Consume
+    // only ceremonies produced by the simulated history, never on normal boot.
+    await queueHouseCeremony();
+    for (const ceremony of await getPendingCeremonies()) {
+      await acknowledgeCeremony(ceremony.id);
+    }
 
     // 7. Sanity check: the snapshot must land EXACTLY on the target phase with
     //    no dangling pending transition — fail loudly instead of shipping an

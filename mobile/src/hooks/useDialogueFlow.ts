@@ -48,7 +48,8 @@ import {
   markDialogueRead,
   markIntroSeen,
   consumeTriggerWords,
-  consumePendingVariantTutorial,
+  getPendingVariantTutorials,
+  acknowledgeVariantTutorial,
   wereTutorialSeedsPlanted,
   markTutorialSeedsPlanted,
   recordConsumedCoordinatedEvent,
@@ -82,6 +83,7 @@ import {
 } from '../services/tending';
 import { buildPhase5Pool, buildPhase5Eligibility } from '../services/dialogue/phase5Pool';
 import { getModalInSpring } from '../theme/surfaces';
+import { showGameAlert } from '../services/gameAlert';
 import {
   AnimalAcquaintanceState,
   loadAnimalAcquaintanceState,
@@ -357,6 +359,8 @@ interface UseDialogueFlowParams {
 interface PreDialoguePage {
   text: string;
   commit?: () => Promise<void>;
+  /** Durable acknowledgement only after all pages of this note are read. */
+  onRead?: () => Promise<void>;
 }
 
 interface UseDialogueFlowReturn {
@@ -502,6 +506,15 @@ export function useDialogueFlow({
       acquaintanceState, animal.type, progress.currentPhase, progress.introsSeen.includes(animal.id)
     )
   ), [acquaintanceState, onAcquaintance, progress]);
+  // A visit is assembled through several storage reads. Closing/unmounting
+  // invalidates that work, so an old opener cannot replace a newer visit.
+  const visitGenerationRef = useRef(0);
+  const openingVisitRef = useRef(false);
+  const advancingDialogueRef = useRef(false);
+  useEffect(() => () => {
+    visitGenerationRef.current += 1;
+    openingVisitRef.current = false;
+  }, []);
 
   // Tending Shrine (Phase 5 endgame) state, loaded synchronously into the hook so
   // the Phase-5 dialogue selection + honest "new dialogue" badge can read it
@@ -920,11 +933,17 @@ export function useDialogueFlow({
 
   // Handle animal tap
   const handleAnimalTap = useCallback(async (animal: Animal) => {
+    if (openingVisitRef.current || advancingDialogueRef.current) return;
+    openingVisitRef.current = true;
+    const generation = ++visitGenerationRef.current;
+    const ownsVisit = () => generation === visitGenerationRef.current;
+    try {
     if (choiceSavePendingRef.current || acquaintanceOpeningRef.current) return;
     if (onAcquaintance && progress) {
       acquaintanceOpeningRef.current = true;
       try {
         const state = await loadAnimalAcquaintanceState();
+        if (!ownsVisit()) return;
         setAcquaintanceState(state);
         let introSeen = progress.introsSeen.includes(animal.id);
         // A visit is saved before the host updates the legacy intro flag. A
@@ -949,11 +968,13 @@ export function useDialogueFlow({
     // Pick up any Tending done since the hook mounted (e.g. the player just
     // deepened the pattern in the pit) so Phase-5 selection/badge are current.
     await refreshTendingState();
+    if (!ownsVisit()) return;
     // Availability and the session cap are phase-aware; make sure the session
     // layer is reading THIS phase and not its module default (see the mirror
     // effect above) before either is consulted.
     if (progress) updateSessionPhase(progress.currentPhase);
     const availability = await checkDialogueAvailability(animal.id, getSessionBonus(animal));
+    if (!ownsVisit()) return;
 
     if (!availability.available) {
       // Phase-aware cooldown messages
@@ -1009,26 +1030,13 @@ export function useDialogueFlow({
       }
     }
 
-    setSelectedAnimal(animal);
-    setDialogueVisit(visit => visit + 1);
-    setIsTalking(false);
-    setShowDialogue(true);
-    // Fresh session: a stale page cursor from the previous session must never
-    // leak into this one — the first line always opens on its first page.
-    resetPageQueue();
-    setChoiceOpen(false);
-    setChoiceEcho(null);
-    setChoiceSaving(false);
-    setChoiceError(null);
-    setActiveChoice(null);
-    choiceSubmissionRef.current = false;
-
     // Build pre-dialogue pages: these show as sequential conversation pages
     // before the regular dialogue, creating natural conversational flow.
     // Phase 5 permits live variant and fulfilled-offering pages before its
     // post-revelation/Tending pool. Approach testimony and reveal callbacks
     // retire at arrival; the archive preserves their earlier versions.
     const pages: PreDialoguePage[] = [];
+    let pendingVisitChoice: DialogueChoice | null = null;
 
     const animalPhase = progress ? getAnimalPhase(progress.currentPhase, animal.type) : 0;
     // Which era's lines this animal is actually on (see getFlavorPhase): the
@@ -1048,10 +1056,11 @@ export function useDialogueFlow({
           animalPhase,
           animal.currentDialogueIndex
         );
+        if (!ownsVisit()) return;
         if (choice) {
           // Show the choice prompt as a pre-dialogue page
           pages.push({ text: choice.prompt });
-          setActiveChoice(choice);
+          pendingVisitChoice = choice;
         }
       } catch {
         // Choice points are non-critical
@@ -1068,6 +1077,7 @@ export function useDialogueFlow({
     ) {
       try {
         const seedsPlanted = await wereTutorialSeedsPlanted();
+        if (!ownsVisit()) return;
         if (!seedsPlanted) {
           const callbackLine = TUTORIAL_CALLBACK_DIALOGUES[Math.floor(Math.random() * TUTORIAL_CALLBACK_DIALOGUES.length)];
           pages.push({ text: callbackLine, commit: () => markTutorialSeedsPlanted() });
@@ -1077,17 +1087,13 @@ export function useDialogueFlow({
       }
     }
 
-    // 2. Variant tutorial note — one-time explanation for newly encountered modes.
-    // Same rule as the trigger queue and the offering request below:
-    // consumePendingVariantTutorial shifts the pending queue and files the
-    // variant under seen as it reads, so it has no peek half to defer to and
-    // may only ever run when its page would be page 0 (guaranteed visible the
-    // instant the modal opens). Without the gate it could sit at page 1 behind
-    // Fox's Phase-4 tutorial callback, and a scrim tap or Android back on page
-    // 0 burned the line forever with nothing having shown it.
+    // A mode note stays queued until the reader advances past its final page.
+    // Peeking must not consume it: the asynchronous visit can be interrupted
+    // before its dialogue is visible, or closed during the typewriter reveal.
     if (progress && pages.length === 0) {
       try {
-        const pendingVariant = await consumePendingVariantTutorial();
+        const pendingVariant = (await getPendingVariantTutorials())[0];
+        if (!ownsVisit()) return;
         if (pendingVariant) {
           const variantLine = getVariantTutorialDialogue(
             animal.type,
@@ -1095,11 +1101,14 @@ export function useDialogueFlow({
             progress.currentPhase
           );
           if (variantLine) {
-            pages.push({ text: variantLine });
+            pages.push({
+              text: variantLine,
+              onRead: () => acknowledgeVariantTutorial(pendingVariant),
+            });
           }
         }
       } catch {
-        // Variant tutorial pages are non-critical
+        // Leave the durable note queued for the next visit.
       }
     }
 
@@ -1140,6 +1149,7 @@ export function useDialogueFlow({
     if (!hasCoordinatedEvent && pages.length === 0) {
       try {
         const consumed = await consumeTriggerWords(animal.type);
+        if (!ownsVisit()) return;
         if (consumed.length > 0) {
           const word = consumed[0];
           if (flavorPhase >= 1) {
@@ -1172,6 +1182,7 @@ export function useDialogueFlow({
           progress.currentPhase as DialoguePhase,
           pages.length === 0
         );
+        if (!ownsVisit()) return;
         if (offering) {
           pages.push({ text: offering.line });
         }
@@ -1184,6 +1195,7 @@ export function useDialogueFlow({
     if (!hasCoordinatedEvent && pages.length === 0 && progress && progress.currentPhase >= 4) {
       try {
         const currentCount = await getSacrificeCount();
+        if (!ownsVisit()) return;
         if (lastSeenSacrificeCount.current[animal.type] === undefined) {
           // First access for this animal since mount — establish baseline without triggering.
           // This prevents stale reactions from old sacrifices after app restart.
@@ -1224,6 +1236,7 @@ export function useDialogueFlow({
       try {
         const sessionNumber = (getSession(animal.id)?.sessionsCompleted ?? 0) + 1;
         const seed = await peekNarrativeSeedPage(animal.type, sessionNumber);
+        if (!ownsVisit()) return;
         if (seed) {
           pages.push(seed);
         }
@@ -1240,6 +1253,7 @@ export function useDialogueFlow({
       if (isVanguard && progress.currentPhase >= 1) {
         try {
           forceRef = !(await hasSeenGuaranteedCrossRef(progress.currentPhase));
+        if (!ownsVisit()) return;
         } catch {
           // Non-critical
         }
@@ -1271,6 +1285,7 @@ export function useDialogueFlow({
     if (animalPhase === 4) {
       try {
         const choiceCallback = await getPhase4CallbackPage(animal.type);
+        if (!ownsVisit()) return;
         if (choiceCallback) {
           const type = animal.type;
           pages.push({
@@ -1294,6 +1309,7 @@ export function useDialogueFlow({
         const seedCallback = await peekNarrativeCallbackPage(animal.type, {
           allowUnheardSeeds: true,
         });
+        if (!ownsVisit()) return;
         if (seedCallback) {
           pages.push(seedCallback);
         }
@@ -1303,11 +1319,26 @@ export function useDialogueFlow({
     }
 
 
+    if (!ownsVisit()) return;
+    setSelectedAnimal(animal);
+    setDialogueVisit(visit => visit + 1);
+    setIsTalking(false);
+    setShowDialogue(true);
+    // Publish the completed visit together, never an old regular line while
+    // this visit's introduction is still being assembled.
+    resetPageQueue();
+    setChoiceSaving(false);
+    setChoiceError(null);
+    setChoiceOpen(false);
+    setChoiceEcho(null);
+    setActiveChoice(pendingVisitChoice);
+    choiceSubmissionRef.current = false;
     setPreDialoguePages(pages);
     // The modal opens on page 0, so page 0 is visible from this moment: commit
     // its bookkeeping here, and every later page as it becomes the head (see
     // handleNextDialogue).
     await commitPage(pages[0]);
+    if (!ownsVisit()) return;
 
     const status = getSessionStatus(animal.id, getSessionBonus(animal));
     setSessionInfo(status);
@@ -1325,6 +1356,9 @@ export function useDialogueFlow({
         tension: entranceSpring.tension,
         useNativeDriver: true,
       }).start();
+    }
+    } finally {
+      if (ownsVisit()) openingVisitRef.current = false;
     }
   }, [dialogueSlide, progress, refreshTendingState, resetPageQueue, onQuestsCompleted, onAcquaintance, refreshAcquaintanceState, getSessionBonus, getUnlockedTypes, setAnimals]);
 
@@ -1362,6 +1396,8 @@ export function useDialogueFlow({
   // Handle closing dialogue. Manual closes keep the session warm so
   // checking in with an animal never feels punitive.
   const closeDialogue = useCallback(async (startCooldown: boolean) => {
+    visitGenerationRef.current += 1;
+    openingVisitRef.current = false;
     hapticLight();
     const closingAnimal = selectedAnimal;
 
@@ -1432,7 +1468,7 @@ export function useDialogueFlow({
   // Leaving an unanswered question records no answer. Its existing pending
   // choice badge brings the player back; only an in-flight save must finish.
   const handleCloseDialogue = useCallback(async () => {
-    if (choiceSavePendingRef.current) return;
+    if (choiceSavePendingRef.current || advancingDialogueRef.current) return;
     await closeDialogue(false);
   }, [closeDialogue]);
 
@@ -1496,7 +1532,7 @@ export function useDialogueFlow({
   // render and tap the standard cooldown message shows — no special casing.
   const handleVisitNextAnimal = useCallback(
     async (next: Animal) => {
-      if (!next || !next.isUnlocked || choiceSavePendingRef.current) return;
+      if (!next || !next.isUnlocked || choiceSavePendingRef.current || advancingDialogueRef.current || openingVisitRef.current) return;
       if (selectedAnimal && next.id === selectedAnimal.id) return;
       await closeDialogue(false);
       await handleAnimalTap(next);
@@ -1506,12 +1542,14 @@ export function useDialogueFlow({
 
   // Handle dialogue advance
   const handleNextDialogue = useCallback(async () => {
-    if (!selectedAnimal || !progress || choiceSavePendingRef.current) return;
+    if (!selectedAnimal || !progress || choiceSavePendingRef.current || advancingDialogueRef.current || openingVisitRef.current) return;
     if (hasPendingAcquaintance(selectedAnimal)) {
       await closeDialogue(false);
       await handleAnimalTap(selectedAnimal);
       return;
     }
+    advancingDialogueRef.current = true;
+    try {
     hapticSelection();
 
     // FIRST: drain any remaining pages of the current line (long lines are
@@ -1541,6 +1579,16 @@ export function useDialogueFlow({
     // If still showing pre-dialogue pages, advance through them
     // Pre-dialogue pages don't count toward session dialogue limits
     if (preDialoguePages.length > 0) {
+      const currentPage = preDialoguePages[0];
+      if (currentPage.onRead) {
+        try {
+          await currentPage.onRead();
+          currentPage.onRead = undefined;
+        } catch {
+          showGameAlert("Couldn't save the conversation", 'Your place is kept. Tap Next again to retry.');
+          return;
+        }
+      }
       resetPageQueue();
       // The echoed pick belongs to the reply page only.
       setChoiceEcho(null);
@@ -1552,7 +1600,7 @@ export function useDialogueFlow({
         await closeDialogue(true);
         return;
       }
-      setPreDialoguePages(prev => prev.slice(1));
+      setPreDialoguePages(preDialoguePages.slice(1));
       // The next page is now the visible one — commit its bookkeeping here
       // (see PreDialoguePage): never at build time, never on advancing PAST it.
       await commitPage(nextHead);
@@ -1756,6 +1804,9 @@ export function useDialogueFlow({
         }
       }
       closeDialogue(true);
+    }
+    } finally {
+      advancingDialogueRef.current = false;
     }
   }, [selectedAnimal, progress, closeDialogue, setAnimals, preDialoguePages, onFoxPlayPrompt, tendingCaughtUp, phase2Cursors, activeChoice, choiceOpen, pageCursor, pageSource, resetPageQueue, getFullDialogueText, getPhase5Pool, getSessionBonus, getUnlockedTypes, selectPhase5, hasPendingAcquaintance, handleAnimalTap]);
 

@@ -16,6 +16,7 @@ import {
   AnimalType,
   getAnimalPhase,
   LATE_PHASE_RECRUITS,
+  PendingCeremony,
 } from '../types/homeWorld';
 import {
   MIN_PUZZLES_FOR_PHASE,
@@ -1110,36 +1111,152 @@ async function logPhaseReached(phase: DialoguePhase, puzzlesSolved: number): Pro
   }
 }
 
+function ceremonyId(cycle: number, kind: PendingCeremony['kind'], phase: DialoguePhase): string {
+  return `${cycle}:${kind}:${phase}`;
+}
+
+function readCeremonies(progress: HomeWorldProgress): PendingCeremony[] {
+  const entries = progress.pendingCeremonies ?? [];
+  if (!Array.isArray(entries) || entries.some(entry =>
+    !entry || !['phase', 'house', 'arrival', 'post_arrival', 'new_cycle'].includes(entry.kind) ||
+    !Number.isInteger(entry.phase) || entry.phase < 0 || entry.phase > 5 ||
+    !Number.isInteger(entry.cycle) || entry.cycle < 0 ||
+    entry.id !== ceremonyId(entry.cycle, entry.kind, entry.phase) ||
+    (entry.previousPhase !== undefined &&
+      (!Number.isInteger(entry.previousPhase) || entry.previousPhase < 0 || entry.previousPhase > 5))
+  )) {
+    throw new Error('The saved story ceremony needs recovery before continuing.');
+  }
+  return entries;
+}
+
+/** Participates in the caller's progress save; never opens a nested transaction. */
+function enqueueCeremony(
+  progress: HomeWorldProgress,
+  kind: PendingCeremony['kind'],
+  phase: DialoguePhase,
+  previousPhase?: DialoguePhase,
+): PendingCeremony {
+  const cycle = progress.cycleCount ?? 0;
+  const id = ceremonyId(cycle, kind, phase);
+  const entries = readCeremonies(progress);
+  const existing = entries.find(entry => entry.id === id);
+  if (existing) return existing;
+  const entry: PendingCeremony = {
+    id, kind, phase, cycle,
+    ...(previousPhase === undefined ? {} : { previousPhase }),
+  };
+  progress.pendingCeremonies = [...entries, entry];
+  return entry;
+}
+
+/**
+ * Ceremony operations must never replace an unreadable save with the forgiving
+ * loadProgress fallback, or trust a cache from before journal/cloud recovery.
+ */
+async function loadFreshCeremonyProgress(): Promise<HomeWorldProgress> {
+  invalidateProgressCache();
+  const raw = await AsyncStorage.getItem(PROGRESS_STORAGE_KEY);
+  const progress: HomeWorldProgress = raw === null ? getDefaultProgress() : JSON.parse(raw);
+  if (!progress || typeof progress !== 'object' ||
+      !Number.isInteger(progress.currentPhase) || progress.currentPhase < 0 || progress.currentPhase > 5 ||
+      !Array.isArray(progress.unlockedAnimals) || !Array.isArray(progress.unlockedRooms)) {
+    throw new Error('Your saved story progress could not be read. Please retry.');
+  }
+  readCeremonies(progress);
+  progressCache = progress;
+  return progress;
+}
+
+/** Ordered, durable ceremonies owed to this save. Legacy completed phases stay completed. */
+export async function getPendingCeremonies(): Promise<PendingCeremony[]> {
+  try {
+    return await runStorageTransaction('ceremony_read', async () =>
+      readCeremonies(await loadFreshCeremonyProgress()).map(entry => ({ ...entry })));
+  } finally {
+    invalidateProgressCache();
+  }
+}
+
+/** Call only after the final page; a stale callback cannot dismiss a different scene. */
+export async function acknowledgeCeremony(id: string): Promise<void> {
+  try {
+    await runStorageTransaction('ceremony_complete', async () => {
+      const progress = await loadFreshCeremonyProgress();
+      const entries = readCeremonies(progress);
+      const completed = entries.find(entry => entry.id === id);
+      if (!completed) return;
+      progress.pendingCeremonies = entries.filter(entry => entry.id !== id);
+      if (completed.kind === 'house') progress.houseCompletionCelebrated = true;
+      if (completed.kind === 'new_cycle') progress.cycleOpeningSeen = completed.cycle;
+      await saveProgress();
+    });
+  } finally {
+    invalidateProgressCache();
+  }
+}
+
+/** Queue the built house's still-unseen ceremony without spending it at detection. */
+export async function queueHouseCeremony(): Promise<PendingCeremony | null> {
+  try {
+    return await runStorageTransaction('ceremony_house', async () => {
+      const progress = await loadFreshCeremonyProgress();
+      if (!progress.houseCompleted || progress.houseCompletionCelebrated) return null;
+      const existing = readCeremonies(progress).find(entry =>
+        entry.kind === 'house' && entry.cycle === (progress.cycleCount ?? 0));
+      if (existing) return { ...existing };
+      const entry = enqueueCeremony(progress, 'house', progress.currentPhase);
+      await saveProgress();
+      return { ...entry };
+    });
+  } finally {
+    invalidateProgressCache();
+  }
+}
+
 /**
  * Confirm a pending phase transition (called from the pit screen).
- * Bumps currentPhase to the pending value and clears the pending flag.
- * Returns the new phase and previous phase, or null if no pending transition.
+ * Commit the new world state and its owed ceremony together. Replaying a
+ * committed save returns the same transition while that ceremony is pending.
  */
 export async function confirmPhaseTransition(): Promise<{
   newPhase: DialoguePhase;
   previousPhase: DialoguePhase;
 } | null> {
-  const progress = await loadProgress();
-  const pending = progress.pendingPhaseTransition;
-
-  if (pending == null) return null;
-
-  const previousPhase = progress.currentPhase;
-  progress.currentPhase = pending;
-  progress.pendingPhaseTransition = null;
-  progress.phaseProgressFraction = 0; // Reset for next phase
-
-  progressCache = progress;
-  await saveProgress();
-
-  // Reset pit nudge so the next pending transition can show a new one
-  await AsyncStorage.removeItem(PIT_NUDGE_SEEN_KEY).catch(() => {});
-
-  // Funnel telemetry: how deep (puzzles) and how old (days) players are when
-  // each phase actually lands.
-  await logPhaseReached(pending, progress.puzzlesSolved);
-
-  return { newPhase: pending, previousPhase };
+  let reached: { phase: DialoguePhase; puzzlesSolved: number } | null = null;
+  try {
+    const result = await runStorageTransaction('phase_transition', async () => {
+      const progress = await loadFreshCeremonyProgress();
+      const pending = progress.pendingPhaseTransition;
+      if (pending == null) {
+        const replay = readCeremonies(progress).find(entry => entry.kind === 'phase' &&
+          entry.cycle === (progress.cycleCount ?? 0) && entry.phase === progress.currentPhase);
+        return replay && replay.previousPhase !== undefined
+          ? { newPhase: replay.phase, previousPhase: replay.previousPhase }
+          : null;
+      }
+      if (!Number.isInteger(pending) || pending <= progress.currentPhase || pending > 4) {
+        throw new Error('The next story phase could not be confirmed. Please retry.');
+      }
+      const previousPhase = progress.currentPhase;
+      progress.currentPhase = pending;
+      progress.pendingPhaseTransition = null;
+      progress.phaseProgressFraction = 0;
+      enqueueCeremony(progress, 'phase', pending, previousPhase);
+      await saveProgress();
+      await AsyncStorage.removeItem(PIT_NUDGE_SEEN_KEY);
+      reached = { phase: pending, puzzlesSolved: progress.puzzlesSolved };
+      return { newPhase: pending, previousPhase };
+    });
+    // Telemetry follows the commit and never repeats for a recovered scene.
+    if (reached) {
+      const boundary = reached as { phase: DialoguePhase; puzzlesSolved: number };
+      await logPhaseReached(boundary.phase, boundary.puzzlesSolved);
+    }
+    return result;
+  } finally {
+    invalidateProgressCache();
+  }
 }
 
 /**
@@ -1758,6 +1875,7 @@ export async function isHouseCompleted(): Promise<boolean> {
  */
 export async function markFinalPuzzleCompleted(): Promise<void> {
   const progress = await loadProgress();
+  if (progress.finalPuzzleCompleted !== true) enqueueCeremony(progress, 'arrival', progress.currentPhase);
   progress.finalPuzzleCompleted = true;
   progress.finaleArmed = false;
   progressCache = progress;
@@ -1807,6 +1925,7 @@ export async function isFinaleArmed(): Promise<boolean> {
  */
 export async function markPostRevelation(): Promise<void> {
   const progress = await loadProgress();
+  if (progress.postRevelation !== true) enqueueCeremony(progress, 'post_arrival', 5);
   progress.postRevelation = true;
   // Phase 5 is read directly from currentPhase by the home/dialogue path
   // (useDialogueFlow, HomeScreen, homeWorldData) — pin it here.
@@ -1913,6 +2032,10 @@ export async function startNewCycle(): Promise<number> {
   progress.phaseProgressFraction = 0;
   progress.pendingPhaseTransition = null;
   progress.phasePuzzleThresholds = [...PHASE_THRESHOLDS];
+  // A new descent owns its own opening. Its reset and ceremony share the
+  // caller's new-cycle transaction, so a restart cannot swallow the opening.
+  progress.pendingCeremonies = [];
+  enqueueCeremony(progress, 'new_cycle', 0);
   progress.phase4Dwell = 0;
   // Clear the endgame pins so the finale + post-revelation can fire again.
   progress.postRevelation = false;

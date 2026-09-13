@@ -392,7 +392,7 @@ describe('finale orchestration wiring', () => {
 
   test('the Arrival is personalized from the ritual memory with a generic fallback', () => {
     expect(APP_TSX).toMatch(/buildFinalPuzzleEvent\(await getRitualWords\(\), await getArrivalContext\(\)\)/);
-    expect(APP_TSX).toMatch(/queueEndgameCinematic\(arrivalEvent\)/);
+    expect(APP_TSX).toMatch(/queueEndgameCinematic\(\)/);
   });
 });
 
@@ -544,19 +544,17 @@ describe('finale staging (armed, not retroactive)', () => {
     // Firing path: only the marked final board's win completes the finale.
     expect(VICTORY_STORAGE).toMatch(/if \(input.finalBoard\) \{[\s\S]{0,900}?await recordStoryBoundary\([\s\S]{0,900}?await markFinalPuzzleCompleted\(\)/);
     expect(APP_TSX).toContain("endgame?.kind === 'arrival'");
-    // The finale event is queued via queueEndgameCinematic, which both schedules
-    // the 1.5s beat AND records the event so a victory exit in the window can
-    // rescue it instead of clearVictoryTimeouts dropping the climax forever.
-    expect(APP_TSX).toMatch(/queueEndgameCinematic\(arrivalEvent\)/);
-    expect(APP_TSX).toMatch(/pendingEndgameEventRef\.current = event;[\s\S]{0,200}?setPhaseTransitionEvent\(event\)/);
+    // Victory persistence queues delivery with completion. App only schedules
+    // presentation, so its timer can be rescued or restarted from disk.
+    expect(APP_TSX).toMatch(/queueEndgameCinematic\(\)/);
+    expect(APP_TSX).toMatch(/pendingEndgameEventRef\.current = true;[\s\S]{0,200}?showPendingCeremony\(\)/);
   });
 
   test('a victory exit rescues a queued endgame cinematic instead of dropping it', () => {
-    // startVictoryExitFlow must play any pending endgame event BEFORE
-    // clearVictoryTimeouts drops its timer (the completion flag already
-    // persisted, so it would never re-queue).
+    // An immediate exit requests the durable scene before clearing the
+    // presentation timer. The controller retains delivery until completion.
     expect(APP_TSX).toMatch(
-      /const pendingEndgame = pendingEndgameEventRef\.current;[\s\S]{0,200}?setPhaseTransitionEvent\(pendingEndgame\);[\s\S]{0,120}?clearVictoryTimeouts\(\)/
+      /const pendingEndgame = pendingEndgameEventRef\.current;[\s\S]{0,200}?showPendingCeremony\(\);[\s\S]{0,120}?clearVictoryTimeouts\(\)/
     );
   });
 
@@ -906,22 +904,33 @@ describe('the victory receipt names the difficulty the board was PAID at', () =>
   });
 });
 
-describe('the instant 2x claim cannot be double-tapped', () => {
-  test('a synchronous in-flight latch guards the awaited credit', () => {
-    const handler = sliceBetween('const handleRewardedDouble = useCallback', 'const handleSpeedRescue');
-    expect(handler).toContain('|| rewardedDoubleInFlightRef.current) return;');
-    expect(handler.indexOf('rewardedDoubleInFlightRef.current = true;')).toBeLessThan(
-      handler.indexOf('await awardBonusAmber')
-    );
-    // Released only on failure — the latch covers the render gap on success.
-    expect(handler.match(/rewardedDoubleInFlightRef\.current = false;/g) || []).toHaveLength(1);
+describe('victory double rewards retain ownership through navigation and retry', () => {
+  test('the modal delegates claim and claimed state to the durable victory hook', () => {
+    expect(APP_TSX).toContain('useVictoryDouble(victoryFlow.victoryData, persistenceActions.setAmberBalance)');
+    expect(APP_TSX).toContain('claim: handleRewardedDouble,');
+    expect(APP_TSX).toContain('claimed: victoryDoubleClaimed,');
+    expect(APP_TSX).toContain('onRewardedDouble={handleRewardedDouble}');
+    expect(APP_TSX).toContain('rewardedDoubleClaimed={victoryDoubleClaimed}');
+    expect(APP_TSX).not.toContain('rewardedDoubleInFlightRef');
   });
 
-  test('the latch is released wherever the claim flag is reset (or the 2x dies for the session)', () => {
-    const resets = APP_TSX.match(/setVictoryDoubleClaimed\(false\);/g) || [];
-    const releases = APP_TSX.match(/rewardedDoubleInFlightRef\.current = false;/g) || [];
-    // One release per reset, plus the one inside the failure path.
-    expect(releases.length).toBe(resets.length + 1);
+  test.each([
+    ['const handleNextLevel = useCallback', 'const handleOnboardingVictoryContinue'],
+    ['const handleReturnHome = useCallback', 'const handleGoToPit'],
+    ['const handleGoToPit = useCallback', '// Android hardware back button'],
+  ])('the %s exit waits for a bonus before story preparation or navigation', (start, end) => {
+    const handler = sliceBetween(start, end);
+    const wait = handler.indexOf('await awaitVictoryDouble();');
+    expect(wait).toBeGreaterThan(handler.indexOf('storyExitPreparing.current = true;'));
+    expect(wait).toBeLessThan(handler.indexOf('await prepareStory()'));
+    expect(wait).toBeLessThan(handler.indexOf('startVictoryExitFlow('));
+  });
+
+  test('a rebuilt session and each new victory retire the old bonus UI', () => {
+    const rebuild = sliceBetween('const rebuildSessionFromStorage = useCallback', 'const showNewCycleCeremony');
+    expect(rebuild).toContain('resetVictoryDouble();');
+    const freshVictory = APP_TSX.slice(APP_TSX.indexOf('const rewardDifficulty: Difficulty ='), APP_TSX.indexOf('// Rewarded-double cadence gate:'));
+    expect(freshVictory).toContain('resetVictoryDouble();');
   });
 });
 
@@ -941,3 +950,4 @@ describe('a daily solve belongs to the board it was played on', () => {
     expect(APP_TSX).not.toContain('dailyDate: isPlayingDaily ? getLocalDateString() : undefined');
   });
 });
+

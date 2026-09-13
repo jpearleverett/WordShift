@@ -1,4 +1,5 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage, { runStorageTransaction } from './persistenceStorage';
+import { getFullProgress, invalidateProgressCache, spendAmber } from './amberCurrency';
 import {
   TENDING_BASE,
   TENDING_GROWTH,
@@ -22,9 +23,8 @@ import { getLocalDateString } from './dateUtils';
  *
  * Hard rules honored: never pay-to-skip-narrative (there is no narrative left to
  * skip — only deepening), expression-not-power, stays serene, never reveals the
- * phase system. The service does NOT spend amber — the caller calls
- * `amberCurrency.spendAmber(cost, 'tending')` first, then `applyTend` records the
- * deepening (mirrors the `sacrifice.ts` / `roomUpgrades.ts` convention).
+ * phase system. Purchases commit their amber cost and deepening together via
+ * `commitTendPurchase`; a failed save can never leave only the charge behind.
  */
 
 const STORAGE_KEY = 'wordshift_tending';
@@ -294,6 +294,58 @@ export async function loadTendingState(): Promise<TendingState> {
   return tendingCache;
 }
 
+/** Fresh, strict purchase read: a damaged or unreadable save is not a new shrine. */
+async function readTendingForPurchase(): Promise<TendingState> {
+  const raw = await AsyncStorage.getItem(STORAGE_KEY);
+  if (!raw) return getDefaultState();
+  const state = JSON.parse(raw) as TendingState;
+  if (!state || !Number.isSafeInteger(state.level) || state.level < 0 ||
+      !Number.isSafeInteger(state.totalAmberTended) || state.totalAmberTended < 0 ||
+      (state.lastTendDate != null && typeof state.lastTendDate !== 'string') ||
+      (state.milestonesSeen != null && (!Array.isArray(state.milestonesSeen) || !state.milestonesSeen.every(Number.isSafeInteger))) ||
+      (state.caughtUp != null && (typeof state.caughtUp !== 'object' || Array.isArray(state.caughtUp)))) {
+    throw new Error('Your shrine save could not be read');
+  }
+  return { ...state, lastTendDate: state.lastTendDate ?? null, milestonesSeen: state.milestonesSeen ?? [], caughtUp: state.caughtUp ?? {} };
+}
+
+export type TendPurchaseResult =
+  | { success: false; newBalance: number; error: 'unavailable' | 'changed' | 'insufficient' }
+  | { success: true; newBalance: number; level: number; milestone: number | null; totalAmberTended: number; amountSpent: number; recovered: boolean };
+
+/** The requested next level is also the receipt: retrying it cannot buy another. */
+export async function commitTendPurchase(expectedNextLevel: number, expectedCost: number): Promise<TendPurchaseResult> {
+  try {
+    return await runStorageTransaction('tending_purchase', async () => {
+      invalidateProgressCache();
+      invalidateTendingCache();
+      const progress = await getFullProgress();
+      if (!isTendingAvailable(progress.currentPhase)) return { success: false, newBalance: progress.amber, error: 'unavailable' };
+      if (!Number.isSafeInteger(expectedNextLevel) || expectedNextLevel <= 0 || !Number.isSafeInteger(expectedCost) || expectedCost <= 0) {
+        return { success: false, newBalance: progress.amber, error: 'changed' };
+      }
+      const state = await readTendingForPurchase();
+      if (state.level >= expectedNextLevel) {
+        return { success: true, newBalance: progress.amber, level: state.level,
+          milestone: state.level === expectedNextLevel ? getTendingMilestoneAt(state.level) : null,
+          totalAmberTended: state.totalAmberTended, amountSpent: 0, recovered: true };
+      }
+      const next = getNextTendingInfo(state);
+      if (next.nextLevel !== expectedNextLevel || next.cost !== expectedCost) {
+        return { success: false, newBalance: progress.amber, error: 'changed' };
+      }
+      const spent = await spendAmber(next.cost, 'tending');
+      if (!spent.success) return { success: false, newBalance: spent.newBalance, error: 'insufficient' };
+      tendingCache = state;
+      const result = await applyTend(next.cost);
+      return { ...result, success: true, newBalance: spent.newBalance, amountSpent: next.cost, recovered: false };
+    });
+  } finally {
+    invalidateProgressCache();
+    invalidateTendingCache();
+  }
+}
+
 /**
  * Record a deepening. The caller MUST have already spent `amountSpent` via
  * `amberCurrency.spendAmber(cost, 'tending')`. Advances the level, records the
@@ -303,7 +355,8 @@ export async function applyTend(
   amountSpent: number,
   today: string = getLocalDateString()
 ): Promise<{ level: number; milestone: number | null; totalAmberTended: number }> {
-  const state = await loadTendingState();
+  const previous = await loadTendingState();
+  const state = { ...previous, milestonesSeen: [...previous.milestonesSeen], caughtUp: { ...previous.caughtUp } };
   state.level += 1;
   state.totalAmberTended += amountSpent;
   state.lastTendDate = today;
@@ -337,9 +390,14 @@ export async function getPhase5CaughtUp(animalType: string): Promise<number> {
 
 /** Persist an animal's updated "caught up" pointer after delivering a new line. */
 export async function setPhase5CaughtUp(animalType: string, value: number): Promise<void> {
-  const state = await loadTendingState();
-  state.caughtUp[animalType] = value;
-  await saveTendingState(state);
+  if (!Number.isSafeInteger(value) || value < 0) return;
+  try {
+    await runStorageTransaction('tending_dialogue', async () => {
+      const state = await readTendingForPurchase();
+      state.caughtUp[animalType] = Math.max(state.caughtUp[animalType] ?? 0, value);
+      await saveTendingState(state);
+    });
+  } finally { invalidateTendingCache(); }
 }
 
 export async function clearTendingState(): Promise<void> {
@@ -354,8 +412,6 @@ export async function clearTendingState(): Promise<void> {
 // ============================================================================
 
 async function saveTendingState(state: TendingState): Promise<void> {
+  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   tendingCache = state;
-  try {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch {}
 }

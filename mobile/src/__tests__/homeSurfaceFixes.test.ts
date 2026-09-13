@@ -18,6 +18,9 @@ const ROOM_VIEW = read('components/home/RoomView.tsx');
 const HOME = read('components/home/HomeScreen.tsx');
 const UNLOCK_FLOW = read('hooks/useUnlockFlow.ts');
 const SETTINGS = read('components/SettingsScreen.tsx');
+const APP = fs.readFileSync(path.resolve(__dirname, '../../App.tsx'), 'utf8');
+const CEREMONY_PLAYBACK = read('services/ceremonyPlayback.ts');
+const AMBER = read('services/amberCurrency.ts');
 
 describe('CelebrationConfetti no longer restarts itself every render', () => {
   // HomeScreen hands it an inline arrow, so listing onComplete in the deps made
@@ -107,21 +110,30 @@ describe('the in-world locked room card tells the truth about a reserved or gate
 });
 
 describe('the house-completion cinematic survives an interrupted delivery', () => {
-  // houseCompleted is WORLD STATE (the endgame chain reads it) so it is still
-  // written at detection; houseCompletionCelebrated is DELIVERY and is written
-  // only when the cutscene actually plays. One flag, written at detection with
-  // delivery in the state of a screen that unmounts on every navigation, lost
-  // the payoff of the 4,615-amber house arc forever if the player tapped PLAY.
+  // World completion and scene completion are separate: interruption must
+  // retain a durable scene, and only finishing that scene consumes it.
   test('the beat re-arms from persisted state, outside the completion guard', () => {
     expect(HOME).toContain('if (houseIsWhole && !progressData.houseCompletionCelebrated)');
   });
 
-  test('the celebrated flag is written on delivery, immediately before the cinematic', () => {
-    const effect = HOME.slice(HOME.indexOf('setPendingHouseCompletion(false);'));
-    const markAt = effect.indexOf('markHouseCompletionCelebrated()');
-    const fireAt = effect.indexOf('onHouseCompleted()');
-    expect(markAt).toBeGreaterThan(-1);
-    expect(fireAt).toBeGreaterThan(markAt);
+  test('Home requests the ceremony without marking an unseen scene celebrated', () => {
+    const effect = HOME.slice(HOME.indexOf('if (!pendingHouseCompletion) return;'), HOME.indexOf('const claimableQuestAmber'));
+    expect(effect).toContain('onHouseCompleted();');
+    expect(effect).not.toContain('markHouseCompletionCelebrated()');
+    expect(APP).toContain('onHouseCompleted={showHouseCeremony}');
+    const request = APP.slice(APP.indexOf('const showHouseCeremony = useCallback'), APP.indexOf('const launchColdOpenPuzzle'));
+    expect(request).toContain('await saveWithPlayerRetry(queueHouseCeremony,');
+    expect(request.indexOf('await ceremonyPlayback.refresh();')).toBeGreaterThan(request.indexOf('await saveWithPlayerRetry(queueHouseCeremony,'));
+  });
+
+  test('the overlay completion acknowledges the owned record before marking the house celebrated', () => {
+    expect(APP).toContain('await ceremonyPlayback.complete(phaseTransitionEvent)');
+    const complete = CEREMONY_PLAYBACK.slice(CEREMONY_PLAYBACK.indexOf('function complete('), CEREMONY_PLAYBACK.indexOf('function reset('));
+    expect(complete).toContain('active?.event !== expectedEvent');
+    expect(complete).toContain('await acknowledge(finished.record.id)');
+    const acknowledge = AMBER.slice(AMBER.indexOf('export async function acknowledgeCeremony'), AMBER.indexOf('export async function queueHouseCeremony'));
+    expect(acknowledge).toContain('const completed = entries.find(entry => entry.id === id);');
+    expect(acknowledge).toContain("if (completed.kind === 'house') progress.houseCompletionCelebrated = true;");
   });
 });
 
@@ -184,3 +196,4 @@ describe('SettingsScreen: the destructive control and the deliberate restores', 
     expect(reset).not.toContain('removeItem(LOCAL_RESET_MARKER_KEY)');
   });
 });
+

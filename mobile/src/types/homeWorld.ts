@@ -302,6 +302,16 @@ export interface Unlockable {
   minPuzzles?: number; // Minimum puzzles completed before this unlock becomes available
 }
 
+/** A story ceremony remains owed until its last page is acknowledged. */
+export interface PendingCeremony {
+  id: string;
+  kind: 'phase' | 'house' | 'arrival' | 'post_arrival' | 'new_cycle';
+  phase: DialoguePhase;
+  cycle: number;
+  /** Kept for an interrupted pit confirmation to return the same result. */
+  previousPhase?: DialoguePhase;
+}
+
 /**
  * Player's home world progress
  */
@@ -351,6 +361,9 @@ export interface HomeWorldProgress {
    * Split, the beat stays armed until it has actually played.
    */
   houseCompletionCelebrated?: boolean;
+  // Embedded in the same save as each boundary: restarting, cloud restore,
+  // or an interrupted write cannot advance the story and lose its ceremony.
+  pendingCeremonies?: PendingCeremony[];
   // Whether the final puzzle has been completed
   finalPuzzleCompleted?: boolean;
   // Whether post-revelation (Phase 5) content has been reached
