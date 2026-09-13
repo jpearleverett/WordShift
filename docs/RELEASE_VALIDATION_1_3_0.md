@@ -1,6 +1,8 @@
 # WordShift 1.3.0 release validation
 
-This is the current release procedure. Earlier launch screenshots, device passes, and completion claims are historical evidence. The September work is tracked in [the implementation ledger](IMPLEMENTATION_STATUS_2026-09-05.md).
+> **Historical snapshot — status clarified September 13, 2026.** This document retains the findings, commands, counts and evidence from its original review. “Current”, “shipped” and completion claims below apply to that recorded snapshot. For the latest code, release procedure and remaining acceptance checks, use [Current build](CURRENT_BUILD.md).
+
+This was the release procedure prepared for version 1.3.0; do not use its version numbers or commands for the current release. Earlier launch screenshots, device passes, and completion claims are historical evidence. The September work is tracked in [the implementation ledger](IMPLEMENTATION_STATUS_2026-09-05.md).
 
 The code prepares Android version code **94**, iOS build **3**, and version **1.3.0**. `expo-crypto` is a new native dependency and the engine is now Expo SDK 57 / React Native 0.86.3: install a new signed binary. This change cannot be delivered to 1.2.7 as an OTA update. The resolved runtime is now `1.3.0-internal-testing` or `1.3.0-production`, chosen in `app.config.js`. Expo requires native compatibility between a binary and an update. [Expo runtime documentation](https://docs.expo.dev/eas-update/runtime-versions/)
 

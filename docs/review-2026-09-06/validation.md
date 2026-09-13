@@ -1,5 +1,7 @@
 # September 6 completion validation
 
+> **Historical snapshot — status clarified September 13, 2026.** This document retains the findings, commands, counts and evidence from its original review. “Current”, “shipped” and completion claims below apply to that recorded snapshot. For the latest code, release procedure and remaining acceptance checks, use [Current build](../CURRENT_BUILD.md).
+
 This record covers the follow-up to `1818609` on
 `feature/game-improvements-vocabulary-audit`. The source prepares WordShift
 1.3.0 / Android 94 / iOS 3. This is implementation and local validation evidence;

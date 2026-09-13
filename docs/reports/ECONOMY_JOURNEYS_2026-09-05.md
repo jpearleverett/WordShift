@@ -1,5 +1,7 @@
 # Economy journey model — 2026-09-05
 
+> **Historical snapshot — status clarified September 13, 2026.** This document retains the findings, commands, counts and evidence from its original review. “Current”, “shipped” and completion claims below apply to that recorded snapshot. For the latest code, release procedure and remaining acceptance checks, use [Current build](../CURRENT_BUILD.md).
+
 Generated from production services by `economyJourneySimulation.test.ts`; regenerate with `node scripts/tools/runEconomySimulation.mjs` from mobile/. Values describe a deterministic model, not observed players or retention.
 
 Each cohort starts on September 5, 2026 and completes 240 boards. All request one hint every five wins; a missing hint is modeled as eventual completion with undo and two invalid attempts. The three-star rate stays at 80% so paid convenience cannot masquerade as a skill change. Starter and milestone hints use production grants. Surprise rewards are disabled; no resonance or optional House Ask is assumed. All paths choose the CLOSED finale when armed and accept pending phase transitions at the next pit visit.

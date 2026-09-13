@@ -1,5 +1,12 @@
 # WordShift: English Google Play launch copy
 
+The listing text was authored September 7, 2026; its feature claims were
+reviewed against `main` at `6f96ebb` on September 13. The accompanying artwork
+remains the September 7 snapshot. Compare its choice screens and room details
+with the latest signed Android build before upload; this review did not
+recapture images, rebuild the ZIP or publish a listing. See
+[current build status](https://github.com/jpearleverett/WordShift/blob/main/docs/CURRENT_BUILD.md).
+
 Use this pack in place of the previous English listing campaign. The recommended presentation starts with a move the viewer can understand, connects puzzle rewards to the house, then introduces the cast and the slowly unsettling story. It keeps the mystery visible without revealing its answers.
 
 ## Paste-ready listing
@@ -39,7 +46,14 @@ The listing contains no ranking claims, invented awards, testimonials, store bad
 
 ## After the listing has traffic
 
-The recommended copy is ready to use now. The alternatives are useful for a later controlled test: keep the images and other text fixed, change the short description, and compare results only when there is enough traffic for a meaningful result. The mechanic-first alternative tests clarity; the story-first alternative tests whether the unusual tone attracts players who stay. Evaluate retention alongside installs so the campaign does not attract players expecting a permanently gentle decorating game.
+After the release and artwork checks above, the recommended copy remains the
+launch candidate. The alternatives are useful for a later controlled test:
+keep the images and other text fixed, change the short description, and compare
+results only when there is enough traffic for a meaningful result. The
+mechanic-first alternative tests clarity; the story-first alternative tests
+whether the unusual tone attracts players who stay. Evaluate retention
+alongside installs so the campaign does not attract players expecting a
+permanently gentle decorating game.
 
 Store presentation can improve clarity and appeal; it cannot promise editorial selection. A short preview video is a useful separate follow-up because Google uses video in some game discovery formats. It should show the real letter move immediately and use the house as the emotional payoff. [Google's preview-video guidance](https://support.google.com/googleplay/android-developer/answer/9866151)
 
@@ -47,4 +61,7 @@ Store presentation can improve clarity and appeal; it cannot promise editorial s
 
 The text was written for the current English-language game on September 7, 2026. The named characters, puzzle variants, progression, cosmetics, and story journal were checked against the source files listed in [claims-and-sources.md](claims-and-sources.md). Screenshots should use actual game captures. Promotional illustration belongs in the feature graphic and supporting composition; it must not invent a different playable interface.
 
-This pack changes no Play Console fields by itself. The text files contain only the content for their named fields. Upload the final artwork in numeric order, paste these fields into the English main listing, and use the final asset descriptions with their matching images.
+This pack changes no Play Console fields by itself. The text files contain only
+the content for their named fields. After verifying the current-build match,
+upload the final artwork in numeric order, paste these fields into the English
+main listing, and use the final asset descriptions with their matching images.

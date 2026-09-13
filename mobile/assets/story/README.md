@@ -1,16 +1,28 @@
 # Story illustrations
 
+Reviewed September 13, 2026 against `main` at `6f96ebb`.
+
 Production views use the generated WebP derivatives in `optimized/`. Rebuild with
 `node scripts/tools/optimizeStoryAssets.mjs` from `mobile/`. The 1290px heroes and
 780px headers preserve the source composition; the PNGs below remain unchanged
-source masters. The eight derivatives total 1.21 MB versus 8.56 MB of PNGs.
+source masters. The optimizer writes eight derivatives. Runtime imports are
+centralized in `src/components/storyArt.ts` and currently reference seven of
+them: four hero images and three headers; the night-road header remains a
+prepared derivative. The script reports exact source/output bytes when rebuilt,
+so use its output rather than treating an old rounded size as a current measure.
+
+Both this directory and its committed `optimized/` delivery assets remain in
+the EAS build archive. Do not exclude `assets/story/` wholesale while reducing
+build uploads: the app needs the imported WebP files. Regeneration is a manual
+asset-maintenance command, not a normal EAS lifecycle hook. See the
+[build and upload guide](../../../docs/BUILD_AND_UPLOAD.md).
 
 Generated with the built-in image generation tool for WordShift, September 2026. Selected outputs were visually inspected and copied into the repository. These illustrations extend the existing cottage pixel art and represent ordinary hospitality, protected privacy, and freedom to leave. They are loaded locally; no image service runs in the app.
 
-- `kept-table.png`: journal and shared-scene header.
-- `private-room.png`: CLOSED boundary and its aftermath.
-- `outward-road-night.png`: CLOSER during the midnight arrival.
-- `outward-road.png`: the same road at dawn in the aftermath.
+- `kept-table.png`: journal/shared-scene headers and ordinary phase-transition passages.
+- `private-room.png`: CLOSED boundary/aftermath and ordinary phase-transition passages.
+- `outward-road-night.png`: CLOSER during the midnight arrival and night-set transition passages.
+- `outward-road.png`: the same road at dawn in the aftermath and New Cycle.
 
 ## Final prompts
 

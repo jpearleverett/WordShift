@@ -17,16 +17,16 @@ Monetization is convenience/expression only, never progression: a cosmetic shop 
 
 ## Tech
 
-React Native + Expo SDK 57 (React Native 0.86), TypeScript (strict), Jest and rendered Playwright journeys (current results are in the implementation ledger). Local-first: the core puzzles play fully offline with all state in AsyncStorage, and there are no user accounts. Backend features (cloud save, daily leaderboard, anonymous analytics via **Supabase**; crash reporting via **Sentry**) and monetization (in-app purchases via **RevenueCat**, ads via **AdMob**) activate when their keys are present in `app.json` → `extra` and degrade to no-ops otherwise — so Expo Go still runs everything. Supabase/Sentry and the Android monetization keys are currently configured; the iOS monetization keys are still empty (iOS falls back to the no-op providers). See [CLAUDE.md](./CLAUDE.md) for the full architecture reference — it's the canonical codebase doc.
+React Native + Expo SDK 57 (React Native 0.86), TypeScript (strict), Jest and rendered Playwright journeys (commit-specific results are in [Current build](docs/CURRENT_BUILD.md)). Local-first: the core puzzles play fully offline with all state in AsyncStorage, and there are no user accounts. Backend features (cloud save, daily leaderboard, anonymous analytics via **Supabase**; crash reporting via **Sentry**) and monetization (in-app purchases via **RevenueCat**, ads via **AdMob**) activate when their keys are present in `app.json` → `extra` and fall back when unavailable. Expo Go and web are development previews; native purchases, ads and release behavior require a signed native build. Supabase/Sentry and the Android monetization keys are currently configured; the iOS monetization keys are still empty (iOS falls back to the no-op providers). See [CLAUDE.md](./CLAUDE.md) for the full architecture reference — it's the canonical codebase doc.
 
-Current engineering status: [September implementation ledger](docs/IMPLEMENTATION_STATUS_2026-09-05.md). Account/device handoff: [completion record](docs/COMPLETION_HANDOFF_2026-09-06.md). The 1.3.0 Supabase integrity endpoints still require the prepared hosted migration; configured public keys alone do not install them. Build/update procedure: [1.3.0 release validation](docs/RELEASE_VALIDATION_1_3_0.md).
+Current source: **1.3.4 / Android version code 98**, audited September 13, 2026. Start with [Current build](docs/CURRENT_BUILD.md), [build and upload guide](docs/BUILD_AND_UPLOAD.md), and [launch checklist](docs/LAUNCH_CHECKLIST.md). Version values identify the checked-in configuration; they do not prove which artifact is installed or published. Hosted Supabase migrations and real-device acceptance must be verified separately; configured public keys alone do not install database functions.
 
 ## Development
 
 ```bash
 cd mobile
 npm install              # or npm ci (fresh checkouts may lack node_modules)
-npx expo start           # dev server (scan QR with Expo Go)
+npx expo start           # development preview; native SDK testing needs a signed build
 npm run typecheck        # tsc --noEmit
 npm run lint             # ESLint 9 flat config (eslint-config-expo)
 ```
@@ -45,13 +45,14 @@ Always use `npm test` for repository checks. CI (`.github/workflows/ci.yml`) che
 
 - **Puzzle banks**: use `npm run generate:puzzles -- <standard|reverse|double> <difficulty>` from `mobile/`, with `EASY`, `MEDIUM`, `MEDIUM_PLUS`, `HARD` or `EXPERT`; prefix a difficulty with `LEX_` for Lexicon. This command dispatches to the **gated toolkit** and writes reviewable sidecars. Follow the printed targeted swap dry run before installing a reviewed sidecar, then always run `node scripts/tools/purgeProfanity.mjs` and the current vocabulary/complete-route checks. See [the regeneration instructions](CLAUDE.md#regenerating-puzzle-banks). Never run legacy generators or manually edit the banks: that can overwrite the gated shape and lose its multi-route guarantee.
 - **Art/SFX**: `npm run generate:assets` rebuilds the app icon, splash, notification icon, the 70-file WAV pack, the world/pixel art, and the UI icon sprites from pure-Node scripts in `mobile/scripts/tools/`.
-- **Builds**: `eas build` profiles live in `mobile/eas.json` (`appVersionSource: "local"` — bump `android.versionCode` manually for each release). Current account/device requirements and prepared commands are in [the completion handoff](./docs/COMPLETION_HANDOFF_2026-09-06.md).
+- **Builds**: `eas build` profiles live in `mobile/eas.json` (`appVersionSource: "local"` — bump `android.versionCode` manually for each release). Current commands, native acceptance gates and EAS archive inspection are in [the build guide](./docs/BUILD_AND_UPLOAD.md).
 
 ## Docs
 
 - [CLAUDE.md](./CLAUDE.md) — architecture, systems, conventions (read this first; contains full narrative spoilers)
-- [docs/COMPLETION_HANDOFF_2026-09-06.md](./docs/COMPLETION_HANDOFF_2026-09-06.md) — current account, physical-device and reader requirements
-- [docs/LAUNCH_CHECKLIST.md](./docs/LAUNCH_CHECKLIST.md) — historical launch checks
+- [docs/CURRENT_BUILD.md](./docs/CURRENT_BUILD.md) — current configuration, merged fixes, CI evidence and documentation map
+- [docs/BUILD_AND_UPLOAD.md](./docs/BUILD_AND_UPLOAD.md) — Android builds, source upload size and archive exclusions
+- [docs/LAUNCH_CHECKLIST.md](./docs/LAUNCH_CHECKLIST.md) — current release checks and outstanding device/account verification
 - [docs/STORE_LISTING.md](./docs/STORE_LISTING.md) — store listing copy, keywords, age rating, screenshot shot list
 - [docs/BACKEND_SETUP.md](./docs/BACKEND_SETUP.md) — Supabase / Sentry provisioning (cloud save, leaderboard, analytics, crash reporting)
 - [docs/MONETIZATION_SETUP.md](./docs/MONETIZATION_SETUP.md) — RevenueCat (IAP) + AdMob (ads) store/product setup

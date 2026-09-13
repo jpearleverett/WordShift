@@ -1,5 +1,7 @@
 # Vocabulary audit — 5 September 2026
 
+> **Historical snapshot — status clarified September 13, 2026.** This document retains the findings, commands, counts and evidence from its original review. “Current”, “shipped” and completion claims below apply to that recorded snapshot. For the latest code, release procedure and remaining acceptance checks, use [Current build](CURRENT_BUILD.md).
+
 The historical dictionary contains 22,749 entries. This revision makes newly served puzzles use a reviewed vocabulary policy and keeps the historical dictionary for compatibility with a board already in progress.
 
 ## What changed

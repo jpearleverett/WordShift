@@ -1,5 +1,11 @@
 # Ad consent and release build 1.3.1
 
+> **Historical release note:** this records the consent work for 1.3.1/build 95.
+> The configuration is now 1.3.4/Android version code 98; see
+> [current build status](../../../docs/CURRENT_BUILD.md). The checks below are
+> evidence for that earlier change, not native acceptance of every later
+> bundle. The consent rules and signed-device acceptance scenarios still apply.
+
 Android build **95**, app version **1.3.1**, carries the consent correction. Its production runtime is `1.3.1-production`, separate from the earlier binary. The native delayed-measurement setting requires a fresh signed build; an update to JavaScript alone cannot add it to build 94.
 
 The provider now requires UMP's explicit `canRequestAds === true` before initializing the advertising SDK or making requests. A consent refresh error may retain permission from a previous session only when UMP confirms that permission. Unknown, missing, or denied permission leaves ads disabled while gameplay boots normally. Native banners subscribe to the same readiness gate. Opening privacy options unmounts them and discards pending/preloaded ads; stale callbacks cannot restore those ads afterward.

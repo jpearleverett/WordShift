@@ -1,5 +1,7 @@
 # Completed puzzle-bank top-up — 6 September 2026
 
+> **Historical snapshot — status clarified September 13, 2026.** This document retains the findings, commands, counts and evidence from its original review. “Current”, “shipped” and completion claims below apply to that recorded snapshot. For the latest code, release procedure and remaining acceptance checks, use [Current build](CURRENT_BUILD.md).
+
 All **30 delivered bank families now contain at least 100 eligible boards**, after current vocabulary filtering, complete-route checks and the profanity purge. The 13 thin families were rebuilt through the supported gated sidecar toolkit. The final catalog contains **4,372 eligible boards in 7,356 stored records**.
 
 The original 5 September review qualified 3,809 boards. Restoring nine attested variants brought that to 3,843. The follow-up also found three unsafe Double Shift half-move boards, removed them through the official purge, and replenished all thin pools. Final eligible capacity is **529 higher** than the post-editorial baseline. Historical stored boards that could no longer qualify were removed from the rebuilt banks; the separate saved-board dictionary and in-progress save compatibility remain unchanged.

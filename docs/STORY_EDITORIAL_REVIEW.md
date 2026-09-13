@@ -1,5 +1,7 @@
 **WordShift: complete story and dialogue editorial review**
 
+> **Historical snapshot — status clarified September 13, 2026.** This document retains the findings, commands, counts and evidence from its original review. “Current”, “shipped” and completion claims below apply to that recorded snapshot. For the latest code, release procedure and remaining acceptance checks, use [Current build](CURRENT_BUILD.md).
+
 Reviewed against the local `main` checkout on 5 September 2026. This is an assessment and proposed revision direction; it does not change the game or establish new canon. Full spoilers follow.
 
 The implemented revision, current canon and validation are documented in [Story and visual implementation](STORY_AND_VISUAL_IMPLEMENTATION.md).

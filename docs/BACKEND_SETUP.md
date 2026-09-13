@@ -1,17 +1,21 @@
-# WordShift Backend Setup (optional, drop-in)
+# WordShift backend setup
 
-> **Current migration status (2026-09-05):** credentials and the original July
+Reviewed against main `6f96ebb` on 2026-09-13. See [current build](CURRENT_BUILD.md)
+and [release gates](LAUNCH_CHECKLIST.md). This is a configuration/runbook audit;
+no hosted migration, retention job or provider dashboard was executed here.
+
+> **Migration implementation (introduced 2026-09-05):** credentials and the original July
 > setup were previously configured. This release adds save integrity, event
 > ingestion, daily board cohorts and private support operations. Their SQL has
 > been rehearsed locally; hosted deployment is a separate release gate. The July
 > verification does not establish that these new RPCs exist in production.
 
-Everything below is **disabled by default** (until credentials are filled in, as
-they now are). The app ships and runs in Expo Go with zero network calls until you
-fill in credentials in `mobile/app.json` under `expo.extra`. The Supabase
-integrations use plain `fetch` (no native SDK), so Expo Go keeps working; crash
-reporting uses the `@sentry/react-native` SDK (see section 2), which no-ops
-when no DSN is set.
+The current `mobile/app.json` has Supabase credentials and a Sentry DSN, so these
+services are enabled when reachable; `telemetryEndpoint` is blank and analytics
+uses the Supabase RPC. Without their corresponding credentials the optional
+services no-op. Supabase uses plain `fetch`; native crash reporting is validated
+with an EAS build. The owner tests signed Android AABs installed through Play
+internal testing, where the native modules are present.
 
 > **Privacy:** ✅ done — `docs/privacy-policy.md` discloses cloud save,
 > analytics, and crash reporting, and the Play data-safety declarations were
@@ -23,7 +27,7 @@ when no DSN is set.
 |---|---|
 | `supabaseUrl` + `supabaseAnonKey` | Cloud save, daily leaderboard, aggregate social proof, and analytics (event upload) |
 | `sentryDsn` | Remote crash/error forwarding |
-| `telemetryEndpoint` | (Alternative analytics sink — a custom collector. If unset but Supabase is set, events go to the Supabase `events` table instead.) |
+| `telemetryEndpoint` | (Alternative analytics sink. If unset but Supabase is configured, stable-ID batches use `ingest_events_v2`; no direct-write fallback.) |
 
 ```jsonc
 // mobile/app.json
@@ -64,33 +68,35 @@ see [save upgrade](SAVE_INTEGRITY_UPGRADE.md) and
 cloud/analytics/ranking unavailable; the client does not fall back to unsafe
 legacy writes.
 
-Then paste `supabaseUrl` + `supabaseAnonKey` (Project Settings → API) into
-`app.json`. Cloud save, leaderboard, social proof, and analytics go live.
+For a new project, configure its public `supabaseUrl` + `supabaseAnonKey` in
+`app.json`; WordShift already has these values. Verify actual RPC responses and
+event arrival after migration. Keys in source alone do not prove service health.
 
 > **Deploy note:** run the SQL and ship the RPC-based client together. Older
 > app builds that still issue direct table reads/writes will simply degrade
 > (every call resolves null — no crash), but their cloud sync and rank display
 > stop working until the player updates.
 
-### Security model: capability URLs, no direct table access
+### Security model: capabilities and restricted table access
 
 The app has **no user auth** — the shipped anon key is public by definition, so
 the database can never trust "who" is calling, only "what they know". The
 model:
 
 - **A player's owner id is an unguessable bearer capability** — a random
-  128-bit random save capability encoded as a complete WS2 recovery code. The old short code is deprecated and its save RPCs are revoked. Presenting a
-  row's owner id is the only way to touch that row.
-- **Direct table access for `anon` is fully denied.** RLS is enabled on every
-  app table with no anon read/write policies, *and* the default table grants
-  are revoked (belt and braces — a future accidental permissive policy still
-  can't re-open access). `GET /rest/v1/saves?select=*` and friends now return
-  errors, so nobody holding the anon key can enumerate or dump rows, and
-  nobody can write another player's rows.
-- **Everything the client needs is a `SECURITY DEFINER` RPC** (owned by
-  `postgres`, `EXECUTE` granted to `anon`) that gates each operation on the
-  caller presenting the owner id, and returns only that owner's data or pure
-  aggregates:
+  128-bit save capability encoded as a complete WS2 recovery code. The old short
+  code is deprecated and its save RPCs are revoked. Client save access requires
+  that row's owner capability; private operators have separate service access.
+- **Direct save/score/support table access for `anon` is denied.** RLS and
+  revoked grants prevent enumeration or direct writes. Telemetry is the explicit
+  exception: legacy clients retain INSERT on approved event columns, with no
+  SELECT and no ability to set server-owned `received_at`. The current client
+  uses the bounded deduplicating RPC instead.
+- **The current client uses `SECURITY DEFINER` RPCs** (owned by `postgres`,
+  with explicit execution grants). Save/score operations require the owner
+  capability; event ingestion and aggregate counters are anonymous operations.
+  Private support/deletion/retention routines are operator-only. Client RPCs
+  return the caller's authorized data or aggregates:
   - `get_save_v2(p_owner)` / `upsert_save_v2(...)`
     — cloud save, one row per capability, 1 MB payload cap.
   - `submit_daily_score_v2(...)` — upserts only the caller's `(owner, date, board_version)` row,
@@ -115,11 +121,12 @@ model:
   can write junk `events` rows; analytics are best-effort and this is
   accepted. Likewise `bump_words_offered` can be spammed within its per-call
   bound — the counter is cosmetic, aggregate-only social proof.
-- Enable Supabase's API rate limits (Dashboard → Settings → API) to blunt
-  brute-force capability guessing and junk-event floods; a UUIDv4 space makes
-  enumeration infeasible regardless.
+- Monitor API usage and apply provider-supported request limits where needed
+  to reduce junk-event floods. Strong WS2 capabilities have 128 random bits;
+  that protection does not authenticate telemetry or validate a score's gameplay.
 
 ### Recovery code (cloud save is auth-free)
+
 To move progress across devices, the player uses **Settings → Backup & Restore**:
 "Show recovery code" on the original device, then "Restore from another device"
 on the new one. A new `WS2-` code contains all 32 hexadecimal characters of the
@@ -130,7 +137,7 @@ follow [the original-device upgrade and verified support procedure](SAVE_INTEGRI
 
 ## 2. Sentry (crash reporting)
 
-> ✅ Live. The app uses the real **`@sentry/react-native` SDK** (not the old
+> **Configured.** The app uses the real **`@sentry/react-native` SDK** (not the old
 > HTTP-store-API forwarder): `Sentry.init` runs at App.tsx module load when
 > `sentryDsn` is set (crash + error capture only, `tracesSampleRate: 0`), and
 > captures **native** crashes (force-closes / SIGSEGV / Java FATAL EXCEPTION)
@@ -142,21 +149,24 @@ follow [the original-device upgrade and verified support procedure](SAVE_INTEGRI
 To re-provision: create a project at sentry.io, copy its DSN into `sentryDsn`
 in `app.json`, and set the org/project slugs in the `@sentry/react-native`
 config plugin (`app.json` → `plugins`; currently `iridescent-games-9n` /
-`wordshift`). **Source maps:** production EAS builds upload them automatically
-— `SENTRY_AUTH_TOKEN` is stored as a secret EAS environment variable, and
-`SENTRY_DISABLE_AUTO_UPLOAD` is set only in the `development`/`preview` build
-profiles (`eas.json`).
+`wordshift`). **Source maps:** the production EAS secret was recorded as configured in July;
+confirm `SENTRY_AUTH_TOKEN` is available to the actual build environment and a
+symbolicated event arrives. `SENTRY_DISABLE_AUTO_UPLOAD` is set only in the
+`development`/`preview` profiles; production/internal-testing rely on their build
+environment credentials. The latest native optimization still requires device
+verification of reporting and startup.
 
 ## 3. Store submission (separate from the above)
 
 - ✅ `expo.extra.eas.projectId` / `owner` are populated (`eas init` done).
-- ✅ `eas.json` → `submit.production.android` is wired (service-account key at
-  `./secrets/play-service-account.json`, internal track) — `eas submit -p
-  android` works. App Store Connect credentials are still open (iOS track).
+- `eas.json` configures both Android submit profiles for the **internal** track
+  with a local service-account file at `./secrets/play-service-account.json`.
+  Earlier uploads were owner-confirmed; verify the local credential and current
+  artifact before submission. App Store Connect credentials remain open.
 
 ## 4. Monetization (in-app purchases + ads)
 
-Separate, and ✅ live on Android: the RevenueCat (IAP) and AdMob (ads) provider
+Separate, and configured on Android (test ads remain enabled): the RevenueCat (IAP) and AdMob (ads) provider
 adapters behind the `iap.ts` / `ads.ts` seams are registered in `App.tsx`, with
 SDKs installed and Android keys set (iOS keys blank → NoOp fallback). See
-**`docs/MONETIZATION_SETUP.md`** for the details and the iOS steps.
+[monetization setup](MONETIZATION_SETUP.md) for the details and the iOS steps.

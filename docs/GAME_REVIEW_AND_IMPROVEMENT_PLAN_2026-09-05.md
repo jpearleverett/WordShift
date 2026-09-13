@@ -1,5 +1,7 @@
 **WordShift: whole-game review and improvement plan**
 
+> **Historical snapshot — status clarified September 13, 2026.** This document retains the findings, commands, counts and evidence from its original review. “Current”, “shipped” and completion claims below apply to that recorded snapshot. For the latest code, release procedure and remaining acceptance checks, use [Current build](CURRENT_BUILD.md).
+
 Reviewed September 5, 2026, at commit `8297227`, app version **1.2.7 / Android 93**. This is a planning deliverable; application code, generated banks, purchases, release configuration, and live backend data were not changed.
 
 The game has a distinctive foundation worth protecting: a satisfying letter-moving puzzle, an increasingly strange home full of individual residents, and a finale whose meaning comes from the player's actual last move. The recent story revision substantially improves the premise. The best next investment is making the existing experience reliable, understandable, and consequential. Another large expansion would currently amplify problems with persistence, overlapping progression systems, and delivery.
