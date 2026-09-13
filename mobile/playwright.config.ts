@@ -20,8 +20,13 @@ export default defineConfig({
     },
   },
   webServer: {
-    command: 'npx expo start --web --port 8081 --max-workers 1',
-    env: { NODE_OPTIONS: '--max-old-space-size=900', EXPO_NO_TELEMETRY: '1', SENTRY_DISABLE_AUTO_UPLOAD: 'true' },
+    command: 'npx expo start --web --host localhost --port 8081 --max-workers 1',
+    env: {
+      NODE_OPTIONS: '--max-old-space-size=900', EXPO_NO_TELEMETRY: '1', SENTRY_DISABLE_AUTO_UPLOAD: 'true',
+      // Browser journeys are local; LAN discovery is unnecessary and fails
+      // in containers that do not expose network interface enumeration.
+      EXPO_UNSTABLE_BONJOUR: '0',
+    },
     url: 'http://localhost:8081',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

@@ -23,7 +23,7 @@ import {
 // Note: HomeScreen's own UI (header, modals) is outside GestureHandlerRootView,
 // so we use react-native's TouchableOpacity here. RoomView and AnimalSprite
 // (inside HouseWorld's GestureHandlerRootView) correctly use RNGH's version.
-import { Animal, Room, HomeWorldProgress } from '../../types/homeWorld';
+import { Animal, Room, HomeWorldProgress, DialoguePhase } from '../../types/homeWorld';
 import { HouseWorld } from './HouseWorld';
 import { CHARACTER_SPRITES } from './AnimalSprite';
 import { DialogueChoicePage, DialogueChoiceEcho } from './DialogueChoicePage';
@@ -57,6 +57,7 @@ import { HubRow } from '../ui/HubRow';
 import { UtilityMenu } from '../ui/UtilityMenu';
 import {
   getFullProgress,
+  invalidateProgressCache,
   markIntroSeen,
   markHouseCompleted,
   markHouseCompletionCelebrated,
@@ -156,7 +157,11 @@ import { getLocalDateString, daysAgoLocal } from '../../services/dateUtils';
 import { getActiveEvent } from '../../services/liveEvents';
 import { DailyChallengeCard } from '../DailyChallengeCard';
 import { isDailyChallengeUnlocked, getDailyStatus } from '../../services/dailyChallenge';
-import { areUpgradesAvailable, getPurchasedUpgrades, getDeepenedRooms, getAttunedRooms } from '../../services/roomUpgrades';
+import { areUpgradesAvailable, getPurchasedUpgrades, getDeepenedRooms, getAttunedRooms,
+  getPendingHouseUpgradeGifts, deliverHouseUpgradeGift, acknowledgeHouseUpgradeGift,
+  HouseUpgradeGift, invalidateRoomUpgradeCache } from '../../services/roomUpgrades';
+import { HouseUpgradeGiftModal } from './HouseUpgradeGiftModal';
+import { runStorageTransaction, StorageRecoveryRequiredError } from '../../services/persistenceStorage';
 import { getTendingLevel } from '../../services/tending';
 import { hapticLight, hapticSelection, hapticSuccess } from '../../services/haptics';
 import { playUiSound, type UiSoundKind } from '../../services/uiSound';
@@ -568,10 +573,28 @@ interface HomeSceneSnapshot {
   upgrades: Record<string, number>;
   deepened: Record<string, number>;
   attuned: Record<string, number>;
+  gifts: HouseUpgradeGift[];
   tendingLevel: number;
 }
 let homeSceneSnapshot: HomeSceneSnapshot | null = null;
 const quietLandingsShown = new Set<string>();
+
+async function loadHouseGiftVisit() {
+  try {
+    return await runStorageTransaction('house_gift_visit', async () => {
+      invalidateProgressCache();
+      invalidateRoomUpgradeCache();
+      // The transaction's read guard refuses legacy fallback-to-default reads.
+      // A failed read must never turn a late-game gift into a Phase 0 reaction.
+      const [gifts, freshProgress] = await Promise.all([getPendingHouseUpgradeGifts(), getFullProgress()]);
+      return { gifts, freshProgress };
+    });
+  } catch (error) {
+    invalidateProgressCache();
+    invalidateRoomUpgradeCache();
+    throw error;
+  }
+}
 
 /** Drop the paint-ahead scene (Reset All / cloud restore rebuilt the save). */
 export function resetHomeSceneSnapshot(): void {
@@ -675,6 +698,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   }, [landingBoundary, landingInherited, landingCycle]);
   const [rooms, setRooms] = useState<Room[]>(homeSceneSnapshot?.rooms ?? []);
   const [animals, setAnimals] = useState<Animal[]>(homeSceneSnapshot?.animals ?? []);
+  const [houseGifts, setHouseGifts] = useState<HouseUpgradeGift[]>(homeSceneSnapshot?.gifts ?? []);
+  const [activeHouseGift, setActiveHouseGift] = useState<HouseUpgradeGift | null>(null);
+  const [giftAnimal, setGiftAnimal] = useState<Animal | null>(null);
+  const [giftPhase, setGiftPhase] = useState<DialoguePhase>(homePhase);
+  const [giftOpening, setGiftOpening] = useState(false);
+  const [giftSaving, setGiftSaving] = useState(false);
+  const [giftError, setGiftError] = useState<string | null>(null);
+  const [giftRecoveryRequired, setGiftRecoveryRequired] = useState(false);
+  const houseGiftBusy = activeHouseGift !== null || giftOpening;
+  const giftSurfaceRef = useRef(false);
+  const giftSavingRef = useRef(false);
+  const giftSessionRef = useRef(0);
+  useEffect(() => () => { giftSessionRef.current += 1; }, []);
+  const pendingGiftRoomIds = useMemo(() => [...new Set(houseGifts.map(gift => gift.roomId))], [houseGifts]);
 
   // Decoration shop state
 
@@ -709,8 +746,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // two can never flicker over each other.
   const introSurfaceBusyRef = useRef(false);
   useLayoutEffect(() => {
-    introSurfaceBusyRef.current = showIntroDialogue || !!introOverrideLines || introOpening || pendingAnimalIntroCount > 0 || storyOverlayActive || showStoryInspection || quietLanding;
-  }, [showIntroDialogue, introOverrideLines, introOpening, pendingAnimalIntroCount, storyOverlayActive, showStoryInspection, quietLanding]);
+    introSurfaceBusyRef.current = giftSurfaceRef.current || showIntroDialogue || !!introOverrideLines || introOpening || pendingAnimalIntroCount > 0 || storyOverlayActive || showStoryInspection || quietLanding;
+  }, [showIntroDialogue, introOverrideLines, introOpening, pendingAnimalIntroCount, storyOverlayActive, showStoryInspection, quietLanding, activeHouseGift, giftOpening]);
   // Journal spotlight intro state
   const [journalSpotlightActive, setJournalSpotlightActive] = useState(false);
   const [journalSpotlightIndex, setJournalSpotlightIndex] = useState(0);
@@ -889,12 +926,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     onFoxPlayPrompt: () => setHighlightPlayButton(true),
     onAcquaintance: presentAnimalAcquaintance,
   });
+  const handleRegularAnimalTap = dialogueFlow.handleAnimalTap;
 
   useLayoutEffect(() => { regularDialogueBusyRef.current = dialogueFlow.showDialogue; }, [dialogueFlow.showDialogue]);
 
   useEffect(() => {
     if (!pendingAnimalIntroCount || introOpening || showIntroDialogue || introOverrideLines ||
-      dialogueFlow.showDialogue || storyOverlayActive || showStoryInspection || quietLanding) return;
+      dialogueFlow.showDialogue || activeHouseGift || giftOpening || storyOverlayActive || showStoryInspection || quietLanding) return;
     const owner = introPresentationRef.current;
     const animal = owner.take();
     if (!animal) return;
@@ -902,7 +940,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     introSurfaceBusyRef.current = false;
     void presentAnimalIntroduction(animal).catch(() => {});
   }, [pendingAnimalIntroCount, introOpening, showIntroDialogue, introOverrideLines,
-    dialogueFlow.showDialogue, storyOverlayActive, showStoryInspection, quietLanding, presentAnimalIntroduction]);
+    dialogueFlow.showDialogue, activeHouseGift, giftOpening, storyOverlayActive, showStoryInspection, quietLanding, presentAnimalIntroduction]);
 
   // Measured portrait framing for whichever character is on screen (see
   // getDialoguePortraitBox). Both dialogue surfaces share the alcove styles, so
@@ -1040,14 +1078,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
     // Load room upgrades (tier 1) + deepenings (tier 2) + attunements (tier 3)
     // — HouseWorld/RoomView render the in-world investment layers from these.
-    const [upgrades, deepened, attuned] = await Promise.all([
+    const [upgrades, deepened, attuned, gifts] = await Promise.all([
       getPurchasedUpgrades(),
       getDeepenedRooms(),
       getAttunedRooms(),
+      getPendingHouseUpgradeGifts(),
     ]);
     setPurchasedUpgrades(upgrades);
     setDeepenedRooms(deepened);
     setAttunedRooms(attuned);
+    setHouseGifts(gifts);
 
     // Phase-5 Tending Level — drives the visual "deepening" of the house sigils.
     const tending = await getTendingLevel();
@@ -1062,12 +1102,113 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       upgrades,
       deepened,
       attuned,
+      gifts,
       tendingLevel: tending,
     };
   }, [refreshUnlockData, reservedArrivalOpacity]);
 
   // Keep the ref in sync
   useLayoutEffect(() => { loadAllDataRef.current = loadAllData; });
+
+  // Gifts own a separate conversation: they never consume story pages, choices,
+  // or a resident's dialogue allowance. Claim the surface before any reads.
+  const handleAnimalPress = useCallback(async (animal: Animal) => {
+    if (giftSurfaceRef.current || introSurfaceBusyRef.current || regularDialogueBusyRef.current) return;
+    giftSurfaceRef.current = true;
+    introSurfaceBusyRef.current = true;
+    const session = ++giftSessionRef.current;
+    setGiftOpening(true);
+    try {
+      const { gifts, freshProgress } = await loadHouseGiftVisit();
+      if (session !== giftSessionRef.current) return;
+      setHouseGifts(gifts);
+      const gift = gifts.find(item => item.roomId === animal.roomId);
+      if (gift) {
+        setGiftAnimal(animal);
+        setGiftPhase(freshProgress.currentPhase);
+        setGiftError(null);
+        setGiftRecoveryRequired(false);
+        setActiveHouseGift(gift);
+      } else {
+        giftSurfaceRef.current = false;
+        introSurfaceBusyRef.current = false;
+        await handleRegularAnimalTap(animal);
+      }
+    } catch {
+      if (session !== giftSessionRef.current) return;
+      giftSurfaceRef.current = false;
+      introSurfaceBusyRef.current = false;
+      setIntroOpenError(`${animal.name}'s visit could not open. Please tap them to try again.`);
+    } finally {
+      if (session === giftSessionRef.current) setGiftOpening(false);
+    }
+  }, [handleRegularAnimalTap]);
+
+  const handleCloseHouseGift = useCallback(() => {
+    if (giftSavingRef.current || giftRecoveryRequired || activeHouseGift?.deliveredAt !== undefined) return;
+    giftSessionRef.current += 1;
+    giftSurfaceRef.current = false;
+    setActiveHouseGift(null);
+    setGiftAnimal(null);
+    setGiftError(null);
+  }, [activeHouseGift, giftRecoveryRequired]);
+
+  const handleGiveHouseGift = useCallback(async () => {
+    if (!activeHouseGift || giftSavingRef.current) return;
+    giftSavingRef.current = true;
+    setGiftSaving(true);
+    setGiftError(null);
+    const session = giftSessionRef.current;
+    try {
+      // Entering delivery also recovers an interrupted write. The exact gift
+      // receipt makes retry safe even after the room effect was already saved.
+      const delivered = await deliverHouseUpgradeGift(activeHouseGift.id);
+      const { freshProgress } = await loadHouseGiftVisit();
+      if (session !== giftSessionRef.current) return;
+      if (!delivered) throw new Error('The gift is no longer waiting.');
+      await loadAllData();
+      if (session !== giftSessionRef.current) return;
+      setGiftPhase(freshProgress.currentPhase);
+      setActiveHouseGift(delivered);
+      setGiftRecoveryRequired(false);
+      hapticSuccess();
+    } catch (error) {
+      if (session !== giftSessionRef.current) return;
+      if (error instanceof StorageRecoveryRequiredError) setGiftRecoveryRequired(true);
+      setGiftError('Your gift still needs to finish saving. Please retry; it will only be given once.');
+    } finally {
+      if (session === giftSessionRef.current) {
+        giftSavingRef.current = false;
+        setGiftSaving(false);
+      }
+    }
+  }, [activeHouseGift, loadAllData]);
+
+  const handleCompleteHouseGift = useCallback(async () => {
+    if (!activeHouseGift || giftSavingRef.current) return;
+    giftSavingRef.current = true;
+    setGiftSaving(true);
+    setGiftError(null);
+    const session = giftSessionRef.current;
+    try {
+      await acknowledgeHouseUpgradeGift(activeHouseGift.id);
+      await loadAllData();
+      if (session !== giftSessionRef.current) return;
+      giftSurfaceRef.current = false;
+      setActiveHouseGift(null);
+      setGiftAnimal(null);
+      setGiftRecoveryRequired(false);
+    } catch {
+      if (session === giftSessionRef.current) {
+        setGiftError('This moment could not be saved. Please retry to finish the visit.');
+      }
+    } finally {
+      if (session === giftSessionRef.current) {
+        giftSavingRef.current = false;
+        setGiftSaving(false);
+      }
+    }
+  }, [activeHouseGift, loadAllData]);
 
   // Play the house-completion celebration only once the final animal's intro
   // dialogue has closed. Completion is detected in the same tick as Bamboo's
@@ -1077,7 +1218,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     if (!pendingHouseCompletion) return;
     // Held while any intro dialogue surface is up (same pair the other
     // one-time home intros gate on).
-    if (showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0) return;
+    if (showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0 || activeHouseGift || giftOpening) return;
     const timer = setTimeout(() => {
       if (introPresentationRef.current.busy() || introPresentationRef.current.pendingCount() > 0 || introSurfaceBusyRef.current) return;
       setPendingHouseCompletion(false);
@@ -1093,7 +1234,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       }
     }, 650);
     return () => clearTimeout(timer);
-  }, [pendingHouseCompletion, showIntroDialogue, introOverrideLines, introOpening, pendingAnimalIntroCount, storyOverlayActive, showStoryInspection, quietLanding, onHouseCompleted]);
+  }, [pendingHouseCompletion, showIntroDialogue, introOverrideLines, introOpening, pendingAnimalIntroCount, activeHouseGift, giftOpening, storyOverlayActive, showStoryInspection, quietLanding, onHouseCompleted]);
 
   const claimableQuestAmber = useMemo(() => {
     if (!weeklyQuestState || !hasHomeProgress) return 0;
@@ -1229,7 +1370,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   // Challenge Mode intro (one-time, Fox-led, after 15 puzzles).
   useEffect(() => {
-    if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0) return;
+    if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0 || houseGiftBusy) return;
     if ((homePuzzleCount || 0) < 15) return;
 
     let cancelled = false;
@@ -1248,12 +1389,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     })();
 
     return () => { cancelled = true; };
-  }, [homePuzzleCount, homePhase, isOnboarding, showIntroDialogue, introOverrideLines, introOpening, pendingAnimalIntroCount, animals, hasHomeProgress]);
+  }, [homePuzzleCount, homePhase, isOnboarding, showIntroDialogue, introOverrideLines, introOpening, pendingAnimalIntroCount, houseGiftBusy, animals, hasHomeProgress]);
 
   // Daily Challenge intro (one-time, Fox-led, when the daily card first unlocks).
   // Celebrates the unlock so the new card isn't discovered silently.
   useEffect(() => {
-    if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0) return;
+    if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0 || houseGiftBusy) return;
     if (!isDailyChallengeUnlocked(homePuzzleCount, homePhase)) return;
 
     let cancelled = false;
@@ -1272,11 +1413,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     })();
 
     return () => { cancelled = true; };
-  }, [homePuzzleCount, homePhase, isOnboarding, showIntroDialogue, introOverrideLines, introOpening, pendingAnimalIntroCount, animals, hasHomeProgress]);
+  }, [homePuzzleCount, homePhase, isOnboarding, showIntroDialogue, introOverrideLines, introOpening, pendingAnimalIntroCount, houseGiftBusy, animals, hasHomeProgress]);
 
   // Pit transition Fox nudge (one-time per pending transition)
   useEffect(() => {
-    if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0) return;
+    if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0 || houseGiftBusy) return;
     if (!pitPhaseReady) return;
 
     let cancelled = false;
@@ -1298,11 +1439,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     })();
 
     return () => { cancelled = true; };
-  }, [pitPhaseReady, homePhase, isOnboarding, showIntroDialogue, introOverrideLines, introOpening, pendingAnimalIntroCount, animals, hasHomeProgress]);
+  }, [pitPhaseReady, homePhase, isOnboarding, showIntroDialogue, introOverrideLines, introOpening, pendingAnimalIntroCount, houseGiftBusy, animals, hasHomeProgress]);
 
   // Journal intro (one-time, Fox-led spotlight, when journal becomes available)
   useEffect(() => {
-    if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0) return;
+    if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0 || houseGiftBusy) return;
     if (!shouldShowJournalButton || journalSpotlightActive) return;
 
     let cancelled = false;
@@ -1318,7 +1459,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     })();
 
     return () => { cancelled = true; };
-  }, [shouldShowJournalButton, homePhase, isOnboarding, showIntroDialogue, introOverrideLines, introOpening, pendingAnimalIntroCount, journalSpotlightActive, hasHomeProgress]);
+  }, [shouldShowJournalButton, homePhase, isOnboarding, showIntroDialogue, introOverrideLines, introOpening, pendingAnimalIntroCount, houseGiftBusy, journalSpotlightActive, hasHomeProgress]);
 
   // First-gate lore intro (one-time, Fox-led): the first time a level-gated
   // room blocks the player (the Jungle Hammock, by default), Fox explains the
@@ -1344,7 +1485,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // It fires whether the player is idling on home OR has opened the room's
   // unlock modal (the intro renders on top, so dismissing reveals Reserve/Skip).
   useEffect(() => {
-    if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0) return;
+    if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0 || houseGiftBusy) return;
     const nu = unlockFlow.nextUnlock;
     if (!nu || nu.type !== 'room' || nu.minPuzzles === undefined) return;
     if ((homePuzzleCount || 0) >= nu.minPuzzles) return; // gate already open — no wall
@@ -1368,7 +1509,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     }, GATED_ROOM_INTRO_SETTLE_MS);
 
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [unlockFlow.nextUnlock, unlockFlow.showRoomUnlock, homePuzzleCount, homePhase, isOnboarding, showIntroDialogue, introOverrideLines, introOpening, pendingAnimalIntroCount, animals, hasHomeProgress]);
+  }, [unlockFlow.nextUnlock, unlockFlow.showRoomUnlock, homePuzzleCount, homePhase, isOnboarding, showIntroDialogue, introOverrideLines, introOpening, pendingAnimalIntroCount, houseGiftBusy, animals, hasHomeProgress]);
 
   // First-harvest home safety net (one-time): the victory-modal gate is the
   // primary teacher, but if the player reaches home past the auto-collect
@@ -1377,7 +1518,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // learned flag itself is only set by a real manual offer at the pit, so the
   // victory gate keeps re-arming either way.
   useEffect(() => {
-    if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0) return;
+    if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0 || houseGiftBusy) return;
     if ((homePuzzleCount || 0) <= AUTO_COLLECT_PUZZLE_LIMIT) return;
     if (!pendingHarvest || pendingHarvest.pendingBatches <= 0) return;
 
@@ -1399,7 +1540,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     })();
 
     return () => { cancelled = true; };
-  }, [homePuzzleCount, homePhase, pendingHarvest, isOnboarding, showIntroDialogue, introOverrideLines, introOpening, pendingAnimalIntroCount, animals, hasHomeProgress]);
+  }, [homePuzzleCount, homePhase, pendingHarvest, isOnboarding, showIntroDialogue, introOverrideLines, introOpening, pendingAnimalIntroCount, houseGiftBusy, animals, hasHomeProgress]);
 
   // Gentle heavy-pit nudge (once per app session): when a big pile of amber
   // sits unoffered, Fox mentions it once. The pit-entrance glow remains the
@@ -1407,7 +1548,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // phase transition is pending (the pit_nudge intro owns that moment) and
   // until the pit has been learned (the safety net above owns teaching).
   useEffect(() => {
-    if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0) return;
+    if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0 || houseGiftBusy) return;
     if (heavyHarvestNudgeShownThisSession) return;
     if (pitPhaseReady) return;
     if ((homePuzzleCount || 0) <= AUTO_COLLECT_PUZZLE_LIMIT) return;
@@ -1430,7 +1571,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     })();
 
     return () => { cancelled = true; };
-  }, [homePuzzleCount, homePhase, pendingHarvest, pitPhaseReady, isOnboarding, showIntroDialogue, introOverrideLines, introOpening, pendingAnimalIntroCount, animals, hasHomeProgress]);
+  }, [homePuzzleCount, homePhase, pendingHarvest, pitPhaseReady, isOnboarding, showIntroDialogue, introOverrideLines, introOpening, pendingAnimalIntroCount, houseGiftBusy, animals, hasHomeProgress]);
 
   // The Keeper's Record: Ember's one-time epilogue on the first quiet
   // post-revelation home landing — she reads the whole journey back from the
@@ -1442,7 +1583,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // close handlers alongside the flag, so a re-fire with a shifted ledger
   // can never leave a near-duplicate entry. Forever-once across cycles.
   useEffect(() => {
-    if (!progress || isOnboarding || showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0) return;
+    if (!progress || isOnboarding || showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0 || houseGiftBusy) return;
     if (progress.currentPhase !== 5 || progress.postRevelation !== true) return;
     if (dialogueFlow.showDialogue || pendingHouseCompletion || pitPhaseReady) return;
 
@@ -1503,7 +1644,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     showIntroDialogue,
     introOverrideLines,
     introOpening,
-    pendingAnimalIntroCount,
+    pendingAnimalIntroCount, houseGiftBusy,
     dialogueFlow.showDialogue,
     pendingHouseCompletion,
     pitPhaseReady,
@@ -1513,7 +1654,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Unbroken Weave intro: a single quiet post-revelation home landing, held
   // until no ceremony, pit transition, or animal dialogue owns the moment.
   useEffect(() => {
-    if (!progress || isOnboarding || showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0) return;
+    if (!progress || isOnboarding || showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0 || houseGiftBusy) return;
     if (progress.currentPhase !== 5 || progress.postRevelation !== true) return;
     if (dialogueFlow.showDialogue || pendingHouseCompletion || pitPhaseReady) return;
     // The Keeper's Record owns the landing it fired on; pitch the weave next visit.
@@ -1552,7 +1693,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     showIntroDialogue,
     introOverrideLines,
     introOpening,
-    pendingAnimalIntroCount,
+    pendingAnimalIntroCount, houseGiftBusy,
     dialogueFlow.showDialogue,
     pendingHouseCompletion,
     pitPhaseReady,
@@ -1563,7 +1704,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // player into the ritual. Held until no ceremony/dialogue owns the moment;
   // marked seen on close (handleAdvanceIntroDialogue) so it lands once.
   useEffect(() => {
-    if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0) return;
+    if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0 || houseGiftBusy) return;
     if (!isSacrificeAvailable(homePhase)) return;
     if (storyOverlayActive || dialogueFlow.showDialogue || pendingHouseCompletion || pitPhaseReady) return;
 
@@ -1588,7 +1729,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [homePhase, isOnboarding, showIntroDialogue, introOverrideLines, introOpening, pendingAnimalIntroCount, storyOverlayActive, dialogueFlow.showDialogue, pendingHouseCompletion, pitPhaseReady, animals, hasHomeProgress]);
+  }, [homePhase, isOnboarding, showIntroDialogue, introOverrideLines, introOpening, pendingAnimalIntroCount, houseGiftBusy, storyOverlayActive, dialogueFlow.showDialogue, pendingHouseCompletion, pitPhaseReady, animals, hasHomeProgress]);
 
   // Ambient home line — atmospheric text when no dialogue is active
   // Fades in, holds for 5s, then fades out to avoid persistent visual clutter.
@@ -2174,7 +2315,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     [journalSpotlightStepMeta]
   );
 
-  const localOverlayActive = showIntroDialogue || !!introOverrideLines || introOpening || pendingAnimalIntroCount > 0 || dialogueFlow.showDialogue ||
+  const localOverlayActive = !!activeHouseGift || giftOpening || showIntroDialogue || !!introOverrideLines || introOpening || pendingAnimalIntroCount > 0 || dialogueFlow.showDialogue ||
     showJournalModal || showSeasonModal || showUtilityModal || showQuestModal ||
     unlockFlow.showShop || unlockFlow.showRoomUnlock !== null || unlockFlow.showInvitePrompt ||
     showHouseCompletion || journalSpotlightActive || showStoryInspection;
@@ -2235,7 +2376,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       const puzzlesLeft = `${remaining} ${remaining === 1 ? 'puzzle' : 'puzzles'} to go`;
       return {
         percent: Math.min(100, (progress.puzzlesSolved / max) * 100),
-        label: isReserved ? `Reserved · ${puzzlesLeft}` : `${puzzlesLeft} · ${unlock.cost} amber`,
+        label: isReserved ? `Reserved · ${puzzlesLeft}` : puzzlesLeft,
         a11y: `${puzzlesLeft}. ${isReserved ? 'Reserved and already paid for.' : `Costs ${unlock.cost} amber.`}`,
         max,
         now,
@@ -2428,7 +2569,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           rooms={rooms}
           animals={animals}
           currentPhase={progress.currentPhase}
-          onAnimalPress={dialogueFlow.handleAnimalTap}
+          onAnimalPress={handleAnimalPress}
+          pendingGiftRoomIds={pendingGiftRoomIds}
           onRoomPress={unlockFlow.handleRoomPress}
           ritualWords={progress.ritualWords}
           nextUnlock={unlockFlow.nextUnlock}
@@ -2482,11 +2624,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 fillColor={getPixelSkin(progress.currentPhase).fillCard}
               />
               <View style={styles.unlockProgressInner}>
-                <Text style={[styles.unlockProgressLabel, { color: st.title }]}>
-                  Next: {unlockFlow.nextUnlock.name}
-                </Text>
-                <Text style={[styles.unlockProgressText, { color: st.body }]}>
-                  {nextUnlockMeter.label}
+                <Text
+                  testID="next-unlock-caption"
+                  style={[styles.unlockProgressText, { color: st.body }]}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  <Text style={[styles.unlockProgressLabel, { color: st.title }]}>
+                    Next: {unlockFlow.nextUnlock.name}
+                  </Text>
+                  {' · '}{nextUnlockMeter.label}
                 </Text>
                 {nextUnlockMeter.percent !== null && <View style={[styles.unlockProgressBarBg, { backgroundColor: st.amberTint, borderColor: st.amberTintBorder }]}>
                   <View
@@ -2590,6 +2737,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       )}
 
       {/* Cooldown Message Toast */}
+      <HouseUpgradeGiftModal
+        visible={activeHouseGift !== null}
+        animal={giftAnimal}
+        gift={activeHouseGift}
+        phase={giftPhase}
+        giving={giftSaving}
+        closeDisabled={giftRecoveryRequired}
+        error={giftError}
+        onGive={handleGiveHouseGift}
+        onClose={handleCloseHouseGift}
+        onComplete={handleCompleteHouseGift}
+      />
+
       {introOpenError && !dialogueFlow.cooldownMessage ? (
         <View
           style={[styles.cooldownToast, { backgroundColor: dt.cooldownBg, borderColor: dt.cooldownBorder }]}
@@ -4466,7 +4626,7 @@ const createStyles = (SCREEN_WIDTH: number, SCREEN_HEIGHT: number, fontScale: nu
     marginBottom: 4,
     // Cottage card frame background; clear the 18dp card strip.
     paddingHorizontal: SURFACE.cardPadX,
-    paddingVertical: 16,
+    paddingVertical: 14,
     zIndex: 10,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 3 },
@@ -4476,19 +4636,17 @@ const createStyles = (SCREEN_WIDTH: number, SCREEN_HEIGHT: number, fontScale: nu
   },
   unlockProgressInner: {
     alignItems: 'stretch',
-    gap: 6,
+    gap: 4,
   },
   unlockProgressLabel: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: FONT_SIZE.bodyLg,
     fontWeight: '800',
-    letterSpacing: 0.5,
   },
   unlockProgressText: {
     fontFamily: PIXEL_FONT_BOLD,
     fontSize: FONT_SIZE.small,
     fontWeight: '800',
-    letterSpacing: 0.3,
+    letterSpacing: 0.1,
   },
   // Recessed wood trough (square pixel ends), amber fill.
   unlockProgressBarBg: {
@@ -4496,7 +4654,7 @@ const createStyles = (SCREEN_WIDTH: number, SCREEN_HEIGHT: number, fontScale: nu
     // unfilled meter is an unbounded tinted strip with no readable extent, and
     // the old pillBg-on-sectionBorder pair sat at 1.14-1.27:1 through phase 3,
     // so a full bar and an empty bar were the same picture.
-    height: 10,
+    height: 6,
     borderWidth: 1,
     overflow: 'hidden',
   },

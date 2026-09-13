@@ -646,6 +646,7 @@ interface RoomViewProps {
   currentPhase: DialoguePhase;
   isAnimalOnCooldown?: boolean;
   quietNotifications?: boolean;
+  hasPendingGift?: boolean;
   cooldownPuzzlesLeft?: number;
   isRoomUpgraded?: boolean;
   /** Tier-2 deepening purchased — wall sigils + a richer interior wash. */
@@ -706,6 +707,7 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
   currentPhase,
   isAnimalOnCooldown = false,
   quietNotifications = false,
+  hasPendingGift = false,
   cooldownPuzzlesLeft,
   isRoomUpgraded = false,
   isDeepened = false,
@@ -1045,6 +1047,7 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
           currentPhase={currentPhase}
           isOnCooldown={isAnimalOnCooldown}
           quietNotifications={quietNotifications}
+          hasPendingGift={hasPendingGift}
           cooldownPuzzlesLeft={cooldownPuzzlesLeft}
         />
       )}
@@ -1600,4 +1603,3 @@ const styles = StyleSheet.create({
 });
 
 export default RoomView;
-

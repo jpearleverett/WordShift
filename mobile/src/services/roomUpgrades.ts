@@ -9,6 +9,7 @@
 import AsyncStorage, { runStorageTransaction } from './persistenceStorage';
 import { invalidateProgressCache, loadProgress, spendAmber } from './amberCurrency';
 import { DialoguePhase } from '../types/homeWorld';
+import { ANIMALS } from './homeWorldData';
 
 const STORAGE_KEY = 'wordshift_room_upgrades';
 
@@ -26,12 +27,14 @@ export interface RoomUpgrade {
 }
 
 export interface RoomUpgradeState {
-  /** Map of roomId → timestamp when the (tier-1) decoration was purchased */
+  /** Map of roomId → timestamp when the (tier-1) decoration was given */
   purchased: Record<string, number>;
-  /** Map of roomId → timestamp when the (tier-2) "deepening" was purchased */
+  /** Map of roomId → timestamp when the (tier-2) "deepening" was given */
   deepened: Record<string, number>;
   /** Map of roomId → attunement level reached (0..3; missing = 0) */
   attunements: Record<string, number>;
+  /** Paid gifts, retained after giving until the resident's reaction finishes. */
+  pendingGifts: HouseUpgradeGift[];
 }
 
 export interface RoomAttunement {
@@ -425,25 +428,32 @@ async function loadState(): Promise<RoomUpgradeState> {
   if (cache) return cache;
   const stored = await AsyncStorage.getItem(STORAGE_KEY);
   if (!stored) {
-    cache = { purchased: {}, deepened: {}, attunements: {} };
+    cache = { purchased: {}, deepened: {}, attunements: {}, pendingGifts: [] };
     return cache;
   }
   const parsed = JSON.parse(stored);
   const validMap = (value: unknown, levels = false): boolean => !!value && typeof value === 'object' &&
     !Array.isArray(value) && Object.values(value).every(item => typeof item === 'number' &&
       Number.isFinite(item) && item >= 0 && (!levels || (Number.isInteger(item) && item <= MAX_ATTUNEMENT_LEVEL)));
+  const pendingGifts: unknown = parsed?.pendingGifts === undefined ? [] : parsed.pendingGifts;
   if (!parsed || !validMap(parsed.purchased) || !validMap(parsed.deepened ?? {}) ||
-      !validMap(parsed.attunements ?? {}, true)) {
+      !validMap(parsed.attunements ?? {}, true) || !validPendingGifts(pendingGifts)) {
     throw new Error('Your room upgrades could not be read. Please try again.');
   }
   // Normalize legacy saves, but never mistake unreadable ownership for an
   // empty house and charge again for furniture the player already bought.
-  cache = { purchased: parsed.purchased, deepened: parsed.deepened ?? {}, attunements: parsed.attunements ?? {} };
+  // Existing ownership predates gift delivery and remains in place. Never
+  // invent a new gift (or another charge) for a legacy purchase.
+  cache = {
+    purchased: parsed.purchased, deepened: parsed.deepened ?? {}, attunements: parsed.attunements ?? {},
+    pendingGifts,
+  };
   return cache;
 }
 
 const copyState = (state: RoomUpgradeState): RoomUpgradeState => ({
   purchased: { ...state.purchased }, deepened: { ...state.deepened }, attunements: { ...state.attunements },
+  pendingGifts: state.pendingGifts.map(gift => ({ ...gift })),
 });
 
 async function saveState(next: RoomUpgradeState): Promise<void> {
@@ -481,7 +491,7 @@ export function areUpgradesAvailable(phase: DialoguePhase): boolean {
  * Grant a room upgrade without charging amber.
  * Returns true if successful, false if already purchased or upgrade doesn't exist.
  * Writes ownership only. Paid purchases must use purchaseHouseUpgrade so the
- * charge and ownership share one durable commit.
+ * charge and pending gift share one durable commit.
  */
 export async function purchaseRoomUpgrade(roomId: string): Promise<boolean> {
   const upgrade = getRoomUpgrade(roomId);
@@ -651,16 +661,50 @@ export type HouseUpgradePurchase =
   | { roomId: string; tier: 2 }
   | { roomId: string; tier: 3; level: number };
 
+export type HouseUpgradeGift = HouseUpgradePurchase & {
+  id: string;
+  purchasedAt: number;
+  /** The room changes on giving, but the receipt waits for its full reaction. */
+  deliveredAt?: number;
+};
+
+function sameUpgrade(a: HouseUpgradePurchase, b: HouseUpgradePurchase): boolean {
+  return a.roomId === b.roomId && a.tier === b.tier &&
+    (a.tier !== 3 || (b.tier === 3 && a.level === b.level));
+}
+
+function validPendingGifts(value: unknown): value is HouseUpgradeGift[] {
+  if (!Array.isArray(value)) return false;
+  const ids = new Set<string>();
+  const offers = new Set<string>();
+  return value.every(gift => {
+    if (!gift || typeof gift !== 'object' || typeof gift.id !== 'string' || !gift.id ||
+        !getRoomUpgrade(gift.roomId) || ![1, 2, 3].includes(gift.tier) ||
+        typeof gift.purchasedAt !== 'number' || !Number.isFinite(gift.purchasedAt) || gift.purchasedAt < 0 ||
+        (gift.deliveredAt !== undefined && (typeof gift.deliveredAt !== 'number' ||
+          !Number.isFinite(gift.deliveredAt) || gift.deliveredAt < 0)) ||
+        (gift.tier === 3 && (!Number.isInteger(gift.level) ||
+          gift.level < 1 || gift.level > MAX_ATTUNEMENT_LEVEL))) return false;
+    const offer = `${gift.roomId}:${gift.tier}:${gift.tier === 3 ? gift.level : 0}`;
+    if (ids.has(gift.id) || offers.has(offer)) return false;
+    ids.add(gift.id);
+    offers.add(offer);
+    return true;
+  });
+}
+
 export interface HouseUpgradePurchaseResult {
   success: boolean;
   newBalance: number;
-  reason?: 'already_owned' | 'unavailable' | 'not_enough_amber' | 'stale_offer';
+  gift?: HouseUpgradeGift;
+  reason?: 'already_owned' | 'already_pending' | 'unavailable' | 'not_enough_amber' | 'stale_offer';
 }
 
 /**
  * The paid shop path. Validate the exact offer before spending; the amber
- * balance, transaction ledger and room ownership then share one durable
- * commit. Retrying an interrupted commit cannot buy a second attunement.
+ * balance, transaction ledger and pending gift then share one durable
+ * commit. Room effects wait for an explicit gift to the resident. Retrying
+ * an interrupted commit cannot buy a second copy or another attunement.
  * The three purchaseRoom* functions remain free-grant APIs for other callers.
  */
 export async function purchaseHouseUpgrade(request: HouseUpgradePurchase): Promise<HouseUpgradePurchaseResult> {
@@ -675,12 +719,16 @@ export async function purchaseHouseUpgrade(request: HouseUpgradePurchase): Promi
       const refuse = (reason: HouseUpgradePurchaseResult['reason']): HouseUpgradePurchaseResult =>
         ({ success: false, newBalance: progress.amber, reason });
       const { roomId, tier } = request;
-      if (!areUpgradesAvailable(progress.currentPhase) || !progress.unlockedRooms.includes(roomId)) {
+      if (![1, 2, 3].includes(tier) || !areUpgradesAvailable(progress.currentPhase) || !progress.unlockedRooms.includes(roomId)) {
         return refuse('unavailable');
       }
       const item = tier === 1 ? getRoomUpgrade(roomId) : tier === 2 ? getRoomDeepening(roomId) :
         Number.isInteger(request.level) ? getAttunementForLevel(roomId, request.level) : null;
       if (!item) return refuse('unavailable');
+      const pending = state.pendingGifts.find(gift => sameUpgrade(gift, request));
+      if (pending && pending.deliveredAt === undefined) {
+        return { ...refuse('already_pending'), gift: { ...pending } };
+      }
       if (tier === 1 && roomId in state.purchased) return refuse('already_owned');
       if (tier > 1 && !(roomId in state.purchased)) return refuse('unavailable');
       if (tier === 2 && roomId in state.deepened) return refuse('already_owned');
@@ -696,16 +744,89 @@ export async function purchaseHouseUpgrade(request: HouseUpgradePurchase): Promi
         throw new Error('Another purchase is still saving. Please try again.');
       }
       const next = copyState(state);
-      if (tier === 1) next.purchased[roomId] = Date.now();
-      else if (tier === 2) next.deepened[roomId] = Date.now();
-      else next.attunements[roomId] = request.level;
-      // Do not publish staged ownership into the room cache before commit.
+      const purchasedAt = Date.now();
+      const gift: HouseUpgradeGift = {
+        ...request,
+        id: `house_gift_${roomId}_${tier}_${tier === 3 ? request.level : 0}_${purchasedAt}_${Math.random().toString(36).slice(2)}`,
+        purchasedAt,
+      };
+      next.pendingGifts.push(gift);
+      // Do not publish a staged gift into the room cache before commit.
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      return { success: true, newBalance: spent.newBalance };
+      return { success: true, newBalance: spent.newBalance, gift: { ...gift } };
     });
   } finally {
     // A rejected journal write leaves the old save; a rejected apply leaves
     // recovery work. Neither may leak a warm, partially updated mirror.
+    invalidateRoomUpgradeCache();
+    invalidateProgressCache();
+  }
+}
+
+/** Gifts waiting to be given, plus given gifts whose reaction is unfinished. */
+export async function getPendingHouseUpgradeGifts(): Promise<HouseUpgradeGift[]> {
+  const state = await loadState();
+  return state.pendingGifts.map(gift => ({ ...gift }));
+}
+
+/**
+ * Give one exact purchased gift. Applying its room effect and retaining the
+ * reaction receipt is one durable commit; retries never advance another level.
+ * A missing ID is a stale callback and cannot grant anything.
+ */
+export async function deliverHouseUpgradeGift(id: string): Promise<HouseUpgradeGift | null> {
+  try {
+    return await runStorageTransaction('house_upgrade_delivery', async () => {
+      invalidateRoomUpgradeCache();
+      invalidateProgressCache();
+      const state = await loadState();
+      const gift = state.pendingGifts.find(item => item.id === id);
+      if (!gift) return null;
+      if (gift.deliveredAt !== undefined) return { ...gift };
+      const progress = await loadProgress();
+      const resident = ANIMALS.find(animal => animal.roomId === gift.roomId);
+      if (!resident || !progress.unlockedRooms.includes(gift.roomId) ||
+          !progress.unlockedAnimals.includes(resident.id)) {
+        throw new Error('Invite this resident before giving them their house upgrade.');
+      }
+      if (gift.tier > 1 && !(gift.roomId in state.purchased)) {
+        throw new Error('Give this resident their decoration before this upgrade.');
+      }
+      const next = copyState(state);
+      const deliveredAt = Date.now();
+      if (gift.tier === 1) next.purchased[gift.roomId] ??= deliveredAt;
+      else if (gift.tier === 2) next.deepened[gift.roomId] ??= deliveredAt;
+      else {
+        const current = state.attunements[gift.roomId] ?? 0;
+        if (gift.level > current + 1) throw new Error('Give the earlier attunement before this one.');
+        next.attunements[gift.roomId] = Math.max(current, gift.level);
+      }
+      const delivered: HouseUpgradeGift = { ...gift, deliveredAt };
+      next.pendingGifts = next.pendingGifts.map(item => item.id === id ? delivered : item);
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      return { ...delivered };
+    });
+  } finally {
+    invalidateRoomUpgradeCache();
+    invalidateProgressCache();
+  }
+}
+
+/** Remove only the delivered gift whose resident reaction was completed. */
+export async function acknowledgeHouseUpgradeGift(id: string): Promise<boolean> {
+  try {
+    return await runStorageTransaction('house_upgrade_reaction', async () => {
+      invalidateRoomUpgradeCache();
+      invalidateProgressCache();
+      const state = await loadState();
+      const gift = state.pendingGifts.find(item => item.id === id);
+      if (!gift || gift.deliveredAt === undefined) return false;
+      const next = copyState(state);
+      next.pendingGifts = next.pendingGifts.filter(item => item.id !== id);
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      return true;
+    });
+  } finally {
     invalidateRoomUpgradeCache();
     invalidateProgressCache();
   }
@@ -729,5 +850,5 @@ export async function getRoomEmbellishmentIntensity(roomId: string): Promise<num
 /** Clear all room upgrade data (for Reset All Data). */
 export async function clearRoomUpgrades(): Promise<void> {
   await AsyncStorage.removeItem(STORAGE_KEY);
-  cache = { purchased: {}, deepened: {}, attunements: {} };
+  cache = { purchased: {}, deepened: {}, attunements: {}, pendingGifts: [] };
 }

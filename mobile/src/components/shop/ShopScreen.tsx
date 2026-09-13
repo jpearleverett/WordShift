@@ -50,7 +50,8 @@ import {
 import { markScreenReady } from '../../services/screenReady';
 import { getFullProgress, invalidateProgressCache } from '../../services/amberCurrency';
 import { runStorageTransaction, StorageRecoveryRequiredError } from '../../services/persistenceStorage';
-import { getRoomsWithStatus } from '../../services/homeWorldData';
+import { getRoomsWithStatus, ANIMALS } from '../../services/homeWorldData';
+import { getHouseUpgradeGiftName } from '../../services/dialogue/houseUpgradeDialogue';
 import { Room, DialoguePhase } from '../../types/homeWorld';
 import {
   areUpgradesAvailable,
@@ -65,6 +66,8 @@ import {
   getPurchasedUpgrades,
   getDeepenedRooms,
   getAttunedRooms,
+  getPendingHouseUpgradeGifts,
+  HouseUpgradeGift,
   purchaseHouseUpgrade,
   HouseUpgradePurchase,
   invalidateRoomUpgradeCache,
@@ -471,6 +474,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   const [purchasedUpgrades, setPurchasedUpgrades] = useState<Record<string, number>>({});
   const [purchasedDeepenings, setPurchasedDeepenings] = useState<Record<string, number>>({});
   const [attunedRooms, setAttunedRooms] = useState<Record<string, number>>({});
+  const [houseGifts, setHouseGifts] = useState<HouseUpgradeGift[]>([]);
   const [houseFeedback, setHouseFeedback] = useState<string | null>(null);
   const [saveRecovery, setSaveRecovery] = useState<
     | { kind: 'house'; request: HouseUpgradePurchase; cost: number; message: string }
@@ -538,16 +542,18 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   }, [allItems]);
 
   const refreshHouse = useCallback(async () => {
-    const [roomList, upgrades, deepenings, attunements] = await Promise.all([
+    const [roomList, upgrades, deepenings, attunements, gifts] = await Promise.all([
       getRoomsWithStatus(),
       getPurchasedUpgrades(),
       getDeepenedRooms(),
       getAttunedRooms(),
+      getPendingHouseUpgradeGifts(),
     ]);
     setRooms(roomList);
     setPurchasedUpgrades(upgrades);
     setPurchasedDeepenings(deepenings);
     setAttunedRooms(attunements);
+    setHouseGifts(gifts);
   }, []);
 
   // In-card purchase resolution (F50): keep the bought card mounted for a read
@@ -727,11 +733,11 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
       .filter(room => room.isUnlocked)
       .map(room => {
         const upgrade = getRoomUpgrade(room.id);
-        if (!upgrade || purchasedUpgrades[room.id]) return null;
+        if (!upgrade || purchasedUpgrades[room.id] || houseGifts.some(gift => gift.roomId === room.id && gift.tier === 1)) return null;
         return { room, upgrade };
       })
       .filter((entry): entry is { room: Room; upgrade: NonNullable<ReturnType<typeof getRoomUpgrade>> } => entry !== null);
-  }, [rooms, purchasedUpgrades]);
+  }, [rooms, purchasedUpgrades, houseGifts]);
 
   // Tier-2 "deepenings": eligible once the room's tier-1 decoration is in
   // place and the deepening hasn't been bought yet.
@@ -742,11 +748,11 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
         const deepening = getRoomDeepening(room.id);
         if (!deepening) return null;
         if (!purchasedUpgrades[room.id]) return null; // tier-1 required first
-        if (purchasedDeepenings[room.id]) return null;
+        if (purchasedDeepenings[room.id] || houseGifts.some(gift => gift.roomId === room.id && gift.tier === 2)) return null;
         return { room, deepening };
       })
       .filter((entry): entry is { room: Room; deepening: NonNullable<ReturnType<typeof getRoomDeepening>> } => entry !== null);
-  }, [rooms, purchasedUpgrades, purchasedDeepenings]);
+  }, [rooms, purchasedUpgrades, purchasedDeepenings, houseGifts]);
 
   // Tier-3 "attunements": eligible once the room's tier-1 decoration is in
   // place (the deepening is NOT required) and the room isn't fully attuned.
@@ -756,12 +762,13 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
       .filter(room => room.isUnlocked)
       .map(room => {
         if (!purchasedUpgrades[room.id]) return null; // tier-1 required first
+        if (houseGifts.some(gift => gift.roomId === room.id && gift.tier === 3)) return null;
         const info = getAttunementForLevel(room.id, (attunedRooms[room.id] ?? 0) + 1);
         if (!info) return null; // no attunement for this room, or fully attuned
         return { room, info };
       })
       .filter((entry): entry is { room: Room; info: NonNullable<ReturnType<typeof getAttunementForLevel>> } => entry !== null);
-  }, [rooms, purchasedUpgrades, attunedRooms]);
+  }, [rooms, purchasedUpgrades, attunedRooms, houseGifts]);
 
   const handleHousePurchase = useCallback(async (
     request: HouseUpgradePurchase, key: string, cost: number, message: string,
@@ -782,6 +789,8 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
           ? 'Not enough amber for that yet.'
           : result.reason === 'already_owned'
             ? 'That upgrade is already in place.'
+            : result.reason === 'already_pending'
+              ? 'That gift is waiting for a visit. Tap the animal at home to give it.'
             : result.reason === 'stale_offer'
               ? 'The room has changed. Its current upgrades are shown below.'
               : 'That room is not ready for this upgrade yet.');
@@ -861,20 +870,20 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   const handleBuyUpgrade = useCallback(async (roomId: string) => {
     const upgrade = getRoomUpgrade(roomId);
     if (!upgrade) return;
-    await handleHousePurchase({ roomId, tier: 1 }, `upgrade_${roomId}`, upgrade.cost, `${upgrade.name} added.`);
+    await handleHousePurchase({ roomId, tier: 1 }, `upgrade_${roomId}`, upgrade.cost, `${upgrade.name} is ready to give.`);
   }, [handleHousePurchase]);
 
   const handleBuyDeepening = useCallback(async (roomId: string) => {
     const deepening = getRoomDeepening(roomId);
     if (!deepening) return;
-    await handleHousePurchase({ roomId, tier: 2 }, `deepen_${roomId}`, deepening.cost, `${deepening.name} settles in.`);
+    await handleHousePurchase({ roomId, tier: 2 }, `deepen_${roomId}`, deepening.cost, `${deepening.name} is ready to give.`);
   }, [handleHousePurchase]);
 
   const handleBuyAttunement = useCallback(async (roomId: string) => {
     const info = getAttunementForLevel(roomId, (attunedRooms[roomId] ?? 0) + 1);
     if (!info) return;
     await handleHousePurchase({ roomId, tier: 3, level: info.level }, `attune_${roomId}`, info.cost,
-      `The room is ${info.name.toLowerCase()} now.`);
+      `${info.name} is ready to give. Visit the animal to attune their room.`);
   }, [attunedRooms, handleHousePurchase]);
 
   // Bought tier-1 decorations and tier-2 deepenings stay LISTED, as "in place"
@@ -905,7 +914,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
 
   const showHouseUpgrades =
     areUpgradesAvailable(housePhase) &&
-    availableUpgrades.length +
+    houseGifts.length + availableUpgrades.length +
       inPlaceUpgrades.length +
       (areDeepeningsAvailable(housePhase) ? availableDeepenings.length + inPlaceDeepenings.length : 0) +
       (areAttunementsAvailable(housePhase) ? availableAttunements.length : 0) > 0;
@@ -1063,7 +1072,14 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   ) => {
     const isResolving = resolving?.key === key;
     return (
-      <Animated.View key={key} style={isResolving ? { opacity: houseFade } : undefined}>
+      // The next attunement is a new offer: remount it after the previous
+      // level fades. Explicit settled opacity also clears the native driver's
+      // last value instead of leaving an invisible row occupying its height.
+      <Animated.View
+        key={artKey ? `${key}_${artKey}` : key}
+        testID={`house-offer-${key}`}
+        style={{ opacity: isResolving ? houseFade : 1 }}
+      >
         <PanelCard phase={phase} kind="card" style={styles.card}>
           <ShopArtThumb artKey={artKey ?? key} />
           <View style={styles.houseCardBody}>
@@ -1282,10 +1298,41 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
             {showHouseUpgrades && (
               <EntranceCascadeItem phase={phase} delay={getCascadeDelayMs(4, { baseMs: HEADER_CASCADE_BASE_MS })}>
               <View>
-                <Text style={[styles.sectionLabel, { color: t.headerMuted }]}>HOUSE UPGRADES</Text>
+                <Text testID="house-upgrades-heading" style={[styles.sectionLabel, { color: t.headerMuted }]}>HOUSE UPGRADES</Text>
                 {houseFeedback != null && (
                   <Text style={[styles.houseFeedback, { color: t.headerMuted }]}>{houseFeedback}</Text>
                 )}
+                {houseGifts.map(gift => {
+                  const resident = ANIMALS.find(animal => animal.roomId === gift.roomId);
+                  const name = getHouseUpgradeGiftName(gift);
+                  const recipient = resident?.name ?? 'the resident';
+                  const artKey = gift.tier === 3 ? `attune_${gift.level}` :
+                    `${gift.tier === 1 ? 'upgrade' : 'deepen'}_${gift.roomId}`;
+                  return (
+                    <PanelCard key={`gift_${gift.id}`} phase={phase} kind="card" style={styles.inPlaceCard}>
+                      <View style={styles.inPlaceRow}>
+                        <ShopArtThumb artKey={artKey} />
+                        <View style={styles.houseCardBody}>
+                          <Text style={[styles.cardName, { color: t.title }]}>{name}</Text>
+                          <Text style={[styles.cardDesc, { color: t.body }]}>
+                            {gift.deliveredAt !== undefined
+                              ? `${recipient} has something to tell you about your gift.`
+                              : `Ready for ${recipient}. Tap them at home to give this gift and change their room.`}
+                          </Text>
+                        </View>
+                      </View>
+                      <CandyButton
+                        label={`Visit ${recipient}`}
+                        onPress={() => navigateAway(() => onFocusRoom ? onFocusRoom(gift.roomId) : onClose())}
+                        phase={phase}
+                        variant="amber"
+                        disabled={busy != null}
+                        style={styles.inPlaceAction}
+                        accessibilityLabel={`Visit ${recipient} to give ${name}`}
+                      />
+                    </PanelCard>
+                  );
+                })}
                 {// eslint-disable-next-line react-hooks/refs -- renderHouseCard forwards onBuy to CandyButton; its purchase guard runs only on press.
                   availableUpgrades.map(({ room, upgrade }) =>
                   renderHouseCard(

@@ -428,6 +428,7 @@ interface AnimalSpriteProps {
   currentPhase: DialoguePhase;
   isOnCooldown?: boolean;
   quietNotifications?: boolean;
+  hasPendingGift?: boolean;
   cooldownPuzzlesLeft?: number;
 }
 
@@ -623,6 +624,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
   currentPhase,
   isOnCooldown = false,
   quietNotifications = false,
+  hasPendingGift = false,
   cooldownPuzzlesLeft,
 }) => {
   const [posX] = useState(() => new Animated.Value(animal.position.x));
@@ -1279,13 +1281,13 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
     };
   }, [animal.type, currentPhase, idleHopY, idlePerkScaleY, idleRot, idleScale, idleShiftX, idleTalkOpacity]);
 
-  // Notification pulse for new dialogue
+  // Gifts remain actionable even while the resident's dialogue is resting.
   useEffect(() => {
+    notificationPulse.setValue(1);
     if (getSettingsSync().reducedMotion) {
-      notificationPulse.setValue(1);
       return;
     }
-    if (animal.hasNewDialogue) {
+    if (hasPendingGift || (animal.hasNewDialogue && !isOnCooldown && !quietNotifications)) {
       const pulse = Animated.loop(
         Animated.sequence([
           Animated.timing(notificationPulse, {
@@ -1306,7 +1308,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
 
       return () => pulse.stop();
     }
-  }, [animal.hasNewDialogue, notificationPulse]);
+  }, [animal.hasNewDialogue, hasPendingGift, isOnCooldown, quietNotifications, notificationPulse]);
 
   // Get mood indicator color based on phase
   const getMoodColor = () => {
@@ -1359,11 +1361,13 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
         // The one focusable element for this animal, so it carries everything
         // the (now decorative) nameplate shows.
         accessibilityLabel={
-          isOnCooldown
-            ? cooldownPuzzlesLeft != null && cooldownPuzzlesLeft > 0
-              ? `${animal.name} the ${animal.type}, resting for ${cooldownPuzzlesLeft === 1 ? '1 more puzzle' : `${cooldownPuzzlesLeft} more puzzles`}`
-              : `${animal.name} the ${animal.type}, resting`
-            : `${animal.name} the ${animal.type}`
+          hasPendingGift
+            ? `${animal.name}, gift ready to give`
+            : isOnCooldown
+              ? cooldownPuzzlesLeft != null && cooldownPuzzlesLeft > 0
+                ? `${animal.name} the ${animal.type}, resting for ${cooldownPuzzlesLeft === 1 ? '1 more puzzle' : `${cooldownPuzzlesLeft} more puzzles`}`
+                : `${animal.name} the ${animal.type}, resting`
+              : `${animal.name} the ${animal.type}`
         }
         accessibilityRole="button"
       >
@@ -1608,13 +1612,34 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
               shows no sleep chrome at all: the animal just keeps wandering. */}
           {isDozing && <SleepingZs />}
 
+          {/* A waiting gift takes precedence over dialogue, including during
+              cooldown or quiet hours. Like the alert pip it stays unflipped. */}
+          {hasPendingGift && (
+            <Animated.View
+              testID="animal-pending-gift"
+              style={[
+                styles.notificationBadge,
+                CHARACTER_SPRITES[animal.type] && !spriteLoadFailed
+                  ? BADGE_ANCHOR[animal.type]
+                  : EMOJI_BADGE_ANCHOR,
+                styles.giftBadge,
+                { transform: [{ scale: notificationPulse }] },
+              ]}
+              pointerEvents="none"
+              importantForAccessibility="no-hide-descendants"
+              accessibilityElementsHidden
+            >
+              <Text style={styles.giftBadgeIcon} allowFontScaling={false}>🎁</Text>
+            </Animated.View>
+          )}
+
           {/* New dialogue indicator - hidden when on cooldown, which is the one
               and only visible tell that an animal has nothing left to say. Its
               anchor is per-animal (BADGE_ANCHOR) because the art does not fill
               its 90dp box, so a container-corner badge floated in dead space
               beside the head. It stays an UNFLIPPED sibling of `body`, so the
               "!" never mirrors with facing. */}
-          {animal.hasNewDialogue && !isOnCooldown && !quietNotifications && (
+          {!hasPendingGift && animal.hasNewDialogue && !isOnCooldown && !quietNotifications && (
             <Animated.View
               style={[
                 styles.notificationBadge,
@@ -1735,6 +1760,19 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
   },
+  giftBadge: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: '#88592E',
+    backgroundColor: '#FFE9B0',
+  },
+  giftBadgeIcon: {
+    fontSize: 18,
+    lineHeight: 22,
+    textAlign: 'center',
+  },
   emotionBubble: {
     position: 'absolute',
     top: -10,
@@ -1757,4 +1795,3 @@ const styles = StyleSheet.create({
 });
 
 export default AnimalSprite;
-

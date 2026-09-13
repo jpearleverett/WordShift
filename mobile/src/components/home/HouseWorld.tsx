@@ -1745,6 +1745,8 @@ interface HouseWorldProps {
   deepenedRooms?: Record<string, number>;
   /** Tier-3 attunement roomId → level reached 1..3 (level-0 rooms omitted). */
   attunedRooms?: Record<string, number>;
+  /** Rooms with a purchased upgrade waiting to be given to their resident. */
+  pendingGiftRoomIds?: string[];
   /**
    * The reservation and the level gate, so the in-world room card can stop
    * inviting a tap it cannot honour. Without these it advertised a build price
@@ -1797,6 +1799,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   purchasedUpgrades = {},
   deepenedRooms = {},
   attunedRooms = {},
+  pendingGiftRoomIds = [],
   reservedUnlockId = null,
   puzzlesSolved = 0,
   phaseProgress,
@@ -2633,6 +2636,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                             onRoomPress={onRoomPress}
                             currentPhase={currentPhase}
                             quietNotifications={quietNotifications}
+                            hasPendingGift={pendingGiftRoomIds.includes(room.id)}
                             isAnimalOnCooldown={roomAnimal ? isOnCooldown(roomAnimal.id) : false}
                             cooldownPuzzlesLeft={roomAnimal ? getSessionStatus(roomAnimal.id).puzzlesRemaining : undefined}
                             isRoomUpgraded={room.id in purchasedUpgrades}

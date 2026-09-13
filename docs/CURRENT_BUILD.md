@@ -4,14 +4,16 @@ Audited **September 13, 2026** against `main` commit [`6f96ebb583f591f46c9c023be
 
 ## Build identity
 
+Current source starts from main `b8fd15d` (app 1.3.5 / Android 99). The CI audit above and its historical totals below remain tied to `6f96ebb`; they are not evidence for a new native build.
+
 | Setting | Checked-in value | Source |
 |---|---|---|
-| App version | `1.3.4` | `mobile/app.json` |
-| Android package / version code | `com.wordshift.app` / `98` | `mobile/app.json` |
+| App version | `1.3.5` | `mobile/app.json` |
+| Android package / version code | `com.wordshift.app` / `99` | `mobile/app.json` |
 | iOS bundle / build number | `com.wordshift.app` / `3` | `mobile/app.json` |
 | Expo / React Native | SDK 57; lockfile resolves Expo `57.0.20`, RN `0.86.3` | `mobile/package-lock.json` |
 | Version management | Local; increase Android version code for each new Play upload | `mobile/eas.json` |
-| Resolved OTA runtime | `1.3.4-<release-channel>` | `mobile/app.config.js` overrides the static runtime policy |
+| Resolved OTA runtime | `1.3.5-<release-channel>` | `mobile/app.config.js` overrides the static runtime policy |
 | Android release optimization | R8 minification, resource shrinking, optimized ProGuard defaults and optimized resource shrinking enabled; PNG crunch disabled | `mobile/app.json`, `mobile/plugins/withAndroidOptimization.js` |
 
 `mobile/package.json` still has npm package version `1.3.1`; that field is tooling metadata, not the Expo app version or Android version code. Do not infer the installed app version from it. The current React Native Gradle plugin resolves AGP 8.12.0; the optimization configuration does not require an AGP 9 migration.
@@ -26,7 +28,8 @@ These entries describe implementation, with acceptance checks below. They are no
 |---|---|---|
 | Late animal introductions | Animals 8–13 unlocked at phase 2 or later receive three personal visits using existing character prose before ordinary catch-up. Earlier acquaintances can be revisited voluntarily. The active visit and progress survive interruption. | `animalAcquaintance.ts`, `useDialogueFlow.ts`; [PR 433](https://github.com/jpearleverett/WordShift/pull/433) |
 | Story choices | Animal choice screens have clearer answer cards, responsive reading space and durable selections. Deferred choices remain unanswered. | `DialogueChoicePage.tsx`, `dialogueChoices.ts`, `useDialogueFlow.ts`; [PR 433](https://github.com/jpearleverett/WordShift/pull/433) |
-| Room upgrades | All 13 rooms / 65 upgrade steps received placement and presentation work. Amber debit, upgrade ownership and ledger updates share a storage transaction. | `roomUpgrades.ts`, room components; [PR 434](https://github.com/jpearleverett/WordShift/pull/434) |
+| Room upgrades | All 13 rooms / 65 upgrade steps become saved gifts on purchase. Visit the room, tap its animal and choose Give to apply the improvement and hear its current-phase reaction. Debit, ledger and pending gift share a transaction; delivery and reaction acknowledgement are durable. Existing installed upgrades remain installed. | `roomUpgrades.ts`, `HouseUpgradeGiftModal.tsx`, `houseUpgradeDialogue.ts` |
+| House layout | The next-unlock sign uses one compact text row, with full requirements in its accessible label and tapped details. Attunement offers restore visible opacity and use separate view keys per level, preventing invisible cards from leaving blank space after purchase. | `HomeScreen.tsx`, `ShopScreen.tsx` |
 | Store and reward safety | Duplicate checkout/restore taps and navigation during pending operations are fenced. Known paid grants can retry local persistence without starting another payment. Cosmetic, Daily Amber and Supporter stipend mutations are transactional. | Billing, currency, reward and store services; [PR 434](https://github.com/jpearleverett/WordShift/pull/434) |
 | Purchase recovery limits | Same-install transaction history can recover eligible missed consumables after a durable baseline. Restore does not replay old spent packs or promise consumable recovery across reinstall/account changes. The first-purchase bonus marker survives Reset All. | `revenueCatBilling.ts`, `iap.ts`, `entitlements.ts`; [PR 434](https://github.com/jpearleverett/WordShift/pull/434) |
 | Phase and story ceremonies | Phase, house, arrival, aftermath and new-cycle ceremonies are queued durably and acknowledged after completion or deliberate Skip. Restart replays an unacknowledged scene from the beginning; old saves do not receive a backfill of every historical scene. | `amberCurrency.ts`, `ceremonyPlayback.ts`, `App.tsx`; [PR 437](https://github.com/jpearleverett/WordShift/pull/437) |
@@ -46,6 +49,10 @@ The [CI run for the audited main commit](https://github.com/jpearleverett/WordSh
 The vocabulary check reports **4,372 eligible boards in 7,356 stored records**, across **30 bank families**, with at least 100 eligible boards per family. Stored counts are not all freshly deliverable boards. Routine top-ups must use the [gated generation instructions](../CLAUDE.md#regenerating-puzzle-banks).
 
 The documentation/upload cleanup adds no gameplay changes. It also clarifies the existing purchase-restore and Reset All behavior in the [privacy policy](privacy-policy.md) and [terms](terms.md), with September 13 effective dates. These source edits take effect on the public site when the documentation is merged and deployed. Its archive checks are recorded in [Build and upload](BUILD_AND_UPLOAD.md). Test totals above are tied to the linked source commit; consult the cleanup PR's checks for its own result.
+
+## House-gift change validation
+
+The September 13 house-gift and layout changes passed **279 focused tests in 10 suites**, TypeScript, lint with zero warnings, and the story corpus integrity audit. These cover exact purchase/delivery receipts, restart recovery, legacy ownership, absent recipients, New Cycle preservation and all 65 upgrades across current dialogue phases. All **four targeted browser journeys** also passed: 320/390px single-row banner bounds and full accessible requirements; normal-motion repeated-attunement layout; all five gift handovers with unopened/unfinished-reaction relaunch recovery; and interrupted purchase retry without a second debit. These browser checks are not a signed-device pass.
 
 ## Remaining release evidence
 
