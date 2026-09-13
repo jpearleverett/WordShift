@@ -31,7 +31,7 @@ run from `mobile/`:
 
 ```bash
 WORDSHIFT_RELEASE_CHANNEL=internal-testing npx expo config --type public
-WORDSHIFT_RELEASE_CHANNEL=internal-testing npx eas update --channel internal-testing --message "Describe the tested change"
+WORDSHIFT_RELEASE_CHANNEL=internal-testing npx eas-cli@latest update --channel internal-testing --message "Describe the tested change"
 ```
 
 Inspect the resolved runtime and ad mode before the publish command. Keep

@@ -82,6 +82,20 @@ The checked-in Android identity is `com.wordshift.app`, app version **1.3.4**, v
 
 The `internal-testing` profile creates a signed store AAB on the `internal-testing` update channel. The `production` submit profile also currently targets Play's **internal** track; its name does not automatically publish to production. The `preview` profile creates an internally distributed APK. See [the launch checklist](LAUNCH_CHECKLIST.md) for release steps.
 
+After reviewing the version/code and completing the pre-build checks, run from `mobile/`:
+
+```bash
+npx eas-cli@latest build --platform android --profile internal-testing
+```
+
+That command starts a cloud build. To submit that exact completed AAB to Play internal testing, replace `YOUR_EAS_BUILD_ID` with its recorded build ID and run:
+
+```bash
+npx eas-cli@latest submit --platform android --profile internal-testing --id YOUR_EAS_BUILD_ID
+```
+
+The submit profile reads `mobile/secrets/play-service-account.json` locally; the credential stays excluded from the build source archive. Install the resulting internal-track release from Play, then record the device results. The production configuration cut and later Play promotion follow the [launch checklist](LAUNCH_CHECKLIST.md).
+
 Release minification and resource shrinking are enabled through `expo-build-properties`. The local `withAndroidOptimization` plugin selects the optimizing ProGuard defaults and enables optimized resource shrinking for the existing AGP 8.12 toolchain. PNG crunching remains disabled. These settings address compiled app size and the Play optimization report; they do not shrink an EAS source upload. A source-upload exclusion also does not reduce an AAB when the excluded material was already absent from the runtime bundle.
 
 Validate the next signed internal-track build on a physical Android device, especially launch, fonts, audio, room/story art, ads, billing/restore, notifications, and background/resume behavior. Record its AAB size, Play per-device download size, and DEX size. No post-change native build size or on-device R8 result was measured during this documentation/upload audit.
