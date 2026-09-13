@@ -2,6 +2,7 @@ import { DAILY_BOARD_VERSION } from './src/services/dailyBoardVersion';
 import { PracticeModal } from './src/components/puzzle/PracticeModal';
 import type { PracticeLessonId } from './src/services/practiceLessons';
 import { saveWithPlayerRetry } from './src/services/saveRetry';
+import { subscribeBillingChanges } from './src/services/iap';
 import { useLaunchIntents } from './src/hooks/useLaunchIntents';
 import { useInitialGameRoute } from './src/hooks/useInitialGameRoute';
 import { useAppBoot } from './src/hooks/useAppBoot';
@@ -195,7 +196,7 @@ import { installGlobalErrorHandler, setErrorForwarder, reportError } from './src
 import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST, STARTER_INTRO_MIN_PUZZLES, FINALE_DWELL_PUZZLES, INTERSTITIAL_MIN_PUZZLES, HOUSE_ASK_MIN_PUZZLES, HOUSE_ASK_CHANCE, HOUSE_ASK_REWARD_AMBER, REWARDED_HINT_GRANT, EXPERT_DIFFICULTY_UNLOCK_PUZZLES, LEXICON_UNLOCK_PUZZLES } from './src/constants/gameBalance';
 import { pickHouseAsk, evaluateHouseAsk, HouseAsk } from './src/services/houseAsks';
 import { getCumulativeStats } from './src/services/starRating';
-import { isStorageTransactionActive, subscribeStorageTransaction } from './src/services/persistenceStorage';
+import { isStorageTransactionActive, subscribeStorageTransaction, StorageRecoveryRequiredError } from './src/services/persistenceStorage';
 import { markPendingChanges, uploadToCloud } from './src/services/cloudSave';
 import * as Sentry from '@sentry/react-native';
 import { getSentryDsn } from './src/services/supabaseClient';
@@ -620,6 +621,15 @@ function MainApp() {
   // mounted HomeScreen reloads its progress (purchased amber must register
   // against the next unlock immediately, not after the next screen change).
   const [homeRefreshSignal, setHomeRefreshSignal] = useState(0);
+  const refreshPurchasedStats = persistenceActions.refreshStats;
+  const refreshPurchasedHints = puzzleActions.refreshHintBalance;
+  useEffect(() => subscribeBillingChanges(() => {
+    // A store approval can arrive after checkout closes or after a relaunch.
+    // Refresh the visible mirrors only after the billing service saved it.
+    void refreshPurchasedStats().catch(() => {});
+    refreshPurchasedHints();
+    setHomeRefreshSignal(signal => signal + 1);
+  }), [refreshPurchasedStats, refreshPurchasedHints]);
   // Shop -> home "see it in the room" hand-off: a one-shot room id the home
   // screen consumes (pans to the room, pulses it) and then clears.
   const [homeFocusRoomId, setHomeFocusRoomId] = useState<string | null>(null);
@@ -1604,8 +1614,16 @@ function MainApp() {
         persistenceActions.refreshStats();
         logEvent({ type: 'supporter_stipend_granted', data: { amount: stipend.amount, month: stipend.month } });
       }
-    } catch {
-      // Non-critical — never block launch on the stipend.
+    } catch (error) {
+      // A claim that never committed can wait for the next launch. Once a
+      // durable commit exists, finish it before play can change its balance.
+      if (error instanceof StorageRecoveryRequiredError) {
+        await saveWithPlayerRetry(claimSupporterStipendIfDue, {
+          title: 'Your monthly amber is waiting',
+          message: 'Your reward is recorded. Retry saving to finish adding it. You will not be charged again.',
+        });
+        persistenceActions.refreshStats();
+      }
     }
 
     if (isRollover) {

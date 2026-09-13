@@ -296,7 +296,7 @@ describe('purchase CTAs are never price-less (fallbackPrice contract)', () => {
 });
 
 describe('daily free-amber grant honors the recorded claim (no Patron over-grant)', () => {
-  it('StoreModal credits amber only via the pure grant decision, after recording', () => {
+  it('StoreModal uses one atomic claim service instead of separately recording and crediting', () => {
     const src = readComponent('StoreModal.tsx');
     const start = src.indexOf('const handleClaimDailyAmber');
     const end = src.indexOf('const handleBuyConsumable');
@@ -304,17 +304,12 @@ describe('daily free-amber grant honors the recorded claim (no Patron over-grant
     expect(end).toBeGreaterThan(start);
     const claimFn = src.slice(start, end);
 
-    // The claim is recorded first, then the grant amount comes from the pure
-    // decision helper (0 when the claim was not recorded), then amber is credited.
-    expect(claimFn).toContain('recordDailyAmberClaim');
-    expect(claimFn).toContain('dailyAmberGrantFor');
-    expect(claimFn).toMatch(/if\s*\(grant\s*<=\s*0\)/);
-    const grantIdx = claimFn.indexOf('dailyAmberGrantFor');
-    const awardIdx = claimFn.indexOf('awardBonusAmber');
-    expect(awardIdx).toBeGreaterThan(grantIdx);
-    // The award must credit the decided grant, never the raw constant.
-    expect(claimFn).toContain("awardBonusAmber(grant, 'rewarded_daily_amber')");
-    expect(claimFn).not.toContain('awardBonusAmber(DAILY_AMBER_REWARD');
+    // Behavioral save/retry/cap coverage lives in dailyAmberPurchase.test.ts.
+    // This seam ensures the Store actually uses that operation.
+    expect(claimFn).toContain('claimDailyAmberReward(');
+    expect(claimFn).toContain('result.newBalance');
+    expect(claimFn).not.toContain('recordDailyAmberClaim(');
+    expect(claimFn).not.toContain('awardBonusAmber(');
   });
 
   it('the Free Amber card gates Patron Claim and the rewarded button identically', () => {

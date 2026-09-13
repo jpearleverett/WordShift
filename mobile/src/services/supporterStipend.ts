@@ -20,9 +20,9 @@
  * Local-month bucketing via services/dateUtils (getLocalDateString sliced to
  * YYYY-MM) — never UTC/toISOString, matching the streak/daily conventions.
  */
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage, { runStorageTransaction } from './persistenceStorage';
 import { getLocalDateString } from './dateUtils';
-import { awardBonusAmber } from './amberCurrency';
+import { awardBonusAmberInTransaction, invalidateProgressCache } from './amberCurrency';
 import { isSupporterSync } from './entitlements';
 import { SUPPORTER_MONTHLY_AMBER } from '../constants/gameBalance';
 
@@ -53,29 +53,23 @@ const getDefault = (): SupporterState => ({ lastStipendMonth: null });
 
 async function load(): Promise<SupporterState> {
   if (cache) return cache;
-  try {
-    const stored = await AsyncStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (parsed && typeof parsed === 'object') {
-        cache = { lastStipendMonth: typeof parsed.lastStipendMonth === 'string' ? parsed.lastStipendMonth : null };
-        return cache;
-      }
+  const stored = await AsyncStorage.getItem(STORAGE_KEY);
+  if (stored) {
+    const parsed = JSON.parse(stored);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) ||
+        !(parsed.lastStipendMonth === null || /^\d{4}-(0[1-9]|1[0-2])$/.test(parsed.lastStipendMonth))) {
+      throw new Error('Your monthly amber record could not be read. Please retry.');
     }
-  } catch {
-    /* fall through to default */
+    cache = { lastStipendMonth: parsed.lastStipendMonth };
+    return cache;
   }
   cache = getDefault();
   return cache;
 }
 
 async function save(state: SupporterState): Promise<void> {
+  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   cache = state;
-  try {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch {
-    /* non-critical — the in-memory cache keeps the session consistent */
-  }
 }
 
 /** Drop the in-memory cache after an external storage write (cloud restore). */
@@ -107,16 +101,28 @@ export async function isSupporterStipendDue(): Promise<boolean> {
  * Grant the monthly Supporter stipend if the player is an active Supporter and
  * hasn't been paid this local month. Idempotent — returns null when not a
  * Supporter or already granted this month. Safe to call once per session at
- * launch. The month is recorded only AFTER the amber is credited, so a failure
- * mid-grant re-attempts next launch rather than skipping a paid month.
+ * launch or after a purchase/restore. The month, amber and ledger share one
+ * durable commit. Retrying after an interrupted commit replays it and returns
+ * null once the month is present, without granting another stipend.
  */
 export async function claimSupporterStipendIfDue(): Promise<SupporterStipendGrant | null> {
   if (!isSupporterSync()) return null;
-  const state = await load();
-  const month = getLocalMonthString();
-  if (state.lastStipendMonth === month) return null;
-
-  const newBalance = await awardBonusAmber(SUPPORTER_MONTHLY_AMBER, 'supporter_stipend');
-  await save({ lastStipendMonth: month });
-  return { amount: SUPPORTER_MONTHLY_AMBER, newBalance, month };
+  try {
+    return await runStorageTransaction('supporter_stipend', async () => {
+      // Re-read after recovery and after any other purchase finished. A warm
+      // balance or claim marker must never overwrite a preceding commit.
+      invalidateSupporterCache();
+      invalidateProgressCache();
+      if (!isSupporterSync()) return null;
+      const state = await load();
+      const month = getLocalMonthString();
+      if (state.lastStipendMonth === month) return null;
+      const newBalance = await awardBonusAmberInTransaction(SUPPORTER_MONTHLY_AMBER, 'supporter_stipend');
+      await save({ lastStipendMonth: month });
+      return { amount: SUPPORTER_MONTHLY_AMBER, newBalance, month };
+    });
+  } finally {
+    invalidateSupporterCache();
+    invalidateProgressCache();
+  }
 }

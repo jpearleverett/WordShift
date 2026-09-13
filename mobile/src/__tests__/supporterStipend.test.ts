@@ -14,14 +14,14 @@ jest.mock('../services/entitlements', () => ({
   isSupporterSync: () => isSupporter,
 }));
 
-let balance = 1000;
-const awardBonusAmber = jest.fn(async (amount: number, _source?: string) => {
-  balance += amount;
-  return balance;
-});
-jest.mock('../services/amberCurrency', () => ({
-  awardBonusAmber: (amount: number, source: string) => awardBonusAmber(amount, source),
-}));
+jest.mock('@react-native-async-storage/async-storage', () => require('./helpers/mockAsyncStorage').createMockAsyncStorage());
+import { getFullProgress, invalidateProgressCache } from '../services/amberCurrency';
+import { recoverPendingStorageTransaction, STORAGE_COMMIT_KEY } from '../services/persistenceStorage';
+
+const originalRead = (AsyncStorage.getItem as jest.Mock).getMockImplementation()!;
+const originalWrite = (AsyncStorage.setItem as jest.Mock).getMockImplementation()!;
+const balance = async () => (await getFullProgress()).amber;
+const payments = async () => JSON.parse(await AsyncStorage.getItem('wordshift_amber_transactions') ?? '[]');
 
 import {
   claimSupporterStipendIfDue,
@@ -35,10 +35,14 @@ import { SUPPORTER_MONTHLY_AMBER } from '../constants/gameBalance';
 beforeEach(async () => {
   mockDay = '2026-07-04';
   isSupporter = false;
-  balance = 1000;
-  awardBonusAmber.mockClear();
-  (AsyncStorage.clear as jest.Mock)();
+  (AsyncStorage.getItem as jest.Mock).mockImplementation(originalRead);
+  (AsyncStorage.setItem as jest.Mock).mockImplementation(originalWrite);
+  await AsyncStorage.clear();
   await clearSupporterState();
+  invalidateProgressCache();
+  const progress = await getFullProgress();
+  await AsyncStorage.setItem('wordshift_home_progress', JSON.stringify({ ...progress, amber: 1000 }));
+  invalidateProgressCache();
 });
 
 describe('supporterStipend', () => {
@@ -50,7 +54,7 @@ describe('supporterStipend', () => {
   test('non-supporter: never due, claim is a no-op', async () => {
     expect(await isSupporterStipendDue()).toBe(false);
     expect(await claimSupporterStipendIfDue()).toBeNull();
-    expect(awardBonusAmber).not.toHaveBeenCalled();
+    expect(await payments()).toEqual([]);
   });
 
   test('supporter first month: due, grants the stipend once', async () => {
@@ -60,8 +64,8 @@ describe('supporterStipend', () => {
     expect(grant).not.toBeNull();
     expect(grant!.amount).toBe(SUPPORTER_MONTHLY_AMBER);
     expect(grant!.month).toBe('2026-07');
-    expect(awardBonusAmber).toHaveBeenCalledTimes(1);
-    expect(awardBonusAmber).toHaveBeenCalledWith(SUPPORTER_MONTHLY_AMBER, 'supporter_stipend');
+    expect(await payments()).toEqual([expect.objectContaining({ amount: SUPPORTER_MONTHLY_AMBER, source: 'supporter_stipend' })]);
+    expect(await balance()).toBe(1000 + SUPPORTER_MONTHLY_AMBER);
   });
 
   test('idempotent within a month — a second claim is a no-op', async () => {
@@ -69,7 +73,7 @@ describe('supporterStipend', () => {
     await claimSupporterStipendIfDue();
     expect(await isSupporterStipendDue()).toBe(false);
     expect(await claimSupporterStipendIfDue()).toBeNull();
-    expect(awardBonusAmber).toHaveBeenCalledTimes(1);
+    expect(await payments()).toHaveLength(1);
   });
 
   test('a new local month grants again', async () => {
@@ -80,7 +84,7 @@ describe('supporterStipend', () => {
     expect(await isSupporterStipendDue()).toBe(true);
     const grant = await claimSupporterStipendIfDue();
     expect(grant!.month).toBe('2026-08');
-    expect(awardBonusAmber).toHaveBeenCalledTimes(2);
+    expect(await payments()).toHaveLength(2);
   });
 
   test('lapsing the subscription stops future stipends', async () => {
@@ -91,7 +95,7 @@ describe('supporterStipend', () => {
     invalidateSupporterCache();
     expect(await isSupporterStipendDue()).toBe(false);
     expect(await claimSupporterStipendIfDue()).toBeNull();
-    expect(awardBonusAmber).toHaveBeenCalledTimes(1);
+    expect(await payments()).toHaveLength(1);
   });
 
   test('clearSupporterState wipes the record (Reset All)', async () => {
@@ -99,5 +103,57 @@ describe('supporterStipend', () => {
     await claimSupporterStipendIfDue();
     await clearSupporterState();
     expect(await isSupporterStipendDue()).toBe(true);
+  });
+
+  test('overlapping startup and purchase callbacks grant this month only once', async () => {
+    isSupporter = true;
+    const results = await Promise.all([claimSupporterStipendIfDue(), claimSupporterStipendIfDue()]);
+    expect(results.filter(Boolean)).toHaveLength(1);
+    expect(await balance()).toBe(1000 + SUPPORTER_MONTHLY_AMBER);
+    expect(await payments()).toHaveLength(1);
+  });
+
+  test('a failed journal leaves both the balance and monthly eligibility unchanged', async () => {
+    isSupporter = true;
+    (AsyncStorage.setItem as jest.Mock).mockImplementation((key, value) => {
+      if (key === STORAGE_COMMIT_KEY) return Promise.reject(new Error('disk full'));
+      return originalWrite(key, value);
+    });
+    await expect(claimSupporterStipendIfDue()).rejects.toThrow('disk full');
+    expect(await balance()).toBe(1000);
+    expect(await payments()).toEqual([]);
+    expect(await isSupporterStipendDue()).toBe(true);
+    (AsyncStorage.setItem as jest.Mock).mockImplementation(originalWrite);
+    await claimSupporterStipendIfDue();
+    expect(await balance()).toBe(1000 + SUPPORTER_MONTHLY_AMBER);
+  });
+
+  test.each(['wordshift_home_progress', 'wordshift_amber_transactions', 'wordshift_supporter'])(
+    'cold recovery after interrupted %s write pays exactly once', async keyToFail => {
+      isSupporter = true;
+      (AsyncStorage.setItem as jest.Mock).mockImplementation((key, value) => {
+        if (key === keyToFail) return Promise.reject(new Error('interrupted apply'));
+        return originalWrite(key, value);
+      });
+      await expect(claimSupporterStipendIfDue()).rejects.toThrow('recovery');
+      expect(await AsyncStorage.getItem(STORAGE_COMMIT_KEY)).not.toBeNull();
+      (AsyncStorage.setItem as jest.Mock).mockImplementation(originalWrite);
+      invalidateSupporterCache();
+      invalidateProgressCache();
+      await recoverPendingStorageTransaction();
+      expect(await claimSupporterStipendIfDue()).toBeNull();
+      expect(await balance()).toBe(1000 + SUPPORTER_MONTHLY_AMBER);
+      expect(await payments()).toHaveLength(1);
+      expect(await AsyncStorage.getItem(STORAGE_COMMIT_KEY)).toBeNull();
+    },
+  );
+
+  test('unreadable monthly ownership fails closed before granting', async () => {
+    isSupporter = true;
+    await AsyncStorage.setItem('wordshift_supporter', '{broken');
+    invalidateSupporterCache();
+    await expect(claimSupporterStipendIfDue()).rejects.toThrow();
+    expect(await balance()).toBe(1000);
+    expect(await payments()).toEqual([]);
   });
 });

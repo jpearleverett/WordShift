@@ -136,11 +136,11 @@ describe('entitlements', () => {
     expect(await hasMadeAmberPurchase()).toBe(true); // ...but never resurrects the one-time 2x
   });
 
-  it('clearEntitlements resets the first-amber-purchase flag', async () => {
+  it('clearEntitlements preserves the first-ever amber-purchase history', async () => {
     await markAmberPurchaseMade();
     await clearEntitlements();
-    expect(await hasMadeAmberPurchase()).toBe(false);
-    expect(hasMadeAmberPurchaseSync()).toBe(false);
+    expect(await hasMadeAmberPurchase()).toBe(true);
+    expect(hasMadeAmberPurchaseSync()).toBe(true);
   });
 });
 
@@ -646,3 +646,4 @@ describe('cosmetics', () => {
 
 // The service owns a debounced telemetry timer; do not let it outlive its test environment.
 afterAll(() => clearEvents());
+

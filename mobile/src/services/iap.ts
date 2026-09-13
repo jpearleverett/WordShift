@@ -15,6 +15,7 @@
 
 import AsyncStorage, { runStorageTransaction, isStorageTransactionActive } from './persistenceStorage';
 import { saveWithPlayerRetry } from './saveRetry';
+import { claimSupporterStipendIfDue } from './supporterStipend';
 import { awardBonusAmberInTransaction, getAmberBalance, invalidateProgressCache } from './amberCurrency';
 import { addHintsInTransaction, getHintBalance, invalidateHintsCache } from './hints';
 import {
@@ -197,6 +198,8 @@ export interface PurchaseResult {
   transactionId?: string;
   /** True when the user dismissed the native purchase sheet. */
   cancelled?: boolean;
+  /** The store is waiting for payment approval; no reward is granted yet. */
+  pending?: boolean;
   error?: string;
 }
 
@@ -304,13 +307,25 @@ export async function getProducts(
  * Purchase a product. On success, the granted entitlements are persisted to
  * entitlements.ts before returning, so callers can immediately read updated state.
  */
-export async function purchaseProduct(productId: ProductId): Promise<PurchaseResult> {
+async function purchaseProductUnlocked(productId: ProductId): Promise<PurchaseResult> {
   const result = await provider.purchase(productId);
   if (result.success) {
-    const ents = result.entitlements && result.entitlements.length > 0
-      ? result.entitlements
-      : entitlementsForProduct(productId);
-    await grantEntitlements(ents);
+    const reported = result.entitlements ?? [];
+    // CustomerInfo can contain older purchases before its new entitlement
+    // attachment appears. A verified known SKU still grants its own item.
+    const expected = Object.values(PRODUCT_IDS).some(id => id === productId) || reported.length === 0
+      ? entitlementsForProduct(productId) : [];
+    const ents = [...new Set([...expected, ...reported])];
+    await saveWithPlayerRetry(async () => {
+      try {
+        await runStorageTransaction('paid_entitlement', async () => {
+          invalidateEntitlementsCache();
+          await grantEntitlements(ents);
+        });
+      } catch (error) { invalidateEntitlementsCache(); throw error; }
+    }, PAID_SAVE_COPY);
+    if (ents.includes(ENTITLEMENTS.SUPPORTER)) await saveWithPlayerRetry(claimSupporterStipendIfDue, PAID_SAVE_COPY);
+    notifyBillingChanges({ productId, entitlements: ents });
     return { ...result, entitlements: ents };
   }
   return result;
@@ -331,6 +346,8 @@ export interface ConsumablePurchaseResult {
   /** True when this was the player's first-ever amber pack — the amount was doubled. */
   firstPurchaseDoubled?: boolean;
   cancelled?: boolean;
+  /** The store is waiting for payment approval; no reward is granted yet. */
+  pending?: boolean;
   error?: string;
 }
 
@@ -433,11 +450,16 @@ async function persistPendingConsumableGrant(entry: GrantIntent): Promise<string
 
 /** Credit + ledger acknowledgement + applied-ID receipt share one commit. */
 export async function settleConsumableGrant(grantId: string): Promise<{ amberBalance: number; hintBalance: number; applied: boolean }> {
+  let productId: string | undefined;
   try {
-    return await runStorageTransaction('paid_grant_credit', async () => {
+    const result = await runStorageTransaction('paid_grant_credit', async () => {
       const applied = new Set<string>(JSON.parse(await AsyncStorage.getItem(APPLIED_GRANTS_KEY) ?? '[]'));
       const grants = await loadPendingGrants();
       const grant = grants.find(item => item.grantId===grantId);
+      productId = grant?.productId;
+      // A starter bundle becomes complete only after both halves settle.
+      if (productId === PRODUCT_IDS.STARTER_PACK && grants.some(item =>
+        item.productId === PRODUCT_IDS.STARTER_PACK && item.grantId !== grantId && !applied.has(item.grantId))) productId = undefined;
       if (!grant && !applied.has(grantId)) throw new Error('Paid reward intent needs recovery');
       if (grant && !applied.has(grantId)) {
         if (!Number.isFinite(grant.reward.amount) || grant.reward.amount<0) throw new Error('Invalid paid reward');
@@ -450,6 +472,8 @@ export async function settleConsumableGrant(grantId: string): Promise<{ amberBal
       await savePendingGrants(grants.filter(item=>item.grantId!==grantId));
       return {amberBalance:await getAmberBalance(), hintBalance:await getHintBalance(), applied:!!grant};
     });
+    notifyBillingChanges({ productId });
+    return result;
   } catch(error) { invalidateProgressCache(); invalidateHintsCache(); throw error; }
 }
 
@@ -496,7 +520,7 @@ export async function acknowledgeConsumableGrant(grantId: string): Promise<void>
  * reward, then calls `acknowledgeConsumableGrant(result.grantId)`; if the app
  * dies in between, `reconcilePendingConsumableGrants()` re-serves the grant.
  */
-export async function purchaseConsumable(productId: ProductId): Promise<ConsumablePurchaseResult> {
+async function purchaseConsumableUnlocked(productId: ProductId): Promise<ConsumablePurchaseResult> {
   const reward = consumableReward(productId);
   if (!reward) {
     return { success: false, productId, error: 'unknown_product' };
@@ -506,7 +530,7 @@ export async function purchaseConsumable(productId: ProductId): Promise<Consumab
     let grantedReward: ConsumableReward = reward;
     let doubled = false;
     if (reward.kind === 'amber') {
-      const isFirst = !(await hasMadeAmberPurchase());
+      const isFirst = !(await saveWithPlayerRetry(hasMadeAmberPurchase, PAID_SAVE_COPY));
       if (isFirst) {
         grantedReward = { kind: 'amber', amount: reward.amount * FIRST_PURCHASE_AMBER_MULTIPLIER };
         doubled = true;
@@ -525,7 +549,7 @@ export async function purchaseConsumable(productId: ProductId): Promise<Consumab
     }
     return { success: true, productId, reward: grantedReward, grantId };
   }
-  return { success: false, productId, cancelled: result.cancelled, error: result.error };
+  return { success: false, productId, cancelled: result.cancelled, pending: result.pending, error: result.error };
 }
 
 export interface StarterPackPurchaseResult {
@@ -542,6 +566,8 @@ export interface StarterPackPurchaseResult {
   /** True when the one-per-account limit blocked the purchase. */
   alreadyOwned?: boolean;
   cancelled?: boolean;
+  /** The store is waiting for payment approval; no reward is granted yet. */
+  pending?: boolean;
   error?: string;
 }
 
@@ -552,7 +578,7 @@ export interface StarterPackPurchaseResult {
  * and survives store restore) and the amber+hints grants are returned for the
  * caller to apply — same convention as `purchaseConsumable`.
  */
-export async function purchaseStarterPack(): Promise<StarterPackPurchaseResult> {
+async function purchaseStarterPackUnlocked(): Promise<StarterPackPurchaseResult> {
   const productId = PRODUCT_IDS.STARTER_PACK;
   if (await hasEntitlement(ENTITLEMENTS.STARTER_PACK)) {
     return { success: false, productId, alreadyOwned: true, error: 'already_owned' };
@@ -574,21 +600,175 @@ export async function purchaseStarterPack(): Promise<StarterPackPurchaseResult> 
       grantIds: { amber: amberGrantId, hints: hintsGrantId },
     };
   }
-  return { success: false, productId, cancelled: result.cancelled, error: result.error };
+  return { success: false, productId, cancelled: result.cancelled, pending: result.pending, error: result.error };
 }
 
 /**
  * Restore previously-purchased products. The store's reported set becomes the
  * authoritative local entitlement state.
  */
-export async function restorePurchases(): Promise<{ entitlements: EntitlementKey[] }> {
-  if (!provider.isReady()) {
-    return { entitlements: await getGrantedEntitlements() };
-  }
-  const { entitlements, error } = await provider.restorePurchases();
-  if (error) {
-    return { entitlements: await getGrantedEntitlements() };
-  }
-  await setEntitlements(entitlements);
-  return { entitlements };
+export async function restorePurchases(): Promise<{ entitlements: EntitlementKey[]; error?: string }> {
+  if (checkoutDone) return { entitlements: await getGrantedEntitlements(), error: 'purchase_in_progress' };
+  const release = beginCheckout();
+  try {
+    if (!provider.isReady()) {
+      return { entitlements: await getGrantedEntitlements(), error: 'billing_unavailable' };
+    }
+    const { entitlements, error } = await provider.restorePurchases();
+    if (error) return { entitlements: await getGrantedEntitlements(), error };
+    try {
+      await saveWithPlayerRetry(async () => {
+        try {
+          await runStorageTransaction('restore_entitlements', async () => {
+            invalidateEntitlementsCache();
+            await setEntitlements(entitlements);
+          });
+        } catch (error) { invalidateEntitlementsCache(); throw error; }
+      }, { title: 'Your purchases are waiting', message: 'We could not save your restored purchases yet. Free some device storage if it is full, then retry. You will not be charged.' });
+    } catch (error) { invalidateEntitlementsCache(); throw error; }
+    notifyBillingChanges({ entitlements: entitlements.filter(key => key !== ENTITLEMENTS.STARTER_PACK) });
+    return { entitlements };
+  } finally { release(); }
+}
+
+/** Process-wide, synchronous lock: remounts and two taps in one React frame
+ * cannot open a second native sheet or race a restore against a paid grant. */
+let checkoutDone: Promise<void> | null = null;
+function beginCheckout(): () => void {
+  let release!: () => void;
+  checkoutDone = new Promise<void>(resolve => { release = resolve; });
+  return () => { checkoutDone = null; release(); };
+}
+async function runCheckout<T extends PurchaseResult>(productId: ProductId, purchase: () => Promise<T>): Promise<T> {
+  if (checkoutDone) return { success: false, productId, error: 'purchase_in_progress' } as T;
+  const release = beginCheckout();
+  try { return await purchase(); } finally { release(); }
+}
+export function purchaseProduct(productId: ProductId): Promise<PurchaseResult> {
+  return runCheckout(productId, () => purchaseProductUnlocked(productId));
+}
+export function purchaseConsumable(productId: ProductId): Promise<ConsumablePurchaseResult> {
+  return runCheckout(productId, () => purchaseConsumableUnlocked(productId));
+}
+export function purchaseStarterPack(): Promise<StarterPackPurchaseResult> {
+  return runCheckout(PRODUCT_IDS.STARTER_PACK, purchaseStarterPackUnlocked);
+}
+
+/** Verified receipt history from the billing SDK, never from player input. */
+export interface StorePurchaseTransaction {
+  transactionId: string;
+  productId: ProductId;
+  purchasedAt: number;
+}
+
+// Local purchase-history receipts survive Reset All and are deliberately absent
+// from cloud saves. Replaying spent consumables after a restore would mint money.
+const HISTORY_BASELINE_KEY = 'wordshift_iap_history_baseline';
+
+function validStoreTransactions(transactions: StorePurchaseTransaction[]): StorePurchaseTransaction[] {
+  return transactions.filter(transaction =>
+    typeof transaction.transactionId === 'string' && transaction.transactionId.length > 0 &&
+    (consumableReward(transaction.productId) || transaction.productId === PRODUCT_IDS.STARTER_PACK) &&
+    Number.isFinite(transaction.purchasedAt));
+}
+
+/** Establish the upgrade/install boundary BEFORE the first native checkout.
+ * Old transactions may already have been spent under an older app version or
+ * restored cloud save, so historical unknown receipts are never granted again. */
+export async function initializeStorePurchaseHistory(transactions: StorePurchaseTransaction[]): Promise<void> {
+  try {
+    await runStorageTransaction('iap_history_baseline', async () => {
+      const stored = await AsyncStorage.getItem(HISTORY_BASELINE_KEY);
+      const valid = validStoreTransactions(transactions);
+      const baseline: unknown = stored === null ? valid.map(item => item.transactionId) : JSON.parse(stored);
+      if (!Array.isArray(baseline) || !baseline.every(id => typeof id === 'string')) throw new Error('Purchase history needs recovery');
+      if (stored === null) await AsyncStorage.setItem(HISTORY_BASELINE_KEY, JSON.stringify(baseline));
+      const applied = new Set<string>(JSON.parse(await AsyncStorage.getItem(APPLIED_GRANTS_KEY) ?? '[]'));
+      // Only an old or already-delivered pack can consume this offer here.
+      // A new checkout callback must leave its legitimate first bonus intact.
+      if (valid.some(item => consumableReward(item.productId)?.kind === 'amber' &&
+          (baseline.includes(item.transactionId) || applied.has(item.transactionId)))) {
+        invalidateEntitlementsCache();
+        await markAmberPurchaseMade();
+      }
+    });
+  } catch (error) { invalidateEntitlementsCache(); throw error; }
+}
+
+let historyRecovery: Promise<void> = Promise.resolve();
+/** Recover completed payments that never reached the purchase promise (app
+ * killed during checkout, delayed payment approval). The callback may arrive
+ * before purchaseStoreProduct resolves, so first let that path record its exact
+ * reward/first-purchase bonus. Settlement then shares its transaction ID dedupe. */
+export function reconcileStorePurchaseHistory(transactions: StorePurchaseTransaction[]): Promise<void> {
+  const run = historyRecovery.catch(() => {}).then(async () => {
+    while (checkoutDone) await checkoutDone;
+    const release = beginCheckout();
+    try {
+    const sorted = validStoreTransactions(transactions).sort((a, b) => a.purchasedAt - b.purchasedAt);
+    for (const transaction of sorted) {
+      const snapshot = await saveWithPlayerRetry(() => runStorageTransaction('iap_history_snapshot', async () => {
+        const raw = await AsyncStorage.getItem(HISTORY_BASELINE_KEY);
+        if (raw === null) throw new Error('Purchase history has not been initialized');
+        const baseline = new Set<string>(JSON.parse(raw));
+        const applied = new Set<string>(JSON.parse(await AsyncStorage.getItem(APPLIED_GRANTS_KEY) ?? '[]'));
+        const pending = await loadPendingGrants();
+        return { ignored: baseline.has(transaction.transactionId), applied, pending };
+      }), PAID_SAVE_COPY);
+      if (snapshot.ignored) continue;
+      const ids = transaction.productId === PRODUCT_IDS.STARTER_PACK
+        ? [`${transaction.transactionId}:amber`, `${transaction.transactionId}:hints`]
+        : [transaction.transactionId];
+      if (ids.every(id => snapshot.applied.has(id))) continue;
+      if (!ids.some(id => snapshot.pending.some(grant => grant.grantId === id))) {
+        await saveWithPlayerRetry(() => persistRecoveredStorePurchase(transaction), PAID_SAVE_COPY);
+      }
+      for (const id of ids) await saveWithPlayerRetry(() => settleConsumableGrant(id), PAID_SAVE_COPY);
+    }
+    } finally { release(); }
+  });
+  historyRecovery = run;
+  return run;
+}
+
+async function persistRecoveredStorePurchase(transaction: StorePurchaseTransaction): Promise<void> {
+  try {
+    await runStorageTransaction('iap_recovered_payment', async () => {
+      invalidateEntitlementsCache();
+      const pending = await loadPendingGrants();
+      const applied = new Set<string>(JSON.parse(await AsyncStorage.getItem(APPLIED_GRANTS_KEY) ?? '[]'));
+      const starter = transaction.productId === PRODUCT_IDS.STARTER_PACK;
+      const reward = consumableReward(transaction.productId);
+      const doubled = reward?.kind === 'amber' && !(await hasMadeAmberPurchase());
+      const rewards: ConsumableReward[] = starter
+        ? [{ kind: 'amber', amount: STARTER_PACK_GRANTS.amber }, { kind: 'hints', amount: STARTER_PACK_GRANTS.hints }]
+        : reward ? [{ ...reward, amount: reward.amount * (doubled ? FIRST_PURCHASE_AMBER_MULTIPLIER : 1) }] : [];
+      for (const item of rewards) {
+        const grantId = starter ? `${transaction.transactionId}:${item.kind}` : transaction.transactionId;
+        if (applied.has(grantId) || pending.some(grant => grant.grantId === grantId)) continue;
+        pending.push({ grantId, productId: transaction.productId, reward: item, purchasedAt: transaction.purchasedAt,
+          ...(doubled ? { firstPurchaseDoubled: true } : {}) });
+      }
+      await savePendingGrants(pending);
+      if (doubled) await markAmberPurchaseMade();
+      if (starter) await grantEntitlements([ENTITLEMENTS.STARTER_PACK]);
+    });
+  } catch (error) { invalidateEntitlementsCache(); throw error; }
+}
+
+
+export interface BillingChange {
+  productId?: string;
+  entitlements?: readonly string[];
+}
+const billingListeners = new Set<(change: BillingChange) => void>();
+/** UI refreshes happen only after durable ownership/currency commits. */
+export function subscribeBillingChanges(listener: (change: BillingChange) => void): () => void {
+  billingListeners.add(listener);
+  return () => { billingListeners.delete(listener); };
+}
+export function notifyBillingChanges(change: BillingChange = {}): void {
+  billingListeners.forEach(listener => {
+    try { listener(change); } catch (error) { console.warn('[IAP] Purchase UI refresh failed:', error); }
+  });
 }

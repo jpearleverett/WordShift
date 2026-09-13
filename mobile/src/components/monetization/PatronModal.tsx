@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -23,13 +23,15 @@ import {
   getProducts,
   purchaseProduct,
   restorePurchases,
+  subscribeBillingChanges,
   IapProduct,
 } from '../../services/iap';
-import { isPatronSync, isAdFreeSync } from '../../services/entitlements';
+import { isPatronSync, isAdFreeSync, ENTITLEMENTS } from '../../services/entitlements';
 import { PATRON_AMBER_BONUS } from '../../constants/gameBalance';
 import { getSettingsSync } from '../../services/settings';
 import { hapticLight, hapticMedium } from '../../services/haptics';
 import { logEvent } from '../../services/eventLogger';
+import { announceForA11y } from '../../services/a11yAnnounce';
 import { FONT_SIZE } from '../../theme/typeScale';
 
 interface PatronModalProps {
@@ -45,7 +47,10 @@ interface PatronModalProps {
   onPatronChange?: (isPatron: boolean) => void;
 }
 
-type FlowState = 'idle' | 'working' | 'unavailable';
+type FlowState = 'idle' | 'working' | 'unavailable' | 'pending';
+const PURCHASE_UNCONFIRMED = "We couldn't confirm this purchase. Check your store purchase history before trying again.";
+const PURCHASE_PENDING = 'The store is still confirming this purchase. Please wait for its confirmation before trying again.';
+const RESTORE_FAILED = "We couldn't restore your purchases right now. Check your connection and store account, then try Restore Purchases again.";
 
 /**
  * Fallback price labels shown when the store product isn't fetchable (NoOp
@@ -114,6 +119,9 @@ export const PatronModal: React.FC<PatronModalProps> = ({
   const [isPatron, setIsPatron] = useState<boolean>(isPatronSync());
   const [adFree, setAdFree] = useState<boolean>(isAdFreeSync());
   const [flow, setFlow] = useState<FlowState>('idle');
+  const operationBusy = useRef(false);
+  const pendingPurchase = useRef<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [priceString, setPriceString] = useState<string | null>(null);
   const [adsPriceString, setAdsPriceString] = useState<string | null>(null);
 
@@ -128,6 +136,23 @@ export const PatronModal: React.FC<PatronModalProps> = ({
       setAdFree(isAdFreeSync());
     }
   }
+
+  useEffect(() => subscribeBillingChanges(change => {
+    const patron = isPatronSync();
+    setIsPatron(patron);
+    setAdFree(isAdFreeSync());
+    const pendingProduct = pendingPurchase.current;
+    const matchingEntitlement = pendingProduct === PRODUCT_IDS.PATRON_KEY
+      ? ENTITLEMENTS.PATRON
+      : pendingProduct === PRODUCT_IDS.REMOVE_ADS ? ENTITLEMENTS.ADFREE : undefined;
+    if (pendingProduct && (change.productId === pendingProduct
+      || (matchingEntitlement && change.entitlements?.includes(matchingEntitlement)))) {
+      pendingPurchase.current = null;
+      setFlow(current => current === 'pending' ? 'idle' : current);
+      setStatusMessage('Your purchase is ready. Thank you.');
+      onPatronChange?.(patron);
+    }
+  }), [onPatronChange]);
 
   // Fetch a localized price string from the store when available. The NoOp
   // provider returns [], so we simply fall back to a generic label.
@@ -181,8 +206,14 @@ export const PatronModal: React.FC<PatronModalProps> = ({
     return () => anim.stop();
   }, [visible, phase, reducedMotion, cardScale, cardOpacity]);
 
+  useEffect(() => {
+    if (statusMessage) announceForA11y(statusMessage);
+  }, [statusMessage]);
+
   const handlePurchase = useCallback(async () => {
-    if (flow === 'working') return;
+    if (operationBusy.current || pendingPurchase.current || isPatronSync()) return;
+    operationBusy.current = true;
+    setStatusMessage(null);
     setFlow('working');
     hapticLight();
     logEvent({ type: 'purchase_initiated', data: { productId: PRODUCT_IDS.PATRON_KEY, kind: 'patron' } });
@@ -191,6 +222,7 @@ export const PatronModal: React.FC<PatronModalProps> = ({
       if (result.success) {
         const patron = isPatronSync();
         setIsPatron(patron);
+        setAdFree(isAdFreeSync());
         onPatronChange?.(patron);
         logEvent({ type: 'iap_purchase', data: { productId: PRODUCT_IDS.PATRON_KEY, kind: 'patron' } });
         hapticMedium();
@@ -198,6 +230,12 @@ export const PatronModal: React.FC<PatronModalProps> = ({
         return;
       }
       // User dismissed the native sheet → just return to idle (no error state).
+      if (result.pending) {
+        pendingPurchase.current = PRODUCT_IDS.PATRON_KEY;
+        setStatusMessage(PURCHASE_PENDING);
+        setFlow('pending');
+        return;
+      }
       if (result.cancelled) {
         logEvent({ type: 'purchase_cancelled', data: { productId: PRODUCT_IDS.PATRON_KEY, kind: 'patron' } });
         setFlow('idle');
@@ -205,15 +243,21 @@ export const PatronModal: React.FC<PatronModalProps> = ({
       }
       // billing_unavailable (NoOp) or any other failure → calm unavailable state.
       logEvent({ type: 'purchase_failed', data: { productId: PRODUCT_IDS.PATRON_KEY, kind: 'patron', reason: result.error ?? 'unknown' } });
+      setStatusMessage(PURCHASE_UNCONFIRMED);
       setFlow('unavailable');
     } catch {
       logEvent({ type: 'purchase_failed', data: { productId: PRODUCT_IDS.PATRON_KEY, kind: 'patron', reason: 'exception' } });
+      setStatusMessage(PURCHASE_UNCONFIRMED);
       setFlow('unavailable');
+    } finally {
+      operationBusy.current = false;
     }
-  }, [flow, onPatronChange]);
+  }, [onPatronChange]);
 
   const handlePurchaseRemoveAds = useCallback(async () => {
-    if (flow === 'working') return;
+    if (operationBusy.current || pendingPurchase.current || isAdFreeSync()) return;
+    operationBusy.current = true;
+    setStatusMessage(null);
     setFlow('working');
     hapticLight();
     logEvent({ type: 'purchase_initiated', data: { productId: PRODUCT_IDS.REMOVE_ADS, kind: 'adfree' } });
@@ -222,10 +266,18 @@ export const PatronModal: React.FC<PatronModalProps> = ({
       if (result.success) {
         // adFree reads patron OR remove-ads; refresh both flags from cache.
         setAdFree(isAdFreeSync());
-        setIsPatron(isPatronSync());
+        const patron = isPatronSync();
+        setIsPatron(patron);
+        onPatronChange?.(patron);
         logEvent({ type: 'iap_purchase', data: { productId: PRODUCT_IDS.REMOVE_ADS, kind: 'adfree' } });
         hapticMedium();
         setFlow('idle');
+        return;
+      }
+      if (result.pending) {
+        pendingPurchase.current = PRODUCT_IDS.REMOVE_ADS;
+        setStatusMessage(PURCHASE_PENDING);
+        setFlow('pending');
         return;
       }
       if (result.cancelled) {
@@ -234,38 +286,59 @@ export const PatronModal: React.FC<PatronModalProps> = ({
         return;
       }
       logEvent({ type: 'purchase_failed', data: { productId: PRODUCT_IDS.REMOVE_ADS, kind: 'adfree', reason: result.error ?? 'unknown' } });
+      setStatusMessage(PURCHASE_UNCONFIRMED);
       setFlow('unavailable');
     } catch {
       logEvent({ type: 'purchase_failed', data: { productId: PRODUCT_IDS.REMOVE_ADS, kind: 'adfree', reason: 'exception' } });
+      setStatusMessage(PURCHASE_UNCONFIRMED);
       setFlow('unavailable');
+    } finally {
+      operationBusy.current = false;
     }
-  }, [flow]);
+  }, [onPatronChange]);
 
   const handleRestore = useCallback(async () => {
-    if (flow === 'working') return;
+    if (operationBusy.current) return;
+    operationBusy.current = true;
+    setStatusMessage(null);
     setFlow('working');
     hapticLight();
     try {
-      await restorePurchases();
+      const restored = await restorePurchases();
+      if (restored.error) {
+        setStatusMessage(RESTORE_FAILED);
+        setFlow(pendingPurchase.current ? 'pending' : 'unavailable');
+        return;
+      }
       const patron = isPatronSync();
       setIsPatron(patron);
       setAdFree(isAdFreeSync());
       onPatronChange?.(patron);
       if (patron) hapticMedium();
-      setFlow('idle');
+      setStatusMessage(restored.entitlements.length > 0
+        ? 'Your purchases have been restored.'
+        : 'No previous purchases were found for this store account.');
+      setFlow(pendingPurchase.current ? 'pending' : 'idle');
     } catch {
-      // Restore on the NoOp backend yields an empty set; nothing to restore.
-      setFlow('idle');
+      setStatusMessage(RESTORE_FAILED);
+      setFlow(pendingPurchase.current ? 'pending' : 'unavailable');
+    } finally {
+      operationBusy.current = false;
     }
-  }, [flow, onPatronChange]);
+  }, [onPatronChange]);
 
   const handleClose = useCallback(() => {
+    if (operationBusy.current) return;
+    pendingPurchase.current = null;
     setFlow('idle');
+    setStatusMessage(null);
     onClose();
   }, [onClose]);
 
   const t = getSurfaceTheme(phase);
   const skin = getPixelSkin(phase);
+  const working = flow === 'working';
+  const purchaseDisabled = working || flow === 'pending';
 
   const benefits: { key: string; render: React.ReactNode }[] = [
     {
@@ -351,11 +424,10 @@ export const PatronModal: React.FC<PatronModalProps> = ({
             </PanelCard>
           )}
 
-          {flow === 'unavailable' && !isPatron && (
-            <View style={[styles.unavailableBox, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}>
+          {statusMessage && (
+            <View accessibilityLiveRegion="polite" style={[styles.unavailableBox, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}>
               <Text style={[styles.unavailableText, { color: t.body }]}>
-                Patronage isn’t available right now. Nothing was charged. Please try
-                again later.
+                {statusMessage}
               </Text>
             </View>
           )}
@@ -368,7 +440,7 @@ export const PatronModal: React.FC<PatronModalProps> = ({
               phase={phase}
               variant="primary"
               size="lg"
-              disabled={flow === 'working'}
+              disabled={purchaseDisabled}
               accessibilityLabel="Become a Patron"
               style={styles.primaryBtn}
             />
@@ -387,7 +459,7 @@ export const PatronModal: React.FC<PatronModalProps> = ({
                 onPress={handlePurchaseRemoveAds}
                 phase={phase}
                 variant="secondary"
-                disabled={flow === 'working'}
+                disabled={purchaseDisabled}
                 accessibilityLabel="Remove ads"
               />
             </View>
@@ -401,7 +473,7 @@ export const PatronModal: React.FC<PatronModalProps> = ({
 
           {flow === 'working' && (
             <View style={styles.workingRow}>
-              <ActivityIndicator size="small" color={t.amberText} />
+              <ActivityIndicator size="small" color={t.amberText} accessibilityLabel="Finishing your store request" />
             </View>
           )}
 
@@ -411,7 +483,7 @@ export const PatronModal: React.FC<PatronModalProps> = ({
               onPress={handleRestore}
               phase={phase}
               variant="quiet"
-              disabled={flow === 'working'}
+              disabled={working}
               accessibilityLabel="Restore purchases"
               style={styles.restoreBtn}
             />
@@ -422,6 +494,7 @@ export const PatronModal: React.FC<PatronModalProps> = ({
             onPress={handleClose}
             phase={phase}
             variant="quiet"
+            disabled={working}
             accessibilityLabel={isPatron ? 'Close' : 'Maybe later'}
           />
 
@@ -593,3 +666,4 @@ const styles = StyleSheet.create({
 });
 
 export default PatronModal;
+
