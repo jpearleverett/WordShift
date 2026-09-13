@@ -1,7 +1,20 @@
-# World-art generation sources
+# Retained art, animation and music sources
 
-AI-generated pixel-art sources for the house exterior. These are NOT bundled
-into the app (nothing `require()`s them) — they are the inputs to:
+Reviewed September 13, 2026 against `main` at `6f96ebb`. This directory retains
+source art, retouch backups, authored music originals and animation inputs.
+Runtime code imports the prepared assets in the delivery directories, not
+these masters. Keep the masters in Git so future edits remain reproducible.
+
+The repository-root `.easignore` excludes `mobile/assets/raw/` from the source
+archive sent to EAS. This is a separate concern from Metro's runtime asset
+selection: an unimported master could previously increase the build upload
+without appearing in the installed app. Asset-generation tools are explicit
+maintenance commands; normal EAS builds use committed delivery assets. See the
+[build and upload guide](../../../docs/BUILD_AND_UPLOAD.md).
+
+## House exterior sources
+
+The pixel-art house exterior sources are inputs to:
 
     node scripts/tools/processRawWorldArt.mjs
 
@@ -9,6 +22,7 @@ which keys out the studio background, crops, downscales, and writes the live
 assets to `assets/environment/` (and window masks to `assets/rooms/windows/`).
 
 Sources:
+
 - `roof_raw.png` → `roof.png`
 - `phase_1.png` .. `phase_5.png` → `foundation_0.png` .. `foundation_4.png`
   (one hand-lit foundation per phase: day green → dusk dry → night blue;
@@ -60,8 +74,9 @@ silently revert that tool's edits.
 (48 kHz stereo VBR at roughly 180-195 kbps, with a cover picture and generator
 tags), renamed to `home_phase0..5.mp3` and `puzzle_phase0..5.mp3` because a
 space in an asset filename is a Metro/Android hazard. Nothing `require()`s
-them and `assets/raw` is not in `assetBundlePatterns`, so they never reach the
-binary. The shipped beds in `assets/music/` are re-encodes written by
+them. `assets/raw` is outside the configured `assetBundlePatterns`, and the
+current upload rules also exclude this source directory from EAS archives.
+The shipped beds in `assets/music/` are re-encodes written by
 
     npm run encode:music
 
@@ -70,3 +85,12 @@ stream stripped, a static per-track gain only if the set spans more than 3 LU
 of integrated loudness). Replace an original here under the same name, re-run
 the script, and commit both files; `src/__tests__/musicAssets.test.ts` checks
 the shipped side on every test run.
+
+## Animation sources
+
+`fox_walk_source.mp4` retains the source for fox's ten delivered frames. The
+eleven authored walk sheets in [`animal_walk_sheets/`](animal_walk_sheets/README.md)
+retain prompts and hashes alongside their originals. Runtime code imports
+`assets/characters/<animal>/walk.png` atlases (or the fox frame PNGs), not these
+source sheets. Axolotl has no new atlas. Rebuilding a source requires the full
+repository checkout with this directory present; it is not a build-server step.

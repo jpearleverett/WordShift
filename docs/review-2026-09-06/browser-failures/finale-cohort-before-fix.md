@@ -1,5 +1,7 @@
 # Instructions
 
+> **Historical snapshot — status clarified September 13, 2026.** This document retains the findings, commands, counts and evidence from its original review. “Current”, “shipped” and completion claims below apply to that recorded snapshot. For the latest code, release procedure and remaining acceptance checks, use [Current build](../../CURRENT_BUILD.md).
+
 - Following Playwright test failed.
 - Explain why, be concise, respect Playwright best practices.
 - Provide a snippet of code with the fix, if possible.

@@ -1,5 +1,7 @@
 # Completed vocabulary editorial review — 6 September 2026
 
+> **Historical snapshot — status clarified September 13, 2026.** This document retains the findings, commands, counts and evidence from its original review. “Current”, “shipped” and completion claims below apply to that recorded snapshot. For the latest code, release procedure and remaining acceptance checks, use [Current build](CURRENT_BUILD.md).
+
 All 58 previously quarantined forms now have a final game policy decision: **9 restored, 49 excluded**. An excluded form may still be real English; this game does not aim to accept every archaic inflection, niche noun plural, abbreviation, or alternate spelling. Historical saved boards keep their original dictionary. No word requires an owner decision.
 
 The [machine-readable decision record](../mobile/scripts/vocabulary/editorial-decisions-2026-09-06.json) contains every matched row from the pinned [ESDB source revision](https://github.com/en-wl/wordlist/tree/1e5b7d3a72f47a71da5d28686c1dd4b397178485), including the variants omitted by the first strict query. Size refers to the headword inclusion level, while variant level describes the spelling; neither measures player comprehension. Direct publisher entries supplement the reinstatements and several easily misunderstood exclusions. Reasons below are WordShift editorial judgments, not dictionary quotations.

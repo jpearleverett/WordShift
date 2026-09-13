@@ -1,0 +1,120 @@
+# EAS archives this Git repository even when the command runs from mobile/.
+# This file REPLACES every .gitignore for EAS. Keep the two mirrored sections
+# below in sync when either .gitignore changes. See docs/BUILD_AND_UPLOAD.md.
+
+# Repository .gitignore protections
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+/undefined/
+
+# Claude Code harness infra (agent worktrees + transcripts) — never commit
+.claude/
+
+# Reviewed completion evidence is retained with its validation reports.
+!docs/review-2026-09-06/*.log
+!docs/review-2026-09-06/browser-logs/*.log
+
+# mobile/.gitignore protections, scoped to mobile/ from the repository root
+# Dependencies
+/mobile/**/node_modules/
+
+# Expo
+/mobile/**/.expo/
+/mobile/**/dist/
+/mobile/**/web-build/
+
+# Native builds
+/mobile/**/*.orig.*
+/mobile/**/*.jks
+/mobile/**/*.p8
+/mobile/**/*.p12
+/mobile/**/*.key
+/mobile/**/*.mobileprovision
+
+# Metro
+/mobile/**/.metro-health-check*
+
+# Debug
+/mobile/**/npm-debug.*
+/mobile/**/yarn-debug.*
+/mobile/**/yarn-error.*
+
+# macOS
+/mobile/**/.DS_Store
+/mobile/**/*.pem
+
+# Local env files
+/mobile/**/.env*.local
+
+# TypeScript
+/mobile/**/*.tsbuildinfo
+/mobile/src/data/.reverseBank*_phase*.json
+/mobile/src/data/.reverseBank*_phase*.json.bak
+/mobile/src/data/.reverseBank*_phase*.json.tmp
+
+# EAS / store credentials — never commit
+/mobile/**/secrets/
+/mobile/src/data/.bank_*_progress.json*
+
+# Gated full-regeneration campaign (checkpoints, sidecar banks, driver logs)
+/mobile/src/data/.gatedRegen_*_progress.json*
+/mobile/src/data/.gatedRegen_*_output.ts*
+/mobile/src/data/.gatedRegen_*.log
+/mobile/src/data/.gatedRegenReverse_*_progress.json*
+/mobile/src/data/.gatedRegenReverse_*_output.ts*
+/mobile/src/data/.gatedRegenReverse_*.log
+/mobile/src/data/.gatedRegenDouble_*_progress.json*
+/mobile/src/data/.gatedRegenDouble_*_output.ts*
+/mobile/src/data/.gatedRegenDouble_*.log
+/mobile/src/data/.pre_gated_*.ts.bak
+
+# Rendered journey evidence (CI artifacts)
+/mobile/**/playwright-report/
+/mobile/**/test-results/
+
+# Authoring originals, Play listing materials, and review/documentation files.
+# Runtime assets (including music and story art), source, scripts, and plugins stay.
+/mobile/assets/raw/
+/mobile/assets/Play_store/
+/docs/
+/mobile/docs/
+/.github/
+
+# The shallow Git object database can duplicate the media in the source archive.
+# EAS resolves the commit metadata before packing; build scripts do not need Git.
+.git
+
+# Locally downloaded app binaries and generated build/test caches.
+*.aab
+*.apk
+*.ipa
+coverage/
+.gradle/
+/mobile/android/build/
+/mobile/android/app/build/
+/mobile/ios/build/
+/mobile/ios/Pods/
+/eas-build-inspect/
+/mobile/eas-build-inspect/

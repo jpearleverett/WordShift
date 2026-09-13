@@ -1,5 +1,8 @@
 # Support, deletion and retention operations
 
+Reviewed against main `6f96ebb` on 2026-09-13. See [current build](CURRENT_BUILD.md)
+and [backend setup](BACKEND_SETUP.md) for the source/deployment distinction.
+
 This is a release deliverable, not evidence that the migrations or retention jobs
 have been deployed. Apply/rehearse the SQL in `supabase/` before advertising the
 updated support flow. Backend operator access is required. Never put a service
@@ -66,9 +69,16 @@ these SQL statements remove provider-side records.
 
 Reset All atomically clears game progress and marks the reset before attempting
 the explicit cloud overwrite. Cloud/install/support identity, install date,
-paid-grant retry protection and anti-repeat courtesy flags survive local reset.
+paid-grant retry protection, the installation purchase-history baseline/applied
+receipts, the first-Amber-purchase flag and anti-repeat courtesy flags survive
+local reset.
 Cloud deletion is a separate action. Store entitlements can be restored on the
-next startup. A reinstall's OS backup behavior is platform dependent.
+next startup. A reinstall's OS backup behavior is platform dependent. Consumable
+history is not a promise to refill spent packs on another installation: older
+unknown receipts are baselined instead of granted again. For a missing paid item,
+verify the native transaction and current grant state before promising recovery
+or issuing a compensating grant; never tell the player to purchase it again to
+retry an already-confirmed payment's local save. See [purchase recovery limits](MONETIZATION_SETUP.md#purchase-and-reward-integrity).
 
 Original-device local progress can upgrade to a strong recovery code. Full
 legacy UUIDv4 capabilities may import their original row. Short or timestamp

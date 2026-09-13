@@ -1,5 +1,10 @@
 # WordShift — Growth & Monetization Strategy
 
+Reviewed against `main` (`6f96ebb`) on September 13, 2026. See
+[current build status](CURRENT_BUILD.md) for the release configuration and
+remaining device checks. This is a planning document, not measured launch
+performance or evidence that the public release has happened.
+
 This note records the growth/monetization policy the game is built and tuned
 for, so future changes stay consistent with the revenue model. It is the
 operational companion to the revenue assessment (the "Arrangement Ledger"
@@ -9,13 +14,12 @@ subscription, or season reward ever feeds `phaseProgress`.
 
 ## The core finding: organic-and-retention, not paid acquisition
 
-WordShift monetizes deliberately lightly (a word game is ~87% ad-supported, and
-this one runs no banners in the core loop, mutes interstitials through the dark
-phases, and sells convenience/cosmetics only). At that ARPDAU, **paid user
-acquisition does not pencil at tier-1 prices** — realistic per-install LTV
-(~$0.30–1.00) sits well under a realistic indie tier-1 CPI (~$4.50–6.50 iOS /
-$3.00–4.50 Android after the beginner premium + ~30% YoY inflation). Every
-monetization design modeled stayed underwater on tier-1 paid UA.
+WordShift monetizes deliberately lightly: it runs no banners in the puzzle
+loop, mutes interstitials from Phase 4 onward, and sells convenience and
+cosmetics. The earlier revenue assessment favored an organic launch. Its
+market averages and LTV/CPI estimates were planning assumptions, not observed
+WordShift results or current market benchmarks. Replace those assumptions
+with actual acquisition, retention, ad and purchase cohorts after launch.
 
 **Therefore the growth engine is organic:**
 
@@ -33,14 +37,12 @@ monetization design modeled stayed underwater on tier-1 paid UA.
 
 Treat it as a small, self-funding experiment, not the plan:
 
-1. **Android + cheap ROW only.** Never tier-1 iOS at launch — ATT keeps iOS
-   attribution >70% probabilistic/SKAN, and below a few hundred installs/day
-   SKAN privacy thresholds make iOS UA effectively unmeasurable.
-2. **Gate on a validated ROAS.** Require a real D7 ROAS that extrapolates past
-   break-even at a D90 window *before* scaling a dollar, and recompute the
-   D7→mature multiplier as cohorts mature (assume 2–3× D7→D365 until proven).
-3. **Hold to a >1:1 realized contribution margin** at D90 before committing
-   recurring budget — an indie cannot absorb a D180 un-recovered cohort.
+1. Start with the Android launch audience and a fixed budget the developer
+   can afford to lose. iOS activation remains separate work.
+2. Measure install cost, retention and net revenue for the same cohort;
+   do not assume an industry multiplier makes a short test profitable.
+3. Scale only when observed contribution after store fees and acquisition
+   costs supports the spend. Treat immature cohorts as uncertain.
 
 ## Monetization surface (as shipped after the revenue pass)
 
@@ -49,7 +51,7 @@ Convenience/expression only. Nothing here touches phase progression.
 | Lever | What it is | Notes |
 |---|---|---|
 | Interstitials | Auto, victory exits only | Every 6 puzzles (Ph 0–2), every 10 (Ph 3), **silent Ph 4–5**. Pit-exit exempt by design. |
-| Rewarded (opt-in) | victory 2×, hint recovery, speed rescue, daily amber, **quest double** | Global cap 8/day; never auto-shown; Patron/ad-free suppressed. |
+| Rewarded (opt-in) | victory 2×, hint recovery, speed rescue, daily amber, **quest double** | Global completed-view cap 8/day; never auto-shown. Paid benefits vary by placement: victory double is free for ad-free holders; Daily Amber is free for Patron specifically. The provider does not blanket-disable opt-in rewards for every paid player. |
 | Banner | Menu-surface only (Stats) | Suppressed for ad-free / onboarding / Ph 4+. Android unit id is configured (test creatives while `adsUseTestIds` is true); iOS stays inert until the iOS keys land. |
 | Amber packs | $0.99 / $2.99 / $6.99 | First pack 2×. Convenience faucet for cosmetics/sinks. |
 | Hint packs | $0.99 / $2.99 | Convenience; hints still cost stars. |
@@ -72,8 +74,24 @@ economy was missing:
   season premium + cosmetic.
 - **Patron $8.99** — one-time premium, strictly above Remove-Ads.
 
-All prices in code are **fallback labels**; the real charged price is the
-Play Console / App Store Connect price tier and MUST be set to match.
+All prices above are **fallback labels**; the purchase UI uses the store's
+localized price when available. The checkout price comes from the active
+Play Console / App Store Connect product configuration, not these examples.
+
+## Purchase delivery and testing
+
+Paid checkout and restore share a lock. Verified rewards use durable pending
+grants and transaction receipts so a storage retry does not charge again.
+Room and cosmetic purchases commit ownership and amber together. Daily Amber,
+the Supporter stipend and victory double also commit their rewards with their
+claim records. These protections are implemented and regression-tested;
+native billing, consent and interruption acceptance still belongs to the
+signed Android build. See [current build status](CURRENT_BUILD.md).
+
+Restore Purchases restores eligible entitlements. It does not recreate spent
+consumables; receipt recovery after an interrupted purchase is limited to the
+known transaction history on the same installation. Keep a current cloud save
+and recovery code for progress and unspent balances.
 
 ## Owner action items (outside this repo)
 
@@ -82,9 +100,11 @@ These are the human/store steps the code is waiting on:
 1. **iOS activation** (deferred by the owner): fill `revenueCatIosKey`,
    `admobInterstitialIdIos`, `admobRewardedIdIos`, `admobBannerIdIos` in
    `app.json → extra`, plus the iOS AdMob app id in the config plugin, and the
-   iOS store products. Worth ~2× total revenue.
-2. **Create store products**: `com.wordshift.supporter_monthly` (auto-renewing
-   subscription) and price tiers for the repriced Remove-Ads / Patron.
+   iOS store products. No iOS revenue uplift has been measured.
+2. **Verify existing store products**: the owner has confirmed Supporter is
+   configured. Check `com.wordshift.supporter_monthly`, its base plan and
+   entitlement, and the current Remove-Ads / Patron prices in the signed
+   release; do not recreate products merely because an older checklist says so.
 3. **Done (Android):** the AdMob banner unit is created and
    `admobBannerIdAndroid` is filled in `app.json → extra`. The iOS banner unit
    rides item 1.

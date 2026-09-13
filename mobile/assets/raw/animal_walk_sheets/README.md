@@ -1,5 +1,7 @@
 # Animal walk source sheets
 
+Reviewed September 13, 2026 against `main` at `6f96ebb`.
+
 These eleven original image generation outputs contain eight authored walking
 poses each, in a four-column, two-row grid. `manifest.json` retains the exact
 prompt and SHA-256 of every source. Each prompt references the corresponding
@@ -9,10 +11,17 @@ for that difference when matching its horizontal framing, and the renderer
 accounts for it when displaying the existing idle and speaking art.
 
 The source sheets are provenance/build inputs only and are not imported by the
-app. The runtime imports one `walk.png` atlas per character. Fox keeps its
-original ten walk frames. Axolotl keeps its existing movement.
+app. The repository-root `.easignore` excludes this raw source directory from EAS
+uploads; the files remain in Git for regeneration. See the
+[build and upload guide](../../../../docs/BUILD_AND_UPLOAD.md).
+The runtime imports one `walk.png` atlas for each of these eleven characters.
+Fox keeps its original ten walk frames. Axolotl keeps its existing movement.
+Walk frames run in Phases 0–3 when motion settings and device tier permit;
+robed phases retain the existing glide. Fennec's facing correction is per pose,
+so turning during travel does not reuse the left-facing idle correction on the
+right-facing walk atlas.
 
-From `mobile/`, rebuild or verify the prepared assets with:
+From `mobile/` in a full repository checkout (including raw sources), rebuild or verify the prepared assets with:
 
 ```sh
 node scripts/tools/buildAnimalWalkAtlases.mjs

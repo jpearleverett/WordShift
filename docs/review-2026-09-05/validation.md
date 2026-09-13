@@ -1,5 +1,7 @@
 # Delivery validation record
 
+> **Historical snapshot — status clarified September 13, 2026.** This document retains the findings, commands, counts and evidence from its original review. “Current”, “shipped” and completion claims below apply to that recorded snapshot. For the latest code, release procedure and remaining acceptance checks, use [Current build](../CURRENT_BUILD.md).
+
 Prepared on 2026-09-06 for the September 5 improvement work. This record separates verified local evidence from remaining release checks. Source reference: the tested source tree on `feature/game-improvements-vocabulary-audit`; see branch history for its delivery commit.
 
 Scope and remaining work: [implementation ledger](../IMPLEMENTATION_STATUS_2026-09-05.md), [release procedure](../RELEASE_VALIDATION_1_3_0.md), [vocabulary audit](../VOCABULARY_AUDIT_2026-09-05.md).

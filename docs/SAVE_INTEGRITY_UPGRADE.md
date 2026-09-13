@@ -1,5 +1,8 @@
 # Save integrity upgrade
 
+Reviewed against main `6f96ebb` on 2026-09-13. See [current build](CURRENT_BUILD.md),
+[backend setup](BACKEND_SETUP.md) and [release gates](LAUNCH_CHECKLIST.md).
+
 This change requires both the updated app and `supabase/save_integrity_v2.sql`,
 applied after the original security setup. Nothing is deployed by editing these
 files. Rehearse against a disposable backend with two devices before promotion.
@@ -54,6 +57,26 @@ explicit transaction helpers only inside an owned transaction and cancel stale
 session callbacks; cache invalidation alone is not cancellation.
 
 Paid grants with a durable local intent apply currency and their receipt together.
-This does not establish a server purchase ledger or remove the native purchase
-completion window before JavaScript has persisted that intent. Native billing
+The current RevenueCat adapter also reconciles completed native transaction IDs
+newer than a durable installation history baseline, covering eligible payments
+that never reached the JavaScript checkout result. Baseline receipts and applied
+transaction IDs survive Reset All and stay out of cloud saves so old spent packs
+cannot be replayed by restore. This is not a server purchase ledger or a guarantee
+of consumable recovery after reinstall/account changes/provider-history gaps.
+The first-Amber-pack bonus likewise has sticky local history. Native checkout,
 reconciliation and actual process termination still require signed-device QA.
+
+Progress now includes a durable `pendingCeremonies` queue. Phase confirmation and
+its ceremony enqueue commit together; house completion is acknowledged after its
+scene, and finale/post-arrival/New Cycle flows queue their required ceremonies.
+Completion or deliberate confirmed Skip acknowledges the scene; an interrupted
+scene replays from its beginning on restart. The queue does not retroactively
+replay every historical ceremony for an old save. Creature introduction visits
+and dialogue choices keep their own persisted progress and presentation ownership.
+
+Victory double claims commit their completion receipt marker with the Amber
+reward; Daily Amber and monthly Supporter claims similarly commit counters/markers
+and currency together. Room/cosmetic purchases include spend, ownership and
+automatic equipment in one transaction; tending includes spend and level. These
+operations must keep using the transaction helpers when later features extend
+saves. See [monetization integrity](MONETIZATION_SETUP.md#purchase-and-reward-integrity).

@@ -1,5 +1,7 @@
 # September review implementation status — updated September 6
 
+> **Historical snapshot — status clarified September 13, 2026.** This document retains the findings, commands, counts and evidence from its original review. “Current”, “shipped” and completion claims below apply to that recorded snapshot. For the latest code, release procedure and remaining acceptance checks, use [Current build](CURRENT_BUILD.md).
+
 This ledger tracks the implementation following the [43-item review](GAME_REVIEW_AND_IMPROVEMENT_PLAN_2026-09-05.md). The review's opening statement and test totals describe the original read-only audit of `8297227`; they are not the delivery status below. Version 1.3.0 / Android 94 / iOS 3 is prepared in source, with Expo 57.0.17 and React Native 0.86.3. A new signed native binary is required. No signed build, store submission, production SQL deployment or reader pilot is claimed here.
 
 **Implemented** means the described code is present, with the stated local checks. It does not waive the remaining acceptance checks. **Ready to execute** identifies prepared tooling or an operational procedure, not an observed production outcome. Engineering owns code/test follow-ups; the release owner owns signed-device and store checks; a backend operator owns hosted migrations/support/retention; the narrative owner owns unfamiliar-reader checks.

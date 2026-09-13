@@ -1,5 +1,11 @@
 # Store image source captures
 
+Reviewed September 13, 2026. Files retained in `launch-2026-09/raw/` belong to
+the September 7 campaign; this documentation review did not recapture them.
+Current choice screens and room details need comparison with those images
+and the latest signed Android release before the pack is reused. Record the
+source revision and renderer whenever captures are regenerated.
+
 `captureLaunch.mjs` drives the actual WordShift interface in Chromium. It creates 1170 × 2100 PNG files (390 × 700 logical viewport, device scale 3) under `assets/Play_store/launch-2026-09/raw/`. The listing layouts are built separately from these source renders.
 
 Start the web app in `mobile/`:

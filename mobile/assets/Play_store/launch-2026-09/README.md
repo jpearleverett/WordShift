@@ -1,6 +1,14 @@
 # WordShift: Google Play upload pack
 
-Open [preview.html](preview.html) to review the whole campaign. Upload the ten PNGs below to the **English main store listing**. The eight phone images belong in the listed order; the feature graphic and icon have their own fields.
+This is the **September 7, 2026 campaign snapshot**. Subsequent builds changed
+choice screens, animal introductions and room details. The September 13
+documentation review did not regenerate these images, the manifest or ZIP.
+Compare the shown UI with the latest signed Android build and recapture
+changed screens before submission. See [current build status](../../../../docs/CURRENT_BUILD.md).
+
+Open [preview.html](preview.html) to review the whole campaign. Once checked,
+upload the ten PNGs below to the **English main store listing**. The eight phone
+images belong in the listed order; the feature graphic and icon have their own fields.
 
 | Order | Play Console field | File |
 | ---: | --- | --- |
@@ -24,5 +32,9 @@ The screenshots are actual React Native web renders, captured at 390 × 700 with
 The feature illustration and icon were generated with the built-in image generation tool using the game's existing art as reference. The exact prompts and references are saved in [source/prompts.json](source/prompts.json); retained masters are in `art/`. Their role is promotional illustration, not a claim that these paintings are playable scenes.
 
 The editable HTML layouts are in `source/layouts/`. From the repository's `mobile/` directory, run `npm run store:build` to rebuild the upload files, preview, contact sheet, copied listing text, and manifest from the retained art and captures. This requires Playwright's Chromium browser. Capture regeneration is separate: `scripts/store/captureLaunch.mjs`. Run `npm run store:package` with Python 3 available to regenerate the ZIP and verify its integrity. Source layouts resolve the game's original fonts and wordmark from the repository; the preview and upload PNGs can be viewed directly after unzipping.
+
+Changing Markdown alone does not refresh the ZIP's embedded documentation or
+any screenshots. Rebuild and package together after a capture refresh; retain
+the new source provenance and review the resulting images before upload.
 
 This pack does not publish a listing or release a build. The existing app launcher icon remains separate from the supplied Play listing icon.

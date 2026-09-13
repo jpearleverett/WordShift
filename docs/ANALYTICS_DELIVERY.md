@@ -1,5 +1,9 @@
 # Event delivery and useful comparisons
 
+Reviewed against main `6f96ebb` on 2026-09-13. See [current build](CURRENT_BUILD.md)
+and [backend deployment](BACKEND_SETUP.md). Supabase is configured in source and
+the custom collector URL is empty; hosted receipt of events still needs evidence.
+
 Events have stable persisted IDs. Queue writes and ID acknowledgements serialize;
 retention keeps the most recent 500 events. A slow upload acknowledges only its
 snapshot IDs, preserving newer events even after retention shifts the queue.
@@ -34,3 +38,25 @@ The first observed event is not necessarily install day for upgraded players.
 Record build/runtime, collection window and eligible sample size with decisions.
 Hosted migration, production event arrival and retention remain operator release
 checks; local Jest queue tests and PostgreSQL rehearsal do not verify them.
+
+## Reading the current gameplay and store events
+
+Use the event union and call sites in `mobile/src/services/eventLogger.ts` as the
+inventory, not old dashboard screenshots. Puzzle, mode, phase, story/choice,
+store, purchase and ad events describe observed actions; the durable gameplay
+receipts and native billing records own progression and payment truth. A lost or
+repeated analytics event must never be used to grant or revoke a purchased item.
+
+Recent changes protect late-animal introductions, choice persistence, ceremony
+replay and paid/reward claims. A replay after interruption can produce another
+observed scene start, so compare completion by install/scene/cycle where those
+fields are present rather than equating starts with unique players. Do not infer
+that every animation frame, dialogue page or navigation gesture is tracked.
+Recheck the relevant call sites and the eligible cohort before adding a funnel.
+
+For release verification, exercise onboarding, a mode unlock, an acquaintance
+visit and choice, ceremony defer/resume/Skip, a normal and abandoned puzzle,
+a pending/cancelled/completed purchase and each ad outcome. Record which events
+actually arrive in the hosted project and which states have no dedicated event.
+A pending payment should not be interpreted as proven revenue from an initiated
+checkout; reconcile monetary totals with Play/RevenueCat reports.

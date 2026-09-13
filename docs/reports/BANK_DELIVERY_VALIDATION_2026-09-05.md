@@ -1,5 +1,7 @@
 # Fresh bank delivery validation — 2026-09-05
 
+> **Historical snapshot — status clarified September 13, 2026.** This document retains the findings, commands, counts and evidence from its original review. “Current”, “shipped” and completion claims below apply to that recorded snapshot. For the latest code, release procedure and remaining acceptance checks, use [Current build](../CURRENT_BUILD.md).
+
 The [6 September follow-up](../PUZZLE_BANK_TOP_UP_2026-09-06.md) completes the editorial decisions and gated bank replenishment. This document preserves the original September 5 findings; use the follow-up report for current bank counts and proofs.
 
 All 30 generated banks were audited against the actual fresh-board dictionary and shared runtime qualification. The generated bank files were not edited. Out of 9,611 historical boards, 3,809 qualified for new play at that audit checkpoint.

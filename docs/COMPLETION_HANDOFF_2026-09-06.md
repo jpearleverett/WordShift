@@ -1,5 +1,7 @@
 # Completion handoff — September 6, 2026
 
+> **Historical snapshot — status clarified September 13, 2026.** This document retains the findings, commands, counts and evidence from its original review. “Current”, “shipped” and completion claims below apply to that recorded snapshot. For the latest code, release procedure and remaining acceptance checks, use [Current build](CURRENT_BUILD.md).
+
 This follow-up finishes the implementable September review work on
 `feature/game-improvements-vocabulary-audit`. Validation results are recorded in
 `review-2026-09-06/validation.md`; the original item ledger remains in

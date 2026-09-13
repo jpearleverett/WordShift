@@ -1,5 +1,9 @@
 # WordShift — Press & Creator Kit
 
+Source review: September 13, 2026, `main` at `6f96ebb`. The configured app
+version is **1.3.4**, Android version code **98**; this does not identify the
+binary currently installed by a reviewer. See [current build status](CURRENT_BUILD.md).
+
 > A cozy word puzzle that is secretly something else. This kit tells you what,
 > how to show it responsibly, and how to skip a ~90-puzzle slow burn using a
 > reviewer fast-forward built into the game.
@@ -15,10 +19,10 @@ editing-room decisions.
 **WordShift** is a candy-colored mobile word puzzle with one satisfying rule:
 pick a letter from one word, drop it into the next, and both must stay real
 words. You earn amber, build a storybook house, and fill it with adorable
-animal friends who chat with you between puzzles. It is genuinely one of the
-coziest word games on the store — for the first few hours. Then the animals'
+animal friends who chat with you between puzzles. The early rooms and
+conversations are warm and welcoming. Then the animals'
 questions get a little strange, the sky over the house turns, and the game
-begins a slow, deliberate descent that most players never see coming. WordShift
+begins a slow, deliberate descent. WordShift
 is a bait-and-switch played completely straight: the warmth is real, which is
 exactly why what follows lands.
 
@@ -31,21 +35,29 @@ exactly why what follows lands.
 | **Platform** | Android (Google Play) at launch; built cross-platform (iOS planned) |
 | **Engine / stack** | React Native + Expo, TypeScript |
 | **Price** | Free. Optional in-app purchases (currency/hint packs, a starter bundle, cosmetics, one-time Remove Ads, a one-time Patron key, and an optional Supporter monthly subscription) and occasional ads with an opt-in rewarded tier |
-| **Monetization stance** | Convenience and cosmetics only — the story unfolds at the same pace for everyone; nothing narrative is purchasable |
+| **Monetization stance** | Convenience and cosmetics; purchases do not advance narrative phase progress or buy story chapters. Players' pace varies with play and reading. |
 | **Accounts** | None required; core puzzles play offline |
-| **Current version** | 1.2.2 |
-| **Content rating** | ESRB Teen / PEGI 12 / Apple 12+ — mild horror themes; no gore, no violence, no profanity (the dictionary is filtered) |
+| **Configured version** | 1.3.4, Android version code 98; confirm the delivered review build |
+| **Audience / rating** | Intended for ages 13+ with dark-fantasy/horror themes. Publish only the regional ratings actually assigned in the store console. |
 | **Genre** | Word puzzle / narrative slow burn |
-| **Session length** | 2–5 minutes per puzzle; the full arc is tens of hours |
-| **Press contact** | `[press contact email — provided with your creator code]` |
+| **Session length** | Varies by difficulty and reading; no measured average is claimed |
+| **Press contact** | jpearleverett@gmail.com |
 
 **By the numbers:** 13 animal companions, a 13-room house built bottom-up,
 5 difficulty tiers (topped by a 6-letter EXPERT), 3 play styles (standard,
 Reverse, Double Shift) with 4 stackable modifiers (Challenge, timed Speed
 runs, the previews-off Blind Offering, and the rare-word Lexicon), a shared
-Daily Challenge with leaderboard, 56 achievements, a 22,749-word dictionary,
-and ~9,611 quality-gated pre-generated puzzles across 30 banks plus on-device
-generation.
+Daily Challenge with leaderboard, 56 achievements, and thousands of word
+puzzles across 30 pre-generated banks plus on-device generation. The September
+6 audit recorded 7,356 stored boards and 4,372 qualifying boards; current
+delivery also applies vocabulary and complete-route eligibility checks. Do
+not advertise every stored board as playable. The newcomer's first Daily
+Challenge has an easier shape and does not enter the shared leaderboard.
+
+The story includes remembered choices beyond the first cup of tea or cocoa.
+Later recruits get personal introductory visits using their established
+writing, with earlier conversations available in the journal. Room upgrades
+are authored additions fitted to each animal's room, not freeform decorating.
 
 ## Why this clips well (creator notes, spoiler-safe)
 
@@ -61,17 +73,20 @@ generation.
   stream at a glance — ghost previews show the word each drop would form, with
   valid/invalid grading on EASY and the earliest boards (past that, judging
   the word yourself is the skill) — and chat can play along.
-- **It respects the bit.** No fourth-wall winks, no "gotcha" jump scares. The
-  game never tells you what is happening; it lets you notice.
+- **It gives you time to notice.** The mood changes before the household can
+  explain it. Later conversations address the evidence and what it means.
 
 ## The creator fast-forward (reviewer save states)
 
-The game's reveal sits **~90+ puzzles deep by design** (the finale lands around
-puzzle 116) — that pacing is the point for players, and a wall for reviewers. Creator-enabled builds therefore
+The first-run reveal has a **90-puzzle minimum** alongside progression gates;
+the finale additionally depends on house completion, its dwell window and
+the next eligible board. These are gates, not a promise that every player
+reaches a scene at one exact puzzle number. Creator-enabled builds therefore
 ship with a private fast-forward that installs a coherent late-game save:
 correct puzzle counts, currency, house progress, unlocked companions, and
-era-appropriate dialogue, with all tutorials already behind you. It is the same
-save a real long-term player would have, minus the weeks.
+era-appropriate dialogue, with tutorials marked seen. It uses the same
+progression systems as normal play, staged for capture. It is not proof
+that a normal player saw every introductory conversation or ceremony.
 
 **How to use it:**
 
@@ -96,8 +111,8 @@ save a real long-term player would have, minus the weeks.
 
 | `era=` | In-game era | You get |
 |---|---|---|
-| `dusk` | Deeper Questions | ~50 puzzles in. The first act's warmth with a visible tilt: dusk skies, uneasy conversations, a half-built house |
-| `shadows` | Growing Shadows | ~85 puzzles in. The slow burn at full heat, the house nearly complete, the mood unmistakably wrong |
+| `dusk` | Deeper Questions | 50-puzzle staged save. Dusk skies, uneasy conversations, a partially built house |
+| `shadows` | Growing Shadows | 85-puzzle staged save. The house is further developed and the mood has darkened |
 | `reveal` | The Horizon | ~140 puzzles in. The late game, house complete. **Spoiler-heavy** |
 | `peace` | Terrible Peace | ~180 puzzles in. The post-story state. **Spoiler-heavy** |
 
@@ -105,6 +120,10 @@ save a real long-term player would have, minus the weeks.
 > is no undo. Use a spare device or profile if you have a personal save you
 > care about. One link per era — you can move between eras by applying another
 > link, but always as a full replacement.
+
+Snapshots intentionally acknowledge ceremonies produced by their staged
+history. Test first-time ceremonies and animal introductions through normal
+play, not by treating these shortcuts as a complete player journey.
 
 **Recommended review path:** play the first 30–60 minutes from a genuinely
 fresh install (the opening is the product's first impression and takes no
@@ -125,20 +144,26 @@ The reveal is the product. We ask, politely and without DRM-shaped teeth:
 
 ## Content rating note
 
-WordShift's horror is **tonal, not graphic**: unease, dread, and implication.
-There is no gore, no violence, no death on screen, no profanity, and no jump
-scares. Rated **Teen (ESRB) / PEGI 12 / 12+ (Apple)** for mild horror and fear
-themes. It is a game about noticing that something is wrong long before anyone
-says it.
+WordShift's horror uses unease, dread and implication. The intended audience
+is 13+, and the dictionary has vocabulary filtering. An intended audience
+is not an issued ESRB, PEGI or Apple rating: use the live console's regional
+results for the reviewed release. The old kit's fixed labels were draft
+guidance and should not be reproduced as assigned ratings.
 
 ## Press assets
 
 - App icon (1024×1024): `mobile/assets/icon.png`
-- Feature graphic (1024×500): `docs/feature-graphic.png`
+- Current campaign review: [September launch pack](../mobile/assets/Play_store/launch-2026-09/README.md)
+- Feature graphic (1024×500): `mobile/assets/Play_store/launch-2026-09/upload/feature-graphic-1024x500.png`
 - Store copy and screenshot shot list: `docs/STORE_LISTING.md` (narrative-safe,
   in order)
 - Additional screenshots/GIFs of any era on request — or capture your own via
   the fast-forward above.
+
+The retained September launch screenshots are web captures from that dated
+campaign. Choice presentation and room details have changed since capture;
+compare them with the latest signed Android build before reuse. This docs
+review did not regenerate artwork or publish a listing.
 
 ---
 
@@ -148,22 +173,26 @@ says it.
 
 ## What WordShift actually is
 
-The animals are a cult. Every puzzle the player solves is, unknowingly, an
-incantation — the words are offerings, the house is a temple being built room
-by room, and the player's "help" is the whole plan. Across five acts the game
-migrates from candy-bright word toy to quiet cosmic horror without ever
-breaking character: the fox who once wanted to tell you about cozy blankets
-eventually says things like *"The fire grows cold... but something else
-burns,"* and it lands **because you remember the blankets**. The final act is
-not a boss fight; it is a reveal, an arrival, and then — worse than any
-scream — a terrible, serene peace. The animals were never evil. They are
-reverent, certain, and grateful. You helped.
+The puzzles form offerings and the growing house prepares for an arrival.
+The residents have different relationships with that tradition: affection,
+doubt, withheld information, investigation and disagreement matter. They are
+not an interchangeable cast secretly agreeing about everything. The main
+story follows evidence of what the house is becoming and asks what its
+inhabitants owe each other.
+
+The finale lets the player set a boundary: a private room that keeps an
+uncorrected thought, or a road that leads away. Earlier decisions affect
+later responses and details, and the post-arrival conversation leaves room
+for anger, hope, uncertainty or silence. New Cycle carries traces of the
+chosen boundary; the journal retains transcripts from the ten most recent
+earlier cycles. Do not promise separate campaigns or a different puzzle set
+for every dialogue choice.
 
 Design rules the game never breaks (useful framing for reviews):
 
 - The fourth wall stays intact; the animals don't know they're in a game.
-- The player is made **complicit**, not victimized: "You solved the puzzle.
-  You brought us closer."
+- The player's participation matters, and their later boundaries and answers
+  matter too.
 - The entity is never named and never explained.
 - Visuals shift slightly *before* the dialogue admits anything — the player is
   meant to feel it before they're told.
@@ -186,29 +215,32 @@ Design rules the game never breaks (useful framing for reviews):
 **`shadows` — Growing Shadows (in-video with a warning):**
 - Storm sky; the shadow at the edge of the house art if you look closely
 - Hollow victory text; the move/victory sounds turn dark
-- Animal choice points (each companion offers one binary dilemma)
+- Animal choice points (one remembered ask/refuse dilemma per companion,
+  delivered when their dialogue reaches the relevant material)
 - The pit's ward marks charging toward something
 
 **`reveal` — The Horizon (SPOILERS — never in thumbnails):**
 - Robed sprites; the looming figure behind the house
 - "The arrangement" spoken plainly; Ember recontextualizing her own tutorial
-- The amber **sacrifice** mechanic (voluntary destruction, zero benefit)
-- Keep playing: the finale fires after roughly eight more wins in this era
+- The voluntary amber offering buys no item or ending; an active offering
+  quest can return part of that amber
+- Keep playing through the finale gates; a staged reveal save is not a
+  guarantee that the arrival fires after exactly eight more wins
 
 **`peace` — Terrible Peace (SPOILERS):**
-- The settled world; serene, grateful animals
+- The changed world and the consequences of the player's chosen boundary
 - The Tending Shrine; "The pattern continues."
 - The New Cycle option — the game's NG+, where the descent comes faster
 
 ## One-line summaries you may quote
 
-> "A word game that is nice to you for ten hours specifically so it can hurt
-> you in the eleventh."
+> "A cozy word puzzle about the things a house remembers."
 
-> "The cult was the friends we made along the way."
+> "Move one letter. Stay long enough to hear what changes."
 
 ---
 
 *This document is the creator/press kit for WordShift. The creator code is
 distributed privately; if you received this kit without one, request it via
-the press contact above. Kit last updated for v1.2.2, 2026-08-31.*
+the press contact above. Kit reviewed against the configured v1.3.4 source,
+2026-09-13; native release acceptance and store publication are separate.*

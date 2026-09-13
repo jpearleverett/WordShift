@@ -2,6 +2,12 @@
 
 > **Android copy superseded September 7, 2026:** use the [current Google Play launch pack](../mobile/docs/store-launch/README.md) and [finished artwork upload guide](../mobile/assets/Play_store/launch-2026-09/README.md). The material below is retained for historical context and iOS reference; do not paste its older Android campaign into Play Console.
 
+> **September 13 source review:** the current configuration and release checks
+> are in [CURRENT_BUILD.md](CURRENT_BUILD.md). The September 7 image pack has
+> not been recaptured for the subsequent dialogue and room changes. Compare
+> it with the latest signed Android build before upload. Historical upload
+> statements below describe those dated campaigns, not current Console state.
+
 Working copy for the App Store / Google Play listings. The hook of the game is
 the tonal bait-and-switch — the listing must *hint* at the darkness without
 spoiling the reveal, while the age rating must declare it honestly.
@@ -86,8 +92,8 @@ They've been waiting.
 - **Content-rating questionnaires:** disclose the actual horror/fear themes and app capabilities in each store's current questionnaire. Google uses IARC to assign regional ratings; a draft ESRB/PEGI label is not an issued rating. [Google content ratings](https://support.google.com/googleplay/android-developer/answer/9898843?hl=en)
 - **Apple:** the current system includes 13+, 16+ and 18+; the old 12+ label below the July artwork is historical. Complete the current App Store Connect questions and inspect the calculated regional rating. The game's intended 13+ audience is a separate product choice. [Apple's current rating definitions](https://developer.apple.com/help/app-store-connect/reference/app-information/age-ratings-values-and-definitions)
 - **Contains ads:** Yes (Google AdMob — interstitial, opt-in rewarded, and menu banners). Declare it in the Play "Ads" question. `app-ads.txt` is live at the domain root (`https://jpearleverett.github.io/app-ads.txt`, pub-6575205005908086).
-- **Contains in-app purchases:** Yes — 10 products: amber packs, hint packs, one-time starter bundle, Remove Ads, Patron's Key, cosmetic bundle (the original 9, created + activated in Play Console 2026-07-02), plus the **Supporter auto-renewing subscription** (revenue pass — create it in Play Console; see `docs/MONETIZATION_SETUP.md`). Play derives the displayed price range from the active products automatically.
-- **Target audience:** 13+ (do not target children — ads + dark themes). Avoids the Families policy.
+- **Contains in-app purchases:** Yes — 10 configured product IDs: amber packs, hint packs, one-time starter bundle, Remove Ads, Patron's Key, cosmetic bundle, and the **Supporter auto-renewing subscription**. The owner has confirmed Supporter is configured; verify existing products and localized prices in the signed release rather than recreating them. See [monetization setup](MONETIZATION_SETUP.md).
+- **Target audience:** the product is intended for ages 13+. Complete the store's audience and content questions accurately for the actual release.
 
 ## Data safety / privacy (Play Data Safety + Apple Privacy)
 
@@ -98,7 +104,7 @@ Backend features are LIVE (Supabase + Sentry + AdMob + Google Play Billing), so 
 - **Device or other IDs — Advertising ID** — collected by Google AdMob. Purpose: advertising/marketing. May be shared with Google.
 - **Approximate location** — coarse, IP-derived, collected by Google AdMob for ad serving. Purpose: advertising/marketing.
 - **Purchase history** — entitlement/purchase records via Google Play Billing / RevenueCat. Purpose: app functionality.
-- **App info & performance / "Other" save data** — cloud backup of the game save (stored under a random install id, synced automatically when online) + daily leaderboard result (time/stars/hints, only if the player plays the daily) → Supabase.
+- **Cloud save and leaderboard data** — the backup uses a separate random save credential, with support/install references privately linked after successful backups. Eligible daily leaderboard results use the install identifier. The newcomer's easier first daily does not submit to the shared leaderboard. Use the current backend inventory and store questionnaire when selecting categories.
 
 Legal pages are **LIVE and publicly accessible** via GitHub Pages (deployed from branch, `/docs`). Use these URLs in the store consoles and in-app Settings (all three are also wired into `mobile/src/constants/links.ts`):
 
@@ -109,7 +115,7 @@ Legal pages are **LIVE and publicly accessible** via GitHub Pages (deployed from
 ## Asset checklist
 
 - [x] App icon 1024×1024 — `mobile/assets/icon.png`
-- [ ] Android 1.3.0 screenshots ×8 from the signed build, following the current capture brief. The July 13 uploads are historical; the names below identify that older campaign. Public listing inspection returned 404 on September 6, so the current internal-track asset set requires Play Console access.
+- [ ] Compare the September 7 campaign's eight web-captured phone images with the latest signed Android build. Refresh changed dialogue/choice and room surfaces as needed. The July 13 uploads and September 6 listing-access result below are historical; current Console state was not reverified by this documentation review.
 - [x] Feature graphic 1024×500 (Play), generated — `docs/feature-graphic.png`
 - [ ] iPhone 6.7" screenshots ×5 (needs device/simulator)
 - [ ] iPad 12.9" screenshots ×3 (supportsTablet is true)

@@ -1,6 +1,6 @@
 # Story clarity and delivery pilot
 
-This is a prepared protocol for F22/F23/F28/F29/F33. **No participants have completed it yet.** Five unfamiliar readers provide an early clarity signal, not statistical retention evidence. Keep answers in de-identified notes; never collect recovery credentials, production saves or telemetry transcripts.
+This is a prepared protocol for the revised story and its delivery, reviewed September 13, 2026 against `main` at `6f96ebb`. The repository contains **no completed participant report for this protocol**; the owner’s earlier 12-tester/14-day Play closed test does not establish that this particular pilot was run. Historical audit references: F22/F23/F28/F29/F33. See [current build](CURRENT_BUILD.md) for release evidence. Five unfamiliar readers provide an early clarity signal, not statistical retention evidence. Keep answers in de-identified notes; never collect recovery credentials, production saves or telemetry transcripts.
 
 ## Prepare
 
@@ -25,7 +25,17 @@ Every reader should see both outcome presentations eventually, but let their fir
 
 **Compressed story walkthrough —25–40 minutes, optionally on another day.** Use the prepared coherent route to move between chapters after the reader has actually read each delivered scene. Label the compression openly. Keep roster, choices, seen pages and chronology coherent; never mark an unseen optional transcript as read and then count its callback as understood. Use the journal to read any required earlier chapter before moving ahead. Record skipped/missing context explicitly. Do not interpret compressed-session timing as ordinary game pacing or economy data.
 
+For a late-arrival route, meet at least one of animals 8–13 in Phase 3. Read its welcome, ordinary-company visit and current-concern visit in that order; defer and reopen one mid-page. Ask what the reader knows about the resident before discussing its role in the mystery. On an established save, use the optional acquaintance visit and verify that it does not pretend the resident just moved in. A visit reopened in Phase 5 should use the aftermath setting.
+
 At the first essential scene, ask the reader to defer it, find it in the journal and resume. At one choice, have them read Back after answering, close/reload and return; the answer must remain theirs. Later ask them to find pending amber, puzzle setup and recovery without directions. Measure taps/time and first wrong destination. Do not reveal or copy an actual recovery credential into the record.
+
+## Check reading and interruption controls
+
+Include a resident choice at normal and enlarged system text sizes. Both full answers, the speaker, the question and “Come back later” must remain reachable. Deferring must not choose an answer. Once an answer is saved, reopen the conversation and confirm that the same answer and callback remain. A simulated storage failure belongs in a controlled test installation: retry must save once and must not advance to an unsaved response.
+
+Check all phase-transition art and both ending routes without conflating a seed with a natural playthrough. On an ordinary timed passage, start scrolling: it should wait for Continue. Tap Continue twice rapidly: only one page should advance. Open Skip, cancel it, and continue reading. Android Back should open the same confirmation, not navigate behind the overlay. Backgrounding must hold the page and stop its audio. Force-closing before completion should replay the queued ceremony from its beginning after restart; exact-page restoration across a process restart is not the implemented contract. A confirmed Skip is an intentional completion and should not replay.
+
+At a mode unlock, interrupt the notice before its final page and reopen it. The notice should remain pending until it is acknowledged through the end. Keep this correctness check separate from whether the reader liked the scene's pacing.
 
 ## Ask before the last move
 
@@ -60,7 +70,7 @@ Separate outcomes into:
 - **Clarity problem:** repeated independent misunderstanding. Change the smallest line, scene placement or interaction that addresses it, then retest with new readers.
 - **Preference:** a single reader's desired tone, music or branch. Preserve it as a signal; do not rewrite the whole game from one preference.
 
-Finish with a dated pilot note listing sample, routes, scores, defects and proposed changes. If fewer than five sessions run, report that exact count. Add a separate signed Android 20-minute listening pass for Skip/mute/background and fatigue, plus native accessibility checks from [release validation](RELEASE_VALIDATION_1_3_0.md); this reader protocol does not replace those checks.
+Finish with a dated pilot note listing sample, routes, scores, defects and proposed changes. If fewer than five sessions run, report that exact count. Add a separate signed Android 20-minute listening pass for Skip/mute/background and fatigue, plus the native checks in the current [launch checklist](LAUNCH_CHECKLIST.md) (the older [1.3.0 validation record](RELEASE_VALIDATION_1_3_0.md) remains historical reference); this reader protocol does not replace those checks.
 
 
 ## Optional blind vocabulary check

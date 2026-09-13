@@ -1,5 +1,7 @@
 # Story editorial review — 6 September 2026
 
+> **Historical snapshot — status clarified September 13, 2026.** This document retains the findings, commands, counts and evidence from its original review. “Current”, “shipped” and completion claims below apply to that recorded snapshot. For the latest code, release procedure and remaining acceptance checks, use [Current build](CURRENT_BUILD.md).
+
 The code/content pass is complete. Reader comprehension and spontaneous voice recognition still require people who have not read the script.
 
 ## Changes and evidence

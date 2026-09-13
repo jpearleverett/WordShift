@@ -5,7 +5,9 @@ title: WordShift Terms of Service
 
 # WordShift Terms of Service
 
-**Effective date:** July 2, 2026
+**Effective date:** September 13, 2026
+
+This revision clarifies existing purchase delivery and restoration behavior.
 
 These terms apply to your use of the WordShift mobile app ("the app"), developed by Jonathan Pearl Everett.
 
@@ -19,7 +21,9 @@ WordShift stores progress locally on your device and, while online, syncs a back
 
 In-game currency ("amber") and hints have no real-world cash value. Amber packs, hint packs, and other optional items are offered as in-app purchases, but they cannot be sold, transferred, redeemed for money, or exchanged outside the app. Game balance, rewards, and prices may be adjusted in updates.
 
-All purchases are processed by the app store you bought them through (Google Play, or Apple's App Store on iOS); the app itself cannot issue refunds, and refunds are handled under that store's policies. Consumable items (amber and hint packs) are credited to your game immediately on purchase and are used up as you spend them. One-time purchases (such as Remove Ads or the starter bundle) can be restored on a new device via **Settings → Restore Purchases**. The optional "Supporter" subscription is an auto-renewing monthly purchase billed by your app store; it renews until you cancel it in that store's subscription settings, and it is likewise restored via Settings → Restore Purchases.
+All purchases are processed by the app store you bought them through (Google Play, or Apple's App Store on iOS); the app itself cannot issue refunds, and refunds are handled under that store's policies. Consumable items (amber and hint packs) are granted after the store confirms a successful purchase and the game saves the reward. A pending payment does not grant items yet. If a confirmed reward cannot be saved, the app offers a retry without another charge; contact support if the reward remains missing.
+
+Eligible one-time entitlements, such as Remove Ads, Patron's Key and the cosmetic bundle, can be restored through **Settings → Restore Purchases** using the relevant store account. Restoring the starter bundle's ownership does not grant its amber and hints again. Restore Purchases does not recreate spent consumables; use **Backup & Restore** for game progress and saved balances. The optional "Supporter" subscription is an auto-renewing monthly purchase billed by your app store; it renews until you cancel it in that store's subscription settings, and an active subscription can likewise be restored through Restore Purchases. Reset All Progress does not cancel a subscription or refund a purchase.
 
 The app shows advertising (occasional interstitial ads, a banner on some menu screens, and reward ads you choose to watch). An optional one-time purchase, or an active Supporter subscription, removes the automatically shown ads.
 
