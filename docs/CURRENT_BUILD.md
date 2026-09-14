@@ -69,13 +69,39 @@ The footer now says `Talk to <name>` and opens the same gift/introduction/conver
 
 Local validation passed **4,789 tests in 197 suites**, the **11 reverse-composition script tests**, TypeScript, zero-warning lint, story integrity, vocabulary/branching and bank-route audits, and the daily cohort check. The **three shortcut browser journeys** passed. CI uses Node-24-based v6 checkout/setup/upload actions while retaining Node 22 for the application; browser evidence uploads only after the browser step runs. ESLint excludes generated browser reports and traces. App version 1.3.5 / Android version code 99 are unchanged.
 
+## Launch readiness review (2026-09-14)
+
+[`LAUNCH_READINESS_REVIEW_2026-09-14.md`](LAUNCH_READINESS_REVIEW_2026-09-14.md)
+answers "is the game ready to publish" with a twelve-dimension review of `main`
+at `8233184` (app 1.3.5 / code 99). Its verdict is **conditionally ready: publish
+the next artifact, not the current one**, on three blockers:
+
+1. **Consumable purchases credit twice.** Checkout records the Google Play order
+   id as the grant id while receipt recovery keys the same purchase on
+   RevenueCat's transaction id, so every amber pack, hint pack and starter pack
+   is granted again by recovery (the first amber pack three times). A
+   JavaScript fix in `revenueCatBilling.ts` plus a regression whose mock uses two
+   different ids.
+2. **The shipping toolchain has never run on a device.** SDK 57 / RN 0.86, R8
+   minification, resource shrinking and the optimizing ProGuard default all
+   landed after the closed test that earned production access (1.2.2 / code 88).
+   The production-cut AAB must pass the internal track on physical phones first.
+3. **The production cut is a manual, unenforced edit.** `adsUseTestIds` must be
+   flipped to `false` and the version code bumped by hand; nothing in a build
+   profile or CI enforces either. Follow the checklist's command sequence and run
+   the production-config test before building.
+
+The review's medium and low findings are being fixed in the same native build;
+the backend items are tracked in [backend setup](BACKEND_SETUP.md) (hosted v2
+migrations verified 2026-09-14; `rate_limits_v1.sql` still to apply).
+
 ## Remaining release evidence
 
 Use the [launch checklist](LAUNCH_CHECKLIST.md) to record results against the actual candidate AAB/version code. In particular:
 
 - Exercise cold start, fonts/art/audio, background/resume and ceremony interruption on the signed **minified** Android build.
 - Exercise a free-player account, test ads, paid checkout, pending/cancelled checkout, retry, restore, reset and reward interruption. Mocked SDK tests and browser journeys do not establish store-side behavior.
-- Verify hosted Supabase migrations and retention jobs, RevenueCat products/entitlements, Sentry delivery and Play listing/consent configuration. Source configuration alone does not prove deployment.
+- The hosted Supabase v2 migrations were verified deployed by a read-only probe on 2026-09-14 ([backend setup](BACKEND_SETUP.md#hosted-state-verified-2026-09-14)); still verify the retention cron run, event arrival, `rate_limits_v1.sql` once applied, RevenueCat products/entitlements, Sentry delivery and Play listing/consent configuration. Source configuration alone does not prove deployment.
 - Compare Play's per-device download/install estimates and DEX metrics after the new build. The reported **497 MB EAS source upload** is a separate measurement; its exact contents have not been inspected here.
 
 Android test ad IDs remain deliberately enabled in the checked-in configuration. The production ad cutover and public Play rollout are separate release actions. iOS monetization configuration remains incomplete.

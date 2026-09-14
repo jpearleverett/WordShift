@@ -93,6 +93,23 @@ purchases and no ads, degrading exactly like the NoOp providers.
 > (including the advertising identifier and coarse location), and the Play
 > data-safety / App content declarations were submitted 2026-07-02. Re-check
 > both if the data collected ever changes.
+>
+> **Play Data safety form: "Device or other IDs" (re-submit before the public
+> release).** The July form declared that category only for the advertising ID.
+> Two bundled SDKs mint their own per-install identifiers even though the app
+> passes them none: the Sentry Android SDK (`@sentry/react-native`) assigns a
+> persisted random installation id as `user.id` on every crash report, and
+> `react-native-purchases` (configured anonymously in `revenueCatBilling.ts`)
+> mints a RevenueCat anonymous app-user id tied to the store purchases.
+> Declare **Device or other IDs** as collected for **App functionality**
+> (purchase management, cloud backup with WordShift's own install id) and
+> **Analytics/Diagnostics** (crash reporting, telemetry), shared with Google
+> (ads), RevenueCat, Supabase and Sentry as applicable, in addition to the
+> Advertising ID row. While there, confirm **Purchase history** covers the
+> Supporter subscription (added 2026-08-31) and **App interactions** still
+> matches the current event inventory (Stats banner 2026-07-16, support-id
+> linkage on successful backups). The privacy policy and data-deletion page
+> already describe both SDK identifiers.
 
 ---
 

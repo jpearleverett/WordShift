@@ -5,10 +5,12 @@ title: WordShift Privacy Policy
 
 # WordShift Privacy Policy
 
-**Effective date:** September 13, 2026
+**Effective date:** September 14, 2026
 
-This revision clarifies existing purchase-restoration and local-reset behavior;
-it adds no data category or service provider.
+Change log: the September 13, 2026 revision clarified existing purchase-restoration
+and local-reset behavior. The September 14, 2026 revision adds the retention
+periods below and links the data-deletion page. Neither adds a data category or
+a service provider.
 
 WordShift ("the app") is a word puzzle game developed by Jonathan Pearl Everett ("we", "us"). This policy explains what information the app handles, what is sent off your device, and which third-party services are involved.
 
@@ -34,7 +36,7 @@ All gameplay data is stored locally on your device using your operating system's
 To understand how the game is played and improve it, the app sends anonymous event data to our backend (Supabase): your random install identifier, platform (Android/iOS), app version, event types (for example, "puzzle completed"), and non-identifying event details (for example, which puzzle mode or store product an event relates to). This does not include your name, email, or contacts.
 
 ### Crash and error reporting
-To find and fix bugs, the app sends crash and error reports to Sentry. These may include your device model, operating-system version, app version, and a technical error trace.
+To find and fix bugs, the app sends crash and error reports to Sentry. These may include your device model, operating-system version, app version, and a technical error trace. The Sentry SDK keeps its own random installation identifier on your device to group reports from the same installation; the app does not pass it your WordShift install identifier, name, or any other identity.
 
 ### Cloud backup
 When you are online, the app automatically backs up your game save (progress, currency, settings) to our backend (Supabase) under a separate random save credential — for example when you open the app and after you complete a puzzle — so your progress can be restored if you reinstall or switch devices. The backup contains game data, never your name, email, or contacts. Successful backups also privately link your support reference and install identifier to the save so support can locate records from linked devices. **Settings → Backup & Restore** shows a recovery code you can use to restore the save on another device, and you can ask us to delete your cloud save at any time (see below).
@@ -64,10 +66,17 @@ If you enable reminders, the app schedules **local notifications** on your devic
 
 WordShift is **not directed to children under 13**, and we do not knowingly collect personal information from children under 13. The story gradually introduces dark-fantasy/horror themes intended for ages 13 and up. If you believe a child has provided us information, contact us and we will delete it.
 
-## Data retention and your choices
+## Data retention
+
+- **Anonymous analytics and crash/error reports:** kept for up to **24 months** from receipt. Analytics rows are removed automatically by a scheduled job on our backend once they pass that age; Sentry applies its own retention window within the same limit.
+- **Cloud backup and daily leaderboard results:** kept until you ask us to delete them, or until the backend project is decommissioned. Your backup is overwritten each time a newer save is uploaded; leaderboard rows are keyed by day and are not otherwise expired.
+- **Purchase records:** held by Google Play (or Apple) and RevenueCat under their own policies for as long as needed to honor and restore your purchases.
+- **Deletion requests:** we handle them within **30 days** of receipt. The full procedure, including what is deleted and what is kept, is on the [data deletion page](../data-deletion/).
+
+## Your choices
 
 - **Reset local data:** Settings → Reset All Progress clears gameplay and the local entitlement cache, while retaining the install/save/support references and purchase retry/history protection described above. Store entitlements may restore afterward.
-- **Cloud backup:** managed via Settings → Backup & Restore; email us with the non-secret Support reference in Settings to request deletion of linked records. Do not email the recovery code; it authorizes backup access. We verify authority separately.
+- **Cloud backup:** managed via Settings → Backup & Restore; email us with the non-secret Support reference in Settings to request deletion of linked records, following the [data deletion page](../data-deletion/). Do not email the recovery code; it authorizes backup access. We verify authority separately.
 - **Ads personalization:** use your device settings to reset or opt out of the advertising identifier, or use the **Privacy Options** entry in the app's Settings (shown where consent rules apply) to change your ad-consent choice.
 - **Notifications:** Settings → Daily Reminders, or your system notification settings.
 - **Other requests:** email us at the address below.

@@ -2,7 +2,10 @@
 
 Reviewed against main `6f96ebb` on 2026-09-13. See [current build](CURRENT_BUILD.md)
 and [backend deployment](BACKEND_SETUP.md). Supabase is configured in source and
-the custom collector URL is empty; hosted receipt of events still needs evidence.
+the custom collector URL is empty. `ingest_events_v2` was verified deployed on
+the hosted project on 2026-09-14 (read-only probe, see
+[backend setup](BACKEND_SETUP.md#hosted-state-verified-2026-09-14)); actual
+event rows arriving from a signed build still need operator-side evidence.
 
 Events have stable persisted IDs. Queue writes and ID acknowledgements serialize;
 retention keeps the most recent 500 events. A slow upload acknowledges only its
@@ -14,7 +17,10 @@ retention beyond 500 records can drop events.
 
 Apply `supabase/events_integrity_v2.sql` before enabling the updated transport.
 The bounded `ingest_events_v2` RPC inserts each `(install_id,event_id)` once;
-an acknowledged-lost response can safely retry. Anonymous table SELECT remains
+an acknowledged-lost response can safely retry. `supabase/rate_limits_v1.sql`
+adds hourly budgets per install (240 calls, 6,000 rows) far above the client's
+one-upload-per-minute, 500-event ceiling; a refused batch returns `false` and
+stays queued locally like any other failed upload. Anonymous table SELECT remains
 denied. The optional custom collector receives the same IDs and must deduplicate
 that pair before returning a successful acknowledgement. It must return success
 only after persisting the whole batch. A missing RPC retains the local queue and

@@ -3,10 +3,14 @@
 Reviewed against main `6f96ebb` on 2026-09-13. See [current build](CURRENT_BUILD.md)
 and [backend setup](BACKEND_SETUP.md) for the source/deployment distinction.
 
-This is a release deliverable, not evidence that the migrations or retention jobs
-have been deployed. Apply/rehearse the SQL in `supabase/` before advertising the
-updated support flow. Backend operator access is required. Never put a service
-key or recovery code in client configuration, email, analytics, tickets or logs.
+The support and retention migrations are deployed: a read-only probe on
+2026-09-14 found `support_preview`, `support_delete_verified` and
+`prune_expired_events` present and denied to `anon` (see
+[backend setup](BACKEND_SETUP.md#hosted-state-verified-2026-09-14)). That probe
+cannot see the cron job or its runs, so the retention gate below still needs its
+operator evidence, and [`rate_limits_v1.sql`](supabase/rate_limits_v1.sql) is not
+yet applied. Backend operator access is required. Never put a service key or
+recovery code in client configuration, email, analytics, tickets or logs.
 
 ## Locate first, verify separately
 
@@ -109,11 +113,32 @@ not establish a successful cleanup. [Supabase Cron](https://supabase.com/docs/gu
 job from the client. Check provider backups and incident/legal holds separately.
 No production retention job or provider deletion was verified by this change.
 
+## Leaderboard poisoning and request budgets
+
+`rate_limits_v1.sql` adds per-install hourly budgets, a Daily plausibility gate
+and an operator purge. If a day's standings look fabricated (thousands of
+entrants, impossible times), remove that cohort with bound parameters from the
+operator connection:
+
+```sql
+select public.purge_daily_cohort($1, $2); -- 'YYYY-MM-DD', board version
+-- Use the cohort id the client reports (mobile/src/services/dailyBoardVersion.ts);
+-- 'legacy_v1' targets the pre-cohort daily_scores table for that date.
+```
+
+The function returns the number of rows removed and refuses malformed input.
+Players whose result is purged see "no standing shown" for that day; nothing
+local is changed. Budget rows live in `public.rate_limits` (one per scope and
+key). They are small and self-resetting; optional housekeeping:
+`delete from public.rate_limits where window_start < now() - interval '1 day';`.
+To free a legitimate install that somehow hit a budget, delete its rows by key.
+
 ## Repeatable local rehearsal
 
 `rehearse.mjs` runs PostgreSQL in memory through PGlite. It checks CAS revisions,
 revoked legacy save access, opaque lookup table permissions, event retry dedup,
-daily board cohorts, and verified deletion scope while preserving unrelated
+daily board cohorts, the request budgets, the Daily plausibility and activity
+gate, the cohort purge, and verified deletion scope while preserving unrelated
 records. It makes no network requests or remote writes. Run the commands in its
 header. A hosted Supabase/PostgREST two-device rehearsal and signed-device
 interrupted-write tests remain release gates.

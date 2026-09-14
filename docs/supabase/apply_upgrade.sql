@@ -9,4 +9,5 @@
 \ir support_operations.sql
 \ir analytics_funnels.sql
 \ir event_retention.sql
+\ir rate_limits_v1.sql
 -- Scheduling remains separate because pg_cron must be enabled in this project.
