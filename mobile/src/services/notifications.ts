@@ -398,9 +398,11 @@ export async function scheduleAllNotifications(currentPhase: number): Promise<vo
     } catch {}
     // Win-back is for LAPSED players. For a player who kept today alive, rung 1
     // starts at +2 so tomorrow's slot stays free for the routine morning
-    // reminder (the one-per-day dedupe would otherwise let the 18:00 win-back
-    // permanently displace the user-configured daily ping on day +1). A player
-    // already at streak risk keeps the original +2 stagger after the risk ping.
+    // reminder (or, for a streak holder at STREAK_COVERS_MORNING_REMINDER+,
+    // for the tomorrow-evening streak-risk ping); the one-per-day dedupe would
+    // otherwise let the 18:00 win-back permanently displace that day-+1 ping.
+    // A player already at streak risk keeps the original +2 stagger after the
+    // risk ping.
     const firstRung = hasStreakRisk || playedToday ? 2 : 1;
     await scheduleWinBackLadder(mod, currentPhase, firstRung, finishedStory, occupiedDays);
 

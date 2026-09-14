@@ -4,10 +4,13 @@ import { Platform, PixelRatio, Dimensions } from 'react-native';
  * Device capability detection for animation scaling and the pre-mounted art
  * budget. Two signals, checked in order:
  *
- *   1. Installed RAM (expo-device's `totalMemory`): at or below LOW_TIER_RAM_BYTES
- *      the device is 'low' outright. The 2026 budget phones that actually
- *      struggle (720x1600 at density 2.0 with 2-3 GB) pass the pixel heuristic
- *      below as 'medium', so RAM is the signal that catches them.
+ *   1. Installed RAM (expo-device's `totalMemory`), ANDROID ONLY: at or below
+ *      LOW_TIER_RAM_BYTES the device is 'low' outright. The 2026 budget phones
+ *      that actually struggle (720x1600 at density 2.0 with 2-3 GB on 4x
+ *      Cortex-A53 class silicon) pass the pixel heuristic below as 'medium',
+ *      so RAM is the signal that catches them. iOS hardware in the same RAM
+ *      band (iPhone 8 through the second SE, 2-3 GB) runs the full set fine,
+ *      so the threshold is never applied there.
  *   2. The pixel heuristic (screen density and resolution), kept as the
  *      fallback when the RAM signal is unavailable (Expo Go without the
  *      module, web, a null reading) and as the finer medium/high split.
@@ -18,7 +21,7 @@ import { Platform, PixelRatio, Dimensions } from 'react-native';
 
 export type DeviceTier = 'high' | 'medium' | 'low';
 
-/** Devices reporting this much installed RAM or less are treated as 'low'. */
+/** Android devices reporting this much installed RAM or less are treated as 'low'. */
 export const LOW_TIER_RAM_BYTES = 3 * 1024 * 1024 * 1024;
 
 let cachedTier: DeviceTier | null = null;
@@ -46,10 +49,10 @@ export function getDeviceTier(): DeviceTier {
   const { width, height } = Dimensions.get('window');
   const totalPixels = width * height * density * density;
   const isAndroid = Platform.OS === 'android';
-  const totalMemory = readTotalMemoryBytes();
+  const totalMemory = isAndroid ? readTotalMemoryBytes() : null;
 
-  if (totalMemory !== null && totalMemory <= LOW_TIER_RAM_BYTES) {
-    // Low-RAM hardware is 'low' whatever its screen says.
+  if (isAndroid && totalMemory !== null && totalMemory <= LOW_TIER_RAM_BYTES) {
+    // Low-RAM Android hardware is 'low' whatever its screen says.
     cachedTier = 'low';
   } else if (isAndroid) {
     // Low-end Android: low density or small screen

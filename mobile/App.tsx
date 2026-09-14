@@ -3027,7 +3027,7 @@ function MainApp() {
       ) {
         finalVictory = { ...finalVictory, mandatoryHarvest: true };
       }
-      // Fox introduces the Keeper's Welcome starter pack once, past puzzle 20,
+      // Fox introduces the Keeper's Welcome starter pack once, past STARTER_INTRO_MIN_PUZZLES (38),
       // for players who don't already own it. Declutter rule: never stack it on
       // a victory that ALREADY has another intro or the mandatory-harvest gate
       // — the store pitch waits for a quiet win (it re-fires until seen, since

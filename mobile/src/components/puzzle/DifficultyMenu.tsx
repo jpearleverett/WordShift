@@ -161,7 +161,7 @@ const SCROLL_BOTTOM_PAD = 28;
 /** Semantic difficulty ring colors (shared candy identity with the header dot). */
 /** Canonical difficulty order — the setup rows and the header chip share it.
  * EXPERT (6-letter apex) is last and is gated: it renders as a locked row with
- * a countdown until EXPERT_UNLOCK_PUZZLES solves (see the row rendering). */
+ * a countdown until EXPERT_DIFFICULTY_UNLOCK_PUZZLES solves (see the row rendering). */
 export const DIFFICULTY_LEVELS: readonly Difficulty[] = ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD', 'EXPERT'];
 
 /** True only for the four real Difficulty union values. */

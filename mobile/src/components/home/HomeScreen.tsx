@@ -2373,7 +2373,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 style={[styles.streakBadge, isStreakAtRisk && styles.streakAtRiskBadge]}
                 accessibilityLabel={`${progress.currentStreak} day streak${isStreakAtRisk ? ', at risk' : ''}`}
               >
-                <Image source={FLAME_ICON} style={styles.streakBadgeIcon} />
+                <Image
+                  source={FLAME_ICON}
+                  style={[styles.streakBadgeIcon, streakIconOnly && isStreakAtRisk && styles.streakAtRiskIcon]}
+                />
                 {/* Below 340dp the header budget leaves the amber pill (the
                     only shrinkable item) too little room once a streak badge
                     is up, and the balance truncated to an ellipsis. The flame
@@ -4380,6 +4383,11 @@ const createStyles = (SCREEN_WIDTH: number, SCREEN_HEIGHT: number, fontScale: nu
   },
   streakAtRiskCount: {
     color: '#FF3C3C',
+  },
+  // Icon-only badge (under 340dp): the red count is gone, so the flame
+  // itself carries the at-risk cue for sighted players.
+  streakAtRiskIcon: {
+    tintColor: '#FF3C3C',
   },
   headerIconBtn: {
     width: 38,

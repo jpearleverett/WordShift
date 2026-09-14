@@ -627,6 +627,13 @@ const BADGE_ANCHOR: Record<AnimalType, { top: number; right: number }> = {
 // to that circle instead, by the same 3dp-bite rule.
 const EMOJI_BADGE_ANCHOR = { top: -5, right: -5 };
 
+/** Idle beats that never touch the talk frame (see buildBeat): the sloth's
+ *  doze, the rabbit's hop, the aye-aye's knock, the kakapo's boom, the
+ *  pangolin's stir and the axolotl's mask-bound perk. */
+const TRANSFORM_ONLY_IDLE_BEATS: ReadonlySet<AnimalType> = new Set<AnimalType>([
+  'rabbit', 'sloth', 'aye_aye', 'kakapo', 'pangolin', 'axolotl',
+]);
+
 /**
  * Progressive "dread" treatment for the idle sprite across Phases 1-3 — the
  * stretch where the dialogue has already curdled but there is no distinct
@@ -1182,6 +1189,10 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
 
     const sprites = CHARACTER_SPRITES[animal.type];
     const hasTalk = Boolean(sprites?.talk);
+    // Only the chirp family and the capybara's mutter drive idleTalkOpacity;
+    // the transform-only beats below must not pay for a talk layer they
+    // never crossfade to (lower tiers mount that layer on demand).
+    const beatUsesTalk = hasTalk && !TRANSFORM_ONLY_IDLE_BEATS.has(animal.type);
     const myId = idleIdRef.current!;
 
     let cancelled = false;
@@ -1302,7 +1313,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
         idleBeatTokenHolder = myId;
         // Lower tiers mount the talk layer on demand: latch it before the
         // first talk-frame beat so the crossfade has a layer to reach.
-        if (hasTalk) setTalkLayerWarmed(true);
+        if (beatUsesTalk) setTalkLayerWarmed(true);
         const anim = buildBeat();
         activeAnim = anim;
         anim.start(() => finishBeat());

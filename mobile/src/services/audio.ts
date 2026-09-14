@@ -201,6 +201,22 @@ const DARK_SFX_PHASE = 3;
 const PEACE_SFX_PHASE = 5;
 export function setAudioPhase(phase: number): void {
   audioPhase = phase;
+  // The idle warm usually fires before the persistence load has reported the
+  // real phase (initAudio runs in the first effect; the phase arrives after
+  // the async load), so a dark-phase player would otherwise warm the bright
+  // set and leave it squatting in the LRU. Re-warm once per band change so
+  // the resident players are the ones this player will actually hear; a
+  // live ceremony crossing into the dark tier gets the same treatment.
+  if (deferredWarmedBand !== null && deferredWarmedBand !== sfxBandForPhase(phase)) {
+    warmDeferredSounds();
+  }
+}
+
+/** 0 bright, 1 dark mirror, 2 peace tier: the variant band a phase resolves to. */
+function sfxBandForPhase(phase: number): number {
+  if (phase >= PEACE_SFX_PHASE) return 2;
+  if (phase >= DARK_SFX_PHASE) return 1;
+  return 0;
 }
 
 /**
@@ -245,6 +261,15 @@ export async function initAudio(): Promise<void> {
 }
 
 let deferredPreloadScheduled = false;
+/** The band the deferred warm last resolved under; null until it has run. */
+let deferredWarmedBand: number | null = null;
+
+function warmDeferredSounds(): void {
+  deferredWarmedBand = sfxBandForPhase(audioPhase);
+  for (const name of DEFERRED_PRELOAD_SOUND_NAMES) {
+    loadSound(resolveSfxForPhase(name, audioPhase)).catch(() => {});
+  }
+}
 
 /** Fallback delay for the deferred preload when requestIdleCallback is absent. */
 const DEFERRED_PRELOAD_FALLBACK_MS = 1500;
@@ -253,19 +278,15 @@ const DEFERRED_PRELOAD_FALLBACK_MS = 1500;
  * Warm the deferred hot-path sounds from an idle callback after first paint
  * (requestIdleCallback where the runtime provides it, a short timeout
  * otherwise), resolved through the phase mirror so the variant warmed is the
- * one this player will hear. Runs once per process.
+ * one this player will hear. Scheduled once per process; setAudioPhase
+ * re-warms if the band changes after the first warm.
  */
 function scheduleDeferredPreload(): void {
   if (deferredPreloadScheduled) return;
   deferredPreloadScheduled = true;
-  const warm = () => {
-    for (const name of DEFERRED_PRELOAD_SOUND_NAMES) {
-      loadSound(resolveSfxForPhase(name, audioPhase)).catch(() => {});
-    }
-  };
   const idle = (globalThis as { requestIdleCallback?: (cb: () => void) => unknown }).requestIdleCallback;
-  if (typeof idle === 'function') idle(warm);
-  else setTimeout(warm, DEFERRED_PRELOAD_FALLBACK_MS);
+  if (typeof idle === 'function') idle(warmDeferredSounds);
+  else setTimeout(warmDeferredSounds, DEFERRED_PRELOAD_FALLBACK_MS);
 }
 
 async function isEnabled(): Promise<boolean> {

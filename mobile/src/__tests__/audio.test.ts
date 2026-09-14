@@ -257,6 +257,23 @@ describe('audio', () => {
       expect(isSoundCached('star_pop_1')).toBe(false);
     });
 
+    test('a phase reported after the idle warm re-warms the deferred set in the new band', async () => {
+      await initAudio();
+      jest.advanceTimersByTime(1500);
+      await Promise.resolve();
+      expect(isSoundCached('valid_move_2')).toBe(true);
+      expect(isSoundCached('valid_move_2_dark')).toBe(false);
+      const before = expoAudio.createAudioPlayer.mock.calls.length;
+      setAudioPhase(3);
+      await Promise.resolve();
+      expect(isSoundCached('valid_move_2_dark')).toBe(true);
+      expect(expoAudio.createAudioPlayer.mock.calls.length - before).toBe(DEFERRED_PRELOAD_SOUND_NAMES.length);
+      // Same band again: no second warm.
+      setAudioPhase(4);
+      await Promise.resolve();
+      expect(expoAudio.createAudioPlayer.mock.calls.length - before).toBe(DEFERRED_PRELOAD_SOUND_NAMES.length);
+    });
+
     test('a second initAudio never re-arms the deferred warm', async () => {
       await initAudio();
       await initAudio();

@@ -32,6 +32,11 @@ afterEach(() => {
 });
 
 describe('getDeviceTier', () => {
+  test('the RAM signal is Android-only: 3 GB iPhones keep their pixel tier', () => {
+    expect(loadTier({ width: 414, height: 896, density: 2, os: 'ios' }, 3 * GB).getDeviceTier()).toBe('high');
+    expect(loadTier({ width: 375, height: 667, density: 2, os: 'ios' }, 2 * GB).getDeviceTier()).toBe('medium');
+  });
+
   test('a 720x1600 density-2 phone with 3 GB of RAM is low, not medium', () => {
     const tier = loadTier(BUDGET_720P, 3 * GB);
     expect(tier.getDeviceTier()).toBe('low');

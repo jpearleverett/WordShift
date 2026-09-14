@@ -4139,7 +4139,7 @@ export function getFoxPitNudgeLines(targetPhase: DialoguePhase): string[] {
  * Hammock, by default) blocks the player. Explains, in-world, WHY the house
  * can't simply be bought forward here, and points at the two amber options:
  * Reserve (set the amber aside now, it rises on its own when the gate opens)
- * and Skip (press it to completion now, for a little more amber). Fires around
+ * and Skip (press it to completion now, though the house asks a good deal more amber for that). Fires around
  * the first gate (~level 28), so mostly the bright-days voice, with a quieter
  * later variant. `roomName` is the gated room's display name ("Jungle Hammock").
  */
@@ -4148,13 +4148,13 @@ export function getGatedRoomIntroLines(phase: number, roomName: string): string[
     return [
       `The house has grown quickly with you, friend. But the ${roomName} is not ready to rise yet.`,
       "Some rooms ask for more than amber. They ask for time, and for words. More of your words must be offered to the pit before the ground will hold the walls.",
-      "If you have the amber, you do not have to wait. There are two ways. Set the amber aside now, and the room will rise on its own when the time comes. Or spend a little more and bring the room to completion now.",
+      "If you have the amber, you do not have to wait. There are two ways. Set the amber aside now, and the room will rise on its own when the time comes. Or pay a good deal more and bring the room to completion now.",
     ];
   }
   return [
     `The house has grown so quickly with you, friend. But the ${roomName} isn't ready to be built yet.`,
     "Some rooms need more than amber. They need a little time, and a few more of your words offered to the pit, before the ground will hold them.",
-    "If you'd rather not wait and you have the amber to spare, there are two ways. Set it aside now, and the room will build itself when the time comes. Or press it to completion now, for a little more.",
+    "If you'd rather not wait and you have the amber to spare, there are two ways. Set it aside now, and the room will build itself when the time comes. Or press it to completion now, though the house asks a good deal more for that.",
   ];
 }
 
