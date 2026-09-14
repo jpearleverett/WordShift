@@ -37,6 +37,27 @@ jobs:
       - name: Test
         run: npm test -- --no-coverage --ci --runInBand
 
+      - name: Resolved production Expo config
+        # The real CLI path through app.config.js for the channel an EAS
+        # production build uses: the production runtime, live ad units, an
+        # inert creator kit. productionConfig.test.ts covers the same
+        # invariants in-process; this step proves the CLI resolves them too.
+        env:
+          WORDSHIFT_RELEASE_CHANNEL: production
+        run: |
+          npx expo config --type public --json > "$RUNNER_TEMP/expo-config-production.json"
+          node - "$RUNNER_TEMP/expo-config-production.json" <<'NODE'
+          const config = require(process.argv[2]);
+          const expected = `${config.version}-production`;
+          const failures = [];
+          if (config.runtimeVersion !== expected) failures.push(`runtimeVersion ${config.runtimeVersion} != ${expected}`);
+          if (config.extra.adsUseTestIds !== false) failures.push(`adsUseTestIds must resolve false on production (got ${config.extra.adsUseTestIds})`);
+          if (config.extra.creatorCode !== '') failures.push('creatorCode must stay empty in a shipping configuration');
+          if (config.name !== 'WordShift') failures.push(`app name ${config.name} != WordShift`);
+          if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
+          console.log(`production config OK: ${config.name} ${config.runtimeVersion}, adsUseTestIds=${config.extra.adsUseTestIds}`);
+          NODE
+
       - name: Reverse top-up composition regressions
         run: npm test -- --no-coverage --ci --runInBand --config scripts/jest.config.js --runTestsByPath scripts/reverseTopUpCandidates.test.ts
 
