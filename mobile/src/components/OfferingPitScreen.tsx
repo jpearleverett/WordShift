@@ -1,5 +1,6 @@
 import { saveWithPlayerRetry } from '../services/saveRetry';
 import { getPitGeometry as computePitGeometry } from '../services/worldGeometry';
+import { layoutOnboardingWords, type OnboardingWordZone } from '../services/pitOnboardingLayout';
 import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
 import { FONT_SIZE } from '../theme/typeScale';
 import {
@@ -438,6 +439,53 @@ function sineOutputRange(base: number, amplitude: number, phaseOffset: number): 
   return [0, 0.25, 0.5, 0.75, 1].map(t =>
     base + amplitude * Math.sin(TWO_PI * (t + phaseOffset))
   );
+}
+
+/**
+ * Air between the onboarding prompt card's bottom edge and the first row of
+ * tutorial words.
+ */
+const ONBOARDING_PROMPT_CLEARANCE = 14;
+
+function onboardingPlacements(words: FlyingWord[], zone: OnboardingWordZone) {
+  return layoutOnboardingWords(
+    words.map(fw => fw.word.length * (MINI_TILE_W + MINI_TILE_GAP)),
+    zone,
+    MINI_TILE_H,
+  );
+}
+
+/**
+ * Seats freshly built tutorial words in their cells, before they reach state.
+ * The vertical bob is dropped outright: the rows are packed close enough that
+ * a bob could slide one word over its neighbour, and during `pit_offering`
+ * every word has to stay individually tappable. The horizontal drift survives
+ * (bounded to the cell), so the words still read as floating.
+ */
+function applyOnboardingPlacement(words: FlyingWord[], zone: OnboardingWordZone): void {
+  const placements = onboardingPlacements(words, zone);
+  words.forEach((fw, index) => {
+    const placement = placements[index];
+    fw.baseX = placement.x;
+    fw.baseY = placement.y;
+    fw.driftAmplitude = placement.driftAmplitude;
+    fw.bobAmplitude = 0;
+  });
+}
+
+/** The same seating for words already in state; a word mid-devour keeps its own path. */
+function placeOnboardingWords(words: FlyingWord[], zone: OnboardingWordZone): FlyingWord[] {
+  const placements = onboardingPlacements(words, zone);
+  let changed = false;
+  const next = words.map((fw, index) => {
+    const placement = placements[index];
+    if (fw.useDevourPos || fw.isDevoured) return fw;
+    if (fw.baseX === placement.x && fw.baseY === placement.y
+      && fw.driftAmplitude === placement.driftAmplitude && fw.bobAmplitude === 0) return fw;
+    changed = true;
+    return { ...fw, baseX: placement.x, baseY: placement.y, driftAmplitude: placement.driftAmplitude, bobAmplitude: 0 };
+  });
+  return changed ? next : words;
 }
 
 const FloatingWordChip = React.memo(({
@@ -881,6 +929,13 @@ interface OfferingPitScreenProps {
   isOnboarding?: boolean;
   /** Current onboarding step (gates the manual tap-to-offer flow) */
   onboardingStep?: string;
+  /**
+   * Bottom edge of the onboarding prompt card App floats above this screen.
+   * The tutorial words are laid out clear of it: the card's height depends on
+   * how its authored line wraps, so a fixed fraction of the screen height is
+   * only ever right for one device.
+   */
+  onboardingPromptBottom?: number;
   /** Total real puzzles completed — gates the manual-harvest Fox intro to
    *  after the auto-collect window (never fires during the early carried era). */
   completedPuzzles?: number;
@@ -905,6 +960,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   onNavigationGuardChange,
   isOnboarding,
   onboardingStep,
+  onboardingPromptBottom,
   completedPuzzles,
   onOnboardingOfferComplete,
 }) => {
@@ -912,6 +968,21 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
   const { PIT_CENTER, PIT_OVAL, WARD_RING_SIZE_Y, WARD_RING_SCALE_X, FLOAT_ZONE, GLOW_OUTER_SIZE, GLOW_OUTER_SCALE_X, GLOW_MIDDLE_SIZE, GLOW_MIDDLE_SCALE_X, GLOW_INNER_SIZE, GLOW_INNER_SCALE_X, GLOW_CORE_SIZE, GLOW_CORE_SCALE_X, GLOW_RIM_SIZE_Y, GLOW_RIM_SCALE_X } = useMemo(() => getPitGeometry(SCREEN_WIDTH, SCREEN_HEIGHT), [SCREEN_WIDTH, SCREEN_HEIGHT]);
   const styles = useMemo(() => createStyles(SCREEN_WIDTH, SCREEN_HEIGHT), [SCREEN_WIDTH, SCREEN_HEIGHT]);
+  // The band the onboarding words are laid out in: below Ember's standing
+  // prompt card, above the pit. Its top follows the card's REPORTED bottom
+  // rather than a fraction of the screen, because the card's height depends on
+  // how its line wraps, and the fraction that cleared it on a tall phone left
+  // the band under it on a short one, where a word is then unreachable and the
+  // step can only advance on the stall rescue.
+  const onboardingWordZone: OnboardingWordZone = useMemo(() => {
+    const top = Math.max(SCREEN_HEIGHT * 0.30, (onboardingPromptBottom ?? 0) + ONBOARDING_PROMPT_CLEARANCE);
+    return {
+      top,
+      bottom: Math.max(top + MINI_TILE_H, SCREEN_HEIGHT * 0.52),
+      left: FLOAT_ZONE.left,
+      right: FLOAT_ZONE.right,
+    };
+  }, [SCREEN_HEIGHT, onboardingPromptBottom, FLOAT_ZONE.left, FLOAT_ZONE.right]);
   // Cottage signage chrome for the pit banners: wooden card frames that age
   // with the world (bright parchment → ash paper), on-parchment inks that
   // flip to cream at phase 4+. The pit art stays untouched behind them.
@@ -1476,16 +1547,10 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         const word = batch.words[i];
         const id = `${batch.id}_${i}`;
         const wordPixelWidth = word.length * (MINI_TILE_W + MINI_TILE_GAP);
-        // During onboarding the FoxGuide "tap each glowing word" card occupies the
-        // top (or bottom) of the screen. Confine the few tutorial words to a central
-        // band clear of it (and above the pit) so none can spawn or drift under the
-        // card, where it would be hidden, untappable, and could soft-lock the step.
-        const zoneTop = isOnboarding ? SCREEN_HEIGHT * 0.30 : FLOAT_ZONE.top;
-        const zoneBottom = isOnboarding ? SCREEN_HEIGHT * 0.52 : FLOAT_ZONE.bottom;
         const zoneWidth = FLOAT_ZONE.right - FLOAT_ZONE.left - wordPixelWidth;
-        const zoneHeight = zoneBottom - zoneTop;
+        const zoneHeight = FLOAT_ZONE.bottom - FLOAT_ZONE.top;
         const baseX = FLOAT_ZONE.left + Math.random() * Math.max(zoneWidth, 20);
-        const baseY = zoneTop + Math.random() * zoneHeight;
+        const baseY = FLOAT_ZONE.top + Math.random() * zoneHeight;
 
         allWords.push({
           id,
@@ -1514,6 +1579,12 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         });
       }
     }
+
+    // Random scatter is fine once the player can use Offer All and may tap any
+    // word they like. The onboarding step has neither: it advances only once
+    // every word has been tapped individually, so the tutorial words go on a
+    // grid whose cells cannot overlap each other or the prompt card.
+    if (isOnboarding) applyOnboardingPlacement(allWords, onboardingWordZone);
 
     batchWordCounts.current = batchCounts;
     devouredPerBatch.current = new Map();
@@ -1568,17 +1639,35 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     const previous = wordViewport.current;
     wordViewport.current = { width: SCREEN_WIDTH, height: SCREEN_HEIGHT };
     if (previous.width === SCREEN_WIDTH && previous.height === SCREEN_HEIGHT) return;
+    // Onboarding positions are owned by the grid effect below, which re-derives
+    // them from the new viewport rather than rescaling a scatter.
+    if (isOnboarding) return;
     setFlyingWords(current => current.map(word => {
       if (word.useDevourPos || word.isDevoured) return word;
       const maxX = Math.max(10, SCREEN_WIDTH - word.word.length * (MINI_TILE_W + MINI_TILE_GAP) - 10);
-      const top = isOnboarding ? SCREEN_HEIGHT * 0.30 : FLOAT_ZONE.top;
-      const bottom = Math.max(top, SCREEN_HEIGHT * (isOnboarding ? 0.52 : 0.55));
+      const top = FLOAT_ZONE.top;
+      const bottom = Math.max(top, SCREEN_HEIGHT * 0.55);
       return { ...word,
         baseX: Math.max(10, Math.min(maxX, word.baseX * SCREEN_WIDTH / previous.width)),
         baseY: Math.max(top, Math.min(bottom, word.baseY * SCREEN_HEIGHT / previous.height)),
       };
     }));
   }, [SCREEN_WIDTH, SCREEN_HEIGHT, isOnboarding, FLOAT_ZONE.top]);
+
+  // Re-lay the tutorial grid whenever its band moves: the prompt card measures
+  // on mount, grows or shrinks when its line changes at pit_offering, and the
+  // viewport can rotate under it. It re-packs whichever words are still on
+  // screen, which is what a moved band needs; a devour is not a band change, so
+  // tapping one word never re-seats the others under the player's finger.
+  const onboardingZoneRef = useRef<OnboardingWordZone | null>(null);
+  useEffect(() => {
+    if (!isOnboarding) return;
+    const previous = onboardingZoneRef.current;
+    onboardingZoneRef.current = onboardingWordZone;
+    if (previous && previous.top === onboardingWordZone.top && previous.bottom === onboardingWordZone.bottom
+      && previous.left === onboardingWordZone.left && previous.right === onboardingWordZone.right) return;
+    setFlyingWords(current => (current.length === 0 ? current : placeOnboardingWords(current, onboardingWordZone)));
+  }, [isOnboarding, onboardingWordZone]);
 
   // ---- Pit surge flash (on devour impact) ----
   const flashPitSurge = useCallback((intensity: number = 1) => {
