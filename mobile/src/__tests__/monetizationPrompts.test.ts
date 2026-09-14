@@ -62,7 +62,7 @@ describe('pure decisions', () => {
   });
 
   it('delays the starter-pack and Patron pitches', () => {
-    expect(STARTER_INTRO_MIN_PUZZLES).toBe(35);
+    expect(STARTER_INTRO_MIN_PUZZLES).toBe(38);
     expect(PATRON_NUDGE_MIN_PUZZLES).toBe(50);
   });
 

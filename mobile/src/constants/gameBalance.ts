@@ -372,12 +372,15 @@ export const REMOVE_ADS_NUDGE_AFTER_INTERSTITIALS = 3;
 
 /**
  * Earliest puzzle count for Fox's one-time "Keeper's Welcome" starter-pack intro.
- * Pushed to puzzle 35 so the store pitch never lands inside the first-session
- * cluster of new-thing introductions (journal, daily, variants, challenge,
- * mandatory harvest all fire before this) — the newcomer meets the game before
- * the game asks for anything. Suppressed if the starter pack is already owned.
+ * Pushed past the first-session cluster of new-thing introductions (journal,
+ * daily, variants, challenge, mandatory harvest all fire before this) — the
+ * newcomer meets the game before the game asks for anything. It sits at 38,
+ * three wins past the EXPERT difficulty unlock (35), so the store pitch and a
+ * new difficulty row never land on the same win, and it is no longer the only
+ * event in the Desert (29) to Office (41) room-gate gap. Suppressed if the
+ * starter pack is already owned.
  */
-export const STARTER_INTRO_MIN_PUZZLES = 35;
+export const STARTER_INTRO_MIN_PUZZLES = 38;
 
 /**
  * Puzzle count where the Journal Hub (ledger, gallery, quests) and the header
@@ -703,9 +706,13 @@ export const DAILY_CHALLENGE_UNLOCK_PUZZLES = 8;
  * that the player has mastered HARD and the core verb, so six-letter boards
  * (more tiles to track, longer chains, a rarer-but-fair vocabulary band) read
  * as an earned step up, not an early wall. Tunable; between HARD-comfort and
- * the Blind Offering apex (80).
+ * the Blind Offering apex (80). Keyed to 35 (was 50) so a 2/day player finds
+ * something new inside the Desert (29) to Office (41) room-gate gap, which
+ * used to hold nothing but the starter-pack pitch across the Phase-2 turn: a
+ * difficulty row is a discoverable beat, not a story beat, so it can move
+ * without touching the arc geography.
  */
-export const EXPERT_DIFFICULTY_UNLOCK_PUZZLES = 50;
+export const EXPERT_DIFFICULTY_UNLOCK_PUZZLES = 35;
 
 /**
  * Lexicon mode gate: the rare-word mode is a late-unlock mastery pursuit. It is
